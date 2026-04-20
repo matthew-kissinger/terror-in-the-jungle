@@ -21,21 +21,35 @@ import { Logger } from '../../utils/Logger';
  */
 const UNDERWATER_FOG_COLOR = 0x003344;
 
+/** Distance from origin at which the directional "sun" light is placed. */
+const SUN_LIGHT_DISTANCE = 500;
+/** Scales horizon color to approximate ground bounce (not a pure mirror of horizon). */
+const HEMISPHERE_GROUND_DARKEN = 0.55;
+/** Minimum Y for the sun light position — prevents degenerate shadow camera when sun is at/below horizon. */
+const MIN_SUN_Y = 20;
+
 /**
  * Architectural seam for sky / sun / cloud state. See `docs/ATMOSPHERE.md`
  * for the design and roadmap (Hosek-Wilkie analytic, prebaked cubemap,
  * volumetric for fly-through).
  *
- * Cycle 2026-04-20-atmosphere-foundation, round 2: this system now owns
- * the analytic Hosek-Wilkie sky dome (replacing the legacy `Skybox`'s
- * static equirectangular PNG) and exposes a per-scenario preset switch
- * via `applyScenarioPreset`. The legacy `Skybox` still exists but logs a
- * deprecation warning on construction; the engine wires the dome here
- * once at boot.
+ * Cycle 2026-04-20-atmosphere-foundation:
+ * - Round 2 (`atmosphere-hosek-wilkie-sky`): owns the analytic
+ *   Hosek-Wilkie sky dome (replacing the legacy `Skybox` PNG) and exposes
+ *   a per-scenario preset switch via `applyScenarioPreset`. Legacy
+ *   `Skybox` still exists but logs a deprecation warning on construction.
+ * - Round 3 (`atmosphere-fog-tinted-by-sky`): owns `scene.fog.color`.
+ *   `WeatherAtmosphere` forwards storm-darken + underwater-override intent
+ *   here instead of writing `fog.color` directly, so the horizon seam
+ *   disappears at every sun angle.
+ * - Round 3 (`atmosphere-sun-hemisphere-coupling`): source of truth for
+ *   directional sun light position + color, hemisphere sky/ground tint,
+ *   and the water system's sun vector. Weather intensity multipliers
+ *   layer on top in `WeatherAtmosphere`.
  *
  * Lives in the existing `World` tracked group in `SystemUpdater` (no new
- * budget group). `update()` forwards the current sun direction to the
- * backend so it can re-bake its CPU-side LUT when needed.
+ * budget group). `update()` forwards sun direction to the backend, then
+ * pushes light + fog state onto the bound renderer.
  */
 export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime {
   private backend: ISkyBackend;
@@ -46,16 +60,26 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
   private cloudCoverage = 0;
 
-  // Fog-tint plumbing (see `atmosphere-fog-tinted-by-sky`). The atmosphere
-  // system owns the single source of truth for `scene.fog.color` so the
-  // horizon seam disappears at every sun angle. `WeatherAtmosphere`
-  // forwards its intent (storm darken + underwater override) here instead
-  // of writing `fog.color` directly.
+  // Renderer + (optional) follow target are bound post-construction so
+  // AtmosphereSystem can drive `scene.fog.color` AND directional moonLight
+  // + hemisphereLight directly each frame without GameRenderer needing to
+  // know about backend internals.
   private renderer?: IGameRenderer;
+  private followTarget?: THREE.Object3D;
+
+  // Fog-tint plumbing (`atmosphere-fog-tinted-by-sky`). WeatherAtmosphere
+  // forwards storm-darken + underwater-override intent here; this system
+  // is the single authority that reconciles them with the sky-driven
+  // horizon tint each frame.
   private fogDarkenFactor = 1.0;
   private fogUnderwaterOverride = false;
-  private readonly scratchHorizon = new THREE.Color();
   private readonly underwaterFogColor = new THREE.Color(UNDERWATER_FOG_COLOR);
+
+  // Scratch vectors/colors to avoid per-frame allocation.
+  private readonly scratchSunColor = new THREE.Color();
+  private readonly scratchZenith = new THREE.Color();
+  private readonly scratchHorizon = new THREE.Color();
+  private readonly scratchSunPosition = new THREE.Vector3();
 
   constructor(backend?: ISkyBackend) {
     this.backend = backend ?? new NullSkyBackend();
@@ -68,6 +92,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
 
   update(deltaTime: number): void {
     this.backend.update(deltaTime, this.sunDirection);
+    this.applyToRenderer();
     this.applyFogColor();
   }
 
@@ -78,6 +103,8 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.hosekBackend?.dispose();
     this.hosekBackend = undefined;
     this.domeMesh = undefined;
+    this.renderer = undefined;
+    this.followTarget = undefined;
   }
 
   /**
@@ -158,11 +185,22 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   }
 
   /**
-   * Cache the renderer so `update()` can drive `scene.fog.color` from the
-   * sky horizon sample each frame. Safe to call multiple times.
+   * Cache the renderer so per-frame updates can drive `scene.fog.color`
+   * (sky-tint + storm darken + underwater override) AND sun + hemisphere
+   * light state directly. Applies once immediately so initial frames
+   * (pre-gameStarted) show correct sky-derived lighting.
    */
   setRenderer(renderer: IGameRenderer): void {
     this.renderer = renderer;
+    this.applyToRenderer();
+  }
+
+  /**
+   * Bind a follow target (typically the player camera) for shadow frustum
+   * recentering. Without a follow target, shadows stay centered on origin.
+   */
+  setShadowFollowTarget(target: THREE.Object3D | undefined): void {
+    this.followTarget = target;
   }
 
   /**
@@ -183,10 +221,70 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.fogUnderwaterOverride = active;
   }
 
+  private applyToRenderer(): void {
+    const renderer = this.renderer;
+    if (!renderer) return;
+
+    // Sun direction + color drive the directional "moon" light.
+    if (renderer.moonLight) {
+      // Start with a sun-direction-scaled offset. Clamp Y so the light
+      // stays above a minimum altitude even if the atmosphere model dips
+      // the sun to/below the horizon — a degenerate near-horizontal
+      // shadow frustum eats precision and can blank out shadows.
+      this.scratchSunPosition
+        .copy(this.sunDirection)
+        .multiplyScalar(SUN_LIGHT_DISTANCE);
+      if (this.scratchSunPosition.y < MIN_SUN_Y) {
+        this.scratchSunPosition.y = MIN_SUN_Y;
+      }
+
+      // Recenter the shadow frustum on the follow target's XZ so shadows
+      // stay sharp near the player regardless of sun angle. The frustum
+      // extents (±100m or ±70m per GPU tier) stay fixed; only the origin
+      // slides with the player. Target stays at terrain level so the
+      // camera still points generally downward.
+      if (this.followTarget) {
+        const t = this.followTarget.position;
+        renderer.moonLight.position.set(
+          this.scratchSunPosition.x + t.x,
+          this.scratchSunPosition.y,
+          this.scratchSunPosition.z + t.z
+        );
+        renderer.moonLight.target.position.set(t.x, 0, t.z);
+      } else {
+        renderer.moonLight.position.copy(this.scratchSunPosition);
+        renderer.moonLight.target.position.set(0, 0, 0);
+      }
+      renderer.moonLight.target.updateMatrixWorld();
+
+      this.backend.getSun(this.scratchSunColor);
+      renderer.moonLight.color.copy(this.scratchSunColor);
+
+      // Matrix world must be updated manually; setupLighting() no longer
+      // freezeTransform()s this light but without an explicit update here
+      // the shadow-map machinery would read a stale world matrix on the
+      // very next render pass.
+      renderer.moonLight.updateMatrixWorld();
+    }
+
+    // Hemisphere sky + ground colors drive the indirect bounce fill. The
+    // ground color is a darkened horizon sample — the horizon is the
+    // dominant contributor to terrain-bounced light in the jungle scene.
+    if (renderer.hemisphereLight) {
+      this.backend.getZenith(this.scratchZenith);
+      this.backend.getHorizon(this.scratchHorizon);
+      renderer.hemisphereLight.color.copy(this.scratchZenith);
+      renderer.hemisphereLight.groundColor
+        .copy(this.scratchHorizon)
+        .multiplyScalar(HEMISPHERE_GROUND_DARKEN);
+      renderer.hemisphereLight.updateMatrixWorld();
+    }
+  }
+
   /**
    * Push the current sky-derived fog color onto the renderer's
-   * `THREE.FogExp2` each frame. Kept separate from backend update so tests
-   * can drive the fog path without a renderer reference.
+   * `THREE.FogExp2` each frame. Kept separate from `applyToRenderer` so
+   * tests can drive the fog path without a renderer reference.
    *
    * The horizon-ring average is the match that kills the seam at every
    * camera yaw: ground-level framings render fog at the same color the

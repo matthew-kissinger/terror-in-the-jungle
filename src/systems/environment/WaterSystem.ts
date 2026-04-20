@@ -2,6 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { Water } from 'three/examples/jsm/objects/Water.js';
 import { GameSystem } from '../../types';
+import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import { AssetLoader } from '../assets/AssetLoader';
 import { getAssetPath } from '../../config/paths';
 import { WeatherSystem } from './WeatherSystem';
@@ -21,6 +22,7 @@ export class WaterSystem implements GameSystem {
   private water?: Water;
   private assetLoader: AssetLoader;
   private weatherSystem?: WeatherSystem;
+  private atmosphereSystem?: ISkyRuntime;
   
   // Water configuration
   private readonly WATER_LEVEL = 0; // Sea level height
@@ -42,6 +44,33 @@ export class WaterSystem implements GameSystem {
 
   setWeatherSystem(weatherSystem: WeatherSystem): void {
     this.weatherSystem = weatherSystem;
+  }
+
+  /**
+   * Bind the atmosphere system so water reflections track the real sun
+   * direction each frame. Before this wire-up the `sun` vector was a stub
+   * initialized to the origin and never updated.
+   */
+  setAtmosphereSystem(atmosphereSystem: ISkyRuntime): void {
+    this.atmosphereSystem = atmosphereSystem;
+    // Apply once immediately so reflections look right on the first frame
+    // even before `update()` runs.
+    this.syncSunFromAtmosphere();
+  }
+
+  private syncSunFromAtmosphere(): void {
+    if (!this.atmosphereSystem) return;
+    this.atmosphereSystem.getSunDirection(this.sun);
+    // `getSunDirection` already returns a unit vector, but re-normalize
+    // defensively in case a future backend returns an unnormalized value.
+    if (this.sun.lengthSq() > 0) {
+      this.sun.normalize();
+    }
+    if (!this.water) return;
+    const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
+    if (waterUniforms && waterUniforms.sunDirection) {
+      waterUniforms.sunDirection.value.copy(this.sun);
+    }
   }
 
   async init(): Promise<void> {
@@ -121,7 +150,7 @@ export class WaterSystem implements GameSystem {
 
   update(deltaTime: number): void {
     if (!this.water) return;
-    
+
     // Update water time for wave animation
     const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
     if (waterUniforms && waterUniforms.time) {
@@ -131,6 +160,12 @@ export class WaterSystem implements GameSystem {
     // Keep ocean centered under camera so map-edge seams are not visible in large worlds.
     this.water.position.x = this.camera.position.x;
     this.water.position.z = this.camera.position.z;
+
+    // Pull the current sun direction from the atmosphere each frame so the
+    // water specular highlight tracks TOD presets (dawn/noon/dusk) and
+    // eventually a live sun cycle. Per-scenario presets are static in v1
+    // so this is cheap; backends that animate will get the updates for free.
+    this.syncSunFromAtmosphere();
 
     // Check underwater state
     this.checkUnderwaterState();
