@@ -469,3 +469,57 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
     expect(() => system.update(0.016)).not.toThrow();
   });
 });
+
+/**
+ * Behavior contract for `fog-density-rebalance` (cycle-2026-04-21): fog
+ * density lives alongside the sky preset so density and horizon color
+ * track together. These tests assert the caller-visible seam — applying
+ * a preset stamps a density onto the bound renderer — without hard-coding
+ * the exact density per scenario (those are tuning values).
+ */
+describe('AtmosphereSystem (preset-driven fog density)', () => {
+  const makeFogRenderer = () => {
+    const fog: any = { color: new THREE.Color(0x000000), density: 0.999 };
+    return { renderer: { fog } as any, fog };
+  };
+
+  it('applies the preset fog density onto the bound renderer when a scenario is applied', () => {
+    const system = new AtmosphereSystem();
+    const { renderer, fog } = makeFogRenderer();
+    system.setRenderer(renderer);
+
+    system.applyScenarioPreset('openfrontier');
+
+    // The density should be scenario-driven (not the test stub's 0.999
+    // sentinel, and not a generic default); this is the caller-visible
+    // contract: preset swap => fog density swap on the renderer.
+    expect(fog.density).not.toBe(0.999);
+    expect(fog.density).toBeGreaterThan(0);
+    expect(fog.density).toBeLessThan(0.04); // below the underwater clamp
+  });
+
+  it('different scenarios stamp different fog densities', () => {
+    // A Shau (dawn patrol, 21km DEM, 4km draw distance) needs a thinner
+    // haze than a short-duration dusk deathmatch so distant mountains
+    // stay legible. Assert the *ordering* (ashau < tdm) rather than the
+    // exact values — the ordering is the behavior we care about.
+    const system = new AtmosphereSystem();
+    const { renderer, fog } = makeFogRenderer();
+    system.setRenderer(renderer);
+
+    system.applyScenarioPreset('ashau');
+    const ashauDensity = fog.density;
+
+    system.applyScenarioPreset('tdm');
+    const tdmDensity = fog.density;
+
+    expect(ashauDensity).toBeLessThan(tdmDensity);
+  });
+
+  it('does not throw when applyScenarioPreset runs before a renderer is bound', () => {
+    const system = new AtmosphereSystem();
+    // Menu-phase AtmosphereSystem has no renderer yet; applying a preset
+    // must still succeed and return true.
+    expect(system.applyScenarioPreset('combat120')).toBe(true);
+  });
+});

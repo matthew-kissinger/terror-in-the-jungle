@@ -102,7 +102,20 @@ export class WeatherSystem implements GameSystem {
 
   setRenderer(renderer: IGameRenderer): void {
     this.renderer = renderer;
-    // Cache initial values from renderer
+    this.refreshAtmosphereBaseline();
+  }
+
+  /**
+   * Re-cache the "clear weather" baseline atmosphere values from the bound
+   * renderer. Called after `AtmosphereSystem.applyScenarioPreset` stamps a
+   * scenario-specific fog density onto the renderer so the weather
+   * multiplier (x1.5 rain, x3.5 storm) scales from the correct base instead
+   * of the stale default captured at composer wire-up. Safe no-op when no
+   * renderer is bound.
+   */
+  refreshAtmosphereBaseline(): void {
+    const renderer = this.renderer;
+    if (!renderer) return;
     if (renderer.fog) {
       this.baseFogDensity = renderer.fog.density;
       this.baseFogColor = renderer.fog.color.getHex();

@@ -190,15 +190,21 @@ export class SystemManager {
         this.waterSystem.setWorldSize(config.worldSize);
       }
     }
-    if (this.weatherSystem) {
-      this.weatherSystem.setWeatherConfig(config.weather);
-    }
-
     // Apply the per-scenario atmosphere preset (sun direction, turbidity,
-    // ground albedo). Picks dawn for A Shau, noon for OF, dusk for TDM,
-    // golden hour for ZC, noon for AI sandbox / combat120.
+    // ground albedo, fog density). Picks dawn for A Shau, noon for OF,
+    // dusk for TDM, golden hour for ZC, noon for AI sandbox / combat120.
+    // Runs BEFORE setWeatherConfig so the weather system's first
+    // `updateAtmosphere` pass reads the preset-driven fog density as its
+    // clear-weather baseline (`fog-density-rebalance`).
     if (this.atmosphereSystem) {
       this.atmosphereSystem.applyScenarioPresetForMode(mode);
+    }
+    if (this.weatherSystem) {
+      // Re-read atmosphere baseline from the renderer after the atmosphere
+      // preset stamped a scenario-specific fog density, so weather
+      // multipliers (x1.5/x2.5/x3.5) scale from the correct base.
+      this.weatherSystem.refreshAtmosphereBaseline();
+      this.weatherSystem.setWeatherConfig(config.weather);
     }
 
     // This will trigger reseedForcesForMode() which respawns forces
