@@ -56,6 +56,15 @@ const PLAYER_STEEP_FLOW_SPEED_FACTOR = 0.82;
 const PLAYER_STEEP_FLOW_MIN_SPEED = 1.4;
 const PLAYER_STEEP_FLOW_LERP = 0.58;
 const PLAYER_TERRAIN_LIP_RISE = 0.45;
+// Maximum upward step the player's eye can take in a single fixed-step frame
+// while already grounded. Real terrain is continuous so a grounded player
+// walking at runSpeed can only gain a small amount of height per tick; when
+// the ground-clamp would teleport them up by more than this the driver has
+// walked into an overhanging collision box (parked aircraft bounding box,
+// edge of a stamped structure) or a cliff seam. Clamping the rise prevents
+// the camera from launching skyward on that one bad frame — the player
+// still tracks terrain smoothly on legitimate climbs.
+const PLAYER_MAX_GROUND_RISE_PER_STEP = 0.5;
 
 export class PlayerMovement {
   static readonly FIXED_STEP_SECONDS = 0.016;
@@ -382,11 +391,32 @@ export class PlayerMovement {
 
     // Check for landing and play landing sound
     const wasGrounded = this.playerState.isGrounded;
+    const horizontalMotionSq =
+      (newPosition.x - this.playerState.position.x) ** 2 +
+      (newPosition.z - this.playerState.position.z) ** 2;
+    const walking = wasGrounded && horizontalMotionSq > 1e-4;
 
     const impactVelocityY = this.playerState.velocity.y;
     if (newPosition.y <= groundHeight) {
-      // Player is on or below ground
-      newPosition.y = groundHeight;
+      // Player is on or below ground.
+      // Upward-rise clamp (walking only): when the player is already
+      // grounded AND moved horizontally this frame, the resolved ground
+      // height cannot jump up by more than PLAYER_MAX_GROUND_RISE_PER_STEP.
+      // That rise is bigger than any legitimate per-step terrain grade at
+      // walking speed, so a larger resolved rise means the clamp just
+      // walked into an overhanging collision box, cliff seam, or stamped
+      // structure lip. Clamping keeps the camera planted and lets the next
+      // frame's horizontal physics resolve the block.
+      //
+      // The clamp is scoped to `walking` so first-frame spawn corrections,
+      // respawn, and vertical landings (wasGrounded=false) still snap the
+      // player to the correct ground height.
+      if (walking) {
+        const maxGroundY = this.playerState.position.y + PLAYER_MAX_GROUND_RISE_PER_STEP;
+        newPosition.y = Math.min(groundHeight, maxGroundY);
+      } else {
+        newPosition.y = groundHeight;
+      }
 
       // Play landing sound if we just landed
       if (!wasGrounded && impactVelocityY < LANDING_SOUND_THRESHOLD && this.footstepAudioSystem) {
