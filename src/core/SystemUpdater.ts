@@ -180,6 +180,10 @@ export class SystemUpdater {
           if (refs.weatherSystem) refs.weatherSystem.update(worldDelta);
         }
 
+        // Atmosphere shares the World budget; runs every frame so backends
+        // (Hosek-Wilkie, prebaked cubemap) can drive sun/sky state pre-render.
+        if (refs.atmosphereSystem) refs.atmosphereSystem.update(worldDelta);
+
         if (refs.waterSystem) refs.waterSystem.update(worldDelta);
       }
       performanceTelemetry.endSystem('World');
@@ -228,6 +232,7 @@ export class SystemUpdater {
       || system === refs.ticketSystem
       || system === refs.waterSystem
       || system === refs.weatherSystem
+      || system === refs.atmosphereSystem
       || system === refs.warSimulator
       || system === refs.strategicFeedback
       || system === refs.airSupportManager

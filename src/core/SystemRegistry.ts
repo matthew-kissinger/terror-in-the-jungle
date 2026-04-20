@@ -4,6 +4,7 @@ import type { CombatantSystem } from '../systems/combat/CombatantSystem';
 import type { Skybox } from '../systems/environment/Skybox';
 import type { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import type { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
+import type { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import type { WaterSystem } from '../systems/environment/WaterSystem';
 import type { WeatherSystem } from '../systems/environment/WeatherSystem';
 import type { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
@@ -53,6 +54,7 @@ export interface SystemKeyToType {
   playerController: PlayerController;
   combatantSystem: CombatantSystem;
   skybox: Skybox;
+  atmosphereSystem: AtmosphereSystem;
   waterSystem: WaterSystem;
   weatherSystem: WeatherSystem;
   firstPersonWeapon: FirstPersonWeapon;
@@ -140,6 +142,7 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'playerController',
   'combatantSystem',
   'skybox',
+  'atmosphereSystem',
   'waterSystem',
   'weatherSystem',
   'firstPersonWeapon',
