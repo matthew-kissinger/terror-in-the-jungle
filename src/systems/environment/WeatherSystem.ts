@@ -4,7 +4,12 @@ import { GameSystem } from '../../types';
 import { ITerrainRuntime, IAudioManager, IGameRenderer } from '../../types/SystemInterfaces';
 import { WeatherState, WeatherConfig } from '../../config/gameModeTypes';
 import { updateLightning, LightningState } from './WeatherLightning';
-import { updateAtmosphere, getBlendedRainIntensity, AtmosphereBaseValues } from './WeatherAtmosphere';
+import {
+  updateAtmosphere,
+  getBlendedRainIntensity,
+  AtmosphereBaseValues,
+  type FogTintIntentReceiver,
+} from './WeatherAtmosphere';
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 
 export class WeatherSystem implements GameSystem {
@@ -13,6 +18,7 @@ export class WeatherSystem implements GameSystem {
   private terrainRuntime: ITerrainRuntime;
   private audioManager?: IAudioManager;
   private renderer?: IGameRenderer;
+  private fogTintIntent?: FogTintIntentReceiver;
 
   // Configuration
   private config?: WeatherConfig;
@@ -82,6 +88,16 @@ export class WeatherSystem implements GameSystem {
 
   setAudioManager(audioManager: IAudioManager): void {
     this.audioManager = audioManager;
+  }
+
+  /**
+   * Wire the atmosphere system as the fog-tint authority. Once set,
+   * weather forwards "storm darken" / "underwater override" intent here
+   * instead of writing `scene.fog.color` directly. Leaving this unset
+   * preserves the pre-atmosphere behavior for isolated tests.
+   */
+  setFogTintIntentReceiver(receiver: FogTintIntentReceiver): void {
+    this.fogTintIntent = receiver;
   }
 
   setRenderer(renderer: IGameRenderer): void {
@@ -330,7 +346,8 @@ export class WeatherSystem implements GameSystem {
       this.targetState,
       this.transitionProgress,
       baseValues,
-      this.lightningState.isFlashing
+      this.lightningState.isFlashing,
+      this.fogTintIntent
     );
   }
 

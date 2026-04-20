@@ -44,6 +44,7 @@ import { AirSupportManager } from '../systems/airsupport/AirSupportManager';
 import { AAEmplacementSystem } from '../systems/airsupport/AAEmplacement';
 import { VehicleManager } from '../systems/vehicle/VehicleManager';
 import { NPCVehicleController } from '../systems/vehicle/NPCVehicleController';
+import type { IGameRenderer } from '../types/SystemInterfaces';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 
@@ -73,7 +74,7 @@ export class SystemInitializer {
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     onProgress: (phase: string, progress: number) => void,
-    _renderer?: any
+    _renderer?: IGameRenderer
   ): Promise<InitializationResult> {
     Logger.info('core', ' Initializing game systems...');
     markStartup('systems.initialize.begin');
@@ -133,6 +134,13 @@ export class SystemInitializer {
     refs.skybox = new Skybox(scene);
     refs.atmosphereSystem = new AtmosphereSystem();
     refs.atmosphereSystem.attachScene(scene);
+    // Fog color becomes sky-driven (see `atmosphere-fog-tinted-by-sky`).
+    // Caching the renderer here lets the atmosphere system push the
+    // horizon sample into `scene.fog.color` each frame, killing the
+    // terrain-to-sky seam the analytic dome previously exposed.
+    if (_renderer) {
+      refs.atmosphereSystem.setRenderer(_renderer);
+    }
     refs.waterSystem = new WaterSystem(scene, camera, refs.assetLoader);
 
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.terrainSystem);

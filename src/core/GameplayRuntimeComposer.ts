@@ -6,6 +6,7 @@ import type { SystemKeyToType } from './SystemRegistry';
 type GameplayRuntimeRefs = Pick<
   SystemKeyToType,
   | 'ammoSupplySystem'
+  | 'atmosphereSystem'
   | 'audioManager'
   | 'combatantSystem'
   | 'firstPersonWeapon'
@@ -93,6 +94,7 @@ interface GameplayRuntimeGroups {
   >;
   environmentRuntime: Pick<
     GameplayRuntimeRefs,
+    | 'atmosphereSystem'
     | 'audioManager'
     | 'weatherSystem'
     | 'waterSystem'
@@ -163,6 +165,7 @@ export function createGameplayRuntimeGroups(
       zoneManager: refs.zoneManager,
     },
     environmentRuntime: {
+      atmosphereSystem: refs.atmosphereSystem,
       audioManager: refs.audioManager,
       weatherSystem: refs.weatherSystem,
       waterSystem: refs.waterSystem,
@@ -322,6 +325,13 @@ function wireEnvironmentRuntime(
     runtime.weatherSystem.setAudioManager(runtime.audioManager);
     if (renderer) {
       runtime.weatherSystem.setRenderer(renderer);
+    }
+    // Forward fog-tint intent (storm darken / underwater override) to
+    // the atmosphere system so `scene.fog.color` stays sky-driven even
+    // while weather is modulating density. See
+    // `atmosphere-fog-tinted-by-sky`.
+    if (runtime.atmosphereSystem) {
+      runtime.weatherSystem.setFogTintIntentReceiver(runtime.atmosphereSystem);
     }
   }
 

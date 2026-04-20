@@ -111,3 +111,124 @@ describe('AtmosphereSystem (ICloudRuntime contract)', () => {
     expect(system.getCoverage()).toBe(1);
   });
 });
+
+/**
+ * Behavior contract for the fog-tint plumbing (`atmosphere-fog-tinted-by-sky`).
+ * These tests guard the observable seam, not the shader ordering — a
+ * future backend that swaps in a different horizon sampler or moves the
+ * darken factor still needs to produce:
+ *   - fog color sampled from the sky horizon by default,
+ *   - fog color darkened by the weather multiplier,
+ *   - fog color snapped to the underwater teal regardless of sky state.
+ */
+describe('AtmosphereSystem (fog-tint plumbing)', () => {
+  const makeCustomBackend = (horizonHex: number): ISkyBackend => {
+    const horizon = new THREE.Color(horizonHex);
+    return {
+      update: () => {},
+      sample: (_dir, out) => out.copy(horizon),
+      getSun: (out) => out,
+      getZenith: (out) => out,
+      getHorizon: (out) => out.copy(horizon),
+    };
+  };
+
+  const makeFogStub = () => {
+    const fog: any = { color: new THREE.Color(0x000000), density: 0.004 };
+    return { renderer: { fog } as any, fog };
+  };
+
+  it('fog color tracks the sky horizon color each frame', () => {
+    const system = new AtmosphereSystem(makeCustomBackend(0xaabbcc));
+    const { renderer, fog } = makeFogStub();
+    system.setRenderer(renderer);
+
+    system.update(0.016);
+
+    expect(fog.color.getHex()).toBe(0xaabbcc);
+  });
+
+  it('fog color updates when the backend horizon color changes between frames', () => {
+    const systemA = new AtmosphereSystem(makeCustomBackend(0x112233));
+    const { renderer, fog } = makeFogStub();
+    systemA.setRenderer(renderer);
+    systemA.update(0.016);
+    expect(fog.color.getHex()).toBe(0x112233);
+
+    // Swap to a backend representing a different time of day; fog should
+    // follow without needing a new atmosphere system.
+    systemA.setBackend(makeCustomBackend(0xddaa55));
+    systemA.update(0.016);
+    expect(fog.color.getHex()).toBe(0xddaa55);
+  });
+
+  it('underwater override snaps fog color to teal regardless of sky state', () => {
+    const system = new AtmosphereSystem(makeCustomBackend(0xff0000));
+    const { renderer, fog } = makeFogStub();
+    system.setRenderer(renderer);
+
+    system.setFogUnderwaterOverride(true);
+    system.update(0.016);
+
+    expect(fog.color.getHex()).toBe(0x003344);
+  });
+
+  it('clearing the underwater override restores the sky-driven fog color', () => {
+    const system = new AtmosphereSystem(makeCustomBackend(0x4488aa));
+    const { renderer, fog } = makeFogStub();
+    system.setRenderer(renderer);
+
+    system.setFogUnderwaterOverride(true);
+    system.update(0.016);
+    expect(fog.color.getHex()).toBe(0x003344);
+
+    system.setFogUnderwaterOverride(false);
+    system.update(0.016);
+    expect(fog.color.getHex()).toBe(0x4488aa);
+  });
+
+  it('darken factor dims the fog color without changing hue for grayscale samples', () => {
+    const system = new AtmosphereSystem(makeCustomBackend(0x888888));
+    const { renderer, fog } = makeFogStub();
+    system.setRenderer(renderer);
+
+    system.setFogDarkenFactor(0.5);
+    system.update(0.016);
+
+    // A 0.5 multiplier on 0x888888 (r=g=b=0.533 linear-ish) must drop
+    // toward ~0x444444; the hue (all channels equal) is preserved.
+    const hex = fog.color.getHex();
+    const r = (hex >> 16) & 0xff;
+    const g = (hex >> 8) & 0xff;
+    const b = hex & 0xff;
+    expect(r).toBe(g);
+    expect(g).toBe(b);
+    // Must be strictly darker than the un-darkened sample.
+    expect(r).toBeLessThan(0x88);
+  });
+
+  it('darken factor is clamped into [0, 1]', () => {
+    const system = new AtmosphereSystem(makeCustomBackend(0x808080));
+    const { renderer, fog } = makeFogStub();
+    system.setRenderer(renderer);
+
+    // Overshoot the upper bound — fog color must still be the sky color
+    // (factor clamped to 1).
+    system.setFogDarkenFactor(5.0);
+    system.update(0.016);
+    expect(fog.color.getHex()).toBe(0x808080);
+
+    // Negative darken must clamp to zero — fog color is black.
+    system.setFogDarkenFactor(-1);
+    system.update(0.016);
+    expect(fog.color.getHex()).toBe(0x000000);
+  });
+
+  it('is a no-op when no renderer has been wired', () => {
+    const system = new AtmosphereSystem(makeCustomBackend(0x222222));
+
+    // Should not throw without a renderer (tests and menu phase run
+    // before the composer wires the renderer).
+    expect(() => system.update(0.016)).not.toThrow();
+  });
+});

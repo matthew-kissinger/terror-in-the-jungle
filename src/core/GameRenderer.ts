@@ -84,15 +84,22 @@ export class GameRenderer {
 
     // === ATMOSPHERE ===
     // Fog re-enabled with matching support in GPU billboard shader
-    // Both terrain and vegetation now fade consistently to fog color
-
-    // Background color - matches fog for seamless distance fade
-    const fogColor = 0x5a7a6a; // Muted green
-    this.scene.background = new THREE.Color(fogColor);
+    // Both terrain and vegetation now fade consistently to fog color.
+    //
+    // Fog color is initialised to a neutral horizon-ish grey so the first
+    // pre-atmosphere frame (before `AtmosphereSystem.update` runs) still
+    // reads as "daytime haze" rather than magenta. Each frame the
+    // analytic sky backend overwrites `this.fog.color` with the live
+    // horizon sample via `AtmosphereSystem.applyFogColor()`, so the
+    // horizon seam between terrain and sky vanishes at every sun angle.
+    // `scene.background` is a static fallback only — the analytic
+    // `HosekWilkieSkyBackend` dome renders in front of it each frame.
+    const INITIAL_FOG_COLOR = 0x7a8f88;
+    this.scene.background = new THREE.Color(INITIAL_FOG_COLOR);
 
     // Exponential fog - density tuned to hide terrain edge (~400-500m)
     // Lower density = fog starts further away
-    this.fog = new THREE.FogExp2(fogColor, 0.004);
+    this.fog = new THREE.FogExp2(INITIAL_FOG_COLOR, 0.004);
     this.scene.fog = this.fog;
 
     this.ambientLight = new THREE.AmbientLight(0xffffff, 1.0);

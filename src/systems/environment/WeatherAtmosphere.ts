@@ -17,6 +17,36 @@ export interface AtmosphereBaseValues {
   ambientColor: number;
 }
 
+/**
+ * Minimal structural surface for the atmosphere system's fog-tint plumbing.
+ * Lets the weather code forward "storm darkens fog" / "underwater override"
+ * intent without directly writing `scene.fog.color` — the atmosphere
+ * system is the single authority that reconciles sky-driven tint, weather
+ * darken, and underwater override each frame.
+ */
+export interface FogTintIntentReceiver {
+  setFogDarkenFactor(factor: number): void;
+  setFogUnderwaterOverride(active: boolean): void;
+}
+
+// Per-weather-state fog darkening. Mirrors the constants in
+// `AtmosphereSystem.WEATHER_FOG_DARKEN` so the weather code stays a pure
+// "intent forwarder" without importing the concrete system.
+const FOG_DARKEN_CLEAR = 1.0;
+const FOG_DARKEN_LIGHT_RAIN = 0.88;
+const FOG_DARKEN_HEAVY_RAIN = 0.7;
+const FOG_DARKEN_STORM = 0.45;
+
+function fogDarkenForState(state: WeatherState): number {
+  switch (state) {
+    case WeatherState.LIGHT_RAIN: return FOG_DARKEN_LIGHT_RAIN;
+    case WeatherState.HEAVY_RAIN: return FOG_DARKEN_HEAVY_RAIN;
+    case WeatherState.STORM: return FOG_DARKEN_STORM;
+    case WeatherState.CLEAR:
+    default: return FOG_DARKEN_CLEAR;
+  }
+}
+
 export function updateAtmosphere(
   renderer: IGameRenderer | undefined,
   isUnderwater: boolean,
@@ -24,13 +54,22 @@ export function updateAtmosphere(
   targetState: WeatherState,
   transitionProgress: number,
   baseValues: AtmosphereBaseValues,
-  isFlashing: boolean
+  isFlashing: boolean,
+  fogIntent?: FogTintIntentReceiver
 ): void {
   if (!renderer) return;
 
   if (isUnderwater) {
     if (renderer.fog) {
       renderer.fog.density = 0.04;
+    }
+    // Forward the underwater override to the atmosphere system so it
+    // pins `fog.color` to `0x003344` every frame. When no intent
+    // receiver is wired (older call sites / unit tests), fall back to
+    // the legacy direct write so behavior stays unchanged.
+    if (fogIntent) {
+      fogIntent.setFogUnderwaterOverride(true);
+    } else if (renderer.fog) {
       renderer.fog.color.setHex(0x003344);
     }
     if (renderer.ambientLight) {
@@ -55,10 +94,26 @@ export function updateAtmosphere(
   const moonInt = currentParams.moonIntensity * (1 - t) + targetParams.moonIntensity * t;
   const hemisphereInt = currentParams.hemisphereIntensity * (1 - t) + targetParams.hemisphereIntensity * t;
 
+  // Fog color is now sampled from the analytic sky horizon by
+  // `AtmosphereSystem.applyFogColor()` every frame. Weather forwards
+  // only the "darken" multiplier (storm => ~0.45) so the sky-driven
+  // tint still reads as "same horizon, dimmer" rather than losing the
+  // sun-color signature.
+  const fogDarken = fogDarkenForState(currentState) * (1 - t) + fogDarkenForState(targetState) * t;
+  if (fogIntent) {
+    fogIntent.setFogUnderwaterOverride(false);
+    fogIntent.setFogDarkenFactor(fogDarken);
+  }
+
   if (!isFlashing) {
     if (renderer.fog) {
       renderer.fog.density = fogDensity;
-      renderer.fog.color.setHex(baseValues.fogColor);
+      // Legacy fallback: when no atmosphere intent receiver is wired,
+      // stamp the baseline fog color so pre-atmosphere behavior is
+      // preserved byte-for-byte in isolated unit tests.
+      if (!fogIntent) {
+        renderer.fog.color.setHex(baseValues.fogColor);
+      }
     }
     if (renderer.ambientLight) {
       renderer.ambientLight.intensity = ambientInt;

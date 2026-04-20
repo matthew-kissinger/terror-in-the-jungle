@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import type { ICloudRuntime, ISkyRuntime } from '../../types/SystemInterfaces';
+import type { ICloudRuntime, IGameRenderer, ISkyRuntime } from '../../types/SystemInterfaces';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { NullSkyBackend } from './atmosphere/NullSkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
@@ -13,6 +13,13 @@ import {
 } from './atmosphere/ScenarioAtmospherePresets';
 import { GameMode } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
+
+/**
+ * Hard-override color for the submerged fog path. Matches the legacy
+ * `WeatherAtmosphere.updateAtmosphere` underwater branch so surfacing
+ * and submerging look identical before and after atmosphere-driven fog.
+ */
+const UNDERWATER_FOG_COLOR = 0x003344;
 
 /**
  * Architectural seam for sky / sun / cloud state. See `docs/ATMOSPHERE.md`
@@ -39,6 +46,17 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
   private cloudCoverage = 0;
 
+  // Fog-tint plumbing (see `atmosphere-fog-tinted-by-sky`). The atmosphere
+  // system owns the single source of truth for `scene.fog.color` so the
+  // horizon seam disappears at every sun angle. `WeatherAtmosphere`
+  // forwards its intent (storm darken + underwater override) here instead
+  // of writing `fog.color` directly.
+  private renderer?: IGameRenderer;
+  private fogDarkenFactor = 1.0;
+  private fogUnderwaterOverride = false;
+  private readonly scratchHorizon = new THREE.Color();
+  private readonly underwaterFogColor = new THREE.Color(UNDERWATER_FOG_COLOR);
+
   constructor(backend?: ISkyBackend) {
     this.backend = backend ?? new NullSkyBackend();
   }
@@ -50,6 +68,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
 
   update(deltaTime: number): void {
     this.backend.update(deltaTime, this.sunDirection);
+    this.applyFogColor();
   }
 
   dispose(): void {
@@ -136,6 +155,60 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   /** Swap backends at runtime (used by future TOD presets and tests). */
   setBackend(backend: ISkyBackend): void {
     this.backend = backend;
+  }
+
+  /**
+   * Cache the renderer so `update()` can drive `scene.fog.color` from the
+   * sky horizon sample each frame. Safe to call multiple times.
+   */
+  setRenderer(renderer: IGameRenderer): void {
+    this.renderer = renderer;
+  }
+
+  /**
+   * Forward weather-driven fog darkening (STORM dims the horizon tint).
+   * Clamped to [0, 1]; the atmosphere system multiplies the sky-horizon
+   * color by this factor each frame.
+   */
+  setFogDarkenFactor(factor: number): void {
+    this.fogDarkenFactor = Math.max(0, Math.min(1, factor));
+  }
+
+  /**
+   * Forward the underwater override. When active, the atmosphere system
+   * snaps `scene.fog.color` to `UNDERWATER_FOG_COLOR` regardless of sky
+   * state (matches the legacy `0x003344` underwater branch).
+   */
+  setFogUnderwaterOverride(active: boolean): void {
+    this.fogUnderwaterOverride = active;
+  }
+
+  /**
+   * Push the current sky-derived fog color onto the renderer's
+   * `THREE.FogExp2` each frame. Kept separate from backend update so tests
+   * can drive the fog path without a renderer reference.
+   *
+   * The horizon-ring average is the match that kills the seam at every
+   * camera yaw: ground-level framings render fog at the same color the
+   * analytic dome paints along `view.y ≈ 0`, so the terrain edge no
+   * longer punches a hard line through the sky.
+   */
+  private applyFogColor(): void {
+    const fog = this.renderer?.fog;
+    if (!fog) return;
+
+    if (this.fogUnderwaterOverride) {
+      fog.color.copy(this.underwaterFogColor);
+      return;
+    }
+
+    this.backend.getHorizon(this.scratchHorizon);
+    const f = this.fogDarkenFactor;
+    fog.color.setRGB(
+      this.scratchHorizon.r * f,
+      this.scratchHorizon.g * f,
+      this.scratchHorizon.b * f
+    );
   }
 
   /** True when the analytic dome owns the sky (Skybox PNG should be skipped). */
