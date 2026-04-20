@@ -72,6 +72,11 @@ function createEngineStub() {
       globalBillboardSystem: { configure: vi.fn() },
       hudSystem: { setPlayAgainCallback: vi.fn() },
       playerController: { setSettingsModal: vi.fn() },
+      atmosphereSystem: {
+        applyScenarioPreset: vi.fn().mockReturnValue(true),
+        ownsSkyDome: vi.fn().mockReturnValue(true),
+      },
+      skybox: { createSkybox: vi.fn() },
     },
   } as any;
 }

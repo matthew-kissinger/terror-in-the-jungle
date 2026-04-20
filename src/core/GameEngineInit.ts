@@ -46,8 +46,15 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
     Logger.info('engine-init', 'Systems initialized, loading assets...');
     await loadGameAssets(engine);
 
+    // Default scenario preset so the analytic dome is up before any mode is
+    // selected (menu / loading background still gets a sky). Per-mode
+    // presets are reapplied in `SystemManager.setGameMode`.
+    engine.systemManager.atmosphereSystem.applyScenarioPreset('combat120');
+
     const skyboxTexture = engine.systemManager.assetLoader.getTexture('skybox');
-    if (skyboxTexture) {
+    if (engine.systemManager.atmosphereSystem.ownsSkyDome()) {
+      Logger.info('engine-init', 'Skybox skipped: AtmosphereSystem owns the dome');
+    } else if (skyboxTexture) {
       engine.systemManager.skybox.createSkybox(skyboxTexture);
       Logger.info('engine-init', 'Skybox created');
     }
