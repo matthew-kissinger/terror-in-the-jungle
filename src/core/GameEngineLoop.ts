@@ -69,8 +69,12 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     // Update all systems
     engine.systemManager.updateSystems(deltaTime, engine.gameStarted);
 
-    // Update skybox position
+    // Keep both the legacy `Skybox` (when still used as a fallback) and
+    // the analytic `AtmosphereSystem` dome glued to the camera so they
+    // never z-fight terrain or clip when pilots climb past the dome
+    // radius.
     engine.systemManager.skybox.updatePosition(engine.renderer.camera.position);
+    engine.systemManager.atmosphereSystem.syncDomePosition(engine.renderer.camera.position);
 
     // Check if mortar is deployed and using mortar camera view
     const mortarSystem = engine.systemManager.mortarSystem;

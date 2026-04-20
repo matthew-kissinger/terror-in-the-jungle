@@ -3,13 +3,28 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { PixelPerfectUtils } from '../../utils/PixelPerfect';
 
+/**
+ * @deprecated Superseded by `AtmosphereSystem`'s analytic Hosek-Wilkie dome
+ * (cycle 2026-04-20-atmosphere-foundation). This class is kept for one
+ * release while consumers migrate; the engine no longer constructs a
+ * skybox dome from the equirectangular PNG when `AtmosphereSystem` owns
+ * the sky. Will be removed in a future release.
+ */
 export class Skybox implements GameSystem {
+  private static deprecationLogged = false;
   private scene: THREE.Scene;
   private skyboxMesh?: THREE.Mesh;
   private skyboxTexture?: THREE.Texture;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
+    if (!Skybox.deprecationLogged) {
+      Skybox.deprecationLogged = true;
+      Logger.warn(
+        'environment',
+        'Skybox is superseded by AtmosphereSystem; this class will be removed in a future release.'
+      );
+    }
   }
 
   async init(): Promise<void> {

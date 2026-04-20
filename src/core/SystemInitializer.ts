@@ -132,6 +132,7 @@ export class SystemInitializer {
     refs.combatantSystem = new CombatantSystem(scene, camera, refs.globalBillboardSystem, refs.assetLoader, refs.terrainSystem);
     refs.skybox = new Skybox(scene);
     refs.atmosphereSystem = new AtmosphereSystem();
+    refs.atmosphereSystem.attachScene(scene);
     refs.waterSystem = new WaterSystem(scene, camera, refs.assetLoader);
 
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.terrainSystem);

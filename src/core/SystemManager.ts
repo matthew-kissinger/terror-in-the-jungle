@@ -5,6 +5,7 @@ import { AssetLoader } from '../systems/assets/AssetLoader';
 import { PlayerController } from '../systems/player/PlayerController';
 import { CombatantSystem } from '../systems/combat/CombatantSystem';
 import { Skybox } from '../systems/environment/Skybox';
+import { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { WaterSystem } from '../systems/environment/WaterSystem';
@@ -194,6 +195,13 @@ export class SystemManager {
       this.weatherSystem.setWeatherConfig(config.weather);
     }
 
+    // Apply the per-scenario atmosphere preset (sun direction, turbidity,
+    // ground albedo). Picks dawn for A Shau, noon for OF, dusk for TDM,
+    // golden hour for ZC, noon for AI sandbox / combat120.
+    if (this.atmosphereSystem) {
+      this.atmosphereSystem.applyScenarioPresetForMode(mode);
+    }
+
     // This will trigger reseedForcesForMode() which respawns forces
     this.gameModeManager.setGameMode(mode);
 
@@ -284,6 +292,7 @@ export class SystemManager {
   get playerController(): PlayerController { return this.registry.require('playerController'); }
   get combatantSystem(): CombatantSystem { return this.registry.require('combatantSystem'); }
   get skybox(): Skybox { return this.registry.require('skybox'); }
+  get atmosphereSystem(): AtmosphereSystem { return this.registry.require('atmosphereSystem'); }
   get waterSystem(): WaterSystem { return this.registry.require('waterSystem'); }
   get weatherSystem(): WeatherSystem { return this.registry.require('weatherSystem'); }
   get firstPersonWeapon(): FirstPersonWeapon { return this.registry.require('firstPersonWeapon'); }

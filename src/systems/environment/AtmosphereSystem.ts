@@ -3,24 +3,39 @@ import { GameSystem } from '../../types';
 import type { ICloudRuntime, ISkyRuntime } from '../../types/SystemInterfaces';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { NullSkyBackend } from './atmosphere/NullSkyBackend';
+import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
+import {
+  SCENARIO_ATMOSPHERE_PRESETS,
+  scenarioKeyForMode,
+  sunDirectionFromPreset,
+  type AtmospherePreset,
+  type ScenarioAtmosphereKey,
+} from './atmosphere/ScenarioAtmospherePresets';
+import { GameMode } from '../../config/gameModeTypes';
+import { Logger } from '../../utils/Logger';
 
 /**
  * Architectural seam for sky / sun / cloud state. See `docs/ATMOSPHERE.md`
  * for the design and roadmap (Hosek-Wilkie analytic, prebaked cubemap,
  * volumetric for fly-through).
  *
- * This cycle (2026-04-20-atmosphere-foundation) is shell-only: the system
- * holds a swappable `ISkyBackend` (defaulting to `NullSkyBackend`, which
- * mirrors the legacy `Skybox` + `setupLighting()` constants) and exposes
- * the `ISkyRuntime` + `ICloudRuntime` surface. `Skybox` keeps rendering;
- * `WeatherSystem` keeps mutating lights directly. No visible change.
+ * Cycle 2026-04-20-atmosphere-foundation, round 2: this system now owns
+ * the analytic Hosek-Wilkie sky dome (replacing the legacy `Skybox`'s
+ * static equirectangular PNG) and exposes a per-scenario preset switch
+ * via `applyScenarioPreset`. The legacy `Skybox` still exists but logs a
+ * deprecation warning on construction; the engine wires the dome here
+ * once at boot.
  *
  * Lives in the existing `World` tracked group in `SystemUpdater` (no new
- * budget group). `update()` is a thin pass-through to the backend so future
- * backends can wake up here.
+ * budget group). `update()` forwards the current sun direction to the
+ * backend so it can re-bake its CPU-side LUT when needed.
  */
 export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime {
   private backend: ISkyBackend;
+  private hosekBackend?: HosekWilkieSkyBackend;
+  private scene?: THREE.Scene;
+  private domeMesh?: THREE.Mesh;
+  private currentScenario?: ScenarioAtmosphereKey;
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
   private cloudCoverage = 0;
 
@@ -38,12 +53,94 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   }
 
   dispose(): void {
-    // No owned GPU resources yet.
+    if (this.scene && this.domeMesh) {
+      this.scene.remove(this.domeMesh);
+    }
+    this.hosekBackend?.dispose();
+    this.hosekBackend = undefined;
+    this.domeMesh = undefined;
+  }
+
+  /**
+   * Bind a scene so the analytic sky dome can be installed when a
+   * Hosek-Wilkie scenario preset is applied. Safe to call multiple times;
+   * the dome is reparented to the most recent scene.
+   */
+  attachScene(scene: THREE.Scene): void {
+    if (this.scene === scene) return;
+    if (this.scene && this.domeMesh) {
+      this.scene.remove(this.domeMesh);
+    }
+    this.scene = scene;
+    if (this.domeMesh) {
+      this.scene.add(this.domeMesh);
+    }
+  }
+
+  /**
+   * Switch the active backend to the analytic Hosek-Wilkie dome and apply
+   * the given scenario preset (sun direction, turbidity, ground albedo,
+   * exposure). Idempotent; calling with the same key just reapplies the
+   * preset. Returns true if the dome was installed (which signals the
+   * caller to skip the legacy `Skybox` PNG load).
+   */
+  applyScenarioPreset(key: ScenarioAtmosphereKey): boolean {
+    const preset = SCENARIO_ATMOSPHERE_PRESETS[key];
+    if (!preset) {
+      Logger.warn('atmosphere', `No scenario preset registered for key '${key}'; keeping current backend.`);
+      return false;
+    }
+
+    if (!this.hosekBackend) {
+      this.hosekBackend = new HosekWilkieSkyBackend();
+      this.backend = this.hosekBackend;
+      this.domeMesh = this.hosekBackend.getMesh();
+      if (this.scene) this.scene.add(this.domeMesh);
+    }
+
+    this.hosekBackend.applyPreset(preset);
+    sunDirectionFromPreset(preset, this.sunDirection);
+    this.currentScenario = key;
+    Logger.info('atmosphere', `Applied scenario preset '${key}' (${preset.label})`);
+
+    // Force LUT bake immediately so subsequent samples are consistent.
+    this.hosekBackend.update(0, this.sunDirection);
+    return true;
+  }
+
+  /** Convenience for callers holding a `GameMode`. */
+  applyScenarioPresetForMode(mode: GameMode): boolean {
+    return this.applyScenarioPreset(scenarioKeyForMode(mode));
+  }
+
+  /** Returns the currently-active preset key, or undefined if none applied. */
+  getCurrentScenario(): ScenarioAtmosphereKey | undefined {
+    return this.currentScenario;
+  }
+
+  /** Returns the currently-active preset, or undefined. */
+  getCurrentPreset(): AtmospherePreset | undefined {
+    return this.currentScenario ? SCENARIO_ATMOSPHERE_PRESETS[this.currentScenario] : undefined;
+  }
+
+  /**
+   * Per-frame hook called from the engine loop so the dome stays glued to
+   * the camera (no clipping when pilots climb past the dome radius).
+   */
+  syncDomePosition(cameraPosition: THREE.Vector3): void {
+    if (this.domeMesh) {
+      this.domeMesh.position.copy(cameraPosition);
+    }
   }
 
   /** Swap backends at runtime (used by future TOD presets and tests). */
   setBackend(backend: ISkyBackend): void {
     this.backend = backend;
+  }
+
+  /** True when the analytic dome owns the sky (Skybox PNG should be skipped). */
+  ownsSkyDome(): boolean {
+    return this.domeMesh !== undefined;
   }
 
   // --- ISkyRuntime ---
