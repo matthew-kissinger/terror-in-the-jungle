@@ -59,6 +59,20 @@ See `docs/ATMOSPHERE.md` "Immediate wins" #2.
 - `IGameRenderer.fog` is still `THREE.FogExp2` — no fence change.
 - `npm run test:run` green; `combat120` perf smoke within current WARN bound.
 
+## Screenshot evidence (required for merge)
+
+Commit PNGs to `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/atmosphere-fog-tinted-by-sky/`. Orchestrator gates merge on the seam test and the weather overrides.
+
+Required shots:
+
+- `combat120-noon.png` — same framing as `atmosphere-hosek-wilkie-sky/combat120-noon.png`. Seam should be gone.
+- `ashau-dawn.png` — same framing as the hosek-wilkie shot. Warm horizon should bleed seamlessly into fog.
+- `tdm-dusk.png` — same framing as the hosek-wilkie shot. Dusk color match is the hardest case.
+- `combat120-storm.png` — combat120 with storm weather forced on. Fog should be visibly darker than `combat120-noon.png` but still color-matched to a darkened sky.
+- `combat120-underwater.png` — player submerged. Fog should snap to `0x003344` override regardless of sky state.
+
+Reuse the camera coords from `atmosphere-hosek-wilkie-sky/README.md` so the diff between the two PRs is just "seam present" vs "seam gone."
+
 ## Non-goals
 
 - Do not replace `FogExp2` with a Hillaire aerial-perspective model. That's v2 (Combo E) territory.

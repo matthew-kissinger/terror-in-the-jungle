@@ -65,6 +65,19 @@ See `docs/ATMOSPHERE.md` "Immediate wins" #3–#5.
 - Per-scenario lighting is visually distinct: `ashau:short` dawn reads as a dawn; `openfrontier` noon reads as noon; `tdm` dusk reads as dusk.
 - `npm run test:run` green; shadow quality and frame times unchanged from master on the `combat120` baseline.
 
+## Screenshot evidence (required for merge)
+
+Commit PNGs to `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/atmosphere-sun-hemisphere-coupling/`. Orchestrator gates merge on shadow direction + water reflection correctness.
+
+Required shots:
+
+- `ashau-dawn-shadow.png` — frame a structure or tree near the player at dawn; shadow direction must visibly point away from the dawn sun azimuth.
+- `openfrontier-noon-water.png` — frame a water surface where the sun specular highlight is visible; highlight should track the noon sun direction (high overhead).
+- `tdm-dusk-shadow.png` — same kind of shadow-cast frame as ashau but at dusk; shadow points opposite the dusk sun.
+- `combat120-storm.png` — same framing as `atmosphere-fog-tinted-by-sky/combat120-storm.png`. Sun should still be visibly dimmed (weather multiplier still wins) without the shadows disappearing.
+
+Reuse camera coords from earlier atmosphere PRs where possible. Note in the dir's `README.md` which shadow object you framed so the next pass can verify.
+
 ## Non-goals
 
 - Do not add a live time-of-day cycle. All scenarios use static presets.

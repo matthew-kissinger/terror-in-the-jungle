@@ -141,6 +141,21 @@ harness-stats-accuracy-damage-wiring (independent)
 - Shadow popping on sun-direction animation: fall back to static frustum follow for v1; ship sun animation without shadow-follow.
 - If `atmosphere-fog-tinted-by-sky` requires changing `IGameRenderer.fog` from `THREE.FogExp2` to a subclass, STOP — that's `[interface-change]`.
 
+### Visual checkpoints (orchestrator-gated)
+
+This cycle ships visible-pixel changes. The orchestrator (main session) is the visual reviewer and gates merge of every visible-change PR on screenshot review.
+
+Per-task gate: each visible-change task brief carries a "Screenshot evidence (required for merge)" section listing required PNGs under `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/<slug>/`. Executors commit the shots in the same PR; the orchestrator reads them via the Read tool (which renders PNG) before `gh pr merge`. If a shot looks wrong, post `gh pr comment` with the specific issue and let the executor iterate.
+
+Tuning combos between rounds — orchestrator captures these directly (Playwright MCP or extending `scripts/perf-capture.ts`) into `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/_orchestrator/<checkpoint>/`:
+
+- **Pre-cycle (master baseline):** capture every per-task required shot from current `master` first, into `_master/`. Executors diff their shots against this baseline.
+- **After Round 2 merges (`atmosphere-hosek-wilkie-sky`):** re-shoot all 5 scenarios at ground level. Expect a visibly bad horizon seam (fog still constant) — confirm the sky gradient itself reads right per scenario.
+- **After Round 3a merges (whichever of `fog-tinted` / `sun-hemisphere` lands first):** capture the same 5 + the storm + underwater overrides. Confirm seam is gone (if fog landed) or sun direction matches shadows (if sun landed).
+- **After Round 3 fully merged (combined ship gate):** final capture of all 5 scenarios + storm + underwater. This is the last visual check before the cycle closes.
+
+Tuning is iterative: if a combo capture reveals a regression that the executors couldn't see in isolation (e.g. fog color blowout when sun goes near the horizon), open a follow-up task brief rather than blocking the round mid-flight.
+
 ## Dispatch protocol
 
 For each round, in a single orchestrator turn:

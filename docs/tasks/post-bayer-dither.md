@@ -49,9 +49,20 @@ Independent of the rest of the atmosphere work because it doesn't touch `Atmosph
 ## Exit criteria
 
 - The fragment shader contains a Bayer 4×4 matrix and a `(bayer - 0.5) / 24` pre-quantize offset.
-- Gradient banding is visibly reduced in `?scenario=combat120` and `?scenario=ashau:short`.
+- Gradient banding is visibly reduced in `combat120` and `ashau:short`.
 - No `npm run test:run` regression; no knip or lint complaints.
 - Playtest sanity: the retro pixelated look is preserved (the screenshots should still read as PS1/Genesis-era, not modern); dither softens without smoothing.
+
+## Screenshot evidence (required for merge)
+
+Commit PNGs to `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/post-bayer-dither/` in the same PR. Orchestrator gates merge on visual review.
+
+Required shots (1080p or native res, no UI overlay if avoidable):
+
+- `combat120-sky-gradient.png` — looking up at the sky dome from `combat120`. Frame should include the banding-prone zenith→horizon gradient.
+- `ashau-distant-fog.png` — `ashau:short`, looking toward a distant treeline so fog falloff is the dominant gradient.
+
+Capture mechanism is your call (Playwright MCP, manual browser, or extending `scripts/perf-capture.ts`). Use the same camera framing as the master baseline shots in `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/_master/` if those exist; otherwise pick reasonable framing and document the camera coords in a tiny `README.md` next to the shots so the next reviewer can re-frame.
 
 ## Non-goals
 

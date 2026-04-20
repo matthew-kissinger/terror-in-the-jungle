@@ -63,6 +63,22 @@ Three.js ships `examples/jsm/objects/Sky.js` (Preetham analytic model). Hosek-Wi
 - No `npm run test:run` regression. `combat120` perf smoke within the current WARN bound (≤ ~16ms avg, ≤ ~35ms p99).
 - Pilots can fly up and the dome follows the camera — no clipping on climb.
 
+## Screenshot evidence (required for merge)
+
+Commit PNGs to `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/atmosphere-hosek-wilkie-sky/`. Orchestrator gates merge on visual review.
+
+Required shots (one per scenario, ground-level camera, framed toward the sun azimuth so the sky gradient + sun position are both visible):
+
+- `combat120-noon.png`
+- `ashau-dawn.png`
+- `openfrontier-noon.png`
+- `tdm-dusk.png`
+- `zc-golden-hour.png`
+
+The horizon seam between sky and the constant-color fog WILL be visibly bad in these shots — that's expected (`atmosphere-fog-tinted-by-sky` fixes it next round). Reviewer is checking sky gradient quality, sun position, and color temperature per preset; not the seam.
+
+Add a `README.md` in the screenshots dir naming the camera/yaw/pitch used so the fog-tinted PR can re-shoot from the same framing.
+
 ## Non-goals
 
 - Do not animate the sun during a match. All presets are static per-scenario in v1.
