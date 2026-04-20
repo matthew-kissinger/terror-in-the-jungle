@@ -215,6 +215,102 @@
     return last ? { x: Number(last.x || 0), y: Number(last.y || 0), z: Number(last.z || 0) } : null;
   }
 
+  // ── Waypoint advance + replan + pit-trap heuristics (bot-pathing-pit-and-steep-uphill). ──
+  //
+  // The driver's old advance-rule used horizontal-only distance to decide a
+  // waypoint had been "passed". On steep uphill that fired before the bot
+  // had actually climbed to the waypoint's height, which exhausted the path
+  // mid-climb and triggered a 750ms-cadence re-plan. The bot then zigzagged.
+  //
+  // These helpers fence both decisions behind explicit horizontal AND vertical
+  // tolerances, and surface the steep-climb case as a separate predicate so
+  // the fast-replan path can defer while the bot is still climbing.
+  //
+  // Defaults:
+  //   - horizontalTolerance 4m: same as the prior live-driver value.
+  //   - verticalTolerance 2.5m: roughly one player-eye-height (2.2m) plus a
+  //     small margin so a waypoint at ground-level still counts as reached.
+  //   - steepClimbVerticalDelta 3m: heuristic for "still climbing"; matches
+  //     the brief.
+
+  function shouldAdvanceWaypoint(opts) {
+    const player = opts && opts.playerPos;
+    const wp = opts && opts.waypoint;
+    if (!player || !wp) return false;
+    const hTol = Number.isFinite(opts && opts.horizontalTolerance) && opts.horizontalTolerance > 0
+      ? Number(opts.horizontalTolerance) : 4;
+    const vTol = Number.isFinite(opts && opts.verticalTolerance) && opts.verticalTolerance > 0
+      ? Number(opts.verticalTolerance) : 2.5;
+    const dx = Number(wp.x || 0) - Number(player.x || 0);
+    const dz = Number(wp.z || 0) - Number(player.z || 0);
+    const horizontal = Math.hypot(dx, dz);
+    if (horizontal > hTol) return false;
+    // Some navmesh waypoints carry a y; if absent (or non-finite) we treat
+    // the waypoint as planar and accept the advance on horizontal proximity.
+    const wy = Number(wp.y);
+    const py = Number(player.y);
+    if (!Number.isFinite(wy) || !Number.isFinite(py)) return true;
+    return Math.abs(wy - py) <= vTol;
+  }
+
+  function isSteepClimbWaypoint(opts) {
+    const player = opts && opts.playerPos;
+    const wp = opts && opts.waypoint;
+    if (!player || !wp) return false;
+    const climbDelta = Number.isFinite(opts && opts.climbDelta) && opts.climbDelta > 0
+      ? Number(opts.climbDelta) : 3;
+    const dx = Number(wp.x || 0) - Number(player.x || 0);
+    const dz = Number(wp.z || 0) - Number(player.z || 0);
+    const horizontal = Math.hypot(dx, dz);
+    // Only "steep" if the waypoint is meaningfully above us AND still nearby
+    // (within ~12m horizontally — beyond that the slope is averaged out).
+    if (horizontal > 12) return false;
+    const wy = Number(wp.y);
+    const py = Number(player.y);
+    if (!Number.isFinite(wy) || !Number.isFinite(py)) return false;
+    return (wy - py) > climbDelta;
+  }
+
+  function shouldFastReplan(opts) {
+    const pathExhausted = !!(opts && opts.pathExhausted);
+    const sinceReplanMs = Number(opts && opts.sinceReplanMs);
+    const fastReplanMs = Number.isFinite(opts && opts.fastReplanMs) && opts.fastReplanMs > 0
+      ? Number(opts.fastReplanMs) : 750;
+    if (!pathExhausted) return false;
+    if (!Number.isFinite(sinceReplanMs) || sinceReplanMs <= fastReplanMs) return false;
+    // Suppress the fast re-plan while the bot is mid-climb to a waypoint that
+    // is still above it. The path is still trustworthy; we just need time to
+    // climb. The full TTL re-plan still fires (handled outside this helper).
+    if (opts && opts.steepClimbActive) return false;
+    return true;
+  }
+
+  function detectPitTrap(opts) {
+    const stuckMs = Number(opts && opts.stuckMs);
+    const stuckThresholdMs = Number.isFinite(opts && opts.stuckThresholdMs) && opts.stuckThresholdMs > 0
+      ? Number(opts.stuckThresholdMs) : 4000;
+    if (!Number.isFinite(stuckMs) || stuckMs < stuckThresholdMs) return false;
+    const player = opts && opts.playerPos;
+    const wp = opts && opts.currentWaypoint;
+    const pitDelta = Number.isFinite(opts && opts.pitVerticalDelta) && opts.pitVerticalDelta > 0
+      ? Number(opts.pitVerticalDelta) : 3;
+    if (!player || !wp) {
+      // No active waypoint context — still surface as a pit-trap when stuck.
+      // The caller decides whether to escape; this predicate is purely
+      // observational so the test can pin "stuck for long enough" alone.
+      return true;
+    }
+    const wy = Number(wp.y);
+    const py = Number(player.y);
+    if (!Number.isFinite(wy) || !Number.isFinite(py)) return true;
+    // True pit signature: the next waypoint is meaningfully above us. If
+    // the waypoint is at or below us, the bot is stuck for some other
+    // reason (terrain wall, geometry pinch); the caller can still react
+    // but a pit-escape teleport is the wrong fix. Return false here so
+    // the escape path is reserved for the up-and-out case.
+    return (wy - py) > pitDelta;
+  }
+
   function evaluateFireGate(opts) {
     const aimErrorRad = Number(opts && opts.aimErrorRad);
     const maxAimErrorRad = Number(opts && opts.maxAimErrorRad);
@@ -963,7 +1059,18 @@
       const now = Date.now();
       const sinceReplan = now - state.lastWaypointReplanAt;
       const pathExhausted = !state.waypoints || state.waypoints.length === 0 || state.waypointIdx >= state.waypoints.length;
-      const needsReplan = sinceReplan > profile.waypointReplanIntervalMs || (pathExhausted && sinceReplan > 750);
+      const currentWp = state.waypoints && state.waypoints.length > 0
+        ? state.waypoints[Math.min(state.waypointIdx, state.waypoints.length - 1)]
+        : null;
+      const steepClimbActive = isSteepClimbWaypoint({ playerPos: playerPos, waypoint: currentWp });
+      const fastReplan = shouldFastReplan({
+        pathExhausted: pathExhausted,
+        sinceReplanMs: sinceReplan,
+        fastReplanMs: 750,
+        steepClimbActive: steepClimbActive,
+      });
+      const fullReplan = sinceReplan > profile.waypointReplanIntervalMs;
+      const needsReplan = fullReplan || fastReplan;
       if (needsReplan) {
         const path = queryPath(systems, playerPos, target);
         state.lastWaypointReplanAt = now;
@@ -976,10 +1083,13 @@
         }
       }
       if (state.waypoints && state.waypoints.length > 0) {
+        // Advance using 3D proximity (horizontal + vertical). On steep uphill
+        // the old horizontal-only test reported "waypoint passed" before the
+        // bot had actually climbed; the full-3D check keeps the waypoint in
+        // play until the bot is both near AND at roughly the same altitude.
         while (state.waypointIdx < state.waypoints.length) {
           const wp = state.waypoints[state.waypointIdx];
-          const d = Math.hypot(Number(wp.x) - playerPos.x, Number(wp.z) - playerPos.z);
-          if (d > 4) break;
+          if (!shouldAdvanceWaypoint({ playerPos: playerPos, waypoint: wp })) break;
           state.waypointIdx++;
         }
         if (state.waypointIdx >= state.waypoints.length) state.lastWaypointReplanAt = 0;
@@ -1156,6 +1266,28 @@
         }
       }
       if (state.stuckMs > state.maxStuckMs) state.maxStuckMs = state.stuckMs;
+
+      // Pit-trap escape — when the bot has been pinned >4s and the next
+      // waypoint is meaningfully above (i.e. the navmesh route requires
+      // climbing out of a pit floor we snapped onto), invalidate the path
+      // and force the next tick to re-snap + re-plan from the current
+      // position. Re-planning from a pit floor sometimes finds a different
+      // exit; if it doesn't, the planner will at least retry from a fresh
+      // navmesh-snapped start point. We rate-limit to one escape per stuck
+      // window so we don't thrash queryPath every tick.
+      if (state.stuckMs > 4000) {
+        const currentWp = state.waypoints && state.waypoints.length > 0
+          ? state.waypoints[Math.min(state.waypointIdx, state.waypoints.length - 1)]
+          : null;
+        if (detectPitTrap({ stuckMs: state.stuckMs, playerPos: playerPos, currentWaypoint: currentWp })) {
+          state.waypoints = null;
+          state.waypointIdx = 0;
+          state.lastWaypointReplanAt = 0; // force the next tick to replan
+          state.stuckTeleportCount++;
+          state.stuckMs = 0;
+          state.lastStablePos = { x: playerPos.x, z: playerPos.z };
+        }
+      }
     }
 
     function updateLockedTarget(current, fresh, now) {
@@ -1471,6 +1603,10 @@
       computeAimSolution: computeAimSolution,
       computeAdaptiveLookahead: computeAdaptiveLookahead,
       pointAlongPath: pointAlongPath,
+      shouldAdvanceWaypoint: shouldAdvanceWaypoint,
+      isSteepClimbWaypoint: isSteepClimbWaypoint,
+      shouldFastReplan: shouldFastReplan,
+      detectPitTrap: detectPitTrap,
       evaluateFireGate: evaluateFireGate,
       angularDistance: angularDistance,
       PLAYER_EYE_HEIGHT: PLAYER_EYE_HEIGHT,
