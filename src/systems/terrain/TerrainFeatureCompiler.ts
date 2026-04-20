@@ -4,8 +4,9 @@ import type {
   MapFeatureDefinition,
   MapFeatureRectFootprint,
 } from '../../config/gameModeTypes';
-import { AIRFIELD_TEMPLATES, type AirfieldSurfaceRect } from '../world/AirfieldTemplates';
+import { AIRFIELD_TEMPLATES, type AirfieldSurfaceRect, type AirfieldTemplate } from '../world/AirfieldTemplates';
 import { generateAirfieldLayout } from '../world/AirfieldLayoutGenerator';
+import { Logger } from '../../utils/Logger';
 import { compileTerrainFlow } from './TerrainFlowCompiler';
 import type {
   CompiledTerrainFeatureSet,
@@ -25,6 +26,14 @@ const DEFAULT_FIREBASE_GRADE_STRENGTH = 0.35;
 const DEFAULT_VILLAGE_GRADE_STRENGTH = 0.2;
 const DEFAULT_AIRFIELD_GRADE_STRENGTH = 0.25;
 const DEFAULT_ROAD_GRADE_STRENGTH = 0.18;
+/** Lateral buffer beyond the widest authored surface rect that the envelope flattens. */
+const AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M = 16;
+/** Outer grade ramp beyond the inner flat radius — smooths hard cliffs at the airfield edge. */
+const AIRFIELD_ENVELOPE_GRADE_RAMP_M = 48;
+/** Strength of the envelope's graded shoulder (0-1). Strong enough to soften cliff faces. */
+const AIRFIELD_ENVELOPE_GRADE_STRENGTH = 0.45;
+/** Meter-scale vertical span across the envelope that triggers a site-slope warning. */
+const AIRFIELD_SLOPE_WARNING_SPAN_M = 18;
 
 export function compileTerrainFeatures(
   config: GameModeConfig,
@@ -39,7 +48,7 @@ export function compileTerrainFeatures(
   };
 
   for (const feature of features) {
-    compileFeature(feature, compiled);
+    compileFeature(feature, compiled, getTerrainHeight ?? null);
   }
 
   const terrainFlow = compileTerrainFlow(config, getTerrainHeight);
@@ -52,8 +61,12 @@ export function compileTerrainFeatures(
   return compiled;
 }
 
-function compileFeature(feature: MapFeatureDefinition, compiled: CompiledTerrainFeatureSet): void {
-  const stamps = compileTerrainStamps(feature);
+function compileFeature(
+  feature: MapFeatureDefinition,
+  compiled: CompiledTerrainFeatureSet,
+  getTerrainHeight: ((x: number, z: number) => number) | null,
+): void {
+  const stamps = compileTerrainStamps(feature, getTerrainHeight);
   if (stamps.length > 0) {
     compiled.stamps.push(...stamps);
   }
@@ -74,11 +87,14 @@ function compileFeature(feature: MapFeatureDefinition, compiled: CompiledTerrain
   }
 }
 
-function compileTerrainStamps(feature: MapFeatureDefinition): TerrainStampConfig[] {
+function compileTerrainStamps(
+  feature: MapFeatureDefinition,
+  getTerrainHeight: ((x: number, z: number) => number) | null,
+): TerrainStampConfig[] {
   const terrain = feature.terrain;
   if (!terrain?.flatten) return [];
 
-  const generated = compileGeneratedTerrainStamps(feature);
+  const generated = compileGeneratedTerrainStamps(feature, getTerrainHeight);
   if (generated.length > 0) {
     return generated;
   }
@@ -164,7 +180,10 @@ function compileGeneratedSurfacePatches(feature: MapFeatureDefinition): TerrainS
   ).surfacePatches;
 }
 
-function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainStampConfig[] {
+function compileGeneratedTerrainStamps(
+  feature: MapFeatureDefinition,
+  getTerrainHeight: ((x: number, z: number) => number) | null,
+): TerrainStampConfig[] {
   if (feature.kind !== 'airfield' || !feature.templateId) {
     return [];
   }
@@ -177,6 +196,13 @@ function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainSt
   const priority = feature.terrain?.priority ?? defaultPriorityForFeature(feature);
   const heightOffset = feature.terrain?.heightOffset ?? 0;
   const authoredStrength = feature.terrain?.gradeStrength;
+
+  // Warn when the airfield is authored on a steep site. Procedural relocation
+  // is not possible here (airfields are hand-authored in game mode configs),
+  // but a dev-time warning flags the problem for map authors.
+  if (getTerrainHeight) {
+    maybeWarnAirfieldSlope(feature, feature.templateId, template, getTerrainHeight);
+  }
 
   const stampedRects: Array<{ kind: 'runway' | 'apron' | 'taxiway' | 'filler'; rect: AirfieldSurfaceRect }> = [
     ...template.taxiways.map((rect) => ({ kind: 'taxiway' as const, rect })),
@@ -239,7 +265,7 @@ function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainSt
     });
   }
 
-  return stampedRects.map(({ kind, rect }, index) => {
+  const rectStamps: TerrainStampConfig[] = stampedRects.map(({ kind, rect }, index) => {
     const stampTuning = resolveAirfieldStampTuning(rect.surface, feature.terrain?.targetHeightMode);
     const yaw = (feature.placement?.yaw ?? 0) + (rect.yaw ?? 0);
     const center = localAlongLateralToWorld(
@@ -274,6 +300,149 @@ function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainSt
       priority: priority + resolveAirfieldStampPriorityOffset(kind) + index,
     };
   });
+
+  // Envelope stamp: flattens the whole airfield footprint (runway + aprons +
+  // taxiways + procedural structure zones) at runway-level with a smooth
+  // grade-blend outward. Without this, dispersal / perimeter structures sit
+  // on bumpy or cliff-edge terrain, and bumps appear between the authored
+  // surface rects. Lower priority than the rect stamps so they still win
+  // inside their own inner radii.
+  const envelope = buildAirfieldEnvelopeStamp(feature, template, priority, heightOffset);
+  return envelope ? [envelope, ...rectStamps] : rectStamps;
+}
+
+/**
+ * Compute the maximum lateral reach of any authored surface rect (taxiway /
+ * apron / runway) from the airfield centerline in local coordinates.
+ */
+function maxLateralSurfaceReach(template: AirfieldTemplate): number {
+  let reach = template.runwayWidth * 0.5;
+  for (const rect of [...template.aprons, ...template.taxiways]) {
+    const rectHalfWidth = Math.abs(rect.offsetLateral) + Math.max(rect.width, rect.length) * 0.5;
+    if (rectHalfWidth > reach) reach = rectHalfWidth;
+  }
+  return reach;
+}
+
+/**
+ * Compute the maximum along-runway reach of any authored surface rect.
+ */
+function maxAlongSurfaceReach(template: AirfieldTemplate): number {
+  let reach = template.runwayLength * 0.5;
+  for (const rect of [...template.aprons, ...template.taxiways]) {
+    const rectHalfLen = Math.abs(rect.offsetAlongRunway) + Math.max(rect.width, rect.length) * 0.5;
+    if (rectHalfLen > reach) reach = rectHalfLen;
+  }
+  return reach;
+}
+
+function buildAirfieldEnvelopeStamp(
+  feature: MapFeatureDefinition,
+  template: AirfieldTemplate,
+  basePriority: number,
+  heightOffset: number,
+): TerrainStampConfig | null {
+  // The procedural layout (AirfieldLayoutGenerator) places structures at
+  // `dispersalOffset + 18` lateral and `runwayLength * 0.5` along, with
+  // "perimeter" structures at radius max(runwayLength/2, dispersalOffset+20).
+  // The envelope's inner (fully-flat) radius must cover authored surfaces and
+  // the dispersal zone — perimeter structures (guard towers / AA at ~240m)
+  // fall inside the graded shoulder where the terrain blends out.
+  const lateralReach = Math.max(
+    maxLateralSurfaceReach(template),
+    template.dispersalOffset + 22,
+  );
+  const alongReach = Math.max(
+    maxAlongSurfaceReach(template),
+    template.runwayLength * 0.5,
+  );
+
+  const innerLateral = lateralReach + AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M;
+  const innerAlong = alongReach + AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M;
+
+  const yaw = feature.placement?.yaw ?? 0;
+  const directionX = Math.sin(yaw);
+  const directionZ = Math.cos(yaw);
+
+  // Capsule: inner radius = lateral extent; segment length = along extent - lateral extent.
+  // When along extent <= lateral extent the capsule degenerates to a circle, which is fine.
+  const segmentHalfLength = Math.max(0, innerAlong - innerLateral);
+
+  const innerRadius = innerLateral;
+  const outerRadius = innerRadius + 6;
+  const gradeRadius = outerRadius + AIRFIELD_ENVELOPE_GRADE_RAMP_M;
+  // The envelope uses its own stronger grade strength (independent of the
+  // authored `terrain.gradeStrength`, which tunes the rect stamps). A stronger
+  // shoulder is what actually prevents hard cliff edges at the airfield
+  // perimeter — without it, the terrain around perimeter structures keeps its
+  // native slope and can drop sharply next to foundations.
+  const gradeStrength = AIRFIELD_ENVELOPE_GRADE_STRENGTH;
+
+  return {
+    kind: 'flatten_capsule',
+    startX: feature.position.x - directionX * segmentHalfLength,
+    startZ: feature.position.z - directionZ * segmentHalfLength,
+    endX: feature.position.x + directionX * segmentHalfLength,
+    endZ: feature.position.z + directionZ * segmentHalfLength,
+    innerRadius,
+    outerRadius,
+    gradeRadius,
+    gradeStrength,
+    // Sampling the runway centerline gives the envelope the same target height
+    // the runway stamp would pick, so runway and envelope agree on "airfield
+    // level" and no step appears where the runway meets its surrounds.
+    samplingRadius: Math.max(12, template.runwayLength * 0.25),
+    targetHeightMode: 'center',
+    heightOffset,
+    // Priority below all rect stamps (filler is priority - 5); use -20 so the
+    // envelope applies first and every authored rect overrides within its own
+    // inner radius.
+    priority: basePriority - 20,
+  };
+}
+
+function maybeWarnAirfieldSlope(
+  feature: MapFeatureDefinition,
+  templateId: string,
+  template: AirfieldTemplate,
+  getTerrainHeight: (x: number, z: number) => number,
+): void {
+  const yaw = feature.placement?.yaw ?? 0;
+  const halfLen = template.runwayLength * 0.5;
+  const halfWidth = Math.max(template.runwayWidth * 0.5, 24);
+  const sinY = Math.sin(yaw);
+  const cosY = Math.cos(yaw);
+
+  let minHeight = Number.POSITIVE_INFINITY;
+  let maxHeight = Number.NEGATIVE_INFINITY;
+  const sampleOffsets: Array<[number, number]> = [
+    [0, 0],
+    [halfLen, 0],
+    [-halfLen, 0],
+    [0, halfWidth],
+    [0, -halfWidth],
+    [halfLen * 0.6, halfWidth * 0.6],
+    [-halfLen * 0.6, halfWidth * 0.6],
+    [halfLen * 0.6, -halfWidth * 0.6],
+    [-halfLen * 0.6, -halfWidth * 0.6],
+  ];
+  for (const [along, lateral] of sampleOffsets) {
+    const worldX = feature.position.x + along * sinY + lateral * cosY;
+    const worldZ = feature.position.z + along * cosY - lateral * sinY;
+    const h = getTerrainHeight(worldX, worldZ);
+    if (!Number.isFinite(h)) continue;
+    if (h < minHeight) minHeight = h;
+    if (h > maxHeight) maxHeight = h;
+  }
+  const span = maxHeight - minHeight;
+  if (Number.isFinite(span) && span > AIRFIELD_SLOPE_WARNING_SPAN_M) {
+    Logger.warn(
+      'terrain',
+      `Airfield "${feature.id}" (template ${templateId}) sits on steep terrain: ` +
+        `vertical span ${span.toFixed(1)}m across ${template.runwayLength.toFixed(0)}m runway footprint. ` +
+        `Envelope flatten will smooth the site but consider authoring a flatter position.`,
+    );
+  }
 }
 
 function compileVegetationExclusion(feature: MapFeatureDefinition): TerrainExclusionZone | null {
