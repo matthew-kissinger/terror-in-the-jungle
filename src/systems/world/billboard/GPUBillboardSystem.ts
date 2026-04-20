@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { AssetLoader } from '../../assets/AssetLoader';
 import { Logger } from '../../../utils/Logger';
-import { GPUBillboardVegetation, GPUVegetationConfig } from './BillboardBufferManager';
+import { GPUBillboardVegetation, GPUVegetationConfig, BillboardLighting } from './BillboardBufferManager';
 import { VegetationTypeConfig } from '../../../config/vegetationTypes';
 
 
@@ -99,10 +99,15 @@ export class GPUBillboardSystem {
     Logger.debug('vegetation', `GPU: Removed ${totalRemoved} vegetation instances for chunk ${chunkKey}`);
   }
 
-  update(camera: THREE.Camera, _deltaTime: number, fog?: THREE.FogExp2 | null): void {
+  update(
+    camera: THREE.Camera,
+    _deltaTime: number,
+    fog?: THREE.FogExp2 | null,
+    lighting?: BillboardLighting | null,
+  ): void {
     const time = performance.now() * 0.001;
     this.vegetationTypes.forEach(vegetation => {
-      vegetation.update(camera, time, fog);
+      vegetation.update(camera, time, fog, lighting);
     });
   }
 

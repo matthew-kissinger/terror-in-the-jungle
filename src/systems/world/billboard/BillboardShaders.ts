@@ -119,6 +119,16 @@ export const BILLBOARD_FRAGMENT_SHADER = `
   uniform float fogStartDistance;  // Distance before fog begins
   uniform bool fogEnabled;
 
+  // Atmosphere lighting uniforms (cycle-2026-04-21 parity pass).
+  // Terrain uses MeshStandardMaterial and picks up AtmosphereSystem's
+  // per-frame hemisphere/sun colors automatically; billboards have no
+  // lighting pipeline, so we feed the same colors in as uniforms and
+  // apply a cheap hemispheric tint here.
+  uniform vec3 sunColor;      // directional light color (matches renderer.moonLight.color)
+  uniform vec3 skyColor;      // zenith/hemisphere sky color
+  uniform vec3 groundColor;   // darkened horizon — matches hemisphereLight.groundColor
+  uniform bool lightingEnabled;
+
   varying vec2 vUv;
   varying float vDistance;
   varying float vLodFactor;
@@ -146,6 +156,23 @@ export const BILLBOARD_FRAGMENT_SHADER = `
     fadeFactor *= (1.0 - vLodFactor * 0.3);
 
     vec3 shaded = pow(texColor.rgb * colorTint, vec3(gammaAdjust));
+
+    // Hemispheric lighting parity with terrain. Vegetation billboards have
+    // no real normals, but uv.y is 0 at the base and 1 at the canopy
+    // (see vertex shader's sway weighting), which gives us a free vertical
+    // gradient. We mix ground->sky along that axis for the ambient term,
+    // then add a flat sun contribution so the scene's directional color
+    // (dawn orange, midday white, dusk gold) reads on the foliage too.
+    // Terrain gets this via MeshStandardMaterial + Three's built-in
+    // hemisphere + directional passes; this is the lightweight analogue.
+    if (lightingEnabled) {
+      vec3 ambient = mix(groundColor, skyColor, 0.5 + 0.5 * vUv.y);
+      // 0.35 sun weight is tuned to approximate the directional contribution
+      // terrain gets at noon without blowing out dawn/dusk — the full PBR
+      // pipeline would do NdotL, but billboards have no usable normal.
+      vec3 light = ambient + sunColor * 0.35;
+      shaded *= light;
+    }
 
     // Apply height-based fog (dense at ground, thin at altitude). Scale the
     // fog mix by texture alpha so soft edge pixels keep more of their bled

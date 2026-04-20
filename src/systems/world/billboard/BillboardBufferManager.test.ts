@@ -493,6 +493,33 @@ describe('GPUBillboardVegetation', () => {
     expect(internal.material.uniforms.fogEnabled.value).toBe(false)
   })
 
+  it('update forwards atmosphere lighting so vegetation tracks TOD like terrain', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+    const lighting = {
+      sunColor: new THREE.Color(1.0, 0.5, 0.2),    // warm dusk
+      skyColor: new THREE.Color(0.1, 0.2, 0.4),    // dim blue sky
+      groundColor: new THREE.Color(0.1, 0.1, 0.05),
+    }
+
+    manager.update(new THREE.PerspectiveCamera(), 0, null, lighting as any)
+
+    expect(internal.material.uniforms.lightingEnabled.value).toBe(true)
+    expect(internal.material.uniforms.sunColor.value.r).toBeCloseTo(1.0)
+    expect(internal.material.uniforms.sunColor.value.g).toBeCloseTo(0.5)
+    expect(internal.material.uniforms.skyColor.value.b).toBeCloseTo(0.4)
+    expect(internal.material.uniforms.groundColor.value.r).toBeCloseTo(0.1)
+  })
+
+  it('update leaves lighting disabled when no lighting snapshot is provided', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    manager.update(new THREE.PerspectiveCamera(), 0, null)
+
+    expect(internal.material.uniforms.lightingEnabled.value).toBe(false)
+  })
+
   it('getters return correct values', () => {
     const manager = new GPUBillboardVegetation(scene, createConfig())
 

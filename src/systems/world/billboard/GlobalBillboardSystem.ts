@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GameSystem, BillboardInstance } from '../../../types';
 import { AssetLoader } from '../../assets/AssetLoader';
 import { GPUBillboardSystem } from './GPUBillboardSystem';
+import type { BillboardLighting } from './BillboardBufferManager';
 import { Logger } from '../../../utils/Logger';
 import { VegetationTypeConfig, VEGETATION_TYPES } from '../../../config/vegetationTypes';
 import { BiomeConfig, getBiome } from '../../../config/biomes';
@@ -79,8 +80,12 @@ export class GlobalBillboardSystem implements GameSystem {
     Logger.info('World', `Billboard system initialized (${this.activeTypes.length} types, biomes=${this.activeBiomes.map(b => b.id).join(',')})`);
   }
 
-  update(deltaTime: number, fog?: THREE.FogExp2 | null): void {
-    this.gpuSystem.update(this.camera, deltaTime, fog);
+  update(
+    deltaTime: number,
+    fog?: THREE.FogExp2 | null,
+    lighting?: BillboardLighting | null,
+  ): void {
+    this.gpuSystem.update(this.camera, deltaTime, fog, lighting);
   }
 
   dispose(): void {
