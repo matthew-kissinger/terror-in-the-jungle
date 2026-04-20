@@ -4,7 +4,6 @@ import { GameSystem } from '../types';
 import { AssetLoader } from '../systems/assets/AssetLoader';
 import { PlayerController } from '../systems/player/PlayerController';
 import { CombatantSystem } from '../systems/combat/CombatantSystem';
-import { Skybox } from '../systems/environment/Skybox';
 import { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
@@ -291,7 +290,6 @@ export class SystemManager {
   get globalBillboardSystem(): GlobalBillboardSystem { return this.registry.require('globalBillboardSystem'); }
   get playerController(): PlayerController { return this.registry.require('playerController'); }
   get combatantSystem(): CombatantSystem { return this.registry.require('combatantSystem'); }
-  get skybox(): Skybox { return this.registry.require('skybox'); }
   get atmosphereSystem(): AtmosphereSystem { return this.registry.require('atmosphereSystem'); }
   get waterSystem(): WaterSystem { return this.registry.require('waterSystem'); }
   get weatherSystem(): WeatherSystem { return this.registry.require('weatherSystem'); }

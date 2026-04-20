@@ -7,25 +7,17 @@ import { SCENARIO_ATMOSPHERE_PRESETS } from './ScenarioAtmospherePresets';
  * Behavior contract for the analytic sky backend exposed via the
  * `ISkyRuntime` surface that fog / hemisphere readers consume. We test
  * what callers see (sun warms at low elevation, zenith deepens at noon,
- * dome ownership transfers off the legacy Skybox), not the specific
+ * analytic sky is installed on construction), not the specific
  * Preetham/HW math. Implementation-mirror tests against scattering
  * constants would die the moment we swap in true Hosek-Wilkie
  * coefficients in a future cycle, which is exactly what
  * `docs/TESTING.md` says to avoid.
  */
 describe('HosekWilkieSkyBackend (via AtmosphereSystem)', () => {
-  it('takes ownership of the sky dome once a scenario preset is applied', () => {
-    const system = new AtmosphereSystem();
-    expect(system.ownsSkyDome()).toBe(false);
-    system.applyScenarioPreset('combat120');
-    expect(system.ownsSkyDome()).toBe(true);
-  });
-
   it('attaches the dome mesh to a bound scene', () => {
     const scene = new THREE.Scene();
     const system = new AtmosphereSystem();
     system.attachScene(scene);
-    system.applyScenarioPreset('combat120');
     const skyMesh = scene.children.find((c) => c.name === 'HosekWilkieSkyDome');
     expect(skyMesh).toBeDefined();
   });
@@ -140,7 +132,6 @@ describe('HosekWilkieSkyBackend (via AtmosphereSystem)', () => {
     const scene = new THREE.Scene();
     const system = new AtmosphereSystem();
     system.attachScene(scene);
-    system.applyScenarioPreset('combat120');
     system.syncDomePosition(new THREE.Vector3(123, 456, -789));
     const dome = scene.children.find((c) => c.name === 'HosekWilkieSkyDome');
     expect(dome).toBeDefined();
@@ -149,12 +140,23 @@ describe('HosekWilkieSkyBackend (via AtmosphereSystem)', () => {
     expect(dome!.position.z).toBe(-789);
   });
 
-  it('falls back to NullSkyBackend until any preset is applied', () => {
-    // Default sky should still match the legacy `Skybox`/setupLighting()
-    // constants until the engine boot path explicitly applies a preset.
+  it('renders a lit analytic sky on construction with no preset call required', () => {
+    // The constructor applies a bootstrap preset so the very first frame
+    // gets a real sky. No legacy Skybox PNG, no NullSkyBackend flat color.
     const system = new AtmosphereSystem();
-    expect(system.getZenithColor(new THREE.Color()).getHex()).toBe(0x87ceeb);
-    expect(system.getHorizonColor(new THREE.Color()).getHex()).toBe(0x5a7a6a);
+    const zenith = system.getZenithColor(new THREE.Color());
+    const horizon = system.getHorizonColor(new THREE.Color());
+    const sun = system.getSunColor(new THREE.Color());
+    for (const c of [zenith, horizon, sun]) {
+      const luma = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+      expect(luma).toBeGreaterThan(0);
+    }
+    // The sky must have a real vertical gradient: zenith differs from
+    // horizon (analytic, not a constant fallback).
+    const dr = zenith.r - horizon.r;
+    const dg = zenith.g - horizon.g;
+    const db = zenith.b - horizon.b;
+    expect(Math.sqrt(dr * dr + dg * dg + db * db)).toBeGreaterThan(0.02);
   });
 });
 

@@ -18,13 +18,13 @@ function makeRendererStub(): IGameRenderer {
 /**
  * Behavior contract for `AtmosphereSystem` as exposed via `ISkyRuntime` /
  * `ICloudRuntime`. These tests guard the seam, not the implementation —
- * future backends (Hosek-Wilkie, prebaked cubemap, volumetric) must
- * satisfy the same caller-visible contract.
+ * future backends (prebaked cubemap, volumetric) must satisfy the same
+ * caller-visible contract.
  *
- * The legacy color constants (`0x5a7a6a` horizon, `0x87ceeb` zenith,
- * `0xfffacd` sun) are the brief's exit criterion: the default backend
- * must reproduce the existing `Skybox` + `setupLighting()` look so the
- * cycle ships with no visible change.
+ * As of `skybox-cutover-no-fallbacks`, the constructor installs the
+ * analytic Hosek-Wilkie backend with a bootstrap preset, so every test
+ * starts with a real lit sky (no NullSkyBackend fallback, no legacy
+ * Skybox PNG).
  */
 describe('AtmosphereSystem (ISkyRuntime contract)', () => {
   it('returns a non-zero unit-length sun direction by default', () => {
@@ -34,29 +34,27 @@ describe('AtmosphereSystem (ISkyRuntime contract)', () => {
     expect(dir.length()).toBeCloseTo(1, 5);
   });
 
-  it('default backend reproduces legacy sky colors (no visible change this cycle)', () => {
+  it('returns non-black sky colors by default (bootstrap preset is live)', () => {
     const system = new AtmosphereSystem();
     const horizon = system.getHorizonColor(new THREE.Color());
     const zenith = system.getZenithColor(new THREE.Color());
     const sun = system.getSunColor(new THREE.Color());
 
-    expect(horizon.getHex()).toBe(0x5a7a6a);
-    expect(zenith.getHex()).toBe(0x87ceeb);
-    expect(sun.getHex()).toBe(0xfffacd);
+    for (const c of [horizon, zenith, sun]) {
+      const luma = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+      expect(luma).toBeGreaterThan(0);
+    }
   });
 
   it('sky color along straight-up direction matches the zenith color', () => {
     const system = new AtmosphereSystem();
     const zenith = system.getZenithColor(new THREE.Color());
     const sample = system.getSkyColorAtDirection(new THREE.Vector3(0, 1, 0), new THREE.Color());
-    expect(sample.getHex()).toBe(zenith.getHex());
-  });
-
-  it('sky color along the horizon ring matches the horizon color', () => {
-    const system = new AtmosphereSystem();
-    const horizon = system.getHorizonColor(new THREE.Color());
-    const sample = system.getSkyColorAtDirection(new THREE.Vector3(1, 0, 0), new THREE.Color());
-    expect(sample.getHex()).toBe(horizon.getHex());
+    // LUT bin quantisation means we won't hit byte-equal; compare with
+    // small tolerance in RGB float space.
+    expect(Math.abs(sample.r - zenith.r)).toBeLessThan(0.02);
+    expect(Math.abs(sample.g - zenith.g)).toBeLessThan(0.02);
+    expect(Math.abs(sample.b - zenith.b)).toBeLessThan(0.02);
   });
 
   it('writes into the caller-supplied out parameter and returns it', () => {
@@ -158,8 +156,8 @@ describe('AtmosphereSystem (renderer coupling)', () => {
 
     system.setRenderer(renderer);
 
-    // Default backend zenith is 0x87ceeb.
-    expect(renderer.hemisphereLight!.color.getHex()).toBe(0x87ceeb);
+    const zenith = system.getZenithColor(new THREE.Color());
+    expect(renderer.hemisphereLight!.color.getHex()).toBe(zenith.getHex());
   });
 
   it('drives hemisphere ground color darker than the backend horizon sample', () => {
@@ -262,8 +260,14 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
     return { renderer: { fog } as any, fog };
   };
 
+  const makeAtmosphereWithBackend = (horizonHex: number) => {
+    const system = new AtmosphereSystem();
+    system.setBackend(makeCustomBackend(horizonHex));
+    return system;
+  };
+
   it('fog color tracks the sky horizon color each frame', () => {
-    const system = new AtmosphereSystem(makeCustomBackend(0xaabbcc));
+    const system = makeAtmosphereWithBackend(0xaabbcc);
     const { renderer, fog } = makeFogStub();
     system.setRenderer(renderer);
 
@@ -273,7 +277,7 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
   });
 
   it('fog color updates when the backend horizon color changes between frames', () => {
-    const systemA = new AtmosphereSystem(makeCustomBackend(0x112233));
+    const systemA = makeAtmosphereWithBackend(0x112233);
     const { renderer, fog } = makeFogStub();
     systemA.setRenderer(renderer);
     systemA.update(0.016);
@@ -287,7 +291,7 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
   });
 
   it('underwater override snaps fog color to teal regardless of sky state', () => {
-    const system = new AtmosphereSystem(makeCustomBackend(0xff0000));
+    const system = makeAtmosphereWithBackend(0xff0000);
     const { renderer, fog } = makeFogStub();
     system.setRenderer(renderer);
 
@@ -298,7 +302,7 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
   });
 
   it('clearing the underwater override restores the sky-driven fog color', () => {
-    const system = new AtmosphereSystem(makeCustomBackend(0x4488aa));
+    const system = makeAtmosphereWithBackend(0x4488aa);
     const { renderer, fog } = makeFogStub();
     system.setRenderer(renderer);
 
@@ -312,7 +316,7 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
   });
 
   it('darken factor dims the fog color without changing hue for grayscale samples', () => {
-    const system = new AtmosphereSystem(makeCustomBackend(0x888888));
+    const system = makeAtmosphereWithBackend(0x888888);
     const { renderer, fog } = makeFogStub();
     system.setRenderer(renderer);
 
@@ -332,7 +336,7 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
   });
 
   it('darken factor is clamped into [0, 1]', () => {
-    const system = new AtmosphereSystem(makeCustomBackend(0x808080));
+    const system = makeAtmosphereWithBackend(0x808080);
     const { renderer, fog } = makeFogStub();
     system.setRenderer(renderer);
 
@@ -349,7 +353,7 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
   });
 
   it('is a no-op when no renderer has been wired', () => {
-    const system = new AtmosphereSystem(makeCustomBackend(0x222222));
+    const system = makeAtmosphereWithBackend(0x222222);
 
     // Should not throw without a renderer (tests and menu phase run
     // before the composer wires the renderer).

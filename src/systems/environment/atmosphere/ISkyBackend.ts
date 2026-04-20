@@ -3,9 +3,8 @@ import * as THREE from 'three';
 /**
  * Backend contract for sky models consumed by `AtmosphereSystem`.
  *
- * Concrete backends planned in `docs/ATMOSPHERE.md`:
- * - `NullSkyBackend` (cycle 2026-04-20): constant colors matching the legacy `Skybox` look.
- * - Hosek-Wilkie analytic (Combo A, v1).
+ * Concrete backends (see `docs/ATMOSPHERE.md`):
+ * - `HosekWilkieSkyBackend` (current default, Combo A v1): analytic dome.
  * - Hillaire prebaked cubemap (Combo E, v2).
  * - Volumetric raymarch for fly-through (Combo F, v3).
  *

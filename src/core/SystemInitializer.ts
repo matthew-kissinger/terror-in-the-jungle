@@ -4,7 +4,6 @@ import { GameSystem } from '../types';
 import { AssetLoader } from '../systems/assets/AssetLoader';
 import { PlayerController } from '../systems/player/PlayerController';
 import { CombatantSystem } from '../systems/combat/CombatantSystem';
-import { Skybox } from '../systems/environment/Skybox';
 import { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
@@ -131,7 +130,6 @@ export class SystemInitializer {
 
     refs.playerController = new PlayerController(camera);
     refs.combatantSystem = new CombatantSystem(scene, camera, refs.globalBillboardSystem, refs.assetLoader, refs.terrainSystem);
-    refs.skybox = new Skybox(scene);
     refs.atmosphereSystem = new AtmosphereSystem();
     refs.atmosphereSystem.attachScene(scene);
     // Fog color becomes sky-driven (see `atmosphere-fog-tinted-by-sky`).
@@ -219,7 +217,6 @@ export class SystemInitializer {
       refs.helicopterModel,
       refs.fixedWingModel,
       refs.worldFeatureSystem,
-      refs.skybox,
       refs.gameModeManager,
       refs.playerSquadController,
       refs.commandInputManager,

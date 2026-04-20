@@ -1,7 +1,6 @@
 import type { AssetLoader } from '../systems/assets/AssetLoader';
 import type { PlayerController } from '../systems/player/PlayerController';
 import type { CombatantSystem } from '../systems/combat/CombatantSystem';
-import type { Skybox } from '../systems/environment/Skybox';
 import type { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import type { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import type { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
@@ -53,7 +52,6 @@ export interface SystemKeyToType {
   globalBillboardSystem: GlobalBillboardSystem;
   playerController: PlayerController;
   combatantSystem: CombatantSystem;
-  skybox: Skybox;
   atmosphereSystem: AtmosphereSystem;
   waterSystem: WaterSystem;
   weatherSystem: WeatherSystem;
@@ -141,7 +139,6 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'globalBillboardSystem',
   'playerController',
   'combatantSystem',
-  'skybox',
   'atmosphereSystem',
   'waterSystem',
   'weatherSystem',
