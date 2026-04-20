@@ -64,9 +64,22 @@ export class PostProcessingManager {
         uniform sampler2D tDiffuse;
         uniform float colorLevels;
         varying vec2 vUv;
+        // 4x4 Bayer ordered-dither matrix scaled to [0, 1).
+        // Adds a sub-quantization-step offset before the existing 24-level quantize
+        // so smooth gradients (sky dome, fog falloff, skin shading) break into a
+        // retro-authentic stipple instead of visible bands.
+        const mat4 bayer4x4 = mat4(
+          0.0 / 16.0,  8.0 / 16.0,  2.0 / 16.0, 10.0 / 16.0,
+         12.0 / 16.0,  4.0 / 16.0, 14.0 / 16.0,  6.0 / 16.0,
+          3.0 / 16.0, 11.0 / 16.0,  1.0 / 16.0,  9.0 / 16.0,
+         15.0 / 16.0,  7.0 / 16.0, 13.0 / 16.0,  5.0 / 16.0
+        );
         void main() {
           vec4 color = texture2D(tDiffuse, vUv);
-          color.rgb = floor(color.rgb * colorLevels + 0.5) / colorLevels;
+          ivec2 p = ivec2(mod(gl_FragCoord.xy, 4.0));
+          float threshold = bayer4x4[p.x][p.y];
+          float dither = (threshold - 0.5) / colorLevels;
+          color.rgb = floor((color.rgb + dither) * colorLevels + 0.5) / colorLevels;
           gl_FragColor = color;
         }
       `,
