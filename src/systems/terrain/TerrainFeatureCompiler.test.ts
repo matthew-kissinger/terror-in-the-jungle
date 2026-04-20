@@ -147,7 +147,8 @@ describe('compileTerrainFeatures', () => {
       ],
     });
 
-    expect(compiled.stamps).toHaveLength(6); // runway + apron + 3 taxiway rects + 1 filler stamp
+    // runway + apron + 3 taxiway rects + 1 filler stamp + 1 envelope stamp
+    expect(compiled.stamps).toHaveLength(7);
     expect(compiled.vegetationExclusionZones).toHaveLength(1);
     expect(compiled.surfacePatches).toHaveLength(5);
     expect(compiled.surfacePatches.some((patch) => patch.shape === 'rect' && patch.surface === 'runway')).toBe(true);
@@ -158,6 +159,20 @@ describe('compileTerrainFeatures', () => {
       && Math.abs(stamp.startX - stamp.endX) > Math.abs(stamp.startZ - stamp.endZ),
     );
     expect(runwayStamp?.targetHeightMode).toBe('center');
+
+    // The lowest-priority airfield stamp is the broad envelope that covers
+    // the full footprint so dispersal / perimeter structures land on flat
+    // ground and cliff edges are smoothed out.
+    const envelope = [...compiled.stamps].sort((a, b) => a.priority - b.priority)[0];
+    expect(envelope.kind).toBe('flatten_capsule');
+    if (envelope.kind === 'flatten_capsule') {
+      // Envelope inner radius should cover the procedural dispersal zone,
+      // which sits well beyond the runway capsule's lateral extent.
+      expect(envelope.innerRadius).toBeGreaterThan(40);
+      // And its grade radius rolls out meaningfully past the inner radius so
+      // the airfield edge blends to native terrain rather than cliffing.
+      expect(envelope.gradeRadius).toBeGreaterThan(envelope.outerRadius + 20);
+    }
   });
 
   it('compiles terrain-flow corridors and overlay paths for route-aware modes', () => {
