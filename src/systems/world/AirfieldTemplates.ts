@@ -229,16 +229,14 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
         clearanceRadius: 22,
         taxiRouteId: 'a1_south_route',
         runwayStartId: 'south_departure',
-        // Demo NPC sortie: A-1 takes off, flies south ~1.5 km down the field
-        // axis to a fly-by waypoint, returns, lands. Playtest evidence for
-        // `npc-fixed-wing-pilot-ai`.
-        npcAutoFlight: {
-          kind: 'ferry',
-          waypointOffsetAlongRunway: -1500,
-          waypointOffsetLateral: 0,
-          altitudeAGLm: 220,
-          airspeedMs: 65,
-        },
+        // A-1 spawns parked and claimable by the player. Previously carried
+        // an `npcAutoFlight: { kind: 'ferry', ... }` field which ferried the
+        // aircraft off the field within seconds of world boot — useful as an
+        // integration test of `npc-fixed-wing-pilot-ai`, but it meant the
+        // player never saw the A-1 at the airfield. Removed in
+        // `aircraft-a1-spawn-regression` (2026-04-20). A ferry sortie can be
+        // reintroduced on a different template if the departing-plane visual
+        // is desired.
       },
       {
         standId: 'stand_ac47',
