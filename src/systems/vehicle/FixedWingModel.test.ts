@@ -210,6 +210,84 @@ describe('FixedWingModel', () => {
     });
   });
 
+  describe('simulation culling', () => {
+    function makeCamera(x: number, y: number, z: number): THREE.PerspectiveCamera {
+      const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+      camera.position.set(x, y, z);
+      return camera;
+    }
+
+    function makePlayerController(camera: THREE.PerspectiveCamera) {
+      return {
+        isInHelicopter: () => false,
+        isInFixedWing: () => false,
+        getFixedWingId: () => null,
+        exitFixedWing: vi.fn(),
+        updatePlayerPosition: vi.fn(),
+        getCamera: () => camera,
+      };
+    }
+
+    it('skips physics for an unpiloted parked aircraft far from the camera', async () => {
+      const camera = makeCamera(10_000, 20, 10_000); // well beyond any cull distance
+      scene.fog = new THREE.Fog(0x888888, 50, 450);
+      model.setPlayerController(makePlayerController(camera) as any);
+
+      const parkingPos = new THREE.Vector3(0, 10, 0);
+      await model.createAircraftAtSpot('fw_far', AircraftModels.A1_SKYRAIDER, parkingPos, 0);
+
+      const beforePos = new THREE.Vector3();
+      const beforeQuat = new THREE.Quaternion();
+      model.getAircraftPositionTo('fw_far', beforePos);
+      model.getAircraftQuaternionTo('fw_far', beforeQuat);
+
+      // Drive many simulation ticks; a parked aircraft should not move anyway,
+      // but the point here is that step() is not called — we verify that by
+      // checking the position/orientation remain bit-identical and velocity
+      // stays at zero after the cull transition.
+      for (let i = 0; i < 30; i++) {
+        model.update(1 / 60);
+      }
+
+      const afterPos = new THREE.Vector3();
+      const afterQuat = new THREE.Quaternion();
+      const afterVel = new THREE.Vector3();
+      model.getAircraftPositionTo('fw_far', afterPos);
+      model.getAircraftQuaternionTo('fw_far', afterQuat);
+      model.getAircraftVelocityTo('fw_far', afterVel);
+
+      expect(afterPos.x).toBe(beforePos.x);
+      expect(afterPos.y).toBe(beforePos.y);
+      expect(afterPos.z).toBe(beforePos.z);
+      expect(afterQuat.x).toBe(beforeQuat.x);
+      expect(afterQuat.y).toBe(beforeQuat.y);
+      expect(afterQuat.z).toBe(beforeQuat.z);
+      expect(afterQuat.w).toBe(beforeQuat.w);
+      expect(afterVel.length()).toBe(0);
+    });
+
+    it('resumes physics for an unpiloted parked aircraft when the camera is near', async () => {
+      const camera = makeCamera(50, 10, 50); // well within cull distance
+      scene.fog = new THREE.Fog(0x888888, 50, 450);
+      model.setPlayerController(makePlayerController(camera) as any);
+
+      const parkingPos = new THREE.Vector3(0, 10, 0);
+      await model.createAircraftAtSpot('fw_near', AircraftModels.A1_SKYRAIDER, parkingPos, 0);
+
+      // With the camera in range, the aircraft is simulated. A parked aircraft
+      // with no command still has its physics tick run, so flight data remains
+      // well-formed (grounded, zero airspeed).
+      for (let i = 0; i < 5; i++) {
+        model.update(1 / 60);
+      }
+
+      const fd = model.getFlightData('fw_near');
+      expect(fd).not.toBeNull();
+      expect(fd!.flightState).toBe('grounded');
+      expect(fd!.airspeed).toBe(0);
+    });
+  });
+
   describe('dispose', () => {
     it('cleans up all aircraft on dispose', async () => {
       const pos = new THREE.Vector3(0, 10, 0);

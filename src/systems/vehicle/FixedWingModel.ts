@@ -19,7 +19,7 @@ import type {
 import { FixedWingAnimation } from './FixedWingAnimation';
 import { FixedWingInteraction } from './FixedWingInteraction';
 import { FixedWingVehicleAdapter } from './FixedWingVehicleAdapter';
-import { shouldRenderAirVehicle } from './AirVehicleVisibility';
+import { shouldRenderAirVehicle, shouldSimulateAirVehicle } from './AirVehicleVisibility';
 import {
   buildFixedWingPilotCommand,
   createIdleFixedWingPilotIntent,
@@ -185,6 +185,13 @@ export class FixedWingModel implements GameSystem {
   private spawnMetadata = new Map<string, FixedWingSpawnMetadata>();
   private lineupAircraft = new Set<string>();
   private terrainSampleCache = new Map<string, CachedTerrainSample>();
+  /**
+   * Per-aircraft latched sim-cull state. `true` means we simulated last frame,
+   * `false` means we were culled. Drives the hysteresis band in
+   * `shouldSimulateAirVehicle`. Aircraft default to `true` (simulate) until we
+   * have evidence they should be culled.
+   */
+  private simulating = new Map<string, boolean>();
   private pilotedAircraftId: string | null = null;
   /** NPC pilots attached to aircraft in our catalog. See `attachNPCPilot()`. */
   private npcPilots = new Map<string, NPCFixedWingPilot>();
@@ -250,10 +257,38 @@ export class FixedWingModel implements GameSystem {
       const npcPilot = !isPiloted ? this.npcPilots.get(aircraftId) : undefined;
       const snapshot = this.buildSnapshot(runtime);
       const flightState = fixedWingFlightStateFromSnapshot(snapshot);
-      const shouldSimulate = isPiloted
+      const needsStep = isPiloted
         || npcPilot !== undefined
         || flightState !== 'grounded'
         || snapshot.airspeed > FixedWingModel.IDLE_SIMULATION_SPEED;
+
+      // Distance cull gate: parked / idle unpiloted aircraft beyond the render
+      // cull distance (plus hysteresis) are removed from the physics path
+      // entirely. Airborne NPC aircraft stay simulated regardless of distance.
+      const wasSimulating = this.simulating.get(aircraftId) ?? true;
+      const withinSimRange = shouldSimulateAirVehicle({
+        camera,
+        scene: this.scene,
+        vehiclePosition: group.position,
+        isAirborne: flightState !== 'grounded',
+        isPiloted,
+        hasActiveNPCPilot: npcPilot !== undefined,
+        currentlySimulating: wasSimulating,
+      });
+      const shouldSimulate = needsStep && withinSimRange;
+
+      if (shouldSimulate !== wasSimulating) {
+        this.simulating.set(aircraftId, shouldSimulate);
+        if (!shouldSimulate) {
+          // Freeze residual velocity so when sim resumes the airframe does not
+          // jump on the first step. Position and quaternion are already the
+          // last-simulated values; skipping step() leaves them untouched.
+          runtime.airframe.getVelocity().set(0, 0, 0);
+          Logger.debug('fixedwing', `simulation culled: ${aircraftId} (distance gate)`);
+        } else {
+          Logger.debug('fixedwing', `simulation resumed: ${aircraftId}`);
+        }
+      }
 
       if (isPiloted) {
         const configKey = this.configKeys.get(aircraftId);
@@ -273,7 +308,7 @@ export class FixedWingModel implements GameSystem {
         } else {
           runtime.command = sanitizeCommand(this.currentCommand, runtime.command);
         }
-      } else if (npcPilot) {
+      } else if (npcPilot && shouldSimulate) {
         const configKey = this.configKeys.get(aircraftId);
         const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
         const airframeState = runtime.airframe.getState();
@@ -380,6 +415,7 @@ export class FixedWingModel implements GameSystem {
     this.spawnMetadata.clear();
     this.lineupAircraft.clear();
     this.terrainSampleCache.clear();
+    this.simulating.clear();
     for (const pilot of this.npcPilots.values()) pilot.clearMission();
     this.npcPilots.clear();
   }
