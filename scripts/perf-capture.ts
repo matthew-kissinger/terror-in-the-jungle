@@ -4,6 +4,7 @@ import { chromium, type BrowserContext, type CDPSession, type Page } from 'playw
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { createRequire } from 'node:module';
 import {
   cleanupPortListeners,
   isPortOpen,
@@ -207,6 +208,11 @@ type RuntimeSample = {
     waypointCount?: number;
     waypointIdx?: number;
     movementTransitions?: number;
+    // Match-end lifecycle (harness-lifecycle-halt-on-match-end). Wall-clock ms
+    // at which the harness driver first observed the match end; null while the
+    // match is still active. Drives early capture finalization.
+    matchEndedAtMs?: number | null;
+    matchOutcome?: 'victory' | 'defeat' | 'draw' | null;
   };
 };
 
@@ -251,6 +257,13 @@ type CaptureSummary = {
     runtimePreflightMs: number;
     runtimePreflightOk: boolean;
   };
+  // Match-end lifecycle (harness-lifecycle-halt-on-match-end).
+  // matchEndedAtMs is wall-clock-ms-since-capture-start when the harness
+  // observed match end; null/undefined when the match was still live at the
+  // configured duration. Memo writers compare against durationSeconds*1000 to
+  // report in-match vs post-match coverage.
+  matchEndedAtMs?: number | null;
+  matchOutcome?: 'victory' | 'defeat' | 'draw' | null;
 };
 
 type MovementViewerPayload = {
@@ -318,6 +331,16 @@ const LOCK_FILE = join(process.cwd(), 'tmp', 'perf-capture.lock');
 const CDP_STOP_TIMEOUT_MS = 3_000;
 const TRACE_STOP_TIMEOUT_MS = 5_000;
 const SCENARIO_SETUP_TIMEOUT_MS = 10_000;
+// harness-lifecycle-halt-on-match-end: load the pure helpers from the driver's
+// CJS surface so the regression test (scripts/perf-harness/...) and the live
+// capture both consume the same `shouldFinalizeAfterMatchEnd` definition. The
+// alternative (a TS-side helper) would force the test to import this file,
+// which pulls in playwright + auto-runs runCapture() at module load.
+const lifecycleRequire = createRequire(import.meta.url);
+const { shouldFinalizeAfterMatchEnd, MATCH_END_TAIL_MS } = lifecycleRequire('./perf-active-driver.cjs') as {
+  shouldFinalizeAfterMatchEnd: (matchEndedAtMs: number | null | undefined, nowMs: number, tailMs?: number) => boolean;
+  MATCH_END_TAIL_MS: number;
+};
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -1754,6 +1777,10 @@ async function runCapture(): Promise<void> {
   let runtimePreflightResult: { totalMs: number; ok: boolean; reason?: string } = { totalMs: 0, ok: true };
   let startupDiagnostics: StartupDiagnostics | null = null;
   let startupTimeline: any = null;
+  // harness-lifecycle-halt-on-match-end: hoisted out of the sample loop so the
+  // finally-block summary writer can pick them up even on early failure.
+  let matchEndedAtRelMs: number | null = null;
+  let matchOutcome: 'victory' | 'defeat' | 'draw' | null = null;
   let activeScenarioStarted = false;
   let cdpStarted = false;
   let playwrightTracingStarted = false;
@@ -2337,7 +2364,13 @@ async function runCapture(): Promise<void> {
               waypointReplanFailures: Number(harnessDriver.waypointReplanFailures ?? 0),
               waypointCount: Number(harnessDriver.waypointCount ?? 0),
               waypointIdx: Number(harnessDriver.waypointIdx ?? 0),
-              movementTransitions: Number(harnessDriver.movementTransitions ?? 0)
+              movementTransitions: Number(harnessDriver.movementTransitions ?? 0),
+              matchEndedAtMs: Number.isFinite(Number(harnessDriver.matchEndedAtMs))
+                ? Number(harnessDriver.matchEndedAtMs)
+                : null,
+              matchOutcome: typeof harnessDriver.matchOutcome === 'string'
+                ? (harnessDriver.matchOutcome as 'victory' | 'defeat' | 'draw')
+                : null
             } : undefined,
             systemTop: Array.isArray(report?.systemBreakdown)
               ? report.systemBreakdown.slice(0, 3).map((s: any) => ({
@@ -2383,6 +2416,19 @@ async function runCapture(): Promise<void> {
           ? ` terrain=${topTerrainStream.name}:${Number(topTerrainStream.timeMs ?? 0).toFixed(2)}ms/${Number(topTerrainStream.budgetMs ?? 0).toFixed(2)}ms pending=${Number(topTerrainStream.pendingUnits ?? 0)}`
           : '';
         logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% draw=${drawCalls} tri=${triangles} rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${terrainSuffix}${driverSuffix}`);
+        // harness-lifecycle-halt-on-match-end: latch the first match-end
+        // observation, then break the loop after MATCH_END_TAIL_MS so we
+        // finalize close to the moment the engine declared a winner instead
+        // of running on into the victory screen.
+        const reportedMatchEnded = sample.harnessDriver?.matchEndedAtMs;
+        if (matchEndedAtRelMs === null && typeof reportedMatchEnded === 'number' && Number.isFinite(reportedMatchEnded)) {
+          matchEndedAtRelMs = Math.max(0, Date.now() - startMs);
+          matchOutcome = sample.harnessDriver?.matchOutcome ?? 'draw';
+          logStep(`🏁 Match ended at t=${(matchEndedAtRelMs / 1000).toFixed(1)}s (outcome=${matchOutcome}); finalizing in ${(MATCH_END_TAIL_MS / 1000).toFixed(1)}s`);
+        }
+        if (shouldFinalizeAfterMatchEnd(matchEndedAtRelMs, Date.now() - startMs)) {
+          break;
+        }
       }
     }
     if (missedSamples > 0) {
@@ -2602,7 +2648,9 @@ async function runCapture(): Promise<void> {
           runtimePreflightEnabled: runtimePreflight,
           runtimePreflightMs: runtimePreflightResult.totalMs,
           runtimePreflightOk: runtimePreflightResult.ok
-        }
+        },
+        matchEndedAtMs: matchEndedAtRelMs,
+        matchOutcome: matchOutcome
       };
       writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
       console.log(`\nArtifacts: ${artifactDir}`);
