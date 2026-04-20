@@ -403,14 +403,23 @@
   // the canonical owner of that lifecycle bit. Pure helper so the Node test
   // can assert the outcome mapping without spinning up the engine.
 
-  function detectMatchEnded(gameState) {
+  // Modes without a faction win condition (harness-match-end-skip-ai-sandbox).
+  // TicketSystem reports phase='ENDED' from the start in ai_sandbox — no
+  // tickets, no objective — which would otherwise latch match-end on the
+  // first sample tick and truncate the capture. Keep the list small and
+  // explicit so zone_control / team_deathmatch / open_frontier still exit
+  // normally when their real win condition fires.
+  const MODES_WITHOUT_WIN_CONDITION = new Set(['ai_sandbox']);
+
+  function detectMatchEnded(gameState, mode) {
+    if (mode && MODES_WITHOUT_WIN_CONDITION.has(String(mode).toLowerCase())) return false;
     if (!gameState) return false;
     if (gameState.phase === 'ENDED') return true;
     return gameState.gameActive === false;
   }
 
-  function detectMatchOutcome(gameState) {
-    if (!detectMatchEnded(gameState)) return null;
+  function detectMatchOutcome(gameState, mode) {
+    if (!detectMatchEnded(gameState, mode)) return null;
     const winner = gameState && gameState.winner;
     if (isBluforFaction(winner)) return 'victory';
     if (isOpforFaction(winner)) return 'defeat';
@@ -1355,10 +1364,10 @@
       // sees a stable value across subsequent samples.
       const ticketGameState = systems && systems.ticketSystem && typeof systems.ticketSystem.getGameState === 'function'
         ? systems.ticketSystem.getGameState() : null;
-      const matchEnded = detectMatchEnded(ticketGameState);
+      const matchEnded = detectMatchEnded(ticketGameState, opts.mode);
       if (matchEnded && state.matchEndedAtMs === null) {
         state.matchEndedAtMs = now;
-        state.matchOutcome = detectMatchOutcome(ticketGameState);
+        state.matchOutcome = detectMatchOutcome(ticketGameState, opts.mode);
       }
 
       const ctx = {
@@ -1708,7 +1717,11 @@
         engineShotsHit: state.shotsHitEngine,
         accuracy: computeAccuracy(state.shotsFiredEngine, state.shotsHitEngine),
         stateHistogramMs: Object.assign({}, state.stateHistogram),
-        matchEndedAtMs: state.matchEndedAtMs,
+        // Emit a non-numeric sentinel (not null) when match-end has not been
+        // latched yet — the capture-side reader does `Number.isFinite(Number(v))`
+        // which treats null as 0 and would spuriously latch. Omitting the
+        // field via undefined round-trips cleanly through JSON/CDP as absent.
+        matchEndedAtMs: typeof state.matchEndedAtMs === 'number' ? state.matchEndedAtMs : undefined,
         matchOutcome: state.matchOutcome,
       };
     }
@@ -1747,7 +1760,10 @@
         engineShotsHit: state.shotsHitEngine,
         pathTrustTtlMs: PATH_TRUST_TTL_MS,
         maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
-        matchEndedAtMs: state.matchEndedAtMs,
+        // See stop() — omit when unset so Number(null)=0 doesn't trip the
+        // capture-side isFinite latch. Surfaced as a numeric timestamp when the
+        // harness has actually observed match-end.
+        matchEndedAtMs: typeof state.matchEndedAtMs === 'number' ? state.matchEndedAtMs : undefined,
         matchOutcome: state.matchOutcome,
       };
     }
