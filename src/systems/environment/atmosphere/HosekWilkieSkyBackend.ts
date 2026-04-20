@@ -12,6 +12,16 @@ const LUT_AZIMUTH_BINS = 32;
 const LUT_ELEVATION_BINS = 8;
 
 /**
+ * Angular threshold (cosine form) at which a sun-direction change forces a
+ * LUT rebake. Cos(0.5deg) = 0.99996..; anything smaller than this dot
+ * product between the previous and current sun vector means the sun has
+ * moved by ~0.5 deg or more. At a 10-minute day cycle this fires roughly
+ * every five seconds of real time, keeping rebakes cheap while still
+ * tracking dawn/dusk hemisphere lighting perceptibly.
+ */
+const LUT_REBAKE_COS_THRESHOLD = Math.cos((0.5 * Math.PI) / 180);
+
+/**
  * Analytic sky-dome backend for `AtmosphereSystem`. Replaces the legacy
  * static-equirectangular `Skybox` with a `ShaderMaterial`-driven dome
  * (geometry + render-state mirrored exactly from `Skybox.ts`: 500-unit
@@ -109,12 +119,22 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   }
 
   update(_deltaTime: number, sunDirection: THREE.Vector3): void {
-    if (!this.lastSunDir.equals(sunDirection)) {
-      this.sunDirection.copy(sunDirection).normalize();
-      this.lastSunDir.copy(this.sunDirection);
-      this.lutDirty = true;
-    }
-    if (this.lutDirty) {
+    // Always track the authoritative sun direction so the dome shader
+    // (uniform refers to this.sunDirection) renders correctly every frame.
+    // The LUT rebake, however, only fires when the direction moved by more
+    // than LUT_REBAKE_COS_THRESHOLD — cheap frame cost once animated TOD
+    // presets move the sun continuously.
+    const nextLen = Math.hypot(sunDirection.x, sunDirection.y, sunDirection.z) || 1;
+    const nx = sunDirection.x / nextLen;
+    const ny = sunDirection.y / nextLen;
+    const nz = sunDirection.z / nextLen;
+    const cosDelta =
+      this.lastSunDir.x * nx + this.lastSunDir.y * ny + this.lastSunDir.z * nz;
+
+    this.sunDirection.set(nx, ny, nz);
+
+    if (this.lutDirty || cosDelta < LUT_REBAKE_COS_THRESHOLD) {
+      this.lastSunDir.set(nx, ny, nz);
       this.bakeLUT();
       this.lutDirty = false;
     }

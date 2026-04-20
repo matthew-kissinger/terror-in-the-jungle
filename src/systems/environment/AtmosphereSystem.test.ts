@@ -217,6 +217,115 @@ describe('AtmosphereSystem (renderer coupling)', () => {
   });
 });
 
+/**
+ * Behavior contract for the day/night cycle (`atmosphere-day-night-cycle`).
+ * Presets carry an optional `todCycle`; when set, the sun direction
+ * evolves with simulated time. Presets without a `todCycle` keep the
+ * v1 static-sun behaviour. Tests assert observable motion, not internal
+ * cycle math or specific elevation constants.
+ */
+describe('AtmosphereSystem (day/night cycle)', () => {
+  it('sun direction is static for a preset with no todCycle (combat120)', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('combat120');
+    const before = system.getSunDirection(new THREE.Vector3()).clone();
+    // Advance simulated time by a full "day" — without a todCycle the sun
+    // must not move.
+    system.setSimulationTimeSeconds(1000);
+    system.update(0.016);
+    const after = system.getSunDirection(new THREE.Vector3());
+    expect(after.x).toBeCloseTo(before.x, 5);
+    expect(after.y).toBeCloseTo(before.y, 5);
+    expect(after.z).toBeCloseTo(before.z, 5);
+  });
+
+  it('sun direction evolves with simulated time for a cycle preset (ashau)', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('ashau');
+    const initial = system.getSunDirection(new THREE.Vector3()).clone();
+
+    // Advance to 1/4 of the day cycle; sun must have moved observably.
+    system.setSimulationTimeSeconds(150);
+    const later = system.getSunDirection(new THREE.Vector3());
+
+    const dx = later.x - initial.x;
+    const dy = later.y - initial.y;
+    const dz = later.z - initial.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    expect(distance).toBeGreaterThan(0.1);
+    expect(later.length()).toBeCloseTo(1, 5);
+  });
+
+  it('sun returns to the preset angle after one full simulated day', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('openfrontier');
+    const preset = system.getCurrentPreset()!;
+    const dayLen = preset.todCycle!.dayLengthSeconds;
+    const start = system.getSunDirection(new THREE.Vector3()).clone();
+
+    // Advance exactly one cycle. Sun must come back to the preset angle.
+    system.setSimulationTimeSeconds(dayLen);
+    const after = system.getSunDirection(new THREE.Vector3());
+    expect(after.x).toBeCloseTo(start.x, 4);
+    expect(after.y).toBeCloseTo(start.y, 4);
+    expect(after.z).toBeCloseTo(start.z, 4);
+  });
+
+  it('sun elevation stays above the analytic sky danger zone across a full day', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('tdm');
+    const preset = system.getCurrentPreset()!;
+    const dayLen = preset.todCycle!.dayLengthSeconds;
+
+    // Sample 48 points across the day and check sun direction stays sane
+    // (no NaN, always unit length, y never drops below a safe floor).
+    const minY = Math.sin(-11 * (Math.PI / 180)); // allow a hair below -10deg
+    for (let i = 0; i < 48; i++) {
+      system.setSimulationTimeSeconds((dayLen * i) / 48);
+      const dir = system.getSunDirection(new THREE.Vector3());
+      expect(Number.isFinite(dir.x)).toBe(true);
+      expect(Number.isFinite(dir.y)).toBe(true);
+      expect(Number.isFinite(dir.z)).toBe(true);
+      expect(dir.length()).toBeCloseTo(1, 4);
+      expect(dir.y).toBeGreaterThanOrEqual(minY);
+    }
+  });
+
+  it('applyScenarioPreset resets simulated time so the boot frame matches the static angle', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('ashau');
+    // Move the clock deep into the day.
+    system.setSimulationTimeSeconds(300);
+    // Reapply — sun must snap back to the preset's configured static angle.
+    system.applyScenarioPreset('ashau');
+    expect(system.getSimulationTimeSeconds()).toBe(0);
+    const dir = system.getSunDirection(new THREE.Vector3());
+    // ashau preset is dawn: low positive y, east-southeast.
+    expect(dir.y).toBeGreaterThan(0);
+    expect(dir.y).toBeLessThan(0.3);
+  });
+
+  it('getSunColor() evolves between dawn-like and noon-like as the cycle advances', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('ashau');
+    // Force LUT rebake for dawn state by running update.
+    system.update(0.016);
+    const dawnSun = system.getSunColor(new THREE.Color());
+    const dawnWarmth = dawnSun.r - dawnSun.b;
+
+    // Advance to ~1/4 of the cycle (noon-ish relative to the preset start).
+    const dayLen = system.getCurrentPreset()!.todCycle!.dayLengthSeconds;
+    system.setSimulationTimeSeconds(dayLen * 0.25);
+    system.update(0.016);
+    const noonSun = system.getSunColor(new THREE.Color());
+    const noonWarmth = noonSun.r - noonSun.b;
+
+    // Sun color must differ observably between the two phases. We expect
+    // dawn to be warmer (red-shifted) than the higher-sun phase.
+    expect(Math.abs(dawnWarmth - noonWarmth)).toBeGreaterThan(0.01);
+  });
+});
+
 describe('AtmosphereSystem (ICloudRuntime contract)', () => {
   it('starts with zero coverage and round-trips a normal value', () => {
     const system = new AtmosphereSystem();

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { AtmosphereSystem } from '../AtmosphereSystem';
+import { HosekWilkieSkyBackend } from './HosekWilkieSkyBackend';
 import { SCENARIO_ATMOSPHERE_PRESETS } from './ScenarioAtmospherePresets';
 
 /**
@@ -157,6 +158,67 @@ describe('HosekWilkieSkyBackend (via AtmosphereSystem)', () => {
     const dg = zenith.g - horizon.g;
     const db = zenith.b - horizon.b;
     expect(Math.sqrt(dr * dr + dg * dg + db * db)).toBeGreaterThan(0.02);
+  });
+});
+
+/**
+ * Behavior contract for the LUT-rebake amortisation
+ * (`atmosphere-day-night-cycle`). A sub-threshold sun-direction change
+ * reuses the previously baked horizon/zenith/sun colors; a supra-threshold
+ * move triggers a fresh bake visible in the output colors. We assert the
+ * observable outcome — same colors for tiny moves, different colors for
+ * big moves — rather than the internal threshold constant.
+ */
+describe('HosekWilkieSkyBackend (LUT rebake threshold)', () => {
+  it('reuses cached colors when sun direction changes by a tiny fraction of a degree', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.applyPreset(SCENARIO_ATMOSPHERE_PRESETS.openfrontier);
+
+    const sun = new THREE.Vector3(0.3, 0.8, 0.5).normalize();
+    backend.update(0.016, sun);
+    const horizonA = backend.getHorizon(new THREE.Color());
+    const sunColorA = backend.getSun(new THREE.Color());
+
+    // Nudge by ~0.05deg (well below the 0.5deg threshold). Must not rebake.
+    const tinyDelta = 0.05 * (Math.PI / 180);
+    const sunSlight = new THREE.Vector3(
+      sun.x + Math.sin(tinyDelta) * 0.1,
+      sun.y,
+      sun.z
+    ).normalize();
+    backend.update(0.016, sunSlight);
+    const horizonB = backend.getHorizon(new THREE.Color());
+    const sunColorB = backend.getSun(new THREE.Color());
+
+    // Cached values must be identical (byte-exact) — same LUT contents.
+    expect(horizonB.r).toBe(horizonA.r);
+    expect(horizonB.g).toBe(horizonA.g);
+    expect(horizonB.b).toBe(horizonA.b);
+    expect(sunColorB.r).toBe(sunColorA.r);
+    expect(sunColorB.g).toBe(sunColorA.g);
+    expect(sunColorB.b).toBe(sunColorA.b);
+  });
+
+  it('rebakes the LUT when sun direction moves beyond the threshold', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.applyPreset(SCENARIO_ATMOSPHERE_PRESETS.ashau);
+
+    const sunHigh = new THREE.Vector3(0.3, 0.8, 0.5).normalize();
+    backend.update(0.016, sunHigh);
+    const horizonHigh = backend.getHorizon(new THREE.Color()).clone();
+
+    // Move the sun by ~30deg — well above any reasonable threshold.
+    const sunLow = new THREE.Vector3(0.8, 0.05, 0.5).normalize();
+    backend.update(0.016, sunLow);
+    const horizonLow = backend.getHorizon(new THREE.Color());
+
+    // Horizon color must shift observably — a low sun reddens / dims the
+    // horizon ring versus a high sun.
+    const dr = horizonHigh.r - horizonLow.r;
+    const dg = horizonHigh.g - horizonLow.g;
+    const db = horizonHigh.b - horizonLow.b;
+    const distance = Math.sqrt(dr * dr + dg * dg + db * db);
+    expect(distance).toBeGreaterThan(0.01);
   });
 });
 

@@ -5,6 +5,7 @@ import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
+  computeSunDirectionAtTime,
   scenarioKeyForMode,
   sunDirectionFromPreset,
   type AtmospherePreset,
@@ -31,6 +32,12 @@ const MIN_SUN_Y = 20;
  * Architectural seam for sky / sun / cloud state. See `docs/ATMOSPHERE.md`
  * for the design and roadmap (Hosek-Wilkie analytic, prebaked cubemap,
  * volumetric for fly-through).
+ *
+ * Cycle 2026-04-21 (`atmosphere-day-night-cycle`): preset-driven animated
+ * sun direction. Presets carry an optional `todCycle` and, when present,
+ * `update(dt)` advances `simulationTimeSeconds` and recomputes
+ * `sunDirection` via `computeSunDirectionAtTime`. Presets without a
+ * `todCycle` (e.g. `combat120`) stay static to preserve perf baselines.
  *
  * Cycle 2026-04-21 (`skybox-cutover-no-fallbacks`): single-authority
  * analytic dome. The `HosekWilkieSkyBackend` is instantiated in the
@@ -68,6 +75,13 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
   private cloudCoverage = 0;
 
+  // Animated sun direction is driven by `simulationTimeSeconds` via the
+  // active preset's optional `todCycle`. Presets without a `todCycle` hold
+  // the sun static at `(sunAzimuthRad, sunElevationRad)` — the v1 behaviour.
+  // A fresh scenario resets simTime to 0, so `applyScenarioPreset()` is
+  // idempotent and the boot frame matches the configured static angle.
+  private simulationTimeSeconds = 0;
+
   // Renderer + (optional) follow target are bound post-construction so
   // AtmosphereSystem can drive `scene.fog.color` AND directional moonLight
   // + hemisphereLight directly each frame without GameRenderer needing to
@@ -104,6 +118,15 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   }
 
   update(deltaTime: number): void {
+    // Advance simulated time and refresh the sun direction if the active
+    // preset carries a `todCycle`. Without a cycle the sun stays at the
+    // static preset angle (set in `applyScenarioPreset`).
+    this.simulationTimeSeconds += deltaTime;
+    const preset = this.getCurrentPreset();
+    if (preset?.todCycle) {
+      computeSunDirectionAtTime(preset, this.simulationTimeSeconds, this.sunDirection);
+    }
+
     this.backend.update(deltaTime, this.sunDirection);
     this.applyToRenderer();
     this.applyFogColor();
@@ -146,6 +169,10 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     }
 
     this.hosekBackend.applyPreset(preset);
+    // Reset sim time so the boot frame matches the preset's configured
+    // static angle, even when a `todCycle` is set. `computeSunDirectionAtTime`
+    // returns the static angle at t=0 by construction.
+    this.simulationTimeSeconds = 0;
     sunDirectionFromPreset(preset, this.sunDirection);
     this.currentScenario = key;
     Logger.info('atmosphere', `Applied scenario preset '${key}' (${preset.label})`);
@@ -153,6 +180,24 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // Force LUT bake immediately so subsequent samples are consistent.
     this.hosekBackend.update(0, this.sunDirection);
     return true;
+  }
+
+  /**
+   * Test hook: override the simulated time (in seconds) used to animate
+   * the sun. Production code does not call this; it exists so behavior
+   * tests can sweep the sun across a day without 10 minutes of real time.
+   */
+  setSimulationTimeSeconds(seconds: number): void {
+    this.simulationTimeSeconds = seconds;
+    const preset = this.getCurrentPreset();
+    if (preset?.todCycle) {
+      computeSunDirectionAtTime(preset, this.simulationTimeSeconds, this.sunDirection);
+    }
+  }
+
+  /** Current simulated time in seconds since the last scenario boot. */
+  getSimulationTimeSeconds(): number {
+    return this.simulationTimeSeconds;
   }
 
   /** Convenience for callers holding a `GameMode`. */
