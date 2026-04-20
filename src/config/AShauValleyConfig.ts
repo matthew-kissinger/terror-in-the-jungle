@@ -81,7 +81,10 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
 
   heightSource: {
     type: 'dem',
-    path: 'data/vietnam/big-map/a-shau-z14-9x9.f32',
+    // Leading slash: resolve relative to origin, not document.baseURI. Matches
+    // the `/data/heightmaps/*.f32` pattern used by the seeded modes and avoids
+    // SPA path-drift when the game is launched from a non-root URL.
+    path: '/data/vietnam/big-map/a-shau-z14-9x9.f32',
     width: DEM_WIDTH,
     height: DEM_HEIGHT,
     metersPerPixel: DEM_METERS_PER_PIXEL
