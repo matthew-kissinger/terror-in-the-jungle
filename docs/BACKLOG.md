@@ -1,6 +1,10 @@
 # Backlog
 
-Last updated: 2026-04-19 (atmosphere-foundation cycle drafted)
+Last updated: 2026-04-19 (repo-state reconciliation)
+
+Historical cycle-close sections below preserve what was true when those cycles
+closed. Current open work lives in the P0/P1/P2/P3 sections plus Known Issues /
+Known Bugs.
 
 ## Recently Completed (cycle-2026-04-18-harness-flight-combat, 2026-04-18 → 2026-04-19)
 
@@ -38,8 +42,6 @@ Seven merged PRs, two rounds abandoned pre-merge, one round replaced mid-cycle. 
 
 ## Cycle conventions (2026-04-18)
 
-## Cycle conventions (2026-04-18)
-
 Phase-letter task IDs (A/B/C/D/E/F) are retired. Every cycle starts from
 the "Current cycle" stub in
 [AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md), uses descriptive slugs
@@ -52,7 +54,7 @@ the runbook for the end-of-cycle ritual.
 ## P0 - Performance Blockers
 
 - [ ] `perf-baseline-refresh` — rebaseline all 4 scenarios against the aim-fixed player bot (PR #96). Carried from `cycle-2026-04-18-harness-flight-combat` after three failed attempts. Stale since 2026-03-06. Brief: `docs/tasks/perf-baseline-refresh.md`.
-- [ ] Reduce initial JS bundle (~710-734kB main runtime chunks). Recast WASM dedupe (C2) trimmed shipped WASM ~half; remaining wins are in `three` and `index` chunks.
+- [ ] Reduce initial JS bundle (current production build emits roughly `three ~727kB`, `index ~866kB`, `ui ~450kB`). Recast WASM dedupe (C2) trimmed shipped WASM ~half; remaining wins are still in runtime chunking and load-path deferral.
 
 ## P1 - Perf harness
 
@@ -61,7 +63,8 @@ the runbook for the end-of-cycle ritual.
 
 ## P1 - Gameplay
 
-- [ ] Wire NPC pilot AI into SystemUpdater for live NPC flight
+- [ ] Repair `scripts/fixed-wing-runtime-probe.ts` after the Airframe API cutover. Current master still calls `model.getPhysics()` inside the probe, so the documented fixed-wing browser validation path is not trustworthy.
+- [ ] Expand and validate live NPC fixed-wing missions beyond the current `FixedWingModel.attachNPCPilot()` / world-feature / air-support path
 - [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy, RTB)
 - [ ] Ground vehicles (M151 jeep first - GLB exists, need driving runtime)
 - [ ] Fixed-wing role split follow-up: A-1 rough-field tuning, AC-47 orbit workflow, F-4 assist/HUD/weapons
@@ -108,17 +111,15 @@ the runbook for the end-of-cycle ritual.
 
 ## Known Issues (flagged, deferred)
 
-1. **NPC hypersprint.** Mechanism identified in `CombatantLODManager` per-update dt amortization (lines ~425, ~454-456, ~652): logical positions tick at full dt but rendered positions don't interpolate, so low-LOD crowds visually teleport. Proper fix is render-side position interpolation (logical vs rendered position split). Shelved for Phase F; F1's attempted dt clamp was closed because it would have broken LOD amortization and the speed-ceiling bypasses it targeted were already fixed on master.
-2. **Combatant mesh silent-drop at scale.** `CombatantMeshFactory` uses `maxInstances = 120`; any bucket that exceeds 120 silently drops the overflow. Flagged in E2 memo (`spike/E2-rendering-at-scale`).
-3. **Orphan AI states.** `CombatantState.RETREATING` and `CombatantState.IDLE` are declared in `src/systems/combat/types.ts` but have no state handlers (E3 memo on `spike/E3-combat-ai-paradigm`).
-4. **Duplicate squad-suppression mutation paths.** `AIFlankingSystem`, `AIStateEngage.initiateSquadSuppression`, and `applySquadCommandOverride` are three parallel paths that can mutate squad command state. Consolidation deferred to Phase F utility-AI design (E3 memo).
-5. **Cross-vehicle state bleed.** `PlayerCamera.flightMouseControlEnabled` is not reset when switching between fixed-wing and helicopter adapters (E6 memo on `spike/E6-vehicle-physics-rebuild`). Low impact in practice but a latent source of adapter-entry surprise.
-6. **Service worker cache version pinned.** `sw.js` uses hard-coded `CACHE_NAME = 'titj-v1'`. Bump on next theme-changing or asset-changing deploy to avoid stale caches (flagged during F2b).
+1. **Orphan `IDLE` AI state.** `CombatantState.RETREATING` now has `AIStateRetreat`; `IDLE` still exists mainly for fixtures / respawn edges and can still fall through if left live at tick time.
+2. **Duplicate squad-suppression mutation paths.** `AIFlankingSystem`, `AIStateEngage.initiateSquadSuppression`, and `applySquadCommandOverride` are three parallel paths that can mutate squad command state. Consolidation deferred to Phase F utility-AI design (E3 memo).
+3. **Cross-vehicle state bleed.** `PlayerCamera.flightMouseControlEnabled` is not reset when switching between fixed-wing and helicopter adapters (E6 memo on `spike/E6-vehicle-physics-rebuild`). Low impact in practice but a latent source of adapter-entry surprise.
+4. **Service worker cache version pinned.** `sw.js` uses hard-coded `CACHE_NAME = 'titj-v1'`. Bump on next theme-changing or asset-changing deploy to avoid stale caches (flagged during F2b).
 
 ## Known Bugs
 
-1. Main runtime bundle is ~780kB (startup stable but heavy).
-2. Open Frontier fixed-wing runtime is player-usable and now has deterministic takeoff probes, but still lacks NPC pilots, orbit/combat mission integration, and landing/orbit acceptance coverage beyond the current probe.
+1. Main production chunks are still heavy (`index ~866kB`, `three ~727kB`, `ui ~450kB`) even though startup is stable.
+2. `scripts/fixed-wing-runtime-probe.ts` is broken on current master after the Airframe cutover (`model.getPhysics()` no longer exists on `FixedWingModel`).
 3. First grenade/explosion cold-start hitch needs fresh perf evidence after the hidden live-effect warmup change.
 
 ## Architecture Debt
@@ -137,7 +138,7 @@ E-track spike memos were kept on `spike/E*` branches and never merged. Pull each
 - **Agent/player API unification.** 1755-LOC driver potentially rewritable to ~150 LOC. Memo: `docs/rearch/E4-agent-player-api.md` on `spike/E4-agent-player-api`. Status: prototype-more.
 - **Deterministic sim + seeded replay.** Proven in spike; ~200 non-determinism sources catalogued. Memo: `docs/rearch/E5-deterministic-sim.md` on `spike/E5-deterministic-sim`. Status: prototype-more.
 - **Vehicle physics rebuild.** Airframe spike and cross-vehicle state bleed confirmed. Memo: `docs/rearch/E6-vehicle-physics-evaluation.md` on `spike/E6-vehicle-physics-rebuild`. Status: prototype-more.
-- **Rendering at scale.** E2 deferred overall but flagged the `maxInstances = 120` silent-drop listed under Known Issues. Memo: `docs/rearch/E2-rendering-evaluation.md` on `spike/E2-rendering-at-scale`.
+- **Rendering at scale.** E2 deferred overall. The old `maxInstances = 120` silent-drop it flagged has since been surfaced and the capacity raised, but true large-N behavior is still unproven. Memo: `docs/rearch/E2-rendering-evaluation.md` on `spike/E2-rendering-at-scale`.
 - **ECS evaluation.** Deferred - bitECS came in ~0.97x at N=3000; V8 already inlines Vector3 shapes well enough. Memo: `docs/rearch/E1-ecs-evaluation.md` (also on master) and `spike/E1-ecs`.
 
 ## Recently Completed (cycle-2026-04-18-rebuild-foundation)
@@ -188,7 +189,7 @@ with letter prefixes dropped (slug convention).
   Falls back to `Math.random()` when no replay session is active, so
   existing code paths are untouched.
 
-### Follow-ups carried forward
+### Historical follow-ups carried forward at cycle close (some later resolved in subsequent cycles)
 
 - **Heap growth regression** on combat120 (~+296% vs baseline during the
   cycle) — investigate whether a specific round introduced it.

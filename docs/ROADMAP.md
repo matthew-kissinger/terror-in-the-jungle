@@ -1,8 +1,9 @@
 # Roadmap
 
-Last updated: 2026-04-08
+Last updated: 2026-04-19
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
+> For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
 
 ## Vision
 
@@ -13,6 +14,8 @@ Core loop: **Play in first person AND command simultaneously.** The player holds
 Vietnam War is the first theater. Architecture generalizes to any war with different factions, terrain, vehicles, and doctrine.
 
 Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain materials and post-processing are ported.
+
+Current truthful framing: the engine already supports large strategic populations through materialization tiers; the verified fully materialized perf frontier is still centered on 120-NPC scenarios, not 3,000 simultaneous live combatants.
 
 ## Architecture Principles
 
@@ -34,7 +37,7 @@ Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain m
 | 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. Water engine and hydrology not started. |
 | 6: Ground Vehicles | NOT STARTED | GLBs exist (jeep, APC, truck, tank, PT-76). No driving runtime. |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
-| 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, and deterministic takeoff probes. NPC pilots, weapons, orbit mission integration, and broader combat loops remain. |
+| 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, and NPC pilot support. Weapons, broader combat loops, and post-Airframe validation/probe cleanup remain. |
 | 9: Faction Expansion | PARTIAL | 4 factions in loadout context (US, ARVN, NVA, VC). AI doctrine per faction not started. |
 | 10: Scale Frontier | NOT STARTED | Gated on combat AI p99 closure. |
 
@@ -83,7 +86,7 @@ Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain m
 
 ## Performance Budget
 
-- Target: 60 FPS with 120+ materialized NPCs
-- Frame budget: <8ms average, <16ms p99
+- Near-term gate: keep 120-NPC materialized scenarios under a stable 60 FPS class budget and continue driving down p95/p99 tails through capture-and-compare work
+- Long-term scale-frontier target before widening materialized counts: <8ms average, <16ms p99
 - Memory: <512MB heap for standard modes
 - Every phase: perf captures before/after, reject regressions

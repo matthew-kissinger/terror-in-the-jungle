@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-17
+Last verified: 2026-04-19
 
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -134,9 +134,9 @@ Naming rule: Only pivot nodes (Joint_*) should match rotor patterns. Child mesh 
 Tail rotor pre-rotation: `pivot.rotation.y = PI/2` baked into GLB so the Z-spin creates a sideways disc.
 
 Fixed-wing runtime (`src/systems/vehicle/`):
-- `FixedWingPhysics` runs on a fixed timestep with an arcade flight model. Ground stabilization ticks (3 frames) prevent false airborne transitions from terrain height mismatch. Thrust is gated by airspeed to prevent rocket-launch at zero speed.
-- `FixedWingControlLaw` sits above physics and converts player pilot intent into bounded phase-aware commands (`taxi`, `takeoff_roll`, `rotation`, `initial_climb`, `flight`, `approach`, `landing_rollout`).
-- `FixedWingModel` only simulates the piloted aircraft plus airborne/unsettled aircraft. It also owns fixed-wing operation states (`parked`, `lineup`, `takeoff_roll`, `rotation`, `initial_climb`, `cruise`, `orbit_hold`, `approach`, `rollout`) and debug runway/approach reposition helpers used by browser probes.
+- `Airframe` is the unified fixed-wing simulation: fixed-step update, swept terrain collision, assist/raw tiers, and one snapshot surface. Ground stabilization ticks absorb terrain-height mismatch on spawn and entry.
+- `FixedWingControlLaw` sits above the sim and converts player/NPC pilot intent into bounded phase-aware commands (`taxi`, `takeoff_roll`, `rotation`, `initial_climb`, `flight`, `approach`, `landing_rollout`).
+- `FixedWingModel` owns the per-aircraft `Airframe`, only simulates the piloted aircraft plus airborne/unsettled/NPC-piloted aircraft, and exposes fixed-wing operation states (`parked`, `lineup`, `takeoff_roll`, `rotation`, `initial_climb`, `cruise`, `orbit_hold`, `approach`, `rollout`) plus runway/approach reposition helpers used by diagnostics and tests.
 - `FixedWingPlayerAdapter` owns throttle/pitch/bank intent, direct-stick overlay, flight-assist/orbit-hold toggles, and seeds fixed-wing HUD state on entry.
 - Template airfields now compile runway/apron/taxi geometry into directional terrain stamps and local-space parking stands. Rotated airfields therefore keep fixed-wing parking side-by-side instead of double-rotating spawn offsets.
 - `AirVehicleVisibility` gates helicopter and fixed-wing rendering against camera/fog distance so far vehicles stop contributing draw calls outside useful visibility.

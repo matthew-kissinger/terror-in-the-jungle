@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-04-17
+Last updated: 2026-04-19
 
 ## Build targets
 
@@ -106,7 +106,8 @@ Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome
 - **Resolved on 2026-04-02:** the Playwright perf harness freeze at `frameCount=1` was caused by same-document View Transitions on the live-entry path. Menu-only transitions can still use `document.startViewTransition()`, but live-entry now bypasses it and perf/sandbox runs explicitly force `uiTransitions=0`.
 - Harness startup probes now capture `rafTicks`, page visibility, startup phase, and active view-transition state so browser scheduling failures are distinguishable from game-loop failures.
 - GitHub-hosted CI perf remains advisory. The harness is now trustworthy locally, but the hosted Linux/Xvfb environment still exhibits non-representative browser scheduling and GPU readback stalls during `combat120`, so authoritative perf gating stays with local/self-run `validate:full`.
-- Full scenario health should be re-baselined after this fix. The table below reflects the last accepted warm measurements before the harness freeze was corrected.
+- Tracked baselines in `perf-baselines.json` are still stale (`lastUpdated: 2026-03-06`). Fresh local `combat120` evidence exists, but the four tracked scenarios still need a coordinated refresh.
+- **Known validation drift on 2026-04-19:** `scripts/fixed-wing-runtime-probe.ts` is currently out of sync with the post-Airframe `FixedWingModel` API and throws `model.getPhysics is not a function`. Treat it as broken until repaired; do not cite it as a passing gate.
 
 ## Validation Gates
 
@@ -118,12 +119,16 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 
 ## Current Scenario Health
 
+Only `combat120` has a fresh local post-PR #96 capture as of 2026-04-19. The
+other tracked scenarios below still need baseline refresh work after the
+harness/player-bot changes.
+
 | Scenario | Status | Avg | p99 | Notes |
 |----------|--------|----:|----:|-------|
-| `combat120` | WARN | ~15ms | ~34ms | Post drift-correction run 2026-04-17: avg dropped -10.7% vs pre-run; p99 tail + heap peak (8.8MB) are the remaining warnings. Max spike ~47ms, hitch 0%. |
-| `openfrontier:short` | WARN | ~9.9ms | ~29.6ms | Renderer/hit-reg regressions recovered; remaining tail-latency + heap-peak warning |
-| `ashau:short` | WARN | ~9ms | ~26ms | WarSim dominates tick budget |
-| `frontier30m` | PASS* | ~6.5ms | ~29ms | Terrain-led tails solved; rare GC outliers |
+| `combat120` | WARN | ~14.7ms | ~33.8ms | Fresh local capture on 2026-04-19 (`artifacts/perf/2026-04-19T22-44-23-057Z`). p95 `32.6ms`, p99 `33.8ms`, heap end-growth `20.35MB`, heap peak-growth `41.64MB`. |
+| `openfrontier:short` | WARN | ~9.9ms | ~29.6ms | Last accepted short capture is still 2026-04-07. Renderer/hit-reg regressions recovered, but scenario refresh is still pending after later harness/player-bot work. |
+| `ashau:short` | WARN | ~9ms | ~26ms | Last tracked warm numbers are still pre-refresh; WarSim remains the dominant budget risk. |
+| `frontier30m` | PASS* | ~6.5ms | ~29ms | Long-soak baseline is stale; refresh is blocked behind harness lifecycle/pathing follow-ups. |
 
 *frontier30m p99 includes rare GC/OS outliers, not game code.
 

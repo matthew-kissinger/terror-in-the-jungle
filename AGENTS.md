@@ -74,7 +74,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 - Navigation: `src/systems/navigation/*` (navmesh, crowd, movement adapter)
 - Strategy (A Shau): `src/systems/strategy/*`
 - Terrain: `src/systems/terrain/*`
-- Vehicles: `src/systems/vehicle/*` (VehicleStateManager, FixedWingPlayerAdapter, HelicopterPlayerAdapter, FixedWingModel, FixedWingPhysics, VehicleManager), `src/systems/helicopter/*`
+- Vehicles: `src/systems/vehicle/*` (VehicleStateManager, FixedWingPlayerAdapter, HelicopterPlayerAdapter, FixedWingModel, `airframe/*`, VehicleManager), `src/systems/helicopter/*`
 - World features: `src/systems/world/*` (WorldFeatureSystem, FirebaseLayoutGenerator, AirfieldLayoutGenerator)
 - Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`, `scripts/preview-server.ts`
 - UI: `src/ui/hud/`, `src/ui/controls/`, `src/ui/icons/`, `src/ui/screens/`, `src/ui/loading/`, `src/ui/engine/`
@@ -85,6 +85,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | Doc | Purpose |
 |-----|---------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System overview, tick graph, coupling heatmap, key patterns |
+| [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) | Current verified repo state, known drift, and immediate priorities |
 | [docs/COMBAT.md](docs/COMBAT.md) | Combat subsystem architecture (new, D1 2026-04-17) |
 | [docs/TESTING.md](docs/TESTING.md) | Four-layer test contract. Read before writing tests. |
 | [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced interfaces in `src/types/SystemInterfaces.ts` |
@@ -141,7 +142,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 
 ## Game-feel requires human playtest
 
-Tests, lint, build, and the fixed-wing runtime probe catch correctness regressions. They do not catch feel regressions. An aircraft that passes every test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.
+Tests, lint, and build catch many correctness regressions. The fixed-wing runtime probe is intended to cover browser-level aircraft validation too, but as of 2026-04-19 `master` it is out of sync with `FixedWingModel`; check [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) before treating it as a passing gate. None of these checks catch feel regressions. An aircraft that passes every other test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.
 
 Any change to flight, driving, combat rhythm, or UI responsiveness must be validated by a human running `docs/PLAYTEST_CHECKLIST.md`. Passing automated checks is necessary, not sufficient. If you can't get a human through the checklist, say so explicitly in the PR description rather than claiming the change is done.
 

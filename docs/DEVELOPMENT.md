@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-04-17
+Last updated: 2026-04-19
 
 ## Prerequisites
 
@@ -14,6 +14,10 @@ npm install
 npm run doctor           # Verify Node, dependencies, and Playwright browser setup
 npm run dev              # Vite dev server
 ```
+
+If `npm ls` reports invalid dependency versions after a dependency bump landed,
+reset the workspace with `npm ci`. Do not assume an existing `node_modules/`
+directory matches `package-lock.json`.
 
 Keep temporary agent worktrees and caches outside this repo root when possible. Nested clones under the main tree add avoidable indexing and search overhead for humans and agents.
 
@@ -33,7 +37,7 @@ npm run validate:fast    # typecheck + lint + test:quick
 ```bash
 npm run validate:fast    # fast local gate
 npm run validate         # lint + test:run + build + smoke:prod
-npm run deadcode         # knip dead code scan (advisory)
+npm run deadcode         # knip dead code scan (advisory; currently not green on master)
 ```
 
 `validate` runs ESLint, the full Vitest suite, TypeScript + Vite production build, then `scripts/prod-smoke.ts` against the built app.
@@ -57,6 +61,10 @@ npx tsx scripts/fixed-wing-runtime-probe.ts --server-mode dev     # debug agains
 `fixed-wing-runtime-probe.ts` boots Open Frontier in Playwright, forces desktop input semantics, steps the live game deterministically through `window.advanceTime(ms)`, and validates runway takeoff/climb for the A-1, F-4, and AC-47. Artifacts land in `artifacts/fixed-wing-runtime-probe/`.
 
 Post-C1 (2026-04-17), the probe defaults to the `perf` build target served via `vite preview` rather than sharing a dev server. See PERFORMANCE.md "Build targets" for the why.
+
+Current caveat: on 2026-04-19 `master`, the probe is broken after the Airframe
+cutover and still calls `model.getPhysics()`. Treat the script as the intended
+validation path, but not as a passing gate until it is repaired.
 
 ### Performance Validation
 
@@ -109,7 +117,7 @@ Neither Tier exercises `_headers` (that's a Cloudflare Pages layer), but both co
 ```bash
 npm run validate:fast    # typecheck + lint + test:quick
 npm run validate         # lint + test + build + smoke
-npm run deadcode         # should stay green
+npm run deadcode         # review output; advisory and currently not green on master
 ```
 
 For performance-sensitive changes, also run:
@@ -128,10 +136,10 @@ CI still captures perf artifacts on every push, but the hosted-run perf outcome 
 ### Build Output
 
 Current large chunks:
-- `three`: ~691kB
-- `index`: ~758kB
+- `three`: ~727kB
+- `index`: ~866kB
 - `recast-navigation.wasm-compat`: ~340kB WASM binary + ~275kB JS loader per entry (shipped WASM roughly halved after C2 dedupe; previously shipped twice across main + worker)
-- `ui`: ~425kB
+- `ui`: ~450kB
 
 ### Manual Smoke Checks
 
@@ -146,7 +154,7 @@ After changes to `src/systems/world/`, `src/systems/terrain/`, `src/systems/vehi
 1. Open Frontier capture records player shots and hits
 2. Nearby enemies are returned by combat spatial queries in the active mode bounds
 3. Entering a plane does not produce vertical self-launch on the first update ticks
-4. `scripts/fixed-wing-runtime-probe.ts` still produces successful A-1 / F-4 / AC-47 takeoff probes when the change touches fixed-wing, airfields, player input, or browser diagnostics hooks
+4. If the change touches fixed-wing, airfields, player input, or browser diagnostics hooks, restore `scripts/fixed-wing-runtime-probe.ts` to a trustworthy passing state or document why the probe is still drifting. As of 2026-04-19 `master`, the probe is out of sync with `FixedWingModel`.
 
 ## Project Structure
 

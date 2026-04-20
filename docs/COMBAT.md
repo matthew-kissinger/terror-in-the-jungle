@@ -1,6 +1,6 @@
 # Combat Subsystem
 
-Last updated: 2026-04-16 (D1 carveout pass)
+Last updated: 2026-04-19
 
 This document is the authoritative architecture reference for the combat
 subsystem (`src/systems/combat/`). Combat is the hot loop: AI decisions,
@@ -176,20 +176,20 @@ Nothing in this layer should import from layers 2-5.
 
 ### 3. AI layer (`ai/` subfolder + orchestrator)
 
-Combat uses a **parameter-driven finite state machine**, not utility AI.
-Each NPC has one of the `CombatantState` values, and a per-state handler
-runs in `CombatantAI.updateAI`. The current doctrine lives in tuning
-constants (engagement range, cover-seek thresholds, flanking triggers),
-not in a data-driven decision tree. E3 research concluded this is the
-right near-term paradigm; a utility-AI layer is a Phase F candidate.
+Combat is still **state-machine-first**. Each NPC has one of the
+`CombatantState` values, and a per-state handler runs in
+`CombatantAI.updateAI`. A small utility-scoring pre-pass now exists inside
+`AIStateEngage` for opted-in factions, but it selects intents inside the
+existing state-machine architecture rather than replacing it. The broader
+doctrine question remains a Phase F candidate.
 
 - `CombatantAI` — thin orchestrator. Dispatches on
   `combatant.state` and delegates to the appropriate handler. Also owns
   `applySquadCommandOverride` (see "Known Issues" below).
 - `ai/AIStatePatrol`, `ai/AIStateEngage`, `ai/AIStateDefend`,
-  `ai/AIStateMovement` — per-state handlers. `AIStateEngage` contains the
-  bulk of the hot-path logic (target re-acquire, cover decision,
-  suppression initiation, fire-rate control).
+  `ai/AIStateMovement`, `ai/AIStateRetreat` — per-state handlers.
+  `AIStateEngage` contains the bulk of the hot-path logic (target
+  re-acquire, cover decision, suppression initiation, fire-rate control).
 - `ai/AITargeting`, `ai/AITargetAcquisition` — who-to-shoot logic.
 - `ai/AILineOfSight` — LOS cache and ray vs. combatant checks. Uses
   `LOSAccelerator` for terrain.
@@ -244,7 +244,7 @@ tick graph). Current status per `docs/PERFORMANCE.md`:
 
 | Scenario | NPCs | Avg | p95 | p99 | Status |
 |----------|-----:|----:|----:|----:|--------|
-| combat120 | 120 | ~16ms | ~32ms | ~34ms | WARN |
+| combat120 | 120 | ~14.7ms | ~32.6ms | ~33.8ms | WARN |
 | openfrontier:short | 120 | ~9.9ms | — | ~29.6ms | WARN |
 | ashau:short | 60 | ~9ms | — | ~26ms | WARN |
 | frontier30m | 120 | ~6.5ms | — | ~29ms | PASS* |
@@ -252,6 +252,10 @@ tick graph). Current status per `docs/PERFORMANCE.md`:
 Frame-level budgets (`combat120` at 120 NPCs):
 - avgFrameMs pass < 16ms, warn < 25ms.
 - p99FrameMs pass < 30ms, warn < 50ms.
+
+As of 2026-04-19, only `combat120` has a fresh local post-PR #96 capture.
+The other scenario rows above remain the last accepted warm captures reflected
+in [docs/PERFORMANCE.md](PERFORMANCE.md).
 
 At 240 NPCs and above, combat avg frame is not baselined. The rule of
 thumb is that AI update scales roughly linearly with count while LOS
@@ -269,13 +273,13 @@ Documented per-frame caps (do not exceed without re-baselining):
 These are deliberately not fixed in the D1 carveout. They are documented
 here so future work can pick them up cleanly.
 
-1. **Orphan `CombatantState` values: `IDLE` and `RETREATING`.**
-   Both enum values are declared in `types.ts` but have no matching case
-   in `CombatantAI.updateAI`'s state switch. `IDLE` is used as an initial
-   state in test fixtures and in `RespawnManager`, but NPCs in `IDLE` at
-   tick time fall through the switch and do nothing.
-   **Do not delete the enum values** — they are referenced by tests and
-   may be intentionally reachable; flag them for Phase F.
+1. **Orphan `CombatantState.IDLE`.**
+   `RETREATING` is now handled by `AIStateRetreat`, but `IDLE` still exists
+   in `types.ts` mainly for fixtures / respawn edges and has no dedicated
+   handler in `CombatantAI.updateAI`. NPCs left live in `IDLE` at tick time
+   still fall through and do nothing. **Do not delete the enum value** —
+   it is referenced by tests and may be intentionally reachable; flag it
+   for Phase F.
 
 2. **Duplicate squad-suppression paths.**
    `AIFlankingSystem` and the inline `AIStateEngage.initiateSquadSuppression`
@@ -284,27 +288,19 @@ here so future work can pick them up cleanly.
    path. These evolved independently and now overlap. Candidate for
    consolidation when faction doctrine AI (D2) lands.
 
-3. **`CombatantMeshFactory.maxInstances = 120`.**
-   NPC billboards are allocated as `InstancedMesh` buckets of 120
-   instances per (faction, state) key. At 2000+ NPCs biased by faction or
-   state (e.g. many `ENGAGING` US soldiers in one mode), instances
-   silently drop once a bucket saturates. Safe for current modes (max
-   120 active NPCs per `combat120` scenario), but needs addressing before
-   A Shau Valley materializes more than ~120 NPCs per bucket.
-
-4. **Cover search cost dominates `combat120` p99.**
+3. **Cover search cost dominates `combat120` p99.**
    Cover search is already budget-capped (6/frame), but per-search cost
    (sandbag iteration, vegetation grid, terrain probes) keeps p99 in the
    WARN range. Further work likely wants a cheaper candidate prefilter
    before full evaluation.
 
-5. **NPC terrain stalling residue.**
+4. **NPC terrain stalling residue.**
    Post-B3 the `StuckDetector` correctly escalates after 4 failed
    backtracks, but the underlying movement solver still routes NPCs into
    unreachable slopes. The B3 fix prevents infinite loops, it does not
    prevent the stall itself.
 
-6. **Mixed import patterns for `IAudioManager`.**
+5. **Mixed import patterns for `IAudioManager`.**
    Combat files import the concrete `AudioManager` rather than the
    fenced `IAudioManager` interface. This predates the interface fence
    and is not urgent, but a future cleanup pass should unify.
