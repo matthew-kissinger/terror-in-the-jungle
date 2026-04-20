@@ -128,8 +128,13 @@ export const BILLBOARD_FRAGMENT_SHADER = `
   void main() {
     vec4 texColor = texture2D(map, vUv);
 
-    // Alpha test - low threshold keeps soft anti-aliased edges
-    if (texColor.a < 0.1) discard;
+    // Alpha test - discard the weakest fringe pixels. The sky-driven fog color
+    // (cycle-2026-04-20 atmosphere) is near-white at the horizon, so any
+    // partial-alpha pixel that survives the test and gets fog-mixed would
+    // emit premultiplied bright-white RGB and read as a halo against the
+    // surviving opaque silhouette. 0.25 drops those without thinning the
+    // silhouette noticeably at gameplay camera distances.
+    if (texColor.a < 0.25) discard;
 
     // Distance-based fade
     float fadeFactor = 1.0;
@@ -142,9 +147,13 @@ export const BILLBOARD_FRAGMENT_SHADER = `
 
     vec3 shaded = pow(texColor.rgb * colorTint, vec3(gammaAdjust));
 
-    // Apply height-based fog (dense at ground, thin at altitude)
+    // Apply height-based fog (dense at ground, thin at altitude). Scale the
+    // fog mix by texture alpha so soft edge pixels keep more of their bled
+    // RGB instead of being lerped toward the bright sky/fog tint — that
+    // lerp was the source of the white/blue outlines reported after the
+    // atmosphere cycle made fogColor sky-driven.
     if (fogEnabled) {
-      shaded = mix(shaded, fogColor, vFogFactor);
+      shaded = mix(shaded, fogColor, vFogFactor * texColor.a);
     }
 
     // Premultiplied alpha output - prevents dark halos from bilinear filtering
