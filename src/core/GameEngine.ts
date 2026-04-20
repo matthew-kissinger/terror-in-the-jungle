@@ -302,7 +302,7 @@ export class GameEngine {
     for (let i = 0; i < steps; i++) {
       this.lastFrameDelta = fixedDelta;
       this.systemManager.updateSystems(fixedDelta, this.gameStarted);
-      this.systemManager.skybox.updatePosition(this.renderer.camera.position);
+      this.systemManager.atmosphereSystem.syncDomePosition(this.renderer.camera.position);
     }
 
     this.renderDiagnosticsFrame();

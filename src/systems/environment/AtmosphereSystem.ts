@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import type { ICloudRuntime, IGameRenderer, ISkyRuntime } from '../../types/SystemInterfaces';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
-import { NullSkyBackend } from './atmosphere/NullSkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
@@ -33,11 +32,17 @@ const MIN_SUN_Y = 20;
  * for the design and roadmap (Hosek-Wilkie analytic, prebaked cubemap,
  * volumetric for fly-through).
  *
- * Cycle 2026-04-20-atmosphere-foundation:
- * - Round 2 (`atmosphere-hosek-wilkie-sky`): owns the analytic
- *   Hosek-Wilkie sky dome (replacing the legacy `Skybox` PNG) and exposes
- *   a per-scenario preset switch via `applyScenarioPreset`. Legacy
- *   `Skybox` still exists but logs a deprecation warning on construction.
+ * Cycle 2026-04-21 (`skybox-cutover-no-fallbacks`): single-authority
+ * analytic dome. The `HosekWilkieSkyBackend` is instantiated in the
+ * constructor and a sane bootstrap preset (`combat120` noon) is applied
+ * immediately, so the very first rendered frame already shows a real sky.
+ * `applyScenarioPreset(<scenario>)` at scenario boot then switches to the
+ * per-scenario look. The legacy `Skybox` PNG dome and `NullSkyBackend`
+ * fallback are gone.
+ *
+ * Prior cycles (kept here as history):
+ * - Round 2 (`atmosphere-hosek-wilkie-sky`): introduced the analytic dome
+ *   alongside the legacy `Skybox` PNG; switchover on `applyScenarioPreset`.
  * - Round 3 (`atmosphere-fog-tinted-by-sky`): owns `scene.fog.color`.
  *   `WeatherAtmosphere` forwards storm-darken + underwater-override intent
  *   here instead of writing `fog.color` directly, so the horizon seam
@@ -52,10 +57,13 @@ const MIN_SUN_Y = 20;
  * pushes light + fog state onto the bound renderer.
  */
 export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime {
+  /** Bootstrap preset applied at construction so the first frame has a real sky. */
+  private static readonly BOOTSTRAP_PRESET: ScenarioAtmosphereKey = 'combat120';
+
   private backend: ISkyBackend;
-  private hosekBackend?: HosekWilkieSkyBackend;
+  private hosekBackend: HosekWilkieSkyBackend;
   private scene?: THREE.Scene;
-  private domeMesh?: THREE.Mesh;
+  private domeMesh: THREE.Mesh;
   private currentScenario?: ScenarioAtmosphereKey;
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
   private cloudCoverage = 0;
@@ -81,8 +89,13 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly scratchHorizon = new THREE.Color();
   private readonly scratchSunPosition = new THREE.Vector3();
 
-  constructor(backend?: ISkyBackend) {
-    this.backend = backend ?? new NullSkyBackend();
+  constructor() {
+    this.hosekBackend = new HosekWilkieSkyBackend();
+    this.backend = this.hosekBackend;
+    this.domeMesh = this.hosekBackend.getMesh();
+    // Apply bootstrap preset synchronously so the first render sees a real
+    // sky — no NullSkyBackend flat-color frame, no legacy PNG fallback.
+    this.applyScenarioPreset(AtmosphereSystem.BOOTSTRAP_PRESET);
   }
 
   async init(): Promise<void> {
@@ -100,48 +113,36 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     if (this.scene && this.domeMesh) {
       this.scene.remove(this.domeMesh);
     }
-    this.hosekBackend?.dispose();
-    this.hosekBackend = undefined;
-    this.domeMesh = undefined;
+    this.hosekBackend.dispose();
     this.renderer = undefined;
     this.followTarget = undefined;
   }
 
   /**
-   * Bind a scene so the analytic sky dome can be installed when a
-   * Hosek-Wilkie scenario preset is applied. Safe to call multiple times;
-   * the dome is reparented to the most recent scene.
+   * Bind a scene so the analytic sky dome can be installed. Safe to call
+   * multiple times; the dome is reparented to the most recent scene.
    */
   attachScene(scene: THREE.Scene): void {
     if (this.scene === scene) return;
-    if (this.scene && this.domeMesh) {
+    if (this.scene) {
       this.scene.remove(this.domeMesh);
     }
     this.scene = scene;
-    if (this.domeMesh) {
-      this.scene.add(this.domeMesh);
-    }
+    this.scene.add(this.domeMesh);
   }
 
   /**
-   * Switch the active backend to the analytic Hosek-Wilkie dome and apply
-   * the given scenario preset (sun direction, turbidity, ground albedo,
-   * exposure). Idempotent; calling with the same key just reapplies the
-   * preset. Returns true if the dome was installed (which signals the
-   * caller to skip the legacy `Skybox` PNG load).
+   * Apply a scenario preset (sun direction, turbidity, ground albedo,
+   * exposure) to the analytic dome. Idempotent; calling with the same key
+   * just reapplies the preset. Returns true when the preset exists; false
+   * (with a warning) when the key is unknown — callers use the boolean to
+   * fall back to the previously-active preset.
    */
   applyScenarioPreset(key: ScenarioAtmosphereKey): boolean {
     const preset = SCENARIO_ATMOSPHERE_PRESETS[key];
     if (!preset) {
       Logger.warn('atmosphere', `No scenario preset registered for key '${key}'; keeping current backend.`);
       return false;
-    }
-
-    if (!this.hosekBackend) {
-      this.hosekBackend = new HosekWilkieSkyBackend();
-      this.backend = this.hosekBackend;
-      this.domeMesh = this.hosekBackend.getMesh();
-      if (this.scene) this.scene.add(this.domeMesh);
     }
 
     this.hosekBackend.applyPreset(preset);
@@ -174,9 +175,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
    * the camera (no clipping when pilots climb past the dome radius).
    */
   syncDomePosition(cameraPosition: THREE.Vector3): void {
-    if (this.domeMesh) {
-      this.domeMesh.position.copy(cameraPosition);
-    }
+    this.domeMesh.position.copy(cameraPosition);
   }
 
   /** Swap backends at runtime (used by future TOD presets and tests). */
@@ -307,11 +306,6 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       this.scratchHorizon.g * f,
       this.scratchHorizon.b * f
     );
-  }
-
-  /** True when the analytic dome owns the sky (Skybox PNG should be skipped). */
-  ownsSkyDome(): boolean {
-    return this.domeMesh !== undefined;
   }
 
   // --- ISkyRuntime ---

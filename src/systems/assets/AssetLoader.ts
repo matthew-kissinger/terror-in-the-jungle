@@ -105,7 +105,6 @@ export class AssetLoader implements GameSystem {
       // UI/Player
       'first-person.png',
       // Environment
-      'skybox.png',
       'waternormals.jpg'
     ];
 
@@ -145,9 +144,6 @@ export class AssetLoader implements GameSystem {
     }
     if (name.startsWith('us-') || name.startsWith('vc-') || name.startsWith('nva-') || name.startsWith('arvn-')) {
       return AssetCategory.ENEMY;
-    }
-    if (name.includes('skybox') || name.includes('sky')) {
-      return AssetCategory.SKYBOX;
     }
 
     return AssetCategory.UNKNOWN;
@@ -223,7 +219,6 @@ export class AssetLoader implements GameSystem {
 
     const lower = name.toLowerCase();
     let maxDim = 2048;
-    if (lower.includes('skybox')) maxDim = 1024;
     if (lower.includes('forestfloor') || lower.includes('waternormals')) maxDim = 1024;
     if (lower.includes('fern') || lower.includes('areca') || lower.includes('elephant') || lower.includes('fanpalm')) maxDim = 2048;
 

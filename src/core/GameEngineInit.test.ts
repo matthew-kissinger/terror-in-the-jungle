@@ -74,9 +74,7 @@ function createEngineStub() {
       playerController: { setSettingsModal: vi.fn() },
       atmosphereSystem: {
         applyScenarioPreset: vi.fn().mockReturnValue(true),
-        ownsSkyDome: vi.fn().mockReturnValue(true),
       },
-      skybox: { createSkybox: vi.fn() },
     },
   } as any;
 }

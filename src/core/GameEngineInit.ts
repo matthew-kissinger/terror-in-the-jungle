@@ -46,18 +46,10 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
     Logger.info('engine-init', 'Systems initialized, loading assets...');
     await loadGameAssets(engine);
 
-    // Default scenario preset so the analytic dome is up before any mode is
-    // selected (menu / loading background still gets a sky). Per-mode
-    // presets are reapplied in `SystemManager.setGameMode`.
-    engine.systemManager.atmosphereSystem.applyScenarioPreset('combat120');
-
-    const skyboxTexture = engine.systemManager.assetLoader.getTexture('skybox');
-    if (engine.systemManager.atmosphereSystem.ownsSkyDome()) {
-      Logger.info('engine-init', 'Skybox skipped: AtmosphereSystem owns the dome');
-    } else if (skyboxTexture) {
-      engine.systemManager.skybox.createSkybox(skyboxTexture);
-      Logger.info('engine-init', 'Skybox created');
-    }
+    // `AtmosphereSystem` applies the `combat120` bootstrap preset in its
+    // constructor so the analytic dome is up before any mode is selected
+    // (menu / loading background still gets a real sky). Per-mode presets
+    // are reapplied in `SystemManager.setGameMode`.
 
     engine.systemManager.globalBillboardSystem.configure('denseJungle');
 
@@ -91,10 +83,7 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
 /**
  * Minimal asset check before starting
  */
-export async function loadGameAssets(engine: GameEngine): Promise<void> {
-  if (!engine.systemManager.assetLoader.getTexture('skybox')) {
-    Logger.warn('engine-init', 'Skybox texture missing; proceeding without skybox.');
-  }
+export async function loadGameAssets(_engine: GameEngine): Promise<void> {
   Logger.info('engine-init', 'Asset check complete');
 }
 
