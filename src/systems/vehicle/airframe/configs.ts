@@ -57,7 +57,13 @@ export const SKYRAIDER_AIRFRAME: AirframeConfig = {
   },
   ground: {
     gearClearanceM: 0.5,
-    liftoffClearanceM: 0.2,
+    // Raised 0.2 → 0.5: the post-liftoff fallback fires when AGL dips below
+    // this + GROUND_TOUCHDOWN_BUFFER_M after the grace window expires.
+    // At 0.2 the fallback was catching normal sub-half-meter oscillation
+    // during the first seconds of a marginal climb and snapping the plane
+    // back to ground, producing a visible bounce/porpoise on takeoff. At 0.5
+    // only a genuine re-touchdown triggers the clamp.
+    liftoffClearanceM: 0.5,
     steeringRadPerSec: 0.6,
     lateralFriction: 7.4,
     rollingResistance: 0.014,
@@ -119,7 +125,7 @@ export const PHANTOM_AIRFRAME: AirframeConfig = {
   },
   ground: {
     gearClearanceM: 0.5,
-    liftoffClearanceM: 0.2,
+    liftoffClearanceM: 0.5,
     steeringRadPerSec: 0.42,
     lateralFriction: 8.8,
     rollingResistance: 0.015,
@@ -181,7 +187,7 @@ export const SPOOKY_AIRFRAME: AirframeConfig = {
   },
   ground: {
     gearClearanceM: 0.5,
-    liftoffClearanceM: 0.2,
+    liftoffClearanceM: 0.5,
     steeringRadPerSec: 0.5,
     lateralFriction: 8.0,
     rollingResistance: 0.017,

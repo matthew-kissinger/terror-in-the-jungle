@@ -35,6 +35,11 @@ const ROTATION_INPUT_THRESHOLD = 0.08;
 const LIFTOFF_WEIGHT_RATIO = 0.25;
 const GROUND_STABILIZATION_TICKS = 3;
 const AIRBORNE_RECOVERY_ALTITUDE = 0.4;
+// Airborne touchdown fallback requires the guards (low AGL + descending) to
+// be true for several consecutive ticks before firing. A single-tick latch
+// caused bounce/porpoise artifacts when marginal-lift aircraft (e.g. AC-47)
+// oscillated across the threshold right after the 1s grace window expired.
+const TOUCHDOWN_LATCH_TICKS = 10;
 
 const _forward = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -95,6 +100,11 @@ export class Airframe {
    *  just-happened liftoff. Prevents an immediate bounce back to ground on
    *  the first airborne frame when the plane is still near zero AGL. */
   private postLiftoffGraceTicks = 0;
+  /** Consecutive ticks the airborne fallback's guards (low AGL + descending)
+   *  have been satisfied. The fallback only fires once this crosses a small
+   *  threshold, so a momentary dip from aerodynamic oscillation during the
+   *  seconds after liftoff doesn't snap the plane back to ground. */
+  private descentLatchTicks = 0;
   /** Captured altitude target for assist-tier cruise hold. Set when the
    *  pilot releases the pitch stick in assist tier; cleared on stick input
    *  or on tier change. */
@@ -148,6 +158,8 @@ export class Airframe {
     this.pitchRate = this.rollRate = this.yawRate = 0;
     this.accumulator = 0;
     this.altitudeHoldTarget = null;
+    this.postLiftoffGraceTicks = 0;
+    this.descentLatchTicks = 0;
     this.snapshot = this.buildSnapshot(this.zeroAero());
   }
 
@@ -173,6 +185,8 @@ export class Airframe {
     this.weightOnWheels = false;
     this.pitchRate = this.rollRate = this.yawRate = 0;
     this.accumulator = 0;
+    this.postLiftoffGraceTicks = 0;
+    this.descentLatchTicks = 0;
     // Capture current altitude as the assist-tier hold target. The pilot
     // will clear it implicitly on their first pitch input.
     this.altitudeHoldTarget = position.y;
@@ -397,9 +411,12 @@ export class Airframe {
       // Vertical impulse so we're not clipping terrain right after liftoff,
       // and a small positive pitch rate so the nose continues up into the
       // commanded pitch attitude instead of sagging for the first ~150 ms.
+      // Floor bumped 3.0 → 4.5 m/s so marginal-lift aircraft (AC-47) leave
+      // the ground with enough vertical margin to clear the fallback
+      // threshold before the grace window expires.
       this.velocity.addScaledVector(
         _up.set(0, 1, 0).applyQuaternion(this.quaternion),
-        Math.max(3.0, newFwd * 0.08),
+        Math.max(4.5, newFwd * 0.12),
       );
       this.pitchRate = Math.max(this.pitchRate, cmd.elevator * 0.5);
       // Suppress immediate retouchdown for ~1s. Keeps the plane from
@@ -523,10 +540,18 @@ export class Airframe {
       this.postLiftoffGraceTicks--;
     }
     const postLiftoffProtected = this.postLiftoffGraceTicks > 0;
+    const touchdownGuardsMet =
+      altitudeAGL <= this.cfg.ground.liftoffClearanceM + GROUND_TOUCHDOWN_BUFFER_M &&
+      this.velocity.y <= 0;
+    if (touchdownGuardsMet && !postLiftoffProtected) {
+      this.descentLatchTicks++;
+    } else {
+      this.descentLatchTicks = 0;
+    }
     if (
       !postLiftoffProtected &&
-      altitudeAGL <= this.cfg.ground.liftoffClearanceM + GROUND_TOUCHDOWN_BUFFER_M &&
-      this.velocity.y <= 0
+      touchdownGuardsMet &&
+      this.descentLatchTicks >= TOUCHDOWN_LATCH_TICKS
     ) {
       this.position.y = groundClearance;
       this.velocity.y = 0;
@@ -536,6 +561,7 @@ export class Airframe {
       this.rollRate = 0;
       this.yawRate *= 0.5;
       this.groundPitch = Math.max(0, _euler.x);
+      this.descentLatchTicks = 0;
       return;
     }
 
