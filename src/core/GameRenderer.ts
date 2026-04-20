@@ -97,9 +97,12 @@ export class GameRenderer {
     const INITIAL_FOG_COLOR = 0x7a8f88;
     this.scene.background = new THREE.Color(INITIAL_FOG_COLOR);
 
-    // Exponential fog - density tuned to hide terrain edge (~400-500m)
-    // Lower density = fog starts further away
-    this.fog = new THREE.FogExp2(INITIAL_FOG_COLOR, 0.004);
+    // Exponential fog. Bootstrap density only — per-scenario fog density
+    // is stamped onto `this.fog.density` by `AtmosphereSystem.applyScenarioPreset`
+    // at scenario boot (`fog-density-rebalance`, cycle-2026-04-21) so the
+    // density stays tuned alongside the preset's sun angle / horizon color.
+    // Weather modulates this base per-frame (x1.5 rain, x3.5 storm).
+    this.fog = new THREE.FogExp2(INITIAL_FOG_COLOR, 0.0022);
     this.scene.fog = this.fog;
 
     this.ambientLight = new THREE.AmbientLight(0xffffff, 1.0);

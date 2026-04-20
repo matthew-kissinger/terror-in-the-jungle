@@ -112,9 +112,12 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
     maxRoutesPerAnchor: 2,
   },
 
-  // Renderer overrides for tall terrain
+  // Renderer overrides for tall terrain. Fog density now lives alongside
+  // the sky preset in `ScenarioAtmospherePresets.ts` (`fog-density-rebalance`)
+  // so the dawn preset's warm horizon color and its density stay tuned
+  // together; the per-mode override here is redundant once the atmosphere
+  // system pushes the preset density onto `renderer.fog.density`.
   cameraFar: 4000,
-  fogDensity: 0.001,
   shadowFar: 500,
   waterEnabled: false, // No global water plane - area has streams, not lakes
 

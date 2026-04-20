@@ -156,10 +156,10 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
 
   /**
    * Apply a scenario preset (sun direction, turbidity, ground albedo,
-   * exposure) to the analytic dome. Idempotent; calling with the same key
-   * just reapplies the preset. Returns true when the preset exists; false
-   * (with a warning) when the key is unknown — callers use the boolean to
-   * fall back to the previously-active preset.
+   * exposure, fog density) to the analytic dome. Idempotent; calling with
+   * the same key just reapplies the preset. Returns true when the preset
+   * exists; false (with a warning) when the key is unknown — callers use
+   * the boolean to fall back to the previously-active preset.
    */
   applyScenarioPreset(key: ScenarioAtmosphereKey): boolean {
     const preset = SCENARIO_ATMOSPHERE_PRESETS[key];
@@ -175,6 +175,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.simulationTimeSeconds = 0;
     sunDirectionFromPreset(preset, this.sunDirection);
     this.currentScenario = key;
+    // Fog density tracks the preset alongside sky color
+    // (`fog-density-rebalance`). Weather modulates this base per-frame
+    // (x1.5 rain, x3.5 storm); `WaterSystem` overrides to 0.04 underwater.
+    if (this.renderer?.fog) {
+      this.renderer.fog.density = preset.fogDensity;
+    }
     Logger.info('atmosphere', `Applied scenario preset '${key}' (${preset.label})`);
 
     // Force LUT bake immediately so subsequent samples are consistent.

@@ -61,6 +61,19 @@ export interface AtmospherePreset {
   /** Final linear-exposure multiplier applied to the dome output. */
   exposure: number;
   /**
+   * Base `THREE.FogExp2` density (per-meter) for this scenario. Applied by
+   * `AtmosphereSystem.applyScenarioPreset` onto the bound renderer's fog.
+   * Tuned alongside `turbidity` now that fog color tracks the sky horizon
+   * (`atmosphere-fog-tinted-by-sky`, cycle-2026-04-20): the legacy flat
+   * 0.004 density saturated distant terrain to near-white once the fog
+   * tint switched from dim grey-green to bright horizon white. Lower
+   * densities let distant terrain read through the haze without bringing
+   * back the seam the horizon-match kills. Weather modulates this base up
+   * (x1.5 rain, x3.5 storm) and `WaterSystem` overrides to 0.04 while
+   * submerged.
+   */
+  fogDensity: number;
+  /**
    * Optional day/night cycle. When undefined the sun is static at
    * (`sunAzimuthRad`, `sunElevationRad`). When set, `AtmosphereSystem`
    * animates the sun across simulated time. See `AtmosphereTodCycle`.
@@ -77,19 +90,6 @@ const DEFAULT_MAX_SUN_ELEVATION_DEG = 70;
  * Compute the animated sun direction for a preset at a given simulated-time
  * offset (in seconds since match start). If the preset has no `todCycle`,
  * returns the static direction (equivalent to `sunDirectionFromPreset`).
- *
- * Model: at `simulationTimeSeconds === 0` the sun sits exactly at the
- * preset's configured `(sunAzimuthRad, sunElevationRad)` — the same value a
- * fully-static preset would produce, so cycle-enabled presets stay
- * backwards-compatible with boot-time tests and screenshots.
- *
- * As time advances, the sun rotates around Y (azimuth sweep of one full
- * revolution per `dayLengthSeconds`) and its elevation is modulated by a
- * sine centered on the configured `startHour`. The elevation swing clamps
- * to `[minSunElevationDeg, maxSunElevationDeg]` so the analytic Preetham /
- * Hosek formulas never see a sun well below the horizon (where they go
- * unstable / NaN). The configured elevation is preserved at `startHour`
- * and the same elevation recurs 24h later.
  */
 export function computeSunDirectionAtTime(
   preset: AtmospherePreset,
@@ -108,26 +108,14 @@ export function computeSunDirectionAtTime(
   const maxElevRad = (maxElevDeg * Math.PI) / 180;
 
   const dayLen = Math.max(1e-3, cycle.dayLengthSeconds);
-  // Normalized cycle phase: 0 at simTime=0 (== preset's startHour), wrapping
-  // at dayLengthSeconds. Keep phase in [0, 1).
   const phase = (((simulationTimeSeconds / dayLen) % 1) + 1) % 1;
 
-  // Elevation sine: peaks 6 hours (1/4 cycle) after start, troughs 18 hours
-  // (3/4 cycle) after start. sin(2*pi*phase) at phase=0 is 0, so the raw
-  // sine-modulated elevation at simTime=0 is the preset's configured
-  // elevation (no offset). Moving forward tilts it up toward max; moving
-  // past the peak swings down toward min.
   const elevSine = Math.sin(2 * Math.PI * phase);
   const baseElev = preset.sunElevationRad;
-  // Interpolate between baseElev and min/max following the sine. When
-  // sine > 0 we head toward maxElev; when < 0 toward minElev. This
-  // preserves baseElev at phase=0 (simTime=0) and at phase=0.5 (12h later).
   const elevation = elevSine >= 0
     ? baseElev + elevSine * (maxElevRad - baseElev)
     : baseElev + elevSine * (baseElev - minElevRad);
 
-  // Azimuth sweep: one full revolution over the simulated day. At phase=0
-  // the azimuth equals the preset's configured value.
   const azimuth = preset.sunAzimuthRad + 2 * Math.PI * phase;
 
   const cosE = Math.cos(elevation);
@@ -163,6 +151,10 @@ export type ScenarioAtmosphereKey = 'ashau' | 'openfrontier' | 'tdm' | 'zc' | 'c
  */
 export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, AtmospherePreset> = {
   // Dawn: low sun in the east, warm amber haze, damp jungle albedo.
+  // Lowest density of the set — A Shau DEM reaches >21km on the X axis with
+  // a 4km draw distance; the mountains have to stay legible through the
+  // horizon haze or the frame reads as flat grey (cycle-2026-04-20
+  // after-round-3 baseline: ground saturates to uniform off-white).
   ashau: {
     label: 'A Shau — dawn patrol',
     sunAzimuthRad: Math.PI * 0.15,          // ~27deg, east-southeast
@@ -171,6 +163,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.4,
     groundAlbedo: new THREE.Color(0x2a3a22), // deep jungle green
     exposure: 0.18,
+    fogDensity: 0.00055,
     // Start at dawn (6am); 10-minute real-time cycle so playtests see the
     // sun sweep across the sky without waiting forever.
     todCycle: { dayLengthSeconds: 600, startHour: 6 },
@@ -184,9 +177,12 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.0,
     groundAlbedo: new THREE.Color(0x3b4c2e),
     exposure: 0.22,
+    fogDensity: 0.0022,
     todCycle: { dayLengthSeconds: 600, startHour: 12 },
   },
   // Dusk: sun very low in the west, heavy haze, strong orange extinction.
+  // Highest fog density — dusk reads as "can see nearby, distance fades"
+  // rather than dawn's "mountains visible through thin mist".
   tdm: {
     label: 'TDM — dusk',
     sunAzimuthRad: Math.PI * 1.1,           // ~198deg, west-southwest
@@ -195,6 +191,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.6,
     groundAlbedo: new THREE.Color(0x2e2a22),
     exposure: 0.16,
+    fogDensity: 0.0028,
     todCycle: { dayLengthSeconds: 600, startHour: 18 },
   },
   // Golden hour: oblique warm light, moderate turbidity.
@@ -206,6 +203,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.2,
     groundAlbedo: new THREE.Color(0x34402a),
     exposure: 0.18,
+    fogDensity: 0.0024,
     todCycle: { dayLengthSeconds: 600, startHour: 16 },
   },
   // AI sandbox (perf harness): noon, perf-neutral; matches the legacy
@@ -218,6 +216,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.0,
     groundAlbedo: new THREE.Color(0x3b4c2e),
     exposure: 0.22,
+    fogDensity: 0.0022,
   },
 };
 

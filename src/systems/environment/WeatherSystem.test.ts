@@ -173,6 +173,31 @@ describe('WeatherSystem', () => {
     });
   });
 
+  describe('refreshAtmosphereBaseline', () => {
+    it('re-reads fog density from the bound renderer after it changes', () => {
+      // Supports `fog-density-rebalance`: after AtmosphereSystem applies a
+      // scenario preset that stamps a new fog density onto the renderer,
+      // WeatherSystem must pick up the new baseline so its multipliers
+      // (x1.5 rain, x3.5 storm) scale from the correct density rather
+      // than the stale default captured at composer wire-up.
+      const { system } = createSystem();
+      const renderer = createMockRenderer();
+      system.setRenderer(renderer);
+      const systemAny = system as WeatherSystemAny;
+      expect(systemAny.baseFogDensity).toBe(0.02);
+
+      renderer.fog!.density = 0.0022;
+      system.refreshAtmosphereBaseline();
+
+      expect(systemAny.baseFogDensity).toBe(0.0022);
+    });
+
+    it('is a no-op when no renderer has been wired', () => {
+      const { system } = createSystem();
+      expect(() => system.refreshAtmosphereBaseline()).not.toThrow();
+    });
+  });
+
   describe('setWeatherConfig', () => {
     it('sets initial weather state instantly', () => {
       const { system } = createSystem();
