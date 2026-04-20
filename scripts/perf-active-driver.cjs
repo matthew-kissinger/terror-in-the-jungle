@@ -337,6 +337,65 @@
     return Math.hypot(dy, dp);
   }
 
+  // ── Objective zone selector (pure, exported for Node-side regression tests). ──
+  //
+  // Picks the next capture zone the harness bot should march on.
+  //
+  // Rules (mode-agnostic; callers pass in the friendly-faction predicate):
+  //   - Skip home-base zones — the bot never targets its own or the enemy
+  //     spawn as an objective.
+  //   - Skip zones that are friendly-owned AND not contested. This is the
+  //     cycling-fix invariant: once a zone is ours and uncontested, it is
+  //     NOT a valid objective. On wide maps (e.g. A Shau) the previous
+  //     "prefer distant unowned zones" scoring still picked a nearby owned
+  //     zone because `priority * 500_000` was swamped by distSq across 10+
+  //     km. Hard-skipping the owned-uncontested class prevents the loop.
+  //   - Among the remaining candidates, prefer contested (someone is taking
+  //     it from us right now), then unowned/enemy-held, breaking ties by
+  //     squared distance. Returns null when no actionable zone remains.
+  //
+  // `isFriendly(owner)` is passed in so the selector stays faction-agnostic
+  // and unit-testable without the BLUFOR/OPFOR constants.
+  function pickObjectiveZone(opts) {
+    const zones = opts && Array.isArray(opts.zones) ? opts.zones : null;
+    if (!zones || zones.length === 0) return null;
+    const playerPos = opts && opts.playerPos;
+    if (!playerPos) return null;
+    const isFriendly = (opts && typeof opts.isFriendly === 'function')
+      ? opts.isFriendly
+      : () => false;
+    const px = Number(playerPos.x);
+    const pz = Number(playerPos.z);
+    if (!Number.isFinite(px) || !Number.isFinite(pz)) return null;
+    // Lexicographic sort: priority class first (contested > unowned/enemy),
+    // then distance. Explicit lex order is safer than a composite score on
+    // wide maps (e.g. A Shau's ~20 km diagonal) where distSq would swamp any
+    // fixed priority weight.
+    let best = null;
+    let bestPriority = Number.POSITIVE_INFINITY;
+    let bestDistSq = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < zones.length; i++) {
+      const z = zones[i];
+      if (!z || z.isHomeBase || !z.position) continue;
+      const isContested = z.state === 'contested';
+      const ownedByUs = isFriendly(z.owner);
+      // Cycling-fix: friendly-owned non-contested zones are NOT actionable.
+      if (ownedByUs && !isContested) continue;
+      const dx = Number(z.position.x) - px;
+      const dz = Number(z.position.z) - pz;
+      if (!Number.isFinite(dx) || !Number.isFinite(dz)) continue;
+      const distSq = dx * dx + dz * dz;
+      // Priority 0 = contested (defend / retake now), 1 = unowned / enemy.
+      const priority = isContested ? 0 : 1;
+      if (priority < bestPriority || (priority === bestPriority && distSq < bestDistSq)) {
+        best = z;
+        bestPriority = priority;
+        bestDistSq = distSq;
+      }
+    }
+    return best;
+  }
+
   // ── Combat stat helpers (pure, exported for Node-side regression tests). ──
   //
   // The driver polls the engine's PlayerStatsTracker each tick. These
@@ -831,21 +890,17 @@
       const zoneManager = systems && systems.zoneManager;
       const zones = zoneManager && zoneManager.getAllZones ? zoneManager.getAllZones() : null;
       if (!Array.isArray(zones) || zones.length === 0) return null;
-      let bestZone = null;
-      let bestScore = Number.POSITIVE_INFINITY;
-      for (let i = 0; i < zones.length; i++) {
-        const z = zones[i];
-        if (!z || z.isHomeBase) continue;
-        const isContested = z.state === 'contested';
-        const isOwned = isBluforFaction(z.owner);
-        const priority = isContested ? 0 : (isOwned ? 3 : 1);
-        const dx = Number(z.position.x) - Number(playerPos.x);
-        const dz = Number(z.position.z) - Number(playerPos.z);
-        const distSq = dx * dx + dz * dz;
-        const score = priority * 500000 + distSq;
-        if (score < bestScore) { bestScore = score; bestZone = z; }
+      const bestZone = pickObjectiveZone({
+        zones: zones,
+        playerPos: playerPos,
+        isFriendly: isBluforFaction,
+      });
+      if (!bestZone || !bestZone.position) {
+        // Nothing actionable — clear the cached objective id so the next
+        // selector pass doesn't carry a stale reference into telemetry.
+        state.lastObjectiveZoneId = null;
+        return null;
       }
-      if (!bestZone || !bestZone.position) return null;
       state.lastObjectiveZoneId = String(bestZone.id || '');
       return {
         position: {
@@ -853,7 +908,7 @@
           y: Number(bestZone.position.y || 0),
           z: Number(bestZone.position.z),
         },
-        priority: bestZone.state === 'contested' ? 2 : (isBluforFaction(bestZone.owner) ? 0 : 1),
+        priority: bestZone.state === 'contested' ? 2 : 1,
       };
     }
 
@@ -1854,6 +1909,8 @@
       rebasedTotal: rebasedTotal,
       damageTakenDelta: damageTakenDelta,
       computeAccuracy: computeAccuracy,
+      // Objective selector (harness-ashau-objective-cycling-fix).
+      pickObjectiveZone: pickObjectiveZone,
     };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

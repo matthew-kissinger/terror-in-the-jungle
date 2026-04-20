@@ -56,6 +56,8 @@ const {
   rebasedTotal,
   damageTakenDelta,
   computeAccuracy,
+  // harness-ashau-objective-cycling-fix: objective zone picker.
+  pickObjectiveZone,
 } = driver;
 
 function makeBotCtx(overrides = {}) {
@@ -1194,5 +1196,173 @@ describe('harness combat stats — driver stop-stats surface (regression guard)'
     expect(typeof rebasedTotal).toBe('function');
     expect(typeof damageTakenDelta).toBe('function');
     expect(typeof computeAccuracy).toBe('function');
+  });
+});
+
+// ── harness-ashau-objective-cycling-fix: objective zone picker. ─────────────
+//
+// Behavior: the bot must not cycle back to a zone it already captured.
+// The bug shape (playtest 2026-04-20, ashau mode) was a nearby friendly-
+// owned zone beating a distant enemy zone on score = priority * weight +
+// distSq, because distSq dominates on 20km maps. The selector now hard-
+// skips friendly-owned non-contested zones; if nothing else is available,
+// it returns null and the caller falls back to the engagement center.
+
+describe('harness objective selector — pickObjectiveZone', () => {
+  const isBlufor = (f) => f === 'US' || f === 'ARVN';
+
+  it('skips a zone the bot already captured even when it is the closest', () => {
+    // Ashau shape: captured zone at 100m, enemy zone 10km out. Old scoring
+    // picked the captured one; new rule excludes it entirely.
+    const captured = {
+      id: 'hill_937',
+      position: { x: 100, z: 0 },
+      owner: 'US',
+      state: 'blufor_controlled',
+      isHomeBase: false,
+    };
+    const enemy = {
+      id: 'dmz_bunker',
+      position: { x: 10000, z: 0 },
+      owner: 'NVA',
+      state: 'opfor_controlled',
+      isHomeBase: false,
+    };
+    const choice = pickObjectiveZone({
+      zones: [captured, enemy],
+      playerPos: { x: 0, z: 0 },
+      isFriendly: isBlufor,
+    });
+    expect(choice).not.toBeNull();
+    expect(choice.id).toBe('dmz_bunker');
+  });
+
+  it('still targets a friendly zone when enemies are actively contesting it', () => {
+    // Defense case: a friendly zone flipping to contested is actionable.
+    // The bot should push back to defend.
+    const defended = {
+      id: 'lz_eagle',
+      position: { x: 50, z: 0 },
+      owner: 'US',
+      state: 'contested',
+      isHomeBase: false,
+    };
+    const enemy = {
+      id: 'dmz_bunker',
+      position: { x: 500, z: 0 },
+      owner: 'NVA',
+      state: 'opfor_controlled',
+      isHomeBase: false,
+    };
+    const choice = pickObjectiveZone({
+      zones: [defended, enemy],
+      playerPos: { x: 0, z: 0 },
+      isFriendly: isBlufor,
+    });
+    expect(choice).not.toBeNull();
+    expect(choice.id).toBe('lz_eagle');
+  });
+
+  it('returns null when every zone is friendly-owned and uncontested', () => {
+    // All objectives captured — caller must fall back (engagement center).
+    const zones = [
+      { id: 'a', position: { x: 100, z: 0 }, owner: 'US', state: 'blufor_controlled', isHomeBase: false },
+      { id: 'b', position: { x: 0, z: 100 }, owner: 'ARVN', state: 'blufor_controlled', isHomeBase: false },
+    ];
+    const choice = pickObjectiveZone({
+      zones: zones,
+      playerPos: { x: 0, z: 0 },
+      isFriendly: isBlufor,
+    });
+    expect(choice).toBeNull();
+  });
+
+  it('skips home-base zones even if they are technically enemy-owned', () => {
+    // Home bases are never objectives. The bot should not try to assault
+    // the enemy spawn.
+    const zones = [
+      { id: 'enemy_home', position: { x: 100, z: 0 }, owner: 'NVA', state: 'opfor_controlled', isHomeBase: true },
+      { id: 'ob', position: { x: 500, z: 0 }, owner: null, state: 'neutral', isHomeBase: false },
+    ];
+    const choice = pickObjectiveZone({
+      zones: zones,
+      playerPos: { x: 0, z: 0 },
+      isFriendly: isBlufor,
+    });
+    expect(choice).not.toBeNull();
+    expect(choice.id).toBe('ob');
+  });
+
+  it('prefers the nearest actionable zone when priorities tie', () => {
+    const near = { id: 'near', position: { x: 50, z: 0 }, owner: 'NVA', state: 'opfor_controlled', isHomeBase: false };
+    const far = { id: 'far', position: { x: 2000, z: 0 }, owner: null, state: 'neutral', isHomeBase: false };
+    const choice = pickObjectiveZone({
+      zones: [far, near],
+      playerPos: { x: 0, z: 0 },
+      isFriendly: isBlufor,
+    });
+    expect(choice.id).toBe('near');
+  });
+
+  it('prefers contested over uncontested even at longer distance', () => {
+    // Contested is priority 0; unowned is priority 1. A contested zone 1km
+    // away should beat a neutral zone 50m away.
+    const contestedFar = { id: 'contested', position: { x: 1000, z: 0 }, owner: 'US', state: 'contested', isHomeBase: false };
+    const neutralNear = { id: 'neutral', position: { x: 50, z: 0 }, owner: null, state: 'neutral', isHomeBase: false };
+    const choice = pickObjectiveZone({
+      zones: [neutralNear, contestedFar],
+      playerPos: { x: 0, z: 0 },
+      isFriendly: isBlufor,
+    });
+    expect(choice.id).toBe('contested');
+  });
+
+  it('is safe against missing or malformed inputs', () => {
+    expect(pickObjectiveZone({})).toBeNull();
+    expect(pickObjectiveZone({ zones: [], playerPos: { x: 0, z: 0 } })).toBeNull();
+    expect(pickObjectiveZone({ zones: null, playerPos: { x: 0, z: 0 } })).toBeNull();
+    expect(pickObjectiveZone({ zones: [{}], playerPos: { x: 0, z: 0 } })).toBeNull();
+    // Non-finite player position — no crash, no pick.
+    expect(pickObjectiveZone({
+      zones: [{ id: 'a', position: { x: 10, z: 0 }, owner: null, state: 'neutral', isHomeBase: false }],
+      playerPos: { x: Number.NaN, z: 0 },
+      isFriendly: isBlufor,
+    })).toBeNull();
+  });
+
+  it('re-selects a fresh zone once the previous pick becomes friendly-owned (capture-then-reselect)', () => {
+    // Regression scenario from the brief: bot captures a zone (it flips to
+    // blufor_controlled). On the NEXT selector tick the same zone must not
+    // be returned — the bot must pick a different, still-enemy zone.
+    const zoneA = {
+      id: 'hill_937',
+      position: { x: 100, z: 0 },
+      owner: null,
+      state: 'neutral',
+      isHomeBase: false,
+    };
+    const zoneB = {
+      id: 'dmz_bunker',
+      position: { x: 5000, z: 0 },
+      owner: 'NVA',
+      state: 'opfor_controlled',
+      isHomeBase: false,
+    };
+    const firstPick = pickObjectiveZone({
+      zones: [zoneA, zoneB],
+      playerPos: { x: 0, z: 0 },
+      isFriendly: isBlufor,
+    });
+    expect(firstPick.id).toBe('hill_937');
+    // Simulate capture: zoneA now blufor-owned, bot standing on it.
+    zoneA.owner = 'US';
+    zoneA.state = 'blufor_controlled';
+    const secondPick = pickObjectiveZone({
+      zones: [zoneA, zoneB],
+      playerPos: { x: 100, z: 0 },
+      isFriendly: isBlufor,
+    });
+    expect(secondPick).not.toBeNull();
+    expect(secondPick.id).toBe('dmz_bunker');
   });
 });
