@@ -149,26 +149,58 @@ export async function configureHeightSource(
   markStartup(`engine-init.start-game.${mode}.height-source.begin`);
   if (config.heightSource?.type === 'dem') {
     markStartup(`engine-init.start-game.${mode}.dem-load.begin`);
-    Logger.info('engine-init', `Loading DEM terrain from ${config.heightSource.path}...`);
+    const { path, width, height, metersPerPixel } = config.heightSource;
+    const expectedBytes = width * height * 4;
+    Logger.info('engine-init', `Loading DEM terrain from ${path} (expect ${width}x${height}, ${(expectedBytes / 1024 / 1024).toFixed(1)}MB)...`);
     try {
-      const response = await fetch(config.heightSource.path);
+      const response = await fetch(path);
       if (!response.ok) {
-        throw new Error(`DEM fetch failed: ${response.status}`);
+        throw new Error(`DEM fetch failed: HTTP ${response.status} for ${path}`);
+      }
+      // SPA fallbacks (Cloudflare Pages _redirects, dev history fallback) can
+      // answer missing-asset requests with 200 + text/html. Treat anything that
+      // is not unambiguously binary as a fetch failure so the terrain pipeline
+      // does not silently install an unrelated procedural provider.
+      const contentType = response.headers.get('content-type') ?? '';
+      if (/^text\/html\b/i.test(contentType)) {
+        throw new Error(
+          `DEM fetch returned HTML (content-type=${contentType}) for ${path}; asset is missing from the deployed public/ tree.`
+        );
       }
       const buffer = await response.arrayBuffer();
+      if (buffer.byteLength === 0) {
+        throw new Error(`DEM fetch returned empty body for ${path}`);
+      }
+      if (buffer.byteLength % 4 !== 0) {
+        throw new Error(
+          `DEM payload is not a Float32Array (byteLength=${buffer.byteLength}, content-type=${contentType}) for ${path}; ` +
+          `expected a multiple of 4 bytes.`
+        );
+      }
+      if (buffer.byteLength !== expectedBytes) {
+        throw new Error(
+          `DEM size mismatch for ${path}: got ${buffer.byteLength} bytes, expected ${expectedBytes} (${width}x${height} Float32).`
+        );
+      }
       const demProvider = new DEMHeightProvider(
         new Float32Array(buffer),
-        config.heightSource.width,
-        config.heightSource.height,
-        config.heightSource.metersPerPixel
+        width,
+        height,
+        metersPerPixel
       );
       getHeightQueryCache().setProvider(demProvider);
       Logger.info(
         'engine-init',
-        `DEM loaded: ${config.heightSource.width}x${config.heightSource.height}, ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`
+        `DEM loaded: ${width}x${height}, ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`
       );
     } catch (error) {
-      Logger.error('engine-init', 'Failed to load DEM terrain:', error);
+      Logger.error(
+        'engine-init',
+        `Failed to load DEM terrain from ${path}; terrain will render flat. ` +
+        `Confirm the binary is present under public${path.startsWith('/') ? path : '/' + path} ` +
+        `(A Shau DEMs are gitignored; see data/vietnam/DATA_PIPELINE.md).`,
+        error,
+      );
     }
     markStartup(`engine-init.start-game.${mode}.dem-load.end`);
     markStartup(`engine-init.start-game.${mode}.height-source.end`);
