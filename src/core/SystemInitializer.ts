@@ -5,6 +5,7 @@ import { AssetLoader } from '../systems/assets/AssetLoader';
 import { PlayerController } from '../systems/player/PlayerController';
 import { CombatantSystem } from '../systems/combat/CombatantSystem';
 import { Skybox } from '../systems/environment/Skybox';
+import { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { WaterSystem } from '../systems/environment/WaterSystem';
@@ -130,6 +131,7 @@ export class SystemInitializer {
     refs.playerController = new PlayerController(camera);
     refs.combatantSystem = new CombatantSystem(scene, camera, refs.globalBillboardSystem, refs.assetLoader, refs.terrainSystem);
     refs.skybox = new Skybox(scene);
+    refs.atmosphereSystem = new AtmosphereSystem();
     refs.waterSystem = new WaterSystem(scene, camera, refs.assetLoader);
 
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.terrainSystem);
@@ -192,6 +194,7 @@ export class SystemInitializer {
       // gpuTerrain disabled
       refs.waterSystem,
       refs.weatherSystem,
+      refs.atmosphereSystem,
       refs.playerController,
       refs.firstPersonWeapon,
       refs.combatantSystem,

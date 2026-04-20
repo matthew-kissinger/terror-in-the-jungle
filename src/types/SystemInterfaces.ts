@@ -286,6 +286,38 @@ export interface IFlashbangScreenEffect {
 }
 
 /**
+ * Sky runtime interface - read-only atmosphere queries for systems that need
+ * sun, sky, and ambient color information (fog tint, hemisphere coupling,
+ * water reflection, weapon/vehicle PBR). Backed by a swappable `ISkyBackend`.
+ *
+ * All getters write into the caller-supplied `out` parameter and return it
+ * so consumers can avoid per-frame allocation.
+ */
+export interface ISkyRuntime {
+  /** Unit vector pointing from the world origin toward the sun. */
+  getSunDirection(out: THREE.Vector3): THREE.Vector3;
+  /** Linear-space sun color after atmospheric transmittance. */
+  getSunColor(out: THREE.Color): THREE.Color;
+  /** Sky color sampled along an arbitrary view direction (used by fog tint). */
+  getSkyColorAtDirection(dir: THREE.Vector3, out: THREE.Color): THREE.Color;
+  /** Sky color at the zenith (straight up). */
+  getZenithColor(out: THREE.Color): THREE.Color;
+  /** Sky color at the horizon (averaged ring). */
+  getHorizonColor(out: THREE.Color): THREE.Color;
+}
+
+/**
+ * Cloud runtime interface - coverage knob for weather and future volumetric
+ * cloud backends. Stub for cycle 2026-04-20; not consumed yet.
+ */
+export interface ICloudRuntime {
+  /** Cloud coverage in [0, 1]. */
+  getCoverage(): number;
+  /** Sets cloud coverage; values are clamped into [0, 1] by the implementation. */
+  setCoverage(v: number): void;
+}
+
+/**
  * Game Renderer interface - main rendering system
  */
 export interface IGameRenderer {
