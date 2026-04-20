@@ -46,6 +46,11 @@ const {
   isSteepClimbWaypoint,
   shouldFastReplan,
   detectPitTrap,
+  // harness-lifecycle-halt-on-match-end exports.
+  detectMatchEnded,
+  detectMatchOutcome,
+  shouldFinalizeAfterMatchEnd,
+  MATCH_END_TAIL_MS,
 } = driver;
 
 function makeBotCtx(overrides = {}) {
@@ -939,5 +944,125 @@ describe('detectPitTrap — pit-floor escape', () => {
       playerPos: { x: 0, y: 0, z: 0 },
       currentWaypoint: null,
     })).toBe(true);
+  });
+});
+
+// ── harness-lifecycle-halt-on-match-end: terminal MATCH_ENDED state. ────────
+//
+// Brief: when the engine reports match-end, the harness driver must transition
+// the bot into a terminal MATCH_ENDED state that emits zero movement / fire /
+// aim intent, and the perf-capture loop must finalize ~2s after the first
+// observation rather than continuing into the victory screen. These tests
+// cover the pure pieces; the wiring is verified by the live capture.
+
+describe('PlayerBot driver mirror — match-end detection', () => {
+  it('treats phase=ENDED as match-ended', () => {
+    expect(detectMatchEnded({ phase: 'ENDED', gameActive: false })).toBe(true);
+  });
+
+  it('treats gameActive=false as match-ended even without ENDED phase', () => {
+    // Defensive: the engine may flip gameActive before the next phase tick.
+    expect(detectMatchEnded({ phase: 'COMBAT', gameActive: false })).toBe(true);
+  });
+
+  it('does not treat live phases as match-ended', () => {
+    expect(detectMatchEnded({ phase: 'COMBAT', gameActive: true })).toBe(false);
+    expect(detectMatchEnded({ phase: 'OVERTIME', gameActive: true })).toBe(false);
+    expect(detectMatchEnded({ phase: 'SETUP', gameActive: true })).toBe(false);
+  });
+
+  it('returns false for null/missing game state (engine not yet up)', () => {
+    expect(detectMatchEnded(null)).toBe(false);
+    expect(detectMatchEnded(undefined)).toBe(false);
+  });
+});
+
+describe('PlayerBot driver mirror — match outcome mapping', () => {
+  it('maps a BLUFOR winner to victory (player plays BLUFOR)', () => {
+    expect(detectMatchOutcome({ phase: 'ENDED', gameActive: false, winner: 'US' })).toBe('victory');
+    expect(detectMatchOutcome({ phase: 'ENDED', gameActive: false, winner: 'ARVN' })).toBe('victory');
+  });
+
+  it('maps an OPFOR winner to defeat', () => {
+    expect(detectMatchOutcome({ phase: 'ENDED', gameActive: false, winner: 'NVA' })).toBe('defeat');
+    expect(detectMatchOutcome({ phase: 'ENDED', gameActive: false, winner: 'VC' })).toBe('defeat');
+  });
+
+  it('maps no-winner / time-limit ties to draw', () => {
+    expect(detectMatchOutcome({ phase: 'ENDED', gameActive: false })).toBe('draw');
+    expect(detectMatchOutcome({ phase: 'ENDED', gameActive: false, winner: undefined })).toBe('draw');
+  });
+
+  it('returns null when the match is still live', () => {
+    expect(detectMatchOutcome({ phase: 'COMBAT', gameActive: true })).toBeNull();
+  });
+});
+
+describe('PlayerBot driver mirror — MATCH_ENDED terminal state', () => {
+  it('transitions to MATCH_ENDED from any live state when ctx.matchEnded is true', () => {
+    const states = ['PATROL', 'ALERT', 'ENGAGE', 'ADVANCE', 'RESPAWN_WAIT'];
+    for (const s of states) {
+      const step = stepBotState(s, makeBotCtx({ matchEnded: true }));
+      expect(step.nextState).toBe('MATCH_ENDED');
+    }
+  });
+
+  it('overrides RESPAWN_WAIT — match-end takes precedence over zero health', () => {
+    // Player can die on the same frame as the victory trigger; bot must still
+    // surrender control rather than try to respawn into a finished match.
+    const step = stepBotState('PATROL', makeBotCtx({ matchEnded: true, health: 0 }));
+    expect(step.nextState).toBe('MATCH_ENDED');
+  });
+
+  it('emits zero movement, no fire, and a null aim target while terminal', () => {
+    // Even with a juicy enemy in front of us, the terminal state must not act.
+    const step = stepBotState('MATCH_ENDED', makeBotCtx({
+      matchEnded: true,
+      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -10 } }),
+      findNearestEnemy: () => makeBotTarget(),
+      canSeeTarget: () => true,
+    }));
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBe(0);
+    expect(step.intent.moveStrafe).toBe(0);
+    expect(step.intent.firePrimary).toBe(false);
+    expect(step.intent.reload).toBe(false);
+    expect(step.intent.aimTarget).toBeNull();
+  });
+});
+
+describe('perf-capture lifecycle — early finalize after match end', () => {
+  it('does not finalize while the match is still live (no observation yet)', () => {
+    expect(shouldFinalizeAfterMatchEnd(null, 30_000)).toBe(false);
+    expect(shouldFinalizeAfterMatchEnd(undefined, 30_000)).toBe(false);
+  });
+
+  it('does not finalize before the tail window elapses', () => {
+    // Match ended at t=30_000ms; "now" is 1s later → still inside the 2s tail.
+    expect(shouldFinalizeAfterMatchEnd(30_000, 31_000)).toBe(false);
+  });
+
+  it('finalizes at exactly MATCH_END_TAIL_MS past observation', () => {
+    // This is the brief's regression scenario — match-end at t=30s on a 90s
+    // capture must finalize at ~32s, well before the configured duration.
+    expect(shouldFinalizeAfterMatchEnd(30_000, 30_000 + MATCH_END_TAIL_MS)).toBe(true);
+    // With the default tail of 2s, the early-exit ETA on a 90s capture is 32s.
+    expect(MATCH_END_TAIL_MS).toBe(2000);
+  });
+
+  it('keeps finalizing as long as we are past the tail window', () => {
+    expect(shouldFinalizeAfterMatchEnd(30_000, 90_000)).toBe(true);
+  });
+
+  it('honours an override tail when provided', () => {
+    // Caller may want a longer flush window. Make sure the helper respects it
+    // rather than falling back to the constant.
+    expect(shouldFinalizeAfterMatchEnd(30_000, 31_500, 5_000)).toBe(false);
+    expect(shouldFinalizeAfterMatchEnd(30_000, 35_500, 5_000)).toBe(true);
+  });
+
+  it('rejects non-finite inputs without crashing', () => {
+    expect(shouldFinalizeAfterMatchEnd(Number.NaN, 1000)).toBe(false);
+    expect(shouldFinalizeAfterMatchEnd(0, Number.NaN)).toBe(false);
   });
 });

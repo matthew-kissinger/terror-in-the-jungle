@@ -348,6 +348,48 @@
   function isOpforFaction(faction) { return OPFOR_FACTIONS.has(faction); }
   function isBluforFaction(faction) { return BLUFOR_FACTIONS.has(faction); }
 
+  // ── Match-end detection (harness-lifecycle-halt-on-match-end). ──
+  //
+  // The harness bot plays for BLUFOR; the live engine signals victory through
+  // TicketSystem.getGameState() which exposes { phase: 'ENDED', winner: Faction }.
+  // GameModeManager itself does not expose a match-end query — TicketSystem is
+  // the canonical owner of that lifecycle bit. Pure helper so the Node test
+  // can assert the outcome mapping without spinning up the engine.
+
+  function detectMatchEnded(gameState) {
+    if (!gameState) return false;
+    if (gameState.phase === 'ENDED') return true;
+    return gameState.gameActive === false;
+  }
+
+  function detectMatchOutcome(gameState) {
+    if (!detectMatchEnded(gameState)) return null;
+    const winner = gameState && gameState.winner;
+    if (isBluforFaction(winner)) return 'victory';
+    if (isOpforFaction(winner)) return 'defeat';
+    return 'draw';
+  }
+
+  // How long perf-capture.ts keeps sampling after the harness reports match-end
+  // before tearing down — gives tail frames a chance to flush. The brief
+  // specifies 2s; tuneable but kept as a constant so the regression test can
+  // assert against the same value.
+  const MATCH_END_TAIL_MS = 2000;
+
+  /**
+   * Pure decision used by scripts/perf-capture.ts: should the capture loop
+   * break out of its `while (Date.now() - startMs < durationSeconds * 1000)`
+   * because the harness already observed match-end at least MATCH_END_TAIL_MS
+   * ago? Returns false when no match-end has been observed yet (capture runs
+   * to its configured duration).
+   */
+  function shouldFinalizeAfterMatchEnd(matchEndedAtMs, nowMs, tailMs) {
+    if (matchEndedAtMs === null || matchEndedAtMs === undefined) return false;
+    if (!Number.isFinite(matchEndedAtMs) || !Number.isFinite(nowMs)) return false;
+    const tail = Number.isFinite(tailMs) && tailMs >= 0 ? tailMs : MATCH_END_TAIL_MS;
+    return nowMs - matchEndedAtMs >= tail;
+  }
+
   function createIdleBotIntent() {
     return {
       moveForward: 0,
@@ -476,8 +518,21 @@
     return { intent, nextState: null, resetTimeInState: false };
   }
 
+  function updateMatchEndedBot(_ctx) {
+    // Terminal state. Harness must not drive movement, aim, or fire after the
+    // engine reports match-end — the live game shows the victory/defeat screen
+    // and any "find nearest enemy" calls return stale or null pointers.
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = 0;
+    return { intent, nextState: null, resetTimeInState: false };
+  }
+
   function stepBotState(state, ctx) {
-    if (ctx.health <= 0 && state !== 'RESPAWN_WAIT') {
+    // Match-end terminates regardless of health; outcome screen is up.
+    if (ctx.matchEnded && state !== 'MATCH_ENDED') {
+      return { intent: createIdleBotIntent(), nextState: 'MATCH_ENDED', resetTimeInState: true };
+    }
+    if (ctx.health <= 0 && state !== 'RESPAWN_WAIT' && state !== 'MATCH_ENDED') {
       return { intent: createIdleBotIntent(), nextState: 'RESPAWN_WAIT', resetTimeInState: true };
     }
     switch (state) {
@@ -486,6 +541,7 @@
       case 'ENGAGE': return updateEngageBot(ctx);
       case 'ADVANCE': return updateAdvanceBot(ctx);
       case 'RESPAWN_WAIT': return updateRespawnWaitBot(ctx);
+      case 'MATCH_ENDED': return updateMatchEndedBot(ctx);
       default: return updatePatrolBot(ctx);
     }
   }
@@ -622,12 +678,18 @@
       transitions: 0,
       lastStateChangeAt: 0,
       stateHistogram: {
-        PATROL: 0, ALERT: 0, ENGAGE: 0, ADVANCE: 0, RESPAWN_WAIT: 0,
+        PATROL: 0, ALERT: 0, ENGAGE: 0, ADVANCE: 0, RESPAWN_WAIT: 0, MATCH_ENDED: 0,
       },
       lastFireProbe: null,
       frontlineInserted: false,
       setupFastForwarded: false,
       enemySpawn: null,
+      // Match-end lifecycle (harness-lifecycle-halt-on-match-end). Wall-clock ms
+      // the harness first observed phase==='ENDED'; null while the match is
+      // still active. Surfaced through getDebugSnapshot/stop so perf-capture.ts
+      // can finalize early instead of running on into the victory screen.
+      matchEndedAtMs: null,
+      matchOutcome: null,
     };
 
     function getSystems() {
@@ -1191,6 +1253,17 @@
       // Update the locked target using object-permanence logic (4s stale window).
       state.currentTarget = updateLockedTarget(state.currentTarget, findEnemyClosure(), now);
 
+      // Match-end check: TicketSystem owns the lifecycle, not GameModeManager.
+      // Latch the first-observed timestamp + outcome so the capture-side reader
+      // sees a stable value across subsequent samples.
+      const ticketGameState = systems && systems.ticketSystem && typeof systems.ticketSystem.getGameState === 'function'
+        ? systems.ticketSystem.getGameState() : null;
+      const matchEnded = detectMatchEnded(ticketGameState);
+      if (matchEnded && state.matchEndedAtMs === null) {
+        state.matchEndedAtMs = now;
+        state.matchOutcome = detectMatchOutcome(ticketGameState);
+      }
+
       const ctx = {
         now,
         state: state.botState,
@@ -1216,6 +1289,7 @@
         getObjective: objectiveClosure,
         sampleHeight: sampleClosure,
         config: botConfig,
+        matchEnded: matchEnded,
       };
 
       const step = stepBotState(state.botState, ctx);
@@ -1522,6 +1596,8 @@
         shotsFired: state.shotsFired,
         reloadsIssued: state.reloadsIssued,
         stateHistogramMs: Object.assign({}, state.stateHistogram),
+        matchEndedAtMs: state.matchEndedAtMs,
+        matchOutcome: state.matchOutcome,
       };
     }
 
@@ -1547,6 +1623,8 @@
         stateHistogramMs: Object.assign({}, state.stateHistogram),
         pathTrustTtlMs: PATH_TRUST_TTL_MS,
         maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
+        matchEndedAtMs: state.matchEndedAtMs,
+        matchOutcome: state.matchOutcome,
       };
     }
 
@@ -1626,6 +1704,11 @@
       engageStrafeIntent: engageStrafeIntent,
       profileForMode: profileForMode,
       botConfigForProfile: botConfigForProfile,
+      // Match-end lifecycle (harness-lifecycle-halt-on-match-end).
+      detectMatchEnded: detectMatchEnded,
+      detectMatchOutcome: detectMatchOutcome,
+      shouldFinalizeAfterMatchEnd: shouldFinalizeAfterMatchEnd,
+      MATCH_END_TAIL_MS: MATCH_END_TAIL_MS,
     };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
