@@ -337,6 +337,53 @@
     return Math.hypot(dy, dp);
   }
 
+  // ── Combat stat helpers (pure, exported for Node-side regression tests). ──
+  //
+  // The driver polls the engine's PlayerStatsTracker each tick. These
+  // helpers turn a (baseline, current) pair of polled snapshots into a
+  // monotonically-increasing run total, ignoring snapshots that look
+  // corrupt (negative, NaN). They also gracefully handle the
+  // PlayerStatsTracker being reset mid-run (e.g. on respawn) by
+  // re-baselining when the polled value drops below the baseline.
+
+  function deltaSinceBaseline(currentValue, baselineValue) {
+    const cur = Number(currentValue);
+    const base = Number(baselineValue);
+    if (!Number.isFinite(cur)) return 0;
+    if (!Number.isFinite(base)) return Math.max(0, cur);
+    return Math.max(0, cur - base);
+  }
+
+  function rebasedTotal(prevTotal, currentValue, baselineValue) {
+    const prev = Number.isFinite(prevTotal) ? Number(prevTotal) : 0;
+    const cur = Number(currentValue);
+    const base = Number(baselineValue);
+    if (!Number.isFinite(cur)) return { total: prev, newBaseline: base };
+    // PlayerStatsTracker reset (cur dropped below baseline). Fold the
+    // last segment into prev and rebase to current.
+    if (Number.isFinite(base) && cur < base) {
+      return { total: prev, newBaseline: cur };
+    }
+    return { total: prev + deltaSinceBaseline(cur, base), newBaseline: cur };
+  }
+
+  function damageTakenDelta(prevHealth, currentHealth) {
+    const prev = Number(prevHealth);
+    const cur = Number(currentHealth);
+    if (!Number.isFinite(prev) || !Number.isFinite(cur)) return 0;
+    // Health going up = regen / respawn. Only count strict drops.
+    if (cur >= prev) return 0;
+    return prev - cur;
+  }
+
+  function computeAccuracy(shotsFired, shotsHit) {
+    const f = Number(shotsFired);
+    const h = Number(shotsHit);
+    if (!Number.isFinite(f) || f <= 0) return 0;
+    if (!Number.isFinite(h) || h <= 0) return 0;
+    return Math.max(0, Math.min(1, h / f));
+  }
+
   // ── PlayerBot state machine (JS mirror of src/dev/harness/playerBot/states.ts). ──
   //
   // `stepBotState(state, ctx)` is pure: returns { intent, nextState, resetTimeInState }.
@@ -690,6 +737,19 @@
       // can finalize early instead of running on into the victory screen.
       matchEndedAtMs: null,
       matchOutcome: null,
+      // Combat stats (rolled up from engine PlayerStatsTracker each tick).
+      // damageDealt / kills / shotsFired / shotsHit are run totals starting
+      // from the moment the driver attached, even if the in-engine
+      // PlayerStatsTracker was reset mid-run (rebasedTotal handles that).
+      damageDealt: 0,
+      damageTaken: 0,
+      kills: 0,
+      shotsFiredEngine: 0,
+      shotsHitEngine: 0,
+      damageDealtBaseline: null,
+      killsBaseline: null,
+      shotsFiredBaseline: null,
+      shotsHitBaseline: null,
     };
 
     function getSystems() {
@@ -961,6 +1021,33 @@
         : null;
     }
 
+    function pollEngineCombatStats(systems) {
+      const hud = systems && systems.hudSystem;
+      if (!hud || typeof hud.getStatsTracker !== 'function') return;
+      let tracker;
+      try {
+        tracker = hud.getStatsTracker();
+      } catch (_err) { return; }
+      if (!tracker || typeof tracker.getStats !== 'function') return;
+      let stats;
+      try {
+        stats = tracker.getStats();
+      } catch (_err) { return; }
+      if (!stats) return;
+      const damage = rebasedTotal(state.damageDealt, stats.damageDealt, state.damageDealtBaseline);
+      state.damageDealt = damage.total;
+      state.damageDealtBaseline = damage.newBaseline;
+      const k = rebasedTotal(state.kills, stats.kills, state.killsBaseline);
+      state.kills = k.total;
+      state.killsBaseline = k.newBaseline;
+      const sf = rebasedTotal(state.shotsFiredEngine, stats.shotsFired, state.shotsFiredBaseline);
+      state.shotsFiredEngine = sf.total;
+      state.shotsFiredBaseline = sf.newBaseline;
+      const sh = rebasedTotal(state.shotsHitEngine, stats.shotsHit, state.shotsHitBaseline);
+      state.shotsHitEngine = sh.total;
+      state.shotsHitBaseline = sh.newBaseline;
+    }
+
     function getCameraAngles(systems) {
       const pc = systems && systems.playerController;
       const cc = pc && pc.cameraController;
@@ -1199,9 +1286,19 @@
       fastForwardSetupPhaseIfNeeded(systems);
 
       const health = getPlayerHealth(systems);
-      // Detect damage taken.
-      if (health.cur < state.lastHealth) state.lastDamageMs = Date.now();
+      // Detect damage taken. Accumulate strict drops only; respawn /
+      // regen (health going up) doesn't count.
+      const damageThisTick = damageTakenDelta(state.lastHealth, health.cur);
+      if (damageThisTick > 0) {
+        state.damageTaken += damageThisTick;
+        state.lastDamageMs = Date.now();
+      }
       state.lastHealth = health.cur;
+
+      // Roll up engine-side combat stats (damage dealt, kills, shots)
+      // from the live PlayerStatsTracker. This is read-only polling —
+      // no event subscription, no engine instrumentation.
+      pollEngineCombatStats(systems);
 
       // Ammo sustainment + health top-up.
       const hs = systems.playerHealthSystem;
@@ -1573,6 +1670,9 @@
     function stop() {
       if (state.heartbeatTimer) { clearInterval(state.heartbeatTimer); state.heartbeatTimer = null; }
       const systems = getSystems();
+      // One last roll-up before we tear down so the stop-stats reflect
+      // any damage / kills landed in the final tick window.
+      pollEngineCombatStats(systems);
       releaseAllControls(systems);
       return {
         respawnCount: state.respawnCount,
@@ -1593,8 +1693,20 @@
         lockSwitches: 0,
         firePitchSafetyGates: 0,
         combatState: state.botState,
+        botState: state.botState,
         shotsFired: state.shotsFired,
         reloadsIssued: state.reloadsIssued,
+        // Combat stats rolled up from PlayerStatsTracker. shotsFired /
+        // shotsHit here are the engine-side counts (actual rounds
+        // fired / impacts), distinct from the driver-side intent
+        // count (`shotsFired` above tracks state.shotsFired which is
+        // intent-fire ticks).
+        damageDealt: state.damageDealt,
+        damageTaken: state.damageTaken,
+        kills: state.kills,
+        engineShotsFired: state.shotsFiredEngine,
+        engineShotsHit: state.shotsHitEngine,
+        accuracy: computeAccuracy(state.shotsFiredEngine, state.shotsHitEngine),
         stateHistogramMs: Object.assign({}, state.stateHistogram),
         matchEndedAtMs: state.matchEndedAtMs,
         matchOutcome: state.matchOutcome,
@@ -1605,6 +1717,11 @@
       return {
         mode: opts.mode,
         botState: state.botState,
+        // Alias `botState` under the legacy `movementState` key so older
+        // capture artifacts (and perf-capture readers prior to
+        // harness-stats-accuracy-damage-wiring) still see a populated
+        // movement field. New readers should prefer `botState`.
+        movementState: state.botState,
         timeInStateMs: state.timeInStateMs,
         currentTarget: state.currentTarget ? String(state.currentTarget.id) : null,
         shotsFired: state.shotsFired,
@@ -1621,6 +1738,13 @@
         healthTopUpCount: state.healthTopUpCount,
         maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
         stateHistogramMs: Object.assign({}, state.stateHistogram),
+        // Combat stats rolled up from PlayerStatsTracker.
+        damageDealt: state.damageDealt,
+        damageTaken: state.damageTaken,
+        kills: state.kills,
+        accuracy: computeAccuracy(state.shotsFiredEngine, state.shotsHitEngine),
+        engineShotsFired: state.shotsFiredEngine,
+        engineShotsHit: state.shotsHitEngine,
         pathTrustTtlMs: PATH_TRUST_TTL_MS,
         maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
         matchEndedAtMs: state.matchEndedAtMs,
@@ -1709,6 +1833,11 @@
       detectMatchOutcome: detectMatchOutcome,
       shouldFinalizeAfterMatchEnd: shouldFinalizeAfterMatchEnd,
       MATCH_END_TAIL_MS: MATCH_END_TAIL_MS,
+      // Combat stat helpers.
+      deltaSinceBaseline: deltaSinceBaseline,
+      rebasedTotal: rebasedTotal,
+      damageTakenDelta: damageTakenDelta,
+      computeAccuracy: computeAccuracy,
     };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

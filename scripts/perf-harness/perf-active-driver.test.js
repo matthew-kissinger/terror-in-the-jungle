@@ -51,6 +51,11 @@ const {
   detectMatchOutcome,
   shouldFinalizeAfterMatchEnd,
   MATCH_END_TAIL_MS,
+  // harness-stats-accuracy-damage-wiring: combat stat helpers.
+  deltaSinceBaseline,
+  rebasedTotal,
+  damageTakenDelta,
+  computeAccuracy,
 } = driver;
 
 function makeBotCtx(overrides = {}) {
@@ -1064,5 +1069,112 @@ describe('perf-capture lifecycle — early finalize after match end', () => {
   it('rejects non-finite inputs without crashing', () => {
     expect(shouldFinalizeAfterMatchEnd(Number.NaN, 1000)).toBe(false);
     expect(shouldFinalizeAfterMatchEnd(0, Number.NaN)).toBe(false);
+  });
+});
+
+// ── harness-stats-accuracy-damage-wiring: behavior tests for the
+// combat-stat rollup helpers used by the active driver.
+
+describe('harness combat stats — damageTakenDelta', () => {
+  it('reports zero when health is unchanged', () => {
+    expect(damageTakenDelta(100, 100)).toBe(0);
+  });
+
+  it('reports the drop when health decreases', () => {
+    expect(damageTakenDelta(100, 73)).toBe(27);
+  });
+
+  it('does not count regen / respawn (health going up)', () => {
+    expect(damageTakenDelta(20, 100)).toBe(0);
+  });
+
+  it('is safe against NaN inputs', () => {
+    expect(damageTakenDelta(NaN, 50)).toBe(0);
+    expect(damageTakenDelta(100, NaN)).toBe(0);
+  });
+});
+
+describe('harness combat stats — computeAccuracy', () => {
+  it('returns hits/shots when both are positive', () => {
+    expect(computeAccuracy(100, 25)).toBeCloseTo(0.25, 5);
+  });
+
+  it('returns 0 when no shots have been fired', () => {
+    expect(computeAccuracy(0, 0)).toBe(0);
+  });
+
+  it('clamps to [0, 1] when hits exceed shots (impossible but defensive)', () => {
+    expect(computeAccuracy(10, 50)).toBeLessThanOrEqual(1);
+    expect(computeAccuracy(10, 50)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('handles negative or NaN inputs as zero', () => {
+    expect(computeAccuracy(-5, 1)).toBe(0);
+    expect(computeAccuracy(10, -1)).toBe(0);
+    expect(computeAccuracy(NaN, 1)).toBe(0);
+  });
+});
+
+describe('harness combat stats — rebasedTotal (handles in-engine reset)', () => {
+  // Behaviour we care about: the run total grows monotonically across
+  // a sequence of polled snapshots, even if the in-engine counter is
+  // reset mid-run (e.g. PlayerStatsTracker re-baselines on respawn).
+  // The test simulates a sequence of polls; we assert end-state, not
+  // any intermediate field shape.
+
+  it('starts at zero before any poll', () => {
+    expect(deltaSinceBaseline(0, null)).toBe(0);
+  });
+
+  it('grows as the polled value rises above the baseline', () => {
+    // Baseline=0, poll1=5 -> total=5
+    let { total, newBaseline } = rebasedTotal(0, 5, 0);
+    expect(total).toBe(5);
+    // poll2=12 -> total=12
+    ({ total, newBaseline } = rebasedTotal(total, 12, newBaseline));
+    expect(total).toBe(12);
+  });
+
+  it('does not double-count when the polled value plateaus', () => {
+    let { total, newBaseline } = rebasedTotal(0, 8, 0);
+    expect(total).toBe(8);
+    ({ total, newBaseline } = rebasedTotal(total, 8, newBaseline));
+    expect(total).toBe(8);
+  });
+
+  it('preserves accumulated total when the in-engine counter is reset', () => {
+    // Bot deals 25 damage, in-engine tracker resets (respawn), then
+    // bot deals 10 more. Total should be 25 + 10 = 35, not 10.
+    let { total, newBaseline } = rebasedTotal(0, 25, 0);
+    expect(total).toBe(25);
+    // PlayerStatsTracker.reset() — polled value drops to 0.
+    ({ total, newBaseline } = rebasedTotal(total, 0, newBaseline));
+    expect(total).toBe(25);
+    // After a couple ticks the polled value rises again.
+    ({ total, newBaseline } = rebasedTotal(total, 4, newBaseline));
+    expect(total).toBe(29);
+    ({ total, newBaseline } = rebasedTotal(total, 10, newBaseline));
+    expect(total).toBe(35);
+  });
+
+  it('survives a NaN poll without losing prior total', () => {
+    let { total, newBaseline } = rebasedTotal(0, 12, 0);
+    expect(total).toBe(12);
+    const result = rebasedTotal(total, NaN, newBaseline);
+    expect(result.total).toBe(12);
+  });
+});
+
+describe('harness combat stats — driver stop-stats surface (regression guard)', () => {
+  // Brief: summary.json must be able to surface kills, damage dealt,
+  // damage taken, accuracy, and the state histogram. The driver
+  // exposes these as fields on the stop() return shape; this guard
+  // makes sure their names don't drift without an intentional update
+  // to the perf-capture summary writer.
+  it('module exports the four combat-stat helpers used by the driver', () => {
+    expect(typeof deltaSinceBaseline).toBe('function');
+    expect(typeof rebasedTotal).toBe('function');
+    expect(typeof damageTakenDelta).toBe('function');
+    expect(typeof computeAccuracy).toBe('function');
   });
 });

@@ -111,6 +111,18 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     return this.hudLayout.getPresentationController();
   }
 
+  /**
+   * Expose the player stats tracker as a read-only handle for harness
+   * callers that need to roll up combat counters (kills, damage dealt,
+   * shots fired/hit). Used by `scripts/perf-active-driver.cjs` to
+   * surface accuracy + damage in capture stop-stats. Engine code that
+   * needs to mutate counters keeps using the dedicated
+   * `addKill()` / `addAssist()` / etc. methods on this class.
+   */
+  getStatsTracker(): PlayerStatsTracker {
+    return this.statsTracker;
+  }
+
   async init(): Promise<void> {
     Logger.info('hud', ' Initializing HUD System...');
 
