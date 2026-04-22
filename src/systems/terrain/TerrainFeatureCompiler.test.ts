@@ -172,6 +172,13 @@ describe('compileTerrainFeatures', () => {
       // And its grade radius rolls out meaningfully past the inner radius so
       // the airfield edge blends to native terrain rather than cliffing.
       expect(envelope.gradeRadius).toBeGreaterThan(envelope.outerRadius + 20);
+      // The inner-to-outer transition must be wide enough to avoid reading as
+      // a hard ramp at the flat edge (>=10 m of blend before the grade
+      // shoulder takes over).
+      expect(envelope.outerRadius - envelope.innerRadius).toBeGreaterThanOrEqual(10);
+      // And the graded shoulder has to be strong enough to visibly blend
+      // native terrain rather than leaving most of the hillside intact.
+      expect(envelope.gradeStrength).toBeGreaterThanOrEqual(0.6);
     }
   });
 
