@@ -560,11 +560,16 @@ export class Airframe {
 
     // Alpha protection: attenuate nose-up elevator as AoA approaches stall.
     // Lives in the sim (not the command builder) so player can't override it.
+    //
+    // Soft tanh roll-off centred on alphaStall, 3-deg characteristic width:
+    //   alphaFactor = 0.5 * (1 - tanh((|alpha| - alphaStall) / 3))
+    // tanh has a smooth derivative everywhere, so the previous bang-bang
+    // 4-deg smoothstep cannot lock onto a boundary edge. A sliver of
+    // authority remains past alphaStall so the pilot can still break out
+    // of a stall with the same stick input that entered it.
     const absAlphaDeg = Math.abs(THREE.MathUtils.radToDeg(a.alphaRad));
-    const protectionOnsetDeg = aero.alphaStallDeg - 5;
-    const protectionFullDeg = aero.alphaStallDeg - 1;
     const alphaFactor =
-      1 - THREE.MathUtils.smoothstep(absAlphaDeg, protectionOnsetDeg, protectionFullDeg);
+      0.5 * (1 - Math.tanh((absAlphaDeg - aero.alphaStallDeg) / 3));
     const protectedElevator = this.elevator > 0 ? this.elevator * alphaFactor : this.elevator;
 
     // Base aerodynamic restoring moments (pitch toward trim, yaw toward 0
