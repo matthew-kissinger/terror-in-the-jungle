@@ -33,6 +33,18 @@ vi.mock('./HelicopterPhysics', () => ({
       isGrounded: false,
       groundHeight: 0
     }));
+    // Default interpolated state differs from raw so tests can verify which
+    // time base a downstream consumer reads. Tests that need a specific
+    // visual pose override this per-case via `mocks.physics.getInterpolatedState`.
+    getInterpolatedState = vi.fn().mockImplementation(() => ({
+      position: new THREE.Vector3(11, 21, 31),
+      velocity: new THREE.Vector3(0, 0, 0),
+      angularVelocity: new THREE.Vector3(0, 0, 0),
+      quaternion: new THREE.Quaternion(),
+      engineRPM: 0.5,
+      isGrounded: false,
+      groundHeight: 0
+    }));
     getControls = vi.fn().mockImplementation(() => ({
       collective: 0.5,
       cyclicPitch: 0,
@@ -419,6 +431,106 @@ describe('HelicopterModel', () => {
       const state = model.getHelicopterState(HELI_ID);
       expect(state).toBeDefined();
       expect(state?.position.y).toBe(20);
+    });
+  });
+
+  describe('piloted pose feed', () => {
+    // Regression: PlayerController (and downstream weapon / door-gunner
+    // consumers) used to receive the raw physics pose while the camera and
+    // render mesh consumed the interpolated pose, producing tick-back-and-
+    // forth sawtooth at high render rates. The contract is that every
+    // external consumer reads the same interpolated visual pose that the
+    // render mesh shows.
+    beforeEach(() => {
+      model.setHelipadSystem(mockHelipadSystem);
+      model.setTerrainManager(mockTerrainManager);
+    });
+
+    it('feeds the same interpolated pose to PlayerController that the render mesh uses', async () => {
+      model.createHelicopterWhenReady();
+      await flushPromises();
+      model.setPlayerController(mockPlayerController);
+      vi.mocked(mockPlayerController.isInHelicopter).mockReturnValue(true);
+      vi.mocked(mockPlayerController.getHelicopterId).mockReturnValue(HELI_ID);
+
+      // Raw physics position differs from interpolated visual position.
+      // After update, helicopter.position (render mesh) tracks the
+      // interpolated pose, not raw physics.
+      model.update(1 / 144);
+
+      const renderMeshPos = model.getHelicopterPosition(HELI_ID)!;
+      const lastCall = vi.mocked(mockPlayerController.updatePlayerPosition).mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const fedPos = lastCall![0] as THREE.Vector3;
+      expect(fedPos.x).toBeCloseTo(renderMeshPos.x, 5);
+      expect(fedPos.y).toBeCloseTo(renderMeshPos.y, 5);
+      expect(fedPos.z).toBeCloseTo(renderMeshPos.z, 5);
+      // And it must NOT equal the raw physics snapshot.
+      const rawPos = mocks.physics.getState().position as THREE.Vector3;
+      expect(fedPos.x).not.toBe(rawPos.x);
+    });
+
+    it('produces a pose-continuous player feed across 120 render ticks at 144Hz', async () => {
+      model.createHelicopterWhenReady();
+      await flushPromises();
+      model.setPlayerController(mockPlayerController);
+      vi.mocked(mockPlayerController.isInHelicopter).mockReturnValue(true);
+      vi.mocked(mockPlayerController.getHelicopterId).mockReturnValue(HELI_ID);
+
+      // Drive the interpolated state with a monotonically advancing alpha so
+      // visual position moves smoothly while raw physics would tick in steps.
+      // This mirrors the real `HelicopterPhysics.getInterpolatedState` which
+      // lerps `previousState -> state` by the stepper's alpha fraction.
+      let tick = 0;
+      const RAW_STEP_HZ = 60;
+      const RENDER_HZ = 144;
+      const RENDER_DT = 1 / RENDER_HZ;
+
+      vi.mocked(mocks.physics.getInterpolatedState).mockImplementation(() => {
+        // Smoothly advancing interpolated altitude at render cadence.
+        const t = tick * RENDER_DT;
+        return {
+          position: new THREE.Vector3(10, 20 + t * 5, 30),
+          velocity: new THREE.Vector3(0, 5, 0),
+          angularVelocity: new THREE.Vector3(0, 0, 0),
+          quaternion: new THREE.Quaternion(),
+          engineRPM: 0.5,
+          isGrounded: false,
+          groundHeight: 0,
+        };
+      });
+      // Raw state stays on fixed-step boundaries; a raw feed would produce
+      // zero-delta render frames between boundaries.
+      vi.mocked(mocks.physics.getState).mockImplementation(() => {
+        const rawT = Math.floor(tick * RENDER_DT * RAW_STEP_HZ) / RAW_STEP_HZ;
+        return {
+          position: new THREE.Vector3(10, 20 + rawT * 5, 30),
+          velocity: new THREE.Vector3(0, 5, 0),
+          angularVelocity: new THREE.Vector3(0, 0, 0),
+          quaternion: new THREE.Quaternion(),
+          engineRPM: 0.5,
+          isGrounded: false,
+          groundHeight: 0,
+        };
+      });
+
+      const ys: number[] = [];
+      for (tick = 1; tick <= 120; tick++) {
+        model.update(RENDER_DT);
+        const calls = vi.mocked(mockPlayerController.updatePlayerPosition).mock.calls;
+        ys.push((calls.at(-1)![0] as THREE.Vector3).y);
+      }
+
+      // Smoothly monotonic progression across 120 ticks: every frame
+      // advances, none stalls. A raw feed would stall ~58% of frames
+      // (144Hz render / 60Hz physics).
+      let zeroDeltaFrames = 0;
+      for (let i = 1; i < ys.length; i++) {
+        const dy = ys[i] - ys[i - 1];
+        expect(dy).toBeGreaterThanOrEqual(0);
+        if (dy === 0) zeroDeltaFrames++;
+      }
+      expect(zeroDeltaFrames).toBe(0);
     });
   });
 
