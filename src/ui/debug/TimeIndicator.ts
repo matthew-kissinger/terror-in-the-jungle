@@ -1,6 +1,12 @@
 import { zIndex } from '../design/tokens';
+import type { DebugPanel } from './DebugHudRegistry';
 
-export class TimeIndicator {
+export class TimeIndicator implements DebugPanel {
+  readonly id = 'time';
+  readonly label = 'Time of Day';
+  readonly defaultVisible = false;
+  readonly defaultHotkey = 'F4';
+
   private container: HTMLDivElement;
   private visible = false;
   private timeText: HTMLDivElement;
@@ -41,23 +47,33 @@ export class TimeIndicator {
     // Keep hidden by default - toggle with F4
     this.container.appendChild(this.iconContainer);
     this.container.appendChild(this.timeText);
+  }
 
-    document.body.appendChild(this.container);
+  mount(container: HTMLElement): void {
+    container.appendChild(this.container);
+  }
+
+  unmount(): void {
+    if (this.container.parentElement) {
+      this.container.parentElement.removeChild(this.container);
+    }
+  }
+
+  setVisible(visible: boolean): void {
+    this.visible = visible;
+    this.container.style.display = visible ? 'flex' : 'none';
   }
 
   toggle(): void {
-    this.visible = !this.visible;
-    this.container.style.display = this.visible ? 'flex' : 'none';
+    this.setVisible(!this.visible);
   }
 
   show(): void {
-    this.visible = true;
-    this.container.style.display = 'flex'; // Use flex for icon + text layout
+    this.setVisible(true);
   }
 
   hide(): void {
-    this.visible = false;
-    this.container.style.display = 'none';
+    this.setVisible(false);
   }
 
   isVisible(): boolean {
@@ -69,7 +85,7 @@ export class TimeIndicator {
    * @param timeString Formatted time string (e.g., "12:30")
    * @param nightFactor 0.0 (day) to 1.0 (night)
    */
-  update(timeString: string, nightFactor: number): void {
+  updateTime(timeString: string, nightFactor: number): void {
     if (!this.visible) return;
 
     this.timeText.innerText = timeString;
@@ -92,8 +108,6 @@ export class TimeIndicator {
 
   dispose(): void {
     this.hide();
-    if (this.container.parentElement) {
-      this.container.parentElement.removeChild(this.container);
-    }
+    this.unmount();
   }
 }

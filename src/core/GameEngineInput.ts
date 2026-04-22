@@ -22,7 +22,9 @@ function handleKeyDown(event: KeyboardEvent): void {
     event.key === 'p' ||
     event.key === 'P' ||
     event.key === '[' ||
-    event.key === ']';
+    event.key === ']' ||
+    event.key === '`' ||
+    event.key === '~';
   if (context !== 'gameplay' && !isDebugKey) return;
 
   if (event.key === 'F1') {
@@ -39,6 +41,8 @@ function handleKeyDown(event: KeyboardEvent): void {
     toggleLogOverlay(engineRef);
   } else if (event.key === 'F4') {
     toggleTimeIndicator(engineRef);
+  } else if (event.key === '`' || event.key === '~') {
+    toggleDebugHud(engineRef);
   } else if (event.key === 'k' || event.key === 'K') {
     // Voluntary respawn with K key
     if (engineRef.gameStarted) {
@@ -139,7 +143,7 @@ export function togglePerformanceStats(engine: GameEngine): void {
  */
 export function toggleRealtimeStatsOverlay(engine: GameEngine): void {
   if (!engine.gameStarted) return;
-  engine.performanceOverlay.toggle();
+  engine.debugHud.togglePanel('performance');
   const overlayVisible = engine.performanceOverlay.isVisible();
   performanceTelemetry.setEnabled(overlayVisible || engine.sandboxEnabled);
 }
@@ -159,14 +163,21 @@ export function togglePostProcessing(engine: GameEngine): void {
  * Toggles the log overlay (F3)
  */
 export function toggleLogOverlay(engine: GameEngine): void {
-  engine.logOverlay.toggle();
+  engine.debugHud.togglePanel('log');
 }
 
 /**
  * Toggles the time indicator overlay (F4)
  */
 export function toggleTimeIndicator(engine: GameEngine): void {
-  engine.timeIndicator.toggle();
+  engine.debugHud.togglePanel('time');
+}
+
+/**
+ * Toggles the master debug HUD container (backtick).
+ */
+export function toggleDebugHud(engine: GameEngine): void {
+  engine.debugHud.toggleAll();
 }
 
 /**

@@ -1,4 +1,5 @@
 import { zIndex } from '../design/tokens';
+import type { DebugPanel } from './DebugHudRegistry';
 
 interface SystemTiming {
   name: string;
@@ -52,7 +53,12 @@ interface BudgetBarRefs {
   barFill: HTMLDivElement;
 }
 
-export class PerformanceOverlay {
+export class PerformanceOverlay implements DebugPanel {
+  readonly id = 'performance';
+  readonly label = 'Performance';
+  readonly defaultVisible = false;
+  readonly defaultHotkey = 'F2';
+
   private container: HTMLDivElement;
   private header: HTMLDivElement;
   private budgetSection: HTMLDivElement;
@@ -119,24 +125,36 @@ export class PerformanceOverlay {
     this.budgetSection.appendChild(this.systemBarsContainer);
 
     this.container.appendChild(this.budgetSection);
-    document.body.appendChild(this.container);
+  }
+
+  mount(container: HTMLElement): void {
+    container.appendChild(this.container);
+  }
+
+  unmount(): void {
+    if (this.container.parentElement) {
+      this.container.parentElement.removeChild(this.container);
+    }
+  }
+
+  setVisible(visible: boolean): void {
+    this.visible = visible;
+    this.container.style.display = visible ? 'block' : 'none';
   }
 
   toggle(): void {
-    this.visible = !this.visible;
-    this.container.style.display = this.visible ? 'block' : 'none';
+    this.setVisible(!this.visible);
   }
 
   hide(): void {
-    this.visible = false;
-    this.container.style.display = 'none';
+    this.setVisible(false);
   }
 
   isVisible(): boolean {
     return this.visible;
   }
 
-  update(stats: PerformanceStats): void {
+  updateStats(stats: PerformanceStats): void {
     if (!this.visible) return;
 
     this.pushFps(stats.fps);
@@ -272,9 +290,7 @@ export class PerformanceOverlay {
 
   dispose(): void {
     this.hide();
-    if (this.container.parentElement) {
-      this.container.parentElement.removeChild(this.container);
-    }
+    this.unmount();
     this.fpsHistory = [];
   }
 

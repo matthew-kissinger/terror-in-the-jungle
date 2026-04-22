@@ -1,7 +1,13 @@
 import type { LogEntry } from '../../utils/Logger';
 import { zIndex } from '../design/tokens';
+import type { DebugPanel } from './DebugHudRegistry';
 
-export class LogOverlay {
+export class LogOverlay implements DebugPanel {
+  readonly id = 'log';
+  readonly label = 'Log Overlay';
+  readonly defaultVisible = false;
+  readonly defaultHotkey = 'F3';
+
   private container: HTMLDivElement;
   private visible = false;
 
@@ -26,25 +32,36 @@ export class LogOverlay {
     this.container.style.zIndex = String(zIndex.debugLog);
     this.container.style.display = 'none';
     this.container.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.35)';
+  }
 
-    document.body.appendChild(this.container);
+  mount(container: HTMLElement): void {
+    container.appendChild(this.container);
+  }
+
+  unmount(): void {
+    if (this.container.parentElement) {
+      this.container.parentElement.removeChild(this.container);
+    }
+  }
+
+  setVisible(visible: boolean): void {
+    this.visible = visible;
+    this.container.style.display = visible ? 'block' : 'none';
   }
 
   toggle(): void {
-    this.visible = !this.visible;
-    this.container.style.display = this.visible ? 'block' : 'none';
+    this.setVisible(!this.visible);
   }
 
   hide(): void {
-    this.visible = false;
-    this.container.style.display = 'none';
+    this.setVisible(false);
   }
 
   isVisible(): boolean {
     return this.visible;
   }
 
-  update(entries: LogEntry[]): void {
+  updateEntries(entries: LogEntry[]): void {
     if (!this.visible) return;
 
     if (entries.length === 0) {
@@ -69,9 +86,7 @@ export class LogOverlay {
 
   dispose(): void {
     this.hide();
-    if (this.container.parentElement) {
-      this.container.parentElement.removeChild(this.container);
-    }
+    this.unmount();
   }
 }
 

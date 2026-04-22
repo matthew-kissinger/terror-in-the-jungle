@@ -29,7 +29,7 @@ export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.V
 
   const showFPS = SettingsManager.getInstance().get('showFPS');
   if (showFPS && !engine.performanceOverlay.isVisible()) {
-    engine.performanceOverlay.toggle();
+    engine.debugHud.togglePanel('performance');
   }
   performanceTelemetry.setEnabled(
     engine.performanceOverlay.isVisible()

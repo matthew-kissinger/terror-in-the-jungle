@@ -60,6 +60,8 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
 
     engine.systemManager.hudSystem.setPlayAgainCallback(() => restartMatch(engine));
 
+    wireDebugPanels(engine);
+
     markStartup('engine-init.initialize-systems.end');
 
     if (engine.sandboxEnabled && engine.sandboxConfig?.autoStart) {
@@ -166,4 +168,37 @@ export function startGame(engine: GameEngine, initialSpawnPosition?: THREE.Vecto
  */
 export function showWelcomeMessage(engine: GameEngine): void {
   logWelcomeMessage(engine);
+}
+
+/**
+ * Connects the new debug panels to their data sources. Called after the
+ * SystemManager has finished initializing. Safe no-op if any panel is absent
+ * (e.g. unit-test engine stubs that only mock the subset they exercise).
+ */
+function wireDebugPanels(engine: GameEngine): void {
+  if (
+    !engine.vehicleStatePanel ||
+    !engine.combatStatePanel ||
+    !engine.currentModePanel ||
+    !engine.frameBudgetPanel
+  ) {
+    return;
+  }
+  const sm = engine.systemManager;
+  const terrain = sm.terrainSystem;
+  engine.vehicleStatePanel.setSources(
+    sm.playerController,
+    (x, z) => (terrain && typeof terrain.getHeightAt === 'function' ? terrain.getHeightAt(x, z) : NaN),
+  );
+  engine.combatStatePanel.setSource(sm.combatantSystem);
+  engine.currentModePanel.setSource({
+    getMode: () => sm.gameModeManager.getCurrentMode(),
+    getWeather: () => {
+      const ws = sm.weatherSystem as unknown as { currentState?: string };
+      return ws?.currentState ?? 'unknown';
+    },
+    getTimeOfDaySeconds: () => sm.atmosphereSystem.getSimulationTimeSeconds(),
+    getScenarioName: () => sm.atmosphereSystem.getCurrentScenario(),
+  });
+  engine.frameBudgetPanel.setSource(() => sm.getSystemTimings());
 }

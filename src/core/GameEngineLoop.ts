@@ -140,6 +140,7 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     updateRuntimeMetrics(engine, deltaTime);
     updatePerformanceOverlay(engine, deltaTime);
     updateLogOverlay(engine);
+    engine.debugHud.update(deltaTime);
     // Any successful frame clears crash streak so only consecutive failures escalate.
     if (crashCount > 0) {
       crashCount = 0;
@@ -251,7 +252,7 @@ function updatePerformanceOverlay(engine: GameEngine, deltaTime: number): void {
   // Get GPU telemetry
   const gpuTelemetry = performanceTelemetry.getGPUTelemetry();
 
-  engine.performanceOverlay.update({
+  engine.performanceOverlay.updateStats({
     fps,
     frameTimeMs: deltaTime * 1000,
     drawCalls: perfStats.drawCalls,
@@ -290,5 +291,5 @@ function updateLogOverlay(engine: GameEngine): void {
   if (!engine.logOverlay.isVisible()) return;
 
   const recent = Logger.getRecent(12);
-  engine.logOverlay.update(recent);
+  engine.logOverlay.updateEntries(recent);
 }
