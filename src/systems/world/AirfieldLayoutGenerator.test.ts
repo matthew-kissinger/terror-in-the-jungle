@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
-import { AIRFIELD_TEMPLATES } from './AirfieldTemplates';
+import { AIRFIELD_TEMPLATES, type AirfieldTemplate } from './AirfieldTemplates';
+import { airfieldEnvelopeInnerLateral } from '../terrain/TerrainFeatureCompiler';
+
+function collectPerimeterModelPaths(template: AirfieldTemplate): Set<string> {
+  return new Set(template.pool.filter((entry) => entry.zone === 'perimeter').map((entry) => entry.modelPath));
+}
 
 describe('AirfieldLayoutGenerator', () => {
   const center = new THREE.Vector3(500, 0, 500);
@@ -152,6 +157,29 @@ describe('AirfieldLayoutGenerator', () => {
         }
       }
     });
+
+    it('places every perimeter structure inside the envelope flat zone', () => {
+      const perimeterModels = collectPerimeterModelPaths(template);
+      const innerLateral = airfieldEnvelopeInnerLateral(template);
+
+      // Sweep multiple seeds so we exercise the perimeter placement code path
+      // regardless of which pool entries the weighted selector picks first.
+      let perimeterPlacementsSeen = 0;
+      for (const seed of ['seed_a', 'seed_b', 'seed_c', 'seed_d', 'seed_e']) {
+        const layout = generateAirfieldLayout(template, center, heading, seed);
+        const perimeter = layout.placements.filter(
+          (p) => p.id?.startsWith('struct_') && perimeterModels.has(p.modelPath),
+        );
+        for (const placement of perimeter) {
+          const radius = Math.hypot(placement.offset.x, placement.offset.z);
+          // Allow the full envelope radius as the upper bound; the clamp uses
+          // `innerLateral - 8` so the assertion has ~8 m of headroom built in.
+          expect(radius).toBeLessThan(innerLateral);
+        }
+        perimeterPlacementsSeen += perimeter.length;
+      }
+      expect(perimeterPlacementsSeen).toBeGreaterThan(0);
+    });
   });
 
   describe('forward_strip template', () => {
@@ -209,6 +237,29 @@ describe('AirfieldLayoutGenerator', () => {
         standId: 'strip_a1',
         runwayStart: expect.objectContaining({ id: 'strip_south_departure' }),
       }));
+    });
+
+    it('places every perimeter structure inside the envelope flat zone', () => {
+      // forward_strip's unclamped perimeter radius (160 m) sits outside the
+      // envelope inner lateral (~140 m); the clamp must pull perimeter props
+      // inside so they do not land on the graded shoulder.
+      const template = AIRFIELD_TEMPLATES.forward_strip;
+      const perimeterModels = collectPerimeterModelPaths(template);
+      const innerLateral = airfieldEnvelopeInnerLateral(template);
+
+      let perimeterPlacementsSeen = 0;
+      for (const seed of ['strip_a', 'strip_b', 'strip_c', 'strip_d', 'strip_e', 'strip_f']) {
+        const layout = generateAirfieldLayout(template, center, heading, seed);
+        const perimeter = layout.placements.filter(
+          (p) => p.id?.startsWith('struct_') && perimeterModels.has(p.modelPath),
+        );
+        for (const placement of perimeter) {
+          const radius = Math.hypot(placement.offset.x, placement.offset.z);
+          expect(radius).toBeLessThan(innerLateral);
+        }
+        perimeterPlacementsSeen += perimeter.length;
+      }
+      expect(perimeterPlacementsSeen).toBeGreaterThan(0);
     });
   });
 

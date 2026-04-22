@@ -27,7 +27,7 @@ const DEFAULT_VILLAGE_GRADE_STRENGTH = 0.2;
 const DEFAULT_AIRFIELD_GRADE_STRENGTH = 0.25;
 const DEFAULT_ROAD_GRADE_STRENGTH = 0.18;
 /** Lateral buffer beyond the widest authored surface rect that the envelope flattens. */
-const AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M = 16;
+export const AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M = 16;
 /** Outer grade ramp beyond the inner flat radius — smooths hard cliffs at the airfield edge. */
 const AIRFIELD_ENVELOPE_GRADE_RAMP_M = 48;
 /** Strength of the envelope's graded shoulder (0-1). Strong enough to soften cliff faces. */
@@ -330,13 +330,27 @@ function compileGeneratedTerrainStamps(
  * Compute the maximum lateral reach of any authored surface rect (taxiway /
  * apron / runway) from the airfield centerline in local coordinates.
  */
-function maxLateralSurfaceReach(template: AirfieldTemplate): number {
+export function maxLateralSurfaceReach(template: AirfieldTemplate): number {
   let reach = template.runwayWidth * 0.5;
   for (const rect of [...template.aprons, ...template.taxiways]) {
     const rectHalfWidth = Math.abs(rect.offsetLateral) + Math.max(rect.width, rect.length) * 0.5;
     if (rectHalfWidth > reach) reach = rectHalfWidth;
   }
   return reach;
+}
+
+/**
+ * Lateral radius of the envelope's fully-flat zone for `template`. Mirrors the
+ * `innerLateral` computation in `buildAirfieldEnvelopeStamp`, exposed so the
+ * procedural layout generator can clamp perimeter placements inside the flat
+ * zone instead of landing on the graded shoulder.
+ */
+export function airfieldEnvelopeInnerLateral(template: AirfieldTemplate): number {
+  const lateralReach = Math.max(
+    maxLateralSurfaceReach(template),
+    template.dispersalOffset + 22,
+  );
+  return lateralReach + AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M;
 }
 
 /**
@@ -361,18 +375,15 @@ function buildAirfieldEnvelopeStamp(
   // `dispersalOffset + 18` lateral and `runwayLength * 0.5` along, with
   // "perimeter" structures at radius max(runwayLength/2, dispersalOffset+20).
   // The envelope's inner (fully-flat) radius must cover authored surfaces and
-  // the dispersal zone — perimeter structures (guard towers / AA at ~240m)
-  // fall inside the graded shoulder where the terrain blends out.
-  const lateralReach = Math.max(
-    maxLateralSurfaceReach(template),
-    template.dispersalOffset + 22,
-  );
+  // the dispersal zone. The layout generator clamps perimeter placements to
+  // `airfieldEnvelopeInnerLateral(template) - 8` so perimeter props stay
+  // inside the flat zone rather than landing on the graded shoulder.
   const alongReach = Math.max(
     maxAlongSurfaceReach(template),
     template.runwayLength * 0.5,
   );
 
-  const innerLateral = lateralReach + AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M;
+  const innerLateral = airfieldEnvelopeInnerLateral(template);
   const innerAlong = alongReach + AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M;
 
   const yaw = feature.placement?.yaw ?? 0;
