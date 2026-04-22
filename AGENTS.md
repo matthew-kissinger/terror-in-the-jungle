@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 This is the authoritative, agent-agnostic operating guide for this repo. Every agent (Claude Code, Codex, Cursor, Gemini, humans) should read this file first. `CLAUDE.md` is a thin wrapper that adds Claude-Code-specific context on top of what's here.
 
@@ -55,7 +55,7 @@ npm run perf:update-baseline        # Overwrite baselines from latest
 ## Daily loop
 
 ```
-1. Branch: task/<id>-<kebab-slug> (e.g. task/B3-npc-terrain-stall)
+1. Branch: task/<descriptive-slug> (e.g. task/preserve-drawing-buffer-dev-gate). Phase-letter IDs (A/B/C/D) were retired 2026-04-18.
 2. npm run doctor
 3. npm run dev (or npm run build:perf && npm run preview:perf for prod-shape)
 4. Make change
