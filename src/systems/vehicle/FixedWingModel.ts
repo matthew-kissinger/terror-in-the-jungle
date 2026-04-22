@@ -356,7 +356,13 @@ export class FixedWingModel implements GameSystem {
       }
 
       if (isPiloted && this.playerController) {
-        this.playerController.updatePlayerPosition(runtime.airframe.getPosition());
+        // Feed the interpolated visual pose, not raw physics. The camera lerps
+        // from `group.position` (set to the interpolated state above when we
+        // simulated), so the PlayerController, HUD readouts (elevation), and
+        // any downstream consumer must share the same time base. Reading raw
+        // physics here aliased the fixed-step sawtooth against the render
+        // cadence and produced visible tick-back-and-forth at high refresh.
+        this.playerController.updatePlayerPosition(group.position);
       }
     }
   }

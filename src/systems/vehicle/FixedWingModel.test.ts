@@ -288,6 +288,52 @@ describe('FixedWingModel', () => {
     });
   });
 
+  describe('piloted pose feed', () => {
+    // Regression: PlayerController used to receive the raw physics pose while
+    // the camera and render mesh consumed the interpolated pose, producing a
+    // tick-back-and-forth sawtooth at high render rates. The contract is that
+    // every external consumer reads the same interpolated visual pose.
+    it('feeds the same interpolated pose to PlayerController that the render mesh uses', async () => {
+      const pos = new THREE.Vector3(0, 500, 0);
+      const updatePlayerPosition = vi.fn();
+      const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+      camera.position.set(0, 500, 0);
+      const playerController = {
+        isInHelicopter: () => false,
+        isInFixedWing: () => true,
+        getFixedWingId: () => 'fw1',
+        exitFixedWing: vi.fn(),
+        updatePlayerPosition,
+        getCamera: () => camera,
+      };
+      model.setPlayerController(playerController as any);
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, pos, 0);
+      model.setPilotedAircraft('fw1');
+      model.setFixedWingControls({ throttle: 1, pitch: 0, roll: 0, yaw: 0 });
+
+      // Step forward with a render dt faster than the 1/60 fixed step so the
+      // accumulator spends most frames between physics boundaries. If the feed
+      // were raw-physics, the PlayerController receive would see a zero-delta
+      // step whenever the accumulator did not cross a boundary.
+      const RENDER_DT = 1 / 144;
+      for (let i = 0; i < 60; i++) {
+        model.update(RENDER_DT);
+      }
+
+      // Final call to updatePlayerPosition must match the group position, which
+      // is the interpolated visual pose.
+      const groupPos = new THREE.Vector3();
+      model.getAircraftPositionTo('fw1', groupPos);
+      const lastCall = updatePlayerPosition.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const fedPos = lastCall![0] as THREE.Vector3;
+      expect(fedPos.x).toBeCloseTo(groupPos.x, 5);
+      expect(fedPos.y).toBeCloseTo(groupPos.y, 5);
+      expect(fedPos.z).toBeCloseTo(groupPos.z, 5);
+    });
+  });
+
   describe('dispose', () => {
     it('cleans up all aircraft on dispose', async () => {
       const pos = new THREE.Vector3(0, 10, 0);
