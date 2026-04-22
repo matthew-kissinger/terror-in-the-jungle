@@ -1,0 +1,233 @@
+{
+  "startedAt": "2026-04-22T15:49:22.429Z",
+  "endedAt": "2026-04-22T15:51:19.714Z",
+  "durationSeconds": 90,
+  "npcs": 120,
+  "requestedNpcs": 120,
+  "url": "http://localhost:9100/?sandbox=true&perf=1&uiTransitions=0&npcs=120&autostart=true&duration=90&combat=1&logLevel=warn&losHeightPrefilter=0&seed=2718",
+  "status": "ok",
+  "finalFrameCount": 5361,
+  "artifactDir": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\artifacts\\perf\\2026-04-22T15-49-22-427Z",
+  "validation": {
+    "overall": "warn",
+    "checks": [
+      {
+        "id": "samples_collected",
+        "status": "pass",
+        "value": 89,
+        "message": "Collected 89 runtime samples; expected at least 72"
+      },
+      {
+        "id": "frame_progress",
+        "status": "pass",
+        "value": 5276,
+        "message": "Frame progression delta=5276 over 90s"
+      },
+      {
+        "id": "max_frame_stall_seconds",
+        "status": "pass",
+        "value": 1.041,
+        "message": "Longest frame progression stall 1.04s"
+      },
+      {
+        "id": "avg_frame_ms",
+        "status": "pass",
+        "value": 16.980371599099286,
+        "message": "Average frame time 16.98ms"
+      },
+      {
+        "id": "peak_p99_frame_ms",
+        "status": "warn",
+        "value": 34.19999999999709,
+        "message": "Peak p99 frame time 34.20ms"
+      },
+      {
+        "id": "peak_max_frame_ms",
+        "status": "pass",
+        "value": 50,
+        "message": "Peak max-frame sample 50.00ms"
+      },
+      {
+        "id": "hitch_50ms_percent",
+        "status": "pass",
+        "value": 0,
+        "message": "Frames >50ms 0.00% (0/5361)"
+      },
+      {
+        "id": "hitch_100ms_percent",
+        "status": "pass",
+        "value": 0,
+        "message": "Frames >100ms 0.00% (0/5361)"
+      },
+      {
+        "id": "over_budget_percent",
+        "status": "pass",
+        "value": 0.24344569288389514,
+        "message": "Average over-budget percent 0.24%"
+      },
+      {
+        "id": "console_errors",
+        "status": "pass",
+        "value": 0,
+        "message": "Captured 0 browser errors/pageerrors/crashes"
+      },
+      {
+        "id": "ui_error_panel_visible",
+        "status": "pass",
+        "value": 0,
+        "message": "No loading/init error panel appeared during capture"
+      },
+      {
+        "id": "combat_budget_dominance",
+        "status": "pass",
+        "value": 0,
+        "message": "Combat was top >16.67ms in 0.0% of samples"
+      },
+      {
+        "id": "raycast_denial_rate",
+        "status": "pass",
+        "value": 0.005109619243248297,
+        "message": "Average LOS raycast denial rate 0.5%"
+      },
+      {
+        "id": "ai_budget_starvation_events",
+        "status": "pass",
+        "value": 2.460674157303371,
+        "message": "Average per-sample AI budget starvation events 2.46"
+      },
+      {
+        "id": "player_shots_recorded",
+        "status": "pass",
+        "value": 354,
+        "message": "Recorded player shots in sim=354"
+      },
+      {
+        "id": "player_hits_recorded",
+        "status": "pass",
+        "value": 193,
+        "message": "Recorded player hits in sim=193"
+      },
+      {
+        "id": "player_hit_rate_peak",
+        "status": "pass",
+        "value": 0.6162790697674418,
+        "message": "Peak hit rate 61.63%"
+      },
+      {
+        "id": "heap_growth_mb",
+        "status": "pass",
+        "value": -2.011580467224121,
+        "message": "Heap end-growth -2.01 MB (baseline=69.58 MB, end=67.57 MB)"
+      },
+      {
+        "id": "heap_peak_growth_mb",
+        "status": "warn",
+        "value": 52.760085105895996,
+        "message": "Heap peak-growth 52.76 MB (peak=122.34 MB)"
+      },
+      {
+        "id": "heap_recovery_ratio",
+        "status": "pass",
+        "value": 1.0381269374980466,
+        "message": "Heap recovery 103.8% from peak (54.77 MB reclaimed before end)"
+      },
+      {
+        "id": "harness_min_shots_fired",
+        "status": "pass",
+        "value": 354,
+        "message": "Harness player shots=354 (min=50)"
+      },
+      {
+        "id": "harness_min_hits_recorded",
+        "status": "pass",
+        "value": 193,
+        "message": "Harness player hits=193 (min=5)"
+      },
+      {
+        "id": "harness_max_stuck_seconds",
+        "status": "pass",
+        "value": 0,
+        "message": "Max harness stuck duration 0.0s (max=5s)"
+      },
+      {
+        "id": "harness_min_movement_transitions",
+        "status": "warn",
+        "value": 2,
+        "message": "Harness movement transitions=2 (min=3)"
+      },
+      {
+        "id": "startup_threshold_seconds",
+        "status": "pass",
+        "value": 6,
+        "message": "Startup frame threshold reached in 6.0s"
+      }
+    ]
+  },
+  "lastStage": "finalize",
+  "scenario": {
+    "mode": "ai_sandbox",
+    "requestedMode": "ai_sandbox",
+    "playerExperience": "Automated large-scale jungle firefight with scripted player movement/firing, forced ground-level engagement, and instant respawn to keep sampling in active combat.",
+    "systemsEmphasized": [
+      "Combat AI",
+      "Player input/fire loop",
+      "Respawn pipeline",
+      "Terrain chunking",
+      "Core frame scheduling"
+    ]
+  },
+  "harnessOverhead": {
+    "probeRoundTripAvgMs": 14.393258426966293,
+    "probeRoundTripP95Ms": 21,
+    "sampleCount": 89,
+    "sampleIntervalMs": 1000,
+    "detailEverySamples": 1
+  },
+  "startupTiming": {
+    "firstEngineSeenSec": 3,
+    "firstMetricsSeenSec": 3,
+    "thresholdReachedSec": 6,
+    "lastStartupMark": "engine-init.startup-flow.interactive-ready",
+    "lastStartupMarkMs": 3158
+  },
+  "toolchain": {
+    "prewarmEnabled": true,
+    "prewarmTotalMs": 42,
+    "prewarmAllOk": true,
+    "runtimePreflightEnabled": false,
+    "runtimePreflightMs": 0,
+    "runtimePreflightOk": true
+  },
+  "perfRuntime": {
+    "victoryConditionsDisabled": false
+  },
+  "matchEndedAtMs": null,
+  "matchOutcome": null,
+  "harnessDriverFinal": {
+    "respawnCount": 0,
+    "ammoRefillCount": 4,
+    "healthTopUpCount": 2,
+    "movementTransitions": 2,
+    "losRejectedShots": 0,
+    "aimDotGateRejectedShots": 103,
+    "waypointsFollowedCount": 0,
+    "waypointReplanFailures": 0,
+    "shotsFired": 233,
+    "reloadsIssued": 129,
+    "damageDealt": 0,
+    "damageTaken": 527.1361407120223,
+    "kills": 76,
+    "accuracy": 0,
+    "engineShotsFired": 0,
+    "engineShotsHit": 0,
+    "botState": "ENGAGE",
+    "stateHistogramMs": {
+      "PATROL": 0,
+      "ALERT": 256,
+      "ENGAGE": 90515,
+      "ADVANCE": 0,
+      "RESPAWN_WAIT": 0,
+      "MATCH_ENDED": 0
+    }
+  }
+}
