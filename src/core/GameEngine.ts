@@ -14,6 +14,8 @@ import { VehicleStatePanel } from '../ui/debug/panels/VehicleStatePanel';
 import { CombatStatePanel } from '../ui/debug/panels/CombatStatePanel';
 import { CurrentModePanel } from '../ui/debug/panels/CurrentModePanel';
 import { FrameBudgetPanel } from '../ui/debug/panels/FrameBudgetPanel';
+import { TimeControlPanel } from '../ui/debug/TimeControlPanel';
+import { TimeScale } from './TimeScale';
 import { RuntimeMetrics } from './RuntimeMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
@@ -47,6 +49,8 @@ export class GameEngine {
   public combatStatePanel: CombatStatePanel;
   public currentModePanel: CurrentModePanel;
   public frameBudgetPanel: FrameBudgetPanel;
+  public timeControlPanel: TimeControlPanel;
+  public timeScale: TimeScale = new TimeScale();
   public runtimeMetrics?: RuntimeMetrics;
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
@@ -87,6 +91,7 @@ export class GameEngine {
     this.combatStatePanel = new CombatStatePanel();
     this.currentModePanel = new CurrentModePanel();
     this.frameBudgetPanel = new FrameBudgetPanel();
+    this.timeControlPanel = new TimeControlPanel(this.timeScale);
     this.debugHud = new DebugHudRegistry();
     this.debugHud.register(this.performanceOverlay);
     this.debugHud.register(this.timeIndicator);
@@ -95,6 +100,7 @@ export class GameEngine {
     this.debugHud.register(this.combatStatePanel);
     this.debugHud.register(this.currentModePanel);
     this.debugHud.register(this.frameBudgetPanel);
+    this.debugHud.register(this.timeControlPanel);
     // Master hud hidden by default — backtick reveals everything.
     this.debugHud.setMasterVisible(false);
     // Perf-harness gate (see src/core/PerfDiagnostics.ts and
