@@ -102,6 +102,103 @@ describe('LOSAccelerator', () => {
     });
   });
 
+  describe('static obstacles (buildings, towers, hangars)', () => {
+    it('blocks a line-of-sight sweep that crosses a registered building', () => {
+      // A horizontal flight path from x=0 to x=20 at y=10 should clip a
+      // building occupying the 8..12 x-range with roof around y=12.
+      const hitPoint = new THREE.Vector3(8, 10, 0);
+      const buildingMesh = createMockMeshWithRaycastControl(
+        new THREE.Vector3(10, 6, 0),
+        6,
+        { distance: 8, point: hitPoint },
+      );
+
+      accelerator.registerStaticObstacle('hangar_01', buildingMesh);
+
+      const origin = new THREE.Vector3(0, 10, 0);
+      const target = new THREE.Vector3(20, 10, 0);
+      const result = accelerator.checkLineOfSight(origin, target, 100);
+
+      expect(result.clear).toBe(false);
+      expect(result.hitPoint).toBeDefined();
+      expect(result.distance).toBe(8);
+    });
+
+    it('a sweep from before a building to past it reports the near face', () => {
+      // Building occupies x in [9,11]; aircraft sweep goes from x=0 to x=20.
+      // A raycast against the mesh should intersect the near face at x~=9.
+      const nearFace = new THREE.Vector3(9, 10, 0);
+      const buildingMesh = createMockMeshWithRaycastControl(
+        new THREE.Vector3(10, 8, 0),
+        2,
+        { distance: 9, point: nearFace },
+      );
+
+      accelerator.registerStaticObstacle('tower_01', buildingMesh);
+
+      const origin = new THREE.Vector3(0, 10, 0);
+      const target = new THREE.Vector3(20, 10, 0);
+      const result = accelerator.checkLineOfSight(origin, target, 100);
+
+      expect(result.clear).toBe(false);
+      expect(result.hitPoint!.x).toBeCloseTo(9);
+    });
+
+    it('no longer blocks after unregisterStaticObstacle', () => {
+      const hitPoint = new THREE.Vector3(5, 0, 0);
+      const buildingMesh = createMockMeshWithRaycastControl(
+        new THREE.Vector3(5, 0, 0),
+        4,
+        { distance: 5, point: hitPoint },
+      );
+
+      accelerator.registerStaticObstacle('bunker_01', buildingMesh);
+      expect(
+        accelerator.checkLineOfSight(
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(10, 0, 0),
+          100,
+        ).clear,
+      ).toBe(false);
+
+      accelerator.unregisterStaticObstacle('bunker_01');
+      expect(
+        accelerator.checkLineOfSight(
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(10, 0, 0),
+          100,
+        ).clear,
+      ).toBe(true);
+    });
+
+    it('coexists with terrain chunks: closest hit wins', () => {
+      // Terrain chunk at distance 7, building at distance 4.
+      // LOS should report the closer (building) hit.
+      const terrainMesh = createMockMeshWithRaycastControl(
+        new THREE.Vector3(7, 0, 0),
+        2,
+        { distance: 7, point: new THREE.Vector3(7, 0, 0) },
+      );
+      const buildingMesh = createMockMeshWithRaycastControl(
+        new THREE.Vector3(4, 0, 0),
+        2,
+        { distance: 4, point: new THREE.Vector3(4, 0, 0) },
+      );
+
+      accelerator.registerChunk('chunk-0-0', terrainMesh);
+      accelerator.registerStaticObstacle('warehouse_01', buildingMesh);
+
+      const result = accelerator.checkLineOfSight(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(10, 0, 0),
+        100,
+      );
+
+      expect(result.clear).toBe(false);
+      expect(result.distance).toBe(4);
+    });
+  });
+
   describe('unregisterChunk', () => {
     it('should unregister a chunk', () => {
       const mesh = createMockMesh(new THREE.Vector3(0, 0, 0), 10);

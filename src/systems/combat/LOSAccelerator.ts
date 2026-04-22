@@ -6,6 +6,12 @@ const _rayBox = new THREE.Box3();
 const _losRaycaster = new THREE.Raycaster();
 const _registeredChunkBox = new THREE.Box3();
 
+// Prefix used to namespace static-obstacle registrations (buildings, towers,
+// hangars) inside the same cache as terrain chunks. Keeps a single iteration
+// path through `getRelevantChunks` so terrain- and building-hits share the
+// same closest-first raycast.
+const STATIC_OBSTACLE_KEY_PREFIX = 'static:';
+
 /**
  * Accelerates line-of-sight checks using BVH-accelerated raycasting
  *
@@ -48,6 +54,26 @@ export class LOSAccelerator {
   unregisterChunk(chunkKey: string): void {
     this.chunkCache.delete(chunkKey);
     Logger.debug('los', `Unregistered chunk ${chunkKey} (remaining: ${this.chunkCache.size})`);
+  }
+
+  /**
+   * Register a static obstacle mesh (e.g. building, tower, hangar) so it is
+   * considered by LOS raycasts alongside terrain chunks. Callers must supply
+   * a stable id; the same id is used to unregister the mesh later.
+   *
+   * The mesh is folded into the same cache terrain chunks live in, namespaced
+   * by `STATIC_OBSTACLE_KEY_PREFIX`, so a single ray pass picks up both
+   * terrain and building hits and returns the closest.
+   */
+  registerStaticObstacle(id: string, mesh: THREE.Mesh): void {
+    this.registerChunk(`${STATIC_OBSTACLE_KEY_PREFIX}${id}`, mesh);
+  }
+
+  /**
+   * Unregister a previously registered static obstacle.
+   */
+  unregisterStaticObstacle(id: string): void {
+    this.unregisterChunk(`${STATIC_OBSTACLE_KEY_PREFIX}${id}`);
   }
 
   /**
