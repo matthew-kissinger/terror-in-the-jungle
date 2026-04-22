@@ -9,6 +9,28 @@ import { freezeTransform } from '../utils/SceneUtils';
 import { estimateGPUTier, isMobileGPU, shouldEnableShadows, getShadowMapSize, getMaxPixelRatio } from '../utils/DeviceDetector';
 import { ViewportInfo, ViewportManager } from '../ui/design/responsive';
 
+/**
+ * Determine whether the WebGLRenderer should preserve its drawing buffer.
+ *
+ * Required by PlaytestCaptureManager (F9) for `renderer.domElement.toBlob()`
+ * to return a non-blank PNG — but retaining the back-buffer adds ~13 MB of
+ * heap residual that retail players who never press F9 shouldn't pay.
+ *
+ * - On in dev builds (F9 + other debug tooling are active by default).
+ * - Opt-in on retail via `?capture=1` URL param so Cloudflare testers can
+ *   reach F9 without a local dev checkout.
+ * - Off otherwise.
+ *
+ * Exported for tests only; do not import from other runtime modules.
+ */
+export function shouldPreserveDrawingBuffer(): boolean {
+  if (import.meta.env.DEV) return true;
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('capture')) return false;
+  return params.get('capture') !== '0';
+}
+
 export class GameRenderer {
   public renderer: THREE.WebGLRenderer;
   public scene: THREE.Scene;
@@ -46,13 +68,12 @@ export class GameRenderer {
       antialias: false, // Disabled for pixel-perfect rendering
       powerPreference: 'high-performance',
       // Required for the F9 playtest capture overlay to call
-      // `renderer.domElement.toBlob()` and get a non-blank PNG. Without
-      // this flag the browser is free to clear/swap the back buffer
-      // after compositing, which returns a blank capture. Some drivers
-      // take a small perf hit; if combat120 p99 ever regresses >2% we
-      // can gate behind `import.meta.env.DEV`. See
-      // docs/tasks/playtest-capture-overlay.md step 0.
-      preserveDrawingBuffer: true
+      // `renderer.domElement.toBlob()` and get a non-blank PNG. Gated
+      // behind DEV or `?capture=1` so retail players don't pay the
+      // ~13 MB back-buffer residual when they'll never press F9. See
+      // `shouldPreserveDrawingBuffer` above and
+      // docs/tasks/preserve-drawing-buffer-dev-gate.md.
+      preserveDrawingBuffer: shouldPreserveDrawingBuffer()
     });
 
     this.setupRenderer();
