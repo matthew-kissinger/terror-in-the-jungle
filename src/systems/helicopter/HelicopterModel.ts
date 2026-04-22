@@ -546,11 +546,18 @@ export class HelicopterModel implements GameSystem {
       });
 
       if (isPiloted && this.playerController) {
-        this.playerController.updatePlayerPosition(state.position);
+        // Feed the interpolated visual pose, not raw physics. The camera lerps
+        // from `helicopter.position` (set to the interpolated state above), so
+        // the PlayerController, weapon system, and any other downstream
+        // consumer must share the same time base. Reading raw physics here
+        // aliased the fixed-step sawtooth against the render cadence and
+        // produced visible tick-back-and-forth at high refresh. Simulation-
+        // internal booleans (`state.isGrounded`) stay raw.
+        this.playerController.updatePlayerPosition(helicopter.position);
 
         // Update weapon system for piloted helicopter
         this.weaponSystem.update(
-          deltaTime, id, state.position, helicopter.quaternion,
+          deltaTime, id, helicopter.position, helicopter.quaternion,
           state.isGrounded, helipadHeight !== undefined,
         );
 
@@ -565,7 +572,7 @@ export class HelicopterModel implements GameSystem {
 
       // Door gunner AI only matters for the piloted helicopter
       if (isPiloted) {
-        this.doorGunner.update(deltaTime, id, state.position, helicopter.quaternion, state.isGrounded);
+        this.doorGunner.update(deltaTime, id, helicopter.position, helicopter.quaternion, state.isGrounded);
       }
     }
 
