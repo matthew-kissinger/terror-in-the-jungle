@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-04-22T00:00:00.000Z",
+  "scenario": "Airfield generated placements - skipFlatSearch branch selection after gating by zone",
+  "note": "Perimeter zone entries now push placements with skipFlatSearch: false, routing through WorldFeatureSystem.resolveTerrainPlacement 9-point footprint solver. Interior zones (runway_side, dispersal) retain the centroid-Y fast path since they sit on or near the flat apron stamp. Verified by Vitest 'perimeter structures opt in to the footprint solver while interior structures keep the flat-snap fast path'.",
+  "templates": {
+    "us_airbase": {
+      "perimeterStructuresUseFootprintSolver": true,
+      "interiorStructuresUseFlatSnap": true,
+      "totalStructureCountRange": { "min": 18, "max": 26 },
+      "perimeterPoolEntries": ["structures/guard_tower.glb", "structures/zpu4_aa.glb"]
+    },
+    "forward_strip": {
+      "perimeterStructuresUseFootprintSolver": true,
+      "interiorStructuresUseFlatSnap": true,
+      "perimeterPoolEntries": ["structures/guard_tower.glb"]
+    }
+  },
+  "footprintSolver": {
+    "file": "src/systems/world/WorldFeatureSystem.ts",
+    "method": "resolveTerrainPlacement",
+    "sampleCount": 9,
+    "cornerPenaltyGate": "cornerMaxDivergence > 1.5 m => score += 50 (effectively rejected)",
+    "searchRingCount": 2,
+    "sampleDirections": 8,
+    "foundationClearanceBudget": "< 0.3 m at all four corners, achieved when heightSpan <= WORLD_FEATURE_FLAT_SPAN_TARGET (0.7 m) because groundedY = meanHeight + min(heightSpan * 0.15, 0.18)"
+  },
+  "tests": [
+    "AirfieldLayoutGenerator > us_airbase template > perimeter structures opt in to the footprint solver while interior structures keep the flat-snap fast path"
+  ]
+}

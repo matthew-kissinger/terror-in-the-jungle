@@ -117,6 +117,41 @@ describe('AirfieldLayoutGenerator', () => {
         expect(p.modelPath.endsWith('.glb')).toBe(true);
       }
     });
+
+    it('perimeter structures opt in to the footprint solver while interior structures keep the flat-snap fast path', () => {
+      // us_airbase includes perimeter entries (guard tower, ZPU-4 AA) and
+      // interior entries (warehouse, fuel drums). Perimeter placements must
+      // route through `resolveTerrainPlacement` (skipFlatSearch falsy) so the
+      // foundation does not float / sink against sub-footprint height variation
+      // at the envelope shoulder. Interior placements stay on the flat apron
+      // and can keep the cheap centroid-Y snap (skipFlatSearch true).
+      const layout = generateAirfieldLayout(template, center, heading);
+      const structures = layout.placements.filter((p) => p.id?.startsWith('struct'));
+      expect(structures.length).toBeGreaterThan(0);
+
+      const perimeterPaths = new Set(
+        template.pool.filter((e) => e.zone === 'perimeter').map((e) => e.modelPath),
+      );
+      const interiorPaths = new Set(
+        template.pool
+          .filter((e) => e.zone === 'runway_side' || e.zone === 'dispersal')
+          .map((e) => e.modelPath),
+      );
+
+      for (const placement of structures) {
+        if (perimeterPaths.has(placement.modelPath) && !interiorPaths.has(placement.modelPath)) {
+          expect(
+            placement.skipFlatSearch,
+            `${placement.id} (${placement.modelPath}) is a perimeter structure and must run the footprint solver`,
+          ).toBeFalsy();
+        } else if (interiorPaths.has(placement.modelPath) && !perimeterPaths.has(placement.modelPath)) {
+          expect(
+            placement.skipFlatSearch,
+            `${placement.id} (${placement.modelPath}) is an interior structure and should keep the fast-path snap`,
+          ).toBe(true);
+        }
+      }
+    });
   });
 
   describe('forward_strip template', () => {

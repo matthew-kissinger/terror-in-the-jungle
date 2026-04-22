@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-04-22T00:00:00.000Z",
+  "scenario": "Airfield generated placements - skipFlatSearch branch selection before gating",
+  "note": "Historical behaviour: all airfield-layout generated structures are pushed with skipFlatSearch: true (AirfieldLayoutGenerator.ts line 290 pre-fix), regardless of zone. Perimeter props (guard towers, ZPU-4 AA) sit at the envelope shoulder where sub-footprint terrain variation is real, and the centroid-Y snap causes footprint corner float / sink amplified by STRUCTURE_SCALE = 2.5.",
+  "templates": {
+    "us_airbase": {
+      "expectedPerimeterStructuresWithFootprintSolver": 0,
+      "totalStructureCountRange": { "min": 18, "max": 26 },
+      "perimeterPoolEntries": ["structures/guard_tower.glb", "structures/zpu4_aa.glb"]
+    },
+    "forward_strip": {
+      "expectedPerimeterStructuresWithFootprintSolver": 0,
+      "perimeterPoolEntries": ["structures/guard_tower.glb"]
+    }
+  },
+  "foundationClearanceSymptom": {
+    "modelPath": "structures/guard_tower.glb",
+    "zone": "perimeter",
+    "observedBehaviour": "floating / sunken foundations at perimeter radius on sloped envelope shoulder",
+    "cornerDivergenceAcceptedByCentroidSnap": "arbitrary (centroid Y used verbatim)"
+  }
+}
