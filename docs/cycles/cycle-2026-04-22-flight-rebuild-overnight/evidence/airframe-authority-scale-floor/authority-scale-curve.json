@@ -1,0 +1,39 @@
+{
+  "note": "qNorm = dynamicPressure / qRef, where qRef = 0.5 * rho * vrSpeedMs^2.",
+  "before": {
+    "formula": "clamp(qNorm, 0.15, 2.2)",
+    "maxSlope": 1,
+    "maxSlopeJump": 1,
+    "keyPoints": {
+      "0.00": 0.15,
+      "0.05": 0.15,
+      "0.10": 0.15,
+      "0.15": 0.15,
+      "0.20": 0.2,
+      "0.30": 0.3,
+      "0.50": 0.5,
+      "1.00": 1,
+      "2.00": 2,
+      "2.20": 2.2,
+      "2.50": 2.2
+    }
+  },
+  "after": {
+    "formula": "min(floor + smoothstep(qNorm, 0.10, 0.30) * (qNorm - floor), 2.2), floor=0.30",
+    "maxSlope": 1,
+    "maxSlopeJump": 1,
+    "keyPoints": {
+      "0.00": 0.3,
+      "0.05": 0.3,
+      "0.10": 0.3,
+      "0.15": 0.2765625,
+      "0.20": 0.25,
+      "0.30": 0.3,
+      "0.50": 0.5,
+      "1.00": 1,
+      "2.00": 2,
+      "2.20": 2.2,
+      "2.50": 2.2
+    }
+  }
+}
