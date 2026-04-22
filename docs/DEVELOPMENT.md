@@ -108,7 +108,12 @@ Required gates before deploy:
 
 Live at: https://terror-in-the-jungle.pages.dev/
 
-See [DEPLOY_WORKFLOW.md](DEPLOY_WORKFLOW.md) for the full build-to-prod path, Cloudflare Pages cache-control strategy, service-worker behavior, and prod header spot-check recipes. For GLB/model, public asset, `index.html`, `_headers`, or `sw.js` changes, run the live header spot-check after deploy.
+See [DEPLOY_WORKFLOW.md](DEPLOY_WORKFLOW.md) for the full build-to-prod path,
+Cloudflare Pages cache-control strategy, service-worker behavior, and prod
+header spot-check recipes. See [CLOUDFLARE_STACK.md](CLOUDFLARE_STACK.md) for
+the target Pages + R2 + Workers architecture for large game assets and future
+user interaction. For GLB/model, public asset, `index.html`, `_headers`, or
+`sw.js` changes, run the live header spot-check after deploy.
 
 ### Local prod-like preview
 
@@ -125,6 +130,9 @@ Current cache contract:
 - Vite content-hashed build output is emitted under `/build-assets/` and cached immutable.
 - Stable-path public assets under `/assets/` and GLB models under `/models/` revalidate.
 - The service worker must not cache-first non-versioned assets.
+- A Shau terrain runtime data is not production-reproducible from GitHub yet
+  because `public/data/vietnam/` is local-only. Solve this through the R2 asset
+  manifest plan in `CLOUDFLARE_STACK.md`, not by committing more large payloads.
 
 ### Pre-Push Checklist
 

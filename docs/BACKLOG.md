@@ -54,7 +54,7 @@ Sixteen merged PRs across five dispatch rounds — the full planned cycle landed
 - **PR #120 `aircraft-ground-physics-tuning`** — post-liftoff ground-clamp oscillation fixed via composite of three candidates: `liftoffClearanceM` 0.2→0.5, 10-tick sustained-descent latch before re-clamp, liftoff impulse bumped 3.0→4.5 m/s. A-1/F-4 bounce-free; AC-47 low-pitch takeoff still single-bounces (aerodynamic authority floor, out of scope).
 
 ### Content + harness
-- **PR #110 `ashau-dem-streaming-fix`** — hardened the DEM loader in `ModeStartupPreparer` to reject HTML/empty/wrong-size payloads and fail loudly when the gitignored `public/data/vietnam/` binary is absent. Path tightened to leading-slash absolute form. Surfaced that CI/fresh-clone machines need a `fetch-ashau-dem` step (follow-up).
+- **PR #110 `ashau-dem-streaming-fix`** — hardened the DEM loader in `ModeStartupPreparer` to reject HTML/empty/wrong-size payloads and fail loudly when the runtime DEM is absent. Path tightened to leading-slash absolute form. The 2026-04-21 deploy validation later confirmed fresh GitHub deploys need a real asset-delivery pipeline for the primary A Shau runtime files.
 - **PR #114 `npc-and-player-leap-fix`** — two independent root causes: `CombatantRenderInterpolator` gained a separate vertical-velocity clamp lower than the horizontal cap (absorbs the +50m catch-up when LOD promotes a distant-culled combatant that was parked at `DISTANT_CULLED_DEFAULT_Y=3m`); `PlayerMovement` grounded clamp got a rate-limit so walking into a parked-aircraft bbox or cliff seam no longer launches the camera.
 - **PR #118 `harness-ashau-objective-cycling-fix`** — extracted `pickObjectiveZone` pure helper from `scripts/perf-active-driver.cjs`; lexicographic sort (priority class → distance) replaces the old "hand back the same captured zone" path. Eight behavior tests pin the regression.
 - **PR #121 `perf-baseline-refresh`** — all four scenarios rebaselined against the cycle end-state. Memo at `docs/rearch/perf-baselines-refresh-2026-04-20.md` documents measured values, threshold formula (pass = measured × 1.15, warn = measured × 1.30), and explicit loosen/tighten deltas vs the stale 2026-03-06 baseline. Frontier30m reached victory condition at ~879s (Open Frontier); 437 samples covered the dynamic-combat portion.
@@ -65,7 +65,7 @@ Sixteen merged PRs across five dispatch rounds — the full planned cycle landed
 - All five rounds dispatched sequentially; no hard-stops triggered (no fence-change proposals, no perf regressions > 5% p99, no > 2-red rounds). Worktree branch cleanup fails cosmetically because each worktree still references its branch — benign.
 
 ### Follow-ups filed (new briefs to consider next cycle)
-- A Shau DEM distribution (CI + fresh clone): commit the 21 MB binary, add a fetch script, or move to Git LFS. Loader now fails loudly but source-of-truth is still "hope it's on disk."
+- A Shau DEM distribution (CI + fresh clone): move the primary 21 MB runtime binary and rivers JSON to the Cloudflare R2 manifest pipeline in `docs/CLOUDFLARE_STACK.md`. Do not rely on local-only `public/data/vietnam/` files in GitHub deploys.
 - `frontier30m` harness soak currently hits Open Frontier victory at ~15min and stops producing capture samples for the remaining half of the window. `harness-match-end-skip-ai-sandbox` (cycle-2026-04-20) only covers ai_sandbox; extend to open_frontier or revise the soak to a non-terminal mode.
 - Screenshot evidence committed by the executors for tasks that need live `npm run dev` (cloud-runtime, aircraft-simulation-culling, several atmosphere shots) is incomplete — marked as playtest deliverables. Human playtest pass queued.
 - Reviewer agents should read the PR diff directly, not the local worktree.
@@ -204,13 +204,20 @@ the runbook for the end-of-cycle ritual.
 
 ## P0 - Deploy freshness and asset delivery
 
-- [ ] After the next manual Cloudflare deploy, verify live headers for `/`,
+- [x] After the 2026-04-21 manual Cloudflare deploy, verify live headers for `/`,
   `/sw.js`, `/build-assets/*`, `/assets/*`, `/models/*`, navmesh, heightmaps,
-  and A Shau JSON using `docs/DEPLOY_WORKFLOW.md`.
+  and A Shau JSON using `docs/DEPLOY_WORKFLOW.md`. This caught a real deploy
+  gap: A Shau runtime data is local-only/gitignored, so live
+  `/data/vietnam/a-shau-rivers.json` returned the SPA HTML shell.
+- [ ] Implement the Cloudflare-native asset delivery plan in
+  `docs/CLOUDFLARE_STACK.md`: R2 bucket, custom domain, CORS, immutable
+  content-addressed terrain/model keys, generated asset manifest, and CI upload
+  validation before Pages deploy.
 - [ ] Add a cross-browser live fresh-load gate for Chrome/Edge and Firefox,
   with a manual Safari/iOS check when service worker or GLB paths change.
-- [ ] Design a content-hashed GLB manifest pipeline so model files can become
-  immutable without risking stale in-place updates.
+- [ ] Move GLBs into the same content-addressed manifest pipeline after terrain
+  delivery is stable, so model files can become immutable without risking stale
+  in-place updates.
 
 ## P1 - Gameplay (carry-forward)
 

@@ -59,6 +59,7 @@ Deployed on [Cloudflare Pages](https://terror-in-the-jungle.pages.dev), CI-gated
 | [Roadmap](docs/ROADMAP.md) | Vision, phase plan, resolved decisions |
 | [Performance](docs/PERFORMANCE.md) | Profiling commands, scenarios, bottleneck status |
 | [Development](docs/DEVELOPMENT.md) | Testing, CI, deployment, pre-push checklist |
+| [Cloudflare Stack](docs/CLOUDFLARE_STACK.md) | Pages, R2 asset delivery, Workers, and live interaction target architecture |
 | [Backlog](docs/BACKLOG.md) | Open work, known bugs, architecture debt |
 | [Asset Manifest](docs/ASSET_MANIFEST.md) | 75 GLBs, integration status, art direction |
 

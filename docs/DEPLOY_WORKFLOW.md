@@ -13,6 +13,9 @@ Docs checked on 2026-04-21:
 - [Cloudflare Pages serving and caching defaults](https://developers.cloudflare.com/pages/configuration/serving-pages/)
 - [Cloudflare content compression](https://developers.cloudflare.com/speed/optimization/content/compression/)
 - [Wrangler install/update](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
+- [Cloudflare R2 uploads](https://developers.cloudflare.com/r2/objects/upload-objects/)
+- [Cloudflare R2 custom-domain caching](https://developers.cloudflare.com/cache/interaction-cloudflare-products/r2/)
+- [Cloudflare Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/)
 
 ## 1. Build To Deploy Path
 
@@ -82,7 +85,9 @@ This is the line between fast and stale:
 - `build-assets/` is Vite output with content hashes. Cache it aggressively.
 - `assets/`, `models/`, `manifest.json`, and `sw.js` are stable-path public assets. Revalidate them.
 - `data/navmesh/` and `data/heightmaps/` are seed-keyed baked data. Cache them aggressively.
-- `data/vietnam/` is non-hashed static JSON. Use a modest TTL.
+- `data/vietnam/` is a local development compatibility path today. Production
+  should move terrain/model payloads to Cloudflare R2 with content-addressed
+  keys instead of relying on gitignored files in a fresh Pages checkout.
 
 The repo now sets Vite `build.assetsDir = 'build-assets'` so generated bundle assets no longer share a URL namespace with mutable files copied from `public/assets/`.
 
@@ -99,7 +104,7 @@ The authoritative source is `public/_headers`, which Cloudflare Pages copies to 
 | `/models/*` | `public, max-age=0, must-revalidate` | GLBs are stable-path assets today; correctness beats avoiding 304 round-trips. |
 | `/data/navmesh/*` | `public, max-age=31536000, immutable` | Pre-baked navmesh binaries are keyed by `<mode>-<seed>.bin`. |
 | `/data/heightmaps/*` | `public, max-age=31536000, immutable` | Heightmaps are seed-keyed as `<mode>-<seed>.f32`. |
-| `/data/vietnam/*` | `public, max-age=86400` | A Shau Valley static JSON is rarely changed but is not content-hashed. |
+| `/data/vietnam/*` | `public, max-age=86400` | Local/development compatibility only until the R2 manifest pipeline owns terrain delivery. |
 
 Cloudflare Pages defaults unmatched static assets to revalidation with ETags. We still keep explicit rules for `sw.js` and `models/*` because stale service workers and stale GLBs are user-visible failures.
 
@@ -137,7 +142,7 @@ Strategy per URL:
 | `/data/heightmaps/*.f32` | cache-first |
 | `/models/*` | network/browser HTTP cache only, no Cache Storage |
 | `/assets/*` public assets | network/browser HTTP cache only, no Cache Storage |
-| `/data/vietnam/*` | network/browser HTTP cache only, follows HTTP TTL |
+| `/data/vietnam/*` | network/browser HTTP cache only, follows HTTP TTL; production target is R2 URL from manifest |
 | everything else | network/browser HTTP cache only |
 
 Install uses `skipWaiting()`. Activate deletes old named caches, enables navigation preload where available, and calls `clients.claim()`.
@@ -227,7 +232,15 @@ Expected results:
 - `/build-assets/<hash>.js` : `Cache-Control: public, max-age=31536000, immutable`
 - `/data/navmesh/*.bin` : `Cache-Control: public, max-age=31536000, immutable`
 - `/data/heightmaps/*.f32` : `Cache-Control: public, max-age=31536000, immutable`
-- `/data/vietnam/*.json` : `Cache-Control: public, max-age=86400`
+- `/data/vietnam/*.json` : `Content-Type: application/json` and `Cache-Control: public, max-age=86400` until replaced by the R2 manifest URL
+- `/data/vietnam/big-map/*.f32` : `Content-Type: application/octet-stream` and `Cache-Control: public, max-age=86400` until replaced by the R2 manifest URL
+
+Current production caveat found on 2026-04-21: the GitHub Actions deploy runs
+from a fresh checkout, and `public/data/vietnam/` is gitignored. The live
+`/data/vietnam/a-shau-rivers.json` check returned HTML, which means A Shau
+runtime data is not currently deploy-reproducible from GitHub. Do not solve this
+by committing large terrain payloads to git. The target fix is the R2 manifest
+pipeline in `docs/CLOUDFLARE_STACK.md`.
 
 If a header drifts from this table, inspect `public/_headers`, then `dist/_headers`, then the live Cloudflare Pages response.
 
@@ -251,6 +264,6 @@ Authentication is only needed for live Cloudflare operations: deploying, listing
 
 ## Open Items
 
-- **Content-hash GLB pipeline.** The ideal long-term answer is hashed model filenames plus a generated manifest, allowing `/models` to become immutable without stale in-place updates.
+- **Content-hash terrain/model pipeline.** Move primary A Shau terrain data and future GLBs/large payloads to Cloudflare R2 with immutable keys and a generated manifest. See `docs/CLOUDFLARE_STACK.md`.
 - **Cross-browser deploy gate.** Add a scripted browser matrix against the live Pages URL for Chrome/Edge and Firefox, with a manual Safari/iOS line item.
 - **Cloudflare Pages PR previews.** Current flow deploys only when manually triggered. Add branch deploys if design or QA needs shareable preview URLs.

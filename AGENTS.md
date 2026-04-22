@@ -93,6 +93,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Profiling commands, scenarios, validation gates |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Dev setup, validation, deployment, pre-push checklist |
 | [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) | Cloudflare Pages deploy + cache/service-worker strategy |
+| [docs/CLOUDFLARE_STACK.md](docs/CLOUDFLARE_STACK.md) | Target Cloudflare architecture for Pages, R2 assets, Workers, and interaction services |
 | [docs/PLAYTEST_CHECKLIST.md](docs/PLAYTEST_CHECKLIST.md) | Human playtest gate for game-feel changes |
 | [docs/BACKLOG.md](docs/BACKLOG.md) | Open work items, known bugs, architecture debt |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Vision and phase plan |

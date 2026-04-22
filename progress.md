@@ -416,3 +416,8 @@ TODO
 
 TODO
 - Real chunk-weight work remains: split startup-critical code from full live-game systems/UI, and revisit Recast/Three manual chunking without regressing startup.
+
+2026-04-21 deploy validation catch
+- First GitHub deploy after stabilization omitted gitignored `public/data/vietnam/` runtime files, causing live `/data/vietnam/a-shau-rivers.json` to fall through to HTML.
+- Rejected the quick "track the 21 MB DEM in git" workaround after user feedback. Current target is Cloudflare-native delivery: R2 bucket + custom domain + content-addressed terrain/model keys + generated manifest + CI upload/header validation before Pages deploy. See `docs/CLOUDFLARE_STACK.md`.
+- Local Wrangler is current (`4.84.1`) but not authenticated; GitHub repo has Cloudflare secrets, but local R2/Pages inspection needs `wrangler login` or `CLOUDFLARE_API_TOKEN` in the shell.

@@ -90,7 +90,7 @@ data/vietnam/big-map/*.png
 data/vietnam/converted/*.f32
 data/vietnam/reference/hydroviet-rivers/
 
-# Public DEM data (copied from data/ for runtime serving, too large for git)
+# Public DEM data (served locally from public/, delivered in production via R2)
 public/data/vietnam/
 
 # Example zoo (reference repos cloned for study, not part of project)
