@@ -9,6 +9,11 @@ import { GameLaunchSelection, GameMode } from '../config/gameModeTypes';
 import { PerformanceOverlay } from '../ui/debug/PerformanceOverlay';
 import { TimeIndicator } from '../ui/debug/TimeIndicator';
 import { LogOverlay } from '../ui/debug/LogOverlay';
+import { DebugHudRegistry } from '../ui/debug/DebugHudRegistry';
+import { VehicleStatePanel } from '../ui/debug/panels/VehicleStatePanel';
+import { CombatStatePanel } from '../ui/debug/panels/CombatStatePanel';
+import { CurrentModePanel } from '../ui/debug/panels/CurrentModePanel';
+import { FrameBudgetPanel } from '../ui/debug/panels/FrameBudgetPanel';
 import { RuntimeMetrics } from './RuntimeMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
@@ -37,6 +42,11 @@ export class GameEngine {
   public performanceOverlay: PerformanceOverlay;
   public timeIndicator: TimeIndicator;
   public logOverlay: LogOverlay;
+  public debugHud: DebugHudRegistry;
+  public vehicleStatePanel: VehicleStatePanel;
+  public combatStatePanel: CombatStatePanel;
+  public currentModePanel: CurrentModePanel;
+  public frameBudgetPanel: FrameBudgetPanel;
   public runtimeMetrics?: RuntimeMetrics;
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
@@ -73,6 +83,20 @@ export class GameEngine {
     this.performanceOverlay = new PerformanceOverlay();
     this.timeIndicator = new TimeIndicator();
     this.logOverlay = new LogOverlay();
+    this.vehicleStatePanel = new VehicleStatePanel();
+    this.combatStatePanel = new CombatStatePanel();
+    this.currentModePanel = new CurrentModePanel();
+    this.frameBudgetPanel = new FrameBudgetPanel();
+    this.debugHud = new DebugHudRegistry();
+    this.debugHud.register(this.performanceOverlay);
+    this.debugHud.register(this.timeIndicator);
+    this.debugHud.register(this.logOverlay);
+    this.debugHud.register(this.vehicleStatePanel);
+    this.debugHud.register(this.combatStatePanel);
+    this.debugHud.register(this.currentModePanel);
+    this.debugHud.register(this.frameBudgetPanel);
+    // Master hud hidden by default — backtick reveals everything.
+    this.debugHud.setMasterVisible(false);
     // Perf-harness gate (see src/core/PerfDiagnostics.ts and
     // docs/PERFORMANCE.md "Build targets"): DEV or VITE_PERF_HARNESS build.
     if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled()) {
@@ -163,9 +187,9 @@ export class GameEngine {
       case 'showFPS': {
         const show = value as boolean;
         if (show && !this.performanceOverlay.isVisible()) {
-          this.performanceOverlay.toggle();
+          this.debugHud.togglePanel('performance');
         } else if (!show && this.performanceOverlay.isVisible()) {
-          this.performanceOverlay.toggle();
+          this.debugHud.togglePanel('performance');
         }
         performanceTelemetry.setEnabled(
           this.performanceOverlay.isVisible()
@@ -374,9 +398,7 @@ export class GameEngine {
     this.loadingScreen.dispose();
     this.systemManager.dispose();
     this.renderer.dispose();
-    this.performanceOverlay.dispose();
-    this.timeIndicator.dispose();
-    this.logOverlay.dispose();
+    this.debugHud.dispose();
     GameEventBus.clear();
     performanceTelemetry.reset();
     objectPool.reset();
