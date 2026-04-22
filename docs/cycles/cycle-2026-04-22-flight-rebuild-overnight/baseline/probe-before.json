@@ -1,0 +1,1796 @@
+{
+  "timestamp": "2026-04-22T04:25:28.782Z",
+  "port": 4173,
+  "results": [
+    {
+      "configKey": "A1_SKYRAIDER",
+      "aircraftId": "airfield_main_fw_0",
+      "entered": true,
+      "touchMode": false,
+      "inputMode": "keyboardMouse",
+      "finalState": {
+        "airspeed": 53.91500267454165,
+        "heading": 269.99999999999994,
+        "verticalSpeed": 14.460951786208247,
+        "altitude": 43.24162300559092,
+        "altitudeAGL": 31.614317974768163,
+        "controlPhase": "flight",
+        "operationState": "cruise",
+        "phase": "airborne",
+        "aoaDeg": 1.9091220119018892,
+        "sideslipDeg": -1.3929847807941565e-14,
+        "throttle": 0.9999999999988458,
+        "brake": 0,
+        "weightOnWheels": false,
+        "isStalled": false,
+        "flightState": "airborne",
+        "stallSpeed": 34,
+        "pitch": 17.467352246781765,
+        "roll": 0,
+        "orbitHoldEnabled": false,
+        "configKey": "A1_SKYRAIDER"
+      },
+      "liftoffAtMs": 4500,
+      "climbAtMs": 7500,
+      "orbitState": null,
+      "orbitValid": null,
+      "approachState": {
+        "positioned": true,
+        "controlPhase": "approach",
+        "operationState": "approach",
+        "phase": "airborne",
+        "altitudeAGL": 41.5,
+        "airspeed": 55.23,
+        "verticalSpeed": -5,
+        "weightOnWheels": false,
+        "stalled": false,
+        "postStepControlPhase": "flight",
+        "postStepOperationState": "cruise"
+      },
+      "approachValid": true,
+      "handoffState": {
+        "lineupPositioned": true,
+        "npcAttached": true,
+        "playerBeforeExit": {
+          "inFixedWing": true,
+          "fixedWingId": "airfield_main_fw_0"
+        },
+        "npcStateWhilePlayer": "COLD",
+        "playerAfterExit": {
+          "inFixedWing": false,
+          "fixedWingId": null
+        },
+        "npcStateAfterExit": "TAKEOFF_ROLL",
+        "npcTransitionLog": [
+          {
+            "from": "COLD",
+            "to": "TAXI",
+            "missionTimeSec": 0.016666666666666666
+          },
+          {
+            "from": "TAXI",
+            "to": "TAKEOFF_ROLL",
+            "missionTimeSec": 0.4333333333333333
+          }
+        ],
+        "flightDataAfterExit": {
+          "operationState": "takeoff_roll",
+          "controlPhase": "takeoff_roll",
+          "airspeed": 10.98,
+          "altitudeAGL": 0,
+          "throttle": 0.991,
+          "brake": 0,
+          "weightOnWheels": true,
+          "stalled": false
+        }
+      },
+      "handoffValid": true,
+      "samples": [
+        {
+          "simTimeMs": 500,
+          "airspeed": 0.45,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.225,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 1000,
+          "airspeed": 2.8,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.603,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 1500,
+          "airspeed": 7.33,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.929,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 2000,
+          "airspeed": 12.88,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.991,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 2500,
+          "airspeed": 18.57,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.999,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 3000,
+          "airspeed": 24.27,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 3500,
+          "airspeed": 29.97,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 4000,
+          "airspeed": 35.64,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "rotation",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 4500,
+          "airspeed": 39.73,
+          "altitudeAGL": 1.9,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 5000,
+          "airspeed": 41.55,
+          "altitudeAGL": 4.85,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 5500,
+          "airspeed": 44.1,
+          "altitudeAGL": 8.94,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 6000,
+          "airspeed": 47.09,
+          "altitudeAGL": 13.33,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 6500,
+          "airspeed": 48.83,
+          "altitudeAGL": 18.52,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 7000,
+          "airspeed": 51.36,
+          "altitudeAGL": 24.82,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 7500,
+          "airspeed": 53.92,
+          "altitudeAGL": 31.61,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        }
+      ],
+      "renderState": "{\"mode\":\"open_frontier\",\"gameStarted\":true,\"coordSystem\":\"x=east/west, z=north/south, y=up\",\"input\":{\"touchMode\":false,\"inputMode\":\"keyboardMouse\"},\"player\":{\"x\":108,\"y\":13.3,\"z\":-1224,\"inHelicopter\":false,\"inFixedWing\":false,\"fixedWingId\":null},\"activeFixedWing\":null,\"fixedWing\":[{\"id\":\"airfield_main_fw_0\",\"configKey\":\"A1_SKYRAIDER\",\"airspeed\":11,\"altitudeAGL\":0,\"heading\":270,\"phase\":\"ground_roll\",\"operationState\":\"takeoff_roll\"},{\"id\":\"airfield_main_fw_1\",\"configKey\":\"AC47_SPOOKY\",\"airspeed\":0,\"altitudeAGL\":0,\"heading\":0,\"phase\":\"parked\",\"operationState\":\"parked\"}],\"hud\":{\"interaction\":\"vehicle-enter\"}}",
+      "success": true,
+      "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\artifacts\\fixed-wing-runtime-probe\\a1_skyraider.png"
+    },
+    {
+      "configKey": "F4_PHANTOM",
+      "aircraftId": "airfield_main_fw_2",
+      "entered": true,
+      "touchMode": false,
+      "inputMode": "keyboardMouse",
+      "finalState": {
+        "airspeed": 90.6232439226281,
+        "heading": 90,
+        "verticalSpeed": 7.193697615232168,
+        "altitude": 106.3678893228488,
+        "altitudeAGL": 44.40910321992205,
+        "controlPhase": "initial_climb",
+        "operationState": "initial_climb",
+        "phase": "airborne",
+        "aoaDeg": 14.10653288321891,
+        "sideslipDeg": 7.23754490023568e-15,
+        "throttle": 0.9999999999996572,
+        "brake": 0,
+        "weightOnWheels": false,
+        "isStalled": false,
+        "flightState": "airborne",
+        "stallSpeed": 60,
+        "pitch": 18.6594774464558,
+        "roll": 0,
+        "orbitHoldEnabled": false,
+        "configKey": "F4_PHANTOM"
+      },
+      "liftoffAtMs": 9000,
+      "climbAtMs": 12500,
+      "orbitState": null,
+      "orbitValid": null,
+      "approachState": {
+        "positioned": true,
+        "controlPhase": "approach",
+        "operationState": "approach",
+        "phase": "airborne",
+        "altitudeAGL": 47.5,
+        "airspeed": 90.14,
+        "verticalSpeed": -5,
+        "weightOnWheels": false,
+        "stalled": false,
+        "postStepControlPhase": "approach",
+        "postStepOperationState": "approach"
+      },
+      "approachValid": true,
+      "handoffState": {
+        "lineupPositioned": true,
+        "npcAttached": true,
+        "playerBeforeExit": {
+          "inFixedWing": true,
+          "fixedWingId": "airfield_main_fw_2"
+        },
+        "npcStateWhilePlayer": "COLD",
+        "playerAfterExit": {
+          "inFixedWing": false,
+          "fixedWingId": null
+        },
+        "npcStateAfterExit": "TAKEOFF_ROLL",
+        "npcTransitionLog": [
+          {
+            "from": "COLD",
+            "to": "TAXI",
+            "missionTimeSec": 0.016666666666666666
+          },
+          {
+            "from": "TAXI",
+            "to": "TAKEOFF_ROLL",
+            "missionTimeSec": 0.4333333333333333
+          }
+        ],
+        "flightDataAfterExit": {
+          "operationState": "lineup",
+          "controlPhase": "taxi",
+          "airspeed": 6.81,
+          "altitudeAGL": 0,
+          "throttle": 0.943,
+          "brake": 0,
+          "weightOnWheels": true,
+          "stalled": false
+        }
+      },
+      "handoffValid": true,
+      "samples": [
+        {
+          "simTimeMs": 500,
+          "airspeed": 0.21,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.165,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 1000,
+          "airspeed": 1.55,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.495,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 1500,
+          "airspeed": 4.4,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.828,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 2000,
+          "airspeed": 8.22,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.949,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 2500,
+          "airspeed": 12.32,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "taxi",
+          "throttle": 0.985,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 3000,
+          "airspeed": 16.52,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.996,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 3500,
+          "airspeed": 20.73,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.999,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 4000,
+          "airspeed": 24.95,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 4500,
+          "airspeed": 29.16,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 5000,
+          "airspeed": 33.38,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 5500,
+          "airspeed": 37.58,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 6000,
+          "airspeed": 41.78,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 6500,
+          "airspeed": 45.98,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 7000,
+          "airspeed": 50.16,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 7500,
+          "airspeed": 54.34,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 8000,
+          "airspeed": 58.51,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 8500,
+          "airspeed": 62.67,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "rotation",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 9000,
+          "airspeed": 66.55,
+          "altitudeAGL": 2.5,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 9500,
+          "airspeed": 69.76,
+          "altitudeAGL": 5.38,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 10000,
+          "airspeed": 73.5,
+          "altitudeAGL": 7.97,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 10500,
+          "airspeed": 76.89,
+          "altitudeAGL": 10.21,
+          "phase": "stall",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 11000,
+          "airspeed": 80.39,
+          "altitudeAGL": 12.77,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 11500,
+          "airspeed": 83.91,
+          "altitudeAGL": 15.25,
+          "phase": "stall",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 12000,
+          "airspeed": 87.08,
+          "altitudeAGL": 27.12,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 12500,
+          "airspeed": 90.62,
+          "altitudeAGL": 44.41,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 90,
+          "stalled": false
+        }
+      ],
+      "renderState": "{\"mode\":\"open_frontier\",\"gameStarted\":true,\"coordSystem\":\"x=east/west, z=north/south, y=up\",\"input\":{\"touchMode\":false,\"inputMode\":\"keyboardMouse\"},\"player\":{\"x\":544,\"y\":86.3,\"z\":-1224,\"inHelicopter\":false,\"inFixedWing\":false,\"fixedWingId\":null},\"activeFixedWing\":null,\"fixedWing\":[{\"id\":\"airfield_main_fw_0\",\"configKey\":\"A1_SKYRAIDER\",\"airspeed\":0,\"altitudeAGL\":0,\"heading\":0,\"phase\":\"parked\",\"operationState\":\"parked\"},{\"id\":\"airfield_main_fw_1\",\"configKey\":\"AC47_SPOOKY\",\"airspeed\":0,\"altitudeAGL\":0,\"heading\":0,\"phase\":\"parked\",\"operationState\":\"parked\"},{\"id\":\"airfield_main_fw_2\",\"configKey\":\"F4_PHANTOM\",\"airspeed\":6.8,\"altitudeAGL\":0,\"heading\":90,\"phase\":\"ground_roll\",\"operationState\":\"lineup\"}],\"hud\":{\"interaction\":\"none\"}}",
+      "success": true,
+      "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\artifacts\\fixed-wing-runtime-probe\\f4_phantom.png"
+    },
+    {
+      "configKey": "AC47_SPOOKY",
+      "aircraftId": "airfield_main_fw_1",
+      "entered": true,
+      "touchMode": false,
+      "inputMode": "keyboardMouse",
+      "finalState": {
+        "airspeed": 77.24807184453799,
+        "heading": 103.29027658311946,
+        "verticalSpeed": 1.6649704022189011,
+        "altitude": 166.62218117500902,
+        "altitudeAGL": 168.19467904680474,
+        "controlPhase": "flight",
+        "operationState": "orbit_hold",
+        "phase": "airborne",
+        "aoaDeg": 2.602705590703563,
+        "sideslipDeg": -4.813419671651041,
+        "throttle": 0.9999999999999973,
+        "brake": 0,
+        "weightOnWheels": false,
+        "isStalled": false,
+        "flightState": "airborne",
+        "stallSpeed": 32,
+        "pitch": 4.7538352696441475,
+        "roll": 11.579083169542628,
+        "orbitHoldEnabled": true,
+        "configKey": "AC47_SPOOKY"
+      },
+      "liftoffAtMs": 9500,
+      "climbAtMs": 16500,
+      "orbitState": {
+        "orbitClimbAtMs": 60000,
+        "controlPhase": "flight",
+        "operationState": "orbit_hold",
+        "orbitHoldEnabled": true,
+        "altitudeAGL": 168.19,
+        "airspeed": 77.25,
+        "heading": 103.3,
+        "roll": 11.58,
+        "weightOnWheels": false,
+        "stalled": false,
+        "samples": [
+          {
+            "simTimeMs": 90500,
+            "airspeed": 60.02,
+            "altitudeAGL": 108.78,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 100.9,
+            "roll": 23.39,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 91000,
+            "airspeed": 61.59,
+            "altitudeAGL": 109.38,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 98.9,
+            "roll": 46.49,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 91500,
+            "airspeed": 63.37,
+            "altitudeAGL": 105.08,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 97.7,
+            "roll": 53.42,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 92000,
+            "airspeed": 65.23,
+            "altitudeAGL": 101.33,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 101.5,
+            "roll": 42.5,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 92500,
+            "airspeed": 66.87,
+            "altitudeAGL": 82.88,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 104.1,
+            "roll": 21.57,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 93000,
+            "airspeed": 68.28,
+            "altitudeAGL": 101.52,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 102.8,
+            "roll": 9.39,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 93500,
+            "airspeed": 69.62,
+            "altitudeAGL": 96.23,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 99.7,
+            "roll": 19.59,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 94000,
+            "airspeed": 70.99,
+            "altitudeAGL": 101.79,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 98.8,
+            "roll": 41.75,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 94500,
+            "airspeed": 72.5,
+            "altitudeAGL": 108.94,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 99.3,
+            "roll": 52.96,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 95000,
+            "airspeed": 74.17,
+            "altitudeAGL": 137.12,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 101.1,
+            "roll": 46.42,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 95500,
+            "airspeed": 75.83,
+            "altitudeAGL": 153.9,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 103.5,
+            "roll": 27.02,
+            "stalled": false
+          },
+          {
+            "simTimeMs": 96000,
+            "airspeed": 77.25,
+            "altitudeAGL": 168.19,
+            "operationState": "orbit_hold",
+            "orbitHoldEnabled": true,
+            "heading": 103.3,
+            "roll": 11.58,
+            "stalled": false
+          }
+        ]
+      },
+      "orbitValid": true,
+      "approachState": {
+        "positioned": true,
+        "controlPhase": "approach",
+        "operationState": "approach",
+        "phase": "airborne",
+        "altitudeAGL": 41.5,
+        "airspeed": 48.26,
+        "verticalSpeed": -5,
+        "weightOnWheels": false,
+        "stalled": false,
+        "postStepControlPhase": "approach",
+        "postStepOperationState": "orbit_hold"
+      },
+      "approachValid": true,
+      "handoffState": {
+        "lineupPositioned": true,
+        "npcAttached": true,
+        "playerBeforeExit": {
+          "inFixedWing": true,
+          "fixedWingId": "airfield_main_fw_1"
+        },
+        "npcStateWhilePlayer": "COLD",
+        "playerAfterExit": {
+          "inFixedWing": false,
+          "fixedWingId": null
+        },
+        "npcStateAfterExit": "TAKEOFF_ROLL",
+        "npcTransitionLog": [
+          {
+            "from": "COLD",
+            "to": "TAXI",
+            "missionTimeSec": 0.016666666666666666
+          },
+          {
+            "from": "TAXI",
+            "to": "TAKEOFF_ROLL",
+            "missionTimeSec": 0.4333333333333333
+          }
+        ],
+        "flightDataAfterExit": {
+          "operationState": "lineup",
+          "controlPhase": "taxi",
+          "airspeed": 2.5,
+          "altitudeAGL": 0,
+          "throttle": 0.764,
+          "brake": 0,
+          "weightOnWheels": true,
+          "stalled": false
+        }
+      },
+      "handoffValid": true,
+      "samples": [
+        {
+          "simTimeMs": 500,
+          "airspeed": 0.1,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.097,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 1000,
+          "airspeed": 0.46,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.332,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 1500,
+          "airspeed": 1.54,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.616,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 2000,
+          "airspeed": 3.18,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.79,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 2500,
+          "airspeed": 5.14,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "lineup",
+          "throttle": 0.886,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 3000,
+          "airspeed": 7.26,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.938,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 3500,
+          "airspeed": 9.48,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.966,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 4000,
+          "airspeed": 11.74,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.981,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 4500,
+          "airspeed": 14.02,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.99,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 5000,
+          "airspeed": 16.31,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.994,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 5500,
+          "airspeed": 18.61,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.997,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 6000,
+          "airspeed": 20.9,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.998,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 6500,
+          "airspeed": 23.18,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 0.999,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 7000,
+          "airspeed": 25.45,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 7500,
+          "airspeed": 27.72,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 8000,
+          "airspeed": 29.97,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 8500,
+          "airspeed": 32.21,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 9000,
+          "airspeed": 34.43,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "rotation",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 9500,
+          "airspeed": 36.53,
+          "altitudeAGL": 1.25,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 10000,
+          "airspeed": 38.17,
+          "altitudeAGL": 2.16,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 10500,
+          "airspeed": 39.91,
+          "altitudeAGL": 3.19,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 11000,
+          "airspeed": 41.86,
+          "altitudeAGL": 3.72,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 11500,
+          "airspeed": 43.53,
+          "altitudeAGL": 4.18,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 12000,
+          "airspeed": 45.04,
+          "altitudeAGL": 5.4,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 12500,
+          "airspeed": 46.79,
+          "altitudeAGL": 6.66,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 13000,
+          "airspeed": 48.35,
+          "altitudeAGL": 7.79,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 13500,
+          "airspeed": 49.68,
+          "altitudeAGL": 9.78,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 14000,
+          "airspeed": 51.29,
+          "altitudeAGL": 11.9,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 14500,
+          "airspeed": 52.66,
+          "altitudeAGL": 13.89,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 15000,
+          "airspeed": 53.84,
+          "altitudeAGL": 16.98,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 15500,
+          "airspeed": 55.38,
+          "altitudeAGL": 19.85,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 16000,
+          "airspeed": 56.52,
+          "altitudeAGL": 22.62,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 16500,
+          "airspeed": 57.51,
+          "altitudeAGL": 31.13,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 30500,
+          "stage": "orbit_climb",
+          "airspeed": 58.98,
+          "altitudeAGL": 20.24,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 31000,
+          "stage": "orbit_climb",
+          "airspeed": 60.87,
+          "altitudeAGL": 7.8,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 270,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 31500,
+          "stage": "orbit_climb",
+          "airspeed": 54.78,
+          "altitudeAGL": 13.26,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 260,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 32000,
+          "stage": "orbit_climb",
+          "airspeed": 54.18,
+          "altitudeAGL": 32.29,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 262.2,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 32500,
+          "stage": "orbit_climb",
+          "airspeed": 53.46,
+          "altitudeAGL": 58.79,
+          "phase": "stall",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 266.9,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 33000,
+          "stage": "orbit_climb",
+          "airspeed": 52.13,
+          "altitudeAGL": 73.96,
+          "phase": "stall",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 269.1,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 33500,
+          "stage": "orbit_climb",
+          "airspeed": 51.42,
+          "altitudeAGL": 80.08,
+          "phase": "stall",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 267.6,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 34000,
+          "stage": "orbit_climb",
+          "airspeed": 51.62,
+          "altitudeAGL": 67.42,
+          "phase": "stall",
+          "operationState": "approach",
+          "throttle": 1,
+          "heading": 264.3,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 34500,
+          "stage": "orbit_climb",
+          "airspeed": 52.74,
+          "altitudeAGL": 59.5,
+          "phase": "stall",
+          "operationState": "approach",
+          "throttle": 1,
+          "heading": 261.2,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 35000,
+          "stage": "orbit_climb",
+          "airspeed": 54.61,
+          "altitudeAGL": 57.33,
+          "phase": "stall",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 259.5,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 35500,
+          "stage": "orbit_climb",
+          "airspeed": 57.02,
+          "altitudeAGL": 55.13,
+          "phase": "stall",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 259.8,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 36000,
+          "stage": "orbit_climb",
+          "airspeed": 59.8,
+          "altitudeAGL": 52.09,
+          "phase": "stall",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 263.2,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 36500,
+          "stage": "orbit_climb",
+          "airspeed": 62.79,
+          "altitudeAGL": 52.42,
+          "phase": "stall",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 276.7,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 37000,
+          "stage": "orbit_climb",
+          "airspeed": 65.87,
+          "altitudeAGL": 1.64,
+          "phase": "stall",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 90.9,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 37500,
+          "stage": "orbit_climb",
+          "airspeed": 2.02,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "taxi",
+          "throttle": 1,
+          "heading": 94.4,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 38000,
+          "stage": "orbit_climb",
+          "airspeed": 4.35,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "taxi",
+          "throttle": 1,
+          "heading": 94.1,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 38500,
+          "stage": "orbit_climb",
+          "airspeed": 6.68,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "taxi",
+          "throttle": 1,
+          "heading": 92.5,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 39000,
+          "stage": "orbit_climb",
+          "airspeed": 9,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 91.4,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 39500,
+          "stage": "orbit_climb",
+          "airspeed": 11.1,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 96,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 40000,
+          "stage": "orbit_climb",
+          "airspeed": 13.41,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 74.6,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 40500,
+          "stage": "orbit_climb",
+          "airspeed": 15.72,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 73,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 41000,
+          "stage": "orbit_climb",
+          "airspeed": 16.14,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 30.8,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 41500,
+          "stage": "orbit_climb",
+          "airspeed": 18.42,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 30.2,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 42000,
+          "stage": "orbit_climb",
+          "airspeed": 17.8,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 105,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 42500,
+          "stage": "orbit_climb",
+          "airspeed": 20.09,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 93,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 43000,
+          "stage": "orbit_climb",
+          "airspeed": 21.81,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 52,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 43500,
+          "stage": "orbit_climb",
+          "airspeed": 24.07,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 48.2,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 44000,
+          "stage": "orbit_climb",
+          "airspeed": 26.33,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 47.5,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 44500,
+          "stage": "orbit_climb",
+          "airspeed": 28.49,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 50.8,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 45000,
+          "stage": "orbit_climb",
+          "airspeed": 30.17,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 55.6,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 45500,
+          "stage": "orbit_climb",
+          "airspeed": 31.97,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "takeoff_roll",
+          "throttle": 1,
+          "heading": 58.3,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 46000,
+          "stage": "orbit_climb",
+          "airspeed": 34.15,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "rotation",
+          "throttle": 1,
+          "heading": 62.7,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 46500,
+          "stage": "orbit_climb",
+          "airspeed": 36.08,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "rotation",
+          "throttle": 1,
+          "heading": 51.2,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 47000,
+          "stage": "orbit_climb",
+          "airspeed": 37.25,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "rotation",
+          "throttle": 1,
+          "heading": 55.7,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 47500,
+          "stage": "orbit_climb",
+          "airspeed": 38.49,
+          "altitudeAGL": 0,
+          "phase": "ground_roll",
+          "operationState": "rotation",
+          "throttle": 1,
+          "heading": 59.3,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 48000,
+          "stage": "orbit_climb",
+          "airspeed": 40.97,
+          "altitudeAGL": 5.34,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 66.7,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 48500,
+          "stage": "orbit_climb",
+          "airspeed": 42.74,
+          "altitudeAGL": 10.3,
+          "phase": "stall",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 70.6,
+          "stalled": true
+        },
+        {
+          "simTimeMs": 49000,
+          "stage": "orbit_climb",
+          "airspeed": 44.91,
+          "altitudeAGL": 12.66,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 68.2,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 49500,
+          "stage": "orbit_climb",
+          "airspeed": 40.76,
+          "altitudeAGL": 0.22,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 98.1,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 50000,
+          "stage": "orbit_climb",
+          "airspeed": 39.31,
+          "altitudeAGL": 1.34,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 124.3,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 50500,
+          "stage": "orbit_climb",
+          "airspeed": 39.51,
+          "altitudeAGL": 4.96,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 114.9,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 51000,
+          "stage": "orbit_climb",
+          "airspeed": 37.93,
+          "altitudeAGL": 0.16,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 102.1,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 51500,
+          "stage": "orbit_climb",
+          "airspeed": 37.14,
+          "altitudeAGL": 10.99,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 103.5,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 52000,
+          "stage": "orbit_climb",
+          "airspeed": 36.75,
+          "altitudeAGL": 28.97,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 108.8,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 52500,
+          "stage": "orbit_climb",
+          "airspeed": 36.9,
+          "altitudeAGL": 41.71,
+          "phase": "airborne",
+          "operationState": "initial_climb",
+          "throttle": 1,
+          "heading": 113,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 53000,
+          "stage": "orbit_climb",
+          "airspeed": 37.84,
+          "altitudeAGL": 68.44,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 114.2,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 53500,
+          "stage": "orbit_climb",
+          "airspeed": 39.31,
+          "altitudeAGL": 71.13,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 112.8,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 54000,
+          "stage": "orbit_climb",
+          "airspeed": 40.77,
+          "altitudeAGL": 72.76,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 112.1,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 54500,
+          "stage": "orbit_climb",
+          "airspeed": 42.5,
+          "altitudeAGL": 70.58,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 112.2,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 55000,
+          "stage": "orbit_climb",
+          "airspeed": 44.31,
+          "altitudeAGL": 71.36,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 110.8,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 55500,
+          "stage": "orbit_climb",
+          "airspeed": 45.75,
+          "altitudeAGL": 72.42,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 109.7,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 56000,
+          "stage": "orbit_climb",
+          "airspeed": 47.35,
+          "altitudeAGL": 74.02,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 110.2,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 56500,
+          "stage": "orbit_climb",
+          "airspeed": 49.06,
+          "altitudeAGL": 76.21,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 109.4,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 57000,
+          "stage": "orbit_climb",
+          "airspeed": 50.33,
+          "altitudeAGL": 79.74,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 108.3,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 57500,
+          "stage": "orbit_climb",
+          "airspeed": 51.77,
+          "altitudeAGL": 82.74,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 109,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 58000,
+          "stage": "orbit_climb",
+          "airspeed": 53.35,
+          "altitudeAGL": 84.81,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 108.1,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 58500,
+          "stage": "orbit_climb",
+          "airspeed": 54.41,
+          "altitudeAGL": 88.36,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 107.1,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 59000,
+          "stage": "orbit_climb",
+          "airspeed": 55.77,
+          "altitudeAGL": 92.03,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 108.1,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 59500,
+          "stage": "orbit_climb",
+          "airspeed": 57.23,
+          "altitudeAGL": 94.62,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 106.8,
+          "stalled": false
+        },
+        {
+          "simTimeMs": 60000,
+          "stage": "orbit_climb",
+          "airspeed": 57.91,
+          "altitudeAGL": 98.42,
+          "phase": "airborne",
+          "operationState": "cruise",
+          "throttle": 1,
+          "heading": 105.5,
+          "stalled": false
+        }
+      ],
+      "renderState": "{\"mode\":\"open_frontier\",\"gameStarted\":true,\"coordSystem\":\"x=east/west, z=north/south, y=up\",\"input\":{\"touchMode\":false,\"inputMode\":\"keyboardMouse\"},\"player\":{\"x\":108,\"y\":64.3,\"z\":-1224,\"inHelicopter\":false,\"inFixedWing\":false,\"fixedWingId\":null},\"activeFixedWing\":null,\"fixedWing\":[{\"id\":\"airfield_main_fw_0\",\"configKey\":\"A1_SKYRAIDER\",\"airspeed\":0,\"altitudeAGL\":0,\"heading\":0,\"phase\":\"parked\",\"operationState\":\"parked\"},{\"id\":\"airfield_main_fw_1\",\"configKey\":\"AC47_SPOOKY\",\"airspeed\":2.5,\"altitudeAGL\":0,\"heading\":270,\"phase\":\"ground_roll\",\"operationState\":\"lineup\"}],\"hud\":{\"interaction\":\"vehicle-enter\"}}",
+      "success": true,
+      "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\artifacts\\fixed-wing-runtime-probe\\ac47_spooky.png"
+    }
+  ]
+}
