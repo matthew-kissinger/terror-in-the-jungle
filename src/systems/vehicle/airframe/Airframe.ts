@@ -580,11 +580,28 @@ export class Airframe {
 
     const stallPitchDrop = a.stalled ? -(0.9 + a.stallSeverity * 1.3) : 0;
 
+    // Climb-rate-scaled pitch damping. Phugoid is the long-period
+    // speed-altitude coupling that shows up in sustained climbs: pitch-up
+    // bleeds airspeed → lift falls → nose drops → airspeed recovers → lift
+    // recovers → nose rises. Real aircraft do this; arcade games damp or
+    // hide it. We scale pitch-rate damping by (1 + climbFactor * bonus)
+    // once vertical speed clearly exceeds cruise-oscillation levels; the
+    // smoothstep window (5 → 12 m/s) is chosen so assist-tier altitude-hold
+    // PD transients (which can peak around 6–7 m/s briefly after a stick
+    // release) stay near baseline damping, and only sustained climbouts
+    // (Vz → 10+ m/s under full throttle) get the full boost. At vy ≥ 12 m/s
+    // damping is 2.5× baseline which quenches the phugoid oscillation.
+    // Descent is deliberately left at baseline damping — we want elevator
+    // authority during dive recoveries.
+    const climbFactor = THREE.MathUtils.smoothstep(this.velocity.y, 5, 12);
+    const CLIMB_DAMP_BONUS = 1.5;
+    const pitchDampScaled = stability.pitchDamp * (1 + climbFactor * CLIMB_DAMP_BONUS);
+
     const pitchAccel =
       protectedElevator * authority.elevator * authorityScale +
       basePitchAssist +
       stallPitchDrop -
-      this.pitchRate * stability.pitchDamp;
+      this.pitchRate * pitchDampScaled;
     const rollAccel =
       this.aileron * authority.aileron * authorityScale +
       rollLevelAssist -
