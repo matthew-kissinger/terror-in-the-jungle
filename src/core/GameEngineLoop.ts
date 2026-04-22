@@ -75,11 +75,15 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     engine.systemManager.updateSystems(deltaTime, engine.gameStarted);
     engine.timeScale.postDispatch();
 
-    // Keep the analytic `AtmosphereSystem` dome glued to the camera so it
-    // never z-fights terrain or clips when pilots climb past the dome
-    // radius. Also tell the atmosphere the local ground height so the
-    // cloud layer sits at (terrainY + baseAltitude) rather than world Y=0.
-    const cameraPos = engine.renderer.camera.position;
+    // Free-fly debug camera: updates independently of player/vehicle input.
+    engine.freeFlyCamera?.update(deltaTime, engine.freeFlyInput);
+
+    // Keep the analytic `AtmosphereSystem` dome glued to the active camera
+    // so it never z-fights terrain or clips when pilots climb past the dome
+    // radius. The override camera (if set) drives the dome too so free-fly
+    // doesn't see a mismatched horizon.
+    const activeCamera = engine.renderer.getActiveCamera();
+    const cameraPos = activeCamera.position;
     engine.systemManager.atmosphereSystem.syncDomePosition(cameraPos);
     const terrainSystem = engine.systemManager.terrainSystem;
     if (terrainSystem && typeof terrainSystem.getHeightAt === 'function') {
@@ -110,7 +114,7 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     if (usingMortarCamera && mortarCamera) {
       renderer.render(engine.renderer.scene, mortarCamera);
     } else {
-      renderer.render(engine.renderer.scene, engine.renderer.camera);
+      renderer.render(engine.renderer.scene, activeCamera);
     }
 
     performanceTelemetry.endGPUTimer();

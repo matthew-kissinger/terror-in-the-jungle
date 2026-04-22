@@ -330,6 +330,9 @@ export class SystemManager {
   get strategicFeedback(): StrategicFeedback { return this.registry.require('strategicFeedback'); }
   get worldFeatureSystem(): WorldFeatureSystem { return this.registry.require('worldFeatureSystem'); }
   get navmeshSystem(): NavmeshSystem { return this.registry.require('navmeshSystem'); }
+  get vehicleManager(): import('../systems/vehicle/VehicleManager').VehicleManager {
+    return this.registry.require('vehicleManager');
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
