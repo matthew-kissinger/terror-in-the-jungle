@@ -34,6 +34,16 @@ const AIRFIELD_ENVELOPE_GRADE_RAMP_M = 48;
 const AIRFIELD_ENVELOPE_GRADE_STRENGTH = 0.45;
 /** Meter-scale vertical span across the envelope that triggers a site-slope warning. */
 const AIRFIELD_SLOPE_WARNING_SPAN_M = 18;
+/**
+ * Extra flat-band margin applied to taxiway capsule stamps only. The painted
+ * tarmac (RectTerrainSurfacePatch) extends rect.width / 2 from centerline; the
+ * base innerPadding (1.5m) leaves only 1.5m of flat band past the paint, and
+ * the capsule's hemispherical endcaps can expose sloped ground under the
+ * corners of the painted rectangle. An additional 2m keeps the full painted
+ * taxiway inside the guaranteed-flat zone. Runway and apron rects are
+ * unaffected — they already have wider padding.
+ */
+const TAXIWAY_EXTRA_PAD = 2;
 
 export function compileTerrainFeatures(
   config: GameModeConfig,
@@ -284,13 +294,18 @@ function compileGeneratedTerrainStamps(
     // Fillers use 'center' target height mode to match runway elevation
     const targetHeightMode = kind === 'filler' ? 'center' as const : stampTuning.targetHeightMode;
 
+    // Taxiway capsules get extra flat-band padding so the painted tarmac
+    // (rect.width-wide) stays inside the guaranteed-flat zone at the capsule
+    // endcaps. Runway and apron padding are unchanged.
+    const taxiwayExtraPad = kind === 'taxiway' ? TAXIWAY_EXTRA_PAD : 0;
+
     return {
       kind: 'flatten_capsule',
       startX: center.x - directionX * segmentHalfLength,
       startZ: center.z - directionZ * segmentHalfLength,
       endX: center.x + directionX * segmentHalfLength,
       endZ: center.z + directionZ * segmentHalfLength,
-      innerRadius: capsuleWidth * 0.5 + stampTuning.innerPadding,
+      innerRadius: capsuleWidth * 0.5 + stampTuning.innerPadding + taxiwayExtraPad,
       outerRadius: capsuleWidth * 0.5 + stampTuning.outerPadding,
       gradeRadius: capsuleWidth * 0.5 + stampTuning.gradePadding,
       gradeStrength: authoredStrength ?? stampTuning.gradeStrength,
