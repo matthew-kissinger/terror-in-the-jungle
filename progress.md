@@ -421,3 +421,22 @@ TODO
 - First GitHub deploy after stabilization omitted gitignored `public/data/vietnam/` runtime files, causing live `/data/vietnam/a-shau-rivers.json` to fall through to HTML.
 - Rejected the quick "track the 21 MB DEM in git" workaround after user feedback. Current target is Cloudflare-native delivery: R2 bucket + custom domain + content-addressed terrain/model keys + generated manifest + CI upload/header validation before Pages deploy. See `docs/CLOUDFLARE_STACK.md`.
 - Local Wrangler is current (`4.84.1`) but not authenticated; GitHub repo has Cloudflare secrets, but local R2/Pages inspection needs `wrangler login` or `CLOUDFLARE_API_TOKEN` in the shell.
+
+2026-04-22 Cloudflare R2 manifest pipeline
+- Authenticated local Wrangler through OAuth and inspected the Cloudflare account. Pages project `terror-in-the-jungle` exists as Direct Upload/no Git provider.
+- Created R2 buckets `titj-game-assets-prod` and `titj-game-assets-preview`; applied public read CORS; enabled temporary `r2.dev` endpoints.
+- Uploaded and validated content-addressed A Shau DEM/rivers objects in prod R2. DEM URL now returns 21,233,664 bytes, `application/octet-stream`, immutable cache, and CORS.
+- Added `scripts/cloudflare-assets.ts`, `src/core/GameAssetManifest.ts`, and deploy workflow integration. A Shau DEM now resolves through `/asset-manifest.json` in production with dev fallback to local `public/data/vietnam/`.
+- GitHub deploy initially failed because the Actions Cloudflare token can deploy Pages but cannot write R2 objects. Patched workflow to set `TITJ_SKIP_R2_UPLOAD=1`; CI now writes/validates the manifest from pinned R2 metadata while local OAuth runs still perform real R2 uploads.
+- Deployed `fe90e8f` successfully via GitHub run `24757914408`. Live Pages source shows `fe90e8f`.
+- Live validation:
+  - `/asset-manifest.json` returns JSON with `Cache-Control: public, max-age=0, must-revalidate`.
+  - R2 DEM URL from the manifest returns expected size/type/cache/CORS.
+  - Web-game Playwright menu flow screenshot saved under `output/web-game/live-pages-r2-fe90e8f/`.
+  - A Shau browser flow requested both `/asset-manifest.json` and the R2 DEM with no failed network requests.
+- Residual issue: A Shau flow still logs `[Navigation] Tiled navmesh generation failed`. This appears independent of the R2 asset delivery fix and should be handled in a terrain/nav quality pass.
+
+TODO
+- Replace temporary `r2.dev` with a custom R2 asset domain.
+- Update the GitHub `CLOUDFLARE_API_TOKEN` secret to include `Account -> Workers R2 Storage -> Edit`, then remove `TITJ_SKIP_R2_UPLOAD=1`.
+- Decide how future generated terrain payloads get into CI without relying on local-only gitignored source files; pinned metadata is acceptable only for already-uploaded immutable assets.
