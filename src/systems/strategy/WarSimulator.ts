@@ -196,6 +196,16 @@ export class WarSimulator implements GameSystem {
     return this.enabled;
   }
 
+  /**
+   * Runtime enable/disable toggle. Leaves `config`, agents, and squads intact
+   * when turning off — this is a "mute" for debug/playtest scrubbing, not a
+   * teardown. Use `disable()` when you want the full clear. Setting back to
+   * true resumes tick processing against the existing state.
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled && this.config !== null;
+  }
+
   // -- Force spawning --
 
   /**

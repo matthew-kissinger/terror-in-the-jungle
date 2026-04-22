@@ -52,6 +52,7 @@ export class GameEngine {
   public timeControlPanel: TimeControlPanel;
   public timeScale: TimeScale = new TimeScale();
   public runtimeMetrics?: RuntimeMetrics;
+  public liveTuningPanel?: import('../ui/debug/LiveTuningPanel').LiveTuningPanel;
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
   public readonly startupFlow = new StartupFlowController();
@@ -124,6 +125,19 @@ export class GameEngine {
   public async initialize(): Promise<void> {
     markStartup('engine.initialize.begin');
     await this.initializeSystems();
+    // Dev-only live tuning panel. Tweakpane is gated behind `import.meta.env.DEV`
+    // so Vite dead-code eliminates it from retail bundles. Failure inside
+    // panel setup must not block engine init — tuning is a developer aid,
+    // not a gameplay requirement.
+    if (import.meta.env.DEV) {
+      try {
+        const { LiveTuningPanel } = await import('../ui/debug/LiveTuningPanel');
+        this.liveTuningPanel = new LiveTuningPanel(this);
+        await this.liveTuningPanel.register(this.debugHud);
+      } catch (err) {
+        Logger.warn('core', 'LiveTuningPanel init failed:', err);
+      }
+    }
     markStartup('engine.initialize.end');
   }
 
