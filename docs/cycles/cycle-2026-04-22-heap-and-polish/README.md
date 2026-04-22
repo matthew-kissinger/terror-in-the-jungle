@@ -2,34 +2,36 @@
 
 **Cycle ID:** `cycle-2026-04-22-heap-and-polish`
 **Opened:** 2026-04-22 (intended for a morning-after autonomous session following the close of `cycle-2026-04-22-flight-rebuild-overnight`).
-**Shape:** small polish cycle — 3 tasks across two sequential rounds. Autonomous-safe.
+**Shape:** small polish cycle — 4 tasks across two sequential rounds. Autonomous-safe.
 
 ## Why this cycle exists
 
-The prior cycle (`cycle-2026-04-22-flight-rebuild-overnight`, closed in commit `c7866bf`) landed the fixed-wing + airfield fixes but surfaced three follow-ups that belong in a tight next pass:
+The prior cycle (`cycle-2026-04-22-flight-rebuild-overnight`, closed in commit `c7866bf`) landed the fixed-wing + airfield fixes but surfaced three follow-ups. Plus one user-reported visual issue escalated during cycle setup:
 
 1. **Heap-recovery regression in combat120.** The post-Round-3 perf capture went from `heap_growth_mb` 9.5 → 53.2 MB and `heap_recovery_ratio` 0.88 → 0.12 vs the Round-0 baseline. The p99 frame-time gate (≤5%) is GREEN (+2.7%), so the cycle correctly did not block on this — but it is the single most important unknown left in the tree, and it showed up *after* thirteen simultaneous merges landed, so there is no bisect data. Root cause is a direct investigation.
 2. **Helicopter PlayerController pose feed.** PR #124 fixed `FixedWingModel.ts:365` to feed interpolated pose to `PlayerController`. `HelicopterModel.ts:549` has the exact same raw-vs-interpolated bug against `state.position` and was flagged out-of-scope by the executor. The interpolated source (`helicopter.position`) is already in scope at line 534 of the same function.
 3. **A-1 Skyraider altitude-hold recapture regression.** PR #126 (altitude-hold unification) engages the Airframe PD in normal flight, but its `±0.15` elevator clamp at `Airframe.ts:347-348` saturates for the Skyraider's high thrust-to-weight at cruise throttle. Recapture-after-pitch-release regressed 175m → 463m for A-1; F-4/AC-47 improved. Brief forbade gain retuning so the regression landed as a trade; now is the right time to fix the clamp per-aircraft.
+4. **Clouds only visible in A Shau mode and look like "one tile above."** User-reported playtest observation (2026-04-22). Clouds ARE wired for every mode (`CloudLayer` instantiated unconditionally; `AtmosphereSystem.updateCloudLayer` runs every frame; every scenario preset sets a nonzero `cloudCoverageDefault`), but the fragment shader's threshold is punishing at low coverage (`lowerEdge = mix(1.0, -0.2, coverage)` → at coverage=0.1 almost nothing passes) and the 3-octave fbm at noise scale 1/900 produces a low-frequency cloud field. Openfrontier (0.1) and combat120 (0.2) read as empty sky; A Shau (0.4) is the only mode where clouds break past the threshold broadly enough to be legible. Three.js upgrade to 0.184 has landed (commit `7b74b3a`), so cloud shader work is no longer consult-only.
 
 ## Tasks in this cycle
 
 Each has a brief at `docs/tasks/<slug>.md`.
 
 - **Round 1 (solo, P0):** `heap-recovery-combat120-triage`
-- **Round 2 (2 parallel, P1):**
+- **Round 2 (3 parallel, P1):**
   - `helicopter-interpolated-pose`
   - `a1-altitude-hold-elevator-clamp`
+  - `cloud-audit-and-polish`
 
 ## Round schedule
 
 ```
 Round 0 (orchestrator prep)
   -> Round 1 (1 task solo)
-      -> Round 2 (2 tasks parallel)
+      -> Round 2 (3 tasks parallel)
 ```
 
-No inter-task blocking within Round 2 (they touch different files and subsystems).
+No inter-task blocking within Round 2 (they touch disjoint subsystems: helicopter, airframe/configs, atmosphere/cloud).
 
 ## Round 0 (orchestrator prep)
 
@@ -40,15 +42,16 @@ No inter-task blocking within Round 2 (they touch different files and subsystems
 
 ## Concurrency cap
 
-2 (only Round 2 has parallelism).
+3 (only Round 2 has parallelism).
 
 ## Dependencies
 
 ```
 Round 0
   -> heap-recovery-combat120-triage (solo)
-      -> helicopter-interpolated-pose  ┐
-      -> a1-altitude-hold-elevator-clamp ┘ parallel
+      -> helicopter-interpolated-pose          ┐
+      -> a1-altitude-hold-elevator-clamp       ├─ parallel (disjoint subsystems)
+      -> cloud-audit-and-polish                ┘
 ```
 
 Round 2 does NOT block on Round 1's fix landing; a diagnostic memo from Round 1 is sufficient to unblock Round 2.
@@ -84,7 +87,8 @@ YES. Orchestrator does NOT pause between rounds.
 - `heap-recovery-combat120-triage` is an investigative P0: the executor may deliver EITHER a targeted code fix OR a diagnostic memo at `docs/rearch/HEAP_RECOVERY_COMBAT120_TRIAGE.md`. Pick the higher-confidence option. A memo is not a failure; it unblocks a future targeted fix with the bisect data in hand.
 - `helicopter-interpolated-pose` mirrors PR #124. Executor should keep the diff tight (≤100 LOC) and copy the `FixedWingModel.test.ts` behavior-test pattern (L2 + L3) for the helicopter side.
 - `a1-altitude-hold-elevator-clamp` should add a per-aircraft `altitudeHoldElevatorClamp` to `FixedWingConfigs.ts` (default 0.15, A-1 at 0.30-0.35 based on probe). Widen the clamp at `Airframe.ts:347-348` to read from config instead of the literal.
-- Helicopter must not regress (scope touches HelicopterModel.ts). terrain-nav-reviewer is NOT needed for any of these tasks (combat-reviewer also not needed); reviewer rules per `docs/AGENT_ORCHESTRATION.md` do not trigger.
+- `cloud-audit-and-polish` is both investigation AND tuning. Executor takes before/after screenshots of the sky across all five modes, diagnoses the preliminary hypothesis (low coverage defaults + punishing threshold make clouds invisible outside A Shau), lands shader + preset tuning. Escape hatch: if screenshots reveal the bug is architectural (e.g., `CloudLayer` not in scene for some modes), memo-only and STOP. Three.js upgrade to 0.184 has landed, so shader work is no longer blocked on a parallel upgrade.
+- Helicopter must not regress (scope touches HelicopterModel.ts). Reviewer rules per `docs/AGENT_ORCHESTRATION.md` do not trigger for any of these tasks — no file under `src/systems/combat/**`, `src/systems/terrain/**`, or `src/systems/navigation/**` is modified (the cloud task touches `src/systems/environment/**`).
 
 ## Post-cycle ritual
 

@@ -78,14 +78,14 @@ The stub template under "Current cycle" is what the next cycle fills in.
 
 ### Why this cycle exists
 
-Follow-up polish pass after `cycle-2026-04-22-flight-rebuild-overnight`. Three items surfaced at cycle close that belong in a tight next pass: (1) combat120 heap-recovery regression (9MB→53MB end-growth; 88%→12% peak recovery); (2) helicopter `PlayerController.updatePlayerPosition` feeds raw physics pose — the same bug PR #124 fixed for fixed-wing; (3) A-1 Skyraider altitude-hold recapture regressed at cruise throttle under PR #126 because the `±0.15` elevator clamp saturates for its thrust-to-weight. Full plan in [docs/cycles/cycle-2026-04-22-heap-and-polish/README.md](cycles/cycle-2026-04-22-heap-and-polish/README.md).
+Follow-up polish pass after `cycle-2026-04-22-flight-rebuild-overnight`. Four items surfaced at cycle close or during setup that belong in a tight next pass: (1) combat120 heap-recovery regression (9MB→53MB end-growth; 88%→12% peak recovery); (2) helicopter `PlayerController.updatePlayerPosition` feeds raw physics pose — the same bug PR #124 fixed for fixed-wing; (3) A-1 Skyraider altitude-hold recapture regressed at cruise throttle under PR #126 because the `±0.15` elevator clamp saturates for its thrust-to-weight; (4) user-reported playtest: clouds only visible in A Shau mode and look like "one tile above" — `CloudLayer` shader threshold + coverage defaults leave openfrontier/combat120 reading as empty sky. Full plan in [docs/cycles/cycle-2026-04-22-heap-and-polish/README.md](cycles/cycle-2026-04-22-heap-and-polish/README.md).
 
 ### Tasks in this cycle
 
-3 tasks, two rounds. Each has a brief at `docs/tasks/<slug>.md`.
+4 tasks, two rounds. Each has a brief at `docs/tasks/<slug>.md`.
 
 - Round 1 (solo, P0): `heap-recovery-combat120-triage` — investigate the heap regression; deliver a diagnostic memo, optionally a targeted fix if root cause is small + high-confidence.
-- Round 2 (2 parallel, P1): `helicopter-interpolated-pose`, `a1-altitude-hold-elevator-clamp`.
+- Round 2 (3 parallel, P1): `helicopter-interpolated-pose`, `a1-altitude-hold-elevator-clamp`, `cloud-audit-and-polish`.
 
 ### Round schedule
 
@@ -95,7 +95,7 @@ R0 (orchestrator prep) → R1 (solo) → R2 (2 parallel). Round 2 does NOT block
 
 ### Concurrency cap
 
-2 (only Round 2 has parallelism).
+3 (only Round 2 has parallelism).
 
 ### Dependencies
 
@@ -103,7 +103,8 @@ R0 (orchestrator prep) → R1 (solo) → R2 (2 parallel). Round 2 does NOT block
 Round 0 (baseline inherited from prior cycle close)
   -> heap-recovery-combat120-triage (solo)
       -> helicopter-interpolated-pose          ┐
-      -> a1-altitude-hold-elevator-clamp       ┘ parallel
+      -> a1-altitude-hold-elevator-clamp       ├─ parallel (disjoint subsystems)
+      -> cloud-audit-and-polish                ┘
 ```
 
 ### Playtest policy
@@ -133,8 +134,10 @@ YES. Orchestrator does NOT pause for "go" between rounds.
 ### Cycle-specific notes
 
 - Triage task (`heap-recovery-combat120-triage`) has a memo-only escape hatch. The executor delivers either a fix OR `docs/rearch/HEAP_RECOVERY_COMBAT120_TRIAGE.md` with the bisect table; pick whichever is higher-confidence.
-- No reviewers trigger for this cycle: the tasks touch `src/systems/helicopter/**` (not terrain/nav, not combat under the reviewer rules) and `src/systems/vehicle/airframe/**` (same). If the triage task lands a fix and that fix touches `src/systems/combat/**`, spawn `combat-reviewer`.
-- Helicopter must not regress (scope is helicopter/fixed-wing-config only). The helicopter task is a direct port of PR #124; the clamp task touches only Airframe + FixedWingConfigs.
+- `cloud-audit-and-polish` has the same escape hatch: if the before-screenshot phase reveals an architectural bug (`CloudLayer` not in scene for some modes, `setTerrainYAtCamera` returning NaN, etc.) the executor writes `docs/rearch/CLOUD_ARCHITECTURAL_ISSUE.md` and STOPS, punting the fix to a dedicated cycle. If screenshots confirm the preliminary diagnosis (threshold + coverage tuning), the fix lands.
+- No reviewers trigger for this cycle: tasks touch `src/systems/helicopter/**`, `src/systems/vehicle/airframe/**`, `src/systems/environment/**`. None of these match `src/systems/combat/**` (combat-reviewer) or `src/systems/terrain/**`/`src/systems/navigation/**` (terrain-nav-reviewer). If the heap-triage task lands a fix that touches `src/systems/combat/**`, spawn `combat-reviewer`.
+- Helicopter must not regress (scope is helicopter/fixed-wing-config only). The helicopter task is a direct port of PR #124; the clamp task touches only Airframe + FixedWingConfigs. The cloud task touches only `AtmosphereSystem` + `CloudLayer` + `ScenarioAtmospherePresets`.
+- Three.js upgrade to 0.184 has landed (commit `7b74b3a`). Cloud shader work is no longer consult-only.
 
 ### Pre-flight acknowledgement
 
