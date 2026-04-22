@@ -201,4 +201,39 @@ function wireDebugPanels(engine: GameEngine): void {
     getScenarioName: () => sm.atmosphereSystem.getCurrentScenario(),
   });
   engine.frameBudgetPanel.setSource(() => sm.getSystemTimings());
+
+  if (engine.entityInspectorPanel) {
+    engine.entityInspectorPanel.setSources({
+      combatants: sm.combatantSystem,
+      vehicles: sm.vehicleManager,
+      player: sm.playerController,
+    });
+    engine.entityInspectorPanel.setFollowController({
+      startFollow: (kind, id) => {
+        if (kind === 'combatant') {
+          const combatant = sm.combatantSystem.getAllCombatants().find(c => c.id === id);
+          if (!combatant) return false;
+          engine.freeFlyCamera.setFollowTarget({
+            getPosition: (tgt) => {
+              const live = sm.combatantSystem.getAllCombatants().find(c => c.id === id);
+              return live ? tgt.copy(live.position) : null;
+            },
+          });
+          return true;
+        }
+        if (kind === 'vehicle') {
+          engine.freeFlyCamera.setFollowTarget({
+            getPosition: (tgt) => {
+              const v = sm.vehicleManager.getVehicle(id);
+              return v ? tgt.copy(v.getPosition()) : null;
+            },
+          });
+          return true;
+        }
+        return false;
+      },
+      stopFollow: () => engine.freeFlyCamera.setFollowTarget(null),
+      isFollowing: () => engine.freeFlyCamera.hasFollowTarget(),
+    });
+  }
 }

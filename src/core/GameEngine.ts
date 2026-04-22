@@ -16,6 +16,8 @@ import { CurrentModePanel } from '../ui/debug/panels/CurrentModePanel';
 import { FrameBudgetPanel } from '../ui/debug/panels/FrameBudgetPanel';
 import { TimeControlPanel } from '../ui/debug/TimeControlPanel';
 import { TimeScale } from './TimeScale';
+import { FreeFlyCamera, type FreeFlyInput } from '../ui/debug/FreeFlyCamera';
+import { EntityInspectorPanel } from '../ui/debug/EntityInspectorPanel';
 import { RuntimeMetrics } from './RuntimeMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
@@ -51,6 +53,12 @@ export class GameEngine {
   public frameBudgetPanel: FrameBudgetPanel;
   public timeControlPanel: TimeControlPanel;
   public timeScale: TimeScale = new TimeScale();
+  public entityInspectorPanel: EntityInspectorPanel;
+  public freeFlyCamera: FreeFlyCamera;
+  public freeFlyInput: FreeFlyInput = {
+    forward: false, back: false, left: false, right: false,
+    up: false, down: false, fast: false, slow: false,
+  };
   public runtimeMetrics?: RuntimeMetrics;
   public liveTuningPanel?: import('../ui/debug/LiveTuningPanel').LiveTuningPanel;
   public sandboxConfig: SandboxConfig | null;
@@ -93,6 +101,8 @@ export class GameEngine {
     this.currentModePanel = new CurrentModePanel();
     this.frameBudgetPanel = new FrameBudgetPanel();
     this.timeControlPanel = new TimeControlPanel(this.timeScale);
+    this.entityInspectorPanel = new EntityInspectorPanel();
+    this.freeFlyCamera = new FreeFlyCamera();
     this.debugHud = new DebugHudRegistry();
     this.debugHud.register(this.performanceOverlay);
     this.debugHud.register(this.timeIndicator);
@@ -102,6 +112,7 @@ export class GameEngine {
     this.debugHud.register(this.currentModePanel);
     this.debugHud.register(this.frameBudgetPanel);
     this.debugHud.register(this.timeControlPanel);
+    this.debugHud.register(this.entityInspectorPanel);
     // Master hud hidden by default — backtick reveals everything.
     this.debugHud.setMasterVisible(false);
     // Perf-harness gate (see src/core/PerfDiagnostics.ts and
@@ -346,7 +357,8 @@ export class GameEngine {
     for (let i = 0; i < steps; i++) {
       this.lastFrameDelta = fixedDelta;
       this.systemManager.updateSystems(fixedDelta, this.gameStarted);
-      const camPos = this.renderer.camera.position;
+      this.freeFlyCamera?.update(fixedDelta, this.freeFlyInput);
+      const camPos = this.renderer.getActiveCamera().position;
       this.systemManager.atmosphereSystem.syncDomePosition(camPos);
       const terrainSystem = this.systemManager.terrainSystem;
       if (terrainSystem && typeof terrainSystem.getHeightAt === 'function') {
@@ -378,7 +390,7 @@ export class GameEngine {
     if (usingMortarCamera && mortarCamera) {
       renderer.render(this.renderer.scene, mortarCamera);
     } else {
-      renderer.render(this.renderer.scene, this.renderer.camera);
+      renderer.render(this.renderer.scene, this.renderer.getActiveCamera());
     }
 
     if (!usingMortarCamera) {

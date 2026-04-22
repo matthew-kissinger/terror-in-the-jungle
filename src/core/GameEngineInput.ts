@@ -2,6 +2,8 @@ import { Logger } from '../utils/Logger';
 import type { GameEngine } from './GameEngine';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { InputContextManager } from '../systems/input/InputContextManager';
+import type { InspectorEntityKind } from '../ui/debug/EntityInspectorPanel';
+import { pickEntityFromClick } from '../ui/debug/FreeFlyPick';
 
 let engineRef: GameEngine | null = null;
 let listenersAttached = false;
@@ -14,6 +16,9 @@ function handleResize(): void {
 function handleKeyDown(event: KeyboardEvent): void {
   if (!engineRef) return;
   const context = InputContextManager.getInstance().getContext();
+  const isFreeFlyKey =
+    event.key === 'v' || event.key === 'V' ||
+    event.key === 'b' || event.key === 'B';
   const isDebugKey =
     event.key === 'F1' ||
     event.key === 'F2' ||
@@ -28,8 +33,14 @@ function handleKeyDown(event: KeyboardEvent): void {
     event.key === 'Backspace' ||
     event.key === '.' ||
     event.key === ',' ||
-    event.key === ';';
+    event.key === ';' ||
+    isFreeFlyKey;
   if (context !== 'gameplay' && !isDebugKey) return;
+
+  // Free-fly WASD/QE/Shift/Ctrl only while free-fly is active.
+  if (engineRef.freeFlyCamera.isActive() && applyFreeFlyKeyState(engineRef, event, true)) {
+    return;
+  }
 
   if (event.key === 'F1') {
     togglePerformanceStats(engineRef);
@@ -55,6 +66,10 @@ function handleKeyDown(event: KeyboardEvent): void {
     slowerSimulation(engineRef);
   } else if (event.key === ';') {
     fasterSimulation(engineRef);
+  } else if (event.key === 'v' || event.key === 'V') {
+    toggleFreeFly(engineRef);
+  } else if (event.key === 'b' || event.key === 'B') {
+    if (engineRef.freeFlyCamera.isActive()) toggleFreeFly(engineRef);
   } else if (event.key === 'k' || event.key === 'K') {
     // Voluntary respawn with K key
     if (engineRef.gameStarted) {
@@ -67,6 +82,33 @@ function handleKeyDown(event: KeyboardEvent): void {
   }
 }
 
+function handleKeyUp(event: KeyboardEvent): void {
+  if (!engineRef) return;
+  if (engineRef.freeFlyCamera.isActive()) {
+    applyFreeFlyKeyState(engineRef, event, false);
+  }
+}
+
+function handleMouseMove(event: MouseEvent): void {
+  if (!engineRef || !engineRef.freeFlyCamera.isActive()) return;
+  // Use movementX/Y when pointer is locked; otherwise fall back to drag-based.
+  const locked = document.pointerLockElement === engineRef.renderer.renderer.domElement;
+  if (locked) {
+    engineRef.freeFlyCamera.applyMouseDelta(event.movementX, event.movementY);
+  }
+}
+
+function handleMouseDown(event: MouseEvent): void {
+  if (!engineRef || !engineRef.freeFlyCamera.isActive()) return;
+  if (event.button !== 0) return;
+  const pick = pickEntityFromClick(engineRef, event);
+  if (pick) {
+    // Master hud must be on for the panel to actually render.
+    if (!engineRef.debugHud.isMasterVisible()) engineRef.debugHud.setMasterVisible(true);
+    engineRef.entityInspectorPanel.show({ kind: pick.kind as InspectorEntityKind, id: pick.id });
+  }
+}
+
 /**
  * Sets up key event listeners for the engine
  */
@@ -76,6 +118,9 @@ export function setupEventListeners(engine: GameEngine): void {
 
   window.addEventListener('resize', handleResize);
   window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('mousedown', handleMouseDown);
   listenersAttached = true;
 }
 
@@ -84,8 +129,54 @@ export function disposeEventListeners(): void {
 
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('keydown', handleKeyDown);
+  window.removeEventListener('keyup', handleKeyUp);
+  window.removeEventListener('mousemove', handleMouseMove);
+  window.removeEventListener('mousedown', handleMouseDown);
   listenersAttached = false;
   engineRef = null;
+}
+
+/**
+ * Apply a keydown/keyup to the shared free-fly input state. Returns true if
+ * the key was consumed so the caller skips other handlers.
+ */
+function applyFreeFlyKeyState(engine: GameEngine, event: KeyboardEvent, isDown: boolean): boolean {
+  const key = event.key.toLowerCase();
+  const state = engine.freeFlyInput;
+  switch (key) {
+    case 'w': state.forward = isDown; return true;
+    case 's': state.back = isDown; return true;
+    case 'a': state.left = isDown; return true;
+    case 'd': state.right = isDown; return true;
+    case 'e': state.up = isDown; return true;
+    case 'q': state.down = isDown; return true;
+    case 'shift': state.fast = isDown; return true;
+    case 'control': state.slow = isDown; return true;
+    default: return false;
+  }
+}
+
+/** Toggle free-fly mode on/off. Swaps the renderer's active camera. */
+export function toggleFreeFly(engine: GameEngine): void {
+  const cam = engine.freeFlyCamera;
+  if (cam.isActive()) {
+    cam.deactivate();
+    engine.renderer.setOverrideCamera(null);
+    // Clear WASD state so holds don't stick when we come back.
+    const st = engine.freeFlyInput;
+    st.forward = st.back = st.left = st.right = st.up = st.down = st.fast = st.slow = false;
+    Logger.info('engine-input', 'Free-fly camera OFF');
+  } else {
+    cam.activate(engine.renderer.camera);
+    engine.renderer.setOverrideCamera(cam.getCamera());
+    // Request pointer lock so mouse-look works. Benign if the user declines.
+    try {
+      engine.renderer.renderer.domElement.requestPointerLock?.();
+    } catch {
+      // Best-effort — ignore security errors in headless test envs.
+    }
+    Logger.info('engine-input', 'Free-fly camera ON (V toggle, B to exit)');
+  }
 }
 
 /**

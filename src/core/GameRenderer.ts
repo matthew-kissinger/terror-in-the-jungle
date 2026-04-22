@@ -14,6 +14,13 @@ export class GameRenderer {
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
   public postProcessing?: PostProcessingManager;
+  /**
+   * Optional camera override. When set, the main render loop draws the scene
+   * from this camera instead of `this.camera`. Used by FreeFlyCamera for
+   * detached-spectator debug; clearing it restores the player/vehicle view.
+   * See `src/ui/debug/FreeFlyCamera.ts`.
+   */
+  private overrideCamera: THREE.PerspectiveCamera | null = null;
 
   // Exposed environment properties for WeatherSystem
   public fog?: THREE.FogExp2;
@@ -187,6 +194,22 @@ export class GameRenderer {
     }
   }
 
+  /** Camera currently driving the main scene render (override if set). */
+  getActiveCamera(): THREE.PerspectiveCamera {
+    return this.overrideCamera ?? this.camera;
+  }
+
+  /** Install/clear a debug camera override. Pass `null` to restore. */
+  setOverrideCamera(cam: THREE.PerspectiveCamera | null): void {
+    this.overrideCamera = cam;
+    if (cam) {
+      const info = ViewportManager.getInstance().info;
+      const aspect = Math.max(1, info.width) / Math.max(1, info.height);
+      cam.aspect = aspect;
+      cam.updateProjectionMatrix();
+    }
+  }
+
   showRenderer(): void {
     this.renderer.domElement.style.display = 'block';
   }
@@ -322,6 +345,10 @@ export class GameRenderer {
     const height = Math.max(1, info.height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    if (this.overrideCamera) {
+      this.overrideCamera.aspect = width / height;
+      this.overrideCamera.updateProjectionMatrix();
+    }
     this.renderer.setSize(width, height);
     if (this.postProcessing) {
       this.postProcessing.setSize(width, height);
