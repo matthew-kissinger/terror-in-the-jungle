@@ -55,6 +55,7 @@ export class GameEngine {
   public timeControlPanel: TimeControlPanel;
   public timeScale: TimeScale = new TimeScale();
   public entityInspectorPanel: EntityInspectorPanel;
+  public worldOverlayControlPanel?: import('../ui/debug/WorldOverlayControlPanel').WorldOverlayControlPanel;
   public freeFlyCamera: FreeFlyCamera;
   public freeFlyInput: FreeFlyInput = {
     forward: false, back: false, left: false, right: false,

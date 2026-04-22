@@ -193,6 +193,17 @@ export class LOSAccelerator {
   }
 
   /**
+   * Read-only iterator over registered chunk bounds for debug visualization.
+   * Returns `{ key, bounds }` tuples — consumers must treat `bounds` as
+   * immutable. Additive accessor added for `world-overlay-debugger`.
+   */
+  *iterChunkBounds(): IterableIterator<{ key: string; bounds: THREE.Box3 }> {
+    for (const [key, entry] of this.chunkCache) {
+      yield { key, bounds: entry.bounds };
+    }
+  }
+
+  /**
    * Clear all cached chunks
    */
   clear(): void {

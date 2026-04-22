@@ -390,6 +390,11 @@ export class TerrainSystem implements GameSystem {
     return this.renderRuntime?.getActiveTerrainTileCount() ?? 0;
   }
 
+  /** Additive debug accessor for `world-overlay-debugger`. See TerrainRenderRuntime. */
+  getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number }> {
+    return this.renderRuntime?.getActiveTilesForDebug() ?? [];
+  }
+
   getChunkSize(): number {
     return this.chunkSize;
   }

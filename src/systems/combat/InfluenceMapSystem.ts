@@ -227,6 +227,15 @@ export class InfluenceMapSystem implements GameSystem {
     return bestZone;
   }
 
+  /**
+   * Read-only grid accessor for debug overlays. Additive accessor added for
+   * `world-overlay-debugger`. Returns the live grid; consumers must treat
+   * cells as immutable.
+   */
+  getGridForDebug(): { grid: ReadonlyArray<ReadonlyArray<InfluenceCell>>; gridSize: number; cellSize: number; worldOffset: THREE.Vector2 } {
+    return { grid: this.grid, gridSize: this.gridSize, cellSize: this.cellSize, worldOffset: this.worldOffset };
+  }
+
   // Setters for external data
 
   setCombatants(combatants: Map<string, Combatant>): void {

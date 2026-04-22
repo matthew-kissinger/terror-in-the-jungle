@@ -71,6 +71,20 @@ export class TerrainRenderRuntime {
     return this.quadtree.getSelectedTileCount();
   }
 
+  /**
+   * Re-runs tile selection against the current camera and returns a snapshot
+   * of the CDLOD tiles the terrain renderer would draw this frame. Additive
+   * accessor added for `world-overlay-debugger`; O(tiles) + frustum update.
+   */
+  getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number }> {
+    this.updateFrustumPlanes();
+    const tiles = this.quadtree.selectTiles(
+      this.camera.position.x, this.camera.position.y, this.camera.position.z,
+      this.frustumPlanes,
+    );
+    return tiles.map((t) => ({ x: t.x, z: t.z, size: t.size, lodLevel: t.lodLevel }));
+  }
+
   dispose(): void {
     this.scene.remove(this.renderer.getMesh());
     this.renderer.dispose();
