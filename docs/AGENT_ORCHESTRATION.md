@@ -70,49 +70,75 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: (none — awaiting next planning pass)
+## Current cycle: cycle-2026-04-22-heap-and-polish
 
 ### Cycle ID
 
-`<cycle-id>`
+`cycle-2026-04-22-heap-and-polish`
 
 ### Why this cycle exists
 
-<one paragraph: what changed in the world or in the repo that justifies this cycle right now>
+Follow-up polish pass after `cycle-2026-04-22-flight-rebuild-overnight`. Three items surfaced at cycle close that belong in a tight next pass: (1) combat120 heap-recovery regression (9MB→53MB end-growth; 88%→12% peak recovery); (2) helicopter `PlayerController.updatePlayerPosition` feeds raw physics pose — the same bug PR #124 fixed for fixed-wing; (3) A-1 Skyraider altitude-hold recapture regressed at cruise throttle under PR #126 because the `±0.15` elevator clamp saturates for its thrust-to-weight. Full plan in [docs/cycles/cycle-2026-04-22-heap-and-polish/README.md](cycles/cycle-2026-04-22-heap-and-polish/README.md).
 
 ### Tasks in this cycle
 
-<list of slugs with one-line descriptions; each must have a brief at `docs/tasks/<slug>.md`>
+3 tasks, two rounds. Each has a brief at `docs/tasks/<slug>.md`.
+
+- Round 1 (solo, P0): `heap-recovery-combat120-triage` — investigate the heap regression; deliver a diagnostic memo, optionally a targeted fix if root cause is small + high-confidence.
+- Round 2 (2 parallel, P1): `helicopter-interpolated-pose`, `a1-altitude-hold-elevator-clamp`.
 
 ### Round schedule
 
-<R1 ... -> R2 ... -> ...; concurrency per round; merge gates>
+R0 (orchestrator prep) → R1 (solo) → R2 (2 parallel). Round 2 does NOT block on Round 1 landing a fix — a memo from Round 1 is sufficient to unblock.
+
+**Round 0 (orchestrator prep):** `git fetch origin && git status` (must be clean); baseline for heap/perf gating inherits `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/evidence/perf-after-round3.json`; no fresh Round-0 capture required.
 
 ### Concurrency cap
 
-<N>
+2 (only Round 2 has parallelism).
 
 ### Dependencies
 
-<inline DAG or pointer to brief file>
+```
+Round 0 (baseline inherited from prior cycle close)
+  -> heap-recovery-combat120-triage (solo)
+      -> helicopter-interpolated-pose          ┐
+      -> a1-altitude-hold-elevator-clamp       ┘ parallel
+```
 
 ### Playtest policy
 
-<which tasks gate on playtest pass before merge; default is "playtest-required PRs merge on CI green and are flagged for morning review">
+DEFERRED. No playtest gate BLOCKS merge. Any playtest-recommended PRs are flagged in RESULT.md.
+
+### Perf policy
+
+Post-Round-2 `npm run perf:capture:combat120`. Two thresholds:
+- p99 frame time within 5% of the inherited baseline (same rule as prior cycle).
+- `heap_recovery_ratio` ≥ 0.5. If the triage task lands a fix, aim to recover toward the pre-cycle 0.88. If it is memo-only, this gate may still fail — record in RESULT.md and do NOT revert.
+
+### Failure handling (autonomous-safe)
+
+- CI red on a task → mark `blocked`, record, continue.
+- Fence-change proposal (`fence_change: yes`) → mark `blocked`, record, DO NOT merge.
+- Probe-assertion fail post-merge → revert the merge if possible; otherwise `rolled-back-pending` in RESULT.md.
 
 ### Visual checkpoints (orchestrator-gated)
 
-<list of `evidence/<slug>/<artifact>` outputs the orchestrator must review before advancing past that round; or "NONE" if cycle is autonomous>
+NONE. Autonomous run.
 
 ### skip-confirm
 
-<yes|no — if yes, orchestrator does NOT pause for "go" between rounds; default no>
+YES. Orchestrator does NOT pause for "go" between rounds.
 
 ### Cycle-specific notes
 
-<anything that does not generalize: budget caps that override the default, special handling for a known-flaky test, etc.>
+- Triage task (`heap-recovery-combat120-triage`) has a memo-only escape hatch. The executor delivers either a fix OR `docs/rearch/HEAP_RECOVERY_COMBAT120_TRIAGE.md` with the bisect table; pick whichever is higher-confidence.
+- No reviewers trigger for this cycle: the tasks touch `src/systems/helicopter/**` (not terrain/nav, not combat under the reviewer rules) and `src/systems/vehicle/airframe/**` (same). If the triage task lands a fix and that fix touches `src/systems/combat/**`, spawn `combat-reviewer`.
+- Helicopter must not regress (scope is helicopter/fixed-wing-config only). The helicopter task is a direct port of PR #124; the clamp task touches only Airframe + FixedWingConfigs.
 
-The previous cycle, `cycle-2026-04-22-flight-rebuild-overnight`, closed on 2026-04-22 with 13 merged PRs (#122–#134) across four sequential rounds and one orchestrator-level navmesh regen. See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-22-flight-rebuild-overnight, 2026-04-22)" and `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/RESULT.md`.
+### Pre-flight acknowledgement
+
+The prior cycle, `cycle-2026-04-22-flight-rebuild-overnight`, closed at commit `c7866bf` with 13 merged PRs (#122–#134). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-22-flight-rebuild-overnight, 2026-04-22)" and `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/RESULT.md`.
 
 ## Dispatch protocol
 
