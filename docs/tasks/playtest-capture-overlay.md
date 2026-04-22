@@ -59,11 +59,14 @@ The `.md` file shape:
 - **Mode:** <GameLaunchSelection.mode>
 - **Player position:** <x,y,z>
 - **Player vehicle:** <fixed-wing-A1 | helicopter-huey | on-foot>
+- **Tuning state snapshot:** see `<sequence>-tuning.json`
 
 ## Annotation
 
 <user's text verbatim>
 ```
+
+**Bundled tuning-state JSON** — alongside each capture, write a `<sequence>-tuning.json` file containing the live-tuning-panel's current value dictionary (reads from whatever `LiveTuningPanel.getState()` or equivalent exposes from the sibling task). This means when the human annotates "A-1 altitude hold feels mushy here" the JSON captures the exact clamp value, PD gains, and any other live-tweaked parameters at that moment. If `live-tuning-panel` has not shipped yet (R2 → R3 sequencing guarantees it will), write `{ "tuning_unavailable": true, "reason": "live-tuning-panel not yet loaded" }` as a graceful fallback.
 
 ### 3. File writing
 

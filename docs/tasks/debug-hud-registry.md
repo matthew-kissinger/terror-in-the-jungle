@@ -10,9 +10,10 @@
 **Files touched:**
 
 - Create: `src/ui/debug/DebugHudRegistry.ts` (registry + master toggle container).
-- Create: `src/ui/debug/panels/VehicleStatePanel.ts` (new panel — current vehicle type, position, velocity, altitude, AGL).
-- Create: `src/ui/debug/panels/CombatStatePanel.ts` (new panel — active combatant count per faction, AI budget per tick, stall-backtrack count).
-- Create: `src/ui/debug/panels/CurrentModePanel.ts` (new panel — GameMode enum, active scenario preset name, weather state, TOD).
+- Create: `src/ui/debug/panels/VehicleStatePanel.ts` (current vehicle type, id, position, velocity, altitude AGL).
+- Create: `src/ui/debug/panels/CombatStatePanel.ts` (active combatant count per faction, AI budget per tick, stall-backtrack count).
+- Create: `src/ui/debug/panels/CurrentModePanel.ts` (GameMode enum, scenario name, weather state, TOD).
+- Create: `src/ui/debug/panels/FrameBudgetPanel.ts` (per-system deltaMs breakdown — sourced from SystemUpdater's per-system telemetry markers).
 - Modify: `src/core/GameEngine.ts` (instantiate registry instead of three independent overlays).
 - Modify: `src/core/GameEngineInput.ts` (add backtick toggle; preserve F1-F4 routes to registry-addressed panels).
 - Modify: `src/ui/debug/PerformanceOverlay.ts` + `TimeIndicator.ts` + `LogOverlay.ts` (adopt a shared `DebugPanel` interface — add one `register()` call, remove the self-mount-to-body step).
@@ -64,7 +65,7 @@ Each of the three existing overlays gets a one-time conversion:
 
 ### 4. New panels
 
-Three thin panels seeded so the registry has non-trivial use. **Accessors verified against master (HEAD `40ddfac`):**
+Four thin panels seeded so the registry has non-trivial use. **Accessors verified against master (HEAD `40ddfac`):**
 
 - **VehicleStatePanel** — read vehicle state via:
   - `engine.systemManager.playerController.vehicleStateManager.getVehicleType()` (returns `'fixed_wing' | 'helicopter' | null`; see `src/systems/vehicle/VehicleStateManager.ts:36`)
@@ -77,6 +78,7 @@ Three thin panels seeded so the registry has non-trivial use. **Accessors verifi
   - If no plausible accessor exists even with the helper, render `—` placeholders and leave a `TODO(cycle-2026-04-24)` comment. Do NOT block the cycle.
   - AI budget starvation counter: `engine.systemManager.combatantSystem.getAIBudgetStarvationPerSecond?.()` or equivalent — grep the symbol and wire if present.
 - **CurrentModePanel** — read via `engine.systemManager.gameModeManager.getCurrentMode()` (returns `GameMode` enum; confirmed used at `bootstrap.ts:144` and `GameEngineInit.ts:95`). Human-readable label via `getGameModeDefinition(mode).name` (see `src/config/gameModeDefinitions.ts`). Weather via `engine.systemManager.weatherSystem.getCurrentState()`; TOD via `engine.systemManager.atmosphereSystem.getCurrentTimeOfDay()` (grep to confirm exact names if different).
+- **FrameBudgetPanel** — per-system `deltaMs` breakdown. Source: `src/core/SystemUpdater.ts` already emits per-system telemetry markers (grep `markSystemBegin`, `markSystemEnd`). Surface them on a read-only accessor and render a sortable list of `<systemName>: <deltaMs>` with a color-coded bar. Updates at 5Hz. If SystemUpdater does not expose a read accessor today, add a ≤20-LOC additive getter.
 
 ### 5. Master toggle
 
@@ -97,7 +99,7 @@ Backtick (`` ` ``) toggles the master container. F1-F4 still toggle their specif
 
 - `DebugHudRegistry` + `DebugPanel` interface exist and are unit-tested.
 - Three existing overlays migrated to the interface; F1-F4 behavior unchanged.
-- Three new panels (`VehicleStatePanel`, `CombatStatePanel`, `CurrentModePanel`) register and display real data.
+- Four new panels (`VehicleStatePanel`, `CombatStatePanel`, `CurrentModePanel`, `FrameBudgetPanel`) register and display real data.
 - Backtick master toggle shows/hides the whole debug surface.
 - `npm run lint`, `npm run test:run`, `npm run build` green.
 - At least one screenshot of the new panels visible in `docs/cycles/cycle-2026-04-23-debug-and-test-modes/evidence/debug-hud-registry/` showing the combined HUD at runtime.
