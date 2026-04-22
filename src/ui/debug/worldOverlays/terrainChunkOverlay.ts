@@ -15,7 +15,10 @@ export function createTerrainChunkOverlay(source: TerrainChunkSource): WorldOver
   let lines: THREE.LineSegments | null = null;
   let positionAttr: THREE.Float32BufferAttribute | null = null;
   let mountedGroup: THREE.Group | null = null;
-  let lastUpdateMs = 0;
+  // -Infinity ensures the first update() always runs. Using 0 is unsafe because
+  // performance.now() can be <250ms in a fresh process (observed in CI), which
+  // would trip the throttle and skip the first draw.
+  let lastUpdateMs = Number.NEGATIVE_INFINITY;
 
   return {
     id: 'terrain-chunks', label: 'Terrain Chunks', hotkey: 'X', defaultVisible: false,
