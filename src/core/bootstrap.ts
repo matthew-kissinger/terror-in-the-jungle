@@ -78,6 +78,27 @@ export async function bootstrapGame(): Promise<void> {
     return;
   }
 
+  // Dev terrain-sandbox mode short-circuits the normal engine boot. Activated
+  // by `?mode=terrain-sandbox`. Gated behind `import.meta.env.DEV` so Vite DCE
+  // eliminates the guard + dynamic import + scene module from retail bundles.
+  // See docs/tasks/terrain-param-sandbox.md.
+  if (import.meta.env.DEV) {
+    const { isTerrainSandboxMode } = await import('../dev/terrainSandboxMode');
+    if (isTerrainSandboxMode()) {
+      try {
+        const { TerrainSandboxScene } = await import('../dev/terrainSandboxScene');
+        const scene = new TerrainSandboxScene(document.body);
+        await scene.start();
+        window.addEventListener('beforeunload', () => scene.dispose());
+      } catch (error) {
+        Logger.error('bootstrap', 'Terrain-sandbox mode failed to initialize', error);
+        const message = error instanceof Error ? error.message : String(error);
+        showFatalError(message);
+      }
+      return;
+    }
+  }
+
   const engine = new GameEngine();
   markStartup('bootstrap.engine-constructed');
 
