@@ -1,0 +1,88 @@
+{
+  "task": "airfield-taxiway-widening",
+  "templateId": "us_airbase",
+  "notes": [
+    "Capsule inner-radius formula from TerrainFeatureCompiler.compileGeneratedTerrainStamps:",
+    "  capsuleWidth = min(rect.width, rect.length)",
+    "  innerRadius  = capsuleWidth * 0.5 + innerPadding",
+    "Before fix: non-runway innerPadding = 1.5m for all rect kinds (taxiway/apron/filler).",
+    "After fix:  taxiway kind adds TAXIWAY_EXTRA_PAD = 2m on top of innerPadding.",
+    "RectTerrainSurfacePatch paints a band of half-width = rect.width / 2.",
+    "For a 12m-wide taxiway, paint half-width is 6m; the flat band must be >= 6m or the painted tarmac can extend onto sloped ground at the capsule endcaps.",
+    "After fix: 12m taxiways get innerRadius = 9.5m (3.5m margin beyond paint).",
+    "After fix: 10m taxiways get innerRadius = 8.5m (3.5m margin beyond paint).",
+    "Runway and apron capsule sizing are unchanged."
+  ],
+  "TAXIWAY_EXTRA_PAD": 2,
+  "nonTaxiwayInnerPadding": 1.5,
+  "runwayInnerPadding_unchanged": 3,
+  "taxiways": [
+    {
+      "label": "main parallel taxiway (north-south)",
+      "rectWidth": 12,
+      "rectLength": 430,
+      "capsuleWidth": 12,
+      "paintHalfWidth": 6,
+      "innerRadiusBefore": 7.5,
+      "innerRadiusAfter": 9.5,
+      "marginBeyondPaintBefore": 1.5,
+      "marginBeyondPaintAfter": 3.5
+    },
+    {
+      "label": "south crossbar",
+      "rectWidth": 12,
+      "rectLength": 38,
+      "capsuleWidth": 12,
+      "paintHalfWidth": 6,
+      "innerRadiusBefore": 7.5,
+      "innerRadiusAfter": 9.5,
+      "marginBeyondPaintBefore": 1.5,
+      "marginBeyondPaintAfter": 3.5
+    },
+    {
+      "label": "centre crossbar",
+      "rectWidth": 12,
+      "rectLength": 38,
+      "capsuleWidth": 12,
+      "paintHalfWidth": 6,
+      "innerRadiusBefore": 7.5,
+      "innerRadiusAfter": 9.5,
+      "marginBeyondPaintBefore": 1.5,
+      "marginBeyondPaintAfter": 3.5
+    },
+    {
+      "label": "north crossbar",
+      "rectWidth": 12,
+      "rectLength": 38,
+      "capsuleWidth": 12,
+      "paintHalfWidth": 6,
+      "innerRadiusBefore": 7.5,
+      "innerRadiusAfter": 9.5,
+      "marginBeyondPaintBefore": 1.5,
+      "marginBeyondPaintAfter": 3.5
+    },
+    {
+      "label": "south runway-edge stub",
+      "rectWidth": 10,
+      "rectLength": 58,
+      "capsuleWidth": 10,
+      "paintHalfWidth": 5,
+      "innerRadiusBefore": 6.5,
+      "innerRadiusAfter": 8.5,
+      "marginBeyondPaintBefore": 1.5,
+      "marginBeyondPaintAfter": 3.5
+    },
+    {
+      "label": "north runway-edge stub",
+      "rectWidth": 10,
+      "rectLength": 58,
+      "capsuleWidth": 10,
+      "paintHalfWidth": 5,
+      "innerRadiusBefore": 6.5,
+      "innerRadiusAfter": 8.5,
+      "marginBeyondPaintBefore": 1.5,
+      "marginBeyondPaintAfter": 3.5
+    }
+  ],
+  "conclusion": "Every taxiway's painted tarmac now sits with >=3.5m of flat-band margin on either side, up from 1.5m before. At capsule endcaps (hemispherical caps with radius = innerRadius), the tarmac rectangle can extend past the hemisphere's width a few meters before the fix; after the fix, the 2m buffer covers this."
+}

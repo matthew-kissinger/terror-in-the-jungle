@@ -175,6 +175,69 @@ describe('compileTerrainFeatures', () => {
     }
   });
 
+  it('keeps taxiway flat-band wide enough to cover painted tarmac edges', () => {
+    // Regression for `airfield-taxiway-widening`: the RectTerrainSurfacePatch
+    // for a taxiway paints a band of half-width rect.width/2. The capsule
+    // stamp must flatten at least that far from the centerline (plus margin),
+    // or the painted tarmac can extend onto sloped ground at the capsule
+    // endcaps. us_airbase has 12m- and 10m-wide taxiways; for each we want
+    // the capsule's innerRadius to exceed paint half-width by at least 2m.
+    const compiled = compileTerrainFeatures({
+      id: GameMode.A_SHAU_VALLEY,
+      name: 'Airfield Mode',
+      description: 'test',
+      worldSize: 5000,
+      chunkRenderDistance: 6,
+      maxTickets: 100,
+      matchDuration: 60,
+      deathPenalty: 1,
+      playerCanSpawnAtZones: true,
+      respawnTime: 5,
+      spawnProtectionDuration: 2,
+      maxCombatants: 20,
+      squadSize: { min: 4, max: 6 },
+      reinforcementInterval: 30,
+      zones: [],
+      captureRadius: 25,
+      captureSpeed: 5,
+      minimapScale: 400,
+      viewDistance: 200,
+      features: [
+        {
+          id: 'us_main_base',
+          kind: 'airfield',
+          position: new THREE.Vector3(0, 0, 0),
+          placement: { yaw: 0 },
+          templateId: 'us_airbase',
+          footprint: { shape: 'circle', radius: 260 },
+          terrain: { flatten: true, targetHeightMode: 'center' },
+        },
+      ],
+    });
+
+    const taxiwayPatches = compiled.surfacePatches.filter(
+      (patch) => patch.shape === 'rect' && patch.surface === 'packed_earth',
+    );
+    expect(taxiwayPatches.length).toBeGreaterThan(0);
+
+    // For each taxiway-width distinct rect, there must exist a capsule stamp
+    // whose innerRadius is comfortably larger than paint half-width. A margin
+    // of >= 3m covers the hemispherical endcap geometry so the painted
+    // rectangle never extends past the flat band.
+    const taxiwayWidths = new Set<number>();
+    for (const patch of taxiwayPatches) {
+      if (patch.shape === 'rect') taxiwayWidths.add(patch.width);
+    }
+
+    for (const width of taxiwayWidths) {
+      const requiredInner = width * 0.5 + 3;
+      const matching = compiled.stamps.some(
+        (stamp) => stamp.kind === 'flatten_capsule' && stamp.innerRadius >= requiredInner,
+      );
+      expect(matching, `no taxiway capsule innerRadius >= ${requiredInner}m for width=${width}`).toBe(true);
+    }
+  });
+
   it('compiles terrain-flow corridors and overlay paths for route-aware modes', () => {
     const compiled = compileTerrainFeatures({
       id: GameMode.ZONE_CONTROL,
