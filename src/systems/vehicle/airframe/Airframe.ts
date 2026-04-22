@@ -28,11 +28,20 @@ const GROUND_EFFECT_HEIGHT_M = 6.0;
 const GROUND_TOUCHDOWN_BUFFER_M = 0.08;
 const STALL_WARNING_FACTOR = 0.95;
 const ROTATION_INPUT_THRESHOLD = 0.08;
-// Arcade-leaning liftoff gate: once the aircraft is rotation-ready and the
-// pilot pitches up, a lift ratio of 0.25 is enough to commit to liftoff.
-// The old sim's 0.4 ratio meant the plane kept accelerating on the runway
-// instead of climbing away in a reasonable window.
-const LIFTOFF_WEIGHT_RATIO = 0.25;
+// Continuous-wheel-load liftoff gate. `wheelLoad = (Vr - forwardSpeed) / Vr`
+// runs 1 → 0 between standstill and Vr. Liftoff commits when the wings can
+// carry at least the residual wheel-load fraction of aircraft weight
+// (`liftRatio >= wheelLoad`). This replaces the old discrete
+// `LIFTOFF_WEIGHT_RATIO = 0.25` constant-threshold gate: at Vr the gate is
+// trivial (0), below Vr the required lift ratio falls off as speed builds,
+// and at zero speed it's unreachable — the plane parks. The old gate produced
+// a visible step at the transition; the new one is monotone in forwardSpeed.
+const LIFTOFF_AIR_AUTHORITY_PITCH_ACCEL_MS2 = 6.0;
+// Floor on the commit-speed ratio so AC-47 (which under-lifts at zero alpha)
+// doesn't try to commit at 20% Vr when pilot briefly pulls pitch — keeps the
+// early roll behaving like taxi. 0.35 × Vr is well below 0.85 × Vr (the old
+// `rotationReady` gate) but above taxi-speed stick twitches.
+const LIFTOFF_MIN_SPEED_RATIO = 0.35;
 const GROUND_STABILIZATION_TICKS = 3;
 const AIRBORNE_RECOVERY_ALTITUDE = 0.4;
 // Airborne *downward* touchdown fallback requires the guards (low AGL + vy<=0)
@@ -390,18 +399,31 @@ export class Airframe {
     const sideSpeed = this.velocity.dot(right);
     const q = 0.5 * AIR_DENSITY * Math.max(fwdSpeed, 0) * Math.max(fwdSpeed, 0);
 
+    // Continuous wheel-load ratio. 1 at standstill, 0 at or above Vr. Replaces
+    // the discrete liftoff gate: friction, pitch authority, and liftoff commit
+    // all scale off this single value. `airAuthority = 1 - wheelLoad` is the
+    // fraction of airborne behaviour the aircraft has already earned at this
+    // speed.
+    const vr = Math.max(aero.vrSpeedMs, 0.0001);
+    const wheelLoad = THREE.MathUtils.clamp((vr - fwdSpeed) / vr, 0, 1);
+    const airAuthority = 1 - wheelLoad;
+
     const thrustAccel = (this.throttle * engine.maxThrustN) / this.cfg.mass.kg;
     const dragAccel = (q * this.cfg.mass.wingAreaM2 * aero.cd0) / this.cfg.mass.kg;
     const brakeAccel = this.brake * ground.brakeDecelMs2;
-    const rollingAccel = ground.rollingResistance * GRAVITY;
+    // Rolling resistance tapers with wheelLoad — at Vr the wheels carry no
+    // weight, so friction is zero. This is the "ground-friction taper" half of
+    // the sticky-takeoff fix: no sudden step when the plane leaves the ground.
+    const rollingAccel = ground.rollingResistance * GRAVITY * wheelLoad;
 
     let newFwd = fwdSpeed + (thrustAccel - dragAccel - brakeAccel - rollingAccel) * dt;
     newFwd = Math.max(0, Math.min(newFwd, aero.maxSpeedMs));
 
+    // Lateral friction also scales with wheelLoad: zero at Vr, full at park.
     const newSide = THREE.MathUtils.lerp(
       sideSpeed,
       0,
-      Math.min(ground.lateralFriction * dt, 1),
+      Math.min(ground.lateralFriction * wheelLoad * dt, 1),
     );
 
     // Steering authority fades in with speed so a parked plane doesn't spin.
@@ -412,23 +434,19 @@ export class Airframe {
       right.copy(forward).cross(normal).normalize();
     }
 
-    // Pre-rotation visual feedback: clamp pitch to maxGroundPitchDeg below Vr
-    // but act IMMEDIATELY on stick (no smoothstep gate). Arcade feel — the
-    // player sees input is working even at zero speed.
-    // Rotation-ready is 85% of Vr — the airframe has enough lift authority
-    // to start rotating, even if full liftoff needs Vr proper. Dropping from
-    // 0.9 → 0.85 shaves ~0.7s off a Skyraider takeoff roll, which is the
-    // difference between "takes off in 8s" and "takes off in 9s" at tuning
-    // targets in the integration harness.
-    const rotationReady = newFwd >= aero.vrSpeedMs * 0.85;
-    let targetPitchRad: number;
-    if (cmd.elevator > 0 && rotationReady) {
-      targetPitchRad = cmd.elevator * THREE.MathUtils.degToRad(ground.rotationPitchLimitDeg);
-    } else if (cmd.elevator > 0) {
-      targetPitchRad = cmd.elevator * THREE.MathUtils.degToRad(ground.maxGroundPitchDeg);
-    } else {
-      targetPitchRad = 0;
-    }
+    // Pitch authority is continuous in airAuthority, not gated on
+    // rotationReady. Visual pitch target blends from the taxi-only
+    // `maxGroundPitchDeg` ceiling at wheelLoad=1 to the full
+    // `rotationPitchLimitDeg` at wheelLoad=0, so the nose progressively takes
+    // bite as speed builds. Acts IMMEDIATELY on stick (no smoothstep gate).
+    const pitchLimitDeg = THREE.MathUtils.lerp(
+      ground.maxGroundPitchDeg,
+      ground.rotationPitchLimitDeg,
+      airAuthority,
+    );
+    const targetPitchRad = cmd.elevator > 0
+      ? cmd.elevator * THREE.MathUtils.degToRad(pitchLimitDeg)
+      : 0;
     this.groundPitch = THREE.MathUtils.lerp(
       this.groundPitch,
       targetPitchRad,
@@ -442,32 +460,42 @@ export class Airframe {
       .clone()
       .multiplyScalar(newFwd)
       .addScaledVector(right, newSide);
+    // Pitch input injects a vertical velocity component proportional to
+    // airAuthority. Position.y is clamped to ground clearance below, so the
+    // plane doesn't actually rise on wheels — but the vertical velocity is
+    // observable and composes with the liftoff impulse, giving the player
+    // "nose taking bite" feedback before the discrete commit. This is what
+    // the old discrete gate foreclosed: below Vr, pitch had no effect on
+    // trajectory at all.
+    const verticalFromPitch =
+      Math.max(cmd.elevator, 0) * airAuthority * LIFTOFF_AIR_AUTHORITY_PITCH_ACCEL_MS2 * dt;
     this.position.addScaledVector(move, dt);
     this.position.y = this.groundHeight + ground.gearClearanceM;
     this.velocity.copy(move);
+    if (verticalFromPitch > 0) {
+      this.velocity.y += verticalFromPitch;
+    }
 
-    // Liftoff gate: rotation-ready AND pilot is holding pitch AND wings
-    // generate enough lift. No second early-promotion path — this is the
-    // only way to leave the ground. Once we're at or above Vr with the
-    // pilot asking to climb, we commit regardless of strict lift ratio —
-    // the arcade feel is "press up, plane lifts." A stricter lift gate
-    // would mean a 10-second ground roll on a Skyraider at full throttle.
+    // Liftoff gate — continuous in wheelLoad. Commit when wings can carry at
+    // least the residual wheel-load fraction of weight AND the pilot asks for
+    // rotation. At Vr (wheelLoad=0) the threshold is trivially 0; below Vr
+    // the required lift ratio rises linearly with wheel load. A minimum
+    // speed ratio guards against committing at taxi speed on a brief stick
+    // twitch. The liftoff vertical impulse (floor bumped 3.0 → 4.5 m/s for
+    // marginal-lift aircraft like AC-47) still rides on top of the new model
+    // and prevents ground-scrape at the moment of rotation.
     const aeroState = this.computeAero();
     const liftRatio = aeroState.lift / (this.cfg.mass.kg * GRAVITY);
     const wantsRotation = cmd.elevator > ROTATION_INPUT_THRESHOLD;
-    const atOrAboveVr = newFwd >= aero.vrSpeedMs;
+    const atOrAboveVr = newFwd >= vr;
+    const aboveMinSpeed = newFwd >= vr * LIFTOFF_MIN_SPEED_RATIO;
+    const liftMeetsWheelLoad = liftRatio >= wheelLoad;
     if (
       wantsRotation &&
-      (atOrAboveVr || (rotationReady && liftRatio >= LIFTOFF_WEIGHT_RATIO))
+      (atOrAboveVr || (aboveMinSpeed && liftMeetsWheelLoad))
     ) {
       this.weightOnWheels = false;
       this.phase = 'rotation';
-      // Vertical impulse so we're not clipping terrain right after liftoff,
-      // and a small positive pitch rate so the nose continues up into the
-      // commanded pitch attitude instead of sagging for the first ~150 ms.
-      // Floor bumped 3.0 → 4.5 m/s so marginal-lift aircraft (AC-47) leave
-      // the ground with enough vertical margin to clear the fallback
-      // threshold before the grace window expires.
       this.velocity.addScaledVector(
         _up.set(0, 1, 0).applyQuaternion(this.quaternion),
         Math.max(4.5, newFwd * 0.12),
@@ -483,12 +511,15 @@ export class Airframe {
       return;
     }
 
-    // Phase classification on the ground.
+    // Phase classification on the ground. Uses the continuous wheelLoad
+    // rather than a discrete rotationReady flag — 'rotation' is reported
+    // whenever the pilot is pulling pitch with meaningful air authority.
+    const inRotationBand = airAuthority >= 0.15 && wantsRotation;
     if (Math.abs(newFwd) < 0.75 && this.throttle < 0.05) {
       this.phase = 'parked';
-    } else if (rotationReady && wantsRotation) {
+    } else if (inRotationBand) {
       this.phase = 'rotation';
-    } else if (rotationReady) {
+    } else if (airAuthority >= 0.15) {
       this.phase = 'takeoff_roll';
     } else if (newFwd < 8) {
       this.phase = 'taxi';
