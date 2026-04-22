@@ -275,6 +275,7 @@ export interface GameModeConfig {
   // Optional DEM terrain source (if absent, use procedural noise)
   heightSource?: {
     type: 'dem';
+    assetId?: string;       // Optional logical ID resolved through asset-manifest.json in production
     path: string;           // e.g. 'data/vietnam/big-map/a-shau-z14-9x9.f32'
     width: number;          // grid pixels
     height: number;         // grid pixels

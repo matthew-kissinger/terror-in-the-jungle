@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "id": "public-game-asset-read",
+      "allowed": {
+        "origins": ["*"],
+        "methods": ["GET", "HEAD"],
+        "headers": ["Range", "Content-Type", "If-None-Match"]
+      },
+      "exposeHeaders": ["Content-Length", "Content-Range", "ETag", "Cache-Control", "Content-Type"],
+      "maxAgeSeconds": 86400
+    }
+  ]
+}

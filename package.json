@@ -80,6 +80,9 @@
     "check:mobile-ui": "npx tsx scripts/mobile-ui-check.ts",
     "check:memory": "npx tsx scripts/memory-growth-tracker.ts",
     "check:assets": "npx tsx scripts/asset-load-analyzer.ts",
+    "cloudflare:assets:manifest": "npx tsx scripts/cloudflare-assets.ts manifest",
+    "cloudflare:assets:upload": "npx tsx scripts/cloudflare-assets.ts upload",
+    "cloudflare:assets:validate": "npx tsx scripts/cloudflare-assets.ts validate",
     "check:states": "npx tsx scripts/state-coverage-probe.ts",
     "profile:modes": "npx tsx scripts/mode-load-profiler.ts",
     "playtest:mobile": "npx tsx scripts/mobile-playtest.ts",
@@ -87,6 +90,7 @@
     "playtest:mobile:flow": "npx tsx scripts/mobile-playtest.ts --flow-only"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260422.1",
     "@types/node": "^25.6.0",
     "@types/three": "^0.184.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
@@ -102,7 +106,8 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.8",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.2",
+    "wrangler": "^4.84.1"
   },
   "overrides": {
     "flatted": "^3.4.2"

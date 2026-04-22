@@ -1,6 +1,6 @@
 # Deploy Workflow
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 Production: https://terror-in-the-jungle.pages.dev/
 
@@ -36,6 +36,7 @@ manual trigger (you decide when)
        - checkout ref (default: master)
        - npm ci
        - npm run build
+       - npm run cloudflare:assets:upload
        - cloudflare/wrangler-action@v3
        - command: pages deploy dist --project-name terror-in-the-jungle
 ```
@@ -55,6 +56,9 @@ Key facts:
 - The deploy workflow runs `cloudflare/wrangler-action@v3`, not Cloudflare Pages' Git integration. Cloudflare sees only the pre-built `dist/` directory.
 - The Pages project has no build step configured on Cloudflare's side. The build is reproducible from `package-lock.json` plus `npm ci` inside the GitHub runner.
 - The deploy workflow does a fresh checkout, `npm ci`, and `npm run build` every run. It does not rely on a CI artifact.
+- After `npm run build`, the deploy workflow runs `npm run cloudflare:assets:upload` with `TITJ_SKIP_R2_UPLOAD=1`. This writes `dist/asset-manifest.json` from pinned R2 metadata and validates public size/content-type/cache/CORS before Pages upload.
+- GitHub Actions fresh checkouts do not contain gitignored A Shau source files. For the current immutable objects, the asset script uses pinned R2 metadata in CI and validates the live object URLs. Local runs with source files present still hash and upload the real files.
+- The GitHub `CLOUDFLARE_API_TOKEN` currently has enough permission for Pages Direct Upload but not R2 object writes. Update that secret to include Account -> Workers R2 Storage -> Edit before removing `TITJ_SKIP_R2_UPLOAD=1`.
 - CI `perf` runs on every push, uploads artifacts, and is intentionally advisory. See `docs/DEVELOPMENT.md` for why.
 - PRs do not auto-deploy. Preview deploys are not currently configured; see "Open Items" below.
 - The build does not emit `.gz` or `.br` sidecar files. Cloudflare negotiates
@@ -64,11 +68,11 @@ Key facts:
 
 Secrets used by the workflow: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 
-Wrangler status on 2026-04-21:
+Wrangler status on 2026-04-22:
 
-- `npx wrangler --version` resolved to `4.84.1`.
+- `wrangler` is installed project-locally at `4.84.1`.
 - `npm view wrangler version` also returned `4.84.1`.
-- Cloudflare recommends project-local Wrangler or `npx wrangler`; the workflow's `wrangler-action@v3` follows the supported Direct Upload path.
+- Cloudflare recommends project-local Wrangler; the workflow's `wrangler-action@v3` follows the supported Direct Upload path.
 
 ## 2. Freshness Contract
 
@@ -86,8 +90,8 @@ This is the line between fast and stale:
 - `assets/`, `models/`, `manifest.json`, and `sw.js` are stable-path public assets. Revalidate them.
 - `data/navmesh/` and `data/heightmaps/` are seed-keyed baked data. Cache them aggressively.
 - `data/vietnam/` is a local development compatibility path today. Production
-  should move terrain/model payloads to Cloudflare R2 with content-addressed
-  keys instead of relying on gitignored files in a fresh Pages checkout.
+  resolves required A Shau DEM data through `asset-manifest.json`, which points
+  at content-addressed Cloudflare R2 keys.
 
 The repo now sets Vite `build.assetsDir = 'build-assets'` so generated bundle assets no longer share a URL namespace with mutable files copied from `public/assets/`.
 
@@ -105,6 +109,7 @@ The authoritative source is `public/_headers`, which Cloudflare Pages copies to 
 | `/data/navmesh/*` | `public, max-age=31536000, immutable` | Pre-baked navmesh binaries are keyed by `<mode>-<seed>.bin`. |
 | `/data/heightmaps/*` | `public, max-age=31536000, immutable` | Heightmaps are seed-keyed as `<mode>-<seed>.f32`. |
 | `/data/vietnam/*` | `public, max-age=86400` | Local/development compatibility only until the R2 manifest pipeline owns terrain delivery. |
+| `/asset-manifest.json` | `public, max-age=0, must-revalidate` | Small Pages-hosted manifest generated during deploy; must point at current R2 asset keys. |
 
 Cloudflare Pages defaults unmatched static assets to revalidation with ETags. We still keep explicit rules for `sw.js` and `models/*` because stale service workers and stale GLBs are user-visible failures.
 
@@ -142,7 +147,8 @@ Strategy per URL:
 | `/data/heightmaps/*.f32` | cache-first |
 | `/models/*` | network/browser HTTP cache only, no Cache Storage |
 | `/assets/*` public assets | network/browser HTTP cache only, no Cache Storage |
-| `/data/vietnam/*` | network/browser HTTP cache only, follows HTTP TTL; production target is R2 URL from manifest |
+| `/data/vietnam/*` | network/browser HTTP cache only, follows HTTP TTL; local dev fallback only |
+| R2 manifest asset URLs | network/browser HTTP cache only; immutable payload cache handled by R2/Cloudflare HTTP headers |
 | everything else | network/browser HTTP cache only |
 
 Install uses `skipWaiting()`. Activate deletes old named caches, enables navigation preload where available, and calls `clients.claim()`.
@@ -205,6 +211,7 @@ BASE=https://terror-in-the-jungle.pages.dev
 for URL in \
   "$BASE/" \
   "$BASE/sw.js" \
+  "$BASE/asset-manifest.json" \
   "$BASE/favicon.ico" \
   "$BASE/manifest.json" \
   "$BASE/models/vehicles/aircraft/a1-skyraider.glb" \
@@ -221,6 +228,10 @@ done
 ASSET=$(curl -s "$BASE/" | grep -oE 'build-assets/[^"]+\.js' | head -1)
 echo "=== $BASE/$ASSET"
 curl -I -s "$BASE/$ASSET" | grep -iE '^(cache-control|content-type|content-encoding|etag|cf-cache-status)'
+
+R2_ASSET=$(curl -s "$BASE/asset-manifest.json" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>console.log(JSON.parse(s).assets['terrain.ashau.dem'].url))")
+echo "=== $R2_ASSET"
+curl -I -s -H "Origin: $BASE" "$R2_ASSET" | grep -iE '^(cache-control|content-type|content-length|access-control-allow-origin|access-control-expose-headers|accept-ranges|etag)'
 ```
 
 Expected results:
@@ -232,15 +243,15 @@ Expected results:
 - `/build-assets/<hash>.js` : `Cache-Control: public, max-age=31536000, immutable`
 - `/data/navmesh/*.bin` : `Cache-Control: public, max-age=31536000, immutable`
 - `/data/heightmaps/*.f32` : `Cache-Control: public, max-age=31536000, immutable`
-- `/data/vietnam/*.json` : `Content-Type: application/json` and `Cache-Control: public, max-age=86400` until replaced by the R2 manifest URL
-- `/data/vietnam/big-map/*.f32` : `Content-Type: application/octet-stream` and `Cache-Control: public, max-age=86400` until replaced by the R2 manifest URL
+- `/asset-manifest.json` : `Content-Type: application/json` and `Cache-Control: public, max-age=0, must-revalidate`
+- R2 A Shau DEM URL from `asset-manifest.json` : `Content-Type: application/octet-stream`, exact `Content-Length`, `Access-Control-Allow-Origin: *` on Origin requests, and `Cache-Control: public, max-age=31536000, immutable`
 
-Current production caveat found on 2026-04-21: the GitHub Actions deploy runs
-from a fresh checkout, and `public/data/vietnam/` is gitignored. The live
-`/data/vietnam/a-shau-rivers.json` check returned HTML, which means A Shau
-runtime data is not currently deploy-reproducible from GitHub. Do not solve this
-by committing large terrain payloads to git. The target fix is the R2 manifest
-pipeline in `docs/CLOUDFLARE_STACK.md`.
+Production caveat history: the 2026-04-21 deploy ran from a fresh checkout, and
+`public/data/vietnam/` is gitignored. The live `/data/vietnam/a-shau-rivers.json`
+check returned HTML, which proved A Shau runtime data was not deploy-reproducible
+from GitHub. The 2026-04-22 R2 manifest pipeline fixes the delivery shape for the
+primary DEM path, but it still needs a live deploy after merge before production
+can be claimed fixed.
 
 If a header drifts from this table, inspect `public/_headers`, then `dist/_headers`, then the live Cloudflare Pages response.
 
@@ -264,6 +275,7 @@ Authentication is only needed for live Cloudflare operations: deploying, listing
 
 ## Open Items
 
-- **Content-hash terrain/model pipeline.** Move primary A Shau terrain data and future GLBs/large payloads to Cloudflare R2 with immutable keys and a generated manifest. See `docs/CLOUDFLARE_STACK.md`.
+- **Custom R2 domain.** Current validated asset URLs use `r2.dev`; attach a real custom domain before treating the R2 stack as final.
+- **Expand content-hash model pipeline.** Primary A Shau DEM/rivers are in R2; future GLBs/large payloads should move through the same manifest after terrain is stable.
 - **Cross-browser deploy gate.** Add a scripted browser matrix against the live Pages URL for Chrome/Edge and Firefox, with a manual Safari/iOS line item.
 - **Cloudflare Pages PR previews.** Current flow deploys only when manually triggered. Add branch deploys if design or QA needs shareable preview URLs.

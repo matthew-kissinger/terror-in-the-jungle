@@ -8,10 +8,12 @@ import { getHeightQueryCache, resetHeightQueryCache } from '../systems/terrain/H
 import { BakedHeightProvider } from '../systems/terrain/BakedHeightProvider';
 import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../systems/terrain/NoiseHeightProvider';
+import { ASHAU_DEM_ASSET_ID, resetGameAssetManifestForTests } from './GameAssetManifest';
 
 describe('ModeStartupPreparer', () => {
   beforeEach(() => {
     resetHeightQueryCache();
+    resetGameAssetManifestForTests();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -78,6 +80,68 @@ describe('ModeStartupPreparer', () => {
     // Provider should report a non-zero height at the DEM center, proving the
     // buffer actually fed the DEM sampler rather than silently falling back.
     expect(provider.getHeightAt(0, 0)).toBeGreaterThan(0);
+  });
+
+  it('resolves a DEM asset id through the production asset manifest before fetching terrain', async () => {
+    const width = 4;
+    const height = 4;
+    const data = new Float32Array(width * height).map((_, i) => 200 + i);
+    const assetUrl = 'https://assets.example.test/terrain/a-shau/test-hash.f32';
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url === '/asset-manifest.json') {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => 'application/json' },
+          json: async () => ({
+            version: 1,
+            generatedAt: '2026-04-22T00:00:00.000Z',
+            gitSha: 'test',
+            assetBaseUrl: 'https://assets.example.test',
+            assets: {
+              [ASHAU_DEM_ASSET_ID]: {
+                id: ASHAU_DEM_ASSET_ID,
+                url: assetUrl,
+                key: 'terrain/a-shau/test-hash.f32',
+                sha256: 'test-hash',
+                size: data.byteLength,
+                contentType: 'application/octet-stream',
+                cacheControl: 'public, max-age=31536000, immutable',
+                required: true,
+              },
+            },
+          }),
+        };
+      }
+      if (url === assetUrl) {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => 'application/octet-stream' },
+          arrayBuffer: async () => data.buffer,
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const config = {
+      id: GameMode.A_SHAU_VALLEY,
+      worldSize: 40,
+      heightSource: {
+        type: 'dem',
+        assetId: ASHAU_DEM_ASSET_ID,
+        path: '/data/vietnam/big-map/test.f32',
+        width,
+        height,
+        metersPerPixel: 10,
+      },
+    } as any;
+
+    await configureHeightSource({} as any, GameMode.A_SHAU_VALLEY, config);
+
+    expect(fetchMock.mock.calls.map(call => call[0])).toEqual(['/asset-manifest.json', assetUrl]);
+    expect(getHeightQueryCache().getProvider()).toBeInstanceOf(DEMHeightProvider);
   });
 
   it('rejects an HTML fallback response so the DEM branch does not install a procedural noise provider', async () => {

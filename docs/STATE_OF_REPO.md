@@ -1,6 +1,6 @@
 # State Of Repo
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
@@ -91,11 +91,13 @@ document answers the narrower question: what is true on `master` right now?
 - Vite no longer runs `vite-plugin-compression`; `dist/` contains canonical
   assets only, while Cloudflare handles gzip/Brotli/Zstandard delivery according
   to visitor `Accept-Encoding` and zone rules.
-- A Shau production runtime data is still local-only. Live Cloudflare validation
-  on 2026-04-21 showed `/data/vietnam/a-shau-rivers.json` returning the SPA
-  HTML shell because `public/data/vietnam/` is gitignored and absent in the
-  GitHub Actions checkout. The target fix is the R2/manifest pipeline in
-  `docs/CLOUDFLARE_STACK.md`, not committing large payloads to git.
+- A Shau production runtime data now has the first R2 manifest path:
+  `titj-game-assets-prod` contains content-addressed DEM/rivers objects,
+  public `r2.dev` access is enabled for temporary validation, and
+  `scripts/cloudflare-assets.ts` uploads, writes `dist/asset-manifest.json`,
+  uploads manifest copies to R2, and validates size/content-type/cache/CORS.
+  The custom R2 domain is still open, and production still needs a live Pages
+  deploy after merge before the live A Shau gap can be called fixed.
 - `npm run perf:capture:frontier30m` now uses perf-only Open Frontier lifecycle
   overrides (`perfMatchDuration=3600`, `perfDisableVictory=1`) so the script is
   a non-terminal 30-minute soak again. The tracked 2026-04-20 baseline still
@@ -116,6 +118,6 @@ document answers the narrower question: what is true on `master` right now?
 3. Re-run `npm run validate:full` and refresh the `frontier30m` baseline from a
    quiet-machine session; do not use captures from a background-game session as
    baseline-quality evidence.
-4. Implement the Cloudflare R2 asset-manifest pipeline before claiming A Shau
-   production delivery is solved; then rerun the prod header spot-check in
-   `docs/DEPLOY_WORKFLOW.md` for both Pages and the R2 asset domain.
+4. Run the updated manual deploy workflow and rerun the prod header spot-check
+   in `docs/DEPLOY_WORKFLOW.md` for both Pages and the R2 asset URL. Then
+   replace the temporary `r2.dev` endpoint with a custom R2 asset domain.

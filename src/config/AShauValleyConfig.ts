@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Faction, Alliance } from '../systems/combat/types';
 import { GameMode, GameModeConfig, WeatherState } from './gameModeTypes';
+import { ASHAU_DEM_ASSET_ID } from '../core/GameAssetManifest';
 
 /**
  * DEM metadata from a-shau-z14-9x9.f32.meta.json
@@ -81,6 +82,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
 
   heightSource: {
     type: 'dem',
+    assetId: ASHAU_DEM_ASSET_ID,
     // Leading slash: resolve relative to origin, not document.baseURI. Matches
     // the `/data/heightmaps/*.f32` pattern used by the seeded modes and avoids
     // SPA path-drift when the game is launched from a non-root URL.

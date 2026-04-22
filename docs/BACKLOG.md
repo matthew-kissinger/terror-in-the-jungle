@@ -209,10 +209,13 @@ the runbook for the end-of-cycle ritual.
   and A Shau JSON using `docs/DEPLOY_WORKFLOW.md`. This caught a real deploy
   gap: A Shau runtime data is local-only/gitignored, so live
   `/data/vietnam/a-shau-rivers.json` returned the SPA HTML shell.
-- [ ] Implement the Cloudflare-native asset delivery plan in
-  `docs/CLOUDFLARE_STACK.md`: R2 bucket, custom domain, CORS, immutable
-  content-addressed terrain/model keys, generated asset manifest, and CI upload
-  validation before Pages deploy.
+- [x] Stand up the first Cloudflare-native asset delivery path in
+  `docs/CLOUDFLARE_STACK.md`: prod/preview R2 buckets, CORS, temporary public
+  `r2.dev` endpoint, immutable content-addressed A Shau DEM/rivers objects,
+  generated `asset-manifest.json`, R2 manifest uploads, runtime DEM manifest
+  resolution, and deploy-workflow upload validation before Pages deploy.
+- [ ] Replace the temporary R2 `r2.dev` endpoint with a custom asset domain,
+  then rerun live Pages + R2 header validation after the next manual deploy.
 - [ ] Add a cross-browser live fresh-load gate for Chrome/Edge and Firefox,
   with a manual Safari/iOS check when service worker or GLB paths change.
 - [ ] Move GLBs into the same content-addressed manifest pipeline after terrain

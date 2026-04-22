@@ -14,6 +14,7 @@ import type { CompiledTerrainFeatureSet } from '../systems/terrain/TerrainFeatur
 import type { PreparedHeightmapGrid, PreparedTerrainSource } from '../systems/terrain/PreparedTerrainSource';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
+import { resolveGameAssetUrl } from './GameAssetManifest';
 // shouldUseTouchControls + orientation lock removed - layout works in any orientation
 import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
@@ -149,13 +150,15 @@ export async function configureHeightSource(
   markStartup(`engine-init.start-game.${mode}.height-source.begin`);
   if (config.heightSource?.type === 'dem') {
     markStartup(`engine-init.start-game.${mode}.dem-load.begin`);
-    const { path, width, height, metersPerPixel } = config.heightSource;
+    const { assetId, path, width, height, metersPerPixel } = config.heightSource;
+    let resolvedPath = path;
     const expectedBytes = width * height * 4;
-    Logger.info('engine-init', `Loading DEM terrain from ${path} (expect ${width}x${height}, ${(expectedBytes / 1024 / 1024).toFixed(1)}MB)...`);
     try {
-      const response = await fetch(path);
+      resolvedPath = await resolveGameAssetUrl(assetId, path);
+      Logger.info('engine-init', `Loading DEM terrain from ${resolvedPath} (expect ${width}x${height}, ${(expectedBytes / 1024 / 1024).toFixed(1)}MB)...`);
+      const response = await fetch(resolvedPath);
       if (!response.ok) {
-        throw new Error(`DEM fetch failed: HTTP ${response.status} for ${path}`);
+        throw new Error(`DEM fetch failed: HTTP ${response.status} for ${resolvedPath}`);
       }
       // SPA fallbacks (Cloudflare Pages _redirects, dev history fallback) can
       // answer missing-asset requests with 200 + text/html. Treat anything that
@@ -164,22 +167,22 @@ export async function configureHeightSource(
       const contentType = response.headers.get('content-type') ?? '';
       if (/^text\/html\b/i.test(contentType)) {
         throw new Error(
-          `DEM fetch returned HTML (content-type=${contentType}) for ${path}; asset is missing from the deployed public/ tree.`
+          `DEM fetch returned HTML (content-type=${contentType}) for ${resolvedPath}; asset is missing from the deployed public/ tree or R2 manifest.`
         );
       }
       const buffer = await response.arrayBuffer();
       if (buffer.byteLength === 0) {
-        throw new Error(`DEM fetch returned empty body for ${path}`);
+        throw new Error(`DEM fetch returned empty body for ${resolvedPath}`);
       }
       if (buffer.byteLength % 4 !== 0) {
         throw new Error(
-          `DEM payload is not a Float32Array (byteLength=${buffer.byteLength}, content-type=${contentType}) for ${path}; ` +
+          `DEM payload is not a Float32Array (byteLength=${buffer.byteLength}, content-type=${contentType}) for ${resolvedPath}; ` +
           `expected a multiple of 4 bytes.`
         );
       }
       if (buffer.byteLength !== expectedBytes) {
         throw new Error(
-          `DEM size mismatch for ${path}: got ${buffer.byteLength} bytes, expected ${expectedBytes} (${width}x${height} Float32).`
+          `DEM size mismatch for ${resolvedPath}: got ${buffer.byteLength} bytes, expected ${expectedBytes} (${width}x${height} Float32).`
         );
       }
       const demProvider = new DEMHeightProvider(
@@ -196,8 +199,9 @@ export async function configureHeightSource(
     } catch (error) {
       Logger.error(
         'engine-init',
-        `Failed to load DEM terrain from ${path}; terrain will render flat. ` +
+        `Failed to load DEM terrain from ${resolvedPath}; terrain will render flat. ` +
         `Confirm the binary is present under public${path.startsWith('/') ? path : '/' + path} ` +
+        `for local dev, or that asset '${assetId ?? '(none)'}' is present in asset-manifest.json/R2 for production ` +
         `(A Shau DEMs are gitignored; see data/vietnam/DATA_PIPELINE.md).`,
         error,
       );

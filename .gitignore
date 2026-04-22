@@ -73,6 +73,7 @@ playtest-results/
 output/
 tmp/
 tmp/*.lock
+.wrangler/
 
 # Claude Code / agent harness
 # Committed: .claude/agents/, .claude/commands/, .claude/skills/, .claude/launch.json (shared debug config)
@@ -92,6 +93,7 @@ data/vietnam/reference/hydroviet-rivers/
 
 # Public DEM data (served locally from public/, delivered in production via R2)
 public/data/vietnam/
+public/asset-manifest.json
 
 # Example zoo (reference repos cloned for study, not part of project)
 example-zoo/

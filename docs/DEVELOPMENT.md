@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 ## Prerequisites
 
@@ -130,9 +130,11 @@ Current cache contract:
 - Vite content-hashed build output is emitted under `/build-assets/` and cached immutable.
 - Stable-path public assets under `/assets/` and GLB models under `/models/` revalidate.
 - The service worker must not cache-first non-versioned assets.
-- A Shau terrain runtime data is not production-reproducible from GitHub yet
-  because `public/data/vietnam/` is local-only. Solve this through the R2 asset
-  manifest plan in `CLOUDFLARE_STACK.md`, not by committing more large payloads.
+- A Shau terrain runtime data is local-only under `public/data/vietnam/` for dev,
+  but production now resolves the DEM through `asset-manifest.json` and
+  content-addressed R2 URLs. The deploy workflow runs
+  `npm run cloudflare:assets:upload` after `npm run build` and before Pages
+  upload.
 
 ### Pre-Push Checklist
 
@@ -158,6 +160,7 @@ For deploy/cache-sensitive work, also run after deployment:
 # See docs/DEPLOY_WORKFLOW.md section 7 for the full command set.
 curl -I https://terror-in-the-jungle.pages.dev/sw.js
 curl -I https://terror-in-the-jungle.pages.dev/models/vehicles/aircraft/a1-skyraider.glb
+npm run cloudflare:assets:validate
 ```
 
 CI still captures perf artifacts on every push, but the hosted-run perf outcome is advisory. If the harness cannot produce a `summary.json`, or if `perf:compare` reports a `FAIL`, the workflow now keeps the artifacts and proceeds with deploy instead of blocking on a runner environment we have already validated as noisy. Treat `validate:full` as the authoritative pre-push perf gate.

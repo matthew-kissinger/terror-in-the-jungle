@@ -1,6 +1,6 @@
 # Vietnam Terrain Data Pipeline
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 ## Objective
 
@@ -19,11 +19,13 @@ Support historical large-scale Vietnam maps (starting with A Shau Valley) using 
   - `data/vietnam/big-map/a-shau-z13-7x7.f32`
   - `1792 x 1792`, ~`18m/px`, ~`33km x 33km`
 - Production delivery target:
-  - Cloudflare R2 bucket with content-addressed object keys
+  - Cloudflare R2 bucket with content-addressed object keys. First prod bucket:
+    `titj-game-assets-prod`.
   - custom domain attached to the bucket so Cloudflare Cache can serve terrain
-    and model data globally
-  - generated manifest in the Pages app shell that maps logical asset IDs to
-    immutable R2 URLs
+    and model data globally. Current temporary validation endpoint:
+    `https://pub-d965f26ac79947f091f25cf31ac4b48d.r2.dev`.
+  - generated `asset-manifest.json` in the Pages app shell that maps logical
+    asset IDs to immutable R2 URLs.
   - see `docs/CLOUDFLARE_STACK.md`
 - Metadata and preview heightmaps are present alongside source DEM files.
 
@@ -34,8 +36,9 @@ Support historical large-scale Vietnam maps (starting with A Shau Valley) using 
 - War simulation and mode tuning are handled in A Shau game config and strategy systems.
 - Local development serves the runtime copies from `public/data/vietnam/`.
 - Production should not rely on those gitignored public files being present in a
-  fresh GitHub Actions checkout. The deploy path should upload large runtime
-  assets to R2 and build the app against the generated R2 manifest.
+  fresh GitHub Actions checkout. The deploy path now uploads large runtime
+  assets to R2, writes `dist/asset-manifest.json`, and builds the app against
+  the generated R2 manifest.
 
 ## Known Data Limitations
 

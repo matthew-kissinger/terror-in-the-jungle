@@ -36,6 +36,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Upload and validate Cloudflare game assets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TITJ_R2_BUCKET: titj-game-assets-prod
+          TITJ_ASSET_BASE_URL: https://pub-d965f26ac79947f091f25cf31ac4b48d.r2.dev
+          TITJ_SKIP_R2_UPLOAD: '1'
+        run: npm run cloudflare:assets:upload
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
