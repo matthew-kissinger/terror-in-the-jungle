@@ -340,12 +340,14 @@ export class Airframe {
       const vs = this.velocity.y;
       // PD loop on altitude error with strong pitch-rate damping. Gains
       // tuned for the B1 integration cruise scenario (5 m deviation over
-      // 5 s at 50 m/s, throttle 0.55). Keep the clamp tight so we never
-      // bang-bang into an oscillation.
+      // 5 s at 50 m/s, throttle 0.55). Clamp is per-aircraft (default 0.15)
+      // because higher-thrust airframes saturate a tight clamp during
+      // recapture from a disturbance; see FixedWingPhysicsConfig.
+      const clamp = this.cfg.feel.altitudeHoldElevatorClamp ?? 0.15;
       const elev = clampScalar(
         -altErr * 0.015 - vs * 0.06 - this.pitchRate * 0.05,
-        -0.15,
-        0.15,
+        -clamp,
+        clamp,
       );
       cmd.elevator = elev;
     }

@@ -200,6 +200,7 @@ export function airframeConfigFromLegacy(cfg: FixedWingPhysicsConfig): AirframeC
       assistMaxPitchDeg: 25,
       coordYawScale: 0.15,
       autoLevelStrength: 0.8,
+      altitudeHoldElevatorClamp: cfg.altitudeHoldElevatorClamp,
     },
   };
 }

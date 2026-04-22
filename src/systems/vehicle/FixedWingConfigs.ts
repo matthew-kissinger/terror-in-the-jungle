@@ -50,6 +50,15 @@ export interface FixedWingPhysicsConfig {
   liftoffClearance: number; // m
   rotationPitchLimitDeg: number;
   groundEffectStrength: number;
+  /**
+   * Per-aircraft saturation clamp on the assist-tier altitude-hold PD's
+   * elevator command (symmetric; abs value). When omitted the Airframe uses
+   * a 0.15 default. Aircraft with higher thrust-to-weight at cruise throttle
+   * (e.g. A-1 Skyraider) can saturate a tight clamp while recapturing from a
+   * climb-wedge disturbance and benefit from a wider value. Hard ceiling is
+   * ~0.40 before the PD risks bang-bang oscillation.
+   */
+  altitudeHoldElevatorClamp?: number;
 }
 
 export interface FixedWingOperationInfo {
@@ -307,6 +316,18 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 14,
       groundEffectStrength: 0.35,
+      // A-1 has the highest thrust-to-weight of the three aircraft at cruise
+      // throttle; the default 0.15 elevator clamp saturates during both the
+      // recapture-after-pitch-release transient and hands-off cruise (60 s
+      // saturated climb of ~2.2 km at 0.15). The probe sweep at 0.16..0.40
+      // shows a narrow stable band: 0.18 still saturates in steady state,
+      // 0.30+ over-corrects into a dive-and-not-recover divergence, and
+      // 0.20..0.24 is monotone-stable. 0.22 is probe-optimal: recapture
+      // peak deviation = 82 m (was 526 m at 0.15), steady-state 60 s peak
+      // deviation = 35 m (was 2234 m at 0.15), no oscillation. See
+      // docs/cycles/cycle-2026-04-22-heap-and-polish/evidence/
+      // a1-altitude-hold-elevator-clamp/.
+      altitudeHoldElevatorClamp: 0.22,
     },
     role: 'attack',
     pilotProfile: 'trainer',

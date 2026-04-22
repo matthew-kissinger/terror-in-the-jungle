@@ -342,6 +342,47 @@ describe('FixedWing L3 integration — behavior contracts', () => {
     expect(af.getState().isStalled).toBe(false);
   });
 
+  // Regression for the a1-altitude-hold-elevator-clamp task. With a default
+  // 0.15 elevator clamp on the altitude-hold PD, an A-1 Skyraider that
+  // pitches up at cruise throttle and then releases the stick overshoots by
+  // ~500 m before the clamp-saturated PD can pull the nose back. The per-
+  // aircraft clamp (0.22 for the A-1) gives the PD enough authority to cap
+  // the recapture peak deviation below 100 m. The observable contract is
+  // peak altitude deviation, not PD gain values — this test stays valid if
+  // the PD structure is later rebuilt, as long as recapture performance is
+  // held.
+  it('A-1 altitude-hold recapture-after-pitch-release peak deviation is below 100m at cruise throttle', () => {
+    const af = new Airframe(new THREE.Vector3(0, 200, 0), SKYRAIDER_AF);
+    const probe = flatProbe(0);
+    af.resetAirborne(new THREE.Vector3(0, 200, 0), new THREE.Quaternion(), 55, 0, 0);
+
+    // 1s settle with neutral stick so the hold-target is captured and the PD
+    // has converged before the climb-wedge disturbance.
+    const cruiseCmd = intent({ throttle: 0.55, tier: 'assist' });
+    for (let i = 0; i < Math.round(1.0 / FIXED_DT); i++) {
+      af.step(cruiseCmd, probe, FIXED_DT);
+    }
+    const captureAltitude = af.getState().altitude;
+
+    // Strong pitch-up for 2s (the disturbance PR #126's executor report
+    // recorded as the regression driver).
+    const pitchCmd = intent({ throttle: 0.55, pitch: 0.8, tier: 'assist' });
+    for (let i = 0; i < Math.round(2.0 / FIXED_DT); i++) {
+      af.step(pitchCmd, probe, FIXED_DT);
+    }
+
+    // Release the stick and track peak altitude deviation over the next 30s.
+    let peakDeviation = 0;
+    for (let i = 0; i < Math.round(30 / FIXED_DT); i++) {
+      af.step(cruiseCmd, probe, FIXED_DT);
+      const deviation = Math.abs(af.getState().altitude - captureAltitude);
+      if (deviation > peakDeviation) peakDeviation = deviation;
+    }
+
+    expect(peakDeviation).toBeLessThan(100);
+    expect(af.getState().isStalled).toBe(false);
+  });
+
   it('exposes an interpolated pose between fixed airframe steps', () => {
     const af = new Airframe(new THREE.Vector3(0, 200, 0), SKYRAIDER_AF);
     const probe = flatProbe(0);

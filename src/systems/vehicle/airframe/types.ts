@@ -161,6 +161,14 @@ export interface AirframeConfig {
     coordYawScale: number;
     /** Autolevel strength when stick is centered in assist mode. */
     autoLevelStrength: number;
+    /**
+     * Symmetric clamp (abs value) on the assist-tier altitude-hold PD's
+     * elevator command. Optional; defaults to 0.15 when undefined. Per-aircraft
+     * because thrust-to-weight differences at cruise throttle mean some
+     * airframes saturate the default clamp during recapture from a climb
+     * disturbance.
+     */
+    altitudeHoldElevatorClamp?: number;
   };
 }
 
