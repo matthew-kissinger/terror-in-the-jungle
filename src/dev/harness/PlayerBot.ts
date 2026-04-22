@@ -46,14 +46,14 @@ export interface PlayerBotObservation {
 }
 
 /** Bounded transition log entry for debug / playtest evidence. */
-export interface PlayerBotTransition {
+interface PlayerBotTransition {
   readonly from: PlayerBotState;
   readonly to: PlayerBotState;
   readonly atMs: number;
 }
 
 /** Histogram of time spent in each state (ms). Used for smoke-capture telemetry. */
-export type PlayerBotStateHistogram = Record<PlayerBotState, number>;
+type PlayerBotStateHistogram = Record<PlayerBotState, number>;
 
 export class PlayerBot {
   private state: PlayerBotState = 'PATROL';
@@ -187,5 +187,4 @@ export class PlayerBot {
   }
 }
 
-export type { PlayerBotConfig, PlayerBotState, PlayerBotIntent, BotVec3, BotTarget } from './playerBot/types';
-export { createIdlePlayerBotIntent, DEFAULT_PLAYER_BOT_CONFIG } from './playerBot/types';
+export type { BotVec3, BotTarget } from './playerBot/types';

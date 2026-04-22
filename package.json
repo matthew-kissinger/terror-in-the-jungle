@@ -10,6 +10,13 @@
       "scripts/perf-active-driver.cjs",
       "scripts/perf-browser-observers.js"
     ],
+    "ignore": [
+      "scripts/capture-*-shots.ts",
+      "tools/generate-*.mjs"
+    ],
+    "ignoreBinaries": [
+      "gh"
+    ],
     "tags": [
       "-lintignore"
     ]
@@ -42,7 +49,7 @@
     "perf:capture:ashau:short": "npx tsx scripts/perf-capture.ts --headed --mode a_shau_valley --npcs 60 --duration 180 --warmup 20 --sample-interval-ms 1500 --detail-every-samples 2 --runtime-preflight false",
     "perf:startup:openfrontier": "npm run build && npx tsx scripts/perf-startup-ui.ts --mode open_frontier",
     "perf:capture:combat120:losprefilter": "npx tsx scripts/perf-capture.ts --headed --mode ai_sandbox --npcs 120 --duration 90 --warmup 15 --seed 2718 --los-height-prefilter true",
-    "perf:capture:frontier30m": "npx tsx scripts/perf-capture.ts --headed --mode open_frontier --npcs 120 --duration 1800 --warmup 30 --sample-interval-ms 2000 --detail-every-samples 5 --runtime-preflight false",
+    "perf:capture:frontier30m": "npx tsx scripts/perf-capture.ts --headed --mode open_frontier --npcs 120 --duration 1800 --warmup 30 --sample-interval-ms 2000 --detail-every-samples 5 --runtime-preflight false --match-duration 3600 --disable-victory true",
     "perf:analyze:latest": "npx tsx scripts/perf-analyze-latest.ts",
     "perf:terrain-probe": "npx tsx scripts/terrain-stream-probe.ts",
     "perf:terrain-probe:ashau": "npx tsx scripts/terrain-stream-probe.ts --mode a_shau_valley",
@@ -68,6 +75,7 @@
     "validate:full": "npm run test:run && npm run build && npm run perf:capture:combat120 && npm run perf:compare -- --scenario combat120",
     "probe": "npx tsx scripts/engine-health-probe.ts",
     "probe:all": "npx tsx scripts/engine-health-probe.ts --all-modes",
+    "probe:fixed-wing": "npx tsx scripts/fixed-wing-runtime-probe.ts",
     "check:hud": "npx tsx scripts/hud-layout-validator.ts",
     "check:mobile-ui": "npx tsx scripts/mobile-ui-check.ts",
     "check:memory": "npx tsx scripts/memory-growth-tracker.ts",
@@ -94,7 +102,6 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.8",
-    "vite-plugin-compression": "^0.5.1",
     "vitest": "^4.1.2"
   },
   "overrides": {

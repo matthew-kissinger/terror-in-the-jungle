@@ -40,6 +40,7 @@ export class TicketSystem implements GameSystem {
   private phaseManager = new TicketSystemPhases();
   private bleedCalculator = new TicketBleedCalculator();
   private victoryChecker = new VictoryConditions();
+  private victoryConditionsEnabled = true;
 
   // Event callbacks
   private onTicketUpdate?: (usTickets: number, opforTickets: number) => void;
@@ -108,6 +109,7 @@ export class TicketSystem implements GameSystem {
   }
 
   private checkVictoryConditions(): void {
+    if (!this.victoryConditionsEnabled) return;
     if (!this.gameState.gameActive) return;
 
     const result = this.victoryChecker.checkVictory({
@@ -252,6 +254,11 @@ export class TicketSystem implements GameSystem {
     this.gameState.isTDM = enabled;
     this.gameState.killTarget = target;
     Logger.info('tickets', `TDM Mode: ${enabled ? 'ENABLED' : 'DISABLED'}, Target: ${target}`);
+  }
+
+  setVictoryConditionsEnabled(enabled: boolean): void {
+    this.victoryConditionsEnabled = enabled;
+    Logger.info('tickets', `Victory conditions: ${enabled ? 'ENABLED' : 'DISABLED'}`);
   }
 
   setTicketUpdateCallback(callback: (usTickets: number, opforTickets: number) => void): void {

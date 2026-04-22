@@ -491,6 +491,25 @@ describe('TicketSystem', () => {
       expect(ticketSystem.getCombatDuration()).toBe(600);
     });
 
+    it('can disable terminal victory checks for perf soak captures', () => {
+      mockZoneManager = createMockZoneManager([
+        createMockCaptureZone('objective', ZoneState.BLUFOR_CONTROLLED, false),
+      ]);
+      ticketSystem.setZoneManager(mockZoneManager);
+
+      ticketSystem.setVictoryConditionsEnabled(false);
+      ticketSystem.update(1000);
+
+      expect(ticketSystem.isGameActive()).toBe(true);
+      expect(ticketSystem.getGameState().phase).not.toBe('ENDED');
+
+      ticketSystem.setVictoryConditionsEnabled(true);
+      ticketSystem.update(0.1);
+
+      expect(ticketSystem.isGameActive()).toBe(false);
+      expect(ticketSystem.getGameState().phase).toBe('ENDED');
+    });
+
     it('restartMatch should reset state', () => {
       ticketSystem.onCombatantDeath(Faction.US);
       ticketSystem.restartMatch();

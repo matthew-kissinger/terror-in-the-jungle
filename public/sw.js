@@ -1,68 +1,59 @@
 /**
  * Service worker for Terror in the Jungle.
- * Cache-first for immutable hashed assets, stale-while-revalidate for HTML,
- * cache-first for pre-baked navmesh binaries.
+ * Cache Storage is reserved for content-versioned resources. Non-versioned
+ * public assets, GLBs, and HTML must revalidate so deploys reach repeat users
+ * without requiring a hard refresh.
  */
 
-const CACHE_NAME = 'titj-v1';
+const CACHE_NAME = 'titj-v2-2026-04-21';
 
-// Critical assets to pre-cache during install
-const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-];
+const HASHED_BUILD_ASSET_RE = /^\/build-assets\/[^/]+-[A-Za-z0-9_-]{8,}\.(?:js|css|mjs|wasm|woff2?|ttf|otf|png|jpe?g|webp|avif|svg|glsl|bin|map)$/i;
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
-  );
   // Activate immediately without waiting for open tabs to close
-  self.skipWaiting();
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  // Clean up old caches
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
+
+      if ('navigationPreload' in self.registration) {
+        await self.registration.navigationPreload.enable();
+      }
+
+      // Claim all open clients immediately
+      await self.clients.claim();
+    })()
   );
-  // Claim all open clients immediately
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
   const url = new URL(event.request.url);
 
   // Only handle same-origin requests
   if (url.origin !== self.location.origin) return;
 
-  // Hashed assets under /assets/ - cache-first (immutable)
-  if (url.pathname.startsWith('/assets/')) {
+  // HTML navigations must prefer the network so users get the newest build on
+  // the first post-deploy visit.
+  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
+    event.respondWith(networkFirst(event.request, event.preloadResponse, { cacheFallback: true }));
+    return;
+  }
+
+  // Content-hashed Vite build output and seed-keyed baked data are immutable.
+  if (isImmutableResource(url.pathname)) {
     event.respondWith(cacheFirst(event.request));
     return;
   }
 
-  // Pre-baked navmesh binaries - cache-first
-  if (url.pathname.startsWith('/data/navmesh/') && url.pathname.endsWith('.bin')) {
-    event.respondWith(cacheFirst(event.request));
-    return;
-  }
-
-  // Other data files - cache-first with 24h TTL (matches _headers)
-  if (url.pathname.startsWith('/data/')) {
-    event.respondWith(cacheFirst(event.request));
-    return;
-  }
-
-  // HTML navigation requests - stale-while-revalidate
-  if (event.request.mode === 'navigate' || url.pathname.endsWith('.html')) {
-    event.respondWith(staleWhileRevalidate(event.request));
-    return;
-  }
-
-  // Everything else (fonts, etc.) - cache-first
-  event.respondWith(cacheFirst(event.request));
+  // Non-versioned assets are intentionally left to the browser/Cloudflare HTTP
+  // cache so Cache-Control and ETag revalidation can keep them fresh.
+  event.respondWith(fetch(event.request));
 });
 
 async function cacheFirst(request) {
@@ -72,23 +63,33 @@ async function cacheFirst(request) {
   const response = await fetch(request);
   if (response.ok) {
     const cache = await caches.open(CACHE_NAME);
-    cache.put(request, response.clone());
+    await cache.put(request, response.clone());
   }
   return response;
 }
 
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
+async function networkFirst(request, preloadResponsePromise, options = {}) {
+  const cacheFallback = options.cacheFallback === true;
+  const cache = cacheFallback ? await caches.open(CACHE_NAME) : null;
 
-  // Fetch in background regardless
-  const fetchPromise = fetch(request).then((response) => {
-    if (response.ok) {
-      cache.put(request, response.clone());
+  try {
+    const preloadResponse = preloadResponsePromise ? await preloadResponsePromise : undefined;
+    const response = preloadResponse || await fetch(request);
+    if (cache && response.ok) {
+      await cache.put(request, response.clone());
     }
     return response;
-  }).catch(() => cached); // If offline, fall back to cache
+  } catch (error) {
+    if (cacheFallback && cache) {
+      const cached = await cache.match(request);
+      if (cached) return cached;
+    }
+    throw error;
+  }
+}
 
-  // Return cached immediately if available, otherwise wait for fetch
-  return cached || fetchPromise;
+function isImmutableResource(pathname) {
+  return HASHED_BUILD_ASSET_RE.test(pathname)
+    || (pathname.startsWith('/data/navmesh/') && pathname.endsWith('.bin'))
+    || (pathname.startsWith('/data/heightmaps/') && pathname.endsWith('.f32'));
 }

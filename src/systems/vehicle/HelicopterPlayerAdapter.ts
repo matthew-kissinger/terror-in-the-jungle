@@ -74,6 +74,7 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
       (ctx.input as any).setInputContext('helicopter');
     }
     ctx.cameraController.saveInfantryAngles();
+    ctx.cameraController.setFlightMouseControlEnabled(true);
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.showHelicopterMouseIndicator();

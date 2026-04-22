@@ -4,10 +4,6 @@ A browser-based 3D first-person shooter and combined-arms sandbox set in the Vie
 
 **[Play Now](https://terror-in-the-jungle.pages.dev)**
 
-<p align="center">
-  <img src="phone-screen.png" alt="Terror in the Jungle - mobile gameplay" width="300">
-</p>
-
 ## Features
 
 - **5 game modes** from 20-player skirmishes to a 3,000-unit strategic war simulation on a 21km historical map
@@ -42,7 +38,7 @@ npm run validate   # Lint + tests + build + smoke test
 npm run check:mobile-ui
 ```
 
-Requires Node 22 (pinned in `.nvmrc`) and a browser with WebGL2.
+Requires Node 24 (pinned in `.nvmrc`) and a browser with WebGL2.
 
 For the current verified state of the repo, see [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md).
 

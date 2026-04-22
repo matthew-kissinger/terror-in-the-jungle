@@ -16,6 +16,10 @@ const _fwPosition = new THREE.Vector3();
 const _fwQuaternion = new THREE.Quaternion();
 const _fwForward = new THREE.Vector3();
 
+const FIXED_WING_CAMERA_FOLLOW_RATE = 9.5;
+const FIXED_WING_CAMERA_LOOK_RATE = 12;
+const FIXED_WING_FOV_RATE = 6;
+
 export class PlayerCamera {
   private camera: THREE.PerspectiveCamera;
   private playerState: PlayerState;
@@ -35,6 +39,9 @@ export class PlayerCamera {
 
   // Fixed-wing camera smoothing
   private baseFOV = 75;
+  private fixedWingLookTarget = new THREE.Vector3();
+  private hasFixedWingCameraState = false;
+  private activeFixedWingCameraId: string | null = null;
 
   // Saved infantry angles for helicopter enter/exit transitions
   private savedInfantryYaw = Math.PI;
@@ -83,12 +90,14 @@ export class PlayerCamera {
     return this.toggleFlightMouseControl();
   }
 
-  updateCamera(input: PlayerInput): void {
+  updateCamera(input: PlayerInput, deltaTime = 1 / 60): void {
     if (this.playerState.isInHelicopter) {
+      this.resetFixedWingCameraState();
       this.updateHelicopterCamera(input);
     } else if (this.playerState.isInFixedWing) {
-      this.updateFixedWingCamera(input);
+      this.updateFixedWingCamera(input, deltaTime);
     } else {
+      this.resetFixedWingCameraState();
       this.updateFirstPersonCamera(input);
     }
   }
@@ -192,9 +201,10 @@ export class PlayerCamera {
     }
   }
 
-  private updateFixedWingCamera(input: PlayerInput): void {
+  private updateFixedWingCamera(input: PlayerInput, deltaTime: number): void {
     const aircraftId = this.playerState.fixedWingId;
     if (!aircraftId || !this.fixedWingModel) {
+      this.resetFixedWingCameraState();
       this.updateFirstPersonCamera(input);
       return;
     }
@@ -202,6 +212,7 @@ export class PlayerCamera {
     const hasPos = this.fixedWingModel.getAircraftPositionTo(aircraftId, _fwPosition);
     const hasQuat = this.fixedWingModel.getAircraftQuaternionTo(aircraftId, _fwQuaternion);
     if (!hasPos || !hasQuat) {
+      this.resetFixedWingCameraState();
       this.updateFirstPersonCamera(input);
       return;
     }
@@ -227,6 +238,7 @@ export class PlayerCamera {
 
       _cameraPosition.set(x, y, z).add(_fwPosition);
       this.camera.position.copy(_cameraPosition);
+      this.hasFixedWingCameraState = false;
 
       _lookTarget.copy(_fwPosition);
       _lookTarget.y += 2;
@@ -239,26 +251,42 @@ export class PlayerCamera {
       _cameraPosition.addScaledVector(_fwForward, -distanceBack);
       _cameraPosition.y += heightAbove;
 
-      // Smooth camera follow for momentum feel
-      this.camera.position.lerp(_cameraPosition, 0.08);
-
       _lookTarget.copy(_fwPosition);
       _lookTarget.y += 2;
-      this.camera.lookAt(_lookTarget);
+
+      if (!this.hasFixedWingCameraState || this.activeFixedWingCameraId !== aircraftId) {
+        this.camera.position.copy(_cameraPosition);
+        this.fixedWingLookTarget.copy(_lookTarget);
+        this.hasFixedWingCameraState = true;
+        this.activeFixedWingCameraId = aircraftId;
+      } else {
+        const followAlpha = 1 - Math.exp(-FIXED_WING_CAMERA_FOLLOW_RATE * Math.max(deltaTime, 0));
+        const lookAlpha = 1 - Math.exp(-FIXED_WING_CAMERA_LOOK_RATE * Math.max(deltaTime, 0));
+        this.camera.position.lerp(_cameraPosition, followAlpha);
+        this.fixedWingLookTarget.lerp(_lookTarget, lookAlpha);
+      }
+
+      this.camera.lookAt(this.fixedWingLookTarget);
     }
 
-    // FOV widening for fast aircraft
+    let targetFOV = this.baseFOV;
     if (display?.fovWidenEnabled) {
       const fd = this.fixedWingModel.getFlightData(aircraftId);
       if (fd) {
         const maxSpeed = 200; // F-4 max speed
         const speedFraction = Math.min(fd.airspeed / maxSpeed, 1.0);
-        const baseFOV = 75;
         const maxFOVBoost = 15;
-        this.camera.fov = baseFOV + speedFraction * maxFOVBoost;
-        this.camera.updateProjectionMatrix();
+        targetFOV = this.baseFOV + speedFraction * maxFOVBoost;
       }
     }
+    const fovAlpha = 1 - Math.exp(-FIXED_WING_FOV_RATE * Math.max(deltaTime, 0));
+    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, fovAlpha);
+    this.camera.updateProjectionMatrix();
+  }
+
+  private resetFixedWingCameraState(): void {
+    this.hasFixedWingCameraState = false;
+    this.activeFixedWingCameraId = null;
   }
 
   /** Save current infantry yaw/pitch before entering helicopter. */

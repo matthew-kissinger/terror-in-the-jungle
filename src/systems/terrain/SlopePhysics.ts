@@ -6,7 +6,7 @@
  */
 
 /** Slope value (1 - normal.y) above which movement is fully blocked (~60 deg). */
-export const MAX_WALKABLE_SLOPE = 0.5;
+const MAX_WALKABLE_SLOPE = 0.5;
 
 /**
  * Dot product of support-normal with world-up at which the player transitions
@@ -58,7 +58,7 @@ export function computeSlopeSpeedMultiplier(slopeValue: number): number {
  * Check whether a slope is walkable at all.
  */
 export function isWalkableSlope(slopeValue: number): boolean {
-  return (1 - slopeValue) >= 0.5;
+  return (1 - slopeValue) >= MAX_WALKABLE_SLOPE;
 }
 
 /**

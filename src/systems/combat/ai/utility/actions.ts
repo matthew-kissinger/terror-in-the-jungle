@@ -100,7 +100,7 @@ export const fireAndFadeAction: UtilityAction = {
 const COORD_SUPPRESSION_MIN_SQUAD = 3
 const COORD_SUPPRESSION_WEIGHT = 0.5
 
-export const coordinateSuppressionAction: UtilityAction = {
+const coordinateSuppressionAction: UtilityAction = {
   id: 'coordinate_suppression',
   weightKey: 'suppress',
   score(ctx: UtilityContext): number {
@@ -132,7 +132,7 @@ export const coordinateSuppressionAction: UtilityAction = {
 const REQUEST_SUPPORT_OUTNUMBER_RATIO = 1.5
 const REQUEST_SUPPORT_WEIGHT = 0.6
 
-export const requestSupportAction: UtilityAction = {
+const requestSupportAction: UtilityAction = {
   id: 'request_support',
   score(ctx: UtilityContext): number {
     if (!ctx.supportAvailable) return 0

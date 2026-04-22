@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type BrowserContextOptions, type Page, type ViewportSize } from 'playwright';
+import { localAppUrl } from './app-url';
 
 type Scenario = 'menu' | 'gameplay';
 
@@ -36,7 +37,7 @@ interface SnapshotResult {
   metrics: ScenarioMetrics;
 }
 
-const BASE_URL = process.env.MATRIX_BASE_URL ?? 'http://127.0.0.1:9100/terror-in-the-jungle/?perf=1';
+const BASE_URL = process.env.MATRIX_BASE_URL ?? localAppUrl({ port: 9100, query: { perf: true } });
 const TS = new Date().toISOString().replace(/[:.]/g, '-');
 const OUT_DIR = path.resolve('artifacts', 'ui-matrix', TS);
 const REPORT_PATH = path.join(OUT_DIR, 'report.md');

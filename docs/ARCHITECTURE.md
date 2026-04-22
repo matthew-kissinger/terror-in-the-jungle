@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-19
+Last verified: 2026-04-21
 
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -51,7 +51,7 @@ Runtime composers (extracted from SystemConnector):
 | Input | `src/systems/input/` | InputContextManager (singleton) | untracked |
 | Audio | `src/systems/audio/` | AudioManager, FootstepAudioSystem | untracked |
 | Effects | `src/systems/effects/` | ExplosionEffectsPool, ImpactEffectsPool, SmokeCloudSystem, TracerPool, PostProcessingManager, CameraShakeSystem | untracked |
-| Environment | `src/systems/environment/` | WeatherSystem, WaterSystem, Skybox | untracked |
+| Environment | `src/systems/environment/` | AtmosphereSystem, CloudLayer, WeatherSystem, WaterSystem | untracked |
 | Debug | `src/systems/debug/` | PerformanceTelemetry (singleton) | untracked |
 | UI | `src/ui/` | HUDSystem, GameUI, TouchControls, MinimapSystem, FullMapSystem | 1.5ms |
 | Config | `src/config/` | gameModeTypes, *Config, MapSeedRegistry, CombatantConfig, FactionCombatTuning | - |
@@ -84,14 +84,14 @@ TRACKED (budgeted, EMA-monitored):
   World       1.0ms  zoneManager + ticketSystem + weather + water (scheduled)
 
 UNTRACKED (catch-all):
-  assetLoader, audioManager, skybox, playerHealth, playerRespawn,
+  assetLoader, audioManager, playerHealth, playerRespawn,
   helipad, deathCam, gameMode, squadCtrl, inventory, camShake,
   suppression, flashbang, smoke, influence, footstep, weaponPickup, rally
 
 GameEventBus.flush()
 performanceTelemetry.endFrame()
 
-POST-TICK: skybox -> renderer.render -> fpw.renderWeapon -> postProcessing
+POST-TICK: renderer.render -> fpw.renderWeapon -> postProcessing
 ```
 
 Scheduled groups (`SimulationScheduler`): `tactical_ui`, `war_sim`, `air_support`, `world_state`, `mode_runtime` run at reduced cadence to save budget.

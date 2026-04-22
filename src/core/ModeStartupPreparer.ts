@@ -386,9 +386,6 @@ export function normalizeLaunchSelection(
   };
 }
 
-/**
- * @lintignore Lazy-loaded by the startup pipeline; Knip does not resolve this dynamic import path.
- */
 export async function prepareModeStartup(
   engine: GameEngine,
   launchSelection: GameLaunchSelection

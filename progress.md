@@ -378,3 +378,41 @@ TODO
     - tests: PASS (`198` files, `3737` tests)
     - build: PASS
     - prod smoke: PASS
+
+2026-04-21 Cycle 2 fixed-wing feel first pass
+- Investigated the reported fixed-wing stiffness, post-climb bounce/porpoise feel, and visual shake. The first code-level mismatch is at the render/camera boundary: fixed-wing was exposing raw Airframe fixed-step pose to scene/camera consumers while the helicopter path exposes an interpolated physics state.
+- Added Airframe interpolated pose output, switched FixedWingModel visual pose/quaternion queries to that output, and made PlayerCamera fixed-wing follow/look/FOV smoothing use elapsed time instead of a fixed per-frame lerp.
+- Validation:
+  - `npx vitest run src/systems/vehicle/__tests__/fixedWing.integration.test.ts src/systems/player/PlayerCamera.test.ts src/systems/vehicle/FixedWingModel.test.ts`: PASS
+  - `npm run typecheck`: PASS
+  - `npm run probe:fixed-wing`: PASS for A-1, F-4, and AC-47 takeoff/climb, AC-47 orbit, approach, and handoff
+  - `npm run validate:fast`: PASS
+- Note: user reported playing games in the background during this pass. Do not use this session for authoritative perf baselines or `validate:full` perf evidence.
+
+TODO
+- Run the fixed-wing human playtest checklist on A-1, AC-47, and F-4. If bounce/porpoise or stiffness remains, tune airframe/control-law damping next rather than adding more vehicles.
+- Run `validate:full` later on a quiet machine before any perf baseline refresh.
+
+2026-04-21 Cycle 2 frontier30m soak semantics
+- Fixed the misleading `frontier30m` setup. Open Frontier's normal 15-minute match timer made the old 30-minute script hit victory around the halfway point, so the latter half was not a trustworthy active-combat soak.
+- Added perf-harness-only runtime overrides:
+  - `perfMatchDuration=<seconds>` extends the TicketSystem combat duration only when diagnostics/perf mode is enabled in dev or `VITE_PERF_HARNESS=1` builds.
+  - `perfDisableVictory=1` disables terminal victory checks for soak captures so time-limit, ticket-depletion, and total-control paths do not transition into the victory screen.
+- Updated `npm run perf:capture:frontier30m` to pass `--match-duration 3600 --disable-victory true`.
+- Validation:
+  - `npx vitest run src/systems/world/GameModeManager.test.ts src/systems/world/TicketSystem.test.ts scripts/perf-harness/perf-active-driver.test.js`: PASS
+
+TODO
+- Re-capture `frontier30m` and refresh the tracked baseline only on a quiet machine. User is running other games during this session, so current perf captures would not be baseline-quality.
+- Continue Cycle 2 startup bundle work while fixed-wing human playtest waits for tomorrow.
+
+2026-04-21 Cycle 2 deploy/bundle hygiene
+- Ran a production build and sourcemap analysis build to inspect chunk shape. Current large chunks remain `index` (~851kB raw / ~221kB gzip), `three` (~734kB raw / ~187kB gzip), and `ui` (~449kB raw / ~106kB gzip). Recast still emits a ~339kB WASM asset plus ~275kB JS loader per main/worker graph.
+- Removed `vite-plugin-compression` and the Vite compression plugin config. Cloudflare Pages already negotiates visitor-facing compression for JS/CSS/WASM/JSON/font assets, so the repo should not upload redundant `.gz`/`.br` sidecars with their own cache surface.
+- Tested a narrower Recast manual-chunk split, but reverted it because Vite hoisted a ~956kB `recast` chunk into the initial modulepreload graph. Recast/Three chunk work needs a more deliberate lazy-boundary change, not a naming-rule tweak.
+- Validation:
+  - `npm run build`: PASS
+  - `dist/` check: no `.gz` or `.br` sidecar files
+
+TODO
+- Real chunk-weight work remains: split startup-critical code from full live-game systems/UI, and revisit Recast/Three manual chunking without regressing startup.

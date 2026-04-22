@@ -93,6 +93,7 @@ function createMockHudSystem() {
 }
 
 function createTransitionContext(playerState: PlayerState, vehicleId = 'fw_1'): VehicleTransitionContext {
+  let flightMouseControlEnabled = false;
   return {
     playerState,
     vehicleId,
@@ -115,8 +116,11 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'fw_1'): 
     cameraController: {
       saveInfantryAngles: vi.fn(),
       restoreInfantryAngles: vi.fn(),
-      getFlightMouseControlEnabled: vi.fn(() => false),
-      getHelicopterMouseControlEnabled: vi.fn(() => false),
+      setFlightMouseControlEnabled: vi.fn((enabled: boolean) => {
+        flightMouseControlEnabled = enabled;
+      }),
+      getFlightMouseControlEnabled: vi.fn(() => flightMouseControlEnabled),
+      getHelicopterMouseControlEnabled: vi.fn(() => flightMouseControlEnabled),
     } as any,
     hudSystem: createMockHudSystem() as any,
   };
@@ -153,6 +157,9 @@ describe('FixedWingPlayerAdapter', () => {
       expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('plane');
       // Model is told this aircraft is now piloted.
       expect(fwModel.setPilotedAircraft).toHaveBeenCalledWith('fw_abc');
+      // Flight mouse control starts from direct-control mode on every entry.
+      expect(ctx.cameraController.setFlightMouseControlEnabled).toHaveBeenCalledWith(true);
+      expect(ctx.hudSystem!.updateFixedWingMouseMode).toHaveBeenCalledWith(true);
       // Stability assist inherits the aircraft default.
       expect(adapter.isAutoLevelEnabled()).toBe(true);
     });
@@ -250,6 +257,42 @@ describe('FixedWingPlayerAdapter', () => {
       expect(intent.orbitHoldEnabled).toBe(true);
       expect(intent.assistEnabled).toBe(true);
       expect(Math.hypot(intent.orbitCenterX, intent.orbitCenterZ)).toBeGreaterThan(0);
+    });
+
+    it('keeps gunship orbit hold through a small terrain-relative altitude dip', () => {
+      const flightData = {
+        altitudeAGL: 160,
+        weightOnWheels: false,
+        operationState: 'cruise',
+      };
+      fwModel = createMockFixedWingModel({
+        configKey: 'AC47_SPOOKY',
+        displayName: 'AC-47 Spooky',
+        flightData,
+      });
+      adapter = new FixedWingPlayerAdapter(fwModel as any);
+
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'ac47_1');
+      adapter.onEnter(ctx);
+      adapter.toggleFlightAssist();
+
+      const updateCtx: VehicleUpdateContext = {
+        deltaTime: 0.016,
+        input: ctx.input,
+        cameraController: ctx.cameraController,
+        hudSystem: ctx.hudSystem,
+      };
+
+      flightData.altitudeAGL = 42;
+      adapter.update(updateCtx);
+      let intent = fwModel.setFixedWingPilotIntent.mock.calls.at(-1)?.[0];
+      expect(intent.orbitHoldEnabled).toBe(true);
+
+      flightData.altitudeAGL = 24;
+      adapter.update(updateCtx);
+      intent = fwModel.setFixedWingPilotIntent.mock.calls.at(-1)?.[0];
+      expect(intent.orbitHoldEnabled).toBe(false);
     });
   });
 });

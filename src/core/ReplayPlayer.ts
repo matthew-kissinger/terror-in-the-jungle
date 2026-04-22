@@ -18,7 +18,7 @@
 import { SeededRandom } from './SeededRandom';
 import type { ReplayBlob, ReplayStateSnapshot, ReplayStateSnapshotEntity } from './ReplayRecorder';
 
-export interface ReplayTolerance {
+interface ReplayTolerance {
   positionEpsilonM: number;
   attitudeEpsilonDeg: number;
   healthEpsilonHp: number;
@@ -38,7 +38,7 @@ export interface SimHarness<I> {
   snapshot(): ReplayStateSnapshot;
 }
 
-export interface ReplayConvergenceReport {
+interface ReplayConvergenceReport {
   ok: boolean;
   tickCount: number;
   positionMaxErrM: number;

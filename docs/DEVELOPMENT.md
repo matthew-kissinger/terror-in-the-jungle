@@ -1,10 +1,10 @@
 # Development Guide
 
-Last updated: 2026-04-19
+Last updated: 2026-04-21
 
 ## Prerequisites
 
-- Node 22 (pinned in `.nvmrc`)
+- Node 24 (pinned in `.nvmrc`)
 - Modern browser with WebGL2 support
 
 ## Quick Start
@@ -37,7 +37,7 @@ npm run validate:fast    # typecheck + lint + test:quick
 ```bash
 npm run validate:fast    # fast local gate
 npm run validate         # lint + test:run + build + smoke:prod
-npm run deadcode         # knip dead code scan (advisory; currently not green on master)
+npm run deadcode         # knip dead code scan (advisory hygiene gate)
 ```
 
 `validate` runs ESLint, the full Vitest suite, TypeScript + Vite production build, then `scripts/prod-smoke.ts` against the built app.
@@ -54,17 +54,24 @@ npm run check:mobile-ui    # Built-app phone viewport flow gate
 ### Runtime Probes
 
 ```bash
-npx tsx scripts/fixed-wing-runtime-probe.ts                       # default: preview mode (builds perf target, serves via vite preview)
-npx tsx scripts/fixed-wing-runtime-probe.ts --server-mode dev     # debug against dev server with source maps
+npm run probe:fixed-wing                                      # default: preview mode (builds perf target, serves via vite preview)
+npx tsx scripts/fixed-wing-runtime-probe.ts --server-mode dev # debug against dev server with source maps
 ```
 
-`fixed-wing-runtime-probe.ts` boots Open Frontier in Playwright, forces desktop input semantics, steps the live game deterministically through `window.advanceTime(ms)`, and validates runway takeoff/climb for the A-1, F-4, and AC-47. Artifacts land in `artifacts/fixed-wing-runtime-probe/`.
+`fixed-wing-runtime-probe.ts` boots Open Frontier in Playwright, forces desktop input semantics, steps the live game deterministically through `window.advanceTime(ms)`, and validates runway takeoff, climb, AC-47 orbit hold, player/NPC handoff, and short-final approach setup for the A-1, F-4, and AC-47. Artifacts land in `artifacts/fixed-wing-runtime-probe/`.
 
 Post-C1 (2026-04-17), the probe defaults to the `perf` build target served via `vite preview` rather than sharing a dev server. See PERFORMANCE.md "Build targets" for the why.
 
-Current caveat: on 2026-04-19 `master`, the probe is broken after the Airframe
-cutover and still calls `model.getPhysics()`. Treat the script as the intended
-validation path, but not as a passing gate until it is repaired.
+`cycle-2026-04-21-stabilization-reset` restored this probe as a maintained
+gate. Treat it as required evidence for fixed-wing/airfield changes.
+
+For Cycle 2 fixed-wing feel work, the probe is necessary but not sufficient.
+It validates takeoff/climb/orbit/handoff/approach correctness; it does not sign
+off high-speed stiffness, altitude porpoise, visual shake, camera smoothing, or
+render interpolation quality. Use [PLAYTEST_CHECKLIST.md](PLAYTEST_CHECKLIST.md)
+for the human feel gate.
+The first Cycle 2 interpolation/camera smoothing patch passes the probe, but it
+still needs that human fixed-wing checklist before more vehicle types are added.
 
 ### Performance Validation
 
@@ -87,7 +94,8 @@ For world-size, staged-prop, aircraft, vehicle, terrain-query, or hit-detection 
 
 ### CI Pipeline
 
-`.github/workflows/ci.yml` deploys to Cloudflare Pages on push to `master`.
+`.github/workflows/ci.yml` runs quality gates on push to `master`. Production
+deploy is manual through `.github/workflows/deploy.yml` or `npm run deploy:prod`.
 
 Required gates before deploy:
 1. `lint`
@@ -100,7 +108,7 @@ Required gates before deploy:
 
 Live at: https://terror-in-the-jungle.pages.dev/
 
-See [DEPLOY_WORKFLOW.md](DEPLOY_WORKFLOW.md) for the full build-to-prod path, Cloudflare Pages cache-control strategy, service-worker behavior, and prod header spot-check recipes.
+See [DEPLOY_WORKFLOW.md](DEPLOY_WORKFLOW.md) for the full build-to-prod path, Cloudflare Pages cache-control strategy, service-worker behavior, and prod header spot-check recipes. For GLB/model, public asset, `index.html`, `_headers`, or `sw.js` changes, run the live header spot-check after deploy.
 
 ### Local prod-like preview
 
@@ -112,12 +120,18 @@ npm run smoke:prod       # headless Playwright smoke over dist/ (what CI runs)
 
 Neither Tier exercises `_headers` (that's a Cloudflare Pages layer), but both confirm the bundled app boots and assets resolve. See DEPLOY_WORKFLOW.md section 5.
 
+Current cache contract:
+
+- Vite content-hashed build output is emitted under `/build-assets/` and cached immutable.
+- Stable-path public assets under `/assets/` and GLB models under `/models/` revalidate.
+- The service worker must not cache-first non-versioned assets.
+
 ### Pre-Push Checklist
 
 ```bash
 npm run validate:fast    # typecheck + lint + test:quick
 npm run validate         # lint + test + build + smoke
-npm run deadcode         # review output; advisory and currently not green on master
+npm run deadcode         # review output; advisory hygiene gate
 ```
 
 For performance-sensitive changes, also run:
@@ -131,15 +145,26 @@ npm run perf:capture:openfrontier:short
 npm run perf:compare -- --scenario openfrontier:short
 ```
 
+For deploy/cache-sensitive work, also run after deployment:
+```bash
+# See docs/DEPLOY_WORKFLOW.md section 7 for the full command set.
+curl -I https://terror-in-the-jungle.pages.dev/sw.js
+curl -I https://terror-in-the-jungle.pages.dev/models/vehicles/aircraft/a1-skyraider.glb
+```
+
 CI still captures perf artifacts on every push, but the hosted-run perf outcome is advisory. If the harness cannot produce a `summary.json`, or if `perf:compare` reports a `FAIL`, the workflow now keeps the artifacts and proceeds with deploy instead of blocking on a runner environment we have already validated as noisy. Treat `validate:full` as the authoritative pre-push perf gate.
 
 ### Build Output
 
 Current large chunks:
-- `three`: ~727kB
-- `index`: ~866kB
-- `recast-navigation.wasm-compat`: ~340kB WASM binary + ~275kB JS loader per entry (shipped WASM roughly halved after C2 dedupe; previously shipped twice across main + worker)
-- `ui`: ~450kB
+- `index`: ~851kB raw / ~221kB gzip
+- `three`: ~734kB raw / ~187kB gzip
+- `ui`: ~449kB raw / ~106kB gzip
+- `recast-navigation.wasm`: ~339kB WASM + ~275kB JS loader per main/worker graph
+
+`npm run build` intentionally does not emit `.gz` or `.br` sidecar files.
+Cloudflare handles visitor-facing compression for the deployed Pages assets, so
+local output stays focused on canonical hashed files.
 
 ### Manual Smoke Checks
 
@@ -154,7 +179,7 @@ After changes to `src/systems/world/`, `src/systems/terrain/`, `src/systems/vehi
 1. Open Frontier capture records player shots and hits
 2. Nearby enemies are returned by combat spatial queries in the active mode bounds
 3. Entering a plane does not produce vertical self-launch on the first update ticks
-4. If the change touches fixed-wing, airfields, player input, or browser diagnostics hooks, restore `scripts/fixed-wing-runtime-probe.ts` to a trustworthy passing state or document why the probe is still drifting. As of 2026-04-19 `master`, the probe is out of sync with `FixedWingModel`.
+4. If the change touches fixed-wing, airfields, player input, or browser diagnostics hooks, run `npm run probe:fixed-wing` or document why the probe could not be used.
 
 ## Project Structure
 
@@ -176,7 +201,7 @@ src/
     assets/       AssetLoader, ModelLoader
     audio/        AudioManager, FootstepAudio, WeaponSounds
     effects/      TracerPool, MuzzleFlash, PostProcessing, CameraShake
-    environment/  WeatherSystem, WaterSystem, Skybox
+    environment/  AtmosphereSystem, CloudLayer, WeatherSystem, WaterSystem
     input/        InputContextManager
     debug/        PerformanceTelemetry, PerformanceBenchmark
   ui/

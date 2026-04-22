@@ -1,52 +1,34 @@
-# Atmosphere System — Design & Roadmap
+# Atmosphere System
 
-Last updated: 2026-04-19
+Last updated: 2026-04-21
 
-Design reference for the sky / sun / fog / cloud / ambient stack. Task briefs in `docs/tasks/atmosphere-*.md` implement the v1 foundation described here.
+This document describes the current sky / sun / fog / cloud / ambient stack and
+the remaining atmosphere roadmap. The v1 atmosphere foundation and polish cycles
+landed across `cycle-2026-04-20-atmosphere-foundation` and
+`cycle-2026-04-21-atmosphere-polish-and-fixes`.
 
-## Why this exists
+## Current Runtime
 
-The current atmosphere is a grab-bag:
+- `AtmosphereSystem` owns the sky dome and implements the fenced `ISkyRuntime`
+  and `ICloudRuntime` surfaces.
+- `HosekWilkieSkyBackend` is the only sky backend on master. The legacy
+  `Skybox.ts`, `NullSkyBackend.ts`, and `public/assets/skybox.png` fallback path
+  was removed in PR #108.
+- `ScenarioAtmospherePresets` provides per-mode time-of-day, fog density,
+  cloud coverage, turbidity, and lighting parameters.
+- `AtmosphereTodCycle` animates sun direction for live modes. `combat120` stays
+  static so the primary perf regression target remains easier to compare.
+- `GameRenderer` fog is driven from atmosphere sky color instead of a hardcoded
+  constant, removing the old horizon seam.
+- Hemisphere, directional, water, terrain, and vegetation lighting now read from
+  the same atmosphere snapshot.
+- `CloudLayer` provides a high-altitude procedural cloud band with weather-
+  driven coverage changes. It is a flat layer with shader detail, not a
+  fly-through volumetric cloud volume.
+- `PostProcessingManager` applies ACES tone mapping before the 24-level quantize
+  and Bayer dither pass so warm dawn/dusk colors survive the retro post chain.
 
-- `Skybox.ts` — 500-unit camera-following sphere with a **static equirectangular texture**.
-- `GameRenderer.setupLighting()` — three `freezeTransform`-locked lights (ambient, directional "moon", hemisphere). Never animated.
-- `GameRenderer` fog — `FogExp2` with a single hardcoded color (`0x5a7a6a`). Horizon seam hides *today* only because the skybox tint and fog color happen to match; any sky animation breaks that invariant.
-- `WeatherAtmosphere.ts` — mutates the above via **scalar multipliers on intensity**. Weather is doing tuning-knob work on a static scene rather than driving a real atmosphere model.
-- `WaterSystem` — has a stub `sun` vector that is initialized to the origin and never updated.
-- `PostProcessingManager.ts` — 1/3-res pixelation + 24-level color quantize in one custom pass. Visible color banding on sky gradients is the main artifact.
-- `SystemInterfaces.ts` — no `ISkyRuntime` / `ICloudRuntime` fence. `Skybox` is unfenced.
-
-Fixed-wing aircraft shipped (B1 airframe, 2026-04-18). Pilots climb toward the 500-unit skybox dome. The existing setup cannot credibly support more flying, more jungle-mood work (dawn patrols, golden-hour objectives), or the P2-roadmap "day/night cycle".
-
-## Shape: Combo G architecture, Combo A first backend
-
-- **Fence addition, not modification.** Add `ISkyRuntime` and `ICloudRuntime` to `src/types/SystemInterfaces.ts`. This is an INTERFACE ADDITION — no existing fenced interface changes, so no `[interface-change]` PR title is required (see `docs/INTERFACE_FENCE.md`).
-- **New `AtmosphereSystem`** at `src/systems/environment/AtmosphereSystem.ts` implements `ISkyRuntime` + hooks `IGameRenderer` ambient/directional/hemisphere lights and fog. Pluggable `ISkyBackend` internally.
-- **First backend (v1): Combo A.** Hosek-Wilkie analytic sky dome + sun color from transmittance + hemisphere from sky zenith/horizon samples + sky-tinted fog color + per-scenario time-of-day preset table.
-- **WeatherSystem keeps its role** but shifts from mutating `GameRenderer.fog/ambientLight/moonLight` directly to mutating `AtmosphereSystem` state (coverage, turbidity, sun-occlusion). One source of truth.
-- **`Skybox.ts` deprecates** — kept for one release with a deprecation log; `AtmosphereSystem` owns the dome.
-
-## Immediate wins (ship alongside v1)
-
-1. **Bayer 4×4 dither before 24-level color quantize.** 3 shader ops in `PostProcessingManager.ts`. Kills gradient banding; makes the retro look *more* retro, not less. Highest visible-quality ROI in the project. Own task: `post-bayer-dither`.
-2. **Fog color = sky color at view direction.** ~20 lines. Eliminates the hard horizon wall permanently. Covered by `atmosphere-fog-tinted-by-sky`.
-3. **Hemisphere color from sky zenith/horizon samples.** ~10 lines of uniform update per frame. Ambient finally belongs to the sky. Covered by `atmosphere-sun-hemisphere-coupling`.
-4. **Sun color from atmospheric transmittance.** Free once Hosek-Wilkie is in — sun color samples the sky model at the sun direction. Dawn/sunset "for free."
-5. **Dynamic sun direction via per-scenario TOD preset table.** `MapSeedRegistry`-style static table — `ashau = dawn`, `openfrontier = noon`, `tdm = dusk`, `zc = golden hour`. No live cycle in v1.
-
-## Future backends (not v1)
-
-- **Combo E (prebaked hybrid, v2):** Hillaire-atmosphere-baked-to-cubemap every 30s of sim time + PMREM IBL for weapons/vehicles + low ground mist (y<30m volumetric raymarch, jungle-visibility gameplay). Swap by `AtmosphereSystem` backend; `ISkyRuntime` does not change.
-- **Combo F (fly-through only, v3):** gate volumetric cloud raymarch on aircraft proximity to the cloud layer using `VehicleAdapter`. Ground combat pays zero; pilots get real 3D clouds.
-- **Combo C (full Nubis, far horizon):** considered out of scope until the ECS rearch track closes and combat120 lands inside 16ms p99 on mid-tier.
-
-## Perf budget
-
-- `AtmosphereSystem` sits in the existing `World` tracked group (1.0ms total including `WeatherSystem`).
-- v1 Combo A is analytic + texture lookups — budget impact target ≤ 0.3ms on mid tier.
-- Any future backend that exceeds this gets its own tracked group and a budget-aware step count via `SystemUpdater`'s EMA hook.
-
-## Interface sketch (informational — final API in the fence brief)
+## Runtime Contract
 
 ```ts
 export interface ISkyRuntime {
@@ -63,11 +45,46 @@ export interface ICloudRuntime {
 }
 ```
 
-The `*ColorAtDirection` sampler is the seam the fog shader reads each frame — the single trick that makes the horizon disappear.
+The important invariant is that fog, ambient lighting, water, terrain, and
+billboards all sample the same atmosphere state. Do not reintroduce independent
+hardcoded sky/fog/light colors for local fixes.
+
+## Current Limits
+
+- Clouds are an overhead layer. Pilots can fly near/through the altitude band,
+  but there is no volumetric scattering, collision, or cloud interior lighting.
+- The current backend uses a CPU LUT and simplified Hosek-Wilkie/Preetham-style
+  math. It is designed for stable low cost, not physically exhaustive sky
+  rendering.
+- Time-of-day is scenario-driven, not a gameplay system with mission scheduling,
+  darkness adaptation, or AI visibility effects.
+- Human screenshot/playtest review is still required for visible atmosphere
+  changes. Automated gates catch correctness and perf, not taste.
+
+## Future Backends
+
+- **Prebaked hybrid:** Hillaire-atmosphere-baked-to-cubemap every coarse time
+  step plus PMREM IBL for weapons/vehicles and ground mist for jungle mood.
+- **Fly-through cloud upgrade:** gate volumetric cloud raymarch on aircraft
+  proximity to the cloud layer so ground combat pays no cost.
+- **Full volumetric atmosphere:** deferred until combat120 frame-time tails and
+  rendering scale work are in a better place.
+
+## Perf Budget
+
+- `AtmosphereSystem` sits in the existing `World` tracked group with
+  `WeatherSystem` and `WaterSystem`.
+- v1 target remains below roughly 0.3ms on mid-tier hardware for sky/fog/cloud
+  updates.
+- Any future backend that exceeds this needs its own tracked group or an
+  explicit cadence/budget contract.
 
 ## References
 
-- Agent design-space report captured in conversation 2026-04-19 (Combo A / E / F / G axes, free-trick ROI).
-- Hosek & Wilkie, "An Analytic Model for Full Spectral Sky-Dome Radiance" (2012).
-- Hillaire 2020, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique."
-- Schneider 2015, "The Real-time Volumetric Cloudscapes of Horizon: Zero Dawn" (for v2/v3 planning).
+- Cycle evidence: `docs/cycles/cycle-2026-04-20-atmosphere-foundation/` and
+  `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/`.
+- Hosek & Wilkie, "An Analytic Model for Full Spectral Sky-Dome Radiance"
+  (2012).
+- Hillaire 2020, "A Scalable and Production Ready Sky and Atmosphere Rendering
+  Technique."
+- Schneider 2015, "The Real-time Volumetric Cloudscapes of Horizon: Zero Dawn."

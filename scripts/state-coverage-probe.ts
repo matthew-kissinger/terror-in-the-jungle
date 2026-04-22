@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { spawn, type ChildProcess } from 'child_process';
 import { Socket } from 'net';
+import { localAppUrl } from './app-url';
 
 const DEV_SERVER_PORT = 9100;
 const TRANSITION_TIMEOUT_MS = 60_000;
@@ -120,7 +121,7 @@ async function main(): Promise<void> {
   const port = parseNumberArg('port', DEV_SERVER_PORT);
   const headed = parseBooleanFlag('headed');
   const artifactDir = ensureArtifactDir();
-  const appUrl = `http://${host}:${port}/terror-in-the-jungle/?perf=1`;
+  const appUrl = localAppUrl({ host, port, query: { perf: true } });
 
   let server: ChildProcess | null = null;
   const portAlreadyOpen = await isPortOpen(host, port);
@@ -230,11 +231,28 @@ async function main(): Promise<void> {
         const startBtn = page.locator('button[data-ref="start"]');
         await startBtn.click({ timeout: 5_000 });
         await page.waitForFunction(() => {
-          const cards = document.querySelectorAll('[data-mode]');
-          return cards.length > 0;
+          return Array.from(document.querySelectorAll('[data-mode]')).some((card) => {
+            if (!(card instanceof HTMLElement)) return false;
+            const style = window.getComputedStyle(card);
+            const rect = card.getBoundingClientRect();
+            return style.display !== 'none'
+              && style.visibility !== 'hidden'
+              && rect.width > 0
+              && rect.height > 0;
+          });
         }, undefined, { timeout: TRANSITION_TIMEOUT_MS });
-        const count = await page.locator('[data-mode]').count();
-        return `Mode select visible with ${count} mode card(s).`;
+        const count = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('[data-mode]')).filter((card) => {
+            if (!(card instanceof HTMLElement)) return false;
+            const style = window.getComputedStyle(card);
+            const rect = card.getBoundingClientRect();
+            return style.display !== 'none'
+              && style.visibility !== 'hidden'
+              && rect.width > 0
+              && rect.height > 0;
+          }).length;
+        });
+        return `Mode select visible with ${count} visible mode card(s).`;
       },
     ));
 
@@ -246,13 +264,26 @@ async function main(): Promise<void> {
         'mode_select',
         'mode_select',
         async () => {
-          const card = page.locator(`[data-mode="${mode}"]`);
-          const exists = (await card.count()) > 0;
-          if (!exists) {
-            throw new Error(`Mode card [data-mode="${mode}"] not found.`);
+          const result = await page.evaluate((expectedMode) => {
+            const modes = Array.from(document.querySelectorAll('[data-mode]'))
+              .map((el) => el.getAttribute('data-mode'))
+              .filter((value): value is string => Boolean(value));
+            const card = document.querySelector(`[data-mode="${expectedMode}"]`);
+            if (!(card instanceof HTMLElement)) {
+              return { exists: Boolean(card), visible: false, modes };
+            }
+            const style = window.getComputedStyle(card);
+            const rect = card.getBoundingClientRect();
+            const visible = style.display !== 'none'
+              && style.visibility !== 'hidden'
+              && rect.width > 0
+              && rect.height > 0;
+            return { exists: true, visible, modes };
+          }, mode);
+          if (!result.exists) {
+            throw new Error(`Mode card [data-mode="${mode}"] not found. Found: ${result.modes.join(', ') || '(none)'}.`);
           }
-          const visible = await card.isVisible();
-          if (!visible) {
+          if (!result.visible) {
             throw new Error(`Mode card [data-mode="${mode}"] exists but is not visible.`);
           }
           return `Mode card "${mode}" found and visible.`;

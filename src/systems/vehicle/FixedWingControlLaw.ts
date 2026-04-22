@@ -52,6 +52,7 @@ interface PilotTuning {
 const CONTROL_PHASE_APPROACH_ALTITUDE = 120;
 const CONTROL_PHASE_INITIAL_CLIMB_ALTITUDE = 50;
 const CONTROL_PHASE_TAXI_SPEED = 6;
+const ORBIT_HOLD_TARGET_AGL_M = 110;
 
 const PILOT_TUNING: Record<FixedWingPilotProfile, PilotTuning> = {
   trainer: {
@@ -199,8 +200,14 @@ export function buildFixedWingPilotCommand(
     rollCommand = THREE.MathUtils.clamp((snapshot.rollDeg - targetBankDeg) / 12, -1, 1) * 0.8;
     rollCommand -= snapshot.rollRateDeg / 85;
 
-    const climbBias = THREE.MathUtils.clamp((1.5 - snapshot.verticalSpeed) * 0.1, -0.15, 0.3);
-    pitchCommand = climbBias - snapshot.pitchRateDeg / 60;
+    const targetVerticalSpeed = snapshot.altitudeAGL < ORBIT_HOLD_TARGET_AGL_M ? 2.5 : 0.2;
+    const climbBias = THREE.MathUtils.clamp((targetVerticalSpeed - snapshot.verticalSpeed) * 0.1, -0.15, 0.3);
+    const altitudeFloorBias = THREE.MathUtils.clamp(
+      (ORBIT_HOLD_TARGET_AGL_M - snapshot.altitudeAGL) / 90,
+      0,
+      0.45,
+    );
+    pitchCommand = Math.max(climbBias, altitudeFloorBias) - snapshot.pitchRateDeg / 60;
 
     yawCommand = intent.orbitTurnDirection * 0.2;
   } else {

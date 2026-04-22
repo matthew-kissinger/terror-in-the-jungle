@@ -1,21 +1,8 @@
 import { defineConfig } from 'vite'
-import compression from 'vite-plugin-compression'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
-  plugins: [
-    compression({
-      algorithm: 'gzip',
-      ext: '.gz',
-      deleteOriginFile: false
-    }),
-    compression({
-      algorithm: 'brotliCompress',
-      ext: '.br',
-      deleteOriginFile: false
-    })
-  ],
   // Route @recast-navigation/wasm to its non-compat entry so the WASM binary
   // ships as one content-hashed asset shared across the main and navmesh
   // worker graphs. The compat variant inlined the binary as base64, which
@@ -38,7 +25,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    assetsDir: 'assets',
+    assetsDir: 'build-assets',
     target: 'es2020',
     reportCompressedSize: true,
     sourcemap: false,

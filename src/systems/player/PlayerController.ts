@@ -165,7 +165,7 @@ export class PlayerController implements GameSystem {
     } else {
       this.movement.updateMovement(deltaTime, this.input, this.camera);
     }
-    this.cameraController.updateCamera(this.input);
+    this.cameraController.updateCamera(this.input, deltaTime);
     this.updateHUD();
     this.updateWeaponSystems();
     if (this.terrainSystem) this.terrainSystem.updatePlayerPosition(this.playerState.position);

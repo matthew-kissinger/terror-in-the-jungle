@@ -4,13 +4,13 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 const _rootWorldInverse = new THREE.Matrix4();
 const _localMatrix = new THREE.Matrix4();
 
-export interface DrawCallOptimizationResult {
+interface DrawCallOptimizationResult {
   sourceMeshCount: number;
   mergedMeshCount: number;
   skippedMeshCount: number;
 }
 
-export type DrawCallOptimizationStrategy = 'merge' | 'batch';
+type DrawCallOptimizationStrategy = 'merge' | 'batch';
 
 interface MergeBucket {
   entries: BucketEntry[];

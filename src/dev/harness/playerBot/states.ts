@@ -19,7 +19,6 @@
 import {
   BotTarget,
   BotVec3,
-  PlayerBotIntent,
   PlayerBotState,
   PlayerBotStateContext,
   PlayerBotStateStep,
@@ -195,10 +194,6 @@ function updateRespawnWait(ctx: PlayerBotStateContext): PlayerBotStateStep {
   }
   return { intent, nextState: null, resetTimeInState: false };
 }
-
-// PlayerBotIntent is re-exported via types.ts consumers; reference is here
-// to keep the import used without introducing dead re-exports.
-export type { PlayerBotIntent };
 
 /**
  * Dispatch a state tick. If health <= 0, the absorbing RESPAWN_WAIT state is

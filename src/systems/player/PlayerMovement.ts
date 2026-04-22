@@ -43,7 +43,7 @@ const FRICTION_RATE = 8;
 // scripts/perf-active-driver.cjs — update both when touching this number.
 // Crouch scales proportionally (1.2 → 1.32, same 0.6 ratio to standing).
 export const PLAYER_EYE_HEIGHT = 2.2;
-export const PLAYER_CROUCH_EYE_HEIGHT = 1.32;
+const PLAYER_CROUCH_EYE_HEIGHT = 1.32;
 const CROUCH_SPEED_MULTIPLIER = 0.5;
 const PLAYER_COLLISION_RADIUS = 0.5;
 const LANDING_SOUND_THRESHOLD = -5;

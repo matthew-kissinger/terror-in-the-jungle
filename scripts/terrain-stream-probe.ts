@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { spawn, type ChildProcess } from 'child_process';
 import { Socket } from 'net';
+import { localAppUrl } from './app-url';
 
 type TerrainStreamSample = {
   atMs: number;
@@ -125,7 +126,11 @@ async function main(): Promise<void> {
   const headed = parseBooleanFlag('headed');
   // Terrain probes want sandbox diagnostics and input behavior, but must not
   // auto-start AI sandbox before we request the target mode.
-  const appUrl = `http://${host}:${port}/terror-in-the-jungle/?perf=1&sandbox=1&autostart=0&logLevel=warn&losHeightPrefilter=0`;
+  const appUrl = localAppUrl({
+    host,
+    port,
+    query: { perf: true, sandbox: true, autostart: false, logLevel: 'warn', losHeightPrefilter: false },
+  });
 
   let server: ChildProcess | null = null;
   const portAlreadyOpen = await isPortOpen(host, port);

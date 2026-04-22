@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Socket } from 'net';
+import { localAppUrl } from './app-url';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -340,7 +341,7 @@ async function main(): Promise<void> {
   };
 
   try {
-    const url = `http://localhost:${port}/terror-in-the-jungle/?perf=1`;
+    const url = localAppUrl({ port, query: { perf: true } });
     for (const device of DEVICES) {
       const label = `${device.width}x${device.height}`;
       console.log(`Testing device ${device.id} (${label})`);

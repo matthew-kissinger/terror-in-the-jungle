@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Socket } from 'net';
+import { localAppUrl } from './app-url';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -340,7 +341,7 @@ function overallStatus(subsystems: SubsystemResult[]): SubsystemStatus {
 // ---------------------------------------------------------------------------
 
 async function probeMode(mode: GameMode, durationSec: number, port: number, headed: boolean): Promise<ProbeReport> {
-  const url = `http://localhost:${port}/terror-in-the-jungle/?perf=1`;
+  const url = localAppUrl({ port, query: { perf: true } });
   logStep(`Probing mode: ${mode} for ${durationSec}s at ${url}`);
 
   const consoleErrors: string[] = [];

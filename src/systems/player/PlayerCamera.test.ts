@@ -41,7 +41,9 @@ describe('PlayerCamera', () => {
       gravity: -20,
       isCrouching: false,
       isInHelicopter: false,
-      helicopterId: null
+      helicopterId: null,
+      isInFixedWing: false,
+      fixedWingId: null,
     } as PlayerState;
 
     // Create mock PlayerInput
@@ -446,6 +448,92 @@ describe('PlayerCamera', () => {
 
       // Should use first-person camera
       expect(camera.position.equals(playerState.position)).toBe(true);
+    });
+  });
+
+  describe('updateCamera - Fixed-wing Following Mode', () => {
+    function createFixedWingModel(
+      aircraftPosition: THREE.Vector3,
+      options: { fovWidenEnabled?: boolean; airspeed?: number } = {},
+    ) {
+      return {
+        getAircraftPositionTo: vi.fn((_id: string, target: THREE.Vector3) => {
+          target.copy(aircraftPosition);
+          return true;
+        }),
+        getAircraftQuaternionTo: vi.fn((_id: string, target: THREE.Quaternion) => {
+          target.identity();
+          return true;
+        }),
+        getDisplayInfo: vi.fn(() => ({
+          cameraDistance: 30,
+          cameraHeight: 8,
+          fovWidenEnabled: options.fovWidenEnabled ?? false,
+        })),
+        getFlightData: vi.fn(() => ({ airspeed: options.airspeed ?? 0 })),
+      };
+    }
+
+    function enterFixedWing(fixedWingModel: unknown): void {
+      playerState.isInFixedWing = true;
+      playerState.fixedWingId = 'fw-1';
+      playerCamera.setFixedWingModel(fixedWingModel as never);
+    }
+
+    it('snaps on first entry, then smooths follow movement instead of teleporting to the new target', () => {
+      const aircraftPosition = new THREE.Vector3(0, 0, 0);
+      const fixedWingModel = createFixedWingModel(aircraftPosition);
+      enterFixedWing(fixedWingModel);
+
+      playerCamera.updateCamera(mockInput, 1 / 60);
+      expect(camera.position.x).toBeCloseTo(0, 5);
+      expect(camera.position.y).toBeCloseTo(8, 5);
+      expect(camera.position.z).toBeCloseTo(30, 5);
+
+      aircraftPosition.set(0, 0, -100);
+      playerCamera.updateCamera(mockInput, 1 / 60);
+
+      expect(camera.position.z).toBeLessThan(30);
+      expect(camera.position.z).toBeGreaterThan(-70);
+    });
+
+    it('uses elapsed time so lower frame rates catch up without extra camera lag', () => {
+      const targetPosition = new THREE.Vector3(0, 8, -70);
+
+      const distanceAfterSecondUpdate = (deltaTime: number): number => {
+        const localCamera = new THREE.PerspectiveCamera();
+        const localPlayerState = {
+          ...playerState,
+          isInFixedWing: true,
+          fixedWingId: 'fw-1',
+        } as PlayerState;
+        const localPlayerCamera = new PlayerCamera(localCamera, localPlayerState);
+        const aircraftPosition = new THREE.Vector3(0, 0, 0);
+        const fixedWingModel = createFixedWingModel(aircraftPosition);
+        localPlayerCamera.setFixedWingModel(fixedWingModel as never);
+        localPlayerCamera.updateCamera(mockInput, 1 / 60);
+
+        aircraftPosition.set(0, 0, -100);
+        localPlayerCamera.updateCamera(mockInput, deltaTime);
+        return localCamera.position.distanceTo(targetPosition);
+      };
+
+      expect(distanceAfterSecondUpdate(1 / 15)).toBeLessThan(distanceAfterSecondUpdate(1 / 120));
+    });
+
+    it('smooths high-speed FOV widening instead of snapping to the full boost in one frame', () => {
+      const aircraftPosition = new THREE.Vector3(0, 0, 0);
+      const fixedWingModel = createFixedWingModel(aircraftPosition, {
+        fovWidenEnabled: true,
+        airspeed: 200,
+      });
+      enterFixedWing(fixedWingModel);
+
+      const initialFov = camera.fov;
+      playerCamera.updateCamera(mockInput, 1 / 60);
+
+      expect(camera.fov).toBeGreaterThan(initialFov);
+      expect(camera.fov).toBeLessThan(90);
     });
   });
 

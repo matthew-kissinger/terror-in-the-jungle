@@ -97,15 +97,10 @@ export const HUD_LAYOUT_STYLES = `
     align-items: center;
   }
 
-  /* On mobile, status-bar is viewport-centered (absolute, not grid-bound).
-     Timer/score + SQD stack vertically, centered on screen regardless
-     of which grid column the slot was assigned to. */
+  /* On mobile, status-bar lives in the center grid column so the slot's
+     measured bounds do not cover the minimap or menu hit targets. */
   [data-device="touch"] .hud-slot[data-region="status-bar"] {
-    grid-area: unset;
-    position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;

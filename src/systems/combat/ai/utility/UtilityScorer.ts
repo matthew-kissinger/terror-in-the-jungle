@@ -135,7 +135,7 @@ export interface UtilityAction {
  * Result of a pick(). Surfaces both the winner and its score for debug
  * overlays / tests. Returns null action only when no action scores > 0.
  */
-export interface UtilityPick {
+interface UtilityPick {
   readonly action: UtilityAction | null
   readonly intent: UtilityIntent | null
   readonly score: number

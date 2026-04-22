@@ -62,7 +62,7 @@ interface AircraftRuntime {
   worldHalfExtent: number;
 }
 
-export interface FixedWingFlightData {
+interface FixedWingFlightData {
   airspeed: number;
   heading: number;
   verticalSpeed: number;
@@ -360,8 +360,9 @@ export class FixedWingModel implements GameSystem {
           this.lineupAircraft.delete(aircraftId);
         }
 
-        group.position.copy(runtime.airframe.getPosition());
-        group.quaternion.copy(runtime.airframe.getQuaternion());
+        const visualState = runtime.airframe.getInterpolatedState();
+        group.position.copy(visualState.position);
+        group.quaternion.copy(visualState.quaternion);
       }
 
       const currentSnapshot = shouldSimulate ? this.buildSnapshot(runtime) : snapshot;
@@ -724,9 +725,9 @@ export class FixedWingModel implements GameSystem {
   }
 
   getAircraftQuaternionTo(id: string, target: THREE.Quaternion): boolean {
-    const runtime = this.runtimes.get(id);
-    if (!runtime) return false;
-    target.copy(runtime.airframe.getQuaternion());
+    const group = this.groups.get(id);
+    if (!group) return false;
+    target.copy(group.quaternion);
     return true;
   }
 

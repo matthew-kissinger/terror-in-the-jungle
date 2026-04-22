@@ -71,6 +71,7 @@ function createMockHudSystem() {
 }
 
 function createTransitionContext(playerState: PlayerState, vehicleId = 'heli_1'): VehicleTransitionContext {
+  let flightMouseControlEnabled = false;
   return {
     playerState,
     vehicleId,
@@ -93,8 +94,11 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'heli_1')
     cameraController: {
       saveInfantryAngles: vi.fn(),
       restoreInfantryAngles: vi.fn(),
-      getFlightMouseControlEnabled: vi.fn(() => false),
-      getHelicopterMouseControlEnabled: vi.fn(() => false),
+      setFlightMouseControlEnabled: vi.fn((enabled: boolean) => {
+        flightMouseControlEnabled = enabled;
+      }),
+      getFlightMouseControlEnabled: vi.fn(() => flightMouseControlEnabled),
+      getHelicopterMouseControlEnabled: vi.fn(() => flightMouseControlEnabled),
     } as any,
     hudSystem: createMockHudSystem() as any,
     gameRenderer: { setCrosshairMode: vi.fn() } as any,
@@ -132,6 +136,9 @@ describe('HelicopterPlayerAdapter', () => {
       expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('helicopter');
       // Camera remembers the infantry angles so we can restore them on exit.
       expect(ctx.cameraController.saveInfantryAngles).toHaveBeenCalled();
+      // Flight mouse control starts from direct-control mode on every entry.
+      expect(ctx.cameraController.setFlightMouseControlEnabled).toHaveBeenCalledWith(true);
+      expect(ctx.hudSystem!.updateHelicopterMouseMode).toHaveBeenCalledWith(true);
     });
 
     it('adjusts the crosshair for the helicopter role on entry', () => {

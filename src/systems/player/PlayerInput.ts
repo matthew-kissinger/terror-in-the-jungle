@@ -5,7 +5,7 @@ import { shouldUseTouchControls, isTouchDevice } from '../../utils/DeviceDetecto
 import { TouchControls } from '../../ui/controls/TouchControls';
 import { GamepadManager } from '../../ui/controls/GamepadManager';
 
-export type FlightVehicleMode = 'none' | 'helicopter' | 'plane';
+type FlightVehicleMode = 'none' | 'helicopter' | 'plane';
 
 export interface InputCallbacks {
   onJump?: () => void;

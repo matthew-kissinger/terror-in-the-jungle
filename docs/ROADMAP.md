@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-04-19
+Last updated: 2026-04-21
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 > For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
@@ -32,18 +32,19 @@ Current truthful framing: the engine already supports large strategic population
 | 0: Asset Manifest | DONE | 75 asset specs generated via PixelForge Kiln. |
 | 1: Asset Generation | DONE | 75 GLBs shipped. Vegetation remakes pending. |
 | 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), animals (6/6), structures integrated. Fixed-wing runtime is live; ground vehicles remain static only. |
-| 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. NPC transport, ground vehicles, and aircraft combat integration remain. |
+| 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. Fixed-wing feel/interpolation sign-off, NPC transport, ground vehicles, and aircraft combat integration remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
 | 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. Water engine and hydrology not started. |
 | 6: Ground Vehicles | NOT STARTED | GLBs exist (jeep, APC, truck, tank, PT-76). No driving runtime. |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
-| 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, and NPC pilot support. Weapons, broader combat loops, and post-Airframe validation/probe cleanup remain. |
+| 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
 | 9: Faction Expansion | PARTIAL | 4 factions in loadout context (US, ARVN, NVA, VC). AI doctrine per faction not started. |
 | 10: Scale Frontier | NOT STARTED | Gated on combat AI p99 closure. |
 
 ## Phase Details (Future Work)
 
 ### Vehicles & Transport
+- Fixed-wing feel/interpolation sign-off before adding more vehicle types
 - Unified `IVehicle` interface for helicopters, ground vehicles, watercraft
 - Ground vehicle physics (terrain-following, speed by surface type)
 - M151 Jeep, M113 APC, M35 Truck as first drivable ground vehicles

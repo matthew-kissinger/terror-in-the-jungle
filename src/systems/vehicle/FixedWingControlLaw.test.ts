@@ -268,4 +268,41 @@ describe('FixedWingControlLaw', () => {
     expect(Math.abs(finalSnapshot.rollDeg)).toBeGreaterThan(5);
     expect(Math.abs(radius - orbitRadius)).toBeLessThan(orbitRadius * 0.35);
   });
+
+  it('commands a stronger climb when gunship orbit hold is close to terrain', () => {
+    const cfg = FIXED_WING_CONFIGS.AC47_SPOOKY;
+    const intent = {
+      ...createIdleFixedWingPilotIntent(),
+      throttleTarget: 1,
+      assistEnabled: true,
+      orbitHoldEnabled: true,
+      orbitCenterX: 0,
+      orbitCenterZ: 0,
+      orbitRadius: cfg.operation.orbitRadius ?? 650,
+      orbitBankDeg: cfg.operation.orbitBankDeg ?? 24,
+      orbitTurnDirection: cfg.operation.orbitTurnDirection ?? -1,
+    };
+
+    const command = buildFixedWingPilotCommand({
+      phase: 'airborne',
+      airspeed: 72,
+      forwardAirspeed: 72,
+      verticalSpeed: -5,
+      altitude: 145,
+      altitudeAGL: 45,
+      aoaDeg: 3,
+      sideslipDeg: 0,
+      headingDeg: 270,
+      pitchDeg: 2,
+      rollDeg: 20,
+      pitchRateDeg: 0,
+      rollRateDeg: 0,
+      throttle: 1,
+      brake: 0,
+      weightOnWheels: false,
+      isStalled: false,
+    }, cfg.physics, cfg.pilotProfile, intent, { positionX: 650, positionZ: 0 });
+
+    expect(command.pitchCommand).toBeGreaterThan(0.35);
+  });
 });

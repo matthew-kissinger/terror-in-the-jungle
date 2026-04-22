@@ -1,12 +1,12 @@
 # Agent Instructions
 
-Last updated: 2026-04-19
+Last updated: 2026-04-21
 
 This is the authoritative, agent-agnostic operating guide for this repo. Every agent (Claude Code, Codex, Cursor, Gemini, humans) should read this file first. `CLAUDE.md` is a thin wrapper that adds Claude-Code-specific context on top of what's here.
 
 ## Project
 
-Terror in the Jungle - a browser-based 3D combat game set in the Vietnam War. Three.js 0.184, TypeScript 6.0, Vite 8, Vitest 4, Node 22.
+Terror in the Jungle - a browser-based 3D combat game set in the Vietnam War. Three.js 0.184, TypeScript 6.0, Vite 8, Vitest 4, Node 24.
 
 Vision: up to 3,000 AI combatants in a single match, stable frame-time tails under load, real-terrain scenarios (A Shau Valley 21km DEM). Ships to Cloudflare Pages at https://terror-in-the-jungle.pages.dev/.
 
@@ -38,6 +38,7 @@ npm run check:states             # State coverage probe
 npm run check:hud                # HUD layout validator
 npm run check:memory             # Memory growth tracker
 npm run probe                    # Engine health probe
+npm run probe:fixed-wing         # Browser-level fixed-wing takeoff/climb/orbit/handoff/approach probe
 npm run playtest:mobile          # Mobile playtest driver
 
 # Perf captures and comparison
@@ -91,7 +92,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced interfaces in `src/types/SystemInterfaces.ts` |
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Profiling commands, scenarios, validation gates |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Dev setup, validation, deployment, pre-push checklist |
-| [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) | Cloudflare Pages deploy + cache strategy (new, C3 2026-04-17) |
+| [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) | Cloudflare Pages deploy + cache/service-worker strategy |
 | [docs/PLAYTEST_CHECKLIST.md](docs/PLAYTEST_CHECKLIST.md) | Human playtest gate for game-feel changes |
 | [docs/BACKLOG.md](docs/BACKLOG.md) | Open work items, known bugs, architecture debt |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Vision and phase plan |
@@ -142,9 +143,13 @@ For perf-sensitive work, add `npm run validate:full` before push.
 
 ## Game-feel requires human playtest
 
-Tests, lint, and build catch many correctness regressions. The fixed-wing runtime probe is intended to cover browser-level aircraft validation too, but as of 2026-04-19 `master` it is out of sync with `FixedWingModel`; check [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) before treating it as a passing gate. None of these checks catch feel regressions. An aircraft that passes every other test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.
+Tests, lint, and build catch many correctness regressions. The fixed-wing runtime probe is intended to cover browser-level aircraft validation too; check [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) and run `npm run probe:fixed-wing` before treating aircraft changes as validated. None of these checks catch feel regressions. An aircraft that passes every other test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.
 
 Any change to flight, driving, combat rhythm, or UI responsiveness must be validated by a human running `docs/PLAYTEST_CHECKLIST.md`. Passing automated checks is necessary, not sufficient. If you can't get a human through the checklist, say so explicitly in the PR description rather than claiming the change is done.
+
+Cycle 2 explicitly owns fixed-wing feel/interpolation work. Do not add more
+vehicle types until the stiff response, altitude bounce/porpoise, and high-speed
+camera/render shake questions have an evidence-backed decision.
 
 ## Known gotchas for agents
 

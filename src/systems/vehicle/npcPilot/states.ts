@@ -41,7 +41,7 @@ export interface StateContext {
   readonly groundElevationM: number;
 }
 
-export interface StateStep {
+interface StateStep {
   readonly intent: FixedWingPilotIntent;
   readonly nextState: PilotState;
   readonly waypointAdvance: number;
@@ -312,7 +312,7 @@ function updateReattackDecision(ctx: StateContext): StateStep {
   };
 }
 
-export function reattackScore(resources: PilotResourceState): number {
+function reattackScore(resources: PilotResourceState): number {
   const ammoWeight = 0.6;
   const fuelWeight = 0.4;
   return resources.ammoFraction * ammoWeight + resources.fuelFraction * fuelWeight;
@@ -408,7 +408,7 @@ export function stepState(state: PilotState, ctx: StateContext): StateStep {
 }
 
 /** Signed [-180, 180] difference between two heading angles in degrees. */
-export function deltaHeadingDeg(a: number, b: number): number {
+function deltaHeadingDeg(a: number, b: number): number {
   let d = a - b;
   while (d > 180) d -= 360;
   while (d < -180) d += 360;

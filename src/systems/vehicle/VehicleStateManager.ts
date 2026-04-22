@@ -2,7 +2,7 @@ import type { PlayerState } from '../../types';
 import type { PlayerVehicleAdapter, VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
 import { Logger } from '../../utils/Logger';
 
-export type VehicleSessionState =
+type VehicleSessionState =
   | { status: 'infantry' }
   | { status: 'in_vehicle'; vehicleType: string; vehicleId: string; adapter: PlayerVehicleAdapter };
 

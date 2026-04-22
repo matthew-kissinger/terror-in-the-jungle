@@ -48,7 +48,7 @@ export interface ReplayBlob<I = unknown> {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
-export interface ReplayRecorderOptions {
+interface ReplayRecorderOptions {
   seed: number;
   scenario: string;
   tickRateHz?: number;

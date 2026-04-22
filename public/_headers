@@ -5,8 +5,17 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: credentialless
 
-/assets/*
+/build-assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+/assets/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/models/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
 
 # /data/* rules are split into specific subpaths so that Cloudflare Pages does
 # not merge multiple matching Cache-Control values into one concatenated header

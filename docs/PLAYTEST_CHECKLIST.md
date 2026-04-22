@@ -1,6 +1,6 @@
 # Playtest Checklist
 
-Last updated: 2026-04-16
+Last updated: 2026-04-21
 
 Agents can run tests and probes. They cannot feel the game. Any PR that touches flight, driving, combat rhythm, or UI responsiveness must be validated against this checklist by a human pressing keys and watching the screen. Tests green + build green != feel green.
 
@@ -12,9 +12,11 @@ Check each item. Unchecked items are failures. Add notes for anything that borde
 - [ ] Full throttle (W) accelerates smoothly, no hitching
 - [ ] Rotation: pull up (Arrow Up) near Vr and aircraft lifts off within ~10 s of full throttle (prop) / ~9 s (jet)
 - [ ] Pitch response feels proportional to stick, not mushy, not snappy
+- [ ] Pitch response does not feel stiff or step-like at high speed
 - [ ] Banks cleanly left/right (Arrow Left/Right) without over-rolling
 - [ ] Releasing bank with auto-level on returns aircraft to roughly level within 3 s
-- [ ] Holds altitude hands-off at cruise with ~70% throttle and auto-level on
+- [ ] Holds altitude hands-off at cruise with ~70% throttle and auto-level on, without repeated bounce/porpoise after reaching the target band
+- [ ] Camera and horizon remain visually stable at speed; no persistent screen shake from simulation/render stepping
 - [ ] Recovers from gentle dive (nose down + release) without stalling
 - [ ] Stall warning and recovery feel reasonable, not abrupt
 - [ ] Landing: approach, flare, touchdown without excessive bounce

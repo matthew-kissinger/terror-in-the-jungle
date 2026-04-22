@@ -18,7 +18,7 @@ import { Logger } from '../../utils/Logger';
  * it into the fixed-wing `Mission` internally.
  */
 
-export interface PilotMission {
+interface PilotMission {
   waypoints: THREE.Vector3[];
   cruiseAltitude: number;
   cruiseSpeed: number;

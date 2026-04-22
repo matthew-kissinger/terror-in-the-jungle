@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Last updated: 2026-04-02
+Last updated: 2026-04-21
 
 ## 3D Models (75 GLBs)
 
@@ -41,8 +41,10 @@ All models: low-poly stylized (PS2-era fidelity), GLB (binary glTF 2.0), PBR mat
 | Terrain/biome textures | 12 | `public/assets/` (lowercase names) | WebP |
 | Faction sprites | 40 | `public/assets/` (4 factions x 10 poses) | WebP |
 | Audio | 21 | `public/assets/` + `public/assets/optimized/` | WAV, OGG, MP3 |
-| Skybox | 1 | `public/assets/skybox.png` | PNG |
 | First-person hands | 1 | `public/assets/first-person.png` | PNG |
+
+The sky is now procedural runtime atmosphere (`AtmosphereSystem` +
+`HosekWilkieSkyBackend`), not a static skybox texture.
 
 ## Art Direction
 

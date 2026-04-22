@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Socket } from 'net';
+import { localAppUrl } from './app-url';
 
 const DEV_SERVER_PORT = 9100;
 const STARTUP_TIMEOUT_MS = 30_000;
@@ -158,7 +159,7 @@ async function profileMode(
       });
     });
 
-    const baseUrl = `http://127.0.0.1:${port}/terror-in-the-jungle/?perf=1`;
+    const baseUrl = localAppUrl({ port, query: { perf: true } });
     const loadStartMs = Date.now();
 
     // Navigate to game

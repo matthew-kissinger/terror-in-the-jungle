@@ -193,6 +193,25 @@ describe('FixedWing L3 integration — behavior contracts', () => {
     expect(Math.abs(endAltitude - startAltitude)).toBeLessThan(5);
   });
 
+  it('exposes an interpolated pose between fixed airframe steps', () => {
+    const af = new Airframe(new THREE.Vector3(0, 200, 0), SKYRAIDER_AF);
+    const probe = flatProbe(0);
+    af.resetAirborne(new THREE.Vector3(0, 200, 0), new THREE.Quaternion(), 50, 0, 0);
+    const cmd = intent({ throttle: 0.55, tier: 'assist' });
+
+    af.step(cmd, probe, FIXED_DT);
+    const fixedStepPosition = af.getState().position.clone();
+    const visualAtStepBoundary = af.getInterpolatedState().position;
+
+    expect(visualAtStepBoundary.z).toBeGreaterThan(fixedStepPosition.z);
+
+    af.step(cmd, probe, FIXED_DT / 2);
+    const visualMidFrame = af.getInterpolatedState().position;
+
+    expect(visualMidFrame.z).toBeLessThan(visualAtStepBoundary.z);
+    expect(visualMidFrame.z).toBeGreaterThan(fixedStepPosition.z);
+  });
+
   it('accelerates in a nose-down dive', () => {
     const af = new Airframe(new THREE.Vector3(0, 300, 0), SKYRAIDER_AF);
     const probe = flatProbe(0);

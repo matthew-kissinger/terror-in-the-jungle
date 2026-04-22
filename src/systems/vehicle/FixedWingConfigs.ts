@@ -86,7 +86,7 @@ export interface FixedWingDisplayInfo {
   seats: number;
 }
 
-export const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
+const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
   A1_SKYRAIDER: {
     displayName: 'A-1 Skyraider',
     hasPropellers: true,
@@ -118,10 +118,6 @@ export const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
     seats: 1,
   },
 };
-
-export function getFixedWingConfig(key: string): FixedWingConfig | null {
-  return FIXED_WING_CONFIGS[key] ?? null;
-}
 
 export function getFixedWingDisplayInfo(key: string): FixedWingDisplayInfo | null {
   return FIXED_WING_DISPLAY[key] ?? null;

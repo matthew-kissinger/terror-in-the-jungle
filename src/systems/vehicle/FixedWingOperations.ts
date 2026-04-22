@@ -31,7 +31,7 @@ export interface FixedWingSpawnMetadata {
   runwayStart?: FixedWingRunwayStartWorld;
 }
 
-export interface FixedWingExitStatus {
+interface FixedWingExitStatus {
   canExit: boolean;
   message?: string;
 }

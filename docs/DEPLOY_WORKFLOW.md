@@ -1,16 +1,24 @@
 # Deploy Workflow
 
-Last updated: 2026-04-18
+Last updated: 2026-04-21
 
 Production: https://terror-in-the-jungle.pages.dev/
 
-This document captures how a commit becomes a live deploy, how caching is layered across Cloudflare Pages + the service worker + the browser, and how to verify prod headers when something looks stale.
+This document captures how a commit becomes a live Cloudflare Pages deploy, how browser freshness is preserved for repeat players, and how to verify prod headers when users report stale assets or load failures.
 
-## 1. Build to deploy path
+Docs checked on 2026-04-21:
+
+- [Cloudflare Pages Direct Upload with Wrangler](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/)
+- [Cloudflare Pages `_headers`](https://developers.cloudflare.com/pages/configuration/headers/)
+- [Cloudflare Pages serving and caching defaults](https://developers.cloudflare.com/pages/configuration/serving-pages/)
+- [Cloudflare content compression](https://developers.cloudflare.com/speed/optimization/content/compression/)
+- [Wrangler install/update](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
+
+## 1. Build To Deploy Path
 
 Deploy is **manual**. `master` no longer auto-deploys. CI gates still run on every push, but the actual Cloudflare Pages upload only happens when you trigger it.
 
-```
+```text
 push to master
   -> .github/workflows/ci.yml         (gates only, no deploy)
        lint  ---\
@@ -33,171 +41,158 @@ manual trigger (you decide when)
 
 Any of:
 
-- `npm run deploy:prod` — shortcut for `gh workflow run deploy.yml`. Runs against master's tip.
-- `gh workflow run deploy.yml -r <branch-or-tag>` — deploy a specific ref.
+- `npm run deploy:prod` - shortcut for `gh workflow run deploy.yml`. Runs against master's tip.
+- `gh workflow run deploy.yml -r <branch-or-tag>` - deploy a specific ref.
 - GitHub web UI: Actions tab -> "Deploy" workflow -> "Run workflow" button.
 
 Typical flow: push to master, wait for CI green, then run `npm run deploy:prod` when you actually want the build live. This lets you batch multiple merges into one deploy.
 
 Key facts:
 
-- The deploy workflow runs `cloudflare/wrangler-action@v3`, **not** Cloudflare Pages' Git integration. Cloudflare sees only the pre-built `dist/` directory.
-- The Pages project has no build step configured on Cloudflare's side. The build is fully reproducible from `package-lock.json` + `npm ci` inside the GitHub runner.
-- The deploy workflow does a fresh checkout + `npm ci` + `npm run build` every run. It does not rely on a CI artifact; that decoupling is why CI and deploy can live in separate workflows.
-- CI `perf` runs on every push, uploads artifacts, and is intentionally advisory — see `docs/DEVELOPMENT.md` for why (Xvfb/GPU noise on hosted runners).
-- PRs do not auto-deploy. Preview deploys are not currently configured; see "Open items" below.
+- The deploy workflow runs `cloudflare/wrangler-action@v3`, not Cloudflare Pages' Git integration. Cloudflare sees only the pre-built `dist/` directory.
+- The Pages project has no build step configured on Cloudflare's side. The build is reproducible from `package-lock.json` plus `npm ci` inside the GitHub runner.
+- The deploy workflow does a fresh checkout, `npm ci`, and `npm run build` every run. It does not rely on a CI artifact.
+- CI `perf` runs on every push, uploads artifacts, and is intentionally advisory. See `docs/DEVELOPMENT.md` for why.
+- PRs do not auto-deploy. Preview deploys are not currently configured; see "Open Items" below.
+- The build does not emit `.gz` or `.br` sidecar files. Cloudflare negotiates
+  visitor-facing compression for supported content types, including JavaScript,
+  CSS, JSON, fonts, and WASM, based on `Accept-Encoding` and zone compression
+  rules. This keeps `dist/` and Pages uploads to the canonical assets only.
 
-Secrets used: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (repo secrets).
+Secrets used by the workflow: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 
-### Why manual
+Wrangler status on 2026-04-21:
 
-Previously every master push deployed. That meant every docs-only or scoping-only merge redeployed prod. Moving deploy to manual keeps CI as the quality gate but lets you decide when users see a change. Tradeoff: you now have to remember to deploy after landing a feature. The intent is "batch shippable merges, then deploy once."
+- `npx wrangler --version` resolved to `4.84.1`.
+- `npm view wrangler version` also returned `4.84.1`.
+- Cloudflare recommends project-local Wrangler or `npx wrangler`; the workflow's `wrangler-action@v3` follows the supported Direct Upload path.
 
-## 2. Cache-control strategy
+## 2. Freshness Contract
 
-The authoritative source is `public/_headers` (Cloudflare Pages convention — copied verbatim to `dist/_headers` on build).
+The production app must satisfy these rules:
 
-| Path pattern                        | Cache-Control                                | Why |
-|-------------------------------------|----------------------------------------------|-----|
-| `/` and `/index.html`               | `public, max-age=0, must-revalidate`         | HTML must revalidate so `<script src="/assets/index-<hash>.js">` points at the current build. |
-| `/assets/*`                         | `public, max-age=31536000, immutable`        | Vite emits content-hashed filenames (e.g. `index-BCOHw9O9.js`). Safe to cache forever. |
-| `/data/navmesh/*`                   | `public, max-age=31536000, immutable`        | Pre-baked navmesh binaries are keyed by `<mode>-<seed>.bin`; content changes imply filename changes. |
-| `/data/heightmaps/*`                | `public, max-age=31536000, immutable`        | Heightmaps are also seed-keyed (`<mode>-<seed>.f32`). Safe to treat as immutable. |
-| `/data/vietnam/*`                   | `public, max-age=86400`                      | A Shau Valley static JSON — rarely changes, but not content-hashed, so modest TTL. |
+1. A repeat visitor gets the newest HTML shell on the next visit after deploy.
+2. Content-hashed build output can be cached for a year because the filename changes when content changes.
+3. Non-hashed public assets, including GLBs, must revalidate and must not be pinned in Cache Storage.
+4. The service worker must not serve a stale shell or stale GLB ahead of the network.
+5. Cache rules must not overlap in ways that duplicate `Cache-Control` values.
 
-Beyond `_headers`, Cloudflare Pages applies its own default on anything unmatched:
+This is the line between fast and stale:
 
-- `Cache-Control: public, max-age=0, must-revalidate`
+- `build-assets/` is Vite output with content hashes. Cache it aggressively.
+- `assets/`, `models/`, `manifest.json`, and `sw.js` are stable-path public assets. Revalidate them.
+- `data/navmesh/` and `data/heightmaps/` are seed-keyed baked data. Cache them aggressively.
+- `data/vietnam/` is non-hashed static JSON. Use a modest TTL.
 
-That default is why:
+The repo now sets Vite `build.assetsDir = 'build-assets'` so generated bundle assets no longer share a URL namespace with mutable files copied from `public/assets/`.
 
-- `/favicon.ico`, `/manifest.json`, `/sw.js` — revalidate on every load. Correct behavior.
-- `/models/**/*.glb` — **also** revalidate on every load. The 75 GLB models under `public/models/` are not content-hashed and have no explicit cache rule, so every page visit pays a 304 round-trip per model. Not ideal (models are multi-MB), but the tradeoff of long-caching non-hashed assets is worse (in-place updates wouldn't propagate). A future improvement is to either hash model filenames at build time or set a modest `max-age=3600` rule for `/models/*`.
+## 3. Cache-Control Strategy
 
-### Known caveat: `/assets/ui/` is non-hashed
+The authoritative source is `public/_headers`, which Cloudflare Pages copies to `dist/_headers` during `npm run build`.
 
-`public/assets/ui/icons/*.png` and `public/assets/ui/screens/*.webp` get copied into `dist/assets/`, so they match the `/assets/*` rule and are cached as `immutable`. They are **not** content-hashed. If an icon is ever updated in place under the same filename, older clients will not pick up the change until their year-long cache expires.
+| Path pattern | Cache-Control | Why |
+| --- | --- | --- |
+| `/` and `/index.html` | `public, max-age=0, must-revalidate` | HTML must revalidate so it points at the current build's hashed files. |
+| `/sw.js` | `public, max-age=0, must-revalidate` | A service-worker update must reach repeat visitors quickly. |
+| `/build-assets/*` | `public, max-age=31536000, immutable` | Vite emits content-hashed filenames here, such as `index-<hash>.js`. |
+| `/assets/*` | `public, max-age=0, must-revalidate` | Public assets copied from `public/assets/` are not guaranteed to be content-hashed. |
+| `/models/*` | `public, max-age=0, must-revalidate` | GLBs are stable-path assets today; correctness beats avoiding 304 round-trips. |
+| `/data/navmesh/*` | `public, max-age=31536000, immutable` | Pre-baked navmesh binaries are keyed by `<mode>-<seed>.bin`. |
+| `/data/heightmaps/*` | `public, max-age=31536000, immutable` | Heightmaps are seed-keyed as `<mode>-<seed>.f32`. |
+| `/data/vietnam/*` | `public, max-age=86400` | A Shau Valley static JSON is rarely changed but is not content-hashed. |
 
-Mitigations if this bites:
+Cloudflare Pages defaults unmatched static assets to revalidation with ETags. We still keep explicit rules for `sw.js` and `models/*` because stale service workers and stale GLBs are user-visible failures.
 
-- Rename the updated file (bump a suffix: `icon-foo.v2.png`) and update references.
-- Or move `public/assets/ui/` to `public/ui/` so it no longer matches the immutable rule (requires updating every `src/ui/**/*.ts` reference plus `index.html` preloads).
+### Header Rule Gotcha
 
-### Fixed on 2026-04-16: duplicated Cache-Control on `/data/` paths
+Cloudflare Pages applies every matching `_headers` rule. If the same header appears twice, values are joined with commas. Do not add a broad `Cache-Control` rule that overlaps a more specific one unless the more specific rule first detaches the old header.
 
-Before this audit, `_headers` had both `/data/navmesh/*` and a broad `/data/*` rule. Cloudflare Pages merges `Cache-Control` from **every** matching section, so responses under `/data/navmesh/*.bin` came back as:
+This already bit `/data/navmesh/*` before 2026-04-16:
 
-```
+```text
 Cache-Control: public, max-age=31536000, immutable, public, max-age=86400
 ```
 
-Browsers interpreted the concatenated header conservatively (closer to `max-age=86400`), so navmesh binaries were revalidating every 24 h instead of being treated as immutable.
+Keep cache-control path groups non-overlapping.
 
-Fix: split `/data/*` into explicit non-overlapping subpath rules (`/data/navmesh/*`, `/data/heightmaps/*`, `/data/vietnam/*`) so exactly one rule matches any given URL. Verify after deploy with:
+## 4. Service Worker
 
-```bash
-curl -I https://terror-in-the-jungle.pages.dev/data/navmesh/open_frontier-42.bin | grep -i cache-control
-# should return a single Cache-Control value, not a comma-chained pair.
+`public/sw.js` is served from `/sw.js` and registered from `index.html` on `window.load`.
+
+Current cache name:
+
+```js
+const CACHE_NAME = 'titj-v2-2026-04-21';
 ```
 
-## 3. Service worker
-
-`public/sw.js` is served from the site root at `/sw.js`. It registers on `window.load` from `index.html`:
-
-```html
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    });
-  }
-</script>
-```
+The `titj-v2-2026-04-21` bump is intentional. Activating this worker deletes the old `titj-v1` Cache Storage entries that could have pinned stale GLBs and stale HTML.
 
 Strategy per URL:
 
-| Request                        | Strategy                   |
-|--------------------------------|----------------------------|
-| `/assets/*`                    | cache-first (treated as immutable) |
-| `/data/navmesh/*.bin`          | cache-first                |
-| `/data/*` (other)              | cache-first                |
-| HTML navigations (`mode: 'navigate'` or `*.html`) | stale-while-revalidate |
-| everything else                | cache-first                |
+| Request | Strategy |
+| --- | --- |
+| HTML navigation, `/`, `*.html` | network-first, cached only as offline fallback |
+| `/build-assets/<content-hash>.*` | cache-first |
+| `/data/navmesh/*.bin` | cache-first |
+| `/data/heightmaps/*.f32` | cache-first |
+| `/models/*` | network/browser HTTP cache only, no Cache Storage |
+| `/assets/*` public assets | network/browser HTTP cache only, no Cache Storage |
+| `/data/vietnam/*` | network/browser HTTP cache only, follows HTTP TTL |
+| everything else | network/browser HTTP cache only |
 
-Install: `skipWaiting()` so a new SW activates without waiting for open tabs to close. Activate: `clients.claim()` to control the current page immediately, plus delete any cache with a name other than the current `CACHE_NAME` (`titj-v1`).
+Install uses `skipWaiting()`. Activate deletes old named caches, enables navigation preload where available, and calls `clients.claim()`.
 
-**Cache bust:** increment `CACHE_NAME` in `public/sw.js` (e.g. `'titj-v2'`). Next SW activation drops the old cache entirely. Do this if you ship a regression that the SW has pinned on users' machines.
+Hard rule: do not add a broad service-worker cache-first fallback. Cache Storage is only for content-versioned resources.
 
-Note: the SW is itself served with `max-age=0, must-revalidate` (Cloudflare default for root-level `.js`), so the SW file update propagates on the next page load — no stale-SW lockout risk.
+## 5. Fresh Visit Flow
 
-## 4. How a user gets the freshest page
+After a deploy:
 
-The interaction of `_headers`, the SW, and the browser cache is:
+1. Browser requests `/`.
+2. Browser and service worker prefer the network for HTML.
+3. Fresh HTML references the current `/build-assets/<hash>.js` and CSS files.
+4. Hashed build assets are cache misses if new, then cached forever by HTTP and the service worker.
+5. GLBs under `/models/` are fetched through HTTP revalidation instead of Cache Storage, so an updated model at the same path can propagate.
+6. Old `titj-v1` Cache Storage is deleted once the v2 worker activates.
 
-1. Browser requests `/`. Response is `max-age=0, must-revalidate`; browser always revalidates.
-2. Browser gets the latest `index.html`, which references a new set of hashed asset filenames (if the build changed).
-3. For each `/assets/<hash>.js|.css`, the SW intercepts. New hashes are cache-misses in the SW; it fetches from network and caches. Old hashes linger in the cache but are never requested again; they get pruned on next SW version bump.
-4. HTML navigation is stale-while-revalidate: the user sees the previously cached shell immediately while the SW fetches the fresh one in the background for the next load.
+Expected result: users should not need a hard refresh for normal deploys. If a user visited before the v2 worker shipped and still reports stale behavior, first triage is DevTools -> Application -> Clear site data, then reload. That should become rare after the v2 worker has propagated.
 
-Net effect: **a user who visited yesterday gets today's build on their next visit** without a hard refresh. There is a one-visit lag on SW-updated HTML (the first load after a deploy shows the old HTML; the second shows the new one). Hashed assets are always correct because `index.html` pins them by name.
-
-### When to force a hard refresh
-
-Only needed if:
-
-- You bumped `CACHE_NAME` in `sw.js` and want to confirm the old cache was dropped.
-- Someone is reporting stale behavior after a deploy — ask them to `Ctrl+Shift+R` (or clear site data from DevTools Application tab) as a first triage step.
-
-Under normal operation, users never need to hard-refresh.
-
-## 5. Local/prod parity testing
-
-Tiered options, in order of fidelity:
+## 6. Local And Prod Parity
 
 ### Tier 0: `npm run dev`
-Vite dev server, HMR, no production build. Fastest loop. Does **not** exercise `_headers`, service worker, or compression. Use for active coding; don't use to verify deploy correctness.
+
+Vite dev server, HMR, no production build. Fastest loop. Does not exercise `_headers`, service worker update behavior, or compression.
 
 ### Tier 1: `npm run build && npm run preview`
-Vite's built-in preview server. Serves `dist/` over a local HTTP server. Closer to prod but still doesn't apply `_headers` (preview doesn't parse Cloudflare's format) and does not run the service worker registration against the correct origin semantics unless you open it on `http://localhost:<port>`.
 
-Useful for: smoke-checking that the bundled app boots, assets resolve, and there are no MIME or 404 issues.
+Serves `dist/` through Vite preview. Closer to prod, but preview does not parse Cloudflare `_headers`.
+
+Useful for checking that the bundled app boots and assets resolve with the same paths that prod will ship.
 
 ### Tier 2: `npm run smoke:prod`
-`scripts/prod-smoke.ts` spawns a local `http.createServer` over `dist/`, launches headless Chromium, clicks through the title → mode-select → deploy flow, and fails on console errors, page errors, 4xx/5xx responses, or deploy-flow regressions. This is what the CI `smoke` job runs.
 
-Does not verify `_headers` either — but it's the most-complete local smoke for "does the built app work end-to-end."
+`scripts/prod-smoke.ts` serves `dist/` through a local HTTP server, launches headless Chromium, clicks through title -> mode-select -> deploy, and fails on console errors, page errors, 4xx/5xx responses, or deploy-flow regressions.
 
-### Tier 3: prod-header spot-check
-After a push to `master` and a successful deploy, confirm the live headers match expectations:
+This is the best local built-app gate, but it still does not validate Cloudflare response headers.
 
-```bash
-# index.html should be no-cache
-curl -I https://terror-in-the-jungle.pages.dev/ | grep -i cache-control
+### Tier 3: Cloudflare header spot-check
 
-# hashed asset should be immutable
-curl -I https://terror-in-the-jungle.pages.dev/assets/index-<hash>.js | grep -i cache-control
+After a deploy, run the commands in section 7 against `https://terror-in-the-jungle.pages.dev/`.
 
-# service worker should be no-cache
-curl -I https://terror-in-the-jungle.pages.dev/sw.js | grep -i cache-control
+### Tier 4: Cross-browser fresh-load check
 
-# navmesh should be immutable (single value, not concatenated)
-curl -I https://terror-in-the-jungle.pages.dev/data/navmesh/open_frontier-42.bin | grep -i cache-control
-```
+For deploys that touch GLBs, service worker policy, `public/assets`, or `index.html`, manually check:
 
-See section 6 for the full header spot-check command set.
+- Chrome or Edge normal profile with prior site data.
+- Firefox normal profile with prior site data.
+- Safari if available, especially on iOS.
+- A private/incognito window as a clean-client control.
 
-### What's missing: Cloudflare Pages PR previews
+The normal-profile check matters because it exercises the old-client update path.
 
-Cloudflare Pages supports per-PR preview deploys via its Git integration, but because our deploy is wrangler-action-based, we don't get those. If preview deploys become important (e.g. for design review), options:
+## 7. Checking Prod Headers
 
-- Add a separate `preview` workflow that runs `wrangler pages deploy dist --project-name terror-in-the-jungle --branch pr-${{ github.event.number }}` on PR open/sync. Cloudflare Pages exposes branch deploys as `pr-<n>.terror-in-the-jungle.pages.dev`.
-- Or switch to Cloudflare's Git integration (loses the "CI gates deploy" guarantee; Cloudflare builds independently).
-
-Keeping the current flow until preview deploys are demanded.
-
-## 6. Checking prod headers
-
-One-shot audit command (paste into any shell):
+One-shot audit command:
 
 ```bash
 BASE=https://terror-in-the-jungle.pages.dev
@@ -207,35 +202,55 @@ for URL in \
   "$BASE/sw.js" \
   "$BASE/favicon.ico" \
   "$BASE/manifest.json" \
+  "$BASE/models/vehicles/aircraft/a1-skyraider.glb" \
+  "$BASE/assets/ui/icons/icon-fire.png" \
   "$BASE/data/navmesh/open_frontier-42.bin" \
   "$BASE/data/heightmaps/open_frontier-42.f32" \
   "$BASE/data/vietnam/a-shau-rivers.json"
 do
   echo "=== $URL"
-  curl -I -s "$URL" | grep -iE '^(cache-control|content-type|content-encoding|etag)'
+  curl -I -s "$URL" | grep -iE '^(cache-control|content-type|content-encoding|etag|cf-cache-status)'
 done
 
-# hashed asset URLs change per build — scrape one from the live HTML first
-ASSET=$(curl -s "$BASE/" | grep -oE 'assets/[^"]+\.js' | head -1)
+# hashed build asset URLs change per build - scrape one from the live HTML first
+ASSET=$(curl -s "$BASE/" | grep -oE 'build-assets/[^"]+\.js' | head -1)
 echo "=== $BASE/$ASSET"
-curl -I -s "$BASE/$ASSET" | grep -iE '^(cache-control|content-type|content-encoding|etag)'
+curl -I -s "$BASE/$ASSET" | grep -iE '^(cache-control|content-type|content-encoding|etag|cf-cache-status)'
 ```
 
-Expected results today:
+Expected results:
 
-- `/` : `Cache-Control: public, max-age=0, must-revalidate`, `Content-Type: text/html; charset=utf-8`
-- `/sw.js` : `Cache-Control: public, max-age=0, must-revalidate`, `Content-Type: application/javascript`
-- `/favicon.ico` : `Cache-Control: public, max-age=0, must-revalidate` (default)
-- `/manifest.json` : `Cache-Control: public, max-age=0, must-revalidate` (default)
-- `/data/navmesh/*.bin` : `Cache-Control: public, max-age=31536000, immutable` (single value, post-fix)
+- `/` : `Cache-Control: public, max-age=0, must-revalidate`
+- `/sw.js` : `Cache-Control: public, max-age=0, must-revalidate`
+- `/models/**/*.glb` : `Cache-Control: public, max-age=0, must-revalidate`
+- `/assets/*` public files : `Cache-Control: public, max-age=0, must-revalidate`
+- `/build-assets/<hash>.js` : `Cache-Control: public, max-age=31536000, immutable`
+- `/data/navmesh/*.bin` : `Cache-Control: public, max-age=31536000, immutable`
 - `/data/heightmaps/*.f32` : `Cache-Control: public, max-age=31536000, immutable`
 - `/data/vietnam/*.json` : `Cache-Control: public, max-age=86400`
-- `/assets/<hash>.js` : `Cache-Control: public, max-age=31536000, immutable`
 
-If a header drifts from this table, the `_headers` file or the Cloudflare Pages default changed — check `public/_headers` in the current build first, then the Pages project config.
+If a header drifts from this table, inspect `public/_headers`, then `dist/_headers`, then the live Cloudflare Pages response.
 
-## Open items (not fixed in this audit)
+## 8. Wrangler And API Keys
 
-- **GLB models have no cache rule.** Every visit revalidates all 75 models. Fix is either content-hashing GLB names or adding a `/models/*` rule with a short `max-age`. Neither is trivial and neither is a correctness bug, so left for a follow-up.
-- **Non-hashed PNGs under `/assets/ui/`** inherit the immutable rule. If icon churn becomes a thing, move them to `/ui/` or add an explicit override.
-- **No PR preview deploys.** Current gate is "master push only." Fine for a single-maintainer cadence; revisit if design collaboration needs a shared preview URL.
+Local version check:
+
+```bash
+npx wrangler --version
+npm view wrangler version
+```
+
+Manual direct upload, if needed:
+
+```bash
+npm run build
+CLOUDFLARE_ACCOUNT_ID=<account-id> npx wrangler pages deploy dist --project-name terror-in-the-jungle
+```
+
+Authentication is only needed for live Cloudflare operations: deploying, listing projects/deployments, or inspecting account-level configuration. Repo-local validation, header policy, and service-worker fixes do not require an API token.
+
+## Open Items
+
+- **Content-hash GLB pipeline.** The ideal long-term answer is hashed model filenames plus a generated manifest, allowing `/models` to become immutable without stale in-place updates.
+- **Cross-browser deploy gate.** Add a scripted browser matrix against the live Pages URL for Chrome/Edge and Firefox, with a manual Safari/iOS line item.
+- **Cloudflare Pages PR previews.** Current flow deploys only when manually triggered. Add branch deploys if design or QA needs shareable preview URLs.

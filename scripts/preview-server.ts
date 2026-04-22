@@ -34,7 +34,7 @@ export interface ServerHandle {
   mode: ServerMode;
 }
 
-export interface StartServerOptions {
+interface StartServerOptions {
   mode?: ServerMode;
   port: number;
   host?: string;
@@ -51,6 +51,12 @@ export interface StartServerOptions {
    * false, a missing output dir will throw.
    */
   buildIfMissing?: boolean;
+  /**
+   * Only meaningful in preview modes. If true, rebuild the selected output
+   * directory even when it already exists. Use this for validation probes that
+   * must never run against stale `dist/` or `dist-perf/` contents.
+   */
+  forceBuild?: boolean;
   /**
    * Optional hook for logging lifecycle events. Defaults to console.log.
    */
@@ -91,7 +97,7 @@ export async function isPortOpen(port: number, host = DEFAULT_HOST): Promise<boo
   });
 }
 
-export async function waitForPort(
+async function waitForPort(
   port: number,
   host: string,
   timeoutMs: number
@@ -178,7 +184,9 @@ export async function startServer(opts: StartServerOptions): Promise<ServerHandl
     const indexPath = mode === 'perf' ? PERF_DIST_INDEX : RETAIL_DIST_INDEX;
     const outDirLabel = mode === 'perf' ? 'dist-perf' : 'dist';
     const buildScript = mode === 'perf' ? 'npm run build:perf' : 'npm run build';
-    if (!existsSync(indexPath)) {
+    if (opts.forceBuild) {
+      runBuildSync(mode, log);
+    } else if (!existsSync(indexPath)) {
       if (!buildIfMissing) {
         throw new Error(`${outDirLabel}/index.html not found. Run \`${buildScript}\` before starting preview.`);
       }

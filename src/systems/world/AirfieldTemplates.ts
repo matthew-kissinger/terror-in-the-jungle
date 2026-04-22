@@ -85,7 +85,7 @@ export interface AirfieldTemplate {
   parkingSpots: AirfieldParkingSpot[];
 }
 
-export interface AirfieldTemplateCompatibilityIssue {
+interface AirfieldTemplateCompatibilityIssue {
   modelPath: string;
   minimumRunwayLength: number;
   actualRunwayLength: number;

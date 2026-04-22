@@ -1,10 +1,37 @@
 # Backlog
 
-Last updated: 2026-04-20 (cycle-2026-04-21-atmosphere-polish-and-fixes close-out)
+Last updated: 2026-04-21 (Cycle 2 active)
 
 Historical cycle-close sections below preserve what was true when those cycles
 closed. Current open work lives in the P0/P1/P2/P3 sections plus Known Issues /
 Known Bugs.
+
+## Current Cycle: cycle-2026-04-21-stabilization-reset
+
+The next work is stabilization before feature expansion. Cycle 0 closed the
+repo truth/control-plane work: Node/toolchain alignment, local probe URL repair,
+fixed-wing probe repair, dead-code cleanup, deploy freshness hardening, and
+stale worktree/branch cleanup.
+
+Plan: [docs/cycles/cycle-2026-04-21-stabilization-reset/README.md](cycles/cycle-2026-04-21-stabilization-reset/README.md)
+
+### Cycle sequence
+
+1. **Truth and gates** — done. Align Node/toolchain truth, repair local diagnostic
+   URLs, restore the fixed-wing runtime probe, refresh stale docs, clean
+   dead-code output, harden Cloudflare/browser freshness, and clean nested
+   worktrees.
+2. **Vehicle and flight alignment** — done for correctness gates. Fixed-wing
+   config ownership, runway/climb/approach probes, AC-47 orbit-hold validation,
+   player/NPC handoff checks, and cross-vehicle flight mouse reset are done.
+   Aircraft feel is not signed off; it intentionally moves to Cycle 2.
+3. **Flight feel, perf, and bundle** — next. Investigate fixed-wing stiffness,
+   altitude bounce/porpoise, visual shake, and interpolation/camera smoothing;
+   reduce large startup chunks; refresh `frontier30m` after its non-terminal
+   soak fix; keep dead-code hygiene clean as bundle and vehicle work move
+   files.
+4. **Combat and navigation quality** — return to terrain/pathing stalls,
+   squad-suppression consolidation, and remaining combat-state cleanup.
 
 ## Recently Completed (cycle-2026-04-21-atmosphere-polish-and-fixes, 2026-04-20)
 
@@ -135,50 +162,69 @@ the runbook for the end-of-cycle ritual.
 
 ## P0 - Performance Blockers
 
-- [ ] `perf-baseline-refresh` — carried from `cycle-2026-04-20-atmosphere-foundation` (2 hard-stop attempts). Needs `harness-ashau-objective-cycling-fix` + `npc-and-player-leap-fix` + `ashau-dem-streaming-fix` to stabilize first. Brief: `docs/tasks/perf-baseline-refresh.md`.
-- [ ] Reduce initial JS bundle (current production build emits roughly `three ~727kB`, `index ~866kB`, `ui ~450kB`).
+- [x] Investigate fixed-wing flight feel before adding more vehicles: stiff
+  controls, altitude bounce/porpoise after climb, visual shake at speed, and
+  whether fixed-wing render/camera interpolation should mirror the helicopter
+  interpolation path. Initial evidence pointed at raw fixed-wing pose exposure
+  to render/camera consumers.
+- [x] Implement the first fixed-wing feel fix set: Airframe interpolated pose,
+  FixedWingModel visual-pose rendering/queries, and elapsed-time fixed-wing
+  camera/look/FOV smoothing. `npm run probe:fixed-wing` passes; human playtest
+  remains the feel gate.
+- [ ] Re-run the human playtest checklist after fixed-wing feel changes. Passing
+  `npm run probe:fixed-wing` is required evidence, but it is not a feel sign-off.
+- [ ] Reduce initial JS bundle. Recent production builds still emit large
+  chunks (`index`, `three`, and `ui` all above the desired startup footprint).
+- [x] Fix `frontier30m` soak semantics. The script now passes
+  `--match-duration 3600 --disable-victory true`, which applies perf-only
+  Open Frontier lifecycle overrides and keeps the 30-minute capture
+  non-terminal. The 2026-04-20 baseline still predates this fix.
+- [x] Remove build-time `.gz`/`.br` sidecar generation from Vite. Cloudflare
+  handles visitor-facing compression for Pages assets, so the deploy upload no
+  longer carries redundant precompressed files.
+- [ ] Keep refreshed perf baselines current after stabilization work. The
+  2026-04-20 refresh is valid for the post-atmosphere cycle, but Node/runtime
+  alignment must be settled before treating future comparisons as apples to
+  apples.
 
-## P0 - Atmosphere visual completeness (queued for cycle-2026-04-21)
+## P0 - Repo truth and validation
 
-- [ ] `post-tone-mapping-aces` — ACES tone-map before quantize so warm dawn/dusk/golden-hour read instead of clipping to white. Brief: `docs/tasks/post-tone-mapping-aces.md`.
-- [ ] `ashau-dem-streaming-fix` — A Shau Valley DEM file present but loader fails; terrain renders flat. Brief: `docs/tasks/ashau-dem-streaming-fix.md`.
+- [x] Align Node/toolchain truth across `.nvmrc`, CI, docs, and perf evidence.
+- [x] Repair stale local diagnostic URL assumptions and keep probes on the
+  current Vite root route.
+- [x] Restore `scripts/fixed-wing-runtime-probe.ts` as a maintained browser
+  validation gate.
+- [x] Refresh stale docs after the atmosphere/cloud/airfield/perf cycle.
+- [x] Triage and clean `npm run deadcode`.
+- [x] Harden deploy freshness by splitting Vite output to `/build-assets/`,
+  revalidating stable public assets and GLBs, and bumping the service worker
+  cache to drop stale `titj-v1` entries.
+- [x] Clean locked nested worktrees and stale task branches after confirming
+  they contain no unmerged work.
 
-## P0 - Aircraft / airfield foundation (queued for cycle-2026-04-21)
+## P0 - Deploy freshness and asset delivery
 
-- [ ] `airfield-terrain-flattening` — root cause of multi-cycle takeoff failures. Airfield placement needs slope rejection + extended flattening footprint covering runway/apron/taxiway/structures. Brief: `docs/tasks/airfield-terrain-flattening.md`.
-- [ ] `aircraft-ground-physics-tuning` — flat-runway takeoff currently impossible (works only via hill-launch). Blocks on `airfield-terrain-flattening`. Brief: `docs/tasks/aircraft-ground-physics-tuning.md`.
-- [ ] `npc-and-player-leap-fix` — NPCs + harness player visibly leap into the air. `CombatantRenderInterpolator` exists; root cause may be upstream Y jumps or vertical clamp too permissive. Brief: `docs/tasks/npc-and-player-leap-fix.md`.
-
-## P1 - Atmosphere polish (queued for cycle-2026-04-21)
-
-- [ ] `fog-density-rebalance` — distant terrain reads white because fog density was tuned for old constant fog color. Brief: `docs/tasks/fog-density-rebalance.md`.
-- [ ] `vegetation-alpha-edge-fix` — white/blue outlines on vegetation edge pixels (alpha-test fringe). Brief: `docs/tasks/vegetation-alpha-edge-fix.md`.
-- [ ] `vegetation-fog-and-lighting-parity` — vegetation responds to fog/lighting differently than terrain (different material path). Brief: `docs/tasks/vegetation-fog-and-lighting-parity.md`.
-- [ ] `atmosphere-day-night-cycle` — animate sun direction over time. Brief: `docs/tasks/atmosphere-day-night-cycle.md`.
-- [ ] `skybox-cutover-no-fallbacks` — delete `Skybox.ts`, `NullSkyBackend.ts`, `skybox.png`. Brief: `docs/tasks/skybox-cutover-no-fallbacks.md`.
-
-## P1 - Aircraft / airfield (queued for cycle-2026-04-21)
-
-- [ ] `airfield-aircraft-orientation` — parking yaws don't align with taxi-route entry; planes need to U-turn to taxi. Brief: `docs/tasks/airfield-aircraft-orientation.md`.
-- [ ] `aircraft-a1-spawn-regression` — A-1 Skyraider missing from main_airbase runway. Narrow scope, orthogonal to physics. Brief: `docs/tasks/aircraft-a1-spawn-regression.md`.
-
-## P1 - Harness (queued for cycle-2026-04-21)
-
-- [ ] `harness-ashau-objective-cycling-fix` — bot loops between already-captured zone and itself in ashau. Stuck-recovery doesn't filter owned zones. Blocks on `ashau-dem-streaming-fix`. Brief: `docs/tasks/harness-ashau-objective-cycling-fix.md`.
+- [ ] After the next manual Cloudflare deploy, verify live headers for `/`,
+  `/sw.js`, `/build-assets/*`, `/assets/*`, `/models/*`, navmesh, heightmaps,
+  and A Shau JSON using `docs/DEPLOY_WORKFLOW.md`.
+- [ ] Add a cross-browser live fresh-load gate for Chrome/Edge and Firefox,
+  with a manual Safari/iOS check when service worker or GLB paths change.
+- [ ] Design a content-hashed GLB manifest pipeline so model files can become
+  immutable without risking stale in-place updates.
 
 ## P1 - Gameplay (carry-forward)
 
-- [ ] Repair `scripts/fixed-wing-runtime-probe.ts` after the Airframe API cutover. Current master still calls `model.getPhysics()` inside the probe.
+- [x] Expand browser-level aircraft validation beyond takeoff into climb and
+  short-final approach setup for A-1, F-4, and AC-47.
+- [x] Expand browser-level aircraft validation into AC-47 player orbit hold.
+- [x] Expand browser-level aircraft validation into player/NPC fixed-wing
+  handoff states.
 - [ ] Expand and validate live NPC fixed-wing missions beyond the current `FixedWingModel.attachNPCPilot()` / world-feature / air-support path.
 - [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy, RTB).
 - [ ] Ground vehicles (M151 jeep first - GLB exists, need driving runtime).
 - [ ] Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds.
 - [ ] Stationary weapons (M2 .50 cal emplacements, NPC manning).
 - [ ] Faction AI doctrines - keep expanding the `FACTION_COMBAT_TUNING` lookup with stance/engagement/retreat parameters.
-
-## P2 - Atmosphere (queued for cycle-2026-04-21)
-
-- [ ] `cloud-runtime-implementation` — implement the `ICloudRuntime` stub with a high-altitude cloud band (≥800m AGL to clear helicopter envelope). Brief: `docs/tasks/cloud-runtime-implementation.md`.
 
 ## P2 - Content & Polish (carry-forward)
 
@@ -216,13 +262,13 @@ the runbook for the end-of-cycle ritual.
 
 1. **Orphan `IDLE` AI state.** `CombatantState.RETREATING` now has `AIStateRetreat`; `IDLE` still exists mainly for fixtures / respawn edges and can still fall through if left live at tick time.
 2. **Duplicate squad-suppression mutation paths.** `AIFlankingSystem`, `AIStateEngage.initiateSquadSuppression`, and `applySquadCommandOverride` are three parallel paths that can mutate squad command state. Consolidation deferred to Phase F utility-AI design (E3 memo).
-3. **Cross-vehicle state bleed.** `PlayerCamera.flightMouseControlEnabled` is not reset when switching between fixed-wing and helicopter adapters (E6 memo on `spike/E6-vehicle-physics-rebuild`). Low impact in practice but a latent source of adapter-entry surprise.
-4. **Service worker cache version pinned.** `sw.js` uses hard-coded `CACHE_NAME = 'titj-v1'`. Bump on next theme-changing or asset-changing deploy to avoid stale caches (flagged during F2b).
+3. **Fixed-wing feel is not yet human-signed off.** Cycle 2 now has a first-pass interpolation/camera smoothing patch for the reported stiff controls, altitude bounce/porpoise perception, and visible screen shake at speed. `npm run probe:fixed-wing` passes, but a human still needs to run the playtest checklist before more vehicle types are added.
+4. **Live production freshness still needs a post-deploy check.** Repo policy is fixed, but users will not receive the new `/build-assets/`, `/models/*`, and `titj-v2-2026-04-21` service-worker behavior until the next manual Cloudflare Pages deploy is live and header-checked.
 
 ## Known Bugs
 
-1. Main production chunks are still heavy (`index ~866kB`, `three ~727kB`, `ui ~450kB`) even though startup is stable.
-2. `scripts/fixed-wing-runtime-probe.ts` is broken on current master after the Airframe cutover (`model.getPhysics()` no longer exists on `FixedWingModel`).
+1. Main production/perf chunks are still heavy (`index ~851kB`, `three ~734kB`, `ui ~449kB`) even though startup is stable. Precompressed sidecar generation has been removed, but real chunk splitting remains open.
+2. `frontier30m` script semantics are fixed, but the tracked baseline still predates the non-terminal soak path. Refresh this only from a quiet-machine perf session.
 3. First grenade/explosion cold-start hitch needs fresh perf evidence after the hidden live-effect warmup change.
 
 ## Architecture Debt
@@ -240,7 +286,7 @@ E-track spike memos were kept on `spike/E*` branches and never merged. Pull each
 - **Render-side position interpolation for LOD'd combatants.** Unblocks the hypersprint fix that F1 could not safely ship. Cross-references `CombatantLODManager.ts` dt amortization.
 - **Agent/player API unification.** 1755-LOC driver potentially rewritable to ~150 LOC. Memo: `docs/rearch/E4-agent-player-api.md` on `spike/E4-agent-player-api`. Status: prototype-more.
 - **Deterministic sim + seeded replay.** Proven in spike; ~200 non-determinism sources catalogued. Memo: `docs/rearch/E5-deterministic-sim.md` on `spike/E5-deterministic-sim`. Status: prototype-more.
-- **Vehicle physics rebuild.** Airframe spike and cross-vehicle state bleed confirmed. Memo: `docs/rearch/E6-vehicle-physics-evaluation.md` on `spike/E6-vehicle-physics-rebuild`. Status: prototype-more.
+- **Vehicle physics rebuild.** Airframe spike confirmed broader rebuild questions. The cross-vehicle flight mouse bleed it flagged was fixed in Cycle 1, but the rebuild remains prototype-more. Memo: `docs/rearch/E6-vehicle-physics-evaluation.md` on `spike/E6-vehicle-physics-rebuild`.
 - **Rendering at scale.** E2 deferred overall. The old `maxInstances = 120` silent-drop it flagged has since been surfaced and the capacity raised, but true large-N behavior is still unproven. Memo: `docs/rearch/E2-rendering-evaluation.md` on `spike/E2-rendering-at-scale`.
 - **ECS evaluation.** Deferred - bitECS came in ~0.97x at N=3000; V8 already inlines Vector3 shapes well enough. Memo: `docs/rearch/E1-ecs-evaluation.md` (also on master) and `spike/E1-ecs`.
 

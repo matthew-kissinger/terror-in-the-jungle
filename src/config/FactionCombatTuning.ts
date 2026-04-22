@@ -37,7 +37,7 @@ export interface FactionActionWeights {
   readonly hold: number;
 }
 
-export interface FactionCombatTuning {
+interface FactionCombatTuning {
   /**
    * Legacy cumulative panic level at which AIStateEngage triggers full-auto +
    * shorter burst pause. Lower = panics sooner (guerrilla). Higher =

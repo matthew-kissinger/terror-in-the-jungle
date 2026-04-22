@@ -5,6 +5,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Socket } from 'net';
+import { localAppUrl } from './app-url';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,47 +102,44 @@ async function isPortOpen(port: number, host = '127.0.0.1'): Promise<boolean> {
   });
 }
 
+async function waitForPort(port: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isPortOpen(port)) return;
+    await sleep(250);
+  }
+  throw new Error(`Timed out waiting for 127.0.0.1:${port}`);
+}
+
 async function startDevServer(port: number): Promise<ChildProcess> {
   logStep(`Starting dev server on port ${port}`);
-  const server = spawn('npm', ['run', 'dev', '--', '--port', String(port), '--host'], {
-    cwd: process.cwd(),
-    stdio: 'pipe',
-    shell: true,
+  const args = ['run', 'dev', '--', '--port', String(port), '--host', '127.0.0.1'];
+  const server = process.platform === 'win32'
+    ? spawn('cmd.exe', ['/d', '/s', '/c', 'npm', ...args], {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+        shell: false,
+      })
+    : spawn('npm', args, {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+        shell: false,
+      });
+
+  server.stdout?.on('data', () => {});
+  server.stderr?.on('data', (data) => {
+    console.error('[dev-server]', data.toString().trim());
   });
 
-  return new Promise((resolve, reject) => {
-    let output = '';
-    let resolved = false;
-    const timeout = setTimeout(() => {
-      server.kill();
-      reject(new Error('Dev server startup timeout'));
-    }, STEP_TIMEOUT_MS);
-
-    server.stdout?.on('data', (data) => {
-      output += data.toString();
-      if (!resolved && (output.includes('Local:') || output.includes('localhost'))) {
-        resolved = true;
-        clearTimeout(timeout);
-        logStep('Dev server ready');
-        resolve(server);
-      }
-    });
-
-    server.stderr?.on('data', (data) => {
-      console.error('[dev-server]', data.toString().trim());
-    });
-
-    server.on('error', (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-  });
+  await waitForPort(port, STEP_TIMEOUT_MS);
+  logStep('Dev server ready');
+  return server;
 }
 
 async function killDevServer(server: ChildProcess): Promise<void> {
   logStep('Stopping dev server');
   if (process.platform === 'win32') {
-    spawn('taskkill', ['/PID', String(server.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
+    spawn('taskkill', ['/PID', String(server.pid), '/T', '/F'], { shell: false, stdio: 'ignore' });
   } else {
     server.kill('SIGTERM');
   }
@@ -517,7 +515,10 @@ async function main(): Promise<void> {
 
     // Launch browser
     logStep('Launching browser');
-    const browser = await chromium.launch({ headless: !headed });
+    const browser = await chromium.launch({
+      headless: !headed,
+      args: ['--use-angle=swiftshader', '--enable-webgl'],
+    });
     const context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
     });
@@ -527,7 +528,7 @@ async function main(): Promise<void> {
     const { getRequests } = setupRequestTracking(page);
 
     // Navigate
-    const url = `http://localhost:${port}/terror-in-the-jungle/?perf=1`;
+    const url = localAppUrl({ port, query: { perf: true } });
     logStep(`Navigating to ${url}`);
     await page.goto(url, { waitUntil: 'commit', timeout: STEP_TIMEOUT_MS });
 

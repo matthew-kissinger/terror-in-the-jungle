@@ -8,7 +8,7 @@ import { Logger } from '../../utils/Logger'
  * LOD-based sync frequency for spatial grid updates.
  * Higher LOD (closer entities) sync more frequently.
  */
-export enum SyncFrequency {
+enum SyncFrequency {
   EVERY_FRAME = 1,   // HIGH LOD (<150m)
   EVERY_2_FRAMES = 2, // MEDIUM LOD (150-300m)
   EVERY_5_FRAMES = 5, // LOW LOD (300-500m)

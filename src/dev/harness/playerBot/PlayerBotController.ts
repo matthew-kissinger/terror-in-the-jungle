@@ -49,7 +49,7 @@ export interface PlayerBotControllerTarget {
  * Apply-result telemetry. The driver can use this to surface what keys
  * the bot actually triggered without having to instrument the controller.
  */
-export interface PlayerBotControllerApplyResult {
+interface PlayerBotControllerApplyResult {
   readonly fired: boolean;
   readonly reloaded: boolean;
   readonly forward: number;

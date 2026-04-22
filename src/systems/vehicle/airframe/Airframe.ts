@@ -61,7 +61,7 @@ const _groundForward = new THREE.Vector3();
 const _groundRight = new THREE.Vector3();
 const _groundNormal = new THREE.Vector3(0, 1, 0);
 
-export const AIRFRAME_FIXED_STEP = 1 / 60;
+const AIRFRAME_FIXED_STEP = 1 / 60;
 
 interface AeroState {
   airspeed: number;
@@ -82,6 +82,9 @@ export class Airframe {
   private readonly position: THREE.Vector3;
   private readonly quaternion = new THREE.Quaternion();
   private readonly velocity = new THREE.Vector3();
+  private readonly previousPosition = new THREE.Vector3();
+  private readonly previousQuaternion = new THREE.Quaternion();
+  private readonly previousVelocity = new THREE.Vector3();
   private readonly terrainNormal = new THREE.Vector3(0, 1, 0);
   private throttle = 0;
   private elevator = 0;
@@ -118,10 +121,38 @@ export class Airframe {
     this.position = initialPosition.clone();
     this.groundHeight = initialPosition.y - config.ground.gearClearanceM;
     this.snapshot = this.buildSnapshot(this.zeroAero());
+    this.syncPreviousPose();
   }
 
   getState(): AirframeState {
     return this.snapshot;
+  }
+
+  getInterpolatedState(): AirframeState {
+    const alpha = THREE.MathUtils.clamp(this.accumulator / AIRFRAME_FIXED_STEP, 0, 1);
+    const position = this.previousPosition.clone().lerp(this.position, alpha);
+    const quaternion = this.previousQuaternion.clone().slerp(this.quaternion, alpha);
+    const velocity = this.previousVelocity.clone().lerp(this.velocity, alpha);
+
+    _euler.setFromQuaternion(quaternion, 'YXZ');
+    const altitudeAGL = Math.max(
+      0,
+      position.y - (this.groundHeight + this.cfg.ground.gearClearanceM),
+    );
+
+    return {
+      ...this.snapshot,
+      position,
+      quaternion,
+      velocity,
+      effectors: { ...this.snapshot.effectors },
+      altitude: position.y,
+      altitudeAGL,
+      verticalSpeedMs: velocity.y,
+      pitchDeg: THREE.MathUtils.radToDeg(_euler.x),
+      rollDeg: THREE.MathUtils.radToDeg(_euler.z),
+      headingDeg: ((THREE.MathUtils.radToDeg(_euler.y) % 360) + 360) % 360,
+    };
   }
 
   getPosition(): THREE.Vector3 {
@@ -161,6 +192,7 @@ export class Airframe {
     this.postLiftoffGraceTicks = 0;
     this.descentLatchTicks = 0;
     this.snapshot = this.buildSnapshot(this.zeroAero());
+    this.syncPreviousPose();
   }
 
   resetAirborne(
@@ -191,6 +223,7 @@ export class Airframe {
     // will clear it implicitly on their first pitch input.
     this.altitudeHoldTarget = position.y;
     this.snapshot = this.buildSnapshot(this.computeAero());
+    this.syncPreviousPose();
   }
 
   /**
@@ -206,9 +239,20 @@ export class Airframe {
     }
     while (this.accumulator >= AIRFRAME_FIXED_STEP) {
       this.accumulator -= AIRFRAME_FIXED_STEP;
+      this.capturePreviousPose();
       this.stepOnce(intent, terrain, AIRFRAME_FIXED_STEP);
     }
     return this.snapshot;
+  }
+
+  private capturePreviousPose(): void {
+    this.previousPosition.copy(this.position);
+    this.previousQuaternion.copy(this.quaternion);
+    this.previousVelocity.copy(this.velocity);
+  }
+
+  private syncPreviousPose(): void {
+    this.capturePreviousPose();
   }
 
   private stepOnce(intent: AirframeIntent, terrain: AirframeTerrainProbe, dt: number): void {

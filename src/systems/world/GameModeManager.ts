@@ -49,6 +49,63 @@ interface GameModeManagerDependencies {
   playerRespawnManager: PlayerRespawnManager;
 }
 
+const PERF_RUNTIME_QUERY_FLAGS = ['sandbox', 'perf', 'telemetry', 'diagnostics'] as const;
+const PERF_MATCH_DURATION_PARAM = 'perfMatchDuration';
+const PERF_DISABLE_VICTORY_PARAM = 'perfDisableVictory';
+const MAX_PERF_MATCH_DURATION_SECONDS = 4 * 60 * 60;
+
+function readBooleanQueryValue(value: string | null): boolean {
+  if (value === null) return false;
+  const normalized = value.toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+function getRuntimeSearchParams(): URLSearchParams | null {
+  if (typeof window === 'undefined' || !window.location?.search) return null;
+  try {
+    return new URLSearchParams(window.location.search);
+  } catch {
+    return null;
+  }
+}
+
+function isPerfRuntimeOverrideEnabled(): boolean {
+  if (!import.meta.env.DEV && import.meta.env.VITE_PERF_HARNESS !== '1') {
+    return false;
+  }
+
+  const globalScope = globalThis as {
+    __ENABLE_PERF_DIAGNOSTICS__?: boolean;
+    __ENABLE_PERF_TELEMETRY__?: boolean;
+  };
+  if (globalScope.__ENABLE_PERF_DIAGNOSTICS__ === true || globalScope.__ENABLE_PERF_TELEMETRY__ === true) {
+    return true;
+  }
+
+  const params = getRuntimeSearchParams();
+  if (!params) return false;
+  return PERF_RUNTIME_QUERY_FLAGS.some(flag => readBooleanQueryValue(params.get(flag)));
+}
+
+function resolvePerfMatchDuration(configDuration: number): number {
+  if (!isPerfRuntimeOverrideEnabled()) return configDuration;
+
+  const raw = getRuntimeSearchParams()?.get(PERF_MATCH_DURATION_PARAM);
+  if (!raw) return configDuration;
+
+  const requested = Math.ceil(Number(raw));
+  if (!Number.isFinite(requested) || requested <= configDuration) {
+    return configDuration;
+  }
+
+  return Math.min(requested, MAX_PERF_MATCH_DURATION_SECONDS);
+}
+
+function shouldDisableVictoryForPerf(): boolean {
+  if (!isPerfRuntimeOverrideEnabled()) return false;
+  return readBooleanQueryValue(getRuntimeSearchParams()?.get(PERF_DISABLE_VICTORY_PARAM) ?? null);
+}
+
 export class GameModeManager implements GameSystem {
   public currentMode: GameMode = GameMode.ZONE_CONTROL;
   private currentConfig: GameModeConfig;
@@ -264,12 +321,26 @@ export class GameModeManager implements GameSystem {
 
     // Configure ticket system
     if (this.ticketSystem) {
+      const matchDuration = resolvePerfMatchDuration(config.matchDuration);
+      const disableVictoryForPerf = shouldDisableVictoryForPerf();
+
       this.ticketSystem.setMaxTickets(config.maxTickets);
-      this.ticketSystem.setMatchDuration(config.matchDuration);
+      this.ticketSystem.setMatchDuration(matchDuration);
       this.ticketSystem.setDeathPenalty(config.deathPenalty);
+      this.ticketSystem.setVictoryConditionsEnabled?.(!disableVictoryForPerf);
 
       const isTDM = this.currentDefinition.policies.objective.kind === 'deathmatch';
       this.ticketSystem.setTDMMode(isTDM, isTDM ? config.maxTickets : 0);
+
+      if (matchDuration !== config.matchDuration) {
+        Logger.info(
+          'world',
+          `Perf harness match duration override: ${config.matchDuration}s -> ${matchDuration}s`
+        );
+      }
+      if (disableVictoryForPerf) {
+        Logger.info('world', 'Perf harness victory conditions disabled for non-terminal soak capture');
+      }
     }
 
     // Configure terrain runtime render distance

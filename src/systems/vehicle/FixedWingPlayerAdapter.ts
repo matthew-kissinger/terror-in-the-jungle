@@ -17,6 +17,8 @@ const FW_MOUSE_SENSITIVITY = 0.5;
 const FW_TOUCH_DEADZONE = 0.1;
 const FW_MOUSE_RECENTER_RATE = 1.8;
 const FW_ASSIST_MOUSE_RECENTER_RATE = 3.2;
+const FW_ORBIT_HOLD_ALTITUDE_HYSTERESIS_M = 60;
+const FW_ORBIT_HOLD_MIN_DROPOUT_ALTITUDE_M = 20;
 
 function createFixedWingUIContext(role: string): VehicleUIContext {
   return {
@@ -90,6 +92,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
       (ctx.input as any).setInputContext('fixed_wing');
     }
     ctx.cameraController.saveInfantryAngles();
+    ctx.cameraController.setFlightMouseControlEnabled(true);
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.showFixedWingInstruments?.();
@@ -226,10 +229,16 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
       ? this.fixedWingModel.getFlightData(this.activeAircraftId)
       : null;
     const activeConfig = this.activeConfigKey ? FIXED_WING_CONFIGS[this.activeConfigKey] : null;
+    const orbitDropoutAltitude = activeConfig
+      ? Math.max(
+          FW_ORBIT_HOLD_MIN_DROPOUT_ALTITUDE_M,
+          (activeConfig.operation.orbitMinAltitude ?? 80) - FW_ORBIT_HOLD_ALTITUDE_HYSTERESIS_M,
+        )
+      : null;
     if (
       this.fixedWingOrbitHold
       && (!activeConfig || !activeFlightData || activeFlightData.weightOnWheels
-        || activeFlightData.altitudeAGL < (activeConfig.operation.orbitMinAltitude ?? 80))
+        || (orbitDropoutAltitude !== null && activeFlightData.altitudeAGL < orbitDropoutAltitude))
     ) {
       this.fixedWingOrbitHold = false;
     }

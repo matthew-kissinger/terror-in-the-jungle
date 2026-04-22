@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { spawn, type ChildProcess } from 'child_process';
 import { Socket } from 'net';
+import { localAppUrl } from './app-url';
 
 const DEV_SERVER_PORT = 9100;
 const STEP_TIMEOUT_MS = 90_000;
@@ -641,7 +642,7 @@ async function main(): Promise<void> {
   const port = parseNumberArg('port', DEV_SERVER_PORT);
   const headed = parseBooleanFlag('headed');
   const artifactDir = ensureArtifactDir();
-  const appUrl = `http://${host}:${port}/terror-in-the-jungle/?perf=1`;
+  const appUrl = localAppUrl({ host, port, query: { perf: true } });
 
   let server: ChildProcess | null = null;
   if (!(await isPortOpen(host, port))) {

@@ -1,9 +1,77 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getGameModeDefinition } from '../../config/gameModeDefinitions';
 import { GameMode } from '../../config/gameModeTypes';
 import { GameModeManager } from './GameModeManager';
 
+function createConnectedManager() {
+  const manager = new GameModeManager();
+  const mockZoneManager = {
+    setGameModeConfig: vi.fn(),
+    getAllZones: vi.fn(() => []),
+  } as any;
+  const mockCombatantSystem = {
+    setMaxCombatants: vi.fn(),
+    setSquadSizes: vi.fn(),
+    setReinforcementInterval: vi.fn(),
+    setAutonomousSpawningEnabled: vi.fn(),
+    reseedForcesForMode: vi.fn(),
+    clearCombatantsForExternalPopulation: vi.fn(),
+    combatantAI: {
+      setEngagementRange: vi.fn(),
+    },
+    setSpatialBounds: vi.fn(),
+  } as any;
+  const mockTicketSystem = {
+    setMaxTickets: vi.fn(),
+    setMatchDuration: vi.fn(),
+    setDeathPenalty: vi.fn(),
+    setTDMMode: vi.fn(),
+    setVictoryConditionsEnabled: vi.fn(),
+  } as any;
+  const mockTerrainSystem = {
+    setRenderDistance: vi.fn(),
+    getHeightAt: vi.fn(() => 0),
+  } as any;
+  const mockMinimapSystem = {
+    setMapIntelPolicy: vi.fn(),
+    setWorldScale: vi.fn(),
+  } as any;
+  const mockFullMapSystem = {
+    setMapIntelPolicy: vi.fn(),
+    setTerrainRuntime: vi.fn(),
+  } as any;
+
+  manager.connectSystems(
+    mockZoneManager,
+    mockCombatantSystem,
+    mockTicketSystem,
+    mockTerrainSystem,
+    mockMinimapSystem,
+    mockFullMapSystem
+  );
+
+  return {
+    manager,
+    mockZoneManager,
+    mockCombatantSystem,
+    mockTicketSystem,
+    mockTerrainSystem,
+    mockMinimapSystem,
+    mockFullMapSystem,
+  };
+}
+
+function stubLocationSearch(search: string): void {
+  vi.stubGlobal('window', {
+    location: { search },
+  });
+}
+
 describe('GameModeManager', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('applies map intel policy from the active runtime', () => {
     const manager = new GameModeManager();
     const mockZoneManager = {
@@ -185,5 +253,35 @@ describe('GameModeManager', () => {
     expect(manager.getDeploySession('respawn').flowLabel).toBe('Frontier insertion');
     expect(manager.getRespawnPolicy().allowControlledZoneSpawns).toBe(true);
     expect(manager.canPlayerSpawnAtZones()).toBe(true);
+  });
+
+  it('ignores perf match lifecycle params unless diagnostics are enabled', () => {
+    stubLocationSearch('?perfMatchDuration=1800&perfDisableVictory=1');
+    const { manager, mockTicketSystem } = createConnectedManager();
+
+    manager.setGameMode(GameMode.OPEN_FRONTIER);
+
+    expect(mockTicketSystem.setMatchDuration).toHaveBeenLastCalledWith(900);
+    expect(mockTicketSystem.setVictoryConditionsEnabled).toHaveBeenLastCalledWith(true);
+  });
+
+  it('applies perf-only match lifecycle overrides for long soak captures', () => {
+    stubLocationSearch('?perf=1&perfMatchDuration=3600&perfDisableVictory=1');
+    const { manager, mockTicketSystem } = createConnectedManager();
+
+    manager.setGameMode(GameMode.OPEN_FRONTIER);
+
+    expect(mockTicketSystem.setMatchDuration).toHaveBeenLastCalledWith(3600);
+    expect(mockTicketSystem.setVictoryConditionsEnabled).toHaveBeenLastCalledWith(false);
+    expect(manager.getCurrentConfig().matchDuration).toBe(900);
+  });
+
+  it('does not let perf match duration overrides shorten the mode contract', () => {
+    stubLocationSearch('?perf=1&perfMatchDuration=120');
+    const { manager, mockTicketSystem } = createConnectedManager();
+
+    manager.setGameMode(GameMode.OPEN_FRONTIER);
+
+    expect(mockTicketSystem.setMatchDuration).toHaveBeenLastCalledWith(900);
   });
 });

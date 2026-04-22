@@ -71,7 +71,7 @@ export interface FixedWingFlightSnapshot {
  * (HUD, operation FSM, derived control-phase). Direct 1:1 except that
  * `climb`/`cruise`/`approach` all collapse to `airborne` on the legacy side.
  */
-export function legacyPhaseFromAirframe(
+function legacyPhaseFromAirframe(
   airframePhase: AirframeState['phase'],
   weightOnWheels: boolean,
 ): FixedWingFlightPhase {

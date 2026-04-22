@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-04-19
+Last updated: 2026-04-21
 
 ## Build targets
 
@@ -18,6 +18,11 @@ drives (`window.__engine`, `window.__metrics`, `window.advanceTime`,
 `window.combatProfile`, `window.perf`, etc.). `VITE_PERF_HARNESS=1` is set at
 build time; Vite constant-folds `import.meta.env.VITE_PERF_HARNESS === '1'`,
 so retail builds dead-code-eliminate the hook branches.
+
+Retail and perf builds do not emit `.gz` or `.br` sidecar files. Cloudflare
+Pages handles visitor-facing compression for JavaScript, CSS, JSON, fonts, and
+WASM, so local build artifacts and deploy uploads stay limited to canonical
+assets.
 
 Why measure the `perf` build instead of `dev`:
 
@@ -72,6 +77,13 @@ npm run perf:startup:openfrontier   # Production startup benchmark
 
 Tracked baselines: `combat120`, `openfrontier:short`, `ashau:short`, `frontier30m`.
 
+`frontier30m` uses perf-harness-only URL overrides from `scripts/perf-capture.ts`:
+`perfMatchDuration=3600` keeps Open Frontier in its combat phase for the full
+capture window, and `perfDisableVictory=1` prevents time-limit, ticket, or
+total-control victory screens from turning the second half into a menu soak.
+These overrides are gated to dev/perf-harness builds and do not ship in the
+retail build path.
+
 ## Environment Variables
 
 ```bash
@@ -106,8 +118,19 @@ Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome
 - **Resolved on 2026-04-02:** the Playwright perf harness freeze at `frameCount=1` was caused by same-document View Transitions on the live-entry path. Menu-only transitions can still use `document.startViewTransition()`, but live-entry now bypasses it and perf/sandbox runs explicitly force `uiTransitions=0`.
 - Harness startup probes now capture `rafTicks`, page visibility, startup phase, and active view-transition state so browser scheduling failures are distinguishable from game-loop failures.
 - GitHub-hosted CI perf remains advisory. The harness is now trustworthy locally, but the hosted Linux/Xvfb environment still exhibits non-representative browser scheduling and GPU readback stalls during `combat120`, so authoritative perf gating stays with local/self-run `validate:full`.
-- Tracked baselines in `perf-baselines.json` are still stale (`lastUpdated: 2026-03-06`). Fresh local `combat120` evidence exists, but the four tracked scenarios still need a coordinated refresh.
-- **Known validation drift on 2026-04-19:** `scripts/fixed-wing-runtime-probe.ts` is currently out of sync with the post-Airframe `FixedWingModel` API and throws `model.getPhysics is not a function`. Treat it as broken until repaired; do not cite it as a passing gate.
+- Tracked baselines in `perf-baselines.json` were refreshed on 2026-04-20 after the atmosphere/airfield/harness cycle. `npm run perf:compare` passes 8/8 checks against those baselines as of 2026-04-21.
+- **Fixed-wing browser gate restored and expanded on 2026-04-21:** `npm run probe:fixed-wing` rebuilds the selected preview target, boots Open Frontier, waits for each requested aircraft to spawn, and validates A-1, F-4, and AC-47 takeoff, climb, AC-47 orbit hold, player/NPC handoff, and short-final approach setup.
+- Cycle 2 treats fixed-wing feel as a separate product gate. The browser probe
+  proves control-flow correctness; it does not prove high-speed feel, altitude
+  damping, camera smoothness, or render interpolation quality. Pair any
+  fixed-wing feel change with the playtest checklist.
+- The first Cycle 2 fixed-wing feel patch adds Airframe pose interpolation plus
+  elapsed-time fixed-wing camera/look/FOV smoothing. `npm run probe:fixed-wing`
+  passes, but human playtest and quiet-machine perf validation remain open.
+- `frontier30m` soak semantics were corrected in Cycle 2: the npm script now
+  passes `--match-duration 3600 --disable-victory true`, which keeps Open
+  Frontier non-terminal for the 30-minute capture. The tracked baseline below is
+  still the old 2026-04-20 run until a quiet-machine refresh is captured.
 
 ## Validation Gates
 
@@ -119,23 +142,30 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 
 ## Current Scenario Health
 
-Only `combat120` has a fresh local post-PR #96 capture as of 2026-04-19. The
-other tracked scenarios below still need baseline refresh work after the
-harness/player-bot changes.
+All tracked scenarios have 2026-04-20 baselines. The `frontier30m` script has
+now been fixed to run as a non-terminal Open Frontier soak, but the tracked
+baseline is still the older semantically compromised capture where Open
+Frontier reached victory around 879s. Refresh it only from a quiet-machine
+perf session.
 
 | Scenario | Status | Avg | p99 | Notes |
 |----------|--------|----:|----:|-------|
-| `combat120` | WARN | ~14.7ms | ~33.8ms | Fresh local capture on 2026-04-19 (`artifacts/perf/2026-04-19T22-44-23-057Z`). p95 `32.6ms`, p99 `33.8ms`, heap end-growth `20.35MB`, heap peak-growth `41.64MB`. |
-| `openfrontier:short` | WARN | ~9.9ms | ~29.6ms | Last accepted short capture is still 2026-04-07. Renderer/hit-reg regressions recovered, but scenario refresh is still pending after later harness/player-bot work. |
-| `ashau:short` | WARN | ~9ms | ~26ms | Last tracked warm numbers are still pre-refresh; WarSim remains the dominant budget risk. |
-| `frontier30m` | PASS* | ~6.5ms | ~29ms | Long-soak baseline is stale; refresh is blocked behind harness lifecycle/pathing follow-ups. |
+| `combat120` | PASS | 13.12ms | 33.4ms | 2026-04-20 artifact `2026-04-20T06-15-39-927Z`; primary 120-NPC regression target. |
+| `openfrontier:short` | PASS | 7.50ms | 32.7ms | 2026-04-20 artifact `2026-04-20T06-18-05-147Z`; large-world short capture. |
+| `ashau:short` | PASS | 5.79ms | 15.6ms | 2026-04-20 artifact `2026-04-20T06-21-56-636Z`; strategy stack + DEM short capture. |
+| `frontier30m` | PASS* | 8.82ms | 33.7ms | 2026-04-20 artifact `2026-04-20T06-25-47-223Z`; baseline predates the non-terminal soak fix and ended early at victory. |
 
-*frontier30m p99 includes rare GC/OS outliers, not game code.
+*`frontier30m` script semantics are fixed as of Cycle 2; the baseline still needs a quiet-machine refresh.
 
 Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p99 34.40ms, max 47.30ms.
 
 ## Known Bottlenecks
 
+0. **Cycle 2 fixed-wing feel and interpolation** - first-pass render/camera
+   smoothing is implemented and probed. Human playtest still needs to determine
+   whether any remaining stiffness or porpoise is an airframe damping/control
+   law issue. Do not refresh perf baselines from sessions with background games
+   or other GPU-heavy apps running.
 1. **Combat AI tails** - cover search is budget-capped to 6/frame via `CoverSearchBudget`, but p95/p99 still in WARN range due to per-search cost (sandbag iteration + vegetation grid + terrain probes).
 2. **Open Frontier renderer tails** - the latest short capture (`artifacts/perf/2026-04-07T04-01-01-963Z`) passes mean/p95/hitch gates, but `p99FrameMs` still warns at `29.60ms` and heap peak-growth still warns at `35.13MB`. The mode is stable again, but not yet back to the March 4 renderer baseline.
 3. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.

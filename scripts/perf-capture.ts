@@ -296,6 +296,10 @@ type CaptureSummary = {
     runtimePreflightMs: number;
     runtimePreflightOk: boolean;
   };
+  perfRuntime?: {
+    matchDurationSeconds?: number;
+    victoryConditionsDisabled: boolean;
+  };
   // Match-end lifecycle (harness-lifecycle-halt-on-match-end).
   // matchEndedAtMs is wall-clock-ms-since-capture-start when the harness
   // observed match end; null/undefined when the match was still live at the
@@ -1765,6 +1769,11 @@ async function runCapture(): Promise<void> {
   );
   const prewarm = parseBooleanFlag('prewarm', DEFAULT_PREWARM);
   const runtimePreflight = parseBooleanFlag('runtime-preflight', DEFAULT_RUNTIME_PREFLIGHT);
+  const matchDurationArg = parseNumberFlag('match-duration', Number.NaN);
+  const perfMatchDurationSeconds = Number.isFinite(matchDurationArg) && matchDurationArg > 0
+    ? Math.ceil(matchDurationArg)
+    : null;
+  const disableVictory = parseBooleanFlag('disable-victory', false);
   const sandboxMode = parseBooleanFlag(
     'sandbox',
     requestedMode === 'ai_sandbox' ? true : DEFAULT_SANDBOX_MODE
@@ -1792,7 +1801,7 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseServer=${reuseServer} serverMode=${serverMode}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} disableVictory=${disableVictory} reuseServer=${reuseServer} serverMode=${serverMode}`);
 
   let server: ServerHandle | null = null;
   let context: BrowserContext | null = null;
@@ -1812,9 +1821,14 @@ async function runCapture(): Promise<void> {
   const uiTransitionsParam = '0';
   const diagnosticsQuery = 'perf=1';
   const seedQuery = seedPin !== null ? `&seed=${seedPin}` : '';
+  const matchDurationQuery = perfMatchDurationSeconds !== null
+    ? `&perfMatchDuration=${perfMatchDurationSeconds}`
+    : '';
+  const disableVictoryQuery = disableVictory ? '&perfDisableVictory=1' : '';
+  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}`;
   const query = sandboxMode
-    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}`
-    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}`;
+    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}${perfRuntimeQuery}`
+    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}${perfRuntimeQuery}`;
   const url = `http://localhost:${port}/${query}`;
   const preflightUrl = `http://localhost:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`;
   const primaryPath = new URL(url).pathname + new URL(url).search;
@@ -2749,6 +2763,10 @@ async function runCapture(): Promise<void> {
           runtimePreflightEnabled: runtimePreflight,
           runtimePreflightMs: runtimePreflightResult.totalMs,
           runtimePreflightOk: runtimePreflightResult.ok
+        },
+        perfRuntime: {
+          matchDurationSeconds: perfMatchDurationSeconds ?? undefined,
+          victoryConditionsDisabled: disableVictory
         },
         matchEndedAtMs: matchEndedAtRelMs,
         matchOutcome: matchOutcome,

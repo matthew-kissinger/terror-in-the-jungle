@@ -135,5 +135,4 @@ export class NPCFixedWingPilot {
   }
 }
 
-export type { Mission, PilotState, NPCFixedWingPilotConfig, PilotResourceState, TerrainProbe } from './npcPilot/types';
-export { DEFAULT_NPC_PILOT_CONFIG } from './npcPilot/types';
+export type { Mission, PilotState, TerrainProbe } from './npcPilot/types';
