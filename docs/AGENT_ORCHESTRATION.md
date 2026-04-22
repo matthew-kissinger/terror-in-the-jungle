@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last updated: 2026-04-22
+Last updated: 2026-04-22 (cycle-2026-04-23-debug-cleanup closed; stub awaiting next planning pass)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -70,77 +70,59 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-04-23-debug-cleanup
+## Current cycle: (none — awaiting next planning pass)
 
 ### Cycle ID
 
-`cycle-2026-04-23-debug-cleanup`
+_empty_ — the last closed cycle was `cycle-2026-04-23-debug-cleanup` on 2026-04-22 (retrospective: `docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md`).
 
 ### Why this cycle exists
 
-Two small follow-ups from the just-closed `cycle-2026-04-23-debug-and-test-modes` want to be paid off before the next feature cycle starts: (1) `preserveDrawingBuffer: true` on `WebGLRenderer` shipped unconditional in PR #144, costing retail players +13 MB heap residual for a feature (F9 capture) they never trigger; (2) PR #145 `world-overlay-debugger` is blocked on a CI-only test failure (`terrainChunkOverlay.test.ts` expected 24 line segments, got 0; 3710 tests green locally). The six overlays (navmesh / LOS / squad influence / LOD tier / aircraft contact / terrain chunks) are genuinely useful for the upcoming playtest and should land. Full plan in [docs/cycles/cycle-2026-04-23-debug-cleanup/README.md](cycles/cycle-2026-04-23-debug-cleanup/README.md).
+_fill in when the next cycle is planned._
 
 ### Tasks in this cycle
 
-2 tasks, one round. Each has a brief at `docs/tasks/<slug>.md`.
-
-- **Round 1 (2 parallel — disjoint file sets):**
-  - `preserve-drawing-buffer-dev-gate` (P0, ≤60 LOC) — gate `preserveDrawingBuffer` in `src/core/GameRenderer.ts` behind `import.meta.env.DEV || ?capture=1`. Retail players who don't opt in stop paying the +13 MB heap tax; Cloudflare testers can reach F9 by adding `?capture=1` to the URL.
-  - `world-overlay-debugger-ci-fix` (P1, ≤50 LOC test delta on top of the existing PR branch) — rebase `task/world-overlay-debugger` on current master, diagnose + fix the `terrainChunkOverlay.test.ts` CI-only failure (most likely a mock-stub ordering issue), re-push, merge PR #145.
+_fill in when the next cycle is planned. Each should have a brief at `docs/tasks/<slug>.md`._
 
 ### Round schedule
 
-R0 (sanity check, no install, no fresh baseline) → R1 (2 parallel) → post-R1 perf gate.
-
-**Round 0 (orchestrator prep):** `git fetch origin && git status` (must be clean). No `npm install` needed (Tweakpane already on master). No fresh baseline — reuse `docs/cycles/cycle-2026-04-23-debug-and-test-modes/baseline/combat120-baseline-summary.json`.
+_fill in when the next cycle is planned._
 
 ### Concurrency cap
 
-2 (R1 uses both slots; no other rounds).
+_default 5; override here if the cycle needs fewer._
 
 ### Dependencies
 
-```
-Round 0 (sanity check)
-  -> preserve-drawing-buffer-dev-gate  ┐
-  -> world-overlay-debugger-ci-fix     ┘─ R1 parallel (fully disjoint file sets)
-```
+_declare the DAG once tasks are seeded._
 
 ### Playtest policy
 
-DEFERRED. No playtest gate BLOCKS merge. Human playtests dev server + Cloudflare Pages AFTER this cycle merges, using the diagnostic surface from the prior cycle plus the corrected retail heap behavior + world-overlay visualizations.
+_required / deferred / none — decide per cycle._
 
 ### Perf policy
 
-- **Baseline:** inherited from prior cycle's R0 capture (no drift since).
-- **Gate:** post-R1 `npm run perf:capture:combat120`. Three thresholds:
-  - p99 within 5% of baseline (34.20 ms → ceiling 35.91 ms).
-  - `heap_recovery_ratio` ≥ 0.5.
-  - `heap_end_growth_mb` ≤ +2 MB (should walk the R3 +13 MB back toward baseline; this is the correctness gate for task 1).
+_fresh baseline or inherit? Gate thresholds? Decide per cycle._
 
-### Failure handling (autonomous-safe)
+### Failure handling
 
-- CI red on a task → mark `blocked`, record, continue.
-- Fence-change proposal → mark `blocked`, DO NOT merge.
-- `world-overlay-debugger-ci-fix` >50 LOC or second CI red after first push → STOP that task, mark blocked, cycle degrades to single-task (preserve-drawing-buffer-dev-gate still lands).
+_defaults to "CI red → blocked, fence change → blocked, continue the round." Override here if the cycle needs stricter hard stops._
 
 ### Visual checkpoints (orchestrator-gated)
 
-NONE. Autonomous run.
+_list here if a round requires human visual review before merging; default NONE._
 
 ### skip-confirm
 
-YES. Orchestrator does NOT pause between R0 sanity check and R1 dispatch.
+_YES → orchestrator dispatches without pausing; NO → orchestrator prints round schedule and waits for "go". Decide per cycle._
 
 ### Cycle-specific notes
 
-- **No reviewers expected.** Task 1 touches only `src/core/GameRenderer.ts`; task 2 touches only `src/ui/debug/worldOverlays/terrainChunkOverlay.test.ts` (+ possibly 1–2 lines of `TerrainRenderRuntime.ts`). Neither triggers combat-reviewer or terrain-nav-reviewer on its own. PR #145's original content already landed past reviewer scope; the fix is diagnostic, not functional.
-- **Task 2's hard stop is real.** If the CI-fix needs accessor rework, do NOT iterate past 50 LOC — leave PR #145 blocked for a future cycle. Cleanup cycle's job is paying off small debts, not rescuing hard blocks.
-- **Both tasks are additive.** No retired code to delete, no feature flags to flip, no rollout needed.
+_anything the orchestrator should know that doesn't fit the other fields._
 
 ### Pre-flight acknowledgement
 
-The prior cycle, `cycle-2026-04-23-debug-and-test-modes`, closed on 2026-04-22 with 6 merged PRs (#139, #140, #141, #142, #143, #144, #146) and 1 blocked PR (#145 `world-overlay-debugger`, CI test failure — addressed by this cycle's task 2). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-23-debug-and-test-modes, 2026-04-22)" and `docs/cycles/cycle-2026-04-23-debug-and-test-modes/RESULT.md`.
+_reference the prior cycle's closing RESULT so the orchestrator knows what state master is in at dispatch time._
 
 ## Dispatch protocol
 

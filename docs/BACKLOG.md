@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-04-22 (cycle-2026-04-23-debug-and-test-modes closed; next cycle stub awaiting planning pass)
+Last updated: 2026-04-22 (cycle-2026-04-23-debug-cleanup closed; next cycle stub awaiting planning pass)
 
 ## Standing workstreams
 
@@ -22,6 +22,23 @@ Parallel to orchestrated cycles, the human is progressively replacing placeholde
 ### Playtest feedback docs
 
 Per-session fillable docs live under `docs/playtest/PLAYTEST_<date>.md`. Each session's notes roll up to the next cycle's planning pass. See `docs/playtest/PLAYTEST_2026-04-22.md` for the template shape.
+
+## Recently Completed (cycle-2026-04-23-debug-cleanup, 2026-04-22)
+
+Two merged PRs in one round, single autonomous session; both follow-ups from the just-closed `cycle-2026-04-23-debug-and-test-modes`. Briefs archived under `docs/tasks/archive/cycle-2026-04-23-debug-cleanup/`. Full retrospective at `docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md`.
+
+### Round 1 (2 parallel)
+- **PR #147 `preserve-drawing-buffer-dev-gate`** — extracted `shouldPreserveDrawingBuffer()` helper in `src/core/GameRenderer.ts`; returns `true` in dev, `true` on retail with `?capture=1`, `false` otherwise. Wired into the `WebGLRenderer` constructor. Retail bundle DCE verified: the minified helper is a pure URL-param check with the DEV branch tree-shaken. Behavior test covers all four branches. Diff 83 LOC vs ≤60 LOC budget (28 prod + 55 test) — envelope mildly over, well inside 500-LOC small-diff rule.
+- **PR #145 `world-overlay-debugger` (rebased + CI-fixed)** — unblocked the six world overlays (navmesh / LOS / squad influence / LOD tier / aircraft contact / terrain chunks) that had been stuck on a CI-only test red. Root cause was in the overlay source, not the test: `terrainChunkOverlay` throttled `update()` to 4 Hz using `performance.now() - lastUpdateMs < 250` with `lastUpdateMs` initialized to `0`, so a fresh-process Vitest cold-start bailed on the first call and `drawRange` stayed 0. Fix: initialize to `Number.NEGATIVE_INFINITY` so first call always runs. 1-line delta in `src/ui/debug/worldOverlays/terrainChunkOverlay.ts`; rebase on master was CLEAN; CI all green on rerun.
+
+### Perf (combat120, seed=2718, 90s, 120 NPCs)
+- R0 baseline (HEAD 6fad9e1, inherited): avg=16.98ms  p99=34.20ms  heap_end=-2.01MB  heap_recovery=1.038
+- post-R1 (HEAD bdaadcc):                 avg=17.25ms  p99=33.90ms  heap_end=+8.36MB  heap_recovery=0.759
+- **p99 gate:** -0.88% vs baseline → PASS. **heap_recovery gate:** 0.759 → PASS. **heap_end_growth gate (≤+2 MB):** YELLOW — +8.36 MB is a ~4.7 MB improvement over R3's +13.08 MB (preserve-drawing-buffer gate released its back-buffer tax) but did not return to baseline's near-zero. Residual likely includes `WorldOverlayRegistry` module-eval-time footprint; single-run variance also in play. Not a revert trigger.
+
+### Follow-ups for next cycle
+- **Investigate residual +8.36 MB heap end-growth.** The `?capture=1` gate pulled ~4.7 MB out of the retail residual; the remaining ~8 MB is probably `WorldOverlayRegistry` boot allocations (6 overlay modules + control panel + 4 accessors). First step is a variance read — rerun combat120 once or twice to confirm the residual is systematic, not single-run noise. Then audit overlay registry boot-time `new` calls and lazy-init the ones that aren't free.
+- **PlaytestCaptureManager preserveDrawingBuffer guard (optional).** Brief's Section 3 flagged a console.warn in `PlaytestCaptureManager.capture()` when `preserveDrawingBuffer === false` so Cloudflare testers who hit F9 without `?capture=1` get a clear signal instead of silent blank PNGs. Trivially small; bundle with any other capture-surface work.
 
 ## Recently Completed (cycle-2026-04-23-debug-and-test-modes, 2026-04-22)
 
