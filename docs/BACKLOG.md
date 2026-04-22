@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-04-22 (cycle-2026-04-22-heap-and-polish closed; cycle-2026-04-23-debug-and-test-modes seeded)
+Last updated: 2026-04-22 (cycle-2026-04-23-debug-and-test-modes closed; next cycle stub awaiting planning pass)
 
 ## Standing workstreams
 
@@ -22,6 +22,47 @@ Parallel to orchestrated cycles, the human is progressively replacing placeholde
 ### Playtest feedback docs
 
 Per-session fillable docs live under `docs/playtest/PLAYTEST_<date>.md`. Each session's notes roll up to the next cycle's planning pass. See `docs/playtest/PLAYTEST_2026-04-22.md` for the template shape.
+
+## Recently Completed (cycle-2026-04-23-debug-and-test-modes, 2026-04-22)
+
+Six merged PRs across three rounds plus a dedicated R0 prep commit, in a single autonomous session. One task blocked on CI red and did NOT merge (world-overlay-debugger, PR #145 remains open for rebase). Briefs archived under `docs/tasks/archive/cycle-2026-04-23-debug-and-test-modes/`. Full retrospective at `docs/cycles/cycle-2026-04-23-debug-and-test-modes/RESULT.md`.
+
+### Round 0 (orchestrator prep)
+- **commit 6fad9e1 `chore(cycle): R0 prep for cycle-2026-04-23-debug-and-test-modes`** — `npm install tweakpane` + fresh combat120 baseline capture committed to `docs/cycles/.../baseline/`. avg=16.98ms, p99=34.2ms, heap_recovery=1.038.
+
+### Round 1 (2 parallel)
+- **PR #140 `debug-hud-registry`** — `DebugHudRegistry` + `DebugPanel` interface; backtick (`` ` ``) master toggle; three existing overlays (PerformanceOverlay / TimeIndicator / LogOverlay) migrated; four new panels seeded (VehicleStatePanel @ 10Hz, CombatStatePanel, CurrentModePanel, FrameBudgetPanel @ 5Hz). F1-F4 behavior preserved via `registry.togglePanel()`. No additive combat accessors needed — `CombatantSystem.getCombatStats()` / `.getTelemetry()` already covered the read surface.
+- **PR #139 `engine-trajectory-memo`** — 3847-word memo at `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` covering stack snapshot, what-we-reinvented, fence review, multi-location reuse blast-radius, recommended sequence, anti-recommendations, immediate-vs-long-term table. Flagged the stale r183 references in MEMORY.md and CLAUDE.md as trivial next-cycle cleanup.
+
+### Round 2 (3 parallel — required orchestrator-directed rebase on one branch)
+- **PR #141 `time-control-overlay`** — `TimeScale` (0 / 0.1 / 0.25 / 0.5 / 1 / 2 / 4) threaded through `GameEngineLoop.dispatch` at a single hook point; `Backspace` for pause (both `Space` = jump and `P` = post-processing were taken), `.` step, `,` slow, `;` fast. `TimeControlPanel` registered with the HUD registry. Executor flagged 14 systems that read `performance.now()` directly and bypass the scale (GPUBillboardSystem, GunplayCore, AmmoSupplySystem, AmmoManager, TerrainStreamingScheduler, TerrainWorkerPool, WarSimulator, StrategicFeedback, ShotCommand, PlayerController, NavmeshSystem, TracerPool, ImpactEffectsPool, ExplosionEffectsPool, AILineOfSight); not a blocker but follow-up material.
+- **PR #143 `live-tuning-panel`** — Tweakpane panel (backslash `\` toggle) with Flight / Clouds / Atmosphere / Combat / Weather folders; localStorage persist + named-preset save/load/export. `LiveTuningPanel.getState()` exposes the values dictionary for the capture overlay to bundle. Retail DCE verified: zero `tweakpane` bytes in `dist/`. Dropped the `altitudeHoldPGain`/`DGain`/`pitchDamperGain` knobs listed in the brief — those fields do not exist on `FixedWingPhysicsConfig` (Airframe uses hardcoded PD gains); per the brief's "hide knob if target not available" rule.
+- **PR #142 `free-fly-camera-and-entity-inspector`** — `V` toggles a detached free-fly camera, `B` reattaches; mouse-click while free-flying raycasts and opens the `EntityInspectorPanel` on the hit entity. Per-type inspectors for Combatant / Vehicle / Prop / Player. Follow mode tracks the selected entity. **Required orchestrator-directed rebase** on top of #141+#143 after same-file conflicts on `GameEngine.ts` / `GameEngineInput.ts`; rebase executor returned CLEAN with 3702 tests green and `--force-with-lease`-pushed the resolved branch. No combat or vehicle accessors needed — `getAllCombatants`, `getVehicle`, `getAllVehicles`, `Combatant` already covered every field. 20-LOC cap stayed unspent.
+
+### Round 3 (3 parallel)
+- **PR #144 `playtest-capture-overlay`** — `preserveDrawingBuffer: true` on `WebGLRenderer` (unconditional; perf-analyst recommends gating behind `import.meta.env.DEV` in a follow-up). F9 captures the current frame, opens a centered modal with a thumbnail + annotation textarea; Submit writes PNG + MD (+ bundled tuning-state JSON) via `showSaveFilePicker` → `<a download>` fallback. Session-scoped directory naming. Executor could not capture a real PNG from the headless env; committed a README with the human-playtest capture procedure as the evidence placeholder.
+- **PR #146 `terrain-param-sandbox`** — new `?mode=terrain-sandbox` URL bypass (sibling to `?mode=flight-test`). Isolated scene with orbit camera + Tweakpane noise/shape/preview params + heightmap PNG export + MapSeedRegistry JSON export + clipboard-copy of the registry entry literal. DEV-gated via `import.meta.env.DEV`; retail DCE verified. **CDLOD terrain was too coupled to `GameEngine` to extract** inside the 500-LOC budget; fell back to `FALLBACK_STATIC_MESH` as the hard-stop escape hatch prescribed — scoped to a single generated mesh. Sandbox uses the shared `NoiseGenerator` Perlin primitive directly; the main-game `NoiseHeightProvider.calculateHeight` is a multi-band (continental + ridges + valleys + hills + water carving) composition, not a parameterized fBm, so no extract-shared-helper refactor fit.
+- **PR #145 `world-overlay-debugger` (BLOCKED — CI test red)** — six overlays (navmesh wireframe, LOS rays, squad influence, LOD tier, aircraft contact, terrain chunks) + `WorldOverlayRegistry` + control panel. `Shift+\` master toggle. Additive read-only accessors in `LOSAccelerator` (+11 LOC), `InfluenceMapSystem` (+9 LOC), `TerrainRenderRuntime` (+14 LOC), `TerrainSystem` (+5 LOC) — all within the ≤20 LOC per-file cap. Gated overlay hotkeys (N/L/I/T/C/X) to only fire when master is visible (T and C collide with air-support bindings). **Test failure in CI only:** `src/ui/debug/worldOverlays/terrainChunkOverlay.test.ts` expected 24 LineSegments (4 per tile × 6 active tiles) but got 0. Executor reported 3710 tests green locally — mock mismatch between the new terrain-chunk accessor and the overlay test stub is the most likely root cause. PR remains open for rebase + CI-fix as a next-cycle Round 1 candidate. Autonomous failure-handling followed (no retry, marked blocked, cycle continued).
+
+### Perf (combat120, seed=2718, 90s, 120 NPCs)
+- R0 baseline (HEAD 6fad9e1):  avg=16.98ms  p99=34.20ms  heap_peak=52.76MB  heap_recovery=1.038
+- post-R1 (HEAD 868f1aa):      avg=15.52ms  p99=34.10ms  heap_peak=34.43MB  heap_recovery=1.201   GREEN
+- post-R2 (HEAD 8833124):      avg=16.65ms  p99=35.30ms  heap_peak=71.03MB  heap_recovery=0.993   YELLOW (no hard stop)
+- post-R3 (HEAD 422563e):      avg=15.58ms  p99=34.50ms  heap_peak=30.80MB  heap_recovery=0.575   PASS
+- **Final gate:** p99 +0.88% vs baseline (ceiling +5.0%) → PASS; heap_recovery 0.575 (floor 0.5) → PASS. The R2 heap-peak WARN was workload-driven (R2 capture had 1 respawn + 88 kills; R3 settled back to lowest peak of the cycle).
+
+### Follow-ups for next cycle
+- **Rebase + CI-fix PR #145 `world-overlay-debugger`** — investigate the `terrainChunkOverlay.test.ts` mock mismatch; most likely the accessor stub shape vs the overlay's assumed `Iterable<tile>` contract. Worth bundling with the DEV-gate follow-up below as a Round 1 pair.
+- **Gate `preserveDrawingBuffer: true` behind `import.meta.env.DEV`** — +13 MB heap residual in R3 attributable to retained WebGL back-buffer; retail players pay the cost for a dev-only feature (F9 capture). Touches only `src/core/GameRenderer.ts`.
+- **MEMORY.md / CLAUDE.md refresh** — both still say `three@0.183 / r183` while `package.json` pins `^0.184.0` (flagged by engine-trajectory memo).
+- **Time-control scaled-delta audit** — 14 systems bypass the `TimeScale` multiplier (see RESULT.md for the full list). Addressing these would make pause / slow-mo / fast-forward behave correctly end-to-end. Not a single-cycle task; scoped to a few systems at a time.
+- **AC-47 low-pitch takeoff single-bounce** (carried over from prior cycles).
+- **Helicopter parity audit** for `HelicopterVehicleAdapter` / `HelicopterPlayerAdapter` (carried over).
+- **Asset replacement + LOD-imposter pipeline** (standing workstream).
+
+### Cycle metrics
+- 6/8 tasks merged. 1 blocked (world-overlay-debugger, CI test red). 1 orchestrator-directed rebase (free-fly on top of time-control + live-tuning). 0 reviewer spawns (anticipated reviewers did not fire — entity-inspector didn't need combat accessors; terrain-param-sandbox fell back to static mesh and stayed out of `src/systems/terrain/**`; world-overlay-debugger was blocked before reviewer dispatch). 0 fence changes. 0 rolled-back merges. 0 direct-to-master commits beyond the explicit R0 prep.
+- Wallclock: ~15:48 UTC R0 prep → ~18:00 UTC cycle close. Single ~2h12m autonomous session.
 
 ## Recently Completed (cycle-2026-04-22-heap-and-polish, 2026-04-22)
 

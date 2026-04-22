@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last updated: 2026-04-20
+Last updated: 2026-04-22
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -70,93 +70,59 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-04-23-debug-and-test-modes
+## Current cycle: (none — awaiting next planning pass)
 
 ### Cycle ID
 
-`cycle-2026-04-23-debug-and-test-modes`
+`<cycle-id>`
 
 ### Why this cycle exists
 
-The human is about to playtest intensely. The current diagnostic surface is thin (four hand-wired F1-F4 overlays, no registry, no live tuning, no free-fly camera, no click-to-inspect, no time control, no world-overlay visualization, no screenshot capture workflow, no standalone terrain editing). This cycle lands the full "observe, tune, drill, freeze, visualize, capture, generalize" diagnostic toolkit in one autonomous pass. Secondary goal: seed the engine-reuse path (terrain-param sandbox + engine-trajectory memo) without committing to a full rearch. Full plan in [docs/cycles/cycle-2026-04-23-debug-and-test-modes/README.md](cycles/cycle-2026-04-23-debug-and-test-modes/README.md).
+<one paragraph: what changed in the world or in the repo that justifies this cycle right now>
 
 ### Tasks in this cycle
 
-8 tasks across three rounds. Each has a brief at `docs/tasks/<slug>.md`.
-
-- **Round 1 (2 parallel — foundation + research):**
-  - `debug-hud-registry` (P0) — registry + backtick master toggle; migrate F1-F4 overlays; seed 4 new panels (vehicle, combat, mode, per-system frame-budget).
-  - `engine-trajectory-memo` (P2) — pure-research memo at `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md`; lib audit + rearch recommendations for multi-location/multi-game reuse.
-- **Round 2 (3 parallel — diagnostic tools):**
-  - `live-tuning-panel` (P0) — Tweakpane panel; curated flight/atmosphere/combat knobs; localStorage persist; combat-mute toggle.
-  - `free-fly-camera-and-entity-inspector` (P0) — `V` to detach cam; click any entity → full state tree inspector.
-  - `time-control-overlay` (P1) — pause / step / slow-mo / fast-forward on `deltaTime` multiplier.
-- **Round 3 (3 parallel — observation + capture + engine-reuse):**
-  - `world-overlay-debugger` (P1) — 3D overlay registry; seed overlays for navmesh, LOS rays, squad-influence heatmap, LOD tiers, aircraft contact capsules, terrain chunks.
-  - `playtest-capture-overlay` (P1) — F9 screenshot + annotation + bundled tuning-panel state JSON; `preserveDrawingBuffer: true` as Step 0.
-  - `terrain-param-sandbox` (P1) — new `?mode=terrain-sandbox`; Tweakpane noise/erosion params; live preview; export heightmap PNG + JSON.
+<list of slugs with one-line descriptions; each must have a brief at `docs/tasks/<slug>.md`>
 
 ### Round schedule
 
-R0 (tweakpane install + fresh baseline) → R1 (2 parallel) → R2 (3 parallel) → R3 (3 parallel).
-
-**Round 0 (orchestrator prep):** `git fetch origin && git status` (must be clean); `npm install tweakpane` + validate `npm run test:run` green; capture a fresh `npm run perf:capture:combat120` and commit to `docs/cycles/cycle-2026-04-23-debug-and-test-modes/baseline/`.
+<R1 ... -> R2 ... -> ...; concurrency per round; merge gates>
 
 ### Concurrency cap
 
-3 (R1 uses 2; R2 and R3 use 3).
+<N>
 
 ### Dependencies
 
-```
-Round 0 (tweakpane install + fresh baseline)
-  -> debug-hud-registry            ┐
-  -> engine-trajectory-memo        ┘─ R1 parallel (disjoint)
-       -> live-tuning-panel        ┐
-       -> free-fly-cam + inspector ├─ R2 parallel (disjoint)
-       -> time-control-overlay     ┘
-            -> world-overlay-debugger      ┐
-            -> playtest-capture-overlay    ├─ R3 parallel (disjoint)
-            -> terrain-param-sandbox       ┘
-```
-
-Soft dep: `playtest-capture-overlay` bundles `live-tuning-panel` state JSON — naturally satisfied by R2→R3 sequencing.
+<inline DAG or pointer to brief file>
 
 ### Playtest policy
 
-DEFERRED. No playtest gate BLOCKS merge. This cycle exists to enable the *next* playtest, not be gated on one.
+<which tasks gate on playtest pass before merge; default is "playtest-required PRs merge on CI green and are flagged for morning review">
 
 ### Perf policy
 
-- **Baseline:** Round-0 fresh capture.
-- **Gate:** post-Round-3 `npm run perf:capture:combat120`. p99 within 5% of Round-0 baseline; `heap_recovery_ratio` ≥ 0.5. Most likely perf risk is `preserveDrawingBuffer: true` from the capture task; if it fails, gate behind `import.meta.env.DEV`.
+<perf gating description; default baseline handling>
 
 ### Failure handling (autonomous-safe)
 
-- CI red on a task → mark `blocked`, record, continue.
-- Fence-change proposal (`fence_change: yes`) → mark `blocked`, record, DO NOT merge.
-- Probe/screenshot-assertion fail post-merge → revert if possible; otherwise `rolled-back-pending` in RESULT.md.
+<failure handling rules>
 
 ### Visual checkpoints (orchestrator-gated)
 
-NONE. Autonomous run.
+<list of `evidence/<slug>/<artifact>` outputs the orchestrator must review before advancing past that round; or "NONE" if cycle is autonomous>
 
 ### skip-confirm
 
-YES. Orchestrator does NOT pause between rounds.
+<yes|no — if yes, orchestrator does NOT pause for "go" between rounds; default no>
 
 ### Cycle-specific notes
 
-- **F1-F4 keybind muscle memory preserved.** Backtick is new master toggle; F1-F4 still toggle their original panels.
-- **`?mode=flight-test` stays** as the isolated-physics bypass at `src/dev/flightTestScene.ts`. `terrain-param-sandbox` adds a new `?mode=terrain-sandbox` bypass via the same URL-dispatch path.
-- **Tweakpane is a new dependency.** Gate all imports behind `import.meta.env.DEV`; Vite DCE eliminates from retail. Zero retail bundle cost.
-- **Do NOT add `@needle-tools/*` to dependencies** — their npm runtime forks three@0.145.4 and we are on r184. The Needle DevTools Chrome extension is installed locally, not via npm.
-- **Combat-reviewer permissive for narrow accessors.** `debug-hud-registry` + `free-fly-camera-and-entity-inspector` may each add ≤20 LOC additive read-only accessors in `src/systems/combat/**`. Reviewer spawns and merges cleanly. Expansion beyond the 20-LOC budget → escalate.
-- **Reviewers:** `world-overlay-debugger` and `terrain-param-sandbox` touch terrain/nav surface (terrain-nav-reviewer). Entity-inspector and combat-state-panel touch combat surface (combat-reviewer). Normal reviewer fan-out.
+<anything that does not generalize: budget caps that override the default, special handling for a known-flaky test, etc.>
 
 ### Pre-flight acknowledgement
 
-The prior cycle, `cycle-2026-04-22-heap-and-polish`, closed on 2026-04-22 with 4 merged PRs (#135–#138). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-22-heap-and-polish, 2026-04-22)" and `docs/cycles/cycle-2026-04-22-heap-and-polish/RESULT.md`.
+The previous cycle, `cycle-2026-04-23-debug-and-test-modes`, closed on 2026-04-22 with 6 merged PRs (#139, #140, #141, #142, #143, #144, #146) and 1 blocked PR (#145 `world-overlay-debugger`, CI test failure — rebasable). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-23-debug-and-test-modes, 2026-04-22)" and `docs/cycles/cycle-2026-04-23-debug-and-test-modes/RESULT.md`.
 
 ## Dispatch protocol
 
