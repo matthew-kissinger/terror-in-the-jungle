@@ -554,9 +554,19 @@ export class Airframe {
     const a = this.computeAero();
 
     // Authority scales with dynamic pressure so stalled / low-q aircraft feel
-    // "mushy" rather than locked into a zero-input attitude.
+    // "mushy" rather than locked into a zero-input attitude. The low-q end uses
+    // a smoothstep-blended floor (rather than a hard clamp) so control response
+    // has a continuous derivative as q crosses the clamp edge — the hard
+    // clamp produced a perceptible change in feel at the low-speed threshold
+    // during slow climb, contributing to climb-rock.
     const qRef = 0.5 * AIR_DENSITY * aero.vrSpeedMs * aero.vrSpeedMs;
-    const authorityScale = THREE.MathUtils.clamp(a.dynamicPressure / qRef, 0.15, 2.2);
+    const qNorm = a.dynamicPressure / qRef;
+    const AUTHORITY_FLOOR = 0.30;
+    const blend = THREE.MathUtils.smoothstep(qNorm, 0.10, 0.30);
+    const authorityScale = Math.min(
+      AUTHORITY_FLOOR + blend * (qNorm - AUTHORITY_FLOOR),
+      2.2,
+    );
 
     // Alpha protection: attenuate nose-up elevator as AoA approaches stall.
     // Lives in the sim (not the command builder) so player can't override it.
