@@ -1,6 +1,6 @@
 # Playtest Checklist
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 Agents can run tests and probes. They cannot feel the game. Any PR that touches flight, driving, combat rhythm, or UI responsiveness must be validated against this checklist by a human pressing keys and watching the screen. Tests green + build green != feel green.
 
@@ -11,6 +11,7 @@ Check each item. Unchecked items are failures. Add notes for anything that borde
 - [ ] Spawns parked on runway, oriented correctly, no ground clipping
 - [ ] Full throttle (W) accelerates smoothly, no hitching
 - [ ] Rotation: pull up (Arrow Up) near Vr and aircraft lifts off within ~10 s of full throttle (prop) / ~9 s (jet)
+- [ ] Takeoff roll and liftoff do not clip through rising terrain or runway shoulders
 - [ ] Pitch response feels proportional to stick, not mushy, not snappy
 - [ ] Pitch response does not feel stiff or step-like at high speed
 - [ ] Banks cleanly left/right (Arrow Left/Right) without over-rolling
@@ -39,6 +40,7 @@ Check each item. Unchecked items are failures. Add notes for anything that borde
 - [ ] Hit indicators fire on every hit; no silent hits
 - [ ] No visible frame stutter during firefights (30+ combatants)
 - [ ] Cover usage looks intentional, not spinning or stuck
+- [ ] Nearby friendly and enemy soldiers stay visually grounded on steep hillsides; no phasing into terrain or floating while moving uphill/downhill
 
 ## Modes and flow
 

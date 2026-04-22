@@ -21,6 +21,7 @@ import type { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { AircraftModels } from '../assets/modelPaths';
 import { NPCFlightController, buildAirSupportMission } from './NPCFlightController';
 import { FIXED_WING_CONFIGS } from '../vehicle/FixedWingConfigs';
+import { createRuntimeTerrainProbe } from '../vehicle/airframe/terrainProbe';
 
 interface AirSupportManagerDependencies {
   combatantSystem: CombatantSystem;
@@ -264,7 +265,12 @@ export class AirSupportManager implements GameSystem {
         .addScaledVector(approachDir, -500);
       startPos.y = (this.terrainSystem?.getHeightAt(startPos.x, startPos.z) ?? 0) + config.altitude;
 
-      const fc = new NPCFlightController(aircraft, startPos, physicsConfig);
+      const fc = new NPCFlightController(
+        aircraft,
+        startPos,
+        physicsConfig,
+        this.terrainSystem ? createRuntimeTerrainProbe(this.terrainSystem) : undefined,
+      );
       const missionType = request.type === 'spooky' ? 'orbit' as const
         : request.type === 'recon' ? 'flyover' as const
         : 'attack_run' as const;

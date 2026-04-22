@@ -656,6 +656,7 @@ export class CombatantLODManager {
     if (options?.lowCost) {
       // Far-NPC fallback path: preserve coarse motion without expensive state/terrain work.
       combatant.position.addScaledVector(combatant.velocity, deltaTime);
+      this.combatantMovement.syncTerrainHeight(combatant);
       this.combatantMovement.updateRotation(combatant, deltaTime);
       if (options.updateSpatial !== false) {
         this.recordSpatialUpdate(combatant);
@@ -806,6 +807,7 @@ export class CombatantLODManager {
         combatant.position.addScaledVector(direction, distanceToMove);
         combatant.rotation = Math.atan2(direction.x, direction.z);
         combatant.position.y = DISTANT_CULLED_DEFAULT_Y;
+        this.combatantMovement.syncTerrainHeight(combatant);
         return;
       }
     }
@@ -826,6 +828,7 @@ export class CombatantLODManager {
     );
     combatant.position.add(randomOffset);
     combatant.position.y = DISTANT_CULLED_DEFAULT_Y;
+    this.combatantMovement.syncTerrainHeight(combatant);
   }
 
   private getStablePhaseOffsetMs(id: string, periodMs: number): number {

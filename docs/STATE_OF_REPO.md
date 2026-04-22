@@ -45,6 +45,13 @@ document answers the narrower question: what is true on `master` right now?
 - `npm run perf:compare` — PASS, 8/8 checks against refreshed baselines
 - Targeted Cycle 2 soak/lifecycle tests — PASS
   - `npx vitest run src/systems/world/GameModeManager.test.ts src/systems/world/TicketSystem.test.ts scripts/perf-harness/perf-active-driver.test.js`
+- Targeted terrain-contact regression tests — PASS on 2026-04-22
+  - `npx vitest run src/systems/combat/CombatantMovement.test.ts src/systems/combat/CombatantLODManager.test.ts src/systems/combat/CombatantRenderInterpolator.test.ts src/systems/vehicle/airframe/terrainProbe.test.ts src/systems/vehicle/__tests__/fixedWing.integration.test.ts src/systems/vehicle/FixedWingModel.test.ts src/systems/airsupport/NPCFlightController.test.ts`
+- Cycle 2 terrain-contact delta validation — PASS on 2026-04-22
+  - `npm run validate:fast`
+  - `npm run build`
+  - `npm run probe:fixed-wing` (A-1, F-4, and AC-47 all passed takeoff,
+    climb, approach, and handoff; AC-47 orbit hold also passed)
 - `npm run doctor` — PASS
   - current shell: Node 24.14.1
   - repo target: `.nvmrc` says Node 24
@@ -98,6 +105,12 @@ document answers the narrower question: what is true on `master` right now?
   uploads manifest copies to R2, and validates size/content-type/cache/CORS.
   The custom R2 domain is still open, and production still needs a live Pages
   deploy after merge before the live A Shau gap can be called fixed.
+- Cycle 2 terrain-contact work is active: nearby NPC hillside phasing/floating
+  was traced to render Y smoothing treating >1m high-LOD terrain corrections as
+  distant snaps, while low-cost/distant NPC paths could preserve stale altitude.
+  Fixed-wing and air-support aircraft also used flat terrain probes for each
+  airframe step. The code now has targeted fixes and tests, but needs human
+  hillside/takeoff playtest before it is called signed off.
 - `npm run perf:capture:frontier30m` now uses perf-only Open Frontier lifecycle
   overrides (`perfMatchDuration=3600`, `perfDisableVictory=1`) so the script is
   a non-terminal 30-minute soak again. The tracked 2026-04-20 baseline still
@@ -110,9 +123,11 @@ document answers the narrower question: what is true on `master` right now?
 
 ## Immediate Priorities
 
-1. Human-playtest the Cycle 2 fixed-wing interpolation/camera smoothing patch.
-   If stiffness, bounce/porpoise, or visual shake persists, move next to
-   airframe damping/control-response tuning with probe evidence.
+1. Human-playtest the Cycle 2 fixed-wing interpolation/camera smoothing and
+   terrain-contact patch. Include nearby friendly/enemy soldiers on steep
+   hillsides and fixed-wing takeoff/liftoff over rising terrain. If stiffness,
+   bounce/porpoise, visual shake, or terrain contact persists, move next to
+   airframe damping/control-response tuning and terrain probe evidence.
 2. Continue Cycle 2 with startup bundle weight reduction while fixed-wing feel
    waits for the scheduled human playtest.
 3. Re-run `npm run validate:full` and refresh the `frontier30m` baseline from a

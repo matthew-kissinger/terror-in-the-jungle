@@ -81,6 +81,7 @@ function createMockCombatantMovement(): CombatantMovement {
   return {
     updateMovement: vi.fn(),
     updateRotation: vi.fn(),
+    syncTerrainHeight: vi.fn(() => true),
     resetPathQueryBudget: vi.fn(),
     removePathCache: vi.fn(),
   } as unknown as CombatantMovement;
@@ -408,6 +409,23 @@ describe('CombatantLODManager', () => {
       expect(dyingCombatant.deathProgress).toBeGreaterThan(0);
     });
 
+    it('keeps low-cost LOD movement terrain-grounded', () => {
+      const largeWorldManager = createMockGameModeManager(2000);
+      manager.setGameModeManager(largeWorldManager);
+      manager.setLODRanges(50, 100, 1000);
+
+      const combatant = createMockCombatant('low', new THREE.Vector3(500, 25, 0));
+      combatant.velocity.set(2, 0, 0);
+      combatant.lastUpdateTime = 0;
+      combatants.set('low', combatant);
+
+      for (let i = 0; i < 8; i++) {
+        manager.updateCombatants(0.016);
+      }
+
+      expect(combatantMovement.syncTerrainHeight).toHaveBeenCalledWith(combatant);
+    });
+
     it('should skip dead actors from LOD update loops and remove them from spatial grid', () => {
       const deadCombatant = createMockCombatant('dead', new THREE.Vector3(100, 0, 0), Faction.US, CombatantState.DEAD, true);
       deadCombatant.deathProgress = 0.1;
@@ -481,6 +499,33 @@ describe('CombatantLODManager', () => {
       expect(newDistance).toBeLessThan(originalDistance);
     });
 
+    it('terrain-grounds distant strategic simulation after moving', () => {
+      manager.setGameModeManager(createMockGameModeManager(2000));
+      const zoneManager = createMockZoneManager();
+      const strategicZone = {
+        id: 'zone1',
+        name: 'Zone 1',
+        position: new THREE.Vector3(0, 0, 0),
+        radius: 20,
+        height: 2,
+        owner: null,
+        state: 'neutral',
+        captureProgress: 0,
+        captureSpeed: 0,
+        isHomeBase: false,
+      };
+      vi.mocked(zoneManager.getAllZones).mockReturnValue([strategicZone as any]);
+      manager.setZoneManager(zoneManager);
+
+      const combatant = createMockCombatant('test', new THREE.Vector3(900, 0, 900));
+      combatant.lastUpdateTime = 1;
+      combatants.set('test', combatant);
+
+      manager.updateCombatants(30);
+
+      expect(combatantMovement.syncTerrainHeight).toHaveBeenCalledWith(combatant);
+    });
+
     it('should ignore home base zones', () => {
       const zoneManager = createMockZoneManager();
       const homeBase = {
@@ -525,7 +570,7 @@ describe('CombatantLODManager', () => {
       // Create a single combatant at far distance to trigger simulateDistantAI
       // Position at (900, 0, 900) - distance ~1273, which is > 600 LOD threshold for 400-size world
       const farCombatant = createMockCombatant('far', new THREE.Vector3(900, 0, 900));
-      farCombatant.lastUpdateTime = 0; // Trigger simulation on first update
+      farCombatant.lastUpdateTime = 1; // Trigger simulation on first update
       combatants.set('far', farCombatant);
 
       const originalX = farCombatant.position.x;

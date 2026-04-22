@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-04-21 (Cycle 2 active)
+Last updated: 2026-04-22 (Cycle 2 active)
 
 Historical cycle-close sections below preserve what was true when those cycles
 closed. Current open work lives in the P0/P1/P2/P3 sections plus Known Issues /
@@ -25,11 +25,13 @@ Plan: [docs/cycles/cycle-2026-04-21-stabilization-reset/README.md](cycles/cycle-
    config ownership, runway/climb/approach probes, AC-47 orbit-hold validation,
    player/NPC handoff checks, and cross-vehicle flight mouse reset are done.
    Aircraft feel is not signed off; it intentionally moves to Cycle 2.
-3. **Flight feel, perf, and bundle** — next. Investigate fixed-wing stiffness,
-   altitude bounce/porpoise, visual shake, and interpolation/camera smoothing;
-   reduce large startup chunks; refresh `frontier30m` after its non-terminal
-   soak fix; keep dead-code hygiene clean as bundle and vehicle work move
-   files.
+3. **Flight feel, terrain contact, perf, and bundle** — active. Investigate
+   fixed-wing stiffness, altitude bounce/porpoise, visual shake, and
+   interpolation/camera smoothing; keep nearby NPCs visually grounded on
+   hillsides; keep fixed-wing takeoff/liftoff from clipping through rising
+   terrain; reduce large startup chunks; refresh `frontier30m` after its
+   non-terminal soak fix; keep dead-code hygiene clean as bundle and vehicle
+   work move files.
 4. **Combat and navigation quality** — return to terrain/pathing stalls,
    squad-suppression consolidation, and remaining combat-state cleanup.
 

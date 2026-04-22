@@ -4,6 +4,7 @@ import type { ITerrainRuntime, IHUDSystem, IPlayerController } from '../../types
 import type { VehicleManager } from './VehicleManager';
 import { Airframe } from './airframe/Airframe';
 import type { AirframeIntent, AirframeTerrainProbe } from './airframe/types';
+import { createFlatTerrainProbe, createRuntimeTerrainProbe } from './airframe/terrainProbe';
 import {
   airframeConfigFromLegacy,
   airframeStateToFixedWingSnapshot,
@@ -14,7 +15,6 @@ import type {
   FixedWingFlightPhase,
   FixedWingFlightSnapshot,
   FixedWingFlightState,
-  FixedWingTerrainSample,
 } from './FixedWingTypes';
 import { FixedWingAnimation } from './FixedWingAnimation';
 import { FixedWingInteraction } from './FixedWingInteraction';
@@ -46,11 +46,6 @@ import { ModelLoader } from '../assets/ModelLoader';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { Faction } from '../combat/types';
 import { Logger } from '../../utils/Logger';
-
-interface CachedTerrainSample {
-  sample: FixedWingTerrainSample;
-  lastSampleMs: number;
-}
 
 interface AircraftRuntime {
   airframe: Airframe;
@@ -119,25 +114,6 @@ function commandToAirframeIntent(cmd: FixedWingCommand): AirframeIntent {
   };
 }
 
-function makeStaticTerrainProbe(sample: FixedWingTerrainSample): AirframeTerrainProbe {
-  const normal = sample.normal ?? new THREE.Vector3(0, 1, 0);
-  const height = sample.height;
-  return {
-    sample() {
-      return { height, normal };
-    },
-    sweep(from: THREE.Vector3, to: THREE.Vector3) {
-      if (from.y >= height && to.y < height) {
-        const t = (from.y - height) / Math.max(from.y - to.y, 0.0001);
-        const point = new THREE.Vector3().lerpVectors(from, to, t);
-        point.y = height;
-        return { hit: true, point, normal };
-      }
-      return null;
-    },
-  };
-}
-
 function sanitizeCommand(command: Partial<FixedWingCommand>, base: FixedWingCommand): FixedWingCommand {
   const next: FixedWingCommand = { ...base };
   if (command.throttleTarget !== undefined) {
@@ -170,7 +146,6 @@ function sanitizeCommand(command: Partial<FixedWingCommand>, base: FixedWingComm
  */
 export class FixedWingModel implements GameSystem {
   private static readonly IDLE_SIMULATION_SPEED = 0.5;
-  private static readonly AI_TERRAIN_SAMPLE_INTERVAL_MS = 100;
   private scene: THREE.Scene;
   private modelLoader = new ModelLoader();
   private animation = new FixedWingAnimation();
@@ -184,7 +159,6 @@ export class FixedWingModel implements GameSystem {
   private collisionRegistered = new Set<string>();
   private spawnMetadata = new Map<string, FixedWingSpawnMetadata>();
   private lineupAircraft = new Set<string>();
-  private terrainSampleCache = new Map<string, CachedTerrainSample>();
   /**
    * Per-aircraft latched sim-cull state. `true` means we simulated last frame,
    * `false` means we were culled. Drives the hysteresis band in
@@ -198,6 +172,7 @@ export class FixedWingModel implements GameSystem {
 
   // Dependencies
   private terrainManager?: ITerrainRuntime;
+  private terrainProbe: AirframeTerrainProbe = createFlatTerrainProbe(0);
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
   private vehicleManager?: VehicleManager;
@@ -216,6 +191,7 @@ export class FixedWingModel implements GameSystem {
 
   setTerrainManager(terrainManager: ITerrainRuntime): void {
     this.terrainManager = terrainManager;
+    this.terrainProbe = createRuntimeTerrainProbe(terrainManager);
     this.interaction.setTerrainManager(terrainManager);
   }
 
@@ -345,11 +321,9 @@ export class FixedWingModel implements GameSystem {
       }
 
       if (shouldSimulate) {
-        const pos = runtime.airframe.getPosition();
-        const terrainSample = this.getTerrainSampleCached(aircraftId, pos.x, pos.z, isPiloted);
         runtime.airframe.step(
           commandToAirframeIntent(runtime.command),
-          makeStaticTerrainProbe(terrainSample),
+          this.terrainProbe,
           deltaTime,
         );
 
@@ -415,7 +389,6 @@ export class FixedWingModel implements GameSystem {
     this.collisionRegistered.clear();
     this.spawnMetadata.clear();
     this.lineupAircraft.clear();
-    this.terrainSampleCache.clear();
     this.simulating.clear();
     for (const pilot of this.npcPilots.values()) pilot.clearMission();
     this.npcPilots.clear();
@@ -852,40 +825,6 @@ export class FixedWingModel implements GameSystem {
 
   private buildSnapshot(runtime: AircraftRuntime): FixedWingFlightSnapshot {
     return airframeStateToFixedWingSnapshot(runtime.airframe.getState());
-  }
-
-  private getTerrainSampleCached(
-    aircraftId: string,
-    x: number,
-    z: number,
-    isPiloted: boolean,
-  ): FixedWingTerrainSample {
-    if (!this.terrainManager) {
-      return { height: 0 };
-    }
-
-    let cached = this.terrainSampleCache.get(aircraftId);
-    if (!cached) {
-      cached = {
-        sample: { height: 0, normal: new THREE.Vector3(0, 1, 0) },
-        lastSampleMs: Number.NEGATIVE_INFINITY,
-      };
-      this.terrainSampleCache.set(aircraftId, cached);
-    }
-
-    const nowMs = performance.now();
-    const needsRefresh = isPiloted
-      || nowMs - cached.lastSampleMs >= FixedWingModel.AI_TERRAIN_SAMPLE_INTERVAL_MS;
-
-    if (needsRefresh) {
-      cached.sample.height = this.terrainManager.getHeightAt(x, z);
-      const normal = cached.sample.normal ?? new THREE.Vector3(0, 1, 0);
-      this.terrainManager.getNormalAt(x, z, normal);
-      cached.sample.normal = normal;
-      cached.lastSampleMs = nowMs;
-    }
-
-    return cached.sample;
   }
 
   private isOrbitHoldActive(aircraftId: string): boolean {

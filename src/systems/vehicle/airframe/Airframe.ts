@@ -335,6 +335,9 @@ export class Airframe {
     // 6. Integrate.
     if (this.weightOnWheels) {
       this.integrateGround(dt, cmd);
+      if (this.weightOnWheels) {
+        this.syncGroundContactAtCurrentPosition(terrain);
+      }
     } else {
       this.integrateAir(dt, cmd);
     }
@@ -482,6 +485,13 @@ export class Airframe {
     } else {
       this.phase = 'takeoff_roll';
     }
+  }
+
+  private syncGroundContactAtCurrentPosition(terrain: AirframeTerrainProbe): void {
+    const sample = terrain.sample(this.position.x, this.position.z);
+    this.groundHeight = sample.height;
+    if (sample.normal) this.terrainNormal.copy(sample.normal).normalize();
+    this.position.y = this.groundHeight + this.cfg.ground.gearClearanceM;
   }
 
   private integrateAir(dt: number, cmd: AirframeCommand): void {

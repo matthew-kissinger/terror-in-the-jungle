@@ -4,8 +4,7 @@
  * `FixedWingCommand` is the command shape produced by `FixedWingControlLaw`'s
  * `buildFixedWingPilotCommand()`; `FixedWingFlightSnapshot` is the observable
  * per-tick telemetry snapshot consumed by control-law and operation-state
- * helpers. `FixedWingTerrainSample` is the flat-slab terrain input used by the
- * flight-test scene and the legacy integration tests.
+ * helpers.
  *
  * These types used to live alongside a legacy fixed-wing shim class. With the
  * B1 cutover the shim is gone — `FixedWingModel` / `NPCFlightController` /
@@ -38,11 +37,6 @@ export interface FixedWingCommand {
   brake: number;
   freeLook: boolean;
   stabilityAssist: boolean;
-}
-
-export interface FixedWingTerrainSample {
-  height: number;
-  normal?: import('three').Vector3;
 }
 
 export interface FixedWingFlightSnapshot {

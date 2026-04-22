@@ -28,11 +28,12 @@ This cycle is intentionally focused on truth, gates, and hygiene. New gameplay, 
 - [x] Defer fixed-wing feel/interpolation polish to Cycle 2. Cycle 1 restored correctness gates; it does not claim aircraft feel is signed off.
 - [x] Keep deploy freshness in the flight/content loop: any GLB, aircraft model, public asset, or service-worker change must pass the Cloudflare header spot-check in `docs/DEPLOY_WORKFLOW.md` after deploy.
 
-## Cycle 2: Flight feel, perf, and bundle
+## Cycle 2: Flight feel, terrain contact, perf, and bundle
 
 - [x] Investigate fixed-wing feel issues reported during manual flight: stiff response, altitude bounce/porpoising after climb, unstable visual shake at speed, and whether fixed-wing needs render/camera interpolation comparable to the helicopter path. Initial evidence pointed at the render/camera boundary: fixed-wing used raw airframe pose, while helicopter exposes interpolated physics state.
 - [x] Implement the first fixed-wing feel fix set: Airframe now exposes an interpolated pose from its fixed-step accumulator, FixedWingModel renders/queries that visual pose, and PlayerCamera uses elapsed-time smoothing for fixed-wing follow, look target, and FOV widening. `npm run probe:fixed-wing` passes after the patch; human feel sign-off is still open.
-- [ ] Re-run the human playtest checklist for flight feel after the automated fixed-wing gates pass; automated checks are not sufficient for aircraft feel.
+- [x] Patch the terrain-contact regressions reported during play: nearby NPCs can visually phase into or float above hillsides when render Y smoothing treats steep-terrain corrections as distant snaps; low-cost/distant NPC paths can preserve stale altitude; fixed-wing and air-support aircraft can miss rising terrain because their airframe probe was flat for a whole physics step.
+- [ ] Re-run the human playtest checklist for flight feel and terrain contact after the automated gates pass; automated checks are not sufficient for aircraft feel or hillside visual quality.
 - [ ] Reduce initial JS chunk weight. Current production build still emits large `index`, `three`, and `ui` chunks.
 - [x] Fix `frontier30m` soak semantics. The script now runs Open Frontier with perf-only match lifecycle overrides (`perfMatchDuration=3600`, `perfDisableVictory=1`) so the capture stays in non-terminal active combat instead of timing out around 15 minutes. Refresh the baseline only from a quiet-machine run.
 - [x] Remove build-time `.gz`/`.br` sidecar generation. Cloudflare handles visitor-facing compression for JS/CSS/WASM; deploy output now contains only canonical assets and hashed build files.

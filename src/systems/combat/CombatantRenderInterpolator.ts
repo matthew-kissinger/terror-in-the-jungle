@@ -23,6 +23,11 @@ const RENDER_MAX_SPEED_MPS = Math.max(NPC_MAX_SPEED * 2, 18);
 const VERTICAL_NEAR_THRESHOLD_M = 1.0;
 const RENDER_NEAR_VERTICAL_SPEED_MPS = NPC_MAX_SPEED; // locomotion rate
 const RENDER_FAR_VERTICAL_SPEED_MPS = 2;              // upstream-snap rate
+// Moderate terrain re-samples are normal hillside travel, not teleport-like
+// artifacts. Keep visible soldiers close to their logical grounded height so
+// they do not appear buried in slopes or floating while Y catches up.
+const VERTICAL_GROUND_CONTACT_THRESHOLD_M = 6.0;
+const MAX_GROUNDED_RENDER_OFFSET_M = 0.35;
 
 // Minimum per-frame closure so the smoother always makes progress even when
 // deltaTime is tiny or NPC_MAX_SPEED is tuned downward.
@@ -132,6 +137,17 @@ export class CombatantRenderInterpolator {
       rendered.y = combatant.position.y;
     } else {
       rendered.y += yStep;
+    }
+
+    if (
+      absDy <= VERTICAL_GROUND_CONTACT_THRESHOLD_M &&
+      (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')
+    ) {
+      rendered.y = THREE.MathUtils.clamp(
+        rendered.y,
+        combatant.position.y - MAX_GROUNDED_RENDER_OFFSET_M,
+        combatant.position.y + MAX_GROUNDED_RENDER_OFFSET_M,
+      );
     }
   }
 

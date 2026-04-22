@@ -210,8 +210,9 @@ export class CombatantMovement {
 
     // Keep on terrain with sampled/cached updates to avoid per-frame height churn at scale.
     if (!options?.disableTerrainSample) {
-      const terrainHeight = this.getTerrainHeightForCombatant(combatant);
-      combatant.position.y = terrainHeight + NPC_Y_OFFSET;
+      if (!this.syncTerrainHeight(combatant)) {
+        throw new Error('CombatantMovement requires terrainSystem before terrain height queries');
+      }
     }
 
     const progress = this.updateProgressTracking(combatant, steering.anchorDistanceBeforeSq, now);
@@ -969,6 +970,20 @@ export class CombatantMovement {
     combatant.terrainSampleHeight = nextHeight;
     combatant.terrainSampleTimeMs = now;
     return nextHeight;
+  }
+
+  /**
+   * Cheap terrain grounding hook for LOD paths that intentionally skip the
+   * full movement solver. Uses the same per-LOD cache as normal movement so
+   * distant crowds do not carry stale or synthetic altitude across slopes.
+   */
+  syncTerrainHeight(combatant: Combatant): boolean {
+    if (!this.terrainSystem) {
+      return false;
+    }
+    const terrainHeight = this.getTerrainHeightForCombatant(combatant);
+    combatant.position.y = terrainHeight + NPC_Y_OFFSET;
+    return true;
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {

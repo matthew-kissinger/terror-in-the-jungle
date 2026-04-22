@@ -32,6 +32,9 @@ export class NPCFlightController {
   private readonly pilot: NPCFixedWingPilot;
   private readonly airframe: Airframe;
   private readonly aircraft: THREE.Group;
+  private readonly terrainProbe: AirframeTerrainProbe;
+  private readonly flatTerrainProbe: AirframeTerrainProbe;
+  private flatTerrainHeight = 0;
   /** Persisted across frames so setMission() can prime throttle pre-first-tick. */
   private intent: AirframeIntent = {
     pitch: 0,
@@ -48,10 +51,13 @@ export class NPCFlightController {
     aircraft: THREE.Group,
     startPosition: THREE.Vector3,
     physicsConfig: FixedWingPhysicsConfig,
+    terrainProbe?: AirframeTerrainProbe,
   ) {
     this.aircraft = aircraft;
     this.pilot = new NPCFixedWingPilot();
     this.airframe = new Airframe(startPosition, airframeConfigFromLegacy(physicsConfig));
+    this.flatTerrainProbe = this.createMutableFlatTerrainProbe();
+    this.terrainProbe = terrainProbe ?? this.flatTerrainProbe;
     // AirSupportManager spawns the aircraft airborne; mark WoW false so
     // the airframe integrates airborne physics straight away.
     const forwardSpeed = 60; // plausible cruise; pilot's PD reels it in.
@@ -88,6 +94,8 @@ export class NPCFlightController {
   }
 
   update(dt: number, terrainHeight: number): void {
+    this.flatTerrainHeight = terrainHeight;
+
     // Run the pilot state machine against the latest airframe observation.
     const snapshot = this.airframe.getState();
     const intent = this.missionActive ? this.pilot.update(dt, snapshot) : null;
@@ -102,7 +110,7 @@ export class NPCFlightController {
       this.intent.tier = intent.assistEnabled ? 'assist' : 'raw';
     }
 
-    this.airframe.step(this.intent, makeStaticTerrainProbe(terrainHeight), dt);
+    this.airframe.step(this.intent, this.terrainProbe, dt);
 
     this.aircraft.position.copy(this.airframe.getPosition());
     this.aircraft.quaternion.copy(this.airframe.getQuaternion());
@@ -129,6 +137,23 @@ export class NPCFlightController {
   dispose(): void {
     this.pilot.clearMission();
     this.missionActive = false;
+  }
+
+  private createMutableFlatTerrainProbe(): AirframeTerrainProbe {
+    const normal = new THREE.Vector3(0, 1, 0);
+    return {
+      sample: () => ({ height: this.flatTerrainHeight, normal }),
+      sweep: (from, to) => {
+        const height = this.flatTerrainHeight;
+        if (from.y >= height && to.y < height) {
+          const t = (from.y - height) / Math.max(from.y - to.y, 0.0001);
+          const point = new THREE.Vector3().lerpVectors(from, to, t);
+          point.y = height;
+          return { hit: true, point, normal };
+        }
+        return null;
+      },
+    };
   }
 }
 
@@ -206,22 +231,4 @@ export function buildAirSupportMission(
 
   Logger.debug('air-support', `Built ${missionType} mission: alt=${altitude}m, speed=${speed}m/s`);
   return mission;
-}
-
-function makeStaticTerrainProbe(height: number): AirframeTerrainProbe {
-  const normal = new THREE.Vector3(0, 1, 0);
-  return {
-    sample() {
-      return { height, normal };
-    },
-    sweep(from: THREE.Vector3, to: THREE.Vector3) {
-      if (from.y >= height && to.y < height) {
-        const t = (from.y - height) / Math.max(from.y - to.y, 0.0001);
-        const point = new THREE.Vector3().lerpVectors(from, to, t);
-        point.y = height;
-        return { hit: true, point, normal };
-      }
-      return null;
-    },
-  };
 }

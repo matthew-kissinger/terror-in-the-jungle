@@ -279,4 +279,38 @@ describe('CombatantRenderInterpolator', () => {
       expect(Math.abs(c.renderedPosition!.y - c.position.y)).toBeLessThan(0.02);
     }
   });
+
+  it('keeps visible grounded combatants close to moderate terrain corrections', () => {
+    const interp = new CombatantRenderInterpolator({
+      maxSpeedMps: 18,
+      maxVerticalFarMps: 2,
+      maxVerticalNearMps: 8,
+    });
+    const c = makeCombatant('a', new THREE.Vector3(0, 10, 0));
+    const combatants = new Map([[c.id, c]]);
+    interp.update(combatants, 1 / 60);
+
+    c.position.y = 13;
+    interp.update(combatants, 1 / 60);
+    expect(c.renderedPosition!.y).toBeGreaterThanOrEqual(c.position.y - 0.35 - 1e-6);
+
+    c.position.y = 9;
+    interp.update(combatants, 1 / 60);
+    expect(c.renderedPosition!.y).toBeLessThanOrEqual(c.position.y + 0.35 + 1e-6);
+  });
+
+  it('still eases distant-cull height snaps instead of grounding huge Y corrections', () => {
+    const interp = new CombatantRenderInterpolator({
+      maxSpeedMps: 18,
+      maxVerticalFarMps: 2,
+      maxVerticalNearMps: 8,
+    });
+    const c = makeCombatant('a', new THREE.Vector3(0, 3, 0));
+    const combatants = new Map([[c.id, c]]);
+    interp.update(combatants, 1 / 60);
+
+    c.position.y = 53;
+    interp.update(combatants, 1 / 60);
+    expect(c.renderedPosition!.y).toBeLessThan(4);
+  });
 });

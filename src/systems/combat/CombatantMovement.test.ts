@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantState } from './types';
 import { createTestCombatant, mockTerrainRuntime } from '../../test-utils';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 
 function mockNavmeshAdapter(agentIds: Set<string> = new Set()) {
   return {
@@ -141,6 +142,20 @@ describe('CombatantMovement', () => {
 
     expect(c.velocity.lengthSq()).toBe(0);
     expect(c.rotation).toBeCloseTo(0);
+  });
+
+  it('can ground a low-cost LOD combatant without running the full solver', () => {
+    terrain.getHeightAt = vi.fn((x: number) => 5 + x * 0.5);
+    const c = createTestCombatant({
+      id: 'npc-low-cost',
+      position: new THREE.Vector3(20, 42, 0),
+      lodLevel: 'low',
+    });
+
+    expect(movement.syncTerrainHeight(c)).toBe(true);
+
+    expect(c.position.y).toBeCloseTo(15 + NPC_Y_OFFSET);
+    expect(c.terrainSampleHeight).toBeCloseTo(15);
   });
 
   describe('stuck detector integration', () => {

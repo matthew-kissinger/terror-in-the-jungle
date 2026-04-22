@@ -72,6 +72,19 @@ function stepProbe(xThreshold: number, highHeight: number, lowHeight: number): A
   };
 }
 
+function risingRunwayProbe(slopePerMeter: number): AirframeTerrainProbe {
+  const normal = new THREE.Vector3(0, 1, 0);
+  const heightAt = (z: number) => Math.max(0, -z * slopePerMeter);
+  return {
+    sample(_x, z) {
+      return { height: heightAt(z), normal };
+    },
+    sweep() {
+      return null;
+    },
+  };
+}
+
 function intent(overrides: Partial<AirframeIntent>): AirframeIntent {
   return {
     pitch: 0,
@@ -133,6 +146,22 @@ describe('FixedWing L3 integration — behavior contracts', () => {
 
     expect(liftoffTick).toBeGreaterThan(0);
     expect(postLiftoffTouchdowns).toBe(0);
+  });
+
+  it('keeps ground roll attached to rising terrain after each movement step', () => {
+    const af = new Airframe(new THREE.Vector3(0, SKYRAIDER_AF.ground.gearClearanceM, 0), SKYRAIDER_AF);
+    const probe = risingRunwayProbe(0.15);
+    const cmd = intent({ throttle: 1, pitch: 0 });
+
+    for (let i = 0; i < Math.round(2 / FIXED_DT); i++) {
+      af.step(cmd, probe, FIXED_DT);
+    }
+
+    const state = af.getState();
+    const expectedGroundY = Math.max(0, -state.position.z * 0.15) + SKYRAIDER_AF.ground.gearClearanceM;
+    expect(state.weightOnWheels).toBe(true);
+    expect(state.position.y).toBeCloseTo(expectedGroundY, 2);
+    expect(state.altitudeAGL).toBeLessThan(0.05);
   });
 
   // Regression: altitude monotonicity across the first climb phase.
