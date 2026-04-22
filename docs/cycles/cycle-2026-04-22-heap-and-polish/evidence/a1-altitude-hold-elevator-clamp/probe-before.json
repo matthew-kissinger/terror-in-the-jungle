@@ -1,0 +1,72 @@
+{
+  "label": "before",
+  "timestamp": "2026-04-22T12:45:56.793Z",
+  "sweep": [
+    0.15
+  ],
+  "results": [
+    {
+      "aircraft": "A1_SKYRAIDER",
+      "scenario": "recapture",
+      "captureAltitudeM": 201.3055711130441,
+      "endAltitudeM": 727.6948067890104,
+      "peakAboveM": 526.3892356759663,
+      "peakBelowM": 0,
+      "peakDeviationM": 526.3892356759663,
+      "stalled": false,
+      "clampUsed": 0.15
+    },
+    {
+      "aircraft": "A1_SKYRAIDER",
+      "scenario": "steady_state",
+      "captureAltitudeM": 204.08880060539,
+      "peakAboveM": 2234.2055555185902,
+      "peakBelowM": 0,
+      "peakDeviationM": 2234.2055555185902,
+      "stalled": false,
+      "clampUsed": 0.15
+    },
+    {
+      "aircraft": "F4_PHANTOM",
+      "scenario": "recapture",
+      "captureAltitudeM": 498.3070424690143,
+      "endAltitudeM": 592.542856861098,
+      "peakAboveM": 94.23581439208374,
+      "peakBelowM": 0,
+      "peakDeviationM": 94.23581439208374,
+      "stalled": false,
+      "clampUsed": 0.15
+    },
+    {
+      "aircraft": "F4_PHANTOM",
+      "scenario": "steady_state",
+      "captureAltitudeM": 503.89760997900964,
+      "peakAboveM": 70.96036736364829,
+      "peakBelowM": -17.770589086885025,
+      "peakDeviationM": 70.96036736364829,
+      "stalled": false,
+      "clampUsed": 0.15
+    },
+    {
+      "aircraft": "AC47_SPOOKY",
+      "scenario": "recapture",
+      "captureAltitudeM": 248.4090732065004,
+      "endAltitudeM": 274.57021215740633,
+      "peakAboveM": 37.77399179330132,
+      "peakBelowM": 0,
+      "peakDeviationM": 37.77399179330132,
+      "stalled": false,
+      "clampUsed": 0.15
+    },
+    {
+      "aircraft": "AC47_SPOOKY",
+      "scenario": "steady_state",
+      "captureAltitudeM": 248.35813858868434,
+      "peakAboveM": 24.505812502011537,
+      "peakBelowM": -1.2849981635779386,
+      "peakDeviationM": 24.505812502011537,
+      "stalled": false,
+      "clampUsed": 0.15
+    }
+  ]
+}
