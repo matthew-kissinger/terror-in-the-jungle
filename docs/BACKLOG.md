@@ -35,6 +35,56 @@ Plan: [docs/cycles/cycle-2026-04-21-stabilization-reset/README.md](cycles/cycle-
 4. **Combat and navigation quality** — return to terrain/pathing stalls,
    squad-suppression consolidation, and remaining combat-state cleanup.
 
+## Recently Completed (cycle-2026-04-22-flight-rebuild-overnight, 2026-04-22)
+
+Thirteen merged PRs across four sequential rounds — the full planned cycle landed without rollback in a single autonomous overnight run. Briefs archived under `docs/tasks/archive/cycle-2026-04-22-flight-rebuild-overnight/`. Plan + per-task briefs lived in `docs/FLIGHT_REBUILD_ORCHESTRATION.md`; per-cycle evidence under `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/`.
+
+### Tier 0 + Tier 1 (Round 1, 5 PRs)
+- **PR #122 `aircraft-building-collision`** — `LOSAccelerator` gained `registerStaticObstacle` / `unregisterStaticObstacle` namespaced sibling APIs that share `chunkCache` with terrain. `WorldFeatureSystem` registers spawned building meshes (footprint ≥3m) post-`freezeTransform` via a feature-detected setter wired in `OperationalRuntimeComposer`. Aircraft sweep now reports building contact via `raycastTerrain → LOSAccelerator.checkLineOfSight`.
+- **PR #123 `airframe-directional-fallback`** — Post-liftoff fallback split into directional branches: downward contact keeps the descent-latch grace, upward/forward terrain penetration responds immediately (clamps Y, zeroes inward velocity). Renamed `descentLatchGraceTicks`. Two L3 regressions added.
+- **PR #124 `player-controller-interpolated-pose`** — `FixedWingModel.update()` now feeds `group.position` (interpolated) to `PlayerController` instead of `airframe.getPosition()` (raw). Probe-quantified: 144Hz pose-continuity sawtooth eliminated (141→0 zero-delta frames, relStddev 1.19→0.03 over 240 samples). HelicopterModel.ts:549 has the same bug — flagged as follow-up, out of scope for this cycle.
+- **PR #125 `airframe-ground-rolling-model`** — Discrete liftoff gate replaced with continuous `wheelLoad = clamp((Vr - forwardSpeed)/Vr, 0, 1)`. Pitch authority scales with `(1 - wheelLoad)`, lateral friction scales with `wheelLoad`. New `LIFTOFF_MIN_SPEED_RATIO=0.35` blocks taxi-speed accidental commits. `syncGroundContactAtCurrentPosition` retained — probe confirmed no rollout drift contribution.
+- **PR #126 `airframe-altitude-hold-unification`** — Option A: `altitudeHoldTarget` captured at liftoff so the Airframe PD takes hands-off cruise in all conditions; the duplicate `buildCommand.ts` block was removed for neutral-stick assist. Recapture-after-pitch-release: F-4 / AC-47 improved; A-1 Skyraider regresses 175m → 463m at cruise throttle (its tighter ±0.15 elevator clamp saturates against high T/W). Latent gain-tune follow-up flagged.
+
+### Tier 2 climb-stability (Round 2, 3 PRs)
+- **PR #127 `airframe-authority-scale-floor`** — `clamp(qNorm, 0.15, 2.2)` replaced with `lerp(0.30, qNorm, smoothstep(qNorm, 0.10, 0.30))` (then `min(_, 2.2)`). Removes the C0 discontinuity at the low-q clamp edge. Continuous derivative through the blend window. (Brief's literal formula was wrong; executor implemented the described intent.)
+- **PR #128 `airframe-climb-rate-pitch-damper`** — Climb-rate-scaled pitch damping added just before `pitchAccel`. Window shifted from the brief's 0→5 m/s to 5→12 m/s after probe showed PD recapture transients (vy peaks 2.5–6.6 m/s) tripped the 0→5 window and broke existing tests. Climb vs RMS reduced 60%; cruise pitch response unchanged.
+- **PR #129 `airframe-soft-alpha-protection`** — Variant B (tanh) won over variant A (widened smoothstep): `alphaFactor = 0.5 * (1 - tanh((|alpha| - alphaStall) / 3))`. Removes the bang-bang oscillator at the protection band edge. Stall protection preserved (airspeed > stallSpeedMs * 0.95). Bookkeeping completed by orchestrator after the executor stopped one tool-call short of `git push`.
+
+### Tier 3 airfield (Round 3, 4 PRs)
+- **PR #130 `airfield-prop-footprint-sampling`** — Zone-based `skipFlatSearch` gating in `AirfieldLayoutGenerator`: interior zones (`runway_side`, `dispersal`) keep the centroid-Y fast path; perimeter zones route through `WorldFeatureSystem.resolveTerrainPlacement`'s 9-point footprint solver. Cleaner than the alternative `envelopeInnerLateral * 0.6` gate.
+- **PR #131 `airfield-perimeter-inside-envelope`** — `AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M` and `airfieldEnvelopeInnerLateral(template)` exposed from `TerrainFeatureCompiler`; `AirfieldLayoutGenerator` clamps `perimDist = min(original, innerLateral - 8)`. Discovery: `us_airbase` perimeter (240m vs `innerLateral`=289m) was already inside; `forward_strip` (160m vs 140m) was the actually-drifting template. Manual rebase + retest after Round 3 merges.
+- **PR #132 `airfield-envelope-ramp-softening`** — `outerRadius = innerRadius + 12` (was +6) and `AIRFIELD_ENVELOPE_GRADE_STRENGTH = 0.65` (was 0.45). Triggered the post-merge OF heightmap + navmesh regen below.
+- **PR #133 `airfield-taxiway-widening`** — `TAXIWAY_EXTRA_PAD = 2m` added to taxiway-only capsule sizing (`min(width,length)/2 + innerPadding(1.5) + 2`). 12m taxiway flat band now 9.5m (was 7.5m); 3.5m margin beyond paint half-width. Runway/apron capsule sizing unchanged.
+
+### Tier 4 design memo (Round 4, 1 PR)
+- **PR #134 `continuous-contact-contract-memo`** — `docs/rearch/CONTINUOUS_CONTACT_CONTRACT.md` (~2200 words, 8 sections + symptom/rule/PR mapping appendix). Proposes `ContactSweepRegistry` BVH unifying airframe + NPC LOD + prop placement contact discipline so the four symptom classes treated this cycle cannot re-emerge. Awaits human review before opening an implementation cycle.
+
+### Orchestrator-level chores (post-Round-3)
+- `chore(assets): regenerate OF heightmaps + navmesh after airfield envelope changes` (commit 614dc76, master direct) — terrain-nav-reviewer flagged that PR #132 + #133 mutate stamp geometry that flows through `prebake-navmesh.ts` for OF. Re-baked all five OF seeds (42/137/2718/31415/65537); ZC and TDM bakes were also re-run but produced no diff.
+- `chore(cycle-2026-04-22): capture Round 0 baselines` (commit c556e34, master direct) — orchestrator-prep step from the cycle plan.
+
+### Perf
+combat120 baseline → post-Round-3:
+- avg: 13.91 → 14.21 ms (+2.2%)
+- p99: 33.60 → 34.50 ms (+2.7%) — within 5% budget
+- max: 46.80 → 52.10 ms (+11.3%, a single 52.1ms outlier; hitch_50ms = 0.03% = 2 frames)
+- heap_growth: 9.5 → 53.2 MB ⚠️ heap_recovery_ratio: 0.88 → 0.12 — the validation `overall: fail` is from heap recovery, not frame time. Cycle policy explicitly only gates on p99; heap is flagged for morning review.
+
+### Follow-ups for next cycle
+- Heap-recovery regression in combat120: 53MB end-growth and 12% peak recovery (was 9MB / 88%). Could be NPC stalls + AI budget starvation events (4.07 avg/sample) or one of the Round 1-3 changes.
+- HelicopterModel.ts:549 has the same raw-vs-interpolated PlayerController feed as PR #124 fixed for fixed-wing.
+- A-1 Skyraider altitude-hold recapture regresses at cruise throttle under PR #126; brief explicitly forbade gain retuning. Future task should expand `±0.15` elevator clamp.
+- AC-47 low-pitch takeoff still single-bounces (carried over from cycle-2026-04-21).
+- "Playtest recommended" (per executor reports): `airframe-directional-fallback` would benefit from a manual A-1 / F-4 / AC-47 takeoff trace before relying on the change in production scenarios.
+
+### Cycle metrics
+- 13/13 tasks merged. 0 blocked, 0 rolled back.
+- 1 manual rebase (PR #131 vs PRs #130 + #132).
+- 1 orchestrator-level cleanup (PR #129 commit/push).
+- Reviewers: combat-reviewer on PR #122 (merge); terrain-nav-reviewer on PRs #131/#132 (merge, regen flagged).
+- Wallclock: ~02:25 (Round 0 baseline) → ~02:42 ET (Round 4 merge), single overnight session.
+
 ## Recently Completed (cycle-2026-04-21-atmosphere-polish-and-fixes, 2026-04-20)
 
 Sixteen merged PRs across five dispatch rounds — the full planned cycle landed without rollback. Briefs archived under `docs/tasks/archive/cycle-2026-04-21-atmosphere-polish-and-fixes/`. Cycle ran in a single ~3h30m orchestrated burst.

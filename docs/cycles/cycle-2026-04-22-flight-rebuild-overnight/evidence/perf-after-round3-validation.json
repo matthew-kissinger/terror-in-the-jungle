@@ -1,0 +1,155 @@
+{
+  "overall": "fail",
+  "checks": [
+    {
+      "id": "samples_collected",
+      "status": "pass",
+      "value": 89,
+      "message": "Collected 89 runtime samples; expected at least 72"
+    },
+    {
+      "id": "frame_progress",
+      "status": "pass",
+      "value": 6336,
+      "message": "Frame progression delta=6336 over 90s"
+    },
+    {
+      "id": "max_frame_stall_seconds",
+      "status": "pass",
+      "value": 1.034,
+      "message": "Longest frame progression stall 1.03s"
+    },
+    {
+      "id": "avg_frame_ms",
+      "status": "pass",
+      "value": 14.21475220490516,
+      "message": "Average frame time 14.21ms"
+    },
+    {
+      "id": "peak_p99_frame_ms",
+      "status": "warn",
+      "value": 34.5,
+      "message": "Peak p99 frame time 34.50ms"
+    },
+    {
+      "id": "peak_max_frame_ms",
+      "status": "pass",
+      "value": 52.099999999998545,
+      "message": "Peak max-frame sample 52.10ms"
+    },
+    {
+      "id": "hitch_50ms_percent",
+      "status": "pass",
+      "value": 0.030959752321981428,
+      "message": "Frames >50ms 0.03% (2/6460)"
+    },
+    {
+      "id": "hitch_100ms_percent",
+      "status": "pass",
+      "value": 0,
+      "message": "Frames >100ms 0.00% (0/6460)"
+    },
+    {
+      "id": "over_budget_percent",
+      "status": "pass",
+      "value": 0.11235955056179778,
+      "message": "Average over-budget percent 0.11%"
+    },
+    {
+      "id": "console_errors",
+      "status": "pass",
+      "value": 0,
+      "message": "Captured 0 browser errors/pageerrors/crashes"
+    },
+    {
+      "id": "ui_error_panel_visible",
+      "status": "pass",
+      "value": 0,
+      "message": "No loading/init error panel appeared during capture"
+    },
+    {
+      "id": "combat_budget_dominance",
+      "status": "pass",
+      "value": 0,
+      "message": "Combat was top >16.67ms in 0.0% of samples"
+    },
+    {
+      "id": "raycast_denial_rate",
+      "status": "pass",
+      "value": 0.005216309932016285,
+      "message": "Average LOS raycast denial rate 0.5%"
+    },
+    {
+      "id": "ai_budget_starvation_events",
+      "status": "warn",
+      "value": 4.067415730337078,
+      "message": "Average per-sample AI budget starvation events 4.07"
+    },
+    {
+      "id": "player_shots_recorded",
+      "status": "pass",
+      "value": 329,
+      "message": "Recorded player shots in sim=329"
+    },
+    {
+      "id": "player_hits_recorded",
+      "status": "pass",
+      "value": 196,
+      "message": "Recorded player hits in sim=196"
+    },
+    {
+      "id": "player_hit_rate_peak",
+      "status": "pass",
+      "value": 0.6262626262626263,
+      "message": "Peak hit rate 62.63%"
+    },
+    {
+      "id": "heap_growth_mb",
+      "status": "warn",
+      "value": 53.245223681132,
+      "message": "Heap end-growth 53.25 MB (baseline=68.37 MB, end=121.62 MB)"
+    },
+    {
+      "id": "heap_peak_growth_mb",
+      "status": "warn",
+      "value": 60.6138931910197,
+      "message": "Heap peak-growth 60.61 MB (peak=128.99 MB)"
+    },
+    {
+      "id": "heap_recovery_ratio",
+      "status": "fail",
+      "value": 0.12156733583612489,
+      "message": "Heap recovery 12.2% from peak (7.37 MB reclaimed before end)"
+    },
+    {
+      "id": "harness_min_shots_fired",
+      "status": "pass",
+      "value": 329,
+      "message": "Harness player shots=329 (min=50)"
+    },
+    {
+      "id": "harness_min_hits_recorded",
+      "status": "pass",
+      "value": 196,
+      "message": "Harness player hits=196 (min=5)"
+    },
+    {
+      "id": "harness_max_stuck_seconds",
+      "status": "pass",
+      "value": 0.7,
+      "message": "Max harness stuck duration 0.7s (max=5s)"
+    },
+    {
+      "id": "harness_min_movement_transitions",
+      "status": "pass",
+      "value": 6,
+      "message": "Harness movement transitions=6 (min=3)"
+    },
+    {
+      "id": "startup_threshold_seconds",
+      "status": "pass",
+      "value": 6,
+      "message": "Startup frame threshold reached in 6.0s"
+    }
+  ]
+}

@@ -70,77 +70,49 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-04-22-flight-rebuild-overnight
+## Current cycle: (none — awaiting next planning pass)
 
 ### Cycle ID
 
-`cycle-2026-04-22-flight-rebuild-overnight`
+`<cycle-id>`
 
 ### Why this cycle exists
 
-Autonomous overnight run that ships Tier 0-3 code fixes for fixed-wing feel and airfield placement, plus a Tier 4 design memo for the continuous-contact contract. Full plan + per-task briefs live in [docs/FLIGHT_REBUILD_ORCHESTRATION.md](FLIGHT_REBUILD_ORCHESTRATION.md); cycle directory is [docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/](cycles/cycle-2026-04-22-flight-rebuild-overnight/).
+<one paragraph: what changed in the world or in the repo that justifies this cycle right now>
 
 ### Tasks in this cycle
 
-13 tasks, four sequential rounds. Each has a brief at `docs/tasks/<slug>.md`.
-
-- Round 1 (Tier 0+1, 5 parallel): `aircraft-building-collision`, `airframe-directional-fallback`, `airframe-altitude-hold-unification`, `airframe-ground-rolling-model`, `player-controller-interpolated-pose`.
-- Round 2 (Tier 2 climb, 3 parallel): `airframe-soft-alpha-protection`, `airframe-climb-rate-pitch-damper`, `airframe-authority-scale-floor`.
-- Round 3 (Tier 3 airfield, 4 parallel): `airfield-perimeter-inside-envelope`, `airfield-prop-footprint-sampling`, `airfield-envelope-ramp-softening`, `airfield-taxiway-widening`.
-- Round 4 (Tier 4 memo, 1 solo): `continuous-contact-contract-memo`.
+<list of slugs with one-line descriptions; each must have a brief at `docs/tasks/<slug>.md`>
 
 ### Round schedule
 
-R1 -> R2 -> R3 -> R4 sequential. Round N dispatches only after Round N-1 is fully merged or flagged blocked. A blocked task does NOT halt the cycle. Full dispatch detail in `docs/FLIGHT_REBUILD_ORCHESTRATION.md`.
-
-**Round 0 (orchestrator prep):** `git fetch origin && git status` (must be clean); create cycle evidence / baseline directories (already seeded in `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/`); run `npm run probe:fixed-wing` and write output to `baseline/probe-before.json`; if `baseline/perf-baseline-combat120.json` does not already exist, run `npm run perf-capture:combat120` and commit it.
+<R1 ... -> R2 ... -> ...; concurrency per round; merge gates>
 
 ### Concurrency cap
 
-5 (within a round).
+<N>
 
 ### Dependencies
 
-```
-Round 0 (probe baseline)
-  -> Round 1 (5 tasks parallel)
-      -> Round 2 (3 tasks parallel)
-          -> Round 3 (4 tasks parallel)
-              -> Round 4 (1 task solo)
-```
-
-No inter-task blocking within a round.
+<inline DAG or pointer to brief file>
 
 ### Playtest policy
 
-DEFERRED to morning. No playtest gate BLOCKS merge. Every playtest-style exit criterion is replaced by a probe-based assertion in the task brief.
-
-### Perf policy
-
-`npm run perf-capture:combat120` at Round 0 (if missing) and post-Round-3. p99 budget: within 5% of baseline. If exceeded, do NOT revert; record in RESULT.md for morning review.
-
-### Failure handling (autonomous-safe)
-
-- CI red on a task -> mark that task `blocked`, record, continue.
-- Fence-change proposal (`fence_change: yes` in executor report) -> mark `blocked`, record, continue; do NOT merge.
-- Probe-assertion fail post-merge -> revert the merge if possible; otherwise mark `rolled-back-pending` and surface in RESULT.md.
-- Round N has >= 1 blocked task -> proceed to Round N+1.
+<which tasks gate on playtest pass before merge; default is "playtest-required PRs merge on CI green and are flagged for morning review">
 
 ### Visual checkpoints (orchestrator-gated)
 
-NONE. Autonomous run.
+<list of `evidence/<slug>/<artifact>` outputs the orchestrator must review before advancing past that round; or "NONE" if cycle is autonomous>
 
 ### skip-confirm
 
-YES. Orchestrator does NOT pause for "go" between rounds.
+<yes|no — if yes, orchestrator does NOT pause for "go" between rounds; default no>
 
 ### Cycle-specific notes
 
-- This is a single-session autonomous run. Orchestrator reads this section, captures Round 0 baseline, then advances R1 -> R2 -> R3 -> R4 without human intervention.
-- All 13 task briefs pre-seeded under `docs/tasks/<slug>.md`. Orchestrator does NOT need to generate them from the plan.
-- Post-cycle, orchestrator writes `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/RESULT.md` with the post-cycle summary template from `docs/FLIGHT_REBUILD_ORCHESTRATION.md`.
-- On cycle close, archive merged briefs via `git mv docs/tasks/<slug>.md docs/tasks/archive/cycle-2026-04-22-flight-rebuild-overnight/<slug>.md` and append a "Recently Completed" section to `docs/BACKLOG.md`.
-- Helicopter must not regress (scope is fixed-wing). Shared-file edits are fine; reviewer verifies heli paths untouched.
+<anything that does not generalize: budget caps that override the default, special handling for a known-flaky test, etc.>
+
+The previous cycle, `cycle-2026-04-22-flight-rebuild-overnight`, closed on 2026-04-22 with 13 merged PRs (#122–#134) across four sequential rounds and one orchestrator-level navmesh regen. See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-22-flight-rebuild-overnight, 2026-04-22)" and `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/RESULT.md`.
 
 ## Dispatch protocol
 
