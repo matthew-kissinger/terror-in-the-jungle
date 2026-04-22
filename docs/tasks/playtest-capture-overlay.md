@@ -9,12 +9,19 @@
 **Budget:** ≤300 LOC.
 **Files touched:**
 
+- Modify: `src/core/GameRenderer.ts:38` — add `preserveDrawingBuffer: true` to the `WebGLRenderer` options. **This is Step 0 and is non-negotiable;** see "preserveDrawingBuffer prerequisite" below.
 - Create: `src/ui/debug/PlaytestCaptureOverlay.ts` (the modal + annotation prompt).
 - Create: `src/ui/debug/PlaytestCaptureManager.ts` (orchestrates capture → prompt → write; session-scoped).
 - Modify: `src/core/GameEngineInput.ts` (F9 key handler).
 - Modify: `src/core/GameEngine.ts` (instantiate the manager; pass it the renderer reference).
 - Possibly register as a `DebugPanel` against `DebugHudRegistry` — if that ships first. If not, mount independently (the registry is not a blocker).
 - Add: `src/ui/debug/PlaytestCaptureOverlay.test.ts` (basic behavior: prompt render, submit → file-write invoked, cancel → no write).
+
+## preserveDrawingBuffer prerequisite (Step 0)
+
+Audit against HEAD `40ddfac`: `src/core/GameRenderer.ts:38` constructs `new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' })`. **`preserveDrawingBuffer` is NOT set.** Without it, `renderer.domElement.toBlob()` and `.toDataURL()` will return a blank transparent image — the WebGL spec clears the back-buffer after presentation unless this flag is on.
+
+Set `preserveDrawingBuffer: true` in the renderer constructor options. Trade-off: a small per-frame cost (the driver keeps the back-buffer addressable after `gl.flush`). This is acceptable for a dev-only F9 feature. If perf-compare on combat120 shows measurable p99 regression from this single flag, STOP and file a finding — the fallback is to gate the flag behind the same dev-mode check the capture overlay uses (`import.meta.env.DEV`).
 
 ## Required reading first
 
@@ -75,12 +82,13 @@ Detect API availability at runtime. For the test harness, stub the writer to an 
 
 ## Steps
 
+0. **Set `preserveDrawingBuffer: true`** on the WebGLRenderer in `src/core/GameRenderer.ts:38`. Run `npm run test:run` to confirm no renderer test breaks; run `npm run dev` and confirm the game still renders. Tiny change, done early to de-risk.
 1. Read "Required reading first."
 2. Sketch `PlaytestCaptureOverlay` modal based on `SettingsModal` pattern.
 3. Build `PlaytestCaptureManager` with in-memory + File System Access writers behind a single interface.
 4. Wire F9 handler.
 5. Write behavior test (jsdom): render overlay, simulate annotation, submit, assert writer invoked with expected payload. Cancel, assert no writer invocation.
-6. Manual smoke: `npm run dev`, play, press F9, confirm modal + capture + write-to-disk prompt.
+6. Manual smoke: `npm run dev`, play, press F9, confirm modal + capture + write-to-disk prompt; verify the captured PNG is NOT blank.
 7. `npm run lint`, `npm run test:run`, `npm run build`.
 
 ## Exit criteria
@@ -103,7 +111,7 @@ Detect API availability at runtime. For the test harness, stub the writer to an 
 ## Hard stops
 
 - Fence change (`src/types/SystemInterfaces.ts`) → STOP.
-- `renderer.domElement.toBlob` returns null or throws (e.g., cross-origin issue with WebGL preserveDrawingBuffer) → STOP, file a finding. Fix is likely setting `preserveDrawingBuffer: true` when constructing the renderer, but that's a perf implication worth checking before landing.
+- `preserveDrawingBuffer: true` at Step 0 causes measurable combat120 p99 regression → STOP, gate the flag behind `import.meta.env.DEV` so retail builds don't pay the cost.
 - File System Access API permission prompt spams the user with every capture → STOP; cache the directory handle in session storage after the first grant.
 
 ## Pairs with

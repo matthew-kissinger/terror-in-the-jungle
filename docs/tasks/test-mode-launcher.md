@@ -24,6 +24,12 @@
 - `src/dev/flightTestScene.ts` — the isolated-physics scene (stays, do not touch).
 - The screen file that handles mode selection in the main menu — grep `GameMode.AI_SANDBOX` or `combat120` under `src/ui/screens/` to locate.
 
+**Known switch statements that need new cases** (verified against master HEAD `40ddfac`):
+- `getGameModeConfig` at `src/config/gameModes.ts:15-42` — 5-case switch over `GameMode`.
+- `getGameModeDefinition` in `src/config/gameModeDefinitions.ts` — mirror switch.
+- Grep `case GameMode\.` across `src/` before pushing to catch any others the executor may have missed.
+- Dev-flag convention: `import.meta.env.DEV` is used in `bootstrap.ts:102` and elsewhere; adopt the same pattern for the dev-gated menu entry.
+
 ## Diagnosis
 
 The `?mode=flight-test` path is an isolated-physics bypass — it does NOT use the normal `GameEngine → ModeStartupPreparer` path. For "full-engine test modes" (real terrain + real atmosphere + suppressed combat/objectives), we need mode entries that go through the normal launch flow but swap specific config (spawn location, director settings, objective-timer, etc.). Adding such a mode today means: new enum value + new `GameModeDefinition` + `normalizeLaunchSelection` case + main-menu entry. This task does the first three infrastructurally so that future test modes are single-file additions.
@@ -36,7 +42,12 @@ Add an `isTestMode: boolean` field (default false) to `GameModeDefinition`. The 
 
 ### 2. URL routing
 
-`main.ts` / `bootstrap.ts` already parse `?mode=<value>`. Confirm the full allowed set includes the new test-mode keys via mapping in the preparer. `?mode=flight-test` remains routed to `src/dev/flightTestScene.ts`; the new keys are routed to the normal boot with `GameMode.AIRFIELD_SANDBOX` etc.
+**CORRECTION (audit against HEAD `40ddfac`):** `bootstrap.ts` does NOT have generic `?mode=<value>` parsing today. The only URL-mode check is `isFlightTestMode()` at `src/dev/flightTestMode.ts` which narrowly matches `?mode=flight-test` and short-circuits to `FlightTestScene`. This task MUST ADD the generic parser — not extend an existing one.
+
+Plan:
+- After the `isFlightTestMode()` early-return at `bootstrap.ts:67` (which stays), add a helper `resolveLaunchFromUrl(): GameLaunchSelection | null` that reads `?mode=<value>` and maps it to a `GameLaunchSelection`. Recognized test-mode values: `airfield-sandbox`, `combat-sandbox` (stub). Unknown values fall back to the normal menu flow.
+- If a URL mode is resolved, skip the main-menu deploy and call `engine.startGame(launchSelection)` directly. (Check `GameEngineInit.ts:110` for the entry point; `normalizeLaunchSelection` accepts either a `GameMode` string or a `GameLaunchSelection`.)
+- The `flight-test` value remains routed to `FlightTestScene` via the existing check — do not merge it into the new parser.
 
 ### 3. Main-menu entry
 

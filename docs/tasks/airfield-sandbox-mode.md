@@ -27,6 +27,15 @@
 
 Flight-feel iteration today requires: launch the full game, wait through a menu, wait through loading, enter a scenario, find an aircraft, avoid combat. That's 60+ seconds of friction and a fighting environment that does not isolate the behavior under test. The existing `?mode=flight-test` (isolated scene) is TOO isolated — no real terrain, no airfield envelope, no atmosphere, no vegetation. This task fills the middle ground: the real engine stack with the real map, but with combat pressure OFF and spawn-to-claim flow compressed to <5 seconds.
 
+**Composer-gate verification (against HEAD `40ddfac`)** — the brief's assumption that `warSimulator.enabled = false` suppresses enemy materialization is CONFIRMED by the code:
+- `src/systems/strategy/WarSimulator.ts:35` — `private enabled = false` (default off).
+- `src/systems/strategy/WarSimulator.ts:139` — `this.enabled = config.enabled;` (set from config at init).
+- `src/systems/strategy/WarSimulator.ts:82` — `update()` early-returns if `!this.enabled`.
+- `src/core/ModeStartupPreparer.ts:354` — `if (!config.warSimulator?.enabled || !engine.systemManager.warSimulator.isEnabled()) { return; }` guards `restorePersistentWarState`.
+- `src/core/SystemUpdater.ts:175-178` — the per-tick WarSimulator update chain already calls `update()` which the instance's own `enabled` gate short-circuits.
+
+So setting `warSimulator: { enabled: false, ... }` on `AIRFIELD_SANDBOX_CONFIG` IS the right lever — the WarSimulator is always constructed, but its init picks up `enabled: false` from the mode config and all its update paths become no-ops. `factionMix` is also read at `ModeStartupPreparer.ts:114`; listing BLUFOR-only is a safe defense-in-depth even though the war-sim gate alone suffices.
+
 ## Fix
 
 ### 1. Mode definition
@@ -89,8 +98,8 @@ Confirm the runtime composer respects `warSimulator.enabled === false`. If not, 
 ## Hard stops
 
 - Fence change (`src/types/SystemInterfaces.ts`) → STOP.
-- Combat director does not respect a composition-level "off" switch → STOP, file a finding, scope reduces to "mode exists, combat not guaranteed off" and gets a follow-up.
-- Spawn-point registry doesn't expose main_airbase parking coordinates as a reachable API → STOP, scope reduces to a hardcoded spawn with a TODO; document in the PR body.
+- WarSimulator gate verification turns up a code path that ignores `isEnabled()` (e.g., a spawn path outside `WarSimulator.update()` that materializes agents regardless) → STOP, file a finding, reduce scope to "mode exists, combat may not be fully suppressed" and flag for a follow-up.
+- Spawn-point registry doesn't expose main_airbase parking coordinates as a reachable API → acceptable to fall back to a hardcoded spawn near the known main_airbase center + TODO note in the PR body. This is NOT a STOP.
 
 ## Pairs with
 

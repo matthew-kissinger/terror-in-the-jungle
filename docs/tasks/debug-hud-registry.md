@@ -64,10 +64,19 @@ Each of the three existing overlays gets a one-time conversion:
 
 ### 4. New panels
 
-Three thin panels seeded so the registry has non-trivial use:
-- **VehicleStatePanel** — reads from `GameEngine.player?.currentVehicle` (fixed-wing, helicopter, on-foot); shows type, position (x,y,z), velocity (m/s), heading, altitude AGL. Updates at 10Hz to save DOM writes.
-- **CombatStatePanel** — reads from whatever the combat director exposes (likely `SquadManager` or similar — investigate and wire read-only accessors if needed); shows BLUFOR/OPFOR active combatants, current AI budget used per tick, stall-backtrack counter.
-- **CurrentModePanel** — reads from GameEngine's stored `GameLaunchSelection`; shows mode enum name, alliance, faction, weather state, TOD hour.
+Three thin panels seeded so the registry has non-trivial use. **Accessors verified against master (HEAD `40ddfac`):**
+
+- **VehicleStatePanel** — read vehicle state via:
+  - `engine.systemManager.playerController.vehicleStateManager.getVehicleType()` (returns `'fixed_wing' | 'helicopter' | null`; see `src/systems/vehicle/VehicleStateManager.ts:36`)
+  - `engine.systemManager.playerController.vehicleStateManager.getVehicleId()` (`src/systems/vehicle/VehicleStateManager.ts:40`)
+  - Full vehicle via `engine.systemManager.vehicleManager.getVehicle(vehicleId)` → `IVehicle` (position + velocity + heading on the interface; see `src/systems/vehicle/VehicleManager.ts:28`)
+  - If type is null, show "on-foot" and read player pose from `playerController.getPosition()`.
+  - Update at 10Hz (every ~6 frames) to save DOM writes.
+- **CombatStatePanel** — preferred accessor path:
+  - BLUFOR/OPFOR counts via `engine.systemManager.combatantSystem.getCombatantCount(faction)` if such an accessor exists — grep `combatantSystem\.get` and `class CombatantSystem` to confirm. If missing, a ≤20-line read-only helper on `CombatantSystem` is acceptable scope (does NOT count as editing `src/systems/combat/**` in a non-trivial way — it's an additive read surface).
+  - If no plausible accessor exists even with the helper, render `—` placeholders and leave a `TODO(cycle-2026-04-24)` comment. Do NOT block the cycle.
+  - AI budget starvation counter: `engine.systemManager.combatantSystem.getAIBudgetStarvationPerSecond?.()` or equivalent — grep the symbol and wire if present.
+- **CurrentModePanel** — read via `engine.systemManager.gameModeManager.getCurrentMode()` (returns `GameMode` enum; confirmed used at `bootstrap.ts:144` and `GameEngineInit.ts:95`). Human-readable label via `getGameModeDefinition(mode).name` (see `src/config/gameModeDefinitions.ts`). Weather via `engine.systemManager.weatherSystem.getCurrentState()`; TOD via `engine.systemManager.atmosphereSystem.getCurrentTimeOfDay()` (grep to confirm exact names if different).
 
 ### 5. Master toggle
 
@@ -98,7 +107,7 @@ Backtick (`` ` ``) toggles the master container. F1-F4 still toggle their specif
 - Do not change the visual layout of `PerformanceOverlay` / `TimeIndicator` / `LogOverlay` — adopt the interface but preserve the current look.
 - Do not add per-panel persistence (open/closed state saved across sessions). That's a polish follow-up.
 - Do not add a hamburger menu or panel reorder UI. The backtick master toggle is the only UX surface this cycle.
-- Do not touch `src/systems/combat/**` to "expose" combat data — if the combat director doesn't already have a read-only accessor for active combatant counts, add it in a small helper inside the panel file that reads from whatever is public. If something genuinely requires opening up a private field, STOP and file a finding; we'll add accessors in a dedicated combat-reviewer-approved follow-up.
+- Do not touch `src/systems/combat/**` for anything other than a narrow additive read-only accessor (≤20 LOC) on an existing class. If a non-trivial refactor is needed, STOP and file a finding; CombatStatePanel renders `—` placeholders and a dedicated combat-reviewer-approved follow-up adds proper surface.
 
 ## Hard stops
 
