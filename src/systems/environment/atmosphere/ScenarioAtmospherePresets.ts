@@ -88,6 +88,14 @@ export interface AtmospherePreset {
    * weather)` so a heavily-clouded preset never unfills under weather.
    */
   cloudCoverageDefault?: number;
+  /**
+   * Optional per-scenario cloud-feature scale in meters-per-first-octave.
+   * Larger = larger, sparser puffs (fair-weather cumulus); smaller =
+   * denser, tighter puffs (overcast). Omitted preserves the cloud-layer
+   * default (~900m). Applied at preset swap via
+   * `CloudLayer.setFeatureScaleMeters`.
+   */
+  cloudScaleMetersPerFeature?: number;
 }
 
 /** Clamp lower bound for sun elevation (radians). Matches ~-10deg by default. */
@@ -176,7 +184,11 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     // Start at dawn (6am); 10-minute real-time cycle so playtests see the
     // sun sweep across the sky without waiting forever.
     todCycle: { dayLengthSeconds: 600, startHour: 6 },
-    cloudCoverageDefault: 0.4, // damp jungle valley, overcast morning
+    // Morning overcast over the jungle valley. Rebalanced up from 0.4 to
+    // 0.55 so the 5-octave field reads as a stronger overcast; tighter
+    // feature scale (700m) gives denser puffs over the narrow valley.
+    cloudCoverageDefault: 0.55,
+    cloudScaleMetersPerFeature: 700,
   },
   // Noon: sun near zenith, neutral turbidity, deep saturated zenith blue.
   openfrontier: {
@@ -189,7 +201,12 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     exposure: 0.22,
     fogDensity: 0.0022,
     todCycle: { dayLengthSeconds: 600, startHour: 12 },
-    cloudCoverageDefault: 0.1, // clear desert sky, only the occasional wisp
+    // Scattered fair-weather cumulus over the frontier. Rebalanced up from
+    // 0.1 (which read as dead-empty under the 3-octave threshold) to 0.25;
+    // larger feature scale (1400m) gives broader, sparser puffs fitting
+    // the clear desert look.
+    cloudCoverageDefault: 0.25,
+    cloudScaleMetersPerFeature: 1400,
   },
   // Dusk: sun very low in the west, heavy haze, strong orange extinction.
   // Highest fog density — dusk reads as "can see nearby, distance fades"
@@ -204,7 +221,10 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     exposure: 0.16,
     fogDensity: 0.0028,
     todCycle: { dayLengthSeconds: 600, startHour: 18 },
-    cloudCoverageDefault: 0.6, // overcast dusk, broken layers
+    // Overcast dusk, broken layers. Rebalanced up slightly from 0.6 to 0.7
+    // so the thicker field still reads as broken layers rather than a
+    // uniform grey sheet once the 5-octave modulator gates large-scale gaps.
+    cloudCoverageDefault: 0.7,
   },
   // Golden hour: oblique warm light, moderate turbidity.
   zc: {
@@ -217,7 +237,10 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     exposure: 0.18,
     fogDensity: 0.0024,
     todCycle: { dayLengthSeconds: 600, startHour: 16 },
-    cloudCoverageDefault: 0.3, // broken golden-hour clouds
+    // Broken golden-hour clouds. Rebalanced up from 0.3 to 0.45 so the
+    // warm oblique light has clouds to catch; the large-scale modulator
+    // keeps the gaps open enough to read as "broken" rather than "overcast".
+    cloudCoverageDefault: 0.45,
   },
   // AI sandbox (perf harness): noon, perf-neutral; matches the legacy
   // combat120 framing so the baseline PNG diff stays meaningful.
@@ -230,7 +253,10 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     groundAlbedo: new THREE.Color(0x3b4c2e),
     exposure: 0.22,
     fogDensity: 0.0022,
-    cloudCoverageDefault: 0.2, // light scattered — perf-lean baseline
+    // Light scattered — perf-lean baseline, but rebalanced from 0.2 to 0.30
+    // so combat120 actually reads as "noon with some clouds" instead of
+    // the effectively-empty sky the 3-octave threshold produced at 0.2.
+    cloudCoverageDefault: 0.30,
   },
 };
 

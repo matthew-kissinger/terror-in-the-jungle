@@ -32,8 +32,20 @@ const BASE_ALTITUDE = 1200;
 const PLANE_SIZE = 4000;
 /** Half-width of the altitude band over which the layer fades out. */
 const EDGE_FADE_HALF_WIDTH = 100;
-/** World-space scale for the noise field; smaller = larger cloud features. */
-const NOISE_SCALE = 1 / 900;
+/**
+ * Default world-space scale for the noise field. Smaller = larger cloud features.
+ * 1/900 ≈ 900m per cumulus puff at the first fbm octave. Presets may override
+ * via `cloudScaleMetersPerFeature` so scenarios can carry a larger (fair-weather
+ * cumulus) or tighter (dense overcast) signature.
+ */
+const DEFAULT_NOISE_SCALE = 1 / 900;
+/**
+ * Default wind direction (XZ) for the cloud-field drift. Shader normalizes;
+ * speed is baked into the fragment at 10 m/s. Exposed as a uniform so
+ * future wind systems can override.
+ */
+const DEFAULT_WIND_DIR_X = 0.7;
+const DEFAULT_WIND_DIR_Z = 0.7;
 
 const cloudVertexShader = /* glsl */`
 varying vec2 vWorldXZ;
@@ -45,11 +57,14 @@ void main() {
 }
 `;
 
-// Procedural fbm using value noise. Kept cheap (2 octaves) — this is one
-// transparent plane drawn once, not a volumetric march. The coverage
+// Procedural fbm using value noise. Fragment cost is dominated by the fbm
+// octave count: this is one transparent plane drawn once, not a volumetric
+// march, so we can afford 5 octaves for richer structure. The coverage
 // uniform thresholds the field so low coverage reveals the sky through
-// the gaps. Sun direction lights the "puff" by biasing brightness toward
-// where the field rises (a cheap stand-in for a real cloud normal).
+// the gaps; a large-scale modulator gates whole *regions* so low coverage
+// reads as scattered cumuli rather than uniform thin noise. Sun direction
+// lights the "puff" by biasing brightness toward where the field rises
+// (a cheap stand-in for a real cloud normal).
 const cloudFragmentShader = /* glsl */`
 varying vec2 vWorldXZ;
 
@@ -58,6 +73,8 @@ uniform vec3 uSunColor;
 uniform float uCoverage;         // [0,1]
 uniform float uEdgeFade;         // [0,1], 1 = fully visible
 uniform float uNoiseScale;       // world -> noise coord scale
+uniform float uTimeSeconds;      // simulation seconds since layer start
+uniform vec2 uWindDir;           // normalized XZ drift direction
 
 // Hash / value noise. Deterministic, cheap, seam-free enough for a
 // transparent cloud layer.
@@ -78,10 +95,13 @@ float valueNoise(vec2 p) {
   return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
 
+// 5-octave fbm. Peak absolute value ~0.5*(1-0.5^5)/(1-0.5) ≈ 0.97; mean
+// stays near 0.5 because the constituent valueNoise samples are in [0,1].
+// Lacunarity 2.03 avoids axis-aligned ghosting at larger scales.
 float fbm(vec2 p) {
   float v = 0.0;
   float amp = 0.5;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 5; i++) {
     v += amp * valueNoise(p);
     p *= 2.03;
     amp *= 0.5;
@@ -90,15 +110,38 @@ float fbm(vec2 p) {
 }
 
 void main() {
-  vec2 uv = vWorldXZ * uNoiseScale;
+  // World-space wind offset drifts the cloud field over time. Wind speed
+  // is baked in (10 m/s) — reads as "visible motion over 60s, not
+  // per-frame jitter". Wind direction is unit-ish; re-normalize here so
+  // fractional (0.7, 0.7) inputs compose cleanly.
+  vec2 wind = length(uWindDir) > 0.0001 ? normalize(uWindDir) : vec2(0.0);
+  vec2 windOffset = wind * uTimeSeconds * 10.0;
+  vec2 uv = (vWorldXZ + windOffset) * uNoiseScale;
+
+  // Large-scale modulator: sample fbm at ~5x the cloud wavelength to pick
+  // out cumulus *fields* (clustered puffs with gaps between them). Smoothed
+  // into a soft [0.5, 1.0] band — a gap region still contributes half its
+  // cloud coverage, so regions never read as a perfectly clear hole. This
+  // keeps low-coverage scenarios from losing their visible puffs entirely
+  // while still giving the cloud field a visible large-scale clustering
+  // signature.
+  vec2 bigUv = uv * 0.2;
+  float bigField = 0.5 + 0.5 * smoothstep(0.20, 0.70, fbm(bigUv));
+
   float base = fbm(uv);
 
   // Coverage threshold; cov=0 hides all clouds, cov=1 fills the sky.
-  // smoothstep softens the cloud edge so the boundary is wispy rather
-  // than sharp.
-  float lowerEdge = mix(1.0, -0.2, clamp(uCoverage, 0.0, 1.0));
-  float upperEdge = lowerEdge + 0.25;
+  // lowerEdge stretches the responsive range so low coverage still yields
+  // sparse-but-visible clouds (mix(1.0, -0.4, ...) was -0.2 previously,
+  // which left openfrontier-coverage=0.1 essentially empty). upperEdge
+  // sits 0.35 above lowerEdge for a wider wispy feather band.
+  float lowerEdge = mix(1.0, -0.4, clamp(uCoverage, 0.0, 1.0));
+  float upperEdge = lowerEdge + 0.35;
   float mask = smoothstep(lowerEdge, upperEdge, base);
+  // Modulate by the large-scale field so low coverage reads as cumulus
+  // patches rather than uniform thin noise over the whole sky, but never
+  // drop below 50% so a whole region never turns perfectly clear.
+  mask *= bigField;
 
   if (mask <= 0.001) {
     discard;
@@ -141,8 +184,10 @@ export class CloudLayer {
 
   private readonly sunDirection = new THREE.Vector3(0, 1, 0);
   private readonly sunColor = new THREE.Color(1, 1, 1);
+  private readonly windDir = new THREE.Vector2(DEFAULT_WIND_DIR_X, DEFAULT_WIND_DIR_Z);
   private coverage = 0;
   private edgeFade = 1;
+  private elapsedSeconds = 0;
 
   constructor() {
     this.material = new THREE.ShaderMaterial({
@@ -152,7 +197,9 @@ export class CloudLayer {
         uSunColor: { value: this.sunColor },
         uCoverage: { value: 0 },
         uEdgeFade: { value: 1 },
-        uNoiseScale: { value: NOISE_SCALE },
+        uNoiseScale: { value: DEFAULT_NOISE_SCALE },
+        uTimeSeconds: { value: 0 },
+        uWindDir: { value: this.windDir },
       },
       vertexShader: cloudVertexShader,
       fragmentShader: cloudFragmentShader,
@@ -191,12 +238,15 @@ export class CloudLayer {
    *   frame so the day-night cycle tracks live).
    * - Computes the edge-on alpha fade based on altitude delta between
    *   camera and plane.
+   * - Accumulates `deltaSeconds` into `uTimeSeconds` so the fragment
+   *   shader drifts the cloud field with simulated wind.
    */
   update(
     cameraPosition: THREE.Vector3,
     terrainYAtCamera: number,
     sunDirection: THREE.Vector3,
-    sunColor: THREE.Color
+    sunColor: THREE.Color,
+    deltaSeconds = 0
   ): void {
     const planeY = terrainYAtCamera + BASE_ALTITUDE;
     this.mesh.position.set(cameraPosition.x, planeY, cameraPosition.z);
@@ -218,6 +268,11 @@ export class CloudLayer {
     this.material.uniforms.uCoverage.value = this.coverage;
     this.material.uniforms.uEdgeFade.value = this.edgeFade;
 
+    if (Number.isFinite(deltaSeconds) && deltaSeconds > 0) {
+      this.elapsedSeconds += deltaSeconds;
+      this.material.uniforms.uTimeSeconds.value = this.elapsedSeconds;
+    }
+
     this.mesh.visible = this.coverage > 0.001 && this.edgeFade > 0.001;
   }
 
@@ -229,6 +284,19 @@ export class CloudLayer {
 
   getCoverage(): number {
     return this.coverage;
+  }
+
+  /**
+   * Override the per-feature noise scale. Input is meters per first-octave
+   * feature — 900 by default, larger = bigger, fewer puffs (fair-weather
+   * cumulus), smaller = denser, tighter puffs (overcast texture). Ignored
+   * if the input is non-finite or non-positive.
+   */
+  setFeatureScaleMeters(metersPerFeature: number): void {
+    if (!Number.isFinite(metersPerFeature) || metersPerFeature <= 0) {
+      return;
+    }
+    this.material.uniforms.uNoiseScale.value = 1 / metersPerFeature;
   }
 
   /** Test hook: observable edge-fade factor for this frame. */

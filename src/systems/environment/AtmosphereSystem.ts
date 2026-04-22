@@ -144,7 +144,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.backend.update(deltaTime, this.sunDirection);
     this.applyToRenderer();
     this.applyFogColor();
-    this.updateCloudLayer();
+    this.updateCloudLayer(deltaTime);
   }
 
   dispose(): void {
@@ -210,6 +210,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.weatherCloudActive = false;
     this.weatherCloudCoverage = 0;
     this.cloudLayer.setCoverage(this.presetCloudCoverage);
+    if (preset.cloudScaleMetersPerFeature !== undefined) {
+      this.cloudLayer.setFeatureScaleMeters(preset.cloudScaleMetersPerFeature);
+    }
 
     Logger.info('atmosphere', `Applied scenario preset '${key}' (${preset.label})`);
 
@@ -437,10 +440,11 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   /**
    * Per-frame cloud-layer update. Pushes the authoritative sun direction
    * and sun color into the cloud shader and repositions the plane above
-   * the camera at the configured base altitude. No-ops gracefully when
-   * no scene has been attached (menu/test phase).
+   * the camera at the configured base altitude. Also forwards deltaTime
+   * so the shader can drift the cloud field with simulated wind. No-ops
+   * gracefully when no scene has been attached (menu/test phase).
    */
-  private updateCloudLayer(): void {
+  private updateCloudLayer(deltaTime: number): void {
     if (!this.scene) return;
 
     // Reconcile preset default with weather override. The weather path
@@ -457,7 +461,8 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       this.cameraPosition,
       this.terrainYAtCamera,
       this.sunDirection,
-      this.scratchCloudSunColor
+      this.scratchCloudSunColor,
+      deltaTime
     );
   }
 

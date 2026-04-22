@@ -107,4 +107,49 @@ describe('CloudLayer (flight-envelope + coverage contract)', () => {
     const layer = new CloudLayer();
     expect(() => layer.dispose()).not.toThrow();
   });
+
+  it('setFeatureScaleMeters accepts reasonable positive values without throwing', () => {
+    const layer = new CloudLayer();
+    expect(() => layer.setFeatureScaleMeters(700)).not.toThrow();
+    expect(() => layer.setFeatureScaleMeters(1400)).not.toThrow();
+  });
+
+  it('setFeatureScaleMeters ignores non-finite or non-positive inputs', () => {
+    const layer = new CloudLayer();
+    // Must not throw and must not render the layer unusable on garbage input.
+    layer.setFeatureScaleMeters(NaN);
+    layer.setFeatureScaleMeters(0);
+    layer.setFeatureScaleMeters(-100);
+    layer.setCoverage(0.5);
+    const camera = new THREE.Vector3(0, 5, 0);
+    layer.update(camera, 0, sunDir, sunColor);
+    // Layer should still function: visibility, edge fade, coverage all normal.
+    expect(layer.getMesh().visible).toBe(true);
+    expect(layer.getCoverage()).toBeCloseTo(0.5, 5);
+  });
+
+  it('update advances over time without throwing and stays visible across frames', () => {
+    // Animated drift contract: repeated updates accumulate time into the
+    // shader-driven wind offset. We can't read the shader uniform directly,
+    // but we can verify the update loop is stable over many frames and the
+    // visibility / coverage surface stays well-defined.
+    const layer = new CloudLayer();
+    layer.setCoverage(0.5);
+    const camera = new THREE.Vector3(0, 5, 0);
+    for (let i = 0; i < 120; i++) {
+      layer.update(camera, 0, sunDir, sunColor, 0.5);
+    }
+    expect(layer.getMesh().visible).toBe(true);
+    expect(layer.getCoverage()).toBeCloseTo(0.5, 5);
+  });
+
+  it('update with default (zero) deltaSeconds still produces a valid frame', () => {
+    // Back-compat: the original update(camera, terrain, sunDir, sunColor)
+    // signature must keep working without a deltaSeconds argument.
+    const layer = new CloudLayer();
+    layer.setCoverage(0.5);
+    const camera = new THREE.Vector3(0, 5, 0);
+    layer.update(camera, 0, sunDir, sunColor);
+    expect(layer.getMesh().visible).toBe(true);
+  });
 });
