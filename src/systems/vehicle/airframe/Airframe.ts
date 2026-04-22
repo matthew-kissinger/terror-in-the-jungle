@@ -35,11 +35,16 @@ const ROTATION_INPUT_THRESHOLD = 0.08;
 const LIFTOFF_WEIGHT_RATIO = 0.25;
 const GROUND_STABILIZATION_TICKS = 3;
 const AIRBORNE_RECOVERY_ALTITUDE = 0.4;
-// Airborne touchdown fallback requires the guards (low AGL + descending) to
-// be true for several consecutive ticks before firing. A single-tick latch
+// Airborne *downward* touchdown fallback requires the guards (low AGL + vy<=0)
+// to be true for several consecutive ticks before firing. A single-tick latch
 // caused bounce/porpoise artifacts when marginal-lift aircraft (e.g. AC-47)
 // oscillated across the threshold right after the 1s grace window expired.
+// The grace + latch gate DOES NOT apply to *upward* penetration — the
+// aircraft climbing over rising terrain must respond immediately so the
+// wheels don't phase through the hillside during the first 1 s post-liftoff.
+// See docs/tasks/airframe-directional-fallback.md.
 const TOUCHDOWN_LATCH_TICKS = 10;
+const POST_LIFTOFF_DESCENT_LATCH_GRACE_TICKS = 60;
 
 const _forward = new THREE.Vector3();
 const _up = new THREE.Vector3();
@@ -99,11 +104,13 @@ export class Airframe {
   private phase: AirframePhase = 'parked';
   private groundHeight = 0;
   private groundStabilizationTicks = GROUND_STABILIZATION_TICKS;
-  /** Ticks during which airborne touchdown fallback is suppressed after a
-   *  just-happened liftoff. Prevents an immediate bounce back to ground on
-   *  the first airborne frame when the plane is still near zero AGL. */
-  private postLiftoffGraceTicks = 0;
-  /** Consecutive ticks the airborne fallback's guards (low AGL + descending)
+  /** Ticks during which the *downward* touchdown fallback is suppressed
+   *  after a just-happened liftoff. Prevents an immediate bounce back to
+   *  ground on the first airborne frame when the plane is still near zero
+   *  AGL. Does NOT apply to upward terrain penetration — the aircraft
+   *  must always respond to rising terrain, even within the grace window. */
+  private descentLatchGraceTicks = 0;
+  /** Consecutive ticks the downward fallback's guards (low AGL + vy<=0)
    *  have been satisfied. The fallback only fires once this crosses a small
    *  threshold, so a momentary dip from aerodynamic oscillation during the
    *  seconds after liftoff doesn't snap the plane back to ground. */
@@ -189,7 +196,7 @@ export class Airframe {
     this.pitchRate = this.rollRate = this.yawRate = 0;
     this.accumulator = 0;
     this.altitudeHoldTarget = null;
-    this.postLiftoffGraceTicks = 0;
+    this.descentLatchGraceTicks = 0;
     this.descentLatchTicks = 0;
     this.snapshot = this.buildSnapshot(this.zeroAero());
     this.syncPreviousPose();
@@ -217,7 +224,7 @@ export class Airframe {
     this.weightOnWheels = false;
     this.pitchRate = this.rollRate = this.yawRate = 0;
     this.accumulator = 0;
-    this.postLiftoffGraceTicks = 0;
+    this.descentLatchGraceTicks = 0;
     this.descentLatchTicks = 0;
     // Capture current altitude as the assist-tier hold target. The pilot
     // will clear it implicitly on their first pitch input.
@@ -339,7 +346,7 @@ export class Airframe {
         this.syncGroundContactAtCurrentPosition(terrain);
       }
     } else {
-      this.integrateAir(dt, cmd);
+      this.integrateAir(dt, cmd, terrain);
     }
 
     // 7. Swept collision. Only meaningful while airborne — ground integration
@@ -466,10 +473,13 @@ export class Airframe {
         Math.max(4.5, newFwd * 0.12),
       );
       this.pitchRate = Math.max(this.pitchRate, cmd.elevator * 0.5);
-      // Suppress immediate retouchdown for ~1s. Keeps the plane from
-      // bouncing back down when it's still near AGL=0 right after liftoff
-      // and alpha-limited pitch authority is still ramping in.
-      this.postLiftoffGraceTicks = 60;
+      // Suppress immediate *downward* retouchdown for ~1s. Keeps the plane
+      // from bouncing back down when it's still near AGL=0 right after
+      // liftoff and alpha-limited pitch authority is still ramping in. The
+      // *upward* terrain response branch (rising terrain) is NOT gated by
+      // this counter — the aircraft must always clear a hillside, even in
+      // the first post-liftoff second.
+      this.descentLatchGraceTicks = POST_LIFTOFF_DESCENT_LATCH_GRACE_TICKS;
       return;
     }
 
@@ -494,7 +504,7 @@ export class Airframe {
     this.position.y = this.groundHeight + this.cfg.ground.gearClearanceM;
   }
 
-  private integrateAir(dt: number, cmd: AirframeCommand): void {
+  private integrateAir(dt: number, cmd: AirframeCommand, terrain: AirframeTerrainProbe): void {
     const { aero, engine, authority, stability } = this.cfg;
     const a = this.computeAero();
 
@@ -584,40 +594,82 @@ export class Airframe {
     }
     this.position.addScaledVector(this.velocity, dt);
 
-    // Gentle ground-plane touchdown fallback for low-angle approaches. Swept
-    // collision is the main path; this catches the level-ish case where the
-    // aircraft is barely above the ground and the sweep returned no hit
-    // (e.g. local flat terrain, previous and next position both above).
-    const groundClearance = this.groundHeight + this.cfg.ground.gearClearanceM;
-    const altitudeAGL = this.position.y - groundClearance;
-    if (this.postLiftoffGraceTicks > 0) {
-      this.postLiftoffGraceTicks--;
+    // Directional ground-plane fallback. The swept collision in stepOnce is
+    // the main path for terrain intersection; this catches level-ish cases
+    // where the sweep returned no hit. We split by direction:
+    //
+    //   Upward — terrain under the aircraft's current XZ is above the
+    //     aircraft's floor Y. Rising terrain (hillside climbout). Always
+    //     respond: clamp Y up to floor, zero any downward velocity
+    //     component. No grace, no latch, no touchdown — the aircraft keeps
+    //     flying. This removes the ~1 s post-liftoff "phase-through rising
+    //     terrain" window that the descent-grace counter used to hide.
+    //
+    //   Downward — terrain is below the aircraft's floor and the aircraft
+    //     is descending (vy <= 0). This is the descent-bounce case the
+    //     grace window was designed for: suppress immediate re-touchdown
+    //     for POST_LIFTOFF_DESCENT_LATCH_GRACE_TICKS, then require
+    //     TOUCHDOWN_LATCH_TICKS consecutive guarded ticks before committing
+    //     to touchdown (avoids porpoising across the threshold).
+    //
+    // Note: `this.groundHeight` was sampled at the OLD XZ at the start of
+    // the tick (before integration). For the upward branch we re-sample at
+    // the NEW XZ so rising terrain is actually seen.
+    const currentSample = terrain.sample(this.position.x, this.position.z);
+    const currentGroundHeight = currentSample.height;
+    const floorY = currentGroundHeight + this.cfg.ground.gearClearanceM;
+    const altitudeAglCurrent = this.position.y - floorY;
+
+    if (this.descentLatchGraceTicks > 0) {
+      this.descentLatchGraceTicks--;
     }
-    const postLiftoffProtected = this.postLiftoffGraceTicks > 0;
-    const touchdownGuardsMet =
-      altitudeAGL <= this.cfg.ground.liftoffClearanceM + GROUND_TOUCHDOWN_BUFFER_M &&
-      this.velocity.y <= 0;
-    if (touchdownGuardsMet && !postLiftoffProtected) {
-      this.descentLatchTicks++;
+
+    // Upward branch: rising terrain at the current XZ intrudes above the
+    // aircraft's floor. Always clamp up immediately.
+    if (altitudeAglCurrent < 0) {
+      this.position.y = floorY;
+      this.groundHeight = currentGroundHeight;
+      if (currentSample.normal) this.terrainNormal.copy(currentSample.normal).normalize();
+      if (this.velocity.y < 0) this.velocity.y = 0;
+      this.descentLatchTicks = 0;
+      // Do NOT set weightOnWheels — the aircraft keeps flying; this is a
+      // ground-clearance assertion, not a landing.
+      this.phase = this.phase === 'stall' ? 'stall' : 'climb';
+      // Drop through to phase classification at end of the method.
     } else {
-      this.descentLatchTicks = 0;
+      // Downward branch: same contract as before, but now clearly scoped.
+      // Use the OLD-XZ groundClearance (this.groundHeight) for the guard so
+      // the descent-bounce case behaves identically to the pre-split code.
+      const groundClearance = this.groundHeight + this.cfg.ground.gearClearanceM;
+      const altitudeAGL = this.position.y - groundClearance;
+      const descentLatchProtected = this.descentLatchGraceTicks > 0;
+      const touchdownGuardsMet =
+        altitudeAGL <= this.cfg.ground.liftoffClearanceM + GROUND_TOUCHDOWN_BUFFER_M &&
+        this.velocity.y <= 0;
+      if (touchdownGuardsMet && !descentLatchProtected) {
+        this.descentLatchTicks++;
+      } else {
+        this.descentLatchTicks = 0;
+      }
+      if (
+        !descentLatchProtected &&
+        touchdownGuardsMet &&
+        this.descentLatchTicks >= TOUCHDOWN_LATCH_TICKS
+      ) {
+        this.position.y = groundClearance;
+        this.velocity.y = 0;
+        this.weightOnWheels = true;
+        this.phase = this.velocity.length() > 1.0 ? 'rollout' : 'parked';
+        this.pitchRate = 0;
+        this.rollRate = 0;
+        this.yawRate *= 0.5;
+        this.groundPitch = Math.max(0, _euler.x);
+        this.descentLatchTicks = 0;
+        return;
+      }
     }
-    if (
-      !postLiftoffProtected &&
-      touchdownGuardsMet &&
-      this.descentLatchTicks >= TOUCHDOWN_LATCH_TICKS
-    ) {
-      this.position.y = groundClearance;
-      this.velocity.y = 0;
-      this.weightOnWheels = true;
-      this.phase = this.velocity.length() > 1.0 ? 'rollout' : 'parked';
-      this.pitchRate = 0;
-      this.rollRate = 0;
-      this.yawRate *= 0.5;
-      this.groundPitch = Math.max(0, _euler.x);
-      this.descentLatchTicks = 0;
-      return;
-    }
+    // Re-use `altitudeAGL`-like value for phase classification below.
+    const altitudeAGL = altitudeAglCurrent;
 
     // Phase classification airborne.
     this.phase = a.stalled
