@@ -324,6 +324,51 @@ describe('FixedWing L3 integration — behavior contracts', () => {
     expect(visualMidFrame.z).toBeGreaterThan(fixedStepPosition.z);
   });
 
+  // Regression: with the render cadence faster than the physics fixed step
+  // (144Hz render vs 60Hz sim), reading the raw physics pose aliases the
+  // fixed-step sawtooth — forward displacement between render frames alternates
+  // between a big chunk (when a physics step fires) and zero (when the
+  // accumulator is mid-step). The interpolated pose is the authoritative
+  // surface: consumers must see a smooth, monotonic advance in steady cruise.
+  it('delivers a monotonic interpolated pose advance at a 144Hz render cadence', () => {
+    const af = new Airframe(new THREE.Vector3(0, 200, 0), SKYRAIDER_AF);
+    const probe = flatProbe(0);
+    af.resetAirborne(new THREE.Vector3(0, 200, 0), new THREE.Quaternion(), 60, 0, 0);
+    const cmd = intent({ throttle: 0.55, tier: 'assist' });
+
+    const RENDER_DT = 1 / 144;
+    // Warm up a few steps so we are well past any startup transient.
+    for (let i = 0; i < 30; i++) af.step(cmd, probe, FIXED_DT);
+
+    const deltas: number[] = [];
+    let prevZ = af.getInterpolatedState().position.z;
+    for (let i = 0; i < 120; i++) {
+      af.step(cmd, probe, RENDER_DT);
+      const z = af.getInterpolatedState().position.z;
+      deltas.push(z - prevZ);
+      prevZ = z;
+    }
+
+    // Every frame-to-frame delta must be positive (plane moves forward along
+    // -Z → increasing displacement toward -Z; we track raw Z which therefore
+    // decreases, so deltas are negative). Assert monotonic decrease: no delta
+    // should reverse sign or be stuck at zero.
+    const direction = Math.sign(deltas[0]);
+    expect(direction).not.toBe(0);
+    for (const d of deltas) {
+      expect(Math.sign(d)).toBe(direction);
+    }
+
+    // Sawtooth signature: with a raw-physics consumer at 144Hz there are
+    // ~84 zero-delta frames out of 120 (render faster than sim), and ~36
+    // big-delta frames. The interpolated consumer should have all frames with
+    // similar magnitude (mean-relative stddev under ~0.5).
+    const mean = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+    const variance = deltas.reduce((a, b) => a + (b - mean) ** 2, 0) / deltas.length;
+    const stddev = Math.sqrt(variance);
+    expect(Math.abs(stddev / mean)).toBeLessThan(0.5);
+  });
+
   it('accelerates in a nose-down dive', () => {
     const af = new Airframe(new THREE.Vector3(0, 300, 0), SKYRAIDER_AF);
     const probe = flatProbe(0);
