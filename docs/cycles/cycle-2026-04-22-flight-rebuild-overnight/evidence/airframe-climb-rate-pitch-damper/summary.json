@@ -1,0 +1,50 @@
+{
+  "task": "airframe-climb-rate-pitch-damper",
+  "cycle": "cycle-2026-04-22-flight-rebuild-overnight",
+  "scenario": "A-1 Skyraider, airborne at 100 m, pitch=0, throttle=1, RAW tier, flat terrain far below, 30 s window, first 2 s skipped",
+  "metric": "vertical-speed oscillation (phugoid)",
+  "baseline": {
+    "vsRms_ms": 62.85,
+    "vsPeakToPeak_ms": 188.4,
+    "vsMin_ms": -120.0,
+    "vsMax_ms": 68.4,
+    "altEnd_m": 345.1,
+    "altPeakToPeak_m": 892.1
+  },
+  "after": {
+    "vsRms_ms": 25.17,
+    "vsPeakToPeak_ms": 85.47,
+    "vsMin_ms": 4.27,
+    "vsMax_ms": 89.74,
+    "altEnd_m": 1888.6,
+    "altPeakToPeak_m": 1786.3
+  },
+  "deltas": {
+    "vsRms_reduction_pct": 59.96,
+    "vsPeakToPeak_reduction_pct": 54.63,
+    "note": "Exit criterion was >= 50% vsRms reduction — met."
+  },
+  "cruiseStep": {
+    "scenario": "airborne at 500 m, v2*1.3 forward speed, +0.5 elevator step, 2 s window, time to reach 10 deg pitch",
+    "baseline_timeTo10Deg_s": 0.633,
+    "after_timeTo10Deg_s": 0.633,
+    "degradation_pct": 0.0,
+    "tolerance_pct": 10,
+    "withinTolerance": true,
+    "note": "The smoothstep(5, 12) window leaves the early pitch transient at baseline damping. Response time identical to baseline."
+  },
+  "cruiseAltHold": {
+    "scenario": "200 m airborne, 50 m/s, neutral stick, assist tier, 5 s (fixedWing integration test)",
+    "baseline_deviation_m": 4.60,
+    "after_deviation_m": 4.60,
+    "note": "PD transient vy peaks at ~2.5 m/s, below the 5 m/s smoothstep floor, so climb damper is inactive here."
+  },
+  "pitchRelease": {
+    "scenario": "55 m/s airborne, 0.15 pitch for 0.5 s then neutral, assist tier, 5 s (fixedWing integration test)",
+    "baseline_deviation_m": 16.92,
+    "after_deviation_m": 17.89,
+    "test_tolerance_m": 20,
+    "note": "PD-recapture transient vy peaks at ~6.6 m/s. Within the smoothstep window (5→12), but the partial damping boost only adds ~1 m overshoot."
+  },
+  "fix": "climbFactor = smoothstep(velocity.y, 5, 12); pitchDamp *= 1 + climbFactor * 1.5. Applied to pitchAccel term in integrateAir. Cruise and brief PD transients unaffected (climbFactor=0 at vy<=5 m/s); 2.5x damping at vy>=12 m/s sustained climb."
+}
