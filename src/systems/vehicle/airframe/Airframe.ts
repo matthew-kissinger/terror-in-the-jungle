@@ -312,9 +312,23 @@ export class Airframe {
     // altitude error. This gives the contract "neutral stick means hold
     // altitude" a real autopilot backbone instead of relying on
     // vs-damping alone (which phase-lags and oscillates at cruise thrust).
-    // Pitch input clears the hold target — pilot took authority back.
+    //
+    // Pitch input clears the hold target — pilot took authority back. When
+    // the pitch stick returns to neutral while airborne in assist tier, we
+    // recapture the present altitude as the new target. This is the single
+    // authoritative altitude-hold PD for fixed wing; buildCommand.ts no
+    // longer ships a parallel cruise-hold elevator term. Recapture on
+    // release was the missing piece: before this, normal player takeoffs
+    // never captured a target (only `resetAirborne` callers did), so the
+    // PD never fired in piloted flight.
     if (Math.abs(intent.pitch) >= 0.05) {
       this.altitudeHoldTarget = null;
+    } else if (
+      intent.tier === 'assist' &&
+      !this.weightOnWheels &&
+      this.altitudeHoldTarget === null
+    ) {
+      this.altitudeHoldTarget = this.position.y;
     }
     if (
       intent.tier === 'assist' &&

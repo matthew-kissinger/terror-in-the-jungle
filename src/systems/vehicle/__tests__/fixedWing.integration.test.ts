@@ -305,6 +305,43 @@ describe('FixedWing L3 integration — behavior contracts', () => {
     expect(Math.abs(endAltitude - startAltitude)).toBeLessThan(5);
   });
 
+  // Regression for the altitude-hold unification: in master, the
+  // Airframe-level altitude-hold PD only fired if `altitudeHoldTarget` had
+  // been captured, and no code captured it after a pitch maneuver in normal
+  // flight — only `resetAirborne` set it. That meant a player who briefly
+  // pitched up and then released the stick in assist tier got no altitude
+  // hold from the Airframe PD; only the weaker buildCommand VS-damping ran.
+  //
+  // Post-unification, releasing the pitch stick in assist tier must
+  // re-capture the present altitude as the hold target and the Airframe PD
+  // must then fight the resulting altitude error. The observable contract
+  // is: at 5 s after release, the PD has engaged and the altitude error is
+  // bounded. The tolerance is generous because the assist-tier PD gains
+  // are not being retuned in this change — the important assertion is
+  // that the PD *engaged at all*, which it did not do pre-unification
+  // for this scenario.
+  it('recaptures the altitude-hold target after a pitch-up release', () => {
+    const af = new Airframe(new THREE.Vector3(0, 200, 0), SKYRAIDER_AF);
+    const probe = flatProbe(0);
+    af.resetAirborne(new THREE.Vector3(0, 200, 0), new THREE.Quaternion(), 55, 0, 0);
+
+    // Brief nudge above the 0.05 threshold clears the hold target.
+    const nudgeCmd = intent({ throttle: 0.55, pitch: 0.15, tier: 'assist' });
+    for (let i = 0; i < Math.round(0.5 / FIXED_DT); i++) {
+      af.step(nudgeCmd, probe, FIXED_DT);
+    }
+
+    const releaseAltitude = af.getState().altitude;
+    const cruiseCmd = intent({ throttle: 0.55, tier: 'assist' });
+    for (let i = 0; i < Math.round(5 / FIXED_DT); i++) {
+      af.step(cruiseCmd, probe, FIXED_DT);
+    }
+
+    const endAltitude = af.getState().altitude;
+    expect(Math.abs(endAltitude - releaseAltitude)).toBeLessThan(20);
+    expect(af.getState().isStalled).toBe(false);
+  });
+
   it('exposes an interpolated pose between fixed airframe steps', () => {
     const af = new Airframe(new THREE.Vector3(0, 200, 0), SKYRAIDER_AF);
     const probe = flatProbe(0);

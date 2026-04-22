@@ -60,25 +60,11 @@ export function buildAirframeCommand(
     const targetPitchDeg = intent.pitch * feel.assistMaxPitchDeg;
     const errDeg = targetPitchDeg - state.pitchDeg;
     elevator = clamp(errDeg * feel.assistPitchP - state.pitchRateDeg * feel.assistPitchD, -1, 1);
-  } else {
-    // Hands-off in assist: hold altitude by damping vertical speed toward 0.
-    // Neutral stick means "hold altitude" to the player, so the sim injects
-    // elevator proportional to verticalSpeedMs in addition to the pitch-
-    // toward-trim term. No toggle, no mode — this is part of the assist
-    // tier contract.
-    // Cruise hold: neutral stick in assist means "maintain present
-    // altitude." Damp vertical speed and keep pitch near trim; gains are
-    // deliberately conservative to avoid phase-lagged oscillation.
-    const pitchErrDeg = cfg.aero.trimAlphaDeg - state.pitchDeg;
-    const vsTermDeg = -state.verticalSpeedMs * 2.0;
-    elevator = clamp(
-      pitchErrDeg * feel.assistPitchP * 0.25
-        + vsTermDeg * feel.assistPitchP * 0.4
-        - state.pitchRateDeg * feel.assistPitchD * 3,
-      -0.25,
-      0.25,
-    );
   }
+  // Hands-off assist: leave the elevator at 0 here. Airframe.ts owns the
+  // single altitude-hold PD that fires when the pitch stick is neutral in
+  // assist tier; it overrides cmd.elevator with a captured-altitude PD
+  // loop. Adding any cruise-hold term here would fight that PD.
 
   // Turn coordination: yaw added proportional to bank.
   const coordYaw = -clamp(state.rollDeg / 40, -1, 1) * feel.coordYawScale;
