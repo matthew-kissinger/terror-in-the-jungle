@@ -18,6 +18,7 @@ import { TimeControlPanel } from '../ui/debug/TimeControlPanel';
 import { TimeScale } from './TimeScale';
 import { FreeFlyCamera, type FreeFlyInput } from '../ui/debug/FreeFlyCamera';
 import { EntityInspectorPanel } from '../ui/debug/EntityInspectorPanel';
+import { PlaytestCaptureManager, DefaultCaptureWriter, type CaptureContext } from '../ui/debug/PlaytestCaptureManager';
 import { RuntimeMetrics } from './RuntimeMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
@@ -61,6 +62,7 @@ export class GameEngine {
   };
   public runtimeMetrics?: RuntimeMetrics;
   public liveTuningPanel?: import('../ui/debug/LiveTuningPanel').LiveTuningPanel;
+  public playtestCaptureManager: PlaytestCaptureManager;
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
   public readonly startupFlow = new StartupFlowController();
@@ -122,6 +124,8 @@ export class GameEngine {
     }
 
     this.contextRecovery = new WebGLContextGuard(this.renderer);
+    this.playtestCaptureManager = new PlaytestCaptureManager(new DefaultCaptureWriter());
+    this.playtestCaptureManager.setContext(this.buildCaptureContext());
     this.setupEventListeners();
     this.setupMenuCallbacks();
     this.clock.connect(document);
@@ -299,6 +303,39 @@ export class GameEngine {
     return Init.initializeSystems(this);
   }
 
+  /**
+   * Read-only snapshot adapter for PlaytestCaptureManager. Kept defensive
+   * because some getters (playerController, gameModeManager) may not be
+   * present before initializeSystems resolves.
+   */
+  private buildCaptureContext(): CaptureContext {
+    return {
+      canvas: this.renderer.renderer.domElement,
+      getMode: () => {
+        try { return this.systemManager.gameModeManager?.getCurrentMode() ?? ''; }
+        catch { return ''; }
+      },
+      getPlayerPosition: () => {
+        try {
+          const pc = this.systemManager.playerController;
+          if (!pc) return null;
+          const p = pc.getPosition();
+          return { x: p.x, y: p.y, z: p.z };
+        } catch { return null; }
+      },
+      getPlayerVehicle: () => {
+        try {
+          const pc = this.systemManager.playerController;
+          if (!pc) return null;
+          if (pc.isInHelicopter()) return `helicopter:${pc.getHelicopterId() ?? '?'}`;
+          if (pc.isInFixedWing()) return `fixed-wing:${pc.getFixedWingId() ?? '?'}`;
+          return null;
+        } catch { return null; }
+      },
+      getTuningState: () => this.liveTuningPanel?.getState() ?? null,
+    };
+  }
+
   public async loadGameAssets(): Promise<void> {
     return Init.loadGameAssets(this);
   }
@@ -431,6 +468,7 @@ export class GameEngine {
     this.systemManager.dispose();
     this.renderer.dispose();
     this.debugHud.dispose();
+    this.playtestCaptureManager.dispose();
     GameEventBus.clear();
     performanceTelemetry.reset();
     objectPool.reset();
