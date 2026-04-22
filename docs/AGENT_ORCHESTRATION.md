@@ -70,49 +70,79 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: (none — awaiting next planning pass)
+## Current cycle: cycle-2026-04-23-debug-and-test-modes
 
 ### Cycle ID
 
-`<cycle-id>`
+`cycle-2026-04-23-debug-and-test-modes`
 
 ### Why this cycle exists
 
-<one paragraph: what changed in the world or in the repo that justifies this cycle right now>
+Iterating on system issues requires re-entering a full game and fighting combat pressure while trying to diagnose a specific subsystem. The existing `?mode=flight-test` (isolated physics scene) is too far removed from authentic engine state for flight-feel work. Debug overlays (F1-F4) are hand-wired so adding a new panel for vehicle-state / combat-state / current-mode means a new top-level overlay class + a new keybind. And playtest feedback capture happens out-of-band in `Win+Shift+S` + a markdown doc. This cycle lands the three foundations that close all three gaps: a debug-HUD registry with a master toggle, a launcher for full-engine test/sandbox modes, a concrete `airfield-sandbox` mode, and an F9 screenshot+annotation capture. Full plan in [docs/cycles/cycle-2026-04-23-debug-and-test-modes/README.md](cycles/cycle-2026-04-23-debug-and-test-modes/README.md).
 
 ### Tasks in this cycle
 
-<list of slugs with one-line descriptions; each must have a brief at `docs/tasks/<slug>.md`>
+4 tasks, two rounds. Each has a brief at `docs/tasks/<slug>.md`.
+
+- Round 1 (solo, P0): `debug-hud-registry` — unify F1-F4 overlays under a registry with a master-toggle (backtick); seed 3 new panels (vehicle-state, combat-state, current-mode).
+- Round 2 (3 parallel, P1):
+  - `test-mode-launcher` — extend `GameMode` enum + main-menu UI for test modes; seed `AIRFIELD_SANDBOX` + `COMBAT_SANDBOX` stub; URL + menu routing.
+  - `airfield-sandbox-mode` — fill in `AIRFIELD_SANDBOX` content: spawn at `main_airbase`, aircraft claimable, enemy AI muted via composition-level config, no objective pressure.
+  - `playtest-capture-overlay` — F9 captures `renderer.domElement.toBlob()` + an annotation prompt; writes session-scoped `.png` + `.md` to `artifacts/playtest/`.
 
 ### Round schedule
 
-<R1 ... -> R2 ... -> ...; concurrency per round; merge gates>
+R0 (fresh baseline) → R1 (solo) → R2 (3 parallel). R2 does NOT block on R1 landing; R2 touches disjoint files.
+
+**Round 0 (orchestrator prep):** `git fetch origin && git status` (must be clean); capture a fresh `npm run perf:capture:combat120` and commit to `docs/cycles/cycle-2026-04-23-debug-and-test-modes/baseline/` (prior cycle flagged the inherited baseline as an outlier; this cycle uses a fresh one).
 
 ### Concurrency cap
 
-<N>
+3 (only Round 2 has parallelism).
 
 ### Dependencies
 
-<inline DAG or pointer to brief file>
+```
+Round 0 (fresh baseline capture)
+  -> debug-hud-registry (solo)
+      -> test-mode-launcher         ┐
+      -> airfield-sandbox-mode      ├─ parallel (disjoint files)
+      -> playtest-capture-overlay   ┘
+```
 
 ### Playtest policy
 
-<which tasks gate on playtest pass before merge; default is "playtest-required PRs merge on CI green and are flagged for morning review">
+DEFERRED. No playtest gate BLOCKS merge. `airfield-sandbox-mode` and `playtest-capture-overlay` are worth a human pass post-merge — flag in RESULT.md under "Playtest recommended."
+
+### Perf policy
+
+- **Baseline:** Round-0 fresh capture (`baseline/perf-baseline-combat120.json`), not the prior cycle's outlier baseline.
+- **Gate:** post-Round-2 `npm run perf:capture:combat120`. p99 within 5% of Round-0 baseline; `heap_recovery_ratio` ≥ 0.5.
+
+### Failure handling (autonomous-safe)
+
+- CI red on a task → mark `blocked`, record, continue.
+- Fence-change proposal (`fence_change: yes`) → mark `blocked`, record, DO NOT merge.
+- Probe/screenshot-assertion fail post-merge → revert if possible; otherwise `rolled-back-pending` in RESULT.md.
 
 ### Visual checkpoints (orchestrator-gated)
 
-<list of `evidence/<slug>/<artifact>` outputs the orchestrator must review before advancing past that round; or "NONE" if cycle is autonomous>
+NONE. Autonomous run. Screenshots are cycle evidence, not orchestrator gates.
 
 ### skip-confirm
 
-<yes|no — if yes, orchestrator does NOT pause for "go" between rounds; default no>
+YES. Orchestrator does NOT pause between rounds.
 
 ### Cycle-specific notes
 
-<anything that does not generalize: budget caps that override the default, special handling for a known-flaky test, etc.>
+- **F1-F4 keybind muscle memory preserved.** `debug-hud-registry` adds a new master-toggle on backtick; F1=Performance F2=runtime-stats F3=Log F4=Time must still toggle their original panels.
+- **`?mode=flight-test` is NOT replaced.** The isolated-physics bypass in `src/dev/flightTestScene.ts` stays for probe/physics work. `test-mode-launcher` adds full-engine test modes that DO use the normal launch flow.
+- **`airfield-sandbox-mode` must suppress combat via composition-level config, NOT by editing `src/systems/combat/**`.** If the executor finds the composer doesn't honor a top-level `warSimulator.enabled=false`, STOP and file a finding.
+- **Reviewers:** `airfield-sandbox-mode` may touch `src/core/ModeStartupPreparer.ts` + `src/config/gameModeDefinitions.ts`; if the diff ends up inside `src/systems/combat/**` or `src/systems/terrain/**`, spawn the matching reviewer. The other three tasks touch `src/ui/**`, `src/core/GameEngine*`, `src/systems/input/**`, `src/config/**` — no reviewer scope.
 
-The previous cycle, `cycle-2026-04-22-heap-and-polish`, closed on 2026-04-22 with 4 merged PRs (#135–#138). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-22-heap-and-polish, 2026-04-22)" and `docs/cycles/cycle-2026-04-22-heap-and-polish/RESULT.md`.
+### Pre-flight acknowledgement
+
+The prior cycle, `cycle-2026-04-22-heap-and-polish`, closed on 2026-04-22 with 4 merged PRs (#135–#138). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-22-heap-and-polish, 2026-04-22)" and `docs/cycles/cycle-2026-04-22-heap-and-polish/RESULT.md`.
 
 ## Dispatch protocol
 

@@ -1,6 +1,27 @@
 # Backlog
 
-Last updated: 2026-04-22 (cycle-2026-04-22-heap-and-polish closed)
+Last updated: 2026-04-22 (cycle-2026-04-22-heap-and-polish closed; cycle-2026-04-23-debug-and-test-modes seeded)
+
+## Standing workstreams
+
+### Asset replacement + LOD-imposter pipeline (ongoing, human-driven)
+
+Parallel to orchestrated cycles, the human is progressively replacing placeholder / low-quality 3D models, textures, and effects with improved assets — some hand-authored, some sourced externally. As part of this pass, imposter LODs will be authored for the replaced models so the distant-LOD tier can swap from full geometry to billboard imposters without the current "pop-in" artifact.
+
+**Scope (tracked, not cycle-gated):**
+- Inventory pass: flag current placeholder assets the human wants upgraded (see the table in each session's `docs/playtest/PLAYTEST_<date>.md`).
+- Replacement intake: drop-in swaps where the replacement is authored to the same rig/scale.
+- Imposter generation: a tooling pass to render 8-direction billboards from each replaced asset for LOD switch at the distant tier.
+- LOD integration: wire imposters into `CombatantLODManager` (or the equivalent for props / vehicles) behind a feature flag per asset class.
+
+**Notes for future orchestrated cycles:**
+- If a future cycle needs to touch model loading or LOD switching, check this workstream first — the imposter-LOD shape may already be in flight on the human side.
+- Tooling preference: headless Three.js render passes (`npm run` script) over external DCC; keeps the pipeline reproducible.
+- When a cycle's RESULT calls out "asset worth replacing" findings from the playtest doc, append to the per-session inventory table, do NOT spawn a separate cycle for it unless the batch is large enough (e.g., ≥10 assets + imposter work).
+
+### Playtest feedback docs
+
+Per-session fillable docs live under `docs/playtest/PLAYTEST_<date>.md`. Each session's notes roll up to the next cycle's planning pass. See `docs/playtest/PLAYTEST_2026-04-22.md` for the template shape.
 
 ## Recently Completed (cycle-2026-04-22-heap-and-polish, 2026-04-22)
 
