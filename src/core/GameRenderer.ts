@@ -44,7 +44,15 @@ export class GameRenderer {
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: false, // Disabled for pixel-perfect rendering
-      powerPreference: 'high-performance'
+      powerPreference: 'high-performance',
+      // Required for the F9 playtest capture overlay to call
+      // `renderer.domElement.toBlob()` and get a non-blank PNG. Without
+      // this flag the browser is free to clear/swap the back buffer
+      // after compositing, which returns a blank capture. Some drivers
+      // take a small perf hit; if combat120 p99 ever regresses >2% we
+      // can gate behind `import.meta.env.DEV`. See
+      // docs/tasks/playtest-capture-overlay.md step 0.
+      preserveDrawingBuffer: true
     });
 
     this.setupRenderer();

@@ -24,6 +24,7 @@ function handleKeyDown(event: KeyboardEvent): void {
     event.key === 'F2' ||
     event.key === 'F3' ||
     event.key === 'F4' ||
+    event.key === 'F9' ||
     event.key === 'p' ||
     event.key === 'P' ||
     event.key === '[' ||
@@ -56,6 +57,8 @@ function handleKeyDown(event: KeyboardEvent): void {
     toggleLogOverlay(engineRef);
   } else if (event.key === 'F4') {
     toggleTimeIndicator(engineRef);
+  } else if (event.key === 'F9') {
+    triggerPlaytestCapture(engineRef);
   } else if (event.key === '`' || event.key === '~') {
     toggleDebugHud(engineRef);
   } else if (event.key === 'Backspace') {
@@ -327,6 +330,15 @@ export function fasterSimulation(engine: GameEngine): void {
     engine.debugHud.togglePanel('time-control');
   }
   Logger.info('engine-input', `[time] scale ${next.toFixed(2)}x`);
+}
+
+/**
+ * Triggers the F9 playtest capture flow. Delegates everything to the
+ * PlaytestCaptureManager so this handler stays thin.
+ */
+export function triggerPlaytestCapture(engine: GameEngine): void {
+  if (!engine.playtestCaptureManager) return;
+  void engine.playtestCaptureManager.trigger();
 }
 
 /**
