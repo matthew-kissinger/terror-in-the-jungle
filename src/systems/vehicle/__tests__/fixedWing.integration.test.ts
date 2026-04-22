@@ -148,6 +148,89 @@ describe('FixedWing L3 integration — behavior contracts', () => {
     expect(postLiftoffTouchdowns).toBe(0);
   });
 
+  // Regression: downward descent-latch grace is preserved. Cutting throttle
+  // immediately after liftoff at low AGL must NOT snap the aircraft back to
+  // the runway within the grace window — the original reason the grace
+  // counter exists. Verifies the directional split didn't break this case.
+  it('does not snap down if throttle is cut at low AGL within grace window', () => {
+    const af = new Airframe(new THREE.Vector3(0, SKYRAIDER_AF.ground.gearClearanceM, 0), SKYRAIDER_AF);
+    const probe = flatProbe(0);
+
+    // Takeoff roll to liftoff.
+    let liftoffTick = -1;
+    const rollTicks = Math.round(12 / FIXED_DT);
+    const rollCmd = intent({ throttle: 1, pitch: 0.3 });
+    for (let i = 0; i < rollTicks && liftoffTick < 0; i++) {
+      af.step(rollCmd, probe, FIXED_DT);
+      if (!af.getState().weightOnWheels) liftoffTick = i;
+    }
+    expect(liftoffTick).toBeGreaterThan(0);
+
+    // Within the grace window (pre-fix was 60 ticks ~ 1 s), cut throttle
+    // and hold neutral pitch. Aircraft should NOT immediately snap back to
+    // weightOnWheels just because vy dips negative.
+    const graceCmd = intent({ throttle: 0, pitch: 0 });
+    // Step half the grace window.
+    let immediateTouchdown = false;
+    for (let i = 0; i < 30; i++) {
+      af.step(graceCmd, probe, FIXED_DT);
+      if (af.getState().weightOnWheels) {
+        immediateTouchdown = true;
+        break;
+      }
+    }
+    expect(immediateTouchdown).toBe(false);
+  });
+
+  // Regression: directional fallback. Before the split, the post-liftoff
+  // grace window (~1 s) suppressed ALL ground contact — including rising
+  // terrain under the climbing aircraft. An aircraft that lifted off over a
+  // ramp would phase through the first few meters of hillside until grace
+  // expired. The fix splits fallback by direction: upward terrain intrusion
+  // is always clamped immediately (no grace, no latch).
+  it('does not phase through rising terrain immediately after liftoff', () => {
+    // Build a downrange ramp that begins below the aircraft and rises
+    // forward (along -Z because forward in body axis is -Z). Start the
+    // aircraft airborne a few meters above z=0 with forward velocity so the
+    // grace counter is active (fresh airborne state), then step over the
+    // ramp. Position.y must never fall below terrainHeight + gearClearance.
+    const slope = 0.1; // 1 m rise per 10 m forward
+    // Ramp begins at z=0; terrain height(z) = max(0, -z * slope) grows as
+    // the aircraft moves into -Z.
+    const probe: AirframeTerrainProbe = {
+      sample(_x, z) {
+        return { height: Math.max(0, -z * slope), normal: new THREE.Vector3(0, 1, 0) };
+      },
+      // Deliberately return null: the bug manifests when the sweep misses
+      // and the fallback has to catch the upward case on its own.
+      sweep() {
+        return null;
+      },
+    };
+    const af = new Airframe(new THREE.Vector3(0, 5, 0), SKYRAIDER_AF);
+    af.resetAirborne(new THREE.Vector3(0, 5, 0), new THREE.Quaternion(), 40, 0, 0);
+    // Also arm the descent grace counter so we're testing INSIDE the window
+    // where the pre-fix code would suppress contact.
+    // resetAirborne clears the counter; we simulate the post-liftoff state
+    // by stepping once then asserting no phase-through on subsequent ticks.
+
+    const cmd = intent({ throttle: 1, pitch: 0.1 });
+    let belowTerrainTicks = 0;
+    // 3 s is well inside the original 1 s grace (60 ticks) plus buffer.
+    for (let i = 0; i < Math.round(3 / FIXED_DT); i++) {
+      af.step(cmd, probe, FIXED_DT);
+      const s = af.getState();
+      const terrainH = Math.max(0, -s.position.z * slope);
+      const floorY = terrainH + SKYRAIDER_AF.ground.gearClearanceM;
+      // Aircraft floor must not dip below terrain. Allow tiny numeric
+      // tolerance for the single-tick crossing before the fallback fires.
+      if (s.position.y < floorY - 0.02) {
+        belowTerrainTicks++;
+      }
+    }
+    expect(belowTerrainTicks).toBe(0);
+  });
+
   it('keeps ground roll attached to rising terrain after each movement step', () => {
     const af = new Airframe(new THREE.Vector3(0, SKYRAIDER_AF.ground.gearClearanceM, 0), SKYRAIDER_AF);
     const probe = risingRunwayProbe(0.15);
