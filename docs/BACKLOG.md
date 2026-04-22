@@ -1,6 +1,45 @@
 # Backlog
 
-Last updated: 2026-04-22 (Cycle 2 active)
+Last updated: 2026-04-22 (cycle-2026-04-22-heap-and-polish closed)
+
+## Recently Completed (cycle-2026-04-22-heap-and-polish, 2026-04-22)
+
+Four merged PRs across two sequential rounds — small polish follow-up to `cycle-2026-04-22-flight-rebuild-overnight`, closed in a single autonomous session without rollback or manual intervention. Briefs archived under `docs/tasks/archive/cycle-2026-04-22-heap-and-polish/`. Per-cycle evidence + RESULT at `docs/cycles/cycle-2026-04-22-heap-and-polish/`.
+
+### Round 1 (solo, P0)
+- **PR #135 `heap-recovery-combat120-triage`** — Triage memo at `docs/rearch/HEAP_RECOVERY_COMBAT120_TRIAGE.md`. Executor ran three fresh `perf:capture:combat120` samples (2 at post-prior-cycle HEAD `a69cd1f`, 1 at pre-cycle seed `88e3d35`) — all came in within baseline envelope (heap_growth 6.07–19.39 MB, heap_recovery_ratio 0.62–0.82, ai_budget_starvation 0.36–1.42/sample). The Round-3-close regression (53.25 MB / 0.12 / 4.07) did not reproduce. Root cause attributed to orchestrator-session host pressure (Hypothesis 5 in the brief's diagnosis table). No code fix landed; memo-only deliverable with three committed captures.
+
+### Round 2 (3 parallel, P1)
+- **PR #136 `helicopter-interpolated-pose`** — Mechanical port of PR #124 from fixed-wing to helicopter. `HelicopterModel.ts:549` (playerController), `:553` (weaponSystem), `:568` (doorGunner) migrated from raw `state.position` to interpolated `helicopter.position`; `state.isGrounded` stayed raw. L2 + L3 behavior tests added. Pose-continuity probe reproduced the fixed-wing precedent's 141 -> 0 zero-delta frame collapse. Three-call-site audit matched the brief's prediction exactly.
+- **PR #137 `a1-altitude-hold-elevator-clamp`** — Per-aircraft `altitudeHoldElevatorClamp` threaded through `FixedWingPhysicsConfig -> FixedWingTypes.airframeConfigFromLegacy -> airframe/types.AirframeConfig.feel -> Airframe.ts`. F-4 + AC-47 stay at 0.15 (no change); A-1 Skyraider tightens to **0.22** after probe sweep. **Surprise:** brief's suggested 0.30-0.40 range induced dive-and-not-recover divergence rather than closing the recapture regression — root-cause diagnosis in the brief was wrong (the observed behavior is gain instability at wider clamp, not saturation). Per-aircraft field solves the symptom regardless; 0.22 brings A-1 recapture-after-pitch-release inside the 100m criterion without altering the other two aircraft.
+- **PR #138 `cloud-audit-and-polish`** — `CloudLayer` shader upgraded: 3 -> 5 octave fbm, `lowerEdge = mix(1.0, -0.4, coverage)` (widened from -0.2), `upperEdge = lowerEdge + 0.35`, large-scale modulator `0.5 + 0.5 * smoothstep(0.20, 0.70, fbm(bigUv))` (the `0.5 +` floor was added after first-iteration screenshots showed openfrontier/combat120 getting worse by punching out large clear holes), and animated drift via `uTimeSeconds` + 10 m/s NE wind. Per-scenario rebalance: openfrontier 0.10 -> 0.25, combat120 0.20 -> 0.30, ashau 0.40 -> 0.55, zc 0.30 -> 0.45, tdm 0.60 -> 0.70. Optional `cloudScaleMetersPerFeature` added (openfrontier 1400m, ashau 700m, others 900m). 10 PNGs (before/after across 5 modes) committed under `evidence/cloud-audit-and-polish/`. The cloud executor's worktree hung `perf:capture:combat120` in `menu_ready` through 54+s across three attempts — orthogonal to the PR (no code path through cloud shader on startup; reproduced with src stashed). Flagged environmental, not regression.
+
+### Perf (combat120 at cycle-close HEAD 7130564 vs inherited baseline perf-after-round3.json)
+- avg: 14.21 -> 14.04 ms (-1.20%)
+- p99 (peak per-sample): 34.50 -> 33.80 ms (-2.03%) — inside 5% gate.
+- p95 (peak per-sample): 32.90 -> 32.50 ms (-1.22%)
+- max frame: 52.10 -> 46.50 ms (-10.75%); hitch_50ms = 0.000% (was 0.031%)
+- heap_growth_mb: +53.25 -> -1.86 (net shrink)
+- heap_peak_growth_mb: 60.61 -> 47.41 (-13.20 MB)
+- heap_recovery_ratio: 0.122 -> 1.039 — clears ≥0.5 gate by wide margin.
+- ai_budget_starvation: 4.07/sample -> 3.07/sample (-24.59%)
+
+Four independent samples (3 triage-captures + 1 post-merge perf-analyst) all land in the healthy band. The Round-3-close baseline stands as the outlier; heap regression did not persist in code.
+
+### Follow-ups for next cycle
+- Baseline recalibration: inherited "perf-after-round3" is itself an outlier; next cycle should capture a fresh combat120 at whatever its opening HEAD is and use that as its reference rather than this cycle's inherited baseline.
+- Shader cost verification on a sky-dominated scenario (`openfrontier:short` or `ashau:short`) — combat120's ai_sandbox framing under-samples the cloud plane's pixel budget, so the "no measurable frame cost" result is scenario-limited.
+- A-1 altitude-hold PD gain pass: the per-aircraft clamp closed the symptom, but 0.30+ destabilizing behavior indicates the underlying PD gains are the real long-term issue. Out of scope for this cycle; right follow-up is a Skyraider-specific gain tune next time a flight cycle opens.
+- AC-47 low-pitch takeoff single-bounce (carried over from cycle-2026-04-21 and cycle-2026-04-22-flight-rebuild-overnight).
+- Helicopter parity audit for `HelicopterVehicleAdapter` / `HelicopterPlayerAdapter` — executor flagged as out-of-scope audit targets; dedicated pass still open.
+- Investigate the `menu_ready` hang in worktree perf captures — not reproduced in the main checkout, but blocked one of this cycle's in-worktree perf probes.
+
+### Cycle metrics
+- 4/4 tasks merged. 0 blocked, 0 rolled back, 0 manual orchestrator interventions, 0 direct-to-master commits, 0 reviewer spawns.
+- Wallclock: ~12:05 UTC (Round 1 dispatch) -> ~13:40 UTC (cycle close). Single ~1h35m session.
+- All executor reports declared `fence_change: no`.
+
+
 
 Historical cycle-close sections below preserve what was true when those cycles
 closed. Current open work lives in the P0/P1/P2/P3 sections plus Known Issues /

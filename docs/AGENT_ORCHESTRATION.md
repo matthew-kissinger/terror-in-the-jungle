@@ -70,78 +70,49 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-04-22-heap-and-polish
+## Current cycle: (none — awaiting next planning pass)
 
 ### Cycle ID
 
-`cycle-2026-04-22-heap-and-polish`
+`<cycle-id>`
 
 ### Why this cycle exists
 
-Follow-up polish pass after `cycle-2026-04-22-flight-rebuild-overnight`. Four items surfaced at cycle close or during setup that belong in a tight next pass: (1) combat120 heap-recovery regression (9MB→53MB end-growth; 88%→12% peak recovery); (2) helicopter `PlayerController.updatePlayerPosition` feeds raw physics pose — the same bug PR #124 fixed for fixed-wing; (3) A-1 Skyraider altitude-hold recapture regressed at cruise throttle under PR #126 because the `±0.15` elevator clamp saturates for its thrust-to-weight; (4) user-reported playtest: clouds only visible in A Shau mode and look like "one tile above" — `CloudLayer` shader threshold + coverage defaults leave openfrontier/combat120 reading as empty sky. Full plan in [docs/cycles/cycle-2026-04-22-heap-and-polish/README.md](cycles/cycle-2026-04-22-heap-and-polish/README.md).
+<one paragraph: what changed in the world or in the repo that justifies this cycle right now>
 
 ### Tasks in this cycle
 
-4 tasks, two rounds. Each has a brief at `docs/tasks/<slug>.md`.
-
-- Round 1 (solo, P0): `heap-recovery-combat120-triage` — investigate the heap regression; deliver a diagnostic memo, optionally a targeted fix if root cause is small + high-confidence.
-- Round 2 (3 parallel, P1): `helicopter-interpolated-pose`, `a1-altitude-hold-elevator-clamp`, `cloud-audit-and-polish`.
+<list of slugs with one-line descriptions; each must have a brief at `docs/tasks/<slug>.md`>
 
 ### Round schedule
 
-R0 (orchestrator prep) → R1 (solo) → R2 (2 parallel). Round 2 does NOT block on Round 1 landing a fix — a memo from Round 1 is sufficient to unblock.
-
-**Round 0 (orchestrator prep):** `git fetch origin && git status` (must be clean); baseline for heap/perf gating inherits `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/evidence/perf-after-round3.json`; no fresh Round-0 capture required.
+<R1 ... -> R2 ... -> ...; concurrency per round; merge gates>
 
 ### Concurrency cap
 
-3 (only Round 2 has parallelism).
+<N>
 
 ### Dependencies
 
-```
-Round 0 (baseline inherited from prior cycle close)
-  -> heap-recovery-combat120-triage (solo)
-      -> helicopter-interpolated-pose          ┐
-      -> a1-altitude-hold-elevator-clamp       ├─ parallel (disjoint subsystems)
-      -> cloud-audit-and-polish                ┘
-```
+<inline DAG or pointer to brief file>
 
 ### Playtest policy
 
-DEFERRED. No playtest gate BLOCKS merge. Any playtest-recommended PRs are flagged in RESULT.md.
-
-### Perf policy
-
-Post-Round-2 `npm run perf:capture:combat120`. Two thresholds:
-- p99 frame time within 5% of the inherited baseline (same rule as prior cycle).
-- `heap_recovery_ratio` ≥ 0.5. If the triage task lands a fix, aim to recover toward the pre-cycle 0.88. If it is memo-only, this gate may still fail — record in RESULT.md and do NOT revert.
-
-### Failure handling (autonomous-safe)
-
-- CI red on a task → mark `blocked`, record, continue.
-- Fence-change proposal (`fence_change: yes`) → mark `blocked`, record, DO NOT merge.
-- Probe-assertion fail post-merge → revert the merge if possible; otherwise `rolled-back-pending` in RESULT.md.
+<which tasks gate on playtest pass before merge; default is "playtest-required PRs merge on CI green and are flagged for morning review">
 
 ### Visual checkpoints (orchestrator-gated)
 
-NONE. Autonomous run.
+<list of `evidence/<slug>/<artifact>` outputs the orchestrator must review before advancing past that round; or "NONE" if cycle is autonomous>
 
 ### skip-confirm
 
-YES. Orchestrator does NOT pause for "go" between rounds.
+<yes|no — if yes, orchestrator does NOT pause for "go" between rounds; default no>
 
 ### Cycle-specific notes
 
-- Triage task (`heap-recovery-combat120-triage`) has a memo-only escape hatch. The executor delivers either a fix OR `docs/rearch/HEAP_RECOVERY_COMBAT120_TRIAGE.md` with the bisect table; pick whichever is higher-confidence.
-- `cloud-audit-and-polish` has the same escape hatch: if the before-screenshot phase reveals an architectural bug (`CloudLayer` not in scene for some modes, `setTerrainYAtCamera` returning NaN, etc.) the executor writes `docs/rearch/CLOUD_ARCHITECTURAL_ISSUE.md` and STOPS, punting the fix to a dedicated cycle. If screenshots confirm the preliminary diagnosis (threshold + coverage tuning), the fix lands.
-- No reviewers trigger for this cycle: tasks touch `src/systems/helicopter/**`, `src/systems/vehicle/airframe/**`, `src/systems/environment/**`. None of these match `src/systems/combat/**` (combat-reviewer) or `src/systems/terrain/**`/`src/systems/navigation/**` (terrain-nav-reviewer). If the heap-triage task lands a fix that touches `src/systems/combat/**`, spawn `combat-reviewer`.
-- Helicopter must not regress (scope is helicopter/fixed-wing-config only). The helicopter task is a direct port of PR #124; the clamp task touches only Airframe + FixedWingConfigs. The cloud task touches only `AtmosphereSystem` + `CloudLayer` + `ScenarioAtmospherePresets`.
-- Three.js upgrade to 0.184 has landed (commit `7b74b3a`). Cloud shader work is no longer consult-only.
+<anything that does not generalize: budget caps that override the default, special handling for a known-flaky test, etc.>
 
-### Pre-flight acknowledgement
-
-The prior cycle, `cycle-2026-04-22-flight-rebuild-overnight`, closed at commit `c7866bf` with 13 merged PRs (#122–#134). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-22-flight-rebuild-overnight, 2026-04-22)" and `docs/cycles/cycle-2026-04-22-flight-rebuild-overnight/RESULT.md`.
+The previous cycle, `cycle-2026-04-22-heap-and-polish`, closed on 2026-04-22 with 4 merged PRs (#135–#138). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-22-heap-and-polish, 2026-04-22)" and `docs/cycles/cycle-2026-04-22-heap-and-polish/RESULT.md`.
 
 ## Dispatch protocol
 

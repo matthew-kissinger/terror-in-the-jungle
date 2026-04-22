@@ -1,0 +1,155 @@
+{
+  "overall": "warn",
+  "checks": [
+    {
+      "id": "samples_collected",
+      "status": "pass",
+      "value": 89,
+      "message": "Collected 89 runtime samples; expected at least 72"
+    },
+    {
+      "id": "frame_progress",
+      "status": "pass",
+      "value": 6580,
+      "message": "Frame progression delta=6580 over 90s"
+    },
+    {
+      "id": "max_frame_stall_seconds",
+      "status": "pass",
+      "value": 1.037,
+      "message": "Longest frame progression stall 1.04s"
+    },
+    {
+      "id": "avg_frame_ms",
+      "status": "pass",
+      "value": 14.04099437626636,
+      "message": "Average frame time 14.04ms"
+    },
+    {
+      "id": "peak_p99_frame_ms",
+      "status": "warn",
+      "value": 33.80000000000291,
+      "message": "Peak p99 frame time 33.80ms"
+    },
+    {
+      "id": "peak_max_frame_ms",
+      "status": "pass",
+      "value": 46.5,
+      "message": "Peak max-frame sample 46.50ms"
+    },
+    {
+      "id": "hitch_50ms_percent",
+      "status": "pass",
+      "value": 0,
+      "message": "Frames >50ms 0.00% (0/6708)"
+    },
+    {
+      "id": "hitch_100ms_percent",
+      "status": "pass",
+      "value": 0,
+      "message": "Frames >100ms 0.00% (0/6708)"
+    },
+    {
+      "id": "over_budget_percent",
+      "status": "pass",
+      "value": 0.10299625468164793,
+      "message": "Average over-budget percent 0.10%"
+    },
+    {
+      "id": "console_errors",
+      "status": "pass",
+      "value": 0,
+      "message": "Captured 0 browser errors/pageerrors/crashes"
+    },
+    {
+      "id": "ui_error_panel_visible",
+      "status": "pass",
+      "value": 0,
+      "message": "No loading/init error panel appeared during capture"
+    },
+    {
+      "id": "combat_budget_dominance",
+      "status": "pass",
+      "value": 0,
+      "message": "Combat was top >16.67ms in 0.0% of samples"
+    },
+    {
+      "id": "raycast_denial_rate",
+      "status": "pass",
+      "value": 0.010610776922381155,
+      "message": "Average LOS raycast denial rate 1.1%"
+    },
+    {
+      "id": "ai_budget_starvation_events",
+      "status": "pass",
+      "value": 3.067415730337079,
+      "message": "Average per-sample AI budget starvation events 3.07"
+    },
+    {
+      "id": "player_shots_recorded",
+      "status": "pass",
+      "value": 287,
+      "message": "Recorded player shots in sim=287"
+    },
+    {
+      "id": "player_hits_recorded",
+      "status": "pass",
+      "value": 150,
+      "message": "Recorded player hits in sim=150"
+    },
+    {
+      "id": "player_hit_rate_peak",
+      "status": "pass",
+      "value": 1,
+      "message": "Peak hit rate 100.00%"
+    },
+    {
+      "id": "heap_growth_mb",
+      "status": "pass",
+      "value": -1.8572184244791714,
+      "message": "Heap end-growth -1.86 MB (baseline=89.53 MB, end=87.68 MB)"
+    },
+    {
+      "id": "heap_peak_growth_mb",
+      "status": "warn",
+      "value": 47.41263039906819,
+      "message": "Heap peak-growth 47.41 MB (peak=136.95 MB)"
+    },
+    {
+      "id": "heap_recovery_ratio",
+      "status": "pass",
+      "value": 1.0391713855326548,
+      "message": "Heap recovery 103.9% from peak (49.27 MB reclaimed before end)"
+    },
+    {
+      "id": "harness_min_shots_fired",
+      "status": "pass",
+      "value": 287,
+      "message": "Harness player shots=287 (min=50)"
+    },
+    {
+      "id": "harness_min_hits_recorded",
+      "status": "pass",
+      "value": 150,
+      "message": "Harness player hits=150 (min=5)"
+    },
+    {
+      "id": "harness_max_stuck_seconds",
+      "status": "pass",
+      "value": 0.5,
+      "message": "Max harness stuck duration 0.5s (max=5s)"
+    },
+    {
+      "id": "harness_min_movement_transitions",
+      "status": "pass",
+      "value": 25,
+      "message": "Harness movement transitions=25 (min=3)"
+    },
+    {
+      "id": "startup_threshold_seconds",
+      "status": "pass",
+      "value": 6,
+      "message": "Startup frame threshold reached in 6.0s"
+    }
+  ]
+}
