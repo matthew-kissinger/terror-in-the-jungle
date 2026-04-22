@@ -1,0 +1,30 @@
+{
+  "description": "Perimeter placement radii BEFORE clamping against envelope inner lateral. Values are computed analytically from template constants (AIRFIELD_TEMPLATES in src/systems/world/AirfieldTemplates.ts) and the envelope stamp formula in TerrainFeatureCompiler.buildAirfieldEnvelopeStamp.",
+  "formula_perimDist_before": "max(template.runwayLength * 0.5, template.dispersalOffset + 20)",
+  "formula_innerLateral": "max(maxLateralSurfaceReach(template), template.dispersalOffset + 22) + AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M(=16)",
+  "envelope_ramp_width_m": 6,
+  "envelope_grade_ramp_m": 48,
+  "templates": {
+    "us_airbase": {
+      "runwayLength": 480,
+      "runwayWidth": 28,
+      "dispersalOffset": 98,
+      "maxLateralSurfaceReach_m": 273,
+      "innerLateral_m": 289,
+      "perimDist_before_clamp_m": 240,
+      "perimDist_outside_flat_zone": false,
+      "note": "us_airbase perimeter (240 m) was already inside innerLateral (289 m); no drift here, but the clamp keeps it stable if template dimensions evolve."
+    },
+    "forward_strip": {
+      "runwayLength": 320,
+      "runwayWidth": 18,
+      "dispersalOffset": 44,
+      "maxLateralSurfaceReach_m": 124,
+      "innerLateral_m": 140,
+      "perimDist_before_clamp_m": 160,
+      "perimDist_outside_flat_zone": true,
+      "overshoot_m": 20,
+      "note": "Perimeter radius 160 m exceeds innerLateral 140 m by 20 m, landing perimeter structures on the 6 m hard ramp + 48 m graded shoulder. Foundations float / sink."
+    }
+  }
+}

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { StaticModelPlacementConfig } from '../../config/gameModeTypes';
 import { getFixedWingConfigForModelPath } from '../vehicle/FixedWingConfigs';
 import type { RectTerrainSurfacePatch } from '../terrain/TerrainFeatureTypes';
+import { airfieldEnvelopeInnerLateral } from '../terrain/TerrainFeatureCompiler';
 import type {
   AirfieldTemplate,
   AirfieldTaxiRoute,
@@ -266,7 +267,15 @@ export function generateAirfieldLayout(
         lateral = template.dispersalOffset + rng() * 18;
         break;
       case 'perimeter': {
-        const perimDist = Math.max(template.runwayLength * 0.5, template.dispersalOffset + 20);
+        // Clamp the perimeter placement radius to stay inside the envelope's
+        // fully-flat zone (minus an 8 m clearance margin). Without the clamp
+        // perimeter structures can land on the 6 m hard ramp just outside the
+        // flat zone and float / sink against the graded shoulder. The
+        // envelope geometry itself is defined in `TerrainFeatureCompiler`;
+        // we import the helper so the radius stays in sync with the stamp.
+        const envelopeInnerLateral = airfieldEnvelopeInnerLateral(template);
+        const rawPerimDist = Math.max(template.runwayLength * 0.5, template.dispersalOffset + 20);
+        const perimDist = Math.min(rawPerimDist, envelopeInnerLateral - 8);
         const angle = rng() * Math.PI * 2;
         along = Math.cos(angle) * perimDist;
         lateral = Math.sin(angle) * perimDist;

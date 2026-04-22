@@ -1,0 +1,25 @@
+{
+  "description": "Perimeter placement radii AFTER clamping against envelope inner lateral. Clamp is `perimDist = min(rawPerimDist, airfieldEnvelopeInnerLateral(template) - 8)`; -8 m leaves clearance inside the flat zone.",
+  "formula_perimDist_after": "min(max(template.runwayLength * 0.5, template.dispersalOffset + 20), airfieldEnvelopeInnerLateral(template) - 8)",
+  "clamp_margin_m": 8,
+  "templates": {
+    "us_airbase": {
+      "innerLateral_m": 289,
+      "perimDist_after_clamp_m": 240,
+      "inside_flat_zone": true,
+      "clearance_from_flat_edge_m": 49,
+      "note": "Unchanged — raw perimDist (240) is well below innerLateral - 8 (281)."
+    },
+    "forward_strip": {
+      "innerLateral_m": 140,
+      "perimDist_after_clamp_m": 132,
+      "inside_flat_zone": true,
+      "clearance_from_flat_edge_m": 8,
+      "note": "Clamped from 160 → 132. Perimeter structures now land 8 m inside the flat zone, on the envelope's `targetHeightMode: 'center'` height, eliminating the float/sink against the hard ramp."
+    }
+  },
+  "validation": {
+    "vitest_assertion": "for both us_airbase and forward_strip, every perimeter-zone structure placement across multiple seeds has Math.hypot(offset.x, offset.z) < airfieldEnvelopeInnerLateral(template). See src/systems/world/AirfieldLayoutGenerator.test.ts.",
+    "heightmap_Y_target_m": "envelope center height (sampled at runway centerline with samplingRadius = max(12, runwayLength * 0.25)). Perimeter placements at Y_target ± 0.5 m."
+  }
+}
