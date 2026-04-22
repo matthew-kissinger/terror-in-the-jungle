@@ -70,59 +70,77 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: (none — awaiting next planning pass)
+## Current cycle: cycle-2026-04-23-debug-cleanup
 
 ### Cycle ID
 
-`<cycle-id>`
+`cycle-2026-04-23-debug-cleanup`
 
 ### Why this cycle exists
 
-<one paragraph: what changed in the world or in the repo that justifies this cycle right now>
+Two small follow-ups from the just-closed `cycle-2026-04-23-debug-and-test-modes` want to be paid off before the next feature cycle starts: (1) `preserveDrawingBuffer: true` on `WebGLRenderer` shipped unconditional in PR #144, costing retail players +13 MB heap residual for a feature (F9 capture) they never trigger; (2) PR #145 `world-overlay-debugger` is blocked on a CI-only test failure (`terrainChunkOverlay.test.ts` expected 24 line segments, got 0; 3710 tests green locally). The six overlays (navmesh / LOS / squad influence / LOD tier / aircraft contact / terrain chunks) are genuinely useful for the upcoming playtest and should land. Full plan in [docs/cycles/cycle-2026-04-23-debug-cleanup/README.md](cycles/cycle-2026-04-23-debug-cleanup/README.md).
 
 ### Tasks in this cycle
 
-<list of slugs with one-line descriptions; each must have a brief at `docs/tasks/<slug>.md`>
+2 tasks, one round. Each has a brief at `docs/tasks/<slug>.md`.
+
+- **Round 1 (2 parallel — disjoint file sets):**
+  - `preserve-drawing-buffer-dev-gate` (P0, ≤60 LOC) — gate `preserveDrawingBuffer` in `src/core/GameRenderer.ts` behind `import.meta.env.DEV || ?capture=1`. Retail players who don't opt in stop paying the +13 MB heap tax; Cloudflare testers can reach F9 by adding `?capture=1` to the URL.
+  - `world-overlay-debugger-ci-fix` (P1, ≤50 LOC test delta on top of the existing PR branch) — rebase `task/world-overlay-debugger` on current master, diagnose + fix the `terrainChunkOverlay.test.ts` CI-only failure (most likely a mock-stub ordering issue), re-push, merge PR #145.
 
 ### Round schedule
 
-<R1 ... -> R2 ... -> ...; concurrency per round; merge gates>
+R0 (sanity check, no install, no fresh baseline) → R1 (2 parallel) → post-R1 perf gate.
+
+**Round 0 (orchestrator prep):** `git fetch origin && git status` (must be clean). No `npm install` needed (Tweakpane already on master). No fresh baseline — reuse `docs/cycles/cycle-2026-04-23-debug-and-test-modes/baseline/combat120-baseline-summary.json`.
 
 ### Concurrency cap
 
-<N>
+2 (R1 uses both slots; no other rounds).
 
 ### Dependencies
 
-<inline DAG or pointer to brief file>
+```
+Round 0 (sanity check)
+  -> preserve-drawing-buffer-dev-gate  ┐
+  -> world-overlay-debugger-ci-fix     ┘─ R1 parallel (fully disjoint file sets)
+```
 
 ### Playtest policy
 
-<which tasks gate on playtest pass before merge; default is "playtest-required PRs merge on CI green and are flagged for morning review">
+DEFERRED. No playtest gate BLOCKS merge. Human playtests dev server + Cloudflare Pages AFTER this cycle merges, using the diagnostic surface from the prior cycle plus the corrected retail heap behavior + world-overlay visualizations.
 
 ### Perf policy
 
-<perf gating description; default baseline handling>
+- **Baseline:** inherited from prior cycle's R0 capture (no drift since).
+- **Gate:** post-R1 `npm run perf:capture:combat120`. Three thresholds:
+  - p99 within 5% of baseline (34.20 ms → ceiling 35.91 ms).
+  - `heap_recovery_ratio` ≥ 0.5.
+  - `heap_end_growth_mb` ≤ +2 MB (should walk the R3 +13 MB back toward baseline; this is the correctness gate for task 1).
 
 ### Failure handling (autonomous-safe)
 
-<failure handling rules>
+- CI red on a task → mark `blocked`, record, continue.
+- Fence-change proposal → mark `blocked`, DO NOT merge.
+- `world-overlay-debugger-ci-fix` >50 LOC or second CI red after first push → STOP that task, mark blocked, cycle degrades to single-task (preserve-drawing-buffer-dev-gate still lands).
 
 ### Visual checkpoints (orchestrator-gated)
 
-<list of `evidence/<slug>/<artifact>` outputs the orchestrator must review before advancing past that round; or "NONE" if cycle is autonomous>
+NONE. Autonomous run.
 
 ### skip-confirm
 
-<yes|no — if yes, orchestrator does NOT pause for "go" between rounds; default no>
+YES. Orchestrator does NOT pause between R0 sanity check and R1 dispatch.
 
 ### Cycle-specific notes
 
-<anything that does not generalize: budget caps that override the default, special handling for a known-flaky test, etc.>
+- **No reviewers expected.** Task 1 touches only `src/core/GameRenderer.ts`; task 2 touches only `src/ui/debug/worldOverlays/terrainChunkOverlay.test.ts` (+ possibly 1–2 lines of `TerrainRenderRuntime.ts`). Neither triggers combat-reviewer or terrain-nav-reviewer on its own. PR #145's original content already landed past reviewer scope; the fix is diagnostic, not functional.
+- **Task 2's hard stop is real.** If the CI-fix needs accessor rework, do NOT iterate past 50 LOC — leave PR #145 blocked for a future cycle. Cleanup cycle's job is paying off small debts, not rescuing hard blocks.
+- **Both tasks are additive.** No retired code to delete, no feature flags to flip, no rollout needed.
 
 ### Pre-flight acknowledgement
 
-The previous cycle, `cycle-2026-04-23-debug-and-test-modes`, closed on 2026-04-22 with 6 merged PRs (#139, #140, #141, #142, #143, #144, #146) and 1 blocked PR (#145 `world-overlay-debugger`, CI test failure — rebasable). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-23-debug-and-test-modes, 2026-04-22)" and `docs/cycles/cycle-2026-04-23-debug-and-test-modes/RESULT.md`.
+The prior cycle, `cycle-2026-04-23-debug-and-test-modes`, closed on 2026-04-22 with 6 merged PRs (#139, #140, #141, #142, #143, #144, #146) and 1 blocked PR (#145 `world-overlay-debugger`, CI test failure — addressed by this cycle's task 2). See `docs/BACKLOG.md` "Recently Completed (cycle-2026-04-23-debug-and-test-modes, 2026-04-22)" and `docs/cycles/cycle-2026-04-23-debug-and-test-modes/RESULT.md`.
 
 ## Dispatch protocol
 
