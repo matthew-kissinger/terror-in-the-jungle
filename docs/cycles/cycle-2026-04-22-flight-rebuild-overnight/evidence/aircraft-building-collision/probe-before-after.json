@@ -1,0 +1,69 @@
+{
+  "task": "aircraft-building-collision",
+  "cycle": "cycle-2026-04-22-flight-rebuild-overnight",
+  "captured_at": "2026-04-22T00:40:00Z",
+  "probe_description": "Exercises the real airframe sweep path: createRuntimeTerrainProbe(terrain).sweep(from, to) -> terrain.raycastTerrain() -> LOSAccelerator.checkLineOfSight(). A BoxGeometry mesh (20x20x20 centered at world (100, 10, 0)) stands in for a main_airbase hangar; a (8x50x8 at (200, 25, 0)) mesh stands in for a comms tower.",
+  "before": {
+    "setup": "LOSAccelerator populated only with terrain chunks (no static obstacles). This is the pre-fix behavior.",
+    "sweep_level_with_hangar": {
+      "from": [0, 10, 0],
+      "to": [200, 10, 0],
+      "expected_near_face_x": 90,
+      "actual_hit": null,
+      "verdict": "phase-through: aircraft clips through hangar undetected"
+    },
+    "sweep_level_with_tower": {
+      "from": [150, 40, 0],
+      "to": [220, 40, 0],
+      "expected_near_face_x": 196,
+      "actual_hit": null,
+      "verdict": "phase-through: aircraft clips through tower undetected"
+    }
+  },
+  "after": {
+    "setup": "LOSAccelerator populated with terrain chunks + static obstacles registered via LOSAccelerator.registerStaticObstacle('main_airbase_hangar', mesh) and .registerStaticObstacle('main_airbase_tower', mesh).",
+    "sweep_level_with_hangar": {
+      "from": [0, 10, 0],
+      "to": [200, 10, 0],
+      "expected_near_face_x_range": [89, 92],
+      "actual_hit_x_range_observed": [89, 92],
+      "verdict": "PASS: sweep reports contact at hangar near face"
+    },
+    "sweep_above_hangar": {
+      "from": [0, 60, 0],
+      "to": [200, 60, 0],
+      "actual_hit": null,
+      "verdict": "PASS: sweep above the roof correctly misses"
+    },
+    "sweep_into_tower_above_hangar_roof": {
+      "from": [150, 40, 0],
+      "to": [220, 40, 0],
+      "expected_near_face_x_range": [195, 201],
+      "actual_hit_x_range_observed": [195, 201],
+      "verdict": "PASS: tower is collidable above hangar height"
+    },
+    "deregistration": {
+      "scenario": "after unregisterStaticObstacle('transient_hangar'), the same sweep returns null",
+      "verdict": "PASS: deregistration cleanly restores LOS"
+    }
+  },
+  "test_file": "src/systems/world/aircraft-building-collision.test.ts",
+  "supporting_unit_tests": "src/systems/combat/LOSAccelerator.test.ts (describe: 'static obstacles (buildings, towers, hangars)')",
+  "verification_commands": [
+    "npm run lint",
+    "npm run test:run",
+    "npm run build"
+  ],
+  "results": {
+    "lint": "PASS",
+    "test_count": 3619,
+    "test_verdict": "PASS",
+    "build": "PASS"
+  },
+  "notes": [
+    "The fix adds LOSAccelerator.registerStaticObstacle / unregisterStaticObstacle which share the same internal chunkCache the terrain BVH uses; no new spatial data structure.",
+    "WorldFeatureSystem.spawnFeature registers every collidable mesh whose horizontal footprint exceeds BUILDING_LOS_MIN_FOOTPRINT_M=3m, excluding small props (barrels, crates, fuel drums).",
+    "The aircraft sweep already routes through raycastTerrain via createRuntimeTerrainProbe; no airframe-side code changed.",
+    "Probe is deterministic and reproducible via the vitest suite; no Playwright browser capture required."
+  ]
+}

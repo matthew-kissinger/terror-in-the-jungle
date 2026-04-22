@@ -15,6 +15,7 @@ import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import { FixedWingModel } from '../vehicle/FixedWingModel';
 import type { FixedWingSpawnMetadata } from '../vehicle/FixedWingOperations';
+import type { LOSAccelerator } from '../combat/LOSAccelerator';
 
 const _rotatedOffset = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
@@ -34,6 +35,13 @@ const WORLD_FEATURE_MIN_SEARCH_RADIUS = 1.5;
 const WORLD_FEATURE_MAX_SEARCH_RADIUS_SMALL = 8;
 const WORLD_FEATURE_MAX_SEARCH_RADIUS_LARGE = 3.5;
 const WORLD_FEATURE_SAMPLE_DIRECTIONS = 8;
+/**
+ * Minimum horizontal footprint (meters) for a static placement to be registered
+ * with the LOS accelerator as an aircraft-collidable obstacle. Tuned to include
+ * buildings, hangars, towers, and bunkers while excluding small props
+ * (barrels, ammo crates, fuel drums) that should not block an aircraft sweep.
+ */
+const BUILDING_LOS_MIN_FOOTPRINT_M = 3;
 
 interface TerrainPlacementCandidate {
   x: number;
@@ -47,6 +55,7 @@ interface SpawnedFeatureObject {
   id: string;
   object: THREE.Object3D;
   collisionRegistered: boolean;
+  losObstacleIds: string[];
 }
 
 interface WorldFeatureSystemDependencies {
@@ -60,6 +69,7 @@ export class WorldFeatureSystem implements GameSystem {
   private gameModeManager?: GameModeManager;
   private navmeshSystem?: NavmeshSystem;
   private fixedWingModel?: FixedWingModel;
+  private losAccelerator?: LOSAccelerator;
   private spawnedObjects: SpawnedFeatureObject[] = [];
   private buildInFlight = false;
   private builtModeId: string | null = null;
@@ -91,6 +101,15 @@ export class WorldFeatureSystem implements GameSystem {
 
   setFixedWingModel(fixedWingModel: FixedWingModel): void {
     this.fixedWingModel = fixedWingModel;
+  }
+
+  /**
+   * Provide the LOS accelerator so spawned buildings can be registered as
+   * aircraft-collidable obstacles. Without this, airframe terrain sweeps
+   * see only the ground and phase through hangars and towers on takeoff.
+   */
+  setLOSAccelerator(losAccelerator: LOSAccelerator): void {
+    this.losAccelerator = losAccelerator;
   }
 
   update(_deltaTime: number): void {
@@ -221,12 +240,54 @@ export class WorldFeatureSystem implements GameSystem {
         this.terrainManager.registerCollisionObject(objectId, object);
       }
 
+      const losObstacleIds = this.registerPlacementWithLOS(objectId, object);
+
       this.spawnedObjects.push({
         id: objectId,
         object,
         collisionRegistered,
+        losObstacleIds,
       });
     }
+  }
+
+  /**
+   * Register every collidable mesh inside a placement with the LOS accelerator
+   * so airframe terrain sweeps see buildings, not just terrain. Returns the
+   * ids used so they can be unregistered on teardown.
+   *
+   * Placements whose combined horizontal footprint is below
+   * `BUILDING_LOS_MIN_FOOTPRINT_M` are skipped (small props, barrels, crates).
+   * These features would otherwise pollute the cache without being realistic
+   * aircraft hazards. World features (buildings, hangars, towers, bunkers)
+   * all clear this threshold.
+   */
+  private registerPlacementWithLOS(objectId: string, root: THREE.Object3D): string[] {
+    if (!this.losAccelerator) {
+      return [];
+    }
+
+    root.updateMatrixWorld(true);
+    _placementBounds.setFromObject(root);
+    if (!isFinite(_placementBounds.min.x) || !isFinite(_placementBounds.max.x)) {
+      return [];
+    }
+    _placementBounds.getSize(_placementSize);
+    const horizontalFootprint = Math.max(_placementSize.x, _placementSize.z);
+    if (horizontalFootprint < BUILDING_LOS_MIN_FOOTPRINT_M) {
+      return [];
+    }
+
+    const ids: string[] = [];
+    let meshIndex = 0;
+    root.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.geometry) {
+        const meshId = `${objectId}_mesh_${meshIndex++}`;
+        this.losAccelerator!.registerStaticObstacle(meshId, child);
+        ids.push(meshId);
+      }
+    });
+    return ids;
   }
 
   private optimizeStaticPlacementObject(object: THREE.Object3D, modelPath: string): void {
@@ -302,6 +363,11 @@ export class WorldFeatureSystem implements GameSystem {
       }
       if (entry.collisionRegistered && this.terrainManager) {
         this.terrainManager.unregisterCollisionObject(entry.id);
+      }
+      if (this.losAccelerator && entry.losObstacleIds.length > 0) {
+        for (const meshId of entry.losObstacleIds) {
+          this.losAccelerator.unregisterStaticObstacle(meshId);
+        }
       }
     }
     this.spawnedObjects = [];

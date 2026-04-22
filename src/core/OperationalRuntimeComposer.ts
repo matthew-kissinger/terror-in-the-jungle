@@ -209,6 +209,13 @@ function wireVehicleRuntime(
     runtime.worldFeatureSystem.setTerrainManager(runtime.terrainSystem);
     runtime.worldFeatureSystem.setGameModeManager(runtime.gameModeManager);
   }
+  // Give WorldFeatureSystem direct access to the LOS accelerator so spawned
+  // buildings participate in aircraft terrain sweeps; ITerrainRuntime does
+  // not expose the accelerator surface.
+  if (typeof runtime.worldFeatureSystem.setLOSAccelerator === 'function'
+    && typeof runtime.terrainSystem.getLOSAccelerator === 'function') {
+    runtime.worldFeatureSystem.setLOSAccelerator(runtime.terrainSystem.getLOSAccelerator());
+  }
 
   // Wire FixedWingModel
   runtime.fixedWingModel.setTerrainManager(runtime.terrainSystem);
