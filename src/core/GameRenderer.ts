@@ -8,6 +8,7 @@ import { Logger } from '../utils/Logger';
 import { freezeTransform } from '../utils/SceneUtils';
 import { estimateGPUTier, isMobileGPU, shouldEnableShadows, getShadowMapSize, getMaxPixelRatio } from '../utils/DeviceDetector';
 import { ViewportInfo, ViewportManager } from '../ui/design/responsive';
+import { WorldOverlayRegistry } from '../ui/debug/WorldOverlayRegistry';
 
 /**
  * Determine whether the WebGLRenderer should preserve its drawing buffer.
@@ -53,6 +54,12 @@ export class GameRenderer {
   private crosshairSystem = new CrosshairSystem();
   private loadingUI = new LoadingUI();
   private viewportUnsubscribe?: () => void;
+  /**
+   * Registry hosting 3D debug overlays (navmesh wireframe, LOS rays, LOD tier
+   * markers, etc.). Overlay content lives in its own `THREE.Group` under the
+   * main scene so the main render pass picks it up without a second RT.
+   */
+  public worldOverlays!: WorldOverlayRegistry;
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -79,6 +86,10 @@ export class GameRenderer {
     this.setupRenderer();
     this.setupLighting();
     this.setupPostProcessing();
+    this.worldOverlays = new WorldOverlayRegistry(this.scene);
+    // Master hidden by default — Shift+\ reveals overlays the same way the
+    // debug HUD is gated behind the backtick toggle.
+    this.worldOverlays.setMasterVisible(false);
   }
 
   private setupRenderer(): void {
@@ -361,6 +372,7 @@ export class GameRenderer {
     // Clean up UI modules
     this.loadingUI.dispose();
     this.crosshairSystem.dispose();
+    this.worldOverlays?.dispose();
 
     // Clean up Three.js resources
     this.renderer.dispose();

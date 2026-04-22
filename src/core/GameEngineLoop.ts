@@ -151,6 +151,7 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     updatePerformanceOverlay(engine, deltaTime);
     updateLogOverlay(engine);
     engine.debugHud.update(deltaTime);
+    engine.renderer.worldOverlays?.update(deltaTime);
     // Any successful frame clears crash streak so only consecutive failures escalate.
     if (crashCount > 0) {
       crashCount = 0;

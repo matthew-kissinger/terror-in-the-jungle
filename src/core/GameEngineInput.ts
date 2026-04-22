@@ -19,6 +19,14 @@ function handleKeyDown(event: KeyboardEvent): void {
   const isFreeFlyKey =
     event.key === 'v' || event.key === 'V' ||
     event.key === 'b' || event.key === 'B';
+  const isWorldOverlayKey =
+    (event.shiftKey && (event.key === '|' || event.key === '\\')) ||
+    event.key === 'n' || event.key === 'N' ||
+    event.key === 'l' || event.key === 'L' ||
+    event.key === 'i' || event.key === 'I' ||
+    event.key === 't' || event.key === 'T' ||
+    event.key === 'c' || event.key === 'C' ||
+    event.key === 'x' || event.key === 'X';
   const isDebugKey =
     event.key === 'F1' ||
     event.key === 'F2' ||
@@ -35,7 +43,8 @@ function handleKeyDown(event: KeyboardEvent): void {
     event.key === '.' ||
     event.key === ',' ||
     event.key === ';' ||
-    isFreeFlyKey;
+    isFreeFlyKey ||
+    isWorldOverlayKey;
   if (context !== 'gameplay' && !isDebugKey) return;
 
   // Free-fly WASD/QE/Shift/Ctrl only while free-fly is active.
@@ -73,6 +82,10 @@ function handleKeyDown(event: KeyboardEvent): void {
     toggleFreeFly(engineRef);
   } else if (event.key === 'b' || event.key === 'B') {
     if (engineRef.freeFlyCamera.isActive()) toggleFreeFly(engineRef);
+  } else if (event.shiftKey && (event.key === '|' || event.key === '\\')) {
+    engineRef.renderer.worldOverlays?.toggleAll();
+  } else if (handleWorldOverlayHotkey(engineRef, event)) {
+    // consumed
   } else if (event.key === 'k' || event.key === 'K') {
     // Voluntary respawn with K key
     if (engineRef.gameStarted) {
@@ -137,6 +150,34 @@ export function disposeEventListeners(): void {
   window.removeEventListener('mousedown', handleMouseDown);
   listenersAttached = false;
   engineRef = null;
+}
+
+/**
+ * Dispatch an N/L/I/T/C/X keypress to the matching world overlay. Only fires
+ * when the overlay master is already visible (opted-in via Shift+\) so the
+ * keys do not shadow gameplay bindings during normal play.
+ */
+function handleWorldOverlayHotkey(engine: GameEngine, event: KeyboardEvent): boolean {
+  const overlays = engine.renderer.worldOverlays;
+  if (!overlays || !overlays.isMasterVisible()) return false;
+  if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return false;
+  const k = event.key.toLowerCase();
+  const map: Record<string, string> = {
+    n: 'navmesh-wireframe',
+    l: 'los-rays',
+    i: 'squad-influence',
+    t: 'lod-tier',
+    c: 'aircraft-contact',
+    x: 'terrain-chunks',
+  };
+  const id = map[k];
+  if (!id) return false;
+  overlays.toggleOverlay(id);
+  // Prevent the key from reaching other listeners (e.g. PlayerInput "T" opens
+  // the air support menu) while overlays are active — the overlay hotkey wins.
+  event.preventDefault();
+  event.stopPropagation();
+  return true;
 }
 
 /**

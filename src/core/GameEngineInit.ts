@@ -5,6 +5,13 @@ import { InitialDeployCancelledError } from '../systems/player/InitialDeployCanc
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
 import { startLiveGame, logWelcomeMessage } from './LiveEntryActivator';
+import { createNavmeshWireframeOverlay } from '../ui/debug/worldOverlays/navmeshWireframeOverlay';
+import { createLodTierOverlay } from '../ui/debug/worldOverlays/lodTierOverlay';
+import { createAircraftContactOverlay } from '../ui/debug/worldOverlays/aircraftContactOverlay';
+import { createLosRayOverlay } from '../ui/debug/worldOverlays/losRayOverlay';
+import { createSquadInfluenceOverlay } from '../ui/debug/worldOverlays/squadInfluenceOverlay';
+import { createTerrainChunkOverlay } from '../ui/debug/worldOverlays/terrainChunkOverlay';
+import { WorldOverlayControlPanel } from '../ui/debug/WorldOverlayControlPanel';
 
 type StartGamePipeline = {
   normalizeLaunchSelection: typeof import('./ModeStartupPreparer').normalizeLaunchSelection;
@@ -61,6 +68,7 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
     engine.systemManager.hudSystem.setPlayAgainCallback(() => restartMatch(engine));
 
     wireDebugPanels(engine);
+    wireWorldOverlays(engine);
 
     markStartup('engine-init.initialize-systems.end');
 
@@ -236,4 +244,57 @@ function wireDebugPanels(engine: GameEngine): void {
       isFollowing: () => engine.freeFlyCamera.hasFollowTarget(),
     });
   }
+}
+
+/**
+ * Register the six scene-space debug overlays and mount the control panel.
+ * Called after `wireDebugPanels` so all source systems are ready. Overlays
+ * are lazy — they allocate GPU resources only on first toggle-on.
+ */
+function wireWorldOverlays(engine: GameEngine): void {
+  const overlays = engine.renderer.worldOverlays;
+  if (!overlays) return;
+  const sm = engine.systemManager;
+  const combatantSystem = sm.combatantSystem;
+  const terrainSystem = sm.terrainSystem;
+  const navmeshSystem = sm.navmeshSystem;
+  const influenceMap = combatantSystem.influenceMap;
+  const cameraPos = () => engine.renderer.getActiveCamera().position;
+
+  overlays.register(createNavmeshWireframeOverlay({
+    getNavMesh: () => (navmeshSystem as unknown as { navMesh?: unknown }).navMesh ?? null,
+    isReady: () => navmeshSystem.isReady?.() ?? false,
+  }));
+  overlays.register(createLodTierOverlay({ combatants: combatantSystem.combatants }));
+  overlays.register(createAircraftContactOverlay({
+    getLOSAccelerator: () => terrainSystem.getLOSAccelerator?.() ?? null,
+    sampleActiveAircraft: () => {
+      const vehicles = sm.vehicleManager?.getAllVehicles?.() ?? [];
+      for (const v of vehicles) {
+        const anyV = v as unknown as {
+          getPosition?: () => THREE.Vector3;
+          getVelocity?: () => THREE.Vector3;
+        };
+        if (typeof anyV.getPosition === 'function' && typeof anyV.getVelocity === 'function') {
+          return { position: anyV.getPosition(), velocity: anyV.getVelocity() };
+        }
+      }
+      return null;
+    },
+  }));
+  overlays.register(createLosRayOverlay({
+    combatants: combatantSystem.combatants,
+    getCameraPosition: cameraPos,
+  }));
+  overlays.register(createSquadInfluenceOverlay({
+    getInfluenceGrid: () => influenceMap?.getGridForDebug?.() ?? null,
+    getCameraPosition: cameraPos,
+  }));
+  overlays.register(createTerrainChunkOverlay({
+    getActiveTiles: () => terrainSystem.getActiveTilesForDebug?.() ?? [],
+    getHeightAt: (x, z) => (typeof terrainSystem.getHeightAt === 'function' ? terrainSystem.getHeightAt(x, z) : 0),
+  }));
+
+  engine.worldOverlayControlPanel = new WorldOverlayControlPanel(overlays);
+  engine.debugHud.register(engine.worldOverlayControlPanel);
 }
