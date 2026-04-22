@@ -31,7 +31,7 @@ const AIRFIELD_ENVELOPE_STRUCTURE_BUFFER_M = 16;
 /** Outer grade ramp beyond the inner flat radius — smooths hard cliffs at the airfield edge. */
 const AIRFIELD_ENVELOPE_GRADE_RAMP_M = 48;
 /** Strength of the envelope's graded shoulder (0-1). Strong enough to soften cliff faces. */
-const AIRFIELD_ENVELOPE_GRADE_STRENGTH = 0.45;
+const AIRFIELD_ENVELOPE_GRADE_STRENGTH = 0.65;
 /** Meter-scale vertical span across the envelope that triggers a site-slope warning. */
 const AIRFIELD_SLOPE_WARNING_SPAN_M = 18;
 /**
@@ -384,7 +384,11 @@ function buildAirfieldEnvelopeStamp(
   const segmentHalfLength = Math.max(0, innerAlong - innerLateral);
 
   const innerRadius = innerLateral;
-  const outerRadius = innerRadius + 6;
+  // Doubled from +6 m (Round 3): a 6 m transition from full flatten to the
+  // grade-strength shoulder behaved as a small cliff at the flat edge. 12 m
+  // gives the inner blend visible width so the airfield rim no longer reads
+  // as a ring around perimeter structures.
+  const outerRadius = innerRadius + 12;
   const gradeRadius = outerRadius + AIRFIELD_ENVELOPE_GRADE_RAMP_M;
   // The envelope uses its own stronger grade strength (independent of the
   // authored `terrain.gradeStrength`, which tunes the rect stamps). A stronger
