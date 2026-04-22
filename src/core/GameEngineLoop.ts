@@ -63,11 +63,17 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     }
 
     engine.clock.update(timestamp);
-    const deltaTime = Math.min(engine.clock.getDelta(), 0.1);
+    const rawDelta = Math.min(engine.clock.getDelta(), 0.1);
+    // Single hook point for pause / slow-mo / fast-forward. Systems that read
+    // performance.now() directly will bypass this multiplier — see PR notes
+    // for the current bypass list.
+    const scale = engine.timeScale.get();
+    const deltaTime = rawDelta * scale;
     engine.lastFrameDelta = deltaTime;
 
     // Update all systems
     engine.systemManager.updateSystems(deltaTime, engine.gameStarted);
+    engine.timeScale.postDispatch();
 
     // Keep the analytic `AtmosphereSystem` dome glued to the camera so it
     // never z-fights terrain or clips when pilots climb past the dome

@@ -24,7 +24,11 @@ function handleKeyDown(event: KeyboardEvent): void {
     event.key === '[' ||
     event.key === ']' ||
     event.key === '`' ||
-    event.key === '~';
+    event.key === '~' ||
+    event.key === 'Backspace' ||
+    event.key === '.' ||
+    event.key === ',' ||
+    event.key === ';';
   if (context !== 'gameplay' && !isDebugKey) return;
 
   if (event.key === 'F1') {
@@ -43,6 +47,14 @@ function handleKeyDown(event: KeyboardEvent): void {
     toggleTimeIndicator(engineRef);
   } else if (event.key === '`' || event.key === '~') {
     toggleDebugHud(engineRef);
+  } else if (event.key === 'Backspace') {
+    toggleTimePause(engineRef);
+  } else if (event.key === '.') {
+    stepOneSimulationFrame(engineRef);
+  } else if (event.key === ',') {
+    slowerSimulation(engineRef);
+  } else if (event.key === ';') {
+    fasterSimulation(engineRef);
   } else if (event.key === 'k' || event.key === 'K') {
     // Voluntary respawn with K key
     if (engineRef.gameStarted) {
@@ -178,6 +190,52 @@ export function toggleTimeIndicator(engine: GameEngine): void {
  */
 export function toggleDebugHud(engine: GameEngine): void {
   engine.debugHud.toggleAll();
+}
+
+/**
+ * Toggles the simulation pause state (Backspace).
+ *
+ * Space is taken by the player jump and `P` is taken by post-processing, so
+ * this handler uses Backspace. Also opens the TimeControlPanel on first use
+ * so the visual indicator is visible.
+ */
+export function toggleTimePause(engine: GameEngine): void {
+  const paused = engine.timeScale.togglePause();
+  if (paused && !engine.timeControlPanel.isVisible()) {
+    engine.debugHud.togglePanel('time-control');
+  }
+  Logger.info('engine-input', `[time] ${paused ? 'paused' : 'resumed'}`);
+}
+
+/**
+ * Advances one simulation frame while paused (period key).
+ */
+export function stepOneSimulationFrame(engine: GameEngine): void {
+  if (!engine.timeScale.isPaused()) return;
+  engine.timeScale.stepOneFrame();
+  Logger.info('engine-input', '[time] step one frame');
+}
+
+/**
+ * Decreases the simulation scale by one tier (comma).
+ */
+export function slowerSimulation(engine: GameEngine): void {
+  const next = engine.timeScale.slower();
+  if (!engine.timeControlPanel.isVisible()) {
+    engine.debugHud.togglePanel('time-control');
+  }
+  Logger.info('engine-input', `[time] scale ${next.toFixed(2)}x`);
+}
+
+/**
+ * Increases the simulation scale by one tier (semicolon).
+ */
+export function fasterSimulation(engine: GameEngine): void {
+  const next = engine.timeScale.faster();
+  if (!engine.timeControlPanel.isVisible()) {
+    engine.debugHud.togglePanel('time-control');
+  }
+  Logger.info('engine-input', `[time] scale ${next.toFixed(2)}x`);
 }
 
 /**
