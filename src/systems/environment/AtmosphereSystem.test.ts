@@ -419,6 +419,48 @@ describe('AtmosphereSystem (ICloudRuntime contract)', () => {
     system.update(0.016);
     expect(system.getCoverage()).toBeCloseTo(baseline, 5);
   });
+
+  /**
+   * Cross-scenario coverage regression (`cloud-audit-and-polish`). The
+   * pre-audit defaults left four of five scenarios invisibly-clouded
+   * (coverage ≤ 0.2 with a 3-octave-fbm threshold that filtered them out).
+   * After the audit, every scenario must carry a *visible* baseline — the
+   * value is a tuning constant, so we assert the shape of the fix (all
+   * scenarios non-zero AND above the pre-audit invisible threshold) rather
+   * than exact values.
+   */
+  const ALL_SCENARIOS = ['ashau', 'openfrontier', 'tdm', 'zc', 'combat120'] as const;
+
+  for (const key of ALL_SCENARIOS) {
+    it(`applies a visible (non-zero) cloud coverage baseline for '${key}'`, () => {
+      const system = new AtmosphereSystem();
+      expect(system.applyScenarioPreset(key)).toBe(true);
+      const coverage = system.getCoverage();
+      expect(coverage).toBeGreaterThan(0);
+      // Pre-audit baseline left openfrontier=0.1 and combat120=0.2 reading
+      // as empty sky. Assert we're clear of that invisibility floor.
+      expect(coverage).toBeGreaterThan(0.2);
+      expect(coverage).toBeLessThanOrEqual(1);
+    });
+  }
+
+  it('preset cloud coverages preserve the intended ordering (clear scenarios < overcast scenarios)', () => {
+    // The authored-atmosphere intent: clear-noon scenarios (openfrontier,
+    // combat120) carry lighter coverage than overcast scenarios (tdm).
+    // Assert the *ordering* rather than specific magnitudes so tuning can
+    // shift without tests rotting.
+    const system = new AtmosphereSystem();
+
+    system.applyScenarioPreset('openfrontier');
+    const openfrontier = system.getCoverage();
+    system.applyScenarioPreset('combat120');
+    const combat120 = system.getCoverage();
+    system.applyScenarioPreset('tdm');
+    const tdm = system.getCoverage();
+
+    expect(openfrontier).toBeLessThan(tdm);
+    expect(combat120).toBeLessThan(tdm);
+  });
 });
 
 /**
