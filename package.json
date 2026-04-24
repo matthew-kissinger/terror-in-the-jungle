@@ -131,7 +131,7 @@
     "@preact/signals-core": "^1.14.1",
     "@recast-navigation/core": "^0.43.0",
     "@recast-navigation/generators": "^0.43.0",
-    "@recast-navigation/three": "^0.43.0",
+    "@recast-navigation/three": "^0.43.1",
     "three": "^0.184.0",
     "three-mesh-bvh": "^0.9.9",
     "tweakpane": "^4.0.5"
