@@ -3,6 +3,11 @@ import * as THREE from 'three';
 import { CombatantBallistics } from './CombatantBallistics';
 import { Combatant } from './types';
 import { createTestCombatant } from '../../test-utils';
+import {
+  NPC_CENTER_MASS_Y_OFFSET,
+  NPC_MUZZLE_Y_OFFSET,
+  PLAYER_CENTER_MASS_Y_OFFSET,
+} from '../../config/CombatantConfig';
 
 const DEFAULT_SKILL_PROFILE = {
   reactionDelayMs: 500,
@@ -47,7 +52,7 @@ describe('CombatantBallistics', () => {
 
       expect(ray).toBeInstanceOf(THREE.Ray);
       expect(ray.origin.x).toBe(10);
-      expect(ray.origin.y).toBe(6.5); // position.y + 1.5
+      expect(ray.origin.y).toBe(5 + NPC_MUZZLE_Y_OFFSET);
       expect(ray.origin.z).toBe(20);
     });
 
@@ -222,7 +227,7 @@ describe('CombatantBallistics', () => {
       expect(ray2.direction.length()).toBeCloseTo(1.0, 5);
     });
 
-    it('adjusts player target position downward', () => {
+    it('aims at player center mass from the player eye anchor', () => {
       const combatant = createMockCombatant({
         position: new THREE.Vector3(0, 0, 0),
         target: {
@@ -247,8 +252,40 @@ describe('CombatantBallistics', () => {
 
       const ray = ballistics.calculateAIShot(combatant, playerPosition);
 
-      // Direction should point slightly downward (negative Y component)
-      expect(ray.direction.y).toBeLessThan(0.1);
+      const expected = new THREE.Vector3(100, 10 + PLAYER_CENTER_MASS_Y_OFFSET, 0)
+        .sub(new THREE.Vector3(0, NPC_MUZZLE_Y_OFFSET, 0))
+        .normalize();
+      expect(ray.direction.y).toBeCloseTo(expected.y, 5);
+    });
+
+    it('aims at NPC target center mass instead of its eye anchor', () => {
+      const combatant = createMockCombatant({
+        position: new THREE.Vector3(0, 2.2, 0),
+        target: {
+          id: 'enemy-1',
+          position: new THREE.Vector3(100, 2.2, 0),
+          velocity: new THREE.Vector3(0, 0, 0),
+        } as any,
+        skillProfile: {
+          aimJitterAmplitude: 0,
+          reactionDelayMs: 500,
+          burstLength: 3,
+          burstPauseMs: 200,
+          leadingErrorFactor: 1.0,
+          suppressionResistance: 0.5,
+          visualRange: 100,
+          fieldOfView: 120,
+          firstShotAccuracy: 0.9,
+          burstDegradation: 0.1,
+        },
+      });
+
+      const ray = ballistics.calculateAIShot(combatant, new THREE.Vector3());
+
+      const expected = new THREE.Vector3(100, 2.2 + NPC_CENTER_MASS_Y_OFFSET, 0)
+        .sub(new THREE.Vector3(0, 2.2 + NPC_MUZZLE_Y_OFFSET, 0))
+        .normalize();
+      expect(ray.direction.y).toBeCloseTo(expected.y, 5);
     });
   });
 
@@ -263,7 +300,7 @@ describe('CombatantBallistics', () => {
 
       expect(ray).toBeInstanceOf(THREE.Ray);
       expect(ray.origin.x).toBe(10);
-      expect(ray.origin.y).toBe(6.5); // position.y + 1.5
+      expect(ray.origin.y).toBe(5 + NPC_MUZZLE_Y_OFFSET);
       expect(ray.origin.z).toBe(20);
     });
 

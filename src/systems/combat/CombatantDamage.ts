@@ -5,6 +5,7 @@ import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
+import { copyNpcCenterMassPosition } from './CombatantBodyMetrics';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
@@ -250,9 +251,7 @@ export class CombatantDamage {
   private spawnDeathEffects(target: Combatant): void {
     if (!this.impactEffectsPool) return;
 
-    // Blood splatter at death position
-    this.scratchBloodPos.copy(target.position);
-    this.scratchBloodPos.y += 1.5; // Chest height
+    copyNpcCenterMassPosition(this.scratchBloodPos, target.position);
     if (target.deathDirection) {
       this.scratchSplatterDir.copy(target.deathDirection).negate();
     } else {

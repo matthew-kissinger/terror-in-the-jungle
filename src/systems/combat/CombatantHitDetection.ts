@@ -19,10 +19,10 @@ interface HitZone {
 
 const PLAYER_HIT_ZONES: HitZone[] = [
   { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.35, isHead: true },
-  { offset: new THREE.Vector3(0.2, -1.1, 0), radius: 0.65, isHead: false },
-  { offset: new THREE.Vector3(0, -2.1, 0), radius: 0.55, isHead: false },
-  { offset: new THREE.Vector3(-0.2, -3.1, 0), radius: 0.35, isHead: false },
-  { offset: new THREE.Vector3(0.2, -3.1, 0), radius: 0.35, isHead: false }
+  { offset: new THREE.Vector3(0.15, -0.75, 0), radius: 0.65, isHead: false },
+  { offset: new THREE.Vector3(0, -1.45, 0), radius: 0.55, isHead: false },
+  { offset: new THREE.Vector3(-0.2, -2.05, 0), radius: 0.35, isHead: false },
+  { offset: new THREE.Vector3(0.2, -2.05, 0), radius: 0.35, isHead: false }
 ]
 
 export class CombatantHitDetection {
@@ -40,35 +40,30 @@ export class CombatantHitDetection {
   private readonly playerMissPoint = new THREE.Vector3()
   private static loggedUninitializedGrid = false
 
-  // Cached hit zones to avoid per-call allocations.
-  // Billboard sprites are PlaneGeometry(NPC_SPRITE_WIDTH, NPC_SPRITE_HEIGHT),
-  // centered at combatant.position (ground level). Zone offsets are independent
-  // of the sprite dimensions — resizing the billboard does not move the hit
-  // zones — but the visible figure occupies roughly the upper half of the plane.
-  // Spheres are widened to better match the billboard visual width (~2.5m body).
-  // Legs raised from below-ground to y=0+ so shots at visible feet register.
+  // Cached hit zones to avoid per-call allocations. Combatant positions are
+  // eye-level actor anchors, mirroring the player camera/eye position.
   private readonly hitZonesEngaging: HitZone[] = [
-    { offset: new THREE.Vector3(0, 2.5, 0), radius: 0.4, isHead: true },
-    { offset: new THREE.Vector3(0.15, 1.4, 0), radius: 0.8, isHead: false },
-    { offset: new THREE.Vector3(0, 0.5, 0), radius: 0.7, isHead: false },
-    { offset: new THREE.Vector3(-0.2, 0.0, 0), radius: 0.45, isHead: false },
-    { offset: new THREE.Vector3(0.2, 0.0, 0), radius: 0.45, isHead: false }
+    { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.4, isHead: true },
+    { offset: new THREE.Vector3(0.15, -0.75, 0), radius: 0.8, isHead: false },
+    { offset: new THREE.Vector3(0, -1.45, 0), radius: 0.7, isHead: false },
+    { offset: new THREE.Vector3(-0.2, -2.05, 0), radius: 0.45, isHead: false },
+    { offset: new THREE.Vector3(0.2, -2.05, 0), radius: 0.45, isHead: false }
   ]
 
   private readonly hitZonesAlert: HitZone[] = [
-    { offset: new THREE.Vector3(0, 2.7, 0), radius: 0.4, isHead: true },
-    { offset: new THREE.Vector3(0, 1.5, 0), radius: 0.8, isHead: false },
-    { offset: new THREE.Vector3(0, 0.5, 0), radius: 0.7, isHead: false },
-    { offset: new THREE.Vector3(-0.3, 0.0, 0), radius: 0.45, isHead: false },
-    { offset: new THREE.Vector3(0.3, 0.0, 0), radius: 0.45, isHead: false }
+    { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.4, isHead: true },
+    { offset: new THREE.Vector3(0, -0.75, 0), radius: 0.8, isHead: false },
+    { offset: new THREE.Vector3(0, -1.45, 0), radius: 0.7, isHead: false },
+    { offset: new THREE.Vector3(-0.3, -2.05, 0), radius: 0.45, isHead: false },
+    { offset: new THREE.Vector3(0.3, -2.05, 0), radius: 0.45, isHead: false }
   ]
 
   private readonly hitZonesDefault: HitZone[] = [
-    { offset: new THREE.Vector3(0, 2.8, 0), radius: 0.4, isHead: true },
-    { offset: new THREE.Vector3(0, 1.5, 0), radius: 0.8, isHead: false },
-    { offset: new THREE.Vector3(0, 0.5, 0), radius: 0.7, isHead: false },
-    { offset: new THREE.Vector3(-0.3, 0.0, 0), radius: 0.45, isHead: false },
-    { offset: new THREE.Vector3(0.3, 0.0, 0), radius: 0.45, isHead: false }
+    { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.4, isHead: true },
+    { offset: new THREE.Vector3(0, -0.75, 0), radius: 0.8, isHead: false },
+    { offset: new THREE.Vector3(0, -1.45, 0), radius: 0.7, isHead: false },
+    { offset: new THREE.Vector3(-0.3, -2.05, 0), radius: 0.45, isHead: false },
+    { offset: new THREE.Vector3(0.3, -2.05, 0), radius: 0.45, isHead: false }
   ]
 
   constructor(gridManager?: SpatialGridManager) {

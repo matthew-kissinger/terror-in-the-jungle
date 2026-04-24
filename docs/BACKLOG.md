@@ -65,6 +65,15 @@ Completed in the current recovery pass:
   The LOD manager no longer imports the global `spatialGridManager` singleton
   directly, and regression coverage proves LOD position sync plus AI update
   dependency flow use the injected grid.
+- Cycle 5 actor-height follow-up: NPC and player positions now use the same
+  eye-level actor-anchor contract. `NPC_Y_OFFSET` matches `PLAYER_EYE_HEIGHT`,
+  `CombatantBodyMetrics` owns muzzle/center-mass/eye derivation, and
+  ballistics, LOS, fire occlusion, hit zones, tracers, death effects, and
+  respawn/deploy tests no longer depend on scattered vertical magic offsets.
+  The NPC billboard plane is also reduced from `3.2m x 4.5m` to `2.0m x 2.8m`
+  and render-shifted down so visible sprite feet stay near terrain and the
+  visible head stays near the actor eye anchor. The remaining question is
+  human visual/art feel, not hidden combat math.
 - Cycle 6 first pass: helicopter squad deployment now queries the runtime
   terrain surface and uses effective/collision-aware height when available.
   `NavmeshSystem` now receives `terrainSystem` from `SystemConnector` and
@@ -111,8 +120,14 @@ Remaining gates before human sign-off / next release pass:
     coverage.
   - Atmosphere/perf follow-up: capture A Shau/Open Frontier fog/cloud
     readability and airfield draw-call/collision/LOS cost before tuning assets.
-- Broader local gates completed on 2026-04-24: `npm run validate:fast`,
-  `npm run build`, `npm run probe:fixed-wing`, `npm run check:states`,
+  - Combat scale/aiming follow-up: current code fixes the vertical contract
+    behind NPCs appearing to fire above the player and shrinks the actual NPC
+    billboard container. Human playtest still needs to confirm NPC billboard
+    scale, tracer start height, hit feedback, and whether player/NPC silhouettes
+    feel matched in ground FPS combat.
+- Broader local gates completed on 2026-04-24: `npm run validate:fast`
+  (243 files, 3787 tests), `npm run build`, `npm run evidence:atmosphere`,
+  `npm run probe:fixed-wing`, `npm run check:states`,
   `npm run check:hud`, `npm run check:mobile-ui`, `npm run doctor`,
   `npm run deadcode`, and `git diff --check`. `npm run validate:full`
   passed unit/build portions but the first combat120 capture failed one heap
@@ -155,14 +170,16 @@ Remaining gates before human sign-off / next release pass:
   - Cycle 9: clouds/fog/readability across all five modes. Current
     evidence: `npm run evidence:atmosphere` attempts ground, sky-coverage, and
     aircraft views for all five modes, and the current artifact is
-    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/`.
+    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`.
     All five modes are wired and measurable through sky-dome clouds; the old
     `CloudLayer` plane is hidden so it no longer draws the hard horizon divider.
     The sky shader now uses a seamless cloud-deck projection instead of
     azimuth-wrapped UVs, so A Shau/TDM/ZC read as broken cloud layers and Open
     Frontier/combat120 read as lighter scattered-cloud presets. Cloud art is
-    still not human-signed off. A Shau has DEM-backed atmosphere evidence with
-    `0` browser errors and disabled water state. The artifact records A Shau
+    still not human-signed off. The latest run reports `0` browser errors,
+    cloud follow `true`, terrain ready at camera, and no terrain/water clipping
+    flags in all five modes. A Shau has DEM-backed atmosphere evidence with
+    disabled water state. The artifact records A Shau
     representative-base nav
     connectivity as passing, but route/NPC movement quality still needs
     play-path validation against the explicit static-tiled nav path.

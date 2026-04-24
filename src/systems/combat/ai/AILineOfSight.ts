@@ -4,6 +4,7 @@ import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
 import { tryConsumeRaycast } from './RaycastBudget';
+import { copyActorEyePosition } from '../CombatantBodyMetrics';
 
 // Module-level scratch vectors for LOS checks
 const _toTarget = new THREE.Vector3();
@@ -193,16 +194,12 @@ export class AILineOfSight {
     targetPos: THREE.Vector3,
     distance: number
   ): boolean {
+    copyActorEyePosition(_eyePos, combatant.position);
+    copyActorEyePosition(_targetEyePos, targetPos);
+
     // Terrain LOS check (high/medium LOD only)
     if (this.terrainSystem && combatant.lodLevel &&
         (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
-
-      _eyePos.copy(combatant.position);
-      _eyePos.y += 1.7;
-
-      _targetEyePos.copy(targetPos);
-      _targetEyePos.y += 1.7;
-
       _direction.subVectors(_targetEyePos, _eyePos).normalize();
 
       const terrainHit = this.terrainSystem.raycastTerrain(_eyePos, _direction, distance);
@@ -214,12 +211,6 @@ export class AILineOfSight {
 
     // Sandbag LOS check
     if (this.sandbagSystem) {
-      _eyePos.copy(combatant.position);
-      _eyePos.y += 1.7;
-
-      _targetEyePos.copy(targetPos);
-      _targetEyePos.y += 1.7;
-
       _direction.subVectors(_targetEyePos, _eyePos).normalize();
 
       _ray.set(_eyePos, _direction);
@@ -235,16 +226,6 @@ export class AILineOfSight {
 
     // Smoke cloud LOS check
     if (this.smokeCloudSystem) {
-      // Use already-computed eye positions from above checks
-      // If not computed yet (low LOD), compute them now
-      if (!combatant.lodLevel || (combatant.lodLevel !== 'high' && combatant.lodLevel !== 'medium')) {
-        _eyePos.copy(combatant.position);
-        _eyePos.y += 1.7;
-
-        _targetEyePos.copy(targetPos);
-        _targetEyePos.y += 1.7;
-      }
-
       if (this.smokeCloudSystem.isLineBlocked(_eyePos, _targetEyePos)) {
         return false;
       }
@@ -269,10 +250,8 @@ export class AILineOfSight {
   private isBlockedByHeightfield(combatant: Combatant, targetPos: THREE.Vector3, distance: number): boolean {
     if (!this.terrainSystem || distance < 35 || distance > 220) return false;
 
-    _eyePos.copy(combatant.position);
-    _eyePos.y += 1.7;
-    _targetEyePos.copy(targetPos);
-    _targetEyePos.y += 1.7;
+    copyActorEyePosition(_eyePos, combatant.position);
+    copyActorEyePosition(_targetEyePos, targetPos);
 
     const samples = Math.min(6, Math.max(2, Math.floor(distance / 20)));
     let blockingSamples = 0;

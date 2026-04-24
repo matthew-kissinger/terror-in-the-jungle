@@ -21,6 +21,11 @@ import { CombatantDamage } from './CombatantDamage';
 import { CombatantSuppression } from './CombatantSuppression';
 import { CombatantCombatEffects } from './CombatantCombatEffects';
 import { GameEventBus } from '../../core/GameEventBus';
+import {
+  copyNpcCenterMassPosition,
+  copyNpcMuzzlePosition,
+  copyPlayerCenterMassPosition,
+} from './CombatantBodyMetrics';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -220,11 +225,13 @@ export class CombatantCombat {
         }
 
         // Use module-level scratch vectors instead of pool allocation
-        this._muzzlePos.copy(combatant.position);
-        this._muzzlePos.y += 1.5; // Muzzle height
+        copyNpcMuzzlePosition(this._muzzlePos, combatant.position);
 
-        this._targetFirePos.copy(targetPos);
-        this._targetFirePos.y += 1.2; // Target center mass
+        if (isPlayerTarget(combatant.target)) {
+          copyPlayerCenterMassPosition(this._targetFirePos, targetPos);
+        } else {
+          copyNpcCenterMassPosition(this._targetFirePos, targetPos);
+        }
 
         this._fireDirection.subVectors(this._targetFirePos, this._muzzlePos).normalize();
 

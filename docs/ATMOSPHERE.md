@@ -64,7 +64,7 @@ hardcoded sky/fog/light colors for local fixes.
   read as lighter scattered-cloud presets but still need art review.
 - `npm run evidence:atmosphere` captures ground, sky-coverage, and aircraft
   views for all modes. The 2026-04-24 post-fix artifact is
-  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/`.
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`.
   That run proved cloud wiring in all five modes after `build` and `build:perf`
   began emitting `asset-manifest.json`. A Shau terrain/readability evidence is
   DEM-backed, A Shau water is disabled without underwater fog, and the browser

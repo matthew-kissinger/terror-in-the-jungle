@@ -29,6 +29,7 @@ import { MissionBriefing } from '../../ui/loading/MissionBriefing';
 import type { MissionBriefingInfo } from '../../ui/loading/MissionBriefing';
 import { DeployFlowController } from './DeployFlowController';
 import { InitialDeployCancelledError } from './InitialDeployCancelledError';
+import { PLAYER_EYE_HEIGHT } from './PlayerMovement';
 
 interface PlayerRespawnManagerDependencies {
   playerHealthSystem: PlayerHealthSystem;
@@ -363,7 +364,7 @@ export class PlayerRespawnManager implements GameSystem {
       throw new Error('PlayerRespawnManager requires terrainSystem before terrain grounding');
     }
     const terrainHeight = this.terrainSystem.getEffectiveHeightAt(position.x, position.z);
-    position.y = terrainHeight + 2; // Add player height offset
+    position.y = terrainHeight + PLAYER_EYE_HEIGHT;
 
     // Move player to spawn position
     if (this.playerController) {

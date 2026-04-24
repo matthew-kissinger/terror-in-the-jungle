@@ -19,6 +19,7 @@ import {
   LoadoutWeapon
 } from '../../ui/loadout/LoadoutTypes';
 import type { LoadoutService } from './LoadoutService';
+import { PLAYER_EYE_HEIGHT } from './PlayerMovement';
 
 // Mock browser globals for Node.js environment
 if (typeof document === 'undefined') {
@@ -594,7 +595,7 @@ describe('PlayerRespawnManager', () => {
       expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3), 'respawn.manager');
       const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
       expect(callPosition.x).toBe(0);
-      expect(callPosition.y).toBe(2); // terrain height (0) + player offset (2)
+      expect(callPosition.y).toBe(PLAYER_EYE_HEIGHT);
       expect(callPosition.z).toBe(-50);
     });
 
@@ -1364,7 +1365,7 @@ describe('PlayerRespawnManager', () => {
       testRespawnManager.respawnAtBase();
 
       const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
-      expect(callPosition.y).toBe(12); // terrain height (10) + player offset (2)
+      expect(callPosition.y).toBe(10 + PLAYER_EYE_HEIGHT);
     });
 
     it('prefers effective terrain height for respawn grounding', () => {
@@ -1395,7 +1396,7 @@ describe('PlayerRespawnManager', () => {
 
       const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
       expect(terrainRuntime.getEffectiveHeightAt).toHaveBeenCalled();
-      expect(callPosition.y).toBe(13);
+      expect(callPosition.y).toBe(11 + PLAYER_EYE_HEIGHT);
     });
 
     it('should handle zone manager with no zones', () => {

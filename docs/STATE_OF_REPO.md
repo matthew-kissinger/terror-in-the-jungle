@@ -60,6 +60,21 @@ the current truth anchor.
   global spatial singleton directly, and coverage proves injected spatial sync
   plus `CombatantAI.updateAI()` use the supplied grid. Targeted combat suites
   and `npm run typecheck` passed.
+- 2026-04-24 Cycle 5 combat actor-height follow-up is in place:
+  NPC and player positions now share an eye-level actor-anchor contract.
+  `NPC_Y_OFFSET` matches `PLAYER_EYE_HEIGHT` (`2.2m`), `PlayerRespawnManager`
+  uses the same player eye height for spawn grounding, and
+  `CombatantBodyMetrics` centralizes NPC muzzle, NPC center-mass, player
+  center-mass, and LOS eye positions. Ballistics, terrain fire checks, LOS,
+  cover threat rays, tracer/muzzle effects, death effects, and hit zones no
+  longer stack independent vertical offsets on top of already raised actor
+  positions. The NPC billboard plane was also reduced from `3.2m x 4.5m` to
+  `2.0m x 2.8m` and shifted down by `NPC_SPRITE_RENDER_Y_OFFSET` so the
+  optimized sprite alpha bounds read as a human-scale silhouette with feet near
+  terrain and head near the actor eye anchor. This addresses the playtest
+  symptom where NPC fire appeared above the player's head and the player felt
+  short next to combatants. Human playtest still decides whether the sprite art
+  itself reads correctly in motion.
 - Cycle 6 terrain/collision first pass is now in place:
   helicopter squad deployment uses the runtime terrain query surface and
   collision-aware `getEffectiveHeightAt()` when available; `NavmeshSystem`
@@ -87,7 +102,7 @@ the current truth anchor.
 - 2026-04-24 Cycle 9 atmosphere update: `npm run evidence:atmosphere`
   attempts all five modes from ground, sky-coverage, and aircraft views. Current
   evidence is under
-  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/`.
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`.
   A Shau, Open Frontier, TDM, Zone Control, and AI Sandbox/combat120 enter live
   mode with `0` browser errors, terrain resident at the camera, and non-zero
   sky-dome cloud coverage. Visible clouds now come from
@@ -127,8 +142,10 @@ the current truth anchor.
   visibility and draw-call optimization; it still needs an airfield perf audit.
 - Not yet signed off: human playtest for aircraft feel, emergency bailout UX,
   helicopter/fixed-wing enter/exit feel, pointer-lock fallback usability, and
-  A Shau airfield taxi/takeoff usability. Per user direction on 2026-04-23,
-  these feel gates are deferred until the end of all current recovery cycles.
+  A Shau airfield taxi/takeoff usability. NPC/player visual scale and AI fire
+  height are now code-corrected but still need human combat-feel confirmation.
+  Per user direction on 2026-04-23, these feel gates are deferred until the end
+  of all current recovery cycles.
 - 2026-04-24 release validation did not treat the first `validate:full` run as
   a clean pass because `perf:capture:combat120` failed one heap recovery check.
   The unit/build portions passed, and a follow-up standalone
@@ -232,9 +249,9 @@ the current truth anchor.
   PASS/WARN on 2026-04-24
   - `npm run typecheck` — PASS after the capture harness and atmosphere patch
   - `npx vitest run src/systems/environment/AtmosphereSystem.test.ts src/systems/environment/atmosphere/HosekWilkieSkyBackend.test.ts src/systems/environment/WaterSystem.test.ts src/systems/navigation/NavmeshSystem.test.ts src/core/ModeStartupPreparer.test.ts` — PASS after sky-dome cloud coverage, disabled-water state, and explicit static-tiled nav changes
-  - `npm run evidence:atmosphere -- --port 9224` — PASS and rebuilt the perf
+  - `npm run evidence:atmosphere` — PASS and rebuilt the perf
     bundle; current artifact is
-    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/`
+    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`
   - WARN: all five modes produced ground, sky, and aircraft screenshots with
     `0` browser errors and terrain resident at the camera. All captured views
     report `cameraBelowTerrain=false` and `waterExposedByTerrainClip=false`.
@@ -246,11 +263,17 @@ the current truth anchor.
     `airfield_main`, combat120, and UI/system budget warnings remain part of the
     release evidence.
   - `npm run lint` — PASS after the evidence/docs alignment
-  - `npm run test:quick` — PASS (`242` files, `3774` tests)
+  - `npm run test:quick` — PASS (`243` files, `3787` tests)
   - `npm run build` — PASS, with the existing large-chunk Vite warning
 - 2026-04-24 final local validation for the recovery commit — PASS/WARN
-  - `npm run validate:fast` — PASS (`242` files, `3781` tests)
+  - `npm run validate:fast` — PASS (`243` files, `3787` tests)
   - `npm run build` — PASS, with the existing large-chunk Vite warning
+  - `npm run evidence:atmosphere` — PASS/WARN; all five modes reported
+    `0` browser errors, cloud follow `true`, nav ready/connected `true`, cloud
+    legibility `pass`, terrain ready at camera `true`,
+    `cameraBelowTerrain=false`, and `waterExposedByTerrainClip=false`;
+    artifact:
+    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/summary.json`
   - `npm run probe:fixed-wing` — PASS for A-1, F-4, and AC-47, including
     takeoff, climb, approach, in-flight bailout, and player/NPC handoff
   - `npm run check:states` — PASS; artifact
@@ -264,6 +287,11 @@ the current truth anchor.
     `npm run perf:capture:combat120` then passed with warnings, and
     `npm run perf:compare -- --scenario combat120` passed 8/8 checks
   - `npm run doctor`, `npm run deadcode`, and `git diff --check` — PASS
+- Cycle 5 combat actor-height and billboard-scale validation — PASS on 2026-04-24
+  - `npx vitest run src/systems/combat/CombatantMeshFactory.test.ts src/systems/combat/CombatantRenderer.test.ts src/systems/combat/CombatantBallistics.test.ts src/systems/combat/CombatantCombatEffects.test.ts src/systems/combat/CombatantHitDetection.test.ts src/systems/combat/ai/AILineOfSight.test.ts src/systems/combat/CombatantMovement.test.ts src/systems/helicopter/SquadDeployFromHelicopter.test.ts src/systems/player/PlayerRespawnManager.test.ts`
+    — PASS, 190 tests after the billboard visual-scale patch
+  - `npm run typecheck` — PASS
+  - `npm run lint` — PASS
 - `npm run doctor` — PASS
   - current shell: Node 24.14.1
   - repo target: `.nvmrc` says Node 24
@@ -348,6 +376,11 @@ the current truth anchor.
   A proper FPS playtest should use a normal browser until the game exposes a
   drag-look/dev fallback and reports `pointerlockerror` instead of silently
   swallowing lock rejection.
+- NPC/player combat verticality and billboard container scale now have one code
+  contract, but not a human combat-feel sign-off. If playtest still reports
+  oversized NPCs, head-high tracers, or shots passing above the player, inspect
+  sprite alpha padding, weapon animation/tracer visuals, and live combat
+  telemetry before changing `NPC_Y_OFFSET` or adding local ballistics offsets.
 - `npm run perf:capture:frontier30m` now uses perf-only Open Frontier lifecycle
   overrides (`perfMatchDuration=3600`, `perfDisableVictory=1`) so the script is
   a non-terminal 30-minute soak again. The tracked 2026-04-20 baseline still

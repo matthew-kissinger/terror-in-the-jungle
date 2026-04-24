@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { CombatantHitDetection } from './CombatantHitDetection';
 import { Combatant, CombatantState, Faction } from './types';
 import { SpatialGridManager } from './SpatialGridManager';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 
 import { createTestCombatant } from '../../test-utils';
 
@@ -96,9 +97,9 @@ describe('CombatantHitDetection', () => {
 
     it('should detect direct body hit', () => {
       const playerPosition = new THREE.Vector3(10, 0, 0);
-      // Aim at torso zone (offset 0.2, -1.1, 0)
+      // Aim at torso zone below the eye anchor.
       const ray = makeRay(
-        new THREE.Vector3(0, -1.1, 0),
+        new THREE.Vector3(0, -0.75, 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -110,9 +111,9 @@ describe('CombatantHitDetection', () => {
 
     it('should detect leg hit (lower left zone)', () => {
       const playerPosition = new THREE.Vector3(10, 0, 0);
-      // Aim at lower left leg zone (offset -0.2, -3.1, 0)
+      // Aim at lower left leg zone above terrain for a standing player.
       const ray = makeRay(
-        new THREE.Vector3(0, -3.1, 0),
+        new THREE.Vector3(0, -2.05, 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -124,9 +125,9 @@ describe('CombatantHitDetection', () => {
 
     it('should detect leg hit (lower right zone)', () => {
       const playerPosition = new THREE.Vector3(10, 0, 0);
-      // Aim at lower right leg zone (offset 0.2, -3.1, 0)
+      // Aim at lower right leg zone above terrain for a standing player.
       const ray = makeRay(
-        new THREE.Vector3(0, -3.1, 0),
+        new THREE.Vector3(0, -2.05, 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -222,14 +223,14 @@ describe('CombatantHitDetection', () => {
       const combatant1 = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 2.8, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
       const combatant2 = makeCombatant({
         id: 'enemy2',
         faction: Faction.NVA,
-        position: new THREE.Vector3(20, 2.8, 0),
+        position: new THREE.Vector3(20, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
@@ -240,7 +241,7 @@ describe('CombatantHitDetection', () => {
         ['enemy2', combatant2]
       ]);
 
-      const ray = makeRay(new THREE.Vector3(0, 2.8, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -252,7 +253,7 @@ describe('CombatantHitDetection', () => {
       const friendly = makeCombatant({
         id: 'friendly1',
         faction: Faction.US,
-        position: new THREE.Vector3(10, 2.8, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
@@ -262,7 +263,7 @@ describe('CombatantHitDetection', () => {
         ['friendly1', friendly]
       ]);
 
-      const ray = makeRay(new THREE.Vector3(0, 2.8, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).toBeNull();
@@ -272,7 +273,7 @@ describe('CombatantHitDetection', () => {
       const deadCombatant = makeCombatant({
         id: 'dead1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 2.8, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.DEAD
       });
 
@@ -282,7 +283,7 @@ describe('CombatantHitDetection', () => {
         ['dead1', deadCombatant]
       ]);
 
-      const ray = makeRay(new THREE.Vector3(0, 2.8, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).toBeNull();
@@ -292,7 +293,7 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
@@ -313,14 +314,14 @@ describe('CombatantHitDetection', () => {
       const combatant1 = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 2.8, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
       const combatant2 = makeCombatant({
         id: 'enemy2',
         faction: Faction.NVA,
-        position: new THREE.Vector3(5, 2.8, 0),
+        position: new THREE.Vector3(5, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
@@ -331,7 +332,7 @@ describe('CombatantHitDetection', () => {
         ['enemy2', combatant2]
       ]);
 
-      const ray = makeRay(new THREE.Vector3(0, 2.8, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -342,7 +343,7 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.ENGAGING
       });
 
@@ -352,8 +353,8 @@ describe('CombatantHitDetection', () => {
         ['enemy1', combatant]
       ]);
 
-      // ENGAGING head zone is at offset (0, 2.5, 0) with radius 0.3
-      const ray = makeRay(new THREE.Vector3(0, 2.5, 0), new THREE.Vector3(1, 0, 0));
+      // ENGAGING head zone is centered at the eye-level actor anchor.
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -364,7 +365,7 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.ALERT
       });
 
@@ -374,8 +375,8 @@ describe('CombatantHitDetection', () => {
         ['enemy1', combatant]
       ]);
 
-      // ALERT head zone is at offset (0, 2.7, 0) with radius 0.35
-      const ray = makeRay(new THREE.Vector3(0, 2.7, 0), new THREE.Vector3(1, 0, 0));
+      // ALERT head zone is centered at the eye-level actor anchor.
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -386,7 +387,7 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
@@ -396,8 +397,8 @@ describe('CombatantHitDetection', () => {
         ['enemy1', combatant]
       ]);
 
-      // Default head zone is at offset (0, 2.8, 0) with radius 0.35
-      const ray = makeRay(new THREE.Vector3(0, 2.8, 0), new THREE.Vector3(1, 0, 0));
+      // Default head zone is centered at the eye-level actor anchor.
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -408,7 +409,7 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
@@ -419,13 +420,13 @@ describe('CombatantHitDetection', () => {
       ]);
 
       // Shoot slightly off-center to get a surface hit
-      const ray = makeRay(new THREE.Vector3(0, 3.0, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET + 0.2, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
       
-      // Head zone center is at (10, 2.8, 0), radius 0.35
-      const zoneCenter = new THREE.Vector3(10, 2.8, 0);
+      // Head zone center is at the eye-level actor anchor.
+      const zoneCenter = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
       const distanceFromCenter = result!.point.distanceTo(zoneCenter);
       
       // Point should be on surface (at radius distance from center)
@@ -436,7 +437,7 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.SUPPRESSING
       });
 
@@ -446,8 +447,8 @@ describe('CombatantHitDetection', () => {
         ['enemy1', combatant]
       ]);
 
-      // SUPPRESSING uses same zones as ENGAGING
-      const ray = makeRay(new THREE.Vector3(0, 2.5, 0), new THREE.Vector3(1, 0, 0));
+      // SUPPRESSING uses same zones as ENGAGING.
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -460,15 +461,15 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.ENGAGING
       });
 
       mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
       const allCombatants = new Map([['enemy1', combatant]]);
 
-      // Test ENGAGING head zone (0, 2.5, 0, radius 0.3)
-      const ray = makeRay(new THREE.Vector3(0, 2.5, 0), new THREE.Vector3(1, 0, 0));
+      // Test ENGAGING head zone centered at the eye-level actor anchor.
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -478,14 +479,14 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.SUPPRESSING
       });
 
       mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
       const allCombatants = new Map([['enemy1', combatant]]);
 
-      const ray = makeRay(new THREE.Vector3(0, 2.5, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -495,15 +496,15 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.ALERT
       });
 
       mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
       const allCombatants = new Map([['enemy1', combatant]]);
 
-      // Test ALERT head zone (0, 2.7, 0, radius 0.35)
-      const ray = makeRay(new THREE.Vector3(0, 2.7, 0), new THREE.Vector3(1, 0, 0));
+      // Test ALERT head zone centered at the eye-level actor anchor.
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -513,15 +514,15 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.IDLE
       });
 
       mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
       const allCombatants = new Map([['enemy1', combatant]]);
 
-      // Test default head zone (0, 2.8, 0, radius 0.35)
-      const ray = makeRay(new THREE.Vector3(0, 2.8, 0), new THREE.Vector3(1, 0, 0));
+      // Test default head zone centered at the eye-level actor anchor.
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -531,14 +532,14 @@ describe('CombatantHitDetection', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
         faction: Faction.NVA,
-        position: new THREE.Vector3(10, 0, 0),
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
         state: CombatantState.PATROLLING
       });
 
       mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
       const allCombatants = new Map([['enemy1', combatant]]);
 
-      const ray = makeRay(new THREE.Vector3(0, 2.8, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();

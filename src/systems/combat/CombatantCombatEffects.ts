@@ -72,16 +72,12 @@ export class CombatantCombatEffects {
       }
 
       const tracerStart = objectPool.getVector3();
-      const tracerOffset = objectPool.getVector3();
-      tracerOffset.set(0, 1.5, 0);
-      tracerStart.copy(shotRay.origin).add(tracerOffset);
+      tracerStart.copy(shotRay.origin);
       this.tracerPool.spawn(tracerStart, hitPoint, 300);
-      objectPool.releaseVector3(tracerOffset);
       objectPool.releaseVector3(tracerStart);
 
       const muzzlePos = objectPool.getVector3();
-      muzzlePos.copy(combatant.position);
-      muzzlePos.y += 1.5;
+      muzzlePos.copy(shotRay.origin);
       const muzzleOffset = objectPool.getVector3();
       muzzleOffset.copy(shotRay.direction).multiplyScalar(2);
       muzzlePos.add(muzzleOffset);
@@ -134,8 +130,7 @@ export class CombatantCombatEffects {
       this.scratchEndPoint.copy(shotRay.origin)
         .addScaledVector(shotRay.direction, 60 + Math.random() * 40);
 
-      this.scratchMuzzlePos.copy(combatant.position);
-      this.scratchMuzzlePos.y += 1.5;
+      this.scratchMuzzlePos.copy(shotRay.origin);
       this.tracerPool.spawn(this.scratchMuzzlePos, this.scratchEndPoint, 300);
 
       this.scratchMuzzleFlashPos.copy(this.scratchMuzzlePos);

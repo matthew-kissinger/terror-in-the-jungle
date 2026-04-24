@@ -29,6 +29,7 @@ This is the execution artifact for the multi-agent architecture recovery plan. T
 | Atmosphere cloud/fog presentation | `AtmosphereSystem`, `HosekWilkieSkyBackend`, scenario presets | renderer, weather, perf captures, playtests | Medium; visible clouds now come from the sky-dome pass, the old `CloudLayer` plane is hidden, and the shader now uses a seamless cloud-deck projection. Open Frontier/combat120 are lighter scattered-cloud presets and still need art review. |
 | World feature render/collision presence | `WorldFeatureSystem` plus per-model optimizer; aircraft use `AirVehicleVisibility` | terrain collision, LOS accelerator, renderer, perf probes | Medium; props/buildings do not yet have the same explicit render/sim visibility contract aircraft have. |
 | Combatant hot state | `CombatantSystem` object map | LOD manager, movement, AI, renderer, spatial grid | High; public maps and singleton spatial access remain scale risks. |
+| Actor height / combat verticality | `CombatantConfig`, `CombatantBodyMetrics`, `CombatantMeshFactory` | player respawn, NPC spawn/deploy, ballistics, LOS, hit zones, tracers, cover checks, billboard renderer | Medium; 2026-04-24 code now uses an eye-level actor-anchor contract and smaller billboard container, but human playtest still must confirm visual NPC/player scale and fire height. |
 | Combatant spatial index | Injected `SpatialGridManager` dependency owned by `CombatantSystem` for the current world/session | `CombatantLODManager`, `CombatantAI`, movement/LOD sync, query callers | Medium; LOD no longer imports the global singleton directly, but the default singleton remains the bootstrap compatibility path until combat storage is fully session-scoped. |
 | System update order | `SystemUpdater` plus `SimulationScheduler` | all runtime systems | High; manual tracked-system exclusions remain a double-update risk. |
 | Probe/harness API | `bootstrap.ts` window hooks and scripts | perf, state, HUD, fixed-wing probes | Medium; useful but still broad private access. |
@@ -48,7 +49,7 @@ responsiveness stay unsigned until the final human playtest form is completed.
 | 2 Fixed-wing feel | Scorch Reviewer | UI/input/session rewrites. | sandbox metrics, fixed-wing probe, airfield staging evidence, human playtest. | Raw `Airframe` cannot be stabilized without hidden correction loops. |
 | 3 Declarative schedule | Architecture Lead | Vehicle feel tuning. | schedule parity report, fast validation, combat smoke. | Update order changes without explicit dependency evidence. |
 | 4 UI/input boundary | Implementer | Vehicle physics or scheduler changes. | mobile UI, HUD check, keyboard/touch browser smoke. | Touch/HUD code writes gameplay vehicle state. |
-| 5 Combat scale | Architecture Lead | Flight tuning, terrain rewrites. | combat scenarios, combat120 capture, memory check. | Renderer, AI, movement, or spatial index creates separate combatant truth. |
+| 5 Combat scale | Architecture Lead | Flight tuning, terrain rewrites. | combat scenarios, combat120 capture, memory check, actor-height contract tests. | Renderer, AI, movement, spatial index, or combat verticality creates separate combatant truth. |
 | 6 Terrain/collision authority | Architecture Lead | Combat data-store migration. | terrain probes, fixed-wing probe, aircraft collision checks. | Vehicles and NPCs query different terrain sources. |
 | 7 Harness productization | Verification Lead | Gameplay behavior changes not required by probe API. | failure artifacts, state/HUD/fixed-wing/perf probes. | Probe succeeds while bypassing the real user path. |
 | 8 Cleanup/guardrails | Integration Captain | Behavior changes without a cycle owner. | deadcode triage, fast validation, current-state doc check. | Deleting a probe removes coverage without replacement. |
@@ -465,13 +466,14 @@ sky-coverage, and aircraft framings for all five modes. The harness boots with
 if terrain is not resident at the camera, and records water plus
 `clipDiagnostics` state so disabled water, water rendering, and terrain/camera
 clipping stay separable. Current artifact:
-`artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/summary.json`.
+`artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/summary.json`.
 Evidence confirmed:
 
 - A Shau, Open Frontier, TDM, Zone Control, and AI Sandbox/combat120 entered
   live mode with the expected active atmosphere preset and `0` browser errors;
-- all five modes had non-zero sky-dome cloud coverage and passing sky texture
-  scores in the automated image analysis;
+- all five modes had passing cloud-legibility image scores, cloud follow
+  `true`, terrain ready at camera, and no captured camera-below-terrain or
+  water-exposed-by-terrain-clip state;
 - the visible cloud authority is now `HosekWilkieSkyBackend`; `CloudLayer` is
   still constructed for compatibility but is kept invisible so the old finite
   plane cannot draw the hard horizontal divider seen in playtest screenshots;
@@ -536,6 +538,43 @@ Cycle 10 owns a fallback retirement pass. The goal is not "remove every
 fallback"; the goal is to remove silent fallbacks that can hide bad wiring.
 Useful fallbacks should become explicit diagnostic failures, dev-only recovery,
 or named compatibility shims with retirement notes.
+
+### Combat Actor Height And Aiming
+
+The 2026-04-24 ground-combat playtest note said NPCs appeared to fire above the
+player's head and that the player felt short relative to nearby NPCs. Current
+code evidence showed a stacked vertical-offset problem: NPCs were spawned at a
+raised position, ballistics and LOS added separate height offsets, and normal
+tracer effects added another vertical offset on top of the shot ray origin.
+
+Current code truth after the Cycle 5 follow-up:
+
+- `Combatant.position` and player position are eye-level actor anchors.
+- `NPC_Y_OFFSET` is `2.2`, matching `PLAYER_EYE_HEIGHT`.
+- `CombatantBodyMetrics` derives NPC muzzle, NPC center mass, player center
+  mass, and actor eye positions for ballistics, LOS, fire-occlusion checks,
+  cover threat rays, tracers, muzzle flashes, death effects, and hit zones.
+- `PlayerRespawnManager` now grounds respawns at `terrain + PLAYER_EYE_HEIGHT`
+  instead of an older hardcoded `+2`.
+- `CombatantMeshFactory` reduced the actual NPC billboard plane from
+  `3.2m x 4.5m` to `2.0m x 2.8m`, and `CombatantRenderer` applies
+  `NPC_SPRITE_RENDER_Y_OFFSET` for non-mounted NPCs so the sprite art's
+  non-transparent feet sit near terrain while the visible head stays near the
+  actor eye anchor.
+- Normal and suppressive tracers start from the actual shot ray origin instead
+  of applying a second muzzle-height offset.
+- The recoil hypothesis is not the primary code cause found here: NPC firing
+  spread comes from skill/jitter and burst degradation, while the visible
+  above-head fire came from anchor/offset drift.
+
+Validation so far: targeted ballistics, effects, hit detection, sizing,
+renderer, LOS, movement, helicopter deploy, and respawn suites passed; the
+full `npm run validate:fast` gate passed with 243 files and 3787 tests, and
+`npm run build` passed. Human playtest still decides whether the billboard
+art, tracer visuals, and perceived player/NPC scale feel correct. If playtest
+still reports mismatch, do not add new hidden offsets; inspect sprite alpha
+padding, imposter scale, weapon flash/tracer art, and live combat telemetry
+first.
 
 ### Terrain Clipping And Water Rendering
 

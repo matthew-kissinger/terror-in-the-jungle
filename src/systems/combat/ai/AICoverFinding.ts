@@ -3,6 +3,8 @@ import { Combatant } from '../types';
 import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { tryConsumeCoverSearch } from './CoverSearchBudget';
+import { copyActorEyePosition } from '../CombatantBodyMetrics';
+import { NPC_Y_OFFSET } from '../../../config/CombatantConfig';
 
 // Module-level scratch vectors for cover finding
 const _sandbagCenter = new THREE.Vector3();
@@ -330,8 +332,7 @@ export class AICoverFinding {
 
     const distance = coverPos.distanceTo(threatPos);
 
-    _threatEyePos.copy(threatPos);
-    _threatEyePos.y += 1.7;
+    copyActorEyePosition(_threatEyePos, threatPos);
 
     _coverEyePos.copy(coverPos);
     // Terrain defilade: combatant crouches behind terrain feature (no sandbag)
@@ -359,11 +360,10 @@ export class AICoverFinding {
 
     const distance = coverPos.distanceTo(threatPos);
 
-    _threatEyePos.copy(threatPos);
-    _threatEyePos.y += 1.7;
+    copyActorEyePosition(_threatEyePos, threatPos);
 
     _coverEyePos.copy(coverPos);
-    _coverEyePos.y += 1.7;
+    _coverEyePos.y += NPC_Y_OFFSET;
 
     _direction.subVectors(_coverEyePos, _threatEyePos).normalize();
 

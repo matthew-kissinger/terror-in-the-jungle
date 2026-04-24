@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Combatant, isPlayerTarget } from './types';
 import { SeededRandom } from '../../core/SeededRandom';
+import {
+  copyNpcCenterMassPosition,
+  copyNpcMuzzlePosition,
+  copyPlayerCenterMassPosition,
+} from './CombatantBodyMetrics';
 
 /**
  * Handles ballistics calculations for AI combatants.
@@ -33,20 +38,21 @@ export class CombatantBallistics {
         0,
         Math.sin(combatant.rotation)
       );
-      this.scratchOrigin.copy(combatant.position);
+      copyNpcMuzzlePosition(this.scratchOrigin, combatant.position);
       this.scratchRay.set(this.scratchOrigin, this.scratchForward);
       return this.scratchRay;
     }
 
+    copyNpcMuzzlePosition(this.scratchOrigin, combatant.position);
+
     // Use scratch for target position
     if (isPlayerTarget(combatant.target)) {
-      this.scratchTargetPos.copy(playerPosition);
-      this.scratchTargetPos.y -= 0.6;
+      copyPlayerCenterMassPosition(this.scratchTargetPos, playerPosition);
     } else {
-      this.scratchTargetPos.copy(combatant.target.position);
+      copyNpcCenterMassPosition(this.scratchTargetPos, combatant.target.position);
     }
 
-    this.scratchToTarget.subVectors(this.scratchTargetPos, combatant.position);
+    this.scratchToTarget.subVectors(this.scratchTargetPos, this.scratchOrigin);
 
     if (!isPlayerTarget(combatant.target) && combatant.target.velocity.length() > 0.1) {
       const timeToTarget = this.scratchToTarget.length() / 800;
@@ -71,9 +77,6 @@ export class CombatantBallistics {
       .addScaledVector(this.scratchRealUp, Math.sin(jitterY))
       .normalize();
 
-    this.scratchOrigin.copy(combatant.position);
-    this.scratchOrigin.y += 1.5;
-
     this.scratchRay.set(this.scratchOrigin, this.scratchFinalDir);
     return this.scratchRay;
   }
@@ -90,12 +93,13 @@ export class CombatantBallistics {
         0,
         Math.sin(combatant.rotation)
       );
-      this.scratchOrigin.copy(combatant.position);
+      copyNpcMuzzlePosition(this.scratchOrigin, combatant.position);
       this.scratchRay.set(this.scratchOrigin, this.scratchForward);
       return this.scratchRay;
     }
 
-    this.scratchToTarget.subVectors(target, combatant.position).normalize();
+    copyNpcMuzzlePosition(this.scratchOrigin, combatant.position);
+    this.scratchToTarget.subVectors(target, this.scratchOrigin).normalize();
 
     const spreadRad = THREE.MathUtils.degToRad(spread);
     const theta = SeededRandom.random() * Math.PI * 2;
@@ -109,9 +113,6 @@ export class CombatantBallistics {
       .addScaledVector(this.scratchRight, Math.cos(theta) * r)
       .addScaledVector(this.scratchRealUp, Math.sin(theta) * r)
       .normalize();
-
-    this.scratchOrigin.copy(combatant.position);
-    this.scratchOrigin.y += 1.5;
 
     this.scratchRay.set(this.scratchOrigin, this.scratchFinalDir);
     return this.scratchRay;

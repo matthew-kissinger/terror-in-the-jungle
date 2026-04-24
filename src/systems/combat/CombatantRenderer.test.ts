@@ -66,6 +66,7 @@ vi.mock('./CombatantMeshFactory', () => ({
   disposeCombatantMeshes: vi.fn(),
   updateCombatantTexture: vi.fn(),
   reportBucketOverflow: vi.fn(),
+  NPC_SPRITE_RENDER_Y_OFFSET: -1.1,
 }));
 
 vi.mock('./CombatantShaders', () => ({

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, isBlufor } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
-import { CombatantMeshFactory, disposeCombatantMeshes, reportBucketOverflow, updateCombatantTexture, type ViewDirection, type WalkFrameMap } from './CombatantMeshFactory';
+import { CombatantMeshFactory, NPC_SPRITE_RENDER_Y_OFFSET, disposeCombatantMeshes, reportBucketOverflow, updateCombatantTexture, type ViewDirection, type WalkFrameMap } from './CombatantMeshFactory';
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
 
@@ -210,6 +210,9 @@ export class CombatantRenderer {
       // CombatantRenderInterpolator (e.g. freshly spawned this frame).
       const sourcePosition = combatant.renderedPosition ?? combatant.position;
       this.scratchPosition.copy(sourcePosition);
+      if (stateKey !== 'mounted') {
+        this.scratchPosition.y += NPC_SPRITE_RENDER_Y_OFFSET;
+      }
       let finalPosition = this.scratchPosition;
       let finalScaleX = scaleX;
       let finalScaleY = combatant.scale.y;

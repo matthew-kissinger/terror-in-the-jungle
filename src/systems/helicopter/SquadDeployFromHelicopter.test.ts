@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { SquadDeployFromHelicopter, type SquadDeployTerrainQuery } from './SquadDeployFromHelicopter';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 
 function createMockTerrain(fixedHeight = 10): SquadDeployTerrainQuery {
   return {
@@ -108,9 +109,9 @@ describe('SquadDeployFromHelicopter', () => {
       expect(result.success).toBe(true);
       expect(result.positions).toHaveLength(4);
 
-      // All positions should be terrain-snapped (y = terrainHeight + NPC_Y_OFFSET = 10 + 3 = 13)
+      // All positions should be terrain-snapped to the NPC eye-level actor anchor.
       for (const pos of result.positions) {
-        expect(pos.y).toBe(13);
+        expect(pos.y).toBe(10 + NPC_Y_OFFSET);
       }
     });
 
@@ -163,7 +164,7 @@ describe('SquadDeployFromHelicopter', () => {
       const result = deploy.deploySquad('heli_1', makeSnapshot());
 
       expect(result.success).toBe(true);
-      expect(result.positions[0].y).toBe(23);
+      expect(result.positions[0].y).toBe(20 + NPC_Y_OFFSET);
       expect(terrain.getEffectiveHeightAt).toHaveBeenCalledTimes(4);
       expect(terrain.getHeightAt).not.toHaveBeenCalled();
     });

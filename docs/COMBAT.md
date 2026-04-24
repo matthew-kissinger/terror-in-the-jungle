@@ -1,6 +1,6 @@
 # Combat Subsystem
 
-Last updated: 2026-04-19
+Last updated: 2026-04-24
 
 This document is the authoritative architecture reference for the combat
 subsystem (`src/systems/combat/`). Combat is the hot loop: AI decisions,
@@ -146,6 +146,31 @@ combat can run in test environments without a full system wiring.
   billboard sprites).
 - Event bus: `GameEventBus` for cross-subsystem signals
   (`npc_killed`, `player_kill`, etc.).
+
+## Actor Height Contract
+
+`Combatant.position` and player position are both eye-level actor anchors. NPCs
+spawn and move at `terrain + NPC_Y_OFFSET`, where `NPC_Y_OFFSET` matches
+`PLAYER_EYE_HEIGHT` (`2.2m` as of 2026-04-24). Navmesh and terrain queries may
+subtract that offset to sample the ground, but combat logic must not add a
+second generic "soldier height" on top of the actor anchor.
+
+Shared vertical facts live in `src/config/CombatantConfig.ts`, and combat code
+must derive muzzle, center-mass, eye/LOS, hit-zone, tracer, and death-effect
+positions through `src/systems/combat/CombatantBodyMetrics.ts` or the constants
+it wraps. Do not reintroduce local `+1.5`, `+1.7`, `+1.2`, or player-target
+`-0.6` magic offsets in ballistics, effects, LOS, cover, or hit detection.
+
+This contract fixes the 2026-04-24 playtest symptom where NPCs visually fired
+above the player and the player felt short relative to nearby combatants. If
+future playtest still says NPCs look too large, treat that as a billboard/asset
+scale or imposter-art problem, not as permission to stack hidden aiming offsets.
+
+The billboard container is part of this contract. `CombatantMeshFactory` now
+uses a `2.0m x 2.8m` NPC plane plus `NPC_SPRITE_RENDER_Y_OFFSET` so the actual
+sprite art reads close to player scale instead of filling the old `3.2m x 4.5m`
+plane. If future sprite assets change their transparent padding, update the
+mesh sizing/offset tests and the art pipeline together.
 
 ## Internal Layers
 

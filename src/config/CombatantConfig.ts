@@ -5,8 +5,26 @@
  * Only values referenced in 2+ files live here.
  */
 
-/** NPC eye-height offset above terrain surface (meters). */
-export const NPC_Y_OFFSET = 3;
+/**
+ * NPC logical position height above terrain surface.
+ *
+ * Player position is camera/eye height, so NPCs use the same eye-level anchor.
+ * Rendering, hit zones, LOS, muzzle flashes, and navmesh terrain queries must
+ * derive from this anchor instead of adding independent "soldier height" values.
+ */
+export const NPC_Y_OFFSET = 2.2;
+
+/** NPC muzzle offset relative to the eye-level actor anchor. */
+export const NPC_MUZZLE_Y_OFFSET = -0.15;
+
+/** NPC center-mass offset relative to the eye-level actor anchor. */
+export const NPC_CENTER_MASS_Y_OFFSET = -0.6;
+
+/** Player center-mass offset relative to the camera/eye actor anchor. */
+export const PLAYER_CENTER_MASS_Y_OFFSET = -0.6;
+
+/** Generic standing actor eye offset relative to an eye-level actor anchor. */
+export const ACTOR_EYE_Y_OFFSET = 0;
 
 /** Maximum NPC movement speed (m/s). Navmesh paths handle navigation; this is raw locomotion speed. */
 export const NPC_MAX_SPEED = 8;

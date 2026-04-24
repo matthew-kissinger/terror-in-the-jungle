@@ -4,11 +4,13 @@ import {
   DEFAULT_MESH_BUCKET_CAPACITY,
   MOUNTED_MESH_BUCKET_CAPACITY,
   NPC_SPRITE_HEIGHT,
+  NPC_SPRITE_RENDER_Y_OFFSET,
   NPC_SPRITE_WIDTH,
   reportBucketOverflow,
   resetBucketOverflowState,
 } from './CombatantMeshFactory';
 import { PLAYER_EYE_HEIGHT } from '../player/PlayerMovement';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { Logger } from '../../utils/Logger';
 
 /**
@@ -154,10 +156,11 @@ describe('CombatantMeshFactory instanced write contract at raised cap', () => {
  */
 describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
   it('sprite silhouette is not taller than the regression ceiling relative to the player eye', () => {
-    // Ratio floor comes from live playtest: 3.5:1 (5m eye-height? no — 7m sprite
-    // over 2m eye = 3.5) feels giant. Keep strictly below 2.5.
+    // Ratio floor comes from live playtest: 3.5:1 (7m sprite over 2m eye)
+    // feels giant. The plane itself should now stay near player scale because
+    // the optimized sprite alpha bounds fill most of the texture.
     const ratio = NPC_SPRITE_HEIGHT / PLAYER_EYE_HEIGHT;
-    expect(ratio).toBeLessThan(2.5);
+    expect(ratio).toBeLessThan(1.35);
   });
 
   it('sprite dimensions are positive and plausible', () => {
@@ -172,5 +175,19 @@ describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
     // 2.2m is the playtest-validated tall-adult eye. Dropping below 2m re-enters
     // the "player feels small" regression; keep a floor at 2m.
     expect(PLAYER_EYE_HEIGHT).toBeGreaterThanOrEqual(2);
+  });
+
+  it('NPC logical anchor matches player eye height so actors read at the same scale', () => {
+    expect(NPC_Y_OFFSET).toBeCloseTo(PLAYER_EYE_HEIGHT, 5);
+  });
+
+  it('NPC billboard plane is shifted down from the eye anchor to keep visible feet grounded', () => {
+    const planeCenterY = NPC_Y_OFFSET + NPC_SPRITE_RENDER_Y_OFFSET;
+    const planeTopY = planeCenterY + NPC_SPRITE_HEIGHT / 2;
+    const planeBottomY = planeCenterY - NPC_SPRITE_HEIGHT / 2;
+
+    expect(planeTopY).toBeLessThanOrEqual(PLAYER_EYE_HEIGHT + 0.35);
+    expect(planeBottomY).toBeLessThan(0);
+    expect(planeBottomY).toBeGreaterThan(-0.45);
   });
 });

@@ -42,6 +42,9 @@ Check each item. Unchecked items are failures. Add notes for anything that borde
 
 ## Squad combat
 
+- [ ] Nearby NPCs read close to player scale in ground FPS view; they no longer look like oversized billboards
+- [ ] NPC feet appear grounded on flat terrain; visual body does not hover after the billboard scale change
+- [ ] NPC head/torso/tracer height lines up with the visible sprite; no persistent above-head firing
 - [ ] AI engages within 2 s of first sight
 - [ ] Fire rate, burst cadence, and weapon sounds match the weapon
 - [ ] Hit indicators fire on every hit; no silent hits

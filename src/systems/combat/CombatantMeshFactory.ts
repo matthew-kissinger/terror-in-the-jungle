@@ -38,16 +38,18 @@ const FACTION_SPRITE_CONFIGS: FactionSpriteConfig[] = [
 const SQUAD_OUTLINE_COLOR = new THREE.Color(0.0, 1.0, 0.3);
 const SQUAD_MARKER_COLOR = new THREE.Color(0.0, 1.0, 0.3);
 
-// NPC billboard dimensions in world units (width x height). The sprite's visible
-// silhouette occupies roughly the upper half of the plane, so the apparent
-// figure height is ~0.55 * SPRITE_HEIGHT. At 4.5m sprite height that maps to a
-// ~2.5m apparent figure — slightly larger than a real soldier for readability
-// at range, without dwarfing the ~2.2m player eye. Previously 5x7, which made
-// the player feel undersized (3.5:1 NPC-apparent-to-player-eye ratio). Hit
-// detection uses CombatantHitDetection's zone offsets, not the sprite size,
-// so shrinking the plane does not affect gameplay hit registration.
-export const NPC_SPRITE_WIDTH = 3.2;
-export const NPC_SPRITE_HEIGHT = 4.5;
+// NPC billboard dimensions in world units (width x height). The optimized
+// soldier textures have alpha bounds covering roughly 80% of their square
+// texture height, so a 2.8m plane reads as a ~2.25m standing soldier. Keep this
+// tied to the player-eye scale: bigger silhouettes make ground FPS feel like
+// the player is short even when the combat anchors are correct.
+export const NPC_SPRITE_WIDTH = 2.0;
+export const NPC_SPRITE_HEIGHT = 2.8;
+
+// The actor anchor is eye height, but PlaneGeometry is center-origin. Shift the
+// visual center down so the sprite's non-transparent feet land near terrain and
+// the visible head stays close to the actor eye anchor.
+export const NPC_SPRITE_RENDER_Y_OFFSET = -1.1;
 
 // Per-bucket instance capacity. The E2 rendering spike (docs/rearch/E2-rendering-evaluation.md
 // on spike/E2-rendering-at-scale) recommended raising this "before combat testing moves past

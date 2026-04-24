@@ -188,7 +188,7 @@ hidden because it produced the hard horizon divider / one-tile feel. Mark cloud
 issues if the sky still reads as blank haze, if the horizon has a flat divider,
 or if weather looks present in one mode but missing in another. Current evidence
 artifact:
-`artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/`.
+`artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`.
 
 For A Shau specifically, first confirm the terrain/DEM is real. The 2026-04-24
 capture now has DEM-backed terrain, screenshots, `0` browser errors, and water
@@ -260,12 +260,23 @@ ________________________________________________________________________________
 - [ ] Nearby friendlies stay grounded on hillsides.
 - [ ] Nearby enemies stay grounded on hillsides.
 - [ ] No visible phasing into mountains at close range.
+- [ ] Nearby NPC billboards look close to player scale in ground FPS view, not oversized relative to the camera height.
+- [ ] NPC feet look grounded on flat terrain after the billboard scale/render-offset change.
+- [ ] Enemy muzzle flashes and tracers line up with the visible body/weapon height.
+- [ ] Enemy fire does not persistently pass above the player camera when the enemy appears to be aiming center mass.
 - [ ] Combat starts within a believable time after sight.
 - [ ] Suppression and hit feedback are readable.
 - [ ] Frame pacing remains acceptable around 30+ combatants.
 - [ ] Cover/flanking looks intentional rather than random or stuck.
 
 Rating 0-4: __
+
+If NPC/player scale or fire height is wrong:
+
+- Mode/location: __________________
+- Enemy faction/distance: __________________
+- Looks too tall / too short / hovering / sunk / firing high / firing low: __________________
+- Screenshot or capture artifact path: __________________
 
 Notes:
 
