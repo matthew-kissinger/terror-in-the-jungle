@@ -285,7 +285,7 @@ export class TouchControls {
     this.applyActorContext(this.actorMode, this.vehicleContext);
     this.applyInteractionContext(this.interaction);
     // mortarButton removed from mobile HUD — mortar is desktop-only for now
-    // helicopterCyclic is NOT shown here; it's shown/hidden by enterHelicopterMode/exitHelicopterMode
+    // helicopterCyclic is presentation-derived and shown only for flight vehicle contexts.
   }
 
   hide(): void {
@@ -312,31 +312,6 @@ export class TouchControls {
     this.adsButton.cancelActivePress();
     this.actionButtons.cancelActiveGesture();
     this.rallyPointButton.cancelActivePress();
-  }
-
-  /**
-   * Enter helicopter mode: dual joystick layout.
-   * Left joystick = collective (Y) + yaw (X).
-   * Right joystick = cyclic pitch (Y) + cyclic roll (X).
-   * Hides infantry controls (fire, ADS, action buttons, rally).
-   */
-  enterHelicopterMode(): void {
-    this.applyActorContext('helicopter', this.vehicleContext);
-  }
-
-  enterFlightVehicleMode(): void {
-    this.enterHelicopterMode();
-  }
-
-  /**
-   * Exit helicopter mode: restore infantry controls.
-   */
-  exitHelicopterMode(): void {
-    this.applyActorContext('infantry', null);
-  }
-
-  exitFlightVehicleMode(): void {
-    this.exitHelicopterMode();
   }
 
   /** Whether currently in helicopter dual-joystick mode. */
@@ -378,10 +353,13 @@ export class TouchControls {
   }
 
   private applyActorContext(actorMode: ActorMode, vehicleContext: VehicleUIContext | null): void {
-    this.actorMode = actorMode;
-    this.inFlightVehicleMode = actorMode === 'helicopter' || actorMode === 'plane';
-    const showInfantryControls = this.visible && actorMode === 'infantry';
-    const showVehicleControls = this.visible && actorMode !== 'infantry';
+    const effectiveActorMode = vehicleContext?.kind ?? actorMode;
+    const hasVehicleContext = vehicleContext !== null;
+    const isFlightVehicleContext = vehicleContext?.hudVariant === 'flight';
+    this.actorMode = effectiveActorMode;
+    this.inFlightVehicleMode = isFlightVehicleContext;
+    const showInfantryControls = this.visible && !hasVehicleContext && effectiveActorMode === 'infantry';
+    const showVehicleControls = this.visible && hasVehicleContext;
 
     this.joystick.setHelicopterMode?.(showVehicleControls);
 
@@ -402,7 +380,11 @@ export class TouchControls {
       this.rallyPointButton.hideButton();
       this.look.hide();
       if (showVehicleControls) {
-        this.helicopterCyclic.show();
+        if (isFlightVehicleContext) {
+          this.helicopterCyclic.show();
+        } else {
+          this.helicopterCyclic.hide();
+        }
         this.vehicleActionBar.setVehicleContext(vehicleContext);
         this.vehicleActionBar.show();
       } else {

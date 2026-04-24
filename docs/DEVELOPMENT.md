@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-04-22
+Last updated: 2026-04-24
 
 ## Prerequisites
 
@@ -90,6 +90,17 @@ See [PERFORMANCE.md](PERFORMANCE.md) for full profiling docs.
 
 For world-size, staged-prop, aircraft, vehicle, terrain-query, or hit-detection changes, `combat120` is not enough. Run `npm run perf:capture:openfrontier:short` and compare that scenario explicitly before you push.
 
+For architecture-recovery releases, also run the mode-specific evidence script
+when atmosphere, terrain visibility, A Shau, or fallback behavior changed:
+
+```bash
+npm run evidence:atmosphere
+```
+
+That script captures A Shau, Open Frontier, TDM, Zone Control, and AI Sandbox
+from ground, sky, and aircraft views, and records terrain/water/nav diagnostics
+so local visual evidence cannot silently narrow to one mode.
+
 ## Deployment
 
 ### CI Pipeline
@@ -134,7 +145,24 @@ Current cache contract:
   but production now resolves the DEM through `asset-manifest.json` and
   content-addressed R2 URLs. The deploy workflow runs
   `npm run cloudflare:assets:upload` after `npm run build` and before Pages
-  upload.
+  upload. `npm run build` and `npm run build:perf` also emit a local preview
+  `asset-manifest.json` into `dist/` and `dist-perf/` so prod-shaped local
+  probes do not hit the SPA HTML fallback. If a local preview returns HTML for
+  `asset-manifest.json` or the DEM, do not treat A Shau screenshots/probes as
+  valid terrain evidence; this is a required-asset failure.
+- A Shau asset delivery passing does not sign off navigation. The current
+  recovery pass removed the old TileCache fallback path; large worlds use
+  explicit static-tiled nav generation, and A Shau startup stops if no generated
+  or pre-baked navmesh exists. Representative-base connectivity can pass while
+  route/NPC movement still needs play-path validation.
+- Before pushing/deploying a cycle that spent most of its time in A Shau, rerun
+  an all-mode gate such as `npm run evidence:atmosphere` plus the usual
+  validation stack. Open Frontier, TDM, Zone Control, and combat120 must still
+  enter live mode without browser errors.
+- Local preview evidence is not live-site evidence. After deploy, confirm the
+  production Pages URL serves the expected `asset-manifest.json`, R2 DEM URL,
+  `/sw.js`, and content-hashed `recast-navigation.wasm` / build assets. See
+  [DEPLOY_WORKFLOW.md](DEPLOY_WORKFLOW.md) for the live header spot-check.
 
 ### Pre-Push Checklist
 

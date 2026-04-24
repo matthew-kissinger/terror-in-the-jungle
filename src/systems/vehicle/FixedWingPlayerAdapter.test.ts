@@ -47,6 +47,11 @@ function createMockFixedWingModel(options?: {
     setPilotedAircraft: vi.fn(),
     setFixedWingPilotIntent: vi.fn(),
     setFixedWingCommand: vi.fn(),
+    getPlayerExitPlan: vi.fn((_aircraftId: string, _options: unknown) => ({
+      canExit: true,
+      mode: 'normal' as const,
+      position: new THREE.Vector3(510, 35, 610),
+    })),
     exitAircraft: vi.fn(),
     tryEnterAircraft: vi.fn(),
   };
@@ -175,6 +180,26 @@ describe('FixedWingPlayerAdapter', () => {
       expect(ctx.cameraController.restoreInfantryAngles).toHaveBeenCalled();
       expect(fwModel.setPilotedAircraft).toHaveBeenCalledWith(null);
       expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('none');
+    });
+
+    it('delegates exit planning to the fixed-wing model with the request options', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'fw_abc');
+      const plannedPosition = new THREE.Vector3(520, 40, 630);
+      const plannedExit = {
+        canExit: true,
+        mode: 'emergency_eject' as const,
+        position: plannedPosition,
+      };
+      fwModel.getPlayerExitPlan.mockReturnValueOnce(plannedExit);
+
+      const result = adapter.getExitPlan(ctx, { allowEject: true, reason: 'input' });
+
+      expect(fwModel.getPlayerExitPlan).toHaveBeenCalledWith('fw_abc', {
+        allowEject: true,
+        reason: 'input',
+      });
+      expect(result).toBe(plannedExit);
     });
   });
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { GameEngine } from '../../core/GameEngine';
 
-export interface FreeFlyPickResult {
+interface FreeFlyPickResult {
   kind: 'combatant' | 'vehicle' | 'prop';
   id: string;
 }

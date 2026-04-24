@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-21
+Last verified: 2026-04-24 (architecture recovery validation pass)
 
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -44,7 +44,7 @@ Runtime composers (extracted from SystemConnector):
 | Strategy | `src/systems/strategy/` | WarSimulator, MaterializationPipeline, StrategicDirector | 2ms |
 | Player | `src/systems/player/` | PlayerController, PlayerMovement, FirstPersonWeapon | 1ms |
 | Weapons | `src/systems/weapons/` | GrenadeSystem, MortarSystem, SandbagSystem, AmmoSupplySystem | 1ms |
-| Vehicles | `src/systems/helicopter/`, `src/systems/vehicle/` | VehicleStateManager, HelicopterPlayerAdapter, FixedWingPlayerAdapter, HelicopterModel, FixedWingModel, VehicleManager | 1ms |
+| Vehicles | `src/systems/helicopter/`, `src/systems/vehicle/` | VehicleSessionController, VehicleStateManager compatibility export, HelicopterPlayerAdapter, FixedWingPlayerAdapter, HelicopterModel, FixedWingModel, VehicleManager | 1ms |
 | World | `src/systems/world/` | ZoneManager, TicketSystem, GameModeManager, WorldFeatureSystem | 1ms |
 | Air Support | `src/systems/airsupport/` | AirSupportManager, AAEmplacement | 1ms |
 | Assets | `src/systems/assets/` | AssetLoader, ModelLoader | untracked |
@@ -136,15 +136,21 @@ Tail rotor pre-rotation: `pivot.rotation.y = PI/2` baked into GLB so the Z-spin 
 Fixed-wing runtime (`src/systems/vehicle/`):
 - `Airframe` is the unified fixed-wing simulation: fixed-step update, swept terrain collision, assist/raw tiers, and one snapshot surface. Ground stabilization ticks absorb terrain-height mismatch on spawn and entry.
 - `FixedWingControlLaw` sits above the sim and converts player/NPC pilot intent into bounded phase-aware commands (`taxi`, `takeoff_roll`, `rotation`, `initial_climb`, `flight`, `approach`, `landing_rollout`).
-- `FixedWingModel` owns the per-aircraft `Airframe`, only simulates the piloted aircraft plus airborne/unsettled/NPC-piloted aircraft, and exposes fixed-wing operation states (`parked`, `lineup`, `takeoff_roll`, `rotation`, `initial_climb`, `cruise`, `orbit_hold`, `approach`, `rollout`) plus runway/approach reposition helpers used by diagnostics and tests.
+- `FixedWingModel` owns the per-aircraft `Airframe`, only simulates the piloted aircraft plus airborne/unsettled/NPC-piloted aircraft, and exposes fixed-wing operation states (`parked`, `lineup`, `takeoff_roll`, `rotation`, `initial_climb`, `cruise`, `orbit_hold`, `approach`, `rollout`) plus runway/approach reposition helpers used by diagnostics and tests. It may propose active-player exit plans, but it does not own the final player session transition.
 - `FixedWingPlayerAdapter` owns throttle/pitch/bank intent, direct-stick overlay, flight-assist/orbit-hold toggles, and seeds fixed-wing HUD state on entry.
 - Template airfields now compile runway/apron/taxi geometry into directional terrain stamps and local-space parking stands. Rotated airfields therefore keep fixed-wing parking side-by-side instead of double-rotating spawn offsets.
+- Current airfield caveat: parking stands and runway starts still sample terrain
+  at different points, and runway/apron/taxi stamps can use different target
+  height modes. The next airfield pass should define one airfield datum/surface
+  authority before treating taxi/takeoff feel as an `Airframe` problem.
 - `AirVehicleVisibility` gates helicopter and fixed-wing rendering against camera/fog distance so far vehicles stop contributing draw calls outside useful visibility.
 - `ModelDrawCallOptimizer` batches static aircraft sub-meshes by material at load time. Rotor/propeller meshes stay separate so animation still works.
 
 Vehicle state management (`src/systems/vehicle/`):
-- `VehicleStateManager` is the single source of truth for player vehicle state. Registered adapters handle enter/exit/update lifecycle with guaranteed cleanup.
-- `PlayerVehicleAdapter` interface: `onEnter()`, `onExit()`, `update()`, `resetControlState()`.
+- `VehicleSessionController` is the single source of truth for player vehicle session state. `VehicleStateManager` is a compatibility re-export while older imports are migrated.
+- Registered adapters handle vehicle-specific enter/exit/update lifecycle. The session controller owns enter, exit, emergency eject, force cleanup, switching, derived `PlayerState` flags, and active-session cleanup ordering.
+- `PlayerVehicleAdapter` interface: `onEnter()`, `onExit()`, `update()`, `resetControlState()`, optional `getExitPlan()`.
+- Exit planning is typed as normal, blocked, emergency-eject, or force-cleanup. Fixed-wing unsafe airborne exit blocks normal model-owned exit, but the active player input path can request an emergency eject through the session controller.
 - `HelicopterPlayerAdapter` owns helicopter control state (collective, cyclic, yaw, altitudeLock). `FixedWingPlayerAdapter` owns fixed-wing control state (throttle, mouse pitch/roll, stabilityAssist).
 - `PlayerState` flags (`isInHelicopter`, `isInFixedWing`) are derived cache synced via `syncPlayerState()`. Adding a new vehicle type requires one new adapter file.
 
@@ -202,9 +208,29 @@ Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> First
 ## Known Architecture Debt
 
 1. **SystemManager ceremony** - adding a new system touches SystemInitializer + one or more composers.
-2. **PlayerController setters** - grouped `configureDependencies()` exists but compatibility setters remain. Vehicle control state moved to adapters (2026-04-06) but model/camera setters still duplicated.
-3. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
-4. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
+2. **PlayerController setters** - grouped `configureDependencies()` exists but compatibility setters remain. Vehicle control state moved to adapters (2026-04-06), player vehicle session state moved to `VehicleSessionController` in the architecture recovery pass, but model/camera setters still duplicate wiring.
+3. **Pointer-lock/input boundary** - `PlayerInput` and
+   `GameEngineInput` both use `document.body` as the lock target, and
+   `PlayerInput` reports lock failures. FPS mouse-look still needs one
+   long-term owner plus human validation of the embedded-browser fallback.
+4. **Atmosphere v1 representation limits** - visible clouds now come from the
+   `HosekWilkieSkyBackend` sky-dome pass, and the old `CloudLayer` plane is
+   hidden so it cannot draw the hard horizon divider / "one tile" artifact.
+   Current Cycle 9 evidence validates all five modes after preview builds began
+   emitting `asset-manifest.json`; the shader now uses a seamless cloud-deck
+   projection instead of azimuth-wrapped UVs. Open Frontier and combat120 are
+   lighter scattered-cloud presets and still need art review.
+5. **A Shau required-asset / navigation gate** - startup now fails
+   A Shau when the required DEM/manifest path is missing or returns HTML, and
+   preview builds now emit the manifest. The old TileCache fallback path has
+   been removed; large worlds use explicit static-tiled generation and A Shau
+   startup stops if no generated or pre-baked navmesh exists. Later Cycle 10 work
+   anchors large-world generation bounds to scenario zones and stages A Shau
+   home-base terrain shoulders. The current artifact has representative-base
+   snap/connectivity/path success; the remaining blocker is route/NPC movement
+   quality and airfield usability, not missing DEM delivery.
+6. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
+7. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
 
 ## Game Modes
 

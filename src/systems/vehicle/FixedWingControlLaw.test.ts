@@ -269,6 +269,58 @@ describe('FixedWingControlLaw', () => {
     expect(Math.abs(radius - orbitRadius)).toBeLessThan(orbitRadius * 0.35);
   });
 
+  it('keeps gunship orbit out of stall under sustained full throttle', () => {
+    const cfg = FIXED_WING_CONFIGS.AC47_SPOOKY;
+    const orbitRadius = cfg.operation.orbitRadius ?? 650;
+    const af = makeAirbornePhysics(cfg.physics);
+    const probe = flatProbe();
+    const initialPosition = af.getPosition().clone();
+    const initialHeadingRad = THREE.MathUtils.degToRad(
+      airframeStateToFixedWingSnapshot(af.getState()).headingDeg,
+    );
+    const anchor = buildOrbitAnchorFromHeading(
+      initialPosition,
+      initialHeadingRad,
+      orbitRadius,
+      cfg.operation.orbitTurnDirection ?? -1,
+    );
+
+    let maxAbsRoll = 0;
+    let minAirspeed = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 1800; i++) {
+      const snapshot = airframeStateToFixedWingSnapshot(af.getState());
+      const pilotIntent = {
+        ...createIdleFixedWingPilotIntent(),
+        throttleTarget: 1,
+        assistEnabled: true,
+        orbitHoldEnabled: true,
+        orbitCenterX: anchor.centerX,
+        orbitCenterZ: anchor.centerZ,
+        orbitRadius,
+        orbitBankDeg: cfg.operation.orbitBankDeg ?? 16,
+        orbitTurnDirection: cfg.operation.orbitTurnDirection ?? -1,
+      };
+
+      const command = buildFixedWingPilotCommand(
+        snapshot,
+        cfg.physics,
+        cfg.pilotProfile,
+        pilotIntent,
+        { positionX: af.getPosition().x, positionZ: af.getPosition().z },
+      );
+      af.step(commandToIntent(command), probe, 1 / 60);
+      const nextSnapshot = airframeStateToFixedWingSnapshot(af.getState());
+      maxAbsRoll = Math.max(maxAbsRoll, Math.abs(nextSnapshot.rollDeg));
+      minAirspeed = Math.min(minAirspeed, nextSnapshot.airspeed);
+    }
+
+    const finalSnapshot = airframeStateToFixedWingSnapshot(af.getState());
+    expect(finalSnapshot.isStalled).toBe(false);
+    expect(minAirspeed).toBeGreaterThan(cfg.physics.stallSpeed * 1.2);
+    expect(maxAbsRoll).toBeLessThan(25);
+    expect(Math.abs(finalSnapshot.rollDeg)).toBeLessThan(45);
+  });
+
   it('commands a stronger climb when gunship orbit hold is close to terrain', () => {
     const cfg = FIXED_WING_CONFIGS.AC47_SPOOKY;
     const intent = {
@@ -304,5 +356,42 @@ describe('FixedWingControlLaw', () => {
     }, cfg.physics, cfg.pilotProfile, intent, { positionX: 650, positionZ: 0 });
 
     expect(command.pitchCommand).toBeGreaterThan(0.35);
+  });
+
+  it('commands nose-down correction when gunship orbit climbs above target altitude', () => {
+    const cfg = FIXED_WING_CONFIGS.AC47_SPOOKY;
+    const intent = {
+      ...createIdleFixedWingPilotIntent(),
+      throttleTarget: 1,
+      assistEnabled: true,
+      orbitHoldEnabled: true,
+      orbitCenterX: 0,
+      orbitCenterZ: 0,
+      orbitRadius: cfg.operation.orbitRadius ?? 650,
+      orbitBankDeg: cfg.operation.orbitBankDeg ?? 24,
+      orbitTurnDirection: cfg.operation.orbitTurnDirection ?? -1,
+    };
+
+    const command = buildFixedWingPilotCommand({
+      phase: 'airborne',
+      airspeed: 80,
+      forwardAirspeed: 80,
+      verticalSpeed: 8,
+      altitude: 210,
+      altitudeAGL: 180,
+      aoaDeg: 6,
+      sideslipDeg: 0,
+      headingDeg: 250,
+      pitchDeg: 12,
+      rollDeg: 28,
+      pitchRateDeg: 0,
+      rollRateDeg: 0,
+      throttle: 1,
+      brake: 0,
+      weightOnWheels: false,
+      isStalled: false,
+    }, cfg.physics, cfg.pilotProfile, intent, { positionX: 650, positionZ: 0 });
+
+    expect(command.pitchCommand).toBeLessThan(0);
   });
 });

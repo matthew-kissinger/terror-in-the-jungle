@@ -11,6 +11,7 @@ vi.mock('../../utils/Logger', () => ({
 function createMockAdapter(vehicleType: string): PlayerVehicleAdapter & {
   onEnter: ReturnType<typeof vi.fn>;
   onExit: ReturnType<typeof vi.fn>;
+  getExitPlan: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
   resetControlState: ReturnType<typeof vi.fn>;
 } {
@@ -19,6 +20,7 @@ function createMockAdapter(vehicleType: string): PlayerVehicleAdapter & {
     inputContext: vehicleType === 'helicopter' ? 'helicopter' : 'fixed_wing',
     onEnter: vi.fn(),
     onExit: vi.fn(),
+    getExitPlan: vi.fn(() => ({ canExit: true, mode: 'normal' as const })),
     update: vi.fn(),
     resetControlState: vi.fn(),
   };
@@ -49,7 +51,11 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'test-veh
     vehicleId,
     position: new THREE.Vector3(10, 20, 30),
     setPosition: vi.fn(),
-    input: { setInHelicopter: vi.fn(), setFlightVehicleMode: vi.fn() } as any,
+    input: {
+      setInHelicopter: vi.fn(),
+      setFlightVehicleMode: vi.fn(),
+      clearTransientInputState: vi.fn(),
+    } as any,
     cameraController: {
       saveInfantryAngles: vi.fn(),
       restoreInfantryAngles: vi.fn(),
@@ -161,6 +167,57 @@ describe('VehicleStateManager', () => {
       manager.exitVehicle(ctx);
       expect(heliAdapter.onExit).not.toHaveBeenCalled();
       expect(fwAdapter.onExit).not.toHaveBeenCalled();
+    });
+
+    it('blocks exit when the active adapter refuses it', () => {
+      const ctx = createTransitionContext(playerState, 'fw_1');
+      fwAdapter.getExitPlan.mockReturnValueOnce({
+        canExit: false,
+        message: 'Aircraft must be on the ground before exit.',
+      });
+      manager.enterVehicle('fixed_wing', 'fw_1', ctx);
+
+      const result = manager.exitVehicle(ctx);
+
+      expect(result).toEqual({
+        exited: false,
+        reason: 'blocked',
+        message: 'Aircraft must be on the ground before exit.',
+      });
+      expect(fwAdapter.onExit).not.toHaveBeenCalled();
+      expect(manager.getVehicleType()).toBe('fixed_wing');
+      expect(playerState.isInFixedWing).toBe(true);
+    });
+
+    it('passes planned emergency ejection position through the exit lifecycle', () => {
+      const ctx = createTransitionContext(playerState, 'fw_1');
+      const ejectPosition = new THREE.Vector3(20, 3, 40);
+      manager.enterVehicle('fixed_wing', 'fw_1', ctx);
+      fwAdapter.getExitPlan.mockReturnValueOnce({
+        canExit: true,
+        mode: 'emergency_eject',
+        position: ejectPosition,
+      });
+
+      const result = manager.exitVehicle(ctx, { allowEject: true, reason: 'input' });
+
+      expect(result).toMatchObject({ exited: true, mode: 'emergency_eject' });
+      expect(fwAdapter.onExit).toHaveBeenCalledWith(expect.objectContaining({
+        vehicleId: 'fw_1',
+        position: ejectPosition,
+        exitMode: 'emergency_eject',
+      }));
+      expect(playerState.isInFixedWing).toBe(false);
+    });
+
+    it('clears pressed input when leaving vehicle state', () => {
+      const ctx = createTransitionContext(playerState, 'fw_1');
+      manager.enterVehicle('fixed_wing', 'fw_1', ctx);
+      vi.mocked(ctx.input.clearTransientInputState).mockClear();
+
+      manager.exitVehicle(ctx);
+
+      expect(ctx.input.clearTransientInputState).toHaveBeenCalledOnce();
     });
   });
 

@@ -26,6 +26,11 @@ function createMockHelicopterModel() {
     getWeaponStatus: vi.fn(),
     getHelicopterPositionTo: vi.fn(),
     getHelicopterQuaternionTo: vi.fn(),
+    getPlayerExitPlan: vi.fn((_helicopterId: string) => ({
+      canExit: true,
+      mode: 'normal' as const,
+      position: new THREE.Vector3(110, 52, 210),
+    })),
     setTerrainManager: vi.fn(),
     setHelipadSystem: vi.fn(),
     setPlayerController: vi.fn(),
@@ -159,6 +164,34 @@ describe('HelicopterPlayerAdapter', () => {
       expect(ctx.cameraController.restoreInfantryAngles).toHaveBeenCalled();
       expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenCalledWith('infantry');
       expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('none');
+    });
+
+    it('delegates exit planning to the helicopter model when available', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'heli_abc');
+      const result = adapter.getExitPlan(ctx, { allowEject: true, reason: 'input' });
+
+      expect(heliModel.getPlayerExitPlan).toHaveBeenCalledWith('heli_abc');
+      expect(result).toEqual({
+        canExit: true,
+        mode: 'normal',
+        position: new THREE.Vector3(110, 52, 210),
+      });
+    });
+
+    it('falls back to the current transition position for legacy helicopter models', () => {
+      delete (heliModel as any).getPlayerExitPlan;
+      adapter = new HelicopterPlayerAdapter(heliModel as any);
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'legacy_heli');
+
+      const result = adapter.getExitPlan(ctx, { allowEject: false, reason: 'model' });
+
+      expect(result).toEqual({
+        canExit: true,
+        mode: 'normal',
+        position: ctx.position,
+      });
     });
   });
 

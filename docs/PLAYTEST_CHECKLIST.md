@@ -1,6 +1,6 @@
 # Playtest Checklist
 
-Last updated: 2026-04-22
+Last updated: 2026-04-24
 
 Agents can run tests and probes. They cannot feel the game. Any PR that touches flight, driving, combat rhythm, or UI responsiveness must be validated against this checklist by a human pressing keys and watching the screen. Tests green + build green != feel green.
 
@@ -9,6 +9,7 @@ Check each item. Unchecked items are failures. Add notes for anything that borde
 ## Fixed-wing (per aircraft: A-1 Skyraider, AC-47 Spooky, F-4 Phantom)
 
 - [ ] Spawns parked on runway, oriented correctly, no ground clipping
+- [ ] Parking stand, taxiway, and runway start share a usable height; no hilly taxi path blocks runway lineup
 - [ ] Full throttle (W) accelerates smoothly, no hitching
 - [ ] Rotation: pull up (Arrow Up) near Vr and aircraft lifts off within ~10 s of full throttle (prop) / ~9 s (jet)
 - [ ] Takeoff roll and liftoff do not clip through rising terrain or runway shoulders
@@ -21,10 +22,16 @@ Check each item. Unchecked items are failures. Add notes for anything that borde
 - [ ] Recovers from gentle dive (nose down + release) without stalling
 - [ ] Stall warning and recovery feel reasonable, not abrupt
 - [ ] Landing: approach, flare, touchdown without excessive bounce
+- [ ] Grounded exit places player beside aircraft without clipping into the model
+- [ ] In-flight emergency bailout does not teleport directly to terrain; follow-up state is understandable
+- [ ] Releasing W/throttle before or during exit does not leave infantry locked in forward walk
 - [ ] AC-47 orbit hold (if playable): turns steadily around anchor, no radius drift
 
 ## Helicopter (per aircraft: UH-1, AH-1, UH-1C)
 
+- [ ] Enter/exit does not leave stale vehicle state, stale HUD, or stuck infantry movement
+- [ ] Rotor visuals spool up/down believably; parked or exited helicopter does not keep flight-RPM blades forever
+- [ ] Rotor blur/high-RPM presentation reads fast enough during flight
 - [ ] Lift off smoothly with collective up, no jitter
 - [ ] Hovers stably with collective centered (minor drift OK, no snap)
 - [ ] Cyclic forward/back/left/right response feels linear
@@ -51,9 +58,21 @@ Check each item. Unchecked items are failures. Add notes for anything that borde
 
 ## General perceptual checks
 
+- [ ] Build source is recorded: local dev, local preview, or live production
+- [ ] If this playtest informs a release, live production has been checked after deploy; local preview evidence alone is not treated as live-site truth
+- [ ] Desktop ground-FPS mouse look works in a normal browser through pointer lock
+- [ ] Embedded/in-app browser playtest either obtains pointer lock or exposes a usable drag-look/fallback path
 - [ ] Frame pacing feels smooth (no ~300 ms spikes every few seconds)
 - [ ] No audio pops, clipped effects, or missing cues
 - [ ] No visible flicker on HUD, vehicle indicators, or reticle
+- [ ] Fog/cloud density does not hide nearby terrain, airfield surface problems, or aircraft readability
+- [ ] Clouds read as a broad sky layer in every mode, with no hard horizon divider; Open Frontier/combat120 haze is acceptable only if it still reads as cloud/weather
+- [ ] Terrain/camera collision prevents below-ground clipping; if clipping happens, record location/mode separately from water quality
+- [ ] Water looks acceptable when viewed normally; seeing a bad full-water view after clipping is recorded as clipping exposure plus a separate water-rendering note
+- [ ] A Shau clearly loads real terrain/DEM data before judging airfield, fog, or cloud readability; do not sign off A Shau from fallback/flat terrain
+- [ ] A Shau route/NPC movement is judged separately from representative nav connectivity; walk/observe actual movement before signing it off
+- [ ] Airfield buildings, aircraft, and props do not pop in/out distractingly
+- [ ] Looking across an airfield does not produce an obvious frame-time cliff
 
 ## Notes from this playtest
 

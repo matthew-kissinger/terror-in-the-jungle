@@ -5,7 +5,7 @@ const CYAN = 0x22eedd;
 const UPDATE_INTERVAL_MS = 250;
 const MAX_TILES = 2048;
 
-export interface TerrainChunkSource {
+interface TerrainChunkSource {
   getActiveTiles(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number }>;
   getHeightAt(x: number, z: number): number;
 }

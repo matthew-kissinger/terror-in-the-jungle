@@ -11,7 +11,6 @@ function createRefs() {
   const explosionEffectsPool = { id: 'explosion-pool' };
   const combatants = [{ id: 'c1' }, { id: 'c2' }];
   const listener = { id: 'listener' };
-  const heightQueryCache = { id: 'height-cache' } as any;
 
   const refs = {
     aaEmplacementSystem: {
@@ -59,6 +58,7 @@ function createRefs() {
       setHUDSystem: vi.fn(),
       setHelipadSystem: vi.fn(),
       setPlayerController: vi.fn(),
+      setSquadDeployTerrain: vi.fn(),
       setTerrainManager: vi.fn(),
       setVehicleManager: vi.fn(),
     },
@@ -113,7 +113,6 @@ function createRefs() {
 
   return {
     refs,
-    heightQueryCache,
     getHelipadCallback: () => helipadCallback,
     getCombatantProvider: () => combatantProvider,
     combatants,
@@ -143,7 +142,6 @@ describe('OperationalRuntimeComposer', () => {
   it('wires vehicle and air-support callbacks, providers, and effect pools', () => {
     const {
       refs,
-      heightQueryCache,
       getHelipadCallback,
       getCombatantProvider,
       combatants,
@@ -151,7 +149,7 @@ describe('OperationalRuntimeComposer', () => {
       listener,
     } = createRefs();
 
-    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { heightQueryCache });
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs));
 
     expect(refs.helipadSystem.setTerrainManager).toHaveBeenCalledWith(refs.terrainSystem);
     expect(refs.helipadSystem.setVegetationSystem).toHaveBeenCalledWith(refs.globalBillboardSystem);
@@ -159,7 +157,8 @@ describe('OperationalRuntimeComposer', () => {
     expect(refs.helicopterModel.setTerrainManager).toHaveBeenCalledWith(refs.terrainSystem);
     expect(refs.helicopterModel.setHelipadSystem).toHaveBeenCalledWith(refs.helipadSystem);
     expect(refs.helicopterModel.setAudioListener).toHaveBeenCalledWith(listener);
-    expect(refs.helicopterModel.setHeightQueryCache).toHaveBeenCalledWith(heightQueryCache);
+    expect(refs.helicopterModel.setSquadDeployTerrain).toHaveBeenCalledWith(refs.terrainSystem);
+    expect(refs.helicopterModel.setHeightQueryCache).not.toHaveBeenCalled();
     expect(refs.helicopterModel.setVehicleManager).toHaveBeenCalledWith(refs.vehicleManager);
     expect(refs.worldFeatureSystem.setTerrainManager).toHaveBeenCalledWith(refs.terrainSystem);
     expect(refs.worldFeatureSystem.setGameModeManager).toHaveBeenCalledWith(refs.gameModeManager);

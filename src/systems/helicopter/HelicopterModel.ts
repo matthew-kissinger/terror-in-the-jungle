@@ -8,19 +8,19 @@ import { createHelicopterGeometry } from './HelicopterGeometry';
 import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
-import { SquadDeployFromHelicopter } from './SquadDeployFromHelicopter';
+import { SquadDeployFromHelicopter, type SquadDeployTerrainQuery } from './SquadDeployFromHelicopter';
 import { HelicopterWeaponSystem } from './HelicopterWeaponSystem';
 import { HelicopterHealthSystem } from './HelicopterHealthSystem';
 import { HelicopterDoorGunner } from './HelicopterDoorGunner';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { VehicleManager } from '../vehicle/VehicleManager';
+import type { VehicleExitOptions, VehicleExitPlan, VehicleExitResult } from '../vehicle/PlayerVehicleAdapter';
 import { HelicopterVehicleAdapter } from '../vehicle/HelicopterVehicleAdapter';
 import { shouldRenderAirVehicle } from '../vehicle/AirVehicleVisibility';
 import { Faction } from '../combat/types';
 import type { IHUDSystem, IPlayerController, ITerrainRuntime, IAudioManager } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
-import type { HeightQueryCache } from '../terrain/HeightQueryCache';
 import { modelLoader } from '../assets/ModelLoader';
 
 interface HelicopterModelDependencies {
@@ -32,9 +32,13 @@ interface HelicopterModelDependencies {
   audioManager: IAudioManager;
   combatantSystem: CombatantSystem;
   grenadeSystem: GrenadeSystem;
-  heightQueryCache: HeightQueryCache;
+  squadDeployTerrain: SquadDeployTerrainQuery;
   vehicleManager: VehicleManager;
 }
+
+type VehicleExitRequester = IPlayerController & {
+  requestVehicleExit?: (options?: VehicleExitOptions) => VehicleExitResult;
+};
 
 export class HelicopterModel implements GameSystem {
   private scene: THREE.Scene;
@@ -99,7 +103,7 @@ export class HelicopterModel implements GameSystem {
     this.setAudioManager(dependencies.audioManager);
     this.setCombatantSystem(dependencies.combatantSystem);
     this.setGrenadeSystem(dependencies.grenadeSystem);
-    this.setHeightQueryCache(dependencies.heightQueryCache);
+    this.setSquadDeployTerrain(dependencies.squadDeployTerrain);
     this.setVehicleManager(dependencies.vehicleManager);
   }
 
@@ -152,8 +156,12 @@ export class HelicopterModel implements GameSystem {
     this.vehicleManager = vm;
   }
 
-  setHeightQueryCache(cache: HeightQueryCache): void {
-    this.squadDeploy = new SquadDeployFromHelicopter(cache);
+  setSquadDeployTerrain(terrain: SquadDeployTerrainQuery): void {
+    this.squadDeploy = new SquadDeployFromHelicopter(terrain);
+  }
+
+  setHeightQueryCache(cache: SquadDeployTerrainQuery): void {
+    this.setSquadDeployTerrain(cache);
   }
 
   /**
@@ -352,11 +360,7 @@ export class HelicopterModel implements GameSystem {
         return;
       }
       const physics = this.helicopterPhysics.get(id);
-      // Skip rotor animation for idle grounded helicopters (engineRPM === 0)
-      const state = physics?.getState();
-      if (!state || !(state.isGrounded && state.engineRPM === 0)) {
-        this.animation.updateRotors(helicopter, id, physics, deltaTime);
-      }
+      this.animation.updateRotors(helicopter, id, physics, deltaTime);
 
       const isPlayerControlling = !!this.playerController &&
                                  this.playerController.isInHelicopter() &&
@@ -375,7 +379,9 @@ export class HelicopterModel implements GameSystem {
     const isPiloted = this.playerController?.isInHelicopter() &&
                       this.playerController.getHelicopterId() === heliId;
     if (isPiloted) {
-      this.interaction.exitHelicopter();
+      if (!this.requestPlayerVehicleExit({ force: true, reason: 'helicopter-destroyed' })) {
+        this.interaction.exitHelicopter();
+      }
       if (this.hudSystem) {
         this.hudSystem.showMessage('Helicopter destroyed!', 3000);
       }
@@ -476,7 +482,38 @@ export class HelicopterModel implements GameSystem {
   }
 
   exitHelicopter(): void {
+    if (this.requestPlayerVehicleExit({ reason: 'helicopter-model' })) {
+      return;
+    }
     this.interaction.exitHelicopter();
+  }
+
+  getPlayerExitPlan(helicopterId: string): VehicleExitPlan | null {
+    const helicopter = this.helicopters.get(helicopterId);
+    if (!helicopter) {
+      return { canExit: false, message: 'Cannot find helicopter for exit.' };
+    }
+
+    const exitPosition = helicopter.position.clone();
+    const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(helicopter.quaternion);
+    exitPosition.addScaledVector(rightVector, 3);
+
+    if (this.terrainManager) {
+      const terrainHeight = this.terrainManager.getEffectiveHeightAt(exitPosition.x, exitPosition.z);
+      exitPosition.y = Math.max(exitPosition.y, terrainHeight + 1.5);
+    }
+
+    return { canExit: true, mode: 'normal', position: exitPosition };
+  }
+
+  private requestPlayerVehicleExit(options: VehicleExitOptions): boolean {
+    const exitRequester = this.playerController as VehicleExitRequester | undefined;
+    if (typeof exitRequester?.requestVehicleExit !== 'function') {
+      return false;
+    }
+
+    const result = exitRequester.requestVehicleExit(options);
+    return result.exited;
   }
 
   private updateHelicopterPhysics(deltaTime: number): void {
@@ -499,11 +536,16 @@ export class HelicopterModel implements GameSystem {
       if (worldHalfExtent > 0) physics.setWorldHalfExtent(worldHalfExtent);
 
       const isPiloted = id === pilotedId;
+      physics.setEngineActive(isPiloted);
 
       if (isPiloted) {
         // Controls are set each frame by PlayerMovement.setHelicopterControls()
       } else if (!physics.getState().isGrounded) {
         // Unoccupied + airborne: zero controls so gravity pulls it down
+        physics.setControls({ collective: 0, cyclicPitch: 0, cyclicRoll: 0, yaw: 0, engineBoost: false });
+      } else if (physics.getState().engineRPM > 0) {
+        // Unoccupied + grounded but still spinning: keep ticking until the
+        // engine/rotor lifecycle reaches a true stopped state.
         physics.setControls({ collective: 0, cyclicPitch: 0, cyclicRoll: 0, yaw: 0, engineBoost: false });
       } else {
         // Unoccupied + grounded: no update needed

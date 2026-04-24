@@ -32,7 +32,7 @@ export interface FreeFlyInput {
   slow: boolean;   // Ctrl
 }
 
-export interface FollowTarget {
+interface FollowTarget {
   getPosition(target: THREE.Vector3): THREE.Vector3 | null;
 }
 

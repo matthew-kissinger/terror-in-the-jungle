@@ -1,4 +1,4 @@
-type SimulationGroupId =
+export type SimulationGroupId =
   | 'tactical_ui'
   | 'war_sim'
   | 'air_support'

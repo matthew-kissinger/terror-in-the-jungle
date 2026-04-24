@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { WorldOverlay } from '../WorldOverlayRegistry';
 import type { Combatant } from '../../../systems/combat/types';
 
-export interface CombatantLodSource {
+interface CombatantLodSource {
   combatants: Map<string, Combatant>;
 }
 

@@ -84,6 +84,10 @@ varying float vSunfade;
 uniform float uMieDirectionalG;
 uniform vec3 uGroundAlbedo;
 uniform float uExposure;
+uniform float uCloudCoverage;
+uniform float uCloudNoiseScale;
+uniform float uCloudTimeSeconds;
+uniform vec2 uCloudWindDir;
 
 const vec3 up = vec3( 0.0, 1.0, 0.0 );
 const float pi = 3.141592653589793238462643383279502884197169;
@@ -92,6 +96,34 @@ const float mieZenithLength = 1.25e3;
 const float sunAngularDiameterCos = 0.9998;
 const float THREE_OVER_SIXTEENPI = 0.05968310365946075;
 const float ONE_OVER_FOURPI = 0.07957747154594767;
+
+float hash21( vec2 p ) {
+  p = fract( p * vec2( 123.34, 456.21 ) );
+  p += dot( p, p + 45.32 );
+  return fract( p.x * p.y );
+}
+
+float valueNoise( vec2 p ) {
+  vec2 i = floor( p );
+  vec2 f = fract( p );
+  float a = hash21( i );
+  float b = hash21( i + vec2( 1.0, 0.0 ) );
+  float c = hash21( i + vec2( 0.0, 1.0 ) );
+  float d = hash21( i + vec2( 1.0, 1.0 ) );
+  vec2 u = f * f * ( 3.0 - 2.0 * f );
+  return mix( a, b, u.x ) + ( c - a ) * u.y * ( 1.0 - u.x ) + ( d - b ) * u.x * u.y;
+}
+
+float fbm( vec2 p ) {
+  float v = 0.0;
+  float amp = 0.5;
+  for ( int i = 0; i < 5; i++ ) {
+    v += amp * valueNoise( p );
+    p *= 2.03;
+    amp *= 0.5;
+  }
+  return v;
+}
 
 float rayleighPhase( float cosTheta ) {
   return THREE_OVER_SIXTEENPI * ( 1.0 + pow( cosTheta, 2.0 ) );
@@ -138,6 +170,45 @@ void main() {
   texColor += uGroundAlbedo * bounce * 0.35 * ( 0.5 + vSunfade );
 
   texColor *= uExposure;
+
+  if ( uCloudCoverage > 0.001 && direction.y > -0.02 ) {
+    float altitude = clamp( direction.y, 0.0, 1.0 );
+    vec2 wind = length( uCloudWindDir ) > 0.0001 ? normalize( uCloudWindDir ) : vec2( 0.0 );
+
+    // Intersect the view ray against a horizontal cloud deck. This keeps the
+    // dome clouds seamless in azimuth; the previous lat/long mapping wrapped
+    // at +/-pi and could paint a hard diagonal divider across the sky.
+    float deckHeight = 1500.0;
+    float rayToDeck = deckHeight / max( direction.y + 0.035, 0.08 );
+    vec2 cloudUv = direction.xz * rayToDeck;
+    cloudUv += wind * uCloudTimeSeconds * 14.0;
+    cloudUv *= uCloudNoiseScale;
+
+    float coverage = clamp( uCloudCoverage, 0.0, 1.0 );
+    float largeField = 0.55 + 0.45 * smoothstep( 0.24, 0.72, fbm( cloudUv * 0.30 ) );
+    float base = fbm( cloudUv * 0.72 );
+    float bodyDetail = fbm( cloudUv * 1.55 + vec2( 17.2, -9.4 ) );
+    float edgeDetail = fbm( cloudUv * 3.10 + vec2( -11.6, 6.7 ) );
+    float lowerEdge = mix( 0.74, 0.36, coverage );
+    float body = smoothstep( lowerEdge, lowerEdge + 0.16, mix( base, bodyDetail, 0.34 ) );
+    float brokenEdge = smoothstep( lowerEdge - 0.12, lowerEdge + 0.22, bodyDetail ) * ( 1.0 - smoothstep( 0.48, 0.86, edgeDetail ) * 0.35 );
+    float horizonWisps = smoothstep( 0.44, 0.78, fbm( cloudUv * 2.05 + vec2( 3.0, -2.0 ) ) ) * smoothstep( 0.02, 0.22, altitude );
+    float mask = clamp( max( body, max( brokenEdge * 0.48, horizonWisps * coverage * 0.42 ) ) * largeField, 0.0, 1.0 );
+    float horizonFeather = smoothstep( -0.015, 0.16, direction.y );
+    float zenithFeather = mix( 1.0, 0.72, smoothstep( 0.78, 1.0, altitude ) );
+    float cloudAlpha = mask * horizonFeather * zenithFeather * mix( 0.56, 0.88, coverage );
+    float veilNoise = smoothstep( 0.28, 0.82, fbm( cloudUv * 0.42 + vec2( -4.0, 11.0 ) ) );
+    cloudAlpha += coverage * horizonFeather * zenithFeather * veilNoise * 0.14;
+
+    float sunFacing = max( 0.0, dot( normalize( direction + up * 0.25 ), normalize( vSunDirection ) ) );
+    vec3 cloudShadow = mix( vec3( 0.24, 0.32, 0.42 ), vec3( 0.48, 0.55, 0.62 ), altitude );
+    vec3 cloudHighlight = vec3( 1.0, 0.96, 0.88 );
+    float highlightAmount = pow( sunFacing, 1.4 ) * ( 1.0 - 0.58 * clamp( vSunDirection.y, 0.0, 1.0 ) );
+    vec3 cloudColor = mix( cloudShadow, cloudHighlight, clamp( highlightAmount, 0.0, 1.0 ) );
+    cloudColor = mix( cloudColor, vec3( 0.72, 0.78, 0.84 ), ( 1.0 - base ) * 0.12 );
+    texColor = mix( texColor, cloudColor, clamp( cloudAlpha, 0.0, 0.90 ) );
+  }
+
   gl_FragColor = vec4( texColor, 1.0 );
 }
 `;

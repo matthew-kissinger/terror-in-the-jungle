@@ -9,6 +9,7 @@ const _euler = new THREE.Euler();
 const _deltaPosition = new THREE.Vector3();
 const _axis = new THREE.Vector3();
 const _deltaQ = new THREE.Quaternion();
+const ENGINE_IDLE_RPM = 0.22;
 
 export interface HelicopterControls {
   collective: number;     // Vertical thrust (0-1)
@@ -56,6 +57,7 @@ export class HelicopterPhysics {
   private smoothedControls: HelicopterControls;
   private worldHalfExtent = 0;
   private readonly stepper = new FixedStepRunner(HelicopterPhysics.FIXED_STEP_SECONDS);
+  private engineActive = false;
 
   constructor(initialPosition: THREE.Vector3, config?: AircraftPhysicsConfig) {
     this.cfg = config ?? DEFAULT_PHYSICS;
@@ -183,7 +185,9 @@ export class HelicopterPhysics {
   }
 
   private updateEngine(deltaTime: number): void {
-    const targetRPM = Math.max(0.2, this.smoothedControls.collective);
+    const targetRPM = this.engineActive
+      ? Math.max(ENGINE_IDLE_RPM, this.smoothedControls.collective)
+      : 0;
     const spoolRate = Math.min(this.cfg.engineSpoolRate * deltaTime, 1.0);
 
     if (targetRPM > this.state.engineRPM) {
@@ -192,6 +196,10 @@ export class HelicopterPhysics {
     } else {
       // Spool down (slower, more realistic)
       this.state.engineRPM = THREE.MathUtils.lerp(this.state.engineRPM, targetRPM, spoolRate * 0.5);
+    }
+
+    if (!this.engineActive && this.state.engineRPM < 0.01) {
+      this.state.engineRPM = 0;
     }
   }
 
@@ -348,6 +356,10 @@ export class HelicopterPhysics {
     Object.assign(this.controls, controls);
   }
 
+  setEngineActive(active: boolean): void {
+    this.engineActive = active;
+  }
+
   getState(): Readonly<HelicopterState> {
     return this.state;
   }
@@ -375,7 +387,8 @@ export class HelicopterPhysics {
     this.state.velocity.set(0, 0, 0);
     this.state.angularVelocity.set(0, 0, 0);
     this.state.quaternion.identity();
-    this.state.engineRPM = 0.2; // Idle at 20%
+    this.state.engineRPM = 0;
+    this.engineActive = false;
 
     // Reset controls
     this.controls.collective = 0;
@@ -388,7 +401,7 @@ export class HelicopterPhysics {
     this.previousState.velocity.set(0, 0, 0);
     this.previousState.angularVelocity.set(0, 0, 0);
     this.previousState.quaternion.identity();
-    this.previousState.engineRPM = 0.2;
+    this.previousState.engineRPM = 0;
     this.previousState.isGrounded = true;
     this.previousState.groundHeight = position.y;
     this.stepper.reset();

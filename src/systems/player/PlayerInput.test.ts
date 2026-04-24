@@ -3,6 +3,8 @@ import { PlayerInput } from './PlayerInput';
 import { SettingsManager } from '../../config/SettingsManager';
 import { WeaponSlot } from './InventoryManager';
 
+const gamepadManagerInstances = vi.hoisted(() => [] as any[]);
+
 // Mock browser globals for Node.js environment
 if (typeof document === 'undefined') {
   class MockEventTarget {
@@ -90,6 +92,7 @@ vi.mock('../../ui/controls/GamepadManager', () => {
     this.getMovementVector = vi.fn().mockReturnValue({ x: 0, z: 0 });
     this.updateSensitivity = vi.fn();
     this.dispose = vi.fn();
+    gamepadManagerInstances.push(this);
   });
   return { GamepadManager: MockGamepadManager };
 });
@@ -108,6 +111,7 @@ describe('PlayerInput', () => {
   afterEach(() => {
     playerInput.dispose();
     vi.restoreAllMocks();
+    gamepadManagerInstances.length = 0;
   });
 
   describe('Initialization', () => {
@@ -121,6 +125,7 @@ describe('PlayerInput', () => {
       expect(addEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('keyup', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('pointerlockchange', expect.any(Function));
+      expect(addEventListenerSpy).toHaveBeenCalledWith('pointerlockerror', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('mousemove', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function));
@@ -151,6 +156,24 @@ describe('PlayerInput', () => {
       playerInput.setControlsEnabled(false);
       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
       expect(playerInput.isKeyPressed('KeyW')).toBe(false);
+    });
+
+    it('clears transient key state and releases held run/scoreboard callbacks', () => {
+      const onRunStop = vi.fn();
+      const onScoreboardToggle = vi.fn();
+      playerInput.setCallbacks({ onRunStop, onScoreboardToggle });
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ShiftLeft' }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Tab' }));
+
+      playerInput.clearTransientInputState();
+
+      expect(playerInput.isKeyPressed('KeyW')).toBe(false);
+      expect(playerInput.isKeyPressed('ShiftLeft')).toBe(false);
+      expect(playerInput.isKeyPressed('Tab')).toBe(false);
+      expect(onRunStop).toHaveBeenCalledOnce();
+      expect(onScoreboardToggle).toHaveBeenCalledWith(false);
     });
   });
 
@@ -289,6 +312,29 @@ describe('PlayerInput', () => {
       expect(callbacks.onEnterExitHelicopter).toHaveBeenCalled();
     });
 
+    it('should prefer generic vehicle enter-exit callback when KeyE is pressed', () => {
+      const onEnterExitVehicle = vi.fn();
+      const onEnterExitHelicopter = vi.fn();
+      playerInput.setCallbacks({ onEnterExitVehicle, onEnterExitHelicopter });
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+
+      expect(onEnterExitVehicle).toHaveBeenCalledTimes(1);
+      expect(onEnterExitHelicopter).not.toHaveBeenCalled();
+    });
+
+    it('should route gamepad interact through the generic vehicle enter-exit callback', () => {
+      const onEnterExitVehicle = vi.fn();
+      const onEnterExitHelicopter = vi.fn();
+      playerInput.setCallbacks({ onEnterExitVehicle, onEnterExitHelicopter });
+      const gamepadCallbacks = gamepadManagerInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+      gamepadCallbacks.onInteract();
+
+      expect(onEnterExitVehicle).toHaveBeenCalledTimes(1);
+      expect(onEnterExitHelicopter).not.toHaveBeenCalled();
+    });
+
     it('should trigger onToggleMouseControl when Right Ctrl is pressed (in helicopter)', () => {
       playerInput.setInHelicopter(true);
       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlRight' }));
@@ -353,6 +399,18 @@ describe('PlayerInput', () => {
       expect(playerInput.getIsPointerLocked()).toBe(false);
     });
 
+    it('clears held movement keys when pointer lock is released', () => {
+      Object.defineProperty(document, 'pointerLockElement', { value: document.body, configurable: true });
+      document.dispatchEvent(new Event('pointerlockchange'));
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+      expect(playerInput.isKeyPressed('KeyW')).toBe(true);
+
+      Object.defineProperty(document, 'pointerLockElement', { value: null, configurable: true });
+      document.dispatchEvent(new Event('pointerlockchange'));
+
+      expect(playerInput.isKeyPressed('KeyW')).toBe(false);
+    });
+
     it('should request pointer lock on click if game started and enabled', () => {
       const requestPointerLockSpy = vi.fn();
       document.body.requestPointerLock = requestPointerLockSpy;
@@ -374,6 +432,25 @@ describe('PlayerInput', () => {
 
       document.dispatchEvent(new MouseEvent('click'));
       expect(requestPointerLockSpy).not.toHaveBeenCalled();
+    });
+
+    it('uses unlocked mouse-look fallback when pointer lock is rejected', async () => {
+      const requestPointerLockSpy = vi.fn(() => Promise.reject(new Error('denied')));
+      document.body.requestPointerLock = requestPointerLockSpy;
+      playerInput.setGameStarted(true);
+      playerInput.setPointerLockEnabled(true);
+
+      document.dispatchEvent(new MouseEvent('click'));
+      await Promise.resolve();
+
+      const event = new MouseEvent('mousemove') as any;
+      Object.defineProperty(event, 'movementX', { value: 12 });
+      Object.defineProperty(event, 'movementY', { value: -4 });
+      document.dispatchEvent(event);
+
+      expect(playerInput.getIsPointerLocked()).toBe(true);
+      expect(playerInput.getMouseMovement().x).not.toBe(0);
+      expect(playerInput.getMouseMovement().y).not.toBe(0);
     });
 
     it('should remove and re-add click listener in setGameStarted', () => {
@@ -429,6 +506,7 @@ describe('PlayerInput', () => {
       expect(removeEventListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
       expect(removeEventListenerSpy).toHaveBeenCalledWith('keyup', expect.any(Function));
       expect(removeEventListenerSpy).toHaveBeenCalledWith('pointerlockchange', expect.any(Function));
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('pointerlockerror', expect.any(Function));
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mousemove', expect.any(Function));
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function));
       expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function));

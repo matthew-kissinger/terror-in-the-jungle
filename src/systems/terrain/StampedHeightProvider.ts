@@ -45,7 +45,7 @@ export function resolveTerrainStamps(
     .sort((a, b) => a.priority - b.priority)
     .map((stamp) => ({
       ...stamp,
-      targetHeight: resolveTargetHeight(baseProvider, stamp),
+      targetHeight: stamp.fixedTargetHeight ?? resolveTargetHeight(baseProvider, stamp),
     }));
 }
 

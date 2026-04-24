@@ -33,6 +33,7 @@ export interface PlayerVehicleControllerDependencies {
   fixedWingModel?: FixedWingModel;
   hudSystem?: HUDSystem;
   airSupportManager?: AirSupportManager;
+  requestVehicleExit?: () => boolean;
 }
 
 export interface PlayerControllerDependencies {

@@ -34,6 +34,7 @@ export class WaterSystem implements GameSystem {
   private sun: THREE.Vector3;
   private wasUnderwater: boolean = false;
   private overlay?: HTMLDivElement;
+  private enabled = true;
   
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
@@ -151,6 +152,11 @@ export class WaterSystem implements GameSystem {
   update(deltaTime: number): void {
     if (!this.water) return;
 
+    if (!this.enabled) {
+      this.setUnderwaterState(false);
+      return;
+    }
+
     // Update water time for wave animation
     const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
     if (waterUniforms && waterUniforms.time) {
@@ -172,8 +178,11 @@ export class WaterSystem implements GameSystem {
   }
 
   private checkUnderwaterState(): void {
-    const isUnderwater = this.camera.position.y < this.WATER_LEVEL;
+    const isUnderwater = this.enabled && this.camera.position.y < this.WATER_LEVEL;
+    this.setUnderwaterState(isUnderwater);
+  }
 
+  private setUnderwaterState(isUnderwater: boolean): void {
     if (isUnderwater !== this.wasUnderwater) {
       this.wasUnderwater = isUnderwater;
       
@@ -251,7 +260,7 @@ export class WaterSystem implements GameSystem {
    * Check if a position is underwater
    */
   isUnderwater(position: THREE.Vector3): boolean {
-    return position.y < this.WATER_LEVEL;
+    return this.enabled && position.y < this.WATER_LEVEL;
   }
   
   /**
@@ -283,6 +292,7 @@ export class WaterSystem implements GameSystem {
    * disable the global water to avoid a flat plane slicing through terrain.
    */
   setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
     if (this.water) {
       this.water.visible = enabled;
     }
@@ -292,6 +302,23 @@ export class WaterSystem implements GameSystem {
         this.overlay.style.opacity = '0';
       }
     }
+    if (!enabled) {
+      this.setUnderwaterState(false);
+    }
+  }
+
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  getDebugInfo(): { enabled: boolean; waterLevel: number; waterVisible: boolean; cameraUnderwater: boolean; size: number } {
+    return {
+      enabled: this.enabled,
+      waterLevel: this.WATER_LEVEL,
+      waterVisible: Boolean(this.water?.visible),
+      cameraUnderwater: this.enabled && this.camera.position.y < this.WATER_LEVEL,
+      size: this.worldWaterSize,
+    };
   }
 
   /**

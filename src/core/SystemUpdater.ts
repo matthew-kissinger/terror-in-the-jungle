@@ -7,6 +7,7 @@ import { Logger } from '../utils/Logger';
 import { isPerfUserTimingEnabled } from './PerfDiagnostics';
 import { GameEventBus } from './GameEventBus';
 import { SimulationScheduler } from './SimulationScheduler';
+import { collectTrackedSystems, SYSTEM_UPDATE_BUDGET_MS } from './SystemUpdateSchedule';
 
 interface SystemTimingEntry {
   name: string;
@@ -68,19 +69,19 @@ export class SystemUpdater {
     }
 
     // Track timing for key systems (both local tracking and performance telemetry)
-    this.trackSystemUpdate('Combat', 5.0, () => {
+    this.trackSystemUpdate('Combat', SYSTEM_UPDATE_BUDGET_MS.Combat, () => {
       performanceTelemetry.beginSystem('Combat');
       if (refs.combatantSystem) refs.combatantSystem.update(deltaTime);
       performanceTelemetry.endSystem('Combat');
     });
 
-    this.trackSystemUpdate('Terrain', 2.0, () => {
+    this.trackSystemUpdate('Terrain', SYSTEM_UPDATE_BUDGET_MS.Terrain, () => {
       performanceTelemetry.beginSystem('Terrain');
       if (refs.terrainSystem && gameStarted) refs.terrainSystem.update(deltaTime);
       performanceTelemetry.endSystem('Terrain');
     });
 
-    this.trackSystemUpdate('Navigation', 2.0, () => {
+    this.trackSystemUpdate('Navigation', SYSTEM_UPDATE_BUDGET_MS.Navigation, () => {
       performanceTelemetry.beginSystem('Navigation');
       if (refs.navmeshSystem) {
         const pos = refs.playerController?.getPosition();
@@ -89,7 +90,7 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('Navigation');
     });
 
-    this.trackSystemUpdate('Billboards', 2.0, () => {
+    this.trackSystemUpdate('Billboards', SYSTEM_UPDATE_BUDGET_MS.Billboards, () => {
       performanceTelemetry.beginSystem('Billboards');
       if (refs.globalBillboardSystem) {
         const fog = scene?.fog as THREE.FogExp2 | undefined;
@@ -114,7 +115,7 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('Billboards');
     });
 
-    this.trackSystemUpdate('Vehicles', 1.0, () => {
+    this.trackSystemUpdate('Vehicles', SYSTEM_UPDATE_BUDGET_MS.Vehicles, () => {
       performanceTelemetry.beginSystem('Vehicles');
       if (refs.helicopterModel) refs.helicopterModel.update(deltaTime);
       if (refs.fixedWingModel) refs.fixedWingModel.update(deltaTime);
@@ -122,14 +123,14 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('Vehicles');
     });
 
-    this.trackSystemUpdate('Player', 1.0, () => {
+    this.trackSystemUpdate('Player', SYSTEM_UPDATE_BUDGET_MS.Player, () => {
       performanceTelemetry.beginSystem('Player');
       if (refs.playerController) refs.playerController.update(deltaTime);
       if (refs.firstPersonWeapon) refs.firstPersonWeapon.update(deltaTime);
       performanceTelemetry.endSystem('Player');
     });
 
-    this.trackSystemUpdate('Weapons', 1.0, () => {
+    this.trackSystemUpdate('Weapons', SYSTEM_UPDATE_BUDGET_MS.Weapons, () => {
       performanceTelemetry.beginSystem('Weapons');
       if (refs.grenadeSystem) refs.grenadeSystem.update(deltaTime);
       if (refs.mortarSystem) refs.mortarSystem.update(deltaTime);
@@ -147,13 +148,13 @@ export class SystemUpdater {
     const worldDelta = this.scheduler.consume('world_state', deltaTime);
     const modeRuntimeDelta = this.scheduler.consume('mode_runtime', deltaTime);
 
-    this.trackSystemUpdate('HUD', 1.0, () => {
+    this.trackSystemUpdate('HUD', SYSTEM_UPDATE_BUDGET_MS.HUD, () => {
       performanceTelemetry.beginSystem('HUD');
       if (refs.hudSystem) refs.hudSystem.update(deltaTime);
       performanceTelemetry.endSystem('HUD');
     });
 
-    this.trackSystemUpdate('TacticalUI', 0.5, () => {
+    this.trackSystemUpdate('TacticalUI', SYSTEM_UPDATE_BUDGET_MS.TacticalUI, () => {
       performanceTelemetry.beginSystem('TacticalUI');
 
       // Minimap/compass/full-map updates are throttled to reduce DOM/canvas churn.
@@ -170,7 +171,7 @@ export class SystemUpdater {
     });
 
     // War Simulator (only active for A Shau Valley mode)
-    this.trackSystemUpdate('WarSim', 2.0, () => {
+    this.trackSystemUpdate('WarSim', SYSTEM_UPDATE_BUDGET_MS.WarSim, () => {
       performanceTelemetry.beginSystem('WarSim');
       if (warSimDelta !== null && refs.warSimulator && refs.playerController) {
         const pos = refs.playerController.getPosition();
@@ -181,7 +182,7 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('WarSim');
     });
 
-    this.trackSystemUpdate('AirSupport', 1.0, () => {
+    this.trackSystemUpdate('AirSupport', SYSTEM_UPDATE_BUDGET_MS.AirSupport, () => {
       performanceTelemetry.beginSystem('AirSupport');
       if (airSupportDelta !== null) {
         if (refs.airSupportManager) refs.airSupportManager.update(airSupportDelta);
@@ -192,7 +193,7 @@ export class SystemUpdater {
     });
 
     // Mode-specific runtime hooks are scheduled outside generic system logic.
-    this.trackSystemUpdate('ModeRuntime', 0.2, () => {
+    this.trackSystemUpdate('ModeRuntime', SYSTEM_UPDATE_BUDGET_MS.ModeRuntime, () => {
       performanceTelemetry.beginSystem('ModeRuntime');
       if (modeRuntimeDelta !== null && refs.gameModeManager) {
         refs.gameModeManager.updateRuntime(modeRuntimeDelta, gameStarted);
@@ -201,7 +202,7 @@ export class SystemUpdater {
     });
 
     // Gate World systems - skip weather and tickets during menu/loading
-    this.trackSystemUpdate('World', 1.0, () => {
+    this.trackSystemUpdate('World', SYSTEM_UPDATE_BUDGET_MS.World, () => {
       performanceTelemetry.beginSystem('World');
       if (worldDelta !== null) {
         if (refs.zoneManager) refs.zoneManager.update(worldDelta);
@@ -222,10 +223,11 @@ export class SystemUpdater {
     });
 
     // Update remaining systems without tracking (lightweight systems)
+    const trackedSystems = collectTrackedSystems(refs);
     this.withUserTiming('Other', () => {
       performanceTelemetry.beginSystem('Other');
       for (const system of systems) {
-        if (!this.isTrackedSystem(system, refs)) {
+        if (!trackedSystems.has(system)) {
           try {
             system.update(deltaTime);
           } catch (error) {
@@ -241,34 +243,6 @@ export class SystemUpdater {
 
     // End frame telemetry
     performanceTelemetry.endFrame();
-  }
-
-  private isTrackedSystem(system: GameSystem, refs: SystemKeyToType): boolean {
-    return system === refs.combatantSystem
-      || system === refs.terrainSystem
-      || system === refs.globalBillboardSystem
-      || system === refs.helicopterModel
-      || system === refs.fixedWingModel
-      || system === refs.vehicleManager
-      || system === refs.playerController
-      || system === refs.firstPersonWeapon
-      || system === refs.grenadeSystem
-      || system === refs.mortarSystem
-      || system === refs.sandbagSystem
-      || system === refs.ammoSupplySystem
-      || system === refs.hudSystem
-      || system === refs.minimapSystem
-      || system === refs.fullMapSystem
-      || system === refs.compassSystem
-      || system === refs.zoneManager
-      || system === refs.ticketSystem
-      || system === refs.waterSystem
-      || system === refs.weatherSystem
-      || system === refs.atmosphereSystem
-      || system === refs.warSimulator
-      || system === refs.strategicFeedback
-      || system === refs.airSupportManager
-      || system === refs.aaEmplacementSystem;
   }
 
   private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {

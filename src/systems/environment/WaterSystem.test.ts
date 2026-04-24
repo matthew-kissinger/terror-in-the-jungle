@@ -63,4 +63,25 @@ describe('WaterSystem sun direction from atmosphere', () => {
     const sun = (system as unknown as { sun: THREE.Vector3 }).sun;
     expect(sun.length()).toBeCloseTo(1, 5);
   });
+
+  it('disabled water does not report underwater positions', () => {
+    const system = makeSystem();
+
+    system.setEnabled(false);
+
+    expect(system.isEnabled()).toBe(false);
+    expect(system.isUnderwater(new THREE.Vector3(0, -10, 0))).toBe(false);
+    expect(system.getDebugInfo().cameraUnderwater).toBe(false);
+  });
+
+  it('disabling water clears an active underwater state', () => {
+    const system = makeSystem();
+    const weather = { setUnderwater: vi.fn() };
+    system.setWeatherSystem(weather as any);
+    (system as unknown as { wasUnderwater: boolean }).wasUnderwater = true;
+
+    system.setEnabled(false);
+
+    expect(weather.setUnderwater).toHaveBeenCalledWith(false);
+  });
 });

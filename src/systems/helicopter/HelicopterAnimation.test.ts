@@ -28,6 +28,19 @@ describe('HelicopterAnimation', () => {
     expect(tailRotor.rotation.z).not.toBe(0);
   });
 
+  it('uses flight-RPM visual speed high enough to read as fast', () => {
+    const animation = new HelicopterAnimation();
+    const helicopter = new THREE.Group();
+    const mainRotor = new THREE.Group();
+    mainRotor.userData.type = 'mainBlades';
+    helicopter.add(mainRotor);
+
+    animation.initialize('heli-fast', helicopter);
+    animation.updateRotors(helicopter, 'heli-fast', createPhysics(1), 0.1);
+
+    expect(mainRotor.rotation.y).toBeGreaterThan(2);
+  });
+
   it('lazily resolves rotor roots if the helicopter was initialized without a group', () => {
     const animation = new HelicopterAnimation();
     const helicopter = new THREE.Group();

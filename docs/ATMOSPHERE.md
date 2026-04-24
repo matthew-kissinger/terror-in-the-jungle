@@ -1,6 +1,6 @@
 # Atmosphere System
 
-Last updated: 2026-04-21
+Last updated: 2026-04-24
 
 This document describes the current sky / sun / fog / cloud / ambient stack and
 the remaining atmosphere roadmap. The v1 atmosphere foundation and polish cycles
@@ -22,9 +22,12 @@ landed across `cycle-2026-04-20-atmosphere-foundation` and
   constant, removing the old horizon seam.
 - Hemisphere, directional, water, terrain, and vegetation lighting now read from
   the same atmosphere snapshot.
-- `CloudLayer` provides a high-altitude procedural cloud band with weather-
-  driven coverage changes. It is a flat layer with shader detail, not a
-  fly-through volumetric cloud volume.
+- `HosekWilkieSkyBackend` owns the visible sky-dome cloud pass. It receives
+  weather/scenario coverage from `AtmosphereSystem` and avoids the old finite
+  cloud-plane horizon divider.
+- `CloudLayer` still exists as legacy/prototype code, but `AtmosphereSystem`
+  keeps its mesh invisible in the active runtime. Do not use the old plane as
+  evidence that player-visible clouds are correct.
 - `PostProcessingManager` applies ACES tone mapping before the 24-level quantize
   and Bayer dither pass so warm dawn/dusk colors survive the retro post chain.
 
@@ -51,8 +54,26 @@ hardcoded sky/fog/light colors for local fixes.
 
 ## Current Limits
 
-- Clouds are an overhead layer. Pilots can fly near/through the altitude band,
-  but there is no volumetric scattering, collision, or cloud interior lighting.
+- Clouds are sky texture and lighting only. There is no volumetric scattering,
+  collision, fly-through cloud interior, or aircraft-specific cloud lighting.
+- Clouds are wired in all five current game modes through the sky dome. The old
+  "one tile" report was valid for the former visible `CloudLayer` plane; that
+  plane is now hidden. The visible sky shader now uses a seamless cloud-deck
+  projection instead of azimuth-wrapped sky UVs. A Shau, TDM, and Zone Control
+  read as heavier broken cloud layers; Open Frontier and combat120 intentionally
+  read as lighter scattered-cloud presets but still need art review.
+- `npm run evidence:atmosphere` captures ground, sky-coverage, and aircraft
+  views for all modes. The 2026-04-24 post-fix artifact is
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/`.
+  That run proved cloud wiring in all five modes after `build` and `build:perf`
+  began emitting `asset-manifest.json`. A Shau terrain/readability evidence is
+  DEM-backed, A Shau water is disabled without underwater fog, and the browser
+  run has `0` errors. The old TileCache fallback path has been removed; large
+  worlds use explicit static-tiled nav generation and A Shau startup stops if no
+  navmesh is generated or pre-baked. The same run records A Shau representative
+  nav connectivity as passing, but route/NPC movement quality and airfield use
+  still need play-path validation. The run also proves the A Shau work did not
+  prevent Open Frontier, TDM, Zone Control, or combat120 from entering live mode.
 - The current backend uses a CPU LUT and simplified Hosek-Wilkie/Preetham-style
   math. It is designed for stable low cost, not physically exhaustive sky
   rendering.

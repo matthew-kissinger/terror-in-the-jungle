@@ -15,7 +15,7 @@ import * as THREE from 'three';
  * The plane sits at a fixed altitude above local terrain (`BASE_ALTITUDE`)
  * and follows the camera on XZ so the player never runs out from under
  * the cloud cover. UVs are sampled in world space so the noise field
- * stays anchored to the world — walking sideways makes clouds drift
+ * stays anchored to the world: walking sideways makes clouds drift
  * overhead as expected.
  *
  * Flight envelope safety: `BASE_ALTITUDE` is set well above the highest
@@ -24,12 +24,17 @@ import * as THREE from 'three';
  * layer alpha-fades out so the paper-thin edge-on view does not look
  * broken. Above the fade range the layer is visible again (viewed from
  * the top).
+ *
+ * Current limitation: this is still a planar approximation, so it cannot
+ * replace a true sky-volume/cloud-dome implementation. The footprint and
+ * horizon fade are intentionally generous to avoid a one-tile cloud cap or
+ * a hard flat divider while Cycle 9 evaluates the sky-integrated version.
  */
 
 /** Meters above local terrain where the cloud plane sits. */
 const BASE_ALTITUDE = 1200;
-/** Plane footprint. Wider than any playable area so the edge never enters the frame. */
-const PLANE_SIZE = 4000;
+/** Plane footprint. Large enough that aircraft/ground views do not expose a hard local tile edge. */
+const PLANE_SIZE = 36000;
 /** Half-width of the altitude band over which the layer fades out. */
 const EDGE_FADE_HALF_WIDTH = 100;
 /**
@@ -49,10 +54,14 @@ const DEFAULT_WIND_DIR_Z = 0.7;
 
 const cloudVertexShader = /* glsl */`
 varying vec2 vWorldXZ;
+varying vec2 vPlaneUv;
+varying vec3 vWorldPos;
 
 void main() {
   vec4 worldPos = modelMatrix * vec4(position, 1.0);
   vWorldXZ = worldPos.xz;
+  vPlaneUv = uv;
+  vWorldPos = worldPos.xyz;
   gl_Position = projectionMatrix * viewMatrix * worldPos;
 }
 `;
@@ -67,6 +76,8 @@ void main() {
 // (a cheap stand-in for a real cloud normal).
 const cloudFragmentShader = /* glsl */`
 varying vec2 vWorldXZ;
+varying vec2 vPlaneUv;
+varying vec3 vWorldPos;
 
 uniform vec3 uSunDirection;
 uniform vec3 uSunColor;
@@ -166,7 +177,20 @@ void main() {
   // sun disc still glows through light cloud. Coverage uniform also
   // biases peak alpha up as coverage approaches 1 (overcast).
   float alpha = mask * mix(0.55, 0.95, clamp(uCoverage, 0.0, 1.0));
-  alpha *= uEdgeFade;
+  // Hide the finite plane footprint. The layer still uses a simple mesh,
+  // but its boundary should feather away before it reads as one hard tile.
+  float edgeDist = min(min(vPlaneUv.x, 1.0 - vPlaneUv.x), min(vPlaneUv.y, 1.0 - vPlaneUv.y));
+  float footprintFade = smoothstep(0.0, 0.035, edgeDist);
+  // A horizontal plane reads as a hard ceiling at very shallow view angles.
+  // Fade those grazing rays so ground-level horizon views see atmospheric
+  // haze instead of a visible local cloud tile boundary.
+  vec3 viewDir = normalize(vWorldPos - cameraPosition);
+  float horizonFade = smoothstep(0.01, 0.08, abs(viewDir.y));
+  alpha *= uEdgeFade * footprintFade * horizonFade;
+
+  if (alpha <= 0.001) {
+    discard;
+  }
 
   gl_FragColor = vec4(color, alpha);
 }
@@ -206,6 +230,7 @@ export class CloudLayer {
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
+      forceSinglePass: true,
     });
 
     this.geometry = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE, 1, 1);
@@ -297,6 +322,10 @@ export class CloudLayer {
       return;
     }
     this.material.uniforms.uNoiseScale.value = 1 / metersPerFeature;
+  }
+
+  resetFeatureScale(): void {
+    this.material.uniforms.uNoiseScale.value = DEFAULT_NOISE_SCALE;
   }
 
   /** Test hook: observable edge-fade factor for this frame. */

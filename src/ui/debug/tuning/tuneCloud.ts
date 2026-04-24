@@ -17,10 +17,10 @@ import type { PaneLike, TuningState } from '../LiveTuningPanel';
 
 const SCENARIOS: ScenarioAtmosphereKey[] = ['openfrontier', 'combat120', 'ashau', 'zc', 'tdm'];
 
-export const coverageKey = (s: ScenarioAtmosphereKey): string => `cloud.${s}.coverage`;
-export const scaleKey = (s: ScenarioAtmosphereKey): string => `cloud.${s}.scaleMetersPerFeature`;
-export const CLOUD_WIND_SPEED_KEY = 'cloud.wind.speedMs';
-export const CLOUD_WIND_DIR_KEY = 'cloud.wind.directionDeg';
+const coverageKey = (s: ScenarioAtmosphereKey): string => `cloud.${s}.coverage`;
+const scaleKey = (s: ScenarioAtmosphereKey): string => `cloud.${s}.scaleMetersPerFeature`;
+const CLOUD_WIND_SPEED_KEY = 'cloud.wind.speedMs';
+const CLOUD_WIND_DIR_KEY = 'cloud.wind.directionDeg';
 
 export function captureCloudDefaults(): TuningState {
   const out: TuningState = {};

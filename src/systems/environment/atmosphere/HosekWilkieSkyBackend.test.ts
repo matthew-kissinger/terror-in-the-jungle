@@ -222,6 +222,32 @@ describe('HosekWilkieSkyBackend (LUT rebake threshold)', () => {
   });
 });
 
+describe('HosekWilkieSkyBackend (sky-integrated cloud coverage)', () => {
+  it('clamps cloud coverage for the sky-dome cloud pass', () => {
+    const backend = new HosekWilkieSkyBackend();
+
+    backend.setCloudCoverage(-1);
+    expect(backend.getCloudCoverage()).toBe(0);
+
+    backend.setCloudCoverage(2);
+    expect(backend.getCloudCoverage()).toBe(1);
+  });
+
+  it('accepts and resets cloud feature scale without invalidating sky samples', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.applyPreset(SCENARIO_ATMOSPHERE_PRESETS.openfrontier);
+
+    backend.setCloudFeatureScaleMeters(1400);
+    backend.resetCloudFeatureScale();
+    backend.update(0.016, new THREE.Vector3(0.3, 0.8, 0.4).normalize());
+
+    const zenith = backend.getZenith(new THREE.Color());
+    expect(Number.isFinite(zenith.r)).toBe(true);
+    expect(Number.isFinite(zenith.g)).toBe(true);
+    expect(Number.isFinite(zenith.b)).toBe(true);
+  });
+});
+
 describe('ScenarioAtmospherePresets', () => {
   it('every preset has a non-zero sun-elevation in [0, pi/2] (no sub-horizon presets)', () => {
     for (const preset of Object.values(SCENARIO_ATMOSPHERE_PRESETS)) {

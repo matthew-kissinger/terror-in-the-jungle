@@ -5,6 +5,25 @@ import type { PlayerCamera } from '../player/PlayerCamera';
 import type { IGameRenderer, IHUDSystem } from '../../types/SystemInterfaces';
 import type { InputContext } from '../input/InputContextManager';
 
+export type VehicleExitMode = 'normal' | 'emergency_eject' | 'force_cleanup';
+
+export interface VehicleExitOptions {
+  allowEject?: boolean;
+  force?: boolean;
+  reason?: string;
+}
+
+export interface VehicleExitPlan {
+  canExit: boolean;
+  mode?: VehicleExitMode;
+  position?: THREE.Vector3;
+  message?: string;
+}
+
+export type VehicleExitResult =
+  | { exited: true; vehicleType: string; vehicleId: string; mode: VehicleExitMode; position: THREE.Vector3 }
+  | { exited: false; reason: 'not_in_vehicle' | 'blocked'; message?: string };
+
 /**
  * Context provided during vehicle enter/exit transitions.
  * Owns all the cross-cutting references the adapter needs to set up or tear down.
@@ -18,6 +37,7 @@ export interface VehicleTransitionContext {
   cameraController: PlayerCamera;
   gameRenderer?: IGameRenderer;
   hudSystem?: IHUDSystem;
+  exitMode?: VehicleExitMode;
 }
 
 /**
@@ -54,6 +74,12 @@ export interface PlayerVehicleAdapter {
    * This is the ONLY exit path - guaranteed cleanup.
    */
   onExit(ctx: VehicleTransitionContext): void;
+
+  /**
+   * Optional exit policy and placement hook. VehicleSessionController owns the
+   * final transition; adapters only describe whether and where the exit can occur.
+   */
+  getExitPlan?(ctx: VehicleTransitionContext, options: VehicleExitOptions): VehicleExitPlan;
 
   /**
    * Per-frame update while the player is in this vehicle.

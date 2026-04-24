@@ -153,6 +153,7 @@ export async function configureHeightSource(
     const { assetId, path, width, height, metersPerPixel } = config.heightSource;
     let resolvedPath = path;
     const expectedBytes = width * height * 4;
+    let demLoadError: unknown = null;
     try {
       resolvedPath = await resolveGameAssetUrl(assetId, path);
       Logger.info('engine-init', `Loading DEM terrain from ${resolvedPath} (expect ${width}x${height}, ${(expectedBytes / 1024 / 1024).toFixed(1)}MB)...`);
@@ -197,9 +198,10 @@ export async function configureHeightSource(
         `DEM loaded: ${width}x${height}, ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`
       );
     } catch (error) {
+      demLoadError = error;
       Logger.error(
         'engine-init',
-        `Failed to load DEM terrain from ${resolvedPath}; terrain will render flat. ` +
+        `Failed to load required DEM terrain from ${resolvedPath}; mode startup cannot continue with fallback terrain. ` +
         `Confirm the binary is present under public${path.startsWith('/') ? path : '/' + path} ` +
         `for local dev, or that asset '${assetId ?? '(none)'}' is present in asset-manifest.json/R2 for production ` +
         `(A Shau DEMs are gitignored; see data/vietnam/DATA_PIPELINE.md).`,
@@ -208,6 +210,10 @@ export async function configureHeightSource(
     }
     markStartup(`engine-init.start-game.${mode}.dem-load.end`);
     markStartup(`engine-init.start-game.${mode}.height-source.end`);
+    if (demLoadError) {
+      const reason = demLoadError instanceof Error ? demLoadError.message : String(demLoadError);
+      throw new Error(`Required DEM terrain unavailable for ${mode}: ${reason}`);
+    }
     return { kind: 'dem' };
   }
 
@@ -312,16 +318,29 @@ async function configureTerrainAndNavigation(
 
   if (engine.systemManager.navmeshSystem.isWasmReady()) {
     const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
+    const navmeshAnchors = config.zones?.map(z =>
+      new THREE.Vector3(z.position.x, 0, z.position.z)
+    ) ?? [];
     // Yield before WASM navmesh generation so the progress bar renders "Generating navigation mesh..."
     await yieldToRenderer();
     markStartup(`engine-init.start-game.${config.id}.navmesh.begin`);
-    await engine.systemManager.navmeshSystem.generateNavmesh(navWorldSize, config.features, config.navmeshAsset);
+    const navmeshGenerated = await engine.systemManager.navmeshSystem.generateNavmesh(
+      navWorldSize,
+      config.features,
+      config.navmeshAsset,
+      { anchors: navmeshAnchors },
+    );
     markStartup(`engine-init.start-game.${config.id}.navmesh.end`);
+
+    if (config.id === GameMode.A_SHAU_VALLEY && !navmeshGenerated) {
+      throw new Error(
+        'A Shau Valley requires a generated or pre-baked navmesh. Startup stopped instead of continuing with beeline navigation.'
+      );
+    }
 
     // Validate navmesh connectivity using representative home bases (not all-pairs).
     // For 16 zones, all-pairs requires up to 120 path queries. Home-base check needs 1-2.
     if (config.zones?.length && engine.systemManager.navmeshSystem.isReady()) {
-      const heightCache = getHeightQueryCache();
       const homeBases = config.zones.filter(z => z.isHomeBase);
 
       // If no home bases defined, fall back to first and last zone as representatives
@@ -330,8 +349,17 @@ async function configureTerrainAndNavigation(
         : [config.zones[0], config.zones[config.zones.length - 1]];
 
       const repPositions = representatives.map(z => {
-        const y = heightCache.getHeightAt(z.position.x, z.position.z);
-        return new THREE.Vector3(z.position.x, y, z.position.z);
+        const y = terrainSystem.getHeightAt(z.position.x, z.position.z);
+        const raw = new THREE.Vector3(z.position.x, y, z.position.z);
+        const searchRadius = Math.max(z.radius + 20, 60);
+        const snapped = engine.systemManager.navmeshSystem.findNearestPoint(raw, searchRadius);
+        if (!snapped) {
+          Logger.warn(
+            'Navigation',
+            `No navmesh near home base "${z.name}" within ${searchRadius.toFixed(0)}m`
+          );
+        }
+        return snapped ?? raw;
       });
 
       const result = engine.systemManager.navmeshSystem.validateConnectivity(repPositions);

@@ -8,20 +8,20 @@ import { inspectProp, type PropPick } from './entityInspectors/inspectProp';
 
 export type InspectorEntityKind = 'combatant' | 'vehicle' | 'player' | 'prop';
 
-export interface InspectorSources {
+interface InspectorSources {
   combatants: CombatantSource;
   vehicles: VehicleSource;
   player: IPlayerController;
 }
 
-export interface InspectorTarget {
+interface InspectorTarget {
   kind: InspectorEntityKind;
   id: string;
   /** Pre-resolved prop pick — only used for 'prop' kind. */
   propPick?: PropPick;
 }
 
-export interface FollowController {
+interface FollowController {
   startFollow(kind: InspectorEntityKind, id: string): boolean;
   stopFollow(): void;
   isFollowing(): boolean;

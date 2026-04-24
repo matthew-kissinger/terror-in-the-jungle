@@ -3,7 +3,13 @@ import type { HelicopterControls } from '../helicopter/HelicopterPhysics';
 import type { IHelicopterModel, IHUDSystem } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
 import type { PlayerCamera } from '../player/PlayerCamera';
-import type { PlayerVehicleAdapter, VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
+import type {
+  PlayerVehicleAdapter,
+  VehicleExitOptions,
+  VehicleExitPlan,
+  VehicleTransitionContext,
+  VehicleUpdateContext,
+} from './PlayerVehicleAdapter';
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 
@@ -119,6 +125,17 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
 
     this.activeHelicopterId = null;
     this.resetControlState();
+  }
+
+  getExitPlan(ctx: VehicleTransitionContext, _options: VehicleExitOptions): VehicleExitPlan {
+    const planner = this.helicopterModel as IHelicopterModel & {
+      getPlayerExitPlan?: (helicopterId: string) => VehicleExitPlan | null;
+    };
+    return planner.getPlayerExitPlan?.(ctx.vehicleId) ?? {
+      canExit: true,
+      mode: 'normal',
+      position: ctx.position,
+    };
   }
 
   update(ctx: VehicleUpdateContext): void {

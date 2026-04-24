@@ -90,6 +90,12 @@ where `uWindOffset = windDir * uTimeSeconds * 10`.
 - `combat120` perf p99 within 5% of baseline.
 - Before/after screenshots for all five modes committed to evidence.
 
+2026-04-24 recovery caveat: this archived task describes the earlier cloud
+polish goal, not current sign-off. Current evidence in `docs/ATMOSPHERE.md` and
+`docs/STATE_OF_REPO.md` validates all five modes after preview builds began
+emitting `asset-manifest.json`, while A Shau still degrades from a TileCache
+failure to a static tiled-navmesh fallback.
+
 ## Non-goals
 
 - **No architectural replacement.** The single-plane + fbm architecture stays. No multi-layer stacks, no billboard systems, no volumetric raymarch. Those are follow-up-cycle territory and belong in a dedicated cloud-rewrite brief gated on design review.

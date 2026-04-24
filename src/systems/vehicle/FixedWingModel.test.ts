@@ -208,6 +208,23 @@ describe('FixedWingModel', () => {
       expect(hud.showMessage).toHaveBeenCalledWith('Aircraft must be on the ground before exit.', 2000);
       expect(playerController.exitFixedWing).not.toHaveBeenCalled();
     });
+
+    it('offers an emergency ejection plan for airborne fixed-wing exit requests', async () => {
+      const metadata = createSpawnMetadata();
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+      model.setPilotedAircraft('fw1');
+      model.positionAircraftOnApproach('fw1');
+
+      const plan = model.getPlayerExitPlan('fw1', { allowEject: true, reason: 'input' });
+
+      expect(plan).toMatchObject({
+        canExit: true,
+        mode: 'emergency_eject',
+        message: 'Emergency bailout.',
+      });
+      expect(plan?.position?.y).toBeGreaterThan(30);
+    });
   });
 
   describe('simulation culling', () => {

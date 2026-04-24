@@ -7,7 +7,13 @@ import { buildOrbitAnchorFromHeading } from './FixedWingOperations';
 import type { IHUDSystem } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
 import type { PlayerCamera } from '../player/PlayerCamera';
-import type { PlayerVehicleAdapter, VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
+import type {
+  PlayerVehicleAdapter,
+  VehicleExitOptions,
+  VehicleExitPlan,
+  VehicleTransitionContext,
+  VehicleUpdateContext,
+} from './PlayerVehicleAdapter';
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 
@@ -142,6 +148,13 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.activeAircraftId = null;
     this.activeConfigKey = null;
     this.resetControlState();
+  }
+
+  getExitPlan(ctx: VehicleTransitionContext, options: VehicleExitOptions): VehicleExitPlan {
+    return this.fixedWingModel.getPlayerExitPlan(ctx.vehicleId, options) ?? {
+      canExit: false,
+      message: 'Cannot find aircraft for exit.',
+    };
   }
 
   update(ctx: VehicleUpdateContext): void {

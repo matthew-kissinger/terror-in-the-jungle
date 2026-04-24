@@ -1,4 +1,3 @@
-import { getHeightQueryCache, type HeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import type { SystemKeyToType } from './SystemRegistry';
 
 type OperationalRuntimeRefs = Pick<
@@ -76,10 +75,6 @@ interface OperationalRuntimeGroups {
   >;
 }
 
-interface OperationalRuntimeOptions {
-  heightQueryCache?: HeightQueryCache;
-}
-
 export function createOperationalRuntimeGroups(
   refs: OperationalRuntimeRefs
 ): OperationalRuntimeGroups {
@@ -130,11 +125,10 @@ export function createOperationalRuntimeGroups(
 }
 
 export function wireOperationalRuntime(
-  groups: OperationalRuntimeGroups,
-  options: OperationalRuntimeOptions = {}
+  groups: OperationalRuntimeGroups
 ): void {
   wireStrategyRuntime(groups.strategyRuntime);
-  wireVehicleRuntime(groups.vehicleRuntime, options.heightQueryCache ?? getHeightQueryCache());
+  wireVehicleRuntime(groups.vehicleRuntime);
   wireAirSupportRuntime(groups.airSupportRuntime);
 }
 
@@ -153,10 +147,7 @@ function wireStrategyRuntime(runtime: OperationalRuntimeGroups['strategyRuntime'
   runtime.fullMapSystem.setWarSimulator(runtime.warSimulator);
 }
 
-function wireVehicleRuntime(
-  runtime: OperationalRuntimeGroups['vehicleRuntime'],
-  heightQueryCache: HeightQueryCache
-): void {
+function wireVehicleRuntime(runtime: OperationalRuntimeGroups['vehicleRuntime']): void {
   if (typeof runtime.helipadSystem.configureDependencies === 'function') {
     runtime.helipadSystem.configureDependencies({
       terrainManager: runtime.terrainSystem,
@@ -184,7 +175,7 @@ function wireVehicleRuntime(
       audioManager: runtime.audioManager,
       combatantSystem: runtime.combatantSystem,
       grenadeSystem: runtime.grenadeSystem,
-      heightQueryCache,
+      squadDeployTerrain: runtime.terrainSystem,
       vehicleManager: runtime.vehicleManager,
     });
   } else {
@@ -196,7 +187,7 @@ function wireVehicleRuntime(
     runtime.helicopterModel.setAudioManager(runtime.audioManager);
     runtime.helicopterModel.setCombatantSystem(runtime.combatantSystem);
     runtime.helicopterModel.setGrenadeSystem(runtime.grenadeSystem);
-    runtime.helicopterModel.setHeightQueryCache(heightQueryCache);
+    runtime.helicopterModel.setSquadDeployTerrain(runtime.terrainSystem);
     runtime.helicopterModel.setVehicleManager(runtime.vehicleManager);
   }
 

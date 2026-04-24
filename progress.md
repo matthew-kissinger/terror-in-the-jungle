@@ -434,9 +434,447 @@ TODO
   - R2 DEM URL from the manifest returns expected size/type/cache/CORS.
   - Web-game Playwright menu flow screenshot saved under `output/web-game/live-pages-r2-fe90e8f/`.
   - A Shau browser flow requested both `/asset-manifest.json` and the R2 DEM with no failed network requests.
-- Residual issue: A Shau flow still logs `[Navigation] Tiled navmesh generation failed`. This appears independent of the R2 asset delivery fix and should be handled in a terrain/nav quality pass.
+- Residual issue: A Shau flow still logged a TileCache/navmesh failure after
+  asset delivery was fixed. Later Cycle 10 logging narrowed this to tile `1, 0`;
+  the branch now makes the fallback explicit by retrying static tiled nav, but
+  A Shau nav remains a terrain/nav quality pass item.
 
 TODO
 - Replace temporary `r2.dev` with a custom R2 asset domain.
 - Update the GitHub `CLOUDFLARE_API_TOKEN` secret to include `Account -> Workers R2 Storage -> Edit`, then remove `TITJ_SKIP_R2_UPLOAD=1`.
 - Decide how future generated terrain payloads get into CI without relying on local-only gitignored source files; pinned metadata is acceptable only for already-uploaded immutable assets.
+
+2026-04-23 Cycle 1 vehicle session continuation
+- Patched the user-reported in-flight aircraft exit and stuck-forward walk issues during the architecture-recovery pass.
+- Fixed-wing emergency ejection now preserves airborne placement instead of projecting bailout to terrain height.
+- `VehicleSessionController` now clears transient `PlayerInput` state on vehicle enter/exit; `PlayerInput` also clears held keys on pointer-lock release/failure, blur, and hidden-tab transitions.
+- Added a pointer-lock failure fallback for embedded browsers and aligned debug free-fly with the gameplay pointer-lock target.
+- Updated the fixed-wing runtime probe to validate keyboard bailout through the real `KeyE` path and check immediate post-exit altitude before the player naturally falls.
+- Validation:
+  - targeted vehicle/input/model tests: PASS (`4` files, `92` tests)
+  - `npm run typecheck`: PASS
+  - `npm run lint`: PASS
+  - `npm run test:quick`: PASS (`242` files, `3762` tests)
+  - `npm run build`: PASS
+  - `npm run probe:fixed-wing`: PASS for A-1, F-4, and AC-47 takeoff, approach, bailout, and handoff
+
+TODO
+- Human playtest still needs to confirm bailout feel, no stuck forward movement, and embedded-browser mouse-look fallback usability.
+- Helicopter rotor stopped/idle/spool/flight-RPM visual lifecycle remains Cycle 2 work.
+- Airfield height datum/surface authority remains a Cycle 2/6 bridge before deeper fixed-wing taxi/takeoff tuning.
+
+2026-04-23 Cycle 2 rotor lifecycle continuation
+- Added `docs/playtest/PLAYTEST_2026-04-23_ARCHITECTURE_RECOVERY_CYCLE.md` as the comprehensive end-of-cycle playtest form for vehicle, pointer-lock, airfield, atmosphere, combat, UI, assets, bugs, and triage notes.
+- Patched helicopter rotor lifecycle:
+  - `HelicopterPhysics` can now distinguish engine-active idle from true stopped rotor state.
+  - Exited/grounded helicopters spool down to `engineRPM = 0` instead of being held at idle.
+  - `HelicopterModel` only keeps ticking unoccupied grounded helicopters while they still need to spool down.
+  - `HelicopterAnimation` uses higher flight-RPM visual speed so blades read faster before considering GLB replacement.
+- Validation:
+  - targeted helicopter tests: PASS (`4` files, `64` tests)
+  - `npm run typecheck`: PASS
+
+TODO
+- Human playtest still decides whether rotor blur or GLB pivot/asset work is needed.
+- Continue with airfield height datum/surface authority and automated probes.
+
+2026-04-23 Cycle 2/6 airfield datum continuation
+- Patched generated airfield terrain shaping so runway, apron, taxiway, filler, and envelope stamps share one runway-derived `fixedTargetHeight` when the runtime terrain provider is available during feature compilation.
+- `StampedHeightProvider` now honors that fixed datum before falling back to local target-height sampling. This keeps stamped runtime terrain and baked stamped heightmaps on the same airfield datum.
+- Added a sloped forward-strip regression that samples the parking stand, taxi connector, hold-short point, runway entry, and runway start through `StampedHeightProvider` and requires one resolved height.
+- Validation:
+  - targeted terrain + vehicle/helicopter suites: PASS (`7` files, `93` tests)
+  - targeted terrain suite after the type fix: PASS (`2` files, `13` tests)
+  - `npm run lint`: PASS
+  - `npm run typecheck`: PASS
+
+TODO
+- Human playtest the A Shau forward-strip stand-to-runway route, lineup point, and takeoff over surrounding terrain.
+- Cycle 6 still needs a proper terrain/collision runtime owner so spawn metadata, vehicle physics, NPC contact, LOS, and probes cannot query different terrain truths.
+
+2026-04-23 Cycle 2 AC-47 orbit closeout
+- `npm run probe:fixed-wing` initially caught a real AC-47 regression after the terrain datum patch: A-1/F-4 passed, AC-47 completed takeoff/approach/bailout/handoff but stalled during orbit hold.
+- Root cause: `FixedWingControlLaw` orbit-hold roll controller used the wrong roll-error sign and damping sign for the Airframe roll-rate convention, so it over-banked and bled speed.
+- Fixed orbit roll control to use target-bank minus current-bank, with damping aligned to the Airframe roll-rate sign.
+- Added coverage to the sustained full-throttle AC-47 orbit test so it checks transient roll and airspeed stall margin, not only final state.
+- Validation:
+  - targeted fixed-wing suites: PASS (`3` files, `39` tests)
+  - `npm run typecheck`: PASS
+  - `npm run lint`: PASS
+  - `npm run probe:fixed-wing`: PASS for A-1, F-4, and AC-47, including AC-47 orbit hold
+  - `npm run test:quick`: PASS (`242` files, `3769` tests)
+  - `npm run build`: PASS
+
+TODO
+- Human playtest still owns feel sign-off for AC-47 orbit, fixed-wing camera shake, bailout UX, and forward-strip taxi/takeoff.
+
+2026-04-23 Cycle 3 scheduler kickoff
+- User explicitly deferred playtesting until the end of all current recovery cycles.
+- Updated `docs/ARCHITECTURE_RECOVERY.md`, `docs/STATE_OF_REPO.md`, and `docs/BACKLOG.md` so Cycle 1/2 human feel gates are deferred, not blockers for Cycle 3.
+- Cycle 3 scope: declarative system schedule/update authority. Do not tune vehicle feel, terrain, or combat behavior unless needed to preserve update-order parity.
+
+TODO
+- Audit `SystemUpdater`, `SimulationScheduler`, and `SystemInitializer` for all manual update lists, scheduler groups, fallback updates, and tracked-system exclusions.
+- Implement the smallest schedule-inspection/validation layer that prevents silent double updates without changing gameplay order.
+
+2026-04-23 Cycle 3 scheduler first pass
+- Added `src/core/SystemUpdateSchedule.ts` with inspectable phase metadata for current `SystemUpdater` groups, budgets, scheduler cadence groups, and scheduled system keys.
+- Replaced `SystemUpdater`'s private hand-maintained tracked-system predicate with schedule-derived fallback exclusions.
+- Covered the latent double-update path where `navmeshSystem` or `npcVehicleController` could be manually updated and then updated again if later added to the generic `systems` list.
+- Timing budgets now come from schedule metadata, while the actual gameplay update order remains unchanged.
+- Focused validation:
+  - `npm run test:quick -- SystemUpdater SimulationScheduler`: PASS
+  - `npm run typecheck`: PASS
+
+TODO
+- Run `npm run lint`, `npm run test:quick`, and `npm run build` for the Cycle 3 implementation gate.
+- Move into Cycle 4 UI/input boundary cleanup after the Cycle 3 gate is green.
+
+2026-04-23 Cycle 3 scheduler gate
+- Cycle 3 implementation gate passed:
+  - `npm run typecheck`: PASS
+  - `npm run lint`: PASS
+  - `npm run test:quick`: PASS (`242` files, `3772` tests)
+  - `npm run build`: PASS
+- Updated docs to mark Cycle 4 as the next active recovery cycle.
+
+TODO
+- Audit UI/input authority for actor/vehicle mode, HUD context, touch controls, and pointer-lock fallback.
+- Keep Cycle 4 out of vehicle physics, terrain shaping, and scheduler order.
+
+2026-04-23 Cycle 4 UI/input boundary first pass
+- Removed the public touch-control vehicle-mode mutators that could independently force helicopter/flight UI state.
+- `TouchControls` now derives vehicle controls and flight cyclic visibility from presentation `VehicleUIContext`.
+- Actor mode alone no longer makes touch controls show the vehicle action bar; runtime should supply `HUDSystem.setVehicleContext()` with capabilities and HUD variant.
+- Validation:
+  - `npm run test:quick -- TouchControls VehicleActionBar PlayerInput FixedWingPlayerAdapter HelicopterPlayerAdapter`: PASS
+  - `npm run typecheck`: PASS
+  - `npm run lint`: PASS
+  - `npm run build`: PASS
+  - `npm run check:hud`: PASS
+  - `npm run check:mobile-ui`: PASS after rebuilding `dist/`
+  - `npm run test:quick`: PASS (`242` files, `3772` tests)
+
+TODO
+- Move into Cycle 5 combat scale/data ownership.
+- Human playtest still owns touch/mobile aircraft exit and pointer-lock fallback feel sign-off at the end of the recovery run.
+
+2026-04-23 Cycle 5 combat spatial ownership first pass
+- Moved the combat LOD spatial dependency behind `CombatantSystem` injection.
+  `CombatantLODManager` no longer imports the global `spatialGridManager`
+  singleton directly.
+- LOD dead-actor removal, position sync, and AI update dependency flow now use
+  the same supplied `SpatialGridManager` instance for the current combat world.
+- Added regression coverage that constructs a non-global spatial grid and proves
+  LOD sync plus `CombatantAI.updateAI()` receive the injected instance.
+- Validation:
+  - `npm run test:quick -- CombatantLODManager CombatantSystem SpatialGridManager CombatantMovement`: PASS
+  - `npm run typecheck`: PASS
+
+TODO
+- Move into Cycle 6 terrain/collision authority.
+- Combat hot state is still a shared object map; fuller data-store migration
+  remains a separate vertical slice with combat scenario/perf-tail evidence.
+
+2026-04-23 Cycle 6 terrain/collision authority first pass
+- Removed the live vehicle-runtime `HeightQueryCache` dependency from
+  helicopter squad deployment. `SquadDeployFromHelicopter` now accepts a
+  runtime terrain query surface and prefers `getEffectiveHeightAt()` for
+  collision-aware deploy positions.
+- `OperationalRuntimeComposer` now wires `terrainSystem` into helicopter squad
+  deployment via `setSquadDeployTerrain()`.
+- `NavmeshSystem` now receives `terrainSystem` from `SystemConnector` and
+  samples navmesh heightfields, obstacle placement, and startup connectivity
+  representative heights through runtime terrain instead of direct
+  `HeightQueryCache` calls.
+- Validation:
+  - `npm run test:quick -- SquadDeployFromHelicopter HelicopterModel OperationalRuntimeComposer TerrainSystem TerrainQueries`: PASS
+  - `npm run test:quick -- NavmeshSystem NavmeshHeightfieldBuilder SystemConnector ModeStartupPreparer SquadDeployFromHelicopter HelicopterModel OperationalRuntimeComposer`: PASS
+  - `npm run typecheck`: PASS
+  - `npm run lint`: PASS
+  - `npm run test:quick`: PASS (`242` files, `3774` tests)
+  - `npm run build`: PASS
+  - `npm run probe:fixed-wing`: first run closed the browser during AC-47 and
+    left partial artifacts; clean rerun PASS for A-1, F-4, and AC-47.
+
+TODO
+- Move into Cycle 7 harness productization after the gate is green.
+- Remaining terrain authority risks: world-feature static obstacles still use a
+  direct `LOSAccelerator` hook, and `PlayerMovement` still has a no-runtime
+  `HeightQueryCache` fallback.
+
+2026-04-23 Cycle 7 harness productization first pass
+- Patched `scripts/fixed-wing-runtime-probe.ts` to write `summary.json`
+  incrementally after each aircraft scenario instead of only at the end.
+- Failed scenarios now write a structured failed result with error text and a
+  best-effort failure screenshot path if the page is still alive.
+- This directly addresses the Cycle 6 transient where the first probe attempt
+  completed A-1/F-4 screenshots, then closed during AC-47 before updating the
+  stale summary file.
+- Validation:
+  - `npm run typecheck`: PASS
+  - `npm run lint`: PASS
+  - `npm run probe:fixed-wing`: PASS; summary now has `status: "passed"`
+  - `npm run check:states`: PASS
+  - `npm run check:hud`: PASS
+
+TODO
+- Start Cycle 8 dead-code/docs/guardrail triage. Do not delete findings from
+  `npm run deadcode` without current code evidence and a delete/adopt/retain
+  classification.
+
+2026-04-24 Cycle 8 cleanup and guardrails first pass
+- Classified `npm run deadcode` findings before editing:
+  - retained/adopted root airframe evidence probes by making them explicit Knip
+    entries;
+  - retained archived cycle evidence `probe.mts` files through Knip ignore
+    configuration;
+  - retained Cloudflare deploy tooling dependencies through Knip dependency
+    ignores;
+  - cleaned local-only source exports so helpers/types/constants are private
+    unless another module actually imports them.
+- Added the missing terrain subsystem guardrail and tightened combat, UI, and
+  scripts guardrails around injected spatial authority, presentation-only UI,
+  and honest browser-probe paths.
+- Validation:
+  - `npm run typecheck`: PASS
+  - `npm run deadcode`: PASS
+  - `npm run lint`: PASS
+  - `npm run test:quick`: PASS, 242 files / 3774 tests
+  - `npm run build`: PASS
+
+TODO
+- Final user playtest remains the game-feel gate for aircraft feel, bailout UX,
+  pointer-lock fallback, and airfield taxi/takeoff usability.
+
+2026-04-24 follow-up gates from user review
+- Verified and documented that clouds are configured for all five current game
+  modes, but v1 clouds are not considered fixed because `CloudLayer` is still a
+  single camera-following plane.
+- Verified and documented that silent fallback risk remains: DEM load failure
+  can leave flat terrain, `PlayerMovement` can fall back to `HeightQueryCache`,
+  air-support non-spooky missions still use legacy direct positioning, terrain
+  LOS wiring has a side channel, and combat spatial singleton compatibility
+  remains.
+- Reframed airfield as partially fixed: terrain stamps share one datum, but
+  stands/taxi/runway helpers still need one airfield surface runtime.
+- Reframed render/LOD/culling as not fully audited: aircraft have visibility
+  gates and static GLBs have draw-call optimization, but buildings/props lack a
+  measured render-in/render-out/perf contract.
+- Updated docs and the architecture-recovery playtest form with Cycles 9-12:
+  atmosphere/cloud evidence, fallback retirement, airfield surface authority,
+  and render/LOD/culling perf.
+
+2026-04-24 Cycle 9/10 evidence refresh and doc alignment
+- First regenerated atmosphere evidence with `npm run evidence:atmosphere -- --port
+  9224` at
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T01-51-14-709Z/`.
+- That run proved the local/perf preview had no `asset-manifest.json`; A Shau
+  correctly failed before live mode and recorded browser errors.
+- Patched `npm run build` and `npm run build:perf` so retail and perf output
+  dirs emit `asset-manifest.json`.
+- Regenerated evidence again. Later superseded artifact:
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T02-18-34-516Z/`.
+- A Shau, Open Frontier, TDM, Zone Control, and AI Sandbox/combat120 now enter
+  live mode and capture ground plus aircraft/cloud screenshots.
+- A Shau records DEM-backed terrain heights, but still emitted a TileCache
+  generation failure at tile `1, 0`.
+- Visual inspection confirms the current state is evidence, not sign-off:
+  Open Frontier/combat120 high views are still mostly sky/haze, TDM/Zone
+  Control expose obvious flat cloud-plane artifacts, A Shau has a visible
+  cloud-plane/horizon band, and all captured live modes still report
+  `cloudFollowCheck.followsCameraXZ === true`.
+- Aligned docs to the new truth in `docs/ARCHITECTURE_RECOVERY.md`,
+  `docs/STATE_OF_REPO.md`, `docs/BACKLOG.md`, `docs/ATMOSPHERE.md`,
+  `docs/ARCHITECTURE.md`, `docs/CLOUDFLARE_STACK.md`, and
+  `docs/playtest/PLAYTEST_2026-04-23_ARCHITECTURE_RECOVERY_CYCLE.md`.
+- Validation:
+  - `npm run typecheck`: PASS
+  - `npx vitest run src/core/ModeStartupPreparer.test.ts src/systems/environment/AtmosphereSystem.test.ts src/systems/environment/atmosphere/CloudLayer.test.ts`: PASS, 63 tests
+  - `npm run lint`: PASS
+  - `npm run test:quick`: PASS, 242 files / 3774 tests
+  - `npm run build`: PASS, with the existing Vite large-chunk warning
+
+TODO
+- Cycle 10: investigate the current A Shau TileCache generation failure at tile
+  `0, 0` with generated bounds
+  `origin=(-8168,-8839) extent=(17057,17722) anchors=18`. The earlier
+  disconnected-home-base warning stopped after the terrain-flow shoulder patch,
+  but static fallback is still degraded and route/NPC movement needs a real
+  A Shau nav gate.
+- Cycle 11: unify airfield surface authority after A Shau terrain is real;
+  keep `tabat_airstrip` and Open Frontier `airfield_main` in scope.
+- Cycle 12: capture airfield/world-feature render, LOD, culling, collision, and
+  LOS perf before replacing models or adding imposters.
+
+2026-04-24 Cycle 10 fallback update and doc realignment
+- Added explicit A Shau nav fallback behavior after the TileCache build failure:
+  `NavmeshSystem` logs the TileCache failure, retries a static tiled navmesh,
+  and warns that TileCache streaming/obstacles are disabled when that fallback
+  is active.
+- Regenerated atmosphere evidence with warning capture enabled. Later
+  superseded artifact:
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T02-33-47-922Z/`.
+- Latest evidence summary:
+  - A Shau, Open Frontier, TDM, Zone Control, and AI Sandbox/combat120 all
+    enter live mode, capture ground plus aircraft screenshots, and record `0`
+    browser errors.
+  - All five modes still report `cloudFollowCheck.followsCameraXZ === true`,
+    so the one-plane cloud representation remains a known v1 limit.
+  - A Shau loads DEM-backed terrain, but TileCache generation still fails at
+    tile `1, 0` and degrades to static nav. That run reported disconnected
+    nav islands and a steep
+    `tabat_airstrip` warning (`112.1m` vertical span across `320m` runway
+    footprint), WebGL context-loss warnings during capture, and ReadPixels GPU
+    stall warnings.
+- Updated docs so agents do not inherit the older A Shau browser-failure
+  framing. Current docs now describe explicit degraded static nav plus
+  remaining connectivity/airfield blockers in `docs/ARCHITECTURE_RECOVERY.md`,
+  `docs/STATE_OF_REPO.md`, `docs/BACKLOG.md`, `docs/ATMOSPHERE.md`,
+  `docs/ARCHITECTURE.md`, `docs/CLOUDFLARE_STACK.md`,
+  `docs/DEVELOPMENT.md`, `docs/PLAYTEST_CHECKLIST.md`, historical cloud-cycle
+  caveats, and the architecture-recovery playtest form.
+- Validation after the fallback/docs alignment:
+  - `npm run typecheck`: PASS
+  - `npm run lint`: PASS
+  - `npm run test:quick`: PASS, 242 files / 3774 tests
+  - `npm run build`: PASS, writes `dist/asset-manifest.json`; existing Vite
+    large-chunk warning remains
+
+TODO
+- Continue Cycle 10 by tracing why A Shau TileCache fails and whether the
+  static fallback is acceptable only as a degraded diagnostic path.
+- Continue Cycle 11 with `tabat_airstrip`: author a real airfield surface
+  authority or move/reshape the site so taxi/takeoff does not rely on a 112m
+  flattening envelope.
+- Continue Cycle 12 with render/LOD/culling evidence; include WebGL
+  context-loss and ReadPixels warnings in the capture/perf audit.
+
+2026-04-24 Cycle 10 A Shau continuation and all-mode release gate
+- User clarified that A Shau still needs to be fixed and must not be skipped,
+  while the cycle also needs all-mode validation before push/deploy.
+- Patched large-world navmesh generation so tiled/static generation bounds are
+  anchored to scenario zones instead of assuming world origin contains useful
+  navigation. Added bounds to the TileCache fallback warning.
+- Patched startup connectivity validation to snap home-base representative
+  points to nearby navmesh and warn when a home base has no navmesh nearby.
+- Enabled A Shau terrain-flow shoulders around home bases/objectives. Latest
+  evidence no longer reports disconnected home-base islands after this change.
+- Current evidence artifact:
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T03-01-30-184Z/`.
+- Latest evidence summary:
+  - A Shau, Open Frontier, TDM, Zone Control, and combat120 all enter live mode
+    with `0` browser errors and ground/aircraft screenshots.
+  - A Shau still falls back from TileCache to static tiled nav:
+    `Failed to build nav mesh tiles at 0, 0; bounds origin=(-8168,-8839)
+    extent=(17057,17722) anchors=18`.
+  - A Shau still warns that `tabat_airstrip` has `112.1m` vertical span across
+    the `320m` runway footprint.
+  - Open Frontier now also warns that `airfield_main` is steep (`19.3m` span
+    across `480m`), and several non-A Shau modes show TacticalUI/World/Combat
+    budget warnings. These are part of the final all-mode release gate.
+- Updated docs to state the current cycle intent:
+  - keep fixing A Shau rather than accepting degraded nav as done;
+  - before push/deploy, rerun all-mode evidence so A Shau work does not regress
+    Open Frontier, TDM, Zone Control, or combat120;
+  - bridge local-vs-prod evidence by checking live Pages/R2/WASM/service-worker
+    headers after deployment because local perf-preview evidence is not live
+    production truth.
+
+TODO
+- Continue A Shau Cycle 10: determine whether TileCache can support the current
+  generated bounds or whether A Shau needs a baked/streamed nav layer.
+- Keep `tabat_airstrip` and Open Frontier `airfield_main` in Cycle 11 airfield
+  authority.
+- Final release gate needs local all-mode evidence, normal validation, and live
+  deploy/header checks.
+
+2026-04-24 Cycle 10/12 atmosphere, terrain-clipping, and water clarification
+- Updated current-facing docs after the latest all-mode evidence artifact:
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/`.
+- Current code truth:
+  - visible clouds are sky-dome clouds from `HosekWilkieSkyBackend`;
+    `CloudLayer` is still present but hidden so the old hard horizon divider /
+    one-tile plane is no longer the visible cloud authority. The shader now uses
+    a seamless cloud-deck projection instead of azimuth-wrapped UVs.
+  - all five modes enter live mode with `0` browser errors and terrain resident
+    at the camera in ground, sky, and aircraft evidence views.
+  - the refreshed artifact reports `cameraBelowTerrain=false` and
+    `waterExposedByTerrainClip=false` in every captured view.
+  - Open Frontier and combat120 cloud metrics pass and now show lighter
+    scattered-cloud forms. A Shau, TDM, and Zone Control read as heavier broken
+    cloud layers. Human playtest remains the final art/readability sign-off.
+  - A Shau water is disabled and no longer reports underwater state in the
+    evidence capture. Terrain/camera clipping and water rendering are separate
+    issues: clipping can expose the global water plane, while water quality /
+    hydrology remains its own render backlog item.
+  - the old TileCache fallback path is removed. Large worlds use explicit
+    static-tiled nav generation, and A Shau startup stops if no generated or
+    pre-baked navmesh exists. Remaining A Shau risk is route/NPC quality, not a
+    hidden TileCache/beeline fallback.
+  - the refreshed artifact records A Shau nav diagnostics: 6/6 representative
+    bases snapped to navmesh, `connected=true`, and every representative pair
+    returned a path. This is not a human/NPC movement sign-off, but it closes
+    the prior missing connectivity evidence gap.
+- Aligned docs: `docs/ARCHITECTURE_RECOVERY.md`, `docs/STATE_OF_REPO.md`,
+  `docs/ATMOSPHERE.md`, `docs/BACKLOG.md`, `docs/ARCHITECTURE.md`,
+  `docs/DEVELOPMENT.md`, `docs/CLOUDFLARE_STACK.md`, the 2026-04-22 cloud cycle
+  caveats, `docs/PLAYTEST_CHECKLIST.md`, and the architecture-recovery playtest
+  form.
+- Added `clipDiagnostics` to `scripts/capture-atmosphere-recovery-shots.ts` so
+  evidence rows report raw/effective terrain clearance, water-level clearance,
+  and whether water was exposed by an invalid below-terrain camera position.
+- Added `navDiagnostics` to the same evidence script. A Shau now fails the
+  artifact if representative bases cannot snap/connect on the navmesh.
+- Repo pulse:
+  - `master`, `origin/master`, and the active recovery worktree all pointed at
+    `4a940957` before this recovery work was committed, so this session's work
+    lived in the dirty main worktree.
+  - No branch has committed work dated 2026-04-23 or 2026-04-24 in this clone.
+  - Most April 22 task branches are patch-equivalent to `master`; four remain
+    non-equivalent and need post-ship cleanup review:
+    `task/world-overlay-debugger`, `task/live-tuning-panel`,
+    `task/airfield-envelope-ramp-softening`, and
+    `task/airframe-ground-rolling-model`.
+
+Validation:
+- `npm run typecheck`: PASS
+- `npx vitest run src/systems/environment/AtmosphereSystem.test.ts src/systems/environment/atmosphere/HosekWilkieSkyBackend.test.ts src/systems/environment/WaterSystem.test.ts src/systems/navigation/NavmeshSystem.test.ts src/core/ModeStartupPreparer.test.ts`: PASS, 91 tests
+- `npm run lint`: PASS
+- `npm run evidence:atmosphere -- --port 9224`: PASS, wrote
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/summary.json`
+
+TODO
+- Continue Cycle 10 with A Shau route/NPC movement quality over explicit
+  static-tiled generation.
+- Continue Cycle 11 with `tabat_airstrip` / `airfield_main` surface authority.
+- Continue Cycle 12 with render/LOD/culling plus separate water/hydrology and
+  terrain/camera clipping evidence.
+
+2026-04-24 Final local recovery gate before commit
+- Current docs aligned away from branch-scoped language in the current truth
+  anchors: `AGENTS.md`, `docs/STATE_OF_REPO.md`,
+  `docs/ARCHITECTURE_RECOVERY.md`, `docs/BACKLOG.md`,
+  `docs/AGENT_ORCHESTRATION.md`, `docs/DEVELOPMENT.md`,
+  `docs/DEPLOY_WORKFLOW.md`, and `docs/PERFORMANCE.md`.
+- Validation completed:
+  - `npm run validate:fast`: PASS, 242 files / 3781 tests.
+  - `npm run build`: PASS, with the existing large-chunk Vite warning.
+  - `npm run probe:fixed-wing`: PASS for A-1, F-4, and AC-47, including
+    takeoff, climb, approach, airborne bailout, and player/NPC handoff.
+  - `npm run check:states`: PASS, artifact
+    `artifacts/states/state-coverage-2026-04-24T05-40-49-159Z.json`.
+  - `npm run check:hud`: PASS, artifact
+    `artifacts/hud/hud-layout-report.json`.
+  - `npm run check:mobile-ui`: PASS, artifact
+    `artifacts/mobile-ui/2026-04-24T05-43-18-934Z/mobile-ui-check`.
+  - `npm run doctor`: PASS.
+  - `npm run deadcode`: PASS.
+  - `git diff --check`: PASS, with CRLF warnings only.
+  - `npm run validate:full`: PASS/WARN. Unit/build stages passed; first
+    combat120 capture failed one heap-recovery check. Standalone
+    `npm run perf:capture:combat120` then passed with warnings at
+    `artifacts/perf/2026-04-24T05-49-45-656Z`, and
+    `npm run perf:compare -- --scenario combat120` passed 8/8 checks.
+- Remaining release-owner work: stage, commit, fast-forward `master`, push,
+  trigger manual deploy, then verify live Pages/R2/WASM/service-worker headers.

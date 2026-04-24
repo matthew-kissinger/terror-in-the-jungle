@@ -1,6 +1,6 @@
 # Deploy Workflow
 
-Last updated: 2026-04-22
+Last updated: 2026-04-24
 
 Production: https://terror-in-the-jungle.pages.dev/
 
@@ -56,7 +56,7 @@ Key facts:
 - The deploy workflow runs `cloudflare/wrangler-action@v3`, not Cloudflare Pages' Git integration. Cloudflare sees only the pre-built `dist/` directory.
 - The Pages project has no build step configured on Cloudflare's side. The build is reproducible from `package-lock.json` plus `npm ci` inside the GitHub runner.
 - The deploy workflow does a fresh checkout, `npm ci`, and `npm run build` every run. It does not rely on a CI artifact.
-- After `npm run build`, the deploy workflow runs `npm run cloudflare:assets:upload` with `TITJ_SKIP_R2_UPLOAD=1`. This writes `dist/asset-manifest.json` from pinned R2 metadata and validates public size/content-type/cache/CORS before Pages upload.
+- `npm run build` writes a preview `dist/asset-manifest.json` from local or pinned R2 metadata so local retail previews can resolve required A Shau assets. After that, the deploy workflow runs `npm run cloudflare:assets:upload` with `TITJ_SKIP_R2_UPLOAD=1`, overwrites/refreshes `dist/asset-manifest.json`, and validates public size/content-type/cache/CORS before Pages upload.
 - GitHub Actions fresh checkouts do not contain gitignored A Shau source files. For the current immutable objects, the asset script uses pinned R2 metadata in CI and validates the live object URLs. Local runs with source files present still hash and upload the real files.
 - The GitHub `CLOUDFLARE_API_TOKEN` currently has enough permission for Pages Direct Upload but not R2 object writes. Update that secret to include Account -> Workers R2 Storage -> Edit before removing `TITJ_SKIP_R2_UPLOAD=1`.
 - CI `perf` runs on every push, uploads artifacts, and is intentionally advisory. See `docs/DEVELOPMENT.md` for why.
@@ -65,6 +65,11 @@ Key facts:
   visitor-facing compression for supported content types, including JavaScript,
   CSS, JSON, fonts, and WASM, based on `Accept-Encoding` and zone compression
   rules. This keeps `dist/` and Pages uploads to the canonical assets only.
+- Local evidence and deployed evidence are intentionally separate. `npm run
+  evidence:atmosphere`, `npm run build`, and `npm run build:perf` prove the
+  local preview bundle and local manifest path. They do not prove that the live
+  Pages deployment is serving the same app shell, service worker,
+  content-hashed build assets, Recast WASM asset, or R2 manifest/DEM URL.
 
 Secrets used by the workflow: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`.
 
@@ -91,9 +96,30 @@ This is the line between fast and stale:
 - `data/navmesh/` and `data/heightmaps/` are seed-keyed baked data. Cache them aggressively.
 - `data/vietnam/` is a local development compatibility path today. Production
   resolves required A Shau DEM data through `asset-manifest.json`, which points
-  at content-addressed Cloudflare R2 keys.
+  at content-addressed Cloudflare R2 keys. If `asset-manifest.json` or the DEM
+  URL returns HTML, any A Shau gameplay evidence is invalid; the runtime/probe
+  should surface that as a required-asset failure, not a harmless fallback.
 
 The repo now sets Vite `build.assetsDir = 'build-assets'` so generated bundle assets no longer share a URL namespace with mutable files copied from `public/assets/`.
+
+### Local vs Live Evidence Gap
+
+For A Shau and other asset-heavy modes, the dev gap is usually not TypeScript
+logic; it is delivery shape:
+
+- local dev may read gitignored compatibility files under `public/data/vietnam/`;
+- local preview now reads generated `dist/asset-manifest.json` /
+  `dist-perf/asset-manifest.json`;
+- CI/deploy fresh checkouts rely on pinned R2 metadata unless the Cloudflare
+  token can write R2;
+- live production depends on Pages freshness, the service-worker update, the
+  content-hashed build/WASM assets under `/build-assets/`, and the R2 URL in
+  `/asset-manifest.json`.
+
+Release evidence must bridge that gap. After deploy, rerun the header checks in
+section 7 and open the live URL for at least one A Shau smoke plus one non-A
+Shau mode smoke. If the live manifest, WASM, or service worker is stale, do not
+reinterpret a local pass as deployed truth.
 
 ## 3. Cache-Control Strategy
 

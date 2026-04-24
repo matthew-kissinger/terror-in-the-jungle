@@ -10,6 +10,7 @@ import type { SquadManager } from './SquadManager';
 import type { GameModeManager } from '../world/GameModeManager';
 import type { ZoneManager } from '../world/ZoneManager';
 import { spatialGridManager } from './SpatialGridManager';
+import type { SpatialGridManager } from './SpatialGridManager';
 
 vi.mock('./SpatialGridManager', () => ({
   spatialGridManager: {
@@ -139,7 +140,8 @@ describe('CombatantLODManager', () => {
       combatantCombat,
       combatantMovement,
       combatantRenderer,
-      squadManager
+      squadManager,
+      spatialGridManager as unknown as any
     );
   });
 
@@ -439,6 +441,46 @@ describe('CombatantLODManager', () => {
       expect(spatialGridManager.syncEntity).not.toHaveBeenCalled();
       // Death animation clock still advances even though LOD updates are skipped.
       expect(deadCombatant.deathProgress).toBeGreaterThan(0.1);
+    });
+
+    it('uses the injected spatial grid for AI and position sync', () => {
+      const injectedSpatialGrid = {
+        syncEntity: vi.fn(),
+        removeEntity: vi.fn(),
+      } as unknown as SpatialGridManager;
+      manager = new CombatantLODManager(
+        combatants,
+        playerPosition,
+        combatantAI,
+        combatantCombat,
+        combatantMovement,
+        combatantRenderer,
+        squadManager,
+        injectedSpatialGrid
+      );
+      manager.setGameModeManager(createMockGameModeManager(400));
+      const combatant = createMockCombatant(
+        'injected-grid-npc',
+        new THREE.Vector3(10, 0, 0),
+        Faction.US,
+        CombatantState.PATROLLING
+      );
+      combatants.set(combatant.id, combatant);
+
+      manager.updateCombatants(0.016);
+      manager.updateCombatants(0.016);
+      manager.updateCombatants(0.016);
+
+      expect(injectedSpatialGrid.syncEntity).toHaveBeenCalledWith(combatant.id, combatant.position);
+      expect(combatantAI.updateAI).toHaveBeenCalledWith(
+        combatant,
+        0.016,
+        playerPosition,
+        combatants,
+        injectedSpatialGrid,
+        'high'
+      );
+      expect(spatialGridManager.syncEntity).not.toHaveBeenCalled();
     });
 
     it('should remove combatants after death animation completes', () => {

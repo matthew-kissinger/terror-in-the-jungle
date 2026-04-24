@@ -5,6 +5,8 @@ import { HelicopterPhysics } from './HelicopterPhysics';
 const _finalQuaternion = new THREE.Quaternion();
 const _scratchEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const _scratchQuaternion = new THREE.Quaternion();
+const MAIN_ROTOR_MAX_VISUAL_SPEED = 48;
+const TAIL_ROTOR_SPEED_MULTIPLIER = 5.5;
 
 interface RotorNodes {
   main: THREE.Object3D[];
@@ -60,9 +62,8 @@ export class HelicopterAnimation {
 
     if (physics) {
       const state = physics.getState();
-      // Base rotor speed from engine RPM - more responsive
-      targetMainSpeed = state.engineRPM * 20; // Increased for more visible rotation
-      targetTailSpeed = targetMainSpeed * 4.5; // Tail rotor spins faster
+      targetMainSpeed = state.engineRPM * MAIN_ROTOR_MAX_VISUAL_SPEED;
+      targetTailSpeed = targetMainSpeed * TAIL_ROTOR_SPEED_MULTIPLIER;
     }
 
     // Smooth rotor acceleration

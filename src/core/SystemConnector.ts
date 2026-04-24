@@ -39,6 +39,7 @@ export class SystemConnector {
   // ── Navigation (navmesh) ──
 
   private wireNavigation(refs: SystemKeyToType): void {
+    refs.navmeshSystem.setTerrainSystem(refs.terrainSystem);
     refs.combatantSystem.setNavmeshSystem(refs.navmeshSystem);
     refs.worldFeatureSystem.setNavmeshSystem(refs.navmeshSystem);
   }

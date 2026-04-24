@@ -185,29 +185,34 @@ export function buildFixedWingPilotCommand(
     const deltaZ = context.positionZ - intent.orbitCenterZ;
     const currentRadius = Math.max(Math.hypot(deltaX, deltaZ), 1);
     const radiusError = (currentRadius - intent.orbitRadius) / intent.orbitRadius;
-    const turnSpeed = Math.max(snapshot.airspeed, snapshot.forwardAirspeed, 1);
-    const requiredBankDeg = THREE.MathUtils.radToDeg(
-      Math.atan((turnSpeed * turnSpeed) / Math.max(intent.orbitRadius * 9.81, 1)),
-    );
-    const nominalBankDeg = Math.max(intent.orbitBankDeg, requiredBankDeg);
-    const bankCorrectionDeg = THREE.MathUtils.clamp(radiusError * 30, -8, 8);
+    const maxOrbitBankDeg = THREE.MathUtils.clamp(intent.orbitBankDeg, 12, 22);
+    const bankCorrectionDeg = THREE.MathUtils.clamp(radiusError * 18, -4, 4);
     const targetBankDeg = THREE.MathUtils.clamp(
-      (nominalBankDeg + bankCorrectionDeg) * intent.orbitTurnDirection,
-      -30,
-      30,
+      (intent.orbitBankDeg + bankCorrectionDeg) * intent.orbitTurnDirection,
+      -maxOrbitBankDeg,
+      maxOrbitBankDeg,
     );
 
-    rollCommand = THREE.MathUtils.clamp((snapshot.rollDeg - targetBankDeg) / 12, -1, 1) * 0.8;
-    rollCommand -= snapshot.rollRateDeg / 85;
+    const rollErrorDeg = targetBankDeg - snapshot.rollDeg;
+    rollCommand = THREE.MathUtils.clamp(rollErrorDeg / 22, -1, 1) * 0.55;
+    rollCommand += snapshot.rollRateDeg / 45;
 
-    const targetVerticalSpeed = snapshot.altitudeAGL < ORBIT_HOLD_TARGET_AGL_M ? 2.5 : 0.2;
-    const climbBias = THREE.MathUtils.clamp((targetVerticalSpeed - snapshot.verticalSpeed) * 0.1, -0.15, 0.3);
+    const altitudeError = ORBIT_HOLD_TARGET_AGL_M - snapshot.altitudeAGL;
+    const targetVerticalSpeed = THREE.MathUtils.clamp(altitudeError / 35, -2.0, 2.5);
+    const verticalSpeedCorrection = THREE.MathUtils.clamp(
+      (targetVerticalSpeed - snapshot.verticalSpeed) * 0.08,
+      -0.28,
+      0.35,
+    );
     const altitudeFloorBias = THREE.MathUtils.clamp(
-      (ORBIT_HOLD_TARGET_AGL_M - snapshot.altitudeAGL) / 90,
+      altitudeError / 90,
       0,
       0.45,
     );
-    pitchCommand = Math.max(climbBias, altitudeFloorBias) - snapshot.pitchRateDeg / 60;
+    const altitudeCommand = altitudeError > 0
+      ? Math.max(verticalSpeedCorrection, altitudeFloorBias)
+      : verticalSpeedCorrection;
+    pitchCommand = altitudeCommand - snapshot.pitchRateDeg / 60;
 
     yawCommand = intent.orbitTurnDirection * 0.2;
   } else {

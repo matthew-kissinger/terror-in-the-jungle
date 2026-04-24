@@ -10,6 +10,9 @@ const DOME_HEIGHT_SEGMENTS = 32;
 
 const LUT_AZIMUTH_BINS = 32;
 const LUT_ELEVATION_BINS = 8;
+const DEFAULT_CLOUD_NOISE_SCALE = 1 / 900;
+const DEFAULT_CLOUD_WIND_DIR_X = 0.7;
+const DEFAULT_CLOUD_WIND_DIR_Z = 0.7;
 
 /**
  * Angular threshold (cosine form) at which a sun-direction change forces a
@@ -53,6 +56,10 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private mieCoefficient = 0.005;
   private mieDirectionalG = 0.8;
   private exposure = 0.5;
+  private cloudCoverage = 0;
+  private cloudNoiseScale = DEFAULT_CLOUD_NOISE_SCALE;
+  private cloudTimeSeconds = 0;
+  private readonly cloudWindDir = new THREE.Vector2(DEFAULT_CLOUD_WIND_DIR_X, DEFAULT_CLOUD_WIND_DIR_Z);
 
   // Ring/zenith cache + LUT, refreshed when the sun direction changes.
   private readonly zenithColor = new THREE.Color(0x000000);
@@ -79,6 +86,10 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
         uMieDirectionalG: { value: this.mieDirectionalG },
         uGroundAlbedo: { value: this.groundAlbedo },
         uExposure: { value: this.exposure },
+        uCloudCoverage: { value: this.cloudCoverage },
+        uCloudNoiseScale: { value: this.cloudNoiseScale },
+        uCloudTimeSeconds: { value: this.cloudTimeSeconds },
+        uCloudWindDir: { value: this.cloudWindDir },
       },
       vertexShader: hosekWilkieVertexShader,
       fragmentShader: hosekWilkieFragmentShader,
@@ -138,6 +149,38 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       this.bakeLUT();
       this.lutDirty = false;
     }
+
+    if (Number.isFinite(_deltaTime) && _deltaTime > 0) {
+      this.cloudTimeSeconds += _deltaTime;
+      this.material.uniforms.uCloudTimeSeconds.value = this.cloudTimeSeconds;
+    }
+  }
+
+  /**
+   * Sky-integrated cloud coverage. This is intentionally separate from
+   * `CloudLayer`: the dome pass guarantees visible clouds in ordinary sky
+   * views without a finite flat-plane horizon.
+   */
+  setCloudCoverage(value: number): void {
+    this.cloudCoverage = Math.max(0, Math.min(1, value));
+    this.material.uniforms.uCloudCoverage.value = this.cloudCoverage;
+  }
+
+  setCloudFeatureScaleMeters(metersPerFeature: number): void {
+    if (!Number.isFinite(metersPerFeature) || metersPerFeature <= 0) {
+      return;
+    }
+    this.cloudNoiseScale = 1 / metersPerFeature;
+    this.material.uniforms.uCloudNoiseScale.value = this.cloudNoiseScale;
+  }
+
+  resetCloudFeatureScale(): void {
+    this.cloudNoiseScale = DEFAULT_CLOUD_NOISE_SCALE;
+    this.material.uniforms.uCloudNoiseScale.value = this.cloudNoiseScale;
+  }
+
+  getCloudCoverage(): number {
+    return this.cloudCoverage;
   }
 
   sample(dir: THREE.Vector3, out: THREE.Color): THREE.Color {

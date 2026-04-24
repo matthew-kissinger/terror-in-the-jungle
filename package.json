@@ -8,7 +8,18 @@
       "public/sw.js",
       "scripts/hud-state-probe.ts",
       "scripts/perf-active-driver.cjs",
-      "scripts/perf-browser-observers.js"
+      "scripts/perf-browser-observers.js",
+      "scripts/probe-alpha-protection.ts",
+      "scripts/probe-altitude-hold-clamp.ts",
+      "scripts/probe-climb-oscillation.ts",
+      "scripts/probe-ground-rolling.ts"
+    ],
+    "ignoreDependencies": [
+      "@cloudflare/workers-types",
+      "wrangler"
+    ],
+    "ignoreFiles": [
+      "docs/cycles/**/evidence/**/probe.mts"
     ],
     "ignore": [
       "scripts/capture-*-shots.ts",
@@ -25,8 +36,8 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "npx tsx scripts/prebake-navmesh.ts",
-    "build": "tsc && vite build",
-    "build:perf": "cross-env VITE_PERF_HARNESS=1 tsc && cross-env VITE_PERF_HARNESS=1 vite build --outDir dist-perf",
+    "build": "tsc && vite build && npm run cloudflare:assets:manifest",
+    "build:perf": "cross-env VITE_PERF_HARNESS=1 tsc && cross-env VITE_PERF_HARNESS=1 vite build --outDir dist-perf && npm run cloudflare:assets:manifest -- --out=dist-perf/asset-manifest.json",
     "typecheck": "tsc --noEmit",
     "doctor": "npx tsx scripts/doctor.ts",
     "validate:fast": "npm run typecheck && npm run lint && npm run test:quick",
@@ -80,6 +91,7 @@
     "check:mobile-ui": "npx tsx scripts/mobile-ui-check.ts",
     "check:memory": "npx tsx scripts/memory-growth-tracker.ts",
     "check:assets": "npx tsx scripts/asset-load-analyzer.ts",
+    "evidence:atmosphere": "npx tsx scripts/capture-atmosphere-recovery-shots.ts",
     "cloudflare:assets:manifest": "npx tsx scripts/cloudflare-assets.ts manifest",
     "cloudflare:assets:upload": "npx tsx scripts/cloudflare-assets.ts upload",
     "cloudflare:assets:validate": "npx tsx scripts/cloudflare-assets.ts validate",

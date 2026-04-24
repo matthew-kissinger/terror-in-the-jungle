@@ -6,7 +6,7 @@ const OVERLAY_RADIUS = 400;
 const UPDATE_INTERVAL_MS = 500;
 const CELL_HEIGHT_OFFSET = 1.0;
 
-export interface InfluenceSource {
+interface InfluenceSource {
   getInfluenceGrid(): {
     grid: ReadonlyArray<ReadonlyArray<InfluenceCell>>;
     gridSize: number;

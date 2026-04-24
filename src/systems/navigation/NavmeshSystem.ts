@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { Logger } from '../../utils/Logger';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { buildHeightfieldMesh } from './NavmeshHeightfieldBuilder';
 import { NavmeshMovementAdapter } from './NavmeshMovementAdapter';
 import { computeNavmeshCacheKey, getCachedNavmesh, setCachedNavmesh } from './NavmeshCache';
 
-import type { Crowd, NavMesh, NavMeshQuery, TileCache, Obstacle } from '@recast-navigation/core';
+import type { Crowd, NavMesh, NavMeshQuery } from '@recast-navigation/core';
 import type { MapFeatureDefinition } from '../../config/gameModeTypes';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 /** Result of a connectivity validation across multiple points. */
 interface ConnectivityResult {
@@ -15,6 +15,24 @@ interface ConnectivityResult {
   /** Groups of point indices that can reach each other. Single group = fully connected. */
   islands: number[][];
 }
+
+interface NavmeshGenerationOptions {
+  /** Scenario points that must be inside the initial/generated navmesh coverage. */
+  anchors?: THREE.Vector3[];
+}
+
+interface TiledGenerationBounds {
+  originX: number;
+  originZ: number;
+  extentX: number;
+  extentZ: number;
+  minTileX: number;
+  maxTileX: number;
+  minTileZ: number;
+  maxTileZ: number;
+}
+
+type NavmeshGenerationMode = 'none' | 'solo' | 'static-tiled';
 
 /** Default search extents for navmesh queries. Y is large to handle elevation. */
 const QUERY_HALF_EXTENTS = { x: 2, y: 50, z: 2 };
@@ -34,6 +52,8 @@ const WALKABLE_CLIMB = 0.6;
 const MAX_CROWD_AGENTS = 64;
 const TILE_SIZE = 256;
 const TILE_RADIUS = 3;
+const TILED_GENERATION_MIN_EXTENT = TILE_SIZE * (TILE_RADIUS * 2 + 1);
+const TILED_ANCHOR_MARGIN = TILE_SIZE * 2;
 
 // Threshold: maps strictly larger than this use tiled navmesh.
 // Open Frontier (3200m) stays on solo - tiled is only needed for A Shau (21136m).
@@ -43,6 +63,10 @@ const TILED_THRESHOLD = 3200;
 const SOLO_MEMORY_LIMIT_MB = 300;
 // Approximate bytes per voxel column (compact heightfield + contour + poly mesh overhead).
 const BYTES_PER_VOXEL_COLUMN = 8;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
 
 /**
  * Scale navmesh cell size (cs) with world size to keep voxel grid bounded.
@@ -64,47 +88,29 @@ function getHeightfieldCellSize(worldSize: number): number {
   return 12.0; // 3200/12 = 267x267 = 71K verts (was 161K at cellSize=8)
 }
 
-// Tile streaming budget
-const MAX_TILES_PER_FRAME = 2;
-
 // Obstacle height for structure exclusion
 const OBSTACLE_HEIGHT = 10.0;
 
 // Worker generation timeout (ms)
 const WORKER_TIMEOUT_MS = 60_000;
 
-interface NavmeshTileKey {
-  tx: number;
-  tz: number;
-}
-
 /**
- * Top-level system owning navmesh lifecycle, crowd simulation, and tiled streaming.
+ * Top-level system owning navmesh lifecycle and crowd simulation.
  *
  * Gracefully degrades to beeline-only movement if WASM fails to load.
  */
 export class NavmeshSystem {
   private navMesh: NavMesh | null = null;
   private navMeshQuery: NavMeshQuery | null = null;
-  private tileCache: TileCache | null = null;
   private crowd: Crowd | null = null;
   private adapter: NavmeshMovementAdapter | null = null;
   private wasmReady = false;
   private worldSize = 0;
-  private isTiled = false;
+  private generationMode: NavmeshGenerationMode = 'none';
+  private terrainSystem?: Pick<ITerrainRuntime, 'getHeightAt'>;
 
-  // Tiled navmesh state
-  private activeTiles = new Map<string, boolean>(); // "tx,tz" -> loaded
-  private pendingTiles: NavmeshTileKey[] = [];
-  private playerTileX = 0;
-  private playerTileZ = 0;
-
-  // Cached references for tile generation
+  // Cached references for generated mesh geometry disposal
   private tileHeightfieldMesh: THREE.Mesh | null = null;
-
-  // Obstacles added via TileCache
-  private obstacles: Obstacle[] = [];
-  private obstacleUpdatePending = false;
 
   // Worker state
   private navmeshWorker: Worker | null = null;
@@ -119,7 +125,7 @@ export class NavmeshSystem {
   private CrowdClass: typeof import('@recast-navigation/core').Crowd | null = null;
   private NavMeshQueryClass: typeof import('@recast-navigation/core').NavMeshQuery | null = null;
   private threeToSoloNavMeshFn: typeof import('@recast-navigation/three').threeToSoloNavMesh | null = null;
-  private threeToTileCacheFn: typeof import('@recast-navigation/three').threeToTileCache | null = null;
+  private threeToTiledNavMeshFn: typeof import('@recast-navigation/three').threeToTiledNavMesh | null = null;
   private getPositionsAndIndicesFn: typeof import('@recast-navigation/three').getPositionsAndIndices | null = null;
   private importNavMeshFn: typeof import('@recast-navigation/core').importNavMesh | null = null;
 
@@ -149,7 +155,7 @@ export class NavmeshSystem {
       if (!skipWorker) {
         const three = await import('@recast-navigation/three');
         this.threeToSoloNavMeshFn = three.threeToSoloNavMesh;
-        this.threeToTileCacheFn = three.threeToTileCache;
+        this.threeToTiledNavMeshFn = three.threeToTiledNavMesh;
         this.getPositionsAndIndicesFn = three.getPositionsAndIndices;
       }
 
@@ -204,6 +210,10 @@ export class NavmeshSystem {
     return this.wasmReady;
   }
 
+  setTerrainSystem(terrainSystem: Pick<ITerrainRuntime, 'getHeightAt'>): void {
+    this.terrainSystem = terrainSystem;
+  }
+
   /** Check if navmesh is available for use. */
   isReady(): boolean {
     return this.wasmReady && this.navMesh !== null;
@@ -232,7 +242,7 @@ export class NavmeshSystem {
 
       this.navMesh = imported.navMesh;
       this.worldSize = worldSize;
-      this.isTiled = false;
+      this.generationMode = 'solo';
       this.createCrowd();
 
       Logger.info('Navigation', `Pre-baked navmesh loaded: ${(navMeshData.byteLength / 1024).toFixed(1)}KB from ${assetUrl}`);
@@ -248,46 +258,50 @@ export class NavmeshSystem {
    * Tries pre-baked asset first if navmeshAsset is provided.
    * Solo navmesh for small maps, tiled for large maps (A Shau).
    */
-  async generateNavmesh(worldSize: number, features?: MapFeatureDefinition[], navmeshAsset?: string): Promise<void> {
+  async generateNavmesh(
+    worldSize: number,
+    features?: MapFeatureDefinition[],
+    navmeshAsset?: string,
+    options: NavmeshGenerationOptions = {},
+  ): Promise<boolean> {
     if (!this.wasmReady) {
       Logger.warn('Navigation', 'Skipping navmesh generation - WASM not ready');
-      return;
+      return false;
     }
 
     // Try pre-baked asset first
     if (navmeshAsset) {
       const loaded = await this.loadPrebakedNavmesh(navmeshAsset, worldSize);
-      if (loaded) return;
-      Logger.info('Navigation', 'Falling back to runtime navmesh generation');
+      if (loaded) return true;
+      Logger.warn('Navigation', 'Pre-baked navmesh unavailable; generating the explicit runtime navmesh for this mode');
     }
 
     this.worldSize = worldSize;
-    this.isTiled = worldSize > TILED_THRESHOLD;
+    this.generationMode = 'none';
 
     const start = performance.now();
 
     let generated = false;
-    if (this.isTiled) {
-      generated = await this.generateTiledNavmesh(worldSize, features);
+    if (worldSize > TILED_THRESHOLD) {
+      generated = await this.generateTiledNavmesh(worldSize, features, options);
     } else {
       generated = await this.generateSoloNavmesh(worldSize, features);
-      if (!generated) {
-        Logger.warn(
-          'Navigation',
-          `Solo navmesh generation failed (worldSize=${worldSize}, features=${features?.length ?? 0}); retrying tiled fallback`
-        );
-        this.isTiled = true;
-        generated = await this.generateTiledNavmesh(worldSize, features);
-      }
     }
 
-    // Add structure obstacles (tiled navmesh only - solo bakes obstacles into heightfield)
-    if (generated && this.isTiled && features?.length) {
-      this.addObstaclesFromFeatures(features);
+    if (!generated) {
+      Logger.error(
+        'Navigation',
+        `Navmesh generation failed with no fallback retry (worldSize=${worldSize}, features=${features?.length ?? 0}, mode=${worldSize > TILED_THRESHOLD ? 'static-tiled' : 'solo'})`,
+      );
+      return false;
     }
 
     const elapsed = performance.now() - start;
-    Logger.info('Navigation', `Navmesh generated in ${elapsed.toFixed(1)}ms (${this.isTiled ? 'tiled' : 'solo'}, worldSize=${worldSize})`);
+    const mode = this.generationMode === 'none'
+      ? (worldSize > TILED_THRESHOLD ? 'static-tiled' : 'solo')
+      : this.generationMode;
+    Logger.info('Navigation', `Navmesh generated in ${elapsed.toFixed(1)}ms (${mode}, worldSize=${worldSize})`);
+    return true;
   }
 
   private async generateSoloNavmesh(worldSize: number, features?: MapFeatureDefinition[]): Promise<boolean> {
@@ -340,10 +354,13 @@ export class NavmeshSystem {
       // Cache miss or error - proceed to generation
     }
 
-    const heightCache = getHeightQueryCache();
+    const sampleHeight = this.getTerrainHeightSampler();
+    if (!sampleHeight) {
+      return false;
+    }
     const halfSize = worldSize / 2;
     const geometry = buildHeightfieldMesh(
-      (x, z) => heightCache.getHeightAt(x, z),
+      sampleHeight,
       -halfSize, -halfSize,
       worldSize, worldSize,
       hfCellSize
@@ -352,7 +369,7 @@ export class NavmeshSystem {
     const mesh = new THREE.Mesh(geometry);
 
     // Build obstacle wall meshes for structures (baked into solo navmesh)
-    const obstacleMeshes = this.buildObstacleMeshes(features, heightCache);
+    const obstacleMeshes = this.buildObstacleMeshes(features, sampleHeight);
     const inputMeshes = [mesh, ...obstacleMeshes];
 
     // Try off-thread generation via worker
@@ -373,13 +390,18 @@ export class NavmeshSystem {
     const result = this.threeToSoloNavMeshFn!(inputMeshes, recastConfig);
 
     if (!result.success || !result.navMesh) {
-      Logger.error('Navigation', 'Solo navmesh generation failed');
+      Logger.error(
+        'Navigation',
+        'Solo navmesh generation failed',
+        result.success ? 'No navMesh returned' : result.error,
+      );
       geometry.dispose();
       for (const m of obstacleMeshes) m.geometry.dispose();
       return false;
     }
 
     this.navMesh = result.navMesh;
+    this.generationMode = 'solo';
     this.createCrowd();
 
     geometry.dispose();
@@ -437,20 +459,98 @@ export class NavmeshSystem {
     return true;
   }
 
-  private async generateTiledNavmesh(worldSize: number, _features?: MapFeatureDefinition[]): Promise<boolean> {
-    // For tiled navmesh, we generate initial tiles around origin
-    // Additional tiles are streamed in update()
-    const heightCache = getHeightQueryCache();
+  private getTiledGenerationBounds(worldSize: number, anchors?: THREE.Vector3[]): TiledGenerationBounds {
     const halfSize = worldSize / 2;
+    const minWorld = -halfSize;
+    const maxWorld = halfSize;
+    const minExtent = Math.min(TILED_GENERATION_MIN_EXTENT, worldSize);
+    const finiteAnchors = anchors?.filter(anchor =>
+      Number.isFinite(anchor.x) && Number.isFinite(anchor.z)
+    ) ?? [];
 
-    // Generate a small initial mesh for the tileCache setup
-    const initExtent = TILE_SIZE * (TILE_RADIUS * 2 + 1);
-    const initHalf = Math.min(initExtent / 2, halfSize);
+    if (finiteAnchors.length === 0) {
+      const initHalf = minExtent / 2;
+      const originX = -initHalf;
+      const originZ = -initHalf;
+      return this.toTiledGenerationBounds(worldSize, originX, originZ, minExtent, minExtent);
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minZ = Number.POSITIVE_INFINITY;
+    let maxZ = Number.NEGATIVE_INFINITY;
+
+    for (const anchor of finiteAnchors) {
+      minX = Math.min(minX, anchor.x);
+      maxX = Math.max(maxX, anchor.x);
+      minZ = Math.min(minZ, anchor.z);
+      maxZ = Math.max(maxZ, anchor.z);
+    }
+
+    minX = clamp(minX - TILED_ANCHOR_MARGIN, minWorld, maxWorld);
+    maxX = clamp(maxX + TILED_ANCHOR_MARGIN, minWorld, maxWorld);
+    minZ = clamp(minZ - TILED_ANCHOR_MARGIN, minWorld, maxWorld);
+    maxZ = clamp(maxZ + TILED_ANCHOR_MARGIN, minWorld, maxWorld);
+
+    const centerX = (minX + maxX) / 2;
+    const centerZ = (minZ + maxZ) / 2;
+    const extentX = Math.min(Math.max(maxX - minX, minExtent), worldSize);
+    const extentZ = Math.min(Math.max(maxZ - minZ, minExtent), worldSize);
+    const originX = clamp(centerX - extentX / 2, minWorld, maxWorld - extentX);
+    const originZ = clamp(centerZ - extentZ / 2, minWorld, maxWorld - extentZ);
+
+    return this.toTiledGenerationBounds(worldSize, originX, originZ, extentX, extentZ);
+  }
+
+  private toTiledGenerationBounds(
+    worldSize: number,
+    originX: number,
+    originZ: number,
+    extentX: number,
+    extentZ: number,
+  ): TiledGenerationBounds {
+    const halfSize = worldSize / 2;
+    const maxTile = Math.max(0, Math.ceil(worldSize / TILE_SIZE) - 1);
+    const minTileX = clamp(Math.floor((originX + halfSize) / TILE_SIZE), 0, maxTile);
+    const maxTileX = clamp(Math.floor((originX + extentX + halfSize) / TILE_SIZE), 0, maxTile);
+    const minTileZ = clamp(Math.floor((originZ + halfSize) / TILE_SIZE), 0, maxTile);
+    const maxTileZ = clamp(Math.floor((originZ + extentZ + halfSize) / TILE_SIZE), 0, maxTile);
+
+    return {
+      originX,
+      originZ,
+      extentX,
+      extentZ,
+      minTileX,
+      maxTileX,
+      minTileZ,
+      maxTileZ,
+    };
+  }
+
+  private async generateTiledNavmesh(
+    worldSize: number,
+    features?: MapFeatureDefinition[],
+    options: NavmeshGenerationOptions = {},
+  ): Promise<boolean> {
+    if (!this.threeToTiledNavMeshFn) {
+      Logger.error('Navigation', 'Cannot generate static tiled navmesh before @recast-navigation/three is loaded');
+      return false;
+    }
+
+    // For large scenarios, generate explicit static coverage around gameplay
+    // anchors instead of assuming world origin contains useful navigation.
+    const sampleHeight = this.getTerrainHeightSampler();
+    if (!sampleHeight) {
+      return false;
+    }
+
+    const bounds = this.getTiledGenerationBounds(worldSize, options.anchors);
     const hfCellSize = getHeightfieldCellSize(worldSize);
     const geometry = buildHeightfieldMesh(
-      (x, z) => heightCache.getHeightAt(x, z),
-      -initHalf, -initHalf,
-      initHalf * 2, initHalf * 2,
+      sampleHeight,
+      bounds.originX, bounds.originZ,
+      bounds.extentX, bounds.extentZ,
       hfCellSize
     );
 
@@ -458,7 +558,8 @@ export class NavmeshSystem {
     const cs = getNavmeshCellSize(worldSize);
     const isLargeWorld = worldSize > 1600;
     const ch = isLargeWorld ? 0.4 : 0.2;
-    const result = this.threeToTileCacheFn!([mesh], {
+    const tileSize = Math.ceil(TILE_SIZE / cs);
+    const recastConfig = {
       cs,
       ch,
       walkableSlopeAngle: WALKABLE_SLOPE_ANGLE,
@@ -470,28 +571,38 @@ export class NavmeshSystem {
       maxVertsPerPoly: 6,
       detailSampleDist: isLargeWorld ? 12 : 6,
       detailSampleMaxError: 1,
-      tileSize: Math.ceil(TILE_SIZE / cs),
-    });
+      tileSize,
+    };
+    Logger.info(
+      'Navigation',
+      `Static tiled navmesh generation bounds origin=(${bounds.originX.toFixed(0)},${bounds.originZ.toFixed(0)}) extent=(${bounds.extentX.toFixed(0)},${bounds.extentZ.toFixed(0)}) anchors=${options.anchors?.length ?? 0} tileSize=${tileSize}`,
+    );
+    const obstacleMeshes = this.buildObstacleMeshes(features, sampleHeight);
+    const inputMeshes = [mesh, ...obstacleMeshes];
+    const result = this.threeToTiledNavMeshFn(inputMeshes, recastConfig);
 
     if (!result.success || !result.navMesh) {
-      Logger.error('Navigation', 'Tiled navmesh generation failed');
+      const boundsSummary = `bounds origin=(${bounds.originX.toFixed(0)},${bounds.originZ.toFixed(0)}) extent=(${bounds.extentX.toFixed(0)},${bounds.extentZ.toFixed(0)}) anchors=${options.anchors?.length ?? 0}`;
+      Logger.error(
+        'Navigation',
+        'Static tiled navmesh generation failed',
+        `${result.success ? 'No navMesh returned' : result.error}; ${boundsSummary}`,
+      );
       geometry.dispose();
+      for (const obstacleMesh of obstacleMeshes) obstacleMesh.geometry.dispose();
       return false;
     }
 
     this.navMesh = result.navMesh;
-    this.tileCache = result.tileCache;
+    this.generationMode = 'static-tiled';
     this.createCrowd();
 
-    // Mark initial tiles as loaded
-    const tilesPerSide = Math.ceil(initHalf * 2 / TILE_SIZE);
-    for (let tx = 0; tx < tilesPerSide; tx++) {
-      for (let tz = 0; tz < tilesPerSide; tz++) {
-        this.activeTiles.set(`${tx},${tz}`, true);
-      }
-    }
-
     geometry.dispose();
+    for (const obstacleMesh of obstacleMeshes) obstacleMesh.geometry.dispose();
+    Logger.info(
+      'Navigation',
+      'Static tiled navmesh generated for large terrain with structure footprints baked into input geometry.',
+    );
     return true;
   }
 
@@ -514,86 +625,13 @@ export class NavmeshSystem {
     }
   }
 
-  /**
-   * Per-frame update: streams tiles (if tiled) and updates crowd.
-   */
-  update(deltaTime: number, playerPosition?: THREE.Vector3): void {
+  /** Per-frame update: updates crowd simulation. */
+  update(deltaTime: number, _playerPosition?: THREE.Vector3): void {
     if (!this.isReady()) return;
-
-    // Process pending obstacle updates (tiled navmesh)
-    if (this.obstacleUpdatePending && this.tileCache && this.navMesh) {
-      const result = this.tileCache.update(this.navMesh);
-      if (result.upToDate) {
-        this.obstacleUpdatePending = false;
-      }
-    }
-
-    // Tile streaming for large maps
-    if (this.isTiled && playerPosition) {
-      this.streamTiles(playerPosition);
-    }
 
     // Update crowd simulation
     if (this.crowd) {
       this.crowd.update(deltaTime);
-    }
-  }
-
-  private streamTiles(playerPos: THREE.Vector3): void {
-    const halfSize = this.worldSize / 2;
-    const newTX = Math.floor((playerPos.x + halfSize) / TILE_SIZE);
-    const newTZ = Math.floor((playerPos.z + halfSize) / TILE_SIZE);
-
-    if (newTX === this.playerTileX && newTZ === this.playerTileZ && this.pendingTiles.length === 0) {
-      return;
-    }
-
-    this.playerTileX = newTX;
-    this.playerTileZ = newTZ;
-
-    // Determine which tiles should be active
-    const desiredTiles = new Set<string>();
-    for (let dx = -TILE_RADIUS; dx <= TILE_RADIUS; dx++) {
-      for (let dz = -TILE_RADIUS; dz <= TILE_RADIUS; dz++) {
-        const tx = newTX + dx;
-        const tz = newTZ + dz;
-        desiredTiles.add(`${tx},${tz}`);
-      }
-    }
-
-    // Queue new tiles
-    for (const key of desiredTiles) {
-      if (!this.activeTiles.has(key)) {
-        const [tx, tz] = key.split(',').map(Number);
-        this.pendingTiles.push({ tx, tz });
-      }
-    }
-
-    // Unload tiles outside radius + 1 margin
-    for (const key of this.activeTiles.keys()) {
-      if (!desiredTiles.has(key)) {
-        this.activeTiles.delete(key);
-        // TileCache handles actual tile removal internally
-      }
-    }
-
-    // Generate pending tiles (budget-limited)
-    let tilesGenerated = 0;
-    while (this.pendingTiles.length > 0 && tilesGenerated < MAX_TILES_PER_FRAME) {
-      const tile = this.pendingTiles.shift()!;
-      this.generateTile(tile.tx, tile.tz);
-      this.activeTiles.set(`${tile.tx},${tile.tz}`, true);
-      tilesGenerated++;
-    }
-  }
-
-  private generateTile(_tx: number, _tz: number): void {
-    // TileCache handles tile generation from the initial heightfield data.
-    // For tiles beyond the initial extent, we'd need to rebuild with
-    // additional heightfield data. In practice, the initial tileCache
-    // generation covers the needed area and tiles stream from cache.
-    if (this.tileCache) {
-      this.tileCache.update(this.navMesh!);
     }
   }
 
@@ -603,7 +641,7 @@ export class NavmeshSystem {
    */
   private buildObstacleMeshes(
     features: MapFeatureDefinition[] | undefined,
-    heightCache: ReturnType<typeof getHeightQueryCache>
+    sampleHeight: (x: number, z: number) => number
   ): THREE.Mesh[] {
     if (!features?.length) return [];
 
@@ -612,7 +650,7 @@ export class NavmeshSystem {
       const fp = feature.footprint;
       if (!fp) continue;
 
-      const y = heightCache.getHeightAt(feature.position.x, feature.position.z);
+      const y = sampleHeight(feature.position.x, feature.position.z);
       const yaw = feature.placement?.yaw ?? 0;
 
       if (fp.shape === 'circle') {
@@ -637,44 +675,12 @@ export class NavmeshSystem {
     return meshes;
   }
 
-  /**
-   * Add runtime obstacles to tiled navmesh via TileCache.
-   * Cylinder for circle footprints, box for rect/strip.
-   */
-  private addObstaclesFromFeatures(features: MapFeatureDefinition[]): void {
-    if (!this.tileCache || !this.navMesh) return;
-
-    const heightCache = getHeightQueryCache();
-    let added = 0;
-
-    for (const feature of features) {
-      const fp = feature.footprint;
-      if (!fp) continue;
-
-      const y = heightCache.getHeightAt(feature.position.x, feature.position.z);
-      const pos = { x: feature.position.x, y, z: feature.position.z };
-
-      if (fp.shape === 'circle') {
-        const result = this.tileCache.addCylinderObstacle(pos, fp.radius, OBSTACLE_HEIGHT);
-        if (result.success && result.obstacle) {
-          this.obstacles.push(result.obstacle);
-          added++;
-        }
-      } else if (fp.shape === 'rect' || fp.shape === 'strip') {
-        const halfExtents = { x: fp.width / 2, y: OBSTACLE_HEIGHT / 2, z: fp.length / 2 };
-        const yaw = feature.placement?.yaw ?? 0;
-        const result = this.tileCache.addBoxObstacle(pos, halfExtents, yaw);
-        if (result.success && result.obstacle) {
-          this.obstacles.push(result.obstacle);
-          added++;
-        }
-      }
+  private getTerrainHeightSampler(): ((x: number, z: number) => number) | null {
+    if (!this.terrainSystem) {
+      Logger.warn('Navigation', 'Cannot generate navmesh before TerrainSystem is connected');
+      return null;
     }
-
-    if (added > 0) {
-      this.obstacleUpdatePending = true;
-      Logger.info('Navigation', `Added ${added} structure obstacles to tiled navmesh`);
-    }
+    return (x, z) => this.terrainSystem!.getHeightAt(x, z);
   }
 
   // ── Path Query API ─────────────────────────────────────────────────
@@ -811,19 +817,9 @@ export class NavmeshSystem {
       this.navMesh.destroy();
       this.navMesh = null;
     }
-    // Remove obstacles from tileCache before destroying it
-    if (this.tileCache) {
-      for (const obs of this.obstacles) {
-        this.tileCache.removeObstacle(obs);
-      }
-    }
-    this.obstacles.length = 0;
-    this.obstacleUpdatePending = false;
     if (this.tileHeightfieldMesh) {
       this.tileHeightfieldMesh.geometry.dispose();
       this.tileHeightfieldMesh = null;
     }
-    this.activeTiles.clear();
-    this.pendingTiles.length = 0;
   }
 }

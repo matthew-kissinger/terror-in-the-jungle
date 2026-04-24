@@ -144,7 +144,7 @@ describe('ModeStartupPreparer', () => {
     expect(getHeightQueryCache().getProvider()).toBeInstanceOf(DEMHeightProvider);
   });
 
-  it('rejects an HTML fallback response so the DEM branch does not install a procedural noise provider', async () => {
+  it('rejects an HTML fallback response so the DEM branch cannot continue with fallback terrain', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const htmlBody = new TextEncoder().encode('<!doctype html><html>...</html>').buffer;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -166,18 +166,18 @@ describe('ModeStartupPreparer', () => {
       },
     } as any;
 
-    const result = await configureHeightSource({} as any, GameMode.A_SHAU_VALLEY, config);
+    await expect(configureHeightSource({} as any, GameMode.A_SHAU_VALLEY, config))
+      .rejects.toThrow(/Required DEM terrain unavailable/);
     const provider = getHeightQueryCache().getProvider();
 
-    expect(result.kind).toBe('dem');
     // Should not have installed a DEM provider built from the HTML payload.
     expect(provider).not.toBeInstanceOf(DEMHeightProvider);
-    // And the caller should have logged a failure so flat terrain is attributable.
+    // And the caller should have logged a failure so invalid terrain is attributable.
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
   });
 
-  it('rejects a DEM payload whose size does not match the declared grid', async () => {
+  it('rejects a DEM payload whose size does not match the declared grid without replacing the provider', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     // Valid Float32 buffer, but smaller than a 4x4 grid expects (64 bytes).
     const tooSmall = new Float32Array(2).buffer;
@@ -204,7 +204,8 @@ describe('ModeStartupPreparer', () => {
       },
     } as any;
 
-    await configureHeightSource({} as any, GameMode.A_SHAU_VALLEY, config);
+    await expect(configureHeightSource({} as any, GameMode.A_SHAU_VALLEY, config))
+      .rejects.toThrow(/Required DEM terrain unavailable/);
     expect(getHeightQueryCache().getProvider()).toBe(baseline);
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();

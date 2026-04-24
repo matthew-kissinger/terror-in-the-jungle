@@ -28,10 +28,10 @@ import type { AirSupportManager } from '../airsupport/AirSupportManager';
 import type { PlayerCombatControllerDependencies, PlayerControllerDependencies, PlayerVehicleControllerDependencies } from './PlayerControllerDependencies';
 import { PlayerCombatController } from './PlayerCombatController';
 import { PlayerVehicleController } from './PlayerVehicleController';
-import { VehicleStateManager } from '../vehicle/VehicleStateManager';
+import { VehicleSessionController } from '../vehicle/VehicleSessionController';
 import { HelicopterPlayerAdapter } from '../vehicle/HelicopterPlayerAdapter';
 import { FixedWingPlayerAdapter } from '../vehicle/FixedWingPlayerAdapter';
-import type { VehicleTransitionContext } from '../vehicle/PlayerVehicleAdapter';
+import type { VehicleExitOptions, VehicleExitResult, VehicleTransitionContext } from '../vehicle/PlayerVehicleAdapter';
 import type { FullMapSystem } from '../../ui/map/FullMapSystem';
 
 interface SettingsModalController {
@@ -97,7 +97,7 @@ export class PlayerController implements GameSystem {
   private cameraController: PlayerCamera;
   private combatController = new PlayerCombatController();
   private vehicleController = new PlayerVehicleController();
-  private vehicleStateManager = new VehicleStateManager();
+  private vehicleStateManager = new VehicleSessionController();
   private helicopterAdapter?: HelicopterPlayerAdapter;
   private fixedWingAdapter?: FixedWingPlayerAdapter;
 
@@ -130,6 +130,9 @@ export class PlayerController implements GameSystem {
 
     // Setup input callbacks
     this.setupInputCallbacks();
+    this.vehicleController.configure({
+      requestVehicleExit: () => this.requestVehicleExit({ allowEject: true, reason: 'input' }).exited,
+    });
   }
 
   async init(): Promise<void> {
@@ -395,11 +398,7 @@ export class PlayerController implements GameSystem {
       return;
     }
     if (this.vehicleStateManager.isInVehicle()) {
-      if (this.playerState.isInHelicopter && this.helicopterModel) {
-        this.helicopterModel.exitHelicopter();
-      } else if (this.playerState.isInFixedWing && this.fixedWingModel) {
-        this.fixedWingModel.exitAircraft();
-      }
+      this.requestVehicleExit({ allowEject: false, reason: 'escape' });
       return;
     }
     if (this.gameStarted && this.settingsModal) {
@@ -705,6 +704,18 @@ export class PlayerController implements GameSystem {
 
   isInFixedWing(): boolean { return this.playerState.isInFixedWing; }
   getFixedWingId(): string | null { return this.playerState.fixedWingId; }
+
+  requestVehicleExit(options: VehicleExitOptions = {}): VehicleExitResult {
+    const vehicleId = this.vehicleStateManager.getVehicleId() ?? '';
+    const result = this.vehicleStateManager.exitVehicle(
+      this.buildTransitionContext(vehicleId, this.playerState.position.clone()),
+      options,
+    );
+    if (result.exited) {
+      this.equipWeapon();
+    }
+    return result;
+  }
 
   private buildTransitionContext(vehicleId: string, position: THREE.Vector3): VehicleTransitionContext {
     return {

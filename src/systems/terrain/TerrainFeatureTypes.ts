@@ -10,6 +10,7 @@ export interface FlattenCircleTerrainStamp {
   gradeStrength: number;
   samplingRadius: number;
   targetHeightMode: TerrainStampTargetHeightMode;
+  fixedTargetHeight?: number;
   heightOffset: number;
   priority: number;
 }
@@ -26,6 +27,7 @@ export interface FlattenCapsuleTerrainStamp {
   gradeStrength: number;
   samplingRadius: number;
   targetHeightMode: TerrainStampTargetHeightMode;
+  fixedTargetHeight?: number;
   heightOffset: number;
   priority: number;
 }

@@ -48,6 +48,13 @@ const MIN_SUN_Y = 20;
  * per-scenario look. The legacy `Skybox` PNG dome and `NullSkyBackend`
  * fallback are gone.
  *
+ * Cycle 2026-04-24 (`architecture-recovery-atmosphere-evidence`):
+ * the analytic sky backend receives the effective cloud coverage. The old
+ * planar `CloudLayer` render is held invisible because playtest evidence
+ * showed a hard flat horizontal divider. The plane remains in code as a
+ * disposable parallax prototype until a volumetric/sky-volume replacement
+ * is designed.
+ *
  * Prior cycles (kept here as history):
  * - Round 2 (`atmosphere-hosek-wilkie-sky`): introduced the analytic dome
  *   alongside the legacy `Skybox` PNG; switchover on `applyScenarioPreset`.
@@ -78,6 +85,8 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
   /** Per-scenario cloud coverage baseline (preset-driven). Weather multiplies on top. */
   private presetCloudCoverage = 0;
+  /** Effective coverage currently applied to the sky-dome cloud pass. */
+  private effectiveCloudCoverage = 0;
   /** Weather-driven cloud coverage target (0..1). Blended into coverage each frame. */
   private weatherCloudCoverage = 0;
   /** True while a weather-override coverage target is active (STORM/RAIN). */
@@ -207,12 +216,18 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // explicit `cloudCoverageDefault` fall through to 0 (clear sky), which
     // preserves the pre-cloud-runtime baseline for perf-sensitive scenes.
     this.presetCloudCoverage = preset.cloudCoverageDefault ?? 0;
+    this.effectiveCloudCoverage = this.presetCloudCoverage;
     this.weatherCloudActive = false;
     this.weatherCloudCoverage = 0;
-    this.cloudLayer.setCoverage(this.presetCloudCoverage);
+    this.cloudLayer.setCoverage(0);
     if (preset.cloudScaleMetersPerFeature !== undefined) {
       this.cloudLayer.setFeatureScaleMeters(preset.cloudScaleMetersPerFeature);
+      this.hosekBackend.setCloudFeatureScaleMeters(preset.cloudScaleMetersPerFeature);
+    } else {
+      this.cloudLayer.resetFeatureScale();
+      this.hosekBackend.resetCloudFeatureScale();
     }
+    this.hosekBackend.setCloudCoverage(this.presetCloudCoverage);
 
     Logger.info('atmosphere', `Applied scenario preset '${key}' (${preset.label})`);
 
@@ -454,9 +469,11 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     const effective = this.weatherCloudActive
       ? Math.max(this.presetCloudCoverage, this.weatherCloudCoverage)
       : this.presetCloudCoverage;
-    this.cloudLayer.setCoverage(effective);
+    this.effectiveCloudCoverage = effective;
+    this.hosekBackend.setCloudCoverage(effective);
 
     this.backend.getSun(this.scratchCloudSunColor);
+    this.cloudLayer.setCoverage(0);
     this.cloudLayer.update(
       this.cameraPosition,
       this.terrainYAtCamera,
@@ -464,12 +481,13 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       this.scratchCloudSunColor,
       deltaTime
     );
+    this.cloudMesh.visible = false;
   }
 
   // --- ICloudRuntime ---
 
   getCoverage(): number {
-    return this.cloudLayer.getCoverage();
+    return this.effectiveCloudCoverage;
   }
 
   setCoverage(v: number): void {
@@ -478,8 +496,10 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // any active weather override — callers bypassing the intent API are
     // typically tests or debug UI that want to see a specific coverage.
     this.presetCloudCoverage = clamped;
+    this.effectiveCloudCoverage = clamped;
     this.weatherCloudActive = false;
     this.weatherCloudCoverage = 0;
-    this.cloudLayer.setCoverage(clamped);
+    this.cloudLayer.setCoverage(0);
+    this.hosekBackend.setCloudCoverage(clamped);
   }
 }

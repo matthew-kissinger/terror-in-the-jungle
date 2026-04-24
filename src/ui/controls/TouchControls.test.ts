@@ -3,6 +3,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InputContextManager } from '../../systems/input/InputContextManager';
+import type { UIState, VehicleUIContext } from '../layout/types';
 
 /**
  * Behavior-focused tests for TouchControls.
@@ -10,7 +11,7 @@ import { InputContextManager } from '../../systems/input/InputContextManager';
  * TouchControls is a thin orchestrator; most of its fan-out to sub-components
  * is implementation. We assert on the public contract instead:
  *   - setCallbacks routes action buttons to the right callback.
- *   - Entering/exiting vehicle modes toggles the shared action bar.
+ *   - Presentation vehicle context toggles the shared action bar.
  *   - Context changes away from gameplay cancel pending touch gestures.
  *   - Modal overlays suppress pointer events on the touch layer.
  */
@@ -195,6 +196,40 @@ vi.mock('./VehicleActionBar', () => ({
 
 import { TouchControls } from './TouchControls';
 
+const helicopterContext: VehicleUIContext = {
+  kind: 'helicopter',
+  role: 'transport',
+  hudVariant: 'flight',
+  weaponCount: 0,
+  capabilities: {
+    canExit: true,
+    canFirePrimary: false,
+    canCycleWeapons: false,
+    canFreeLook: true,
+    canStabilize: true,
+    canDeploySquad: true,
+    canOpenMap: true,
+    canOpenCommand: true,
+  },
+};
+
+function createPresentationState(overrides: Partial<UIState> = {}): UIState {
+  return {
+    device: 'touch',
+    inputMode: 'touch',
+    phase: 'playing',
+    vehicle: 'infantry',
+    actorMode: 'infantry',
+    overlay: 'none',
+    scoreboardVisible: false,
+    interaction: null,
+    vehicleContext: null,
+    ads: false,
+    layout: 'mobile-landscape',
+    ...overrides,
+  };
+}
+
 describe('TouchControls', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -271,25 +306,92 @@ describe('TouchControls', () => {
     expect(onWeaponSelect).toHaveBeenCalledWith(3);
   });
 
-  it('enterHelicopterMode / exitHelicopterMode toggles the vehicle action bar', () => {
+  it('routes vehicle action-bar exit through the vehicle enter-exit callback', () => {
+    const controls = new TouchControls();
+    const onEnterExitVehicle = vi.fn();
+    const onEnterExitHelicopter = vi.fn();
+    controls.setCallbacks({
+      onFireStart: vi.fn(),
+      onFireStop: vi.fn(),
+      onJump: vi.fn(),
+      onReload: vi.fn(),
+      onGrenade: vi.fn(),
+      onSprintStart: vi.fn(),
+      onSprintStop: vi.fn(),
+      onWeaponSelect: vi.fn(),
+      onADSToggle: vi.fn(),
+      onEnterExitVehicle,
+      onEnterExitHelicopter,
+      onSandbagRotateLeft: vi.fn(),
+      onSandbagRotateRight: vi.fn(),
+      onRallyPointPlace: vi.fn(),
+    });
+
+    const vehicleCallbacks = vehicleActionBarInstances[0].setCallbacks.mock.calls[0][0] as {
+      onExitVehicle: () => void;
+    };
+    vehicleCallbacks.onExitVehicle();
+
+    expect(onEnterExitVehicle).toHaveBeenCalledTimes(1);
+    expect(onEnterExitHelicopter).not.toHaveBeenCalled();
+  });
+
+  it('routes vehicle action-bar exit through the legacy helicopter callback when no generic callback exists', () => {
+    const controls = new TouchControls();
+    const onEnterExitHelicopter = vi.fn();
+    controls.setCallbacks({
+      onFireStart: vi.fn(),
+      onFireStop: vi.fn(),
+      onJump: vi.fn(),
+      onReload: vi.fn(),
+      onGrenade: vi.fn(),
+      onSprintStart: vi.fn(),
+      onSprintStop: vi.fn(),
+      onWeaponSelect: vi.fn(),
+      onADSToggle: vi.fn(),
+      onEnterExitHelicopter,
+      onSandbagRotateLeft: vi.fn(),
+      onSandbagRotateRight: vi.fn(),
+      onRallyPointPlace: vi.fn(),
+    });
+
+    const vehicleCallbacks = vehicleActionBarInstances[0].setCallbacks.mock.calls[0][0] as {
+      onExitVehicle: () => void;
+    };
+    vehicleCallbacks.onExitVehicle();
+
+    expect(onEnterExitHelicopter).toHaveBeenCalledTimes(1);
+  });
+
+  it('presentation vehicle context toggles the vehicle action bar', () => {
     const controls = new TouchControls();
     controls.show();
 
-    controls.enterHelicopterMode();
+    controls.applyPresentationState(createPresentationState({
+      actorMode: 'helicopter',
+      vehicle: 'helicopter',
+      vehicleContext: helicopterContext,
+    }));
+
+    expect(vehicleActionBarInstances[0].setVehicleContext).toHaveBeenCalledWith(helicopterContext);
     expect(vehicleActionBarInstances[0].show).toHaveBeenCalled();
 
-    controls.exitHelicopterMode();
+    controls.applyPresentationState(createPresentationState());
     expect(vehicleActionBarInstances[0].hide).toHaveBeenCalled();
   });
 
-  it('flight-mode aliases route through the same vehicle layout', () => {
+  it('derives flight mode from presentation vehicle context', () => {
     const controls = new TouchControls();
     controls.show();
 
-    controls.enterFlightVehicleMode();
+    controls.applyPresentationState(createPresentationState({
+      actorMode: 'plane',
+      vehicle: 'plane',
+      vehicleContext: { ...helicopterContext, kind: 'plane', role: 'pilot' },
+    }));
     expect(controls.isInFlightMode()).toBe(true);
 
-    controls.exitFlightVehicleMode();
+    controls.applyPresentationState(createPresentationState());
     expect(controls.isInFlightMode()).toBe(false);
   });
 

@@ -38,7 +38,7 @@ export const DEFAULT_PREVIEW_TOGGLES: PreviewToggles = {
   normals: false,
 };
 
-export interface SandboxPaneHandlers {
+interface SandboxPaneHandlers {
   onParamsChange: () => void;
   onPreviewChange: () => void;
   onExport: () => void;

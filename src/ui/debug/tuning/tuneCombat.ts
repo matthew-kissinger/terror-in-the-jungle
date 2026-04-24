@@ -10,9 +10,9 @@ import type { PaneLike, TuningState } from '../LiveTuningPanel';
  * read-only monitors so `getState()` reflects the current headcount.
  */
 
-export const COMBAT_MUTED_KEY = 'combat.muted';
-export const COMBAT_BLUFOR_COUNT_KEY = 'combat.bluforAlive';
-export const COMBAT_OPFOR_COUNT_KEY = 'combat.opforAlive';
+const COMBAT_MUTED_KEY = 'combat.muted';
+const COMBAT_BLUFOR_COUNT_KEY = 'combat.bluforAlive';
+const COMBAT_OPFOR_COUNT_KEY = 'combat.opforAlive';
 
 interface WarFacade {
   isEnabled(): boolean;

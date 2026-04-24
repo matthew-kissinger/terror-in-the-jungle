@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { GameMode } from '../../config/gameModeTypes';
+import { A_SHAU_VALLEY_CONFIG } from '../../config/AShauValleyConfig';
+import { AIRFIELD_TEMPLATES } from '../world/AirfieldTemplates';
 import { compileTerrainFeatures } from './TerrainFeatureCompiler';
+import type { IHeightProvider } from './IHeightProvider';
+import { StampedHeightProvider } from './StampedHeightProvider';
 
 describe('compileTerrainFeatures', () => {
   it('compiles helipad terrain, surface, and vegetation outputs', () => {
@@ -245,6 +249,67 @@ describe('compileTerrainFeatures', () => {
     }
   });
 
+  it('uses one runway datum for all generated airfield stamps on sloped sites', () => {
+    const baseProvider: IHeightProvider = {
+      getHeightAt: (x: number, z: number) => 80 + x * 0.03 + z * 0.08,
+      getWorkerConfig: () => ({ type: 'noise', seed: 1 }),
+    };
+    const featurePosition = new THREE.Vector3(0, 0, 0);
+    const template = AIRFIELD_TEMPLATES.forward_strip;
+    const compiled = compileTerrainFeatures({
+      id: GameMode.A_SHAU_VALLEY,
+      name: 'Airfield Mode',
+      description: 'test',
+      worldSize: 5000,
+      chunkRenderDistance: 6,
+      maxTickets: 100,
+      matchDuration: 60,
+      deathPenalty: 1,
+      playerCanSpawnAtZones: true,
+      respawnTime: 5,
+      spawnProtectionDuration: 2,
+      maxCombatants: 20,
+      squadSize: { min: 4, max: 6 },
+      reinforcementInterval: 30,
+      zones: [],
+      captureRadius: 25,
+      captureSpeed: 5,
+      minimapScale: 400,
+      viewDistance: 200,
+      features: [
+        {
+          id: 'sloped_forward_strip',
+          kind: 'airfield',
+          position: featurePosition,
+          placement: { yaw: 0 },
+          templateId: 'forward_strip',
+          footprint: { shape: 'circle', radius: 180 },
+          terrain: { flatten: true, targetHeightMode: 'center' },
+        },
+      ],
+    }, (x, z) => baseProvider.getHeightAt(x, z));
+
+    const airfieldStamps = compiled.stamps.filter((stamp) => stamp.kind === 'flatten_capsule');
+    expect(airfieldStamps.length).toBeGreaterThan(1);
+    const firstDatum = airfieldStamps[0].fixedTargetHeight;
+    expect(firstDatum).toBeDefined();
+    for (const stamp of airfieldStamps) {
+      expect(stamp.fixedTargetHeight).toBeCloseTo(firstDatum!, 5);
+    }
+
+    const stampedProvider = new StampedHeightProvider(baseProvider, compiled.stamps);
+    const taxiAndRunwayPoints = [
+      new THREE.Vector3(42, 0, 24),   // parking stand
+      new THREE.Vector3(24, 0, 24),   // taxiway connector
+      new THREE.Vector3(24, 0, -128), // hold-short taxi point
+      new THREE.Vector3(0, 0, -128),  // runway entry
+      new THREE.Vector3(0, 0, -146),  // runway start
+    ];
+    const heights = taxiAndRunwayPoints.map((point) => stampedProvider.getHeightAt(point.x, point.z));
+    expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(0.001);
+    expect(template.runwayLength).toBe(320);
+  });
+
   it('compiles terrain-flow corridors and overlay paths for route-aware modes', () => {
     const compiled = compileTerrainFeatures({
       id: GameMode.ZONE_CONTROL,
@@ -409,5 +474,23 @@ describe('compileTerrainFeatures', () => {
     expect(shoulderStamp).toBeDefined();
     expect(shoulderStamp?.targetHeightMode).toBe('max');
     expect((shoulderStamp?.priority ?? 999)).toBeLessThan(firebaseStamp?.priority ?? 0);
+  });
+
+  it('compiles A Shau home-base shoulders so navmesh has staged base terrain', () => {
+    const compiled = compileTerrainFeatures(
+      A_SHAU_VALLEY_CONFIG,
+      (x, z) => 700 + x * 0.001 - z * 0.001,
+    );
+    const homeBases = A_SHAU_VALLEY_CONFIG.zones.filter(zone => zone.isHomeBase);
+
+    for (const zone of homeBases) {
+      const shoulder = compiled.stamps.find((stamp) =>
+        stamp.kind === 'flatten_circle'
+        && stamp.centerX === zone.position.x
+        && stamp.centerZ === zone.position.z
+        && stamp.innerRadius > zone.radius
+      );
+      expect(shoulder, `${zone.name} should have a terrain-flow shoulder`).toBeDefined();
+    }
   });
 });

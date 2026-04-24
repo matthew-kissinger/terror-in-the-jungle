@@ -25,6 +25,10 @@ describe('HelicopterPhysics', () => {
       expect(controls.autoHover).toBe(true);
       expect(controls.engineBoost).toBe(false);
     });
+
+    it('starts with the engine and rotors stopped', () => {
+      expect(physics.getState().engineRPM).toBe(0);
+    });
   });
 
   describe('Lift and Gravity', () => {
@@ -41,6 +45,7 @@ describe('HelicopterPhysics', () => {
     });
 
     it('should gain upward velocity with full collective', () => {
+      physics.setEngineActive(true);
       physics.setControls({ collective: 1.0 });
       
       // Run a few updates to allow input smoothing and engine spool up
@@ -59,6 +64,8 @@ describe('HelicopterPhysics', () => {
       // Two instances to compare
       const physicsNormal = new HelicopterPhysics(initialPos);
       const physicsBoost = new HelicopterPhysics(initialPos);
+      physicsNormal.setEngineActive(true);
+      physicsBoost.setEngineActive(true);
       
       physicsNormal.setControls({ collective: 1.0, engineBoost: false });
       physicsBoost.setControls({ collective: 1.0, engineBoost: true });
@@ -246,6 +253,7 @@ describe('HelicopterPhysics', () => {
     });
 
     it('should increase load with collective', () => {
+      physics.setEngineActive(true);
       physics.setControls({ collective: 0 });
       physics.update(0.1, 0);
       const loadIdle = physics.getEngineAudioParams().load;
@@ -255,6 +263,35 @@ describe('HelicopterPhysics', () => {
       const loadActive = physics.getEngineAudioParams().load;
       
       expect(loadActive).toBeGreaterThan(loadIdle);
+    });
+  });
+
+  describe('Engine lifecycle', () => {
+    it('spools to idle while engine is active even at zero collective', () => {
+      physics.setEngineActive(true);
+
+      for (let i = 0; i < 30; i++) {
+        physics.update(0.016, 0);
+      }
+
+      expect(physics.getState().engineRPM).toBeGreaterThan(0.05);
+    });
+
+    it('spools down to stopped after the engine is deactivated', () => {
+      physics.setEngineActive(true);
+      physics.setControls({ collective: 1 });
+      for (let i = 0; i < 60; i++) {
+        physics.update(0.016, 0);
+      }
+      expect(physics.getState().engineRPM).toBeGreaterThan(0.2);
+
+      physics.setEngineActive(false);
+      physics.setControls({ collective: 0 });
+      for (let i = 0; i < 360; i++) {
+        physics.update(0.016, 0);
+      }
+
+      expect(physics.getState().engineRPM).toBe(0);
     });
   });
 

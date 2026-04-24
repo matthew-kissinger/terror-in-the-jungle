@@ -53,14 +53,18 @@ export class PlayerInput {
   private boundOnKeyDown!: (event: KeyboardEvent) => void;
   private boundOnKeyUp!: (event: KeyboardEvent) => void;
   private boundOnPointerLockChange!: () => void;
+  private boundOnPointerLockError!: () => void;
   private boundOnMouseMove!: (event: MouseEvent) => void;
   private boundOnMouseDown!: (event: MouseEvent) => void;
   private boundOnMouseUp!: (event: MouseEvent) => void;
   private boundOnWheel!: (event: WheelEvent) => void;
+  private boundOnWindowBlur!: () => void;
+  private boundOnVisibilityChange!: () => void;
   private callbacks: InputCallbacks = {};
   private isControlsEnabled = true;
   private flightVehicleMode: FlightVehicleMode = 'none';
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
+  private pointerLockFallbackActive = false;
 
   /** Touch controls - only created on touch-capable devices */
   private touchControls: TouchControls | null = null;
@@ -189,9 +193,11 @@ export class PlayerInput {
       if (this.boundRequestPointerLock) {
         document.removeEventListener('click', this.boundRequestPointerLock);
       }
-      if (document.pointerLockElement === document.body) {
+      if (document.pointerLockElement === this.getPointerLockTarget()) {
         document.exitPointerLock();
       }
+      this.pointerLockFallbackActive = false;
+      this.clearTransientInputState();
     } else if (this.gameStarted && this.boundRequestPointerLock) {
       document.addEventListener('click', this.boundRequestPointerLock);
     }
@@ -278,12 +284,26 @@ export class PlayerInput {
     this.mouseMovement.y = 0;
   }
 
+  clearTransientInputState(): void {
+    const hadShift = this.keys.has('shiftleft') || this.keys.has('shiftright');
+    const hadTab = this.keys.has('tab');
+    this.keys.clear();
+    this.clearMouseMovement();
+
+    if (hadShift) {
+      this.callbacks.onRunStop?.();
+    }
+    if (hadTab) {
+      this.callbacks.onScoreboardToggle?.(false);
+    }
+  }
+
   getIsPointerLocked(): boolean {
     // On touch devices, always report as "locked" so camera updates apply
     if (this.isTouchMode && this.gameStarted) return true;
     // On gamepad, always report as "locked" so right-stick look works
     if (this.gamepadManager?.isActive() && this.gameStarted) return true;
-    return this.isPointerLocked;
+    return this.isPointerLocked || (this.pointerLockFallbackActive && this.gameStarted);
   }
 
   /** Whether touch controls are active */
@@ -344,10 +364,13 @@ export class PlayerInput {
     this.boundOnKeyDown = this.onKeyDown.bind(this);
     this.boundOnKeyUp = this.onKeyUp.bind(this);
     this.boundOnPointerLockChange = this.onPointerLockChange.bind(this);
+    this.boundOnPointerLockError = this.onPointerLockError.bind(this);
     this.boundOnMouseMove = this.onMouseMove.bind(this);
     this.boundOnMouseDown = this.onMouseDown.bind(this);
     this.boundOnMouseUp = this.onMouseUp.bind(this);
     this.boundOnWheel = this.onWheel.bind(this);
+    this.boundOnWindowBlur = this.onWindowBlur.bind(this);
+    this.boundOnVisibilityChange = this.onVisibilityChange.bind(this);
 
     // Keyboard events
     document.addEventListener('keydown', this.boundOnKeyDown);
@@ -355,10 +378,15 @@ export class PlayerInput {
 
     // Mouse events
     document.addEventListener('pointerlockchange', this.boundOnPointerLockChange);
+    document.addEventListener('pointerlockerror', this.boundOnPointerLockError);
     document.addEventListener('mousemove', this.boundOnMouseMove);
     document.addEventListener('mousedown', this.boundOnMouseDown);
     document.addEventListener('mouseup', this.boundOnMouseUp);
     document.addEventListener('wheel', this.boundOnWheel, { passive: false });
+    document.addEventListener('visibilitychange', this.boundOnVisibilityChange);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blur', this.boundOnWindowBlur);
+    }
 
     // Store bound function to avoid duplicate listeners
     this.boundRequestPointerLock = this.requestPointerLock.bind(this);
@@ -377,7 +405,12 @@ export class PlayerInput {
       document.removeEventListener('click', this.boundRequestPointerLock);
     }
     document.removeEventListener('pointerlockchange', this.boundOnPointerLockChange);
+    document.removeEventListener('pointerlockerror', this.boundOnPointerLockError);
     document.removeEventListener('mousemove', this.boundOnMouseMove);
+    document.removeEventListener('visibilitychange', this.boundOnVisibilityChange);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('blur', this.boundOnWindowBlur);
+    }
 
     if (this.touchControls) {
       this.touchControls.dispose();
@@ -549,24 +582,35 @@ export class PlayerInput {
     // Don't lock if controls are disabled (dead/respawning)
     if (!this.pointerLockEnabled) return;
     if (this.gameStarted && !this.isPointerLocked && this.isControlsEnabled) {
+      const target = this.getPointerLockTarget();
       // requestPointerLock returns a Promise; catch rejection when document
       // state doesn't allow locking (e.g. not focused, embedded iframe).
-      Promise.resolve(document.body.requestPointerLock()).catch(() => {});
+      Promise.resolve(target.requestPointerLock()).catch((error) => {
+        this.handlePointerLockFailure(error);
+      });
     }
   }
 
   private onPointerLockChange(): void {
-    this.isPointerLocked = document.pointerLockElement === document.body;
+    this.isPointerLocked = document.pointerLockElement === this.getPointerLockTarget();
 
     if (this.isPointerLocked) {
+      this.pointerLockFallbackActive = false;
       Logger.info('player', 'Pointer locked - mouse look enabled');
     } else {
+      this.clearTransientInputState();
       Logger.info('player', 'Pointer lock released - click to re-enable mouse look');
     }
   }
 
+  private onPointerLockError(): void {
+    this.handlePointerLockFailure();
+  }
+
   private onMouseMove(event: MouseEvent): void {
-    if (!this.isPointerLocked) return;
+    if (!this.isPointerLocked && !(this.pointerLockFallbackActive && this.gameStarted && this.isControlsEnabled)) {
+      return;
+    }
 
     const sensitivity = SettingsManager.getInstance().getMouseSensitivityRaw();
     this.mouseMovement.x = event.movementX * sensitivity;
@@ -574,12 +618,12 @@ export class PlayerInput {
   }
 
   private onMouseDown(event: MouseEvent): void {
-    if (!this.isPointerLocked || !this.isControlsEnabled) return;
+    if (!this.getIsPointerLocked() || !this.isControlsEnabled) return;
     this.callbacks.onMouseDown?.(event.button);
   }
 
   private onMouseUp(event: MouseEvent): void {
-    if (!this.isPointerLocked || !this.isControlsEnabled) return;
+    if (!this.getIsPointerLocked() || !this.isControlsEnabled) return;
     this.callbacks.onMouseUp?.(event.button);
   }
 
@@ -639,9 +683,11 @@ Escape - Open settings (on foot) / Exit helicopter
 
   // Unlock mouse cursor for respawn UI
   unlockPointer(): void {
-    if (document.pointerLockElement === document.body) {
+    if (document.pointerLockElement === this.getPointerLockTarget()) {
       document.exitPointerLock();
     }
+    this.pointerLockFallbackActive = false;
+    this.clearTransientInputState();
   }
 
   // Re-lock mouse cursor after respawn
@@ -649,8 +695,33 @@ Escape - Open settings (on foot) / Exit helicopter
     if (this.gameStarted && this.pointerLockEnabled && !document.pointerLockElement) {
       // Small delay to avoid conflict with UI interaction
       setTimeout(() => {
-        Promise.resolve(document.body.requestPointerLock()).catch(() => {});
+        Promise.resolve(this.getPointerLockTarget().requestPointerLock()).catch((error) => {
+          this.handlePointerLockFailure(error);
+        });
       }, 100);
+    }
+  }
+
+  private getPointerLockTarget(): HTMLElement {
+    return document.body;
+  }
+
+  private handlePointerLockFailure(error?: unknown): void {
+    this.pointerLockFallbackActive = this.gameStarted && this.pointerLockEnabled && this.isControlsEnabled;
+    this.clearTransientInputState();
+    Logger.warn(
+      'player',
+      `Pointer lock failed; using unlocked mouse-look fallback.${error instanceof Error ? ` ${error.message}` : ''}`,
+    );
+  }
+
+  private onWindowBlur(): void {
+    this.clearTransientInputState();
+  }
+
+  private onVisibilityChange(): void {
+    if (document.visibilityState === 'hidden') {
+      this.clearTransientInputState();
     }
   }
 }

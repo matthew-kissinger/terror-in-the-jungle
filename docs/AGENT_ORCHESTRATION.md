@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last updated: 2026-04-22 (cycle-2026-04-23-debug-cleanup closed; stub awaiting next planning pass)
+Last updated: 2026-04-24 (architecture recovery run tracked in `docs/ARCHITECTURE_RECOVERY.md`)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -70,59 +70,84 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: (none — awaiting next planning pass)
+## Current cycle: architecture recovery stabilization
 
 ### Cycle ID
 
-_empty_ — the last closed cycle was `cycle-2026-04-23-debug-cleanup` on 2026-04-22 (retrospective: `docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md`).
+`architecture-recovery-cycle0-12` — active board:
+`docs/ARCHITECTURE_RECOVERY.md`. The last closed multi-agent PR cycle remains
+`cycle-2026-04-23-debug-cleanup` on 2026-04-22 (retrospective:
+`docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md`).
 
 ### Why this cycle exists
 
-_fill in when the next cycle is planned._
+Recover architecture drift after many unsupervised agent passes. The current
+goals are single runtime authority for vehicle sessions, explicit terrain/nav
+and atmosphere evidence, fallback retirement, trustworthy probes, and a final
+human playtest gate.
 
 ### Tasks in this cycle
 
-_fill in when the next cycle is planned. Each should have a brief at `docs/tasks/<slug>.md`._
+See `docs/ARCHITECTURE_RECOVERY.md` for the cycle board, current evidence,
+residual risks, and follow-up gates. Do not seed duplicate task briefs from
+stale backlog text.
 
 ### Round schedule
 
-_fill in when the next cycle is planned._
+Serial release-owner pass. Broad parallel executor dispatch is paused until
+the recovery commit is merged, deployed, and live-site evidence is checked.
 
 ### Concurrency cap
 
-_default 5; override here if the cycle needs fewer._
+1 for release-owner work. Restore the default only when a new PR-based cycle is
+seeded with bounded task briefs.
 
 ### Dependencies
 
-_declare the DAG once tasks are seeded._
+Current dependency order: docs/current-state alignment -> local validation ->
+commit -> merge to `master` -> push -> manual deploy -> production header/live
+checks -> human playtest.
 
 ### Playtest policy
 
-_required / deferred / none — decide per cycle._
+Deferred until the end of the recovery run per user direction. Final playtest
+uses `docs/PLAYTEST_CHECKLIST.md` plus
+`docs/playtest/PLAYTEST_2026-04-23_ARCHITECTURE_RECOVERY_CYCLE.md`.
 
 ### Perf policy
 
-_fresh baseline or inherit? Gate thresholds? Decide per cycle._
+Use current baselines. Local perf remains authoritative; GitHub-hosted perf is
+advisory. Treat the 2026-04-24 combat120 heap-recovery split as PASS/WARN until
+a quiet-machine `validate:full` rerun refreshes the signal.
 
 ### Failure handling
 
-_defaults to "CI red → blocked, fence change → blocked, continue the round." Override here if the cycle needs stricter hard stops._
+Current hard stops: fenced interface change without approval, hidden fallback
+that masks required A Shau terrain/nav assets, duplicate runtime authority for
+vehicle session state, or live deploy serving stale app/manifest/WASM assets.
 
 ### Visual checkpoints (orchestrator-gated)
 
-_list here if a round requires human visual review before merging; default NONE._
+Final human playtest required before game-feel closure. Production deploy
+verification can proceed before that because the user asked to playtest at the
+end of the cycle.
 
 ### skip-confirm
 
-_YES → orchestrator dispatches without pausing; NO → orchestrator prints round schedule and waits for "go". Decide per cycle._
+YES for the current release-owner pass.
 
 ### Cycle-specific notes
 
-_anything the orchestrator should know that doesn't fit the other fields._
+Archived docs remain historical; current truth anchors are
+`docs/STATE_OF_REPO.md`, `docs/ARCHITECTURE_RECOVERY.md`, and
+`docs/DEPLOY_WORKFLOW.md`.
 
 ### Pre-flight acknowledgement
 
-_reference the prior cycle's closing RESULT so the orchestrator knows what state master is in at dispatch time._
+Prior closed cycle:
+`docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md`. Current recovery work
+is not a normal multi-PR cycle; see `docs/ARCHITECTURE_RECOVERY.md` before
+dispatching more agents.
 
 ## Dispatch protocol
 

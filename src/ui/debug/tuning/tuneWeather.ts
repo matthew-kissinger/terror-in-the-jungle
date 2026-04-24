@@ -8,7 +8,7 @@ import type { PaneLike, TuningState } from '../LiveTuningPanel';
  * so unrelated knob edits don't keep restarting weather transitions.
  */
 
-export const WEATHER_STATE_KEY = 'weather.state';
+const WEATHER_STATE_KEY = 'weather.state';
 
 const OPTIONS = {
   CLEAR: WeatherState.CLEAR,

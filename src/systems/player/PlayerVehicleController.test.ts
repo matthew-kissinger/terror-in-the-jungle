@@ -53,6 +53,22 @@ describe('PlayerVehicleController', () => {
     expect(exitAircraft).toHaveBeenCalled();
   });
 
+  it('routes active vehicle exit through the session callback when available', () => {
+    const vehicle = new PlayerVehicleController();
+    const exitAircraft = vi.fn();
+    const requestVehicleExit = vi.fn(() => true);
+    vehicle.configure({
+      fixedWingModel: { exitAircraft } as any,
+      requestVehicleExit,
+    });
+
+    const ps = createPlayerState({ isInFixedWing: true, fixedWingId: 'fw_1' });
+    vehicle.handleEnterExitVehicle(ps);
+
+    expect(requestVehicleExit).toHaveBeenCalled();
+    expect(exitAircraft).not.toHaveBeenCalled();
+  });
+
   it('handleEnterExitVehicle tries fixed-wing first when on foot', () => {
     const vehicle = new PlayerVehicleController();
     const tryEnterAircraft = vi.fn(() => true);

@@ -180,7 +180,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.4,
     groundAlbedo: new THREE.Color(0x2a3a22), // deep jungle green
     exposure: 0.18,
-    fogDensity: 0.00055,
+    fogDensity: 0.0003,
     // Start at dawn (6am); 10-minute real-time cycle so playtests see the
     // sun sweep across the sky without waiting forever.
     todCycle: { dayLengthSeconds: 600, startHour: 6 },
@@ -199,13 +199,12 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.0,
     groundAlbedo: new THREE.Color(0x3b4c2e),
     exposure: 0.22,
-    fogDensity: 0.0022,
+    fogDensity: 0.00055,
     todCycle: { dayLengthSeconds: 600, startHour: 12 },
-    // Scattered fair-weather cumulus over the frontier. Rebalanced up from
-    // 0.1 (which read as dead-empty under the 3-octave threshold) to 0.25;
-    // larger feature scale (1400m) gives broader, sparser puffs fitting
-    // the clear desert look.
-    cloudCoverageDefault: 0.25,
+    // Scattered fair-weather cumulus over the frontier. Coverage stays below
+    // overcast but must be high enough to remain visible in ordinary ground
+    // screenshots, not only in A Shau.
+    cloudCoverageDefault: 0.62,
     cloudScaleMetersPerFeature: 1400,
   },
   // Dusk: sun very low in the west, heavy haze, strong orange extinction.
@@ -219,7 +218,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.6,
     groundAlbedo: new THREE.Color(0x2e2a22),
     exposure: 0.16,
-    fogDensity: 0.0028,
+    fogDensity: 0.0012,
     todCycle: { dayLengthSeconds: 600, startHour: 18 },
     // Overcast dusk, broken layers. Rebalanced up slightly from 0.6 to 0.7
     // so the thicker field still reads as broken layers rather than a
@@ -235,12 +234,12 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.2,
     groundAlbedo: new THREE.Color(0x34402a),
     exposure: 0.18,
-    fogDensity: 0.0024,
+    fogDensity: 0.0009,
     todCycle: { dayLengthSeconds: 600, startHour: 16 },
-    // Broken golden-hour clouds. Rebalanced up from 0.3 to 0.45 so the
+    // Broken golden-hour clouds. Rebalanced up from 0.3 to 0.55 so the
     // warm oblique light has clouds to catch; the large-scale modulator
     // keeps the gaps open enough to read as "broken" rather than "overcast".
-    cloudCoverageDefault: 0.45,
+    cloudCoverageDefault: 0.55,
   },
   // AI sandbox (perf harness): noon, perf-neutral; matches the legacy
   // combat120 framing so the baseline PNG diff stays meaningful.
@@ -252,11 +251,11 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     rayleigh: 2.0,
     groundAlbedo: new THREE.Color(0x3b4c2e),
     exposure: 0.22,
-    fogDensity: 0.0022,
-    // Light scattered — perf-lean baseline, but rebalanced from 0.2 to 0.30
+    fogDensity: 0.00055,
+    // Light scattered — perf-lean baseline, but rebalanced from 0.2 to 0.48
     // so combat120 actually reads as "noon with some clouds" instead of
     // the effectively-empty sky the 3-octave threshold produced at 0.2.
-    cloudCoverageDefault: 0.30,
+    cloudCoverageDefault: 0.56,
   },
 };
 

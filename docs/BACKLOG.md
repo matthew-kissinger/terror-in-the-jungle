@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-04-22 (cycle-2026-04-23-debug-cleanup closed; next cycle stub awaiting planning pass)
+Last updated: 2026-04-24
 
 ## Standing workstreams
 
@@ -22,6 +22,174 @@ Parallel to orchestrated cycles, the human is progressively replacing placeholde
 ### Playtest feedback docs
 
 Per-session fillable docs live under `docs/playtest/PLAYTEST_<date>.md`. Each session's notes roll up to the next cycle's planning pass. See `docs/playtest/PLAYTEST_2026-04-22.md` for the template shape.
+
+## Active Recovery Board
+
+Architecture recovery is the current stabilization board. The items below
+describe the code state being promoted to `master`; archived cycle sections
+remain historical evidence.
+
+Completed in the current recovery pass:
+- Cycle 0 control board: [ARCHITECTURE_RECOVERY.md](ARCHITECTURE_RECOVERY.md).
+- Vehicle session authority: `VehicleSessionController` owns player vehicle
+  enter, exit, emergency eject, switching, and derived `PlayerState` flags.
+- Model/session split: fixed-wing and helicopter models provide exit facts;
+  adapters expose optional `getExitPlan()`; the session controller finalizes
+  the transition.
+- Touch action-bar EXIT wiring is covered at the UI orchestration layer and
+  routes through the generic vehicle enter/exit callback.
+- Keyboard `KeyE` and gamepad interact routing are covered at the `PlayerInput`
+  callback layer and prefer the generic vehicle enter/exit callback.
+- `HelicopterModel.exitHelicopter()` now routes through the session-aware
+  `requestVehicleExit()` path when available, keeping `HelicopterInteraction`
+  as legacy fallback.
+- Fixed-wing probe path: player/NPC handoff now exits through the keyboard
+  `KeyE` path instead of a direct private call.
+- Fixed-wing probe path: in-flight emergency bailout now exits through keyboard
+  `KeyE` while airborne and then re-enters/resets for the existing handoff
+  validation.
+- AC-47 orbit hold was stabilized enough for the browser fixed-wing probe to
+  pass after the session refactor.
+- Cycle 3 first pass: `SystemUpdateSchedule` now declares the current
+  `SystemUpdater` phases, budgets, cadence groups, and scheduled system keys.
+  The `Other` fallback derives its tracked-system exclusion set from that
+  metadata, including `navmeshSystem`, `npcVehicleController`, and the
+  `gameModeManager` runtime hook, so adding those systems to the generic system
+  list cannot silently double-update them.
+- Cycle 4 first pass: `TouchControls` now derives vehicle/touch flight layout
+  from presentation `VehicleUIContext` instead of public touch-mode mutators.
+  The vehicle action bar remains capability-driven, and actor mode alone is no
+  longer enough for touch controls to independently enter aircraft mode.
+- Cycle 5 first pass: `CombatantSystem` now owns the current spatial index
+  dependency for the combat world and injects it into `CombatantLODManager`.
+  The LOD manager no longer imports the global `spatialGridManager` singleton
+  directly, and regression coverage proves LOD position sync plus AI update
+  dependency flow use the injected grid.
+- Cycle 6 first pass: helicopter squad deployment now queries the runtime
+  terrain surface and uses effective/collision-aware height when available.
+  `NavmeshSystem` now receives `terrainSystem` from `SystemConnector` and
+  samples navmesh heightfields, obstacle placement, and connectivity
+  representative heights through the runtime terrain source instead of direct
+  `HeightQueryCache` access.
+- Cycle 7 first pass: `scripts/fixed-wing-runtime-probe.ts` now writes
+  incremental summaries after each aircraft scenario and records structured
+  failure rows plus best-effort failure screenshots when a browser/scenario
+  failure interrupts the run.
+
+Validation completed in the current recovery pass:
+- targeted vehicle/session contract tests - PASS
+- targeted touch vehicle-exit callback tests - PASS
+- targeted keyboard/gamepad vehicle-exit callback tests - PASS
+- targeted helicopter model/session exit tests - PASS
+- `npm run validate:fast` - PASS
+- `npm run check:mobile-ui` - PASS
+- `npm run build` - PASS
+- `npm run probe:fixed-wing` - PASS, including takeoff, approach, in-flight
+  bailout, and player/NPC handoff
+
+Remaining gates before human sign-off / next release pass:
+- Human playtest of grounded exit, in-flight fixed-wing emergency bailout,
+  helicopter entry/exit, respawn/death cleanup, AC-47 orbit feel, A Shau
+  forward-strip taxi/takeoff, pointer-lock fallback, and touch/mobile exit
+  feel is deferred until the end of all current recovery cycles per user
+  direction on 2026-04-23.
+- 2026-04-23 playtest findings now routed into the cycle board:
+  - Cycle 1 closure: current fixes now preserve airborne bailout height,
+    clear held input on vehicle exit, and provide a pointer-lock rejection
+    fallback. Automated tests/probe pass; human playtest is still required.
+  - Cycle 2 vehicle feel: current rotor lifecycle patch now lets exited
+    helicopters spool down to stopped and increases flight-RPM visual speed.
+    Human playtest still decides whether blurred-disc or GLB work is needed.
+  - Cycle 2/6 bridge: current airfield datum patch now gives generated
+    runway, taxiway, apron, filler, and envelope stamps one shared target
+    height on sloped sites. Human playtest still needs to confirm the A Shau
+    taxi/runway route feels usable; Cycle 6 still owns full terrain/collision
+    runtime unification.
+  - Cycle 2 fixed-wing follow-up: AC-47 orbit hold had a roll-error sign bug
+    that the browser probe caught after the terrain patch. The current fix
+    restores AC-47 orbit probe success and adds transient roll/stall-margin
+    coverage.
+  - Atmosphere/perf follow-up: capture A Shau/Open Frontier fog/cloud
+    readability and airfield draw-call/collision/LOS cost before tuning assets.
+- Broader local gates completed on 2026-04-24: `npm run validate:fast`,
+  `npm run build`, `npm run probe:fixed-wing`, `npm run check:states`,
+  `npm run check:hud`, `npm run check:mobile-ui`, `npm run doctor`,
+  `npm run deadcode`, and `git diff --check`. `npm run validate:full`
+  passed unit/build portions but the first combat120 capture failed one heap
+  recovery check; a standalone rerun of `npm run perf:capture:combat120`
+  passed with warnings and `npm run perf:compare -- --scenario combat120`
+  passed 8/8. Treat this release perf gate as PASS/WARN until a quiet-machine
+  full validation rerun refreshes the heap signal.
+- Cycle 3 implementation gate passed on 2026-04-23: `npm run typecheck`,
+  `npm run lint`, `npm run test:quick`, and `npm run build`.
+- Cycle 4 automated gate passed on 2026-04-23: targeted UI/input suites,
+  `npm run typecheck`, `npm run lint`, `npm run build`, `npm run check:hud`,
+  `npm run check:mobile-ui`, and `npm run test:quick`.
+- Cycle 5 first-pass validation passed on 2026-04-23: targeted combat
+  ownership suites and `npm run typecheck`.
+- Cycle 6 first-pass targeted validation passed on 2026-04-23: targeted
+  terrain/navigation/helicopter/composer suites and `npm run typecheck`.
+- Cycle 6 broad gate passed on 2026-04-23: `npm run lint`,
+  `npm run test:quick`, `npm run build`, and a clean rerun of
+  `npm run probe:fixed-wing`. The first fixed-wing probe attempt closed the
+  browser during AC-47 and left partial artifacts, which is now routed to Cycle
+  7 harness productization.
+- Next recovery follow-up is Cycle 7 harness productization after Cycle 6 broad
+  gate and fixed-wing probe. Keep it to diagnostic/probe trust, real user paths,
+  and useful failure artifacts.
+- Cycle 7 first-pass validation so far: `npm run typecheck` and `npm run lint`
+  passed after the fixed-wing probe summary writer change. The post-patch
+  `npm run probe:fixed-wing` rerun passed and wrote `status: "passed"` to the
+  fixed-wing probe summary. `npm run check:states` and `npm run check:hud`
+  also passed.
+- Next recovery follow-up is Cycle 8 dead-code/docs/guardrails. Keep it to
+  evidence-backed cleanup and local subsystem rules; do not delete code based
+  on dead-code tool output alone.
+- Cycle 8 first pass is complete: `npm run deadcode` is clean
+  after classifying retained flight evidence probes, archived evidence scripts,
+  and Cloudflare deploy tooling; local-only helper exports were made private;
+  terrain/combat/UI/scripts guardrails now capture current ownership rules.
+  `npm run typecheck`, `npm run lint`, `npm run test:quick`, and
+  `npm run build` also passed.
+- 2026-04-24 follow-up gates added after user review:
+  - Cycle 9: clouds/fog/readability across all five modes. Current
+    evidence: `npm run evidence:atmosphere` attempts ground, sky-coverage, and
+    aircraft views for all five modes, and the current artifact is
+    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T05-24-42-281Z/`.
+    All five modes are wired and measurable through sky-dome clouds; the old
+    `CloudLayer` plane is hidden so it no longer draws the hard horizon divider.
+    The sky shader now uses a seamless cloud-deck projection instead of
+    azimuth-wrapped UVs, so A Shau/TDM/ZC read as broken cloud layers and Open
+    Frontier/combat120 read as lighter scattered-cloud presets. Cloud art is
+    still not human-signed off. A Shau has DEM-backed atmosphere evidence with
+    `0` browser errors and disabled water state. The artifact records A Shau
+    representative-base nav
+    connectivity as passing, but route/NPC movement quality still needs
+    play-path validation against the explicit static-tiled nav path.
+    Terrain/camera clipping and water rendering are tracked separately:
+    clipping can expose the global water plane, while water quality/hydrology
+    remains its own render backlog item. `tabat_airstrip` remains steep, and
+    Open Frontier also reports a separate steep `airfield_main` warning.
+  - Cycle 10: fallback retirement. Remove or make explicit silent fallbacks
+    that can hide bad wiring, especially required A Shau DEM/asset resolution,
+    terrain, air support, LOS, and spatial singleton compatibility. The local
+    preview manifest blocker is fixed by generating `asset-manifest.json` during
+    `build` and `build:perf`; the old TileCache fallback path has been removed.
+    The current blocker is proving A Shau route/NPC movement quality beyond the
+    representative-base connectivity gate, with startup hard-failing if no
+    navmesh is generated or pre-baked.
+    Do not skip A Shau, and do not close the cycle without an all-mode
+    regression pass.
+  - Release/docs gate: before push/deploy, rerun all-mode local evidence and
+    then bridge local-vs-deployed truth through live Pages/R2/WASM/service-worker
+    header checks. A local perf-preview pass is not automatically live-site
+    truth.
+  - Cycle 11: airfield surface authority. Terrain stamps share one datum, but
+    stands/taxi/runway helper metadata still need one runtime surface truth.
+  - Cycle 12: render/LOD/culling/water perf. Measure airfield draw calls,
+    triangles, collision registrations, LOS obstacles, water/hydrology visuals,
+    object pop-in, and aircraft/building visibility before replacing assets or
+    adding imposters.
 
 ## Recently Completed (cycle-2026-04-23-debug-cleanup, 2026-04-22)
 
@@ -399,6 +567,8 @@ the runbook for the end-of-cycle ritual.
 - [x] Expand browser-level aircraft validation into AC-47 player orbit hold.
 - [x] Expand browser-level aircraft validation into player/NPC fixed-wing
   handoff states.
+- [x] Branch-local: update player/NPC fixed-wing handoff validation to use the
+  real keyboard exit path through `VehicleSessionController`.
 - [ ] Expand and validate live NPC fixed-wing missions beyond the current `FixedWingModel.attachNPCPilot()` / world-feature / air-support path.
 - [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy, RTB).
 - [ ] Ground vehicles (M151 jeep first - GLB exists, need driving runtime).
@@ -442,19 +612,42 @@ the runbook for the end-of-cycle ritual.
 
 1. **Orphan `IDLE` AI state.** `CombatantState.RETREATING` now has `AIStateRetreat`; `IDLE` still exists mainly for fixtures / respawn edges and can still fall through if left live at tick time.
 2. **Duplicate squad-suppression mutation paths.** `AIFlankingSystem`, `AIStateEngage.initiateSquadSuppression`, and `applySquadCommandOverride` are three parallel paths that can mutate squad command state. Consolidation deferred to Phase F utility-AI design (E3 memo).
-3. **Fixed-wing feel is not yet human-signed off.** Cycle 2 now has a first-pass interpolation/camera smoothing patch for the reported stiff controls, altitude bounce/porpoise perception, and visible screen shake at speed. `npm run probe:fixed-wing` passes, but a human still needs to run the playtest checklist before more vehicle types are added.
-4. **Live production freshness still needs a post-deploy check.** Repo policy is fixed, but users will not receive the new `/build-assets/`, `/models/*`, and `titj-v2-2026-04-21` service-worker behavior until the next manual Cloudflare Pages deploy is live and header-checked.
+3. **Vehicle session recovery is implemented, but not human-signed-off.** `VehicleSessionController` removes the known split session authority, but human aircraft enter/exit playtest still needs to happen before it is treated as closed.
+4. **Fixed-wing feel is not yet human-signed off.** Cycle 2 now has a first-pass interpolation/camera smoothing patch for the reported stiff controls, altitude bounce/porpoise perception, visible screen shake at speed, plus an AC-47 orbit-hold sign fix. `npm run probe:fixed-wing` passes for A-1, F-4, and AC-47, but a human still needs to run the playtest checklist before more vehicle types are added.
+5. **Pointer lock has an embedded-browser fallback, but usability is not playtest-signed.** `PlayerInput` and `GameEngineInput` now share the `document.body` lock target, and `pointerlockerror` activates an unlocked mouse-look fallback. A normal browser remains the cleanest FPS playtest path until the fallback is human-verified.
+6. **Airfield height authority is partially repaired, not fully unified.** Branch-local terrain stamps now share one generated airfield datum on sloped sites, covering the obvious runway/taxi/apron mismatch. `WorldFeatureSystem`, `FixedWingModel`, terrain queries, collision, and probes still need a Cycle 6 terrain/collision runtime owner so staging and gameplay cannot drift again.
+7. **Helicopter rotor lifecycle has a stopped/spool-down fix, but no high-RPM blur sign-off.** Engine active/stopped state now lets exited helicopters stop at `engineRPM = 0`, and animation speed was raised. Human playtest decides whether the GLB pivots, authored nodes, or missing blurred-disc representation are the next limitation.
+8. **Atmosphere v1 can hide playtest evidence.** Cycle 9 now has comparison
+   captures for all five modes and reduced fog density. Visible clouds now come
+   from the sky-dome pass, and the old `CloudLayer` plane is hidden so it cannot
+   create the hard horizon divider / "one tile" artifact. A Shau now has
+   DEM-backed screenshots, disabled water state, and no browser errors in the
+   latest atmosphere run. The artifact now records representative-base
+   snap/connectivity/path success, but route/NPC movement quality remains a
+   Cycle 10 blocker because the representative gate is not the same as a live
+   movement sign-off. The earlier disconnected-home-base warning stopped after
+   A Shau terrain-flow shoulders were enabled.
+9. **Live production freshness still needs a post-deploy check.** Repo policy is fixed, but users will not receive the new `/build-assets/`, `/models/*`, and `titj-v2-2026-04-21` service-worker behavior until the next manual Cloudflare Pages deploy is live and header-checked.
+10. **Cycle 3 scheduler recovery has a first pass, not a full declarative scheduler migration.** `SystemUpdateSchedule` now removes the duplicate tracked-system exclusion authority from `SystemUpdater`, but the broader manual phase order is still preserved until a future parity-backed migration.
+11. **Cycle 4 UI/input boundary has a first pass, not human sign-off.** Touch vehicle controls now derive from presentation `VehicleUIContext`, but the final human playtest still needs to confirm touch/mobile aircraft exit and pointer-lock fallback usability.
+12. **Cycle 5 combat spatial ownership has a first pass, not full data-store recovery.** `CombatantLODManager` now receives the spatial grid from `CombatantSystem` instead of importing the singleton directly, but combat hot state is still an object map and scale/perf sign-off still needs combat scenario and perf-tail validation.
+13. **Cycle 6 terrain/collision authority has a first pass, not full terrain-collision runtime unification.** Helicopter squad deploy and navmesh generation now use runtime terrain, but `WorldFeatureSystem` still has a direct `LOSAccelerator` static-obstacle hook and `PlayerMovement` still has a no-runtime fallback to `HeightQueryCache`.
+14. **Cycle 7 harness productization has a first pass, not final diagnostic API design.** Fixed-wing probe summaries are now incremental, but broad `window.__engine` access still needs a deliberate diagnostic API decision before the harness is considered productized.
 
 ## Known Bugs
 
 1. Main production/perf chunks are still heavy (`index ~851kB`, `three ~734kB`, `ui ~449kB`) even though startup is stable. Precompressed sidecar generation has been removed, but real chunk splitting remains open.
 2. `frontier30m` script semantics are fixed, but the tracked baseline still predates the non-terminal soak path. Refresh this only from a quiet-machine perf session.
 3. First grenade/explosion cold-start hitch needs fresh perf evidence after the hidden live-effect warmup change.
+4. Branch-local vehicle exit UX fixes still need human confirmation:
+   in-flight fixed-wing bailout now preserves altitude, and vehicle-session
+   cleanup clears held input, but the final recovery playtest must confirm
+   bailout feel and no stuck-forward infantry movement.
 
 ## Architecture Debt
 
 1. SystemManager ceremony - adding a new system touches SystemInitializer + composers.
-2. PlayerController setter methods (reduced after vehicle adapter refactor; model/camera setters still duplicated).
+2. PlayerController setter methods (reduced after vehicle adapter refactor and `VehicleSessionController`; model/camera setters still duplicated).
 3. Variable deltaTime physics (no fixed timestep for grenade/NPC/particle systems; player, helicopter, and fixed-wing use FixedStepRunner).
 4. Mixed UI paradigms (~50 files with raw createElement alongside UIComponent + CSS Modules).
 

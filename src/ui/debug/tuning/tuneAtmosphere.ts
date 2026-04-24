@@ -12,8 +12,8 @@ import type { PaneLike, TuningState } from '../LiveTuningPanel';
  * (combat120) silently ignore the knob.
  */
 
-export const FOG_DENSITY_MUL_KEY = 'atmosphere.fogDensityMultiplier';
-export const TOD_HOUR_KEY = 'atmosphere.todHour';
+const FOG_DENSITY_MUL_KEY = 'atmosphere.fogDensityMultiplier';
+const TOD_HOUR_KEY = 'atmosphere.todHour';
 
 // Baseline fog density per scenario, captured at panel construction so the
 // multiplier stays idempotent across repeated apply() calls.

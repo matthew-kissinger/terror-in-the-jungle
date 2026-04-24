@@ -1,6 +1,6 @@
 # Cloudflare Stack
 
-Last updated: 2026-04-22
+Last updated: 2026-04-24
 
 Production today: `https://terror-in-the-jungle.pages.dev/`
 
@@ -169,6 +169,16 @@ logical id -> url + size + sha256 + contentType + cache policy + required
 ```
 
 Runtime should resolve A Shau's DEM from the manifest rather than hardcoding `/data/vietnam/big-map/a-shau-z14-9x9.f32`. Local dev can fall back to same-origin `/data/...`; production should fail startup if a required manifest entry is missing, returns HTML, has the wrong content type, or has the wrong size.
+
+2026-04-24 recovery note: the Cycle 9 atmosphere harness reproduced
+`asset-manifest.json` returning HTML in perf preview. `build` and `build:perf`
+now generate `asset-manifest.json` into their output dirs, and the latest
+atmosphere harness loads A Shau DEM-backed terrain with `0` browser errors.
+The remaining A Shau issue is no longer asset delivery: the old TileCache
+fallback path has been removed, large worlds use explicit static-tiled nav
+generation, and A Shau startup stops if no generated or pre-baked navmesh
+exists. Static-tiled route/NPC quality still belongs to Cycle 10
+fallback/navigation recovery even when representative-base connectivity passes.
 
 Recommended staged resolver behavior:
 

@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Last updated: 2026-04-22
+Last updated: 2026-04-24
 
 This is the authoritative, agent-agnostic operating guide for this repo. Every agent (Claude Code, Codex, Cursor, Gemini, humans) should read this file first. `CLAUDE.md` is a thin wrapper that adds Claude-Code-specific context on top of what's here.
 
@@ -50,6 +50,7 @@ npm run perf:quick                  # Smoke capture (not a baseline)
 npm run perf:compare                # Compare latest vs tracked baselines
 npm run perf:compare:strict         # Same, but fail on warnings too
 npm run perf:update-baseline        # Overwrite baselines from latest
+npm run evidence:atmosphere         # All-mode ground/sky/aircraft atmosphere + terrain visibility evidence
 ```
 
 ## Daily loop
@@ -65,6 +66,22 @@ npm run perf:update-baseline        # Overwrite baselines from latest
 ```
 
 For perf-sensitive work, add `npm run validate:full` before push.
+
+## Current-state discipline
+
+- Read [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) before making current
+  claims. Roadmap, backlog, comments, archived docs, and tests are sensors, not
+  truth.
+- A Shau Valley is a required scenario, not optional coverage. If work touches
+  terrain, navigation, atmosphere, vehicles, airfields, deploy assets, or
+  performance, validate A Shau directly and keep its current blockers visible.
+- Do not let A Shau-focused work narrow the release gate. Before push/deploy in
+  a recovery pass, rerun the all-mode evidence path so Open Frontier, TDM,
+  Zone Control, and combat120 stay covered too.
+- Local preview evidence is not live production evidence. After deployment,
+  verify the live Pages app shell, `/asset-manifest.json`, R2 DEM URL, `/sw.js`,
+  Recast WASM/build asset headers, and any service-worker cache behavior before
+  claiming the deployed game matches local validation.
 
 ## Runtime Landmarks
 
@@ -87,6 +104,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 |-----|---------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System overview, tick graph, coupling heatmap, key patterns |
 | [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) | Current verified repo state, known drift, and immediate priorities |
+| [docs/ARCHITECTURE_RECOVERY.md](docs/ARCHITECTURE_RECOVERY.md) | Architecture recovery cycles, gates, current findings, and residual risks |
 | [docs/COMBAT.md](docs/COMBAT.md) | Combat subsystem architecture (new, D1 2026-04-17) |
 | [docs/TESTING.md](docs/TESTING.md) | Four-layer test contract. Read before writing tests. |
 | [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced interfaces in `src/types/SystemInterfaces.ts` |
@@ -130,7 +148,8 @@ For perf-sensitive work, add `npm run validate:full` before push.
 ### Patterns to Avoid
 - Do not add `any` types
 - Do not reorder tick groups without checking dependencies
-- Do not add systems without updating SystemInitializer + isTrackedSystem()
+- Do not add systems without updating `SystemInitializer` plus the declarative
+  schedule metadata that drives fallback exclusions.
 - Do not commit .env files or secrets
 - Do not assert on internal tuning numbers or state-name strings in tests
 

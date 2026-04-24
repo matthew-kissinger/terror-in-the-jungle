@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-04-21
+Last updated: 2026-04-24
 
 ## Build targets
 
@@ -118,7 +118,7 @@ Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome
 - **Resolved on 2026-04-02:** the Playwright perf harness freeze at `frameCount=1` was caused by same-document View Transitions on the live-entry path. Menu-only transitions can still use `document.startViewTransition()`, but live-entry now bypasses it and perf/sandbox runs explicitly force `uiTransitions=0`.
 - Harness startup probes now capture `rafTicks`, page visibility, startup phase, and active view-transition state so browser scheduling failures are distinguishable from game-loop failures.
 - GitHub-hosted CI perf remains advisory. The harness is now trustworthy locally, but the hosted Linux/Xvfb environment still exhibits non-representative browser scheduling and GPU readback stalls during `combat120`, so authoritative perf gating stays with local/self-run `validate:full`.
-- Tracked baselines in `perf-baselines.json` were refreshed on 2026-04-20 after the atmosphere/airfield/harness cycle. `npm run perf:compare` passes 8/8 checks against those baselines as of 2026-04-21.
+- Tracked baselines in `perf-baselines.json` were refreshed on 2026-04-20 after the atmosphere/airfield/harness cycle. `npm run perf:compare -- --scenario combat120` passed 8/8 checks against those baselines on 2026-04-24 after a clean standalone combat120 capture.
 - **Fixed-wing browser gate restored and expanded on 2026-04-21:** `npm run probe:fixed-wing` rebuilds the selected preview target, boots Open Frontier, waits for each requested aircraft to spawn, and validates A-1, F-4, and AC-47 takeoff, climb, AC-47 orbit hold, player/NPC handoff, and short-final approach setup.
 - Cycle 2 treats fixed-wing feel as a separate product gate. The browser probe
   proves control-flow correctness; it does not prove high-speed feel, altitude
@@ -131,6 +131,14 @@ Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome
   passes `--match-duration 3600 --disable-victory true`, which keeps Open
   Frontier non-terminal for the 30-minute capture. The tracked baseline below is
   still the old 2026-04-20 run until a quiet-machine refresh is captured.
+- 2026-04-24 architecture-recovery perf gate: `npm run validate:full` passed
+  the unit/build portions but the first `combat120` capture failed one
+  heap-recovery check. A standalone rerun of
+  `npm run perf:capture:combat120` then passed with warnings at
+  `artifacts/perf/2026-04-24T05-49-45-656Z`, and
+  `npm run perf:compare -- --scenario combat120` passed 8/8 checks. Treat this
+  as PASS/WARN until a quiet-machine full validation run refreshes heap
+  confidence.
 
 ## Validation Gates
 
@@ -150,7 +158,7 @@ perf session.
 
 | Scenario | Status | Avg | p99 | Notes |
 |----------|--------|----:|----:|-------|
-| `combat120` | PASS | 13.12ms | 33.4ms | 2026-04-20 artifact `2026-04-20T06-15-39-927Z`; primary 120-NPC regression target. |
+| `combat120` | PASS/WARN | 14.45ms | 33.70ms | Latest 2026-04-24 standalone capture `2026-04-24T05-49-45-656Z`; compare passed 8/8, heap growth remained WARN. Baseline remains 2026-04-20 until deliberately refreshed. |
 | `openfrontier:short` | PASS | 7.50ms | 32.7ms | 2026-04-20 artifact `2026-04-20T06-18-05-147Z`; large-world short capture. |
 | `ashau:short` | PASS | 5.79ms | 15.6ms | 2026-04-20 artifact `2026-04-20T06-21-56-636Z`; strategy stack + DEM short capture. |
 | `frontier30m` | PASS* | 8.82ms | 33.7ms | 2026-04-20 artifact `2026-04-20T06-25-47-223Z`; baseline predates the non-terminal soak fix and ended early at victory. |

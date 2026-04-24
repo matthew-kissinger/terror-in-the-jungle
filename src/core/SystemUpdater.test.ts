@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { SystemUpdater } from './SystemUpdater';
+import { SYSTEM_UPDATE_SCHEDULE, TRACKED_SYSTEM_KEYS } from './SystemUpdateSchedule';
 import type { SystemKeyToType } from './SystemRegistry';
 
 function createRefs(overrides: Partial<SystemKeyToType> = {}): SystemKeyToType {
@@ -63,6 +64,17 @@ function createRefs(overrides: Partial<SystemKeyToType> = {}): SystemKeyToType {
 }
 
 describe('SystemUpdater', () => {
+  it('declares manually scheduled systems as fallback-tracked', () => {
+    const scheduledKeys = new Set(
+      SYSTEM_UPDATE_SCHEDULE.flatMap(group => group.systems.map(system => system.key)),
+    );
+
+    expect(scheduledKeys.has('navmeshSystem')).toBe(true);
+    expect(scheduledKeys.has('npcVehicleController')).toBe(true);
+    expect(scheduledKeys.has('gameModeManager')).toBe(true);
+    expect(new Set(TRACKED_SYSTEM_KEYS)).toEqual(scheduledKeys);
+  });
+
   it('schedules world-state updates on a lower cadence with accumulated delta', () => {
     const updater = new SystemUpdater();
     const refs = createRefs();
@@ -91,5 +103,61 @@ describe('SystemUpdater', () => {
 
     expect(refs.hudSystem.showMessage).not.toHaveBeenCalled();
     expect(refs.playerController.setPosition).not.toHaveBeenCalled();
+  });
+
+  it('does not fallback-update manually scheduled systems when they are present in the generic system list', () => {
+    const updater = new SystemUpdater();
+    const navmeshSystem = {
+      update: vi.fn(),
+    };
+    const npcVehicleController = {
+      update: vi.fn(),
+    };
+    const gameModeManager = {
+      getRespawnPolicy: vi.fn(() => ({ contactAssistStyle: 'none' })),
+      update: vi.fn(),
+      updateRuntime: vi.fn(),
+    };
+    const refs = createRefs({
+      navmeshSystem,
+      npcVehicleController,
+      gameModeManager,
+    } as unknown as Partial<SystemKeyToType>);
+
+    updater.updateSystems(
+      refs,
+      [
+        navmeshSystem,
+        npcVehicleController,
+        gameModeManager,
+      ] as unknown as Parameters<SystemUpdater['updateSystems']>[1],
+      undefined,
+      0.016,
+      true,
+    );
+
+    expect(navmeshSystem.update).toHaveBeenCalledTimes(1);
+    expect(npcVehicleController.update).toHaveBeenCalledTimes(1);
+    expect(gameModeManager.updateRuntime).not.toHaveBeenCalled();
+    expect(gameModeManager.update).not.toHaveBeenCalled();
+  });
+
+  it('fallback-updates systems that are not declared in the explicit schedule', () => {
+    const updater = new SystemUpdater();
+    const genericSystem = {
+      update: vi.fn(),
+    };
+    const refs = createRefs();
+
+    updater.updateSystems(
+      refs,
+      [genericSystem] as unknown as Parameters<SystemUpdater['updateSystems']>[1],
+      undefined,
+      0.016,
+      true,
+    );
+
+    expect(genericSystem.update).toHaveBeenCalledTimes(1);
+    expect(genericSystem.update).toHaveBeenCalledWith(0.016);
   });
 });

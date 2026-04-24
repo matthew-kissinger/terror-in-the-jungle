@@ -23,6 +23,7 @@ vi.mock('./HelicopterPhysics', () => ({
   HelicopterPhysics: class {
     update = vi.fn();
     setControls = vi.fn();
+    setEngineActive = vi.fn();
     setWorldHalfExtent = vi.fn();
     getState = vi.fn().mockImplementation(() => ({
       position: new THREE.Vector3(10, 20, 30),
@@ -369,8 +370,58 @@ describe('HelicopterModel', () => {
 
       model.update(0.16);
 
+      expect(mocks.physics.setEngineActive).toHaveBeenCalledWith(true);
       expect(mocks.physics.update).toHaveBeenCalled();
       expect(mockPlayerController.updatePlayerPosition).toHaveBeenCalled();
+    });
+
+    it('continues ticking a grounded unoccupied helicopter until rotors stop', async () => {
+      model.createHelicopterWhenReady();
+      await flushPromises();
+      model.setPlayerController(mockPlayerController);
+      vi.mocked(mockPlayerController.isInHelicopter).mockReturnValue(false);
+      vi.mocked(mocks.physics.getState).mockImplementation(() => ({
+        position: new THREE.Vector3(10, 20, 30),
+        velocity: new THREE.Vector3(0, 0, 0),
+        angularVelocity: new THREE.Vector3(0, 0, 0),
+        quaternion: new THREE.Quaternion(),
+        engineRPM: 0.4,
+        isGrounded: true,
+        groundHeight: 0,
+      }));
+
+      model.update(0.16);
+
+      expect(mocks.physics.setEngineActive).toHaveBeenCalledWith(false);
+      expect(mocks.physics.setControls).toHaveBeenCalledWith({
+        collective: 0,
+        cyclicPitch: 0,
+        cyclicRoll: 0,
+        yaw: 0,
+        engineBoost: false,
+      });
+      expect(mocks.physics.update).toHaveBeenCalled();
+    });
+
+    it('skips physics for a grounded unoccupied helicopter once the engine is stopped', async () => {
+      model.createHelicopterWhenReady();
+      await flushPromises();
+      model.setPlayerController(mockPlayerController);
+      vi.mocked(mockPlayerController.isInHelicopter).mockReturnValue(false);
+      vi.mocked(mocks.physics.getState).mockImplementation(() => ({
+        position: new THREE.Vector3(10, 20, 30),
+        velocity: new THREE.Vector3(0, 0, 0),
+        angularVelocity: new THREE.Vector3(0, 0, 0),
+        quaternion: new THREE.Quaternion(),
+        engineRPM: 0,
+        isGrounded: true,
+        groundHeight: 0,
+      }));
+
+      model.update(0.16);
+
+      expect(mocks.physics.setEngineActive).toHaveBeenCalledWith(false);
+      expect(mocks.physics.update).not.toHaveBeenCalled();
     });
 
     it('should detect helipad height during physics update when near helipad', async () => {
@@ -406,6 +457,17 @@ describe('HelicopterModel', () => {
     it('should call exitHelicopter on interaction subsystem', () => {
       model.exitHelicopter();
       expect(mocks.interaction.exitHelicopter).toHaveBeenCalled();
+    });
+
+    it('routes model-owned exit requests through the vehicle session when available', () => {
+      const requestVehicleExit = vi.fn(() => ({ exited: true }));
+      (mockPlayerController as any).requestVehicleExit = requestVehicleExit;
+      model.setPlayerController(mockPlayerController);
+
+      model.exitHelicopter();
+
+      expect(requestVehicleExit).toHaveBeenCalledWith({ reason: 'helicopter-model' });
+      expect(mocks.interaction.exitHelicopter).not.toHaveBeenCalled();
     });
   });
 

@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { HeightQueryCache } from '../terrain/HeightQueryCache';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 
 // --- Deploy constraints ---
@@ -20,6 +19,11 @@ interface DeployResult {
   reason?: string;
 }
 
+export interface SquadDeployTerrainQuery {
+  getHeightAt(x: number, z: number): number;
+  getEffectiveHeightAt?(x: number, z: number): number;
+}
+
 interface HelicopterSnapshot {
   position: THREE.Vector3;
   velocity: THREE.Vector3;
@@ -31,11 +35,11 @@ interface HelicopterSnapshot {
  * Pure calculation - does not spawn combatants or manage scene objects.
  */
 export class SquadDeployFromHelicopter {
-  private heightCache: HeightQueryCache;
+  private terrain: SquadDeployTerrainQuery;
   private cooldowns: Map<string, number> = new Map();
 
-  constructor(heightCache: HeightQueryCache) {
-    this.heightCache = heightCache;
+  constructor(terrain: SquadDeployTerrainQuery) {
+    this.terrain = terrain;
   }
 
   /**
@@ -102,7 +106,8 @@ export class SquadDeployFromHelicopter {
 
       const worldX = state.position.x + offsetX;
       const worldZ = state.position.z + offsetZ;
-      const terrainHeight = this.heightCache.getHeightAt(worldX, worldZ);
+      const terrainHeight = this.terrain.getEffectiveHeightAt?.(worldX, worldZ)
+        ?? this.terrain.getHeightAt(worldX, worldZ);
 
       positions.push(new THREE.Vector3(worldX, terrainHeight + NPC_Y_OFFSET, worldZ));
     }

@@ -1,8 +1,12 @@
 # Flight Rebuild - Multi-Cycle Orchestration Plan
 
-Last updated: 2026-04-22 (post commit 8c6b8ca validation)
+Last updated: 2026-04-24 (historical plan; superseded by architecture recovery board)
 
-This plan coordinates the remediation of the fixed-wing flight subsystem across four sequenced cycles. It is the single source of truth for the "flight rebuild" effort: what we fix, in what order, with what acceptance criteria, and with what lessons from prior cycles baked in.
+This plan coordinated an earlier fixed-wing flight remediation effort. It is
+kept as historical evidence and task-shaping context, not as current truth. For
+the live recovery board and current validation state, use
+[ARCHITECTURE_RECOVERY.md](ARCHITECTURE_RECOVERY.md) and
+[STATE_OF_REPO.md](STATE_OF_REPO.md).
 
 The plan is executable via `/orchestrate` once the user seeds the active cycle's section into `docs/AGENT_ORCHESTRATION.md`'s "Current cycle" slot. Two operating modes are supported:
 

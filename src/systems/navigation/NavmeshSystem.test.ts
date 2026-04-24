@@ -27,7 +27,7 @@ vi.mock('@recast-navigation/core', () => ({
 }));
 vi.mock('@recast-navigation/three', () => ({
   threeToSoloNavMesh: vi.fn(),
-  threeToTileCache: vi.fn(),
+  threeToTiledNavMesh: vi.fn(),
   getPositionsAndIndices: vi.fn(),
 }));
 vi.mock('./NavmeshCache');
@@ -51,6 +51,24 @@ function createReadySystem(): NavmeshSystem {
   return system;
 }
 
+interface TiledBoundsForTest {
+  originX: number;
+  originZ: number;
+  extentX: number;
+  extentZ: number;
+}
+
+function getTiledBoundsForTest(
+  system: NavmeshSystem,
+  worldSize: number,
+  anchors?: THREE.Vector3[],
+): TiledBoundsForTest {
+  const s = system as unknown as {
+    getTiledGenerationBounds: (worldSize: number, anchors?: THREE.Vector3[]) => TiledBoundsForTest;
+  };
+  return s.getTiledGenerationBounds(worldSize, anchors);
+}
+
 // ── Graceful degradation (no WASM / no navmesh) ─────────────────────
 
 describe('NavmeshSystem graceful degradation', () => {
@@ -68,7 +86,7 @@ describe('NavmeshSystem graceful degradation', () => {
   });
 
   it('skips navmesh generation when WASM is not ready', async () => {
-    await system.generateNavmesh(400);
+    await expect(system.generateNavmesh(400)).resolves.toBe(false);
     expect(system.isReady()).toBe(false);
   });
 
@@ -79,6 +97,47 @@ describe('NavmeshSystem graceful degradation', () => {
   it('update and dispose are safe before the system is initialized', () => {
     expect(() => system.update(0.016)).not.toThrow();
     expect(() => system.dispose()).not.toThrow();
+  });
+
+  it('centers large-world tiled generation around supplied scenario anchors', () => {
+    const anchors = [
+      new THREE.Vector3(-7656, 0, -2761),
+      new THREE.Vector3(6239, 0, 6145),
+      new THREE.Vector3(-5519, 0, -8327),
+      new THREE.Vector3(-7656, 0, 8371),
+    ];
+
+    const bounds = getTiledBoundsForTest(system, 21136, anchors);
+
+    for (const anchor of anchors) {
+      expect(anchor.x).toBeGreaterThanOrEqual(bounds.originX);
+      expect(anchor.x).toBeLessThanOrEqual(bounds.originX + bounds.extentX);
+      expect(anchor.z).toBeGreaterThanOrEqual(bounds.originZ);
+      expect(anchor.z).toBeLessThanOrEqual(bounds.originZ + bounds.extentZ);
+    }
+    expect(bounds.originX).not.toBe(-896);
+    expect(bounds.originZ).not.toBe(-896);
+  });
+
+  it('does not retry a failed solo build through a hidden large-world fallback', async () => {
+    const solo = vi.fn(() => ({ success: false, error: 'synthetic solo failure' }));
+    const tiled = vi.fn(() => ({ success: true, navMesh: { destroy: vi.fn() } }));
+    const s = system as unknown as {
+      wasmReady: boolean;
+      terrainSystem: { getHeightAt: (x: number, z: number) => number };
+      threeToSoloNavMeshFn: typeof solo;
+      threeToTiledNavMeshFn: typeof tiled;
+    };
+    s.wasmReady = true;
+    s.terrainSystem = { getHeightAt: () => 0 };
+    s.threeToSoloNavMeshFn = solo;
+    s.threeToTiledNavMeshFn = tiled;
+
+    await expect(system.generateNavmesh(400)).resolves.toBe(false);
+
+    expect(solo).toHaveBeenCalledTimes(1);
+    expect(tiled).not.toHaveBeenCalled();
+    expect(system.isReady()).toBe(false);
   });
 });
 

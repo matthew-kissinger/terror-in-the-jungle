@@ -18,7 +18,13 @@ export class PlayerVehicleController {
   }
 
   handleEnterExitVehicle(playerState: PlayerState): void {
-    // Exit current vehicle first
+    if (playerState.isInHelicopter || playerState.isInFixedWing) {
+      if (this.deps.requestVehicleExit) {
+        this.deps.requestVehicleExit();
+        return;
+      }
+    }
+
     if (playerState.isInHelicopter) {
       this.deps.helicopterModel?.exitHelicopter();
       return;

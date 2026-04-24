@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { WorldOverlay } from '../WorldOverlayRegistry';
 import type { LOSAccelerator } from '../../../systems/combat/LOSAccelerator';
 
-export interface AircraftContactSource {
+interface AircraftContactSource {
   getLOSAccelerator(): LOSAccelerator | null;
   sampleActiveAircraft?(): { position: THREE.Vector3; velocity: THREE.Vector3 } | null;
 }

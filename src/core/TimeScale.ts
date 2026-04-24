@@ -7,8 +7,8 @@
  * system that reads `performance.now()` instead of the dispatched delta will
  * bypass this control (flagged in the task PR body).
  */
-export const TIME_SCALE_TIERS = [0.1, 0.25, 0.5, 1, 2, 4] as const;
-export type TimeScaleValue = typeof TIME_SCALE_TIERS[number];
+const TIME_SCALE_TIERS = [0.1, 0.25, 0.5, 1, 2, 4] as const;
+type TimeScaleValue = typeof TIME_SCALE_TIERS[number];
 
 export class TimeScale {
   private scale: TimeScaleValue = 1;

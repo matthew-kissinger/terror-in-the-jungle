@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Last updated: 2026-04-21
+Last updated: 2026-04-24
 
 ## 3D Models (75 GLBs)
 
@@ -45,6 +45,12 @@ All models: low-poly stylized (PS2-era fidelity), GLB (binary glTF 2.0), PBR mat
 
 The sky is now procedural runtime atmosphere (`AtmosphereSystem` +
 `HosekWilkieSkyBackend`), not a static skybox texture.
+
+Vehicle and airfield asset quality is not signed off. The 2026-04-24 recovery
+pass fixed vehicle-session ownership, helicopter rotor spool-down, and
+sky-dome cloud wiring, but aircraft/building draw cost, airfield staging
+surfaces, water rendering, and imposter/LOD replacements remain future
+evidence-backed asset work.
 
 ## Art Direction
 

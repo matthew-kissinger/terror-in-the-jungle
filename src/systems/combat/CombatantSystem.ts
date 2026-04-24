@@ -22,7 +22,7 @@ import { CombatantCombat, CombatHitResult } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
-import { spatialGridManager } from './SpatialGridManager';
+import { SpatialGridManager, spatialGridManager as defaultSpatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 
@@ -73,6 +73,7 @@ export class CombatantSystem implements GameSystem {
   public readonly squadManager: SquadManager;
   public influenceMap?: InfluenceMapSystem;
   public sandbagSystem?: import('../weapons/SandbagSystem').SandbagSystem;
+  private readonly spatialGridManager: SpatialGridManager;
 
   // New focused modules
   private spawnManager: CombatantSpawnManager;
@@ -102,13 +103,15 @@ export class CombatantSystem implements GameSystem {
     camera: THREE.Camera,
     globalBillboardSystem: GlobalBillboardSystem,
     assetLoader: AssetLoader,
-    terrainSystem?: ITerrainRuntime
+    terrainSystem?: ITerrainRuntime,
+    spatialGridManager: SpatialGridManager = defaultSpatialGridManager
   ) {
     this.scene = scene;
     this.camera = camera;
     this.globalBillboardSystem = globalBillboardSystem;
     this.assetLoader = assetLoader;
     this.terrainSystem = terrainSystem;
+    this.spatialGridManager = spatialGridManager;
 
     // Initialize effect pools
     this.tracerPool = new TracerPool(this.scene, 256);
@@ -131,10 +134,10 @@ export class CombatantSystem implements GameSystem {
     this.squadManager = new SquadManager(this.combatantFactory, terrainSystem);
 
     // Initialize spatial grid (will be reinitialized when game mode is set)
-    spatialGridManager.initialize(4000);
+    this.spatialGridManager.initialize(4000);
 
     // Set spatial grid manager on CombatantMovement for cluster manager optimizations
-    this.combatantMovement.setSpatialGridManager(spatialGridManager);
+    this.combatantMovement.setSpatialGridManager(this.spatialGridManager);
 
     // Initialize new focused modules
     this.spawnManager = new CombatantSpawnManager(
@@ -150,7 +153,8 @@ export class CombatantSystem implements GameSystem {
       this.combatantCombat,
       this.combatantMovement,
       this.combatantRenderer,
-      this.squadManager
+      this.squadManager,
+      this.spatialGridManager
     );
 
     this.profiler = new CombatantProfiler(
@@ -170,7 +174,7 @@ export class CombatantSystem implements GameSystem {
     );
 
     // Combat queries use the unified spatial grid manager.
-    this.combatantCombat.setSpatialQueryProvider((center, radius) => spatialGridManager.queryRadius(center, radius));
+    this.combatantCombat.setSpatialQueryProvider((center, radius) => this.spatialGridManager.queryRadius(center, radius));
   }
 
   async init(): Promise<void> {
@@ -327,7 +331,7 @@ export class CombatantSystem implements GameSystem {
     );
     combatant.health = Math.min(data.health, combatant.maxHealth);
     this.combatants.set(combatant.id, combatant);
-    spatialGridManager.syncEntity(combatant.id, combatant.position);
+    this.spatialGridManager.syncEntity(combatant.id, combatant.position);
     return combatant.id;
   }
 
@@ -350,7 +354,7 @@ export class CombatantSystem implements GameSystem {
     // Unregister from navmesh crowd before removal
     this.combatantMovement.unregisterNavmeshAgent(combatantId);
 
-    spatialGridManager.removeEntity(combatantId);
+    this.spatialGridManager.removeEntity(combatantId);
     this.combatants.delete(combatantId);
 
     return snapshot;
@@ -410,7 +414,7 @@ export class CombatantSystem implements GameSystem {
   }
 
   querySpatialRadius(center: THREE.Vector3, radius: number): string[] {
-    return spatialGridManager.queryRadius(center, radius);
+    return this.spatialGridManager.queryRadius(center, radius);
   }
 
   getCombatantLiveness(id: string): { exists: boolean; alive: boolean } {
@@ -485,7 +489,7 @@ export class CombatantSystem implements GameSystem {
     this.lodManager.setGameModeManager(gameModeManager);
     // Reinitialize spatial grid with correct world size
     const worldSize = gameModeManager.getWorldSize();
-    spatialGridManager.reinitialize(worldSize);
+    this.spatialGridManager.reinitialize(worldSize);
     Logger.info('combat', `Spatial grid reinitialized with world size ${worldSize}`);
   }
 
@@ -535,7 +539,7 @@ export class CombatantSystem implements GameSystem {
   clearCombatantsForExternalPopulation(): void {
     const ids = Array.from(this.combatants.keys());
     for (const id of ids) {
-      spatialGridManager.removeEntity(id);
+      this.spatialGridManager.removeEntity(id);
     }
     this.combatants.clear();
     this.squadManager.dispose();
@@ -545,10 +549,10 @@ export class CombatantSystem implements GameSystem {
   }
 
   setSpatialBounds(size: number): void {
-    spatialGridManager.reinitialize(size);
+    this.spatialGridManager.reinitialize(size);
     // Re-insert all existing combatants
     this.combatants.forEach((c, id) => {
-      spatialGridManager.syncEntity(id, c.position);
+      this.spatialGridManager.syncEntity(id, c.position);
     });
     Logger.info('combat', `Spatial bounds resized to ${size}m`);
   }

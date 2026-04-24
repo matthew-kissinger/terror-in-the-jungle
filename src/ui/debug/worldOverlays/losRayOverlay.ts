@@ -7,7 +7,7 @@ const UPDATE_INTERVAL_MS = 100;
 const CLEAR_COLOR = 0x33ff66;
 const BLOCKED_COLOR = 0xff3333;
 
-export interface LosRaySource {
+interface LosRaySource {
   combatants: Map<string, Combatant>;
   getCameraPosition(): THREE.Vector3;
 }

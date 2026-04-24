@@ -42,6 +42,7 @@ import {
   getFixedWingDisplayInfo,
 } from './FixedWingConfigs';
 import type { FixedWingDisplayInfo } from './FixedWingConfigs';
+import type { VehicleExitOptions, VehicleExitPlan, VehicleExitResult } from './PlayerVehicleAdapter';
 import { ModelLoader } from '../assets/ModelLoader';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { Faction } from '../combat/types';
@@ -56,6 +57,10 @@ interface AircraftRuntime {
   command: FixedWingCommand;
   worldHalfExtent: number;
 }
+
+type VehicleExitRequester = {
+  requestVehicleExit?: (options?: VehicleExitOptions) => VehicleExitResult;
+};
 
 interface FixedWingFlightData {
   airspeed: number;
@@ -543,7 +548,62 @@ export class FixedWingModel implements GameSystem {
     return this.interaction.tryEnterAircraft();
   }
 
+  getPlayerExitPlan(aircraftId: string | null, options: VehicleExitOptions = {}): VehicleExitPlan | null {
+    if (!aircraftId) {
+      return { canExit: false, message: 'Cannot find aircraft for exit.' };
+    }
+
+    const group = this.groups.get(aircraftId);
+    if (!group) {
+      return { canExit: false, message: 'Cannot find aircraft for exit.' };
+    }
+
+    const normalPosition = this.buildAircraftExitPosition(group, false);
+    if (options.force) {
+      return { canExit: true, mode: 'force_cleanup', position: normalPosition };
+    }
+
+    const flightData = this.getFlightData(aircraftId);
+    const configKey = this.configKeys.get(aircraftId);
+    const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
+    if (!flightData || !config) {
+      return { canExit: true, mode: 'normal', position: normalPosition };
+    }
+
+    const exitStatus = getFixedWingExitStatus({
+      weightOnWheels: flightData.weightOnWheels,
+      airspeed: flightData.airspeed,
+      altitudeAGL: flightData.altitudeAGL,
+    }, config);
+    if (exitStatus.canExit) {
+      return { canExit: true, mode: 'normal', position: normalPosition };
+    }
+
+    if (options.allowEject) {
+      return {
+        canExit: true,
+        mode: 'emergency_eject',
+        position: this.buildAircraftEjectionPosition(group),
+        message: 'Emergency bailout.',
+      };
+    }
+
+    return {
+      canExit: false,
+      message: exitStatus.message ?? 'Cannot exit aircraft yet.',
+      position: normalPosition,
+    };
+  }
+
   exitAircraft(): void {
+    const exitRequester = this.playerController as (IPlayerController & VehicleExitRequester) | undefined;
+    if (typeof exitRequester?.requestVehicleExit === 'function') {
+      const result = exitRequester.requestVehicleExit({ allowEject: false, reason: 'fixed-wing-model' });
+      if (result.exited || result.reason === 'blocked') {
+        return;
+      }
+    }
+
     if (this.pilotedAircraftId) {
       const flightData = this.getFlightData(this.pilotedAircraftId);
       const configKey = this.configKeys.get(this.pilotedAircraftId);
@@ -565,6 +625,40 @@ export class FixedWingModel implements GameSystem {
     this.currentPilotIntent = createIdleFixedWingPilotIntent();
     this.pilotIntentActive = false;
     this.interaction.exitAircraft();
+  }
+
+  private buildAircraftExitPosition(group: THREE.Group, projectToGround: boolean): THREE.Vector3 {
+    const exitPosition = group.position.clone();
+    const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(group.quaternion);
+    const aftVector = new THREE.Vector3(0, 0, 1).applyQuaternion(group.quaternion);
+    exitPosition.addScaledVector(rightVector, projectToGround ? 7 : 4);
+    if (projectToGround) {
+      exitPosition.addScaledVector(aftVector, 6);
+    }
+
+    if (this.terrainManager) {
+      const terrainHeight = this.terrainManager.getEffectiveHeightAt(exitPosition.x, exitPosition.z);
+      exitPosition.y = projectToGround
+        ? terrainHeight + 1.5
+        : Math.max(exitPosition.y, terrainHeight + 1.5);
+    }
+
+    return exitPosition;
+  }
+
+  private buildAircraftEjectionPosition(group: THREE.Group): THREE.Vector3 {
+    const exitPosition = group.position.clone();
+    const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(group.quaternion);
+    const aftVector = new THREE.Vector3(0, 0, 1).applyQuaternion(group.quaternion);
+    exitPosition.addScaledVector(rightVector, 7);
+    exitPosition.addScaledVector(aftVector, 6);
+
+    if (this.terrainManager) {
+      const terrainHeight = this.terrainManager.getEffectiveHeightAt(exitPosition.x, exitPosition.z);
+      exitPosition.y = Math.max(exitPosition.y, terrainHeight + 1.5);
+    }
+
+    return exitPosition;
   }
 
   setPilotedAircraft(aircraftId: string | null): void {

@@ -13,13 +13,13 @@
 
 import type { GeneratedHeightmap, HeightmapParams } from './heightmapGenerator';
 
-export interface MapSeedRegistryEntry {
+interface MapSeedRegistryEntry {
   seed: number;
   navmeshAsset: string;
   heightmapAsset: string;
 }
 
-export interface SandboxExportJson {
+interface SandboxExportJson {
   registryEntry: MapSeedRegistryEntry;
   params: HeightmapParams;
   meta: {
@@ -71,7 +71,7 @@ export function formatRegistryLiteral(entry: MapSeedRegistryEntry): string {
  * Encode the heightmap as 8-bit grayscale PNG via the canvas API. The
  * `.f32` export carries full precision; the PNG is a visualization.
  */
-export async function heightmapToPngBlob(
+async function heightmapToPngBlob(
   heightmap: GeneratedHeightmap,
   doc: Document | undefined = typeof document !== 'undefined' ? document : undefined,
 ): Promise<Blob> {
@@ -105,7 +105,7 @@ export function heightmapToF32Blob(heightmap: GeneratedHeightmap): Blob {
   return new Blob([copy.buffer], { type: 'application/octet-stream' });
 }
 
-export interface ExportBundle {
+interface ExportBundle {
   baseName: string;
   f32: Blob;
   png: Blob;

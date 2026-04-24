@@ -32,13 +32,18 @@ type ScenarioResult = {
   orbitValid: boolean | null;
   approachState: unknown;
   approachValid: boolean;
+  bailoutState: unknown;
+  bailoutValid: boolean;
   handoffState: unknown;
   handoffValid: boolean;
   samples: unknown[];
   renderState: string | null;
   success: boolean;
-  screenshotPath: string;
+  screenshotPath: string | null;
+  error?: string;
 };
+
+type ProbeStatus = 'partial' | 'passed' | 'failed';
 
 function parseNumberArg(name: string, fallback: number): number {
   const key = `--${name}`;
@@ -322,8 +327,85 @@ async function runScenario(page: Page, configKey: string): Promise<Omit<Scenario
         && approachFlightData.operationState === 'approach'
       );
 
+      const bailoutPlayerBeforeExit = {
+        inFixedWing: player.isInFixedWing?.() ?? null,
+        fixedWingId: player.getFixedWingId?.() ?? null,
+      };
+      const bailoutFlightDataBeforeExit = model.getFlightData(id);
+      dispatchKey('keydown', 'KeyE', 'e');
+      await window.advanceTime(chunkMs);
+      const bailoutImmediatePosition = player.getPosition();
+      const bailoutPlayerImmediatelyAfterExit = {
+        inFixedWing: player.isInFixedWing?.() ?? null,
+        fixedWingId: player.getFixedWingId?.() ?? null,
+        position: bailoutImmediatePosition
+          ? {
+              x: Number(bailoutImmediatePosition.x.toFixed(2)),
+              y: Number(bailoutImmediatePosition.y.toFixed(2)),
+              z: Number(bailoutImmediatePosition.z.toFixed(2)),
+            }
+          : null,
+      };
+      dispatchKey('keyup', 'KeyE', 'e');
+      await window.advanceTime(1000);
+      const bailoutFlightDataAfterExit = model.getFlightData(id);
+      const bailoutPlayerPosition = player.getPosition();
+      const bailoutPlayerAfterExit = {
+        inFixedWing: player.isInFixedWing?.() ?? null,
+        fixedWingId: player.getFixedWingId?.() ?? null,
+        position: bailoutPlayerPosition
+          ? {
+              x: Number(bailoutPlayerPosition.x.toFixed(2)),
+              y: Number(bailoutPlayerPosition.y.toFixed(2)),
+              z: Number(bailoutPlayerPosition.z.toFixed(2)),
+            }
+          : null,
+      };
+      const bailoutState = {
+        exitPath: 'keyboard',
+        playerBeforeExit: bailoutPlayerBeforeExit,
+        playerImmediatelyAfterExit: bailoutPlayerImmediatelyAfterExit,
+        playerAfterExit: bailoutPlayerAfterExit,
+        flightDataBeforeExit: bailoutFlightDataBeforeExit
+          ? {
+              operationState: bailoutFlightDataBeforeExit.operationState,
+              controlPhase: bailoutFlightDataBeforeExit.controlPhase,
+              airspeed: Number(bailoutFlightDataBeforeExit.airspeed.toFixed(2)),
+              altitude: Number(bailoutFlightDataBeforeExit.altitude.toFixed(2)),
+              altitudeAGL: Number(bailoutFlightDataBeforeExit.altitudeAGL.toFixed(2)),
+              weightOnWheels: bailoutFlightDataBeforeExit.weightOnWheels,
+              stalled: bailoutFlightDataBeforeExit.isStalled,
+            }
+          : null,
+        flightDataAfterExit: bailoutFlightDataAfterExit
+          ? {
+              operationState: bailoutFlightDataAfterExit.operationState,
+              controlPhase: bailoutFlightDataAfterExit.controlPhase,
+              airspeed: Number(bailoutFlightDataAfterExit.airspeed.toFixed(2)),
+              altitudeAGL: Number(bailoutFlightDataAfterExit.altitudeAGL.toFixed(2)),
+              weightOnWheels: bailoutFlightDataAfterExit.weightOnWheels,
+              stalled: bailoutFlightDataAfterExit.isStalled,
+            }
+          : null,
+      };
+      const bailoutValid = Boolean(
+        bailoutFlightDataBeforeExit
+        && bailoutPlayerBeforeExit.inFixedWing === true
+        && bailoutPlayerBeforeExit.fixedWingId === id
+        && bailoutFlightDataBeforeExit.weightOnWheels === false
+        && bailoutFlightDataBeforeExit.altitudeAGL > 5
+        && bailoutPlayerImmediatelyAfterExit.inFixedWing === false
+        && bailoutPlayerImmediatelyAfterExit.fixedWingId === null
+        && bailoutPlayerImmediatelyAfterExit.position !== null
+        && bailoutPlayerImmediatelyAfterExit.position.y >= bailoutFlightDataBeforeExit.altitude - 20
+        && bailoutFlightDataAfterExit
+      );
+
       const handoffLineupPositioned = model.positionAircraftAtRunwayStart(id);
       const handoffGroup = model.groups.get(id);
+      if (handoffGroup) {
+        player.enterFixedWing(id, new Vector3Ctor(handoffGroup.position.x, handoffGroup.position.y, handoffGroup.position.z));
+      }
       model.detachNPCPilot?.(id);
       const metadata = model.getSpawnMetadata?.(id);
       const runwayStart = metadata?.runwayStart ?? null;
@@ -355,8 +437,9 @@ async function runScenario(page: Page, configKey: string): Promise<Omit<Scenario
         inFixedWing: player.isInFixedWing?.() ?? null,
         fixedWingId: player.getFixedWingId?.() ?? null,
       };
-      const exitPosition = homePosition.clone().add(new Vector3Ctor(6, 0, 6));
-      player.exitFixedWing(exitPosition);
+      dispatchKey('keydown', 'KeyE', 'e');
+      await window.advanceTime(chunkMs);
+      dispatchKey('keyup', 'KeyE', 'e');
       await window.advanceTime(1500);
       const handoffPilotAfterExit = model.getNPCPilot?.(id) ?? null;
       const handoffAfterExitState = handoffPilotAfterExit?.getState?.() ?? null;
@@ -369,6 +452,7 @@ async function runScenario(page: Page, configKey: string): Promise<Omit<Scenario
         lineupPositioned: handoffLineupPositioned,
         npcAttached: handoffAttached,
         playerBeforeExit: handoffPlayerBeforeExit,
+        exitPath: 'keyboard',
         npcStateWhilePlayer: handoffWhilePlayerState,
         playerAfterExit: handoffPlayerAfterExit,
         npcStateAfterExit: handoffAfterExitState,
@@ -413,6 +497,8 @@ async function runScenario(page: Page, configKey: string): Promise<Omit<Scenario
         orbitValid,
         approachState,
         approachValid,
+        bailoutState,
+        bailoutValid,
         handoffState,
         handoffValid,
         samples,
@@ -451,12 +537,13 @@ function printSummaryTable(results: ScenarioResult[]): void {
       stalled: finalState?.isStalled === true ? 'yes' : 'no',
       orbit: r.orbitValid === null ? 'n/a' : r.orbitValid ? 'yes' : 'no',
       approach: r.approachValid ? 'yes' : 'no',
+      bailout: r.bailoutValid ? 'yes' : 'no',
       handoff: r.handoffValid ? 'yes' : 'no',
     };
   });
 
   const headers: Array<keyof typeof rows[number]> = [
-    'aircraft', 'success', 'liftoffSec', 'climbSec', 'finalAltM', 'finalSpeedMs', 'phase', 'stalled', 'orbit', 'approach', 'handoff',
+    'aircraft', 'success', 'liftoffSec', 'climbSec', 'finalAltM', 'finalSpeedMs', 'phase', 'stalled', 'orbit', 'approach', 'bailout', 'handoff',
   ];
   const widths = headers.map((h) => Math.max(
     String(h).length,
@@ -472,6 +559,57 @@ function printSummaryTable(results: ScenarioResult[]): void {
     console.log(fmt(headers.map((h) => String(row[h]))));
   }
   console.log('');
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.stack ?? error.message : String(error);
+}
+
+function makeFailureResult(
+  configKey: string,
+  error: unknown,
+  screenshotPath: string | null,
+): ScenarioResult {
+  return {
+    configKey,
+    aircraftId: '',
+    entered: false,
+    touchMode: null,
+    inputMode: null,
+    finalState: null,
+    liftoffAtMs: null,
+    climbAtMs: null,
+    orbitState: null,
+    orbitValid: null,
+    approachState: null,
+    approachValid: false,
+    bailoutState: null,
+    bailoutValid: false,
+    handoffState: null,
+    handoffValid: false,
+    samples: [],
+    renderState: null,
+    success: false,
+    screenshotPath,
+    error: formatError(error),
+  };
+}
+
+function writeProbeSummary(
+  artifactDir: string,
+  port: number,
+  results: ScenarioResult[],
+  status: ProbeStatus,
+  error?: unknown,
+): void {
+  const summary = {
+    timestamp: new Date().toISOString(),
+    port,
+    status,
+    error: error === undefined ? undefined : formatError(error),
+    results,
+  };
+  writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
 }
 
 async function main(): Promise<void> {
@@ -515,43 +653,60 @@ async function main(): Promise<void> {
     const results: ScenarioResult[] = [];
     const url = `http://${HOST}:${port}/?perf=1`;
     for (const configKey of ['A1_SKYRAIDER', 'F4_PHANTOM', 'AC47_SPOOKY']) {
-      const context = await createContext(browser);
-      const page = await context.newPage();
-      await bootOpenFrontier(page, url);
-      const scenario = await runScenario(page, configKey);
-      const screenshotPath = join(artifactDir, `${configKey.toLowerCase()}.png`);
-      await page.screenshot({ path: screenshotPath, fullPage: false, timeout: 0 });
-      const finalState = scenario.finalState as {
-        altitudeAGL?: number;
-        phase?: string;
-        isStalled?: boolean;
-      } | null;
-      const success = Boolean(
-        scenario.entered
-        && scenario.touchMode === false
-        && finalState
-        && finalState.isStalled === false
-        && scenario.liftoffAtMs !== null
-        && scenario.climbAtMs !== null
-        && scenario.orbitValid !== false
-        && (finalState.phase === 'airborne' || (finalState.altitudeAGL ?? 0) > 0.2)
-        && scenario.approachValid
-        && scenario.handoffValid
-      );
-      results.push({
-        ...scenario,
-        success,
-        screenshotPath,
-      });
-      await context.close();
+      let context: BrowserContext | null = null;
+      let page: Page | null = null;
+      try {
+        context = await createContext(browser);
+        page = await context.newPage();
+        await bootOpenFrontier(page, url);
+        const scenario = await runScenario(page, configKey);
+        const screenshotPath = join(artifactDir, `${configKey.toLowerCase()}.png`);
+        await page.screenshot({ path: screenshotPath, fullPage: false, timeout: 0 });
+        const finalState = scenario.finalState as {
+          altitudeAGL?: number;
+          phase?: string;
+          isStalled?: boolean;
+        } | null;
+        const success = Boolean(
+          scenario.entered
+          && scenario.touchMode === false
+          && finalState
+          && finalState.isStalled === false
+          && scenario.liftoffAtMs !== null
+          && scenario.climbAtMs !== null
+          && scenario.orbitValid !== false
+          && (finalState.phase === 'airborne' || (finalState.altitudeAGL ?? 0) > 0.2)
+          && scenario.approachValid
+          && scenario.bailoutValid
+          && scenario.handoffValid
+        );
+        results.push({
+          ...scenario,
+          success,
+          screenshotPath,
+        });
+        writeProbeSummary(artifactDir, port, results, 'partial');
+      } catch (error) {
+        let failureScreenshotPath: string | null = null;
+        if (page && !page.isClosed()) {
+          failureScreenshotPath = join(artifactDir, `${configKey.toLowerCase()}-failure.png`);
+          try {
+            await page.screenshot({ path: failureScreenshotPath, fullPage: false, timeout: 0 });
+          } catch {
+            failureScreenshotPath = null;
+          }
+        }
+        results.push(makeFailureResult(configKey, error, failureScreenshotPath));
+        writeProbeSummary(artifactDir, port, results, 'failed', error);
+        throw error;
+      } finally {
+        if (context) {
+          await context.close().catch(() => {});
+        }
+      }
     }
 
-    const summary = {
-      timestamp: new Date().toISOString(),
-      port,
-      results,
-    };
-    writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
+    writeProbeSummary(artifactDir, port, results, 'passed');
     printSummaryTable(results);
     await browser.close();
 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { WorldOverlay } from '../WorldOverlayRegistry';
 
 /** Read-surface needed from the NavmeshSystem. Optional so tests can fake it. */
-export interface NavmeshHandle {
+interface NavmeshHandle {
   getNavMesh?(): unknown | null;
   isReady?(): boolean;
 }

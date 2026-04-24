@@ -108,7 +108,7 @@ function handleKeyUp(event: KeyboardEvent): void {
 function handleMouseMove(event: MouseEvent): void {
   if (!engineRef || !engineRef.freeFlyCamera.isActive()) return;
   // Use movementX/Y when pointer is locked; otherwise fall back to drag-based.
-  const locked = document.pointerLockElement === engineRef.renderer.renderer.domElement;
+  const locked = document.pointerLockElement === getPointerLockTarget();
   if (locked) {
     engineRef.freeFlyCamera.applyMouseDelta(event.movementX, event.movementY);
   }
@@ -201,7 +201,7 @@ function applyFreeFlyKeyState(engine: GameEngine, event: KeyboardEvent, isDown: 
 }
 
 /** Toggle free-fly mode on/off. Swaps the renderer's active camera. */
-export function toggleFreeFly(engine: GameEngine): void {
+function toggleFreeFly(engine: GameEngine): void {
   const cam = engine.freeFlyCamera;
   if (cam.isActive()) {
     cam.deactivate();
@@ -215,12 +215,16 @@ export function toggleFreeFly(engine: GameEngine): void {
     engine.renderer.setOverrideCamera(cam.getCamera());
     // Request pointer lock so mouse-look works. Benign if the user declines.
     try {
-      engine.renderer.renderer.domElement.requestPointerLock?.();
+      getPointerLockTarget().requestPointerLock?.();
     } catch {
       // Best-effort — ignore security errors in headless test envs.
     }
     Logger.info('engine-input', 'Free-fly camera ON (V toggle, B to exit)');
   }
+}
+
+function getPointerLockTarget(): HTMLElement {
+  return document.body;
 }
 
 /**
@@ -323,7 +327,7 @@ export function toggleTimeIndicator(engine: GameEngine): void {
 /**
  * Toggles the master debug HUD container (backtick).
  */
-export function toggleDebugHud(engine: GameEngine): void {
+function toggleDebugHud(engine: GameEngine): void {
   engine.debugHud.toggleAll();
 }
 
@@ -334,7 +338,7 @@ export function toggleDebugHud(engine: GameEngine): void {
  * this handler uses Backspace. Also opens the TimeControlPanel on first use
  * so the visual indicator is visible.
  */
-export function toggleTimePause(engine: GameEngine): void {
+function toggleTimePause(engine: GameEngine): void {
   const paused = engine.timeScale.togglePause();
   if (paused && !engine.timeControlPanel.isVisible()) {
     engine.debugHud.togglePanel('time-control');
@@ -345,7 +349,7 @@ export function toggleTimePause(engine: GameEngine): void {
 /**
  * Advances one simulation frame while paused (period key).
  */
-export function stepOneSimulationFrame(engine: GameEngine): void {
+function stepOneSimulationFrame(engine: GameEngine): void {
   if (!engine.timeScale.isPaused()) return;
   engine.timeScale.stepOneFrame();
   Logger.info('engine-input', '[time] step one frame');
@@ -354,7 +358,7 @@ export function stepOneSimulationFrame(engine: GameEngine): void {
 /**
  * Decreases the simulation scale by one tier (comma).
  */
-export function slowerSimulation(engine: GameEngine): void {
+function slowerSimulation(engine: GameEngine): void {
   const next = engine.timeScale.slower();
   if (!engine.timeControlPanel.isVisible()) {
     engine.debugHud.togglePanel('time-control');
@@ -365,7 +369,7 @@ export function slowerSimulation(engine: GameEngine): void {
 /**
  * Increases the simulation scale by one tier (semicolon).
  */
-export function fasterSimulation(engine: GameEngine): void {
+function fasterSimulation(engine: GameEngine): void {
   const next = engine.timeScale.faster();
   if (!engine.timeControlPanel.isVisible()) {
     engine.debugHud.togglePanel('time-control');
@@ -377,7 +381,7 @@ export function fasterSimulation(engine: GameEngine): void {
  * Triggers the F9 playtest capture flow. Delegates everything to the
  * PlaytestCaptureManager so this handler stays thin.
  */
-export function triggerPlaytestCapture(engine: GameEngine): void {
+function triggerPlaytestCapture(engine: GameEngine): void {
   if (!engine.playtestCaptureManager) return;
   void engine.playtestCaptureManager.trigger();
 }

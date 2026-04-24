@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
-import { SquadDeployFromHelicopter } from './SquadDeployFromHelicopter';
-import type { HeightQueryCache } from '../terrain/HeightQueryCache';
+import { SquadDeployFromHelicopter, type SquadDeployTerrainQuery } from './SquadDeployFromHelicopter';
 
-function createMockHeightCache(fixedHeight = 10): HeightQueryCache {
+function createMockTerrain(fixedHeight = 10): SquadDeployTerrainQuery {
   return {
     getHeightAt: vi.fn().mockReturnValue(fixedHeight),
-  } as unknown as HeightQueryCache;
+  };
 }
 
 function makeSnapshot(overrides: Partial<{
@@ -23,11 +22,11 @@ function makeSnapshot(overrides: Partial<{
 
 describe('SquadDeployFromHelicopter', () => {
   let deploy: SquadDeployFromHelicopter;
-  let cache: HeightQueryCache;
+  let terrain: SquadDeployTerrainQuery;
 
   beforeEach(() => {
-    cache = createMockHeightCache(10);
-    deploy = new SquadDeployFromHelicopter(cache);
+    terrain = createMockTerrain(10);
+    deploy = new SquadDeployFromHelicopter(terrain);
   });
 
   describe('canDeploy', () => {
@@ -153,10 +152,20 @@ describe('SquadDeployFromHelicopter', () => {
       expect(result.positions).toHaveLength(0);
     });
 
-    it('queries height cache for each position', () => {
+    it('queries terrain runtime for each position', () => {
       deploy.deploySquad('heli_1', makeSnapshot());
       // 4 positions = 4 height queries
-      expect(cache.getHeightAt).toHaveBeenCalledTimes(4);
+      expect(terrain.getHeightAt).toHaveBeenCalledTimes(4);
+    });
+
+    it('uses effective terrain height when collision-aware runtime provides it', () => {
+      terrain.getEffectiveHeightAt = vi.fn().mockReturnValue(20);
+      const result = deploy.deploySquad('heli_1', makeSnapshot());
+
+      expect(result.success).toBe(true);
+      expect(result.positions[0].y).toBe(23);
+      expect(terrain.getEffectiveHeightAt).toHaveBeenCalledTimes(4);
+      expect(terrain.getHeightAt).not.toHaveBeenCalled();
     });
 
     it('limits positions to memberCount', () => {

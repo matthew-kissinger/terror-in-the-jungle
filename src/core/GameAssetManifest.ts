@@ -1,9 +1,8 @@
 import { Logger } from '../utils/Logger';
 
 export const ASHAU_DEM_ASSET_ID = 'terrain.ashau.dem';
-export const ASHAU_RIVERS_ASSET_ID = 'terrain.ashau.rivers';
 
-export interface GameAssetManifestEntry {
+interface GameAssetManifestEntry {
   id: string;
   url: string;
   key: string;
@@ -14,7 +13,7 @@ export interface GameAssetManifestEntry {
   required: boolean;
 }
 
-export interface GameAssetManifest {
+interface GameAssetManifest {
   version: 1;
   generatedAt: string;
   gitSha: string;

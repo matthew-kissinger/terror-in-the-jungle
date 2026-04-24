@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-04-21
+Last updated: 2026-04-24
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 > For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
@@ -15,7 +15,7 @@ Vietnam War is the first theater. Architecture generalizes to any war with diffe
 
 Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain materials and post-processing are ported.
 
-Current truthful framing: the engine already supports large strategic populations through materialization tiers; the verified fully materialized perf frontier is still centered on 120-NPC scenarios, not 3,000 simultaneous live combatants.
+Current truthful framing: the engine already supports large strategic populations through materialization tiers; the verified fully materialized perf frontier is still centered on 120-NPC scenarios, not 3,000 simultaneous live combatants. Architecture recovery is currently prioritizing state ownership, A Shau terrain/nav truth, airfield surfaces, and render/LOD evidence before new feature expansion.
 
 ## Architecture Principles
 
@@ -34,7 +34,7 @@ Current truthful framing: the engine already supports large strategic population
 | 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), animals (6/6), structures integrated. Fixed-wing runtime is live; ground vehicles remain static only. |
 | 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. Fixed-wing feel/interpolation sign-off, NPC transport, ground vehicles, and aircraft combat integration remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
-| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. Water engine and hydrology not started. |
+| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water exists as a legacy plane, but hydrology/watercraft-grade rendering is not started. |
 | 6: Ground Vehicles | NOT STARTED | GLBs exist (jeep, APC, truck, tank, PT-76). No driving runtime. |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
 | 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
