@@ -83,7 +83,7 @@ current-code fixes and automated evidence, but still need human playtest.
 | Helicopter blades keep spinning after exit and do not visually read as high RPM in flight. | `HelicopterPhysics.updateEngine()` floors engine RPM at 0.2; `HelicopterAnimation` spins at `engineRPM * 20` with no blurred-disc state. | Cycle 2 vehicle feel/presentation. | Add explicit engine/rotor lifecycle states: stopped, idle, spool-up, flight RPM, and high-RPM blur. Inspect GLB nodes only after the lifecycle is correct. |
 | Airfield aircraft/taxi/runway height mismatch still appears in playtest. | Parked aircraft sample height at stand position; runway line-up samples height again at runway start; generated runway/apron/taxi stamps previously picked local target heights independently on slopes. | Cycle 2/6 bridge: airfield staging before Airframe scorch decision. | Branch-local patch gives generated airfield terrain stamps one runway datum and validates parking/taxi/runway route height deltas. Human playtest still needs to confirm A Shau usability, then Cycle 6 should unify terrain/collision/staging access. |
 | Fog/clouds can obscure whether terrain and airfields are correct. | Branch-local visible clouds moved into `HosekWilkieSkyBackend`; `AtmosphereSystem` keeps the old `CloudLayer` invisible so the finite plane cannot create a hard horizon divider. | Cycle 9 atmosphere pass. | Latest all-mode evidence shows sky coverage metrics in every mode and no visible cloud-plane authority. Human playtest must still judge whether Open Frontier/combat120 haze is acceptable cloud art. |
-| A Shau required terrain/nav can block evidence. | Branch-local `ModeStartupPreparer` now throws when the required DEM/manifest path fails; local perf preview now loads DEM-backed terrain. Large-world nav is explicit static-tiled generation, and A Shau startup fails if no navmesh is generated or pre-baked. | Cycle 10 fallback retirement plus Cycle 11 airfield validation. | Do not skip A Shau: keep fixing static-tiled nav quality and `tabat_airstrip` surface. Before push/deploy, also rerun all-mode evidence so Open Frontier/TDM/ZC/combat120 do not regress while A Shau is being repaired. |
+| A Shau required terrain/nav can block evidence. | Branch-local `ModeStartupPreparer` now throws when the required DEM/manifest path fails; local perf preview now loads DEM-backed terrain. Large-world nav is explicit static-tiled generation, and A Shau startup fails if no navmesh is generated or pre-baked. | Cycle 10 fallback retirement plus Cycle 11 airfield validation. | Do not skip A Shau: keep fixing static-tiled nav quality and `tabat_airstrip` surface. The final pre-release all-mode evidence rerun after the NPC/README pass kept Open Frontier/TDM/ZC/combat120 entering live mode with `0` browser errors; rerun it again if more runtime code lands before deploy. |
 | Aircraft/buildings appear to hurt frames near airfields. | Aircraft have `AirVehicleVisibility`; world props load through `WorldFeatureSystem` and draw-call optimizer but lack an equivalent prop/building visibility contract. | Cycle 5/6 perf ownership. | Run an airfield perf capture with draw calls, triangles, collision objects, and LOS obstacle counts before replacing GLBs. |
 
 Cycle 1 follow-up patch on 2026-04-23:
@@ -466,7 +466,7 @@ sky-coverage, and aircraft framings for all five modes. The harness boots with
 if terrain is not resident at the camera, and records water plus
 `clipDiagnostics` state so disabled water, water rendering, and terrain/camera
 clipping stay separable. Current artifact:
-`artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/summary.json`.
+`artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T13-08-25-253Z/summary.json`.
 Evidence confirmed:
 
 - A Shau, Open Frontier, TDM, Zone Control, and AI Sandbox/combat120 entered
@@ -569,7 +569,7 @@ Current code truth after the Cycle 5 follow-up:
 
 Validation so far: targeted ballistics, effects, hit detection, sizing,
 renderer, LOS, movement, helicopter deploy, and respawn suites passed; the
-full `npm run validate:fast` gate passed with 243 files and 3787 tests, and
+final `npm run validate:fast` gate passed with 243 files and 3789 tests, and
 `npm run build` passed. Human playtest still decides whether the billboard
 art, tracer visuals, and perceived player/NPC scale feel correct. If playtest
 still reports mismatch, do not add new hidden offsets; inspect sprite alpha

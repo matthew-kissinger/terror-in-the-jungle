@@ -32,8 +32,8 @@ const DEATH_TOTAL_TIME = DEATH_FALL_DURATION + DEATH_GROUND_TIME + DEATH_FADEOUT
 
 // ── Distant AI simulation ──
 const DISTANT_SIM_TIME_STEP = 30; // seconds per sim step
-const DISTANT_SIM_SPEED = 4; // m/s for distant movement
-const DISTANT_SIM_RANDOM_OFFSET = 20; // meters random scatter
+const DISTANT_SIM_SPEED = 2.2; // m/s for distant movement
+const DISTANT_SIM_RANDOM_OFFSET = 12; // meters random scatter
 const DISTANT_CULLED_DEFAULT_Y = 3; // approximate terrain Y for culled units
 
 // ── LOD ranges by GPU tier (meters) ──

@@ -172,6 +172,32 @@ sprite art reads close to player scale instead of filling the old `3.2m x 4.5m`
 plane. If future sprite assets change their transparent padding, update the
 mesh sizing/offset tests and the art pipeline together.
 
+## NPC Locomotion Contract
+
+As of 2026-04-24, infantry locomotion uses a real shared ceiling:
+`NPC_MAX_SPEED = 6m/s`. Movement states may choose slower tactical speeds, but
+they must not hide higher recovery speeds behind `Math.max(...)` expressions to
+compensate for bad pathing. If pathing is bad, fix navmesh/terrain routing
+instead of making soldiers sprint at or above the player's 10m/s walk budget.
+
+Current movement shape:
+
+- long route traversal caps at `NPC_MAX_SPEED`;
+- advancing/flanking/cover movement stays below that cap;
+- combat approach, retreat, strafe, defend, and player-squad command movement
+  use lower tactical speeds;
+- distant-culled strategic simulation uses smaller coarse steps than the visible
+  solver and remains terrain-grounded after each step;
+- high/medium LOD combatants clamp rendered Y near logical grounded Y so nearby
+  NPCs do not hover while large terrain corrections ease in. Low/culled NPCs
+  may still ease large upstream snaps because they are outside close visual
+  judgment range.
+
+Navigation is still a separate open issue. `NavmeshSystem` can load prebaked
+seed assets and query paths, but `CombatantMovement` currently keeps long-range
+route guidance disabled while validation continues. Do not treat lower speed
+tuning as a substitute for re-enabling validated navmesh route following.
+
 ## Internal Layers
 
 Combat has five internal layers. The layer boundaries are logical, not

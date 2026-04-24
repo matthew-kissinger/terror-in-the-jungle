@@ -23,7 +23,7 @@ export function handleRejoiningMovement(
     const toSquad = objectPool.getVector3();
     toSquad.subVectors(squadCentroid, combatant.position);
     toSquad.normalize();
-    const speed = Math.min(7, distanceToSquad / 3);
+    const speed = Math.min(5.2, distanceToSquad / 3);
     combatant.velocity.set(toSquad.x * speed, 0, toSquad.z * speed);
     combatant.rotation = Math.atan2(toSquad.z, toSquad.x);
     objectPool.releaseVector3(toSquad);
@@ -61,7 +61,7 @@ export function handlePlayerCommand(
         const distance = toDestination.length();
         if (distance > 2) {
           toDestination.normalize();
-          const speed = Math.min(6, distance / 2);
+          const speed = Math.min(4.5, distance / 2);
           combatant.velocity.set(toDestination.x * speed, 0, toDestination.z * speed);
           combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
         } else {
@@ -80,7 +80,7 @@ export function handlePlayerCommand(
         const distance = toDestination.length();
         if (distance > 2) {
           toDestination.normalize();
-          combatant.velocity.set(toDestination.x * 4, 0, toDestination.z * 4);
+          combatant.velocity.set(toDestination.x * 3, 0, toDestination.z * 3);
           combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
         } else {
           combatant.velocity.set(0, 0, 0);
@@ -98,7 +98,7 @@ export function handlePlayerCommand(
         const distance = toDestination.length();
         if (distance > 3) {
           toDestination.normalize();
-          combatant.velocity.set(toDestination.x * 3, 0, toDestination.z * 3);
+          combatant.velocity.set(toDestination.x * 2.4, 0, toDestination.z * 2.4);
           combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
         } else {
           combatant.velocity.set(0, 0, 0);
@@ -116,7 +116,7 @@ export function handlePlayerCommand(
         const distance = toDestination.length();
         if (distance > 5) {
           toDestination.normalize();
-          combatant.velocity.set(toDestination.x * 8, 0, toDestination.z * 8);
+          combatant.velocity.set(toDestination.x * 5.2, 0, toDestination.z * 5.2);
           combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
         } else {
           combatant.velocity.set(0, 0, 0);

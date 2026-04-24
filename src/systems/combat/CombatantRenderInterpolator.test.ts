@@ -202,6 +202,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 3, 0));
+    c.lodLevel = 'culled';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 
@@ -215,7 +216,7 @@ describe('CombatantRenderInterpolator', () => {
       const ySteppedThisFrame = c.renderedPosition!.y - previousY;
       // While the gap is still large, every frame must stay within the
       // far-tier cap. No single frame is allowed to "leap."
-      expect(Math.abs(ySteppedThisFrame)).toBeLessThanOrEqual(8 * dt + 1e-6);
+      expect(Math.abs(ySteppedThisFrame)).toBeLessThanOrEqual(2 * dt + 1e-6);
     }
   });
 
@@ -226,6 +227,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 0, 0));
+    c.lodLevel = 'culled';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 
@@ -247,6 +249,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 0, 0));
+    c.lodLevel = 'culled';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 
@@ -299,6 +302,23 @@ describe('CombatantRenderInterpolator', () => {
     expect(c.renderedPosition!.y).toBeLessThanOrEqual(c.position.y + 0.35 + 1e-6);
   });
 
+  it('grounds visible combatants instead of letting large Y corrections hover onscreen', () => {
+    const interp = new CombatantRenderInterpolator({
+      maxSpeedMps: 18,
+      maxVerticalFarMps: 2,
+      maxVerticalNearMps: 8,
+    });
+    const c = makeCombatant('a', new THREE.Vector3(0, 3, 0));
+    c.lodLevel = 'medium';
+    const combatants = new Map([[c.id, c]]);
+    interp.update(combatants, 1 / 60);
+
+    c.position.y = 53;
+    interp.update(combatants, 1 / 60);
+
+    expect(c.renderedPosition!.y).toBeGreaterThanOrEqual(c.position.y - 0.35 - 1e-6);
+  });
+
   it('still eases distant-cull height snaps instead of grounding huge Y corrections', () => {
     const interp = new CombatantRenderInterpolator({
       maxSpeedMps: 18,
@@ -306,6 +326,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 3, 0));
+    c.lodLevel = 'culled';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 

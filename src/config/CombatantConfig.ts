@@ -27,7 +27,7 @@ export const PLAYER_CENTER_MASS_Y_OFFSET = -0.6;
 export const ACTOR_EYE_Y_OFFSET = 0;
 
 /** Maximum NPC movement speed (m/s). Navmesh paths handle navigation; this is raw locomotion speed. */
-export const NPC_MAX_SPEED = 8;
+export const NPC_MAX_SPEED = 6;
 
 /** Default NPC health and max health. */
 export const NPC_HEALTH = 100;

@@ -102,6 +102,32 @@ This is the line between fast and stale:
 
 The repo now sets Vite `build.assetsDir = 'build-assets'` so generated bundle assets no longer share a URL namespace with mutable files copied from `public/assets/`.
 
+### Navmesh Delivery By Mode
+
+Cloudflare does not build navmesh data. GitHub Actions runs `npm run build`,
+and the build's `prebuild` step runs `scripts/prebake-navmesh.ts` only when the
+tracked seed assets are missing or `--force` is used. The seed-keyed assets for
+Open Frontier, Zone Control, and TDM are committed under `public/data/navmesh/`
+and `public/data/heightmaps/`, copied into `dist/`, and served by Pages with
+immutable cache headers.
+
+Current split:
+
+- Open Frontier: five prebaked seeds in `MapSeedRegistry`.
+- Zone Control: three prebaked seeds in `MapSeedRegistry`.
+- Team Deathmatch: three prebaked seeds in `MapSeedRegistry`.
+- AI Sandbox/combat120: procedural/small-map runtime path.
+- A Shau Valley: no prebaked navmesh asset today. The DEM/rivers payloads are
+  resolved through the Pages-hosted `asset-manifest.json` and immutable R2
+  URLs, then `NavmeshSystem` builds static-tiled navigation at startup around
+  scenario anchors. A Shau startup intentionally fails if terrain/nav evidence
+  is missing instead of falling back to beeline-only movement.
+
+Do not move navmesh binaries into the R2 manifest unless their size or variant
+count becomes a Pages-upload problem. The current issue is not Cloudflare
+delivery for prebaked modes; it is runtime route-follow quality and validation,
+especially for A Shau.
+
 ### Local vs Live Evidence Gap
 
 For A Shau and other asset-heavy modes, the dev gap is usually not TypeScript

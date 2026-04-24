@@ -101,7 +101,7 @@ describe('CombatantMovement', () => {
       disableTerrainSample: true,
     });
 
-    expect(c.velocity.x).toBeGreaterThan(6.5);
+    expect(c.velocity.x).toBeGreaterThan(4);
     expect(Math.abs(c.velocity.z)).toBeLessThan(0.01);
   });
 
@@ -121,7 +121,7 @@ describe('CombatantMovement', () => {
       disableTerrainSample: true,
     });
 
-    expect(c.velocity.x).toBeGreaterThan(7.4);
+    expect(c.velocity.x).toBeGreaterThan(4.3);
     expect(Math.abs(c.velocity.z)).toBeLessThan(0.2);
   });
 

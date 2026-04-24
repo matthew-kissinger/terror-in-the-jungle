@@ -102,7 +102,7 @@ the current truth anchor.
 - 2026-04-24 Cycle 9 atmosphere update: `npm run evidence:atmosphere`
   attempts all five modes from ground, sky-coverage, and aircraft views. Current
   evidence is under
-  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`.
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T13-08-25-253Z/`.
   A Shau, Open Frontier, TDM, Zone Control, and AI Sandbox/combat120 enter live
   mode with `0` browser errors, terrain resident at the camera, and non-zero
   sky-dome cloud coverage. Visible clouds now come from
@@ -126,12 +126,25 @@ the current truth anchor.
   run still reports a steep `tabat_airstrip` warning with `112.1m` vertical span
   across the `320m` runway footprint.
 - 2026-04-24 all-mode regression note: the same evidence run produced `0`
-  browser errors for Open Frontier, TDM, Zone Control, and combat120. Do not let
-  the A Shau repair narrow validation: before push/deploy, rerun all-mode
-  evidence and keep non-A Shau warnings visible. Latest non-A Shau warnings
-  include an Open Frontier `airfield_main` steep-site warning, combat120 AI and
-  `Combat` budget warnings, and TacticalUI/World budget warnings in several
-  modes.
+  browser errors for Open Frontier, TDM, Zone Control, and combat120. A final
+  pre-release rerun after the NPC locomotion and README pass kept all five
+  modes at `0` browser errors, terrain ready at the camera, cloud legibility
+  `pass`, `cameraBelowTerrain=false`, and
+  `waterExposedByTerrainClip=false`. Keep non-A Shau warnings visible: A Shau
+  still reports the steep `tabat_airstrip` warning, combat120 still reports AI
+  and `Combat` budget warnings, and TacticalUI/World budget warnings remain in
+  several modes.
+- 2026-04-24 NPC movement follow-up: infantry movement now has a real
+  `NPC_MAX_SPEED = 6m/s` ceiling instead of hidden 9-10m/s state speeds. Patrol,
+  advancing, cover-seeking, combat approach/retreat/strafe, defend, and
+  player-squad command movement were reduced accordingly. Distant-culled
+  strategic simulation now uses smaller coarse steps, and high/medium LOD
+  combatants clamp rendered Y close to their logical grounded position so
+  nearby NPCs stop visually hovering during large terrain-height corrections.
+  Targeted movement/render/navigation tests passed, and the final local gate
+  after README/docs alignment passed `npm run validate:fast`, `npm run build`,
+  `npm run smoke:prod`, and `npm run evidence:atmosphere`. Human playtest still
+  needs to judge infantry pacing in live combat.
 - Silent fallback risk is not fully removed; `PlayerMovement`,
   air-support mission positioning, terrain LOS wiring, and combat spatial
   singleton compatibility all still need an explicit fallback-retirement cycle.
@@ -251,7 +264,7 @@ the current truth anchor.
   - `npx vitest run src/systems/environment/AtmosphereSystem.test.ts src/systems/environment/atmosphere/HosekWilkieSkyBackend.test.ts src/systems/environment/WaterSystem.test.ts src/systems/navigation/NavmeshSystem.test.ts src/core/ModeStartupPreparer.test.ts` — PASS after sky-dome cloud coverage, disabled-water state, and explicit static-tiled nav changes
   - `npm run evidence:atmosphere` — PASS and rebuilt the perf
     bundle; current artifact is
-    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`
+    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T13-08-25-253Z/`
   - WARN: all five modes produced ground, sky, and aircraft screenshots with
     `0` browser errors and terrain resident at the camera. All captured views
     report `cameraBelowTerrain=false` and `waterExposedByTerrainClip=false`.
@@ -266,14 +279,15 @@ the current truth anchor.
   - `npm run test:quick` — PASS (`243` files, `3787` tests)
   - `npm run build` — PASS, with the existing large-chunk Vite warning
 - 2026-04-24 final local validation for the recovery commit — PASS/WARN
-  - `npm run validate:fast` — PASS (`243` files, `3787` tests)
+  - `npm run validate:fast` — PASS (`243` files, `3789` tests)
   - `npm run build` — PASS, with the existing large-chunk Vite warning
+  - `npm run smoke:prod` — PASS at a local production server
   - `npm run evidence:atmosphere` — PASS/WARN; all five modes reported
-    `0` browser errors, cloud follow `true`, nav ready/connected `true`, cloud
-    legibility `pass`, terrain ready at camera `true`,
+    `0` browser errors, cloud follow `true`, nav ready/connected `true`,
+    cloud legibility `pass`, terrain ready at camera `true`,
     `cameraBelowTerrain=false`, and `waterExposedByTerrainClip=false`;
     artifact:
-    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/summary.json`
+    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T13-08-25-253Z/summary.json`
   - `npm run probe:fixed-wing` — PASS for A-1, F-4, and AC-47, including
     takeoff, climb, approach, in-flight bailout, and player/NPC handoff
   - `npm run check:states` — PASS; artifact
@@ -345,6 +359,13 @@ the current truth anchor.
   uploads manifest copies to R2, and validates size/content-type/cache/CORS.
   The custom R2 domain is still open, and production still needs a live Pages
   deploy after merge before the live A Shau gap can be called fixed.
+- Navmesh deployment is split by mode. Open Frontier, Zone Control, and TDM use
+  tracked seed-keyed prebaked navmesh/heightmap files under
+  `public/data/navmesh/` and `public/data/heightmaps/`, served by Cloudflare
+  Pages with immutable cache headers. A Shau currently has no prebaked navmesh
+  asset; it loads the DEM via `asset-manifest.json`/R2 and generates explicit
+  static-tiled navmesh at startup, hard-failing if generation is unavailable.
+  The delivery path is verified, but route-follow movement quality is not.
 - Cycle 2 terrain-contact work is active: nearby NPC hillside phasing/floating
   was traced to render Y smoothing treating >1m high-LOD terrain corrections as
   distant snaps, while low-cost/distant NPC paths could preserve stale altitude.

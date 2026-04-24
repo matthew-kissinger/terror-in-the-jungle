@@ -878,3 +878,48 @@ TODO
     `npm run perf:compare -- --scenario combat120` passed 8/8 checks.
 - Remaining release-owner work: stage, commit, fast-forward `master`, push,
   trigger manual deploy, then verify live Pages/R2/WASM/service-worker headers.
+
+2026-04-24 NPC movement/navmesh deployment pass
+- Verified current production deploy points at commit
+  `9dafb7766ae94b20a501c9bc1fd2b0f0b64d9d80`; latest `deploy.yml` run
+  succeeded, and live Pages headers show `/`, `/asset-manifest.json`,
+  `/sw.js`, seed navmesh binaries, and Recast WASM serving with the intended
+  cache split.
+- Deployment/navmesh finding: Open Frontier, Zone Control, and TDM use
+  committed seed-keyed navmesh/heightmap files under `public/data`; A Shau
+  resolves DEM/rivers through the asset manifest/R2 and builds static-tiled
+  navmesh at startup. Cloudflare is not building navmesh, and the current risk
+  is route-follow quality, not the Pages cache path.
+- Reduced infantry locomotion speeds to a real `NPC_MAX_SPEED = 6m/s`, removed
+  hidden 9-10m/s state speeds, reduced distant-culled coarse movement, and made
+  high/medium LOD combatants clamp rendered Y near grounded logical Y to reduce
+  visible hover.
+- Targeted movement/render/navigation tests passed:
+  `npx vitest run src/systems/combat/CombatantMovement.test.ts src/systems/combat/CombatantMovementStates.test.ts src/systems/combat/CombatantRenderInterpolator.test.ts src/systems/combat/CombatantLODManager.test.ts src/systems/navigation/NavmeshSystem.test.ts src/systems/navigation/NavmeshMovementAdapter.test.ts`.
+
+TODO
+- `npm run validate:fast` passed after docs/code edits: typecheck, lint, and
+  243 test files / 3789 tests.
+- `npm run build` passed after docs/code edits; `prebuild` found all 22 baked
+  assets already present and skipped regeneration. Existing Vite large-chunk
+  warning remains.
+- `npm run smoke:prod` passed at `http://127.0.0.1:53616/`.
+- Human playtest still needs to judge infantry pacing and whether route-follow
+  navmesh quality, not speed, is now the main problem.
+
+2026-04-24 README OSS front-door pass
+- Rewrote `README.md` to make the live game link, current-state truth anchor,
+  stabilization focus, quickstart, validation, repo map, docs map,
+  contributing rules, and deploy caveat clearer for public OSS readers.
+- Kept claims aligned with current docs: A Shau is described as a 3,000-unit
+  strategic simulation with local materialization, not 3,000 fully live NPC
+  meshes; known open work remains visible instead of hidden behind marketing
+  language.
+- Fresh final validation after the README/doc alignment:
+  - `git diff --check`: PASS, CRLF warnings only.
+  - `npm run validate:fast`: PASS, 243 files / 3789 tests.
+  - `npm run build`: PASS, existing large-chunk Vite warning only.
+  - `npm run smoke:prod`: PASS at `http://127.0.0.1:59767/`.
+  - `npm run evidence:atmosphere`: PASS/WARN, artifact
+    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T13-08-25-253Z/summary.json`.
+- Next release step remains commit/push/manual deploy/live verification.

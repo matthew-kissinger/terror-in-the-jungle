@@ -126,7 +126,8 @@ Remaining gates before human sign-off / next release pass:
     scale, tracer start height, hit feedback, and whether player/NPC silhouettes
     feel matched in ground FPS combat.
 - Broader local gates completed on 2026-04-24: `npm run validate:fast`
-  (243 files, 3787 tests), `npm run build`, `npm run evidence:atmosphere`,
+  (243 files, 3789 tests), `npm run build`, `npm run smoke:prod`,
+  `npm run evidence:atmosphere`,
   `npm run probe:fixed-wing`, `npm run check:states`,
   `npm run check:hud`, `npm run check:mobile-ui`, `npm run doctor`,
   `npm run deadcode`, and `git diff --check`. `npm run validate:full`
@@ -170,7 +171,7 @@ Remaining gates before human sign-off / next release pass:
   - Cycle 9: clouds/fog/readability across all five modes. Current
     evidence: `npm run evidence:atmosphere` attempts ground, sky-coverage, and
     aircraft views for all five modes, and the current artifact is
-    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`.
+    `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T13-08-25-253Z/`.
     All five modes are wired and measurable through sky-dome clouds; the old
     `CloudLayer` plane is hidden so it no longer draws the hard horizon divider.
     The sky shader now uses a seamless cloud-deck projection instead of
@@ -197,6 +198,11 @@ Remaining gates before human sign-off / next release pass:
     navmesh is generated or pre-baked.
     Do not skip A Shau, and do not close the cycle without an all-mode
     regression pass.
+  - NPC locomotion follow-up: `NPC_MAX_SPEED` now caps infantry at 6m/s and
+    visible high/medium LOD NPCs are clamped near grounded Y to reduce hover.
+    Remaining work is route quality, not another hidden speed bump: validate
+    navmesh-guided long-range movement before re-enabling route guidance in
+    `CombatantMovement`.
   - Release/docs gate: before push/deploy, rerun all-mode local evidence and
     then bridge local-vs-deployed truth through live Pages/R2/WASM/service-worker
     header checks. A local perf-preview pass is not automatically live-site
@@ -644,12 +650,13 @@ the runbook for the end-of-cycle ritual.
    Cycle 10 blocker because the representative gate is not the same as a live
    movement sign-off. The earlier disconnected-home-base warning stopped after
    A Shau terrain-flow shoulders were enabled.
-9. **Live production freshness still needs a post-deploy check.** Repo policy is fixed, but users will not receive the new `/build-assets/`, `/models/*`, and `titj-v2-2026-04-21` service-worker behavior until the next manual Cloudflare Pages deploy is live and header-checked.
-10. **Cycle 3 scheduler recovery has a first pass, not a full declarative scheduler migration.** `SystemUpdateSchedule` now removes the duplicate tracked-system exclusion authority from `SystemUpdater`, but the broader manual phase order is still preserved until a future parity-backed migration.
-11. **Cycle 4 UI/input boundary has a first pass, not human sign-off.** Touch vehicle controls now derive from presentation `VehicleUIContext`, but the final human playtest still needs to confirm touch/mobile aircraft exit and pointer-lock fallback usability.
-12. **Cycle 5 combat spatial ownership has a first pass, not full data-store recovery.** `CombatantLODManager` now receives the spatial grid from `CombatantSystem` instead of importing the singleton directly, but combat hot state is still an object map and scale/perf sign-off still needs combat scenario and perf-tail validation.
-13. **Cycle 6 terrain/collision authority has a first pass, not full terrain-collision runtime unification.** Helicopter squad deploy and navmesh generation now use runtime terrain, but `WorldFeatureSystem` still has a direct `LOSAccelerator` static-obstacle hook and `PlayerMovement` still has a no-runtime fallback to `HeightQueryCache`.
-14. **Cycle 7 harness productization has a first pass, not final diagnostic API design.** Fixed-wing probe summaries are now incremental, but broad `window.__engine` access still needs a deliberate diagnostic API decision before the harness is considered productized.
+9. **NPC route-follow quality is not signed off.** Infantry is now slower and nearby render Y is grounded, but long-range `CombatantMovement` navmesh route guidance is still disabled pending validation. If NPCs still surge, climb badly, or hover after this pass, investigate LOD/update cadence and navmesh route following rather than raising movement speeds again.
+10. **Live production freshness still needs a post-deploy check.** Repo policy is fixed, but users will not receive the new `/build-assets/`, `/models/*`, and `titj-v2-2026-04-21` service-worker behavior until the next manual Cloudflare Pages deploy is live and header-checked.
+11. **Cycle 3 scheduler recovery has a first pass, not a full declarative scheduler migration.** `SystemUpdateSchedule` now removes the duplicate tracked-system exclusion authority from `SystemUpdater`, but the broader manual phase order is still preserved until a future parity-backed migration.
+12. **Cycle 4 UI/input boundary has a first pass, not human sign-off.** Touch vehicle controls now derive from presentation `VehicleUIContext`, but the final human playtest still needs to confirm touch/mobile aircraft exit and pointer-lock fallback usability.
+13. **Cycle 5 combat spatial ownership has a first pass, not full data-store recovery.** `CombatantLODManager` now receives the spatial grid from `CombatantSystem` instead of importing the singleton directly, but combat hot state is still an object map and scale/perf sign-off still needs combat scenario and perf-tail validation.
+14. **Cycle 6 terrain/collision authority has a first pass, not full terrain-collision runtime unification.** Helicopter squad deploy and navmesh generation now use runtime terrain, but `WorldFeatureSystem` still has a direct `LOSAccelerator` static-obstacle hook and `PlayerMovement` still has a no-runtime fallback to `HeightQueryCache`.
+15. **Cycle 7 harness productization has a first pass, not final diagnostic API design.** Fixed-wing probe summaries are now incremental, but broad `window.__engine` access still needs a deliberate diagnostic API decision before the harness is considered productized.
 
 ## Known Bugs
 

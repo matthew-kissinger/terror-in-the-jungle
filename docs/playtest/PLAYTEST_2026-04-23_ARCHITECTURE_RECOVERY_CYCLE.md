@@ -188,7 +188,7 @@ hidden because it produced the hard horizon divider / one-tile feel. Mark cloud
 issues if the sky still reads as blank haze, if the horizon has a flat divider,
 or if weather looks present in one mode but missing in another. Current evidence
 artifact:
-`artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T07-05-19-071Z/`.
+`artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T13-08-25-253Z/`.
 
 For A Shau specifically, first confirm the terrain/DEM is real. The 2026-04-24
 capture now has DEM-backed terrain, screenshots, `0` browser errors, and water
@@ -198,9 +198,10 @@ nav path passes gameplay movement checks. The artifact nav gate now confirms
 representative-base snap/connectivity/path success; do not use that alone to
 sign off actual route or NPC movement.
 
-Before this playtest is used for a push/deploy decision, rerun all-mode evidence
-after the final code change. A Shau must be fixed, but Open Frontier, TDM, Zone
-Control, and combat120 must also still enter live mode without browser errors.
+Before this playtest is used for a push/deploy decision after any new runtime
+change, rerun all-mode evidence. The latest pre-release rerun after the
+NPC/README pass kept A Shau, Open Frontier, TDM, Zone Control, and combat120
+entering live mode without browser errors.
 
 | Mode | Real terrain/DEM loaded? | Ground fog too dense? | Aircraft fog too dense? | Clouds visible? | Horizon divider / blank haze? | Terrain readable? | Aircraft readable? | Rating 0-4 |
 |---|---|---|---|---|---|---|---|---|

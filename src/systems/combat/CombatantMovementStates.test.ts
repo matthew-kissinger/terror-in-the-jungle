@@ -38,6 +38,9 @@ vi.mock('./CombatantMovementCommands', () => ({
 // Mock Logger
 vi.mock('../../utils/Logger', () => ({ Logger: { info: vi.fn(), warn: vi.fn() } }));
 
+const PLAYER_WALK_SPEED = 10;
+const PLAYER_CLOSE_MARGIN = 2;
+
 const createCombatant = (overrides: Partial<Combatant> = {}): Combatant => {
   return {
     id: 'c1',
@@ -213,7 +216,8 @@ describe('CombatantMovementStates', () => {
         zoneManager: zoneManager as any,
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
-      expect(midLeader.velocity.length()).toBeCloseTo(7.5, 5); // PATROL_SPEED
+      expect(midLeader.velocity.length()).toBeGreaterThan(PATROL_CLOSE_SPEED);
+      expect(midLeader.velocity.length()).toBeLessThan(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
 
       const farLeader = createCombatant({
         id: 'far',
@@ -225,7 +229,8 @@ describe('CombatantMovementStates', () => {
         zoneManager: zoneManager as any,
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
-      expect(farLeader.velocity.length()).toBeCloseTo(10, 5); // PATROL_LONG_DISTANCE_SPEED
+      expect(farLeader.velocity.length()).toBeGreaterThan(midLeader.velocity.length());
+      expect(farLeader.velocity.length()).toBeLessThanOrEqual(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
     });
 
     it('falls back to advancing toward enemy base when no zones are available', () => {
@@ -242,7 +247,8 @@ describe('CombatantMovementStates', () => {
         getEnemyBasePosition: () => new THREE.Vector3(30, 0, 0)
       });
 
-      expect(combatant.velocity.x).toBeCloseTo(7.5, 5); // FALLBACK_ADVANCE_SPEED
+      expect(combatant.velocity.x).toBeGreaterThan(PATROL_CLOSE_SPEED);
+      expect(combatant.velocity.x).toBeLessThan(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
 
@@ -334,7 +340,8 @@ describe('CombatantMovementStates', () => {
       const target = createCombatant({ id: 't1', position: new THREE.Vector3(100, 0, 0) });
       const combatant = createCombatant({ target, position: new THREE.Vector3(0, 0, 0) });
       updateCombatMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(5.5, 5); // COMBAT_APPROACH_SPEED
+      expect(combatant.velocity.x).toBeGreaterThan(0);
+      expect(combatant.velocity.length()).toBeLessThan(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
 
@@ -342,7 +349,8 @@ describe('CombatantMovementStates', () => {
       const target = createCombatant({ id: 't1', position: new THREE.Vector3(10, 0, 0) });
       const combatant = createCombatant({ target, position: new THREE.Vector3(0, 0, 0) });
       updateCombatMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(-3.5, 5); // COMBAT_RETREAT_SPEED
+      expect(combatant.velocity.x).toBeLessThan(0);
+      expect(combatant.velocity.length()).toBeLessThan(3);
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
 
@@ -353,9 +361,9 @@ describe('CombatantMovementStates', () => {
       dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(1000);
 
       updateCombatMovement(combatant);
-      const expectedZ = Math.sin(1) * 1.5; // COMBAT_STRAFE_SPEED / 2 (strafe factor)
       expect(combatant.velocity.x).toBeCloseTo(0, 5);
-      expect(combatant.velocity.z).toBeCloseTo(expectedZ, 5);
+      expect(Math.abs(combatant.velocity.z)).toBeGreaterThan(0);
+      expect(Math.abs(combatant.velocity.z)).toBeLessThan(1);
     });
   });
 
@@ -375,7 +383,8 @@ describe('CombatantMovementStates', () => {
     it('moves toward destination at COVER_SEEKING_SPEED when not arrived', () => {
       const combatant = createCombatant({ destinationPoint: new THREE.Vector3(20, 0, 0) });
       updateCoverSeekingMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(9, 5); // COVER_SEEKING_SPEED
+      expect(combatant.velocity.x).toBeGreaterThan(ADVANCING_TRAVERSE_SPEED);
+      expect(combatant.velocity.x).toBeLessThan(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
   });
@@ -410,19 +419,31 @@ describe('CombatantMovementStates', () => {
   // experiences (NPCs slower than player). Lowering a constant further is fine;
   // raising one past the margin will break the combat loop.
   describe('NPC speed cap invariant', () => {
-    const PLAYER_WALK_SPEED = 10;
-    const CLOSE_MARGIN = 2;
-
     it('advancing traverse speed leaves the player enough margin to close', () => {
-      expect(ADVANCING_TRAVERSE_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - CLOSE_MARGIN);
+      expect(ADVANCING_TRAVERSE_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
     });
 
     it('defend speed leaves the player enough margin to close', () => {
-      expect(DEFEND_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - CLOSE_MARGIN);
+      expect(DEFEND_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
     });
 
     it('patrol close-range speed leaves the player enough margin to close', () => {
-      expect(PATROL_CLOSE_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - CLOSE_MARGIN);
+      expect(PATROL_CLOSE_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
+    });
+
+    it('route traversal never exceeds the shared NPC max speed', () => {
+      const farLeader = createCombatant({
+        squadRole: 'leader',
+        destinationPoint: new THREE.Vector3(200, 0, 0),
+        lastZoneEvalTime: 2000,
+      });
+
+      updatePatrolMovement(farLeader, 0.016, new Map(), new Map(), {
+        zoneManager: { getAllZones: vi.fn(() => []) } as any,
+        getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0),
+      });
+
+      expect(farLeader.velocity.length()).toBeLessThanOrEqual(PLAYER_WALK_SPEED - PLAYER_CLOSE_MARGIN);
     });
   });
 });
