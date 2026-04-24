@@ -301,9 +301,12 @@ Expected results:
 Production caveat history: the 2026-04-21 deploy ran from a fresh checkout, and
 `public/data/vietnam/` is gitignored. The live `/data/vietnam/a-shau-rivers.json`
 check returned HTML, which proved A Shau runtime data was not deploy-reproducible
-from GitHub. The 2026-04-22 R2 manifest pipeline fixes the delivery shape for the
-primary DEM path, but it still needs a live deploy after merge before production
-can be claimed fixed.
+from GitHub. The 2026-04-22 R2 manifest pipeline fixed the delivery shape for
+the primary DEM path, and the 2026-04-24 manual deploy verified the live Pages
+freshness path: `/asset-manifest.json` served the release git SHA and R2 DEM
+URL, stable shell assets revalidated, and hashed build/navmesh/WASM assets were
+served immutable. This is a delivery/freshness proof; A Shau route-follow,
+water/hydrology, and airfield quality still need gameplay validation.
 
 If a header drifts from this table, inspect `public/_headers`, then `dist/_headers`, then the live Cloudflare Pages response.
 

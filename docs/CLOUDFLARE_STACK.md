@@ -8,7 +8,7 @@ This document is the deployment/storage target for the game. `docs/DEPLOY_WORKFL
 
 ## Current Check
 
-Checked locally on 2026-04-22:
+Checked locally on 2026-04-24:
 
 - `npx wrangler --version` -> `4.84.1`
 - `npm view wrangler version` -> `4.84.1`
@@ -19,7 +19,10 @@ Checked locally on 2026-04-22:
 - `npm view @cloudflare/realtimekit-ui version` -> `1.1.2`
 - `wrangler login` succeeded through OAuth for account `56adffd40534f7fe110fc661a40bbf53`.
 - Pages project exists: `terror-in-the-jungle`, domain `terror-in-the-jungle.pages.dev`, Direct Upload/no Git provider.
-- Latest listed Pages deployment is source `0807209`; docs-only `fb96660` was pushed after that deployment and is not the live Pages source.
+- The 2026-04-24 manual deploy path is verified through GitHub Actions Direct
+  Upload plus live Pages header checks. The live `/asset-manifest.json` must
+  report the release git SHA after every player-test deploy; do not rely on a
+  local build or a stale Pages deployment list as production truth.
 - R2 buckets created: `titj-game-assets-prod` and `titj-game-assets-preview`.
 - CORS applied to both buckets from `cloudflare/r2-cors-public-read.json`.
 - Temporary public `r2.dev` endpoints enabled:
@@ -417,7 +420,7 @@ Expected:
 3. Add asset manifest generation for local A Shau runtime files. Done for primary DEM + rivers.
 4. Add R2 upload and live manifest validation scripts. Done via `scripts/cloudflare-assets.ts`.
 5. Update the A Shau loader to resolve through the manifest in production with dev-only local fallback. Done for `terrain.ashau.dem`.
-6. Add CI upload/header validation before Pages deploy. Done in `.github/workflows/deploy.yml`; needs one live workflow run after merge.
+6. Add CI upload/header validation before Pages deploy. Done in `.github/workflows/deploy.yml`; verified in a live manual deploy on 2026-04-24.
 7. Replace pinned metadata with a reproducible CI artifact/source handoff before the next terrain payload revision. The current pinned fallback is acceptable for already-uploaded immutable objects, not for new asset generation.
 8. Move GLBs into the manifest pipeline once terrain is stable.
 9. Prototype a small Worker control plane only after asset delivery is reliable.

@@ -922,4 +922,12 @@ TODO
   - `npm run smoke:prod`: PASS at `http://127.0.0.1:59767/`.
   - `npm run evidence:atmosphere`: PASS/WARN, artifact
     `artifacts/architecture-recovery/cycle9-atmosphere/2026-04-24T13-08-25-253Z/summary.json`.
-- Next release step remains commit/push/manual deploy/live verification.
+- Commit `ce87fef885c1a6d6678a4f4b7be6342c70053c60` pushed to `origin/master`;
+  manual `deploy.yml` run `24891880026` succeeded and live Pages verification
+  passed. Live `/asset-manifest.json` served the release git SHA and R2 DEM
+  URL, stable shell assets revalidated, hashed build/navmesh/WASM assets were
+  immutable, and a live Zone Control smoke reached the deployment UI without
+  console/page/request errors.
+- Follow-up docs alignment replaces the old "needs deploy" caveat with a
+  recurring release-gate requirement: repeat manifest/header/live-smoke checks
+  after each player-test push.

@@ -357,8 +357,11 @@ the current truth anchor.
   public `r2.dev` access is enabled for temporary validation, and
   `scripts/cloudflare-assets.ts` uploads, writes `dist/asset-manifest.json`,
   uploads manifest copies to R2, and validates size/content-type/cache/CORS.
-  The custom R2 domain is still open, and production still needs a live Pages
-  deploy after merge before the live A Shau gap can be called fixed.
+  The custom R2 domain is still open. The 2026-04-24 release was manually
+  deployed and live-verified: `/asset-manifest.json` served the release git
+  SHA and R2 DEM URL, Pages cache headers matched the deploy contract, and a
+  live Zone Control smoke reached the deployment UI without browser/request
+  errors. This proves delivery freshness, not A Shau route-play quality.
 - Navmesh deployment is split by mode. Open Frontier, Zone Control, and TDM use
   tracked seed-keyed prebaked navmesh/heightmap files under
   `public/data/navmesh/` and `public/data/heightmaps/`, served by Cloudflare
@@ -438,10 +441,10 @@ the current truth anchor.
 7. Re-run `npm run validate:full` and refresh the `frontier30m` baseline from a
    quiet-machine session; do not use captures from a background-game session as
    baseline-quality evidence.
-8. Run the updated manual deploy workflow and rerun the prod header spot-check
-   in `docs/DEPLOY_WORKFLOW.md` for both Pages and the R2 asset URL. Then
-   replace the temporary `r2.dev` endpoint with a custom R2 asset domain.
-9. Bridge local-vs-prod evidence before release: local perf-preview screenshots
-   are not deployed truth until the live Pages URL serves the same
-   `asset-manifest.json`, R2 DEM, service worker, WASM, and content-hashed build
-   assets.
+8. Keep the manual deploy/header spot-check in `docs/DEPLOY_WORKFLOW.md` as a
+   release gate. The 2026-04-24 release bridged local-vs-prod evidence; repeat
+   the check after every push intended for player testing, then replace the
+   temporary `r2.dev` endpoint with a custom R2 asset domain.
+9. Treat local perf-preview screenshots as non-deployed truth until the live
+   Pages URL serves the same `asset-manifest.json`, R2 DEM, service worker,
+   WASM, and content-hashed build assets.
