@@ -1274,3 +1274,25 @@ TODO
   `npm run validate:fast` passed (247 files / 3834 tests), and direct scans of
   `public`, `dist`, and `dist-perf` found no `assets/source/soldiers` paths or
   old source-soldier filenames.
+
+2026-04-26 Pixel Forge production deploy verification
+- Committed the Pixel Forge NPC/vegetation cutover, hitbox/gun-range, and source
+  asset cleanup as `c70d6d74f689b99ae97513e842b40248923c62c2`, pushed it to
+  `origin/master`, and manually triggered GitHub Actions Deploy run
+  `24968673208`.
+- Deploy run `24968673208` passed: checkout, setup, dependency install, build,
+  Cloudflare asset upload/validation, and Cloudflare Pages deploy all completed.
+  The only annotation was the existing `cloudflare/wrangler-action@v3` Node 20
+  deprecation warning from GitHub Actions.
+- Live Pages verification passed:
+  `https://terror-in-the-jungle.pages.dev/asset-manifest.json` served git SHA
+  `c70d6d74f689b99ae97513e842b40248923c62c2`; `/`, `/sw.js`,
+  `/asset-manifest.json`, main build assets, terrain/navmesh workers, Recast
+  WASM/build assets, and A Shau R2 DEM/rivers returned `200` with expected cache
+  headers.
+- Live browser smoke passed at
+  `https://terror-in-the-jungle.pages.dev/?sandbox=1&npcs=40&seed=2718&diag=1`:
+  the gameplay HUD rendered with canvases, `window.__engineHealth` and
+  `window.__rendererInfo` were exposed by `?diag=1`, and there were no browser
+  console errors or failed requests. `?mode=gun-range` remains a DEV-only route,
+  so production smoke uses live sandbox gameplay instead.

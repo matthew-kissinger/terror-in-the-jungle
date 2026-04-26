@@ -10,11 +10,11 @@ the current truth anchor.
 
 ## Dev Cycle Close-Out Snapshot On 2026-04-26
 
-- Pixel Forge NPC/vegetation cutover is the current local runtime truth, not a
-  production release claim. Old NPC sprites, old NPC source-soldier PNGs, old
-  root-level vegetation WebPs, blocked vegetation species, `dipterocarp`, and
-  `rejected-do-not-import` paths are guarded by
-  `npm run check:pixel-forge-cutover`.
+- Pixel Forge NPC/vegetation cutover is now the current production runtime
+  truth at commit `c70d6d74f689b99ae97513e842b40248923c62c2`. Old NPC
+  sprites, old NPC source-soldier PNGs, old root-level vegetation WebPs,
+  blocked vegetation species, `dipterocarp`, and `rejected-do-not-import`
+  paths are guarded by `npm run check:pixel-forge-cutover`.
 - Current local gates are green after the latest hitbox/source-asset cleanup:
   `npm run check:pixel-forge-cutover`, `npm run validate:fast` (247 files /
   3834 tests), `npm run build`, `npm run build:perf`, and a post-build Pixel
@@ -23,6 +23,12 @@ the current truth anchor.
   remain. The local gun range at
   `http://127.0.0.1:5173/?mode=gun-range&glb=1` rendered with `GLBs=4/4` and
   no browser console errors.
+- Live verification on 2026-04-26: manual GitHub Actions Deploy run
+  `24968673208` passed, `https://terror-in-the-jungle.pages.dev/asset-manifest.json`
+  served git SHA `c70d6d74f689b99ae97513e842b40248923c62c2`, Pages/R2/Recast
+  headers returned `200`, and a live sandbox smoke reached the gameplay HUD
+  with no browser console errors or failed requests. The isolated
+  `?mode=gun-range` route remains DEV-only and is not a production route.
 - Current visual state: close NPCs are Pixel Forge GLBs with weapons inside
   64m, mid/far NPCs are Pixel Forge animated impostors, vegetation is still
   impostor-only, post-processing/pixelation is disabled, and approved
