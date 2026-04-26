@@ -1,23 +1,60 @@
 # Backlog
 
-Last updated: 2026-04-24
+Last updated: 2026-04-26
 
 ## Standing workstreams
 
-### Asset replacement + LOD-imposter pipeline (ongoing, human-driven)
+### Pixel Forge asset replacement + LOD/impostor pipeline (active)
 
-Parallel to orchestrated cycles, the human is progressively replacing placeholder / low-quality 3D models, textures, and effects with improved assets — some hand-authored, some sourced externally. As part of this pass, imposter LODs will be authored for the replaced models so the distant-LOD tier can swap from full geometry to billboard imposters without the current "pop-in" artifact.
+Parallel to orchestrated cycles, the human is progressively replacing
+placeholder / low-quality 3D models, textures, and effects with improved assets
+- some hand-authored, some sourced externally. The 2026-04-26 Pixel Forge pass
+has now cut NPC and vegetation runtime visuals over to new assets only:
+approved vegetation species use manifest-backed impostor color/normal atlases,
+close NPCs use skinned GLBs with weapons, and mid/far NPCs use animated
+impostor atlases. Old root-level vegetation WebP files and old faction sprite
+WebP files are no longer valid runtime or shipped assets.
 
 **Scope (tracked, not cycle-gated):**
-- Inventory pass: flag current placeholder assets the human wants upgraded (see the table in each session's `docs/playtest/PLAYTEST_<date>.md`).
-- Replacement intake: drop-in swaps where the replacement is authored to the same rig/scale.
-- Imposter generation: a tooling pass to render 8-direction billboards from each replaced asset for LOD switch at the distant tier.
-- LOD integration: wire imposters into `CombatantLODManager` (or the equivalent for props / vehicles) behind a feature flag per asset class.
+- Keep `npm run check:pixel-forge-cutover` green so old NPC sprites, old
+  NPC source-soldier PNGs, old vegetation assets, blocked species IDs, and
+  rejected handoff paths cannot drift back into runtime or shipped output.
+- Next polish pass should keep gameplay-facing combat feel ahead of more asset
+  churn. Hit registration now uses shared Pixel Forge visual hit proxies for
+  close GLBs, impostors, and the player character, plus an isolated Pixel Forge
+  GLB gun range at `?mode=gun-range`; human playtest still needs to
+  judge crosshair feel, projected barrel tracer feedback, close NPC camera
+  occlusion/collision feel, and whether the current 1.5x Pixel Forge NPC scale
+  feels right in live fights.
+- Finish visual tuning from human playtest: vegetation close opacity,
+  lighting/readability, wind feel, high-speed atlas snapping, faction marker
+  style, NPC background separation, and close/far impostor readability.
+- Palm/tree quality is not final. Current runtime guards avoid the worst
+  `giantPalm` and `coconut` atlas snapping, but a higher-quality pass should
+  evaluate close mesh vegetation LODs or a hybrid trunk-mesh/canopy-impostor
+  path instead of trying to solve tall asymmetric palms with flat billboards
+  alone.
+- Measure static building/prop culling before changing residency. The user has
+  flagged that buildings appear to stay visible indefinitely; first add
+  renderer-category evidence, then decide whether distance culling, HLOD, or
+  batching policy needs to change.
+- Integrate Pixel Forge props through `PixelForgePropCatalog` and placement
+  profiles. Props are not fallback substitutes for missing vegetation/NPC
+  species.
+- For future assets, prefer reproducible generated impostor packages with
+  explicit atlas metadata, color-space declarations, normal-space declarations,
+  edge bleed/crop bounds, and runtime validation.
 
 **Notes for future orchestrated cycles:**
-- If a future cycle needs to touch model loading or LOD switching, check this workstream first — the imposter-LOD shape may already be in flight on the human side.
-- Tooling preference: headless Three.js render passes (`npm run` script) over external DCC; keeps the pipeline reproducible.
-- When a cycle's RESULT calls out "asset worth replacing" findings from the playtest doc, append to the per-session inventory table, do NOT spawn a separate cycle for it unless the batch is large enough (e.g., ≥10 assets + imposter work).
+- If a future cycle needs to touch model loading, LOD switching, vegetation
+  scattering, or prop placement, check this workstream first because the Pixel
+  Forge manifest and validator now define the allowed runtime asset surface.
+- Tooling preference: headless Three.js render/package passes (`npm run` script)
+  over external DCC; keep atlas packages reproducible and testable.
+- When a cycle's RESULT calls out "asset worth replacing" findings from a
+  playtest doc, append to the per-session inventory table and the Pixel Forge
+  intake notes; do not spawn a separate cycle unless the batch is large enough
+  to justify a renderer/pipeline pass.
 
 ### Playtest feedback docs
 

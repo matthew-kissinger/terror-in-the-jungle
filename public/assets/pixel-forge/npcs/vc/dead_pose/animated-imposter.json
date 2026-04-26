@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "kind": "animated-octahedral-imposter",
+  "source": {
+    "path": "glb/vc/dead_pose.glb",
+    "bytes": 225664,
+    "tris": 1118,
+    "skinned": true,
+    "hash": "8da13722e56b4326337dddad38e920f06f6be60b1e37f46ad779fe95fed19470",
+    "animationClips": [
+      "Armature|Dead|baselayer"
+    ],
+    "attachments": [
+      {
+        "id": "ak47",
+        "kind": "weapon",
+        "sourcePath": "weapons/ak47.glb",
+        "bytes": 67588,
+        "hash": "1fab1876b236f1cf2c5759cb7e669c5badf7fc4195fd6640c35f46c515c43ce8"
+      }
+    ]
+  },
+  "bbox": {
+    "min": [
+      -0.432438988523601,
+      0.004115444931719416,
+      -0.23594053246411756
+    ],
+    "max": [
+      0.38142557766312446,
+      1.521538619904803,
+      1.0327587908665712
+    ],
+    "worldSize": 1.5174231749730838,
+    "yOffset": 0.7628270324182612
+  },
+  "projection": "orthographic",
+  "view": {
+    "layout": "octahedral",
+    "directionEncoding": "octahedral",
+    "grid": {
+      "x": 7,
+      "y": 7,
+      "count": 49
+    },
+    "tileSize": 96,
+    "framesPerClip": 8
+  },
+  "clips": [
+    {
+      "target": "death",
+      "resolved": "baselayer",
+      "rawName": "Armature|Dead|baselayer",
+      "matchedBy": "fallback",
+      "fallbackRawName": "Armature|Dead|baselayer",
+      "frameCount": 8,
+      "durationSec": 3
+    }
+  ],
+  "textures": {
+    "layout": "atlas",
+    "color": {
+      "uri": "animated-albedo-packed.png",
+      "format": "rgba8",
+      "width": 2688,
+      "height": 1344,
+      "layers": 8,
+      "framesX": 4,
+      "framesY": 2,
+      "bytes": 663833,
+      "colorSpace": "srgb"
+    }
+  },
+  "runtime": {
+    "renderer": "webgl2",
+    "primitive": "instanced-quad",
+    "material": "ShaderMaterial",
+    "textureMode": "packed-2d-atlas",
+    "attributes": [
+      "frameOffset",
+      "clip",
+      "variant",
+      "yaw",
+      "paletteRow"
+    ]
+  },
+  "storage": {
+    "colorBytes": 14450688,
+    "totalRawBytes": 14450688,
+    "envelopeBytes": 31457280,
+    "fitsEnvelope": true
+  },
+  "validation": {
+    "warnings": [
+      {
+        "code": "ANIMATED_IMPOSTER_CLIP_FALLBACK",
+        "severity": "warning",
+        "message": "death will use Armature|Dead|baselayer as a fallback clip.",
+        "fixHint": "Treat the output as visually provisional until a dedicated clip exists."
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "angles": 16,
+  "tilesX": 4,
+  "tilesY": 4,
+  "tileSize": 512,
+  "atlasWidth": 2048,
+  "atlasHeight": 2048,
+  "worldSize": 18.12628173828125,
+  "yOffset": 9.063140869140625,
+  "projection": "orthographic",
+  "axis": "hemi-y",
+  "hemi": true,
+  "layout": "latlon",
+  "azimuths": [
+    0,
+    1.5707963267948966,
+    3.141592653589793,
+    4.71238898038469
+  ],
+  "elevations": [
+    1.48352986419518,
+    1.0471975511965976,
+    0.5235987755982988,
+    0.08726646259971647
+  ],
+  "bbox": {
+    "min": [
+      -2.030073881149292,
+      0,
+      -1.9707800149917603
+    ],
+    "max": [
+      2.130631923675537,
+      18.12628173828125,
+      2.58762788772583
+    ]
+  },
+  "source": {
+    "path": "C:\\Users\\Mattm\\X\\vegetation-research\\assets\\tier-a-psx\\polypizza\\bamboo-google-2\\model.glb",
+    "bytes": 2345020,
+    "tris": 3864
+  },
+  "auxLayers": [
+    "albedo",
+    "normal"
+  ],
+  "bgColor": "transparent",
+  "colorLayer": "baseColor",
+  "normalSpace": "capture-view",
+  "edgeBleedPx": 2,
+  "textureColorSpace": "srgb"
+}

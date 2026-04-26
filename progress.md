@@ -114,6 +114,15 @@ TODO
 - Confirm the GitHub Actions `CI` run passes `lint`, `test`, `build`, `smoke`, `mobile-ui`, `perf`, and `deploy`.
 - Verify `https://terror-in-the-jungle.pages.dev/` returns healthy content after the deploy completes.
 
+2026-04-26 Pixel Forge visual follow-up
+- Began second-pass fixes for the Pixel Forge-only vegetation/NPC runtime after playtest notes: vegetation disappeared at very close range, distant impostors over-fogged/brightened, atlas views snapped during flight, and close NPC GLBs read too small with foot/terrain issues.
+- Current patch direction: disable vegetation near fade until close LOD meshes exist, bind billboard fog density to the active scene fog instead of the old hardcoded dense billboard fog, blend adjacent vegetation impostor atlas columns, and scale/ground close NPC GLBs from their measured bounds against the Pixel Forge impostor visual height.
+- Implemented the visual pass and validated it: targeted billboard/combat tests passed, `npm run validate:fast` passed, `npm run build` passed, and a WebGL smoke against `http://127.0.0.1:5173/?sandbox=1&npcs=60&seed=2718&diag=1` reached live sandbox with no browser errors. Latest screenshot: `artifacts/web-game/pixel-forge-lod-smoke/shot-2.png`.
+
+TODO
+- Human playtest should still check high-speed flight around bamboo/palms; adjacent atlas blending removes hard tile pops but may read slightly softer at oblique angles.
+- Static building/prop distance culling still needs a measured pass with renderer-category instrumentation before changing residency or HLOD policy.
+
 2026-04-03 fixed-wing controller rebuild follow-up
 - Reworked the fixed-wing stack around a command-driven sim-lite flight model:
   - `src/systems/vehicle/FixedWingPhysics.ts` now owns fixed-step ground-roll / rotation / airborne / stall / landing-rollout behavior, terrain-aware ground contact, air-relative aerodynamics, and touchdown recovery.
@@ -931,3 +940,337 @@ TODO
 - Follow-up docs alignment replaces the old "needs deploy" caveat with a
   recurring release-gate requirement: repeat manifest/header/live-smoke checks
   after each player-test push.
+
+2026-04-26 Pixel Forge asset-only cutover
+- Began hard cutover from old NPC/vegetation art to Pixel Forge-only runtime
+  assets. Copied accepted vegetation impostor packages, NPC combined GLBs,
+  NPC animated impostor atlases, and the 80 new prop GLBs into `public/`.
+- Added the Pixel Forge runtime manifest, prop catalog, and cutover validator.
+  `AssetLoader` now registers NPC/vegetation textures from the manifest instead
+  of old root-level webp filenames.
+- Removed old root-level NPC sprite and vegetation webp assets from
+  `public/assets`; terrain, UI, audio, and weapon assets were left alone.
+- Rewired combatant rendering to Pixel Forge-only impostor buckets plus capped
+  close GLB model pools from the combined faction GLBs; old directional soldier
+  texture keys are no longer runtime inputs.
+- Validation so far: `npm run typecheck` PASS,
+  `npm run check:pixel-forge-cutover` PASS, targeted Vitest for vegetation,
+  billboard, and combat renderer/factory PASS (6 files / 69 tests).
+- Final local validation for the cutover pass: `npm run validate:fast` PASS
+  (244 files / 3796 tests), `npm run build` PASS, `npm run smoke:prod` PASS,
+  `git diff --check` PASS with CRLF warnings only. The generic web-game
+  Playwright client captured the mode-select screen with no console errors,
+  but did not drive the DOM mode card because that helper sends mouse actions
+  relative to the canvas.
+- Removed the old vegetation/soldier optimizer path that could regenerate
+  deleted webp assets; `assets:optimize:vegetation` and `assets:fix-alpha`
+  now route to the Pixel Forge cutover validator.
+- User-visible stale asset report traced to an old `dist-perf` build that still
+  shipped the legacy AssetLoader registry and copied old webp files. Expanded
+  `check:pixel-forge-cutover` to scan `dist` and `dist-perf`, then rebuilt both
+  outputs. The validator now fails on stale shipped legacy filenames/tokens.
+- Added a vegetation billboard near-field fade uniform in the Pixel Forge shader
+  path to reduce large impostor planes clipping into the first-person camera.
+- Fresh follow-up validation: `npm run build` PASS, `npm run build:perf` PASS,
+  `npm run check:pixel-forge-cutover` PASS, `npm run validate:fast` PASS
+  (244 files / 3796 tests), `npm run smoke:prod` PASS, and `git diff --check`
+  PASS with CRLF warnings only. Direct preview probes for both `dist` and
+  `dist-perf` confirmed old asset URLs serve only HTML fallback, not images,
+  while new Pixel Forge PNG/GLB paths serve real asset bytes.
+- Visual perf follow-up found the first `giantPalm` candidate
+  (`palm-quaternius-3`) had an off-origin 25.9m capture footprint and produced
+  huge near-camera billboard planes. Switched runtime `giantPalm` to the
+  approved `palm-quaternius-2` package, removed the oversized variant from
+  `public/`, and taught the validator to fail on that variant in source or
+  shipped output.
+- Rebuilt after the palm swap and reran: `npm run build` PASS,
+  `npm run build:perf` PASS, `npm run check:pixel-forge-cutover` PASS,
+  `npm run validate:fast` PASS, `npm run smoke:prod` PASS, `git diff --check`
+  PASS with CRLF warnings only, and direct preview/prod-perf probes confirmed
+  old `.webp` URLs do not serve images while new Pixel Forge PNG/GLB URLs do.
+  `npm run perf:quick` still fails on the active-driver combat hit/shots gate
+  (`artifacts/perf/2026-04-26T13-23-51-069Z`), but its final screenshot shows
+  the stale old art and oversized palm slabs are gone.
+- User playtest appearance notes from the local preview:
+  - Vegetation impostors currently disappear when the player gets too close;
+    the near-field fade is too aggressive as a gameplay solution and should be
+    replaced or limited by a proper near LOD/clearance strategy.
+  - Distant scene reads too bright and foggy; atmosphere/fog/vegetation
+    lighting needs to be separated from asset color calibration instead of
+    solved by texture swaps.
+  - NPCs animate and walk, but their world scale is too small and legs can
+    clip through terrain; close GLB scale, impostor scale, y-offset, and
+    terrain grounding need a single calibration pass.
+  - Vegetation impostors snap noticeably, especially while flying. The current
+    view-angle tile selection/LOD transition is too discrete for fast camera
+    movement and needs smoothing, hysteresis, or cross-fade.
+  - These should be split into separate fixes: vegetation near handling,
+    atmosphere/lighting, NPC scale/grounding, and vegetation LOD snapping.
+
+2026-04-26 Pixel Forge NPC renderer restart
+- Root-cause note for the bad NPC pass: close Pixel Forge GLBs were spawned
+  without weapon attachments, the 6-per-faction / 24-total close mesh pool was
+  exhausted in clustered sandbox combat and nearby enemies fell back to
+  impostors, NVA/VC close GLBs are flat-color assets rather than textured
+  assets and need runtime readability tuning, the current `advance_fire` source
+  clip contains horizontal root motion that rubberbands scene movement, and the
+  review-only NPC package was promoted into runtime before those contracts were
+  enforced.
+- Restart plan: centralize faction/body/weapon/socket/clip/LOD metadata in a
+  Pixel Forge NPC runtime adapter, reserve the 45m near range for close GLB
+  meshes only, attach M16A1/AK-47 weapons through the `RightHand`/`LeftHand`
+  socket contract, strip horizontal root motion from looped close clips at load
+  time, keep animated impostors for mid/far range only, and add tests/probes so
+  the renderer cannot silently regress to near impostors or unarmed close GLBs.
+- Implementation checkpoint: added `PixelForgeNpcRuntime`, moved moving combat
+  states to `walk_fight_forward`, strips horizontal `Hips.position` root motion
+  from looped clips, expands close model pools to 32 per pool / 96 selected,
+  suppresses near impostors on close-pool overflow, attaches M16A1/AK-47 weapon
+  GLBs to close models, and tunes flat NVA/VC close-material colors for
+  readability without old textures.
+- Validation checkpoint: targeted Pixel Forge NPC runtime/renderer/factory
+  Vitest passed, `npm run check:pixel-forge-cutover` passed with weapon GLB
+  requirements, `npm run validate:fast` passed (245 files / 3807 tests), and
+  `npm run build` passed with the existing large-chunk warning. The new
+  `npm run probe:pixel-forge-npcs` live sandbox probe passed at
+  `http://127.0.0.1:5173/?sandbox=1&npcs=100&seed=2718&diag=1`; nearest NPCs
+  were close GLBs with `hasWeapon=true` and no actor inside 45m rendered as an
+  impostor. Probe artifacts are in `artifacts/pixel-forge-npc-probe/`. The
+  generic web-game Playwright client also captured
+  `output/web-game/shot-0.png`; the screenshot still shows vegetation occlusion
+  and overall environment readability as follow-up visual issues, separate
+  from the near-range NPC renderer contract.
+
+2026-04-26 Pixel Forge vegetation/NPC readability pass
+- Implemented close vegetation alpha hardening and lighting calibration in the
+  Pixel Forge billboard shader while keeping `nearFadeDistance=0`: core atlas
+  pixels are pushed toward opaque inside 30m, transition back by roughly 55m,
+  and close foliage gets a brighter minimum light/exposure floor without old
+  vegetation assets or close mesh vegetation LODs.
+- Removed the runtime retro/pixelated look for this pass: the main renderer no
+  longer constructs `PostProcessingManager`, WebGL antialiasing is enabled,
+  post-process/pixel-size hotkeys are no longer bound, and foliage/NPC impostor
+  atlases use linear mipmapped sampling instead of nearest-neighbor billboard
+  filtering.
+- Disabled the renderer-facing NPC turn smoothing because the Pixel Forge turn
+  rig is not reliable; `visualRotation` now snaps to authoritative combatant
+  rotation and clears turn velocity.
+- Increased shared NPC visual height by 1.5x for both close GLBs and far
+  impostors, then added material/emissive readability tuning for close flat GLBs
+  and a mild contrast/lift in the NPC impostor shader so actors stand out more
+  against terrain.
+- Validation: targeted billboard/combat/renderer tests passed (7 files / 85
+  tests), `npm run validate:fast` passed (246 files / 3813 tests), `npm run
+  build` passed with the existing large-chunk warning, and
+  `npm run check:pixel-forge-cutover` passed after build.
+- Browser smoke: the develop-web-game Playwright client reached live sandbox
+  at `http://127.0.0.1:5173/?sandbox=1&npcs=80&seed=2718&diag=1` with captures
+  under `artifacts/web-game/pixel-forge-vegetation-npc-readability-rerun/`.
+ A direct runtime probe reported `hasPostProcessing=false`, `gameStarted=true`,
+ and no browser console/page errors. Visual note: a nearby friendly can now
+ fill the camera when standing very close after the 1.5x scale increase; leave
+ any proximity-hide or squad spacing change for a separate playtest decision.
+
+2026-04-26 Pixel Forge grounding/wind/readability follow-up
+- Fixed floating vegetation caused by transparent lower padding in low-angle
+  Pixel Forge atlas rows. Runtime vegetation type generation now applies
+  species-specific grounding sinks for the affected approved assets
+  (`bambooGrove`, `coconut`, `elephantEar`, `fanPalm`, `giantPalm`) so visible
+  bases land at or slightly below terrain without per-frame terrain sampling.
+- Strengthened vegetation wind by replacing the tiny hardcoded sway with
+  per-material GPU vertex uniforms (`windStrength`, `windSpeed`,
+  `windSpatialScale`). The animation remains fully shader-side, LOD-scaled,
+  and does not add CPU-side instance updates.
+- Improved NPC readability by lifting Pixel Forge impostor color toward the
+  faction marker color, raising and enlarging the instanced ground marker so it
+  follows elevated terrain instead of staying at world `y=0.1`, and adding
+  faction-specific close-GLB material tuning for US/ARVN as well as NVA/VC.
+- Validation: targeted vegetation/billboard/combat tests passed (5 files / 77
+  tests) plus focused NPC runtime/renderer tests passed (2 files / 23 tests).
+  `npm run validate:fast` passed (246 files / 3817 tests), `npm run build`
+  passed with the existing large-chunk warning, and
+  `npm run check:pixel-forge-cutover` passed after build.
+- Browser smoke: sandbox at
+  `http://127.0.0.1:5173/?sandbox=1&npcs=80&seed=2718&diag=1` reached gameplay
+  with no browser console/page errors. Latest visual capture:
+  `artifacts/web-game/pixel-forge-grounding-wind-readability-final/shot-0.png`.
+  The faction marker is now visible on elevated terrain; it may need a later
+  style pass if the horizontal ring reads too UI-like in human playtest.
+
+2026-04-26 Pixel Forge NPC impostor facing/lighting/range follow-up
+- Inspected the packed Pixel Forge NPC atlas row for `usArmy/idle`; the current
+  renderer was treating the camera-in-front case as view column 0, which reads
+  like a side/back presentation for the package. Runtime view-column selection
+  now applies a 180-degree Pixel Forge forward offset before sampling the 7-wide
+  impostor row, with a regression test for front/rear view columns.
+- Pushed the no-impostor near band farther out: close GLBs now cover 64m
+  instead of 45m, the selected close cap is 128, and per-pool capacity is 40.
+  The renderer still suppresses over-cap near impostors instead of silently
+  falling back to billboarded NPCs inside the hard close range.
+- Added cheap shader-side readability lighting for billboarded NPCs:
+  `npcExposure=1.14`, `minNpcLight=0.82`, `npcTopLight=0.22`, plus a slightly
+  stronger faction-color lift. This keeps far impostors visible without adding
+  CPU-side lighting work or old sprite assets.
+- Updated `scripts/probe-pixel-forge-npcs.ts` to read the runtime close-radius
+  constant so the live probe enforces the current 64m contract instead of the
+  retired 45m threshold.
+- Validation: targeted NPC renderer/factory/runtime tests passed (3 files / 39
+  tests), `npm run validate:fast` passed (246 files / 3820 tests), `npm run
+  build` passed with the existing large-chunk warning, and
+  `npm run check:pixel-forge-cutover` passed after build. Live probe at
+  `http://127.0.0.1:5173/?sandbox=1&npcs=100&seed=2718&diag=1` passed with
+  `closeRadiusMeters=64`, 26 active close GLBs, armed nearest actors, and no
+  failures; artifacts are in `artifacts/pixel-forge-npc-probe/`.
+- Browser note: a short develop-web-game smoke reached live sandbox with no
+  browser console/page errors and screenshot
+  `artifacts/web-game/pixel-forge-npc-facing-lighting-range-short/shot-0.png`.
+ A longer virtual-time web-game run timed out before writing artifacts. The
+ probe screenshot still shows a very close GLB can fill the camera after the
+ 1.5x scale increase; treat that as a later squad spacing/proximity-hide
+ decision rather than an impostor LOD issue.
+
+2026-04-26 Pixel Forge docs/progress drift alignment
+- Opened the local sandbox in the in-app browser for human testing at
+  `http://127.0.0.1:5173/?sandbox=1&npcs=100&seed=2718&diag=1`.
+- Corrected non-archived docs that still described the pre-Pixel-Forge state:
+  `docs/STATE_OF_REPO.md` now has a 2026-04-26 Pixel Forge cutover section,
+  `docs/ASSET_MANIFEST.md` now lists 159 GLBs plus Pixel Forge NPC/vegetation
+  assets instead of old 2D sprites/root WebP vegetation, `docs/BACKLOG.md`
+  now treats the Pixel Forge asset pipeline as active/current, and
+  `docs/ARCHITECTURE_RECOVERY.md` now references the 64m close-GLB contract
+  instead of the old faction-sprite sizing path.
+- Kept unresolved visual risk visible in docs: vegetation close readability,
+  wind/snap feel, close GLB camera occlusion after 1.5x scale, faction marker
+  style, static building/prop culling/HLOD measurement, and human playtest
+  sign-off.
+
+2026-04-26 Pixel Forge NPC impostor brightness and small-palm stabilization
+- Fixed Pixel Forge NPC impostors reading too dark versus close GLBs by
+  outputting straight RGB with alpha instead of multiplying impostor color by
+  alpha before transparent blending. Also lifted the billboard NPC lighting
+  floor (`npcExposure=1.2`, `minNpcLight=0.92`) and reduced the top-light crush
+  so far actors stay closer to the flat-color GLB look.
+- Confirmed the small Pixel Forge palm (`giantPalm` / `palm-quaternius-2`) uses
+  a curved trunk in its atlas. Azimuth interpolation makes that trunk jump
+  laterally during camera angle changes, so `giantPalm` now locks to atlas
+  column 3 and disables per-angle atlas blending for that species. This is the
+  cheap billboard fix; a close 3D vegetation LOD or per-column pivot metadata
+  would be the higher-fidelity follow-up.
+- Increased `giantPalm` runtime size by 1.75x while scaling its y-offset and
+  grounding sink with the same factor so the larger palm stays planted.
+- Validation: targeted Pixel Forge combat/vegetation/billboard tests passed
+  (4 files / 63 tests), `npm run check:pixel-forge-cutover` passed,
+  `npm run validate:fast` passed (246 files / 3823 tests), `npm run build`
+  passed with the existing large-chunk warning, and the post-build Pixel Forge
+  cutover check passed. Browser smoke reached sandbox gameplay at
+  `http://127.0.0.1:5173/?sandbox=1&npcs=100&seed=2718&diag=1` with no browser
+ console/page errors; NPC probe passed with `closeRadiusMeters=64`, armed
+  close GLBs, and no failures.
+
+2026-04-26 Pixel Forge tall-palm atlas row quarantine
+- Investigated the remaining "two trunk locations" report on tall palms. The
+  coconut/tall-palm bottom atlas row (`coconut-palm-google`, row 3) contains a
+  duplicated/offset palm silhouette in the tile itself, and azimuth blending on
+  the curved trunk draws two trunks during camera-angle transitions. Debug
+  strips were written under `artifacts/debug/coconut-row2.png` and
+  `artifacts/debug/coconut-row3.png`.
+- Added manifest-backed runtime controls for problematic vegetation atlases:
+  `stableAzimuthColumn` continues to lock skinny asymmetric trunks to a clean
+  column, and new `maxElevationRow` lets a species avoid a bad low-angle row
+  without affecting the rest of the billboard renderer.
+- Applied the guard only to `coconut`: lock to column 2 and cap elevation row
+  at 2 so ground-level views no longer sample the broken row 3. This is a
+  production-safe interim fix; the higher-quality answer is regenerating palms
+  with close mesh/trunk LODs or a hybrid trunk-mesh/canopy-impostor path.
+- Validation: targeted vegetation/billboard tests passed (3 files / 51 tests),
+  `npm run check:pixel-forge-cutover` passed, `npm run validate:fast` passed
+  (246 files / 3825 tests), `npm run build` passed with the existing
+  large-chunk warning, and the post-build Pixel Forge cutover check passed.
+  The in-app browser sandbox was reopened at
+  `http://127.0.0.1:5173/?sandbox=1&npcs=100&seed=2718&diag=1` with no
+  browser console errors.
+
+2026-04-26 Pixel Forge dev-cycle close-out and docs alignment
+- Aligned current-state docs for the end of the Pixel Forge visual iteration:
+  `docs/STATE_OF_REPO.md` now has a dev-cycle close-out snapshot, current green
+  local gates, current runtime truth, and the next polish queue; `docs/BACKLOG.md`
+  now prioritizes hitbox/shot feedback, close NPC occlusion/collision feel,
+  faction readability, palm/tree close LOD quality, vegetation atlas snapping,
+  and static prop/building culling evidence; `docs/ASSET_MANIFEST.md` records
+  the interim `giantPalm`/`coconut` atlas guards and the likely need for close
+  mesh or hybrid trunk/canopy vegetation; `docs/ARCHITECTURE_RECOVERY.md` now
+  reflects the latest 3825-test fast gate and routes any remaining scale/hitbox
+  issues back through telemetry instead of hidden offsets.
+- Close-out intent: this is a local development checkpoint so the next session
+  can start on polish work, not a live production release claim. Remaining
+  human-review items are explicit and current docs no longer imply old sprite
+  or old vegetation runtime behavior.
+- Final close-out validation: `npm run validate:fast` passed (246 files / 3825
+  tests), `npm run build` passed with the existing large-chunk warning,
+  post-build `npm run check:pixel-forge-cutover` passed, `git diff --check`
+  reported only existing CRLF normalization warnings, and a fresh in-app
+  browser sandbox opened at
+  `http://127.0.0.1:5173/?sandbox=1&npcs=100&seed=2718&diag=1` with no browser
+  console errors.
+
+2026-04-26 Pixel Forge hitbox alignment and gun-range route
+- Rebuilt player shot registration around shared Pixel Forge visual hit
+  proxies in `CombatantBodyMetrics`: head sphere, chest capsule, pelvis sphere,
+  and two leg capsules are derived from the current 1.5x NPC visual height and
+  can use logical or rendered visual position.
+- Updated `CombatantHitDetection` so player damage/preview paths use
+  `positionMode: 'visual'`, while NPC-vs-NPC raycasts still default to logical
+  positions. Player weapon firing now keeps the original camera/crosshair ray
+  for damage and uses the barrel-aligned ray only for tracer visuals.
+- Added `?diag=1&hitboxes=1` renderer debug proxies over nearby live NPCs,
+  sourced from the same helper rather than duplicated offsets.
+- Added an isolated Pixel Forge GLB dev gun range at `?mode=gun-range` for
+  crosshair, tracer, and hit-proxy validation without loading terrain, AI,
+  vegetation, impostors, or combat120. The scene exposes
+  `window.render_game_to_text()` and `window.advanceTime(ms)` for automation.
+- Documentation aligned in `docs/STATE_OF_REPO.md`, `docs/BACKLOG.md`, and
+  `docs/COMBAT.md`. Human playtest still needs to judge final shot feel,
+  muzzle/tracer presentation, and close NPC collision/occlusion.
+- Validation: targeted gun-range/combat/weapon/renderer tests passed (5 files /
+  85 tests), `npm run validate:fast` passed (247 files / 3833 tests),
+  `npm run build` passed with the existing large-chunk warning, and post-build
+  `npm run check:pixel-forge-cutover` passed. In-app browser smoke at
+  `http://127.0.0.1:5173/?mode=gun-range` rendered the range with no console
+  errors; automation artifact
+  `artifacts/web-game/gun-range-hitbox-smoke/state-0.json` recorded a center
+  shot head hit on the target.
+
+2026-04-26 Pixel Forge hitbox follow-up: taller shared player/NPC proxies
+- Increased the shared Pixel Forge hit-proxy height multiplier to better cover
+  the actual GLB silhouettes seen in the gun-range playtest.
+- Moved `checkPlayerHit()` off the old fixed sprite-era player spheres and onto
+  `CombatantBodyMetrics.writeCharacterHitProxies()`, so NPC shots against the
+  player now use the same head/chest/pelvis/leg proportions as close GLB NPCs
+  and impostor NPCs.
+- Kept player damage on the original camera/crosshair ray, but changed the
+  first-person blue tracer presentation to project from the actual overlay
+  weapon muzzle/barrel point and start farther in front of the camera. This
+  keeps fair hit registration while reducing the distracting near-camera red
+  vs. blue ray gap in the gun range.
+- Updated the gun-range tracer debug path to use a lightweight invisible
+  muzzle/barrel object in camera space instead of a bare fixed line origin, so
+  the blue debug ray is derived from an explicit barrel marker just like
+  production derives from the weapon rig `muzzleRef`.
+- Updated docs to reflect the GLB gun range and the shared player/NPC/impostor
+  hit-proxy contract. Human playtest still needs to confirm the taller proxy,
+  projected barrel tracer, and close camera feel.
+
+2026-04-26 Pixel Forge close-out asset cleanup
+- Removed the old `public/assets/source/soldiers/` source PNGs after user
+  approval because Vite copied them into `dist/assets/source/soldiers/`, which
+  violated the no-old-NPC-assets shipped-output rule.
+- Tightened `scripts/validate-pixel-forge-cutover.ts` so
+  `assets/source/soldiers` paths and the old source-soldier PNG filenames fail
+  the cutover check in source, `dist`, or `dist-perf`.
+- Rebuilt both retail and perf outputs after the asset cleanup:
+  `npm run build` passed, `npm run build:perf` passed, and the generated
+  `dist/asset-manifest.json` plus `dist-perf/asset-manifest.json` were refreshed.
+- Validation after cleanup: `npm run check:pixel-forge-cutover` passed,
+  `npm run validate:fast` passed (247 files / 3834 tests), and direct scans of
+  `public`, `dist`, and `dist-perf` found no `assets/source/soldiers` paths or
+  old source-soldier filenames.

@@ -8,7 +8,8 @@ import type { BiomeVegetationEntry } from '../../config/biomes';
 const coconutOnly: VegetationTypeConfig[] = [
   {
     id: 'coconut',
-    textureName: 'CoconutPalm',
+    textureName: 'PixelForge.Vegetation.coconut.color',
+    normalTextureName: 'PixelForge.Vegetation.coconut.normal',
     size: 10,
     maxInstances: 1000,
     yOffset: 4,
@@ -18,6 +19,16 @@ const coconutOnly: VegetationTypeConfig[] = [
     placement: 'poisson',
     poissonMinDistance: 12,
     tier: 'midLevel',
+    representation: 'imposter',
+    atlasProfile: 'mid-balanced',
+    shaderProfile: 'normal-lit',
+    imposterAtlas: {
+      tilesX: 4,
+      tilesY: 4,
+      layout: 'latlon',
+      tileSize: 512,
+    },
+    normalSpace: 'capture-view',
   },
 ];
 

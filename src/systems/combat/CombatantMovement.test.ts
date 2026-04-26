@@ -158,6 +158,34 @@ describe('CombatantMovement', () => {
     expect(c.terrainSampleHeight).toBeCloseTo(15);
   });
 
+  it('snaps visual rotation to authoritative facing without turn smoothing', () => {
+    const c = createTestCombatant({
+      id: 'npc-turn',
+      rotation: Math.PI * 1.5,
+      visualRotation: 0.25,
+      rotationVelocity: 3,
+    });
+
+    movement.updateRotation(c, 0.016);
+
+    expect(c.visualRotation).toBeCloseTo(Math.PI * 1.5);
+    expect(c.rotationVelocity).toBe(0);
+  });
+
+  it('normalizes snapped visual rotation and clears invalid turn velocity', () => {
+    const c = createTestCombatant({
+      id: 'npc-turn-wrap',
+      rotation: -Math.PI / 2,
+      visualRotation: Number.NaN,
+      rotationVelocity: Number.POSITIVE_INFINITY,
+    });
+
+    movement.updateRotation(c, 10);
+
+    expect(c.visualRotation).toBeCloseTo(Math.PI * 1.5);
+    expect(c.rotationVelocity).toBe(0);
+  });
+
   describe('stuck detector integration', () => {
     it('does not crash when processing dead NPC', () => {
       const c = createTestCombatant({

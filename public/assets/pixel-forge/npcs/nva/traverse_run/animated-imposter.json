@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "kind": "animated-octahedral-imposter",
+  "source": {
+    "path": "glb/nva/traverse_run.glb",
+    "bytes": 208000,
+    "tris": 1187,
+    "skinned": true,
+    "hash": "c9840c124d41070138648d857a366490c51e0c74a1c48801fc17f62fe7bb72fb",
+    "animationClips": [
+      "Armature|running|baselayer"
+    ],
+    "attachments": [
+      {
+        "id": "ak47",
+        "kind": "weapon",
+        "sourcePath": "weapons/ak47.glb",
+        "bytes": 67588,
+        "hash": "1fab1876b236f1cf2c5759cb7e669c5badf7fc4195fd6640c35f46c515c43ce8"
+      }
+    ]
+  },
+  "bbox": {
+    "min": [
+      -0.21093114488572323,
+      -0.011490319737778216,
+      -0.41303074872106843
+    ],
+    "max": [
+      0.216078311726558,
+      1.670941812632158,
+      1.0999772200996927
+    ],
+    "worldSize": 1.6824321323699363,
+    "yOffset": 0.8297257464471899
+  },
+  "projection": "orthographic",
+  "view": {
+    "layout": "octahedral",
+    "directionEncoding": "octahedral",
+    "grid": {
+      "x": 7,
+      "y": 7,
+      "count": 49
+    },
+    "tileSize": 96,
+    "framesPerClip": 8
+  },
+  "clips": [
+    {
+      "target": "running",
+      "resolved": "baselayer",
+      "rawName": "Armature|running|baselayer",
+      "matchedBy": "fallback",
+      "fallbackRawName": "Armature|running|baselayer",
+      "frameCount": 8,
+      "durationSec": 0.6666666865348816
+    }
+  ],
+  "textures": {
+    "layout": "atlas",
+    "color": {
+      "uri": "animated-albedo-packed.png",
+      "format": "rgba8",
+      "width": 2688,
+      "height": 1344,
+      "layers": 8,
+      "framesX": 4,
+      "framesY": 2,
+      "bytes": 662426,
+      "colorSpace": "srgb"
+    }
+  },
+  "runtime": {
+    "renderer": "webgl2",
+    "primitive": "instanced-quad",
+    "material": "ShaderMaterial",
+    "textureMode": "packed-2d-atlas",
+    "attributes": [
+      "frameOffset",
+      "clip",
+      "variant",
+      "yaw",
+      "paletteRow"
+    ]
+  },
+  "storage": {
+    "colorBytes": 14450688,
+    "totalRawBytes": 14450688,
+    "envelopeBytes": 31457280,
+    "fitsEnvelope": true
+  },
+  "validation": {
+    "warnings": [
+      {
+        "code": "ANIMATED_IMPOSTER_CLIP_FALLBACK",
+        "severity": "warning",
+        "message": "running will use Armature|running|baselayer as a fallback clip.",
+        "fixHint": "Treat the output as visually provisional until a dedicated clip exists."
+      }
+    ]
+  }
+}

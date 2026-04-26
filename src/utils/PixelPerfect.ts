@@ -13,18 +13,13 @@ export class PixelPerfectUtils {
   }
 
   /**
-   * Configure texture for billboards with mipmapping.
-   * - NearestFilter for magFilter: crisp pixels when close
-   * - NearestMipmapLinearFilter for minFilter: nearest-neighbor within each mip
-   *   level (preserves pixel art character) with linear blending between mip
-   *   levels (prevents visible popping as distance changes)
-   * - Mipmaps enabled: reduces shimmer/aliasing at distance
-   * - Anisotropy disabled: billboards always face the camera so oblique-angle
-   *   correction provides no benefit
+   * Configure texture atlases for billboard/impostor rendering.
+   * Pixel Forge foliage and NPC impostors are now production atlases rather
+   * than deliberately pixelated sprites, so sample them with linear mipmaps.
    */
   static configureBillboardTexture(texture: THREE.Texture): THREE.Texture {
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
     texture.wrapS = THREE.ClampToEdgeWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.flipY = true;

@@ -1,14 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import {
+  CombatantMeshFactory,
   DEFAULT_MESH_BUCKET_CAPACITY,
   MOUNTED_MESH_BUCKET_CAPACITY,
+  NPC_CLOSE_MODEL_TARGET_HEIGHT,
   NPC_SPRITE_HEIGHT,
   NPC_SPRITE_RENDER_Y_OFFSET,
   NPC_SPRITE_WIDTH,
+  disposeCombatantMeshes,
   reportBucketOverflow,
   resetBucketOverflowState,
 } from './CombatantMeshFactory';
+import type { AssetLoader } from '../assets/AssetLoader';
 import { PLAYER_EYE_HEIGHT } from '../player/PlayerMovement';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { Logger } from '../../utils/Logger';
@@ -50,40 +54,40 @@ describe('CombatantMeshFactory bucket overflow reporting', () => {
   });
 
   it('warns on overflow instead of dropping silently', () => {
-    reportBucketOverflow('US_walking_front', 0);
+    reportBucketOverflow('US_idle', 0);
 
     // The first overflow in a fresh state must produce an observable warning.
     expect(warnSpy).toHaveBeenCalled();
     const firstCall = warnSpy.mock.calls[0];
     expect(firstCall[0]).toBe('combat-renderer');
-    expect(firstCall[1]).toContain('US_walking_front');
+    expect(firstCall[1]).toContain('US_idle');
   });
 
   it('coalesces rapid overflows into one warning per bucket per second', () => {
     // Simulate many overflows inside a single second — the log must be rate-limited.
     for (let i = 0; i < 50; i++) {
-      reportBucketOverflow('NVA_walking_side', i);
+      reportBucketOverflow('NVA_patrol_walk', i);
     }
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
   it('emits a second warning once the rate-limit window has elapsed', () => {
-    reportBucketOverflow('VC_firing_front', 0);
+    reportBucketOverflow('VC_advance_fire', 0);
     expect(warnSpy).toHaveBeenCalledTimes(1);
 
     // Within the same second: suppressed.
-    reportBucketOverflow('VC_firing_front', 500);
+    reportBucketOverflow('VC_advance_fire', 500);
     expect(warnSpy).toHaveBeenCalledTimes(1);
 
     // After the 1s window elapses: a new warning can fire.
-    reportBucketOverflow('VC_firing_front', 1500);
+    reportBucketOverflow('VC_advance_fire', 1500);
     expect(warnSpy).toHaveBeenCalledTimes(2);
   });
 
   it('tracks overflow counts independently per bucket', () => {
-    reportBucketOverflow('US_walking_front', 0);
-    reportBucketOverflow('NVA_firing_back', 0);
+    reportBucketOverflow('US_idle', 0);
+    reportBucketOverflow('NVA_advance_fire', 0);
 
     // Two distinct buckets both overflowing in the same instant should each get their own
     // warning, because the rate limit is per-bucket, not global.
@@ -145,22 +149,22 @@ describe('CombatantMeshFactory instanced write contract at raised cap', () => {
 
 /**
  * Behavior: the NPC billboard silhouette must not dwarf the player. The player
- * eye height is the closest on-screen anchor for relative scale; if the sprite
- * height is more than ~2.5x eye height the player feels undersized (playtest
- * observation in docs/tasks/perf-harness-verticality-and-sizing.md).
+ * eye height is the closest on-screen anchor for relative scale. Pixel Forge
+ * NPCs now intentionally read larger than the player-camera anchor, but still
+ * need a ceiling so they do not regress to the old giant billboard problem.
  *
  * These tests do not pin exact sprite/eye dimensions — tuning is allowed — but
- * pin the RATIO that determines the "player feels appropriately sized" gameplay
- * contract. Any future change that pushes the ratio back past 2.5 must update
+ * pin the RATIO that determines the "NPC is readable but not giant" gameplay
+ * contract. Any future change that pushes the ratio back past this must update
  * these thresholds deliberately.
  */
 describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
   it('sprite silhouette is not taller than the regression ceiling relative to the player eye', () => {
-    // Ratio floor comes from live playtest: 3.5:1 (7m sprite over 2m eye)
-    // feels giant. The plane itself should now stay near player scale because
-    // the optimized sprite alpha bounds fill most of the texture.
+    // 4.425m over the 2.2m eye anchor is the current readability target.
+    // 2.25x leaves headroom while still blocking a return to the 7m sprite era.
     const ratio = NPC_SPRITE_HEIGHT / PLAYER_EYE_HEIGHT;
-    expect(ratio).toBeLessThan(1.35);
+    expect(ratio).toBeGreaterThan(1.85);
+    expect(ratio).toBeLessThan(2.25);
   });
 
   it('sprite dimensions are positive and plausible', () => {
@@ -169,6 +173,10 @@ describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
     expect(NPC_SPRITE_HEIGHT).toBeGreaterThan(0);
     // Height-wider-than-wide (portrait) — a landscape billboard would be a bug.
     expect(NPC_SPRITE_HEIGHT).toBeGreaterThan(NPC_SPRITE_WIDTH);
+  });
+
+  it('close Pixel Forge GLBs target the same visual height as impostor NPCs', () => {
+    expect(NPC_CLOSE_MODEL_TARGET_HEIGHT).toBeCloseTo(NPC_SPRITE_HEIGHT, 5);
   });
 
   it('player eye height does not drop below the floor that keeps NPCs from feeling huge', () => {
@@ -186,8 +194,33 @@ describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
     const planeTopY = planeCenterY + NPC_SPRITE_HEIGHT / 2;
     const planeBottomY = planeCenterY - NPC_SPRITE_HEIGHT / 2;
 
-    expect(planeTopY).toBeLessThanOrEqual(PLAYER_EYE_HEIGHT + 0.35);
-    expect(planeBottomY).toBeLessThan(0);
-    expect(planeBottomY).toBeGreaterThan(-0.45);
+    expect(planeTopY).toBeGreaterThan(PLAYER_EYE_HEIGHT + 1.5);
+    expect(planeTopY).toBeLessThanOrEqual(PLAYER_EYE_HEIGHT + 2.4);
+    expect(planeBottomY).toBeLessThanOrEqual(0.1);
+    expect(planeBottomY).toBeGreaterThan(-0.25);
+  });
+});
+
+describe('CombatantMeshFactory Pixel Forge impostor readability material', () => {
+  it('configures a light floor and exposure for billboarded NPCs', () => {
+    const scene = new THREE.Scene();
+    const texture = new THREE.Texture();
+    const assetLoader = {
+      getTexture: vi.fn(() => texture),
+    } as unknown as AssetLoader;
+    const factory = new CombatantMeshFactory(scene, assetLoader);
+    const assets = factory.createFactionBillboards();
+    const material = assets.factionMaterials.get('US_idle');
+
+    expect(material).toBeDefined();
+    expect(material?.uniforms.readabilityStrength.value).toBeGreaterThanOrEqual(0.35);
+    expect(material?.uniforms.npcExposure.value).toBeCloseTo(1.2);
+    expect(material?.uniforms.minNpcLight.value).toBeCloseTo(0.92);
+    expect(material?.uniforms.npcTopLight.value).toBeCloseTo(0.16);
+    expect(material?.fragmentShader).toContain('gl_FragColor = vec4(npcColor, alpha)');
+    expect(material?.fragmentShader).not.toContain('gl_FragColor = vec4(npcColor * alpha, alpha)');
+
+    disposeCombatantMeshes(scene, assets);
+    texture.dispose();
   });
 });

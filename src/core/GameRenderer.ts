@@ -1,6 +1,5 @@
 import * as THREE from 'three';
-import { PixelPerfectUtils } from '../utils/PixelPerfect';
-import { PostProcessingManager } from '../systems/effects/PostProcessingManager';
+import type { PostProcessingManager } from '../systems/effects/PostProcessingManager';
 import { CrosshairSystem } from '../ui/hud/CrosshairSystem';
 import type { CrosshairMode } from '../ui/hud/CrosshairSystem';
 import { LoadingUI } from './LoadingUI';
@@ -72,7 +71,7 @@ export class GameRenderer {
     );
 
     this.renderer = new THREE.WebGLRenderer({
-      antialias: false, // Disabled for pixel-perfect rendering
+      antialias: true,
       powerPreference: 'high-performance',
       // Required for the F9 playtest capture overlay to call
       // `renderer.domElement.toBlob()` and get a non-blank PNG. Gated
@@ -98,8 +97,6 @@ export class GameRenderer {
 
     Logger.info('Renderer', `Initializing renderer (Tier: ${gpuTier}, Mobile: ${isMobile})`);
 
-    // Configure for pixel-perfect rendering
-    PixelPerfectUtils.configureRenderer(this.renderer);
     // Aggregate stats across the whole frame; the loop resets once before rendering.
     this.renderer.info.autoReset = false;
 
@@ -205,11 +202,10 @@ export class GameRenderer {
   }
 
   private setupPostProcessing(): void {
-    this.postProcessing = new PostProcessingManager(
-      this.renderer,
-      this.scene,
-      this.camera
-    );
+    // Pixel Forge NPCs now render as close skinned meshes plus mid/far impostors.
+    // The old low-res quantized post pass made flat GLBs and vegetation harder
+    // to read, so runtime rendering goes directly to the backbuffer for now.
+    this.postProcessing = undefined;
   }
 
   /**

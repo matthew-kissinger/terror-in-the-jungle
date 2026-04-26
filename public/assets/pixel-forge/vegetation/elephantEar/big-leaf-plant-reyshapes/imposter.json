@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "angles": 8,
+  "tilesX": 4,
+  "tilesY": 2,
+  "tileSize": 256,
+  "atlasWidth": 1024,
+  "atlasHeight": 512,
+  "worldSize": 8.071530374600641,
+  "yOffset": 2.3434315150942107,
+  "projection": "orthographic",
+  "axis": "hemi-y",
+  "hemi": true,
+  "layout": "latlon",
+  "azimuths": [
+    0,
+    1.5707963267948966,
+    3.141592653589793,
+    4.71238898038469
+  ],
+  "elevations": [
+    0.9599310885968813,
+    0.2617993877991494
+  ],
+  "bbox": {
+    "min": [
+      -3.7079774246267165,
+      -1.4077815056168363,
+      -4.592738169556791
+    ],
+    "max": [
+      3.2979653795634483,
+      6.094644535805258,
+      3.47879220504385
+    ]
+  },
+  "source": {
+    "path": "C:\\Users\\Mattm\\X\\vegetation-research\\assets\\tier-a-psx\\polypizza\\big-leaf-plant-reyshapes\\model.glb",
+    "bytes": 52428,
+    "tris": 732
+  },
+  "auxLayers": [
+    "albedo",
+    "normal"
+  ],
+  "bgColor": "transparent",
+  "colorLayer": "baseColor",
+  "normalSpace": "capture-view",
+  "edgeBleedPx": 2,
+  "textureColorSpace": "srgb"
+}

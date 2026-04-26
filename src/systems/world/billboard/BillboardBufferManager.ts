@@ -1,14 +1,41 @@
 import * as THREE from 'three';
 import { Logger } from '../../../utils/Logger';
 import { BILLBOARD_VERTEX_SHADER, BILLBOARD_FRAGMENT_SHADER } from './BillboardShaders';
+import type {
+  VegetationAtlasProfile,
+  VegetationImposterAtlasConfig,
+  VegetationRepresentation,
+  VegetationShaderProfile,
+} from '../../../config/vegetationTypes';
+
+const DEFAULT_BILLBOARD_FOG_DENSITY = 0.00055;
+const MAX_BILLBOARD_FOG_DENSITY = 0.002;
+
+const clamp = (value: number, min: number, max: number): number => (
+  Math.min(max, Math.max(min, value))
+);
+
+const resolveWindStrength = (height: number, profile: VegetationAtlasProfile): number => {
+  const profileMultiplier = profile === 'ground-compact'
+    ? 0.55
+    : profile === 'canopy-hero' || profile === 'canopy-balanced'
+      ? 1.15
+      : 0.85;
+  return clamp(height * 0.018 * profileMultiplier, 0.08, 0.34);
+};
 
 export interface GPUVegetationConfig {
   maxInstances: number;
   texture: THREE.Texture;
+  normalTexture?: THREE.Texture;
   width: number;
   height: number;
   fadeDistance: number;
   maxDistance: number;
+  representation: VegetationRepresentation;
+  atlasProfile: VegetationAtlasProfile;
+  shaderProfile: VegetationShaderProfile;
+  imposterAtlas?: VegetationImposterAtlasConfig;
 }
 
 /**
@@ -53,6 +80,7 @@ export class GPUBillboardVegetation {
   constructor(scene: THREE.Scene, config: GPUVegetationConfig) {
     this.scene = scene;
     this.maxInstances = config.maxInstances;
+    const alphaCrop = config.imposterAtlas?.alphaCrop ?? { minU: 0, minV: 0, maxU: 1, maxV: 1 };
 
     // Create plane geometry for billboard
     const planeGeometry = new THREE.PlaneGeometry(config.width, config.height);
@@ -86,17 +114,37 @@ export class GPUBillboardVegetation {
     this.material = new THREE.RawShaderMaterial({
       uniforms: {
         map: { value: config.texture },
+        normalMap: { value: config.normalTexture ?? config.texture },
+        normalMapEnabled: { value: Boolean(config.normalTexture && config.shaderProfile === 'normal-lit') },
+        imposterAtlasEnabled: { value: Boolean(config.imposterAtlas) },
+        imposterTiles: { value: new THREE.Vector2(config.imposterAtlas?.tilesX ?? 1, config.imposterAtlas?.tilesY ?? 1) },
+        imposterUvBounds: { value: new THREE.Vector4(alphaCrop.minU, alphaCrop.minV, alphaCrop.maxU, alphaCrop.maxV) },
+        stableAtlasAzimuth: { value: Number.isFinite(config.imposterAtlas?.stableAzimuthColumn) },
+        stableAtlasColumn: { value: config.imposterAtlas?.stableAzimuthColumn ?? 0 },
+        maxAtlasElevationRow: { value: config.imposterAtlas?.maxElevationRow ?? -1 },
         time: { value: 0 },
         cameraPosition: { value: new THREE.Vector3() },
         fadeDistance: { value: config.fadeDistance },
         maxDistance: { value: config.maxDistance },
+        // Pixel Forge vegetation is currently impostor-only at close range.
+        // A near fade without a close mesh replacement makes plants disappear
+        // when the player walks into them, so keep this disabled until a
+        // manifest-backed close LOD exists.
+        nearFadeDistance: { value: 0.0 },
         lodDistances: { value: new THREE.Vector2(150, 300) },
         viewMatrix: { value: new THREE.Matrix4() },
-        colorTint: { value: new THREE.Color(0.92, 0.94, 0.88) },
+        colorTint: { value: new THREE.Color(1.04, 1.08, 1.0) },
         gammaAdjust: { value: 1.0 },
+        nearAlphaSolidDistance: { value: 30.0 },
+        vegetationExposure: { value: 1.18 },
+        nearLightBoostDistance: { value: 85.0 },
+        minVegetationLight: { value: 0.68 },
+        windStrength: { value: resolveWindStrength(config.height, config.atlasProfile) },
+        windSpeed: { value: 1.15 },
+        windSpatialScale: { value: 0.055 },
         // Height fog uniforms - creates ground-level mist effect
         fogColor: { value: new THREE.Color(0x5a7a6a) },
-        fogDensity: { value: 0.006 },        // How much fog accumulates with distance
+        fogDensity: { value: DEFAULT_BILLBOARD_FOG_DENSITY }, // Kept in sync with scene fog in update().
         fogHeightFalloff: { value: 0.03 },   // How quickly fog thins with altitude (lower = thicker at height)
         fogStartDistance: { value: 100.0 },  // Fog doesn't appear until this distance
         fogEnabled: { value: false },
@@ -289,9 +337,17 @@ export class GPUBillboardVegetation {
     if (fog) {
       this.material.uniforms.fogEnabled.value = true;
       this.material.uniforms.fogColor.value.copy(fog.color);
-      // Height fog uses its own density/falloff, not the scene's FogExp2 density
+      const sceneFogDensity = Number.isFinite(fog.density)
+        ? fog.density
+        : DEFAULT_BILLBOARD_FOG_DENSITY;
+      this.material.uniforms.fogDensity.value = clamp(
+        sceneFogDensity,
+        0,
+        MAX_BILLBOARD_FOG_DENSITY,
+      );
     } else {
       this.material.uniforms.fogEnabled.value = false;
+      this.material.uniforms.fogDensity.value = DEFAULT_BILLBOARD_FOG_DENSITY;
     }
 
     // Atmosphere lighting — forward the same sun/hemisphere colors terrain's

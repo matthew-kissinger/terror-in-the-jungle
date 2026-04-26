@@ -39,6 +39,20 @@ vi.mock('three', () => {
     }
   }
 
+  class Vector4 {
+    x: number
+    y: number
+    z: number
+    w: number
+
+    constructor(x = 0, y = 0, z = 0, w = 0) {
+      this.x = x
+      this.y = y
+      this.z = z
+      this.w = w
+    }
+  }
+
   class Matrix4 {
     copiedFrom?: Matrix4
 
@@ -170,6 +184,7 @@ vi.mock('three', () => {
     Mesh,
     Vector3,
     Vector2,
+    Vector4,
     Matrix4,
     Color,
     PerspectiveCamera,
@@ -201,6 +216,9 @@ const createConfig = (maxInstances = 5) => ({
   height: 3,
   fadeDistance: 10,
   maxDistance: 100,
+  representation: 'imposter' as const,
+  atlasProfile: 'ground-compact' as const,
+  shaderProfile: 'hemisphere' as const,
 })
 
 const createInstance = (x: number, y: number, z: number, sx = 1, sy = 1, rot = 0) => ({
@@ -226,6 +244,107 @@ describe('GPUBillboardVegetation', () => {
     expect(internal.mesh).toBeTruthy()
     expect(internal.mesh.frustumCulled).toBe(false)
     expect(scene.add).toHaveBeenCalledWith(internal.mesh)
+  })
+
+  it('configures imposter uniforms without requiring a normal atlas', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    expect(internal.material.uniforms.imposterAtlasEnabled.value).toBe(false)
+    expect(internal.material.uniforms.normalMapEnabled.value).toBe(false)
+    expect(internal.material.uniforms.imposterTiles.value.x).toBe(1)
+    expect(internal.material.uniforms.imposterTiles.value.y).toBe(1)
+  })
+
+  it('keeps close-range fade disabled while Pixel Forge vegetation is impostor-only', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    expect(internal.material.uniforms.nearFadeDistance.value).toBe(0)
+  })
+
+  it('configures close alpha hardening without using close-distance fade', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    expect(internal.material.uniforms.nearFadeDistance.value).toBe(0)
+    expect(internal.material.uniforms.nearAlphaSolidDistance.value).toBe(30)
+  })
+
+  it('configures Pixel Forge vegetation lighting readability defaults', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    expect(internal.material.uniforms.colorTint.value.r).toBeCloseTo(1.04)
+    expect(internal.material.uniforms.colorTint.value.g).toBeCloseTo(1.08)
+    expect(internal.material.uniforms.colorTint.value.b).toBeCloseTo(1.0)
+    expect(internal.material.uniforms.vegetationExposure.value).toBeCloseTo(1.18)
+    expect(internal.material.uniforms.nearLightBoostDistance.value).toBe(85)
+    expect(internal.material.uniforms.minVegetationLight.value).toBeCloseTo(0.68)
+  })
+
+  it('configures GPU wind sway uniforms without per-instance CPU animation', () => {
+    const manager = new GPUBillboardVegetation(scene, {
+      ...createConfig(),
+      height: 18,
+      atlasProfile: 'mid-balanced',
+    })
+    const internal = manager as any
+
+    expect(internal.material.uniforms.windStrength.value).toBeGreaterThan(0.2)
+    expect(internal.material.uniforms.windStrength.value).toBeLessThanOrEqual(0.34)
+    expect(internal.material.uniforms.windSpeed.value).toBeCloseTo(1.15)
+    expect(internal.material.uniforms.windSpatialScale.value).toBeCloseTo(0.055)
+  })
+
+  it('enables atlas tile selection and normal sampling when provided', () => {
+    const normalTexture = { id: 'normal' } as any
+    const manager = new GPUBillboardVegetation(scene, {
+      ...createConfig(),
+      normalTexture,
+      atlasProfile: 'mid-balanced',
+      shaderProfile: 'normal-lit',
+      imposterAtlas: {
+        tilesX: 8,
+        tilesY: 4,
+        layout: 'latlon',
+        tileSize: 512,
+        alphaCrop: { minU: 0.1, minV: 0.2, maxU: 0.9, maxV: 0.95 },
+      },
+    })
+    const internal = manager as any
+
+    expect(internal.material.uniforms.normalMap.value).toBe(normalTexture)
+    expect(internal.material.uniforms.normalMapEnabled.value).toBe(true)
+    expect(internal.material.uniforms.imposterAtlasEnabled.value).toBe(true)
+    expect(internal.material.uniforms.imposterTiles.value.x).toBe(8)
+    expect(internal.material.uniforms.imposterTiles.value.y).toBe(4)
+    expect(internal.material.uniforms.imposterUvBounds.value.x).toBeCloseTo(0.1)
+    expect(internal.material.uniforms.imposterUvBounds.value.w).toBeCloseTo(0.95)
+    expect(internal.material.uniforms.stableAtlasAzimuth.value).toBe(false)
+    expect(internal.material.uniforms.stableAtlasColumn.value).toBe(0)
+    expect(internal.material.uniforms.maxAtlasElevationRow.value).toBe(-1)
+  })
+
+  it('can lock asymmetric impostors to one stable atlas column and cap bad elevation rows', () => {
+    const manager = new GPUBillboardVegetation(scene, {
+      ...createConfig(),
+      atlasProfile: 'canopy-balanced',
+      imposterAtlas: {
+        tilesX: 8,
+        tilesY: 4,
+        layout: 'latlon',
+        tileSize: 512,
+        stableAzimuthColumn: 3,
+        maxElevationRow: 2,
+      },
+    })
+    const internal = manager as any
+
+    expect(internal.material.uniforms.imposterAtlasEnabled.value).toBe(true)
+    expect(internal.material.uniforms.stableAtlasAzimuth.value).toBe(true)
+    expect(internal.material.uniforms.stableAtlasColumn.value).toBe(3)
+    expect(internal.material.uniforms.maxAtlasElevationRow.value).toBe(2)
   })
 
   it('uses plane geometry index and attributes', () => {
@@ -476,12 +595,22 @@ describe('GPUBillboardVegetation', () => {
     const internal = manager as any
     const fogColor = new THREE.Color(0.1, 0.2, 0.3)
 
-    manager.update(new THREE.PerspectiveCamera(), 0, { color: fogColor } as any)
+    manager.update(new THREE.PerspectiveCamera(), 0, { color: fogColor, density: 0.0003 } as any)
 
     expect(internal.material.uniforms.fogEnabled.value).toBe(true)
     expect(internal.material.uniforms.fogColor.value.r).toBeCloseTo(0.1)
     expect(internal.material.uniforms.fogColor.value.g).toBeCloseTo(0.2)
     expect(internal.material.uniforms.fogColor.value.b).toBeCloseTo(0.3)
+    expect(internal.material.uniforms.fogDensity.value).toBeCloseTo(0.0003)
+  })
+
+  it('clamps scene fog density before forwarding it to billboard shaders', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    manager.update(new THREE.PerspectiveCamera(), 0, { color: new THREE.Color(), density: 0.006 } as any)
+
+    expect(internal.material.uniforms.fogDensity.value).toBeCloseTo(0.002)
   })
 
   it('update disables fog when no fog is provided', () => {

@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "angles": 32,
+  "tilesX": 8,
+  "tilesY": 4,
+  "tileSize": 512,
+  "atlasWidth": 4096,
+  "atlasHeight": 2048,
+  "worldSize": 3.587358469146576,
+  "yOffset": 1.7991539581220009,
+  "projection": "orthographic",
+  "axis": "hemi-y",
+  "hemi": true,
+  "layout": "latlon",
+  "azimuths": [
+    0,
+    0.7853981633974483,
+    1.5707963267948966,
+    2.356194490192345,
+    3.141592653589793,
+    3.9269908169872414,
+    4.71238898038469,
+    5.497787143782138
+  ],
+  "elevations": [
+    1.48352986419518,
+    1.0471975511965976,
+    0.5235987755982988,
+    0.08726646259971647
+  ],
+  "bbox": {
+    "min": [
+      -0.9417577646672729,
+      0.0054747235487129405,
+      -1.3988014308205285
+    ],
+    "max": [
+      1.66792795062065,
+      3.592833192695289,
+      1.1193928016617032
+    ]
+  },
+  "source": {
+    "path": "C:\\Users\\Mattm\\X\\vegetation-research\\assets\\tier-a-psx\\polypizza\\palm-quaternius-2\\model.glb",
+    "bytes": 115980,
+    "tris": 3208
+  },
+  "auxLayers": [
+    "albedo",
+    "normal"
+  ],
+  "bgColor": "transparent",
+  "colorLayer": "baseColor",
+  "normalSpace": "capture-view",
+  "edgeBleedPx": 2,
+  "textureColorSpace": "srgb"
+}

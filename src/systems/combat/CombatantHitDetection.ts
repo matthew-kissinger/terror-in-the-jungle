@@ -3,27 +3,17 @@ import { Combatant, CombatantState, Faction, isAlly } from './types'
 import { SpatialGridManager, spatialGridManager } from './SpatialGridManager'
 import { performanceTelemetry } from '../debug/PerformanceTelemetry'
 import { Logger } from '../../utils/Logger'
+import {
+  createCombatantHitProxyScratch,
+  writeCharacterHitProxies,
+  writeCombatantHitProxies,
+  type CombatantHitProxy,
+  type CombatantHitProxyPositionMode,
+} from './CombatantBodyMetrics'
 
-const _tmp = new THREE.Vector3()
-const _zoneCenter = new THREE.Vector3()
-const _closestPoint = new THREE.Vector3()
-
-/**
- * Hit zone definition for combatant body parts
- */
-interface HitZone {
-  offset: THREE.Vector3
-  radius: number
-  isHead: boolean
+export interface CombatantRaycastOptions {
+  positionMode?: CombatantHitProxyPositionMode
 }
-
-const PLAYER_HIT_ZONES: HitZone[] = [
-  { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.35, isHead: true },
-  { offset: new THREE.Vector3(0.15, -0.75, 0), radius: 0.65, isHead: false },
-  { offset: new THREE.Vector3(0, -1.45, 0), radius: 0.55, isHead: false },
-  { offset: new THREE.Vector3(-0.2, -2.05, 0), radius: 0.35, isHead: false },
-  { offset: new THREE.Vector3(0.2, -2.05, 0), radius: 0.35, isHead: false }
-]
 
 export class CombatantHitDetection {
   private readonly MAX_ENGAGEMENT_RANGE = 280
@@ -36,35 +26,16 @@ export class CombatantHitDetection {
   private scratchVec1 = new THREE.Vector3()
   private scratchVec2 = new THREE.Vector3()
   private scratchVec3 = new THREE.Vector3()
+  private scratchVec4 = new THREE.Vector3()
+  private scratchVec5 = new THREE.Vector3()
+  private scratchVec6 = new THREE.Vector3()
+  private readonly hitProxyScratch = createCombatantHitProxyScratch()
+  private readonly playerHitProxyScratch = createCombatantHitProxyScratch()
+  private readonly combatantHitPoint = new THREE.Vector3()
   private readonly playerHitPoint = new THREE.Vector3()
+  private readonly playerClosestHitPoint = new THREE.Vector3()
   private readonly playerMissPoint = new THREE.Vector3()
   private static loggedUninitializedGrid = false
-
-  // Cached hit zones to avoid per-call allocations. Combatant positions are
-  // eye-level actor anchors, mirroring the player camera/eye position.
-  private readonly hitZonesEngaging: HitZone[] = [
-    { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.4, isHead: true },
-    { offset: new THREE.Vector3(0.15, -0.75, 0), radius: 0.8, isHead: false },
-    { offset: new THREE.Vector3(0, -1.45, 0), radius: 0.7, isHead: false },
-    { offset: new THREE.Vector3(-0.2, -2.05, 0), radius: 0.45, isHead: false },
-    { offset: new THREE.Vector3(0.2, -2.05, 0), radius: 0.45, isHead: false }
-  ]
-
-  private readonly hitZonesAlert: HitZone[] = [
-    { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.4, isHead: true },
-    { offset: new THREE.Vector3(0, -0.75, 0), radius: 0.8, isHead: false },
-    { offset: new THREE.Vector3(0, -1.45, 0), radius: 0.7, isHead: false },
-    { offset: new THREE.Vector3(-0.3, -2.05, 0), radius: 0.45, isHead: false },
-    { offset: new THREE.Vector3(0.3, -2.05, 0), radius: 0.45, isHead: false }
-  ]
-
-  private readonly hitZonesDefault: HitZone[] = [
-    { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.4, isHead: true },
-    { offset: new THREE.Vector3(0, -0.75, 0), radius: 0.8, isHead: false },
-    { offset: new THREE.Vector3(0, -1.45, 0), radius: 0.7, isHead: false },
-    { offset: new THREE.Vector3(-0.3, -2.05, 0), radius: 0.45, isHead: false },
-    { offset: new THREE.Vector3(0.3, -2.05, 0), radius: 0.45, isHead: false }
-  ]
 
   constructor(gridManager?: SpatialGridManager) {
     // Use provided grid manager or singleton
@@ -90,25 +61,27 @@ export class CombatantHitDetection {
     ray: THREE.Ray,
     playerPosition: THREE.Vector3
   ): { hit: boolean; point: THREE.Vector3; headshot: boolean } {
-    for (const zone of PLAYER_HIT_ZONES) {
-      _zoneCenter.copy(playerPosition).add(zone.offset)
-      _tmp.subVectors(_zoneCenter, ray.origin)
-      const t = _tmp.dot(ray.direction)
+    const proxies = writeCharacterHitProxies(this.playerHitProxyScratch, { anchor: playerPosition })
+    let closestDistance = Number.POSITIVE_INFINITY
+    let closestHeadshot = false
 
-      if (t < 0 || t > this.MAX_ENGAGEMENT_RANGE) continue
+    for (const proxy of proxies) {
+      const distance = this.intersectCombatantHitProxy(ray, proxy, this.playerHitPoint)
+      if (distance === null || distance > this.MAX_ENGAGEMENT_RANGE) continue
 
-      _closestPoint.copy(ray.origin).addScaledVector(ray.direction, t)
-      const distSq = _closestPoint.distanceToSquared(_zoneCenter)
+      if (distance < closestDistance) {
+        closestDistance = distance
+        closestHeadshot = proxy.isHead
+        this.playerClosestHitPoint.copy(this.playerHitPoint)
+      }
+    }
 
-      if (distSq <= zone.radius * zone.radius) {
-        _tmp.copy(_closestPoint).sub(_zoneCenter).normalize()
-        this.playerHitPoint.copy(_zoneCenter).addScaledVector(_tmp, zone.radius)
-
-        return {
-          hit: true,
-          point: this.playerHitPoint,
-          headshot: zone.isHead
-        }
+    if (Number.isFinite(closestDistance)) {
+      this.playerHitPoint.copy(this.playerClosestHitPoint)
+      return {
+        hit: true,
+        point: this.playerHitPoint,
+        headshot: closestHeadshot
       }
     }
 
@@ -122,7 +95,8 @@ export class CombatantHitDetection {
   raycastCombatants(
     ray: THREE.Ray,
     shooterFaction: Faction,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    options: CombatantRaycastOptions = {}
   ): { combatant: Combatant; distance: number; point: THREE.Vector3; headshot: boolean } | null {
     let closest: { combatant: Combatant; distance: number; point: THREE.Vector3; headshot: boolean } | null = null
 
@@ -142,47 +116,28 @@ export class CombatantHitDetection {
       candidateIds = this.gridManager.queryRadius(ray.origin, this.MAX_ENGAGEMENT_RANGE)
     }
 
-    // Use scratch vectors to avoid allocations
-    const tmp = this.scratchVec1
-    const closestPoint = this.scratchVec2
-    const zoneCenter = this.scratchVec3
-
     for (const id of candidateIds) {
       const combatant = allCombatants.get(id)
       if (!combatant) continue
       if (isAlly(combatant.faction, shooterFaction)) continue
       if (combatant.state === CombatantState.DEAD) continue
 
-      // Use cached hit zones (no allocation)
-      const hitZones = this.getHitZonesForState(combatant.state)
+      const proxies = writeCombatantHitProxies(
+        this.hitProxyScratch,
+        combatant,
+        options.positionMode ?? 'logical'
+      )
 
-      for (const zone of hitZones) {
-        // Use scratch vector instead of clone
-        zoneCenter.copy(combatant.position).add(zone.offset)
-        tmp.subVectors(zoneCenter, ray.origin)
-        const t = tmp.dot(ray.direction)
+      for (const proxy of proxies) {
+        const distance = this.intersectCombatantHitProxy(ray, proxy, this.combatantHitPoint)
+        if (distance === null || distance > this.MAX_ENGAGEMENT_RANGE) continue
 
-        if (t < 0 || t > this.MAX_ENGAGEMENT_RANGE) continue
-
-        // Reuse scratch vector
-        closestPoint.copy(ray.origin).addScaledVector(ray.direction, t)
-        const distSq = closestPoint.distanceToSquared(zoneCenter)
-
-        if (distSq <= zone.radius * zone.radius) {
-          const distance = t
-
-          if (!closest || distance < closest.distance) {
-            // Only allocate when we have a hit (rare)
-            const hitDir = closestPoint.clone().sub(zoneCenter).normalize()
-            const actualHitPoint = zoneCenter.clone().add(hitDir.multiplyScalar(zone.radius))
-
-            closest = {
-              combatant,
-              distance,
-              point: actualHitPoint,
-              headshot: zone.isHead
-            }
-            break
+        if (!closest || distance < closest.distance) {
+          closest = {
+            combatant,
+            distance,
+            point: this.combatantHitPoint.clone(),
+            headshot: proxy.isHead
           }
         }
       }
@@ -191,16 +146,95 @@ export class CombatantHitDetection {
     return closest
   }
 
-  /**
-   * Get cached hit zones for state (no per-call allocation)
-   */
-  private getHitZonesForState(state: CombatantState): HitZone[] {
-    if (state === CombatantState.ENGAGING || state === CombatantState.SUPPRESSING) {
-      return this.hitZonesEngaging
-    } else if (state === CombatantState.ALERT) {
-      return this.hitZonesAlert
-    } else {
-      return this.hitZonesDefault
+  private intersectCombatantHitProxy(
+    ray: THREE.Ray,
+    proxy: CombatantHitProxy,
+    outPoint: THREE.Vector3
+  ): number | null {
+    if (proxy.kind === 'sphere') {
+      return this.intersectSphereProxy(ray, proxy.center, proxy.radius, outPoint)
     }
+    return this.intersectCapsuleProxy(ray, proxy.start, proxy.end, proxy.radius, outPoint)
+  }
+
+  private intersectSphereProxy(
+    ray: THREE.Ray,
+    center: THREE.Vector3,
+    radius: number,
+    outPoint: THREE.Vector3
+  ): number | null {
+    const tmp = this.scratchVec1
+    const closestPoint = this.scratchVec2
+    const hitDir = this.scratchVec3
+    tmp.subVectors(center, ray.origin)
+    const t = tmp.dot(ray.direction)
+    if (t < 0) return null
+
+    closestPoint.copy(ray.origin).addScaledVector(ray.direction, t)
+    const distSq = closestPoint.distanceToSquared(center)
+    if (distSq > radius * radius) return null
+
+    hitDir.copy(closestPoint).sub(center)
+    if (hitDir.lengthSq() > 0.000001) {
+      outPoint.copy(center).addScaledVector(hitDir.normalize(), radius)
+    } else {
+      outPoint.copy(closestPoint)
+    }
+    return t
+  }
+
+  private intersectCapsuleProxy(
+    ray: THREE.Ray,
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    radius: number,
+    outPoint: THREE.Vector3
+  ): number | null {
+    const segment = this.scratchVec1.subVectors(end, start)
+    const originToStart = this.scratchVec2.subVectors(ray.origin, start)
+    const rayClosest = this.scratchVec3
+    const segmentClosest = this.scratchVec4
+    const delta = this.scratchVec5
+    const direction = this.scratchVec6.copy(ray.direction)
+
+    const segmentLengthSq = segment.lengthSq()
+    if (segmentLengthSq <= 0.000001) {
+      return this.intersectSphereProxy(ray, start, radius, outPoint)
+    }
+
+    const b = direction.dot(segment)
+    const d = direction.dot(originToStart)
+    const e = segment.dot(originToStart)
+    const denom = segmentLengthSq - b * b
+
+    let rayT = 0
+    let segmentT = 0
+    if (Math.abs(denom) > 0.000001) {
+      rayT = (b * e - segmentLengthSq * d) / denom
+      segmentT = (e + b * rayT) / segmentLengthSq
+    } else {
+      rayT = 0
+      segmentT = e / segmentLengthSq
+    }
+
+    if (rayT < 0) {
+      rayT = 0
+      segmentT = e / segmentLengthSq
+    }
+
+    segmentT = THREE.MathUtils.clamp(segmentT, 0, 1)
+    if (segmentT === 0) {
+      rayT = Math.max(0, -d)
+    } else if (segmentT === 1) {
+      rayT = Math.max(0, b - d)
+    }
+
+    rayClosest.copy(ray.origin).addScaledVector(direction, rayT)
+    segmentClosest.copy(start).addScaledVector(segment, segmentT)
+    delta.subVectors(rayClosest, segmentClosest)
+    if (delta.lengthSq() > radius * radius) return null
+
+    outPoint.copy(rayClosest)
+    return rayT
   }
 }

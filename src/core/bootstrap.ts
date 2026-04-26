@@ -83,6 +83,21 @@ export async function bootstrapGame(): Promise<void> {
   // eliminates the guard + dynamic import + scene module from retail bundles.
   // See docs/tasks/terrain-param-sandbox.md.
   if (import.meta.env.DEV) {
+    const { isGunRangeMode } = await import('../dev/gunRangeMode');
+    if (isGunRangeMode()) {
+      try {
+        const { GunRangeScene } = await import('../dev/gunRangeScene');
+        const scene = new GunRangeScene(document.body);
+        scene.start();
+        window.addEventListener('beforeunload', () => scene.dispose());
+      } catch (error) {
+        Logger.error('bootstrap', 'Gun-range mode failed to initialize', error);
+        const message = error instanceof Error ? error.message : String(error);
+        showFatalError(message);
+      }
+      return;
+    }
+
     const { isTerrainSandboxMode } = await import('../dev/terrainSandboxMode');
     if (isTerrainSandboxMode()) {
       try {

@@ -329,7 +329,7 @@ export class CombatantCombat {
       }
     }
 
-    const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
+    const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants, { positionMode: 'visual' });
     const terrainHit = this.terrainSystem
       ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
       : { hit: false as const };
@@ -418,7 +418,7 @@ export class CombatantCombat {
       }
     }
 
-    const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
+    const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants, { positionMode: 'visual' });
     const terrainHit = this.terrainSystem
       ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
       : { hit: false as const };

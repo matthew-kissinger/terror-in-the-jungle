@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "angles": 16,
+  "tilesX": 4,
+  "tilesY": 4,
+  "tileSize": 512,
+  "atlasWidth": 2048,
+  "atlasHeight": 2048,
+  "worldSize": 27.079299926757812,
+  "yOffset": 13.539649963378906,
+  "projection": "orthographic",
+  "axis": "hemi-y",
+  "hemi": true,
+  "layout": "latlon",
+  "azimuths": [
+    0,
+    1.5707963267948966,
+    3.141592653589793,
+    4.71238898038469
+  ],
+  "elevations": [
+    1.48352986419518,
+    1.0471975511965976,
+    0.5235987755982988,
+    0.08726646259971647
+  ],
+  "bbox": {
+    "min": [
+      -4.059819221496582,
+      0,
+      -6.74864387512207
+    ],
+    "max": [
+      8.692570686340332,
+      27.079299926757812,
+      5.40939998626709
+    ]
+  },
+  "source": {
+    "path": "C:\\Users\\Mattm\\X\\vegetation-research\\assets\\tier-a-psx\\polypizza\\coconut-palm-google\\model.glb",
+    "bytes": 2384288,
+    "tris": 2784
+  },
+  "auxLayers": [
+    "albedo",
+    "normal"
+  ],
+  "bgColor": "transparent",
+  "colorLayer": "baseColor",
+  "normalSpace": "capture-view",
+  "edgeBleedPx": 2,
+  "textureColorSpace": "srgb"
+}

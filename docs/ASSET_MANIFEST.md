@@ -1,8 +1,8 @@
 # Asset Manifest
 
-Last updated: 2026-04-24
+Last updated: 2026-04-26
 
-## 3D Models (75 GLBs)
+## 3D Models (159 GLBs)
 
 Shipped path: `public/models/**` (Vite static assets).
 
@@ -15,7 +15,9 @@ Shipped path: `public/models/**` (Vite static assets).
 | Structures | 34 | Sandbag wall/bunker, guard tower, helipad, TOC bunker, tunnel entrance, AA emplacements |
 | Buildings | 12 | Shophouse, French villa, pagoda, church, farmhouse, warehouse |
 | Animals | 6 | Water buffalo, tiger, macaque, king cobra, egret, wild boar |
-| Props | 1 | Wooden barrel |
+| Legacy props | 1 | Wooden barrel |
+| Pixel Forge NPC bodies | 4 | US Army, ARVN, NVA, VC combined skinned GLBs |
+| Pixel Forge props | 80 | Barrels, boxes, bottles, fences, fish, camp, fortification, and clutter GLBs |
 
 All models: low-poly stylized (PS2-era fidelity), GLB (binary glTF 2.0), PBR materials (metalness/roughness).
 
@@ -30,27 +32,48 @@ All models: low-poly stylized (PS2-era fidelity), GLB (binary glTF 2.0), PBR mat
 | Watercraft | Not wired | Blocked on water engine. |
 | Animals | 6/6 integrated | All types via AnimalSystem. |
 | Structures | Integrated | Procedural firebase/airfield generators, WorldFeatureSystem. |
-| NPCs | 2D sprites | Billboard sprite system (InstancedMesh), no 3D NPC models. |
+| Pixel Forge NPCs | Integrated first pass | Close actors use combined skinned GLBs with M16A1/AK-47 attachments. Mid/far actors use Pixel Forge animated impostor atlases through instanced buckets. No old NPC sprite assets are allowed by the cutover validator. |
+| Pixel Forge props | Cataloged | `PixelForgePropCatalog` exposes the 80 curated GLBs for placement profiles. These props are not substitutes for vegetation or NPC gaps. |
 
 ## Other Assets
 
 | Category | Count | Location | Format |
 |----------|------:|----------|--------|
 | UI icons | 38 | `public/assets/ui/icons/` | PNG (pixel art, white-on-transparent) |
-| Vegetation billboards | 13 | `public/assets/` (PascalCase names) | WebP |
+| Pixel Forge vegetation impostors | 7 approved species | `public/assets/pixel-forge/vegetation/` | PNG color atlas + PNG normal atlas + JSON metadata |
+| Pixel Forge NPC animated impostors | 32 clip packages, 28 runtime-manifested clips | `public/assets/pixel-forge/npcs/` | PNG atlas + JSON metadata |
 | Terrain/biome textures | 12 | `public/assets/` (lowercase names) | WebP |
-| Faction sprites | 40 | `public/assets/` (4 factions x 10 poses) | WebP |
 | Audio | 21 | `public/assets/` + `public/assets/optimized/` | WAV, OGG, MP3 |
 | First-person hands | 1 | `public/assets/first-person.png` | PNG |
+
+Old root-level vegetation WebP files, old faction sprite WebP files, and old
+source-soldier PNG files are no longer runtime or shipped assets. `npm run
+check:pixel-forge-cutover` fails on old vegetation filenames, old NPC sprite
+filenames, old `assets/source/soldiers` paths, blocked vegetation species IDs,
+`dipterocarp`, and `rejected-do-not-import` paths in source or shipped output.
+
+Approved runtime vegetation species are `bambooGrove`, `fern`, `bananaPlant`,
+`fanPalm`, `elephantEar`, `coconut`, and `giantPalm`. Blocked species remain
+excluded until regenerated or approved: `rubberTree`, `ricePaddyPlants`,
+`elephantGrass`, `areca`, `mangrove`, and `banyan`.
+
+Pixel Forge vegetation is currently impostor-only. Runtime metadata now carries
+review fixes for asymmetric palm packages: `giantPalm` is enlarged and locked
+to one stable azimuth column, and `coconut` is locked to a clean column while
+avoiding its bad low-elevation atlas row. These guards are an interim runtime
+answer, not final tree art. For polished close-range palms, prefer regenerated
+assets with close mesh LODs or a hybrid instanced trunk plus impostor canopy
+path.
 
 The sky is now procedural runtime atmosphere (`AtmosphereSystem` +
 `HosekWilkieSkyBackend`), not a static skybox texture.
 
 Vehicle and airfield asset quality is not signed off. The 2026-04-24 recovery
 pass fixed vehicle-session ownership, helicopter rotor spool-down, and
-sky-dome cloud wiring, but aircraft/building draw cost, airfield staging
-surfaces, water rendering, and imposter/LOD replacements remain future
-evidence-backed asset work.
+sky-dome cloud wiring. The 2026-04-26 Pixel Forge pass replaced NPC and
+vegetation runtime art, but hitbox feel, aircraft/building draw cost, airfield
+staging surfaces, water rendering, close-proximity NPC camera occlusion, and
+measured static-prop culling/HLOD remain future evidence-backed work.
 
 ## Art Direction
 

@@ -46,15 +46,11 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 1.0 },
     { typeId: 'elephantEar',   densityMultiplier: 1.0 },
-    { typeId: 'elephantGrass', densityMultiplier: 0.3 },
     { typeId: 'fanPalm',      densityMultiplier: 1.0 },
     { typeId: 'coconut',      densityMultiplier: 0.8 },
-    { typeId: 'areca',        densityMultiplier: 0.6 },
     { typeId: 'bambooGrove',  densityMultiplier: 0.4 },
     { typeId: 'bananaPlant',  densityMultiplier: 0.5 },
-    { typeId: 'dipterocarp',  densityMultiplier: 0.5 },
-    { typeId: 'banyan',       densityMultiplier: 0.5 },
-    { typeId: 'rubberTree',   densityMultiplier: 0.3 },
+    { typeId: 'giantPalm',    densityMultiplier: 0.5 },
   ],
 };
 
@@ -66,11 +62,9 @@ const BIOME_HIGHLAND: BiomeConfig = {
   groundRoughness: 0.78,
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 0.6 },
-    { typeId: 'elephantGrass', densityMultiplier: 0.5 },
     { typeId: 'fanPalm',      densityMultiplier: 0.3 },
-    { typeId: 'areca',        densityMultiplier: 0.4 },
-    { typeId: 'dipterocarp',  densityMultiplier: 0.8 },
-    { typeId: 'rubberTree',   densityMultiplier: 0.5 },
+    { typeId: 'bambooGrove',  densityMultiplier: 0.35 },
+    { typeId: 'giantPalm',    densityMultiplier: 0.8 },
   ],
 };
 
@@ -81,9 +75,9 @@ const BIOME_RICE_PADDY: BiomeConfig = {
   groundTileScale: 0.12,
   groundRoughness: 0.95,
   vegetationPalette: [
-    { typeId: 'ricePaddyPlants', densityMultiplier: 1.5 },
-    { typeId: 'elephantGrass',   densityMultiplier: 0.4 },
-    { typeId: 'bananaPlant',     densityMultiplier: 0.3 },
+    { typeId: 'fern',          densityMultiplier: 0.7 },
+    { typeId: 'elephantEar',   densityMultiplier: 0.35 },
+    { typeId: 'bananaPlant',   densityMultiplier: 0.3 },
   ],
 };
 
@@ -97,7 +91,6 @@ const BIOME_RIVERBANK: BiomeConfig = {
     { typeId: 'elephantEar',   densityMultiplier: 1.2 },
     { typeId: 'fanPalm',      densityMultiplier: 0.8 },
     { typeId: 'coconut',      densityMultiplier: 1.0 },
-    { typeId: 'mangrove',     densityMultiplier: 1.0 },
     { typeId: 'fern',         densityMultiplier: 0.5 },
   ],
 };
@@ -109,7 +102,7 @@ const BIOME_CLEARED: BiomeConfig = {
   groundTileScale: 0.1,
   groundRoughness: 0.88,
   vegetationPalette: [
-    { typeId: 'elephantGrass', densityMultiplier: 0.3 },
+    { typeId: 'fern',          densityMultiplier: 0.25 },
   ],
 };
 
@@ -120,8 +113,8 @@ const BIOME_TALL_GRASS: BiomeConfig = {
   groundTileScale: 0.1,
   groundRoughness: 0.87,
   vegetationPalette: [
-    { typeId: 'elephantGrass', densityMultiplier: 1.5 },
-    { typeId: 'fern',          densityMultiplier: 0.4 },
+    { typeId: 'fern',          densityMultiplier: 1.2 },
+    { typeId: 'elephantEar',   densityMultiplier: 0.5 },
     { typeId: 'bananaPlant',   densityMultiplier: 0.2 },
   ],
 };
@@ -134,7 +127,6 @@ const BIOME_MUD_TRAIL: BiomeConfig = {
   groundRoughness: 0.92,
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 0.2 },
-    { typeId: 'elephantGrass', densityMultiplier: 0.1 },
   ],
 };
 
@@ -158,7 +150,8 @@ const BIOME_SWAMP: BiomeConfig = {
   groundTileScale: 0.14,
   groundRoughness: 0.96,
   vegetationPalette: [
-    { typeId: 'mangrove',      densityMultiplier: 1.2 },
+    { typeId: 'coconut',       densityMultiplier: 0.7 },
+    { typeId: 'fanPalm',       densityMultiplier: 0.6 },
     { typeId: 'elephantEar',   densityMultiplier: 0.8 },
     { typeId: 'fern',          densityMultiplier: 0.6 },
   ],
@@ -171,7 +164,7 @@ const BIOME_DEFOLIATED: BiomeConfig = {
   groundTileScale: 0.1,
   groundRoughness: 0.9,
   vegetationPalette: [
-    { typeId: 'elephantGrass', densityMultiplier: 0.1 },
+    { typeId: 'fern',          densityMultiplier: 0.1 },
   ],
 };
 

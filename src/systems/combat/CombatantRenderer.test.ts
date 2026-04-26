@@ -5,9 +5,17 @@ import { Combatant, CombatantState, Faction } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
 import * as CombatantMeshFactoryModule from './CombatantMeshFactory';
 import * as CombatantShadersModule from './CombatantShaders';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 
-// Directions used in directional billboard system
-const DIRECTIONS = ['front', 'back', 'side'] as const;
+const CLIPS = [
+  'idle',
+  'patrol_walk',
+  'traverse_run',
+  'advance_fire',
+  'walk_fight_forward',
+  'death_fall_back',
+  'dead_pose',
+] as const;
 
 function createMockInstancedMesh(): THREE.InstancedMesh {
   const geometry = new THREE.PlaneGeometry(1, 1);
@@ -29,10 +37,8 @@ function createMockShaderMaterial(): THREE.ShaderMaterial {
 function buildFactionMeshMap(): Map<string, THREE.InstancedMesh> {
   const map = new Map<string, THREE.InstancedMesh>();
   for (const prefix of ['US', 'ARVN', 'NVA', 'VC', 'SQUAD']) {
-    for (const state of ['walking', 'firing']) {
-      for (const dir of DIRECTIONS) {
-        map.set(`${prefix}_${state}_${dir}`, createMockInstancedMesh());
-      }
+    for (const clip of CLIPS) {
+      map.set(`${prefix}_${clip}`, createMockInstancedMesh());
     }
   }
   return map;
@@ -41,13 +47,76 @@ function buildFactionMeshMap(): Map<string, THREE.InstancedMesh> {
 function buildFactionMaterialMap(): Map<string, THREE.ShaderMaterial> {
   const map = new Map<string, THREE.ShaderMaterial>();
   for (const prefix of ['US', 'ARVN', 'NVA', 'VC', 'SQUAD']) {
-    for (const state of ['walking', 'firing']) {
-      for (const dir of DIRECTIONS) {
-        map.set(`${prefix}_${state}_${dir}`, createMockShaderMaterial());
-      }
+    for (const clip of CLIPS) {
+      map.set(`${prefix}_${clip}`, createMockShaderMaterial());
     }
   }
   return map;
+}
+
+vi.mock('../assets/ModelLoader', () => ({
+  modelLoader: {
+    loadAnimatedModel: vi.fn().mockImplementation(async () => ({
+      scene: createMockAnimatedScene(),
+      animations: CLIPS.map((clip) => new THREE.AnimationClip(clip, 1, [])),
+    })),
+    loadModel: vi.fn().mockImplementation(async () => {
+      const root = new THREE.Group();
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 0.1, 0.08),
+        new THREE.MeshStandardMaterial({ name: 'weapon', color: 0x333333 }),
+      );
+      mesh.name = 'Mesh_Barrel';
+      root.add(mesh);
+      return root;
+    }),
+    disposeInstance: vi.fn(),
+  },
+}));
+
+function createMockAnimatedScene(): THREE.Group {
+  const root = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 1.8, 0.3),
+    new THREE.MeshStandardMaterial({ name: 'nva_uniform', color: 0xc4ba99 }),
+  );
+  body.position.y = 0.9;
+  root.add(body);
+
+  const hips = new THREE.Bone();
+  hips.name = 'Hips';
+  hips.position.set(0, 0.9, 0);
+  const spine = new THREE.Bone();
+  spine.name = 'Spine';
+  spine.position.set(0, 0.35, 0);
+  const leftArm = new THREE.Bone();
+  leftArm.name = 'LeftArm';
+  leftArm.position.set(-0.25, 0.25, 0);
+  const leftForeArm = new THREE.Bone();
+  leftForeArm.name = 'LeftForeArm';
+  leftForeArm.position.set(-0.25, -0.2, 0.08);
+  const leftHand = new THREE.Bone();
+  leftHand.name = 'LeftHand';
+  leftHand.position.set(-0.05, -0.18, 0.08);
+  const rightArm = new THREE.Bone();
+  rightArm.name = 'RightArm';
+  rightArm.position.set(0.25, 0.25, 0);
+  const rightForeArm = new THREE.Bone();
+  rightForeArm.name = 'RightForeArm';
+  rightForeArm.position.set(0.25, -0.2, 0.08);
+  const rightHand = new THREE.Bone();
+  rightHand.name = 'RightHand';
+  rightHand.position.set(0.05, -0.18, 0.08);
+
+  root.add(hips);
+  hips.add(spine);
+  spine.add(leftArm);
+  leftArm.add(leftForeArm);
+  leftForeArm.add(leftHand);
+  spine.add(rightArm);
+  rightArm.add(rightForeArm);
+  rightForeArm.add(rightHand);
+  return root;
 }
 
 vi.mock('./CombatantMeshFactory', () => ({
@@ -66,7 +135,19 @@ vi.mock('./CombatantMeshFactory', () => ({
   disposeCombatantMeshes: vi.fn(),
   updateCombatantTexture: vi.fn(),
   reportBucketOverflow: vi.fn(),
-  NPC_SPRITE_RENDER_Y_OFFSET: -1.1,
+  setPixelForgeNpcImpostorAttributes: vi.fn(),
+  getPixelForgeNpcBucketKey: (faction: string, clip: string) => `${faction}_${clip}`,
+  getPixelForgeNpcClipForCombatant: (combatant: Combatant) => {
+    if (combatant.state === 'dead') return combatant.isDying ? 'death_fall_back' : 'dead_pose';
+    if (combatant.state === 'engaging' || combatant.state === 'suppressing' || combatant.state === 'advancing') {
+      return 'walk_fight_forward';
+    }
+    if (combatant.state === 'patrolling') return 'patrol_walk';
+    if (combatant.state === 'retreating' || combatant.state === 'seeking_cover') return 'traverse_run';
+    return 'idle';
+  },
+  NPC_SPRITE_RENDER_Y_OFFSET: -0.04,
+  NPC_CLOSE_MODEL_TARGET_HEIGHT: 4.425,
 }));
 
 vi.mock('./CombatantShaders', () => ({
@@ -162,6 +243,60 @@ describe('CombatantRenderer', () => {
       expect(combatant.billboardIndex).toBeDefined();
     });
 
+    it('renders hard-close NPCs as armed GLB meshes, not impostors', () => {
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('near-1', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      combatants.set('near-1', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, { hasWeapon: boolean; weaponRoot?: THREE.Object3D }> }).activeCloseModels;
+      expect(combatant.billboardIndex).toBe(-1);
+      expect(activeCloseModels.get('near-1')?.hasWeapon).toBe(true);
+      expect(activeCloseModels.get('near-1')?.weaponRoot).toBeDefined();
+    });
+
+    it('does not let low-LOD classification force a near impostor inside the hard close radius', () => {
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('near-low-lod', Faction.VC, new THREE.Vector3(20, 0, 0));
+      combatant.lodLevel = 'low';
+      combatants.set('near-low-lod', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      expect(combatant.billboardIndex).toBe(-1);
+      expect(activeCloseModels.has('near-low-lod')).toBe(true);
+    });
+
+    it('keeps expanded near-range NPCs as GLB meshes before impostor LOD begins', () => {
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('expanded-near', Faction.US, new THREE.Vector3(60, 0, 0));
+      combatants.set('expanded-near', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      expect(combatant.billboardIndex).toBe(-1);
+      expect(activeCloseModels.has('expanded-near')).toBe(true);
+    });
+
+    it('prioritizes nearest hard-close actors when a close pool is exhausted', () => {
+      const combatants = new Map<string, Combatant>();
+      for (let i = 0; i < 48; i++) {
+        const combatant = createMockCombatant(`nva-${i}`, Faction.NVA, new THREE.Vector3(2 + i, 0, 0));
+        combatants.set(combatant.id, combatant);
+      }
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      expect(activeCloseModels.has('nva-0')).toBe(true);
+      expect(activeCloseModels.has('nva-39')).toBe(true);
+      expect(activeCloseModels.has('nva-47')).toBe(false);
+      expect(combatants.get('nva-47')?.billboardIndex).toBe(-1);
+    });
+
     it('skips dead non-dying combatants', () => {
       const combatants = new Map<string, Combatant>();
       const deadCombatant = createMockCombatant('dead-1', Faction.US, new THREE.Vector3(10, 0, 0), CombatantState.DEAD);
@@ -195,6 +330,37 @@ describe('CombatantRenderer', () => {
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
       expect(farCombatant.billboardIndex).toBeUndefined();
+    });
+
+    it('grounds faction markers at combatant terrain height on elevated terrain', () => {
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('ridge-1', Faction.US, new THREE.Vector3(80, 54.9, 0));
+      combatants.set('ridge-1', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 54.9, 0));
+
+      const markers = (renderer as unknown as { factionGroundMarkers: Map<string, THREE.InstancedMesh> }).factionGroundMarkers;
+      const markerMesh = Array.from(markers.values()).find((mesh) => mesh.count === 1)!;
+      const markerMatrix = new THREE.Matrix4();
+      const markerPosition = new THREE.Vector3();
+      markerMesh.getMatrixAt(0, markerMatrix);
+      markerPosition.setFromMatrixPosition(markerMatrix);
+
+      expect(markerMesh.count).toBe(1);
+      expect(markerPosition.y).toBeCloseTo(54.9 - NPC_Y_OFFSET + 0.08);
+    });
+
+    it('maps front and rear Pixel Forge impostor views with the package forward offset', () => {
+      const combatant = createMockCombatant('view-1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const getViewColumn = (renderer as unknown as {
+        getImpostorViewColumn(combatant: Combatant): number;
+      }).getImpostorViewColumn.bind(renderer);
+
+      camera.position.set(10, 5, 0);
+      expect(getViewColumn(combatant)).toBe(3);
+
+      camera.position.set(-10, 5, 0);
+      expect(getViewColumn(combatant)).toBe(0);
     });
 
     it('handles player squad tagging when squad id is set', () => {

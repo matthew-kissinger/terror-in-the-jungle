@@ -5,9 +5,34 @@
  * read from this registry so adding/removing a type is a one-file change.
  */
 
+import { PIXEL_FORGE_VEGETATION_ASSETS, type PixelForgeVegetationAsset } from './pixelForgeAssets';
+
+export type VegetationTier = 'groundCover' | 'midLevel' | 'canopy';
+export type VegetationRepresentation = 'imposter';
+export type VegetationAtlasProfile = 'ground-compact' | 'mid-balanced' | 'canopy-balanced' | 'canopy-hero';
+export type VegetationShaderProfile = 'hemisphere' | 'normal-lit';
+
+export interface VegetationAlphaCrop {
+  minU: number;
+  minV: number;
+  maxU: number;
+  maxV: number;
+}
+
+export interface VegetationImposterAtlasConfig {
+  tilesX: number;
+  tilesY: number;
+  layout: 'latlon';
+  tileSize: 256 | 512 | 1024;
+  alphaCrop?: VegetationAlphaCrop;
+  stableAzimuthColumn?: number;
+  maxElevationRow?: number;
+}
+
 export interface VegetationTypeConfig {
   id: string;
   textureName: string;       // AssetLoader key
+  normalTextureName?: string; // Optional normal atlas key when imported from Pixel Forge
   size: number;              // Square billboard size (meters)
   maxInstances: number;      // GPU buffer cap
   yOffset: number;           // Quad-center offset above terrain (accounts for texture bottom padding)
@@ -16,177 +41,138 @@ export interface VegetationTypeConfig {
   baseDensity: number;       // Multiplier on DENSITY_PER_UNIT (1 / 128 sq-units)
   placement: 'random' | 'poisson';
   poissonMinDistance?: number;
-  tier: 'groundCover' | 'midLevel' | 'canopy';
+  tier: VegetationTier;
+  representation: VegetationRepresentation;
+  atlasProfile: VegetationAtlasProfile;
+  shaderProfile: VegetationShaderProfile;
+  imposterAtlas?: VegetationImposterAtlasConfig;
+  normalSpace?: 'capture-view';
 }
 
-export const VEGETATION_TYPES: VegetationTypeConfig[] = [
-  // --- Ground cover ---
-  {
-    id: 'fern',
-    textureName: 'Fern',
-    size: 4,
+type VegetationTuning = Pick<
+  VegetationTypeConfig,
+  'maxInstances' | 'fadeDistance' | 'maxDistance' | 'baseDensity' | 'placement' | 'poissonMinDistance'
+>;
+
+const VEGETATION_TUNING: Record<string, VegetationTuning> = {
+  fern: {
     maxInstances: 100_000,
-    yOffset: 0.9,
     fadeDistance: 200,
     maxDistance: 250,
     baseDensity: 6.0,
     placement: 'random',
-    tier: 'groundCover',
   },
-  {
-    id: 'elephantEar',
-    textureName: 'ElephantEarPlants',
-    size: 5,
+  elephantEar: {
     maxInstances: 30_000,
-    yOffset: 1.3,
     fadeDistance: 250,
     maxDistance: 300,
     baseDensity: 0.8,
     placement: 'random',
-    tier: 'groundCover',
   },
-  {
-    id: 'elephantGrass',
-    textureName: 'ElephantGrass',
-    size: 3,
-    maxInstances: 40_000,
-    yOffset: 0.9,
-    fadeDistance: 200,
-    maxDistance: 250,
-    baseDensity: 1.0,
-    placement: 'random',
-    tier: 'groundCover',
-  },
-  {
-    id: 'ricePaddyPlants',
-    textureName: 'RicePaddyPlants',
-    size: 2,
-    maxInstances: 50_000,
-    yOffset: 0.3,
-    fadeDistance: 150,
-    maxDistance: 200,
-    baseDensity: 4.0,
-    placement: 'random',
-    tier: 'groundCover',
-  },
-
-  // --- Mid-level ---
-  {
-    id: 'fanPalm',
-    textureName: 'FanPalmCluster',
-    size: 16,
+  fanPalm: {
     maxInstances: 25_000,
-    yOffset: 5.5,
     fadeDistance: 360,
     maxDistance: 430,
-    baseDensity: 0.5,
+    baseDensity: 0.65,
     placement: 'random',
-    tier: 'midLevel',
   },
-  {
-    id: 'coconut',
-    textureName: 'CoconutPalm',
-    size: 25,
+  coconut: {
     maxInstances: 20_000,
-    yOffset: 11.5,
     fadeDistance: 450,
     maxDistance: 520,
-    baseDensity: 0.3,
+    baseDensity: 0.35,
     placement: 'poisson',
     poissonMinDistance: 12,
-    tier: 'midLevel',
   },
-  {
-    id: 'areca',
-    textureName: 'ArecaPalmCluster',
-    size: 18,
-    maxInstances: 30_000,
-    yOffset: 7.2,
-    fadeDistance: 360,
-    maxDistance: 430,
-    baseDensity: 0.4,
-    placement: 'poisson',
-    poissonMinDistance: 8,
-    tier: 'midLevel',
-  },
-  {
-    id: 'bambooGrove',
-    textureName: 'BambooGrove',
-    size: 18,
+  bambooGrove: {
     maxInstances: 15_000,
-    yOffset: 6.6,
     fadeDistance: 350,
     maxDistance: 400,
-    baseDensity: 0.5,
+    baseDensity: 0.6,
     placement: 'poisson',
     poissonMinDistance: 8,
-    tier: 'midLevel',
   },
-  {
-    id: 'bananaPlant',
-    textureName: 'BananaPlant',
-    size: 8,
-    maxInstances: 15_000,
-    yOffset: 3.0,
+  bananaPlant: {
+    maxInstances: 20_000,
     fadeDistance: 250,
     maxDistance: 300,
-    baseDensity: 0.4,
+    baseDensity: 0.55,
     placement: 'random',
-    tier: 'midLevel',
   },
-  {
-    id: 'mangrove',
-    textureName: 'Mangrove',
-    size: 12,
+  giantPalm: {
     maxInstances: 10_000,
-    yOffset: 4.4,
-    fadeDistance: 300,
-    maxDistance: 350,
-    baseDensity: 0.3,
+    fadeDistance: 500,
+    maxDistance: 600,
+    baseDensity: 0.2,
     placement: 'poisson',
-    poissonMinDistance: 10,
-    tier: 'midLevel',
+    poissonMinDistance: 16,
   },
+};
 
-  // --- Canopy ---
-  {
-    id: 'dipterocarp',
-    textureName: 'DipterocarpGiant',
-    size: 30,
-    maxInstances: 10_000,
-    yOffset: 14.0,
-    fadeDistance: 500,
-    maxDistance: 600,
-    baseDensity: 0.15,
-    placement: 'poisson',
-    poissonMinDistance: 16,
-    tier: 'canopy',
-  },
-  {
-    id: 'banyan',
-    textureName: 'TwisterBanyan',
-    size: 27,
-    maxInstances: 10_000,
-    yOffset: 9.6,
-    fadeDistance: 500,
-    maxDistance: 600,
-    baseDensity: 0.15,
-    placement: 'poisson',
-    poissonMinDistance: 16,
-    tier: 'canopy',
-  },
-  {
-    id: 'rubberTree',
-    textureName: 'RubberTree',
-    size: 22,
-    maxInstances: 8_000,
-    yOffset: 10.2,
-    fadeDistance: 450,
-    maxDistance: 550,
-    baseDensity: 0.12,
-    placement: 'poisson',
-    poissonMinDistance: 16,
-    tier: 'canopy',
-  },
-];
+// Low-camera atlas rows in several Pixel Forge packages have transparent
+// padding below the visible trunk/leaf base. Lower only those center anchors
+// so the visible cutout base sits on terrain instead of floating above it.
+const VEGETATION_GROUNDING_SINK: Record<string, number> = {
+  bambooGrove: 0.6,
+  coconut: 2.45,
+  elephantEar: 0.45,
+  fanPalm: 2.8,
+  giantPalm: 0.6,
+};
+
+const VEGETATION_RUNTIME_SCALE: Record<string, number> = {
+  giantPalm: 1.75,
+};
+
+// Skinny, asymmetric trunks do not survive atlas cross-fading: blending two
+// azimuth columns draws two trunks instead of a rotated trunk. Coconut also
+// has a bad low-elevation atlas row with a duplicated palm silhouette, so keep
+// ground-view sampling on the clean row until the asset can be regenerated.
+const VEGETATION_STABLE_AZIMUTH_COLUMN: Record<string, number> = {
+  coconut: 2,
+  giantPalm: 3,
+};
+
+const VEGETATION_MAX_ELEVATION_ROW: Record<string, number> = {
+  coconut: 2,
+};
+
+function toVegetationType(asset: PixelForgeVegetationAsset): VegetationTypeConfig {
+  const tuning = VEGETATION_TUNING[asset.id];
+  if (!tuning) {
+    throw new Error(`Missing Pixel Forge vegetation tuning for ${asset.id}`);
+  }
+  const runtimeScale = VEGETATION_RUNTIME_SCALE[asset.id] ?? 1;
+  const groundingSink = VEGETATION_GROUNDING_SINK[asset.id] ?? 0;
+
+  return {
+    id: asset.id,
+    textureName: asset.textureName,
+    normalTextureName: asset.normalTextureName,
+    size: asset.worldSize * runtimeScale,
+    maxInstances: tuning.maxInstances,
+    yOffset: (asset.yOffset - groundingSink) * runtimeScale,
+    fadeDistance: tuning.fadeDistance,
+    maxDistance: tuning.maxDistance,
+    baseDensity: tuning.baseDensity,
+    placement: tuning.placement,
+    poissonMinDistance: tuning.poissonMinDistance,
+    tier: asset.tier,
+    representation: 'imposter',
+    atlasProfile: asset.atlasProfile,
+    shaderProfile: asset.shaderProfile,
+    imposterAtlas: {
+      tilesX: asset.tilesX,
+      tilesY: asset.tilesY,
+      layout: 'latlon',
+      tileSize: asset.tileSize,
+      stableAzimuthColumn: VEGETATION_STABLE_AZIMUTH_COLUMN[asset.id],
+      maxElevationRow: VEGETATION_MAX_ELEVATION_ROW[asset.id],
+    },
+    normalSpace: asset.shaderProfile === 'normal-lit' ? 'capture-view' : undefined,
+  };
+}
+
+export const VEGETATION_TYPES: VegetationTypeConfig[] =
+  PIXEL_FORGE_VEGETATION_ASSETS.map(toVegetationType);
 

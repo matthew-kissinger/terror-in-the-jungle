@@ -33,10 +33,6 @@ function handleKeyDown(event: KeyboardEvent): void {
     event.key === 'F3' ||
     event.key === 'F4' ||
     event.key === 'F9' ||
-    event.key === 'p' ||
-    event.key === 'P' ||
-    event.key === '[' ||
-    event.key === ']' ||
     event.key === '`' ||
     event.key === '~' ||
     event.key === 'Backspace' ||
@@ -54,14 +50,8 @@ function handleKeyDown(event: KeyboardEvent): void {
 
   if (event.key === 'F1') {
     togglePerformanceStats(engineRef);
-  } else if (event.key === 'p' || event.key === 'P') {
-    togglePostProcessing(engineRef);
   } else if (event.key === 'F2') {
     toggleRealtimeStatsOverlay(engineRef);
-  } else if (event.key === '[') {
-    adjustPixelSize(engineRef, -1);
-  } else if (event.key === ']') {
-    adjustPixelSize(engineRef, 1);
   } else if (event.key === 'F3') {
     toggleLogOverlay(engineRef);
   } else if (event.key === 'F4') {
@@ -299,9 +289,7 @@ export function toggleRealtimeStatsOverlay(engine: GameEngine): void {
   performanceTelemetry.setEnabled(overlayVisible || engine.sandboxEnabled);
 }
 
-/**
- * Toggles post-processing effects (P)
- */
+/** Legacy debug API retained for callers; runtime post-processing is disabled. */
 export function togglePostProcessing(engine: GameEngine): void {
   if (!engine.gameStarted || !engine.renderer.postProcessing) return;
 
@@ -334,9 +322,8 @@ function toggleDebugHud(engine: GameEngine): void {
 /**
  * Toggles the simulation pause state (Backspace).
  *
- * Space is taken by the player jump and `P` is taken by post-processing, so
- * this handler uses Backspace. Also opens the TimeControlPanel on first use
- * so the visual indicator is visible.
+ * Space is taken by the player jump, so this handler uses Backspace. Also
+ * opens the TimeControlPanel on first use so the visual indicator is visible.
  */
 function toggleTimePause(engine: GameEngine): void {
   const paused = engine.timeScale.togglePause();
@@ -386,9 +373,7 @@ function triggerPlaytestCapture(engine: GameEngine): void {
   void engine.playtestCaptureManager.trigger();
 }
 
-/**
- * Adjusts the pixel size for the pixelation effect ([ and ])
- */
+/** Legacy debug API retained for callers; runtime pixelation is disabled. */
 export function adjustPixelSize(engine: GameEngine, delta: number): void {
   if (!engine.gameStarted || !engine.renderer.postProcessing) return;
 

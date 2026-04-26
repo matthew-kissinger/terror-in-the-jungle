@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "angles": 16,
+  "tilesX": 4,
+  "tilesY": 4,
+  "tileSize": 512,
+  "atlasWidth": 2048,
+  "atlasHeight": 2048,
+  "worldSize": 16.275616940110922,
+  "yOffset": 8.076928468421102,
+  "projection": "orthographic",
+  "axis": "hemi-y",
+  "hemi": true,
+  "layout": "latlon",
+  "azimuths": [
+    0,
+    1.5707963267948966,
+    3.141592653589793,
+    4.71238898038469
+  ],
+  "elevations": [
+    1.48352986419518,
+    1.0471975511965976,
+    0.5235987755982988,
+    0.08726646259971647
+  ],
+  "bbox": {
+    "min": [
+      -6.657549858093262,
+      -0.06088000163435936,
+      -6.472109794616699
+    ],
+    "max": [
+      6.360486030578613,
+      16.214736938476562,
+      6.01340913772583
+    ]
+  },
+  "source": {
+    "path": "C:\\Users\\Mattm\\X\\vegetation-research\\assets\\tier-a-psx\\polypizza\\lady-palm-google-1\\model.glb",
+    "bytes": 2181876,
+    "tris": 2040
+  },
+  "auxLayers": [
+    "albedo",
+    "normal"
+  ],
+  "bgColor": "transparent",
+  "colorLayer": "baseColor",
+  "normalSpace": "capture-view",
+  "edgeBleedPx": 2,
+  "textureColorSpace": "srgb"
+}

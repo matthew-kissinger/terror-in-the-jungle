@@ -1,5 +1,4 @@
 import { Logger } from '../utils/Logger';
-import { PostProcessingManager } from '../systems/effects/PostProcessingManager';
 import type { GameRenderer } from './GameRenderer';
 
 /**
@@ -109,16 +108,6 @@ export class WebGLContextGuard {
     // Renderer auto-restores its own state, but we must resize to
     // re-allocate the drawing buffer at the correct dimensions.
     sr.renderer.setSize(window.innerWidth, window.innerHeight);
-
-    // Rebuild the post-processing pipeline (framebuffers, render targets, shaders)
-    if (sr.postProcessing) {
-      sr.postProcessing.dispose();
-      sr.postProcessing = new PostProcessingManager(
-        sr.renderer,
-        sr.scene,
-        sr.camera
-      );
-    }
 
     // Force shadow map rebuild
     sr.renderer.shadowMap.needsUpdate = true;

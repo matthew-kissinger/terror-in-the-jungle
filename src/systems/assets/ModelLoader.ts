@@ -1,9 +1,15 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { getModelPath } from '../../config/paths';
 import { Logger } from '../../utils/Logger';
 
-interface LoadedModel {
+export interface LoadedModel {
+  scene: THREE.Group;
+  animations: THREE.AnimationClip[];
+}
+
+export interface AnimatedModelInstance {
   scene: THREE.Group;
   animations: THREE.AnimationClip[];
 }
@@ -32,6 +38,17 @@ export class ModelLoader {
     instance.userData[SHARED_MODEL_INSTANCE_KEY] = true;
     instance.userData.modelPath = relativePath;
     return instance;
+  }
+
+  async loadAnimatedModel(relativePath: string): Promise<AnimatedModelInstance> {
+    const model = await this.loadModelRaw(relativePath);
+    const instance = cloneSkeleton(model.scene) as THREE.Group;
+    instance.userData[SHARED_MODEL_INSTANCE_KEY] = true;
+    instance.userData.modelPath = relativePath;
+    return {
+      scene: instance,
+      animations: model.animations,
+    };
   }
 
   /**

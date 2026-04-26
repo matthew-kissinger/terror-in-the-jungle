@@ -30,6 +30,9 @@ export class GPUBillboardSystem {
         Logger.warn('vegetation', `Texture not found for ${vegType.id} (${vegType.textureName}), skipping`);
         continue;
       }
+      const normalTexture = vegType.normalTextureName
+        ? this.assetLoader.getTexture(vegType.normalTextureName)
+        : undefined;
 
       const config: GPUVegetationConfig = {
         maxInstances: vegType.maxInstances,
@@ -38,7 +41,12 @@ export class GPUBillboardSystem {
         height: vegType.size,
         fadeDistance: vegType.fadeDistance,
         maxDistance: vegType.maxDistance,
+        representation: vegType.representation,
+        atlasProfile: vegType.atlasProfile,
+        shaderProfile: vegType.shaderProfile,
       };
+      if (normalTexture) config.normalTexture = normalTexture;
+      if (vegType.imposterAtlas) config.imposterAtlas = vegType.imposterAtlas;
 
       const vegetation = new GPUBillboardVegetation(this.scene, config);
       this.vegetationTypes.set(vegType.id, vegetation);

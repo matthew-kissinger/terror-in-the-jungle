@@ -3,7 +3,17 @@ import * as THREE from 'three';
 import { CombatantHitDetection } from './CombatantHitDetection';
 import { Combatant, CombatantState, Faction } from './types';
 import { SpatialGridManager } from './SpatialGridManager';
-import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import { NPC_PIXEL_FORGE_VISUAL_HEIGHT, NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import {
+  COMBATANT_HIT_PROXY_CHEST_END_RATIO,
+  COMBATANT_HIT_PROXY_CHEST_START_RATIO,
+  COMBATANT_HIT_PROXY_HEAD_CENTER_RATIO,
+  COMBATANT_HIT_PROXY_HEAD_RADIUS_RATIO,
+  COMBATANT_HIT_PROXY_LEG_END_RATIO,
+  COMBATANT_HIT_PROXY_LEG_START_RATIO,
+  COMBATANT_HIT_PROXY_PELVIS_CENTER_RATIO,
+  COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER,
+} from './CombatantBodyMetrics';
 
 import { createTestCombatant } from '../../test-utils';
 
@@ -31,6 +41,26 @@ function makeCombatant(overrides: Partial<Combatant> = {}): Combatant {
 // Helper: Create a ray
 function makeRay(origin: THREE.Vector3, direction: THREE.Vector3): THREE.Ray {
   return new THREE.Ray(origin, direction.clone().normalize());
+}
+
+function pixelForgeHeadY(anchorY = NPC_Y_OFFSET): number {
+  return anchorY - NPC_Y_OFFSET + pixelForgeProxyHeight() * COMBATANT_HIT_PROXY_HEAD_CENTER_RATIO;
+}
+
+function pixelForgeChestY(anchorY = NPC_Y_OFFSET): number {
+  return anchorY - NPC_Y_OFFSET + pixelForgeProxyHeight() * ((COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2);
+}
+
+function pixelForgePelvisY(anchorY = NPC_Y_OFFSET): number {
+  return anchorY - NPC_Y_OFFSET + pixelForgeProxyHeight() * COMBATANT_HIT_PROXY_PELVIS_CENTER_RATIO;
+}
+
+function pixelForgeLegY(anchorY = NPC_Y_OFFSET): number {
+  return anchorY - NPC_Y_OFFSET + pixelForgeProxyHeight() * ((COMBATANT_HIT_PROXY_LEG_START_RATIO + COMBATANT_HIT_PROXY_LEG_END_RATIO) / 2);
+}
+
+function pixelForgeProxyHeight(): number {
+  return NPC_PIXEL_FORGE_VISUAL_HEIGHT * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER;
 }
 
 describe('CombatantHitDetection', () => {
@@ -81,9 +111,9 @@ describe('CombatantHitDetection', () => {
 
   describe('checkPlayerHit', () => {
     it('should detect direct head hit', () => {
-      const playerPosition = new THREE.Vector3(10, 0, 0);
+      const playerPosition = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
       const ray = makeRay(
-        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, pixelForgeHeadY(), 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -91,15 +121,14 @@ describe('CombatantHitDetection', () => {
 
       expect(result.hit).toBe(true);
       expect(result.headshot).toBe(true);
-      // Hit point should be within the head zone
-      expect(result.point.distanceTo(playerPosition)).toBeLessThanOrEqual(0.35);
+      const headCenter = new THREE.Vector3(10, pixelForgeHeadY(), 0);
+      expect(result.point.distanceTo(headCenter)).toBeLessThanOrEqual(pixelForgeProxyHeight() * COMBATANT_HIT_PROXY_HEAD_RADIUS_RATIO);
     });
 
     it('should detect direct body hit', () => {
-      const playerPosition = new THREE.Vector3(10, 0, 0);
-      // Aim at torso zone below the eye anchor.
+      const playerPosition = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
       const ray = makeRay(
-        new THREE.Vector3(0, -0.75, 0),
+        new THREE.Vector3(0, pixelForgeChestY(), 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -110,10 +139,9 @@ describe('CombatantHitDetection', () => {
     });
 
     it('should detect leg hit (lower left zone)', () => {
-      const playerPosition = new THREE.Vector3(10, 0, 0);
-      // Aim at lower left leg zone above terrain for a standing player.
+      const playerPosition = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
       const ray = makeRay(
-        new THREE.Vector3(0, -2.05, 0),
+        new THREE.Vector3(0, pixelForgeLegY(), 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -124,10 +152,9 @@ describe('CombatantHitDetection', () => {
     });
 
     it('should detect leg hit (lower right zone)', () => {
-      const playerPosition = new THREE.Vector3(10, 0, 0);
-      // Aim at lower right leg zone above terrain for a standing player.
+      const playerPosition = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
       const ray = makeRay(
-        new THREE.Vector3(0, -2.05, 0),
+        new THREE.Vector3(0, pixelForgeLegY(), 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -138,7 +165,7 @@ describe('CombatantHitDetection', () => {
     });
 
     it('should return miss when ray passes far from all zones', () => {
-      const playerPosition = new THREE.Vector3(10, 0, 0);
+      const playerPosition = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
       const ray = makeRay(
         new THREE.Vector3(0, 100, 0),
         new THREE.Vector3(1, 0, 0)
@@ -154,9 +181,9 @@ describe('CombatantHitDetection', () => {
     });
 
     it('should skip when ray points away from player (t < 0)', () => {
-      const playerPosition = new THREE.Vector3(10, 0, 0);
+      const playerPosition = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
       const ray = makeRay(
-        new THREE.Vector3(20, 0, 0),
+        new THREE.Vector3(20, pixelForgeHeadY(), 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -166,9 +193,9 @@ describe('CombatantHitDetection', () => {
     });
 
     it('should skip when ray is beyond MAX_ENGAGEMENT_RANGE', () => {
-      const playerPosition = new THREE.Vector3(320, 0, 0);
+      const playerPosition = new THREE.Vector3(320, NPC_Y_OFFSET, 0);
       const ray = makeRay(
-        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, pixelForgeHeadY(), 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -178,26 +205,26 @@ describe('CombatantHitDetection', () => {
     });
 
     it('should return hit point on zone surface', () => {
-      const playerPosition = new THREE.Vector3(10, 0, 0);
+      const playerPosition = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
       // Shoot slightly off-center to get a surface hit
       const ray = makeRay(
-        new THREE.Vector3(0, 0.2, 0),
+        new THREE.Vector3(0, pixelForgeHeadY() + 0.2, 0),
         new THREE.Vector3(1, 0, 0)
       );
 
       const result = hitDetection.checkPlayerHit(ray, playerPosition);
 
       expect(result.hit).toBe(true);
-      // Head zone has radius 0.35, so hit point should be ~0.35 units from center
-      const distanceFromCenter = result.point.distanceTo(playerPosition);
-      expect(distanceFromCenter).toBeCloseTo(0.35, 1);
+      const headCenter = new THREE.Vector3(10, pixelForgeHeadY(), 0);
+      const distanceFromCenter = result.point.distanceTo(headCenter);
+      expect(distanceFromCenter).toBeCloseTo(pixelForgeProxyHeight() * COMBATANT_HIT_PROXY_HEAD_RADIUS_RATIO, 1);
     });
 
     it('should handle edge case: ray tangent to sphere', () => {
-      const playerPosition = new THREE.Vector3(10, 0, 0);
-      // Ray passes exactly at radius distance (0.35 for head)
+      const playerPosition = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
+      const headRadius = pixelForgeProxyHeight() * COMBATANT_HIT_PROXY_HEAD_RADIUS_RATIO;
       const ray = makeRay(
-        new THREE.Vector3(0, 0.35, 0),
+        new THREE.Vector3(0, pixelForgeHeadY() + headRadius - 0.0001, 0),
         new THREE.Vector3(1, 0, 0)
       );
 
@@ -353,8 +380,7 @@ describe('CombatantHitDetection', () => {
         ['enemy1', combatant]
       ]);
 
-      // ENGAGING head zone is centered at the eye-level actor anchor.
-      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, pixelForgeHeadY(), 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -375,8 +401,7 @@ describe('CombatantHitDetection', () => {
         ['enemy1', combatant]
       ]);
 
-      // ALERT head zone is centered at the eye-level actor anchor.
-      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, pixelForgeHeadY(), 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
@@ -397,12 +422,111 @@ describe('CombatantHitDetection', () => {
         ['enemy1', combatant]
       ]);
 
-      // Default head zone is centered at the eye-level actor anchor.
-      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, pixelForgeHeadY(), 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
       expect(result!.headshot).toBe(true);
+    });
+
+    it('returns body hits for Pixel Forge chest, pelvis, and leg proxy heights', () => {
+      const combatant = makeCombatant({
+        id: 'enemy1',
+        faction: Faction.NVA,
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
+        state: CombatantState.IDLE
+      });
+
+      mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
+      const allCombatants = new Map<string, Combatant>([['enemy1', combatant]]);
+
+      for (const y of [pixelForgeChestY(), pixelForgePelvisY(), pixelForgeLegY()]) {
+        const ray = makeRay(new THREE.Vector3(0, y, 0), new THREE.Vector3(1, 0, 0));
+        const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
+        expect(result).not.toBeNull();
+        expect(result!.headshot).toBe(false);
+      }
+    });
+
+    it('does not classify the old eye-anchor hit point as a headshot', () => {
+      const combatant = makeCombatant({
+        id: 'enemy1',
+        faction: Faction.NVA,
+        position: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
+        state: CombatantState.IDLE
+      });
+
+      mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
+      const allCombatants = new Map<string, Combatant>([['enemy1', combatant]]);
+
+      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
+      const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
+
+      expect(result).not.toBeNull();
+      expect(result!.headshot).toBe(false);
+    });
+
+    it('uses renderedPosition for player-shot visual hit registration when requested', () => {
+      const combatant = makeCombatant({
+        id: 'enemy1',
+        faction: Faction.NVA,
+        position: new THREE.Vector3(20, NPC_Y_OFFSET, 0),
+        renderedPosition: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
+        state: CombatantState.IDLE
+      });
+
+      mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
+      const allCombatants = new Map<string, Combatant>([['enemy1', combatant]]);
+
+      const ray = makeRay(new THREE.Vector3(0, pixelForgeHeadY(), 0), new THREE.Vector3(1, 0, 0));
+      const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants, { positionMode: 'visual' });
+
+      expect(result).not.toBeNull();
+      expect(result!.combatant.id).toBe('enemy1');
+      expect(result!.distance).toBeCloseTo(10);
+      expect(result!.headshot).toBe(true);
+    });
+
+    it('keeps default NPC-vs-NPC hit detection anchored to logical position', () => {
+      const combatant = makeCombatant({
+        id: 'enemy1',
+        faction: Faction.NVA,
+        position: new THREE.Vector3(20, NPC_Y_OFFSET, 0),
+        renderedPosition: new THREE.Vector3(10, NPC_Y_OFFSET, 0),
+        state: CombatantState.IDLE
+      });
+
+      mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
+      const allCombatants = new Map<string, Combatant>([['enemy1', combatant]]);
+
+      const ray = makeRay(new THREE.Vector3(0, pixelForgeHeadY(), 0), new THREE.Vector3(1, 0, 0));
+      const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
+
+      expect(result).not.toBeNull();
+      expect(result!.combatant.id).toBe('enemy1');
+      expect(result!.distance).toBeCloseTo(20);
+      expect(result!.headshot).toBe(true);
+    });
+
+    it('keeps impostor LOD NPCs hittable through the shared Pixel Forge proxy', () => {
+      const combatant = makeCombatant({
+        id: 'enemy1',
+        faction: Faction.NVA,
+        position: new THREE.Vector3(55, NPC_Y_OFFSET, 0),
+        renderedPosition: new THREE.Vector3(55, NPC_Y_OFFSET, 0),
+        state: CombatantState.ENGAGING,
+        lodLevel: 'low',
+      });
+
+      mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);
+      const allCombatants = new Map<string, Combatant>([['enemy1', combatant]]);
+
+      const ray = makeRay(new THREE.Vector3(0, pixelForgeChestY(), 0), new THREE.Vector3(1, 0, 0));
+      const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants, { positionMode: 'visual' });
+
+      expect(result).not.toBeNull();
+      expect(result!.combatant.id).toBe('enemy1');
+      expect(result!.headshot).toBe(false);
     });
 
     it('should return point on zone surface, not center', () => {
@@ -420,17 +544,15 @@ describe('CombatantHitDetection', () => {
       ]);
 
       // Shoot slightly off-center to get a surface hit
-      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET + 0.2, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, pixelForgeHeadY() + 0.2, 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();
       
-      // Head zone center is at the eye-level actor anchor.
-      const zoneCenter = new THREE.Vector3(10, NPC_Y_OFFSET, 0);
+      const zoneCenter = new THREE.Vector3(10, pixelForgeHeadY(), 0);
       const distanceFromCenter = result!.point.distanceTo(zoneCenter);
       
-      // Point should be on surface (at radius distance from center)
-      expect(distanceFromCenter).toBeCloseTo(0.35, 1);
+      expect(distanceFromCenter).toBeCloseTo(pixelForgeProxyHeight() * COMBATANT_HIT_PROXY_HEAD_RADIUS_RATIO, 1);
     });
 
     it('should use ENGAGING zones for SUPPRESSING state', () => {
@@ -447,8 +569,7 @@ describe('CombatantHitDetection', () => {
         ['enemy1', combatant]
       ]);
 
-      // SUPPRESSING uses same zones as ENGAGING.
-      const ray = makeRay(new THREE.Vector3(0, NPC_Y_OFFSET, 0), new THREE.Vector3(1, 0, 0));
+      const ray = makeRay(new THREE.Vector3(0, pixelForgeHeadY(), 0), new THREE.Vector3(1, 0, 0));
       const result = hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
       expect(result).not.toBeNull();

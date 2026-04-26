@@ -39,7 +39,28 @@ function makeMockBillboard(): GlobalBillboardSystem {
 }
 
 const testTypes: VegetationTypeConfig[] = [
-  { id: 'fern', textureName: 'fern', size: 2, maxInstances: 1000, yOffset: 0, fadeDistance: 50, maxDistance: 100, baseDensity: 1, placement: 'random', tier: 'groundCover' },
+  {
+    id: 'fern',
+    textureName: 'PixelForge.Vegetation.fern.color',
+    normalTextureName: 'PixelForge.Vegetation.fern.normal',
+    size: 2,
+    maxInstances: 1000,
+    yOffset: 0,
+    fadeDistance: 50,
+    maxDistance: 100,
+    baseDensity: 1,
+    placement: 'random',
+    tier: 'groundCover',
+    representation: 'imposter',
+    atlasProfile: 'ground-compact',
+    shaderProfile: 'hemisphere',
+    imposterAtlas: {
+      tilesX: 4,
+      tilesY: 2,
+      layout: 'latlon',
+      tileSize: 256,
+    },
+  },
 ];
 
 const testPalette: BiomeVegetationEntry[] = [

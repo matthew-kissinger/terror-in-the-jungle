@@ -29,6 +29,16 @@ export const ACTOR_EYE_Y_OFFSET = 0;
 /** Maximum NPC movement speed (m/s). Navmesh paths handle navigation; this is raw locomotion speed. */
 export const NPC_MAX_SPEED = 6;
 
+/** Pixel Forge NPC visual scale shared by close GLBs and animated impostors. */
+export const NPC_PIXEL_FORGE_VISUAL_SCALE_MULTIPLIER = 1.5;
+
+/** Raw Pixel Forge NPC impostor/model target height before runtime scale. */
+export const NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT = 2.95;
+
+/** Runtime Pixel Forge NPC visual height used by rendering and hit proxies. */
+export const NPC_PIXEL_FORGE_VISUAL_HEIGHT =
+  NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT * NPC_PIXEL_FORGE_VISUAL_SCALE_MULTIPLIER;
+
 /** Default NPC health and max health. */
 export const NPC_HEALTH = 100;
 

@@ -28,7 +28,7 @@ const _tracerEnd = new THREE.Vector3()
 const _pelletDirection = new THREE.Vector3()
 const _barrelRotation = new THREE.Quaternion()
 
-const PLAYER_BARREL_WORLD_DISTANCE = 0.95
+const PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE = 1.35
 const PLAYER_BARREL_FALLBACK_RIGHT = 0.18
 const PLAYER_BARREL_FALLBACK_UP = -0.14
 
@@ -136,14 +136,14 @@ export class WeaponFiring {
       this.audioManager.playPlayerWeaponSound(command.weaponType)
     }
 
-    const resolvedCommand = this.resolveBarrelAlignedCommand(command, _barrelOrigin, _aimPoint)
+    const visualCommand = this.resolveBarrelAlignedCommand(command, _barrelOrigin, _aimPoint)
 
     // Execute based on weapon type
     let result: ShotResult
-    if (resolvedCommand.weaponType === 'shotgun' && resolvedCommand.pelletRays) {
-      result = this.shotExecutor.executeShotgunShot(resolvedCommand)
+    if (command.weaponType === 'shotgun' && command.pelletRays) {
+      result = this.shotExecutor.executeShotgunShot(command)
     } else {
-      result = this.shotExecutor.executeSingleShot(resolvedCommand)
+      result = this.shotExecutor.executeSingleShot(command)
     }
 
     if (this.statsTracker) {
@@ -154,7 +154,7 @@ export class WeaponFiring {
     this.spawnMuzzleFlash()
 
     // Spawn tracer
-    this.spawnTracer(resolvedCommand, result, _barrelOrigin, _aimPoint)
+    this.spawnTracer(visualCommand, result, _barrelOrigin, _aimPoint)
 
     // Record in telemetry
     performanceTelemetry.recordShot(result.hit)
@@ -298,9 +298,27 @@ export class WeaponFiring {
     this.camera.getWorldPosition(_cameraPos)
     this.camera.getWorldDirection(_forward)
 
+    if (this.muzzleRef && this.overlayCamera) {
+      this.camera.updateMatrixWorld(true)
+      this.overlayCamera.updateMatrixWorld(true)
+      this.muzzleRef.updateWorldMatrix(true, false)
+      this.muzzleRef.getWorldPosition(_muzzlePos)
+      _overlayMuzzleNdc.copy(_muzzlePos).project(this.overlayCamera)
+      _muzzleRayPoint
+        .set(_overlayMuzzleNdc.x, _overlayMuzzleNdc.y, 0.5)
+        .unproject(this.camera)
+      _barrelDirection.subVectors(_muzzleRayPoint, _cameraPos)
+      if (_barrelDirection.lengthSq() > 0.0001) {
+        return target.copy(_cameraPos).addScaledVector(
+          _barrelDirection.normalize(),
+          PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE
+        )
+      }
+    }
+
     if (isADS) {
       // ADS: barrel is centered on screen, use camera origin with small forward offset
-      return target.copy(_cameraPos).addScaledVector(_forward, PLAYER_BARREL_WORLD_DISTANCE)
+      return target.copy(_cameraPos).addScaledVector(_forward, PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE)
     }
 
     this.camera.getWorldQuaternion(_cameraQuat)
@@ -313,7 +331,7 @@ export class WeaponFiring {
     return target.copy(_cameraPos)
       .addScaledVector(_cameraRight, PLAYER_BARREL_FALLBACK_RIGHT)
       .addScaledVector(_cameraUp, PLAYER_BARREL_FALLBACK_UP)
-      .addScaledVector(_forward, PLAYER_BARREL_WORLD_DISTANCE)
+      .addScaledVector(_forward, PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE)
   }
 
   getGunCore(): GunplayCore {

@@ -556,11 +556,11 @@ Current code truth after the Cycle 5 follow-up:
   cover threat rays, tracers, muzzle flashes, death effects, and hit zones.
 - `PlayerRespawnManager` now grounds respawns at `terrain + PLAYER_EYE_HEIGHT`
   instead of an older hardcoded `+2`.
-- `CombatantMeshFactory` reduced the actual NPC billboard plane from
-  `3.2m x 4.5m` to `2.0m x 2.8m`, and `CombatantRenderer` applies
-  `NPC_SPRITE_RENDER_Y_OFFSET` for non-mounted NPCs so the sprite art's
-  non-transparent feet sit near terrain while the visible head stays near the
-  actor eye anchor.
+- The 2026-04-26 Pixel Forge cutover supersedes the old faction-sprite sizing
+  path. `CombatantMeshFactory` now gives Pixel Forge NPC impostors and close
+  GLBs the same larger readability target, while `CombatantRenderer` keeps
+  actors inside 64m on armed close GLBs and uses animated impostors only beyond
+  that hard near band.
 - Normal and suppressive tracers start from the actual shot ray origin instead
   of applying a second muzzle-height offset.
 - The recoil hypothesis is not the primary code cause found here: NPC firing
@@ -568,13 +568,15 @@ Current code truth after the Cycle 5 follow-up:
   above-head fire came from anchor/offset drift.
 
 Validation so far: targeted ballistics, effects, hit detection, sizing,
-renderer, LOS, movement, helicopter deploy, and respawn suites passed; the
-final `npm run validate:fast` gate passed with 243 files and 3789 tests, and
-`npm run build` passed. Human playtest still decides whether the billboard
-art, tracer visuals, and perceived player/NPC scale feel correct. If playtest
-still reports mismatch, do not add new hidden offsets; inspect sprite alpha
-padding, imposter scale, weapon flash/tracer art, and live combat telemetry
-first.
+renderer, LOS, movement, helicopter deploy, and respawn suites passed. The
+latest Pixel Forge cutover gate passed `npm run validate:fast` with 246 files /
+3825 tests, `npm run build`, `npm run check:pixel-forge-cutover`, and
+`npm run probe:pixel-forge-npcs` with no actors inside 64m rendered as
+impostors. Human playtest still decides whether Pixel Forge scale, close-camera
+occlusion, tracer visuals, faction markers, hitbox feel, and perceived
+player/NPC scale feel correct. If playtest still reports mismatch, do not add
+new hidden offsets; inspect GLB/impostor scale, atlas alpha padding, weapon
+flash/tracer art, hit-zone telemetry, and live combat telemetry first.
 
 ### Terrain Clipping And Water Rendering
 
@@ -654,6 +656,11 @@ is mixed:
 - Buildings can be registered into terrain collision and LOS acceleration, but
   there is no airfield-specific perf report for draw calls, triangles, collision
   objects, LOS obstacle count, or pop-in behavior.
+- The 2026-04-26 Pixel Forge vegetation cutover is intentionally still
+  billboard/impostor-only. Runtime now avoids the worst reviewed palm atlas
+  defects (`giantPalm` stable column, `coconut` bad-row quarantine), but close
+  tree quality should move to measured close mesh LODs or a hybrid trunk-mesh /
+  canopy-impostor renderer if human playtest still sees trunk snapping.
 
 Cycle 12 owns render/LOD/culling. Do not replace GLBs or add imposters before
 capturing the airfield cost profile; otherwise asset work can mask the real

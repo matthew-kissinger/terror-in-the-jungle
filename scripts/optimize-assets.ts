@@ -38,56 +38,7 @@ interface ProcessResult {
 
 const PROJECT_ROOT = resolve(join(import.meta.dirname!, '..'));
 
-const VEGETATION_NAME_MAP: Record<string, string> = {
-  'jungle-fern': 'Fern',
-  'elephant-ear-plants': 'ElephantEarPlants',
-  'fan-palm-cluster': 'FanPalmCluster',
-  'coconut-palm': 'CoconutPalm',
-  'areca-palm-cluster': 'ArecaPalmCluster',
-  'dipterocarp-giant': 'DipterocarpGiant',
-  'banyan-tree': 'TwisterBanyan',
-  // New types — keep kebab-to-PascalCase
-  'bamboo-grove': 'BambooGrove',
-  'rice-paddy-plants': 'RicePaddyPlants',
-  'banana-plant': 'BananaPlant',
-  'elephant-grass': 'ElephantGrass',
-  'mangrove': 'Mangrove',
-  'rubber-tree': 'RubberTree',
-};
-
-const SOLDIER_NAME_MAP: Record<string, string> = {};
-for (const faction of ['nva', 'arvn']) {
-  for (const dir of ['front', 'back', 'side']) {
-    SOLDIER_NAME_MAP[`${faction}-${dir}-walk1`] = `${faction}-walk-${dir}-1`;
-    SOLDIER_NAME_MAP[`${faction}-${dir}-walk2`] = `${faction}-walk-${dir}-2`;
-    SOLDIER_NAME_MAP[`${faction}-${dir}-fire`] = `${faction}-fire-${dir}`;
-  }
-}
-
 const CATEGORIES: Record<string, CategoryConfig> = {
-  vegetation: {
-    src: 'public/assets/source/vegetation',
-    dest: 'public/assets',
-    format: 'webp',
-    quality: 95,
-    maxDim: 1024,
-    trimAlpha: false,
-    cleanEdges: false,
-    enforcePOT: true,
-    nameMap: VEGETATION_NAME_MAP,
-  },
-  soldiers: {
-    src: 'public/assets/source/soldiers',
-    dest: 'public/assets',
-    format: 'webp',
-    quality: 95,
-    maxDim: 512,
-    trimAlpha: false,
-    cleanEdges: false,
-    enforcePOT: true,
-    pixelArt: true,
-    nameMap: SOLDIER_NAME_MAP,
-  },
   textures: {
     src: 'public/assets/source/textures',
     dest: 'public/assets',
@@ -403,7 +354,7 @@ function parseArgs(): { category: string; dryRun: boolean; force: boolean; repor
 Usage: npx tsx scripts/optimize-assets.ts [options]
 
 Options:
-  --category <name>   Process a single category (vegetation, soldiers, textures, icons, screens) or 'all' (default: all)
+  --category <name>   Process a single category (textures, icons, screens) or 'all' (default: all)
   --dry-run           Show what would be processed without writing files
   --force             Overwrite existing output files
   --no-report         Skip the summary report

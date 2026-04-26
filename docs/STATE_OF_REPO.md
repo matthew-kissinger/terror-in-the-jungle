@@ -1,12 +1,95 @@
 # State Of Repo
 
-Last updated: 2026-04-24
+Last updated: 2026-04-26
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
 document answers the narrower question: what is verified in the current repo
 state. Historical cycle/archive docs remain historical evidence; this file is
 the current truth anchor.
+
+## Dev Cycle Close-Out Snapshot On 2026-04-26
+
+- Pixel Forge NPC/vegetation cutover is the current local runtime truth, not a
+  production release claim. Old NPC sprites, old NPC source-soldier PNGs, old
+  root-level vegetation WebPs, blocked vegetation species, `dipterocarp`, and
+  `rejected-do-not-import` paths are guarded by
+  `npm run check:pixel-forge-cutover`.
+- Current local gates are green after the latest hitbox/source-asset cleanup:
+  `npm run check:pixel-forge-cutover`, `npm run validate:fast` (247 files /
+  3834 tests), `npm run build`, `npm run build:perf`, and a post-build Pixel
+  Forge cutover check. `public`, `dist`, and `dist-perf` were scanned after the
+  rebuild and no `assets/source/soldiers` paths or old source-soldier filenames
+  remain. The local gun range at
+  `http://127.0.0.1:5173/?mode=gun-range&glb=1` rendered with `GLBs=4/4` and
+  no browser console errors.
+- Current visual state: close NPCs are Pixel Forge GLBs with weapons inside
+  64m, mid/far NPCs are Pixel Forge animated impostors, vegetation is still
+  impostor-only, post-processing/pixelation is disabled, and approved
+  vegetation uses Pixel Forge atlas metadata plus normal maps.
+- Latest fixes added after playtest: NPC impostors now output straight alpha
+  color instead of darkened premultiplied RGB, `giantPalm` is enlarged and
+  locked to a stable atlas column, and `coconut` avoids its broken low-angle
+  atlas row that showed two trunk locations.
+- Return-to-polish queue: human playtest of the new hit-proxy shot feel and
+  `?mode=gun-range`, tracer/muzzle feedback, close NPC camera occlusion and
+  collision feel, faction readability against terrain, palm/tree close-range
+  LOD quality, vegetation atlas snapping under flight, static building/prop
+  culling evidence, and human playtest sign-off.
+
+## Pixel Forge Asset Cutover Update On 2026-04-26
+
+- NPC and vegetation runtime art is now Pixel Forge-only. Runtime source,
+  tests, and shipped output are guarded by `npm run check:pixel-forge-cutover`,
+  which fails on old faction sprite filenames, old NPC source-soldier PNG
+  filenames/paths, old root-level vegetation WebP filenames, blocked vegetation
+  species IDs, `dipterocarp`, and `rejected-do-not-import` paths.
+- Approved runtime vegetation is limited to seven Pixel Forge impostor species:
+  `bambooGrove`, `fern`, `bananaPlant`, `fanPalm`, `elephantEar`, `coconut`,
+  and `giantPalm`. Blocked species remain out of production until regenerated
+  or approved: `rubberTree`, `ricePaddyPlants`, `elephantGrass`, `areca`,
+  `mangrove`, and `banyan`.
+- Vegetation still uses the GPU billboard path, now with manifest-backed color
+  and normal atlases, close alpha hardening, a brighter minimum lighting floor,
+  shader-side wind, species grounding sinks for low-angle atlas padding, and
+  per-species atlas guards for reviewed problem packages. `giantPalm` is scaled
+  up and locked to a stable azimuth column; `coconut` is locked to a clean
+  column and capped away from its bad low-elevation row. There is still no
+  close 3D vegetation LOD in this pass.
+- Close NPCs use Pixel Forge combined skinned GLBs with M16A1/AK-47 weapon
+  attachments. The no-impostor near band is currently `64m`, selected close
+  GLB capacity is `128`, and per-pool capacity is `40`; over-cap near actors
+  are suppressed/logged instead of silently falling back to old sprites or near
+  impostors.
+- Mid/far NPCs use Pixel Forge animated impostor atlases. Runtime now applies
+  the package forward-view offset for view-column selection, strips horizontal
+  root motion from looped GLB clips, maps moving states away from
+  `advance_fire`, and applies shader-side readability lighting to the impostor
+  path.
+- Player hit registration now raycasts LOD-independent Pixel Forge visual
+  proxies from `CombatantBodyMetrics` instead of the old sprite-era fixed
+  spheres. NPC shots against the player use the same taller character proxy.
+  The live shot path uses the camera/crosshair ray for damage, keeps the
+  projected weapon muzzle/barrel path for tracer visuals, and exposes
+  `?diag=1&hitboxes=1` plus the isolated Pixel Forge GLB dev route
+  `?mode=gun-range` for hitbox checks without loading combat120.
+- The retro pixelation/post-processing path is disabled for this pass. WebGL
+  antialiasing is enabled and the post-process/pixel-size hotkeys are no longer
+  active runtime controls.
+- Local validation on the current cutover state: targeted Pixel Forge combat,
+  vegetation, billboard, renderer, hitbox, weapon, and gun-range suites passed;
+  `npm run validate:fast` passed with 247 files / 3834 tests; `npm run build`
+  and `npm run build:perf` passed with the existing large-chunk warning;
+  `npm run check:pixel-forge-cutover` passed after both builds; and
+  `npm run probe:pixel-forge-npcs` passed against
+  `http://127.0.0.1:5173/?sandbox=1&npcs=100&seed=2718&diag=1` with
+  `closeRadiusMeters=64`, armed close GLBs, and no actors inside 64m rendered
+  as impostors.
+- Not signed off: human playtest still needs to judge combat hitbox feel,
+  vegetation transparency, wind/readability, high-speed vegetation atlas
+  snapping, close GLB camera occlusion after the 1.5x NPC scale increase,
+  faction marker style, and static building/prop culling/HLOD behavior under
+  measured render budgets.
 
 ## Architecture Recovery Update On 2026-04-23/24
 
@@ -68,13 +151,17 @@ the current truth anchor.
   center-mass, and LOS eye positions. Ballistics, terrain fire checks, LOS,
   cover threat rays, tracer/muzzle effects, death effects, and hit zones no
   longer stack independent vertical offsets on top of already raised actor
-  positions. The NPC billboard plane was also reduced from `3.2m x 4.5m` to
-  `2.0m x 2.8m` and shifted down by `NPC_SPRITE_RENDER_Y_OFFSET` so the
-  optimized sprite alpha bounds read as a human-scale silhouette with feet near
-  terrain and head near the actor eye anchor. This addresses the playtest
-  symptom where NPC fire appeared above the player's head and the player felt
-  short next to combatants. Human playtest still decides whether the sprite art
-  itself reads correctly in motion.
+  positions. The older small-sprite visual follow-up has since been superseded
+  by the 2026-04-26 Pixel Forge NPC renderer: close actors use skinned GLBs,
+  mid/far actors use animated impostors, and both paths share a larger 1.5x
+  readability scale. Hit registration now uses a single taller Pixel Forge
+  character proxy for close GLB NPCs, impostor NPCs, and the player target, and
+  first-person tracer visuals project from the weapon muzzle/barrel presentation
+  point while damage stays on the camera/crosshair ray. This addresses the
+  playtest symptom where NPC fire appeared above the player's head and the
+  player felt short next to combatants, but human playtest still decides
+  whether the current Pixel Forge scale, camera proximity, tracer visuals, and
+  faction readability feel correct in motion.
 - Cycle 6 terrain/collision first pass is now in place:
   helicopter squad deployment uses the runtime terrain query surface and
   collision-aware `getEffectiveHeightAt()` when available; `NavmeshSystem`

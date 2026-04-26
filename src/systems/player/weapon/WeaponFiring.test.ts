@@ -256,7 +256,7 @@ describe('WeaponFiring', () => {
       // Should not crash even if statsTracker/audioManager/hudSystem are missing
     })
 
-    it('fires and traces from a barrel-aligned world start instead of camera center', () => {
+    it('damages from the camera ray while tracing from the projected weapon muzzle', () => {
       const muzzleRef = new THREE.Object3D()
       weaponFiring.setMuzzleRef(muzzleRef)
 
@@ -271,12 +271,27 @@ describe('WeaponFiring', () => {
 
       weaponFiring.executeShot(command)
 
+      const expectedMuzzleNdc = new THREE.Vector3(0.62, -0.28, -0.72).project(overlayCamera)
+      const expectedMuzzleRayPoint = new THREE.Vector3(expectedMuzzleNdc.x, expectedMuzzleNdc.y, 0.5).unproject(camera)
+      const expectedTracerStart = expectedMuzzleRayPoint
+        .sub(camera.position)
+        .normalize()
+        .multiplyScalar(1.35)
+        .add(camera.position)
+
       const firedRay = vi.mocked(combatantSystem.handlePlayerShot).mock.calls[0][0] as THREE.Ray
-      expect(firedRay.origin.x).toBeGreaterThan(0.05)
-      expect(firedRay.origin.y).toBeLessThan(0)
-      expect(firedRay.direction.z).toBeLessThan(-0.9)
+      expect(firedRay.origin.x).toBeCloseTo(0)
+      expect(firedRay.origin.y).toBeCloseTo(0)
+      expect(firedRay.origin.z).toBeCloseTo(0)
+      expect(firedRay.direction.x).toBeCloseTo(0)
+      expect(firedRay.direction.y).toBeCloseTo(0)
+      expect(firedRay.direction.z).toBeCloseTo(-1)
       expect(tracerPool.spawn).toHaveBeenCalledWith(
-        expect.objectContaining({ x: expect.any(Number), y: expect.any(Number), z: expect.any(Number) }),
+        expect.objectContaining({
+          x: expect.closeTo(expectedTracerStart.x, 2),
+          y: expect.closeTo(expectedTracerStart.y, 2),
+          z: expect.closeTo(expectedTracerStart.z, 2),
+        }),
         expect.objectContaining({ x: 0, y: 0, z: -10 }),
         120
       )

@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "kind": "animated-octahedral-imposter",
+  "source": {
+    "path": "glb/vc/rest.glb",
+    "bytes": 189144,
+    "tris": 1118,
+    "skinned": true,
+    "hash": "6f2644a8d5d9a4691172ea79a26f59867130b1266804b1a41a120fcf3a9fd5d6",
+    "animationClips": [
+      "Armature|clip0|baselayer"
+    ],
+    "attachments": [
+      {
+        "id": "ak47",
+        "kind": "weapon",
+        "sourcePath": "weapons/ak47.glb",
+        "bytes": 67588,
+        "hash": "1fab1876b236f1cf2c5759cb7e669c5badf7fc4195fd6640c35f46c515c43ce8"
+      }
+    ]
+  },
+  "bbox": {
+    "min": [
+      -0.24999992880873909,
+      -4.3896371506550724e-7,
+      -0.2319999352776134
+    ],
+    "max": [
+      0.24999992770193713,
+      1.7899997796143894,
+      0.9764762875147073
+    ],
+    "worldSize": 1.7900002185781045,
+    "yOffset": 0.8949996703253371
+  },
+  "projection": "orthographic",
+  "view": {
+    "layout": "octahedral",
+    "directionEncoding": "octahedral",
+    "grid": {
+      "x": 7,
+      "y": 7,
+      "count": 49
+    },
+    "tileSize": 96,
+    "framesPerClip": 8
+  },
+  "clips": [
+    {
+      "target": "idle",
+      "resolved": "baselayer",
+      "rawName": "Armature|clip0|baselayer",
+      "matchedBy": "fallback",
+      "fallbackRawName": "Armature|clip0|baselayer",
+      "frameCount": 8,
+      "durationSec": 0.30000001192092896
+    }
+  ],
+  "textures": {
+    "layout": "atlas",
+    "color": {
+      "uri": "animated-albedo-packed.png",
+      "format": "rgba8",
+      "width": 2688,
+      "height": 1344,
+      "layers": 8,
+      "framesX": 4,
+      "framesY": 2,
+      "bytes": 239595,
+      "colorSpace": "srgb"
+    }
+  },
+  "runtime": {
+    "renderer": "webgl2",
+    "primitive": "instanced-quad",
+    "material": "ShaderMaterial",
+    "textureMode": "packed-2d-atlas",
+    "attributes": [
+      "frameOffset",
+      "clip",
+      "variant",
+      "yaw",
+      "paletteRow"
+    ]
+  },
+  "storage": {
+    "colorBytes": 14450688,
+    "totalRawBytes": 14450688,
+    "envelopeBytes": 31457280,
+    "fitsEnvelope": true
+  },
+  "validation": {
+    "warnings": [
+      {
+        "code": "ANIMATED_IMPOSTER_CLIP_FALLBACK",
+        "severity": "warning",
+        "message": "idle will use Armature|clip0|baselayer as a fallback clip.",
+        "fixHint": "Treat the output as visually provisional until a dedicated clip exists."
+      }
+    ]
+  }
+}

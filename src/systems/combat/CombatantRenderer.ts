@@ -1,21 +1,84 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, isBlufor } from './types';
+import { Combatant, CombatantState } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
-import { CombatantMeshFactory, NPC_SPRITE_RENDER_Y_OFFSET, disposeCombatantMeshes, reportBucketOverflow, updateCombatantTexture, type ViewDirection, type WalkFrameMap } from './CombatantMeshFactory';
+import {
+  CombatantMeshFactory,
+  NPC_CLOSE_MODEL_TARGET_HEIGHT,
+  NPC_SPRITE_RENDER_Y_OFFSET,
+  disposeCombatantMeshes,
+  getPixelForgeNpcBucketKey,
+  getPixelForgeNpcClipForCombatant,
+  reportBucketOverflow,
+  setPixelForgeNpcImpostorAttributes,
+  updateCombatantTexture,
+  type WalkFrameMap,
+} from './CombatantMeshFactory';
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
-
-/** Walk animation interval in seconds. */
-const WALK_FRAME_INTERVAL = 0.4;
-
-/** Dot product threshold for side view. Below this absolute value = side. */
-const SIDE_DOT_THRESHOLD = 0.45;
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import { isDiagEnabled } from '../../core/PerfDiagnostics';
+import { modelLoader } from '../assets/ModelLoader';
+import {
+  createCombatantHitProxyScratch,
+  writeCombatantHitProxies,
+  type CombatantHitProxy,
+} from './CombatantBodyMetrics';
+import { type PixelForgeNpcClipId } from '../../config/pixelForgeAssets';
+import {
+  getPixelForgeNpcPoolKey,
+  getPixelForgeNpcRuntimeFaction,
+  PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+  PIXEL_FORGE_NPC_RUNTIME_FACTIONS,
+  sanitizePixelForgeNpcAnimationClip,
+  type PixelForgeNpcFactionRuntimeConfig,
+  type PixelForgeNpcPoolKey,
+  type PixelForgeNpcWeaponRuntimeConfig,
+} from './PixelForgeNpcRuntime';
 
 /** Y bob amplitude in world units. */
 const BOB_AMPLITUDE = 0.12;
 
 /** Y bob speed multiplier. */
 const BOB_SPEED = 3.0;
+const TWO_PI = Math.PI * 2;
+const NPC_IMPOSTOR_VIEW_COLUMNS = 7;
+const NPC_IMPOSTOR_VIEW_FORWARD_OFFSET = Math.PI;
+const HITBOX_DEBUG_MAX_ACTORS = 24;
+
+function isHitboxDebugEnabled(): boolean {
+  if (!isDiagEnabled() || typeof window === 'undefined') return false;
+  try {
+    const value = new URLSearchParams(window.location.search).get('hitboxes');
+    return value === '1' || value === 'true' || value === 'yes' || value === 'on';
+  } catch {
+    return false;
+  }
+}
+
+interface CloseModelInstance {
+  root: THREE.Group;
+  mixer: THREE.AnimationMixer;
+  actions: Map<PixelForgeNpcClipId, THREE.AnimationAction>;
+  poolKey: PixelForgeNpcPoolKey;
+  factionConfig: PixelForgeNpcFactionRuntimeConfig;
+  weaponPivot?: THREE.Group;
+  weaponRoot?: THREE.Group;
+  weaponConfig: PixelForgeNpcWeaponRuntimeConfig;
+  bones: Map<string, THREE.Object3D>;
+  hasWeapon: boolean;
+  boundsMinY: number;
+  visualScale: number;
+  activeClip?: PixelForgeNpcClipId;
+  combatantId?: string;
+}
+
+interface CloseModelMetrics {
+  boundsMinY: number;
+  visualScale: number;
+}
 
 export class CombatantRenderer {
   private scene: THREE.Scene;
@@ -32,6 +95,9 @@ export class CombatantRenderer {
   private playerSquadDetected = false;
   private shaderSettings = new CombatantShaderSettingsManager();
   private combatantStates: Map<string, { state: number; damaged: number }> = new Map();
+  private closeModelPools: Map<PixelForgeNpcPoolKey, CloseModelInstance[]> = new Map();
+  private activeCloseModels: Map<string, CloseModelInstance> = new Map();
+  private readonly closeModelOverflowLastLog = new Map<string, number>();
 
   // Walk animation state
   private walkFrameTimer = 0;
@@ -54,14 +120,37 @@ export class CombatantRenderer {
   private readonly scratchScaleMatrix = new THREE.Matrix4();
   private readonly scratchOutlineMatrix = new THREE.Matrix4();
   private readonly scratchMarkerMatrix = new THREE.Matrix4();
+  private readonly scratchBounds = new THREE.Box3();
+  private readonly scratchBoundsSize = new THREE.Vector3();
   private readonly renderWriteCounts = new Map<string, number>();
   private readonly renderCombatStates = new Map<string, number>();
+  private readonly hitboxDebugEnabled = isHitboxDebugEnabled();
+  private readonly hitboxDebugGroup = new THREE.Group();
+  private readonly hitboxDebugProxies = createCombatantHitProxyScratch();
+  private readonly hitboxDebugUp = new THREE.Vector3(0, 1, 0);
+  private readonly hitboxHeadMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff4f4f,
+    transparent: true,
+    opacity: 0.85,
+    wireframe: true,
+    depthTest: false,
+  });
+  private readonly hitboxBodyMaterial = new THREE.MeshBasicMaterial({
+    color: 0x37d8ff,
+    transparent: true,
+    opacity: 0.72,
+    wireframe: true,
+    depthTest: false,
+  });
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
     this.camera = camera;
     this.assetLoader = assetLoader;
     this.meshFactory = new CombatantMeshFactory(scene, assetLoader);
+    this.hitboxDebugGroup.name = 'PixelForgeHitboxDebugOverlay';
+    this.hitboxDebugGroup.visible = this.hitboxDebugEnabled;
+    this.scene.add(this.hitboxDebugGroup);
   }
 
   private stableHash01(id: string): number {
@@ -81,6 +170,7 @@ export class CombatantRenderer {
     this.soldierTextures = assets.soldierTextures;
     this.factionMaterials = assets.factionMaterials;
     this.walkFrameTextures = assets.walkFrameTextures;
+    await this.createCloseModelPools();
   }
 
   setPlayerSquadId(squadId: string | undefined): void {
@@ -89,47 +179,504 @@ export class CombatantRenderer {
     Logger.info('combat-renderer', ` Renderer: Player squad ID set to: ${squadId}`);
   }
 
-  /**
-   * Compute viewing direction for a combatant based on camera angle.
-   * Returns 'front' if camera is in front of the NPC, 'back' if behind, 'side' if perpendicular.
-   */
-  private getViewDirection(combatantForward: THREE.Vector3, cameraToCombatant: THREE.Vector3): ViewDirection {
-    const facingDot = combatantForward.dot(cameraToCombatant);
-    if (Math.abs(facingDot) < SIDE_DOT_THRESHOLD) return 'side';
-    // facingDot > 0 means camera-to-npc aligns with npc facing = camera sees back
-    return facingDot > 0 ? 'back' : 'front';
-  }
+  private async createCloseModelPools(): Promise<void> {
+    const modelConfigs = [
+      ...PIXEL_FORGE_NPC_RUNTIME_FACTIONS.map((config) => ({
+        poolKey: config.runtimeFaction as PixelForgeNpcPoolKey,
+        factionConfig: config,
+      })),
+      {
+        poolKey: 'SQUAD' as PixelForgeNpcPoolKey,
+        factionConfig: getPixelForgeNpcRuntimeFaction('SQUAD'),
+      },
+    ];
 
-  /**
-   * Update walk frame animation timer. Call once per frame.
-   */
-  updateWalkFrame(deltaTime: number): void {
-    this.elapsedTime += deltaTime;
-    this.walkFrameTimer += deltaTime;
-    if (this.walkFrameTimer >= WALK_FRAME_INTERVAL) {
-      this.walkFrameTimer -= WALK_FRAME_INTERVAL;
-      this.currentWalkFrame = this.currentWalkFrame === 'a' ? 'b' : 'a';
-
-      // Swap textures on all walking meshes
-      this.walkFrameTextures.forEach((frames, key) => {
-        const tex = frames[this.currentWalkFrame];
-        // Key is "{FACTION}_{direction}", mesh key is "{FACTION}_walking_{direction}"
-        const meshKey = `${key.split('_')[0]}_walking_${key.split('_')[1]}`;
-        const mesh = this.factionMeshes.get(meshKey);
-        if (mesh && mesh.material instanceof THREE.MeshBasicMaterial) {
-          mesh.material.map = tex;
-          mesh.material.needsUpdate = true;
+    for (const config of modelConfigs) {
+      const pool: CloseModelInstance[] = [];
+      for (let i = 0; i < PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION; i++) {
+        try {
+          const model = await modelLoader.loadAnimatedModel(config.factionConfig.modelPath);
+          const weaponRoot = await modelLoader.loadModel(config.factionConfig.weapon.modelPath);
+          const weaponPivot = new THREE.Group();
+          weaponPivot.name = `${config.factionConfig.weapon.id}_weapon_socket`;
+          weaponPivot.visible = true;
+          this.normalizeWeaponRoot(weaponRoot, config.factionConfig.weapon);
+          weaponPivot.add(weaponRoot);
+          model.scene.add(weaponPivot);
+          model.scene.visible = false;
+          model.scene.traverse((child) => {
+            if (child instanceof THREE.Object3D) child.frustumCulled = false;
+          });
+          this.applyCloseModelMaterialTuning(model.scene, config.factionConfig);
+          this.scene.add(model.scene);
+          const mixer = new THREE.AnimationMixer(model.scene);
+          const metrics = this.measureCloseModelMetrics(model.scene);
+          const bones = this.collectBones(model.scene);
+          pool.push({
+            root: model.scene,
+            mixer,
+            actions: this.createActionMap(mixer, model.animations),
+            poolKey: config.poolKey,
+            factionConfig: config.factionConfig,
+            weaponPivot,
+            weaponRoot,
+            weaponConfig: config.factionConfig.weapon,
+            bones,
+            hasWeapon: bones.has(config.factionConfig.rightHandSocket) && bones.has(config.factionConfig.leftHandSocket),
+            boundsMinY: metrics.boundsMinY,
+            visualScale: metrics.visualScale,
+          });
+        } catch (error) {
+          Logger.warn('combat-renderer', `Failed to create Pixel Forge NPC model from ${config.factionConfig.modelPath}`, error);
+          break;
         }
-        // Also update outline mesh texture
-        const outlineMat = this.factionMaterials.get(meshKey);
-        if (outlineMat && outlineMat.uniforms.map) {
-          outlineMat.uniforms.map.value = tex;
-        }
-      });
+      }
+      this.closeModelPools.set(config.poolKey, pool);
     }
   }
 
+  private createActionMap(mixer: THREE.AnimationMixer, animations: THREE.AnimationClip[]): Map<PixelForgeNpcClipId, THREE.AnimationAction> {
+    const actions = new Map<PixelForgeNpcClipId, THREE.AnimationAction>();
+    for (const clip of animations) {
+      if (this.isPixelForgeNpcClip(clip.name)) {
+        actions.set(clip.name, mixer.clipAction(sanitizePixelForgeNpcAnimationClip(clip)));
+      }
+    }
+    mixer.stopAllAction();
+    return actions;
+  }
+
+  private isPixelForgeNpcClip(value: string): value is PixelForgeNpcClipId {
+    return value === 'idle'
+      || value === 'patrol_walk'
+      || value === 'traverse_run'
+      || value === 'advance_fire'
+      || value === 'walk_fight_forward'
+      || value === 'death_fall_back'
+      || value === 'dead_pose';
+  }
+
+  private collectBones(root: THREE.Object3D): Map<string, THREE.Object3D> {
+    const bones = new Map<string, THREE.Object3D>();
+    root.traverse((child) => {
+      if (child instanceof THREE.Bone) {
+        bones.set(child.name, child);
+      }
+    });
+    return bones;
+  }
+
+  private applyCloseModelMaterialTuning(
+    root: THREE.Object3D,
+    factionConfig: PixelForgeNpcFactionRuntimeConfig,
+  ): void {
+    const tuning = PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING[factionConfig.packageFaction];
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      if (Array.isArray(child.material)) {
+        child.material = child.material.map((material) => this.cloneTunedCloseMaterial(material, tuning));
+      } else {
+        child.material = this.cloneTunedCloseMaterial(child.material, tuning);
+      }
+    });
+  }
+
+  private cloneTunedCloseMaterial(
+    material: THREE.Material,
+    tuning: Record<string, number> | undefined,
+  ): THREE.Material {
+    const cloned = material.clone();
+    if (cloned instanceof THREE.MeshStandardMaterial) {
+      const materialNameParts = cloned.name.split('_');
+      const materialToken = materialNameParts[materialNameParts.length - 1];
+      const tunedColor = materialToken && tuning ? tuning[materialToken] : undefined;
+      if (tunedColor !== undefined) {
+        cloned.color.setHex(tunedColor);
+      }
+      const isUniformSurface =
+        materialToken === 'uniform' ||
+        materialToken === 'trousers' ||
+        materialToken === 'headgear' ||
+        materialToken === 'accent';
+      if (isUniformSurface) {
+        cloned.color.offsetHSL(0, 0.08, 0.1);
+      }
+      cloned.emissive.copy(cloned.color).multiplyScalar(isUniformSurface ? 0.16 : 0.06);
+      cloned.emissiveIntensity = isUniformSurface ? 0.28 : 0.1;
+      cloned.roughness = Math.max(cloned.roughness, 0.9);
+      cloned.metalness = 0;
+      cloned.needsUpdate = true;
+    }
+    return cloned;
+  }
+
+  private normalizeWeaponRoot(root: THREE.Group, weapon: PixelForgeNpcWeaponRuntimeConfig): void {
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(root);
+    const size = box.getSize(new THREE.Vector3());
+    const longAxis = Math.max(size.x, size.y, size.z) || 1;
+    const scale = weapon.lengthMeters / longAxis;
+    root.scale.setScalar(scale);
+
+    const gripObject = this.findNamed(root, weapon.gripNames);
+    const supportObject = this.findNamed(root, weapon.supportNames);
+    const muzzleObject = this.findNamed(root, weapon.muzzleNames);
+    const stockObject = this.findNamed(root, weapon.stockNames);
+    const grip = this.centerOfObject(root, gripObject) ?? new THREE.Vector3();
+    const support = this.centerOfObject(root, supportObject);
+    const muzzle = this.centerOfObject(root, muzzleObject);
+    const stock = this.centerOfObject(root, stockObject);
+    const muzzleDirection = muzzle
+      ? muzzle.clone().sub(grip)
+      : new THREE.Vector3(1, 0, 0);
+    const alignment = muzzleDirection.lengthSq() > 0.0001
+      ? new THREE.Quaternion().setFromUnitVectors(muzzleDirection.normalize(), new THREE.Vector3(1, 0, 0))
+      : new THREE.Quaternion();
+    root.quaternion.copy(alignment);
+
+    const transformLocal = (point: THREE.Vector3): THREE.Vector3 =>
+      point.clone().multiplyScalar(scale).applyQuaternion(root.quaternion);
+    const transformedGrip = transformLocal(grip);
+    root.position.copy(transformedGrip.multiplyScalar(-1));
+    root.userData.stockOffset = stock
+      ? transformLocal(stock).sub(transformLocal(grip))
+      : new THREE.Vector3(-0.28, 0.04, 0);
+    root.userData.supportOffset = support
+      ? transformLocal(support).sub(transformLocal(grip))
+      : new THREE.Vector3(0.28, 0.02, 0);
+    root.updateMatrixWorld(true);
+  }
+
+  private findNamed(root: THREE.Object3D, names: string[]): THREE.Object3D | undefined {
+    for (const name of names) {
+      let found: THREE.Object3D | undefined;
+      root.traverse((child) => {
+        if (!found && child.name === name) found = child;
+      });
+      if (found) return found;
+    }
+    return undefined;
+  }
+
+  private centerOfObject(root: THREE.Object3D, object: THREE.Object3D | undefined): THREE.Vector3 | undefined {
+    if (!object) return undefined;
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(object);
+    if (box.isEmpty()) return undefined;
+    return root.worldToLocal(box.getCenter(new THREE.Vector3()));
+  }
+
+  private measureCloseModelMetrics(root: THREE.Object3D): CloseModelMetrics {
+    root.updateMatrixWorld(true);
+    this.scratchBounds.setFromObject(root);
+    this.scratchBounds.getSize(this.scratchBoundsSize);
+    const height = this.scratchBoundsSize.y;
+    if (!Number.isFinite(height) || height <= 0.01 || !Number.isFinite(this.scratchBounds.min.y)) {
+      return {
+        boundsMinY: 0,
+        visualScale: NPC_CLOSE_MODEL_TARGET_HEIGHT / 1.8,
+      };
+    }
+
+    return {
+      boundsMinY: this.scratchBounds.min.y,
+      visualScale: NPC_CLOSE_MODEL_TARGET_HEIGHT / height,
+    };
+  }
+
+  updateWalkFrame(deltaTime: number): void {
+    this.elapsedTime += deltaTime;
+    this.walkFrameTimer += deltaTime;
+    this.activeCloseModels.forEach((instance) => instance.mixer.update(deltaTime));
+    this.factionMaterials.forEach((material) => {
+      if (material.uniforms.time) {
+        material.uniforms.time.value = this.elapsedTime;
+      }
+    });
+  }
+
+  private updateCloseModels(
+    combatants: Map<string, Combatant>,
+    playerPosition: THREE.Vector3,
+  ): { closeModelIds: Set<string>; suppressedImpostorIds: Set<string> } {
+    const candidates: Array<{ combatant: Combatant; distanceSq: number; poolKey: PixelForgeNpcPoolKey }> = [];
+    combatants.forEach((combatant) => {
+      if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
+      const distanceSq = combatant.position.distanceToSquared(playerPosition);
+      if (distanceSq > PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ) return;
+      const poolKey = getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
+      candidates.push({ combatant, distanceSq, poolKey });
+    });
+    candidates.sort((a, b) => a.distanceSq - b.distanceSq);
+
+    const selected = new Set<string>();
+    const suppressedImpostorIds = new Set<string>();
+    for (const candidate of candidates) {
+      if (selected.size >= PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP) {
+        suppressedImpostorIds.add(candidate.combatant.id);
+        this.reportCloseModelOverflow(candidate.poolKey, candidate.distanceSq, 'total-cap');
+        continue;
+      }
+      const instance = this.ensureCloseModel(candidate.combatant.id, candidate.poolKey);
+      if (!instance) {
+        suppressedImpostorIds.add(candidate.combatant.id);
+        this.reportCloseModelOverflow(candidate.poolKey, candidate.distanceSq, 'pool-empty');
+        continue;
+      }
+      selected.add(candidate.combatant.id);
+      this.updateCloseModelInstance(instance, candidate.combatant, candidate.poolKey);
+    }
+
+    this.activeCloseModels.forEach((instance, combatantId) => {
+      if (!selected.has(combatantId)) {
+        this.releaseCloseModel(combatantId, instance);
+      }
+    });
+
+    return { closeModelIds: selected, suppressedImpostorIds };
+  }
+
+  private ensureCloseModel(combatantId: string, poolKey: PixelForgeNpcPoolKey): CloseModelInstance | undefined {
+    const active = this.activeCloseModels.get(combatantId);
+    if (active) {
+      if (active.poolKey === poolKey) return active;
+      this.releaseCloseModel(combatantId, active);
+    }
+
+    const pool = this.closeModelPools.get(poolKey);
+    const instance = pool?.pop();
+    if (!instance) return undefined;
+
+    instance.combatantId = combatantId;
+    instance.root.visible = true;
+    this.activeCloseModels.set(combatantId, instance);
+    return instance;
+  }
+
+  private releaseCloseModel(combatantId: string, instance: CloseModelInstance): void {
+    this.activeCloseModels.delete(combatantId);
+    instance.root.visible = false;
+    instance.mixer.stopAllAction();
+    instance.activeClip = undefined;
+    instance.combatantId = undefined;
+    const pool = this.closeModelPools.get(instance.poolKey);
+    if (pool) pool.push(instance);
+  }
+
+  private updateCloseModelInstance(instance: CloseModelInstance, combatant: Combatant, poolKey: PixelForgeNpcPoolKey): void {
+    const sourcePosition = combatant.renderedPosition ?? combatant.position;
+    const terrainY = sourcePosition.y - NPC_Y_OFFSET;
+    const scaledMinY = instance.boundsMinY * instance.visualScale * combatant.scale.y;
+    combatant.billboardIndex = -1;
+    instance.root.position.set(sourcePosition.x, terrainY - scaledMinY, sourcePosition.z);
+    instance.root.rotation.set(0, Math.PI / 2 - combatant.visualRotation, 0);
+    instance.root.scale.set(
+      combatant.scale.x * instance.visualScale,
+      combatant.scale.y * instance.visualScale,
+      combatant.scale.z * instance.visualScale,
+    );
+    instance.root.visible = true;
+    instance.root.updateMatrixWorld(true);
+
+    const clipId = getPixelForgeNpcClipForCombatant(combatant);
+    if (instance.activeClip !== clipId) {
+      const next = instance.actions.get(clipId) ?? instance.actions.get('idle');
+      if (next) {
+        instance.mixer.stopAllAction();
+        next.reset();
+        next.enabled = true;
+        next.play();
+        instance.activeClip = clipId;
+      } else {
+        Logger.warn('combat-renderer', `Missing Pixel Forge NPC clip ${clipId} for ${poolKey}`);
+      }
+    }
+    this.updateWeaponSocket(instance);
+  }
+
+  private reportCloseModelOverflow(poolKey: PixelForgeNpcPoolKey, distanceSq: number, reason: string): void {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const key = `${poolKey}:${reason}`;
+    const last = this.closeModelOverflowLastLog.get(key);
+    if (last !== undefined && now - last < 1000) return;
+    this.closeModelOverflowLastLog.set(key, now);
+    Logger.warn(
+      'combat-renderer',
+      `Pixel Forge close NPC ${reason} for ${poolKey} at ${Math.sqrt(distanceSq).toFixed(1)}m; suppressing near impostor fallback`,
+    );
+  }
+
+  private updateWeaponSocket(instance: CloseModelInstance): void {
+    if (!instance.weaponPivot || !instance.weaponRoot) {
+      instance.hasWeapon = false;
+      return;
+    }
+
+    const right = this.getBoneWorldPosition(instance, instance.factionConfig.rightHandSocket);
+    const leftShoulder = this.getBoneWorldPosition(instance, 'LeftArm') ?? this.getBoneWorldPosition(instance, 'LeftShoulder');
+    const rightShoulder = this.getBoneWorldPosition(instance, 'RightArm') ?? this.getBoneWorldPosition(instance, 'RightShoulder');
+    if (!right) {
+      instance.hasWeapon = false;
+      return;
+    }
+
+    const up = new THREE.Vector3(0, 1, 0);
+    const travelForward = this.getRootForward(instance.root);
+    travelForward.y = 0;
+    if (travelForward.lengthSq() < 0.0001) travelForward.set(0, 0, 1);
+    travelForward.normalize();
+
+    const torsoForward = this.getBodyForward(instance);
+    torsoForward.y = 0;
+    if (torsoForward.lengthSq() < 0.0001) torsoForward.set(0, 0, 1);
+    torsoForward.normalize();
+
+    const forward = instance.weaponConfig.socketMode === 'shouldered-forward' ? travelForward : torsoForward;
+    let actorRight = new THREE.Vector3().crossVectors(forward, up).normalize();
+    if (leftShoulder && rightShoulder) {
+      const shoulderSpan = rightShoulder.clone().sub(leftShoulder);
+      shoulderSpan.y = 0;
+      if (shoulderSpan.lengthSq() > 0.0001) {
+        shoulderSpan.normalize();
+        if (shoulderSpan.dot(actorRight) < 0) shoulderSpan.multiplyScalar(-1);
+        actorRight = shoulderSpan;
+      }
+    }
+    const cleanUp = new THREE.Vector3().crossVectors(actorRight, forward).normalize();
+    const worldMatrix = new THREE.Matrix4().makeBasis(forward, cleanUp, actorRight);
+    const worldQuaternion = new THREE.Quaternion().setFromRotationMatrix(worldMatrix);
+    if (instance.weaponConfig.pitchTrimDeg) {
+      worldQuaternion.multiply(new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 0, 1),
+        THREE.MathUtils.degToRad(instance.weaponConfig.pitchTrimDeg),
+      ));
+    }
+
+    const parent = instance.weaponPivot.parent ?? instance.root;
+    parent.updateMatrixWorld(true);
+    const parentQuaternion = parent.getWorldQuaternion(new THREE.Quaternion());
+    instance.weaponPivot.quaternion.copy(parentQuaternion.invert().multiply(worldQuaternion));
+
+    const shoulder = rightShoulder ?? right;
+    const shoulderCenter = leftShoulder && rightShoulder
+      ? leftShoulder.clone().lerp(rightShoulder, 0.5)
+      : shoulder.clone().sub(actorRight.clone().multiplyScalar(0.12));
+    const shoulderPocket = shoulder.clone()
+      .lerp(shoulderCenter, 0.42)
+      .add(cleanUp.clone().multiplyScalar(-0.035));
+    const stockOffset = this.getWeaponOffset(instance.weaponRoot, 'stockOffset', new THREE.Vector3(-0.28, 0.04, 0));
+    const stockWorldOffset = stockOffset.applyQuaternion(worldQuaternion);
+    const stockAnchoredGrip = shoulderPocket.clone()
+      .add(forward.clone().multiplyScalar(instance.weaponConfig.forwardHold + instance.weaponConfig.gripOffset))
+      .sub(stockWorldOffset);
+    const desiredWorldPosition = stockAnchoredGrip.add(actorRight.clone().multiplyScalar(0.006));
+    instance.weaponPivot.position.copy(parent.worldToLocal(desiredWorldPosition.clone()));
+    instance.weaponPivot.updateMatrixWorld(true);
+
+    const supportOffset = this.getWeaponOffset(instance.weaponRoot, 'supportOffset', new THREE.Vector3(0.28, 0.02, 0));
+    const supportTarget = desiredWorldPosition.clone().add(supportOffset.applyQuaternion(worldQuaternion));
+    const axes = { forward, cleanUp, actorRight };
+    this.solveArmToTarget(instance, 'Right', desiredWorldPosition, axes);
+    this.solveArmToTarget(instance, 'Left', supportTarget, axes);
+    instance.root.updateMatrixWorld(true);
+    instance.weaponPivot.updateMatrixWorld(true);
+    instance.hasWeapon = true;
+  }
+
+  private getWeaponOffset(root: THREE.Object3D, key: 'stockOffset' | 'supportOffset', fallback: THREE.Vector3): THREE.Vector3 {
+    const value = root.userData[key];
+    return value instanceof THREE.Vector3 ? value.clone() : fallback;
+  }
+
+  private getBoneWorldPosition(instance: CloseModelInstance, name: string): THREE.Vector3 | undefined {
+    const bone = instance.bones.get(name);
+    return bone ? bone.getWorldPosition(new THREE.Vector3()) : undefined;
+  }
+
+  private getRootForward(root: THREE.Object3D): THREE.Vector3 {
+    const quaternion = root.getWorldQuaternion(new THREE.Quaternion());
+    return new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion).normalize();
+  }
+
+  private getBodyForward(instance: CloseModelInstance): THREE.Vector3 {
+    const body = instance.bones.get('Hips') ?? instance.bones.get('Spine') ?? instance.root;
+    const quaternion = body.getWorldQuaternion(new THREE.Quaternion());
+    return new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion).normalize();
+  }
+
+  private solveArmToTarget(
+    instance: CloseModelInstance,
+    side: 'Right' | 'Left',
+    target: THREE.Vector3,
+    axes: { forward: THREE.Vector3; cleanUp: THREE.Vector3; actorRight: THREE.Vector3 },
+  ): void {
+    const upper = instance.bones.get(`${side}Arm`);
+    const fore = instance.bones.get(`${side}ForeArm`);
+    const hand = instance.bones.get(`${side}Hand`);
+    if (!upper || !fore || !hand) return;
+
+    instance.root.updateMatrixWorld(true);
+    const shoulder = upper.getWorldPosition(new THREE.Vector3());
+    const elbowNow = fore.getWorldPosition(new THREE.Vector3());
+    const handNow = hand.getWorldPosition(new THREE.Vector3());
+    const upperLength = Math.max(0.001, shoulder.distanceTo(elbowNow));
+    const foreLength = Math.max(0.001, elbowNow.distanceTo(handNow));
+    const reach = Math.max(0.08, upperLength + foreLength - 0.025);
+    const targetVector = target.clone().sub(shoulder);
+    const distance = targetVector.length();
+    if (distance < 0.001) return;
+
+    const direction = targetVector.clone().normalize();
+    const clampedTarget = distance > reach
+      ? shoulder.clone().add(direction.clone().multiplyScalar(reach))
+      : target.clone();
+    const clampedDistance = Math.min(distance, reach);
+    const sideSign = side === 'Right' ? 1 : -1;
+    const pole = shoulder.clone()
+      .add(axes.cleanUp.clone().multiplyScalar(-0.24))
+      .add(axes.actorRight.clone().multiplyScalar(0.22 * sideSign))
+      .add(axes.forward.clone().multiplyScalar(0.04));
+    let planeNormal = direction.clone().cross(pole.clone().sub(shoulder)).normalize();
+    if (planeNormal.lengthSq() < 0.0001) {
+      planeNormal = axes.actorRight.clone().multiplyScalar(sideSign);
+    }
+    const bendDirection = planeNormal.clone().cross(direction).normalize();
+    const along = (upperLength * upperLength - foreLength * foreLength + clampedDistance * clampedDistance)
+      / (2 * clampedDistance);
+    const height = Math.sqrt(Math.max(0, upperLength * upperLength - along * along));
+    const elbow = shoulder.clone()
+      .add(direction.clone().multiplyScalar(along))
+      .add(bendDirection.multiplyScalar(height));
+
+    this.setBoneDirectionWorld(upper, elbow.clone().sub(shoulder));
+    instance.root.updateMatrixWorld(true);
+    const elbowWorld = fore.getWorldPosition(new THREE.Vector3());
+    this.setBoneDirectionWorld(fore, clampedTarget.clone().sub(elbowWorld));
+    instance.root.updateMatrixWorld(true);
+  }
+
+  private setBoneDirectionWorld(bone: THREE.Object3D, directionWorld: THREE.Vector3): void {
+    if (!bone.parent) return;
+    const direction = directionWorld.clone().normalize();
+    if (direction.lengthSq() < 0.0001) return;
+    const parentInv = bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const targetLocal = direction.applyQuaternion(parentInv).normalize();
+    bone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetLocal);
+    bone.updateMatrixWorld(true);
+  }
+
+  private getImpostorViewColumn(combatant: Combatant): number {
+    const sourcePosition = combatant.renderedPosition ?? combatant.position;
+    const toCameraX = this.camera.position.x - sourcePosition.x;
+    const toCameraZ = this.camera.position.z - sourcePosition.z;
+    const worldAngle = Math.atan2(toCameraZ, toCameraX);
+    const localAngle =
+      ((worldAngle - combatant.visualRotation + NPC_IMPOSTOR_VIEW_FORWARD_OFFSET) % TWO_PI + TWO_PI) % TWO_PI;
+    return Math.floor((localAngle / TWO_PI) * NPC_IMPOSTOR_VIEW_COLUMNS) % NPC_IMPOSTOR_VIEW_COLUMNS;
+  }
+
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
+    const { closeModelIds, suppressedImpostorIds } = this.updateCloseModels(combatants, playerPosition);
     this.factionMeshes.forEach(mesh => mesh.count = 0);
     this.factionAuraMeshes.forEach(mesh => mesh.count = 0);
     this.factionGroundMarkers.forEach(mesh => mesh.count = 0);
@@ -144,39 +691,22 @@ export class CombatantRenderer {
     const matrix = this.scratchMatrix;
     this.camera.getWorldDirection(this.scratchCameraDir);
     const cameraAngle = Math.atan2(this.scratchCameraDir.x, this.scratchCameraDir.z);
-    this.scratchCameraRight.crossVectors(this.scratchCameraDir, this.scratchUp).normalize();
-    this.scratchCameraForward.set(this.scratchCameraDir.x, 0, this.scratchCameraDir.z).normalize();
 
     combatants.forEach(combatant => {
+      if (closeModelIds.has(combatant.id)) return;
+      if (suppressedImpostorIds.has(combatant.id)) {
+        combatant.billboardIndex = -1;
+        return;
+      }
       if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
       if (combatant.position.distanceToSquared(playerPosition) > RENDER_DISTANCE_SQ) return;
 
-      // Compute NPC forward direction
-      this.scratchCombatantForward.set(
-        Math.cos(combatant.visualRotation), 0, Math.sin(combatant.visualRotation)
-      );
-
-      // Camera-to-NPC vector (normalized)
-      this.scratchToCombatant.subVectors(combatant.position, this.camera.position).normalize();
-
-      // Determine viewing direction
-      const viewDir = this.getViewDirection(this.scratchCombatantForward, this.scratchToCombatant);
-
-      // Determine render state
-      let stateKey: string;
-      if (combatant.state === CombatantState.IN_VEHICLE || combatant.state === CombatantState.BOARDING || combatant.state === CombatantState.DISMOUNTING) {
-        stateKey = 'mounted';
-      } else if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.SUPPRESSING) {
-        stateKey = 'firing';
-      } else {
-        stateKey = 'walking';
-      }
-
-      // Build mesh key: {faction}_{ state}_{direction}
-      const isPlayerSquad = combatant.squadId === this.playerSquadId && isBlufor(combatant.faction);
+      const poolKey = getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
+      const isPlayerSquad = poolKey === 'SQUAD';
       if (isPlayerSquad && !this.playerSquadDetected) this.playerSquadDetected = true;
-      const factionPrefix = isPlayerSquad ? 'SQUAD' : combatant.faction;
-      const key = `${factionPrefix}_${stateKey}_${viewDir}`;
+      const factionPrefix = poolKey;
+      const clipId = getPixelForgeNpcClipForCombatant(combatant);
+      const key = getPixelForgeNpcBucketKey(factionPrefix, clipId);
 
       const mesh = this.factionMeshes.get(key);
       if (!mesh) return;
@@ -191,17 +721,7 @@ export class CombatantRenderer {
       // Billboard rotation: face camera
       matrix.makeRotationY(cameraAngle);
 
-      // Determine scaleX (side sprite flipping)
-      let scaleX = Math.abs(combatant.scale.x);
-      if (viewDir === 'side') {
-        // Side sprites show the soldier facing right.
-        // Determine NPC travel direction relative to camera right axis.
-        // If NPC faces right relative to camera, flip the sprite so it faces forward.
-        const combatantDotRight = this.scratchCombatantForward.dot(this.scratchCameraRight);
-        if (combatantDotRight > 0) {
-          scaleX = -scaleX; // Flip horizontally
-        }
-      }
+      const scaleX = Math.abs(combatant.scale.x);
 
       // Position with Y bob for walking NPCs.
       // Prefer interpolated rendered position when available so dt-amortized
@@ -210,16 +730,13 @@ export class CombatantRenderer {
       // CombatantRenderInterpolator (e.g. freshly spawned this frame).
       const sourcePosition = combatant.renderedPosition ?? combatant.position;
       this.scratchPosition.copy(sourcePosition);
-      if (stateKey !== 'mounted') {
-        this.scratchPosition.y += NPC_SPRITE_RENDER_Y_OFFSET;
-      }
+      this.scratchPosition.y += NPC_SPRITE_RENDER_Y_OFFSET;
       let finalPosition = this.scratchPosition;
       let finalScaleX = scaleX;
       let finalScaleY = combatant.scale.y;
       let finalScaleZ = combatant.scale.z;
 
-      // Walking Y bob (not for firing, dying, or mounted)
-      if (stateKey === 'walking' && !combatant.isDying) {
+      if ((clipId === 'patrol_walk' || clipId === 'traverse_run') && !combatant.isDying) {
         const bobPhase = this.stableHash01(combatant.id) * Math.PI * 2;
         const bobY = Math.sin(this.elapsedTime * BOB_SPEED + bobPhase) * BOB_AMPLITUDE;
         finalPosition.y += bobY;
@@ -411,6 +928,12 @@ export class CombatantRenderer {
       this.scratchScaleMatrix.makeScale(finalScaleX, finalScaleY, finalScaleZ);
       matrix.multiply(this.scratchScaleMatrix);
       mesh.setMatrixAt(index, matrix);
+      setPixelForgeNpcImpostorAttributes(
+        mesh,
+        index,
+        this.stableHash01(combatant.id),
+        this.getImpostorViewColumn(combatant),
+      );
       combatant.billboardIndex = index;
 
       const outlineMesh = this.factionAuraMeshes.get(key);
@@ -420,13 +943,12 @@ export class CombatantRenderer {
         this.scratchOutlineMatrix.multiply(this.scratchScaleMatrix);
         outlineMesh.setMatrixAt(index, this.scratchOutlineMatrix);
       }
-      // No ground marker for mounted NPCs (they're airborne in vehicles).
-      // Use the same interpolated source as the billboard so marker and sprite
+      // Use the same interpolated source as the impostor so marker and actor
       // stay co-located when dt amortization smooths the visible position.
       const markerMesh = this.factionGroundMarkers.get(key);
-      if (markerMesh && stateKey !== 'mounted') {
+      if (markerMesh) {
         this.scratchMarkerMatrix.makeRotationX(-Math.PI / 2);
-        this.scratchMarkerMatrix.setPosition(sourcePosition.x, 0.1, sourcePosition.z);
+        this.scratchMarkerMatrix.setPosition(sourcePosition.x, sourcePosition.y - NPC_Y_OFFSET + 0.08, sourcePosition.z);
         markerMesh.setMatrixAt(index, this.scratchMarkerMatrix);
       }
 
@@ -469,6 +991,65 @@ export class CombatantRenderer {
         outlineMaterial.uniforms.combatState.value = this.renderCombatStates.get(key) ?? 0;
       }
     });
+
+    this.updateHitboxDebugOverlay(combatants, playerPosition);
+  }
+
+  private updateHitboxDebugOverlay(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
+    if (!this.hitboxDebugEnabled) return;
+
+    this.clearHitboxDebugOverlay();
+    const candidates = Array.from(combatants.values())
+      .filter(combatant => combatant.state !== CombatantState.DEAD || combatant.isDying)
+      .map(combatant => ({
+        combatant,
+        distanceSq: (combatant.renderedPosition ?? combatant.position).distanceToSquared(playerPosition),
+      }))
+      .sort((a, b) => a.distanceSq - b.distanceSq)
+      .slice(0, HITBOX_DEBUG_MAX_ACTORS);
+
+    for (const { combatant } of candidates) {
+      const proxies = writeCombatantHitProxies(this.hitboxDebugProxies, combatant, 'visual');
+      for (const proxy of proxies) {
+        this.addHitboxDebugProxy(proxy);
+      }
+    }
+  }
+
+  private addHitboxDebugProxy(proxy: CombatantHitProxy): void {
+    if (proxy.kind === 'sphere') {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(proxy.radius, 10, 8),
+        proxy.isHead ? this.hitboxHeadMaterial : this.hitboxBodyMaterial,
+      );
+      mesh.position.copy(proxy.center);
+      mesh.renderOrder = 999;
+      this.hitboxDebugGroup.add(mesh);
+      return;
+    }
+
+    const length = proxy.start.distanceTo(proxy.end);
+    if (length <= 0.0001) return;
+    const mesh = new THREE.Mesh(
+      new THREE.CapsuleGeometry(proxy.radius, length, 4, 8),
+      this.hitboxBodyMaterial,
+    );
+    mesh.position.copy(proxy.start).add(proxy.end).multiplyScalar(0.5);
+    mesh.quaternion.setFromUnitVectors(
+      this.hitboxDebugUp,
+      this.scratchPerpDir.subVectors(proxy.end, proxy.start).normalize(),
+    );
+    mesh.renderOrder = 999;
+    this.hitboxDebugGroup.add(mesh);
+  }
+
+  private clearHitboxDebugOverlay(): void {
+    for (const child of this.hitboxDebugGroup.children) {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+      }
+    }
+    this.hitboxDebugGroup.clear();
   }
 
   // Update shader time and global uniforms
@@ -515,6 +1096,22 @@ export class CombatantRenderer {
 
 
   dispose(): void {
+    this.clearHitboxDebugOverlay();
+    this.hitboxHeadMaterial.dispose();
+    this.hitboxBodyMaterial.dispose();
+    this.scene.remove(this.hitboxDebugGroup);
+    this.activeCloseModels.forEach((instance) => {
+      instance.mixer.stopAllAction();
+      modelLoader.disposeInstance(instance.root);
+    });
+    this.activeCloseModels.clear();
+    this.closeModelPools.forEach((pool) => {
+      for (const instance of pool) {
+        instance.mixer.stopAllAction();
+        modelLoader.disposeInstance(instance.root);
+      }
+    });
+    this.closeModelPools.clear();
     disposeCombatantMeshes(this.scene, {
       factionMeshes: this.factionMeshes,
       factionAuraMeshes: this.factionAuraMeshes,

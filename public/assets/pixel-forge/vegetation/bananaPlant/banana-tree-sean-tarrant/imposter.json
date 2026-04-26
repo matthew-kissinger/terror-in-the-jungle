@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "angles": 16,
+  "tilesX": 4,
+  "tilesY": 4,
+  "tileSize": 512,
+  "atlasWidth": 2048,
+  "atlasHeight": 2048,
+  "worldSize": 4.740561008453369,
+  "yOffset": -0.7582870721817017,
+  "projection": "orthographic",
+  "axis": "hemi-y",
+  "hemi": true,
+  "layout": "latlon",
+  "azimuths": [
+    0,
+    1.5707963267948966,
+    3.141592653589793,
+    4.71238898038469
+  ],
+  "elevations": [
+    1.48352986419518,
+    1.0471975511965976,
+    0.5235987755982988,
+    0.08726646259971647
+  ],
+  "bbox": {
+    "min": [
+      -2.3106210231781006,
+      -2.6645750999450684,
+      -2.19861102104187
+    ],
+    "max": [
+      2.3575448989868164,
+      1.148000955581665,
+      2.541949987411499
+    ]
+  },
+  "source": {
+    "path": "C:\\Users\\Mattm\\X\\vegetation-research\\assets\\tier-a-psx\\polypizza\\banana-tree-sean-tarrant\\model.glb",
+    "bytes": 794912,
+    "tris": 12060
+  },
+  "auxLayers": [
+    "albedo",
+    "normal"
+  ],
+  "bgColor": "transparent",
+  "colorLayer": "baseColor",
+  "normalSpace": "capture-view",
+  "edgeBleedPx": 2,
+  "textureColorSpace": "srgb"
+}

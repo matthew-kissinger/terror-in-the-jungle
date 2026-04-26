@@ -142,8 +142,8 @@ combat can run in test environments without a full system wiring.
   call into player when the player is the target; suppression events
   flow player-ward for screen shake / audio.
 - Weapons: `SandbagSystem` (cover lookups).
-- Assets / rendering: `GlobalBillboardSystem`, `AssetLoader` (NPC
-  billboard sprites).
+- Assets / rendering: `CombatantRenderer`, Pixel Forge close GLBs, Pixel Forge
+  animated impostors, `GlobalBillboardSystem`, and `AssetLoader`.
 - Event bus: `GameEventBus` for cross-subsystem signals
   (`npc_killed`, `player_kill`, etc.).
 
@@ -167,10 +167,33 @@ future playtest still says NPCs look too large, treat that as a billboard/asset
 scale or imposter-art problem, not as permission to stack hidden aiming offsets.
 
 The billboard container is part of this contract. `CombatantMeshFactory` now
-uses a `2.0m x 2.8m` NPC plane plus `NPC_SPRITE_RENDER_Y_OFFSET` so the actual
-sprite art reads close to player scale instead of filling the old `3.2m x 4.5m`
-plane. If future sprite assets change their transparent padding, update the
-mesh sizing/offset tests and the art pipeline together.
+owns the Pixel Forge close-model target height and impostor visual height so
+close GLBs and far impostors share one scale source. If future Pixel Forge
+assets change transparent padding, model bounds, or the chosen 1.5x readability
+scale, update the mesh sizing/offset tests and the art pipeline together.
+
+## Player Hit Registration Contract
+
+Player shots raycast against LOD-independent Pixel Forge hit proxies generated
+by `CombatantBodyMetrics.writeCombatantHitProxies()` /
+`writeCharacterHitProxies()`, not against skinned GLB triangles, impostor alpha
+masks, or the old sprite-era fixed spheres. NPC shots against the player use
+the same standing-character proxy contract, so player and NPC hit registration
+share the same vertical proportions.
+
+The live player damage path uses the original camera/crosshair ray with
+`positionMode: 'visual'`, so `renderedPosition` is honored when the visual NPC
+differs from the logical simulation position. The blue tracer path is visual
+only: it starts from the projected first-person weapon muzzle/barrel
+presentation point and converges to the camera/crosshair aim point. NPC-vs-NPC
+raycasts continue to default to logical positions.
+
+Debugging hooks:
+
+- `?diag=1&hitboxes=1` draws the same shared proxies over nearby live NPCs.
+- `?mode=gun-range` opens an isolated Pixel Forge GLB dev range that
+  uses the production proxy helper and hit detection without terrain, AI,
+  vegetation, impostor load, or combat120 load.
 
 ## NPC Locomotion Contract
 

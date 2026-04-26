@@ -190,6 +190,16 @@ describe('CombatantCombat', () => {
       expect(result.hit).toBe(false);
     });
 
+    it('uses visual Pixel Forge proxy positions for player shot damage', () => {
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+      const allCombatants = new Map<string, Combatant>();
+      const raycast = vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue(null);
+
+      combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
+
+      expect(raycast).toHaveBeenCalledWith(ray, Faction.US, allCombatants, { positionMode: 'visual' });
+    });
+
     it('adds a kill to the HUD when the shot is lethal', () => {
       const target = createMockCombatant('target-1', Faction.NVA, 10);
       const allCombatants = new Map<string, Combatant>([['target-1', target]]);

@@ -26,12 +26,6 @@ import {
 } from '../terrain/GameplaySurfaceSampling';
 import { isWalkableSlope } from '../terrain/SlopePhysics';
 
-// ── Rotation spring-damper ──
-const ROTATION_SPRING = 15;
-const ROTATION_DAMPING = 10;
-const MAX_DELTA_TIME = 0.1;
-const DEFAULT_DELTA_TIME = 0.016;
-
 // ── Terrain sample intervals by LOD (ms) ──
 const TERRAIN_SAMPLE_INTERVAL_HIGH = 80;
 const TERRAIN_SAMPLE_INTERVAL_MEDIUM = 140;
@@ -261,32 +255,19 @@ export class CombatantMovement {
     );
   }
 
-  updateRotation(combatant: Combatant, deltaTime: number): void {
+  updateRotation(combatant: Combatant, _deltaTime: number): void {
     // Guard against NaN/Infinity to avoid unbounded normalization loops on bad state.
     if (!Number.isFinite(combatant.rotation)) {
       combatant.rotation = 0;
     }
-    if (!Number.isFinite(combatant.visualRotation)) {
-      combatant.visualRotation = combatant.rotation;
-    }
     if (!Number.isFinite(combatant.rotationVelocity)) {
       combatant.rotationVelocity = 0;
     }
-    const safeDeltaTime = Number.isFinite(deltaTime) ? Math.max(0, Math.min(deltaTime, MAX_DELTA_TIME)) : DEFAULT_DELTA_TIME;
 
-    // Normalize to -PI..PI range using modulo math (bounded cost).
-    let rotationDifference = combatant.rotation - combatant.visualRotation;
-    rotationDifference = ((rotationDifference + Math.PI) % CombatantMovement.TAU + CombatantMovement.TAU) % CombatantMovement.TAU - Math.PI;
-
-    // Apply smooth interpolation with velocity for natural movement
-    const rotationAcceleration = rotationDifference * ROTATION_SPRING;
-    const rotationDamping = combatant.rotationVelocity * ROTATION_DAMPING;
-
-    combatant.rotationVelocity += (rotationAcceleration - rotationDamping) * safeDeltaTime;
-    combatant.visualRotation += combatant.rotationVelocity * safeDeltaTime;
-
-    // Normalize to 0..2PI range.
-    combatant.visualRotation = ((combatant.visualRotation % CombatantMovement.TAU) + CombatantMovement.TAU) % CombatantMovement.TAU;
+    // The Pixel Forge package has no reliable turn-in-place rig. Keep facing
+    // authoritative and deterministic instead of running a spring turn blend.
+    combatant.visualRotation = ((combatant.rotation % CombatantMovement.TAU) + CombatantMovement.TAU) % CombatantMovement.TAU;
+    combatant.rotationVelocity = 0;
   }
 
   private applyTerrainAwareVelocity(
