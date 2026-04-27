@@ -125,7 +125,7 @@ jobs:
 
   mobile-ui:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     needs: [lint, test]
 
     steps:

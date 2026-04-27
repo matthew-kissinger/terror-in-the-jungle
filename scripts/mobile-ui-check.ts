@@ -699,8 +699,28 @@ async function main(): Promise<void> {
       browsers.chromium?.close(),
       browsers.webkit?.close(),
     ]);
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer(server);
   }
+}
+
+async function closeServer(server: ReturnType<typeof createServer>): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      server.closeAllConnections?.();
+      resolve();
+    }, 5_000);
+    timeout.unref?.();
+    server.close((error?: Error) => {
+      clearTimeout(timeout);
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+    server.closeIdleConnections?.();
+    server.closeAllConnections?.();
+  });
 }
 
 void main().catch((error) => {
