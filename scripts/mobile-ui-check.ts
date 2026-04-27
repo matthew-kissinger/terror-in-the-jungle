@@ -258,6 +258,14 @@ async function scrollSelectorIntoView(page: Page, selector: string): Promise<voi
   });
 }
 
+async function clickSelectorDirect(page: Page, selector: string): Promise<void> {
+  const locator = page.locator(selector).first();
+  await locator.waitFor({ state: 'visible', timeout: 120_000 });
+  await locator.evaluate((element) => {
+    (element as HTMLElement).click();
+  });
+}
+
 async function triggerWithFallback(
   page: Page,
   selector: string,
@@ -453,7 +461,7 @@ async function maybeExerciseCommandOverlay(
 
   report.checks.push(await assertActionable(page, '.command-mode-overlay__close', 'Command overlay close'));
   await captureScreenshot(page, report.device.id, 'command-overlay', artifactDir, report.screenshots);
-  await tapSelector(page, '.command-mode-overlay__close');
+  await clickSelectorDirect(page, '.command-mode-overlay__close');
   await page.waitForSelector('.command-mode-overlay[data-visible="true"]', { state: 'hidden', timeout: 30_000 });
 }
 
