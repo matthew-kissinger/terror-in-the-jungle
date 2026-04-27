@@ -11,6 +11,7 @@ import {
   disposeCombatantMeshes,
   reportBucketOverflow,
   resetBucketOverflowState,
+  setPixelForgeNpcImpostorAttributes,
 } from './CombatantMeshFactory';
 import type { AssetLoader } from '../assets/AssetLoader';
 import { PLAYER_EYE_HEIGHT } from '../player/PlayerMovement';
@@ -222,5 +223,43 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
 
     disposeCombatantMeshes(scene, assets);
     texture.dispose();
+  });
+
+  it('keeps locomotion impostors in loop mode and death impostors in one-shot mode', () => {
+    const scene = new THREE.Scene();
+    const texture = new THREE.Texture();
+    const assetLoader = {
+      getTexture: vi.fn(() => texture),
+    } as unknown as AssetLoader;
+    const factory = new CombatantMeshFactory(scene, assetLoader);
+    const assets = factory.createFactionBillboards();
+
+    expect(assets.factionMaterials.get('US_idle')?.uniforms.animationMode.value).toBe(0);
+    expect(assets.factionMaterials.get('US_death_fall_back')?.uniforms.animationMode.value).toBe(1);
+    expect(assets.factionMaterials.get('US_death_fall_back')?.fragmentShader).toContain('oneShotFrame');
+    expect(assets.factionMaterials.get('US_death_fall_back')?.fragmentShader).toContain('vOpacity');
+
+    disposeCombatantMeshes(scene, assets);
+    texture.dispose();
+  });
+
+  it('stores per-instance one-shot animation progress and fade opacity', () => {
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.setAttribute('instancePhase', new THREE.InstancedBufferAttribute(new Float32Array(1), 1));
+    geometry.setAttribute('instanceViewColumn', new THREE.InstancedBufferAttribute(new Float32Array(1), 1));
+    geometry.setAttribute('instanceAnimationProgress', new THREE.InstancedBufferAttribute(new Float32Array(1), 1));
+    geometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(new Float32Array(1).fill(1), 1));
+    const material = new THREE.MeshBasicMaterial();
+    const mesh = new THREE.InstancedMesh(geometry, material, 1);
+
+    setPixelForgeNpcImpostorAttributes(mesh, 0, 0.25, 3, 0.75, 0.4);
+
+    expect((geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute).getX(0)).toBeCloseTo(0.25);
+    expect((geometry.getAttribute('instanceViewColumn') as THREE.InstancedBufferAttribute).getX(0)).toBe(3);
+    expect((geometry.getAttribute('instanceAnimationProgress') as THREE.InstancedBufferAttribute).getX(0)).toBeCloseTo(0.75);
+    expect((geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute).getX(0)).toBeCloseTo(0.4);
+
+    geometry.dispose();
+    material.dispose();
   });
 });

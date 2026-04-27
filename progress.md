@@ -1296,3 +1296,20 @@ TODO
   `window.__rendererInfo` were exposed by `?diag=1`, and there were no browser
   console errors or failed requests. `?mode=gun-range` remains a DEV-only route,
   so production smoke uses live sandbox gameplay instead.
+
+2026-04-26 Pixel Forge NPC death lifecycle fix
+- New playtest issue: Pixel Forge NPC deaths could visually fall more than once
+  during the 8.7s dying window. Root cause is split across LOD paths: close GLB
+  `death_fall_back` actions were ordinary looping `AnimationAction`s, and far
+  impostor death atlases used the same looping time/phase shader as locomotion.
+- Implemented the contract that death is driven by combatant `deathProgress`:
+  close GLBs use a one-shot clamped `death_fall_back` pose, and far impostors
+  receive per-instance one-shot animation progress plus fade opacity. Meshes
+  still remain pooled for performance, but they fade near the end of the dying
+  window and are hidden/released when the combatant leaves the active map.
+- Validation: targeted renderer/mesh-factory tests passed (2 files / 39 tests),
+  `npm run typecheck` passed, `npm run validate:fast` passed (247 files / 3839
+  tests), `npm run build` passed with the existing large-chunk warning, and
+  post-build `npm run check:pixel-forge-cutover` passed. Local gun-range browser
+  smoke at `http://127.0.0.1:5173/?mode=gun-range&glb=1&t=1777241544507`
+  rendered four Pixel Forge GLB targets with no console errors.

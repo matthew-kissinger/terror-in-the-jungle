@@ -379,6 +379,79 @@ describe('CombatantRenderer', () => {
   });
 
   describe('death animations', () => {
+    it('clamps close GLB death fall to a one-shot pose instead of looping it', () => {
+      const combatants = new Map<string, Combatant>();
+      const dyingCombatant = createMockCombatant('dying-close', Faction.US, new THREE.Vector3(10, 0, 0), CombatantState.DEAD);
+      dyingCombatant.isDying = true;
+      dyingCombatant.deathProgress = 0.5;
+      dyingCombatant.deathAnimationType = 'fallback';
+      dyingCombatant.deathDirection = new THREE.Vector3(1, 0, 0);
+      combatants.set('dying-close', dyingCombatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as {
+        activeCloseModels: Map<string, {
+          activeClip?: string;
+          actions: Map<string, THREE.AnimationAction>;
+          root: THREE.Group;
+        }>;
+      }).activeCloseModels;
+      const instance = activeCloseModels.get('dying-close');
+      const deathAction = instance?.actions.get('death_fall_back');
+
+      expect(instance?.activeClip).toBe('death_fall_back');
+      expect(deathAction?.clampWhenFinished).toBe(true);
+      expect(deathAction?.paused).toBe(true);
+      expect(deathAction?.time).toBeGreaterThan(0.9);
+      expect(instance?.root.visible).toBe(true);
+    });
+
+    it('fades close GLB materials during the death fadeout window', () => {
+      const combatants = new Map<string, Combatant>();
+      const dyingCombatant = createMockCombatant('dying-fade', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.DEAD);
+      dyingCombatant.isDying = true;
+      dyingCombatant.deathProgress = 0.95;
+      dyingCombatant.deathAnimationType = 'fallback';
+      dyingCombatant.deathDirection = new THREE.Vector3(1, 0, 0);
+      combatants.set('dying-fade', dyingCombatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as {
+        activeCloseModels: Map<string, { root: THREE.Group }>;
+      }).activeCloseModels;
+      const instance = activeCloseModels.get('dying-fade');
+      const materials: THREE.Material[] = [];
+      instance?.root.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const childMaterials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.push(...childMaterials);
+      });
+
+      expect(materials.some((material) => material.opacity < 1 && material.transparent)).toBe(true);
+    });
+
+    it('drives far death impostors with one-shot frame progress and fade opacity', () => {
+      const combatants = new Map<string, Combatant>();
+      const dyingCombatant = createMockCombatant('dying-far', Faction.US, new THREE.Vector3(120, 0, 0), CombatantState.DEAD);
+      dyingCombatant.isDying = true;
+      dyingCombatant.deathProgress = 0.95;
+      dyingCombatant.deathAnimationType = 'fallback';
+      dyingCombatant.deathDirection = new THREE.Vector3(1, 0, 0);
+      combatants.set('dying-far', dyingCombatant);
+      const setAttributes = vi.mocked(CombatantMeshFactoryModule.setPixelForgeNpcImpostorAttributes);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      expect(dyingCombatant.billboardIndex).toBe(0);
+      expect(setAttributes).toHaveBeenCalled();
+      const call = setAttributes.mock.calls[0];
+      expect(call[4]).toBeCloseTo(0.999);
+      expect(call[5]).toBeGreaterThan(0);
+      expect(call[5]).toBeLessThan(1);
+    });
+
     it('handles all death animation types without throwing', () => {
       const combatants = new Map<string, Combatant>();
       for (const [i, type] of (['fallback', 'spinfall', 'shatter', 'crumple'] as const).entries()) {

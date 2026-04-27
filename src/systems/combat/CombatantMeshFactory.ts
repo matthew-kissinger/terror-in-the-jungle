@@ -53,14 +53,20 @@ const NPC_IMPOSTOR_VERTEX_SHADER = `
   varying vec2 vUv;
   varying float vPhase;
   varying float vViewColumn;
+  varying float vAnimationProgress;
+  varying float vOpacity;
 
   attribute float instancePhase;
   attribute float instanceViewColumn;
+  attribute float instanceAnimationProgress;
+  attribute float instanceOpacity;
 
   void main() {
     vUv = uv;
     vPhase = instancePhase;
     vViewColumn = instanceViewColumn;
+    vAnimationProgress = instanceAnimationProgress;
+    vOpacity = instanceOpacity;
     vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
@@ -79,14 +85,19 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
   uniform float npcExposure;
   uniform float minNpcLight;
   uniform float npcTopLight;
+  uniform float animationMode;
 
   varying vec2 vUv;
   varying float vPhase;
   varying float vViewColumn;
+  varying float vAnimationProgress;
+  varying float vOpacity;
 
   void main() {
     float safeDuration = max(clipDuration, 0.001);
-    float frame = floor(mod(((time + vPhase * safeDuration) / safeDuration) * framesPerClip, framesPerClip));
+    float loopFrame = floor(mod(((time + vPhase * safeDuration) / safeDuration) * framesPerClip, framesPerClip));
+    float oneShotFrame = floor(clamp(vAnimationProgress, 0.0, 0.999) * framesPerClip);
+    float frame = mix(loopFrame, oneShotFrame, step(0.5, animationMode));
     float frameX = mod(frame, frameGrid.x);
     float frameY = floor(frame / frameGrid.x);
     float viewX = clamp(floor(vViewColumn + 0.5), 0.0, viewGrid.x - 1.0);
@@ -109,7 +120,7 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
     float topLight = smoothstep(0.12, 1.0, vUv.y) * npcTopLight;
     float npcLight = max(minNpcLight, minNpcLight + topLight);
     npcColor = min(npcColor * npcExposure * npcLight, vec3(1.0));
-    float alpha = texColor.a;
+    float alpha = texColor.a * clamp(vOpacity, 0.0, 1.0);
     gl_FragColor = vec4(npcColor, alpha);
   }
 `;
@@ -127,9 +138,13 @@ export function setPixelForgeNpcImpostorAttributes(
   index: number,
   phase: number,
   viewColumn: number,
+  animationProgress = 0,
+  opacity = 1,
 ): void {
   const phaseAttribute = mesh.geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute | undefined;
   const viewAttribute = mesh.geometry.getAttribute('instanceViewColumn') as THREE.InstancedBufferAttribute | undefined;
+  const animationProgressAttribute = mesh.geometry.getAttribute('instanceAnimationProgress') as THREE.InstancedBufferAttribute | undefined;
+  const opacityAttribute = mesh.geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute | undefined;
   if (phaseAttribute) {
     phaseAttribute.setX(index, phase);
     phaseAttribute.needsUpdate = true;
@@ -137,6 +152,14 @@ export function setPixelForgeNpcImpostorAttributes(
   if (viewAttribute) {
     viewAttribute.setX(index, viewColumn);
     viewAttribute.needsUpdate = true;
+  }
+  if (animationProgressAttribute) {
+    animationProgressAttribute.setX(index, animationProgress);
+    animationProgressAttribute.needsUpdate = true;
+  }
+  if (opacityAttribute) {
+    opacityAttribute.setX(index, opacity);
+    opacityAttribute.needsUpdate = true;
   }
 }
 
@@ -193,6 +216,7 @@ export class CombatantMeshFactory {
         npcExposure: { value: 1.2 },
         minNpcLight: { value: 0.92 },
         npcTopLight: { value: 0.16 },
+        animationMode: { value: clipId === 'death_fall_back' ? 1 : 0 },
       },
       vertexShader: NPC_IMPOSTOR_VERTEX_SHADER,
       fragmentShader: NPC_IMPOSTOR_FRAGMENT_SHADER,
@@ -214,6 +238,8 @@ export class CombatantMeshFactory {
     const geometry = new THREE.PlaneGeometry(NPC_SPRITE_WIDTH, NPC_SPRITE_HEIGHT);
     geometry.setAttribute('instancePhase', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
     geometry.setAttribute('instanceViewColumn', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
+    geometry.setAttribute('instanceAnimationProgress', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
+    geometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances).fill(1), 1));
 
     const material = this.createImpostorMaterial(texture, clipId, markerColor);
     const mesh = new THREE.InstancedMesh(geometry, material, maxInstances);

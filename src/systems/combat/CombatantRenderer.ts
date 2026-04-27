@@ -47,6 +47,42 @@ const TWO_PI = Math.PI * 2;
 const NPC_IMPOSTOR_VIEW_COLUMNS = 7;
 const NPC_IMPOSTOR_VIEW_FORWARD_OFFSET = Math.PI;
 const HITBOX_DEBUG_MAX_ACTORS = 24;
+const DEATH_TOTAL_DURATION_SECONDS = 8.7;
+const DEATH_FALL_DURATION_SECONDS = 0.7;
+const DEATH_GROUND_DURATION_SECONDS = 6.0;
+const DEATH_FADEOUT_DURATION_SECONDS = 2.0;
+const DEATH_FALL_PHASE = DEATH_FALL_DURATION_SECONDS / DEATH_TOTAL_DURATION_SECONDS;
+const DEATH_GROUND_PHASE = DEATH_GROUND_DURATION_SECONDS / DEATH_TOTAL_DURATION_SECONDS;
+const DEATH_FADEOUT_PHASE = DEATH_FADEOUT_DURATION_SECONDS / DEATH_TOTAL_DURATION_SECONDS;
+const DEATH_FADE_START_PHASE = DEATH_FALL_PHASE + DEATH_GROUND_PHASE;
+const DEATH_CLIP_HOLD_PROGRESS = 0.999;
+const CLOSE_MODEL_FADE_EPSILON = 0.01;
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function getCombatantDeathProgress(combatant: Combatant): number {
+  if (!combatant.isDying) return 0;
+  return clamp01(combatant.deathProgress ?? 0);
+}
+
+function getCombatantDeathClipProgress(combatant: Combatant): number {
+  const progress = getCombatantDeathProgress(combatant);
+  if (progress <= 0) return 0;
+  return Math.min(DEATH_CLIP_HOLD_PROGRESS, progress / DEATH_FALL_PHASE);
+}
+
+function getCombatantDeathOpacity(combatant: Combatant): number {
+  if (!combatant.isDying) return 1;
+  const progress = getCombatantDeathProgress(combatant);
+  if (progress <= DEATH_FADE_START_PHASE) return 1;
+  return clamp01(1 - (progress - DEATH_FADE_START_PHASE) / DEATH_FADEOUT_PHASE);
+}
+
+function isOneShotDeathClip(clipId: PixelForgeNpcClipId): boolean {
+  return clipId === 'death_fall_back';
+}
 
 function isHitboxDebugEnabled(): boolean {
   if (!isDiagEnabled() || typeof window === 'undefined') return false;
@@ -71,6 +107,7 @@ interface CloseModelInstance {
   hasWeapon: boolean;
   boundsMinY: number;
   visualScale: number;
+  materialStates: CloseModelMaterialState[];
   activeClip?: PixelForgeNpcClipId;
   combatantId?: string;
 }
@@ -78,6 +115,13 @@ interface CloseModelInstance {
 interface CloseModelMetrics {
   boundsMinY: number;
   visualScale: number;
+}
+
+interface CloseModelMaterialState {
+  material: THREE.Material;
+  opacity: number;
+  transparent: boolean;
+  depthWrite: boolean;
 }
 
 export class CombatantRenderer {
@@ -225,6 +269,7 @@ export class CombatantRenderer {
             hasWeapon: bones.has(config.factionConfig.rightHandSocket) && bones.has(config.factionConfig.leftHandSocket),
             boundsMinY: metrics.boundsMinY,
             visualScale: metrics.visualScale,
+            materialStates: this.collectCloseModelMaterialStates(model.scene),
           });
         } catch (error) {
           Logger.warn('combat-renderer', `Failed to create Pixel Forge NPC model from ${config.factionConfig.modelPath}`, error);
@@ -239,7 +284,15 @@ export class CombatantRenderer {
     const actions = new Map<PixelForgeNpcClipId, THREE.AnimationAction>();
     for (const clip of animations) {
       if (this.isPixelForgeNpcClip(clip.name)) {
-        actions.set(clip.name, mixer.clipAction(sanitizePixelForgeNpcAnimationClip(clip)));
+        const action = mixer.clipAction(sanitizePixelForgeNpcAnimationClip(clip));
+        if (isOneShotDeathClip(clip.name)) {
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
+        } else {
+          action.setLoop(THREE.LoopRepeat, Infinity);
+          action.clampWhenFinished = false;
+        }
+        actions.set(clip.name, action);
       }
     }
     mixer.stopAllAction();
@@ -308,6 +361,37 @@ export class CombatantRenderer {
       cloned.needsUpdate = true;
     }
     return cloned;
+  }
+
+  private collectCloseModelMaterialStates(root: THREE.Object3D): CloseModelMaterialState[] {
+    const states: CloseModelMaterialState[] = [];
+    const seen = new Set<THREE.Material>();
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) {
+        if (seen.has(material)) continue;
+        seen.add(material);
+        states.push({
+          material,
+          opacity: material.opacity,
+          transparent: material.transparent,
+          depthWrite: material.depthWrite,
+        });
+      }
+    });
+    return states;
+  }
+
+  private setCloseModelOpacity(instance: CloseModelInstance, opacity: number): void {
+    const clamped = clamp01(opacity);
+    for (const state of instance.materialStates) {
+      const material = state.material;
+      material.opacity = state.opacity * clamped;
+      material.transparent = state.transparent || clamped < 0.999;
+      material.depthWrite = clamped >= 0.999 ? state.depthWrite : false;
+      material.needsUpdate = true;
+    }
   }
 
   private normalizeWeaponRoot(root: THREE.Group, weapon: PixelForgeNpcWeaponRuntimeConfig): void {
@@ -449,6 +533,11 @@ export class CombatantRenderer {
 
     instance.combatantId = combatantId;
     instance.root.visible = true;
+    this.setCloseModelOpacity(instance, 1);
+    instance.actions.forEach((action) => {
+      action.paused = false;
+      action.timeScale = 1;
+    });
     this.activeCloseModels.set(combatantId, instance);
     return instance;
   }
@@ -457,6 +546,13 @@ export class CombatantRenderer {
     this.activeCloseModels.delete(combatantId);
     instance.root.visible = false;
     instance.mixer.stopAllAction();
+    this.setCloseModelOpacity(instance, 1);
+    instance.actions.forEach((action) => {
+      action.paused = false;
+      action.time = 0;
+      action.timeScale = 1;
+      action.enabled = false;
+    });
     instance.activeClip = undefined;
     instance.combatantId = undefined;
     const pool = this.closeModelPools.get(instance.poolKey);
@@ -475,7 +571,9 @@ export class CombatantRenderer {
       combatant.scale.y * instance.visualScale,
       combatant.scale.z * instance.visualScale,
     );
-    instance.root.visible = true;
+    const deathOpacity = getCombatantDeathOpacity(combatant);
+    this.setCloseModelOpacity(instance, deathOpacity);
+    instance.root.visible = deathOpacity > CLOSE_MODEL_FADE_EPSILON;
     instance.root.updateMatrixWorld(true);
 
     const clipId = getPixelForgeNpcClipForCombatant(combatant);
@@ -484,6 +582,8 @@ export class CombatantRenderer {
       if (next) {
         instance.mixer.stopAllAction();
         next.reset();
+        next.paused = false;
+        next.timeScale = 1;
         next.enabled = true;
         next.play();
         instance.activeClip = clipId;
@@ -491,7 +591,27 @@ export class CombatantRenderer {
         Logger.warn('combat-renderer', `Missing Pixel Forge NPC clip ${clipId} for ${poolKey}`);
       }
     }
+    this.syncCloseModelDeathAction(instance, combatant, clipId);
     this.updateWeaponSocket(instance);
+  }
+
+  private syncCloseModelDeathAction(
+    instance: CloseModelInstance,
+    combatant: Combatant,
+    clipId: PixelForgeNpcClipId,
+  ): void {
+    const action = instance.actions.get('death_fall_back');
+    if (!action) return;
+    if (!combatant.isDying || !isOneShotDeathClip(clipId)) {
+      action.paused = false;
+      return;
+    }
+
+    const clipDuration = Math.max(0.001, action.getClip().duration);
+    const clipProgress = getCombatantDeathClipProgress(combatant);
+    action.enabled = true;
+    action.time = clipDuration * clipProgress;
+    action.paused = clipProgress >= DEATH_CLIP_HOLD_PROGRESS;
   }
 
   private reportCloseModelOverflow(poolKey: PixelForgeNpcPoolKey, distanceSq: number, reason: string): void {
@@ -735,6 +855,9 @@ export class CombatantRenderer {
       let finalScaleX = scaleX;
       let finalScaleY = combatant.scale.y;
       let finalScaleZ = combatant.scale.z;
+      const deathOpacity = getCombatantDeathOpacity(combatant);
+      const impostorAnimationProgress =
+        clipId === 'death_fall_back' ? getCombatantDeathClipProgress(combatant) : 0;
 
       if ((clipId === 'patrol_walk' || clipId === 'traverse_run') && !combatant.isDying) {
         const bobPhase = this.stableHash01(combatant.id) * Math.PI * 2;
@@ -744,11 +867,11 @@ export class CombatantRenderer {
 
       // Death animation
       if (combatant.isDying && combatant.deathProgress !== undefined) {
-          const FALL_PHASE = 0.7 / 8.7;
-          const GROUND_PHASE = 6.0 / 8.7;
-          const FADEOUT_PHASE = 2.0 / 8.7;
+          const FALL_PHASE = DEATH_FALL_PHASE;
+          const GROUND_PHASE = DEATH_GROUND_PHASE;
+          const FADEOUT_PHASE = DEATH_FADEOUT_PHASE;
 
-          const progress = combatant.deathProgress;
+          const progress = getCombatantDeathProgress(combatant);
           const animType = combatant.deathAnimationType || 'fallback';
 
           if (animType === 'shatter') {
@@ -933,13 +1056,16 @@ export class CombatantRenderer {
         index,
         this.stableHash01(combatant.id),
         this.getImpostorViewColumn(combatant),
+        impostorAnimationProgress,
+        deathOpacity,
       );
       combatant.billboardIndex = index;
 
       const outlineMesh = this.factionAuraMeshes.get(key);
       if (outlineMesh) {
         this.scratchOutlineMatrix.copy(matrix);
-        this.scratchScaleMatrix.makeScale(1.2, 1.2, 1.2);
+        const outlineScale = 1.2 * Math.max(0.001, deathOpacity);
+        this.scratchScaleMatrix.makeScale(outlineScale, outlineScale, outlineScale);
         this.scratchOutlineMatrix.multiply(this.scratchScaleMatrix);
         outlineMesh.setMatrixAt(index, this.scratchOutlineMatrix);
       }
@@ -949,6 +1075,9 @@ export class CombatantRenderer {
       if (markerMesh) {
         this.scratchMarkerMatrix.makeRotationX(-Math.PI / 2);
         this.scratchMarkerMatrix.setPosition(sourcePosition.x, sourcePosition.y - NPC_Y_OFFSET + 0.08, sourcePosition.z);
+        const markerScale = Math.max(0.001, deathOpacity);
+        this.scratchScaleMatrix.makeScale(markerScale, markerScale, markerScale);
+        this.scratchMarkerMatrix.multiply(this.scratchScaleMatrix);
         markerMesh.setMatrixAt(index, this.scratchMarkerMatrix);
       }
 
