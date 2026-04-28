@@ -27,7 +27,9 @@ jobs:
       - name: Checkout game field kits
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: git -c http.extraheader="AUTHORIZATION: bearer ${GITHUB_TOKEN}" clone --depth 1 https://github.com/matthew-kissinger/game-field-kits.git ../game-field-kits
+        run: >
+          git -c http.extraheader="AUTHORIZATION: bearer ${GITHUB_TOKEN}"
+          clone --depth 1 https://github.com/matthew-kissinger/game-field-kits.git ../game-field-kits
 
       - name: Setup Node
         uses: actions/setup-node@v6
