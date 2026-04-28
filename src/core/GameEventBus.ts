@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createEventBus } from '@tij-starter-kits/event-bus';
+import { createEventBus } from '@game-field-kits/event-bus';
 import type { Faction } from '../systems/combat/types';
 
 /**
@@ -52,3 +52,4 @@ class GameEventBusImpl {
 
 /** Singleton instance. */
 export const GameEventBus = new GameEventBusImpl();
+

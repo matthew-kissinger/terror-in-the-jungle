@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   optimizeStaticModelDrawCalls as optimizePackageStaticModelDrawCalls,
   type DrawCallOptimizationStrategy,
-} from '@tij-starter-kits/three-model-optimizer';
+} from '@game-field-kits/three-model-optimizer';
 
 interface DrawCallOptimizationResult {
   sourceMeshCount: number;
@@ -36,3 +36,4 @@ export function optimizeStaticModelDrawCalls(
     skippedMeshCount: result.skippedMeshCount,
   };
 }
+

@@ -1,12 +1,49 @@
 # State Of Repo
 
-Last updated: 2026-04-26
+Last updated: 2026-04-28
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
 document answers the narrower question: what is verified in the current repo
 state. Historical cycle/archive docs remain historical evidence; this file is
 the current truth anchor.
+
+## Starter-Kits Incubation Close-Out On 2026-04-28
+
+- A sibling incubation repo now exists at
+  `C:\Users\Mattm\X\games-3d\game-field-kits`. It is a private npm workspace
+  for browser-game packages, kits, templates, examples, and recipes. It uses
+  the agnostic `@game-field-kits/*` package scope while retaining TIJ only as
+  provenance for the first extracted systems. Current local commits:
+  `71e2da4 chore: bootstrap starter-kits incubation repo` and
+  `a7b71f1 chore: rename incubation workspace to game field kits`.
+- Wave 1 reusable packages are backported into TIJ through compatibility
+  wrappers while preserving TIJ-facing APIs: `@game-field-kits/event-bus`,
+  `@game-field-kits/frame-scheduler`,
+  `@game-field-kits/three-effect-pool`, and
+  `@game-field-kits/three-model-optimizer`. TIJ uses local `file:`
+  dependencies plus `.npmrc` `install-links=true` so Three peer dependencies
+  resolve through the game repo.
+- Starter-kits validation passed: `npm ci`, `npm run check`, and
+  `npm run smoke:browser`. The smoke gate starts seven visual workspaces and
+  captures desktop/mobile Playwright screenshots while asserting no page
+  errors, no console errors, nonblank canvas output, and in-viewport overlays.
+- TIJ Wave 1 backport validation passed: `npm install`, `npm run typecheck`,
+  targeted tests for `GameEventBus`, `SimulationScheduler`,
+  `ModelDrawCallOptimizer`, and effect pools, plus `npm run validate:fast`
+  with 247 files / 3839 tests passing. The stderr output included known
+  existing test warnings from Pixel Forge pool-empty cases, jsdom canvas
+  support, and defensive logging tests.
+- Wave 2 remains incubating and is not backported: `terrain-height-core`,
+  `asset-manifest-core`, and `animated-impostor-runtime`. Terrain now has
+  TIJ-derived golden sampled-height tests in the starter-kits repo; runtime
+  replacement in TIJ is blocked until those contracts stay green and the game
+  has a reviewed integration plan.
+- The untracked asset/review files in the TIJ root remain intentionally
+  outside this closeout unless explicitly imported or archived:
+  `60-free-plants.zip`, `foliage-pack.zip`, `survival-kit.zip`,
+  `pixel-forge-tij-asset-handoff/`, `viewer-screenshot.png`, and
+  `viewer-typed.png`.
 
 ## Dev Cycle Close-Out Snapshot On 2026-04-26
 
@@ -541,3 +578,4 @@ the current truth anchor.
 9. Treat local perf-preview screenshots as non-deployed truth until the live
    Pages URL serves the same `asset-manifest.json`, R2 DEM, service worker,
    WASM, and content-hashed build assets.
+

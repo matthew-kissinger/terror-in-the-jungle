@@ -134,12 +134,13 @@
     "@recast-navigation/core": "^0.43.0",
     "@recast-navigation/generators": "^0.43.0",
     "@recast-navigation/three": "^0.43.0",
-    "@tij-starter-kits/event-bus": "file:../tij-starter-kits/packages/event-bus",
-    "@tij-starter-kits/frame-scheduler": "file:../tij-starter-kits/packages/frame-scheduler",
-    "@tij-starter-kits/three-effect-pool": "file:../tij-starter-kits/packages/three-effect-pool",
-    "@tij-starter-kits/three-model-optimizer": "file:../tij-starter-kits/packages/three-model-optimizer",
+    "@game-field-kits/event-bus": "file:../game-field-kits/packages/event-bus",
+    "@game-field-kits/frame-scheduler": "file:../game-field-kits/packages/frame-scheduler",
+    "@game-field-kits/three-effect-pool": "file:../game-field-kits/packages/three-effect-pool",
+    "@game-field-kits/three-model-optimizer": "file:../game-field-kits/packages/three-model-optimizer",
     "three": "^0.184.0",
     "three-mesh-bvh": "^0.9.9",
     "tweakpane": "^4.0.5"
   }
 }
+

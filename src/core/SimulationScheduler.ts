@@ -1,4 +1,4 @@
-import { FrameSchedulerController } from '@tij-starter-kits/frame-scheduler';
+import { FrameSchedulerController } from '@game-field-kits/frame-scheduler';
 
 export type SimulationGroupId =
   | 'tactical_ui'
@@ -36,3 +36,4 @@ export class SimulationScheduler {
     this.scheduler.reset(groupId);
   }
 }
+

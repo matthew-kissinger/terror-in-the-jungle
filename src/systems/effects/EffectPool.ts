@@ -1,1 +1,2 @@
-export { EffectPool } from '@tij-starter-kits/three-effect-pool';
+export { EffectPool } from '@game-field-kits/three-effect-pool';
+
