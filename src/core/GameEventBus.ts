@@ -1,10 +1,11 @@
 import * as THREE from 'three';
+import { createEventBus } from '@tij-starter-kits/event-bus';
 import type { Faction } from '../systems/combat/types';
 
 /**
  * Typed game event definitions. Each key maps to a payload type.
  */
-interface GameEvents {
+interface GameEvents extends Record<string, unknown> {
   npc_killed: {
     killerId: string; victimId: string;
     killerFaction: Faction; victimFaction: Faction;
@@ -25,50 +26,27 @@ interface GameEvents {
   mode_load_progress: { phase: string; progress: number; label: string };
 }
 
-type Callback<K extends keyof GameEvents> = (event: GameEvents[K]) => void;
-
-interface QueuedEvent { type: keyof GameEvents; payload: GameEvents[keyof GameEvents] }
-
 /**
  * Singleton typed event bus. Events are queued during a frame and delivered
  * in batch via flush() at the end of the frame to avoid per-event overhead.
  */
 class GameEventBusImpl {
-  private listeners = new Map<keyof GameEvents, Callback<any>[]>();
-  private queue: QueuedEvent[] = [];
+  private bus = createEventBus<GameEvents>();
 
-  subscribe<K extends keyof GameEvents>(type: K, callback: Callback<K>): () => void {
-    let list = this.listeners.get(type);
-    if (!list) { list = []; this.listeners.set(type, list); }
-    list.push(callback);
-    return () => {
-      const arr = this.listeners.get(type);
-      if (!arr) return;
-      const idx = arr.indexOf(callback);
-      if (idx >= 0) arr.splice(idx, 1);
-    };
+  subscribe<K extends keyof GameEvents & string>(type: K, callback: (event: GameEvents[K]) => void): () => void {
+    return this.bus.subscribe(type, callback);
   }
 
-  emit<K extends keyof GameEvents>(type: K, event: GameEvents[K]): void {
-    this.queue.push({ type, payload: event });
+  emit<K extends keyof GameEvents & string>(type: K, event: GameEvents[K]): void {
+    this.bus.emit(type, event);
   }
 
   flush(): void {
-    if (this.queue.length === 0) return;
-    const batch = this.queue;
-    this.queue = [];
-    for (const { type, payload } of batch) {
-      const list = this.listeners.get(type);
-      if (!list) continue;
-      for (const cb of list) {
-        cb(payload);
-      }
-    }
+    this.bus.flush();
   }
 
   clear(): void {
-    this.listeners.clear();
-    this.queue.length = 0;
+    this.bus.clear();
   }
 }
 

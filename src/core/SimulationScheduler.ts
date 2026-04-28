@@ -1,3 +1,5 @@
+import { FrameSchedulerController } from '@tij-starter-kits/frame-scheduler';
+
 export type SimulationGroupId =
   | 'tactical_ui'
   | 'war_sim'
@@ -20,44 +22,17 @@ const DEFAULT_GROUPS: SimulationGroupConfig[] = [
 ];
 
 export class SimulationScheduler {
-  private readonly groups = new Map<SimulationGroupId, SimulationGroupConfig>();
-  private readonly accumulators = new Map<SimulationGroupId, number>();
+  private readonly scheduler: FrameSchedulerController<SimulationGroupId>;
 
   constructor(groups: SimulationGroupConfig[] = DEFAULT_GROUPS) {
-    for (const group of groups) {
-      this.groups.set(group.id, group);
-      this.accumulators.set(group.id, 0);
-    }
+    this.scheduler = new FrameSchedulerController(groups);
   }
 
   consume(groupId: SimulationGroupId, deltaTime: number): number | null {
-    const group = this.groups.get(groupId);
-    if (!group) {
-      throw new Error(`Unknown simulation group: ${groupId}`);
-    }
-
-    if (group.intervalSeconds <= 0) {
-      return deltaTime;
-    }
-
-    const nextDelta = (this.accumulators.get(groupId) ?? 0) + deltaTime;
-    if (nextDelta < group.intervalSeconds) {
-      this.accumulators.set(groupId, nextDelta);
-      return null;
-    }
-
-    this.accumulators.set(groupId, 0);
-    return nextDelta;
+    return this.scheduler.consume(groupId, deltaTime);
   }
 
   reset(groupId?: SimulationGroupId): void {
-    if (groupId) {
-      this.accumulators.set(groupId, 0);
-      return;
-    }
-
-    for (const key of this.accumulators.keys()) {
-      this.accumulators.set(key, 0);
-    }
+    this.scheduler.reset(groupId);
   }
 }
