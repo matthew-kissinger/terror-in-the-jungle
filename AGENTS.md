@@ -173,7 +173,18 @@ camera/render shake questions have an evidence-backed decision.
 
 ## Known gotchas for agents
 
-- **gh PAT scope.** If `gh pr create` or `gh pr merge` fails with "Resource not accessible by personal access token", prefix with `GITHUB_TOKEN= GH_TOKEN= gh ...` to fall back to keyring auth.
+- **gh PAT scope.** If `gh pr create`, `gh pr merge`, or `gh workflow run ...`
+  fails with "Resource not accessible by personal access token", clear
+  `GITHUB_TOKEN` and `GH_TOKEN` so `gh` can fall back to keyring auth. For
+  workflow dispatch, prefer the repo wrappers: `npm run ci:manual` and
+  `npm run deploy:prod`.
+- **Docs-only pushes may skip automatic CI.** `ci.yml` is path-filtered. If a
+  doc-only commit is intended to prove or ship release state, run
+  `npm run ci:manual` before deployment instead of assuming GitHub started CI.
+- **Deploy is manual.** Pushing `master` is not production proof. Use
+  `npm run deploy:prod`, then verify live `/asset-manifest.json`, Pages/R2/WASM
+  headers, service-worker behavior, and a meaningful live browser flow before
+  claiming production parity.
 - **Don't anchor on doc claims against current file state.** Briefs and backlogs drift. Verify with Read against the current file before proposing a fix. If the brief's premise is wrong, stop and escalate, don't rationalize an outdated task.
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.

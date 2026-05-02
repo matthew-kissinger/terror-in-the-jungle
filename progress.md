@@ -1744,3 +1744,14 @@ TODO
   request, or retry-panel failures. This verifies the docs/tooling release only;
   Cycle 1 still makes no texture, imposter, grenade, culling, or WebGPU
   remediation claim.
+
+2026-05-02 Agent ergonomics / release DX follow-up
+- The Cycle 1 release exposed two repeatable agent friction points: limited
+  GitHub token environment variables can shadow keyring auth for workflow
+  dispatch, and docs-only release-state commits may not start automatic CI
+  because `ci.yml` is path-filtered.
+- Added `scripts/github-workflow-run.ts`, `npm run ci:manual`, and updated
+  `npm run deploy:prod` so agents have repo-native workflow commands that clear
+  `GITHUB_TOKEN` / `GH_TOKEN` and watch the resulting Actions run.
+- Updated `AGENTS.md` and `docs/DEPLOY_WORKFLOW.md` so future agents treat those
+  issues as repo DX signals, not one-off terminal quirks.

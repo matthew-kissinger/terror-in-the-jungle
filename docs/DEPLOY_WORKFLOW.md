@@ -53,11 +53,18 @@ manual trigger (you decide when)
 
 Any of:
 
-- `npm run deploy:prod` - shortcut for `gh workflow run deploy.yml`. Runs against master's tip.
-- `gh workflow run deploy.yml -r <branch-or-tag>` - deploy a specific ref.
+- `npm run deploy:prod` - dispatches `deploy.yml` against master's tip, clears
+  problematic GitHub token environment variables, and watches the run.
+- `npx tsx scripts/github-workflow-run.ts deploy.yml --ref <branch-or-tag> --watch`
+  - deploy a specific ref through the same wrapper.
 - GitHub web UI: Actions tab -> "Deploy" workflow -> "Run workflow" button.
 
-Typical flow: push to master, wait for CI green, then run `npm run deploy:prod` when you actually want the build live. This lets you batch multiple merges into one deploy.
+Typical flow: push to master, wait for CI green, then run `npm run deploy:prod` when you actually want the build live. This lets you batch multiple merges into one deploy. For docs-only release-state commits, CI may not start automatically because `ci.yml` is path-filtered; run `npm run ci:manual` before deploy.
+
+The workflow wrappers use `scripts/github-workflow-run.ts`, which removes
+`GITHUB_TOKEN` and `GH_TOKEN` from the child `gh` process. That avoids the
+common agent failure where a limited PAT shadows local keyring auth and GitHub
+returns `Resource not accessible by personal access token`.
 
 Key facts:
 
@@ -162,6 +169,11 @@ Release evidence must bridge that gap. After deploy, rerun the header checks in
 section 7 and open the live URL for at least one A Shau smoke plus one non-A
 Shau mode smoke. If the live manifest, WASM, or service worker is stale, do not
 reinterpret a local pass as deployed truth.
+
+Docs-only release-state commits are still release commits. If a commit changes
+what the repo claims about production, manually dispatch CI with
+`npm run ci:manual`, then deploy and verify the live manifest before closing the
+loop.
 
 ## 3. Cache-Control Strategy
 
