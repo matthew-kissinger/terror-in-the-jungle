@@ -1664,7 +1664,7 @@ TODO
 - Manual Deploy workflow run `25262818886` passed: checkout,
   `game-field-kits` checkout/build, dependency install, production build,
   Cloudflare asset validation, and Cloudflare Pages deploy all completed.
-- Live `/asset-manifest.json` now reports
+- After the first Cycle 0 deploy, live `/asset-manifest.json` reported
   `475aa7792c51823184c454a0b63852e79da2285d`; `/`, `/sw.js`,
   `/asset-manifest.json`, the A Shau R2 DEM URL, hashed JS/CSS assets, and
   Recast WASM assets returned `200` with the expected production cache/content
@@ -1673,7 +1673,9 @@ TODO
   `START GAME`, selected `zone_control`, and reached the deploy UI with no
   console errors, page errors, request failures, or retry panel.
 - Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` from local
-  pending language to shipped/live-verified Cycle 0 state.
+  pending language to shipped/live-verified Cycle 0 state. The docs avoid
+  treating their own SHA as durable state; live `/asset-manifest.json` remains
+  the current deployed SHA source of truth after doc-only alignment commits.
 - Next agent-team handoff: execute Phase 2 / Cycle 1. Do not start texture,
   imposter, grenade, vegetation, or WebGPU remediation before certifying
   trusted baselines and the Asset Acceptance Standard.

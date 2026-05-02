@@ -24,12 +24,14 @@ measurement itself was trustworthy.
 
 ## Shipped Cycle 0 State
 
-Cycle 0 shipped on `master` at
+Cycle 0 evidence payload shipped on `master` at
 `475aa7792c51823184c454a0b63852e79da2285d` through manual Deploy workflow run
-`25262818886`. Live Pages `/asset-manifest.json` returned the same git SHA,
+`25262818886`. Live Pages `/asset-manifest.json` returned that payload SHA,
 `/`, `/sw.js`, `/asset-manifest.json`, the A Shau R2 DEM URL, hashed JS/CSS,
 and Recast WASM assets returned `200`, and a live browser smoke reached the
 Zone Control deploy UI with no console, page, request, or retry-panel failures.
+Doc-only release-state commits may advance `master`; the live
+`/asset-manifest.json` remains the current deployed SHA source of truth.
 
 Shipped payload:
 

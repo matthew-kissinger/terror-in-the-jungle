@@ -74,10 +74,11 @@ the current truth anchor.
   vegetation horizon audit, and KB-STRATEGIE WebGPU audit, then writes a suite
   summary. Latest local suite:
   `artifacts/perf/2026-05-02T21-49-44-009Z/projekt-143-evidence-suite/suite-summary.json`.
-- Current source and production truth after the Projekt Objekt-143 Cycle 0
-  release: `master`, `origin/master`, and live `/asset-manifest.json` all
-  reported `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow
-  run `25262818886` served that SHA.
+- Projekt Objekt-143 Cycle 0 evidence payload landed at
+  `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
+  `25262818886` served that payload SHA. Doc-only release-state commits may
+  advance `master`; live `/asset-manifest.json` is the current deployed SHA
+  source of truth.
 - Historical note: the stable-ground audit opened while source was at
   `f99181a0bf8a6b2a8684fc1ae3796022c16aad22` and live Pages still served
   `5f585f7d4bf5ad2c0c85450235ac4c9950988d83`. Those audit-start values are now
@@ -111,11 +112,13 @@ the current truth anchor.
 
 ## Shipped Recovery Slice On 2026-05-02
 
-Current branch is `master` at
+The Cycle 0 evidence payload commit is
 `475aa7792c51823184c454a0b63852e79da2285d`. Production Pages was verified
-serving that same SHA after manual Deploy workflow run `25262818886`. The
-Projekt Objekt-143 recovery work described below is shipped as a measurement
-and evidence slice, not as a performance remediation.
+serving that payload after manual Deploy workflow run `25262818886`, then
+doc-only release-state alignment followed on `master`. The Projekt Objekt-143
+recovery work described below is shipped as a measurement and evidence slice,
+not as a performance remediation. For the exact currently deployed SHA, check
+live `/asset-manifest.json`.
 
 Shipped scope for this development cycle:
 
