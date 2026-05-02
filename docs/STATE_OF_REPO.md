@@ -82,9 +82,18 @@ the current truth anchor.
   short and A Shau short passed measurement trust, startup and grenade artifacts
   are diagnostic by design, combat120 failed measurement trust, and the low-load
   grenade probe still reproduces the first-use stall. The standard lives in
-  [ASSET_ACCEPTANCE_STANDARD.md](ASSET_ACCEPTANCE_STANDARD.md). This is local
-  evidence only; live Pages was not rechecked in this Cycle 1 pass, so no
-  production parity claim is made.
+  [ASSET_ACCEPTANCE_STANDARD.md](ASSET_ACCEPTANCE_STANDARD.md).
+- Projekt Objekt-143 Cycle 1 certification docs/tooling landed at
+  `806d5fa43d63854dd80496a67e8aaef4a741c627`. CI run `25263686228` passed and
+  manual Deploy workflow run `25264091996` succeeded. At that release, live Pages
+  `/asset-manifest.json` reported that SHA; `/`, `/sw.js`,
+  `/asset-manifest.json`, representative public assets, Open Frontier
+  navmesh/heightmap assets, the A Shau R2 DEM URL, and Recast WASM/build assets
+  returned `200` with the expected cache/content headers. A live browser smoke
+  reached the Zone Control deploy UI with no console, page, request, or retry
+  failures. This verifies the Cycle 1 docs/tooling release, not any optimization
+  remediation. Later doc-only release-state commits may advance `master`; live
+  `/asset-manifest.json` remains the exact current deployed SHA source of truth.
 - Projekt Objekt-143 Cycle 0 evidence payload landed at
   `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
   `25262818886` served that payload SHA. Doc-only release-state commits may

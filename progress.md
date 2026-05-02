@@ -1726,3 +1726,21 @@ TODO
   tuning, grenade warmup fix, culling certification, or WebGPU migration was
   started. No live deploy check was run, so do not claim production parity from
   this Cycle 1 local evidence.
+
+2026-05-02 Projekt Objekt-143 Phase 2 / Cycle 1 commit/deploy continuation
+- Committed Cycle 1 certification docs/tooling as
+  `806d5fa43d63854dd80496a67e8aaef4a741c627`
+  (`docs(projekt-143): certify cycle 1 baselines`) and pushed to `master`.
+- GitHub Actions CI run `25263686228` passed: lint, build, perf, test, smoke,
+  and mobile UI jobs all completed successfully.
+- Manual Deploy workflow run `25264091996` passed and deployed the commit to
+  Cloudflare Pages.
+- Live `/asset-manifest.json` reported
+  `806d5fa43d63854dd80496a67e8aaef4a741c627`. Header checks returned `200` for
+  `/`, `/sw.js`, `/asset-manifest.json`, representative public assets, Open
+  Frontier navmesh/heightmap assets, the A Shau R2 DEM URL, and Recast
+  WASM/build assets with expected cache/content headers.
+- Live browser smoke reached the Zone Control deploy UI with no console, page,
+  request, or retry-panel failures. This verifies the docs/tooling release only;
+  Cycle 1 still makes no texture, imposter, grenade, culling, or WebGPU
+  remediation claim.

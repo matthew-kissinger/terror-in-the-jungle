@@ -19,7 +19,7 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status: Open Frontier and A Shau steady-state captures passed measurement trust, combat120 did not, and the low-load grenade probe still reproduces the first-use stall. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status and the docs/tooling release has been deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`. Open Frontier and A Shau steady-state captures passed measurement trust, combat120 did not, and the low-load grenade probe still reproduces the first-use stall. KB-METRIK remains first and blocks optimization claims from other bureaus. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
 ## Shipped Cycle 0 State
@@ -166,8 +166,17 @@ Cycle 1 local source and build truth:
   `artifacts/perf/2026-05-02T22-24-03-223Z/projekt-143-cycle1-benchmark-bundle/bundle-summary.json`
   plus `projekt-143-cycle1-metadata.json` sidecars into each source artifact.
 
-Baseline bundle status: WARN, not production parity. Live deployment was not
-rechecked in this Cycle 1 pass, so no deployed-game parity claim is made here.
+Baseline bundle status: WARN. The Cycle 1 docs/tooling release was initially deployed at
+`806d5fa43d63854dd80496a67e8aaef4a741c627` after CI run `25263686228` and
+manual Deploy workflow run `25264091996` passed. At that release, live Pages
+`/asset-manifest.json` reported that SHA; Pages shell, service worker, manifest,
+representative public assets, Open Frontier navmesh/heightmap assets, the A Shau
+R2 DEM URL, and Recast WASM/build assets returned `200` with the expected
+cache/content headers; a live Zone Control smoke reached the deploy UI without
+console, page, request, or retry failures. This verifies the docs/tooling
+release only; it is not a remediation or optimization claim. Later doc-only
+release-state commits may advance `master`; live `/asset-manifest.json` remains
+the exact current deployed SHA source of truth.
 
 | Probe | Artifact | Trust | Result |
 | --- | --- | --- | --- |
