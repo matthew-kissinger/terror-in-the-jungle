@@ -1,12 +1,46 @@
 # State Of Repo
 
-Last updated: 2026-04-28
+Last updated: 2026-05-02
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
 document answers the narrower question: what is verified in the current repo
 state. Historical cycle/archive docs remain historical evidence; this file is
 the current truth anchor.
+
+## Stable-Ground Snapshot On 2026-05-02
+
+- Current source branch truth at audit start: `master` and `origin/master`
+  pointed at `f99181a0bf8a6b2a8684fc1ae3796022c16aad22`.
+- Latest green CI for that source SHA: GitHub Actions run `25036829545`.
+- Live production was functioning but stale at audit start:
+  `/asset-manifest.json` served
+  `5f585f7d4bf5ad2c0c85450235ac4c9950988d83`, the last successful Deploy run
+  `24972641184` from 2026-04-27. The current stabilization pass is not closed
+  until a manual Deploy run serves the final accepted `master` SHA.
+- Live Pages/R2 spot checks returned `200` for `/`, `/sw.js`,
+  `/asset-manifest.json`, the A Shau DEM R2 URL, and the Recast WASM asset.
+  A live browser smoke reached the Zone Control deploy UI with no console,
+  page, or request failures.
+- The root review payload was moved out of the repo after hash verification to
+  `C:\Users\Mattm\X\games-3d\tij-local-review-artifacts\2026-05-02-stable-ground`.
+  The tracked TIJ worktree is clean on the stabilization branch.
+- Sibling `game-field-kits` is part of the current control plane. Its
+  `master`/`origin/master` pointed at
+  `a7b71f1e9af61e2f89bb0adefae5121891896f62`; `npm ci`,
+  `npm run check`, and `npm run smoke:browser` passed on 2026-05-02.
+- Stale open PRs `#47` and `#148` through `#153` were closed, and their head
+  branches were deleted. Other unmerged task/spike branches remain retained
+  inventory until reviewed for unique work.
+- Local stabilization gates passed for `doctor`, `validate:fast`, `build`,
+  `smoke:prod`, `check:mobile-ui`, `probe:fixed-wing`, and
+  `evidence:atmosphere` on 2026-05-02. `validate:full` is PASS/WARN rather than
+  clean: unit/build stages passed, but `perf:capture:combat120` failed the
+  local frame-time validation with avg/p99 at 100.00ms and Combat over budget
+  in every sample. Artifact:
+  `artifacts/perf/2026-05-02T07-29-13-476Z/validation.json`.
+- Detailed evidence for this pass lives in
+  [STABILIZATION_AUDIT_2026-05.md](STABILIZATION_AUDIT_2026-05.md).
 
 ## Starter-Kits Incubation Close-Out On 2026-04-28
 
@@ -39,11 +73,10 @@ the current truth anchor.
   TIJ-derived golden sampled-height tests in the starter-kits repo; runtime
   replacement in TIJ is blocked until those contracts stay green and the game
   has a reviewed integration plan.
-- The untracked asset/review files in the TIJ root remain intentionally
-  outside this closeout unless explicitly imported or archived:
-  `60-free-plants.zip`, `foliage-pack.zip`, `survival-kit.zip`,
-  `pixel-forge-tij-asset-handoff/`, `viewer-screenshot.png`, and
-  `viewer-typed.png`.
+- The previously untracked asset/review files in the TIJ root were relocated
+  during the 2026-05-02 stable-ground cleanup and are no longer expected in
+  the repo root. Their archive path and verification summary are recorded in
+  [STABILIZATION_AUDIT_2026-05.md](STABILIZATION_AUDIT_2026-05.md).
 
 ## Dev Cycle Close-Out Snapshot On 2026-04-26
 
@@ -568,9 +601,11 @@ the current truth anchor.
    complete. The final playtest must still cover grounded exits, in-flight
    bailout, helicopter entry/exit and rotor feel, AC-47 orbit, A Shau
    forward-strip taxi/takeoff, pointer-lock fallback, and keyboard/touch paths.
-7. Re-run `npm run validate:full` and refresh the `frontier30m` baseline from a
-   quiet-machine session; do not use captures from a background-game session as
-   baseline-quality evidence.
+7. Re-run combat120 `validate:full` from a quiet-machine session before
+   claiming perf sign-off or refreshing baselines. The 2026-05-02 stabilization
+   run passed unit/build stages but failed local combat120 frame-time gates with
+   avg/p99 pinned at 100.00ms, so the current evidence is a blocker candidate,
+   not baseline-quality data.
 8. Keep the manual deploy/header spot-check in `docs/DEPLOY_WORKFLOW.md` as a
    release gate. The 2026-04-24 release bridged local-vs-prod evidence; repeat
    the check after every push intended for player testing, then replace the

@@ -1,6 +1,21 @@
 # Performance & Profiling
 
-Last updated: 2026-04-24
+Last updated: 2026-05-02
+
+## Stable-Ground Perf Posture
+
+The 2026-05-02 stabilization pass does not refresh baselines or tune runtime
+performance. Its perf goal is release confidence: keep `validate:full` as the
+authoritative local gate, treat hosted CI perf as advisory, and record any
+quiet-machine limitation as PASS/WARN instead of hiding it. Baseline refreshes
+remain a separate task.
+
+Current stabilization evidence is not a clean perf sign-off: on 2026-05-02,
+`npm run validate:full` passed unit/build stages but failed during
+`perf:capture:combat120` with avg frame 100.00ms, p99 100.00ms, 100% frames
+over 50ms, and Combat over budget in every sample. Browser/page errors were
+`0`, heap end-growth passed, and shot/hit sanity passed. Artifact:
+`artifacts/perf/2026-05-02T07-29-13-476Z/validation.json`.
 
 ## Build targets
 
@@ -139,6 +154,11 @@ Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome
   `npm run perf:compare -- --scenario combat120` passed 8/8 checks. Treat this
   as PASS/WARN until a quiet-machine full validation run refreshes heap
   confidence.
+- 2026-05-02 stable-ground rerun: `npm run validate:full` passed tests/build
+  but failed combat120 frame-time gates at
+  `artifacts/perf/2026-05-02T07-29-13-476Z`. This is a stronger perf-confidence
+  warning than the April heap-only run and must be rerun on a quiet machine
+  before claiming combat120 perf sign-off or refreshing baselines.
 
 ## Validation Gates
 
@@ -158,7 +178,7 @@ perf session.
 
 | Scenario | Status | Avg | p99 | Notes |
 |----------|--------|----:|----:|-------|
-| `combat120` | PASS/WARN | 14.45ms | 33.70ms | Latest 2026-04-24 standalone capture `2026-04-24T05-49-45-656Z`; compare passed 8/8, heap growth remained WARN. Baseline remains 2026-04-20 until deliberately refreshed. |
+| `combat120` | WARN | 100.00ms | 100.00ms | Latest 2026-05-02 stabilization capture `2026-05-02T07-29-13-476Z` failed frame-time validation while unit/build and browser-error gates passed. Previous clean standalone capture remains `2026-04-24T05-49-45-656Z`; rerun on a quiet machine before baseline refresh or perf sign-off. |
 | `openfrontier:short` | PASS | 7.50ms | 32.7ms | 2026-04-20 artifact `2026-04-20T06-18-05-147Z`; large-world short capture. |
 | `ashau:short` | PASS | 5.79ms | 15.6ms | 2026-04-20 artifact `2026-04-20T06-21-56-636Z`; strategy stack + DEM short capture. |
 | `frontier30m` | PASS* | 8.82ms | 33.7ms | 2026-04-20 artifact `2026-04-20T06-25-47-223Z`; baseline predates the non-terminal soak fix and ended early at victory. |

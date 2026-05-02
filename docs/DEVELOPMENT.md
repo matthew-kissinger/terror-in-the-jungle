@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-04-24
+Last updated: 2026-05-02
 
 ## Prerequisites
 
@@ -14,6 +14,13 @@ npm install
 npm run doctor           # Verify Node, dependencies, and Playwright browser setup
 npm run dev              # Vite dev server
 ```
+
+TIJ currently consumes local `file:` packages from the sibling workspace
+`../game-field-kits`. For a fresh checkout or after moving that sibling repo,
+run `npm ci` and `npm run build --workspaces --if-present` in
+`../game-field-kits` before trusting TIJ validation. CI and deploy perform the
+same bootstrap through `.github/scripts/checkout-game-field-kits.sh` and
+`.github/scripts/build-game-field-kits.sh`.
 
 If `npm ls` reports invalid dependency versions after a dependency bump landed,
 reset the workspace with `npm ci`. Do not assume an existing `node_modules/`
@@ -125,6 +132,10 @@ header spot-check recipes. See [CLOUDFLARE_STACK.md](CLOUDFLARE_STACK.md) for
 the target Pages + R2 + Workers architecture for large game assets and future
 user interaction. For GLB/model, public asset, `index.html`, `_headers`, or
 `sw.js` changes, run the live header spot-check after deploy.
+
+Stable-ground rule: a green local build is not a release. The release is only
+current after the manual Deploy workflow succeeds and live
+`/asset-manifest.json` reports the final `master` SHA.
 
 ### Local prod-like preview
 

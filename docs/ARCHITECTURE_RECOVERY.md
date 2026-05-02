@@ -1,8 +1,18 @@
 # Architecture Recovery
 
-Last updated: 2026-04-24
+Last updated: 2026-05-02
 
 This is the execution artifact for the multi-agent architecture recovery plan. Treat it as a current-state control board, not proof that a subsystem is correct. Code and runtime evidence still outrank this document.
+
+## Stable-Ground Status On 2026-05-02
+
+The architecture-recovery cycles below are now historical/control-board
+evidence, not active execution scope for the stable-ground pass. The active
+May 2026 stabilization scope is ops/drift only: deploy parity, current docs,
+worktree hygiene, stale PR/branch cleanup, and sibling dependency
+reproducibility. Open feel, perf, asset, terrain, and runtime architecture
+questions should be carried in [BACKLOG.md](BACKLOG.md) until a new focused
+cycle reopens them.
 
 ## Global Gates
 
