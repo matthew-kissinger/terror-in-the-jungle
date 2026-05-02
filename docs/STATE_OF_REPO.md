@@ -73,7 +73,18 @@ the current truth anchor.
   the KB-CULL texture audit, KB-OPTIK imposter optics audit, KB-TERRAIN
   vegetation horizon audit, and KB-STRATEGIE WebGPU audit, then writes a suite
   summary. Latest local suite:
-  `artifacts/perf/2026-05-02T21-49-44-009Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-02T22-05-00-955Z/projekt-143-evidence-suite/suite-summary.json`.
+- Phase 2 / Cycle 1 now has a baseline certification bundle and an Asset
+  Acceptance Standard. `npm run check:projekt-143-cycle1-bundle -- ...` wrote
+  `artifacts/perf/2026-05-02T22-24-03-223Z/projekt-143-cycle1-benchmark-bundle/bundle-summary.json`
+  for source HEAD `cef45fcc906ebe4357009109e2186c83c2a38426`; local retail and
+  perf manifests report the same SHA. Bundle status is WARN: Open Frontier
+  short and A Shau short passed measurement trust, startup and grenade artifacts
+  are diagnostic by design, combat120 failed measurement trust, and the low-load
+  grenade probe still reproduces the first-use stall. The standard lives in
+  [ASSET_ACCEPTANCE_STANDARD.md](ASSET_ACCEPTANCE_STANDARD.md). This is local
+  evidence only; live Pages was not rechecked in this Cycle 1 pass, so no
+  production parity claim is made.
 - Projekt Objekt-143 Cycle 0 evidence payload landed at
   `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
   `25262818886` served that payload SHA. Doc-only release-state commits may

@@ -1679,3 +1679,50 @@ TODO
 - Next agent-team handoff: execute Phase 2 / Cycle 1. Do not start texture,
   imposter, grenade, vegetation, or WebGPU remediation before certifying
   trusted baselines and the Asset Acceptance Standard.
+
+2026-05-02 Projekt Objekt-143 Phase 2 / Cycle 1 baseline certification
+- Required first actions passed: `npm run doctor` and `npm run check:projekt-143`.
+  Fresh static suite artifact:
+  `artifacts/perf/2026-05-02T22-05-00-955Z/projekt-143-evidence-suite/suite-summary.json`.
+- Refreshed local builds at HEAD `cef45fcc906ebe4357009109e2186c83c2a38426`;
+  both `dist/asset-manifest.json` and `dist-perf/asset-manifest.json` report
+  that SHA.
+- Startup baselines:
+  - Open Frontier:
+    `artifacts/perf/2026-05-02T22-07-48-283Z/startup-ui-open-frontier`,
+    3 headed retail runs, avg mode-click-to-playable `6180.7ms`, max WebGL
+    upload `2780.5ms`.
+  - Zone Control:
+    `artifacts/perf/2026-05-02T22-08-46-576Z/startup-ui-zone-control`,
+    3 headed retail runs, avg mode-click-to-playable `6467.7ms`, max WebGL
+    upload `2608.2ms`.
+- Runtime baselines:
+  - combat120:
+    `artifacts/perf/2026-05-02T22-09-13-541Z`, validation FAIL and measurement
+    trust FAIL (`probeAvg=149.14ms`, `probeP95=258ms`). Do not use frame-time
+    numbers for regression decisions.
+  - Open Frontier short:
+    `artifacts/perf/2026-05-02T22-11-29-560Z`, measurement trust PASS,
+    validation WARN, avg/p95/p99/max `23.70/29.20/32.70/100ms`, 4 hitches
+    above `50ms`.
+  - A Shau short:
+    `artifacts/perf/2026-05-02T22-15-19-678Z`, measurement trust PASS,
+    validation WARN, avg/p95/p99/max `12.04/18.30/31.50/48.50ms`, no hitches
+    above `50ms`.
+- Grenade low-load probe:
+  `artifacts/perf/2026-05-02T22-19-40-381Z/grenade-spike-ai-sandbox`, `npcs=2`,
+  2 grenades, CPU profile present. Stall reproduced: baseline p95/p99/max
+  `21.8/22.6/23.2ms`, detonation p95/p99/max `23.7/32.5/100ms`, one `387ms`
+  long task, two LoAF entries, grenade frag JS `2.5ms` total.
+- Added `scripts/projekt-143-cycle1-benchmark-bundle.ts` and package script
+  `check:projekt-143-cycle1-bundle`. It wrote
+  `artifacts/perf/2026-05-02T22-24-03-223Z/projekt-143-cycle1-benchmark-bundle/bundle-summary.json`
+  and `projekt-143-cycle1-metadata.json` sidecars into the six source artifact
+  directories. Bundle status is WARN because combat120 is untrusted and the
+  grenade stall remains.
+- Added `docs/ASSET_ACCEPTANCE_STANDARD.md` and updated
+  `docs/PROJEKT_OBJEKT_143.md`, `docs/PERFORMANCE.md`, and
+  `docs/STATE_OF_REPO.md`. No remediation, texture regeneration, imposter
+  tuning, grenade warmup fix, culling certification, or WebGPU migration was
+  started. No live deploy check was run, so do not claim production parity from
+  this Cycle 1 local evidence.

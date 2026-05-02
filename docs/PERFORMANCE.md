@@ -82,6 +82,7 @@ npm run check:pixel-forge-optics    # KB-OPTIK imposter optics audit
 npm run check:vegetation-horizon    # KB-TERRAIN vegetation horizon audit
 npm run check:webgpu-strategy       # KB-STRATEGIE WebGL/WebGPU audit
 npm run check:projekt-143           # Cycle 0 static evidence suite
+npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark bundle sidecars
 ```
 
 Startup UI benchmarks are retail-build measurements, not perf-harness frame
@@ -160,6 +161,13 @@ would contaminate sustained runtime grenade attribution.
 static metadata and image analysis: it does not replace screenshot comparison,
 but it catches bake/runtime scale mismatches, low effective pixels per meter,
 alpha occupancy, atlas luma/chroma, and divergent shader contracts.
+
+`projekt-143-cycle1-benchmark-bundle.ts` writes a Cycle 1 certification bundle
+under `artifacts/perf/<timestamp>/projekt-143-cycle1-benchmark-bundle/` and a
+`projekt-143-cycle1-metadata.json` sidecar into each source artifact directory.
+Those sidecars record commit SHA, mode, timing windows, warmup policy,
+browser/runtime metadata, instrumentation flags, renderer/scene evidence, and
+measurement-trust status.
 
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so
@@ -341,10 +349,43 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   post-stabilization spike target, not a current perf remediation.
 - 2026-05-02 Cycle 0 static evidence suite:
   `npm run check:projekt-143` wrote
-  `artifacts/perf/2026-05-02T21-49-44-009Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-02T22-05-00-955Z/projekt-143-evidence-suite/suite-summary.json`.
   The suite passed KB-CULL texture audit, KB-OPTIK imposter optics audit,
   KB-TERRAIN vegetation horizon audit, and KB-STRATEGIE WebGPU audit. It does
   not run `perf:grenade-spike`; that remains a separate headed runtime probe.
+- 2026-05-02 Cycle 1 baseline bundle:
+  `npm run check:projekt-143-cycle1-bundle -- ...` wrote
+  `artifacts/perf/2026-05-02T22-24-03-223Z/projekt-143-cycle1-benchmark-bundle/bundle-summary.json`
+  for source HEAD `cef45fcc906ebe4357009109e2186c83c2a38426`, with local
+  retail and perf manifests reporting the same SHA. The bundle status is
+  WARN: Open Frontier short and A Shau short passed measurement trust, startup
+  UI and grenade-spike artifacts are diagnostic by design, and combat120 failed
+  measurement trust with `probeAvg=149.14ms` / `probeP95=258ms`. Do not use the
+  combat120 frame-time numbers for regression decisions until a trusted rerun
+  exists.
+- 2026-05-02 Cycle 1 startup evidence: headed retail Open Frontier startup
+  wrote
+  `artifacts/perf/2026-05-02T22-07-48-283Z/startup-ui-open-frontier` and
+  averaged `6180.7ms` mode-click-to-playable, while Zone Control wrote
+  `artifacts/perf/2026-05-02T22-08-46-576Z/startup-ui-zone-control` and
+  averaged `6467.7ms`. Both include WebGL upload attribution and three CPU
+  profiles. The largest upload in both modes remains Pixel Forge vegetation,
+  especially giantPalm albedo.
+- 2026-05-02 Cycle 1 trusted steady-state evidence: Open Frontier short wrote
+  `artifacts/perf/2026-05-02T22-11-29-560Z` with measurement trust PASS,
+  avg/p95/p99/max `23.70/29.20/32.70/100ms`, 4 hitches above `50ms`, renderer
+  stats, and scene attribution with `0%` visible unattributed triangles. A Shau
+  short wrote `artifacts/perf/2026-05-02T22-15-19-678Z` with measurement trust
+  PASS, avg/p95/p99/max `12.04/18.30/31.50/48.50ms`, no `>50ms` hitches,
+  renderer stats, and scene attribution with `0%` visible unattributed
+  triangles.
+- 2026-05-02 Cycle 1 grenade-spike evidence:
+  `artifacts/perf/2026-05-02T22-19-40-381Z/grenade-spike-ai-sandbox` used
+  `npcs=2` and two grenades after warmup. It still reproduced the first-use
+  stall: baseline p95/p99/max `21.8/22.6/23.2ms`, detonation p95/p99/max
+  `23.7/32.5/100ms`, one `387ms` long task, two LoAF entries, and
+  `kb-effects.grenade.frag.total=2.5ms` total. CPU profile is present; no
+  grenade remediation is claimed.
 
 ## Validation Gates
 

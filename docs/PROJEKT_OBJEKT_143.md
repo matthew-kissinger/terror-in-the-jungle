@@ -19,7 +19,7 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | KB-METRIK is first and blocks optimization claims from other bureaus; KB-LOAD has startup measurement and texture-upload attribution; KB-CULL has texture-acceptance measurement and scenario estimates; KB-EFFECTS has first-use grenade-spike attribution; KB-OPTIK has imposter metadata and shader-contract attribution; KB-TERRAIN has vegetation-horizon static coverage evidence; KB-STRATEGIE recommends reinforcing WebGL and deferring WebGPU migration. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status: Open Frontier and A Shau steady-state captures passed measurement trust, combat120 did not, and the low-load grenade probe still reproduces the first-use stall. KB-METRIK remains first and blocks optimization claims from other bureaus. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
 ## Shipped Cycle 0 State
@@ -151,6 +151,51 @@ is measurement credibility. The current artifacts can show that a frame is bad;
 they cannot reliably assign cost to helicopters, buildings, vegetation
 imposters, NPC imposters, combat effects, startup work, shader compilation, or
 harness overhead.
+
+## Phase 2 / Cycle 1 Baseline Certification
+
+Cycle 1 local source and build truth:
+
+- Source HEAD: `cef45fcc906ebe4357009109e2186c83c2a38426`.
+- Local `dist/asset-manifest.json` and `dist-perf/asset-manifest.json` both
+  report `cef45fcc906ebe4357009109e2186c83c2a38426`.
+- `npm run doctor` passed on Node `24.14.1`, Playwright `1.59.1`.
+- `npm run check:projekt-143` passed and wrote
+  `artifacts/perf/2026-05-02T22-05-00-955Z/projekt-143-evidence-suite/suite-summary.json`.
+- Cycle 1 bundle certification wrote
+  `artifacts/perf/2026-05-02T22-24-03-223Z/projekt-143-cycle1-benchmark-bundle/bundle-summary.json`
+  plus `projekt-143-cycle1-metadata.json` sidecars into each source artifact.
+
+Baseline bundle status: WARN, not production parity. Live deployment was not
+rechecked in this Cycle 1 pass, so no deployed-game parity claim is made here.
+
+| Probe | Artifact | Trust | Result |
+| --- | --- | --- | --- |
+| Open Frontier startup | `artifacts/perf/2026-05-02T22-07-48-283Z/startup-ui-open-frontier` | Diagnostic startup evidence, not perf-capture trust | Three headed retail runs averaged `6180.7ms` mode-click-to-playable and `5165.0ms` deploy-click-to-playable. WebGL upload attribution and three CPU profiles are present. Largest uploads again include Pixel Forge vegetation/NPC atlases; max upload was `2780.5ms`. |
+| Zone Control startup | `artifacts/perf/2026-05-02T22-08-46-576Z/startup-ui-zone-control` | Diagnostic startup evidence, not perf-capture trust | Three headed retail runs averaged `6467.7ms` mode-click-to-playable and `5312.7ms` deploy-click-to-playable. WebGL upload attribution and three CPU profiles are present. The largest upload was giantPalm albedo at `2608.2ms`. |
+| combat120 | `artifacts/perf/2026-05-02T22-09-13-541Z` | FAIL (`probeAvg=149.14ms`, `probeP95=258ms`) | Frame numbers are not trusted for regression decisions. The artifact still records renderer stats, browser long tasks/LoAF entries, and scene attribution; validation failed with avg/p95/p99/max frame all clamped at `100ms`. |
+| Open Frontier short | `artifacts/perf/2026-05-02T22-11-29-560Z` | PASS (`probeAvg=15.72ms`, `probeP95=26ms`, missed `0%`) | Trusted as a WARN capture: avg `23.70ms`, p95 `29.20ms`, p99 `32.70ms`, max `100ms`, 4 hitches above `50ms`, renderer stats and scene attribution present with visible-unattributed triangles at `0%`. |
+| A Shau short | `artifacts/perf/2026-05-02T22-15-19-678Z` | PASS (`probeAvg=10.52ms`, `probeP95=18ms`, missed `0%`) | Trusted as a WARN capture: avg `12.04ms`, p95 `18.30ms`, p99 `31.50ms`, max `48.50ms`, no `>50ms` hitches, renderer stats and scene attribution present with visible-unattributed triangles at `0%`. |
+| Low-load grenade spike | `artifacts/perf/2026-05-02T22-19-40-381Z/grenade-spike-ai-sandbox` | Diagnostic effect-attribution evidence | Two-grenade probe with `npcs=2` reproduced the first-use stall: baseline p95/p99/max `21.8/22.6/23.2ms`, detonation p95/p99/max `23.7/32.5/100ms`, one `387ms` long task and two LoAF entries. Grenade JS timing stayed small (`kb-effects.grenade.frag.total=2.5ms` total); CPU profile is present. |
+
+Measurement-trust assessment:
+
+- Harness overhead is acceptable for Open Frontier short and A Shau short only.
+- Browser long-task and long-animation-frame observers are present in all
+  browser artifacts.
+- CPU profiles are present for startup UI and grenade-spike artifacts, but not
+  for the steady-state perf captures because those were not run with deep CDP.
+- WebGL upload attribution is present only for startup UI artifacts; it is
+  intentionally disabled for steady-state and grenade runtime probes.
+- Renderer stats and scene attribution are present for steady-state perf
+  captures. KB-CULL can use Open Frontier and A Shau scene attribution, but not
+  combat120, because combat120 measurement trust failed.
+
+The Asset Acceptance Standard is now documented in
+[ASSET_ACCEPTANCE_STANDARD.md](ASSET_ACCEPTANCE_STANDARD.md). It formalizes the
+texture, mipmapped-memory, atlas-density, normal-map, triangle/draw-call,
+LOD/culling, screenshot, and perf-evidence gates for Pixel Forge and other
+runtime assets.
 
 ## Phase 2 Bureau Tracker
 
@@ -508,8 +553,8 @@ Open questions:
 
 ### KB-CULL - Culling And Asset Discipline
 
-Status: MEASUREMENT STARTED FOR TEXTURE ACCEPTANCE; FULL CULLING CERTIFICATION
-WAITS ON DRAW-CALL TELEMETRY.
+Status: ASSET ACCEPTANCE STANDARD LANDED; FULL CULLING CERTIFICATION WAITS ON
+DRAW-CALL TELEMETRY.
 
 Progress:
 
@@ -521,31 +566,12 @@ Progress:
   `texSubImage2D` startup stall and are not a final art rule. They are intended
   to prevent future asset drops from silently adding multi-second first-present
   uploads.
-
-Draft asset acceptance standard:
-
-- Every registered runtime texture must have a matching on-disk file and must
-  match the dimensions declared by `src/config/pixelForgeAssets.ts`.
-- Any single runtime texture estimated above `16MiB` mipmapped RGBA requires an
-  explicit acceptance note and startup-upload evidence.
-- Any single runtime texture estimated above `32MiB` mipmapped RGBA is blocked
-  unless the asset owner proves it is pre-uploaded behind a truthful loading
-  state or replaced with a compressed/downscaled/partitioned representation.
-- Vegetation atlases above `80px` per runtime meter require visual justification
-  or regeneration at a lower tile size. High pixels-per-meter on a small runtime
-  prop is a direct upload-risk signal, not visual quality by itself.
-- Normal maps for billboard/imposter vegetation must justify their runtime
-  value against upload cost. If a species can meet visual acceptance with
-  hemisphere lighting alone, the normal atlas should not ship by default.
-- NPC animated albedo atlases must be evaluated as a package, not per-file
-  source PNG size: current registry shape is `28` atlases at `18.38MiB`
-  estimated mipmapped RGBA each.
-- Candidate target sizes are not accepted replacements until visual QA checks
-  imposter darkness, silhouette readability, animation readability, and
-  distant-canopy coverage against the original atlases.
-- Scenario estimates must be attached to any acceptance exception. An exception
-  that keeps a large atlas must state why its visual value beats the measured
-  upload and residency cost.
+- 2026-05-02 Cycle 1: the Asset Acceptance Standard is landed in
+  [ASSET_ACCEPTANCE_STANDARD.md](ASSET_ACCEPTANCE_STANDARD.md). It keeps the
+  current texture thresholds as mechanical gates, adds atlas density,
+  normal-map, triangle/draw-call, LOD/culling, screenshot, and perf-evidence
+  requirements, and documents `npm run check:projekt-143-cycle1-bundle` as the
+  benchmark sidecar/bundle certifier.
 
 Open questions:
 
@@ -733,7 +759,7 @@ Scope:
   runs KB-CULL texture audit, KB-OPTIK imposter optics audit, KB-TERRAIN
   vegetation horizon audit, and KB-STRATEGIE WebGPU strategy audit, then writes
   a suite summary artifact. Latest validation:
-  `artifacts/perf/2026-05-02T21-49-44-009Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-02T22-05-00-955Z/projekt-143-evidence-suite/suite-summary.json`.
 
 Dependencies:
 
