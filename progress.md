@@ -1313,3 +1313,346 @@ TODO
   post-build `npm run check:pixel-forge-cutover` passed. Local gun-range browser
   smoke at `http://127.0.0.1:5173/?mode=gun-range&glb=1&t=1777241544507`
   rendered four Pixel Forge GLB targets with no console errors.
+
+2026-05-02 Projekt Objekt-143 KB-METRIK continuation
+- Added perf-capture measurement-trust reporting. Each capture now writes
+  `measurement-trust.json`, embeds `measurementTrust` in `summary.json`, and
+  adds a `measurement_trust` validation check before frame-time numbers are
+  treated as usable evidence.
+- Normalized perf server bind/navigation to `127.0.0.1`, avoiding Windows
+  localhost/IPv6 ambiguity during startup captures.
+- Added post-sample `scene-attribution.json` capture with category buckets,
+  mesh/material/geometry counts, live instance-aware triangle estimates,
+  effective parent visibility, example meshes, and visible-example meshes. The
+  attribution pass runs after the runtime sample window so it does not pollute
+  frame timing.
+- Validation: `npm run typecheck` passed. Headed perf-build control
+  `artifacts/perf/2026-05-02T16-37-21-875Z` exited 0 with measurement trust
+  PASS (`probeAvg=14.00ms`, `probeP95=17.00ms`, missed samples 0%), avg frame
+  14.23ms, heap recovery PASS, no browser errors, and validation WARN only for
+  peak p99 31.70ms.
+- Finding: scene attribution now classifies terrain, water, atmosphere,
+  vegetation imposters, NPC imposters, hidden close NPC GLBs, hidden weapon
+  pools, and static features. Visible unattributed triangles fell to 244 in the
+  control capture, but hidden resident pools are large even with `npcs=0`:
+  1,360 close-NPC meshes / 132,840 resident triangles and 8,480 weapon meshes /
+  133,440 resident triangles. That is now a KB-LOAD/KB-CULL startup and asset
+  residency target.
+
+2026-05-02 Projekt Objekt-143 KB-LOAD measurement opening
+- Refreshed the retail build with `npm run build`; `dist/asset-manifest.json`
+  now reports git SHA `5fd4ba34e28c4840b0f72e1a0475881d050122a1`.
+- Ran headed retail startup UI benchmarks, three iterations each:
+  `artifacts/perf/2026-05-02T18-30-01-826Z/startup-ui-open-frontier` and
+  `artifacts/perf/2026-05-02T18-30-45-200Z/startup-ui-zone-control`.
+- Open Frontier averaged 5457.3ms from mode click to playable; Zone Control
+  averaged 5288.3ms. The measured stall is real, but this sample does not yet
+  support treating Open Frontier as uniquely worse by more than noise.
+- Stage split: Open Frontier averaged 1156.6ms across
+  `engine-init.start-game.*` and 3893.2ms from startup-flow begin to
+  interactive-ready; Zone Control averaged 1177.1ms and 3633.5ms. KB-LOAD's
+  next target is live-entry spawn warming/hidden pool construction and first-use
+  shader/material work, not broad terrain/navmesh speculation.
+
+2026-05-02 Projekt Objekt-143 startup telemetry label fix
+- Changed `SystemInitializer` startup marks to use stable `SystemRegistry` keys
+  instead of constructor names, because retail minification converted several
+  labels into unreadable identifiers.
+- Validation: `npm run typecheck` passed, `npm run build` passed, and a one-run
+  headed Open Frontier startup benchmark wrote
+  `artifacts/perf/2026-05-02T18-35-49-488Z/startup-ui-open-frontier`.
+- The validation artifact now exposes labels such as
+  `systems.init.combatantSystem`; in that run `combatantSystem` init measured
+  576.9ms, `firstPersonWeapon` init 62.0ms, `terrainSystem` init 49.0ms,
+  `engine-init.start-game.open_frontier` 1265.3ms, and live-entry 3271.3ms.
+
+2026-05-02 Projekt Objekt-143 live-entry stall narrowing
+- Added named `engine-init.startup-flow.*` marks inside `LiveEntryActivator`
+  for hide-loading, position-player, flush-chunk-update, renderer-visible,
+  enable-player-systems, audio-start, combat-enable, background task
+  scheduling, and enter-live.
+- Added `browser-stalls.json` to `scripts/perf-startup-ui.ts` by installing the
+  existing `perf-browser-observers.js` long-task/long-animation-frame observer
+  during retail startup UI benchmarks.
+- Validation: `npm run typecheck` passed; `npm run build` passed; one Open
+  Frontier startup run with marks wrote
+  `artifacts/perf/2026-05-02T18-59-10-446Z/startup-ui-open-frontier`.
+- A three-run Open Frontier validation after the bounded frame-yield guard wrote
+  `artifacts/perf/2026-05-02T19-01-27-585Z/startup-ui-open-frontier` and still
+  averaged 5298.0ms from mode click to playable. Live-entry still averaged
+  about 3757ms, almost entirely inside `flush-chunk-update` after the sync
+  terrain update ended. The yield resolved by `requestAnimationFrame`, not the
+  100ms timeout, so the guard did not fix the local stall.
+- Follow-up observer-enabled artifact
+  `artifacts/perf/2026-05-02T19-03-09-195Z/startup-ui-open-frontier` recorded
+  `startup-flow-total=3804.3ms`, `frame-yield-wait=3802.1ms`, and a 3813ms
+  long task starting at 4571.2ms. Startup marks put terrain-update end at
+  4513.4ms and yield return at 8315.5ms. Next KB-LOAD target is attribution of
+  that long task, not terrain update speculation.
+
+2026-05-02 Projekt Objekt-143 texture-upload lead
+- Extended startup UI evidence so `perf-browser-observers.js` preserves
+  long-task attribution and long-animation-frame script entries, and
+  `scripts/perf-startup-ui.ts` writes per-iteration Chrome CPU profiles as
+  `cpu-profile-iteration-N.cpuprofile`.
+- Validation: `npm run typecheck` passed; headed Open Frontier startup UI runs
+  wrote `artifacts/perf/2026-05-02T19-09-45-201Z/startup-ui-open-frontier` and
+  `artifacts/perf/2026-05-02T19-11-07-930Z/startup-ui-open-frontier`.
+- The latest profiled artifact measured `modeClickToPlayable=5535ms`,
+  `deployClickToPlayable=4688ms`, `startup-flow-total=3841.7ms`,
+  `frame-yield-wait=3838.6ms`, and a 3850ms long task after terrain update.
+  Long-task browser attribution remained `unknown/window`.
+- CPU profile aggregation for
+  `artifacts/perf/2026-05-02T19-11-07-930Z/startup-ui-open-frontier/cpu-profile-iteration-1.cpuprofile`
+  showed dominant self-time in generated Three code:
+  `je build-assets/three-DgNwuF1l.js 4079:13616` at 3233.9ms. Inspecting the
+  generated bundle maps `je` to `WebGLState.texSubImage2D`.
+- Current KB-LOAD lead: the live-entry stall is likely first-present WebGL
+  texture upload/update work. Next useful step is texture-upload attribution by
+  asset owner, then a policy decision between pre-upload/precompile before the
+  loading screen clears, compression/downscale/atlas fixes, or deferring
+  non-critical textures behind truthful progressive readiness.
+
+2026-05-02 Projekt Objekt-143 texture-owner attribution
+- Added diagnostic WebGL texture-upload wrapping to `perf-browser-observers.js`.
+  It tracks upload operation, bound texture id, dimensions, source type, source
+  URL for image sources, and top uploads by duration. This is intentionally
+  intrusive and should be used for attribution, not clean timing baselines.
+- Added WebGL upload counts and durations into `scripts/perf-startup-ui.ts`
+  summary output.
+- Validation: `node --check scripts/perf-browser-observers.js` passed,
+  `npm run typecheck` passed, and a headed Open Frontier startup UI capture
+  wrote `artifacts/perf/2026-05-02T19-19-47-099Z/startup-ui-open-frontier`.
+- Finding: the diagnostic artifact recorded 324 WebGL texture upload calls,
+  3157.8ms total upload wrapper time, and a 2342.3ms max `texSubImage2D`.
+  The largest single upload was
+  `assets/pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.png`
+  at 4096x2048. Other top uploads were the giantPalm normal map, Pixel Forge
+  vegetation imposter albedo/normal maps at 2048x2048, and Pixel Forge NPC
+  animated albedo atlases at 2688x1344.
+- Next KB-LOAD/KBCULL/KB-OPTIK handoff: define an asset acceptance policy for
+  imposter/NPC texture dimensions, compression, mip generation, normal-map
+  necessity, and preload/deferred-upload behavior before attempting a runtime
+  workaround.
+- Final validation after adding WebGL upload fields to `summary.json` wrote
+  `artifacts/perf/2026-05-02T19-21-53-436Z/startup-ui-open-frontier`.
+  `summary.json` now reports `webglTextureUploadCount=345`,
+  `webglTextureUploadTotalDurationMs=2757.2ms`, and
+  `webglTextureUploadMaxDurationMs=1958.0ms`; the largest upload was again the
+  giantPalm imposter albedo texture.
+
+2026-05-02 Projekt Objekt-143 Pixel Forge texture acceptance audit
+- Added `scripts/pixel-forge-texture-audit.ts` and wired it as
+  `npm run check:pixel-forge-textures`.
+- The audit reads `src/config/pixelForgeAssets.ts`, verifies each registered
+  texture has an on-disk file, checks dimensions against registry expectations,
+  and estimates uncompressed RGBA plus full mip chain residency. The thresholds
+  are deliberately an acceptance-standard draft: warn at 16MiB and fail at
+  32MiB per texture.
+- Validation: `npm run typecheck` passed and `npm run check:pixel-forge-textures`
+  wrote
+  `artifacts/perf/2026-05-02T19-26-55-682Z/pixel-forge-texture-audit/texture-audit.json`.
+- Finding: all 42 registered Pixel Forge textures exist, but 38 are flagged.
+  Total source PNG bytes are 26,180,240, while estimated mipmapped RGBA
+  residency is 781.17MiB. Vegetation color and normal atlases each account for
+  133.33MiB; NPC albedo atlases account for 514.5MiB. GiantPalm color and normal
+  are hard failures at 42.67MiB each; all 28 NPC albedo atlases warn at 18.38MiB
+  each and are non-power-of-two at 2688x1344.
+- Extended the audit with vegetation pixels-per-runtime-meter and reran it at
+  `artifacts/perf/2026-05-02T19-28-36-962Z/pixel-forge-texture-audit/texture-audit.json`.
+  GiantPalm is 81.5px/m and bananaPlant is 108.02px/m, so both now carry an
+  oversampling warning in addition to their residency flags. Fern and
+  elephantEar are the compact counterexamples at 2.67MiB per atlas.
+- Next handoff: use this audit as the first KB-CULL asset acceptance gate, then
+  decide whether giantPalm needs downscale/regeneration, normal-map removal,
+  compression, or explicit pre-upload before attempting a runtime fix.
+
+2026-05-02 Projekt Objekt-143 texture target candidates
+- Extended `scripts/pixel-forge-texture-audit.ts` with remediation candidates.
+  Candidate sizes are planning evidence only: they estimate what a regeneration
+  target would buy before anyone approves replacement art.
+- Validation: `npm run typecheck` passed and `npm run check:pixel-forge-textures`
+  wrote
+  `artifacts/perf/2026-05-02T19-33-14-632Z/pixel-forge-texture-audit/texture-audit.json`.
+- Finding: applying candidates to every flagged texture would reduce estimated
+  mipmapped RGBA residency from 781.17MiB to 373.42MiB, saving 407.75MiB.
+  GiantPalm color/normal would move from 4096x2048 / 42.67MiB each to
+  2048x1024 / 10.67MiB each. Mid-level vegetation 2048x2048 atlases would move
+  to 1024x1024 / 5.33MiB each. NPC animated albedo atlases would target padded
+  2048x1024 / 10.67MiB each using 64px frames instead of the current 2688x1344
+  / 18.38MiB shape.
+- Next handoff: candidate targets must go through visual QA for imposter
+  darkness, silhouettes, animation readability, and distant-canopy coverage
+  before any runtime import or preload policy treats them as accepted.
+
+2026-05-02 Projekt Objekt-143 texture scenario estimates
+- Extended `scripts/pixel-forge-texture-audit.ts` again so the JSON report
+  includes package-level scenario estimates, not just per-texture candidates.
+- Validation: `npm run typecheck` passed and `npm run check:pixel-forge-textures`
+  wrote
+  `artifacts/perf/2026-05-02T19-34-49-412Z/pixel-forge-texture-audit/texture-audit.json`.
+- Scenario estimates from the current registry: no vegetation normals
+  647.97MiB, vegetation candidates only 589.3MiB, vegetation candidates without
+  normals 551.97MiB, NPC candidates only 565.42MiB, all candidates 373.42MiB.
+- Next handoff: KB-CULL can now compare package-level asset-policy choices in
+  the same artifact. KB-OPTIK still has to validate visual consequences before
+  any candidate texture target can be treated as accepted.
+
+2026-05-02 Projekt Objekt-143 local ship-state alignment
+- Updated `docs/STATE_OF_REPO.md` with an explicit local pending recovery slice:
+  current branch/head, planned development-cycle scope, local files waiting to
+  ship, and what cannot be claimed yet.
+- Updated `docs/PROJEKT_OBJEKT_143.md` so the Phase 2 status includes both
+  KB-LOAD texture-upload attribution and KB-CULL texture-acceptance/scenario
+  estimates, plus a local ship-state section.
+- Current local payload is an instrumentation/evidence slice: measurement trust,
+  startup/live-entry attribution, stable startup labels, diagnostic WebGL upload
+  attribution, and the Pixel Forge texture acceptance audit. It is not a
+  startup remediation, asset-regeneration patch, visual sign-off, WebGPU
+  migration, or Phase 3 remediation execution.
+
+2026-05-02 Projekt Objekt-143 KB-EFFECTS grenade-spike attribution
+- Added frag-grenade user timings in `src/systems/weapons/GrenadeEffects.ts`
+  and a dedicated `scripts/perf-grenade-spike.ts` probe, exposed as
+  `npm run perf:grenade-spike`.
+- The grenade probe disables the startup WebGL texture-upload observer because
+  wrapping every WebGL texture call contaminates sustained runtime attribution.
+- Best low-load evidence:
+  `artifacts/perf/2026-05-02T20-21-05-603Z/grenade-spike-ai-sandbox`.
+  With `npcs=2` and two grenades, baseline p95/p99/max were
+  22.6ms/23.6ms/25.0ms; detonation p95/p99/max were 25.7ms/30.6ms/100.0ms.
+  The first trigger aligned with a 379ms long task and 380.5ms long animation
+  frame; the second trigger did not produce a matching long task.
+- Frag detonation JS is not the observed spike: two detonations measured
+  `kb-effects.grenade.frag.total` at 1.4ms total / 1.0ms max, while
+  spawnProjectile was 0.6ms total / 0.4ms max and the pool/audio/damage/shake
+  steps were sub-millisecond.
+- CPU profile lead: aggregate self-time points at first visible Three/WebGL
+  render/program work (`updateMatrixWorld`, minified Three render functions,
+  `(program)`, `getProgramInfoLog`, `renderBufferDirect`), not particle
+  allocation, damage, audio decode, or physics broadphase.
+- 120-NPC evidence:
+  `artifacts/perf/2026-05-02T20-19-04-818Z/grenade-spike-ai-sandbox` is not a
+  valid grenade-isolation capture because the baseline is already saturated at
+  100ms frames before detonation. It still shows grenade JS at about 1.2ms.
+- Updated `docs/PROJEKT_OBJEKT_143.md`, `docs/STATE_OF_REPO.md`, and
+  `docs/PERFORMANCE.md` with the KB-EFFECTS brief and local ship-state
+  alignment. No grenade-spike remediation has shipped yet.
+
+2026-05-02 Projekt Objekt-143 KB-OPTIK imposter optics audit
+- Added `scripts/pixel-forge-imposter-optics-audit.ts` and wired it as
+  `npm run check:pixel-forge-optics`.
+- The audit reads registered Pixel Forge NPC/vegetation assets, metadata JSON,
+  alpha occupancy, luma/chroma statistics, and runtime scale constants. It
+  writes
+  `artifacts/perf/<timestamp>/pixel-forge-imposter-optics-audit/optics-audit.json`.
+- Validation: `npm run check:pixel-forge-optics` passed and wrote
+  `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`;
+  `npm run typecheck` passed.
+- Finding: NPC runtime atlases are a confirmed scale/resolution suspect.
+  `28/28` runtime NPC clip atlases were flagged. Median visible actor height is
+  65px inside a 96px tile, runtime/source height ratio median is 2.63x, and
+  runtime effective resolution is only 21.69px/m.
+- Finding: the field report that NPC imposters look wrong is supported, but
+  this static pass does not prove the runtime plane is half-sized. It points to
+  a bake/runtime contract mismatch plus low effective pixels per meter. A
+  screenshot rig still needs to compare projected close-GLB and imposter bounds.
+- Finding: the darkness/parity issue is credible architecturally because the
+  three LOD/render paths are split. NPC imposters use a straight-alpha
+  `ShaderMaterial` with independent readability/exposure/min-light constants;
+  vegetation uses an atmosphere-aware premultiplied `RawShaderMaterial`; close
+  GLBs use the regular Three material path.
+- Vegetation optics repeated the texture-audit scale concerns: `bananaPlant`
+  is oversampled at 108.02px/m, while `giantPalm` is runtime-scaled 1.75x over
+  its declared source size and still oversampled at 81.5px/m.
+- Updated `docs/PROJEKT_OBJEKT_143.md`, `docs/STATE_OF_REPO.md`,
+  `docs/PERFORMANCE.md`, and `docs/ASSET_MANIFEST.md`. No imposter brightness,
+  scale, atlas, or normal-map remediation has shipped yet.
+
+2026-05-02 Projekt Objekt-143 KB-TERRAIN vegetation horizon audit
+- Added `scripts/vegetation-horizon-audit.ts` and wired it as
+  `npm run check:vegetation-horizon`.
+- The audit compares mode camera far planes, visual terrain extents, terrain
+  LOD inputs, vegetation cell residency, biome palettes, and registered
+  vegetation fade/max distances. It writes
+  `artifacts/perf/<timestamp>/vegetation-horizon-audit/horizon-audit.json`.
+- Validation: `npm run check:vegetation-horizon` passed and wrote
+  `artifacts/perf/2026-05-02T21-29-15-593Z/vegetation-horizon-audit/horizon-audit.json`.
+- Finding: the barren-horizon report is supported for large/elevated modes.
+  Current vegetation fades out by 600m, while Open Frontier can expose an
+  estimated 396.79m terrain band beyond visible vegetation and A Shau can
+  expose 3399.2m because its camera far plane is 4000m.
+- Finding: the large-mode limiter is not generated-cell residency in the first
+  static pass. Vegetation residency reaches 832m on-axis and 1176.63m at the
+  cell-square corner; the shader max distance cuts visibility first.
+- Recommended direction: add a reversible outer canopy representation for large
+  modes, likely sparse GPU-instanced canopy cards plus terrain tint in the far
+  band, while keeping Pixel Forge imposters as the near/mid layer. Do not
+  blindly raise existing billboard max distances without overdraw, draw-call,
+  and screenshot evidence.
+- Updated `docs/PROJEKT_OBJEKT_143.md`, `docs/STATE_OF_REPO.md`,
+  `docs/PERFORMANCE.md`, and `docs/ASSET_MANIFEST.md`. No distant-canopy or
+  barren-horizon remediation has shipped yet.
+
+2026-05-02 Projekt Objekt-143 KB-STRATEGIE WebGL/WebGPU decision basis
+- Added `scripts/webgpu-strategy-audit.ts` and wired it as
+  `npm run check:webgpu-strategy`.
+- The audit records active renderer construction, active WebGPU source matches,
+  WebGL-specific type/context dependencies, migration-blocker patterns, current
+  combatant bucket capacity, and retained E2 spike evidence. It writes
+  `artifacts/perf/<timestamp>/webgpu-strategy-audit/strategy-audit.json`.
+- Validation: `npm run check:webgpu-strategy` passed and wrote
+  `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`.
+- Finding: active runtime source has no WebGPU renderer path. The audit reports
+  0 active WebGPU source matches, 5 WebGL renderer entrypoints including dev
+  tools, and 94 migration-blocker matches across custom shader/material,
+  post-processing, and WebGL context usage.
+- Finding: the retained E2 rendering spike remains available at
+  `origin/spike/E2-rendering-at-scale`. It measured the keyed-instanced
+  NPC-shaped path at about 2.02ms avg for 3000 instances and recommended
+  deferring WebGPU migration. The old 120-instance bucket cliff has since been
+  reduced as a silent-risk item: current default bucket capacity is 512 and
+  overflow is reported.
+- External check: Three.js WebGPURenderer can fall back to WebGL 2 but requires
+  ShaderMaterial, RawShaderMaterial, onBeforeCompile, and old EffectComposer
+  paths to move to node materials/TSL. MDN still marks WebGPU as not Baseline.
+- Recommendation filed: reinforce WebGL for stabilization. WebGPU remains a
+  post-stabilization spike for an isolated renderer path, not a migration to
+  start inside the current recovery slice.
+- Updated `docs/PROJEKT_OBJEKT_143.md`, `docs/STATE_OF_REPO.md`,
+  `docs/PERFORMANCE.md`, and `progress.md`. No WebGPU migration implementation
+  has shipped or been started.
+
+2026-05-02 Projekt Objekt-143 Phase 3 draft plan
+- Added the first dependency-aware Phase 3 multi-cycle plan to
+  `docs/PROJEKT_OBJEKT_143.md`.
+- Sequence: Cycle 0 ships the evidence slice, Cycle 1 certifies baselines and
+  asset policy, Cycle 2 builds visual/runtime proof harnesses, Cycle 3 applies
+  measured WebGL remediations, and Cycle 4 is a contained WebGPU/TSL spike only
+  if WebGL remains the measured blocker.
+- Acceptance criteria now call out specific gates for startup upload evidence,
+  trusted combat captures, NPC projected-height/luma parity, elevated
+  vegetation screenshots, draw-call attribution, grenade long-task removal,
+  outer-canopy p95/draw-call limits, and explicit WebGPU point-of-no-return
+  approval.
+- Updated `docs/STATE_OF_REPO.md` so the local state says Phase 3 draft exists
+  and the next cycle should ship the evidence slice before remediation.
+
+2026-05-02 Projekt Objekt-143 Cycle 0 static evidence suite
+- Added `scripts/projekt-143-evidence-suite.ts` and wired it as
+  `npm run check:projekt-143`.
+- The suite runs the four static bureau audits as one local gate:
+  Pixel Forge texture audit, Pixel Forge imposter optics audit, vegetation
+  horizon audit, and WebGL/WebGPU strategy audit. It writes
+  `artifacts/perf/<timestamp>/projekt-143-evidence-suite/suite-summary.json`.
+- First attempt failed because `execFileSync('npx.cmd', ...)` returned
+  `spawnSync npx.cmd EINVAL` on Windows. The runner now invokes the local
+  `tsx` CLI through `node` directly, avoiding shell argument warnings and
+  `.cmd` spawn failures.
+- Validation: `npm run check:projekt-143` passed and wrote
+  `artifacts/perf/2026-05-02T21-49-44-009Z/projekt-143-evidence-suite/suite-summary.json`.
+- The suite intentionally does not run `perf:grenade-spike`; that probe remains
+  separate because it is a headed runtime/browser capture and should not be
+  hidden inside the quick static evidence gate.
+- Updated `docs/PROJEKT_OBJEKT_143.md`, `docs/STATE_OF_REPO.md`,
+  `docs/PERFORMANCE.md`, and `progress.md`.

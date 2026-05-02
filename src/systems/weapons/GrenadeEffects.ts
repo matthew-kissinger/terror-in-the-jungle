@@ -17,6 +17,50 @@ const _offset = new THREE.Vector3();
 const _spawnPos = new THREE.Vector3();
 const _velocity = new THREE.Vector3();
 
+const GRENADE_EFFECT_TIMING_ENABLED = import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1';
+let grenadeEffectMeasureSequence = 0;
+
+function beginGrenadeEffectMeasure(type: string): string | null {
+  if (!GRENADE_EFFECT_TIMING_ENABLED || typeof performance === 'undefined' || typeof performance.mark !== 'function') {
+    return null;
+  }
+
+  const baseName = `kb-effects.grenade.${type}.${++grenadeEffectMeasureSequence}`;
+  performance.mark(`${baseName}.begin`);
+  return baseName;
+}
+
+function measureGrenadeEffectStep(baseName: string | null, step: string, run: () => void): void {
+  if (!baseName || typeof performance === 'undefined' || typeof performance.measure !== 'function') {
+    run();
+    return;
+  }
+
+  const beginName = `${baseName}.${step}.begin`;
+  const endName = `${baseName}.${step}.end`;
+  performance.mark(beginName);
+  try {
+    run();
+  } finally {
+    performance.mark(endName);
+    performance.measure(`kb-effects.grenade.${step}`, beginName, endName);
+    performance.clearMarks(beginName);
+    performance.clearMarks(endName);
+  }
+}
+
+function endGrenadeEffectMeasure(baseName: string | null, type: string): void {
+  if (!baseName || typeof performance === 'undefined' || typeof performance.measure !== 'function') {
+    return;
+  }
+
+  const endName = `${baseName}.end`;
+  performance.mark(endName);
+  performance.measure(`kb-effects.grenade.${type}.total`, `${baseName}.begin`, endName);
+  performance.clearMarks(`${baseName}.begin`);
+  performance.clearMarks(endName);
+}
+
 /**
  * Handles different grenade type explosion effects
  */
@@ -56,49 +100,68 @@ export class GrenadeEffects {
     combatantSystem: CombatantSystem | undefined,
     playerController: IPlayerController | undefined
   ): void {
-    // Main explosion effect - big flash, smoke, fire, shockwave
-    if (explosionEffectsPool) {
-      explosionEffectsPool.spawn(grenade.position);
-    }
+    // KB-EFFECTS records step-level user timings in dev/perf builds so grenade
+    // spikes can be attributed before remediation changes the behavior.
+    const measureBase = beginGrenadeEffectMeasure('frag');
+    try {
+      // Main explosion effect - big flash, smoke, fire, shockwave
+      measureGrenadeEffectStep(measureBase, 'frag.explosionPool', () => {
+        if (explosionEffectsPool) {
+          explosionEffectsPool.spawn(grenade.position);
+        }
+      });
 
-    // Additional debris/impact effects for more detail
-    if (impactEffectsPool) {
-      for (let i = 0; i < 5; i++) {
-        _offset.set(
-          (Math.random() - 0.5) * 3,
-          Math.random() * 1.5,
-          (Math.random() - 0.5) * 3
-        );
-        _spawnPos.copy(grenade.position).add(_offset);
-        _velocity.set(0, 1, 0);
-        impactEffectsPool.spawn(_spawnPos, _velocity);
-      }
-    }
+      // Additional debris/impact effects for more detail
+      measureGrenadeEffectStep(measureBase, 'frag.impactPool', () => {
+        if (impactEffectsPool) {
+          for (let i = 0; i < 5; i++) {
+            _offset.set(
+              (Math.random() - 0.5) * 3,
+              Math.random() * 1.5,
+              (Math.random() - 0.5) * 3
+            );
+            _spawnPos.copy(grenade.position).add(_offset);
+            _velocity.set(0, 1, 0);
+            impactEffectsPool.spawn(_spawnPos, _velocity);
+          }
+        }
+      });
 
-    if (audioManager) {
-      audioManager.playExplosionAt(grenade.position);
-    }
+      measureGrenadeEffectStep(measureBase, 'frag.audio', () => {
+        if (audioManager) {
+          audioManager.playExplosionAt(grenade.position);
+        }
+      });
 
-    if (combatantSystem) {
-      combatantSystem.applyExplosionDamage(
-        grenade.position,
-        this.DAMAGE_RADIUS,
-        this.MAX_DAMAGE,
-        'PLAYER',
-        grenade.killFeedWeaponType ?? 'grenade'
-      );
-    }
+      measureGrenadeEffectStep(measureBase, 'frag.damage', () => {
+        if (combatantSystem) {
+          combatantSystem.applyExplosionDamage(
+            grenade.position,
+            this.DAMAGE_RADIUS,
+            this.MAX_DAMAGE,
+            'PLAYER',
+            grenade.killFeedWeaponType ?? 'grenade'
+          );
+        }
+      });
 
-    // Apply enhanced camera shake from explosion
-    if (playerController) {
-      playerController.applyExplosionShake(grenade.position, this.DAMAGE_RADIUS);
-    }
+      // Apply enhanced camera shake from explosion
+      measureGrenadeEffectStep(measureBase, 'frag.cameraShake', () => {
+        if (playerController) {
+          playerController.applyExplosionShake(grenade.position, this.DAMAGE_RADIUS);
+        }
+      });
 
-    GameEventBus.emit('explosion', {
-      position: grenade.position,
-      radius: this.DAMAGE_RADIUS,
-      source: 'frag_grenade',
-    });
+      measureGrenadeEffectStep(measureBase, 'frag.event', () => {
+        GameEventBus.emit('explosion', {
+          position: grenade.position,
+          radius: this.DAMAGE_RADIUS,
+          source: 'frag_grenade',
+        });
+      });
+    } finally {
+      endGrenadeEffectMeasure(measureBase, 'frag');
+    }
   }
 
   private explodeSmoke(

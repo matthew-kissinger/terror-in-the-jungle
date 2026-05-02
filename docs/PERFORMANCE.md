@@ -71,13 +71,24 @@ npm run perf:capture:teamdeathmatch # TDM scenario
 npm run perf:capture:openfrontier:short  # Open Frontier short
 npm run perf:capture:ashau:short    # A Shau short
 npm run perf:capture:frontier30m    # 30-minute soak test
+npm run perf:grenade-spike          # KB-EFFECTS grenade first-use probe
 npm run perf:quick                  # Quick smoke (not a baseline)
 npm run perf:compare                # Compare latest vs tracked baselines
 npm run perf:compare:strict         # Same compare, but fail on warnings too
 npm run perf:update-baseline        # Update baselines from latest capture
 npm run perf:analyze:latest         # Analyze most recent artifacts
 npm run perf:startup:openfrontier   # Production startup benchmark
+npm run check:pixel-forge-optics    # KB-OPTIK imposter optics audit
+npm run check:vegetation-horizon    # KB-TERRAIN vegetation horizon audit
+npm run check:webgpu-strategy       # KB-STRATEGIE WebGL/WebGPU audit
+npm run check:projekt-143           # Cycle 0 static evidence suite
 ```
+
+Startup UI benchmarks are retail-build measurements, not perf-harness frame
+captures. They measure operator-visible phases from title screen through
+deploy and playable HUD, and they are useful for KB-LOAD mode-entry evidence.
+They do not write `measurement-trust.json`, do not expose per-frame runtime
+samples, and do not replace `perf-capture.ts` for steady-state frame claims.
 
 ## Scenarios
 
@@ -116,6 +127,8 @@ Each run writes to `artifacts/perf/<timestamp>/`:
 |------|----------|
 | `summary.json` | Pass/warn/fail result, frame timing stats |
 | `validation.json` | Gate results (combat, heap, hitches) |
+| `measurement-trust.json` | Harness self-certification from probe round-trip, missed samples, and sample presence |
+| `scene-attribution.json` | Post-sample scene census by approximate asset/system category |
 | `runtime-samples.json` | Per-sample frame timing, heap, renderer.info, system timing |
 | `movement-artifacts.json` | Occupancy cells, hotspots, sampled tracks |
 | `movement-terrain-context.json` | Gameplay surface context for viewer |
@@ -126,7 +139,31 @@ Each run writes to `artifacts/perf/<timestamp>/`:
 
 Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome-trace.json`.
 
-`summary.json`, `validation.json`, `console.json`, and `runtime-samples.json` are written on best effort failure paths as well, so a blocked run still leaves enough evidence to diagnose startup regressions.
+`perf-startup-ui.ts` writes its own retail startup artifacts under
+`artifacts/perf/<timestamp>/startup-ui-<mode>/`: `summary.json`,
+`startup-marks.json`, `browser-stalls.json`, `console.json`, and
+`cpu-profile-iteration-N.cpuprofile`. Treat those artifacts as startup and
+UI-readiness evidence only. `browser-stalls.json` also includes diagnostic
+WebGL texture-upload attribution during startup UI runs; those wrapped WebGL
+calls are useful for asset ownership, but the resulting run is not an
+uncontaminated frame-time baseline.
+
+`perf-grenade-spike.ts` writes KB-EFFECTS artifacts under
+`artifacts/perf/<timestamp>/grenade-spike-<mode>/`: `summary.json`,
+`baseline-snapshot.json`, `detonation-snapshot.json`, `console.json`, and
+`cpu-profile.cpuprofile`. The probe disables the diagnostic WebGL
+texture-upload observer because that startup tracer wraps hot WebGL calls and
+would contaminate sustained runtime grenade attribution.
+
+`pixel-forge-imposter-optics-audit.ts` writes KB-OPTIK artifacts under
+`artifacts/perf/<timestamp>/pixel-forge-imposter-optics-audit/`. The audit is
+static metadata and image analysis: it does not replace screenshot comparison,
+but it catches bake/runtime scale mismatches, low effective pixels per meter,
+alpha occupancy, atlas luma/chroma, and divergent shader contracts.
+
+`summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
+and `runtime-samples.json` are written on best effort failure paths as well, so
+a blocked run still leaves enough evidence to diagnose startup regressions.
 
 ## Harness Status
 
@@ -159,6 +196,155 @@ Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome
   `artifacts/perf/2026-05-02T07-29-13-476Z`. This is a stronger perf-confidence
   warning than the April heap-only run and must be rerun on a quiet machine
   before claiming combat120 perf sign-off or refreshing baselines.
+- 2026-05-02 KB-METRIK first patch: `perf-capture.ts` now writes
+  `measurement-trust.json`, embeds `measurementTrust` in `summary.json`, and
+  adds a `measurement_trust` check to `validation.json`. A capture with no
+  runtime samples, missed samples, or high harness probe round-trip is marked
+  untrusted before its frame-time numbers are used for regression decisions.
+- 2026-05-02 KB-METRIK continuation: perf capture now binds and navigates via
+  `127.0.0.1`, avoiding Windows `localhost` ambiguity. It also writes
+  `scene-attribution.json` after sampling, not during sampling, so object census
+  work cannot distort frame timing. Headless Chromium was explicitly separated
+  from headed evidence in this session: headless captures failed measurement
+  trust, while a headed perf-build control at
+  `artifacts/perf/2026-05-02T16-37-21-875Z` passed measurement trust
+  (`probeAvg=14.00ms`, `probeP95=17.00ms`, missed samples `0%`) with avg frame
+  `14.23ms`, no browser errors, heap recovery PASS, and only a p99 warning.
+- 2026-05-02 scene-attribution status: the artifact now includes example and
+  visible-example meshes per bucket, uses effective parent visibility, counts
+  zero-live-instance instanced meshes as zero live triangles, and classifies the
+  actual runtime path prefixes for Pixel Forge NPCs/weapons plus water and
+  atmosphere. In the latest control capture, visible unattributed triangles are
+  244, below 1% of the main-scene visible triangle census.
+- 2026-05-02 scene-residency finding: even with `npcs=0`, the control capture
+  shows hidden resident close-NPC pools: `npc_close_glb` contributes 1,360
+  resident meshes / 132,840 resident triangles and `weapons` contributes 8,480
+  resident meshes / 133,440 resident triangles, both effectively invisible.
+  Treat this as startup/memory/first-use evidence for KB-LOAD and KB-CULL, not
+  as current-frame visible render cost.
+- 2026-05-02 KB-LOAD measurement opened: after a fresh `npm run build`, retail
+  headed startup benchmarks ran three iterations for Open Frontier and Zone
+  Control. Open Frontier averaged 5457.3ms from mode click to playable at
+  `artifacts/perf/2026-05-02T18-30-01-826Z/startup-ui-open-frontier`; Zone
+  Control averaged 5288.3ms at
+  `artifacts/perf/2026-05-02T18-30-45-200Z/startup-ui-zone-control`. The
+  operator-visible stall is real, but the Open Frontier lead over Zone Control
+  was only 169.0ms in this sample. In both modes, most measured post-selection
+  time sits after deploy click in live entry, not in the named pre-deploy
+  terrain/navmesh stages.
+- 2026-05-02 startup label fix: `SystemInitializer` now emits
+  `systems.init.<registryKey>.*` marks instead of constructor-name marks, because
+  production minification made the previous retail labels unreadable. The
+  validation startup artifact
+  `artifacts/perf/2026-05-02T18-35-49-488Z/startup-ui-open-frontier` confirms
+  stable labels such as `systems.init.combatantSystem` and measured
+  `combatantSystem` init at 576.9ms in that one run.
+- 2026-05-02 live-entry instrumentation: `LiveEntryActivator` now emits named
+  marks for hide-loading, player positioning, terrain chunk flush, renderer
+  reveal, player/HUD enable, audio start, combat enable, background task
+  scheduling, and `enterLive()`. Startup UI benchmarks now install the existing
+  browser-stall observer, preserve long-task/long-animation-frame attribution,
+  and write `browser-stalls.json` plus per-run Chrome CPU profiles.
+- 2026-05-02 live-entry finding: after those marks landed, Open Frontier still
+  averaged 5298.0ms from mode click to playable over three runs at
+  `artifacts/perf/2026-05-02T19-01-27-585Z/startup-ui-open-frontier`. The
+  measured live-entry span averaged about 3757ms, almost entirely inside
+  `flush-chunk-update` after the synchronous terrain update had ended. The
+  observer-enabled artifact
+  `artifacts/perf/2026-05-02T19-03-09-195Z/startup-ui-open-frontier` recorded a
+  3813ms long task during that yield window. A later CPU-profiled artifact at
+  `artifacts/perf/2026-05-02T19-11-07-930Z/startup-ui-open-frontier` recorded a
+  3850ms long task and attributed the dominant CPU self-time to Three's
+  WebGLState `texSubImage2D` wrapper (`3233.9ms`). Treat the next KB-LOAD target
+  as first-present texture upload attribution and residency policy, not generic
+  terrain update cost.
+- 2026-05-02 texture-upload attribution: after adding diagnostic WebGL upload
+  wrapping and source URL capture, the headed Open Frontier artifact
+  `artifacts/perf/2026-05-02T19-19-47-099Z/startup-ui-open-frontier` recorded
+  324 texture upload calls, `3157.8ms` total upload wrapper time, and a
+  `2342.3ms` max `texSubImage2D`. The largest upload was
+  `assets/pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.png`
+  at `4096x2048`; the rest of the high-cost list is dominated by Pixel Forge
+  vegetation imposter maps and `2688x1344` NPC animated albedo atlases. This
+  artifact is diagnostic; do not compare its timing directly against unwrapped
+  startup runs.
+- 2026-05-02 summary validation: after adding WebGL upload fields to
+  `summary.json`, the headed artifact
+  `artifacts/perf/2026-05-02T19-21-53-436Z/startup-ui-open-frontier` wrote
+  `webglTextureUploadCount=345`, `webglTextureUploadTotalDurationMs=2757.2ms`,
+  and `webglTextureUploadMaxDurationMs=1958.0ms`. The largest upload was again
+  `assets/pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.png`.
+- 2026-05-02 texture inventory gate: `npm run check:pixel-forge-textures`
+  writes `artifacts/perf/<timestamp>/pixel-forge-texture-audit/texture-audit.json`.
+  The current artifact
+  `artifacts/perf/2026-05-02T19-33-14-632Z/pixel-forge-texture-audit/texture-audit.json`
+  inventories all 42 registered Pixel Forge textures with no missing files,
+  38 flagged textures, 26,180,240 source bytes, and 781.17MiB estimated
+  mipmapped RGBA residency. The audit flags giantPalm color and normal atlases
+  as hard failures at 42.67MiB each and all 28 NPC albedo atlases as warning
+  textures at 18.38MiB each. It also flags vegetation oversampling above
+  80 pixels per runtime meter: giantPalm is 81.5px/m and bananaPlant is
+  108.02px/m. Its candidate-size projection reduces estimated residency to
+  373.42MiB, saving 407.75MiB if every flagged texture is regenerated to the
+  proposed target. Scenario estimates in
+  `artifacts/perf/2026-05-02T19-34-49-412Z/pixel-forge-texture-audit/texture-audit.json`
+  are: no vegetation normals `647.97MiB`, vegetation candidates only
+  `589.3MiB`, vegetation candidates without normals `551.97MiB`, NPC candidates
+  only `565.42MiB`, all candidates `373.42MiB`. This is planning evidence, not
+  a visual sign-off.
+- 2026-05-02 KB-EFFECTS grenade-spike probe: `npm run perf:grenade-spike`
+  records matched baseline and detonation windows plus frag detonation user
+  timings. The low-load two-grenade artifact
+  `artifacts/perf/2026-05-02T20-21-05-603Z/grenade-spike-ai-sandbox` reproduced
+  a first-use stall: baseline p95/p99/max were `22.6ms / 23.6ms / 25.0ms`,
+  detonation p95/p99/max were `25.7ms / 30.6ms / 100.0ms`, and the first
+  trigger aligned with a `379ms` long task and `380.5ms` long animation frame.
+  Two grenade detonations measured only `1.4ms` total JS frag work with
+  sub-millisecond pool, audio, damage, camera-shake, and event steps. The CPU
+  profile points at first visible Three/WebGL render and program work
+  (`updateMatrixWorld`, `getProgramInfoLog`, `renderBufferDirect`), not at the
+  grenade gameplay code. The 120-NPC artifact
+  `artifacts/perf/2026-05-02T20-19-04-818Z/grenade-spike-ai-sandbox` is not a
+  valid isolation capture because its baseline is already saturated at
+  `100ms` frames before detonation.
+- 2026-05-02 KB-OPTIK imposter optics audit:
+  `npm run check:pixel-forge-optics` wrote
+  `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`.
+  It flagged `28/28` runtime NPC atlases and `2/7` vegetation atlases. NPC
+  median visible tile height is `65px` inside a `96px` tile, runtime/source
+  height ratio median is `2.63x`, and runtime effective resolution is only
+  `21.69px/m`. The audit also records the shader-contract split: NPC imposters
+  use a separate straight-alpha `ShaderMaterial`, vegetation uses a
+  premultiplied atmosphere-aware `RawShaderMaterial`, and close GLBs use the
+  regular Three material path. Treat this as root-cause evidence for
+  brightness/size investigation, not as visual sign-off.
+- 2026-05-02 KB-TERRAIN vegetation horizon audit:
+  `npm run check:vegetation-horizon` wrote
+  `artifacts/perf/2026-05-02T21-29-15-593Z/vegetation-horizon-audit/horizon-audit.json`.
+  It compares camera far planes, visual terrain extents, vegetation cell
+  residency, biome palettes, and shader fade/max distances. The registry max
+  vegetation draw distance is `600m`, while scatterer residency reaches
+  `832m` on-axis and `1176.63m` at the cell-square corner, so large-mode
+  horizon loss is shader-distance limited before it is scatterer-limited.
+  Open Frontier exposes an estimated `396.79m` terrain band beyond visible
+  vegetation; A Shau exposes `3399.2m` because its camera far plane is `4000m`.
+  Treat this as static coverage evidence; a runtime elevated-camera screenshot
+  harness is still required before accepting a far-canopy implementation.
+- 2026-05-02 KB-STRATEGIE WebGL/WebGPU audit:
+  `npm run check:webgpu-strategy` wrote
+  `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`.
+  Active runtime source has `0` WebGPU matches, `5` WebGL renderer entrypoints
+  including dev/viewer tools, and `94` migration-blocker matches across custom
+  shader/material/post-processing/WebGL-context usage. The retained E2 spike
+  measured a keyed-instanced NPC-shaped path at about `2.02ms` avg for `3000`
+  instances and recommended deferring WebGPU migration. Treat WebGPU as a
+  post-stabilization spike target, not a current perf remediation.
+- 2026-05-02 Cycle 0 static evidence suite:
+  `npm run check:projekt-143` wrote
+  `artifacts/perf/2026-05-02T21-49-44-009Z/projekt-143-evidence-suite/suite-summary.json`.
+  The suite passed KB-CULL texture audit, KB-OPTIK imposter optics audit,
+  KB-TERRAIN vegetation horizon audit, and KB-STRATEGIE WebGPU audit. It does
+  not run `perf:grenade-spike`; that remains a separate headed runtime probe.
 
 ## Validation Gates
 
@@ -196,7 +382,21 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    or other GPU-heavy apps running.
 1. **Combat AI tails** - cover search is budget-capped to 6/frame via `CoverSearchBudget`, but p95/p99 still in WARN range due to per-search cost (sandbag iteration + vegetation grid + terrain probes).
 2. **Open Frontier renderer tails** - the latest short capture (`artifacts/perf/2026-04-07T04-01-01-963Z`) passes mean/p95/hitch gates, but `p99FrameMs` still warns at `29.60ms` and heap peak-growth still warns at `35.13MB`. The mode is stable again, but not yet back to the March 4 renderer baseline.
-3. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
+3. **Grenade first-use render/program stall** - KB-EFFECTS now reproduces a
+   low-load first-use detonation stall while measuring the frag JS path at
+   about 1ms. The current lead is first visible Three/WebGL explosion
+   render/program work. Do not treat the older hidden-effect warmup as closed
+   until the two-grenade probe passes without a trigger-adjacent long task.
+4. **NPC imposter scale/resolution and brightness parity** - static KB-OPTIK
+   evidence now shows every runtime NPC atlas is stretched more than 2x against
+   source bbox height and uses only `21.69px/m` at runtime. The shader path is
+   also split from both vegetation and close GLBs. A matched screenshot rig is
+   required before fixing constants or regenerating atlases.
+5. **Large-mode vegetation horizon gap** - static KB-TERRAIN evidence shows
+   current Pixel Forge vegetation disappears by `600m`, while Open Frontier
+   and A Shau terrain remains visible beyond that range. The current lead is a
+   missing outer canopy tier, not a scatterer residency bug.
+6. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
 
 ## Resolved Bottlenecks
 

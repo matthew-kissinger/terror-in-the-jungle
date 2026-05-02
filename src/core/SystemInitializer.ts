@@ -237,6 +237,17 @@ export class SystemInitializer {
       refs.vehicleManager
     ];
 
+    // Registry keys survive production minification; constructor names do not.
+    // Startup telemetry uses these labels so retail-shaped captures can still
+    // identify which system consumed initialization time.
+    const allSystemSet = new Set<GameSystem>(allSystems);
+    const systemTelemetryNames = new Map<GameSystem, string>();
+    for (const [key, system] of Object.entries(refs)) {
+      if (allSystemSet.has(system as GameSystem)) {
+        systemTelemetryNames.set(system as GameSystem, key);
+      }
+    }
+
     onProgress('world', 0.5);
 
     // Defer non-critical systems so first interactive frame is not blocked.
@@ -255,7 +266,7 @@ export class SystemInitializer {
 
     // Initialize critical systems first
     for (const system of systems) {
-      const name = (system as any)?.constructor?.name ?? 'UnknownSystem';
+      const name = systemTelemetryNames.get(system) ?? (system as any)?.constructor?.name ?? 'UnknownSystem';
       if (preInitializedSystems.has(system)) {
         markStartup(`systems.init.${name}.skipped-preinitialized`);
         continue;

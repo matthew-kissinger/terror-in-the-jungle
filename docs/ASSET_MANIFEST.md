@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Last updated: 2026-04-26
+Last updated: 2026-05-02
 
 ## 3D Models (159 GLBs)
 
@@ -64,6 +64,29 @@ avoiding its bad low-elevation atlas row. These guards are an interim runtime
 answer, not final tree art. For polished close-range palms, prefer regenerated
 assets with close mesh LODs or a hybrid instanced trunk plus impostor canopy
 path.
+
+Projekt Objekt-143 KB-OPTIK opened a static imposter optics audit on
+2026-05-02: `npm run check:pixel-forge-optics` writes
+`artifacts/perf/<timestamp>/pixel-forge-imposter-optics-audit/optics-audit.json`.
+The first artifact,
+`artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`,
+flags every runtime NPC animated impostor atlas: 96px tiles have median visible
+actor height of 65px, while runtime stretches the source bakes to a 4.425m
+plane. That is a scale/resolution contract problem to validate visually before
+changing runtime constants or regenerating atlases. The same audit flags
+`bananaPlant` and `giantPalm` vegetation as oversampled relative to runtime
+size. This is evidence for KB-OPTIK/KB-CULL, not asset approval or rejection.
+
+Projekt Objekt-143 KB-TERRAIN opened a vegetation horizon audit on 2026-05-02:
+`npm run check:vegetation-horizon` writes
+`artifacts/perf/<timestamp>/vegetation-horizon-audit/horizon-audit.json`. The
+first artifact,
+`artifacts/perf/2026-05-02T21-29-15-593Z/vegetation-horizon-audit/horizon-audit.json`,
+confirms current runtime vegetation has no outer canopy tier beyond the
+registered `600m` max distance. Open Frontier and A Shau can render terrain
+well beyond that range, so distant barren terrain is an asset representation
+gap, not approval to extend the existing near/mid Pixel Forge imposters without
+new perf and screenshot evidence.
 
 The sky is now procedural runtime atmosphere (`AtmosphereSystem` +
 `HosekWilkieSkyBackend`), not a static skybox texture.

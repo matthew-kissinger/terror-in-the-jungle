@@ -281,6 +281,8 @@ type CaptureSummary = {
     sampleIntervalMs: number;
     detailEverySamples: number;
   };
+  measurementTrust: MeasurementTrustReport;
+  sceneAttribution?: SceneAttributionEntry[];
   startupTiming?: {
     firstEngineSeenSec?: number;
     firstMetricsSeenSec?: number;
@@ -351,6 +353,51 @@ type ValidationReport = {
   checks: ValidationCheck[];
 };
 
+type MeasurementTrustReport = {
+  status: ValidationCheckStatus;
+  probeRoundTripAvgMs: number;
+  probeRoundTripP95Ms: number;
+  probeRoundTripMaxMs: number;
+  sampleCount: number;
+  missedSamples: number;
+  missedSampleRate: number;
+  sampleIntervalMs: number;
+  detailEverySamples: number;
+  checks: ValidationCheck[];
+  summary: string;
+};
+
+type SceneAttributionEntry = {
+  category: string;
+  objects: number;
+  visibleObjects: number;
+  meshes: number;
+  instancedMeshes: number;
+  drawCallLike: number;
+  instances: number;
+  triangles: number;
+  visibleTriangles: number;
+  materials: number;
+  geometries: number;
+  examples?: Array<{
+    nameChain: string;
+    type: string;
+    modelPath: string | null;
+    materialType: string | null;
+    triangles: number;
+    instances: number;
+    effectivelyVisible: boolean;
+  }>;
+  visibleExamples?: Array<{
+    nameChain: string;
+    type: string;
+    modelPath: string | null;
+    materialType: string | null;
+    triangles: number;
+    instances: number;
+  }>;
+};
+
 const DEV_SERVER_PORT = 9100;
 const DEFAULT_DURATION_SECONDS = 90;
 const DEFAULT_WARMUP_SECONDS = 15;
@@ -379,6 +426,7 @@ const LOCK_FILE = join(process.cwd(), 'tmp', 'perf-capture.lock');
 const CDP_STOP_TIMEOUT_MS = 3_000;
 const TRACE_STOP_TIMEOUT_MS = 5_000;
 const SCENARIO_SETUP_TIMEOUT_MS = 10_000;
+const PERF_SERVER_HOST = '127.0.0.1';
 // harness-lifecycle-halt-on-match-end: load the pure helpers from the driver's
 // CJS surface so the regression test (scripts/perf-harness/...) and the live
 // capture both consume the same `shouldFinalizeAfterMatchEnd` definition. The
@@ -643,6 +691,80 @@ function percentile(values: number[], p: number): number {
   return sorted[idx];
 }
 
+function computeMeasurementTrust(options: {
+  probeRoundTripMs: number[];
+  runtimeSampleCount: number;
+  missedSamples: number;
+  sampleIntervalMs: number;
+  detailEverySamples: number;
+}): MeasurementTrustReport {
+  const probeRoundTripAvgMs = average(options.probeRoundTripMs);
+  const probeRoundTripP95Ms = percentile(options.probeRoundTripMs, 0.95);
+  const probeRoundTripMaxMs = options.probeRoundTripMs.length > 0
+    ? Math.max(...options.probeRoundTripMs)
+    : 0;
+  const totalSampleAttempts = options.runtimeSampleCount + options.missedSamples;
+  const missedSampleRate = totalSampleAttempts > 0
+    ? options.missedSamples / totalSampleAttempts
+    : 0;
+
+  const checks: ValidationCheck[] = [
+    {
+      id: 'measurement_probe_avg_ms',
+      status: probeRoundTripAvgMs <= 25 ? 'pass' : probeRoundTripAvgMs <= 75 ? 'warn' : 'fail',
+      value: probeRoundTripAvgMs,
+      message: `Harness probe average round-trip ${probeRoundTripAvgMs.toFixed(2)}ms`
+    },
+    {
+      id: 'measurement_probe_p95_ms',
+      status: probeRoundTripP95Ms <= 75 ? 'pass' : probeRoundTripP95Ms <= 150 ? 'warn' : 'fail',
+      value: probeRoundTripP95Ms,
+      message: `Harness probe p95 round-trip ${probeRoundTripP95Ms.toFixed(2)}ms`
+    },
+    {
+      id: 'measurement_missed_sample_rate',
+      status: missedSampleRate <= 0.05 ? 'pass' : missedSampleRate <= 0.15 ? 'warn' : 'fail',
+      value: missedSampleRate,
+      message: `Missed ${(missedSampleRate * 100).toFixed(1)}% of runtime sample attempts`
+    },
+    {
+      id: 'measurement_samples_present',
+      status: options.runtimeSampleCount > 0 ? 'pass' : 'fail',
+      value: options.runtimeSampleCount,
+      message: `Collected ${options.runtimeSampleCount} trusted-window runtime samples`
+    }
+  ];
+  const status = getOverallStatus(checks);
+  const summary = status === 'pass'
+    ? 'Measurement path certified for regression comparison.'
+    : status === 'warn'
+      ? 'Measurement path is usable with caution; corroborate before baseline decisions.'
+      : 'Measurement path is not trusted for performance regression decisions.';
+
+  return {
+    status,
+    probeRoundTripAvgMs,
+    probeRoundTripP95Ms,
+    probeRoundTripMaxMs,
+    sampleCount: options.probeRoundTripMs.length,
+    missedSamples: options.missedSamples,
+    missedSampleRate,
+    sampleIntervalMs: options.sampleIntervalMs,
+    detailEverySamples: options.detailEverySamples,
+    checks,
+    summary
+  };
+}
+
+function measurementTrustValidationCheck(report: MeasurementTrustReport): ValidationCheck {
+  return {
+    id: 'measurement_trust',
+    status: report.status,
+    value: report.probeRoundTripP95Ms,
+    message: `${report.summary} probeAvg=${report.probeRoundTripAvgMs.toFixed(2)}ms probeP95=${report.probeRoundTripP95Ms.toFixed(2)}ms missed=${(report.missedSampleRate * 100).toFixed(1)}%`
+  };
+}
+
 function chooseContourStep(heightRange: number): number {
   if (heightRange > 220) return 30;
   if (heightRange > 120) return 20;
@@ -750,6 +872,181 @@ async function captureMovementViewerPayload(page: Page): Promise<MovementViewerP
       contourStep,
     },
   };
+}
+
+async function captureSceneAttribution(page: Page): Promise<SceneAttributionEntry[] | null> {
+  const source = String.raw`
+  (() => {
+    const renderer = window.__renderer;
+    const engine = window.__engine;
+    const scene = renderer?.scene ?? engine?.renderer?.scene;
+    if (!scene?.traverse) return null;
+
+    const buckets = new Map();
+    const materialArray = (material) => Array.isArray(material)
+      ? material
+      : material
+        ? [material]
+        : [];
+    const getBucket = (category) => {
+      let bucket = buckets.get(category);
+      if (!bucket) {
+        bucket = {
+          category,
+          objects: 0,
+          visibleObjects: 0,
+          meshes: 0,
+          instancedMeshes: 0,
+          drawCallLike: 0,
+          instances: 0,
+          triangles: 0,
+          visibleTriangles: 0,
+          materials: new Set(),
+          geometries: new Set(),
+          examples: [],
+          visibleExamples: []
+        };
+        buckets.set(category, bucket);
+      }
+      return bucket;
+    };
+    const modelPathFor = (object) => {
+      let current = object;
+      while (current) {
+        const path = current.userData?.modelPath;
+        if (typeof path === 'string' && path.length > 0) return path.toLowerCase();
+        current = current.parent;
+      }
+      return '';
+    };
+    const nameChainFor = (object) => {
+      const names = [];
+      let current = object;
+      while (current && names.length < 6) {
+        if (typeof current.name === 'string' && current.name.length > 0) names.push(current.name.toLowerCase());
+        current = current.parent;
+      }
+      return names.join('/');
+    };
+    const categoryFor = (object) => {
+      let current = object;
+      while (current) {
+        const category = current.userData?.perfCategory;
+        if (typeof category === 'string' && category.length > 0) return category;
+        current = current.parent;
+      }
+      const modelPath = modelPathFor(object);
+      const names = nameChainFor(object);
+      const uniforms = materialArray(object.material).map((material) => material?.uniforms ?? {});
+      const hasUniform = (name) => uniforms.some((uniform) => Object.prototype.hasOwnProperty.call(uniform, name));
+      if (names.includes('cdlodterrain')) return 'terrain';
+      if (names.includes('hosekwilkieskydome') || names.includes('cloudlayer')) return 'atmosphere';
+      if (hasUniform('waterColor') || hasUniform('distortionScale')) return 'water';
+      if (hasUniform('vegetationExposure') || hasUniform('imposterAtlasEnabled')) return 'vegetation_imposters';
+      if (hasUniform('npcExposure') || hasUniform('clipDuration')) return 'npc_imposters';
+      if (modelPath.includes('npcs/pixel-forge')) return 'npc_close_glb';
+      if (modelPath.includes('vehicles/aircraft/uh1') || modelPath.includes('vehicles/aircraft/ah1') || modelPath.includes('huey') || modelPath.includes('cobra')) return 'helicopters';
+      if (modelPath.includes('vehicles/aircraft')) return 'fixed_wing_aircraft';
+      if (modelPath.includes('buildings/') || modelPath.includes('structures/') || modelPath.includes('props/')) return 'world_static_features';
+      if (modelPath.includes('weapons/')) return 'weapons';
+      if (names.includes('hitboxdebug')) return 'debug_overlays';
+      return 'unattributed';
+    };
+    const triangleCountFor = (geometry) => {
+      if (!geometry) return 0;
+      const indexCount = Number(geometry.index?.count ?? 0);
+      if (indexCount > 0) return indexCount / 3;
+      const positionCount = Number(geometry.attributes?.position?.count ?? 0);
+      return positionCount > 0 ? positionCount / 3 : 0;
+    };
+    const instanceCountFor = (object) => {
+      if (object.isInstancedMesh) return Math.max(0, Number(object.count ?? 0));
+      const instanceCount = Number(object.geometry?.instanceCount ?? 0);
+      return Number.isFinite(instanceCount) && instanceCount > 0 ? instanceCount : 1;
+    };
+    const isEffectivelyVisible = (object) => {
+      let current = object;
+      while (current) {
+        if (current.visible === false) return false;
+        current = current.parent;
+      }
+      return true;
+    };
+    const materialLabelFor = (object) => {
+      const material = materialArray(object.material)[0];
+      if (!material) return null;
+      return typeof material.type === 'string' && material.type.length > 0
+        ? material.type
+        : typeof material.name === 'string' && material.name.length > 0
+          ? material.name
+          : null;
+    };
+
+    scene.traverse((object) => {
+      const category = categoryFor(object);
+      const bucket = getBucket(category);
+      const effectivelyVisible = isEffectivelyVisible(object);
+      bucket.objects += 1;
+      if (effectivelyVisible) bucket.visibleObjects += 1;
+      if (!object.isMesh) return;
+
+      const materials = materialArray(object.material);
+      const materialCount = Math.max(1, materials.length);
+      const instances = instanceCountFor(object);
+      const baseTriangles = triangleCountFor(object.geometry);
+      const triangles = Math.round(baseTriangles * (object.isInstancedMesh ? instances : Math.max(1, instances)));
+      bucket.meshes += 1;
+      if (object.isInstancedMesh) bucket.instancedMeshes += 1;
+      bucket.drawCallLike += materialCount;
+      bucket.instances += instances;
+      bucket.triangles += triangles;
+      if (effectivelyVisible) bucket.visibleTriangles += triangles;
+      if (object.geometry) bucket.geometries.add(object.geometry);
+      for (const material of materials) bucket.materials.add(material);
+      if (bucket.examples.length < 8) {
+        const example = {
+          nameChain: nameChainFor(object) || '(unnamed)',
+          type: object.type || 'Object3D',
+          modelPath: modelPathFor(object) || null,
+          materialType: materialLabelFor(object),
+          triangles,
+          instances,
+          effectivelyVisible
+        };
+        bucket.examples.push(example);
+      }
+      if (effectivelyVisible && bucket.visibleExamples.length < 8) {
+        bucket.visibleExamples.push({
+          nameChain: nameChainFor(object) || '(unnamed)',
+          type: object.type || 'Object3D',
+          modelPath: modelPathFor(object) || null,
+          materialType: materialLabelFor(object),
+          triangles,
+          instances
+        });
+      }
+    });
+
+    return Array.from(buckets.values())
+      .map((bucket) => ({
+        category: bucket.category,
+        objects: bucket.objects,
+        visibleObjects: bucket.visibleObjects,
+        meshes: bucket.meshes,
+        instancedMeshes: bucket.instancedMeshes,
+        drawCallLike: bucket.drawCallLike,
+        instances: bucket.instances,
+        triangles: bucket.triangles,
+        visibleTriangles: bucket.visibleTriangles,
+        materials: bucket.materials.size,
+        geometries: bucket.geometries.size,
+        examples: bucket.examples,
+        visibleExamples: bucket.visibleExamples
+      }))
+      .sort((a, b) => b.visibleTriangles - a.visibleTriangles || b.drawCallLike - a.drawCallLike);
+  })()
+  `;
+  return page.evaluate(source) as Promise<SceneAttributionEntry[] | null>;
 }
 
 type HarnessModeThresholds = {
@@ -1221,7 +1518,7 @@ async function prewarmDevServer(port: number, paths: string[]): Promise<{ totalM
   let allOk = true;
 
   for (const path of paths) {
-    const url = `http://localhost:${port}${path}`;
+    const url = `http://${PERF_SERVER_HOST}:${port}${path}`;
     const stepStart = Date.now();
     try {
       const res = await withTimeout(
@@ -1813,7 +2110,10 @@ async function runCapture(): Promise<void> {
   const runtimeSamples: RuntimeSample[] = [];
   let movementArtifacts: MovementArtifactReportForViewer | null = null;
   let movementViewerPayload: MovementViewerPayload | null = null;
+  let sceneAttribution: SceneAttributionEntry[] | null = null;
   const probeRoundTripMs: number[] = [];
+  let missedSamples = 0;
+  let measurementTrust: MeasurementTrustReport | null = null;
   const startedAt = nowIso();
   const combatParam = enableCombat ? '1' : '0';
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
@@ -1829,8 +2129,8 @@ async function runCapture(): Promise<void> {
   const query = sandboxMode
     ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}${perfRuntimeQuery}`
     : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}${perfRuntimeQuery}`;
-  const url = `http://localhost:${port}/${query}`;
-  const preflightUrl = `http://localhost:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`;
+  const url = `http://${PERF_SERVER_HOST}:${port}/${query}`;
+  const preflightUrl = `http://${PERF_SERVER_HOST}:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`;
   const primaryPath = new URL(url).pathname + new URL(url).search;
   const prewarmPaths = sandboxMode
     ? [
@@ -1963,7 +2263,7 @@ async function runCapture(): Promise<void> {
       server = await startServer({
         mode: serverMode,
         port,
-        host: '127.0.0.1',
+        host: PERF_SERVER_HOST,
         startupTimeoutMs: STEP_TIMEOUT_MS,
         stdio: 'pipe',
         log: logStep,
@@ -2178,7 +2478,6 @@ async function runCapture(): Promise<void> {
     }
 
     const startMs = Date.now();
-    let missedSamples = 0;
     let sampleTick = 0;
     while (Date.now() - startMs < durationSeconds * 1000) {
       await sleep(sampleIntervalMs);
@@ -2631,6 +2930,15 @@ async function runCapture(): Promise<void> {
       }
       validation.overall = getOverallStatus(validation.checks);
     }
+    measurementTrust = computeMeasurementTrust({
+      probeRoundTripMs,
+      runtimeSampleCount: runtimeSamples.length,
+      missedSamples,
+      sampleIntervalMs,
+      detailEverySamples
+    });
+    validation.checks.push(measurementTrustValidationCheck(measurementTrust));
+    validation.overall = getOverallStatus(validation.checks);
 
     stage = 'write-artifacts';
     if (page) {
@@ -2640,6 +2948,14 @@ async function runCapture(): Promise<void> {
         10_000
       );
       movementArtifacts = movementViewerPayload?.movementArtifacts ?? null;
+      sceneAttribution = await safeAwait(
+        'scene-attribution',
+        captureSceneAttribution(page),
+        10_000
+      );
+      if (sceneAttribution) {
+        writeFileSync(join(artifactDir, 'scene-attribution.json'), JSON.stringify(sceneAttribution, null, 2), 'utf-8');
+      }
       if (movementArtifacts) {
         writeFileSync(join(artifactDir, 'movement-artifacts.json'), JSON.stringify(movementArtifacts, null, 2), 'utf-8');
       }
@@ -2660,6 +2976,9 @@ async function runCapture(): Promise<void> {
     }
     if (chromeTrace.length > 0) {
       writeFileSync(join(artifactDir, 'chrome-trace.json'), chromeTrace, 'utf-8');
+    }
+    if (measurementTrust) {
+      writeFileSync(join(artifactDir, 'measurement-trust.json'), JSON.stringify(measurementTrust, null, 2), 'utf-8');
     }
     writeFileSync(join(artifactDir, 'validation.json'), JSON.stringify(validation, null, 2), 'utf-8');
     if (startupDiagnostics) {
@@ -2685,10 +3004,20 @@ async function runCapture(): Promise<void> {
   } finally {
     stage = 'finalize';
     try {
+      if (!measurementTrust) {
+        measurementTrust = computeMeasurementTrust({
+          probeRoundTripMs,
+          runtimeSampleCount: runtimeSamples.length,
+          missedSamples,
+          sampleIntervalMs,
+          detailEverySamples
+        });
+      }
       if (page) {
         writeFileSync(join(artifactDir, 'console.json'), JSON.stringify(consoleEntries, null, 2), 'utf-8');
         writeFileSync(join(artifactDir, 'runtime-samples.json'), JSON.stringify(runtimeSamples, null, 2), 'utf-8');
       }
+      writeFileSync(join(artifactDir, 'measurement-trust.json'), JSON.stringify(measurementTrust, null, 2), 'utf-8');
       if (validation.checks.length === 0) {
         validation = {
           overall: 'fail',
@@ -2707,8 +3036,12 @@ async function runCapture(): Promise<void> {
             }
           ]
         };
-        writeFileSync(join(artifactDir, 'validation.json'), JSON.stringify(validation, null, 2), 'utf-8');
       }
+      if (!validation.checks.some(check => check.id === 'measurement_trust')) {
+        validation.checks.push(measurementTrustValidationCheck(measurementTrust));
+        validation.overall = getOverallStatus(validation.checks);
+      }
+      writeFileSync(join(artifactDir, 'validation.json'), JSON.stringify(validation, null, 2), 'utf-8');
       const summary: CaptureSummary = {
         startedAt,
         endedAt: nowIso(),
@@ -2749,6 +3082,8 @@ async function runCapture(): Promise<void> {
           sampleIntervalMs,
           detailEverySamples
         },
+        measurementTrust,
+        sceneAttribution: sceneAttribution ?? undefined,
         startupTiming: {
           firstEngineSeenSec: startupState.firstEngineSeenSec,
           firstMetricsSeenSec: startupState.firstMetricsSeenSec,

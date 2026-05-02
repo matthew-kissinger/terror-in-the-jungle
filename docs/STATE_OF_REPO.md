@@ -10,21 +10,88 @@ the current truth anchor.
 
 ## Stable-Ground Snapshot On 2026-05-02
 
-- Current source branch truth at audit start: `master` and `origin/master`
-  pointed at `f99181a0bf8a6b2a8684fc1ae3796022c16aad22`.
-- Latest green CI for that source SHA: GitHub Actions run `25036829545`.
-- Live production was functioning but stale at audit start:
-  `/asset-manifest.json` served
-  `5f585f7d4bf5ad2c0c85450235ac4c9950988d83`, the last successful Deploy run
-  `24972641184` from 2026-04-27. The current stabilization pass is not closed
-  until a manual Deploy run serves the final accepted `master` SHA.
+- A recovery operation is now tracked in
+  [PROJEKT_OBJEKT_143.md](PROJEKT_OBJEKT_143.md). Phase 1 was signed on
+  2026-05-02 after a read-only audit of code, live deployment state, tooling,
+  perf artifacts, and suspect assets. Phase 2 is active with KB-METRIK first:
+  the perf/profiling stack must certify measurement trust before optimization
+  claims are accepted.
+- Current Projekt Objekt-143 continuation has added measurement-trust output
+  to perf captures and opened KB-LOAD measurement with retail startup UI
+  artifacts. The first measured split shows Open Frontier and Zone Control both
+  around 5.3-5.5s from mode click to playable, with most post-selection time
+  after deploy click. Follow-up live-entry marks and browser-stall capture now
+  narrow the local Open Frontier stall to a multi-second long task during the
+  frame-yield window after terrain update, not the terrain update call itself.
+  The latest CPU-profiled artifact points the dominant cost at Three/WebGL
+  `texSubImage2D`, and the first asset-named diagnostic capture points the
+  largest single upload at
+  `assets/pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.png`
+  (`4096x2048`, `2342.3ms`) with more Pixel Forge vegetation and NPC atlas
+  uploads behind it. The new `npm run check:pixel-forge-textures` artifact
+  inventories 42 Pixel Forge textures and estimates 781.17MiB of mipmapped RGBA
+  residency, with giantPalm color/normal as hard failures and every NPC albedo
+  atlas warning-sized. The extended audit also flags giantPalm and bananaPlant
+  as vegetation oversampling cases above 80 pixels per runtime meter. Its
+  candidate-size projection reduces estimated residency to 373.42MiB, saving
+  407.75MiB if every flagged texture is regenerated to the proposed target.
+  Scenario estimates now show the tradeoff between no-normal-map, vegetation,
+  NPC, and all-candidate paths. This is an investigation finding; the current
+  code changes are not a final startup remediation or visual asset sign-off.
+  The same continuation opened KB-EFFECTS grenade-spike attribution with
+  `npm run perf:grenade-spike`: a low-load two-grenade probe reproduced a
+  first-use browser stall, while measured frag detonation JS work stayed at
+  `1.4ms` total across two grenades. The current lead is first visible
+  Three/WebGL explosion render/program work, not particle allocation, damage,
+  audio, or physics broadphase.
+- KB-OPTIK measurement has also started. `npm run check:pixel-forge-optics`
+  writes a Pixel Forge imposter optics audit; the first artifact,
+  `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`,
+  flagged `28/28` runtime NPC atlases and `2/7` vegetation atlases. NPC
+  imposter bakes use `96px` tiles with median visible actor height `65px`, but
+  runtime stretches those bakes to a `4.425m` plane, producing a median
+  runtime/source height ratio of `2.63x` and only `21.69px/m`. The first
+  brightness-parity finding is architectural: NPC imposters, vegetation
+  imposters, and close GLBs use separate shader/material contracts.
+- KB-TERRAIN measurement has started with `npm run check:vegetation-horizon`.
+  The first artifact,
+  `artifacts/perf/2026-05-02T21-29-15-593Z/vegetation-horizon-audit/horizon-audit.json`,
+  supports the elevated-camera vegetation report for large modes: registered
+  vegetation fades out by `600m`, while Open Frontier can expose an estimated
+  `396.79m` terrain band beyond vegetation and A Shau Valley can expose
+  `3399.2m` because its camera far plane is `4000m`. The scatterer residency
+  radius is not the primary large-mode limiter in this static audit; shader
+  max distance is.
+- KB-STRATEGIE filed the WebGL/WebGPU brief. `npm run check:webgpu-strategy`
+  wrote
+  `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`:
+  active source has `0` WebGPU runtime matches, the active game renderer is
+  still WebGL, the audit found `94` migration-blocker matches, and the retained
+  E2 spike remains available. Recommendation: reinforce WebGL for the
+  stabilization cycle and defer any WebGPU migration point of no return.
+- Cycle 0 now has a static evidence bundle. `npm run check:projekt-143` runs
+  the KB-CULL texture audit, KB-OPTIK imposter optics audit, KB-TERRAIN
+  vegetation horizon audit, and KB-STRATEGIE WebGPU audit, then writes a suite
+  summary. Latest local suite:
+  `artifacts/perf/2026-05-02T21-49-44-009Z/projekt-143-evidence-suite/suite-summary.json`.
+- Current source and production truth after the stable-ground refresh:
+  `master`, `origin/master`, and live `/asset-manifest.json` all reported
+  `5fd4ba34e28c4840b0f72e1a0475881d050122a1`; Deploy run `25247508549`
+  served that SHA.
+- Historical note: the stable-ground audit opened while source was at
+  `f99181a0bf8a6b2a8684fc1ae3796022c16aad22` and live Pages still served
+  `5f585f7d4bf5ad2c0c85450235ac4c9950988d83`. Those audit-start values are now
+  superseded by the refreshed `5fd4ba34e28c4840b0f72e1a0475881d050122a1`
+  production parity check.
 - Live Pages/R2 spot checks returned `200` for `/`, `/sw.js`,
   `/asset-manifest.json`, the A Shau DEM R2 URL, and the Recast WASM asset.
   A live browser smoke reached the Zone Control deploy UI with no console,
   page, or request failures.
 - The root review payload was moved out of the repo after hash verification to
   `C:\Users\Mattm\X\games-3d\tij-local-review-artifacts\2026-05-02-stable-ground`.
-  The tracked TIJ worktree is clean on the stabilization branch.
+  The tracked TIJ worktree was clean at the close of that stable-ground pass;
+  current Projekt Objekt-143 recovery edits and local build artifacts are
+  intentionally uncommitted until reviewed.
 - Sibling `game-field-kits` is part of the current control plane. Its
   `master`/`origin/master` pointed at
   `a7b71f1e9af61e2f89bb0adefae5121891896f62`; `npm ci`,
@@ -41,6 +108,96 @@ the current truth anchor.
   `artifacts/perf/2026-05-02T07-29-13-476Z/validation.json`.
 - Detailed evidence for this pass lives in
   [STABILIZATION_AUDIT_2026-05.md](STABILIZATION_AUDIT_2026-05.md).
+
+## Local Pending Recovery Slice On 2026-05-02
+
+Current branch is `master` at
+`5fd4ba34e28c4840b0f72e1a0475881d050122a1`. Production Pages was last verified
+serving that same SHA during the stable-ground pass. The Projekt Objekt-143
+recovery work described below is local-only until committed, pushed, deployed,
+and live-verified.
+
+Planned scope for this local development cycle:
+
+- Establish trusted measurements before optimization: `perf-capture.ts` now
+  writes measurement-trust evidence and post-sample scene attribution.
+- Open KB-LOAD with startup/UI evidence rather than anecdotes: startup marks,
+  browser-stall capture, CPU profiles, and WebGL texture-upload attribution now
+  isolate the Open Frontier live-entry stall to first-present texture upload
+  work.
+- Open KB-CULL asset discipline with a mechanical Pixel Forge texture gate:
+  `npm run check:pixel-forge-textures` inventories registered Pixel Forge
+  atlases, estimates mipmapped RGBA residency, flags oversize/oversampled
+  textures, and emits regeneration scenario estimates.
+- Open KB-EFFECTS with a reproducible grenade spike probe: frag detonation
+  user timings and `scripts/perf-grenade-spike.ts` now distinguish grenade JS
+  cost from browser/render first-use stalls.
+- Open KB-OPTIK with a static imposter optics audit: metadata, alpha occupancy,
+  runtime scale, atlas luma/chroma, and shader-path notes now identify the
+  first NPC scale/resolution and brightness-parity leads.
+- Open KB-TERRAIN with a vegetation horizon audit: camera far planes, visual
+  terrain extents, vegetation cell residency, shader max distances, and
+  per-mode biome palettes now identify the large-mode barren-horizon lead.
+- File KB-STRATEGIE with a WebGL/WebGPU decision basis: active renderer
+  inventory, retained E2 rendering spike evidence, WebGPU migration blockers,
+  capability unlocks, and migration cost estimate.
+- Add a Cycle 0 evidence-suite command so the static bureau audits can be
+  verified as one local gate before remediation work starts.
+- Keep the recovery record current in `docs/PROJEKT_OBJEKT_143.md`,
+  `docs/PERFORMANCE.md`, and `progress.md`.
+
+Local changes waiting to ship:
+
+- Foundational telemetry/tooling: `scripts/perf-capture.ts`,
+  `scripts/perf-browser-observers.js`, `scripts/perf-startup-ui.ts`.
+- Runtime instrumentation only: `src/core/SystemInitializer.ts` stable startup
+  labels and `src/core/LiveEntryActivator.ts` live-entry marks plus bounded
+  frame-yield guard. These do not claim to fix startup; they expose where it
+  stalls.
+- Asset discipline tooling: new `scripts/pixel-forge-texture-audit.ts` and
+  `package.json` script `check:pixel-forge-textures`.
+- Combat-effect attribution tooling: `src/systems/weapons/GrenadeEffects.ts`
+  diagnostic timings, new `scripts/perf-grenade-spike.ts`, and `package.json`
+  script `perf:grenade-spike`.
+- Imposter optics tooling: new
+  `scripts/pixel-forge-imposter-optics-audit.ts` and `package.json` script
+  `check:pixel-forge-optics`.
+- Terrain horizon tooling: new `scripts/vegetation-horizon-audit.ts` and
+  `package.json` script `check:vegetation-horizon`.
+- Strategy tooling: new `scripts/webgpu-strategy-audit.ts` and `package.json`
+  script `check:webgpu-strategy`.
+- Cycle 0 evidence-suite tooling: new `scripts/projekt-143-evidence-suite.ts`
+  and `package.json` script `check:projekt-143`.
+- Documentation/ledger updates: new `docs/PROJEKT_OBJEKT_143.md`, updates to
+  `docs/PERFORMANCE.md`, `docs/STATE_OF_REPO.md`, and `progress.md`.
+
+What is not ready to claim:
+
+- No startup remediation has shipped. The current evidence identifies WebGL
+  `texSubImage2D` texture upload and Pixel Forge atlases as the leading cause.
+- No Pixel Forge texture candidate has visual sign-off. Candidate dimensions
+  are planning estimates only until KB-OPTIK validates imposter darkness,
+  silhouette readability, animation readability, and distant-canopy coverage.
+- No grenade-spike remediation has shipped. The probe currently identifies a
+  first-use render/program stall candidate and records that 120-NPC AI Sandbox
+  is already saturated before a grenade can be isolated.
+- No imposter brightness, NPC scale, NPC atlas, or vegetation normal-map fix
+  has shipped. KB-OPTIK now has static evidence, but still needs matched
+  screenshot comparison against close GLBs and runtime vegetation.
+- No distant-canopy or barren-horizon fix has shipped. KB-TERRAIN now has
+  static coverage evidence, but still needs elevated runtime screenshots and
+  matched perf captures before any outer-canopy layer is accepted.
+- No WebGPU migration has shipped or been started. KB-STRATEGIE recommends
+  staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
+  after the measured blockers are under control.
+- Phase 3 now has a draft multi-cycle plan in
+  `docs/PROJEKT_OBJEKT_143.md`. The next cycle should ship the evidence slice
+  first, then certify baselines and asset policy before remediation. KB-CULL
+  still needs draw-call/culling certification beyond the texture-acceptance
+  slice, KB-EFFECTS still needs a verified warmup or first-use-render
+  remediation before it can close, KB-OPTIK still needs visual QA before
+  remediation can be accepted, and KB-TERRAIN still needs runtime
+  screenshot/perf validation.
 
 ## Starter-Kits Incubation Close-Out On 2026-04-28
 

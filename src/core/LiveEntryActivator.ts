@@ -9,6 +9,8 @@ import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 import { resolveModeSpawnPosition } from './ModeSpawnPosition';
 import { resolveNearbySafeSpawnPosition, resolveOpenSpawnFacingYaw } from './SpawnFacing';
 
+const LIVE_ENTRY_FRAME_YIELD_TIMEOUT_MS = 100;
+
 export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): void {
   if (engine.gameStarted) {
     return;
@@ -41,6 +43,12 @@ export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.V
 async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): Promise<void> {
   markStartup('engine-init.startup-flow.begin');
   const startTime = performance.now();
+  const markStepBegin = (step: string): void => {
+    markStartup(`engine-init.startup-flow.${step}.begin`);
+  };
+  const markStepEnd = (step: string): void => {
+    markStartup(`engine-init.startup-flow.${step}.end`);
+  };
   const markPhase = (phase: string, status?: string, detail?: string) => {
     Logger.info('engine-init', `[startup] ${phase}`);
     if (status) {
@@ -48,11 +56,14 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     }
   };
 
+  markStepBegin('hide-loading');
   markPhase('hide-loading');
   engine.loadingScreen.hide();
   engine.renderer.showSpawnLoadingIndicator();
   engine.renderer.setSpawnLoadingStatus('DEPLOYING TO BATTLEFIELD', 'Preparing insertion route and combat zone...');
+  markStepEnd('hide-loading');
 
+  markStepBegin('position-player');
   markPhase('position-player', 'SYNCING INSERTION POINT', 'Validating terrain height and spawn safety...');
   try {
     const definition = engine.systemManager.gameModeManager.getCurrentDefinition();
@@ -75,30 +86,42 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
   } catch {
     // Keep startup resilient; spawn fallback already exists elsewhere.
   }
+  markStepEnd('position-player');
 
+  markStepBegin('flush-chunk-update');
   markPhase('flush-chunk-update', 'BUILDING LOCAL TERRAIN', 'Finalizing chunk data around insertion zone...');
   engine.systemManager.terrainSystem.update(0.016);
-  await nextFrame();
+  markStartup('engine-init.startup-flow.flush-chunk-update.terrain-update-end');
+  const frameYield = await nextFrame();
+  markStartup(`engine-init.startup-flow.flush-chunk-update.yield-${frameYield}`);
+  markStepEnd('flush-chunk-update');
 
+  markStepBegin('renderer-visible');
   markPhase('renderer-visible', 'RENDERER ONLINE', 'Bringing visual systems to ready state...');
   engine.renderer.showRenderer();
   engine.renderer.hideSpawnLoadingIndicator();
+  markStepEnd('renderer-visible');
 
+  markStepBegin('enable-player-systems');
   markPhase('enable-player-systems', 'LIVE', 'Combat systems active. Good hunting.');
   engine.systemManager.firstPersonWeapon.setGameStarted(true);
   engine.systemManager.playerController.setGameStarted(true);
   engine.systemManager.hudSystem.startMatch();
+  markStepEnd('enable-player-systems');
 
   if (!engine.sandboxEnabled && !shouldUseTouchControls()) {
     Logger.info('engine-init', 'Click anywhere to enable mouse look!');
   }
 
+  markStepBegin('audio-start');
   if (engine.systemManager.audioManager) {
     engine.systemManager.audioManager.startAmbient();
     const settings = SettingsManager.getInstance();
     engine.systemManager.audioManager.setMasterVolume(settings.getMasterVolumeNormalized());
   }
+  markStepEnd('audio-start');
 
+  markStepBegin('combat-enable');
   const allowCombat = engine.sandboxConfig?.enableCombat ?? true;
   if (allowCombat && engine.systemManager.combatantSystem && typeof engine.systemManager.combatantSystem.enableCombat === 'function') {
     engine.systemManager.combatantSystem.enableCombat();
@@ -106,10 +129,12 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
   } else if (!allowCombat) {
     Logger.info('engine-init', 'Combat AI disabled by sandbox config (combat=0)');
   }
+  markStepEnd('combat-enable');
 
   // Warm GPU pipeline by spawning one explosion below ground.
   // This forces shader compilation + texture/buffer uploads through the
   // actual render pipeline, eliminating first-grenade stalls.
+  markStepBegin('background-tasks-schedule');
   requestBackgroundTask(engine, () => {
     try {
       const cs = engine.systemManager.combatantSystem;
@@ -122,13 +147,31 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
   }, 1000);
   requestBackgroundTask(engine, () => engine.renderer.precompileShaders(), 2000);
   requestBackgroundTask(engine, () => engine.systemManager.startDeferredInitialization(), 500);
+  markStepEnd('background-tasks-schedule');
+
+  markStepBegin('enter-live');
   engine.startupFlow.enterLive();
+  markStepEnd('enter-live');
   markPhase(`interactive-ready (${(performance.now() - startTime).toFixed(1)}ms)`);
   markStartup('engine-init.startup-flow.interactive-ready');
 }
 
-function nextFrame(): Promise<void> {
-  return new Promise(resolve => requestAnimationFrame(() => resolve()));
+function nextFrame(): Promise<'raf' | 'timeout'> {
+  return new Promise(resolve => {
+    let settled = false;
+    const settle = (result: 'raf' | 'timeout') => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve(result);
+    };
+
+    // This yield exists to let terrain work breathe before renderer reveal. It
+    // must not become the startup gate: Chromium can delay rAF callbacks while
+    // the renderer canvas is hidden behind deploy/loading UI.
+    const timeoutId = window.setTimeout(() => settle('timeout'), LIVE_ENTRY_FRAME_YIELD_TIMEOUT_MS);
+    requestAnimationFrame(() => settle('raf'));
+  });
 }
 
 function requestBackgroundTask(engine: GameEngine, task: () => void, timeoutMs: number): void {

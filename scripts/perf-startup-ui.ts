@@ -9,6 +9,7 @@ const HOST = '127.0.0.1';
 const DEFAULT_PORT = 4174;
 const DIST_ROOT = join(process.cwd(), 'dist');
 const INDEX_PATH = join(DIST_ROOT, 'index.html');
+const OBSERVER_SCRIPT_PATH = join(process.cwd(), 'scripts', 'perf-browser-observers.js');
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const DEFAULT_RUNS = 3;
 
@@ -51,6 +52,14 @@ type ConsoleEntry = {
   text: string;
 };
 
+type BrowserStallsSnapshot = {
+  support?: Record<string, boolean>;
+  totals?: Record<string, unknown>;
+  recent?: Record<string, unknown>;
+} | null;
+
+type CpuProfileSnapshot = unknown;
+
 type BenchmarkRun = {
   iteration: number;
   timings: {
@@ -67,6 +76,8 @@ type BenchmarkRun = {
   consoleEntries: ConsoleEntry[];
   pageErrors: string[];
   requestErrors: string[];
+  browserStalls: BrowserStallsSnapshot;
+  cpuProfile: CpuProfileSnapshot;
 };
 
 type Summary = {
@@ -158,9 +169,11 @@ async function runBenchmarkIteration(
 ): Promise<BenchmarkRun> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   const page = await context.newPage();
+  const cdpSession = await context.newCDPSession(page);
   const consoleEntries: ConsoleEntry[] = [];
   const pageErrors: string[] = [];
   const requestErrors: string[] = [];
+  let cpuProfile: CpuProfileSnapshot = null;
 
   page.on('console', (msg) => {
     consoleEntries.push({ type: msg.type(), text: msg.text() });
@@ -175,7 +188,10 @@ async function runBenchmarkIteration(
   });
 
   try {
+    await cdpSession.send('Profiler.enable');
+    await cdpSession.send('Profiler.start');
     const t0 = Date.now();
+    await page.addInitScript({ content: readFileSync(OBSERVER_SCRIPT_PATH, 'utf-8') });
     await page.goto(`http://${HOST}:${port}/?logLevel=info`, { waitUntil: 'networkidle', timeout: 120_000 });
     await page.waitForSelector('button[data-ref="start"]', { state: 'visible', timeout: 120_000 });
     const tStartVisible = Date.now();
@@ -218,6 +234,11 @@ async function runBenchmarkIteration(
     const startup = await page.evaluate(() => {
       return (window as any).__startupTelemetry?.getSnapshot?.() ?? null;
     });
+    const browserStalls = await page.evaluate(() => {
+      return (window as any).__perfHarnessObservers?.drain?.() ?? null;
+    });
+    const profileResult = await cdpSession.send('Profiler.stop');
+    cpuProfile = profileResult?.profile ?? null;
 
     return {
       iteration,
@@ -235,8 +256,20 @@ async function runBenchmarkIteration(
       consoleEntries,
       pageErrors,
       requestErrors,
+      browserStalls,
+      cpuProfile,
     };
   } finally {
+    try {
+      if (cpuProfile === null) {
+        const profileResult = await cdpSession.send('Profiler.stop');
+        cpuProfile = profileResult?.profile ?? null;
+      }
+    } catch {
+      // Profiling is diagnostic-only; startup timing artifacts remain useful
+      // when Chromium refuses stop during teardown or navigation failure.
+    }
+    await cdpSession.detach().catch(() => {});
     await context.close();
   }
 }
@@ -270,6 +303,19 @@ function buildSummary(mode: string, runs: BenchmarkRun[], url: string): Summary 
       errorCounts: {
         pageErrors: run.pageErrors.length,
         requestErrors: run.requestErrors.length,
+      },
+      browserStalls: {
+        longTaskCount: Number(run.browserStalls?.totals?.longTaskCount ?? 0),
+        longTaskMaxDurationMs: Number(run.browserStalls?.totals?.longTaskMaxDurationMs ?? 0),
+        longAnimationFrameCount: Number(run.browserStalls?.totals?.longAnimationFrameCount ?? 0),
+        longAnimationFrameMaxDurationMs: Number(run.browserStalls?.totals?.longAnimationFrameMaxDurationMs ?? 0),
+        webglTextureUploadCount: Number(run.browserStalls?.totals?.webglTextureUploadCount ?? 0),
+        webglTextureUploadTotalDurationMs: Number(
+          run.browserStalls?.totals?.webglTextureUploadTotalDurationMs ?? 0,
+        ),
+        webglTextureUploadMaxDurationMs: Number(
+          run.browserStalls?.totals?.webglTextureUploadMaxDurationMs ?? 0,
+        ),
       },
     })),
   };
@@ -317,6 +363,21 @@ async function main(): Promise<void> {
         requestErrors: run.requestErrors,
       })), null, 2),
     );
+    writeFileSync(
+      join(artifactDir, 'browser-stalls.json'),
+      JSON.stringify(runs.map((run) => ({
+        iteration: run.iteration,
+        browserStalls: run.browserStalls,
+      })), null, 2),
+    );
+    runs.forEach((run) => {
+      if (run.cpuProfile) {
+        writeFileSync(
+          join(artifactDir, `cpu-profile-iteration-${run.iteration}.cpuprofile`),
+          JSON.stringify(run.cpuProfile),
+        );
+      }
+    });
 
     console.log(`Startup benchmark complete: ${artifactDir}`);
     console.log(JSON.stringify(summary.averagesMs, null, 2));
