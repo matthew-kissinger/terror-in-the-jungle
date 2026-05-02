@@ -1,6 +1,28 @@
 # Backlog
 
-Last updated: 2026-04-26
+Last updated: 2026-05-02
+
+## Stable-Ground Follow-Up
+
+The 2026-05-02 stabilization pass freezes feature work until release parity is
+restored and documented. Current priority is ops/drift, not new runtime
+capability.
+
+- Deploy the final accepted `master` SHA after CI is green, then verify live
+  `/asset-manifest.json`, `/sw.js`, Pages headers, R2 DEM headers, Recast WASM,
+  Zone Control browser smoke, and one A Shau startup path.
+- Keep `game-field-kits` reproducible: if TIJ file dependencies or CI checkout
+  scripts change, validate both repos and the deploy-key checkout path.
+- Review retained unmerged task/spike branches in batches. Delete only branches
+  that are merged, superseded by current code/docs, or intentionally archived;
+  preserve unique work until it is either imported or explicitly rejected.
+- Keep root-level asset/review drops outside the TIJ repo root. Import assets
+  only through the reviewed Pixel Forge/runtime pipeline.
+- Refresh performance confidence on a quiet machine. `validate:full` remains
+  authoritative locally; hosted CI perf is advisory. The 2026-05-02
+  stabilization run failed local combat120 frame-time gates after unit/build
+  stages passed, with artifact
+  `artifacts/perf/2026-05-02T07-29-13-476Z/validation.json`.
 
 ## Standing workstreams
 
@@ -694,6 +716,14 @@ the runbook for the end-of-cycle ritual.
 13. **Cycle 5 combat spatial ownership has a first pass, not full data-store recovery.** `CombatantLODManager` now receives the spatial grid from `CombatantSystem` instead of importing the singleton directly, but combat hot state is still an object map and scale/perf sign-off still needs combat scenario and perf-tail validation.
 14. **Cycle 6 terrain/collision authority has a first pass, not full terrain-collision runtime unification.** Helicopter squad deploy and navmesh generation now use runtime terrain, but `WorldFeatureSystem` still has a direct `LOSAccelerator` static-obstacle hook and `PlayerMovement` still has a no-runtime fallback to `HeightQueryCache`.
 15. **Cycle 7 harness productization has a first pass, not final diagnostic API design.** Fixed-wing probe summaries are now incremental, but broad `window.__engine` access still needs a deliberate diagnostic API decision before the harness is considered productized.
+16. **2026-05-02 combat120 perf confidence is not clean.** The stabilization
+   run passed `doctor`, `validate:fast`, `build`, `smoke:prod`,
+   `check:mobile-ui`, `probe:fixed-wing`, and `evidence:atmosphere`, but
+   `validate:full` failed inside `perf:capture:combat120` with avg/p99 at
+   100.00ms, 100% of frames over 50ms, and Combat over budget in 100% of
+   samples. Because the branch is docs/ops-only and the capture had `0`
+   browser/page errors, treat this as a quiet-machine rerun and perf-triage
+   item before any baseline refresh.
 
 ## Known Bugs
 

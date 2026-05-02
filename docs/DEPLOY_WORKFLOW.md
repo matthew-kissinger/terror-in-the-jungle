@@ -1,10 +1,16 @@
 # Deploy Workflow
 
-Last updated: 2026-04-24
+Last updated: 2026-05-02
 
 Production: https://terror-in-the-jungle.pages.dev/
 
 This document captures how a commit becomes a live Cloudflare Pages deploy, how browser freshness is preserved for repeat players, and how to verify prod headers when users report stale assets or load failures.
+
+Current stable-ground finding on 2026-05-02: production was healthy but stale.
+`master` was at `f99181a0bf8a6b2a8684fc1ae3796022c16aad22`, while live
+`/asset-manifest.json` reported
+`5f585f7d4bf5ad2c0c85450235ac4c9950988d83`. Treat this as the canonical
+failure mode for release drift: CI green does not imply Pages is current.
 
 Docs checked on 2026-04-21:
 
@@ -34,6 +40,8 @@ push to master
 manual trigger (you decide when)
   -> .github/workflows/deploy.yml     (workflow_dispatch)
        - checkout ref (default: master)
+       - checkout ../game-field-kits with GAME_FIELD_KITS_DEPLOY_KEY
+       - build consumed @game-field-kits packages
        - npm ci
        - npm run build
        - npm run cloudflare:assets:upload
@@ -54,6 +62,11 @@ Typical flow: push to master, wait for CI green, then run `npm run deploy:prod` 
 Key facts:
 
 - The deploy workflow runs `cloudflare/wrangler-action@v3`, not Cloudflare Pages' Git integration. Cloudflare sees only the pre-built `dist/` directory.
+- The deploy workflow must clone the private sibling repo
+  `matthew-kissinger/game-field-kits` with `GAME_FIELD_KITS_DEPLOY_KEY`, then
+  build the consumed `@game-field-kits/*` packages before TIJ runs `npm ci`.
+  If that key, clone path, or sibling build fails, deploy is blocked before
+  Pages upload.
 - The Pages project has no build step configured on Cloudflare's side. The build is reproducible from `package-lock.json` plus `npm ci` inside the GitHub runner.
 - The deploy workflow does a fresh checkout, `npm ci`, and `npm run build` every run. It does not rely on a CI artifact.
 - `npm run build` writes a preview `dist/asset-manifest.json` from local or pinned R2 metadata so local retail previews can resolve required A Shau assets. After that, the deploy workflow runs `npm run cloudflare:assets:upload` with `TITJ_SKIP_R2_UPLOAD=1`, overwrites/refreshes `dist/asset-manifest.json`, and validates public size/content-type/cache/CORS before Pages upload.
@@ -88,6 +101,9 @@ The production app must satisfy these rules:
 3. Non-hashed public assets, including GLBs, must revalidate and must not be pinned in Cache Storage.
 4. The service worker must not serve a stale shell or stale GLB ahead of the network.
 5. Cache rules must not overlap in ways that duplicate `Cache-Control` values.
+6. `/asset-manifest.json` must report the final intended release git SHA after
+   each manual deploy. If it reports an older SHA, production is stale even if
+   the app appears to load.
 
 This is the line between fast and stale:
 
