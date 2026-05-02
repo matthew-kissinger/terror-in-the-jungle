@@ -74,24 +74,24 @@ the current truth anchor.
   vegetation horizon audit, and KB-STRATEGIE WebGPU audit, then writes a suite
   summary. Latest local suite:
   `artifacts/perf/2026-05-02T21-49-44-009Z/projekt-143-evidence-suite/suite-summary.json`.
-- Current source and production truth after the stable-ground refresh:
-  `master`, `origin/master`, and live `/asset-manifest.json` all reported
-  `5fd4ba34e28c4840b0f72e1a0475881d050122a1`; Deploy run `25247508549`
-  served that SHA.
+- Current source and production truth after the Projekt Objekt-143 Cycle 0
+  release: `master`, `origin/master`, and live `/asset-manifest.json` all
+  reported `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow
+  run `25262818886` served that SHA.
 - Historical note: the stable-ground audit opened while source was at
   `f99181a0bf8a6b2a8684fc1ae3796022c16aad22` and live Pages still served
   `5f585f7d4bf5ad2c0c85450235ac4c9950988d83`. Those audit-start values are now
   superseded by the refreshed `5fd4ba34e28c4840b0f72e1a0475881d050122a1`
   production parity check.
 - Live Pages/R2 spot checks returned `200` for `/`, `/sw.js`,
-  `/asset-manifest.json`, the A Shau DEM R2 URL, and the Recast WASM asset.
-  A live browser smoke reached the Zone Control deploy UI with no console,
-  page, or request failures.
+  `/asset-manifest.json`, the A Shau DEM R2 URL, hashed JS/CSS assets, and the
+  Recast WASM assets. A live browser smoke reached the Zone Control deploy UI
+  with no console, page, request, or retry-panel failures.
 - The root review payload was moved out of the repo after hash verification to
   `C:\Users\Mattm\X\games-3d\tij-local-review-artifacts\2026-05-02-stable-ground`.
   The tracked TIJ worktree was clean at the close of that stable-ground pass;
-  current Projekt Objekt-143 recovery edits and local build artifacts are
-  intentionally uncommitted until reviewed.
+  the later Projekt Objekt-143 Cycle 0 evidence slice is now committed,
+  pushed, deployed, and live-verified.
 - Sibling `game-field-kits` is part of the current control plane. Its
   `master`/`origin/master` pointed at
   `a7b71f1e9af61e2f89bb0adefae5121891896f62`; `npm ci`,
@@ -109,15 +109,15 @@ the current truth anchor.
 - Detailed evidence for this pass lives in
   [STABILIZATION_AUDIT_2026-05.md](STABILIZATION_AUDIT_2026-05.md).
 
-## Local Pending Recovery Slice On 2026-05-02
+## Shipped Recovery Slice On 2026-05-02
 
 Current branch is `master` at
-`5fd4ba34e28c4840b0f72e1a0475881d050122a1`. Production Pages was last verified
-serving that same SHA during the stable-ground pass. The Projekt Objekt-143
-recovery work described below is local-only until committed, pushed, deployed,
-and live-verified.
+`475aa7792c51823184c454a0b63852e79da2285d`. Production Pages was verified
+serving that same SHA after manual Deploy workflow run `25262818886`. The
+Projekt Objekt-143 recovery work described below is shipped as a measurement
+and evidence slice, not as a performance remediation.
 
-Planned scope for this local development cycle:
+Shipped scope for this development cycle:
 
 - Establish trusted measurements before optimization: `perf-capture.ts` now
   writes measurement-trust evidence and post-sample scene attribution.
@@ -146,7 +146,7 @@ Planned scope for this local development cycle:
 - Keep the recovery record current in `docs/PROJEKT_OBJEKT_143.md`,
   `docs/PERFORMANCE.md`, and `progress.md`.
 
-Local changes waiting to ship:
+Shipped payload:
 
 - Foundational telemetry/tooling: `scripts/perf-capture.ts`,
   `scripts/perf-browser-observers.js`, `scripts/perf-startup-ui.ts`.
@@ -191,13 +191,13 @@ What is not ready to claim:
   staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
   after the measured blockers are under control.
 - Phase 3 now has a draft multi-cycle plan in
-  `docs/PROJEKT_OBJEKT_143.md`. The next cycle should ship the evidence slice
-  first, then certify baselines and asset policy before remediation. KB-CULL
-  still needs draw-call/culling certification beyond the texture-acceptance
-  slice, KB-EFFECTS still needs a verified warmup or first-use-render
-  remediation before it can close, KB-OPTIK still needs visual QA before
-  remediation can be accepted, and KB-TERRAIN still needs runtime
-  screenshot/perf validation.
+  `docs/PROJEKT_OBJEKT_143.md`. Cycle 0 evidence is shipped. The next agent
+  team should execute Phase 2 / Cycle 1 by certifying trusted baselines and the
+  Asset Acceptance Standard before any remediation. KB-CULL still needs
+  draw-call/culling certification beyond the texture-acceptance slice,
+  KB-EFFECTS still needs a verified warmup or first-use-render remediation
+  before it can close, KB-OPTIK still needs visual QA before remediation can be
+  accepted, and KB-TERRAIN still needs runtime screenshot/perf validation.
 
 ## Starter-Kits Incubation Close-Out On 2026-04-28
 

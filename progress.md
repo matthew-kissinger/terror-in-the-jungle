@@ -1656,3 +1656,24 @@ TODO
   hidden inside the quick static evidence gate.
 - Updated `docs/PROJEKT_OBJEKT_143.md`, `docs/STATE_OF_REPO.md`,
   `docs/PERFORMANCE.md`, and `progress.md`.
+
+2026-05-02 Projekt Objekt-143 Cycle 0 release
+- Committed the recovery evidence slice as
+  `475aa7792c51823184c454a0b63852e79da2285d`
+  (`chore(projekt-143): ship recovery evidence slice`) and pushed `master`.
+- Manual Deploy workflow run `25262818886` passed: checkout,
+  `game-field-kits` checkout/build, dependency install, production build,
+  Cloudflare asset validation, and Cloudflare Pages deploy all completed.
+- Live `/asset-manifest.json` now reports
+  `475aa7792c51823184c454a0b63852e79da2285d`; `/`, `/sw.js`,
+  `/asset-manifest.json`, the A Shau R2 DEM URL, hashed JS/CSS assets, and
+  Recast WASM assets returned `200` with the expected production cache/content
+  headers.
+- Live browser smoke against `https://terror-in-the-jungle.pages.dev/` clicked
+  `START GAME`, selected `zone_control`, and reached the deploy UI with no
+  console errors, page errors, request failures, or retry panel.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` from local
+  pending language to shipped/live-verified Cycle 0 state.
+- Next agent-team handoff: execute Phase 2 / Cycle 1. Do not start texture,
+  imposter, grenade, vegetation, or WebGPU remediation before certifying
+  trusted baselines and the Asset Acceptance Standard.

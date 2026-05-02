@@ -22,14 +22,16 @@ measurement itself was trustworthy.
 | Phase 2 - Specialist Bureaus | ACTIVE | KB-METRIK is first and blocks optimization claims from other bureaus; KB-LOAD has startup measurement and texture-upload attribution; KB-CULL has texture-acceptance measurement and scenario estimates; KB-EFFECTS has first-use grenade-spike attribution; KB-OPTIK has imposter metadata and shader-contract attribution; KB-TERRAIN has vegetation-horizon static coverage evidence; KB-STRATEGIE recommends reinforcing WebGL and deferring WebGPU migration. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
-## Local Ship State
+## Shipped Cycle 0 State
 
-This recovery slice is local-only on `master` at
-`5fd4ba34e28c4840b0f72e1a0475881d050122a1` until committed, pushed, deployed,
-and live-verified. It is intended to ship as an instrumentation and evidence
-slice, not as a performance fix.
+Cycle 0 shipped on `master` at
+`475aa7792c51823184c454a0b63852e79da2285d` through manual Deploy workflow run
+`25262818886`. Live Pages `/asset-manifest.json` returned the same git SHA,
+`/`, `/sw.js`, `/asset-manifest.json`, the A Shau R2 DEM URL, hashed JS/CSS,
+and Recast WASM assets returned `200`, and a live browser smoke reached the
+Zone Control deploy UI with no console, page, request, or retry-panel failures.
 
-Ready-for-review local payload:
+Shipped payload:
 
 - Measurement trust and scene attribution in `scripts/perf-capture.ts`.
 - Startup UI evidence expansion in `scripts/perf-startup-ui.ts` and
