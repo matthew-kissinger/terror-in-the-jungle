@@ -60,4 +60,34 @@ describe('optimizeStaticModelDrawCalls', () => {
     expect(countMeshes(root)).toBe(1);
     expect((root.children[0] as THREE.BatchedMesh).isBatchedMesh).toBe(true);
   });
+
+  it('deinterleaves GLTFLoader-style attributes before static merging', () => {
+    const root = new THREE.Group();
+    const material = new THREE.MeshStandardMaterial({ color: 0x4a5a2a });
+    const interleaved = new THREE.InterleavedBuffer(new Float32Array([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ]), 3);
+    const interleavedGeometry = new THREE.BufferGeometry();
+    interleavedGeometry.setAttribute('position', new THREE.InterleavedBufferAttribute(interleaved, 3, 0));
+    interleavedGeometry.setIndex([0, 1, 2]);
+
+    const bufferGeometry = new THREE.BufferGeometry();
+    bufferGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+      0, 0, 0,
+      -1, 0, 0,
+      0, -1, 0,
+    ], 3));
+    bufferGeometry.setIndex([0, 1, 2]);
+
+    root.add(new THREE.Mesh(interleavedGeometry, material));
+    root.add(new THREE.Mesh(bufferGeometry, material));
+
+    const result = optimizeStaticModelDrawCalls(root);
+
+    expect(result.sourceMeshCount).toBe(2);
+    expect(result.mergedMeshCount).toBe(1);
+    expect(countMeshes(root)).toBe(1);
+  });
 });

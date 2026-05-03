@@ -434,7 +434,7 @@ export class FixedWingModel implements GameSystem {
     if (!display) return false;
 
     try {
-      const innerModel = await this.modelLoader.loadModel(modelPath);
+      const { scene: innerModel, animations } = await this.modelLoader.loadAnimatedModel(modelPath);
       // GLB faces +Z but physics forward is -Z. Rotate inner model 180° on Y
       // so it visually aligns with the physics forward direction.
       innerModel.rotation.y = Math.PI;
@@ -499,7 +499,7 @@ export class FixedWingModel implements GameSystem {
       });
 
       // Wire animation on the inner model (where propeller nodes live)
-      this.animation.initialize(id, configKey, innerModel);
+      this.animation.initialize(id, configKey, innerModel, animations);
 
       // Register with VehicleManager
       if (this.vehicleManager) {
@@ -524,13 +524,20 @@ export class FixedWingModel implements GameSystem {
     const result = optimizeStaticModelDrawCalls(innerModel, {
       batchNamePrefix: `${configKey.toLowerCase()}_static`,
       excludeMesh: (mesh) => {
-        const meshName = mesh.name.toLowerCase();
-        for (const propName of propellerNames) {
-          if (meshName.includes(propName)) {
+        let current: THREE.Object3D | null = mesh;
+        while (current) {
+          const nodeName = current.name.toLowerCase();
+          for (const propName of propellerNames) {
+            if (nodeName.includes(propName)) {
+              return true;
+            }
+          }
+          if (nodeName.includes('propeller') || nodeName.includes('prop')) {
             return true;
           }
+          current = current.parent;
         }
-        return meshName.includes('propeller') || meshName.includes('prop_');
+        return false;
       },
     });
 

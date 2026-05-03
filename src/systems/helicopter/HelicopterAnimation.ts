@@ -9,9 +9,17 @@ const MAIN_ROTOR_MAX_VISUAL_SPEED = 48;
 const TAIL_ROTOR_SPEED_MULTIPLIER = 5.5;
 
 interface RotorNodes {
-  main: THREE.Object3D[];
-  tail: THREE.Object3D[];
+  main: Array<{
+    node: THREE.Object3D;
+    axis: RotorSpinAxis;
+  }>;
+  tail: Array<{
+    node: THREE.Object3D;
+    axis: RotorSpinAxis;
+  }>;
 }
+
+type RotorSpinAxis = 'x' | 'y' | 'z';
 
 /**
  * Manages helicopter rotor animations and visual tilt effects.
@@ -90,10 +98,10 @@ export class HelicopterAnimation {
     // Apply rotations to cached rotor groups (wrap to prevent float precision loss)
     const TAU = Math.PI * 2;
     for (const mainRotor of nodes.main) {
-      mainRotor.rotation.y = (mainRotor.rotation.y + newMainSpeed * deltaTime) % TAU;
+      mainRotor.node.rotation[mainRotor.axis] = (mainRotor.node.rotation[mainRotor.axis] + newMainSpeed * deltaTime) % TAU;
     }
     for (const tailRotor of nodes.tail) {
-      tailRotor.rotation.z = (tailRotor.rotation.z + newTailSpeed * deltaTime) % TAU;
+      tailRotor.node.rotation[tailRotor.axis] = (tailRotor.node.rotation[tailRotor.axis] + newTailSpeed * deltaTime) % TAU;
     }
   }
 
@@ -190,11 +198,23 @@ export class HelicopterAnimation {
     const nodes: RotorNodes = { main: [], tail: [] };
     helicopter.traverse((child) => {
       if (child.userData.type === 'mainBlades') {
-        nodes.main.push(child);
+        nodes.main.push({
+          node: child,
+          axis: resolveRotorSpinAxis(child, 'y'),
+        });
       } else if (child.userData.type === 'tailBlades') {
-        nodes.tail.push(child);
+        nodes.tail.push({
+          node: child,
+          axis: resolveRotorSpinAxis(child, 'z'),
+        });
       }
     });
     return nodes;
   }
+}
+
+function resolveRotorSpinAxis(node: THREE.Object3D, fallback: RotorSpinAxis): RotorSpinAxis {
+  return node.userData.spinAxis === 'x' || node.userData.spinAxis === 'y' || node.userData.spinAxis === 'z'
+    ? node.userData.spinAxis
+    : fallback;
 }

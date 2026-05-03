@@ -19,7 +19,7 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is open with WARN status: horizon screenshots and static audits exist, culling attribution is under the unattributed triangle budget, but close-NPC/imposter views and matched GLB/imposter crops are not certified. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is open with WARN status: horizon screenshots and static audits exist, culling attribution is under the unattributed triangle budget, but close-NPC/imposter views and matched GLB/imposter crops are not certified. User-approved aircraft GLB replacement has entered Cycle 2 as an evidence-gated asset/runtime import, not as a performance claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
 ## Shipped Cycle 0 State
@@ -876,14 +876,43 @@ Current Cycle 2 status:
   `5f46713d101f6fea974da6d77f303c95df58000c`. Open Frontier and A Shau each
   have ground-readability, sky-coverage, and aircraft-clouds screenshots plus
   renderer/terrain samples. This is current-condition proof, not remediation.
-- 2026-05-03: `npm run check:projekt-143-cycle2-proof` wrote
-  `artifacts/perf/2026-05-03T01-13-21-209Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+- 2026-05-03: `npm run check:projekt-143-cycle2-proof` was refreshed after
+  the aircraft import and wrote
+  `artifacts/perf/2026-05-03T08-27-06-170Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
   Overall status is WARN. Runtime horizon screenshots and static horizon audit
   checks passed. Scene attribution is under the `10%` unattributed visible
   triangle budget (`4.00%` Open Frontier, `6.03%` A Shau), but some required
   categories have zero visible triangles in these captures and need dedicated
   close-NPC/NPC-imposter views. Static optics evidence exists, but matched
   close-GLB/imposter screenshots are not certified yet.
+- 2026-05-03: user approved moving the aircraft GLB replacement into Cycle 2.
+  Six Pixel Forge aircraft GLBs were imported through
+  `scripts/import-pixel-forge-aircraft.ts` rather than copied directly. The
+  importer records source/provenance metadata and wraps the `+X`-forward source
+  scene under `TIJ_AxisNormalize_XForward_To_ZForward` so the public runtime
+  GLBs keep TIJ's `+Z`-forward storage contract. Provenance sidecars are tracked
+  under `docs/asset-provenance/pixel-forge-aircraft-2026-05-02/`. Local import
+  evidence:
+  `artifacts/perf/2026-05-03T01-55-00-000Z/pixel-forge-aircraft-import/summary.json`.
+  Standalone visual viewer evidence:
+  `artifacts/perf/2026-05-03T01-58-00-000Z/pixel-forge-aircraft-viewer/summary.json`.
+  `npm run probe:fixed-wing -- --boot-attempts=2` passed at
+  `artifacts/fixed-wing-runtime-probe/summary.json`, covering A-1, F-4, and
+  AC-47 takeoff/climb/approach/bailout/handoff. The first Open Frontier
+  renderer capture exposed GLTFLoader interleaved-attribute merge errors; the
+  TIJ `ModelDrawCallOptimizer` wrapper now deinterleaves geometry attributes
+  before static batching, and the rerun at
+  `artifacts/perf/2026-05-03T03-07-26-873Z` has measurement-trust PASS and `0`
+  browser errors. A Shau renderer evidence at
+  `artifacts/perf/2026-05-03T03-11-40-162Z` also has measurement-trust PASS and
+  `0` browser errors. Both large-mode validations are WARN on peak p99, and
+  strict `perf:compare` fails against older baselines, so there is no
+  optimization claim. Local code gates for this aircraft patch now pass:
+  `npm run validate:fast`, `npm run build`, and `npm run check:projekt-143`
+  with the latest static evidence summary at
+  `artifacts/perf/2026-05-03T03-23-55-447Z/projekt-143-evidence-suite/suite-summary.json`.
+  Pending before production parity: CI/deploy, live Pages `/asset-manifest.json`,
+  and a human aircraft-feel playtest.
 - No shader, atlas, culling, far-canopy, grenade, texture, or WebGPU remediation
   may be accepted from Cycle 2 until the relevant proof check is PASS or a
   documented exception exists.

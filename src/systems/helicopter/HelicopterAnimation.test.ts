@@ -28,6 +28,21 @@ describe('HelicopterAnimation', () => {
     expect(tailRotor.rotation.z).not.toBe(0);
   });
 
+  it('honors rotor spin axes declared by the loaded asset', () => {
+    const animation = new HelicopterAnimation();
+    const helicopter = new THREE.Group();
+    const tailRotor = new THREE.Group();
+    tailRotor.userData.type = 'tailBlades';
+    tailRotor.userData.spinAxis = 'x';
+    helicopter.add(tailRotor);
+
+    animation.initialize('heli-axis', helicopter);
+    animation.updateRotors(helicopter, 'heli-axis', createPhysics(0.75), 0.1);
+
+    expect(tailRotor.rotation.x).not.toBe(0);
+    expect(tailRotor.rotation.z).toBe(0);
+  });
+
   it('uses flight-RPM visual speed high enough to read as fast', () => {
     const animation = new HelicopterAnimation();
     const helicopter = new THREE.Group();

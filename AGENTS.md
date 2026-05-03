@@ -52,6 +52,9 @@ npm run perf:compare                # Compare latest vs tracked baselines
 npm run perf:compare:strict         # Same, but fail on warnings too
 npm run perf:update-baseline        # Overwrite baselines from latest
 npm run evidence:atmosphere         # All-mode ground/sky/aircraft atmosphere + terrain visibility evidence
+
+# Asset import and validation
+npm run assets:import-pixel-forge-aircraft  # Normalize/copy Pixel Forge aircraft GLBs + provenance
 ```
 
 ## Daily loop

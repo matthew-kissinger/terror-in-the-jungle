@@ -72,6 +72,7 @@
     "assets:optimize:vegetation": "npm run check:pixel-forge-cutover",
     "assets:optimize:dry": "npx tsx scripts/optimize-assets.ts --dry-run",
     "assets:fix-alpha": "npm run check:pixel-forge-cutover",
+    "assets:import-pixel-forge-aircraft": "npx tsx scripts/import-pixel-forge-aircraft.ts",
     "ui:matrix": "npx tsx scripts/ui-device-matrix.ts",
     "test": "vitest",
     "test:run": "vitest run",

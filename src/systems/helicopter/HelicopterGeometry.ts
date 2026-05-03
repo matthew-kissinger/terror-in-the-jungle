@@ -44,7 +44,7 @@ export async function createHelicopterGeometry(
   }
   const { modelPath, displayName, faction } = info ?? AIRCRAFT_INFO.UH1_HUEY;
 
-  const scene = await modelLoader.loadModel(modelPath);
+  const { scene, animations } = await modelLoader.loadAnimatedModel(modelPath);
 
   // Rotate GLB -90 degrees so nose faces forward in game space
   scene.rotation.y = -Math.PI / 2;
@@ -52,7 +52,7 @@ export async function createHelicopterGeometry(
   const helicopterGroup = new THREE.Group();
   helicopterGroup.add(scene);
 
-  wireRotorGroups(scene, helicopterGroup);
+  wireRotorGroups(scene, helicopterGroup, animations);
   optimizeAircraftScene(scene, aircraftKey);
 
   helicopterGroup.userData = {
@@ -67,7 +67,12 @@ export async function createHelicopterGeometry(
 
 // ─── Rotor wiring ─────────────────────────────────────────────────────────
 
-function wireRotorGroups(scene: THREE.Group, helicopterGroup: THREE.Group): void {
+function wireRotorGroups(
+  scene: THREE.Group,
+  helicopterGroup: THREE.Group,
+  animations: THREE.AnimationClip[],
+): void {
+  const animationAxes = inferSpinAxesFromAnimationClips(animations);
   const mainBladeNodes: THREE.Object3D[] = [];
   const tailBladeNodes: THREE.Object3D[] = [];
   let rotorHub: THREE.Object3D | undefined;
@@ -78,6 +83,7 @@ function wireRotorGroups(scene: THREE.Group, helicopterGroup: THREE.Group): void
 
     if (rotorType) {
       child.userData.type = rotorType;
+      child.userData.spinAxis = animationAxes.get(name) ?? (rotorType === 'mainBlades' ? 'y' : 'z');
     }
 
     if (isMainRotorPartName(name)) {
@@ -104,16 +110,53 @@ function wireRotorGroups(scene: THREE.Group, helicopterGroup: THREE.Group): void
   // Synthetic fallbacks if no blades found at all
   if (mainBladeNodes.length === 0 && !hasGroupedMain) {
     const mainBlades = createSyntheticMainRotor();
+    mainBlades.userData.spinAxis = 'y';
     mainBlades.position.set(0, 4.5, 0);
     helicopterGroup.add(mainBlades);
     Logger.debug('helicopter', 'Added synthetic main rotor blades');
   }
   if (tailBladeNodes.length === 0 && !hasGroupedTail) {
     const tailBlades = createSyntheticTailRotor();
+    tailBlades.userData.spinAxis = 'z';
     tailBlades.position.set(-6, 2.5, 0);
     helicopterGroup.add(tailBlades);
     Logger.debug('helicopter', 'Added synthetic tail rotor blades');
   }
+}
+
+function inferSpinAxesFromAnimationClips(animations: THREE.AnimationClip[]): Map<string, 'x' | 'y' | 'z'> {
+  const axes = new Map<string, 'x' | 'y' | 'z'>();
+  for (const clip of animations) {
+    for (const track of clip.tracks) {
+      if (!track.name.endsWith('.quaternion') || track.values.length < 8) {
+        continue;
+      }
+      const nodeName = track.name.slice(0, -'.quaternion'.length).toLowerCase();
+      const axis = inferQuaternionTrackAxis(track.values);
+      if (axis) {
+        axes.set(nodeName, axis);
+      }
+    }
+  }
+  return axes;
+}
+
+function inferQuaternionTrackAxis(values: ArrayLike<number>): 'x' | 'y' | 'z' | null {
+  let maxX = 0;
+  let maxY = 0;
+  let maxZ = 0;
+  for (let i = 0; i + 3 < values.length; i += 4) {
+    maxX = Math.max(maxX, Math.abs(values[i]));
+    maxY = Math.max(maxY, Math.abs(values[i + 1]));
+    maxZ = Math.max(maxZ, Math.abs(values[i + 2]));
+  }
+
+  if (maxX < 0.5 && maxY < 0.5 && maxZ < 0.5) {
+    return null;
+  }
+  if (maxX >= maxY && maxX >= maxZ) return 'x';
+  if (maxY >= maxX && maxY >= maxZ) return 'y';
+  return 'z';
 }
 
 function optimizeAircraftScene(scene: THREE.Group, aircraftKey: string): void {

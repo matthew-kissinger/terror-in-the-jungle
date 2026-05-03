@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 ## 3D Models (159 GLBs)
 
@@ -26,8 +26,8 @@ All models: low-poly stylized (PS2-era fidelity), GLB (binary glTF 2.0), PBR mat
 | Category | Status | Details |
 |----------|--------|---------|
 | Weapons | 7/9 integrated | M16A1, AK-47, Ithaca 37, M3, M1911, M60, M79 via WeaponRigManager. RPG-7 and M2 Browning not wired. |
-| Helicopters | 3/3 integrated | UH-1 Huey, UH-1C Gunship, AH-1 Cobra via ModelLoader. Rotor pivots rigged (Joint_MainRotor/Joint_TailRotor). Tail rotor has baked `rotation.y = PI/2` for sideways spin. |
-| Fixed-wing | 3/3 integrated | F-4 Phantom, AC-47 Spooky, A-1 Skyraider flyable at airfields via FixedWingModel. Aerodynamic physics, propeller animation, per-aircraft HUD. |
+| Helicopters | 3/3 integrated | UH-1 Huey, UH-1C Gunship, AH-1 Cobra via ModelLoader. Runtime aircraft GLBs now come from the Pixel Forge aircraft import and preserve embedded rotor pivot animation metadata. |
+| Fixed-wing | 3/3 integrated | F-4 Phantom, AC-47 Spooky, A-1 Skyraider flyable at airfields via FixedWingModel. Runtime aircraft GLBs now come from the Pixel Forge aircraft import; propeller spin axes are inferred from embedded GLB animation tracks. |
 | Ground vehicles | 5/5 static | Staged in motor pools. No driving/interaction. |
 | Watercraft | Not wired | Blocked on water engine. |
 | Animals | 6/6 integrated | All types via AnimalSystem. |
@@ -94,9 +94,29 @@ The sky is now procedural runtime atmosphere (`AtmosphereSystem` +
 Vehicle and airfield asset quality is not signed off. The 2026-04-24 recovery
 pass fixed vehicle-session ownership, helicopter rotor spool-down, and
 sky-dome cloud wiring. The 2026-04-26 Pixel Forge pass replaced NPC and
-vegetation runtime art, but hitbox feel, aircraft/building draw cost, airfield
-staging surfaces, water rendering, close-proximity NPC camera occlusion, and
-measured static-prop culling/HLOD remain future evidence-backed work.
+vegetation runtime art. On 2026-05-03, the six runtime aircraft GLBs were
+replaced from the Pixel Forge aircraft source set through
+`npm run assets:import-pixel-forge-aircraft`, which wraps source `+X`-forward
+aircraft under a `TIJ_AxisNormalize_XForward_To_ZForward` root so the public
+runtime assets keep TIJ's `+Z`-forward storage contract. Source provenance
+sidecars are mirrored under
+`docs/asset-provenance/pixel-forge-aircraft-2026-05-02/`. The import summary
+is `artifacts/perf/2026-05-03T01-55-00-000Z/pixel-forge-aircraft-import/summary.json`,
+and the local visual viewer evidence is
+`artifacts/perf/2026-05-03T01-58-00-000Z/pixel-forge-aircraft-viewer/summary.json`.
+`npm run probe:fixed-wing -- --boot-attempts=2` passed at
+`artifacts/fixed-wing-runtime-probe/summary.json` on 2026-05-03, covering A-1,
+F-4, and AC-47 takeoff/climb/approach/bailout/handoff. Large-mode renderer
+evidence exists at
+`artifacts/perf/2026-05-03T03-07-26-873Z` (Open Frontier short) and
+`artifacts/perf/2026-05-03T03-11-40-162Z` (A Shau short): both have trusted
+measurement paths and zero browser errors, but both are WARN captures and fail
+strict `perf:compare` thresholds, so they are not optimization evidence. This
+is not a final production parity claim until CI/deploy and live Pages checks
+pass.
+Hitbox feel, aircraft/building draw cost, airfield staging surfaces, water
+rendering, close-proximity NPC camera occlusion, and measured static-prop
+culling/HLOD remain evidence-backed work.
 
 ## Art Direction
 
@@ -111,5 +131,12 @@ Models generated via PixelForge Kiln (procedural geometry -> Three.js GLTFExport
 - Pivot nodes: `Joint_*` (e.g., `Joint_MainRotor`, `Joint_TailRotor`)
 - Mesh nodes: `Mesh_*` (e.g., `Mesh_Fuselage`, `Mesh_Wing_L`)
 - Rotor meshes must NOT contain `mainrotor`/`tailrotor` in their names (use MR*/TR* prefixes) to avoid double-animation by HelicopterGeometry.ts detection.
+- Pixel Forge aircraft source GLBs are `+X` forward. The TIJ runtime aircraft
+  contract is public `+Z` forward, so imports must use
+  `npm run assets:import-pixel-forge-aircraft` rather than direct file copy.
+- Aircraft rotor/propeller pivots must remain named and animated in the GLB.
+  Runtime animation infers spin axes from embedded quaternion tracks, and the
+  draw-call optimizer must exclude animated prop/rotor descendants by ancestor
+  pivot, not only by leaf mesh name.
 
 See `docs/archive/ASSET_MANIFEST_FULL.md` for original generation specs.

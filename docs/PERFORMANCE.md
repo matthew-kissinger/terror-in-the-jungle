@@ -478,6 +478,26 @@ Treat first capture after fresh boot as cold-start data. Use matched warm pairs 
 
 For world-feature, asset, aircraft, or collision-query changes, pair `npm run perf:capture:openfrontier:short` with `npm run perf:compare -- --scenario openfrontier:short` before considering the work done. `combat120` alone will not catch Open Frontier's staging and large-world regressions.
 
+Perf and browser probes can pin pre-baked terrain modes with `?seed=<n>`.
+`npm run probe:fixed-wing` uses Open Frontier seed `42` by default so airfield
+coverage is deterministic instead of dependent on random seed rotation. General
+Open Frontier perf captures keep their existing scenario semantics unless a
+specific seed is passed for an A/B pair.
+
+For Pixel Forge aircraft GLB replacement, use
+`npm run assets:import-pixel-forge-aircraft` instead of direct copies. The
+importer records provenance, preserves embedded animation tracks, and wraps
+source `+X`-forward aircraft into TIJ's public `+Z`-forward aircraft storage
+contract. Acceptance still requires standalone viewer screenshots,
+`npm run probe:fixed-wing`, and Open Frontier/A Shau renderer stats before any
+production parity or optimization claim.
+
+Pixel Forge aircraft GLBs may load with a mix of interleaved and regular
+`BufferAttribute` layouts from `GLTFLoader`. TIJ's
+`ModelDrawCallOptimizer` wrapper deinterleaves attributes before passing static
+meshes to the reusable optimizer so Three.js batching does not emit
+`mergeAttributes()` console errors.
+
 ## Diagnostics
 
 - Perf diagnostics gated behind `import.meta.env.DEV` + `?perf=1` URL param at runtime, OR `import.meta.env.VITE_PERF_HARNESS === '1'` at build time (see `npm run build:perf`). Retail `npm run build` ships ZERO harness surface - the hook branches are dead-code-eliminated.

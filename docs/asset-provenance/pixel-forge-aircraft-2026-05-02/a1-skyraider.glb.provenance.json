@@ -1,0 +1,38 @@
+{
+  "asset": "a1-skyraider.glb",
+  "provider": "anthropic",
+  "model": "claude-opus-4-7",
+  "pipeline": "batch-glb",
+  "ts": "2026-05-02T22:25:50.154Z",
+  "prompt": "A-1 Skyraider — Douglas \"Spad\" propeller ground-attack aircraft, Vietnam War era. Navy gray / olive drab. Single radial piston engine. Target ~12m long, ~3200 tris.\n\nUse the coordinate contract: +X forward/nose, +Y up, +Z right, ground at Y=0. Prefer the axis-specific primitives (capsuleXGeo, cylinderXGeo, cylinderZGeo, coneXGeo) over hand-rotating Y-axis primitives. Use createWingPair() for any wings or stub wings so the roots attach flush to the fuselage. Use beamBetween() for skid struts, pylons, braces, and antenna wires — endpoints must touch the parts they connect. Use cylinderOnAxis(center, normal, radius, height) for non-cardinal-axis tubes. Use taperConeGeo(rBottom, rTop, height, axis) for engine nacelles, pylon caps — anything that's a frustum rather than a pointed cone. Use pipeAlongPath(points, radius, { bendRadius }) for cables, hoses, antennas with corners. Use createLadder() only if there's a visible ladder.\n\nNO DECORATIVE GEOMETRY (CRITICAL — performance + visual cleanliness):\n- DO NOT call decalBox at all. No insignia, no national markings, no red stars, no white stars, no hull numbers, no invasion stripes, no painted bands.\n- DO NOT add small boxGeo / planeGeo decals to \"represent paint\" or \"represent windows\" or \"represent door frames\". Color variation is texture work, not mesh work.\n- DO NOT model open-doorway frames as separate boxes around an empty space. Helicopter cabin sides are SOLID. Door positions are implied by the silhouette, not by extra mesh.\n- Every mesh in the scene must contribute to the recognizable silhouette. If removing the mesh does not change the readable shape, the mesh should not exist. Each box/plane/cylinder is a draw call.\n- Skyraider-style yellow wingtip nav-light boxes are the maximum tolerable decoration: tiny, peripheral, silhouette-relevant. Do not add anything bigger than that purely for color.\n\nWING PARAMETERS (CRITICAL — these are world-unit OFFSETS, NOT angles):\n- 'dihedral' on wingGeo / createWingPair is the TIP Y-OFFSET in METERS, not an angle. For a normal-looking wing use ~3-6% of span (e.g. span=4 → dihedral=0.1 to 0.25). dihedral >= span/2 makes a 45°+ gull-wing — almost always WRONG.\n- 'sweep' is the TIP X-DISPLACEMENT in METERS (positive = tip aft along -X).\n- 'span', 'rootChord', 'tipChord', 'thickness' all in world units (meters).\n\nVERTICAL TAIL FIN ORIENTATION (CRITICAL — a vertical fin must STAND UP):\n- The simplest reliable form: boxGeo(chord, height, thickness) where Y (height) is the second-largest dimension after chord, and thickness is small. Example: boxGeo(2.0, 1.8, 0.08) — chord 2.0m along X, height 1.8m along Y, thickness 0.08m along Z. boxGeo's default orientation already stands up — do not rotate it.\n- Position the fin so its BASE overlaps the top-rear of the fuselage (final ~5% of body length, lower face flush with fuselage roof).\n- DO NOT use createWingPair / wingGeo for a vertical fin without explicitly rotating by [Math.PI/2, 0, 0] — wingGeo's span axis is Z by default, which makes it lay flat horizontally.\n\nAttachment is mandatory: every part must visibly touch or overlap (~0.02 units) the part it connects to. Nothing floating. ESPECIALLY:\n- T-TAIL ATTACHMENT: vertical fin's BASE must overlap the top-rear of the fuselage (final ~5% of body length). Horizontal stabilizer (createWingPair on top of the fin) must mount with rootZ at fin half-thickness so its roots visibly touch the fin tip.\n- ROTOR BLADES: each blade must overlap the rotor hub by 0.05+ at its inner end. Position blades RELATIVE to the hub center, not at world origin.\n- TAIL BOOM: must connect continuously from the rear of the cabin to the tail fin. No gap.\n- COCKPIT GLASS: position the canopy so its bottom edge sits flush against the fuselage roof, slightly forward of fuselage center. Glass MUST be a distinct glassMaterial mesh, not the same color as the body.\n\nNAMED PIVOTS (TIJ animation hookup — case-insensitive regex match):\n- Helicopter main rotor pivot: 'mainRotor' OR 'mainBlades' (either works).\n- Helicopter tail rotor pivot: 'tailRotor' OR 'tailBlades'.\n- Fixed-wing single propeller: 'propeller'. Twin: 'propLeft', 'propRight'. Quad: 'prop1', 'prop2', 'prop3', 'prop4'.\n\nHelicopter tail rotors spin around the X axis — their blades live in the YZ plane (NOT the XZ plane). Main rotors spin around Y — blades in XZ plane.\n\nParts:\n- Chunky fuselage along +X with a rounded nose (capsuleXGeo is ideal). Olive drab skin.\n- Large radial engine cowling at the nose — a wider cylinderXGeo ring with a conical nose fairing (coneXGeo) in front.\n- 4-blade propeller at the very front — hub (sphereGeo or short cylinderXGeo) with 4 long thin blades arranged radially around the X axis (XZ plane and XY plane pairs). Named pivot \"propeller\" with spin around X.\n- Bubble cockpit canopy on top of the fuselage, glass material.\n- Large low-mounted WINGS — use createWingPair, rootZ = fuselage half-width, meaningful span, tapered chord, slight dihedral (~0.1), zero sweep. This is a straight-wing prop plane.\n- Under-wing ordnance: 2-4 bomb/rocket hardpoints per side — small boxGeo pylons (via beamBetween) with capsuleXGeo bombs hanging underneath.\n- Vertical tail fin at the rear.\n- Horizontal stabilizer (use createWingPair again, smaller, mounted high on the tail).\n- Tricycle landing gear: main gear legs (beamBetween from wing root to wheel hub) with cylinderZGeo wheels, plus a tail wheel. Mark these as retractable-pose (extended / on ground).\n\nInclude meta.tags = ['aircraft','fixed-wing','prop','ground-attack']. Animation: propeller-spin.",
+  "promptHash": "sha1:910c40f5d387e3f45e22823303e156cf08342061",
+  "latencyMs": 43561,
+  "code": {
+    "bytes": 6736,
+    "sha1": "sha1:ca3a9f9b581df084e3d988a12ebb53830d908188"
+  },
+  "extras": {
+    "slug": "a1-skyraider",
+    "batch": "aircraft",
+    "attempts": 1,
+    "softFailuresUsed": 0,
+    "structuralWarnings": [],
+    "tris": 2144,
+    "primitiveUsage": {
+      "createRoot": 1,
+      "gameMaterial": 7,
+      "glassMaterial": 1,
+      "capsuleXGeo": 10,
+      "createPart": 48,
+      "cylinderXGeo": 6,
+      "coneXGeo": 1,
+      "createPivot": 1,
+      "boxGeo": 28,
+      "createWingPair": 2,
+      "beamBetween": 6,
+      "cylinderZGeo": 3,
+      "rotationTrack": 1,
+      "createClip": 1
+    }
+  }
+}

@@ -16,7 +16,9 @@ import { FIXED_WING_CONFIGS } from '../src/systems/vehicle/FixedWingConfigs';
 
 const HOST = '127.0.0.1';
 const DEFAULT_PORT = 4173;
+const DEFAULT_MAP_SEED = 42;
 const STARTUP_TIMEOUT_MS = 120_000;
+const DEFAULT_BOOT_ATTEMPTS = 2;
 const CHUNK_MS = 500;
 
 type ScenarioResult = {
@@ -44,6 +46,13 @@ type ScenarioResult = {
 };
 
 type ProbeStatus = 'partial' | 'passed' | 'failed';
+
+class BootReadinessError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BootReadinessError';
+  }
+}
 
 function parseNumberArg(name: string, fallback: number): number {
   const key = `--${name}`;
@@ -103,6 +112,39 @@ async function createContext(browser: Awaited<ReturnType<typeof chromium.launch>
   return context;
 }
 
+async function readRenderState(page: Page): Promise<string | null> {
+  try {
+    return await page.evaluate(() => {
+      const win = window as Window & {
+        render_game_to_text?: () => string;
+        __engine?: {
+          gameStarted?: boolean;
+          gameStartPending?: boolean;
+          systemManager?: {
+            fixedWingModel?: {
+              getAircraftIds?: () => string[];
+              getConfigKey?: (id: string) => string;
+            };
+          };
+        };
+      };
+      if (typeof win.render_game_to_text === 'function') {
+        return win.render_game_to_text();
+      }
+      const model = win.__engine?.systemManager?.fixedWingModel;
+      const ids = model?.getAircraftIds?.() ?? [];
+      return JSON.stringify({
+        gameStarted: win.__engine?.gameStarted ?? false,
+        gameStartPending: win.__engine?.gameStartPending ?? false,
+        fixedWingIds: ids,
+        fixedWingConfigs: ids.map((id) => model?.getConfigKey?.(id) ?? null),
+      });
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function bootOpenFrontier(page: Page, url: string): Promise<void> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: STARTUP_TIMEOUT_MS });
   await page.waitForFunction(() => Boolean((window as any).__engine), undefined, { timeout: STARTUP_TIMEOUT_MS });
@@ -110,11 +152,19 @@ async function bootOpenFrontier(page: Page, url: string): Promise<void> {
     (window as any).__engine.startGameWithMode('open_frontier');
   });
   await page.waitForFunction(() => Boolean((window as any).__engine?.gameStarted), undefined, { timeout: STARTUP_TIMEOUT_MS });
-  await page.waitForFunction(
-    () => ((window as any).__engine.systemManager.fixedWingModel?.getAircraftIds?.().length ?? 0) > 0,
-    undefined,
-    { timeout: STARTUP_TIMEOUT_MS },
-  );
+  try {
+    await page.waitForFunction(
+      () => ((window as any).__engine.systemManager.fixedWingModel?.getAircraftIds?.().length ?? 0) > 0,
+      undefined,
+      { timeout: STARTUP_TIMEOUT_MS },
+    );
+  } catch (error) {
+    const renderState = await readRenderState(page);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new BootReadinessError(
+      `Open Frontier reached gameplay but no fixed-wing aircraft became available before timeout. ${message}. renderState=${renderState ?? 'unavailable'}`,
+    );
+  }
 }
 
 async function runScenario(page: Page, configKey: string): Promise<Omit<ScenarioResult, 'screenshotPath' | 'success'>> {
@@ -614,7 +664,9 @@ function writeProbeSummary(
 
 async function main(): Promise<void> {
   const port = parseNumberArg('port', DEFAULT_PORT);
+  const mapSeed = parseNumberArg('seed', DEFAULT_MAP_SEED);
   const headed = parseBooleanArg('headed', false);
+  const bootAttempts = Math.max(1, Math.floor(parseNumberArg('boot-attempts', DEFAULT_BOOT_ATTEMPTS)));
   // Default OFF: fresh spawn + explicit teardown per run.
   const reuseServer = parseBooleanArg('reuse-server', parseBooleanArg('reuse-dev-server', false));
   // Default 'perf': preview the perf-harness bundle (prod-shape with
@@ -651,58 +703,77 @@ async function main(): Promise<void> {
     });
 
     const results: ScenarioResult[] = [];
-    const url = `http://${HOST}:${port}/?perf=1`;
+    const url = `http://${HOST}:${port}/?perf=1&seed=${mapSeed}`;
     for (const configKey of ['A1_SKYRAIDER', 'F4_PHANTOM', 'AC47_SPOOKY']) {
-      let context: BrowserContext | null = null;
-      let page: Page | null = null;
-      try {
-        context = await createContext(browser);
-        page = await context.newPage();
-        await bootOpenFrontier(page, url);
-        const scenario = await runScenario(page, configKey);
-        const screenshotPath = join(artifactDir, `${configKey.toLowerCase()}.png`);
-        await page.screenshot({ path: screenshotPath, fullPage: false, timeout: 0 });
-        const finalState = scenario.finalState as {
-          altitudeAGL?: number;
-          phase?: string;
-          isStalled?: boolean;
-        } | null;
-        const success = Boolean(
-          scenario.entered
-          && scenario.touchMode === false
-          && finalState
-          && finalState.isStalled === false
-          && scenario.liftoffAtMs !== null
-          && scenario.climbAtMs !== null
-          && scenario.orbitValid !== false
-          && (finalState.phase === 'airborne' || (finalState.altitudeAGL ?? 0) > 0.2)
-          && scenario.approachValid
-          && scenario.bailoutValid
-          && scenario.handoffValid
-        );
-        results.push({
-          ...scenario,
-          success,
-          screenshotPath,
-        });
-        writeProbeSummary(artifactDir, port, results, 'partial');
-      } catch (error) {
-        let failureScreenshotPath: string | null = null;
-        if (page && !page.isClosed()) {
-          failureScreenshotPath = join(artifactDir, `${configKey.toLowerCase()}-failure.png`);
-          try {
-            await page.screenshot({ path: failureScreenshotPath, fullPage: false, timeout: 0 });
-          } catch {
-            failureScreenshotPath = null;
+      let completed = false;
+      let lastError: unknown = null;
+      for (let bootAttempt = 1; bootAttempt <= bootAttempts; bootAttempt++) {
+        let context: BrowserContext | null = null;
+        let page: Page | null = null;
+        try {
+          context = await createContext(browser);
+          page = await context.newPage();
+          await bootOpenFrontier(page, url);
+          const scenario = await runScenario(page, configKey);
+          const screenshotPath = join(artifactDir, `${configKey.toLowerCase()}.png`);
+          await page.screenshot({ path: screenshotPath, fullPage: false, timeout: 0 });
+          const finalState = scenario.finalState as {
+            altitudeAGL?: number;
+            phase?: string;
+            isStalled?: boolean;
+          } | null;
+          const success = Boolean(
+            scenario.entered
+            && scenario.touchMode === false
+            && finalState
+            && finalState.isStalled === false
+            && scenario.liftoffAtMs !== null
+            && scenario.climbAtMs !== null
+            && scenario.orbitValid !== false
+            && (finalState.phase === 'airborne' || (finalState.altitudeAGL ?? 0) > 0.2)
+            && scenario.approachValid
+            && scenario.bailoutValid
+            && scenario.handoffValid
+          );
+          results.push({
+            ...scenario,
+            success,
+            screenshotPath,
+          });
+          writeProbeSummary(artifactDir, port, results, 'partial');
+          completed = true;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (error instanceof BootReadinessError && bootAttempt < bootAttempts) {
+            console.log(`[probe] ${configKey} boot attempt ${bootAttempt}/${bootAttempts} produced no fixed-wing aircraft; retrying fresh context.`);
+            continue;
+          }
+
+          let failureScreenshotPath: string | null = null;
+          if (page && !page.isClosed()) {
+            failureScreenshotPath = join(artifactDir, `${configKey.toLowerCase()}-failure.png`);
+            try {
+              await page.screenshot({ path: failureScreenshotPath, fullPage: false, timeout: 0 });
+            } catch {
+              failureScreenshotPath = null;
+            }
+          }
+          results.push(makeFailureResult(configKey, error, failureScreenshotPath));
+          writeProbeSummary(artifactDir, port, results, 'failed', error);
+          throw error;
+        } finally {
+          if (context) {
+            await context.close().catch(() => {});
           }
         }
-        results.push(makeFailureResult(configKey, error, failureScreenshotPath));
+      }
+
+      if (!completed) {
+        const error = lastError ?? new Error(`${configKey} did not complete.`);
+        results.push(makeFailureResult(configKey, error, null));
         writeProbeSummary(artifactDir, port, results, 'failed', error);
         throw error;
-      } finally {
-        if (context) {
-          await context.close().catch(() => {});
-        }
       }
     }
 

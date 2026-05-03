@@ -7,7 +7,7 @@ import type { FixedWingSpawnMetadata } from './FixedWingOperations';
 // Mock ModelLoader
 vi.mock('../assets/ModelLoader', () => ({
   ModelLoader: class {
-    async loadModel(_path: string): Promise<THREE.Group> {
+    private createMockAircraft(): THREE.Group {
       const group = new THREE.Group();
       group.name = 'mock-aircraft';
       // Add a propeller node for animation testing
@@ -15,6 +15,14 @@ vi.mock('../assets/ModelLoader', () => ({
       prop.name = 'propeller';
       group.add(prop);
       return group;
+    }
+
+    async loadModel(_path: string): Promise<THREE.Group> {
+      return this.createMockAircraft();
+    }
+
+    async loadAnimatedModel(_path: string): Promise<{ scene: THREE.Group; animations: THREE.AnimationClip[] }> {
+      return { scene: this.createMockAircraft(), animations: [] };
     }
   },
 }));

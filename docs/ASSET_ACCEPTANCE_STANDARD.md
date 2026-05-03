@@ -1,6 +1,6 @@
 # Asset Acceptance Standard
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 This is the Phase 2 / Cycle 1 acceptance standard for Pixel Forge and other
 runtime assets in Terror in the Jungle. It is a stabilization gate, not an art
@@ -115,6 +115,28 @@ Any asset over budget is blocked unless its acceptance note includes:
   triangles remain below `10%`.
 - A rollback path.
 
+## GLB Orientation And Rig Policy
+
+GLB replacement is not a file-copy task. The runtime contract must be checked
+against the source contract before import.
+
+- Aircraft source assets from Pixel Forge are authored `+X` forward. TIJ public
+  aircraft assets are stored `+Z` forward for the existing fixed-wing and
+  helicopter runtime. Use `npm run assets:import-pixel-forge-aircraft`, which
+  wraps the source scene under `TIJ_AxisNormalize_XForward_To_ZForward`, and
+  keep the import summary as evidence.
+- Animated rotor, propeller, turret, or weapon pivots must remain as named GLB
+  nodes with preserved animation tracks. Runtime code may infer spin axes from
+  the tracks, but cannot silently assume a single global axis for all assets.
+- Draw-call optimization may merge static aircraft descendants, but animated
+  pivot descendants must be excluded by ancestor name or explicit metadata.
+- Sidecar provenance belongs in `docs/asset-provenance/<source-batch>/`, and
+  acceptance notes must record provider, prompt/source, source triangles,
+  structural warnings, and any manual normalization applied.
+- A GLB can pass static import checks and still fail acceptance if browser
+  screenshots, renderer stats, or fixed-wing/helicopter probes expose bad
+  orientation, frozen blades, incorrect bounds, or unacceptable draw cost.
+
 ## LOD And Culling Registration
 
 Every accepted runtime asset must be registered in the appropriate visibility
@@ -145,6 +167,7 @@ Use this evidence matrix before accepting changes:
 | NPC imposter scale/luma | Matched close GLB and imposter screenshots at LOD switch distances; projected height and mean luma/chroma deltas |
 | Vegetation atlas/normal change | Ground and elevated screenshots in Open Frontier and A Shau, plus texture audit |
 | Static feature/vehicle culling | Trusted Open Frontier or A Shau perf capture with renderer stats and scene attribution |
+| Aircraft GLB replacement | Import summary with provenance, standalone viewer screenshots, `npm run probe:fixed-wing`, and Open Frontier/A Shau renderer stats before production claim |
 | Grenade/effect first-use fix | Low-load two-grenade probe before/after; no long task above `50ms` within the trigger window |
 | Outer canopy | Elevated Open Frontier and A Shau screenshots plus p95 frame and draw-call deltas |
 

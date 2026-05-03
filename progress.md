@@ -1793,3 +1793,68 @@ TODO
 - Cycle 2 remains proof-only. Do not accept shader, atlas, culling, far-canopy,
   grenade, texture, or WebGPU remediation until the relevant proof check is
   PASS or carries a documented exception.
+
+2026-05-03 Pixel Forge aircraft GLB replacement in Cycle 2
+- User approved adding the six Pixel Forge aircraft GLBs to Cycle 2, with the
+  constraint that this be treated as an evidence-gated asset/runtime import
+  rather than a blind copy or an optimization claim.
+- Added `scripts/import-pixel-forge-aircraft.ts` and
+  `npm run assets:import-pixel-forge-aircraft`. The importer reads each GLB and
+  sidecar provenance file from the Pixel Forge aircraft source folder, wraps
+  the `+X`-forward source scene under
+  `TIJ_AxisNormalize_XForward_To_ZForward` so TIJ public aircraft assets remain
+  `+Z` forward, writes the runtime GLBs under
+  `public/models/vehicles/aircraft/`, and mirrors provenance sidecars under
+  `docs/asset-provenance/pixel-forge-aircraft-2026-05-02/`.
+- Updated helicopter/fixed-wing runtime animation handling so rotor and
+  propeller spin axes can be inferred from embedded GLB quaternion tracks
+  instead of assuming one global axis. Fixed-wing static mesh optimization now
+  preserves animated prop descendants by ancestor pivot name.
+- Local import evidence:
+  `artifacts/perf/2026-05-03T01-55-00-000Z/pixel-forge-aircraft-import/summary.json`.
+  Local standalone viewer evidence:
+  `artifacts/perf/2026-05-03T01-58-00-000Z/pixel-forge-aircraft-viewer/summary.json`.
+- Pending gates before production parity or perf claims: focused runtime tests,
+  typecheck/build, `npm run probe:fixed-wing`, Open Frontier/A Shau renderer
+  evidence, CI/deploy, live Pages checks, and human aircraft-feel playtest.
+- Fixed-wing probe follow-up: the first browser probe pass completed A-1 and
+  F-4 but then exposed a nondeterministic Open Frontier seed/airfield coverage
+  issue while attempting AC-47. `MapSeedRegistry` now honors `?seed=<n>` for
+  pre-baked modes, and `scripts/fixed-wing-runtime-probe.ts` pins Open Frontier
+  to seed `42` by default while retaining a retry plus render-state diagnostic
+  for boots that reach gameplay without the required fixed-wing set. A seed-42
+  Open Frontier perf capture produced renderer stats with `0` console errors,
+  but it failed the active-driver gate because that seed did not move/shoot; the
+  general short perf script keeps its existing unpinned scenario semantics.
+- `npm run probe:fixed-wing -- --boot-attempts=2` passed at
+  `artifacts/fixed-wing-runtime-probe/summary.json` after the seed/retry
+  hardening, covering A-1, F-4, and AC-47.
+- Open Frontier short initially failed with 42 browser errors from
+  `THREE.BufferGeometryUtils.mergeAttributes()` while batching imported GLB
+  geometry. `ModelDrawCallOptimizer` now deinterleaves GLTFLoader interleaved
+  attributes before static merge/batch handoff, with a regression test in
+  `src/systems/assets/ModelDrawCallOptimizer.test.ts`.
+- Rerun Open Frontier short:
+  `artifacts/perf/2026-05-03T03-07-26-873Z` with measurement-trust PASS, `0`
+  browser errors, validation WARN on peak p99 `48.90ms`, and strict
+  `perf:compare -- --scenario openfrontier:short --dir 2026-05-03T03-07-26-873Z`
+  failing against the older baseline. This is renderer evidence, not a perf win.
+- A Shau short:
+  `artifacts/perf/2026-05-03T03-11-40-162Z` with measurement-trust PASS, `0`
+  browser errors, validation WARN on peak p99 `47.70ms`, and strict
+  `perf:compare -- --scenario ashau:short --dir 2026-05-03T03-11-40-162Z`
+  failing against the older baseline. This is renderer evidence, not a perf win.
+- Fixed the FixedWingModel unit-test mock to cover the new animated-model loader
+  contract. `npm run test:run -- src/systems/vehicle/FixedWingModel.test.ts`
+  passed with 16 tests.
+- Local gates now passing after the aircraft patch: `npm run validate:fast`,
+  `npm run build`, and `npm run check:projekt-143`. The fresh Projekt-143 static
+  suite wrote
+  `artifacts/perf/2026-05-03T03-23-55-447Z/projekt-143-evidence-suite/suite-summary.json`.
+- Refreshed `npm run check:projekt-143-cycle2-proof` after the aircraft patch;
+  it remains WARN for missing dedicated culling/optic certification views and
+  wrote
+  `artifacts/perf/2026-05-03T08-27-06-170Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+- Still not claimed: production parity, aircraft feel, or any performance
+  improvement. Those require CI/deploy/live Pages checks and a human aircraft
+  playtest.

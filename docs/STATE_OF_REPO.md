@@ -109,12 +109,38 @@ the current truth anchor.
 - Phase 2 / Cycle 2 is now open as visual/runtime proof work. Runtime screenshots
   were refreshed at
   `artifacts/perf/2026-05-03T01-00-12-099Z/projekt-143-cycle2-runtime-proof/summary.json`.
-  `npm run check:projekt-143-cycle2-proof` wrote
-  `artifacts/perf/2026-05-03T01-13-21-209Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  `npm run check:projekt-143-cycle2-proof` was refreshed after the aircraft
+  import and wrote
+  `artifacts/perf/2026-05-03T08-27-06-170Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
   with WARN status: Open Frontier/A Shau elevated screenshots and static horizon
   audit are present, culling attribution is below the `10%` unattributed visible
   triangle budget, but close-NPC/NPC-imposter culling views and matched
   close-GLB/imposter screenshots are not certified.
+- Cycle 2 now also includes the user-approved aircraft GLB replacement as an
+  evidence-gated asset/runtime import. The six runtime aircraft GLBs were
+  imported from Pixel Forge through `npm run assets:import-pixel-forge-aircraft`
+  with source `+X` forward normalized to TIJ public `+Z` forward by an explicit
+  wrapper node. Runtime code now reads embedded GLB animation tracks for
+  rotor/prop spin-axis hints and protects animated prop/rotor descendants from
+  static draw-call batching by ancestor. Provenance sidecars are under
+  `docs/asset-provenance/pixel-forge-aircraft-2026-05-02/`; local import and
+  viewer evidence are
+  `artifacts/perf/2026-05-03T01-55-00-000Z/pixel-forge-aircraft-import/summary.json`
+  and
+  `artifacts/perf/2026-05-03T01-58-00-000Z/pixel-forge-aircraft-viewer/summary.json`.
+  `npm run probe:fixed-wing -- --boot-attempts=2` passed at
+  `artifacts/fixed-wing-runtime-probe/summary.json`. Open Frontier short
+  renderer evidence at `artifacts/perf/2026-05-03T03-07-26-873Z` and A Shau
+  short evidence at `artifacts/perf/2026-05-03T03-11-40-162Z` both have trusted
+  measurement paths and `0` browser errors after the wrapper-level
+  deinterleaving fix for GLTFLoader interleaved attributes. Both captures are
+  WARN on peak p99 and fail strict `perf:compare` thresholds against older
+  baselines. Local `npm run validate:fast`, `npm run build`, and
+  `npm run check:projekt-143` pass after the aircraft patch; the latest static
+  evidence suite is
+  `artifacts/perf/2026-05-03T03-23-55-447Z/projekt-143-evidence-suite/suite-summary.json`.
+  This is not a production parity or perf-improvement claim until CI/deploy and
+  live checks are complete.
 - Projekt Objekt-143 Cycle 0 evidence payload landed at
   `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
   `25262818886` served that payload SHA. Doc-only release-state commits may

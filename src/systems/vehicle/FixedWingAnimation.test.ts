@@ -41,6 +41,28 @@ describe('FixedWingAnimation', () => {
     expect(prop.rotation.z).not.toBe(0);
   });
 
+  it('uses embedded propeller animation metadata to choose the spin axis', () => {
+    const group = createGroupWithPropeller('propeller');
+    const clip = new THREE.AnimationClip('PropSpin', 0.4, [
+      new THREE.QuaternionKeyframeTrack(
+        'propeller.quaternion',
+        [0, 0.2, 0.4],
+        [
+          0, 0, 0, 1,
+          1, 0, 0, 0,
+          0, 0, 0, -1,
+        ],
+      ),
+    ]);
+
+    animation.initialize('fw-pixel-forge', 'A1_SKYRAIDER', group, [clip]);
+    animation.update('fw-pixel-forge', 1.0, 1 / 60);
+
+    const prop = group.getObjectByName('propeller')!;
+    expect(prop.rotation.x).not.toBe(0);
+    expect(prop.rotation.z).toBe(0);
+  });
+
   it('finds and spins twin propellers (AC-47 Spooky)', () => {
     const group = createGroupWithTwinProps();
     animation.initialize('fw2', 'AC47_SPOOKY', group);

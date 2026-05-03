@@ -39,6 +39,14 @@ export function getMapVariants(mode: GameMode): MapSeedVariant[] {
   return SEED_VARIANTS[mode] ?? [];
 }
 
+function getRequestedSeed(): number | null {
+  if (typeof window === 'undefined') return null;
+  const raw = new URLSearchParams(window.location.search).get('seed');
+  if (raw === null || raw.trim() === '') return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
 /**
  * Pick a random pre-baked seed variant for a mode, avoiding the last-used seed.
  * Returns null if no variants are registered (e.g. A Shau uses DEM, AI sandbox is random).
@@ -46,6 +54,20 @@ export function getMapVariants(mode: GameMode): MapSeedVariant[] {
 export function pickRandomVariant(mode: GameMode): MapSeedVariant | null {
   const variants = SEED_VARIANTS[mode];
   if (!variants || variants.length === 0) return null;
+
+  const requestedSeed = getRequestedSeed();
+  if (requestedSeed !== null) {
+    const pinned = variants.find((variant) => variant.seed === requestedSeed);
+    if (pinned) {
+      try {
+        sessionStorage.setItem(LAST_SEED_KEY + mode, String(pinned.seed));
+      } catch {
+        // ignore
+      }
+      return pinned;
+    }
+  }
+
   if (variants.length === 1) return variants[0];
 
   // Avoid repeating the last seed
