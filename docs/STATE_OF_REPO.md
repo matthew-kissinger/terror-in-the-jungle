@@ -58,7 +58,11 @@ the current truth anchor.
   GLBs used separate shader/material contracts. Commit
   `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` now forwards scene lighting/fog
   into NPC imposter shader uniforms; expanded luma is inside band, but
-  gameplay-camera visible-height samples still flag.
+  the 8.5m near-stress camera visible-height samples still flag. Commit
+  `5b053711cece65b5915ea786acc56e4a8ea22736` adds a runtime LOD-edge camera
+  proof path; the committed-sha LOD-edge artifact passes with `0/40` flags, so
+  the current open KB-OPTIK decision is near-stress exception/human review, not
+  a measured LOD-edge failure.
 - KB-TERRAIN measurement has started with `npm run check:vegetation-horizon`.
   The first artifact,
   `artifacts/perf/2026-05-02T21-29-15-593Z/vegetation-horizon-audit/horizon-audit.json`,
@@ -304,10 +308,13 @@ What is not ready to claim:
   captures `40` samples across five lighting profiles and two camera profiles.
   Measurement trust is PASS, expanded luma is now `-11.31%` to `9.03%`
   against the `+/-12%` band, and `10/40` samples still flag on
-  gameplay-camera visible-height ratios. It is not yet live-deployed, it has
-  no perf improvement claim, and final visual parity now requires
-  gameplay-camera silhouette/crop decision, a documented visual exception, or
-  human review.
+  8.5m near-stress visible-height ratios. The committed-sha runtime LOD-edge
+  proof at
+  `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json`
+  is PASS with measurement trust PASS, `0/40` flags, visible-height ratio
+  `0.855-0.895`, and luma `-6.94%` to `9.77%`. It is not yet live-deployed, it
+  has no perf improvement claim, and final visual parity still requires
+  documented near-stress exception or human review.
 - No distant-canopy or barren-horizon fix has shipped. KB-TERRAIN now has
   static coverage evidence, but still needs elevated runtime screenshots and
   matched perf captures before any outer-canopy layer is accepted.
@@ -316,12 +323,13 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T18-50-03-715Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T19-02-55-123Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
-  `needs_decision` because gameplay-camera visible-height samples still flag
-  after expanded luma was brought into band. KB-LOAD texture upload/residency
+  `needs_decision` because the 8.5m near-stress camera still flags even though
+  runtime LOD-edge proof passes after expanded luma was brought into band.
+  KB-LOAD texture upload/residency
   and KB-EFFECTS grenade first-use are
   `ready_for_branch`, and KB-TERRAIN/KB-CULL are `needs_baseline`. It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
@@ -330,12 +338,13 @@ What is not ready to claim:
   parity, far-canopy, grenade, texture-upload, culling, WebGPU, or
   production-parity remediation is accepted from it.
 - KB-OPTIK now has an executable decision packet at
-  `artifacts/perf/2026-05-03T18-50-04-224Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`.
   It records the current NPC target as `2.95m`, imposter visible-height ratio
   average as `0.879`, imposter luma delta percent average as `-0.073`,
-  expanded proof flagged samples as `10`, aircraft longest-axis/current-NPC
-  average as `4.52x`, and the recommended next runtime branch as targeted
-  gameplay-camera silhouette/crop decision or switching to KB-LOAD/KB-EFFECTS.
+  near-stress expanded proof flagged samples as `10`, runtime LOD-edge proof
+  flagged samples as `0`, aircraft longest-axis/current-NPC average as `4.52x`,
+  and the recommended next branch as documenting the near-stress silhouette
+  exception or switching to KB-LOAD/KB-EFFECTS.
   It continues to reject aircraft resizing as the next response without a
   separate vehicle-scale proof.
 - Commit `5b726746b0034d9327f5cb03ddcd3147294125ed` passed GitHub CI run

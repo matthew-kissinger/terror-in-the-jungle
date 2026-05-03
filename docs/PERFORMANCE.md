@@ -217,13 +217,19 @@ After commit `b24c23bfdbd027458a4d3e27155158723a32f4ad`, it distinguishes
 expanded-luma success from gameplay-camera silhouette flags and recommends
 `target-gameplay-camera-silhouette-or-switch-bureau` when luma is inside band
 but visible-height ratios still warn.
+After commit `5b053711cece65b5915ea786acc56e4a8ea22736`, it reads the latest
+near-stress expanded proof and runtime LOD-edge expanded proof separately. If
+near-stress still flags but LOD-edge passes, it recommends
+`document-near-stress-silhouette-exception-or-switch-bureau`.
 Aircraft resizing remains rejected as the next response unless a separate
 vehicle-scale proof is opened.
 
 `projekt-143-optik-expanded-proof.ts` writes a headed KB-OPTIK expanded proof
 under `artifacts/perf/<timestamp>/projekt-143-optik-expanded-proof/`. It
 renders matched close-GLB/imposter crops for all four Pixel Forge NPC factions
-across five lighting profiles and two camera profiles. The artifact includes
+across five lighting profiles and two camera profiles. Pass
+`--camera-profile-set=runtime-lod-edge` to replace the 8.5m near-stress
+perspective camera with the 64m close-model cutoff camera. The artifact includes
 `summary.json`, `summary.md`, per-sample close/imposter PNGs, browser/runtime
 metadata, renderer stats, and strict measurement-trust flags. WARN means the
 capture is trusted but the expanded visual bands are not closed; FAIL means do
@@ -232,8 +238,12 @@ The committed-sha artifact
 `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json`
 records commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad`, measurement trust
 PASS, luma delta range `-11.31%` to `9.03%`, and `10/40` remaining flags from
-gameplay-camera visible-height ratios. Treat it as expanded-luma after
-evidence, not final visual closeout.
+8.5m near-stress visible-height ratios. Runtime LOD-edge after evidence at
+`artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json`
+records commit `5b053711cece65b5915ea786acc56e4a8ea22736`, measurement trust
+PASS, status PASS, `0/40` flags, visible-height ratio `0.855-0.895`, and luma
+delta `-6.94%` to `9.77%`. Treat the near-stress WARN as a visual-exception or
+human-review decision, not a measured runtime LOD-edge failure.
 
 `projekt-143-culling-proof.ts` writes a headed deterministic renderer/category
 fixture under `artifacts/perf/<timestamp>/projekt-143-culling-proof/`. It uses
@@ -522,9 +532,13 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    lighting/fog into NPC imposter shader uniforms. The expanded proof at
    `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json`
    is measurement-trusted but WARN: luma is now in band at `-11.31%` to
-   `9.03%`, while `10/40` samples still flag on gameplay-camera visible-height
-   ratios. Current lead: luma/material parity is no longer the blocker; the
-   remaining KB-OPTIK decision is perspective-camera silhouette/crop parity.
+   `9.03%`, while `10/40` samples still flag on 8.5m near-stress
+   visible-height ratios. Runtime LOD-edge proof at
+   `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json`
+   is measurement-trusted PASS with `0/40` flags. Current lead: luma/material
+   parity is no longer the blocker, and the runtime LOD-edge camera is inside
+   band; the remaining KB-OPTIK decision is near-stress exception/human review
+   or deliberate switch to KB-LOAD/KB-EFFECTS.
    Do not claim full visual parity or performance improvement.
 5. **Large-mode vegetation horizon gap** - static KB-TERRAIN evidence shows
    current Pixel Forge vegetation disappears by `600m`, while Open Frontier

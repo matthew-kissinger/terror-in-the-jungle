@@ -2112,5 +2112,32 @@ TODO
   `npm run check:projekt-143-optik-expanded` WARN by design,
   `npm run check:projekt-143-optik-decision` WARN by design, and
   `npm run check:projekt-143-cycle3-kickoff` WARN by design. No production
-  parity, performance improvement, final visual parity, aircraft-scale
-  acceptance, or human-playtest signoff is claimed.
+ parity, performance improvement, final visual parity, aircraft-scale
+ acceptance, or human-playtest signoff is claimed.
+
+2026-05-03 Projekt Objekt-143 KB-OPTIK runtime LOD-edge proof pass
+- Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds
+  `--camera-profile-set=runtime-lod-edge` to
+  `scripts/projekt-143-optik-expanded-proof.ts` and updates the decision/kickoff
+  scripts so near-stress expanded proof and runtime LOD-edge proof are routed
+  separately.
+- Committed-sha runtime LOD-edge proof:
+  `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json`.
+  Measurement trust is PASS and status is PASS: `40` samples, `0` flags,
+  visible-height ratio `0.855-0.895`, and luma delta percent `-6.94` to
+  `9.77`.
+- The near-stress artifact remains
+  `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json`
+  with `10/40` visible-height flags at the 8.5m perspective camera. Because
+  the runtime LOD-edge camera passes, this is now a near-stress visual-exception
+  or human-review decision, not a measured runtime LOD-edge failure.
+- Refreshed handoff artifacts:
+  `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`
+  and
+  `artifacts/perf/2026-05-03T19-02-55-123Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  KB-OPTIK remains `needs_decision`; the recommended next branch is
+  `document-near-stress-silhouette-exception-or-switch-bureau`.
+- No production parity, performance improvement, final visual parity,
+  aircraft-scale acceptance, or human-playtest signoff is claimed.
+- Validation after docs alignment: `npm run check:projekt-143` PASS,
+  `artifacts/perf/2026-05-03T19-05-22-881Z/projekt-143-evidence-suite/suite-summary.json`.
