@@ -501,7 +501,7 @@ function buildEffectsTarget(grenadePath: string | null, grenade: GrenadeSummary 
     bureau: 'KB-EFFECTS',
     status: trusted ? 'ready_for_branch' : 'needs_baseline',
     priority: 3,
-    summary: 'Grenade remediation can start only as a first-use warmup/program-stall branch with the low-load two-grenade probe as before evidence.',
+    summary: 'Grenade remediation is blocked on render-frame attribution; matched visible warmup attempts still reproduced the low-load two-grenade first-use stall.',
     evidence: {
       grenadeArtifactPath: rel(grenadePath),
       status: grenade?.status ?? null,
@@ -512,7 +512,8 @@ function buildEffectsTarget(grenadePath: string | null, grenade: GrenadeSummary 
     },
     requiredBefore: [
       'Refresh low-load two-grenade probe if the latest artifact is stale or missing CPU profile/long-task windows.',
-      'Keep grenade JS, audio, particle, and shader/program warmup changes separate unless evidence forces coupling.',
+      'Use the latest rejected warmup artifacts as negative evidence; do not repeat visible render warmup without a new attribution hypothesis.',
+      'Keep grenade JS, audio, particle, renderer, and shader/program changes separate unless evidence forces coupling.',
     ],
     acceptance: [
       'No long task above 50ms within +/-250ms of either warmed trigger.',
@@ -522,6 +523,7 @@ function buildEffectsTarget(grenadePath: string | null, grenade: GrenadeSummary 
     nonClaims: [
       'Do not close KB-EFFECTS from frag JS timings alone.',
       'Do not use saturated combat120 grenade artifacts for first-use attribution.',
+      'Do not claim first-use visible warmup fixes KB-EFFECTS; three matched variants still reproduced the stall.',
     ],
   };
 }
@@ -705,12 +707,12 @@ function main(): void {
       'Treat the 2.95m NPC target drop, per-tile imposter crop, selected-lighting luma proof, and expanded-luma atmosphere pass as the current KB-OPTIK remediation slice.',
       'If KB-OPTIK continues immediately, use the runtime LOD-edge proof plus the near-stress artifact to decide visual exception/human review before changing crop or scale again.',
       'For KB-LOAD, treat the giantPalm warmup as partial upload mitigation only; the next branch must prove startup latency does not regress while reducing remaining uploads.',
-      'Run one KB-EFFECTS first-use grenade warmup branch only against the low-load two-grenade probe.',
+      'For KB-EFFECTS, run render-frame attribution before another warmup branch; matched visible warmups have already failed the low-load two-grenade probe.',
       'Keep KB-TERRAIN and KB-CULL remediation branches separate until matched large-mode perf windows are prepared.',
       'Keep WebGPU out of Cycle 3 unless the owner explicitly approves reopening the point-of-no-return decision.',
     ],
     openDecisions: [
-      'Should KB-OPTIK document the 8.5m near-stress silhouette exception after the runtime LOD-edge PASS, run human visual review, or should KB-LOAD/KB-EFFECTS take the next remediation slot?',
+      'Should KB-OPTIK document the 8.5m near-stress silhouette exception after the runtime LOD-edge PASS, run human visual review, or should KB-LOAD/KB-EFFECTS attribution take the next remediation slot?',
       'Should the next KB-LOAD branch target fanPalm with a latency guard, NPC atlases, approved asset regeneration, or upload scheduling?',
       'Which large-mode p95/draw-call budget will be used for far-canopy acceptance in this cycle?',
     ],

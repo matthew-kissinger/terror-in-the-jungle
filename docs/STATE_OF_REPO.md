@@ -43,7 +43,11 @@ the current truth anchor.
   first-use browser stall, while measured frag detonation JS work stayed at
   `1.4ms` total across two grenades. The current lead is first visible
   Three/WebGL explosion render/program work, not particle allocation, damage,
-  audio, or physics broadphase.
+  audio, or physics broadphase. The 2026-05-03 current-HEAD refresh reproduced
+  the stall again, and three matched visible warmup variants still hit
+  trigger-adjacent `100ms` detonation frames with `373-397ms` long tasks. Those
+  runtime warmup changes were rejected and reverted; KB-EFFECTS now needs
+  render-frame attribution before another warmup branch.
 - KB-OPTIK measurement has also started. `npm run check:pixel-forge-optics`
   writes a Pixel Forge imposter optics audit; the first artifact,
   `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`,
@@ -323,7 +327,7 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T22-04-56-309Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T22-24-44-200Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
@@ -331,7 +335,8 @@ What is not ready to claim:
   runtime LOD-edge proof passes after expanded luma was brought into band.
   KB-LOAD texture upload/residency remains `ready_for_branch` for remaining
   uploads after the partial giantPalm warmup, KB-EFFECTS grenade first-use is
-  `ready_for_branch`, and KB-TERRAIN/KB-CULL are `needs_baseline`. It also
+  `ready_for_branch` for render-frame attribution after rejected visible
+  warmups, and KB-TERRAIN/KB-CULL are `needs_baseline`. It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
   combat120, and A Shau perf summary paths for handoff. This is
   planning/agent-DX evidence; no atlas regeneration, gameplay-camera visual

@@ -406,6 +406,24 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   `artifacts/perf/2026-05-02T20-19-04-818Z/grenade-spike-ai-sandbox` is not a
   valid isolation capture because its baseline is already saturated at
   `100ms` frames before detonation.
+- 2026-05-03 KB-EFFECTS low-load refresh and rejected warmups: current-HEAD
+  before evidence
+  `artifacts/perf/2026-05-03T22-09-54-365Z/grenade-spike-ai-sandbox`
+  reproduced the first-use stall with baseline p95/max `22.6ms / 24.2ms`,
+  detonation p95/max `22.5ms / 100.0ms`, max-frame delta `75.8ms`, one
+  `379ms` long task, two LoAF entries, CPU profile present, and
+  `kb-effects.grenade.frag.total=1.4ms` total / `0.9ms` max. Three matched
+  visible warmup attempts were rejected and reverted:
+  `artifacts/perf/2026-05-03T22-12-40-344Z/grenade-spike-ai-sandbox`
+  explosion-only warmup still hit detonation max `100.0ms` and a `397ms` long
+  task,
+  `artifacts/perf/2026-05-03T22-16-26-287Z/grenade-spike-ai-sandbox`
+  full frag render-path warmup still hit detonation max `100.0ms` and a
+  `387ms` long task, and
+  `artifacts/perf/2026-05-03T22-18-02-801Z/grenade-spike-ai-sandbox`
+  culling-forced full frag warmup still hit detonation max `100.0ms` and a
+  `373ms` long task. No grenade remediation is claimed; the next KB-EFFECTS
+  branch must add render-frame attribution before another warmup.
 - 2026-05-02 KB-OPTIK imposter optics audit:
   `npm run check:pixel-forge-optics` wrote
   `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`.
@@ -536,7 +554,8 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
 3. **Grenade first-use render/program stall** - KB-EFFECTS now reproduces a
    low-load first-use detonation stall while measuring the frag JS path at
    about 1ms. The current lead is first visible Three/WebGL explosion
-   render/program work. Do not treat the older hidden-effect warmup as closed
+   render/program work, but three visible warmup variants still reproduced the
+   stall. The next pass is render-frame attribution, not another blind warmup,
    until the two-grenade probe passes without a trigger-adjacent long task.
 4. **NPC imposter expanded visual parity** - the first KB-OPTIK remediation
    dropped the shared NPC runtime target to `2.95m` and added generated

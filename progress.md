@@ -2174,3 +2174,32 @@ TODO
   and `npm run validate:fast` PASS. No production parity, startup-latency win,
   startup closeout, texture residency closeout, or clean frame-time improvement
   is claimed.
+
+2026-05-03 Projekt Objekt-143 KB-EFFECTS rejected warmup pass
+- Fresh current-HEAD before evidence:
+  `artifacts/perf/2026-05-03T22-09-54-365Z/grenade-spike-ai-sandbox`.
+  The headed low-load two-grenade probe reproduced the first-use stall with
+  baseline p95/max `22.6ms / 24.2ms`, detonation p95/max
+  `22.5ms / 100.0ms`, max-frame delta `75.8ms`, one `379ms` long task, two
+  LoAF entries, CPU profile present, and
+  `kb-effects.grenade.frag.total=1.4ms` total / `0.9ms` max.
+- Rejected remediation evidence: explosion-only visible render warmup
+  `artifacts/perf/2026-05-03T22-12-40-344Z/grenade-spike-ai-sandbox`, full
+  frag render-path warmup
+  `artifacts/perf/2026-05-03T22-16-26-287Z/grenade-spike-ai-sandbox`, and
+  culling-forced full frag warmup
+  `artifacts/perf/2026-05-03T22-18-02-801Z/grenade-spike-ai-sandbox` all
+  still hit detonation max `100.0ms` with one long task each (`397ms`,
+  `387ms`, and `373ms`). The runtime warmup code was reverted; no KB-EFFECTS
+  remediation landed.
+- Agent/DX routing update: `scripts/projekt-143-cycle3-kickoff.ts` now sends
+  KB-EFFECTS to render-frame attribution before another warmup branch and
+  records the rejected warmup artifacts as negative evidence.
+- Refreshed handoff artifacts: `npm run check:projekt-143-cycle3-kickoff`
+  WARN by design at
+  `artifacts/perf/2026-05-03T22-24-44-200Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-03T22-27-16-532Z/projekt-143-evidence-suite/suite-summary.json`.
+- Validation: `npm run typecheck` PASS and `npm run validate:fast` PASS. No
+  production parity, grenade closeout, startup-latency win, culling, WebGPU, or
+  performance-improvement claim is made from this pass.
