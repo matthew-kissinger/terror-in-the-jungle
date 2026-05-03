@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Last updated: 2026-04-24
+Last updated: 2026-05-03
 
 This is the authoritative, agent-agnostic operating guide for this repo. Every agent (Claude Code, Codex, Cursor, Gemini, humans) should read this file first. `CLAUDE.md` is a thin wrapper that adds Claude-Code-specific context on top of what's here.
 
@@ -185,6 +185,11 @@ camera/render shake questions have an evidence-backed decision.
   `npm run deploy:prod`, then verify live `/asset-manifest.json`, Pages/R2/WASM
   headers, service-worker behavior, and a meaningful live browser flow before
   claiming production parity.
+- **Deploy action runtime warnings.** The deploy workflow opts JavaScript
+  actions into Node 24 with `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`. If
+  GitHub emits a new action-runtime deprecation warning, treat it as release-DX
+  maintenance and document the decision before changing third-party action
+  versions.
 - **Don't anchor on doc claims against current file state.** Briefs and backlogs drift. Verify with Read against the current file before proposing a fix. If the brief's premise is wrong, stop and escalate, don't rationalize an outdated task.
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.

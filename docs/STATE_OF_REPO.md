@@ -1,6 +1,6 @@
 # State Of Repo
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
@@ -94,6 +94,13 @@ the current truth anchor.
   failures. This verifies the Cycle 1 docs/tooling release, not any optimization
   remediation. Later doc-only release-state commits may advance `master`; live
   `/asset-manifest.json` remains the exact current deployed SHA source of truth.
+- Agent-DX follow-up `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e` added the
+  repo-native GitHub workflow dispatch wrapper plus stable mobile UI gate hooks.
+  Manual CI run `25265347136` passed lint, build, test, perf, smoke, and mobile
+  UI; Deploy run `25265623981` passed; live `/asset-manifest.json`, Pages
+  headers, R2 A Shau DEM headers, service worker state, and a Zone Control
+  browser smoke were verified. This is release workflow and mobile gate
+  hardening, not a Projekt Objekt-143 optimization/remediation claim.
 - Projekt Objekt-143 Cycle 0 evidence payload landed at
   `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
   `25262818886` served that payload SHA. Doc-only release-state commits may

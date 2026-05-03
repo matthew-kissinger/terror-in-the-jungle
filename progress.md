@@ -1764,3 +1764,15 @@ TODO
   now exposes `data-ready`, `#settings-modal` exposes `data-visible`, and the
   mobile UI harness waits on those attributes while emitting selector/hit-stack
   diagnostics if a trigger still fails.
+- Commit `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`
+  (`test(mobile): harden gameplay menu gate`) passed manual CI run
+  `25265347136`; the previously failing hosted `mobile-ui` job passed.
+- Manual Deploy workflow run `25265623981` deployed `f68f09a`. Live
+  `/asset-manifest.json` reported `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`;
+  Pages shell, `sw.js`, asset manifest, representative GLB/data/build/WASM
+  assets, and the R2 A Shau DEM URL returned expected headers. Live browser
+  smoke reached the Zone Control deploy UI with no console, page, request, or
+  retry-panel failures.
+- The deploy run emitted GitHub's Node 20 action deprecation warning for the
+  Cloudflare deploy action. Added `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to
+  `.github/workflows/deploy.yml` and documented this as release-DX maintenance.

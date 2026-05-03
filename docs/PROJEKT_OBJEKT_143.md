@@ -1,6 +1,6 @@
 # Projekt Objekt-143 Recovery Ledger
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 This ledger tracks the recovery operation opened after field reports of
 startup stalls, frame-time regressions, imposter visual mismatches, vegetation
@@ -19,7 +19,7 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status and the docs/tooling release has been deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`. Open Frontier and A Shau steady-state captures passed measurement trust, combat120 did not, and the low-load grenade probe still reproduces the first-use stall. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`. Exact production SHA remains `/asset-manifest.json`. Open Frontier and A Shau steady-state captures passed measurement trust, combat120 did not, and the low-load grenade probe still reproduces the first-use stall. KB-METRIK remains first and blocks optimization claims from other bureaus. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
 ## Shipped Cycle 0 State
@@ -177,6 +177,14 @@ console, page, request, or retry failures. This verifies the docs/tooling
 release only; it is not a remediation or optimization claim. Later doc-only
 release-state commits may advance `master`; live `/asset-manifest.json` remains
 the exact current deployed SHA source of truth.
+
+Agent-DX follow-up: `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e` added
+repo-native workflow dispatch wrappers plus stable mobile UI gate state hooks.
+Manual CI run `25265347136` passed lint, build, test, perf, smoke, and mobile UI;
+manual Deploy workflow run `25265623981` passed; live `/asset-manifest.json`
+reported `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; live header checks and a
+Zone Control browser smoke passed. This is release workflow and mobile gate
+hardening only, not a rendering, asset, grenade, culling, or WebGPU remediation.
 
 | Probe | Artifact | Trust | Result |
 | --- | --- | --- | --- |

@@ -1,6 +1,6 @@
 # Deploy Workflow
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 Production: https://terror-in-the-jungle.pages.dev/
 
@@ -65,6 +65,11 @@ The workflow wrappers use `scripts/github-workflow-run.ts`, which removes
 `GITHUB_TOKEN` and `GH_TOKEN` from the child `gh` process. That avoids the
 common agent failure where a limited PAT shadows local keyring auth and GitHub
 returns `Resource not accessible by personal access token`.
+
+The deploy job sets `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` so GitHub-hosted
+JavaScript actions run under the upcoming Node 24 action runtime. If this
+warning returns, treat it as release workflow maintenance and verify against
+current Cloudflare/GitHub action guidance before changing action versions.
 
 Key facts:
 
