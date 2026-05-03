@@ -1910,6 +1910,11 @@ TODO
   with `0` browser/page/request errors, probeP95 `1.96ms`, CPU profile capture,
   browser long-task/LoAF capture, renderer stats (`133` draw calls, `4,887`
   triangles), and all required categories visible.
+- Follow-up from screenshot review: the proof fixture is not runtime scale
+  evidence. Its GLBs are scaled by longest bounding-box axis so all categories
+  fit one camera; renamed the fixture sizing field to
+  `fixtureLongestAxisMeters` and documented that KB-OPTIK matched screenshots
+  own NPC/vehicle relative-scale judgment.
 - Refreshed `npm run check:projekt-143-cycle2-proof`; the new suite artifact is
   `artifacts/perf/2026-05-03T09-35-33-689Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
   It remains WARN overall only because KB-OPTIK still lacks matched

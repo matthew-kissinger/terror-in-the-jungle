@@ -188,7 +188,10 @@ fixture screenshot. It is not a gameplay perf baseline and does not certify
 visual parity; it exists so KB-CULL has trusted draw-call/triangle attribution
 without repeating untrusted combat-heavy AI Sandbox captures. The npm command
 runs headed by default because headless Chromium produced a lost WebGL context
-and zero renderer counters on 2026-05-03.
+and zero renderer counters on 2026-05-03. The fixture screenshot is also not a
+runtime scale proof: GLB assets are scaled by longest bounding-box axis to keep
+all required categories visible in one camera. Use matched KB-OPTIK screenshots,
+not this fixture, to judge whether NPCs are too large or vehicles are too small.
 
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so

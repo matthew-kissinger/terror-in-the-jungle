@@ -19,7 +19,7 @@ type FixtureAsset = {
   category: string;
   path: string;
   kind: 'glb' | 'shader-proxy';
-  targetHeightMeters?: number;
+  fixtureLongestAxisMeters?: number;
 };
 
 type RendererInfo = {
@@ -106,28 +106,28 @@ const FIXTURE_ASSETS: FixtureAsset[] = [
     category: 'world_static_features',
     path: '/models/structures/sandbag-wall.glb',
     kind: 'glb',
-    targetHeightMeters: 3.4,
+    fixtureLongestAxisMeters: 3.4,
   },
   {
     id: 'a1-skyraider-fixed-wing',
     category: 'fixed_wing_aircraft',
     path: '/models/vehicles/aircraft/a1-skyraider.glb',
     kind: 'glb',
-    targetHeightMeters: 4.8,
+    fixtureLongestAxisMeters: 4.8,
   },
   {
     id: 'uh1-huey-helicopter',
     category: 'helicopters',
     path: '/models/vehicles/aircraft/uh1-huey.glb',
     kind: 'glb',
-    targetHeightMeters: 4.3,
+    fixtureLongestAxisMeters: 4.3,
   },
   {
     id: 'us-army-close-npc',
     category: 'npc_close_glb',
     path: '/models/npcs/pixel-forge-v1/usArmy.glb',
     kind: 'glb',
-    targetHeightMeters: 3.6,
+    fixtureLongestAxisMeters: 3.6,
   },
   {
     id: 'vegetation-imposter-shader-proxy',
@@ -346,7 +346,7 @@ function proofHtml(): string {
       const initialBox = new THREE.Box3().setFromObject(root);
       const size = initialBox.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z, 0.001);
-      root.scale.multiplyScalar((asset.targetHeightMeters || 4) / maxDim);
+      root.scale.multiplyScalar((asset.fixtureLongestAxisMeters || 4) / maxDim);
       root.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(root);
       const center = box.getCenter(new THREE.Vector3());
@@ -432,6 +432,10 @@ function proofHtml(): string {
       window.__projekt143CullingProofReady = {
         ok: true,
         loaded,
+        scaleContract: {
+          kind: 'fixture-only',
+          note: 'Assets are scaled by longest bounding-box axis only to keep every renderer category visible in one camera. This screenshot is not runtime visual scale evidence.'
+        },
         rendererInfo: renderFrameForStats(),
         perfEntries: window.__projekt143PerfEntries,
         userAgent: navigator.userAgent
@@ -756,6 +760,7 @@ async function main(): Promise<void> {
         assets: FIXTURE_ASSETS,
         notes: [
           'This is a deterministic renderer/scene-attribution proof, not a gameplay perf baseline.',
+          'The fixture screenshot is not runtime scale evidence; GLB categories are scaled by longest bounding-box axis only to keep all proof categories visible in one camera.',
           'GLB categories use current runtime assets and modelPath-based classification.',
           'Imposter categories use shader-uniform proxies matching the runtime classifier until matched screenshot evidence is added.',
         ],

@@ -906,7 +906,10 @@ Current Cycle 2 status:
   close Pixel Forge NPC GLBs. Measurement trust is PASS with browser/page/
   request errors at `0` and probeP95 `1.96ms`. A headless exploratory run
   produced a lost WebGL context and zero renderer counters, so the npm script
-  is headed by default.
+  is headed by default. The proof screenshot is not relative scale evidence:
+  fixture GLBs are scaled by longest bounding-box axis to keep all required
+  categories visible in one camera. KB-OPTIK matched close-GLB/imposter
+  screenshots remain the scale/parity authority.
 - 2026-05-03: `npm run check:projekt-143-cycle2-proof` was refreshed again
   after the dedicated culling proof and wrote
   `artifacts/perf/2026-05-03T09-35-33-689Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.

@@ -118,7 +118,9 @@ the current truth anchor.
   `artifacts/perf/2026-05-03T09-35-33-689Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
   with WARN status only because matched close-GLB/imposter screenshots are not
   certified. KB-CULL scene attribution is now PASS; KB-OPTIK matched visual
-  proof remains open.
+  proof remains open. The culling proof screenshot is not runtime scale
+  evidence because its fixture rescales GLBs by longest bounding-box axis to fit
+  one camera.
 - Cycle 2 now also includes the user-approved aircraft GLB replacement as an
   evidence-gated asset/runtime import. The six runtime aircraft GLBs were
   imported from Pixel Forge through `npm run assets:import-pixel-forge-aircraft`
