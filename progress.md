@@ -2254,3 +2254,38 @@ TODO
 - Final local validation: `npm run check:projekt-143` PASS at
   `artifacts/perf/2026-05-03T23-07-31-605Z/projekt-143-evidence-suite/suite-summary.json`
   and `npm run validate:fast` PASS.
+
+2026-05-03 Projekt Objekt-143 KB-EFFECTS low-load trust closeout
+- Hardened `scripts/perf-grenade-spike.ts` so the first live grenade is armed
+  inside its `requestAnimationFrame` callback: observer drains, frame metrics,
+  perf reports, render attribution, and performance marks reset immediately
+  before `spawnProjectile`. This prevents pre-trigger frame scheduling from
+  being counted as grenade-trigger work.
+- Added measurement-trust flags for trigger/post-trigger LoAF counts,
+  post-trigger LoAF counts, and classified pre-trigger frame max state. The
+  Cycle 3 kickoff matrix now supports `evidence_complete` targets and surfaces
+  those flags for KB-EFFECTS handoff.
+- Trusted evidence:
+  `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`
+  is PASS for measurement trust. It records baseline p95/max
+  `23.5ms / 27.6ms`, detonation p95/max `24.3ms / 30.2ms`, max-frame delta
+  `2.6ms`, hitch50 delta `0`, detonation long tasks `0`,
+  trigger/post-trigger LoAF count `0`, near-trigger main-scene render max
+  `23.6ms`, and `kb-effects.grenade.frag.total=1.5ms` total / `0.9ms` max.
+- Refreshed handoff artifact:
+  `artifacts/perf/2026-05-03T23-30-22-640Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  is WARN by design for remaining KB-OPTIK, KB-TERRAIN, and KB-CULL work, but
+  KB-EFFECTS `grenade-first-use-stall` is now `evidence_complete` for the
+  low-load unlit pooled explosion path.
+- Refreshed static suite:
+  `artifacts/perf/2026-05-03T23-30-22-745Z/projekt-143-evidence-suite/suite-summary.json`
+  PASS.
+- Docs aligned in `docs/PROJEKT_OBJEKT_143.md`, `docs/PERFORMANCE.md`,
+  `docs/STATE_OF_REPO.md`, and `docs/BACKLOG.md`. No production parity,
+  combat120/stress grenade closeout, WebGPU migration, or future explosion
+  visual-polish claim is made from this pass.
+- Validation: `npm run check:projekt-143-cycle3-kickoff` WARN by design at
+  `artifacts/perf/2026-05-03T23-30-22-640Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-03T23-30-22-745Z/projekt-143-evidence-suite/suite-summary.json`,
+  and `npm run validate:fast` PASS.

@@ -202,9 +202,9 @@ blocking gate.
 Cycle 2 proof, KB-OPTIK scale proof, texture audit, Open Frontier and Zone
 Control startup evidence, Open Frontier/combat120/A Shau perf summaries,
 grenade probe, vegetation horizon audit, and culling proof, then classifies
-candidate Cycle 3 branches as `ready_for_branch`, `needs_decision`,
-`needs_baseline`, or `blocked`. This is an agent-DX handoff command; it does
-not approve or apply any remediation.
+candidate Cycle 3 branches as `evidence_complete`, `ready_for_branch`,
+`needs_decision`, `needs_baseline`, or `blocked`. This is an agent-DX handoff
+command; it does not approve or apply any remediation.
 
 `projekt-143-optik-decision-packet.ts` writes a KB-OPTIK decision packet under
 `artifacts/perf/<timestamp>/projekt-143-optik-decision-packet/`. It consumes the
@@ -448,6 +448,20 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   final KB-EFFECTS closeout: measurement trust is `warn` because the latest
   artifact still has one pre-trigger LoAF and a `100.0ms` max frame to
   classify.
+- 2026-05-03 KB-EFFECTS trust closeout:
+  `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox` moved
+  final observer/frame-metric arming into the first live grenade's
+  `requestAnimationFrame` callback. The low-load two-grenade probe is PASS for
+  measurement trust: CPU profile, browser long-task observer, LoAF observer,
+  disabled WebGL upload observer, and render attribution are all present.
+  Baseline p95/max are `23.5ms / 27.6ms`; detonation p95/max are
+  `24.3ms / 30.2ms`; max-frame delta is `2.6ms`; hitch50 delta is `0`;
+  detonation long tasks are `0`; trigger/post-trigger LoAF count is `0`;
+  near-trigger main-scene render max is `23.6ms`; and
+  `kb-effects.grenade.frag.total=1.5ms` total / `0.9ms` max. This closes the
+  low-load grenade first-use stall for the unlit pooled explosion path. It
+  does not close saturated combat120 grenade behavior or future explosion
+  visual-polish changes.
 - 2026-05-02 KB-OPTIK imposter optics audit:
   `npm run check:pixel-forge-optics` wrote
   `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`.
@@ -577,12 +591,12 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
 2. **Open Frontier renderer tails** - the latest short capture (`artifacts/perf/2026-04-07T04-01-01-963Z`) passes mean/p95/hitch gates, but `p99FrameMs` still warns at `29.60ms` and heap peak-growth still warns at `35.13MB`. The mode is stable again, but not yet back to the March 4 renderer baseline.
 3. **Grenade first-use render/program stall** - KB-EFFECTS attributed the
    low-load first-use long task to the dynamic explosion `PointLight`
-   render/program path and removed that path locally. The post-remediation
-   low-load probe has `0` browser long tasks and no trigger-adjacent
-   main-scene render call above `29.5ms`, but it still reports a pre-trigger
-   LoAF and `100.0ms` max frame. The next pass is measurement-trust
-   classification, not another explosion warmup or a reintroduction of dynamic
-   lights.
+   render/program path, removed that path locally, and closed the low-load
+   trust gap with in-frame observer/metric arming. The trusted low-load probe
+   has `0` browser long tasks, `0` trigger/post-trigger LoAFs, no
+   trigger-adjacent main-scene render call above `23.6ms`, and detonation max
+   `30.2ms`. Preserve the unlit pooled path; any future visual polish or
+   stress-scene claim needs fresh matched render attribution.
 4. **NPC imposter expanded visual parity** - the first KB-OPTIK remediation
    dropped the shared NPC runtime target to `2.95m` and added generated
    per-tile crop maps for upright NPC imposter atlases. The selected-lighting

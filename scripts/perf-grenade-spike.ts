@@ -50,6 +50,7 @@ type TriggerResult = {
   atMs?: number;
   frameCount?: number;
   position?: { x: number; y: number; z: number };
+  armedAtMs?: number;
 };
 
 type BrowserStallsSummary = {
@@ -516,11 +517,23 @@ async function takeSnapshot(page: Page, label: string): Promise<ProbeSnapshot> {
   }, label);
 }
 
-async function triggerGrenade(page: Page): Promise<TriggerResult> {
-  return page.evaluate(() => {
+async function triggerGrenade(page: Page, resetBeforeSpawn: boolean): Promise<TriggerResult> {
+  return page.evaluate((shouldResetBeforeSpawn: boolean) => {
     return new Promise<TriggerResult>((resolve) => {
       requestAnimationFrame(() => {
         const w = window as any;
+        const armedAtMs = performance.now();
+        if (shouldResetBeforeSpawn) {
+          w.__perfHarnessObservers?.drain?.();
+          w.__kbEffectsRenderAttribution?.drain?.();
+          w.__metrics?.reset?.();
+          w.perf?.reset?.();
+          w.__perfHarnessObservers?.reset?.();
+          w.__kbEffectsRenderAttribution?.reset?.();
+          performance.clearMarks?.();
+          performance.clearMeasures?.();
+        }
+
         const engine = w.__engine;
         const grenadeSystem = engine?.systemManager?.grenadeSystem;
         const playerController = engine?.systemManager?.playerController;
@@ -555,6 +568,7 @@ async function triggerGrenade(page: Page): Promise<TriggerResult> {
         resolve({
           ok: true,
           atMs: performance.now(),
+          armedAtMs,
           frameCount: Number(metrics?.frameCount ?? 0),
           position: {
             x: Number(position.x),
@@ -564,7 +578,7 @@ async function triggerGrenade(page: Page): Promise<TriggerResult> {
         });
       });
     });
-  });
+  }, resetBeforeSpawn);
 }
 
 function getUserTiming(snapshot: ProbeSnapshot): Record<string, { count: number; totalDurationMs: number; maxDurationMs: number }> {
@@ -650,14 +664,21 @@ function buildMeasurementTrust(
     .map((trigger) => Number(trigger.atMs ?? Number.NaN))
     .filter(Number.isFinite);
   const firstTriggerAtMs = triggerTimes.length > 0 ? Math.min(...triggerTimes) : null;
+  const longAnimationFrames = detonationStalls.topLongAnimationFrames;
   const preTriggerLongAnimationFrameCount = firstTriggerAtMs === null
     ? 0
-    : detonationStalls.topLongAnimationFrames.filter((entry) => entry.startTime < firstTriggerAtMs).length;
+    : longAnimationFrames.filter((entry) => entry.startTime < firstTriggerAtMs).length;
   const preTriggerLoafOverlapsFirstTrigger = firstTriggerAtMs === null
     ? false
-    : detonationStalls.topLongAnimationFrames.some((entry) => (
+    : longAnimationFrames.some((entry) => (
         entry.startTime < firstTriggerAtMs && entry.startTime + entry.duration >= firstTriggerAtMs
       ));
+  const triggerOrPostTriggerLongAnimationFrameCount = firstTriggerAtMs === null
+    ? detonationStalls.longAnimationFrameCount
+    : longAnimationFrames.filter((entry) => entry.startTime + entry.duration >= firstTriggerAtMs).length;
+  const postTriggerLongAnimationFrameCount = firstTriggerAtMs === null
+    ? detonationStalls.longAnimationFrameCount
+    : longAnimationFrames.filter((entry) => entry.startTime >= firstTriggerAtMs).length;
   const maxNearTriggerMainSceneRenderMs = (renderAttribution?.topNearTriggerPhaseCalls ?? [])
     .filter((call) => String(call.phase ?? '').includes('webgl.render.main-scene'))
     .reduce((max, call) => Math.max(max, Number(call.durationMs ?? 0)), 0);
@@ -677,10 +698,17 @@ function buildMeasurementTrust(
     detonationLongAnimationFrameCount: detonationStalls.longAnimationFrameCount,
     preTriggerLongAnimationFrameCount,
     preTriggerLoafOverlapsFirstTrigger,
+    triggerOrPostTriggerLongAnimationFrameCount,
+    postTriggerLongAnimationFrameCount,
     detonationMaxFrameMs: detonation.frame.maxFrameMs,
     maxNearTriggerMainSceneRenderMs,
     maxRenderCallMs: Number(renderAttribution?.totals?.maxDurationMs ?? 0),
   };
+  const classifiedPreTriggerFrameMax = (
+    detonation.frame.maxFrameMs >= 100
+    && preTriggerLongAnimationFrameCount > 0
+    && triggerOrPostTriggerLongAnimationFrameCount === 0
+  );
   const status = (
     flags.cpuProfileCaptured
     && flags.browserLongTaskObserver
@@ -689,9 +717,16 @@ function buildMeasurementTrust(
     && flags.renderAttributionInstalled
     && detonationStalls.longTaskCount === 0
     && !preTriggerLoafOverlapsFirstTrigger
-    && detonation.frame.maxFrameMs < 100
+    && triggerOrPostTriggerLongAnimationFrameCount === 0
+    && (detonation.frame.maxFrameMs < 100 || classifiedPreTriggerFrameMax)
   ) ? 'pass' : 'warn';
-  return { status, flags };
+  return {
+    status,
+    flags: {
+      ...flags,
+      classifiedPreTriggerFrameMax,
+    },
+  };
 }
 
 async function stopProfiler(cdp: CDPSession): Promise<unknown> {
@@ -779,7 +814,7 @@ async function run(): Promise<void> {
     await cdp.send('Profiler.start');
     const triggers: TriggerResult[] = [];
     for (let i = 0; i < options.grenadeCount; i++) {
-      const trigger = await triggerGrenade(page);
+      const trigger = await triggerGrenade(page, i === 0);
       triggers.push(trigger);
       if (!trigger.ok) {
         throw new Error(trigger.reason ?? 'Grenade trigger failed');

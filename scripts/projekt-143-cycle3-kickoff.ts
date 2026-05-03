@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { join, relative } from 'node:path';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
-type TargetStatus = 'ready_for_branch' | 'needs_decision' | 'needs_baseline' | 'blocked';
+type TargetStatus = 'evidence_complete' | 'ready_for_branch' | 'needs_decision' | 'needs_baseline' | 'blocked';
 
 type Cycle3Target = {
   id: string;
@@ -524,12 +524,28 @@ function buildEffectsTarget(grenadePath: string | null, grenade: GrenadeSummary 
   const frameMaxMs = grenade?.detonation?.frame?.maxFrameMs ?? null;
   const stalls = grenade?.detonation?.browserStalls ?? null;
   const fragTiming = grenade?.detonation?.userTiming?.['kb-effects.grenade.frag.total'] ?? null;
+  const trustFlags = grenade?.measurementTrust?.flags ?? {};
+  const triggerOrPostLoafCount = Number(trustFlags.triggerOrPostTriggerLongAnimationFrameCount ?? Number.POSITIVE_INFINITY);
+  const nearTriggerMainRenderMs = Number(trustFlags.maxNearTriggerMainSceneRenderMs ?? renderMaxMs ?? Number.POSITIVE_INFINITY);
+  const lowLoadEvidenceComplete = Boolean(
+    hasRenderAttribution
+    && grenade?.measurementTrust?.status === 'pass'
+    && (stalls?.longTaskCount ?? Number.POSITIVE_INFINITY) === 0
+    && triggerOrPostLoafCount === 0
+    && nearTriggerMainRenderMs < 50
+    && frameMaxMs !== null
+    && frameMaxMs < 50
+  );
   return {
     id: 'grenade-first-use-stall',
     bureau: 'KB-EFFECTS',
-    status: hasRenderAttribution ? 'needs_decision' : (trusted ? 'ready_for_branch' : 'needs_baseline'),
+    status: lowLoadEvidenceComplete
+      ? 'evidence_complete'
+      : (hasRenderAttribution ? 'needs_decision' : (trusted ? 'ready_for_branch' : 'needs_baseline')),
     priority: 3,
-    summary: hasRenderAttribution
+    summary: lowLoadEvidenceComplete
+      ? 'KB-EFFECTS low-load grenade first-use closeout is evidence-complete for the unlit pooled explosion path; no trigger/post-trigger browser stall remains in the trusted probe.'
+      : hasRenderAttribution
       ? 'KB-EFFECTS has first unlit-explosion architecture evidence: trigger-adjacent render calls are no longer the 300ms+ stall, but the probe still needs clean browser-stall/frame-metric closeout.'
       : 'Grenade remediation is blocked on render-frame attribution; matched visible warmup attempts still reproduced the low-load two-grenade first-use stall.',
     evidence: {
@@ -545,9 +561,13 @@ function buildEffectsTarget(grenadePath: string | null, grenade: GrenadeSummary 
       detonationLongAnimationFrameCount: stalls?.longAnimationFrameCount ?? null,
       detonationLongAnimationFrameMaxMs: stalls?.longAnimationFrameMaxDurationMs ?? null,
       renderAttributionMaxMs: renderMaxMs,
-      maxNearTriggerMainSceneRenderMs: grenade?.measurementTrust?.flags?.maxNearTriggerMainSceneRenderMs ?? null,
-      preTriggerLongAnimationFrameCount: grenade?.measurementTrust?.flags?.preTriggerLongAnimationFrameCount ?? null,
-      preTriggerLoafOverlapsFirstTrigger: grenade?.measurementTrust?.flags?.preTriggerLoafOverlapsFirstTrigger ?? null,
+      maxNearTriggerMainSceneRenderMs: trustFlags.maxNearTriggerMainSceneRenderMs ?? null,
+      preTriggerLongAnimationFrameCount: trustFlags.preTriggerLongAnimationFrameCount ?? null,
+      preTriggerLoafOverlapsFirstTrigger: trustFlags.preTriggerLoafOverlapsFirstTrigger ?? null,
+      triggerOrPostTriggerLongAnimationFrameCount: trustFlags.triggerOrPostTriggerLongAnimationFrameCount ?? null,
+      postTriggerLongAnimationFrameCount: trustFlags.postTriggerLongAnimationFrameCount ?? null,
+      classifiedPreTriggerFrameMax: trustFlags.classifiedPreTriggerFrameMax ?? null,
+      lowLoadEvidenceComplete,
       fragTotalDurationMs: fragTiming?.totalDurationMs ?? null,
       fragMaxDurationMs: fragTiming?.maxDurationMs ?? null,
       maxFrameDeltaMs: grenade?.deltas?.maxFrameMs ?? null,
@@ -555,10 +575,14 @@ function buildEffectsTarget(grenadePath: string | null, grenade: GrenadeSummary 
       windows: grenade?.windows ?? null,
     },
     requiredBefore: [
-      hasRenderAttribution
+      lowLoadEvidenceComplete
+        ? 'Keep the unlit pooled explosion architecture; do not reintroduce dynamic explosion lights for visual polish.'
+        : hasRenderAttribution
         ? 'Classify or remove the remaining pre-trigger LoAF/frame-metric contamination before declaring KB-EFFECTS closed.'
         : 'Refresh low-load two-grenade probe if the latest artifact is stale or missing CPU profile/long-task windows.',
-      'Do not reintroduce dynamic explosion PointLights; grenade visuals should stay unlit, pooled, and shader-stable.',
+      lowLoadEvidenceComplete
+        ? 'Treat any future grenade visual changes as new evidence work with matched render attribution.'
+        : 'Do not reintroduce dynamic explosion PointLights; grenade visuals should stay unlit, pooled, and shader-stable.',
       'Keep grenade JS, audio, particle, renderer, and shader/program changes separate unless evidence forces coupling.',
     ],
     acceptance: [
@@ -570,7 +594,9 @@ function buildEffectsTarget(grenadePath: string | null, grenade: GrenadeSummary 
     nonClaims: [
       'Do not close KB-EFFECTS from frag JS timings alone.',
       'Do not use saturated combat120 grenade artifacts for first-use attribution.',
-      'Do not claim full KB-EFFECTS closeout while the low-load probe still records a 100ms max frame or unclassified LoAF.',
+      lowLoadEvidenceComplete
+        ? 'Do not claim combat120 or stress-scene grenade closeout from the low-load probe.'
+        : 'Do not claim full KB-EFFECTS closeout while the low-load probe still records a 100ms max frame or unclassified LoAF.',
     ],
   };
 }
