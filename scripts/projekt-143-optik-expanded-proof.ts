@@ -555,12 +555,29 @@ function proofHtml(): string {
           parityScale: { value: tuning.parityScale },
           parityLift: { value: tuning.parityLift },
           paritySaturation: { value: tuning.paritySaturation },
+          npcLightingEnabled: { value: 0 },
+          npcAtmosphereLightScale: { value: 1 },
+          npcSkyColor: { value: new THREE.Color(1, 1, 1) },
+          npcGroundColor: { value: new THREE.Color(0.35, 0.35, 0.3) },
+          npcSunColor: { value: new THREE.Color(1, 1, 1) },
+          npcFogMode: { value: 0 },
+          npcFogColor: { value: new THREE.Color(0x7a8f88) },
+          npcFogDensity: { value: 0.00055 },
+          npcFogHeightFalloff: { value: 0.03 },
+          npcFogStartDistance: { value: 100 },
+          npcFogNear: { value: 100 },
+          npcFogFar: { value: 600 },
         },
         vertexShader: \`
           varying vec2 vUv;
+          varying float vDistance;
+          varying float vWorldY;
           void main() {
             vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vDistance = length(cameraPosition - worldPosition.xyz);
+            vWorldY = worldPosition.y;
+            gl_Position = projectionMatrix * viewMatrix * worldPosition;
           }
         \`,
         fragmentShader: \`
@@ -580,7 +597,21 @@ function proofHtml(): string {
           uniform float parityScale;
           uniform float parityLift;
           uniform float paritySaturation;
+          uniform float npcLightingEnabled;
+          uniform float npcAtmosphereLightScale;
+          uniform vec3 npcSkyColor;
+          uniform vec3 npcGroundColor;
+          uniform vec3 npcSunColor;
+          uniform float npcFogMode;
+          uniform vec3 npcFogColor;
+          uniform float npcFogDensity;
+          uniform float npcFogHeightFalloff;
+          uniform float npcFogStartDistance;
+          uniform float npcFogNear;
+          uniform float npcFogFar;
           varying vec2 vUv;
+          varying float vDistance;
+          varying float vWorldY;
           void main() {
             float frameX = mod(frameIndex, frameGrid.x);
             float frameY = floor(frameIndex / frameGrid.x);
@@ -608,6 +639,29 @@ function proofHtml(): string {
             npcColor = min(npcColor * parityScale + vec3(parityLift), vec3(1.0));
             float parityLuma = dot(npcColor, vec3(0.299, 0.587, 0.114));
             npcColor = clamp(mix(vec3(parityLuma), npcColor, paritySaturation), 0.0, 1.0);
+            if (npcLightingEnabled > 0.5) {
+              vec3 atmosphereTint = mix(npcGroundColor, npcSkyColor, 0.42 + 0.58 * vUv.y) + npcSunColor * 0.18;
+              float atmosphereLuma = max(dot(atmosphereTint, vec3(0.299, 0.587, 0.114)), 0.001);
+              vec3 normalizedTint = clamp(atmosphereTint / atmosphereLuma, vec3(0.62), vec3(1.38));
+              npcColor = clamp(npcColor * normalizedTint * npcAtmosphereLightScale, 0.0, 1.0);
+            }
+            if (npcFogMode > 0.5) {
+              float fogFactor = 0.0;
+              if (npcFogMode > 1.5) {
+                fogFactor = smoothstep(npcFogNear, npcFogFar, vDistance);
+              } else {
+                float effectiveDistance = max(0.0, vDistance - npcFogStartDistance);
+                fogFactor = 1.0 - exp(-npcFogDensity * effectiveDistance);
+              }
+              float heightFactor = exp(-npcFogHeightFalloff * max(0.0, vWorldY));
+              float edgeFogMask = smoothstep(0.18, 0.6, texColor.a);
+              fogFactor = clamp(fogFactor * heightFactor * edgeFogMask, 0.0, 1.0);
+              float fogColorLuma = dot(npcFogColor, vec3(0.299, 0.587, 0.114));
+              float maxFogBoost = mix(2.2, 1.55, smoothstep(0.35, 0.65, fogColorLuma));
+              float fogBoost = mix(1.0, maxFogBoost, smoothstep(0.45, 0.95, fogFactor));
+              vec3 fogMatchColor = min(npcFogColor * fogBoost, vec3(1.0));
+              npcColor = mix(npcColor, fogMatchColor, fogFactor);
+            }
             gl_FragColor = vec4(npcColor, texColor.a);
           }
         \`,
@@ -656,6 +710,88 @@ function proofHtml(): string {
       if (profile.fog) {
         scene.fog = new THREE.Fog(profile.fog.color, profile.fog.near, profile.fog.far);
       }
+    }
+
+    function colorLuma(color) {
+      return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function syncNpcImposterAtmosphere(object, scene, camera) {
+      const skyColor = new THREE.Color(0, 0, 0);
+      const groundColor = new THREE.Color(0, 0, 0);
+      const sunColor = new THREE.Color(0, 0, 0);
+      const tmp = new THREE.Color();
+      let skyWeight = 0;
+      let groundWeight = 0;
+      let sunWeight = 0;
+      let lightMetric = 0;
+      for (const child of scene.children) {
+        if (child.isHemisphereLight) {
+          tmp.copy(child.color).multiplyScalar(child.intensity);
+          skyColor.add(tmp);
+          skyWeight += child.intensity;
+          lightMetric += colorLuma(tmp) * 0.65;
+          tmp.copy(child.groundColor).multiplyScalar(child.intensity);
+          groundColor.add(tmp);
+          groundWeight += child.intensity;
+          lightMetric += colorLuma(tmp) * 0.35;
+        } else if (child.isDirectionalLight) {
+          tmp.copy(child.color).multiplyScalar(child.intensity);
+          sunColor.add(tmp);
+          sunWeight += child.intensity;
+          lightMetric += colorLuma(tmp) * 0.35;
+        }
+      }
+      if (skyWeight > 0) skyColor.multiplyScalar(1 / skyWeight);
+      else skyColor.setRGB(1, 1, 1);
+      if (groundWeight > 0) groundColor.multiplyScalar(1 / groundWeight);
+      else groundColor.setRGB(0.35, 0.35, 0.3);
+      if (sunWeight > 0) sunColor.multiplyScalar(1 / sunWeight);
+      else sunColor.setRGB(1, 1, 1);
+      const lightingEnabled = skyWeight > 0 || groundWeight > 0 || sunWeight > 0;
+      const lightScale = lightingEnabled
+        ? clamp(lightMetric / 1.272, 0.5, 1.12)
+        : 1;
+      let fogMode = 0;
+      const fogColor = new THREE.Color(0x7a8f88);
+      let fogDensity = 0.00055;
+      let fogNear = 100;
+      let fogFar = 600;
+      if (scene.fog && scene.fog.isFogExp2) {
+        fogMode = 1;
+        fogColor.copy(scene.fog.color);
+        fogDensity = clamp(scene.fog.density, 0, 0.002);
+      } else if (scene.fog && scene.fog.isFog) {
+        fogMode = 2;
+        fogColor.copy(scene.fog.color);
+        fogNear = scene.fog.near;
+        fogFar = scene.fog.far;
+      }
+      object.traverse((child) => {
+        if (!child.isMesh) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        for (const material of materials) {
+          const uniforms = material && material.uniforms;
+          if (!uniforms || !uniforms.npcAtmosphereLightScale) continue;
+          if (uniforms.cameraPosition) {
+            uniforms.cameraPosition.value.copy(camera.position);
+          }
+          uniforms.npcLightingEnabled.value = lightingEnabled ? 1 : 0;
+          uniforms.npcAtmosphereLightScale.value = lightScale;
+          uniforms.npcSkyColor.value.copy(skyColor);
+          uniforms.npcGroundColor.value.copy(groundColor);
+          uniforms.npcSunColor.value.copy(sunColor);
+          uniforms.npcFogMode.value = fogMode;
+          uniforms.npcFogColor.value.copy(fogColor);
+          uniforms.npcFogDensity.value = fogDensity;
+          uniforms.npcFogNear.value = fogNear;
+          uniforms.npcFogFar.value = fogFar;
+        }
+      });
     }
 
     function createRenderer(profile) {
@@ -714,6 +850,7 @@ function proofHtml(): string {
       orientImposterToCamera(object, camera);
       scene.add(object);
       object.updateMatrixWorld(true);
+      syncNpcImposterAtmosphere(object, scene, camera);
       const projected = projectBoxPixels(new THREE.Box3().setFromObject(object), camera, runtimeContracts.cropWidth, runtimeContracts.cropHeight);
       renderer.render(scene, camera);
       const dataUrl = renderer.domElement.toDataURL('image/png');

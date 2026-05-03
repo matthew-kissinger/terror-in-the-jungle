@@ -223,6 +223,10 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect(material?.uniforms.parityScale.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.parityScale);
     expect(material?.uniforms.parityLift.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.parityLift);
     expect(material?.uniforms.paritySaturation.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.paritySaturation);
+    expect(material?.uniforms.npcLightingEnabled.value).toBe(0);
+    expect(material?.uniforms.npcAtmosphereLightScale.value).toBe(1);
+    expect(material?.uniforms.npcFogMode.value).toBe(0);
+    expect(material?.uniforms.npcFogColor.value).toBeInstanceOf(THREE.Color);
     expect(material?.uniforms.tileCropMap.value).toBeInstanceOf(THREE.DataTexture);
     expect(material?.uniforms.tileCropMapSize.value.x).toBe(28);
     expect(material?.uniforms.tileCropMapSize.value.y).toBe(14);
@@ -230,6 +234,8 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect(material?.fragmentShader).toContain('croppedUv');
     expect(material?.fragmentShader).toContain('parityScale');
     expect(material?.fragmentShader).toContain('paritySaturation');
+    expect(material?.fragmentShader).toContain('npcAtmosphereLightScale');
+    expect(material?.fragmentShader).toContain('npcFogMode');
     expect(material?.fragmentShader).toContain('gl_FragColor = vec4(npcColor, alpha)');
     expect(material?.fragmentShader).not.toContain('gl_FragColor = vec4(npcColor * alpha, alpha)');
 

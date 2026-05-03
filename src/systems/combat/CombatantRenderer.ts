@@ -1183,7 +1183,7 @@ export class CombatantRenderer {
 
   // Update shader time and global uniforms
   updateShaderUniforms(_deltaTime: number): void {
-    updateShaderUniforms(this.factionMaterials, this.camera);
+    updateShaderUniforms(this.factionMaterials, this.camera, this.scene);
   }
 
   // Handle damage flash for specific combatant

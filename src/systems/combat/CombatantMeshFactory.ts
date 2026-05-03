@@ -62,6 +62,8 @@ const NPC_IMPOSTOR_VERTEX_SHADER = `
   varying float vViewColumn;
   varying float vAnimationProgress;
   varying float vOpacity;
+  varying float vDistance;
+  varying float vWorldY;
 
   attribute float instancePhase;
   attribute float instanceViewColumn;
@@ -75,6 +77,8 @@ const NPC_IMPOSTOR_VERTEX_SHADER = `
     vAnimationProgress = instanceAnimationProgress;
     vOpacity = instanceOpacity;
     vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
+    vDistance = length(cameraPosition - worldPosition.xyz);
+    vWorldY = worldPosition.y;
     gl_Position = projectionMatrix * viewMatrix * worldPosition;
   }
 `;
@@ -98,12 +102,26 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
   uniform float parityScale;
   uniform float parityLift;
   uniform float paritySaturation;
+  uniform float npcLightingEnabled;
+  uniform float npcAtmosphereLightScale;
+  uniform vec3 npcSkyColor;
+  uniform vec3 npcGroundColor;
+  uniform vec3 npcSunColor;
+  uniform float npcFogMode;
+  uniform vec3 npcFogColor;
+  uniform float npcFogDensity;
+  uniform float npcFogHeightFalloff;
+  uniform float npcFogStartDistance;
+  uniform float npcFogNear;
+  uniform float npcFogFar;
 
   varying vec2 vUv;
   varying float vPhase;
   varying float vViewColumn;
   varying float vAnimationProgress;
   varying float vOpacity;
+  varying float vDistance;
+  varying float vWorldY;
 
   void main() {
     float safeDuration = max(clipDuration, 0.001);
@@ -138,6 +156,29 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
     float parityLuma = dot(npcColor, vec3(0.299, 0.587, 0.114));
     npcColor = clamp(mix(vec3(parityLuma), npcColor, paritySaturation), 0.0, 1.0);
     float alpha = texColor.a * clamp(vOpacity, 0.0, 1.0);
+    if (npcLightingEnabled > 0.5) {
+      vec3 atmosphereTint = mix(npcGroundColor, npcSkyColor, 0.42 + 0.58 * vUv.y) + npcSunColor * 0.18;
+      float atmosphereLuma = max(dot(atmosphereTint, vec3(0.299, 0.587, 0.114)), 0.001);
+      vec3 normalizedTint = clamp(atmosphereTint / atmosphereLuma, vec3(0.62), vec3(1.38));
+      npcColor = clamp(npcColor * normalizedTint * npcAtmosphereLightScale, 0.0, 1.0);
+    }
+    if (npcFogMode > 0.5) {
+      float fogFactor = 0.0;
+      if (npcFogMode > 1.5) {
+        fogFactor = smoothstep(npcFogNear, npcFogFar, vDistance);
+      } else {
+        float effectiveDistance = max(0.0, vDistance - npcFogStartDistance);
+        fogFactor = 1.0 - exp(-npcFogDensity * effectiveDistance);
+      }
+      float heightFactor = exp(-npcFogHeightFalloff * max(0.0, vWorldY));
+      float edgeFogMask = smoothstep(0.18, 0.6, texColor.a);
+      fogFactor = clamp(fogFactor * heightFactor * edgeFogMask, 0.0, 1.0);
+      float fogColorLuma = dot(npcFogColor, vec3(0.299, 0.587, 0.114));
+      float maxFogBoost = mix(2.2, 1.55, smoothstep(0.35, 0.65, fogColorLuma));
+      float fogBoost = mix(1.0, maxFogBoost, smoothstep(0.45, 0.95, fogFactor));
+      vec3 fogMatchColor = min(npcFogColor * fogBoost, vec3(1.0));
+      npcColor = mix(npcColor, fogMatchColor, fogFactor);
+    }
     gl_FragColor = vec4(npcColor, alpha);
   }
 `;
@@ -264,6 +305,18 @@ export class CombatantMeshFactory {
         parityScale: { value: tuning.parityScale },
         parityLift: { value: tuning.parityLift },
         paritySaturation: { value: tuning.paritySaturation },
+        npcLightingEnabled: { value: 0 },
+        npcAtmosphereLightScale: { value: 1 },
+        npcSkyColor: { value: new THREE.Color(1, 1, 1) },
+        npcGroundColor: { value: new THREE.Color(0.35, 0.35, 0.3) },
+        npcSunColor: { value: new THREE.Color(1, 1, 1) },
+        npcFogMode: { value: 0 },
+        npcFogColor: { value: new THREE.Color(0x7a8f88) },
+        npcFogDensity: { value: 0.00055 },
+        npcFogHeightFalloff: { value: 0.03 },
+        npcFogStartDistance: { value: 100 },
+        npcFogNear: { value: 100 },
+        npcFogFar: { value: 600 },
       },
       vertexShader: NPC_IMPOSTOR_VERTEX_SHADER,
       fragmentShader: NPC_IMPOSTOR_FRAGMENT_SHADER,
