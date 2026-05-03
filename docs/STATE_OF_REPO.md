@@ -101,6 +101,20 @@ the current truth anchor.
   headers, R2 A Shau DEM headers, service worker state, and a Zone Control
   browser smoke were verified. This is release workflow and mobile gate
   hardening, not a Projekt Objekt-143 optimization/remediation claim.
+- Release-DX hardening `5f46713d101f6fea974da6d77f303c95df58000c` opted the
+  deploy workflow into GitHub's Node 24 JavaScript action runtime. Manual CI
+  run `25265757159`, Deploy run `25266081872`, live `/asset-manifest.json`,
+  Pages/R2/build/WASM headers, service worker state, and a Zone Control browser
+  smoke all passed.
+- Phase 2 / Cycle 2 is now open as visual/runtime proof work. Runtime screenshots
+  were refreshed at
+  `artifacts/perf/2026-05-03T01-00-12-099Z/projekt-143-cycle2-runtime-proof/summary.json`.
+  `npm run check:projekt-143-cycle2-proof` wrote
+  `artifacts/perf/2026-05-03T01-13-21-209Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  with WARN status: Open Frontier/A Shau elevated screenshots and static horizon
+  audit are present, culling attribution is below the `10%` unattributed visible
+  triangle budget, but close-NPC/NPC-imposter culling views and matched
+  close-GLB/imposter screenshots are not certified.
 - Projekt Objekt-143 Cycle 0 evidence payload landed at
   `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
   `25262818886` served that payload SHA. Doc-only release-state commits may
@@ -221,13 +235,12 @@ What is not ready to claim:
   staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
   after the measured blockers are under control.
 - Phase 3 now has a draft multi-cycle plan in
-  `docs/PROJEKT_OBJEKT_143.md`. Cycle 0 evidence is shipped. The next agent
-  team should execute Phase 2 / Cycle 1 by certifying trusted baselines and the
-  Asset Acceptance Standard before any remediation. KB-CULL still needs
-  draw-call/culling certification beyond the texture-acceptance slice,
-  KB-EFFECTS still needs a verified warmup or first-use-render remediation
-  before it can close, KB-OPTIK still needs visual QA before remediation can be
-  accepted, and KB-TERRAIN still needs runtime screenshot/perf validation.
+  `docs/PROJEKT_OBJEKT_143.md`. Cycle 0 evidence and Cycle 1 baseline/policy
+  work are shipped. The next agent team should continue Phase 2 / Cycle 2 by
+  producing dedicated close-NPC/NPC-imposter visual and culling views before any
+  shader, atlas, culling, far-canopy, grenade, texture, or WebGPU remediation
+  is accepted. KB-EFFECTS still needs a verified warmup or first-use-render
+  remediation before it can close.
 
 ## Starter-Kits Incubation Close-Out On 2026-04-28
 

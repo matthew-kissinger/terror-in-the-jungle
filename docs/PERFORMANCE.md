@@ -83,6 +83,7 @@ npm run check:vegetation-horizon    # KB-TERRAIN vegetation horizon audit
 npm run check:webgpu-strategy       # KB-STRATEGIE WebGL/WebGPU audit
 npm run check:projekt-143           # Cycle 0 static evidence suite
 npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark bundle sidecars
+npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 ```
 
 Startup UI benchmarks are retail-build measurements, not perf-harness frame
@@ -168,6 +169,12 @@ under `artifacts/perf/<timestamp>/projekt-143-cycle1-benchmark-bundle/` and a
 Those sidecars record commit SHA, mode, timing windows, warmup policy,
 browser/runtime metadata, instrumentation flags, renderer/scene evidence, and
 measurement-trust status.
+
+`projekt-143-cycle2-proof-suite.ts` writes a Cycle 2 visual/runtime proof
+status bundle. It pairs the latest runtime screenshot summary, static optics
+and horizon audits, and Open Frontier/A Shau scene attribution. The command is
+non-strict by default and may return `WARN` while proof surfaces are incomplete;
+use `--strict` once Cycle 2 is ready to become a blocking gate.
 
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so

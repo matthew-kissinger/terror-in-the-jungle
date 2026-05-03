@@ -1776,3 +1776,20 @@ TODO
 - The deploy run emitted GitHub's Node 20 action deprecation warning for the
   Cloudflare deploy action. Added `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to
   `.github/workflows/deploy.yml` and documented this as release-DX maintenance.
+
+2026-05-03 Projekt Objekt-143 Phase 2 / Cycle 2 proof opening
+- User asked to update docs, align repo, and continue the cycle. Confirmed
+  `npm run doctor` passed on Node `24.14.1` and Playwright `1.59.1`.
+- Refreshed runtime visual proof with
+  `npm run evidence:atmosphere -- --out-dir artifacts/perf/2026-05-03T01-00-12-099Z/projekt-143-cycle2-runtime-proof`.
+  The run rebuilt `dist-perf` and captured all-mode ground-readability,
+  sky-coverage, and aircraft-clouds screenshots. Open Frontier and A Shau now
+  have current elevated runtime screenshots with renderer/terrain samples.
+- Added `scripts/projekt-143-cycle2-proof-suite.ts` and package script
+  `check:projekt-143-cycle2-proof`. The latest proof suite wrote
+  `artifacts/perf/2026-05-03T01-13-21-209Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  with WARN status: runtime horizon screenshots PASS, static horizon audit PASS,
+  culling scene attribution WARN, NPC matched GLB/imposter screenshots WARN.
+- Cycle 2 remains proof-only. Do not accept shader, atlas, culling, far-canopy,
+  grenade, texture, or WebGPU remediation until the relevant proof check is
+  PASS or carries a documented exception.

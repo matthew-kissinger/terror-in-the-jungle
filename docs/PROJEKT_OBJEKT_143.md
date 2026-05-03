@@ -19,7 +19,7 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`. Exact production SHA remains `/asset-manifest.json`. Open Frontier and A Shau steady-state captures passed measurement trust, combat120 did not, and the low-load grenade probe still reproduces the first-use stall. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is open with WARN status: horizon screenshots and static audits exist, culling attribution is under the unattributed triangle budget, but close-NPC/imposter views and matched GLB/imposter crops are not certified. KB-METRIK remains first and blocks optimization claims from other bureaus. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
 ## Shipped Cycle 0 State
@@ -185,6 +185,10 @@ manual Deploy workflow run `25265623981` passed; live `/asset-manifest.json`
 reported `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; live header checks and a
 Zone Control browser smoke passed. This is release workflow and mobile gate
 hardening only, not a rendering, asset, grenade, culling, or WebGPU remediation.
+Release-DX hardening `5f46713d101f6fea974da6d77f303c95df58000c` opted the
+deploy workflow's JavaScript actions into Node 24 and aligned the docs after
+manual CI run `25265757159`, Deploy run `25266081872`, live manifest/header
+checks, and a Zone Control browser smoke passed.
 
 | Probe | Artifact | Trust | Result |
 | --- | --- | --- | --- |
@@ -863,6 +867,26 @@ Acceptance:
 Reversibility:
 
 - Foundational validation surfaces. Screenshots and probes are additive.
+
+Current Cycle 2 status:
+
+- 2026-05-03: `npm run evidence:atmosphere -- --out-dir
+  artifacts/perf/2026-05-03T01-00-12-099Z/projekt-143-cycle2-runtime-proof`
+  refreshed all-mode runtime screenshots on source
+  `5f46713d101f6fea974da6d77f303c95df58000c`. Open Frontier and A Shau each
+  have ground-readability, sky-coverage, and aircraft-clouds screenshots plus
+  renderer/terrain samples. This is current-condition proof, not remediation.
+- 2026-05-03: `npm run check:projekt-143-cycle2-proof` wrote
+  `artifacts/perf/2026-05-03T01-13-21-209Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  Overall status is WARN. Runtime horizon screenshots and static horizon audit
+  checks passed. Scene attribution is under the `10%` unattributed visible
+  triangle budget (`4.00%` Open Frontier, `6.03%` A Shau), but some required
+  categories have zero visible triangles in these captures and need dedicated
+  close-NPC/NPC-imposter views. Static optics evidence exists, but matched
+  close-GLB/imposter screenshots are not certified yet.
+- No shader, atlas, culling, far-canopy, grenade, texture, or WebGPU remediation
+  may be accepted from Cycle 2 until the relevant proof check is PASS or a
+  documented exception exists.
 
 ### Cycle 3 - Measured WebGL Remediation
 

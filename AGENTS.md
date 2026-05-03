@@ -37,6 +37,7 @@ npm run check:mobile-ui          # Built-app phone viewport flow gate
 npm run check:states             # State coverage probe
 npm run check:hud                # HUD layout validator
 npm run check:memory             # Memory growth tracker
+npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof bundle
 npm run probe                    # Engine health probe
 npm run probe:fixed-wing         # Browser-level fixed-wing takeoff/climb/orbit/handoff/approach probe
 npm run playtest:mobile          # Mobile playtest driver
