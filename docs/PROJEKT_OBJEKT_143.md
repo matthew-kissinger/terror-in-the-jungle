@@ -19,7 +19,7 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is open with WARN status: horizon screenshots and static audits exist, culling attribution is under the unattributed triangle budget, but close-NPC/imposter views and matched GLB/imposter crops are not certified. User-approved aircraft GLB replacement has entered Cycle 2 as an evidence-gated asset/runtime import, not as a performance claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is open with WARN status: horizon screenshots and static audits exist, culling attribution is under the unattributed triangle budget, but close-NPC/imposter views and matched GLB/imposter crops are not certified. User-approved aircraft GLB replacement is delivered as an evidence-gated asset/runtime import, not as a performance or aircraft-feel claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
 ## Shipped Cycle 0 State
@@ -911,8 +911,14 @@ Current Cycle 2 status:
   `npm run validate:fast`, `npm run build`, and `npm run check:projekt-143`
   with the latest static evidence summary at
   `artifacts/perf/2026-05-03T03-23-55-447Z/projekt-143-evidence-suite/suite-summary.json`.
-  Pending before production parity: CI/deploy, live Pages `/asset-manifest.json`,
-  and a human aircraft-feel playtest.
+  Manual CI run `25274278013` and Deploy run `25274649157` passed. Live Pages
+  `/asset-manifest.json` reported
+  `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`; Pages shell, service worker,
+  manifest, representative aircraft GLBs, Open Frontier navmesh/heightmap,
+  hashed build assets, Recast WASM, and the A Shau R2 DEM URL returned `200`;
+  a live Zone Control browser smoke reached the deploy UI with no console,
+  page, request, or retry-panel failures. Remaining open gate: human
+  aircraft-feel playtest.
 - No shader, atlas, culling, far-canopy, grenade, texture, or WebGPU remediation
   may be accepted from Cycle 2 until the relevant proof check is PASS or a
   documented exception exists.

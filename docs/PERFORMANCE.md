@@ -490,7 +490,11 @@ importer records provenance, preserves embedded animation tracks, and wraps
 source `+X`-forward aircraft into TIJ's public `+Z`-forward aircraft storage
 contract. Acceptance still requires standalone viewer screenshots,
 `npm run probe:fixed-wing`, and Open Frontier/A Shau renderer stats before any
-production parity or optimization claim.
+optimization claim. The 2026-05-03 aircraft import was delivered at
+`afa9247f1ec36a9a98dedb50595a9f6e0bc81a33` after manual CI run `25274278013`,
+Deploy run `25274649157`, live `/asset-manifest.json` verification, Pages/R2
+header checks, and a live Zone Control browser smoke; that is delivery parity,
+not aircraft-feel or performance-improvement certification.
 
 Pixel Forge aircraft GLBs may load with a mix of interleaved and regular
 `BufferAttribute` layouts from `GLTFLoader`. TIJ's

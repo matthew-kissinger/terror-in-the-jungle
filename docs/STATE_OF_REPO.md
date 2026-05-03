@@ -139,8 +139,14 @@ the current truth anchor.
   `npm run check:projekt-143` pass after the aircraft patch; the latest static
   evidence suite is
   `artifacts/perf/2026-05-03T03-23-55-447Z/projekt-143-evidence-suite/suite-summary.json`.
-  This is not a production parity or perf-improvement claim until CI/deploy and
-  live checks are complete.
+  Commit `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33` passed manual CI run
+  `25274278013` and Deploy run `25274649157`. Live `/asset-manifest.json`
+  reported that SHA; Pages shell, service worker, manifest, representative
+  aircraft GLBs, Open Frontier navmesh/heightmap, hashed build assets, Recast
+  WASM, and the A Shau R2 DEM URL returned `200`; live Zone Control browser
+  smoke reached the deploy UI with no console, page, request, or retry-panel
+  failures. This verifies production delivery, not aircraft-feel or
+  perf-improvement certification.
 - Projekt Objekt-143 Cycle 0 evidence payload landed at
   `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
   `25262818886` served that payload SHA. Doc-only release-state commits may

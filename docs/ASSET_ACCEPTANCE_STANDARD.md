@@ -167,7 +167,7 @@ Use this evidence matrix before accepting changes:
 | NPC imposter scale/luma | Matched close GLB and imposter screenshots at LOD switch distances; projected height and mean luma/chroma deltas |
 | Vegetation atlas/normal change | Ground and elevated screenshots in Open Frontier and A Shau, plus texture audit |
 | Static feature/vehicle culling | Trusted Open Frontier or A Shau perf capture with renderer stats and scene attribution |
-| Aircraft GLB replacement | Import summary with provenance, standalone viewer screenshots, `npm run probe:fixed-wing`, and Open Frontier/A Shau renderer stats before production claim |
+| Aircraft GLB replacement | Import summary with provenance, standalone viewer screenshots, `npm run probe:fixed-wing`, Open Frontier/A Shau renderer stats, CI/deploy/live Pages verification before delivery claim, and human playtest before aircraft-feel sign-off |
 | Grenade/effect first-use fix | Low-load two-grenade probe before/after; no long task above `50ms` within the trigger window |
 | Outer canopy | Elevated Open Frontier and A Shau screenshots plus p95 frame and draw-call deltas |
 

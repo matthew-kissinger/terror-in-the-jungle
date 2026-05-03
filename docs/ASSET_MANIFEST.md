@@ -112,8 +112,11 @@ evidence exists at
 `artifacts/perf/2026-05-03T03-11-40-162Z` (A Shau short): both have trusted
 measurement paths and zero browser errors, but both are WARN captures and fail
 strict `perf:compare` thresholds, so they are not optimization evidence. This
-is not a final production parity claim until CI/deploy and live Pages checks
-pass.
+asset delivery was deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`:
+manual CI run `25274278013` and Deploy run `25274649157` passed, live
+`/asset-manifest.json` reported that SHA, representative Pages/R2/build/aircraft
+GLB/WASM assets returned `200`, and the live Zone Control browser smoke passed.
+This is still not aircraft-feel or performance-improvement sign-off.
 Hitbox feel, aircraft/building draw cost, airfield staging surfaces, water
 rendering, close-proximity NPC camera occlusion, and measured static-prop
 culling/HLOD remain evidence-backed work.

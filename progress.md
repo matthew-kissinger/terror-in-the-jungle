@@ -1858,3 +1858,20 @@ TODO
 - Still not claimed: production parity, aircraft feel, or any performance
   improvement. Those require CI/deploy/live Pages checks and a human aircraft
   playtest.
+
+2026-05-03 Pixel Forge aircraft GLB release verification
+- Committed and pushed `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`
+  (`feat(assets): import Pixel Forge aircraft`) to `master`.
+- Manual CI run `25274278013` passed test, build, perf, lint, smoke, and
+  mobile-ui.
+- Manual Deploy workflow run `25274649157` passed.
+- Live `/asset-manifest.json` reported
+  `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Header checks returned `200` for
+  `/`, `/sw.js`, `/asset-manifest.json`, representative aircraft GLBs, Open
+  Frontier navmesh/heightmap assets, hashed build JS, Recast WASM, and the A
+  Shau R2 DEM URL.
+- Live browser smoke reached the Zone Control deploy UI with no console, page,
+  request, or retry-panel failures. Artifact:
+  `artifacts/live-smoke/2026-05-03T08-49-58-395Z/summary.json`.
+- Production delivery is verified for the aircraft asset/runtime import. Still
+  not claimed: aircraft-feel sign-off or any performance improvement.
