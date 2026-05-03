@@ -1755,3 +1755,12 @@ TODO
   `GITHUB_TOKEN` / `GH_TOKEN` and watch the resulting Actions run.
 - Updated `AGENTS.md` and `docs/DEPLOY_WORKFLOW.md` so future agents treat those
   issues as repo DX signals, not one-off terminal quirks.
+- First wrapper-dispatched CI run `25264683973` proved the GitHub dispatch
+  wrapper works but failed the hosted `mobile-ui` job in Android wide landscape:
+  the gameplay menu button was visible, yet `#settings-modal` remained hidden.
+  Local `npm run check:mobile-ui` passed all four Chromium cases at
+  `artifacts/mobile-ui/2026-05-02T23-52-01-666Z/mobile-ui-check`.
+- Added stable UI/harness state hooks for future agents: `#touch-menu-btn`
+  now exposes `data-ready`, `#settings-modal` exposes `data-visible`, and the
+  mobile UI harness waits on those attributes while emitting selector/hit-stack
+  diagnostics if a trigger still fails.

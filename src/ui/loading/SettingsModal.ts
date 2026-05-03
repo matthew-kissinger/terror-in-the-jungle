@@ -39,6 +39,7 @@ export class SettingsModal extends UIComponent {
     this.root.className = `${styles.overlay} settings-modal`;
     this.root.id = 'settings-modal';
     this.root.setAttribute('data-ref', 'settings-modal');
+    this.root.dataset.visible = 'false';
     this.root.setAttribute('role', 'dialog');
     this.root.setAttribute('aria-modal', 'true');
     this.root.setAttribute('aria-label', 'Settings');
@@ -201,6 +202,7 @@ export class SettingsModal extends UIComponent {
     // Visibility toggle
     this.effect(() => {
       const vis = this.visible.value;
+      this.root.dataset.visible = String(vis);
       this.toggleClass(styles.visible, vis);
       this.onVisibilityChange?.(vis);
       if (vis) {

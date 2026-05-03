@@ -247,6 +247,42 @@ async function dispatchPointerDown(page: Page, selector: string): Promise<void> 
   });
 }
 
+async function dispatchPointerSequence(page: Page, selector: string): Promise<void> {
+  const locator = page.locator(selector).first();
+  await locator.waitFor({ state: 'visible', timeout: 120_000 });
+  await locator.evaluate((element) => {
+    const rect = (element as HTMLElement).getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
+    const pointerDown = new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      buttons: 1,
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX,
+      clientY,
+    });
+    const pointerUp = new PointerEvent('pointerup', {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      buttons: 0,
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX,
+      clientY,
+    });
+    element.dispatchEvent(pointerDown);
+    element.dispatchEvent(pointerUp);
+  });
+}
+
 async function scrollSelectorIntoView(page: Page, selector: string): Promise<void> {
   const locator = page.locator(selector).first();
   await locator.waitFor({ state: 'attached', timeout: 120_000 });
@@ -266,6 +302,62 @@ async function clickSelectorDirect(page: Page, selector: string): Promise<void> 
   });
 }
 
+async function collectTriggerDiagnostics(page: Page, selector: string): Promise<unknown> {
+  return page.evaluate((target) => {
+    const describeElement = (element: Element | null) => {
+      if (!element) return null;
+      const htmlElement = element as HTMLElement;
+      const rect = htmlElement.getBoundingClientRect();
+      const style = window.getComputedStyle(htmlElement);
+      return {
+        tag: htmlElement.tagName,
+        id: htmlElement.id || null,
+        className: typeof htmlElement.className === 'string'
+          ? htmlElement.className
+          : String(htmlElement.className),
+        dataRef: htmlElement.getAttribute('data-ref'),
+        dataReady: htmlElement.dataset.ready,
+        dataVisible: htmlElement.dataset.visible,
+        ariaDisabled: htmlElement.getAttribute('aria-disabled'),
+        ariaLabel: htmlElement.getAttribute('aria-label'),
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity,
+        pointerEvents: style.pointerEvents,
+        rect: {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+        },
+      };
+    };
+
+    const targetElement = document.querySelector(target);
+    const targetRect = targetElement instanceof HTMLElement ? targetElement.getBoundingClientRect() : null;
+    const centerX = targetRect ? targetRect.left + targetRect.width / 2 : window.innerWidth / 2;
+    const centerY = targetRect ? targetRect.top + targetRect.height / 2 : window.innerHeight / 2;
+    const hitStack = document.elementsFromPoint(centerX, centerY).slice(0, 5).map((element) => describeElement(element));
+    const modal = document.querySelector('#settings-modal');
+    const activeElement = document.activeElement;
+
+    return {
+      target: describeElement(targetElement),
+      hitStack,
+      settingsModal: describeElement(modal),
+      activeElement: describeElement(activeElement),
+      viewport: {
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        visualWidth: window.visualViewport?.width ?? null,
+        visualHeight: window.visualViewport?.height ?? null,
+      },
+    };
+  }, selector).catch((error) => ({ error: String(error) }));
+}
+
 async function triggerWithFallback(
   page: Page,
   selector: string,
@@ -275,26 +367,33 @@ async function triggerWithFallback(
 ): Promise<void> {
   const attempts = preferredAction === 'tap'
     ? [
-        () => tapSelector(page, selector),
-        () => dispatchPointerDown(page, selector),
+        { name: 'tap', run: () => tapSelector(page, selector) },
+        { name: 'pointer-sequence', run: () => dispatchPointerSequence(page, selector) },
+        { name: 'pointerdown', run: () => dispatchPointerDown(page, selector) },
       ]
     : [
-        () => dispatchPointerDown(page, selector),
-        () => tapSelector(page, selector),
+        { name: 'pointer-sequence', run: () => dispatchPointerSequence(page, selector) },
+        { name: 'pointerdown', run: () => dispatchPointerDown(page, selector) },
+        { name: 'tap', run: () => tapSelector(page, selector) },
       ];
 
-  let lastError: unknown = null;
+  const errors: string[] = [];
   for (const attempt of attempts) {
     try {
-      await attempt();
+      await attempt.run();
       await waitForOutcome();
       return;
     } catch (error) {
-      lastError = error;
+      errors.push(`${attempt.name}: ${String(error)}`);
+      await page.waitForTimeout(250);
     }
   }
 
-  throw new Error(`${label} failed to trigger expected outcome: ${String(lastError)}`);
+  const diagnostics = await collectTriggerDiagnostics(page, selector);
+  const diagnosticPayload = JSON.stringify(diagnostics);
+  throw new Error(
+    `${label} failed to trigger expected outcome. Attempts: ${errors.join(' | ')}. Diagnostics: ${diagnosticPayload}`
+  );
 }
 
 async function assertActionable(page: Page, selector: string, label: string): Promise<Actionability> {
@@ -515,7 +614,7 @@ async function runDeviceCase(
     await captureScreenshot(page, device.id, 'title', artifactDir, report.screenshots);
 
     await tapSelector(page, 'button[data-ref="settings"]');
-    await page.waitForSelector('#settings-modal', { state: 'visible', timeout: 30_000 });
+    await page.waitForSelector('#settings-modal[data-visible="true"]', { state: 'visible', timeout: 30_000 });
     report.checks.push(await assertActionable(page, '#settings-modal [data-ref="close"]', 'Title settings close'));
     report.checks.push(await assertScrollOwner(page, '#settings-modal [data-ref="scroll-body"]', 'Title settings scroll body'));
     await captureScreenshot(page, device.id, 'title-settings', artifactDir, report.screenshots);
@@ -564,7 +663,8 @@ async function runDeviceCase(
 
     await tapSelector(page, '#respawn-button');
     await waitForGameplay(page);
-    report.checks.push(await assertActionable(page, '#touch-menu-btn', 'Gameplay menu button'));
+    await page.waitForSelector('#touch-menu-btn[data-ready="true"]', { state: 'visible', timeout: 30_000 });
+    report.checks.push(await assertActionable(page, '#touch-menu-btn[data-ready="true"]', 'Gameplay menu button'));
     await captureScreenshot(page, device.id, 'gameplay', artifactDir, report.screenshots);
 
     // MAP and CMD buttons are intentionally hidden in short landscape (max-height: 440px)
@@ -599,10 +699,10 @@ async function runDeviceCase(
 
   await triggerWithFallback(
     page,
-    '#touch-menu-btn',
+    '#touch-menu-btn[data-ready="true"]',
     'Gameplay menu button',
-    () => page.waitForSelector('#settings-modal', { state: 'visible', timeout: 5_000 }).then(() => {}),
-    'tap',
+    () => page.waitForSelector('#settings-modal[data-visible="true"]', { state: 'visible', timeout: 5_000 }).then(() => {}),
+    'pointerdown',
   );
   report.checks.push(await assertActionable(page, '#settings-modal [data-ref="close"]', 'Gameplay settings close'));
   report.checks.push(await assertScrollOwner(page, '#settings-modal [data-ref="scroll-body"]', 'Gameplay settings scroll body'));

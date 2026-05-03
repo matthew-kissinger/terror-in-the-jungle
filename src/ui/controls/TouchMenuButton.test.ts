@@ -21,6 +21,17 @@ describe('TouchMenuButton', () => {
     expect(document.getElementById('touch-menu-btn')).toBeTruthy();
   });
 
+  it('marks readiness after the open callback is wired', () => {
+    const root = document.getElementById('touch-menu-btn')!;
+    expect(root.dataset.ready).toBe('false');
+    expect(root.getAttribute('aria-disabled')).toBe('true');
+
+    button.setOpenCallback(() => {});
+
+    expect(root.dataset.ready).toBe('true');
+    expect(root.getAttribute('aria-disabled')).toBe('false');
+  });
+
   it('show / hide toggle visibility', () => {
     button.hide();
     expect(document.getElementById('touch-menu-btn')!.style.display).toBe('none');

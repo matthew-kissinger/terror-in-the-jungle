@@ -13,6 +13,8 @@ export class TouchMenuButton extends UIComponent {
   protected build(): void {
     this.root.className = styles.menuBtn;
     this.root.id = 'touch-menu-btn';
+    this.root.dataset.ready = 'false';
+    this.root.setAttribute('aria-disabled', 'true');
 
     const iconEl = document.createElement('img');
     iconEl.src = icon('icon-menu');
@@ -29,6 +31,8 @@ export class TouchMenuButton extends UIComponent {
 
   setOpenCallback(callback: () => void): void {
     this.onOpenCallback = callback;
+    this.root.dataset.ready = 'true';
+    this.root.setAttribute('aria-disabled', 'false');
   }
 
   private onButtonTap = (e: Event): void => {

@@ -117,7 +117,9 @@ describe('SettingsModal', () => {
     modal.setOnVisibilityChange(callback);
 
     modal.show();
+    expect(modal.element.dataset.visible).toBe('true');
     modal.hide();
+    expect(modal.element.dataset.visible).toBe('false');
 
     expect(callback).toHaveBeenNthCalledWith(1, true);
     expect(callback).toHaveBeenNthCalledWith(2, false);
