@@ -111,7 +111,7 @@ the current truth anchor.
   `artifacts/perf/2026-05-03T01-00-12-099Z/projekt-143-cycle2-runtime-proof/summary.json`.
   `npm run check:projekt-143-cycle2-proof` was refreshed after the aircraft
   import and wrote
-  `artifacts/perf/2026-05-03T08-27-06-170Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  `artifacts/perf/2026-05-03T09-17-01-580Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
   with WARN status: Open Frontier/A Shau elevated screenshots and static horizon
   audit are present, culling attribution is below the `10%` unattributed visible
   triangle budget, but close-NPC/NPC-imposter culling views and matched
@@ -147,6 +147,14 @@ the current truth anchor.
   smoke reached the deploy UI with no console, page, request, or retry-panel
   failures. This verifies production delivery, not aircraft-feel or
   perf-improvement certification.
+- KB-CULL close-NPC/NPC-imposter certification is still blocked. Focused
+  AI Sandbox diagnostic captures at `artifacts/perf/2026-05-03T09-10-57-791Z`
+  (`npcs=120`) and `artifacts/perf/2026-05-03T09-13-00-811Z` (`npcs=60`) exposed
+  the missing renderer categories but failed validation and measurement trust.
+  The 60-NPC artifact recorded `npc_close_glb` at `39601` visible triangles and
+  `npc_imposters` at `2` visible triangles, but probeAvg `96.62ms` and probeP95
+  `211ms` make it diagnostic-only. Next proof work should use a deterministic
+  low-overhead camera/culling harness, not another combat-heavy AI Sandbox run.
 - Projekt Objekt-143 Cycle 0 evidence payload landed at
   `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
   `25262818886` served that payload SHA. Doc-only release-state commits may

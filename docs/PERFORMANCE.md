@@ -502,6 +502,15 @@ Pixel Forge aircraft GLBs may load with a mix of interleaved and regular
 meshes to the reusable optimizer so Three.js batching does not emit
 `mergeAttributes()` console errors.
 
+Cycle 2 KB-CULL close-NPC/NPC-imposter certification needs trusted renderer
+attribution. Combat-heavy AI Sandbox captures can expose those categories, but
+they are not a valid certification path when measurement trust fails. The
+2026-05-03 focused 60-NPC diagnostic artifact
+`artifacts/perf/2026-05-03T09-13-00-811Z` recorded visible `npc_close_glb` and
+`npc_imposters`, but failed `measurement_trust` (`probeAvg=96.62ms`,
+`probeP95=211ms`), so it remains diagnostic-only. Use a deterministic
+low-overhead camera proof for KB-CULL closure.
+
 ## Diagnostics
 
 - Perf diagnostics gated behind `import.meta.env.DEV` + `?perf=1` URL param at runtime, OR `import.meta.env.VITE_PERF_HARNESS === '1'` at build time (see `npm run build:perf`). Retail `npm run build` ships ZERO harness surface - the hook branches are dead-code-eliminated.

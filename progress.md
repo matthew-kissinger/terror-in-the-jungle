@@ -1854,7 +1854,7 @@ TODO
 - Refreshed `npm run check:projekt-143-cycle2-proof` after the aircraft patch;
   it remains WARN for missing dedicated culling/optic certification views and
   wrote
-  `artifacts/perf/2026-05-03T08-27-06-170Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  `artifacts/perf/2026-05-03T09-17-01-580Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
 - Still not claimed: production parity, aircraft feel, or any performance
   improvement. Those require CI/deploy/live Pages checks and a human aircraft
   playtest.
@@ -1875,3 +1875,19 @@ TODO
   `artifacts/live-smoke/2026-05-03T08-49-58-395Z/summary.json`.
 - Production delivery is verified for the aircraft asset/runtime import. Still
   not claimed: aircraft-feel sign-off or any performance improvement.
+
+2026-05-03 Cycle 2 KB-CULL diagnostic follow-up
+- Ran focused AI Sandbox culling probes to try to populate the missing
+  close-NPC and NPC-imposter renderer categories without remediation:
+  `artifacts/perf/2026-05-03T09-10-57-791Z` (`npcs=120`) and
+  `artifacts/perf/2026-05-03T09-13-00-811Z` (`npcs=60`).
+- Both artifacts failed validation and `measurement_trust`; the 60-NPC run had
+  probeAvg `96.62ms`, probeP95 `211ms`, avg/p99 `100ms`, and
+  `hitch_50ms_percent=100%`.
+- The 60-NPC artifact did expose the needed categories in `scene-attribution`:
+  `npc_close_glb` had `39601` visible triangles and `npc_imposters` had `2`
+  visible triangles. This is diagnostic signal only, not KB-CULL certification.
+- Agent-DX finding: do not repeat combat-heavy AI Sandbox captures for Cycle 2
+  culling certification. The next useful step is a deterministic low-overhead
+  camera/culling proof that records renderer stats and scene attribution with a
+  trusted measurement path.

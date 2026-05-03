@@ -878,7 +878,7 @@ Current Cycle 2 status:
   renderer/terrain samples. This is current-condition proof, not remediation.
 - 2026-05-03: `npm run check:projekt-143-cycle2-proof` was refreshed after
   the aircraft import and wrote
-  `artifacts/perf/2026-05-03T08-27-06-170Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  `artifacts/perf/2026-05-03T09-17-01-580Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
   Overall status is WARN. Runtime horizon screenshots and static horizon audit
   checks passed. Scene attribution is under the `10%` unattributed visible
   triangle budget (`4.00%` Open Frontier, `6.03%` A Shau), but some required
@@ -919,6 +919,16 @@ Current Cycle 2 status:
   a live Zone Control browser smoke reached the deploy UI with no console,
   page, request, or retry-panel failures. Remaining open gate: human
   aircraft-feel playtest.
+- 2026-05-03 KB-CULL follow-up: focused AI Sandbox captures were attempted to
+  expose close-NPC and NPC-imposter renderer categories:
+  `artifacts/perf/2026-05-03T09-10-57-791Z` (`npcs=120`) and
+  `artifacts/perf/2026-05-03T09-13-00-811Z` (`npcs=60`). Both failed validation
+  and `measurement_trust`; the lower-load capture still had probeAvg `96.62ms`
+  and probeP95 `211ms`. It did expose `npc_close_glb` (`39601` visible
+  triangles) and `npc_imposters` (`2` visible triangles), but the artifact is
+  diagnostic only. KB-CULL remains blocked until a lower-overhead deterministic
+  camera proof records renderer stats and scene attribution with measurement
+  trust.
 - No shader, atlas, culling, far-canopy, grenade, texture, or WebGPU remediation
   may be accepted from Cycle 2 until the relevant proof check is PASS or a
   documented exception exists.
