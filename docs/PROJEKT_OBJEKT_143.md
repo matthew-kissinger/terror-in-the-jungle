@@ -20,7 +20,7 @@ measurement itself was trustworthy.
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
 | Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is evidence-complete PASS through `artifacts/perf/2026-05-03T16-48-58-020Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched proof refreshed after the selected-lighting luma slice at `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` drops the NPC runtime target to `2.95m` and adds generated per-tile imposter crop maps; commit `1395198da4db95611457ecde769b611e3d36354e` adds faction imposter material tuning. Matched visible-height ratios improved from the Cycle 2 before range `0.52-0.54x` to `0.861-0.895x`, and selected-lighting luma delta now ranges `-0.44%` to `0.36%`. No perf improvement, final visual parity, aircraft-scale acceptance, or production parity is claimed. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | KB-EFFECTS ATTRIBUTION ROUTED 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T22-24-44-200Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD has a giantPalm-only upload warmup that reduces WebGL upload totals but does not prove startup-latency improvement. KB-EFFECTS has refreshed low-load proof and three rejected visible warmup artifacts; the next branch is render-frame attribution, not another blind warmup. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-EFFECTS. KB-TERRAIN and KB-CULL still need matched baselines. |
+| Phase 3 - Multi-Cycle Engineering Plan | KB-EFFECTS FIRST REMEDIATION / TRUST GAP 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T23-05-29-475Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD has a giantPalm-only upload warmup that reduces WebGL upload totals but does not prove startup-latency improvement. KB-EFFECTS now has render attribution and a first unlit explosion architecture change that removes dynamic explosion PointLights; trigger-adjacent main-scene render calls drop below `30ms`, but final closeout is blocked by an unclassified LoAF/frame-metric artifact. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-EFFECTS. KB-TERRAIN and KB-CULL still need matched baselines. |
 
 ## Shipped Cycle 0 State
 
@@ -738,7 +738,7 @@ Open questions:
 
 ### KB-EFFECTS - Combat Effects
 
-Status: MEASUREMENT REFRESHED; VISIBLE WARMUP ATTEMPTS REJECTED; REMEDIATION BLOCKED ON RENDER-FRAME ATTRIBUTION.
+Status: FIRST REMEDIATION EVIDENCED; DYNAMIC-LIGHT RENDER STALL REMOVED; CLOSEOUT BLOCKED ON LOAF/FRAME-METRIC TRUST GAP.
 
 Progress:
 
@@ -808,29 +808,62 @@ Progress:
   detonation max `100.0ms`, max-frame delta `75.3ms`, one `373ms` long task,
   and two long-animation-frame entries. The runtime warmup code was reverted
   and no grenade remediation was landed.
+- 2026-05-03 render attribution before remediation:
+  `artifacts/perf/2026-05-03T22-36-46-874Z/grenade-spike-ai-sandbox`
+  wrapped main scene, weapon, grenade overlay, and update phases around the
+  low-load two-grenade probe. It confirmed the first trigger hit a
+  trigger-adjacent `webgl.render.main-scene` call at `380ms`, plus a nested
+  `178.2ms` main-scene render call. The first-use scene child count was
+  `1379`, one above the `1378` baseline, and the CPU profile again pointed at
+  Three/WebGL program and render work including `(program)`,
+  `updateMatrixWorld`, and `getProgramInfoLog`. This made the dynamic
+  explosion light/program-state path the first actionable culprit.
+- 2026-05-03 first-principles remediation:
+  `ExplosionEffectsPool` no longer creates, pools, adds, positions, fades, or
+  disposes `THREE.PointLight` instances for grenade explosions. Grenade
+  explosions are now unlit pooled visuals: flash sprite, smoke/fire/debris
+  `Points`, and shockwave ring. `ExplosionEffectsPool.test.ts` asserts that
+  pool construction/spawn adds no `THREE.PointLight` and still makes a flash
+  sprite visible.
+- 2026-05-03 post-remediation evidence:
+  `artifacts/perf/2026-05-03T23-04-07-778Z/grenade-spike-ai-sandbox` reran the
+  perf-build low-load two-grenade probe after the unlit explosion change,
+  rAF-scheduled trigger, and compact measurement-trust summary patch. Baseline
+  p95/max were `36.1ms / 48.1ms`; detonation p95/max were
+  `31.0ms / 100.0ms`. This run is noisier than the preceding post-remediation
+  check at `artifacts/perf/2026-05-03T22-57-28-665Z/grenade-spike-ai-sandbox`,
+  but it preserves the actionable signal: browser long tasks stayed at `0`,
+  trigger-adjacent render attribution showed no main-scene render call above
+  `29.5ms`, and grenade frag JS stayed small at
+  `kb-effects.grenade.frag.total=2.0ms` total / `1.4ms` max. Measurement trust
+  is `warn`: CPU profile, long-task observer, LoAF observer, disabled upload
+  observer, and render attribution are present, but one long animation frame
+  starts before the first trigger while the detonation window still reports a
+  `100.0ms` max frame. That blocks full KB-EFFECTS closeout as a frame-metric
+  classification gap rather than rejecting the unlit explosion architecture.
 
 Root-cause hypotheses:
 
-1. The rejected visible warmup variants still did not hit the browser work that
-   owns the trigger-adjacent long task, or the long task is driven by a coupled
-   render-frame state transition outside the warmed objects.
-2. The renderer still compiles or validates explosion material/program state on
-   first visible use; Chrome reports this through Three/WebGL stack frames such
-   as `getProgramInfoLog` and `renderBufferDirect`.
+1. The trigger-adjacent long task was caused by first-use render/program-state
+   churn from the dynamic explosion `PointLight` path, not grenade damage,
+   audio, physics broadphase, or particle JS.
+2. The remaining `100.0ms` detonation max frame and LoAF are currently
+   unclassified because the LoAF starts before the first trigger after the
+   rAF-scheduled trigger and pre-trigger settle window.
 3. The current 120-NPC AI Sandbox is over budget before the grenade and cannot
    isolate detonation cost until KB-METRIK/KB-CULL/KB-LOAD reduce baseline
    saturation.
 
 Ranked remediations:
 
-1. Add render-frame attribution around the grenade trigger frame before another
-   warmup branch: identify which Three/WebGL render call, material/program path,
-   matrix update, or scene mutation owns the long task.
-2. Precompile, simplify, or defer only the attributed first-frame visual path:
-   prime the point/sprite/ring materials, avoid first-use dynamic light state
-   changes, or defer non-critical smoke/fire layers by one frame if the profile
-   proves they own first-use work.
-3. Keep the 120-NPC grenade check advisory until the baseline window reaches
+1. Preserve the unlit pooled explosion architecture. Do not reintroduce dynamic
+   explosion lights or other per-detonation scene-light state transitions.
+2. Harden the low-load probe so pre-trigger LoAF/frame-metric contamination is
+   classified or excluded before declaring KB-EFFECTS closed.
+3. If explosion visual polish is needed, add it through shader-stable unlit
+   sprites, particles, rings, or texture-atlas work with matched before/after
+   render attribution.
+4. Keep the 120-NPC grenade check advisory until the baseline window reaches
    at least p95 `<33ms`; otherwise the grenade signal remains hidden inside the
    already-failed combat frame budget.
 
@@ -839,6 +872,9 @@ Acceptance:
 - Low-load two-grenade probe: no long task above `50ms` within `+/-250ms` of
   either trigger after warmup, and first/second detonation p95 delta below
   `3ms` over matched frame windows.
+- Render attribution: no trigger-adjacent main-scene render call above `50ms`.
+- Measurement trust: any remaining LoAF or `100ms` frame max is classified as
+  trigger-caused or pre-trigger harness/browser contamination.
 - Stress grenade probe: only considered valid after its pre-detonation
   baseline p95 is below `33ms` and measurement trust passes.
 
@@ -1159,11 +1195,12 @@ Reversibility:
 
 Current Cycle 3 status:
 
-- 2026-05-03: after the KB-EFFECTS rejected warmup pass, `npm run
+- 2026-05-03: after the KB-EFFECTS unlit explosion remediation pass, `npm run
   check:projekt-143-cycle3-kickoff` wrote
-  `artifacts/perf/2026-05-03T22-24-44-200Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
-  Overall status is WARN because KB-TERRAIN and KB-CULL still need matched
-  baselines. KB-OPTIK `npc-imposter-scale-luma-contract` is now
+  `artifacts/perf/2026-05-03T23-05-29-475Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Overall status is WARN because KB-OPTIK and KB-EFFECTS still need decisions
+  and KB-TERRAIN/KB-CULL still need matched baselines. KB-OPTIK
+  `npc-imposter-scale-luma-contract` is now
   `needs_decision`: the first `2.95m` target/crop remediation plus
   selected/expanded luma tuning has matched evidence inside the `+/-15%`
   height band and `+/-12%` luma band. The trusted near-stress expanded proof
@@ -1174,10 +1211,11 @@ Current Cycle 3 status:
   KB-LOAD `pixel-forge-texture-upload-residency` remains
   `ready_for_branch`, now specifically for remaining uploads/residency after
   the giantPalm-only warmup reduced WebGL upload totals without proving a
-  startup-latency win. KB-EFFECTS `grenade-first-use-stall` remains
-  `ready_for_branch`, but specifically for render-frame attribution after
-  three matched visible warmup variants still reproduced the low-load stall.
-  KB-TERRAIN
+  startup-latency win. KB-EFFECTS `grenade-first-use-stall` now has first
+  unlit-explosion remediation evidence: dynamic explosion `PointLight` removal
+  eliminates the trigger-adjacent `300ms+` main-scene render stall and browser
+  long task, but it remains open for pre-trigger LoAF/frame-metric
+  classification before final closeout. KB-TERRAIN
   `large-mode-vegetation-horizon` and KB-CULL
   `static-feature-and-vehicle-culling-hlod` remain `needs_baseline`.
 - 2026-05-03: `npm run check:projekt-143-optik-decision` refreshed the

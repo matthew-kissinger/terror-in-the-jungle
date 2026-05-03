@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 
 export interface ExplosionEffect {
-  flash: THREE.PointLight;
   flashSprite: THREE.Sprite;
   smokeParticles: THREE.Points;
   fireParticles: THREE.Points;
@@ -18,16 +17,10 @@ export interface ExplosionEffect {
  * Creates a complete explosion effect with all visual components
  */
 export function createExplosionEffect(
-  scene: THREE.Scene,
   smokeTexture: THREE.Texture,
   flashTexture: THREE.Texture,
   debrisTexture: THREE.Texture
 ): ExplosionEffect {
-  // Bright flash light - brighter and larger radius
-  const flash = new THREE.PointLight(0xffaa44, 0, 80);
-  flash.visible = false;
-  flash.matrixAutoUpdate = true;
-
   // Flash sprite for visual burst - larger initial size
   const flashSpriteMaterial = new THREE.SpriteMaterial({
     map: flashTexture,
@@ -126,7 +119,6 @@ export function createExplosionEffect(
   }
 
   return {
-    flash,
     flashSprite,
     smokeParticles,
     fireParticles,

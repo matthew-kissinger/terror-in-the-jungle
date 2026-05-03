@@ -9,13 +9,11 @@ const GRAVITY = new THREE.Vector3(0, -3, 0);
 export function updateFlash(effect: ExplosionEffect, elapsed: number): void {
   if (elapsed < 200) {
     const flashProgress = elapsed / 200;
-    effect.flash.intensity = 8 * (1 - flashProgress);
     effect.flashSprite.material.opacity = 1 - flashProgress;
     // Flash expands rapidly
     const scale = 15 + flashProgress * 8;
     effect.flashSprite.scale.set(scale, scale, 1);
   } else {
-    effect.flash.visible = false;
     effect.flashSprite.visible = false;
   }
 }

@@ -156,10 +156,16 @@ uncontaminated frame-time baseline.
 
 `perf-grenade-spike.ts` writes KB-EFFECTS artifacts under
 `artifacts/perf/<timestamp>/grenade-spike-<mode>/`: `summary.json`,
-`baseline-snapshot.json`, `detonation-snapshot.json`, `console.json`, and
-`cpu-profile.cpuprofile`. The probe disables the diagnostic WebGL
-texture-upload observer because that startup tracer wraps hot WebGL calls and
-would contaminate sustained runtime grenade attribution.
+`baseline-snapshot.json`, `detonation-snapshot.json`, `render-attribution.json`,
+`console.json`, and `cpu-profile.cpuprofile`. The `summary.json` includes a
+compact `measurementTrust` block and browser-stall summaries for handoff. The
+probe disables the diagnostic WebGL texture-upload observer because that
+startup tracer wraps hot WebGL calls and would contaminate sustained runtime
+grenade attribution. The grenade probe does install its own scoped render/frame
+attribution around main-scene, weapon, grenade-overlay, and update phases; it
+also supports a pre-trigger settle window so browser stalls that begin before
+the live grenade trigger can be classified instead of mistaken for detonation
+work.
 
 `pixel-forge-imposter-optics-audit.ts` writes KB-OPTIK artifacts under
 `artifacts/perf/<timestamp>/pixel-forge-imposter-optics-audit/`. The audit is
@@ -424,6 +430,24 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   culling-forced full frag warmup still hit detonation max `100.0ms` and a
   `373ms` long task. No grenade remediation is claimed; the next KB-EFFECTS
   branch must add render-frame attribution before another warmup.
+- 2026-05-03 KB-EFFECTS render attribution and first unlit explosion
+  remediation: before remediation,
+  `artifacts/perf/2026-05-03T22-36-46-874Z/grenade-spike-ai-sandbox`
+  attributed the first trigger to a `380ms` `webgl.render.main-scene` call and
+  nested `178.2ms` main-scene render work while dynamic explosion
+  `PointLight` instances were still pooled in the scene. After removing
+  grenade explosion `PointLight` creation/pooling entirely,
+  `artifacts/perf/2026-05-03T23-04-07-778Z/grenade-spike-ai-sandbox` recorded
+  baseline p95/max `36.1ms / 48.1ms`, detonation p95/max
+  `31.0ms / 100.0ms`, `0` browser long tasks, trigger-adjacent main-scene
+  render max `29.5ms`, and `kb-effects.grenade.frag.total=2.0ms` total /
+  `1.4ms` max. This final schema-refresh run is noisier than
+  `artifacts/perf/2026-05-03T22-57-28-665Z/grenade-spike-ai-sandbox`, but both
+  artifacts remove the `300ms+` trigger-adjacent render call. This is accepted
+  as first remediation evidence for the dynamic light render/program stall, not
+  final KB-EFFECTS closeout: measurement trust is `warn` because the latest
+  artifact still has one pre-trigger LoAF and a `100.0ms` max frame to
+  classify.
 - 2026-05-02 KB-OPTIK imposter optics audit:
   `npm run check:pixel-forge-optics` wrote
   `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`.
@@ -551,12 +575,14 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    or other GPU-heavy apps running.
 1. **Combat AI tails** - cover search is budget-capped to 6/frame via `CoverSearchBudget`, but p95/p99 still in WARN range due to per-search cost (sandbag iteration + vegetation grid + terrain probes).
 2. **Open Frontier renderer tails** - the latest short capture (`artifacts/perf/2026-04-07T04-01-01-963Z`) passes mean/p95/hitch gates, but `p99FrameMs` still warns at `29.60ms` and heap peak-growth still warns at `35.13MB`. The mode is stable again, but not yet back to the March 4 renderer baseline.
-3. **Grenade first-use render/program stall** - KB-EFFECTS now reproduces a
-   low-load first-use detonation stall while measuring the frag JS path at
-   about 1ms. The current lead is first visible Three/WebGL explosion
-   render/program work, but three visible warmup variants still reproduced the
-   stall. The next pass is render-frame attribution, not another blind warmup,
-   until the two-grenade probe passes without a trigger-adjacent long task.
+3. **Grenade first-use render/program stall** - KB-EFFECTS attributed the
+   low-load first-use long task to the dynamic explosion `PointLight`
+   render/program path and removed that path locally. The post-remediation
+   low-load probe has `0` browser long tasks and no trigger-adjacent
+   main-scene render call above `29.5ms`, but it still reports a pre-trigger
+   LoAF and `100.0ms` max frame. The next pass is measurement-trust
+   classification, not another explosion warmup or a reintroduction of dynamic
+   lights.
 4. **NPC imposter expanded visual parity** - the first KB-OPTIK remediation
    dropped the shared NPC runtime target to `2.95m` and added generated
    per-tile crop maps for upright NPC imposter atlases. The selected-lighting

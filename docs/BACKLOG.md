@@ -729,9 +729,12 @@ the runbook for the end-of-cycle ritual.
 
 1. Main production/perf chunks are still heavy (`index ~851kB`, `three ~734kB`, `ui ~449kB`) even though startup is stable. Precompressed sidecar generation has been removed, but real chunk splitting remains open.
 2. `frontier30m` script semantics are fixed, but the tracked baseline still predates the non-terminal soak path. Refresh this only from a quiet-machine perf session.
-3. First grenade/explosion cold-start hitch has fresh low-load evidence and
-   three rejected visible warmup attempts; next work needs render-frame
-   attribution before another warmup branch.
+3. First grenade/explosion cold-start hitch has first remediation evidence:
+   render attribution pinned the trigger-adjacent long task to the dynamic
+   explosion `PointLight` path, and the local unlit explosion path removes
+   browser long tasks plus the `300ms+` main-scene render call. Remaining work
+   is LoAF/frame-metric classification and optional visual review, not another
+   blind warmup.
 4. Branch-local vehicle exit UX fixes still need human confirmation:
    in-flight fixed-wing bailout now preserves altitude, and vehicle-session
    cleanup clears held input, but the final recovery playtest must confirm

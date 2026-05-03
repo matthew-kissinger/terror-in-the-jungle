@@ -34,7 +34,6 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
     // Pre-allocate pool and add to scene once (toggle visible, never add/remove)
     for (let i = 0; i < maxEffects; i++) {
       const effect = this.createEffect();
-      this.scene.add(effect.flash);
       this.scene.add(effect.flashSprite);
       this.scene.add(effect.smokeParticles);
       this.scene.add(effect.fireParticles);
@@ -45,7 +44,7 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
   }
 
   protected createEffect(): ExplosionEffect {
-    return createExplosionEffect(this.scene, this.smokeTexture, this.flashTexture, this.debrisTexture);
+    return createExplosionEffect(this.smokeTexture, this.flashTexture, this.debrisTexture);
   }
 
   protected isExpired(effect: ExplosionEffect, now: number): boolean {
@@ -53,7 +52,6 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
   }
 
   protected deactivateEffect(effect: ExplosionEffect): void {
-    effect.flash.visible = false;
     effect.flashSprite.visible = false;
     effect.smokeParticles.visible = false;
     effect.fireParticles.visible = false;
@@ -62,7 +60,6 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
   }
 
   protected disposeEffect(effect: ExplosionEffect): void {
-    this.scene.remove(effect.flash);
     this.scene.remove(effect.flashSprite);
     this.scene.remove(effect.smokeParticles);
     this.scene.remove(effect.fireParticles);
@@ -88,11 +85,6 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
     if (!effect) return;
 
     const now = performance.now();
-
-    // Position flash
-    effect.flash.position.copy(position);
-    effect.flash.intensity = 8;
-    effect.flash.visible = true;
 
     // Position flash sprite
     effect.flashSprite.position.copy(position);

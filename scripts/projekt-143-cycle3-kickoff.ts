@@ -42,7 +42,7 @@ type Cycle2Proof = {
 
 type OpticsScaleProof = {
   status?: CheckStatus;
-  measurementTrust?: { status?: CheckStatus };
+  measurementTrust?: { status?: CheckStatus; flags?: Record<string, unknown> };
   runtimeContracts?: {
     npc?: {
       visualHeightMeters?: number;
@@ -138,7 +138,30 @@ type GrenadeSummary = {
   status?: CheckStatus;
   measurementTrust?: { status?: CheckStatus };
   baseline?: unknown;
-  detonation?: unknown;
+  detonation?: {
+    frame?: {
+      p95FrameMs?: number;
+      maxFrameMs?: number;
+    };
+    renderAttribution?: {
+      totals?: {
+        maxDurationMs?: number;
+      };
+      topNearTriggerCalls?: unknown[];
+    };
+    browserStalls?: {
+      longTaskCount?: number;
+      longTaskMaxDurationMs?: number;
+      longAnimationFrameCount?: number;
+      longAnimationFrameMaxDurationMs?: number;
+    };
+    userTiming?: Record<string, { totalDurationMs?: number; maxDurationMs?: number }>;
+  };
+  deltas?: {
+    maxFrameMs?: number;
+    p99FrameMs?: number;
+    hitch50Count?: number;
+  };
   windows?: unknown;
 };
 
@@ -496,34 +519,58 @@ function buildLoadTarget(
 
 function buildEffectsTarget(grenadePath: string | null, grenade: GrenadeSummary | null): Cycle3Target {
   const trusted = grenade?.measurementTrust?.status === 'pass' || Boolean(grenadePath);
+  const hasRenderAttribution = Boolean(grenade?.detonation?.renderAttribution);
+  const renderMaxMs = grenade?.detonation?.renderAttribution?.totals?.maxDurationMs ?? null;
+  const frameMaxMs = grenade?.detonation?.frame?.maxFrameMs ?? null;
+  const stalls = grenade?.detonation?.browserStalls ?? null;
+  const fragTiming = grenade?.detonation?.userTiming?.['kb-effects.grenade.frag.total'] ?? null;
   return {
     id: 'grenade-first-use-stall',
     bureau: 'KB-EFFECTS',
-    status: trusted ? 'ready_for_branch' : 'needs_baseline',
+    status: hasRenderAttribution ? 'needs_decision' : (trusted ? 'ready_for_branch' : 'needs_baseline'),
     priority: 3,
-    summary: 'Grenade remediation is blocked on render-frame attribution; matched visible warmup attempts still reproduced the low-load two-grenade first-use stall.',
+    summary: hasRenderAttribution
+      ? 'KB-EFFECTS has first unlit-explosion architecture evidence: trigger-adjacent render calls are no longer the 300ms+ stall, but the probe still needs clean browser-stall/frame-metric closeout.'
+      : 'Grenade remediation is blocked on render-frame attribution; matched visible warmup attempts still reproduced the low-load two-grenade first-use stall.',
     evidence: {
       grenadeArtifactPath: rel(grenadePath),
       status: grenade?.status ?? null,
       measurementTrustStatus: grenade?.measurementTrust?.status ?? null,
       hasBaselineWindow: Boolean(grenade?.baseline),
       hasDetonationWindow: Boolean(grenade?.detonation),
+      hasRenderAttribution,
+      detonationFrameMaxMs: frameMaxMs,
+      detonationLongTaskCount: stalls?.longTaskCount ?? null,
+      detonationLongTaskMaxMs: stalls?.longTaskMaxDurationMs ?? null,
+      detonationLongAnimationFrameCount: stalls?.longAnimationFrameCount ?? null,
+      detonationLongAnimationFrameMaxMs: stalls?.longAnimationFrameMaxDurationMs ?? null,
+      renderAttributionMaxMs: renderMaxMs,
+      maxNearTriggerMainSceneRenderMs: grenade?.measurementTrust?.flags?.maxNearTriggerMainSceneRenderMs ?? null,
+      preTriggerLongAnimationFrameCount: grenade?.measurementTrust?.flags?.preTriggerLongAnimationFrameCount ?? null,
+      preTriggerLoafOverlapsFirstTrigger: grenade?.measurementTrust?.flags?.preTriggerLoafOverlapsFirstTrigger ?? null,
+      fragTotalDurationMs: fragTiming?.totalDurationMs ?? null,
+      fragMaxDurationMs: fragTiming?.maxDurationMs ?? null,
+      maxFrameDeltaMs: grenade?.deltas?.maxFrameMs ?? null,
+      hitch50Delta: grenade?.deltas?.hitch50Count ?? null,
       windows: grenade?.windows ?? null,
     },
     requiredBefore: [
-      'Refresh low-load two-grenade probe if the latest artifact is stale or missing CPU profile/long-task windows.',
-      'Use the latest rejected warmup artifacts as negative evidence; do not repeat visible render warmup without a new attribution hypothesis.',
+      hasRenderAttribution
+        ? 'Classify or remove the remaining pre-trigger LoAF/frame-metric contamination before declaring KB-EFFECTS closed.'
+        : 'Refresh low-load two-grenade probe if the latest artifact is stale or missing CPU profile/long-task windows.',
+      'Do not reintroduce dynamic explosion PointLights; grenade visuals should stay unlit, pooled, and shader-stable.',
       'Keep grenade JS, audio, particle, renderer, and shader/program changes separate unless evidence forces coupling.',
     ],
     acceptance: [
       'No long task above 50ms within +/-250ms of either warmed trigger.',
       'First/second detonation p95 delta below 3ms.',
-      'CPU profile shows the removed stall source or explicitly documents browser attribution limits.',
+      'Render attribution shows no trigger-adjacent main-scene render call above 50ms.',
+      'Any remaining LoAF/frame max is classified as trigger-caused or pre-trigger harness contamination.',
     ],
     nonClaims: [
       'Do not close KB-EFFECTS from frag JS timings alone.',
       'Do not use saturated combat120 grenade artifacts for first-use attribution.',
-      'Do not claim first-use visible warmup fixes KB-EFFECTS; three matched variants still reproduced the stall.',
+      'Do not claim full KB-EFFECTS closeout while the low-load probe still records a 100ms max frame or unclassified LoAF.',
     ],
   };
 }
@@ -707,7 +754,7 @@ function main(): void {
       'Treat the 2.95m NPC target drop, per-tile imposter crop, selected-lighting luma proof, and expanded-luma atmosphere pass as the current KB-OPTIK remediation slice.',
       'If KB-OPTIK continues immediately, use the runtime LOD-edge proof plus the near-stress artifact to decide visual exception/human review before changing crop or scale again.',
       'For KB-LOAD, treat the giantPalm warmup as partial upload mitigation only; the next branch must prove startup latency does not regress while reducing remaining uploads.',
-      'For KB-EFFECTS, run render-frame attribution before another warmup branch; matched visible warmups have already failed the low-load two-grenade probe.',
+      'For KB-EFFECTS, preserve the unlit pooled explosion architecture and close the remaining browser-stall/frame-metric classification gap before claiming final grenade closeout.',
       'Keep KB-TERRAIN and KB-CULL remediation branches separate until matched large-mode perf windows are prepared.',
       'Keep WebGPU out of Cycle 3 unless the owner explicitly approves reopening the point-of-no-return decision.',
     ],

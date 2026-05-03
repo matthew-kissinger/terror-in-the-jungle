@@ -46,8 +46,14 @@ the current truth anchor.
   audio, or physics broadphase. The 2026-05-03 current-HEAD refresh reproduced
   the stall again, and three matched visible warmup variants still hit
   trigger-adjacent `100ms` detonation frames with `373-397ms` long tasks. Those
-  runtime warmup changes were rejected and reverted; KB-EFFECTS now needs
-  render-frame attribution before another warmup branch.
+  runtime warmup changes were rejected and reverted. A follow-up render
+  attribution pass then isolated the actionable stall to the dynamic explosion
+  `PointLight` render/program path: the before artifact recorded a
+  trigger-adjacent `380ms` main-scene render call, while the unlit explosion
+  remediation recorded `0` browser long tasks and trigger-adjacent main-scene
+  render max `29.5ms`. KB-EFFECTS is not closed yet because the latest probe
+  still reports a `100ms` max frame and a LoAF that begins before the first
+  trigger.
 - KB-OPTIK measurement has also started. `npm run check:pixel-forge-optics`
   writes a Pixel Forge imposter optics audit; the first artifact,
   `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`,
@@ -278,6 +284,10 @@ Shipped payload:
 - Combat-effect attribution tooling: `src/systems/weapons/GrenadeEffects.ts`
   diagnostic timings, new `scripts/perf-grenade-spike.ts`, and `package.json`
   script `perf:grenade-spike`.
+- First KB-EFFECTS remediation: grenade explosions no longer create or pool
+  dynamic `THREE.PointLight` instances. Explosion visuals are now unlit pooled
+  sprites, point particles, and shockwave rings to avoid per-detonation scene
+  light/program churn.
 - Imposter optics tooling: new
   `scripts/pixel-forge-imposter-optics-audit.ts` and `package.json` script
   `check:pixel-forge-optics`.
@@ -297,9 +307,10 @@ What is not ready to claim:
 - No Pixel Forge texture candidate has visual sign-off. Candidate dimensions
   are planning estimates only until KB-OPTIK validates imposter darkness,
   silhouette readability, animation readability, and distant-canopy coverage.
-- No grenade-spike remediation has shipped. The probe currently identifies a
-  first-use render/program stall candidate and records that 120-NPC AI Sandbox
-  is already saturated before a grenade can be isolated.
+- No final grenade-spike closeout has shipped. The first unlit explosion
+  remediation removes the measured dynamic-light render/program stall, but the
+  low-load probe still needs LoAF/frame-metric classification and the 120-NPC
+  AI Sandbox remains saturated before a grenade can be isolated.
 - No NPC atlas regeneration, vegetation normal-map fix, or final NPC visual
   closeout has shipped. The first local KB-OPTIK remediation slice spans
   `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9`,
@@ -327,21 +338,22 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T22-24-44-200Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T23-05-29-475Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
   `needs_decision` because the 8.5m near-stress camera still flags even though
   runtime LOD-edge proof passes after expanded luma was brought into band.
   KB-LOAD texture upload/residency remains `ready_for_branch` for remaining
-  uploads after the partial giantPalm warmup, KB-EFFECTS grenade first-use is
-  `ready_for_branch` for render-frame attribution after rejected visible
-  warmups, and KB-TERRAIN/KB-CULL are `needs_baseline`. It also
+  uploads after the partial giantPalm warmup, KB-EFFECTS grenade first-use now
+  has first unlit-explosion remediation evidence but still needs pre-trigger
+  LoAF/frame-metric classification before closeout, and KB-TERRAIN/KB-CULL are
+  `needs_baseline`. It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
   combat120, and A Shau perf summary paths for handoff. This is
   planning/agent-DX evidence; no atlas regeneration, gameplay-camera visual
-  parity, startup-latency win, far-canopy, grenade, texture residency closeout,
-  culling, WebGPU, or
+  parity, startup-latency win, far-canopy, final grenade closeout, texture
+  residency closeout, culling, WebGPU, or
   production-parity remediation is accepted from it.
 - KB-OPTIK now has an executable decision packet at
   `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`.

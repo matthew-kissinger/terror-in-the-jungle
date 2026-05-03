@@ -2199,7 +2199,58 @@ TODO
   WARN by design at
   `artifacts/perf/2026-05-03T22-24-44-200Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
   `npm run check:projekt-143` PASS at
-  `artifacts/perf/2026-05-03T22-27-16-532Z/projekt-143-evidence-suite/suite-summary.json`.
+ `artifacts/perf/2026-05-03T22-27-16-532Z/projekt-143-evidence-suite/suite-summary.json`.
 - Validation: `npm run typecheck` PASS and `npm run validate:fast` PASS. No
   production parity, grenade closeout, startup-latency win, culling, WebGPU, or
   performance-improvement claim is made from this pass.
+
+2026-05-03 Projekt Objekt-143 KB-EFFECTS unlit explosion remediation
+- Added scoped render/frame attribution to `scripts/perf-grenade-spike.ts`.
+  The probe now writes `render-attribution.json`, records render/update phase
+  costs around grenade triggers, drains metrics after a pre-trigger settle
+  window, and schedules live grenade triggers on `requestAnimationFrame`.
+- Before remediation evidence:
+  `artifacts/perf/2026-05-03T22-36-46-874Z/grenade-spike-ai-sandbox`
+  attributed the first-use stall to trigger-adjacent main-scene render work:
+  `webgl.render.main-scene=380ms`, nested main-scene render `178.2ms`, one
+  `387ms` long task, and CPU-profile weight in Three/WebGL program/render
+  paths including `(program)`, `updateMatrixWorld`, and `getProgramInfoLog`.
+- First-principles remediation: grenade explosions no longer create, pool, add,
+  position, fade, or dispose dynamic `THREE.PointLight` instances. The runtime
+  effect path is now unlit pooled flash sprite, smoke/fire/debris `Points`, and
+  shockwave ring. Added `ExplosionEffectsPool.test.ts` to lock the no-light
+  contract while preserving visible flash-spawn behavior.
+- After evidence:
+  `artifacts/perf/2026-05-03T23-04-07-778Z/grenade-spike-ai-sandbox` recorded
+  baseline p95/max `36.1ms / 48.1ms`, detonation p95/max
+  `31.0ms / 100.0ms`, `0` browser long tasks, trigger-adjacent main-scene
+  render max `29.5ms`, and `kb-effects.grenade.frag.total=2.0ms` total /
+  `1.4ms` max. This schema-refresh run is noisier than the preceding
+  post-remediation run at
+  `artifacts/perf/2026-05-03T22-57-28-665Z/grenade-spike-ai-sandbox`, but both
+  remove the measured dynamic-light render/program stall. `summary.json` now
+  carries `measurementTrust.status=warn` with CPU profile, long-task observer,
+  LoAF observer, disabled upload observer, render attribution, and
+  `preTriggerLongAnimationFrameCount=1` all present. KB-EFFECTS does not close
+  because one pre-trigger LoAF and a `100.0ms` max frame still need
+  classification.
+- Validation before final docs/kickoff refresh: `npm run typecheck` PASS,
+  `npm run perf:grenade-spike -- --npcs=2 --baseline-frames=120
+  --post-frames=240 --baseline-ms=2000 --post-ms=4500 --warmup-ms=10000
+  --grenades=2 --port=9192` PASS, and
+  `npx vitest run src/systems/effects/ExplosionEffectsPool.test.ts
+  src/systems/weapons/GrenadeEffects.test.ts
+  src/systems/weapons/GrenadeSystem.test.ts
+  src/systems/weapons/MortarSystem.test.ts` PASS. No production parity, final
+  grenade closeout, broad combat120 closeout, WebGPU migration, or visual
+  polish claim is made from this pass.
+- Refreshed handoff artifact: `npm run check:projekt-143-cycle3-kickoff` WARN
+  by design at
+  `artifacts/perf/2026-05-03T23-05-29-475Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  KB-EFFECTS is `needs_decision` with `measurementTrustStatus=warn`,
+  detonation long tasks `0`, LoAF count `1`, max near-trigger main-scene
+  render `29.5ms`, pre-trigger LoAF count `1`, and the remaining required work
+  is browser-stall/frame classification before final closeout.
+- Final local validation: `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-03T23-07-31-605Z/projekt-143-evidence-suite/suite-summary.json`
+  and `npm run validate:fast` PASS.
