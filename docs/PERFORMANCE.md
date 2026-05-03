@@ -213,6 +213,10 @@ slot to KB-LOAD/KB-EFFECTS.
 After commit `57d873e7f305fb528e7570232a291950e89c6ade`, it consumes the
 expanded proof and recommends targeted lighting/material-contract remediation
 or switching bureaus when expanded coverage is trusted but flagged.
+After commit `b24c23bfdbd027458a4d3e27155158723a32f4ad`, it distinguishes
+expanded-luma success from gameplay-camera silhouette flags and recommends
+`target-gameplay-camera-silhouette-or-switch-bureau` when luma is inside band
+but visible-height ratios still warn.
 Aircraft resizing remains rejected as the next response unless a separate
 vehicle-scale proof is opened.
 
@@ -224,6 +228,12 @@ across five lighting profiles and two camera profiles. The artifact includes
 metadata, renderer stats, and strict measurement-trust flags. WARN means the
 capture is trusted but the expanded visual bands are not closed; FAIL means do
 not use the numbers.
+The committed-sha artifact
+`artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json`
+records commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad`, measurement trust
+PASS, luma delta range `-11.31%` to `9.03%`, and `10/40` remaining flags from
+gameplay-camera visible-height ratios. Treat it as expanded-luma after
+evidence, not final visual closeout.
 
 `projekt-143-culling-proof.ts` writes a headed deterministic renderer/category
 fixture under `artifacts/perf/<timestamp>/projekt-143-culling-proof/`. It uses
@@ -507,12 +517,14 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`
    improved visible-height ratios from the before range `0.52-0.54x` to
    `0.861-0.895x`, inside the first-remediation `+/-15%` band, and selected
-   setup luma delta is now `-0.44%` to `0.36%`. The expanded proof at
-   `artifacts/perf/2026-05-03T17-26-45-106Z/projekt-143-optik-expanded-proof/summary.json`
-   is measurement-trusted but WARN: `34/40` samples flag, with luma delta range
-   `-53.57%` to `104.58%`. Current lead: selected lighting is aligned, but
-   close GLBs and NPC imposters still diverge under dawn/dusk/haze/storm and
-   gameplay-camera conditions because their lighting/material contracts differ.
+   setup luma delta is now `-0.44%` to `0.36%`. Commit
+   `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` then forwards scene
+   lighting/fog into NPC imposter shader uniforms. The expanded proof at
+   `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json`
+   is measurement-trusted but WARN: luma is now in band at `-11.31%` to
+   `9.03%`, while `10/40` samples still flag on gameplay-camera visible-height
+   ratios. Current lead: luma/material parity is no longer the blocker; the
+   remaining KB-OPTIK decision is perspective-camera silhouette/crop parity.
    Do not claim full visual parity or performance improvement.
 5. **Large-mode vegetation horizon gap** - static KB-TERRAIN evidence shows
    current Pixel Forge vegetation disappears by `600m`, while Open Frontier

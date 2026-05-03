@@ -2088,3 +2088,29 @@ TODO
   slot to KB-LOAD texture/upload residency or KB-EFFECTS grenade first-use.
   No production parity, performance improvement, final visual parity,
   aircraft-scale acceptance, or human-playtest signoff is claimed.
+
+2026-05-03 Projekt Objekt-143 KB-OPTIK atmosphere remediation
+- Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` forwards the scene
+  lighting/fog snapshot into NPC imposter shader uniforms and updates
+  `scripts/projekt-143-optik-expanded-proof.ts` so the proof exercises the
+  same atmosphere contract.
+- Committed-sha proof:
+  `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json`.
+  Measurement trust is PASS with `0` browser, page, request, and load errors.
+  Expanded luma now lands inside the `+/-12%` band (`-11.31%` to `9.03%`);
+  remaining WARN is `10/40` gameplay-perspective visible-height samples.
+- Agent/DX follow-up commit `b24c23bfdbd027458a4d3e27155158723a32f4ad`
+  retargets the decision/kickoff scripts so future agents route the next
+  KB-OPTIK choice to
+  `target-gameplay-camera-silhouette-or-switch-bureau`, not another generic
+  shader-constant pass.
+- Refreshed handoff artifacts:
+  `artifacts/perf/2026-05-03T18-50-04-224Z/projekt-143-optik-decision-packet/decision-packet.json`
+  and
+  `artifacts/perf/2026-05-03T18-50-03-715Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+- Validation: `npm run validate:fast` PASS, `npm run build` PASS,
+  `npm run check:projekt-143-optik-expanded` WARN by design,
+  `npm run check:projekt-143-optik-decision` WARN by design, and
+  `npm run check:projekt-143-cycle3-kickoff` WARN by design. No production
+  parity, performance improvement, final visual parity, aircraft-scale
+  acceptance, or human-playtest signoff is claimed.
