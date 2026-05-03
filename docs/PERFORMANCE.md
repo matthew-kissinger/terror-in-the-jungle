@@ -201,12 +201,13 @@ not approve or apply any remediation.
 
 `projekt-143-optik-decision-packet.ts` writes a KB-OPTIK decision packet under
 `artifacts/perf/<timestamp>/projekt-143-optik-decision-packet/`. It consumes the
-trusted matched scale proof, records the current `4.425m` NPC target, base
-`2.95m` target, imposter visible-height ratio, luma delta, and aircraft
-longest-axis ratios against both NPC targets. It explicitly rejects aircraft
-resizing as the first response to the NPC/vehicle scale concern, recommends a
-measured imposter crop/regeneration branch for the immediate LOD-pop problem,
-and leaves the absolute NPC target as an owner/art-direction decision.
+trusted matched scale proof, records the current NPC target, base `2.95m`
+target, imposter visible-height ratio, luma delta, and aircraft longest-axis
+ratios. After the 2026-05-03 first remediation, it recognizes the `2.95m`
+target drop plus per-tile crop map as complete for this slice and recommends
+shader/luma parity as the next KB-OPTIK branch if optics work continues.
+Aircraft resizing remains rejected as the next response unless a separate
+vehicle-scale proof is opened.
 
 `projekt-143-culling-proof.ts` writes a headed deterministic renderer/category
 fixture under `artifacts/perf/<timestamp>/projekt-143-culling-proof/`. It uses
@@ -482,14 +483,17 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    about 1ms. The current lead is first visible Three/WebGL explosion
    render/program work. Do not treat the older hidden-effect warmup as closed
    until the two-grenade probe passes without a trigger-adjacent long task.
-4. **NPC imposter scale/resolution and brightness parity** - static KB-OPTIK
-   evidence shows every runtime NPC atlas is stretched more than 2x against
-   source bbox height and uses only `21.69px/m` at runtime. The matched Cycle 2
-   proof now shows imposter visible silhouettes at only `0.52-0.54x` close-GLB
-   height and darker by `26.59-59.06` luma despite the same `4.425m` geometry
-   target. The shader path is also split from both vegetation and close GLBs.
-   Do not fix constants or regenerate atlases without before/after matched
-   proof.
+4. **NPC imposter luma/material parity** - the first KB-OPTIK remediation
+   dropped the shared NPC runtime target to `2.95m` and added generated
+   per-tile crop maps for upright NPC imposter atlases. The refreshed matched
+   proof at
+   `artifacts/perf/2026-05-03T16-13-34-596Z/projekt-143-optics-scale-proof/summary.json`
+   improved visible-height ratios from the before range `0.52-0.54x` to
+   `0.861-0.895x`, inside the first-remediation `+/-15%` band. Remaining
+   issue: imposter crops are still `26.94-59.29` luma darker than close GLB
+   crops, and the shader path is still split from both vegetation and close
+   GLBs. Do not claim full visual parity or performance improvement from the
+   scale/crop patch.
 5. **Large-mode vegetation horizon gap** - static KB-TERRAIN evidence shows
    current Pixel Forge vegetation disappears by `600m`, while Open Frontier
    and A Shau terrain remains visible beyond that range. The current lead is a

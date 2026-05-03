@@ -71,11 +71,16 @@ Projekt Objekt-143 KB-OPTIK opened a static imposter optics audit on
 The first artifact,
 `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`,
 flags every runtime NPC animated impostor atlas: 96px tiles have median visible
-actor height of 65px, while runtime stretches the source bakes to a 4.425m
-plane. That is a scale/resolution contract problem to validate visually before
-changing runtime constants or regenerating atlases. The same audit flags
-`bananaPlant` and `giantPalm` vegetation as oversampled relative to runtime
-size. This is evidence for KB-OPTIK/KB-CULL, not asset approval or rejection.
+actor height of 65px. The original runtime stretched the source bakes to a
+4.425m plane; the 2026-05-03 first KB-OPTIK remediation now uses the approved
+2.95m target plus generated upright per-tile crop maps. Regenerate the crop map
+with `npm run assets:generate-npc-crops` after NPC atlas changes and verify it
+with `npm run check:pixel-forge-npc-crops`. The refreshed matched proof at
+`artifacts/perf/2026-05-03T16-13-34-596Z/projekt-143-optics-scale-proof/summary.json`
+puts NPC close/imposter visible-height ratios inside the first-remediation
+`+/-15%` band, but luma remains flagged. The same audit flags `bananaPlant` and
+`giantPalm` vegetation as oversampled relative to runtime size. This is evidence
+for KB-OPTIK/KB-CULL, not full asset approval or rejection.
 
 Projekt Objekt-143 KB-TERRAIN opened a vegetation horizon audit on 2026-05-02:
 `npm run check:vegetation-horizon` writes

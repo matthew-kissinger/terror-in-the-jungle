@@ -1987,14 +1987,14 @@ TODO
   `artifacts/perf/2026-05-03T15-03-07-006Z/projekt-143-optik-decision-packet/decision-packet.json`.
   Status is WARN because it intentionally leaves the absolute NPC target as an
   owner/art-direction decision.
-- Findings: current NPC target is `4.425m` from a `2.95m` base target times
+- Findings: then-current NPC target was `4.425m` from a `2.95m` base target times
   `1.50`; close GLBs are scaled about `2.51x` from source; imposter visible
   height is only `0.522-0.544x` the close GLB; aircraft longest-axis ratios are
   `3.01x` average against current NPC height and `4.52x` against the base
   target.
 - Decision: do not resize aircraft first. First runtime remediation should
   prototype NPC imposter crop/regeneration against one faction/clip, while the
-  owner decides whether absolute NPC target drops from `4.425m` to `2.95m` or
+  owner decided whether absolute NPC target should drop from `4.425m` to `2.95m` or
   requires a larger human-scale redesign. Shader/luma parity comes after
   scale/crop.
 - Repo alignment: Cycle 3 kickoff commit
@@ -2005,3 +2005,34 @@ TODO
   `npm run check:projekt-143-optik-decision` WARN by design,
   `npm run check:projekt-143-cycle3-kickoff` WARN by design with the decision
   packet path included, and `npm run validate:fast` PASS.
+
+2026-05-03 Projekt Objekt-143 first KB-OPTIK remediation
+- Owner approved dropping the absolute NPC target to the recommended Pixel
+  Forge base target. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9`
+  changes the shared Pixel Forge NPC runtime target from `4.425m` to `2.95m`,
+  derives the imposter billboard Y offset from `NPC_Y_OFFSET`, and adds a
+  generated per-tile crop map for upright NPC imposter atlases.
+- Agent/DX improvement: added `scripts/generate-pixel-forge-npc-tile-crops.ts`,
+  `npm run assets:generate-npc-crops`, and
+  `npm run check:pixel-forge-npc-crops`. The crop check is now part of
+  `npm run validate:fast`, so future Pixel Forge NPC atlas updates cannot leave
+  stale crop metadata silently.
+- Post-commit matched proof:
+  `artifacts/perf/2026-05-03T16-13-34-596Z/projekt-143-optics-scale-proof/summary.json`.
+  Source SHA is `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9`. Visible-height
+  ratios improved from the before range `0.52-0.54x` to `0.895` (US), `0.895`
+  (ARVN), `0.863` (NVA), and `0.861` (VC), inside the first-remediation
+  `+/-15%` proof band.
+- Luma remains open: post-remediation imposter crops are still `-26.94` to
+  `-59.29` darker than close GLB crops, so the next KB-OPTIK branch is
+  shader/material luma parity or an explicit visual exception.
+- Refreshed evidence artifacts:
+  `artifacts/perf/2026-05-03T16-13-47-104Z/projekt-143-optik-decision-packet/decision-packet.json`,
+  `artifacts/perf/2026-05-03T16-13-59-633Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`,
+  `artifacts/perf/2026-05-03T16-14-08-949Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  and `artifacts/perf/2026-05-03T16-13-49-501Z/projekt-143-evidence-suite/suite-summary.json`.
+- Validation before the remediation commit: `npm run validate:fast` PASS and
+  `npm run build` PASS. Post-commit proof and Projekt suite commands listed
+  above passed/WARNed as designed. No production parity, performance
+  improvement, aircraft-scale acceptance, or final human-scale/playtest signoff
+  is claimed.

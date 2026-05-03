@@ -49,10 +49,13 @@ the current truth anchor.
   `artifacts/perf/2026-05-02T20-54-56-960Z/pixel-forge-imposter-optics-audit/optics-audit.json`,
   flagged `28/28` runtime NPC atlases and `2/7` vegetation atlases. NPC
   imposter bakes use `96px` tiles with median visible actor height `65px`, but
-  runtime stretches those bakes to a `4.425m` plane, producing a median
-  runtime/source height ratio of `2.63x` and only `21.69px/m`. The first
-  brightness-parity finding is architectural: NPC imposters, vegetation
-  imposters, and close GLBs use separate shader/material contracts.
+  the original runtime stretched those bakes to a `4.425m` plane, producing a
+  median runtime/source height ratio of `2.63x` and only `21.69px/m`. The first
+  KB-OPTIK remediation at
+  `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` now uses the approved `2.95m`
+  target plus generated upright per-tile crop maps. The first brightness-parity
+  finding remains architectural: NPC imposters, vegetation imposters, and close
+  GLBs use separate shader/material contracts.
 - KB-TERRAIN measurement has started with `npm run check:vegetation-horizon`.
   The first artifact,
   `artifacts/perf/2026-05-02T21-29-15-593Z/vegetation-horizon-audit/horizon-audit.json`,
@@ -106,28 +109,32 @@ the current truth anchor.
   run `25265757159`, Deploy run `25266081872`, live `/asset-manifest.json`,
   Pages/R2/build/WASM headers, service worker state, and a Zone Control browser
   smoke all passed.
-- Phase 2 / Cycle 2 is now evidence-complete as visual/runtime proof work, not
-  as remediation. Runtime screenshots
+- Phase 2 / Cycle 2 is now evidence-complete as visual/runtime proof work.
+  Runtime screenshots
   were refreshed at
   `artifacts/perf/2026-05-03T01-00-12-099Z/projekt-143-cycle2-runtime-proof/summary.json`.
   The dedicated headed KB-CULL renderer/category proof passed at
   `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json`
   with nonzero renderer stats (`133` draw calls, `4,887` triangles), CPU
   profile capture, browser long-task/LoAF capture, all required renderer
-  categories visible, and trusted probe overhead. KB-OPTIK matched scale proof
-  passed as evidence at
-  `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`.
-  It shows the current close-GLB and imposter geometry both target `4.425m`,
-  while rendered imposter silhouettes average only `0.53x` of close-GLB visible
-  height and are darker by `26.59-59.06` luma. The six aircraft GLBs load at
-  imported native scale with longest-axis/NPC-height ratios from `2.07x` to
-  `5.52x`. `npm run check:projekt-143-cycle2-proof` was refreshed afterward
-  and wrote
-  `artifacts/perf/2026-05-03T11-19-13-862Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
-  with PASS status for evidence completeness. This is not a shader, scale,
-  imposter, culling, or aircraft-feel remediation claim. The culling proof
-  screenshot is not runtime scale evidence because its fixture rescales GLBs by
-  longest bounding-box axis to fit one camera.
+  categories visible, and trusted probe overhead. The original KB-OPTIK matched
+  scale proof at
+  `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`
+  showed close-GLB and imposter geometry both targeting `4.425m`, while
+  rendered imposter silhouettes averaged only `0.53x` of close-GLB visible
+  height and were darker by `26.59-59.06` luma. The first KB-OPTIK remediation
+  commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` dropped the shared target
+  to `2.95m`, added generated upright per-tile crop maps, and refreshed the
+  matched proof at
+  `artifacts/perf/2026-05-03T16-13-34-596Z/projekt-143-optics-scale-proof/summary.json`.
+  Visible-height ratios are now `0.861-0.895x`, inside the first-remediation
+  `+/-15%` proof band; luma remains flagged at `-26.94` to `-59.29`. `npm run
+  check:projekt-143-cycle2-proof` was refreshed afterward and wrote
+  `artifacts/perf/2026-05-03T16-13-59-633Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  with PASS status for evidence completeness. This is not shader/luma,
+  performance, aircraft-scale, aircraft-feel, or production parity acceptance.
+  The culling proof screenshot is not runtime scale evidence because its
+  fixture rescales GLBs by longest bounding-box axis to fit one camera.
 - Cycle 2 now also includes the user-approved aircraft GLB replacement as an
   evidence-gated asset/runtime import. The six runtime aircraft GLBs were
   imported from Pixel Forge through `npm run assets:import-pixel-forge-aircraft`
@@ -277,37 +284,37 @@ What is not ready to claim:
 - No grenade-spike remediation has shipped. The probe currently identifies a
   first-use render/program stall candidate and records that 120-NPC AI Sandbox
   is already saturated before a grenade can be isolated.
-- No imposter brightness, NPC scale, NPC atlas, or vegetation normal-map fix
-  has shipped. KB-OPTIK now has static and matched close-GLB/imposter evidence:
-  the matched proof shows current NPC imposter visible silhouettes are about
-  half the close-GLB height despite sharing the same `4.425m` geometry target.
-  That is a remediation blocker, not a fix.
+- No imposter brightness, NPC atlas, or vegetation normal-map fix has shipped.
+  The first local KB-OPTIK scale/crop remediation exists at
+  `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9`: it drops the shared NPC target
+  to `2.95m` and adds generated per-tile crop maps, with matched visible-height
+  ratios now `0.861-0.895x`. It is not yet live-deployed, it has no perf
+  improvement claim, and luma remains outside target.
 - No distant-canopy or barren-horizon fix has shipped. KB-TERRAIN now has
   static coverage evidence, but still needs elevated runtime screenshots and
   matched perf captures before any outer-canopy layer is accepted.
 - No WebGPU migration has shipped or been started. KB-STRATEGIE recommends
   staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
   after the measured blockers are under control.
-- Phase 3 now has a Cycle 3 kickoff/readiness matrix in
+- Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T15-03-08-568Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T16-14-08-949Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
-  are shipped. The kickoff marks KB-OPTIK NPC scale/luma as `needs_decision`,
-  KB-LOAD texture upload/residency and KB-EFFECTS grenade first-use as
-  `ready_for_branch`, and KB-TERRAIN/KB-CULL as `needs_baseline`. It also
-  carries Open Frontier and Zone Control startup paths plus Open Frontier,
-  combat120, and A Shau perf summary paths for handoff. This is planning/
-  agent-DX evidence only; no shader, atlas, imposter, far-canopy, grenade,
-  texture, culling, or WebGPU remediation has shipped.
+  are shipped. The kickoff marks KB-OPTIK NPC scale/crop/luma as
+  `ready_for_branch` after the first local remediation, KB-LOAD texture
+  upload/residency and KB-EFFECTS grenade first-use as `ready_for_branch`, and
+  KB-TERRAIN/KB-CULL as `needs_baseline`. It also carries Open Frontier and
+  Zone Control startup paths plus Open Frontier, combat120, and A Shau perf
+  summary paths for handoff. This is planning/agent-DX evidence; no shader/luma,
+  atlas regeneration, far-canopy, grenade, texture-upload, culling, WebGPU, or
+  production-parity remediation is accepted from it.
 - KB-OPTIK now has an executable decision packet at
-  `artifacts/perf/2026-05-03T15-03-07-006Z/projekt-143-optik-decision-packet/decision-packet.json`.
-  It records the current NPC target as `4.425m`, the Pixel Forge base target as
-  `2.95m`, the imposter visible-height ratio as `0.522-0.544`, and aircraft
-  longest-axis ratios as `3.01x` average against current NPC height or `4.52x`
-  average against the base target. It rejects aircraft resizing as the first
-  branch, recommends an NPC imposter crop/regeneration prototype for the
-  measured LOD-pop problem, and keeps the absolute NPC target as an owner
-  decision. No scale, shader, or asset remediation has shipped.
+  `artifacts/perf/2026-05-03T16-13-47-104Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  It records the current NPC target as `2.95m`, imposter visible-height ratio
+  average as `0.879`, aircraft longest-axis/current-NPC average as `4.52x`, and
+  the recommended next KB-OPTIK branch as shader/luma parity after scale/crop.
+  It continues to reject aircraft resizing as the next response without a
+  separate vehicle-scale proof.
 - Commit `5b726746b0034d9327f5cb03ddcd3147294125ed` passed GitHub CI run
   `25277824856` after the Cycle 3 kickoff docs/tooling release. It was not
   deployed or live-verified; do not claim production parity for that commit.
