@@ -30,7 +30,7 @@ npm run lint                     # ESLint on src/
 npm run deadcode                 # knip dead-code scan (advisory)
 
 # Gated checks
-npm run validate:fast            # typecheck + lint + test:quick
+npm run validate:fast            # Pixel Forge cutover/crop checks + typecheck + lint + test:quick
 npm run validate                 # lint + test:run + build + smoke:prod
 npm run validate:full            # test:run + build + combat120 capture + perf:compare
 npm run check:mobile-ui          # Built-app phone viewport flow gate
@@ -56,6 +56,8 @@ npm run evidence:atmosphere         # All-mode ground/sky/aircraft atmosphere + 
 
 # Asset import and validation
 npm run assets:import-pixel-forge-aircraft  # Normalize/copy Pixel Forge aircraft GLBs + provenance
+npm run assets:generate-npc-crops            # Regenerate Pixel Forge NPC per-tile imposter crop map
+npm run check:pixel-forge-npc-crops          # Verify generated NPC crop map is current
 ```
 
 ## Daily loop

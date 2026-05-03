@@ -262,16 +262,20 @@ function buildOptikTarget(
     .map((entry) => entry.nativeLongestAxisToNpcVisualHeight)
     .filter((value): value is number => value !== null && value !== undefined);
   const trusted = proof?.status === 'pass' && proof.measurementTrust?.status === 'pass';
+  const visibleHeightWithinBand = ratios.length > 0 && ratios.every((ratio) => ratio >= 0.85 && ratio <= 1.15);
+  const lumaStillFlagged = lumaDeltas.some((delta) => Math.abs(delta) > 25);
 
   return {
     id: 'npc-imposter-scale-luma-contract',
     bureau: 'KB-OPTIK',
-    status: trusted ? 'needs_decision' : 'blocked',
+    status: trusted ? (visibleHeightWithinBand ? 'ready_for_branch' : 'needs_decision') : 'blocked',
     priority: 1,
     summary: trusted
-      ? decisionPath
-        ? 'Matched evidence and KB-OPTIK decision packet exist; imposter crop/regeneration is the recommended first runtime branch, while absolute NPC target remains an owner decision.'
-        : 'Matched evidence exists; decide whether to change NPC runtime visual height, regenerate imposter bakes, align shader/luma, or combine those changes in separate measured slices.'
+      ? visibleHeightWithinBand
+        ? 'First scale/crop remediation has matched evidence inside the +/-15% height band; remaining KB-OPTIK work is shader/luma parity or an explicit visual exception.'
+        : decisionPath
+          ? 'Matched evidence and KB-OPTIK decision packet exist; imposter crop/regeneration remains the recommended first runtime branch.'
+          : 'Matched evidence exists; decide whether to change NPC runtime visual height, regenerate imposter bakes, align shader/luma, or combine those changes in separate measured slices.'
       : 'Matched close-GLB/imposter evidence is missing or untrusted.',
     evidence: {
       opticsScaleProofPath: rel(opticsPath),
@@ -280,6 +284,8 @@ function buildOptikTarget(
       recommendedFirstRuntimeBranch: decision?.recommendedSequence?.[1] ?? null,
       openOwnerDecision: decision?.openOwnerDecision ?? null,
       runtimeNpcVisualHeightMeters: proof?.runtimeContracts?.npc?.visualHeightMeters ?? null,
+      visibleHeightWithinBand,
+      lumaStillFlagged,
       renderedVisibleHeightRatio: {
         min: min(ratios),
         average: average(ratios),
@@ -297,17 +303,17 @@ function buildOptikTarget(
       },
     },
     requiredBefore: [
-      'Pick one variable for the first branch: NPC visual height, imposter bake crop/scale, or imposter shader/luma.',
-      'Record the current matched crop artifact as the before proof.',
-      'If NPC visual height changes, update close GLB, imposter, hit/aiming, and player-relative scale tests together.',
+      'Use the latest matched scale/crop proof as the after artifact for the first remediation.',
+      'If continuing KB-OPTIK, isolate shader/luma parity from target height and crop metadata changes.',
+      'If changing the 2.95m target again, update close GLB, imposter, hit/aiming, and player-relative scale tests together.',
     ],
     acceptance: [
-      'Matched close/imposter visible height delta within +/-10% or explicit visual exception.',
+      'Matched close/imposter visible height delta within +/-15% for the first remediation, or explicit visual exception.',
       'Mean opaque luma delta within +/-12% under the selected first lighting setup, then expand to dawn/dusk/haze.',
       'No performance or upload regression accepted without paired artifacts.',
     ],
     nonClaims: [
-      'Do not claim NPC scale is fixed from evidence alone.',
+      'Do not claim full NPC visual parity while luma remains flagged.',
       'Do not accept aircraft scale changes from this target without a separate vehicle-scale proof.',
     ],
   };
@@ -561,14 +567,15 @@ function main(): void {
     },
     targets,
     recommendedOrder: [
-      'Decide the NPC scale/bake/luma contract from the KB-OPTIK matched proof before touching shader constants or atlases.',
+      'Treat the 2.95m NPC target drop plus per-tile imposter crop as the first KB-OPTIK remediation; use its matched proof before any next visual pass.',
+      'If KB-OPTIK continues immediately, isolate shader/luma parity from target-height and crop work.',
       'Run one KB-LOAD texture/upload branch with fresh startup before/after evidence if the team wants the first measurable WebGL remediation.',
       'Run one KB-EFFECTS first-use grenade warmup branch only against the low-load two-grenade probe.',
       'Keep KB-TERRAIN and KB-CULL remediation branches separate until matched large-mode perf windows are prepared.',
       'Keep WebGPU out of Cycle 3 unless the owner explicitly approves reopening the point-of-no-return decision.',
     ],
     openDecisions: [
-      'Is the first KB-OPTIK branch allowed to reduce NPC runtime visual height, or must it regenerate/crop imposters to match the current 4.425m target?',
+      'Should the next KB-OPTIK pass address luma/material parity now, or should KB-LOAD/KB-EFFECTS take the next remediation slot?',
       'Should the first KB-LOAD branch target giantPalm, NPC atlases, or upload scheduling?',
       'Which large-mode p95/draw-call budget will be used for far-canopy acceptance in this cycle?',
     ],

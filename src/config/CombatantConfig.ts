@@ -29,8 +29,14 @@ export const ACTOR_EYE_Y_OFFSET = 0;
 /** Maximum NPC movement speed (m/s). Navmesh paths handle navigation; this is raw locomotion speed. */
 export const NPC_MAX_SPEED = 6;
 
-/** Pixel Forge NPC visual scale shared by close GLBs and animated impostors. */
-export const NPC_PIXEL_FORGE_VISUAL_SCALE_MULTIPLIER = 1.5;
+/**
+ * Pixel Forge NPC visual scale shared by close GLBs and animated impostors.
+ *
+ * Keep the absolute actor target on the reviewed Pixel Forge base height.
+ * Runtime readability is handled by material/crop policy, not by inflating the
+ * actor above the package acceptance scale.
+ */
+export const NPC_PIXEL_FORGE_VISUAL_SCALE_MULTIPLIER = 1.0;
 
 /** Raw Pixel Forge NPC impostor/model target height before runtime scale. */
 export const NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT = 2.95;

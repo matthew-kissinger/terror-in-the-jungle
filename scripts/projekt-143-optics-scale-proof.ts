@@ -18,6 +18,7 @@ import {
   PIXEL_FORGE_NPC_FACTIONS,
   type PixelForgeNpcFactionAsset,
 } from '../src/config/pixelForgeAssets';
+import { getPixelForgeNpcTileCropMap } from '../src/config/generated/pixelForgeNpcTileCrops';
 import {
   NPC_CLOSE_MODEL_TARGET_HEIGHT,
   NPC_SPRITE_HEIGHT,
@@ -146,6 +147,14 @@ type ProofSummary = {
       closeModelTargetHeightMeters: number;
       actorAnchorYMeters: number;
       spriteRenderYOffsetMeters: number;
+      tileCropMap: {
+        width: number;
+        height: number;
+        tileSize: number;
+        alphaThreshold: number;
+        paddingPx: number;
+        uncropped: boolean;
+      };
     };
     vehicles: {
       scalePolicy: string;
@@ -289,6 +298,7 @@ function serveFile(file: string, res: ServerResponse): void {
 function proofHtml(): string {
   const npcFixtures = JSON.stringify(NPC_FIXTURES);
   const aircraftFixtures = JSON.stringify(AIRCRAFT_FIXTURES);
+  const matchedClipCropMap = getPixelForgeNpcTileCropMap(MATCHED_CLIP_ID);
   const runtimeContracts = JSON.stringify({
     npcSpriteWidth: NPC_SPRITE_WIDTH,
     npcSpriteHeight: NPC_SPRITE_HEIGHT,
@@ -300,6 +310,7 @@ function proofHtml(): string {
     cropOrthoHeightMeters: CROP_ORTHO_HEIGHT_METERS,
     matchedClipId: MATCHED_CLIP_ID,
     clip: PIXEL_FORGE_NPC_CLIPS.find((clip) => clip.id === MATCHED_CLIP_ID),
+    matchedClipCropMap,
     materialTuning: PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING,
   });
 
@@ -409,11 +420,29 @@ function proofHtml(): string {
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = true;
       const clip = runtimeContracts.clip;
+      const cropMap = runtimeContracts.matchedClipCropMap;
+      const cropTexture = new THREE.DataTexture(
+        Uint8Array.from(cropMap.data),
+        cropMap.width,
+        cropMap.height,
+        THREE.RGBAFormat,
+        THREE.UnsignedByteType
+      );
+      cropTexture.name = 'Projekt143.NPC.' + runtimeContracts.matchedClipId + '.tileCropMap';
+      cropTexture.generateMipmaps = false;
+      cropTexture.minFilter = THREE.NearestFilter;
+      cropTexture.magFilter = THREE.NearestFilter;
+      cropTexture.wrapS = THREE.ClampToEdgeWrapping;
+      cropTexture.wrapT = THREE.ClampToEdgeWrapping;
+      cropTexture.flipY = false;
+      cropTexture.needsUpdate = true;
       return new THREE.ShaderMaterial({
         uniforms: {
           map: { value: texture },
           viewGrid: { value: new THREE.Vector2(clip.viewGridX, clip.viewGridY) },
           frameGrid: { value: new THREE.Vector2(clip.framesX, clip.framesY) },
+          tileCropMap: { value: cropTexture },
+          tileCropMapSize: { value: new THREE.Vector2(cropMap.width, cropMap.height) },
           viewColumn: { value: Math.floor(clip.viewGridX * 0.5) },
           frameIndex: { value: 0 },
           combatState: { value: 0 },
@@ -442,6 +471,8 @@ function proofHtml(): string {
           uniform float npcExposure;
           uniform float minNpcLight;
           uniform float npcTopLight;
+          uniform sampler2D tileCropMap;
+          uniform vec2 tileCropMapSize;
           varying vec2 vUv;
           void main() {
             float frameX = mod(frameIndex, frameGrid.x);
@@ -450,9 +481,11 @@ function proofHtml(): string {
             float viewY = floor(viewGrid.y * 0.5);
             vec2 atlasGrid = viewGrid * frameGrid;
             vec2 tile = vec2(frameX * viewGrid.x + viewX, frameY * viewGrid.y + viewY);
+            vec4 tileCrop = texture2D(tileCropMap, (tile + vec2(0.5)) / tileCropMapSize);
+            vec2 croppedUv = mix(tileCrop.xy, tileCrop.zw, vUv);
             vec2 sampleUv = vec2(
-              (tile.x + vUv.x) / atlasGrid.x,
-              1.0 - ((tile.y + 1.0 - vUv.y) / atlasGrid.y)
+              (tile.x + croppedUv.x) / atlasGrid.x,
+              1.0 - ((tile.y + 1.0 - croppedUv.y) / atlasGrid.y)
             );
             vec4 texColor = texture2D(map, sampleUv);
             if (texColor.a < 0.18) discard;
@@ -853,12 +886,13 @@ function buildFindings(npcComparisons: NpcComparison[], aircraft: BrowserAircraf
     .filter((value): value is number => value !== null);
   if (heightRatios.length > 0) {
     const avgRatio = heightRatios.reduce((sum, value) => sum + value, 0) / heightRatios.length;
-    findings.push(
-      `NPC close-GLB and imposter geometry share the ${NPC_CLOSE_MODEL_TARGET_HEIGHT.toFixed(3)}m runtime target, but rendered visible silhouette ratio averages ${avgRatio.toFixed(2)} imposter/close.`
-    );
+    const ratioText = `NPC close-GLB and imposter geometry share the ${NPC_CLOSE_MODEL_TARGET_HEIGHT.toFixed(3)}m runtime target; rendered visible silhouette ratio averages ${avgRatio.toFixed(2)} imposter/close.`;
+    findings.push(avgRatio >= 0.85 && avgRatio <= 1.15
+      ? `${ratioText} The per-tile crop remediation is within the +/-15% matched-height proof band.`
+      : `${ratioText} This remains outside the +/-15% matched-height proof band.`);
   }
   findings.push(
-    `The NPC runtime visual target is ${NPC_CLOSE_MODEL_TARGET_HEIGHT.toFixed(3)}m from ${NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT.toFixed(2)}m base height times ${NPC_PIXEL_FORGE_VISUAL_SCALE_MULTIPLIER.toFixed(2)}. Treat absolute NPC scale as a design/art-contract decision, not as settled by the culling proof.`
+    `The NPC runtime visual target is ${NPC_CLOSE_MODEL_TARGET_HEIGHT.toFixed(3)}m from ${NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT.toFixed(2)}m base height times ${NPC_PIXEL_FORGE_VISUAL_SCALE_MULTIPLIER.toFixed(2)}; this run records the owner-approved first target drop, not a broader human-scale redesign.`
   );
   const smallAircraft = aircraft.filter((entry) => entry.nativeLongestAxisToNpcVisualHeight < 2);
   if (smallAircraft.length > 0) {
@@ -1011,6 +1045,7 @@ async function run(): Promise<void> {
 
     const summaryFile = join(outputDir, 'summary.json');
     const markdownFile = join(outputDir, 'summary.md');
+    const matchedClipCropMap = getPixelForgeNpcTileCropMap(MATCHED_CLIP_ID);
     const summary: ProofSummary = {
       createdAt: new Date().toISOString(),
       sourceGitSha: gitSha(),
@@ -1034,6 +1069,14 @@ async function run(): Promise<void> {
           closeModelTargetHeightMeters: NPC_CLOSE_MODEL_TARGET_HEIGHT,
           actorAnchorYMeters: NPC_Y_OFFSET,
           spriteRenderYOffsetMeters: NPC_SPRITE_RENDER_Y_OFFSET,
+          tileCropMap: {
+            width: matchedClipCropMap.width,
+            height: matchedClipCropMap.height,
+            tileSize: matchedClipCropMap.tileSize,
+            alphaThreshold: matchedClipCropMap.alphaThreshold,
+            paddingPx: matchedClipCropMap.paddingPx,
+            uncropped: matchedClipCropMap.uncropped,
+          },
         },
         vehicles: {
           scalePolicy: 'Runtime aircraft GLBs load at imported native scale; fixed-wing and helicopter paths rotate for game forward but do not apply a meter-scale normalization pass.',

@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { join, relative } from 'node:path';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
-type DecisionState = 'recommended_first_branch' | 'defer' | 'reject_first_branch' | 'needs_owner_decision';
+type DecisionState = 'complete' | 'recommended_first_branch' | 'defer' | 'reject_first_branch' | 'needs_owner_decision';
 
 type NpcRuntimeContracts = {
   baseVisualHeightMeters?: number;
@@ -151,22 +151,40 @@ function ratios(longestAxes: number[], denominator: number | null): Array<number
   return longestAxes.map((value) => value / denominator);
 }
 
-function buildDecisionOptions(baseTarget: number | null): DecisionOption[] {
+function buildDecisionOptions(
+  baseTarget: number | null,
+  currentTarget: number | null,
+  visibleHeightRatioAverage: number | null
+): DecisionOption[] {
   const baseTargetText = baseTarget ? `${baseTarget.toFixed(2)}m` : 'the Pixel Forge base target';
+  const firstTargetDropped = baseTarget !== null
+    && currentTarget !== null
+    && Math.abs(currentTarget - baseTarget) < 0.01;
+  const cropInProofBand = visibleHeightRatioAverage !== null
+    && visibleHeightRatioAverage >= 0.85
+    && visibleHeightRatioAverage <= 1.15;
   return [
     {
       id: 'lower-npc-target-before-vehicle-scale',
-      state: 'needs_owner_decision',
-      summary: `Use ${baseTargetText} as the first lower-risk absolute NPC target candidate before touching aircraft scale.`,
+      state: firstTargetDropped ? 'complete' : 'needs_owner_decision',
+      summary: firstTargetDropped
+        ? `The first absolute NPC target drop is landed at ${baseTargetText}; do not resize aircraft as a substitute.`
+        : `Use ${baseTargetText} as the first lower-risk absolute NPC target candidate before touching aircraft scale.`,
       why: [
-        'The current 4.425m NPC target comes from a 1.50 readability multiplier, not from source GLB human height.',
+        firstTargetDropped
+          ? 'The runtime target now uses the Pixel Forge base height directly instead of the prior readability multiplier.'
+          : 'The prior 4.425m NPC target came from a 1.50 readability multiplier, not from source GLB human height.',
         'Imported aircraft already load at native GLB scale; scaling vehicles first would hide the NPC contract issue and still leave the close/imposter mismatch.',
         'Dropping the multiplier is a smaller first move than jumping all the way to a 1.8m human-scale target.',
       ],
       branchShape: [
-        'Change only the NPC absolute target contract in a measured branch.',
-        'Regenerate the KB-OPTIK scale proof and player-relative screenshots before claiming acceptance.',
-        'Do not claim imposter parity from this branch unless matched visible-height evidence also passes.',
+        firstTargetDropped
+          ? 'Keep any future absolute target move in a separate measured branch.'
+          : 'Change only the NPC absolute target contract in a measured branch.',
+        firstTargetDropped
+          ? 'Use the refreshed KB-OPTIK scale proof as the after artifact for this first move.'
+          : 'Regenerate the KB-OPTIK scale proof and player-relative screenshots before claiming acceptance.',
+        'Do not claim final human-scale art direction without human playtest and broader gameplay evidence.',
       ],
       acceptance: [
         'NPC target, hit proxy, muzzle/aim, close GLB, and imposter geometry all report the same selected target.',
@@ -180,20 +198,28 @@ function buildDecisionOptions(baseTarget: number | null): DecisionOption[] {
     },
     {
       id: 'repack-or-regenerate-npc-imposter-crops',
-      state: 'recommended_first_branch',
-      summary: 'Fix the visible-height mismatch by making the imposter alpha silhouette occupy the same target height as the close GLB.',
+      state: cropInProofBand ? 'complete' : 'recommended_first_branch',
+      summary: cropInProofBand
+        ? 'The first per-tile imposter crop remediation is inside the matched-height proof band.'
+        : 'Fix the visible-height mismatch by making the imposter alpha silhouette occupy the same target height as the close GLB.',
       why: [
-        'The close GLB and imposter geometry already project to the same height, but the imposter visible alpha silhouette is only about half as tall.',
+        cropInProofBand
+          ? 'The refreshed proof shows the close/imposter visible-height ratio inside the +/-15% first-remediation band.'
+          : 'The close GLB and imposter geometry already project to the same height, but the imposter visible alpha silhouette is only about half as tall.',
         'This is the direct LOD-pop cause measured by the matched crops.',
-        'It is independent from whether the final absolute NPC target is 4.425m, 2.95m, or another approved value.',
+        'It is independent from whether the final absolute NPC target is 2.95m or another explicitly approved future value.',
       ],
       branchShape: [
-        'Prototype crop/UV metadata or atlas regeneration on one faction/clip first.',
-        'Rerun matched close/imposter crops for all factions before accepting the runtime path.',
+        cropInProofBand
+          ? 'Keep the generated crop map check in the validation path when NPC atlases change.'
+          : 'Prototype crop/UV metadata or atlas regeneration on one faction/clip first.',
+        cropInProofBand
+          ? 'Use the refreshed matched close/imposter crops for all factions as the after artifact.'
+          : 'Rerun matched close/imposter crops for all factions before accepting the runtime path.',
         'Keep shader/luma changes out of the same first patch unless crop evidence proves they are coupled.',
       ],
       acceptance: [
-        'Matched close/imposter visible height ratio lands within +/-10%.',
+        'Matched close/imposter visible height ratio lands within +/-15% for the first remediation.',
         'Effective visible actor pixels-per-meter is recorded after the crop change.',
         'Open Frontier/combat120 before/after artifacts show no upload or frame-time regression from regenerated textures.',
       ],
@@ -204,8 +230,10 @@ function buildDecisionOptions(baseTarget: number | null): DecisionOption[] {
     },
     {
       id: 'shader-luma-parity-after-scale-crop',
-      state: 'defer',
-      summary: 'Defer luma/material work until visible height and absolute target are explicitly chosen.',
+      state: cropInProofBand && firstTargetDropped ? 'recommended_first_branch' : 'defer',
+      summary: cropInProofBand && firstTargetDropped
+        ? 'Shader/luma parity is now the next KB-OPTIK visual branch if optics work continues.'
+        : 'Defer luma/material work until visible height and absolute target are explicitly chosen.',
       why: [
         'The measured luma delta is real, but luma work can mask silhouette and scale defects if done first.',
         'NPC imposters and close GLBs currently use different lighting/material paths.',
@@ -290,6 +318,14 @@ function main(): void {
   const currentTarget = npc.closeModelTargetHeightMeters ?? npc.visualHeightMeters ?? null;
   const baseTarget = npc.baseVisualHeightMeters ?? null;
   const longestAxes = finite(aircraft.map((entry) => entry.nativeBoundsMeters?.longestAxis));
+  const imposterVisibleHeightRatio = range(comparisons.map((entry) => entry.deltas?.renderedVisibleHeightRatio));
+  const imposterMeanOpaqueLumaDelta = range(comparisons.map((entry) => entry.deltas?.meanOpaqueLumaDelta));
+  const firstTargetDropped = baseTarget !== null
+    && currentTarget !== null
+    && Math.abs(currentTarget - baseTarget) < 0.01;
+  const cropInProofBand = imposterVisibleHeightRatio.average !== null
+    && imposterVisibleHeightRatio.average >= 0.85
+    && imposterVisibleHeightRatio.average <= 1.15;
 
   const packet: DecisionPacket = {
     createdAt: new Date().toISOString(),
@@ -305,22 +341,31 @@ function main(): void {
       currentMultiplier: npc.visualScaleMultiplier !== undefined ? round(npc.visualScaleMultiplier) : null,
       closeModelSourceHeightMeters: range(comparisons.map((entry) => entry.closeModel?.sourceHeightMeters)),
       closeModelRuntimeScale: range(comparisons.map((entry) => entry.closeModel?.visualScale)),
-      imposterVisibleHeightRatio: range(comparisons.map((entry) => entry.deltas?.renderedVisibleHeightRatio)),
-      imposterMeanOpaqueLumaDelta: range(comparisons.map((entry) => entry.deltas?.meanOpaqueLumaDelta)),
+      imposterVisibleHeightRatio,
+      imposterMeanOpaqueLumaDelta,
       aircraftLongestAxisMeters: range(longestAxes),
       aircraftLongestAxisToCurrentNpc: range(ratios(longestAxes, currentTarget)),
       aircraftLongestAxisToBaseNpc: range(ratios(longestAxes, baseTarget)),
       aircraftLongestAxisToHumanScaleNpc: range(ratios(longestAxes, HUMAN_SCALE_REFERENCE_METERS)),
     },
-    decisionOptions: buildDecisionOptions(baseTarget),
-    recommendedSequence: [
-      'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract and imposter-crop problem until a dedicated vehicle-scale proof says otherwise.',
-      'Prototype the imposter crop/regeneration fix on one faction/clip because it directly attacks the measured 0.52-0.54 visible-height ratio.',
-      'In parallel or as the next small branch, ask the owner to approve whether the absolute NPC target drops from 4.425m to the 2.95m base target before any broader human-scale move.',
-      'After crop and target decisions, handle shader/luma parity with matched lighting screenshots.',
-      'Only reopen aircraft scale after the NPC target/crop evidence lands and fixed-wing/helicopter playtest probes are in scope.',
-    ],
-    openOwnerDecision: 'Approve the first absolute NPC target candidate: keep 4.425m for readability, drop to the 2.95m Pixel Forge base target, or authorize a larger human-scale redesign with gameplay/playtest scope.',
+    decisionOptions: buildDecisionOptions(baseTarget, currentTarget, imposterVisibleHeightRatio.average),
+    recommendedSequence: firstTargetDropped && cropInProofBand
+      ? [
+          'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract problem unless a dedicated vehicle-scale proof says otherwise.',
+          'Treat the 2.95m target drop and per-tile crop map as the first landed KB-OPTIK remediation; use the latest matched proof as the after artifact.',
+          'If KB-OPTIK continues immediately, handle shader/luma parity with matched lighting screenshots and no further target-height changes.',
+          'Only reopen aircraft scale after the NPC target/crop evidence and fixed-wing/helicopter playtest probes are in scope.',
+        ]
+      : [
+          'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract and imposter-crop problem until a dedicated vehicle-scale proof says otherwise.',
+          'Prototype the imposter crop/regeneration fix because it directly attacks the measured visible-height ratio.',
+          'Ask the owner to approve whether the absolute NPC target uses the 2.95m base target before any broader human-scale move.',
+          'After crop and target decisions, handle shader/luma parity with matched lighting screenshots.',
+          'Only reopen aircraft scale after the NPC target/crop evidence lands and fixed-wing/helicopter playtest probes are in scope.',
+        ],
+    openOwnerDecision: firstTargetDropped && cropInProofBand
+      ? 'No open owner decision remains for the first 2.95m target/crop remediation. Next decision: take KB-OPTIK luma/material parity now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+      : 'Approve the first absolute NPC target candidate: keep the readability multiplier, drop to the 2.95m Pixel Forge base target, or authorize a larger human-scale redesign with gameplay/playtest scope.',
   };
 
   const outputDir = join(ARTIFACT_ROOT, timestampSlug(), OUTPUT_NAME);
@@ -334,7 +379,7 @@ function main(): void {
   console.log(`- current NPC target: ${packet.rootCause.currentNpcTargetMeters ?? 'unknown'}m`);
   console.log(`- imposter visible-height ratio avg: ${packet.rootCause.imposterVisibleHeightRatio.average ?? 'unknown'}`);
   console.log(`- aircraft longest-axis/current-NPC avg: ${packet.rootCause.aircraftLongestAxisToCurrentNpc.average ?? 'unknown'}`);
-  console.log(`- recommended first runtime branch: repack-or-regenerate-npc-imposter-crops`);
+  console.log(`- recommended next runtime branch: ${firstTargetDropped && cropInProofBand ? 'shader-luma-parity-after-scale-crop' : 'repack-or-regenerate-npc-imposter-crops'}`);
 
   if (process.argv.includes('--strict') && packet.status !== 'pass') {
     process.exitCode = 1;

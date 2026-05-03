@@ -146,8 +146,8 @@ vi.mock('./CombatantMeshFactory', () => ({
     if (combatant.state === 'retreating' || combatant.state === 'seeking_cover') return 'traverse_run';
     return 'idle';
   },
-  NPC_SPRITE_RENDER_Y_OFFSET: -0.04,
-  NPC_CLOSE_MODEL_TARGET_HEIGHT: 4.425,
+  NPC_SPRITE_RENDER_Y_OFFSET: -0.725,
+  NPC_CLOSE_MODEL_TARGET_HEIGHT: 2.95,
 }));
 
 vi.mock('./CombatantShaders', () => ({

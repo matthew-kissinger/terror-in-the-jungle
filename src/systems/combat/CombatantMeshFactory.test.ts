@@ -151,8 +151,9 @@ describe('CombatantMeshFactory instanced write contract at raised cap', () => {
 /**
  * Behavior: the NPC billboard silhouette must not dwarf the player. The player
  * eye height is the closest on-screen anchor for relative scale. Pixel Forge
- * NPCs now intentionally read larger than the player-camera anchor, but still
- * need a ceiling so they do not regress to the old giant billboard problem.
+ * NPCs now target the Pixel Forge package acceptance height directly. The
+ * material crop path handles readability, so the absolute actor target needs a
+ * ceiling and a floor rather than the old giant billboard multiplier.
  *
  * These tests do not pin exact sprite/eye dimensions — tuning is allowed — but
  * pin the RATIO that determines the "NPC is readable but not giant" gameplay
@@ -161,11 +162,11 @@ describe('CombatantMeshFactory instanced write contract at raised cap', () => {
  */
 describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
   it('sprite silhouette is not taller than the regression ceiling relative to the player eye', () => {
-    // 4.425m over the 2.2m eye anchor is the current readability target.
-    // 2.25x leaves headroom while still blocking a return to the 7m sprite era.
+    // 2.95m over the 2.2m eye anchor is the approved first absolute target.
+    // The upper bound blocks a return to the 4.425m readability stretch.
     const ratio = NPC_SPRITE_HEIGHT / PLAYER_EYE_HEIGHT;
-    expect(ratio).toBeGreaterThan(1.85);
-    expect(ratio).toBeLessThan(2.25);
+    expect(ratio).toBeGreaterThan(1.25);
+    expect(ratio).toBeLessThan(1.5);
   });
 
   it('sprite dimensions are positive and plausible', () => {
@@ -195,10 +196,10 @@ describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
     const planeTopY = planeCenterY + NPC_SPRITE_HEIGHT / 2;
     const planeBottomY = planeCenterY - NPC_SPRITE_HEIGHT / 2;
 
-    expect(planeTopY).toBeGreaterThan(PLAYER_EYE_HEIGHT + 1.5);
-    expect(planeTopY).toBeLessThanOrEqual(PLAYER_EYE_HEIGHT + 2.4);
-    expect(planeBottomY).toBeLessThanOrEqual(0.1);
-    expect(planeBottomY).toBeGreaterThan(-0.25);
+    expect(planeTopY).toBeGreaterThan(PLAYER_EYE_HEIGHT + 0.6);
+    expect(planeTopY).toBeLessThanOrEqual(PLAYER_EYE_HEIGHT + 0.9);
+    expect(planeBottomY).toBeLessThanOrEqual(0.05);
+    expect(planeBottomY).toBeGreaterThan(-0.05);
   });
 });
 
@@ -218,6 +219,11 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect(material?.uniforms.npcExposure.value).toBeCloseTo(1.2);
     expect(material?.uniforms.minNpcLight.value).toBeCloseTo(0.92);
     expect(material?.uniforms.npcTopLight.value).toBeCloseTo(0.16);
+    expect(material?.uniforms.tileCropMap.value).toBeInstanceOf(THREE.DataTexture);
+    expect(material?.uniforms.tileCropMapSize.value.x).toBe(28);
+    expect(material?.uniforms.tileCropMapSize.value.y).toBe(14);
+    expect(material?.fragmentShader).toContain('tileCropMap');
+    expect(material?.fragmentShader).toContain('croppedUv');
     expect(material?.fragmentShader).toContain('gl_FragColor = vec4(npcColor, alpha)');
     expect(material?.fragmentShader).not.toContain('gl_FragColor = vec4(npcColor * alpha, alpha)');
 

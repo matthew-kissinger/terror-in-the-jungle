@@ -5,7 +5,9 @@ import { Logger } from '../../utils/Logger';
 import {
   NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT,
   NPC_PIXEL_FORGE_VISUAL_SCALE_MULTIPLIER,
+  NPC_Y_OFFSET,
 } from '../../config/CombatantConfig';
+import { getPixelForgeNpcTileCropMap } from '../../config/generated/pixelForgeNpcTileCrops';
 import {
   PIXEL_FORGE_NPC_CLIPS,
   PIXEL_FORGE_NPC_FACTIONS,
@@ -40,7 +42,7 @@ const NPC_BASE_SPRITE_HEIGHT = NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT;
 
 export const NPC_SPRITE_WIDTH = NPC_BASE_SPRITE_WIDTH * NPC_VISUAL_SCALE_MULTIPLIER;
 export const NPC_SPRITE_HEIGHT = NPC_BASE_SPRITE_HEIGHT * NPC_VISUAL_SCALE_MULTIPLIER;
-export const NPC_SPRITE_RENDER_Y_OFFSET = -0.04;
+export const NPC_SPRITE_RENDER_Y_OFFSET = NPC_SPRITE_HEIGHT / 2 - NPC_Y_OFFSET;
 export const NPC_CLOSE_MODEL_TARGET_HEIGHT = NPC_SPRITE_HEIGHT;
 export const DEFAULT_MESH_BUCKET_CAPACITY = 512;
 export const MOUNTED_MESH_BUCKET_CAPACITY = 128;
@@ -86,6 +88,8 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
   uniform float minNpcLight;
   uniform float npcTopLight;
   uniform float animationMode;
+  uniform sampler2D tileCropMap;
+  uniform vec2 tileCropMapSize;
 
   varying vec2 vUv;
   varying float vPhase;
@@ -104,9 +108,11 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
     float viewY = floor(viewGrid.y * 0.5);
     vec2 atlasGrid = viewGrid * frameGrid;
     vec2 tile = vec2(frameX * viewGrid.x + viewX, frameY * viewGrid.y + viewY);
+    vec4 tileCrop = texture2D(tileCropMap, (tile + vec2(0.5)) / tileCropMapSize);
+    vec2 croppedUv = mix(tileCrop.xy, tileCrop.zw, vUv);
     vec2 sampleUv = vec2(
-      (tile.x + vUv.x) / atlasGrid.x,
-      1.0 - ((tile.y + 1.0 - vUv.y) / atlasGrid.y)
+      (tile.x + croppedUv.x) / atlasGrid.x,
+      1.0 - ((tile.y + 1.0 - croppedUv.y) / atlasGrid.y)
     );
     vec4 texColor = texture2D(map, sampleUv);
     if (texColor.a < 0.18) discard;
@@ -124,6 +130,29 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
     gl_FragColor = vec4(npcColor, alpha);
   }
 `;
+
+function createPixelForgeNpcTileCropTexture(clipId: PixelForgeNpcClipId): {
+  texture: THREE.DataTexture;
+  size: THREE.Vector2;
+} {
+  const cropMap = getPixelForgeNpcTileCropMap(clipId);
+  const texture = new THREE.DataTexture(
+    Uint8Array.from(cropMap.data),
+    cropMap.width,
+    cropMap.height,
+    THREE.RGBAFormat,
+    THREE.UnsignedByteType,
+  );
+  texture.name = `PixelForge.NPC.${clipId}.tileCropMap`;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.flipY = false;
+  texture.needsUpdate = true;
+  return { texture, size: new THREE.Vector2(cropMap.width, cropMap.height) };
+}
 
 export function getPixelForgeNpcClipForCombatant(combatant: Combatant): PixelForgeNpcClipId {
   return getPixelForgeNpcRuntimeClip(combatant);
@@ -201,8 +230,9 @@ export class CombatantMeshFactory {
     if (!clip) {
       throw new Error(`Unknown Pixel Forge NPC clip: ${clipId}`);
     }
+    const tileCrop = createPixelForgeNpcTileCropTexture(clipId);
 
-    return new THREE.ShaderMaterial({
+    const material = new THREE.ShaderMaterial({
       uniforms: {
         map: { value: texture },
         time: { value: 0 },
@@ -217,6 +247,8 @@ export class CombatantMeshFactory {
         minNpcLight: { value: 0.92 },
         npcTopLight: { value: 0.16 },
         animationMode: { value: clipId === 'death_fall_back' ? 1 : 0 },
+        tileCropMap: { value: tileCrop.texture },
+        tileCropMapSize: { value: tileCrop.size },
       },
       vertexShader: NPC_IMPOSTOR_VERTEX_SHADER,
       fragmentShader: NPC_IMPOSTOR_FRAGMENT_SHADER,
@@ -226,6 +258,8 @@ export class CombatantMeshFactory {
       forceSinglePass: true,
       depthWrite: true,
     });
+    material.addEventListener('dispose', () => tileCrop.texture.dispose());
+    return material;
   }
 
   private createMeshSet(
