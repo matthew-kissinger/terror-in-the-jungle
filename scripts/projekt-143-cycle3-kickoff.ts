@@ -72,6 +72,21 @@ type OptikDecisionPacket = {
   openOwnerDecision?: string;
 };
 
+type OptikExpandedProof = {
+  status?: CheckStatus;
+  measurementTrust?: { status?: CheckStatus };
+  aggregate?: {
+    sampleCount?: number;
+    flaggedSamples?: number;
+    minVisibleHeightRatio?: number | null;
+    maxVisibleHeightRatio?: number | null;
+    minLumaDeltaPercent?: number | null;
+    maxLumaDeltaPercent?: number | null;
+    maxAbsLumaDeltaPercent?: number | null;
+    flaggedProfiles?: string[];
+  };
+};
+
 type TextureAudit = {
   summary?: {
     totalEstimatedMipmappedRgbaMiB?: number;
@@ -251,7 +266,9 @@ function buildOptikTarget(
   opticsPath: string | null,
   proof: OpticsScaleProof | null,
   decisionPath: string | null,
-  decision: OptikDecisionPacket | null
+  decision: OptikDecisionPacket | null,
+  expandedPath: string | null,
+  expanded: OptikExpandedProof | null
 ): Cycle3Target {
   const ratios = (proof?.npcComparisons ?? [])
     .map((entry) => entry.deltas?.renderedVisibleHeightRatio)
@@ -269,17 +286,31 @@ function buildOptikTarget(
   const visibleHeightWithinBand = ratios.length > 0 && ratios.every((ratio) => ratio >= 0.85 && ratio <= 1.15);
   const lumaStillFlagged = (proof?.npcComparisons ?? [])
     .some((entry) => entry.flags?.some((flag) => flag.startsWith('rendered-luma-delta-')));
+  const expandedTrusted = expanded?.measurementTrust?.status === 'pass';
+  const expandedFlaggedSamples = expanded?.aggregate?.flaggedSamples ?? null;
+  const expandedHasFlags = expandedTrusted && expandedFlaggedSamples !== null && expandedFlaggedSamples > 0;
+  const expandedPasses = expandedTrusted && expanded?.status === 'pass';
 
   return {
     id: 'npc-imposter-scale-luma-contract',
     bureau: 'KB-OPTIK',
-    status: trusted ? (visibleHeightWithinBand ? 'ready_for_branch' : 'needs_decision') : 'blocked',
+    status: trusted
+      ? visibleHeightWithinBand
+        ? expandedHasFlags
+          ? 'needs_decision'
+          : 'ready_for_branch'
+        : 'needs_decision'
+      : 'blocked',
     priority: 1,
     summary: trusted
       ? visibleHeightWithinBand
         ? lumaStillFlagged
           ? 'First scale/crop remediation has matched evidence inside the +/-15% height band; remaining KB-OPTIK work is shader/luma parity or an explicit visual exception.'
-          : 'Scale/crop and selected-lighting luma parity are inside matched proof bands; remaining KB-OPTIK work is expanded lighting snapshots, human review, or explicit closeout.'
+          : expandedPasses
+            ? 'Scale/crop and expanded lighting/gameplay-camera luma parity are inside matched proof bands; remaining KB-OPTIK work is human review or explicit closeout.'
+            : expandedHasFlags
+              ? 'Scale/crop and selected-lighting luma parity are inside matched proof bands, but expanded lighting/gameplay-camera proof found visual flags that need targeted KB-OPTIK decision.'
+              : 'Scale/crop and selected-lighting luma parity are inside matched proof bands; remaining KB-OPTIK work is expanded lighting snapshots, human review, or explicit closeout.'
         : decisionPath
           ? 'Matched evidence and KB-OPTIK decision packet exist; imposter crop/regeneration remains the recommended first runtime branch.'
           : 'Matched evidence exists; decide whether to change NPC runtime visual height, regenerate imposter bakes, align shader/luma, or combine those changes in separate measured slices.'
@@ -287,7 +318,9 @@ function buildOptikTarget(
     evidence: {
       opticsScaleProofPath: rel(opticsPath),
       optikDecisionPacketPath: rel(decisionPath),
+      optikExpandedProofPath: rel(expandedPath),
       optikDecisionPacketStatus: decision?.status ?? null,
+      optikExpandedProofStatus: expanded?.status ?? null,
       recommendedFirstRuntimeBranch: decision?.recommendedSequence?.[1] ?? null,
       openOwnerDecision: decision?.openOwnerDecision ?? null,
       runtimeNpcVisualHeightMeters: proof?.runtimeContracts?.npc?.visualHeightMeters ?? null,
@@ -313,12 +346,26 @@ function buildOptikTarget(
         average: average(aircraftRatios),
         max: max(aircraftRatios),
       },
+      expandedProof: {
+        sampleCount: expanded?.aggregate?.sampleCount ?? null,
+        flaggedSamples: expandedFlaggedSamples,
+        minVisibleHeightRatio: expanded?.aggregate?.minVisibleHeightRatio ?? null,
+        maxVisibleHeightRatio: expanded?.aggregate?.maxVisibleHeightRatio ?? null,
+        minLumaDeltaPercent: expanded?.aggregate?.minLumaDeltaPercent ?? null,
+        maxLumaDeltaPercent: expanded?.aggregate?.maxLumaDeltaPercent ?? null,
+        maxAbsLumaDeltaPercent: expanded?.aggregate?.maxAbsLumaDeltaPercent ?? null,
+        flaggedProfiles: expanded?.aggregate?.flaggedProfiles ?? null,
+      },
     },
     requiredBefore: [
       'Use the latest matched scale/crop proof as the after artifact for the first remediation.',
       lumaStillFlagged
         ? 'If continuing KB-OPTIK, isolate shader/luma parity from target height and crop metadata changes.'
-        : 'If continuing KB-OPTIK, expand proof coverage to dawn, dusk, haze, and combat camera screenshots without changing target height or crop metadata.',
+        : expandedTrusted
+          ? expandedHasFlags
+            ? 'If continuing KB-OPTIK, inspect the flagged expanded lighting/gameplay-camera samples before changing shader constants again.'
+            : 'If continuing KB-OPTIK, use the expanded lighting/gameplay-camera proof for human visual review or explicit closeout.'
+          : 'If continuing KB-OPTIK, expand proof coverage to dawn, dusk, haze, and combat camera screenshots without changing target height or crop metadata.',
       'If changing the 2.95m target again, update close GLB, imposter, hit/aiming, and player-relative scale tests together.',
     ],
     acceptance: [
@@ -329,7 +376,9 @@ function buildOptikTarget(
     nonClaims: [
       lumaStillFlagged
         ? 'Do not claim full NPC visual parity while luma remains flagged.'
-        : 'Do not claim final NPC visual parity until expanded lighting screenshots and human review exist.',
+        : expandedPasses
+          ? 'Do not claim human visual signoff from mechanical proof alone.'
+          : 'Do not claim final NPC visual parity until expanded lighting screenshots and human review exist.',
       'Do not accept aircraft scale changes from this target without a separate vehicle-scale proof.',
     ],
   };
@@ -533,6 +582,7 @@ function main(): void {
   const artifactFiles = walkFiles(ARTIFACT_ROOT, () => true);
   const cycle2Path = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-cycle2-proof-suite', 'cycle2-proof-summary.json')));
   const opticsScalePath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-optics-scale-proof', 'summary.json')));
+  const optikExpandedPath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-optik-expanded-proof', 'summary.json')));
   const optikDecisionPath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-optik-decision-packet', 'decision-packet.json')));
   const texturePath = latestFile(artifactFiles, (path) => path.endsWith(join('pixel-forge-texture-audit', 'texture-audit.json')));
   const startupOpenPath = latestStartupSummary(artifactFiles, 'open-frontier');
@@ -546,6 +596,7 @@ function main(): void {
 
   const cycle2 = readJson<Cycle2Proof>(cycle2Path);
   const opticsScale = readJson<OpticsScaleProof>(opticsScalePath);
+  const optikExpanded = readJson<OptikExpandedProof>(optikExpandedPath);
   const optikDecision = readJson<OptikDecisionPacket>(optikDecisionPath);
   const texture = readJson<TextureAudit>(texturePath);
   const startupOpen = readJson<StartupSummary>(startupOpenPath);
@@ -555,7 +606,7 @@ function main(): void {
   const culling = readJson<CullingProof>(cullingPath);
 
   const targets = [
-    buildOptikTarget(opticsScalePath, opticsScale, optikDecisionPath, optikDecision),
+    buildOptikTarget(opticsScalePath, opticsScale, optikDecisionPath, optikDecision, optikExpandedPath, optikExpanded),
     buildLoadTarget(texturePath, startupOpenPath, startupOpen, startupZonePath, startupZone, texture),
     buildEffectsTarget(grenadePath, grenade),
     buildTerrainTarget(horizonPath, horizon, openFrontierPerfPath, aShauPerfPath),
@@ -570,6 +621,7 @@ function main(): void {
     inputs: {
       cycle2Proof: rel(cycle2Path),
       opticsScaleProof: rel(opticsScalePath),
+      optikExpandedProof: rel(optikExpandedPath),
       optikDecisionPacket: rel(optikDecisionPath),
       textureAudit: rel(texturePath),
       startupOpenFrontier: rel(startupOpenPath),
