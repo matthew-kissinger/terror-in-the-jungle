@@ -2062,3 +2062,29 @@ TODO
   next remediation slot to KB-LOAD texture/upload or KB-EFFECTS grenade
   first-use. No production parity, performance improvement, final visual
   parity, aircraft-scale acceptance, or human-playtest signoff is claimed.
+
+2026-05-03 Projekt Objekt-143 KB-OPTIK expanded proof pass
+- Commit `57d873e7f305fb528e7570232a291950e89c6ade` adds
+  `scripts/projekt-143-optik-expanded-proof.ts` and
+  `npm run check:projekt-143-optik-expanded`. The proof renders matched
+  close-GLB/imposter crops for all four Pixel Forge NPC factions across five
+  lighting profiles and two camera profiles.
+- Committed-sha proof:
+  `artifacts/perf/2026-05-03T17-26-45-106Z/projekt-143-optik-expanded-proof/summary.json`.
+  Source SHA is `57d873e7f305fb528e7570232a291950e89c6ade`. Measurement trust
+  is PASS with `0` browser errors, page errors, request failures, and load
+  errors. Status is WARN because `34/40` samples flag; visible-height ratio
+  range is `0.844-0.895`, and luma delta percent range is `-53.57` to
+  `104.58`.
+- Refreshed decision/kickoff artifacts:
+  `artifacts/perf/2026-05-03T17-27-07-711Z/projekt-143-optik-decision-packet/decision-packet.json`
+  and
+  `artifacts/perf/2026-05-03T17-27-07-141Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  KB-OPTIK now reads as `needs_decision`, not closeout: selected-lighting
+  target/crop/luma is done, but expanded lighting/gameplay-camera proof found
+  visual flags.
+- Next owner/agent choice: target the expanded imposter lighting/material
+  contract with this proof as before evidence, or switch the next remediation
+  slot to KB-LOAD texture/upload residency or KB-EFFECTS grenade first-use.
+  No production parity, performance improvement, final visual parity,
+  aircraft-scale acceptance, or human-playtest signoff is claimed.

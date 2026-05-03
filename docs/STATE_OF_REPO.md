@@ -295,9 +295,15 @@ What is not ready to claim:
   `1395198da4db95611457ecde769b611e3d36354e`: it drops the shared NPC target
   to `2.95m`, adds generated per-tile crop maps, and aligns selected-lighting
   luma with matched visible-height ratios `0.861-0.895x` and luma delta
-  `-0.44%` to `0.36%`. It is not yet live-deployed, it has no perf improvement
-  claim, and it still needs expanded lighting/gameplay-camera proof or human
-  review before final visual parity can be claimed.
+  `-0.44%` to `0.36%`. Commit
+  `57d873e7f305fb528e7570232a291950e89c6ade` then added the expanded KB-OPTIK
+  proof. The trusted artifact at
+  `artifacts/perf/2026-05-03T17-26-45-106Z/projekt-143-optik-expanded-proof/summary.json`
+  captures `40` samples across five lighting profiles and two camera profiles,
+  and flags `34` of them with luma range `-53.57%` to `104.58%`. It is not yet
+  live-deployed, it has no perf improvement claim, and final visual parity now
+  requires targeted lighting/material contract remediation, a documented visual
+  exception, or human review.
 - No distant-canopy or barren-horizon fix has shipped. KB-TERRAIN now has
   static coverage evidence, but still needs elevated runtime screenshots and
   matched perf captures before any outer-canopy layer is accepted.
@@ -306,25 +312,27 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T16-48-46-437Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T17-27-07-141Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
-  as inside matched proof bands after the first local remediation slice,
-  KB-LOAD texture upload/residency and KB-EFFECTS grenade first-use as
-  `ready_for_branch`, and KB-TERRAIN/KB-CULL as `needs_baseline`. It also
+  as inside matched proof bands after the first local remediation slice, but
+  `needs_decision` after expanded lighting/gameplay-camera proof found visual
+  flags. KB-LOAD texture upload/residency and KB-EFFECTS grenade first-use are
+  `ready_for_branch`, and KB-TERRAIN/KB-CULL are `needs_baseline`. It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
   combat120, and A Shau perf summary paths for handoff. This is
   planning/agent-DX evidence; no atlas regeneration, expanded-lighting visual
   parity, far-canopy, grenade, texture-upload, culling, WebGPU, or
   production-parity remediation is accepted from it.
 - KB-OPTIK now has an executable decision packet at
-  `artifacts/perf/2026-05-03T16-48-44-272Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  `artifacts/perf/2026-05-03T17-27-07-711Z/projekt-143-optik-decision-packet/decision-packet.json`.
   It records the current NPC target as `2.95m`, imposter visible-height ratio
   average as `0.879`, imposter luma delta percent average as `-0.073`,
-  aircraft longest-axis/current-NPC average as `4.52x`, and the recommended
-  next runtime branch as expanded KB-OPTIK coverage or switching to KB-LOAD or
-  KB-EFFECTS. It continues to reject aircraft resizing as the next response
-  without a separate vehicle-scale proof.
+  expanded proof flagged samples as `34`, aircraft longest-axis/current-NPC
+  average as `4.52x`, and the recommended next runtime branch as targeted
+  expanded-lighting contract remediation or switching to KB-LOAD/KB-EFFECTS.
+  It continues to reject aircraft resizing as the next response without a
+  separate vehicle-scale proof.
 - Commit `5b726746b0034d9327f5cb03ddcd3147294125ed` passed GitHub CI run
   `25277824856` after the Cycle 3 kickoff docs/tooling release. It was not
   deployed or live-verified; do not claim production parity for that commit.

@@ -87,6 +87,7 @@ npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proo
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet
+npm run check:projekt-143-optik-expanded # KB-OPTIK expanded lighting/gameplay-camera proof
 ```
 
 Startup UI benchmarks are retail-build measurements, not perf-harness frame
@@ -209,8 +210,20 @@ target drop plus per-tile crop map as complete for this slice. After commit
 selected-lighting luma parity as inside the matched proof band and recommends
 expanded lighting/gameplay-camera coverage or switching the next remediation
 slot to KB-LOAD/KB-EFFECTS.
+After commit `57d873e7f305fb528e7570232a291950e89c6ade`, it consumes the
+expanded proof and recommends targeted lighting/material-contract remediation
+or switching bureaus when expanded coverage is trusted but flagged.
 Aircraft resizing remains rejected as the next response unless a separate
 vehicle-scale proof is opened.
+
+`projekt-143-optik-expanded-proof.ts` writes a headed KB-OPTIK expanded proof
+under `artifacts/perf/<timestamp>/projekt-143-optik-expanded-proof/`. It
+renders matched close-GLB/imposter crops for all four Pixel Forge NPC factions
+across five lighting profiles and two camera profiles. The artifact includes
+`summary.json`, `summary.md`, per-sample close/imposter PNGs, browser/runtime
+metadata, renderer stats, and strict measurement-trust flags. WARN means the
+capture is trusted but the expanded visual bands are not closed; FAIL means do
+not use the numbers.
 
 `projekt-143-culling-proof.ts` writes a headed deterministic renderer/category
 fixture under `artifacts/perf/<timestamp>/projekt-143-culling-proof/`. It uses
@@ -494,10 +507,13 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`
    improved visible-height ratios from the before range `0.52-0.54x` to
    `0.861-0.895x`, inside the first-remediation `+/-15%` band, and selected
-   setup luma delta is now `-0.44%` to `0.36%`. Remaining issue: this is one
-   matched lighting setup only. Do not claim full visual parity or performance
-   improvement until dawn/dusk/haze/storm and gameplay-camera evidence exists
-   or a documented visual exception is accepted.
+   setup luma delta is now `-0.44%` to `0.36%`. The expanded proof at
+   `artifacts/perf/2026-05-03T17-26-45-106Z/projekt-143-optik-expanded-proof/summary.json`
+   is measurement-trusted but WARN: `34/40` samples flag, with luma delta range
+   `-53.57%` to `104.58%`. Current lead: selected lighting is aligned, but
+   close GLBs and NPC imposters still diverge under dawn/dusk/haze/storm and
+   gameplay-camera conditions because their lighting/material contracts differ.
+   Do not claim full visual parity or performance improvement.
 5. **Large-mode vegetation horizon gap** - static KB-TERRAIN evidence shows
    current Pixel Forge vegetation disappears by `600m`, while Open Frontier
    and A Shau terrain remains visible beyond that range. The current lead is a
