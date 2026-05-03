@@ -19,8 +19,8 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is evidence-complete PASS through `artifacts/perf/2026-05-03T16-13-59-633Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched scale proof refreshed after first remediation at `artifacts/perf/2026-05-03T16-13-34-596Z/projekt-143-optics-scale-proof/summary.json`. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` drops the NPC runtime target to `2.95m` and adds generated per-tile imposter crop maps; matched visible-height ratios improved from the Cycle 2 before range `0.52-0.54x` to `0.861-0.895x`. Luma remains flagged (`-26.94` to `-59.29`), no perf improvement is claimed, and this commit has not been live-deployed. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | FIRST KB-OPTIK REMEDIATION LANDED LOCALLY 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T16-14-08-949Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-03T16-13-47-104Z/projekt-143-optik-decision-packet/decision-packet.json`. Next KB-OPTIK work is shader/luma parity or an explicit visual exception; KB-LOAD and KB-EFFECTS remain ready-for-branch; KB-TERRAIN and KB-CULL still need matched baselines. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is evidence-complete PASS through `artifacts/perf/2026-05-03T16-48-58-020Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched proof refreshed after the selected-lighting luma slice at `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` drops the NPC runtime target to `2.95m` and adds generated per-tile imposter crop maps; commit `1395198da4db95611457ecde769b611e3d36354e` adds faction imposter material tuning. Matched visible-height ratios improved from the Cycle 2 before range `0.52-0.54x` to `0.861-0.895x`, and selected-lighting luma delta now ranges `-0.44%` to `0.36%`. No perf improvement, final visual parity, aircraft-scale acceptance, or production parity is claimed. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 3 - Multi-Cycle Engineering Plan | FIRST KB-OPTIK REMEDIATION SLICE LANDED LOCALLY 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T16-48-46-437Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-03T16-48-44-272Z/projekt-143-optik-decision-packet/decision-packet.json`. The first KB-OPTIK target/crop/selected-lighting luma slice is inside matched proof bands; remaining KB-OPTIK work is expanded lighting/gameplay-camera screenshots, human review, or explicit closeout. KB-LOAD and KB-EFFECTS remain ready-for-branch; KB-TERRAIN and KB-CULL still need matched baselines. |
 
 ## Shipped Cycle 0 State
 
@@ -492,13 +492,26 @@ Progress:
   flags open: imposter crops remain `-26.94` to `-59.29` darker than close GLB
   crops. This is scale/crop remediation evidence only; it is not shader/luma,
   performance, aircraft-scale, human-scale, or production parity acceptance.
+- 2026-05-03 selected-lighting luma slice: commit
+  `1395198da4db95611457ecde769b611e3d36354e` adds per-faction imposter
+  material tuning and updates the matched proof/decision tools to record luma
+  deltas as a percentage of the matched close-GLB crop. The committed proof at
+  `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`
+  has `sourceGitSha` `1395198da4db95611457ecde769b611e3d36354e`, visible-height
+  ratios `0.895` (US), `0.895` (ARVN), `0.863` (NVA), and `0.861` (VC), and
+  selected-lighting luma deltas `-0.13%` (US), `-0.44%` (ARVN), `0.36%`
+  (NVA), and `-0.08%` (VC). This closes the single-lighting luma branch only;
+  it is not final NPC visual parity, gameplay-camera acceptance, performance
+  acceptance, aircraft-scale acceptance, human playtest signoff, or production
+  parity.
 
 Root-cause hypotheses:
 
 1. The before state stretched `96px` NPC imposter tiles to a `4.425m` runtime
    plane while the alpha silhouette often occupied only `55-72px`. The first
-   remediation now uses the `2.95m` target plus per-tile upright crop maps, but
-   the source atlases are still `96px` and luma parity is still unresolved.
+   remediation now uses the `2.95m` target plus per-tile upright crop maps.
+   Source atlases are still `96px`; selected-lighting luma is aligned, but
+   expanded dawn/dusk/haze/storm and gameplay-camera parity is unresolved.
 2. NPC brightness parity cannot be fixed by one exposure number because the
    NPC imposter shader does not share vegetation's atmosphere snapshot or the
    close GLB/Three material lighting path.
@@ -524,7 +537,8 @@ Acceptance:
 
 - First scale/crop remediation status: matched visible-height ratios now land
   within the `+/-15%` first-remediation proof band, but not all factions are
-  within a stricter `+/-10%` final-polish band. Luma is still outside target.
+  within a stricter `+/-10%` final-polish band. The selected-lighting luma
+  slice is inside the `+/-12%` proof band.
 - NPC close GLB versus imposter screenshot rig reports projected actor-height
   delta within `+/-15%` for the first remediation, and within `+/-10%` before
   final visual sign-off unless a documented visual exception exists.
@@ -1051,28 +1065,30 @@ Reversibility:
 Current Cycle 3 status:
 
 - 2026-05-03: after commit
-  `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9`, `npm run
+  `1395198da4db95611457ecde769b611e3d36354e`, `npm run
   check:projekt-143-cycle3-kickoff` wrote
-  `artifacts/perf/2026-05-03T16-14-08-949Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T16-48-46-437Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Overall status is WARN because KB-TERRAIN and KB-CULL still need matched
   baselines. KB-OPTIK `npc-imposter-scale-luma-contract` is now
-  `ready_for_branch`: the first `2.95m` target/crop remediation has matched
-  evidence inside the `+/-15%` height band, and the next KB-OPTIK choice is
-  shader/luma parity or an explicit visual exception. KB-LOAD
+  `ready_for_branch`: the first `2.95m` target/crop remediation plus
+  selected-lighting luma tuning has matched evidence inside the `+/-15%`
+  height band and `+/-12%` luma band. The next KB-OPTIK choice is expanded
+  lighting/gameplay-camera screenshots, human review, or explicit closeout.
+  KB-LOAD
   `pixel-forge-texture-upload-residency` and KB-EFFECTS
   `grenade-first-use-stall` are also `ready_for_branch`. KB-TERRAIN
   `large-mode-vegetation-horizon` and KB-CULL
   `static-feature-and-vehicle-culling-hlod` remain `needs_baseline`.
 - 2026-05-03: `npm run check:projekt-143-optik-decision` refreshed the
   decision packet at
-  `artifacts/perf/2026-05-03T16-13-47-104Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  `artifacts/perf/2026-05-03T16-48-44-272Z/projekt-143-optik-decision-packet/decision-packet.json`.
   It now records current NPC target `2.95m`, imposter visible-height ratio
-  average `0.879`, and aircraft longest-axis/current-NPC average `4.52x`. The
-  first absolute-target and crop decisions are complete for this remediation;
-  the recommended next KB-OPTIK branch is
-  `shader-luma-parity-after-scale-crop`. Aircraft resizing remains rejected as
-  the next response unless a separate vehicle-scale proof and playtest scope are
-  opened.
+  average `0.879`, imposter luma delta percent average `-0.073`, and aircraft
+  longest-axis/current-NPC average `4.52x`. The first absolute-target, crop,
+  and selected-lighting luma decisions are complete for this remediation; the
+  recommended next runtime branch is `expand-kb-optik-coverage-or-switch-bureau`.
+  Aircraft resizing remains rejected as the next response unless a separate
+  vehicle-scale proof and playtest scope are opened.
 
 ### Cycle 4 - Strategic Spike Only
 

@@ -204,8 +204,11 @@ not approve or apply any remediation.
 trusted matched scale proof, records the current NPC target, base `2.95m`
 target, imposter visible-height ratio, luma delta, and aircraft longest-axis
 ratios. After the 2026-05-03 first remediation, it recognizes the `2.95m`
-target drop plus per-tile crop map as complete for this slice and recommends
-shader/luma parity as the next KB-OPTIK branch if optics work continues.
+target drop plus per-tile crop map as complete for this slice. After commit
+`1395198da4db95611457ecde769b611e3d36354e`, it also recognizes
+selected-lighting luma parity as inside the matched proof band and recommends
+expanded lighting/gameplay-camera coverage or switching the next remediation
+slot to KB-LOAD/KB-EFFECTS.
 Aircraft resizing remains rejected as the next response unless a separate
 vehicle-scale proof is opened.
 
@@ -483,17 +486,18 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    about 1ms. The current lead is first visible Three/WebGL explosion
    render/program work. Do not treat the older hidden-effect warmup as closed
    until the two-grenade probe passes without a trigger-adjacent long task.
-4. **NPC imposter luma/material parity** - the first KB-OPTIK remediation
+4. **NPC imposter expanded visual parity** - the first KB-OPTIK remediation
    dropped the shared NPC runtime target to `2.95m` and added generated
-   per-tile crop maps for upright NPC imposter atlases. The refreshed matched
+   per-tile crop maps for upright NPC imposter atlases. The selected-lighting
+   luma slice then added per-faction imposter material tuning. The refreshed matched
    proof at
-   `artifacts/perf/2026-05-03T16-13-34-596Z/projekt-143-optics-scale-proof/summary.json`
+   `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`
    improved visible-height ratios from the before range `0.52-0.54x` to
-   `0.861-0.895x`, inside the first-remediation `+/-15%` band. Remaining
-   issue: imposter crops are still `26.94-59.29` luma darker than close GLB
-   crops, and the shader path is still split from both vegetation and close
-   GLBs. Do not claim full visual parity or performance improvement from the
-   scale/crop patch.
+   `0.861-0.895x`, inside the first-remediation `+/-15%` band, and selected
+   setup luma delta is now `-0.44%` to `0.36%`. Remaining issue: this is one
+   matched lighting setup only. Do not claim full visual parity or performance
+   improvement until dawn/dusk/haze/storm and gameplay-camera evidence exists
+   or a documented visual exception is accepted.
 5. **Large-mode vegetation horizon gap** - static KB-TERRAIN evidence shows
    current Pixel Forge vegetation disappears by `600m`, while Open Frontier
    and A Shau terrain remains visible beyond that range. The current lead is a

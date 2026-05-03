@@ -2036,3 +2036,29 @@ TODO
   above passed/WARNed as designed. No production parity, performance
   improvement, aircraft-scale acceptance, or final human-scale/playtest signoff
   is claimed.
+
+2026-05-03 Projekt Objekt-143 KB-OPTIK selected-lighting luma pass
+- Commit `1395198da4db95611457ecde769b611e3d36354e` adds per-faction Pixel
+  Forge NPC imposter material tuning and upgrades the matched proof/decision
+  tooling to track luma delta as a percentage of the close-GLB crop.
+- Post-commit matched proof:
+  `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`.
+  Source SHA is `1395198da4db95611457ecde769b611e3d36354e`. Visible-height
+  ratios remain `0.895` (US), `0.895` (ARVN), `0.863` (NVA), and `0.861`
+  (VC). Selected-lighting luma deltas are `-0.13%` (US), `-0.44%` (ARVN),
+  `0.36%` (NVA), and `-0.08%` (VC), inside the `+/-12%` proof band.
+- Refreshed evidence artifacts:
+  `artifacts/perf/2026-05-03T16-48-44-272Z/projekt-143-optik-decision-packet/decision-packet.json`,
+  `artifacts/perf/2026-05-03T16-48-58-020Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`,
+  `artifacts/perf/2026-05-03T16-48-46-437Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  and `artifacts/perf/2026-05-03T16-49-11-364Z/projekt-143-evidence-suite/suite-summary.json`.
+- Validation: `npm run check:projekt-143-optics-scale-proof -- --port=0`
+  PASS, `npm run check:projekt-143-optik-decision` WARN by design, `npm run
+  check:projekt-143-cycle2-proof` PASS, `npm run check:projekt-143-cycle3-kickoff`
+  WARN by design, and `npm run check:projekt-143` PASS.
+- Repo alignment: update docs to treat the first KB-OPTIK remediation as
+  target/crop plus selected-lighting luma only. Next pass is expanded
+  dawn/dusk/haze/storm and gameplay-camera KB-OPTIK coverage, or switching the
+  next remediation slot to KB-LOAD texture/upload or KB-EFFECTS grenade
+  first-use. No production parity, performance improvement, final visual
+  parity, aircraft-scale acceptance, or human-playtest signoff is claimed.
