@@ -452,7 +452,7 @@ function buildLoadTarget(
     bureau: 'KB-LOAD',
     status: hasStartup && hasTextureAudit ? 'ready_for_branch' : 'needs_baseline',
     priority: 2,
-    summary: 'The first WebGL remediation branch should target upload/residency only if it preserves visual parity and records before/after startup upload tables.',
+    summary: 'KB-LOAD has a first giantPalm upload warmup; the next WebGL branch should target remaining upload/residency only if it preserves visual parity and records before/after startup upload tables.',
     evidence: {
       textureAuditPath: rel(texturePath),
       startupOpenFrontierPath: rel(startupOpenPath),
@@ -477,16 +477,18 @@ function buildLoadTarget(
     },
     requiredBefore: [
       'Run fresh Open Frontier and Zone Control startup UI artifacts immediately before the branch if the latest startup artifacts predate the target assets.',
-      'Choose one texture class first: giantPalm vegetation, NPC albedo atlases, or preload/deferred upload policy.',
+      'Do not broaden startup texture warmup from the rejected fanPalm artifact without a new paired proof.',
+      'Choose one remaining texture class first: fanPalm with a latency guard, NPC albedo atlases, approved asset regeneration, or preload/deferred upload policy.',
       'Pair all texture candidates with KB-OPTIK visual proof before shipping.',
     ],
     acceptance: [
-      'Open Frontier mode-click-to-playable median and p95 improve against the before artifact.',
-      'WebGL upload total and largest-upload table improve or document why the change is visual-only.',
+      'Open Frontier and Zone Control mode-click-to-playable median and p95 do not regress against the before artifact.',
+      'WebGL upload total and largest-upload table improve, or the branch is recorded as rejected evidence rather than landed remediation.',
       'No texture downscale/compression is accepted without visual screenshots.',
     ],
     nonClaims: [
       'Texture candidate savings are planning estimates, not accepted art changes.',
+      'Do not claim a startup-latency win from WebGL upload totals alone.',
       'Do not compare diagnostic wrapped-upload timing directly against clean runtime captures.',
     ],
   };
@@ -702,14 +704,14 @@ function main(): void {
     recommendedOrder: [
       'Treat the 2.95m NPC target drop, per-tile imposter crop, selected-lighting luma proof, and expanded-luma atmosphere pass as the current KB-OPTIK remediation slice.',
       'If KB-OPTIK continues immediately, use the runtime LOD-edge proof plus the near-stress artifact to decide visual exception/human review before changing crop or scale again.',
-      'Run one KB-LOAD texture/upload branch with fresh startup before/after evidence if the team wants the first measurable WebGL remediation.',
+      'For KB-LOAD, treat the giantPalm warmup as partial upload mitigation only; the next branch must prove startup latency does not regress while reducing remaining uploads.',
       'Run one KB-EFFECTS first-use grenade warmup branch only against the low-load two-grenade probe.',
       'Keep KB-TERRAIN and KB-CULL remediation branches separate until matched large-mode perf windows are prepared.',
       'Keep WebGPU out of Cycle 3 unless the owner explicitly approves reopening the point-of-no-return decision.',
     ],
     openDecisions: [
       'Should KB-OPTIK document the 8.5m near-stress silhouette exception after the runtime LOD-edge PASS, run human visual review, or should KB-LOAD/KB-EFFECTS take the next remediation slot?',
-      'Should the first KB-LOAD branch target giantPalm, NPC atlases, or upload scheduling?',
+      'Should the next KB-LOAD branch target fanPalm with a latency guard, NPC atlases, approved asset regeneration, or upload scheduling?',
       'Which large-mode p95/draw-call budget will be used for far-canopy acceptance in this cycle?',
     ],
   };

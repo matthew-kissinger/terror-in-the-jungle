@@ -20,7 +20,7 @@ measurement itself was trustworthy.
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
 | Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is evidence-complete PASS through `artifacts/perf/2026-05-03T16-48-58-020Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched proof refreshed after the selected-lighting luma slice at `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` drops the NPC runtime target to `2.95m` and adds generated per-tile imposter crop maps; commit `1395198da4db95611457ecde769b611e3d36354e` adds faction imposter material tuning. Matched visible-height ratios improved from the Cycle 2 before range `0.52-0.54x` to `0.861-0.895x`, and selected-lighting luma delta now ranges `-0.44%` to `0.36%`. No perf improvement, final visual parity, aircraft-scale acceptance, or production parity is claimed. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | KB-OPTIK LOD-EDGE PASS / NEAR-STRESS DECISION 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T19-02-55-123Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-OPTIK now needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-EFFECTS. KB-TERRAIN and KB-CULL still need matched baselines. |
+| Phase 3 - Multi-Cycle Engineering Plan | KB-LOAD PARTIAL WARMUP / KB-OPTIK NEAR-STRESS DECISION 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T22-04-56-309Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD now has a giantPalm-only upload warmup that reduces WebGL upload totals but does not prove startup-latency improvement. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-EFFECTS. KB-TERRAIN and KB-CULL still need matched baselines. |
 
 ## Shipped Cycle 0 State
 
@@ -292,7 +292,7 @@ Acceptance:
 
 ### KB-LOAD - Initialization And Cold Start
 
-Status: MEASUREMENT STARTED; REMEDIATION BLOCKED ON KB-METRIK SIGN-OFF.
+Status: FIRST SCOPED TEXTURE-UPLOAD WARMUP LANDED LOCALLY; CLOSEOUT BLOCKED ON FOLLOW-UP UPLOAD AND RESIDENCY EVIDENCE.
 
 Progress:
 
@@ -405,6 +405,36 @@ Progress:
   estimates `565.42MiB`; applying all candidates estimates `373.42MiB`.
   These are package-level planning estimates for KB-CULL/KB-OPTIK, not a
   replacement for visual QA.
+- 2026-05-03 first KB-LOAD remediation: `src/systems/assets/AssetLoader.ts`
+  now exposes `warmGpuTextures()`, and `src/core/LiveEntryActivator.ts`
+  uploads the current hard-fail giantPalm color/normal atlas pair behind the
+  spawn loading overlay before renderer reveal. Startup telemetry now records
+  `engine-init.startup-flow.texture-upload-warmup.*` marks and browser user
+  timings named `kb-load.texture-upload-warmup.*`.
+- 2026-05-03 paired giantPalm warmup evidence: Open Frontier before
+  `artifacts/perf/2026-05-03T21-45-13-207Z/startup-ui-open-frontier` averaged
+  `4685.7ms` deploy-click-to-playable and `5340.7ms` mode-click-to-playable;
+  after
+  `artifacts/perf/2026-05-03T22-01-10-796Z/startup-ui-open-frontier` averaged
+  `4749.0ms` and `5443.3ms`. Its average WebGL upload total moved from
+  `3341.0ms` to `1157.2ms`, and average max upload moved from `2390.5ms` to
+  `275.4ms`. Zone Control before
+  `artifacts/perf/2026-05-03T21-46-34-676Z/startup-ui-zone-control` averaged
+  `4909.0ms` / `5491.0ms`; after
+  `artifacts/perf/2026-05-03T22-02-28-966Z/startup-ui-zone-control` averaged
+  `4939.0ms` / `5469.0ms`; average WebGL upload total moved from `3340.6ms`
+  to `1229.6ms`, and average max upload moved from `2379.4ms` to `360.1ms`.
+  Trust flags are present in all four artifacts: long tasks, LoAF entries,
+  WebGL upload attribution, user timings, and three Chrome CPU profiles per
+  artifact. This is a narrow upload-stall mitigation and attribution
+  improvement, not a certified startup-latency closeout.
+- 2026-05-03 negative evidence: expanding the same warmup to fanPalm was tested
+  and rejected. Open Frontier
+  `artifacts/perf/2026-05-03T21-54-02-583Z/startup-ui-open-frontier` regressed
+  to `4904.3ms` deploy-click-to-playable, and Zone Control
+  `artifacts/perf/2026-05-03T21-55-18-768Z/startup-ui-zone-control` regressed
+  to `5100.7ms`. Do not broaden startup texture warmup by asset name without a
+  paired before/after artifact.
 
 Open questions:
 
@@ -1109,10 +1139,9 @@ Reversibility:
 
 Current Cycle 3 status:
 
-- 2026-05-03: after commit
-  `5b053711cece65b5915ea786acc56e4a8ea22736`, `npm run
+- 2026-05-03: after the first KB-LOAD warmup pass, `npm run
   check:projekt-143-cycle3-kickoff` wrote
-  `artifacts/perf/2026-05-03T19-02-55-123Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T22-04-56-309Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Overall status is WARN because KB-TERRAIN and KB-CULL still need matched
   baselines. KB-OPTIK `npc-imposter-scale-luma-contract` is now
   `needs_decision`: the first `2.95m` target/crop remediation plus
@@ -1122,8 +1151,10 @@ Current Cycle 3 status:
   runtime LOD-edge proof passes with `0/40` flags. The next KB-OPTIK choice is
   documenting that near-stress exception, running human visual review, or
   switching the next remediation slot to KB-LOAD/KB-EFFECTS.
-  KB-LOAD
-  `pixel-forge-texture-upload-residency` and KB-EFFECTS
+  KB-LOAD `pixel-forge-texture-upload-residency` remains
+  `ready_for_branch`, now specifically for remaining uploads/residency after
+  the giantPalm-only warmup reduced WebGL upload totals without proving a
+  startup-latency win. KB-EFFECTS
   `grenade-first-use-stall` are also `ready_for_branch`. KB-TERRAIN
   `large-mode-vegetation-horizon` and KB-CULL
   `static-feature-and-vehicle-culling-hlod` remain `needs_baseline`.

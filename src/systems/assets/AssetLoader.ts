@@ -12,6 +12,49 @@ interface TextureAssetDefinition {
   colorSpace?: PixelForgeColorSpace;
 }
 
+export interface TextureUploadWarmupEntry {
+  name: string;
+  path: string;
+  category: AssetCategory;
+  width: number;
+  height: number;
+  estimatedMipmappedMiB: number;
+  durationMs: number;
+  status: 'uploaded' | 'failed';
+  error?: string;
+}
+
+export interface TextureUploadWarmupSummary {
+  requested: number;
+  uploaded: number;
+  missing: number;
+  failed: number;
+  totalDurationMs: number;
+  entries: TextureUploadWarmupEntry[];
+  missingNames: string[];
+}
+
+function getTextureDimensions(texture: THREE.Texture): { width: number; height: number } {
+  const image = texture.image as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number } | undefined;
+  return {
+    width: Number(image?.width ?? image?.naturalWidth ?? 0),
+    height: Number(image?.height ?? image?.naturalHeight ?? 0),
+  };
+}
+
+function estimateMipmappedTextureMiB(width: number, height: number): number {
+  if (width <= 0 || height <= 0) {
+    return 0;
+  }
+  const rgbaBytes = width * height * 4;
+  const mipmappedBytes = rgbaBytes * (4 / 3);
+  return Math.round((mipmappedBytes / (1024 * 1024)) * 100) / 100;
+}
+
+function sanitizePerformanceName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_.-]+/g, '-');
+}
+
 export class AssetLoader implements GameSystem {
   private assets: Map<string, AssetInfo> = new Map();
   private textureLoader = new THREE.TextureLoader();
@@ -207,6 +250,82 @@ export class AssetLoader implements GameSystem {
 
   getTexture(name: string): THREE.Texture | undefined {
     return this.loadedTextures.get(name);
+  }
+
+  warmGpuTextures(renderer: THREE.WebGLRenderer, names: readonly string[]): TextureUploadWarmupSummary {
+    const start = performance.now();
+    const entries: TextureUploadWarmupEntry[] = [];
+    const missingNames: string[] = [];
+    let uploaded = 0;
+    let failed = 0;
+
+    for (const name of names) {
+      const asset = this.assets.get(name);
+      const texture = this.loadedTextures.get(name);
+      if (!asset || !texture) {
+        missingNames.push(name);
+        continue;
+      }
+
+      const { width, height } = getTextureDimensions(texture);
+      const entryStart = performance.now();
+      const perfName = `kb-load.texture-upload-warmup.${sanitizePerformanceName(name)}`;
+      try {
+        performance.mark(`${perfName}.begin`);
+        renderer.initTexture(texture);
+        const durationMs = Math.round((performance.now() - entryStart) * 100) / 100;
+        performance.mark(`${perfName}.end`);
+        performance.measure(perfName, `${perfName}.begin`, `${perfName}.end`);
+        entries.push({
+          name,
+          path: asset.path,
+          category: asset.category,
+          width,
+          height,
+          estimatedMipmappedMiB: estimateMipmappedTextureMiB(width, height),
+          durationMs,
+          status: 'uploaded',
+        });
+        uploaded++;
+      } catch (error) {
+        const durationMs = Math.round((performance.now() - entryStart) * 100) / 100;
+        performance.mark(`${perfName}.end`);
+        performance.measure(perfName, `${perfName}.begin`, `${perfName}.end`);
+        entries.push({
+          name,
+          path: asset.path,
+          category: asset.category,
+          width,
+          height,
+          estimatedMipmappedMiB: estimateMipmappedTextureMiB(width, height),
+          durationMs,
+          status: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+        });
+        failed++;
+        Logger.warn('assets', `GPU texture warmup failed for ${name}`, error);
+      }
+    }
+
+    const summary: TextureUploadWarmupSummary = {
+      requested: names.length,
+      uploaded,
+      missing: missingNames.length,
+      failed,
+      totalDurationMs: Math.round((performance.now() - start) * 100) / 100,
+      entries,
+      missingNames,
+    };
+
+    if (summary.requested > 0) {
+      Logger.info(
+        'assets',
+        `GPU texture warmup: ${summary.uploaded}/${summary.requested} uploaded, ${summary.missing} missing, ${summary.failed} failed in ${summary.totalDurationMs}ms`,
+        summary.entries.map(entry => `${entry.name} ${entry.width}x${entry.height} ${entry.durationMs}ms`)
+      );
+    }
+
+    return summary;
   }
 
   getAssetsByCategory(category: AssetCategory): AssetInfo[] {

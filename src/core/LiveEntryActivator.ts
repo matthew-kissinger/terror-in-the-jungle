@@ -8,6 +8,7 @@ import { markStartup } from './StartupTelemetry';
 import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 import { resolveModeSpawnPosition } from './ModeSpawnPosition';
 import { resolveNearbySafeSpawnPosition, resolveOpenSpawnFacingYaw } from './SpawnFacing';
+import { PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES } from '../config/pixelForgeAssets';
 
 const LIVE_ENTRY_FRAME_YIELD_TIMEOUT_MS = 100;
 
@@ -92,6 +93,19 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
   markPhase('flush-chunk-update', 'BUILDING LOCAL TERRAIN', 'Finalizing chunk data around insertion zone...');
   engine.systemManager.terrainSystem.update(0.016);
   markStartup('engine-init.startup-flow.flush-chunk-update.terrain-update-end');
+
+  if (PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES.length > 0) {
+    markStepBegin('texture-upload-warmup');
+    markPhase('texture-upload-warmup', 'PRIMING JUNGLE TEXTURES', 'Uploading critical vegetation atlases before renderer reveal...');
+    const summary = engine.systemManager.assetLoader.warmGpuTextures(
+      engine.renderer.renderer,
+      PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES
+    );
+    markStartup(`engine-init.startup-flow.texture-upload-warmup.uploaded-${summary.uploaded}`);
+    markStartup(`engine-init.startup-flow.texture-upload-warmup.failed-${summary.failed}`);
+    markStepEnd('texture-upload-warmup');
+  }
+
   const frameYield = await nextFrame();
   markStartup(`engine-init.startup-flow.flush-chunk-update.yield-${frameYield}`);
   markStepEnd('flush-chunk-update');

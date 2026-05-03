@@ -323,19 +323,20 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T19-02-55-123Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T22-04-56-309Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
   `needs_decision` because the 8.5m near-stress camera still flags even though
   runtime LOD-edge proof passes after expanded luma was brought into band.
-  KB-LOAD texture upload/residency
-  and KB-EFFECTS grenade first-use are
+  KB-LOAD texture upload/residency remains `ready_for_branch` for remaining
+  uploads after the partial giantPalm warmup, KB-EFFECTS grenade first-use is
   `ready_for_branch`, and KB-TERRAIN/KB-CULL are `needs_baseline`. It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
   combat120, and A Shau perf summary paths for handoff. This is
   planning/agent-DX evidence; no atlas regeneration, gameplay-camera visual
-  parity, far-canopy, grenade, texture-upload, culling, WebGPU, or
+  parity, startup-latency win, far-canopy, grenade, texture residency closeout,
+  culling, WebGPU, or
   production-parity remediation is accepted from it.
 - KB-OPTIK now has an executable decision packet at
   `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`.
@@ -347,6 +348,15 @@ What is not ready to claim:
   exception or switching to KB-LOAD/KB-EFFECTS.
   It continues to reject aircraft resizing as the next response without a
   separate vehicle-scale proof.
+- KB-LOAD has a first local runtime remediation, not a closeout. The current
+  code warms only the giantPalm color/normal texture pair before renderer
+  reveal through `AssetLoader.warmGpuTextures()`. Paired retail startup
+  artifacts show WebGL upload totals improved in Open Frontier
+  (`3341.0ms` to `1157.2ms`) and Zone Control (`3340.6ms` to `1229.6ms`), but
+  deploy-click-to-playable did not improve (`4685.7ms` to `4749.0ms` in Open
+  Frontier, `4909.0ms` to `4939.0ms` in Zone Control). The rejected fanPalm
+  expansion artifacts are worse in both modes, so future startup warmup
+  broadening needs paired evidence before landing.
 - Commit `5b726746b0034d9327f5cb03ddcd3147294125ed` passed GitHub CI run
   `25277824856` after the Cycle 3 kickoff docs/tooling release. It was not
   deployed or live-verified; do not claim production parity for that commit.

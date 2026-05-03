@@ -175,6 +175,13 @@ export const PIXEL_FORGE_BLOCKED_VEGETATION_IDS = [
   'banyan',
 ] as const;
 
+// Current KB-LOAD startup audit top offender. This list names textures that are
+// explicitly uploaded behind the spawn loading overlay before renderer reveal.
+export const PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES: readonly string[] =
+  PIXEL_FORGE_VEGETATION_ASSETS
+    .filter((asset) => asset.id === 'giantPalm')
+    .flatMap((asset) => [asset.textureName, asset.normalTextureName]);
+
 export const PIXEL_FORGE_NPC_FACTIONS: readonly PixelForgeNpcFactionAsset[] = [
   { runtimeFaction: 'US', packageFaction: 'usArmy', modelPath: 'npcs/pixel-forge-v1/usArmy.glb', primaryWeapon: 'm16a1' },
   { runtimeFaction: 'ARVN', packageFaction: 'arvn', modelPath: 'npcs/pixel-forge-v1/arvn.glb', primaryWeapon: 'm16a1' },

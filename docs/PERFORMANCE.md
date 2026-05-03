@@ -462,6 +462,25 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   averaged `6467.7ms`. Both include WebGL upload attribution and three CPU
   profiles. The largest upload in both modes remains Pixel Forge vegetation,
   especially giantPalm albedo.
+- 2026-05-03 KB-LOAD first runtime warmup: `AssetLoader.warmGpuTextures()`
+  uploads the giantPalm color/normal pair before renderer reveal and emits
+  `kb-load.texture-upload-warmup.*` user timings. Paired headed retail
+  artifacts are:
+  `artifacts/perf/2026-05-03T21-45-13-207Z/startup-ui-open-frontier` ->
+  `artifacts/perf/2026-05-03T22-01-10-796Z/startup-ui-open-frontier`, and
+  `artifacts/perf/2026-05-03T21-46-34-676Z/startup-ui-zone-control` ->
+  `artifacts/perf/2026-05-03T22-02-28-966Z/startup-ui-zone-control`.
+  Open Frontier deploy-click-to-playable moved `4685.7ms` to `4749.0ms`,
+  while WebGL upload total/max averages moved `3341.0/2390.5ms` to
+  `1157.2/275.4ms`. Zone Control deploy-click-to-playable moved `4909.0ms`
+  to `4939.0ms`, while WebGL upload total/max averages moved
+  `3340.6/2379.4ms` to `1229.6/360.1ms`. A fanPalm expansion artifact was
+  worse in both modes and was not kept:
+  `artifacts/perf/2026-05-03T21-54-02-583Z/startup-ui-open-frontier` and
+  `artifacts/perf/2026-05-03T21-55-18-768Z/startup-ui-zone-control`.
+  Treat this as partial startup-upload remediation plus next-target evidence,
+  not as a startup-latency win, clean frame-time baseline, or production parity
+  proof.
 - 2026-05-02 Cycle 1 trusted steady-state evidence: Open Frontier short wrote
   `artifacts/perf/2026-05-02T22-11-29-560Z` with measurement trust PASS,
   avg/p95/p99/max `23.70/29.20/32.70/100ms`, 4 hitches above `50ms`, renderer

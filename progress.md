@@ -2141,3 +2141,36 @@ TODO
   aircraft-scale acceptance, or human-playtest signoff is claimed.
 - Validation after docs alignment: `npm run check:projekt-143` PASS,
   `artifacts/perf/2026-05-03T19-05-22-881Z/projekt-143-evidence-suite/suite-summary.json`.
+
+2026-05-03 Projekt Objekt-143 KB-LOAD first texture-upload remediation
+- Added `AssetLoader.warmGpuTextures()` and startup warmup marks/user timings
+  for critical Pixel Forge texture uploads. Runtime startup now warms only the
+  giantPalm color/normal atlas pair behind the spawn loading overlay before
+  renderer reveal.
+- Paired Open Frontier evidence: before
+  `artifacts/perf/2026-05-03T21-45-13-207Z/startup-ui-open-frontier` averaged
+  `4685.7ms` deploy-click-to-playable and `5340.7ms` mode-click-to-playable;
+  after
+  `artifacts/perf/2026-05-03T22-01-10-796Z/startup-ui-open-frontier` averaged
+  `4749.0ms` and `5443.3ms`. WebGL upload total/max averages moved
+  `3341.0/2390.5ms` to `1157.2/275.4ms`.
+- Paired Zone Control evidence: before
+  `artifacts/perf/2026-05-03T21-46-34-676Z/startup-ui-zone-control` averaged
+  `4909.0ms` deploy-click-to-playable and `5491.0ms` mode-click-to-playable;
+  after
+  `artifacts/perf/2026-05-03T22-02-28-966Z/startup-ui-zone-control` averaged
+  `4939.0ms` and `5469.0ms`. WebGL upload total/max averages moved
+  `3340.6/2379.4ms` to `1229.6/360.1ms`.
+- Negative evidence: broadening the warmup to fanPalm regressed the same
+  startup samples, so that expansion was reverted. Rejected artifacts:
+  `artifacts/perf/2026-05-03T21-54-02-583Z/startup-ui-open-frontier` and
+  `artifacts/perf/2026-05-03T21-55-18-768Z/startup-ui-zone-control`.
+- Validation: `npm run typecheck` PASS, `npx vitest run
+  src/systems/assets/AssetLoader.test.ts` PASS, `npm run build` PASS,
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-03T21-57-48-690Z/projekt-143-evidence-suite/suite-summary.json`,
+  `npm run check:projekt-143-cycle3-kickoff` WARN by design at
+  `artifacts/perf/2026-05-03T22-04-56-309Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  and `npm run validate:fast` PASS. No production parity, startup-latency win,
+  startup closeout, texture residency closeout, or clean frame-time improvement
+  is claimed.
