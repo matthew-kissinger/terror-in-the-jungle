@@ -105,6 +105,7 @@
     "check:projekt-143-optics-scale-proof": "npx tsx scripts/projekt-143-optics-scale-proof.ts --headed",
     "check:projekt-143-culling-proof": "npx tsx scripts/projekt-143-culling-proof.ts --headed",
     "check:projekt-143-cycle2-proof": "npx tsx scripts/projekt-143-cycle2-proof-suite.ts",
+    "check:projekt-143-cycle3-kickoff": "npx tsx scripts/projekt-143-cycle3-kickoff.ts",
     "evidence:atmosphere": "npx tsx scripts/capture-atmosphere-recovery-shots.ts",
     "cloudflare:assets:manifest": "npx tsx scripts/cloudflare-assets.ts manifest",
     "cloudflare:assets:upload": "npx tsx scripts/cloudflare-assets.ts upload",

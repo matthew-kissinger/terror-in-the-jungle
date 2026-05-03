@@ -123,7 +123,7 @@ the current truth anchor.
   imported native scale with longest-axis/NPC-height ratios from `2.07x` to
   `5.52x`. `npm run check:projekt-143-cycle2-proof` was refreshed afterward
   and wrote
-  `artifacts/perf/2026-05-03T10-39-53-595Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  `artifacts/perf/2026-05-03T11-19-13-862Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
   with PASS status for evidence completeness. This is not a shader, scale,
   imposter, culling, or aircraft-feel remediation claim. The culling proof
   screenshot is not runtime scale evidence because its fixture rescales GLBs by
@@ -150,7 +150,7 @@ the current truth anchor.
   baselines. Local `npm run validate:fast`, `npm run build`, and
   `npm run check:projekt-143` pass after the aircraft patch; the latest static
   evidence suite is
-  `artifacts/perf/2026-05-03T10-36-57-982Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T11-18-46-108Z/projekt-143-evidence-suite/suite-summary.json`.
   Commit `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33` passed manual CI run
   `25274278013` and Deploy run `25274649157`. Live `/asset-manifest.json`
   reported that SHA; Pages shell, service worker, manifest, representative
@@ -288,15 +288,17 @@ What is not ready to claim:
 - No WebGPU migration has shipped or been started. KB-STRATEGIE recommends
   staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
   after the measured blockers are under control.
-- Phase 3 now has a draft multi-cycle plan in
-  `docs/PROJEKT_OBJEKT_143.md`. Cycle 0 evidence and Cycle 1 baseline/policy
-  work are shipped. Cycle 2 now has matched KB-OPTIK crops and KB-CULL
-  category/draw-call proof. The next work should decide the NPC scale/bake
-  contract from that evidence before any shader, atlas, imposter, far-canopy,
-  grenade, texture, or WebGPU remediation is accepted. KB-CULL still needs
-  before/after captures before accepting an actual culling or HLOD change.
-  KB-EFFECTS still needs a verified warmup or first-use-render remediation
-  before it can close.
+- Phase 3 now has a Cycle 3 kickoff/readiness matrix in
+  `docs/PROJEKT_OBJEKT_143.md` and
+  `artifacts/perf/2026-05-03T11-20-50-184Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
+  are shipped. The kickoff marks KB-OPTIK NPC scale/luma as `needs_decision`,
+  KB-LOAD texture upload/residency and KB-EFFECTS grenade first-use as
+  `ready_for_branch`, and KB-TERRAIN/KB-CULL as `needs_baseline`. It also
+  carries Open Frontier and Zone Control startup paths plus Open Frontier,
+  combat120, and A Shau perf summary paths for handoff. This is planning/
+  agent-DX evidence only; no shader, atlas, imposter, far-canopy, grenade,
+  texture, culling, or WebGPU remediation has shipped.
 
 ## Starter-Kits Incubation Close-Out On 2026-04-28
 

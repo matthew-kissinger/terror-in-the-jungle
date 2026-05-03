@@ -85,6 +85,7 @@ npm run check:projekt-143           # Cycle 0 static evidence suite
 npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark bundle sidecars
 npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proof
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
+npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 ```
 
 Startup UI benchmarks are retail-build measurements, not perf-harness frame
@@ -187,6 +188,15 @@ and horizon audits, Open Frontier/A Shau scene attribution, and the latest
 present. The command is non-strict by default and may return `WARN` while proof
 surfaces are incomplete; use `--strict` once Cycle 2 is ready to become a
 blocking gate.
+
+`projekt-143-cycle3-kickoff.ts` writes a remediation readiness matrix under
+`artifacts/perf/<timestamp>/projekt-143-cycle3-kickoff/`. It reads the latest
+Cycle 2 proof, KB-OPTIK scale proof, texture audit, Open Frontier and Zone
+Control startup evidence, Open Frontier/combat120/A Shau perf summaries,
+grenade probe, vegetation horizon audit, and culling proof, then classifies
+candidate Cycle 3 branches as `ready_for_branch`, `needs_decision`,
+`needs_baseline`, or `blocked`. This is an agent-DX handoff command; it does
+not approve or apply any remediation.
 
 `projekt-143-culling-proof.ts` writes a headed deterministic renderer/category
 fixture under `artifacts/perf/<timestamp>/projekt-143-culling-proof/`. It uses

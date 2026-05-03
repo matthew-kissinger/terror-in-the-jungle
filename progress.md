@@ -1850,7 +1850,7 @@ TODO
 - Local gates now passing after the aircraft patch: `npm run validate:fast`,
   `npm run build`, and `npm run check:projekt-143`. The fresh Projekt-143 static
   suite wrote
-  `artifacts/perf/2026-05-03T10-36-57-982Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T11-18-46-108Z/projekt-143-evidence-suite/suite-summary.json`.
 - Refreshed `npm run check:projekt-143-cycle2-proof` after the aircraft patch;
   it remains WARN for missing dedicated culling/optic certification views and
   wrote
@@ -1920,7 +1920,7 @@ TODO
   It remains WARN overall only because KB-OPTIK still lacks matched
   close-GLB/imposter screenshot crops. KB-CULL scene attribution is now PASS.
 - Refreshed `npm run check:projekt-143`; the static suite passed at
-  `artifacts/perf/2026-05-03T10-36-57-982Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T11-18-46-108Z/projekt-143-evidence-suite/suite-summary.json`.
 - Still not claimed: any culling/HLOD optimization, imposter visual parity,
   aircraft feel, or production parity for the docs/tooling-only changes.
 
@@ -1948,7 +1948,33 @@ TODO
   decision before remediation.
 - `npm run check:projekt-143-cycle2-proof` now consumes the scale proof and
   passed at
-  `artifacts/perf/2026-05-03T10-39-53-595Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  `artifacts/perf/2026-05-03T11-19-13-862Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
   PASS means Cycle 2 evidence surfaces are complete for review. Still not
   claimed: NPC scale remediation, imposter parity, shader/atlas changes,
   aircraft-size remediation, or production parity.
+
+2026-05-03 Projekt Objekt-143 Cycle 3 kickoff
+- Added `scripts/projekt-143-cycle3-kickoff.ts` and
+  `npm run check:projekt-143-cycle3-kickoff` as an agent-DX/readiness command.
+  It reads the latest Cycle 2 proof, KB-OPTIK scale proof, texture audit,
+  startup evidence, grenade probe, vegetation horizon audit, and culling proof,
+  then writes a remediation readiness matrix.
+- First kickoff artifact:
+  `artifacts/perf/2026-05-03T11-20-50-184Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Overall status is WARN by design because the next phase needs decisions and
+  baselines before fixes.
+- The refreshed kickoff artifact carries Open Frontier and Zone Control startup
+  paths plus Open Frontier, combat120, and A Shau perf summary paths so the
+  next branch does not have to rediscover the trusted baseline bundle.
+- Target states: KB-OPTIK `npc-imposter-scale-luma-contract` is
+  `needs_decision`; KB-LOAD `pixel-forge-texture-upload-residency` and
+  KB-EFFECTS `grenade-first-use-stall` are `ready_for_branch`; KB-TERRAIN
+  `large-mode-vegetation-horizon` and KB-CULL
+  `static-feature-and-vehicle-culling-hlod` are `needs_baseline`.
+- Validation after the kickoff patch: `npm run check:projekt-143-cycle3-kickoff`
+  WARN by design, `npm run check:projekt-143-cycle2-proof` PASS,
+  `npm run check:projekt-143` PASS, and isolated `npm run validate:fast` PASS.
+- This continues Projekt into Cycle 3 planning only. Still not claimed:
+  startup remediation, texture regeneration, NPC scale/luma fix, grenade
+  warmup fix, far-canopy layer, culling/HLOD change, WebGPU migration, or
+  production parity.

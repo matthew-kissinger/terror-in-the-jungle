@@ -19,8 +19,8 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is now evidence-complete PASS through `artifacts/perf/2026-05-03T10-39-53-595Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched scale proof at `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`. The KB-OPTIK proof flags a real visual-scale/parity problem: close GLB and imposter geometry share the `4.425m` target, but rendered imposter silhouettes average `0.53x` close-GLB height. User-approved aircraft GLB replacement is delivered as an evidence-gated asset/runtime import, not as a performance, scale-remediation, or aircraft-feel claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is now evidence-complete PASS through `artifacts/perf/2026-05-03T11-19-13-862Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched scale proof at `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`. The KB-OPTIK proof flags a real visual-scale/parity problem: close GLB and imposter geometry share the `4.425m` target, but rendered imposter silhouettes average `0.53x` close-GLB height. User-approved aircraft GLB replacement is delivered as an evidence-gated asset/runtime import, not as a performance, scale-remediation, or aircraft-feel claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 3 - Multi-Cycle Engineering Plan | KICKOFF FILED 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is now mechanically summarized by `artifacts/perf/2026-05-03T11-20-50-184Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`. It remains non-remediation until the first measured before/after branch lands. |
 
 ## Shipped Cycle 0 State
 
@@ -946,7 +946,7 @@ Current Cycle 2 status:
   visible height and substantially darker luma.
 - 2026-05-03: `npm run check:projekt-143-cycle2-proof` now consumes the
   KB-OPTIK scale proof and passed at
-  `artifacts/perf/2026-05-03T10-39-53-595Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  `artifacts/perf/2026-05-03T11-19-13-862Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
   PASS means the Cycle 2 evidence bundle is complete for review; it is not a
   shader, atlas, NPC-scale, vehicle-scale, culling, or performance remediation
   claim.
@@ -975,7 +975,7 @@ Current Cycle 2 status:
   optimization claim. Local code gates for this aircraft patch now pass:
   `npm run validate:fast`, `npm run build`, and `npm run check:projekt-143`
   with the latest static evidence summary at
-  `artifacts/perf/2026-05-03T10-36-57-982Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T11-18-46-108Z/projekt-143-evidence-suite/suite-summary.json`.
   Manual CI run `25274278013` and Deploy run `25274649157` passed. Live Pages
   `/asset-manifest.json` reported
   `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`; Pages shell, service worker,
@@ -1028,6 +1028,24 @@ Acceptance:
 Reversibility:
 
 - Reversible remediation. Each fix must land in its own PR or bisectable commit.
+
+Current Cycle 3 status:
+
+- 2026-05-03: `npm run check:projekt-143-cycle3-kickoff` added a mechanical
+  readiness matrix and wrote
+  `artifacts/perf/2026-05-03T11-20-50-184Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Overall status is WARN because the next work is not a single green-lighted
+  fix. KB-OPTIK `npc-imposter-scale-luma-contract` is `needs_decision`:
+  matched proof exists, but the first branch must choose between NPC runtime
+  visual height, imposter bake/crop scale, shader/luma parity, or a deliberately
+  separated sequence. KB-LOAD `pixel-forge-texture-upload-residency` and
+  KB-EFFECTS `grenade-first-use-stall` are `ready_for_branch` with before
+  evidence available. KB-TERRAIN `large-mode-vegetation-horizon` and KB-CULL
+  `static-feature-and-vehicle-culling-hlod` are `needs_baseline`, because they
+  still require matched before/after runtime windows for any actual remediation.
+  The artifact carries Open Frontier and Zone Control startup paths plus Open
+  Frontier, combat120, and A Shau perf summary paths for faster handoff. This
+  kickoff artifact is agent-DX and planning evidence only.
 
 ### Cycle 4 - Strategic Spike Only
 
