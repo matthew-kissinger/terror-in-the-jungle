@@ -74,6 +74,7 @@ type OptikDecisionPacket = {
 
 type OptikExpandedProof = {
   status?: CheckStatus;
+  coverage?: { cameraProfileSet?: string };
   measurementTrust?: { status?: CheckStatus };
   aggregate?: {
     sampleCount?: number;
@@ -193,6 +194,17 @@ function latestFile(files: string[], predicate: (path: string) => boolean): stri
   return matches[0] ?? null;
 }
 
+function expandedCameraProfileSet(path: string): string {
+  return readJson<OptikExpandedProof>(path)?.coverage?.cameraProfileSet ?? 'expanded-stress';
+}
+
+function latestExpandedProofPath(files: string[], cameraProfileSet: string): string | null {
+  return latestFile(files, (path) =>
+    path.endsWith(join('projekt-143-optik-expanded-proof', 'summary.json'))
+    && expandedCameraProfileSet(path) === cameraProfileSet
+  );
+}
+
 function latestStartupSummary(files: string[], mode: 'open-frontier' | 'zone-control'): string | null {
   return latestFile(files, (path) =>
     path.endsWith(join(`startup-ui-${mode}`, 'summary.json'))
@@ -268,7 +280,9 @@ function buildOptikTarget(
   decisionPath: string | null,
   decision: OptikDecisionPacket | null,
   expandedPath: string | null,
-  expanded: OptikExpandedProof | null
+  expanded: OptikExpandedProof | null,
+  runtimeLodExpandedPath: string | null,
+  runtimeLodExpanded: OptikExpandedProof | null
 ): Cycle3Target {
   const ratios = (proof?.npcComparisons ?? [])
     .map((entry) => entry.deltas?.renderedVisibleHeightRatio)
@@ -300,6 +314,9 @@ function buildOptikTarget(
   const expandedOnlyVisibleHeightFlags = expandedHasFlags
     && expandedLumaInProofBand
     && !expandedVisibleHeightInProofBand;
+  const runtimeLodExpandedPasses =
+    runtimeLodExpanded?.measurementTrust?.status === 'pass'
+    && runtimeLodExpanded?.status === 'pass';
 
   return {
     id: 'npc-imposter-scale-luma-contract',
@@ -319,7 +336,9 @@ function buildOptikTarget(
           : expandedPasses
             ? 'Scale/crop and expanded lighting/gameplay-camera luma parity are inside matched proof bands; remaining KB-OPTIK work is human review or explicit closeout.'
             : expandedOnlyVisibleHeightFlags
-              ? 'Scale/crop and expanded lighting luma are inside proof bands, but gameplay-camera visible-height samples still need a KB-OPTIK shape/crop decision.'
+              ? runtimeLodExpandedPasses
+                ? 'Scale/crop and expanded lighting luma are inside proof bands; the 8.5m near-stress camera flags, but runtime LOD-edge proof passes, so KB-OPTIK needs a visual-exception or human-review decision.'
+                : 'Scale/crop and expanded lighting luma are inside proof bands, but gameplay-camera visible-height samples still need a KB-OPTIK shape/crop decision.'
             : expandedHasFlags
               ? 'Scale/crop and selected-lighting luma parity are inside matched proof bands, but expanded lighting/gameplay-camera proof found visual flags that need targeted KB-OPTIK decision.'
               : 'Scale/crop and selected-lighting luma parity are inside matched proof bands; remaining KB-OPTIK work is expanded lighting snapshots, human review, or explicit closeout.'
@@ -331,8 +350,10 @@ function buildOptikTarget(
       opticsScaleProofPath: rel(opticsPath),
       optikDecisionPacketPath: rel(decisionPath),
       optikExpandedProofPath: rel(expandedPath),
+      runtimeLodExpandedProofPath: rel(runtimeLodExpandedPath),
       optikDecisionPacketStatus: decision?.status ?? null,
       optikExpandedProofStatus: expanded?.status ?? null,
+      runtimeLodExpandedProofStatus: runtimeLodExpanded?.status ?? null,
       recommendedFirstRuntimeBranch: decision?.recommendedSequence?.[1] ?? null,
       openOwnerDecision: decision?.openOwnerDecision ?? null,
       runtimeNpcVisualHeightMeters: proof?.runtimeContracts?.npc?.visualHeightMeters ?? null,
@@ -359,6 +380,7 @@ function buildOptikTarget(
         max: max(aircraftRatios),
       },
       expandedProof: {
+        cameraProfileSet: expanded?.coverage?.cameraProfileSet ?? null,
         sampleCount: expanded?.aggregate?.sampleCount ?? null,
         flaggedSamples: expandedFlaggedSamples,
         minVisibleHeightRatio: expanded?.aggregate?.minVisibleHeightRatio ?? null,
@@ -368,6 +390,17 @@ function buildOptikTarget(
         maxAbsLumaDeltaPercent: expanded?.aggregate?.maxAbsLumaDeltaPercent ?? null,
         flaggedProfiles: expanded?.aggregate?.flaggedProfiles ?? null,
       },
+      runtimeLodExpandedProof: {
+        cameraProfileSet: runtimeLodExpanded?.coverage?.cameraProfileSet ?? null,
+        sampleCount: runtimeLodExpanded?.aggregate?.sampleCount ?? null,
+        flaggedSamples: runtimeLodExpanded?.aggregate?.flaggedSamples ?? null,
+        minVisibleHeightRatio: runtimeLodExpanded?.aggregate?.minVisibleHeightRatio ?? null,
+        maxVisibleHeightRatio: runtimeLodExpanded?.aggregate?.maxVisibleHeightRatio ?? null,
+        minLumaDeltaPercent: runtimeLodExpanded?.aggregate?.minLumaDeltaPercent ?? null,
+        maxLumaDeltaPercent: runtimeLodExpanded?.aggregate?.maxLumaDeltaPercent ?? null,
+        maxAbsLumaDeltaPercent: runtimeLodExpanded?.aggregate?.maxAbsLumaDeltaPercent ?? null,
+        flaggedProfiles: runtimeLodExpanded?.aggregate?.flaggedProfiles ?? null,
+      },
     },
     requiredBefore: [
       'Use the latest matched scale/crop proof as the after artifact for the first remediation.',
@@ -375,7 +408,9 @@ function buildOptikTarget(
         ? 'If continuing KB-OPTIK, isolate shader/luma parity from target height and crop metadata changes.'
         : expandedTrusted
           ? expandedOnlyVisibleHeightFlags
-            ? 'If continuing KB-OPTIK, inspect the flagged gameplay-camera silhouette samples before changing shader constants again.'
+            ? runtimeLodExpandedPasses
+              ? 'If continuing KB-OPTIK, document the near-stress camera exception or run human visual review before changing crop/scale again.'
+              : 'If continuing KB-OPTIK, inspect the flagged gameplay-camera silhouette samples before changing shader constants again.'
             : expandedHasFlags
             ? 'If continuing KB-OPTIK, inspect the flagged expanded lighting/gameplay-camera samples before changing shader constants again.'
             : 'If continuing KB-OPTIK, use the expanded lighting/gameplay-camera proof for human visual review or explicit closeout.'
@@ -393,7 +428,9 @@ function buildOptikTarget(
         : expandedPasses
           ? 'Do not claim human visual signoff from mechanical proof alone.'
           : expandedOnlyVisibleHeightFlags
-            ? 'Do not claim final NPC visual parity while gameplay-camera silhouette samples remain flagged.'
+            ? runtimeLodExpandedPasses
+              ? 'Do not claim final NPC visual parity until the near-stress exception is documented or human-reviewed.'
+              : 'Do not claim final NPC visual parity while gameplay-camera silhouette samples remain flagged.'
             : 'Do not claim final NPC visual parity until expanded lighting screenshots and human review exist.',
       'Do not accept aircraft scale changes from this target without a separate vehicle-scale proof.',
     ],
@@ -598,7 +635,8 @@ function main(): void {
   const artifactFiles = walkFiles(ARTIFACT_ROOT, () => true);
   const cycle2Path = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-cycle2-proof-suite', 'cycle2-proof-summary.json')));
   const opticsScalePath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-optics-scale-proof', 'summary.json')));
-  const optikExpandedPath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-optik-expanded-proof', 'summary.json')));
+  const optikExpandedPath = latestExpandedProofPath(artifactFiles, 'expanded-stress');
+  const runtimeLodExpandedPath = latestExpandedProofPath(artifactFiles, 'runtime-lod-edge');
   const optikDecisionPath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-optik-decision-packet', 'decision-packet.json')));
   const texturePath = latestFile(artifactFiles, (path) => path.endsWith(join('pixel-forge-texture-audit', 'texture-audit.json')));
   const startupOpenPath = latestStartupSummary(artifactFiles, 'open-frontier');
@@ -613,6 +651,7 @@ function main(): void {
   const cycle2 = readJson<Cycle2Proof>(cycle2Path);
   const opticsScale = readJson<OpticsScaleProof>(opticsScalePath);
   const optikExpanded = readJson<OptikExpandedProof>(optikExpandedPath);
+  const runtimeLodExpanded = readJson<OptikExpandedProof>(runtimeLodExpandedPath);
   const optikDecision = readJson<OptikDecisionPacket>(optikDecisionPath);
   const texture = readJson<TextureAudit>(texturePath);
   const startupOpen = readJson<StartupSummary>(startupOpenPath);
@@ -622,7 +661,16 @@ function main(): void {
   const culling = readJson<CullingProof>(cullingPath);
 
   const targets = [
-    buildOptikTarget(opticsScalePath, opticsScale, optikDecisionPath, optikDecision, optikExpandedPath, optikExpanded),
+    buildOptikTarget(
+      opticsScalePath,
+      opticsScale,
+      optikDecisionPath,
+      optikDecision,
+      optikExpandedPath,
+      optikExpanded,
+      runtimeLodExpandedPath,
+      runtimeLodExpanded,
+    ),
     buildLoadTarget(texturePath, startupOpenPath, startupOpen, startupZonePath, startupZone, texture),
     buildEffectsTarget(grenadePath, grenade),
     buildTerrainTarget(horizonPath, horizon, openFrontierPerfPath, aShauPerfPath),
@@ -638,6 +686,7 @@ function main(): void {
       cycle2Proof: rel(cycle2Path),
       opticsScaleProof: rel(opticsScalePath),
       optikExpandedProof: rel(optikExpandedPath),
+      runtimeLodExpandedProof: rel(runtimeLodExpandedPath),
       optikDecisionPacket: rel(optikDecisionPath),
       textureAudit: rel(texturePath),
       startupOpenFrontier: rel(startupOpenPath),
@@ -652,14 +701,14 @@ function main(): void {
     targets,
     recommendedOrder: [
       'Treat the 2.95m NPC target drop, per-tile imposter crop, selected-lighting luma proof, and expanded-luma atmosphere pass as the current KB-OPTIK remediation slice.',
-      'If KB-OPTIK continues immediately, inspect gameplay-camera silhouette/crop evidence without changing shader constants again.',
+      'If KB-OPTIK continues immediately, use the runtime LOD-edge proof plus the near-stress artifact to decide visual exception/human review before changing crop or scale again.',
       'Run one KB-LOAD texture/upload branch with fresh startup before/after evidence if the team wants the first measurable WebGL remediation.',
       'Run one KB-EFFECTS first-use grenade warmup branch only against the low-load two-grenade probe.',
       'Keep KB-TERRAIN and KB-CULL remediation branches separate until matched large-mode perf windows are prepared.',
       'Keep WebGPU out of Cycle 3 unless the owner explicitly approves reopening the point-of-no-return decision.',
     ],
     openDecisions: [
-      'Should the next KB-OPTIK pass refine gameplay-camera silhouette/crop parity, document a visual exception, or should KB-LOAD/KB-EFFECTS take the next remediation slot?',
+      'Should KB-OPTIK document the 8.5m near-stress silhouette exception after the runtime LOD-edge PASS, run human visual review, or should KB-LOAD/KB-EFFECTS take the next remediation slot?',
       'Should the first KB-LOAD branch target giantPalm, NPC atlases, or upload scheduling?',
       'Which large-mode p95/draw-call budget will be used for far-canopy acceptance in this cycle?',
     ],

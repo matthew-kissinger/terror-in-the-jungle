@@ -56,6 +56,9 @@ type OpticsScaleProof = {
 
 type OptikExpandedProof = {
   status?: CheckStatus;
+  coverage?: {
+    cameraProfileSet?: string;
+  };
   measurementTrust?: {
     status?: CheckStatus;
   };
@@ -69,6 +72,19 @@ type OptikExpandedProof = {
     maxAbsLumaDeltaPercent?: number | null;
     flaggedProfiles?: string[];
   };
+};
+
+type ExpandedProofDigest = {
+  cameraProfileSet: string | null;
+  status: CheckStatus | null;
+  sampleCount: number | null;
+  flaggedSamples: number | null;
+  minVisibleHeightRatio: number | null;
+  maxVisibleHeightRatio: number | null;
+  minLumaDeltaPercent: number | null;
+  maxLumaDeltaPercent: number | null;
+  maxAbsLumaDeltaPercent: number | null;
+  flaggedProfiles: string[] | null;
 };
 
 type DecisionOption = {
@@ -96,17 +112,8 @@ type DecisionPacket = {
     imposterVisibleHeightRatio: { min: number | null; average: number | null; max: number | null };
     imposterMeanOpaqueLumaDelta: { min: number | null; average: number | null; max: number | null };
     imposterMeanOpaqueLumaDeltaPercent: { min: number | null; average: number | null; max: number | null };
-    expandedProof: {
-      status: CheckStatus | null;
-      sampleCount: number | null;
-      flaggedSamples: number | null;
-      minVisibleHeightRatio: number | null;
-      maxVisibleHeightRatio: number | null;
-      minLumaDeltaPercent: number | null;
-      maxLumaDeltaPercent: number | null;
-      maxAbsLumaDeltaPercent: number | null;
-      flaggedProfiles: string[] | null;
-    };
+    expandedProof: ExpandedProofDigest;
+    runtimeLodExpandedProof: ExpandedProofDigest;
     aircraftLongestAxisMeters: { min: number | null; average: number | null; max: number | null };
     aircraftLongestAxisToCurrentNpc: { min: number | null; average: number | null; max: number | null };
     aircraftLongestAxisToBaseNpc: { min: number | null; average: number | null; max: number | null };
@@ -153,6 +160,17 @@ function readJson<T>(path: string | null): T | null {
   return JSON.parse(readFileSync(path, 'utf-8')) as T;
 }
 
+function expandedCameraProfileSet(path: string): string {
+  return readJson<OptikExpandedProof>(path)?.coverage?.cameraProfileSet ?? 'expanded-stress';
+}
+
+function latestExpandedProofPath(cameraProfileSet: string): string | null {
+  return latestFile(ARTIFACT_ROOT, (path) =>
+    path.endsWith(join('projekt-143-optik-expanded-proof', 'summary.json'))
+    && expandedCameraProfileSet(path) === cameraProfileSet
+  );
+}
+
 function rel(path: string | null): string | null {
   return path ? relative(process.cwd(), path).replaceAll('\\', '/') : null;
 }
@@ -179,6 +197,21 @@ function range(values: Array<number | null | undefined>): { min: number | null; 
 function ratios(longestAxes: number[], denominator: number | null): Array<number | null> {
   if (!denominator || denominator <= 0) return [];
   return longestAxes.map((value) => value / denominator);
+}
+
+function expandedProofDigest(expanded: OptikExpandedProof | null): ExpandedProofDigest {
+  return {
+    cameraProfileSet: expanded?.coverage?.cameraProfileSet ?? null,
+    status: expanded?.status ?? null,
+    sampleCount: expanded?.aggregate?.sampleCount ?? null,
+    flaggedSamples: expanded?.aggregate?.flaggedSamples ?? null,
+    minVisibleHeightRatio: expanded?.aggregate?.minVisibleHeightRatio ?? null,
+    maxVisibleHeightRatio: expanded?.aggregate?.maxVisibleHeightRatio ?? null,
+    minLumaDeltaPercent: expanded?.aggregate?.minLumaDeltaPercent ?? null,
+    maxLumaDeltaPercent: expanded?.aggregate?.maxLumaDeltaPercent ?? null,
+    maxAbsLumaDeltaPercent: expanded?.aggregate?.maxAbsLumaDeltaPercent ?? null,
+    flaggedProfiles: expanded?.aggregate?.flaggedProfiles ?? null,
+  };
 }
 
 function buildDecisionOptions(
@@ -388,7 +421,8 @@ function writeMarkdown(packet: DecisionPacket, file: string): void {
     `- Imposter visible height ratio: ${JSON.stringify(packet.rootCause.imposterVisibleHeightRatio)}`,
     `- Imposter luma delta: ${JSON.stringify(packet.rootCause.imposterMeanOpaqueLumaDelta)}`,
     `- Imposter luma delta percent: ${JSON.stringify(packet.rootCause.imposterMeanOpaqueLumaDeltaPercent)}`,
-    `- Expanded proof: ${JSON.stringify(packet.rootCause.expandedProof)}`,
+    `- Expanded near-stress proof: ${JSON.stringify(packet.rootCause.expandedProof)}`,
+    `- Runtime LOD-edge proof: ${JSON.stringify(packet.rootCause.runtimeLodExpandedProof)}`,
     `- Aircraft longest axis / current NPC: ${JSON.stringify(packet.rootCause.aircraftLongestAxisToCurrentNpc)}`,
     `- Aircraft longest axis / base NPC: ${JSON.stringify(packet.rootCause.aircraftLongestAxisToBaseNpc)}`,
     '',
@@ -412,9 +446,11 @@ function writeMarkdown(packet: DecisionPacket, file: string): void {
 
 function main(): void {
   const opticsScalePath = latestFile(ARTIFACT_ROOT, (path) => path.endsWith(join('projekt-143-optics-scale-proof', 'summary.json')));
-  const optikExpandedPath = latestFile(ARTIFACT_ROOT, (path) => path.endsWith(join('projekt-143-optik-expanded-proof', 'summary.json')));
+  const optikExpandedPath = latestExpandedProofPath('expanded-stress');
+  const runtimeLodExpandedPath = latestExpandedProofPath('runtime-lod-edge');
   const proof = readJson<OpticsScaleProof>(opticsScalePath);
   const expanded = readJson<OptikExpandedProof>(optikExpandedPath);
+  const runtimeLodExpanded = readJson<OptikExpandedProof>(runtimeLodExpandedPath);
   const trusted = proof?.status === 'pass' && proof.measurementTrust?.status === 'pass';
   const npc = proof?.runtimeContracts?.npc ?? {};
   const comparisons = proof?.npcComparisons ?? [];
@@ -448,6 +484,9 @@ function main(): void {
   const expandedOnlyVisibleHeightFlags = expandedHasFlags
     && expandedLumaInProofBand
     && !expandedVisibleHeightInProofBand;
+  const runtimeLodExpandedPasses =
+    runtimeLodExpanded?.measurementTrust?.status === 'pass'
+    && runtimeLodExpanded?.status === 'pass';
   const selectedLightingComplete = firstTargetDropped && cropInProofBand && maxAbsLumaDeltaPercent !== null && maxAbsLumaDeltaPercent <= 12;
 
   const packet: DecisionPacket = {
@@ -458,6 +497,7 @@ function main(): void {
     inputs: {
       opticsScaleProof: rel(opticsScalePath),
       optikExpandedProof: rel(optikExpandedPath),
+      runtimeLodExpandedProof: rel(runtimeLodExpandedPath),
     },
     rootCause: {
       currentNpcTargetMeters: currentTarget !== null ? round(currentTarget) : null,
@@ -468,17 +508,8 @@ function main(): void {
       imposterVisibleHeightRatio,
       imposterMeanOpaqueLumaDelta,
       imposterMeanOpaqueLumaDeltaPercent,
-      expandedProof: {
-        status: expanded?.status ?? null,
-        sampleCount: expanded?.aggregate?.sampleCount ?? null,
-        flaggedSamples: expandedFlaggedSamples,
-        minVisibleHeightRatio: expanded?.aggregate?.minVisibleHeightRatio ?? null,
-        maxVisibleHeightRatio: expanded?.aggregate?.maxVisibleHeightRatio ?? null,
-        minLumaDeltaPercent: expanded?.aggregate?.minLumaDeltaPercent ?? null,
-        maxLumaDeltaPercent: expanded?.aggregate?.maxLumaDeltaPercent ?? null,
-        maxAbsLumaDeltaPercent: expanded?.aggregate?.maxAbsLumaDeltaPercent ?? null,
-        flaggedProfiles: expanded?.aggregate?.flaggedProfiles ?? null,
-      },
+      expandedProof: expandedProofDigest(expanded),
+      runtimeLodExpandedProof: expandedProofDigest(runtimeLodExpanded),
       aircraftLongestAxisMeters: range(longestAxes),
       aircraftLongestAxisToCurrentNpc: range(ratios(longestAxes, currentTarget)),
       aircraftLongestAxisToBaseNpc: range(ratios(longestAxes, baseTarget)),
@@ -489,7 +520,9 @@ function main(): void {
       ? [
           'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract problem unless a dedicated vehicle-scale proof says otherwise.',
           'Treat the 2.95m target drop, per-tile crop map, selected-lighting luma, and expanded-luma atmosphere pass as the landed KB-OPTIK remediation slice.',
-          'Use the expanded KB-OPTIK proof as after-luma evidence; the next KB-OPTIK decision is gameplay-camera silhouette/crop acceptance or a documented visual exception.',
+          runtimeLodExpandedPasses
+            ? 'Runtime LOD-edge proof passes; treat the remaining 8.5m near-stress silhouette flags as a visual-exception or human-review decision before changing runtime crop/scale again.'
+            : 'Use the expanded KB-OPTIK proof as after-luma evidence; the next KB-OPTIK decision is gameplay-camera silhouette/crop acceptance or a documented visual exception.',
           'If the team wants measurable WebGL improvement before more visual work, switch the next remediation slot to KB-LOAD texture/upload residency or KB-EFFECTS grenade first-use stall.',
         ]
       : selectedLightingComplete && expandedHasFlags
@@ -521,7 +554,9 @@ function main(): void {
           'Only reopen aircraft scale after the NPC target/crop evidence lands and fixed-wing/helicopter playtest probes are in scope.',
         ],
     openOwnerDecision: selectedLightingComplete && expandedOnlyVisibleHeightFlags
-      ? 'Expanded KB-OPTIK luma is inside band, but gameplay-perspective visible-height samples still flag. Next decision: accept/document the perspective silhouette exception, refine crop/geometry, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+      ? runtimeLodExpandedPasses
+        ? 'Runtime LOD-edge KB-OPTIK proof passes, but the 8.5m near-stress camera still flags visible height. Next decision: document the near-stress exception/human review, or explicitly request another runtime crop/scale pass despite LOD-edge evidence.'
+        : 'Expanded KB-OPTIK luma is inside band, but gameplay-perspective visible-height samples still flag. Next decision: accept/document the perspective silhouette exception, refine crop/geometry, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
       : selectedLightingComplete && expandedHasFlags
       ? 'Expanded KB-OPTIK coverage exists and is trusted, but it found visual flags. Next decision: target the imposter lighting/material contract now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
       : selectedLightingComplete
@@ -543,10 +578,13 @@ function main(): void {
   console.log(`- imposter visible-height ratio avg: ${packet.rootCause.imposterVisibleHeightRatio.average ?? 'unknown'}`);
   console.log(`- imposter luma delta pct avg: ${packet.rootCause.imposterMeanOpaqueLumaDeltaPercent.average ?? 'unknown'}`);
   console.log(`- expanded proof flagged samples: ${packet.rootCause.expandedProof.flaggedSamples ?? 'unknown'}`);
+  console.log(`- runtime LOD-edge proof flagged samples: ${packet.rootCause.runtimeLodExpandedProof.flaggedSamples ?? 'unknown'}`);
   console.log(`- aircraft longest-axis/current-NPC avg: ${packet.rootCause.aircraftLongestAxisToCurrentNpc.average ?? 'unknown'}`);
   console.log(`- recommended next runtime branch: ${
     selectedLightingComplete && expandedOnlyVisibleHeightFlags
-      ? 'target-gameplay-camera-silhouette-or-switch-bureau'
+      ? runtimeLodExpandedPasses
+        ? 'document-near-stress-silhouette-exception-or-switch-bureau'
+        : 'target-gameplay-camera-silhouette-or-switch-bureau'
       : selectedLightingComplete && expandedHasFlags
       ? 'target-expanded-lighting-contract-or-switch-bureau'
       : selectedLightingComplete

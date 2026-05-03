@@ -31,6 +31,7 @@ import {
 } from '../src/systems/combat/PixelForgeNpcRuntime';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
+type CameraProfileSet = 'expanded-stress' | 'runtime-lod-edge';
 
 type LightingProfile = {
   id: string;
@@ -167,6 +168,7 @@ type ExpandedSummary = {
     };
   };
   coverage: {
+    cameraProfileSet: CameraProfileSet;
     lightingProfiles: LightingProfile[];
     cameraProfiles: CameraProfile[];
   };
@@ -216,6 +218,8 @@ const MATCHED_CLIP_ID = 'idle';
 const MIN_VISIBLE_HEIGHT_RATIO = 0.85;
 const MAX_VISIBLE_HEIGHT_RATIO = 1.15;
 const MAX_ABS_LUMA_DELTA_PERCENT = 12;
+const DEFAULT_CAMERA_PROFILE_SET: CameraProfileSet = 'expanded-stress';
+const RUNTIME_LOD_EDGE_DISTANCE_METERS = 64;
 
 const LIGHTING_PROFILES: LightingProfile[] = [
   {
@@ -277,8 +281,8 @@ const LIGHTING_PROFILES: LightingProfile[] = [
   },
 ];
 
-const CAMERA_PROFILES: CameraProfile[] = [
-  {
+const CAMERA_PROFILE_LIBRARY: Record<string, CameraProfile> = {
+  'matched-orthographic': {
     id: 'matched-orthographic',
     label: 'Matched orthographic crop',
     kind: 'orthographic',
@@ -286,15 +290,28 @@ const CAMERA_PROFILES: CameraProfile[] = [
     lookAt: [0, NPC_CLOSE_MODEL_TARGET_HEIGHT / 2, 0],
     orthoHeightMeters: 5.2,
   },
-  {
+  'gameplay-front-perspective': {
     id: 'gameplay-front-perspective',
-    label: 'Front-facing gameplay perspective',
+    label: 'Front-facing near gameplay perspective',
     kind: 'perspective',
     position: [0, 2.2, 8.5],
     lookAt: [0, 1.45, 0],
     fovDegrees: 34,
   },
-];
+  'runtime-lod-edge-perspective': {
+    id: 'runtime-lod-edge-perspective',
+    label: 'Runtime LOD-edge front perspective',
+    kind: 'perspective',
+    position: [0, 2.2, RUNTIME_LOD_EDGE_DISTANCE_METERS],
+    lookAt: [0, 1.45, 0],
+    fovDegrees: 34,
+  },
+};
+
+const CAMERA_PROFILE_SETS: Record<CameraProfileSet, string[]> = {
+  'expanded-stress': ['matched-orthographic', 'gameplay-front-perspective'],
+  'runtime-lod-edge': ['matched-orthographic', 'runtime-lod-edge-perspective'],
+};
 
 const NPC_FIXTURES = PIXEL_FORGE_NPC_FACTIONS.map((faction) => ({
   runtimeFaction: faction.runtimeFaction,
@@ -325,6 +342,16 @@ function parseOutputDir(): string {
   if (raw) return raw;
   const stamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
   return join(ARTIFACT_ROOT, stamp, OUTPUT_NAME);
+}
+
+function parseCameraProfileSet(): CameraProfileSet {
+  const raw = argValue('--camera-profile-set') ?? DEFAULT_CAMERA_PROFILE_SET;
+  if (raw === 'expanded-stress' || raw === 'runtime-lod-edge') return raw;
+  throw new Error(`Invalid --camera-profile-set value: ${raw}`);
+}
+
+function resolveCameraProfiles(cameraProfileSet: CameraProfileSet): CameraProfile[] {
+  return CAMERA_PROFILE_SETS[cameraProfileSet].map((id) => CAMERA_PROFILE_LIBRARY[id]);
 }
 
 function gitSha(): string {
@@ -388,10 +415,10 @@ function serveFile(file: string, res: ServerResponse): void {
   res.end(readFileSync(file));
 }
 
-function proofHtml(): string {
+function proofHtml(cameraProfiles: CameraProfile[]): string {
   const npcFixtures = JSON.stringify(NPC_FIXTURES);
   const lightingProfiles = JSON.stringify(LIGHTING_PROFILES);
-  const cameraProfiles = JSON.stringify(CAMERA_PROFILES);
+  const cameraProfilePayload = JSON.stringify(cameraProfiles);
   const matchedClipCropMap = getPixelForgeNpcTileCropMap(MATCHED_CLIP_ID);
   const runtimeContracts = JSON.stringify({
     npcSpriteWidth: NPC_SPRITE_WIDTH,
@@ -430,7 +457,7 @@ function proofHtml(): string {
 
     const npcFixtures = ${npcFixtures};
     const lightingProfiles = ${lightingProfiles};
-    const cameraProfiles = ${cameraProfiles};
+    const cameraProfiles = ${cameraProfilePayload};
     const runtimeContracts = ${runtimeContracts};
     const loadErrors = [];
     const loader = new GLTFLoader();
@@ -990,8 +1017,8 @@ function proofHtml(): string {
 </html>`;
 }
 
-function createStaticServer(port: number): Promise<{ server: Server; url: string }> {
-  const html = proofHtml();
+function createStaticServer(port: number, cameraProfiles: CameraProfile[]): Promise<{ server: Server; url: string }> {
+  const html = proofHtml(cameraProfiles);
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const pathname = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`).pathname;
     if (pathname === '/') {
@@ -1134,7 +1161,10 @@ function buildAggregate(samples: ExpandedSample[]): ExpandedSummary['aggregate']
   };
 }
 
-function buildFindings(summary: Pick<ExpandedSummary, 'aggregate' | 'measurementTrust'>): string[] {
+function buildFindings(
+  summary: Pick<ExpandedSummary, 'aggregate' | 'measurementTrust'>,
+  cameraProfiles: CameraProfile[],
+): string[] {
   const findings: string[] = [];
   const { aggregate } = summary;
   if (summary.measurementTrust.status !== 'pass') {
@@ -1142,7 +1172,7 @@ function buildFindings(summary: Pick<ExpandedSummary, 'aggregate' | 'measurement
     return findings;
   }
   findings.push(
-    `Expanded KB-OPTIK proof captured ${aggregate.sampleCount} close-GLB/imposter comparisons across ${LIGHTING_PROFILES.length} lighting profiles and ${CAMERA_PROFILES.length} camera profiles.`
+    `Expanded KB-OPTIK proof captured ${aggregate.sampleCount} close-GLB/imposter comparisons across ${LIGHTING_PROFILES.length} lighting profiles and ${cameraProfiles.length} camera profiles.`
   );
   findings.push(
     `Visible-height ratio range is ${aggregate.minVisibleHeightRatio ?? 'n/a'} to ${aggregate.maxVisibleHeightRatio ?? 'n/a'} against the ${MIN_VISIBLE_HEIGHT_RATIO}-${MAX_VISIBLE_HEIGHT_RATIO} band.`
@@ -1168,6 +1198,7 @@ function writeMarkdown(summary: ExpandedSummary, file: string): void {
     `Generated: ${summary.createdAt}`,
     `Source SHA: ${summary.sourceGitSha}`,
     `Status: ${summary.status.toUpperCase()}`,
+    `Camera profile set: ${summary.coverage.cameraProfileSet}`,
     '',
     '## Findings',
     '',
@@ -1189,7 +1220,9 @@ async function run(): Promise<void> {
   const outputDir = parseOutputDir();
   mkdirSync(outputDir, { recursive: true });
   const port = parsePort();
-  const { server, url } = await createStaticServer(port);
+  const cameraProfileSet = parseCameraProfileSet();
+  const cameraProfiles = resolveCameraProfiles(cameraProfileSet);
+  const { server, url } = await createStaticServer(port, cameraProfiles);
   const browserErrors: string[] = [];
   const pageErrors: string[] = [];
   const requestFailures: string[] = [];
@@ -1268,7 +1301,7 @@ async function run(): Promise<void> {
       });
     }
 
-    const expectedSamples = NPC_FIXTURES.length * LIGHTING_PROFILES.length * CAMERA_PROFILES.length;
+    const expectedSamples = NPC_FIXTURES.length * LIGHTING_PROFILES.length * cameraProfiles.length;
     const trustStatus: CheckStatus =
       browserErrors.length === 0
       && pageErrors.length === 0
@@ -1334,8 +1367,9 @@ async function run(): Promise<void> {
         },
       },
       coverage: {
+        cameraProfileSet,
         lightingProfiles: LIGHTING_PROFILES,
-        cameraProfiles: CAMERA_PROFILES,
+        cameraProfiles,
       },
       files: {
         summary: rel(summaryFile) ?? summaryFile,
@@ -1344,7 +1378,7 @@ async function run(): Promise<void> {
       },
       aggregate,
       samples,
-      findings: buildFindings(summaryWithoutFindings),
+      findings: buildFindings(summaryWithoutFindings, cameraProfiles),
       browserErrors,
       pageErrors,
       requestFailures: [...requestFailures, ...payload.loadErrors],
