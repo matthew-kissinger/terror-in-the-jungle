@@ -116,14 +116,14 @@ the current truth anchor.
   profile capture, browser long-task/LoAF capture, all required renderer
   categories visible, and trusted probe overhead. KB-OPTIK matched scale proof
   passed as evidence at
-  `artifacts/perf/2026-05-03T10-35-14-737Z/projekt-143-optics-scale-proof/summary.json`.
+  `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`.
   It shows the current close-GLB and imposter geometry both target `4.425m`,
   while rendered imposter silhouettes average only `0.53x` of close-GLB visible
   height and are darker by `26.59-59.06` luma. The six aircraft GLBs load at
   imported native scale with longest-axis/NPC-height ratios from `2.07x` to
   `5.52x`. `npm run check:projekt-143-cycle2-proof` was refreshed afterward
   and wrote
-  `artifacts/perf/2026-05-03T10-35-45-948Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  `artifacts/perf/2026-05-03T10-39-53-595Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
   with PASS status for evidence completeness. This is not a shader, scale,
   imposter, culling, or aircraft-feel remediation claim. The culling proof
   screenshot is not runtime scale evidence because its fixture rescales GLBs by

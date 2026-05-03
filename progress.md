@@ -1932,7 +1932,7 @@ TODO
   records projected geometry height, rendered visible silhouette height,
   luma/chroma deltas, and a same-scale aircraft lineup.
 - Trusted proof passed at
-  `artifacts/perf/2026-05-03T10-35-14-737Z/projekt-143-optics-scale-proof/summary.json`
+  `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`
   with `0` browser/page/request/load errors, four matched NPC crop pairs, six
   aircraft native-scale entries, and renderer stats captured.
 - Finding: close GLB and imposter geometry both target `4.425m`, but rendered
@@ -1948,7 +1948,7 @@ TODO
   decision before remediation.
 - `npm run check:projekt-143-cycle2-proof` now consumes the scale proof and
   passed at
-  `artifacts/perf/2026-05-03T10-35-45-948Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  `artifacts/perf/2026-05-03T10-39-53-595Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
   PASS means Cycle 2 evidence surfaces are complete for review. Still not
   claimed: NPC scale remediation, imposter parity, shader/atlas changes,
   aircraft-size remediation, or production parity.

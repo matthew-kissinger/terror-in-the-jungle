@@ -19,7 +19,7 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is now evidence-complete PASS through `artifacts/perf/2026-05-03T10-35-45-948Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched scale proof at `artifacts/perf/2026-05-03T10-35-14-737Z/projekt-143-optics-scale-proof/summary.json`. The KB-OPTIK proof flags a real visual-scale/parity problem: close GLB and imposter geometry share the `4.425m` target, but rendered imposter silhouettes average `0.53x` close-GLB height. User-approved aircraft GLB replacement is delivered as an evidence-gated asset/runtime import, not as a performance, scale-remediation, or aircraft-feel claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is now evidence-complete PASS through `artifacts/perf/2026-05-03T10-39-53-595Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched scale proof at `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`. The KB-OPTIK proof flags a real visual-scale/parity problem: close GLB and imposter geometry share the `4.425m` target, but rendered imposter silhouettes average `0.53x` close-GLB height. User-approved aircraft GLB replacement is delivered as an evidence-gated asset/runtime import, not as a performance, scale-remediation, or aircraft-feel claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
 ## Shipped Cycle 0 State
@@ -462,7 +462,7 @@ Progress:
   pixels-per-meter values range from `18.91` to `68.45`.
 - 2026-05-03 matched scale proof: `npm run
   check:projekt-143-optics-scale-proof -- --port=0` passed at
-  `artifacts/perf/2026-05-03T10-35-14-737Z/projekt-143-optics-scale-proof/summary.json`.
+  `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`.
   The proof renders the close Pixel Forge GLB and the matching NPC imposter
   shader crop in the same orthographic camera/light setup, then records visible
   silhouette height and luma/chroma deltas. All four factions share the same
@@ -937,7 +937,7 @@ Current Cycle 2 status:
   renderer categories with trusted measurement.
 - 2026-05-03: `npm run check:projekt-143-optics-scale-proof -- --port=0`
   added the matched KB-OPTIK evidence and passed at
-  `artifacts/perf/2026-05-03T10-35-14-737Z/projekt-143-optics-scale-proof/summary.json`.
+  `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`.
   It records four close-GLB/imposter crop pairs, projected geometry height,
   rendered visible silhouette height, luma/chroma deltas, same-scale aircraft
   native bounds, headed browser metadata, and measurement-trust flags. The
@@ -946,7 +946,7 @@ Current Cycle 2 status:
   visible height and substantially darker luma.
 - 2026-05-03: `npm run check:projekt-143-cycle2-proof` now consumes the
   KB-OPTIK scale proof and passed at
-  `artifacts/perf/2026-05-03T10-35-45-948Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  `artifacts/perf/2026-05-03T10-39-53-595Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
   PASS means the Cycle 2 evidence bundle is complete for review; it is not a
   shader, atlas, NPC-scale, vehicle-scale, culling, or performance remediation
   claim.
