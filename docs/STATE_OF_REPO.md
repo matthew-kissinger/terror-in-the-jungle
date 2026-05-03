@@ -106,21 +106,28 @@ the current truth anchor.
   run `25265757159`, Deploy run `25266081872`, live `/asset-manifest.json`,
   Pages/R2/build/WASM headers, service worker state, and a Zone Control browser
   smoke all passed.
-- Phase 2 / Cycle 2 is now open as visual/runtime proof work. Runtime screenshots
+- Phase 2 / Cycle 2 is now evidence-complete as visual/runtime proof work, not
+  as remediation. Runtime screenshots
   were refreshed at
   `artifacts/perf/2026-05-03T01-00-12-099Z/projekt-143-cycle2-runtime-proof/summary.json`.
   The dedicated headed KB-CULL renderer/category proof passed at
-  `artifacts/perf/2026-05-03T09-35-13-554Z/projekt-143-culling-proof/summary.json`
+  `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json`
   with nonzero renderer stats (`133` draw calls, `4,887` triangles), CPU
   profile capture, browser long-task/LoAF capture, all required renderer
-  categories visible, and probeP95 `1.96ms`. `npm run
-  check:projekt-143-cycle2-proof` was refreshed afterward and wrote
-  `artifacts/perf/2026-05-03T09-35-33-689Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
-  with WARN status only because matched close-GLB/imposter screenshots are not
-  certified. KB-CULL scene attribution is now PASS; KB-OPTIK matched visual
-  proof remains open. The culling proof screenshot is not runtime scale
-  evidence because its fixture rescales GLBs by longest bounding-box axis to fit
-  one camera.
+  categories visible, and trusted probe overhead. KB-OPTIK matched scale proof
+  passed as evidence at
+  `artifacts/perf/2026-05-03T10-35-14-737Z/projekt-143-optics-scale-proof/summary.json`.
+  It shows the current close-GLB and imposter geometry both target `4.425m`,
+  while rendered imposter silhouettes average only `0.53x` of close-GLB visible
+  height and are darker by `26.59-59.06` luma. The six aircraft GLBs load at
+  imported native scale with longest-axis/NPC-height ratios from `2.07x` to
+  `5.52x`. `npm run check:projekt-143-cycle2-proof` was refreshed afterward
+  and wrote
+  `artifacts/perf/2026-05-03T10-35-45-948Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  with PASS status for evidence completeness. This is not a shader, scale,
+  imposter, culling, or aircraft-feel remediation claim. The culling proof
+  screenshot is not runtime scale evidence because its fixture rescales GLBs by
+  longest bounding-box axis to fit one camera.
 - Cycle 2 now also includes the user-approved aircraft GLB replacement as an
   evidence-gated asset/runtime import. The six runtime aircraft GLBs were
   imported from Pixel Forge through `npm run assets:import-pixel-forge-aircraft`
@@ -143,7 +150,7 @@ the current truth anchor.
   baselines. Local `npm run validate:fast`, `npm run build`, and
   `npm run check:projekt-143` pass after the aircraft patch; the latest static
   evidence suite is
-  `artifacts/perf/2026-05-03T09-36-55-865Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T10-36-57-982Z/projekt-143-evidence-suite/suite-summary.json`.
   Commit `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33` passed manual CI run
   `25274278013` and Deploy run `25274649157`. Live `/asset-manifest.json`
   reported that SHA; Pages shell, service worker, manifest, representative
@@ -271,8 +278,10 @@ What is not ready to claim:
   first-use render/program stall candidate and records that 120-NPC AI Sandbox
   is already saturated before a grenade can be isolated.
 - No imposter brightness, NPC scale, NPC atlas, or vegetation normal-map fix
-  has shipped. KB-OPTIK now has static evidence, but still needs matched
-  screenshot comparison against close GLBs and runtime vegetation.
+  has shipped. KB-OPTIK now has static and matched close-GLB/imposter evidence:
+  the matched proof shows current NPC imposter visible silhouettes are about
+  half the close-GLB height despite sharing the same `4.425m` geometry target.
+  That is a remediation blocker, not a fix.
 - No distant-canopy or barren-horizon fix has shipped. KB-TERRAIN now has
   static coverage evidence, but still needs elevated runtime screenshots and
   matched perf captures before any outer-canopy layer is accepted.
@@ -281,13 +290,13 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a draft multi-cycle plan in
   `docs/PROJEKT_OBJEKT_143.md`. Cycle 0 evidence and Cycle 1 baseline/policy
-  work are shipped. The next agent team should continue Phase 2 / Cycle 2 by
-  producing matched close-GLB/imposter visual crops for KB-OPTIK before any
-  shader, atlas, imposter, far-canopy, grenade, texture, or WebGPU remediation
-  is accepted. KB-CULL now has trusted category/draw-call proof, but still
-  needs before/after captures before accepting an actual culling or HLOD
-  change. KB-EFFECTS still needs a verified warmup or first-use-render
-  remediation before it can close.
+  work are shipped. Cycle 2 now has matched KB-OPTIK crops and KB-CULL
+  category/draw-call proof. The next work should decide the NPC scale/bake
+  contract from that evidence before any shader, atlas, imposter, far-canopy,
+  grenade, texture, or WebGPU remediation is accepted. KB-CULL still needs
+  before/after captures before accepting an actual culling or HLOD change.
+  KB-EFFECTS still needs a verified warmup or first-use-render remediation
+  before it can close.
 
 ## Starter-Kits Incubation Close-Out On 2026-04-28
 

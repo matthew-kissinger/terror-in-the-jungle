@@ -1850,7 +1850,7 @@ TODO
 - Local gates now passing after the aircraft patch: `npm run validate:fast`,
   `npm run build`, and `npm run check:projekt-143`. The fresh Projekt-143 static
   suite wrote
-  `artifacts/perf/2026-05-03T09-36-55-865Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T10-36-57-982Z/projekt-143-evidence-suite/suite-summary.json`.
 - Refreshed `npm run check:projekt-143-cycle2-proof` after the aircraft patch;
   it remains WARN for missing dedicated culling/optic certification views and
   wrote
@@ -1920,6 +1920,35 @@ TODO
   It remains WARN overall only because KB-OPTIK still lacks matched
   close-GLB/imposter screenshot crops. KB-CULL scene attribution is now PASS.
 - Refreshed `npm run check:projekt-143`; the static suite passed at
-  `artifacts/perf/2026-05-03T09-36-55-865Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T10-36-57-982Z/projekt-143-evidence-suite/suite-summary.json`.
 - Still not claimed: any culling/HLOD optimization, imposter visual parity,
   aircraft feel, or production parity for the docs/tooling-only changes.
+
+2026-05-03 Cycle 2 KB-OPTIK matched scale proof
+- Added `scripts/projekt-143-optics-scale-proof.ts` and
+  `npm run check:projekt-143-optics-scale-proof`. The proof serves a headed
+  browser fixture that renders current close Pixel Forge NPC GLBs and matching
+  NPC imposter shader crops with the same orthographic camera/light setup, then
+  records projected geometry height, rendered visible silhouette height,
+  luma/chroma deltas, and a same-scale aircraft lineup.
+- Trusted proof passed at
+  `artifacts/perf/2026-05-03T10-35-14-737Z/projekt-143-optics-scale-proof/summary.json`
+  with `0` browser/page/request/load errors, four matched NPC crop pairs, six
+  aircraft native-scale entries, and renderer stats captured.
+- Finding: close GLB and imposter geometry both target `4.425m`, but rendered
+  imposter silhouettes are only `0.52-0.54x` close-GLB height across the four
+  factions. Imposter crops are darker by `26.59-59.06` luma. This supports the
+  screenshot review concern, but the likely problem is the NPC bake/runtime
+  scale contract plus shader/luma parity, not the Cycle 2 culling proof
+  screenshot.
+- Aircraft native GLB longest-axis/current-NPC-height ratios are `2.07x` UH-1C,
+  `2.14x` AH-1, `2.33x` UH-1, `2.82x` A-1, `3.21x` F-4, and `5.52x` AC-47.
+  The aircraft are not obviously below NPC size, but the smaller helicopters
+  are close enough that absolute NPC visual height needs a design/art-contract
+  decision before remediation.
+- `npm run check:projekt-143-cycle2-proof` now consumes the scale proof and
+  passed at
+  `artifacts/perf/2026-05-03T10-35-45-948Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  PASS means Cycle 2 evidence surfaces are complete for review. Still not
+  claimed: NPC scale remediation, imposter parity, shader/atlas changes,
+  aircraft-size remediation, or production parity.

@@ -164,6 +164,15 @@ static metadata and image analysis: it does not replace screenshot comparison,
 but it catches bake/runtime scale mismatches, low effective pixels per meter,
 alpha occupancy, atlas luma/chroma, and divergent shader contracts.
 
+`projekt-143-optics-scale-proof.ts` writes matched KB-OPTIK visual evidence
+under `artifacts/perf/<timestamp>/projekt-143-optics-scale-proof/`. It renders
+the current close Pixel Forge GLBs and matching NPC imposter shader crops in the
+same orthographic camera/light setup, records projected geometry height,
+rendered visible silhouette height, luma/chroma deltas, and a same-scale lineup
+with the six aircraft GLBs at imported native scale. PASS means the evidence is
+complete enough for review; it is not an imposter, NPC-scale, aircraft-scale, or
+shader remediation claim.
+
 `projekt-143-cycle1-benchmark-bundle.ts` writes a Cycle 1 certification bundle
 under `artifacts/perf/<timestamp>/projekt-143-cycle1-benchmark-bundle/` and a
 `projekt-143-cycle1-metadata.json` sidecar into each source artifact directory.
@@ -174,9 +183,10 @@ measurement-trust status.
 `projekt-143-cycle2-proof-suite.ts` writes a Cycle 2 visual/runtime proof
 status bundle. It pairs the latest runtime screenshot summary, static optics
 and horizon audits, Open Frontier/A Shau scene attribution, and the latest
-`projekt-143-culling-proof` summary when present. The command is non-strict by
-default and may return `WARN` while proof surfaces are incomplete; use
-`--strict` once Cycle 2 is ready to become a blocking gate.
+`projekt-143-culling-proof` and `projekt-143-optics-scale-proof` summaries when
+present. The command is non-strict by default and may return `WARN` while proof
+surfaces are incomplete; use `--strict` once Cycle 2 is ready to become a
+blocking gate.
 
 `projekt-143-culling-proof.ts` writes a headed deterministic renderer/category
 fixture under `artifacts/perf/<timestamp>/projekt-143-culling-proof/`. It uses
@@ -453,10 +463,13 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    render/program work. Do not treat the older hidden-effect warmup as closed
    until the two-grenade probe passes without a trigger-adjacent long task.
 4. **NPC imposter scale/resolution and brightness parity** - static KB-OPTIK
-   evidence now shows every runtime NPC atlas is stretched more than 2x against
-   source bbox height and uses only `21.69px/m` at runtime. The shader path is
-   also split from both vegetation and close GLBs. A matched screenshot rig is
-   required before fixing constants or regenerating atlases.
+   evidence shows every runtime NPC atlas is stretched more than 2x against
+   source bbox height and uses only `21.69px/m` at runtime. The matched Cycle 2
+   proof now shows imposter visible silhouettes at only `0.52-0.54x` close-GLB
+   height and darker by `26.59-59.06` luma despite the same `4.425m` geometry
+   target. The shader path is also split from both vegetation and close GLBs.
+   Do not fix constants or regenerate atlases without before/after matched
+   proof.
 5. **Large-mode vegetation horizon gap** - static KB-TERRAIN evidence shows
    current Pixel Forge vegetation disappears by `600m`, while Open Frontier
    and A Shau terrain remains visible beyond that range. The current lead is a

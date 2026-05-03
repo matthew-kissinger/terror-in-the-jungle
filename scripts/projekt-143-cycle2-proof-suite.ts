@@ -71,6 +71,65 @@ type OpticsAudit = {
   };
 };
 
+type OpticsScaleProof = {
+  createdAt?: string;
+  sourceGitSha?: string;
+  status?: CheckStatus;
+  files?: {
+    summary?: string;
+    markdown?: string;
+    lineupScreenshot?: string;
+  };
+  runtimeContracts?: {
+    npc?: {
+      visualHeightMeters?: number;
+      spriteWidthMeters?: number;
+      closeModelTargetHeightMeters?: number;
+    };
+  };
+  npcComparisons?: Array<{
+    runtimeFaction?: string;
+    clip?: string;
+    files?: {
+      closeCrop?: string;
+      imposterCrop?: string;
+    };
+    closeImageStats?: {
+      visibleBounds?: { height?: number } | null;
+      meanOpaqueLuma?: number | null;
+      meanOpaqueChroma?: number | null;
+    };
+    imposterImageStats?: {
+      visibleBounds?: { height?: number } | null;
+      meanOpaqueLuma?: number | null;
+      meanOpaqueChroma?: number | null;
+    };
+    deltas?: {
+      renderedVisibleHeightRatio?: number | null;
+      renderedVisibleHeightDeltaPercent?: number | null;
+      meanOpaqueLumaDelta?: number | null;
+      meanOpaqueChromaDelta?: number | null;
+    };
+    flags?: string[];
+  }>;
+  aircraftNativeScale?: Array<{
+    key?: string;
+    nativeBoundsMeters?: {
+      widthX?: number;
+      heightY?: number;
+      depthZ?: number;
+      longestAxis?: number;
+    };
+    nativeLongestAxisToNpcVisualHeight?: number;
+  }>;
+  findings?: string[];
+  measurementTrust?: {
+    status?: CheckStatus;
+    flags?: Record<string, unknown>;
+    summary?: string;
+  };
+};
+
 type HorizonAudit = {
   createdAt?: string;
   summary?: {
@@ -349,22 +408,72 @@ function checkCullingAttribution(summaryPaths: string[], cullingProofPath: strin
   };
 }
 
-function checkNpcMatchedProof(opticsPath: string | null): ProofCheck {
+function checkNpcMatchedProof(opticsPath: string | null, scaleProofPath: string | null): ProofCheck {
   const optics = opticsPath ? readJson<OpticsAudit>(opticsPath) : null;
+  const scaleProof = scaleProofPath ? readJson<OpticsScaleProof>(scaleProofPath) : null;
+  const trustedScaleProof = scaleProof?.status === 'pass' && scaleProof.measurementTrust?.status === 'pass';
+  const comparisonCount = scaleProof?.npcComparisons?.length ?? 0;
+  const completeCrops = (scaleProof?.npcComparisons ?? []).filter((comparison) =>
+    comparison.files?.closeCrop
+    && existsSync(comparison.files.closeCrop)
+    && comparison.files?.imposterCrop
+    && existsSync(comparison.files.imposterCrop)
+  ).length;
+  const hasAircraftScale = (scaleProof?.aircraftNativeScale?.length ?? 0) >= 6;
+  const status: CheckStatus = trustedScaleProof && comparisonCount >= 4 && completeCrops >= 4 && hasAircraftScale
+    ? 'pass'
+    : scaleProofPath
+      ? 'fail'
+      : 'warn';
+
   return {
     id: 'npc_glb_imposter_matched_screenshots',
-    status: 'warn',
-    summary: 'Static optics evidence exists, but matched close-GLB/imposter screenshot crops are not certified yet.',
+    status,
+    summary: status === 'pass'
+      ? 'Matched close-GLB/imposter crops and native aircraft scale evidence are captured for KB-OPTIK review.'
+      : scaleProofPath
+        ? 'A matched close-GLB/imposter proof exists, but it is incomplete or untrusted.'
+        : 'Static optics evidence exists, but matched close-GLB/imposter screenshot crops are not certified yet.',
     evidence: {
       opticsAuditPath: rel(opticsPath),
       createdAt: optics?.createdAt ?? null,
       npcEntries: optics?.summary?.npcEntries ?? null,
       npcFlaggedEntries: optics?.summary?.npcFlaggedEntries ?? null,
+      scaleProof: {
+        summaryPath: rel(scaleProofPath),
+        createdAt: scaleProof?.createdAt ?? null,
+        sourceGitSha: scaleProof?.sourceGitSha ?? null,
+        status: scaleProof?.status ?? null,
+        measurementTrustStatus: scaleProof?.measurementTrust?.status ?? null,
+        measurementTrustFlags: scaleProof?.measurementTrust?.flags ?? null,
+        runtimeNpcVisualHeightMeters: scaleProof?.runtimeContracts?.npc?.visualHeightMeters ?? null,
+        comparisonCount,
+        completeCrops,
+        aircraftScaleEntries: scaleProof?.aircraftNativeScale?.length ?? null,
+        lineupScreenshot: scaleProof?.files?.lineupScreenshot ?? null,
+        findings: scaleProof?.findings ?? [],
+        npcDeltas: (scaleProof?.npcComparisons ?? []).map((comparison) => ({
+          runtimeFaction: comparison.runtimeFaction ?? null,
+          clip: comparison.clip ?? null,
+          closeVisibleHeightPx: comparison.closeImageStats?.visibleBounds?.height ?? null,
+          imposterVisibleHeightPx: comparison.imposterImageStats?.visibleBounds?.height ?? null,
+          renderedVisibleHeightRatio: comparison.deltas?.renderedVisibleHeightRatio ?? null,
+          renderedVisibleHeightDeltaPercent: comparison.deltas?.renderedVisibleHeightDeltaPercent ?? null,
+          meanOpaqueLumaDelta: comparison.deltas?.meanOpaqueLumaDelta ?? null,
+          meanOpaqueChromaDelta: comparison.deltas?.meanOpaqueChromaDelta ?? null,
+          flags: comparison.flags ?? [],
+          files: comparison.files ?? null,
+        })),
+        aircraftNativeScale: (scaleProof?.aircraftNativeScale ?? []).map((entry) => ({
+          key: entry.key ?? null,
+          nativeBoundsMeters: entry.nativeBoundsMeters ?? null,
+          nativeLongestAxisToNpcVisualHeight: entry.nativeLongestAxisToNpcVisualHeight ?? null,
+        })),
+      },
       requiredNextEvidence: [
-        'close GLB crop at selected LOD switch distance',
-        'matching imposter crop from the same camera/light setup',
-        'projected height delta',
-        'mean opaque luma/chroma delta',
+        'use the matched crops to decide whether current NPC scale is acceptable',
+        'use the aircraft native bounds to decide whether vehicle GLB unit scale needs normalization',
+        'do not ship a scale, shader, or atlas remediation without before/after matched proof',
       ],
     },
   };
@@ -428,12 +537,14 @@ function main(): void {
     ?? latestFile(ARTIFACT_ROOT, (path) => path.endsWith(join('vegetation-horizon-audit', 'horizon-audit.json')));
   const cullingProof = argValue('--culling-proof')
     ?? latestFile(ARTIFACT_ROOT, (path) => path.endsWith(join('projekt-143-culling-proof', 'summary.json')));
+  const opticsScaleProof = argValue('--optics-scale-proof')
+    ?? latestFile(ARTIFACT_ROOT, (path) => path.endsWith(join('projekt-143-optics-scale-proof', 'summary.json')));
 
   const checks: ProofCheck[] = [
     checkRuntimeHorizon(runtimeSummary),
     checkStaticHorizon(horizonAudit),
     checkCullingAttribution([openFrontierSummary, aShauSummary].filter((path): path is string => Boolean(path)), cullingProof),
-    checkNpcMatchedProof(opticsAudit),
+    checkNpcMatchedProof(opticsAudit, opticsScaleProof),
   ];
   const cullingCheck = checks.find((check) => check.id === 'culling_scene_attribution');
   const npcMatchedCheck = checks.find((check) => check.id === 'npc_glb_imposter_matched_screenshots');
@@ -458,6 +569,7 @@ function main(): void {
       aShauSummary: rel(aShauSummary),
       cullingProof: rel(cullingProof),
       opticsAudit: rel(opticsAudit),
+      opticsScaleProof: rel(opticsScaleProof),
       horizonAudit: rel(horizonAudit),
     },
     checks,

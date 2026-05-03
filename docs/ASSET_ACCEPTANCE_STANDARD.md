@@ -73,10 +73,15 @@ Mechanical supporting gates:
 
 ```bash
 npm run check:pixel-forge-optics
+npm run check:projekt-143-optics-scale-proof
 npm run check:vegetation-horizon
 ```
 
-These are static audits. They do not replace runtime screenshots.
+`check:pixel-forge-optics` and `check:vegetation-horizon` are static audits.
+`check:projekt-143-optics-scale-proof` is the matched close-GLB/imposter crop
+and same-scale aircraft reference proof. Passing the proof only means the
+evidence is trusted enough for review; visual-scale, luma, shader, atlas, or
+aircraft-size changes still need before/after proof.
 
 ## Normal Maps
 
