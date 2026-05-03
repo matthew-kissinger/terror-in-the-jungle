@@ -1957,10 +1957,11 @@ TODO
 - Added `scripts/projekt-143-cycle3-kickoff.ts` and
   `npm run check:projekt-143-cycle3-kickoff` as an agent-DX/readiness command.
   It reads the latest Cycle 2 proof, KB-OPTIK scale proof, texture audit,
-  startup evidence, grenade probe, vegetation horizon audit, and culling proof,
-  then writes a remediation readiness matrix.
-- First kickoff artifact:
-  `artifacts/perf/2026-05-03T11-20-50-184Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  startup evidence, grenade probe, vegetation horizon audit, culling proof, and
+  the KB-OPTIK decision packet when present, then writes a remediation readiness
+  matrix.
+- Current kickoff artifact:
+  `artifacts/perf/2026-05-03T15-03-08-568Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Overall status is WARN by design because the next phase needs decisions and
   baselines before fixes.
 - The refreshed kickoff artifact carries Open Frontier and Zone Control startup
@@ -1978,3 +1979,29 @@ TODO
   startup remediation, texture regeneration, NPC scale/luma fix, grenade
   warmup fix, far-canopy layer, culling/HLOD change, WebGPU migration, or
   production parity.
+
+2026-05-03 Projekt Objekt-143 KB-OPTIK decision packet
+- Added `scripts/projekt-143-optik-decision-packet.ts` and
+  `npm run check:projekt-143-optik-decision`.
+- First packet artifact:
+  `artifacts/perf/2026-05-03T15-03-07-006Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  Status is WARN because it intentionally leaves the absolute NPC target as an
+  owner/art-direction decision.
+- Findings: current NPC target is `4.425m` from a `2.95m` base target times
+  `1.50`; close GLBs are scaled about `2.51x` from source; imposter visible
+  height is only `0.522-0.544x` the close GLB; aircraft longest-axis ratios are
+  `3.01x` average against current NPC height and `4.52x` against the base
+  target.
+- Decision: do not resize aircraft first. First runtime remediation should
+  prototype NPC imposter crop/regeneration against one faction/clip, while the
+  owner decides whether absolute NPC target drops from `4.425m` to `2.95m` or
+  requires a larger human-scale redesign. Shader/luma parity comes after
+  scale/crop.
+- Repo alignment: Cycle 3 kickoff commit
+  `5b726746b0034d9327f5cb03ddcd3147294125ed` passed GitHub CI run
+  `25277824856`. It was not deployed or live-verified, so no production parity
+  is claimed.
+- Validation for this decision-packet patch: `npm run typecheck` PASS,
+  `npm run check:projekt-143-optik-decision` WARN by design,
+  `npm run check:projekt-143-cycle3-kickoff` WARN by design with the decision
+  packet path included, and `npm run validate:fast` PASS.

@@ -290,7 +290,7 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T11-20-50-184Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T15-03-08-568Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/luma as `needs_decision`,
   KB-LOAD texture upload/residency and KB-EFFECTS grenade first-use as
@@ -299,6 +299,18 @@ What is not ready to claim:
   combat120, and A Shau perf summary paths for handoff. This is planning/
   agent-DX evidence only; no shader, atlas, imposter, far-canopy, grenade,
   texture, culling, or WebGPU remediation has shipped.
+- KB-OPTIK now has an executable decision packet at
+  `artifacts/perf/2026-05-03T15-03-07-006Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  It records the current NPC target as `4.425m`, the Pixel Forge base target as
+  `2.95m`, the imposter visible-height ratio as `0.522-0.544`, and aircraft
+  longest-axis ratios as `3.01x` average against current NPC height or `4.52x`
+  average against the base target. It rejects aircraft resizing as the first
+  branch, recommends an NPC imposter crop/regeneration prototype for the
+  measured LOD-pop problem, and keeps the absolute NPC target as an owner
+  decision. No scale, shader, or asset remediation has shipped.
+- Commit `5b726746b0034d9327f5cb03ddcd3147294125ed` passed GitHub CI run
+  `25277824856` after the Cycle 3 kickoff docs/tooling release. It was not
+  deployed or live-verified; do not claim production parity for that commit.
 
 ## Starter-Kits Incubation Close-Out On 2026-04-28
 

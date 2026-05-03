@@ -86,6 +86,7 @@ npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark 
 npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proof
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
+npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet
 ```
 
 Startup UI benchmarks are retail-build measurements, not perf-harness frame
@@ -197,6 +198,15 @@ grenade probe, vegetation horizon audit, and culling proof, then classifies
 candidate Cycle 3 branches as `ready_for_branch`, `needs_decision`,
 `needs_baseline`, or `blocked`. This is an agent-DX handoff command; it does
 not approve or apply any remediation.
+
+`projekt-143-optik-decision-packet.ts` writes a KB-OPTIK decision packet under
+`artifacts/perf/<timestamp>/projekt-143-optik-decision-packet/`. It consumes the
+trusted matched scale proof, records the current `4.425m` NPC target, base
+`2.95m` target, imposter visible-height ratio, luma delta, and aircraft
+longest-axis ratios against both NPC targets. It explicitly rejects aircraft
+resizing as the first response to the NPC/vehicle scale concern, recommends a
+measured imposter crop/regeneration branch for the immediate LOD-pop problem,
+and leaves the absolute NPC target as an owner/art-direction decision.
 
 `projekt-143-culling-proof.ts` writes a headed deterministic renderer/category
 fixture under `artifacts/perf/<timestamp>/projekt-143-culling-proof/`. It uses

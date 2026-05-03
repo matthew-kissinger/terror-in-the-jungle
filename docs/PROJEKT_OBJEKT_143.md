@@ -20,7 +20,7 @@ measurement itself was trustworthy.
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
 | Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is now evidence-complete PASS through `artifacts/perf/2026-05-03T11-19-13-862Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched scale proof at `artifacts/perf/2026-05-03T10-39-21-420Z/projekt-143-optics-scale-proof/summary.json`. The KB-OPTIK proof flags a real visual-scale/parity problem: close GLB and imposter geometry share the `4.425m` target, but rendered imposter silhouettes average `0.53x` close-GLB height. User-approved aircraft GLB replacement is delivered as an evidence-gated asset/runtime import, not as a performance, scale-remediation, or aircraft-feel claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | KICKOFF FILED 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is now mechanically summarized by `artifacts/perf/2026-05-03T11-20-50-184Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`. It remains non-remediation until the first measured before/after branch lands. |
+| Phase 3 - Multi-Cycle Engineering Plan | KB-OPTIK DECISION FILED 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T15-03-08-568Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the KB-OPTIK NPC/vehicle scale decision packet is filed at `artifacts/perf/2026-05-03T15-03-07-006Z/projekt-143-optik-decision-packet/decision-packet.json`. It remains non-remediation until the first measured before/after branch lands. |
 
 ## Shipped Cycle 0 State
 
@@ -1033,7 +1033,7 @@ Current Cycle 3 status:
 
 - 2026-05-03: `npm run check:projekt-143-cycle3-kickoff` added a mechanical
   readiness matrix and wrote
-  `artifacts/perf/2026-05-03T11-20-50-184Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T15-03-08-568Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Overall status is WARN because the next work is not a single green-lighted
   fix. KB-OPTIK `npc-imposter-scale-luma-contract` is `needs_decision`:
   matched proof exists, but the first branch must choose between NPC runtime
@@ -1046,6 +1046,18 @@ Current Cycle 3 status:
   The artifact carries Open Frontier and Zone Control startup paths plus Open
   Frontier, combat120, and A Shau perf summary paths for faster handoff. This
   kickoff artifact is agent-DX and planning evidence only.
+- 2026-05-03: `npm run check:projekt-143-optik-decision` wrote
+  `artifacts/perf/2026-05-03T15-03-07-006Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  It resolves the "NPCs too big or vehicles too small" concern into separate
+  workstreams: current NPC target is `4.425m` from a `2.95m` base target times
+  `1.50`, imported aircraft GLBs are still native-scale runtime assets, and
+  current aircraft longest-axis/current-NPC ratios average `3.01x` versus
+  `4.52x` against the `2.95m` base target. The packet rejects aircraft resizing
+  as the first branch, recommends an imposter crop/regeneration prototype for
+  the measured `0.52-0.54x` visible-height mismatch, defers shader/luma parity
+  until scale/crop are settled, and leaves the absolute NPC target as an owner
+  decision. This is a decision artifact, not a remediation or visual acceptance
+  claim.
 
 ### Cycle 4 - Strategic Spike Only
 

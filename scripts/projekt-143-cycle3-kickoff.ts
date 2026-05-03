@@ -65,6 +65,12 @@ type OpticsScaleProof = {
   }>;
 };
 
+type OptikDecisionPacket = {
+  status?: CheckStatus;
+  recommendedSequence?: string[];
+  openOwnerDecision?: string;
+};
+
 type TextureAudit = {
   summary?: {
     totalEstimatedMipmappedRgbaMiB?: number;
@@ -240,7 +246,12 @@ function statusFromTargets(targets: Cycle3Target[], cycle2: Cycle2Proof | null):
   return 'pass';
 }
 
-function buildOptikTarget(opticsPath: string | null, proof: OpticsScaleProof | null): Cycle3Target {
+function buildOptikTarget(
+  opticsPath: string | null,
+  proof: OpticsScaleProof | null,
+  decisionPath: string | null,
+  decision: OptikDecisionPacket | null
+): Cycle3Target {
   const ratios = (proof?.npcComparisons ?? [])
     .map((entry) => entry.deltas?.renderedVisibleHeightRatio)
     .filter((value): value is number => value !== null && value !== undefined);
@@ -258,10 +269,16 @@ function buildOptikTarget(opticsPath: string | null, proof: OpticsScaleProof | n
     status: trusted ? 'needs_decision' : 'blocked',
     priority: 1,
     summary: trusted
-      ? 'Matched evidence exists; decide whether to change NPC runtime visual height, regenerate imposter bakes, align shader/luma, or combine those changes in separate measured slices.'
+      ? decisionPath
+        ? 'Matched evidence and KB-OPTIK decision packet exist; imposter crop/regeneration is the recommended first runtime branch, while absolute NPC target remains an owner decision.'
+        : 'Matched evidence exists; decide whether to change NPC runtime visual height, regenerate imposter bakes, align shader/luma, or combine those changes in separate measured slices.'
       : 'Matched close-GLB/imposter evidence is missing or untrusted.',
     evidence: {
       opticsScaleProofPath: rel(opticsPath),
+      optikDecisionPacketPath: rel(decisionPath),
+      optikDecisionPacketStatus: decision?.status ?? null,
+      recommendedFirstRuntimeBranch: decision?.recommendedSequence?.[1] ?? null,
+      openOwnerDecision: decision?.openOwnerDecision ?? null,
       runtimeNpcVisualHeightMeters: proof?.runtimeContracts?.npc?.visualHeightMeters ?? null,
       renderedVisibleHeightRatio: {
         min: min(ratios),
@@ -494,6 +511,7 @@ function main(): void {
   const artifactFiles = walkFiles(ARTIFACT_ROOT, () => true);
   const cycle2Path = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-cycle2-proof-suite', 'cycle2-proof-summary.json')));
   const opticsScalePath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-optics-scale-proof', 'summary.json')));
+  const optikDecisionPath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-optik-decision-packet', 'decision-packet.json')));
   const texturePath = latestFile(artifactFiles, (path) => path.endsWith(join('pixel-forge-texture-audit', 'texture-audit.json')));
   const startupOpenPath = latestStartupSummary(artifactFiles, 'open-frontier');
   const startupZonePath = latestStartupSummary(artifactFiles, 'zone-control');
@@ -506,6 +524,7 @@ function main(): void {
 
   const cycle2 = readJson<Cycle2Proof>(cycle2Path);
   const opticsScale = readJson<OpticsScaleProof>(opticsScalePath);
+  const optikDecision = readJson<OptikDecisionPacket>(optikDecisionPath);
   const texture = readJson<TextureAudit>(texturePath);
   const startupOpen = readJson<StartupSummary>(startupOpenPath);
   const startupZone = readJson<StartupSummary>(startupZonePath);
@@ -514,7 +533,7 @@ function main(): void {
   const culling = readJson<CullingProof>(cullingPath);
 
   const targets = [
-    buildOptikTarget(opticsScalePath, opticsScale),
+    buildOptikTarget(opticsScalePath, opticsScale, optikDecisionPath, optikDecision),
     buildLoadTarget(texturePath, startupOpenPath, startupOpen, startupZonePath, startupZone, texture),
     buildEffectsTarget(grenadePath, grenade),
     buildTerrainTarget(horizonPath, horizon, openFrontierPerfPath, aShauPerfPath),
@@ -529,6 +548,7 @@ function main(): void {
     inputs: {
       cycle2Proof: rel(cycle2Path),
       opticsScaleProof: rel(opticsScalePath),
+      optikDecisionPacket: rel(optikDecisionPath),
       textureAudit: rel(texturePath),
       startupOpenFrontier: rel(startupOpenPath),
       startupZoneControl: rel(startupZonePath),
