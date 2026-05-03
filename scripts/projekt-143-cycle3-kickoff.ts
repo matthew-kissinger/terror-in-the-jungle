@@ -290,6 +290,16 @@ function buildOptikTarget(
   const expandedFlaggedSamples = expanded?.aggregate?.flaggedSamples ?? null;
   const expandedHasFlags = expandedTrusted && expandedFlaggedSamples !== null && expandedFlaggedSamples > 0;
   const expandedPasses = expandedTrusted && expanded?.status === 'pass';
+  const expandedMaxAbsLumaDeltaPercent = expanded?.aggregate?.maxAbsLumaDeltaPercent ?? null;
+  const expandedLumaInProofBand = expandedTrusted
+    && expandedMaxAbsLumaDeltaPercent !== null
+    && expandedMaxAbsLumaDeltaPercent <= 12;
+  const expandedVisibleHeightInProofBand = expandedTrusted
+    && (expanded?.aggregate?.minVisibleHeightRatio ?? 0) >= 0.85
+    && (expanded?.aggregate?.maxVisibleHeightRatio ?? 2) <= 1.15;
+  const expandedOnlyVisibleHeightFlags = expandedHasFlags
+    && expandedLumaInProofBand
+    && !expandedVisibleHeightInProofBand;
 
   return {
     id: 'npc-imposter-scale-luma-contract',
@@ -308,6 +318,8 @@ function buildOptikTarget(
           ? 'First scale/crop remediation has matched evidence inside the +/-15% height band; remaining KB-OPTIK work is shader/luma parity or an explicit visual exception.'
           : expandedPasses
             ? 'Scale/crop and expanded lighting/gameplay-camera luma parity are inside matched proof bands; remaining KB-OPTIK work is human review or explicit closeout.'
+            : expandedOnlyVisibleHeightFlags
+              ? 'Scale/crop and expanded lighting luma are inside proof bands, but gameplay-camera visible-height samples still need a KB-OPTIK shape/crop decision.'
             : expandedHasFlags
               ? 'Scale/crop and selected-lighting luma parity are inside matched proof bands, but expanded lighting/gameplay-camera proof found visual flags that need targeted KB-OPTIK decision.'
               : 'Scale/crop and selected-lighting luma parity are inside matched proof bands; remaining KB-OPTIK work is expanded lighting snapshots, human review, or explicit closeout.'
@@ -362,7 +374,9 @@ function buildOptikTarget(
       lumaStillFlagged
         ? 'If continuing KB-OPTIK, isolate shader/luma parity from target height and crop metadata changes.'
         : expandedTrusted
-          ? expandedHasFlags
+          ? expandedOnlyVisibleHeightFlags
+            ? 'If continuing KB-OPTIK, inspect the flagged gameplay-camera silhouette samples before changing shader constants again.'
+            : expandedHasFlags
             ? 'If continuing KB-OPTIK, inspect the flagged expanded lighting/gameplay-camera samples before changing shader constants again.'
             : 'If continuing KB-OPTIK, use the expanded lighting/gameplay-camera proof for human visual review or explicit closeout.'
           : 'If continuing KB-OPTIK, expand proof coverage to dawn, dusk, haze, and combat camera screenshots without changing target height or crop metadata.',
@@ -370,7 +384,7 @@ function buildOptikTarget(
     ],
     acceptance: [
       'Matched close/imposter visible height delta within +/-15% for the first remediation, or explicit visual exception.',
-      'Mean opaque luma delta within +/-12% under the selected first lighting setup, then expand to dawn/dusk/haze.',
+      'Mean opaque luma delta within +/-12% under selected and expanded lighting snapshots.',
       'No performance or upload regression accepted without paired artifacts.',
     ],
     nonClaims: [
@@ -378,7 +392,9 @@ function buildOptikTarget(
         ? 'Do not claim full NPC visual parity while luma remains flagged.'
         : expandedPasses
           ? 'Do not claim human visual signoff from mechanical proof alone.'
-          : 'Do not claim final NPC visual parity until expanded lighting screenshots and human review exist.',
+          : expandedOnlyVisibleHeightFlags
+            ? 'Do not claim final NPC visual parity while gameplay-camera silhouette samples remain flagged.'
+            : 'Do not claim final NPC visual parity until expanded lighting screenshots and human review exist.',
       'Do not accept aircraft scale changes from this target without a separate vehicle-scale proof.',
     ],
   };
@@ -635,15 +651,15 @@ function main(): void {
     },
     targets,
     recommendedOrder: [
-      'Treat the 2.95m NPC target drop, per-tile imposter crop, and selected-lighting luma proof as the first KB-OPTIK remediation slice.',
-      'If KB-OPTIK continues immediately, expand to dawn/dusk/haze and combat camera screenshots without mixing in target-height or crop work.',
+      'Treat the 2.95m NPC target drop, per-tile imposter crop, selected-lighting luma proof, and expanded-luma atmosphere pass as the current KB-OPTIK remediation slice.',
+      'If KB-OPTIK continues immediately, inspect gameplay-camera silhouette/crop evidence without changing shader constants again.',
       'Run one KB-LOAD texture/upload branch with fresh startup before/after evidence if the team wants the first measurable WebGL remediation.',
       'Run one KB-EFFECTS first-use grenade warmup branch only against the low-load two-grenade probe.',
       'Keep KB-TERRAIN and KB-CULL remediation branches separate until matched large-mode perf windows are prepared.',
       'Keep WebGPU out of Cycle 3 unless the owner explicitly approves reopening the point-of-no-return decision.',
     ],
     openDecisions: [
-      'Should the next KB-OPTIK pass expand luma/material parity to more lighting and gameplay cameras, or should KB-LOAD/KB-EFFECTS take the next remediation slot?',
+      'Should the next KB-OPTIK pass refine gameplay-camera silhouette/crop parity, document a visual exception, or should KB-LOAD/KB-EFFECTS take the next remediation slot?',
       'Should the first KB-LOAD branch target giantPalm, NPC atlases, or upload scheduling?',
       'Which large-mode p95/draw-call budget will be used for far-canopy acceptance in this cycle?',
     ],

@@ -200,6 +200,16 @@ function buildDecisionOptions(
   const expandedFlaggedSamples = expanded?.aggregate?.flaggedSamples ?? null;
   const expandedHasFlags = expandedTrusted && expandedFlaggedSamples !== null && expandedFlaggedSamples > 0;
   const expandedPasses = expandedTrusted && expanded?.status === 'pass';
+  const expandedMaxAbsLumaDeltaPercent = expanded?.aggregate?.maxAbsLumaDeltaPercent ?? null;
+  const expandedLumaInProofBand = expandedTrusted
+    && expandedMaxAbsLumaDeltaPercent !== null
+    && expandedMaxAbsLumaDeltaPercent <= 12;
+  const expandedVisibleHeightInProofBand = expandedTrusted
+    && (expanded?.aggregate?.minVisibleHeightRatio ?? 0) >= 0.85
+    && (expanded?.aggregate?.maxVisibleHeightRatio ?? 2) <= 1.15;
+  const expandedOnlyVisibleHeightFlags = expandedHasFlags
+    && expandedLumaInProofBand
+    && !expandedVisibleHeightInProofBand;
   return [
     {
       id: 'lower-npc-target-before-vehicle-scale',
@@ -269,20 +279,26 @@ function buildDecisionOptions(
       id: 'shader-luma-parity-after-scale-crop',
       state: cropInProofBand && firstTargetDropped && lumaInProofBand ? 'complete' : cropInProofBand && firstTargetDropped ? 'recommended_first_branch' : 'defer',
       summary: cropInProofBand && firstTargetDropped && lumaInProofBand
-        ? expandedTrusted
+        ? expandedLumaInProofBand
+          ? 'Selected and expanded lighting luma parity are inside proof bands; remaining KB-OPTIK decision is gameplay-camera silhouette.'
+          : expandedTrusted
           ? 'Selected-lighting shader/luma parity is inside the matched proof band; expanded coverage now owns the remaining KB-OPTIK decision.'
           : 'Selected-lighting shader/luma parity is inside the matched proof band; expand coverage before final visual closeout.'
         : cropInProofBand && firstTargetDropped
           ? 'Shader/luma parity is now the next KB-OPTIK visual branch if optics work continues.'
         : 'Defer luma/material work until visible height and absolute target are explicitly chosen.',
       why: [
-        lumaInProofBand
+        expandedLumaInProofBand
+          ? 'The expanded proof no longer has luma flags, so the remaining risk is perspective-camera silhouette/shape.'
+          : lumaInProofBand
           ? 'The selected matched proof no longer has luma flags, so the remaining risk is lighting/camera coverage rather than this single setup.'
           : 'The measured luma delta is real, but luma work can mask silhouette and scale defects if done first.',
         'NPC imposters and close GLBs currently use different lighting/material paths.',
       ],
       branchShape: [
-        lumaInProofBand
+        expandedLumaInProofBand
+          ? 'Keep the expanded lighting proof as the after artifact for this luma slice.'
+          : lumaInProofBand
           ? 'Keep the selected-lighting proof as the after artifact for this luma slice.'
           : 'After crop/target decisions, align one lighting setup first.',
         'Expand to dawn, dusk, haze, and storm before final visual closeout.',
@@ -297,22 +313,30 @@ function buildDecisionOptions(
     },
     {
       id: 'expanded-lighting-gameplay-camera-contract',
-      state: expandedPasses ? 'complete' : expandedHasFlags ? 'recommended_first_branch' : lumaInProofBand ? 'recommended_first_branch' : 'defer',
+      state: expandedPasses ? 'complete' : expandedOnlyVisibleHeightFlags ? 'needs_owner_decision' : expandedHasFlags ? 'recommended_first_branch' : lumaInProofBand ? 'recommended_first_branch' : 'defer',
       summary: expandedPasses
         ? 'Expanded lighting/gameplay-camera proof is inside the mechanical bands; move to human review or explicit closeout.'
+        : expandedOnlyVisibleHeightFlags
+          ? 'Expanded luma is inside band; remaining flags are gameplay-perspective visible-height/crop decisions.'
         : expandedHasFlags
           ? 'Expanded lighting/gameplay-camera proof found visual flags; decide whether to fix the imposter lighting contract now or switch bureaus.'
           : lumaInProofBand
             ? 'Run expanded lighting/gameplay-camera proof before final visual closeout.'
             : 'Defer expanded coverage until selected-lighting luma parity exists.',
       why: [
-        expandedHasFlags
+        expandedOnlyVisibleHeightFlags
+          ? 'The expanded proof is no longer a lighting/luma failure; flagged profiles are gameplay-camera silhouette ratios below the mechanical height floor.'
+          : expandedHasFlags
           ? 'The selected setup passes, but dawn/dusk/haze/storm and gameplay-camera views expose the split between close-GLB lighting and the unlit imposter shader path.'
           : 'A single selected lighting setup is too narrow for final NPC visual parity.',
-        'This branch must not change target height or crop metadata; it is a lighting/material contract decision.',
+        expandedOnlyVisibleHeightFlags
+          ? 'The next KB-OPTIK choice should be visual exception, crop/geometry refinement, or switching bureaus.'
+          : 'This branch must not change target height or crop metadata; it is a lighting/material contract decision.',
       ],
       branchShape: [
-        expandedHasFlags
+        expandedOnlyVisibleHeightFlags
+          ? 'Use the expanded proof as after-luma evidence and inspect the gameplay-perspective samples before changing shader constants again.'
+          : expandedHasFlags
           ? 'Use the expanded proof as before evidence and target only the flagged lighting/camera contract.'
           : 'Capture expanded proof across dawn, dusk, haze, storm, and gameplay-style camera framing.',
         'If remediating, decide whether NPC imposters should receive atmosphere/fog/light uniforms or whether close GLB proof lighting should be constrained to the gameplay contract.',
@@ -414,6 +438,16 @@ function main(): void {
   const expandedTrusted = expanded?.measurementTrust?.status === 'pass';
   const expandedFlaggedSamples = expanded?.aggregate?.flaggedSamples ?? null;
   const expandedHasFlags = expandedTrusted && expandedFlaggedSamples !== null && expandedFlaggedSamples > 0;
+  const expandedMaxAbsLumaDeltaPercent = expanded?.aggregate?.maxAbsLumaDeltaPercent ?? null;
+  const expandedLumaInProofBand = expandedTrusted
+    && expandedMaxAbsLumaDeltaPercent !== null
+    && expandedMaxAbsLumaDeltaPercent <= 12;
+  const expandedVisibleHeightInProofBand = expandedTrusted
+    && (expanded?.aggregate?.minVisibleHeightRatio ?? 0) >= 0.85
+    && (expanded?.aggregate?.maxVisibleHeightRatio ?? 2) <= 1.15;
+  const expandedOnlyVisibleHeightFlags = expandedHasFlags
+    && expandedLumaInProofBand
+    && !expandedVisibleHeightInProofBand;
   const selectedLightingComplete = firstTargetDropped && cropInProofBand && maxAbsLumaDeltaPercent !== null && maxAbsLumaDeltaPercent <= 12;
 
   const packet: DecisionPacket = {
@@ -451,7 +485,14 @@ function main(): void {
       aircraftLongestAxisToHumanScaleNpc: range(ratios(longestAxes, HUMAN_SCALE_REFERENCE_METERS)),
     },
     decisionOptions: buildDecisionOptions(baseTarget, currentTarget, imposterVisibleHeightRatio.average, maxAbsLumaDeltaPercent, expanded),
-    recommendedSequence: selectedLightingComplete && expandedHasFlags
+    recommendedSequence: selectedLightingComplete && expandedOnlyVisibleHeightFlags
+      ? [
+          'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract problem unless a dedicated vehicle-scale proof says otherwise.',
+          'Treat the 2.95m target drop, per-tile crop map, selected-lighting luma, and expanded-luma atmosphere pass as the landed KB-OPTIK remediation slice.',
+          'Use the expanded KB-OPTIK proof as after-luma evidence; the next KB-OPTIK decision is gameplay-camera silhouette/crop acceptance or a documented visual exception.',
+          'If the team wants measurable WebGL improvement before more visual work, switch the next remediation slot to KB-LOAD texture/upload residency or KB-EFFECTS grenade first-use stall.',
+        ]
+      : selectedLightingComplete && expandedHasFlags
       ? [
           'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract problem unless a dedicated vehicle-scale proof says otherwise.',
           'Treat the 2.95m target drop, per-tile crop map, and selected-lighting luma parity as the first landed KB-OPTIK remediation slice.',
@@ -479,7 +520,9 @@ function main(): void {
           'After crop and target decisions, handle shader/luma parity with matched lighting screenshots.',
           'Only reopen aircraft scale after the NPC target/crop evidence lands and fixed-wing/helicopter playtest probes are in scope.',
         ],
-    openOwnerDecision: selectedLightingComplete && expandedHasFlags
+    openOwnerDecision: selectedLightingComplete && expandedOnlyVisibleHeightFlags
+      ? 'Expanded KB-OPTIK luma is inside band, but gameplay-perspective visible-height samples still flag. Next decision: accept/document the perspective silhouette exception, refine crop/geometry, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+      : selectedLightingComplete && expandedHasFlags
       ? 'Expanded KB-OPTIK coverage exists and is trusted, but it found visual flags. Next decision: target the imposter lighting/material contract now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
       : selectedLightingComplete
       ? 'No open owner decision remains for the first selected-lighting KB-OPTIK remediation. Next decision: expand KB-OPTIK coverage now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
@@ -502,7 +545,9 @@ function main(): void {
   console.log(`- expanded proof flagged samples: ${packet.rootCause.expandedProof.flaggedSamples ?? 'unknown'}`);
   console.log(`- aircraft longest-axis/current-NPC avg: ${packet.rootCause.aircraftLongestAxisToCurrentNpc.average ?? 'unknown'}`);
   console.log(`- recommended next runtime branch: ${
-    selectedLightingComplete && expandedHasFlags
+    selectedLightingComplete && expandedOnlyVisibleHeightFlags
+      ? 'target-gameplay-camera-silhouette-or-switch-bureau'
+      : selectedLightingComplete && expandedHasFlags
       ? 'target-expanded-lighting-contract-or-switch-bureau'
       : selectedLightingComplete
         ? 'expand-kb-optik-coverage-or-switch-bureau'
