@@ -37,6 +37,7 @@ npm run check:mobile-ui          # Built-app phone viewport flow gate
 npm run check:states             # State coverage probe
 npm run check:hud                # HUD layout validator
 npm run check:memory             # Memory growth tracker
+npm run check:projekt-143-culling-proof  # Headed deterministic renderer/category proof
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof bundle
 npm run probe                    # Engine health probe
 npm run probe:fixed-wing         # Browser-level fixed-wing takeoff/climb/orbit/handoff/approach probe
@@ -197,6 +198,6 @@ camera/render shake questions have an evidence-backed decision.
 - **Don't anchor on doc claims against current file state.** Briefs and backlogs drift. Verify with Read against the current file before proposing a fix. If the brief's premise is wrong, stop and escalate, don't rationalize an outdated task.
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.
-- **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust; build or use a lower-overhead deterministic camera proof before closing KB-CULL.
+- **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:projekt-143-culling-proof` and then `npm run check:projekt-143-cycle2-proof`; the proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
 - **Worktrees do not inherit `node_modules`.** `test -d node_modules || npm ci --prefer-offline` before local verification.
 - **Keep ephemeral agent worktrees outside the repo root when possible.** Nested clones and caches slow IDE indexing, ripgrep, and agent tree walks even when ignore rules are present.

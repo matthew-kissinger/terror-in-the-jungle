@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-05-02
+Last updated: 2026-05-03
 
 ## Stable-Ground Perf Posture
 
@@ -83,6 +83,7 @@ npm run check:vegetation-horizon    # KB-TERRAIN vegetation horizon audit
 npm run check:webgpu-strategy       # KB-STRATEGIE WebGL/WebGPU audit
 npm run check:projekt-143           # Cycle 0 static evidence suite
 npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark bundle sidecars
+npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proof
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 ```
 
@@ -172,9 +173,22 @@ measurement-trust status.
 
 `projekt-143-cycle2-proof-suite.ts` writes a Cycle 2 visual/runtime proof
 status bundle. It pairs the latest runtime screenshot summary, static optics
-and horizon audits, and Open Frontier/A Shau scene attribution. The command is
-non-strict by default and may return `WARN` while proof surfaces are incomplete;
-use `--strict` once Cycle 2 is ready to become a blocking gate.
+and horizon audits, Open Frontier/A Shau scene attribution, and the latest
+`projekt-143-culling-proof` summary when present. The command is non-strict by
+default and may return `WARN` while proof surfaces are incomplete; use
+`--strict` once Cycle 2 is ready to become a blocking gate.
+
+`projekt-143-culling-proof.ts` writes a headed deterministic renderer/category
+fixture under `artifacts/perf/<timestamp>/projekt-143-culling-proof/`. It uses
+current runtime GLBs for static features, fixed-wing aircraft, helicopters, and
+close Pixel Forge NPCs, plus shader-uniform proxies for vegetation and NPC
+imposter categories. The artifact includes `summary.json`, `summary.md`,
+`scene-attribution.json`, `renderer-info.json`, `cpu-profile.json`, and a
+fixture screenshot. It is not a gameplay perf baseline and does not certify
+visual parity; it exists so KB-CULL has trusted draw-call/triangle attribution
+without repeating untrusted combat-heavy AI Sandbox captures. The npm command
+runs headed by default because headless Chromium produced a lost WebGL context
+and zero renderer counters on 2026-05-03.
 
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so
@@ -508,8 +522,14 @@ they are not a valid certification path when measurement trust fails. The
 2026-05-03 focused 60-NPC diagnostic artifact
 `artifacts/perf/2026-05-03T09-13-00-811Z` recorded visible `npc_close_glb` and
 `npc_imposters`, but failed `measurement_trust` (`probeAvg=96.62ms`,
-`probeP95=211ms`), so it remains diagnostic-only. Use a deterministic
-low-overhead camera proof for KB-CULL closure.
+`probeP95=211ms`), so it remains diagnostic-only. The headed deterministic
+proof at
+`artifacts/perf/2026-05-03T09-35-13-554Z/projekt-143-culling-proof/summary.json`
+captured renderer stats (`133` draw calls, `4,887` triangles), CPU profile,
+scene attribution, browser long-task/LoAF entries, and all required renderer
+categories with trusted probe overhead (`probeP95=1.96ms`). Pair it with
+`npm run check:projekt-143-cycle2-proof`; KB-OPTIK still needs matched
+close-GLB/imposter screenshots before imposter fixes can be accepted.
 
 ## Diagnostics
 

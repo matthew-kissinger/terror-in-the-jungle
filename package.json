@@ -102,6 +102,7 @@
     "check:webgpu-strategy": "npx tsx scripts/webgpu-strategy-audit.ts",
     "check:projekt-143": "npx tsx scripts/projekt-143-evidence-suite.ts",
     "check:projekt-143-cycle1-bundle": "npx tsx scripts/projekt-143-cycle1-benchmark-bundle.ts",
+    "check:projekt-143-culling-proof": "npx tsx scripts/projekt-143-culling-proof.ts --headed",
     "check:projekt-143-cycle2-proof": "npx tsx scripts/projekt-143-cycle2-proof-suite.ts",
     "evidence:atmosphere": "npx tsx scripts/capture-atmosphere-recovery-shots.ts",
     "cloudflare:assets:manifest": "npx tsx scripts/cloudflare-assets.ts manifest",

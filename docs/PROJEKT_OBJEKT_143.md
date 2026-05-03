@@ -19,7 +19,7 @@ measurement itself was trustworthy.
 | Phase | Status | Notes |
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
-| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is open with WARN status: horizon screenshots and static audits exist, culling attribution is under the unattributed triangle budget, but close-NPC/imposter views and matched GLB/imposter crops are not certified. User-approved aircraft GLB replacement is delivered as an evidence-gated asset/runtime import, not as a performance or aircraft-feel claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
+| Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof remains WARN overall because matched GLB/imposter crops are not certified, but KB-CULL renderer/category proof is now trusted and PASS through `artifacts/perf/2026-05-03T09-35-13-554Z/projekt-143-culling-proof/summary.json` plus the refreshed suite at `artifacts/perf/2026-05-03T09-35-33-689Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`. User-approved aircraft GLB replacement is delivered as an evidence-gated asset/runtime import, not as a performance or aircraft-feel claim. KB-METRIK remains first and blocks optimization claims from other bureaus. |
 | Phase 3 - Multi-Cycle Engineering Plan | DRAFT FILED 2026-05-02 | Dependency-aware cycle plan exists below. It remains draft until first remediation cycle lands with measured before/after evidence. |
 
 ## Shipped Cycle 0 State
@@ -574,8 +574,8 @@ Open questions:
 
 ### KB-CULL - Culling And Asset Discipline
 
-Status: ASSET ACCEPTANCE STANDARD LANDED; FULL CULLING CERTIFICATION WAITS ON
-DRAW-CALL TELEMETRY.
+Status: ASSET ACCEPTANCE STANDARD LANDED; CATEGORY/DRAW-CALL PROOF PASS;
+REMEDIATION STILL BLOCKED ON BEFORE/AFTER EVIDENCE.
 
 Progress:
 
@@ -593,11 +593,20 @@ Progress:
   normal-map, triangle/draw-call, LOD/culling, screenshot, and perf-evidence
   requirements, and documents `npm run check:projekt-143-cycle1-bundle` as the
   benchmark sidecar/bundle certifier.
+- 2026-05-03 Cycle 2: `npm run check:projekt-143-culling-proof` now provides a
+  deterministic headed WebGL proof for renderer category attribution. The PASS
+  artifact at
+  `artifacts/perf/2026-05-03T09-35-13-554Z/projekt-143-culling-proof/summary.json`
+  records nonzero renderer counters, CPU profile capture, browser
+  long-task/LoAF capture, and required category coverage for static features,
+  aircraft, vegetation imposters, NPC imposters, and close Pixel Forge NPC GLBs.
+  This certifies the attribution path for KB-CULL; it is not an optimization or
+  visual parity claim.
 
 Open questions:
 
-- Which asset classes are actually visible, submitted, and drawn by camera
-  distance and mode?
+- Which asset classes are actually submitted and drawn by distance after a
+  proposed culling/HLOD change?
 - What static asset acceptance standard prevents future unmeasured regressions?
 - Which Pixel Forge atlases can be compressed, downscaled, split by faction or
   readiness tier, or deferred without breaking imposter quality?
@@ -862,7 +871,8 @@ Acceptance:
   horizon defect before any remediation lands.
 - Draw-call and triangle attribution identify static-feature, aircraft,
   vegetation, NPC imposter, and close NPC costs to below `10%` unattributed
-  visible triangles in representative captures.
+  visible triangles in representative captures, with a dedicated headed proof
+  allowed to cover categories not visible in the representative camera windows.
 
 Reversibility:
 
@@ -885,6 +895,26 @@ Current Cycle 2 status:
   categories have zero visible triangles in these captures and need dedicated
   close-NPC/NPC-imposter views. Static optics evidence exists, but matched
   close-GLB/imposter screenshots are not certified yet.
+- 2026-05-03: `npm run check:projekt-143-culling-proof` added the dedicated
+  KB-CULL renderer/category proof that the AI Sandbox diagnostics could not
+  certify. The trusted headed artifact is
+  `artifacts/perf/2026-05-03T09-35-13-554Z/projekt-143-culling-proof/summary.json`.
+  It records commit SHA, headed browser metadata, a fixture screenshot,
+  CPU profile, browser long-task/LoAF capture, renderer stats (`133` draw
+  calls, `4,887` triangles), and scene attribution for static features,
+  fixed-wing aircraft, helicopters, vegetation imposters, NPC imposters, and
+  close Pixel Forge NPC GLBs. Measurement trust is PASS with browser/page/
+  request errors at `0` and probeP95 `1.96ms`. A headless exploratory run
+  produced a lost WebGL context and zero renderer counters, so the npm script
+  is headed by default.
+- 2026-05-03: `npm run check:projekt-143-cycle2-proof` was refreshed again
+  after the dedicated culling proof and wrote
+  `artifacts/perf/2026-05-03T09-35-33-689Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  Overall status remains WARN only because KB-OPTIK still lacks matched
+  close-GLB/imposter screenshot crops. KB-CULL scene attribution is PASS:
+  Open Frontier and A Shau representative captures remain below the `10%`
+  unattributed visible-triangle budget, and the dedicated proof covers required
+  renderer categories with trusted measurement.
 - 2026-05-03: user approved moving the aircraft GLB replacement into Cycle 2.
   Six Pixel Forge aircraft GLBs were imported through
   `scripts/import-pixel-forge-aircraft.ts` rather than copied directly. The
@@ -910,7 +940,7 @@ Current Cycle 2 status:
   optimization claim. Local code gates for this aircraft patch now pass:
   `npm run validate:fast`, `npm run build`, and `npm run check:projekt-143`
   with the latest static evidence summary at
-  `artifacts/perf/2026-05-03T03-23-55-447Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T09-36-55-865Z/projekt-143-evidence-suite/suite-summary.json`.
   Manual CI run `25274278013` and Deploy run `25274649157` passed. Live Pages
   `/asset-manifest.json` reported
   `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`; Pages shell, service worker,
@@ -926,9 +956,9 @@ Current Cycle 2 status:
   and `measurement_trust`; the lower-load capture still had probeAvg `96.62ms`
   and probeP95 `211ms`. It did expose `npc_close_glb` (`39601` visible
   triangles) and `npc_imposters` (`2` visible triangles), but the artifact is
-  diagnostic only. KB-CULL remains blocked until a lower-overhead deterministic
-  camera proof records renderer stats and scene attribution with measurement
-  trust.
+  diagnostic only. This failed path is retained as an agent-DX warning: do not
+  repeat combat-heavy AI Sandbox captures for KB-CULL certification when the
+  deterministic headed proof exists.
 - No shader, atlas, culling, far-canopy, grenade, texture, or WebGPU remediation
   may be accepted from Cycle 2 until the relevant proof check is PASS or a
   documented exception exists.

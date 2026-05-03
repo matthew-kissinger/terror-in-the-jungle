@@ -3,6 +3,10 @@
 import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { join, relative } from 'path';
+import {
+  PROJEKT_143_REQUIRED_SCENE_CATEGORIES,
+  type SceneAttributionEntry,
+} from './projekt-143-scene-attribution';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
 
@@ -11,13 +15,6 @@ type ProofCheck = {
   status: CheckStatus;
   summary: string;
   evidence: Record<string, unknown>;
-};
-
-type SceneAttributionEntry = {
-  category?: string;
-  drawCallLike?: number;
-  visibleTriangles?: number;
-  triangles?: number;
 };
 
 type PerfSummary = {
@@ -84,6 +81,38 @@ type HorizonAudit = {
   };
 };
 
+type CullingProofSummary = {
+  createdAt?: string;
+  sourceGitSha?: string;
+  status?: CheckStatus;
+  files?: {
+    summary?: string;
+    screenshot?: string;
+    sceneAttribution?: string;
+    rendererInfo?: string;
+    cpuProfile?: string | null;
+  };
+  rendererInfo?: {
+    drawCalls?: number;
+    triangles?: number;
+    geometries?: number;
+    textures?: number;
+    programs?: number;
+    webglRenderer?: string | null;
+  } | null;
+  categoryCoverage?: Array<{
+    category?: string;
+    present?: boolean;
+    visibleTriangles?: number;
+    drawCallLike?: number;
+  }>;
+  measurementTrust?: {
+    status?: CheckStatus;
+    flags?: Record<string, unknown>;
+    summary?: string;
+  };
+};
+
 type ProofSuite = {
   createdAt: string;
   sourceGitSha: string;
@@ -96,15 +125,6 @@ type ProofSuite = {
 
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const OUTPUT_NAME = 'projekt-143-cycle2-proof-suite';
-const REQUIRED_SCENE_CATEGORIES = [
-  'world_static_features',
-  'fixed_wing_aircraft',
-  'helicopters',
-  'vegetation_imposters',
-  'npc_imposters',
-  'npc_close_glb',
-];
-
 function argValue(name: string): string | null {
   const eq = process.argv.find((arg) => arg.startsWith(`${name}=`));
   if (eq) return eq.split('=').slice(1).join('=');
@@ -221,13 +241,13 @@ function checkRuntimeHorizon(summaryPath: string | null): ProofCheck {
   };
 }
 
-function checkCullingAttribution(summaryPaths: string[]): ProofCheck {
+function checkCullingAttribution(summaryPaths: string[], cullingProofPath: string | null): ProofCheck {
   if (summaryPaths.length < 2) {
     return {
       id: 'culling_scene_attribution',
       status: 'fail',
       summary: 'Open Frontier and A Shau scene-attribution captures are both required.',
-      evidence: { summaryPaths: summaryPaths.map(rel) },
+      evidence: { summaryPaths: summaryPaths.map(rel), cullingProofPath: rel(cullingProofPath) },
     };
   }
 
@@ -239,8 +259,8 @@ function checkCullingAttribution(summaryPaths: string[]): ProofCheck {
     const byCategory = new Map(entries.map((entry) => [entry.category ?? 'unknown', entry]));
     const unattributed = byCategory.get('unattributed');
     const unattributedVisibleTriangles = Number(unattributed?.visibleTriangles ?? 0);
-    const missingCategories = REQUIRED_SCENE_CATEGORIES.filter((category) => !byCategory.has(category));
-    const zeroVisibleCategories = REQUIRED_SCENE_CATEGORIES.filter((category) => {
+    const missingCategories = PROJEKT_143_REQUIRED_SCENE_CATEGORIES.filter((category) => !byCategory.has(category));
+    const zeroVisibleCategories = PROJEKT_143_REQUIRED_SCENE_CATEGORIES.filter((category) => {
       const entry = byCategory.get(category);
       return entry && Number(entry.visibleTriangles ?? 0) <= 0;
     });
@@ -259,7 +279,7 @@ function checkCullingAttribution(summaryPaths: string[]): ProofCheck {
         : null,
       missingCategories,
       zeroVisibleCategories,
-      categories: REQUIRED_SCENE_CATEGORIES.map((category) => {
+      categories: PROJEKT_143_REQUIRED_SCENE_CATEGORIES.map((category) => {
         const entry = byCategory.get(category);
         return {
           category,
@@ -276,21 +296,56 @@ function checkCullingAttribution(summaryPaths: string[]): ProofCheck {
     capture.unattributedVisibleTrianglePercent !== null && capture.unattributedVisibleTrianglePercent > 10
   );
   const zeroVisible = captures.filter((capture) => capture.zeroVisibleCategories.length > 0);
-  const status: CheckStatus = missing.length > 0 || overUnattributedBudget.length > 0
+  const cullingProof = cullingProofPath ? readJson<CullingProofSummary>(cullingProofPath) : null;
+  const proofCoverage = PROJEKT_143_REQUIRED_SCENE_CATEGORIES.map((category) => {
+    const entry = cullingProof?.categoryCoverage?.find((candidate) => candidate.category === category);
+    return {
+      category,
+      present: Boolean(entry?.present),
+      visibleTriangles: Number(entry?.visibleTriangles ?? 0),
+      drawCallLike: Number(entry?.drawCallLike ?? 0),
+    };
+  });
+  const proofCoversRequiredCategories = proofCoverage.every((entry) => entry.present && entry.visibleTriangles > 0);
+  const proofTrusted = cullingProof?.status === 'pass' && cullingProof.measurementTrust?.status === 'pass';
+  const proofCertifiesMissingRuntimeViews = proofTrusted && proofCoversRequiredCategories;
+  const runtimeViewGaps = missing.length > 0 || zeroVisible.length > 0;
+  const status: CheckStatus = overUnattributedBudget.length > 0
     ? 'fail'
-    : zeroVisible.length > 0
-      ? 'warn'
+    : runtimeViewGaps
+      ? proofCertifiesMissingRuntimeViews
+        ? 'pass'
+        : missing.length > 0
+          ? 'fail'
+          : 'warn'
       : 'pass';
 
   return {
     id: 'culling_scene_attribution',
     status,
     summary: status === 'pass'
-      ? 'Representative captures identify required renderer categories with unattributed visible triangles under 10%.'
+      ? runtimeViewGaps
+        ? 'Representative captures stay under the unattributed triangle budget, and the dedicated low-overhead proof covers required renderer categories.'
+        : 'Representative captures identify required renderer categories with unattributed visible triangles under 10%.'
       : status === 'warn'
         ? 'Scene attribution is under the unattributed triangle budget, but some required categories have zero visible triangles and need dedicated views before certification.'
-        : 'Scene attribution is missing required categories or exceeds the unattributed triangle budget.',
-    evidence: { captures },
+        : 'Scene attribution exceeds the unattributed triangle budget, lacks trusted dedicated proof, or is missing required categories.',
+    evidence: {
+      captures,
+      dedicatedProof: {
+        summaryPath: rel(cullingProofPath),
+        createdAt: cullingProof?.createdAt ?? null,
+        sourceGitSha: cullingProof?.sourceGitSha ?? null,
+        status: cullingProof?.status ?? null,
+        measurementTrustStatus: cullingProof?.measurementTrust?.status ?? null,
+        measurementTrustFlags: cullingProof?.measurementTrust?.flags ?? null,
+        rendererInfo: cullingProof?.rendererInfo ?? null,
+        files: cullingProof?.files ?? null,
+        categoryCoverage: proofCoverage,
+        proofCoversRequiredCategories,
+        proofTrusted,
+      },
+    },
   };
 }
 
@@ -371,12 +426,25 @@ function main(): void {
     ?? latestFile(ARTIFACT_ROOT, (path) => path.endsWith(join('pixel-forge-imposter-optics-audit', 'optics-audit.json')));
   const horizonAudit = argValue('--horizon-audit')
     ?? latestFile(ARTIFACT_ROOT, (path) => path.endsWith(join('vegetation-horizon-audit', 'horizon-audit.json')));
+  const cullingProof = argValue('--culling-proof')
+    ?? latestFile(ARTIFACT_ROOT, (path) => path.endsWith(join('projekt-143-culling-proof', 'summary.json')));
 
   const checks: ProofCheck[] = [
     checkRuntimeHorizon(runtimeSummary),
     checkStaticHorizon(horizonAudit),
-    checkCullingAttribution([openFrontierSummary, aShauSummary].filter((path): path is string => Boolean(path))),
+    checkCullingAttribution([openFrontierSummary, aShauSummary].filter((path): path is string => Boolean(path)), cullingProof),
     checkNpcMatchedProof(opticsAudit),
+  ];
+  const cullingCheck = checks.find((check) => check.id === 'culling_scene_attribution');
+  const npcMatchedCheck = checks.find((check) => check.id === 'npc_glb_imposter_matched_screenshots');
+  const openItems = [
+    ...(npcMatchedCheck?.status === 'pass'
+      ? []
+      : ['Add dedicated matched close-GLB/imposter screenshot crops for NPC LOD switch distances.']),
+    ...(cullingCheck?.status === 'pass'
+      ? []
+      : ['Add dedicated close-NPC and NPC-imposter culling views where those categories are visibly populated.']),
+    'Do not accept shader, atlas, culling, or far-canopy remediation until this suite is PASS or a documented exception exists.',
   ];
 
   const report: ProofSuite = {
@@ -388,15 +456,12 @@ function main(): void {
       runtimeSummary: rel(runtimeSummary),
       openFrontierSummary: rel(openFrontierSummary),
       aShauSummary: rel(aShauSummary),
+      cullingProof: rel(cullingProof),
       opticsAudit: rel(opticsAudit),
       horizonAudit: rel(horizonAudit),
     },
     checks,
-    openItems: [
-      'Add dedicated matched close-GLB/imposter screenshot crops for NPC LOD switch distances.',
-      'Add dedicated close-NPC and NPC-imposter culling views where those categories are visibly populated.',
-      'Do not accept shader, atlas, culling, or far-canopy remediation until this suite is PASS or a documented exception exists.',
-    ],
+    openItems,
   };
 
   const outputDir = argValue('--out-dir') ?? join(ARTIFACT_ROOT, timestampSlug(), OUTPUT_NAME);

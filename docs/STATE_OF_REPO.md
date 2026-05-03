@@ -109,13 +109,16 @@ the current truth anchor.
 - Phase 2 / Cycle 2 is now open as visual/runtime proof work. Runtime screenshots
   were refreshed at
   `artifacts/perf/2026-05-03T01-00-12-099Z/projekt-143-cycle2-runtime-proof/summary.json`.
-  `npm run check:projekt-143-cycle2-proof` was refreshed after the aircraft
-  import and wrote
-  `artifacts/perf/2026-05-03T09-17-01-580Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
-  with WARN status: Open Frontier/A Shau elevated screenshots and static horizon
-  audit are present, culling attribution is below the `10%` unattributed visible
-  triangle budget, but close-NPC/NPC-imposter culling views and matched
-  close-GLB/imposter screenshots are not certified.
+  The dedicated headed KB-CULL renderer/category proof passed at
+  `artifacts/perf/2026-05-03T09-35-13-554Z/projekt-143-culling-proof/summary.json`
+  with nonzero renderer stats (`133` draw calls, `4,887` triangles), CPU
+  profile capture, browser long-task/LoAF capture, all required renderer
+  categories visible, and probeP95 `1.96ms`. `npm run
+  check:projekt-143-cycle2-proof` was refreshed afterward and wrote
+  `artifacts/perf/2026-05-03T09-35-33-689Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`
+  with WARN status only because matched close-GLB/imposter screenshots are not
+  certified. KB-CULL scene attribution is now PASS; KB-OPTIK matched visual
+  proof remains open.
 - Cycle 2 now also includes the user-approved aircraft GLB replacement as an
   evidence-gated asset/runtime import. The six runtime aircraft GLBs were
   imported from Pixel Forge through `npm run assets:import-pixel-forge-aircraft`
@@ -138,7 +141,7 @@ the current truth anchor.
   baselines. Local `npm run validate:fast`, `npm run build`, and
   `npm run check:projekt-143` pass after the aircraft patch; the latest static
   evidence suite is
-  `artifacts/perf/2026-05-03T03-23-55-447Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T09-36-55-865Z/projekt-143-evidence-suite/suite-summary.json`.
   Commit `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33` passed manual CI run
   `25274278013` and Deploy run `25274649157`. Live `/asset-manifest.json`
   reported that SHA; Pages shell, service worker, manifest, representative
@@ -147,14 +150,14 @@ the current truth anchor.
   smoke reached the deploy UI with no console, page, request, or retry-panel
   failures. This verifies production delivery, not aircraft-feel or
   perf-improvement certification.
-- KB-CULL close-NPC/NPC-imposter certification is still blocked. Focused
-  AI Sandbox diagnostic captures at `artifacts/perf/2026-05-03T09-10-57-791Z`
-  (`npcs=120`) and `artifacts/perf/2026-05-03T09-13-00-811Z` (`npcs=60`) exposed
-  the missing renderer categories but failed validation and measurement trust.
-  The 60-NPC artifact recorded `npc_close_glb` at `39601` visible triangles and
+- Failed KB-CULL diagnostic path retained for agent-DX: focused AI Sandbox
+  captures at `artifacts/perf/2026-05-03T09-10-57-791Z` (`npcs=120`) and
+  `artifacts/perf/2026-05-03T09-13-00-811Z` (`npcs=60`) exposed the close-NPC
+  and NPC-imposter categories but failed validation and measurement trust. The
+  60-NPC artifact recorded `npc_close_glb` at `39601` visible triangles and
   `npc_imposters` at `2` visible triangles, but probeAvg `96.62ms` and probeP95
-  `211ms` make it diagnostic-only. Next proof work should use a deterministic
-  low-overhead camera/culling harness, not another combat-heavy AI Sandbox run.
+  `211ms` make it diagnostic-only. Do not repeat that path for certification
+  while `npm run check:projekt-143-culling-proof` exists.
 - Projekt Objekt-143 Cycle 0 evidence payload landed at
   `475aa7792c51823184c454a0b63852e79da2285d`; manual Deploy workflow run
   `25262818886` served that payload SHA. Doc-only release-state commits may
@@ -277,9 +280,11 @@ What is not ready to claim:
 - Phase 3 now has a draft multi-cycle plan in
   `docs/PROJEKT_OBJEKT_143.md`. Cycle 0 evidence and Cycle 1 baseline/policy
   work are shipped. The next agent team should continue Phase 2 / Cycle 2 by
-  producing dedicated close-NPC/NPC-imposter visual and culling views before any
-  shader, atlas, culling, far-canopy, grenade, texture, or WebGPU remediation
-  is accepted. KB-EFFECTS still needs a verified warmup or first-use-render
+  producing matched close-GLB/imposter visual crops for KB-OPTIK before any
+  shader, atlas, imposter, far-canopy, grenade, texture, or WebGPU remediation
+  is accepted. KB-CULL now has trusted category/draw-call proof, but still
+  needs before/after captures before accepting an actual culling or HLOD
+  change. KB-EFFECTS still needs a verified warmup or first-use-render
   remediation before it can close.
 
 ## Starter-Kits Incubation Close-Out On 2026-04-28

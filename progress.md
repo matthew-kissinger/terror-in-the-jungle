@@ -1850,7 +1850,7 @@ TODO
 - Local gates now passing after the aircraft patch: `npm run validate:fast`,
   `npm run build`, and `npm run check:projekt-143`. The fresh Projekt-143 static
   suite wrote
-  `artifacts/perf/2026-05-03T03-23-55-447Z/projekt-143-evidence-suite/suite-summary.json`.
+  `artifacts/perf/2026-05-03T09-36-55-865Z/projekt-143-evidence-suite/suite-summary.json`.
 - Refreshed `npm run check:projekt-143-cycle2-proof` after the aircraft patch;
   it remains WARN for missing dedicated culling/optic certification views and
   wrote
@@ -1891,3 +1891,30 @@ TODO
   culling certification. The next useful step is a deterministic low-overhead
   camera/culling proof that records renderer stats and scene attribution with a
   trusted measurement path.
+
+2026-05-03 Cycle 2 KB-CULL deterministic proof
+- Added `scripts/projekt-143-scene-attribution.ts` so perf capture and Cycle 2
+  proof tooling share the same renderer-category classifier and required
+  Projekt-143 category list.
+- Added `scripts/projekt-143-culling-proof.ts` and
+  `npm run check:projekt-143-culling-proof`. The proof serves a small headed
+  WebGL fixture with current runtime GLBs for static features, fixed-wing
+  aircraft, helicopters, and close Pixel Forge NPCs, plus shader-uniform
+  proxies for vegetation/NPC imposter categories.
+- A headless exploratory run at
+  `artifacts/perf/2026-05-03T09-31-20-350Z/projekt-143-culling-proof/summary.json`
+  loaded the scene categories but lost the WebGL context and recorded zero
+  renderer counters, so the npm command is headed by default.
+- The trusted headed proof passed at
+  `artifacts/perf/2026-05-03T09-35-13-554Z/projekt-143-culling-proof/summary.json`
+  with `0` browser/page/request errors, probeP95 `1.96ms`, CPU profile capture,
+  browser long-task/LoAF capture, renderer stats (`133` draw calls, `4,887`
+  triangles), and all required categories visible.
+- Refreshed `npm run check:projekt-143-cycle2-proof`; the new suite artifact is
+  `artifacts/perf/2026-05-03T09-35-33-689Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`.
+  It remains WARN overall only because KB-OPTIK still lacks matched
+  close-GLB/imposter screenshot crops. KB-CULL scene attribution is now PASS.
+- Refreshed `npm run check:projekt-143`; the static suite passed at
+  `artifacts/perf/2026-05-03T09-36-55-865Z/projekt-143-evidence-suite/suite-summary.json`.
+- Still not claimed: any culling/HLOD optimization, imposter visual parity,
+  aircraft feel, or production parity for the docs/tooling-only changes.
