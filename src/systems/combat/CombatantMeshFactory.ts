@@ -12,9 +12,14 @@ import {
   PIXEL_FORGE_NPC_CLIPS,
   PIXEL_FORGE_NPC_FACTIONS,
   pixelForgeNpcTextureName,
+  type PixelForgeNpcFactionAsset,
   type PixelForgeNpcClipId,
 } from '../../config/pixelForgeAssets';
-import { getPixelForgeNpcRuntimeClip } from './PixelForgeNpcRuntime';
+import {
+  getPixelForgeNpcRuntimeClip,
+  PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING,
+  type PixelForgeNpcImposterMaterialTuning,
+} from './PixelForgeNpcRuntime';
 
 export type ViewDirection = 'front' | 'back' | 'side';
 export type WalkFrameMap = Map<string, { a: THREE.Texture; b: THREE.Texture }>;
@@ -90,6 +95,9 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
   uniform float animationMode;
   uniform sampler2D tileCropMap;
   uniform vec2 tileCropMapSize;
+  uniform float parityScale;
+  uniform float parityLift;
+  uniform float paritySaturation;
 
   varying vec2 vUv;
   varying float vPhase;
@@ -126,6 +134,9 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
     float topLight = smoothstep(0.12, 1.0, vUv.y) * npcTopLight;
     float npcLight = max(minNpcLight, minNpcLight + topLight);
     npcColor = min(npcColor * npcExposure * npcLight, vec3(1.0));
+    npcColor = min(npcColor * parityScale + vec3(parityLift), vec3(1.0));
+    float parityLuma = dot(npcColor, vec3(0.299, 0.587, 0.114));
+    npcColor = clamp(mix(vec3(parityLuma), npcColor, paritySaturation), 0.0, 1.0);
     float alpha = texColor.a * clamp(vOpacity, 0.0, 1.0);
     gl_FragColor = vec4(npcColor, alpha);
   }
@@ -225,6 +236,7 @@ export class CombatantMeshFactory {
     texture: THREE.Texture,
     clipId: PixelForgeNpcClipId,
     readabilityColor: THREE.Color,
+    tuning: PixelForgeNpcImposterMaterialTuning,
   ): THREE.ShaderMaterial {
     const clip = PIXEL_FORGE_NPC_CLIPS.find((candidate) => candidate.id === clipId);
     if (!clip) {
@@ -242,13 +254,16 @@ export class CombatantMeshFactory {
         frameGrid: { value: new THREE.Vector2(clip.framesX, clip.framesY) },
         combatState: { value: 0 },
         readabilityColor: { value: readabilityColor.clone() },
-        readabilityStrength: { value: 0.38 },
-        npcExposure: { value: 1.2 },
-        minNpcLight: { value: 0.92 },
-        npcTopLight: { value: 0.16 },
+        readabilityStrength: { value: tuning.readabilityStrength },
+        npcExposure: { value: tuning.npcExposure },
+        minNpcLight: { value: tuning.minNpcLight },
+        npcTopLight: { value: tuning.npcTopLight },
         animationMode: { value: clipId === 'death_fall_back' ? 1 : 0 },
         tileCropMap: { value: tileCrop.texture },
         tileCropMapSize: { value: tileCrop.size },
+        parityScale: { value: tuning.parityScale },
+        parityLift: { value: tuning.parityLift },
+        paritySaturation: { value: tuning.paritySaturation },
       },
       vertexShader: NPC_IMPOSTOR_VERTEX_SHADER,
       fragmentShader: NPC_IMPOSTOR_FRAGMENT_SHADER,
@@ -267,6 +282,7 @@ export class CombatantMeshFactory {
     key: string,
     clipId: PixelForgeNpcClipId,
     markerColor: THREE.Color,
+    packageFaction: PixelForgeNpcFactionAsset['packageFaction'],
     maxInstances: number,
   ): { mesh: THREE.InstancedMesh; material: THREE.ShaderMaterial; marker: THREE.InstancedMesh } {
     const geometry = new THREE.PlaneGeometry(NPC_SPRITE_WIDTH, NPC_SPRITE_HEIGHT);
@@ -275,7 +291,12 @@ export class CombatantMeshFactory {
     geometry.setAttribute('instanceAnimationProgress', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
     geometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances).fill(1), 1));
 
-    const material = this.createImpostorMaterial(texture, clipId, markerColor);
+    const material = this.createImpostorMaterial(
+      texture,
+      clipId,
+      markerColor,
+      PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING[packageFaction],
+    );
     const mesh = new THREE.InstancedMesh(geometry, material, maxInstances);
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.frustumCulled = false;
@@ -317,6 +338,7 @@ export class CombatantMeshFactory {
     const createFactionBuckets = (
       factionKey: Faction | 'SQUAD',
       textureFaction: Faction,
+      packageFaction: PixelForgeNpcFactionAsset['packageFaction'],
       maxInstances: number,
     ) => {
       for (const clip of PIXEL_FORGE_NPC_CLIPS) {
@@ -331,6 +353,7 @@ export class CombatantMeshFactory {
           key,
           clip.id,
           FACTION_MARKER_COLORS[factionKey],
+          packageFaction,
           maxInstances,
         );
         factionMeshes.set(key, mesh);
@@ -341,9 +364,14 @@ export class CombatantMeshFactory {
     };
 
     for (const faction of PIXEL_FORGE_NPC_FACTIONS) {
-      createFactionBuckets(faction.runtimeFaction as Faction, faction.runtimeFaction as Faction, DEFAULT_MESH_BUCKET_CAPACITY);
+      createFactionBuckets(
+        faction.runtimeFaction as Faction,
+        faction.runtimeFaction as Faction,
+        faction.packageFaction,
+        DEFAULT_MESH_BUCKET_CAPACITY,
+      );
     }
-    createFactionBuckets('SQUAD', Faction.US, DEFAULT_MESH_BUCKET_CAPACITY);
+    createFactionBuckets('SQUAD', Faction.US, 'usArmy', DEFAULT_MESH_BUCKET_CAPACITY);
 
     Logger.info('combat', `Created Pixel Forge NPC impostor buckets: ${factionMeshes.size} meshes`);
 

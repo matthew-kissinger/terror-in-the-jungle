@@ -24,6 +24,7 @@ type NpcComparison = {
   deltas?: {
     renderedVisibleHeightRatio?: number | null;
     meanOpaqueLumaDelta?: number | null;
+    meanOpaqueLumaDeltaPercent?: number | null;
   };
   flags?: string[];
 };
@@ -77,6 +78,7 @@ type DecisionPacket = {
     closeModelRuntimeScale: { min: number | null; average: number | null; max: number | null };
     imposterVisibleHeightRatio: { min: number | null; average: number | null; max: number | null };
     imposterMeanOpaqueLumaDelta: { min: number | null; average: number | null; max: number | null };
+    imposterMeanOpaqueLumaDeltaPercent: { min: number | null; average: number | null; max: number | null };
     aircraftLongestAxisMeters: { min: number | null; average: number | null; max: number | null };
     aircraftLongestAxisToCurrentNpc: { min: number | null; average: number | null; max: number | null };
     aircraftLongestAxisToBaseNpc: { min: number | null; average: number | null; max: number | null };
@@ -154,7 +156,8 @@ function ratios(longestAxes: number[], denominator: number | null): Array<number
 function buildDecisionOptions(
   baseTarget: number | null,
   currentTarget: number | null,
-  visibleHeightRatioAverage: number | null
+  visibleHeightRatioAverage: number | null,
+  maxAbsLumaDeltaPercent: number | null
 ): DecisionOption[] {
   const baseTargetText = baseTarget ? `${baseTarget.toFixed(2)}m` : 'the Pixel Forge base target';
   const firstTargetDropped = baseTarget !== null
@@ -163,6 +166,7 @@ function buildDecisionOptions(
   const cropInProofBand = visibleHeightRatioAverage !== null
     && visibleHeightRatioAverage >= 0.85
     && visibleHeightRatioAverage <= 1.15;
+  const lumaInProofBand = maxAbsLumaDeltaPercent !== null && maxAbsLumaDeltaPercent <= 12;
   return [
     {
       id: 'lower-npc-target-before-vehicle-scale',
@@ -230,17 +234,23 @@ function buildDecisionOptions(
     },
     {
       id: 'shader-luma-parity-after-scale-crop',
-      state: cropInProofBand && firstTargetDropped ? 'recommended_first_branch' : 'defer',
-      summary: cropInProofBand && firstTargetDropped
-        ? 'Shader/luma parity is now the next KB-OPTIK visual branch if optics work continues.'
+      state: cropInProofBand && firstTargetDropped && lumaInProofBand ? 'complete' : cropInProofBand && firstTargetDropped ? 'recommended_first_branch' : 'defer',
+      summary: cropInProofBand && firstTargetDropped && lumaInProofBand
+        ? 'Selected-lighting shader/luma parity is inside the matched proof band; expand coverage before final visual closeout.'
+        : cropInProofBand && firstTargetDropped
+          ? 'Shader/luma parity is now the next KB-OPTIK visual branch if optics work continues.'
         : 'Defer luma/material work until visible height and absolute target are explicitly chosen.',
       why: [
-        'The measured luma delta is real, but luma work can mask silhouette and scale defects if done first.',
+        lumaInProofBand
+          ? 'The selected matched proof no longer has luma flags, so the remaining risk is lighting/camera coverage rather than this single setup.'
+          : 'The measured luma delta is real, but luma work can mask silhouette and scale defects if done first.',
         'NPC imposters and close GLBs currently use different lighting/material paths.',
       ],
       branchShape: [
-        'After crop/target decisions, align one lighting setup first.',
-        'Expand to dawn, dusk, haze, and storm after the first matched proof passes.',
+        lumaInProofBand
+          ? 'Keep the selected-lighting proof as the after artifact for this luma slice.'
+          : 'After crop/target decisions, align one lighting setup first.',
+        'Expand to dawn, dusk, haze, and storm before final visual closeout.',
       ],
       acceptance: [
         'Mean opaque luma delta within +/-12% under the selected setup.',
@@ -287,6 +297,7 @@ function writeMarkdown(packet: DecisionPacket, file: string): void {
     `- Current multiplier: ${packet.rootCause.currentMultiplier ?? 'unknown'}`,
     `- Imposter visible height ratio: ${JSON.stringify(packet.rootCause.imposterVisibleHeightRatio)}`,
     `- Imposter luma delta: ${JSON.stringify(packet.rootCause.imposterMeanOpaqueLumaDelta)}`,
+    `- Imposter luma delta percent: ${JSON.stringify(packet.rootCause.imposterMeanOpaqueLumaDeltaPercent)}`,
     `- Aircraft longest axis / current NPC: ${JSON.stringify(packet.rootCause.aircraftLongestAxisToCurrentNpc)}`,
     `- Aircraft longest axis / base NPC: ${JSON.stringify(packet.rootCause.aircraftLongestAxisToBaseNpc)}`,
     '',
@@ -320,6 +331,11 @@ function main(): void {
   const longestAxes = finite(aircraft.map((entry) => entry.nativeBoundsMeters?.longestAxis));
   const imposterVisibleHeightRatio = range(comparisons.map((entry) => entry.deltas?.renderedVisibleHeightRatio));
   const imposterMeanOpaqueLumaDelta = range(comparisons.map((entry) => entry.deltas?.meanOpaqueLumaDelta));
+  const imposterMeanOpaqueLumaDeltaPercent = range(comparisons.map((entry) => entry.deltas?.meanOpaqueLumaDeltaPercent));
+  const lumaDeltaPercents = finite(comparisons.map((entry) => entry.deltas?.meanOpaqueLumaDeltaPercent));
+  const maxAbsLumaDeltaPercent = lumaDeltaPercents.length > 0
+    ? Math.max(...lumaDeltaPercents.map((value) => Math.abs(value)))
+    : null;
   const firstTargetDropped = baseTarget !== null
     && currentTarget !== null
     && Math.abs(currentTarget - baseTarget) < 0.01;
@@ -343,13 +359,21 @@ function main(): void {
       closeModelRuntimeScale: range(comparisons.map((entry) => entry.closeModel?.visualScale)),
       imposterVisibleHeightRatio,
       imposterMeanOpaqueLumaDelta,
+      imposterMeanOpaqueLumaDeltaPercent,
       aircraftLongestAxisMeters: range(longestAxes),
       aircraftLongestAxisToCurrentNpc: range(ratios(longestAxes, currentTarget)),
       aircraftLongestAxisToBaseNpc: range(ratios(longestAxes, baseTarget)),
       aircraftLongestAxisToHumanScaleNpc: range(ratios(longestAxes, HUMAN_SCALE_REFERENCE_METERS)),
     },
-    decisionOptions: buildDecisionOptions(baseTarget, currentTarget, imposterVisibleHeightRatio.average),
-    recommendedSequence: firstTargetDropped && cropInProofBand
+    decisionOptions: buildDecisionOptions(baseTarget, currentTarget, imposterVisibleHeightRatio.average, maxAbsLumaDeltaPercent),
+    recommendedSequence: firstTargetDropped && cropInProofBand && maxAbsLumaDeltaPercent !== null && maxAbsLumaDeltaPercent <= 12
+      ? [
+          'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract problem unless a dedicated vehicle-scale proof says otherwise.',
+          'Treat the 2.95m target drop, per-tile crop map, and selected-lighting luma parity as the first landed KB-OPTIK remediation slice.',
+          'If KB-OPTIK continues immediately, expand to dawn/dusk/haze, storm, and combat camera screenshots before final visual closeout.',
+          'Otherwise switch the next remediation slot to KB-LOAD texture/upload residency or KB-EFFECTS grenade first-use stall.',
+        ]
+      : firstTargetDropped && cropInProofBand
       ? [
           'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract problem unless a dedicated vehicle-scale proof says otherwise.',
           'Treat the 2.95m target drop and per-tile crop map as the first landed KB-OPTIK remediation; use the latest matched proof as the after artifact.',
@@ -363,8 +387,10 @@ function main(): void {
           'After crop and target decisions, handle shader/luma parity with matched lighting screenshots.',
           'Only reopen aircraft scale after the NPC target/crop evidence lands and fixed-wing/helicopter playtest probes are in scope.',
         ],
-    openOwnerDecision: firstTargetDropped && cropInProofBand
-      ? 'No open owner decision remains for the first 2.95m target/crop remediation. Next decision: take KB-OPTIK luma/material parity now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+    openOwnerDecision: firstTargetDropped && cropInProofBand && maxAbsLumaDeltaPercent !== null && maxAbsLumaDeltaPercent <= 12
+      ? 'No open owner decision remains for the first selected-lighting KB-OPTIK remediation. Next decision: expand KB-OPTIK coverage now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+      : firstTargetDropped && cropInProofBand
+        ? 'No open owner decision remains for the first 2.95m target/crop remediation. Next decision: take KB-OPTIK luma/material parity now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
       : 'Approve the first absolute NPC target candidate: keep the readability multiplier, drop to the 2.95m Pixel Forge base target, or authorize a larger human-scale redesign with gameplay/playtest scope.',
   };
 
@@ -378,8 +404,9 @@ function main(): void {
   console.log(`KB-OPTIK decision packet ${packet.status.toUpperCase()}: ${relative(process.cwd(), jsonFile)}`);
   console.log(`- current NPC target: ${packet.rootCause.currentNpcTargetMeters ?? 'unknown'}m`);
   console.log(`- imposter visible-height ratio avg: ${packet.rootCause.imposterVisibleHeightRatio.average ?? 'unknown'}`);
+  console.log(`- imposter luma delta pct avg: ${packet.rootCause.imposterMeanOpaqueLumaDeltaPercent.average ?? 'unknown'}`);
   console.log(`- aircraft longest-axis/current-NPC avg: ${packet.rootCause.aircraftLongestAxisToCurrentNpc.average ?? 'unknown'}`);
-  console.log(`- recommended next runtime branch: ${firstTargetDropped && cropInProofBand ? 'shader-luma-parity-after-scale-crop' : 'repack-or-regenerate-npc-imposter-crops'}`);
+  console.log(`- recommended next runtime branch: ${firstTargetDropped && cropInProofBand && maxAbsLumaDeltaPercent !== null && maxAbsLumaDeltaPercent <= 12 ? 'expand-kb-optik-coverage-or-switch-bureau' : firstTargetDropped && cropInProofBand ? 'shader-luma-parity-after-scale-crop' : 'repack-or-regenerate-npc-imposter-crops'}`);
 
   if (process.argv.includes('--strict') && packet.status !== 'pass') {
     process.exitCode = 1;

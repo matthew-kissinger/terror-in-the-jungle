@@ -27,6 +27,7 @@ import {
 } from '../src/systems/combat/CombatantMeshFactory';
 import {
   PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING,
+  PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING,
 } from '../src/systems/combat/PixelForgeNpcRuntime';
 import { AircraftModels } from '../src/systems/assets/modelPaths';
 
@@ -119,6 +120,7 @@ type NpcComparison = Omit<BrowserNpcMetric, 'closeCropDataUrl' | 'imposterCropDa
     renderedVisibleHeightDeltaPercent: number | null;
     projectedGeometryHeightDeltaPercent: number | null;
     meanOpaqueLumaDelta: number | null;
+    meanOpaqueLumaDeltaPercent: number | null;
     meanOpaqueChromaDelta: number | null;
   };
   flags: string[];
@@ -311,6 +313,7 @@ function proofHtml(): string {
     matchedClipId: MATCHED_CLIP_ID,
     clip: PIXEL_FORGE_NPC_CLIPS.find((clip) => clip.id === MATCHED_CLIP_ID),
     matchedClipCropMap,
+    imposterMaterialTuning: PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING,
     materialTuning: PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING,
   });
 
@@ -414,13 +417,14 @@ function proofHtml(): string {
       };
     }
 
-    function createNpcImposterMaterial(texture) {
+    function createNpcImposterMaterial(texture, packageFaction) {
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.generateMipmaps = true;
       const clip = runtimeContracts.clip;
       const cropMap = runtimeContracts.matchedClipCropMap;
+      const tuning = runtimeContracts.imposterMaterialTuning[packageFaction] || runtimeContracts.imposterMaterialTuning.usArmy;
       const cropTexture = new THREE.DataTexture(
         Uint8Array.from(cropMap.data),
         cropMap.width,
@@ -447,10 +451,13 @@ function proofHtml(): string {
           frameIndex: { value: 0 },
           combatState: { value: 0 },
           readabilityColor: { value: new THREE.Color(0.0, 0.5, 1.0) },
-          readabilityStrength: { value: 0.38 },
-          npcExposure: { value: 1.2 },
-          minNpcLight: { value: 0.92 },
-          npcTopLight: { value: 0.16 },
+          readabilityStrength: { value: tuning.readabilityStrength },
+          npcExposure: { value: tuning.npcExposure },
+          minNpcLight: { value: tuning.minNpcLight },
+          npcTopLight: { value: tuning.npcTopLight },
+          parityScale: { value: tuning.parityScale },
+          parityLift: { value: tuning.parityLift },
+          paritySaturation: { value: tuning.paritySaturation },
         },
         vertexShader: \`
           varying vec2 vUv;
@@ -473,6 +480,9 @@ function proofHtml(): string {
           uniform float npcTopLight;
           uniform sampler2D tileCropMap;
           uniform vec2 tileCropMapSize;
+          uniform float parityScale;
+          uniform float parityLift;
+          uniform float paritySaturation;
           varying vec2 vUv;
           void main() {
             float frameX = mod(frameIndex, frameGrid.x);
@@ -498,6 +508,9 @@ function proofHtml(): string {
             float topLight = smoothstep(0.12, 1.0, vUv.y) * npcTopLight;
             float npcLight = max(minNpcLight, minNpcLight + topLight);
             npcColor = min(npcColor * npcExposure * npcLight, vec3(1.0));
+            npcColor = min(npcColor * parityScale + vec3(parityLift), vec3(1.0));
+            float parityLuma = dot(npcColor, vec3(0.299, 0.587, 0.114));
+            npcColor = clamp(mix(vec3(parityLuma), npcColor, paritySaturation), 0.0, 1.0);
             gl_FragColor = vec4(npcColor, texColor.a);
           }
         \`,
@@ -515,9 +528,9 @@ function proofHtml(): string {
       });
     }
 
-    function makeImposter(texture) {
+    function makeImposter(texture, packageFaction) {
       const geometry = new THREE.PlaneGeometry(runtimeContracts.npcSpriteWidth, runtimeContracts.npcSpriteHeight);
-      const material = createNpcImposterMaterial(texture);
+      const material = createNpcImposterMaterial(texture, packageFaction);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.y = runtimeContracts.npcActorAnchorY + runtimeContracts.npcRenderYOffset;
       mesh.updateMatrixWorld(true);
@@ -605,7 +618,7 @@ function proofHtml(): string {
       ]);
       const close = makeCloseModel(gltf, fixture.packageFaction);
       const closeCrop = renderTransparentCrop(close.root);
-      const imposter = makeImposter(texture);
+      const imposter = makeImposter(texture, fixture.packageFaction);
       const imposterCrop = renderTransparentCrop(imposter);
       return {
         runtimeFaction: fixture.runtimeFaction,
@@ -869,7 +882,12 @@ function comparisonFlags(closeStats: VisibleImageStats, imposterStats: VisibleIm
     }
   }
   if (closeStats.meanOpaqueLuma !== null && imposterStats.meanOpaqueLuma !== null) {
-    if (Math.abs(imposterStats.meanOpaqueLuma - closeStats.meanOpaqueLuma) > 25) {
+    const lumaDelta = imposterStats.meanOpaqueLuma - closeStats.meanOpaqueLuma;
+    const lumaDeltaPercent = closeStats.meanOpaqueLuma > 0 ? (lumaDelta / closeStats.meanOpaqueLuma) * 100 : 0;
+    if (Math.abs(lumaDeltaPercent) > 12) {
+      flags.push('rendered-luma-delta-over-12pct');
+    }
+    if (Math.abs(lumaDelta) > 25) {
       flags.push('rendered-luma-delta-over-25');
     }
   }
@@ -891,6 +909,17 @@ function buildFindings(npcComparisons: NpcComparison[], aircraft: BrowserAircraf
       ? `${ratioText} The per-tile crop remediation is within the +/-15% matched-height proof band.`
       : `${ratioText} This remains outside the +/-15% matched-height proof band.`);
   }
+  const lumaDeltaPercents = npcComparisons
+    .map((entry) => entry.deltas.meanOpaqueLumaDeltaPercent)
+    .filter((value): value is number => value !== null);
+  if (lumaDeltaPercents.length > 0) {
+    const maxAbsLumaDeltaPercent = Math.max(...lumaDeltaPercents.map((value) => Math.abs(value)));
+    const minLumaDeltaPercent = Math.min(...lumaDeltaPercents);
+    const maxLumaDeltaPercent = Math.max(...lumaDeltaPercents);
+    findings.push(maxAbsLumaDeltaPercent <= 12
+      ? `Matched imposter luma is within the +/-12% selected-lighting proof band; luma delta range is ${minLumaDeltaPercent.toFixed(2)}% to ${maxLumaDeltaPercent.toFixed(2)}%.`
+      : `Matched imposter luma remains outside the +/-12% selected-lighting proof band; luma delta range is ${minLumaDeltaPercent.toFixed(2)}% to ${maxLumaDeltaPercent.toFixed(2)}%.`);
+  }
   findings.push(
     `The NPC runtime visual target is ${NPC_CLOSE_MODEL_TARGET_HEIGHT.toFixed(3)}m from ${NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT.toFixed(2)}m base height times ${NPC_PIXEL_FORGE_VISUAL_SCALE_MULTIPLIER.toFixed(2)}; this run records the owner-approved first target drop, not a broader human-scale redesign.`
   );
@@ -902,7 +931,7 @@ function buildFindings(npcComparisons: NpcComparison[], aircraft: BrowserAircraf
   } else {
     findings.push('Aircraft GLBs load at native imported scale; this proof records their meter-scale bounds but does not resize or remediate them.');
   }
-  findings.push('PASS means the matched evidence artifact is complete and trusted enough for review; it is not an imposter, shader, NPC-scale, or aircraft-scale acceptance claim.');
+  findings.push('PASS means the matched evidence artifact is complete and trusted enough for review; it is not final visual, gameplay, performance, aircraft-scale, or production acceptance.');
   return findings;
 }
 
@@ -1006,6 +1035,9 @@ async function run(): Promise<void> {
           projectedGeometryHeightDeltaPercent: roundMetric(projectedHeightDelta, 3),
           meanOpaqueLumaDelta: closeStats.meanOpaqueLuma !== null && imposterStats.meanOpaqueLuma !== null
             ? roundMetric(imposterStats.meanOpaqueLuma - closeStats.meanOpaqueLuma, 2)
+            : null,
+          meanOpaqueLumaDeltaPercent: closeStats.meanOpaqueLuma !== null && imposterStats.meanOpaqueLuma !== null && closeStats.meanOpaqueLuma > 0
+            ? roundMetric(((imposterStats.meanOpaqueLuma - closeStats.meanOpaqueLuma) / closeStats.meanOpaqueLuma) * 100, 2)
             : null,
           meanOpaqueChromaDelta: closeStats.meanOpaqueChroma !== null && imposterStats.meanOpaqueChroma !== null
             ? roundMetric(imposterStats.meanOpaqueChroma - closeStats.meanOpaqueChroma, 2)

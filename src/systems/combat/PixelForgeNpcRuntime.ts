@@ -32,6 +32,16 @@ export interface PixelForgeNpcFactionRuntimeConfig {
   weapon: PixelForgeNpcWeaponRuntimeConfig;
 }
 
+export interface PixelForgeNpcImposterMaterialTuning {
+  readabilityStrength: number;
+  npcExposure: number;
+  minNpcLight: number;
+  npcTopLight: number;
+  parityScale: number;
+  parityLift: number;
+  paritySaturation: number;
+}
+
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS = 64;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ =
   PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS * PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS;
@@ -115,6 +125,48 @@ export const PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING: Partial<
     uniform: 0x5c4c36,
     trousers: 0x4d422f,
     headgear: 0xc8b98a,
+  },
+};
+
+export const PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING: Record<
+  PixelForgeNpcFactionAsset['packageFaction'],
+  PixelForgeNpcImposterMaterialTuning
+> = {
+  usArmy: {
+    readabilityStrength: 0.38,
+    npcExposure: 1.2,
+    minNpcLight: 0.92,
+    npcTopLight: 0.16,
+    parityScale: 1.8,
+    parityLift: 0.08,
+    paritySaturation: 1.6,
+  },
+  arvn: {
+    readabilityStrength: 0.38,
+    npcExposure: 1.2,
+    minNpcLight: 0.92,
+    npcTopLight: 0.16,
+    parityScale: 1.7,
+    parityLift: 0.06,
+    paritySaturation: 1.25,
+  },
+  nva: {
+    readabilityStrength: 0.38,
+    npcExposure: 1.2,
+    minNpcLight: 0.92,
+    npcTopLight: 0.16,
+    parityScale: 1.45,
+    parityLift: 0.04,
+    paritySaturation: 2.4,
+  },
+  vc: {
+    readabilityStrength: 0.38,
+    npcExposure: 1.2,
+    minNpcLight: 0.92,
+    npcTopLight: 0.16,
+    parityScale: 1.3,
+    parityLift: 0.035,
+    paritySaturation: 2.3,
   },
 };
 

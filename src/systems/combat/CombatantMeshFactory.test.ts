@@ -17,6 +17,7 @@ import type { AssetLoader } from '../assets/AssetLoader';
 import { PLAYER_EYE_HEIGHT } from '../player/PlayerMovement';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { Logger } from '../../utils/Logger';
+import { PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING } from './PixelForgeNpcRuntime';
 
 /**
  * Behavior contract for CombatantMeshFactory's per-bucket overflow handling.
@@ -216,14 +217,19 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
 
     expect(material).toBeDefined();
     expect(material?.uniforms.readabilityStrength.value).toBeGreaterThanOrEqual(0.35);
-    expect(material?.uniforms.npcExposure.value).toBeCloseTo(1.2);
-    expect(material?.uniforms.minNpcLight.value).toBeCloseTo(0.92);
-    expect(material?.uniforms.npcTopLight.value).toBeCloseTo(0.16);
+    expect(material?.uniforms.npcExposure.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.npcExposure);
+    expect(material?.uniforms.minNpcLight.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.minNpcLight);
+    expect(material?.uniforms.npcTopLight.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.npcTopLight);
+    expect(material?.uniforms.parityScale.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.parityScale);
+    expect(material?.uniforms.parityLift.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.parityLift);
+    expect(material?.uniforms.paritySaturation.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.paritySaturation);
     expect(material?.uniforms.tileCropMap.value).toBeInstanceOf(THREE.DataTexture);
     expect(material?.uniforms.tileCropMapSize.value.x).toBe(28);
     expect(material?.uniforms.tileCropMapSize.value.y).toBe(14);
     expect(material?.fragmentShader).toContain('tileCropMap');
     expect(material?.fragmentShader).toContain('croppedUv');
+    expect(material?.fragmentShader).toContain('parityScale');
+    expect(material?.fragmentShader).toContain('paritySaturation');
     expect(material?.fragmentShader).toContain('gl_FragColor = vec4(npcColor, alpha)');
     expect(material?.fragmentShader).not.toContain('gl_FragColor = vec4(npcColor * alpha, alpha)');
 
