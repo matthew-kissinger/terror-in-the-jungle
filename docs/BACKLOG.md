@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-05-02
+Last updated: 2026-05-04
 
 ## Stable-Ground Follow-Up
 
@@ -726,7 +726,7 @@ the runbook for the end-of-cycle ritual.
    item before any baseline refresh.
 17. **Projekt Objekt-143 KB-TERRAIN has before evidence, not a fix.** The
    fresh-build baseline at
-   `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`
+   `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`
    captures elevated Open Frontier/A Shau horizon screenshots and linked
    perf-before guardrails. A far-canopy or distance-policy branch is now
    ready to start, but it still needs matched after screenshots plus Open

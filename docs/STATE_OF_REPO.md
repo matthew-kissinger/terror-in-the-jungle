@@ -1,6 +1,6 @@
 # State Of Repo
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
@@ -89,7 +89,7 @@ the current truth anchor.
   max distance is. Cycle 3 then added
   `npm run check:projekt-143-terrain-baseline`, with the fresh-build baseline
   at
-  `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`.
   It captures elevated Open Frontier and A Shau screenshots plus renderer,
   terrain, vegetation, browser, warmup, and linked perf-before metadata. It is
   before evidence only; no far-canopy fix is accepted from it.
@@ -343,7 +343,7 @@ What is not ready to claim:
 - No distant-canopy or barren-horizon fix has shipped. KB-TERRAIN now has
   static coverage evidence plus the fresh-build elevated runtime before
   baseline at
-  `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`.
   It is ready for a far-horizon branch, but any outer-canopy layer still needs
   matched after screenshots and Open Frontier/A Shau perf deltas before it is
   accepted.
@@ -352,7 +352,7 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T23-54-12-365Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-04T00-05-12-050Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
@@ -362,7 +362,7 @@ What is not ready to claim:
   uploads after the partial giantPalm warmup, KB-EFFECTS grenade first-use is
   `evidence_complete` for the trusted low-load probe, KB-TERRAIN is now
   `ready_for_branch` after the fresh-build elevated horizon baseline at
-  `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`,
+  `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`,
   and KB-CULL remains `needs_baseline`. It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
   combat120, and A Shau perf summary paths for handoff. This is
@@ -371,7 +371,7 @@ What is not ready to claim:
   residency closeout, culling, WebGPU, or
   production-parity remediation is accepted from it.
 - KB-OPTIK now has an executable decision packet at
-  `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`.
   It records the current NPC target as `2.95m`, imposter visible-height ratio
   average as `0.879`, imposter luma delta percent average as `-0.073`,
   near-stress expanded proof flagged samples as `10`, runtime LOD-edge proof

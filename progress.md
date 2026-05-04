@@ -2304,20 +2304,21 @@ TODO
   ground band is blank, which should save future agents from accepting a
   telemetry-only screenshot artifact.
 - Fresh-build baseline:
-  `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`
-  is PASS. It captured `4/4` screenshots with renderer, terrain, vegetation,
+  `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`
+  is PASS from clean HEAD `294baf038cce9f9f31588169bf6f4c8c3e22976d`.
+  It captured `4/4` screenshots with renderer, terrain, vegetation,
   and image-content evidence, plus trusted before perf baselines. Future
   far-horizon after captures must stay within the recorded guardrails: Open
   Frontier p95 `<=43.5ms` and draw calls `<=1141`; A Shau p95 `<=40.9ms` and
   draw calls `<=864`.
 - Cycle 3 kickoff now consumes the terrain horizon baseline and writes
   `terrainHorizonBaseline` in its input list. Latest kickoff:
-  `artifacts/perf/2026-05-03T23-54-12-365Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-04T00-05-12-050Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
   remains WARN overall because KB-OPTIK needs an owner decision and KB-CULL
   still needs an owner-path baseline, but KB-TERRAIN
   `large-mode-vegetation-horizon` is now `ready_for_branch`.
 - Refreshed KB-OPTIK decision packet after stale routing cleanup:
-  `artifacts/perf/2026-05-03T23-54-37-913Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`.
   Its owner-choice language now routes non-OPTIK work to
   KB-LOAD/KB-TERRAIN/KB-CULL instead of reopening the completed low-load
   KB-EFFECTS path.

@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 ## Stable-Ground Perf Posture
 
@@ -276,7 +276,7 @@ screenshots, and records browser metadata, warmup policy, renderer stats,
 terrain readiness, vegetation active counters, nonblank ground-band image
 checks, latest trusted Open Frontier/A Shau perf summaries, the vegetation
 horizon audit, and the culling proof. The first fresh-build artifact is
-`artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
+`artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`.
 It is a before baseline for a future far-horizon branch, not an accepted
 far-canopy implementation. Future after evidence must rerun this command and
 matched Open Frontier/A Shau perf captures; the current guardrails are Open
@@ -639,7 +639,7 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    current Pixel Forge vegetation disappears by `600m`, while Open Frontier
    and A Shau terrain remains visible beyond that range. Cycle 3 now has a
    fresh-build elevated screenshot/perf-before baseline at
-   `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
+   `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`.
    The current lead is a missing outer canopy tier, not a scatterer residency
    bug; no far-canopy remediation is accepted yet.
 6. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
