@@ -206,6 +206,27 @@ type CullingProof = {
   };
 };
 
+type CullingOwnerBaseline = {
+  status?: CheckStatus;
+  measurementTrust?: { status?: CheckStatus };
+  selectedOwnerPath?: {
+    id?: string;
+    status?: 'ready_for_branch' | 'diagnostic_only' | 'blocked';
+    ownerCategories?: string[];
+    evidence?: Record<string, unknown>;
+  } | null;
+  performanceBaselines?: {
+    openFrontier?: {
+      visibleUnattributedPercent?: number | null;
+      maxRendererDrawCalls?: number | null;
+    };
+    aShau?: {
+      visibleUnattributedPercent?: number | null;
+      maxRendererDrawCalls?: number | null;
+    };
+  };
+};
+
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const OUTPUT_NAME = 'projekt-143-cycle3-kickoff';
 
@@ -688,19 +709,27 @@ function buildTerrainTarget(
 function buildCullTarget(
   cullingPath: string | null,
   culling: CullingProof | null,
+  cullingBaselinePath: string | null,
+  cullingBaseline: CullingOwnerBaseline | null,
   openFrontierSummaryPath: string | null,
   aShauSummaryPath: string | null,
   combat120SummaryPath: string | null
 ): Cycle3Target {
   const trusted = culling?.status === 'pass' && culling.measurementTrust?.status === 'pass';
+  const ownerBaselineReady = cullingBaseline?.status === 'pass'
+    && cullingBaseline.measurementTrust?.status === 'pass'
+    && cullingBaseline.selectedOwnerPath?.status === 'ready_for_branch';
   return {
     id: 'static-feature-and-vehicle-culling-hlod',
     bureau: 'KB-CULL',
-    status: trusted ? 'needs_baseline' : 'blocked',
+    status: ownerBaselineReady ? 'ready_for_branch' : (trusted ? 'needs_baseline' : 'blocked'),
     priority: 5,
-    summary: 'Culling/HLOD remediation has category proof, but each actual change still needs representative before/after renderer telemetry.',
+    summary: ownerBaselineReady
+      ? 'KB-CULL has a selected owner-path before baseline for large-mode world static features and visible helicopters.'
+      : 'Culling/HLOD remediation has category proof, but each actual change still needs representative before/after renderer telemetry.',
     evidence: {
       cullingProofPath: rel(cullingPath),
+      cullingOwnerBaselinePath: rel(cullingBaselinePath),
       openFrontierPerfSummaryPath: rel(openFrontierSummaryPath),
       aShauPerfSummaryPath: rel(aShauSummaryPath),
       combat120PerfSummaryPath: rel(combat120SummaryPath),
@@ -708,10 +737,21 @@ function buildCullTarget(
       measurementTrustStatus: culling?.measurementTrust?.status ?? null,
       drawCalls: culling?.rendererInfo?.drawCalls ?? null,
       triangles: culling?.rendererInfo?.triangles ?? null,
+      ownerBaselineStatus: cullingBaseline?.status ?? null,
+      ownerBaselineMeasurementTrustStatus: cullingBaseline?.measurementTrust?.status ?? null,
+      selectedOwnerPathId: cullingBaseline?.selectedOwnerPath?.id ?? null,
+      selectedOwnerCategories: cullingBaseline?.selectedOwnerPath?.ownerCategories ?? null,
+      openFrontierVisibleUnattributedPercent: cullingBaseline?.performanceBaselines?.openFrontier?.visibleUnattributedPercent ?? null,
+      aShauVisibleUnattributedPercent: cullingBaseline?.performanceBaselines?.aShau?.visibleUnattributedPercent ?? null,
+      ownerEvidence: cullingBaseline?.selectedOwnerPath?.evidence ?? null,
     },
     requiredBefore: [
-      'Pick one owner path: static world features, parked aircraft visibility, close NPC pool residency, or vegetation imposters.',
-      'Capture representative before scene attribution and renderer stats for that path.',
+      ownerBaselineReady
+        ? 'Start with the selected owner path or explicitly file a different owner decision before editing runtime culling code.'
+        : 'Pick one owner path: static world features, parked aircraft visibility, close NPC pool residency, or vegetation imposters.',
+      ownerBaselineReady
+        ? 'Rerun the culling owner baseline after any candidate change and compare matched owner draw-call/triangle deltas.'
+        : 'Capture representative before scene attribution and renderer stats for that path.',
       'Keep HLOD/culling registration visible in docs and artifacts.',
     ],
     acceptance: [
@@ -771,6 +811,7 @@ function main(): void {
   const horizonPath = latestFile(artifactFiles, (path) => path.endsWith(join('vegetation-horizon-audit', 'horizon-audit.json')));
   const terrainBaselinePath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-terrain-horizon-baseline', 'summary.json')));
   const cullingPath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-culling-proof', 'summary.json')));
+  const cullingBaselinePath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-culling-owner-baseline', 'summary.json')));
 
   const cycle2 = readJson<Cycle2Proof>(cycle2Path);
   const opticsScale = readJson<OpticsScaleProof>(opticsScalePath);
@@ -784,6 +825,7 @@ function main(): void {
   const horizon = readJson<HorizonAudit>(horizonPath);
   const terrainBaseline = readJson<TerrainHorizonBaseline>(terrainBaselinePath);
   const culling = readJson<CullingProof>(cullingPath);
+  const cullingBaseline = readJson<CullingOwnerBaseline>(cullingBaselinePath);
 
   const targets = [
     buildOptikTarget(
@@ -799,7 +841,7 @@ function main(): void {
     buildLoadTarget(texturePath, startupOpenPath, startupOpen, startupZonePath, startupZone, texture),
     buildEffectsTarget(grenadePath, grenade),
     buildTerrainTarget(horizonPath, horizon, openFrontierPerfPath, aShauPerfPath, terrainBaselinePath, terrainBaseline),
-    buildCullTarget(cullingPath, culling, openFrontierPerfPath, aShauPerfPath, combat120PerfPath),
+    buildCullTarget(cullingPath, culling, cullingBaselinePath, cullingBaseline, openFrontierPerfPath, aShauPerfPath, combat120PerfPath),
   ].sort((a, b) => a.priority - b.priority);
 
   const report: KickoffReport = {
@@ -823,6 +865,7 @@ function main(): void {
       horizonAudit: rel(horizonPath),
       terrainHorizonBaseline: rel(terrainBaselinePath),
       cullingProof: rel(cullingPath),
+      cullingOwnerBaseline: rel(cullingBaselinePath),
     },
     targets,
     recommendedOrder: [
@@ -831,7 +874,7 @@ function main(): void {
       'For KB-LOAD, treat the giantPalm warmup as partial upload mitigation only; the next branch must prove startup latency does not regress while reducing remaining uploads.',
       'For KB-EFFECTS, preserve the unlit pooled explosion architecture; do not reopen low-load grenade work unless visuals change, and do not infer combat120/stress closeout.',
       'For KB-TERRAIN, use the terrain horizon baseline proof as before evidence, then require matched after screenshots plus Open Frontier/A Shau perf deltas.',
-      'Keep KB-CULL remediation separate from KB-TERRAIN until a single owner path and representative before/after renderer telemetry are chosen.',
+      'For KB-CULL, use the owner-path baseline before evidence first; do not move close-NPC residency out of diagnostic-only status until combat stress measurement trust passes.',
       'Keep WebGPU out of Cycle 3 unless the owner explicitly approves reopening the point-of-no-return decision.',
     ],
     openDecisions: [

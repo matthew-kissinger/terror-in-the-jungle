@@ -38,6 +38,7 @@ npm run check:states             # State coverage probe
 npm run check:hud                # HUD layout validator
 npm run check:memory             # Memory growth tracker
 npm run check:projekt-143-culling-proof  # Headed deterministic renderer/category proof
+npm run check:projekt-143-culling-baseline # Culling owner-path before packet
 npm run check:projekt-143-terrain-baseline # Elevated terrain horizon before proof
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof bundle
 npm run probe                    # Engine health probe
@@ -202,6 +203,12 @@ camera/render shake questions have an evidence-backed decision.
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.
 - **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:projekt-143-culling-proof` and then `npm run check:projekt-143-cycle2-proof`; the proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
+- **Cycle 3 KB-CULL owner baseline.** Before changing culling, HLOD, static
+  features, vehicle visibility, or pool residency, run
+  `npm run check:projekt-143-culling-baseline`. It selects a representative
+  owner path from trusted Open Frontier/A Shau scene attribution and keeps
+  close-NPC pool residency diagnostic-only until combat stress measurement
+  trust passes.
 - **Cycle 3 KB-TERRAIN before proof.** Before changing far vegetation,
   canopy, terrain fog, or view-distance policy, run
   `npm run check:projekt-143-terrain-baseline`. It force-builds the perf target
