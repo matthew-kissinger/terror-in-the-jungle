@@ -212,6 +212,7 @@ describe('HelicopterModel', () => {
       enterHelicopter: vi.fn(),
       exitHelicopter: vi.fn(),
       getPosition: vi.fn().mockReturnValue(new THREE.Vector3(0, 0, 0)),
+      getCamera: vi.fn().mockReturnValue(null),
     } as unknown as IPlayerController;
 
     mockHUDSystem = {
@@ -422,6 +423,31 @@ describe('HelicopterModel', () => {
 
       expect(mocks.physics.setEngineActive).toHaveBeenCalledWith(false);
       expect(mocks.physics.update).not.toHaveBeenCalled();
+    });
+
+    it('still applies render-distance culling before skipping a stopped parked helicopter', async () => {
+      const farHelipad = new THREE.Vector3(10_000, 10, 0);
+      vi.mocked(mockHelipadSystem.getHelipadPosition).mockReturnValue(farHelipad.clone());
+      vi.mocked(mockHelipadSystem.getAllHelipads).mockReturnValue([makeHelipadInfo(HELIPAD_ID, farHelipad)]);
+      model.createHelicopterWhenReady();
+      await flushPromises();
+      model.setPlayerController(mockPlayerController);
+      vi.mocked(mockPlayerController.isInHelicopter).mockReturnValue(false);
+      vi.mocked(mockPlayerController.getCamera).mockReturnValue(new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000));
+      vi.mocked(mocks.physics.getState).mockImplementation(() => ({
+        position: farHelipad.clone(),
+        velocity: new THREE.Vector3(0, 0, 0),
+        angularVelocity: new THREE.Vector3(0, 0, 0),
+        quaternion: new THREE.Quaternion(),
+        engineRPM: 0,
+        isGrounded: true,
+        groundHeight: 0,
+      }));
+
+      model.update(0.16);
+
+      expect(mocks.physics.update).not.toHaveBeenCalled();
+      expect(scene.children[0].visible).toBe(false);
     });
 
     it('should detect helipad height during physics update when near helipad', async () => {

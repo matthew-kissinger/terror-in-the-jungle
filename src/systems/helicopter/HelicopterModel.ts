@@ -537,22 +537,24 @@ export class HelicopterModel implements GameSystem {
 
       const isPiloted = id === pilotedId;
       physics.setEngineActive(isPiloted);
+      const stateBeforeUpdate = physics.getState();
 
       if (isPiloted) {
         // Controls are set each frame by PlayerMovement.setHelicopterControls()
-      } else if (!physics.getState().isGrounded) {
+      } else if (!stateBeforeUpdate.isGrounded) {
         // Unoccupied + airborne: zero controls so gravity pulls it down
         physics.setControls({ collective: 0, cyclicPitch: 0, cyclicRoll: 0, yaw: 0, engineBoost: false });
-      } else if (physics.getState().engineRPM > 0) {
+      } else if (stateBeforeUpdate.engineRPM > 0) {
         // Unoccupied + grounded but still spinning: keep ticking until the
         // engine/rotor lifecycle reaches a true stopped state.
         physics.setControls({ collective: 0, cyclicPitch: 0, cyclicRoll: 0, yaw: 0, engineBoost: false });
       } else {
-        // Unoccupied + grounded: no update needed
+        this.updateHelicopterRenderVisibility(helicopter, stateBeforeUpdate, isPiloted, camera);
+        // Unoccupied + grounded: no physics update needed.
         continue;
       }
 
-      const currentPos = physics.getState().position;
+      const currentPos = stateBeforeUpdate.position;
       const terrainHeight = this.terrainManager.getHeightAt(currentPos.x, currentPos.z);
 
       let helipadHeight: number | undefined;
@@ -578,14 +580,7 @@ export class HelicopterModel implements GameSystem {
       const finalQuaternion = this.animation.updateVisualTilt(helicopter, id, physics, deltaTime);
       helicopter.quaternion.copy(finalQuaternion);
 
-      helicopter.visible = shouldRenderAirVehicle({
-        camera,
-        scene: this.scene,
-        vehiclePosition: helicopter.position,
-        isAirborne: !state.isGrounded,
-        isPiloted,
-        currentlyVisible: helicopter.visible,
-      });
+      this.updateHelicopterRenderVisibility(helicopter, state, isPiloted, camera);
 
       if (isPiloted && this.playerController) {
         // Feed the interpolated visual pose, not raw physics. The camera lerps
@@ -621,6 +616,22 @@ export class HelicopterModel implements GameSystem {
     // Tick weapon effects once per frame
     this.weaponSystem.updateEffects(deltaTime);
     this.doorGunner.updateEffects(deltaTime);
+  }
+
+  private updateHelicopterRenderVisibility(
+    helicopter: THREE.Group,
+    state: ReturnType<HelicopterPhysics['getState']>,
+    isPiloted: boolean,
+    camera: THREE.Camera | null,
+  ): void {
+    helicopter.visible = shouldRenderAirVehicle({
+      camera,
+      scene: this.scene,
+      vehiclePosition: helicopter.position,
+      isAirborne: !state.isGrounded,
+      isPiloted,
+      currentlyVisible: helicopter.visible,
+    });
   }
 
   setHelicopterControls(helicopterId: string, controls: Partial<HelicopterControls>): void {

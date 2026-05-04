@@ -62,6 +62,13 @@ ledger; this file is the short operational prompt.
   `artifacts/perf/2026-05-04T14-17-44-361Z/summary.json`
   (static-feature draw-call reduction only; no broad Open Frontier perf win or
   A Shau acceptance)
+- KB-CULL grounded/parked helicopter visibility evidence:
+  `artifacts/perf/2026-05-04T17-41-57-455Z/summary.json`,
+  `artifacts/perf/2026-05-04T17-51-52-562Z/summary.json`,
+  `artifacts/perf/2026-05-04T17-56-35-772Z/projekt-143-culling-proof/summary.json`, and
+  `artifacts/perf/2026-05-04T17-56-41-253Z/projekt-143-culling-owner-baseline/summary.json`
+  (visible-helicopter category reduction only; not broad vehicle/HLOD or A Shau
+  terrain acceptance)
 - Rejected KB-CULL static-helicopter candidate:
   `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json`
 - KB-EFFECTS trusted low-load closeout:
@@ -120,8 +127,12 @@ ledger; this file is the short operational prompt.
   `WorldStaticFeatureBatchRoot` and are batched across placement boundaries.
   The selected owner path remains
   `large-mode-world-static-and-visible-helicopters`, but the current accepted
-  scope is only static-feature layer draw-call reduction: refreshed owner
-  evidence records Open Frontier owner draw-call-like `261` and A Shau `307`.
+  scope is only static-feature layer draw-call reduction plus grounded/parked
+  helicopter visibility reduction: refreshed owner evidence records Open
+  Frontier owner draw-call-like `261` and A Shau `307` after static batching,
+  then a parked-helicopter pass takes Open Frontier helicopter attribution to
+  `0` visible objects / `0` visible triangles and reduces A Shau from `56`
+  visible objects / `4,796` visible triangles to `37` / `2,696`.
   Open Frontier static attribution improved, but total renderer max is mixed
   because close NPCs/weapons were visible in the after capture; A Shau improved
   materially and no longer heap-fails in the fresh run, but it remains WARN and
@@ -165,7 +176,9 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-04T14-29-34-142Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-04T17-58-34-753Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+- Projekt evidence suite:
+  artifacts/perf/2026-05-04T17-58-50-965Z/projekt-143-evidence-suite/suite-summary.json
 - KB-TERRAIN before baseline:
   artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:
@@ -190,6 +203,10 @@ Current evidence anchors:
   artifacts/perf/2026-05-04T14-08-33-257Z/projekt-143-culling-proof/summary.json
   artifacts/perf/2026-05-04T14-13-30-766Z/summary.json
   artifacts/perf/2026-05-04T14-17-44-361Z/summary.json
+- KB-CULL grounded/parked helicopter visibility:
+  artifacts/perf/2026-05-04T17-41-57-455Z/summary.json
+  artifacts/perf/2026-05-04T17-51-52-562Z/summary.json
+  artifacts/perf/2026-05-04T17-56-41-253Z/projekt-143-culling-owner-baseline/summary.json
 - KB-EFFECTS low-load closeout:
   artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json
 - KB-OPTIK decision packet:
@@ -218,9 +235,13 @@ Current bureau state:
 - KB-CULL: partial static-feature batching pass filed. Shared static-feature
   root reduced world-static draw-call-like in Open Frontier and A Shau; treat
   it as static-feature draw-call reduction only, not broad culling/HLOD or
-  perf acceptance. The selected owner path remains large-mode world static
-  features plus visible helicopters; close-NPC/weapon residency remains
-  diagnostic-only. Rejected static-helicopter distance-cull after artifact:
+  perf acceptance. A follow-up grounded/parked helicopter pass applies the
+  existing air-vehicle render-distance rule before stopped grounded helicopters
+  skip physics; treat it as visible-helicopter category reduction only. Open
+  Frontier reaches `0` visible helicopter objects/triangles, while A Shau is
+  reduced but not closed (`37` visible objects / `2,696` visible triangles).
+  Close-NPC/weapon residency remains diagnostic-only. Rejected
+  static-helicopter distance-cull after artifact:
   artifacts/perf/2026-05-04T00-55-00-501Z/summary.json.
 - KB-EFFECTS: evidence_complete only for low-load grenade first-use stall.
 - KB-OPTIK: needs_decision for near-stress silhouette exception/human review.
@@ -231,8 +252,9 @@ checking that the selected bureau has before evidence. Prefer a narrow,
 bisectable branch:
 - KB-CULL next path: continue from the shared static-feature batching evidence
   with matched Open Frontier/A Shau captures, and only claim the category that
-  actually improves. Static-feature draw-call reduction has evidence; visible
-  helicopters and close-NPC/weapon residency are not closed.
+  actually improves. Static-feature draw-call reduction and grounded/parked
+  helicopter visibility reduction have evidence; A Shau visible helicopters and
+  close-NPC/weapon residency are not closed.
 - KB-TERRAIN first path: far-horizon representation/distance policy, using the
   elevated screenshot baseline and Open Frontier/A Shau perf guardrails.
 - KB-LOAD first path: texture/upload residency with paired Open Frontier and

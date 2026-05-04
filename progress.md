@@ -2703,3 +2703,44 @@ TODO
   `npm run check:projekt-143` PASS at
   `artifacts/perf/2026-05-04T14-29-43-744Z/projekt-143-evidence-suite/suite-summary.json`;
   `npm run validate:fast` PASS (`251` files, `3860` tests).
+
+2026-05-04 Projekt Objekt-143 KB-CULL grounded/parked helicopter visibility pass
+- Fixed a helicopter visibility owner-path gap: stopped grounded helicopters
+  previously skipped the update loop before `shouldRenderAirVehicle` was
+  applied, so distant parked helicopters could remain scene-visible forever.
+  `HelicopterModel` now applies the existing air-vehicle render-distance rule
+  before that stopped/grounded early-continue path.
+- Targeted tests:
+  `npx vitest run src\systems\vehicle\AirVehicleVisibility.test.ts src\systems\helicopter\HelicopterModel.test.ts`
+  PASS (`2` files, `39` tests).
+- Open Frontier evidence:
+  first run `artifacts/perf/2026-05-04T17-36-44-412Z/summary.json` was
+  measurement-trusted but validation FAIL on peak p99 `61.60ms`, so it is not
+  accepted. Rerun `artifacts/perf/2026-05-04T17-41-57-455Z/summary.json` is
+  measurement-trusted with validation WARN only on peak p99 `48.70ms`.
+  Scene attribution records `helicopters` at `0` visible objects / `0` visible
+  triangles while `world_static_features` stays at the accepted batched count
+  (`222` draw-call-like, `155` materials, `222` meshes).
+- A Shau evidence:
+  first run `artifacts/perf/2026-05-04T17-46-23-113Z/summary.json` was
+  measurement-trusted but validation FAIL on heap recovery, so it is diagnostic
+  only despite reducing helicopters to `19` visible objects / `2,100` visible
+  triangles. Rerun `artifacts/perf/2026-05-04T17-51-52-562Z/summary.json` is
+  measurement-trusted with validation WARN only on peak p99 `33.70ms`. Against
+  the static-feature after point, helicopters reduced from `56` visible objects
+  / `4,796` visible triangles to `37` / `2,696`.
+- Refreshed Projekt culling evidence:
+  `npm run check:projekt-143-culling-proof` PASS at
+  `artifacts/perf/2026-05-04T17-56-35-772Z/projekt-143-culling-proof/summary.json`;
+  `npm run check:projekt-143-culling-baseline` PASS at
+  `artifacts/perf/2026-05-04T17-56-41-253Z/projekt-143-culling-owner-baseline/summary.json`.
+- Broad Projekt gates after docs:
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-04T17-58-34-753Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T17-58-50-965Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`251` files, `3863` tests).
+- Accepted scope: grounded/parked helicopter visible-category reduction only.
+  Non-claims: no broad vehicle culling/HLOD acceptance, no frame-time baseline
+  refresh, no A Shau terrain/nav acceptance, and no close-NPC/weapon residency
+  closeout.

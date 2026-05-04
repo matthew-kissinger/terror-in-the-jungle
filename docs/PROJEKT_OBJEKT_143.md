@@ -1491,6 +1491,32 @@ Current Cycle 3 status:
   `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json` because Open Frontier
   validation failed and the owner path stayed at `388`; do not repeat that
   exact approach as a claimed KB-CULL fix without new before/after evidence.
+  A follow-up grounded/parked helicopter visibility branch is now accepted only
+  as a narrow visible-helicopter category reduction: it applies the existing
+  air-vehicle render-distance rule before stopped grounded helicopters skip the
+  physics update. Targeted helicopter/air-vehicle visibility tests passed.
+  Open Frontier rerun evidence at
+  `artifacts/perf/2026-05-04T17-41-57-455Z/summary.json` is measurement-trusted
+  with validation WARN only on peak p99; `helicopters` attribution drops to
+  `0` visible objects / `0` visible triangles. A Shau rerun evidence at
+  `artifacts/perf/2026-05-04T17-51-52-562Z/summary.json` is measurement-trusted
+  with validation WARN only on peak p99; against the static-feature after
+  point it reduces helicopters from `56` visible objects / `4,796` visible
+  triangles to `37` / `2,696`. A prior A Shau run at
+  `artifacts/perf/2026-05-04T17-46-23-113Z/summary.json` reduced helicopters
+  further but failed heap recovery, so it remains diagnostic only. The
+  refreshed culling proof is
+  `artifacts/perf/2026-05-04T17-56-35-772Z/projekt-143-culling-proof/summary.json`,
+  and the refreshed owner baseline is
+  `artifacts/perf/2026-05-04T17-56-41-253Z/projekt-143-culling-owner-baseline/summary.json`.
+  Do not promote this to broad vehicle culling/HLOD, frame-time, or A Shau
+  terrain/nav acceptance.
+- 2026-05-04 final KB-CULL grounded/parked helicopter gates:
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-04T17-58-34-753Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T17-58-50-965Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`251` files, `3863` tests).
 - 2026-05-04 local follow-up validation: focused vegetation/terrain/harness
   unit tests passed, `npm run check:projekt-143-terrain-placement` PASS wrote
   `artifacts/perf/2026-05-04T12-59-25-892Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`,

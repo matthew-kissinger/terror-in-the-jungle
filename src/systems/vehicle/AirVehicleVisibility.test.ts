@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { shouldSimulateAirVehicle } from './AirVehicleVisibility';
+import { shouldRenderAirVehicle, shouldSimulateAirVehicle } from './AirVehicleVisibility';
 
 function makeCamera(position: THREE.Vector3): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
@@ -199,5 +199,39 @@ describe('shouldSimulateAirVehicle', () => {
         currentlySimulating: false,
       }),
     ).toBe(true);
+  });
+});
+
+describe('shouldRenderAirVehicle', () => {
+  it('always renders a piloted aircraft regardless of distance', () => {
+    const camera = makeCamera(new THREE.Vector3(0, 0, 0));
+    const scene = makeFoggyScene();
+
+    expect(
+      shouldRenderAirVehicle({
+        camera,
+        scene,
+        vehiclePosition: new THREE.Vector3(10_000, 0, 0),
+        isAirborne: false,
+        isPiloted: true,
+        currentlyVisible: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('culls an unpiloted parked aircraft far beyond the visibility distance', () => {
+    const camera = makeCamera(new THREE.Vector3(0, 0, 0));
+    const scene = makeFoggyScene();
+
+    expect(
+      shouldRenderAirVehicle({
+        camera,
+        scene,
+        vehiclePosition: new THREE.Vector3(10_000, 0, 0),
+        isAirborne: false,
+        isPiloted: false,
+        currentlyVisible: true,
+      }),
+    ).toBe(false);
   });
 });
