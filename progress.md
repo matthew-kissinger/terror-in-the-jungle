@@ -2354,3 +2354,28 @@ TODO
   progress log. No culling/HLOD, close-NPC residency, startup-latency,
   far-canopy, WebGPU, production parity, or combat120/stress grenade closeout
   is claimed from this pass.
+
+2026-05-04 Projekt Objekt-143 fresh-agent handoff
+- Added `docs/PROJEKT_OBJEKT_143_HANDOFF.md` as the short continuation prompt
+  and evidence-anchor index for a fresh agent session. The handoff explicitly
+  keeps local work ahead of `origin/master`, avoids push/deploy/live parity
+  claims, and preserves WebGL stabilization as the current strategy.
+- Agent-DX alignment: added Projekt Objekt-143, the fresh-agent handoff, and
+  the Asset Acceptance Standard to the `AGENTS.md` documentation map, and linked
+  the handoff from `docs/PROJEKT_OBJEKT_143.md` Cycle 3 status.
+- Current handoff state: KB-LOAD, KB-TERRAIN, and KB-CULL are
+  `ready_for_branch`; KB-EFFECTS is `evidence_complete` only for the trusted
+  low-load unlit pooled grenade path; KB-OPTIK remains `needs_decision` for the
+  8.5m near-stress silhouette exception/human-review decision.
+- Latest evidence anchors remain:
+  `artifacts/perf/2026-05-04T00-14-47-283Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  `artifacts/perf/2026-05-04T00-18-26-810Z/projekt-143-evidence-suite/suite-summary.json`,
+  `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`,
+  `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`,
+  `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`,
+  and
+  `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`.
+- Validation before handoff: `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T00-18-26-810Z/projekt-143-evidence-suite/suite-summary.json`
+  and `npm run validate:fast` PASS. The final handoff pass is docs-only and
+  does not claim any remediation beyond recorded evidence.

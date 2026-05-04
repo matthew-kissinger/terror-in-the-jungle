@@ -1218,6 +1218,9 @@ Reversibility:
 
 Current Cycle 3 status:
 
+- Fresh-agent handoff: `docs/PROJEKT_OBJEKT_143_HANDOFF.md` contains the
+  short continuation prompt, current local repo constraints, and latest
+  evidence anchors for agents taking over from a clean session.
 - 2026-05-04: after the KB-CULL owner baseline pass, `npm run
   check:projekt-143-cycle3-kickoff` wrote
   `artifacts/perf/2026-05-04T00-14-47-283Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.

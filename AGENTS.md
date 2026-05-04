@@ -113,6 +113,9 @@ For perf-sensitive work, add `npm run validate:full` before push.
 |-----|---------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System overview, tick graph, coupling heatmap, key patterns |
 | [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) | Current verified repo state, known drift, and immediate priorities |
+| [docs/PROJEKT_OBJEKT_143.md](docs/PROJEKT_OBJEKT_143.md) | Projekt Objekt-143 evidence ledger, bureau states, and cycle plan |
+| [docs/PROJEKT_OBJEKT_143_HANDOFF.md](docs/PROJEKT_OBJEKT_143_HANDOFF.md) | Short fresh-agent handoff and continuation prompt for Projekt Objekt-143 |
+| [docs/ASSET_ACCEPTANCE_STANDARD.md](docs/ASSET_ACCEPTANCE_STANDARD.md) | Pixel Forge and runtime asset acceptance policy |
 | [docs/ARCHITECTURE_RECOVERY.md](docs/ARCHITECTURE_RECOVERY.md) | Architecture recovery cycles, gates, current findings, and residual risks |
 | [docs/COMBAT.md](docs/COMBAT.md) | Combat subsystem architecture (new, D1 2026-04-17) |
 | [docs/TESTING.md](docs/TESTING.md) | Four-layer test contract. Read before writing tests. |
