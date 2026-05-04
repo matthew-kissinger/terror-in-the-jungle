@@ -523,21 +523,21 @@ function main(): void {
           runtimeLodExpandedPasses
             ? 'Runtime LOD-edge proof passes; treat the remaining 8.5m near-stress silhouette flags as a visual-exception or human-review decision before changing runtime crop/scale again.'
             : 'Use the expanded KB-OPTIK proof as after-luma evidence; the next KB-OPTIK decision is gameplay-camera silhouette/crop acceptance or a documented visual exception.',
-          'If the team wants measurable WebGL improvement before more visual work, switch the next remediation slot to KB-LOAD texture/upload residency or KB-EFFECTS grenade first-use stall.',
+          'If the team wants measurable WebGL improvement before more visual work, switch the next remediation slot to KB-LOAD texture/upload residency, KB-TERRAIN horizon coverage, or KB-CULL renderer telemetry.',
         ]
       : selectedLightingComplete && expandedHasFlags
       ? [
           'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract problem unless a dedicated vehicle-scale proof says otherwise.',
           'Treat the 2.95m target drop, per-tile crop map, and selected-lighting luma parity as the first landed KB-OPTIK remediation slice.',
           'Use the expanded KB-OPTIK proof as before evidence for a targeted lighting/material-contract decision; do not mix in target-height or crop changes.',
-          'If the team wants measurable WebGL improvement before more visual work, switch the next remediation slot to KB-LOAD texture/upload residency or KB-EFFECTS grenade first-use stall.',
+          'If the team wants measurable WebGL improvement before more visual work, switch the next remediation slot to KB-LOAD texture/upload residency, KB-TERRAIN horizon coverage, or KB-CULL renderer telemetry.',
         ]
       : selectedLightingComplete
       ? [
           'Do not resize aircraft first. Treat the current evidence as an NPC visual-contract problem unless a dedicated vehicle-scale proof says otherwise.',
           'Treat the 2.95m target drop, per-tile crop map, and selected-lighting luma parity as the first landed KB-OPTIK remediation slice.',
           'If KB-OPTIK continues immediately, expand to dawn/dusk/haze, storm, and combat camera screenshots before final visual closeout.',
-          'Otherwise switch the next remediation slot to KB-LOAD texture/upload residency or KB-EFFECTS grenade first-use stall.',
+          'Otherwise switch the next remediation slot to KB-LOAD texture/upload residency, KB-TERRAIN horizon coverage, or KB-CULL renderer telemetry.',
         ]
       : firstTargetDropped && cropInProofBand
       ? [
@@ -556,13 +556,13 @@ function main(): void {
     openOwnerDecision: selectedLightingComplete && expandedOnlyVisibleHeightFlags
       ? runtimeLodExpandedPasses
         ? 'Runtime LOD-edge KB-OPTIK proof passes, but the 8.5m near-stress camera still flags visible height. Next decision: document the near-stress exception/human review, or explicitly request another runtime crop/scale pass despite LOD-edge evidence.'
-        : 'Expanded KB-OPTIK luma is inside band, but gameplay-perspective visible-height samples still flag. Next decision: accept/document the perspective silhouette exception, refine crop/geometry, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+        : 'Expanded KB-OPTIK luma is inside band, but gameplay-perspective visible-height samples still flag. Next decision: accept/document the perspective silhouette exception, refine crop/geometry, or switch the next remediation slot to KB-LOAD/KB-TERRAIN/KB-CULL.'
       : selectedLightingComplete && expandedHasFlags
-      ? 'Expanded KB-OPTIK coverage exists and is trusted, but it found visual flags. Next decision: target the imposter lighting/material contract now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+      ? 'Expanded KB-OPTIK coverage exists and is trusted, but it found visual flags. Next decision: target the imposter lighting/material contract now, or switch the next remediation slot to KB-LOAD/KB-TERRAIN/KB-CULL.'
       : selectedLightingComplete
-      ? 'No open owner decision remains for the first selected-lighting KB-OPTIK remediation. Next decision: expand KB-OPTIK coverage now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+      ? 'No open owner decision remains for the first selected-lighting KB-OPTIK remediation. Next decision: expand KB-OPTIK coverage now, or switch the next remediation slot to KB-LOAD/KB-TERRAIN/KB-CULL.'
       : firstTargetDropped && cropInProofBand
-        ? 'No open owner decision remains for the first 2.95m target/crop remediation. Next decision: take KB-OPTIK luma/material parity now, or switch the next remediation slot to KB-LOAD/KB-EFFECTS.'
+        ? 'No open owner decision remains for the first 2.95m target/crop remediation. Next decision: take KB-OPTIK luma/material parity now, or switch the next remediation slot to KB-LOAD/KB-TERRAIN/KB-CULL.'
       : 'Approve the first absolute NPC target candidate: keep the readability multiplier, drop to the 2.95m Pixel Forge base target, or authorize a larger human-scale redesign with gameplay/playtest scope.',
   };
 

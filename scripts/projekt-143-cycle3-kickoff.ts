@@ -173,6 +173,30 @@ type HorizonAudit = {
   };
 };
 
+type TerrainHorizonBaseline = {
+  status?: CheckStatus;
+  measurementTrust?: { status?: CheckStatus };
+  scenarios?: Array<{
+    shots?: Array<unknown>;
+  }>;
+  performanceBaselines?: {
+    openFrontier?: {
+      status?: CheckStatus;
+      peakP95FrameMs?: number | null;
+      p95AfterCeilingPlus1p5Ms?: number | null;
+      maxDrawCalls?: number | null;
+      drawCallAfterCeiling10Percent?: number | null;
+    };
+    aShau?: {
+      status?: CheckStatus;
+      peakP95FrameMs?: number | null;
+      p95AfterCeilingPlus1p5Ms?: number | null;
+      maxDrawCalls?: number | null;
+      drawCallAfterCeiling10Percent?: number | null;
+    };
+  };
+};
+
 type CullingProof = {
   status?: CheckStatus;
   measurementTrust?: { status?: CheckStatus };
@@ -605,26 +629,48 @@ function buildTerrainTarget(
   horizonPath: string | null,
   horizon: HorizonAudit | null,
   openFrontierSummaryPath: string | null,
-  aShauSummaryPath: string | null
+  aShauSummaryPath: string | null,
+  terrainBaselinePath: string | null,
+  terrainBaseline: TerrainHorizonBaseline | null
 ): Cycle3Target {
   const hasHorizon = Boolean(horizonPath);
+  const screenshotBaselineTrusted = terrainBaseline?.status === 'pass'
+    && terrainBaseline.measurementTrust?.status === 'pass'
+    && (terrainBaseline.scenarios ?? []).reduce((sum, scenario) => sum + (scenario.shots?.length ?? 0), 0) >= 4;
+  const matchedPerfTrusted = terrainBaseline?.performanceBaselines?.openFrontier?.status === 'pass'
+    && terrainBaseline.performanceBaselines.aShau?.status === 'pass';
+  const baselineReady = hasHorizon && screenshotBaselineTrusted && matchedPerfTrusted;
   return {
     id: 'large-mode-vegetation-horizon',
     bureau: 'KB-TERRAIN',
-    status: hasHorizon ? 'needs_baseline' : 'blocked',
+    status: baselineReady ? 'ready_for_branch' : (hasHorizon ? 'needs_baseline' : 'blocked'),
     priority: 4,
-    summary: 'Outer-canopy work needs matched elevated runtime screenshots and perf deltas before any far layer is accepted.',
+    summary: baselineReady
+      ? 'Elevated Open Frontier/A Shau screenshot and perf-before baselines are ready; outer-canopy work still needs matched after evidence.'
+      : 'Outer-canopy work needs matched elevated runtime screenshots and perf deltas before any far layer is accepted.',
     evidence: {
       horizonAuditPath: rel(horizonPath),
+      terrainHorizonBaselinePath: rel(terrainBaselinePath),
       openFrontierPerfSummaryPath: rel(openFrontierSummaryPath),
       aShauPerfSummaryPath: rel(aShauSummaryPath),
+      terrainBaselineStatus: terrainBaseline?.status ?? null,
+      terrainBaselineMeasurementTrustStatus: terrainBaseline?.measurementTrust?.status ?? null,
+      screenshotCount: (terrainBaseline?.scenarios ?? []).reduce((sum, scenario) => sum + (scenario.shots?.length ?? 0), 0),
+      openFrontierP95AfterCeilingPlus1p5Ms: terrainBaseline?.performanceBaselines?.openFrontier?.p95AfterCeilingPlus1p5Ms ?? null,
+      openFrontierDrawCallAfterCeiling10Percent: terrainBaseline?.performanceBaselines?.openFrontier?.drawCallAfterCeiling10Percent ?? null,
+      aShauP95AfterCeilingPlus1p5Ms: terrainBaseline?.performanceBaselines?.aShau?.p95AfterCeilingPlus1p5Ms ?? null,
+      aShauDrawCallAfterCeiling10Percent: terrainBaseline?.performanceBaselines?.aShau?.drawCallAfterCeiling10Percent ?? null,
       flaggedModes: horizon?.summary?.flaggedModes ?? null,
       largestBareTerrainBandMeters: horizon?.summary?.largestBareTerrainBandMeters ?? null,
       largestBareTerrainBandMode: horizon?.summary?.largestBareTerrainBandMode ?? null,
     },
     requiredBefore: [
-      'Use current elevated Open Frontier and A Shau screenshots as before evidence.',
-      'Define whether the first branch is visual-only proof, far-canopy cards, or vegetation distance policy.',
+      baselineReady
+        ? 'Choose the first far-horizon owner path: visual-only proof, far-canopy cards, or vegetation distance policy.'
+        : 'Use current elevated Open Frontier and A Shau screenshots as before evidence.',
+      baselineReady
+        ? 'Fresh-build the terrain horizon baseline before the after comparison if the current proof reused an existing perf build.'
+        : 'Define whether the first branch is visual-only proof, far-canopy cards, or vegetation distance policy.',
       'Capture matched perf before and after in Open Frontier and A Shau.',
     ],
     acceptance: [
@@ -723,6 +769,7 @@ function main(): void {
   const aShauPerfPath = latestPerfSummaryForMode(artifactFiles, 'a_shau_valley');
   const grenadePath = latestFile(artifactFiles, (path) => path.includes('grenade-spike-') && path.endsWith('summary.json'));
   const horizonPath = latestFile(artifactFiles, (path) => path.endsWith(join('vegetation-horizon-audit', 'horizon-audit.json')));
+  const terrainBaselinePath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-terrain-horizon-baseline', 'summary.json')));
   const cullingPath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-culling-proof', 'summary.json')));
 
   const cycle2 = readJson<Cycle2Proof>(cycle2Path);
@@ -735,6 +782,7 @@ function main(): void {
   const startupZone = readJson<StartupSummary>(startupZonePath);
   const grenade = readJson<GrenadeSummary>(grenadePath);
   const horizon = readJson<HorizonAudit>(horizonPath);
+  const terrainBaseline = readJson<TerrainHorizonBaseline>(terrainBaselinePath);
   const culling = readJson<CullingProof>(cullingPath);
 
   const targets = [
@@ -750,7 +798,7 @@ function main(): void {
     ),
     buildLoadTarget(texturePath, startupOpenPath, startupOpen, startupZonePath, startupZone, texture),
     buildEffectsTarget(grenadePath, grenade),
-    buildTerrainTarget(horizonPath, horizon, openFrontierPerfPath, aShauPerfPath),
+    buildTerrainTarget(horizonPath, horizon, openFrontierPerfPath, aShauPerfPath, terrainBaselinePath, terrainBaseline),
     buildCullTarget(cullingPath, culling, openFrontierPerfPath, aShauPerfPath, combat120PerfPath),
   ].sort((a, b) => a.priority - b.priority);
 
@@ -773,6 +821,7 @@ function main(): void {
       aShauPerfSummary: rel(aShauPerfPath),
       grenadeSpike: rel(grenadePath),
       horizonAudit: rel(horizonPath),
+      terrainHorizonBaseline: rel(terrainBaselinePath),
       cullingProof: rel(cullingPath),
     },
     targets,
@@ -780,12 +829,13 @@ function main(): void {
       'Treat the 2.95m NPC target drop, per-tile imposter crop, selected-lighting luma proof, and expanded-luma atmosphere pass as the current KB-OPTIK remediation slice.',
       'If KB-OPTIK continues immediately, use the runtime LOD-edge proof plus the near-stress artifact to decide visual exception/human review before changing crop or scale again.',
       'For KB-LOAD, treat the giantPalm warmup as partial upload mitigation only; the next branch must prove startup latency does not regress while reducing remaining uploads.',
-      'For KB-EFFECTS, preserve the unlit pooled explosion architecture and close the remaining browser-stall/frame-metric classification gap before claiming final grenade closeout.',
-      'Keep KB-TERRAIN and KB-CULL remediation branches separate until matched large-mode perf windows are prepared.',
+      'For KB-EFFECTS, preserve the unlit pooled explosion architecture; do not reopen low-load grenade work unless visuals change, and do not infer combat120/stress closeout.',
+      'For KB-TERRAIN, use the terrain horizon baseline proof as before evidence, then require matched after screenshots plus Open Frontier/A Shau perf deltas.',
+      'Keep KB-CULL remediation separate from KB-TERRAIN until a single owner path and representative before/after renderer telemetry are chosen.',
       'Keep WebGPU out of Cycle 3 unless the owner explicitly approves reopening the point-of-no-return decision.',
     ],
     openDecisions: [
-      'Should KB-OPTIK document the 8.5m near-stress silhouette exception after the runtime LOD-edge PASS, run human visual review, or should KB-LOAD/KB-EFFECTS attribution take the next remediation slot?',
+      'Should KB-OPTIK document the 8.5m near-stress silhouette exception after the runtime LOD-edge PASS, run human visual review, or should KB-LOAD/KB-TERRAIN/KB-CULL take the next remediation slot?',
       'Should the next KB-LOAD branch target fanPalm with a latency guard, NPC atlases, approved asset regeneration, or upload scheduling?',
       'Which large-mode p95/draw-call budget will be used for far-canopy acceptance in this cycle?',
     ],

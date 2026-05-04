@@ -78,15 +78,21 @@ the current truth anchor.
   proof path; the committed-sha LOD-edge artifact passes with `0/40` flags, so
   the current open KB-OPTIK decision is near-stress exception/human review, not
   a measured LOD-edge failure.
-- KB-TERRAIN measurement has started with `npm run check:vegetation-horizon`.
-  The first artifact,
+- KB-TERRAIN measurement has moved from static audit to before-baseline
+  screenshot evidence. `npm run check:vegetation-horizon` first wrote
   `artifacts/perf/2026-05-02T21-29-15-593Z/vegetation-horizon-audit/horizon-audit.json`,
   supports the elevated-camera vegetation report for large modes: registered
   vegetation fades out by `600m`, while Open Frontier can expose an estimated
   `396.79m` terrain band beyond vegetation and A Shau Valley can expose
   `3399.2m` because its camera far plane is `4000m`. The scatterer residency
   radius is not the primary large-mode limiter in this static audit; shader
-  max distance is.
+  max distance is. Cycle 3 then added
+  `npm run check:projekt-143-terrain-baseline`, with the fresh-build baseline
+  at
+  `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  It captures elevated Open Frontier and A Shau screenshots plus renderer,
+  terrain, vegetation, browser, warmup, and linked perf-before metadata. It is
+  before evidence only; no far-canopy fix is accepted from it.
 - KB-STRATEGIE filed the WebGL/WebGPU brief. `npm run check:webgpu-strategy`
   wrote
   `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`:
@@ -335,14 +341,18 @@ What is not ready to claim:
   has no perf improvement claim, and final visual parity still requires
   documented near-stress exception or human review.
 - No distant-canopy or barren-horizon fix has shipped. KB-TERRAIN now has
-  static coverage evidence, but still needs elevated runtime screenshots and
-  matched perf captures before any outer-canopy layer is accepted.
+  static coverage evidence plus the fresh-build elevated runtime before
+  baseline at
+  `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  It is ready for a far-horizon branch, but any outer-canopy layer still needs
+  matched after screenshots and Open Frontier/A Shau perf deltas before it is
+  accepted.
 - No WebGPU migration has shipped or been started. KB-STRATEGIE recommends
   staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-03T23-30-22-640Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T23-54-12-365Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
@@ -350,8 +360,10 @@ What is not ready to claim:
   runtime LOD-edge proof passes after expanded luma was brought into band.
   KB-LOAD texture upload/residency remains `ready_for_branch` for remaining
   uploads after the partial giantPalm warmup, KB-EFFECTS grenade first-use is
-  `evidence_complete` for the trusted low-load probe, and KB-TERRAIN/KB-CULL
-  are `needs_baseline`. It also
+  `evidence_complete` for the trusted low-load probe, KB-TERRAIN is now
+  `ready_for_branch` after the fresh-build elevated horizon baseline at
+  `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`,
+  and KB-CULL remains `needs_baseline`. It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
   combat120, and A Shau perf summary paths for handoff. This is
   planning/agent-DX evidence; no atlas regeneration, gameplay-camera visual
@@ -365,7 +377,7 @@ What is not ready to claim:
   near-stress expanded proof flagged samples as `10`, runtime LOD-edge proof
   flagged samples as `0`, aircraft longest-axis/current-NPC average as `4.52x`,
   and the recommended next branch as documenting the near-stress silhouette
-  exception or switching to KB-LOAD/KB-EFFECTS.
+  exception or switching to KB-LOAD/KB-TERRAIN/KB-CULL.
   It continues to reject aircraft resizing as the next response without a
   separate vehicle-scale proof.
 - KB-LOAD has a first local runtime remediation, not a closeout. The current

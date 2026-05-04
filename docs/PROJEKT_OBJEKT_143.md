@@ -20,7 +20,7 @@ measurement itself was trustworthy.
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
 | Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is evidence-complete PASS through `artifacts/perf/2026-05-03T16-48-58-020Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched proof refreshed after the selected-lighting luma slice at `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` drops the NPC runtime target to `2.95m` and adds generated per-tile imposter crop maps; commit `1395198da4db95611457ecde769b611e3d36354e` adds faction imposter material tuning. Matched visible-height ratios improved from the Cycle 2 before range `0.52-0.54x` to `0.861-0.895x`, and selected-lighting luma delta now ranges `-0.44%` to `0.36%`. No perf improvement, final visual parity, aircraft-scale acceptance, or production parity is claimed. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | KB-EFFECTS LOW-LOAD CLOSEOUT 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T23-30-22-640Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD has a giantPalm-only upload warmup that reduces WebGL upload totals but does not prove startup-latency improvement. KB-EFFECTS low-load grenade first-use closeout is evidence-complete for the unlit pooled explosion path at `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`: measurement trust PASS, no trigger/post-trigger browser stall, detonation max `30.2ms`, near-trigger main-scene render max `23.6ms`, and grenade frag JS `1.5ms` total. Do not infer combat120/stress grenade closeout from the low-load probe. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD. KB-TERRAIN and KB-CULL still need matched baselines. |
+| Phase 3 - Multi-Cycle Engineering Plan | KB-TERRAIN BASELINE READY 2026-05-03 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-03T23-54-12-365Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-03T23-54-37-913Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD has a giantPalm-only upload warmup that reduces WebGL upload totals but does not prove startup-latency improvement. KB-EFFECTS low-load grenade first-use closeout is evidence-complete for the unlit pooled explosion path at `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`: measurement trust PASS, no trigger/post-trigger browser stall, detonation max `30.2ms`, near-trigger main-scene render max `23.6ms`, and grenade frag JS `1.5ms` total. KB-TERRAIN now has a fresh perf-build elevated screenshot/perf-before baseline at `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`; it is ready for a far-horizon branch but does not accept any canopy or distance-policy remediation. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-TERRAIN/KB-CULL. KB-CULL still needs representative owner-path before/after renderer telemetry. |
 
 ## Shipped Cycle 0 State
 
@@ -1208,11 +1208,11 @@ Reversibility:
 
 Current Cycle 3 status:
 
-- 2026-05-03: after the KB-EFFECTS low-load closeout pass, `npm run
+- 2026-05-03: after the KB-TERRAIN baseline proof pass, `npm run
   check:projekt-143-cycle3-kickoff` wrote
-  `artifacts/perf/2026-05-03T23-30-22-640Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-03T23-54-12-365Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Overall status is WARN because KB-OPTIK still needs a decision and
-  KB-TERRAIN/KB-CULL still need matched baselines. KB-OPTIK
+  KB-CULL still needs a representative owner-path baseline. KB-OPTIK
   `npc-imposter-scale-luma-contract` is now
   `needs_decision`: the first `2.95m` target/crop remediation plus
   selected/expanded luma tuning has matched evidence inside the `+/-15%`
@@ -1220,7 +1220,7 @@ Current Cycle 3 status:
   still flags `10/40` 8.5m perspective visible-height samples, while the
   runtime LOD-edge proof passes with `0/40` flags. The next KB-OPTIK choice is
   documenting that near-stress exception, running human visual review, or
-  switching the next remediation slot to KB-LOAD/KB-EFFECTS.
+  switching the next remediation slot to KB-LOAD/KB-TERRAIN/KB-CULL.
   KB-LOAD `pixel-forge-texture-upload-residency` remains
   `ready_for_branch`, now specifically for remaining uploads/residency after
   the giantPalm-only warmup reduced WebGL upload totals without proving a
@@ -1229,11 +1229,20 @@ Current Cycle 3 status:
   `PointLight` removal and in-frame metric arming eliminated the
   trigger-adjacent `300ms+` main-scene render stall, browser long task, and
   inherited `100ms` frame metric. KB-TERRAIN
-  `large-mode-vegetation-horizon` and KB-CULL
-  `static-feature-and-vehicle-culling-hlod` remain `needs_baseline`.
+  `large-mode-vegetation-horizon` is now `ready_for_branch` after
+  `npm run check:projekt-143-terrain-baseline` wrote
+  `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`
+  from a fresh perf build. It captured `4/4` elevated Open Frontier and
+  A Shau screenshots with renderer stats, terrain metrics, vegetation active
+  counters, and nonblank terrain image checks, then linked trusted Open
+  Frontier and A Shau perf-before baselines. Future after captures must stay
+  within the recorded ceilings: Open Frontier p95 `<=43.5ms` and draw calls
+  `<=1141`, A Shau p95 `<=40.9ms` and draw calls `<=864`.
+  KB-CULL `static-feature-and-vehicle-culling-hlod` remains
+  `needs_baseline`.
 - 2026-05-03: `npm run check:projekt-143-optik-decision` refreshed the
   decision packet at
-  `artifacts/perf/2026-05-03T19-02-57-442Z/projekt-143-optik-decision-packet/decision-packet.json`.
+  `artifacts/perf/2026-05-03T23-54-37-913Z/projekt-143-optik-decision-packet/decision-packet.json`.
   It now records current NPC target `2.95m`, imposter visible-height ratio
   average `0.879`, imposter luma delta percent average `-0.073`, and aircraft
   longest-axis/current-NPC average `4.52x`. It records near-stress expanded
@@ -1282,9 +1291,12 @@ Current draft after initial bureau briefs:
 4. Re-run `combat120` and Open Frontier startup on a fresh build with certified
    telemetry, using the 2026-05-02 retail startup split as the first KB-LOAD
    comparison point rather than a root-cause conclusion.
-5. Add elevated Open Frontier and A Shau vegetation-horizon screenshot
-   captures before implementing a far-canopy layer.
+5. Rerun the elevated Open Frontier and A Shau vegetation-horizon baseline
+   before any far-canopy after comparison; the first fresh-build baseline is
+   filed at
+   `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
 6. Keep WebGPU migration out of the minimum stabilization subset; strategy
    evidence recommends reinforcing WebGL until the measured blockers are fixed.
-7. Only then start remediation in KB-LOAD, KB-CULL, KB-OPTIK, KB-TERRAIN, and
-   KB-EFFECTS.
+7. Only then start remediation in KB-LOAD, KB-CULL, KB-OPTIK, and
+   KB-TERRAIN. KB-EFFECTS low-load is evidence-complete; reopen it only for
+   combat120/stress evidence or visual changes.

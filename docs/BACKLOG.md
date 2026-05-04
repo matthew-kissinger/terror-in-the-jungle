@@ -724,6 +724,18 @@ the runbook for the end-of-cycle ritual.
    samples. Because the branch is docs/ops-only and the capture had `0`
    browser/page errors, treat this as a quiet-machine rerun and perf-triage
    item before any baseline refresh.
+17. **Projekt Objekt-143 KB-TERRAIN has before evidence, not a fix.** The
+   fresh-build baseline at
+   `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`
+   captures elevated Open Frontier/A Shau horizon screenshots and linked
+   perf-before guardrails. A far-canopy or distance-policy branch is now
+   ready to start, but it still needs matched after screenshots plus Open
+   Frontier/A Shau p95 and draw-call deltas before closure.
+18. **Projekt Objekt-143 KB-CULL still lacks an owner-path baseline.** The
+   deterministic renderer/category proof is trusted, but the first actual
+   culling/HLOD branch must choose one owner path and capture representative
+   before/after renderer telemetry. Do not certify culling from static
+   inventory or the proof screenshot alone.
 
 ## Known Bugs
 

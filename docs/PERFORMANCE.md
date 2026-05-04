@@ -84,6 +84,7 @@ npm run check:webgpu-strategy       # KB-STRATEGIE WebGL/WebGPU audit
 npm run check:projekt-143           # Cycle 0 static evidence suite
 npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark bundle sidecars
 npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proof
+npm run check:projekt-143-terrain-baseline # Cycle 3 elevated horizon screenshot/perf-before proof
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet
@@ -201,10 +202,10 @@ blocking gate.
 `artifacts/perf/<timestamp>/projekt-143-cycle3-kickoff/`. It reads the latest
 Cycle 2 proof, KB-OPTIK scale proof, texture audit, Open Frontier and Zone
 Control startup evidence, Open Frontier/combat120/A Shau perf summaries,
-grenade probe, vegetation horizon audit, and culling proof, then classifies
-candidate Cycle 3 branches as `evidence_complete`, `ready_for_branch`,
-`needs_decision`, `needs_baseline`, or `blocked`. This is an agent-DX handoff
-command; it does not approve or apply any remediation.
+grenade probe, vegetation horizon audit, terrain horizon baseline, and culling
+proof, then classifies candidate Cycle 3 branches as `evidence_complete`,
+`ready_for_branch`, `needs_decision`, `needs_baseline`, or `blocked`. This is
+an agent-DX handoff command; it does not approve or apply any remediation.
 
 `projekt-143-optik-decision-packet.ts` writes a KB-OPTIK decision packet under
 `artifacts/perf/<timestamp>/projekt-143-optik-decision-packet/`. It consumes the
@@ -215,7 +216,7 @@ target drop plus per-tile crop map as complete for this slice. After commit
 `1395198da4db95611457ecde769b611e3d36354e`, it also recognizes
 selected-lighting luma parity as inside the matched proof band and recommends
 expanded lighting/gameplay-camera coverage or switching the next remediation
-slot to KB-LOAD/KB-EFFECTS.
+slot to KB-LOAD/KB-TERRAIN/KB-CULL.
 After commit `57d873e7f305fb528e7570232a291950e89c6ade`, it consumes the
 expanded proof and recommends targeted lighting/material-contract remediation
 or switching bureaus when expanded coverage is trusted but flagged.
@@ -265,6 +266,22 @@ and zero renderer counters on 2026-05-03. The fixture screenshot is also not a
 runtime scale proof: GLB assets are scaled by longest bounding-box axis to keep
 all required categories visible in one camera. Use matched KB-OPTIK screenshots,
 not this fixture, to judge whether NPCs are too large or vehicles are too small.
+
+`projekt-143-terrain-horizon-baseline.ts` writes an elevated KB-TERRAIN before
+baseline under
+`artifacts/perf/<timestamp>/projekt-143-terrain-horizon-baseline/`. It
+force-builds the perf target by default, serves the perf bundle, captures
+Open Frontier and A Shau `horizon-elevated` plus `horizon-high-oblique`
+screenshots, and records browser metadata, warmup policy, renderer stats,
+terrain readiness, vegetation active counters, nonblank ground-band image
+checks, latest trusted Open Frontier/A Shau perf summaries, the vegetation
+horizon audit, and the culling proof. The first fresh-build artifact is
+`artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
+It is a before baseline for a future far-horizon branch, not an accepted
+far-canopy implementation. Future after evidence must rerun this command and
+matched Open Frontier/A Shau perf captures; the current guardrails are Open
+Frontier p95 `<=43.5ms` and draw calls `<=1141`, A Shau p95 `<=40.9ms` and
+draw calls `<=864`.
 
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so
@@ -616,12 +633,15 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    is measurement-trusted PASS with `0/40` flags. Current lead: luma/material
    parity is no longer the blocker, and the runtime LOD-edge camera is inside
    band; the remaining KB-OPTIK decision is near-stress exception/human review
-   or deliberate switch to KB-LOAD/KB-EFFECTS.
+   or deliberate switch to KB-LOAD/KB-TERRAIN/KB-CULL.
    Do not claim full visual parity or performance improvement.
 5. **Large-mode vegetation horizon gap** - static KB-TERRAIN evidence shows
    current Pixel Forge vegetation disappears by `600m`, while Open Frontier
-   and A Shau terrain remains visible beyond that range. The current lead is a
-   missing outer canopy tier, not a scatterer residency bug.
+   and A Shau terrain remains visible beyond that range. Cycle 3 now has a
+   fresh-build elevated screenshot/perf-before baseline at
+   `artifacts/perf/2026-05-03T23-51-05-873Z/projekt-143-terrain-horizon-baseline/summary.json`.
+   The current lead is a missing outer canopy tier, not a scatterer residency
+   bug; no far-canopy remediation is accepted yet.
 6. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
 
 ## Resolved Bottlenecks
