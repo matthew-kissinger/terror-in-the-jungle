@@ -741,11 +741,14 @@ Progress:
   shortened to `2.95m`. The TypeScript bot and CJS perf driver now aim at the
   visual chest proxy below the eye-level actor anchor and prefer rendered
   target anchors when the live driver supplies them. Unit evidence covers the
-  height contract, but the last full Open Frontier active-player capture,
-  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json`, failed with zero
-  recorded hits and only a short ENGAGE window. Do not use active-player Open
-  Frontier captures for performance acceptance until a fresh capture records
-  hits under the new aim contract.
+  height contract, and the fresh post-fix Open Frontier capture
+  `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json` records `120` player
+  shots, `43` hits, and `9` kills, replacing the earlier zero-hit failure at
+  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json`. Treat the new
+  artifact as active-player hit-contract evidence only: the owner reported
+  another browser game was running on and off during the capture, so the
+  frame-time and heap numbers are potentially skewed and must not be used for
+  perf acceptance or baseline refresh.
 - 2026-05-04 owner world-placement target: the later KB-TERRAIN/KB-CULL scope
   also includes terrain-aligned static placement. Buildings, HQs, vehicles,
   and airfield/support presets should not hang foundations off hill edges or
@@ -761,6 +764,18 @@ Progress:
   richer ground variety, custom grass/ground foliage and cover where useful,
   and route/trail surfaces that read worn-in, smoother, and more vehicle-usable
   for future driving instead of arbitrary grey gravel or decorative paths.
+- 2026-05-04 low-resource terrain asset inventory:
+  `scripts/projekt-143-terrain-asset-inventory.ts` is exposed as
+  `npm run check:projekt-143-terrain-assets` and writes
+  `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
+  It records `12` terrain WebP textures, including `5` green-ground variants
+  and `4` trail/cleared/disturbed variants, plus `5` Pixel Forge
+  ground-cover/trail prop candidates, `12` existing building candidates, `7`
+  runtime Pixel Forge vegetation species, and `6` blocked Pixel Forge
+  vegetation species. This closes the "look into existing texture/assets"
+  inventory step without browser/perf work. It does not accept any new runtime
+  asset; visual, footprint, collision, draw-call, texture residency, and
+  LOD/HLOD review are still required before import or placement changes.
 
 Root-cause hypotheses:
 
@@ -1409,9 +1424,10 @@ Current Cycle 3 status:
   A Shau after-placement capture no longer logs the Ta Bat steep-airfield
   warning, but A Shau remains WARN because terrain-stall/route symptoms are
   still open. The active-player harness also has a shorter-NPC visual-chest
-  aim fix in unit tests, while the latest full Open Frontier active-player
-  capture still recorded zero hits; do not treat killbot captures as perf
-  acceptance until a fresh post-fix capture records hits.
+  aim fix in unit tests and a fresh Open Frontier capture with `120` shots and
+  `43` hits. Because another browser game was running on and off during that
+  capture, use it to close the zero-hit hit-contract question only; do not use
+  its frame-time metrics as perf acceptance.
   KB-CULL `static-feature-and-vehicle-culling-hlod` is now
   `ready_for_branch` after
   `npm run check:projekt-143-culling-baseline` wrote
@@ -1434,6 +1450,10 @@ Current Cycle 3 status:
   with only the expected AI Sandbox fixed-fallback seed flag, and
   `npm run check:projekt-143-terrain-baseline` PASS wrote
   `artifacts/perf/2026-05-04T11-26-11-588Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  A low-resource terrain asset inventory pass wrote
+  `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
+  and is WARN by design because it is shortlist evidence, not asset
+  acceptance.
   Final broad gates passed or warned as expected:
   `npm run check:projekt-143-cycle3-kickoff` WARN at
   `artifacts/perf/2026-05-04T11-29-35-677Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,

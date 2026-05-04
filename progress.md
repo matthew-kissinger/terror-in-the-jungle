@@ -2590,3 +2590,24 @@ TODO
   before completing F-4/AC-47. The leftover probe preview/browser processes
   were cleaned up. Do not claim a full fixed-wing browser pass for this
   placement move until the probe completes all aircraft.
+- Follow-up Open Frontier active-player capture:
+  `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json` has measurement trust
+  PASS and records `120` player shots, `43` hits, and `9` kills, so the
+  shorter-NPC killbot aim contract is no longer in the zero-hit state. The
+  owner noted another browser game was running on and off during the capture;
+  use this artifact as hit-contract evidence only, not clean frame-time/heap
+  acceptance or baseline evidence.
+- Resource note from owner: avoid additional perf/browser captures for roughly
+  the next hour because another agent team needs machine/browser resources.
+  Continue with low-resource static/code/docs work toward Objekt-143 instead.
+- Added low-resource static terrain asset inventory:
+  `scripts/projekt-143-terrain-asset-inventory.ts` and
+  `npm run check:projekt-143-terrain-assets`. First run hit sandbox `tsx`
+  `spawn EPERM`; approved rerun passed with expected WARN at
+  `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
+  It found `12` terrain WebP textures (`5` green-ground variants, `4`
+  trail/cleared/disturbed variants), `5` Pixel Forge ground-cover/trail prop
+  candidates, `12` building candidates, `7` runtime Pixel Forge vegetation
+  species, `6` still-blocked vegetation species, and `0` missing assets.
+  Non-claim: this is inventory/shortlist evidence only, not asset import,
+  visual acceptance, placement acceptance, or perf acceptance.

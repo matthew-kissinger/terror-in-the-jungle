@@ -88,6 +88,7 @@ npm run check:projekt-143-culling-baseline # Cycle 3 culling owner-path before p
 npm run check:projekt-143-terrain-baseline # Cycle 3 elevated horizon screenshot/perf-before proof
 npm run check:projekt-143-terrain-distribution # Ground material/vegetation distribution audit
 npm run check:projekt-143-terrain-placement # Terrain feature footprint/foundation audit
+npm run check:projekt-143-terrain-assets # Terrain texture/foliage/building candidate inventory
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet
@@ -340,6 +341,20 @@ This is placement-shape evidence only. A Shau after-placement perf evidence at
 Bat steep-footprint warning, but it remains WARN and does not accept route,
 nav, vehicle usability, or final static feature layout.
 
+`projekt-143-terrain-asset-inventory.ts` writes a KB-TERRAIN static asset
+inventory under
+`artifacts/perf/<timestamp>/projekt-143-terrain-asset-inventory/`. It
+enumerates terrain WebP ground textures, runtime biome usage, Pixel Forge
+ground-cover/trail prop candidates, existing building/structure candidates,
+runtime Pixel Forge vegetation, and blocked Pixel Forge vegetation. The first
+artifact is
+`artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`:
+`12` terrain textures, `5` green-ground variants, `4` trail/cleared/disturbed
+variants, `5` Pixel Forge ground-cover prop candidates, `12` building
+candidates, `7` runtime vegetation species, and `6` still-blocked vegetation
+species. WARN is expected because this is an inventory and shortlist input,
+not runtime import or visual/perf acceptance.
+
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so
 a blocked run still leaves enough evidence to diagnose startup regressions.
@@ -348,11 +363,14 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
 
 - **Active-player killbot caveat (2026-05-04):** shorter Pixel Forge NPCs
   changed the target-height contract. The local bot and CJS driver now aim at
-  the visual chest proxy and can use rendered target anchors, but the latest
-  full Open Frontier active-player capture
-  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json` still recorded zero
-  hits. Do not accept active-player perf claims from killbot captures until a
-  fresh post-fix capture records hits.
+  the visual chest proxy and can use rendered target anchors. The fresh
+  post-fix Open Frontier capture
+  `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json` records `120` player
+  shots, `43` hits, and `9` kills, so the zero-hit target-height failure is no
+  longer current. Treat that artifact as hit-contract evidence only: another
+  browser game was running on and off during the capture, so frame-time/heap
+  metrics may be skewed and must not refresh baselines or support perf
+  acceptance.
 - **Resolved on 2026-04-02:** the Playwright perf harness freeze at `frameCount=1` was caused by same-document View Transitions on the live-entry path. Menu-only transitions can still use `document.startViewTransition()`, but live-entry now bypasses it and perf/sandbox runs explicitly force `uiTransitions=0`.
 - Harness startup probes now capture `rafTicks`, page visibility, startup phase, and active view-transition state so browser scheduling failures are distinguishable from game-loop failures.
 - GitHub-hosted CI perf remains advisory. The harness is now trustworthy locally, but the hosted Linux/Xvfb environment still exhibits non-representative browser scheduling and GPU readback stalls during `combat120`, so authoritative perf gating stays with local/self-run `validate:full`.

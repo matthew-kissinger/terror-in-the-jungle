@@ -39,12 +39,16 @@ ledger; this file is the short operational prompt.
   `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
 - KB-TERRAIN placement/foundation audit:
   `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+- KB-TERRAIN terrain asset inventory:
+  `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
   `artifacts/perf/2026-05-04T02-45-03-756Z/summary.json`
 - KB-TERRAIN A Shau after placement pass:
   `artifacts/perf/2026-05-04T04-14-35-401Z/summary.json`
-- Active-player harness blocked capture after shorter-NPC aim investigation:
-  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json`
+- Active-player hit-contract evidence after shorter-NPC aim investigation:
+  `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json`
+  (`120` shots / `43` hits; frame-time metrics are not clean acceptance
+  because another browser game was running on and off during the capture)
 - KB-CULL owner baseline:
   `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
 - Rejected KB-CULL static-helicopter candidate:
@@ -84,13 +88,17 @@ ledger; this file is the short operational prompt.
   Forge building replacements. Also inventory existing TIJ and Pixel Forge
   ground, path, trail, grass, foliage, and cover texture/assets before custom
   work; routes should become worn-in, smoothed, vehicle-usable trails where
-  that fits future gameplay.
+  that fits future gameplay. The first low-resource inventory now exists at
+  `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`;
+  it is shortlist evidence only and does not accept any asset for runtime use.
 - Active-player perf harness: shorter Pixel Forge NPCs require the killbot to
   aim at the visual chest proxy below the eye-level actor anchor. The local
-  TypeScript bot and CJS perf driver have unit coverage for that contract, but
-  the latest full Open Frontier active-player capture still recorded zero
-  hits. Do not use active-player captures for acceptance until a fresh post-fix
-  capture records hits.
+  TypeScript bot and CJS perf driver have unit coverage for that contract, and
+  `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json` records `120` player
+  shots and `43` hits. Use that artifact to close the zero-hit target-height
+  question only. The owner reported another browser game was running on and
+  off during the capture, so its frame-time/heap numbers are potentially
+  skewed and cannot be used as perf acceptance or baseline refresh.
 - KB-CULL `static-feature-and-vehicle-culling-hlod`: `ready_for_branch`.
   The selected owner path is
   `large-mode-world-static-and-visible-helicopters`. Close-NPC/weapon pool
@@ -141,12 +149,14 @@ Current evidence anchors:
   artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
 - KB-TERRAIN placement/foundation audit:
   artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
+- KB-TERRAIN terrain asset inventory:
+  artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json
 - KB-TERRAIN Open Frontier after vegetation pass:
   artifacts/perf/2026-05-04T02-45-03-756Z/summary.json
 - KB-TERRAIN A Shau after placement pass:
   artifacts/perf/2026-05-04T04-14-35-401Z/summary.json
-- Active-player harness blocked capture:
-  artifacts/perf/2026-05-04T10-36-41-205Z/summary.json
+- Active-player hit-contract evidence:
+  artifacts/perf/2026-05-04T11-35-07-274Z/summary.json
 - KB-CULL owner baseline:
   artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json
 - KB-EFFECTS low-load closeout:
@@ -165,13 +175,14 @@ Current bureau state:
   an asset audit for ground/path/grass/foliage/cover variety and future
   vehicle-usable trail surfaces. Current local terrain work has Open Frontier
   WARN/trusted evidence, clustered-bamboo static distribution evidence, and a
-  passing placement/foundation audit. A Shau after placement no longer logs the
+  passing placement/foundation audit plus a static terrain asset inventory.
+  A Shau after placement no longer logs the
   `tabat_airstrip` steep-footprint warning but is still WARN with
   terrain-stall/route symptoms; do not claim A Shau acceptance. The
-  active-player killbot has a shorter-NPC visual-chest aim fix in unit tests,
-  but the latest full Open Frontier active-player capture recorded zero hits;
-  do not trust active-player perf acceptance until a fresh post-fix capture
-  records hits.
+  active-player killbot has a shorter-NPC visual-chest aim fix in unit tests
+  and a fresh Open Frontier capture with `120` shots / `43` hits. Do not trust
+  that capture for frame-time acceptance because another browser game was
+  running on and off during it.
 - KB-CULL: ready_for_branch, selected owner path is large-mode world static
   features plus visible helicopters; close-NPC/weapon residency remains
   diagnostic-only. Rejected static-helicopter distance-cull after artifact:

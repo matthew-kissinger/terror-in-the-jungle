@@ -396,13 +396,24 @@ What is not ready to claim:
   `artifacts/perf/2026-05-04T04-14-35-401Z/summary.json` no longer logs the
   Ta Bat steep-footprint warning, but it remains WARN with terrain-stall/route
   symptoms, so this is not A Shau acceptance.
-- The active-player perf harness has a current local shorter-NPC aim fix, but
-  no full capture acceptance yet. The bot/driver now aim at the Pixel Forge
-  visual chest proxy below the actor eye-level anchor and can use rendered
-  target anchors. The latest full Open Frontier active-player capture,
-  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json`, still recorded zero
-  hits; active-player/killbot captures must remain non-authoritative until a
-  fresh post-fix capture records hits.
+- A low-resource KB-TERRAIN asset inventory now exists at
+  `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
+  It found `12` terrain WebP textures (`5` green-ground variants and `4`
+  trail/cleared/disturbed variants), `5` Pixel Forge ground-cover prop
+  candidates, `12` building candidates, `7` runtime Pixel Forge vegetation
+  species, and `6` blocked vegetation species. This is shortlist evidence
+  only; no custom grass, ground-cover, trail, or building import is accepted
+  from static file presence.
+- The active-player perf harness has a current local shorter-NPC aim fix. The
+  bot/driver now aim at the Pixel Forge visual chest proxy below the actor
+  eye-level anchor and can use rendered target anchors. The fresh post-fix
+  Open Frontier capture
+  `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json` records `120` player
+  shots, `43` hits, and `9` kills, so the earlier zero-hit failure is no
+  longer the current hit-contract state. Do not use that capture as clean
+  frame-time acceptance or baseline evidence: the owner reported another
+  browser game was running on and off during it, so metrics are potentially
+  skewed.
 - Fixed-wing browser validation is incomplete for the local terrain-placement
   move. `npm run probe:fixed-wing` first hit sandbox `spawn EPERM`; the
   approved rerun produced partial A-1 success in
