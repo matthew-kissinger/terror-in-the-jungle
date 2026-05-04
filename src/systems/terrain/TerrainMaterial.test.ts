@@ -37,6 +37,7 @@ const testBiomeConfig = {
   rules: [
     { biomeSlot: 1, elevationMin: 900, elevationMax: 2000, minUpDot: 0.7, priority: 2 },
   ],
+  cliffRockBiomeSlot: 1,
 };
 
 const testSplatmap: SplatmapConfig = {
@@ -80,6 +81,8 @@ describe('TerrainMaterial', () => {
     expect(shader.uniforms.terrainNormalMap).toBeDefined();
     expect(shader.uniforms.terrainWorldSize.value).toBe(512);
     expect(shader.uniforms.biomeTexture0).toBeDefined();
+    expect(shader.uniforms.biomeRuleElevationBlendWidth).toBeDefined();
+    expect(shader.uniforms.cliffRockBiomeSlot.value).toBe(1);
   });
 
   it('updateTerrainMaterialTextures marks the material dirty for shader recompile', () => {

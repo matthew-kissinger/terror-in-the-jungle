@@ -86,6 +86,7 @@ npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark 
 npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proof
 npm run check:projekt-143-culling-baseline # Cycle 3 culling owner-path before packet
 npm run check:projekt-143-terrain-baseline # Cycle 3 elevated horizon screenshot/perf-before proof
+npm run check:projekt-143-terrain-distribution # Ground material/vegetation distribution audit
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet
@@ -300,6 +301,21 @@ far-canopy implementation. Future after evidence must rerun this command and
 matched Open Frontier/A Shau perf captures; the current guardrails are Open
 Frontier p95 `<=43.5ms` and draw calls `<=1141`, A Shau p95 `<=40.9ms` and
 draw calls `<=864`.
+
+`projekt-143-terrain-distribution-audit.ts` writes a KB-TERRAIN static
+material distribution audit under
+`artifacts/perf/<timestamp>/projekt-143-terrain-distribution-audit/`. It
+samples each shipped mode's terrain provider and records CPU biome
+classification, shader-primary material distribution, flat/steep material
+distribution, estimated vegetation density, and cliff-rock accent eligibility.
+The 2026-05-04 material pass artifact is
+`artifacts/perf/2026-05-04T02-02-26-811Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`:
+flat ground is `100%` jungle-like primary material in all modes, Open Frontier
+is `99.99%` jungle-like overall, A Shau is `100%`, and steep-side rock-accent
+coverage passes in all modes. The WARN status is expected because AI Sandbox is
+sampled with fixed fallback seed `42` when its production config requests a
+random seed. This audit is not a screenshot, performance, vegetation-density,
+or final art acceptance gate.
 
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so
@@ -666,6 +682,19 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    appears mainly on hillsides, palms and ferns need scale/grounding review,
    large palms and ground vegetation should be more present, and bamboo should
    become scattered dense clusters rather than the dominant forest layer.
+   The first material-distribution pass is captured at
+   `artifacts/perf/2026-05-04T02-02-26-811Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+   and the matching screenshot proof at
+   `artifacts/perf/2026-05-04T02-06-49-928Z/projekt-143-terrain-horizon-baseline/summary.json`;
+   this corrects the broad elevation-cap material rules but does not accept
+   final A Shau atmosphere/color, vegetation scale/density, or far-canopy
+   work. The later terrain/world-placement goal also includes shaped pads for
+   buildings, HQs, airfields, support compounds, and parked vehicles so
+   foundations do not hang off hills, plus a Pixel Forge building candidate
+   shortlist that must pass visual and performance acceptance before import.
+   It also includes an inventory of TIJ and Pixel Forge ground/path/trail,
+   grass, foliage, and cover assets for richer terrain variety, plus worn-in
+   smoothed route surfaces that can become vehicle-usable paths in future.
 6. **KB-CULL first owner path is selected, not fixed** - the clean owner
    baseline at
    `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`

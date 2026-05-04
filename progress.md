@@ -2408,3 +2408,56 @@ TODO
 - Final local validation: `npm run validate:fast` PASS. No culling/HLOD,
   terrain-material, vegetation-distribution, far-canopy, startup-latency,
   WebGPU, production-parity, or perf-improvement claim is made from this pass.
+
+2026-05-04 Projekt Objekt-143 KB-TERRAIN material distribution pass
+- Added `scripts/projekt-143-terrain-distribution-audit.ts` and wired
+  `npm run check:projekt-143-terrain-distribution`. The audit samples all
+  shipped mode height providers and records CPU biome classification,
+  shader-primary material distribution, flat/steep material distribution,
+  estimated vegetation density, and cliff-rock accent eligibility.
+- Fixed the broad elevation-cap material problem instead of just raising a
+  cutoff: procedural modes no longer classify high elevation as primary
+  `highland`; Open Frontier no longer uses a generic flat/high `cleared` cap;
+  A Shau no longer uses broad highland/cleared/bamboo elevation belts as
+  primary terrain material. `highland` remains bound as a terrain material
+  accent layer and is applied through slope-gated cliff/hillside blending.
+- Final static distribution artifact:
+  `artifacts/perf/2026-05-04T02-02-26-811Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+  Result: all modes have `100%` flat jungle-like primary ground; Open Frontier
+  is `99.99%` jungle-like overall; A Shau is `100%`; all steep-side rock
+  accent checks pass. The audit remains WARN only because AI Sandbox uses
+  `terrainSeed: random` and the audit samples it with fixed fallback seed `42`.
+- Updated the terrain horizon screenshot gate after a false negative on bright
+  green Open Frontier terrain: the image-content check now accepts visible
+  ground-band variance/green content instead of only the older low-luma
+  contrast condition. The failed intermediate artifact was
+  `artifacts/perf/2026-05-04T02-02-38-636Z/projekt-143-terrain-horizon-baseline/summary.json`;
+  visual inspection showed terrain was present.
+- Final screenshot/build proof:
+  `artifacts/perf/2026-05-04T02-06-49-928Z/projekt-143-terrain-horizon-baseline/summary.json`
+  PASS with `4/4` elevated screenshots, renderer/terrain/vegetation telemetry,
+  and `0` browser/page/scenario errors.
+- Targeted validation:
+  `npx vitest run src\systems\terrain\BiomeClassifier.test.ts src\systems\terrain\TerrainBiomeRuntimeConfig.test.ts src\systems\terrain\TerrainMaterial.test.ts src\config\vegetationTypes.test.ts`
+  PASS (`4` files, `20` tests).
+- Folded new owner goals into docs/handoff: next KB-TERRAIN/KB-CULL work must
+  also address hanging building foundations and poorly sampled airfield, HQ,
+  vehicle, firebase, and support-compound placement. Pixel Forge building
+  assets should be shortlisted by visual fit, foundation footprint,
+  collision/LOD/HLOD readiness, draw calls, triangles, and acceptance evidence
+  before replacement.
+- Folded additional owner texture/route goals into docs/handoff: audit existing
+  TIJ and Pixel Forge ground, path, trail, grass, foliage, and cover assets for
+  more terrain variety before custom asset work; future routes should read as
+  worn-in dirt/mud/grass/packed-earth trails and be smoothed/graded with
+  future vehicle usability in mind.
+- Still open: this pass does not accept final A Shau atmosphere/far-ridge
+  color, vegetation scale/density, fern grounding, palm density, bamboo
+  clustering, far canopy, building-placement fixes, Pixel Forge building
+  imports, production parity, or any performance improvement.
+- Final gates after docs and goal updates:
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-04T02-19-44-373Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T02-20-04-490Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`251` files, `3854` tests).

@@ -10,11 +10,17 @@ interface TerrainVegetationRuntimeConfig {
 function getConfiguredBiomeIds(
   defaultBiomeId: string,
   biomeRules: BiomeClassificationRule[],
+  extraBiomeIds: string[] = [],
 ): string[] {
   const biomeIds = [defaultBiomeId];
   for (const rule of biomeRules) {
     if (!biomeIds.includes(rule.biomeId)) {
       biomeIds.push(rule.biomeId);
+    }
+  }
+  for (const biomeId of extraBiomeIds) {
+    if (!biomeIds.includes(biomeId)) {
+      biomeIds.push(biomeId);
     }
   }
   return biomeIds;
@@ -37,7 +43,7 @@ export function buildTerrainBiomeMaterialConfig(
   defaultBiomeId: string,
   biomeRules: BiomeClassificationRule[],
 ): TerrainBiomeMaterialConfig {
-  const orderedBiomes = getConfiguredBiomeIds(defaultBiomeId, biomeRules).map((biomeId) => getBiome(biomeId));
+  const orderedBiomes = getConfiguredBiomeIds(defaultBiomeId, biomeRules, ['highland']).map((biomeId) => getBiome(biomeId));
 
   const biomeSlotById = new Map<string, number>();
   const layers = orderedBiomes.map((biome, index) => {
@@ -66,10 +72,11 @@ export function buildTerrainBiomeMaterialConfig(
         biomeSlot,
         elevationMin: rule.elevationMin ?? -1e9,
         elevationMax: rule.elevationMax ?? 1e9,
+        elevationBlendWidth: rule.elevationBlendWidth,
         minUpDot: rule.slopeMax !== undefined ? Math.cos((rule.slopeMax * Math.PI) / 180) : -1,
         priority: rule.priority,
       };
     });
 
-  return { layers, rules };
+  return { layers, rules, cliffRockBiomeSlot: biomeSlotById.get('highland') ?? 0 };
 }

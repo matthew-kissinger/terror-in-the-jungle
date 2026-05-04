@@ -25,6 +25,7 @@ export interface BiomeClassificationRule {
   elevationMin?: number;     // metres
   elevationMax?: number;
   slopeMax?: number;         // degrees
+  elevationBlendWidth?: number; // shader material blend around elevation thresholds
   priority: number;          // higher wins ties
 }
 

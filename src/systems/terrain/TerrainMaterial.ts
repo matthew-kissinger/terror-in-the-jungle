@@ -85,9 +85,11 @@ uniform float biomeRoughness[8];
 uniform float biomeRuleBiomeSlot[8];
 uniform float biomeRuleMinElevation[8];
 uniform float biomeRuleMaxElevation[8];
+uniform float biomeRuleElevationBlendWidth[8];
 uniform float biomeRuleMinUpDot[8];
 uniform float biomeRulePriority[8];
 uniform float biomeRuleEnabled[8];
+uniform float cliffRockBiomeSlot;
 uniform float antiTilingStrength;
 uniform float triplanarSlopeThreshold;
 uniform float environmentWetness;
@@ -186,7 +188,7 @@ float computeBiomeRuleWeight(int ruleIndex, float elevation, float slopeUp) {
     elevation,
     biomeRuleMinElevation[ruleIndex],
     biomeRuleMaxElevation[ruleIndex],
-    120.0
+    biomeRuleElevationBlendWidth[ruleIndex]
   );
   float slopeWeight = biomeSlopeWeight(slopeUp, biomeRuleMinUpDot[ruleIndex], 0.08);
   float priorityBias = 1.0 + max(0.0, biomeRulePriority[ruleIndex]) * 0.02;
@@ -313,13 +315,15 @@ vec3 applyLowlandWetness(vec3 color, float slopeUp, float elevation) {
 
 vec3 applyCliffRockAccent(vec3 color, float slopeUp, float elevation, vec2 worldUv, vec2 uvOffset) {
   float cliffMask = 1.0 - smoothstep(0.55, 0.78, slopeUp);
-  float elevationMask = smoothstep(700.0, 1400.0, elevation);
-  float rockBlend = cliffMask * elevationMask * 0.38;
+  float proceduralHillMask = smoothstep(20.0, 60.0, elevation) * (1.0 - smoothstep(150.0, 300.0, elevation));
+  float demRidgeMask = smoothstep(450.0, 950.0, elevation);
+  float elevationMask = max(proceduralHillMask, demRidgeMask);
+  float rockBlend = cliffMask * elevationMask * 0.42;
   if (rockBlend <= 0.001) {
     return color;
   }
 
-  vec4 rockPlanar = sampleBiomeTexture(1.0, worldUv, uvOffset);
+  vec4 rockPlanar = sampleBiomeTexture(cliffRockBiomeSlot, worldUv, uvOffset);
   return mix(color, rockPlanar.rgb, rockBlend);
 }
 
@@ -459,6 +463,7 @@ export interface TerrainBiomeRuleConfig {
   biomeSlot: number;
   elevationMin: number;
   elevationMax: number;
+  elevationBlendWidth?: number;
   minUpDot: number;
   priority: number;
 }
@@ -466,6 +471,7 @@ export interface TerrainBiomeRuleConfig {
 export interface TerrainBiomeMaterialConfig {
   layers: TerrainBiomeLayerConfig[];
   rules: TerrainBiomeRuleConfig[];
+  cliffRockBiomeSlot?: number;
 }
 
 interface TerrainMaterialOptions {
@@ -642,6 +648,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   const ruleBiomeSlot = new Float32Array(MAX_BIOME_RULES);
   const ruleMinElevation = new Float32Array(MAX_BIOME_RULES);
   const ruleMaxElevation = new Float32Array(MAX_BIOME_RULES);
+  const ruleElevationBlendWidth = new Float32Array(MAX_BIOME_RULES);
   const ruleMinUpDot = new Float32Array(MAX_BIOME_RULES);
   const rulePriority = new Float32Array(MAX_BIOME_RULES);
   const ruleEnabled = new Float32Array(MAX_BIOME_RULES);
@@ -669,6 +676,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
       ruleBiomeSlot[i] = 0;
       ruleMinElevation[i] = -1e9;
       ruleMaxElevation[i] = 1e9;
+      ruleElevationBlendWidth[i] = 120;
       ruleMinUpDot[i] = -1;
       rulePriority[i] = -1e9;
       ruleEnabled[i] = 0;
@@ -678,6 +686,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     ruleBiomeSlot[i] = rule.biomeSlot;
     ruleMinElevation[i] = rule.elevationMin;
     ruleMaxElevation[i] = rule.elevationMax;
+    ruleElevationBlendWidth[i] = rule.elevationBlendWidth ?? 120;
     ruleMinUpDot[i] = rule.minUpDot;
     rulePriority[i] = rule.priority;
     ruleEnabled[i] = 1;
@@ -729,6 +738,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     triplanarSlopeThreshold: { value: splatmap.triplanarSlopeThreshold },
     environmentWetness: { value: surfaceWetness },
     featureSurfacePatchCount: { value: Math.min(surfacePatches.length, MAX_FEATURE_SURFACE_PATCHES) },
+    cliffRockBiomeSlot: { value: biomeConfig.cliffRockBiomeSlot ?? 0 },
     featureSurfaceShape: { value: featureSurfaceShape },
     featureSurfaceType: { value: featureSurfaceType },
     featureSurfaceX: { value: featureSurfaceX },
@@ -745,6 +755,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     biomeRuleBiomeSlot: { value: ruleBiomeSlot },
     biomeRuleMinElevation: { value: ruleMinElevation },
     biomeRuleMaxElevation: { value: ruleMaxElevation },
+    biomeRuleElevationBlendWidth: { value: ruleElevationBlendWidth },
     biomeRuleMinUpDot: { value: ruleMinUpDot },
     biomeRulePriority: { value: rulePriority },
     biomeRuleEnabled: { value: ruleEnabled },

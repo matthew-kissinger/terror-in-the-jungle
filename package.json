@@ -109,6 +109,7 @@
     "check:projekt-143-culling-proof": "npx tsx scripts/projekt-143-culling-proof.ts --headed",
     "check:projekt-143-culling-baseline": "npx tsx scripts/projekt-143-culling-owner-baseline.ts",
     "check:projekt-143-terrain-baseline": "npx tsx scripts/projekt-143-terrain-horizon-baseline.ts",
+    "check:projekt-143-terrain-distribution": "npx tsx scripts/projekt-143-terrain-distribution-audit.ts",
     "check:projekt-143-cycle2-proof": "npx tsx scripts/projekt-143-cycle2-proof-suite.ts",
     "check:projekt-143-cycle3-kickoff": "npx tsx scripts/projekt-143-cycle3-kickoff.ts",
     "check:projekt-143-optik-decision": "npx tsx scripts/projekt-143-optik-decision-packet.ts",

@@ -16,13 +16,16 @@ const ALL_GAME_MODES: readonly GameMode[] = [
   GameMode.A_SHAU_VALLEY,
 ];
 
-function getBiomeIdsForMode(mode: GameMode): string[] {
+function getBiomeIdsForMode(mode: GameMode, includeMaterialAccentBiomes = false): string[] {
   const config = getGameModeConfig(mode);
   const biomeIds = [config.terrain.defaultBiome];
   for (const rule of config.terrain.biomeRules ?? []) {
     if (!biomeIds.includes(rule.biomeId)) {
       biomeIds.push(rule.biomeId);
     }
+  }
+  if (includeMaterialAccentBiomes && !biomeIds.includes('highland')) {
+    biomeIds.push('highland');
   }
   return biomeIds;
 }
@@ -41,7 +44,7 @@ describe('TerrainBiomeRuntimeConfig', () => {
   it('builds terrain material bindings for every game mode', () => {
     const textureByName = new Map<string, THREE.Texture>();
     for (const mode of ALL_GAME_MODES) {
-      for (const biomeId of getBiomeIdsForMode(mode)) {
+      for (const biomeId of getBiomeIdsForMode(mode, true)) {
         const biome = getBiome(biomeId);
         textureByName.set(biome.groundTexture, new THREE.Texture());
       }
@@ -63,13 +66,14 @@ describe('TerrainBiomeRuntimeConfig', () => {
 
       expect(materialConfig.layers.length).toBeGreaterThan(0);
       expect(materialConfig.layers.every((layer) => layer.texture instanceof THREE.Texture)).toBe(true);
+      expect(materialConfig.layers[materialConfig.cliffRockBiomeSlot ?? -1]?.biomeId).toBe('highland');
     }
   });
 
   it('creates live terrain materials for every shipped game mode', () => {
     const textureByName = new Map<string, THREE.Texture>();
     for (const mode of ALL_GAME_MODES) {
-      for (const biomeId of getBiomeIdsForMode(mode)) {
+      for (const biomeId of getBiomeIdsForMode(mode, true)) {
         const biome = getBiome(biomeId);
         textureByName.set(biome.groundTexture, new THREE.Texture());
       }

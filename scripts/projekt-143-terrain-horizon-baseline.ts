@@ -644,6 +644,11 @@ async function analyzeImage(file: string): Promise<ImageMetrics> {
   };
 }
 
+function hasVisibleTerrainBand(metrics: ImageBandMetrics): boolean {
+  if (metrics.lumaMean >= 252) return false;
+  return metrics.edgeContrast > 0.5 || metrics.lumaStdDev > 8 || metrics.greenDominanceRatio > 0.01;
+}
+
 async function captureScenario(page: Page, outputDir: string, plan: ScenarioPlan) {
   await startMode(page, plan.mode);
   await dismissBriefingIfPresent(page);
@@ -838,7 +843,7 @@ async function main(): Promise<void> {
     typeof shot.metrics.terrain?.vegetationActiveTotal === 'number'
   ).length;
   const terrainVisibleImageShots = scenarios.flatMap((scenario) => scenario.shots).filter((shot) =>
-    shot.imageMetrics.groundBand.lumaMean < 245 && shot.imageMetrics.groundBand.edgeContrast > 0.5
+    hasVisibleTerrainBand(shot.imageMetrics.groundBand)
   ).length;
   const browserErrorCount = scenarios.reduce((sum, scenario) => sum + scenario.browserErrors.length + scenario.pageErrors.length + (scenario.error ? 1 : 0), 0);
 

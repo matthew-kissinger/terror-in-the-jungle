@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { A_SHAU_VALLEY_CONFIG } from '../../config/AShauValleyConfig';
+import { OPEN_FRONTIER_CONFIG } from '../../config/OpenFrontierConfig';
 import { classifyBiome } from './BiomeClassifier';
 
 describe('BiomeClassifier', () => {
@@ -17,7 +18,7 @@ describe('BiomeClassifier', () => {
     expect(biomeId).toBe('denseJungle');
   });
 
-  it('limits A Shau highland rock to upper ridges', () => {
+  it('keeps A Shau upper ridges jungle as the primary biome instead of brown caps', () => {
     const terrainConfig = A_SHAU_VALLEY_CONFIG.terrain;
     expect(terrainConfig).toBeDefined();
 
@@ -28,10 +29,10 @@ describe('BiomeClassifier', () => {
       terrainConfig?.defaultBiome ?? 'denseJungle',
     );
 
-    expect(biomeId).toBe('highland');
+    expect(biomeId).toBe('denseJungle');
   });
 
-  it('uses bamboo grove on flatter upland shelves before the highland cutoff', () => {
+  it('does not use a broad A Shau bamboo belt as the primary terrain biome', () => {
     const terrainConfig = A_SHAU_VALLEY_CONFIG.terrain;
     expect(terrainConfig).toBeDefined();
 
@@ -42,6 +43,45 @@ describe('BiomeClassifier', () => {
       terrainConfig?.defaultBiome ?? 'denseJungle',
     );
 
-    expect(biomeId).toBe('bambooGrove');
+    expect(biomeId).toBe('denseJungle');
+  });
+
+  it('keeps procedural mid-elevation ground in jungle instead of broad rocky highland', () => {
+    const terrainConfig = OPEN_FRONTIER_CONFIG.terrain;
+
+    const biomeId = classifyBiome(
+      30,
+      10,
+      terrainConfig.biomeRules,
+      terrainConfig.defaultBiome,
+    );
+
+    expect(biomeId).toBe('denseJungle');
+  });
+
+  it('keeps procedural hilltops jungle as the primary biome instead of grey caps', () => {
+    const terrainConfig = OPEN_FRONTIER_CONFIG.terrain;
+
+    const biomeId = classifyBiome(
+      80,
+      8,
+      terrainConfig.biomeRules,
+      terrainConfig.defaultBiome,
+    );
+
+    expect(biomeId).toBe('denseJungle');
+  });
+
+  it('does not use procedural highland as the primary biome for steep hillsides', () => {
+    const terrainConfig = OPEN_FRONTIER_CONFIG.terrain;
+
+    const biomeId = classifyBiome(
+      80,
+      50,
+      terrainConfig.biomeRules,
+      terrainConfig.defaultBiome,
+    );
+
+    expect(biomeId).toBe('denseJungle');
   });
 });

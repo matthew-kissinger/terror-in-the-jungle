@@ -93,6 +93,24 @@ the current truth anchor.
   It captures elevated Open Frontier and A Shau screenshots plus renderer,
   terrain, vegetation, browser, warmup, and linked perf-before metadata. It is
   before evidence only; no far-canopy fix is accepted from it.
+  A later 2026-05-04 KB-TERRAIN material pass added
+  `npm run check:projekt-143-terrain-distribution` and shifted terrain material
+  rules so broad highland/cleared/bamboo elevation bands no longer drive the
+  primary ground biome in procedural modes or A Shau. The final static
+  distribution artifact,
+  `artifacts/perf/2026-05-04T02-02-26-811Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`,
+  reports `100%` flat jungle-like primary ground in every mode and passes all
+  steep-side rock-accent checks; its WARN is only the AI Sandbox random-seed
+  fallback. The matching fresh-build screenshot proof is
+  `artifacts/perf/2026-05-04T02-06-49-928Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  This is a material-distribution correction, not final vegetation density,
+  far-canopy, A Shau atmosphere/color, static feature placement, or Pixel Forge
+  building replacement acceptance. Current owner goal also includes properly
+  shaped foundations for buildings/HQs/airfields/vehicles and a later
+  performance-aware review of Pixel Forge building candidates. It also includes
+  a future asset audit for TIJ and Pixel Forge ground/path/trail/grass/foliage
+  and cover texture variety, with worn-in smoothed route surfaces that can
+  support future vehicles where appropriate.
 - KB-STRATEGIE filed the WebGL/WebGPU brief. `npm run check:webgpu-strategy`
   wrote
   `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`:

@@ -22,13 +22,15 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-04T00-14-47-283Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-04T02-19-44-373Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
-  `artifacts/perf/2026-05-04T00-18-26-810Z/projekt-143-evidence-suite/suite-summary.json`
+  `artifacts/perf/2026-05-04T02-20-04-490Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
-  `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`
+  `artifacts/perf/2026-05-04T02-06-49-928Z/projekt-143-terrain-horizon-baseline/summary.json`
+- KB-TERRAIN material distribution audit:
+  `artifacts/perf/2026-05-04T02-02-26-811Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
 - KB-CULL owner baseline:
   `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
 - Rejected KB-CULL static-helicopter candidate:
@@ -50,7 +52,16 @@ ledger; this file is the short operational prompt.
   preserving texture variety; verify whether slope/biome material distribution
   is inverted if green is mostly on hillsides; scale and ground tiny palms and
   ferns; increase big palms and ground vegetation; and make bamboo scattered
-  dense clusters rather than the dominant forest layer.
+  dense clusters rather than the dominant forest layer. The first
+  material-distribution pass removes broad highland/cleared/bamboo elevation
+  caps as primary terrain rules and keeps rock available as a slope-gated
+  accent; it is not final A Shau art acceptance. Later terrain/world-placement
+  work must also fix hanging building foundations and review airfield, HQ,
+  vehicle, firebase, and support-compound presets before considering Pixel
+  Forge building replacements. Also inventory existing TIJ and Pixel Forge
+  ground, path, trail, grass, foliage, and cover texture/assets before custom
+  work; routes should become worn-in, smoothed, vehicle-usable trails where
+  that fits future gameplay.
 - KB-CULL `static-feature-and-vehicle-culling-hlod`: `ready_for_branch`.
   The selected owner path is
   `large-mode-world-static-and-visible-helicopters`. Close-NPC/weapon pool
@@ -94,9 +105,11 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-04T00-14-47-283Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-04T02-19-44-373Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - KB-TERRAIN before baseline:
-  artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json
+  artifacts/perf/2026-05-04T02-06-49-928Z/projekt-143-terrain-horizon-baseline/summary.json
+- KB-TERRAIN material distribution:
+  artifacts/perf/2026-05-04T02-02-26-811Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
 - KB-CULL owner baseline:
   artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json
 - KB-EFFECTS low-load closeout:
@@ -109,7 +122,11 @@ Current bureau state:
 - KB-TERRAIN: ready_for_branch, before baseline exists; no far-canopy fix yet.
   Include the owner visual target: majority green/jungle floor, possible
   inverted material distribution, bigger/grounded palms and ferns, more big
-  palms and ground cover, and bamboo as scattered dense clusters.
+  palms and ground cover, bamboo as scattered dense clusters, terrain-shaped
+  building/HQ/airfield/vehicle foundations with no hill-edge overhangs, and a
+  performance-aware Pixel Forge building shortlist before replacement. Include
+  an asset audit for ground/path/grass/foliage/cover variety and future
+  vehicle-usable trail surfaces.
 - KB-CULL: ready_for_branch, selected owner path is large-mode world static
   features plus visible helicopters; close-NPC/weapon residency remains
   diagnostic-only. Rejected static-helicopter distance-cull after artifact:

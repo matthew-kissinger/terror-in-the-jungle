@@ -15,11 +15,8 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [
-      { biomeId: 'highland',   elevationMin: 15, slopeMax: 45, priority: 3 },
-      { biomeId: 'cleared',    elevationMin: 18, slopeMax: 8,  priority: 4 },
-      { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, priority: 2 },
-      { biomeId: 'riverbank',  elevationMax: 1,  slopeMax: 15, priority: 5 },
-      { biomeId: 'denseJungle', elevationMax: 15, priority: 1 },
+      { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, elevationBlendWidth: 4, priority: 2 },
+      { biomeId: 'riverbank',  elevationMax: 1,  slopeMax: 15, elevationBlendWidth: 3, priority: 5 },
     ],
   },
   terrainFlow: {

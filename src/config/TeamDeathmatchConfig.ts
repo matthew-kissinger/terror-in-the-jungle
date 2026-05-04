@@ -15,9 +15,7 @@ export const TEAM_DEATHMATCH_CONFIG: GameModeConfig = {
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [
-      { biomeId: 'highland',   elevationMin: 15, slopeMax: 45, priority: 3 },
-      { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, priority: 2 },
-      { biomeId: 'denseJungle', elevationMax: 15, priority: 1 },
+      { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, elevationBlendWidth: 4, priority: 2 },
     ],
   },
   weather: {

@@ -40,6 +40,7 @@ npm run check:memory             # Memory growth tracker
 npm run check:projekt-143-culling-proof  # Headed deterministic renderer/category proof
 npm run check:projekt-143-culling-baseline # Culling owner-path before packet
 npm run check:projekt-143-terrain-baseline # Elevated terrain horizon before proof
+npm run check:projekt-143-terrain-distribution # Ground material/vegetation distribution audit
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof bundle
 npm run probe                    # Engine health probe
 npm run probe:fixed-wing         # Browser-level fixed-wing takeoff/climb/orbit/handoff/approach probe

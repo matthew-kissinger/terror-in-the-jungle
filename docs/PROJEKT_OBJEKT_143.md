@@ -661,6 +661,45 @@ Progress:
   should shift from a dominant continuous forest to scattered dense clusters.
   This is target definition only; no texture, scale, or vegetation distribution
   remediation is accepted without before/after screenshots and perf evidence.
+- 2026-05-04 ground-material distribution pass:
+  `scripts/projekt-143-terrain-distribution-audit.ts` is exposed as
+  `npm run check:projekt-143-terrain-distribution` and records CPU biome,
+  shader-primary material, flat/steep ground material, estimated vegetation
+  density, and cliff-rock accent eligibility for all shipped modes. The final
+  static artifact for this pass is
+  `artifacts/perf/2026-05-04T02-02-26-811Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+  It reports all modes at `100%` flat jungle-like primary ground, Open
+  Frontier at `99.99%` overall jungle-like primary ground, A Shau at `100%`,
+  and steep-side rock-accent eligibility above the audit floor in every mode.
+  The remaining WARN is expected evidence hygiene: AI Sandbox has
+  `terrainSeed: random` and is sampled with fixed fallback seed `42`.
+- 2026-05-04 implementation note: the broad procedural `highland` elevation
+  cap, Open Frontier generic `cleared` cap, and A Shau generic
+  highland/cleared/bamboo elevation belts are no longer primary terrain
+  classification rules. `highland` remains available to the terrain material as
+  a cliff/hillside accent layer through `cliffRockBiomeSlot`, with the shader
+  using slope-gated rock blending instead of grey/brown mountaintop caps. The
+  fresh perf-build screenshot proof after the pass is
+  `artifacts/perf/2026-05-04T02-06-49-928Z/projekt-143-terrain-horizon-baseline/summary.json`
+  and passed with `4/4` screenshots, renderer/terrain/vegetation telemetry,
+  and `0` browser/page/scenario errors. Human visual review is still required:
+  A Shau distant ridges remain muted under current atmosphere/fog, so this is a
+  material-distribution correction, not final A Shau art direction acceptance.
+- 2026-05-04 owner world-placement target: the later KB-TERRAIN/KB-CULL scope
+  also includes terrain-aligned static placement. Buildings, HQs, vehicles,
+  and airfield/support presets should not hang foundations off hill edges or
+  rely on poorly sampled random placement. The likely path is to audit and
+  align terrain stamps, airfield templates, firebase/HQ presets, vehicle
+  parking, and generated feature footprints before swapping assets. Pixel Forge
+  has multiple building iterations that should be shortlisted for visual fit,
+  triangle/draw-call cost, collision/foundation footprint, and LOD/HLOD
+  readiness before any runtime replacement.
+- 2026-05-04 owner texture/route target: later KB-TERRAIN work should also
+  inventory existing TIJ and Pixel Forge ground, grass, path, trail, foliage,
+  and cover texture/asset candidates before inventing new content. The goal is
+  richer ground variety, custom grass/ground foliage and cover where useful,
+  and route/trail surfaces that read worn-in, smoother, and more vehicle-usable
+  for future driving instead of arbitrary grey gravel or decorative paths.
 
 Root-cause hypotheses:
 
@@ -684,7 +723,11 @@ Ranked remediations:
    upload budgets are measured.
 3. Use terrain-texture vegetation tinting as the fallback minimum for the
    farthest band if card density cannot meet frame-time budgets.
-4. Defer virtual texturing or full low-poly cluster forests until WebGL/WebGPU
+4. Audit and shortlist existing TIJ/Pixel Forge ground textures, grass/foliage
+   assets, cover props, and path/trail materials before making custom assets;
+   route stamps should become smoother, worn-in surfaces with vehicle usability
+   in mind.
+5. Defer virtual texturing or full low-poly cluster forests until WebGL/WebGPU
    strategy and memory budgets are decided.
 
 Acceptance:
@@ -699,6 +742,15 @@ Acceptance:
 - Vegetation review confirms palms and ferns are properly grounded and scaled,
   large palms and ground cover are visibly more present, and bamboo appears as
   scattered dense pockets rather than the dominant forest layer.
+- Static feature review confirms airfields, HQs, buildings, support compounds,
+  and parked vehicles sit on shaped terrain pads with no hanging foundations or
+  hill-edge overhangs. Pixel Forge building candidates must pass the Asset
+  Acceptance Standard and a placement/foundation screenshot review before they
+  replace shipped structures.
+- Trail/route review confirms paths use intentional worn-in dirt, mud, grass,
+  or packed-earth materials from existing/project-approved assets where
+  possible, and that their terrain stamps are smooth enough to support future
+  vehicle movement without fighting route shoulders or building pads.
 - Open Frontier and A Shau perf captures show the outer-canopy layer adds no
   more than `1.5ms` to p95 frame time and no more than `10%` renderer draw-call
   growth against matched post-warmup captures.
@@ -715,6 +767,11 @@ Open questions:
 - What memory and draw-call budget is available for the outer vegetation layer?
 - What A Shau camera profiles should be treated as authoritative: player
   infantry, helicopter, fixed-wing, free-fly debug, or strategy overview?
+- Which existing TIJ or Pixel Forge ground/path/foliage/cover textures are
+  production-worthy, and where do we need custom grass, ground-cover, or trail
+  assets instead?
+- Which route surfaces should become future vehicle paths, and what slope,
+  width, shoulder, and smoothing constraints should those trail stamps obey?
 
 ### KB-CULL - Culling And Asset Discipline
 

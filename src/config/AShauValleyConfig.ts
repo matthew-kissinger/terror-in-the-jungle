@@ -94,11 +94,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
 
   terrain: {
     defaultBiome: 'denseJungle',
-    biomeRules: [
-      { biomeId: 'highland', elevationMin: 1450, slopeMax: 24, priority: 2 },
-      { biomeId: 'cleared', slopeMax: 10, elevationMin: 1200, priority: 3 },
-      { biomeId: 'bambooGrove', elevationMin: 950, elevationMax: 1450, slopeMax: 16, priority: 1 },
-    ]
+    biomeRules: []
   },
   terrainFlow: {
     enabled: true,
