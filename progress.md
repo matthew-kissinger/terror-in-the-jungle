@@ -2379,3 +2379,32 @@ TODO
   `artifacts/perf/2026-05-04T00-18-26-810Z/projekt-143-evidence-suite/suite-summary.json`
   and `npm run validate:fast` PASS. The final handoff pass is docs-only and
   does not claim any remediation beyond recorded evidence.
+
+2026-05-04 Projekt Objekt-143 continuation and rejected KB-CULL candidate
+- Fixed agent-DX in `scripts/doctor.ts`: Playwright browser discovery now calls
+  the repo-local Playwright CLI through `process.execPath` instead of a Windows
+  `cmd.exe`/`npx` shim, and spawn errors are included in doctor output. This
+  keeps the Windows-safe no-shim pattern for agent sandboxes and local shells.
+- Refreshed starting gates: `npm run doctor` PASS; `npm run
+  check:projekt-143-cycle3-kickoff` WARN by design at
+  `artifacts/perf/2026-05-04T01-04-49-022Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T01-04-58-778Z/projekt-143-evidence-suite/suite-summary.json`.
+- Tested a narrow KB-CULL static-helicopter distance-cull prototype against
+  `WorldFeatureSystem`, then rejected it before commit. The targeted Vitest
+  slice passed, but the trusted Open Frontier after capture at
+  `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json` failed validation
+  with `peak_p99_frame_ms=64.70ms` and did not improve the selected owner path:
+  `world_static_features` stayed `349`, visible `helicopters` stayed `39`, and
+  combined owner draw-call-like remained `388`. A Shau after capture was skipped
+  because the first required guardrail already failed.
+- Recorded the owner-requested KB-TERRAIN visual target in the Projekt ledger,
+  handoff, performance notes, and state doc: keep terrain texture variety but
+  make most traversable ground read jungle green rather than gravel; check for
+  possible inverted slope/biome material weighting if green is mostly on
+  hillsides; scale and ground tiny palms and ferns; add more big palms and
+  ground vegetation; and make bamboo scattered dense clusters rather than the
+  dominant forest layer.
+- Final local validation: `npm run validate:fast` PASS. No culling/HLOD,
+  terrain-material, vegetation-distribution, far-canopy, startup-latency,
+  WebGPU, production-parity, or perf-improvement claim is made from this pass.

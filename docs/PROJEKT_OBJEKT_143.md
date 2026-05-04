@@ -649,6 +649,18 @@ Progress:
   `4000m` while vegetation still disappears at `600m`. Zone Control's visual
   extent can exceed vegetation by `160m`; AI Sandbox and TDM are terrain-extent
   limited and do not expose a large in-map barren band in this static model.
+- 2026-05-04 owner visual target: the terrain and vegetation remediation goal
+  now explicitly includes ground material balance and close vegetation scale,
+  not only far-horizon canopy. Most traversable ground should read as jungle
+  green rather than gravel; if green appears mainly on hill or mountain sides,
+  inspect terrain material distribution for an inverted slope/biome mask or
+  weighting issue while preserving the existing texture variety. Tiny palm
+  placements should be scaled up, ferns should sit higher and larger instead
+  of being sunk into the ground, big palms such as `giantPalm`/`fanPalm` should
+  be more numerous, ground vegetation density should increase, and bamboo
+  should shift from a dominant continuous forest to scattered dense clusters.
+  This is target definition only; no texture, scale, or vegetation distribution
+  remediation is accepted without before/after screenshots and perf evidence.
 
 Root-cause hypotheses:
 
@@ -680,6 +692,13 @@ Acceptance:
 - Elevated-camera screenshots for Open Frontier and A Shau show no barren
   terrain band between the `600m` near/mid vegetation tier and the visible
   terrain horizon.
+- Ground-level and elevated screenshots show the majority jungle floor reading
+  green/vegetated, with gravel/rock retained only where intentionally exposed.
+  Evidence must cover Open Frontier and A Shau and must preserve the existing
+  terrain texture variety instead of replacing it with a flat tint.
+- Vegetation review confirms palms and ferns are properly grounded and scaled,
+  large palms and ground cover are visibly more present, and bamboo appears as
+  scattered dense pockets rather than the dominant forest layer.
 - Open Frontier and A Shau perf captures show the outer-canopy layer adds no
   more than `1.5ms` to p95 frame time and no more than `10%` renderer draw-call
   growth against matched post-warmup captures.
@@ -737,6 +756,15 @@ Progress:
   visible unattributed percentages `4.729%` and `5.943%`, and total draw-call
   ceilings `1037` / `785`. Close-NPC and weapon pool residency remains a
   diagnostic-only candidate until combat stress measurement trust passes.
+- 2026-05-04 rejected candidate: a static helicopter distance-cull prototype
+  against `WorldFeatureSystem` was not accepted. The targeted Vitest slice
+  passed before rejection, but the trusted Open Frontier after capture at
+  `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json` failed validation
+  with `peak_p99_frame_ms=64.70ms`, and the selected owner draw-call-like path
+  did not improve: `world_static_features` stayed `349`, visible `helicopters`
+  stayed `39`, and combined owner draw-call-like remained `388`. A Shau after
+  capture was skipped because the first required guardrail already failed. No
+  culling/HLOD remediation or perf win is accepted from this attempt.
 
 Open questions:
 
@@ -1250,6 +1278,12 @@ Current Cycle 3 status:
   Frontier and A Shau perf-before baselines. Future after captures must stay
   within the recorded ceilings: Open Frontier p95 `<=43.5ms` and draw calls
   `<=1141`, A Shau p95 `<=40.9ms` and draw calls `<=864`.
+  The branch goal now also includes jungle-floor material correction and
+  vegetation distribution: preserve texture variety but make most ground read
+  green/jungle, investigate possible inverted material distribution if green is
+  appearing mainly on hillsides, scale and ground palms/ferns properly, add
+  more big palms and ground vegetation, and reduce bamboo dominance into
+  scattered dense clusters.
   KB-CULL `static-feature-and-vehicle-culling-hlod` is now
   `ready_for_branch` after
   `npm run check:projekt-143-culling-baseline` wrote
@@ -1260,6 +1294,10 @@ Current Cycle 3 status:
   A Shau captures without regressing total renderer draw calls or visible
   unattributed percentage. Close-NPC pool residency remains diagnostic-only
   because the visible combat artifact still failed measurement trust.
+  A static helicopter distance-cull candidate was rejected after
+  `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json` because Open Frontier
+  validation failed and the owner path stayed at `388`; do not repeat that
+  exact approach as a claimed KB-CULL fix without new before/after evidence.
 - 2026-05-03: `npm run check:projekt-143-optik-decision` refreshed the
   decision packet at
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`.

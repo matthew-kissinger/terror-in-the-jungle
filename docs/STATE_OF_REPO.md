@@ -346,7 +346,12 @@ What is not ready to claim:
   `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`.
   It is ready for a far-horizon branch, but any outer-canopy layer still needs
   matched after screenshots and Open Frontier/A Shau perf deltas before it is
-  accepted.
+  accepted. The terrain branch now also carries an explicit owner visual target:
+  keep texture variety but make most traversable ground read jungle green
+  rather than gravel, check for possible inverted slope/biome material
+  distribution if green appears mostly on hillsides, scale/ground tiny palms and
+  ferns, add more big palms and ground vegetation, and make bamboo scattered
+  dense clusters instead of the dominant forest layer.
 - No WebGPU migration has shipped or been started. KB-STRATEGIE recommends
   staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
   after the measured blockers are under control.
@@ -388,7 +393,10 @@ What is not ready to claim:
   is `388`; A Shau owner draw-call-like is `719`; visible unattributed
   triangles are `4.729%` and `5.943%`. This is branch-start evidence only:
   no culling/HLOD optimization has shipped, and close-NPC/weapon pool residency
-  remains diagnostic-only until combat stress measurement trust passes.
+  remains diagnostic-only until combat stress measurement trust passes. A
+  static helicopter distance-cull prototype was rejected at
+  `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json` because Open Frontier
+  validation failed and the selected owner path did not improve.
 - KB-LOAD has a first local runtime remediation, not a closeout. The current
   code warms only the giantPalm color/normal texture pair before renderer
   reveal through `AssetLoader.warmGpuTextures()`. Paired retail startup

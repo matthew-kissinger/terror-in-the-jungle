@@ -659,7 +659,13 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    fresh-build elevated screenshot/perf-before baseline at
    `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`.
    The current lead is a missing outer canopy tier, not a scatterer residency
-   bug; no far-canopy remediation is accepted yet.
+   bug; no far-canopy remediation is accepted yet. The KB-TERRAIN goal now
+   also includes ground material and vegetation distribution correction:
+   most traversable ground should read jungle green rather than gravel, a
+   possible inverted slope/biome material weighting should be checked if green
+   appears mainly on hillsides, palms and ferns need scale/grounding review,
+   large palms and ground vegetation should be more present, and bamboo should
+   become scattered dense clusters rather than the dominant forest layer.
 6. **KB-CULL first owner path is selected, not fixed** - the clean owner
    baseline at
    `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
@@ -667,6 +673,10 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    current guardrails are Open Frontier owner draw-call-like below `388`,
    A Shau owner draw-call-like below `719`, total draw calls not above
    `1037` / `785`, and visible unattributed triangles below `10%`.
+   A 2026-05-04 static helicopter distance-cull prototype was rejected after
+   `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json`: measurement trust
+   passed, but Open Frontier validation failed and owner draw-call-like stayed
+   `388`.
    Close-NPC/weapon pool residency remains diagnostic-only until combat stress
    measurement trust passes.
 7. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.

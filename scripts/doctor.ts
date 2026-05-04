@@ -31,7 +31,9 @@ function run(command: string, args: string[]): { ok: boolean; output: string } {
     encoding: 'utf8',
     shell: false,
   });
-  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}${
+    result.error ? `\n${result.error.message}` : ''
+  }`.trim();
   return {
     ok: result.status === 0,
     output,
@@ -70,10 +72,8 @@ if (existsSync(playwrightPackagePath)) {
   addResult('Playwright package', 'FAIL', 'playwright package missing from node_modules');
 }
 
-const playwrightList =
-  process.platform === 'win32'
-    ? run('cmd.exe', ['/d', '/s', '/c', 'npx playwright install --list'])
-    : run('npx', ['playwright', 'install', '--list']);
+const playwrightCliPath = join(repoRoot, 'node_modules', 'playwright', 'cli.js');
+const playwrightList = run(process.execPath, [playwrightCliPath, 'install', '--list']);
 if (!playwrightList.ok) {
   addResult(
     'Playwright browsers',

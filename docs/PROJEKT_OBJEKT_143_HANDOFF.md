@@ -31,6 +31,8 @@ ledger; this file is the short operational prompt.
   `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`
 - KB-CULL owner baseline:
   `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
+- Rejected KB-CULL static-helicopter candidate:
+  `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json`
 - KB-EFFECTS trusted low-load closeout:
   `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`
 
@@ -43,11 +45,20 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN `large-mode-vegetation-horizon`: `ready_for_branch`.
   The first far-horizon branch must use the terrain baseline before/after
   screenshot path and matched Open Frontier/A Shau perf captures.
+  The goal now also includes ground and vegetation art-direction correction:
+  most traversable ground should read jungle green rather than gravel while
+  preserving texture variety; verify whether slope/biome material distribution
+  is inverted if green is mostly on hillsides; scale and ground tiny palms and
+  ferns; increase big palms and ground vegetation; and make bamboo scattered
+  dense clusters rather than the dominant forest layer.
 - KB-CULL `static-feature-and-vehicle-culling-hlod`: `ready_for_branch`.
   The selected owner path is
   `large-mode-world-static-and-visible-helicopters`. Close-NPC/weapon pool
   residency remains diagnostic-only until combat stress measurement trust
   passes.
+  A static helicopter distance-cull prototype was rejected because the trusted
+  Open Frontier after capture failed validation and owner draw-call-like stayed
+  `388`; do not repeat it as a claimed fix without new evidence.
 - KB-EFFECTS `grenade-first-use-stall`: `evidence_complete` for the low-load
   unlit pooled explosion path. Do not infer combat120/stress closeout or
   future visual-polish safety from the low-load probe.
@@ -96,9 +107,13 @@ Current evidence anchors:
 Current bureau state:
 - KB-LOAD: ready_for_branch, but no startup-latency win yet.
 - KB-TERRAIN: ready_for_branch, before baseline exists; no far-canopy fix yet.
+  Include the owner visual target: majority green/jungle floor, possible
+  inverted material distribution, bigger/grounded palms and ferns, more big
+  palms and ground cover, and bamboo as scattered dense clusters.
 - KB-CULL: ready_for_branch, selected owner path is large-mode world static
   features plus visible helicopters; close-NPC/weapon residency remains
-  diagnostic-only.
+  diagnostic-only. Rejected static-helicopter distance-cull after artifact:
+  artifacts/perf/2026-05-04T00-55-00-501Z/summary.json.
 - KB-EFFECTS: evidence_complete only for low-load grenade first-use stall.
 - KB-OPTIK: needs_decision for near-stress silhouette exception/human review.
 
