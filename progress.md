@@ -2312,10 +2312,10 @@ TODO
   Frontier p95 `<=43.5ms` and draw calls `<=1141`; A Shau p95 `<=40.9ms` and
   draw calls `<=864`.
 - Cycle 3 kickoff now consumes the terrain horizon baseline and writes
-  `terrainHorizonBaseline` in its input list. Latest kickoff:
+  `terrainHorizonBaseline` in its input list. The kickoff at this step:
   `artifacts/perf/2026-05-04T00-05-12-050Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
-  remains WARN overall because KB-OPTIK needs an owner decision and KB-CULL
-  still needs an owner-path baseline, but KB-TERRAIN
+  remained WARN overall because KB-OPTIK needed an owner decision and KB-CULL
+  still needed an owner-path baseline, but KB-TERRAIN
   `large-mode-vegetation-horizon` is now `ready_for_branch`.
 - Refreshed KB-OPTIK decision packet after stale routing cleanup:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`.
@@ -2329,3 +2329,28 @@ TODO
 - Validation: `npm run check:projekt-143` PASS at
   `artifacts/perf/2026-05-03T23-59-39-390Z/projekt-143-evidence-suite/suite-summary.json`
   and `npm run validate:fast` PASS.
+
+2026-05-04 Projekt Objekt-143 KB-CULL owner baseline proof
+- Added `scripts/projekt-143-culling-owner-baseline.ts` and wired
+  `npm run check:projekt-143-culling-baseline`. The command consumes the
+  headed culling proof, trusted Open Frontier and A Shau perf summaries,
+  scene attribution, runtime renderer samples, and the latest AI Sandbox
+  diagnostic. It selects an owner path only from trusted before evidence and
+  keeps close-NPC/weapon pool residency diagnostic-only until combat stress
+  measurement trust passes.
+- Clean-HEAD baseline:
+  `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
+  is PASS from source `527e05433ea72adaf83ca28692137f5be67fb438`. It selects
+  `large-mode-world-static-and-visible-helicopters`. Guardrails for the first
+  after branch: Open Frontier owner draw-call-like below `388`, A Shau owner
+  draw-call-like below `719`, total draw calls not above `1037` / `785`, and
+  visible unattributed triangles below `10%`.
+- Cycle 3 kickoff now consumes `cullingOwnerBaseline` and marks KB-CULL
+  `static-feature-and-vehicle-culling-hlod` as `ready_for_branch` at
+  `artifacts/perf/2026-05-04T00-14-47-283Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Overall remains WARN because KB-OPTIK still needs an owner decision.
+- Docs and agent-DX aligned in `AGENTS.md`, `docs/PROJEKT_OBJEKT_143.md`,
+  `docs/PERFORMANCE.md`, `docs/STATE_OF_REPO.md`, `docs/BACKLOG.md`, and this
+  progress log. No culling/HLOD, close-NPC residency, startup-latency,
+  far-canopy, WebGPU, production parity, or combat120/stress grenade closeout
+  is claimed from this pass.

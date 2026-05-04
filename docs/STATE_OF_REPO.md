@@ -352,7 +352,7 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-04T00-05-12-050Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-04T00-14-47-283Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
@@ -363,7 +363,9 @@ What is not ready to claim:
   `evidence_complete` for the trusted low-load probe, KB-TERRAIN is now
   `ready_for_branch` after the fresh-build elevated horizon baseline at
   `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`,
-  and KB-CULL remains `needs_baseline`. It also
+  and KB-CULL is now `ready_for_branch` after the clean owner-path baseline at
+  `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`.
+  It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
   combat120, and A Shau perf summary paths for handoff. This is
   planning/agent-DX evidence; no atlas regeneration, gameplay-camera visual
@@ -380,6 +382,13 @@ What is not ready to claim:
   exception or switching to KB-LOAD/KB-TERRAIN/KB-CULL.
   It continues to reject aircraft resizing as the next response without a
   separate vehicle-scale proof.
+- KB-CULL now has an executable first owner-path before packet. The selected
+  path is `large-mode-world-static-and-visible-helicopters`, backed by trusted
+  Open Frontier and A Shau scene attribution. Open Frontier owner draw-call-like
+  is `388`; A Shau owner draw-call-like is `719`; visible unattributed
+  triangles are `4.729%` and `5.943%`. This is branch-start evidence only:
+  no culling/HLOD optimization has shipped, and close-NPC/weapon pool residency
+  remains diagnostic-only until combat stress measurement trust passes.
 - KB-LOAD has a first local runtime remediation, not a closeout. The current
   code warms only the giantPalm color/normal texture pair before renderer
   reveal through `AssetLoader.warmGpuTextures()`. Paired retail startup

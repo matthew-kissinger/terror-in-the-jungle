@@ -84,6 +84,7 @@ npm run check:webgpu-strategy       # KB-STRATEGIE WebGL/WebGPU audit
 npm run check:projekt-143           # Cycle 0 static evidence suite
 npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark bundle sidecars
 npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proof
+npm run check:projekt-143-culling-baseline # Cycle 3 culling owner-path before packet
 npm run check:projekt-143-terrain-baseline # Cycle 3 elevated horizon screenshot/perf-before proof
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
@@ -203,9 +204,10 @@ blocking gate.
 Cycle 2 proof, KB-OPTIK scale proof, texture audit, Open Frontier and Zone
 Control startup evidence, Open Frontier/combat120/A Shau perf summaries,
 grenade probe, vegetation horizon audit, terrain horizon baseline, and culling
-proof, then classifies candidate Cycle 3 branches as `evidence_complete`,
-`ready_for_branch`, `needs_decision`, `needs_baseline`, or `blocked`. This is
-an agent-DX handoff command; it does not approve or apply any remediation.
+proof plus owner baseline, then classifies candidate Cycle 3 branches as
+`evidence_complete`, `ready_for_branch`, `needs_decision`, `needs_baseline`, or
+`blocked`. This is an agent-DX handoff command; it does not approve or apply
+any remediation.
 
 `projekt-143-optik-decision-packet.ts` writes a KB-OPTIK decision packet under
 `artifacts/perf/<timestamp>/projekt-143-optik-decision-packet/`. It consumes the
@@ -266,6 +268,22 @@ and zero renderer counters on 2026-05-03. The fixture screenshot is also not a
 runtime scale proof: GLB assets are scaled by longest bounding-box axis to keep
 all required categories visible in one camera. Use matched KB-OPTIK screenshots,
 not this fixture, to judge whether NPCs are too large or vehicles are too small.
+
+`projekt-143-culling-owner-baseline.ts` writes a KB-CULL owner-path before
+packet under
+`artifacts/perf/<timestamp>/projekt-143-culling-owner-baseline/`. It consumes
+the headed culling proof, trusted Open Frontier and A Shau perf summaries,
+scene attribution, renderer runtime samples, and the latest AI Sandbox combat
+diagnostic. The first clean-HEAD PASS artifact is
+`artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`.
+It selects `large-mode-world-static-and-visible-helicopters` because trusted
+large-mode captures contain representative draw-call/triangle telemetry for
+`world_static_features` and visible `helicopters`: Open Frontier owner
+draw-call-like `388`, A Shau owner draw-call-like `719`, visible unattributed
+triangles `4.729%` / `5.943%`, and total draw-call ceilings `1037` / `785`.
+Close-NPC and weapon pool residency remains diagnostic-only because the visible
+combat artifact still fails measurement trust. This is before evidence, not a
+culling/HLOD improvement claim.
 
 `projekt-143-terrain-horizon-baseline.ts` writes an elevated KB-TERRAIN before
 baseline under
@@ -642,7 +660,16 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`.
    The current lead is a missing outer canopy tier, not a scatterer residency
    bug; no far-canopy remediation is accepted yet.
-6. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
+6. **KB-CULL first owner path is selected, not fixed** - the clean owner
+   baseline at
+   `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
+   selects large-mode world static features and visible helicopters. The
+   current guardrails are Open Frontier owner draw-call-like below `388`,
+   A Shau owner draw-call-like below `719`, total draw calls not above
+   `1037` / `785`, and visible unattributed triangles below `10%`.
+   Close-NPC/weapon pool residency remains diagnostic-only until combat stress
+   measurement trust passes.
+7. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
 
 ## Resolved Bottlenecks
 

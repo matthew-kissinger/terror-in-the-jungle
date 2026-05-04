@@ -731,11 +731,13 @@ the runbook for the end-of-cycle ritual.
    perf-before guardrails. A far-canopy or distance-policy branch is now
    ready to start, but it still needs matched after screenshots plus Open
    Frontier/A Shau p95 and draw-call deltas before closure.
-18. **Projekt Objekt-143 KB-CULL still lacks an owner-path baseline.** The
-   deterministic renderer/category proof is trusted, but the first actual
-   culling/HLOD branch must choose one owner path and capture representative
-   before/after renderer telemetry. Do not certify culling from static
-   inventory or the proof screenshot alone.
+18. **Projekt Objekt-143 KB-CULL has a selected before path, not a fix.** The
+   owner packet at
+   `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
+   selects large-mode world static features and visible helicopters for the
+   first representative culling/HLOD branch. It still needs matched after
+   telemetry before closure, and close-NPC/weapon pool residency remains
+   diagnostic-only until combat stress measurement trust passes.
 
 ## Known Bugs
 
