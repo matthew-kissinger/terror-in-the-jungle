@@ -38,6 +38,7 @@ describe('WorldFeatureSystem', () => {
   let currentConfig: any;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     scene = new THREE.Scene();
     system = new WorldFeatureSystem(scene);
     terrainManager = {
@@ -89,7 +90,9 @@ describe('WorldFeatureSystem', () => {
     system.update(0.016);
     await flushPromises();
 
-    expect(scene.children.length).toBeGreaterThanOrEqual(6);
+    expect(scene.children).toHaveLength(1);
+    expect(scene.children[0].name).toBe('WorldStaticFeatureBatchRoot');
+    expect(vi.mocked(modelLoader.loadModel).mock.calls.length).toBeGreaterThanOrEqual(6);
   });
 
   it('spawns fixed-wing aircraft from local stand offsets without double-rotating them', async () => {
@@ -181,12 +184,13 @@ describe('WorldFeatureSystem', () => {
     await flushPromises();
 
     expect(scene.children.length).toBe(1);
-    const placed = scene.children[0];
-    expect(placed.position.x).toBeGreaterThan(10.5);
-    expect(placed.position.y).toBeLessThan(8);
+    const bounds = new THREE.Box3().setFromObject(scene.children[0]);
+    const center = bounds.getCenter(new THREE.Vector3());
+    expect(center.x).toBeGreaterThan(10.5);
+    expect(center.y).toBeLessThan(8);
   });
 
-  it('optimizes generic static placements before adding them to the scene', async () => {
+  it('optimizes generic static placements inside the shared world feature layer', async () => {
     currentConfig = {
       id: GameMode.ZONE_CONTROL,
       features: [

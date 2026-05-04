@@ -2604,7 +2604,7 @@ TODO
   `scripts/projekt-143-terrain-asset-inventory.ts` and
   `npm run check:projekt-143-terrain-assets`. First run hit sandbox `tsx`
   `spawn EPERM`; approved rerun passed with expected WARN at
-  `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
+ `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
   It found `12` terrain WebP textures (`5` green-ground variants, `4`
   trail/cleared/disturbed variants), `5` Pixel Forge ground-cover/trail prop
   candidates, `12` building candidates, `7` runtime Pixel Forge vegetation
@@ -2652,4 +2652,54 @@ TODO
   `artifacts/perf/2026-05-04T13-11-32-562Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
   `npm run check:projekt-143` PASS at
   `artifacts/perf/2026-05-04T13-11-45-723Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`251` files, `3860` tests).
+
+2026-05-04 Projekt Objekt-143 KB-CULL static-feature batching pass
+- Implemented the first accepted KB-CULL category reduction: static
+  `WorldFeatureSystem` placements now live under one
+  `WorldStaticFeatureBatchRoot`, and compatible static meshes are batched
+  across placement boundaries after collision/LOS registration. The
+  `ModelDrawCallOptimizer` wrapper now exposes `minBucketSize` so this shared
+  pass can skip one-off material buckets while preserving existing callers.
+- Targeted validation before perf evidence:
+  `npx vitest run src\systems\world\WorldFeatureSystem.test.ts src\systems\assets\ModelDrawCallOptimizer.test.ts`
+  PASS (`2` files, `11` tests), and `npm run typecheck` PASS.
+- Refreshed culling proof:
+  `npm run check:projekt-143-culling-proof` PASS at
+  `artifacts/perf/2026-05-04T14-08-33-257Z/projekt-143-culling-proof/summary.json`.
+  Required renderer categories remain visible/trusted; this is category proof,
+  not visual scale proof.
+- Fresh Open Frontier after evidence:
+  `artifacts/perf/2026-05-04T14-13-30-766Z/summary.json` completed with
+  measurement trust PASS and validation WARN only on `peak_p99_frame_ms`
+  (`50.90ms`). Static attribution improved versus the previous local Open
+  Frontier capture: `world_static_features` draw-call-like `328 -> 222`,
+  materials `261 -> 155`, meshes `328 -> 222`, and unattributed draw-call-like
+  `303 -> 199`. Non-claim: max renderer draw calls rose to `1019`, and the
+  after capture had visible close NPCs/weapons that were not visible in the
+  comparison artifact, so this is not a clean Open Frontier total renderer or
+  frame-time win.
+- Fresh A Shau after evidence:
+  `artifacts/perf/2026-05-04T14-17-44-361Z/summary.json` completed with
+  measurement trust PASS and validation WARN only on `peak_p99_frame_ms`
+  (`40.70ms`). Against the previous local A Shau route artifact,
+  `world_static_features` draw-call-like moved `666 -> 268`, materials
+  `599 -> 201`, meshes `666 -> 268`, max renderer draw calls `1061 -> 376`,
+  max frame `79.7ms -> 46.5ms`, and heap validation no longer fails in this
+  run. Non-claim: terrain-stall warnings still appear, so this is not A Shau
+  terrain/nav acceptance.
+- Refreshed KB-CULL owner baseline:
+  `npm run check:projekt-143-culling-baseline` PASS at
+  `artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`.
+  It records selected owner draw-call-like `261` Open Frontier / `307` A Shau
+  and visible unattributed `0.428%` / `2.907%`.
+- Accepted scope: static-feature layer draw-call reduction. Still open:
+  visible helicopter remediation, close-NPC/weapon pool residency, broad
+  culling/HLOD acceptance, far canopy, A Shau terrain/nav acceptance, human
+  playtest, production parity, and any performance-baseline refresh.
+- Final gates after docs:
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-04T14-29-34-142Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T14-29-43-744Z/projekt-143-evidence-suite/suite-summary.json`;
   `npm run validate:fast` PASS (`251` files, `3860` tests).

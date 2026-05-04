@@ -71,6 +71,7 @@ export class WorldFeatureSystem implements GameSystem {
   private fixedWingModel?: FixedWingModel;
   private losAccelerator?: LOSAccelerator;
   private spawnedObjects: SpawnedFeatureObject[] = [];
+  private staticFeatureRoot: THREE.Group | null = null;
   private buildInFlight = false;
   private builtModeId: string | null = null;
 
@@ -147,11 +148,16 @@ export class WorldFeatureSystem implements GameSystem {
 
   private async rebuildForMode(modeId: string, features: MapFeatureDefinition[]): Promise<void> {
     this.clearSpawnedObjects();
+    this.staticFeatureRoot = new THREE.Group();
+    this.staticFeatureRoot.name = 'WorldStaticFeatureBatchRoot';
+    this.staticFeatureRoot.userData.perfCategory = 'world_static_features';
+    this.scene.add(this.staticFeatureRoot);
 
     try {
       for (const feature of features) {
         await this.spawnFeature(feature);
       }
+      this.optimizeStaticFeatureRoot();
       this.builtModeId = modeId;
       Logger.info('world', `Spawned ${this.spawnedObjects.length} world feature objects for mode "${modeId}"`);
     } finally {
@@ -195,7 +201,6 @@ export class WorldFeatureSystem implements GameSystem {
 
       const object = await modelLoader.loadModel(placement.modelPath);
       prepareModelForPlacement(object, placement.modelPath);
-      this.optimizeStaticPlacementObject(object, placement.modelPath);
 
       const profile = getModelPlacementProfile(placement.modelPath);
 
@@ -232,7 +237,7 @@ export class WorldFeatureSystem implements GameSystem {
           child.receiveShadow = true;
         }
       });
-      this.scene.add(object);
+      (this.staticFeatureRoot ?? this.scene).add(object);
       freezeTransform(object);
       const objectId = `${feature.id}_${placement.id ?? i}`;
       const collisionRegistered = placement.registerCollision === true && profile.collisionMode === 'bounds';
@@ -248,6 +253,26 @@ export class WorldFeatureSystem implements GameSystem {
         collisionRegistered,
         losObstacleIds,
       });
+    }
+  }
+
+  private optimizeStaticFeatureRoot(): void {
+    if (!this.staticFeatureRoot || this.staticFeatureRoot.children.length === 0) {
+      return;
+    }
+
+    const result = optimizeStaticModelDrawCalls(this.staticFeatureRoot, {
+      batchNamePrefix: 'world_static_features',
+      strategy: 'batch',
+      minBucketSize: 2,
+      excludeMesh: (mesh) => (mesh as THREE.BatchedMesh).isBatchedMesh === true,
+    });
+
+    if (result.sourceMeshCount > 1 && result.mergedMeshCount > 0) {
+      Logger.info(
+        'world',
+        `Optimized world feature layer: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} shared batch(es)`,
+      );
     }
   }
 
@@ -288,21 +313,6 @@ export class WorldFeatureSystem implements GameSystem {
       }
     });
     return ids;
-  }
-
-  private optimizeStaticPlacementObject(object: THREE.Object3D, modelPath: string): void {
-    const profile = getModelPlacementProfile(modelPath);
-    const result = optimizeStaticModelDrawCalls(object, {
-      batchNamePrefix: modelPath.replace(/[/.]/g, '_'),
-      strategy: profile.drawCallOptimization,
-    });
-
-    if (result.sourceMeshCount > 1 && result.mergedMeshCount > 0) {
-      Logger.info(
-        'world',
-        `Optimized static placement ${modelPath}: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} ${profile.drawCallOptimization} batch(es)`,
-      );
-    }
   }
 
   private resolvePlacements(feature: MapFeatureDefinition): StaticModelPlacementConfig[] {
@@ -371,7 +381,31 @@ export class WorldFeatureSystem implements GameSystem {
       }
     }
     this.spawnedObjects = [];
+    this.clearStaticFeatureRoot();
     this.builtModeId = null;
+  }
+
+  private clearStaticFeatureRoot(): void {
+    if (!this.staticFeatureRoot) {
+      return;
+    }
+
+    this.staticFeatureRoot.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) {
+        return;
+      }
+      if (child.userData.generatedOptimizedMesh === true) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((material) => material.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
+    });
+    this.staticFeatureRoot.removeFromParent();
+    this.staticFeatureRoot.clear();
+    this.staticFeatureRoot = null;
   }
 
   /**

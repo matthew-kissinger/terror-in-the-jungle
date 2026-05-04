@@ -21,6 +21,7 @@ export function optimizeStaticModelDrawCalls(
     batchNamePrefix?: string;
     excludeMesh?: (mesh: THREE.Mesh) => boolean;
     strategy?: DrawCallOptimizationStrategy;
+    minBucketSize?: number;
   },
 ): DrawCallOptimizationResult {
   normalizeInterleavedGeometryAttributes(root, options?.excludeMesh);
@@ -29,7 +30,7 @@ export function optimizeStaticModelDrawCalls(
     batchNamePrefix: options?.batchNamePrefix,
     excludeMesh: options?.excludeMesh,
     strategy: options?.strategy,
-    minBucketSize: 1,
+    minBucketSize: options?.minBucketSize ?? 1,
   });
 
   return {

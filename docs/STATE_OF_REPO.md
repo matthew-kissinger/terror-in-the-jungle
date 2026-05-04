@@ -436,7 +436,7 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-04T00-14-47-283Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-04T14-29-34-142Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
@@ -447,8 +447,11 @@ What is not ready to claim:
   `evidence_complete` for the trusted low-load probe, KB-TERRAIN is now
   `ready_for_branch` after the fresh-build elevated horizon baseline at
   `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`,
-  and KB-CULL is now `ready_for_branch` after the clean owner-path baseline at
-  `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`.
+  and KB-CULL has a partial static-feature batching reduction after the clean
+  owner-path baseline at
+  `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
+  and refreshed after packet at
+  `artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`.
   It also
   carries Open Frontier and Zone Control startup paths plus Open Frontier,
   combat120, and A Shau perf summary paths for handoff. This is
@@ -476,6 +479,22 @@ What is not ready to claim:
   static helicopter distance-cull prototype was rejected at
   `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json` because Open Frontier
   validation failed and the selected owner path did not improve.
+- Local KB-CULL follow-up now has partial static-feature batching evidence.
+  `WorldFeatureSystem` builds static placements under one
+  `WorldStaticFeatureBatchRoot` and batches compatible static meshes across
+  placement boundaries after collision/LOS registration. The refreshed owner
+  baseline at
+  `artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`
+  passes with owner draw-call-like `261` Open Frontier / `307` A Shau. Open
+  Frontier static attribution improved from the previous local capture
+  (`world_static_features` `328` to `222` draw-call-like), but the total
+  renderer max is mixed because the after capture has visible close NPC and
+  weapon meshes. A Shau improved materially against the previous route
+  artifact (`world_static_features` `666` to `268`; max renderer draw calls
+  `1061` to `376`) and no longer heap-fails in the fresh run, but the capture
+  remains WARN on peak p99 and terrain-stall warnings still appear. This is
+  static-feature draw-call reduction only, not broad culling/HLOD, frame-time,
+  A Shau terrain/nav, or production acceptance.
 - KB-LOAD has a first local runtime remediation, not a closeout. The current
   code warms only the giantPalm color/normal texture pair before renderer
   reveal through `AssetLoader.warmGpuTextures()`. Paired retail startup

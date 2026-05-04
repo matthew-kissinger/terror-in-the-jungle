@@ -289,6 +289,20 @@ Close-NPC and weapon pool residency remains diagnostic-only because the visible
 combat artifact still fails measurement trust. This is before evidence, not a
 culling/HLOD improvement claim.
 
+After the 2026-05-04 shared static-feature batching pass, the refreshed owner
+packet is
+`artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`.
+It consumes fresh trusted Open Frontier and A Shau captures after
+`WorldFeatureSystem` moved static placements under one
+`WorldStaticFeatureBatchRoot` and batched compatible meshes across placement
+boundaries. The selected owner draw-call-like totals move to Open Frontier
+`261` and A Shau `307`. The supporting after captures are
+`artifacts/perf/2026-05-04T14-13-30-766Z/summary.json` and
+`artifacts/perf/2026-05-04T14-17-44-361Z/summary.json`. Treat this as
+static-feature layer draw-call reduction only: Open Frontier total renderer
+max is mixed by visible close NPCs/weapons, and A Shau still needs separate
+terrain/nav/runtime acceptance.
+
 `projekt-143-terrain-horizon-baseline.ts` writes an elevated KB-TERRAIN before
 baseline under
 `artifacts/perf/<timestamp>/projekt-143-terrain-horizon-baseline/`. It
@@ -756,7 +770,8 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    failed; both runs still surface the `tabat_airstrip` steep-footprint
    warning. Do not treat this vegetation pass as an A Shau perf or placement
    acceptance gate.
-6. **KB-CULL first owner path is selected, not fixed** - the clean owner
+6. **KB-CULL first owner path has a partial static-feature reduction, not a
+   closeout** - the clean owner
    baseline at
    `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
    selects large-mode world static features and visible helicopters. The
@@ -767,6 +782,13 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json`: measurement trust
    passed, but Open Frontier validation failed and owner draw-call-like stayed
    `388`.
+   The later shared static-feature root/batching pass has trusted after
+   evidence at
+   `artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`
+   and lowers the selected owner draw-call-like to `261` Open Frontier /
+   `307` A Shau. Treat that as static-feature draw-call reduction only:
+   Open Frontier total renderer max is mixed by close-NPC/weapon visibility,
+   and A Shau still needs terrain/nav/runtime acceptance.
    Close-NPC/weapon pool residency remains diagnostic-only until combat stress
    measurement trust passes.
 7. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
