@@ -30,6 +30,7 @@ interface VegetationDensityEntry {
   id: string;
   tier: string;
   relativeDensity: number;
+  clusterCoverageEstimate: number;
   percent: number;
 }
 
@@ -267,8 +268,19 @@ function addVegetationDensity(
   for (const entry of biome.vegetationPalette) {
     const vegetationType = VEGETATION_TYPES.find((type) => type.id === entry.typeId);
     if (!vegetationType) continue;
-    addCount(densityByType, entry.typeId, sampleWeight * entry.densityMultiplier * vegetationType.baseDensity);
+    addCount(
+      densityByType,
+      entry.typeId,
+      sampleWeight * entry.densityMultiplier * vegetationType.baseDensity * estimateClusterCoverage(vegetationType),
+    );
   }
+}
+
+function estimateClusterCoverage(vegetationType: typeof VEGETATION_TYPES[number]): number {
+  if (!vegetationType.cluster) return 1;
+  const threshold = Math.max(0, Math.min(1, vegetationType.cluster.threshold));
+  const feather = Math.max(0, Math.min(0.5, vegetationType.cluster.edgeFeather));
+  return roundMetric(Math.max(0.05, Math.min(1, 1 - threshold + feather * 0.5)), 3);
 }
 
 function toVegetationDensity(entries: Map<string, number>): VegetationDensityEntry[] {
@@ -280,6 +292,7 @@ function toVegetationDensity(entries: Map<string, number>): VegetationDensityEnt
         id,
         tier: type?.tier ?? 'unknown',
         relativeDensity: roundMetric(relativeDensity, 4),
+        clusterCoverageEstimate: type ? estimateClusterCoverage(type) : 1,
         percent: total > 0 ? roundMetric((relativeDensity / total) * 100, 2) : 0,
       };
     })
@@ -446,6 +459,7 @@ function buildReport(): TerrainDistributionAudit {
         'This is a static rule/material projection audit, not a screenshot proof.',
         'Terrain-flow stamps, feature surface patches, weather wetness, and runtime fog are not applied.',
         'CPU biome distribution estimates vegetation palettes; material primary distribution mirrors the terrain shader rule weights.',
+        'Clustered vegetation types use approximate static coverage estimates; screenshots/runtime captures remain the authority for visual density.',
         'Cliff-rock accent metrics estimate the shader overlay that can use rocky texture on slopes without making highland the primary ground biome.',
         'Use this to choose a KB-TERRAIN branch; final acceptance still needs Open Frontier/A Shau screenshots and perf deltas.',
       ],

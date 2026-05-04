@@ -75,8 +75,27 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     const giantPalm = VEGETATION_TYPES.find((type) => type.id === 'giantPalm');
 
     expect(giantPalm).toBeDefined();
-    expect(giantPalm?.size).toBeGreaterThan(6);
+    expect(giantPalm?.size).toBeGreaterThan(8);
     expect(giantPalm?.imposterAtlas?.stableAzimuthColumn).toBe(3);
+  });
+
+  it('lifts and enlarges fern ground cover so it is not buried below terrain', () => {
+    const fern = VEGETATION_TYPES.find((type) => type.id === 'fern');
+
+    expect(fern).toBeDefined();
+    expect(fern?.size).toBeGreaterThan(4.5);
+    expect((fern?.yOffset ?? 0) - ((fern?.size ?? 0) * 0.5)).toBeGreaterThan(-0.35);
+  });
+
+  it('biases the jungle mix toward palms while keeping bamboo clustered', () => {
+    const fanPalm = VEGETATION_TYPES.find((type) => type.id === 'fanPalm');
+    const giantPalm = VEGETATION_TYPES.find((type) => type.id === 'giantPalm');
+    const bamboo = VEGETATION_TYPES.find((type) => type.id === 'bambooGrove');
+
+    expect(fanPalm?.baseDensity).toBeGreaterThan(bamboo?.baseDensity ?? 0);
+    expect(giantPalm?.baseDensity).toBeGreaterThan(0.3);
+    expect(bamboo?.cluster?.scale).toBeGreaterThan(200);
+    expect(bamboo?.cluster?.threshold).toBeGreaterThan(0.5);
   });
 
   it('quarantines the broken low-angle coconut atlas row and trunk cross-fade', () => {

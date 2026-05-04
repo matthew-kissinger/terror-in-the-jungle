@@ -2461,3 +2461,61 @@ TODO
   `npm run check:projekt-143` PASS at
   `artifacts/perf/2026-05-04T02-20-04-490Z/projekt-143-evidence-suite/suite-summary.json`;
   `npm run validate:fast` PASS (`251` files, `3854` tests).
+
+2026-05-04 Projekt Objekt-143 KB-TERRAIN vegetation scale and cluster pass
+- Tuned runtime vegetation toward the owner visual target without importing new
+  assets: `fern` is larger/lifted, `giantPalm` is larger and denser,
+  `fanPalm`/`coconut` density increased, and `bambooGrove` now uses a
+  deterministic large-scale cluster mask so it appears in dense pockets instead
+  of filling the whole mid-level forest layer.
+- Added behavior coverage for larger/grounded ferns, larger giant palms, palm
+  bias over bamboo, and cluster masks rejecting bamboo candidate points.
+  Targeted validation passed:
+  `npx vitest run src\config\vegetationTypes.test.ts src\systems\terrain\VegetationScatterer.test.ts src\systems\terrain\ChunkVegetationGenerator.test.ts`
+  (`3` files, `17` tests).
+- Static distribution evidence:
+  `artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+  Bamboo estimated share is now about `1.45-1.52%` across shipped modes while
+  flat jungle-like primary ground remains `100%` in every mode and Open
+  Frontier remains `99.99%` jungle-like overall. Clustered vegetation coverage
+  in that audit is an estimate, not visual authority.
+- Elevated screenshot/build proof:
+  `artifacts/perf/2026-05-04T02-41-37-056Z/projekt-143-terrain-horizon-baseline/summary.json`
+  PASS with `4/4` screenshots, renderer/terrain/vegetation telemetry, and `0`
+  browser/page/scenario errors. Open Frontier screenshots no longer show the
+  broad grey summit problem; A Shau far ridges still need art/perf review.
+- Open Frontier perf after evidence:
+  `artifacts/perf/2026-05-04T02-45-03-756Z/summary.json` is measurement-trusted
+  but validation WARN. It recorded avg `24.26ms`, peakP99 `49.90ms`,
+  hitch50 `0.13%`, vegetation active instances `46,247`, and movement
+  transitions `93`.
+- A Shau is blocked, not accepted. First after capture
+  `artifacts/perf/2026-05-04T02-48-58-787Z/summary.json` failed validation
+  despite measurement trust PASS (`peakP99=93.90ms`, `hitch50=2.49%`, movement
+  transitions `2`). Rerun
+  `artifacts/perf/2026-05-04T02-53-54-886Z/summary.json` also failed and had
+  measurement trust WARN. Both runs repeated the `tabat_airstrip` steep
+  footprint warning (`112.1m` vertical span across `320m` runway footprint) and
+  terrain-stall symptoms, which aligns with the still-open building/airfield/
+  HQ/vehicle foundation and route-stamp goal.
+- Asset/texture inventory notes for the later goal: TIJ already ships terrain
+  WebPs including `jungle-floor`, `mud-ground`, `rice-paddy`,
+  `rocky-highland`, `tall-grass`, `bamboo-floor`, `swamp`,
+  `defoliated-ground`, and `firebase-ground`. Pixel Forge has candidate
+  war-textures such as `jungle-mud`, `cracked-earth`, `napalmed-ground`,
+  `bamboo-mat-floor`, `weathered-planks`, and `corrugated-metal`; output props
+  include grass/patch-grass variants and rocks; building candidates include
+  huts, stilt houses, shophouses, bunkers, warehouses, temple/pagoda/church,
+  rice-barn/mill, and plantation/villa assets. These need acceptance review
+  before runtime import, especially for footprint, collision, draw-call,
+  triangle, and LOD/HLOD cost.
+- Still open: no A Shau perf acceptance, no far-canopy fix, no static
+  foundation/preset fix, no Pixel Forge building import, no custom trail/grass
+  asset generation, no production parity, and no broad performance improvement
+  claim from this pass.
+- Final gates after docs:
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-04T03-03-26-031Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T03-03-39-979Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`251` files, `3857` tests).

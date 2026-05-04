@@ -316,6 +316,12 @@ coverage passes in all modes. The WARN status is expected because AI Sandbox is
 sampled with fixed fallback seed `42` when its production config requests a
 random seed. This audit is not a screenshot, performance, vegetation-density,
 or final art acceptance gate.
+After the first vegetation scale/distribution pass, the latest distribution
+artifact is
+`artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+It includes clustered-vegetation coverage estimates; use them as static
+guidance only, because runtime screenshots and perf captures remain the
+authority for visual density and frame-time impact.
 
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so
@@ -695,6 +701,18 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    It also includes an inventory of TIJ and Pixel Forge ground/path/trail,
    grass, foliage, and cover assets for richer terrain variety, plus worn-in
    smoothed route surfaces that can become vehicle-usable paths in future.
+   The follow-up vegetation pass is recorded by
+   `artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+   and
+   `artifacts/perf/2026-05-04T02-41-37-056Z/projekt-143-terrain-horizon-baseline/summary.json`.
+   Open Frontier after capture
+   `artifacts/perf/2026-05-04T02-45-03-756Z/summary.json` is
+   measurement-trusted but WARN. A Shau after capture
+   `artifacts/perf/2026-05-04T02-48-58-787Z/summary.json` failed validation,
+   and rerun `artifacts/perf/2026-05-04T02-53-54-886Z/summary.json` also
+   failed; both runs still surface the `tabat_airstrip` steep-footprint
+   warning. Do not treat this vegetation pass as an A Shau perf or placement
+   acceptance gate.
 6. **KB-CULL first owner path is selected, not fixed** - the clean owner
    baseline at
    `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`

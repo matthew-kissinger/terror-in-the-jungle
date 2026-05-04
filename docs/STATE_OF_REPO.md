@@ -111,6 +111,20 @@ the current truth anchor.
   a future asset audit for TIJ and Pixel Forge ground/path/trail/grass/foliage
   and cover texture variety, with worn-in smoothed route surfaces that can
   support future vehicles where appropriate.
+  A follow-up local vegetation pass enlarged/lifted `fern`, enlarged
+  `giantPalm`, raised palm density, and made `bambooGrove` use a large-scale
+  cluster mask. Its latest static distribution artifact is
+  `artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
+  the latest elevated screenshot proof is
+  `artifacts/perf/2026-05-04T02-41-37-056Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  Open Frontier after evidence at
+  `artifacts/perf/2026-05-04T02-45-03-756Z/summary.json` is measurement-trusted
+  but still WARN. A Shau is explicitly blocked: after evidence at
+  `artifacts/perf/2026-05-04T02-48-58-787Z/summary.json` failed validation,
+  and rerun `artifacts/perf/2026-05-04T02-53-54-886Z/summary.json` also
+  failed. Both runs still expose the steep `tabat_airstrip` footprint warning,
+  so A Shau foundation/route/preset quality remains part of the current
+  terrain problem.
 - KB-STRATEGIE filed the WebGL/WebGPU brief. `npm run check:webgpu-strategy`
   wrote
   `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`:
@@ -370,6 +384,9 @@ What is not ready to claim:
   distribution if green appears mostly on hillsides, scale/ground tiny palms and
   ferns, add more big palms and ground vegetation, and make bamboo scattered
   dense clusters instead of the dominant forest layer.
+  A first vegetation-tuning pass now exists locally, but it is not A Shau
+  acceptance: Open Frontier remained measurement-trusted/WARN and A Shau failed
+  two short captures while reporting the steep `tabat_airstrip` footprint.
 - No WebGPU migration has shipped or been started. KB-STRATEGIE recommends
   staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
   after the measured blockers are under control.

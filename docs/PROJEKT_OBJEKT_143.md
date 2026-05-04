@@ -627,7 +627,7 @@ Acceptance:
 
 ### KB-TERRAIN - Distant Terrain And Vegetation
 
-Status: MEASUREMENT STARTED; REMEDIATION BLOCKED ON ELEVATED SCREENSHOT QA AND PERF BUDGETS.
+Status: MATERIAL/VEGETATION PASS STARTED; FAR-HORIZON AND A SHAU PERF REMAIN BLOCKED.
 
 Progress:
 
@@ -685,6 +685,30 @@ Progress:
   and `0` browser/page/scenario errors. Human visual review is still required:
   A Shau distant ridges remain muted under current atmosphere/fog, so this is a
   material-distribution correction, not final A Shau art direction acceptance.
+- 2026-05-04 vegetation scale and bamboo-distribution pass: `fern` and
+  `giantPalm` runtime scale/grounding were adjusted, `fanPalm`, `coconut`, and
+  `giantPalm` densities were raised, and `bambooGrove` now has a large-scale
+  cluster mask so bamboo can form dense pockets without filling every
+  mid-level Poisson candidate. The latest static distribution artifact is
+  `artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
+  bamboo estimated share falls to about `1.45-1.52%` across shipped modes while
+  all flat-ground jungle-like material checks remain at `100%` and Open
+  Frontier remains `99.99%` jungle-like overall. The fresh perf-build elevated
+  screenshot proof after this pass is
+  `artifacts/perf/2026-05-04T02-41-37-056Z/projekt-143-terrain-horizon-baseline/summary.json`
+  and passes with `4/4` screenshots and `0` browser/page/scenario errors.
+  Open Frontier after capture
+  `artifacts/perf/2026-05-04T02-45-03-756Z/summary.json` is measurement-trusted
+  but still validation WARN (`avg=24.26ms`, `peakP99=49.90ms`,
+  `hitch50=0.13%`, vegetation active instances `46,247`). A Shau is not
+  accepted: `artifacts/perf/2026-05-04T02-48-58-787Z/summary.json` failed
+  validation despite measurement trust PASS (`peakP99=93.90ms`,
+  `hitch50=2.49%`, movement transitions `2`), and rerun
+  `artifacts/perf/2026-05-04T02-53-54-886Z/summary.json` failed with
+  measurement trust WARN. Both A Shau runs still log the `tabat_airstrip`
+  steep-footprint warning (`112.1m` vertical span across a `320m` runway
+  footprint), so the placement/foundation/route preset problem remains a live
+  blocker, not a cosmetic follow-up.
 - 2026-05-04 owner world-placement target: the later KB-TERRAIN/KB-CULL scope
   also includes terrain-aligned static placement. Buildings, HQs, vehicles,
   and airfield/support presets should not hang foundations off hill edges or

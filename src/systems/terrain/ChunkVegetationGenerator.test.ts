@@ -36,6 +36,42 @@ const palette: BiomeVegetationEntry[] = [
   { typeId: 'coconut', densityMultiplier: 1 },
 ];
 
+const rejectedClusterBamboo: VegetationTypeConfig[] = [
+  {
+    id: 'bambooGrove',
+    textureName: 'PixelForge.Vegetation.bambooGrove.color',
+    normalTextureName: 'PixelForge.Vegetation.bambooGrove.normal',
+    size: 18,
+    maxInstances: 1000,
+    yOffset: 8,
+    fadeDistance: 350,
+    maxDistance: 400,
+    baseDensity: 8,
+    placement: 'poisson',
+    poissonMinDistance: 10,
+    cluster: {
+      scale: 256,
+      threshold: 1.1,
+      edgeFeather: 0.05,
+    },
+    tier: 'midLevel',
+    representation: 'imposter',
+    atlasProfile: 'mid-balanced',
+    shaderProfile: 'normal-lit',
+    imposterAtlas: {
+      tilesX: 4,
+      tilesY: 4,
+      layout: 'latlon',
+      tileSize: 512,
+    },
+    normalSpace: 'capture-view',
+  },
+];
+
+const bambooPalette: BiomeVegetationEntry[] = [
+  { typeId: 'bambooGrove', densityMultiplier: 1 },
+];
+
 describe('ChunkVegetationGenerator', () => {
   beforeEach(() => {
     ((ChunkVegetationGenerator as any).poissonTemplateCache as Map<string, unknown>).clear();
@@ -68,5 +104,25 @@ describe('ChunkVegetationGenerator', () => {
     const firstLocal = firstInstances[0].position.x % 64;
     const secondLocal = secondInstances[0].position.x % 64;
     expect(secondLocal).not.toBeCloseTo(firstLocal, 5);
+  });
+
+  it('uses vegetation cluster masks to prevent bamboo from filling every candidate point', () => {
+    const template = [
+      new THREE.Vector2(10, 10),
+      new THREE.Vector2(20, 20),
+      new THREE.Vector2(30, 30),
+    ];
+    vi.spyOn(MathUtils, 'poissonDiskSampling').mockReturnValue(template);
+
+    const result = ChunkVegetationGenerator.generateVegetation(
+      0,
+      0,
+      64,
+      () => 5,
+      rejectedClusterBamboo,
+      bambooPalette,
+    );
+
+    expect(result.get('bambooGrove') ?? []).toHaveLength(0);
   });
 });

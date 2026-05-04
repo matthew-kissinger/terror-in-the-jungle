@@ -12,6 +12,12 @@ export type VegetationRepresentation = 'imposter';
 export type VegetationAtlasProfile = 'ground-compact' | 'mid-balanced' | 'canopy-balanced' | 'canopy-hero';
 export type VegetationShaderProfile = 'hemisphere' | 'normal-lit';
 
+export interface VegetationClusterConfig {
+  scale: number;
+  threshold: number;
+  edgeFeather: number;
+}
+
 export interface VegetationAlphaCrop {
   minU: number;
   minV: number;
@@ -41,6 +47,7 @@ export interface VegetationTypeConfig {
   baseDensity: number;       // Multiplier on DENSITY_PER_UNIT (1 / 128 sq-units)
   placement: 'random' | 'poisson';
   poissonMinDistance?: number;
+  cluster?: VegetationClusterConfig;
   tier: VegetationTier;
   representation: VegetationRepresentation;
   atlasProfile: VegetationAtlasProfile;
@@ -52,7 +59,9 @@ export interface VegetationTypeConfig {
 type VegetationTuning = Pick<
   VegetationTypeConfig,
   'maxInstances' | 'fadeDistance' | 'maxDistance' | 'baseDensity' | 'placement' | 'poissonMinDistance'
->;
+> & {
+  cluster?: VegetationClusterConfig;
+};
 
 const VEGETATION_TUNING: Record<string, VegetationTuning> = {
   fern: {
@@ -73,24 +82,29 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     maxInstances: 25_000,
     fadeDistance: 360,
     maxDistance: 430,
-    baseDensity: 0.65,
+    baseDensity: 0.8,
     placement: 'random',
   },
   coconut: {
     maxInstances: 20_000,
     fadeDistance: 450,
     maxDistance: 520,
-    baseDensity: 0.35,
+    baseDensity: 0.45,
     placement: 'poisson',
     poissonMinDistance: 12,
   },
   bambooGrove: {
-    maxInstances: 15_000,
+    maxInstances: 10_000,
     fadeDistance: 350,
     maxDistance: 400,
-    baseDensity: 0.6,
+    baseDensity: 0.65,
     placement: 'poisson',
-    poissonMinDistance: 8,
+    poissonMinDistance: 10,
+    cluster: {
+      scale: 260,
+      threshold: 0.56,
+      edgeFeather: 0.12,
+    },
   },
   bananaPlant: {
     maxInstances: 20_000,
@@ -100,12 +114,12 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     placement: 'random',
   },
   giantPalm: {
-    maxInstances: 10_000,
+    maxInstances: 15_000,
     fadeDistance: 500,
     maxDistance: 600,
-    baseDensity: 0.2,
+    baseDensity: 0.35,
     placement: 'poisson',
-    poissonMinDistance: 16,
+    poissonMinDistance: 12,
   },
 };
 
@@ -120,8 +134,13 @@ const VEGETATION_GROUNDING_SINK: Record<string, number> = {
   giantPalm: 0.6,
 };
 
+const VEGETATION_GROUNDING_LIFT: Record<string, number> = {
+  fern: 2.15,
+};
+
 const VEGETATION_RUNTIME_SCALE: Record<string, number> = {
-  giantPalm: 1.75,
+  fern: 1.25,
+  giantPalm: 2.25,
 };
 
 // Skinny, asymmetric trunks do not survive atlas cross-fading: blending two
@@ -144,6 +163,7 @@ function toVegetationType(asset: PixelForgeVegetationAsset): VegetationTypeConfi
   }
   const runtimeScale = VEGETATION_RUNTIME_SCALE[asset.id] ?? 1;
   const groundingSink = VEGETATION_GROUNDING_SINK[asset.id] ?? 0;
+  const groundingLift = VEGETATION_GROUNDING_LIFT[asset.id] ?? 0;
 
   return {
     id: asset.id,
@@ -151,12 +171,13 @@ function toVegetationType(asset: PixelForgeVegetationAsset): VegetationTypeConfi
     normalTextureName: asset.normalTextureName,
     size: asset.worldSize * runtimeScale,
     maxInstances: tuning.maxInstances,
-    yOffset: (asset.yOffset - groundingSink) * runtimeScale,
+    yOffset: (asset.yOffset - groundingSink + groundingLift) * runtimeScale,
     fadeDistance: tuning.fadeDistance,
     maxDistance: tuning.maxDistance,
     baseDensity: tuning.baseDensity,
     placement: tuning.placement,
     poissonMinDistance: tuning.poissonMinDistance,
+    cluster: tuning.cluster,
     tier: asset.tier,
     representation: 'imposter',
     atlasProfile: asset.atlasProfile,

@@ -175,6 +175,7 @@ export class ChunkVegetationGenerator {
         const share = total > 0 ? w / total : 0;
         const count = Math.floor(points.length * share);
         const instances: BillboardInstance[] = [];
+        const typeSalt = this.hashString(mt.id);
 
         for (let i = 0; i < count && idx < points.length; i++, idx++) {
           const p = this.getShiftedPoissonPoint(points[idx], offset.x, offset.y, size);
@@ -183,6 +184,10 @@ export class ChunkVegetationGenerator {
           if (slopeDeg(p.x, p.y, size, getHeight) > MAX_MIDLEVEL_SLOPE) continue;
           const dn = densityNoise(baseX + p.x, baseZ + p.y);
           if (dn < 0.1) continue;
+          const clusterMask = this.getClusterMask(mt, baseX + p.x, baseZ + p.y, typeSalt);
+          if (clusterMask <= 0) continue;
+          const clusterRoll = this.hashInts(chunkX + idx, chunkZ, typeSalt ^ 0xB4400);
+          if ((clusterRoll / 0xffffffff) > clusterMask) continue;
           const hs = this.hashInts(chunkX + idx, chunkZ, 0xCAFE0002);
           const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
@@ -215,6 +220,10 @@ export class ChunkVegetationGenerator {
           const h = getHeight(p.x, p.y);
           if (h < 0) continue;
           if (trunkGrid.isNear(p.x, p.y)) continue;
+          const clusterMask = this.getClusterMask(vt, baseX + p.x, baseZ + p.y, typeSalt);
+          if (clusterMask <= 0) continue;
+          const clusterRoll = this.hashInts(chunkX + i, chunkZ, typeSalt ^ 0xB4401);
+          if ((clusterRoll / 0xffffffff) > clusterMask) continue;
           const hs = this.hashInts(chunkX + i, chunkZ, typeSalt ^ 0xCAFE0003);
           const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
@@ -233,6 +242,10 @@ export class ChunkVegetationGenerator {
           const h = getHeight(lx, lz);
           if (h < 0) continue;
           if (trunkGrid.isNear(lx, lz)) continue;
+          const clusterMask = this.getClusterMask(vt, baseX + lx, baseZ + lz, typeSalt);
+          if (clusterMask <= 0) continue;
+          const clusterRoll = this.hashInts(chunkX + i, chunkZ, typeSalt ^ 0xB4402);
+          if ((clusterRoll / 0xffffffff) > clusterMask) continue;
           const dn = densityNoise(baseX + lx, baseZ + lz);
           const hDensity = this.hashInts(chunkX + i, chunkZ + i, typeSalt ^ 0x12345678);
           if ((hDensity / 0xffffffff) > dn) continue;
@@ -295,6 +308,37 @@ export class ChunkVegetationGenerator {
   private static wrapCoordinate(value: number, size: number): number {
     const wrapped = value % size;
     return wrapped < 0 ? wrapped + size : wrapped;
+  }
+
+  private static getClusterMask(
+    type: VegetationTypeConfig,
+    worldX: number,
+    worldZ: number,
+    salt: number,
+  ): number {
+    if (!type.cluster) return 1;
+    const scale = Math.max(1, type.cluster.scale);
+    const threshold = type.cluster.threshold;
+    const feather = Math.max(0.001, type.cluster.edgeFeather);
+    const value = this.valueNoise01(worldX / scale, worldZ / scale, salt);
+    return MathUtils.smoothstep(threshold - feather, threshold + feather, value);
+  }
+
+  private static valueNoise01(x: number, z: number, salt: number): number {
+    const x0 = Math.floor(x);
+    const z0 = Math.floor(z);
+    const tx = x - x0;
+    const tz = z - z0;
+    const sx = tx * tx * (3 - 2 * tx);
+    const sz = tz * tz * (3 - 2 * tz);
+    const maxUint32 = 0xffffffff;
+    const a = this.hashInts(x0, z0, salt) / maxUint32;
+    const b = this.hashInts(x0 + 1, z0, salt) / maxUint32;
+    const c = this.hashInts(x0, z0 + 1, salt) / maxUint32;
+    const d = this.hashInts(x0 + 1, z0 + 1, salt) / maxUint32;
+    const xTop = MathUtils.lerp(a, b, sx);
+    const xBottom = MathUtils.lerp(c, d, sx);
+    return MathUtils.lerp(xTop, xBottom, sz);
   }
 
   private static hashString(value: string): number {
