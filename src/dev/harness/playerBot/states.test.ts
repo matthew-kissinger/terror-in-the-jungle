@@ -17,6 +17,18 @@ import {
   PlayerBotState,
   PlayerBotStateContext,
 } from './types';
+import { NPC_PIXEL_FORGE_VISUAL_HEIGHT, NPC_Y_OFFSET } from '../../../config/CombatantConfig';
+import {
+  COMBATANT_HIT_PROXY_CHEST_END_RATIO,
+  COMBATANT_HIT_PROXY_CHEST_START_RATIO,
+  COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER,
+} from '../../../systems/combat/CombatantBodyMetrics';
+
+const TARGET_VISUAL_CHEST_Y_OFFSET =
+  NPC_PIXEL_FORGE_VISUAL_HEIGHT
+  * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
+  * ((COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2)
+  - NPC_Y_OFFSET;
 
 function makeCtx(overrides: Partial<PlayerBotStateContext> = {}): PlayerBotStateContext {
   const defaults: PlayerBotStateContext = {
@@ -173,13 +185,25 @@ describe('states — ENGAGE', () => {
     }
   });
 
-  it('writes an aimTarget at the target chest/LOS height', () => {
-    const target = makeTarget({ position: { x: 30, y: 0, z: 0 } });
+  it('writes an aimTarget at the visual chest proxy from the actor anchor', () => {
+    const target = makeTarget({ position: { x: 30, y: NPC_Y_OFFSET, z: 0 } });
     const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
     expect(step.intent.aimTarget).not.toBeNull();
     expect(step.intent.aimTarget!.x).toBeCloseTo(30, 5);
-    // LOS-height offset (1.7m per TARGET_LOS_HEIGHT) applied above ground.
-    expect(step.intent.aimTarget!.y).toBeGreaterThan(target.position.y);
+    expect(step.intent.aimTarget!.y).toBeCloseTo(NPC_Y_OFFSET + TARGET_VISUAL_CHEST_Y_OFFSET, 5);
+    expect(step.intent.aimTarget!.y).toBeLessThan(target.position.y);
+  });
+
+  it('prefers a rendered aim anchor when the driver supplies one', () => {
+    const target = makeTarget({
+      position: { x: 30, y: NPC_Y_OFFSET, z: 0 },
+      aimPosition: { x: 36, y: NPC_Y_OFFSET + 0.5, z: -4 },
+    });
+    const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
+    expect(step.intent.aimTarget).not.toBeNull();
+    expect(step.intent.aimTarget!.x).toBeCloseTo(36, 5);
+    expect(step.intent.aimTarget!.y).toBeCloseTo(NPC_Y_OFFSET + 0.5 + TARGET_VISUAL_CHEST_Y_OFFSET, 5);
+    expect(step.intent.aimTarget!.z).toBeCloseTo(-4, 5);
   });
 });
 

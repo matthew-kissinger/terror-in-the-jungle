@@ -72,6 +72,11 @@ const bambooPalette: BiomeVegetationEntry[] = [
   { typeId: 'bambooGrove', densityMultiplier: 1 },
 ];
 
+const coconutAndBambooPalette: BiomeVegetationEntry[] = [
+  { typeId: 'coconut', densityMultiplier: 1 },
+  { typeId: 'bambooGrove', densityMultiplier: 1 },
+];
+
 describe('ChunkVegetationGenerator', () => {
   beforeEach(() => {
     ((ChunkVegetationGenerator as any).poissonTemplateCache as Map<string, unknown>).clear();
@@ -124,5 +129,36 @@ describe('ChunkVegetationGenerator', () => {
     );
 
     expect(result.get('bambooGrove') ?? []).toHaveLength(0);
+  });
+
+  it('uses a per-type poisson grid for clustered bamboo instead of the shared palm spacing', () => {
+    const bambooWithTighterSpacing: VegetationTypeConfig = {
+      ...rejectedClusterBamboo[0],
+      baseDensity: 4,
+      poissonMinDistance: 7,
+      cluster: {
+        scale: 256,
+        threshold: -0.1,
+        edgeFeather: 0.05,
+      },
+    };
+    const samplingSpy = vi.spyOn(MathUtils, 'poissonDiskSampling')
+      .mockReturnValue([
+        new THREE.Vector2(10, 10),
+        new THREE.Vector2(20, 20),
+        new THREE.Vector2(30, 30),
+      ]);
+
+    ChunkVegetationGenerator.generateVegetation(
+      0,
+      0,
+      64,
+      () => 5,
+      [...coconutOnly, bambooWithTighterSpacing],
+      coconutAndBambooPalette,
+    );
+
+    expect(samplingSpy).toHaveBeenCalledWith(64, 64, 12);
+    expect(samplingSpy).toHaveBeenCalledWith(64, 64, 7);
   });
 });

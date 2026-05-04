@@ -707,8 +707,45 @@ Progress:
   `artifacts/perf/2026-05-04T02-53-54-886Z/summary.json` failed with
   measurement trust WARN. Both A Shau runs still log the `tabat_airstrip`
   steep-footprint warning (`112.1m` vertical span across a `320m` runway
-  footprint), so the placement/foundation/route preset problem remains a live
-  blocker, not a cosmetic follow-up.
+  footprint), which opened the placement/foundation/route preset problem as a
+  live blocker rather than a cosmetic follow-up.
+- 2026-05-04 bamboo-clustering follow-up: the first cluster mask still left
+  bamboo visually scattered because clustered mid-level species were sharing
+  the same Poisson spacing/grid as palms. `ChunkVegetationGenerator` now splits
+  clustered mid-level Poisson species into a per-type pass, so `bambooGrove`
+  can use tighter local spacing inside noise-selected grove pockets without
+  being thinned by the palm grid. The latest static distribution artifact is
+  `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
+  it keeps flat jungle-like primary ground at `100%` in every mode and lowers
+  bamboo estimated share to about `1.0-1.05%` across shipped modes. This still
+  needs screenshot/human review for visual grove readability and for whether
+  ferns are now too large or too bright at ground level.
+- 2026-05-04 terrain placement/foundation audit:
+  `scripts/projekt-143-terrain-placement-audit.ts` is exposed as
+  `npm run check:projekt-143-terrain-placement` and measures native source
+  slope span plus stamped core span for flattened airfield, firebase, and
+  support features. The initial artifact
+  `artifacts/perf/2026-05-04T04-04-19-128Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  failed `airfield_main` (`43.3m` source span) and `tabat_airstrip`
+  (`112.11m` source span). After relocating/reorienting Open Frontier and Ta
+  Bat features onto flatter terrain, the latest passing audit is
+  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`:
+  `airfield_main` is `5.24m`, `tabat_airstrip` is `9.18m`, and the support
+  footprints are below the fail threshold. A Shau after-placement perf evidence
+  at `artifacts/perf/2026-05-04T04-14-35-401Z/summary.json` is
+  measurement-trusted/WARN and no longer logs the Ta Bat steep-footprint
+  warning, but it is not A Shau acceptance because terrain-stall/recovery and
+  movement-transition warnings still need a route/nav/gameplay pass.
+- 2026-05-04 active-player harness blocker: the perf "killbot" was still
+  shooting at an old target-height contract after the Pixel Forge NPCs were
+  shortened to `2.95m`. The TypeScript bot and CJS perf driver now aim at the
+  visual chest proxy below the eye-level actor anchor and prefer rendered
+  target anchors when the live driver supplies them. Unit evidence covers the
+  height contract, but the last full Open Frontier active-player capture,
+  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json`, failed with zero
+  recorded hits and only a short ENGAGE window. Do not use active-player Open
+  Frontier captures for performance acceptance until a fresh capture records
+  hits under the new aim contract.
 - 2026-05-04 owner world-placement target: the later KB-TERRAIN/KB-CULL scope
   also includes terrain-aligned static placement. Buildings, HQs, vehicles,
   and airfield/support presets should not hang foundations off hill edges or
@@ -1365,6 +1402,16 @@ Current Cycle 3 status:
   appearing mainly on hillsides, scale and ground palms/ferns properly, add
   more big palms and ground vegetation, and reduce bamboo dominance into
   scattered dense clusters.
+  The current local branch adds a second bamboo clustering fix that gives
+  clustered mid-level vegetation its own Poisson spacing instead of sharing the
+  palm grid, plus a terrain placement audit and first Open Frontier/A Shau
+  airfield relocation. The latest placement audit passes and the latest
+  A Shau after-placement capture no longer logs the Ta Bat steep-airfield
+  warning, but A Shau remains WARN because terrain-stall/route symptoms are
+  still open. The active-player harness also has a shorter-NPC visual-chest
+  aim fix in unit tests, while the latest full Open Frontier active-player
+  capture still recorded zero hits; do not treat killbot captures as perf
+  acceptance until a fresh post-fix capture records hits.
   KB-CULL `static-feature-and-vehicle-culling-hlod` is now
   `ready_for_branch` after
   `npm run check:projekt-143-culling-baseline` wrote
@@ -1379,6 +1426,24 @@ Current Cycle 3 status:
   `artifacts/perf/2026-05-04T00-55-00-501Z/summary.json` because Open Frontier
   validation failed and the owner path stayed at `388`; do not repeat that
   exact approach as a claimed KB-CULL fix without new before/after evidence.
+- 2026-05-04 local follow-up validation: focused vegetation/terrain/harness
+  unit tests passed, `npm run check:projekt-143-terrain-placement` PASS wrote
+  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`,
+  `npm run check:projekt-143-terrain-distribution` WARN wrote
+  `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+  with only the expected AI Sandbox fixed-fallback seed flag, and
+  `npm run check:projekt-143-terrain-baseline` PASS wrote
+  `artifacts/perf/2026-05-04T11-26-11-588Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  Final broad gates passed or warned as expected:
+  `npm run check:projekt-143-cycle3-kickoff` WARN at
+  `artifacts/perf/2026-05-04T11-29-35-677Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T11-29-35-169Z/projekt-143-evidence-suite/suite-summary.json`,
+  and `npm run validate:fast` PASS (`251` files, `3860` tests). Fixed-wing
+  browser probe validation is incomplete: `npm run probe:fixed-wing` first hit
+  sandbox `spawn EPERM`, then the approved rerun produced only partial A-1
+  success in `artifacts/fixed-wing-runtime-probe/summary.json` before timing
+  out; no full fixed-wing pass is claimed.
 - 2026-05-03: `npm run check:projekt-143-optik-decision` refreshed the
   decision packet at
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`.

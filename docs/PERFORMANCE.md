@@ -87,6 +87,7 @@ npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proo
 npm run check:projekt-143-culling-baseline # Cycle 3 culling owner-path before packet
 npm run check:projekt-143-terrain-baseline # Cycle 3 elevated horizon screenshot/perf-before proof
 npm run check:projekt-143-terrain-distribution # Ground material/vegetation distribution audit
+npm run check:projekt-143-terrain-placement # Terrain feature footprint/foundation audit
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet
@@ -316,12 +317,28 @@ coverage passes in all modes. The WARN status is expected because AI Sandbox is
 sampled with fixed fallback seed `42` when its production config requests a
 random seed. This audit is not a screenshot, performance, vegetation-density,
 or final art acceptance gate.
-After the first vegetation scale/distribution pass, the latest distribution
-artifact is
-`artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+After the first vegetation scale/distribution pass and the bamboo-clustering
+follow-up, the latest distribution artifact is
+`artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
 It includes clustered-vegetation coverage estimates; use them as static
 guidance only, because runtime screenshots and perf captures remain the
-authority for visual density and frame-time impact.
+authority for visual density and frame-time impact. The current bamboo target
+is dense grove pockets, not random individual scatter and not a continuous
+bamboo forest.
+
+`projekt-143-terrain-placement-audit.ts` writes a KB-TERRAIN
+placement/foundation audit under
+`artifacts/perf/<timestamp>/projekt-143-terrain-placement-audit/`. It samples
+flattened airfield, firebase, and support features before and after terrain
+stamps, including generated airfield placements, to catch foundations and
+runway footprints that hang off hills. The initial 2026-05-04 artifact failed
+Open Frontier `airfield_main` and A Shau `tabat_airstrip`; the latest passing
+artifact is
+`artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`.
+This is placement-shape evidence only. A Shau after-placement perf evidence at
+`artifacts/perf/2026-05-04T04-14-35-401Z/summary.json` no longer logs the Ta
+Bat steep-footprint warning, but it remains WARN and does not accept route,
+nav, vehicle usability, or final static feature layout.
 
 `summary.json`, `validation.json`, `measurement-trust.json`, `console.json`,
 and `runtime-samples.json` are written on best effort failure paths as well, so
@@ -329,6 +346,13 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
 
 ## Harness Status
 
+- **Active-player killbot caveat (2026-05-04):** shorter Pixel Forge NPCs
+  changed the target-height contract. The local bot and CJS driver now aim at
+  the visual chest proxy and can use rendered target anchors, but the latest
+  full Open Frontier active-player capture
+  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json` still recorded zero
+  hits. Do not accept active-player perf claims from killbot captures until a
+  fresh post-fix capture records hits.
 - **Resolved on 2026-04-02:** the Playwright perf harness freeze at `frameCount=1` was caused by same-document View Transitions on the live-entry path. Menu-only transitions can still use `document.startViewTransition()`, but live-entry now bypasses it and perf/sandbox runs explicitly force `uiTransitions=0`.
 - Harness startup probes now capture `rafTicks`, page visibility, startup phase, and active view-transition state so browser scheduling failures are distinguishable from game-loop failures.
 - GitHub-hosted CI perf remains advisory. The harness is now trustworthy locally, but the hosted Linux/Xvfb environment still exhibits non-representative browser scheduling and GPU readback stalls during `combat120`, so authoritative perf gating stays with local/self-run `validate:full`.

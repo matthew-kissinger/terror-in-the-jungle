@@ -94,16 +94,16 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     poissonMinDistance: 12,
   },
   bambooGrove: {
-    maxInstances: 10_000,
+    maxInstances: 12_000,
     fadeDistance: 350,
     maxDistance: 400,
-    baseDensity: 0.65,
+    baseDensity: 1.15,
     placement: 'poisson',
-    poissonMinDistance: 10,
+    poissonMinDistance: 7,
     cluster: {
       scale: 260,
-      threshold: 0.56,
-      edgeFeather: 0.12,
+      threshold: 0.72,
+      edgeFeather: 0.06,
     },
   },
   bananaPlant: {

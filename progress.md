@@ -2519,3 +2519,74 @@ TODO
   `npm run check:projekt-143` PASS at
   `artifacts/perf/2026-05-04T03-03-39-979Z/projekt-143-evidence-suite/suite-summary.json`;
   `npm run validate:fast` PASS (`251` files, `3857` tests).
+
+2026-05-04 Projekt Objekt-143 terrain placement, bamboo clustering, and killbot aim follow-up
+- Added `scripts/projekt-143-terrain-placement-audit.ts` and wired
+  `npm run check:projekt-143-terrain-placement`. The audit samples flattened
+  airfield/firebase/support features on source terrain and after stamps so
+  hanging foundations, hill-edge runways, and generated airfield placements are
+  caught mechanically before visual review.
+- Initial placement evidence
+  `artifacts/perf/2026-05-04T04-04-19-128Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  failed Open Frontier `airfield_main` (`43.3m` source span) and A Shau
+  `tabat_airstrip` (`112.11m` source span). After relocating/reorienting the
+  Open Frontier airfield/motor pool and Ta Bat airstrip/support/motor-pool
+  presets, the latest placement audit
+  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  passes. `airfield_main` is now `5.24m`; `tabat_airstrip` is `9.18m`.
+- A Shau after-placement perf evidence
+  `artifacts/perf/2026-05-04T04-14-35-401Z/summary.json` is
+  measurement-trusted/WARN and no longer logs the Ta Bat steep-footprint
+  warning. It is not A Shau acceptance: terrain-stall/recovery and movement
+  transition warnings remain and need route/nav/gameplay placement work.
+- Fixed the bamboo follow-up the owner called out: clustered mid-level Poisson
+  species now get their own per-type grid instead of sharing palm spacing, so
+  `bambooGrove` can form denser local grove pockets. The latest distribution
+  evidence is
+  `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
+  flat jungle-like ground remains `100%` in every mode and bamboo estimated
+  share is about `1.0-1.05%`. Still open: screenshot/human review for visual
+  grove readability and whether the larger ferns are now too bright or too
+  dominant at eye level.
+- Fixed the perf active-player target-height contract after the Pixel Forge
+  NPCs were shortened. The TypeScript player bot and CJS perf driver now aim
+  at the visual chest proxy below the eye-level actor anchor, and the live
+  driver can pass `renderedPosition` as an aim anchor for visual hit proxies.
+  Targeted bot/driver tests pass, but the full Open Frontier active-player
+  capture at `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json` still
+  recorded zero hits and only a short ENGAGE window. Do not use killbot
+  captures for perf acceptance until a fresh post-fix capture records hits.
+- Folded the latest owner goals into Projekt docs/handoff/state/performance:
+  bamboo should be clustered groves, not random scatter; keep and audit other
+  green ground texture variants rather than only `jungle-floor`; improve all
+  vegetation placement logic; explore custom grass/ground foliage/cover only
+  after asset review; make trails more worn-in/smooth/vehicle-usable; continue
+  terrain-shaped building/HQ/vehicle/airfield placement; and review Pixel Forge
+  building and foliage candidates through the asset acceptance/perf path before
+  runtime import.
+- Final validation for this follow-up:
+  `npx vitest run src\config\vegetationTypes.test.ts src\systems\terrain\VegetationScatterer.test.ts src\systems\terrain\ChunkVegetationGenerator.test.ts`
+  PASS (`3` files, `18` tests);
+  `npx vitest run src\systems\terrain\TerrainFeatureCompiler.test.ts src\systems\world\AirfieldLayoutGenerator.test.ts src\systems\world\WorldFeatureSystem.test.ts`
+  PASS (`3` files, `35` tests);
+  `npx vitest run src\dev\harness\playerBot\states.test.ts scripts\perf-harness\perf-active-driver.test.js`
+  PASS (`2` files, `157` tests).
+- Final Projekt gates:
+  `npm run check:projekt-143-terrain-placement` PASS at
+  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`;
+  `npm run check:projekt-143-terrain-distribution` WARN only for AI Sandbox
+  fixed fallback seed at
+  `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
+  `npm run check:projekt-143-terrain-baseline` PASS at
+  `artifacts/perf/2026-05-04T11-26-11-588Z/projekt-143-terrain-horizon-baseline/summary.json`;
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-04T11-29-35-677Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T11-29-35-169Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`251` files, `3860` tests).
+- Fixed-wing probe caveat: `npm run probe:fixed-wing` hit sandbox
+  `spawn EPERM`; the approved rerun built `dist-perf` and produced partial A-1
+  success in `artifacts/fixed-wing-runtime-probe/summary.json`, then timed out
+  before completing F-4/AC-47. The leftover probe preview/browser processes
+  were cleaned up. Do not claim a full fixed-wing browser pass for this
+  placement move until the probe completes all aircraft.

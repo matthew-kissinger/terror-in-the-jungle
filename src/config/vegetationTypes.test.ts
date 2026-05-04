@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getBiome } from './biomes';
 import { VEGETATION_TYPES } from './vegetationTypes';
 import { PIXEL_FORGE_BLOCKED_VEGETATION_IDS, PIXEL_FORGE_VEGETATION_ASSETS } from './pixelForgeAssets';
 
@@ -91,11 +92,18 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     const fanPalm = VEGETATION_TYPES.find((type) => type.id === 'fanPalm');
     const giantPalm = VEGETATION_TYPES.find((type) => type.id === 'giantPalm');
     const bamboo = VEGETATION_TYPES.find((type) => type.id === 'bambooGrove');
+    const denseJungle = getBiome('denseJungle');
+    const bambooJungleMultiplier =
+      denseJungle.vegetationPalette.find((entry) => entry.typeId === 'bambooGrove')?.densityMultiplier ?? 0;
+    const fanPalmJungleMultiplier =
+      denseJungle.vegetationPalette.find((entry) => entry.typeId === 'fanPalm')?.densityMultiplier ?? 0;
 
-    expect(fanPalm?.baseDensity).toBeGreaterThan(bamboo?.baseDensity ?? 0);
+    expect((fanPalm?.baseDensity ?? 0) * fanPalmJungleMultiplier)
+      .toBeGreaterThan((bamboo?.baseDensity ?? 0) * bambooJungleMultiplier);
     expect(giantPalm?.baseDensity).toBeGreaterThan(0.3);
+    expect(bamboo?.poissonMinDistance).toBeLessThan(8);
     expect(bamboo?.cluster?.scale).toBeGreaterThan(200);
-    expect(bamboo?.cluster?.threshold).toBeGreaterThan(0.5);
+    expect(bamboo?.cluster?.threshold).toBeGreaterThan(0.7);
   });
 
   it('quarantines the broken low-angle coconut atlas row and trunk cross-fade', () => {

@@ -161,8 +161,8 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
       id: 'airfield_main',
       kind: 'airfield',
       name: 'Main Airfield',
-      position: new THREE.Vector3(320, 0, -1230),
-      placement: { yaw: Math.PI * 0.5 },
+      position: new THREE.Vector3(365, 0, -1335),
+      placement: { yaw: (Math.PI * 0.5) - 0.15 },
       templateId: 'us_airbase',
       footprint: { shape: 'circle', radius: 270 },
       terrain: {
@@ -179,8 +179,8 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
       id: 'airfield_motor_pool',
       kind: 'firebase',
       name: 'Main Motor Pool',
-      position: new THREE.Vector3(110, 0, -1090),
-      placement: { yaw: Math.PI * 0.48 },
+      position: new THREE.Vector3(155, 0, -1195),
+      placement: { yaw: (Math.PI * 0.48) - 0.15 },
       footprint: { shape: 'circle', radius: 36 },
       terrain: {
         flatten: true,

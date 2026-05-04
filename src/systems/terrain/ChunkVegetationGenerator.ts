@@ -104,12 +104,14 @@ export class ChunkVegetationGenerator {
     // Partition types
     const canopyTypes: VegetationTypeConfig[] = [];
     const midPoissonTypes: VegetationTypeConfig[] = [];
+    const clusteredMidPoissonTypes: VegetationTypeConfig[] = [];
     const groundTypes: VegetationTypeConfig[] = [];
 
     for (const vt of vegetationTypes) {
       const d = densityMap.get(vt.id);
       if (d === undefined || d <= 0) continue;
       if (vt.tier === 'canopy') canopyTypes.push(vt);
+      else if (vt.tier === 'midLevel' && vt.placement === 'poisson' && vt.cluster) clusteredMidPoissonTypes.push(vt);
       else if (vt.tier === 'midLevel' && vt.placement === 'poisson') midPoissonTypes.push(vt);
       else groundTypes.push(vt);
     }
@@ -199,6 +201,41 @@ export class ChunkVegetationGenerator {
         }
         if (instances.length > 0) result.set(mt.id, instances);
       }
+    }
+
+    // ---- CLUSTERED MID-LEVEL POISSON: per-type grid so grove species can form dense stands ----
+    for (const mt of clusteredMidPoissonTypes) {
+      const effectiveDensity = mt.baseDensity * (densityMap.get(mt.id) ?? 0);
+      if (effectiveDensity <= 0) continue;
+
+      const minDist = mt.poissonMinDistance ?? 8;
+      const points = this.getPoissonTemplate(size, minDist);
+      const typeSalt = this.hashString(mt.id);
+      const offset = this.getPoissonOffset(chunkX, chunkZ, typeSalt ^ 0x5EED2001, size);
+      const maxCount = Math.floor(size * size * DENSITY_PER_UNIT * effectiveDensity);
+      const limit = Math.min(points.length, maxCount);
+      const instances: BillboardInstance[] = [];
+
+      for (let i = 0; i < limit; i++) {
+        const p = this.getShiftedPoissonPoint(points[i], offset.x, offset.y, size);
+        const h = getHeight(p.x, p.y);
+        if (h < 0) continue;
+        if (slopeDeg(p.x, p.y, size, getHeight) > MAX_MIDLEVEL_SLOPE) continue;
+        const clusterMask = this.getClusterMask(mt, baseX + p.x, baseZ + p.y, typeSalt);
+        if (clusterMask <= 0) continue;
+        const clusterRoll = this.hashInts(chunkX + i, chunkZ, typeSalt ^ 0xB4403);
+        if ((clusterRoll / 0xffffffff) > clusterMask) continue;
+        const hs = this.hashInts(chunkX + i, chunkZ, typeSalt ^ 0xCAFE0004);
+        const s = 0.9 + (hs / 0xffffffff) * 0.2;
+        instances.push({
+          position: new THREE.Vector3(baseX + p.x, h + mt.yOffset, baseZ + p.y),
+          scale: new THREE.Vector3(s, s, 1),
+          rotation: 0,
+        });
+        trunkGrid.add(p.x, p.y);
+      }
+
+      if (instances.length > 0) result.set(mt.id, instances);
     }
 
     // ---- GROUND COVER + MID-LEVEL RANDOM: trunk suppression, water/slope check, density noise ----

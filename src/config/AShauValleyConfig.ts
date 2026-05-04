@@ -270,8 +270,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       id: 'tabat_airstrip',
       kind: 'airfield',
       name: 'Ta Bat Rough Airstrip',
-      position: geoToWorld(16.27, 107.16),
-      placement: { yaw: Math.PI * 0.18 },
+      position: geoToWorld(16.267709, 107.158176),
+      placement: { yaw: (Math.PI * 0.18) + 0.45 },
       templateId: 'forward_strip',
       footprint: { shape: 'circle', radius: 180 },
       terrain: {
@@ -288,8 +288,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       id: 'tabat_support_compound',
       kind: 'airfield',
       name: 'Ta Bat Support Compound',
-      position: geoToWorld(16.2715, 107.1635),
-      placement: { yaw: Math.PI * 0.18 },
+      position: geoToWorld(16.269209, 107.161676),
+      placement: { yaw: (Math.PI * 0.18) + 0.45 },
       footprint: { shape: 'circle', radius: 24 },
       terrain: {
         flatten: true,
@@ -313,8 +313,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       id: 'tabat_motor_pool',
       kind: 'firebase',
       name: 'Ta Bat Armored Yard',
-      position: geoToWorld(16.2728, 107.1668),
-      placement: { yaw: Math.PI * 0.18 },
+      position: geoToWorld(16.270509, 107.164976),
+      placement: { yaw: (Math.PI * 0.18) + 0.45 },
       footprint: { shape: 'circle', radius: 34 },
       terrain: {
         flatten: true,

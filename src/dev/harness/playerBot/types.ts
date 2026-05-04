@@ -31,6 +31,8 @@ export interface BotVec3 {
 export interface BotTarget {
   id: string;
   position: BotVec3;
+  /** Optional rendered/on-screen anchor. Player hits use visual hit proxies. */
+  aimPosition?: BotVec3;
   lastKnownMs: number;
 }
 

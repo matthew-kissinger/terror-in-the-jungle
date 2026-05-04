@@ -49,7 +49,7 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
     { typeId: 'elephantEar',   densityMultiplier: 1.0 },
     { typeId: 'fanPalm',      densityMultiplier: 1.0 },
     { typeId: 'coconut',      densityMultiplier: 0.8 },
-    { typeId: 'bambooGrove',  densityMultiplier: 0.4 },
+    { typeId: 'bambooGrove',  densityMultiplier: 0.25 },
     { typeId: 'bananaPlant',  densityMultiplier: 0.5 },
     { typeId: 'giantPalm',    densityMultiplier: 0.5 },
   ],
@@ -64,7 +64,7 @@ const BIOME_HIGHLAND: BiomeConfig = {
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 0.6 },
     { typeId: 'fanPalm',      densityMultiplier: 0.3 },
-    { typeId: 'bambooGrove',  densityMultiplier: 0.35 },
+    { typeId: 'bambooGrove',  densityMultiplier: 0.2 },
     { typeId: 'giantPalm',    densityMultiplier: 0.8 },
   ],
 };
@@ -138,7 +138,7 @@ const BIOME_BAMBOO_GROVE: BiomeConfig = {
   groundTileScale: 0.135,
   groundRoughness: 0.84,
   vegetationPalette: [
-    { typeId: 'bambooGrove',   densityMultiplier: 2.0 },
+    { typeId: 'bambooGrove',   densityMultiplier: 2.8 },
     { typeId: 'fern',          densityMultiplier: 0.8 },
     { typeId: 'elephantEar',   densityMultiplier: 0.3 },
   ],

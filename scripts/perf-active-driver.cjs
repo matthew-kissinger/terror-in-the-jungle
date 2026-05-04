@@ -105,15 +105,18 @@
     return best;
   }
 
-  // Player eye-height and target chest-height — mirrors src/systems/player/PlayerMovement.ts
-  // (PLAYER_EYE_HEIGHT = 2.2). Keep these constants in sync; the Node test
-  // imports them as-is.
+  // Actor-height mirrors. PlayerController.getPosition() and combatant.position
+  // are already eye-level actor anchors, matching PlayerMovement.PLAYER_EYE_HEIGHT
+  // and CombatantConfig.NPC_Y_OFFSET. Only ground/objective points need a
+  // positive look height; combatant targets need a center-mass offset below
+  // their actor anchor.
   const PLAYER_EYE_HEIGHT = 2.2;
-  const TARGET_CHEST_HEIGHT = 1.2;
-  // LOS-height: bot aims at 1.7m above target ground (matches engine NPC-to-NPC
-  // LOS). 1.2m aimed at the low-torso hitbox which was clipping into terrain
-  // on uneven ground.
-  const TARGET_LOS_HEIGHT = 1.7;
+  // Mirrors the visual chest proxy center:
+  // NPC_PIXEL_FORGE_VISUAL_HEIGHT(2.95) * HIT_PROXY_HEIGHT_MULTIPLIER(1.16)
+  // * average chest ratio(0.59) - NPC_Y_OFFSET(2.2).
+  const TARGET_ACTOR_AIM_Y_OFFSET = -0.18;
+  const TARGET_CHEST_HEIGHT = PLAYER_EYE_HEIGHT + TARGET_ACTOR_AIM_Y_OFFSET;
+  const TARGET_LOS_HEIGHT = TARGET_CHEST_HEIGHT;
   const DEFAULT_BULLET_SPEED = 400;
 
   // Player's maximum walkable slope, derived from SlopePhysics.PLAYER_CLIMB_SLOPE_DOT.
@@ -527,10 +530,11 @@
   }
 
   function botAimPoint(target) {
+    const anchor = target.aimPosition || target.position;
     return {
-      x: Number(target.position.x || 0),
-      y: Number(target.position.y || 0) + TARGET_LOS_HEIGHT,
-      z: Number(target.position.z || 0),
+      x: Number(anchor.x || 0),
+      y: Number(anchor.y || 0) + TARGET_ACTOR_AIM_Y_OFFSET,
+      z: Number(anchor.z || 0),
     };
   }
 
@@ -558,7 +562,7 @@
     if (objective && objective.position) {
       intent.aimTarget = {
         x: Number(objective.position.x || 0),
-        y: Number(objective.position.y || 0) + TARGET_LOS_HEIGHT,
+        y: Number(objective.position.y || 0) + TARGET_CHEST_HEIGHT,
         z: Number(objective.position.z || 0),
       };
       intent.moveForward = 1;
@@ -944,24 +948,30 @@
           y: Number(best.position.y || 0),
           z: Number(best.position.z || 0),
         },
+        aimPosition: best.renderedPosition ? {
+          x: Number(best.renderedPosition.x),
+          y: Number(best.renderedPosition.y || 0),
+          z: Number(best.renderedPosition.z || 0),
+        } : undefined,
         lastKnownMs: Date.now(),
       };
     }
 
     // `canSeeTarget` — consumes `terrainSystem.raycastTerrain` (the same primitive
     // AILineOfSight uses internally), so the bot cannot acquire a target through
-    // a hill. Eye-to-chest segment; hit distance < segment length → occluded.
+    // a hill. Player/combatant positions are already eye-level actor anchors;
+    // raycast from player eye to target center mass.
     function canSeeTarget(systems, playerPos, targetPos) {
       const terrain = systems && systems.terrainSystem;
       if (!terrain || typeof terrain.raycastTerrain !== 'function') return true;
       const from = {
         x: Number(playerPos.x),
-        y: Number(playerPos.y || 0) + PLAYER_EYE_HEIGHT,
+        y: Number(playerPos.y || 0),
         z: Number(playerPos.z),
       };
       const to = {
         x: Number(targetPos.x),
-        y: Number(targetPos.y || 0) + TARGET_CHEST_HEIGHT,
+        y: Number(targetPos.y || 0) + TARGET_ACTOR_AIM_Y_OFFSET,
         z: Number(targetPos.z),
       };
       const dx = to.x - from.x;
@@ -1431,7 +1441,7 @@
         timeInStateMs: state.timeInStateMs,
         eyePos: {
           x: playerPos.x,
-          y: playerPos.y + PLAYER_EYE_HEIGHT,
+          y: playerPos.y,
           z: playerPos.z,
         },
         velocity: velocity,
@@ -1884,6 +1894,7 @@
       angularDistance: angularDistance,
       PLAYER_EYE_HEIGHT: PLAYER_EYE_HEIGHT,
       TARGET_CHEST_HEIGHT: TARGET_CHEST_HEIGHT,
+      TARGET_ACTOR_AIM_Y_OFFSET: TARGET_ACTOR_AIM_Y_OFFSET,
       TARGET_LOS_HEIGHT: TARGET_LOS_HEIGHT,
       DEFAULT_BULLET_SPEED: DEFAULT_BULLET_SPEED,
       PLAYER_CLIMB_SLOPE_DOT: PLAYER_CLIMB_SLOPE_DOT,

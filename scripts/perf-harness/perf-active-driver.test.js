@@ -28,6 +28,7 @@ const {
   evaluateFireGate,
   PLAYER_EYE_HEIGHT,
   TARGET_CHEST_HEIGHT,
+  TARGET_ACTOR_AIM_Y_OFFSET,
   DEFAULT_BULLET_SPEED,
   PLAYER_CLIMB_SLOPE_DOT,
   PLAYER_MAX_CLIMB_ANGLE_RAD,
@@ -266,15 +267,14 @@ describe('perf-active-driver utility target lock (Dave Mark IAUS)', () => {
 
 describe('perf-active-driver aim solution (eye-height + velocity lead)', () => {
   it('looks down at a stationary target 10m ahead at ground level', () => {
-    // Eye at (0, eye_h, 0); target body at (10, 0, 0) ground; aim chest at +1.2.
+    // Eye at (0, eye_h, 0); ground/objective aim height is center mass.
     const solution = computeAimSolution({
       eyeX: 0, eyeY: PLAYER_EYE_HEIGHT, eyeZ: 0,
       targetX: 10, targetY: TARGET_CHEST_HEIGHT, targetZ: 0,
       targetVx: 0, targetVy: 0, targetVz: 0,
       bulletSpeed: DEFAULT_BULLET_SPEED
     });
-    // Eye above chest by PLAYER_EYE_HEIGHT - TARGET_CHEST_HEIGHT = 0.8 m.
-    // Pitch should be atan2(-0.8, 10) ≈ -4.57° — slightly down at the chest.
+    // Eye above target by PLAYER_EYE_HEIGHT - TARGET_CHEST_HEIGHT.
     const expectedPitch = Math.atan2(-(PLAYER_EYE_HEIGHT - TARGET_CHEST_HEIGHT), 10);
     expect(solution.pitch).toBeCloseTo(expectedPitch, 5);
     expect(solution.horizontalDist).toBeCloseTo(10, 5);
@@ -683,12 +683,27 @@ describe('PlayerBot driver mirror — ENGAGE', () => {
     }
   });
 
-  it('writes an aimTarget (world-space point) — not angles', () => {
+  it('writes an aimTarget at the visual chest proxy — not angles', () => {
     const step = stepBotState('ENGAGE', makeBotCtx({
-      currentTarget: makeBotTarget({ position: { x: 30, y: 0, z: 0 } }),
+      currentTarget: makeBotTarget({ position: { x: 30, y: PLAYER_EYE_HEIGHT, z: 0 } }),
     }));
     expect(step.intent.aimTarget).not.toBeNull();
     expect(step.intent.aimTarget.x).toBeCloseTo(30, 5);
+    expect(step.intent.aimTarget.y).toBeCloseTo(PLAYER_EYE_HEIGHT + TARGET_ACTOR_AIM_Y_OFFSET, 5);
+    expect(step.intent.aimTarget.y).toBeLessThan(PLAYER_EYE_HEIGHT);
+  });
+
+  it('prefers rendered aim position when supplied by the live driver', () => {
+    const step = stepBotState('ENGAGE', makeBotCtx({
+      currentTarget: makeBotTarget({
+        position: { x: 30, y: PLAYER_EYE_HEIGHT, z: 0 },
+        aimPosition: { x: 36, y: PLAYER_EYE_HEIGHT + 0.5, z: -4 },
+      }),
+    }));
+    expect(step.intent.aimTarget).not.toBeNull();
+    expect(step.intent.aimTarget.x).toBeCloseTo(36, 5);
+    expect(step.intent.aimTarget.y).toBeCloseTo(PLAYER_EYE_HEIGHT + 0.5 + TARGET_ACTOR_AIM_Y_OFFSET, 5);
+    expect(step.intent.aimTarget.z).toBeCloseTo(-4, 5);
   });
 });
 

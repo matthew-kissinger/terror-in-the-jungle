@@ -24,6 +24,12 @@ import {
   PlayerBotStateStep,
   createIdlePlayerBotIntent,
 } from './types';
+import { NPC_PIXEL_FORGE_VISUAL_HEIGHT, NPC_Y_OFFSET } from '../../../config/CombatantConfig';
+import {
+  COMBATANT_HIT_PROXY_CHEST_END_RATIO,
+  COMBATANT_HIT_PROXY_CHEST_START_RATIO,
+  COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER,
+} from '../../../systems/combat/CombatantBodyMetrics';
 
 /** Horizontal distance between two 3D points. */
 export function horizontalDistance(a: BotVec3, b: BotVec3): number {
@@ -32,18 +38,19 @@ export function horizontalDistance(a: BotVec3, b: BotVec3): number {
   return Math.hypot(dx, dz);
 }
 
-/**
- * Chest/LOS offset applied to a target's ground position. 1.7m aligns with
- * the engine NPC-to-NPC LOS height used by AILineOfSight — aiming at 1.2m
- * clipped low-torso shots into the ground on uneven terrain.
- */
-const TARGET_LOS_HEIGHT = 1.7;
+const TARGET_ACTOR_AIM_Y_OFFSET =
+  NPC_PIXEL_FORGE_VISUAL_HEIGHT
+  * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
+  * ((COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2)
+  - NPC_Y_OFFSET;
+const OBJECTIVE_LOOK_HEIGHT = NPC_Y_OFFSET + TARGET_ACTOR_AIM_Y_OFFSET;
 
 function aimPointForTarget(target: BotTarget): BotVec3 {
+  const anchor = target.aimPosition ?? target.position;
   return {
-    x: target.position.x,
-    y: target.position.y + TARGET_LOS_HEIGHT,
-    z: target.position.z,
+    x: anchor.x,
+    y: anchor.y + TARGET_ACTOR_AIM_Y_OFFSET,
+    z: anchor.z,
   };
 }
 
@@ -84,7 +91,7 @@ function updatePatrol(ctx: PlayerBotStateContext): PlayerBotStateStep {
 
   const objective = ctx.getObjective();
   if (objective) {
-    intent.aimTarget = { x: objective.position.x, y: objective.position.y + TARGET_LOS_HEIGHT, z: objective.position.z };
+    intent.aimTarget = { x: objective.position.x, y: objective.position.y + OBJECTIVE_LOOK_HEIGHT, z: objective.position.z };
     intent.moveForward = 1;
     const dist = horizontalDistance(ctx.eyePos, objective.position);
     intent.sprint = dist > ctx.config.sprintDistance;
@@ -125,7 +132,7 @@ function updateEngage(ctx: PlayerBotStateContext): PlayerBotStateStep {
     return { intent, nextState: 'PATROL', resetTimeInState: true };
   }
 
-  // Aim at the target (chest/LOS height). No health / suppression bail-outs —
+  // Aim at the visual chest proxy below the eye-level actor anchor. No health / suppression bail-outs —
   // this is a perf-harness player surrogate, not a soldier. Players push in
   // for kills; they do not flee on damage.
   intent.aimTarget = aimPointForTarget(target);

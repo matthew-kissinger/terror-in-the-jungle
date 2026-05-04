@@ -18,24 +18,33 @@ ledger; this file is the short operational prompt.
 - Keep WebGL stabilization as the active strategy. Do not start WebGPU
   migration unless the project owner explicitly approves that point of no
   return after evidence.
+- Fixed-wing browser validation is incomplete for the latest local terrain
+  placement move. `npm run probe:fixed-wing` hit sandbox `spawn EPERM`; the
+  approved rerun built the perf bundle and wrote partial A-1 success to
+  `artifacts/fixed-wing-runtime-probe/summary.json`, then timed out before
+  completing F-4/AC-47. Do not claim a full fixed-wing probe pass from this
+  handoff.
 
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-04T03-03-26-031Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-04T11-29-35-677Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
-  `artifacts/perf/2026-05-04T03-03-39-979Z/projekt-143-evidence-suite/suite-summary.json`
+  `artifacts/perf/2026-05-04T11-29-35-169Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
-  `artifacts/perf/2026-05-04T02-41-37-056Z/projekt-143-terrain-horizon-baseline/summary.json`
+  `artifacts/perf/2026-05-04T11-26-11-588Z/projekt-143-terrain-horizon-baseline/summary.json`
 - KB-TERRAIN material distribution audit:
-  `artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+  `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+- KB-TERRAIN placement/foundation audit:
+  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
   `artifacts/perf/2026-05-04T02-45-03-756Z/summary.json`
-- KB-TERRAIN A Shau blocked after vegetation pass:
-  `artifacts/perf/2026-05-04T02-48-58-787Z/summary.json`
-  and rerun `artifacts/perf/2026-05-04T02-53-54-886Z/summary.json`
+- KB-TERRAIN A Shau after placement pass:
+  `artifacts/perf/2026-05-04T04-14-35-401Z/summary.json`
+- Active-player harness blocked capture after shorter-NPC aim investigation:
+  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json`
 - KB-CULL owner baseline:
   `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`
 - Rejected KB-CULL static-helicopter candidate:
@@ -61,16 +70,27 @@ ledger; this file is the short operational prompt.
   material-distribution pass removes broad highland/cleared/bamboo elevation
   caps as primary terrain rules and keeps rock available as a slope-gated
   accent; the follow-up vegetation pass enlarges/lifts ferns, increases large
-  palm density, and changes bamboo into clustered pockets. It is still not
-  final A Shau art/perf acceptance: Open Frontier is measurement-trusted but
-  WARN after the pass, while A Shau failed twice and still reports the
-  `tabat_airstrip` steep-footprint warning. Later terrain/world-placement
-  work must also fix hanging building foundations and review airfield, HQ,
-  vehicle, firebase, and support-compound presets before considering Pixel
+  palm density, and changes bamboo into clustered pockets. The current local
+  branch adds a second bamboo fix because the first pass still looked
+  scattered: clustered mid-level vegetation now uses its own Poisson grid so
+  bamboo can form denser grove pockets instead of being thinned by palm
+  spacing. It also adds a terrain placement/foundation audit and moves the
+  first Open Frontier/A Shau airfield/support presets onto flatter terrain.
+  The latest A Shau after-placement capture no longer logs the Ta Bat steep
+  airfield warning, but it is still WARN and still shows terrain-stall/route
+  symptoms, so no A Shau acceptance is claimed. Later terrain/world-placement
+  work must continue fixing hanging building foundations and review airfield,
+  HQ, vehicle, firebase, and support-compound presets before considering Pixel
   Forge building replacements. Also inventory existing TIJ and Pixel Forge
   ground, path, trail, grass, foliage, and cover texture/assets before custom
   work; routes should become worn-in, smoothed, vehicle-usable trails where
   that fits future gameplay.
+- Active-player perf harness: shorter Pixel Forge NPCs require the killbot to
+  aim at the visual chest proxy below the eye-level actor anchor. The local
+  TypeScript bot and CJS perf driver have unit coverage for that contract, but
+  the latest full Open Frontier active-player capture still recorded zero
+  hits. Do not use active-player captures for acceptance until a fresh post-fix
+  capture records hits.
 - KB-CULL `static-feature-and-vehicle-culling-hlod`: `ready_for_branch`.
   The selected owner path is
   `large-mode-world-static-and-visible-helicopters`. Close-NPC/weapon pool
@@ -114,16 +134,19 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-04T03-03-26-031Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-04T11-29-35-677Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - KB-TERRAIN before baseline:
-  artifacts/perf/2026-05-04T02-41-37-056Z/projekt-143-terrain-horizon-baseline/summary.json
+  artifacts/perf/2026-05-04T11-26-11-588Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:
-  artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
+  artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
+- KB-TERRAIN placement/foundation audit:
+  artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
 - KB-TERRAIN Open Frontier after vegetation pass:
   artifacts/perf/2026-05-04T02-45-03-756Z/summary.json
-- KB-TERRAIN A Shau blocked after vegetation pass:
-  artifacts/perf/2026-05-04T02-48-58-787Z/summary.json
-  and artifacts/perf/2026-05-04T02-53-54-886Z/summary.json
+- KB-TERRAIN A Shau after placement pass:
+  artifacts/perf/2026-05-04T04-14-35-401Z/summary.json
+- Active-player harness blocked capture:
+  artifacts/perf/2026-05-04T10-36-41-205Z/summary.json
 - KB-CULL owner baseline:
   artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json
 - KB-EFFECTS low-load closeout:
@@ -140,9 +163,15 @@ Current bureau state:
   building/HQ/airfield/vehicle foundations with no hill-edge overhangs, and a
   performance-aware Pixel Forge building shortlist before replacement. Include
   an asset audit for ground/path/grass/foliage/cover variety and future
-  vehicle-usable trail surfaces. Current local vegetation pass has Open
-  Frontier WARN/trusted evidence but A Shau failed twice and still logs the
-  `tabat_airstrip` steep-footprint warning; do not claim A Shau acceptance.
+  vehicle-usable trail surfaces. Current local terrain work has Open Frontier
+  WARN/trusted evidence, clustered-bamboo static distribution evidence, and a
+  passing placement/foundation audit. A Shau after placement no longer logs the
+  `tabat_airstrip` steep-footprint warning but is still WARN with
+  terrain-stall/route symptoms; do not claim A Shau acceptance. The
+  active-player killbot has a shorter-NPC visual-chest aim fix in unit tests,
+  but the latest full Open Frontier active-player capture recorded zero hits;
+  do not trust active-player perf acceptance until a fresh post-fix capture
+  records hits.
 - KB-CULL: ready_for_branch, selected owner path is large-mode world static
   features plus visible helicopters; close-NPC/weapon residency remains
   diagnostic-only. Rejected static-helicopter distance-cull after artifact:

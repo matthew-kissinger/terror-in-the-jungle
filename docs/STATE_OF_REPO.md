@@ -384,9 +384,31 @@ What is not ready to claim:
   distribution if green appears mostly on hillsides, scale/ground tiny palms and
   ferns, add more big palms and ground vegetation, and make bamboo scattered
   dense clusters instead of the dominant forest layer.
-  A first vegetation-tuning pass now exists locally, but it is not A Shau
-  acceptance: Open Frontier remained measurement-trusted/WARN and A Shau failed
-  two short captures while reporting the steep `tabat_airstrip` footprint.
+  Local follow-up now includes a second bamboo clustering fix because the first
+  grove mask still looked scattered: clustered mid-level vegetation gets its
+  own Poisson grid instead of sharing palm spacing. The latest distribution
+  audit is
+  `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+  A placement/foundation audit also exists at
+  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`;
+  it passes after moving/reorienting the first Open Frontier and Ta Bat
+  airfield/support presets. A Shau after-placement evidence at
+  `artifacts/perf/2026-05-04T04-14-35-401Z/summary.json` no longer logs the
+  Ta Bat steep-footprint warning, but it remains WARN with terrain-stall/route
+  symptoms, so this is not A Shau acceptance.
+- The active-player perf harness has a current local shorter-NPC aim fix, but
+  no full capture acceptance yet. The bot/driver now aim at the Pixel Forge
+  visual chest proxy below the actor eye-level anchor and can use rendered
+  target anchors. The latest full Open Frontier active-player capture,
+  `artifacts/perf/2026-05-04T10-36-41-205Z/summary.json`, still recorded zero
+  hits; active-player/killbot captures must remain non-authoritative until a
+  fresh post-fix capture records hits.
+- Fixed-wing browser validation is incomplete for the local terrain-placement
+  move. `npm run probe:fixed-wing` first hit sandbox `spawn EPERM`; the
+  approved rerun produced partial A-1 success in
+  `artifacts/fixed-wing-runtime-probe/summary.json` and then timed out before
+  F-4/AC-47 completion. Do not claim fixed-wing probe acceptance for this local
+  state until the full probe completes.
 - No WebGPU migration has shipped or been started. KB-STRATEGIE recommends
   staying on WebGL during stabilization, with a contained WebGPU/TSL spike only
   after the measured blockers are under control.
