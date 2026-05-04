@@ -125,6 +125,17 @@ the current truth anchor.
   failed. Both runs still expose the steep `tabat_airstrip` footprint warning,
   so A Shau foundation/route/preset quality remains part of the current
   terrain problem.
+  Follow-up placement work moved the Ta Bat preset onto flatter terrain, and
+  follow-up route work changed A Shau `terrainFlow` from map-only overlays to
+  full stamped `jungle_trail` corridors. The route audit at
+  `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
+  passes with `12` A Shau routes, `52,504m` of route length, `1,321` capsule
+  stamps, and `14` surface patches. The paired A Shau capture
+  `artifacts/perf/2026-05-04T13-03-02-238Z/summary.json` is measurement-trusted
+  and improves active-player coverage (`170` shots, `59` hits, `57` movement
+  transitions), but it fails validation on heap end-growth/recovery and still
+  logs terrain-stall warnings. This is route-policy progress, not A Shau
+  runtime acceptance.
 - KB-STRATEGIE filed the WebGL/WebGPU brief. `npm run check:webgpu-strategy`
   wrote
   `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`:

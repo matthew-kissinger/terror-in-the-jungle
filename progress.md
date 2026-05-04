@@ -2611,3 +2611,45 @@ TODO
   species, `6` still-blocked vegetation species, and `0` missing assets.
   Non-claim: this is inventory/shortlist evidence only, not asset import,
   visual acceptance, placement acceptance, or perf acceptance.
+
+2026-05-04 Projekt Objekt-143 A Shau route/trail stamping pass
+- Added `scripts/projekt-143-terrain-route-audit.ts` and
+  `npm run check:projekt-143-terrain-routes`. The audit validates route-aware
+  modes for generated route paths, full terrain stamping where required,
+  `jungle_trail` surface patches, route capsule counts, and route centerline
+  roughness before browser proof.
+- Changed A Shau `terrainFlow` from `map_only` to full stamped
+  `jungle_trail` corridors with conservative average-height smoothing
+  (`routeWidth=36`, `routeBlend=14`, `routeSpacing=40`,
+  `routeTerrainWidthScale=0.38`, `routeGradeStrength=0.06`,
+  `routeTargetHeightMode=average`). This addresses the owner goal that routes
+  should become worn-in, smoothed, future vehicle-usable trails, but it is not
+  vehicle navigation acceptance.
+- Route audit evidence:
+  `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
+  PASS. A Shau now reports `12` route paths, `52,504m` route length, `1,321`
+  route capsule stamps, and `14` route surface patches with no policy flags.
+- Static/browser terrain evidence after the route pass:
+  `npm run check:projekt-143-terrain-placement` PASS at
+  `artifacts/perf/2026-05-04T12-59-25-892Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`;
+  `npm run check:projekt-143-terrain-distribution` WARN only for AI Sandbox
+  fixed fallback seed at
+  `artifacts/perf/2026-05-04T12-59-32-610Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
+  `npm run check:projekt-143-terrain-baseline` PASS at
+  `artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json`.
+- A Shau runtime capture:
+  `artifacts/perf/2026-05-04T13-03-02-238Z/summary.json` completed with
+  measurement trust PASS (`probeAvg=10.31ms`, `probeP95=16ms`, missed `0%`),
+  avg `11.83ms`, peak p99 WARN `49.20ms`, `0` browser errors, `170` player
+  shots, `59` hits, `57` movement transitions, and max stuck `1.3s`. It failed
+  validation on heap end-growth/recovery (`+84.17MiB`, `0.5%` recovery), and
+  terrain-stall warnings still appeared. Use it as trusted regression evidence
+  and hit/movement evidence only; do not claim A Shau acceptance.
+- Final gates after docs/code for this pass:
+  targeted terrain/route Vitest suite PASS (`4` files, `17` tests);
+  `npm run typecheck` PASS;
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-04T13-11-32-562Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T13-11-45-723Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`251` files, `3860` tests).

@@ -28,9 +28,9 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-04T11-29-35-677Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-04T13-11-32-562Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
-  `artifacts/perf/2026-05-04T11-29-35-169Z/projekt-143-evidence-suite/suite-summary.json`
+  `artifacts/perf/2026-05-04T13-11-45-723Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -38,13 +38,18 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN material distribution audit:
   `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
 - KB-TERRAIN placement/foundation audit:
-  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  `artifacts/perf/2026-05-04T12-59-25-892Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
 - KB-TERRAIN terrain asset inventory:
   `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
+- KB-TERRAIN route/trail policy audit:
+  `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
   `artifacts/perf/2026-05-04T02-45-03-756Z/summary.json`
 - KB-TERRAIN A Shau after placement pass:
   `artifacts/perf/2026-05-04T04-14-35-401Z/summary.json`
+- KB-TERRAIN A Shau after route-stamping pass:
+  `artifacts/perf/2026-05-04T13-03-02-238Z/summary.json`
+  (measurement trust PASS; validation FAIL on heap end-growth/recovery)
 - Active-player hit-contract evidence after shorter-NPC aim investigation:
   `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json`
   (`120` shots / `43` hits; frame-time metrics are not clean acceptance
@@ -81,8 +86,13 @@ ledger; this file is the short operational prompt.
   spacing. It also adds a terrain placement/foundation audit and moves the
   first Open Frontier/A Shau airfield/support presets onto flatter terrain.
   The latest A Shau after-placement capture no longer logs the Ta Bat steep
-  airfield warning, but it is still WARN and still shows terrain-stall/route
-  symptoms, so no A Shau acceptance is claimed. Later terrain/world-placement
+  airfield warning, and A Shau now has full stamped `jungle_trail`
+  terrain-flow corridors instead of map-only route overlays. The route audit
+  passes with `12` A Shau routes, `52,504m` of route length, `1,321` route
+  capsule stamps, and `14` surface patches. The paired A Shau capture records
+  `170` shots, `59` hits, and `57` movement transitions with measurement trust
+  PASS, but validation fails on heap growth/recovery and terrain-stall warnings
+  still appear, so A Shau is still not accepted. Later terrain/world-placement
   work must continue fixing hanging building foundations and review airfield,
   HQ, vehicle, firebase, and support-compound presets before considering Pixel
   Forge building replacements. Also inventory existing TIJ and Pixel Forge
@@ -142,19 +152,23 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-04T11-29-35-677Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-04T13-11-32-562Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - KB-TERRAIN before baseline:
-  artifacts/perf/2026-05-04T11-26-11-588Z/projekt-143-terrain-horizon-baseline/summary.json
+  artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:
-  artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
+  artifacts/perf/2026-05-04T12-59-32-610Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
 - KB-TERRAIN placement/foundation audit:
-  artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
+  artifacts/perf/2026-05-04T12-59-25-892Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
 - KB-TERRAIN terrain asset inventory:
   artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json
+- KB-TERRAIN route/trail policy audit:
+  artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json
 - KB-TERRAIN Open Frontier after vegetation pass:
   artifacts/perf/2026-05-04T02-45-03-756Z/summary.json
 - KB-TERRAIN A Shau after placement pass:
   artifacts/perf/2026-05-04T04-14-35-401Z/summary.json
+- KB-TERRAIN A Shau after route-stamping pass:
+  artifacts/perf/2026-05-04T13-03-02-238Z/summary.json
 - Active-player hit-contract evidence:
   artifacts/perf/2026-05-04T11-35-07-274Z/summary.json
 - KB-CULL owner baseline:
@@ -174,11 +188,12 @@ Current bureau state:
   performance-aware Pixel Forge building shortlist before replacement. Include
   an asset audit for ground/path/grass/foliage/cover variety and future
   vehicle-usable trail surfaces. Current local terrain work has Open Frontier
-  WARN/trusted evidence, clustered-bamboo static distribution evidence, and a
-  passing placement/foundation audit plus a static terrain asset inventory.
-  A Shau after placement no longer logs the
-  `tabat_airstrip` steep-footprint warning but is still WARN with
-  terrain-stall/route symptoms; do not claim A Shau acceptance. The
+  WARN/trusted evidence, clustered-bamboo static distribution evidence, a
+  passing placement/foundation audit, a static terrain asset inventory, and a
+  passing route/trail policy audit. A Shau now stamps full `jungle_trail`
+  corridors instead of map-only route overlays, but the after-route capture
+  fails heap validation and still shows terrain-stall warnings; do not claim
+  A Shau acceptance. The
   active-player killbot has a shorter-NPC visual-chest aim fix in unit tests
   and a fresh Open Frontier capture with `120` shots / `43` hits. Do not trust
   that capture for frame-time acceptance because another browser game was

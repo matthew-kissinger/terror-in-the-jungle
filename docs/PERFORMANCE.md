@@ -89,6 +89,7 @@ npm run check:projekt-143-terrain-baseline # Cycle 3 elevated horizon screenshot
 npm run check:projekt-143-terrain-distribution # Ground material/vegetation distribution audit
 npm run check:projekt-143-terrain-placement # Terrain feature footprint/foundation audit
 npm run check:projekt-143-terrain-assets # Terrain texture/foliage/building candidate inventory
+npm run check:projekt-143-terrain-routes # Route/trail smoothing and surface policy audit
 npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet

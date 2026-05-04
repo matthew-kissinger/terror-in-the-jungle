@@ -776,6 +776,23 @@ Progress:
   inventory step without browser/perf work. It does not accept any new runtime
   asset; visual, footprint, collision, draw-call, texture residency, and
   LOD/HLOD review are still required before import or placement changes.
+- 2026-05-04 A Shau route/trail stamping pass:
+  `scripts/projekt-143-terrain-route-audit.ts` is exposed as
+  `npm run check:projekt-143-terrain-routes` and writes
+  `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`.
+  A Shau `terrainFlow` now uses full `jungle_trail` route stamping instead of
+  map-only routes, with conservative average-height smoothing. The audit
+  reports `12` A Shau route paths, `52,504m` of route length, `1,321` route
+  capsule stamps, and `14` surface patches with no route-policy flags. This is
+  route-surface/stamp acceptance only, not final vehicle-navigation or visual
+  acceptance. The paired A Shau runtime capture
+  `artifacts/perf/2026-05-04T13-03-02-238Z/summary.json` has measurement trust
+  PASS and stronger active-player movement/hit coverage (`170` shots,
+  `59` hits, `57` movement transitions, max stuck `1.3s`), but it failed
+  validation on heap end-growth/recovery and still logged terrain-stall
+  warnings. A Shau remains blocked; the next terrain branch should connect
+  route stamps to nav/war-simulator path quality and heap behavior before
+  claiming acceptance.
 
 Root-cause hypotheses:
 
@@ -1420,10 +1437,11 @@ Current Cycle 3 status:
   The current local branch adds a second bamboo clustering fix that gives
   clustered mid-level vegetation its own Poisson spacing instead of sharing the
   palm grid, plus a terrain placement audit and first Open Frontier/A Shau
-  airfield relocation. The latest placement audit passes and the latest
-  A Shau after-placement capture no longer logs the Ta Bat steep-airfield
-  warning, but A Shau remains WARN because terrain-stall/route symptoms are
-  still open. The active-player harness also has a shorter-NPC visual-chest
+  airfield relocation. The latest placement audit passes and A Shau route
+  overlays now stamp `jungle_trail` terrain corridors, but A Shau remains
+  blocked because the paired route capture failed heap validation and
+  terrain-stall symptoms still appear. The active-player harness also has a
+  shorter-NPC visual-chest
   aim fix in unit tests and a fresh Open Frontier capture with `120` shots and
   `43` hits. Because another browser game was running on and off during that
   capture, use it to close the zero-hit hit-contract question only; do not use
@@ -1444,21 +1462,27 @@ Current Cycle 3 status:
   exact approach as a claimed KB-CULL fix without new before/after evidence.
 - 2026-05-04 local follow-up validation: focused vegetation/terrain/harness
   unit tests passed, `npm run check:projekt-143-terrain-placement` PASS wrote
-  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`,
+  `artifacts/perf/2026-05-04T12-59-25-892Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`,
   `npm run check:projekt-143-terrain-distribution` WARN wrote
-  `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+  `artifacts/perf/2026-05-04T12-59-32-610Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
   with only the expected AI Sandbox fixed-fallback seed flag, and
   `npm run check:projekt-143-terrain-baseline` PASS wrote
-  `artifacts/perf/2026-05-04T11-26-11-588Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  `artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  The new route audit passed at
+  `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`.
+  A Shau after-route perf evidence at
+  `artifacts/perf/2026-05-04T13-03-02-238Z/summary.json` is measurement-trusted
+  but failed validation on heap growth/recovery, so it is regression evidence
+  for the route pass and active-player hit coverage, not A Shau acceptance.
   A low-resource terrain asset inventory pass wrote
   `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
   and is WARN by design because it is shortlist evidence, not asset
   acceptance.
   Final broad gates passed or warned as expected:
   `npm run check:projekt-143-cycle3-kickoff` WARN at
-  `artifacts/perf/2026-05-04T11-29-35-677Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  `artifacts/perf/2026-05-04T13-11-32-562Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
   `npm run check:projekt-143` PASS at
-  `artifacts/perf/2026-05-04T11-29-35-169Z/projekt-143-evidence-suite/suite-summary.json`,
+  `artifacts/perf/2026-05-04T13-11-45-723Z/projekt-143-evidence-suite/suite-summary.json`,
   and `npm run validate:fast` PASS (`251` files, `3860` tests). Fixed-wing
   browser probe validation is incomplete: `npm run probe:fixed-wing` first hit
   sandbox `spawn EPERM`, then the approved rerun produced only partial A-1
