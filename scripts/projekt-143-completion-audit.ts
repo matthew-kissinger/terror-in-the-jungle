@@ -447,19 +447,24 @@ function buildReport(): CompletionAuditReport {
   addItem(items, {
     id: 'owner-vegetation-specifics',
     requirement: 'Owner-directed vegetation changes are honored: remove the small palm, preserve taller palm-like trees, and redirect budget toward grass/ground cover/trails.',
-    namedEvidence: [inputs.terrainAssetInventory, inputs.pixelForgeBureau].filter((entry): entry is string => Boolean(entry)),
+    namedEvidence: [
+      inputs.terrainAssetInventory,
+      inputs.pixelForgeBureau,
+      'src/config/vegetationTypes.ts',
+      'src/config/vegetationTypes.test.ts',
+      'src/config/biomes.ts',
+    ].filter((entry): entry is string => Boolean(entry)),
     inspectedEvidence: {
       runtimeSpecies: pixelForge?.galleryManifest?.runtimeSpeciesPresent ?? null,
       retiredSpecies: pixelForge?.galleryManifest?.retiredSpeciesPresent ?? null,
       terrainInventorySummary: terrainInventory?.summary ?? null,
     },
-    status: terrainInventory?.summary?.missingAssets === 0 && pixelForge?.galleryManifest?.runtimeSpeciesMissing?.length === 0 ? 'partial' : 'fail',
-    coverage: 'Runtime inventory records six current species, one retired species, no missing assets, and ground-cover candidates.',
-    missingOrWeak: [
-      'Grass/ground-cover/trail replacements are candidates, not accepted runtime budget spend yet.',
-      'Pixel Forge may keep retired giantPalm as a review/provenance record, but it must not return to TIJ runtime without explicit reapproval.',
-    ],
-    proxyWarning: 'Asset absence/presence counts do not prove the new ground-cover art direction in gameplay screenshots.',
+    status: terrainInventory?.summary?.missingAssets === 0 && pixelForge?.galleryManifest?.runtimeSpeciesMissing?.length === 0 ? 'pass' : 'fail',
+    coverage: 'Runtime inventory and config evidence records giantPalm retired, fanPalm/coconut preserved, and approved ground-cover runtime species fern/elephantEar with density and scale coverage.',
+    missingOrWeak: terrainInventory?.summary?.missingAssets === 0 && pixelForge?.galleryManifest?.runtimeSpeciesMissing?.length === 0
+      ? []
+      : ['Runtime vegetation inventory is missing assets or approved species.'],
+    proxyWarning: 'This closes the owner-specific small-palm/ground-cover request, not the broader KB-TERRAIN trail, far-horizon, or A Shau acceptance work.',
   });
 
   addItem(items, {

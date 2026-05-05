@@ -39,7 +39,7 @@ ledger; this file is the short operational prompt.
 - Cycle 3 kickoff/readiness:
   `artifacts/perf/2026-05-05T12-34-31-425Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Completion audit:
-  `artifacts/perf/2026-05-05T13-03-47-780Z/projekt-143-completion-audit/completion-audit.json`
+  `artifacts/perf/2026-05-05T14-17-00-439Z/projekt-143-completion-audit/completion-audit.json`
 - Static Projekt suite:
   `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-LOAD fresh sequential startup baselines:
@@ -67,7 +67,7 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN vegetation source pipeline review:
   `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md`
 - KB-FORGE local Pixel Forge bureau audit:
-  `artifacts/perf/2026-05-05T13-03-10-136Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+  `artifacts/perf/2026-05-05T14-12-07-402Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
 - KB-TERRAIN route/trail policy audit:
   `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
@@ -158,7 +158,8 @@ ledger; this file is the short operational prompt.
   `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.
   Use `npm run check:projekt-143-pixel-forge` from TIJ to catalog its TIJ
   pipeline commands, review gallery, output manifest, NPC package surface, and
-  vegetation package state. Latest audit is WARN with Pixel Forge present,
+  vegetation package state. Latest audit is PASS for the liaison/catalog scope
+  with Pixel Forge present,
   `109` manifest entries, `13` vegetation entries, all `6` current TIJ runtime
   vegetation species present, retired `giantPalm` still present in the Pixel
   Forge gallery manifest, all `6` blocked/review-only species still present,
@@ -166,8 +167,10 @@ ledger; this file is the short operational prompt.
   impostor packages. Its relevance catalog records `6` prop families, `13`
   vegetation packages, and `5` review queues: ground-cover budget replacement,
   route/trail surfaces, base/foundation kits, far-canopy/tree variety, and
-  NPC/weapon packaging. KB-FORGE should analyze relevance and package
-  readiness before KB-TERRAIN or KB-OPTIK imports anything into runtime.
+  NPC/weapon packaging. Retired and blocked species are review/provenance
+  records in Pixel Forge, not TIJ runtime targets. KB-FORGE should analyze
+  relevance and package readiness before KB-TERRAIN or KB-OPTIK imports
+  anything into runtime.
 - KB-TERRAIN `large-mode-vegetation-horizon`: `ready_for_branch`.
   The first far-horizon branch must use the terrain baseline before/after
   screenshot path and matched Open Frontier/A Shau perf captures.

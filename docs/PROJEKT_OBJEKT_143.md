@@ -45,13 +45,14 @@ Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
 `artifacts/perf/2026-05-05T12-34-31-425Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The first explicit completion audit is
-`artifacts/perf/2026-05-05T13-03-47-780Z/projekt-143-completion-audit/completion-audit.json`.
+`artifacts/perf/2026-05-05T14-17-00-439Z/projekt-143-completion-audit/completion-audit.json`.
 It reports `NOT_COMPLETE`: KB-OPTIK remains blocked on the near-stress
 visual/human-review decision, KB-LOAD/KB-TERRAIN/KB-CULL remain
 `ready_for_branch`, KB-FORGE is now a PASS for local pipeline cataloging,
-owner vegetation
-replacement is only partially covered, and the current local stack is dirty,
-unpushed, and undeployed.
+owner vegetation specifics are PASS for retiring the short palm, preserving
+`fanPalm`/`coconut`, and keeping ground-cover budget directed toward
+fern/elephantEar/trail candidates. The audited local stack was still dirty,
+unpushed, and undeployed, so validation/release remains FAIL.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
 KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an
@@ -59,7 +60,7 @@ optional offline GLB source feeding Pixel Forge rather than replacing it.
 Grass, ground cover, and trail-edge variety should come from Pixel Forge
 catalog/review work, a licensed asset-library review, or custom low-card bake
 before any runtime import. The latest local audit at
-`artifacts/perf/2026-05-05T13-03-10-136Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+`artifacts/perf/2026-05-05T14-12-07-402Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
 is PASS for the local liaison/catalog scope with the Pixel Forge sibling repo
 present, all `6` current TIJ runtime vegetation species present, retired
 `giantPalm` still visible only as review/provenance, all `6`

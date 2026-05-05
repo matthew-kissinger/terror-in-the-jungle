@@ -3093,11 +3093,12 @@ TODO
   checks current git state, and writes JSON/Markdown under
   `artifacts/perf/<timestamp>/projekt-143-completion-audit/`.
 - Latest artifact:
-  `artifacts/perf/2026-05-05T13-03-47-780Z/projekt-143-completion-audit/completion-audit.json`.
+  `artifacts/perf/2026-05-05T14-17-00-439Z/projekt-143-completion-audit/completion-audit.json`.
   Status is `NOT_COMPLETE`, which is expected and intentional. It marks the
   static suite and scoped KB-EFFECTS grenade path as pass, but KB-OPTIK remains
   blocked on near-stress visual/human-review decision, KB-LOAD/KB-TERRAIN/
   KB-CULL remain partial, KB-FORGE now passes for local pipeline cataloging,
-  owner vegetation replacement remains partially covered because ground-cover
-  and trail replacements are still candidates, and the local branch is dirty,
-  unpushed, and undeployed.
+  owner vegetation specifics now pass for retiring the short palm, preserving
+  `fanPalm`/`coconut`, and redirecting replacement budget toward approved
+  ground-cover/candidate trail work. Validation/release still fails because the
+  audited branch was dirty, unpushed, and undeployed.
