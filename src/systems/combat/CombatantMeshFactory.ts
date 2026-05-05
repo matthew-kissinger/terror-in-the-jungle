@@ -33,6 +33,14 @@ interface CombatantMeshAssets {
   walkFrameTextures: WalkFrameMap;
 }
 
+export interface CombatantImpostorBucketAssets {
+  key: string;
+  mesh: THREE.InstancedMesh;
+  marker: THREE.InstancedMesh;
+  texture: THREE.Texture;
+  material: THREE.ShaderMaterial;
+}
+
 const FACTION_MARKER_COLORS: Record<Faction | 'SQUAD', THREE.Color> = {
   [Faction.US]: new THREE.Color(0.0, 0.5, 1.0),
   [Faction.ARVN]: new THREE.Color(0.0, 0.7, 0.6),
@@ -51,6 +59,14 @@ export const NPC_SPRITE_RENDER_Y_OFFSET = NPC_SPRITE_HEIGHT / 2 - NPC_Y_OFFSET;
 export const NPC_CLOSE_MODEL_TARGET_HEIGHT = NPC_SPRITE_HEIGHT;
 export const DEFAULT_MESH_BUCKET_CAPACITY = 512;
 export const MOUNTED_MESH_BUCKET_CAPACITY = 128;
+// KB-LOAD: allocate only the common startup loops during combat-system init.
+// Other faction/clip pairs are created on demand for the first visible far NPC,
+// keeping unused Pixel Forge atlases out of first reveal.
+export const PIXEL_FORGE_NPC_STARTUP_CLIP_IDS: readonly PixelForgeNpcClipId[] = [
+  'idle',
+  'patrol_walk',
+];
+const PIXEL_FORGE_NPC_ALL_CLIP_IDS: readonly PixelForgeNpcClipId[] = PIXEL_FORGE_NPC_CLIPS.map((clip) => clip.id);
 
 const OVERFLOW_LOG_INTERVAL_MS = 1000;
 const bucketOverflowLastLog = new Map<string, number>();
@@ -273,6 +289,28 @@ export class CombatantMeshFactory {
     this.assetLoader = assetLoader;
   }
 
+  private resolveBucketSpec(factionKey: Faction | 'SQUAD'): {
+    textureFaction: Faction;
+    packageFaction: PixelForgeNpcFactionAsset['packageFaction'];
+    markerColor: THREE.Color;
+  } | null {
+    if (factionKey === 'SQUAD') {
+      return {
+        textureFaction: Faction.US,
+        packageFaction: 'usArmy',
+        markerColor: FACTION_MARKER_COLORS.SQUAD,
+      };
+    }
+
+    const faction = PIXEL_FORGE_NPC_FACTIONS.find((candidate) => candidate.runtimeFaction === factionKey);
+    if (!faction) return null;
+    return {
+      textureFaction: faction.runtimeFaction as Faction,
+      packageFaction: faction.packageFaction,
+      markerColor: FACTION_MARKER_COLORS[factionKey],
+    };
+  }
+
   private createImpostorMaterial(
     texture: THREE.Texture,
     clipId: PixelForgeNpcClipId,
@@ -380,7 +418,38 @@ export class CombatantMeshFactory {
     return { mesh, material, marker };
   }
 
-  createFactionBillboards(): CombatantMeshAssets {
+  createFactionImpostorBucket(
+    factionKey: Faction | 'SQUAD',
+    clipId: PixelForgeNpcClipId,
+    maxInstances: number = DEFAULT_MESH_BUCKET_CAPACITY,
+  ): CombatantImpostorBucketAssets | null {
+    const spec = this.resolveBucketSpec(factionKey);
+    if (!spec) {
+      Logger.warn('combat', `Unknown Pixel Forge NPC bucket faction: ${factionKey}`);
+      return null;
+    }
+
+    const texture = this.assetLoader.getTexture(pixelForgeNpcTextureName(spec.textureFaction, clipId));
+    if (!texture) {
+      Logger.warn('combat', `Missing Pixel Forge NPC impostor texture for ${spec.textureFaction}/${clipId}`);
+      return null;
+    }
+
+    const key = getPixelForgeNpcBucketKey(factionKey, clipId);
+    const { mesh, material, marker } = this.createMeshSet(
+      texture,
+      key,
+      clipId,
+      spec.markerColor,
+      spec.packageFaction,
+      maxInstances,
+    );
+    return { key, mesh, marker, texture, material };
+  }
+
+  createFactionBillboards(
+    initialClipIds: readonly PixelForgeNpcClipId[] = PIXEL_FORGE_NPC_ALL_CLIP_IDS,
+  ): CombatantMeshAssets {
     const factionMeshes = new Map<string, THREE.InstancedMesh>();
     const factionAuraMeshes = new Map<string, THREE.InstancedMesh>();
     const factionGroundMarkers = new Map<string, THREE.InstancedMesh>();
@@ -388,45 +457,30 @@ export class CombatantMeshFactory {
     const factionMaterials = new Map<string, THREE.ShaderMaterial>();
     const walkFrameTextures: WalkFrameMap = new Map();
 
-    const createFactionBuckets = (
-      factionKey: Faction | 'SQUAD',
-      textureFaction: Faction,
-      packageFaction: PixelForgeNpcFactionAsset['packageFaction'],
-      maxInstances: number,
-    ) => {
-      for (const clip of PIXEL_FORGE_NPC_CLIPS) {
-        const texture = this.assetLoader.getTexture(pixelForgeNpcTextureName(textureFaction, clip.id));
-        if (!texture) {
-          Logger.warn('combat', `Missing Pixel Forge NPC impostor texture for ${textureFaction}/${clip.id}`);
-          continue;
-        }
-        const key = getPixelForgeNpcBucketKey(factionKey, clip.id);
-        const { mesh, material, marker } = this.createMeshSet(
-          texture,
-          key,
-          clip.id,
-          FACTION_MARKER_COLORS[factionKey],
-          packageFaction,
-          maxInstances,
-        );
-        factionMeshes.set(key, mesh);
-        factionGroundMarkers.set(key, marker);
-        factionMaterials.set(key, material);
-        soldierTextures.set(key, texture);
-      }
+    const registerBucket = (bucket: CombatantImpostorBucketAssets | null): void => {
+      if (!bucket) return;
+      factionMeshes.set(bucket.key, bucket.mesh);
+      factionGroundMarkers.set(bucket.key, bucket.marker);
+      factionMaterials.set(bucket.key, bucket.material);
+      soldierTextures.set(bucket.key, bucket.texture);
     };
 
     for (const faction of PIXEL_FORGE_NPC_FACTIONS) {
-      createFactionBuckets(
-        faction.runtimeFaction as Faction,
-        faction.runtimeFaction as Faction,
-        faction.packageFaction,
-        DEFAULT_MESH_BUCKET_CAPACITY,
-      );
+      for (const clipId of initialClipIds) {
+        registerBucket(
+          this.createFactionImpostorBucket(
+            faction.runtimeFaction as Faction,
+            clipId,
+            DEFAULT_MESH_BUCKET_CAPACITY,
+          ),
+        );
+      }
     }
-    createFactionBuckets('SQUAD', Faction.US, 'usArmy', DEFAULT_MESH_BUCKET_CAPACITY);
+    for (const clipId of initialClipIds) {
+      registerBucket(this.createFactionImpostorBucket('SQUAD', clipId, DEFAULT_MESH_BUCKET_CAPACITY));
+    }
 
-    Logger.info('combat', `Created Pixel Forge NPC impostor buckets: ${factionMeshes.size} meshes`);
+    Logger.info('combat', `Created Pixel Forge NPC startup impostor buckets: ${factionMeshes.size} meshes`);
 
     return { factionMeshes, factionAuraMeshes, factionGroundMarkers, soldierTextures, factionMaterials, walkFrameTextures };
   }

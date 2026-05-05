@@ -5,6 +5,7 @@ import {
   DEFAULT_MESH_BUCKET_CAPACITY,
   MOUNTED_MESH_BUCKET_CAPACITY,
   NPC_CLOSE_MODEL_TARGET_HEIGHT,
+  PIXEL_FORGE_NPC_STARTUP_CLIP_IDS,
   NPC_SPRITE_HEIGHT,
   NPC_SPRITE_RENDER_Y_OFFSET,
   NPC_SPRITE_WIDTH,
@@ -18,6 +19,7 @@ import { PLAYER_EYE_HEIGHT } from '../player/PlayerMovement';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { Logger } from '../../utils/Logger';
 import { PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING } from './PixelForgeNpcRuntime';
+import { Faction } from './types';
 
 /**
  * Behavior contract for CombatantMeshFactory's per-bucket overflow handling.
@@ -205,6 +207,46 @@ describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
 });
 
 describe('CombatantMeshFactory Pixel Forge impostor readability material', () => {
+  it('can create only startup NPC impostor clips before lazy runtime bucket allocation', () => {
+    const scene = new THREE.Scene();
+    const texture = new THREE.Texture();
+    const assetLoader = {
+      getTexture: vi.fn(() => texture),
+    } as unknown as AssetLoader;
+    const factory = new CombatantMeshFactory(scene, assetLoader);
+
+    const assets = factory.createFactionBillboards(PIXEL_FORGE_NPC_STARTUP_CLIP_IDS);
+
+    expect(assets.factionMeshes.size).toBe(10);
+    expect(assets.factionMeshes.has('US_idle')).toBe(true);
+    expect(assets.factionMeshes.has('US_patrol_walk')).toBe(true);
+    expect(assets.factionMeshes.has('US_walk_fight_forward')).toBe(false);
+
+    disposeCombatantMeshes(scene, assets);
+    texture.dispose();
+  });
+
+  it('creates non-startup NPC impostor buckets on demand', () => {
+    const scene = new THREE.Scene();
+    const texture = new THREE.Texture();
+    const assetLoader = {
+      getTexture: vi.fn(() => texture),
+    } as unknown as AssetLoader;
+    const factory = new CombatantMeshFactory(scene, assetLoader);
+
+    const bucket = factory.createFactionImpostorBucket(Faction.NVA, 'advance_fire');
+
+    expect(bucket?.key).toBe('NVA_advance_fire');
+    expect(bucket?.mesh.count).toBe(0);
+    expect(bucket?.material.uniforms.animationMode.value).toBe(0);
+
+    bucket?.mesh.geometry.dispose();
+    if (bucket?.mesh.material instanceof THREE.Material) bucket.mesh.material.dispose();
+    bucket?.marker.geometry.dispose();
+    if (bucket?.marker.material instanceof THREE.Material) bucket.marker.material.dispose();
+    texture.dispose();
+  });
+
   it('configures a light floor and exposure for billboarded NPCs', () => {
     const scene = new THREE.Scene();
     const texture = new THREE.Texture();

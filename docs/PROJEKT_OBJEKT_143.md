@@ -20,7 +20,7 @@ measurement itself was trustworthy.
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
 | Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is evidence-complete PASS through `artifacts/perf/2026-05-03T16-48-58-020Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched proof refreshed after the selected-lighting luma slice at `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` drops the NPC runtime target to `2.95m` and adds generated per-tile imposter crop maps; commit `1395198da4db95611457ecde769b611e3d36354e` adds faction imposter material tuning. Matched visible-height ratios improved from the Cycle 2 before range `0.52-0.54x` to `0.861-0.895x`, and selected-lighting luma delta now ranges `-0.44%` to `0.36%`. No perf improvement, final visual parity, aircraft-scale acceptance, or production parity is claimed. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | KB-TERRAIN/CULL/NAV LOCAL FOLLOW-UP 2026-05-05 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD has a giantPalm-only upload warmup that reduces WebGL upload totals but does not prove startup-latency improvement. KB-EFFECTS low-load grenade first-use closeout is evidence-complete for the unlit pooled explosion path at `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`: measurement trust PASS, no trigger/post-trigger browser stall, detonation max `30.2ms`, near-trigger main-scene render max `23.6ms`, and grenade frag JS `1.5ms` total. KB-TERRAIN has a clean-HEAD fresh perf-build elevated screenshot/perf-before baseline at `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`; it is ready for a far-horizon branch but does not accept any canopy or distance-policy remediation. KB-CULL has a clean-HEAD owner-path baseline at `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`; it selected large-mode world static features plus visible helicopters as the first representative branch path and keeps close-NPC pool residency diagnostic-only. The local static-feature shared batching pass has trusted after evidence at `artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`: owner draw-call-like is down to Open Frontier `261` and A Shau `307`, accepted only as static-feature layer draw-call reduction. The terrain/culling follow-up fixes terrain-lip camera clipping, keeps rock as a moss-tinted cliff accent, restores near vegetation residency under frame pressure, and adds per-feature static visibility; its final static gates pass, but the Open Frontier runtime capture failed harness combat behavior and local asset baking may skew perf, so no broad culling/HLOD, vegetation occlusion, perf, production, or A Shau acceptance is claimed. Commit `e92523a` partially closes the navmesh validity gap with a bake manifest, terrain/feature signatures, runtime solo-cache fingerprints, and runtime-placement obstacle baking; targeted nav tests, `test:run`, `validate:fast`, `build`, and the refreshed Projekt suite passed. Commit `356bc2e418af2f2f9aa8109dcf29a5ad7e291924` was pushed to `origin/master` and GitHub CI run `25353544629` passed, but live Pages still serves `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`, so production parity is not claimed. The navmesh work does not close A Shau nav quality, withheld Open Frontier seed variants, or Zone Control seed 137 placement warnings. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-TERRAIN/KB-CULL. |
+| Phase 3 - Multi-Cycle Engineering Plan | KB-TERRAIN/CULL/NAV LOCAL FOLLOW-UP 2026-05-05 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD has a giantPalm-only upload warmup plus a local lazy NPC imposter branch that reduce WebGL upload totals/residency but do not close progressive readiness or production parity. KB-EFFECTS low-load grenade first-use closeout is evidence-complete for the unlit pooled explosion path at `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`: measurement trust PASS, no trigger/post-trigger browser stall, detonation max `30.2ms`, near-trigger main-scene render max `23.6ms`, and grenade frag JS `1.5ms` total. KB-TERRAIN has a clean-HEAD fresh perf-build elevated screenshot/perf-before baseline at `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`; it is ready for a far-horizon branch but does not accept any canopy or distance-policy remediation. KB-CULL has a clean-HEAD owner-path baseline at `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`; it selected large-mode world static features plus visible helicopters as the first representative branch path and keeps close-NPC pool residency diagnostic-only. The local static-feature shared batching pass has trusted after evidence at `artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`: owner draw-call-like is down to Open Frontier `261` and A Shau `307`, accepted only as static-feature layer draw-call reduction. The terrain/culling follow-up fixes terrain-lip camera clipping, keeps rock as a moss-tinted cliff accent, restores near vegetation residency under frame pressure, and adds per-feature static visibility; its final static gates pass, but the Open Frontier runtime capture failed harness combat behavior and local asset baking may skew perf, so no broad culling/HLOD, vegetation occlusion, perf, production, or A Shau acceptance is claimed. Commit `e92523a` partially closes the navmesh validity gap with a bake manifest, terrain/feature signatures, runtime solo-cache fingerprints, and runtime-placement obstacle baking; targeted nav tests, `test:run`, `validate:fast`, `build`, and the refreshed Projekt suite passed. Commit `356bc2e418af2f2f9aa8109dcf29a5ad7e291924` was pushed to `origin/master` and GitHub CI run `25353544629` passed, but live Pages still serves `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`, so production parity is not claimed. The navmesh work does not close A Shau nav quality, withheld Open Frontier seed variants, or Zone Control seed 137 placement warnings. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-TERRAIN/KB-CULL. |
 
 Current working-tree update on 2026-05-05: Zone Control seed `137`
 placement warnings are locally cleared by
@@ -43,9 +43,9 @@ latest Projekt suite is
 `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`.
 Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
-`artifacts/perf/2026-05-05T12-34-31-425Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
-The first explicit completion audit is
-`artifacts/perf/2026-05-05T14-17-00-439Z/projekt-143-completion-audit/completion-audit.json`.
+`artifacts/perf/2026-05-05T16-44-34-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+The latest explicit completion audit is
+`artifacts/perf/2026-05-05T16-45-01-714Z/projekt-143-completion-audit/completion-audit.json`.
 It reports `NOT_COMPLETE`: KB-OPTIK remains blocked on the near-stress
 visual/human-review decision, KB-LOAD/KB-TERRAIN/KB-CULL remain
 `ready_for_branch`, KB-FORGE is now a PASS for local pipeline cataloging,
@@ -113,6 +113,28 @@ stats, vegetation counters, and `0` browser/page/request failures. Mechanical
 deltas stayed inside the current review band (`15.595` max mean absolute RGB
 delta; `8.284%` max absolute mean luma delta), but status remains WARN until
 human visual review accepts the contact sheet.
+The current KB-LOAD local branch narrows NPC imposter startup residency:
+`CombatantRenderer` now eagerly creates only `idle` and `patrol_walk` Pixel
+Forge NPC imposter buckets, and lazily creates uncommon faction/clip buckets
+when a visible far NPC first needs them. Accepted Open Frontier evidence at
+`artifacts/perf/2026-05-05T16-36-44-588Z/startup-ui-open-frontier/summary.json`
+averages `4526.7ms` mode-click-to-playable, `3867.7ms`
+deploy-click-to-playable, `437.6ms` WebGL upload total, `35.87ms` average max
+upload, and `459.33` upload calls. Accepted Zone Control evidence at
+`artifacts/perf/2026-05-05T16-39-16-223Z/startup-ui-zone-control/summary.json`
+averages `2994.3ms` mode-click-to-playable, `2458.7ms`
+deploy-click-to-playable, `415ms` WebGL upload total, `39.5ms` average max
+upload, and `321.33` upload calls. This is a scoped KB-LOAD startup/upload
+improvement, not Projekt completion, production parity, or approval to remove
+vegetation normals. The stricter no-eager NPC variant was rejected after
+Open Frontier
+`artifacts/perf/2026-05-05T16-33-44-776Z/startup-ui-open-frontier/summary.json`
+and Zone Control
+`artifacts/perf/2026-05-05T16-34-47-581Z/startup-ui-zone-control/summary.json`
+because Zone deploy-click-to-playable regressed versus the idle/patrol-eager
+candidate; a noisy Zone rerun at
+`artifacts/perf/2026-05-05T16-37-49-634Z/startup-ui-zone-control/summary.json`
+is retained as outlier evidence due to a single fanPalm normal upload spike.
 
 ## Shipped Cycle 0 State
 
@@ -599,6 +621,36 @@ Progress:
   evidence. It still reports WARN because human visual review must accept the
   contact sheet before vegetation normal-map removal becomes runtime or Pixel
   Forge bake policy.
+- 2026-05-05 lazy NPC imposter bucket remediation: `CombatantMeshFactory` now
+  exposes explicit Pixel Forge faction/clip bucket creation, and
+  `CombatantRenderer` initializes only the common `idle` and `patrol_walk`
+  imposter buckets at startup. Uncommon runtime clips such as
+  `walk_fight_forward`, `advance_fire`, `traverse_run`, and death clips are
+  created the first time a visible far NPC needs them. Focused combat tests
+  verify startup bucket filtering and lazy creation. The accepted Open Frontier
+  artifact
+  `artifacts/perf/2026-05-05T16-36-44-588Z/startup-ui-open-frontier/summary.json`
+  averaged `4526.7ms` mode-click-to-playable, `3867.7ms`
+  deploy-click-to-playable, `437.6ms` WebGL upload total, `35.87ms` average
+  max upload, and `459.33` upload calls versus the same-day baseline
+  `5198ms`, `4466.333ms`, `845.733ms`, `30.967ms`, and `541.333` upload
+  calls. The accepted Zone Control rerun
+  `artifacts/perf/2026-05-05T16-39-16-223Z/startup-ui-zone-control/summary.json`
+  averaged `2994.3ms` mode-click-to-playable, `2458.7ms`
+  deploy-click-to-playable, `415ms` WebGL upload total, `39.5ms` average max
+  upload, and `321.33` upload calls versus baseline `5417ms`, `4887ms`,
+  `841.6ms`, `39.067ms`, and `590` upload calls. A stricter no-eager variant
+  was tested and rejected:
+  `artifacts/perf/2026-05-05T16-33-44-776Z/startup-ui-open-frontier/summary.json`
+  and
+  `artifacts/perf/2026-05-05T16-34-47-581Z/startup-ui-zone-control/summary.json`
+  showed that fully deferring all NPC buckets made Zone deploy-click-to-playable
+  worse than the idle/patrol-eager candidate. Zone artifact
+  `artifacts/perf/2026-05-05T16-37-49-634Z/startup-ui-zone-control/summary.json`
+  is documented as noisy outlier evidence because a single fanPalm normal map
+  upload contaminated the averages. This is accepted as a narrow startup/upload
+  branch only; long tasks, progressive readiness, visual review, and production
+  parity remain open.
 
 Open questions:
 

@@ -131,6 +131,16 @@ vi.mock('./CombatantMeshFactory', () => ({
         walkFrameTextures: new Map(),
       };
     }
+
+    createFactionImpostorBucket(faction: string, clip: string) {
+      return {
+        key: `${faction}_${clip}`,
+        mesh: createMockInstancedMesh(),
+        marker: createMockInstancedMesh(),
+        texture: new THREE.Texture(),
+        material: createMockShaderMaterial(),
+      };
+    }
   },
   disposeCombatantMeshes: vi.fn(),
   updateCombatantTexture: vi.fn(),
@@ -148,6 +158,7 @@ vi.mock('./CombatantMeshFactory', () => ({
   },
   NPC_SPRITE_RENDER_Y_OFFSET: -0.725,
   NPC_CLOSE_MODEL_TARGET_HEIGHT: 2.95,
+  PIXEL_FORGE_NPC_STARTUP_CLIP_IDS: ['idle', 'patrol_walk'],
 }));
 
 vi.mock('./CombatantShaders', () => ({
@@ -320,6 +331,24 @@ describe('CombatantRenderer', () => {
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
       expect(dyingCombatant.billboardIndex).toBeDefined();
+    });
+
+    it('lazy-creates a Pixel Forge impostor bucket when a non-startup clip first appears', () => {
+      const maps = renderer as unknown as { factionMeshes: Map<string, THREE.InstancedMesh> };
+      maps.factionMeshes.delete('NVA_walk_fight_forward');
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant(
+        'engaging-far',
+        Faction.NVA,
+        new THREE.Vector3(120, 0, 0),
+        CombatantState.ENGAGING
+      );
+      combatants.set('engaging-far', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      expect(maps.factionMeshes.has('NVA_walk_fight_forward')).toBe(true);
+      expect(combatant.billboardIndex).toBe(0);
     });
 
     it('culls combatants beyond render distance', () => {

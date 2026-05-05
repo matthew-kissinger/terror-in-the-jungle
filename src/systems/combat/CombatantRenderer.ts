@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState } from './types';
+import { Combatant, CombatantState, Faction } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
 import {
   CombatantMeshFactory,
   NPC_CLOSE_MODEL_TARGET_HEIGHT,
+  PIXEL_FORGE_NPC_STARTUP_CLIP_IDS,
   NPC_SPRITE_RENDER_Y_OFFSET,
   disposeCombatantMeshes,
   getPixelForgeNpcBucketKey,
@@ -207,7 +208,7 @@ export class CombatantRenderer {
   }
 
   async createFactionBillboards(): Promise<void> {
-    const assets = this.meshFactory.createFactionBillboards();
+    const assets = this.meshFactory.createFactionBillboards(PIXEL_FORGE_NPC_STARTUP_CLIP_IDS);
     this.factionMeshes = assets.factionMeshes;
     this.factionAuraMeshes = assets.factionAuraMeshes;
     this.factionGroundMarkers = assets.factionGroundMarkers;
@@ -215,6 +216,27 @@ export class CombatantRenderer {
     this.factionMaterials = assets.factionMaterials;
     this.walkFrameTextures = assets.walkFrameTextures;
     await this.createCloseModelPools();
+  }
+
+  private ensureImpostorBucket(
+    factionPrefix: Faction | 'SQUAD',
+    clipId: PixelForgeNpcClipId,
+  ): THREE.InstancedMesh | undefined {
+    const key = getPixelForgeNpcBucketKey(factionPrefix, clipId);
+    const existing = this.factionMeshes.get(key);
+    if (existing) return existing;
+
+    const bucket = this.meshFactory.createFactionImpostorBucket(factionPrefix, clipId);
+    if (!bucket) return undefined;
+
+    this.factionMeshes.set(bucket.key, bucket.mesh);
+    this.factionGroundMarkers.set(bucket.key, bucket.marker);
+    this.factionMaterials.set(bucket.key, bucket.material);
+    this.soldierTextures.set(bucket.key, bucket.texture);
+    this.renderWriteCounts.set(bucket.key, 0);
+    this.renderCombatStates.set(bucket.key, 0);
+    Logger.info('combat-renderer', `Lazy-created Pixel Forge NPC impostor bucket ${bucket.key}`);
+    return bucket.mesh;
   }
 
   setPlayerSquadId(squadId: string | undefined): void {
@@ -828,7 +850,7 @@ export class CombatantRenderer {
       const clipId = getPixelForgeNpcClipForCombatant(combatant);
       const key = getPixelForgeNpcBucketKey(factionPrefix, clipId);
 
-      const mesh = this.factionMeshes.get(key);
+      const mesh = this.ensureImpostorBucket(factionPrefix, clipId);
       if (!mesh) return;
       const capacity = (mesh.instanceMatrix as any).count ?? mesh.count;
       const index = this.renderWriteCounts.get(key) ?? 0;
@@ -1220,6 +1242,8 @@ export class CombatantRenderer {
   }
 
   updateCombatantTexture(combatant: Combatant): void {
+    const poolKey = getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
+    this.ensureImpostorBucket(poolKey, getPixelForgeNpcClipForCombatant(combatant));
     updateCombatantTexture(this.soldierTextures, combatant);
   }
 

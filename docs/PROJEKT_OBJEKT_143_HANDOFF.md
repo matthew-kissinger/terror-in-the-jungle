@@ -37,9 +37,9 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-05T12-34-31-425Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T16-44-34-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Completion audit:
-  `artifacts/perf/2026-05-05T14-17-00-439Z/projekt-143-completion-audit/completion-audit.json`
+  `artifacts/perf/2026-05-05T16-45-01-714Z/projekt-143-completion-audit/completion-audit.json`
 - Static Projekt suite:
   `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-LOAD fresh sequential startup baselines:
@@ -54,6 +54,10 @@ ledger; this file is the short operational prompt.
   `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json`
   and
   `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png`
+- KB-LOAD lazy NPC imposter bucket branch:
+  `artifacts/perf/2026-05-05T16-36-44-588Z/startup-ui-open-frontier/summary.json`
+  and
+  `artifacts/perf/2026-05-05T16-39-16-223Z/startup-ui-zone-control/summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -153,6 +157,24 @@ ledger; this file is the short operational prompt.
   `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png`.
   Mechanical deltas are inside the review band, but status is WARN until a
   human accepts the visual result.
+  The current local branch also adds lazy Pixel Forge NPC imposter buckets:
+  startup now eagerly creates only `idle` and `patrol_walk` buckets, with other
+  faction/clip buckets created on first visible far-NPC use. Accepted evidence:
+  Open Frontier
+  `artifacts/perf/2026-05-05T16-36-44-588Z/startup-ui-open-frontier/summary.json`
+  averaged `4526.7ms` mode-click-to-playable, `3867.7ms`
+  deploy-click-to-playable, `437.6ms` WebGL upload total, and `459.33` upload
+  calls; Zone Control
+  `artifacts/perf/2026-05-05T16-39-16-223Z/startup-ui-zone-control/summary.json`
+  averaged `2994.3ms` mode-click-to-playable, `2458.7ms`
+  deploy-click-to-playable, `415ms` WebGL upload total, and `321.33` upload
+  calls. The no-eager NPC variant was rejected from
+  `artifacts/perf/2026-05-05T16-33-44-776Z/startup-ui-open-frontier/summary.json`
+  and
+  `artifacts/perf/2026-05-05T16-34-47-581Z/startup-ui-zone-control/summary.json`
+  because Zone deploy-click-to-playable regressed versus the idle/patrol-eager
+  branch. Treat this as a narrow KB-LOAD startup/upload win only; it does not
+  close progressive readiness, visual review, release, or Projekt completion.
 - KB-FORGE `local-pixel-forge-asset-pipeline`: local liaison bureau.
   Pixel Forge is our sibling repo at
   `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.

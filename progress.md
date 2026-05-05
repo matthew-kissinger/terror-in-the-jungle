@@ -3102,3 +3102,38 @@ TODO
   `fanPalm`/`coconut`, and redirecting replacement budget toward approved
   ground-cover/candidate trail work. Validation/release still fails because the
   audited branch was dirty, unpushed, and undeployed.
+
+2026-05-05 Projekt Objekt-143 KB-LOAD lazy NPC imposter buckets
+- Changed Pixel Forge NPC imposter startup residency so the combat renderer
+  eagerly creates only the common `idle` and `patrol_walk` faction buckets.
+  Less common clips now allocate their faction bucket on first visible far-NPC
+  use, instead of requiring every `2688x1344` NPC animated albedo atlas at
+  first reveal.
+- Accepted startup evidence: Open Frontier
+  `artifacts/perf/2026-05-05T16-36-44-588Z/startup-ui-open-frontier/summary.json`
+  averaged `4526.7ms` mode-click-to-playable, `3867.7ms`
+  deploy-click-to-playable, `437.6ms` WebGL upload total, and `459.33` upload
+  calls. Zone Control
+  `artifacts/perf/2026-05-05T16-39-16-223Z/startup-ui-zone-control/summary.json`
+  averaged `2994.3ms` mode-click-to-playable, `2458.7ms`
+  deploy-click-to-playable, `415ms` WebGL upload total, and `321.33` upload
+  calls.
+- Rejected the stricter no-eager NPC variant after
+  `artifacts/perf/2026-05-05T16-33-44-776Z/startup-ui-open-frontier/summary.json`
+  and
+  `artifacts/perf/2026-05-05T16-34-47-581Z/startup-ui-zone-control/summary.json`
+  because Zone deploy-click-to-playable regressed versus the idle/patrol-eager
+  branch. Zone artifact
+  `artifacts/perf/2026-05-05T16-37-49-634Z/startup-ui-zone-control/summary.json`
+  is retained as a noisy outlier due to a single fanPalm normal upload spike.
+- Validation so far: focused combat mesh factory/renderer tests passed and
+  `npm run build` passed with the existing large-chunk warning.
+  `npm run check:projekt-143-cycle3-kickoff` remains WARN only for the known
+  KB-OPTIK human-review decision at
+  `artifacts/perf/2026-05-05T16-44-34-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `npm run check:projekt-143-completion-audit` writes
+  `artifacts/perf/2026-05-05T16-45-01-714Z/projekt-143-completion-audit/completion-audit.json`
+  with expected `NOT_COMPLETE` because the working tree is uncommitted and
+  KB-OPTIK/KB-LOAD/KB-TERRAIN/KB-CULL/release remain open. This is a narrow
+  KB-LOAD startup/upload improvement, not Projekt completion or production
+  parity.
