@@ -3070,3 +3070,32 @@ TODO
   `npm run check:projekt-143-vegetation-normal-proof` passed with expected
   WARN, `npm run check:projekt-143-cycle3-kickoff` passed with expected WARN,
   and `npm run validate:fast` passed with `254` test files and `3876` tests.
+
+2026-05-05 Projekt Objekt-143 KB-FORGE audit refresh
+- Refreshed `npm run check:projekt-143-pixel-forge` after the local
+  Pixel Forge bureau was folded into Projekt Objekt-143. Latest artifact:
+  `artifacts/perf/2026-05-05T12-36-40-786Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`.
+- Result remains expected WARN: Pixel Forge is present at
+  `C:\Users\Mattm\X\games-3d\pixel-forge`, the TIJ pipeline, gallery,
+  vegetation validator, and NPC package surfaces are readable, and the catalog
+  still records `109` manifest entries, `13` vegetation packages, `6` runtime
+  species present, `1` retired species still in the Pixel Forge manifest, `6`
+  blocked/review-only species, `6` prop families, and `5` relevance queues.
+- This refresh keeps the owner framing explicit: KB-FORGE analyzes and catalogs
+  the local Pixel Forge toolchain first. It does not approve runtime imports or
+  replace Pixel Forge with EZ Tree or any other source generator.
+
+2026-05-05 Projekt Objekt-143 completion audit
+- Added `scripts/projekt-143-completion-audit.ts`, exposed as
+  `npm run check:projekt-143-completion-audit`. The audit restates the
+  objective as concrete success criteria, maps the prompt to artifact evidence,
+  checks current git state, and writes JSON/Markdown under
+  `artifacts/perf/<timestamp>/projekt-143-completion-audit/`.
+- Latest artifact:
+  `artifacts/perf/2026-05-05T12-53-49-779Z/projekt-143-completion-audit/completion-audit.json`.
+  Status is `NOT_COMPLETE`, which is expected and intentional. It marks the
+  static suite and scoped KB-EFFECTS grenade path as pass, but KB-OPTIK remains
+  blocked on near-stress visual/human-review decision, KB-LOAD/KB-TERRAIN/
+  KB-CULL remain partial, KB-FORGE remains catalog-only WARN, owner vegetation
+  replacement remains partially covered, and the local branch is dirty,
+  unpushed, and undeployed.

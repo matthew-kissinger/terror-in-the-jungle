@@ -114,6 +114,7 @@
     "check:projekt-143-terrain-placement": "npx tsx scripts/projekt-143-terrain-placement-audit.ts",
     "check:projekt-143-terrain-assets": "npx tsx scripts/projekt-143-terrain-asset-inventory.ts",
     "check:projekt-143-pixel-forge": "npx tsx scripts/projekt-143-pixel-forge-bureau.ts",
+    "check:projekt-143-completion-audit": "npx tsx scripts/projekt-143-completion-audit.ts",
     "check:projekt-143-terrain-routes": "npx tsx scripts/projekt-143-terrain-route-audit.ts",
     "check:projekt-143-cycle2-proof": "npx tsx scripts/projekt-143-cycle2-proof-suite.ts",
     "check:projekt-143-cycle3-kickoff": "npx tsx scripts/projekt-143-cycle3-kickoff.ts",

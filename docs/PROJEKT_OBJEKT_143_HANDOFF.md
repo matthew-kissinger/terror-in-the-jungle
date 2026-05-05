@@ -37,7 +37,9 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-05T12-20-11-036Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T12-34-31-425Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+- Completion audit:
+  `artifacts/perf/2026-05-05T12-53-49-779Z/projekt-143-completion-audit/completion-audit.json`
 - Static Projekt suite:
   `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-LOAD fresh sequential startup baselines:
@@ -65,7 +67,7 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN vegetation source pipeline review:
   `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md`
 - KB-FORGE local Pixel Forge bureau audit:
-  `artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+  `artifacts/perf/2026-05-05T12-36-40-786Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
 - KB-TERRAIN route/trail policy audit:
   `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
@@ -303,10 +305,13 @@ Initial commands:
 3. npm run check:projekt-143-cycle3-kickoff
 4. npm run check:projekt-143
 5. npm run check:projekt-143-pixel-forge
+6. npm run check:projekt-143-completion-audit
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-05T12-20-11-036Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-05T12-34-31-425Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+- Completion audit:
+  artifacts/perf/2026-05-05T12-53-49-779Z/projekt-143-completion-audit/completion-audit.json
 - Static Projekt suite:
   artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json
 - KB-LOAD startup baselines:
@@ -319,7 +324,7 @@ Current evidence anchors:
   artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json
   artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png
 - KB-FORGE local Pixel Forge bureau:
-  artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json
+  artifacts/perf/2026-05-05T12-36-40-786Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json
 - KB-TERRAIN before baseline:
   artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:
