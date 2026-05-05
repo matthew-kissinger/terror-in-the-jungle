@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { GameMode } from '../../config/gameModeTypes';
 import { A_SHAU_VALLEY_CONFIG } from '../../config/AShauValleyConfig';
+import { ZONE_CONTROL_CONFIG } from '../../config/ZoneControlConfig';
 import { AIRFIELD_TEMPLATES } from '../world/AirfieldTemplates';
 import { compileTerrainFeatures } from './TerrainFeatureCompiler';
 import type { IHeightProvider } from './IHeightProvider';
+import { NoiseHeightProvider } from './NoiseHeightProvider';
 import { StampedHeightProvider } from './StampedHeightProvider';
+
+const PLACEMENT_CORE_WARN_SPAN_METERS = 2;
 
 describe('compileTerrainFeatures', () => {
   it('compiles helipad terrain, surface, and vegetation outputs', () => {
@@ -476,6 +480,25 @@ describe('compileTerrainFeatures', () => {
     expect((shoulderStamp?.priority ?? 999)).toBeLessThan(firebaseStamp?.priority ?? 0);
   });
 
+  it('keeps Zone Control authored pads usable on the steep registered seed', () => {
+    const provider = new NoiseHeightProvider(137);
+    const compiled = compileTerrainFeatures(
+      ZONE_CONTROL_CONFIG,
+      (x, z) => provider.getHeightAt(x, z),
+    );
+    const stampedProvider = new StampedHeightProvider(provider, compiled.stamps);
+    const flattenedCircleFeatures = ZONE_CONTROL_CONFIG.features
+      ?.filter((feature) => feature.terrain?.flatten === true && feature.footprint?.shape === 'circle')
+      ?? [];
+
+    for (const feature of flattenedCircleFeatures) {
+      const radius = feature.terrain?.flatRadius ?? feature.footprint.radius;
+      const span = measureCircleSpan(stampedProvider, feature.position.x, feature.position.z, radius);
+      expect(span, `${feature.id} flattened core should stay within placement tolerance`)
+        .toBeLessThanOrEqual(PLACEMENT_CORE_WARN_SPAN_METERS);
+    }
+  });
+
   it('compiles A Shau home-base shoulders so navmesh has staged base terrain', () => {
     const compiled = compileTerrainFeatures(
       A_SHAU_VALLEY_CONFIG,
@@ -494,3 +517,35 @@ describe('compileTerrainFeatures', () => {
     }
   });
 });
+
+function measureCircleSpan(
+  provider: IHeightProvider,
+  centerX: number,
+  centerZ: number,
+  radius: number,
+): number {
+  let minHeight = Number.POSITIVE_INFINITY;
+  let maxHeight = Number.NEGATIVE_INFINITY;
+
+  for (const point of sampleCircle(centerX, centerZ, radius)) {
+    const height = provider.getHeightAt(point.x, point.y);
+    minHeight = Math.min(minHeight, height);
+    maxHeight = Math.max(maxHeight, height);
+  }
+
+  return maxHeight - minHeight;
+}
+
+function sampleCircle(centerX: number, centerZ: number, radius: number): THREE.Vector2[] {
+  const points = [new THREE.Vector2(centerX, centerZ)];
+  for (const sampleRadius of [radius * 0.5, radius]) {
+    for (let index = 0; index < 8; index++) {
+      const angle = (index / 8) * Math.PI * 2;
+      points.push(new THREE.Vector2(
+        centerX + Math.cos(angle) * sampleRadius,
+        centerZ + Math.sin(angle) * sampleRadius,
+      ));
+    }
+  }
+  return points;
+}
