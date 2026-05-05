@@ -51,12 +51,15 @@ optional offline GLB source feeding Pixel Forge rather than replacing it.
 Grass, ground cover, and trail-edge variety should come from Pixel Forge
 catalog/review work, a licensed asset-library review, or custom low-card bake
 before any runtime import. The latest local audit at
-`artifacts/perf/2026-05-05T03-50-22-634Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+`artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
 is WARN with the Pixel Forge sibling repo present, all `6` current TIJ runtime
 vegetation species present, retired `giantPalm` still present in the Pixel
 Forge gallery manifest, all `6` blocked/review-only vegetation species still
 present, and the NPC review package counted as `4` factions, `8` clips, and
-`32` impostor packages. The local audit command is
+`32` impostor packages. Its relevance catalog now records `6` prop families,
+`13` vegetation packages, and `5` review queues for ground-cover budget
+replacement, trail/route surfaces, base/foundation kits, far-canopy/tree
+variety, and NPC/weapon packaging. The local audit command is
 `npm run check:projekt-143-pixel-forge`.
 
 ## Shipped Cycle 0 State

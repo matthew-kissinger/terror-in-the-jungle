@@ -35,7 +35,10 @@ npm run check:projekt-143-pixel-forge
 This reads `C:\Users\Mattm\X\games-3d\pixel-forge`, catalogs the existing TIJ
 pipeline commands, review gallery, output manifest, NPC package surface, and
 vegetation package state, then compares Pixel Forge output against TIJ runtime,
-blocked, and retired vegetation species.
+blocked, and retired vegetation species. It also emits a relevance catalog for
+Pixel Forge prop families, vegetation packages, and review queues covering
+ground-cover budget replacement, route/trail surfaces, base/foundation kits,
+far-canopy/tree variety, and NPC/weapon packaging.
 
 ## Source Tool Read
 

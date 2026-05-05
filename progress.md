@@ -2962,3 +2962,15 @@ TODO
 - `npm run validate:fast` PASS (`253` files, `3874` tests). Updated the
   Projekt ledger and handoff so the local state records the unpushed local
   stack and does not imply production parity.
+
+2026-05-05 Projekt Objekt-143 KB-FORGE relevance catalog
+- Expanded `scripts/projekt-143-pixel-forge-bureau.ts` from a presence/status
+  audit into a relevance catalog for the local Pixel Forge repo. The report now
+  summarizes `6` prop families, `13` vegetation packages, and `5` review
+  queues: ground-cover budget replacement, route/trail surfaces,
+  base/foundation kits, far-canopy/tree variety, and NPC/weapon packaging.
+- Refreshed `npm run check:projekt-143-pixel-forge`: expected WARN at
+  `artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+  because retired `giantPalm` and blocked/review-only species remain present
+  in the Pixel Forge gallery manifest. No Pixel Forge output is accepted for
+  runtime by this catalog.

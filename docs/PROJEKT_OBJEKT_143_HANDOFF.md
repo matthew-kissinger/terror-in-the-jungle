@@ -52,7 +52,7 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN vegetation source pipeline review:
   `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md`
 - KB-FORGE local Pixel Forge bureau audit:
-  `artifacts/perf/2026-05-05T03-50-22-634Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+  `artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
 - KB-TERRAIN route/trail policy audit:
   `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
@@ -112,8 +112,11 @@ ledger; this file is the short operational prompt.
   vegetation species present, retired `giantPalm` still present in the Pixel
   Forge gallery manifest, all `6` blocked/review-only species still present,
   and the NPC review package counted as `4` factions, `8` clips, and `32`
-  impostor packages. KB-FORGE should analyze relevance and package readiness
-  before KB-TERRAIN or KB-OPTIK imports anything into runtime.
+  impostor packages. Its relevance catalog records `6` prop families, `13`
+  vegetation packages, and `5` review queues: ground-cover budget replacement,
+  route/trail surfaces, base/foundation kits, far-canopy/tree variety, and
+  NPC/weapon packaging. KB-FORGE should analyze relevance and package
+  readiness before KB-TERRAIN or KB-OPTIK imports anything into runtime.
 - KB-TERRAIN `large-mode-vegetation-horizon`: `ready_for_branch`.
   The first far-horizon branch must use the terrain baseline before/after
   screenshot path and matched Open Frontier/A Shau perf captures.
@@ -258,7 +261,7 @@ Current evidence anchors:
 - Static Projekt suite:
   artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json
 - KB-FORGE local Pixel Forge bureau:
-  artifacts/perf/2026-05-05T03-50-22-634Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json
+  artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json
 - KB-TERRAIN before baseline:
   artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:
