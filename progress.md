@@ -2974,3 +2974,25 @@ TODO
   because retired `giantPalm` and blocked/review-only species remain present
   in the Pixel Forge gallery manifest. No Pixel Forge output is accepted for
   runtime by this catalog.
+
+2026-05-05 Projekt Objekt-143 KB-LOAD fresh startup baseline
+- Built the current retail bundle with `npm run build` after the short-palm
+  removal and KB-FORGE catalog commits.
+- First Open Frontier/Zone Control startup captures were run concurrently and
+  are treated as diagnostic-only because parallel Chromium runs can contaminate
+  startup timing.
+- Reran the startup baselines sequentially. Open Frontier wrote
+  `artifacts/perf/2026-05-05T04-13-00-783Z/startup-ui-open-frontier/summary.json`
+  with averages: `5209.3ms` mode-click-to-playable, `4516.7ms`
+  deploy-click-to-playable, `844.5ms` WebGL upload total, and `33.1ms` max
+  upload. Zone Control wrote
+  `artifacts/perf/2026-05-05T04-14-18-778Z/startup-ui-zone-control/summary.json`
+  with `5440.3ms` mode-click-to-playable, `4835.7ms`
+  deploy-click-to-playable, `864.567ms` WebGL upload total, and `42ms` max
+  upload.
+- Refreshed `npm run check:projekt-143-cycle3-kickoff`: expected WARN at
+  `artifacts/perf/2026-05-05T04-14-55-548Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  KB-LOAD remains `ready_for_branch`: the prior multi-second `giantPalm`
+  largest-upload failure is gone from the current startup path, but long tasks
+  and multi-second playable latency remain, so this is not a startup-latency
+  win or closeout.

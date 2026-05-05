@@ -36,9 +36,13 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-05T03-50-28-671Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T04-14-55-548Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
   `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`
+- KB-LOAD fresh sequential startup baselines:
+  `artifacts/perf/2026-05-05T04-13-00-783Z/startup-ui-open-frontier/summary.json`
+  and
+  `artifacts/perf/2026-05-05T04-14-18-778Z/startup-ui-zone-control/summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -101,7 +105,13 @@ ledger; this file is the short operational prompt.
 - KB-LOAD `pixel-forge-texture-upload-residency`: `ready_for_branch`.
   GiantPalm warmup reduced WebGL upload totals but did not improve startup
   latency. Do not broaden warmup from the rejected fanPalm evidence without a
-  paired proof.
+  paired proof. Fresh sequential startup baselines after the short-palm
+  retirement record Open Frontier `5209.3ms` mode-click-to-playable,
+  `4516.7ms` deploy-click-to-playable, `844.5ms` WebGL upload total, and
+  `33.1ms` max upload; Zone Control records `5440.3ms`
+  mode-click-to-playable, `4835.7ms` deploy-click-to-playable, `864.567ms`
+  WebGL upload total, and `42ms` max upload. This is current upload/residency
+  evidence only; long tasks and multi-second playable latency remain.
 - KB-FORGE `local-pixel-forge-asset-pipeline`: local liaison bureau.
   Pixel Forge is our sibling repo at
   `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.
@@ -257,9 +267,12 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-05T03-50-28-671Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-05T04-14-55-548Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - Static Projekt suite:
   artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json
+- KB-LOAD startup baselines:
+  artifacts/perf/2026-05-05T04-13-00-783Z/startup-ui-open-frontier/summary.json
+  artifacts/perf/2026-05-05T04-14-18-778Z/startup-ui-zone-control/summary.json
 - KB-FORGE local Pixel Forge bureau:
   artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json
 - KB-TERRAIN before baseline:

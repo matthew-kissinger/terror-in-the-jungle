@@ -43,7 +43,7 @@ latest Projekt suite is
 `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`.
 Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
-`artifacts/perf/2026-05-05T03-50-28-671Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+`artifacts/perf/2026-05-05T04-14-55-548Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
 KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an
@@ -61,6 +61,12 @@ present, and the NPC review package counted as `4` factions, `8` clips, and
 replacement, trail/route surfaces, base/foundation kits, far-canopy/tree
 variety, and NPC/weapon packaging. The local audit command is
 `npm run check:projekt-143-pixel-forge`.
+Fresh sequential KB-LOAD startup baselines after the short-palm retirement are
+filed at
+`artifacts/perf/2026-05-05T04-13-00-783Z/startup-ui-open-frontier/summary.json`
+and
+`artifacts/perf/2026-05-05T04-14-18-778Z/startup-ui-zone-control/summary.json`;
+they are current upload/residency evidence, not a startup-latency closeout.
 
 ## Shipped Cycle 0 State
 
@@ -475,6 +481,19 @@ Progress:
   `artifacts/perf/2026-05-03T21-55-18-768Z/startup-ui-zone-control` regressed
   to `5100.7ms`. Do not broaden startup texture warmup by asset name without a
   paired before/after artifact.
+- 2026-05-05 fresh sequential KB-LOAD baseline after the short-palm removal:
+  `npm run build` passed and retail startup captures wrote
+  `artifacts/perf/2026-05-05T04-13-00-783Z/startup-ui-open-frontier/summary.json`
+  and
+  `artifacts/perf/2026-05-05T04-14-18-778Z/startup-ui-zone-control/summary.json`.
+  Open Frontier averaged `5209.3ms` mode-click-to-playable,
+  `4516.7ms` deploy-click-to-playable, `844.5ms` WebGL upload total, and
+  `33.1ms` max upload. Zone Control averaged `5440.3ms`
+  mode-click-to-playable, `4835.7ms` deploy-click-to-playable, `864.567ms`
+  WebGL upload total, and `42ms` max upload. This records that the retired
+  short palm removed the prior multi-second largest-upload failure from the
+  current startup path, but long tasks and multi-second playable latency remain.
+  Do not call this a startup-latency win or closeout.
 
 Open questions:
 
