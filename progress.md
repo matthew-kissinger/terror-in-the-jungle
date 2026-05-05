@@ -3164,6 +3164,26 @@ TODO
   KB-OPTIK human-review decision at
   `artifacts/perf/2026-05-05T17-50-18-919Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 
+2026-05-05 Projekt Objekt-143 vegetation scale-anchor follow-up
+- Rechecked all active Pixel Forge vegetation after the banana-plant fix and
+  found one remaining generator-level grounding risk: random billboard scale
+  was changing the quad height, but `ChunkVegetationGenerator` still placed
+  centers at `terrainHeight + yOffset`. Oversized instances could therefore
+  sink below the source-alpha base band, while undersized instances could
+  float above it.
+- Fixed every canopy, mid-level, clustered-mid, and random ground-cover
+  placement path to anchor at `terrainHeight + yOffset * instanceScale`, so
+  the visible base stays stable across the existing `0.9..1.1` vegetation
+  scale variation. Added behavior coverage that checks the generated center
+  height tracks the instance scale.
+- Validation: `npx vitest run src\config\vegetationTypes.test.ts src\systems\terrain\ChunkVegetationGenerator.test.ts`
+  passed with `17` tests, and `npm run typecheck -- --pretty false` passed.
+- A direct alpha scan of the actual runtime-sampled vegetation atlas rows after
+  the scale-anchor fix reports worst visible bases across the `0.9..1.1`
+  scale band at: bambooGrove `-0.081m`, fern `0.153m`, bananaPlant `0.021m`,
+  fanPalm `-0.103m`, elephantEar `-0.175m`, and coconut `0.270m`. None of
+  the remaining active species has the old banana-plant half-buried profile.
+
 2026-05-05 Projekt Objekt-143 KB-LOAD close-model and live-entry readiness
 - Added a second KB-LOAD startup branch after the lazy NPC imposter-bucket
   work. Pixel Forge close-GLB NPC pools are no longer built during combat

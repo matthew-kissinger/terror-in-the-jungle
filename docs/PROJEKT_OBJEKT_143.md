@@ -58,13 +58,19 @@ light-green half-buried floor leaves as `bananaPlant`, not `fern` or
 `elephantEar`. It raises the banana-plant runtime anchor, adds an `18deg`
 slope placement cap for that low random imposter, and broadens the grounding
 unit coverage so every active runtime vegetation species has a visible-base
-near-terrain assertion. A source-alpha audit now shows the remaining active
-species have worst visible bases within `0.22m` below terrain, while
-`bananaPlant` moves from the severe buried case to `0.03m` above terrain.
-Focused vegetation tests, the world-feature regression test, `git diff
---check`, the production build, and `validate:fast` pass; no browser visual
-acceptance, perf acceptance, release, or production parity is claimed for this
-local follow-up yet.
+near-terrain assertion. A scale-aware source-alpha audit of runtime-sampled
+atlas rows now shows worst visible bases at bambooGrove `-0.08m`, fern
+`0.15m`, bananaPlant `0.02m`, fanPalm `-0.10m`, elephantEar `-0.18m`, and
+coconut `0.27m`; no active species retains the severe half-buried profile.
+A scale-anchor follow-up found one remaining generator-level risk: random
+vegetation scale changed billboard height but not the terrain-center anchor,
+so larger instances could sink and smaller instances could float. The terrain
+generator now applies `terrainHeight + yOffset * instanceScale` on every
+vegetation placement path, keeping those source-alpha base offsets stable
+across the random scale band. Focused vegetation tests, the world-feature
+regression test, `git diff --check`, the production build, and `validate:fast`
+pass; no browser visual acceptance, perf acceptance, release, or production
+parity is claimed for this local follow-up yet.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
 KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an

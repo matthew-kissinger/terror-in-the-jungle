@@ -214,4 +214,23 @@ describe('ChunkVegetationGenerator', () => {
     expect(flatResult.get('bananaPlant')?.length ?? 0).toBeGreaterThan(0);
     expect(steepResult.get('bananaPlant') ?? []).toHaveLength(0);
   });
+
+  it('scales billboard center height with instance scale so visible bases stay terrain anchored', () => {
+    const terrainHeight = 5;
+    const result = ChunkVegetationGenerator.generateVegetation(
+      0,
+      0,
+      64,
+      () => terrainHeight,
+      bananaPlantGrounded,
+      bananaPlantPalette,
+    );
+    const first = result.get('bananaPlant')?.[0];
+
+    expect(first).toBeDefined();
+    expect(first!.position.y - terrainHeight).toBeCloseTo(
+      bananaPlantGrounded[0].yOffset * first!.scale.y,
+      5,
+    );
+  });
 });

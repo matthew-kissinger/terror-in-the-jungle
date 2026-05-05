@@ -148,7 +148,7 @@ export class ChunkVegetationGenerator {
           const hs = this.hashInts(chunkX + idx, chunkZ, 0xCAFE0001);
           const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
-            position: new THREE.Vector3(baseX + p.x, h + ct.yOffset, baseZ + p.y),
+            position: new THREE.Vector3(baseX + p.x, this.scaledAnchorY(h, ct, s), baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
             rotation: 0,
           });
@@ -193,7 +193,7 @@ export class ChunkVegetationGenerator {
           const hs = this.hashInts(chunkX + idx, chunkZ, 0xCAFE0002);
           const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
-            position: new THREE.Vector3(baseX + p.x, h + mt.yOffset, baseZ + p.y),
+            position: new THREE.Vector3(baseX + p.x, this.scaledAnchorY(h, mt, s), baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
             rotation: 0,
           });
@@ -228,7 +228,7 @@ export class ChunkVegetationGenerator {
         const hs = this.hashInts(chunkX + i, chunkZ, typeSalt ^ 0xCAFE0004);
         const s = 0.9 + (hs / 0xffffffff) * 0.2;
         instances.push({
-          position: new THREE.Vector3(baseX + p.x, h + mt.yOffset, baseZ + p.y),
+          position: new THREE.Vector3(baseX + p.x, this.scaledAnchorY(h, mt, s), baseZ + p.y),
           scale: new THREE.Vector3(s, s, 1),
           rotation: 0,
         });
@@ -265,7 +265,7 @@ export class ChunkVegetationGenerator {
           const hs = this.hashInts(chunkX + i, chunkZ, typeSalt ^ 0xCAFE0003);
           const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
-            position: new THREE.Vector3(baseX + p.x, h + vt.yOffset, baseZ + p.y),
+            position: new THREE.Vector3(baseX + p.x, this.scaledAnchorY(h, vt, s), baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
             rotation: 0,
           });
@@ -291,7 +291,7 @@ export class ChunkVegetationGenerator {
           const hs = this.hashInts(chunkX, chunkZ, typeSalt ^ (i * 7919));
           const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
-            position: new THREE.Vector3(baseX + lx, h + vt.yOffset, baseZ + lz),
+            position: new THREE.Vector3(baseX + lx, this.scaledAnchorY(h, vt, s), baseZ + lz),
             scale: new THREE.Vector3(s, s, 1),
             rotation: 0,
           });
@@ -302,6 +302,14 @@ export class ChunkVegetationGenerator {
     }
 
     return result;
+  }
+
+  private static scaledAnchorY(
+    terrainHeight: number,
+    type: VegetationTypeConfig,
+    instanceScale: number,
+  ): number {
+    return terrainHeight + type.yOffset * instanceScale;
   }
 
   private static getPoissonTemplate(size: number, radius: number): ReadonlyArray<PoissonTemplatePoint> {
