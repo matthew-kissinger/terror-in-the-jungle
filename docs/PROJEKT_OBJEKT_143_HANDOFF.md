@@ -175,6 +175,22 @@ ledger; this file is the short operational prompt.
   because Zone deploy-click-to-playable regressed versus the idle/patrol-eager
   branch. Treat this as a narrow KB-LOAD startup/upload win only; it does not
   close progressive readiness, visual review, release, or Projekt completion.
+  The follow-up KB-LOAD branch also defers Pixel Forge close-GLB NPC pools
+  until after live entry, leaves close NPCs visible as imposters while the
+  close pool is pending, moves deferred warmups until after the first
+  post-reveal frame/timeout, and changes `perf-startup-ui` playable polling so
+  DOM readiness is not gated by `requestAnimationFrame`. Clean accepted
+  evidence: Open Frontier
+  `artifacts/perf/2026-05-05T18-49-03-248Z/startup-ui-open-frontier/summary.json`
+  averaged `4324.3ms` mode-click-to-playable, `3622ms`
+  deploy-click-to-playable, `417.367ms` WebGL upload total, and `149` upload
+  calls; Zone Control
+  `artifacts/perf/2026-05-05T18-47-51-310Z/startup-ui-zone-control/summary.json`
+  averaged `2774.3ms` mode-click-to-playable, `2138.7ms`
+  deploy-click-to-playable, `415.1ms` WebGL upload total, and `116` upload
+  calls. Treat this as another scoped KB-LOAD readiness/upload improvement,
+  not full texture policy, visual review, production parity, or Projekt
+  completion.
 - KB-FORGE `local-pixel-forge-asset-pipeline`: local liaison bureau.
   Pixel Forge is our sibling repo at
   `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.

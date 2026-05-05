@@ -147,6 +147,25 @@ because Zone deploy-click-to-playable regressed versus the idle/patrol-eager
 candidate; a noisy Zone rerun at
 `artifacts/perf/2026-05-05T16-37-49-634Z/startup-ui-zone-control/summary.json`
 is retained as outlier evidence due to a single fanPalm normal upload spike.
+The follow-up KB-LOAD startup branch defers Pixel Forge close-GLB NPC pools
+until after live entry, keeps close NPCs visible as imposters while their GLB
+pool is pending, moves live-entry deferred warmups until after the first
+post-reveal frame/timeout, and fixes `perf-startup-ui` so DOM-playable polling
+is not tied to `requestAnimationFrame`. Clean accepted startup evidence is
+Open Frontier
+`artifacts/perf/2026-05-05T18-49-03-248Z/startup-ui-open-frontier/summary.json`
+at `4324.3ms` mode-click-to-playable, `3622ms` deploy-click-to-playable,
+`417.367ms` WebGL upload total, `31.467ms` average max upload, and `149`
+upload calls; and Zone Control
+`artifacts/perf/2026-05-05T18-47-51-310Z/startup-ui-zone-control/summary.json`
+at `2774.3ms` mode-click-to-playable, `2138.7ms`
+deploy-click-to-playable, `415.1ms` WebGL upload total, `36.433ms` average max
+upload, and `116` upload calls. The contaminated Open Frontier rerun at
+`artifacts/perf/2026-05-05T18-47-02-323Z/startup-ui-open-frontier/summary.json`
+is retained as diagnostic because one coconut normal upload spiked to
+`1708ms`. This branch is a scoped startup/readiness improvement; it does not
+close KB-LOAD texture policy, vegetation-normal visual review, production
+parity, or Projekt completion.
 
 ## Shipped Cycle 0 State
 

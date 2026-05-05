@@ -3163,3 +3163,28 @@ TODO
   `npm run check:projekt-143-cycle3-kickoff` remains WARN only for the known
   KB-OPTIK human-review decision at
   `artifacts/perf/2026-05-05T17-50-18-919Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+
+2026-05-05 Projekt Objekt-143 KB-LOAD close-model and live-entry readiness
+- Added a second KB-LOAD startup branch after the lazy NPC imposter-bucket
+  work. Pixel Forge close-GLB NPC pools are no longer built during combat
+  system init; close NPCs remain visible as imposters while their close-GLB pool
+  is queued, then the pool loads after live entry.
+- Tightened live-entry scheduling: the post-terrain frame yield is now
+  telemetry only, deferred initialization/grenade/shader warmups are scheduled
+  after the first post-reveal frame/timeout, and the close-GLB lazy-load gate
+  opens later instead of competing with the first playable frame.
+- Fixed `scripts/perf-startup-ui.ts` so the playable DOM condition polls on a
+  timer rather than `requestAnimationFrame`; delayed compositor frames remain
+  visible in startup marks but no longer hide DOM readiness.
+- Clean accepted startup evidence: Open Frontier
+  `artifacts/perf/2026-05-05T18-49-03-248Z/startup-ui-open-frontier/summary.json`
+  averaged `4324.3ms` mode-click-to-playable, `3622ms`
+  deploy-click-to-playable, `417.367ms` WebGL upload total, and `149` upload
+  calls. Zone Control
+  `artifacts/perf/2026-05-05T18-47-51-310Z/startup-ui-zone-control/summary.json`
+  averaged `2774.3ms` mode-click-to-playable, `2138.7ms`
+  deploy-click-to-playable, `415.1ms` WebGL upload total, and `116` upload
+  calls.
+- This is a scoped KB-LOAD readiness/upload improvement. It does not close
+  vegetation-normal visual review, broad texture policy, release, production
+  parity, or Projekt Objekt-143 completion.

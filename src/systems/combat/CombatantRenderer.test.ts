@@ -238,7 +238,7 @@ describe('CombatantRenderer', () => {
     assetLoader = createMockAssetLoader();
 
     renderer = new CombatantRenderer(scene, camera, assetLoader);
-    await renderer.createFactionBillboards();
+    await renderer.createFactionBillboards({ eagerCloseModelPools: true });
 
     vi.clearAllMocks();
   });
@@ -290,6 +290,29 @@ describe('CombatantRenderer', () => {
       const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
       expect(combatant.billboardIndex).toBe(-1);
       expect(activeCloseModels.has('expanded-near')).toBe(true);
+    });
+
+    it('keeps close NPCs visible as impostors while a close-model pool is still lazy-loading', async () => {
+      vi.useFakeTimers();
+      const lazyRenderer = new CombatantRenderer(scene, camera, assetLoader);
+      await lazyRenderer.createFactionBillboards();
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('near-lazy', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      combatants.set('near-lazy', combatant);
+
+      lazyRenderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const lazyState = lazyRenderer as unknown as {
+        activeCloseModels: Map<string, unknown>;
+        closeModelPoolLoads: Map<string, Promise<void>>;
+      };
+      expect(lazyState.activeCloseModels.has('near-lazy')).toBe(false);
+      expect(lazyState.closeModelPoolLoads.has(Faction.NVA)).toBe(true);
+      expect(combatant.billboardIndex).toBe(0);
+
+      lazyRenderer.dispose();
+      await vi.runOnlyPendingTimersAsync();
+      vi.useRealTimers();
     });
 
     it('prioritizes nearest hard-close actors when a close pool is exhausted', () => {

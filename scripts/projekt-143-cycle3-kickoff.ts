@@ -540,7 +540,7 @@ function buildLoadTarget(
     bureau: 'KB-LOAD',
     status: hasStartup && hasTextureAudit ? 'ready_for_branch' : 'needs_baseline',
     priority: 2,
-    summary: 'KB-LOAD retired the old giantPalm-only warmup with the small-palm runtime removal; the next WebGL branch should target remaining upload/residency only if it preserves visual parity and records before/after startup upload tables.',
+    summary: 'KB-LOAD has scoped startup/upload wins from lazy NPC imposter buckets plus post-reveal background work and lazy close-GLB pool loading; remaining texture/upload branches still need paired visual proof and before/after startup tables.',
     evidence: {
       textureAuditPath: rel(texturePath),
       startupOpenFrontierPath: rel(startupOpenPath),
@@ -574,6 +574,7 @@ function buildLoadTarget(
       'Run fresh Open Frontier and Zone Control startup UI artifacts immediately before the branch if the latest startup artifacts predate the target assets.',
       'Do not broaden startup texture warmup from the rejected fanPalm artifact without a new paired proof.',
       'Choose one remaining texture class first: fanPalm with a latency guard, NPC albedo atlases, approved asset regeneration, or preload/deferred upload policy.',
+      'Keep live-entry background work and close-GLB pool loading out of the first playable frame unless paired startup artifacts prove no regression.',
       'Pair all texture candidates with KB-OPTIK visual proof before shipping. Vegetation normal-map removal now has a mechanical A/B proof path, but it remains human-review WARN until the contact sheet is accepted.',
     ],
     acceptance: [

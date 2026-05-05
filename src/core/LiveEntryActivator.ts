@@ -9,6 +9,7 @@ import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 import { resolveModeSpawnPosition } from './ModeSpawnPosition';
 import { resolveNearbySafeSpawnPosition, resolveOpenSpawnFacingYaw } from './SpawnFacing';
 import { PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES } from '../config/pixelForgeAssets';
+import { PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG } from '../systems/combat/PixelForgeNpcRuntime';
 
 const LIVE_ENTRY_FRAME_YIELD_TIMEOUT_MS = 100;
 
@@ -42,6 +43,7 @@ export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.V
 }
 
 async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): Promise<void> {
+  setNpcCloseModelLazyLoadAllowed(false);
   markStartup('engine-init.startup-flow.begin');
   const startTime = performance.now();
   const markStepBegin = (step: string): void => {
@@ -55,6 +57,27 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     if (status) {
       engine.renderer.setSpawnLoadingStatus(status, detail);
     }
+  };
+  const schedulePostRevealBackgroundTasks = (): void => {
+    markStepBegin('background-tasks-schedule');
+    requestBackgroundTask(engine, () => {
+      try {
+        const cs = engine.systemManager.combatantSystem;
+        const warmupPos = new THREE.Vector3(0, -500, 0);
+        cs.explosionEffectsPool.spawn(warmupPos);
+        cs.impactEffectsPool.spawn(warmupPos, warmupPos);
+      } catch {
+        // Engine may already be disposing after a short-lived warmup run.
+      }
+    }, 1000);
+    requestBackgroundTask(engine, () => engine.renderer.precompileShaders(), 2000);
+    requestBackgroundTask(engine, () => engine.systemManager.startDeferredInitialization(), 500);
+    window.setTimeout(() => {
+      if (engine.isDisposed) return;
+      setNpcCloseModelLazyLoadAllowed(true);
+      markStartup('engine-init.startup-flow.npc-close-model-lazy-load.allowed');
+    }, 5000);
+    markStepEnd('background-tasks-schedule');
   };
 
   markStepBegin('hide-loading');
@@ -106,8 +129,11 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     markStepEnd('texture-upload-warmup');
   }
 
-  const frameYield = await nextFrame();
-  markStartup(`engine-init.startup-flow.flush-chunk-update.yield-${frameYield}`);
+  void nextFrame().then((frameYield) => {
+    markStartup(`engine-init.startup-flow.flush-chunk-update.post-reveal-yield-${frameYield}`);
+    schedulePostRevealBackgroundTasks();
+  });
+  markStartup('engine-init.startup-flow.flush-chunk-update.yield-not-gated');
   markStepEnd('flush-chunk-update');
 
   markStepBegin('renderer-visible');
@@ -145,29 +171,16 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
   }
   markStepEnd('combat-enable');
 
-  // Warm GPU pipeline by spawning one explosion below ground.
-  // This forces shader compilation + texture/buffer uploads through the
-  // actual render pipeline, eliminating first-grenade stalls.
-  markStepBegin('background-tasks-schedule');
-  requestBackgroundTask(engine, () => {
-    try {
-      const cs = engine.systemManager.combatantSystem;
-      const warmupPos = new THREE.Vector3(0, -500, 0);
-      cs.explosionEffectsPool.spawn(warmupPos);
-      cs.impactEffectsPool.spawn(warmupPos, warmupPos);
-    } catch {
-      // Engine may already be disposing after a short-lived warmup run.
-    }
-  }, 1000);
-  requestBackgroundTask(engine, () => engine.renderer.precompileShaders(), 2000);
-  requestBackgroundTask(engine, () => engine.systemManager.startDeferredInitialization(), 500);
-  markStepEnd('background-tasks-schedule');
-
   markStepBegin('enter-live');
   engine.startupFlow.enterLive();
   markStepEnd('enter-live');
   markPhase(`interactive-ready (${(performance.now() - startTime).toFixed(1)}ms)`);
   markStartup('engine-init.startup-flow.interactive-ready');
+}
+
+function setNpcCloseModelLazyLoadAllowed(allowed: boolean): void {
+  if (typeof window === 'undefined') return;
+  (window as unknown as Record<string, boolean>)[PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG] = allowed;
 }
 
 function nextFrame(): Promise<'raf' | 'timeout'> {
@@ -188,7 +201,7 @@ function nextFrame(): Promise<'raf' | 'timeout'> {
   });
 }
 
-function requestBackgroundTask(engine: GameEngine, task: () => void, timeoutMs: number): void {
+function requestBackgroundTask(engine: GameEngine, task: () => void, delayMs: number): void {
   const runSafely = () => {
     if (engine.isDisposed) {
       return;
@@ -199,12 +212,15 @@ function requestBackgroundTask(engine: GameEngine, task: () => void, timeoutMs: 
       // Background warmups are best-effort only and should never crash the page.
     }
   };
-  const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
-  if (typeof w.requestIdleCallback === 'function') {
-    w.requestIdleCallback(() => runSafely(), { timeout: timeoutMs });
-  } else {
-    setTimeout(runSafely, timeoutMs);
-  }
+  window.setTimeout(() => {
+    if (engine.isDisposed) return;
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+    if (typeof w.requestIdleCallback === 'function') {
+      w.requestIdleCallback(() => runSafely(), { timeout: 1000 });
+    } else {
+      runSafely();
+    }
+  }, delayMs);
 }
 
 export function logWelcomeMessage(engine: GameEngine): void {

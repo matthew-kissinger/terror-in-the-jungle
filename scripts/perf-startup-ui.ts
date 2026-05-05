@@ -305,7 +305,13 @@ async function runBenchmarkIteration(
       const canvasVisible = !!canvas && getComputedStyle(canvas).display !== 'none';
       const respawnHidden = !respawn || getComputedStyle(respawn).display === 'none';
       return hudPhase === 'playing' && canvasVisible && respawnHidden && !overlay;
-    }, undefined, { timeout: 120_000 });
+    }, undefined, {
+      timeout: 120_000,
+      // Do not use rAF polling for the readiness gate. A delayed compositor
+      // frame is useful evidence, but it must not hide that the live-entry DOM
+      // state is already playable.
+      polling: 50,
+    });
     const tPlayable = Date.now();
 
     const startup = await page.evaluate(() => {
