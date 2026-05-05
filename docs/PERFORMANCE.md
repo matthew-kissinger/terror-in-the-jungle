@@ -164,6 +164,16 @@ with relative asset paths, dimensions, sample counts, and max upload durations
 so Projekt KB-LOAD can name current residency targets without digging into raw
 observer output.
 
+For KB-LOAD candidate proof runs, `perf-startup-ui.ts` also supports
+`--disable-vegetation-normals`. That flag injects
+`window.__KB_LOAD_DISABLE_VEGETATION_NORMALS__ = true` before app startup, so
+`GPUBillboardSystem` skips vegetation normal-map binding and uses hemisphere
+vegetation shading only for that run. Candidate summaries record
+`candidateFlags.disableVegetationNormals=true` and are written to
+`startup-ui-<mode>-vegetation-normals-disabled/`. Treat those folders as
+candidate evidence only; the default runtime path and default kickoff baseline
+selection still use `startup-ui-<mode>/`.
+
 `perf-grenade-spike.ts` writes KB-EFFECTS artifacts under
 `artifacts/perf/<timestamp>/grenade-spike-<mode>/`: `summary.json`,
 `baseline-snapshot.json`, `detonation-snapshot.json`, `render-attribution.json`,
@@ -655,6 +665,19 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   Treat this as partial startup-upload remediation plus next-target evidence,
   not as a startup-latency win, clean frame-time baseline, or production parity
   proof.
+- 2026-05-05 KB-LOAD vegetation-normal proof mode: `perf-startup-ui.ts`
+  gained `--disable-vegetation-normals`, which writes candidate folders under
+  `startup-ui-<mode>-vegetation-normals-disabled/` and keeps default startup
+  baselines separate. Open Frontier candidate proof
+  `artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json`
+  averaged `4420ms` mode-click-to-playable and `3741.333ms`
+  deploy-click-to-playable, but the upload table is noisy because an
+  `(inline-or-unknown)` upload reached `1736.4ms`. Zone Control candidate proof
+  `artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json`
+  averaged `3203.667ms` mode-click-to-playable, `2631.667ms`
+  deploy-click-to-playable, `767.467ms` WebGL upload total, and `492.667`
+  upload calls. This is not an accepted art or runtime policy change; vegetation
+  normal-map removal still requires KB-OPTIK side-by-side visual review.
 - 2026-05-02 Cycle 1 trusted steady-state evidence: Open Frontier short wrote
   `artifacts/perf/2026-05-02T22-11-29-560Z` with measurement trust PASS,
   avg/p95/p99/max `23.70/29.20/32.70/100ms`, 4 hitches above `50ms`, renderer

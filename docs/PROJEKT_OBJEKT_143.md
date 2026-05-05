@@ -43,7 +43,7 @@ latest Projekt suite is
 `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`.
 Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
-`artifacts/perf/2026-05-05T04-26-07-523Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+`artifacts/perf/2026-05-05T05-34-24-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
 KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an
@@ -75,6 +75,25 @@ average max upload. Zone Control averages `5417ms` mode-click-to-playable,
 largest-upload failure; current top targets are Pixel Forge vegetation
 imposters/normals and NPC animated albedo atlases. This is current
 upload/residency attribution, not a startup-latency closeout.
+A proof-only KB-LOAD candidate hook now exists for startup measurement:
+`scripts/perf-startup-ui.ts --disable-vegetation-normals` injects a runtime
+flag before app startup, skips vegetation normal-map binding, forces the
+vegetation shader profile to `hemisphere`, records
+`candidateFlags.disableVegetationNormals=true`, and writes candidate artifacts
+under `startup-ui-<mode>-vegetation-normals-disabled/` so default kickoff
+selection does not confuse them with baselines. Default runtime still loads
+vegetation normal maps. The latest Open Frontier candidate at
+`artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json`
+averaged `4420ms` mode-click-to-playable and `3741.333ms`
+deploy-click-to-playable, but its upload table is contaminated by a large
+`(inline-or-unknown)` upload (`1736.4ms` max) and `1365.8ms` average upload
+total. The cleaner Zone Control candidate at
+`artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json`
+averaged `3203.667ms` mode-click-to-playable, `2631.667ms`
+deploy-click-to-playable, `767.467ms` WebGL upload total, `41.267ms` average
+max upload, and `492.667` upload calls. Treat this as candidate evidence only:
+normal-map removal still needs KB-OPTIK screenshot/luma/chroma review before it
+can become an accepted runtime asset policy.
 
 ## Shipped Cycle 0 State
 
@@ -346,7 +365,7 @@ Acceptance:
 
 ### KB-LOAD - Initialization And Cold Start
 
-Status: FIRST SCOPED TEXTURE-UPLOAD WARMUP LANDED LOCALLY; CLOSEOUT BLOCKED ON FOLLOW-UP UPLOAD AND RESIDENCY EVIDENCE.
+Status: UPLOAD ATTRIBUTION ACTIVE; VEGETATION-NORMAL PROOF HOOK LOCAL; CLOSEOUT BLOCKED ON VISUAL REVIEW AND FOLLOW-UP RESIDENCY EVIDENCE.
 
 Progress:
 
@@ -526,6 +545,26 @@ Progress:
   multi-second largest-upload failure from the current startup path, but long
   tasks and multi-second playable latency remain. Do not call this a
   startup-latency win or closeout.
+- 2026-05-05 KB-LOAD vegetation-normal proof mode: `scripts/perf-startup-ui.ts`
+  now accepts `--disable-vegetation-normals`, injects
+  `window.__KB_LOAD_DISABLE_VEGETATION_NORMALS__ = true` before app startup,
+  records `candidateFlags.disableVegetationNormals=true`, and writes candidate
+  artifacts under `startup-ui-<mode>-vegetation-normals-disabled/`. The runtime
+  proof hook leaves the default app path unchanged. `GPUBillboardSystem` only
+  skips normal textures and forces `hemisphere` vegetation shading when that
+  explicit proof flag is present. Open Frontier candidate evidence at
+  `artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json`
+  averaged `4420ms` mode-click-to-playable and `3741.333ms`
+  deploy-click-to-playable, but its upload table is noisy because a large
+  `(inline-or-unknown)` upload reached `1736.4ms`, leaving upload total at
+  `1365.8ms`. Zone Control candidate evidence at
+  `artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json`
+  is cleaner: `3203.667ms` mode-click-to-playable, `2631.667ms`
+  deploy-click-to-playable, `767.467ms` WebGL upload total, `41.267ms` average
+  max upload, and `492.667` upload calls. No vegetation normal-map removal is
+  accepted by this proof. KB-OPTIK still needs side-by-side visual screenshots
+  and luma/chroma/fog review before any runtime default or Pixel Forge bake
+  policy changes.
 
 Open questions:
 

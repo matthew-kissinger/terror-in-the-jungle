@@ -104,6 +104,10 @@ type WebglUploadSummary = {
   largestUploads: WebglLargestUpload[];
 };
 
+type CandidateFlags = {
+  disableVegetationNormals: boolean;
+};
+
 type CpuProfileSnapshot = unknown;
 
 type BenchmarkRun = {
@@ -131,6 +135,7 @@ type Summary = {
   mode: string;
   runs: number;
   url: string;
+  candidateFlags: CandidateFlags;
   averagesMs: Record<string, number>;
   summary: {
     modeClickToPlayableMs: MetricSummary;
@@ -172,7 +177,7 @@ function timestampSlug(): string {
   return new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
 }
 
-function parseArgs(): { mode: string; runs: number; port: number; headed: boolean } {
+function parseArgs(): { mode: string; runs: number; port: number; headed: boolean; candidateFlags: CandidateFlags } {
   const args = process.argv.slice(2);
   const readValue = (flag: string, fallback: string): string => {
     const index = args.findIndex((arg) => arg === `--${flag}`);
@@ -187,6 +192,9 @@ function parseArgs(): { mode: string; runs: number; port: number; headed: boolea
     runs: Number(readValue('runs', String(DEFAULT_RUNS))),
     port: Number(readValue('port', String(DEFAULT_PORT))),
     headed: args.includes('--headed'),
+    candidateFlags: {
+      disableVegetationNormals: args.includes('--disable-vegetation-normals'),
+    },
   };
 }
 
@@ -229,6 +237,7 @@ async function runBenchmarkIteration(
   iteration: number,
   mode: string,
   port: number,
+  candidateFlags: CandidateFlags,
 ): Promise<BenchmarkRun> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   const page = await context.newPage();
@@ -254,6 +263,11 @@ async function runBenchmarkIteration(
     await cdpSession.send('Profiler.enable');
     await cdpSession.send('Profiler.start');
     const t0 = Date.now();
+    if (candidateFlags.disableVegetationNormals) {
+      await page.addInitScript({
+        content: 'window.__KB_LOAD_DISABLE_VEGETATION_NORMALS__ = true;',
+      });
+    }
     await page.addInitScript({ content: readFileSync(OBSERVER_SCRIPT_PATH, 'utf-8') });
     await page.goto(`http://${HOST}:${port}/?logLevel=info`, { waitUntil: 'networkidle', timeout: 120_000 });
     await page.waitForSelector('button[data-ref="start"]', { state: 'visible', timeout: 120_000 });
@@ -493,13 +507,14 @@ function buildWebglUploadSummary(runs: BenchmarkRun[]): WebglUploadSummary {
   };
 }
 
-function buildSummary(mode: string, runs: BenchmarkRun[], url: string): Summary {
+function buildSummary(mode: string, runs: BenchmarkRun[], url: string, candidateFlags: CandidateFlags): Summary {
   const webglUploadSummary = buildWebglUploadSummary(runs);
   return {
     createdAt: new Date().toISOString(),
     mode,
     runs: runs.length,
     url,
+    candidateFlags,
     averagesMs: {
       pageLoadToStartVisible: averageMetric(runs, 'pageLoadToStartVisible'),
       startClickToModeVisible: averageMetric(runs, 'startClickToModeVisible'),
@@ -554,17 +569,25 @@ async function main(): Promise<void> {
   try {
     const runs: BenchmarkRun[] = [];
     for (let iteration = 1; iteration <= options.runs; iteration++) {
-      runs.push(await runBenchmarkIteration(browser, iteration, options.mode, options.port));
+      runs.push(await runBenchmarkIteration(browser, iteration, options.mode, options.port, options.candidateFlags));
     }
 
+    const candidateSuffix = options.candidateFlags.disableVegetationNormals
+      ? '-vegetation-normals-disabled'
+      : '';
     const artifactDir = join(
       ARTIFACT_ROOT,
       timestampSlug(),
-      `startup-ui-${options.mode.replaceAll('_', '-')}`,
+      `startup-ui-${options.mode.replaceAll('_', '-')}${candidateSuffix}`,
     );
     mkdirSync(artifactDir, { recursive: true });
 
-    const summary = buildSummary(options.mode, runs, `http://${HOST}:${options.port}/?logLevel=info`);
+    const summary = buildSummary(
+      options.mode,
+      runs,
+      `http://${HOST}:${options.port}/?logLevel=info`,
+      options.candidateFlags
+    );
     writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2));
     writeFileSync(
       join(artifactDir, 'startup-marks.json'),

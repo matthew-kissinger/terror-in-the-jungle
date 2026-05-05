@@ -3018,3 +3018,30 @@ TODO
   `fanPalm` imposter; Zone Control is led by `bananaPlant`, `bambooGrove`, and
   `fanPalm` imposters. The retired short palm is no longer the largest-upload
   failure, but long tasks and multi-second playable latency remain.
+
+2026-05-05 Projekt Objekt-143 KB-LOAD vegetation-normal proof mode
+- Added a proof-only `--disable-vegetation-normals` option to
+  `scripts/perf-startup-ui.ts`. It injects
+  `window.__KB_LOAD_DISABLE_VEGETATION_NORMALS__ = true` before app startup,
+  records `candidateFlags.disableVegetationNormals=true`, and writes candidate
+  artifacts under `startup-ui-<mode>-vegetation-normals-disabled/` so default
+  startup baselines stay separate.
+- `GPUBillboardSystem` keeps the default normal-lit Pixel Forge vegetation path
+  unchanged, but when the proof flag is present it skips vegetation normal
+  textures and forces hemisphere shading for the run. Added focused unit
+  coverage for both default and proof-hook behavior.
+- Candidate startup evidence: Open Frontier wrote
+  `artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json`
+  with `4420ms` mode-click-to-playable and `3741.333ms`
+  deploy-click-to-playable, but upload attribution is noisy due to a large
+  `(inline-or-unknown)` upload. Zone Control wrote
+  `artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json`
+  with `3203.667ms` mode-click-to-playable, `2631.667ms`
+  deploy-click-to-playable, `767.467ms` WebGL upload total, and `492.667`
+  upload calls. This is measurement evidence only, not approval to remove
+  vegetation normal maps from the default runtime or Pixel Forge bake.
+- Validation: `git diff --check` passed, `npm run check:projekt-143-cycle3-kickoff`
+  remained WARN only for the existing KB-OPTIK human-review decision at
+  `artifacts/perf/2026-05-05T05-34-24-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  `npm run validate:fast` passed with `254` test files and `3876` tests, and
+  `npm run build` passed with the existing large-chunk warning.

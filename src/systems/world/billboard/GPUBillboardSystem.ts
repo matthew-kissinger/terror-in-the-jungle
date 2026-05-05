@@ -4,6 +4,10 @@ import { Logger } from '../../../utils/Logger';
 import { GPUBillboardVegetation, GPUVegetationConfig, BillboardLighting } from './BillboardBufferManager';
 import { VegetationTypeConfig } from '../../../config/vegetationTypes';
 
+function shouldDisableVegetationNormalMapsForProof(): boolean {
+  const globalScope = globalThis as { __KB_LOAD_DISABLE_VEGETATION_NORMALS__?: boolean };
+  return globalScope.__KB_LOAD_DISABLE_VEGETATION_NORMALS__ === true;
+}
 
 export class GPUBillboardSystem {
   private vegetationTypes: Map<string, GPUBillboardVegetation> = new Map();
@@ -23,6 +27,10 @@ export class GPUBillboardSystem {
    */
   async initializeFromConfig(types: VegetationTypeConfig[]): Promise<void> {
     Logger.info('vegetation', 'Initializing GPU billboard system');
+    const disableNormalMaps = shouldDisableVegetationNormalMapsForProof();
+    if (disableNormalMaps) {
+      Logger.info('vegetation', 'KB-LOAD proof mode: vegetation normal maps disabled for this run');
+    }
 
     for (const vegType of types) {
       const texture = this.assetLoader.getTexture(vegType.textureName);
@@ -30,7 +38,7 @@ export class GPUBillboardSystem {
         Logger.warn('vegetation', `Texture not found for ${vegType.id} (${vegType.textureName}), skipping`);
         continue;
       }
-      const normalTexture = vegType.normalTextureName
+      const normalTexture = !disableNormalMaps && vegType.normalTextureName
         ? this.assetLoader.getTexture(vegType.normalTextureName)
         : undefined;
 
@@ -43,7 +51,7 @@ export class GPUBillboardSystem {
         maxDistance: vegType.maxDistance,
         representation: vegType.representation,
         atlasProfile: vegType.atlasProfile,
-        shaderProfile: vegType.shaderProfile,
+        shaderProfile: disableNormalMaps ? 'hemisphere' : vegType.shaderProfile,
       };
       if (normalTexture) config.normalTexture = normalTexture;
       if (vegType.imposterAtlas) config.imposterAtlas = vegType.imposterAtlas;

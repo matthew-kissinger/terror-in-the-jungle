@@ -16,8 +16,9 @@ ledger; this file is the short operational prompt.
 - Current local `master` has an unpushed local stack on top of
   `origin/master`. The stack includes the Zone Control pad fix, short-palm
   retirement, vegetation source-pipeline review, KB-FORGE bureau audit, and
-  this handoff refresh. Run `git log --oneline origin/master..master` for the
-  exact current count. These are not pushed or deployed.
+  KB-LOAD startup/upload attribution work, including the vegetation-normal
+  proof hook. Run `git log --oneline origin/master..master` for the exact
+  current count. These are not pushed or deployed.
 - GitHub CI run `25353544629` passed on `356bc2e` for lint, test, build,
   smoke, perf, and mobile UI.
 - No production parity is claimed for the latest `master` state. Live Pages
@@ -36,13 +37,17 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-05T04-26-07-523Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T05-34-24-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
   `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-LOAD fresh sequential startup baselines:
   `artifacts/perf/2026-05-05T04-24-07-730Z/startup-ui-open-frontier/summary.json`
   and
   `artifacts/perf/2026-05-05T04-25-31-931Z/startup-ui-zone-control/summary.json`
+- KB-LOAD vegetation-normal candidate proof:
+  `artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json`
+  and
+  `artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -116,7 +121,23 @@ ledger; this file is the short operational prompt.
   `npcs/usArmy/idle/animated-albedo-packed.png`, `bambooGrove` imposter, and
   `fanPalm` imposter; Zone Control is led by `bananaPlant`, `bambooGrove`, and
   `fanPalm` imposters. This is current upload/residency attribution only; long
-  tasks and multi-second playable latency remain.
+  tasks and multi-second playable latency remain. A proof-only startup option
+  now exists through
+  `npx tsx scripts/perf-startup-ui.ts --mode <mode> --disable-vegetation-normals`.
+  It injects `window.__KB_LOAD_DISABLE_VEGETATION_NORMALS__ = true`, writes
+  `candidateFlags.disableVegetationNormals=true`, skips vegetation normal-map
+  binding, and stores artifacts under
+  `startup-ui-<mode>-vegetation-normals-disabled/` so default baselines and
+  kickoff selection stay separate. Current candidate evidence: Open Frontier
+  `artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json`
+  averaged `4420ms` mode-click-to-playable and `3741.333ms`
+  deploy-click-to-playable, but upload attribution is noisy due to a large
+  `(inline-or-unknown)` upload (`1736.4ms` max). Zone Control
+  `artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json`
+  is cleaner at `3203.667ms` mode-click-to-playable, `2631.667ms`
+  deploy-click-to-playable, `767.467ms` WebGL upload total, and `492.667`
+  upload calls. This is not approval to remove vegetation normal maps from the
+  default runtime or Pixel Forge bake; KB-OPTIK visual review is still required.
 - KB-FORGE `local-pixel-forge-asset-pipeline`: local liaison bureau.
   Pixel Forge is our sibling repo at
   `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.
@@ -272,12 +293,15 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-05T04-14-55-548Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-05T05-34-24-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - Static Projekt suite:
   artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json
 - KB-LOAD startup baselines:
-  artifacts/perf/2026-05-05T04-13-00-783Z/startup-ui-open-frontier/summary.json
-  artifacts/perf/2026-05-05T04-14-18-778Z/startup-ui-zone-control/summary.json
+  artifacts/perf/2026-05-05T04-24-07-730Z/startup-ui-open-frontier/summary.json
+  artifacts/perf/2026-05-05T04-25-31-931Z/startup-ui-zone-control/summary.json
+- KB-LOAD vegetation-normal candidate proof:
+  artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json
+  artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json
 - KB-FORGE local Pixel Forge bureau:
   artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json
 - KB-TERRAIN before baseline:
@@ -322,7 +346,10 @@ Current evidence anchors:
   artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json
 
 Current bureau state:
-- KB-LOAD: ready_for_branch, but no startup-latency win yet.
+- KB-LOAD: ready_for_branch, but no startup-latency win yet. The
+  `--disable-vegetation-normals` startup option is a proof-only measurement
+  hook; do not turn it into a default runtime policy without KB-OPTIK
+  screenshot/luma/chroma evidence.
 - KB-TERRAIN: ready_for_branch, before baseline exists; no far-canopy fix yet.
   Include the owner visual target: majority green/jungle floor, possible
   inverted material distribution, remove the short Quaternius palm
