@@ -11,8 +11,12 @@ ledger; this file is the short operational prompt.
 - Repo: `C:\Users\Mattm\X\games-3d\terror-in-the-jungle`
 - Branch: `master`
 - Verified pushed state before this handoff report:
-  `master` / `origin/master` at `356bc2e418af2f2f9aa8109dcf29a5ad7e291924`
+  `origin/master` at `356bc2e418af2f2f9aa8109dcf29a5ad7e291924`
   (`docs(projekt-143): align navmesh recovery state`).
+- Current local `master` is ahead of `origin/master` by two commits:
+  `571464e` (`fix(terrain): stabilize Zone Control feature pads`) and
+  `a0aeacb` (`fix(vegetation): retire short Pixel Forge palm`). These are not
+  pushed or deployed.
 - GitHub CI run `25353544629` passed on `356bc2e` for lint, test, build,
   smoke, perf, and mobile UI.
 - No production parity is claimed for the latest `master` state. Live Pages
@@ -44,6 +48,8 @@ ledger; this file is the short operational prompt.
   `artifacts/perf/2026-05-05T02-39-51-929Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
 - KB-TERRAIN terrain asset inventory:
   `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
+- KB-TERRAIN vegetation source pipeline review:
+  `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md`
 - KB-TERRAIN route/trail policy audit:
   `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
@@ -105,10 +111,14 @@ ledger; this file is the short operational prompt.
   `coconut`); spend the freed vegetation budget on grass or other ground cover;
   increase big palms and ground vegetation; and make bamboo scattered dense
   clusters rather than the dominant forest layer. Also add a source-pipeline
-  investigation for EZ Tree or a similar licensed procedural/tree workflow to
-  generate browser-budget GLBs that can be baked into Pixel Forge-compatible
-  impostors/LODs for missing Vietnam trees, understory, grass/ground cover, and
-  trail-edge assets. The first
+  investigation for EZ Tree or a similar licensed procedural/tree workflow.
+  The current review in
+  `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md` recommends Dan
+  Greenheck's `EZ-Tree` as the first offline GLB-generation pilot for tree
+  families, while grass, ground cover, and trail-edge assets should come from a
+  licensed asset-library review or custom low-card bake. Every candidate must
+  be baked through Pixel Forge-compatible impostors/LODs before runtime import.
+  The first
   material-distribution pass removes broad highland/cleared/bamboo elevation
   caps as primary terrain rules and keeps rock available as a slope-gated
   accent; the follow-up vegetation pass enlarges/lifts ferns, increases large

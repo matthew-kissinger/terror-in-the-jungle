@@ -2912,3 +2912,19 @@ TODO
   `artifacts/perf/2026-05-05T03-24-24-591Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
   only because KB-OPTIK still needs the known visual-exception/human-review
   decision.
+
+2026-05-05 23:40 EDT Projekt Objekt-143 vegetation source-pipeline review
+- Researched the owner-suggested EZ Tree direction and split it from runtime
+  acceptance. Added
+  `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md` as a decision packet:
+  Dan Greenheck's `EZ-Tree` is the recommended first offline GLB-generation
+  pilot because it is Three.js-oriented, MIT licensed, and can export GLB/PNG;
+  it should not be added to the shipped runtime bundle for Cycle 3.
+- Recorded QuickMesh as a low-poly fallback, botaniq/Shizen as licensed asset
+  library candidates for grass, ground cover, tropical understory, and
+  trail-edge variety, and Blender Sapling/Tree-Gen as experimental fallback
+  paths only.
+- Updated the Projekt ledger and handoff so future agents route generated or
+  sourced vegetation through Pixel Forge `review-only` baking, license/provenance
+  capture, asset inventory, screenshots, texture/upload evidence, and matched
+  Open Frontier/A Shau validation before runtime import.

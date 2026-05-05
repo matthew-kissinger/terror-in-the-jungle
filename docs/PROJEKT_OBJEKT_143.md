@@ -44,6 +44,11 @@ latest Projekt suite is
 Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
 `artifacts/perf/2026-05-05T03-24-24-591Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+The vegetation source-generator follow-up is now split into
+[PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
+`EZ-Tree` is the recommended first offline GLB-generation pilot, while grass,
+ground cover, and trail-edge variety should come from a licensed asset-library
+review or custom low-card bake before any runtime import.
 
 ## Shipped Cycle 0 State
 
