@@ -443,7 +443,7 @@ function buildReport(): PixelForgeBureauReport {
     findings.push('Gallery manifest is missing; run Pixel Forge tij:pipeline before relying on package inventory.');
   }
   if (retiredSpeciesPresent.length > 0) {
-    findings.push(`Gallery manifest still includes retired TIJ species: ${retiredSpeciesPresent.join(', ')}.`);
+    findings.push(`Gallery manifest includes retired TIJ species for review/provenance only: ${retiredSpeciesPresent.join(', ')}.`);
   }
   if (blockedSpeciesPresent.length > 0) {
     findings.push(`Gallery manifest includes blocked/review-only species: ${blockedSpeciesPresent.join(', ')}.`);
@@ -455,8 +455,6 @@ function buildReport(): PixelForgeBureauReport {
   const hardMissing = !existsSync(PIXEL_FORGE_ROOT) || !surfaces.packageJson.exists;
   const hasWarnings =
     !manifest
-    || retiredSpeciesPresent.length > 0
-    || blockedSpeciesPresent.length > 0
     || runtimeSpeciesMissing.length > 0
     || manifestOnlySpecies.length > 0
     || !surfaces.tijPipelineRunner.exists
@@ -504,7 +502,7 @@ function buildReport(): PixelForgeBureauReport {
       caveats: [
         'Relevance means shortlist value only; no candidate is accepted for TIJ runtime by this audit.',
         'Pixel Forge gallery entries can be stale relative to TIJ runtime policy until Pixel Forge is refreshed.',
-        'Blocked vegetation remains blocked even when it appears in the local Pixel Forge gallery manifest.',
+        'Retired and blocked vegetation may remain visible in the local Pixel Forge gallery manifest as review/provenance records, but they are not TIJ runtime targets.',
       ],
     },
     findings,

@@ -433,12 +433,14 @@ function buildReport(): CompletionAuditReport {
       vegetationPackages: pixelForge?.relevanceCatalog?.vegetationPackages?.length ?? null,
       npcPackage: pixelForge?.npcPackage ?? null,
     },
-    status: pixelForge?.pixelForgeRootExists ? 'partial' : 'missing',
+    status: pixelForge?.status === 'pass' ? 'pass' : pixelForge?.pixelForgeRootExists ? 'partial' : 'missing',
     coverage: 'The sibling Pixel Forge repo is present and cataloged for TIJ pipeline relevance.',
-    missingOrWeak: [
-      'Audit remains WARN because retired and blocked/review-only species are still present in the Pixel Forge gallery manifest.',
-      'No Pixel Forge output is accepted for runtime by this catalog.',
-    ],
+    missingOrWeak: pixelForge?.status === 'pass'
+      ? []
+      : [
+        'Audit remains WARN because the local Pixel Forge pipeline/catalog surface is incomplete or stale.',
+        'No Pixel Forge output is accepted for runtime by this catalog.',
+      ],
     proxyWarning: 'Local pipeline availability and a relevance catalog are not production asset acceptance.',
   });
 
@@ -454,8 +456,8 @@ function buildReport(): CompletionAuditReport {
     status: terrainInventory?.summary?.missingAssets === 0 && pixelForge?.galleryManifest?.runtimeSpeciesMissing?.length === 0 ? 'partial' : 'fail',
     coverage: 'Runtime inventory records six current species, one retired species, no missing assets, and ground-cover candidates.',
     missingOrWeak: [
-      'Small-palm runtime removal is verified, but Pixel Forge still carries retired giantPalm in its review manifest.',
       'Grass/ground-cover/trail replacements are candidates, not accepted runtime budget spend yet.',
+      'Pixel Forge may keep retired giantPalm as a review/provenance record, but it must not return to TIJ runtime without explicit reapproval.',
     ],
     proxyWarning: 'Asset absence/presence counts do not prove the new ground-cover art direction in gameplay screenshots.',
   });

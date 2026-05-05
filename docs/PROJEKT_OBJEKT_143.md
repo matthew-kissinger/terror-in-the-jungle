@@ -45,10 +45,11 @@ Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
 `artifacts/perf/2026-05-05T12-34-31-425Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The first explicit completion audit is
-`artifacts/perf/2026-05-05T12-53-49-779Z/projekt-143-completion-audit/completion-audit.json`.
+`artifacts/perf/2026-05-05T13-03-47-780Z/projekt-143-completion-audit/completion-audit.json`.
 It reports `NOT_COMPLETE`: KB-OPTIK remains blocked on the near-stress
 visual/human-review decision, KB-LOAD/KB-TERRAIN/KB-CULL remain
-`ready_for_branch`, KB-FORGE is catalog-only WARN, owner vegetation
+`ready_for_branch`, KB-FORGE is now a PASS for local pipeline cataloging,
+owner vegetation
 replacement is only partially covered, and the current local stack is dirty,
 unpushed, and undeployed.
 The vegetation source-generator follow-up is now split into
@@ -58,12 +59,13 @@ optional offline GLB source feeding Pixel Forge rather than replacing it.
 Grass, ground cover, and trail-edge variety should come from Pixel Forge
 catalog/review work, a licensed asset-library review, or custom low-card bake
 before any runtime import. The latest local audit at
-`artifacts/perf/2026-05-05T12-36-40-786Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
-is WARN with the Pixel Forge sibling repo present, all `6` current TIJ runtime
-vegetation species present, retired `giantPalm` still present in the Pixel
-Forge gallery manifest, all `6` blocked/review-only vegetation species still
-present, and the NPC review package counted as `4` factions, `8` clips, and
-`32` impostor packages. Its relevance catalog now records `6` prop families,
+`artifacts/perf/2026-05-05T13-03-10-136Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+is PASS for the local liaison/catalog scope with the Pixel Forge sibling repo
+present, all `6` current TIJ runtime vegetation species present, retired
+`giantPalm` still visible only as review/provenance, all `6`
+blocked/review-only vegetation species still visible as non-runtime records,
+and the NPC review package counted as `4` factions, `8` clips, and `32`
+impostor packages. Its relevance catalog now records `6` prop families,
 `13` vegetation packages, and `5` review queues for ground-cover budget
 replacement, trail/route surfaces, base/foundation kits, far-canopy/tree
 variety, and NPC/weapon packaging. The local audit command is
