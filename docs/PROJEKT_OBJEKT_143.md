@@ -20,7 +20,30 @@ measurement itself was trustworthy.
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
 | Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is evidence-complete PASS through `artifacts/perf/2026-05-03T16-48-58-020Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched proof refreshed after the selected-lighting luma slice at `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` drops the NPC runtime target to `2.95m` and adds generated per-tile imposter crop maps; commit `1395198da4db95611457ecde769b611e3d36354e` adds faction imposter material tuning. Matched visible-height ratios improved from the Cycle 2 before range `0.52-0.54x` to `0.861-0.895x`, and selected-lighting luma delta now ranges `-0.44%` to `0.36%`. No perf improvement, final visual parity, aircraft-scale acceptance, or production parity is claimed. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | KB-TERRAIN/CULL/NAV LOCAL FOLLOW-UP 2026-05-05 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD has a giantPalm-only upload warmup that reduces WebGL upload totals but does not prove startup-latency improvement. KB-EFFECTS low-load grenade first-use closeout is evidence-complete for the unlit pooled explosion path at `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`: measurement trust PASS, no trigger/post-trigger browser stall, detonation max `30.2ms`, near-trigger main-scene render max `23.6ms`, and grenade frag JS `1.5ms` total. KB-TERRAIN has a clean-HEAD fresh perf-build elevated screenshot/perf-before baseline at `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`; it is ready for a far-horizon branch but does not accept any canopy or distance-policy remediation. KB-CULL has a clean-HEAD owner-path baseline at `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`; it selected large-mode world static features plus visible helicopters as the first representative branch path and keeps close-NPC pool residency diagnostic-only. The local static-feature shared batching pass has trusted after evidence at `artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`: owner draw-call-like is down to Open Frontier `261` and A Shau `307`, accepted only as static-feature layer draw-call reduction. The terrain/culling follow-up fixes terrain-lip camera clipping, keeps rock as a moss-tinted cliff accent, restores near vegetation residency under frame pressure, and adds per-feature static visibility; its final static gates pass, but the Open Frontier runtime capture failed harness combat behavior and local asset baking may skew perf, so no broad culling/HLOD, vegetation occlusion, perf, production, or A Shau acceptance is claimed. Commit `e92523a` partially closes the navmesh validity gap with a bake manifest, terrain/feature signatures, runtime solo-cache fingerprints, and runtime-placement obstacle baking; targeted nav tests, `test:run`, `validate:fast`, `build`, and the refreshed Projekt suite passed. It does not close A Shau nav quality, withheld Open Frontier seed variants, Zone Control seed 137 placement warnings, or production parity. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-TERRAIN/KB-CULL. |
+| Phase 3 - Multi-Cycle Engineering Plan | KB-TERRAIN/CULL/NAV LOCAL FOLLOW-UP 2026-05-05 | Dependency-aware cycle plan exists below. Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`, and the refreshed KB-OPTIK decision packet is filed at `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`. Commit `5792bafb7abd51c12dcf715a395a9c1d8c91c8ad` adds the NPC imposter atmosphere/fog uniform path; near-stress expanded proof at `artifacts/perf/2026-05-03T18-46-14-291Z/projekt-143-optik-expanded-proof/summary.json` reduces luma from `-53.57%` to `104.58%` down to `-11.31%` to `9.03%`, inside the `+/-12%` band, but still flags `10/40` 8.5m perspective visible-height samples. Commit `5b053711cece65b5915ea786acc56e4a8ea22736` adds the runtime LOD-edge camera profile set and routing; committed-sha LOD-edge proof at `artifacts/perf/2026-05-03T19-02-38-432Z/projekt-143-optik-expanded-proof/summary.json` is PASS with `0/40` flags, visible-height ratio `0.855-0.895`, and luma `-6.94%` to `9.77%`. KB-LOAD has a giantPalm-only upload warmup that reduces WebGL upload totals but does not prove startup-latency improvement. KB-EFFECTS low-load grenade first-use closeout is evidence-complete for the unlit pooled explosion path at `artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json`: measurement trust PASS, no trigger/post-trigger browser stall, detonation max `30.2ms`, near-trigger main-scene render max `23.6ms`, and grenade frag JS `1.5ms` total. KB-TERRAIN has a clean-HEAD fresh perf-build elevated screenshot/perf-before baseline at `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`; it is ready for a far-horizon branch but does not accept any canopy or distance-policy remediation. KB-CULL has a clean-HEAD owner-path baseline at `artifacts/perf/2026-05-04T00-14-23-014Z/projekt-143-culling-owner-baseline/summary.json`; it selected large-mode world static features plus visible helicopters as the first representative branch path and keeps close-NPC pool residency diagnostic-only. The local static-feature shared batching pass has trusted after evidence at `artifacts/perf/2026-05-04T14-22-32-048Z/projekt-143-culling-owner-baseline/summary.json`: owner draw-call-like is down to Open Frontier `261` and A Shau `307`, accepted only as static-feature layer draw-call reduction. The terrain/culling follow-up fixes terrain-lip camera clipping, keeps rock as a moss-tinted cliff accent, restores near vegetation residency under frame pressure, and adds per-feature static visibility; its final static gates pass, but the Open Frontier runtime capture failed harness combat behavior and local asset baking may skew perf, so no broad culling/HLOD, vegetation occlusion, perf, production, or A Shau acceptance is claimed. Commit `e92523a` partially closes the navmesh validity gap with a bake manifest, terrain/feature signatures, runtime solo-cache fingerprints, and runtime-placement obstacle baking; targeted nav tests, `test:run`, `validate:fast`, `build`, and the refreshed Projekt suite passed. Commit `356bc2e418af2f2f9aa8109dcf29a5ad7e291924` was pushed to `origin/master` and GitHub CI run `25353544629` passed, but live Pages still serves `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`, so production parity is not claimed. The navmesh work does not close A Shau nav quality, withheld Open Frontier seed variants, or Zone Control seed 137 placement warnings. KB-OPTIK still needs a near-stress visual-exception/human-review decision or a deliberate switch to KB-LOAD/KB-TERRAIN/KB-CULL. |
+
+Current working-tree update on 2026-05-05: Zone Control seed `137`
+placement warnings are locally cleared by
+`artifacts/perf/2026-05-05T02-39-51-929Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`,
+and fresh A Shau runtime evidence at
+`artifacts/perf/2026-05-05T02-41-21-751Z/summary.json` clears the previous
+hard heap failure while keeping measurement trust, movement, and hit guardrails
+green. A Shau remains unsigned because NPC terrain-stall backtracking is still
+visible. KB-TERRAIN now also includes the owner-directed objective to remove
+the short Quaternius palm (`giantPalm` / `palm-quaternius-2`) from runtime and
+shipped assets, preserve the taller `fanPalm` and `coconut` palm-like species,
+and spend the freed vegetation budget on grass or other ground cover.
+Follow-up validation removed the short palm from runtime and shipped public
+assets, preserved `fanPalm` and `coconut`, refreshed build/perf bundles, and
+records the current vegetation inventory at
+`artifacts/perf/2026-05-05T03-23-29-111Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
+with `6` runtime species, `1` retired species, `6` blocked species, and `0`
+missing assets. `npm run validate:fast` passed after this change, and the
+latest Projekt suite is
+`artifacts/perf/2026-05-05T03-24-06-823Z/projekt-143-evidence-suite/suite-summary.json`.
+Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
+human-review decision at
+`artifacts/perf/2026-05-05T03-24-24-591Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 
 ## Shipped Cycle 0 State
 
@@ -764,6 +787,22 @@ Progress:
   richer ground variety, custom grass/ground foliage and cover where useful,
   and route/trail surfaces that read worn-in, smoother, and more vehicle-usable
   for future driving instead of arbitrary grey gravel or decorative paths.
+- 2026-05-05 owner vegetation target: remove the small palm tree species from
+  the runtime vegetation set completely. Visual review confirmed this is the
+  misleadingly named `giantPalm` / `palm-quaternius-2` short Quaternius palm,
+  not the taller `fanPalm` or `coconut` palm-like trees, which should stay. The
+  small palm's visual/perf budget should move to grass, low foliage, or other
+  ground-cover assets. Do not spend another remediation pass trying to scale
+  the small palm into a tree; treat it as a removal and replacement objective
+  under KB-TERRAIN vegetation acceptance.
+- 2026-05-05 owner source-asset pipeline target: investigate EZ Tree or a
+  similar procedural/tree-source workflow for generating browser-appropriate
+  GLBs that can be baked into TIJ impostors/LODs for missing Vietnam tree
+  families, understory variety, ground cover, grass, trail-edge cover, and
+  route-surface detail. This is a source-pipeline investigation, not runtime
+  acceptance: verify exact tool identity, licensing, polygon/texture budgets,
+  Pixel Forge bake compatibility, and visual fit before any generated GLB or
+  baked atlas enters shipped assets.
 - 2026-05-04 low-resource terrain asset inventory:
   `scripts/projekt-143-terrain-asset-inventory.ts` is exposed as
   `npm run check:projekt-143-terrain-assets` and writes
@@ -771,8 +810,10 @@ Progress:
   It records `12` terrain WebP textures, including `5` green-ground variants
   and `4` trail/cleared/disturbed variants, plus `5` Pixel Forge
   ground-cover/trail prop candidates, `12` existing building candidates, `7`
-  runtime Pixel Forge vegetation species, and `6` blocked Pixel Forge
-  vegetation species. This closes the "look into existing texture/assets"
+  runtime Pixel Forge vegetation species before the short-palm retirement, and
+  `6` blocked Pixel Forge vegetation species. The post-removal runtime target
+  is `6` species plus `1` retired short palm entry. This closes the
+  "look into existing texture/assets"
   inventory step without browser/perf work. It does not accept any new runtime
   asset; visual, footprint, collision, draw-call, texture residency, and
   LOD/HLOD review are still required before import or placement changes.
@@ -790,9 +831,14 @@ Progress:
   PASS and stronger active-player movement/hit coverage (`170` shots,
   `59` hits, `57` movement transitions, max stuck `1.3s`), but it failed
   validation on heap end-growth/recovery and still logged terrain-stall
-  warnings. A Shau remains blocked; the next terrain branch should connect
-  route stamps to nav/war-simulator path quality and heap behavior before
-  claiming acceptance.
+  warnings. A fresh current-worktree rerun at
+  `artifacts/perf/2026-05-05T02-41-21-751Z/summary.json` clears the hard heap
+  blocker (`heap_growth_mb=-61.58`, peak growth `16.64MB`, recovery PASS) and
+  keeps measurement trust PASS, `150` shots, `86` hits, and `27` movement
+  transitions. It is still WARN on peak p99 (`34.80ms`) and still logs NPC
+  terrain-stall backtracking, so A Shau is improved but not fully signed off;
+  the next terrain branch should connect route stamps to nav/war-simulator path
+  quality before claiming acceptance.
 - 2026-05-04 local terrain/camera follow-up: the grey mountaintop problem has
   a second, more conservative shader pass in progress. `highland`/rock remains
   available, but only as a reduced moss-tinted cliff/steep-side accent instead
@@ -832,10 +878,12 @@ Progress:
   runtime static placements that opt into collision. This partially closes the
   stale-navmesh risk for registered procedural variants. Remaining limits:
   Open Frontier seeds `137`, `2718`, `31415`, and `65537` are intentionally
-  withheld until they have per-seed feature presets; the expanded placement
-  audit now checks every registered pre-baked seed and currently WARNs on two
-  Zone Control seed `137` flattened-core spans; and A Shau still needs route,
-  nav quality, heap, and terrain-stall acceptance before it can be signed.
+  withheld until they have per-seed feature presets. The current working tree
+  clears the two Zone Control seed `137` flattened-core warnings with
+  `nva_bunkers` and `trail_opfor_egress` below the placement threshold in
+  `artifacts/perf/2026-05-05T02-39-51-929Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`.
+  A Shau still needs route/nav quality and terrain-stall acceptance before it
+  can be signed.
 
 Root-cause hypotheses:
 
@@ -875,9 +923,17 @@ Acceptance:
   green/vegetated, with gravel/rock retained only where intentionally exposed.
   Evidence must cover Open Frontier and A Shau and must preserve the existing
   terrain texture variety instead of replacing it with a flat tint.
-- Vegetation review confirms palms and ferns are properly grounded and scaled,
+- Vegetation review confirms the short Quaternius palm has been removed from
+  runtime and shipped public assets, the taller `fanPalm` and `coconut`
+  palm-like species remain,
+  the freed visual/perf budget has moved into grass or other ground cover,
   large palms and ground cover are visibly more present, and bamboo appears as
   scattered dense pockets rather than the dominant forest layer.
+- Source-pipeline review identifies whether EZ Tree or a similar procedural
+  tree workflow can produce licensed, browser-budget GLBs for missing Vietnam
+  tree families, understory, ground cover/grass, and trail-edge assets, and
+  proves those GLBs bake into Pixel Forge-compatible impostors/LODs before any
+  generated asset ships.
 - Static feature review confirms airfields, HQs, buildings, support compounds,
   and parked vehicles sit on shaped terrain pads with no hanging foundations or
   hill-edge overhangs. Pixel Forge building candidates must pass the Asset
@@ -906,6 +962,11 @@ Open questions:
 - Which existing TIJ or Pixel Forge ground/path/foliage/cover textures are
   production-worthy, and where do we need custom grass, ground-cover, or trail
   assets instead?
+- Which ground-cover, grass, or trail-edge package takes over the retired
+  `giantPalm` / `palm-quaternius-2` density/texture/upload budget?
+- Is EZ Tree the right source generator for the missing Vietnam trees/cover, or
+  should the pipeline use another licensed procedural/tree source before Pixel
+  Forge baking?
 - Which route surfaces should become future vehicle paths, and what slope,
   width, shoulder, and smoothing constraints should those trail stamps obey?
 - What is the next nav-quality gate after the bake-manifest work: route-to-nav

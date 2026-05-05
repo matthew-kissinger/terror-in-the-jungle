@@ -35,7 +35,7 @@ describe('AssetLoader GPU texture warmup', () => {
   it('uploads requested loaded textures and records texture residency metadata', () => {
     const loader = new AssetLoader();
     const texture = makeTexture(4096, 2048);
-    const name = 'PixelForge.Vegetation.giantPalm.color';
+    const name = 'PixelForge.Vegetation.fanPalm.color';
     seedTexture(loader, name, texture);
     const renderer = { initTexture: vi.fn() } as unknown as THREE.WebGLRenderer;
 
@@ -60,7 +60,7 @@ describe('AssetLoader GPU texture warmup', () => {
 
   it('keeps startup resilient when a renderer upload fails', () => {
     const loader = new AssetLoader();
-    const name = 'PixelForge.Vegetation.giantPalm.normal';
+    const name = 'PixelForge.Vegetation.fanPalm.normal';
     seedTexture(loader, name, makeTexture(4096, 2048));
     vi.spyOn(Logger, 'warn').mockImplementation(() => undefined);
     const renderer = {

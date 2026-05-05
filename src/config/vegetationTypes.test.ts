@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { getBiome } from './biomes';
 import { VEGETATION_TYPES } from './vegetationTypes';
-import { PIXEL_FORGE_BLOCKED_VEGETATION_IDS, PIXEL_FORGE_VEGETATION_ASSETS } from './pixelForgeAssets';
+import {
+  PIXEL_FORGE_BLOCKED_VEGETATION_IDS,
+  PIXEL_FORGE_RETIRED_VEGETATION_IDS,
+  PIXEL_FORGE_VEGETATION_ASSETS,
+} from './pixelForgeAssets';
 
 describe('VEGETATION_TYPES production imposter policy', () => {
   it('marks every vegetation type as a GLB-sourced imposter target', () => {
@@ -41,10 +45,35 @@ describe('VEGETATION_TYPES production imposter policy', () => {
       'elephantEar',
       'fanPalm',
       'fern',
-      'giantPalm',
     ]);
-    for (const blockedId of PIXEL_FORGE_BLOCKED_VEGETATION_IDS) {
-      expect(runtimeIds).not.toContain(blockedId);
+    for (const excludedId of [
+      ...PIXEL_FORGE_BLOCKED_VEGETATION_IDS,
+      ...PIXEL_FORGE_RETIRED_VEGETATION_IDS,
+    ]) {
+      expect(runtimeIds).not.toContain(excludedId);
+    }
+  });
+
+  it('keeps the retired small palm out of runtime vegetation and biome palettes', () => {
+    const runtimeIds = VEGETATION_TYPES.map((type) => type.id);
+    const biomeIds = [
+      'denseJungle',
+      'highland',
+      'ricePaddy',
+      'riverbank',
+      'cleared',
+      'tallGrass',
+      'mudTrail',
+      'bambooGrove',
+      'swamp',
+      'defoliated',
+    ];
+
+    for (const retiredId of PIXEL_FORGE_RETIRED_VEGETATION_IDS) {
+      expect(runtimeIds).not.toContain(retiredId);
+      for (const biomeId of biomeIds) {
+        expect(getBiome(biomeId).vegetationPalette.map((entry) => entry.typeId)).not.toContain(retiredId);
+      }
     }
   });
 
@@ -62,7 +91,6 @@ describe('VEGETATION_TYPES production imposter policy', () => {
       coconut: 2.41,
       elephantEar: 2.10,
       fanPalm: 2.79,
-      giantPalm: 0.96,
     };
 
     for (const type of VEGETATION_TYPES) {
@@ -72,12 +100,12 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     }
   });
 
-  it('enlarges and stabilizes the small palm impostor to reduce trunk snapping', () => {
-    const giantPalm = VEGETATION_TYPES.find((type) => type.id === 'giantPalm');
+  it('preserves the tall fan palm as runtime mid-level vegetation', () => {
+    const fanPalm = VEGETATION_TYPES.find((type) => type.id === 'fanPalm');
 
-    expect(giantPalm).toBeDefined();
-    expect(giantPalm?.size).toBeGreaterThan(8);
-    expect(giantPalm?.imposterAtlas?.stableAzimuthColumn).toBe(3);
+    expect(fanPalm).toBeDefined();
+    expect(fanPalm?.size).toBeGreaterThan(16);
+    expect(fanPalm?.tier).toBe('midLevel');
   });
 
   it('lifts and enlarges fern ground cover so it is not buried below terrain', () => {
@@ -88,19 +116,24 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect((fern?.yOffset ?? 0) - ((fern?.size ?? 0) * 0.5)).toBeGreaterThan(-0.35);
   });
 
-  it('biases the jungle mix toward palms while keeping bamboo clustered', () => {
+  it('biases the jungle mix toward the tall palm and ground cover while keeping bamboo clustered', () => {
     const fanPalm = VEGETATION_TYPES.find((type) => type.id === 'fanPalm');
-    const giantPalm = VEGETATION_TYPES.find((type) => type.id === 'giantPalm');
     const bamboo = VEGETATION_TYPES.find((type) => type.id === 'bambooGrove');
     const denseJungle = getBiome('denseJungle');
     const bambooJungleMultiplier =
       denseJungle.vegetationPalette.find((entry) => entry.typeId === 'bambooGrove')?.densityMultiplier ?? 0;
     const fanPalmJungleMultiplier =
       denseJungle.vegetationPalette.find((entry) => entry.typeId === 'fanPalm')?.densityMultiplier ?? 0;
+    const denseGroundCoverMultiplier = denseJungle.vegetationPalette
+      .filter((entry) => entry.typeId === 'fern' || entry.typeId === 'elephantEar')
+      .reduce((sum, entry) => sum + entry.densityMultiplier, 0);
+    const highlandFernMultiplier =
+      getBiome('highland').vegetationPalette.find((entry) => entry.typeId === 'fern')?.densityMultiplier ?? 0;
 
     expect((fanPalm?.baseDensity ?? 0) * fanPalmJungleMultiplier)
       .toBeGreaterThan((bamboo?.baseDensity ?? 0) * bambooJungleMultiplier);
-    expect(giantPalm?.baseDensity).toBeGreaterThan(0.3);
+    expect(denseGroundCoverMultiplier).toBeGreaterThan(2.2);
+    expect(highlandFernMultiplier).toBeGreaterThan(0.7);
     expect(bamboo?.poissonMinDistance).toBeLessThan(8);
     expect(bamboo?.cluster?.scale).toBeGreaterThan(200);
     expect(bamboo?.cluster?.threshold).toBeGreaterThan(0.7);

@@ -147,24 +147,11 @@ export const PIXEL_FORGE_VEGETATION_ASSETS: readonly PixelForgeVegetationAsset[]
     yOffset: 13.54,
     variant: 'coconut-palm-google',
   },
-  {
-    id: 'giantPalm',
-    textureName: 'PixelForge.Vegetation.giantPalm.color',
-    normalTextureName: 'PixelForge.Vegetation.giantPalm.normal',
-    colorFile: 'pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.png',
-    normalFile: 'pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.normal.png',
-    sourceMetaFile: 'pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.json',
-    tier: 'canopy',
-    atlasProfile: 'canopy-balanced',
-    shaderProfile: 'normal-lit',
-    tilesX: 8,
-    tilesY: 4,
-    tileSize: 512,
-    worldSize: 3.59,
-    yOffset: 1.80,
-    variant: 'palm-quaternius-2',
-  },
 ];
+
+export const PIXEL_FORGE_RETIRED_VEGETATION_IDS = [
+  'giantPalm',
+] as const;
 
 export const PIXEL_FORGE_BLOCKED_VEGETATION_IDS = [
   'rubberTree',
@@ -175,12 +162,9 @@ export const PIXEL_FORGE_BLOCKED_VEGETATION_IDS = [
   'banyan',
 ] as const;
 
-// Current KB-LOAD startup audit top offender. This list names textures that are
-// explicitly uploaded behind the spawn loading overlay before renderer reveal.
-export const PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES: readonly string[] =
-  PIXEL_FORGE_VEGETATION_ASSETS
-    .filter((asset) => asset.id === 'giantPalm')
-    .flatMap((asset) => [asset.textureName, asset.normalTextureName]);
+// The old giantPalm-only warmup was retired with the small-palm runtime removal.
+// Do not broaden this to fanPalm or other texture classes without paired proof.
+export const PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES: readonly string[] = [];
 
 export const PIXEL_FORGE_NPC_FACTIONS: readonly PixelForgeNpcFactionAsset[] = [
   { runtimeFaction: 'US', packageFaction: 'usArmy', modelPath: 'npcs/pixel-forge-v1/usArmy.glb', primaryWeapon: 'm16a1' },

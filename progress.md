@@ -2835,3 +2835,80 @@ TODO
   feel validation, and not production parity until the branch is pushed,
   CI/deploy state is checked, and live Pages/R2/WASM/service-worker behavior is
   verified.
+
+2026-05-04 22:08 EDT Projekt Objekt-143 docs/status alignment
+- Verified current repo truth after the shepherd push: `master` and
+  `origin/master` are aligned at
+  `356bc2e418af2f2f9aa8109dcf29a5ad7e291924`
+  (`docs(projekt-143): align navmesh recovery state`).
+- GitHub CI run `25353544629` passed on `356bc2e` for lint, test, build,
+  smoke, perf, and mobile UI. The run still includes the known non-blocking
+  perf artifact/continue-on-error annotations, but the workflow conclusion is
+  success.
+- Live production is intentionally not current: Pages
+  `/asset-manifest.json` still reports
+  `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Do not claim production parity
+  for the last-24-hour Projekt work until `npm run deploy:prod` is run and the
+  live Pages/R2/WASM/service-worker/browser-smoke proof is refreshed.
+- Updated `docs/PROJEKT_OBJEKT_143.md`,
+  `docs/PROJEKT_OBJEKT_143_HANDOFF.md`, and `docs/STATE_OF_REPO.md` to record
+  the pushed/CI-verified but not-deployed state. Created
+  `docs/PROJEKT_OBJEKT_143_24H_STATUS_2026-05-04.md` as the owner-facing
+  status report for goal alignment before the next run.
+
+2026-05-04 22:45 EDT Projekt Objekt-143 terrain/nav evidence refresh
+- Focused `TerrainFeatureCompiler` Vitest passed with the local Zone Control
+  seed `137` pad-flatness regression coverage (`9` tests).
+- `npm run check:projekt-143-terrain-placement` passed and wrote
+  `artifacts/perf/2026-05-05T02-39-51-929Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`;
+  all audited modes, including Zone Control seed `137`, have `0` placement
+  warnings.
+- `npm run build:perf` passed, then `npm run perf:capture:ashau:short` wrote
+  `artifacts/perf/2026-05-05T02-41-21-751Z/summary.json`. A Shau is now
+  measurement-trusted and clears heap, movement, and hit guardrails
+  (`150` shots / `86` hits), but remains WARN on peak p99 and still logs NPC
+  terrain-stall backtracking. Do not claim final A Shau route/nav acceptance.
+- Folded the owner vegetation objective into Projekt: remove the small palm
+  species from runtime completely, preserve the good tall palm, and redirect
+  that visual/perf budget to grass or other ground cover.
+- Refreshed broad Projekt gates after the docs/evidence update:
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-05T02-51-58-852Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run check:projekt-143-cycle3-kickoff` WARN only for the expected
+  KB-OPTIK visual-exception/human-review decision at
+  `artifacts/perf/2026-05-05T02-53-11-768Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  the regenerated kickoff packet now names small-palm removal as part of the
+  KB-TERRAIN branch evidence.
+
+2026-05-05 23:05 EDT Projekt Objekt-143 short-palm retirement
+- Visual review confirmed the small palm to remove is the misleadingly named
+  `giantPalm` / `palm-quaternius-2` short Quaternius palm. The taller
+  palm-like species `fanPalm` and `coconut` remain runtime vegetation.
+- Removed `giantPalm` from the runtime Pixel Forge vegetation registry,
+  removed its biome palette entries, retired the old giantPalm-only startup
+  warmup list, deleted the shipped public short-palm atlas files, and redirected
+  the dense-jungle/highland budget toward `fern` and `elephantEar` ground
+  cover.
+- Updated Projekt docs and generated evidence scripts to record the retirement
+  separately from blocked Pixel Forge species, and added the source-pipeline
+  objective to investigate EZ Tree or a similar licensed procedural/tree GLB
+  workflow for missing Vietnam trees, understory, grass/ground cover, and
+  trail-edge assets before Pixel Forge baking/runtime import.
+- Validation after removal: focused vegetation/AssetLoader Vitest PASS
+  (`2` files, `13` tests); `npm run build` PASS after regenerating Zone
+  Control navmesh/heightmaps; `npm run build:perf` PASS and cleared stale
+  `dist-perf` short-palm assets; `npm run validate:fast` PASS (`253` files,
+  `3874` tests); `npm run check:projekt-143-terrain-assets` WARN at
+  `artifacts/perf/2026-05-05T03-23-29-111Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
+  with `6` runtime vegetation species, `1` retired species, `6` blocked
+  species, and `0` missing assets; `npm run check:projekt-143-terrain-distribution`
+  WARN at
+  `artifacts/perf/2026-05-05T03-23-42-696Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
+  `npm run check:projekt-143-terrain-placement` PASS at
+  `artifacts/perf/2026-05-05T03-23-53-465Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-05T03-24-06-823Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run check:projekt-143-cycle3-kickoff` WARN at
+  `artifacts/perf/2026-05-05T03-24-24-591Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  only because KB-OPTIK still needs the known visual-exception/human-review
+  decision.

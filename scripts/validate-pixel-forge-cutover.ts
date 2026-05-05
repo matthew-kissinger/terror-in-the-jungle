@@ -174,6 +174,9 @@ const scanOutputDirectory = (dir: string): void => {
         if (displayPath.endsWith('assets/source/soldiers')) {
           errors.push(`legacy soldier source assets must not ship under ${displayPath}`);
         }
+        if (displayPath.endsWith('assets/pixel-forge/vegetation/giantPalm')) {
+          errors.push(`retired short palm assets must not ship under ${displayPath}`);
+        }
         stack.push(path);
         continue;
       }
@@ -230,9 +233,14 @@ if (existsSync(oversizedPalmPath)) {
   errors.push(`oversized Pixel Forge palm variant must not be copied under ${relative(repoRoot, oversizedPalmPath)}`);
 }
 
+const retiredShortPalmPath = join(repoRoot, 'public/assets/pixel-forge/vegetation/giantPalm/palm-quaternius-2');
+if (existsSync(retiredShortPalmPath)) {
+  errors.push(`retired short palm assets must not ship under ${relative(repoRoot, retiredShortPalmPath)}`);
+}
+
 const requiredPaths = [
-  'public/assets/pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.png',
-  'public/assets/pixel-forge/vegetation/giantPalm/palm-quaternius-2/imposter.normal.png',
+  'public/assets/pixel-forge/vegetation/fanPalm/lady-palm-google-1/imposter.png',
+  'public/assets/pixel-forge/vegetation/fanPalm/lady-palm-google-1/imposter.normal.png',
   'public/assets/pixel-forge/npcs/usArmy/idle/animated-albedo-packed.png',
   'public/models/npcs/pixel-forge-v1/usArmy.glb',
   'public/models/npcs/pixel-forge-v1/nva.glb',

@@ -520,7 +520,7 @@ function buildLoadTarget(
     bureau: 'KB-LOAD',
     status: hasStartup && hasTextureAudit ? 'ready_for_branch' : 'needs_baseline',
     priority: 2,
-    summary: 'KB-LOAD has a first giantPalm upload warmup; the next WebGL branch should target remaining upload/residency only if it preserves visual parity and records before/after startup upload tables.',
+    summary: 'KB-LOAD retired the old giantPalm-only warmup with the small-palm runtime removal; the next WebGL branch should target remaining upload/residency only if it preserves visual parity and records before/after startup upload tables.',
     evidence: {
       textureAuditPath: rel(texturePath),
       startupOpenFrontierPath: rel(startupOpenPath),
@@ -667,7 +667,7 @@ function buildTerrainTarget(
     status: baselineReady ? 'ready_for_branch' : (hasHorizon ? 'needs_baseline' : 'blocked'),
     priority: 4,
     summary: baselineReady
-      ? 'Elevated Open Frontier/A Shau screenshot and perf-before baselines are ready; outer-canopy work still needs matched after evidence.'
+      ? 'Elevated Open Frontier/A Shau screenshot and perf-before baselines are ready; outer-canopy and small-palm removal work still need matched after evidence.'
       : 'Outer-canopy work needs matched elevated runtime screenshots and perf deltas before any far layer is accepted.',
     evidence: {
       horizonAuditPath: rel(horizonPath),
@@ -692,10 +692,14 @@ function buildTerrainTarget(
       baselineReady
         ? 'Fresh-build the terrain horizon baseline before the after comparison if the current proof reused an existing perf build.'
         : 'Define whether the first branch is visual-only proof, far-canopy cards, or vegetation distance policy.',
+      'Remove the short Quaternius palm only with a matched vegetation review that preserves the taller fanPalm/coconut palm-like species and reallocates the freed budget to grass or ground cover.',
+      'Treat EZ Tree or similar procedural tree tooling as a source-pipeline investigation only: verify licensing, browser GLB budget, and Pixel Forge bake compatibility before runtime import.',
       'Capture matched perf before and after in Open Frontier and A Shau.',
     ],
     acceptance: [
       'Elevated Open Frontier and A Shau screenshots show improved horizon coverage.',
+      'The short Quaternius palm is absent from runtime vegetation and shipped assets while the taller palm-like species remain visible and the replacement ground cover is documented.',
+      'Any generated tree/ground-cover source GLB has a reviewed license, triangle/texture budget, Pixel Forge bake, and screenshot proof before becoming a shipped asset.',
       'Outer canopy adds no more than 1.5ms p95 frame time and no more than 10% draw-call growth.',
       'No near/mid vegetation regression in ground cameras.',
     ],
@@ -871,7 +875,7 @@ function main(): void {
     recommendedOrder: [
       'Treat the 2.95m NPC target drop, per-tile imposter crop, selected-lighting luma proof, and expanded-luma atmosphere pass as the current KB-OPTIK remediation slice.',
       'If KB-OPTIK continues immediately, use the runtime LOD-edge proof plus the near-stress artifact to decide visual exception/human review before changing crop or scale again.',
-      'For KB-LOAD, treat the giantPalm warmup as partial upload mitigation only; the next branch must prove startup latency does not regress while reducing remaining uploads.',
+      'For KB-LOAD, treat the old giantPalm warmup as retired partial upload evidence only; the next branch must prove startup latency does not regress while reducing remaining uploads.',
       'For KB-EFFECTS, preserve the unlit pooled explosion architecture; do not reopen low-load grenade work unless visuals change, and do not infer combat120/stress closeout.',
       'For KB-TERRAIN, use the terrain horizon baseline proof as before evidence, then require matched after screenshots plus Open Frontier/A Shau perf deltas.',
       'For KB-CULL, use the owner-path baseline before evidence first; do not move close-NPC residency out of diagnostic-only status until combat stress measurement trust passes.',
@@ -881,6 +885,7 @@ function main(): void {
       'Should KB-OPTIK document the 8.5m near-stress silhouette exception after the runtime LOD-edge PASS, run human visual review, or should KB-LOAD/KB-TERRAIN/KB-CULL take the next remediation slot?',
       'Should the next KB-LOAD branch target fanPalm with a latency guard, NPC atlases, approved asset regeneration, or upload scheduling?',
       'Which large-mode p95/draw-call budget will be used for far-canopy acceptance in this cycle?',
+      'Is EZ Tree the right source generator for missing Vietnam trees and trail/ground cover, or should another licensed procedural source feed the Pixel Forge bake path?',
     ],
   };
 

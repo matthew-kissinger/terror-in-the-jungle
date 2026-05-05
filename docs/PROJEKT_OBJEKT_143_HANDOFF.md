@@ -10,13 +10,14 @@ ledger; this file is the short operational prompt.
 
 - Repo: `C:\Users\Mattm\X\games-3d\terror-in-the-jungle`
 - Branch: `master`
-- The recovered local work has been checkpointed through `e92523a`
-  (`fix(navmesh): add terrain-aware bake invalidation`). Do not claim
-  production parity unless this branch has been pushed, CI has passed, and live
-  Pages/R2/WASM/service-worker checks have been verified.
-- No production parity is claimed for the latest local work. Live production
-  truth still comes from `/asset-manifest.json` and live Pages/R2/WASM/service
-  worker checks.
+- Verified pushed state before this handoff report:
+  `master` / `origin/master` at `356bc2e418af2f2f9aa8109dcf29a5ad7e291924`
+  (`docs(projekt-143): align navmesh recovery state`).
+- GitHub CI run `25353544629` passed on `356bc2e` for lint, test, build,
+  smoke, perf, and mobile UI.
+- No production parity is claimed for the latest `master` state. Live Pages
+  `/asset-manifest.json` still reports
+  `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`; deploy remains manual.
 - Keep WebGL stabilization as the active strategy. Do not start WebGPU
   migration unless the project owner explicitly approves that point of no
   return after evidence.
@@ -30,9 +31,9 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T02-53-11-768Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
-  `artifacts/perf/2026-05-05T01-45-04-864Z/projekt-143-evidence-suite/suite-summary.json`
+  `artifacts/perf/2026-05-05T02-51-58-852Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -40,7 +41,7 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN material distribution audit:
   `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
 - KB-TERRAIN placement/foundation audit:
-  `artifacts/perf/2026-05-05T01-41-42-472Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  `artifacts/perf/2026-05-05T02-39-51-929Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
 - KB-TERRAIN terrain asset inventory:
   `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
 - KB-TERRAIN route/trail policy audit:
@@ -52,6 +53,10 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN A Shau after route-stamping pass:
   `artifacts/perf/2026-05-04T13-03-02-238Z/summary.json`
   (measurement trust PASS; validation FAIL on heap end-growth/recovery)
+- KB-TERRAIN A Shau current rerun:
+  `artifacts/perf/2026-05-05T02-41-21-751Z/summary.json`
+  (measurement trust PASS; validation WARN only on peak p99; heap, movement,
+  and hit guardrails PASS; NPC terrain-stall backtracking still visible)
 - KB-TERRAIN local mossy cliff/material follow-up:
   `artifacts/perf/2026-05-04T21-42-10-596Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
 - Local Open Frontier visibility/vegetation diagnostic:
@@ -94,9 +99,16 @@ ledger; this file is the short operational prompt.
   The goal now also includes ground and vegetation art-direction correction:
   most traversable ground should read jungle green rather than gravel while
   preserving texture variety; verify whether slope/biome material distribution
-  is inverted if green is mostly on hillsides; scale and ground tiny palms and
-  ferns; increase big palms and ground vegetation; and make bamboo scattered
-  dense clusters rather than the dominant forest layer. The first
+  is inverted if green is mostly on hillsides; remove the short Quaternius palm
+  (`giantPalm` / `palm-quaternius-2`) from runtime and shipped assets
+  completely; preserve the taller palm-like species (`fanPalm` and
+  `coconut`); spend the freed vegetation budget on grass or other ground cover;
+  increase big palms and ground vegetation; and make bamboo scattered dense
+  clusters rather than the dominant forest layer. Also add a source-pipeline
+  investigation for EZ Tree or a similar licensed procedural/tree workflow to
+  generate browser-budget GLBs that can be baked into Pixel Forge-compatible
+  impostors/LODs for missing Vietnam trees, understory, grass/ground cover, and
+  trail-edge assets. The first
   material-distribution pass removes broad highland/cleared/bamboo elevation
   caps as primary terrain rules and keeps rock available as a slope-gated
   accent; the follow-up vegetation pass enlarges/lifts ferns, increases large
@@ -113,7 +125,11 @@ ledger; this file is the short operational prompt.
   capsule stamps, and `14` surface patches. The paired A Shau capture records
   `170` shots, `59` hits, and `57` movement transitions with measurement trust
   PASS, but validation fails on heap growth/recovery and terrain-stall warnings
-  still appear, so A Shau is still not accepted. Later terrain/world-placement
+  still appear. The current rerun at
+  `artifacts/perf/2026-05-05T02-41-21-751Z/summary.json` clears the hard heap
+  blocker (`heap_growth_mb=-61.58`, peak growth `16.64MB`, recovery PASS) and
+  keeps movement/hit guardrails green, but terrain-stall backtracking still
+  appears, so A Shau is improved but not accepted. Later terrain/world-placement
   work must continue fixing hanging building foundations and review airfield,
   HQ, vehicle, firebase, and support-compound presets before considering Pixel
   Forge building replacements. Also inventory existing TIJ and Pixel Forge
@@ -135,8 +151,11 @@ ledger; this file is the short operational prompt.
   contract now uses collidable runtime placements instead of trafficable
   feature footprints. Remaining navigation risk is acceptance-level, not just
   invalidation plumbing: withheld Open Frontier seeds need per-seed feature
-  presets, Zone Control seed `137` has two placement-audit warnings, and A Shau
-  still needs route/nav quality, heap, and terrain-stall proof before signoff.
+  presets, the current working tree clears the two Zone Control seed `137`
+  placement warnings in
+  `artifacts/perf/2026-05-05T02-39-51-929Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`,
+  and A Shau still needs route/nav quality plus terrain-stall proof before
+  signoff.
 - Active-player perf harness: shorter Pixel Forge NPCs require the killbot to
   aim at the visual chest proxy below the eye-level actor anchor. The local
   TypeScript bot and CJS perf driver have unit coverage for that contract, and
@@ -207,15 +226,15 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-05T02-53-11-768Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - Projekt evidence suite:
-  artifacts/perf/2026-05-05T01-45-04-864Z/projekt-143-evidence-suite/suite-summary.json
+  artifacts/perf/2026-05-05T02-51-58-852Z/projekt-143-evidence-suite/suite-summary.json
 - KB-TERRAIN before baseline:
   artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:
   artifacts/perf/2026-05-04T21-42-10-596Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
 - KB-TERRAIN placement/foundation audit:
-  artifacts/perf/2026-05-05T01-41-42-472Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
+  artifacts/perf/2026-05-05T02-39-51-929Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
 - KB-TERRAIN terrain asset inventory:
   artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json
 - KB-TERRAIN route/trail policy audit:
@@ -226,6 +245,8 @@ Current evidence anchors:
   artifacts/perf/2026-05-04T04-14-35-401Z/summary.json
 - KB-TERRAIN A Shau after route-stamping pass:
   artifacts/perf/2026-05-04T13-03-02-238Z/summary.json
+- KB-TERRAIN A Shau current rerun:
+  artifacts/perf/2026-05-05T02-41-21-751Z/summary.json
 - KB-TERRAIN local mossy cliff/material follow-up:
   artifacts/perf/2026-05-04T21-42-10-596Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
 - Local Open Frontier visibility/vegetation diagnostic:
@@ -253,25 +274,37 @@ Current bureau state:
 - KB-LOAD: ready_for_branch, but no startup-latency win yet.
 - KB-TERRAIN: ready_for_branch, before baseline exists; no far-canopy fix yet.
   Include the owner visual target: majority green/jungle floor, possible
-  inverted material distribution, bigger/grounded palms and ferns, more big
-  palms and ground cover, bamboo as scattered dense clusters, terrain-shaped
-  building/HQ/airfield/vehicle foundations with no hill-edge overhangs, and a
-  performance-aware Pixel Forge building shortlist before replacement. Include
-  an asset audit for ground/path/grass/foliage/cover variety and future
-  vehicle-usable trail surfaces. Current local terrain work has Open Frontier
+  inverted material distribution, remove the short Quaternius palm
+  (`giantPalm` / `palm-quaternius-2`) from runtime and shipped assets, preserve
+  the taller `fanPalm` and `coconut` palm-like species, redirect that budget
+  toward grass or ground cover, add more big palms and ground cover, bamboo as
+  scattered dense clusters, terrain-shaped building/HQ/airfield/vehicle
+  foundations with no hill-edge overhangs, and a performance-aware Pixel Forge
+  building shortlist before replacement. Include an asset audit for
+  ground/path/grass/foliage/cover variety and future vehicle-usable trail
+  surfaces, plus an EZ Tree or similar source-pipeline investigation for
+  licensed browser-budget GLBs that can become Pixel Forge-compatible
+  impostors/LODs. Current local terrain work has Open Frontier
   WARN/trusted evidence, clustered-bamboo static distribution evidence, a
   passing placement/foundation audit, a static terrain asset inventory, and a
   passing route/trail policy audit. A Shau now stamps full `jungle_trail`
-  corridors instead of map-only route overlays, but the after-route capture
-  fails heap validation and still shows terrain-stall warnings; do not claim
+  corridors instead of map-only route overlays. The older after-route capture
+  fails heap validation and still shows terrain-stall warnings; the current
+  rerun clears heap but still shows terrain-stall backtracking, so do not claim
   A Shau acceptance. Current local follow-up keeps rock as a reduced
   moss-tinted cliff accent rather than a broad grey elevation cap, fixes the
   hill-clipping camera case by rejecting terrain-lip horizontal steps that
   would put the eye inside the hillside, and records the navmesh invalidation
   risk: `e92523a` now gives registered bakes a manifest/signature gate and
   runtime solo navmesh cache fingerprints, but it does not sign off A Shau nav
-  quality, withheld Open Frontier seed variants, or Zone Control seed `137`
-  placement warnings. The active-player killbot has a shorter-NPC visual-chest
+  quality or withheld Open Frontier seed variants. Current local placement
+  evidence clears the Zone Control seed `137` placement warnings. The latest
+  short-palm retirement validation has `npm run validate:fast` PASS,
+  `npm run build` PASS, `npm run build:perf` PASS, `6` runtime vegetation
+  species, `1` retired short palm, and `0` missing assets at
+  `artifacts/perf/2026-05-05T03-23-29-111Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
+  The
+  active-player killbot has a shorter-NPC visual-chest
   aim fix in unit tests
   and a fresh Open Frontier capture with `120` shots / `43` hits. Do not trust
   that capture for frame-time acceptance because another browser game was

@@ -6,12 +6,13 @@ import { BuildingModels, StructureModels } from '../src/systems/assets/modelPath
 import { PIXEL_FORGE_PROP_CATALOG } from '../src/systems/assets/PixelForgePropCatalog';
 import {
   PIXEL_FORGE_BLOCKED_VEGETATION_IDS,
+  PIXEL_FORGE_RETIRED_VEGETATION_IDS,
   PIXEL_FORGE_VEGETATION_ASSETS,
 } from '../src/config/pixelForgeAssets';
 import { getBiome } from '../src/config/biomes';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
-type CandidateStatus = 'runtime' | 'candidate' | 'blocked' | 'review_required';
+type CandidateStatus = 'runtime' | 'candidate' | 'blocked' | 'retired' | 'review_required';
 
 interface TextureEntry {
   name: string;
@@ -56,6 +57,7 @@ interface TerrainAssetInventory {
     pixelForgeGroundCoverCandidates: number;
     runtimeVegetationSpecies: number;
     blockedVegetationSpecies: number;
+    retiredVegetationSpecies: number;
     buildingCandidates: number;
     missingAssets: number;
   };
@@ -243,7 +245,21 @@ function vegetationEntries(): VegetationEntry[] {
     ],
   }));
 
-  return [...accepted, ...blocked];
+  const retired = PIXEL_FORGE_RETIRED_VEGETATION_IDS.map((id) => ({
+    id,
+    variant: 'owner-retired-runtime-species',
+    tier: 'canopy',
+    colorFile: '',
+    normalFile: '',
+    colorExists: false,
+    normalExists: false,
+    status: 'retired' as CandidateStatus,
+    notes: [
+      'Owner-retired small palm species; keep out of runtime unless a future vegetation review explicitly re-approves it.',
+    ],
+  }));
+
+  return [...accepted, ...retired, ...blocked];
 }
 
 function buildInventory(): TerrainAssetInventory {
@@ -269,6 +285,7 @@ function buildInventory(): TerrainAssetInventory {
       pixelForgeGroundCoverCandidates: props.filter((entry) => entry.role === 'ground-cover-candidate').length,
       runtimeVegetationSpecies: vegetation.filter((entry) => entry.status === 'runtime').length,
       blockedVegetationSpecies: vegetation.filter((entry) => entry.status === 'blocked').length,
+      retiredVegetationSpecies: vegetation.filter((entry) => entry.status === 'retired').length,
       buildingCandidates: models.filter((entry) => entry.role === 'building-candidate').length,
       missingAssets,
     },
@@ -281,10 +298,13 @@ function buildInventory(): TerrainAssetInventory {
         'Use this inventory to shortlist ground textures by surface role before adding custom grass, cover, or trail assets.',
         'Prefer existing green-ground textures for local material variety before generating new terrain albedo.',
         'Treat Pixel Forge grass/patch/rock props as review candidates for ground-cover clumps, not automatic runtime imports.',
+        'Keep the retired small palm out of runtime and spend replacement vegetation budget on ground-cover candidates or approved grass.',
+        'Investigate EZ Tree or a similar licensed procedural/tree source only as a GLB-generation path; bake and validate generated assets before runtime import.',
         'Tie any trail visual change to existing jungle_trail/packed_earth/dirt_road surface kinds and terrain-flow stamps.',
       ],
       validationRequiredBeforeRuntimeImport: [
         'Asset Acceptance Standard review for visual fit, footprint, collision, draw calls, triangles, texture residency, and LOD/HLOD path.',
+        'Generated tree/ground-cover GLBs must prove licensing, browser-budget geometry/textures, Pixel Forge bake compatibility, and impostor/LOD quality before shipping.',
         'Open Frontier and A Shau screenshots once browser resources are available.',
         'Matched perf captures only after the owner clears the machine for perf/browser work.',
       ],
@@ -292,6 +312,7 @@ function buildInventory(): TerrainAssetInventory {
         'No new runtime asset is accepted by this inventory.',
         'No performance or visual-quality claim is made from static file presence.',
         'No blocked Pixel Forge vegetation species is unblocked by this audit.',
+        'The retired small palm source assets may remain on disk for provenance, but they are not runtime vegetation.',
       ],
     },
   };
@@ -316,7 +337,7 @@ function main(): void {
     `- Pixel Forge ground-cover props=${report.summary.pixelForgeGroundCoverCandidates}, buildings=${report.summary.buildingCandidates}`,
   );
   console.log(
-    `- runtime vegetation=${report.summary.runtimeVegetationSpecies}, blocked vegetation=${report.summary.blockedVegetationSpecies}, missing=${report.summary.missingAssets}`,
+    `- runtime vegetation=${report.summary.runtimeVegetationSpecies}, retired vegetation=${report.summary.retiredVegetationSpecies}, blocked vegetation=${report.summary.blockedVegetationSpecies}, missing=${report.summary.missingAssets}`,
   );
   if (report.status === 'fail') {
     process.exitCode = 1;

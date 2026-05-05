@@ -113,14 +113,6 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     baseDensity: 0.55,
     placement: 'random',
   },
-  giantPalm: {
-    maxInstances: 15_000,
-    fadeDistance: 500,
-    maxDistance: 600,
-    baseDensity: 0.35,
-    placement: 'poisson',
-    poissonMinDistance: 12,
-  },
 };
 
 // Low-camera atlas rows in several Pixel Forge packages have transparent
@@ -131,7 +123,6 @@ const VEGETATION_GROUNDING_SINK: Record<string, number> = {
   coconut: 2.45,
   elephantEar: 0.45,
   fanPalm: 2.8,
-  giantPalm: 0.6,
 };
 
 const VEGETATION_GROUNDING_LIFT: Record<string, number> = {
@@ -140,7 +131,6 @@ const VEGETATION_GROUNDING_LIFT: Record<string, number> = {
 
 const VEGETATION_RUNTIME_SCALE: Record<string, number> = {
   fern: 1.25,
-  giantPalm: 2.25,
 };
 
 // Skinny, asymmetric trunks do not survive atlas cross-fading: blending two
@@ -149,7 +139,6 @@ const VEGETATION_RUNTIME_SCALE: Record<string, number> = {
 // ground-view sampling on the clean row until the asset can be regenerated.
 const VEGETATION_STABLE_AZIMUTH_COLUMN: Record<string, number> = {
   coconut: 2,
-  giantPalm: 3,
 };
 
 const VEGETATION_MAX_ELEVATION_ROW: Record<string, number> = {

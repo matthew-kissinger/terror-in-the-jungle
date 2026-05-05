@@ -53,17 +53,19 @@ filenames, old `assets/source/soldiers` paths, blocked vegetation species IDs,
 `dipterocarp`, and `rejected-do-not-import` paths in source or shipped output.
 
 Approved runtime vegetation species are `bambooGrove`, `fern`, `bananaPlant`,
-`fanPalm`, `elephantEar`, `coconut`, and `giantPalm`. Blocked species remain
-excluded until regenerated or approved: `rubberTree`, `ricePaddyPlants`,
-`elephantGrass`, `areca`, `mangrove`, and `banyan`.
+`fanPalm`, `elephantEar`, and `coconut`. The short Quaternius palm previously
+named `giantPalm` / `palm-quaternius-2` is owner-retired and its public shipped
+assets were removed on 2026-05-05; do not confuse it with the preserved taller
+`fanPalm` or `coconut` palm-like trees. Blocked species remain excluded until
+regenerated or approved: `rubberTree`, `ricePaddyPlants`, `elephantGrass`,
+`areca`, `mangrove`, and `banyan`.
 
 Pixel Forge vegetation is currently impostor-only. Runtime metadata now carries
-review fixes for asymmetric palm packages: `giantPalm` is enlarged and locked
-to one stable azimuth column, and `coconut` is locked to a clean column while
-avoiding its bad low-elevation atlas row. These guards are an interim runtime
-answer, not final tree art. For polished close-range palms, prefer regenerated
-assets with close mesh LODs or a hybrid instanced trunk plus impostor canopy
-path.
+review fixes for asymmetric palm packages: `coconut` is locked to a clean
+column while avoiding its bad low-elevation atlas row. These guards are an
+interim runtime answer, not final tree art. For polished close-range palms,
+prefer regenerated assets with close mesh LODs or a hybrid instanced trunk plus
+impostor canopy path.
 
 Projekt Objekt-143 KB-OPTIK opened a static imposter optics audit on
 2026-05-02: `npm run check:pixel-forge-optics` writes

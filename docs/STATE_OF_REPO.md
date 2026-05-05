@@ -10,6 +10,14 @@ the current truth anchor.
 
 ## Stable-Ground Snapshot On 2026-05-02
 
+- Latest pushed repo state before the 24-hour handoff report:
+  `master` and `origin/master` are aligned at
+  `356bc2e418af2f2f9aa8109dcf29a5ad7e291924`, and GitHub CI run
+  `25353544629` passed on that SHA. Live Pages remains behind by design:
+  `/asset-manifest.json` reports
+  `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. No production parity is claimed
+  for the latest repo state until the manual deploy path and live header/smoke
+  checks are run.
 - A recovery operation is now tracked in
   [PROJEKT_OBJEKT_143.md](PROJEKT_OBJEKT_143.md). Phase 1 was signed on
   2026-05-02 after a read-only audit of code, live deployment state, tooling,
@@ -111,11 +119,26 @@ the current truth anchor.
   a future asset audit for TIJ and Pixel Forge ground/path/trail/grass/foliage
   and cover texture variety, with worn-in smoothed route surfaces that can
   support future vehicles where appropriate.
-  A follow-up local vegetation pass enlarged/lifted `fern`, enlarged
-  `giantPalm`, raised palm density, and made `bambooGrove` use a large-scale
-  cluster mask. Its latest static distribution artifact is
+  The 2026-05-05 owner vegetation target changes the palm direction: remove
+  the short Quaternius palm from runtime and shipped assets, preserve the
+  taller palm-like trees, and spend that freed visual/perf budget on grass or
+  other ground-cover assets.
+  The visually confirmed short palm is the misleadingly named `giantPalm` /
+  `palm-quaternius-2` package, not the taller `fanPalm` or `coconut`
+  palm-like trees. Local runtime config now removes `giantPalm`, removes its
+  public shipped assets, preserves `fanPalm` and `coconut`, and reallocates the
+  biome slot toward `fern` and `elephantEar` ground cover. Earlier local
+  vegetation work enlarged/lifted `fern` and made `bambooGrove` use a
+  large-scale cluster mask. Its latest static distribution artifact before the
+  removal is
   `artifacts/perf/2026-05-04T02-41-29-573Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
-  the latest elevated screenshot proof is
+  post-removal validation records `6` runtime vegetation species, `1` retired
+  species, `6` blocked species, and `0` missing assets at
+  `artifacts/perf/2026-05-05T03-23-29-111Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
+  `npm run validate:fast` and `npm run build` pass after the removal, and the
+  latest Projekt evidence suite passes at
+  `artifacts/perf/2026-05-05T03-24-06-823Z/projekt-143-evidence-suite/suite-summary.json`.
+  The latest elevated screenshot proof is
   `artifacts/perf/2026-05-04T02-41-37-056Z/projekt-143-terrain-horizon-baseline/summary.json`.
   Open Frontier after evidence at
   `artifacts/perf/2026-05-04T02-45-03-756Z/summary.json` is measurement-trusted
@@ -136,6 +159,12 @@ the current truth anchor.
   transitions), but it fails validation on heap end-growth/recovery and still
   logs terrain-stall warnings. This is route-policy progress, not A Shau
   runtime acceptance.
+  A current-worktree rerun at
+  `artifacts/perf/2026-05-05T02-41-21-751Z/summary.json` clears the hard heap
+  failure (`heap_growth_mb=-61.58`, peak growth `16.64MB`, recovery PASS) and
+  keeps movement/hit guardrails green, but it still logs NPC terrain-stall
+  backtracking and remains WARN on peak p99. This is stronger A Shau evidence,
+  not final route/nav acceptance.
   Current local follow-up keeps rock as a reduced moss-tinted cliff accent
   rather than a broad grey elevation cap, and it fixes a player-camera terrain
   clipping failure mode where the grounded rise clamp could leave the camera
@@ -147,9 +176,10 @@ the current truth anchor.
   fingerprints, and bake/runtime obstacle generation now uses collidable
   runtime placements rather than trafficable feature envelopes. This is not
   A Shau navigation acceptance. Open Frontier non-default seeds remain
-  withheld until per-seed feature presets exist, Zone Control seed `137` now
-  has explicit placement-audit warnings, and A Shau still needs route/nav
-  quality plus heap/terrain-stall proof.
+  withheld until per-seed feature presets exist. The current working tree
+  clears the Zone Control seed `137` placement-audit warnings at
+  `artifacts/perf/2026-05-05T02-39-51-929Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`.
+  A Shau still needs route/nav quality plus terrain-stall proof.
 - KB-STRATEGIE filed the WebGL/WebGPU brief. `npm run check:webgpu-strategy`
   wrote
   `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`:
@@ -406,9 +436,12 @@ What is not ready to claim:
   accepted. The terrain branch now also carries an explicit owner visual target:
   keep texture variety but make most traversable ground read jungle green
   rather than gravel, check for possible inverted slope/biome material
-  distribution if green appears mostly on hillsides, scale/ground tiny palms and
-  ferns, add more big palms and ground vegetation, and make bamboo scattered
-  dense clusters instead of the dominant forest layer.
+  distribution if green appears mostly on hillsides, remove the short
+  Quaternius palm (`giantPalm` / `palm-quaternius-2`) from runtime and shipped
+  assets, preserve the taller `fanPalm` and `coconut` palm-like species,
+  redirect that budget to grass or other ground cover, add more big palms and
+  ground vegetation, and make bamboo scattered dense clusters instead of the
+  dominant forest layer.
   Local follow-up now includes a second bamboo clustering fix because the first
   grove mask still looked scattered: clustered mid-level vegetation gets its
   own Poisson grid instead of sharing palm spacing. The latest distribution
@@ -520,9 +553,12 @@ What is not ready to claim:
   draw-call-like rises because culling granularity is finer. Vegetation behind
   hills should be handled with coarse terrain/cluster/Hi-Z-style occlusion,
   not per-instance raycasts.
-- KB-LOAD has a first local runtime remediation, not a closeout. The current
-  code warms only the giantPalm color/normal texture pair before renderer
-  reveal through `AssetLoader.warmGpuTextures()`. Paired retail startup
+- KB-LOAD has retired its first local runtime remediation with the short-palm
+  removal, not a closeout. The old code warmed only the `giantPalm`
+  color/normal texture pair before renderer reveal through
+  `AssetLoader.warmGpuTextures()`; the current warmup list is empty because the
+  short Quaternius palm no longer ships and the taller palm-like species need
+  separate paired proof before any warmup. Historical paired retail startup
   artifacts show WebGL upload totals improved in Open Frontier
   (`3341.0ms` to `1157.2ms`) and Zone Control (`3340.6ms` to `1229.6ms`), but
   deploy-click-to-playable did not improve (`4685.7ms` to `4749.0ms` in Open
@@ -611,18 +647,20 @@ What is not ready to claim:
   which fails on old faction sprite filenames, old NPC source-soldier PNG
   filenames/paths, old root-level vegetation WebP filenames, blocked vegetation
   species IDs, `dipterocarp`, and `rejected-do-not-import` paths.
-- Approved runtime vegetation is limited to seven Pixel Forge impostor species:
-  `bambooGrove`, `fern`, `bananaPlant`, `fanPalm`, `elephantEar`, `coconut`,
-  and `giantPalm`. Blocked species remain out of production until regenerated
-  or approved: `rubberTree`, `ricePaddyPlants`, `elephantGrass`, `areca`,
-  `mangrove`, and `banyan`.
+- Approved runtime vegetation is limited to six Pixel Forge impostor species:
+  `bambooGrove`, `fern`, `bananaPlant`, `fanPalm`, `elephantEar`, and
+  `coconut`. The short Quaternius palm previously named `giantPalm` /
+  `palm-quaternius-2` is owner-retired and removed from shipped public assets;
+  the taller `fanPalm` and `coconut` palm-like trees remain runtime species.
+  Blocked species remain out of production until regenerated or approved:
+  `rubberTree`, `ricePaddyPlants`, `elephantGrass`, `areca`, `mangrove`, and
+  `banyan`.
 - Vegetation still uses the GPU billboard path, now with manifest-backed color
   and normal atlases, close alpha hardening, a brighter minimum lighting floor,
   shader-side wind, species grounding sinks for low-angle atlas padding, and
-  per-species atlas guards for reviewed problem packages. `giantPalm` is scaled
-  up and locked to a stable azimuth column; `coconut` is locked to a clean
-  column and capped away from its bad low-elevation row. There is still no
-  close 3D vegetation LOD in this pass.
+  per-species atlas guards for reviewed problem packages. `coconut` is locked
+  to a clean column and capped away from its bad low-elevation row. There is
+  still no close 3D vegetation LOD in this pass.
 - Close NPCs use Pixel Forge combined skinned GLBs with M16A1/AK-47 weapon
   attachments. The no-impostor near band is currently `64m`, selected close
   GLB capacity is `128`, and per-pool capacity is `40`; over-cap near actors
