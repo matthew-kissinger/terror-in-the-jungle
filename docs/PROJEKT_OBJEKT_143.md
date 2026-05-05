@@ -40,17 +40,23 @@ records the current vegetation inventory at
 with `6` runtime species, `1` retired species, `6` blocked species, and `0`
 missing assets. `npm run validate:fast` passed after this change, and the
 latest Projekt suite is
-`artifacts/perf/2026-05-05T03-24-06-823Z/projekt-143-evidence-suite/suite-summary.json`.
+`artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`.
 Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
-`artifacts/perf/2026-05-05T03-24-24-591Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+`artifacts/perf/2026-05-05T03-50-28-671Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
 KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an
 optional offline GLB source feeding Pixel Forge rather than replacing it.
 Grass, ground cover, and trail-edge variety should come from Pixel Forge
 catalog/review work, a licensed asset-library review, or custom low-card bake
-before any runtime import. The local audit command is
+before any runtime import. The latest local audit at
+`artifacts/perf/2026-05-05T03-50-22-634Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+is WARN with the Pixel Forge sibling repo present, all `6` current TIJ runtime
+vegetation species present, retired `giantPalm` still present in the Pixel
+Forge gallery manifest, all `6` blocked/review-only vegetation species still
+present, and the NPC review package counted as `4` factions, `8` clips, and
+`32` impostor packages. The local audit command is
 `npm run check:projekt-143-pixel-forge`.
 
 ## Shipped Cycle 0 State

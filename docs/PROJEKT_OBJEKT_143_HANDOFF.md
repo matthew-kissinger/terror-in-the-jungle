@@ -13,10 +13,11 @@ ledger; this file is the short operational prompt.
 - Verified pushed state before this handoff report:
   `origin/master` at `356bc2e418af2f2f9aa8109dcf29a5ad7e291924`
   (`docs(projekt-143): align navmesh recovery state`).
-- Current local `master` is ahead of `origin/master` by two commits:
-  `571464e` (`fix(terrain): stabilize Zone Control feature pads`) and
-  `a0aeacb` (`fix(vegetation): retire short Pixel Forge palm`). These are not
-  pushed or deployed.
+- Current local `master` has an unpushed local stack on top of
+  `origin/master`. The stack includes the Zone Control pad fix, short-palm
+  retirement, vegetation source-pipeline review, KB-FORGE bureau audit, and
+  this handoff refresh. Run `git log --oneline origin/master..master` for the
+  exact current count. These are not pushed or deployed.
 - GitHub CI run `25353544629` passed on `356bc2e` for lint, test, build,
   smoke, perf, and mobile UI.
 - No production parity is claimed for the latest `master` state. Live Pages
@@ -35,9 +36,9 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-05T02-53-11-768Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T03-50-28-671Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
-  `artifacts/perf/2026-05-05T02-51-58-852Z/projekt-143-evidence-suite/suite-summary.json`
+  `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -51,7 +52,7 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN vegetation source pipeline review:
   `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md`
 - KB-FORGE local Pixel Forge bureau audit:
-  run `npm run check:projekt-143-pixel-forge`
+  `artifacts/perf/2026-05-05T03-50-22-634Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
 - KB-TERRAIN route/trail policy audit:
   `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
@@ -106,8 +107,13 @@ ledger; this file is the short operational prompt.
   `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.
   Use `npm run check:projekt-143-pixel-forge` from TIJ to catalog its TIJ
   pipeline commands, review gallery, output manifest, NPC package surface, and
-  vegetation package state. KB-FORGE should analyze relevance and package
-  readiness before KB-TERRAIN or KB-OPTIK imports anything into runtime.
+  vegetation package state. Latest audit is WARN with Pixel Forge present,
+  `109` manifest entries, `13` vegetation entries, all `6` current TIJ runtime
+  vegetation species present, retired `giantPalm` still present in the Pixel
+  Forge gallery manifest, all `6` blocked/review-only species still present,
+  and the NPC review package counted as `4` factions, `8` clips, and `32`
+  impostor packages. KB-FORGE should analyze relevance and package readiness
+  before KB-TERRAIN or KB-OPTIK imports anything into runtime.
 - KB-TERRAIN `large-mode-vegetation-horizon`: `ready_for_branch`.
   The first far-horizon branch must use the terrain baseline before/after
   screenshot path and matched Open Frontier/A Shau perf captures.
@@ -244,12 +250,15 @@ Initial commands:
 2. npm run doctor
 3. npm run check:projekt-143-cycle3-kickoff
 4. npm run check:projekt-143
+5. npm run check:projekt-143-pixel-forge
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-05T02-53-11-768Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
-- Projekt evidence suite:
-  artifacts/perf/2026-05-05T02-51-58-852Z/projekt-143-evidence-suite/suite-summary.json
+  artifacts/perf/2026-05-05T03-50-28-671Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+- Static Projekt suite:
+  artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json
+- KB-FORGE local Pixel Forge bureau:
+  artifacts/perf/2026-05-05T03-50-22-634Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json
 - KB-TERRAIN before baseline:
   artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:

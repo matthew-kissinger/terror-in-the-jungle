@@ -2944,3 +2944,21 @@ TODO
   generators such as `EZ-Tree` are optional source inputs to Pixel Forge, not
   replacements for Pixel Forge's review-only, bake, manifest, validator, and
   gallery gates.
+
+2026-05-05 Projekt Objekt-143 KB-FORGE validation and handoff alignment
+- Refreshed `npm run check:projekt-143-pixel-forge`: expected WARN at
+  `artifacts/perf/2026-05-05T03-50-22-634Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`.
+  Pixel Forge is present with `109` manifest entries, `13` vegetation entries,
+  all `6` current TIJ runtime vegetation species present, retired `giantPalm`
+  still in the Pixel Forge gallery manifest, `6` blocked/review-only vegetation
+  species present, and the NPC review package counted as `4` factions, `8`
+  clips, and `32` impostor packages.
+- Refreshed Projekt evidence: `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run check:projekt-143-cycle3-kickoff` WARN at
+  `artifacts/perf/2026-05-05T03-50-28-671Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  only for the existing KB-OPTIK near-stress visual-exception/human-review
+  decision.
+- `npm run validate:fast` PASS (`253` files, `3874` tests). Updated the
+  Projekt ledger and handoff so the local state records the unpushed local
+  stack and does not imply production parity.
