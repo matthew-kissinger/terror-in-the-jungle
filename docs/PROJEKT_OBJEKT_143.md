@@ -43,7 +43,7 @@ latest Projekt suite is
 `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`.
 Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
-`artifacts/perf/2026-05-05T16-44-34-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+`artifacts/perf/2026-05-05T17-50-18-919Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The latest explicit completion audit is
 `artifacts/perf/2026-05-05T16-45-01-714Z/projekt-143-completion-audit/completion-audit.json`.
 It reports `NOT_COMPLETE`: KB-OPTIK remains blocked on the near-stress
@@ -53,6 +53,18 @@ owner vegetation specifics are PASS for retiring the short palm, preserving
 `fanPalm`/`coconut`, and keeping ground-cover budget directed toward
 fern/elephantEar/trail candidates. The audited local stack was still dirty,
 unpushed, and undeployed, so validation/release remains FAIL.
+The latest local vegetation grounding follow-up identifies the owner-reported
+light-green half-buried floor leaves as `bananaPlant`, not `fern` or
+`elephantEar`. It raises the banana-plant runtime anchor, adds an `18deg`
+slope placement cap for that low random imposter, and broadens the grounding
+unit coverage so every active runtime vegetation species has a visible-base
+near-terrain assertion. A source-alpha audit now shows the remaining active
+species have worst visible bases within `0.22m` below terrain, while
+`bananaPlant` moves from the severe buried case to `0.03m` above terrain.
+Focused vegetation tests, the world-feature regression test, `git diff
+--check`, the production build, and `validate:fast` pass; no browser visual
+acceptance, perf acceptance, release, or production parity is claimed for this
+local follow-up yet.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
 KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an

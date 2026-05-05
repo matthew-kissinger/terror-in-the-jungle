@@ -256,6 +256,7 @@ export class ChunkVegetationGenerator {
           const p = this.getShiftedPoissonPoint(pts[i], offset.x, offset.y, size);
           const h = getHeight(p.x, p.y);
           if (h < 0) continue;
+          if (vt.maxSlopeDeg !== undefined && slopeDeg(p.x, p.y, size, getHeight) > vt.maxSlopeDeg) continue;
           if (trunkGrid.isNear(p.x, p.y)) continue;
           const clusterMask = this.getClusterMask(vt, baseX + p.x, baseZ + p.y, typeSalt);
           if (clusterMask <= 0) continue;
@@ -278,6 +279,7 @@ export class ChunkVegetationGenerator {
           const lz = (hz / 0xffffffff) * size;
           const h = getHeight(lx, lz);
           if (h < 0) continue;
+          if (vt.maxSlopeDeg !== undefined && slopeDeg(lx, lz, size, getHeight) > vt.maxSlopeDeg) continue;
           if (trunkGrid.isNear(lx, lz)) continue;
           const clusterMask = this.getClusterMask(vt, baseX + lx, baseZ + lz, typeSalt);
           if (clusterMask <= 0) continue;

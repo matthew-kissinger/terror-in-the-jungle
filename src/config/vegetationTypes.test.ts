@@ -85,18 +85,22 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     }
   });
 
-  it('grounds low-angle atlas silhouettes so visible vegetation bases do not float', () => {
+  it('grounds low-angle atlas silhouettes so visible vegetation bases stay near terrain', () => {
     const lowAngleVisibleBasePaddingMeters: Record<string, number> = {
       bambooGrove: 0.56,
-      coconut: 2.41,
-      elephantEar: 2.10,
-      fanPalm: 2.79,
+      bananaPlant: 0.96,
+      coconut: 2.23,
+      elephantEar: 2.0,
+      fanPalm: 2.77,
+      fern: 0.42,
     };
 
     for (const type of VEGETATION_TYPES) {
-      const visiblePadding = lowAngleVisibleBasePaddingMeters[type.id] ?? 0;
+      const visiblePadding = lowAngleVisibleBasePaddingMeters[type.id];
+      expect(visiblePadding).toBeDefined();
       const visibleBaseY = type.yOffset - type.size * 0.5 + visiblePadding;
-      expect(visibleBaseY).toBeLessThanOrEqual(0.12);
+      expect(visibleBaseY).toBeGreaterThanOrEqual(-0.3);
+      expect(visibleBaseY).toBeLessThanOrEqual(0.3);
     }
   });
 
@@ -114,6 +118,15 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(fern).toBeDefined();
     expect(fern?.size).toBeGreaterThan(4.5);
     expect((fern?.yOffset ?? 0) - ((fern?.size ?? 0) * 0.5)).toBeGreaterThan(-0.35);
+  });
+
+  it('lifts and slope-caps banana plant impostors so they do not sit half below terrain', () => {
+    const bananaPlant = VEGETATION_TYPES.find((type) => type.id === 'bananaPlant');
+
+    expect(bananaPlant).toBeDefined();
+    expect((bananaPlant?.yOffset ?? 0) - ((bananaPlant?.size ?? 0) * 0.5) + 0.96)
+      .toBeGreaterThanOrEqual(0);
+    expect(bananaPlant?.maxSlopeDeg).toBeLessThanOrEqual(18);
   });
 
   it('biases the jungle mix toward the tall palm and ground cover while keeping bamboo clustered', () => {

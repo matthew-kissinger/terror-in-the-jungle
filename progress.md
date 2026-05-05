@@ -3137,3 +3137,29 @@ TODO
   KB-OPTIK/KB-LOAD/KB-TERRAIN/KB-CULL/release remain open. This is a narrow
   KB-LOAD startup/upload improvement, not Projekt completion or production
   parity.
+
+2026-05-05 Projekt Objekt-143 banana-plant grounding follow-up
+- Checked the owner screenshot from Downloads and corrected the local
+  identification: the light-green half-buried floor leaves are runtime
+  `bananaPlant`, not `fern` or `elephantEar`. The Pixel Forge source atlas has
+  a negative source `yOffset`, and the previous runtime anchor placed most of
+  the low banana-plant billboard below terrain.
+- Added optional per-type `maxSlopeDeg` support to `VegetationTypeConfig` and
+  `ChunkVegetationGenerator`, then capped `bananaPlant` at `18deg` so this low
+  random imposter does not spawn on steep faces where a vertical billboard
+  clips into terrain. Raised the banana-plant grounding lift to `2.2`, which
+  moves its worst source-alpha visible base to `0.03m` above terrain while
+  leaving `fern` and `elephantEar` unchanged.
+- Audited all active runtime vegetation imposters against their source-alpha
+  bounds after the correction. Worst visible bases are now: bambooGrove
+  `-0.07m`, fern `0.17m`, bananaPlant `0.03m`, fanPalm `-0.09m`,
+  elephantEar `-0.15m`, and coconut `-0.22m`; there is no remaining active
+  vegetation species with the severe half-buried banana-plant profile.
+- Validation: `npx vitest run src\config\vegetationTypes.test.ts src\systems\terrain\ChunkVegetationGenerator.test.ts`
+  passed with `16` tests, `npx vitest run src\systems\world\WorldFeatureSystem.test.ts`
+  passed after reverting the unrelated diagnostic culling experiment, `git diff --check`
+  passed, `npm run build` passed with the existing large-chunk warning, and
+  `npm run validate:fast` passed with `254` files and `3881` tests.
+  `npm run check:projekt-143-cycle3-kickoff` remains WARN only for the known
+  KB-OPTIK human-review decision at
+  `artifacts/perf/2026-05-05T17-50-18-919Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.

@@ -47,6 +47,7 @@ export interface VegetationTypeConfig {
   baseDensity: number;       // Multiplier on DENSITY_PER_UNIT (1 / 128 sq-units)
   placement: 'random' | 'poisson';
   poissonMinDistance?: number;
+  maxSlopeDeg?: number;
   cluster?: VegetationClusterConfig;
   tier: VegetationTier;
   representation: VegetationRepresentation;
@@ -60,6 +61,7 @@ type VegetationTuning = Pick<
   VegetationTypeConfig,
   'maxInstances' | 'fadeDistance' | 'maxDistance' | 'baseDensity' | 'placement' | 'poissonMinDistance'
 > & {
+  maxSlopeDeg?: number;
   cluster?: VegetationClusterConfig;
 };
 
@@ -112,6 +114,7 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     maxDistance: 300,
     baseDensity: 0.55,
     placement: 'random',
+    maxSlopeDeg: 18,
   },
 };
 
@@ -126,6 +129,7 @@ const VEGETATION_GROUNDING_SINK: Record<string, number> = {
 };
 
 const VEGETATION_GROUNDING_LIFT: Record<string, number> = {
+  bananaPlant: 2.2,
   fern: 2.15,
 };
 
@@ -166,6 +170,7 @@ function toVegetationType(asset: PixelForgeVegetationAsset): VegetationTypeConfi
     baseDensity: tuning.baseDensity,
     placement: tuning.placement,
     poissonMinDistance: tuning.poissonMinDistance,
+    maxSlopeDeg: tuning.maxSlopeDeg,
     cluster: tuning.cluster,
     tier: asset.tier,
     representation: 'imposter',

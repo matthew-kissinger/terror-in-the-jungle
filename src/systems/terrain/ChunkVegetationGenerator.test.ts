@@ -72,6 +72,37 @@ const bambooPalette: BiomeVegetationEntry[] = [
   { typeId: 'bambooGrove', densityMultiplier: 1 },
 ];
 
+const bananaPlantGrounded: VegetationTypeConfig[] = [
+  {
+    id: 'bananaPlant',
+    textureName: 'PixelForge.Vegetation.bananaPlant.color',
+    normalTextureName: 'PixelForge.Vegetation.bananaPlant.normal',
+    size: 4.74,
+    maxInstances: 1000,
+    yOffset: 1.44,
+    fadeDistance: 250,
+    maxDistance: 300,
+    baseDensity: 20,
+    placement: 'random',
+    maxSlopeDeg: 18,
+    tier: 'midLevel',
+    representation: 'imposter',
+    atlasProfile: 'mid-balanced',
+    shaderProfile: 'normal-lit',
+    imposterAtlas: {
+      tilesX: 4,
+      tilesY: 4,
+      layout: 'latlon',
+      tileSize: 512,
+    },
+    normalSpace: 'capture-view',
+  },
+];
+
+const bananaPlantPalette: BiomeVegetationEntry[] = [
+  { typeId: 'bananaPlant', densityMultiplier: 1 },
+];
+
 const coconutAndBambooPalette: BiomeVegetationEntry[] = [
   { typeId: 'coconut', densityMultiplier: 1 },
   { typeId: 'bambooGrove', densityMultiplier: 1 },
@@ -160,5 +191,27 @@ describe('ChunkVegetationGenerator', () => {
 
     expect(samplingSpy).toHaveBeenCalledWith(64, 64, 12);
     expect(samplingSpy).toHaveBeenCalledWith(64, 64, 7);
+  });
+
+  it('rejects slope-capped random vegetation where low billboards would clip into terrain', () => {
+    const flatResult = ChunkVegetationGenerator.generateVegetation(
+      0,
+      0,
+      64,
+      () => 5,
+      bananaPlantGrounded,
+      bananaPlantPalette,
+    );
+    const steepResult = ChunkVegetationGenerator.generateVegetation(
+      0,
+      0,
+      64,
+      (x, z) => x + z,
+      bananaPlantGrounded,
+      bananaPlantPalette,
+    );
+
+    expect(flatResult.get('bananaPlant')?.length ?? 0).toBeGreaterThan(0);
+    expect(steepResult.get('bananaPlant') ?? []).toHaveLength(0);
   });
 });
