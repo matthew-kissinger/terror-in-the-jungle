@@ -1,6 +1,6 @@
 # State Of Repo
 
-Last updated: 2026-05-04
+Last updated: 2026-05-05
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
@@ -140,10 +140,16 @@ the current truth anchor.
   rather than a broad grey elevation cap, and it fixes a player-camera terrain
   clipping failure mode where the grounded rise clamp could leave the camera
   inside a sudden hillside lip. `PlayerMovement` now rejects that horizontal
-  step. A navigation follow-up remains open: pre-baked seed assets are paired
-  through `MapSeedRegistry`, but existing navmesh/heightmap files are skipped
-  by `scripts/prebake-navmesh.ts` unless regenerated with `--force`, and the
-  runtime solo-navmesh cache key omits terrain/stamp/hash inputs.
+  step. Commit `e92523a` partially closes the navigation invalidation gap:
+  registered pre-baked variants now have `public/data/navmesh/bake-manifest.json`
+  signatures, `scripts/prebake-navmesh.ts` regenerates when those signatures
+  are stale, runtime solo-navmesh cache keys include terrain/feature
+  fingerprints, and bake/runtime obstacle generation now uses collidable
+  runtime placements rather than trafficable feature envelopes. This is not
+  A Shau navigation acceptance. Open Frontier non-default seeds remain
+  withheld until per-seed feature presets exist, Zone Control seed `137` now
+  has explicit placement-audit warnings, and A Shau still needs route/nav
+  quality plus heap/terrain-stall proof.
 - KB-STRATEGIE filed the WebGL/WebGPU brief. `npm run check:webgpu-strategy`
   wrote
   `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`:

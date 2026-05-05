@@ -1,6 +1,6 @@
 # Projekt Objekt-143 Handoff
 
-Last updated: 2026-05-04
+Last updated: 2026-05-05
 
 Use this as the first-read handoff for a fresh agent session continuing
 Projekt Objekt-143. `docs/PROJEKT_OBJEKT_143.md` remains the authoritative
@@ -10,8 +10,10 @@ ledger; this file is the short operational prompt.
 
 - Repo: `C:\Users\Mattm\X\games-3d\terror-in-the-jungle`
 - Branch: `master`
-- Local branch is intentionally ahead of `origin/master`; do not push/deploy
-  unless the owner explicitly asks for that release step.
+- The recovered local work has been checkpointed through `e92523a`
+  (`fix(navmesh): add terrain-aware bake invalidation`). Do not claim
+  production parity unless this branch has been pushed, CI has passed, and live
+  Pages/R2/WASM/service-worker checks have been verified.
 - No production parity is claimed for the latest local work. Live production
   truth still comes from `/asset-manifest.json` and live Pages/R2/WASM/service
   worker checks.
@@ -28,9 +30,9 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-04T21-42-43-709Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
-  `artifacts/perf/2026-05-04T21-42-43-062Z/projekt-143-evidence-suite/suite-summary.json`
+  `artifacts/perf/2026-05-05T01-45-04-864Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -38,7 +40,7 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN material distribution audit:
   `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
 - KB-TERRAIN placement/foundation audit:
-  `artifacts/perf/2026-05-04T12-59-25-892Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  `artifacts/perf/2026-05-05T01-41-42-472Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
 - KB-TERRAIN terrain asset inventory:
   `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
 - KB-TERRAIN route/trail policy audit:
@@ -126,10 +128,15 @@ ledger; this file is the short operational prompt.
   when a grounded movement step would put the player X/Z onto a terrain lip
   while Y is still clamped to the previous eye height, `PlayerMovement` now
   rejects the horizontal step so the camera does not enter the hillside. The
-  Recast/navmesh concern is still open: pre-baked navmesh/heightmap assets are
-  seed-paired, but existing files are not automatically invalidated by terrain
-  stamp/route/foundation changes, and the runtime solo-navmesh cache key lacks
-  terrain/feature hash inputs.
+  Recast/navmesh stale-cache concern is partially closed by `e92523a`:
+  registered pre-baked variants now use `public/data/navmesh/bake-manifest.json`
+  plus deterministic terrain/feature signatures, and runtime solo navmesh
+  cache keys include a terrain/feature fingerprint. The bake/runtime obstacle
+  contract now uses collidable runtime placements instead of trafficable
+  feature footprints. Remaining navigation risk is acceptance-level, not just
+  invalidation plumbing: withheld Open Frontier seeds need per-seed feature
+  presets, Zone Control seed `137` has two placement-audit warnings, and A Shau
+  still needs route/nav quality, heap, and terrain-stall proof before signoff.
 - Active-player perf harness: shorter Pixel Forge NPCs require the killbot to
   aim at the visual chest proxy below the eye-level actor anchor. The local
   TypeScript bot and CJS perf driver have unit coverage for that contract, and
@@ -200,15 +207,15 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-04T21-42-43-709Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - Projekt evidence suite:
-  artifacts/perf/2026-05-04T21-42-43-062Z/projekt-143-evidence-suite/suite-summary.json
+  artifacts/perf/2026-05-05T01-45-04-864Z/projekt-143-evidence-suite/suite-summary.json
 - KB-TERRAIN before baseline:
   artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:
   artifacts/perf/2026-05-04T21-42-10-596Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
 - KB-TERRAIN placement/foundation audit:
-  artifacts/perf/2026-05-04T12-59-25-892Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
+  artifacts/perf/2026-05-05T01-41-42-472Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
 - KB-TERRAIN terrain asset inventory:
   artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json
 - KB-TERRAIN route/trail policy audit:
@@ -261,9 +268,11 @@ Current bureau state:
   moss-tinted cliff accent rather than a broad grey elevation cap, fixes the
   hill-clipping camera case by rejecting terrain-lip horizontal steps that
   would put the eye inside the hillside, and records the navmesh invalidation
-  risk: pre-baked assets are seed-paired but not terrain/stamp-hash invalidated,
-  while runtime solo navmesh cache keys omit terrain/feature hashes. The
-  active-player killbot has a shorter-NPC visual-chest aim fix in unit tests
+  risk: `e92523a` now gives registered bakes a manifest/signature gate and
+  runtime solo navmesh cache fingerprints, but it does not sign off A Shau nav
+  quality, withheld Open Frontier seed variants, or Zone Control seed `137`
+  placement warnings. The active-player killbot has a shorter-NPC visual-chest
+  aim fix in unit tests
   and a fresh Open Frontier capture with `120` shots / `43` hits. Do not trust
   that capture for frame-time acceptance because another browser game was
   running on and off during it.

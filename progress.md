@@ -2790,3 +2790,48 @@ TODO
   `artifacts/perf/2026-05-04T21-24-46-901Z/summary.json` failed validation on
   harness combat behavior (`7` shots, `0` hits), and local asset baking may
   skew frame-time metrics. Use its scene attribution diagnostically only.
+
+2026-05-05 Projekt Objekt-143 navmesh invalidation shepherd pass
+- Checkpointed the recovered navmesh/terrain-bake work as `e92523a`
+  (`fix(navmesh): add terrain-aware bake invalidation`). The patch adds
+  deterministic `NavmeshBakeSignature` hashing, a tracked
+  `public/data/navmesh/bake-manifest.json`, stale-signature regeneration in
+  `scripts/prebake-navmesh.ts`, terrain/feature fingerprints for runtime solo
+  navmesh cache keys, and shared `NavmeshFeatureObstacles` so the bake/runtime
+  contract uses collidable runtime placements instead of trafficable feature
+  envelopes.
+- Re-baked the currently registered procedural navmesh/heightmap assets. The
+  prebuild check now reports `All 14 pre-baked assets match the navmesh bake
+  manifest; skipping generation.` Open Frontier runtime selection is narrowed
+  to seed `42`; seeds `137`, `2718`, `31415`, and `65537` remain withheld until
+  they have per-seed feature presets.
+- Expanded the terrain placement audit to check every registered pre-baked
+  seed. Latest audit:
+  `artifacts/perf/2026-05-05T01-41-42-472Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`.
+  It is WARN, not FAIL: Zone Control seed `137` has two flattened-core span
+  warnings (`nva_bunkers` and `trail_opfor_egress`). Do not claim all seeded
+  placement/foundation work is closed from this pass.
+- Aligned `docs/PROJEKT_OBJEKT_143.md`,
+  `docs/PROJEKT_OBJEKT_143_HANDOFF.md`, `docs/STATE_OF_REPO.md`, and
+  `docs/DEPLOY_WORKFLOW.md` so the stale-navmesh risk is no longer described
+  as missing plumbing. It is now a partially closed invalidation problem with
+  remaining acceptance risks: A Shau nav quality/heap/terrain-stall proof,
+  withheld Open Frontier variants, and Zone Control seed `137` placement
+  warnings.
+- Validation:
+  targeted nav/seed Vitest PASS (`4` files, `12` tests);
+  `npm run typecheck` PASS;
+  `npx tsx scripts/prebake-navmesh.ts` PASS/skip by manifest;
+  `npm run check:projekt-143-terrain-placement` WARN at the artifact above;
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-05T01-45-05-395Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-05T01-45-04-864Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`253` files, `3872` tests);
+  `npm run build` PASS;
+  `npm run test:run` PASS (`253` files, `3872` tests).
+- Non-claims: this is not A Shau navigation acceptance, not a far-canopy or
+  culling/HLOD closeout, not a frame-time/perf-baseline refresh, not fixed-wing
+  feel validation, and not production parity until the branch is pushed,
+  CI/deploy state is checked, and live Pages/R2/WASM/service-worker behavior is
+  verified.

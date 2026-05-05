@@ -1,6 +1,6 @@
 # Deploy Workflow
 
-Last updated: 2026-05-03
+Last updated: 2026-05-05
 
 Production: https://terror-in-the-jungle.pages.dev/
 
@@ -134,14 +134,18 @@ The repo now sets Vite `build.assetsDir = 'build-assets'` so generated bundle as
 
 Cloudflare does not build navmesh data. GitHub Actions runs `npm run build`,
 and the build's `prebuild` step runs `scripts/prebake-navmesh.ts` only when the
-tracked seed assets are missing or `--force` is used. The seed-keyed assets for
-Open Frontier, Zone Control, and TDM are committed under `public/data/navmesh/`
-and `public/data/heightmaps/`, copied into `dist/`, and served by Pages with
+registered seed assets are missing, their `bake-manifest.json` signatures are
+stale, or `--force` is used. The seed-keyed assets for Open Frontier, Zone
+Control, and TDM are committed under `public/data/navmesh/` and
+`public/data/heightmaps/`, copied into `dist/`, and served by Pages with
 immutable cache headers.
 
 Current split:
 
-- Open Frontier: five prebaked seeds in `MapSeedRegistry`.
+- Open Frontier: one active prebaked seed in `MapSeedRegistry` (`42`). Older
+  generated Open Frontier files remain in the repo, but seeds `137`, `2718`,
+  `31415`, and `65537` are intentionally withheld from runtime selection until
+  they have per-seed feature presets.
 - Zone Control: three prebaked seeds in `MapSeedRegistry`.
 - Team Deathmatch: three prebaked seeds in `MapSeedRegistry`.
 - AI Sandbox/combat120: procedural/small-map runtime path.
