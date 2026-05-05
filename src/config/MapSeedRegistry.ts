@@ -13,10 +13,10 @@ interface MapSeedVariant {
 const SEED_VARIANTS: Record<string, MapSeedVariant[]> = {
   [GameMode.OPEN_FRONTIER]: [
     { seed: 42, navmeshAsset: '/data/navmesh/open_frontier-42.bin', heightmapAsset: '/data/heightmaps/open_frontier-42.f32' },
-    { seed: 137, navmeshAsset: '/data/navmesh/open_frontier-137.bin', heightmapAsset: '/data/heightmaps/open_frontier-137.f32' },
-    { seed: 2718, navmeshAsset: '/data/navmesh/open_frontier-2718.bin', heightmapAsset: '/data/heightmaps/open_frontier-2718.f32' },
-    { seed: 31415, navmeshAsset: '/data/navmesh/open_frontier-31415.bin', heightmapAsset: '/data/heightmaps/open_frontier-31415.f32' },
-    { seed: 65537, navmeshAsset: '/data/navmesh/open_frontier-65537.bin', heightmapAsset: '/data/heightmaps/open_frontier-65537.f32' },
+    // Seeds 137, 2718, 31415, and 65537 are intentionally withheld until
+    // Open Frontier supports per-seed feature presets. The shared current
+    // airfield preset spans 49-70m of native vertical relief on those seeds,
+    // which creates bad foundations and disconnected bake variants.
   ],
   [GameMode.ZONE_CONTROL]: [
     { seed: 42, navmeshAsset: '/data/navmesh/zone_control-42.bin', heightmapAsset: '/data/heightmaps/zone_control-42.f32' },

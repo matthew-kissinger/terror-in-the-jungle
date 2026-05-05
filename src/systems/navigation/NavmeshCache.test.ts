@@ -22,6 +22,13 @@ describe('NavmeshCache', () => {
       const key2 = await computeNavmeshCacheKey(3200, { cs: 2.0 });
       expect(key1).not.toBe(key2);
     });
+
+    it('returns a different key when terrain fingerprint changes', async () => {
+      const config = { cs: 3.0, ch: 0.4 };
+      const key1 = await computeNavmeshCacheKey(3200, config, 'terrain-a');
+      const key2 = await computeNavmeshCacheKey(3200, config, 'terrain-b');
+      expect(key1).not.toBe(key2);
+    });
   });
 
   describe('getCachedNavmesh / setCachedNavmesh', () => {

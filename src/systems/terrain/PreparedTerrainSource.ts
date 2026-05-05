@@ -9,4 +9,6 @@ export interface PreparedHeightmapGrid {
 export interface PreparedTerrainSource {
   kind: 'procedural' | 'dem' | 'prebaked';
   preparedHeightmap?: PreparedHeightmapGrid;
+  /** Deterministic source identity for runtime navmesh cache invalidation. */
+  terrainFingerprint?: string | number;
 }

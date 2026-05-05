@@ -3,6 +3,7 @@ import { Logger } from '../../utils/Logger';
 import { buildHeightfieldMesh } from './NavmeshHeightfieldBuilder';
 import { NavmeshMovementAdapter } from './NavmeshMovementAdapter';
 import { computeNavmeshCacheKey, getCachedNavmesh, setCachedNavmesh } from './NavmeshCache';
+import { buildNavmeshFeatureObstacleMeshes } from './NavmeshFeatureObstacles';
 
 import type { Crowd, NavMesh, NavMeshQuery } from '@recast-navigation/core';
 import type { MapFeatureDefinition } from '../../config/gameModeTypes';
@@ -19,6 +20,8 @@ interface ConnectivityResult {
 interface NavmeshGenerationOptions {
   /** Scenario points that must be inside the initial/generated navmesh coverage. */
   anchors?: THREE.Vector3[];
+  /** Terrain/feature fingerprint used to avoid reusing stale runtime navmesh cache entries. */
+  cacheFingerprint?: unknown;
 }
 
 interface TiledGenerationBounds {
@@ -87,9 +90,6 @@ function getHeightfieldCellSize(worldSize: number): number {
   if (worldSize <= 1600) return 6.0;
   return 12.0; // 3200/12 = 267x267 = 71K verts (was 161K at cellSize=8)
 }
-
-// Obstacle height for structure exclusion
-const OBSTACLE_HEIGHT = 10.0;
 
 // Worker generation timeout (ms)
 const WORKER_TIMEOUT_MS = 60_000;
@@ -285,7 +285,7 @@ export class NavmeshSystem {
     if (worldSize > TILED_THRESHOLD) {
       generated = await this.generateTiledNavmesh(worldSize, features, options);
     } else {
-      generated = await this.generateSoloNavmesh(worldSize, features);
+      generated = await this.generateSoloNavmesh(worldSize, features, options.cacheFingerprint);
     }
 
     if (!generated) {
@@ -304,7 +304,11 @@ export class NavmeshSystem {
     return true;
   }
 
-  private async generateSoloNavmesh(worldSize: number, features?: MapFeatureDefinition[]): Promise<boolean> {
+  private async generateSoloNavmesh(
+    worldSize: number,
+    features?: MapFeatureDefinition[],
+    cacheFingerprint: unknown = null,
+  ): Promise<boolean> {
     const cs = getNavmeshCellSize(worldSize);
     const hfCellSize = getHeightfieldCellSize(worldSize);
 
@@ -341,7 +345,7 @@ export class NavmeshSystem {
     // Check IndexedDB cache
     let cacheKey: string | null = null;
     try {
-      cacheKey = await computeNavmeshCacheKey(worldSize, recastConfig);
+      cacheKey = await computeNavmeshCacheKey(worldSize, recastConfig, cacheFingerprint);
       const cached = await getCachedNavmesh(cacheKey);
       if (cached && this.importNavMeshFn) {
         const imported = this.importNavMeshFn(cached);
@@ -369,7 +373,7 @@ export class NavmeshSystem {
     const mesh = new THREE.Mesh(geometry);
 
     // Build obstacle wall meshes for structures (baked into solo navmesh)
-    const obstacleMeshes = this.buildObstacleMeshes(features, sampleHeight);
+    const obstacleMeshes = buildNavmeshFeatureObstacleMeshes(features, sampleHeight);
     const inputMeshes = [mesh, ...obstacleMeshes];
 
     // Try off-thread generation via worker
@@ -577,7 +581,7 @@ export class NavmeshSystem {
       'Navigation',
       `Static tiled navmesh generation bounds origin=(${bounds.originX.toFixed(0)},${bounds.originZ.toFixed(0)}) extent=(${bounds.extentX.toFixed(0)},${bounds.extentZ.toFixed(0)}) anchors=${options.anchors?.length ?? 0} tileSize=${tileSize}`,
     );
-    const obstacleMeshes = this.buildObstacleMeshes(features, sampleHeight);
+    const obstacleMeshes = buildNavmeshFeatureObstacleMeshes(features, sampleHeight);
     const inputMeshes = [mesh, ...obstacleMeshes];
     const result = this.threeToTiledNavMeshFn(inputMeshes, recastConfig);
 
@@ -633,46 +637,6 @@ export class NavmeshSystem {
     if (this.crowd) {
       this.crowd.update(deltaTime);
     }
-  }
-
-  /**
-   * Build obstacle wall meshes from feature footprints for baking into solo navmesh.
-   * Creates tall vertical geometry that Recast treats as unwalkable.
-   */
-  private buildObstacleMeshes(
-    features: MapFeatureDefinition[] | undefined,
-    sampleHeight: (x: number, z: number) => number
-  ): THREE.Mesh[] {
-    if (!features?.length) return [];
-
-    const meshes: THREE.Mesh[] = [];
-    for (const feature of features) {
-      const fp = feature.footprint;
-      if (!fp) continue;
-
-      const y = sampleHeight(feature.position.x, feature.position.z);
-      const yaw = feature.placement?.yaw ?? 0;
-
-      if (fp.shape === 'circle') {
-        const geo = new THREE.CylinderGeometry(fp.radius, fp.radius, OBSTACLE_HEIGHT, 12);
-        const m = new THREE.Mesh(geo);
-        m.position.set(feature.position.x, y + OBSTACLE_HEIGHT / 2, feature.position.z);
-        m.updateMatrixWorld(true);
-        meshes.push(m);
-      } else if (fp.shape === 'rect' || fp.shape === 'strip') {
-        const geo = new THREE.BoxGeometry(fp.width, OBSTACLE_HEIGHT, fp.length);
-        const m = new THREE.Mesh(geo);
-        m.position.set(feature.position.x, y + OBSTACLE_HEIGHT / 2, feature.position.z);
-        if (yaw !== 0) m.rotation.y = yaw;
-        m.updateMatrixWorld(true);
-        meshes.push(m);
-      }
-    }
-
-    if (meshes.length > 0) {
-      Logger.info('Navigation', `Built ${meshes.length} obstacle meshes for solo navmesh`);
-    }
-    return meshes;
   }
 
   private getTerrainHeightSampler(): ((x: number, z: number) => number) | null {

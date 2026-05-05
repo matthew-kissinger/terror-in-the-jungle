@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "generator": "scripts/prebake-navmesh.ts",
+  "entries": [
+    {
+      "modeId": "open_frontier",
+      "seed": 42,
+      "signature": "navmesh-bake-v1-158a9d9d4cbc50",
+      "navmeshAsset": "/data/navmesh/open_frontier-42.bin",
+      "heightmapAsset": "/data/heightmaps/open_frontier-42.f32",
+      "worldSize": 3200,
+      "heightmapGridSize": 1024,
+      "csOptions": [
+        2,
+        1.5
+      ]
+    },
+    {
+      "modeId": "zone_control",
+      "seed": 42,
+      "signature": "navmesh-bake-v1-02d524366bddae",
+      "navmeshAsset": "/data/navmesh/zone_control-42.bin",
+      "heightmapAsset": "/data/heightmaps/zone_control-42.f32",
+      "worldSize": 800,
+      "heightmapGridSize": 256,
+      "csOptions": [
+        1
+      ]
+    },
+    {
+      "modeId": "zone_control",
+      "seed": 137,
+      "signature": "navmesh-bake-v1-0d3c5954ec3ace",
+      "navmeshAsset": "/data/navmesh/zone_control-137.bin",
+      "heightmapAsset": "/data/heightmaps/zone_control-137.f32",
+      "worldSize": 800,
+      "heightmapGridSize": 256,
+      "csOptions": [
+        1
+      ]
+    },
+    {
+      "modeId": "zone_control",
+      "seed": 2718,
+      "signature": "navmesh-bake-v1-0b716051068f3d",
+      "navmeshAsset": "/data/navmesh/zone_control-2718.bin",
+      "heightmapAsset": "/data/heightmaps/zone_control-2718.f32",
+      "worldSize": 800,
+      "heightmapGridSize": 256,
+      "csOptions": [
+        1
+      ]
+    },
+    {
+      "modeId": "tdm",
+      "seed": 42,
+      "signature": "navmesh-bake-v1-0da185ea38515d",
+      "navmeshAsset": "/data/navmesh/tdm-42.bin",
+      "heightmapAsset": "/data/heightmaps/tdm-42.f32",
+      "worldSize": 400,
+      "heightmapGridSize": 256,
+      "csOptions": [
+        1
+      ]
+    },
+    {
+      "modeId": "tdm",
+      "seed": 137,
+      "signature": "navmesh-bake-v1-091e864f1deb72",
+      "navmeshAsset": "/data/navmesh/tdm-137.bin",
+      "heightmapAsset": "/data/heightmaps/tdm-137.f32",
+      "worldSize": 400,
+      "heightmapGridSize": 256,
+      "csOptions": [
+        1
+      ]
+    },
+    {
+      "modeId": "tdm",
+      "seed": 2718,
+      "signature": "navmesh-bake-v1-022bb3741ab0b9",
+      "navmeshAsset": "/data/navmesh/tdm-2718.bin",
+      "heightmapAsset": "/data/heightmaps/tdm-2718.f32",
+      "worldSize": 400,
+      "heightmapGridSize": 256,
+      "csOptions": [
+        1
+      ]
+    }
+  ]
+}

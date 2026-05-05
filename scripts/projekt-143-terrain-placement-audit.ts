@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { A_SHAU_VALLEY_CONFIG } from '../src/config/AShauValleyConfig';
 import { AI_SANDBOX_CONFIG } from '../src/config/AiSandboxConfig';
 import type { GameModeConfig, MapFeatureDefinition } from '../src/config/gameModeTypes';
+import { getMapVariants } from '../src/config/MapSeedRegistry';
 import { OPEN_FRONTIER_CONFIG } from '../src/config/OpenFrontierConfig';
 import { TEAM_DEATHMATCH_CONFIG } from '../src/config/TeamDeathmatchConfig';
 import { ZONE_CONTROL_CONFIG } from '../src/config/ZoneControlConfig';
@@ -127,7 +128,7 @@ function loadDemProvider(config: GameModeConfig): DEMHeightProvider {
   );
 }
 
-function createHeightProvider(config: GameModeConfig): {
+function createHeightProvider(config: GameModeConfig, sampledSeedOverride?: number | null): {
   provider: IHeightProvider;
   kind: HeightProviderKind;
   sampledSeed: number | null;
@@ -140,7 +141,9 @@ function createHeightProvider(config: GameModeConfig): {
     };
   }
 
-  const sampledSeed = typeof config.terrainSeed === 'number'
+  const sampledSeed = typeof sampledSeedOverride === 'number'
+    ? sampledSeedOverride
+    : typeof config.terrainSeed === 'number'
     ? config.terrainSeed
     : PROCEDURAL_RANDOM_SEED_FALLBACK;
   return {
@@ -150,8 +153,23 @@ function createHeightProvider(config: GameModeConfig): {
   };
 }
 
-function analyzeMode(config: GameModeConfig): ModePlacementAudit {
-  const { provider, kind, sampledSeed } = createHeightProvider(config);
+function resolveAuditSeeds(config: GameModeConfig): Array<number | null> {
+  if (config.heightSource?.type === 'dem') {
+    return [null];
+  }
+  const variants = getMapVariants(config.id);
+  if (variants.length > 0) {
+    return [...new Set(variants.map((variant) => variant.seed))];
+  }
+  return [
+    typeof config.terrainSeed === 'number'
+      ? config.terrainSeed
+      : PROCEDURAL_RANDOM_SEED_FALLBACK,
+  ];
+}
+
+function analyzeMode(config: GameModeConfig, sampledSeedOverride?: number | null): ModePlacementAudit {
+  const { provider, kind, sampledSeed } = createHeightProvider(config, sampledSeedOverride);
   const compiled = compileTerrainFeatures(config, (x, z) => provider.getHeightAt(x, z));
   const stampedProvider = new StampedHeightProvider(provider, compiled.stamps);
   const features = (config.features ?? [])
@@ -386,7 +404,9 @@ function describeFeatureFootprint(feature: MapFeatureDefinition): string {
 }
 
 function buildReport(): TerrainPlacementAudit {
-  const modes = MODES.map(analyzeMode);
+  const modes = MODES.flatMap((config) =>
+    resolveAuditSeeds(config).map((seed) => analyzeMode(config, seed)),
+  );
   const failFeatures = modes.reduce((sum, mode) => sum + mode.failFeatures, 0);
   const warnFeatures = modes.reduce((sum, mode) => sum + mode.warnFeatures, 0);
   const auditedFeatures = modes.reduce((sum, mode) => sum + mode.auditedFeatures, 0);
@@ -405,6 +425,7 @@ function buildReport(): TerrainPlacementAudit {
       proceduralRandomSeedFallback: PROCEDURAL_RANDOM_SEED_FALLBACK,
       notes: [
         'This is a static terrain-source and stamp-effect audit, not screenshot acceptance.',
+        'Procedural modes are audited for every registered pre-baked seed variant, not only the default config seed.',
         'Airfield native runway span is measured before stamps so authored cliff-edge sites stay visible.',
         'Stamped core spans verify that current flatten stamps produce a usable pad; they do not prove visual foundation quality.',
         'Generated airfield placement spans use a fixed 8m footprint proxy because final model bounds are runtime asset data.',
@@ -456,7 +477,7 @@ function main(): void {
   for (const mode of report.modes) {
     const flagged = mode.features.filter((feature) => feature.flags.length > 0);
     console.log(
-      `- ${mode.id}: audited=${mode.auditedFeatures}, fail=${mode.failFeatures}, warn=${mode.warnFeatures}`,
+      `- ${mode.id}${mode.sampledSeed !== null ? ` seed=${mode.sampledSeed}` : ''}: audited=${mode.auditedFeatures}, fail=${mode.failFeatures}, warn=${mode.warnFeatures}`,
     );
     for (const feature of flagged.slice(0, 6)) {
       console.log(

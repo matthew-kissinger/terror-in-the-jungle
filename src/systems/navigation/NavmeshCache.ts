@@ -35,8 +35,9 @@ function openDB(): Promise<IDBDatabase> {
 export async function computeNavmeshCacheKey(
   worldSize: number,
   recastConfig: Record<string, number>,
+  terrainFingerprint: unknown = null,
 ): Promise<string> {
-  const payload = JSON.stringify({ worldSize, ...recastConfig });
+  const payload = JSON.stringify({ worldSize, terrainFingerprint, ...recastConfig });
   const encoded = new TextEncoder().encode(payload);
   const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
   const hashArray = new Uint8Array(hashBuffer);

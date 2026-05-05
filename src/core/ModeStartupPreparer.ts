@@ -20,6 +20,7 @@ import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { GameEventBus } from './GameEventBus';
 import { markStartup } from './StartupTelemetry';
+import { computeNavmeshBakeSignature } from '../systems/navigation/NavmeshBakeSignature';
 
 /** Yield to the browser so it can repaint (progress bar, etc.) between heavy sync phases. */
 function yieldToRenderer(): Promise<void> {
@@ -214,7 +215,13 @@ export async function configureHeightSource(
       const reason = demLoadError instanceof Error ? demLoadError.message : String(demLoadError);
       throw new Error(`Required DEM terrain unavailable for ${mode}: ${reason}`);
     }
-    return { kind: 'dem' };
+    return {
+      kind: 'dem',
+      terrainFingerprint: computeNavmeshBakeSignature({
+        heightSource: config.heightSource,
+        resolvedPath,
+      }),
+    };
   }
 
   // Try seed rotation: pick a random pre-baked variant if available
@@ -252,6 +259,7 @@ export async function configureHeightSource(
             gridSize,
             workerConfig,
           },
+          terrainFingerprint: config.heightmapAsset,
         };
       }
       Logger.warn('engine-init', `Pre-baked heightmap not found (${response.status}), falling back to procedural`);
@@ -268,7 +276,7 @@ export async function configureHeightSource(
   getHeightQueryCache().setProvider(new NoiseHeightProvider(seed));
   Logger.info('engine-init', `Procedural terrain seed: ${seed}`);
   markStartup(`engine-init.start-game.${mode}.height-source.end`);
-  return { kind: 'procedural' };
+  return { kind: 'procedural', terrainFingerprint: seed };
 }
 
 async function configureTerrainAndNavigation(
@@ -324,11 +332,19 @@ async function configureTerrainAndNavigation(
     // Yield before WASM navmesh generation so the progress bar renders "Generating navigation mesh..."
     await yieldToRenderer();
     markStartup(`engine-init.start-game.${config.id}.navmesh.begin`);
+    const navmeshCacheFingerprint = computeNavmeshBakeSignature({
+      modeId: config.id,
+      terrainSource: preparedTerrainSource.terrainFingerprint ?? config.heightSource ?? config.terrainSeed ?? null,
+      worldSize: navWorldSize,
+      terrain: config.terrain ?? null,
+      terrainFlow: config.terrainFlow ?? null,
+      features: config.features ?? [],
+    });
     const navmeshGenerated = await engine.systemManager.navmeshSystem.generateNavmesh(
       navWorldSize,
       config.features,
       config.navmeshAsset,
-      { anchors: navmeshAnchors },
+      { anchors: navmeshAnchors, cacheFingerprint: navmeshCacheFingerprint },
     );
     markStartup(`engine-init.start-game.${config.id}.navmesh.end`);
 
