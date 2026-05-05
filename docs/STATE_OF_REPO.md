@@ -136,6 +136,14 @@ the current truth anchor.
   transitions), but it fails validation on heap end-growth/recovery and still
   logs terrain-stall warnings. This is route-policy progress, not A Shau
   runtime acceptance.
+  Current local follow-up keeps rock as a reduced moss-tinted cliff accent
+  rather than a broad grey elevation cap, and it fixes a player-camera terrain
+  clipping failure mode where the grounded rise clamp could leave the camera
+  inside a sudden hillside lip. `PlayerMovement` now rejects that horizontal
+  step. A navigation follow-up remains open: pre-baked seed assets are paired
+  through `MapSeedRegistry`, but existing navmesh/heightmap files are skipped
+  by `scripts/prebake-navmesh.ts` unless regenerated with `--force`, and the
+  runtime solo-navmesh cache key omits terrain/stamp/hash inputs.
 - KB-STRATEGIE filed the WebGL/WebGPU brief. `npm run check:webgpu-strategy`
   wrote
   `artifacts/perf/2026-05-02T21-37-39-757Z/webgpu-strategy-audit/strategy-audit.json`:
@@ -436,7 +444,7 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-04T14-29-34-142Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-04T21-42-43-709Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
   are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
   as inside matched proof bands after the first local remediation slice, but
@@ -495,6 +503,17 @@ What is not ready to claim:
   remains WARN on peak p99 and terrain-stall warnings still appear. This is
   static-feature draw-call reduction only, not broad culling/HLOD, frame-time,
   A Shau terrain/nav, or production acceptance.
+- A local KB-CULL follow-up is in progress for world static feature visibility:
+  distant bases/houses were staying visible from anywhere because the static
+  feature root was global. The current local code restores per-feature render
+  groups and applies distance/hysteresis visibility before per-feature
+  batching. The first diagnostic Open Frontier capture has useful scene
+  attribution but failed harness combat validation and was run while local
+  asset baking could skew performance, so it is not acceptance. It does show
+  the tradeoff to resolve next: visible static triangles fall, while
+  draw-call-like rises because culling granularity is finer. Vegetation behind
+  hills should be handled with coarse terrain/cluster/Hi-Z-style occlusion,
+  not per-instance raycasts.
 - KB-LOAD has a first local runtime remediation, not a closeout. The current
   code warms only the giantPalm color/normal texture pair before renderer
   reveal through `AssetLoader.warmGpuTextures()`. Paired retail startup

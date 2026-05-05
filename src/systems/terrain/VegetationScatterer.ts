@@ -16,6 +16,7 @@ import type { TerrainExclusionZone } from './TerrainFeatureTypes';
  */
 export class VegetationScatterer {
   private static readonly DEFAULT_VISUAL_MARGIN = 200;
+  private static readonly CRITICAL_RESIDENCY_RADIUS_CELLS = 1;
   private billboardSystem: GlobalBillboardSystem;
   private cellSize: number;
   private activeCells: Set<string> = new Set();
@@ -266,7 +267,8 @@ export class VegetationScatterer {
       didWork = true;
     }
 
-    for (let i = 0; i < Math.max(0, maxAddsPerFrame) && this.pendingAdditions.length > 0; i++) {
+    const addBudget = this.resolveAddBudget(maxAddsPerFrame);
+    for (let i = 0; i < addBudget && this.pendingAdditions.length > 0; i++) {
       const key = this.pendingAdditions.shift()!;
       this.generateCell(key);
       this.activeCells.add(key);
@@ -274,6 +276,29 @@ export class VegetationScatterer {
     }
 
     return didWork;
+  }
+
+  private resolveAddBudget(maxAddsPerFrame: number): number {
+    const requestedBudget = Math.max(0, maxAddsPerFrame);
+    if (requestedBudget > 0 || this.pendingAdditions.length === 0) {
+      return requestedBudget;
+    }
+
+    const criticalIndex = this.pendingAdditions.findIndex((key) =>
+      this.getCellDistanceToCenter(
+        key,
+        this.lastPlayerCellX,
+        this.lastPlayerCellZ,
+      ) <= VegetationScatterer.CRITICAL_RESIDENCY_RADIUS_CELLS
+    );
+    if (criticalIndex < 0) {
+      return 0;
+    }
+    if (criticalIndex > 0) {
+      const [criticalCell] = this.pendingAdditions.splice(criticalIndex, 1);
+      this.pendingAdditions.unshift(criticalCell);
+    }
+    return 1;
   }
 
   private getCellDistanceToCenter(cellKey: string, centerCellX: number, centerCellZ: number): number {

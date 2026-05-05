@@ -2744,3 +2744,49 @@ TODO
   Non-claims: no broad vehicle culling/HLOD acceptance, no frame-time baseline
   refresh, no A Shau terrain/nav acceptance, and no close-NPC/weapon residency
   closeout.
+
+2026-05-04 Projekt Objekt-143 terrain/culling/camera follow-up
+- Fixed the hill-facing first-person camera clipping failure mode in
+  `PlayerMovement`: if a grounded fixed-step move would place the player X/Z
+  onto a terrain lip while Y is still limited by the rise clamp, the horizontal
+  step is now rejected and marked terrain-blocked. This prevents the camera
+  from being left inside a hillside when walking up into a slope.
+- Kept jungle ground as the dominant material while reducing the remaining grey
+  mountaintop look: highland/rock is now a moss-tinted steep-cliff accent, not
+  a broad elevation cap. The refreshed distribution audit is WARN only for the
+  expected AI Sandbox random-seed fallback:
+  `artifacts/perf/2026-05-04T21-42-10-596Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+- Fixed nearby vegetation residency starvation: when frame pressure throttles
+  general vegetation additions to zero, `VegetationScatterer` still admits one
+  pending cell inside the critical player radius. The diagnostic Open Frontier
+  capture shows near vegetation now fills in, but it also records `85,915`
+  active vegetation instances, so follow-up needs coarse vegetation
+  occlusion/distance policy rather than blind distance expansion.
+- Fixed the "distant bases/houses always render" owner-path bug by changing
+  `WorldFeatureSystem` from one globally visible static-feature root to
+  per-feature render groups with distance/hysteresis visibility before
+  per-feature batching. Diagnostic Open Frontier scene attribution at
+  `artifacts/perf/2026-05-04T21-24-46-901Z/scene-attribution.json` records
+  `world_static_features` visible triangles at `6,448`, but draw-call-like is
+  `337` because finer culling granularity increases batch count. This is a
+  visibility fix and HLOD prompt, not final renderer acceptance.
+- Folded the remaining analysis into Projekt docs/handoff: AAA-style hidden
+  vegetation/prop savings should come from coarse terrain/cluster/Hi-Z-style
+  occlusion, not per-instance raycasts; and navmesh/heightmap validity needs a
+  bake-manifest or terrain/stamp hash because `prebake-navmesh` skips existing
+  assets unless forced and the runtime solo-navmesh cache key omits terrain
+  and feature inputs.
+- Validation: focused Vitest PASS (`5` files, `142` tests);
+  `npm run build:perf` PASS; `npm run check:projekt-143-culling-proof` PASS at
+  `artifacts/perf/2026-05-04T21-42-38-633Z/projekt-143-culling-proof/summary.json`;
+  `npm run check:projekt-143-culling-baseline` PASS at
+  `artifacts/perf/2026-05-04T21-42-16-288Z/projekt-143-culling-owner-baseline/summary.json`;
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected for KB-OPTIK at
+  `artifacts/perf/2026-05-04T21-42-43-709Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143` PASS at
+  `artifacts/perf/2026-05-04T21-42-43-062Z/projekt-143-evidence-suite/suite-summary.json`;
+  `npm run validate:fast` PASS (`251` files, `3866` tests).
+- Non-claims: the fresh Open Frontier runtime capture
+  `artifacts/perf/2026-05-04T21-24-46-901Z/summary.json` failed validation on
+  harness combat behavior (`7` shots, `0` hits), and local asset baking may
+  skew frame-time metrics. Use its scene attribution diagnostically only.

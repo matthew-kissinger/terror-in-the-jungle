@@ -255,4 +255,58 @@ describe('WorldFeatureSystem', () => {
 
     expect(batchedMeshCount).toBe(1);
   });
+
+  it('distance-culls static feature groups instead of keeping every base visible', async () => {
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(0, 30, 0);
+    system = new WorldFeatureSystem(scene, camera);
+    system.setTerrainManager(terrainManager);
+    system.setGameModeManager({
+      getCurrentConfig: () => currentConfig,
+    } as any);
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'near_base',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, 0),
+          staticPlacements: [
+            {
+              modelPath: 'near_base.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+        {
+          id: 'far_base',
+          kind: 'village',
+          position: new THREE.Vector3(1600, 0, 0),
+          staticPlacements: [
+            {
+              modelPath: 'far_base.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+    system.update(0.016);
+
+    const root = scene.children.find((child) => child.name === 'WorldStaticFeatureBatchRoot') as THREE.Group;
+    const near = root.children.find((child) => child.name === 'WorldFeature_near_base');
+    const far = root.children.find((child) => child.name === 'WorldFeature_far_base');
+
+    expect(near?.visible).toBe(true);
+    expect(far?.visible).toBe(false);
+
+    camera.position.set(1600, 30, 0);
+    system.update(0.016);
+
+    expect(near?.visible).toBe(false);
+    expect(far?.visible).toBe(true);
+  });
 });

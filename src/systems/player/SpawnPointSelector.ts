@@ -16,6 +16,8 @@ import { GameMode } from '../../config/gameModeTypes';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
 import type { DeploySessionKind } from '../world/runtime/DeployFlowSession';
 
+const HELIPAD_INFANTRY_STANDOFF_METERS = 12;
+
 /**
  * Encapsulates all spawn point selection logic: gathering available spawn
  * points from zones/helipads/insertions, filtering by alliance, sorting by
@@ -143,13 +145,13 @@ export class SpawnPointSelector {
         ? runtimeHelipads.map(hp => ({
             id: hp.id,
             name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
-            position: hp.position.clone(),
+            position: this.getHelipadInfantrySpawnPosition(hp.position),
             aircraft: hp.aircraft,
           }))
         : configuredHelipads.map(hp => ({
             id: hp.id,
             name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
-            position: hp.position.clone(),
+            position: this.getHelipadInfantrySpawnPosition(hp.position),
             aircraft: hp.aircraft,
           }));
 
@@ -334,6 +336,10 @@ export class SpawnPointSelector {
     }
 
     return priority;
+  }
+
+  private getHelipadInfantrySpawnPosition(helipadPosition: THREE.Vector3): THREE.Vector3 {
+    return helipadPosition.clone().add(new THREE.Vector3(HELIPAD_INFANTRY_STANDOFF_METERS, 0, 0));
   }
 
   private getPolicyDrivenPressureSpawnPosition(): THREE.Vector3 | null {

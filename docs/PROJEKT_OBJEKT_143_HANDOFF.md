@@ -28,9 +28,9 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-04T14-29-34-142Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-04T21-42-43-709Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
-  `artifacts/perf/2026-05-04T14-29-43-744Z/projekt-143-evidence-suite/suite-summary.json`
+  `artifacts/perf/2026-05-04T21-42-43-062Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -50,6 +50,12 @@ ledger; this file is the short operational prompt.
 - KB-TERRAIN A Shau after route-stamping pass:
   `artifacts/perf/2026-05-04T13-03-02-238Z/summary.json`
   (measurement trust PASS; validation FAIL on heap end-growth/recovery)
+- KB-TERRAIN local mossy cliff/material follow-up:
+  `artifacts/perf/2026-05-04T21-42-10-596Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+- Local Open Frontier visibility/vegetation diagnostic:
+  `artifacts/perf/2026-05-04T21-24-46-901Z/summary.json`
+  (measurement trust PASS but validation FAIL on harness combat behavior; also
+  noisy because local asset baking was running)
 - Active-player hit-contract evidence after shorter-NPC aim investigation:
   `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json`
   (`120` shots / `43` hits; frame-time metrics are not clean acceptance
@@ -65,8 +71,8 @@ ledger; this file is the short operational prompt.
 - KB-CULL grounded/parked helicopter visibility evidence:
   `artifacts/perf/2026-05-04T17-41-57-455Z/summary.json`,
   `artifacts/perf/2026-05-04T17-51-52-562Z/summary.json`,
-  `artifacts/perf/2026-05-04T17-56-35-772Z/projekt-143-culling-proof/summary.json`, and
-  `artifacts/perf/2026-05-04T17-56-41-253Z/projekt-143-culling-owner-baseline/summary.json`
+  `artifacts/perf/2026-05-04T21-42-38-633Z/projekt-143-culling-proof/summary.json`, and
+  `artifacts/perf/2026-05-04T21-42-16-288Z/projekt-143-culling-owner-baseline/summary.json`
   (visible-helicopter category reduction only; not broad vehicle/HLOD or A Shau
   terrain acceptance)
 - Rejected KB-CULL static-helicopter candidate:
@@ -114,6 +120,16 @@ ledger; this file is the short operational prompt.
   that fits future gameplay. The first low-resource inventory now exists at
   `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`;
   it is shortlist evidence only and does not accept any asset for runtime use.
+  Current local follow-up reduces the remaining grey/rocky high-elevation
+  look by keeping rock as a moss-tinted steep-cliff accent, not a blanket
+  mountaintop biome. It also fixes a first-person hill-clipping failure mode:
+  when a grounded movement step would put the player X/Z onto a terrain lip
+  while Y is still clamped to the previous eye height, `PlayerMovement` now
+  rejects the horizontal step so the camera does not enter the hillside. The
+  Recast/navmesh concern is still open: pre-baked navmesh/heightmap assets are
+  seed-paired, but existing files are not automatically invalidated by terrain
+  stamp/route/foundation changes, and the runtime solo-navmesh cache key lacks
+  terrain/feature hash inputs.
 - Active-player perf harness: shorter Pixel Forge NPCs require the killbot to
   aim at the visual chest proxy below the eye-level actor anchor. The local
   TypeScript bot and CJS perf driver have unit coverage for that contract, and
@@ -140,7 +156,15 @@ ledger; this file is the short operational prompt.
   remains diagnostic-only until combat stress measurement trust passes.
   A static helicopter distance-cull prototype was rejected because the trusted
   Open Frontier after capture failed validation and owner draw-call-like stayed
-  `388`; do not repeat it as a claimed fix without new evidence.
+  `388`; do not repeat it as a claimed fix without new evidence. Current local
+  follow-up changes world static features from one globally visible batch root
+  to per-feature render groups with distance/hysteresis culling, because bases
+  and houses were visibly rendering at any distance. The first diagnostic
+  Open Frontier scene attribution shows lower visible static triangles but
+  higher draw-call-like from finer granularity, so this needs final gates and a
+  later HLOD/cluster plan before broad acceptance. For vegetation behind hills,
+  use coarse terrain/cluster/Hi-Z-style occlusion planning; do not add
+  per-instance raycasts.
 - KB-EFFECTS `grenade-first-use-stall`: `evidence_complete` for the low-load
   unlit pooled explosion path. Do not infer combat120/stress closeout or
   future visual-polish safety from the low-load probe.
@@ -176,13 +200,13 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-04T17-58-34-753Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-04T21-42-43-709Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - Projekt evidence suite:
-  artifacts/perf/2026-05-04T17-58-50-965Z/projekt-143-evidence-suite/suite-summary.json
+  artifacts/perf/2026-05-04T21-42-43-062Z/projekt-143-evidence-suite/suite-summary.json
 - KB-TERRAIN before baseline:
   artifacts/perf/2026-05-04T12-59-44-452Z/projekt-143-terrain-horizon-baseline/summary.json
 - KB-TERRAIN material distribution:
-  artifacts/perf/2026-05-04T12-59-32-610Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
+  artifacts/perf/2026-05-04T21-42-10-596Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
 - KB-TERRAIN placement/foundation audit:
   artifacts/perf/2026-05-04T12-59-25-892Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json
 - KB-TERRAIN terrain asset inventory:
@@ -195,6 +219,12 @@ Current evidence anchors:
   artifacts/perf/2026-05-04T04-14-35-401Z/summary.json
 - KB-TERRAIN A Shau after route-stamping pass:
   artifacts/perf/2026-05-04T13-03-02-238Z/summary.json
+- KB-TERRAIN local mossy cliff/material follow-up:
+  artifacts/perf/2026-05-04T21-42-10-596Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json
+- Local Open Frontier visibility/vegetation diagnostic:
+  artifacts/perf/2026-05-04T21-24-46-901Z/summary.json
+  (measurement trust PASS but validation FAIL on harness combat behavior; also
+  noisy because local asset baking was running)
 - Active-player hit-contract evidence:
   artifacts/perf/2026-05-04T11-35-07-274Z/summary.json
 - KB-CULL owner baseline:
@@ -206,7 +236,7 @@ Current evidence anchors:
 - KB-CULL grounded/parked helicopter visibility:
   artifacts/perf/2026-05-04T17-41-57-455Z/summary.json
   artifacts/perf/2026-05-04T17-51-52-562Z/summary.json
-  artifacts/perf/2026-05-04T17-56-41-253Z/projekt-143-culling-owner-baseline/summary.json
+  artifacts/perf/2026-05-04T21-42-16-288Z/projekt-143-culling-owner-baseline/summary.json
 - KB-EFFECTS low-load closeout:
   artifacts/perf/2026-05-03T23-25-20-507Z/grenade-spike-ai-sandbox/summary.json
 - KB-OPTIK decision packet:
@@ -227,7 +257,12 @@ Current bureau state:
   passing route/trail policy audit. A Shau now stamps full `jungle_trail`
   corridors instead of map-only route overlays, but the after-route capture
   fails heap validation and still shows terrain-stall warnings; do not claim
-  A Shau acceptance. The
+  A Shau acceptance. Current local follow-up keeps rock as a reduced
+  moss-tinted cliff accent rather than a broad grey elevation cap, fixes the
+  hill-clipping camera case by rejecting terrain-lip horizontal steps that
+  would put the eye inside the hillside, and records the navmesh invalidation
+  risk: pre-baked assets are seed-paired but not terrain/stamp-hash invalidated,
+  while runtime solo navmesh cache keys omit terrain/feature hashes. The
   active-player killbot has a shorter-NPC visual-chest aim fix in unit tests
   and a fresh Open Frontier capture with `120` shots / `43` hits. Do not trust
   that capture for frame-time acceptance because another browser game was
@@ -240,6 +275,12 @@ Current bureau state:
   skip physics; treat it as visible-helicopter category reduction only. Open
   Frontier reaches `0` visible helicopter objects/triangles, while A Shau is
   reduced but not closed (`37` visible objects / `2,696` visible triangles).
+  Current local follow-up changes world static features to per-feature
+  distance/hysteresis render groups because distant bases/houses were staying
+  visible at any distance. The first diagnostic capture lowers visible static
+  triangles but increases draw-call-like, so final gates plus HLOD/cluster work
+  are still required. Vegetation hidden behind hills should be handled with
+  coarse terrain/cluster/Hi-Z-style occlusion, not per-instance raycasts.
   Close-NPC/weapon residency remains diagnostic-only. Rejected
   static-helicopter distance-cull after artifact:
   artifacts/perf/2026-05-04T00-55-00-501Z/summary.json.

@@ -155,7 +155,7 @@ export class SystemInitializer {
     refs.helipadSystem = new HelipadSystem(scene);
     refs.helicopterModel = new HelicopterModel(scene);
     refs.fixedWingModel = new FixedWingModel(scene);
-    refs.worldFeatureSystem = new WorldFeatureSystem(scene);
+    refs.worldFeatureSystem = new WorldFeatureSystem(scene, camera);
 
     refs.navmeshSystem = new NavmeshSystem();
     // Prewarm WASM download+compile now so it's ready when mode startup needs it.

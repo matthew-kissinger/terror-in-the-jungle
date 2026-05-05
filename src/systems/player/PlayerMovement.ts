@@ -378,6 +378,21 @@ export class PlayerMovement {
       }
     }
 
+    const wasGrounded = this.playerState.isGrounded;
+    const horizontalMotionSq =
+      (newPosition.x - this.playerState.position.x) ** 2 +
+      (newPosition.z - this.playerState.position.z) ** 2;
+    const walking = wasGrounded && horizontalMotionSq > 1e-4;
+
+    if (walking && groundHeight - currentGroundHeight > PLAYER_MAX_GROUND_RISE_PER_STEP) {
+      newPosition.x = this.playerState.position.x;
+      newPosition.z = this.playerState.position.z;
+      this.playerState.velocity.x = 0;
+      this.playerState.velocity.z = 0;
+      blockedByTerrain = true;
+      groundHeight = currentGroundHeight;
+    }
+
     // Allow standing on top of sandbags
     if (this.sandbagSystem) {
       const sandbagTop = this.sandbagSystem.getStandingHeight(newPosition.x, newPosition.z);
@@ -390,12 +405,6 @@ export class PlayerMovement {
     }
 
     // Check for landing and play landing sound
-    const wasGrounded = this.playerState.isGrounded;
-    const horizontalMotionSq =
-      (newPosition.x - this.playerState.position.x) ** 2 +
-      (newPosition.z - this.playerState.position.z) ** 2;
-    const walking = wasGrounded && horizontalMotionSq > 1e-4;
-
     const impactVelocityY = this.playerState.velocity.y;
     if (newPosition.y <= groundHeight) {
       // Player is on or below ground.
@@ -405,8 +414,8 @@ export class PlayerMovement {
       // That rise is bigger than any legitimate per-step terrain grade at
       // walking speed, so a larger resolved rise means the clamp just
       // walked into an overhanging collision box, cliff seam, or stamped
-      // structure lip. Clamping keeps the camera planted and lets the next
-      // frame's horizontal physics resolve the block.
+      // structure lip. The horizontal step is rejected above before this
+      // clamp runs so the camera cannot be left inside the terrain surface.
       //
       // The clamp is scoped to `walking` so first-frame spawn corrections,
       // respawn, and vertical landings (wasGrounded=false) still snap the

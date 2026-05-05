@@ -109,6 +109,34 @@ describe('VegetationScatterer', () => {
     expect(count2).toBe(count1);
   });
 
+  it('still loads nearest cells when far vegetation additions are throttled', () => {
+    const pos = new THREE.Vector3(10, 0, 10);
+
+    scatterer.updateBudgeted(pos, { maxAddsPerFrame: 0, maxRemovalsPerFrame: 0 });
+
+    expect(scatterer.getActiveCellCount()).toBe(1);
+    expect(billboard.addChunkInstances).toHaveBeenCalledTimes(1);
+    expect(scatterer.getPendingCounts().adds).toBeGreaterThan(0);
+  });
+
+  it('prioritizes critical cells over stale far pending additions when throttled', () => {
+    const internals = scatterer as unknown as {
+      pendingAdditions: string[];
+      lastPlayerCellX: number;
+      lastPlayerCellZ: number;
+      processPendingWork(maxAddsPerFrame: number, maxRemovalsPerFrame: number): boolean;
+    };
+    internals.pendingAdditions = ['8,8', '0,0'];
+    internals.lastPlayerCellX = 0;
+    internals.lastPlayerCellZ = 0;
+
+    expect(internals.processPendingWork(0, 0)).toBe(true);
+
+    expect(billboard.addChunkInstances).toHaveBeenCalledTimes(1);
+    expect(billboard.addChunkInstances.mock.calls[0][0]).toBe('0,0');
+    expect(internals.pendingAdditions).toEqual(['8,8']);
+  });
+
   it('removes distant cells when player moves', () => {
     scatterer.update(new THREE.Vector3(0, 0, 0));
     scatterer.update(new THREE.Vector3(500, 0, 500)); // Move far away

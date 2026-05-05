@@ -95,8 +95,8 @@ const SAMPLE_GRID_SIZE = 49;
 const SAMPLE_WORLD_INSET_PERCENT = 4;
 const FLAT_SLOPE_MAX_DEGREES = 16;
 const STEEP_SLOPE_MIN_DEGREES = 35;
-const CLIFF_ROCK_ACCENT_ELIGIBLE_BLEND = 0.05;
-const MIN_STEEP_CLIFF_ROCK_ACCENT_ELIGIBLE_PERCENT = 15;
+const CLIFF_ROCK_ACCENT_ELIGIBLE_BLEND = 0.03;
+const MIN_STEEP_CLIFF_ROCK_ACCENT_ELIGIBLE_PERCENT = 5;
 const PROCEDURAL_RANDOM_SEED_FALLBACK = 42;
 const DEFAULT_MATERIAL_ELEVATION_BLEND_WIDTH_METERS = 120;
 const MODES: readonly GameModeConfig[] = [
@@ -205,12 +205,12 @@ function classifyMaterialPrimary(
 
 function computeCliffRockAccentBlend(elevation: number, slopeDeg: number): number {
   const slopeUp = Math.cos((slopeDeg * Math.PI) / 180);
-  const cliffMask = 1 - smoothstep(0.55, 0.78, slopeUp);
+  const cliffMask = 1 - smoothstep(0.50, 0.74, slopeUp);
   const proceduralHillMask =
     smoothstep(20, 60, elevation) *
     (1 - smoothstep(150, 300, elevation));
   const demRidgeMask = smoothstep(450, 950, elevation);
-  return cliffMask * Math.max(proceduralHillMask, demRidgeMask) * 0.42;
+  return cliffMask * Math.max(proceduralHillMask, demRidgeMask) * 0.26;
 }
 
 function loadDemProvider(config: GameModeConfig): DEMHeightProvider {
@@ -460,7 +460,7 @@ function buildReport(): TerrainDistributionAudit {
         'Terrain-flow stamps, feature surface patches, weather wetness, and runtime fog are not applied.',
         'CPU biome distribution estimates vegetation palettes; material primary distribution mirrors the terrain shader rule weights.',
         'Clustered vegetation types use approximate static coverage estimates; screenshots/runtime captures remain the authority for visual density.',
-        'Cliff-rock accent metrics estimate the shader overlay that can use rocky texture on slopes without making highland the primary ground biome.',
+        'Cliff-rock accent metrics estimate the shader overlay that can use moss-tinted rocky texture on steep slopes without making highland the primary ground biome.',
         'Use this to choose a KB-TERRAIN branch; final acceptance still needs Open Frontier/A Shau screenshots and perf deltas.',
       ],
     },

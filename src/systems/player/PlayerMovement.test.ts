@@ -333,14 +333,18 @@ describe('PlayerMovement', () => {
     // clamp keeps the player planted while preserving real step-up motion.
 
     it('does not launch the camera when effective ground rises abruptly under walking motion', () => {
-      // Current XZ has flat terrain; the target XZ (x > 0.05) resolves to
+      // Current XZ has flat terrain; the target XZ (x > 2) resolves to
       // a 30m-tall effective ground — simulating a collision-bbox or cliff
       // seam the player walks into. Before the clamp this produced a
-      // 30m one-frame Y jump.
+      // 30m one-frame Y jump. The player speed is raised so one fixed
+      // movement step reaches the synthetic lip without making the support
+      // sampler see it at the current position.
       vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
-      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => (x > 0.05 ? 30 : 0));
-      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => (x > 0.05 ? 30 : 0));
+      playerState.speed = 200;
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => (x > 2 ? 30 : 0));
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => (x > 2 ? 30 : 0));
 
+      const initialX = playerState.position.x;
       const initialY = playerState.position.y;
       playerMovement.updateMovement(0.016, mockInput, mockCamera);
 
@@ -349,6 +353,8 @@ describe('PlayerMovement', () => {
       // +30m. The exact bound mirrors PLAYER_MAX_GROUND_RISE_PER_STEP.
       const riseThisFrame = playerState.position.y - initialY;
       expect(riseThisFrame).toBeLessThanOrEqual(0.55); // 0.5 + float slack
+      expect(playerState.position.x).toBeCloseTo(initialX, 5);
+      expect(playerState.velocity.x).toBe(0);
     });
 
     it('still snaps to ground on respawn / first-frame spawn correction', () => {

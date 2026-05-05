@@ -42,6 +42,8 @@ const WORLD_FEATURE_SAMPLE_DIRECTIONS = 8;
  * (barrels, ammo crates, fuel drums) that should not block an aircraft sweep.
  */
 const BUILDING_LOS_MIN_FOOTPRINT_M = 3;
+const WORLD_FEATURE_RENDER_DISTANCE_M = 900;
+const WORLD_FEATURE_RENDER_HYSTERESIS_M = 80;
 
 interface TerrainPlacementCandidate {
   x: number;
@@ -58,6 +60,13 @@ interface SpawnedFeatureObject {
   losObstacleIds: string[];
 }
 
+interface WorldFeatureRenderGroup {
+  id: string;
+  anchor: THREE.Vector3;
+  group: THREE.Group;
+  visible: boolean;
+}
+
 interface WorldFeatureSystemDependencies {
   terrainManager: ITerrainRuntime;
   gameModeManager: GameModeManager;
@@ -65,18 +74,21 @@ interface WorldFeatureSystemDependencies {
 
 export class WorldFeatureSystem implements GameSystem {
   private readonly scene: THREE.Scene;
+  private readonly camera?: THREE.Camera;
   private terrainManager?: ITerrainRuntime;
   private gameModeManager?: GameModeManager;
   private navmeshSystem?: NavmeshSystem;
   private fixedWingModel?: FixedWingModel;
   private losAccelerator?: LOSAccelerator;
   private spawnedObjects: SpawnedFeatureObject[] = [];
+  private featureGroups: WorldFeatureRenderGroup[] = [];
   private staticFeatureRoot: THREE.Group | null = null;
   private buildInFlight = false;
   private builtModeId: string | null = null;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, camera?: THREE.Camera) {
     this.scene = scene;
+    this.camera = camera;
   }
 
   async init(): Promise<void> {
@@ -120,6 +132,7 @@ export class WorldFeatureSystem implements GameSystem {
 
     const config = this.gameModeManager.getCurrentConfig();
     if (this.builtModeId === config.id) {
+      this.updateFeatureVisibility();
       return;
     }
 
@@ -155,9 +168,11 @@ export class WorldFeatureSystem implements GameSystem {
 
     try {
       for (const feature of features) {
-        await this.spawnFeature(feature);
+        const featureGroup = this.createFeatureGroup(feature);
+        await this.spawnFeature(feature, featureGroup.group);
+        this.optimizeStaticFeatureGroup(featureGroup.group);
       }
-      this.optimizeStaticFeatureRoot();
+      this.updateFeatureVisibility();
       this.builtModeId = modeId;
       Logger.info('world', `Spawned ${this.spawnedObjects.length} world feature objects for mode "${modeId}"`);
     } finally {
@@ -165,7 +180,23 @@ export class WorldFeatureSystem implements GameSystem {
     }
   }
 
-  private async spawnFeature(feature: MapFeatureDefinition): Promise<void> {
+  private createFeatureGroup(feature: MapFeatureDefinition): WorldFeatureRenderGroup {
+    const group = new THREE.Group();
+    group.name = `WorldFeature_${feature.id}`;
+    group.userData.perfCategory = 'world_static_features';
+    this.staticFeatureRoot?.add(group);
+
+    const renderGroup: WorldFeatureRenderGroup = {
+      id: feature.id,
+      anchor: feature.position.clone(),
+      group,
+      visible: true,
+    };
+    this.featureGroups.push(renderGroup);
+    return renderGroup;
+  }
+
+  private async spawnFeature(feature: MapFeatureDefinition, parent: THREE.Object3D): Promise<void> {
     const placements = this.resolvePlacements(feature);
     if (placements.length === 0 || !this.terrainManager) {
       return;
@@ -237,7 +268,7 @@ export class WorldFeatureSystem implements GameSystem {
           child.receiveShadow = true;
         }
       });
-      (this.staticFeatureRoot ?? this.scene).add(object);
+      parent.add(object);
       freezeTransform(object);
       const objectId = `${feature.id}_${placement.id ?? i}`;
       const collisionRegistered = placement.registerCollision === true && profile.collisionMode === 'bounds';
@@ -256,12 +287,12 @@ export class WorldFeatureSystem implements GameSystem {
     }
   }
 
-  private optimizeStaticFeatureRoot(): void {
-    if (!this.staticFeatureRoot || this.staticFeatureRoot.children.length === 0) {
+  private optimizeStaticFeatureGroup(group: THREE.Group): void {
+    if (group.children.length === 0) {
       return;
     }
 
-    const result = optimizeStaticModelDrawCalls(this.staticFeatureRoot, {
+    const result = optimizeStaticModelDrawCalls(group, {
       batchNamePrefix: 'world_static_features',
       strategy: 'batch',
       minBucketSize: 2,
@@ -273,6 +304,33 @@ export class WorldFeatureSystem implements GameSystem {
         'world',
         `Optimized world feature layer: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} shared batch(es)`,
       );
+    }
+  }
+
+  private updateFeatureVisibility(): void {
+    if (!this.camera || this.featureGroups.length === 0) {
+      return;
+    }
+
+    const cameraX = this.camera.position.x;
+    const cameraZ = this.camera.position.z;
+    const showDistanceSq = WORLD_FEATURE_RENDER_DISTANCE_M * WORLD_FEATURE_RENDER_DISTANCE_M;
+    const hideDistance = WORLD_FEATURE_RENDER_DISTANCE_M + WORLD_FEATURE_RENDER_HYSTERESIS_M;
+    const hideDistanceSq = hideDistance * hideDistance;
+
+    for (const entry of this.featureGroups) {
+      const dx = entry.anchor.x - cameraX;
+      const dz = entry.anchor.z - cameraZ;
+      const distanceSq = dx * dx + dz * dz;
+      const shouldBeVisible = entry.visible
+        ? distanceSq <= hideDistanceSq
+        : distanceSq <= showDistanceSq;
+
+      if (entry.visible === shouldBeVisible) {
+        continue;
+      }
+      entry.visible = shouldBeVisible;
+      entry.group.visible = shouldBeVisible;
     }
   }
 
@@ -381,6 +439,7 @@ export class WorldFeatureSystem implements GameSystem {
       }
     }
     this.spawnedObjects = [];
+    this.featureGroups = [];
     this.clearStaticFeatureRoot();
     this.builtModeId = null;
   }

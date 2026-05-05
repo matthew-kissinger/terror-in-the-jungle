@@ -314,17 +314,18 @@ vec3 applyLowlandWetness(vec3 color, float slopeUp, float elevation) {
 }
 
 vec3 applyCliffRockAccent(vec3 color, float slopeUp, float elevation, vec2 worldUv, vec2 uvOffset) {
-  float cliffMask = 1.0 - smoothstep(0.55, 0.78, slopeUp);
+  float cliffMask = 1.0 - smoothstep(0.50, 0.74, slopeUp);
   float proceduralHillMask = smoothstep(20.0, 60.0, elevation) * (1.0 - smoothstep(150.0, 300.0, elevation));
   float demRidgeMask = smoothstep(450.0, 950.0, elevation);
   float elevationMask = max(proceduralHillMask, demRidgeMask);
-  float rockBlend = cliffMask * elevationMask * 0.42;
+  float rockBlend = cliffMask * elevationMask * 0.26;
   if (rockBlend <= 0.001) {
     return color;
   }
 
   vec4 rockPlanar = sampleBiomeTexture(cliffRockBiomeSlot, worldUv, uvOffset);
-  return mix(color, rockPlanar.rgb, rockBlend);
+  vec3 mossyRock = mix(rockPlanar.rgb, rockPlanar.rgb * vec3(0.66, 0.86, 0.68), 0.45);
+  return mix(color, mossyRock, rockBlend);
 }
 
 vec3 applyFeatureSurfaceColor(vec3 color, vec2 worldPos) {
