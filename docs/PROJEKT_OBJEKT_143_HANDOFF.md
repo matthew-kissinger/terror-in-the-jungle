@@ -36,13 +36,13 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-05T04-14-55-548Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T04-26-07-523Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
   `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-LOAD fresh sequential startup baselines:
-  `artifacts/perf/2026-05-05T04-13-00-783Z/startup-ui-open-frontier/summary.json`
+  `artifacts/perf/2026-05-05T04-24-07-730Z/startup-ui-open-frontier/summary.json`
   and
-  `artifacts/perf/2026-05-05T04-14-18-778Z/startup-ui-zone-control/summary.json`
+  `artifacts/perf/2026-05-05T04-25-31-931Z/startup-ui-zone-control/summary.json`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -106,12 +106,17 @@ ledger; this file is the short operational prompt.
   GiantPalm warmup reduced WebGL upload totals but did not improve startup
   latency. Do not broaden warmup from the rejected fanPalm evidence without a
   paired proof. Fresh sequential startup baselines after the short-palm
-  retirement record Open Frontier `5209.3ms` mode-click-to-playable,
-  `4516.7ms` deploy-click-to-playable, `844.5ms` WebGL upload total, and
-  `33.1ms` max upload; Zone Control records `5440.3ms`
-  mode-click-to-playable, `4835.7ms` deploy-click-to-playable, `864.567ms`
-  WebGL upload total, and `42ms` max upload. This is current upload/residency
-  evidence only; long tasks and multi-second playable latency remain.
+  retirement and upload-summary patch record Open Frontier `5198ms`
+  mode-click-to-playable, `4466.333ms` deploy-click-to-playable, `845.733ms`
+  WebGL upload total, `30.967ms` average max upload, and `541.333` upload
+  calls; Zone Control records `5417ms` mode-click-to-playable, `4887ms`
+  deploy-click-to-playable, `841.6ms` WebGL upload total, `39.067ms` average
+  max upload, and `590` upload calls. The kickoff now carries non-null
+  `largestUploads`: Open Frontier is led by
+  `npcs/usArmy/idle/animated-albedo-packed.png`, `bambooGrove` imposter, and
+  `fanPalm` imposter; Zone Control is led by `bananaPlant`, `bambooGrove`, and
+  `fanPalm` imposters. This is current upload/residency attribution only; long
+  tasks and multi-second playable latency remain.
 - KB-FORGE `local-pixel-forge-asset-pipeline`: local liaison bureau.
   Pixel Forge is our sibling repo at
   `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.

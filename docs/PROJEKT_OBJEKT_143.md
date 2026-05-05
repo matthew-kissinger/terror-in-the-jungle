@@ -43,7 +43,7 @@ latest Projekt suite is
 `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`.
 Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
-`artifacts/perf/2026-05-05T04-14-55-548Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+`artifacts/perf/2026-05-05T04-26-07-523Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
 KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an
@@ -61,12 +61,20 @@ present, and the NPC review package counted as `4` factions, `8` clips, and
 replacement, trail/route surfaces, base/foundation kits, far-canopy/tree
 variety, and NPC/weapon packaging. The local audit command is
 `npm run check:projekt-143-pixel-forge`.
-Fresh sequential KB-LOAD startup baselines after the short-palm retirement are
-filed at
-`artifacts/perf/2026-05-05T04-13-00-783Z/startup-ui-open-frontier/summary.json`
+Fresh sequential KB-LOAD startup baselines after the short-palm retirement and
+upload-summary patch are filed at
+`artifacts/perf/2026-05-05T04-24-07-730Z/startup-ui-open-frontier/summary.json`
 and
-`artifacts/perf/2026-05-05T04-14-18-778Z/startup-ui-zone-control/summary.json`;
-they are current upload/residency evidence, not a startup-latency closeout.
+`artifacts/perf/2026-05-05T04-25-31-931Z/startup-ui-zone-control/summary.json`;
+the refreshed kickoff now carries non-null largest-upload tables. Open Frontier
+averages `5198ms` mode-click-to-playable, `4466.333ms`
+deploy-click-to-playable, `845.733ms` WebGL upload total, and `30.967ms`
+average max upload. Zone Control averages `5417ms` mode-click-to-playable,
+`4887ms` deploy-click-to-playable, `841.6ms` WebGL upload total, and
+`39.067ms` average max upload. The short palm no longer appears as the
+largest-upload failure; current top targets are Pixel Forge vegetation
+imposters/normals and NPC animated albedo atlases. This is current
+upload/residency attribution, not a startup-latency closeout.
 
 ## Shipped Cycle 0 State
 
@@ -490,10 +498,34 @@ Progress:
   `4516.7ms` deploy-click-to-playable, `844.5ms` WebGL upload total, and
   `33.1ms` max upload. Zone Control averaged `5440.3ms`
   mode-click-to-playable, `4835.7ms` deploy-click-to-playable, `864.567ms`
-  WebGL upload total, and `42ms` max upload. This records that the retired
-  short palm removed the prior multi-second largest-upload failure from the
-  current startup path, but long tasks and multi-second playable latency remain.
-  Do not call this a startup-latency win or closeout.
+  WebGL upload total, and `42ms` max upload.
+- 2026-05-05 KB-LOAD upload-attribution summary patch: startup `summary.json`
+  now includes `summary.webglTextureUpload*` median/p95 aggregates and
+  `webglUploadSummary.largestUploads`, using relative asset paths so the Cycle
+  3 kickoff can name remaining upload targets. Fresh sequential artifacts
+  `artifacts/perf/2026-05-05T04-24-07-730Z/startup-ui-open-frontier/summary.json`
+  and
+  `artifacts/perf/2026-05-05T04-25-31-931Z/startup-ui-zone-control/summary.json`
+  refreshed the kickoff at
+  `artifacts/perf/2026-05-05T04-26-07-523Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Open Frontier averaged `5198ms` mode-click-to-playable, `4466.333ms`
+  deploy-click-to-playable, `845.733ms` WebGL upload total, `30.967ms` average
+  max upload, and `541.333` upload calls. Its current top uploads are
+  `assets/pixel-forge/npcs/usArmy/idle/animated-albedo-packed.png`
+  (`33.8ms` max), `assets/pixel-forge/vegetation/bambooGrove/bamboo-google-2/imposter.png`
+  (`32.5ms` max), and
+  `assets/pixel-forge/vegetation/fanPalm/lady-palm-google-1/imposter.png`
+  (`31.7ms` max). Zone Control averaged `5417ms` mode-click-to-playable,
+  `4887ms` deploy-click-to-playable, `841.6ms` WebGL upload total, `39.067ms`
+  average max upload, and `590` upload calls. Its current top uploads are
+  `assets/pixel-forge/vegetation/bananaPlant/banana-tree-sean-tarrant/imposter.png`
+  (`42.3ms` max), `assets/pixel-forge/vegetation/bambooGrove/bamboo-google-2/imposter.png`
+  (`39.5ms` max), and
+  `assets/pixel-forge/vegetation/fanPalm/lady-palm-google-1/imposter.png`
+  (`33.7ms` max). This records that the retired short palm removed the prior
+  multi-second largest-upload failure from the current startup path, but long
+  tasks and multi-second playable latency remain. Do not call this a
+  startup-latency win or closeout.
 
 Open questions:
 

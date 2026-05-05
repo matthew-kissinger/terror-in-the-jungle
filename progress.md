@@ -2992,7 +2992,29 @@ TODO
   upload.
 - Refreshed `npm run check:projekt-143-cycle3-kickoff`: expected WARN at
   `artifacts/perf/2026-05-05T04-14-55-548Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
-  KB-LOAD remains `ready_for_branch`: the prior multi-second `giantPalm`
-  largest-upload failure is gone from the current startup path, but long tasks
-  and multi-second playable latency remain, so this is not a startup-latency
-  win or closeout.
+ KB-LOAD remains `ready_for_branch`: the prior multi-second `giantPalm`
+ largest-upload failure is gone from the current startup path, but long tasks
+ and multi-second playable latency remain, so this is not a startup-latency
+ win or closeout.
+
+2026-05-05 Projekt Objekt-143 KB-LOAD upload attribution summary
+- Added `webglUploadSummary.largestUploads` and median/p95 upload aggregates to
+  `scripts/perf-startup-ui.ts` so startup `summary.json` carries asset-level
+  upload attribution instead of requiring manual inspection of
+  `browser-stalls.json`.
+- Refreshed sequential startup baselines. Open Frontier wrote
+  `artifacts/perf/2026-05-05T04-24-07-730Z/startup-ui-open-frontier/summary.json`
+  with `5198ms` mode-click-to-playable, `4466.333ms`
+  deploy-click-to-playable, `845.733ms` WebGL upload total, `30.967ms`
+  average max upload, and `541.333` upload calls. Zone Control wrote
+  `artifacts/perf/2026-05-05T04-25-31-931Z/startup-ui-zone-control/summary.json`
+  with `5417ms` mode-click-to-playable, `4887ms`
+  deploy-click-to-playable, `841.6ms` WebGL upload total, `39.067ms` average
+  max upload, and `590` upload calls.
+- Refreshed `npm run check:projekt-143-cycle3-kickoff`: expected WARN at
+  `artifacts/perf/2026-05-05T04-26-07-523Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  KB-LOAD now names current top uploads: Open Frontier is led by
+  `npcs/usArmy/idle/animated-albedo-packed.png`, `bambooGrove` imposter, and
+  `fanPalm` imposter; Zone Control is led by `bananaPlant`, `bambooGrove`, and
+  `fanPalm` imposters. The retired short palm is no longer the largest-upload
+  failure, but long tasks and multi-second playable latency remain.

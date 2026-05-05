@@ -158,7 +158,11 @@ Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome
 UI-readiness evidence only. `browser-stalls.json` also includes diagnostic
 WebGL texture-upload attribution during startup UI runs; those wrapped WebGL
 calls are useful for asset ownership, but the resulting run is not an
-uncontaminated frame-time baseline.
+uncontaminated frame-time baseline. `summary.json` repeats the compact upload
+metrics as median/p95 aggregates and carries `webglUploadSummary.largestUploads`
+with relative asset paths, dimensions, sample counts, and max upload durations
+so Projekt KB-LOAD can name current residency targets without digging into raw
+observer output.
 
 `perf-grenade-spike.ts` writes KB-EFFECTS artifacts under
 `artifacts/perf/<timestamp>/grenade-spike-<mode>/`: `summary.json`,

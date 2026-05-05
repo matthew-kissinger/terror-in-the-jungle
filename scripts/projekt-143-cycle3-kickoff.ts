@@ -117,6 +117,7 @@ type StartupSummary = {
   summary?: {
     modeClickToPlayableMs?: { average?: number; median?: number; p95?: number };
     deployClickToPlayableMs?: { average?: number; median?: number; p95?: number };
+    webglTextureUploadCount?: { average?: number; median?: number; p95?: number };
     webglTextureUploadTotalDurationMs?: { average?: number; median?: number; p95?: number };
     webglTextureUploadMaxDurationMs?: { average?: number; median?: number; p95?: number };
   };
@@ -124,6 +125,7 @@ type StartupSummary = {
     totalDurationMs?: number;
     maxDurationMs?: number;
     count?: number;
+    averageCount?: number;
     largestUploads?: unknown[];
   };
 };
@@ -331,7 +333,8 @@ function startupUploadAverage(
     return summary.summary?.webglTextureUploadMaxDurationMs?.average
       ?? average((summary.perRun ?? []).map((run) => run.browserStalls?.webglTextureUploadMaxDurationMs ?? NaN));
   }
-  return summary.webglUploadSummary?.count
+  return summary.summary?.webglTextureUploadCount?.average
+    ?? summary.webglUploadSummary?.averageCount
     ?? average((summary.perRun ?? []).map((run) => run.browserStalls?.webglTextureUploadCount ?? NaN));
 }
 

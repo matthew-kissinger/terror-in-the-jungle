@@ -58,6 +58,52 @@ type BrowserStallsSnapshot = {
   recent?: Record<string, unknown>;
 } | null;
 
+type MetricSummary = {
+  average: number;
+  median: number;
+  p95: number;
+  min: number;
+  max: number;
+};
+
+type WebglTextureUploadEntry = {
+  operation: string;
+  duration: number;
+  target: string;
+  width: number;
+  height: number;
+  sourceType: string;
+  sourceUrl: string;
+  byteLength: number;
+};
+
+type WebglLargestUpload = {
+  sourceUrl: string;
+  operation: string;
+  target: string;
+  width: number;
+  height: number;
+  sourceType: string;
+  sampleCount: number;
+  runCount: number;
+  totalDurationMs: number;
+  maxDurationMs: number;
+  averageDurationMs: number;
+};
+
+type WebglUploadSummary = {
+  count: number;
+  averageCount: number;
+  totalDurationMs: number;
+  averageTotalDurationMs: number;
+  maxDurationMs: number;
+  averageMaxDurationMs: number;
+  countSummary: MetricSummary;
+  totalDurationSummaryMs: MetricSummary;
+  maxDurationSummaryMs: MetricSummary;
+  largestUploads: WebglLargestUpload[];
+};
+
 type CpuProfileSnapshot = unknown;
 
 type BenchmarkRun = {
@@ -86,6 +132,14 @@ type Summary = {
   runs: number;
   url: string;
   averagesMs: Record<string, number>;
+  summary: {
+    modeClickToPlayableMs: MetricSummary;
+    deployClickToPlayableMs: MetricSummary;
+    webglTextureUploadCount: MetricSummary;
+    webglTextureUploadTotalDurationMs: MetricSummary;
+    webglTextureUploadMaxDurationMs: MetricSummary;
+  };
+  webglUploadSummary: WebglUploadSummary;
   perRun: Array<{
     iteration: number;
     timings: BenchmarkRun['timings'];
@@ -95,6 +149,15 @@ type Summary = {
     errorCounts: {
       pageErrors: number;
       requestErrors: number;
+    };
+    browserStalls: {
+      longTaskCount: number;
+      longTaskMaxDurationMs: number;
+      longAnimationFrameCount: number;
+      longAnimationFrameMaxDurationMs: number;
+      webglTextureUploadCount: number;
+      webglTextureUploadTotalDurationMs: number;
+      webglTextureUploadMaxDurationMs: number;
     };
   }>;
 };
@@ -279,7 +342,159 @@ function averageMetric(runs: BenchmarkRun[], key: keyof BenchmarkRun['timings'])
   return Math.round((total / runs.length) * 10) / 10;
 }
 
+function roundMetric(value: number): number {
+  return Number(value.toFixed(3));
+}
+
+function metricSummary(values: number[]): MetricSummary {
+  const finite = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (finite.length === 0) {
+    return { average: 0, median: 0, p95: 0, min: 0, max: 0 };
+  }
+
+  const percentile = (fraction: number): number => {
+    const index = Math.min(finite.length - 1, Math.max(0, Math.ceil(finite.length * fraction) - 1));
+    return finite[index];
+  };
+
+  const middle = Math.floor(finite.length / 2);
+  const median = finite.length % 2 === 0
+    ? (finite[middle - 1] + finite[middle]) / 2
+    : finite[middle];
+
+  return {
+    average: roundMetric(finite.reduce((sum, value) => sum + value, 0) / finite.length),
+    median: roundMetric(median),
+    p95: roundMetric(percentile(0.95)),
+    min: roundMetric(finite[0]),
+    max: roundMetric(finite[finite.length - 1]),
+  };
+}
+
+function numericStallMetric(run: BenchmarkRun, key: string): number {
+  const value = run.browserStalls?.totals?.[key];
+  const numericValue = Number(value ?? 0);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function numberValue(value: unknown): number {
+  const numericValue = Number(value ?? 0);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+}
+
+function normalizeSourceUrl(sourceUrl: string): string {
+  if (sourceUrl.length === 0) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(sourceUrl);
+    return decodeURIComponent(parsed.pathname).replace(/^\/+/, '');
+  } catch {
+    return sourceUrl.replace(/^\/+/, '');
+  }
+}
+
+function webglTopUploads(run: BenchmarkRun): WebglTextureUploadEntry[] {
+  const recent = run.browserStalls?.recent;
+  const topUploads = Array.isArray(recent?.webglTextureUploadTop)
+    ? recent.webglTextureUploadTop
+    : [];
+
+  return topUploads
+    .map(asRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => ({
+      operation: stringValue(entry.operation),
+      duration: numberValue(entry.duration),
+      target: stringValue(entry.target),
+      width: numberValue(entry.width),
+      height: numberValue(entry.height),
+      sourceType: stringValue(entry.sourceType),
+      sourceUrl: normalizeSourceUrl(stringValue(entry.sourceUrl)),
+      byteLength: numberValue(entry.byteLength),
+    }))
+    .filter((entry) => entry.duration > 0);
+}
+
+function buildWebglUploadSummary(runs: BenchmarkRun[]): WebglUploadSummary {
+  const countValues = runs.map((run) => numericStallMetric(run, 'webglTextureUploadCount'));
+  const totalDurationValues = runs.map((run) => numericStallMetric(run, 'webglTextureUploadTotalDurationMs'));
+  const maxDurationValues = runs.map((run) => numericStallMetric(run, 'webglTextureUploadMaxDurationMs'));
+  const countSummary = metricSummary(countValues);
+  const totalDurationSummary = metricSummary(totalDurationValues);
+  const maxDurationSummary = metricSummary(maxDurationValues);
+  const buckets = new Map<string, WebglLargestUpload & { runIterations: Set<number> }>();
+
+  for (const run of runs) {
+    for (const upload of webglTopUploads(run)) {
+      const sourceUrl = upload.sourceUrl.length > 0 ? upload.sourceUrl : '(inline-or-unknown)';
+      const key = [
+        sourceUrl,
+        upload.operation,
+        upload.target,
+        upload.width,
+        upload.height,
+        upload.sourceType,
+      ].join('|');
+      const existing = buckets.get(key);
+      if (existing) {
+        existing.sampleCount += 1;
+        existing.totalDurationMs = roundMetric(existing.totalDurationMs + upload.duration);
+        existing.maxDurationMs = roundMetric(Math.max(existing.maxDurationMs, upload.duration));
+        existing.averageDurationMs = roundMetric(existing.totalDurationMs / existing.sampleCount);
+        existing.runIterations.add(run.iteration);
+        existing.runCount = existing.runIterations.size;
+      } else {
+        buckets.set(key, {
+          sourceUrl,
+          operation: upload.operation,
+          target: upload.target,
+          width: upload.width,
+          height: upload.height,
+          sourceType: upload.sourceType,
+          sampleCount: 1,
+          runCount: 1,
+          totalDurationMs: roundMetric(upload.duration),
+          maxDurationMs: roundMetric(upload.duration),
+          averageDurationMs: roundMetric(upload.duration),
+          runIterations: new Set([run.iteration]),
+        });
+      }
+    }
+  }
+
+  const largestUploads = Array.from(buckets.values())
+    .map(({ runIterations: _runIterations, ...upload }) => upload)
+    .sort((a, b) => b.maxDurationMs - a.maxDurationMs || b.totalDurationMs - a.totalDurationMs)
+    .slice(0, 12);
+
+  return {
+    count: roundMetric(countValues.reduce((sum, value) => sum + value, 0)),
+    averageCount: countSummary.average,
+    totalDurationMs: roundMetric(totalDurationValues.reduce((sum, value) => sum + value, 0)),
+    averageTotalDurationMs: totalDurationSummary.average,
+    maxDurationMs: maxDurationSummary.max,
+    averageMaxDurationMs: maxDurationSummary.average,
+    countSummary,
+    totalDurationSummaryMs: totalDurationSummary,
+    maxDurationSummaryMs: maxDurationSummary,
+    largestUploads,
+  };
+}
+
 function buildSummary(mode: string, runs: BenchmarkRun[], url: string): Summary {
+  const webglUploadSummary = buildWebglUploadSummary(runs);
   return {
     createdAt: new Date().toISOString(),
     mode,
@@ -294,6 +509,14 @@ function buildSummary(mode: string, runs: BenchmarkRun[], url: string): Summary 
       deployClickToPlayable: averageMetric(runs, 'deployClickToPlayable'),
       modeClickToPlayable: averageMetric(runs, 'modeClickToPlayable'),
     },
+    summary: {
+      modeClickToPlayableMs: metricSummary(runs.map((run) => run.timings.modeClickToPlayable)),
+      deployClickToPlayableMs: metricSummary(runs.map((run) => run.timings.deployClickToPlayable)),
+      webglTextureUploadCount: webglUploadSummary.countSummary,
+      webglTextureUploadTotalDurationMs: webglUploadSummary.totalDurationSummaryMs,
+      webglTextureUploadMaxDurationMs: webglUploadSummary.maxDurationSummaryMs,
+    },
+    webglUploadSummary,
     perRun: runs.map((run) => ({
       iteration: run.iteration,
       timings: run.timings,
@@ -305,17 +528,13 @@ function buildSummary(mode: string, runs: BenchmarkRun[], url: string): Summary 
         requestErrors: run.requestErrors.length,
       },
       browserStalls: {
-        longTaskCount: Number(run.browserStalls?.totals?.longTaskCount ?? 0),
-        longTaskMaxDurationMs: Number(run.browserStalls?.totals?.longTaskMaxDurationMs ?? 0),
-        longAnimationFrameCount: Number(run.browserStalls?.totals?.longAnimationFrameCount ?? 0),
-        longAnimationFrameMaxDurationMs: Number(run.browserStalls?.totals?.longAnimationFrameMaxDurationMs ?? 0),
-        webglTextureUploadCount: Number(run.browserStalls?.totals?.webglTextureUploadCount ?? 0),
-        webglTextureUploadTotalDurationMs: Number(
-          run.browserStalls?.totals?.webglTextureUploadTotalDurationMs ?? 0,
-        ),
-        webglTextureUploadMaxDurationMs: Number(
-          run.browserStalls?.totals?.webglTextureUploadMaxDurationMs ?? 0,
-        ),
+        longTaskCount: numericStallMetric(run, 'longTaskCount'),
+        longTaskMaxDurationMs: numericStallMetric(run, 'longTaskMaxDurationMs'),
+        longAnimationFrameCount: numericStallMetric(run, 'longAnimationFrameCount'),
+        longAnimationFrameMaxDurationMs: numericStallMetric(run, 'longAnimationFrameMaxDurationMs'),
+        webglTextureUploadCount: numericStallMetric(run, 'webglTextureUploadCount'),
+        webglTextureUploadTotalDurationMs: numericStallMetric(run, 'webglTextureUploadTotalDurationMs'),
+        webglTextureUploadMaxDurationMs: numericStallMetric(run, 'webglTextureUploadMaxDurationMs'),
       },
     })),
   };
