@@ -3045,3 +3045,28 @@ TODO
   `artifacts/perf/2026-05-05T05-34-24-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
   `npm run validate:fast` passed with `254` test files and `3876` tests, and
   `npm run build` passed with the existing large-chunk warning.
+
+2026-05-05 Projekt Objekt-143 vegetation-normal visual proof
+- Added `scripts/projekt-143-vegetation-normal-proof.ts` and
+  `npm run check:projekt-143-vegetation-normal-proof`. The command force-builds
+  the perf target, captures default normal-lit vegetation versus the
+  no-normal candidate at fixed Open Frontier seed `42` and Zone Control seed
+  `137` camera anchors, and writes a contact sheet plus pair-delta summary.
+- Latest artifact:
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json`.
+  Contact sheet:
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png`.
+  The proof captured `8/8` screenshots, `4/4` A/B pairs, renderer stats,
+  positive vegetation counters, and `0` browser/page/request failures.
+  Mechanical deltas stayed inside the current review band: max mean absolute
+  RGB delta `15.595`, max mean absolute luma delta `18.848`, and max absolute
+  mean luma delta `8.284%`.
+- Refreshed `npm run check:projekt-143-cycle3-kickoff`: expected WARN at
+  `artifacts/perf/2026-05-05T12-20-11-036Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  KB-LOAD now points at the visual proof path and contact sheet, but the
+  normal-map removal candidate still requires human visual acceptance before
+  becoming runtime or Pixel Forge bake policy.
+- Validation: `git diff --check` passed,
+  `npm run check:projekt-143-vegetation-normal-proof` passed with expected
+  WARN, `npm run check:projekt-143-cycle3-kickoff` passed with expected WARN,
+  and `npm run validate:fast` passed with `254` test files and `3876` tests.

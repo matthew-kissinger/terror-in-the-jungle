@@ -37,7 +37,7 @@ ledger; this file is the short operational prompt.
 ## Latest Evidence Anchors
 
 - Cycle 3 kickoff/readiness:
-  `artifacts/perf/2026-05-05T05-34-24-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  `artifacts/perf/2026-05-05T12-20-11-036Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
 - Static Projekt suite:
   `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`
 - KB-LOAD fresh sequential startup baselines:
@@ -48,6 +48,10 @@ ledger; this file is the short operational prompt.
   `artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json`
   and
   `artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json`
+- KB-LOAD/OPTIK vegetation-normal visual proof:
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json`
+  and
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png`
 - KB-OPTIK decision packet:
   `artifacts/perf/2026-05-04T00-05-37-320Z/projekt-143-optik-decision-packet/decision-packet.json`
 - KB-TERRAIN before baseline:
@@ -138,6 +142,15 @@ ledger; this file is the short operational prompt.
   deploy-click-to-playable, `767.467ms` WebGL upload total, and `492.667`
   upload calls. This is not approval to remove vegetation normal maps from the
   default runtime or Pixel Forge bake; KB-OPTIK visual review is still required.
+  The visual companion command
+  `npm run check:projekt-143-vegetation-normal-proof` is now available. Latest
+  artifact
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json`
+  captured `8/8` screenshots, `4/4` A/B pairs, renderer stats, vegetation
+  counters, and no browser/page/request failures. Contact sheet:
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png`.
+  Mechanical deltas are inside the review band, but status is WARN until a
+  human accepts the visual result.
 - KB-FORGE `local-pixel-forge-asset-pipeline`: local liaison bureau.
   Pixel Forge is our sibling repo at
   `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.
@@ -293,7 +306,7 @@ Initial commands:
 
 Current evidence anchors:
 - Cycle 3 kickoff:
-  artifacts/perf/2026-05-05T05-34-24-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
+  artifacts/perf/2026-05-05T12-20-11-036Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json
 - Static Projekt suite:
   artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json
 - KB-LOAD startup baselines:
@@ -302,6 +315,9 @@ Current evidence anchors:
 - KB-LOAD vegetation-normal candidate proof:
   artifacts/perf/2026-05-05T05-31-24-775Z/startup-ui-open-frontier-vegetation-normals-disabled/summary.json
   artifacts/perf/2026-05-05T05-28-07-843Z/startup-ui-zone-control-vegetation-normals-disabled/summary.json
+- KB-LOAD/OPTIK vegetation-normal visual proof:
+  artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json
+  artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png
 - KB-FORGE local Pixel Forge bureau:
   artifacts/perf/2026-05-05T04-01-08-047Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json
 - KB-TERRAIN before baseline:
@@ -348,8 +364,9 @@ Current evidence anchors:
 Current bureau state:
 - KB-LOAD: ready_for_branch, but no startup-latency win yet. The
   `--disable-vegetation-normals` startup option is a proof-only measurement
-  hook; do not turn it into a default runtime policy without KB-OPTIK
-  screenshot/luma/chroma evidence.
+  hook. It now has a visual A/B proof command and contact sheet, but do not
+  turn it into a default runtime policy without human acceptance of that visual
+  evidence.
 - KB-TERRAIN: ready_for_branch, before baseline exists; no far-canopy fix yet.
   Include the owner visual target: majority green/jungle floor, possible
   inverted material distribution, remove the short Quaternius palm

@@ -106,6 +106,7 @@
     "check:projekt-143-cycle1-bundle": "npx tsx scripts/projekt-143-cycle1-benchmark-bundle.ts",
     "check:projekt-143-optics-scale-proof": "npx tsx scripts/projekt-143-optics-scale-proof.ts --headed",
     "check:projekt-143-optik-expanded": "npx tsx scripts/projekt-143-optik-expanded-proof.ts --headed",
+    "check:projekt-143-vegetation-normal-proof": "npx tsx scripts/projekt-143-vegetation-normal-proof.ts",
     "check:projekt-143-culling-proof": "npx tsx scripts/projekt-143-culling-proof.ts --headed",
     "check:projekt-143-culling-baseline": "npx tsx scripts/projekt-143-culling-owner-baseline.ts",
     "check:projekt-143-terrain-baseline": "npx tsx scripts/projekt-143-terrain-horizon-baseline.ts",

@@ -130,6 +130,21 @@ type StartupSummary = {
   };
 };
 
+type VegetationNormalProof = {
+  status?: CheckStatus;
+  files?: {
+    contactSheet?: string;
+  };
+  aggregate?: {
+    expectedPairs?: number;
+    capturedPairs?: number;
+    maxMeanAbsRgbDelta?: number | null;
+    maxMeanAbsLumaDelta?: number | null;
+    maxAbsMeanLumaDeltaPercent?: number | null;
+    maxVegetationActiveDelta?: number | null;
+  };
+};
+
 type PerfSummary = {
   scenario?: {
     mode?: string;
@@ -514,7 +529,9 @@ function buildLoadTarget(
   startupOpen: StartupSummary | null,
   startupZonePath: string | null,
   startupZone: StartupSummary | null,
-  texture: TextureAudit | null
+  texture: TextureAudit | null,
+  vegetationNormalProofPath: string | null,
+  vegetationNormalProof: VegetationNormalProof | null,
 ): Cycle3Target {
   const hasStartup = Boolean(startupOpenPath && startupZonePath);
   const hasTextureAudit = Boolean(texturePath);
@@ -545,17 +562,25 @@ function buildLoadTarget(
       zoneControlWebglUploadMaxAverageMs: startupUploadAverage(startupZone, 'webglTextureUploadMaxDurationMs'),
       zoneControlUploadCount: startupUploadAverage(startupZone, 'webglTextureUploadCount'),
       zoneControlLargestUploads: startupZone?.webglUploadSummary?.largestUploads ?? null,
+      vegetationNormalProofPath: rel(vegetationNormalProofPath),
+      vegetationNormalProofStatus: vegetationNormalProof?.status ?? null,
+      vegetationNormalProofContactSheet: vegetationNormalProof?.files?.contactSheet ?? null,
+      vegetationNormalProofCapturedPairs: vegetationNormalProof?.aggregate?.capturedPairs ?? null,
+      vegetationNormalProofExpectedPairs: vegetationNormalProof?.aggregate?.expectedPairs ?? null,
+      vegetationNormalProofMaxMeanAbsRgbDelta: vegetationNormalProof?.aggregate?.maxMeanAbsRgbDelta ?? null,
+      vegetationNormalProofMaxAbsMeanLumaDeltaPercent: vegetationNormalProof?.aggregate?.maxAbsMeanLumaDeltaPercent ?? null,
     },
     requiredBefore: [
       'Run fresh Open Frontier and Zone Control startup UI artifacts immediately before the branch if the latest startup artifacts predate the target assets.',
       'Do not broaden startup texture warmup from the rejected fanPalm artifact without a new paired proof.',
       'Choose one remaining texture class first: fanPalm with a latency guard, NPC albedo atlases, approved asset regeneration, or preload/deferred upload policy.',
-      'Pair all texture candidates with KB-OPTIK visual proof before shipping.',
+      'Pair all texture candidates with KB-OPTIK visual proof before shipping. Vegetation normal-map removal now has a mechanical A/B proof path, but it remains human-review WARN until the contact sheet is accepted.',
     ],
     acceptance: [
       'Open Frontier and Zone Control mode-click-to-playable median and p95 do not regress against the before artifact.',
       'WebGL upload total and largest-upload table improve, or the branch is recorded as rejected evidence rather than landed remediation.',
       'No texture downscale/compression is accepted without visual screenshots.',
+      'No vegetation normal-map removal is accepted without a reviewed `projekt-143-vegetation-normal-proof` contact sheet.',
     ],
     nonClaims: [
       'Texture candidate savings are planning estimates, not accepted art changes.',
@@ -811,6 +836,7 @@ function main(): void {
   const texturePath = latestFile(artifactFiles, (path) => path.endsWith(join('pixel-forge-texture-audit', 'texture-audit.json')));
   const startupOpenPath = latestStartupSummary(artifactFiles, 'open-frontier');
   const startupZonePath = latestStartupSummary(artifactFiles, 'zone-control');
+  const vegetationNormalProofPath = latestFile(artifactFiles, (path) => path.endsWith(join('projekt-143-vegetation-normal-proof', 'summary.json')));
   const openFrontierPerfPath = latestPerfSummaryForMode(artifactFiles, 'open_frontier');
   const combat120PerfPath = latestPerfSummaryForMode(artifactFiles, 'ai_sandbox');
   const aShauPerfPath = latestPerfSummaryForMode(artifactFiles, 'a_shau_valley');
@@ -828,6 +854,7 @@ function main(): void {
   const texture = readJson<TextureAudit>(texturePath);
   const startupOpen = readJson<StartupSummary>(startupOpenPath);
   const startupZone = readJson<StartupSummary>(startupZonePath);
+  const vegetationNormalProof = readJson<VegetationNormalProof>(vegetationNormalProofPath);
   const grenade = readJson<GrenadeSummary>(grenadePath);
   const horizon = readJson<HorizonAudit>(horizonPath);
   const terrainBaseline = readJson<TerrainHorizonBaseline>(terrainBaselinePath);
@@ -845,7 +872,16 @@ function main(): void {
       runtimeLodExpandedPath,
       runtimeLodExpanded,
     ),
-    buildLoadTarget(texturePath, startupOpenPath, startupOpen, startupZonePath, startupZone, texture),
+    buildLoadTarget(
+      texturePath,
+      startupOpenPath,
+      startupOpen,
+      startupZonePath,
+      startupZone,
+      texture,
+      vegetationNormalProofPath,
+      vegetationNormalProof,
+    ),
     buildEffectsTarget(grenadePath, grenade),
     buildTerrainTarget(horizonPath, horizon, openFrontierPerfPath, aShauPerfPath, terrainBaselinePath, terrainBaseline),
     buildCullTarget(cullingPath, culling, cullingBaselinePath, cullingBaseline, openFrontierPerfPath, aShauPerfPath, combat120PerfPath),
@@ -865,6 +901,7 @@ function main(): void {
       textureAudit: rel(texturePath),
       startupOpenFrontier: rel(startupOpenPath),
       startupZoneControl: rel(startupZonePath),
+      vegetationNormalProof: rel(vegetationNormalProofPath),
       openFrontierPerfSummary: rel(openFrontierPerfPath),
       combat120PerfSummary: rel(combat120PerfPath),
       aShauPerfSummary: rel(aShauPerfPath),
@@ -878,7 +915,7 @@ function main(): void {
     recommendedOrder: [
       'Treat the 2.95m NPC target drop, per-tile imposter crop, selected-lighting luma proof, and expanded-luma atmosphere pass as the current KB-OPTIK remediation slice.',
       'If KB-OPTIK continues immediately, use the runtime LOD-edge proof plus the near-stress artifact to decide visual exception/human review before changing crop or scale again.',
-      'For KB-LOAD, treat the old giantPalm warmup as retired partial upload evidence only; the next branch must prove startup latency does not regress while reducing remaining uploads.',
+      'For KB-LOAD, treat the old giantPalm warmup as retired partial upload evidence only; the next branch must prove startup latency does not regress while reducing remaining uploads. Vegetation normal-map removal now has mechanical A/B evidence, but needs human visual acceptance before becoming policy.',
       'For KB-EFFECTS, preserve the unlit pooled explosion architecture; do not reopen low-load grenade work unless visuals change, and do not infer combat120/stress closeout.',
       'For KB-TERRAIN, use the terrain horizon baseline proof as before evidence, then require matched after screenshots plus Open Frontier/A Shau perf deltas.',
       'For KB-CULL, use the owner-path baseline before evidence first; do not move close-NPC residency out of diagnostic-only status until combat stress measurement trust passes.',
@@ -886,7 +923,7 @@ function main(): void {
     ],
     openDecisions: [
       'Should KB-OPTIK document the 8.5m near-stress silhouette exception after the runtime LOD-edge PASS, run human visual review, or should KB-LOAD/KB-TERRAIN/KB-CULL take the next remediation slot?',
-      'Should the next KB-LOAD branch target fanPalm with a latency guard, NPC atlases, approved asset regeneration, or upload scheduling?',
+      'Should the next KB-LOAD branch target fanPalm with a latency guard, NPC atlases, approved asset regeneration, upload scheduling, or vegetation normal-map removal if the contact sheet is human-accepted?',
       'Which large-mode p95/draw-call budget will be used for far-canopy acceptance in this cycle?',
       'Is EZ Tree the right source generator for missing Vietnam trees and trail/ground cover, or should another licensed procedural source feed the Pixel Forge bake path?',
     ],

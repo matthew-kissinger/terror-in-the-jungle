@@ -43,7 +43,7 @@ latest Projekt suite is
 `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`.
 Cycle 3 kickoff remains WARN only for the existing KB-OPTIK visual-exception /
 human-review decision at
-`artifacts/perf/2026-05-05T05-34-24-541Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+`artifacts/perf/2026-05-05T12-20-11-036Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
 KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an
@@ -93,7 +93,16 @@ averaged `3203.667ms` mode-click-to-playable, `2631.667ms`
 deploy-click-to-playable, `767.467ms` WebGL upload total, `41.267ms` average
 max upload, and `492.667` upload calls. Treat this as candidate evidence only:
 normal-map removal still needs KB-OPTIK screenshot/luma/chroma review before it
-can become an accepted runtime asset policy.
+can become an accepted runtime asset policy. The first visual A/B companion is
+now filed at
+`artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json`
+with contact sheet
+`artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png`.
+It captured `8/8` screenshots, `4/4` default-versus-no-normal pairs, renderer
+stats, vegetation counters, and `0` browser/page/request failures. Mechanical
+deltas stayed inside the current review band (`15.595` max mean absolute RGB
+delta; `8.284%` max absolute mean luma delta), but status remains WARN until
+human visual review accepts the contact sheet.
 
 ## Shipped Cycle 0 State
 
@@ -565,6 +574,21 @@ Progress:
   accepted by this proof. KB-OPTIK still needs side-by-side visual screenshots
   and luma/chroma/fog review before any runtime default or Pixel Forge bake
   policy changes.
+- 2026-05-05 vegetation-normal visual A/B proof:
+  `npm run check:projekt-143-vegetation-normal-proof` force-built the perf
+  target and wrote
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json`
+  plus contact sheet
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png`.
+  The proof captures default normal-lit vegetation and the no-normal candidate
+  at fixed Open Frontier seed `42` and Zone Control seed `137` camera anchors.
+  It records `8/8` screenshots, `4/4` A/B pairs, renderer stats, positive
+  vegetation counters, and `0` browser/page/request failures. Mechanical deltas
+  are inside the current review band (`15.595` max mean absolute RGB delta;
+  `8.284%` max absolute mean luma delta), so the candidate has usable visual
+  evidence. It still reports WARN because human visual review must accept the
+  contact sheet before vegetation normal-map removal becomes runtime or Pixel
+  Forge bake policy.
 
 Open questions:
 

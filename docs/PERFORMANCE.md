@@ -94,6 +94,7 @@ npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof status
 npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet
 npm run check:projekt-143-optik-expanded # KB-OPTIK expanded lighting/gameplay-camera proof
+npm run check:projekt-143-vegetation-normal-proof # KB-LOAD/OPTIK vegetation normal-map A/B proof
 ```
 
 Startup UI benchmarks are retail-build measurements, not perf-harness frame
@@ -173,6 +174,12 @@ vegetation shading only for that run. Candidate summaries record
 `startup-ui-<mode>-vegetation-normals-disabled/`. Treat those folders as
 candidate evidence only; the default runtime path and default kickoff baseline
 selection still use `startup-ui-<mode>/`.
+
+`projekt-143-vegetation-normal-proof.ts` is the visual companion for that
+startup candidate. It force-builds the perf target by default, captures
+default normal-lit vegetation and no-normal vegetation at fixed Open Frontier
+and Zone Control camera anchors, writes a contact sheet plus pair deltas, and
+reports WARN until a human accepts the visual result.
 
 `perf-grenade-spike.ts` writes KB-EFFECTS artifacts under
 `artifacts/perf/<timestamp>/grenade-spike-<mode>/`: `summary.json`,
@@ -678,6 +685,16 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   deploy-click-to-playable, `767.467ms` WebGL upload total, and `492.667`
   upload calls. This is not an accepted art or runtime policy change; vegetation
   normal-map removal still requires KB-OPTIK side-by-side visual review.
+- 2026-05-05 KB-LOAD/OPTIK vegetation-normal visual proof:
+  `npm run check:projekt-143-vegetation-normal-proof` wrote
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json`
+  and contact sheet
+  `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/contact-sheet.png`.
+  It captured `8/8` screenshots, `4/4` default-versus-no-normal pairs,
+  renderer stats, vegetation counters, and `0` browser/page/request failures.
+  Mechanical deltas stayed inside the review band with max mean absolute RGB
+  delta `15.595` and max absolute mean luma delta `8.284%`, but the proof is
+  WARN until human visual review accepts the contact sheet.
 - 2026-05-02 Cycle 1 trusted steady-state evidence: Open Frontier short wrote
   `artifacts/perf/2026-05-02T22-11-29-560Z` with measurement trust PASS,
   avg/p95/p99/max `23.70/29.20/32.70/100ms`, 4 hitches above `50ms`, renderer
