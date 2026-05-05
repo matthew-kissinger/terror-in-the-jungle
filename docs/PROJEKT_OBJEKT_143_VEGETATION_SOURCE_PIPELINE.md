@@ -2,7 +2,9 @@
 
 Last updated: 2026-05-05
 
-Status: decision packet and source-pipeline guidance only. No source generator,
+Status: decision packet and source-pipeline guidance only. This file now sits
+under KB-FORGE, the Projekt bureau that treats the sibling Pixel Forge repo as
+our local asset pipeline rather than an external vendor. No source generator,
 asset-library item, generated GLB, or exported texture is accepted for runtime
 by this note.
 
@@ -24,6 +26,17 @@ Pixel Forge-compatible bake, screenshot review, and Open Frontier/A Shau perf
 or horizon evidence when the asset can affect large modes. Runtime procedural
 generation is out of scope for Cycle 3; use source tools offline, then bake.
 
+Mechanical local audit:
+
+```bash
+npm run check:projekt-143-pixel-forge
+```
+
+This reads `C:\Users\Mattm\X\games-3d\pixel-forge`, catalogs the existing TIJ
+pipeline commands, review gallery, output manifest, NPC package surface, and
+vegetation package state, then compares Pixel Forge output against TIJ runtime,
+blocked, and retired vegetation species.
+
 ## Source Tool Read
 
 | Source | Fit | Use | Blockers |
@@ -36,7 +49,8 @@ generation is out of scope for Cycle 3; use source tools offline, then bake.
 
 ## Recommendation
 
-Use `EZ-Tree` first, but only as an offline source generator. It overlaps best
+Use Pixel Forge first. Use `EZ-Tree` only as an optional offline source
+generator feeding Pixel Forge, not as a replacement pipeline. It overlaps best
 with this repo because the generator is already Three.js-oriented and can emit
 GLB source files, but the runtime should continue consuming baked Pixel
 Forge-style imposters and explicit runtime registries. Do not add
@@ -80,6 +94,8 @@ The first runtime branch should be narrow enough to prove the whole path:
 
 - This is not approval to import botaniq, Shizen, QuickMesh, Tree-Gen, Sapling,
   or `EZ-Tree` output into runtime.
+- This is not approval to bypass Pixel Forge review-only, manifest, validator,
+  or gallery gates.
 - This is not a WebGPU trigger.
 - This does not close KB-TERRAIN; it only makes the missing vegetation source
   decision more concrete.

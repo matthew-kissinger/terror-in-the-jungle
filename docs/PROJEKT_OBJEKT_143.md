@@ -46,9 +46,12 @@ human-review decision at
 `artifacts/perf/2026-05-05T03-24-24-591Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
 The vegetation source-generator follow-up is now split into
 [PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md](PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md):
-`EZ-Tree` is the recommended first offline GLB-generation pilot, while grass,
-ground cover, and trail-edge variety should come from a licensed asset-library
-review or custom low-card bake before any runtime import.
+KB-FORGE owns the local Pixel Forge liaison path, with `EZ-Tree` only as an
+optional offline GLB source feeding Pixel Forge rather than replacing it.
+Grass, ground cover, and trail-edge variety should come from Pixel Forge
+catalog/review work, a licensed asset-library review, or custom low-card bake
+before any runtime import. The local audit command is
+`npm run check:projekt-143-pixel-forge`.
 
 ## Shipped Cycle 0 State
 

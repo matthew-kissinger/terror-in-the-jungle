@@ -2928,3 +2928,19 @@ TODO
   sourced vegetation through Pixel Forge `review-only` baking, license/provenance
   capture, asset inventory, screenshots, texture/upload evidence, and matched
   Open Frontier/A Shau validation before runtime import.
+
+2026-05-05 23:55 EDT Projekt Objekt-143 KB-FORGE bureau setup
+- Folded the local Pixel Forge repo into Projekt as KB-FORGE rather than
+  treating it as an external source pool. Added
+  `scripts/projekt-143-pixel-forge-bureau.ts`, exposed as
+  `npm run check:projekt-143-pixel-forge`, to catalog
+  `C:\Users\Mattm\X\games-3d\pixel-forge` from the TIJ side.
+- The audit reads Pixel Forge package scripts (`tij:pipeline`,
+  `tij:vegetation-validate`, `tij:npc-package`), the `/gallery-tij` route,
+  the generated `gallery-manifest.json`, and the NPC package manifest surface,
+  then compares manifest vegetation against TIJ runtime, blocked, and retired
+  species.
+- Updated the source-pipeline review, Projekt ledger, and handoff so external
+  generators such as `EZ-Tree` are optional source inputs to Pixel Forge, not
+  replacements for Pixel Forge's review-only, bake, manifest, validator, and
+  gallery gates.

@@ -50,6 +50,8 @@ ledger; this file is the short operational prompt.
   `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
 - KB-TERRAIN vegetation source pipeline review:
   `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md`
+- KB-FORGE local Pixel Forge bureau audit:
+  run `npm run check:projekt-143-pixel-forge`
 - KB-TERRAIN route/trail policy audit:
   `artifacts/perf/2026-05-04T12-58-03-421Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
 - KB-TERRAIN Open Frontier after vegetation pass:
@@ -99,6 +101,13 @@ ledger; this file is the short operational prompt.
   GiantPalm warmup reduced WebGL upload totals but did not improve startup
   latency. Do not broaden warmup from the rejected fanPalm evidence without a
   paired proof.
+- KB-FORGE `local-pixel-forge-asset-pipeline`: local liaison bureau.
+  Pixel Forge is our sibling repo at
+  `C:\Users\Mattm\X\games-3d\pixel-forge`, not a third-party asset source.
+  Use `npm run check:projekt-143-pixel-forge` from TIJ to catalog its TIJ
+  pipeline commands, review gallery, output manifest, NPC package surface, and
+  vegetation package state. KB-FORGE should analyze relevance and package
+  readiness before KB-TERRAIN or KB-OPTIK imports anything into runtime.
 - KB-TERRAIN `large-mode-vegetation-horizon`: `ready_for_branch`.
   The first far-horizon branch must use the terrain baseline before/after
   screenshot path and matched Open Frontier/A Shau perf captures.
@@ -111,13 +120,15 @@ ledger; this file is the short operational prompt.
   `coconut`); spend the freed vegetation budget on grass or other ground cover;
   increase big palms and ground vegetation; and make bamboo scattered dense
   clusters rather than the dominant forest layer. Also add a source-pipeline
-  investigation for EZ Tree or a similar licensed procedural/tree workflow.
-  The current review in
+  investigation for EZ Tree or a similar licensed procedural/tree workflow as
+  optional source input to Pixel Forge, not as a replacement for the local
+  pipeline. The current review in
   `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md` recommends Dan
-  Greenheck's `EZ-Tree` as the first offline GLB-generation pilot for tree
-  families, while grass, ground cover, and trail-edge assets should come from a
-  licensed asset-library review or custom low-card bake. Every candidate must
-  be baked through Pixel Forge-compatible impostors/LODs before runtime import.
+  Greenheck's `EZ-Tree` as a possible offline GLB-generation pilot for tree
+  families, while grass, ground cover, and trail-edge assets should start with
+  Pixel Forge catalog/review work, a licensed asset-library review, or custom
+  low-card bake. Every candidate must be baked through Pixel Forge-compatible
+  impostors/LODs before runtime import.
   The first
   material-distribution pass removes broad highland/cleared/bamboo elevation
   caps as primary terrain rules and keeps rock available as a slope-gated
