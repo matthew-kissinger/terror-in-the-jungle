@@ -108,6 +108,10 @@ export interface MovementArtifactTrackPoint {
   z: number
   tMs: number
   intent?: MovementIntentTelemetryKey
+  requestedSpeed?: number
+  actualSpeed?: number
+  wantsMovement?: boolean
+  blockedByTerrain?: boolean
 }
 
 export interface MovementArtifactTrack {

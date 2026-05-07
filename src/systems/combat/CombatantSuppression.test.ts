@@ -237,7 +237,7 @@ describe('CombatantSuppression', () => {
       expect(combatant.panicLevel).toBeGreaterThan(0);
     });
 
-    it('triggers cover seeking after multiple near misses', () => {
+    it('records heavy suppression without entering orphan cover seeking', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
         faction: Faction.NVA,
@@ -245,6 +245,33 @@ describe('CombatantSuppression', () => {
         state: CombatantState.ENGAGING,
         panicLevel: 0.7,
         nearMissCount: 2,
+      });
+
+      const allCombatants = new Map([['enemy-1', combatant]]);
+      const shotRay = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+      const hitPoint = new THREE.Vector3(0, 0, 0);
+
+      vi.mocked(spatialGridManager.queryRadius).mockReturnValue(['enemy-1']);
+
+      suppression.trackNearMisses(shotRay, hitPoint, Faction.US, allCombatants);
+
+      expect(combatant.nearMissCount).toBe(3);
+      expect(combatant.suppressionLevel).toBeGreaterThan(0);
+      expect(combatant.panicLevel).toBeGreaterThan(0.7);
+      expect(combatant.state).toBe(CombatantState.ENGAGING);
+    });
+
+    it('can enter cover seeking when a concrete cover anchor already exists', () => {
+      const cover = new THREE.Vector3(5, 0, 5);
+      const combatant = createMockCombatant({
+        id: 'enemy-1',
+        faction: Faction.NVA,
+        position: new THREE.Vector3(1, 0, 0),
+        state: CombatantState.ENGAGING,
+        panicLevel: 0.7,
+        nearMissCount: 2,
+        coverPosition: cover,
+        destinationPoint: cover.clone(),
       });
 
       const allCombatants = new Map([['enemy-1', combatant]]);

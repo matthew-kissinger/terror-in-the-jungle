@@ -70,6 +70,32 @@ describe('TerrainBiomeRuntimeConfig', () => {
     }
   });
 
+  it('can include hydrology-only material biomes even when no elevation rule references them', () => {
+    const textureByName = new Map<string, THREE.Texture>();
+    for (const biomeId of ['denseJungle', 'swamp', 'riverbank', 'highland']) {
+      textureByName.set(getBiome(biomeId).groundTexture, new THREE.Texture());
+    }
+    const assetLoader = {
+      getTexture(name: string): THREE.Texture | undefined {
+        return textureByName.get(name);
+      },
+    };
+
+    const materialConfig = buildTerrainBiomeMaterialConfig(
+      assetLoader as any,
+      'denseJungle',
+      [],
+      ['swamp', 'riverbank'],
+    );
+
+    expect(materialConfig.layers.map((layer) => layer.biomeId)).toEqual([
+      'denseJungle',
+      'swamp',
+      'riverbank',
+      'highland',
+    ]);
+  });
+
   it('creates live terrain materials for every shipped game mode', () => {
     const textureByName = new Map<string, THREE.Texture>();
     for (const mode of ALL_GAME_MODES) {

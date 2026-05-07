@@ -5,7 +5,7 @@
     {
       "modeId": "open_frontier",
       "seed": 42,
-      "signature": "navmesh-bake-v1-158a9d9d4cbc50",
+      "signature": "navmesh-bake-v1-168bb0f3123733",
       "navmeshAsset": "/data/navmesh/open_frontier-42.bin",
       "heightmapAsset": "/data/heightmaps/open_frontier-42.f32",
       "worldSize": 3200,
@@ -18,7 +18,7 @@
     {
       "modeId": "zone_control",
       "seed": 42,
-      "signature": "navmesh-bake-v1-02499b04647ced",
+      "signature": "navmesh-bake-v1-1077c5a14f3ef7",
       "navmeshAsset": "/data/navmesh/zone_control-42.bin",
       "heightmapAsset": "/data/heightmaps/zone_control-42.f32",
       "worldSize": 800,
@@ -30,7 +30,7 @@
     {
       "modeId": "zone_control",
       "seed": 137,
-      "signature": "navmesh-bake-v1-1133788361d6a9",
+      "signature": "navmesh-bake-v1-0b3e8d985bb000",
       "navmeshAsset": "/data/navmesh/zone_control-137.bin",
       "heightmapAsset": "/data/heightmaps/zone_control-137.f32",
       "worldSize": 800,
@@ -42,7 +42,7 @@
     {
       "modeId": "zone_control",
       "seed": 2718,
-      "signature": "navmesh-bake-v1-01a764dad540ad",
+      "signature": "navmesh-bake-v1-0af3b5288085b0",
       "navmeshAsset": "/data/navmesh/zone_control-2718.bin",
       "heightmapAsset": "/data/heightmaps/zone_control-2718.f32",
       "worldSize": 800,
@@ -54,7 +54,7 @@
     {
       "modeId": "tdm",
       "seed": 42,
-      "signature": "navmesh-bake-v1-0da185ea38515d",
+      "signature": "navmesh-bake-v1-0eb6a67c59cc6f",
       "navmeshAsset": "/data/navmesh/tdm-42.bin",
       "heightmapAsset": "/data/heightmaps/tdm-42.f32",
       "worldSize": 400,
@@ -66,7 +66,7 @@
     {
       "modeId": "tdm",
       "seed": 137,
-      "signature": "navmesh-bake-v1-091e864f1deb72",
+      "signature": "navmesh-bake-v1-1d9224d7be4bec",
       "navmeshAsset": "/data/navmesh/tdm-137.bin",
       "heightmapAsset": "/data/heightmaps/tdm-137.f32",
       "worldSize": 400,
@@ -78,7 +78,7 @@
     {
       "modeId": "tdm",
       "seed": 2718,
-      "signature": "navmesh-bake-v1-022bb3741ab0b9",
+      "signature": "navmesh-bake-v1-088d630bc714d4",
       "navmeshAsset": "/data/navmesh/tdm-2718.bin",
       "heightmapAsset": "/data/heightmaps/tdm-2718.f32",
       "worldSize": 400,

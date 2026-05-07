@@ -7,6 +7,7 @@ import { AssetLoader } from '../assets/AssetLoader';
 import { getAssetPath } from '../../config/paths';
 import { WeatherSystem } from './WeatherSystem';
 import { playElementAnimation } from '../../ui/engine/playElementAnimation';
+import type { HydrologyBakeArtifact } from '../terrain/hydrology/HydrologyBake';
 
 interface WaterUniforms {
   time?: { value: number };
@@ -16,10 +17,59 @@ interface WaterUniforms {
   [key: string]: { value: any } | undefined;
 }
 
+interface HydrologyRiverMeshStats {
+  channelCount: number;
+  segmentCount: number;
+  vertexCount: number;
+  totalLengthMeters: number;
+  maxAccumulationCells: number;
+}
+
+interface WaterDebugInfo {
+  enabled: boolean;
+  waterLevel: number;
+  waterVisible: boolean;
+  cameraUnderwater: boolean;
+  size: number;
+  hydrologyRiverMaterialProfile: string;
+  hydrologyRiverVisible: boolean;
+  hydrologyChannelCount: number;
+  hydrologySegmentCount: number;
+  hydrologyVertexCount: number;
+  hydrologyTotalLengthMeters: number;
+  hydrologyMaxAccumulationCells: number;
+}
+
+const EMPTY_HYDROLOGY_RIVER_STATS: HydrologyRiverMeshStats = {
+  channelCount: 0,
+  segmentCount: 0,
+  vertexCount: 0,
+  totalLengthMeters: 0,
+  maxAccumulationCells: 0,
+};
+
+const MAX_HYDROLOGY_RIVER_CHANNELS = 24;
+const MAX_HYDROLOGY_RIVER_SEGMENTS = 2048;
+const HYDROLOGY_RIVER_SURFACE_OFFSET_METERS = 0.35;
+const HYDROLOGY_RIVER_MIN_SEGMENT_LENGTH_METERS = 0.5;
+const GLOBAL_WATER_COLOR = 0x17362f;
+const GLOBAL_WATER_DISTORTION_SCALE = 2.35;
+const GLOBAL_WATER_ALPHA = 0.78;
+const GLOBAL_WATER_TIME_SCALE = 0.36;
+const HYDROLOGY_RIVER_MATERIAL_PROFILE = 'natural_channel_gradient';
+const HYDROLOGY_RIVER_BANK_COLOR = new THREE.Color(0x23382e);
+const HYDROLOGY_RIVER_SHALLOW_COLOR = new THREE.Color(0x1e4e52);
+const HYDROLOGY_RIVER_DEEP_COLOR = new THREE.Color(0x0b2a34);
+const HYDROLOGY_RIVER_BANK_ALPHA = 0.01;
+const HYDROLOGY_RIVER_CENTER_ALPHA = 0.32;
+
 export class WaterSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
   private water?: Water;
+  private hydrologyRiverGroup?: THREE.Group;
+  private hydrologyRiverMesh?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  private hydrologyRiverStats: HydrologyRiverMeshStats = { ...EMPTY_HYDROLOGY_RIVER_STATS };
   private assetLoader: AssetLoader;
   private weatherSystem?: WeatherSystem;
   private atmosphereSystem?: ISkyRuntime;
@@ -103,10 +153,10 @@ export class WaterSystem implements GameSystem {
       waterNormals: waterNormals,
       sunDirection: new THREE.Vector3(),
       sunColor: 0xffffff,
-      waterColor: 0x001e0f, // Deep blue-green
-      distortionScale: 3.7,
+      waterColor: GLOBAL_WATER_COLOR,
+      distortionScale: GLOBAL_WATER_DISTORTION_SCALE,
       fog: this.scene.fog !== undefined,
-      alpha: 0.9, // Slight transparency
+      alpha: GLOBAL_WATER_ALPHA,
     });
 
     // Rotate to be horizontal (Water defaults to vertical)
@@ -152,20 +202,21 @@ export class WaterSystem implements GameSystem {
   update(deltaTime: number): void {
     if (!this.water) return;
 
-    if (!this.enabled) {
+    if (!this.isGlobalWaterPlaneActive()) {
       this.setUnderwaterState(false);
-      return;
     }
 
-    // Update water time for wave animation
-    const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
-    if (waterUniforms && waterUniforms.time) {
-      waterUniforms.time.value += deltaTime * 0.5; // Slower wave speed
-    }
+    if (this.water.visible) {
+      // Update water time for wave animation
+      const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
+      if (waterUniforms && waterUniforms.time) {
+        waterUniforms.time.value += deltaTime * GLOBAL_WATER_TIME_SCALE;
+      }
 
-    // Keep ocean centered under camera so map-edge seams are not visible in large worlds.
-    this.water.position.x = this.camera.position.x;
-    this.water.position.z = this.camera.position.z;
+      // Keep ocean centered under camera so map-edge seams are not visible in large worlds.
+      this.water.position.x = this.camera.position.x;
+      this.water.position.z = this.camera.position.z;
+    }
 
     // Pull the current sun direction from the atmosphere each frame so the
     // water specular highlight tracks TOD presets (dawn/noon/dusk) and
@@ -178,7 +229,7 @@ export class WaterSystem implements GameSystem {
   }
 
   private checkUnderwaterState(): void {
-    const isUnderwater = this.enabled && this.camera.position.y < this.WATER_LEVEL;
+    const isUnderwater = this.isGlobalWaterPlaneActive() && this.camera.position.y < this.WATER_LEVEL;
     this.setUnderwaterState(isUnderwater);
   }
 
@@ -221,6 +272,8 @@ export class WaterSystem implements GameSystem {
   }
 
   dispose(): void {
+    this.clearHydrologyChannels();
+
     if (this.water) {
       this.scene.remove(this.water);
       this.water.geometry.dispose();
@@ -260,7 +313,7 @@ export class WaterSystem implements GameSystem {
    * Check if a position is underwater
    */
   isUnderwater(position: THREE.Vector3): boolean {
-    return this.enabled && position.y < this.WATER_LEVEL;
+    return this.isGlobalWaterPlaneActive() && position.y < this.WATER_LEVEL;
   }
   
   /**
@@ -293,9 +346,7 @@ export class WaterSystem implements GameSystem {
    */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    if (this.water) {
-      this.water.visible = enabled;
-    }
+    this.updateGlobalWaterVisibility();
     if (this.overlay) {
       if (!enabled) {
         this.overlay.style.display = 'none';
@@ -311,14 +362,52 @@ export class WaterSystem implements GameSystem {
     return this.enabled;
   }
 
-  getDebugInfo(): { enabled: boolean; waterLevel: number; waterVisible: boolean; cameraUnderwater: boolean; size: number } {
+  getDebugInfo(): WaterDebugInfo {
     return {
       enabled: this.enabled,
       waterLevel: this.WATER_LEVEL,
       waterVisible: Boolean(this.water?.visible),
-      cameraUnderwater: this.enabled && this.camera.position.y < this.WATER_LEVEL,
+      cameraUnderwater: this.isGlobalWaterPlaneActive() && this.camera.position.y < this.WATER_LEVEL,
       size: this.worldWaterSize,
+      hydrologyRiverMaterialProfile: this.hydrologyRiverMesh ? HYDROLOGY_RIVER_MATERIAL_PROFILE : 'none',
+      hydrologyRiverVisible: Boolean(this.hydrologyRiverGroup?.visible),
+      hydrologyChannelCount: this.hydrologyRiverStats.channelCount,
+      hydrologySegmentCount: this.hydrologyRiverStats.segmentCount,
+      hydrologyVertexCount: this.hydrologyRiverStats.vertexCount,
+      hydrologyTotalLengthMeters: this.hydrologyRiverStats.totalLengthMeters,
+      hydrologyMaxAccumulationCells: this.hydrologyRiverStats.maxAccumulationCells,
     };
+  }
+
+  /**
+   * Add map-space river and stream surfaces generated from an accepted
+   * hydrology bake. This is separate from the global water plane so A Shau can
+   * keep the sea-level plane disabled while still drawing DEM-following water.
+   */
+  setHydrologyChannels(artifact: HydrologyBakeArtifact | null): void {
+    this.clearHydrologyChannels();
+    if (!artifact || artifact.channelPolylines.length === 0) {
+      return;
+    }
+
+    const meshBuild = this.buildHydrologyRiverMesh(artifact);
+    if (!meshBuild) {
+      return;
+    }
+
+    const group = new THREE.Group();
+    group.name = 'hydrology-river-surfaces';
+    group.add(meshBuild.mesh);
+    this.scene.add(group);
+
+    this.hydrologyRiverGroup = group;
+    this.hydrologyRiverMesh = meshBuild.mesh;
+    this.hydrologyRiverStats = meshBuild.stats;
+    this.updateGlobalWaterVisibility();
+    Logger.info(
+      'environment',
+      `Hydrology river surfaces loaded: ${meshBuild.stats.channelCount} channels, ${meshBuild.stats.segmentCount} segments`,
+    );
   }
 
   /**
@@ -339,4 +428,198 @@ export class WaterSystem implements GameSystem {
     const scale = this.worldWaterSize / this.BASE_WATER_SIZE;
     this.water.scale.set(scale, 1, scale);
   }
+
+  private clearHydrologyChannels(): void {
+    if (this.hydrologyRiverGroup) {
+      this.scene.remove(this.hydrologyRiverGroup);
+    }
+    if (this.hydrologyRiverMesh) {
+      this.hydrologyRiverMesh.geometry.dispose();
+      this.hydrologyRiverMesh.material.dispose();
+    }
+    this.hydrologyRiverGroup = undefined;
+    this.hydrologyRiverMesh = undefined;
+    this.hydrologyRiverStats = { ...EMPTY_HYDROLOGY_RIVER_STATS };
+    this.updateGlobalWaterVisibility();
+  }
+
+  private isGlobalWaterPlaneActive(): boolean {
+    return this.enabled && !this.hydrologyRiverGroup;
+  }
+
+  private updateGlobalWaterVisibility(): void {
+    if (this.water) {
+      this.water.visible = this.isGlobalWaterPlaneActive();
+    }
+  }
+
+  private buildHydrologyRiverMesh(
+    artifact: HydrologyBakeArtifact,
+  ): { mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>; stats: HydrologyRiverMeshStats } | null {
+    const geometryBuild = this.buildHydrologyRiverGeometry(artifact);
+    if (!geometryBuild) return null;
+
+    const material = new THREE.MeshStandardMaterial({
+      name: 'hydrology-river-surface-material',
+      color: 0xffffff,
+      emissive: 0x000000,
+      emissiveIntensity: 0.02,
+      roughness: 0.54,
+      metalness: 0,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      vertexColors: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -2,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geometryBuild.geometry, material);
+    mesh.name = 'hydrology-river-surface-mesh';
+    mesh.frustumCulled = true;
+    mesh.renderOrder = 2;
+    return { mesh, stats: geometryBuild.stats };
+  }
+
+  private buildHydrologyRiverGeometry(
+    artifact: HydrologyBakeArtifact,
+  ): { geometry: THREE.BufferGeometry; stats: HydrologyRiverMeshStats } | null {
+    const sortedChannels = [...artifact.channelPolylines]
+      .sort((a, b) => b.maxAccumulationCells - a.maxAccumulationCells || b.lengthMeters - a.lengthMeters)
+      .slice(0, MAX_HYDROLOGY_RIVER_CHANNELS);
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [];
+    const colors: number[] = [];
+    const indices: number[] = [];
+    let segmentCount = 0;
+    let totalLengthMeters = 0;
+    let maxAccumulationCells = 0;
+
+    for (const channel of sortedChannels) {
+      const points = channel.points;
+      if (points.length < 2) continue;
+      maxAccumulationCells = Math.max(maxAccumulationCells, channel.maxAccumulationCells);
+      let channelDistanceMeters = 0;
+
+      for (let index = 0; index < points.length - 1; index++) {
+        if (segmentCount >= MAX_HYDROLOGY_RIVER_SEGMENTS) break;
+        const start = points[index];
+        const end = points[index + 1];
+        if (!start || !end) continue;
+
+        const dx = end.x - start.x;
+        const dz = end.z - start.z;
+        const length = Math.hypot(dx, dz);
+        if (length < HYDROLOGY_RIVER_MIN_SEGMENT_LENGTH_METERS) continue;
+
+        const accumulationCells = Math.max(start.accumulationCells, end.accumulationCells, channel.maxAccumulationCells);
+        const width = this.resolveHydrologyRiverWidth(accumulationCells, artifact);
+        const flowFactor = this.resolveHydrologyRiverAccumulationFactor(accumulationCells, artifact);
+        const halfWidth = width * 0.5;
+        const normalX = -dz / length;
+        const normalZ = dx / length;
+        const startY = start.elevationMeters + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS;
+        const endY = end.elevationMeters + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS;
+        const vertexBase = positions.length / 3;
+        const uvStartV = channelDistanceMeters / Math.max(width, 1);
+        channelDistanceMeters += length;
+        const uvEndV = channelDistanceMeters / Math.max(width, 1);
+        const bankColor = HYDROLOGY_RIVER_BANK_COLOR.clone()
+          .lerp(HYDROLOGY_RIVER_SHALLOW_COLOR, 0.18 + flowFactor * 0.22);
+        const centerColor = HYDROLOGY_RIVER_SHALLOW_COLOR.clone()
+          .lerp(HYDROLOGY_RIVER_DEEP_COLOR, 0.48 + flowFactor * 0.38);
+
+        positions.push(
+          start.x + normalX * halfWidth, startY, start.z + normalZ * halfWidth,
+          start.x, startY, start.z,
+          start.x - normalX * halfWidth, startY, start.z - normalZ * halfWidth,
+          end.x + normalX * halfWidth, endY, end.z + normalZ * halfWidth,
+          end.x, endY, end.z,
+          end.x - normalX * halfWidth, endY, end.z - normalZ * halfWidth,
+        );
+        normals.push(0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0);
+        uvs.push(0, uvStartV, 0.5, uvStartV, 1, uvStartV, 0, uvEndV, 0.5, uvEndV, 1, uvEndV);
+        pushHydrologyRiverColor(colors, bankColor, HYDROLOGY_RIVER_BANK_ALPHA);
+        pushHydrologyRiverColor(colors, centerColor, HYDROLOGY_RIVER_CENTER_ALPHA);
+        pushHydrologyRiverColor(colors, bankColor, HYDROLOGY_RIVER_BANK_ALPHA);
+        pushHydrologyRiverColor(colors, bankColor, HYDROLOGY_RIVER_BANK_ALPHA);
+        pushHydrologyRiverColor(colors, centerColor, HYDROLOGY_RIVER_CENTER_ALPHA);
+        pushHydrologyRiverColor(colors, bankColor, HYDROLOGY_RIVER_BANK_ALPHA);
+        indices.push(
+          vertexBase,
+          vertexBase + 3,
+          vertexBase + 1,
+          vertexBase + 3,
+          vertexBase + 4,
+          vertexBase + 1,
+          vertexBase + 1,
+          vertexBase + 4,
+          vertexBase + 2,
+          vertexBase + 4,
+          vertexBase + 5,
+          vertexBase + 2,
+        );
+
+        segmentCount++;
+        totalLengthMeters += length;
+      }
+      if (segmentCount >= MAX_HYDROLOGY_RIVER_SEGMENTS) break;
+    }
+
+    if (segmentCount === 0) {
+      return null;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+    geometry.setIndex(indices);
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+
+    return {
+      geometry,
+      stats: {
+        channelCount: sortedChannels.filter(channel => channel.points.length >= 2).length,
+        segmentCount,
+        vertexCount: positions.length / 3,
+        totalLengthMeters,
+        maxAccumulationCells,
+      },
+    };
+  }
+
+  private resolveHydrologyRiverWidth(accumulationCells: number, artifact: HydrologyBakeArtifact): number {
+    const cellSize = artifact.cellSizeMeters;
+    const minWidth = clamp(cellSize * 0.045, 2, 4);
+    const maxWidth = clamp(cellSize * 0.12, 5, 10);
+    const t = this.resolveHydrologyRiverAccumulationFactor(accumulationCells, artifact);
+    return minWidth + (maxWidth - minWidth) * t;
+  }
+
+  private resolveHydrologyRiverAccumulationFactor(
+    accumulationCells: number,
+    artifact: HydrologyBakeArtifact,
+  ): number {
+    const p98 = Math.max(1, artifact.thresholds.accumulationP98Cells);
+    const p99 = Math.max(p98 + 1, artifact.thresholds.accumulationP99Cells);
+    return clamp(
+      (Math.log1p(Math.max(0, accumulationCells)) - Math.log1p(p98))
+      / Math.max(0.001, Math.log1p(p99) - Math.log1p(p98)),
+      0,
+      1,
+    );
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function pushHydrologyRiverColor(colors: number[], color: THREE.Color, alpha: number): void {
+  colors.push(color.r, color.g, color.b, alpha);
 }

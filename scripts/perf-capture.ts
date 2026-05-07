@@ -147,6 +147,7 @@ type RuntimeSample = {
     budgetMs: number;
     timeMs: number;
     pendingUnits: number;
+    debug?: Record<string, unknown>;
   }>;
   movement?: {
     player: {
@@ -213,7 +214,63 @@ type RuntimeSample = {
     waypointReplanFailures?: number;
     waypointCount?: number;
     waypointIdx?: number;
+    routeTargetResets?: number;
+    routeNoProgressResets?: number;
     movementTransitions?: number;
+    objectiveKind?: string | null;
+    objectiveDistance?: number | null;
+    objectiveZoneId?: string | null;
+    nearestOpforDistance?: number | null;
+    nearestPerceivedEnemyDistance?: number | null;
+    currentTargetDistance?: number | null;
+    pathTargetKind?: string | null;
+    pathTargetDistance?: number | null;
+    pathQueryStatus?: string | null;
+    pathLength?: number | null;
+    pathFailureReason?: string | null;
+    pathQueryDistance?: number | null;
+    pathStartSnapped?: boolean | null;
+    pathEndSnapped?: boolean | null;
+    pathStartSnapDistance?: number | null;
+    pathEndSnapDistance?: number | null;
+    routeProgressDistance?: number | null;
+    routeProgressAgeMs?: number | null;
+    routeProgressTravelMeters?: number | null;
+    firstObjectiveDistance?: number | null;
+    minObjectiveDistance?: number | null;
+    objectiveDistanceClosed?: number | null;
+    playerDistanceMoved?: number | null;
+    movementIntentCalls?: number | null;
+    nonZeroMovementIntentCalls?: number | null;
+    lastMovementIntent?: Record<string, unknown> | null;
+    lastNonZeroMovementIntent?: Record<string, unknown> | null;
+    runtimeLiveness?: {
+      engineFrameCount: number;
+      harnessRafTicks: number;
+      documentHidden: boolean | null;
+      visibilityState: string | null;
+      gameStarted: boolean;
+      playerInHelicopter: boolean;
+      playerInFixedWing: boolean;
+      playerInVehicle: boolean;
+      playerSpectating: boolean;
+      playerPositionX: number | null;
+      playerPositionY: number | null;
+      playerPositionZ: number | null;
+      playerVelocityX: number;
+      playerVelocityY: number;
+      playerVelocityZ: number;
+      playerMovementSamples: number;
+      playerAvgRequestedSpeed: number;
+      playerAvgActualSpeed: number;
+      playerBlockedByTerrain: number;
+      terrainHeightAtPlayer: number | null;
+      effectiveHeightAtPlayer: number | null;
+      collisionHeightDeltaAtPlayer: number | null;
+      collisionContributorsAtPlayer: Array<Record<string, unknown>>;
+      playerMovementDebug: Record<string, unknown> | null;
+    } | null;
+    perceptionRange?: number | null;
     // Match-end lifecycle (harness-lifecycle-halt-on-match-end). Wall-clock ms
     // at which the harness driver first observed the match end; null while the
     // match is still active. Drives early capture finalization.
@@ -240,6 +297,8 @@ type HarnessDriverFinal = {
   aimDotGateRejectedShots: number;
   waypointsFollowedCount: number;
   waypointReplanFailures: number;
+  routeTargetResets?: number;
+  routeNoProgressResets?: number;
   shotsFired: number;
   reloadsIssued: number;
   // Final values surfaced by the active driver's stop() call. These
@@ -254,6 +313,39 @@ type HarnessDriverFinal = {
   engineShotsHit: number;
   botState: string;
   stateHistogramMs: Record<string, number>;
+  objectiveKind?: string | null;
+  objectiveDistance?: number | null;
+  objectiveZoneId?: string | null;
+  nearestOpforDistance?: number | null;
+  nearestPerceivedEnemyDistance?: number | null;
+  currentTargetDistance?: number | null;
+  pathTargetKind?: string | null;
+  pathTargetDistance?: number | null;
+  pathQueryStatus?: string | null;
+  pathLength?: number | null;
+  pathFailureReason?: string | null;
+  pathQueryDistance?: number | null;
+  pathStartSnapped?: boolean | null;
+  pathEndSnapped?: boolean | null;
+  pathStartSnapDistance?: number | null;
+  pathEndSnapDistance?: number | null;
+  routeProgressDistance?: number | null;
+  routeProgressAgeMs?: number | null;
+  routeProgressTravelMeters?: number | null;
+  firstObjectiveDistance?: number | null;
+  minObjectiveDistance?: number | null;
+  objectiveDistanceClosed?: number | null;
+  playerDistanceMoved?: number | null;
+  movementIntentCalls?: number | null;
+  nonZeroMovementIntentCalls?: number | null;
+  lastMovementIntent?: Record<string, unknown> | null;
+  lastNonZeroMovementIntent?: Record<string, unknown> | null;
+  runtimeLiveness?: RuntimeSample['harnessDriver'] extends infer Driver
+    ? Driver extends { runtimeLiveness?: infer Liveness }
+      ? Liveness
+      : never
+    : never;
+  perceptionRange?: number | null;
 };
 
 type CaptureSummary = {
@@ -281,6 +373,7 @@ type CaptureSummary = {
     sampleCount: number;
     sampleIntervalMs: number;
     detailEverySamples: number;
+    missedSampleErrors?: Record<string, number>;
   };
   measurementTrust: MeasurementTrustReport;
   sceneAttribution?: SceneAttributionEntry[];
@@ -373,9 +466,13 @@ type SceneAttributionEntry = {
   objects: number;
   visibleObjects: number;
   meshes: number;
+  visibleMeshes?: number;
   instancedMeshes: number;
+  visibleInstancedMeshes?: number;
   drawCallLike: number;
+  visibleDrawCallLike?: number;
   instances: number;
+  visibleInstances?: number;
   triangles: number;
   visibleTriangles: number;
   materials: number;
@@ -427,6 +524,7 @@ const LOCK_FILE = join(process.cwd(), 'tmp', 'perf-capture.lock');
 const CDP_STOP_TIMEOUT_MS = 3_000;
 const TRACE_STOP_TIMEOUT_MS = 5_000;
 const SCENARIO_SETUP_TIMEOUT_MS = 10_000;
+const POST_CAPTURE_HARD_TIMEOUT_MS = 120_000;
 const PERF_SERVER_HOST = '127.0.0.1';
 // harness-lifecycle-halt-on-match-end: load the pure helpers from the driver's
 // CJS surface so the regression test (scripts/perf-harness/...) and the live
@@ -571,6 +669,49 @@ function parseNumberFlag(name: string, fallback: number): number {
   return fallback;
 }
 
+function nullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function objectOrNull(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+}
+
+function normalizeRuntimeLiveness(value: unknown): NonNullable<RuntimeSample['harnessDriver']>['runtimeLiveness'] {
+  const raw = objectOrNull(value);
+  if (!raw) return null;
+  return {
+    engineFrameCount: Number(raw.engineFrameCount ?? 0),
+    harnessRafTicks: Number(raw.harnessRafTicks ?? 0),
+    documentHidden: typeof raw.documentHidden === 'boolean' ? raw.documentHidden : null,
+    visibilityState: typeof raw.visibilityState === 'string' ? raw.visibilityState : null,
+    gameStarted: Boolean(raw.gameStarted),
+    playerInHelicopter: Boolean(raw.playerInHelicopter),
+    playerInFixedWing: Boolean(raw.playerInFixedWing),
+    playerInVehicle: Boolean(raw.playerInVehicle),
+    playerSpectating: Boolean(raw.playerSpectating),
+    playerPositionX: nullableNumber(raw.playerPositionX),
+    playerPositionY: nullableNumber(raw.playerPositionY),
+    playerPositionZ: nullableNumber(raw.playerPositionZ),
+    playerVelocityX: Number(raw.playerVelocityX ?? 0),
+    playerVelocityY: Number(raw.playerVelocityY ?? 0),
+    playerVelocityZ: Number(raw.playerVelocityZ ?? 0),
+    playerMovementSamples: Number(raw.playerMovementSamples ?? 0),
+    playerAvgRequestedSpeed: Number(raw.playerAvgRequestedSpeed ?? 0),
+    playerAvgActualSpeed: Number(raw.playerAvgActualSpeed ?? 0),
+    playerBlockedByTerrain: Number(raw.playerBlockedByTerrain ?? 0),
+    terrainHeightAtPlayer: nullableNumber(raw.terrainHeightAtPlayer),
+    effectiveHeightAtPlayer: nullableNumber(raw.effectiveHeightAtPlayer),
+    collisionHeightDeltaAtPlayer: nullableNumber(raw.collisionHeightDeltaAtPlayer),
+    collisionContributorsAtPlayer: Array.isArray(raw.collisionContributorsAtPlayer)
+      ? raw.collisionContributorsAtPlayer.filter((entry): entry is Record<string, unknown> => Boolean(entry && typeof entry === 'object'))
+      : [],
+    playerMovementDebug: objectOrNull(raw.playerMovementDebug),
+  };
+}
+
 function parseBooleanFlag(name: string, fallback: boolean): boolean {
   const envName = name.toUpperCase().replace(/-/g, '_');
   const envKeys = [
@@ -631,6 +772,28 @@ function parseStringFlag(name: string, fallback: string): string {
   }
 
   return fallback;
+}
+
+function printUsage(): void {
+  console.log(`Usage: npx tsx scripts/perf-capture.ts [options]
+
+Common options:
+  --mode <ai_sandbox|open_frontier|zone_control|team_deathmatch|a_shau_valley>
+  --npcs <count>
+  --duration <seconds>
+  --warmup <seconds>
+  --seed <number>
+  --sample-interval-ms <ms>
+  --detail-every-samples <count>
+  --runtime-preflight <true|false>
+  --server-mode <perf|dev|preview>
+  --headed
+  --help
+
+Examples:
+  npx tsx scripts/perf-capture.ts --mode open_frontier --npcs 120 --duration 90 --warmup 15 --seed 42
+  npx tsx scripts/perf-capture.ts --mode a_shau_valley --duration 120 --warmup 20 --headed
+`);
 }
 
 function normalizeGameMode(mode: string): 'ai_sandbox' | 'open_frontier' | 'zone_control' | 'team_deathmatch' | 'a_shau_valley' {
@@ -1788,8 +1951,9 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
 
   if (!result) return null;
 
+  const runtimeLiveness = normalizeRuntimeLiveness(result.runtimeLiveness);
   logStep(
-    `🎮 Active driver stopped (respawns=${result.respawnCount}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0}, movementTransitions=${Number(result.movementTransitions ?? 0)}, losRejectedShots=${Number(result.losRejectedShots ?? 0)}, stuckTeleports=${Number(result.stuckTeleportCount ?? 0)}, maxStuckSec=${Number(result.maxStuckSeconds ?? 0).toFixed(1)}, gradientDeflections=${Number(result.gradientProbeDeflections ?? 0)}, waypointsFollowed=${Number(result.waypointsFollowedCount ?? 0)}, waypointReplanFailures=${Number(result.waypointReplanFailures ?? 0)}, kills=${Number(result.kills ?? 0)}, damageDealt=${Number(result.damageDealt ?? 0).toFixed(1)}, damageTaken=${Number(result.damageTaken ?? 0).toFixed(1)}, accuracy=${(Number(result.accuracy ?? 0) * 100).toFixed(1)}%)`
+    `🎮 Active driver stopped (respawns=${result.respawnCount}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0}, movementTransitions=${Number(result.movementTransitions ?? 0)}, losRejectedShots=${Number(result.losRejectedShots ?? 0)}, stuckTeleports=${Number(result.stuckTeleportCount ?? 0)}, stuckWaypointSkips=${Number(result.stuckWaypointSkips ?? 0)}, routeTargetResets=${Number(result.routeTargetResets ?? 0)}, routeNoProgressResets=${Number(result.routeNoProgressResets ?? 0)}, maxStuckSec=${Number(result.maxStuckSeconds ?? 0).toFixed(1)}, gradientDeflections=${Number(result.gradientProbeDeflections ?? 0)}, waypointsFollowed=${Number(result.waypointsFollowedCount ?? 0)}, waypointReplanFailures=${Number(result.waypointReplanFailures ?? 0)}, intent=${Number(result.nonZeroMovementIntentCalls ?? 0)}/${Number(result.movementIntentCalls ?? 0)}, engineFrames=${Number(runtimeLiveness?.engineFrameCount ?? 0)}, raf=${Number(runtimeLiveness?.harnessRafTicks ?? 0)}, playerMoveSamples=${Number(runtimeLiveness?.playerMovementSamples ?? 0)}, kills=${Number(result.kills ?? 0)}, damageDealt=${Number(result.damageDealt ?? 0).toFixed(1)}, damageTaken=${Number(result.damageTaken ?? 0).toFixed(1)}, accuracy=${(Number(result.accuracy ?? 0) * 100).toFixed(1)}%)`
   );
 
   return {
@@ -1801,6 +1965,8 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
     aimDotGateRejectedShots: Number(result.aimDotGateRejectedShots ?? 0),
     waypointsFollowedCount: Number(result.waypointsFollowedCount ?? 0),
     waypointReplanFailures: Number(result.waypointReplanFailures ?? 0),
+    routeTargetResets: Number(result.routeTargetResets ?? 0),
+    routeNoProgressResets: Number(result.routeNoProgressResets ?? 0),
     shotsFired: Number(result.shotsFired ?? 0),
     reloadsIssued: Number(result.reloadsIssued ?? 0),
     damageDealt: Number(result.damageDealt ?? 0),
@@ -1815,6 +1981,49 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
           Object.entries(result.stateHistogramMs).map(([k, v]) => [String(k), Number(v ?? 0)])
         )
       : {},
+    objectiveKind: typeof result.objectiveKind === 'string'
+      ? result.objectiveKind
+      : null,
+    objectiveDistance: nullableNumber(result.objectiveDistance),
+    objectiveZoneId: typeof result.objectiveZoneId === 'string'
+      ? result.objectiveZoneId
+      : null,
+    nearestOpforDistance: nullableNumber(result.nearestOpforDistance),
+    nearestPerceivedEnemyDistance: nullableNumber(result.nearestPerceivedEnemyDistance),
+    currentTargetDistance: nullableNumber(result.currentTargetDistance),
+    pathTargetKind: typeof result.pathTargetKind === 'string'
+      ? result.pathTargetKind
+      : null,
+    pathTargetDistance: nullableNumber(result.pathTargetDistance),
+    pathQueryStatus: typeof result.pathQueryStatus === 'string'
+      ? result.pathQueryStatus
+      : null,
+    pathLength: nullableNumber(result.pathLength),
+    pathFailureReason: typeof result.pathFailureReason === 'string'
+      ? result.pathFailureReason
+      : null,
+    pathQueryDistance: nullableNumber(result.pathQueryDistance),
+    pathStartSnapped: typeof result.pathStartSnapped === 'boolean'
+      ? result.pathStartSnapped
+      : null,
+    pathEndSnapped: typeof result.pathEndSnapped === 'boolean'
+      ? result.pathEndSnapped
+      : null,
+    pathStartSnapDistance: nullableNumber(result.pathStartSnapDistance),
+    pathEndSnapDistance: nullableNumber(result.pathEndSnapDistance),
+    routeProgressDistance: nullableNumber(result.routeProgressDistance),
+    routeProgressAgeMs: nullableNumber(result.routeProgressAgeMs),
+    routeProgressTravelMeters: nullableNumber(result.routeProgressTravelMeters),
+    firstObjectiveDistance: nullableNumber(result.firstObjectiveDistance),
+    minObjectiveDistance: nullableNumber(result.minObjectiveDistance),
+    objectiveDistanceClosed: nullableNumber(result.objectiveDistanceClosed),
+    playerDistanceMoved: nullableNumber(result.playerDistanceMoved),
+    movementIntentCalls: nullableNumber(result.movementIntentCalls),
+    nonZeroMovementIntentCalls: nullableNumber(result.nonZeroMovementIntentCalls),
+    lastMovementIntent: objectOrNull(result.lastMovementIntent),
+    lastNonZeroMovementIntent: objectOrNull(result.lastNonZeroMovementIntent),
+    runtimeLiveness,
+    perceptionRange: nullableNumber(result.perceptionRange),
   };
 }
 
@@ -1866,6 +2075,11 @@ async function stopChromeTracing(cdp: CDPSession): Promise<string> {
 }
 
 async function runCapture(): Promise<void> {
+  if (hasFlag('help') || process.argv.includes('-h')) {
+    printUsage();
+    return;
+  }
+
   const durationSeconds = parseNumberFlag('duration', DEFAULT_DURATION_SECONDS);
   const warmupSeconds = parseNumberFlag('warmup', DEFAULT_WARMUP_SECONDS);
   const npcs = parseNumberFlag('npcs', DEFAULT_NPCS);
@@ -1943,6 +2157,7 @@ async function runCapture(): Promise<void> {
   let sceneAttribution: SceneAttributionEntry[] | null = null;
   const probeRoundTripMs: number[] = [];
   let missedSamples = 0;
+  const missedSampleErrors: Record<string, number> = {};
   let measurementTrust: MeasurementTrustReport | null = null;
   const startedAt = nowIso();
   const combatParam = enableCombat ? '1' : '0';
@@ -2066,6 +2281,18 @@ async function runCapture(): Promise<void> {
     releaseRunLock();
   };
 
+  const armHardTimeout = (timeoutMs: number): void => {
+    if (hardTimeout) {
+      clearTimeout(hardTimeout);
+    }
+    hardTimeout = setTimeout(() => {
+      const reason = `Hard timeout reached at stage=${stage}`;
+      console.error(reason);
+      emergencyShutdown(reason);
+      process.exit(1);
+    }, timeoutMs);
+  };
+
   const handleProcessSignal = (signal: NodeJS.Signals): void => {
     const reason = `Capture interrupted by ${signal} at stage=${stage}`;
     console.error(reason);
@@ -2078,12 +2305,7 @@ async function runCapture(): Promise<void> {
     process.once('SIGINT', handleProcessSignal);
     process.once('SIGTERM', handleProcessSignal);
     signalHandlersInstalled = true;
-    hardTimeout = setTimeout(() => {
-      const reason = `Hard timeout reached at stage=${stage}`;
-      console.error(reason);
-      emergencyShutdown(reason);
-      process.exit(1);
-    }, runHardTimeoutMs);
+    armHardTimeout(runHardTimeoutMs);
 
     stage = 'start-server';
     if (reuseServer && await isPortOpen(port)) {
@@ -2122,8 +2344,12 @@ async function runCapture(): Promise<void> {
         '--disable-renderer-backgrounding',
         '--disable-frame-rate-limit',
         '--enable-precise-memory-info',
+        '--window-position=0,0',
+        '--window-size=1920,1080',
+        '--force-device-scale-factor=1',
       ],
-      viewport: { width: 1920, height: 1080 }
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 1,
     });
     stage = 'start-playwright-trace';
     if (playwrightTrace) {
@@ -2138,6 +2364,61 @@ async function runCapture(): Promise<void> {
     await withTimeout(
       'install browser perf observers',
       page.addInitScript({ path: join(process.cwd(), 'scripts', 'perf-browser-observers.js') }),
+      STEP_TIMEOUT_MS
+    );
+    await withTimeout(
+      'install browser sample helpers',
+      page.addInitScript({
+        content: `
+          (() => {
+            const nullableNumber = function(value) {
+              if (value === null || value === undefined || value === '') return null;
+              const parsed = Number(value);
+              return Number.isFinite(parsed) ? parsed : null;
+            };
+            const objectOrNull = function(value) {
+              return value && typeof value === 'object' ? value : null;
+            };
+            const normalizeRuntimeLiveness = function(value) {
+              const raw = objectOrNull(value);
+              if (!raw) return null;
+              return {
+                engineFrameCount: Number(raw.engineFrameCount ?? 0),
+                harnessRafTicks: Number(raw.harnessRafTicks ?? 0),
+                documentHidden: typeof raw.documentHidden === 'boolean' ? raw.documentHidden : null,
+                visibilityState: typeof raw.visibilityState === 'string' ? raw.visibilityState : null,
+                gameStarted: Boolean(raw.gameStarted),
+                playerInHelicopter: Boolean(raw.playerInHelicopter),
+                playerInFixedWing: Boolean(raw.playerInFixedWing),
+                playerInVehicle: Boolean(raw.playerInVehicle),
+                playerSpectating: Boolean(raw.playerSpectating),
+                playerPositionX: nullableNumber(raw.playerPositionX),
+                playerPositionY: nullableNumber(raw.playerPositionY),
+                playerPositionZ: nullableNumber(raw.playerPositionZ),
+                playerVelocityX: Number(raw.playerVelocityX ?? 0),
+                playerVelocityY: Number(raw.playerVelocityY ?? 0),
+                playerVelocityZ: Number(raw.playerVelocityZ ?? 0),
+                playerMovementSamples: Number(raw.playerMovementSamples ?? 0),
+                playerAvgRequestedSpeed: Number(raw.playerAvgRequestedSpeed ?? 0),
+                playerAvgActualSpeed: Number(raw.playerAvgActualSpeed ?? 0),
+                playerBlockedByTerrain: Number(raw.playerBlockedByTerrain ?? 0),
+                terrainHeightAtPlayer: nullableNumber(raw.terrainHeightAtPlayer),
+                effectiveHeightAtPlayer: nullableNumber(raw.effectiveHeightAtPlayer),
+                collisionHeightDeltaAtPlayer: nullableNumber(raw.collisionHeightDeltaAtPlayer),
+                collisionContributorsAtPlayer: Array.isArray(raw.collisionContributorsAtPlayer)
+                  ? raw.collisionContributorsAtPlayer.filter((entry) => Boolean(entry && typeof entry === 'object'))
+                  : [],
+                playerMovementDebug: objectOrNull(raw.playerMovementDebug),
+              };
+            };
+            window.__perfCaptureHarnessHelpers = {
+              nullableNumber,
+              objectOrNull,
+              normalizeRuntimeLiveness,
+            };
+          })();
+        `,
+      }),
       STEP_TIMEOUT_MS
     );
     await withTimeout(
@@ -2334,6 +2615,10 @@ async function runCapture(): Promise<void> {
             : null;
           const memory = (performance as any).memory;
           const snapshot = metrics?.getSnapshot?.();
+          const sampleHelpers = (window as any).__perfCaptureHarnessHelpers;
+          const nullableNumber = sampleHelpers.nullableNumber;
+          const objectOrNull = sampleHelpers.objectOrNull;
+          const normalizeRuntimeLiveness = sampleHelpers.normalizeRuntimeLiveness;
           return {
             frameCount: Number(snapshot?.frameCount ?? 0),
             avgFrameMs: Number(snapshot?.avgFrameMs ?? 0),
@@ -2431,6 +2716,9 @@ async function runCapture(): Promise<void> {
                   budgetMs: Number(stream?.budgetMs ?? 0),
                   timeMs: Number(stream?.timeMs ?? 0),
                   pendingUnits: Number(stream?.pendingUnits ?? 0),
+                  ...(stream?.debug && typeof stream.debug === 'object'
+                    ? { debug: stream.debug as Record<string, unknown> }
+                    : {}),
                 }))
               : undefined,
             movement: movement ? {
@@ -2581,10 +2869,53 @@ async function runCapture(): Promise<void> {
               waypointReplanFailures: Number(harnessDriver.waypointReplanFailures ?? 0),
               waypointCount: Number(harnessDriver.waypointCount ?? 0),
               waypointIdx: Number(harnessDriver.waypointIdx ?? 0),
+              routeTargetResets: Number(harnessDriver.routeTargetResets ?? 0),
+              routeNoProgressResets: Number(harnessDriver.routeNoProgressResets ?? 0),
               movementTransitions: Number(harnessDriver.movementTransitions ?? 0),
-              matchEndedAtMs: Number.isFinite(Number(harnessDriver.matchEndedAtMs))
-                ? Number(harnessDriver.matchEndedAtMs)
+              objectiveKind: typeof harnessDriver.objectiveKind === 'string'
+                ? harnessDriver.objectiveKind
                 : null,
+              objectiveDistance: nullableNumber(harnessDriver.objectiveDistance),
+              objectiveZoneId: typeof harnessDriver.objectiveZoneId === 'string'
+                ? harnessDriver.objectiveZoneId
+                : null,
+              nearestOpforDistance: nullableNumber(harnessDriver.nearestOpforDistance),
+              nearestPerceivedEnemyDistance: nullableNumber(harnessDriver.nearestPerceivedEnemyDistance),
+              currentTargetDistance: nullableNumber(harnessDriver.currentTargetDistance),
+              pathTargetKind: typeof harnessDriver.pathTargetKind === 'string'
+                ? harnessDriver.pathTargetKind
+                : null,
+              pathTargetDistance: nullableNumber(harnessDriver.pathTargetDistance),
+              pathQueryStatus: typeof harnessDriver.pathQueryStatus === 'string'
+                ? harnessDriver.pathQueryStatus
+                : null,
+              pathLength: nullableNumber(harnessDriver.pathLength),
+              pathFailureReason: typeof harnessDriver.pathFailureReason === 'string'
+                ? harnessDriver.pathFailureReason
+                : null,
+              pathQueryDistance: nullableNumber(harnessDriver.pathQueryDistance),
+              pathStartSnapped: typeof harnessDriver.pathStartSnapped === 'boolean'
+                ? harnessDriver.pathStartSnapped
+                : null,
+              pathEndSnapped: typeof harnessDriver.pathEndSnapped === 'boolean'
+                ? harnessDriver.pathEndSnapped
+                : null,
+              pathStartSnapDistance: nullableNumber(harnessDriver.pathStartSnapDistance),
+              pathEndSnapDistance: nullableNumber(harnessDriver.pathEndSnapDistance),
+              routeProgressDistance: nullableNumber(harnessDriver.routeProgressDistance),
+              routeProgressAgeMs: nullableNumber(harnessDriver.routeProgressAgeMs),
+              routeProgressTravelMeters: nullableNumber(harnessDriver.routeProgressTravelMeters),
+              firstObjectiveDistance: nullableNumber(harnessDriver.firstObjectiveDistance),
+              minObjectiveDistance: nullableNumber(harnessDriver.minObjectiveDistance),
+              objectiveDistanceClosed: nullableNumber(harnessDriver.objectiveDistanceClosed),
+              playerDistanceMoved: nullableNumber(harnessDriver.playerDistanceMoved),
+              movementIntentCalls: nullableNumber(harnessDriver.movementIntentCalls),
+              nonZeroMovementIntentCalls: nullableNumber(harnessDriver.nonZeroMovementIntentCalls),
+              lastMovementIntent: objectOrNull(harnessDriver.lastMovementIntent),
+              lastNonZeroMovementIntent: objectOrNull(harnessDriver.lastNonZeroMovementIntent),
+              runtimeLiveness: normalizeRuntimeLiveness(harnessDriver.runtimeLiveness),
+              perceptionRange: nullableNumber(harnessDriver.perceptionRange),
+              matchEndedAtMs: nullableNumber(harnessDriver.matchEndedAtMs),
               matchOutcome: typeof harnessDriver.matchOutcome === 'string'
                 ? (harnessDriver.matchOutcome as 'victory' | 'defeat' | 'draw')
                 : null,
@@ -2615,7 +2946,13 @@ async function runCapture(): Promise<void> {
         probeRoundTripMs.push(Date.now() - probeStart);
         sample = { ts: nowIso(), ...raw };
         sampleTick++;
-      } catch {
+      } catch (error) {
+        const rawMessage = error instanceof Error ? error.message : String(error);
+        const message = (rawMessage.split('\n')[0] || 'unknown runtime sample error').slice(0, 220);
+        missedSampleErrors[message] = (missedSampleErrors[message] ?? 0) + 1;
+        if (missedSamples < 3 || missedSamples % 5 === 4) {
+          logStep(`⚠ Runtime sample missed: ${message}`);
+        }
         missedSamples++;
         sampleTick++;
       }
@@ -2644,8 +2981,44 @@ async function runCapture(): Promise<void> {
           : sample.harnessDriver?.movementState
             ? String(sample.harnessDriver.movementState)
             : '';
-        const driverSuffix = driverReason || driverMovement
-          ? ` driver=${driverMovement || 'unknown'} probe=${driverReason || 'unknown'}`
+        const objectiveKind = typeof sample.harnessDriver?.objectiveKind === 'string'
+          ? sample.harnessDriver.objectiveKind
+          : '';
+        const objectiveDistance = Number(sample.harnessDriver?.objectiveDistance);
+        const nearestOpforDistance = Number(sample.harnessDriver?.nearestOpforDistance);
+        const perceivedDistance = Number(sample.harnessDriver?.nearestPerceivedEnemyDistance);
+        const pathTargetKind = typeof sample.harnessDriver?.pathTargetKind === 'string'
+          ? sample.harnessDriver.pathTargetKind
+          : '';
+        const pathTargetDistance = Number(sample.harnessDriver?.pathTargetDistance);
+        const pathQueryStatus = typeof sample.harnessDriver?.pathQueryStatus === 'string'
+          ? sample.harnessDriver.pathQueryStatus
+          : '';
+        const pathFailureReason = typeof sample.harnessDriver?.pathFailureReason === 'string'
+          ? sample.harnessDriver.pathFailureReason
+          : '';
+        const pathStartSnapDistance = nullableNumber(sample.harnessDriver?.pathStartSnapDistance);
+        const pathEndSnapDistance = nullableNumber(sample.harnessDriver?.pathEndSnapDistance);
+        const objectiveSuffix = objectiveKind
+          ? ` obj=${objectiveKind}:${Number.isFinite(objectiveDistance) ? objectiveDistance.toFixed(0) : 'na'}m`
+          : '';
+        const opforSuffix = Number.isFinite(nearestOpforDistance)
+          ? ` opfor=${nearestOpforDistance.toFixed(0)}m`
+          : '';
+        const perceivedSuffix = Number.isFinite(perceivedDistance)
+          ? ` perceived=${perceivedDistance.toFixed(0)}m`
+          : '';
+        const pathSuffix = pathTargetKind || pathQueryStatus
+          ? ` path=${pathTargetKind || 'unknown'}:${Number.isFinite(pathTargetDistance) ? pathTargetDistance.toFixed(0) : 'na'}m/${pathQueryStatus || 'unknown'}`
+          : '';
+        const pathFailureSuffix = pathFailureReason
+          ? ` reason=${pathFailureReason}`
+          : '';
+        const pathSnapSuffix = pathFailureReason && (pathStartSnapDistance !== null || pathEndSnapDistance !== null)
+          ? ` snap=${pathStartSnapDistance !== null ? pathStartSnapDistance.toFixed(1) : 'na'}/${pathEndSnapDistance !== null ? pathEndSnapDistance.toFixed(1) : 'na'}m`
+          : '';
+        const driverSuffix = driverReason || driverMovement || objectiveSuffix || opforSuffix || perceivedSuffix || pathSuffix || pathFailureSuffix
+          ? ` driver=${driverMovement || 'unknown'} probe=${driverReason || 'unknown'}${objectiveSuffix}${opforSuffix}${perceivedSuffix}${pathSuffix}${pathFailureSuffix}${pathSnapSuffix}`
           : '';
         const terrainSuffix = topTerrainStream
           ? ` terrain=${topTerrainStream.name}:${Number(topTerrainStream.timeMs ?? 0).toFixed(2)}ms/${Number(topTerrainStream.budgetMs ?? 0).toFixed(2)}ms pending=${Number(topTerrainStream.pendingUnits ?? 0)}`
@@ -2770,6 +3143,7 @@ async function runCapture(): Promise<void> {
     validation.checks.push(measurementTrustValidationCheck(measurementTrust));
     validation.overall = getOverallStatus(validation.checks);
 
+    armHardTimeout(POST_CAPTURE_HARD_TIMEOUT_MS);
     stage = 'write-artifacts';
     if (page) {
       movementViewerPayload = await safeAwait(
@@ -2910,7 +3284,8 @@ async function runCapture(): Promise<void> {
           probeRoundTripP95Ms: percentile(probeRoundTripMs, 0.95),
           sampleCount: probeRoundTripMs.length,
           sampleIntervalMs,
-          detailEverySamples
+          detailEverySamples,
+          missedSampleErrors: Object.keys(missedSampleErrors).length > 0 ? missedSampleErrors : undefined
         },
         measurementTrust,
         sceneAttribution: sceneAttribution ?? undefined,

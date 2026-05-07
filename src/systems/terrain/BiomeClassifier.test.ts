@@ -46,6 +46,52 @@ describe('BiomeClassifier', () => {
     expect(biomeId).toBe('denseJungle');
   });
 
+  it('uses A Shau dry low flats as ground-cover pockets outside hydrology masks', () => {
+    const terrainConfig = A_SHAU_VALLEY_CONFIG.terrain;
+
+    const biomeId = classifyBiome(
+      520,
+      5,
+      terrainConfig?.biomeRules,
+      terrainConfig?.defaultBiome ?? 'denseJungle',
+    );
+
+    expect(biomeId).toBe('tallGrass');
+  });
+
+  it('keeps A Shau dry lowland shoulders in jungle unless hydrology marks a channel', () => {
+    const terrainConfig = A_SHAU_VALLEY_CONFIG.terrain;
+
+    const biomeId = classifyBiome(
+      660,
+      8,
+      terrainConfig?.biomeRules,
+      terrainConfig?.defaultBiome ?? 'denseJungle',
+    );
+
+    expect(biomeId).toBe('denseJungle');
+  });
+
+  it('keeps A Shau bamboo pockets limited to low flat benches', () => {
+    const terrainConfig = A_SHAU_VALLEY_CONFIG.terrain;
+
+    const grove = classifyBiome(
+      780,
+      6,
+      terrainConfig?.biomeRules,
+      terrainConfig?.defaultBiome ?? 'denseJungle',
+    );
+    const slopeRejected = classifyBiome(
+      780,
+      20,
+      terrainConfig?.biomeRules,
+      terrainConfig?.defaultBiome ?? 'denseJungle',
+    );
+
+    expect(grove).toBe('bambooGrove');
+    expect(slopeRejected).toBe('denseJungle');
+  });
+
   it('keeps procedural mid-elevation ground in jungle instead of broad rocky highland', () => {
     const terrainConfig = OPEN_FRONTIER_CONFIG.terrain;
 

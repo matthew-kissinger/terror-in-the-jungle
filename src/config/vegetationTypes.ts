@@ -72,6 +72,7 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     maxDistance: 250,
     baseDensity: 6.0,
     placement: 'random',
+    maxSlopeDeg: 24,
   },
   elephantEar: {
     maxInstances: 30_000,
@@ -79,6 +80,7 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     maxDistance: 300,
     baseDensity: 0.8,
     placement: 'random',
+    maxSlopeDeg: 22,
   },
   fanPalm: {
     maxInstances: 25_000,
@@ -86,6 +88,7 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     maxDistance: 430,
     baseDensity: 0.8,
     placement: 'random',
+    maxSlopeDeg: 30,
   },
   coconut: {
     maxInstances: 20_000,

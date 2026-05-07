@@ -94,7 +94,21 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
 
   terrain: {
     defaultBiome: 'denseJungle',
-    biomeRules: []
+    biomeRules: [
+      // Wet/channel vegetation is now owned by the baked hydrology mask below.
+      // Base rules stay dry-terrain only so low valley cells are not broadly
+      // mislabeled as swamp or riverbank outside accepted drainage corridors.
+      { biomeId: 'tallGrass', elevationMax: 620, slopeMax: 8, elevationBlendWidth: 60, priority: 4 },
+      { biomeId: 'bambooGrove', elevationMin: 680, elevationMax: 920, slopeMax: 10, elevationBlendWidth: 80, priority: 5 },
+    ],
+    farCanopyTint: {
+      enabled: true,
+      startDistance: 480,
+      endDistance: 3200,
+      strength: 0.56,
+      fogStrength: 0.78,
+      color: [0.09, 0.23, 0.08],
+    },
   },
   terrainFlow: {
     enabled: true,
@@ -112,6 +126,15 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
     homeBaseShoulderTargetHeightMode: 'max',
     connectObjectivePairs: false,
     maxRoutesPerAnchor: 2,
+  },
+  hydrology: {
+    preload: true,
+    biomeClassification: {
+      enabled: true,
+      wetBiomeId: 'swamp',
+      channelBiomeId: 'riverbank',
+      maxSlopeDeg: 16,
+    },
   },
 
   // Renderer overrides for tall terrain. Fog density now lives alongside

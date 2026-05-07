@@ -27,6 +27,8 @@ import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSy
 import type { VegetationTypeConfig } from '../../config/vegetationTypes';
 import type { BiomeClassificationRule, BiomeVegetationEntry } from '../../config/biomes';
 import { ChunkVegetationGenerator } from './ChunkVegetationGenerator';
+import { createHydrologyBiomeClassifier } from './hydrology/HydrologyBiomeClassifier';
+import type { HydrologyBakeArtifact } from './hydrology/HydrologyBake';
 
 function makeMockBillboard(): GlobalBillboardSystem {
   return {
@@ -70,6 +72,34 @@ const testPalette: BiomeVegetationEntry[] = [
 const highlandPalette: BiomeVegetationEntry[] = [
   { typeId: 'fern', densityMultiplier: 0.25 },
 ];
+
+const riverbankPalette: BiomeVegetationEntry[] = [
+  { typeId: 'fern', densityMultiplier: 0.5 },
+];
+
+const HYDROLOGY_ARTIFACT: HydrologyBakeArtifact = {
+  schemaVersion: 1,
+  width: 3,
+  height: 3,
+  cellSizeMeters: 64,
+  depressionHandling: 'epsilon-fill',
+  transform: {
+    originX: -64,
+    originZ: -64,
+    cellSizeMeters: 64,
+  },
+  thresholds: {
+    accumulationP90Cells: 3,
+    accumulationP95Cells: 4,
+    accumulationP98Cells: 5,
+    accumulationP99Cells: 6,
+  },
+  masks: {
+    wetCandidateCells: [],
+    channelCandidateCells: [8],
+  },
+  channelPolylines: [],
+};
 
 describe('VegetationScatterer', () => {
   let scatterer: VegetationScatterer;
@@ -117,6 +147,34 @@ describe('VegetationScatterer', () => {
     expect(scatterer.getActiveCellCount()).toBe(1);
     expect(billboard.addChunkInstances).toHaveBeenCalledTimes(1);
     expect(scatterer.getPendingCounts().adds).toBeGreaterThan(0);
+  });
+
+  it('reports residency debug info for perf heap attribution', () => {
+    const pos = new THREE.Vector3(10, 0, 10);
+
+    scatterer.updateBudgeted(pos, { maxAddsPerFrame: 2, maxRemovalsPerFrame: 0 });
+
+    expect(scatterer.getDebugInfo()).toEqual(expect.objectContaining({
+      cellSize: 64,
+      maxCellDistance: 2,
+      activeCells: 2,
+      targetCells: 25,
+      pendingAdditions: 23,
+      pendingRemovals: 0,
+      lastPlayerCell: { x: 0, z: 0 },
+      lastUpdate: expect.objectContaining({
+        requestedAddBudget: 2,
+        resolvedAddBudget: 2,
+        addedCells: 2,
+        removedCells: 0,
+        generatedInstances: expect.any(Number),
+        lastGeneratedCell: expect.objectContaining({
+          cellKey: expect.any(String),
+          instanceCount: expect.any(Number),
+          typeCounts: expect.any(Object),
+        }),
+      }),
+    }));
   });
 
   it('prioritizes critical cells over stale far pending additions when throttled', () => {
@@ -174,4 +232,25 @@ describe('VegetationScatterer', () => {
     expect(classifiedPalette).toEqual(highlandPalette);
   });
 
+  it('can classify vegetation cells from a feature-gated hydrology mask', () => {
+    scatterer.configure(
+      testTypes,
+      'denseJungle',
+      new Map([
+        ['denseJungle', testPalette],
+        ['riverbank', riverbankPalette],
+      ]),
+      [],
+      createHydrologyBiomeClassifier(HYDROLOGY_ARTIFACT, {
+        wetBiomeId: 'swamp',
+        channelBiomeId: 'riverbank',
+      }),
+    );
+
+    scatterer.update(new THREE.Vector3(0, 0, 0));
+
+    expect(ChunkVegetationGenerator.generateVegetation).toHaveBeenCalled();
+    const calls = vi.mocked(ChunkVegetationGenerator.generateVegetation).mock.calls;
+    expect(calls.map(call => call[5])).toContainEqual(riverbankPalette);
+  });
 });

@@ -17,6 +17,14 @@ function makeCamera(position: THREE.Vector3): THREE.PerspectiveCamera {
   return camera;
 }
 
+function makeCameraLookingAt(position: THREE.Vector3, target: THREE.Vector3): THREE.PerspectiveCamera {
+  const camera = makeCamera(position);
+  camera.lookAt(target);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  return camera;
+}
+
 function makeFoggyScene(): THREE.Scene {
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x888888, 50, 450);
@@ -233,5 +241,62 @@ describe('shouldRenderAirVehicle', () => {
         currentlyVisible: true,
       }),
     ).toBe(false);
+  });
+
+  it('renders an unpiloted parked aircraft inside the camera view', () => {
+    const camera = makeCameraLookingAt(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, -100),
+    );
+    const scene = makeFoggyScene();
+
+    expect(
+      shouldRenderAirVehicle({
+        camera,
+        scene,
+        vehiclePosition: new THREE.Vector3(0, 0, -250),
+        isAirborne: false,
+        isPiloted: false,
+        currentlyVisible: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('frustum-culls an unpiloted parked aircraft behind the camera', () => {
+    const camera = makeCameraLookingAt(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, -100),
+    );
+    const scene = makeFoggyScene();
+
+    expect(
+      shouldRenderAirVehicle({
+        camera,
+        scene,
+        vehiclePosition: new THREE.Vector3(0, 0, 250),
+        isAirborne: false,
+        isPiloted: false,
+        currentlyVisible: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps close unpiloted aircraft visible even outside the frustum', () => {
+    const camera = makeCameraLookingAt(
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, -100),
+    );
+    const scene = makeFoggyScene();
+
+    expect(
+      shouldRenderAirVehicle({
+        camera,
+        scene,
+        vehiclePosition: new THREE.Vector3(0, 0, 50),
+        isAirborne: false,
+        isPiloted: false,
+        currentlyVisible: false,
+      }),
+    ).toBe(true);
   });
 });

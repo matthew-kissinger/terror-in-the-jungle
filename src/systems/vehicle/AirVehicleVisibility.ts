@@ -4,6 +4,13 @@ const DEFAULT_CULL_DISTANCE = 450;
 const FOG_TRANSMITTANCE_THRESHOLD = 0.02;
 const AIRBORNE_DISTANCE_MULTIPLIER = 1.2;
 const VISIBLE_HYSTERESIS_MULTIPLIER = 1.12;
+const FRUSTUM_ALWAYS_VISIBLE_DISTANCE = 120;
+const AIR_VEHICLE_BOUNDS_RADIUS = 80;
+
+const _airVehicleFrustum = new THREE.Frustum();
+const _airVehicleViewProjection = new THREE.Matrix4();
+const _airVehicleCameraInverse = new THREE.Matrix4();
+const _airVehicleBounds = new THREE.Sphere();
 
 export function shouldRenderAirVehicle(params: {
   camera: THREE.Camera | null;
@@ -25,8 +32,16 @@ export function shouldRenderAirVehicle(params: {
   const maxDistance = getAirVehicleCullDistance(params.scene, camera, params.isAirborne)
     * (params.currentlyVisible ? VISIBLE_HYSTERESIS_MULTIPLIER : 1.0);
   const maxDistanceSq = maxDistance * maxDistance;
+  const distanceSq = camera.position.distanceToSquared(params.vehiclePosition);
+  if (distanceSq > maxDistanceSq) {
+    return false;
+  }
 
-  return camera.position.distanceToSquared(params.vehiclePosition) <= maxDistanceSq;
+  if (distanceSq <= FRUSTUM_ALWAYS_VISIBLE_DISTANCE * FRUSTUM_ALWAYS_VISIBLE_DISTANCE) {
+    return true;
+  }
+
+  return airVehicleIntersectsCameraView(camera, params.vehiclePosition);
 }
 
 /**
@@ -102,4 +117,14 @@ function getFogVisibilityDistance(fog: THREE.Fog | THREE.FogExp2 | null): number
   }
 
   return DEFAULT_CULL_DISTANCE;
+}
+
+function airVehicleIntersectsCameraView(camera: THREE.Camera, position: THREE.Vector3): boolean {
+  camera.updateMatrixWorld(true);
+  _airVehicleCameraInverse.copy(camera.matrixWorld).invert();
+  _airVehicleViewProjection.multiplyMatrices(camera.projectionMatrix, _airVehicleCameraInverse);
+  _airVehicleFrustum.setFromProjectionMatrix(_airVehicleViewProjection);
+  _airVehicleBounds.center.copy(position);
+  _airVehicleBounds.radius = AIR_VEHICLE_BOUNDS_RADIUS;
+  return _airVehicleFrustum.intersectsSphere(_airVehicleBounds);
 }

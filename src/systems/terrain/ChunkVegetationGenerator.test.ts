@@ -103,6 +103,40 @@ const bananaPlantPalette: BiomeVegetationEntry[] = [
   { typeId: 'bananaPlant', densityMultiplier: 1 },
 ];
 
+const slopeCappedRandomTypes: VegetationTypeConfig[] = [
+  {
+    ...bananaPlantGrounded[0],
+    id: 'fern',
+    textureName: 'PixelForge.Vegetation.fern.color',
+    normalTextureName: 'PixelForge.Vegetation.fern.normal',
+    tier: 'groundCover',
+    maxSlopeDeg: 24,
+  },
+  {
+    ...bananaPlantGrounded[0],
+    id: 'elephantEar',
+    textureName: 'PixelForge.Vegetation.elephantEar.color',
+    normalTextureName: 'PixelForge.Vegetation.elephantEar.normal',
+    tier: 'groundCover',
+    maxSlopeDeg: 22,
+  },
+  {
+    ...bananaPlantGrounded[0],
+    id: 'fanPalm',
+    textureName: 'PixelForge.Vegetation.fanPalm.color',
+    normalTextureName: 'PixelForge.Vegetation.fanPalm.normal',
+    size: 16,
+    yOffset: 5,
+    maxSlopeDeg: 30,
+  },
+  bananaPlantGrounded[0],
+];
+
+const slopeCappedRandomPalette: BiomeVegetationEntry[] = slopeCappedRandomTypes.map((type) => ({
+  typeId: type.id,
+  densityMultiplier: 1,
+}));
+
 const coconutAndBambooPalette: BiomeVegetationEntry[] = [
   { typeId: 'coconut', densityMultiplier: 1 },
   { typeId: 'bambooGrove', densityMultiplier: 1 },
@@ -213,6 +247,30 @@ describe('ChunkVegetationGenerator', () => {
 
     expect(flatResult.get('bananaPlant')?.length ?? 0).toBeGreaterThan(0);
     expect(steepResult.get('bananaPlant') ?? []).toHaveLength(0);
+  });
+
+  it('applies slope caps to every random vegetation class on steep terrain', () => {
+    const flatResult = ChunkVegetationGenerator.generateVegetation(
+      0,
+      0,
+      64,
+      () => 5,
+      slopeCappedRandomTypes,
+      slopeCappedRandomPalette,
+    );
+    const steepResult = ChunkVegetationGenerator.generateVegetation(
+      0,
+      0,
+      64,
+      (x, z) => x + z,
+      slopeCappedRandomTypes,
+      slopeCappedRandomPalette,
+    );
+
+    for (const type of slopeCappedRandomTypes) {
+      expect(flatResult.get(type.id)?.length ?? 0).toBeGreaterThan(0);
+      expect(steepResult.get(type.id) ?? []).toHaveLength(0);
+    }
   });
 
   it('scales billboard center height with instance scale so visible bases stay terrain anchored', () => {

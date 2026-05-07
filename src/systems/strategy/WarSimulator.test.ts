@@ -9,6 +9,7 @@ type SpawnZone = {
   id: string;
   name: string;
   position: { x: number; z: number };
+  radius?: number;
   isHomeBase: boolean;
   owner: Faction | null;
   state?: string;
@@ -142,6 +143,38 @@ describe('WarSimulator.spawnStrategicForces frontline seeding', () => {
     const secondCount = simulator.getAgentCount();
     expect(secondCount).toBe(120);
   });
+
+  it('keeps frontline spawns inside the objective shoulder instead of the steep outer rim', () => {
+    const simulator = createConfiguredSimulator(100, 10);
+
+    const hill: SpawnZone = {
+      id: 'hill_937',
+      name: 'Hill 937',
+      position: { x: 0, z: 0 },
+      radius: 60,
+      isHomeBase: false,
+      owner: null,
+      state: 'contested',
+      ticketBleedRate: 6
+    };
+    const zones: SpawnZone[] = [
+      { id: 'us_hq', name: 'US HQ', position: { x: -1000, z: 0 }, radius: 45, isHomeBase: true, owner: Faction.US },
+      { id: 'opfor_hq', name: 'OP HQ', position: { x: 1000, z: 0 }, radius: 45, isHomeBase: true, owner: Faction.NVA },
+      hill
+    ];
+
+    simulator.spawnStrategicForces(zones);
+
+    const hillAgents = [...simulator.getAllAgents().values()].filter((agent) => {
+      const dx = agent.x - hill.position.x;
+      const dz = agent.z - hill.position.z;
+      return dx * dx + dz * dz < 80 * 80;
+    });
+    expect(hillAgents.length).toBeGreaterThanOrEqual(40);
+    for (const agent of hillAgents) {
+      expect(Math.hypot(agent.x - hill.position.x, agent.z - hill.position.z)).toBeLessThanOrEqual(33.1);
+    }
+  });
 });
 
 describe('WarSimulator strategic routing', () => {
@@ -226,5 +259,52 @@ describe('WarSimulator strategic routing', () => {
     expect(squad.routeWaypointIndex).toBeGreaterThan(0);
     expect(agent.destX).toBeGreaterThan(900);
     expect(Math.abs(agent.destZ)).toBeLessThan(10);
+  });
+
+  it('bounds final objective formation slots inside the route arrival band', () => {
+    const simulator = createConfiguredSimulator(1, 1);
+    const agent: StrategicAgent = {
+      id: 'ws_agent_11',
+      faction: Faction.US,
+      x: -100,
+      z: 0,
+      y: 0,
+      health: 100,
+      alive: true,
+      tier: AgentTier.SIMULATED,
+      squadId: 'ws_squad_0',
+      isLeader: false,
+      destX: 0,
+      destZ: 0,
+      speed: 100,
+      combatState: 'idle',
+      formationSlot: 11,
+    };
+    const squad: StrategicSquad = {
+      id: 'ws_squad_0',
+      faction: Faction.US,
+      members: Array.from({ length: 12 }, (_, index) => `ws_agent_${index}`),
+      leaderId: 'ws_agent_0',
+      x: -100,
+      z: 0,
+      objectiveZoneId: 'objective',
+      objectiveX: 0,
+      objectiveZ: 0,
+      stance: 'attack',
+      strength: 1,
+      combatActive: false,
+      lastCombatTime: 0,
+      routeWaypointIndex: 0,
+      routeWaypoints: [{
+        x: 0,
+        z: 0,
+        arrivalRadius: 48,
+        kind: 'objective',
+      }],
+    };
+
+    const destination = (simulator as any).getAgentTravelDestination(agent, squad);
+
+    expect(Math.hypot(destination.x, destination.z)).toBeLessThanOrEqual(34.6);
   });
 });

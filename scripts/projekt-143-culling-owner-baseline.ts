@@ -19,14 +19,18 @@ type SceneAttributionEntry = {
   objects?: number;
   visibleObjects?: number;
   meshes?: number;
+  visibleMeshes?: number;
   drawCallLike?: number;
+  visibleDrawCallLike?: number;
   instances?: number;
+  visibleInstances?: number;
   triangles?: number;
   visibleTriangles?: number;
   materials?: number;
 };
 
 type PerfSummary = {
+  status?: CheckStatus | 'ok' | 'failed';
   startedAt?: string;
   durationSeconds?: number;
   scenario?: { mode?: string };
@@ -77,10 +81,13 @@ type CullingProof = {
 type CategoryDigest = {
   category: string;
   drawCallLike: number;
+  visibleDrawCallLike: number;
   objects: number;
   visibleObjects: number;
   meshes: number;
+  visibleMeshes: number;
   instances: number;
+  visibleInstances: number;
   triangles: number;
   visibleTriangles: number;
   materials: number;
@@ -220,11 +227,17 @@ function latestPerfSummaryForMode(mode: string, trustedOnly: boolean): string | 
       if (summary.scenario?.mode !== mode) return false;
       if (!existsSync(join(path, '..', 'scene-attribution.json'))) return false;
       if (!existsSync(join(path, '..', 'runtime-samples.json'))) return false;
-      return !trustedOnly || summary.measurementTrust?.status === 'pass';
+      return !trustedOnly || isCertificationPerfSummary(summary);
     } catch {
       return false;
     }
   });
+}
+
+function isCertificationPerfSummary(summary: PerfSummary): boolean {
+  return summary.measurementTrust?.status === 'pass'
+    && summary.validation?.overall !== 'fail'
+    && summary.status !== 'failed';
 }
 
 function latestCullingProof(): string | null {
@@ -245,15 +258,28 @@ function numericMax(values: Array<number | undefined>): number | null {
 }
 
 function digestCategory(entry: SceneAttributionEntry | undefined, category: string): CategoryDigest {
+  const visibleTriangles = num(entry?.visibleTriangles);
+  const visibleDrawCallLike = typeof entry?.visibleDrawCallLike === 'number'
+    ? num(entry.visibleDrawCallLike)
+    : visibleTriangles === 0
+      ? 0
+      : num(entry?.drawCallLike);
   return {
     category,
     drawCallLike: num(entry?.drawCallLike),
+    visibleDrawCallLike,
     objects: num(entry?.objects),
     visibleObjects: num(entry?.visibleObjects),
     meshes: num(entry?.meshes),
+    visibleMeshes: num(entry?.visibleMeshes),
     instances: num(entry?.instances),
+    visibleInstances: typeof entry?.visibleInstances === 'number'
+      ? num(entry.visibleInstances)
+      : visibleTriangles === 0
+        ? 0
+        : num(entry?.instances),
     triangles: num(entry?.triangles),
-    visibleTriangles: num(entry?.visibleTriangles),
+    visibleTriangles,
     materials: num(entry?.materials),
   };
 }
@@ -317,7 +343,7 @@ function perfDigest(path: string | null, mode: string): PerfDigest {
     sceneAttributionPath: existsSync(sceneAttributionPath) ? rel(sceneAttributionPath) : null,
     runtimeSamplesPath: existsSync(runtimeSamplesPath) ? rel(runtimeSamplesPath) : null,
     mode,
-    trusted: summary.measurementTrust?.status === 'pass' && existsSync(sceneAttributionPath) && existsSync(runtimeSamplesPath),
+    trusted: isCertificationPerfSummary(summary) && existsSync(sceneAttributionPath) && existsSync(runtimeSamplesPath),
     startedAt: summary.startedAt ?? null,
     durationSeconds: typeof summary.durationSeconds === 'number' ? summary.durationSeconds : null,
     validationOverall: summary.validation?.overall ?? null,
@@ -349,12 +375,14 @@ function sumCategories(digest: PerfDigest, categories: string[], key: keyof Cate
 function buildLargeModeOwner(openFrontier: PerfDigest, aShau: PerfDigest): OwnerCandidate {
   const openDrawCalls = sumCategories(openFrontier, LARGE_MODE_OWNER_CATEGORIES, 'drawCallLike');
   const aShauDrawCalls = sumCategories(aShau, LARGE_MODE_OWNER_CATEGORIES, 'drawCallLike');
+  const openVisibleDrawCalls = sumCategories(openFrontier, LARGE_MODE_OWNER_CATEGORIES, 'visibleDrawCallLike');
+  const aShauVisibleDrawCalls = sumCategories(aShau, LARGE_MODE_OWNER_CATEGORIES, 'visibleDrawCallLike');
   const openVisibleTriangles = sumCategories(openFrontier, LARGE_MODE_OWNER_CATEGORIES, 'visibleTriangles');
   const aShauVisibleTriangles = sumCategories(aShau, LARGE_MODE_OWNER_CATEGORIES, 'visibleTriangles');
   const ready = openFrontier.trusted
     && aShau.trusted
-    && openDrawCalls > 0
-    && aShauDrawCalls > 0
+    && openVisibleDrawCalls > 0
+    && aShauVisibleDrawCalls > 0
     && openVisibleTriangles > 0
     && aShauVisibleTriangles > 0;
   return {
@@ -369,6 +397,7 @@ function buildLargeModeOwner(openFrontier: PerfDigest, aShau: PerfDigest): Owner
         summaryPath: openFrontier.path,
         maxRendererDrawCalls: openFrontier.maxRendererDrawCalls,
         ownerDrawCallLike: openDrawCalls,
+        ownerVisibleDrawCallLike: openVisibleDrawCalls,
         ownerVisibleTriangles: openVisibleTriangles,
         visibleUnattributedPercent: openFrontier.visibleUnattributedPercent,
       },
@@ -376,12 +405,13 @@ function buildLargeModeOwner(openFrontier: PerfDigest, aShau: PerfDigest): Owner
         summaryPath: aShau.path,
         maxRendererDrawCalls: aShau.maxRendererDrawCalls,
         ownerDrawCallLike: aShauDrawCalls,
+        ownerVisibleDrawCallLike: aShauVisibleDrawCalls,
         ownerVisibleTriangles: aShauVisibleTriangles,
         visibleUnattributedPercent: aShau.visibleUnattributedPercent,
       },
       afterGuardrails: {
-        openFrontierOwnerDrawCallLikeMustImproveBelow: openDrawCalls,
-        aShauOwnerDrawCallLikeMustImproveBelow: aShauDrawCalls,
+        openFrontierOwnerVisibleDrawCallLikeMustImproveBelow: openVisibleDrawCalls,
+        aShauOwnerVisibleDrawCallLikeMustImproveBelow: aShauVisibleDrawCalls,
         openFrontierTotalDrawCallsMustNotRegressAbove: openFrontier.maxRendererDrawCalls,
         aShauTotalDrawCallsMustNotRegressAbove: aShau.maxRendererDrawCalls,
       },
@@ -392,7 +422,7 @@ function buildLargeModeOwner(openFrontier: PerfDigest, aShau: PerfDigest): Owner
       'Keep static features and vehicle visibility separated in code if the evidence shows only one category improving.',
     ],
     acceptance: [
-      'Matched Open Frontier and A Shau after artifacts show lower owner draw-call-like counts or visible triangles for the chosen owner category.',
+      'Matched Open Frontier and A Shau after artifacts show lower owner visible draw-call-like counts or visible triangles for the chosen owner category.',
       `Visible unattributed triangles remain below ${REQUIRED_VISIBLE_UNATTRIBUTED_MAX_PERCENT}%.`,
       'Total renderer draw calls do not regress in the matched camera windows.',
       'No vehicle entry, collision, or airfield interaction regression is accepted without playtest/probe coverage.',
@@ -457,8 +487,10 @@ function buildVegetationCandidate(openFrontier: PerfDigest, aShau: PerfDigest): 
     ownerCategories: ['vegetation_imposters'],
     evidence: {
       openFrontierVegetationDrawCallLike: category(openFrontier, 'vegetation_imposters').drawCallLike,
+      openFrontierVegetationVisibleDrawCallLike: category(openFrontier, 'vegetation_imposters').visibleDrawCallLike,
       openFrontierVegetationVisibleTriangles: category(openFrontier, 'vegetation_imposters').visibleTriangles,
       aShauVegetationDrawCallLike: category(aShau, 'vegetation_imposters').drawCallLike,
+      aShauVegetationVisibleDrawCallLike: category(aShau, 'vegetation_imposters').visibleDrawCallLike,
       aShauVegetationVisibleTriangles: category(aShau, 'vegetation_imposters').visibleTriangles,
     },
     requiredBefore: [
@@ -490,6 +522,9 @@ function statusFromChecks(checks: ValidationCheck[]): CheckStatus {
 }
 
 function writeMarkdown(summary: CullingOwnerBaseline, path: string): void {
+  const selectedEvidence = summary.selectedOwnerPath?.evidence ?? {};
+  const openEvidence = selectedEvidence.openFrontier as Record<string, unknown> | undefined;
+  const aShauEvidence = selectedEvidence.aShau as Record<string, unknown> | undefined;
   const lines = [
     '# Projekt Objekt-143 Culling Owner Baseline',
     '',
@@ -503,6 +538,19 @@ function writeMarkdown(summary: CullingOwnerBaseline, path: string): void {
     summary.selectedOwnerPath
       ? `- ${summary.selectedOwnerPath.status.toUpperCase()} ${summary.selectedOwnerPath.id}: ${summary.selectedOwnerPath.summary}`
       : '- none',
+    '',
+    summary.selectedOwnerPath
+      ? '| Mode | Owner visible draw-call-like | Owner total draw-call-like | Owner visible triangles | Max renderer draw calls |'
+      : '',
+    summary.selectedOwnerPath
+      ? '| --- | ---: | ---: | ---: | ---: |'
+      : '',
+    summary.selectedOwnerPath
+      ? `| Open Frontier | ${openEvidence?.ownerVisibleDrawCallLike ?? 'n/a'} | ${openEvidence?.ownerDrawCallLike ?? 'n/a'} | ${openEvidence?.ownerVisibleTriangles ?? 'n/a'} | ${openEvidence?.maxRendererDrawCalls ?? 'n/a'} |`
+      : '',
+    summary.selectedOwnerPath
+      ? `| A Shau | ${aShauEvidence?.ownerVisibleDrawCallLike ?? 'n/a'} | ${aShauEvidence?.ownerDrawCallLike ?? 'n/a'} | ${aShauEvidence?.ownerVisibleTriangles ?? 'n/a'} | ${aShauEvidence?.maxRendererDrawCalls ?? 'n/a'} |`
+      : '',
     '',
     '## Inputs',
     '',

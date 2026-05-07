@@ -48,6 +48,11 @@ const STEPS: EvidenceStep[] = [
     artifactPattern: /Vegetation horizon audit written to\s+(.+horizon-audit\.json)/,
   },
   {
+    id: 'kb-terrain-pixel-forge-structure-review',
+    command: ['scripts/projekt-143-pixel-forge-structure-review.ts'],
+    artifactPattern: /Projekt 143 Pixel Forge structure review \w+:\s+(.+structure-review\.json)/,
+  },
+  {
     id: 'kb-strategie-webgpu-audit',
     command: ['scripts/webgpu-strategy-audit.ts'],
     artifactPattern: /WebGPU strategy audit written to\s+(.+strategy-audit\.json)/,

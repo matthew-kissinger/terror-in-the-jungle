@@ -262,6 +262,9 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect(material?.uniforms.npcExposure.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.npcExposure);
     expect(material?.uniforms.minNpcLight.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.minNpcLight);
     expect(material?.uniforms.npcTopLight.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.npcTopLight);
+    expect(material?.uniforms.horizontalCropExpansion.value).toBeCloseTo(
+      PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.horizontalCropExpansion,
+    );
     expect(material?.uniforms.parityScale.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.parityScale);
     expect(material?.uniforms.parityLift.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.parityLift);
     expect(material?.uniforms.paritySaturation.value).toBeCloseTo(PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING.usArmy.paritySaturation);
@@ -273,6 +276,8 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect(material?.uniforms.tileCropMapSize.value.x).toBe(28);
     expect(material?.uniforms.tileCropMapSize.value.y).toBe(14);
     expect(material?.fragmentShader).toContain('tileCropMap');
+    expect(material?.fragmentShader).toContain('horizontalCropExpansion');
+    expect(material?.fragmentShader).toContain('cropCenterX');
     expect(material?.fragmentShader).toContain('croppedUv');
     expect(material?.fragmentShader).toContain('parityScale');
     expect(material?.fragmentShader).toContain('paritySaturation');
@@ -307,15 +312,17 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     const geometry = new THREE.PlaneGeometry(1, 1);
     geometry.setAttribute('instancePhase', new THREE.InstancedBufferAttribute(new Float32Array(1), 1));
     geometry.setAttribute('instanceViewColumn', new THREE.InstancedBufferAttribute(new Float32Array(1), 1));
+    geometry.setAttribute('instanceViewRow', new THREE.InstancedBufferAttribute(new Float32Array(1), 1));
     geometry.setAttribute('instanceAnimationProgress', new THREE.InstancedBufferAttribute(new Float32Array(1), 1));
     geometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(new Float32Array(1).fill(1), 1));
     const material = new THREE.MeshBasicMaterial();
     const mesh = new THREE.InstancedMesh(geometry, material, 1);
 
-    setPixelForgeNpcImpostorAttributes(mesh, 0, 0.25, 3, 0.75, 0.4);
+    setPixelForgeNpcImpostorAttributes(mesh, 0, 0.25, 3, 0, 0.75, 0.4);
 
     expect((geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute).getX(0)).toBeCloseTo(0.25);
     expect((geometry.getAttribute('instanceViewColumn') as THREE.InstancedBufferAttribute).getX(0)).toBe(3);
+    expect((geometry.getAttribute('instanceViewRow') as THREE.InstancedBufferAttribute).getX(0)).toBe(0);
     expect((geometry.getAttribute('instanceAnimationProgress') as THREE.InstancedBufferAttribute).getX(0)).toBeCloseTo(0.75);
     expect((geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute).getX(0)).toBeCloseTo(0.4);
 

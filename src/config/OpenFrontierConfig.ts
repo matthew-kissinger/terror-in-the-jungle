@@ -16,8 +16,14 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
     defaultBiome: 'denseJungle',
     biomeRules: [
       { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, elevationBlendWidth: 4, priority: 2 },
-      { biomeId: 'riverbank',  elevationMax: 1,  slopeMax: 15, elevationBlendWidth: 3, priority: 5 },
     ],
+    farCanopyTint: {
+      enabled: true,
+      startDistance: 560,
+      endDistance: 1250,
+      strength: 0.28,
+      color: [0.12, 0.26, 0.11],
+    },
   },
   terrainFlow: {
     enabled: true,
@@ -33,6 +39,16 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
     homeBaseShoulderTargetHeightMode: 'max',
     connectObjectivePairs: true,
     maxRoutesPerAnchor: 4,
+  },
+  hydrology: {
+    preload: true,
+    allowSeededFallback: true,
+    biomeClassification: {
+      enabled: true,
+      wetBiomeId: 'riverbank',
+      channelBiomeId: 'riverbank',
+      maxSlopeDeg: 16,
+    },
   },
   weather: {
     enabled: true,
@@ -229,7 +245,7 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
       id: 'supply_depot_main',
       kind: 'road',
       name: 'Supply Depot Compound',
-      position: new THREE.Vector3(-800, 0, -200),
+      position: new THREE.Vector3(-820, 0, -160),
       placement: { yaw: Math.PI * 0.1 },
       footprint: { shape: 'circle', radius: 22 },
       terrain: {
@@ -402,7 +418,7 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
     {
       id: 'zone_depot',
       name: 'Supply Depot',
-      position: new THREE.Vector3(-800, 0, -200),
+      position: new THREE.Vector3(-820, 0, -160),
       radius: 25,
       isHomeBase: false,
       owner: null,

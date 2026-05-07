@@ -47,10 +47,22 @@ const vegetationType: VegetationTypeConfig = {
   yOffset: 8,
 };
 
+const hemisphereVegetationType: VegetationTypeConfig = {
+  ...vegetationType,
+  id: 'fern',
+  textureName: 'PixelForge.Vegetation.fern.color',
+  normalTextureName: 'PixelForge.Vegetation.fern.normal',
+  shaderProfile: 'hemisphere',
+  atlasProfile: 'ground-compact',
+  tier: 'groundCover',
+};
+
 function makeAssetLoader(): AssetLoader {
   const textures = new Map<string, THREE.Texture>([
     [vegetationType.textureName, new THREE.Texture()],
     [vegetationType.normalTextureName, new THREE.Texture()],
+    [hemisphereVegetationType.textureName, new THREE.Texture()],
+    [hemisphereVegetationType.normalTextureName, new THREE.Texture()],
   ]);
 
   return {
@@ -81,6 +93,19 @@ describe('GPUBillboardSystem KB-LOAD proof hooks', () => {
     const config = latestVegetationConfig();
     expect(config?.normalTexture).toBeDefined();
     expect(config?.shaderProfile).toBe('normal-lit');
+  });
+
+  it('does not fetch unused normal textures for hemisphere-profile vegetation', async () => {
+    const assetLoader = makeAssetLoader();
+    const system = new GPUBillboardSystem(new THREE.Scene(), assetLoader);
+
+    await system.initializeFromConfig([hemisphereVegetationType]);
+
+    const config = latestVegetationConfig();
+    expect(config?.normalTexture).toBeUndefined();
+    expect(config?.shaderProfile).toBe('hemisphere');
+    expect(assetLoader.getTexture).toHaveBeenCalledWith(hemisphereVegetationType.textureName);
+    expect(assetLoader.getTexture).not.toHaveBeenCalledWith(hemisphereVegetationType.normalTextureName);
   });
 
   it('can disable vegetation normals for KB-LOAD candidate proof runs', async () => {

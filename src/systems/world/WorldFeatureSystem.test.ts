@@ -120,12 +120,12 @@ describe('WorldFeatureSystem', () => {
     const fixedWingCalls = fixedWingModel.createAircraftAtSpot.mock.calls;
     expect(fixedWingCalls).toHaveLength(3);
     const worldPositions = fixedWingCalls.map((call) => call[2] as THREE.Vector3);
-    expect(worldPositions.map((p) => Number(p.z.toFixed(2)))).toEqual([-176, -176, -176]);
-    expect(worldPositions.map((p) => Number(p.x.toFixed(2)))).toEqual([38, 120, 202]);
+    expect(worldPositions.map((p) => Number(p.z.toFixed(2)))).toEqual([-220, -164, -200]);
+    expect(worldPositions.map((p) => Number(p.x.toFixed(2)))).toEqual([230, 144, 186]);
     expect(fixedWingCalls[0][4]).toEqual(expect.objectContaining({
       standId: 'stand_a1',
       taxiRoute: expect.any(Array),
-      runwayStart: expect.objectContaining({ id: 'south_departure' }),
+      runwayStart: expect.objectContaining({ id: 'north_departure' }),
     }));
     expect(fixedWingCalls[2][4]).toEqual(expect.objectContaining({
       standId: 'stand_f4',
@@ -190,6 +190,45 @@ describe('WorldFeatureSystem', () => {
     expect(center.y).toBeLessThan(8);
   });
 
+  it('samples the full footprint of large buildings before accepting cliff-edge placement', async () => {
+    const largeBuilding = new THREE.Group();
+    largeBuilding.add(new THREE.Mesh(
+      new THREE.BoxGeometry(12, 1, 12),
+      new THREE.MeshStandardMaterial({ color: 0x4a5a2a }),
+    ));
+    vi.mocked(modelLoader.loadModel).mockResolvedValueOnce(largeBuilding);
+
+    terrainManager.getHeightAt = vi.fn((x: number, z: number) => {
+      if (Math.abs(x) < 1.5 && Math.abs(z - 11.25) < 0.75) {
+        return 18;
+      }
+      return 5;
+    });
+    currentConfig = {
+      id: GameMode.ZONE_CONTROL,
+      features: [
+        {
+          id: 'large_edge_building',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, 0),
+          staticPlacements: [
+            {
+              modelPath: BuildingModels.WAREHOUSE,
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    const bounds = new THREE.Box3().setFromObject(scene.children[0]);
+    const center = bounds.getCenter(new THREE.Vector3());
+    expect(center.distanceTo(new THREE.Vector3(0, center.y, 0))).toBeGreaterThan(4);
+  });
+
   it('optimizes generic static placements inside the shared world feature layer', async () => {
     currentConfig = {
       id: GameMode.ZONE_CONTROL,
@@ -221,6 +260,51 @@ describe('WorldFeatureSystem', () => {
       }
     });
 
+    expect(meshCount).toBe(1);
+  });
+
+  it('batches compatible static placements across features in the same culling sector', async () => {
+    currentConfig = {
+      id: GameMode.ZONE_CONTROL,
+      features: [
+        {
+          id: 'near_feature_a',
+          kind: 'village',
+          position: new THREE.Vector3(10, 0, 20),
+          staticPlacements: [
+            {
+              modelPath: 'near_a.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+        {
+          id: 'near_feature_b',
+          kind: 'village',
+          position: new THREE.Vector3(120, 0, 80),
+          staticPlacements: [
+            {
+              modelPath: 'near_b.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    const root = scene.children[0];
+    const sectors = root.children.filter((child) => child.name.startsWith('WorldFeatureSector_'));
+    let meshCount = 0;
+    root.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        meshCount++;
+      }
+    });
+
+    expect(sectors).toHaveLength(1);
     expect(meshCount).toBe(1);
   });
 
@@ -297,8 +381,9 @@ describe('WorldFeatureSystem', () => {
     system.update(0.016);
 
     const root = scene.children.find((child) => child.name === 'WorldStaticFeatureBatchRoot') as THREE.Group;
-    const near = root.children.find((child) => child.name === 'WorldFeature_near_base');
-    const far = root.children.find((child) => child.name === 'WorldFeature_far_base');
+    const sectors = root.children.filter((child) => child.name.startsWith('WorldFeatureSector_'));
+    const near = sectors.find((child) => child.visible);
+    const far = sectors.find((child) => !child.visible);
 
     expect(near?.visible).toBe(true);
     expect(far?.visible).toBe(false);
@@ -308,5 +393,56 @@ describe('WorldFeatureSystem', () => {
 
     expect(near?.visible).toBe(false);
     expect(far?.visible).toBe(true);
+  });
+
+  it('frustum-culls distant static feature sectors that are behind the camera', async () => {
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 2000);
+    camera.position.set(0, 30, 0);
+    camera.lookAt(0, 20, -100);
+    camera.updateMatrixWorld(true);
+    system = new WorldFeatureSystem(scene, camera);
+    system.setTerrainManager(terrainManager);
+    system.setGameModeManager({
+      getCurrentConfig: () => currentConfig,
+    } as any);
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'front_base',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, -500),
+          staticPlacements: [
+            {
+              modelPath: 'front_base.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+        {
+          id: 'rear_base',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, 500),
+          staticPlacements: [
+            {
+              modelPath: 'rear_base.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+    system.update(0.016);
+
+    const root = scene.children.find((child) => child.name === 'WorldStaticFeatureBatchRoot') as THREE.Group;
+    const sectors = root.children.filter((child) => child.name.startsWith('WorldFeatureSector_'));
+    const front = sectors.find((child) => child.name.endsWith('0,-1'));
+    const rear = sectors.find((child) => child.name.endsWith('0,0'));
+
+    expect(front?.visible).toBe(true);
+    expect(rear?.visible).toBe(false);
   });
 });

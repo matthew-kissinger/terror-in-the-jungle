@@ -53,6 +53,7 @@ describe('HelicopterInteraction', () => {
       const playerPosition = new THREE.Vector3(13, 5, 20);
       const playerController = {
         isInHelicopter: vi.fn(() => inHelicopter),
+        isInFixedWing: vi.fn(() => false),
         getHelicopterId: vi.fn(() => 'heli_test'),
         getPosition: vi.fn(() => playerPosition),
         exitHelicopter: vi.fn(() => {
@@ -92,5 +93,69 @@ describe('HelicopterInteraction', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('does not offer helicopter entry while the player is already in a fixed-wing aircraft', () => {
+    const helicopter = new THREE.Group();
+    helicopter.position.set(0, 0, 0);
+    const interaction = new HelicopterInteraction(
+      new Map([['heli_test', helicopter]]),
+      6,
+    );
+
+    const playerController = {
+      isInHelicopter: vi.fn(() => false),
+      isInFixedWing: vi.fn(() => true),
+      getPosition: vi.fn(() => new THREE.Vector3(1, 0, 0)),
+      enterHelicopter: vi.fn(),
+    };
+    const hudSystem = {
+      setInteractionContext: vi.fn(),
+    };
+
+    interaction.setPlayerController(playerController as any);
+    interaction.setHUDSystem(hudSystem as any);
+
+    interaction.checkPlayerProximity();
+    interaction.tryEnterHelicopter();
+
+    expect(hudSystem.setInteractionContext).toHaveBeenLastCalledWith(null);
+    expect(playerController.enterHelicopter).not.toHaveBeenCalled();
+  });
+
+  it('keeps a render-culled helicopter enterable when the player is on foot', () => {
+    const helicopter = new THREE.Group();
+    helicopter.position.set(0, 0, 0);
+    helicopter.visible = false;
+    const interaction = new HelicopterInteraction(
+      new Map([['heli_test', helicopter]]),
+      6,
+    );
+
+    const playerController = {
+      isInHelicopter: vi.fn(() => false),
+      isInFixedWing: vi.fn(() => false),
+      getPosition: vi.fn(() => new THREE.Vector3(1, 0, 0)),
+      enterHelicopter: vi.fn(),
+    };
+    const hudSystem = {
+      setInteractionContext: vi.fn(),
+    };
+
+    interaction.setPlayerController(playerController as any);
+    interaction.setHUDSystem(hudSystem as any);
+
+    interaction.checkPlayerProximity();
+
+    expect(hudSystem.setInteractionContext).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        kind: 'vehicle-enter',
+        targetId: 'heli_test',
+      }),
+    );
+
+    interaction.tryEnterHelicopter();
+
+    expect(playerController.enterHelicopter).toHaveBeenCalledWith('heli_test', expect.any(THREE.Vector3));
   });
 });

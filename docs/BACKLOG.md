@@ -1,12 +1,43 @@
 # Backlog
 
-Last updated: 2026-05-04
+Last updated: 2026-05-07
 
 ## Stable-Ground Follow-Up
 
 The 2026-05-02 stabilization pass freezes feature work until release parity is
 restored and documented. Current priority is ops/drift, not new runtime
 capability.
+
+### Projekt Objekt-143 Stabilization Closeout
+
+The 2026-05-07 owner direction changes Projekt Objekt-143 from exhaustive
+experimental bureau completion into a stabilization closeout. Required before
+calling this cycle done:
+
+- Preserve the accepted/scoped improvements already made in the local stack.
+- Keep unresolved KB-LOAD, KB-TERRAIN, KB-CULL, water, vegetation, active-driver,
+  Pixel Forge, and platform findings documented as roadmap/backlog signal.
+- Run the stabilization validation gate for the current local stack; do not
+  claim final water art, broad HLOD/culling, asset-import, vehicle-driving, or
+  skilled-player acceptance from partial evidence.
+- Commit the local stack, push to `master`, run CI/deploy, and verify live
+  Pages production parity.
+
+Deferred to the next Projekt revamp:
+
+- Natural water/river rendering, crossings, gameplay water queries, and
+  watercraft-ready physics.
+- Accepted Pixel Forge vegetation candidate import and runtime visual proof.
+- Dense vegetation ecology, bamboo/palm clustering, grass/ground cover, and
+  disturbed trail edges.
+- Pixel Forge building/vehicle replacement, foundation polish, collision/pivot
+  checks, and future driving surfaces.
+- Broad HLOD, static-cluster policy, vegetation culling, and parked-aircraft
+  playtest coverage.
+- Combined-arms skilled-player feel: objective flow, support activity, reduced
+  local crowd churn, and sustained battlefield life.
+- WebGPU/worker/WASM/native-backed browser capability branches after WebGL
+  stabilization.
 
 - Deploy the final accepted `master` SHA after CI is green, then verify live
   `/asset-manifest.json`, `/sw.js`, Pages headers, R2 DEM headers, Recast WASM,

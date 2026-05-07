@@ -21,6 +21,9 @@ type ProbeSummary = {
   closeRadiusMeters: number;
   combatantCount: number;
   activeCloseModelCount: number;
+  closeModelPoolLoads: number;
+  closeModelPoolTargets: Record<string, number>;
+  closeModelPoolAvailable: Record<string, number>;
   nearest: ProbeNpcRow[];
   failures: string[];
 };
@@ -37,11 +40,19 @@ function parseStringFlag(name: string, fallback: string): string {
   return fallback;
 }
 
+function parseNumberFlag(name: string, fallback: number): number {
+  const raw = parseStringFlag(name, String(fallback));
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 function hasFlag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
 
 const url = parseStringFlag('url', DEFAULT_URL);
+const waitMs = parseNumberFlag('wait-ms', 3000);
+const waitForClose = hasFlag('wait-for-close');
 const headed = hasFlag('headed');
 if (!existsSync(ARTIFACT_DIR)) mkdirSync(ARTIFACT_DIR, { recursive: true });
 
@@ -67,7 +78,16 @@ try {
     const combatants = (window as any).__engine?.systemManager?.combatantSystem?.combatants;
     return combatants instanceof Map && combatants.size > 0;
   }, undefined, { timeout: 90_000 });
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(waitMs);
+  if (waitForClose) {
+    try {
+      await page.waitForFunction(() => (
+        ((window as any).__engine?.systemManager?.combatantSystem?.combatantRenderer?.activeCloseModels?.size ?? 0) > 0
+      ), undefined, { timeout: Math.max(1000, waitMs) });
+    } catch {
+      // Keep reporting the observed runtime state below; a timeout here is evidence.
+    }
+  }
 
   const summary = await page.evaluate((closeRadiusMeters): ProbeSummary => {
     const engine = (window as any).__engine;
@@ -77,6 +97,21 @@ try {
     const activeCloseModels = renderer?.activeCloseModels instanceof Map
       ? renderer.activeCloseModels
       : new Map();
+    const closeModelPoolTargets: Record<string, number> = {};
+    if (renderer?.closeModelPoolTargets instanceof Map) {
+      renderer.closeModelPoolTargets.forEach((target: number, key: string) => {
+        closeModelPoolTargets[key] = target;
+      });
+    }
+    const closeModelPoolAvailable: Record<string, number> = {};
+    if (renderer?.closeModelPools instanceof Map) {
+      renderer.closeModelPools.forEach((pool: unknown[], key: string) => {
+        closeModelPoolAvailable[key] = pool.length;
+      });
+    }
+    const closeModelPoolLoads = renderer?.closeModelPoolLoads instanceof Map
+      ? renderer.closeModelPoolLoads.size
+      : 0;
     const rows: ProbeNpcRow[] = Array.from(combat.combatants.values()).map((combatant: any) => {
       const dx = combatant.position.x - playerPosition.x;
       const dy = combatant.position.y - playerPosition.y;
@@ -101,9 +136,12 @@ try {
 
     const nearest = rows.slice(0, 24);
     const failures: string[] = [];
+    if (activeCloseModels.size === 0) {
+      failures.push('no active close GLB models observed after probe wait');
+    }
     for (const row of rows) {
-      if (row.distance <= closeRadiusMeters && row.renderMode !== 'close-glb') {
-        failures.push(`${row.id} is ${row.renderMode} at ${row.distance.toFixed(1)}m`);
+      if (row.distance <= closeRadiusMeters && row.renderMode === 'culled') {
+        failures.push(`${row.id} is culled inside close radius at ${row.distance.toFixed(1)}m`);
       }
       if (row.renderMode === 'close-glb' && !row.hasWeapon) {
         failures.push(`${row.id} close GLB has no weapon`);
@@ -116,6 +154,9 @@ try {
       closeRadiusMeters,
       combatantCount: rows.length,
       activeCloseModelCount: activeCloseModels.size,
+      closeModelPoolLoads,
+      closeModelPoolTargets,
+      closeModelPoolAvailable,
       nearest,
       failures,
     };

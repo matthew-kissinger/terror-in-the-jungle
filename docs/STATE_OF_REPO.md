@@ -1,12 +1,23 @@
 # State Of Repo
 
-Last updated: 2026-05-05
+Last updated: 2026-05-07
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
 document answers the narrower question: what is verified in the current repo
 state. Historical cycle/archive docs remain historical evidence; this file is
 the current truth anchor.
+
+## Current Stabilization Direction On 2026-05-07
+
+Projekt Objekt-143 has shifted from exhaustive experimental bureau completion
+to a stabilization closeout. Current repo truth should preserve the useful
+fixes and evidence from the long agent/orchestration cycle, record unresolved
+KB-LOAD, KB-TERRAIN, KB-CULL, water, vegetation, Pixel Forge, culling/HLOD, and
+combined-arms findings as roadmap/backlog work, then validate, commit, push,
+deploy, and live-verify the current stack. Do not claim final water art,
+accepted Pixel Forge candidate import, broad HLOD/culling, future driving
+surfaces, or skilled combined-arms feel from the current partial artifacts.
 
 ## Stable-Ground Snapshot On 2026-05-02
 
@@ -83,9 +94,11 @@ the current truth anchor.
   into NPC imposter shader uniforms; expanded luma is inside band, but
   the 8.5m near-stress camera visible-height samples still flag. Commit
   `5b053711cece65b5915ea786acc56e4a8ea22736` adds a runtime LOD-edge camera
-  proof path; the committed-sha LOD-edge artifact passes with `0/40` flags, so
-  the current open KB-OPTIK decision is near-stress exception/human review, not
-  a measured LOD-edge failure.
+  proof path; the committed-sha LOD-edge artifact passes with `0/40` flags.
+  The current local KB-OPTIK packet is owner-accepted with caution at
+  `artifacts/perf/2026-05-05T23-13-35-420Z/projekt-143-optik-human-review/review-summary.json`;
+  future downward-facing or brightness polish needs a fresh proof-gated pass
+  rather than retuning the accepted state opportunistically.
 - KB-TERRAIN measurement has moved from static audit to before-baseline
   screenshot evidence. `npm run check:vegetation-horizon` first wrote
   `artifacts/perf/2026-05-02T21-29-15-593Z/vegetation-horizon-audit/horizon-audit.json`,
@@ -119,6 +132,46 @@ the current truth anchor.
   a future asset audit for TIJ and Pixel Forge ground/path/trail/grass/foliage
   and cover texture variety, with worn-in smoothed route surfaces that can
   support future vehicles where appropriate.
+  A local 2026-05-06 foundation follow-up expands circular terrain
+  stamps to cover their authored surface radius, adds a graded helipad
+  shoulder, routes generated airfield structures through the footprint solver,
+  and widens large static-prop flat-search. The rebuilt review packet
+  `artifacts/perf/2026-05-06T12-50-19-106Z/projekt-143-terrain-visual-review/visual-review.json`
+  is PASS for `14` Open Frontier/A Shau screenshots including airfield,
+  parking, and support-foundation views. The matching placement audit was
+  tightened after visual review to warn on large native relief under otherwise
+  flat stamped pads. Open Frontier `supply_depot_main` / `zone_depot` was moved
+  from `(-800,-200)` to `(-820,-160)`, clearing Open Frontier's
+  foundation-native-relief warning. A later follow-up moved the remaining TDM
+  and Zone Control seed-variant pads away from high native relief. A later audit
+  fix found generated airfield placements were sampled with `world.z` from a
+  `THREE.Vector2`, so large building/vehicle/aircraft placements were
+  effectively reporting zero native relief. The latest placement artifact
+  `artifacts/perf/2026-05-06T17-11-14-436Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  is WARN with `fail=0` / `warn=2`: Open Frontier `airfield_main` has `9`
+  generated placements over the native-relief review threshold, worst
+  `parking_0` A-1 at `32.03m` source span, and A Shau `tabat_airstrip` still
+  flags the A-1 parking placement at `8.54m` source span. This is not final
+  KB-TERRAIN acceptance: generated airfield foundations remain a visual blocker,
+  matched perf and owner art review are still open, Pixel Forge upgraded
+  building/vehicle GLBs have not been imported, and future vehicle-driving
+  surfaces are not certified. The
+  refreshed terrain asset inventory at
+  `artifacts/perf/2026-05-06T13-16-02-955Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
+  adds GLB metadata for the Pixel Forge replacement path: `12` building
+  candidates total `5,704` triangles, runtime structure/foundation models total
+  `7,528` triangles, and `30` static entries need medium/high optimization
+  review mostly for mesh/material/primitive fragmentation. It also catalogs the
+  sibling Pixel Forge gallery as `19` building GLBs totaling `18,338` triangles
+  and `5` ground-vehicle GLBs totaling `5,272` triangles for future
+  side-by-side replacement and driving-surface review. The structure review at
+  `artifacts/perf/2026-05-06T16-45-59-860Z/projekt-143-pixel-forge-structure-review/structure-review.json`
+  adds a source-gallery contact sheet and now finds `19/19` building review
+  grids plus `5/5` current ground-vehicle review grids. The vehicle grids are
+  TIJ-generated artifacts from current Pixel Forge GLBs and did not mutate
+  Pixel Forge `war-assets`; vehicle-driving candidates still need
+  wheel/contact/pivot, collision-proxy, and terrain-surface checks before any
+  runtime import.
   The 2026-05-05 owner vegetation target changes the palm direction: remove
   the short Quaternius palm from runtime and shipped assets, preserve the
   taller palm-like trees, and spend that freed visual/perf budget on grass or
@@ -163,13 +216,23 @@ the current truth anchor.
   `artifacts/perf/2026-05-05T02-41-21-751Z/summary.json` clears the hard heap
   failure (`heap_growth_mb=-61.58`, peak growth `16.64MB`, recovery PASS) and
   keeps movement/hit guardrails green, but it still logs NPC terrain-stall
-  backtracking and remains WARN on peak p99. This is stronger A Shau evidence,
-  not final route/nav acceptance.
+  backtracking and remains WARN on peak p99. A later endpoint inset follow-up
+  moves non-home objective routes inside capture footprints and passes route
+  audit at
+  `artifacts/perf/2026-05-06T17-00-32-294Z/projekt-143-terrain-route-audit/terrain-route-audit.json`;
+  the paired A Shau capture
+  `artifacts/perf/2026-05-05T23-32-48-770Z/summary.json` improves waypoint
+  replans `81 -> 40` and waypoints followed `249 -> 317` versus the previous
+  current-worktree run, but still warns on p99/heap growth and logs `42`
+  terrain-stall warnings. This is stronger A Shau evidence, not final route/nav
+  acceptance.
   Current local follow-up keeps rock as a reduced moss-tinted cliff accent
   rather than a broad grey elevation cap, and it fixes a player-camera terrain
   clipping failure mode where the grounded rise clamp could leave the camera
-  inside a sudden hillside lip. `PlayerMovement` now rejects that horizontal
-  step. Commit `e92523a` partially closes the navigation invalidation gap:
+  inside a sudden hillside lip. `PlayerMovement` now rejects true multi-meter
+  cliff jumps while allowing smaller stamped/noisy terrain lips that previously
+  produced false movement stalls. Commit `e92523a` partially closes the
+  navigation invalidation gap:
   registered pre-baked variants now have `public/data/navmesh/bake-manifest.json`
   signatures, `scripts/prebake-navmesh.ts` regenerates when those signatures
   are stale, runtime solo-navmesh cache keys include terrain/feature
@@ -441,27 +504,155 @@ What is not ready to claim:
   assets, preserve the taller `fanPalm` and `coconut` palm-like species,
   redirect that budget to grass or other ground cover, add more big palms and
   ground vegetation, and make bamboo scattered dense clusters instead of the
-  dominant forest layer.
+  dominant forest layer. It now also carries an explicit non-uniform landscape
+  distribution target: A Shau should not read as evenly spaced everything
+  everywhere, so future acceptance needs researched bamboo grove pockets,
+  denser palm stands, water/lowland-edge vegetation from hydrology proxies,
+  disturbed trail edges, deterministic cluster audits, A Shau before/after
+  screenshots, and perf captures.
+  A first local A Shau distribution implementation now uses DEM-derived
+  hydrology proxies in `A_SHAU_VALLEY_CONFIG`: low flats become wet `swamp`,
+  lowland shoulders become `riverbank` palm/understory habitat, and flatter
+  low benches can become limited `bambooGrove` pockets. The current static
+  distribution audit
+  `artifacts/perf/2026-05-05T23-49-30-281Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+  passes with A Shau CPU biome coverage `77.8%` denseJungle, `15.7%`
+  riverbank, `4.04%` bambooGrove, and `2.46%` swamp. The fresh elevated
+  screenshot baseline
+  `artifacts/perf/2026-05-05T23-49-56-989Z/projekt-143-terrain-horizon-baseline/summary.json`
+  captures 4/4 nonblank Open Frontier/A Shau shots and links trusted
+  perf-before summaries. This is still a proxy/candidate slice, not final
+  KB-TERRAIN acceptance, because water-edge placement needs a real stream or
+  hydrology input plus matched after perf and human visual review.
+  A reusable hydrology branch is documented in
+  `docs/PROJEKT_OBJEKT_143_HYDROLOGY.md` and backed by
+  `src/systems/terrain/hydrology/HydrologyBake.ts`, a deterministic D8-style
+  flow-direction/accumulation bake for sampled height grids with an optional
+  epsilon-fill depression pass. The latest static/runtime hydrology audit
+  `artifacts/perf/2026-05-06T17-01-02-257Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`
+  is PASS for the runtime classification contract: A Shau DEM wet candidates
+  cover `6.24%` of sampled cells and Open Frontier procedural wet candidates
+  cover `2.47%`, with runtime hydrology classification covering `100%` of wet
+  candidates and leaving `0%` dense-jungle wet candidates in both maps. Broad
+  dry-cell `riverbank`/`swamp` elevation proxies have been removed from A Shau
+  and Open Frontier. A dry lowland `tallGrass` ground-cover band now clears the
+  A Shau uniform-biome flag without widening hydrology corridors.
+  The latest distribution audit is
+  `artifacts/perf/2026-05-06T17-00-32-427Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+  The hydrology audit JSON includes bounded world-space `channelPolylines` for
+  the top channel paths, but those remain branch-start river-corridor
+  candidates, not accepted rivers. It also writes schema-v1 hydrology cache
+  artifacts with sparse wet/channel cell lists and channel polylines for A Shau
+  and Open Frontier, and `scripts/prebake-hydrology.ts` makes the accepted
+  cache shape durable under `public/data/hydrology` with
+  `npm run hydrology:generate` and `npm run check:hydrology-bakes`.
+  `HydrologyBakeManifest.ts` provides the typed manifest/cache loader,
+  `HydrologyBiomeClassifier.ts` provides the default large-map vegetation
+  classifier, and `HydrologyCorridor.ts` provides a pure world-space
+  channel/bank/wetland/upland sampler over cached `channelPolylines`.
+  The latest artifact writes review masks at
+`artifacts/perf/2026-05-06T17-01-02-257Z/projekt-143-terrain-hydrology-audit/a_shau_valley-hydrology-mask.png`
+  and
+`artifacts/perf/2026-05-06T17-01-02-257Z/projekt-143-terrain-hydrology-audit/open_frontier-hydrology-mask.png`.
+  Cache artifacts are
+`artifacts/perf/2026-05-06T17-01-02-257Z/projekt-143-terrain-hydrology-audit/a_shau_valley-hydrology-cache.json`
+  and
+`artifacts/perf/2026-05-06T17-01-02-257Z/projekt-143-terrain-hydrology-audit/open_frontier-hydrology-cache.json`.
+  Durable tracked cache paths are `public/data/hydrology/bake-manifest.json`,
+  `public/data/hydrology/a_shau_valley-hydrology.json`, and
+  `public/data/hydrology/open_frontier-42-hydrology.json`.
+  A static water-system contract audit at
+  `artifacts/perf/2026-05-06T10-07-20-371Z/projekt-143-water-system-audit/water-system-audit.json`
+  records the current renderer truth: `WaterSystem` still owns the global
+  Open Frontier water plane, and it now also has a provisional hydrology
+  river-strip mesh consumer wired from startup. Runtime proof at
+  `artifacts/perf/2026-05-06T10-26-04-620Z/projekt-143-water-runtime-proof/water-runtime-proof.json`
+  confirms Open Frontier has `12` hydrology channels / `592` segments with
+  global water enabled and A Shau has `12` channels / `552` segments with the
+  global water plane disabled. This is runtime presence proof only; final
+  stream visuals, flow, crossings, gameplay water queries, perf, and human
+  visual acceptance remain open.
+  Current elevated terrain horizon proof at
+  `artifacts/perf/2026-05-06T10-51-52-518Z/projekt-143-terrain-horizon-baseline/summary.json`
+  is PASS for four Open Frontier/A Shau screenshots with renderer, terrain,
+  vegetation, browser-error, and linked trusted perf-before checks. This is
+  runtime evidence only; final far-horizon appearance still needs human visual
+  acceptance and matched after captures for any future branch.
+  Current terrain visual-review packet at
+  `artifacts/perf/2026-05-06T11-24-43-438Z/projekt-143-terrain-visual-review/visual-review.json`
+  is PASS for eight Open Frontier/A Shau player-ground, route/trail,
+  river-oblique, and river-ground screenshots with zero browser/page errors,
+  plus a review contact sheet at
+  `artifacts/perf/2026-05-06T11-24-43-438Z/projekt-143-terrain-visual-review/terrain-visual-contact-sheet.png`.
+  This is review packet evidence only; it does not accept terrain art,
+  hydrology river visuals, perf, or production parity.
+  The attempted matched Open Frontier perf leg at
+  `artifacts/perf/2026-05-06T11-30-35-349Z/summary.json` is rejected as
+  KB-TERRAIN acceptance evidence: measurement trust, shots/hits, average frame,
+  and end heap growth passed, but validation failed on `137.50 MB` peak heap
+  growth and warned on `49.80ms` peak p99. A Shau paired perf was not run from
+  that slot because the first leg of the pair was already invalid.
+  Heap diagnostic
+  `artifacts/perf/2026-05-06T11-42-10-167Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`
+  classifies the rejected run as a `transient_gc_wave` likely tied to
+  vegetation cell streaming or other short-lived traversal allocations near the
+  player. This is diagnostic negative evidence only, not a fix or acceptance.
+  The attempted Open Frontier after capture at
+  `artifacts/perf/2026-05-06T00-00-32-485Z/summary.json` is rejected as
+  acceptance evidence: it failed validation on peak p99, hitch percentage, and
+  harness shots/hits, and the owner reported concurrent web game tests on the
+  same device. The terrain baseline and Cycle 3 selector scripts now skip perf
+  summaries with failed validation even when measurement trust passes. The
+  yellow-fruit `bananaPlant` albedo atlas also has a local color cleanup so the
+  lower stem reads green instead of cyan-blue, with a new
+  `src/config/vegetationTypes.test.ts` regression check for zero strong
+  cyan-blue opaque pixels. The final 2026-05-06 `npm run validate:fast` rerun
+  passes after an initial noisy `SpatialOctree.test.ts` timing failure and
+  isolated pass; that is local static validation only, not perf, visual, or
+  production acceptance. `npm run build` and `npm run build:perf` also pass
+  after the atlas/selector changes, with only the existing Vite chunk-size
+  warning. The vegetation-normal A/B proof was refreshed after the atlas
+  cleanup at
+  `artifacts/perf/2026-05-06T00-28-10-228Z/projekt-143-vegetation-normal-proof/summary.json`
+  with contact sheet
+  `artifacts/perf/2026-05-06T00-28-10-228Z/projekt-143-vegetation-normal-proof/contact-sheet.png`;
+  it remains WARN because the no-normal candidate exceeds the visual review
+  band. Default normal maps stay unchanged, and the no-normal candidate is
+  rejected for current runtime or Pixel Forge bake policy unless a future PASS
+  or owner-accepted contact sheet replaces this evidence.
   Local follow-up now includes a second bamboo clustering fix because the first
   grove mask still looked scattered: clustered mid-level vegetation gets its
   own Poisson grid instead of sharing palm spacing. The latest distribution
   audit is
-  `artifacts/perf/2026-05-04T10-53-17-067Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
-  A placement/foundation audit also exists at
-  `artifacts/perf/2026-05-04T10-53-17-143Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`;
-  it passes after moving/reorienting the first Open Frontier and Ta Bat
-  airfield/support presets. A Shau after-placement evidence at
+  `artifacts/perf/2026-05-06T17-00-32-427Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`;
+  it now includes runtime hydrology classification, clears the A Shau
+  uniform-biome flag, and remains WARN only for the AI Sandbox random-seed
+  audit fallback note.
+  Latest completion audit remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T18-36-51-770Z/projekt-143-completion-audit/completion-audit.json`.
+  Open blockers are still KB-LOAD, KB-TERRAIN, KB-CULL, and validation/release.
+  Earlier placement/foundation audits passed after moving/reorienting the first
+  Open Frontier and Ta Bat airfield/support presets, but the latest generated
+  airfield placement audit reopens foundation visual risk at
+  `artifacts/perf/2026-05-06T17-11-14-436Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`.
+  A Shau after-placement evidence at
   `artifacts/perf/2026-05-04T04-14-35-401Z/summary.json` no longer logs the
-  Ta Bat steep-footprint warning, but it remains WARN with terrain-stall/route
-  symptoms, so this is not A Shau acceptance.
+  old Ta Bat steep-footprint warning, but A Shau remains WARN with
+  terrain-stall/route symptoms and a current `tabat_airstrip` generated A-1
+  parking placement relief warning, so this is not A Shau acceptance.
 - A low-resource KB-TERRAIN asset inventory now exists at
-  `artifacts/perf/2026-05-04T11-43-52-912Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
+  `artifacts/perf/2026-05-06T13-16-02-955Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
   It found `12` terrain WebP textures (`5` green-ground variants and `4`
   trail/cleared/disturbed variants), `5` Pixel Forge ground-cover prop
   candidates, `12` building candidates, `7` runtime Pixel Forge vegetation
-  species, and `6` blocked vegetation species. This is shortlist evidence
-  only; no custom grass, ground-cover, trail, or building import is accepted
-  from static file presence.
+  species, and `6` blocked vegetation species, with no missing assets. The GLB
+  metadata pass records `5,704` candidate-building triangles, `7,528` runtime
+  structure/foundation triangles, and `30` medium/high optimization risks
+  mostly from many small meshes/materials/primitives. It also records `19`
+  sibling Pixel Forge building-gallery candidates and `5` sibling Pixel Forge
+  ground-vehicle candidates. This is shortlist evidence only; no custom grass,
+  ground-cover, trail, building, or vehicle import is accepted from static file
+  presence.
 - The active-player perf harness has a current local shorter-NPC aim fix. The
   bot/driver now aim at the Pixel Forge visual chest proxy below the actor
   eye-level anchor and can use rendered target anchors. The fresh post-fix
@@ -471,7 +662,91 @@ What is not ready to claim:
   longer the current hit-contract state. Do not use that capture as clean
   frame-time acceptance or baseline evidence: the owner reported another
   browser game was running on and off during it, so metrics are potentially
-  skewed.
+  skewed. A later 2026-05-06 local close-pressure patch makes the driver
+  hold-and-shoot inside each mode close-contact distance and puts utility-AI
+  fire-and-fade re-entry behind the existing cover-seek cooldown; the latest
+  local slice also keeps objective travel unless a visible target is inside the
+  mode acquisition band, reduces player-anchored frontline compression, and
+  suppresses close-range utility cover hops. This is not final skilled-player
+  acceptance. Trusted reruns after the first patch are filed: Open Frontier
+  `artifacts/perf/2026-05-06T13-45-41-194Z/summary.json` is OK with measurement
+  trust PASS, validation WARN on p99 only, `150` shots / `17` hits, max stuck
+  `4.3s`, and diagnostic PASS with `4` route-progress resets while ending on a
+  far current-target chase around `450m`; A Shau
+  `artifacts/perf/2026-05-06T13-49-19-901Z/summary.json` is OK with measurement
+  trust PASS, validation WARN on heap growth/recovery only, `49` shots / `6`
+  hits, max stuck `1.5s`, and diagnostic PASS ending in zone PATROL after
+  closing objective distance by `500.45m`. Treat this as improved liveness and
+  route-progress evidence. The latest Open Frontier selector/movement-clamp
+  rerun at
+  `artifacts/perf/2026-05-06T14-44-44-702Z/summary.json` has measurement trust
+  PASS, validation WARN on p99/heap peak only, diagnostic PASS, `102` shots /
+  `17` hits, `37` movement transitions, max stuck `0.3s`, `0` route
+  no-progress resets, `blockReason=none`, and `465.97m` player travel. It still
+  needs owner visual review for remaining dense close-contact twitch/cover
+  behavior and only closes `17.9m` of final objective distance while fighting a
+  nearby OPFOR.
+  A subsequent objective-aware target-lock pass fixes the far-target
+  reacquire/pacing failure in the perf driver, with Open Frontier
+  `artifacts/perf/2026-05-06T15-09-39-654Z/summary.json` and A Shau
+  `artifacts/perf/2026-05-06T15-11-14-529Z/summary.json` both OK with
+  measurement trust PASS and validation WARN. A Shau still showed repeated
+  terrain-stall warnings, so a narrow strategy/follower follow-up now keeps
+  strategic spawns and final formation slots inside objective shoulders and
+  makes close followers own/hold their leader destination instead of falling
+  through to enemy-base fallback motion. Accepted A Shau proof at
+  `artifacts/perf/2026-05-06T15-32-02-870Z/summary.json` remains WARN but
+  records `223` shots / `44` hits / `10` kills, max stuck `1.2s`, `1` route
+  no-progress reset, and `21` terrain-stall/backtracking warnings with no
+  combatant repeating more than `3` times. This improves the prior
+  scatter-only artifact at
+  `artifacts/perf/2026-05-06T15-27-27-070Z/summary.json`, which logged `44`
+  warnings with one combatant repeating `19` times. The broad terrain-flow /
+  trail-shoulder experiment at
+  `artifacts/perf/2026-05-06T15-36-41-357Z/summary.json` stayed at `22`
+  warnings and was reverted. A Shau route/nav quality is improved but still
+  unsigned.
+  A later close-pressure suppression/player-driver follow-up fixes another
+  observed twitch path: near-miss suppression no longer enters orphan
+  `SEEKING_COVER` without a cover anchor/destination, the injected perf driver
+  faces route movement while moving and combat aim while firing, and occluded
+  close targets keep repositioning until a `6m` point-blank hold. Diagnostic
+  artifacts
+  `artifacts/perf/2026-05-06T16-21-27-610Z`,
+  `artifacts/perf/2026-05-06T16-25-07-821Z`, and
+  `artifacts/perf/2026-05-06T16-27-52-490Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  show the movement bug and fix sequence; the latest 60-NPC diagnostic records
+  `63` shots / `7` hits / `3` kills, max stuck `0.2s`, `125.99m` travel, and
+  movement block reason `none`, but the capture still failed perf/heap
+  validation. Owner visual review after that still observed dense close-pressure
+  cover-like pacing/yaw twitch. The current local target-lock patch keeps active
+  close targets through brief LOS/nearest-enemy churn, but the fresh compressed
+  Open Frontier browser probe at
+  `artifacts/perf/2026-05-06T17-25-29-462Z/summary.json` still fails validation:
+  measurement trust passes, max stuck is `0.3s`, movement transitions are `40`,
+  but the run records only `1` hit, `10` route target resets, `6` route
+  no-progress resets, and negative final objective closure. Treat it as
+  behavior diagnostic evidence only, not skilled-player, culling, distribution,
+  or perf acceptance.
+  A subsequent pure-pursuit/world-movement/tactical-hold follow-up fixes missed
+  route-waypoint backward pulls, keeps the injected CJS driver on world-space
+  movement intent, and adds a movement-artifact heading-flip diagnostic. The
+  latest headed compressed Open Frontier artifact
+  `artifacts/perf/2026-05-06T18-24-22-092Z/summary.json` is OK with
+  measurement trust PASS and validation WARN: `82` shots / `16` hits / `4`
+  kills, max stuck `0.5s`, `64` movement transitions, `148` waypoints followed,
+  `2` route no-progress resets, average frame `9.31ms`, p99 `35.80ms`, and
+  heap peak growth `39.38MB`. The paired diagnostic at
+  `artifacts/perf/2026-05-06T18-24-22-092Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  is still WARN because final objective closure is only `15.2m` and the player
+  movement track records `22` heading reversals over `120` degrees, all
+  short-hop pacing reversals. This is materially better than the rejected
+  90-plus-flip close-range experiments, but it is still not skilled-player,
+  distribution, culling, or perf acceptance. Owner-observed NPC speed spikes
+  remain an open telemetry-audit item: the largest spot-checked spikes are
+  often initial harness relocation/compression samples, but some non-initial
+  terrain backtracking/recovery segments still exceed plausible run limits and
+  need a formal speed sanity gate before infantry locomotion can be accepted.
 - Fixed-wing browser validation is incomplete for the local terrain-placement
   move. `npm run probe:fixed-wing` first hit sandbox `spawn EPERM`; the
   approved rerun produced partial A-1 success in
@@ -483,15 +758,38 @@ What is not ready to claim:
   after the measured blockers are under control.
 - Phase 3 now has a refreshed Cycle 3 kickoff/readiness matrix in
   `docs/PROJEKT_OBJEKT_143.md` and
-  `artifacts/perf/2026-05-04T21-42-43-709Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  `artifacts/perf/2026-05-06T03-26-51-656Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
   Cycle 0 evidence, Cycle 1 baseline/policy work, and Cycle 2 proof surfaces
-  are shipped. The kickoff marks KB-OPTIK NPC scale/crop/selected-lighting luma
-  as inside matched proof bands after the first local remediation slice, but
-  `needs_decision` because the 8.5m near-stress camera still flags even though
-  runtime LOD-edge proof passes after expanded luma was brought into band.
-  KB-LOAD texture upload/residency remains `ready_for_branch` for remaining
-  uploads after the partial giantPalm warmup, KB-EFFECTS grenade first-use is
-  `evidence_complete` for the trusted low-load probe, KB-TERRAIN is now
+  are shipped. The latest local kickoff marks KB-OPTIK NPC scale/crop/luma as
+  `evidence_complete` after runtime LOD-edge proof passes and owner accepts the
+  runtime-equivalent same-scene review packet with caution.
+  KB-LOAD texture upload/residency remains `ready_for_branch`; the selected
+  next proof branch is
+  `vegetation-atlas-regeneration-retain-normals` from
+  `artifacts/perf/2026-05-06T02-56-15-735Z/projekt-143-load-branch-selector/load-branch-selector.json`,
+  with Pixel Forge readiness at
+  `artifacts/perf/2026-05-06T03-24-43-522Z/projekt-143-pixel-forge-vegetation-readiness/vegetation-readiness.json`.
+  That readiness artifact records source variants and normal-lit pairs present
+  for the four selected active vegetation atlases, and `branchExecutionState`
+  is now `ready_for_candidate_generation` because the local Pixel Forge TIJ
+  runner exposes a review-only `kb-load-vegetation-256` profile, separate
+  `tij-candidates` output root, and selected-species validator. Generated
+  candidate atlases and selected-species validation have now run in Pixel
+  Forge. The static candidate proof at
+  `artifacts/perf/2026-05-06T04-17-12-580Z/projekt-143-vegetation-candidate-proof/summary.json`
+  is PASS with `4/4` selected color/normal/meta pairs complete, and the TIJ
+  import-plan dry run at
+  `artifacts/perf/2026-05-06T11-03-21-671Z/projekt-143-vegetation-candidate-import-plan/import-plan.json`
+  is PASS with `importState=dry_run_ready` and `4/4` replacements mapped to
+  runtime paths. Accepted visual proof, actual import, and quiet-machine
+  startup claims are still open. The old giantPalm/fanPalm warmup path stays
+  retired partial evidence.
+  A refreshed KB-FORGE audit at
+  `artifacts/perf/2026-05-06T03-37-10-850Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+  now records `manifestPolicyAligned=true`: `giantPalm` is retired in the local
+  Pixel Forge review manifest, the six blocked species remain blocked, and the
+  six current runtime species remain candidates.
+  KB-EFFECTS grenade first-use is `evidence_complete` for the trusted low-load probe, KB-TERRAIN is now
   `ready_for_branch` after the fresh-build elevated horizon baseline at
   `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`,
   and KB-CULL has a partial static-feature batching reduction after the clean
@@ -512,10 +810,10 @@ What is not ready to claim:
   average as `0.879`, imposter luma delta percent average as `-0.073`,
   near-stress expanded proof flagged samples as `10`, runtime LOD-edge proof
   flagged samples as `0`, aircraft longest-axis/current-NPC average as `4.52x`,
-  and the recommended next branch as documenting the near-stress silhouette
-  exception or switching to KB-LOAD/KB-TERRAIN/KB-CULL.
-  It continues to reject aircraft resizing as the next response without a
-  separate vehicle-scale proof.
+  and the accepted packet at
+  `artifacts/perf/2026-05-05T23-13-35-420Z/projekt-143-optik-human-review/review-summary.json`
+  records runtime-equivalent owner acceptance. It continues to reject aircraft
+  resizing or NPC retuning as the next response without separate proof.
 - KB-CULL now has an executable first owner-path before packet. The selected
   path is `large-mode-world-static-and-visible-helicopters`, backed by trusted
   Open Frontier and A Shau scene attribution. Open Frontier owner draw-call-like
@@ -542,17 +840,28 @@ What is not ready to claim:
   remains WARN on peak p99 and terrain-stall warnings still appear. This is
   static-feature draw-call reduction only, not broad culling/HLOD, frame-time,
   A Shau terrain/nav, or production acceptance.
-- A local KB-CULL follow-up is in progress for world static feature visibility:
-  distant bases/houses were staying visible from anywhere because the static
-  feature root was global. The current local code restores per-feature render
-  groups and applies distance/hysteresis visibility before per-feature
-  batching. The first diagnostic Open Frontier capture has useful scene
-  attribution but failed harness combat validation and was run while local
-  asset baking could skew performance, so it is not acceptance. It does show
-  the tradeoff to resolve next: visible static triangles fall, while
-  draw-call-like rises because culling granularity is finer. Vegetation behind
-  hills should be handled with coarse terrain/cluster/Hi-Z-style occlusion,
-  not per-instance raycasts.
+- A local KB-CULL follow-up now has scoped before/after proof for world static
+  feature and visible-helicopter ownership. `WorldFeatureSystem` uses
+  frustum-aware static feature sector visibility on top of distance/hysteresis
+  culling, and the refreshed owner baseline at
+  `artifacts/perf/2026-05-06T16-53-41-964Z/projekt-143-culling-owner-baseline/summary.json`
+  feeds Cycle 3
+  `artifacts/perf/2026-05-06T16-54-35-084Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  That kickoff records the static-feature/visible-helicopter owner slice as
+  `evidence_complete`: Open Frontier visible owner draw-call-like delta `-223`
+  and total draw calls delta `-281`; A Shau visible owner draw-call-like delta
+  `-661` and total draw calls delta `-392`. Broad HLOD, vehicle interaction,
+  static-cluster, and vegetation-distance policy remain open. Vegetation hidden
+  behind hills should be handled with coarse terrain/cluster/Hi-Z-style
+  occlusion, not per-instance raycasts.
+- A later KB-CULL vehicle-interaction safety slice fixed
+  `HelicopterInteraction` so helicopter entry prompts/entry attempts are
+  suppressed while the player is already in fixed-wing flight. Targeted
+  vehicle tests also prove render-culled helicopters and parked fixed-wing
+  aircraft remain enterable when the player is on foot. This is unit-level
+  safety evidence only; broad HLOD/culling, future ground-vehicle driving,
+  parked-aircraft playtest coverage, matched perf, and production parity remain
+  open.
 - KB-LOAD has retired its first local runtime remediation with the short-palm
   removal, not a closeout. The old code warmed only the `giantPalm`
   color/normal texture pair before renderer reveal through

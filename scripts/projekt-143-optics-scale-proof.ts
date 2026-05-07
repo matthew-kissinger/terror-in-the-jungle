@@ -448,6 +448,7 @@ function proofHtml(): string {
           tileCropMap: { value: cropTexture },
           tileCropMapSize: { value: new THREE.Vector2(cropMap.width, cropMap.height) },
           viewColumn: { value: Math.floor(clip.viewGridX * 0.5) },
+          viewRow: { value: 0 },
           frameIndex: { value: 0 },
           combatState: { value: 0 },
           readabilityColor: { value: new THREE.Color(0.0, 0.5, 1.0) },
@@ -455,6 +456,7 @@ function proofHtml(): string {
           npcExposure: { value: tuning.npcExposure },
           minNpcLight: { value: tuning.minNpcLight },
           npcTopLight: { value: tuning.npcTopLight },
+          horizontalCropExpansion: { value: tuning.horizontalCropExpansion },
           parityScale: { value: tuning.parityScale },
           parityLift: { value: tuning.parityLift },
           paritySaturation: { value: tuning.paritySaturation },
@@ -471,6 +473,7 @@ function proofHtml(): string {
           uniform vec2 viewGrid;
           uniform vec2 frameGrid;
           uniform float viewColumn;
+          uniform float viewRow;
           uniform float frameIndex;
           uniform float combatState;
           uniform vec3 readabilityColor;
@@ -478,6 +481,7 @@ function proofHtml(): string {
           uniform float npcExposure;
           uniform float minNpcLight;
           uniform float npcTopLight;
+          uniform float horizontalCropExpansion;
           uniform sampler2D tileCropMap;
           uniform vec2 tileCropMapSize;
           uniform float parityScale;
@@ -488,11 +492,15 @@ function proofHtml(): string {
             float frameX = mod(frameIndex, frameGrid.x);
             float frameY = floor(frameIndex / frameGrid.x);
             float viewX = clamp(floor(viewColumn + 0.5), 0.0, viewGrid.x - 1.0);
-            float viewY = floor(viewGrid.y * 0.5);
+            float viewY = clamp(floor(viewRow + 0.5), 0.0, viewGrid.y - 1.0);
             vec2 atlasGrid = viewGrid * frameGrid;
             vec2 tile = vec2(frameX * viewGrid.x + viewX, frameY * viewGrid.y + viewY);
             vec4 tileCrop = texture2D(tileCropMap, (tile + vec2(0.5)) / tileCropMapSize);
-            vec2 croppedUv = mix(tileCrop.xy, tileCrop.zw, vUv);
+            float cropCenterX = (tileCrop.x + tileCrop.z) * 0.5;
+            float cropHalfX = (tileCrop.z - tileCrop.x) * 0.5 * max(horizontalCropExpansion, 1.0);
+            vec2 cropMin = vec2(max(0.0, cropCenterX - cropHalfX), tileCrop.y);
+            vec2 cropMax = vec2(min(1.0, cropCenterX + cropHalfX), tileCrop.w);
+            vec2 croppedUv = mix(cropMin, cropMax, vUv);
             vec2 sampleUv = vec2(
               (tile.x + croppedUv.x) / atlasGrid.x,
               1.0 - ((tile.y + 1.0 - croppedUv.y) / atlasGrid.y)
@@ -532,9 +540,51 @@ function proofHtml(): string {
       const geometry = new THREE.PlaneGeometry(runtimeContracts.npcSpriteWidth, runtimeContracts.npcSpriteHeight);
       const material = createNpcImposterMaterial(texture, packageFaction);
       const mesh = new THREE.Mesh(geometry, material);
+      mesh.userData.projekt143Imposter = true;
       mesh.position.y = runtimeContracts.npcActorAnchorY + runtimeContracts.npcRenderYOffset;
       mesh.updateMatrixWorld(true);
       return mesh;
+    }
+
+    function octahedralViewTileForDirection(localX, localY, localZ) {
+      const length = Math.hypot(localX, localY, localZ) || 1;
+      const x = localX / length;
+      const y = localY / length;
+      const z = localZ / length;
+      const invL1 = 1 / (Math.abs(x) + Math.abs(y) + Math.abs(z) || 1);
+      let u = x * invL1;
+      let v = z * invL1;
+      if (y < 0) {
+        const oldU = u;
+        u = (1 - Math.abs(v)) * Math.sign(oldU || 1);
+        v = (1 - Math.abs(oldU)) * Math.sign(v || 1);
+      }
+      const clip = runtimeContracts.clip;
+      const column = Math.min(clip.viewGridX - 1, Math.max(0, Math.floor(((u + 1) * 0.5) * clip.viewGridX)));
+      const row = Math.min(clip.viewGridY - 1, Math.max(0, Math.floor(((1 - v) * 0.5) * clip.viewGridY)));
+      return { column, row };
+    }
+
+    function syncImposterViewTile(object, camera) {
+      if (!object.userData.projekt143Imposter) return;
+      const cameraVector = camera.isOrthographicCamera
+        ? camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(-1)
+        : new THREE.Vector3(
+            camera.position.x - object.position.x,
+            camera.position.y - runtimeContracts.npcActorAnchorY,
+            camera.position.z - object.position.z,
+          );
+      const viewTile = octahedralViewTileForDirection(cameraVector.x, cameraVector.y, cameraVector.z);
+      object.traverse((child) => {
+        if (!child.isMesh) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        for (const material of materials) {
+          const uniforms = material && material.uniforms;
+          if (!uniforms || !uniforms.viewColumn || !uniforms.viewRow) continue;
+          uniforms.viewColumn.value = viewTile.column;
+          uniforms.viewRow.value = viewTile.row;
+        }
+      });
     }
 
     function makeLights(scene) {
@@ -603,6 +653,7 @@ function proofHtml(): string {
       scene.add(object);
       object.updateMatrixWorld(true);
       const camera = createCropCamera();
+      syncImposterViewTile(object, camera);
       const projected = projectBoxPixels(new THREE.Box3().setFromObject(object), camera, runtimeContracts.cropWidth, runtimeContracts.cropHeight);
       renderer.render(scene, camera);
       const dataUrl = renderer.domElement.toDataURL('image/png');
@@ -724,6 +775,7 @@ function proofHtml(): string {
           loadErrors.push(String(error));
         }
       })).then(() => {
+        scene.traverse((child) => syncImposterViewTile(child, camera));
         renderer.render(scene, camera);
         return {
           drawCalls: renderer.info.render.calls,

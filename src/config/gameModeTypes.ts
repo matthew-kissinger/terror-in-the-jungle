@@ -288,6 +288,21 @@ export interface GameModeConfig {
   shadowFar?: number;
   waterEnabled?: boolean; // Default true; set false to disable global water plane
 
+  // Optional feature-gated hydrology cache preload. This loads public
+  // /data/hydrology cache artifacts for future terrain/material/water work but
+  // does not change mode visuals by itself.
+  hydrology?: {
+    preload?: boolean;
+    manifestUrl?: string;
+    allowSeededFallback?: boolean;
+    biomeClassification?: {
+      enabled?: boolean;
+      wetBiomeId?: string;
+      channelBiomeId?: string;
+      maxSlopeDeg?: number;
+    };
+  };
+
   // Match settings
   maxTickets: number;
   matchDuration: number; // seconds

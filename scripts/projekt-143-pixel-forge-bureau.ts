@@ -82,6 +82,8 @@ interface PixelForgeBureauReport {
     kinds: Record<string, number>;
     vegetationSpecies: string[];
     productionStatuses: Record<string, string>;
+    manifestPolicyAligned: boolean;
+    manifestPolicyIssues: string[];
     runtimeSpeciesPresent: string[];
     runtimeSpeciesMissing: string[];
     retiredSpeciesPresent: string[];
@@ -421,6 +423,15 @@ function buildReport(): PixelForgeBureauReport {
   const blockedSpeciesPresent = blockedSpecies.filter((id) => manifestSpecies.has(id));
   const allowedKnownSpecies = new Set([...runtimeSpecies, ...retiredSpecies, ...blockedSpecies]);
   const manifestOnlySpecies = vegetationSpecies.filter((id) => !allowedKnownSpecies.has(id));
+  const manifestPolicyIssues = [
+    ...retiredSpecies
+      .filter((id) => productionStatuses[id] !== 'retired')
+      .map((id) => `${id} should be retired but is ${productionStatuses[id] ?? 'missing'}`),
+    ...blockedSpecies
+      .filter((id) => productionStatuses[id] !== 'blocked')
+      .map((id) => `${id} should be blocked but is ${productionStatuses[id] ?? 'missing'}`),
+  ];
+  const manifestPolicyAligned = manifestPolicyIssues.length === 0;
   const propFamilies = buildPropFamilies(entries);
   const vegetationPackages = buildVegetationPackages(vegetationEntries, runtimeSpecies, retiredSpecies, blockedSpecies);
   const npcPackage = inspectNpcPackage(PIXEL_FORGE_ROOT);
@@ -450,6 +461,11 @@ function buildReport(): PixelForgeBureauReport {
   }
   if (runtimeSpeciesMissing.length > 0) {
     findings.push(`Gallery manifest is missing current TIJ runtime species: ${runtimeSpeciesMissing.join(', ')}.`);
+  }
+  if (manifestPolicyAligned) {
+    findings.push('Gallery manifest retired/blocked production statuses align with current TIJ policy.');
+  } else if (manifestPolicyIssues.length > 0) {
+    findings.push(`Gallery manifest policy issues remain: ${manifestPolicyIssues.join('; ')}.`);
   }
 
   const hardMissing = !existsSync(PIXEL_FORGE_ROOT) || !surfaces.packageJson.exists;
@@ -482,6 +498,8 @@ function buildReport(): PixelForgeBureauReport {
       kinds: countKinds(entries),
       vegetationSpecies,
       productionStatuses,
+      manifestPolicyAligned,
+      manifestPolicyIssues,
       runtimeSpeciesPresent,
       runtimeSpeciesMissing,
       retiredSpeciesPresent,
@@ -509,7 +527,9 @@ function buildReport(): PixelForgeBureauReport {
     recommendations: [
       'Treat KB-FORGE as the local Pixel Forge liaison bureau for TIJ: catalog relevance, run package validation, and produce review-only handoff evidence before TIJ runtime import.',
       'Do not use external EZ-Tree or asset-library outputs as a replacement for Pixel Forge; use them as optional source inputs that Pixel Forge can ingest, bake, validate, and gallery-review.',
-      'First KB-FORGE vegetation task: refresh the Pixel Forge TIJ vegetation manifest so retired giantPalm is no longer a production target and blocked species remain explicitly review-only.',
+      manifestPolicyAligned
+        ? 'Pixel Forge TIJ vegetation manifest policy is aligned: retired giantPalm and blocked species remain review/provenance records, not runtime import targets.'
+        : 'First KB-FORGE vegetation task: refresh the Pixel Forge TIJ vegetation manifest so retired giantPalm is no longer a production target and blocked species remain explicitly review-only.',
       'Second KB-FORGE vegetation task: catalog missing Vietnam families for grass, ground cover, trail-edge clumps, understory, and far-canopy silhouettes against what Pixel Forge can already generate or bake.',
       'Keep Pixel Forge output under review-only/package directories until TIJ asset acceptance has screenshots, texture/upload evidence, and Open Frontier/A Shau coverage.',
     ],

@@ -4,6 +4,11 @@ import { StrategicAgent, StrategicSquad, AgentTier } from './types';
 import { WarEventEmitter } from './WarEventEmitter';
 import type { ZoneManager, CaptureZone } from '../world/ZoneManager';
 
+const OBJECTIVE_SCATTER_RADIUS_SCALE = 0.38;
+const HOME_OBJECTIVE_SCATTER_RADIUS_SCALE = 0.5;
+const MIN_OBJECTIVE_SCATTER_RADIUS_M = 10;
+const MAX_OBJECTIVE_SCATTER_RADIUS_M = 45;
+
 /**
  * Strategic AI Director.
  *
@@ -71,9 +76,11 @@ export class StrategicDirector {
     // Score zones
     const zoneScores = this.scoreZones(zones);
 
-    // Assign squads per faction
-    this.assignFactionSquads(Faction.US, zones, zoneScores);
-    this.assignFactionSquads(Faction.NVA, zones, zoneScores);
+    // Assign squads per active faction. Large-map configs can mix US/ARVN and
+    // NVA/VC, so hardcoding only US/NVA leaves allied squads without orders.
+    for (const faction of this.getActiveFactions()) {
+      this.assignFactionSquads(faction, zones, zoneScores);
+    }
 
     // Propagate orders to agents
     this.propagateOrders();
@@ -132,6 +139,26 @@ export class StrategicDirector {
     return scores;
   }
 
+  private getActiveFactions(): Faction[] {
+    const activeFactions = new Set<Faction>();
+
+    for (const squad of this.squads.values()) {
+      if (squad.strength > 0) {
+        activeFactions.add(squad.faction);
+      }
+    }
+
+    for (const agent of this.agents.values()) {
+      if (agent.alive) {
+        activeFactions.add(agent.faction);
+      }
+    }
+
+    return activeFactions.size > 0
+      ? [...activeFactions]
+      : [Faction.US, Faction.NVA];
+  }
+
   private assignFactionSquads(
     faction: Faction,
     zones: CaptureZone[],
@@ -141,15 +168,16 @@ export class StrategicDirector {
       .filter(s => s.faction === faction && s.strength > 0);
 
     if (factionSquads.length === 0) return;
+    const alliance = getAlliance(faction);
 
     // Partition by strength
     const strong = factionSquads.filter(s => s.strength > 0.5);
     const weak = factionSquads.filter(s => s.strength > 0.1 && s.strength <= 0.5);
 
     // Get zone lists by faction perspective
-    const enemyAlliance = getEnemyAlliance(getAlliance(faction));
+    const enemyAlliance = getEnemyAlliance(alliance);
     const enemyZones = zones.filter(z => z.owner !== null && getAlliance(z.owner) === enemyAlliance && !z.isHomeBase);
-    const ownedZones = zones.filter(z => z.owner === faction && !z.isHomeBase);
+    const ownedZones = zones.filter(z => zoneBelongsToAlliance(z, alliance) && !z.isHomeBase);
     const contestedZones = zones.filter(z => z.state === 'contested' && !z.isHomeBase);
     const neutralZones = zones.filter(z => z.owner === null && !z.isHomeBase);
 
@@ -217,7 +245,7 @@ export class StrategicDirector {
 
     // Weak squads: retreat to nearest friendly zone
     for (const squad of weak) {
-      const friendlyZones = zones.filter(z => z.owner === faction || z.isHomeBase);
+      const friendlyZones = zones.filter(z => zoneBelongsToAlliance(z, alliance));
       let nearest: CaptureZone | null = null;
       let nearestDistSq = Infinity;
       for (const z of friendlyZones) {
@@ -236,9 +264,10 @@ export class StrategicDirector {
   }
 
   private assignSquadToZone(squad: StrategicSquad, zone: CaptureZone, stance: StrategicSquad['stance']): void {
+    const objectiveOffset = randomObjectiveOffset(zone);
     squad.objectiveZoneId = zone.id;
-    squad.objectiveX = zone.position.x + (Math.random() - 0.5) * zone.radius;
-    squad.objectiveZ = zone.position.z + (Math.random() - 0.5) * zone.radius;
+    squad.objectiveX = zone.position.x + objectiveOffset.x;
+    squad.objectiveZ = zone.position.z + objectiveOffset.z;
     squad.stance = stance;
     squad.routeGoalKey = undefined;
     squad.routeWaypoints = undefined;
@@ -303,7 +332,8 @@ export class StrategicDirector {
   private handleReinforcements(elapsedTime: number, zones: CaptureZone[]): void {
     const cooldown = this.config.reinforcementCooldown;
 
-    for (const [faction, _label] of [[Faction.US, 'US'], [Faction.NVA, 'NVA']] as const) {
+    for (const faction of this.getActiveFactions()) {
+      const alliance = getAlliance(faction);
       const key = `reinforce_${faction}`;
       const lastTime = this.lastReinforcementTime[key] || 0;
       if (elapsedTime - lastTime < cooldown) continue;
@@ -320,13 +350,13 @@ export class StrategicDirector {
 
       // Reinforce if below 70% strength
       if (total > 0 && alive / total < 0.7) {
-        const hqs = zones.filter(z => z.isHomeBase && z.owner === faction);
+        const hqs = zones.filter(z => z.isHomeBase && zoneBelongsToAlliance(z, alliance));
         if (hqs.length === 0) continue;
 
         // Find forward zones near the player owned by this faction
         // This gets reinforcements into the fight faster than HQ-only spawning
         const forwardZones = zones.filter(z => {
-          if (z.isHomeBase || z.owner !== faction) return false;
+          if (z.isHomeBase || !zoneBelongsToAlliance(z, alliance)) return false;
           const fdx = z.position.x - this.playerX;
           const fdz = z.position.z - this.playerZ;
           return (fdx * fdx + fdz * fdz) < this.FORWARD_REINFORCE_RADIUS * this.FORWARD_REINFORCE_RADIUS;
@@ -376,4 +406,29 @@ export class StrategicDirector {
       }
     }
   }
+}
+
+function randomObjectiveOffset(zone: CaptureZone): { x: number; z: number } {
+  const radiusScale = zone.isHomeBase
+    ? HOME_OBJECTIVE_SCATTER_RADIUS_SCALE
+    : OBJECTIVE_SCATTER_RADIUS_SCALE;
+  const scatterRadius = clamp(
+    zone.radius * radiusScale,
+    MIN_OBJECTIVE_SCATTER_RADIUS_M,
+    MAX_OBJECTIVE_SCATTER_RADIUS_M,
+  );
+  const angle = Math.random() * Math.PI * 2;
+  const distance = Math.sqrt(Math.random()) * scatterRadius;
+  return {
+    x: Math.cos(angle) * distance,
+    z: Math.sin(angle) * distance,
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function zoneBelongsToAlliance(zone: CaptureZone, alliance: ReturnType<typeof getAlliance>): boolean {
+  return zone.owner !== null && getAlliance(zone.owner) === alliance;
 }

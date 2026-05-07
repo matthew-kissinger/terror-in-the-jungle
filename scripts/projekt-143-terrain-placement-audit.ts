@@ -11,6 +11,7 @@ import { getMapVariants } from '../src/config/MapSeedRegistry';
 import { OPEN_FRONTIER_CONFIG } from '../src/config/OpenFrontierConfig';
 import { TEAM_DEATHMATCH_CONFIG } from '../src/config/TeamDeathmatchConfig';
 import { ZONE_CONTROL_CONFIG } from '../src/config/ZoneControlConfig';
+import { AircraftModels, BuildingModels, GroundVehicleModels, StructureModels } from '../src/systems/assets/modelPaths';
 import { AIRFIELD_TEMPLATES } from '../src/systems/world/AirfieldTemplates';
 import { generateAirfieldLayout } from '../src/systems/world/AirfieldLayoutGenerator';
 import { DEMHeightProvider } from '../src/systems/terrain/DEMHeightProvider';
@@ -39,8 +40,29 @@ interface PlacementAuditEntry extends SpanMetrics {
   flags: string[];
   generatedPlacements?: {
     count: number;
+    maxFootprintRadiusMeters: number;
     maxSourceSpanMeters: number;
     maxStampedSpanMeters: number;
+    maxExactStampedSpanMeters: number;
+    nativeReliefWarnCount: number;
+    worstExactCorePlacements: Array<{
+      id: string;
+      modelPath: string;
+      worldX: number;
+      worldZ: number;
+      footprintRadiusMeters: number;
+      sourceSpanMeters: number;
+      stampedSpanMeters: number;
+    }>;
+    worstNativeReliefPlacements: Array<{
+      id: string;
+      modelPath: string;
+      worldX: number;
+      worldZ: number;
+      footprintRadiusMeters: number;
+      sourceSpanMeters: number;
+      stampedSpanMeters: number;
+    }>;
   };
 }
 
@@ -65,7 +87,10 @@ interface TerrainPlacementAudit {
   assumptions: {
     airfieldRunwayNativeSpanFailMeters: number;
     flattenedCoreSpanWarnMeters: number;
-    generatedPlacementFootprintRadiusMeters: number;
+    foundationNativeReliefWarnMeters: number;
+    generatedPlacementNativeReliefWarnMeters: number;
+    generatedPlacementDefaultFootprintRadiusMeters: number;
+    generatedPlacementMaxFootprintRadiusMeters: number;
     proceduralRandomSeedFallback: number;
     notes: string[];
   };
@@ -94,7 +119,21 @@ const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const PROCEDURAL_RANDOM_SEED_FALLBACK = 42;
 const AIRFIELD_RUNWAY_NATIVE_SPAN_FAIL_M = 18;
 const FLATTENED_CORE_SPAN_WARN_M = 2;
-const GENERATED_PLACEMENT_FOOTPRINT_RADIUS_M = 8;
+const FOUNDATION_NATIVE_RELIEF_WARN_M = 30;
+const GENERATED_PLACEMENT_NATIVE_RELIEF_WARN_M = 6;
+const GENERATED_PLACEMENT_DEFAULT_FOOTPRINT_RADIUS_M = 8;
+const GENERATED_PLACEMENT_FOOTPRINT_RADIUS_BY_MODEL_M: Readonly<Record<string, number>> = {
+  [AircraftModels.A1_SKYRAIDER]: 20,
+  [AircraftModels.AC47_SPOOKY]: 30,
+  [AircraftModels.F4_PHANTOM]: 24,
+  [AircraftModels.UH1_HUEY]: 14,
+  [BuildingModels.WAREHOUSE]: 18,
+  [GroundVehicleModels.M35_TRUCK]: 9,
+  [StructureModels.COMMAND_TENT]: 7,
+  [StructureModels.GENERATOR_SHED]: 4,
+  [StructureModels.GUARD_TOWER]: 5,
+  [StructureModels.ZPU4_AA]: 6,
+};
 
 function timestampSlug(): string {
   return new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
@@ -206,10 +245,16 @@ function analyzeFeature(
   } else if (spans.stampedSpanMeters > FLATTENED_CORE_SPAN_WARN_M) {
     flags.push('flattened-core-span-above-target');
   }
+  if (feature.kind !== 'airfield' && spans.sourceSpanMeters > FOUNDATION_NATIVE_RELIEF_WARN_M) {
+    flags.push('foundation-native-relief-visual-review-required');
+  }
 
   const generatedPlacements = analyzeGeneratedAirfieldPlacements(feature, sourceProvider, stampedProvider);
-  if (generatedPlacements && generatedPlacements.maxStampedSpanMeters > FLATTENED_CORE_SPAN_WARN_M) {
+  if (generatedPlacements && generatedPlacements.maxExactStampedSpanMeters > FLATTENED_CORE_SPAN_WARN_M) {
     flags.push('generated-placement-core-span-above-target');
+  }
+  if (generatedPlacements && generatedPlacements.nativeReliefWarnCount > 0) {
+    flags.push('generated-placement-native-relief-visual-review-required');
   }
 
   return {
@@ -362,23 +407,65 @@ function analyzeGeneratedAirfieldPlacements(
   );
   let maxSourceSpan = 0;
   let maxStampedSpan = 0;
+  let maxExactStampedSpan = 0;
+  let maxFootprintRadius = 0;
+  const worstExactCorePlacements: NonNullable<PlacementAuditEntry['generatedPlacements']>['worstExactCorePlacements'] = [];
+  const worstNativeReliefPlacements: NonNullable<PlacementAuditEntry['generatedPlacements']>['worstNativeReliefPlacements'] = [];
   for (const placement of layout.placements) {
     const offset = placement.offset;
     const world = rotatePlacementOffset(feature.position, feature.placement?.yaw ?? 0, offset);
+    const footprintRadius = generatedPlacementFootprintRadius(placement.modelPath);
     const spans = measureSpan(
-      sampleCircle(world.x, world.z, GENERATED_PLACEMENT_FOOTPRINT_RADIUS_M),
+      sampleCircle(world.x, world.y, footprintRadius),
       sourceProvider,
       stampedProvider,
     );
+    maxFootprintRadius = Math.max(maxFootprintRadius, footprintRadius);
     maxSourceSpan = Math.max(maxSourceSpan, spans.sourceSpanMeters);
     maxStampedSpan = Math.max(maxStampedSpan, spans.stampedSpanMeters);
+    const exactTerrainSnap = placement.skipFlatSearch === true;
+    if (exactTerrainSnap) {
+      maxExactStampedSpan = Math.max(maxExactStampedSpan, spans.stampedSpanMeters);
+      worstExactCorePlacements.push({
+        id: placement.id ?? 'unnamed',
+        modelPath: placement.modelPath,
+        worldX: roundMetric(world.x, 2),
+        worldZ: roundMetric(world.y, 2),
+        footprintRadiusMeters: roundMetric(footprintRadius, 2),
+        sourceSpanMeters: spans.sourceSpanMeters,
+        stampedSpanMeters: spans.stampedSpanMeters,
+      });
+    }
+    if (exactTerrainSnap && spans.sourceSpanMeters > GENERATED_PLACEMENT_NATIVE_RELIEF_WARN_M) {
+      worstNativeReliefPlacements.push({
+        id: placement.id ?? 'unnamed',
+        modelPath: placement.modelPath,
+        worldX: roundMetric(world.x, 2),
+        worldZ: roundMetric(world.y, 2),
+        footprintRadiusMeters: roundMetric(footprintRadius, 2),
+        sourceSpanMeters: spans.sourceSpanMeters,
+        stampedSpanMeters: spans.stampedSpanMeters,
+      });
+    }
   }
+  worstExactCorePlacements.sort((a, b) => b.stampedSpanMeters - a.stampedSpanMeters);
+  worstNativeReliefPlacements.sort((a, b) => b.sourceSpanMeters - a.sourceSpanMeters);
 
   return {
     count: layout.placements.length,
+    maxFootprintRadiusMeters: roundMetric(maxFootprintRadius, 2),
     maxSourceSpanMeters: roundMetric(maxSourceSpan, 2),
     maxStampedSpanMeters: roundMetric(maxStampedSpan, 2),
+    maxExactStampedSpanMeters: roundMetric(maxExactStampedSpan, 2),
+    nativeReliefWarnCount: worstNativeReliefPlacements.length,
+    worstExactCorePlacements: worstExactCorePlacements.slice(0, 8),
+    worstNativeReliefPlacements: worstNativeReliefPlacements.slice(0, 8),
   };
+}
+
+function generatedPlacementFootprintRadius(modelPath: string): number {
+  return GENERATED_PLACEMENT_FOOTPRINT_RADIUS_BY_MODEL_M[modelPath]
+    ?? GENERATED_PLACEMENT_DEFAULT_FOOTPRINT_RADIUS_M;
 }
 
 function rotatePlacementOffset(center: THREE.Vector3, yaw: number, offset: THREE.Vector3): THREE.Vector2 {
@@ -421,14 +508,22 @@ function buildReport(): TerrainPlacementAudit {
     assumptions: {
       airfieldRunwayNativeSpanFailMeters: AIRFIELD_RUNWAY_NATIVE_SPAN_FAIL_M,
       flattenedCoreSpanWarnMeters: FLATTENED_CORE_SPAN_WARN_M,
-      generatedPlacementFootprintRadiusMeters: GENERATED_PLACEMENT_FOOTPRINT_RADIUS_M,
+      foundationNativeReliefWarnMeters: FOUNDATION_NATIVE_RELIEF_WARN_M,
+      generatedPlacementNativeReliefWarnMeters: GENERATED_PLACEMENT_NATIVE_RELIEF_WARN_M,
+      generatedPlacementDefaultFootprintRadiusMeters: GENERATED_PLACEMENT_DEFAULT_FOOTPRINT_RADIUS_M,
+      generatedPlacementMaxFootprintRadiusMeters: Math.max(
+        GENERATED_PLACEMENT_DEFAULT_FOOTPRINT_RADIUS_M,
+        ...Object.values(GENERATED_PLACEMENT_FOOTPRINT_RADIUS_BY_MODEL_M),
+      ),
       proceduralRandomSeedFallback: PROCEDURAL_RANDOM_SEED_FALLBACK,
       notes: [
         'This is a static terrain-source and stamp-effect audit, not screenshot acceptance.',
         'Procedural modes are audited for every registered pre-baked seed variant, not only the default config seed.',
         'Airfield native runway span is measured before stamps so authored cliff-edge sites stay visible.',
         'Stamped core spans verify that current flatten stamps produce a usable pad; they do not prove visual foundation quality.',
-        'Generated airfield placement spans use a fixed 8m footprint proxy because final model bounds are runtime asset data.',
+        'Large native relief under a non-airfield pad warns because a perfectly flat stamped core can still read as a mesa or cliff-edge foundation in screenshots.',
+        'Generated airfield placement spans use model-specific footprint proxies for known aircraft, large buildings, and ground vehicles; final model bounds remain runtime asset data.',
+        'Generated placement core/native-relief warnings are scoped to exact/no-flat-search parked aircraft or vehicles; runtime flat-search structures remain visual-review items, not static-audit failures.',
         'Final acceptance still needs A Shau/Open Frontier screenshots and perf captures when placement changes affect runtime.',
       ],
     },
@@ -440,14 +535,16 @@ function buildReport(): TerrainPlacementAudit {
     },
     modes,
     recommendation: {
-      nextBranch: 'Fix authored feature sites that fail native airfield span before importing new buildings or claiming foundation acceptance.',
+      nextBranch: 'Fix authored feature sites or generated airfield placements that fail native airfield span, warn on large native pad relief, or show cliff-edge generated foundations before importing new buildings or claiming foundation acceptance.',
       validationRequired: [
         'Before/after terrain placement audit artifact.',
         'Targeted terrain feature tests for airfield stamps and route pads.',
+        'Runtime visual review of airfield buildings, parked aircraft, and ground vehicles before swapping in Pixel Forge structure/vehicle GLBs.',
         'A Shau perf/screenshot evidence before accepting terrain placement or foundation visual quality.',
       ],
       nonClaims: [
         'No building asset acceptance from placement spans alone.',
+        'No vehicle-driving surface or collision acceptance from placement spans alone.',
         'No runtime performance claim without matched perf captures.',
         'No final foundation visual acceptance without screenshots.',
       ],

@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-05-04
+Last updated: 2026-05-06
 
 ## Stable-Ground Perf Posture
 
@@ -81,6 +81,7 @@ npm run perf:startup:openfrontier   # Production startup benchmark
 npm run check:pixel-forge-optics    # KB-OPTIK imposter optics audit
 npm run check:vegetation-horizon    # KB-TERRAIN vegetation horizon audit
 npm run check:webgpu-strategy       # KB-STRATEGIE WebGL/WebGPU audit
+npm run check:projekt-143-platform-capabilities # KB-STRATEGIE guarded browser platform probe
 npm run check:projekt-143           # Cycle 0 static evidence suite
 npm run check:projekt-143-cycle1-bundle -- <artifact dirs>  # Cycle 1 benchmark bundle sidecars
 npm run check:projekt-143-culling-proof  # Cycle 2 headed renderer/category proof
@@ -95,6 +96,8 @@ npm run check:projekt-143-cycle3-kickoff # Cycle 3 remediation readiness matrix
 npm run check:projekt-143-optik-decision # KB-OPTIK NPC/vehicle scale decision packet
 npm run check:projekt-143-optik-expanded # KB-OPTIK expanded lighting/gameplay-camera proof
 npm run check:projekt-143-vegetation-normal-proof # KB-LOAD/OPTIK vegetation normal-map A/B proof
+npm run check:projekt-143-load-branch # KB-LOAD next texture branch selector
+npm run check:projekt-143-pixel-forge-vegetation-readiness # KB-LOAD Pixel Forge selected-branch readiness audit
 ```
 
 Startup UI benchmarks are retail-build measurements, not perf-harness frame
@@ -131,6 +134,22 @@ PERF_DURATION=<seconds>     PERF_WARMUP=<seconds>     PERF_NPCS=<count>
 PERF_COMBAT=1|0             PERF_ACTIVE_PLAYER=1|0    PERF_PORT=<port>
 PERF_DEEP_CDP=1|0           PERF_PREWARM=1|0          PERF_SAMPLE_INTERVAL_MS=<ms>
 ```
+
+## Capture Environment Discipline
+
+Headed perf captures now launch Chromium with a fixed `1920x1080` viewport,
+`--window-position=0,0`, `--window-size=1920,1080`, and
+`--force-device-scale-factor=1` / `deviceScaleFactor: 1`. This is intended to
+avoid the owner-reported multi-monitor span contaminating frame-time and
+compositor behavior.
+
+Do not refresh baselines or accept Projekt performance evidence while another
+browser game, browser-test agent, SDS repo overnight agent, or asset bake is
+active on the same device. Before any headed or GPU-heavy capture, do a
+lightweight process/resource check for browser, Node, and Bun workloads. If the
+same stale resource-consuming processes remain after roughly three hours, clean
+them up before resuming resource-heavy Projekt work, then run one final process
+check before capture.
 
 ## Artifacts
 
@@ -179,7 +198,9 @@ selection still use `startup-ui-<mode>/`.
 startup candidate. It force-builds the perf target by default, captures
 default normal-lit vegetation and no-normal vegetation at fixed Open Frontier
 and Zone Control camera anchors, writes a contact sheet plus pair deltas, and
-reports WARN until a human accepts the visual result.
+reports WARN until a future PASS or owner-accepted visual result exists. As of
+the latest Projekt 143 refresh, WARN means the no-normal path is rejected for
+default policy and default vegetation normal maps remain active.
 
 `perf-grenade-spike.ts` writes KB-EFFECTS artifacts under
 `artifacts/perf/<timestamp>/grenade-spike-<mode>/`: `summary.json`,
@@ -397,6 +418,101 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
 
 ## Harness Status
 
+- **Resource contention caveat (2026-05-06):** current owner reports include
+  other browser/game agents and an SDS repo overnight Claude shift on the same
+  device. Treat local headed/GPU-heavy captures as blocked until a lightweight
+  process check shows the machine is quiet. The harness window clamp should
+  reduce monitor-span noise, but it does not make a busy machine acceptable for
+  perf acceptance.
+- **NPC recovery follow-up (2026-05-06):** `CombatantMovement` now rejects
+  zero-distance navmesh backtrack snaps and prefers last-good navmesh progress
+  before scored terrain fallback. A Shau after evidence
+  `artifacts/perf/2026-05-06T04-46-26-097Z/summary.json` clears the shot gate
+  with `240` validation player shots / `170` hits, but remains WARN on p99,
+  heap peak, and repeated terrain backtracking. Open Frontier
+  `artifacts/perf/2026-05-06T04-51-35-039Z/summary.json` remains WARN and
+  points toward active-driver route/engagement behavior. The rejected
+  frontline-compression run
+  `artifacts/perf/2026-05-06T04-58-04-461Z/summary.json` failed validation and
+  was reverted.
+- **Active-driver route-overlay follow-up (2026-05-06):** the perf driver now
+  carries a `movementTarget` for navmesh overlay points. While the bot is
+  moving and not firing, the controller faces that route point instead of the
+  far enemy/objective aim target, which matches the camera-relative movement
+  contract and addresses the "player stops after a few minutes" failure shape
+  seen in Open Frontier. Validation so far includes focused CPU tests:
+  `npx vitest run src/dev/harness/playerBot/PlayerBotController.test.ts
+  src/dev/harness/playerBot/states.test.ts src/dev/harness/PlayerBot.test.ts
+  scripts/perf-harness/perf-active-driver.test.js` and `npm run typecheck`
+  pass. A headless Open Frontier diagnostic after the patch,
+  `artifacts/perf/2026-05-06T06-18-15-743Z/summary.json`, failed validation and
+  measurement trust, but it improved the specific route-stuck telemetry versus
+  `artifacts/perf/2026-05-06T06-04-57-681Z/summary.json`: max harness stuck
+  `176.1s -> 0s`, player `blockedByTerrain 275 -> 0`, and
+  `avgActualSpeed 0 -> 8.82m/s`. Combat still fired `0` shots and stayed in
+  PATROL, so the driver now also prefers a nearest-live-OPFOR patrol objective
+  in aggressive large-map profiles before falling back to capture-zone routing.
+  The capture stream now also records `objectiveKind`, `objectiveDistance`,
+  `nearestOpforDistance`, `nearestPerceivedEnemyDistance`, and
+  `perceptionRange`, plus path target kind/distance and last query status, so
+  the next diagnostic can separate objective routing, perception range, and
+  nav/path failure. `npm run check:projekt-143-active-driver-diagnostic` reads
+  the resulting runtime samples and prefers the newest telemetry-bearing
+  capture when no artifact is passed. This is harness proof routing and
+  telemetry, not gameplay AI. A quiet-machine Open Frontier/A Shau rerun is
+  still required before claiming runtime movement, combat, or perf acceptance.
+  The first resource-clean headed Open Frontier rerun with telemetry,
+  `artifacts/perf/2026-05-06T07-38-14-932Z/summary.json`, has measurement
+  trust PASS but validation FAIL: the bot records `nearest_opfor` objectives,
+  enters ADVANCE, and sees a perceived target around `724m`, but path queries
+  remain `failed`, the target never reaches fire range, and shots stay `0`.
+  Two follow-up path-planning experiments are rejected diagnostic artifacts:
+  `artifacts/perf/2026-05-06T07-45-35-107Z/summary.json` briefly produced
+  `ok` path queries but regressed p99 and still fired `0` shots, while
+  `artifacts/perf/2026-05-06T07-51-32-551Z/summary.json` and the confirmation
+  run `artifacts/perf/2026-05-06T07-54-19-080Z/summary.json` missed all runtime
+  samples and fail measurement trust.
+- **Active-driver terrain/contact and combat-front proof (2026-05-06):**
+  retained fixes now address the next failure layer without accepting the
+  rejected path-planning experiments. `perf-capture.ts` injects browser runtime
+  helpers as raw page-init script content, so telemetry sampling no longer
+  fails on browser-scope helper references. `TerrainQueries.getEffectiveHeightAt()`
+  now limits effective ground to low/standable static support surfaces and
+  explicit helipads; tall generic or dynamic collision bounds still block
+  collisions but no longer lift the player's target ground. The Open Frontier
+  active driver can also place a capped player-anchored combat front and sync
+  combatant logical positions, rendered positions, and spatial-grid entries.
+  The headed 20s proof
+  `artifacts/perf/2026-05-06T08-52-31-466Z/summary.json` has measurement trust
+  PASS and validation WARN. Active gates pass (`33` shots, `19` hits, `6`
+  kills, max stuck `0.5s`, `19` movement transitions), and the paired
+  diagnostic
+  `artifacts/perf/2026-05-06T08-52-31-466Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  is PASS with `playerBlockedByTerrain=0`, `collisionHeightDeltaAtPlayer=0`,
+  and `blockReason=none`. Do not promote this to baseline or KB-TERRAIN
+  acceptance: p99 `53.50ms`, average frame `26.37ms`, hitch50 `0.94%`, and
+  heap peak growth `77.85MB` remain WARN, the run is short, and A Shau still
+  needs route/nav-quality acceptance.
+- **Close-model frustum-culling proof (2026-05-06):** the full-duration
+  Open Frontier active-driver path exposed the next KB-CULL failure layer.
+  Before evidence
+  `artifacts/perf/2026-05-06T09-06-03-544Z/summary.json` has measurement trust
+  PASS but validation FAIL: average frame `31.08ms`, p99 `65.90ms`, hitch50
+  `3.78%`, and scene attribution dominated by close weapons / close NPC GLBs.
+  `CombatantRenderer` now keeps close Pixel Forge NPC body and weapon meshes
+  eligible for renderer frustum culling and computes missing bounding spheres
+  instead of forcing every close-model child to render off-camera. Focused
+  `CombatantRenderer` tests, `npm run typecheck`, and `npm run build:perf`
+  pass. After evidence
+  `artifacts/perf/2026-05-06T09-09-45-715Z/summary.json` is Open Frontier
+  validation WARN with measurement trust PASS, p99 `47.90ms`, hitch50 `0.04%`,
+  heap peak growth `6.69MB`, `81` shots / `45` hits, and active-driver
+  diagnostic PASS. Matched A Shau after evidence
+  `artifacts/perf/2026-05-06T09-11-34-037Z/summary.json` is validation WARN
+  with measurement trust PASS, p99 `26.70ms`, hitch50 `0%`, heap peak growth
+  `27.81MB`, `171` shots / `95` hits, and active-driver diagnostic PASS. This
+  accepts only a scoped close-model culling/runtime-liveness slice; broad
+  HLOD/culling and KB-TERRAIN visual/hydrology closeout remain open.
 - **Active-player killbot caveat (2026-05-04):** shorter Pixel Forge NPCs
   changed the target-height contract. The local bot and CJS driver now aim at
   the visual chest proxy and can use rendered target anchors. The fresh
@@ -629,6 +745,28 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   measured a keyed-instanced NPC-shaped path at about `2.02ms` avg for `3000`
   instances and recommended deferring WebGPU migration. Treat WebGPU as a
   post-stabilization spike target, not a current perf remediation.
+- 2026-05-06 KB-STRATEGIE near-metal platform-track refresh:
+  `npm run check:webgpu-strategy` wrote
+  `artifacts/perf/2026-05-06T05-53-35-718Z/webgpu-strategy-audit/strategy-audit.json`
+  through the refreshed static Projekt suite. Active runtime source still has
+  `0` WebGPU matches; the broader repo now has `12` WebGL renderer entrypoints
+  including proof/review tools and `113` migration-blocker matches. The new
+  `nearMetalPlatformTrack` inventories existing GPU timing, device-class,
+  OffscreenCanvas, SharedArrayBuffer, cross-origin isolation, and worker-render
+  source hooks, then records browser capability probing as a guarded follow-up
+  path rather than runtime evidence.
+  The audit excludes Projekt tooling self-references, including the completion
+  audit and platform probe, so `activeWebgpuSourceMatches=0` reflects runtime
+  source instead of routing-tool field names.
+  The guarded browser probe command is now
+  `npm run check:projekt-143-platform-capabilities`. The headless browser run at
+  `artifacts/perf/2026-05-06T06-03-26-013Z/projekt-143-platform-capability-probe/summary.json`
+  is WARN inventory: WebGL2 is available through SwiftShader,
+  `EXT_disjoint_timer_query_webgl2` is unavailable, `navigator.gpu` has no
+  WebGPU adapter, OffscreenCanvas WebGL2 and isolated SharedArrayBuffer pass,
+  and local `_headers` plus live Pages COOP/COEP headers pass. Prefer a headed
+  hardware-backed quiet-machine rerun before any architecture decision. This is
+  a read-only platform-utilization path, not migration approval.
 - 2026-05-02 Cycle 0 static evidence suite:
   `npm run check:projekt-143` wrote
   `artifacts/perf/2026-05-02T22-05-00-955Z/projekt-143-evidence-suite/suite-summary.json`.
@@ -684,7 +822,8 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   averaged `3203.667ms` mode-click-to-playable, `2631.667ms`
   deploy-click-to-playable, `767.467ms` WebGL upload total, and `492.667`
   upload calls. This is not an accepted art or runtime policy change; vegetation
-  normal-map removal still requires KB-OPTIK side-by-side visual review.
+  normal-map removal is rejected for default policy while the latest visual
+  proof remains WARN.
 - 2026-05-05 KB-LOAD/OPTIK vegetation-normal visual proof:
   `npm run check:projekt-143-vegetation-normal-proof` wrote
   `artifacts/perf/2026-05-05T12-15-23-150Z/projekt-143-vegetation-normal-proof/summary.json`
@@ -694,7 +833,10 @@ a blocked run still leaves enough evidence to diagnose startup regressions.
   renderer stats, vegetation counters, and `0` browser/page/request failures.
   Mechanical deltas stayed inside the review band with max mean absolute RGB
   delta `15.595` and max absolute mean luma delta `8.284%`, but the proof is
-  WARN until human visual review accepts the contact sheet.
+  WARN until human visual review accepts the contact sheet. A later
+  2026-05-06 refresh exceeded the review band, so default runtime policy stays
+  on vegetation normal maps unless a future PASS or owner-accepted proof
+  replaces that result.
 - 2026-05-02 Cycle 1 trusted steady-state evidence: Open Frontier short wrote
   `artifacts/perf/2026-05-02T22-11-29-560Z` with measurement trust PASS,
   avg/p95/p99/max `23.70/29.20/32.70/100ms`, 4 hitches above `50ms`, renderer
@@ -835,7 +977,7 @@ Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p
    and A Shau still needs terrain/nav/runtime acceptance.
    Close-NPC/weapon pool residency remains diagnostic-only until combat stress
    measurement trust passes.
-7. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
+7. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip. The 2026-05-06 NPC navmesh recovery follow-up removes a no-op current-position snap, which improves A Shau combat evidence, but repeated backtracking still remains and Open Frontier active-driver routing still needs diagnosis.
 
 ## Resolved Bottlenecks
 

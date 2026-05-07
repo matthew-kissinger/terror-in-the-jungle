@@ -32,6 +32,20 @@ type WebgpuStrategyAudit = {
       overflowReportingPresent: boolean;
     };
   };
+  nearMetalPlatformTrack: {
+    sourceMatches: {
+      gpuTiming: MatchEntry[];
+      deviceClassPolicy: MatchEntry[];
+      offscreenCanvas: MatchEntry[];
+      sharedArrayBuffer: MatchEntry[];
+      crossOriginIsolation: MatchEntry[];
+      workerRendering: MatchEntry[];
+    };
+    browserProbeStatus: 'deferred_resource_contention' | 'ready_to_run';
+    requiredBrowserProbeFields: string[];
+    nextActions: string[];
+    nonClaims: string[];
+  };
   priorSpike: {
     branch: string;
     commit: string | null;
@@ -57,6 +71,11 @@ type WebgpuStrategyAudit = {
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const TEXT_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.md', '.html', '.json']);
 const ACTIVE_DIRS = ['src', 'scripts', 'public'];
+const TOOLING_SELF_EXCLUDES = new Set([
+  'scripts/webgpu-strategy-audit.ts',
+  'scripts/projekt-143-completion-audit.ts',
+  'scripts/projekt-143-platform-capability-probe.ts',
+]);
 const SEARCH_EXCLUDES = new Set([
   'node_modules',
   'dist',
@@ -95,7 +114,7 @@ function collectFiles(rootDir: string): string[] {
         continue;
       }
       if (stats.isFile() && TEXT_EXTENSIONS.has(extname(path))) {
-        if (relative(process.cwd(), path).replaceAll('\\', '/') === 'scripts/webgpu-strategy-audit.ts') {
+        if (TOOLING_SELF_EXCLUDES.has(relative(process.cwd(), path).replaceAll('\\', '/'))) {
           continue;
         }
         files.push(path);
@@ -193,6 +212,9 @@ function getPriorSpike(): WebgpuStrategyAudit['priorSpike'] {
 
 function buildAudit(): WebgpuStrategyAudit {
   const files = ACTIVE_DIRS.flatMap(collectFiles);
+  const browserProbeStatus = process.env.PROJEKT_143_PLATFORM_BROWSER_READY === '1'
+    ? 'ready_to_run'
+    : 'deferred_resource_contention';
   const combatantMeshFactoryPath = join(process.cwd(), 'src', 'systems', 'combat', 'CombatantMeshFactory.ts');
   const combatantMeshFactory = existsSync(combatantMeshFactoryPath)
     ? readFileSync(combatantMeshFactoryPath, 'utf8')
@@ -225,6 +247,34 @@ function buildAudit(): WebgpuStrategyAudit {
         mountedBucketCapacity: extractConstNumber(combatantMeshFactory, 'MOUNTED_MESH_BUCKET_CAPACITY'),
         overflowReportingPresent: combatantMeshFactory.includes('reportBucketOverflow'),
       },
+    },
+    nearMetalPlatformTrack: {
+      sourceMatches: {
+        gpuTiming: findMatches(files, /EXT_disjoint_timer_query|GPUTimingTelemetry|gpuTiming|GPU_DISJOINT_EXT/),
+        deviceClassPolicy: findMatches(files, /estimateGPUTier|DeviceDetector|deviceMemory|hardwareConcurrency|isMobileDevice/),
+        offscreenCanvas: findMatches(files, /OffscreenCanvas|transferControlToOffscreen/),
+        sharedArrayBuffer: findMatches(files, /SharedArrayBuffer|Atomics\b/),
+        crossOriginIsolation: findMatches(files, /crossOriginIsolated|Cross-Origin-Opener-Policy|Cross-Origin-Embedder-Policy|COOP|COEP/),
+        workerRendering: findMatches(files, /new\s+Worker|WorkerNavigator|worker\.requestAnimationFrame|DedicatedWorkerGlobalScope/),
+      },
+      browserProbeStatus,
+      requiredBrowserProbeFields: [
+        'navigator.gpu availability, adapter info where exposed, supported features, and limits.',
+        'WebGL2 extension set, including EXT_disjoint_timer_query_webgl2 availability.',
+        'OffscreenCanvas and transferControlToOffscreen availability for the game canvas.',
+        'crossOriginIsolated, SharedArrayBuffer constructor visibility, Atomics availability, hardwareConcurrency, and deviceMemory.',
+        'WebGL renderer/vendor strings and current DeviceDetector tier result.',
+        'Whether the capture window is single-monitor, fixed 1920x1080, and deviceScaleFactor=1.',
+      ],
+      nextActions: [
+        'Run npm run check:projekt-143-platform-capabilities -- --run-browser --headed only when the machine is quiet.',
+        'Keep the probe read-only; it must not select WebGPU or OffscreenCanvas runtime code by itself.',
+        'Use the probe to decide whether WebGL2 timer coverage, WASM threads, worker rendering, or WebGPU spikes are even viable on the owner machine and deployed Pages.',
+      ],
+      nonClaims: [
+        'This static audit does not prove browser support on the owner machine.',
+        'This static audit does not approve native bindings, WebGPU migration, OffscreenCanvas rendering, or WASM-thread rewrites.',
+      ],
     },
     priorSpike: getPriorSpike(),
     recommendation: {
@@ -277,6 +327,7 @@ function main(): void {
   console.log(`activeWebgpuSourceMatches=${audit.activeRuntime.activeWebgpuSourceMatches.length}`);
   console.log(`webglRendererEntrypoints=${audit.activeRuntime.webglRendererEntrypoints.length}`);
   console.log(`migrationBlockerMatches=${blockerCount}`);
+  console.log(`nearMetalBrowserProbeStatus=${audit.nearMetalPlatformTrack.browserProbeStatus}`);
   console.log(`e2SpikeAvailable=${audit.priorSpike.available}`);
   console.log(`recommendation=${audit.recommendation.decision}`);
 }

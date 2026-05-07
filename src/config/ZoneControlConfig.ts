@@ -4,16 +4,16 @@ import { GameMode, GameModeConfig, WeatherState } from './gameModeTypes';
 
 // Zone Control - widened layout with more staging depth and less base crowding:
 //
-//            US Base / Firebase (0, -180)
+//            US Base / Firebase (-50, -180)
 //           /              \
 //      Alpha                Charlie
-//  (-230, -20)              (230, 20)
+//  (-220, 30)               (170, -30)
 //           \              /
 //            \            /
 //              Bravo
 //             (0, 135)
 //           /              \
-//      OPFOR Base / Bunkers (0, 290)
+//      OPFOR Base / Bunkers (-30, 330)
 //
 // This creates longer approaches, more flank depth, and a less cramped opening fight.
 export const ZONE_CONTROL_CONFIG: GameModeConfig = {
@@ -81,7 +81,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       id: 'firebase_us',
       kind: 'firebase' as const,
       name: 'US Firebase',
-      position: new THREE.Vector3(0, 0, -180),
+      position: new THREE.Vector3(-50, 0, -180),
       placement: { yaw: Math.PI },
       footprint: { shape: 'circle' as const, radius: 42 },
       terrain: {
@@ -102,7 +102,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       id: 'nva_bunkers',
       kind: 'firebase' as const,
       name: 'NVA Bunker Cluster',
-      position: new THREE.Vector3(0, 0, 290),
+      position: new THREE.Vector3(-30, 0, 330),
       placement: { yaw: 0 },
       footprint: { shape: 'circle' as const, radius: 30 },
       terrain: {
@@ -166,7 +166,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       id: 'village_alpha',
       kind: 'village' as const,
       name: 'West Village',
-      position: new THREE.Vector3(-220, 0, -10),
+      position: new THREE.Vector3(-220, 0, 30),
       placement: { yaw: Math.PI * 0.3 },
       footprint: { shape: 'circle' as const, radius: 20 },
       terrain: {
@@ -204,7 +204,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       id: 'nva_trail_charlie',
       kind: 'firebase' as const,
       name: 'East Trail Base',
-      position: new THREE.Vector3(220, 0, 20),
+      position: new THREE.Vector3(170, 0, -30),
       placement: { yaw: -Math.PI * 0.3 },
       footprint: { shape: 'circle' as const, radius: 18 },
       terrain: {
@@ -225,7 +225,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
     {
       id: 'us_base',
       name: 'US Base',
-      position: new THREE.Vector3(0, 0, -180),
+      position: new THREE.Vector3(-50, 0, -180),
       radius: 36,
       isHomeBase: true,
       owner: Faction.US,
@@ -235,7 +235,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
     {
       id: 'opfor_base',
       name: 'OPFOR Base',
-      position: new THREE.Vector3(0, 0, 290),
+      position: new THREE.Vector3(-30, 0, 330),
       radius: 36,
       isHomeBase: true,
       owner: Faction.VC,
@@ -245,7 +245,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
     {
       id: 'zone_alpha',
       name: 'Alpha',
-      position: new THREE.Vector3(-230, 0, -20),
+      position: new THREE.Vector3(-220, 0, 30),
       radius: 20,
       isHomeBase: false,
       owner: null,
@@ -263,7 +263,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
     {
       id: 'zone_charlie',
       name: 'Charlie',
-      position: new THREE.Vector3(230, 0, 20),
+      position: new THREE.Vector3(170, 0, -30),
       radius: 20,
       isHomeBase: false,
       owner: null,

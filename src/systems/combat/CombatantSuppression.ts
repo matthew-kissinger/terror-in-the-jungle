@@ -106,11 +106,19 @@ export class CombatantSuppression {
     combatant.panicLevel = Math.min(1.0, combatant.panicLevel + 0.2 * proximityFactor);
     combatant.suppressionLevel = Math.min(1.0, combatant.suppressionLevel + 0.25 * proximityFactor);
 
-    // If heavily suppressed, seek cover
-    if (combatant.nearMissCount >= 3 && combatant.panicLevel > 0.6) {
-      if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.ADVANCING) {
-        combatant.state = CombatantState.SEEKING_COVER;
-      }
+    // Do not force SEEKING_COVER here. Cover movement needs a concrete
+    // coverPosition/destinationPoint; otherwise dense near-miss clusters
+    // bounce ENGAGING -> SEEKING_COVER -> ENGAGING every AI tick. The
+    // engagement state consumes suppressionLevel and performs the real cover
+    // search before entering SEEKING_COVER.
+    if (
+      combatant.nearMissCount >= 3
+      && combatant.panicLevel > 0.6
+      && combatant.coverPosition
+      && combatant.destinationPoint
+      && (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.ADVANCING)
+    ) {
+      combatant.state = CombatantState.SEEKING_COVER;
     }
   }
 }

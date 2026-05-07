@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { SplatmapConfig } from './TerrainConfig';
 import type { TerrainSurfaceKind, TerrainSurfacePatch } from './TerrainFeatureTypes';
+import type { TerrainFarCanopyTintConfig } from '../../config/biomes';
 
 const MAX_BIOME_TEXTURES = 8;
 const MAX_BIOME_RULES = 8;
@@ -105,6 +106,21 @@ uniform float featureSurfaceHalfLength[${MAX_FEATURE_SURFACE_PATCHES}];
 uniform float featureSurfaceBlend[${MAX_FEATURE_SURFACE_PATCHES}];
 uniform float featureSurfaceYawCos[${MAX_FEATURE_SURFACE_PATCHES}];
 uniform float featureSurfaceYawSin[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float farCanopyTintEnabled;
+uniform float farCanopyTintStartDistance;
+uniform float farCanopyTintEndDistance;
+uniform float farCanopyTintStrength;
+uniform float farCanopyTintFogStrength;
+uniform vec3 farCanopyTintColor;
+uniform sampler2D hydrologyMaskTexture;
+uniform float hydrologyMaskEnabled;
+uniform vec2 hydrologyMaskOrigin;
+uniform vec2 hydrologyMaskTextureSize;
+uniform float hydrologyMaskCellSize;
+uniform float hydrologyWetBiomeSlot;
+uniform float hydrologyChannelBiomeSlot;
+uniform float hydrologyWetStrength;
+uniform float hydrologyChannelStrength;
 uniform bool debugWireframe;
 
 varying vec3 vWorldPosition;
@@ -229,6 +245,39 @@ void classifyBiomeBlend(vec3 normal, out float primarySlot, out float secondaryS
   secondaryBlend = secondWeight <= 0.001 ? 0.0 : clamp(secondWeight / (bestWeight + secondWeight), 0.0, 0.5);
 }
 
+vec2 sampleHydrologyMask(vec2 worldPos) {
+  if (hydrologyMaskEnabled < 0.5 || hydrologyMaskCellSize <= 0.0) {
+    return vec2(0.0);
+  }
+
+  vec2 gridUv = ((worldPos - hydrologyMaskOrigin) / hydrologyMaskCellSize + vec2(0.5)) / hydrologyMaskTextureSize;
+  if (gridUv.x < 0.0 || gridUv.x > 1.0 || gridUv.y < 0.0 || gridUv.y > 1.0) {
+    return vec2(0.0);
+  }
+
+  return texture2D(hydrologyMaskTexture, gridUv).rg;
+}
+
+void applyHydrologyBiomeBlend(
+  vec2 worldPos,
+  inout float primarySlot,
+  inout float secondarySlot,
+  inout float secondaryBlend
+) {
+  vec2 hydrologyMask = sampleHydrologyMask(worldPos);
+  float channelWeight = smoothstep(0.2, 0.8, hydrologyMask.g) * hydrologyChannelStrength;
+  float wetWeight = smoothstep(0.2, 0.8, hydrologyMask.r) * hydrologyWetStrength;
+  float hydrologyWeight = max(channelWeight, wetWeight);
+  if (hydrologyWeight <= 0.001) {
+    return;
+  }
+
+  float originalPrimary = primarySlot;
+  primarySlot = channelWeight >= wetWeight ? hydrologyChannelBiomeSlot : hydrologyWetBiomeSlot;
+  secondarySlot = originalPrimary;
+  secondaryBlend = clamp(1.0 - hydrologyWeight, 0.0, 1.0);
+}
+
 vec4 sampleBiomeTextureRaw(float biomeSlot, vec2 uv) {
   if (biomeSlot < 0.5) return texture2D(biomeTexture0, uv);
   if (biomeSlot < 1.5) return texture2D(biomeTexture1, uv);
@@ -328,6 +377,45 @@ vec3 applyCliffRockAccent(vec3 color, float slopeUp, float elevation, vec2 world
   return mix(color, mossyRock, rockBlend);
 }
 
+float farCanopyTintMask(float slopeUp, float elevation, vec2 worldPos) {
+  if (farCanopyTintEnabled < 0.5) {
+    return 0.0;
+  }
+
+  float distanceMask = smoothstep(
+    farCanopyTintStartDistance,
+    max(farCanopyTintStartDistance + 1.0, farCanopyTintEndDistance),
+    distance(cameraPosition.xz, worldPos)
+  );
+  float slopeMask = smoothstep(0.18, 0.72, slopeUp);
+  float elevationMask = 1.0 - smoothstep(2400.0, 3800.0, elevation);
+  float breakup = mix(
+    0.74,
+    1.12,
+    hashUV(worldPos * 0.003 + vec2(3.71, 5.19))
+  );
+
+  return clamp(
+    farCanopyTintStrength * distanceMask * slopeMask * elevationMask * breakup,
+    0.0,
+    0.65
+  );
+}
+
+vec3 applyFarCanopyTint(vec3 color, float slopeUp, float elevation, vec2 worldPos) {
+  float mask = farCanopyTintMask(slopeUp, elevation, worldPos);
+  if (mask <= 0.001) {
+    return color;
+  }
+
+  vec3 canopyColor = farCanopyTintColor * mix(
+    0.82,
+    1.18,
+    hashUV(worldPos * 0.007 + vec2(1.37, 8.53))
+  );
+  return mix(color, canopyColor, mask);
+}
+
 vec3 applyFeatureSurfaceColor(vec3 color, vec2 worldPos) {
   float packedEarthWeight = featureSurfaceWeight(1.0, worldPos);
   if (packedEarthWeight > 0.001) {
@@ -368,6 +456,7 @@ float primaryBiomeSlot;
 float secondaryBiomeSlot;
 float secondaryBiomeBlend;
 classifyBiomeBlend(normalize(vTerrainNormal), primaryBiomeSlot, secondaryBiomeSlot, secondaryBiomeBlend);
+applyHydrologyBiomeBlend(vWorldPosition.xz, primaryBiomeSlot, secondaryBiomeSlot, secondaryBiomeBlend);
 vec2 uvOffset = vec2(0.0);
 if (antiTilingStrength > 0.0) {
   float noise = hashUV(vWorldUV * 7.0);
@@ -393,6 +482,7 @@ vec3 finalColor = biomeSample.rgb * macroVariation(vWorldPosition.xz);
 finalColor = jungleHumidityTint(finalColor, slopeUp, vWorldPosition.y);
 finalColor = applyLowlandWetness(finalColor, slopeUp, vWorldPosition.y);
 finalColor = applyCliffRockAccent(finalColor, slopeUp, vWorldPosition.y, vWorldPosition.xz, uvOffset);
+finalColor = applyFarCanopyTint(finalColor, slopeUp, vWorldPosition.y, vWorldPosition.xz);
 finalColor = applyFeatureSurfaceColor(finalColor, vWorldPosition.xz);
 diffuseColor.rgb = finalColor;
 if (debugWireframe) {
@@ -415,6 +505,7 @@ float primaryRoughnessBiomeSlot;
 float secondaryRoughnessBiomeSlot;
 float roughnessSecondaryBlend;
 classifyBiomeBlend(normalize(vTerrainNormal), primaryRoughnessBiomeSlot, secondaryRoughnessBiomeSlot, roughnessSecondaryBlend);
+applyHydrologyBiomeBlend(vWorldPosition.xz, primaryRoughnessBiomeSlot, secondaryRoughnessBiomeSlot, roughnessSecondaryBlend);
 float roughnessSample = sampleBiomeRoughness(primaryRoughnessBiomeSlot);
 if (roughnessSecondaryBlend > 0.001) {
   float secondaryRoughness = sampleBiomeRoughness(secondaryRoughnessBiomeSlot);
@@ -445,12 +536,31 @@ float jungleTrailWeightR = featureSurfaceWeight(5.0, vWorldPosition.xz);
 if (jungleTrailWeightR > 0.001) {
   roughnessSample = mix(roughnessSample, 0.95, jungleTrailWeightR);
 }
+float farCanopyRoughnessMask = farCanopyTintMask(
+  clamp(dot(normalize(vTerrainNormal), vec3(0.0, 1.0, 0.0)), 0.0, 1.0),
+  vWorldPosition.y,
+  vWorldPosition.xz
+);
+roughnessSample = mix(roughnessSample, max(roughnessSample, 0.92), farCanopyRoughnessMask * 0.55);
 roughnessFactor *= roughnessSample;
 `;
 
 const TERRAIN_FRAGMENT_NORMAL_OVERRIDE = /* glsl */ `
 normal = normalize(vTerrainNormal);
 nonPerturbedNormal = normal;
+`;
+
+const TERRAIN_FRAGMENT_FOG_TINT = /* glsl */ `
+#include <fog_fragment>
+float farCanopyFogMask = farCanopyTintMask(
+  clamp(dot(normalize(vTerrainNormal), vec3(0.0, 1.0, 0.0)), 0.0, 1.0),
+  vWorldPosition.y,
+  vWorldPosition.xz
+);
+if (farCanopyFogMask > 0.001) {
+  vec3 foggedCanopy = farCanopyTintColor * 0.86;
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, foggedCanopy, farCanopyFogMask * farCanopyTintFogStrength);
+}
 `;
 
 export interface TerrainBiomeLayerConfig {
@@ -475,12 +585,27 @@ export interface TerrainBiomeMaterialConfig {
   cliffRockBiomeSlot?: number;
 }
 
+export interface TerrainHydrologyMaskMaterialConfig {
+  texture: THREE.Texture;
+  width: number;
+  height: number;
+  originX: number;
+  originZ: number;
+  cellSizeMeters: number;
+  wetBiomeId: string;
+  channelBiomeId: string;
+  wetStrength?: number;
+  channelStrength?: number;
+}
+
 interface TerrainMaterialOptions {
   heightTexture: THREE.DataTexture;
   normalTexture: THREE.DataTexture;
   worldSize: number;
   splatmap: SplatmapConfig;
   biomeConfig: TerrainBiomeMaterialConfig;
+  hydrologyMask?: TerrainHydrologyMaskMaterialConfig | null;
+  farCanopyTint?: TerrainFarCanopyTintConfig;
   surfaceWetness?: number;
   tileGridResolution?: number;
   surfacePatches?: TerrainSurfacePatch[];
@@ -507,12 +632,16 @@ export function updateTerrainMaterialTextures(
   biomeConfig: TerrainBiomeMaterialConfig,
   splatmap?: SplatmapConfig,
   surfacePatches?: TerrainSurfacePatch[],
+  farCanopyTint?: TerrainFarCanopyTintConfig,
+  hydrologyMask?: TerrainHydrologyMaskMaterialConfig | null,
 ): void {
   applyTerrainMaterialOptions(material, {
     heightTexture,
     normalTexture,
     worldSize,
     biomeConfig,
+    hydrologyMask,
+    farCanopyTint,
     splatmap: splatmap ?? {
       layers: [],
       triplanarSlopeThreshold: 0.707,
@@ -536,6 +665,27 @@ export function updateTerrainMaterialWetness(
   }
 }
 
+export function updateTerrainMaterialFarCanopyTint(
+  material: THREE.MeshStandardMaterial,
+  farCanopyTint?: TerrainFarCanopyTintConfig,
+): void {
+  const normalized = normalizeFarCanopyTint(farCanopyTint);
+  material.userData.terrainFarCanopyTint = normalized;
+  const terrainUniforms = material.userData.terrainUniforms as Record<string, { value: unknown }> | undefined;
+  if (!terrainUniforms) return;
+
+  terrainUniforms.farCanopyTintEnabled.value = normalized.enabled ? 1 : 0;
+  terrainUniforms.farCanopyTintStartDistance.value = normalized.startDistance;
+  terrainUniforms.farCanopyTintEndDistance.value = normalized.endDistance;
+  terrainUniforms.farCanopyTintStrength.value = normalized.strength;
+  terrainUniforms.farCanopyTintFogStrength.value = normalized.fogStrength;
+  (terrainUniforms.farCanopyTintColor.value as THREE.Color).setRGB(
+    normalized.color[0],
+    normalized.color[1],
+    normalized.color[2],
+  );
+}
+
 function applyTerrainMaterialOptions(
   material: THREE.MeshStandardMaterial,
   options: TerrainMaterialOptions,
@@ -556,16 +706,18 @@ function applyTerrainMaterialOptions(
       }
     }
     material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
+    material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
     return;
   }
 
   // First-time setup: store uniforms and install onBeforeCompile
   material.userData.terrainUniforms = shaderBindings.uniforms;
   material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
+  material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
 
   // Unique program cache key so Three.js never serves a cached plain
   // MeshStandardMaterial program for this terrain shader.
-  material.customProgramCacheKey = () => 'TerrainCDLOD_v1';
+  material.customProgramCacheKey = () => 'TerrainCDLOD_v3_hydrology_mask';
 
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, shaderBindings.uniforms);
@@ -613,6 +765,10 @@ function applyTerrainMaterialOptions(
       '#include <normal_fragment_begin>',
       '#include <normal_fragment_begin>\n' + TERRAIN_FRAGMENT_NORMAL_OVERRIDE,
     );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <fog_fragment>',
+      TERRAIN_FRAGMENT_FOG_TINT,
+    );
   };
 }
 
@@ -633,6 +789,8 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   const rules = biomeConfig.rules;
   const surfacePatches = options.surfacePatches ?? [];
   const surfaceWetness = THREE.MathUtils.clamp(options.surfaceWetness ?? 0, 0, 1);
+  const farCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
+  const hydrologyMask = resolveHydrologyMaskMaterial(options.hydrologyMask, biomeConfig, heightTexture);
 
   if (layers.length === 0) {
     throw new Error('Terrain material requires at least one biome layer');
@@ -738,6 +896,25 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     antiTilingStrength: { value: splatmap.antiTilingStrength },
     triplanarSlopeThreshold: { value: splatmap.triplanarSlopeThreshold },
     environmentWetness: { value: surfaceWetness },
+    farCanopyTintEnabled: { value: farCanopyTint.enabled ? 1 : 0 },
+    farCanopyTintStartDistance: { value: farCanopyTint.startDistance },
+    farCanopyTintEndDistance: { value: farCanopyTint.endDistance },
+    farCanopyTintStrength: { value: farCanopyTint.strength },
+    farCanopyTintFogStrength: { value: farCanopyTint.fogStrength },
+    farCanopyTintColor: { value: new THREE.Color(
+      farCanopyTint.color[0],
+      farCanopyTint.color[1],
+      farCanopyTint.color[2],
+    ) },
+    hydrologyMaskTexture: { value: hydrologyMask.texture },
+    hydrologyMaskEnabled: { value: hydrologyMask.enabled ? 1 : 0 },
+    hydrologyMaskOrigin: { value: new THREE.Vector2(hydrologyMask.originX, hydrologyMask.originZ) },
+    hydrologyMaskTextureSize: { value: new THREE.Vector2(hydrologyMask.width, hydrologyMask.height) },
+    hydrologyMaskCellSize: { value: hydrologyMask.cellSizeMeters },
+    hydrologyWetBiomeSlot: { value: hydrologyMask.wetBiomeSlot },
+    hydrologyChannelBiomeSlot: { value: hydrologyMask.channelBiomeSlot },
+    hydrologyWetStrength: { value: hydrologyMask.wetStrength },
+    hydrologyChannelStrength: { value: hydrologyMask.channelStrength },
     featureSurfacePatchCount: { value: Math.min(surfacePatches.length, MAX_FEATURE_SURFACE_PATCHES) },
     cliffRockBiomeSlot: { value: biomeConfig.cliffRockBiomeSlot ?? 0 },
     featureSurfaceShape: { value: featureSurfaceShape },
@@ -767,6 +944,84 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   }
 
   return { uniforms };
+}
+
+function normalizeFarCanopyTint(farCanopyTint?: TerrainFarCanopyTintConfig): Required<TerrainFarCanopyTintConfig> {
+  const startDistance = Math.max(0, farCanopyTint?.startDistance ?? 600);
+  const endDistance = Math.max(startDistance + 1, farCanopyTint?.endDistance ?? 1400);
+  const strength = THREE.MathUtils.clamp(farCanopyTint?.strength ?? 0.28, 0, 0.65);
+  const fogStrength = THREE.MathUtils.clamp(farCanopyTint?.fogStrength ?? 0.42, 0, 1);
+  const color = farCanopyTint?.color ?? [0.12, 0.26, 0.11];
+
+  return {
+    enabled: farCanopyTint?.enabled === true,
+    startDistance,
+    endDistance,
+    strength,
+    fogStrength,
+    color,
+  };
+}
+
+interface ResolvedTerrainHydrologyMaskMaterialConfig {
+  enabled: boolean;
+  texture: THREE.Texture;
+  width: number;
+  height: number;
+  originX: number;
+  originZ: number;
+  cellSizeMeters: number;
+  wetBiomeSlot: number;
+  channelBiomeSlot: number;
+  wetStrength: number;
+  channelStrength: number;
+}
+
+function resolveHydrologyMaskMaterial(
+  hydrologyMask: TerrainHydrologyMaskMaterialConfig | null | undefined,
+  biomeConfig: TerrainBiomeMaterialConfig,
+  fallbackTexture: THREE.Texture,
+): ResolvedTerrainHydrologyMaskMaterialConfig {
+  const disabled = {
+    enabled: false,
+    texture: fallbackTexture,
+    width: 1,
+    height: 1,
+    originX: 0,
+    originZ: 0,
+    cellSizeMeters: 1,
+    wetBiomeSlot: 0,
+    channelBiomeSlot: 0,
+    wetStrength: 0,
+    channelStrength: 0,
+  };
+  if (!hydrologyMask) return disabled;
+
+  const wetBiomeSlot = biomeConfig.layers.findIndex((layer) => layer.biomeId === hydrologyMask.wetBiomeId);
+  const channelBiomeSlot = biomeConfig.layers.findIndex((layer) => layer.biomeId === hydrologyMask.channelBiomeId);
+  if (
+    wetBiomeSlot < 0
+    || channelBiomeSlot < 0
+    || hydrologyMask.width <= 0
+    || hydrologyMask.height <= 0
+    || hydrologyMask.cellSizeMeters <= 0
+  ) {
+    return disabled;
+  }
+
+  return {
+    enabled: true,
+    texture: hydrologyMask.texture,
+    width: hydrologyMask.width,
+    height: hydrologyMask.height,
+    originX: hydrologyMask.originX,
+    originZ: hydrologyMask.originZ,
+    cellSizeMeters: hydrologyMask.cellSizeMeters,
+    wetBiomeSlot,
+    channelBiomeSlot,
+    wetStrength: THREE.MathUtils.clamp(hydrologyMask.wetStrength ?? 0.08, 0, 1),
+    channelStrength: THREE.MathUtils.clamp(hydrologyMask.channelStrength ?? 0.14, 0, 1),
+  };
 }
 
 function readCurrentSurfaceWetness(material: THREE.MeshStandardMaterial): number {

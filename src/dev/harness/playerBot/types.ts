@@ -36,6 +36,14 @@ export interface BotTarget {
   lastKnownMs: number;
 }
 
+/** Active match objective supplied by the harness driver. */
+export interface BotObjective {
+  position: BotVec3;
+  priority: number;
+  /** Runtime objective class; zone objectives should not reacquire ungated combat targets. */
+  kind?: string;
+}
+
 /**
  * Intent the bot emits each tick. The controller translates this into the
  * existing PlayerController surface (movement intent, view angles, fire).
@@ -56,6 +64,10 @@ export interface PlayerBotIntent {
 
   // Aim — world-space 3D target. `null` = hold current view angles (no slew).
   aimTarget: BotVec3 | null;
+  // Optional movement look target. When present and the bot is moving but not
+  // firing, the controller may face this point so camera-relative movement can
+  // follow a nav/path corner instead of the far combat/objective aim point.
+  movementTarget: BotVec3 | null;
   aimLerpRate: number;   // 0..1; 1 = snap
 
   // Fire — bot writes intent; controller debounces and aim-dot-gates.
@@ -85,7 +97,7 @@ export interface PlayerBotStateContext {
   readonly canSeeTarget: (targetPos: BotVec3) => boolean;
   readonly queryPath: (from: BotVec3, to: BotVec3) => BotVec3[] | null;
   readonly findNearestNavmeshPoint: (point: BotVec3) => BotVec3 | null;
-  readonly getObjective: () => { position: BotVec3; priority: number } | null;
+  readonly getObjective: () => BotObjective | null;
   readonly sampleHeight: (x: number, z: number) => number;
 
   // Tuning — mode profile carried in from the driver.
@@ -120,8 +132,14 @@ export interface PlayerBotConfig {
   readonly engageStrafeAmplitude: number;
   /** Strafe oscillation period (ms). */
   readonly engageStrafePeriodMs: number;
+  /** Minimum time to remain in ENGAGE before yielding to ADVANCE on transient LOS/range flicker. */
+  readonly minEngageStateMs: number;
+  /** Minimum time to remain in ADVANCE before reacquiring ENGAGE on transient LOS/range flicker. */
+  readonly minAdvanceStateMs: number;
   /** Perception range (m) for findNearestEnemy. */
   readonly perceptionRange: number;
+  /** Max distance (m) where a newly seen target can interrupt objective travel. */
+  readonly targetAcquisitionDistance: number;
   /** Tick length (ms) — used for path-age calculations. */
   readonly tickMs: number;
 }
@@ -130,11 +148,14 @@ export const DEFAULT_PLAYER_BOT_CONFIG: PlayerBotConfig = {
   maxFireDistance: 165,
   sprintDistance: 200,
   approachDistance: 120,
-  pushInDistance: 8,
+  pushInDistance: 18,
   aimLerpRate: 1,
-  engageStrafeAmplitude: 0.3,
+  engageStrafeAmplitude: 0,
   engageStrafePeriodMs: 750,
+  minEngageStateMs: 700,
+  minAdvanceStateMs: 700,
   perceptionRange: 220,
+  targetAcquisitionDistance: 165,
   tickMs: 250,
 };
 
@@ -147,6 +168,7 @@ export function createIdlePlayerBotIntent(): PlayerBotIntent {
     crouch: false,
     jump: false,
     aimTarget: null,
+    movementTarget: null,
     aimLerpRate: 1,
     firePrimary: false,
     reload: false,

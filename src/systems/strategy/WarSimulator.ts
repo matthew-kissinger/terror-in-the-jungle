@@ -20,6 +20,22 @@ import type { TicketSystem } from '../world/TicketSystem';
 import type { InfluenceMapSystem } from '../combat/InfluenceMapSystem';
 
 const WAR_STATE_SCHEMA_VERSION = 1;
+const DEFAULT_STRATEGIC_SPAWN_SPREAD_M = 100;
+const MIN_STRATEGIC_SPAWN_SPREAD_M = 18;
+const HOME_BASE_SPAWN_RADIUS_SCALE = 0.75;
+const OBJECTIVE_SPAWN_RADIUS_SCALE = 0.55;
+const OBJECTIVE_FORMATION_RADIUS_SCALE = 0.72;
+
+type StrategicZoneInput = {
+  id: string;
+  name?: string;
+  position: { x: number; z: number };
+  radius?: number;
+  isHomeBase: boolean;
+  owner: Faction | null;
+  state?: string;
+  ticketBleedRate?: number;
+};
 
 /**
  * WarSimulator - persistent large-scale war engine.
@@ -213,15 +229,7 @@ export class WarSimulator implements GameSystem {
    * Distributes agents across faction HQ zones in squads.
    */
   spawnStrategicForces(
-    zones: Array<{
-      id: string;
-      name: string;
-      position: { x: number; z: number };
-      isHomeBase: boolean;
-      owner: Faction | null;
-      state?: string;
-      ticketBleedRate?: number;
-    }>
+    zones: StrategicZoneInput[]
   ): void {
     if (!this.config) return;
     this.resetStrategicForces();
@@ -304,8 +312,8 @@ export class WarSimulator implements GameSystem {
 
   private spawnFactionForces(
     faction: Faction,
-    primaryZones: Array<{ id: string; position: { x: number; z: number } }>,
-    _secondaryZones: Array<{ id: string; position: { x: number; z: number } }>,
+    primaryZones: StrategicZoneInput[],
+    _secondaryZones: StrategicZoneInput[],
     squadCount: number,
     squadMin: number,
     squadMax: number
@@ -313,7 +321,7 @@ export class WarSimulator implements GameSystem {
     for (let i = 0; i < squadCount; i++) {
       const zone = primaryZones[i % primaryZones.length];
       const size = squadMin + Math.floor(Math.random() * (squadMax - squadMin + 1));
-      const spread = 100; // meters spread around zone center
+      const spread = resolveStrategicSpawnSpread(zone);
 
       const squadId = `ws_squad_${this.nextSquadId++}`;
       const members: string[] = [];
@@ -528,7 +536,7 @@ export class WarSimulator implements GameSystem {
       return { x: waypoint.x, z: waypoint.z };
     }
 
-    return this.applyFormationOffset(agent, squad, waypoint.x, waypoint.z, routeIndex);
+    return this.applyFormationOffset(agent, squad, waypoint.x, waypoint.z, routeIndex, waypoint.arrivalRadius);
   }
 
   private getCurrentSquadWaypoint(squad: StrategicSquad) {
@@ -549,6 +557,7 @@ export class WarSimulator implements GameSystem {
     baseX: number,
     baseZ: number,
     routeIndex: number,
+    arrivalRadius?: number,
   ): { x: number; z: number } {
     const slot = agent.formationSlot ?? squad.members.indexOf(agent.id);
     if (slot <= 0) {
@@ -575,9 +584,19 @@ export class WarSimulator implements GameSystem {
     const column = (adjustedSlot % 3) - 1;
     const row = Math.floor(adjustedSlot / 3) + 1;
 
+    const rawOffsetX = perpX * column * 9 - dirX * row * 10;
+    const rawOffsetZ = perpZ * column * 9 - dirZ * row * 10;
+    const maxRadius = arrivalRadius
+      ? Math.max(16, arrivalRadius * OBJECTIVE_FORMATION_RADIUS_SCALE)
+      : Number.POSITIVE_INFINITY;
+    const offsetLength = Math.hypot(rawOffsetX, rawOffsetZ);
+    const offsetScale = offsetLength > maxRadius
+      ? maxRadius / offsetLength
+      : 1;
+
     return {
-      x: baseX + perpX * column * 9 - dirX * row * 10,
-      z: baseZ + perpZ * column * 9 - dirZ * row * 10,
+      x: baseX + rawOffsetX * offsetScale,
+      z: baseZ + rawOffsetZ * offsetScale,
     };
   }
 
@@ -747,8 +766,23 @@ export class WarSimulator implements GameSystem {
   }
 }
 
+function resolveStrategicSpawnSpread(zone: StrategicZoneInput): number {
+  const radius = Number.isFinite(zone.radius) && zone.radius !== undefined
+    ? Math.max(1, zone.radius)
+    : DEFAULT_STRATEGIC_SPAWN_SPREAD_M;
+  if (zone.isHomeBase) {
+    return clamp(radius * HOME_BASE_SPAWN_RADIUS_SCALE, MIN_STRATEGIC_SPAWN_SPREAD_M, DEFAULT_STRATEGIC_SPAWN_SPREAD_M);
+  }
+
+  return clamp(radius * OBJECTIVE_SPAWN_RADIUS_SCALE, MIN_STRATEGIC_SPAWN_SPREAD_M, DEFAULT_STRATEGIC_SPAWN_SPREAD_M);
+}
+
 function distanceSq2D(ax: number, az: number, bx: number, bz: number): number {
   const dx = bx - ax;
   const dz = bz - az;
   return dx * dx + dz * dz;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

@@ -200,22 +200,25 @@ export function pixelForgeNpcTextureName(runtimeFaction: string, clipId: string)
 }
 
 export const PIXEL_FORGE_TEXTURE_ASSETS: PixelForgeTextureAsset[] = [
-  ...PIXEL_FORGE_VEGETATION_ASSETS.flatMap((asset) => [
-    {
+  ...PIXEL_FORGE_VEGETATION_ASSETS.flatMap((asset) => {
+    const entries: PixelForgeTextureAsset[] = [{
       name: asset.textureName,
       file: asset.colorFile,
-      category: 'foliage' as const,
-      colorSpace: 'srgb' as const,
+      category: 'foliage',
+      colorSpace: 'srgb',
       billboard: true,
-    },
-    {
-      name: asset.normalTextureName,
-      file: asset.normalFile,
-      category: 'foliage' as const,
-      colorSpace: 'linear' as const,
-      billboard: true,
-    },
-  ]),
+    }];
+    if (asset.shaderProfile === 'normal-lit') {
+      entries.push({
+        name: asset.normalTextureName,
+        file: asset.normalFile,
+        category: 'foliage',
+        colorSpace: 'linear',
+        billboard: true,
+      });
+    }
+    return entries;
+  }),
   ...PIXEL_FORGE_NPC_FACTIONS.flatMap((faction) =>
     PIXEL_FORGE_NPC_CLIPS.map((clip) => ({
       name: pixelForgeNpcTextureName(faction.runtimeFaction, clip.id),

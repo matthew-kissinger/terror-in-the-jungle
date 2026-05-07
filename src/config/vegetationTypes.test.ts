@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import sharp from 'sharp';
 import { getBiome } from './biomes';
 import { VEGETATION_TYPES } from './vegetationTypes';
 import {
   PIXEL_FORGE_BLOCKED_VEGETATION_IDS,
   PIXEL_FORGE_RETIRED_VEGETATION_IDS,
+  PIXEL_FORGE_TEXTURE_ASSETS,
   PIXEL_FORGE_VEGETATION_ASSETS,
 } from './pixelForgeAssets';
+
+const BANANA_PLANT_ATLAS_PATH =
+  'public/assets/pixel-forge/vegetation/bananaPlant/banana-tree-sean-tarrant/imposter.png';
 
 describe('VEGETATION_TYPES production imposter policy', () => {
   it('marks every vegetation type as a GLB-sourced imposter target', () => {
@@ -31,6 +36,22 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(tallVegetation.every((type) => type.shaderProfile === 'normal-lit')).toBe(true);
     expect(tallVegetation.every((type) => type.normalSpace === 'capture-view')).toBe(true);
     expect(tallVegetation.every((type) => type.atlasProfile !== 'ground-compact')).toBe(true);
+  });
+
+  it('keeps hemisphere-only ground-cover normal maps out of the startup texture manifest', () => {
+    const manifestNames = new Set(PIXEL_FORGE_TEXTURE_ASSETS.map((asset) => asset.name));
+    const groundCover = PIXEL_FORGE_VEGETATION_ASSETS.filter((asset) => asset.shaderProfile === 'hemisphere');
+    const normalLit = PIXEL_FORGE_VEGETATION_ASSETS.filter((asset) => asset.shaderProfile === 'normal-lit');
+
+    expect(groundCover.map((asset) => asset.id).sort()).toEqual(['elephantEar', 'fern']);
+    for (const asset of groundCover) {
+      expect(manifestNames).toContain(asset.textureName);
+      expect(manifestNames).not.toContain(asset.normalTextureName);
+    }
+    for (const asset of normalLit) {
+      expect(manifestNames).toContain(asset.textureName);
+      expect(manifestNames).toContain(asset.normalTextureName);
+    }
   });
 
   it('uses only approved Pixel Forge vegetation assets', () => {
@@ -127,6 +148,47 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect((bananaPlant?.yOffset ?? 0) - ((bananaPlant?.size ?? 0) * 0.5) + 0.96)
       .toBeGreaterThanOrEqual(0);
     expect(bananaPlant?.maxSlopeDeg).toBeLessThanOrEqual(18);
+  });
+
+  it('keeps the banana plant stem green instead of cyan-blue', async () => {
+    const { data } = await sharp(BANANA_PLANT_ATLAS_PATH)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let strongCyanStemPixels = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      if (a < 24) {
+        continue;
+      }
+
+      if (r < 90 && g > 95 && b > 85 && b > r + 35 && g > r + 45) {
+        strongCyanStemPixels += 1;
+      }
+    }
+
+    expect(strongCyanStemPixels).toBe(0);
+  });
+
+  it('slope-caps all random vegetation that can clip into hillside terrain', () => {
+    const randomTypes = VEGETATION_TYPES
+      .filter((type) => type.placement === 'random')
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    expect(randomTypes.map((type) => type.id)).toEqual([
+      'bananaPlant',
+      'elephantEar',
+      'fanPalm',
+      'fern',
+    ]);
+    expect(randomTypes.every((type) => type.maxSlopeDeg !== undefined)).toBe(true);
+    expect(VEGETATION_TYPES.find((type) => type.id === 'fern')?.maxSlopeDeg).toBeLessThanOrEqual(24);
+    expect(VEGETATION_TYPES.find((type) => type.id === 'elephantEar')?.maxSlopeDeg).toBeLessThanOrEqual(22);
+    expect(VEGETATION_TYPES.find((type) => type.id === 'fanPalm')?.maxSlopeDeg).toBeLessThanOrEqual(30);
   });
 
   it('biases the jungle mix toward the tall palm and ground cover while keeping bamboo clustered', () => {

@@ -4,13 +4,14 @@
  * reload. The bot never touches the engine directly; the controller is
  * the one and only translation boundary.
  *
- * Aim path: intent carries a world-space `aimTarget` point. The
- * controller uses `camera.lookAt()` (the same primitive every other
- * camera consumer in the repo uses — PlayerCamera, DeathCamSystem,
- * MortarCamera, SpectatorCamera, and the old killbot driver) to compute
- * the target yaw/pitch. That keeps the rotation convention inside
- * Three.js, where it belongs, and prevents the sign-error regression
- * PR #95 shipped.
+ * Aim path: intent carries a world-space `aimTarget` point. When a caller
+ * supplies `movementTarget` while the bot is moving and not firing, the
+ * controller faces that movement point instead; player movement is
+ * camera-relative, so path following needs the camera on the route corner,
+ * not the far enemy/objective. Otherwise the controller uses `camera.lookAt()`
+ * (the same primitive every other camera consumer in the repo uses) to compute
+ * target yaw/pitch. That keeps the rotation convention inside Three.js, where
+ * it belongs, and prevents the sign-error regression PR #95 shipped.
  *
  * Fire path: an aim-dot gate (cosine cone) runs before `fireStart()`.
  * It is the one-line defense against future rotation-convention
@@ -133,7 +134,13 @@ export class PlayerBotController {
     let aimDot: number | undefined;
 
     const camera = typeof this.target.getCamera === 'function' ? this.target.getCamera() : undefined;
-    if (intent.aimTarget && camera) {
+    const wantsMovement = Math.abs(forward) > 0.01 || Math.abs(strafe) > 0.01;
+    const viewTarget =
+      wantsMovement && intent.movementTarget && !intent.firePrimary
+        ? intent.movementTarget
+        : intent.aimTarget;
+
+    if (viewTarget && camera) {
       // Stash the real rotation so lookAt's temporary write can be overwritten
       // by our lerped value via setViewAngles. This keeps the camera frame
       // coherent with PlayerCamera.setInfantryViewAngles.
@@ -143,7 +150,7 @@ export class PlayerBotController {
       const savedX = camera.rotation.x;
 
       // Compute target yaw/pitch.
-      camera.lookAt(intent.aimTarget.x, intent.aimTarget.y, intent.aimTarget.z);
+      camera.lookAt(viewTarget.x, viewTarget.y, viewTarget.z);
       const targetYaw = wrapYaw(camera.rotation.y);
       const targetPitch = clampPitch(camera.rotation.x);
 
@@ -161,9 +168,11 @@ export class PlayerBotController {
       // After setViewAngles has applied the lerped angles, the camera
       // actually points at (yawNext, pitchNext). Re-read world direction
       // and compare to the eye→target vector for the aim-dot gate.
-      aimDot = computeAimDot(camera, intent.aimTarget);
+      if (intent.aimTarget) {
+        aimDot = computeAimDot(camera, intent.aimTarget);
+      }
     }
-    // else: aimTarget === null → hold current angles; no call to setViewAngles.
+    // else: no view target → hold current angles; no call to setViewAngles.
 
     // Fire path. Reload trumps fire (mirrors the live player's input).
     let fired = false;

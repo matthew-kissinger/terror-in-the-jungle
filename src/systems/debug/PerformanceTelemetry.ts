@@ -404,6 +404,8 @@ export class PerformanceTelemetry {
       positionX,
       positionZ,
       requestedSpeed > 0.1 || actualSpeed > 0.15,
+      requestedSpeed,
+      actualSpeed,
       blockedByTerrain,
       dwellUpdate.pinnedStarted,
     )
@@ -739,6 +741,8 @@ export class PerformanceTelemetry {
     x: number,
     z: number,
     wantsMovement: boolean,
+    requestedSpeed: number,
+    actualSpeed: number,
     blockedByTerrain: boolean,
     pinnedStarted: boolean,
   ): void {
@@ -762,7 +766,12 @@ export class PerformanceTelemetry {
 
     this.playerTrackCooldownMs -= deltaTime * 1000
     if (this.playerTrackCooldownMs <= 0) {
-      this.appendTrackPoint(this.playerTrack, x, z)
+      this.appendTrackPoint(this.playerTrack, x, z, undefined, {
+        requestedSpeed,
+        actualSpeed,
+        wantsMovement,
+        blockedByTerrain,
+      })
       this.playerTrackCooldownMs = PLAYER_TRACK_SAMPLE_MS
       if (this.playerTrack.length > MAX_PLAYER_TRACK_POINTS) {
         this.playerTrack.shift()
@@ -896,6 +905,7 @@ export class PerformanceTelemetry {
     x: number,
     z: number,
     intent?: MovementIntentTelemetryKey,
+    extra?: Partial<Pick<MovementArtifactTrackPoint, 'requestedSpeed' | 'actualSpeed' | 'wantsMovement' | 'blockedByTerrain'>>,
   ): void {
     const previous = points[points.length - 1]
     if (previous) {
@@ -910,6 +920,7 @@ export class PerformanceTelemetry {
       z,
       tMs: Math.round(performance.now()),
       intent,
+      ...extra,
     })
   }
 

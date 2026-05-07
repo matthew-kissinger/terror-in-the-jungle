@@ -383,6 +383,20 @@ describe('CombatantLODManager', () => {
 
       // Movement should still update every frame (visual smoothness)
       expect(combatantMovement.updateMovement).toHaveBeenCalledTimes(3);
+      expect(combatant.lastUpdateTime).toBeGreaterThan(0);
+    });
+
+    it('stamps high LOD update time so medium LOD cannot inherit stale catch-up delta', () => {
+      const combatant = createMockCombatant('high-to-medium', new THREE.Vector3(10, 0, 0));
+      combatant.lastUpdateTime = 1;
+      combatants.set('high-to-medium', combatant);
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+
+      manager.updateCombatants(0.016);
+
+      expect(combatant.lodLevel).toBe('high');
+      expect(combatant.lastUpdateTime).toBe(100_000);
+      nowSpy.mockRestore();
     });
 
     it('should schedule medium LOD updates based on dynamic interval and stagger', () => {

@@ -30,8 +30,10 @@ import {
   getPixelForgeNpcRuntimeFaction,
   PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING,
   PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
   PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_TOP_UP_BATCH,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
   PIXEL_FORGE_NPC_RUNTIME_FACTIONS,
   sanitizePixelForgeNpcAnimationClip,
@@ -39,15 +41,13 @@ import {
   type PixelForgeNpcPoolKey,
   type PixelForgeNpcWeaponRuntimeConfig,
 } from './PixelForgeNpcRuntime';
+import { getPixelForgeNpcViewTileForCamera } from './PixelForgeNpcView';
 
 /** Y bob amplitude in world units. */
 const BOB_AMPLITUDE = 0.12;
 
 /** Y bob speed multiplier. */
 const BOB_SPEED = 3.0;
-const TWO_PI = Math.PI * 2;
-const NPC_IMPOSTOR_VIEW_COLUMNS = 7;
-const NPC_IMPOSTOR_VIEW_FORWARD_OFFSET = Math.PI;
 const HITBOX_DEBUG_MAX_ACTORS = 24;
 const DEATH_TOTAL_DURATION_SECONDS = 8.7;
 const DEATH_FALL_DURATION_SECONDS = 0.7;
@@ -147,6 +147,7 @@ export class CombatantRenderer {
   private combatantStates: Map<string, { state: number; damaged: number }> = new Map();
   private closeModelPools: Map<PixelForgeNpcPoolKey, CloseModelInstance[]> = new Map();
   private closeModelPoolLoads: Map<PixelForgeNpcPoolKey, Promise<void>> = new Map();
+  private closeModelPoolTargets: Map<PixelForgeNpcPoolKey, number> = new Map();
   private activeCloseModels: Map<string, CloseModelInstance> = new Map();
   private readonly closeModelOverflowLastLog = new Map<string, number>();
   private disposed = false;
@@ -267,16 +268,39 @@ export class CombatantRenderer {
     ];
 
     for (const config of modelConfigs) {
-      await this.createCloseModelPool(config.poolKey, config.factionConfig);
+      await this.createCloseModelPool(
+        config.poolKey,
+        config.factionConfig,
+        PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
+      );
     }
   }
 
-  private queueCloseModelPoolLoad(poolKey: PixelForgeNpcPoolKey): void {
-    if (this.disposed || this.closeModelPools.has(poolKey) || this.closeModelPoolLoads.has(poolKey)) return;
+  private queueCloseModelPoolLoad(
+    poolKey: PixelForgeNpcPoolKey,
+    requestedTarget = PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
+  ): void {
+    if (this.disposed) return;
+    const currentTotal = this.countCloseModelInstances(poolKey);
+    const previousTarget = this.closeModelPoolTargets.get(poolKey) ?? currentTotal;
+    const nextTarget = Math.min(
+      PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      Math.max(requestedTarget, previousTarget, currentTotal),
+    );
+    if (currentTotal >= nextTarget) return;
+    this.closeModelPoolTargets.set(poolKey, nextTarget);
+    if (this.closeModelPoolLoads.has(poolKey)) return;
     const factionConfig = getPixelForgeNpcRuntimeFaction(poolKey);
     const startLoad = async (): Promise<void> => {
       if (this.disposed) return;
-      await this.createCloseModelPool(poolKey, factionConfig);
+      while (!this.disposed) {
+        const target = this.closeModelPoolTargets.get(poolKey) ?? nextTarget;
+        const before = this.countCloseModelInstances(poolKey);
+        if (before >= target) return;
+        await this.createCloseModelPool(poolKey, factionConfig, target);
+        const after = this.countCloseModelInstances(poolKey);
+        if (after >= (this.closeModelPoolTargets.get(poolKey) ?? target) || after <= before) return;
+      }
     };
     const loadPromise = new Promise<void>((resolve) => {
       const run = (): void => {
@@ -322,11 +346,23 @@ export class CombatantRenderer {
   private async createCloseModelPool(
     poolKey: PixelForgeNpcPoolKey,
     factionConfig: PixelForgeNpcFactionRuntimeConfig,
+    targetSize = PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
   ): Promise<void> {
-    if (this.disposed || this.closeModelPools.has(poolKey)) return;
+    if (this.disposed) return;
 
-    const pool: CloseModelInstance[] = [];
-    for (let i = 0; i < PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION; i++) {
+    const pool = this.closeModelPools.get(poolKey) ?? [];
+    if (!this.closeModelPools.has(poolKey)) {
+      this.closeModelPools.set(poolKey, pool);
+    }
+    const target = Math.min(
+      PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      Math.max(0, Math.floor(targetSize)),
+    );
+    let total = this.countCloseModelInstances(poolKey);
+    if (total >= target) return;
+
+    const created: CloseModelInstance[] = [];
+    for (; total < target; total++) {
       if (this.disposed) break;
       try {
         const model = await modelLoader.loadAnimatedModel(factionConfig.modelPath);
@@ -343,15 +379,13 @@ export class CombatantRenderer {
         weaponPivot.add(weaponRoot);
         model.scene.add(weaponPivot);
         model.scene.visible = false;
-        model.scene.traverse((child) => {
-          if (child instanceof THREE.Object3D) child.frustumCulled = false;
-        });
+        this.configureCloseModelFrustumCulling(model.scene);
         this.applyCloseModelMaterialTuning(model.scene, factionConfig);
         this.scene.add(model.scene);
         const mixer = new THREE.AnimationMixer(model.scene);
         const metrics = this.measureCloseModelMetrics(model.scene);
         const bones = this.collectBones(model.scene);
-        pool.push({
+        const instance: CloseModelInstance = {
           root: model.scene,
           mixer,
           actions: this.createActionMap(mixer, model.animations),
@@ -365,7 +399,9 @@ export class CombatantRenderer {
           boundsMinY: metrics.boundsMinY,
           visualScale: metrics.visualScale,
           materialStates: this.collectCloseModelMaterialStates(model.scene),
-        });
+        };
+        pool.push(instance);
+        created.push(instance);
       } catch (error) {
         Logger.warn('combat-renderer', `Failed to create Pixel Forge NPC model from ${factionConfig.modelPath}`, error);
         break;
@@ -373,15 +409,50 @@ export class CombatantRenderer {
     }
 
     if (this.disposed) {
-      for (const instance of pool) {
+      for (const instance of created) {
         instance.mixer.stopAllAction();
         modelLoader.disposeInstance(instance.root);
       }
       return;
     }
 
-    this.closeModelPools.set(poolKey, pool);
-    Logger.info('combat-renderer', `Created Pixel Forge NPC close-model pool ${poolKey}: ${pool.length} models`);
+    Logger.info(
+      'combat-renderer',
+      `Created Pixel Forge NPC close-model pool ${poolKey}: `
+        + `${pool.length}/${this.countCloseModelInstances(poolKey)} available/total models (target ${target})`,
+    );
+  }
+
+  private configureCloseModelFrustumCulling(root: THREE.Object3D): void {
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      child.frustumCulled = true;
+      if (!child.geometry.boundingSphere) {
+        child.geometry.computeBoundingSphere();
+      }
+    });
+  }
+
+  private countCloseModelInstances(poolKey: PixelForgeNpcPoolKey): number {
+    let total = this.closeModelPools.get(poolKey)?.length ?? 0;
+    this.activeCloseModels.forEach((instance) => {
+      if (instance.poolKey === poolKey) total++;
+    });
+    return total;
+  }
+
+  private queueCloseModelPoolGrowth(poolKey: PixelForgeNpcPoolKey): boolean {
+    const currentTotal = this.countCloseModelInstances(poolKey);
+    if (currentTotal >= PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION) return false;
+    const nextTarget = Math.min(
+      PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      Math.max(
+        PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
+        currentTotal + PIXEL_FORGE_NPC_CLOSE_MODEL_TOP_UP_BATCH,
+      ),
+    );
+    this.queueCloseModelPoolLoad(poolKey, nextTarget);
+    return true;
   }
 
   private createActionMap(mixer: THREE.AnimationMixer, animations: THREE.AnimationClip[]): Map<PixelForgeNpcClipId, THREE.AnimationAction> {
@@ -607,8 +678,7 @@ export class CombatantRenderer {
       }
       const instance = this.ensureCloseModel(candidate.combatant.id, candidate.poolKey);
       if (!instance) {
-        if (!this.closeModelPools.has(candidate.poolKey)) {
-          this.queueCloseModelPoolLoad(candidate.poolKey);
+        if (this.queueCloseModelPoolGrowth(candidate.poolKey)) {
           continue;
         }
         suppressedImpostorIds.add(candidate.combatant.id);
@@ -893,14 +963,9 @@ export class CombatantRenderer {
     bone.updateMatrixWorld(true);
   }
 
-  private getImpostorViewColumn(combatant: Combatant): number {
+  private getImpostorViewTile(combatant: Combatant): { column: number; row: number } {
     const sourcePosition = combatant.renderedPosition ?? combatant.position;
-    const toCameraX = this.camera.position.x - sourcePosition.x;
-    const toCameraZ = this.camera.position.z - sourcePosition.z;
-    const worldAngle = Math.atan2(toCameraZ, toCameraX);
-    const localAngle =
-      ((worldAngle - combatant.visualRotation + NPC_IMPOSTOR_VIEW_FORWARD_OFFSET) % TWO_PI + TWO_PI) % TWO_PI;
-    return Math.floor((localAngle / TWO_PI) * NPC_IMPOSTOR_VIEW_COLUMNS) % NPC_IMPOSTOR_VIEW_COLUMNS;
+    return getPixelForgeNpcViewTileForCamera(sourcePosition, this.camera.position, combatant.visualRotation);
   }
 
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
@@ -1159,11 +1224,13 @@ export class CombatantRenderer {
       this.scratchScaleMatrix.makeScale(finalScaleX, finalScaleY, finalScaleZ);
       matrix.multiply(this.scratchScaleMatrix);
       mesh.setMatrixAt(index, matrix);
+      const viewTile = this.getImpostorViewTile(combatant);
       setPixelForgeNpcImpostorAttributes(
         mesh,
         index,
         this.stableHash01(combatant.id),
-        this.getImpostorViewColumn(combatant),
+        viewTile.column,
+        viewTile.row,
         impostorAnimationProgress,
         deathOpacity,
       );
@@ -1353,6 +1420,7 @@ export class CombatantRenderer {
     });
     this.closeModelPools.clear();
     this.closeModelPoolLoads.clear();
+    this.closeModelPoolTargets.clear();
     disposeCombatantMeshes(this.scene, {
       factionMeshes: this.factionMeshes,
       factionAuraMeshes: this.factionAuraMeshes,

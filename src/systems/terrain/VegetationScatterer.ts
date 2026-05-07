@@ -6,6 +6,49 @@ import { classifyBiome, computeSlopeDeg } from './BiomeClassifier';
 import { ChunkVegetationGenerator } from './ChunkVegetationGenerator';
 import { getHeightQueryCache } from './HeightQueryCache';
 import type { TerrainExclusionZone } from './TerrainFeatureTypes';
+import { classifyHydrologyBiome, type HydrologyBiomeClassifier } from './hydrology/HydrologyBiomeClassifier';
+import type { BillboardInstance } from '../../types';
+
+export interface VegetationCellGenerationDebugInfo {
+  cellKey: string;
+  biomeId: string | null;
+  instanceCount: number;
+  typeCounts: Record<string, number>;
+  skippedReason: 'unconfigured' | 'outside-world-margin' | 'empty-palette' | 'empty-cell' | null;
+}
+
+export interface VegetationScattererUpdateDebugInfo {
+  requestedAddBudget: number;
+  resolvedAddBudget: number;
+  maxRemovalsPerFrame: number;
+  addedCells: number;
+  removedCells: number;
+  generatedInstances: number;
+  emptyCells: number;
+  lastGeneratedCell: VegetationCellGenerationDebugInfo | null;
+}
+
+export interface VegetationScattererDebugInfo {
+  cellSize: number;
+  maxCellDistance: number;
+  activeCells: number;
+  targetCells: number;
+  pendingAdditions: number;
+  pendingRemovals: number;
+  lastPlayerCell: { x: number; z: number } | null;
+  lastUpdate: VegetationScattererUpdateDebugInfo;
+}
+
+const EMPTY_UPDATE_DEBUG: VegetationScattererUpdateDebugInfo = {
+  requestedAddBudget: 0,
+  resolvedAddBudget: 0,
+  maxRemovalsPerFrame: 0,
+  addedCells: 0,
+  removedCells: 0,
+  generatedInstances: 0,
+  emptyCells: 0,
+  lastGeneratedCell: null,
+};
 
 /**
  * Cell-based vegetation scatterer. Replaces per-chunk vegetation generation.
@@ -28,12 +71,14 @@ export class VegetationScatterer {
   private lastPlayerCellZ = NaN;
   private worldHalfExtent = Infinity; // Half the world size; cells outside are skipped
   private visualMargin = VegetationScatterer.DEFAULT_VISUAL_MARGIN;
+  private lastUpdateDebug: VegetationScattererUpdateDebugInfo = { ...EMPTY_UPDATE_DEBUG };
 
   // Vegetation config
   private vegetationTypes: VegetationTypeConfig[] = [];
   private biomePalettes: Map<string, BiomeVegetationEntry[]> = new Map();
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
+  private hydrologyBiomeClassifier: HydrologyBiomeClassifier | null = null;
   private exclusionZones: TerrainExclusionZone[] = [];
 
   constructor(
@@ -63,11 +108,13 @@ export class VegetationScatterer {
     defaultBiomeId: string,
     biomePalettes: Map<string, BiomeVegetationEntry[]>,
     biomeRules: BiomeClassificationRule[] = [],
+    hydrologyBiomeClassifier: HydrologyBiomeClassifier | null = null,
   ): void {
     this.vegetationTypes = types;
     this.defaultBiomeId = defaultBiomeId;
     this.biomePalettes = new Map(biomePalettes);
     this.biomeRules = biomeRules.slice();
+    this.hydrologyBiomeClassifier = hydrologyBiomeClassifier;
   }
 
   setExclusionZones(zones: TerrainExclusionZone[]): void {
@@ -104,6 +151,29 @@ export class VegetationScatterer {
     };
   }
 
+  getDebugInfo(): VegetationScattererDebugInfo {
+    return {
+      cellSize: this.cellSize,
+      maxCellDistance: this.maxCellDistance,
+      activeCells: this.activeCells.size,
+      targetCells: this.targetCells.size,
+      pendingAdditions: this.pendingAdditions.length,
+      pendingRemovals: this.pendingRemovals.length,
+      lastPlayerCell: Number.isFinite(this.lastPlayerCellX) && Number.isFinite(this.lastPlayerCellZ)
+        ? { x: this.lastPlayerCellX, z: this.lastPlayerCellZ }
+        : null,
+      lastUpdate: {
+        ...this.lastUpdateDebug,
+        lastGeneratedCell: this.lastUpdateDebug.lastGeneratedCell
+          ? {
+              ...this.lastUpdateDebug.lastGeneratedCell,
+              typeCounts: { ...this.lastUpdateDebug.lastGeneratedCell.typeCounts },
+            }
+          : null,
+      },
+    };
+  }
+
   isReadyAround(playerPosition: THREE.Vector3, radiusCells: number = 1): boolean {
     const centerCellX = Math.floor(playerPosition.x / this.cellSize);
     const centerCellZ = Math.floor(playerPosition.z / this.cellSize);
@@ -120,8 +190,10 @@ export class VegetationScatterer {
     return true;
   }
 
-  private generateCell(cellKey: string): void {
-    if (this.vegetationTypes.length === 0 || this.biomePalettes.size === 0) return;
+  private generateCell(cellKey: string): VegetationCellGenerationDebugInfo {
+    if (this.vegetationTypes.length === 0 || this.biomePalettes.size === 0) {
+      return this.createCellGenerationDebugInfo(cellKey, null, new Map(), 'unconfigured');
+    }
 
     const [cxStr, czStr] = cellKey.split(',');
     const cellX = parseInt(cxStr, 10);
@@ -135,12 +207,23 @@ export class VegetationScatterer {
 
     // Skip cells beyond the visual terrain margin (200m past world edge)
     const limit = this.worldHalfExtent + this.visualMargin;
-    if (Math.abs(centerX) > limit || Math.abs(centerZ) > limit) return;
+    if (Math.abs(centerX) > limit || Math.abs(centerZ) > limit) {
+      return this.createCellGenerationDebugInfo(cellKey, null, new Map(), 'outside-world-margin');
+    }
     const centerHeight = this.getAlignedHeight(cache, centerX, centerZ);
     const centerSlopeDeg = computeSlopeDeg(centerX, centerZ, 4, (x, z) => this.getAlignedHeight(cache, x, z));
-    const biomeId = classifyBiome(centerHeight, centerSlopeDeg, this.biomeRules, this.defaultBiomeId);
+    const biomeId = classifyHydrologyBiome(
+      classifyBiome(centerHeight, centerSlopeDeg, this.biomeRules, this.defaultBiomeId),
+      centerHeight,
+      centerSlopeDeg,
+      centerX,
+      centerZ,
+      this.hydrologyBiomeClassifier,
+    );
     const biomePalette = this.biomePalettes.get(biomeId) ?? this.biomePalettes.get(this.defaultBiomeId);
-    if (!biomePalette || biomePalette.length === 0) return;
+    if (!biomePalette || biomePalette.length === 0) {
+      return this.createCellGenerationDebugInfo(cellKey, biomeId, new Map(), 'empty-palette');
+    }
 
     // Height lookup in local cell coordinates
     const getHeight = (localX: number, localZ: number): number => {
@@ -160,6 +243,12 @@ export class VegetationScatterer {
     if (filteredInstances.size > 0) {
       this.billboardSystem.addChunkInstances(cellKey, filteredInstances);
     }
+    return this.createCellGenerationDebugInfo(
+      cellKey,
+      biomeId,
+      filteredInstances,
+      filteredInstances.size > 0 ? null : 'empty-cell',
+    );
   }
 
   /**
@@ -259,22 +348,41 @@ export class VegetationScatterer {
 
   private processPendingWork(maxAddsPerFrame: number, maxRemovalsPerFrame: number): boolean {
     let didWork = false;
+    const debug: VegetationScattererUpdateDebugInfo = {
+      requestedAddBudget: Math.max(0, maxAddsPerFrame),
+      resolvedAddBudget: 0,
+      maxRemovalsPerFrame: Math.max(0, maxRemovalsPerFrame),
+      addedCells: 0,
+      removedCells: 0,
+      generatedInstances: 0,
+      emptyCells: 0,
+      lastGeneratedCell: null,
+    };
 
     for (let i = 0; i < Math.max(0, maxRemovalsPerFrame) && this.pendingRemovals.length > 0; i++) {
       const key = this.pendingRemovals.shift()!;
       this.billboardSystem.removeChunkInstances(key);
       this.activeCells.delete(key);
       didWork = true;
+      debug.removedCells++;
     }
 
     const addBudget = this.resolveAddBudget(maxAddsPerFrame);
+    debug.resolvedAddBudget = addBudget;
     for (let i = 0; i < addBudget && this.pendingAdditions.length > 0; i++) {
       const key = this.pendingAdditions.shift()!;
-      this.generateCell(key);
+      const generated = this.generateCell(key);
       this.activeCells.add(key);
       didWork = true;
+      debug.addedCells++;
+      debug.generatedInstances += generated.instanceCount;
+      debug.lastGeneratedCell = generated;
+      if (generated.instanceCount === 0) {
+        debug.emptyCells++;
+      }
     }
 
+    this.lastUpdateDebug = debug;
     return didWork;
   }
 
@@ -318,14 +426,14 @@ export class VegetationScatterer {
     return cache.getHeightAt(worldX, worldZ);
   }
 
-  private filterExcludedInstances(instancesByType: Map<string, THREE.Object3D[] | any[]>): Map<string, any[]> {
+  private filterExcludedInstances(instancesByType: Map<string, BillboardInstance[]>): Map<string, BillboardInstance[]> {
     if (this.exclusionZones.length === 0) {
-      return instancesByType as Map<string, any[]>;
+      return instancesByType;
     }
 
-    const filtered = new Map<string, any[]>();
+    const filtered = new Map<string, BillboardInstance[]>();
     for (const [typeId, instances] of instancesByType) {
-      const nextInstances = instances.filter((instance: any) => !this.isExcluded(instance.position.x, instance.position.z));
+      const nextInstances = instances.filter(instance => !this.isExcluded(instance.position.x, instance.position.z));
       if (nextInstances.length > 0) {
         filtered.set(typeId, nextInstances);
       }
@@ -342,5 +450,26 @@ export class VegetationScatterer {
       }
     }
     return false;
+  }
+
+  private createCellGenerationDebugInfo(
+    cellKey: string,
+    biomeId: string | null,
+    instancesByType: Map<string, BillboardInstance[]>,
+    skippedReason: VegetationCellGenerationDebugInfo['skippedReason'],
+  ): VegetationCellGenerationDebugInfo {
+    const typeCounts: Record<string, number> = {};
+    let instanceCount = 0;
+    for (const [typeId, instances] of instancesByType) {
+      typeCounts[typeId] = instances.length;
+      instanceCount += instances.length;
+    }
+    return {
+      cellKey,
+      biomeId,
+      instanceCount,
+      typeCounts,
+      skippedReason,
+    };
   }
 }

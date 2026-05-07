@@ -23,6 +23,7 @@ const DEFAULT_ZONE_SHOULDER_TARGET_HEIGHT_MODE = 'average';
 const DEFAULT_HOME_BASE_SHOULDER_TARGET_HEIGHT_MODE = 'max';
 const DEFAULT_MAX_ROUTES_PER_ANCHOR = 3;
 const OBJECTIVE_NEIGHBOR_LINKS = 2;
+const OBJECTIVE_ROUTE_ENDPOINT_RADIUS_SCALE = 0.88;
 
 interface TerrainFlowCompileResult {
   stamps: TerrainStampConfig[];
@@ -306,7 +307,7 @@ function insetEndpoint(
   const shoulderPadding = policy.zoneShoulderPadding ?? DEFAULT_ZONE_SHOULDER_PADDING;
   const preferredInset = zone.isHomeBase
     ? zone.radius + shoulderPadding * 0.95
-    : zone.radius + shoulderPadding * 0.55;
+    : zone.radius * OBJECTIVE_ROUTE_ENDPOINT_RADIUS_SCALE;
   const inset = clamp(preferredInset, 8, Math.max(8, distance - 6));
   points[zoneIndex] = {
     x: zonePoint.x + (dx / distance) * inset,

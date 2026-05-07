@@ -38,7 +38,8 @@ export class GPUBillboardSystem {
         Logger.warn('vegetation', `Texture not found for ${vegType.id} (${vegType.textureName}), skipping`);
         continue;
       }
-      const normalTexture = !disableNormalMaps && vegType.normalTextureName
+      const shaderProfile = disableNormalMaps ? 'hemisphere' : vegType.shaderProfile;
+      const normalTexture = !disableNormalMaps && shaderProfile === 'normal-lit' && vegType.normalTextureName
         ? this.assetLoader.getTexture(vegType.normalTextureName)
         : undefined;
 
@@ -51,7 +52,7 @@ export class GPUBillboardSystem {
         maxDistance: vegType.maxDistance,
         representation: vegType.representation,
         atlasProfile: vegType.atlasProfile,
-        shaderProfile: disableNormalMaps ? 'hemisphere' : vegType.shaderProfile,
+        shaderProfile,
       };
       if (normalTexture) config.normalTexture = normalTexture;
       if (vegType.imposterAtlas) config.imposterAtlas = vegType.imposterAtlas;

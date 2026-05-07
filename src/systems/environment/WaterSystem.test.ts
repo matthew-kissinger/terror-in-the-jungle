@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { WaterSystem } from './WaterSystem';
 import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import type { AssetLoader } from '../assets/AssetLoader';
+import type { HydrologyBakeArtifact } from '../terrain/hydrology/HydrologyBake';
 
 // Avoid pulling in the Logger implementation (which writes to the console)
 // during these small unit tests.
@@ -31,12 +32,54 @@ function makeAtmosphere(dir: THREE.Vector3): ISkyRuntime {
   };
 }
 
-function makeSystem(): WaterSystem {
+function makeSystemWithScene(): { scene: THREE.Scene; system: WaterSystem } {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
   // AssetLoader is only consulted from `init()`, which we do not invoke here.
   const assetLoader = {} as unknown as AssetLoader;
-  return new WaterSystem(scene, camera, assetLoader);
+  return { scene, system: new WaterSystem(scene, camera, assetLoader) };
+}
+
+function makeSystem(): WaterSystem {
+  return makeSystemWithScene().system;
+}
+
+function makeHydrologyArtifact(): HydrologyBakeArtifact {
+  return {
+    schemaVersion: 1,
+    width: 2,
+    height: 2,
+    cellSizeMeters: 10,
+    depressionHandling: 'epsilon-fill',
+    transform: {
+      originX: 0,
+      originZ: 0,
+      cellSizeMeters: 10,
+    },
+    thresholds: {
+      accumulationP90Cells: 2,
+      accumulationP95Cells: 4,
+      accumulationP98Cells: 8,
+      accumulationP99Cells: 16,
+    },
+    masks: {
+      wetCandidateCells: [1],
+      channelCandidateCells: [1],
+    },
+    channelPolylines: [
+      {
+        headCell: 0,
+        outletCell: 1,
+        lengthCells: 2,
+        lengthMeters: 20,
+        maxAccumulationCells: 16,
+        points: [
+          { cell: 0, x: -5, z: 0, elevationMeters: 2, accumulationCells: 8 },
+          { cell: 1, x: 15, z: 0, elevationMeters: 1, accumulationCells: 16 },
+        ],
+      },
+    ],
+  };
 }
 
 describe('WaterSystem sun direction from atmosphere', () => {
@@ -83,5 +126,72 @@ describe('WaterSystem sun direction from atmosphere', () => {
     system.setEnabled(false);
 
     expect(weather.setUnderwater).toHaveBeenCalledWith(false);
+  });
+
+  it('renders hydrology river surfaces independently of the global water plane toggle', () => {
+    const { scene, system } = makeSystemWithScene();
+
+    system.setHydrologyChannels(makeHydrologyArtifact());
+    system.setEnabled(false);
+
+    const info = system.getDebugInfo();
+    expect(info.enabled).toBe(false);
+    expect(info.hydrologyRiverMaterialProfile).toBe('natural_channel_gradient');
+    expect(info.hydrologyRiverVisible).toBe(true);
+    expect(info.hydrologyChannelCount).toBe(1);
+    expect(info.hydrologySegmentCount).toBe(1);
+    expect(scene.getObjectByName('hydrology-river-surfaces')).toBeDefined();
+  });
+
+  it('suppresses the global water plane when hydrology river surfaces are present', () => {
+    const { system } = makeSystemWithScene();
+    const fakeWater = { visible: false };
+    (system as unknown as { water: { visible: boolean } }).water = fakeWater;
+
+    system.setEnabled(true);
+    expect(fakeWater.visible).toBe(true);
+
+    system.setHydrologyChannels(makeHydrologyArtifact());
+
+    expect(fakeWater.visible).toBe(false);
+    expect(system.isUnderwater(new THREE.Vector3(0, -1, 0))).toBe(false);
+
+    system.setHydrologyChannels(null);
+    expect(fakeWater.visible).toBe(true);
+  });
+
+  it('builds hydrology river surfaces with bank-to-channel vertex color coverage', () => {
+    const { scene, system } = makeSystemWithScene();
+
+    system.setHydrologyChannels(makeHydrologyArtifact());
+
+    const mesh = scene.getObjectByName('hydrology-river-surface-mesh') as THREE.Mesh<
+      THREE.BufferGeometry,
+      THREE.MeshStandardMaterial
+    >;
+    const position = mesh.geometry.getAttribute('position');
+    const color = mesh.geometry.getAttribute('color');
+    const index = mesh.geometry.getIndex();
+
+    expect(position.count).toBe(6);
+    expect(color.count).toBe(position.count);
+    expect(color.itemSize).toBe(4);
+    expect(index?.count).toBe(12);
+    expect(mesh.material.vertexColors).toBe(true);
+    expect(mesh.material.emissiveIntensity).toBeLessThan(0.05);
+  });
+
+  it('clears hydrology river surfaces when the next mode has no hydrology bake', () => {
+    const { scene, system } = makeSystemWithScene();
+
+    system.setHydrologyChannels(makeHydrologyArtifact());
+    system.setHydrologyChannels(null);
+
+    const info = system.getDebugInfo();
+    expect(info.hydrologyRiverVisible).toBe(false);
+    expect(info.hydrologyRiverMaterialProfile).toBe('none');
+    expect(info.hydrologyChannelCount).toBe(0);
+    expect(info.hydrologySegmentCount).toBe(0);
+    expect(scene.getObjectByName('hydrology-river-surfaces')).toBeUndefined();
   });
 });

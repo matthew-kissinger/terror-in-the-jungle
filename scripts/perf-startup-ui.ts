@@ -2,8 +2,8 @@
 
 import { chromium, type Browser } from 'playwright';
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
-import { extname, join, normalize } from 'path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { extname, join, normalize, resolve } from 'path';
 
 const HOST = '127.0.0.1';
 const DEFAULT_PORT = 4174;
@@ -106,7 +106,31 @@ type WebglUploadSummary = {
 
 type CandidateFlags = {
   disableVegetationNormals: boolean;
+  useVegetationCandidates: boolean;
+  vegetationCandidateImportPlan: string | null;
+  vegetationCandidateReplacementCount: number;
 };
+
+type CandidateImportPlanItem = {
+  runtime?: {
+    color?: string | null;
+    normal?: string | null;
+    meta?: string | null;
+  };
+  candidate?: {
+    color?: string | null;
+    normal?: string | null;
+    meta?: string | null;
+  };
+};
+
+type CandidateImportPlan = {
+  status?: string;
+  importState?: string;
+  items?: CandidateImportPlanItem[];
+};
+
+type CandidateAssetMap = Map<string, string>;
 
 type CpuProfileSnapshot = unknown;
 
@@ -177,7 +201,7 @@ function timestampSlug(): string {
   return new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
 }
 
-function parseArgs(): { mode: string; runs: number; port: number; headed: boolean; candidateFlags: CandidateFlags } {
+function parseArgs(): { mode: string; runs: number; port: number; headed: boolean; useVegetationCandidates: boolean; vegetationCandidateImportPlan: string | null; candidateFlags: CandidateFlags } {
   const args = process.argv.slice(2);
   const readValue = (flag: string, fallback: string): string => {
     const index = args.findIndex((arg) => arg === `--${flag}`);
@@ -187,15 +211,95 @@ function parseArgs(): { mode: string; runs: number; port: number; headed: boolea
     return args[index + 1];
   };
 
+  const useVegetationCandidates = args.includes('--use-vegetation-candidates');
+  const vegetationCandidateImportPlan = readValue('vegetation-candidate-import-plan', '');
+
   return {
     mode: readValue('mode', 'open_frontier'),
     runs: Number(readValue('runs', String(DEFAULT_RUNS))),
     port: Number(readValue('port', String(DEFAULT_PORT))),
     headed: args.includes('--headed'),
+    useVegetationCandidates,
+    vegetationCandidateImportPlan: vegetationCandidateImportPlan || null,
     candidateFlags: {
       disableVegetationNormals: args.includes('--disable-vegetation-normals'),
+      useVegetationCandidates,
+      vegetationCandidateImportPlan: null,
+      vegetationCandidateReplacementCount: 0,
     },
   };
+}
+
+function walkFiles(root: string): string[] {
+  if (!existsSync(root)) return [];
+  const files: string[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const path = join(root, entry.name);
+    if (entry.isDirectory()) files.push(...walkFiles(path));
+    else files.push(path);
+  }
+  return files;
+}
+
+function latestFile(files: string[], predicate: (path: string) => boolean): string | null {
+  const matches = files.filter(predicate);
+  matches.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  return matches[0] ?? null;
+}
+
+function latestVegetationCandidateImportPlan(): string | null {
+  return latestFile(
+    walkFiles(ARTIFACT_ROOT),
+    (path) => path.endsWith(join('projekt-143-vegetation-candidate-import-plan', 'import-plan.json')),
+  );
+}
+
+function normalizeRequestKey(pathname: string): string {
+  return decodeURIComponent(pathname).replace(/^\/+/, '').replaceAll('\\', '/');
+}
+
+function runtimePathToRequestKey(runtimePath: string | null | undefined): string | null {
+  if (!runtimePath) return null;
+  return runtimePath.replace(/^public[\\/]/, '').replace(/^\/+/, '').replaceAll('\\', '/');
+}
+
+function addCandidateMapping(
+  map: CandidateAssetMap,
+  runtimePath: string | null | undefined,
+  candidatePath: string | null | undefined,
+): void {
+  const requestKey = runtimePathToRequestKey(runtimePath);
+  if (!requestKey || !candidatePath) return;
+  const resolvedCandidate = resolve(process.cwd(), candidatePath);
+  if (!existsSync(resolvedCandidate)) return;
+  map.set(requestKey, resolvedCandidate);
+}
+
+function loadVegetationCandidateAssetMap(importPlanPath: string | null): { map: CandidateAssetMap; importPlanPath: string | null } {
+  const resolvedImportPlanPath = importPlanPath
+    ? resolve(process.cwd(), importPlanPath)
+    : latestVegetationCandidateImportPlan();
+  const map: CandidateAssetMap = new Map();
+  if (!resolvedImportPlanPath || !existsSync(resolvedImportPlanPath)) {
+    throw new Error('Vegetation candidate import plan not found. Run npm run check:projekt-143-vegetation-candidate-import-plan first or pass --vegetation-candidate-import-plan <path>.');
+  }
+
+  const importPlan = JSON.parse(readFileSync(resolvedImportPlanPath, 'utf-8')) as CandidateImportPlan;
+  if (importPlan.status !== 'pass' || !['dry_run_ready', 'applied'].includes(String(importPlan.importState))) {
+    throw new Error(`Vegetation candidate import plan is not usable for proof substitution: status=${importPlan.status ?? 'missing'} importState=${importPlan.importState ?? 'missing'}`);
+  }
+
+  for (const item of importPlan.items ?? []) {
+    addCandidateMapping(map, item.runtime?.color, item.candidate?.color);
+    addCandidateMapping(map, item.runtime?.normal, item.candidate?.normal);
+    addCandidateMapping(map, item.runtime?.meta, item.candidate?.meta);
+  }
+
+  if (map.size === 0) {
+    throw new Error('Vegetation candidate import plan produced zero runtime asset substitutions.');
+  }
+
+  return { map, importPlanPath: resolvedImportPlanPath };
 }
 
 function resolveFilePath(pathname: string): string | null {
@@ -209,8 +313,21 @@ function resolveFilePath(pathname: string): string | null {
   return resolved;
 }
 
-function serveDist(req: IncomingMessage, res: ServerResponse): void {
+function serveFile(filePath: string, res: ServerResponse): void {
+  const body = readFileSync(filePath);
+  const contentType = MIME_TYPES[extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+  res.writeHead(200, { 'Content-Type': contentType });
+  res.end(body);
+}
+
+function serveDist(req: IncomingMessage, res: ServerResponse, candidateAssetMap: CandidateAssetMap): void {
   const requestUrl = new URL(req.url ?? '/', `http://${HOST}`);
+  const candidateFile = candidateAssetMap.get(normalizeRequestKey(requestUrl.pathname));
+  if (candidateFile && existsSync(candidateFile)) {
+    serveFile(candidateFile, res);
+    return;
+  }
+
   const filePath = resolveFilePath(requestUrl.pathname);
   if (!filePath || !existsSync(filePath)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -226,10 +343,7 @@ function serveDist(req: IncomingMessage, res: ServerResponse): void {
     return;
   }
 
-  const body = readFileSync(finalPath);
-  const contentType = MIME_TYPES[extname(finalPath).toLowerCase()] ?? 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': contentType });
-  res.end(body);
+  serveFile(finalPath, res);
 }
 
 async function runBenchmarkIteration(
@@ -564,11 +678,20 @@ function buildSummary(mode: string, runs: BenchmarkRun[], url: string, candidate
 async function main(): Promise<void> {
   ensureBuildExists();
   const options = parseArgs();
+  let candidateAssetMap: CandidateAssetMap = new Map();
+  if (options.useVegetationCandidates) {
+    const candidate = loadVegetationCandidateAssetMap(options.vegetationCandidateImportPlan);
+    candidateAssetMap = candidate.map;
+    options.candidateFlags.vegetationCandidateImportPlan = candidate.importPlanPath
+      ? normalize(candidate.importPlanPath).replaceAll('\\', '/')
+      : null;
+    options.candidateFlags.vegetationCandidateReplacementCount = candidateAssetMap.size;
+  }
   const browser = await chromium.launch({
     headless: !options.headed,
     args: ['--use-angle=swiftshader', '--enable-webgl'],
   });
-  const server = createServer(serveDist);
+  const server = createServer((req, res) => serveDist(req, res, candidateAssetMap));
 
   await new Promise<void>((resolve) => server.listen(options.port, HOST, resolve));
 
@@ -578,13 +701,14 @@ async function main(): Promise<void> {
       runs.push(await runBenchmarkIteration(browser, iteration, options.mode, options.port, options.candidateFlags));
     }
 
-    const candidateSuffix = options.candidateFlags.disableVegetationNormals
-      ? '-vegetation-normals-disabled'
-      : '';
+    const candidateSuffix = [
+      options.candidateFlags.disableVegetationNormals ? 'vegetation-normals-disabled' : '',
+      options.candidateFlags.useVegetationCandidates ? 'vegetation-candidates' : '',
+    ].filter(Boolean).join('-');
     const artifactDir = join(
       ARTIFACT_ROOT,
       timestampSlug(),
-      `startup-ui-${options.mode.replaceAll('_', '-')}${candidateSuffix}`,
+      `startup-ui-${options.mode.replaceAll('_', '-')}${candidateSuffix ? `-${candidateSuffix}` : ''}`,
     );
     mkdirSync(artifactDir, { recursive: true });
 

@@ -12,6 +12,9 @@ import { StampedHeightProvider } from '../systems/terrain/StampedHeightProvider'
 import { bakeStampedHeightmapGrid } from '../systems/terrain/TerrainStampGridBaker';
 import type { CompiledTerrainFeatureSet } from '../systems/terrain/TerrainFeatureTypes';
 import type { PreparedHeightmapGrid, PreparedTerrainSource } from '../systems/terrain/PreparedTerrainSource';
+import { loadHydrologyBakeForMode } from '../systems/terrain/hydrology/HydrologyBakeManifest';
+import type { LoadedHydrologyBake } from '../systems/terrain/hydrology/HydrologyBakeManifest';
+import type { HydrologyBiomePolicy } from '../systems/terrain/hydrology/HydrologyBiomeClassifier';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
 import { resolveGameAssetUrl } from './GameAssetManifest';
@@ -44,6 +47,71 @@ const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
 interface CompiledStartupTerrainFeatures {
   compiledFeatures: CompiledTerrainFeatureSet;
   preparedTerrainSource: PreparedTerrainSource;
+}
+
+function hydrologyPreloadEnabled(config: ReturnType<typeof getGameModeConfig>): boolean {
+  const globalScope = globalThis as {
+    __PROJEKT_143_ENABLE_HYDROLOGY_PRELOAD__?: boolean;
+    __PROJEKT_143_ENABLE_HYDROLOGY_BIOMES__?: boolean;
+  };
+  return config.hydrology?.preload === true
+    || config.hydrology?.biomeClassification?.enabled === true
+    || globalScope.__PROJEKT_143_ENABLE_HYDROLOGY_PRELOAD__ === true
+    || globalScope.__PROJEKT_143_ENABLE_HYDROLOGY_BIOMES__ === true;
+}
+
+async function maybePreloadHydrologyBake(
+  mode: GameMode,
+  config: ReturnType<typeof getGameModeConfig>,
+): Promise<LoadedHydrologyBake | null> {
+  if (!hydrologyPreloadEnabled(config)) return null;
+
+  try {
+    const seed = typeof config.terrainSeed === 'number' ? config.terrainSeed : null;
+    const loaded = await loadHydrologyBakeForMode({
+      modeId: mode,
+      seed,
+      allowSeededFallback: config.hydrology?.allowSeededFallback,
+      manifestUrl: config.hydrology?.manifestUrl,
+    });
+
+    if (!loaded) {
+      Logger.info(
+        'engine-init',
+        `Hydrology preload enabled for ${mode}, but no matching public bake cache was found for seed=${seed ?? 'unseeded'}.`,
+      );
+      return null;
+    }
+
+    Logger.info(
+      'engine-init',
+      `Hydrology cache preloaded for ${mode}: ${loaded.entry.signature} (${loaded.artifact.width}x${loaded.artifact.height})`,
+    );
+    return loaded;
+  } catch (error) {
+    Logger.warn(
+      'engine-init',
+      `Hydrology preload failed for ${mode}; continuing without hydrology-backed vegetation classification.`,
+      error,
+    );
+    return null;
+  }
+}
+
+function hydrologyBiomePolicyEnabled(config: ReturnType<typeof getGameModeConfig>): boolean {
+  const globalScope = globalThis as { __PROJEKT_143_ENABLE_HYDROLOGY_BIOMES__?: boolean };
+  return config.hydrology?.biomeClassification?.enabled === true
+    || globalScope.__PROJEKT_143_ENABLE_HYDROLOGY_BIOMES__ === true;
+}
+
+function resolveHydrologyBiomePolicy(config: ReturnType<typeof getGameModeConfig>): HydrologyBiomePolicy | null {
+  if (!hydrologyBiomePolicyEnabled(config)) return null;
+  const policy = config.hydrology?.biomeClassification;
+  return {
+    wetBiomeId: policy?.wetBiomeId ?? 'swamp',
+    channelBiomeId: policy?.channelBiomeId ?? 'riverbank',
+    maxSlopeDeg: policy?.maxSlopeDeg,
+  };
 }
 
 function compileStartupTerrainFeatures(
@@ -217,6 +285,7 @@ export async function configureHeightSource(
     }
     return {
       kind: 'dem',
+      hydrologyBake: await maybePreloadHydrologyBake(mode, config),
       terrainFingerprint: computeNavmeshBakeSignature({
         heightSource: config.heightSource,
         resolvedPath,
@@ -254,6 +323,7 @@ export async function configureHeightSource(
         markStartup(`engine-init.start-game.${mode}.height-source.end`);
         return {
           kind: 'prebaked',
+          hydrologyBake: await maybePreloadHydrologyBake(mode, config),
           preparedHeightmap: {
             data: gridData,
             gridSize,
@@ -276,7 +346,11 @@ export async function configureHeightSource(
   getHeightQueryCache().setProvider(new NoiseHeightProvider(seed));
   Logger.info('engine-init', `Procedural terrain seed: ${seed}`);
   markStartup(`engine-init.start-game.${mode}.height-source.end`);
-  return { kind: 'procedural', terrainFingerprint: seed };
+  return {
+    kind: 'procedural',
+    hydrologyBake: await maybePreloadHydrologyBake(mode, config),
+    terrainFingerprint: seed,
+  };
 }
 
 async function configureTerrainAndNavigation(
@@ -299,7 +373,11 @@ async function configureTerrainAndNavigation(
   }
 
   const terrainSystem = engine.systemManager.terrainSystem;
+  const hydrologyBake = preparedTerrainSource.hydrologyBake ?? null;
   terrainSystem.setPreparedHeightmap(preparedTerrainSource.preparedHeightmap ?? null);
+  terrainSystem.setHydrologyBake(hydrologyBake);
+  terrainSystem.setHydrologyBiomePolicy(resolveHydrologyBiomePolicy(config));
+  engine.systemManager.waterSystem.setHydrologyChannels(hydrologyBake?.artifact ?? null);
   const previousWorldSize = terrainSystem.getPlayableWorldSize();
   const targetWorldSize = config.worldSize ?? previousWorldSize;
   const worldSizeChanged = targetWorldSize !== previousWorldSize;
@@ -322,6 +400,7 @@ async function configureTerrainAndNavigation(
 
   const defaultBiome = config.terrain?.defaultBiome ?? 'denseJungle';
   terrainSystem.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
+  terrainSystem.setFarCanopyTint(config.terrain?.farCanopyTint);
   markStartup(`engine-init.start-game.${config.id}.terrain-config.end`);
 
   if (engine.systemManager.navmeshSystem.isWasmReady()) {

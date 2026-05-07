@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { GameSystem } from '../../types';
 import type { AssetLoader } from '../assets/AssetLoader';
 import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
-import { type BiomeClassificationRule } from '../../config/biomes';
+import { type BiomeClassificationRule, type TerrainFarCanopyTintConfig } from '../../config/biomes';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
 import { Logger } from '../../utils/Logger';
 import { markStartup } from '../../core/StartupTelemetry';
@@ -11,18 +11,34 @@ import { BakedHeightProvider } from './BakedHeightProvider';
 import type { IHeightProvider } from './IHeightProvider';
 import type { CompiledTerrainFeatureSet } from './TerrainFeatureTypes';
 import type { PreparedHeightmapGrid } from './PreparedTerrainSource';
+import type { LoadedHydrologyBake } from './hydrology/HydrologyBakeManifest';
+import {
+  createHydrologyBiomeClassifier,
+  type HydrologyBiomeClassifier,
+  type HydrologyBiomePolicy,
+} from './hydrology/HydrologyBiomeClassifier';
 
 import { TerrainRenderRuntime } from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
 import { TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
 import { TerrainQueries } from './TerrainQueries';
-import { VegetationScatterer } from './VegetationScatterer';
+import { VegetationScatterer, type VegetationScattererDebugInfo } from './VegetationScatterer';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
 import { TerrainStreamingScheduler } from './streaming/TerrainStreamingScheduler';
 import {
   buildTerrainVegetationRuntimeConfig,
 } from './TerrainBiomeRuntimeConfig';
 import { createTerrainConfig, computeDefaultLODRanges, computeMaxLODLevels, type TerrainSystemConfig, type TerrainRuntimeBootstrapConfig } from './TerrainConfig';
+
+interface TerrainStreamingMetricDebug {
+  name: string;
+  budgetMs: number;
+  timeMs: number;
+  pendingUnits: number;
+  debug?: {
+    vegetation?: VegetationScattererDebugInfo;
+  };
+}
 
 /**
  * Top-level terrain runtime facade. Implements GameSystem.
@@ -61,6 +77,8 @@ export class TerrainSystem implements GameSystem {
   private biomeRules: BiomeClassificationRule[] = [];
   private surfaceWetness = 0;
   private preparedHeightmap: PreparedHeightmapGrid | null = null;
+  private hydrologyBake: LoadedHydrologyBake | null = null;
+  private hydrologyBiomePolicy: HydrologyBiomePolicy | null = null;
   private terrainFeatures: CompiledTerrainFeatureSet = {
     stamps: [],
     surfacePatches: [],
@@ -224,6 +242,10 @@ export class TerrainSystem implements GameSystem {
     }
     this.surfaceWetness = clampedWetness;
     this.surfaceRuntime.setSurfaceWetness(clampedWetness);
+  }
+
+  setFarCanopyTint(farCanopyTint?: TerrainFarCanopyTintConfig): void {
+    this.surfaceRuntime.setFarCanopyTint(farCanopyTint);
   }
 
   setTerrainFeatures(features: CompiledTerrainFeatureSet): void {
@@ -399,12 +421,14 @@ export class TerrainSystem implements GameSystem {
     return this.chunkSize;
   }
 
-  getStreamingMetrics(): Array<{ name: string; budgetMs: number; timeMs: number; pendingUnits: number }> {
+  getStreamingMetrics(): TerrainStreamingMetricDebug[] {
+    const vegetationDebug = this.vegetationScatterer.getDebugInfo();
     return this.streamingScheduler.getMetrics().map(metric => ({
       name: metric.name,
       budgetMs: metric.budgetMs,
       timeMs: metric.emaMs,
       pendingUnits: metric.pendingUnits,
+      ...(metric.name === 'vegetation' ? { debug: { vegetation: vegetationDebug } } : {}),
     }));
   }
 
@@ -422,6 +446,52 @@ export class TerrainSystem implements GameSystem {
 
   setPreparedHeightmap(preparedHeightmap: PreparedHeightmapGrid | null): void {
     this.preparedHeightmap = preparedHeightmap;
+  }
+
+  setHydrologyBake(hydrologyBake: LoadedHydrologyBake | null): void {
+    this.hydrologyBake = hydrologyBake;
+    this.surfaceRuntime.setHydrologyMaterialMask(this.hydrologyBake, this.hydrologyBiomePolicy);
+    if (this.hydrologyBiomePolicy) {
+      this.applyVegetationConfig();
+      if (this.isInitialized) {
+        this.vegetationScatterer.regenerateAll();
+      }
+    }
+  }
+
+  setHydrologyBiomePolicy(policy: HydrologyBiomePolicy | null): void {
+    this.hydrologyBiomePolicy = policy ? { ...policy } : null;
+    this.surfaceRuntime.setHydrologyMaterialMask(this.hydrologyBake, this.hydrologyBiomePolicy);
+    this.applyVegetationConfig();
+    if (this.isInitialized) {
+      this.vegetationScatterer.regenerateAll();
+    }
+  }
+
+  getHydrologyBakeDebugInfo(): {
+    loaded: boolean;
+    modeId: string | null;
+    signature: string | null;
+    wetCandidateCells: number | null;
+    channelCandidateCells: number | null;
+    channelPolylines: number | null;
+    biomePolicyEnabled: boolean;
+    materialMaskEnabled: boolean;
+    wetBiomeId: string | null;
+    channelBiomeId: string | null;
+  } {
+    return {
+      loaded: Boolean(this.hydrologyBake),
+      modeId: this.hydrologyBake?.entry.modeId ?? null,
+      signature: this.hydrologyBake?.entry.signature ?? null,
+      wetCandidateCells: this.hydrologyBake?.artifact.masks.wetCandidateCells.length ?? null,
+      channelCandidateCells: this.hydrologyBake?.artifact.masks.channelCandidateCells.length ?? null,
+      channelPolylines: this.hydrologyBake?.artifact.channelPolylines.length ?? null,
+      biomePolicyEnabled: Boolean(this.hydrologyBiomePolicy),
+      materialMaskEnabled: Boolean(this.hydrologyBake && this.hydrologyBiomePolicy),
+      wetBiomeId: this.hydrologyBiomePolicy?.wetBiomeId ?? null,
+      channelBiomeId: this.hydrologyBiomePolicy?.channelBiomeId ?? null,
+    };
   }
 
   setWorldSize(worldSize: number): void {
@@ -638,13 +708,31 @@ export class TerrainSystem implements GameSystem {
   }
 
   private applyVegetationConfig(): void {
-    const vegetationConfig = buildTerrainVegetationRuntimeConfig(this.defaultBiomeId, this.biomeRules);
+    const hydrologyBiomeIds = this.hydrologyBiomePolicy
+      ? [this.hydrologyBiomePolicy.wetBiomeId, this.hydrologyBiomePolicy.channelBiomeId]
+      : [];
+    const vegetationConfig = buildTerrainVegetationRuntimeConfig(
+      this.defaultBiomeId,
+      this.biomeRules,
+      hydrologyBiomeIds,
+    );
     const { biomeIds, biomePalettes } = vegetationConfig;
     this.billboardSystem.configure(biomeIds);
     const activeTypes = this.billboardSystem.getActiveVegetationTypes();
-    this.vegetationScatterer.configure(activeTypes, this.defaultBiomeId, biomePalettes, this.biomeRules);
+    this.vegetationScatterer.configure(
+      activeTypes,
+      this.defaultBiomeId,
+      biomePalettes,
+      this.biomeRules,
+      this.createHydrologyBiomeClassifier(),
+    );
     this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
     this.vegetationScatterer.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+  }
+
+  private createHydrologyBiomeClassifier(): HydrologyBiomeClassifier | null {
+    if (!this.hydrologyBake || !this.hydrologyBiomePolicy) return null;
+    return createHydrologyBiomeClassifier(this.hydrologyBake.artifact, this.hydrologyBiomePolicy);
   }
 
   private propagateTerrainSourceChanges(): void {

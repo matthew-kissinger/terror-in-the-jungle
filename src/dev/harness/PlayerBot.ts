@@ -15,6 +15,7 @@
  */
 
 import {
+  BotObjective,
   BotTarget,
   BotVec3,
   DEFAULT_PLAYER_BOT_CONFIG,
@@ -41,7 +42,7 @@ export interface PlayerBotObservation {
   readonly canSeeTarget: (targetPos: BotVec3) => boolean;
   readonly queryPath: (from: BotVec3, to: BotVec3) => BotVec3[] | null;
   readonly findNearestNavmeshPoint: (point: BotVec3) => BotVec3 | null;
-  readonly getObjective: () => { position: BotVec3; priority: number } | null;
+  readonly getObjective: () => BotObjective | null;
   readonly sampleHeight: (x: number, z: number) => number;
 }
 
@@ -150,8 +151,10 @@ export class PlayerBot {
    * Compute the target for this tick. Returns the current locked target if
    * it is still valid; otherwise refreshes from `findNearestEnemy`.
    *
-   * "Still valid" = we have last seen it within 4s AND findNearestEnemy
-   * returned the same id OR returned nothing (object-permanence window).
+   * "Still valid" = we have last seen it within 4s. A different fresh
+   * nearest-enemy sample does not steal the lock during that window; dense
+   * close-pressure fights otherwise flip aim between nearby candidates every
+   * decision tick and read as pacing/twitching.
    */
   private updateTarget(obs: PlayerBotObservation): BotTarget | null {
     const fresh = obs.findNearestEnemy();
@@ -171,9 +174,8 @@ export class PlayerBot {
       return fresh;
     }
 
-    // Keep the stale target so ADVANCE can close the gap (object permanence).
-    // If a fresh candidate appears, prefer it — closer/visible beats stale.
-    return fresh ?? this.currentTarget;
+    // Keep the current target through transient nearest-enemy churn.
+    return this.currentTarget;
   }
 
   private transitionTo(next: PlayerBotState, atMs: number): void {
@@ -187,4 +189,4 @@ export class PlayerBot {
   }
 }
 
-export type { BotVec3, BotTarget } from './playerBot/types';
+export type { BotVec3, BotTarget, BotObjective } from './playerBot/types';

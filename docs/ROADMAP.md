@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-04-24
+Last updated: 2026-05-07
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 > For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
@@ -16,6 +16,37 @@ Vietnam War is the first theater. Architecture generalizes to any war with diffe
 Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain materials and post-processing are ported.
 
 Current truthful framing: the engine already supports large strategic populations through materialization tiers; the verified fully materialized perf frontier is still centered on 120-NPC scenarios, not 3,000 simultaneous live combatants. Architecture recovery is currently prioritizing state ownership, A Shau terrain/nav truth, airfield surfaces, and render/LOD evidence before new feature expansion.
+
+## Projekt Objekt-143 Follow-Up
+
+Projekt Objekt-143 follow-up is intentionally deferred until the current local
+stabilization stack is validated, committed, pushed to `master`, deployed, and
+live-verified. The 2026-05 experimental/orchestration cycle produced useful
+code, tools, and evidence, but the next step is repo stabilization rather than
+another scope expansion.
+
+Carry these findings into the next Projekt revamp:
+
+- Water and hydrology: keep the hydrology corridor/bake work, but treat natural
+  river/lake rendering, crossings, gameplay water queries, and watercraft-grade
+  physics as future terrain-engine work.
+- Vegetation ecology: use the short-palm retirement, bamboo/ground-cover
+  distribution audits, and Pixel Forge candidate proofs as starting evidence
+  for clustered jungle, hydrology-aware palms/understory, trail edges, and grass
+  or ground-cover replacement work.
+- Pixel Forge pipeline: keep the 256px vegetation candidate branch, dry-run
+  import plan, structure review, and bureau catalog as future import inputs;
+  do not import candidate assets without owner visual acceptance and runtime
+  proof.
+- Combined-arms feel: keep the active-driver, StrategicDirector, and NPC route
+  evidence as stabilization gains, but treat skilled-player objective flow,
+  visible support activity, and battlefield life as a future gameplay pass.
+- Culling/HLOD: keep the scoped culling evidence and interaction-safety tests,
+  then revisit broad HLOD, vegetation culling, parked-aircraft playtest, and
+  future vehicle-driving surfaces after the release cutoff.
+- Platform utilization: stay WebGL-first for stabilization; reopen WebGPU,
+  OffscreenCanvas, worker simulation, and WASM/threading only as proof-gated
+  architecture branches.
 
 ## Architecture Principles
 

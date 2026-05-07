@@ -177,19 +177,19 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
     ],
     taxiRoutes: [
       {
-        id: 'a1_south_route',
+        id: 'a1_north_route',
         points: [
-          { offsetAlongRunway: -82, offsetLateral: 96 },
-          { offsetAlongRunway: -82, offsetLateral: 58 },
-          { offsetAlongRunway: -194, offsetLateral: 58 },
-          { offsetAlongRunway: -194, offsetLateral: 0 },
+          { offsetAlongRunway: 110, offsetLateral: 140 },
+          { offsetAlongRunway: 110, offsetLateral: 58 },
+          { offsetAlongRunway: 194, offsetLateral: 58 },
+          { offsetAlongRunway: 194, offsetLateral: 0 },
         ],
       },
       {
         id: 'ac47_south_route',
         points: [
-          { offsetAlongRunway: 0, offsetLateral: 96 },
-          { offsetAlongRunway: 0, offsetLateral: 58 },
+          { offsetAlongRunway: 24, offsetLateral: 84 },
+          { offsetAlongRunway: 24, offsetLateral: 58 },
           { offsetAlongRunway: -194, offsetLateral: 58 },
           { offsetAlongRunway: -194, offsetLateral: 0 },
         ],
@@ -197,8 +197,8 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       {
         id: 'f4_north_route',
         points: [
-          { offsetAlongRunway: 82, offsetLateral: 96 },
-          { offsetAlongRunway: 82, offsetLateral: 58 },
+          { offsetAlongRunway: 66, offsetLateral: 120 },
+          { offsetAlongRunway: 66, offsetLateral: 58 },
           { offsetAlongRunway: 194, offsetLateral: 58 },
           { offsetAlongRunway: 194, offsetLateral: 0 },
         ],
@@ -230,13 +230,13 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       {
         standId: 'stand_a1',
         modelPath: AircraftModels.A1_SKYRAIDER,
-        offsetAlongRunway: -82,
-        offsetLateral: 96,
+        offsetAlongRunway: 110,
+        offsetLateral: 140,
         // Yaw is computed at spawn time from the first taxi-route point.
         // See `computeParkingYaw` in AirfieldLayoutGenerator.
         clearanceRadius: 22,
-        taxiRouteId: 'a1_south_route',
-        runwayStartId: 'south_departure',
+        taxiRouteId: 'a1_north_route',
+        runwayStartId: 'north_departure',
         // A-1 spawns parked and claimable by the player. Previously carried
         // an `npcAutoFlight: { kind: 'ferry', ... }` field which ferried the
         // aircraft off the field within seconds of world boot — useful as an
@@ -249,8 +249,8 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       {
         standId: 'stand_ac47',
         modelPath: AircraftModels.AC47_SPOOKY,
-        offsetAlongRunway: 0,
-        offsetLateral: 96,
+        offsetAlongRunway: 24,
+        offsetLateral: 84,
         clearanceRadius: 30,
         taxiRouteId: 'ac47_south_route',
         runwayStartId: 'south_departure',
@@ -258,8 +258,8 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       {
         standId: 'stand_f4',
         modelPath: AircraftModels.F4_PHANTOM,
-        offsetAlongRunway: 82,
-        offsetLateral: 96,
+        offsetAlongRunway: 66,
+        offsetLateral: 120,
         clearanceRadius: 24,
         taxiRouteId: 'f4_north_route',
         runwayStartId: 'north_departure',
@@ -286,6 +286,14 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
         offsetLateral: 42,
         length: 96,
         width: 34,
+        blend: 3,
+        surface: 'packed_earth',
+      },
+      {
+        offsetAlongRunway: -48,
+        offsetLateral: 54,
+        length: 52,
+        width: 48,
         blend: 3,
         surface: 'packed_earth',
       },
@@ -322,8 +330,8 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       {
         id: 'strip_a1_route',
         points: [
-          { offsetAlongRunway: 24, offsetLateral: 42 },
-          { offsetAlongRunway: 24, offsetLateral: 24 },
+          { offsetAlongRunway: -48, offsetLateral: 54 },
+          { offsetAlongRunway: -48, offsetLateral: 24 },
           { offsetAlongRunway: -128, offsetLateral: 24 },
           { offsetAlongRunway: -128, offsetLateral: 0 },
         ],
@@ -344,15 +352,15 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
     parkingSpots: [
       {
         modelPath: AircraftModels.UH1_HUEY,
-        offsetAlongRunway: -22,
-        offsetLateral: 42,
+        offsetAlongRunway: 0,
+        offsetLateral: 24,
         clearanceRadius: 14,
       },
       {
         standId: 'strip_a1',
         modelPath: AircraftModels.A1_SKYRAIDER,
-        offsetAlongRunway: 24,
-        offsetLateral: 42,
+        offsetAlongRunway: -48,
+        offsetLateral: 54,
         clearanceRadius: 20,
         taxiRouteId: 'strip_a1_route',
         runwayStartId: 'strip_south_departure',

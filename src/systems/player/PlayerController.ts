@@ -11,7 +11,7 @@ import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { RallyPointSystem } from '../combat/RallyPointSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { InputManager } from '../input/InputManager';
-import { PlayerMovement } from './PlayerMovement';
+import { PlayerMovement, type PlayerMovementDebugSnapshot } from './PlayerMovement';
 import { PlayerCamera } from './PlayerCamera';
 import { SpectatorCamera, type SpectatorCandidate } from './SpectatorCamera';
 import { InputContextManager } from '../input/InputContextManager';
@@ -634,6 +634,16 @@ export class PlayerController implements GameSystem {
     this.movement.setRunning(!!intent.sprint);
     this.playerState.isRunning = !!intent.sprint;
   }
+  /**
+   * Set a world-space movement intent. This is for harness/agent route
+   * following where movement must stay independent from camera aim.
+   */
+  applyWorldMovementIntent(intent: { x: number; z: number; sprint: boolean }): void {
+    const hasIntent = Math.hypot(intent.x, intent.z) > 0.01;
+    this.movement.setAgentWorldMovementIntent(hasIntent ? { x: intent.x, z: intent.z } : null);
+    this.movement.setRunning(!!intent.sprint);
+    this.playerState.isRunning = !!intent.sprint;
+  }
   /** Start firing via the unified action path. Idempotent. */
   fireStart(): void { this.actionFireStart(); }
   /** Stop firing via the unified action path. Idempotent. */
@@ -652,6 +662,7 @@ export class PlayerController implements GameSystem {
   }
   getCamera(): THREE.PerspectiveCamera { return this.camera; }
   isMoving(): boolean { return this.playerState.velocity.length() > 0.1; }
+  getMovementDebugSnapshot(): PlayerMovementDebugSnapshot | null { return this.movement.getDebugSnapshot(); }
   teleport(position: THREE.Vector3): void { this.setPosition(position, 'teleport'); }
   setViewAngles(yaw: number, pitch = 0): void { this.cameraController.setInfantryViewAngles(yaw, pitch); }
 

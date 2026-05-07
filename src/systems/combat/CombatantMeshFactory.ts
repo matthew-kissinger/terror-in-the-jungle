@@ -76,6 +76,7 @@ const NPC_IMPOSTOR_VERTEX_SHADER = `
   varying vec2 vUv;
   varying float vPhase;
   varying float vViewColumn;
+  varying float vViewRow;
   varying float vAnimationProgress;
   varying float vOpacity;
   varying float vDistance;
@@ -83,6 +84,7 @@ const NPC_IMPOSTOR_VERTEX_SHADER = `
 
   attribute float instancePhase;
   attribute float instanceViewColumn;
+  attribute float instanceViewRow;
   attribute float instanceAnimationProgress;
   attribute float instanceOpacity;
 
@@ -90,6 +92,7 @@ const NPC_IMPOSTOR_VERTEX_SHADER = `
     vUv = uv;
     vPhase = instancePhase;
     vViewColumn = instanceViewColumn;
+    vViewRow = instanceViewRow;
     vAnimationProgress = instanceAnimationProgress;
     vOpacity = instanceOpacity;
     vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
@@ -112,6 +115,7 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
   uniform float npcExposure;
   uniform float minNpcLight;
   uniform float npcTopLight;
+  uniform float horizontalCropExpansion;
   uniform float animationMode;
   uniform sampler2D tileCropMap;
   uniform vec2 tileCropMapSize;
@@ -134,6 +138,7 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
   varying vec2 vUv;
   varying float vPhase;
   varying float vViewColumn;
+  varying float vViewRow;
   varying float vAnimationProgress;
   varying float vOpacity;
   varying float vDistance;
@@ -147,11 +152,15 @@ const NPC_IMPOSTOR_FRAGMENT_SHADER = `
     float frameX = mod(frame, frameGrid.x);
     float frameY = floor(frame / frameGrid.x);
     float viewX = clamp(floor(vViewColumn + 0.5), 0.0, viewGrid.x - 1.0);
-    float viewY = floor(viewGrid.y * 0.5);
+    float viewY = clamp(floor(vViewRow + 0.5), 0.0, viewGrid.y - 1.0);
     vec2 atlasGrid = viewGrid * frameGrid;
     vec2 tile = vec2(frameX * viewGrid.x + viewX, frameY * viewGrid.y + viewY);
     vec4 tileCrop = texture2D(tileCropMap, (tile + vec2(0.5)) / tileCropMapSize);
-    vec2 croppedUv = mix(tileCrop.xy, tileCrop.zw, vUv);
+    float cropCenterX = (tileCrop.x + tileCrop.z) * 0.5;
+    float cropHalfX = (tileCrop.z - tileCrop.x) * 0.5 * max(horizontalCropExpansion, 1.0);
+    vec2 cropMin = vec2(max(0.0, cropCenterX - cropHalfX), tileCrop.y);
+    vec2 cropMax = vec2(min(1.0, cropCenterX + cropHalfX), tileCrop.w);
+    vec2 croppedUv = mix(cropMin, cropMax, vUv);
     vec2 sampleUv = vec2(
       (tile.x + croppedUv.x) / atlasGrid.x,
       1.0 - ((tile.y + 1.0 - croppedUv.y) / atlasGrid.y)
@@ -235,11 +244,13 @@ export function setPixelForgeNpcImpostorAttributes(
   index: number,
   phase: number,
   viewColumn: number,
+  viewRow: number,
   animationProgress = 0,
   opacity = 1,
 ): void {
   const phaseAttribute = mesh.geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute | undefined;
   const viewAttribute = mesh.geometry.getAttribute('instanceViewColumn') as THREE.InstancedBufferAttribute | undefined;
+  const viewRowAttribute = mesh.geometry.getAttribute('instanceViewRow') as THREE.InstancedBufferAttribute | undefined;
   const animationProgressAttribute = mesh.geometry.getAttribute('instanceAnimationProgress') as THREE.InstancedBufferAttribute | undefined;
   const opacityAttribute = mesh.geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute | undefined;
   if (phaseAttribute) {
@@ -249,6 +260,10 @@ export function setPixelForgeNpcImpostorAttributes(
   if (viewAttribute) {
     viewAttribute.setX(index, viewColumn);
     viewAttribute.needsUpdate = true;
+  }
+  if (viewRowAttribute) {
+    viewRowAttribute.setX(index, viewRow);
+    viewRowAttribute.needsUpdate = true;
   }
   if (animationProgressAttribute) {
     animationProgressAttribute.setX(index, animationProgress);
@@ -337,6 +352,7 @@ export class CombatantMeshFactory {
         npcExposure: { value: tuning.npcExposure },
         minNpcLight: { value: tuning.minNpcLight },
         npcTopLight: { value: tuning.npcTopLight },
+        horizontalCropExpansion: { value: tuning.horizontalCropExpansion },
         animationMode: { value: clipId === 'death_fall_back' ? 1 : 0 },
         tileCropMap: { value: tileCrop.texture },
         tileCropMapSize: { value: tileCrop.size },
@@ -379,6 +395,7 @@ export class CombatantMeshFactory {
     const geometry = new THREE.PlaneGeometry(NPC_SPRITE_WIDTH, NPC_SPRITE_HEIGHT);
     geometry.setAttribute('instancePhase', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
     geometry.setAttribute('instanceViewColumn', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
+    geometry.setAttribute('instanceViewRow', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
     geometry.setAttribute('instanceAnimationProgress', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
     geometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances).fill(1), 1));
 

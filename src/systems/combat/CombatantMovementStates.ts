@@ -27,6 +27,7 @@ const ADVANCING_CLOSE_SPEED = 3.4;
 const COMBAT_RETREAT_SPEED = 2.4;
 const COMBAT_STRAFE_SPEED = 1.8;
 const COVER_SEEKING_SPEED = 5.2;
+const RETREATING_FALLBACK_SPEED = 4.8;
 export const DEFEND_SPEED = 3.2;
 const SUPPRESS_HOLD_SPEED = 0;
 
@@ -37,7 +38,9 @@ const PATROL_CLOSE_DISTANCE = 20;
 const PATROL_LONG_DISTANCE = 100;
 const ENGAGEMENT_DISTANCE = 30;
 const ENGAGEMENT_TOLERANCE = 10;
+const CLOSE_QUARTERS_RETREAT_DISTANCE = 6;
 const COVER_ARRIVAL_RADIUS = 2;
+const RETREAT_ARRIVAL_RADIUS = 2;
 const DEFEND_ARRIVAL_RADIUS = 2;
 const ADVANCE_ARRIVAL_RADIUS = 3;
 const ADVANCE_CLOSE_DISTANCE = 16;
@@ -91,6 +94,11 @@ export function updatePatrolMovement(
       if (leader && leader.id !== combatant.id) {
         // Use leader's destination if available (move toward same objective)
         const target = leader.destinationPoint ?? leader.position;
+        if (combatant.destinationPoint) {
+          combatant.destinationPoint.copy(target);
+        } else {
+          combatant.destinationPoint = target.clone();
+        }
         _moveVec.subVectors(target, combatant.position);
         const dist = _moveVec.length();
         if (dist > SQUAD_FOLLOW_DISTANCE) {
@@ -103,6 +111,8 @@ export function updatePatrolMovement(
           combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
           return;
         }
+        combatant.velocity.set(0, 0, 0);
+        return;
       }
     }
   }
@@ -211,8 +221,9 @@ export function updateCombatMovement(combatant: Combatant): void {
   if (distance > ENGAGEMENT_DISTANCE + ENGAGEMENT_TOLERANCE) {
     // Move closer
     combatant.velocity.copy(_moveVec).multiplyScalar(COMBAT_APPROACH_SPEED);
-  } else if (distance < ENGAGEMENT_DISTANCE - ENGAGEMENT_TOLERANCE) {
-    // Back up
+  } else if (distance < CLOSE_QUARTERS_RETREAT_DISTANCE) {
+    // Only backpedal when nearly colliding. Broader close-range backing made
+    // clustered starts pace instead of resolving the fight.
     combatant.velocity.copy(_moveVec).multiplyScalar(-COMBAT_RETREAT_SPEED);
   } else {
     // Strafe
@@ -245,6 +256,28 @@ export function updateAdvancingMovement(combatant: Combatant): void {
   }
 
   combatant.velocity.set(_moveVec.x * speed, 0, _moveVec.z * speed);
+  combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
+}
+
+export function updateRetreatingMovement(combatant: Combatant): void {
+  if (!combatant.destinationPoint) {
+    combatant.velocity.set(0, 0, 0);
+    return;
+  }
+
+  _moveVec.subVectors(combatant.destinationPoint, combatant.position);
+  const distance = _moveVec.length();
+  if (distance < RETREAT_ARRIVAL_RADIUS) {
+    combatant.velocity.set(0, 0, 0);
+    return;
+  }
+
+  _moveVec.normalize();
+  combatant.velocity.set(
+    _moveVec.x * RETREATING_FALLBACK_SPEED,
+    0,
+    _moveVec.z * RETREATING_FALLBACK_SPEED
+  );
   combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
 }
 

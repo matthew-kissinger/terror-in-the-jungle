@@ -6,6 +6,12 @@ import { AssetLoader } from '../assets/AssetLoader';
 import * as CombatantMeshFactoryModule from './CombatantMeshFactory';
 import * as CombatantShadersModule from './CombatantShaders';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import { modelLoader } from '../assets/ModelLoader';
+import {
+  getPixelForgeNpcRuntimeFaction,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+} from './PixelForgeNpcRuntime';
 
 const CLIPS = [
   'idle',
@@ -267,6 +273,46 @@ describe('CombatantRenderer', () => {
       expect(activeCloseModels.get('near-1')?.weaponRoot).toBeDefined();
     });
 
+    it('keeps close-model body and weapon meshes eligible for frustum culling', () => {
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('near-cull', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      combatants.set('near-cull', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as {
+        activeCloseModels: Map<string, { root: THREE.Group; weaponRoot?: THREE.Object3D }>;
+      }).activeCloseModels;
+      const instance = activeCloseModels.get('near-cull');
+      expect(instance).toBeDefined();
+
+      const meshCullingStates: boolean[] = [];
+      instance?.root.traverse((child) => {
+        if (child instanceof THREE.Mesh) meshCullingStates.push(child.frustumCulled);
+      });
+
+      expect(meshCullingStates.length).toBeGreaterThan(0);
+      expect(meshCullingStates.every(Boolean)).toBe(true);
+    });
+
+    it('eager close-model pools only seed the initial demand size', async () => {
+      const localRenderer = new CombatantRenderer(scene, camera, assetLoader);
+      await localRenderer.createFactionBillboards({ eagerCloseModelPools: true });
+
+      const poolState = localRenderer as unknown as {
+        closeModelPools: Map<string, unknown[]>;
+      };
+
+      expect(poolState.closeModelPools.get(Faction.NVA)).toHaveLength(
+        PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
+      );
+      expect(modelLoader.loadAnimatedModel).toHaveBeenCalledTimes(
+        PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION * 5,
+      );
+
+      localRenderer.dispose();
+    });
+
     it('does not let low-LOD classification force a near impostor inside the hard close radius', () => {
       const combatants = new Map<string, Combatant>();
       const combatant = createMockCombatant('near-low-lod', Faction.VC, new THREE.Vector3(20, 0, 0));
@@ -315,7 +361,41 @@ describe('CombatantRenderer', () => {
       vi.useRealTimers();
     });
 
-    it('prioritizes nearest hard-close actors when a close pool is exhausted', () => {
+    it('keeps overflow close actors as impostors while a demand pool can grow', () => {
+      const combatants = new Map<string, Combatant>();
+      for (let i = 0; i < 48; i++) {
+        const combatant = createMockCombatant(`nva-${i}`, Faction.NVA, new THREE.Vector3(2 + i, 0, 0));
+        combatants.set(combatant.id, combatant);
+      }
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const state = renderer as unknown as {
+        activeCloseModels: Map<string, unknown>;
+        closeModelPoolLoads: Map<string, Promise<void>>;
+      };
+      const activeCloseModels = state.activeCloseModels;
+      expect(activeCloseModels.has('nva-0')).toBe(true);
+      expect(activeCloseModels.has(`nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION - 1}`)).toBe(true);
+      expect(activeCloseModels.has(`nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION}`)).toBe(false);
+      expect(activeCloseModels.has('nva-47')).toBe(false);
+      expect(state.closeModelPoolLoads.has(Faction.NVA)).toBe(true);
+      expect(combatants.get('nva-47')?.billboardIndex).toBeGreaterThanOrEqual(0);
+    });
+
+    it('suppresses only after the per-faction close-model pool reaches its hard cap', async () => {
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        Faction.NVA,
+        getPixelForgeNpcRuntimeFaction(Faction.NVA),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+
       const combatants = new Map<string, Combatant>();
       for (let i = 0; i < 48; i++) {
         const combatant = createMockCombatant(`nva-${i}`, Faction.NVA, new THREE.Vector3(2 + i, 0, 0));
@@ -402,17 +482,20 @@ describe('CombatantRenderer', () => {
       expect(markerPosition.y).toBeCloseTo(54.9 - NPC_Y_OFFSET + 0.08);
     });
 
-    it('maps front and rear Pixel Forge impostor views with the package forward offset', () => {
+    it('maps Pixel Forge impostor views through the octahedral atlas contract', () => {
       const combatant = createMockCombatant('view-1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const getViewColumn = (renderer as unknown as {
-        getImpostorViewColumn(combatant: Combatant): number;
-      }).getImpostorViewColumn.bind(renderer);
+      const getViewTile = (renderer as unknown as {
+        getImpostorViewTile(combatant: Combatant): { column: number; row: number };
+      }).getImpostorViewTile.bind(renderer);
 
-      camera.position.set(10, 5, 0);
-      expect(getViewColumn(combatant)).toBe(3);
+      camera.position.set(10, 0, 0);
+      expect(getViewTile(combatant)).toEqual({ column: 3, row: 0 });
 
-      camera.position.set(-10, 5, 0);
-      expect(getViewColumn(combatant)).toBe(0);
+      camera.position.set(-10, 0, 0);
+      expect(getViewTile(combatant)).toEqual({ column: 3, row: 6 });
+
+      camera.position.set(0, 10, 0);
+      expect(getViewTile(combatant)).toEqual({ column: 3, row: 3 });
     });
 
     it('handles player squad tagging when squad id is set', () => {
@@ -499,9 +582,10 @@ describe('CombatantRenderer', () => {
       expect(dyingCombatant.billboardIndex).toBe(0);
       expect(setAttributes).toHaveBeenCalled();
       const call = setAttributes.mock.calls[0];
-      expect(call[4]).toBeCloseTo(0.999);
-      expect(call[5]).toBeGreaterThan(0);
-      expect(call[5]).toBeLessThan(1);
+      expect(call[4]).toBeGreaterThanOrEqual(0);
+      expect(call[5]).toBeCloseTo(0.999);
+      expect(call[6]).toBeGreaterThan(0);
+      expect(call[6]).toBeLessThan(1);
     });
 
     it('handles all death animation types without throwing', () => {

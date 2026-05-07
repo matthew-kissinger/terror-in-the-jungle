@@ -290,18 +290,17 @@ export function generateAirfieldLayout(
 
     if (!isSpacingValid(localOff.x, localOff.z, clearanceRadius, placed)) continue;
 
-    // Perimeter structures sit at the envelope shoulder where sub-footprint
-    // terrain variation can float / sink the foundation under the STRUCTURE_SCALE
-    // amplification. Runway-side and dispersal structures are on or near the
-    // flat apron stamp and can keep the cheap centroid-Y snap.
-    const isPerimeter = entry.zone === 'perimeter';
+    // Every generated structure still gets the runtime flat-search pass. Human
+    // review found that runway-side and dispersal props can visually overhang
+    // when the whole airfield sits near a hill/cliff edge; keeping exact local
+    // offsets is less important than grounding the structure footprint.
     placements.push({
       id: `struct_${placements.length}`,
       modelPath: entry.modelPath,
       offset: localOff,
       yaw: (rng() - 0.5) * 0.3,
       registerCollision: entry.registerCollision,
-      skipFlatSearch: !isPerimeter,
+      skipFlatSearch: false,
     });
     placed.push({ x: localOff.x, z: localOff.z, radius: clearanceRadius });
   }

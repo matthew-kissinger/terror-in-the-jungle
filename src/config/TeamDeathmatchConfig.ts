@@ -87,7 +87,7 @@ export const TEAM_DEATHMATCH_CONFIG: GameModeConfig = {
       id: 'center_village',
       kind: 'village' as const,
       name: 'Central Village',
-      position: new THREE.Vector3(-30, 0, 0),
+      position: new THREE.Vector3(-50, 0, -60),
       placement: { yaw: Math.PI * 0.2 },
       footprint: { shape: 'circle' as const, radius: 20 },
       terrain: {

@@ -73,6 +73,42 @@ describe('PlayerBot — entry and PATROL', () => {
   });
 });
 
+describe('PlayerBot — target lock stability', () => {
+  it('keeps the current target through transient nearest-enemy churn', () => {
+    const bot = new PlayerBot();
+    const current = makeTarget({ id: 'old_target', lastKnownMs: 1000 });
+    const fresh = makeTarget({ id: 'new_target', lastKnownMs: 1250 });
+
+    bot.update(250, makeObservation({
+      now: 1000,
+      findNearestEnemy: () => current,
+    }));
+    bot.update(250, makeObservation({
+      now: 1250,
+      findNearestEnemy: () => fresh,
+    }));
+
+    expect(bot.getCurrentTarget()).toBe(current);
+  });
+
+  it('switches target after the current lock is stale', () => {
+    const bot = new PlayerBot();
+    const current = makeTarget({ id: 'old_target', lastKnownMs: 1000 });
+    const fresh = makeTarget({ id: 'new_target', lastKnownMs: 6000 });
+
+    bot.update(250, makeObservation({
+      now: 1000,
+      findNearestEnemy: () => current,
+    }));
+    bot.update(5000, makeObservation({
+      now: 6000,
+      findNearestEnemy: () => fresh,
+    }));
+
+    expect(bot.getCurrentTarget()).toBe(fresh);
+  });
+});
+
 describe('PlayerBot — ALERT to ENGAGE / ADVANCE', () => {
   it('hands off to ENGAGE when target is in range and visible', () => {
     const bot = new PlayerBot();
@@ -151,12 +187,22 @@ describe('PlayerBot — ENGAGE', () => {
     expect(intent.aimTarget!.x).toBeCloseTo(50, 5);
   });
 
-  it('hands off to ADVANCE when target becomes occluded mid-engagement', () => {
+  it('holds ENGAGE through transient occlusion before handing off to ADVANCE', () => {
     const bot = new PlayerBot();
     const target = makeTarget({ position: { x: 0, y: 0, z: -30 } });
     bot.update(250, makeObservation({ findNearestEnemy: () => target }));
     bot.update(250, makeObservation({ findNearestEnemy: () => target })); // ENGAGE
-    // Now LOS breaks:
+    // Now LOS breaks. The first tick should hold the combat sight picture
+    // instead of snapping the camera/route state.
+    bot.update(250, makeObservation({
+      findNearestEnemy: () => target,
+      canSeeTarget: () => false,
+    }));
+    expect(bot.getState()).toBe('ENGAGE');
+    bot.update(250, makeObservation({
+      findNearestEnemy: () => target,
+      canSeeTarget: () => false,
+    }));
     bot.update(250, makeObservation({
       findNearestEnemy: () => target,
       canSeeTarget: () => false,
@@ -192,7 +238,17 @@ describe('PlayerBot — ADVANCE', () => {
       canSeeTarget: () => false,
     }));
     expect(bot.getState()).toBe('ADVANCE');
-    // Regain LOS — next tick should be ENGAGE.
+    // Regain LOS. ADVANCE has its own dwell so one reacquired sample cannot
+    // spin the route-follow camera back into combat aim.
+    bot.update(250, makeObservation({
+      findNearestEnemy: () => target,
+      canSeeTarget: () => true,
+    }));
+    expect(bot.getState()).toBe('ADVANCE');
+    bot.update(250, makeObservation({
+      findNearestEnemy: () => target,
+      canSeeTarget: () => true,
+    }));
     bot.update(250, makeObservation({
       findNearestEnemy: () => target,
       canSeeTarget: () => true,

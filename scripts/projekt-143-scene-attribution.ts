@@ -3,9 +3,13 @@ export type SceneAttributionEntry = {
   objects: number;
   visibleObjects: number;
   meshes: number;
+  visibleMeshes: number;
   instancedMeshes: number;
+  visibleInstancedMeshes: number;
   drawCallLike: number;
+  visibleDrawCallLike: number;
   instances: number;
+  visibleInstances: number;
   triangles: number;
   visibleTriangles: number;
   materials: number;
@@ -61,9 +65,13 @@ export const PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE = String.raw`
         objects: 0,
         visibleObjects: 0,
         meshes: 0,
+        visibleMeshes: 0,
         instancedMeshes: 0,
+        visibleInstancedMeshes: 0,
         drawCallLike: 0,
+        visibleDrawCallLike: 0,
         instances: 0,
+        visibleInstances: 0,
         triangles: 0,
         visibleTriangles: 0,
         materials: new Set(),
@@ -165,7 +173,13 @@ export const PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE = String.raw`
     bucket.drawCallLike += materialCount;
     bucket.instances += instances;
     bucket.triangles += triangles;
-    if (effectivelyVisible) bucket.visibleTriangles += triangles;
+    if (effectivelyVisible) {
+      bucket.visibleMeshes += 1;
+      if (object.isInstancedMesh) bucket.visibleInstancedMeshes += 1;
+      bucket.visibleDrawCallLike += materialCount;
+      bucket.visibleInstances += instances;
+      bucket.visibleTriangles += triangles;
+    }
     if (object.geometry) bucket.geometries.add(object.geometry);
     for (const material of materials) bucket.materials.add(material);
     if (bucket.examples.length < 8) {
@@ -198,9 +212,13 @@ export const PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE = String.raw`
       objects: bucket.objects,
       visibleObjects: bucket.visibleObjects,
       meshes: bucket.meshes,
+      visibleMeshes: bucket.visibleMeshes,
       instancedMeshes: bucket.instancedMeshes,
+      visibleInstancedMeshes: bucket.visibleInstancedMeshes,
       drawCallLike: bucket.drawCallLike,
+      visibleDrawCallLike: bucket.visibleDrawCallLike,
       instances: bucket.instances,
+      visibleInstances: bucket.visibleInstances,
       triangles: bucket.triangles,
       visibleTriangles: bucket.visibleTriangles,
       materials: bucket.materials.size,

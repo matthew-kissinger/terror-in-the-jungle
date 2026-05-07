@@ -17,6 +17,7 @@
  */
 
 import {
+  BotObjective,
   BotTarget,
   BotVec3,
   PlayerBotState,
@@ -44,6 +45,7 @@ const TARGET_ACTOR_AIM_Y_OFFSET =
   * ((COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2)
   - NPC_Y_OFFSET;
 const OBJECTIVE_LOOK_HEIGHT = NPC_Y_OFFSET + TARGET_ACTOR_AIM_Y_OFFSET;
+const OCCLUDED_TARGET_HOLD_DISTANCE = 6;
 
 function aimPointForTarget(target: BotTarget): BotVec3 {
   const anchor = target.aimPosition ?? target.position;
@@ -60,6 +62,37 @@ function isEngagable(ctx: PlayerBotStateContext, target: BotTarget | null): bool
   const dist = horizontalDistance(ctx.eyePos, target.position);
   if (dist > ctx.config.maxFireDistance) return false;
   return ctx.canSeeTarget(target.position);
+}
+
+function shouldInterruptObjectiveForTarget(
+  ctx: PlayerBotStateContext,
+  target: BotTarget,
+  objective: BotObjective | null,
+): boolean {
+  if (!objective) return true;
+  const dist = horizontalDistance(ctx.eyePos, target.position);
+  const acquisitionDistance = Math.max(0, ctx.config.targetAcquisitionDistance);
+  return dist <= acquisitionDistance && ctx.canSeeTarget(target.position);
+}
+
+function resolveUngatedCombatTarget(ctx: PlayerBotStateContext): BotTarget | null {
+  const objective = ctx.getObjective();
+  if (objective?.kind === 'zone') return null;
+  return ctx.findNearestEnemy();
+}
+
+function pushInDistanceForVisibility(ctx: PlayerBotStateContext, visible: boolean): number {
+  if (visible) return ctx.config.pushInDistance;
+  return Math.min(ctx.config.pushInDistance, OCCLUDED_TARGET_HOLD_DISTANCE);
+}
+
+function tacticalHoldDistance(config: PlayerBotStateContext['config']): number {
+  const push = Math.max(0, config.pushInDistance);
+  const maxFire = Math.max(push, config.maxFireDistance);
+  const approach = Math.max(push, config.approachDistance);
+  // Keep closing from the edge of fire range, but stop before point-blank
+  // crowd contact where target churn and collision noise dominate the bot.
+  return Math.max(push, Math.min(approach, maxFire * 0.55));
 }
 
 /**
@@ -82,14 +115,16 @@ function updatePatrol(ctx: PlayerBotStateContext): PlayerBotStateStep {
   const intent = createIdlePlayerBotIntent();
   intent.aimLerpRate = ctx.config.aimLerpRate;
 
+  const objective = ctx.getObjective();
   const enemy = ctx.findNearestEnemy();
   if (enemy) {
-    // Hand off target selection to ALERT (which decides ENGAGE vs ADVANCE).
-    intent.aimTarget = aimPointForTarget(enemy);
-    return { intent, nextState: 'ALERT', resetTimeInState: true };
+    if (shouldInterruptObjectiveForTarget(ctx, enemy, objective)) {
+      // Hand off target selection to ALERT (which decides ENGAGE vs ADVANCE).
+      intent.aimTarget = aimPointForTarget(enemy);
+      return { intent, nextState: 'ALERT', resetTimeInState: true };
+    }
   }
 
-  const objective = ctx.getObjective();
   if (objective) {
     intent.aimTarget = { x: objective.position.x, y: objective.position.y + OBJECTIVE_LOOK_HEIGHT, z: objective.position.z };
     intent.moveForward = 1;
@@ -109,7 +144,7 @@ function updateAlert(ctx: PlayerBotStateContext): PlayerBotStateStep {
   //   - target visible & in range → ENGAGE
   //   - target known but blocked → ADVANCE to close the gap / regain LOS
   //   - target vanished → PATROL
-  const target = ctx.currentTarget ?? ctx.findNearestEnemy();
+  const target = ctx.currentTarget ?? resolveUngatedCombatTarget(ctx);
   if (!target) {
     return { intent, nextState: 'PATROL', resetTimeInState: true };
   }
@@ -140,7 +175,14 @@ function updateEngage(ctx: PlayerBotStateContext): PlayerBotStateStep {
   const visible = ctx.canSeeTarget(target.position);
   const dist = horizontalDistance(ctx.eyePos, target.position);
   if (!visible || dist > ctx.config.maxFireDistance) {
-    // Hold aim for a frame, but let the caller know we're switching.
+    if (ctx.timeInStateMs < ctx.config.minEngageStateMs) {
+      // Hold the combat sight picture through short LOS/range flicker instead
+      // of snapping back to route-follow every tick.
+      const holdDistance = Math.max(tacticalHoldDistance(ctx.config), pushInDistanceForVisibility(ctx, false));
+      intent.moveForward = dist > holdDistance ? 1 : 0;
+      intent.sprint = dist > ctx.config.sprintDistance;
+      return { intent, nextState: null, resetTimeInState: false };
+    }
     return { intent, nextState: 'ADVANCE', resetTimeInState: true };
   }
 
@@ -158,9 +200,11 @@ function updateEngage(ctx: PlayerBotStateContext): PlayerBotStateStep {
     ctx.config.engageStrafeAmplitude,
   );
 
-  // Push in until close. NEVER negative — players don't back-pedal in a
-  // fight, and back-pedalling broke hits=0 in Round 5/6.
-  intent.moveForward = dist > ctx.config.pushInDistance ? 1 : 0;
+  // Push into firing range, then plant and shoot. Continuing to hold forward
+  // while the camera is aim-locked makes close target clusters look like
+  // 180-degree pacing because movement is camera-relative.
+  const holdFireDistance = tacticalHoldDistance(ctx.config);
+  intent.moveForward = dist > holdFireDistance ? 1 : 0;
 
   return { intent, nextState: null, resetTimeInState: false };
 }
@@ -169,7 +213,7 @@ function updateAdvance(ctx: PlayerBotStateContext): PlayerBotStateStep {
   const intent = createIdlePlayerBotIntent();
   intent.aimLerpRate = ctx.config.aimLerpRate;
 
-  const target = ctx.currentTarget ?? ctx.findNearestEnemy();
+  const target = ctx.currentTarget ?? resolveUngatedCombatTarget(ctx);
   if (!target) {
     return { intent, nextState: 'PATROL', resetTimeInState: true };
   }
@@ -177,9 +221,17 @@ function updateAdvance(ctx: PlayerBotStateContext): PlayerBotStateStep {
   // Keep eyes on the target even while advancing.
   intent.aimTarget = aimPointForTarget(target);
 
-  // Re-check LOS: if we can now see the target, hand off to ENGAGE.
-  if (isEngagable(ctx, target)) {
-    return { intent, nextState: 'ENGAGE', resetTimeInState: true };
+  // Re-check LOS: if we can now see the target, hand off to ENGAGE after a
+  // short dwell so one reacquired sample cannot spin the route-follow camera.
+  const visible = ctx.canSeeTarget(target.position);
+  const dist = horizontalDistance(ctx.eyePos, target.position);
+  if (visible && dist <= ctx.config.maxFireDistance) {
+    if (ctx.timeInStateMs >= ctx.config.minAdvanceStateMs) {
+      return { intent, nextState: 'ENGAGE', resetTimeInState: true };
+    }
+    intent.moveForward = dist > tacticalHoldDistance(ctx.config) ? 1 : 0;
+    intent.sprint = dist > ctx.config.sprintDistance;
+    return { intent, nextState: null, resetTimeInState: false };
   }
 
   // Movement toward the target. The DRIVER is expected to convert this
@@ -187,8 +239,7 @@ function updateAdvance(ctx: PlayerBotStateContext): PlayerBotStateStep {
   // `findNearestNavmeshPoint` get consumed — the bot itself just says
   // "move forward toward the target bearing"). Keeping this tight avoids
   // duplicating path-follow logic between the bot and the driver.
-  intent.moveForward = 1;
-  const dist = horizontalDistance(ctx.eyePos, target.position);
+  intent.moveForward = dist > pushInDistanceForVisibility(ctx, visible) ? 1 : 0;
   intent.sprint = dist > ctx.config.sprintDistance;
   return { intent, nextState: null, resetTimeInState: false };
 }

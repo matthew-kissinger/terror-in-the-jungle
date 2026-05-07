@@ -74,6 +74,7 @@ type ValidationCheck = {
 };
 
 type PerfSummary = {
+  status?: CheckStatus | 'ok' | 'failed';
   startedAt?: string;
   durationSeconds?: number;
   scenario?: { mode?: string };
@@ -308,11 +309,19 @@ function latestPerfSummaryForMode(mode: string): string | null {
     if (!path.endsWith('summary.json')) return false;
     try {
       const summary = readJson<PerfSummary>(path);
-      return summary.scenario?.mode === mode && existsSync(join(path, '..', 'runtime-samples.json'));
+      return summary.scenario?.mode === mode
+        && isCertificationPerfSummary(summary)
+        && existsSync(join(path, '..', 'runtime-samples.json'));
     } catch {
       return false;
     }
   });
+}
+
+function isCertificationPerfSummary(summary: PerfSummary): boolean {
+  return summary.measurementTrust?.status === 'pass'
+    && summary.validation?.overall !== 'fail'
+    && summary.status !== 'failed';
 }
 
 function getValidationValue(summary: PerfSummary | null, id: string): number | null {
@@ -359,7 +368,7 @@ function perfBaselineDigest(path: string | null, mode: string): PerfBaselineDige
   const peakP95FrameMs = numericMax(samples.map((sample) => sample.p95FrameMs));
   const maxDrawCalls = numericMax(samples.map((sample) => sample.renderer?.drawCalls));
   const maxTriangles = numericMax(samples.map((sample) => sample.renderer?.triangles));
-  const trusted = summary.measurementTrust?.status === 'pass';
+  const trusted = isCertificationPerfSummary(summary);
   const hasRendererStats = maxDrawCalls !== null && maxTriangles !== null;
   const hasSceneAttribution = existsSync(sceneAttributionPath) && (summary.sceneAttribution?.length ?? 0) > 0;
 

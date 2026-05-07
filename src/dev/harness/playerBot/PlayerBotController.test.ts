@@ -211,6 +211,35 @@ describe('PlayerBotController — aim translation', () => {
     expect(target.viewCalls.length).toBe(0);
   });
 
+  it('faces movementTarget while moving without firing', () => {
+    const target = makeTarget();
+    const controller = new PlayerBotController(target);
+    const intent = createIdlePlayerBotIntent();
+    intent.moveForward = 1;
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
+    intent.movementTarget = { x: 0, y: 0, z: -10 };
+    intent.aimLerpRate = 1;
+    controller.apply(intent);
+    const fwd = target.camera.getWorldDirection(new THREE.Vector3());
+    expect(fwd.z).toBeLessThan(-0.9);
+    expect(Math.abs(fwd.x)).toBeLessThan(0.2);
+  });
+
+  it('prioritizes aimTarget over movementTarget while firing', () => {
+    const target = makeTarget();
+    const controller = new PlayerBotController(target);
+    const intent = createIdlePlayerBotIntent();
+    intent.moveForward = 1;
+    intent.firePrimary = true;
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
+    intent.movementTarget = { x: 0, y: 0, z: -10 };
+    intent.aimLerpRate = 1;
+    const result = controller.apply(intent);
+    const fwd = target.camera.getWorldDirection(new THREE.Vector3());
+    expect(fwd.x).toBeGreaterThan(0.9);
+    expect(result.fired).toBe(true);
+  });
+
   it('clamps pitch to the ±80° gimbal margin when target is nearly overhead', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);

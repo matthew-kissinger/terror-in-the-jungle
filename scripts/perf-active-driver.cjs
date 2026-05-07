@@ -126,6 +126,16 @@
 
   // Path-trust invariant (perf-harness-verticality-and-sizing).
   const PATH_TRUST_TTL_MS = 5000;
+  const ROUTE_MICRO_TARGET_DISTANCE = 3;
+  const ROUTE_MICRO_TARGET_ANCHOR_DISTANCE = 12;
+  const ROUTE_TARGET_REPLAN_DISTANCE = 24;
+  const ROUTE_PROGRESS_MIN_IMPROVEMENT = 8;
+  const ROUTE_PROGRESS_MIN_CLOSURE_RATIO = 0.15;
+  const ROUTE_PROGRESS_TIMEOUT_MS = 6000;
+  const ROUTE_PROGRESS_MIN_TRAVEL = 60;
+  const ROUTE_NO_PROGRESS_TARGET_COOLDOWN_MS = 8000;
+  const NAVMESH_START_SNAP_RADIUS = 80;
+  const NAVMESH_TARGET_SNAP_RADIUS = 80;
 
   function isPathTrusted(opts) {
     const path = opts && opts.path;
@@ -196,23 +206,78 @@
   function pointAlongPath(path, fromIdx, fromPos, lookaheadDist) {
     if (!Array.isArray(path) || path.length === 0) return null;
     const idx = Math.max(0, Math.min(path.length - 1, Number(fromIdx) || 0));
+    if (path.length === 1 || idx >= path.length - 1) {
+      const last = path[path.length - 1];
+      return last ? { x: Number(last.x || 0), y: Number(last.y || 0), z: Number(last.z || 0) } : null;
+    }
+
     const pos = fromPos || path[idx];
-    let remaining = Number.isFinite(lookaheadDist) && lookaheadDist > 0 ? Number(lookaheadDist) : 8;
-    let ax = Number(pos && pos.x || 0);
-    let az = Number(pos && pos.z || 0);
-    for (let i = idx; i < path.length; i++) {
-      const wp = path[i];
-      if (!wp) continue;
-      const wx = Number(wp.x || 0);
-      const wz = Number(wp.z || 0);
-      const seg = Math.hypot(wx - ax, wz - az);
-      if (seg >= remaining) {
-        const t = seg > 0 ? remaining / seg : 0;
-        return { x: ax + (wx - ax) * t, y: Number(wp.y || 0), z: az + (wz - az) * t };
+    const px = Number(pos && pos.x || 0);
+    const pz = Number(pos && pos.z || 0);
+    const lookahead = Number.isFinite(lookaheadDist) && lookaheadDist > 0 ? Number(lookaheadDist) : 8;
+    const cumulative = new Array(path.length).fill(0);
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1] || {};
+      const b = path[i] || {};
+      cumulative[i] = cumulative[i - 1] + Math.hypot(
+        Number(b.x || 0) - Number(a.x || 0),
+        Number(b.z || 0) - Number(a.z || 0),
+      );
+    }
+
+    let best = null;
+    let bestDistanceSq = Number.POSITIVE_INFINITY;
+    for (let i = idx; i < path.length - 1; i++) {
+      const a = path[i] || {};
+      const b = path[i + 1] || {};
+      const ax = Number(a.x || 0);
+      const az = Number(a.z || 0);
+      const bx = Number(b.x || 0);
+      const bz = Number(b.z || 0);
+      const vx = bx - ax;
+      const vz = bz - az;
+      const segSq = vx * vx + vz * vz;
+      if (segSq <= 1e-8) continue;
+      const t = Math.max(0, Math.min(1, ((px - ax) * vx + (pz - az) * vz) / segSq));
+      const qx = ax + vx * t;
+      const qz = az + vz * t;
+      const dx = qx - px;
+      const dz = qz - pz;
+      const dSq = dx * dx + dz * dz;
+      if (dSq < bestDistanceSq) {
+        bestDistanceSq = dSq;
+        best = {
+          distance: cumulative[i] + Math.sqrt(segSq) * t,
+        };
       }
-      remaining -= seg;
-      ax = wx;
-      az = wz;
+    }
+    if (!best) {
+      const wp = path[idx];
+      best = { distance: cumulative[idx], x: Number(wp.x || 0), z: Number(wp.z || 0) };
+    }
+
+    const targetDistance = Math.min(cumulative[cumulative.length - 1], best.distance + lookahead);
+    for (let i = idx; i < path.length - 1; i++) {
+      const a = path[i] || {};
+      const b = path[i + 1] || {};
+      const segStart = cumulative[i];
+      const segEnd = cumulative[i + 1];
+      const segLen = segEnd - segStart;
+      if (segLen <= 1e-8) continue;
+      if (targetDistance <= segEnd || i === path.length - 2) {
+        const t = Math.max(0, Math.min(1, (targetDistance - segStart) / segLen));
+        const ax = Number(a.x || 0);
+        const ay = Number(a.y || 0);
+        const az = Number(a.z || 0);
+        const bx = Number(b.x || 0);
+        const by = Number(b.y || 0);
+        const bz = Number(b.z || 0);
+        return {
+          x: ax + (bx - ax) * t,
+          y: ay + (by - ay) * t,
+          z: az + (bz - az) * t,
+        };
+      }
     }
     const last = path[path.length - 1];
     return last ? { x: Number(last.x || 0), y: Number(last.y || 0), z: Number(last.z || 0) } : null;
@@ -399,6 +464,39 @@
     return best;
   }
 
+  function selectPatrolObjective(opts) {
+    const aggressive = !!(opts && opts.aggressiveMode);
+    const combatObjective = opts && opts.combatObjective && opts.combatObjective.position
+      ? opts.combatObjective
+      : null;
+    const zoneObjective = opts && opts.zoneObjective && opts.zoneObjective.position
+      ? opts.zoneObjective
+      : null;
+    const fallbackObjective = opts && opts.fallbackObjective && opts.fallbackObjective.position
+      ? opts.fallbackObjective
+      : null;
+    const maxCombatDistance = Number(opts && opts.combatObjectiveMaxDistance);
+    const combatDistance = Number(combatObjective && combatObjective.distance);
+    const combatInDetourRange =
+      combatObjective &&
+      (!Number.isFinite(maxCombatDistance) || !Number.isFinite(combatDistance) || combatDistance <= maxCombatDistance);
+
+    if (aggressive && combatInDetourRange) return combatObjective;
+    if (zoneObjective) return zoneObjective;
+    if (combatObjective) return combatObjective;
+    return fallbackObjective;
+  }
+
+  function objectiveTelemetryKey(objective, zoneId) {
+    if (!objective || !objective.position) return null;
+    const kind = String(objective.kind || 'unknown');
+    if (kind === 'zone' && zoneId) return `zone:${String(zoneId)}`;
+    if (objective.id !== null && objective.id !== undefined && String(objective.id) !== '') {
+      return `${kind}:${String(objective.id)}`;
+    }
+    return kind;
+  }
+
   // ── Combat stat helpers (pure, exported for Node-side regression tests). ──
   //
   // The driver polls the engine's PlayerStatsTracker each tick. These
@@ -517,16 +615,303 @@
       jump: false,
       // World-space aim target. null = hold current view angles.
       aimTarget: null,
+      // World-space movement look target. Used for camera-relative path
+      // following while moving but not firing.
+      movementTarget: null,
       aimLerpRate: 1,
       firePrimary: false,
       reload: false,
     };
   }
 
+  function selectDriverViewTarget(intent, overlayPoint, moving) {
+    const movementTarget = (intent && intent.movementTarget) || overlayPoint || null;
+    if (moving && movementTarget && !(intent && intent.firePrimary)) {
+      return movementTarget;
+    }
+    return intent && intent.aimTarget ? intent.aimTarget : null;
+  }
+
+  function computeWorldMovementIntent(intent, overlayPoint, playerPos) {
+    if (!intent || !playerPos) return null;
+    const forward = Number(intent.moveForward || 0);
+    const strafe = Number(intent.moveStrafe || 0);
+    const wantsMove = Math.abs(forward) > 0.1 || Math.abs(strafe) > 0.1;
+    if (!wantsMove) return null;
+    const target = intent.movementTarget || overlayPoint || (forward > 0.1 ? intent.aimTarget : null) || null;
+    if (!target) return null;
+    const dx = Number(target.x || 0) - Number(playerPos.x || 0);
+    const dz = Number(target.z || 0) - Number(playerPos.z || 0);
+    const len = Math.hypot(dx, dz);
+    if (!Number.isFinite(len) || len < 0.5) {
+      return { x: 0, z: 0, distance: Number.isFinite(len) ? len : 0 };
+    }
+    return { x: dx / len, z: dz / len, distance: len };
+  }
+
+  function applyRouteOverlayRecovery(intent, overlayPoint, stuckMs) {
+    if (!intent || !overlayPoint || intent.firePrimary) return intent;
+    const wantsMove = Math.abs(Number(intent.moveForward || 0)) > 0.1
+      || Math.abs(Number(intent.moveStrafe || 0)) > 0.1;
+    if (!wantsMove) return intent;
+
+    // Route-following on real terrain is more reliable at infantry walk speed:
+    // sprinting into a navmesh corner can make PlayerMovement reject every
+    // step as a terrain lip before the route can bend around it.
+    intent.sprint = false;
+
+    const stuck = Number(stuckMs || 0);
+    if (stuck > 2000) {
+      const side = Math.floor(stuck / 1750) % 2 === 0 ? 1 : -1;
+      const existingStrafe = Number(intent.moveStrafe || 0);
+      intent.moveStrafe = Math.max(-1, Math.min(1, existingStrafe + side * 0.55));
+    }
+    return intent;
+  }
+
+  function shouldTrackHarnessStuckProgress(intent) {
+    if (!intent) return false;
+    return Math.abs(Number(intent.moveForward || 0)) > 0.1
+      || Math.abs(Number(intent.moveStrafe || 0)) > 0.1;
+  }
+
+  function shouldSkipStuckWaypoint(opts) {
+    const stuckMs = Number(opts && opts.stuckMs);
+    if (!Number.isFinite(stuckMs) || stuckMs < 4500) return false;
+    const path = opts && opts.path;
+    const waypointIdx = Number(opts && opts.waypointIdx);
+    if (!Array.isArray(path) || path.length < 2) return false;
+    if (!Number.isInteger(waypointIdx) || waypointIdx < 0) return false;
+    return waypointIdx < path.length - 1;
+  }
+
+  function hasRouteTargetMoved(opts) {
+    const last = opts && opts.lastTarget;
+    const next = opts && opts.nextTarget;
+    const threshold = Number.isFinite(Number(opts && opts.threshold))
+      ? Number(opts.threshold)
+      : ROUTE_TARGET_REPLAN_DISTANCE;
+    if (!last || !next) return false;
+    if (last.x === null || last.x === undefined || last.z === null || last.z === undefined) return false;
+    if (next.x === null || next.x === undefined || next.z === null || next.z === undefined) return false;
+    const lx = Number(last.x);
+    const lz = Number(last.z);
+    const nx = Number(next.x);
+    const nz = Number(next.z);
+    if (!Number.isFinite(lx) || !Number.isFinite(lz) || !Number.isFinite(nx) || !Number.isFinite(nz)) {
+      return false;
+    }
+    return Math.hypot(nx - lx, nz - lz) > Math.max(0, threshold);
+  }
+
+  function shouldResetRouteForNoProgress(opts) {
+    const currentDistance = Number(opts && opts.currentDistance);
+    const baselineDistance = Number(opts && opts.baselineDistance);
+    const elapsedMs = Number(opts && opts.elapsedMs);
+    const playerMoved = Number(opts && opts.playerMoved);
+    if (!Number.isFinite(currentDistance) || !Number.isFinite(baselineDistance)) return false;
+    if (!Number.isFinite(elapsedMs) || !Number.isFinite(playerMoved)) return false;
+    const minImprovement = Number.isFinite(Number(opts && opts.minImprovement))
+      ? Number(opts.minImprovement)
+      : ROUTE_PROGRESS_MIN_IMPROVEMENT;
+    const minClosureRatio = Number.isFinite(Number(opts && opts.minClosureRatio))
+      ? Number(opts.minClosureRatio)
+      : ROUTE_PROGRESS_MIN_CLOSURE_RATIO;
+    const timeoutMs = Number.isFinite(Number(opts && opts.timeoutMs))
+      ? Number(opts.timeoutMs)
+      : ROUTE_PROGRESS_TIMEOUT_MS;
+    const minTravel = Number.isFinite(Number(opts && opts.minTravel))
+      ? Number(opts.minTravel)
+      : ROUTE_PROGRESS_MIN_TRAVEL;
+    const closure = baselineDistance - currentDistance;
+    const closureRatio = playerMoved > 0 ? closure / playerMoved : closure > 0 ? Number.POSITIVE_INFINITY : 0;
+    if (closure >= Math.max(0, minImprovement) && closureRatio >= Math.max(0, minClosureRatio)) {
+      return false;
+    }
+    return elapsedMs >= Math.max(0, timeoutMs) && playerMoved >= Math.max(0, minTravel);
+  }
+
+  function isTargetTemporarilyBlocked(id, blockedTargets, nowMs) {
+    if (id === null || id === undefined || !blockedTargets) return false;
+    const key = String(id);
+    const until = Number(blockedTargets[key]);
+    const now = Number(nowMs);
+    if (!Number.isFinite(until) || !Number.isFinite(now)) return false;
+    if (until <= now) {
+      try { delete blockedTargets[key]; } catch (_err) { /* ignore */ }
+      return false;
+    }
+    return true;
+  }
+
+  function markTargetTemporarilyBlocked(blockedTargets, id, nowMs, durationMs) {
+    if (!blockedTargets || id === null || id === undefined) return false;
+    const now = Number(nowMs);
+    const duration = Number.isFinite(Number(durationMs)) && Number(durationMs) > 0
+      ? Number(durationMs)
+      : ROUTE_NO_PROGRESS_TARGET_COOLDOWN_MS;
+    if (!Number.isFinite(now)) return false;
+    blockedTargets[String(id)] = now + duration;
+    return true;
+  }
+
+  function shouldUseTargetForCurrentObjective(opts) {
+    const target = opts && opts.target;
+    if (!target || !target.position) return false;
+    const objective = opts && opts.objective;
+    if (!objective || !objective.position) return true;
+    const playerPos = opts && opts.playerPos;
+    if (!playerPos) return false;
+    const targetDistance = botHorizontalDistance(playerPos, target.position);
+    if (!Number.isFinite(targetDistance)) return false;
+
+    const objectiveKind = String(objective.kind || '');
+    if (objectiveKind === 'nearest_opfor') return true;
+
+    const acquisitionDistance = Math.max(0, Number(opts && opts.acquisitionDistance || 0));
+    const maxFireDistance = Math.max(acquisitionDistance, Number(opts && opts.maxFireDistance || acquisitionDistance));
+    const botState = String(opts && opts.botState || 'PATROL');
+    const current = opts && opts.currentTarget;
+    const sameLockedTarget = current && target && String(current.id || '') === String(target.id || '');
+    const canSeeTarget = opts && typeof opts.canSeeTarget === 'function'
+      ? !!opts.canSeeTarget(target.position)
+      : false;
+
+    if (targetDistance <= acquisitionDistance && canSeeTarget) return true;
+    if (!sameLockedTarget) return false;
+    if (botState !== 'ALERT' && botState !== 'ENGAGE' && botState !== 'ADVANCE') return false;
+    // Close-pressure fights can momentarily occlude the locked target behind
+    // another NPC or a terrain/cover sample. Hold the lock through that short
+    // flicker so the driver does not yaw 180 degrees between nearby candidates
+    // on every decision tick.
+    return targetDistance <= maxFireDistance;
+  }
+
+  function shouldUseRouteOverlayForIntent(opts) {
+    const intent = opts && opts.intent;
+    if (!intent) return false;
+    const wantsMove = Math.abs(Number(intent.moveForward || 0)) > 0.1
+      || Math.abs(Number(intent.moveStrafe || 0)) > 0.1;
+    if (!wantsMove) return false;
+    const botState = String(opts && opts.botState || '');
+    if (botState !== 'ADVANCE' && botState !== 'PATROL' && botState !== 'ALERT' && botState !== 'ENGAGE') {
+      return false;
+    }
+
+    // If the bot is already firing, LOS is established by the state machine.
+    // Route overlay points are still useful around occlusion, but during
+    // visible fire-and-close behavior they can make the driver step around a
+    // local nav corner instead of simply pushing toward the target.
+    if (botState === 'ENGAGE' && intent.firePrimary && opts && opts.currentTarget) {
+      return false;
+    }
+
+    return botState === 'ADVANCE' || botState === 'PATROL' || botState === 'ALERT' || botState === 'ENGAGE';
+  }
+
+  function shouldUseDirectCombatRouteFallback(opts) {
+    const targetKind = String(opts && opts.targetKind || '');
+    if (targetKind !== 'current_target' && targetKind !== 'nearest_opfor') return false;
+    const failureReason = String(opts && opts.failureReason || '');
+    if (failureReason !== 'end_snap_failed' && failureReason !== 'start_snap_failed') return false;
+    const targetDistance = Number(opts && opts.targetDistance);
+    if (!Number.isFinite(targetDistance) || targetDistance <= 0) return false;
+    const maxDistance = Number(opts && opts.maxDistance);
+    if (!Number.isFinite(maxDistance) || maxDistance <= 0) return false;
+    return targetDistance <= maxDistance;
+  }
+
+  function createDirectCombatFallbackPath(playerPos, target) {
+    if (!playerPos || !target) return null;
+    const distance = botHorizontalDistance(playerPos, target);
+    if (!Number.isFinite(distance) || distance < 0.5) return null;
+    return [
+      {
+        x: Number(playerPos.x || 0),
+        y: Number(playerPos.y || 0),
+        z: Number(playerPos.z || 0),
+      },
+      {
+        x: Number(target.x || 0),
+        y: Number.isFinite(Number(target.y)) ? Number(target.y) : Number(playerPos.y || 0),
+        z: Number(target.z || 0),
+      },
+    ];
+  }
+
+  const OCCLUDED_TARGET_HOLD_DISTANCE = 6;
+  function pushInDistanceForVisibility(config, visible) {
+    const push = Math.max(0, Number(config && config.pushInDistance || 0));
+    if (visible) return push;
+    return Math.min(push, OCCLUDED_TARGET_HOLD_DISTANCE);
+  }
+
+  function tacticalHoldDistance(config) {
+    const push = Math.max(0, Number(config && config.pushInDistance || 0));
+    const maxFire = Math.max(push, Number(config && config.maxFireDistance || 0));
+    const approach = Math.max(push, Number(config && config.approachDistance || maxFire));
+    // Fight like a player: keep closing from the edge of fire range, but stop
+    // before point-blank crowd contact where target selection and collision
+    // noise can dominate the harness.
+    return Math.max(push, Math.min(approach, maxFire * 0.55));
+  }
+
   function botHorizontalDistance(a, b) {
     const dx = Number(a.x || 0) - Number(b.x || 0);
     const dz = Number(a.z || 0) - Number(b.z || 0);
     return Math.hypot(dx, dz);
+  }
+
+  function isRouteOverlayMicroTarget(playerPos, overlayPoint, anchor) {
+    if (!playerPos || !overlayPoint || !anchor) return false;
+    const routeDistance = botHorizontalDistance(playerPos, overlayPoint);
+    const anchorDistance = botHorizontalDistance(playerPos, anchor);
+    return routeDistance > 0
+      && routeDistance < ROUTE_MICRO_TARGET_DISTANCE
+      && anchorDistance > ROUTE_MICRO_TARGET_ANCHOR_DISTANCE;
+  }
+
+  function isRoutePathExhausted(path, waypointIdx) {
+    const index = Number(waypointIdx);
+    return Array.isArray(path)
+      && path.length > 0
+      && Number.isFinite(index)
+      && index >= path.length;
+  }
+
+  function computeRouteContinuationPoint(playerPos, dirX, dirZ, distance) {
+    if (!playerPos) return null;
+    const dx = Number(dirX);
+    const dz = Number(dirZ);
+    const len = Math.hypot(dx, dz);
+    if (!Number.isFinite(len) || len < 0.5) return null;
+    const d = Number.isFinite(Number(distance)) && Number(distance) > 0 ? Number(distance) : 8;
+    return {
+      x: Number(playerPos.x || 0) + (dx / len) * d,
+      y: Number(playerPos.y || 0),
+      z: Number(playerPos.z || 0) + (dz / len) * d,
+    };
+  }
+
+  function computeAnchorContinuationPoint(playerPos, anchor, distance) {
+    if (!playerPos || !anchor) return null;
+    return computeRouteContinuationPoint(
+      playerPos,
+      Number(anchor.x || 0) - Number(playerPos.x || 0),
+      Number(anchor.z || 0) - Number(playerPos.z || 0),
+      distance,
+    );
+  }
+
+  function rememberRouteOverlayDirection(state, playerPos, overlayPoint) {
+    if (!state || !playerPos || !overlayPoint) return false;
+    const dx = Number(overlayPoint.x || 0) - Number(playerPos.x || 0);
+    const dz = Number(overlayPoint.z || 0) - Number(playerPos.z || 0);
+    const len = Math.hypot(dx, dz);
+    if (!Number.isFinite(len) || len < 0.5) return false;
+    state.lastRouteOverlayDirX = dx / len;
+    state.lastRouteOverlayDirZ = dz / len;
+    return true;
   }
 
   function botAimPoint(target) {
@@ -553,12 +938,17 @@
   function updatePatrolBot(ctx) {
     const intent = createIdleBotIntent();
     intent.aimLerpRate = ctx.config.aimLerpRate;
+    const objective = ctx.getObjective();
     const enemy = ctx.findNearestEnemy();
     if (enemy) {
-      intent.aimTarget = botAimPoint(enemy);
-      return { intent, nextState: 'ALERT', resetTimeInState: true };
+      const dist = botHorizontalDistance(ctx.eyePos, enemy.position);
+      const acquisitionDistance = Math.max(0, Number(ctx.config.targetAcquisitionDistance || ctx.config.maxFireDistance || 0));
+      const interruptsObjective = !objective || (dist <= acquisitionDistance && ctx.canSeeTarget(enemy.position));
+      if (interruptsObjective) {
+        intent.aimTarget = botAimPoint(enemy);
+        return { intent, nextState: 'ALERT', resetTimeInState: true };
+      }
     }
-    const objective = ctx.getObjective();
     if (objective && objective.position) {
       intent.aimTarget = {
         x: Number(objective.position.x || 0),
@@ -574,7 +964,7 @@
   function updateAlertBot(ctx) {
     const intent = createIdleBotIntent();
     intent.aimLerpRate = ctx.config.aimLerpRate;
-    const target = ctx.currentTarget || ctx.findNearestEnemy();
+    const target = ctx.currentTarget || resolveUngatedCombatTarget(ctx);
     if (!target) {
       return { intent, nextState: 'PATROL', resetTimeInState: true };
     }
@@ -598,6 +988,12 @@
     const visible = !!ctx.canSeeTarget(target.position);
     const dist = botHorizontalDistance(ctx.eyePos, target.position);
     if (!visible || dist > ctx.config.maxFireDistance) {
+      if (ctx.timeInStateMs < ctx.config.minEngageStateMs) {
+        const holdDistance = Math.max(tacticalHoldDistance(ctx.config), pushInDistanceForVisibility(ctx.config, false));
+        intent.moveForward = dist > holdDistance ? 1 : 0;
+        intent.sprint = dist > ctx.config.sprintDistance;
+        return { intent, nextState: null, resetTimeInState: false };
+      }
       return { intent, nextState: 'ADVANCE', resetTimeInState: true };
     }
     if (ctx.magazine.current <= 0) {
@@ -606,26 +1002,42 @@
       intent.firePrimary = true;
     }
     intent.moveStrafe = engageStrafeIntent(ctx.timeInStateMs, ctx.config.engageStrafePeriodMs, ctx.config.engageStrafeAmplitude);
-    // Push in until close. NEVER negative — no back-pedalling.
-    intent.moveForward = dist > ctx.config.pushInDistance ? 1 : 0;
+    // Push into firing range, then plant and shoot. Continuing to hold forward
+    // while the camera is aim-locked makes close target clusters look like
+    // 180-degree pacing because movement is camera-relative.
+    const holdFireDistance = tacticalHoldDistance(ctx.config);
+    intent.moveForward = dist > holdFireDistance ? 1 : 0;
     return { intent, nextState: null, resetTimeInState: false };
   }
 
   function updateAdvanceBot(ctx) {
     const intent = createIdleBotIntent();
     intent.aimLerpRate = ctx.config.aimLerpRate;
-    const target = ctx.currentTarget || ctx.findNearestEnemy();
+    const target = ctx.currentTarget || resolveUngatedCombatTarget(ctx);
     if (!target) {
       return { intent, nextState: 'PATROL', resetTimeInState: true };
     }
     intent.aimTarget = botAimPoint(target);
-    if (isEngagable(ctx, target)) {
-      return { intent, nextState: 'ENGAGE', resetTimeInState: true };
-    }
-    intent.moveForward = 1;
+    const visible = !!ctx.canSeeTarget(target.position);
     const dist = botHorizontalDistance(ctx.eyePos, target.position);
+    if (visible && dist <= ctx.config.maxFireDistance) {
+      if (ctx.timeInStateMs >= ctx.config.minAdvanceStateMs) {
+        return { intent, nextState: 'ENGAGE', resetTimeInState: true };
+      }
+      intent.moveForward = dist > tacticalHoldDistance(ctx.config) ? 1 : 0;
+      intent.sprint = dist > ctx.config.sprintDistance;
+      return { intent, nextState: null, resetTimeInState: false };
+    }
+    intent.moveForward = dist > pushInDistanceForVisibility(ctx.config, visible) ? 1 : 0;
     intent.sprint = dist > ctx.config.sprintDistance;
     return { intent, nextState: null, resetTimeInState: false };
+  }
+
+  function resolveUngatedCombatTarget(ctx) {
+    const objective = ctx && typeof ctx.getObjective === 'function' ? ctx.getObjective() : null;
+    const objectiveKind = objective && objective.kind ? String(objective.kind) : '';
+    if (objective && objectiveKind === 'zone') return null;
+    return ctx && typeof ctx.findNearestEnemy === 'function' ? ctx.findNearestEnemy() : null;
   }
 
   function updateRespawnWaitBot(ctx) {
@@ -644,6 +1056,14 @@
     const intent = createIdleBotIntent();
     intent.aimLerpRate = 0;
     return { intent, nextState: null, resetTimeInState: false };
+  }
+
+  function selectLockedTarget(current, fresh, now, staleMs) {
+    const ttlMs = Number.isFinite(Number(staleMs)) ? Number(staleMs) : 4000;
+    if (!current) return fresh || null;
+    if (fresh && fresh.id === current.id) return fresh;
+    if ((Number(now) - Number(current.lastKnownMs || 0)) > ttlMs) return fresh || null;
+    return current;
   }
 
   function stepBotState(state, ctx) {
@@ -675,6 +1095,7 @@
         approachDistance: 120,
         retreatDistance: 18,
         perceptionRange: 220,
+        targetAcquisitionDistance: 165,
         aggressiveMode: false,
         waypointReplanIntervalMs: 3500,
         decisionIntervalMs: 250,
@@ -685,6 +1106,7 @@
         approachDistance: 185,
         retreatDistance: 16,
         perceptionRange: 900,
+        targetAcquisitionDistance: 185,
         aggressiveMode: true,
         waypointReplanIntervalMs: 5000,
         decisionIntervalMs: 250,
@@ -695,6 +1117,7 @@
         approachDistance: 150,
         retreatDistance: 18,
         perceptionRange: 1100,
+        targetAcquisitionDistance: 150,
         aggressiveMode: true,
         waypointReplanIntervalMs: 4000,
         decisionIntervalMs: 250,
@@ -705,6 +1128,7 @@
         approachDistance: 110,
         retreatDistance: 16,
         perceptionRange: 220,
+        targetAcquisitionDistance: 125,
         aggressiveMode: false,
         waypointReplanIntervalMs: 5000,
         decisionIntervalMs: 250,
@@ -715,6 +1139,7 @@
         approachDistance: 90,
         retreatDistance: 12,
         perceptionRange: 260,
+        targetAcquisitionDistance: 140,
         aggressiveMode: false,
         waypointReplanIntervalMs: 6000,
         decisionIntervalMs: 250,
@@ -728,15 +1153,75 @@
       maxFireDistance: profile.maxFireDistance,
       sprintDistance: profile.sprintDistance,
       approachDistance: profile.approachDistance,
-      // Stop pushing closer inside ~8m. NEVER negative — the bot does not
-      // back-pedal into its target.
-      pushInDistance: 8,
+      // Stop pushing inside the mode's close-contact distance. NEVER
+      // negative — the bot holds and shoots instead of back-pedalling or
+      // charging through a crowded target cluster.
+      pushInDistance: Math.max(8, Number(profile.retreatDistance || 0)),
       aimLerpRate: 1,
-      engageStrafeAmplitude: profile.aggressiveMode ? 0.3 : 0.2,
+      engageStrafeAmplitude: 0,
       engageStrafePeriodMs: 750,
+      minEngageStateMs: 700,
+      minAdvanceStateMs: 700,
       perceptionRange: profile.perceptionRange,
+      targetAcquisitionDistance: Number.isFinite(Number(profile.targetAcquisitionDistance))
+        ? Number(profile.targetAcquisitionDistance)
+        : profile.maxFireDistance,
       tickMs: 250,
     };
+  }
+
+  function combatObjectiveMaxDistanceForProfile(profile) {
+    if (!profile) return 0;
+    const acquisition = Number(profile.targetAcquisitionDistance);
+    const base = Number.isFinite(acquisition) && acquisition > 0 ? acquisition : 0;
+    if (!profile.aggressiveMode) return base;
+    const fireRange = Number(profile.maxFireDistance);
+    const perception = Number(profile.perceptionRange);
+    const pursuitRange = Number.isFinite(fireRange) && fireRange > 0 ? fireRange * 3 : base;
+    const cappedPursuit = Number.isFinite(perception) && perception > 0
+      ? Math.min(perception, pursuitRange)
+      : pursuitRange;
+    return Math.max(base, cappedPursuit);
+  }
+
+  function supportsFrontlineCompression(mode) {
+    return mode === 'ai_sandbox'
+      || mode === 'zone_control'
+      || mode === 'team_deathmatch'
+      || mode === 'open_frontier'
+      || mode === 'a_shau_valley';
+  }
+
+  function usesPlayerAnchoredFrontlineCompression(mode) {
+    return mode === 'open_frontier' || mode === 'a_shau_valley';
+  }
+
+  function placeCompressedCombatantForHarness(systems, combatant, x, z) {
+    if (!combatant || !combatant.position) return false;
+    const terrain = systems && systems.terrainSystem;
+    const h = terrain && typeof terrain.getHeightAt === 'function'
+      ? terrain.getHeightAt(x, z)
+      : undefined;
+    combatant.position.x = x;
+    combatant.position.z = z;
+    if (Number.isFinite(h)) combatant.position.y = Number(h) + PLAYER_EYE_HEIGHT;
+
+    if (combatant.renderedPosition && typeof combatant.renderedPosition.copy === 'function') {
+      combatant.renderedPosition.copy(combatant.position);
+    } else if (combatant.position && typeof combatant.position.clone === 'function') {
+      combatant.renderedPosition = combatant.position.clone();
+    }
+
+    if (combatant.velocity && typeof combatant.velocity.set === 'function') {
+      combatant.velocity.set(0, 0, 0);
+    }
+
+    const cs = systems && systems.combatantSystem;
+    const grid = cs && cs.spatialGridManager;
+    if (grid && typeof grid.syncEntity === 'function' && combatant.id) {
+      grid.syncEntity(combatant.id, combatant.position);
+    }
+    return true;
   }
 
   // ── Driver implementation ──────────────────────────────────────────────────
@@ -753,9 +1238,7 @@
     };
     const profile = profileForMode(opts.mode);
     const botConfig = botConfigForProfile(profile);
-    const enableFrontlineCompression = opts.compressFrontline && (
-      opts.mode === 'ai_sandbox' || opts.mode === 'zone_control' || opts.mode === 'team_deathmatch'
-    );
+    const enableFrontlineCompression = opts.compressFrontline && supportsFrontlineCompression(opts.mode);
 
     const state = {
       heartbeatTimer: null,
@@ -767,6 +1250,32 @@
       lastDamageMs: 0,
       lastHealth: 100,
       lastObjectiveZoneId: null,
+      lastObjectiveKind: null,
+      lastObjectiveKey: null,
+      lastObjectiveDistance: null,
+      nearestOpforDistance: null,
+      nearestPerceivedEnemyDistance: null,
+      currentTargetDistance: null,
+      lastPathTargetKind: null,
+      lastPathTargetDistance: null,
+      lastPathTargetX: null,
+      lastPathTargetZ: null,
+      lastPathQueryStatus: null,
+      lastPathLength: 0,
+      lastPathFailureReason: null,
+      lastPathQueryDistance: null,
+      lastPathStartSnapped: null,
+      lastPathEndSnapped: null,
+      lastPathStartSnapDistance: null,
+      lastPathEndSnapDistance: null,
+      firstObjectiveDistance: null,
+      minObjectiveDistance: null,
+      playerDistanceMoved: 0,
+      lastMovementSamplePos: null,
+      movementIntentCalls: 0,
+      nonZeroMovementIntentCalls: 0,
+      lastMovementIntent: null,
+      lastNonZeroMovementIntent: null,
       // Movement / controller state.
       firingHeld: false,
       lastYaw: 0,
@@ -778,6 +1287,14 @@
       lastWaypointReplanAt: 0,
       waypointsFollowed: 0,
       waypointReplanFailures: 0,
+      routeTargetResets: 0,
+      routeNoProgressResets: 0,
+      blockedTargetUntil: Object.create(null),
+      lastRouteProgressDistance: null,
+      lastRouteProgressMoved: 0,
+      lastRouteProgressAt: 0,
+      lastRouteOverlayDirX: null,
+      lastRouteOverlayDirZ: null,
       // Telemetry.
       respawnCount: 0,
       ammoRefillCount: 0,
@@ -791,6 +1308,7 @@
       losRejectedShots: 0,
       aimDotGateRejectedShots: 0,
       stuckTeleportCount: 0,
+      stuckWaypointSkips: 0,
       maxStuckMs: 0,
       stuckMs: 0,
       lastStablePos: null,
@@ -866,6 +1384,43 @@
       return null;
     }
 
+    function getNearestOpforObjective(systems, playerPos) {
+      const cs = systems && systems.combatantSystem;
+      const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
+      state.nearestOpforDistance = null;
+      if (!Array.isArray(combatants) || combatants.length === 0 || !playerPos) return null;
+      let best = null;
+      let bestDistSq = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < combatants.length; i++) {
+        const c = combatants[i];
+        if (!c || c.id === 'player_proxy') continue;
+        if (!isOpforFaction(c.faction)) continue;
+        if (c.health <= 0 || c.state === 'dead') continue;
+        if (isTargetTemporarilyBlocked(c.id, state.blockedTargetUntil, Date.now())) continue;
+        if (!c.position) continue;
+        const dx = Number(c.position.x) - Number(playerPos.x);
+        const dz = Number(c.position.z) - Number(playerPos.z);
+        const distSq = dx * dx + dz * dz;
+        if (!Number.isFinite(distSq) || distSq >= bestDistSq) continue;
+        bestDistSq = distSq;
+        best = c;
+      }
+      if (!best || !best.position) return null;
+      const distance = Math.sqrt(bestDistSq);
+      state.nearestOpforDistance = Number.isFinite(distance) ? distance : null;
+      return {
+        id: String(best.id || ''),
+        kind: 'nearest_opfor',
+        position: {
+          x: Number(best.position.x),
+          y: Number(best.position.y || 0),
+          z: Number(best.position.z),
+        },
+        priority: 3,
+        distance: state.nearestOpforDistance,
+      };
+    }
+
     function getEngagementCenter(systems) {
       const cs = systems && systems.combatantSystem;
       const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
@@ -907,6 +1462,7 @@
       }
       state.lastObjectiveZoneId = String(bestZone.id || '');
       return {
+        kind: 'zone',
         position: {
           x: Number(bestZone.position.x),
           y: Number(bestZone.position.y || 0),
@@ -924,6 +1480,7 @@
     function findNearestEnemy(systems, playerPos) {
       const cs = systems && systems.combatantSystem;
       const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
+      state.nearestPerceivedEnemyDistance = null;
       if (!Array.isArray(combatants) || combatants.length === 0) return null;
       const pr = botConfig.perceptionRange;
       const prSq = pr * pr;
@@ -934,6 +1491,8 @@
         if (!c || c.id === 'player_proxy') continue;
         if (!isOpforFaction(c.faction)) continue;
         if (c.health <= 0 || c.state === 'dead') continue;
+        if (isTargetTemporarilyBlocked(c.id, state.blockedTargetUntil, Date.now())) continue;
+        if (!c.position) continue;
         const dx = Number(c.position.x) - Number(playerPos.x);
         const dz = Number(c.position.z) - Number(playerPos.z);
         const distSq = dx * dx + dz * dz;
@@ -941,6 +1500,8 @@
         if (distSq < bestDistSq) { bestDistSq = distSq; best = c; }
       }
       if (!best) return null;
+      const distance = Math.sqrt(bestDistSq);
+      state.nearestPerceivedEnemyDistance = Number.isFinite(distance) ? distance : null;
       return {
         id: String(best.id || ''),
         position: {
@@ -989,45 +1550,90 @@
     // navmesh, no path).
     function queryPath(systems, fromPos, toPos) {
       const nav = systems && systems.navmeshSystem;
-      if (!nav || typeof nav.queryPath !== 'function') return null;
+      state.lastPathQueryDistance = fromPos && toPos ? botHorizontalDistance(fromPos, toPos) : null;
+      state.lastPathFailureReason = null;
+      state.lastPathStartSnapped = null;
+      state.lastPathEndSnapped = null;
+      state.lastPathStartSnapDistance = null;
+      state.lastPathEndSnapDistance = null;
+      if (!nav || typeof nav.queryPath !== 'function') {
+        state.lastPathFailureReason = 'nav_unavailable';
+        return null;
+      }
       try {
         // Snap both endpoints onto the mesh before querying. This is the
         // Round 3 fix: on open_frontier the player regularly stands just
-        // off-mesh and queryPath returns null. findNearestPoint (radius 5m)
-        // recovers the 99% case the way live NPCs already do.
-        const start = snapOntoNavmesh(systems, fromPos);
-        const end = snapOntoNavmesh(systems, toPos);
-        const path = nav.queryPath(start, end);
-        if (!path || path.length === 0) return null;
+        // off-mesh and queryPath returns null. The harness player can drift
+        // farther from the generated navmesh than NPC recovery allows while it
+        // pushes across large Open Frontier slopes, and live OPFOR targets can
+        // stand outside the walkable mesh too. Snap both sides to nearby
+        // walkable points so the harness routes toward the combat front instead
+        // of failing the whole long-map approach.
+        const start = snapOntoNavmeshDetailed(systems, fromPos, NAVMESH_START_SNAP_RADIUS);
+        const end = snapOntoNavmeshDetailed(systems, toPos, NAVMESH_TARGET_SNAP_RADIUS);
+        state.lastPathStartSnapped = start.snapped;
+        state.lastPathEndSnapped = end.snapped;
+        state.lastPathStartSnapDistance = start.distance;
+        state.lastPathEndSnapDistance = end.distance;
+        const path = nav.queryPath(start.point, end.point);
+        if (!path || path.length === 0) {
+          state.lastPathFailureReason = !start.found
+            ? 'start_snap_failed'
+            : !end.found
+              ? 'end_snap_failed'
+              : 'compute_path_failed';
+          return null;
+        }
         const out = [];
         for (let i = 0; i < path.length; i++) {
           const p = path[i];
           if (!p) continue;
           out.push({ x: Number(p.x || 0), y: Number(p.y || 0), z: Number(p.z || 0) });
         }
-        return out.length > 0 ? out : null;
+        if (out.length === 0) {
+          state.lastPathFailureReason = 'empty_path_after_filter';
+          return null;
+        }
+        return out;
       } catch (_err) {
+        state.lastPathFailureReason = 'query_exception';
         return null;
       }
     }
 
-    function snapOntoNavmesh(systems, pos) {
+    function snapOntoNavmeshDetailed(systems, pos, searchRadius) {
+      const point = {
+        x: Number(pos && pos.x || 0),
+        y: Number(pos && pos.y || 0),
+        z: Number(pos && pos.z || 0),
+      };
       const nav = systems && systems.navmeshSystem;
-      if (!nav || typeof nav.findNearestPoint !== 'function') return pos;
+      if (!nav || typeof nav.findNearestPoint !== 'function') {
+        return { point: point, found: true, snapped: false, distance: 0 };
+      }
       try {
-        const snapped = nav.findNearestPoint(pos, 5);
+        const radius = Number.isFinite(Number(searchRadius)) && Number(searchRadius) > 0
+          ? Number(searchRadius)
+          : NAVMESH_START_SNAP_RADIUS;
+        const snapped = nav.findNearestPoint(pos, radius);
         if (snapped && Number.isFinite(snapped.x) && Number.isFinite(snapped.z)) {
-          return { x: Number(snapped.x), y: Number(snapped.y || pos.y || 0), z: Number(snapped.z) };
+          const snappedPoint = { x: Number(snapped.x), y: Number(snapped.y || point.y || 0), z: Number(snapped.z) };
+          const distance = botHorizontalDistance(point, snappedPoint);
+          return { point: snappedPoint, found: true, snapped: distance > 0.01, distance: distance };
         }
       } catch (_err) { /* ignore */ }
-      return pos;
+      return { point: point, found: false, snapped: false, distance: null };
+    }
+
+    function snapOntoNavmesh(systems, pos) {
+      return snapOntoNavmeshDetailed(systems, pos, NAVMESH_START_SNAP_RADIUS).point;
     }
 
     function findNearestNavmeshPoint(systems, pos) {
       const nav = systems && systems.navmeshSystem;
       if (!nav || typeof nav.findNearestPoint !== 'function') return null;
       try {
-        const p = nav.findNearestPoint(pos, 5);
+        const p = nav.findNearestPoint(pos, NAVMESH_START_SNAP_RADIUS);
         if (!p || !Number.isFinite(p.x)) return null;
         return { x: Number(p.x), y: Number(p.y || 0), z: Number(p.z) };
       } catch (_err) {
@@ -1043,11 +1649,40 @@
     }
 
     function getObjective(systems, playerPos) {
+      const combatTarget = getNearestOpforObjective(systems, playerPos);
       const zoneTarget = getObjectiveZoneTarget(systems, playerPos);
-      if (zoneTarget) return zoneTarget;
       const center = getEngagementCenter(systems);
-      if (center) return { position: center, priority: 1 };
-      return null;
+      const fallbackTarget = center ? { kind: 'engagement_center', position: center, priority: 1 } : null;
+      const selected = selectPatrolObjective({
+        aggressiveMode: profile.aggressiveMode,
+        combatObjective: combatTarget,
+        zoneObjective: zoneTarget,
+        fallbackObjective: fallbackTarget,
+        combatObjectiveMaxDistance: combatObjectiveMaxDistanceForProfile(profile),
+      });
+      if (selected && selected.kind !== 'zone') state.lastObjectiveZoneId = null;
+      const selectedObjectiveKey = objectiveTelemetryKey(selected, state.lastObjectiveZoneId);
+      if (selectedObjectiveKey !== state.lastObjectiveKey) {
+        state.lastObjectiveKey = selectedObjectiveKey;
+        state.firstObjectiveDistance = null;
+        state.minObjectiveDistance = null;
+      }
+      state.lastObjectiveKind = selected && selected.kind ? String(selected.kind) : null;
+      if (selected && selected.position && playerPos) {
+        const selectedDistance = Number(selected.distance);
+        state.lastObjectiveDistance = Number.isFinite(selectedDistance)
+          ? selectedDistance
+          : botHorizontalDistance(playerPos, selected.position);
+        if (Number.isFinite(state.lastObjectiveDistance)) {
+          if (state.firstObjectiveDistance === null) state.firstObjectiveDistance = state.lastObjectiveDistance;
+          if (state.minObjectiveDistance === null || state.lastObjectiveDistance < state.minObjectiveDistance) {
+            state.minObjectiveDistance = state.lastObjectiveDistance;
+          }
+        }
+      } else {
+        state.lastObjectiveDistance = null;
+      }
+      return selected;
     }
 
     function getPlayerPos(systems) {
@@ -1063,6 +1698,135 @@
       }
       const v = systems.playerController.getVelocity();
       return { x: Number(v.x || 0), y: Number(v.y || 0), z: Number(v.z || 0) };
+    }
+
+    function getRuntimeLiveness(systems) {
+      const w = globalWindow;
+      const pc = systems && systems.playerController;
+      const playerPos = getPlayerPos(systems);
+      const terrain = systems && systems.terrainSystem;
+      let metricsSnapshot = null;
+      try {
+        metricsSnapshot = w && w.__metrics && typeof w.__metrics.getSnapshot === 'function'
+          ? w.__metrics.getSnapshot()
+          : null;
+      } catch (_err) {
+        metricsSnapshot = null;
+      }
+      let movementStats = null;
+      try {
+        const perf = w && w.perf;
+        movementStats = perf && typeof perf.getMovement === 'function'
+          ? perf.getMovement()
+          : null;
+      } catch (_err) {
+        movementStats = null;
+      }
+      let playerSpectating = false;
+      try {
+        playerSpectating = !!(pc && typeof pc.isSpectating === 'function' && pc.isSpectating());
+      } catch (_err) {
+        playerSpectating = false;
+      }
+      let playerInHelicopter = false;
+      try {
+        playerInHelicopter = !!(pc && typeof pc.isInHelicopter === 'function' && pc.isInHelicopter());
+      } catch (_err) {
+        playerInHelicopter = false;
+      }
+      let playerInFixedWing = false;
+      try {
+        playerInFixedWing = !!(pc && typeof pc.isInFixedWing === 'function' && pc.isInFixedWing());
+      } catch (_err) {
+        playerInFixedWing = false;
+      }
+      const doc = typeof document !== 'undefined' ? document : null;
+      const velocity = getPlayerVelocity(systems);
+      let playerMovementDebug = null;
+      try {
+        if (pc && typeof pc.getMovementDebugSnapshot === 'function') {
+          playerMovementDebug = pc.getMovementDebugSnapshot();
+        } else {
+          const movement = pc && pc.movement;
+          playerMovementDebug = movement && typeof movement.getDebugSnapshot === 'function'
+            ? movement.getDebugSnapshot()
+            : null;
+        }
+      } catch (_err) {
+        playerMovementDebug = null;
+      }
+      const terrainHeightAtPlayer = playerPos && terrain && typeof terrain.getHeightAt === 'function'
+        ? Number(terrain.getHeightAt(playerPos.x, playerPos.z))
+        : null;
+      const effectiveHeightAtPlayer = playerPos && terrain && typeof terrain.getEffectiveHeightAt === 'function'
+        ? Number(terrain.getEffectiveHeightAt(playerPos.x, playerPos.z))
+        : null;
+      return {
+        engineFrameCount: Number(metricsSnapshot && metricsSnapshot.frameCount) || 0,
+        harnessRafTicks: Number(w && w.__perfHarnessRaf && w.__perfHarnessRaf.ticks) || 0,
+        documentHidden: doc ? !!doc.hidden : null,
+        visibilityState: doc ? String(doc.visibilityState || '') : null,
+        gameStarted: !!(w && w.__engine && w.__engine.gameStarted),
+        playerInHelicopter: playerInHelicopter,
+        playerInFixedWing: playerInFixedWing,
+        playerInVehicle: playerInHelicopter || playerInFixedWing,
+        playerSpectating: playerSpectating,
+        playerPositionX: playerPos ? Number(playerPos.x || 0) : null,
+        playerPositionY: playerPos ? Number(playerPos.y || 0) : null,
+        playerPositionZ: playerPos ? Number(playerPos.z || 0) : null,
+        playerVelocityX: Number(velocity.x || 0),
+        playerVelocityY: Number(velocity.y || 0),
+        playerVelocityZ: Number(velocity.z || 0),
+        playerMovementSamples: Number(movementStats && movementStats.player && movementStats.player.samples) || 0,
+        playerAvgRequestedSpeed: Number(movementStats && movementStats.player && movementStats.player.avgRequestedSpeed) || 0,
+        playerAvgActualSpeed: Number(movementStats && movementStats.player && movementStats.player.avgActualSpeed) || 0,
+        playerBlockedByTerrain: Number(movementStats && movementStats.player && movementStats.player.blockedByTerrain) || 0,
+        terrainHeightAtPlayer: Number.isFinite(terrainHeightAtPlayer) ? terrainHeightAtPlayer : null,
+        effectiveHeightAtPlayer: Number.isFinite(effectiveHeightAtPlayer) ? effectiveHeightAtPlayer : null,
+        collisionHeightDeltaAtPlayer: Number.isFinite(terrainHeightAtPlayer) && Number.isFinite(effectiveHeightAtPlayer)
+          ? effectiveHeightAtPlayer - terrainHeightAtPlayer
+          : null,
+        collisionContributorsAtPlayer: getCollisionContributorsAtPlayer(systems, playerPos),
+        playerMovementDebug: playerMovementDebug,
+      };
+    }
+
+    function getCollisionContributorsAtPlayer(systems, playerPos) {
+      if (!systems || !systems.terrainSystem || !playerPos) return [];
+      const terrain = systems.terrainSystem;
+      const queries = terrain.terrainQueries;
+      const map = queries && queries.collisionObjects;
+      if (!map || typeof map.forEach !== 'function') return [];
+      const out = [];
+      try {
+        map.forEach((entry, id) => {
+          if (!entry || !entry.object || !entry.object.visible) return;
+          const box = entry.bounds;
+          if (!box) return;
+          if (entry.dynamic && typeof entry.object.updateMatrixWorld === 'function' && typeof box.setFromObject === 'function') {
+            entry.object.updateMatrixWorld(true);
+            box.setFromObject(entry.object);
+          }
+          if (!box.min || !box.max) return;
+          if (playerPos.x < box.min.x || playerPos.x > box.max.x || playerPos.z < box.min.z || playerPos.z > box.max.z) {
+            return;
+          }
+          out.push({
+            id: String(id),
+            dynamic: !!entry.dynamic,
+            minX: Number(box.min.x),
+            maxX: Number(box.max.x),
+            minY: Number(box.min.y),
+            maxY: Number(box.max.y),
+            minZ: Number(box.min.z),
+            maxZ: Number(box.max.z),
+          });
+        });
+      } catch (_err) {
+        return out;
+      }
+      out.sort((a, b) => Number(b.maxY || 0) - Number(a.maxY || 0));
+      return out.slice(0, 5);
     }
 
     function getPlayerHealth(systems) {
@@ -1239,6 +2003,38 @@
       const dz = oc.z - uc.z;
       const distance = Math.hypot(dx, dz);
       state.frontlineDistance = distance;
+      const playerPos = getPlayerPos(systems);
+      if (usesPlayerAnchoredFrontlineCompression(opts.mode) && playerPos) {
+        const pdx = oc.x - playerPos.x;
+        const pdz = oc.z - playerPos.z;
+        const playerToOpfor = Math.hypot(pdx, pdz);
+        const safeDx = playerToOpfor > 0.001 ? pdx / playerToOpfor : 0;
+        const safeDz = playerToOpfor > 0.001 ? pdz / playerToOpfor : -1;
+        const latX = -safeDz;
+        const latZ = safeDx;
+        function moveGroupAroundPlayer(group, side) {
+          let moved = 0;
+          const perSideCap = side > 0 ? 10 : 8;
+          const cap = Math.min(group.length, Math.max(0, Math.min(opts.maxCompressedPerFaction, perSideCap)));
+          for (let i = 0; i < cap; i++) {
+            const c = group[i];
+            const lane = (Math.random() - 0.5) * (side > 0 ? 170 : 130);
+            const forward = side > 0
+              ? 160 + Math.random() * 130
+              : -(65 + Math.random() * 85);
+            const nx = playerPos.x + safeDx * forward + latX * lane;
+            const nz = playerPos.z + safeDz * forward + latZ * lane;
+            if (placeCompressedCombatantForHarness(systems, c, nx, nz)) moved++;
+          }
+          return moved;
+        }
+        const um = moveGroupAroundPlayer(us, -1);
+        const om = moveGroupAroundPlayer(opfor, 1);
+        state.frontlineMoveCount = um + om;
+        state.frontlineDistance = playerToOpfor;
+        state.frontlineCompressed = true;
+        return;
+      }
       if (!Number.isFinite(distance) || distance < opts.frontlineTriggerDistance) {
         state.frontlineCompressed = true;
         return;
@@ -1258,13 +2054,7 @@
           const forward = side * (35 + Math.random() * 25);
           const nx = midX + safeDx * forward + latX * lane;
           const nz = midZ + safeDz * forward + latZ * lane;
-          const h = systems.terrainSystem && systems.terrainSystem.getHeightAt
-            ? systems.terrainSystem.getHeightAt(nx, nz) : undefined;
-          c.position.x = nx;
-          c.position.z = nz;
-          if (Number.isFinite(h)) c.position.y = Number(h) + 2;
-          if (c.velocity && c.velocity.set) c.velocity.set(0, 0, 0);
-          moved++;
+          if (placeCompressedCombatantForHarness(systems, c, nx, nz)) moved++;
         }
         return moved;
       }
@@ -1277,9 +2067,93 @@
     // ── Path follow (ADVANCE / PATROL use the bot's moveForward + yaw; we
     // layer a navmesh waypoint so the camera yaw lock still respects terrain.) ──
 
-    function updateWaypoints(systems, playerPos, target) {
-      if (!target) { state.waypoints = null; state.waypointIdx = 0; return; }
+    function updateWaypoints(systems, playerPos, target, targetKind) {
+      if (!target) {
+        state.waypoints = null;
+        state.waypointIdx = 0;
+        state.lastPathTargetKind = null;
+        state.lastPathTargetDistance = null;
+        state.lastPathTargetX = null;
+        state.lastPathTargetZ = null;
+        state.lastPathQueryStatus = null;
+        state.lastPathLength = 0;
+        state.lastPathFailureReason = null;
+        state.lastPathQueryDistance = null;
+        state.lastPathStartSnapped = null;
+        state.lastPathEndSnapped = null;
+        state.lastPathStartSnapDistance = null;
+        state.lastPathEndSnapDistance = null;
+        state.lastRouteProgressDistance = null;
+        state.lastRouteProgressMoved = state.playerDistanceMoved;
+        state.lastRouteProgressAt = 0;
+        state.lastRouteOverlayDirX = null;
+        state.lastRouteOverlayDirZ = null;
+        return;
+      }
       const now = Date.now();
+      const targetKey = targetKind ? String(targetKind) : 'unknown';
+      const targetX = Number(target.x);
+      const targetZ = Number(target.z);
+      const targetDistance = playerPos ? botHorizontalDistance(playerPos, target) : null;
+      const targetKindChanged = !!state.lastPathTargetKind && state.lastPathTargetKind !== targetKey;
+      const targetMoved = hasRouteTargetMoved({
+        lastTarget: { x: state.lastPathTargetX, z: state.lastPathTargetZ },
+        nextTarget: { x: targetX, z: targetZ },
+      });
+      if (targetKindChanged || targetMoved) {
+        state.waypoints = null;
+        state.waypointIdx = 0;
+        state.lastWaypointReplanAt = 0;
+        state.routeTargetResets++;
+        state.lastRouteProgressDistance = Number.isFinite(Number(targetDistance)) ? Number(targetDistance) : null;
+        state.lastRouteProgressMoved = state.playerDistanceMoved;
+        state.lastRouteProgressAt = now;
+        state.lastRouteOverlayDirX = null;
+        state.lastRouteOverlayDirZ = null;
+      }
+      state.lastPathTargetKind = targetKey;
+      state.lastPathTargetDistance = targetDistance;
+      state.lastPathTargetX = Number.isFinite(targetX) ? targetX : null;
+      state.lastPathTargetZ = Number.isFinite(targetZ) ? targetZ : null;
+      const routeProgressDistance = Number(targetDistance);
+      if (Number.isFinite(routeProgressDistance)) {
+        if (state.lastRouteProgressDistance === null || !Number.isFinite(Number(state.lastRouteProgressDistance))) {
+          state.lastRouteProgressDistance = routeProgressDistance;
+          state.lastRouteProgressMoved = state.playerDistanceMoved;
+          state.lastRouteProgressAt = now;
+        } else if (shouldResetRouteForNoProgress({
+          currentDistance: routeProgressDistance,
+          baselineDistance: Number(state.lastRouteProgressDistance),
+          elapsedMs: now - Number(state.lastRouteProgressAt || now),
+          playerMoved: state.playerDistanceMoved - Number(state.lastRouteProgressMoved || 0),
+        })) {
+          state.waypoints = null;
+          state.waypointIdx = 0;
+          state.lastWaypointReplanAt = 0;
+          state.routeNoProgressResets++;
+          state.lastRouteProgressDistance = routeProgressDistance;
+          state.lastRouteProgressMoved = state.playerDistanceMoved;
+          state.lastRouteProgressAt = now;
+          if (state.lastPathTargetKind === 'current_target') {
+            markTargetTemporarilyBlocked(
+              state.blockedTargetUntil,
+              state.currentTarget && state.currentTarget.id,
+              now,
+              ROUTE_NO_PROGRESS_TARGET_COOLDOWN_MS,
+            );
+            state.currentTarget = null;
+          }
+        } else {
+          const closure = Number(state.lastRouteProgressDistance) - routeProgressDistance;
+          const movedSinceBaseline = state.playerDistanceMoved - Number(state.lastRouteProgressMoved || 0);
+          const closureRatio = movedSinceBaseline > 0 ? closure / movedSinceBaseline : closure > 0 ? Number.POSITIVE_INFINITY : 0;
+          if (closure >= ROUTE_PROGRESS_MIN_IMPROVEMENT && closureRatio >= ROUTE_PROGRESS_MIN_CLOSURE_RATIO) {
+            state.lastRouteProgressDistance = routeProgressDistance;
+            state.lastRouteProgressMoved = state.playerDistanceMoved;
+            state.lastRouteProgressAt = now;
+          }
+        }
+      }
       const sinceReplan = now - state.lastWaypointReplanAt;
       const pathExhausted = !state.waypoints || state.waypoints.length === 0 || state.waypointIdx >= state.waypoints.length;
       const currentWp = state.waypoints && state.waypoints.length > 0
@@ -1300,9 +2174,33 @@
         if (path && path.length > 0) {
           state.waypoints = path;
           state.waypointIdx = 0;
+          state.lastPathQueryStatus = 'ok';
+          state.lastPathLength = path.length;
+          state.lastPathFailureReason = null;
+        } else if (shouldUseDirectCombatRouteFallback({
+          targetKind: targetKey,
+          failureReason: state.lastPathFailureReason,
+          targetDistance: targetDistance,
+          maxDistance: combatObjectiveMaxDistanceForProfile(profile),
+        })) {
+          const fallbackPath = createDirectCombatFallbackPath(playerPos, target);
+          if (fallbackPath) {
+            state.waypoints = fallbackPath;
+            state.waypointIdx = 0;
+            state.lastPathQueryStatus = 'direct_combat_fallback';
+            state.lastPathLength = fallbackPath.length;
+            state.lastPathFailureReason = null;
+          } else {
+            state.waypointReplanFailures++;
+            state.waypoints = null;
+            state.lastPathQueryStatus = 'failed';
+            state.lastPathLength = 0;
+          }
         } else {
           state.waypointReplanFailures++;
           state.waypoints = null;
+          state.lastPathQueryStatus = 'failed';
+          state.lastPathLength = 0;
         }
       }
       if (state.waypoints && state.waypoints.length > 0) {
@@ -1401,6 +2299,11 @@
 
       const playerPos = getPlayerPos(systems);
       if (!playerPos) return;
+      if (state.lastMovementSamplePos) {
+        const moved = botHorizontalDistance(state.lastMovementSamplePos, playerPos);
+        if (Number.isFinite(moved) && moved < 100) state.playerDistanceMoved += moved;
+      }
+      state.lastMovementSamplePos = { x: playerPos.x, y: playerPos.y, z: playerPos.z };
       const velocity = getPlayerVelocity(systems);
       const angles = getCameraAngles(systems);
       const magazine = getMagazine(systems);
@@ -1419,10 +2322,36 @@
       const pathClosure = (from, to) => queryPath(systems, from, to);
       const snapClosure = (p) => findNearestNavmeshPoint(systems, p);
       const sampleClosure = (x, z) => sampleHeight(systems, x, z);
-      const objectiveClosure = () => getObjective(systems, playerPos);
+      let objectiveResolved = false;
+      let objectiveCache = null;
+      const objectiveClosure = () => {
+        if (!objectiveResolved) {
+          objectiveCache = getObjective(systems, playerPos);
+          objectiveResolved = true;
+        }
+        return objectiveCache;
+      };
 
-      // Update the locked target using object-permanence logic (4s stale window).
-      state.currentTarget = updateLockedTarget(state.currentTarget, findEnemyClosure(), now);
+      // Update the locked target using object-permanence logic (4s stale
+      // window), then gate the lock against the current objective. Without the
+      // second step, PATROL can correctly reject a distant target while the
+      // wrapper still routes movement toward that stale combatant.
+      const freshTarget = findEnemyClosure();
+      const objectiveForTargetGate = objectiveClosure();
+      const candidateTarget = updateLockedTarget(state.currentTarget, freshTarget, now);
+      state.currentTarget = shouldUseTargetForCurrentObjective({
+        target: candidateTarget,
+        currentTarget: state.currentTarget,
+        objective: objectiveForTargetGate,
+        playerPos: playerPos,
+        botState: state.botState,
+        acquisitionDistance: botConfig.targetAcquisitionDistance,
+        maxFireDistance: botConfig.maxFireDistance,
+        canSeeTarget: losClosure,
+      }) ? candidateTarget : null;
+      state.currentTargetDistance = state.currentTarget && state.currentTarget.position
+        ? botHorizontalDistance(playerPos, state.currentTarget.position)
+        : null;
 
       // Match-end check: TicketSystem owns the lifecycle, not GameModeManager.
       // Latch the first-observed timestamp + outcome so the capture-side reader
@@ -1476,13 +2405,73 @@
       // a 3D point the driver steers MOVEMENT toward; AIM still points at the
       // bot's chosen aim target (usually the enemy).
       let overlayPoint = null;
-      const wantsMove = step.intent.moveForward > 0.1;
-      if (wantsMove && (state.botState === 'ADVANCE' || state.botState === 'PATROL' || state.botState === 'ALERT')) {
+      if (shouldUseRouteOverlayForIntent({
+        intent: step.intent,
+        botState: state.botState,
+        currentTarget: state.currentTarget,
+      })) {
+        const patrolObjective = state.currentTarget ? null : objectiveClosure();
+        const anchorKind = state.currentTarget ? 'current_target'
+          : (patrolObjective && patrolObjective.kind ? patrolObjective.kind : null);
         const anchor = state.currentTarget ? state.currentTarget.position
-          : (objectiveClosure() ? objectiveClosure().position : null);
+          : (patrolObjective ? patrolObjective.position : null);
         if (anchor) {
-          updateWaypoints(systems, playerPos, anchor);
+          updateWaypoints(systems, playerPos, anchor, anchorKind);
           overlayPoint = overlayPathPoint(playerPos);
+          if (overlayPoint) rememberRouteOverlayDirection(state, playerPos, overlayPoint);
+          if (isRoutePathExhausted(state.waypoints, state.waypointIdx)) {
+            state.lastWaypointReplanAt = 0;
+            overlayPoint = computeRouteContinuationPoint(
+              playerPos,
+              state.lastRouteOverlayDirX,
+              state.lastRouteOverlayDirZ,
+              computeAdaptiveLookahead(0),
+            ) || computeAnchorContinuationPoint(playerPos, anchor, computeAdaptiveLookahead(0));
+            if (overlayPoint) {
+              step.intent.movementTarget = {
+                x: Number(overlayPoint.x || 0),
+                y: Number.isFinite(Number(overlayPoint.y))
+                  ? Number(overlayPoint.y) + PLAYER_EYE_HEIGHT
+                  : Number(playerPos.y || 0),
+                z: Number(overlayPoint.z || 0),
+              };
+              applyRouteOverlayRecovery(step.intent, overlayPoint, state.stuckMs);
+            } else {
+              step.intent.movementTarget = null;
+              step.intent.moveForward = 0;
+              step.intent.sprint = false;
+            }
+          } else if (isRouteOverlayMicroTarget(playerPos, overlayPoint, anchor)) {
+            state.waypoints = null;
+            state.waypointIdx = 0;
+            state.lastWaypointReplanAt = 0;
+            overlayPoint = computeAnchorContinuationPoint(playerPos, anchor, computeAdaptiveLookahead(0));
+            if (overlayPoint) {
+              step.intent.movementTarget = {
+                x: Number(overlayPoint.x || 0),
+                y: Number.isFinite(Number(overlayPoint.y))
+                  ? Number(overlayPoint.y) + PLAYER_EYE_HEIGHT
+                  : Number(playerPos.y || 0),
+                z: Number(overlayPoint.z || 0),
+              };
+              applyRouteOverlayRecovery(step.intent, overlayPoint, state.stuckMs);
+            } else {
+              step.intent.movementTarget = null;
+              step.intent.moveForward = 0;
+              step.intent.sprint = false;
+            }
+          } else {
+            step.intent.movementTarget = overlayPoint
+              ? {
+                  x: Number(overlayPoint.x || 0),
+                  y: Number.isFinite(Number(overlayPoint.y))
+                    ? Number(overlayPoint.y) + PLAYER_EYE_HEIGHT
+                    : Number(playerPos.y || 0),
+                  z: Number(overlayPoint.z || 0),
+                }
+              : null;
+            applyRouteOverlayRecovery(step.intent, overlayPoint, state.stuckMs);
+          }
         }
       }
 
@@ -1497,7 +2486,11 @@
       // fancy teleport-recovery loop; with the bot consuming navmesh paths,
       // stuck-ness usually means "terrain not loaded yet", so we only record
       // the maximum for telemetry and let the autorespawn handle extreme cases.
-      if (!state.lastStablePos) {
+      const shouldTrackStuck = shouldTrackHarnessStuckProgress(step.intent);
+      if (!shouldTrackStuck) {
+        state.stuckMs = 0;
+        state.lastStablePos = { x: playerPos.x, z: playerPos.z };
+      } else if (!state.lastStablePos) {
         state.lastStablePos = { x: playerPos.x, z: playerPos.z };
         state.stuckMs = 0;
       } else {
@@ -1531,16 +2524,21 @@
           state.stuckTeleportCount++;
           state.stuckMs = 0;
           state.lastStablePos = { x: playerPos.x, z: playerPos.z };
+        } else if (shouldSkipStuckWaypoint({
+          stuckMs: state.stuckMs,
+          path: state.waypoints,
+          waypointIdx: state.waypointIdx,
+        })) {
+          state.waypointIdx++;
+          state.stuckWaypointSkips++;
+          state.stuckMs = 0;
+          state.lastStablePos = { x: playerPos.x, z: playerPos.z };
         }
       }
     }
 
     function updateLockedTarget(current, fresh, now) {
-      const staleMs = 4000;
-      if (!current) return fresh;
-      if (fresh && fresh.id === current.id) return fresh;
-      if ((now - current.lastKnownMs) > staleMs) return fresh;
-      return fresh || current;
+      return selectLockedTarget(current, fresh, now, 4000);
     }
 
     function applyIntent(systems, intent, currentAngles, overlayPoint, playerPos) {
@@ -1551,8 +2549,31 @@
       const forward = clampAxis(intent.moveForward);
       const strafe = clampAxis(intent.moveStrafe);
       const sprint = !!intent.sprint && forward > 0.1;
+      const wantsMovement = Math.abs(forward) > 0.01 || Math.abs(strafe) > 0.01;
+      const worldMovement = computeWorldMovementIntent(intent, overlayPoint, playerPos);
       if (typeof pc.applyMovementIntent === 'function') {
-        pc.applyMovementIntent({ forward, strafe, sprint });
+        if (worldMovement && typeof pc.applyWorldMovementIntent === 'function') {
+          pc.applyWorldMovementIntent({ x: worldMovement.x, z: worldMovement.z, sprint });
+        } else {
+          pc.applyMovementIntent({ forward, strafe, sprint });
+        }
+        const movementIntent = {
+          forward,
+          strafe,
+          sprint,
+          wantsMovement,
+          movementMode: worldMovement && typeof pc.applyWorldMovementIntent === 'function' ? 'world' : 'camera',
+          worldX: worldMovement && typeof pc.applyWorldMovementIntent === 'function' ? worldMovement.x : null,
+          worldZ: worldMovement && typeof pc.applyWorldMovementIntent === 'function' ? worldMovement.z : null,
+          worldDistance: worldMovement && typeof pc.applyWorldMovementIntent === 'function' ? worldMovement.distance : null,
+          atMs: Date.now(),
+        };
+        state.movementIntentCalls++;
+        state.lastMovementIntent = movementIntent;
+        if (wantsMovement) {
+          state.nonZeroMovementIntentCalls++;
+          state.lastNonZeroMovementIntent = movementIntent;
+        }
       }
 
       // ── Aim path: camera.lookAt() is the ONLY place the rotation
@@ -1572,15 +2593,16 @@
       let yawNext = state.lastYaw;
       let pitchNext = state.lastPitch;
       let aimDot = null; // aim-dot against intent.aimTarget, for the fire gate
-      if (intent.aimTarget && camera) {
+      const viewTarget = selectDriverViewTarget(intent, overlayPoint, wantsMovement);
+      if (viewTarget && camera) {
         const prevOrder = camera.rotation.order;
         camera.rotation.order = 'YXZ';
         const savedY = camera.rotation.y;
         const savedX = camera.rotation.x;
         camera.lookAt(
-          Number(intent.aimTarget.x || 0),
-          Number(intent.aimTarget.y || 0),
-          Number(intent.aimTarget.z || 0),
+          Number(viewTarget.x || 0),
+          Number(viewTarget.y || 0),
+          Number(viewTarget.z || 0),
         );
         const targetYaw = Number(camera.rotation.y || 0);
         const targetPitch = Number(camera.rotation.x || 0);
@@ -1598,9 +2620,9 @@
 
         // After setViewAngles, the camera points at (yawNext, pitchNext).
         // Compute cosine of (camera forward) vs (eye→aimTarget) for the
-        // fire gate. readCameraWorld extracts forward + position from the
-        // camera's matrixWorld without a THREE.Vector3 dependency.
-        if (readCameraWorld(camera, _tmpEye, _tmpForward)) {
+        // fire gate. When viewTarget is the route overlay and the bot is not
+        // firing, this is intentionally skipped.
+        if (intent.aimTarget && readCameraWorld(camera, _tmpEye, _tmpForward)) {
           const tx = Number(intent.aimTarget.x || 0) - _tmpEye.x;
           const ty = Number(intent.aimTarget.y || 0) - _tmpEye.y;
           const tz = Number(intent.aimTarget.z || 0) - _tmpEye.z;
@@ -1609,25 +2631,6 @@
             aimDot = (_tmpForward.x * tx + _tmpForward.y * ty + _tmpForward.z * tz) / tLen;
           }
         }
-      } else if (overlayPoint && camera && playerPos) {
-        // No aim target (e.g. PATROL with no objective) — still slew toward
-        // the movement overlay so the camera roughly faces travel direction.
-        const prevOrder = camera.rotation.order;
-        camera.rotation.order = 'YXZ';
-        const savedY = camera.rotation.y;
-        const savedX = camera.rotation.x;
-        camera.lookAt(Number(overlayPoint.x || 0), Number((overlayPoint.y || playerPos.y) + PLAYER_EYE_HEIGHT), Number(overlayPoint.z || 0));
-        const targetYaw = Number(camera.rotation.y || 0);
-        camera.rotation.y = savedY;
-        camera.rotation.x = savedX;
-        camera.rotation.order = prevOrder;
-        yawNext = lerpAngle(state.lastYaw, targetYaw, intent.aimLerpRate);
-        pitchNext = state.lastPitch;
-        if (typeof pc.setViewAngles === 'function') {
-          pc.setViewAngles(yawNext, pitchNext);
-        }
-        state.lastYaw = yawNext;
-        state.lastPitch = pitchNext;
       }
 
       // ── Fire gate: require aim-dot ≥ 0.8 (cos ≈ 37° cone) before firing.
@@ -1744,6 +2747,7 @@
     function stop() {
       if (state.heartbeatTimer) { clearInterval(state.heartbeatTimer); state.heartbeatTimer = null; }
       const systems = getSystems();
+      const runtimeLiveness = getRuntimeLiveness(systems);
       // One last roll-up before we tear down so the stop-stats reflect
       // any damage / kills landed in the final tick window.
       pollEngineCombatStats(systems);
@@ -1760,6 +2764,9 @@
         losRejectedShots: state.losRejectedShots,
         aimDotGateRejectedShots: state.aimDotGateRejectedShots,
         stuckTeleportCount: state.stuckTeleportCount,
+        stuckWaypointSkips: state.stuckWaypointSkips,
+        routeTargetResets: state.routeTargetResets,
+        routeNoProgressResets: state.routeNoProgressResets,
         maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
         gradientProbeDeflections: 0,
         waypointsFollowedCount: state.waypointsFollowed,
@@ -1788,10 +2795,44 @@
         // field via undefined round-trips cleanly through JSON/CDP as absent.
         matchEndedAtMs: typeof state.matchEndedAtMs === 'number' ? state.matchEndedAtMs : undefined,
         matchOutcome: state.matchOutcome,
+        objectiveKind: state.lastObjectiveKind,
+        objectiveDistance: state.lastObjectiveDistance,
+        objectiveZoneId: state.lastObjectiveZoneId,
+        nearestOpforDistance: state.nearestOpforDistance,
+        nearestPerceivedEnemyDistance: state.nearestPerceivedEnemyDistance,
+        currentTargetDistance: state.currentTargetDistance,
+        pathTargetKind: state.lastPathTargetKind,
+        pathTargetDistance: state.lastPathTargetDistance,
+        routeProgressDistance: state.lastRouteProgressDistance,
+        routeProgressAgeMs: state.lastRouteProgressAt > 0 ? Math.max(0, Date.now() - state.lastRouteProgressAt) : null,
+        routeProgressTravelMeters: state.lastRouteProgressAt > 0
+          ? Math.max(0, state.playerDistanceMoved - Number(state.lastRouteProgressMoved || 0))
+          : null,
+        pathQueryStatus: state.lastPathQueryStatus,
+        pathLength: state.lastPathLength,
+        pathFailureReason: state.lastPathFailureReason,
+        pathQueryDistance: state.lastPathQueryDistance,
+        pathStartSnapped: state.lastPathStartSnapped,
+        pathEndSnapped: state.lastPathEndSnapped,
+        pathStartSnapDistance: state.lastPathStartSnapDistance,
+        pathEndSnapDistance: state.lastPathEndSnapDistance,
+        firstObjectiveDistance: state.firstObjectiveDistance,
+        minObjectiveDistance: state.minObjectiveDistance,
+        objectiveDistanceClosed: Number.isFinite(state.firstObjectiveDistance) && Number.isFinite(state.lastObjectiveDistance)
+          ? state.firstObjectiveDistance - state.lastObjectiveDistance
+          : null,
+        playerDistanceMoved: state.playerDistanceMoved,
+        movementIntentCalls: state.movementIntentCalls,
+        nonZeroMovementIntentCalls: state.nonZeroMovementIntentCalls,
+        lastMovementIntent: state.lastMovementIntent,
+        lastNonZeroMovementIntent: state.lastNonZeroMovementIntent,
+        runtimeLiveness: runtimeLiveness,
+        perceptionRange: botConfig.perceptionRange,
       };
     }
 
     function getDebugSnapshot() {
+      const systems = getSystems();
       return {
         mode: opts.mode,
         botState: state.botState,
@@ -1806,6 +2847,9 @@
         reloadsIssued: state.reloadsIssued,
         waypointsFollowedCount: state.waypointsFollowed,
         waypointReplanFailures: state.waypointReplanFailures,
+        stuckWaypointSkips: state.stuckWaypointSkips,
+        routeTargetResets: state.routeTargetResets,
+        routeNoProgressResets: state.routeNoProgressResets,
         waypointCount: state.waypoints ? state.waypoints.length : 0,
         waypointIdx: state.waypointIdx,
         movementTransitions: state.transitions,
@@ -1823,6 +2867,39 @@
         accuracy: computeAccuracy(state.shotsFiredEngine, state.shotsHitEngine),
         engineShotsFired: state.shotsFiredEngine,
         engineShotsHit: state.shotsHitEngine,
+        objectiveKind: state.lastObjectiveKind,
+        objectiveDistance: state.lastObjectiveDistance,
+        objectiveZoneId: state.lastObjectiveZoneId,
+        nearestOpforDistance: state.nearestOpforDistance,
+        nearestPerceivedEnemyDistance: state.nearestPerceivedEnemyDistance,
+        currentTargetDistance: state.currentTargetDistance,
+        pathTargetKind: state.lastPathTargetKind,
+        pathTargetDistance: state.lastPathTargetDistance,
+        routeProgressDistance: state.lastRouteProgressDistance,
+        routeProgressAgeMs: state.lastRouteProgressAt > 0 ? Math.max(0, Date.now() - state.lastRouteProgressAt) : null,
+        routeProgressTravelMeters: state.lastRouteProgressAt > 0
+          ? Math.max(0, state.playerDistanceMoved - Number(state.lastRouteProgressMoved || 0))
+          : null,
+        pathQueryStatus: state.lastPathQueryStatus,
+        pathLength: state.lastPathLength,
+        pathFailureReason: state.lastPathFailureReason,
+        pathQueryDistance: state.lastPathQueryDistance,
+        pathStartSnapped: state.lastPathStartSnapped,
+        pathEndSnapped: state.lastPathEndSnapped,
+        pathStartSnapDistance: state.lastPathStartSnapDistance,
+        pathEndSnapDistance: state.lastPathEndSnapDistance,
+        firstObjectiveDistance: state.firstObjectiveDistance,
+        minObjectiveDistance: state.minObjectiveDistance,
+        objectiveDistanceClosed: Number.isFinite(state.firstObjectiveDistance) && Number.isFinite(state.lastObjectiveDistance)
+          ? state.firstObjectiveDistance - state.lastObjectiveDistance
+          : null,
+        playerDistanceMoved: state.playerDistanceMoved,
+        movementIntentCalls: state.movementIntentCalls,
+        nonZeroMovementIntentCalls: state.nonZeroMovementIntentCalls,
+        lastMovementIntent: state.lastMovementIntent,
+        lastNonZeroMovementIntent: state.lastNonZeroMovementIntent,
+        runtimeLiveness: getRuntimeLiveness(systems),
+        perceptionRange: botConfig.perceptionRange,
         pathTrustTtlMs: PATH_TRUST_TTL_MS,
         maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
         // See stop() — omit when unset so Number(null)=0 doesn't trip the
@@ -1902,14 +2979,38 @@
       PLAYER_MAX_CLIMB_GRADIENT: PLAYER_MAX_CLIMB_GRADIENT,
       PATH_TRUST_TTL_MS: PATH_TRUST_TTL_MS,
       AIM_PITCH_LIMIT_RAD: AIM_PITCH_LIMIT_RAD,
+      NAVMESH_START_SNAP_RADIUS: NAVMESH_START_SNAP_RADIUS,
+      NAVMESH_TARGET_SNAP_RADIUS: NAVMESH_TARGET_SNAP_RADIUS,
       isPathTrusted: isPathTrusted,
       clampAimYByPitch: clampAimYByPitch,
       // Bot primitives.
       stepBotState: stepBotState,
       createIdleBotIntent: createIdleBotIntent,
+      selectDriverViewTarget: selectDriverViewTarget,
+      computeWorldMovementIntent: computeWorldMovementIntent,
+      isRouteOverlayMicroTarget: isRouteOverlayMicroTarget,
+      isRoutePathExhausted: isRoutePathExhausted,
+      computeRouteContinuationPoint: computeRouteContinuationPoint,
+      computeAnchorContinuationPoint: computeAnchorContinuationPoint,
+      applyRouteOverlayRecovery: applyRouteOverlayRecovery,
+      shouldTrackHarnessStuckProgress: shouldTrackHarnessStuckProgress,
+      shouldSkipStuckWaypoint: shouldSkipStuckWaypoint,
+      hasRouteTargetMoved: hasRouteTargetMoved,
+      shouldResetRouteForNoProgress: shouldResetRouteForNoProgress,
+      isTargetTemporarilyBlocked: isTargetTemporarilyBlocked,
+      markTargetTemporarilyBlocked: markTargetTemporarilyBlocked,
+      shouldUseTargetForCurrentObjective: shouldUseTargetForCurrentObjective,
+      shouldUseRouteOverlayForIntent: shouldUseRouteOverlayForIntent,
+      shouldUseDirectCombatRouteFallback: shouldUseDirectCombatRouteFallback,
+      createDirectCombatFallbackPath: createDirectCombatFallbackPath,
       engageStrafeIntent: engageStrafeIntent,
+      selectLockedTarget: selectLockedTarget,
       profileForMode: profileForMode,
       botConfigForProfile: botConfigForProfile,
+      combatObjectiveMaxDistanceForProfile: combatObjectiveMaxDistanceForProfile,
+      supportsFrontlineCompression: supportsFrontlineCompression,
+      usesPlayerAnchoredFrontlineCompression: usesPlayerAnchoredFrontlineCompression,
+      placeCompressedCombatantForHarness: placeCompressedCombatantForHarness,
       // Match-end lifecycle (harness-lifecycle-halt-on-match-end).
       detectMatchEnded: detectMatchEnded,
       detectMatchOutcome: detectMatchOutcome,
@@ -1922,6 +3023,8 @@
       computeAccuracy: computeAccuracy,
       // Objective selector (harness-ashau-objective-cycling-fix).
       pickObjectiveZone: pickObjectiveZone,
+      selectPatrolObjective: selectPatrolObjective,
+      objectiveTelemetryKey: objectiveTelemetryKey,
     };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -14,7 +14,9 @@ const {
   mockVegetationSetExclusionZones,
   mockVegetationUpdateBudgeted,
   mockVegetationPendingCounts,
+  mockVegetationDebugInfo,
   mockVegetationReadyAround,
+  mockUpdateFarCanopyTint,
 } = vi.hoisted(() => ({
   mockProviderGetHeightAt: vi.fn().mockReturnValue(10),
   mockCacheGetHeightAt: vi.fn().mockReturnValue(10),
@@ -27,7 +29,27 @@ const {
   mockVegetationSetExclusionZones: vi.fn(),
   mockVegetationUpdateBudgeted: vi.fn().mockReturnValue(false),
   mockVegetationPendingCounts: vi.fn().mockReturnValue({ adds: 0, removals: 0 }),
+  mockVegetationDebugInfo: vi.fn().mockReturnValue({
+    cellSize: 128,
+    maxCellDistance: 6,
+    activeCells: 0,
+    targetCells: 0,
+    pendingAdditions: 0,
+    pendingRemovals: 0,
+    lastPlayerCell: null,
+    lastUpdate: {
+      requestedAddBudget: 0,
+      resolvedAddBudget: 0,
+      maxRemovalsPerFrame: 0,
+      addedCells: 0,
+      removedCells: 0,
+      generatedInstances: 0,
+      emptyCells: 0,
+      lastGeneratedCell: null,
+    },
+  }),
   mockVegetationReadyAround: vi.fn().mockReturnValue(true),
+  mockUpdateFarCanopyTint: vi.fn(),
 }));
 
 vi.mock('./HeightQueryCache', () => {
@@ -85,6 +107,7 @@ vi.mock('./TerrainMaterial', () => ({
     needsUpdate: false,
     dispose: vi.fn(),
   }),
+  updateTerrainMaterialFarCanopyTint: mockUpdateFarCanopyTint,
   updateTerrainMaterialTextures: vi.fn(),
   updateTerrainMaterialWetness: vi.fn(),
 }));
@@ -107,6 +130,7 @@ vi.mock('./VegetationScatterer', () => ({
     update = vi.fn();
     updateBudgeted = mockVegetationUpdateBudgeted;
     getPendingCounts = mockVegetationPendingCounts;
+    getDebugInfo = mockVegetationDebugInfo;
     isReadyAround = mockVegetationReadyAround;
     clear = vi.fn();
     regenerateAll = mockVegetationRegenerateAll;
@@ -193,6 +217,7 @@ describe('TerrainSystem', () => {
     mockVegetationUpdateBudgeted.mockClear();
     mockVegetationPendingCounts.mockClear();
     mockVegetationReadyAround.mockClear();
+    mockUpdateFarCanopyTint.mockClear();
     scene = makeMockScene();
     terrain = new TerrainSystem(
       scene,
@@ -279,6 +304,170 @@ describe('TerrainSystem', () => {
       expect(mockUploadPrebakedGrid).toHaveBeenCalled();
     });
 
+    it('stores a preloaded hydrology bake without changing terrain or vegetation state', () => {
+      terrain.setHydrologyBake({
+        manifest: {
+          schemaVersion: 1,
+          generator: 'test',
+          entries: [],
+        },
+        entry: {
+          modeId: 'open_frontier',
+          source: 'procedural-noise',
+          seed: 42,
+          signature: 'hydrology-test-frontier-42',
+          hydrologyAsset: '/data/hydrology/open_frontier-42-hydrology.json',
+          worldSize: 3200,
+          sampleGridSize: 2,
+          sampleWorldInsetPercent: 4,
+          sampleSpacingMeters: 12,
+          depressionHandling: 'epsilon-fill',
+          wetCandidateAccumulationQuantile: 0.92,
+          channelCandidateAccumulationQuantile: 0.98,
+          wetCandidateSlopeMaxDegrees: 16,
+          wetCandidateElevationMaxMeters: 35,
+          currentHydrologyBiomeIds: ['riverbank'],
+        },
+        artifact: {
+          schemaVersion: 1,
+          width: 2,
+          height: 2,
+          cellSizeMeters: 12,
+          depressionHandling: 'epsilon-fill',
+          transform: {
+            originX: -12,
+            originZ: -12,
+            cellSizeMeters: 12,
+          },
+          thresholds: {
+            accumulationP90Cells: 1,
+            accumulationP95Cells: 2,
+            accumulationP98Cells: 3,
+            accumulationP99Cells: 4,
+          },
+          masks: {
+            wetCandidateCells: [2, 3],
+            channelCandidateCells: [3],
+          },
+          channelPolylines: [],
+        },
+      });
+
+      expect(terrain.getHydrologyBakeDebugInfo()).toEqual({
+        loaded: true,
+        modeId: 'open_frontier',
+        signature: 'hydrology-test-frontier-42',
+        wetCandidateCells: 2,
+        channelCandidateCells: 1,
+        channelPolylines: 0,
+        biomePolicyEnabled: false,
+        materialMaskEnabled: false,
+        wetBiomeId: null,
+        channelBiomeId: null,
+      });
+      expect(mockVegetationRegenerateAll).not.toHaveBeenCalled();
+
+      terrain.setHydrologyBake(null);
+      expect(terrain.getHydrologyBakeDebugInfo().loaded).toBe(false);
+    });
+
+    it('adds hydrology target biomes to vegetation configuration only when the policy is enabled', () => {
+      terrain.setHydrologyBiomePolicy({
+        wetBiomeId: 'swamp',
+        channelBiomeId: 'riverbank',
+        maxSlopeDeg: 16,
+      });
+
+      expect(mockVegetationConfigure).toHaveBeenLastCalledWith(
+        expect.anything(),
+        'denseJungle',
+        expect.any(Map),
+        [],
+        null,
+      );
+      const configuredPaletteMap = mockVegetationConfigure.mock.calls.at(-1)?.[2] as Map<string, unknown>;
+      expect([...configuredPaletteMap.keys()]).toEqual(['denseJungle', 'swamp', 'riverbank']);
+      expect(terrain.getHydrologyBakeDebugInfo()).toEqual(expect.objectContaining({
+        biomePolicyEnabled: true,
+        wetBiomeId: 'swamp',
+        channelBiomeId: 'riverbank',
+      }));
+    });
+
+    it('creates a feathered hydrology material mask for terrain blending', () => {
+      terrain.setHydrologyBiomePolicy({
+        wetBiomeId: 'swamp',
+        channelBiomeId: 'riverbank',
+        maxSlopeDeg: 16,
+      });
+      terrain.setHydrologyBake({
+        manifest: {
+          schemaVersion: 1,
+          generator: 'test',
+          entries: [],
+        },
+        entry: {
+          modeId: 'a_shau_valley',
+          source: 'dem',
+          seed: null,
+          signature: 'hydrology-test-ashau',
+          hydrologyAsset: '/data/hydrology/a_shau_valley-hydrology.json',
+          worldSize: 21136,
+          sampleGridSize: 3,
+          sampleWorldInsetPercent: 4,
+          sampleSpacingMeters: 79.26,
+          depressionHandling: 'epsilon-fill',
+          wetCandidateAccumulationQuantile: 0.92,
+          channelCandidateAccumulationQuantile: 0.98,
+          wetCandidateSlopeMaxDegrees: 16,
+          wetCandidateElevationMaxMeters: 980,
+          currentHydrologyBiomeIds: ['swamp', 'riverbank'],
+        },
+        artifact: {
+          schemaVersion: 1,
+          width: 3,
+          height: 3,
+          cellSizeMeters: 79.26,
+          depressionHandling: 'epsilon-fill',
+          transform: {
+            originX: -79.26,
+            originZ: -79.26,
+            cellSizeMeters: 79.26,
+          },
+          thresholds: {
+            accumulationP90Cells: 1,
+            accumulationP95Cells: 2,
+            accumulationP98Cells: 3,
+            accumulationP99Cells: 4,
+          },
+          masks: {
+            wetCandidateCells: [4],
+            channelCandidateCells: [4],
+          },
+          channelPolylines: [],
+        },
+      });
+
+      const surfaceRuntime = (terrain as unknown as {
+        surfaceRuntime: {
+          hydrologyMaskTexture: THREE.DataTexture | null;
+          hydrologyMaskMaterial: { wetStrength?: number; channelStrength?: number } | null;
+        };
+      }).surfaceRuntime;
+      const texture = surfaceRuntime.hydrologyMaskTexture;
+      const data = texture?.image.data as Uint8Array | undefined;
+      const centerOffset = 4 * 4;
+      const adjacentOffset = 1 * 4;
+
+      expect(texture?.magFilter).toBe(THREE.LinearFilter);
+      expect(texture?.minFilter).toBe(THREE.LinearFilter);
+      expect(data?.[centerOffset]).toBe(255);
+      expect(data?.[adjacentOffset]).toBeGreaterThan(0);
+      expect(data?.[adjacentOffset]).toBeLessThan(255);
+      expect(surfaceRuntime.hydrologyMaskMaterial?.wetStrength).toBeCloseTo(0.08);
+      expect(surfaceRuntime.hydrologyMaskMaterial?.channelStrength).toBeCloseTo(0.14);
+    });
+
     it('setBiomeConfig regenerates vegetation after init', async () => {
       await terrain.init();
       terrain.setBiomeConfig('highland', []);
@@ -300,6 +489,26 @@ describe('TerrainSystem', () => {
       ]);
 
       expect(billboard.configure).toHaveBeenCalledWith(['denseJungle', 'highland']);
+    });
+
+    it('forwards far-canopy tint policy to the terrain material runtime', async () => {
+      await terrain.init();
+
+      terrain.setFarCanopyTint({
+        enabled: true,
+        startDistance: 560,
+        endDistance: 1250,
+        strength: 0.28,
+      });
+
+      expect(mockUpdateFarCanopyTint).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          enabled: true,
+          startDistance: 560,
+          endDistance: 1250,
+        }),
+      );
     });
 
     it('collision object register/unregister round-trips without error', () => {

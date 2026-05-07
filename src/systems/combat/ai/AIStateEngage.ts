@@ -28,6 +28,7 @@ const NEARBY_ENEMY_BURST = 6
 // ── Cover behavior ──
 const COVER_BURST_LENGTH = 2
 const COVER_BURST_PAUSE_MS = 1500
+const UTILITY_COVER_REPATH_COOLDOWN_MS = 3000
 
 // ── Suppression ──
 const SUPPRESSION_BURST = 12
@@ -191,7 +192,7 @@ export class AIStateEngage {
           combatant.coverPosition = undefined
 
           // Immediately seek new cover if should reposition
-          if (coverEval.shouldReposition) {
+          if (coverEval.shouldReposition && targetDistance >= CLOSE_RANGE_DISTANCE) {
             const newCover = this.coverSystem.findBestCover(combatant, targetPos, allCombatants)
             if (newCover) {
               combatant.state = CombatantState.SEEKING_COVER
@@ -233,30 +234,40 @@ export class AIStateEngage {
       // the scorer before the default engage/seek-cover ladder. Known intents
       // route the unit into the matching state; unknown intents (or none)
       // fall through to the legacy ladder.
-      if (this.utilityScorer && getFactionCombatTuning(combatant.faction).useUtilityAI) {
+      if (
+        targetDistance >= CLOSE_RANGE_DISTANCE &&
+        this.utilityScorer &&
+        getFactionCombatTuning(combatant.faction).useUtilityAI
+      ) {
         const ctx = this.buildUtilityContext(combatant, targetPos)
         const pick = this.utilityScorer.pick(ctx)
         const intent = pick.intent
         if (intent && intent.kind === 'seekCoverInBearing') {
-          // Scratch Vector3 inside fireAndFadeAction.apply() is shared across
-          // invocations — clone into combatant so subsequent picks can't
-          // mutate the stored destination out from under us. Reuse the
-          // combatant's existing Vector3 fields when present to avoid
-          // per-tick allocations on re-entry.
-          combatant.state = CombatantState.SEEKING_COVER
-          if (combatant.coverPosition) {
-            combatant.coverPosition.copy(intent.coverPosition)
-          } else {
-            combatant.coverPosition = intent.coverPosition.clone()
+          const now = Date.now()
+          const coverSeekAgeMs = combatant.lastCoverSeekTime ? now - combatant.lastCoverSeekTime : Number.POSITIVE_INFINITY
+          if (coverSeekAgeMs >= UTILITY_COVER_REPATH_COOLDOWN_MS) {
+            // Scratch Vector3 inside fireAndFadeAction.apply() is shared across
+            // invocations — clone into combatant so subsequent picks can't
+            // mutate the stored destination out from under us. Reuse the
+            // combatant's existing Vector3 fields when present to avoid
+            // per-tick allocations on re-entry.
+            combatant.state = CombatantState.SEEKING_COVER
+            if (combatant.coverPosition) {
+              combatant.coverPosition.copy(intent.coverPosition)
+            } else {
+              combatant.coverPosition = intent.coverPosition.clone()
+            }
+            if (combatant.destinationPoint) {
+              combatant.destinationPoint.copy(intent.coverPosition)
+            } else {
+              combatant.destinationPoint = intent.coverPosition.clone()
+            }
+            combatant.lastCoverSeekTime = now
+            combatant.inCover = false
+            return
           }
-          if (combatant.destinationPoint) {
-            combatant.destinationPoint.copy(intent.coverPosition)
-          } else {
-            combatant.destinationPoint = intent.coverPosition.clone()
-          }
-          combatant.lastCoverSeekTime = Date.now()
-          combatant.inCover = false
-          return
+          // Otherwise fall through to the legacy engage ladder during the same
+          // cooldown window used by AICoverFinding.shouldSeekCover().
         }
         if (intent && intent.kind === 'reposition') {
           // Fallback point is a pooled scratch on the action singleton —
@@ -278,7 +289,7 @@ export class AIStateEngage {
       }
 
       // Check if should seek cover - use improved cover system if available
-      if (shouldSeekCover(combatant)) {
+      if (targetDistance >= CLOSE_RANGE_DISTANCE && shouldSeekCover(combatant)) {
         let coverPosition: THREE.Vector3 | null = null
 
         if (this.coverSystem) {

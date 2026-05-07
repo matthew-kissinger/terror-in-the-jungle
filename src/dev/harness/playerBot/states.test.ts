@@ -78,6 +78,26 @@ describe('states — PATROL', () => {
     expect(step.nextState).toBe('ALERT');
   });
 
+  it('keeps moving toward an objective instead of chasing a distant target', () => {
+    const step = stepState('PATROL', makeCtx({
+      findNearestEnemy: () => makeTarget({ position: { x: 0, y: 0, z: -500 } }),
+      getObjective: () => ({ position: { x: 100, y: 0, z: 0 }, priority: 1 }),
+    }));
+
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.intent.aimTarget?.x).toBeCloseTo(100, 5);
+  });
+
+  it('breaks off objective travel for a close visible target', () => {
+    const step = stepState('PATROL', makeCtx({
+      findNearestEnemy: () => makeTarget({ position: { x: 0, y: 0, z: -30 } }),
+      getObjective: () => ({ position: { x: 100, y: 0, z: 0 }, priority: 1 }),
+    }));
+
+    expect(step.nextState).toBe('ALERT');
+  });
+
   it('emits no fire intent', () => {
     const step = stepState('PATROL', makeCtx());
     expect(step.intent.firePrimary).toBe(false);
@@ -118,6 +138,18 @@ describe('states — ALERT', () => {
     }));
     expect(step.nextState).toBe('PATROL');
   });
+
+  it('does not reacquire an ungated enemy while the active objective is a zone', () => {
+    const step = stepState('ALERT', makeCtx({
+      currentTarget: null,
+      findNearestEnemy: () => makeTarget({ position: { x: 0, y: 0, z: -500 } }),
+      getObjective: () => ({ kind: 'zone', position: { x: 100, y: 0, z: 0 }, priority: 1 }),
+    }));
+
+    expect(step.nextState).toBe('PATROL');
+    expect(step.intent.aimTarget).toBeNull();
+    expect(step.intent.moveForward).toBe(0);
+  });
 });
 
 describe('states — ENGAGE', () => {
@@ -146,9 +178,34 @@ describe('states — ENGAGE', () => {
     const step = stepState('ENGAGE', makeCtx({
       currentTarget: target,
       canSeeTarget: () => false,
+      timeInStateMs: DEFAULT_PLAYER_BOT_CONFIG.minEngageStateMs,
     }));
     expect(step.nextState).toBe('ADVANCE');
     expect(step.intent.firePrimary).toBe(false);
+  });
+
+  it('holds ENGAGE through a close transient LOS loss before the dwell expires', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -30 } });
+    const step = stepState('ENGAGE', makeCtx({
+      currentTarget: target,
+      canSeeTarget: () => false,
+      timeInStateMs: 0,
+    }));
+    expect(step.nextState).toBeNull();
+    expect(step.intent.firePrimary).toBe(false);
+    expect(step.intent.moveForward).toBe(0);
+  });
+
+  it('keeps pushing during a distant transient LOS loss before the dwell expires', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -180 } });
+    const step = stepState('ENGAGE', makeCtx({
+      currentTarget: target,
+      canSeeTarget: () => false,
+      timeInStateMs: 0,
+    }));
+    expect(step.nextState).toBeNull();
+    expect(step.intent.firePrimary).toBe(false);
+    expect(step.intent.moveForward).toBeGreaterThan(0);
   });
 
   it('transitions to ADVANCE when target is out of fire range', () => {
@@ -156,6 +213,7 @@ describe('states — ENGAGE', () => {
     const step = stepState('ENGAGE', makeCtx({
       currentTarget: target,
       canSeeTarget: () => true,
+      timeInStateMs: DEFAULT_PLAYER_BOT_CONFIG.minEngageStateMs,
     }));
     expect(step.nextState).toBe('ADVANCE');
   });
@@ -183,6 +241,27 @@ describe('states — ENGAGE', () => {
       const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
       expect(step.intent.moveForward).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  it('holds position and fires inside the close-contact push-in distance', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -10 } });
+    const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
+    expect(step.intent.firePrimary).toBe(true);
+    expect(step.intent.moveForward).toBe(0);
+  });
+
+  it('plants and fires inside the tactical engagement band', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -60 } });
+    const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
+    expect(step.intent.firePrimary).toBe(true);
+    expect(step.intent.moveForward).toBe(0);
+  });
+
+  it('pushes while firing when outside the tactical engagement band', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -160 } });
+    const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
+    expect(step.intent.firePrimary).toBe(true);
+    expect(step.intent.moveForward).toBeGreaterThan(0);
   });
 
   it('writes an aimTarget at the visual chest proxy from the actor anchor', () => {
@@ -213,8 +292,33 @@ describe('states — ADVANCE', () => {
     const step = stepState('ADVANCE', makeCtx({
       currentTarget: target,
       canSeeTarget: () => true,
+      timeInStateMs: DEFAULT_PLAYER_BOT_CONFIG.minAdvanceStateMs,
     }));
     expect(step.nextState).toBe('ENGAGE');
+  });
+
+  it('holds position on a close transient LOS reacquire before the dwell expires', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -30 } });
+    const step = stepState('ADVANCE', makeCtx({
+      currentTarget: target,
+      canSeeTarget: () => true,
+      timeInStateMs: 0,
+    }));
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBe(0);
+    expect(step.intent.firePrimary).toBe(false);
+  });
+
+  it('keeps advancing toward a distant transient LOS reacquire before the dwell expires', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -180 } });
+    const step = stepState('ADVANCE', makeCtx({
+      currentTarget: target,
+      canSeeTarget: () => true,
+      timeInStateMs: 0,
+    }));
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.intent.firePrimary).toBe(false);
   });
 
   it('keeps moving forward when target is still occluded', () => {
@@ -224,6 +328,28 @@ describe('states — ADVANCE', () => {
       canSeeTarget: () => false,
     }));
     expect(step.intent.moveForward).toBeGreaterThan(0);
+  });
+
+  it('keeps repositioning toward a close occluded target outside point-blank distance', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -15 } });
+    const step = stepState('ADVANCE', makeCtx({
+      currentTarget: target,
+      canSeeTarget: () => false,
+    }));
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.intent.firePrimary).toBe(false);
+  });
+
+  it('holds instead of walking through a point-blank occluded target', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -3 } });
+    const step = stepState('ADVANCE', makeCtx({
+      currentTarget: target,
+      canSeeTarget: () => false,
+    }));
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBe(0);
+    expect(step.intent.firePrimary).toBe(false);
   });
 
   it('does not emit fire intent in ADVANCE', () => {
@@ -241,6 +367,18 @@ describe('states — ADVANCE', () => {
       findNearestEnemy: () => null,
     }));
     expect(step.nextState).toBe('PATROL');
+  });
+
+  it('does not aim or advance toward an ungated enemy while the active objective is a zone', () => {
+    const step = stepState('ADVANCE', makeCtx({
+      currentTarget: null,
+      findNearestEnemy: () => makeTarget({ position: { x: 0, y: 0, z: -500 } }),
+      getObjective: () => ({ kind: 'zone', position: { x: 100, y: 0, z: 0 }, priority: 1 }),
+    }));
+
+    expect(step.nextState).toBe('PATROL');
+    expect(step.intent.aimTarget).toBeNull();
+    expect(step.intent.moveForward).toBe(0);
   });
 });
 
@@ -273,6 +411,10 @@ describe('pure helpers', () => {
 
   it('engageStrafeIntent is zero when amplitude is zero', () => {
     expect(engageStrafeIntent(500, 800, 0)).toBe(0);
+  });
+
+  it('default bot config disables scripted ENGAGE strafe for perf captures', () => {
+    expect(DEFAULT_PLAYER_BOT_CONFIG.engageStrafeAmplitude).toBe(0);
   });
 });
 

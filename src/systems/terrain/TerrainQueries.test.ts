@@ -41,19 +41,46 @@ describe('TerrainQueries', () => {
     expect(h).toBe(10);
   });
 
-  it('getEffectiveHeightAt returns max of terrain and collision objects', () => {
-    // Register a collision object that's higher than terrain
+  it('getEffectiveHeightAt returns low standable collision surfaces', () => {
     const obj = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 8, 4),
+      new THREE.BoxGeometry(4, 1, 4),
       new THREE.MeshBasicMaterial(),
     );
-    obj.position.set(10, 10, 20);
+    obj.position.set(10, 10.25, 20);
     obj.updateMatrixWorld(true);
 
     queries.registerCollisionObject('box1', obj);
 
     const h = queries.getEffectiveHeightAt(10, 20);
-    expect(h).toBeGreaterThanOrEqual(10); // At least terrain height
+    expect(h).toBe(10.75);
+  });
+
+  it('ignores tall generic collision bounds for effective height but keeps collision checks', () => {
+    const obj = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.MeshBasicMaterial(),
+    );
+    obj.position.set(0, 12, 0);
+    obj.updateMatrixWorld(true);
+
+    queries.registerCollisionObject('building_box', obj);
+
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(10);
+    expect(queries.checkObjectCollision(new THREE.Vector3(0, 12, 0), 0)).toBe(true);
+  });
+
+  it('allows helipad collision surfaces to contribute to effective height', () => {
+    const obj = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.MeshBasicMaterial(),
+    );
+    obj.position.set(0, 12, 0);
+    obj.userData.type = 'helipad';
+    obj.updateMatrixWorld(true);
+
+    queries.registerCollisionObject('helipad_box', obj);
+
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(14);
   });
 
   it('raycastTerrain delegates to LOSAccelerator', () => {
@@ -91,24 +118,24 @@ describe('TerrainQueries', () => {
     expect(true).toBe(true);
   });
 
-  it('keeps static collision bounds cached after registration', () => {
+  it('keeps static low collision bounds cached after registration', () => {
     const obj = new THREE.Mesh(
-      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.BoxGeometry(4, 1, 4),
       new THREE.MeshBasicMaterial(),
     );
-    obj.position.set(0, 12, 0);
+    obj.position.set(0, 10.25, 0);
     obj.updateMatrixWorld(true);
 
     queries.registerCollisionObject('static_box', obj);
-    expect(queries.getEffectiveHeightAt(0, 0)).toBe(14);
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(10.75);
 
     obj.position.set(0, 20, 0);
     obj.updateMatrixWorld(true);
 
-    expect(queries.getEffectiveHeightAt(0, 0)).toBe(14);
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(10.75);
   });
 
-  it('recomputes bounds for dynamic collision objects', () => {
+  it('recomputes dynamic collision bounds without treating them as effective ground', () => {
     const obj = new THREE.Mesh(
       new THREE.BoxGeometry(4, 4, 4),
       new THREE.MeshBasicMaterial(),
@@ -117,12 +144,13 @@ describe('TerrainQueries', () => {
     obj.updateMatrixWorld(true);
 
     queries.registerCollisionObject('dynamic_box', obj, { dynamic: true });
-    expect(queries.getEffectiveHeightAt(0, 0)).toBe(14);
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(10);
 
     obj.position.set(0, 20, 0);
     obj.updateMatrixWorld(true);
 
-    expect(queries.getEffectiveHeightAt(0, 0)).toBe(22);
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(10);
+    expect(queries.checkObjectCollision(new THREE.Vector3(0, 20, 0), 0)).toBe(true);
   });
 
   it('getLOSAccelerator returns the injected accelerator', () => {

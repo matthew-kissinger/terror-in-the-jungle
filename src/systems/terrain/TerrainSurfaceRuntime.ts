@@ -2,18 +2,26 @@ import * as THREE from 'three';
 import type { AssetLoader } from '../assets/AssetLoader';
 import type { IHeightProvider } from './IHeightProvider';
 import type { SplatmapConfig } from './TerrainConfig';
-import type { BiomeClassificationRule } from '../../config/biomes';
+import type { BiomeClassificationRule, TerrainFarCanopyTintConfig } from '../../config/biomes';
 import type { TerrainSurfacePatch } from './TerrainFeatureTypes';
 import { HeightmapGPU } from './HeightmapGPU';
 import {
   createTerrainMaterial,
+  type TerrainHydrologyMaskMaterialConfig,
+  updateTerrainMaterialFarCanopyTint,
   updateTerrainMaterialTextures,
   updateTerrainMaterialWetness,
 } from './TerrainMaterial';
 import { buildTerrainBiomeMaterialConfig } from './TerrainBiomeRuntimeConfig';
+import { materializeHydrologyMasksFromArtifact } from './hydrology/HydrologyBake';
+import type { LoadedHydrologyBake } from './hydrology/HydrologyBakeManifest';
+import type { HydrologyBiomePolicy } from './hydrology/HydrologyBiomeClassifier';
 
 const MIN_HEIGHTMAP_GRID_SIZE = 256;
 const MAX_HEIGHTMAP_GRID_SIZE = 1024;
+const HYDROLOGY_MASK_FEATHER_RADIUS_CELLS = 1;
+const HYDROLOGY_WET_MATERIAL_STRENGTH = 0.08;
+const HYDROLOGY_CHANNEL_MATERIAL_STRENGTH = 0.14;
 
 function roundUpToPowerOfTwo(value: number): number {
   let result = 1;
@@ -48,6 +56,9 @@ export class TerrainSurfaceRuntime {
   private readonly tileGridResolution: number;
   private terrainMaterial: THREE.MeshStandardMaterial | null = null;
   private surfaceWetness = 0;
+  private farCanopyTint: TerrainFarCanopyTintConfig = { enabled: false };
+  private hydrologyMaskMaterial: TerrainHydrologyMaskMaterialConfig | null = null;
+  private hydrologyMaskTexture: THREE.DataTexture | null = null;
   private featureSurfacePatches: TerrainSurfacePatch[] = [];
   private currentWorldSize = 0;
   private currentDefaultBiomeId = 'denseJungle';
@@ -82,7 +93,9 @@ export class TerrainSurfaceRuntime {
       normalTexture,
       worldSize,
       splatmap: this.splatmap,
-      biomeConfig: buildTerrainBiomeMaterialConfig(this.assetLoader, defaultBiomeId, biomeRules),
+      biomeConfig: this.buildBiomeMaterialConfig(defaultBiomeId, biomeRules),
+      hydrologyMask: this.hydrologyMaskMaterial,
+      farCanopyTint: this.farCanopyTint,
       surfaceWetness: this.surfaceWetness,
       tileGridResolution: this.tileGridResolution,
       surfacePatches: this.featureSurfacePatches,
@@ -125,7 +138,9 @@ export class TerrainSurfaceRuntime {
       normalTexture,
       worldSize,
       splatmap: this.splatmap,
-      biomeConfig: buildTerrainBiomeMaterialConfig(this.assetLoader, defaultBiomeId, biomeRules),
+      biomeConfig: this.buildBiomeMaterialConfig(defaultBiomeId, biomeRules),
+      hydrologyMask: this.hydrologyMaskMaterial,
+      farCanopyTint: this.farCanopyTint,
       surfaceWetness: this.surfaceWetness,
       tileGridResolution: this.tileGridResolution,
       surfacePatches: this.featureSurfacePatches,
@@ -170,6 +185,42 @@ export class TerrainSurfaceRuntime {
     }
   }
 
+  setFarCanopyTint(farCanopyTint?: TerrainFarCanopyTintConfig): void {
+    this.farCanopyTint = farCanopyTint ?? { enabled: false };
+    if (this.terrainMaterial) {
+      updateTerrainMaterialFarCanopyTint(this.terrainMaterial, this.farCanopyTint);
+    }
+  }
+
+  setHydrologyMaterialMask(
+    hydrologyBake: LoadedHydrologyBake | null,
+    policy: HydrologyBiomePolicy | null,
+  ): void {
+    this.disposeHydrologyMaskTexture();
+    this.hydrologyMaskMaterial = null;
+
+    if (hydrologyBake && policy) {
+      const texture = createHydrologyMaskTexture(hydrologyBake.artifact);
+      this.hydrologyMaskTexture = texture;
+      this.hydrologyMaskMaterial = {
+        texture,
+        width: hydrologyBake.artifact.width,
+        height: hydrologyBake.artifact.height,
+        originX: hydrologyBake.artifact.transform.originX,
+        originZ: hydrologyBake.artifact.transform.originZ,
+        cellSizeMeters: hydrologyBake.artifact.transform.cellSizeMeters,
+        wetBiomeId: policy.wetBiomeId,
+        channelBiomeId: policy.channelBiomeId,
+        wetStrength: HYDROLOGY_WET_MATERIAL_STRENGTH,
+        channelStrength: HYDROLOGY_CHANNEL_MATERIAL_STRENGTH,
+      };
+    }
+
+    if (this.terrainMaterial) {
+      this.updateMaterialArguments();
+    }
+  }
+
   setFeatureSurfacePatches(surfacePatches: TerrainSurfacePatch[]): void {
     this.featureSurfacePatches = surfacePatches.slice();
     if (this.terrainMaterial) {
@@ -191,6 +242,7 @@ export class TerrainSurfaceRuntime {
 
   dispose(): void {
     this.heightmapGPU.dispose();
+    this.disposeHydrologyMaskTexture();
     this.terrainMaterial?.dispose();
     this.terrainMaterial = null;
   }
@@ -229,14 +281,106 @@ export class TerrainSurfaceRuntime {
       resolvedHeightTexture,
       resolvedNormalTexture,
       resolvedWorldSize,
-      buildTerrainBiomeMaterialConfig(
-        this.assetLoader,
+      this.buildBiomeMaterialConfig(
         defaultBiomeId ?? this.currentDefaultBiomeId,
         biomeRules ?? this.currentBiomeRules,
       ),
       this.splatmap,
       this.featureSurfacePatches,
+      this.farCanopyTint,
+      this.hydrologyMaskMaterial,
     );
     updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
   }
+
+  private buildBiomeMaterialConfig(defaultBiomeId: string, biomeRules: BiomeClassificationRule[]) {
+    return buildTerrainBiomeMaterialConfig(
+      this.assetLoader,
+      defaultBiomeId,
+      biomeRules,
+      this.getHydrologyMaterialBiomeIds(),
+    );
+  }
+
+  private getHydrologyMaterialBiomeIds(): string[] {
+    if (!this.hydrologyMaskMaterial) return [];
+    return [
+      this.hydrologyMaskMaterial.wetBiomeId,
+      this.hydrologyMaskMaterial.channelBiomeId,
+    ];
+  }
+
+  private disposeHydrologyMaskTexture(): void {
+    this.hydrologyMaskTexture?.dispose();
+    this.hydrologyMaskTexture = null;
+  }
+}
+
+function createHydrologyMaskTexture(artifact: LoadedHydrologyBake['artifact']): THREE.DataTexture {
+  const masks = materializeHydrologyMasksFromArtifact(artifact);
+  const cellCount = artifact.width * artifact.height;
+  const data = new Uint8Array(cellCount * 4);
+  const wetWeights = featherHydrologyMask(
+    masks.wetCandidate,
+    artifact.width,
+    artifact.height,
+    HYDROLOGY_MASK_FEATHER_RADIUS_CELLS,
+  );
+  const channelWeights = featherHydrologyMask(
+    masks.channelCandidate,
+    artifact.width,
+    artifact.height,
+    HYDROLOGY_MASK_FEATHER_RADIUS_CELLS,
+  );
+
+  for (let index = 0; index < cellCount; index++) {
+    const offset = index * 4;
+    data[offset] = wetWeights[index] ?? 0;
+    data[offset + 1] = channelWeights[index] ?? 0;
+    data[offset + 2] = 0;
+    data[offset + 3] = 255;
+  }
+
+  const texture = new THREE.DataTexture(
+    data,
+    artifact.width,
+    artifact.height,
+    THREE.RGBAFormat,
+    THREE.UnsignedByteType,
+  );
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function featherHydrologyMask(mask: Uint8Array, width: number, height: number, radiusCells: number): Uint8Array {
+  const weights = new Uint8Array(mask.length);
+  const radius = Math.max(0, Math.floor(radiusCells));
+
+  for (let index = 0; index < mask.length; index++) {
+    if ((mask[index] ?? 0) <= 0) continue;
+
+    const centerX = index % width;
+    const centerY = Math.floor(index / width);
+    for (let dy = -radius; dy <= radius; dy++) {
+      const y = centerY + dy;
+      if (y < 0 || y >= height) continue;
+      for (let dx = -radius; dx <= radius; dx++) {
+        const x = centerX + dx;
+        if (x < 0 || x >= width) continue;
+        const distanceCells = Math.hypot(dx, dy);
+        if (distanceCells > radius + 0.001) continue;
+        const feather = 1 - distanceCells / (radius + 1);
+        const weight = Math.round(255 * feather);
+        const targetIndex = y * width + x;
+        weights[targetIndex] = Math.max(weights[targetIndex] ?? 0, weight);
+      }
+    }
+  }
+
+  return weights;
 }

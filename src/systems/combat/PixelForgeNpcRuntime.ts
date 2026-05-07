@@ -37,6 +37,7 @@ export interface PixelForgeNpcImposterMaterialTuning {
   npcExposure: number;
   minNpcLight: number;
   npcTopLight: number;
+  horizontalCropExpansion: number;
   parityScale: number;
   parityLift: number;
   paritySaturation: number;
@@ -47,6 +48,8 @@ export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ =
   PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS * PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP = 128;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION = 40;
+export const PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION = 8;
+export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOP_UP_BATCH = 4;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG = '__TIJ_ALLOW_NPC_CLOSE_MODEL_LAZY_LOAD__';
 
 export const PIXEL_FORGE_NPC_WEAPONS: Record<PixelForgeNpcWeaponId, PixelForgeNpcWeaponRuntimeConfig> = {
@@ -138,6 +141,7 @@ export const PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING: Record<
     npcExposure: 1.2,
     minNpcLight: 0.92,
     npcTopLight: 0.16,
+    horizontalCropExpansion: 1.7,
     parityScale: 1.8,
     parityLift: 0.08,
     paritySaturation: 1.6,
@@ -147,6 +151,7 @@ export const PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING: Record<
     npcExposure: 1.2,
     minNpcLight: 0.92,
     npcTopLight: 0.16,
+    horizontalCropExpansion: 1.7,
     parityScale: 1.7,
     parityLift: 0.06,
     paritySaturation: 1.25,
@@ -156,6 +161,7 @@ export const PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING: Record<
     npcExposure: 1.2,
     minNpcLight: 0.92,
     npcTopLight: 0.16,
+    horizontalCropExpansion: 1.7,
     parityScale: 1.45,
     parityLift: 0.04,
     paritySaturation: 2.4,
@@ -165,8 +171,9 @@ export const PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING: Record<
     npcExposure: 1.2,
     minNpcLight: 0.92,
     npcTopLight: 0.16,
-    parityScale: 1.3,
-    parityLift: 0.035,
+    horizontalCropExpansion: 1.7,
+    parityScale: 1.75,
+    parityLift: 0.06,
     paritySaturation: 2.3,
   },
 };

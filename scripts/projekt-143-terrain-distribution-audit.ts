@@ -15,6 +15,18 @@ import type { IHeightProvider } from '../src/systems/terrain/IHeightProvider';
 import { DEMHeightProvider } from '../src/systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../src/systems/terrain/NoiseHeightProvider';
 import { classifyBiome, computeSlopeDeg } from '../src/systems/terrain/BiomeClassifier';
+import {
+  classifyHydrologyBiome,
+  createHydrologyBiomeClassifier,
+  type HydrologyBiomeClassifier,
+} from '../src/systems/terrain/hydrology/HydrologyBiomeClassifier';
+import {
+  HYDROLOGY_BAKE_MANIFEST_PATH,
+  parseHydrologyBakeArtifact,
+  parseHydrologyBakeManifest,
+  resolveHydrologyAssetUrl,
+  selectHydrologyBakeEntry,
+} from '../src/systems/terrain/hydrology/HydrologyBakeManifest';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
 type HeightProviderKind = 'noise' | 'dem';
@@ -54,6 +66,12 @@ interface ModeDistributionReport {
     steepGroundEligiblePercent: number;
     averageBlend: number;
     maxBlend: number;
+  };
+  runtimeHydrologyClassification: {
+    enabled: boolean;
+    loaded: boolean;
+    signature: string | null;
+    biomeIds: string[];
   };
   vegetationRelativeDensity: VegetationDensityEntry[];
   flags: string[];
@@ -127,6 +145,20 @@ function addCount(map: Map<string, number>, key: string, amount = 1): void {
   map.set(key, (map.get(key) ?? 0) + amount);
 }
 
+function publicPathFromAssetUrl(assetUrl: string): string | null {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(assetUrl)) return null;
+  const relativePath = assetUrl.startsWith('/') ? assetUrl.slice(1) : assetUrl;
+  return join(process.cwd(), 'public', relativePath);
+}
+
+function readJsonFile(path: string): unknown {
+  return JSON.parse(readFileSync(path, 'utf-8')) as unknown;
+}
+
+function uniqueBiomeIds(...ids: string[]): string[] {
+  return [...new Set(ids)];
+}
+
 function toDistribution(map: Map<string, number>, total: number): DistributionEntry[] {
   return [...map.entries()]
     .map(([id, samples]) => ({
@@ -139,6 +171,76 @@ function toDistribution(map: Map<string, number>, total: number): DistributionEn
 
 function getDistributionPercent(entries: DistributionEntry[], id: string): number {
   return entries.find((entry) => entry.id === id)?.percent ?? 0;
+}
+
+function loadRuntimeHydrologyClassifier(config: GameModeConfig): ModeDistributionReport['runtimeHydrologyClassification'] & {
+  classifier: HydrologyBiomeClassifier | null;
+} {
+  const policy = config.hydrology?.biomeClassification;
+  if (policy?.enabled !== true) {
+    return {
+      enabled: false,
+      loaded: false,
+      signature: null,
+      biomeIds: [],
+      classifier: null,
+    };
+  }
+
+  const biomeIds = uniqueBiomeIds(policy.wetBiomeId, policy.channelBiomeId);
+  const manifestUrl = config.hydrology?.manifestUrl ?? HYDROLOGY_BAKE_MANIFEST_PATH;
+  const manifestPath = publicPathFromAssetUrl(manifestUrl);
+  if (!manifestPath || !existsSync(manifestPath)) {
+    return {
+      enabled: true,
+      loaded: false,
+      signature: null,
+      biomeIds,
+      classifier: null,
+    };
+  }
+
+  const manifest = parseHydrologyBakeManifest(readJsonFile(manifestPath));
+  const entry = selectHydrologyBakeEntry(manifest, {
+    modeId: config.id,
+    seed: typeof config.terrainSeed === 'number' ? config.terrainSeed : undefined,
+    allowSeededFallback: config.hydrology?.allowSeededFallback,
+  });
+  if (!entry) {
+    return {
+      enabled: true,
+      loaded: false,
+      signature: null,
+      biomeIds,
+      classifier: null,
+    };
+  }
+
+  const artifactUrl = resolveHydrologyAssetUrl(entry.hydrologyAsset, manifestUrl);
+  const artifactPath = publicPathFromAssetUrl(artifactUrl);
+  if (!artifactPath || !existsSync(artifactPath)) {
+    return {
+      enabled: true,
+      loaded: false,
+      signature: entry.signature,
+      biomeIds,
+      classifier: null,
+    };
+  }
+
+  const classifier = createHydrologyBiomeClassifier(parseHydrologyBakeArtifact(readJsonFile(artifactPath)), {
+    wetBiomeId: policy.wetBiomeId,
+    channelBiomeId: policy.channelBiomeId,
+    maxSlopeDeg: policy.maxSlopeDeg,
+  });
+
+  return {
+    enabled: true,
+    loaded: true,
+    signature: entry.signature,
+    biomeIds,
+    classifier,
+  };
 }
 
 function getJungleLikePercent(entries: DistributionEntry[]): number {
@@ -303,6 +405,7 @@ function analyzeMode(config: GameModeConfig): ModeDistributionReport {
   const { provider, kind, sampledSeed, slopeSampleDistance } = createHeightProvider(config);
   const defaultBiome = config.terrain.defaultBiome;
   const rules = config.terrain.biomeRules ?? [];
+  const hydrology = loadRuntimeHydrologyClassifier(config);
   const halfWorld = config.worldSize * 0.5;
   const inset = halfWorld * (SAMPLE_WORLD_INSET_PERCENT / 100);
   const minWorld = -halfWorld + inset;
@@ -330,7 +433,15 @@ function analyzeMode(config: GameModeConfig): ModeDistributionReport {
       const z = minWorld + ((maxWorld - minWorld) * iz) / (SAMPLE_GRID_SIZE - 1);
       const height = provider.getHeightAt(x, z);
       const slopeDeg = computeSlopeDeg(x, z, slopeSampleDistance, (sx, sz) => provider.getHeightAt(sx, sz));
-      const cpuBiome = classifyBiome(height, slopeDeg, rules, defaultBiome);
+      const baseCpuBiome = classifyBiome(height, slopeDeg, rules, defaultBiome);
+      const cpuBiome = classifyHydrologyBiome(
+        baseCpuBiome,
+        height,
+        slopeDeg,
+        x,
+        z,
+        hydrology.classifier,
+      );
       const materialBiome = classifyMaterialPrimary(height, slopeDeg, rules, defaultBiome);
       const cliffRockBlend = computeCliffRockAccentBlend(height, slopeDeg);
 
@@ -371,6 +482,12 @@ function analyzeMode(config: GameModeConfig): ModeDistributionReport {
   const flatJungleLikePercent = getJungleLikePercent(flatGroundMaterialDistribution);
   const flatHighlandPercent = getDistributionPercent(flatGroundMaterialDistribution, 'highland');
   const steepDenseJunglePercent = getDistributionPercent(steepGroundMaterialDistribution, 'denseJungle');
+  const dominantCpuBiome = cpuBiomeDistribution[0];
+  const hydrologyRuntimePercent = roundMetric(
+    getDistributionPercent(cpuBiomeDistribution, 'riverbank') +
+    getDistributionPercent(cpuBiomeDistribution, 'swamp'),
+  );
+  const bambooBiomePercent = getDistributionPercent(cpuBiomeDistribution, 'bambooGrove');
   const cliffRockAccent = {
     eligiblePercent: roundMetric((cliffRockEligibleSamples / samples) * 100, 2),
     steepGroundEligiblePercent: steepSamples > 0
@@ -404,9 +521,31 @@ function analyzeMode(config: GameModeConfig): ModeDistributionReport {
       `Steep-slope dense-jungle material share is ${steepDenseJunglePercent}% and cliff-rock accent eligibility is ${cliffRockAccent.steepGroundEligiblePercent}%.`,
     );
   }
+  if (hydrology.enabled && !hydrology.loaded) {
+    flags.push('runtime-hydrology-classifier-missing');
+    findings.push(`${config.id} has hydrology biome classification enabled but the audit could not load its baked mask artifact.`);
+  }
   if (bambooPercent > 20) {
     flags.push('bamboo-density-dominance-risk');
     findings.push(`Estimated bamboo relative vegetation density is ${bambooPercent}%.`);
+  }
+  if (config.id === 'a_shau_valley') {
+    if ((dominantCpuBiome?.percent ?? 0) > 90) {
+      flags.push('a-shau-uniform-biome-risk');
+      findings.push(`A Shau dominant CPU biome is ${dominantCpuBiome?.percent ?? 0}%, so vegetation will read too uniformly.`);
+    }
+    if (hydrologyRuntimePercent < 1) {
+      flags.push('a-shau-hydrology-runtime-missing');
+      findings.push(`A Shau runtime riverbank/swamp hydrology coverage is only ${hydrologyRuntimePercent}%.`);
+    }
+    if (bambooBiomePercent < 0.5) {
+      flags.push('a-shau-bamboo-pocket-missing');
+      findings.push(`A Shau bamboo grove biome coverage is only ${bambooBiomePercent}%.`);
+    }
+    if (bambooBiomePercent > 8) {
+      flags.push('a-shau-bamboo-pocket-too-broad');
+      findings.push(`A Shau bamboo grove biome coverage is ${bambooBiomePercent}%, which risks a broad bamboo belt.`);
+    }
   }
   if (config.terrainSeed === 'random') {
     flags.push('random-seed-mode-sampled-with-fixed-fallback');
@@ -429,6 +568,12 @@ function analyzeMode(config: GameModeConfig): ModeDistributionReport {
     flatGroundMaterialDistribution,
     steepGroundMaterialDistribution,
     cliffRockAccent,
+    runtimeHydrologyClassification: {
+      enabled: hydrology.enabled,
+      loaded: hydrology.loaded,
+      signature: hydrology.signature,
+      biomeIds: hydrology.biomeIds,
+    },
     vegetationRelativeDensity,
     flags,
     findings,
@@ -458,8 +603,10 @@ function buildReport(): TerrainDistributionAudit {
       notes: [
         'This is a static rule/material projection audit, not a screenshot proof.',
         'Terrain-flow stamps, feature surface patches, weather wetness, and runtime fog are not applied.',
-        'CPU biome distribution estimates vegetation palettes; material primary distribution mirrors the terrain shader rule weights.',
+        'CPU biome distribution estimates vegetation palettes after runtime hydrology mask overrides when a baked hydrology classifier is enabled.',
+        'Material primary distribution mirrors base terrain shader rule weights before shader-side hydrology mask blending.',
         'Clustered vegetation types use approximate static coverage estimates; screenshots/runtime captures remain the authority for visual density.',
+        'A Shau riverbank/swamp CPU percentages now come from the baked hydrology mask instead of broad DEM lowland proxy rules.',
         'Cliff-rock accent metrics estimate the shader overlay that can use moss-tinted rocky texture on steep slopes without making highland the primary ground biome.',
         'Use this to choose a KB-TERRAIN branch; final acceptance still needs Open Frontier/A Shau screenshots and perf deltas.',
       ],
@@ -472,7 +619,7 @@ function buildReport(): TerrainDistributionAudit {
     },
     modes,
     recommendation: {
-      nextBranch: 'Adjust terrain material rules so traversable ground reads jungle-like, then separately tune vegetation scale/density after screenshot review.',
+      nextBranch: 'Adjust terrain material and vegetation community rules so traversable ground reads jungle-like while A Shau gains hydrology-biased palm/understory pockets, limited bamboo groves, and non-uniform ground cover.',
       validationRequired: [
         'Before/after terrain distribution audit artifact.',
         'Ground-level and elevated Open Frontier/A Shau screenshots.',
@@ -505,7 +652,7 @@ function main(): void {
     const flatJungle = getJungleLikePercent(mode.flatGroundMaterialDistribution);
     const bamboo = mode.vegetationRelativeDensity.find((entry) => entry.id === 'bambooGrove')?.percent ?? 0;
     console.log(
-      `- ${mode.id}: materialJungleLike=${materialJungle}%, flatJungleLike=${flatJungle}%, cliffRockSteepEligible=${mode.cliffRockAccent.steepGroundEligiblePercent}%, bambooDensity=${roundMetric(bamboo)}%, flags=${mode.flags.join(',') || 'none'}`,
+      `- ${mode.id}: materialJungleLike=${materialJungle}%, flatJungleLike=${flatJungle}%, cliffRockSteepEligible=${mode.cliffRockAccent.steepGroundEligiblePercent}%, hydrologyRuntime=${mode.runtimeHydrologyClassification.loaded ? mode.runtimeHydrologyClassification.biomeIds.join('/') : 'none'}, bambooDensity=${roundMetric(bamboo)}%, flags=${mode.flags.join(',') || 'none'}`,
     );
   }
 }

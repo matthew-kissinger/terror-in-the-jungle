@@ -65,8 +65,8 @@ export class HelicopterInteraction {
       return;
     }
 
-    // If player is in helicopter, don't show interaction prompt
-    if (this.playerController.isInHelicopter()) {
+    // If player is in any vehicle, don't show a competing entry prompt.
+    if (this.playerController.isInHelicopter() || this.playerController.isInFixedWing()) {
       this.clearInteractionPrompt();
       return;
     }
@@ -117,7 +117,7 @@ export class HelicopterInteraction {
       return;
     }
 
-    if (this.playerController.isInHelicopter()) {
+    if (this.playerController.isInHelicopter() || this.playerController.isInFixedWing()) {
       return;
     }
 

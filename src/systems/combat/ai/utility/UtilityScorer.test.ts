@@ -171,6 +171,53 @@ describe('UtilityScorer: integration with AIStateEngage', () => {
     expect(vc.state).toBe(CombatantState.ENGAGING)
   })
 
+  it('does not re-enter fire-and-fade while the cover-seek cooldown is active', () => {
+    engage.setUtilityScorer(new UtilityScorer([fireAndFadeAction]))
+    engage.setCoverBearingProbe(() => true)
+
+    const vc = createCombatant('vc', Faction.VC, new THREE.Vector3(10, 0, 0))
+    const target = createCombatant('target', Faction.US, new THREE.Vector3(-10, 0, 0))
+    vc.target = target
+    vc.lastHitTime = Date.now() - 500
+    vc.lastCoverSeekTime = Date.now() - 1000
+    vc.panicLevel = 0.9
+
+    tick(vc)
+
+    expect(vc.state).toBe(CombatantState.ENGAGING)
+    expect(vc.destinationPoint).toBeUndefined()
+  })
+
+  it('does not fire-and-fade when the threat is already in close range', () => {
+    engage.setUtilityScorer(new UtilityScorer([fireAndFadeAction]))
+    engage.setCoverBearingProbe(() => true)
+
+    const vc = createCombatant('vc', Faction.VC, new THREE.Vector3(10, 0, 0))
+    const target = createCombatant('target', Faction.US, new THREE.Vector3(0, 0, 0))
+    vc.target = target
+    vc.lastHitTime = Date.now() - 500
+    vc.panicLevel = 0.9
+
+    tick(vc)
+
+    expect(vc.state).toBe(CombatantState.ENGAGING)
+    expect(vc.destinationPoint).toBeUndefined()
+  })
+
+  it('does not enter legacy cover-seeking when the threat is already in close range', () => {
+    shouldSeekCover.mockReturnValue(true)
+    findNearestCover.mockReturnValue(new THREE.Vector3(14, 0, 0))
+
+    const vc = createCombatant('vc', Faction.VC, new THREE.Vector3(10, 0, 0))
+    const target = createCombatant('target', Faction.US, new THREE.Vector3(0, 0, 0))
+    vc.target = target
+
+    tick(vc)
+
+    expect(vc.state).toBe(CombatantState.ENGAGING)
+    expect(findNearestCover).not.toHaveBeenCalled()
+  })
+
   it('NVA does not fade at moderate pressure even with utility-AI on — commits harder than VC', () => {
     // After the doctrine-expansion pass, NVA opts in to utility-AI like every
     // faction, but its action-weight table damps fade/reposition and

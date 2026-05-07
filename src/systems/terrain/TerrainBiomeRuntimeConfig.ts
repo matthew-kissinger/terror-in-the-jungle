@@ -29,8 +29,9 @@ function getConfiguredBiomeIds(
 export function buildTerrainVegetationRuntimeConfig(
   defaultBiomeId: string,
   biomeRules: BiomeClassificationRule[],
+  extraBiomeIds: string[] = [],
 ): TerrainVegetationRuntimeConfig {
-  const biomeIds = getConfiguredBiomeIds(defaultBiomeId, biomeRules);
+  const biomeIds = getConfiguredBiomeIds(defaultBiomeId, biomeRules, extraBiomeIds);
   const biomePalettes = new Map<string, BiomeVegetationEntry[]>();
   for (const biomeId of biomeIds) {
     biomePalettes.set(biomeId, getBiome(biomeId).vegetationPalette);
@@ -42,8 +43,10 @@ export function buildTerrainBiomeMaterialConfig(
   assetLoader: AssetLoader,
   defaultBiomeId: string,
   biomeRules: BiomeClassificationRule[],
+  extraBiomeIds: string[] = [],
 ): TerrainBiomeMaterialConfig {
-  const orderedBiomes = getConfiguredBiomeIds(defaultBiomeId, biomeRules, ['highland']).map((biomeId) => getBiome(biomeId));
+  const orderedBiomes = getConfiguredBiomeIds(defaultBiomeId, biomeRules, [...extraBiomeIds, 'highland'])
+    .map((biomeId) => getBiome(biomeId));
 
   const biomeSlotById = new Map<string, number>();
   const layers = orderedBiomes.map((biome, index) => {

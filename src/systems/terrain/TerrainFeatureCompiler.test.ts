@@ -61,11 +61,12 @@ describe('compileTerrainFeatures', () => {
     expect(compiled.surfacePatches).toHaveLength(1);
     expect(compiled.vegetationExclusionZones).toHaveLength(1);
     expect(compiled.stamps[0].kind).toBe('flatten_circle');
-    if (compiled.stamps[0].kind === 'flatten_circle') {
-      expect(compiled.stamps[0].gradeRadius).toBe(compiled.stamps[0].outerRadius);
-      expect(compiled.stamps[0].gradeStrength).toBe(0);
-    }
     expect(compiled.surfacePatches[0].shape).toBe('circle');
+    if (compiled.surfacePatches[0].shape === 'circle' && compiled.stamps[0].kind === 'flatten_circle') {
+      expect(compiled.stamps[0].innerRadius).toBeGreaterThanOrEqual(compiled.surfacePatches[0].outerRadius);
+      expect(compiled.stamps[0].gradeRadius).toBeGreaterThan(compiled.stamps[0].outerRadius);
+      expect(compiled.stamps[0].gradeStrength).toBeGreaterThan(0);
+    }
     expect(compiled.vegetationExclusionZones[0].radius).toBe(13);
   });
 
@@ -155,12 +156,12 @@ describe('compileTerrainFeatures', () => {
       ],
     });
 
-    // runway + apron + 3 taxiway rects + 1 filler stamp + 1 envelope stamp
-    expect(compiled.stamps).toHaveLength(7);
+    // runway + 2 aprons + 3 taxiway rects + 1 filler stamp + 1 envelope stamp
+    expect(compiled.stamps).toHaveLength(8);
     expect(compiled.vegetationExclusionZones).toHaveLength(1);
-    expect(compiled.surfacePatches).toHaveLength(5);
+    expect(compiled.surfacePatches).toHaveLength(6);
     expect(compiled.surfacePatches.some((patch) => patch.shape === 'rect' && patch.surface === 'runway')).toBe(true);
-    expect(compiled.surfacePatches.filter((patch) => patch.shape === 'rect' && patch.surface === 'packed_earth').length).toBe(4);
+    expect(compiled.surfacePatches.filter((patch) => patch.shape === 'rect' && patch.surface === 'packed_earth').length).toBe(5);
     expect(compiled.stamps.every((stamp) => stamp.kind === 'flatten_capsule')).toBe(true);
     const runwayStamp = compiled.stamps.find((stamp) =>
       stamp.kind === 'flatten_capsule'

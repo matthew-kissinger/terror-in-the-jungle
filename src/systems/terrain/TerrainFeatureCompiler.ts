@@ -22,6 +22,7 @@ const DEFAULT_HELIPAD_FLAT_RADIUS = 8;
 const DEFAULT_HELIPAD_BLEND_RADIUS = 13;
 const DEFAULT_HELIPAD_SURFACE_OUTER_RADIUS = 12.5;
 const DEFAULT_HELIPAD_EXCLUSION_RADIUS = 13;
+const DEFAULT_HELIPAD_GRADE_STRENGTH = 0.42;
 const DEFAULT_FIREBASE_GRADE_STRENGTH = 0.35;
 const DEFAULT_VILLAGE_GRADE_STRENGTH = 0.2;
 const DEFAULT_AIRFIELD_GRADE_STRENGTH = 0.25;
@@ -112,7 +113,11 @@ function compileTerrainStamps(
   const circle = resolveCircleFootprint(feature);
   if (!circle) return [];
 
-  const innerRadius = terrain.flatRadius ?? Math.min(circle.radius, defaultFlatRadiusForFeature(feature));
+  const surfaceOuterRadius = resolveCircularSurfaceOuterRadius(feature);
+  const innerRadius = Math.max(
+    terrain.flatRadius ?? Math.min(circle.radius, defaultFlatRadiusForFeature(feature)),
+    surfaceOuterRadius ?? 0,
+  );
   const outerRadius = Math.max(innerRadius, terrain.blendRadius ?? Math.max(circle.radius, defaultBlendRadiusForFeature(feature)));
   const gradeRadius = resolveGradeRadius(feature, circle.radius, outerRadius);
   const gradeStrength = resolveGradeStrength(feature, terrain.gradeStrength, gradeRadius, outerRadius);
@@ -170,6 +175,14 @@ function compileSurfacePatch(feature: MapFeatureDefinition): TerrainSurfacePatch
     surface: surface.kind,
     priority: feature.terrain?.priority ?? defaultPriorityForFeature(feature),
   };
+}
+
+function resolveCircularSurfaceOuterRadius(feature: MapFeatureDefinition): number | null {
+  if (!feature.surface || !resolveCircleFootprint(feature)) {
+    return null;
+  }
+  const innerRadius = feature.surface.innerRadius ?? resolveCircleFootprint(feature)?.radius ?? 0;
+  return Math.max(innerRadius, feature.surface.outerRadius ?? defaultSurfaceOuterRadiusForFeature(feature));
 }
 
 function compileGeneratedSurfacePatches(feature: MapFeatureDefinition): TerrainSurfacePatch[] {
@@ -579,6 +592,7 @@ function resolveGradeRadius(feature: MapFeatureDefinition, footprintRadius: numb
     case 'road':
       return Math.max(outerRadius + footprintRadius * 0.75, footprintRadius * 2);
     case 'helipad':
+      return Math.max(outerRadius + footprintRadius * 1.5, footprintRadius * 3);
     default:
       return outerRadius;
   }
@@ -608,6 +622,7 @@ function resolveGradeStrength(
     case 'road':
       return DEFAULT_ROAD_GRADE_STRENGTH;
     case 'helipad':
+      return DEFAULT_HELIPAD_GRADE_STRENGTH;
     default:
       return 0;
   }

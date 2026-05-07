@@ -1,5 +1,301 @@
 Original prompt: we had an intern come in a really both things up recently - can you take sober look at all the code end to end and come up with a plan to right the wrongs and properly bring this engine back up to speed with latest tech, standards, practices, techniques, novel implementation and referring to docs and code and not assuming but validating. look at handoff perf harness and understand it could be a symptom of a larger system issue.
 
+2026-05-06 Projekt Objekt-143 KB-CULL vehicle interaction safety slice
+- Fixed a cross-vehicle prompt bug in `HelicopterInteraction`: helicopter
+  proximity and entry now suppress while the player is already in any vehicle,
+  not just while already in a helicopter. This prevents a competing helicopter
+  entry prompt/entry path while the player is riding a fixed-wing aircraft.
+- Added culling-safety behavior coverage for future vehicle work:
+  render-culled/invisible helicopters and fixed-wing aircraft remain
+  proximity-detectable and enterable when the player is on foot. This keeps
+  render visibility independent from gameplay interaction, which is required
+  before broader vehicle/HLOD culling or future drivable ground vehicles.
+- Validation: `npx vitest run
+  src/systems/helicopter/HelicopterInteraction.test.ts
+  src/systems/vehicle/FixedWingInteraction.test.ts
+  src/systems/vehicle/AirVehicleVisibility.test.ts --reporter=dot` PASS
+  (`16` tests), `npx tsc --noEmit --pretty false` PASS, and
+  `npm run build:perf` PASS.
+- Fresh completion audit remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T16-09-55-891Z/projekt-143-completion-audit/completion-audit.json`;
+  blockers remain KB-LOAD, broad KB-TERRAIN, broad KB-CULL, and
+  validation/release.
+- Refreshed Cycle 3 kickoff
+  `artifacts/perf/2026-05-06T16-54-35-084Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  now records the vehicle-interaction safety slice under KB-CULL while keeping
+  broad HLOD/vehicle-driving/vegetation culling open.
+- Non-claim: this is a scoped KB-CULL vehicle-interaction safety slice only.
+  It does not close broad HLOD/culling, parked-aircraft playtest coverage,
+  future ground-vehicle driving, matched runtime perf, or release parity.
+
+2026-05-06 Projekt Objekt-143 large foundation footprint hardening
+- Hardened the runtime placement solver against the owner-observed
+  building/vehicle foundation overhang risk. The warehouse GLB's scaled
+  horizontal footprint is about `17.5m` radius, while the old runtime solver
+  capped model footprint at `10m` and sampled terrain relief at `9.5m`; the
+  solver now allows large static placements up to `24m`, samples terrain out
+  to `18m`, and searches a wider `24m` large-prop flat candidate radius.
+- Tightened `scripts/projekt-143-terrain-placement-audit.ts` so generated
+  airfield placements use model-aware footprint proxies for known large
+  buildings and ground vehicles instead of the old single small-prop proxy.
+  Latest `npm run check:projekt-143-terrain-placement` PASS:
+  `artifacts/perf/2026-05-06T16-50-24-263Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  with `fail=0`, `warn=0`, default generated-placement footprint `8m`, and
+  max known generated-placement proxy `18m`.
+- Validation: `npx vitest run src/systems/world/WorldFeatureSystem.test.ts
+  src/systems/world/AirfieldLayoutGenerator.test.ts --reporter=dot` PASS
+  (`31` tests), `npx tsc --noEmit --pretty false` PASS,
+  `npm run build:perf` PASS, and `node --check
+  scripts/perf-active-driver.cjs` PASS.
+- Fresh completion audit:
+  `artifacts/perf/2026-05-06T15-53-08-933Z/projekt-143-completion-audit/completion-audit.json`.
+  Projekt remains `NOT_COMPLETE`: KB-LOAD, broad KB-TERRAIN, broad KB-CULL,
+  and validation/release remain blockers. This pass does not import Pixel
+  Forge building/vehicle GLBs, does not claim human foundation visual
+  acceptance, and does not certify future vehicle-driving surfaces.
+
+2026-05-06 Projekt Objekt-143 A Shau objective route-stall follow-up
+- Accepted a narrow strategy/follower movement fix for the A Shau
+  terrain-stall/backtracking pattern that remained after the objective-aware
+  active-driver pass. `WarSimulator` now keeps strategic spawns and final
+  formation slots inside objective shoulders, `StrategicDirector` uses bounded
+  disc scatter instead of full-radius square scatter for squad zone
+  assignments, and `CombatantMovementStates` makes followers own their leader
+  destination/hold position instead of falling through to enemy-base fallback
+  motion while close to the leader.
+- Runtime proof after the accepted patch:
+  `artifacts/perf/2026-05-06T15-32-02-870Z/summary.json` is A Shau OK with
+  measurement trust PASS and validation WARN only. It records `223` shots,
+  `44` hits, `10` kills, max stuck `1.2s`, `1` route no-progress reset, and
+  `21` terrain-stall/backtracking warnings. The warning shape is improved
+  versus the immediately prior scatter-only run at
+  `artifacts/perf/2026-05-06T15-27-27-070Z/summary.json`, which logged `44`
+  warnings with one combatant repeating `19` times; after the follower fix, no
+  combatant repeats more than `3` times.
+- Rejected a broad A Shau terrain-flow/trail-shoulder tweak. Diagnostic run
+  `artifacts/perf/2026-05-06T15-36-41-357Z/summary.json` stayed WARN with
+  `22` terrain-stall warnings, so the config change was reverted instead of
+  being carried as a fix.
+- Validation: focused movement/strategy/world/active-driver Vitest PASS
+  (`239` tests), `npx tsc --noEmit --pretty false` PASS, and
+  `npm run build:perf` PASS after reverting the rejected terrain-flow
+  experiment. Fresh completion audit:
+  `artifacts/perf/2026-05-06T15-42-48-513Z/projekt-143-completion-audit/completion-audit.json`.
+  Projekt remains `NOT_COMPLETE`: KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release remain blockers.
+
+2026-05-06 Projekt Objekt-143 objective-aware driver and culling owner-slice proof
+- Fixed the remaining harness-player objective/target plumbing that matched the
+  owner-observed pacing/twitch failure. `scripts/perf-active-driver.cjs` now
+  gates target locks against the current objective, so far perceived enemies do
+  not steal zone/objective routing, and a target that triggers route
+  no-progress gets an `8s` temporary cooldown instead of being reacquired on
+  the next tick. Added Vitest coverage for far-target objective preservation,
+  close visible target interruption, and target cooldown behavior.
+- Runtime proof after the fix:
+  Open Frontier `artifacts/perf/2026-05-06T15-09-39-654Z/summary.json`
+  completed OK with measurement trust PASS, validation WARN only, `112` shots,
+  `18` hits, `5` kills, `0` route no-progress resets, and max stuck `1.8s`.
+  A Shau `artifacts/perf/2026-05-06T15-11-14-529Z/summary.json` completed OK
+  with measurement trust PASS, validation WARN only, `210` shots, `30` hits,
+  `7` kills, `1` route no-progress reset, and max stuck `3.3s`.
+- The same runtime pair refreshed KB-CULL after the world static feature
+  frustum-sector visibility patch. `npm run check:projekt-143-culling-baseline`
+  PASS at
+  `artifacts/perf/2026-05-06T16-53-41-964Z/projekt-143-culling-owner-baseline/summary.json`.
+  Cycle 3 kickoff at
+  `artifacts/perf/2026-05-06T15-14-05-137Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  records the static-feature/visible-helicopter owner path as
+  `evidence_complete`: Open Frontier owner visible draw-call-like delta `-223`
+  and total renderer draw calls delta `-281`; A Shau owner visible
+  draw-call-like delta `-661` and total renderer draw calls delta `-392`.
+- Fresh completion audit:
+  `artifacts/perf/2026-05-06T15-14-35-828Z/projekt-143-completion-audit/completion-audit.json`.
+  Projekt remains `NOT_COMPLETE`. KB-CULL is now partial because broad HLOD,
+  vehicle interaction, static-cluster, and vegetation-distance policy remain
+  open, not because the selected static-owner slice lacks proof. KB-LOAD,
+  KB-TERRAIN, KB-CULL, and validation/release remain blockers.
+- Validation so far: `node --check scripts/perf-active-driver.cjs` PASS,
+  `npx vitest run scripts/perf-harness/perf-active-driver.test.js --reporter=dot`
+  PASS (`167` tests), `npm run build:perf` PASS before the perf pair, and the
+  three Projekt audits above PASS as scoped/NOT_COMPLETE evidence.
+
+2026-05-06 Projekt Objekt-143 default hydrology-backed vegetation classification
+- Advanced KB-TERRAIN without starting new GPU-heavy captures while other local
+  agents may be active. A Shau and Open Frontier now default-enable baked
+  hydrology cache preload plus hydrology-backed vegetation-biome
+  classification in `src/config/AShauValleyConfig.ts` and
+  `src/config/OpenFrontierConfig.ts`.
+- Hardened `ModeStartupPreparer`: hydrology cache fetch/parse failures now log
+  WARN and continue without the optional hydrology classifier instead of
+  blocking mode startup.
+- Added a terrain material consumer for the same hydrology masks:
+  `TerrainSurfaceRuntime` materializes wet/channel masks as a GPU texture,
+  `TerrainBiomeRuntimeConfig` can include hydrology-only biome slots, and
+  `TerrainMaterial` samples the mask to prefer wet/channel ground texture and
+  roughness blends.
+- Added `src/config/gameModeHydrology.test.ts` and a startup fallback test.
+  Focused validation passed:
+  `npx vitest run src/core/ModeStartupPreparer.test.ts src/config/gameModeHydrology.test.ts src/systems/terrain/hydrology/HydrologyBakeManifest.test.ts src/systems/terrain/VegetationScatterer.test.ts src/systems/terrain/TerrainSystem.test.ts`
+  (`43` tests), plus `npm run check:hydrology-bakes` PASS.
+- Runtime validation: `npm run build:perf` PASS. Short headed Open Frontier
+  hydrology-default startup/liveness proof
+  `artifacts/perf/2026-05-06T09-51-26-258Z/summary.json` is WARN with
+  measurement trust PASS, no browser errors, p99 `39.40ms`, heap peak growth
+  PASS `24.92MB`, and `26` shots / `9` hits. Short headed A Shau proof
+  `artifacts/perf/2026-05-06T09-52-17-998Z/summary.json` is WARN with
+  measurement trust PASS, no browser errors, p99 `26.60ms`, heap peak growth
+  `72.73MB`, `73` shots / `40` hits, and
+  active-driver diagnostic PASS at
+  `artifacts/perf/2026-05-06T09-52-17-998Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+- Refreshed static terrain checks:
+  `artifacts/perf/2026-05-06T09-51-07-413Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`
+  remains WARN on the broad existing elevation proxy, and
+  `artifacts/perf/2026-05-06T09-29-43-351Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+  remains WARN only for the random-seed AI Sandbox fallback.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T09-59-02-813Z/projekt-143-completion-audit/completion-audit.json`.
+  It now records `terrainHydrologyBakeLoaderStatus=default_mode_preload` and
+  `terrainHydrologyBiomeClassifierStatus=default_mode_vegetation_classifier`,
+  plus `terrainHydrologyMaterialMaskStatus=default_mode_material_mask`,
+  but remains `NOT_COMPLETE`. This closes only the default vegetation-mask and
+  terrain-material-mask wiring slice; water rendering/river meshes, visual
+  acceptance, KB-LOAD, broad KB-CULL, and release parity remain open.
+
+2026-05-06 Projekt Objekt-143 close-model culling and full-duration active-driver pair
+- Ran A Shau 20s first to check the post-fix active-driver shape:
+  `artifacts/perf/2026-05-06T09-01-40-612Z/summary.json`. It failed validation
+  only as diagnostic evidence: measurement trust PASS, movement/combat healthy,
+  but heap recovery failed at the end of the short window and shots warned.
+- A longer A Shau 60s proof before the culling patch passed as WARN at
+  `artifacts/perf/2026-05-06T09-03-39-765Z/summary.json`, with diagnostic PASS.
+  The matching Open Frontier 60s proof then exposed the next bottleneck at
+  `artifacts/perf/2026-05-06T09-06-03-544Z/summary.json`: measurement trust
+  PASS but validation FAIL on average frame `31.08ms`, p99 `65.90ms`, hitch50
+  `3.78%`, and close weapon/close GLB draw-call pressure.
+- Fixed the scoped KB-CULL cause in `CombatantRenderer`: close Pixel Forge NPC
+  body and weapon meshes now stay eligible for renderer frustum culling, with
+  missing bounding spheres computed, instead of forcing `frustumCulled=false`
+  on every close-model child.
+- Validation: `npx vitest run src/systems/combat/CombatantRenderer.test.ts`
+  PASS (`28` tests), `npm run typecheck` PASS, and `npm run build:perf` PASS.
+- Matched after evidence now gives full-duration active-driver liveness on the
+  rebuilt code:
+  Open Frontier `artifacts/perf/2026-05-06T09-09-45-715Z/summary.json`
+  validation WARN with measurement trust PASS, diagnostic PASS, p99 `47.90ms`,
+  hitch50 `0.04%`, heap peak growth `6.69MB`, `81` shots / `45` hits, max stuck
+  `0.8s`; A Shau
+  `artifacts/perf/2026-05-06T09-11-34-037Z/summary.json` validation WARN with
+  measurement trust PASS, diagnostic PASS, p99 `26.70ms`, hitch50 `0%`, heap
+  peak growth `27.81MB`, `171` shots / `95` hits, max stuck `0.7s`.
+- Non-claim: this accepts only active-driver liveness plus scoped close-model
+  frustum-culling evidence. KB-TERRAIN still needs hydrology/water, ground
+  cover/trail visual acceptance, and remaining NPC terrain-stall/backtracking
+  quality work. KB-CULL still needs broad HLOD/static-cluster/vehicle/
+  vegetation culling evidence.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T09-21-20-265Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE`; blockers are KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release.
+
+2026-05-06 Projekt Objekt-143 active-driver terrain/contact and combat-front proof
+- Fixed the retained active-driver runtime failure path after the rejected
+  path-planning experiments. `perf-capture.ts` now injects runtime helper code
+  as raw browser init-script content so samples no longer page-error on helper
+  references. `TerrainQueries.getEffectiveHeightAt()` now treats only
+  low/standable static support surfaces and explicit helipads as effective
+  ground; tall generic and dynamic collision bounds remain collision blockers
+  but no longer raise player ground. Open Frontier active-driver compression is
+  now player-anchored for long maps, capped to avoid dogpiling, and syncs
+  combatant logical positions with rendered anchors and the spatial grid.
+- Latest headed proof:
+  `artifacts/perf/2026-05-06T08-52-31-466Z/summary.json`. Measurement trust
+  PASS, validation WARN. Active gates PASS: `33` player shots, `19` hits,
+  `6` kills, max stuck `0.5s`, and `19` movement transitions. Runtime liveness
+  shows `playerBlockedByTerrain=0`, `collisionHeightDeltaAtPlayer=0`, and
+  movement debug `blockReason=none`. Diagnostic:
+  `artifacts/perf/2026-05-06T08-52-31-466Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  PASS.
+- Non-claim: this is active-driver liveness evidence, not Projekt completion or
+  KB-TERRAIN acceptance. The run is only 20s, Open Frontier only, and still
+  WARNs on average frame `26.37ms`, p99 `53.50ms`, hitch50 `0.94%`, and heap
+  peak growth `77.85MB`; A Shau route/nav quality and full-duration/soak proof
+  remain open.
+- Validation: `node --check scripts/perf-active-driver.cjs` PASS; focused
+  active-driver/diagnostic/terrain/player movement/controller Vitest suite PASS
+  (`256` tests); `npm run typecheck` PASS.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T08-59-52-107Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE`; blockers are KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release because the worktree is still uncommitted and not
+  production-verified.
+
+2026-05-06 Projekt Objekt-143 resource-free evidence pass
+- Opened the Pixel Forge vegetation candidate contact sheet for owner review in Edge:
+  `artifacts/perf/2026-05-06T04-17-12-580Z/projekt-143-vegetation-candidate-proof/candidate-contact-sheet.png`.
+  This still requires owner visual acceptance before any runtime import.
+- Refreshed KB-TERRAIN horizon proof after a fresh perf build:
+  `artifacts/perf/2026-05-06T04-23-14-080Z/projekt-143-terrain-horizon-baseline/summary.json`
+  PASS with 4/4 elevated screenshots, renderer/terrain/vegetation counters,
+  trusted Open Frontier/A Shau perf baselines, and 0 browser errors.
+- Refreshed KB-CULL deterministic proof and owner baseline:
+  `artifacts/perf/2026-05-06T16-53-34-384Z/projekt-143-culling-proof/summary.json`
+  PASS and
+  `artifacts/perf/2026-05-06T16-53-41-964Z/projekt-143-culling-owner-baseline/summary.json`
+  PASS.
+- Ran fresh resource-free large-mode captures:
+  Open Frontier `artifacts/perf/2026-05-06T04-27-07-950Z/summary.json`
+  and A Shau `artifacts/perf/2026-05-06T04-30-51-979Z/summary.json`.
+  Both have measurement trust PASS and validation WARN. Open Frontier warns on
+  p99 `45.40ms`, heap peak growth `66.23MB`, and shots below harness minimum;
+  A Shau warns on p99 `33.40ms`, heap peak growth `87.77MB`, and shots below
+  harness minimum. Both logs still show terrain-stall/backtracking noise, so
+  route/nav quality is not signed.
+- Refreshed kickoff and completion audit:
+  `artifacts/perf/2026-05-06T16-54-35-084Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  PASS and
+  `artifacts/perf/2026-05-06T05-53-50-518Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`. KB-OPTIK, KB-EFFECTS, KB-FORGE, and owner vegetation
+  specifics are PASS; KB-STRATEGIE browser capability probing, KB-LOAD,
+  KB-TERRAIN, KB-CULL, and validation/release remain blockers.
+- Refreshed static Projekt suite after excluding completion-audit tooling from
+  the WebGPU active-runtime scan:
+  `artifacts/perf/2026-05-06T05-53-35-745Z/projekt-143-evidence-suite/suite-summary.json`
+  PASS. Its KB-STRATEGIE step writes
+  `artifacts/perf/2026-05-06T05-53-35-718Z/webgpu-strategy-audit/strategy-audit.json`
+  with `activeWebgpuSourceMatches=0`; the platform capability probe remains
+  browser-deferred until the machine is quiet.
+
+2026-05-05 KB-OPTIK imposter view follow-up
+- Owner review rejected the runtime-equivalent NPC comparison because the close GLB faced camera with a weapon while the imposter showed a top-of-head/back-facing atlas view.
+- Root cause was TIJ sampling Pixel Forge `animated-octahedral-imposter` NPC atlases as yaw-only columns while hard-selecting the center row. The center row is the overhead/top view in this octahedral grid.
+- Added per-instance imposter view rows and an octahedral camera-direction selector for NPC imposters; updated the runtime review, expanded proof, and scale proof harnesses to use row-aware sampling.
+- New review packet: `artifacts/perf/2026-05-05T22-48-34-788Z/projekt-143-optik-human-review/index.html`. It remains `needs_human_decision`, not accepted.
+- Refreshed kickoff `artifacts/perf/2026-05-05T22-50-14-559Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json` is WARN with KB-OPTIK still `needs_decision`; completion audit `artifacts/perf/2026-05-05T22-50-24-059Z/projekt-143-completion-audit/completion-audit.json` is still `NOT_COMPLETE`.
+- Validation: `npx tsc --noEmit --pretty false` PASS; `npx vitest run src/systems/combat/CombatantRenderer.test.ts src/systems/combat/CombatantMeshFactory.test.ts` PASS (`45` tests).
+
+2026-05-05 KB-OPTIK silhouette/coverage audit
+- Added code-measured alpha-mask alignment to `scripts/projekt-143-optik-runtime-review.ts`; the review now writes close/imposter silhouette crops plus red/cyan/white overlays.
+- New review packet: `artifacts/perf/2026-05-05T22-55-48-974Z/projekt-143-optik-human-review/index.html`.
+- All four faction pairs now use the same canonical front octahedral tile `3,0`; the earlier per-faction view skew was caused by using actor x-offset with an orthographic review camera.
+- Metrics confirm the remaining mismatch is width/coverage, not height: mask IoU `0.5084-0.5366`, height ratio `0.9639-0.98`, imposter opaque area ratio `1.8253-1.8592`, and visible width ratio `1.6818-1.7667`.
+- Biggest residual alignment offsets: VC centroid delta `19.38px`, NVA bbox-center delta `13.24px` in the `512px` audit crop.
+- Validation: `npx tsc --noEmit --pretty false` PASS; combat renderer/mesh factory Vitest PASS; refreshed scale proof PASS; runtime LOD-edge expanded proof WARN on luma; kickoff `artifacts/perf/2026-05-05T22-56-45-502Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json` remains WARN; completion audit `artifacts/perf/2026-05-05T22-56-43-629Z/projekt-143-completion-audit/completion-audit.json` remains `NOT_COMPLETE`.
+
+2026-05-05 KB-OPTIK horizontal crop remediation
+- Root cause of the measured coverage mismatch was the runtime shader stretching Pixel Forge's tight horizontal crop to the full NPC billboard width. The fix keeps vertical crop behavior but expands the horizontal sampling window by `1.7x`.
+- Updated runtime/proof shader paths: `CombatantMeshFactory`, `projekt-143-optik-runtime-review`, `projekt-143-optik-expanded-proof`, and `projekt-143-optics-scale-proof`.
+- New review packet: `artifacts/perf/2026-05-05T23-01-30-992Z/projekt-143-optik-human-review/index.html`; it is open for human inspection.
+- Metrics improved materially: mask IoU `0.6143-0.8633`, height ratio `0.9639-0.98`, opaque area ratio `1.0717-1.0945`, visible width ratio `0.9886-1.0444`, max centroid delta `14.09px`, and max bbox-center delta `13.29px`.
+- Validation: `npx tsc --noEmit --pretty false` PASS; `npx vitest run src/systems/combat/CombatantRenderer.test.ts src/systems/combat/CombatantMeshFactory.test.ts` PASS (`45` tests); scale proof `artifacts/perf/2026-05-05T23-02-25-884Z/projekt-143-optics-scale-proof/summary.json` PASS; runtime LOD-edge expanded proof `artifacts/perf/2026-05-05T23-02-25-910Z/projekt-143-optik-expanded-proof/summary.json` WARN on luma; kickoff `artifacts/perf/2026-05-05T23-02-48-164Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json` WARN; completion audit `artifacts/perf/2026-05-05T23-02-46-377Z/projekt-143-completion-audit/completion-audit.json` remains `NOT_COMPLETE`.
+
+2026-05-05 KB-OPTIK VC luma pass
+- The remaining luma proof flags were isolated to VC; US/ARVN/NVA were already inside band.
+- Tuned only VC imposter parity values. Scale proof now PASS at `artifacts/perf/2026-05-05T23-05-39-582Z/projekt-143-optics-scale-proof/summary.json` with selected-lighting luma delta `-5.06%` to `-0.81%`.
+- Runtime LOD-edge expanded proof now PASS at `artifacts/perf/2026-05-05T23-05-39-578Z/projekt-143-optik-expanded-proof/summary.json` with luma delta `-9.44%` to `10.5%` and `0` flagged samples.
+- Final review packet: `artifacts/perf/2026-05-05T23-05-52-555Z/projekt-143-optik-human-review/index.html`; silhouette metrics remain mask IoU `0.6143-0.8633`, height ratio `0.9639-0.98`, opaque area ratio `1.0717-1.0945`, and visible width ratio `0.9886-1.0444`.
+- Validation: `npx tsc --noEmit --pretty false` PASS; `npx vitest run src/systems/combat/CombatantRenderer.test.ts src/systems/combat/CombatantMeshFactory.test.ts src/systems/combat/CombatantShaders.test.ts` PASS (`48` tests); kickoff `artifacts/perf/2026-05-05T23-06-21-567Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json` WARN because human visual review/explicit exception is still required; completion audit `artifacts/perf/2026-05-05T23-06-19-305Z/projekt-143-completion-audit/completion-audit.json` remains `NOT_COMPLETE`.
+
 2026-04-01
 - Validated the perf-harness freeze in the real browser path instead of assuming. Root cause is the same-document View Transition boundary used by `GameUI.hide()` during live-entry, not a generic Playwright/WebGL/rAF failure.
 - Added `src/ui/engine/UITransitions.ts` to centralize transition policy. Menu-only transitions still opt in when supported; live-entry always falls back to immediate DOM updates. `?uiTransitions=0|1` is available for diagnostics. Perf/sandbox default to no transitions.
@@ -2954,7 +3250,7 @@ TODO
   species present, and the NPC review package counted as `4` factions, `8`
   clips, and `32` impostor packages.
 - Refreshed Projekt evidence: `npm run check:projekt-143` PASS at
-  `artifacts/perf/2026-05-05T03-50-27-087Z/projekt-143-evidence-suite/suite-summary.json`;
+  `artifacts/perf/2026-05-06T05-27-42-111Z/projekt-143-evidence-suite/suite-summary.json`;
   `npm run check:projekt-143-cycle3-kickoff` WARN at
   `artifacts/perf/2026-05-05T03-50-28-671Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
   only for the existing KB-OPTIK near-stress visual-exception/human-review
@@ -3136,7 +3432,7 @@ TODO
   with expected `NOT_COMPLETE` because the working tree is uncommitted and
   KB-OPTIK/KB-LOAD/KB-TERRAIN/KB-CULL/release remain open. This is a narrow
   KB-LOAD startup/upload improvement, not Projekt completion or production
-  parity.
+ parity.
 
 2026-05-05 Projekt Objekt-143 banana-plant grounding follow-up
 - Checked the owner screenshot from Downloads and corrected the local
@@ -3208,3 +3504,2752 @@ TODO
 - This is a scoped KB-LOAD readiness/upload improvement. It does not close
   vegetation-normal visual review, broad texture policy, release, production
   parity, or Projekt Objekt-143 completion.
+
+2026-05-05 Projekt Objekt-143 KB-TERRAIN far-canopy and vegetation grounding proof
+- Added `npm run check:vegetation-grounding`, a source-alpha/runtime-size audit
+  over all active Pixel Forge vegetation imposters. The latest grounding audit
+  passed with `6` runtime species and `0` flagged species at
+  `artifacts/perf/2026-05-05T19-50-05-046Z/vegetation-grounding-audit/summary.md`.
+  This confirms the banana-plant grounding issue is not repeated by the other
+  active vegetation types under the current atlas/scale/y-offset contract.
+- Added per-mode terrain `farCanopyTint` policy and shader uniforms so Open
+  Frontier and A Shau can carry distant green canopy color through terrain
+  material and fog without changing terrain geometry or vegetation instance
+  counts. A Shau uses the stronger long-range fog tint because the elevated
+  DEM horizon otherwise still read as tan bare earth.
+- Fresh elevated horizon proof after the tint tuning passed at
+  `artifacts/perf/2026-05-05T19-32-42-944Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  Against the clean before artifact
+  `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`,
+  A Shau elevated far-band green ratio moved from `0.0266` to `0.5223`, and
+  A Shau high-oblique far-band green ratio moved from `0` to `0.2292`. Open
+  Frontier ground-band green ratios also improved while retaining renderer and
+  terrain telemetry.
+- Runtime/perf evidence is mixed. A Shau short capture
+  `artifacts/perf/2026-05-05T19-40-41-562Z/summary.json` completed with
+  measurement trust PASS, no browser errors, `129` shots, `58` hits, average
+  frame `7.40ms`, and WARN heap/p99 checks. Open Frontier short capture
+  `artifacts/perf/2026-05-05T19-36-31-245Z/summary.json` collected trusted
+  renderer samples but failed the active-combat validator because the harness
+  driver stayed in `ADVANCE`, recorded `0` shots / `0` hits, and had `216`
+  waypoint replan failures. Treat that Open Frontier artifact as diagnostic,
+  not acceptance.
+- This is a scoped KB-TERRAIN visual/grounding candidate, not Projekt
+  completion. Open Frontier active-driver acceptance still needs a separate
+  harness/navigation fix or a deliberately documented capture policy change.
+
+2026-05-05 Projekt Objekt-143 vegetation grounding recheck
+- Re-ran `npm run check:vegetation-grounding` after the owner asked to make sure
+  there is nothing else like the half-buried light-green leaf asset. Fresh
+  artifact: `artifacts/perf/2026-05-05T20-22-50-292Z/vegetation-grounding-audit/summary.md`.
+  Result: PASS, `6` runtime species, `0` flagged species.
+- Confirmed there is no second active vegetation path bypassing the registry:
+  `GlobalBillboardSystem` filters biome palettes through `VEGETATION_TYPES`, and
+  `AssetLoader` foliage comes from the Pixel Forge manifest. `npm run
+  check:pixel-forge-cutover` passed, confirming retired/blocked/legacy foliage
+  is not in the runtime cutover path.
+- Focused validation passed with `19` tests:
+  `npx vitest run src\config\vegetationTypes.test.ts src\systems\terrain\ChunkVegetationGenerator.test.ts src\systems\world\billboard\GPUBillboardSystem.test.ts`.
+  Current conclusion: no other active vegetation species retains the severe
+  half-buried banana-plant profile.
+
+2026-05-05 Projekt Objekt-143 vegetation slope-guard recheck
+- Rechecked the grounding audit coverage after the owner asked to make sure
+  nothing else can reproduce the half-buried leaves on slopes. The active
+  source-alpha/base audit already passed, but random `fern`, `elephantEar`, and
+  `fanPalm` placements still had no explicit per-type slope guard, which left a
+  hillside clipping class open on A Shau's all-dense-jungle DEM slopes.
+- Added conservative slope caps for those random species: `fern <=24deg`,
+  `elephantEar <=22deg`, and `fanPalm <=30deg`; `bananaPlant` remains
+  `<=18deg`. Tightened `scripts/vegetation-grounding-audit.ts` so future random
+  ground-cover or mid-level vegetation fails the audit if it lacks the expected
+  slope guard.
+- Validation: `npx vitest run src/config/vegetationTypes.test.ts src/systems/terrain/ChunkVegetationGenerator.test.ts`
+  passed with `19` tests, `npm run check:vegetation-grounding` passed at
+  `artifacts/perf/2026-05-05T20-50-50-316Z/vegetation-grounding-audit/summary.md`,
+  `npm run validate:fast` passed with `254` files / `3890` tests, and
+  `git diff --check` passed with CRLF warnings only.
+
+2026-05-05 Projekt Objekt-143 KB-LOAD close-GLB residency follow-up
+- Reworked Pixel Forge close-NPC GLB pools from one-shot `40` model creation per
+  faction to demand-sized residency: each pool now seeds `8` models, grows in
+  `4` model batches only when hard-close demand exhausts available instances,
+  and keeps close overflow visible as impostors while the pool can still grow.
+  The per-faction hard cap remains `40`.
+- Added renderer coverage for the new contract: eager pools seed only the
+  initial demand size, close overflow remains visible as impostors while top-up
+  is queued, and suppression only occurs after the per-faction hard cap is
+  reached. Focused renderer validation passed with `27` tests.
+- Validation passed:
+  - `npx vitest run src\systems\combat\CombatantRenderer.test.ts`
+  - `npx vitest run src\systems\combat\CombatantSystem.test.ts src\systems\combat\CombatantMeshFactory.test.ts src\systems\combat\PixelForgeNpcRuntime.test.ts`
+  - `npm run typecheck -- --pretty false`
+  - `git diff --check`
+  - `npm run build:perf`
+  - `npm run validate:fast` (`254` files, `3888` tests)
+- Open Frontier 120 NPC short capture after the change passed validation at
+  `artifacts/perf/2026-05-05T20-10-35-267Z/summary.json` with overall WARN:
+  measurement trust PASS, `99` shots, `37` hits, average frame `10.27ms`, heap
+  end-growth `12.17MiB` PASS, heap peak-growth `36.97MiB` WARN. Compared with
+  the failing refreshed-before artifact
+  `artifacts/perf/2026-05-05T19-57-55-371Z/summary.json`, heap peak-growth fell
+  from `149.54MiB` FAIL and close residency dropped from `1080` close-NPC meshes
+  plus `7000` weapon meshes to `224` close-NPC meshes plus `1400` weapon meshes.
+- A Shau 60 NPC short capture passed validation at
+  `artifacts/perf/2026-05-05T20-15-48-568Z/summary.json` with overall WARN:
+  measurement trust PASS, `210` shots, `105` hits, average frame `5.79ms`, p99
+  `18.30ms` PASS, heap end-growth `-17.29MiB` PASS, heap peak-growth
+  `49.76MiB` WARN.
+- This closes the specific Open Frontier heap-peak FAIL caused by close
+  NPC/weapon pool residency, but it is not Projekt completion. Residual WARNs
+  remain, and the formal Projekt audit still needs to be rerun after this
+  evidence.
+
+2026-05-05 Projekt Objekt-143 close-pool evidence routing correction
+- Updated the Cycle 3 kickoff and completion audit scripts so the close
+  NPC/weapon pool-residency slice is no longer incorrectly described as
+  diagnostic-only. Fresh kickoff artifact:
+  `artifacts/perf/2026-05-05T20-29-10-030Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  It records the scoped close-pool residency status as `evidence_complete`
+  using the trusted failing-before Open Frontier capture
+  `artifacts/perf/2026-05-05T19-57-55-371Z/summary.json`, trusted Open
+  Frontier after capture
+  `artifacts/perf/2026-05-05T20-10-35-267Z/summary.json`, and trusted A Shau
+  after capture
+  `artifacts/perf/2026-05-05T20-15-48-568Z/summary.json`.
+- Re-ran the completion audit at
+  `artifacts/perf/2026-05-05T20-29-15-202Z/projekt-143-completion-audit/completion-audit.json`.
+  Result remains `NOT_COMPLETE`: KB-OPTIK still needs the near-stress visual
+  decision/human review, KB-LOAD/KB-TERRAIN/KB-CULL remain broader partial
+  targets, and validation/release remains failed because the tree is local,
+  dirty, unpushed, and undeployed.
+- Validation for this verifier-only correction: `npm run typecheck -- --pretty
+  false` PASS.
+
+2026-05-05 Projekt Objekt-143 KB-OPTIK human-review packet
+- Created a browser-review packet for the remaining KB-OPTIK owner decision at
+  `artifacts/perf/2026-05-05T20-31-49-687Z/projekt-143-optik-human-review/index.html`,
+  with machine-readable state in
+  `artifacts/perf/2026-05-05T20-31-49-687Z/projekt-143-optik-human-review/review-summary.json`.
+  The packet compares runtime LOD-edge pairs against the flagged 8.5m
+  near-stress perspective pairs so the decision can be made from visible close
+  GLB/imposter screenshots instead of the too-dark contact-sheet thumbnails.
+- Wired the review-summary artifact into the Cycle 3 kickoff and completion
+  audit scripts. Fresh kickoff:
+  `artifacts/perf/2026-05-05T20-33-51-778Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Fresh completion audit:
+  `artifacts/perf/2026-05-05T20-33-57-297Z/projekt-143-completion-audit/completion-audit.json`.
+  Result remains `NOT_COMPLETE` because the review state is still
+  `needs_human_decision`, not an accepted exception.
+- Validation: `npm run typecheck -- --pretty false` PASS.
+
+2026-05-05 Projekt Objekt-143 KB-OPTIK human-review rejection
+- Owner rejected the current KB-OPTIK human-review packet as a wrong comparison:
+  the close GLB side is a T-pose/weaponless crop while the impostor side is a
+  posed atlas/runtime frame with top-of-head/weapon visibility. Generated the
+  invalidation artifact at
+  `artifacts/perf/2026-05-05T22-00-33-358Z/projekt-143-optik-human-review/review-summary.json`
+  with browser HTML at
+  `artifacts/perf/2026-05-05T22-00-33-358Z/projekt-143-optik-human-review/index.html`.
+  It records `status: invalid_runtime_comparison` and
+  `comparisonBasis: separate_transparent_crops`, and it invalidates the earlier
+  `2026-05-05T20-31-49-687Z` packet for acceptance.
+- Hardened the Cycle 3 kickoff and completion audit so accepted human review
+  now requires `comparisonBasis: runtime_equivalent_same_scene` or
+  `owner_explicit_exception`. Fresh kickoff:
+  `artifacts/perf/2026-05-05T22-01-25-069Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Fresh completion audit:
+  `artifacts/perf/2026-05-05T22-01-35-069Z/projekt-143-completion-audit/completion-audit.json`.
+  Result remains `NOT_COMPLETE`; KB-OPTIK is explicitly blocked on a
+  runtime-equivalent same-scene review packet or owner exception.
+- Validation: `npm run check:projekt-143-optik-human-review` no-op PASS after
+  artifact creation, `npx tsc --noEmit --pretty false` PASS,
+  `npm run check:projekt-143-cycle3-kickoff` WARN as expected, and
+  `npm run check:projekt-143-completion-audit` NOT_COMPLETE as expected.
+
+2026-05-05 Projekt Objekt-143 KB-OPTIK runtime-equivalent review packet
+- Added `scripts/projekt-143-optik-runtime-review.ts` and package script
+  `npm run check:projekt-143-optik-runtime-review`. The new harness generates a
+  replacement human-review packet instead of reusing the rejected T-pose crop
+  packet.
+- Fresh packet:
+  `artifacts/perf/2026-05-05T22-19-43-527Z/projekt-143-optik-human-review/review-summary.json`
+  with browser HTML at
+  `artifacts/perf/2026-05-05T22-19-43-527Z/projekt-143-optik-human-review/index.html`
+  and contact sheet at
+  `artifacts/perf/2026-05-05T22-19-43-527Z/projekt-143-optik-human-review/runtime-equivalent-contact-sheet.png`.
+  It records `status: needs_human_decision` and
+  `comparisonBasis: runtime_equivalent_same_scene`.
+- Pairing contract: same faction, `walk_fight_forward` clip, pose progress
+  `0.35`, frame `2`, target height, crop map, camera, lighting, and runtime
+  weapon socket basis. The close GLB side is animated and weaponed (`hasWeapon:
+  true` for all four factions); the imposter side uses the runtime shader/crop
+  contract. The packet has `0` page errors, `0` request errors, `0` console
+  errors, and `0` load errors.
+- Hardened the invalidation command so `npm run
+  check:projekt-143-optik-human-review` no-ops while a runtime-equivalent
+  packet is pending owner decision, unless explicitly run with `--force`.
+- Fresh kickoff and completion audit now point at the runtime-equivalent packet:
+  `artifacts/perf/2026-05-05T22-20-39-336Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  and
+  `artifacts/perf/2026-05-05T22-20-53-273Z/projekt-143-completion-audit/completion-audit.json`.
+  Result remains `NOT_COMPLETE`; KB-OPTIK is blocked on owner visual decision
+  or explicit exception, not on missing comparison evidence.
+- Validation: `npm run check:projekt-143-optik-runtime-review` PASS,
+  `npm run check:projekt-143-optik-human-review` no-op PASS,
+  `npx tsc --noEmit --pretty false` PASS, kickoff WARN as expected, and
+  completion audit NOT_COMPLETE as expected.
+
+2026-05-05 Projekt Objekt-143 KB-TERRAIN evidence routing correction
+- Updated the Cycle 3 kickoff and completion audit scripts to separate
+  completed KB-TERRAIN sub-slices from still-open terrain acceptance. Fresh
+  kickoff:
+  `artifacts/perf/2026-05-05T20-37-51-175Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Fresh completion audit:
+  `artifacts/perf/2026-05-05T20-37-56-912Z/projekt-143-completion-audit/completion-audit.json`.
+- The kickoff now records three scoped terrain sub-slices as
+  `evidence_complete`:
+  - far-canopy tint before/after evidence from
+    `artifacts/perf/2026-05-04T00-02-01-922Z/projekt-143-terrain-horizon-baseline/summary.json`
+    to
+    `artifacts/perf/2026-05-05T19-32-42-944Z/projekt-143-terrain-horizon-baseline/summary.json`,
+    with green-ratio deltas: Open Frontier elevated ground `+0.6489`, Open
+    Frontier high-oblique ground `+0.2598`, A Shau elevated far band `+0.4957`,
+    and A Shau high-oblique far band `+0.2292`.
+  - runtime vegetation grounding from
+    `artifacts/perf/2026-05-05T20-22-50-292Z/vegetation-grounding-audit/summary.json`
+    with `6` runtime species and `0` flagged species.
+  - small-palm retirement and ground-cover direction from
+    `artifacts/perf/2026-05-05T03-23-29-111Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`
+    with `6` runtime vegetation species, `1` retired species, `0` missing
+    assets, `5` Pixel Forge ground-cover candidates, and `4`
+    trail/cleared-surface texture candidates.
+- The overall KB-TERRAIN target deliberately remains `ready_for_branch`, not
+  complete. Open items remain A Shau route/nav quality while terrain-stall or
+  backtracking warnings exist, runtime acceptance of new ground-cover/trail
+  assets, and human visual review for final far-horizon art direction.
+- Validation: `npm run typecheck -- --pretty false` PASS and `git diff
+  --check` PASS with CRLF warnings only.
+
+2026-05-05 Projekt Objekt-143 KB-LOAD manifest-normal cleanup evidence
+- Kept the KB-LOAD vegetation normal-map cleanup scoped: hemisphere-only
+  ground-cover normal maps are now omitted from `PIXEL_FORGE_TEXTURE_ASSETS`,
+  and the GPU billboard path only fetches normal textures for `normal-lit`
+  vegetation. This removes unused startup-manifest entries for hemisphere
+  ground cover without changing the normal-lit mid/canopy assets.
+- Fresh post-build startup captures:
+  - Open Frontier:
+    `artifacts/perf/2026-05-05T22-06-32-013Z/startup-ui-open-frontier/summary.json`
+    averaged `3405.7ms` mode-click-to-playable, `2607ms`
+    deploy-click-to-playable, `526ms` WebGL upload total, `55.633ms` average
+    max upload, and `143` upload calls.
+  - Zone Control:
+    `artifacts/perf/2026-05-05T22-05-09-285Z/startup-ui-zone-control/summary.json`
+    averaged `1897ms` mode-click-to-playable, `1269.7ms`
+    deploy-click-to-playable, `439.067ms` WebGL upload total, `39.867ms`
+    average max upload, and `110` upload calls.
+  - Both captures recorded `0` page errors and `0` request errors.
+  - The prior Open Frontier run at
+    `artifacts/perf/2026-05-05T22-04-19-550Z/startup-ui-open-frontier/summary.json`
+    is retained as diagnostic only because one fanPalm color upload spiked to
+    `3594.5ms`; the immediate rerun did not reproduce that stall.
+- Re-ran kickoff/completion after the fresh startup captures:
+  `artifacts/perf/2026-05-05T22-07-22-437Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  and
+  `artifacts/perf/2026-05-05T22-07-31-863Z/projekt-143-completion-audit/completion-audit.json`.
+  Result remains `NOT_COMPLETE`; KB-LOAD is still `ready_for_branch`, not
+  `evidence_complete`, because this proves no observed startup regression for
+  the cleanup rather than a closed texture policy.
+- Validation: `npm run build` PASS, targeted Vitest
+  `src/config/vegetationTypes.test.ts`
+  `src/systems/world/billboard/GPUBillboardSystem.test.ts` PASS (`17` tests),
+  and `npm run check:pixel-forge-cutover` PASS.
+
+2026-05-05 Projekt Objekt-143 KB-CULL owner-path comparison refresh
+- Added current owner-path comparison details to the Cycle 3 kickoff so KB-CULL
+  can distinguish scoped accepted slices from diagnostic-only owner telemetry.
+  Fresh kickoff:
+  `artifacts/perf/2026-05-05T20-40-41-011Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Fresh completion audit:
+  `artifacts/perf/2026-05-05T20-40-46-740Z/projekt-143-completion-audit/completion-audit.json`.
+- Result: the selected static-feature/visible-helicopter owner path remains
+  `diagnostic_only` in the latest comparison. Against the latest clean owner
+  baseline
+  `artifacts/perf/2026-05-04T13-54-40-532Z/projekt-143-culling-owner-baseline/summary.json`,
+  the current owner-path artifact
+  `artifacts/perf/2026-05-05T17-32-39-529Z/projekt-143-culling-owner-baseline/summary.json`
+  improves A Shau owner draw-call-like by `-57` and A Shau total draw calls by
+  `-512`, but Open Frontier owner draw-call-like regresses by `+9` and total
+  draw calls by `+13`. That does not meet the matched two-mode acceptance rule.
+- This does not undo the earlier static-feature/parked-helicopter work; it
+  keeps the current formal closeout honest. KB-CULL still has the close
+  NPC/weapon pool residency slice accepted, but broad HLOD/static-feature/
+  vehicle/vegetation culling remains open.
+
+2026-05-05 Projekt Objekt-143 validation refresh
+- Fresh local validation after the vegetation, KB-LOAD, KB-TERRAIN, KB-CULL,
+  and audit-routing changes:
+  - `npm run validate:fast` PASS: Pixel Forge cutover, NPC crop check,
+    typecheck, lint, and `254` Vitest files / `3888` tests.
+  - `npm run build` PASS: prebuild navmesh manifest check skipped regeneration
+    because all `14` prebaked assets matched, production Vite build completed,
+    and `dist/asset-manifest.json` was written for local SHA
+    `6e15e7a4d1c69d05546c7f43658313206e13766f`.
+  - `git diff --check` PASS with CRLF warnings only.
+- This improves the validation posture of the local stack but does not close
+  Projekt. The working tree remains dirty, `master` remains ahead of
+  `origin/master`, the KB-OPTIK human decision is still open, and production
+  parity has not been claimed.
+
+2026-05-05 Projekt Objekt-143 KB-CULL current-tree refresh
+- Re-ran `npm run check:projekt-143-culling-baseline` against the current local
+  tree. Fresh artifact:
+  `artifacts/perf/2026-05-05T20-43-14-020Z/projekt-143-culling-owner-baseline/summary.json`.
+  The culling owner baseline passed and used the current trusted Open Frontier
+  capture
+  `artifacts/perf/2026-05-05T20-10-35-267Z/summary.json` plus the current
+  trusted A Shau capture
+  `artifacts/perf/2026-05-05T20-15-48-568Z/summary.json`.
+- Re-ran kickoff/completion after that refresh:
+  `artifacts/perf/2026-05-05T20-43-40-723Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  and
+  `artifacts/perf/2026-05-05T20-43-46-439Z/projekt-143-completion-audit/completion-audit.json`.
+- KB-CULL remains partial. The current selected static-feature/visible-helicopter
+  comparison is still `diagnostic_only`: A Shau owner draw-call-like improves
+  by `-57`, but Open Frontier owner draw-call-like remains `+9` versus the
+  latest clean owner baseline, and Open Frontier total draw calls are much
+  higher in the current capture. The close NPC/weapon pool residency slice
+  remains the only accepted KB-CULL sub-slice in the formal kickoff.
+
+2026-05-05 Projekt Objekt-143 vegetation grounding follow-up
+- Re-ran `npm run check:vegetation-grounding` after the owner asked to make
+  sure there was nothing else like the half-buried light-green leaf cluster.
+  Fresh artifact:
+  `artifacts/perf/2026-05-05T21-03-21-302Z/vegetation-grounding-audit/summary.json`.
+- Result: PASS across all `6` runtime Pixel Forge vegetation species with `0`
+  flagged species. The audit covers actual low-angle imposter alpha rows against
+  runtime size/y-offset and requires slope guards for random low/mid vegetation:
+  bambooGrove, fern, bananaPlant, fanPalm, elephantEar, and coconut are all
+  inside the visible-base window and guarded either by generator slope caps or
+  per-type caps.
+- Cross-check: `public/assets/pixel-forge/vegetation` only contains those six
+  active runtime folders, `GlobalBillboardSystem` filters mode biome palettes
+  through `VEGETATION_TYPES`, and `VegetationScatterer` forwards those active
+  types into `ChunkVegetationGenerator`; no second runtime vegetation path was
+  found for hidden/bypassing foliage.
+- Targeted validation passed:
+  `npx vitest run src/config/vegetationTypes.test.ts src/systems/terrain/ChunkVegetationGenerator.test.ts`
+  and
+  `npx vitest run src/systems/world/billboard/GPUBillboardSystem.test.ts src/systems/terrain/VegetationScatterer.test.ts`.
+
+2026-05-05 Projekt Objekt-143 KB-CULL sector-batching attempt
+- Tightened `scripts/projekt-143-culling-owner-baseline.ts` so a perf summary
+  with `measurementTrust=pass` is not accepted as certification evidence when
+  `summary.status === failed` or `validation.overall === fail`. This prevented
+  the failed Open Frontier capture
+  `artifacts/perf/2026-05-05T20-57-47-241Z/summary.json` from becoming a false
+  current culling baseline.
+- Added sector-level static-feature batching in `WorldFeatureSystem`: nearby
+  features are grouped into `700m` culling sectors, static placements are
+  optimized once per sector, and sector visibility uses feature-footprint bounds
+  instead of only a feature anchor. Targeted coverage:
+  `npx vitest run src/systems/world/WorldFeatureSystem.test.ts src/systems/assets/ModelDrawCallOptimizer.test.ts`
+  and `npx tsc --noEmit --pretty false` both pass.
+- Evidence for the `700m` sector candidate:
+  - deterministic culling proof PASS:
+    `artifacts/perf/2026-05-05T20-57-39-664Z/projekt-143-culling-proof/summary.json`
+  - Open Frontier standard capture WARN/pass-for-baseline:
+    `artifacts/perf/2026-05-05T21-11-01-263Z/summary.json`
+  - A Shau standard capture WARN/pass-for-baseline:
+    `artifacts/perf/2026-05-05T21-14-48-270Z/summary.json`
+  - current owner baseline PASS:
+    `artifacts/perf/2026-05-05T21-19-08-037Z/projekt-143-culling-owner-baseline/summary.json`
+- Result: this is useful but not a KB-CULL closeout. The current owner path
+  improves owner draw-call-like versus the latest clean baseline in both large
+  modes, but Open Frontier still regresses total renderer draw calls versus the
+  clean baseline (`811` after vs `587` clean-before), so formal kickoff keeps
+  KB-CULL at `ready_for_branch`, not `evidence_complete`:
+  `artifacts/perf/2026-05-05T21-19-35-304Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  Completion audit remains `NOT_COMPLETE`:
+  `artifacts/perf/2026-05-05T21-19-33-370Z/projekt-143-completion-audit/completion-audit.json`.
+- Negative evidence: a smaller `350m` sector was tested and rejected. It passed
+  targeted tests and deterministic proof
+  `artifacts/perf/2026-05-05T21-21-47-445Z/projekt-143-culling-proof/summary.json`,
+  but Open Frontier still peaked at `812` renderer draw calls and world static
+  owner draw-call-like regressed back to `337`, so the runtime constant was
+  restored to `700m`.
+
+2026-05-05 Projekt Objekt-143 docs and validation refresh
+- Updated `docs/PROJEKT_OBJEKT_143.md` so the top current-state ledger, KB-CULL
+  section, and Cycle 3 status point at the latest vegetation grounding,
+  culling owner-baseline, kickoff, and completion-audit artifacts instead of
+  older same-day evidence.
+- Rebuilt the perf bundle after restoring the sector size to `700m`:
+  `npm run build:perf` PASS.
+- Final local gates after the docs/culling refresh:
+  `npm run validate:fast` PASS with Pixel Forge cutover, NPC crop check,
+  typecheck, lint, and `254` Vitest files / `3891` tests; `git diff --check`
+  PASS with CRLF normalization warnings only.
+- Current owner-answer: the half-buried light-green floor-leaf issue is covered
+  by the banana-plant grounding/slope fix plus the all-active-species
+  grounding audit. No other active runtime vegetation path or active species was
+  found with that severe buried profile.
+
+2026-05-05 Projekt Objekt-143 KB-CULL close-pool residency routing fix
+- Updated `scripts/projekt-143-cycle3-kickoff.ts` so the close-NPC/weapon
+  residency slice uses the clean culling owner-baseline Open Frontier before
+  packet rather than whichever later Open Frontier capture happened to be the
+  latest heap failure. The earlier selector was too broad for the actual
+  residency requirement and could choose a failed after-branch diagnostic run.
+- Refreshed Cycle 3 kickoff:
+  `artifacts/perf/2026-05-05T22-32-15-489Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`.
+  The close-pool residency slice is now `evidence_complete` with the clean
+  before packet
+  `artifacts/perf/2026-05-04T11-35-07-274Z/summary.json`, Open Frontier after
+  `artifacts/perf/2026-05-05T21-11-01-263Z/summary.json`, and A Shau after
+  `artifacts/perf/2026-05-05T21-14-48-270Z/summary.json`.
+- Evidence deltas: hidden close-NPC draw-call-like moved `1360 -> 168`
+  Open Frontier and `1360 -> 104` A Shau; hidden weapon draw-call-like moved
+  `8480 -> 1032` Open Frontier and `8480 -> 664` A Shau. Both after captures
+  have measurement trust PASS, playable shot/hit checks PASS, and no heap
+  peak failure.
+- `npx tsc --noEmit --pretty false` PASS. Completion audit remains
+  `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-05T22-32-30-053Z/projekt-143-completion-audit/completion-audit.json`.
+  Broad KB-CULL is still open because the static-feature/visible-helicopter
+  owner path remains `diagnostic_only` on total renderer draw calls, and
+  KB-OPTIK/KB-LOAD/KB-TERRAIN/release gates remain open.
+
+2026-05-05 Projekt Objekt-143 A Shau route audit refresh
+- Re-ran `npm run check:projekt-143-terrain-routes`; fresh PASS artifact:
+  `artifacts/perf/2026-05-05T22-34-25-178Z/projekt-143-terrain-route-audit/terrain-route-audit.json`.
+  A Shau still reports `12` route paths, `52,504m` route length, `1,321`
+  route capsule stamps, `14` surface patches, and no static route-policy flags.
+- Targeted route test command
+  `npx vitest run src/systems/terrain/TerrainFeatureCompiler.test.ts src/systems/terrain/TerrainSurfaceRuntime.test.ts`
+  passed the available route compiler test file (`1` file, `9` tests). This is
+  a static route-policy refresh only; it does not close the A Shau runtime
+  route/nav quality item because the latest A Shau perf artifact still records
+  route-follow backtracking and low-progress movement telemetry.
+
+2026-05-05 Projekt Objekt-143 KB-OPTIK human-review caveat
+- Investigated the owner observation that the KB-OPTIK Human Review packet makes
+  impostors look like they are not in the same positions as the GLBs. The packet
+  is visually misleading: it shows separate transparent crop renders, not a
+  same-scene overlay, and the proof crop path renders the close GLB unanimated
+  and without its runtime weapon while the impostor is an idle atlas frame.
+- Runtime probe after the post-reveal close-model lazy-load window passed with
+  active close GLBs, weapon sockets present, and active animation clips:
+  `npx tsx scripts/probe-pixel-forge-npcs.ts --url
+  "http://127.0.0.1:5173/?sandbox=1&npcs=100&seed=2718&diag=1" --wait-ms 12000
+  --wait-for-close`. The generated summary is
+  `artifacts/pixel-forge-npc-probe/summary.json`; the screenshot is
+  `artifacts/pixel-forge-npc-probe/latest.png`.
+- Conclusion: this is not currently confirmed as an in-game anchor bug. It is a
+  KB-OPTIK evidence-quality problem. Do not accept the remaining KB-OPTIK human
+  decision from that old packet alone; regenerate or extend the review packet so
+  close GLB and impostor are compared with same-scene/runtime-equivalent pose,
+  animation, weapon, camera, and lighting.
+
+2026-05-05 Projekt Objekt-143 vegetation distribution/hydrology target
+- Folded the owner note into `docs/PROJEKT_OBJEKT_143.md`: A Shau vegetation
+  should not read as an evenly spaced mix of every active species everywhere.
+  KB-TERRAIN now explicitly needs a landscape-distribution pass, not only
+  density, grounding, and species inventory.
+- Target direction: bamboo grove/forest pockets, denser palm stands, palms and
+  understory biased by lowland/water-edge or hydrology proxies where
+  appropriate, trail-edge disturbed vegetation, and richer ground-cover
+  transitions instead of one uniform scatter field.
+- Acceptance implication: current static material distribution and vegetation
+  density audits do not close this. The path forward needs research into
+  Vietnam plant-community/hydrology placement, deterministic clustered
+  distribution audits, and before/after A Shau screenshots plus perf captures.
+
+2026-05-05 Projekt Objekt-143 KB-OPTIK owner acceptance
+- Owner accepted the refreshed runtime-equivalent same-scene KB-OPTIK review
+  packet at
+  `artifacts/perf/2026-05-05T23-13-35-420Z/projekt-143-optik-human-review/review-summary.json`
+  with `status: accepted_exception`. The accepted basis is the current `2.95m`
+  target, per-tile crop maps, runtime weapon/socket pose, selected/expanded luma
+  tuning, runtime LOD-edge proof, and in-browser visual inspection.
+- Caveat recorded in the ledger: do not destabilize the good-looking current
+  in-game state. Slight downward-facing bias or remaining imposter darkness is a
+  future proof-gated crop/view/rebake or lighting-parity pass, not a reason to
+  retune the accepted packet opportunistically.
+- Refreshed Cycle 3 kickoff:
+  `artifacts/perf/2026-05-05T23-57-30-245Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  marks KB-OPTIK `evidence_complete`. Completion audit
+  `artifacts/perf/2026-05-05T23-57-39-542Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` because KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release remain open.
+
+2026-05-05 Projekt Objekt-143 A Shau route endpoint inset follow-up
+- Runtime A Shau stall hotspots around Hill 937 showed route endpoints stopping
+  outside the capture footprint, forcing NPCs to leave smoothed trail stamps for
+  the final objective push. `TerrainFlowCompiler` now keeps home-base exits
+  conservative but ends non-home objective routes at `0.88 * zone.radius`.
+- Focused validation passed:
+  `npx vitest run src/systems/terrain/TerrainFeatureCompiler.test.ts src/systems/terrain/TerrainSurfaceRuntime.test.ts src/systems/combat/CombatantMovement.test.ts`;
+  `npm run check:projekt-143-terrain-routes` wrote
+  `artifacts/perf/2026-05-06T17-00-32-294Z/projekt-143-terrain-route-audit/terrain-route-audit.json`;
+  `npm run check:projekt-143-terrain-placement` wrote
+  `artifacts/perf/2026-05-05T23-32-34-928Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`.
+- Paired A Shau capture
+  `artifacts/perf/2026-05-05T23-32-48-770Z/summary.json` remains WARN: p99
+  `32.50ms`, heap end-growth `27.10MB`, heap peak-growth `59.05MB`, and `42`
+  terrain-stall warnings. It is still a narrow route-quality improvement, not
+  A Shau route/nav acceptance, even though waypoint replans improved `81 -> 40`
+  and waypoints followed improved `249 -> 317` against the previous
+ current-worktree run.
+
+2026-05-05 Projekt Objekt-143 A Shau vegetation distribution proxy
+- Implemented the owner-requested non-uniform A Shau distribution direction as
+  a first KB-TERRAIN candidate slice. `A_SHAU_VALLEY_CONFIG` now classifies
+  DEM low flats as `swamp`, lowland shoulders as `riverbank`, and flatter
+  low benches as limited `bambooGrove` pockets. The riverbank/swamp palettes
+  bias toward palms and understory (`fanPalm`, `coconut`, `elephantEar`,
+  `bananaPlant`) instead of using the same dense-jungle mix everywhere.
+- Added A Shau-specific distribution guardrails to
+  `scripts/projekt-143-terrain-distribution-audit.ts`: dominant-biome
+  uniformity, hydrology-proxy coverage, missing bamboo pocket, and overly broad
+  bamboo pocket checks. The audit notes these are DEM lowland proxies until a
+  real stream/hydrology layer exists.
+- Validation passed:
+  `npx vitest run src/systems/terrain/BiomeClassifier.test.ts src/systems/terrain/TerrainBiomeRuntimeConfig.test.ts src/config/vegetationTypes.test.ts src/systems/terrain/ChunkVegetationGenerator.test.ts`;
+  `npx tsc --noEmit --pretty false`;
+  `npm run check:projekt-143-terrain-distribution`; and
+  `npm run check:projekt-143-terrain-baseline`.
+- Evidence:
+  `artifacts/perf/2026-05-05T23-49-30-281Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`
+  passes for A Shau with CPU biome coverage `77.8%` denseJungle, `15.7%`
+  riverbank, `4.04%` bambooGrove, and `2.46%` swamp. The fresh elevated
+  screenshot baseline is
+  `artifacts/perf/2026-05-05T23-49-56-989Z/projekt-143-terrain-horizon-baseline/summary.json`.
+- Non-claim: this does not accept KB-TERRAIN. Individual vegetation is not
+  clearly reviewable from the elevated horizon shots, the linked perf baselines
+  are existing summaries rather than matched post-change full captures, and a
+  real stream/hydrology layer plus ground-level human visual review remain
+  needed before water-edge placement is final.
+- Refreshed routing artifacts after the docs update:
+  `artifacts/perf/2026-05-05T23-57-30-245Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  remains PASS with KB-TERRAIN `ready_for_branch`, and
+  `artifacts/perf/2026-05-05T23-57-39-542Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` because KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release are still blockers.
+
+2026-05-06 Projekt Objekt-143 noisy Open Frontier capture and banana albedo fix
+- Ran `npm run perf:capture:openfrontier:short` for post-distribution matched
+  perf evidence, but the artifact is rejected for acceptance:
+  `artifacts/perf/2026-05-06T00-00-32-485Z/summary.json`.
+  It failed validation on peak p99 (`100ms`), hitch >50ms percent (`4.35%`),
+  harness shots (`2`, min `60`), and harness hits (`1`, min `4`). Owner also
+  reported another web game test run was active on the same device during the
+  capture, so even diagnostic frame-time comparison is noisy.
+- Guarded future routing against that failure mode. `scripts/projekt-143-cycle3-kickoff.ts`
+  and `scripts/projekt-143-terrain-horizon-baseline.ts` now skip latest perf
+  summaries unless they are certification-grade: measurement trust passes,
+  validation is not fail, and top-level status is not `failed`. Refreshed
+  kickoff
+  `artifacts/perf/2026-05-06T00-08-41-043Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  correctly keeps using Open Frontier
+  `artifacts/perf/2026-05-05T21-21-55-999Z/summary.json` instead of the noisy
+  failed capture.
+- Fixed the owner-reported yellow-fruit plant color issue. The plant is
+  `bananaPlant`; its albedo atlas had cyan/blue lower-stem pixels baked into
+  `public/assets/pixel-forge/vegetation/bananaPlant/banana-tree-sean-tarrant/imposter.png`.
+  Recolored those stem pixels to green and visually inspected the atlas.
+- Added a regression to `src/config/vegetationTypes.test.ts` that loads the
+  banana plant atlas with `sharp` and requires `0` strong cyan-blue opaque stem
+  pixels. `npx vitest run src/config/vegetationTypes.test.ts` passes:
+  `1` file, `15` tests, no type errors. A direct pixel audit also reports
+  `strongCyan=0`.
+- Script-level TypeScript spot check passed after adding a missing
+  `measurementTrust.flags` type on the Cycle 3 grenade summary:
+  `npx tsc --noEmit --pretty false --ignoreConfig --skipLibCheck --target ES2021 --lib ES2021,DOM --module ESNext --moduleResolution bundler --allowImportingTsExtensions --esModuleInterop scripts/projekt-143-terrain-horizon-baseline.ts scripts/projekt-143-cycle3-kickoff.ts`.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T00-12-25-795Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`. Blockers are unchanged: KB-LOAD, KB-TERRAIN,
+  KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 static gate refresh after banana/selector work
+- Ran `npm run validate:fast`. First run passed Pixel Forge cutover, NPC crop
+  check, typecheck, and lint, then failed one timing-sensitive benchmark in
+  `src/systems/combat/SpatialOctree.test.ts`:
+  `octreeTime=127.57ms` was not under `linearTime * 5 = 102.09ms`.
+  Given the owner-reported concurrent web-game testing on this device, treated
+  that as a noisy timing signal rather than a confirmed octree regression.
+- Focused rerun `npx vitest run src/systems/combat/SpatialOctree.test.ts`
+  passed: `1` file, `18` tests, no type errors.
+- Full rerun `npm run validate:fast` then passed: Pixel Forge cutover PASS,
+  NPC crop map current, `tsc --noEmit` PASS, `eslint src/` PASS, and
+  `test:quick` PASS with `254` files / `3899` tests / no type errors.
+- Non-claim: this improves the local static validation state only. It does not
+  close KB-LOAD, KB-TERRAIN, KB-CULL, matched perf, visual acceptance,
+  commit/push, CI, deploy, or live production parity.
+- Refreshed completion audit after the successful static gate:
+  `artifacts/perf/2026-05-06T00-19-11-278Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`; blockers are KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release.
+- Ran build gates after static validation:
+  `npm run build` PASS and `npm run build:perf` PASS. Both wrote fresh asset
+  manifests (`dist/asset-manifest.json` and `dist-perf/asset-manifest.json`)
+  and only emitted the usual Vite chunk-size warning. This does not close
+  production parity because the stack remains dirty, unpushed, undeployed, and
+  missing the remaining bureau acceptances.
+- Latest completion audit after build gates:
+  `artifacts/perf/2026-05-06T00-21-32-194Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` with the same blockers.
+
+2026-05-06 Projekt Objekt-143 audit and vegetation-normal proof refresh
+- Refreshed the completion audit:
+  `artifacts/perf/2026-05-06T00-26-58-775Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE`. PASS items now include KB-OPTIK, KB-EFFECTS,
+  KB-FORGE, and owner vegetation specifics; blockers remain KB-LOAD,
+  KB-TERRAIN, KB-CULL, and validation/release.
+- Refreshed the KB-LOAD/OPTIK vegetation-normal visual proof after the banana
+  albedo cleanup with
+  `npm run check:projekt-143-vegetation-normal-proof -- --no-build`. Artifact:
+  `artifacts/perf/2026-05-06T00-28-10-228Z/projekt-143-vegetation-normal-proof/summary.json`;
+  contact sheet:
+  `artifacts/perf/2026-05-06T00-28-10-228Z/projekt-143-vegetation-normal-proof/contact-sheet.png`.
+- The proof captured `8/8` screenshots and `4/4` A/B pairs with renderer
+  stats, positive vegetation counters, and `0` browser/page/request failures,
+  but it remains WARN. The no-normal candidate visibly diverges from the
+  default path and exceeds the current review band, so vegetation normal-map
+  removal remains blocked on human visual acceptance.
+- Aligned `docs/PROJEKT_OBJEKT_143.md`,
+  `docs/PROJEKT_OBJEKT_143_HANDOFF.md`, and `docs/STATE_OF_REPO.md` to point at
+  the latest audit/proof paths and preserve the non-claim.
+- Reran the completion audit after the proof/docs refresh:
+  `artifacts/perf/2026-05-06T00-35-19-117Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE` with the same blockers: KB-LOAD, KB-TERRAIN,
+  KB-CULL, and validation/release.
+- Refreshed the routing chain once more after the latest visual proof:
+  `npm run check:projekt-143-cycle3-kickoff` PASS at
+  `artifacts/perf/2026-05-06T00-37-00-413Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  followed by completion audit
+  `artifacts/perf/2026-05-06T00-37-15-175Z/projekt-143-completion-audit/completion-audit.json`.
+  The audit remains `NOT_COMPLETE` with KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release as blockers.
+
+2026-05-06 Projekt Objekt-143 reusable hydrology branch/audit
+- Added a pure reusable hydrology bake core in
+  `src/systems/terrain/hydrology/HydrologyBake.ts` with focused behavior tests
+  in `src/systems/terrain/hydrology/HydrologyBake.test.ts`. The first slice
+  implements deterministic D8-style flow direction, optional epsilon-fill
+  depression routing, flow accumulation, percentile thresholds, and
+  wet-candidate classification over sampled height grids without touching
+  runtime renderer/terrain behavior.
+- Added `scripts/projekt-143-terrain-hydrology-audit.ts` and exposed it as
+  `npm run check:projekt-143-terrain-hydrology`. Initial A Shau-only artifact:
+  `artifacts/perf/2026-05-06T00-59-27-181Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`.
+  It is WARN because epsilon-filled A Shau DEM wet candidates cover `6.24%` of
+  sampled cells, current riverbank/swamp rules cover `67.91%` of those
+  candidates, `80.29%` of current hydrology-biome cells sit outside the DEM
+  wetness signal, and `16.65%` of wet candidates classify as `bambooGrove`.
+- Added `docs/PROJEKT_OBJEKT_143_HYDROLOGY.md` to fold the owner request into
+  KB-TERRAIN: bakeable hydrology should drive DEM masks, procedural Open
+  Frontier rivers, bank/wetland vegetation, trail crossings, carve stamps, and
+  future river rendering instead of another flat/global water shader.
+- Wired the hydrology audit into `scripts/projekt-143-cycle3-kickoff.ts` and
+  `scripts/projekt-143-completion-audit.ts`. Initial routing after the A
+  Shau-only audit:
+  `artifacts/perf/2026-05-06T00-59-52-623Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  PASS, followed by
+  `artifacts/perf/2026-05-06T01-00-10-338Z/projekt-143-completion-audit/completion-audit.json`
+  `NOT_COMPLETE`.
+- Validation: `npx vitest run src/systems/terrain/hydrology/HydrologyBake.test.ts`
+  PASS (`6` tests), and a focused TypeScript check over the hydrology audit,
+  kickoff/completion scripts, and bake module passed with no type errors before
+  the epsilon-fill follow-up. Final `npm run typecheck` PASS and
+  `git diff --check` PASS with only normal CRLF warnings after the docs refresh.
+- Non-claim: this does not change runtime vegetation/terrain yet, add water
+  rendering, close KB-TERRAIN, produce clean perf evidence, commit/push, deploy,
+  or claim production parity. The next implementation branch should add
+  breach/outlet policy plus cached DEM/procedural hydrology masks before
+  runtime ecology acceptance.
+
+2026-05-06 Projekt Objekt-143 Open Frontier hydrology audit extension
+- Extended `scripts/projekt-143-terrain-hydrology-audit.ts` so the same
+  epsilon-filled D8 bake audits both A Shau's DEM and Open Frontier's seeded
+  procedural `NoiseHeightProvider`. The top-level summary stays A Shau-shaped
+  for existing Cycle 3 consumers, while `scenarios.openFrontier` records the
+  reusable-map evidence.
+- Fresh audit:
+  `artifacts/perf/2026-05-06T01-07-29-962Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`.
+  A Shau remains WARN with `6.24%` wet candidates and `80.29%` of current
+  riverbank/swamp cells outside the DEM wetness signal. Open Frontier now
+  reports `2.47%` wet candidates, `62.62%` current riverbank coverage of those
+  candidates, and `78.68%` of current riverbank cells outside the generated
+  wetness signal.
+- Wired the Open Frontier hydrology summary into the Cycle 3 kickoff and
+  completion-audit inspected evidence. Fresh routing:
+  `artifacts/perf/2026-05-06T01-08-54-139Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  PASS, followed by
+  `artifacts/perf/2026-05-06T01-09-12-416Z/projekt-143-completion-audit/completion-audit.json`
+  `NOT_COMPLETE`.
+- Validation: `npm run typecheck` PASS after adding the multi-map audit fields.
+  This remains static/non-perf work only; no Open Frontier river rendering,
+  terrain carving, runtime vegetation change, perf claim, commit/push, deploy,
+  or production parity is claimed.
+
+2026-05-06 Projekt Objekt-143 reusable hydrology mask API
+- Added `createHydrologyMasks` to
+  `src/systems/terrain/hydrology/HydrologyBake.ts` so wet/channel mask
+  classification is a reusable bake API instead of script-local logic. The
+  A Shau/Open Frontier audit now consumes that API.
+- Added `extractHydrologyChannelPaths` to expose branch-start river graph
+  candidates from thresholded accumulation. Latest static metrics: A Shau has
+  `20` channel paths with a longest path of about `21.6km`; Open Frontier has
+  `27` channel paths with a longest path of about `2.8km`. The latest audit JSON
+  also includes bounded world-space `channelPolylines` for the top paths.
+- Focused validation:
+  `npx vitest run src/systems/terrain/hydrology/HydrologyBake.test.ts` PASS
+  with `9` tests; `npm run typecheck` PASS.
+- Fresh audit after the mask API kept the same static numbers and now writes
+  review masks:
+  `artifacts/perf/2026-05-06T02-48-23-154Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`,
+  `artifacts/perf/2026-05-06T02-48-23-154Z/projekt-143-terrain-hydrology-audit/a_shau_valley-hydrology-mask.png`,
+  and
+  `artifacts/perf/2026-05-06T02-48-23-154Z/projekt-143-terrain-hydrology-audit/open_frontier-hydrology-mask.png`.
+  Fresh routing:
+  `artifacts/perf/2026-05-06T01-47-55-375Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  PASS, followed by
+  `artifacts/perf/2026-05-06T01-51-03-227Z/projekt-143-completion-audit/completion-audit.json`
+  `NOT_COMPLETE`.
+- `git diff --check` PASS after docs alignment with only normal CRLF warnings.
+  Non-claim remains unchanged: no runtime hydrology/terrain/water change, no
+  perf acceptance, no commit/push/deploy, and no production parity.
+
+2026-05-06 Projekt Objekt-143 hydrology cache artifact contract
+- Added schema-v1 hydrology cache helpers in
+  `src/systems/terrain/hydrology/HydrologyBake.ts`:
+  `createHydrologyBakeArtifact`, `materializeHydrologyMasksFromArtifact`, and
+  world-position sampling over cache masks. The artifact stores sparse
+  wet/channel cell lists, thresholds, world transform, and bounded channel
+  polylines.
+- Extended `scripts/projekt-143-terrain-hydrology-audit.ts` so each audit writes
+  per-map cache JSON next to the review masks:
+  `artifacts/perf/2026-05-06T02-48-23-154Z/projekt-143-terrain-hydrology-audit/a_shau_valley-hydrology-cache.json`
+  and
+  `artifacts/perf/2026-05-06T02-48-23-154Z/projekt-143-terrain-hydrology-audit/open_frontier-hydrology-cache.json`.
+  The parent audit remains WARN at
+  `artifacts/perf/2026-05-06T02-48-23-154Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`
+  with the same A Shau/Open Frontier wetness mismatch findings.
+- Fresh routing:
+  `artifacts/perf/2026-05-06T01-47-55-375Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  PASS, followed by
+  `artifacts/perf/2026-05-06T01-51-03-227Z/projekt-143-completion-audit/completion-audit.json`
+  `NOT_COMPLETE`.
+- Validation: `npx vitest run src/systems/terrain/hydrology/HydrologyBake.test.ts`
+  PASS with `11` tests, `npm run check:projekt-143-terrain-hydrology` WARN as
+  expected, and `npx tsc --noEmit --pretty false` PASS. Non-claim remains: no
+  runtime terrain/vegetation/water consumer is wired to the cache yet.
+
+2026-05-06 Projekt Objekt-143 durable hydrology prebake manifest
+- Added `scripts/prebake-hydrology.ts`, `npm run hydrology:generate`, and
+  `npm run check:hydrology-bakes`. This mirrors the navmesh-style manifest
+  discipline without adding it to `prebuild` or runtime loading yet.
+- Generated durable cache files under `public/data/hydrology`:
+  `bake-manifest.json`, `a_shau_valley-hydrology.json`, and
+  `open_frontier-42-hydrology.json`. The manifest covers A Shau's DEM and the
+  currently approved Open Frontier seed `42`; withheld Open Frontier seeds stay
+  out until per-seed presets exist.
+- Validation: `npm run hydrology:generate` wrote `2` caches, `npm run
+  check:hydrology-bakes` PASS, `npx tsc --noEmit --pretty false` PASS, and
+  `npx vitest run src/systems/terrain/hydrology/HydrologyBake.test.ts` PASS
+  with `11` tests. This still does not wire hydrology into biome/material/water
+  runtime behavior.
+
+2026-05-06 Projekt Objekt-143 completion audit hydrology manifest awareness
+- Updated `scripts/projekt-143-completion-audit.ts` so KB-TERRAIN evidence
+  directly lists `public/data/hydrology/bake-manifest.json` and its generated
+  A Shau/Open Frontier cache entries. This keeps the durable cache contract
+  visible in completion audits without treating it as terrain closeout.
+- Fresh completion audit:
+  `artifacts/perf/2026-05-06T01-51-03-227Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` with blockers unchanged: KB-LOAD, KB-TERRAIN,
+  KB-CULL, and validation/release.
+- Validation: `npx tsc --noEmit --pretty false` PASS and
+  `npm run check:hydrology-bakes` PASS.
+
+2026-05-06 Projekt Objekt-143 hydrology runtime-loader scaffold
+- Added `src/systems/terrain/hydrology/HydrologyBakeManifest.ts` with typed
+  manifest parsing, seed-aware cache selection, relative asset URL resolution,
+  injected-fetch loading, and schema checks for `/data/hydrology` cache JSON.
+  This created the runtime-facing entry point for feature-gated terrain preload
+  work without changing default mode startup, terrain classification,
+  vegetation, materials, or water rendering.
+- Added `src/systems/terrain/hydrology/HydrologyBakeManifest.test.ts`; focused
+  hydrology tests now cover bake/mask/cache behavior plus manifest loading.
+- Validation: `npx vitest run
+  src/systems/terrain/hydrology/HydrologyBake.test.ts
+  src/systems/terrain/hydrology/HydrologyBakeManifest.test.ts` PASS with `16`
+  tests, `npx tsc --noEmit --pretty false` PASS, and `npm run build` PASS.
+  The build proves Vite copies tracked public hydrology caches to
+  `dist/data/hydrology/*`; the Cloudflare `asset-manifest.json` remains the
+  separate R2 terrain-asset manifest.
+- Refreshed routing evidence after the loader scaffold:
+  `artifacts/perf/2026-05-06T02-15-02-096Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  records `terrainHydrologyBakeLoaderStatus=feature_gated_preload`, and
+  `artifacts/perf/2026-05-06T02-15-15-868Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` with blockers unchanged: KB-LOAD, KB-TERRAIN,
+  KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 feature-gated hydrology preload
+- Wired `HydrologyBakeManifest.ts` into `ModeStartupPreparer` behind
+  `config.hydrology.preload` or `globalThis.__PROJEKT_143_ENABLE_HYDROLOGY_PRELOAD__`.
+  Default modes do not fetch hydrology caches.
+- Added inert storage/debug state to `TerrainSystem` via `setHydrologyBake`
+  and `getHydrologyBakeDebugInfo`. This is preload plumbing only: no terrain,
+  vegetation, material, water, or gameplay query consumes the masks yet.
+- Validation: `npx vitest run src/core/ModeStartupPreparer.test.ts
+  src/systems/terrain/TerrainSystem.test.ts
+  src/systems/terrain/hydrology/HydrologyBakeManifest.test.ts` PASS with `30`
+  tests, and `npx tsc --noEmit --pretty false` PASS.
+- Final focused validation after the startup hook:
+  `npx vitest run src/systems/terrain/hydrology/HydrologyBake.test.ts
+  src/systems/terrain/hydrology/HydrologyBakeManifest.test.ts
+  src/core/ModeStartupPreparer.test.ts src/systems/terrain/TerrainSystem.test.ts`
+  PASS with `41` tests, and `npm run build` PASS.
+
+2026-05-06 Projekt Objekt-143 water-system contract audit
+- Added `scripts/projekt-143-water-system-audit.ts` and
+  `npm run check:projekt-143-water-system`. The audit is static, so it is safe
+  while local perf/browser readings are noisy.
+- Latest artifact:
+  `artifacts/perf/2026-05-06T02-25-48-988Z/projekt-143-water-system-audit/water-system-audit.json`
+  is WARN by design. It records that the current runtime water is a
+  camera-following global Three.js plane at `Y=0`; A Shau disables that plane;
+  Open Frontier still uses the default global plane with procedural
+  negative-height water/lake/river-valley carving; A Shau has `70` river
+  polyline entries; and neither the existing A Shau river data nor the new
+  hydrology caches are runtime river renderers. It also records that the
+  hydrology cache can now preload behind an explicit feature gate, and a
+  separate hydrology-biome classifier candidate exists behind its own gate,
+  while default visuals stay unchanged.
+- Wired that artifact into the refreshed Cycle 3 kickoff and completion audit:
+  `terrainWaterSystemStatus=warn`. This keeps the future hydrology/river work
+  separate from the old global-water fallback and prevents calling the current
+  plane a river system.
+
+2026-05-06 Projekt Objekt-143 hydrology-biome classifier candidate
+- Added `src/systems/terrain/hydrology/HydrologyBiomeClassifier.ts` and
+  focused tests. It materializes public hydrology bake masks once and can
+  classify vegetation cells as wet/channel biomes behind the explicit
+  `hydrology.biomeClassification.enabled` config gate or
+  `globalThis.__PROJEKT_143_ENABLE_HYDROLOGY_BIOMES__`.
+- Wired the candidate through `ModeStartupPreparer`, `TerrainSystem`, and
+  `VegetationScatterer` without enabling it in default modes. This gives the
+  next quiet-machine pass a real hydrology-backed vegetation candidate path,
+  while preserving the current accepted visuals.
+- Refreshed static water and routing evidence:
+  `artifacts/perf/2026-05-06T02-25-48-988Z/projekt-143-water-system-audit/water-system-audit.json`,
+  `artifacts/perf/2026-05-06T02-56-57-961Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  and
+  `artifacts/perf/2026-05-06T03-01-02-879Z/projekt-143-completion-audit/completion-audit.json`.
+- Validation: focused Vitest hydrology/vegetation/terrain/startup set PASS
+  with `54` tests, `npx tsc --noEmit --pretty false` PASS, and
+  `npm run check:hydrology-bakes` PASS. `npm run build` PASS with the existing
+  Vite chunk-size warning only. Projekt remains `NOT_COMPLETE`;
+  KB-LOAD, KB-TERRAIN, KB-CULL, and validation/release are still blockers.
+- Follow-up static gate: `npm run validate:fast` PASS, including Pixel Forge
+  cutover, NPC crop map check, typecheck, lint, and `257` Vitest files /
+  `3924` tests. The emitted stderr was existing jsdom/canvas and intentional
+  diagnostic logging, not a failing gate.
+
+2026-05-06 Projekt Objekt-143 KB-LOAD normal-map policy closeout wording
+- Tightened the KB-LOAD routing language so the no-normal vegetation candidate
+  is not treated as pending default-policy approval. The current policy is:
+  default runtime vegetation normal maps stay unchanged, and the no-normal path
+  is rejected for current default runtime or Pixel Forge bake policy while the
+  latest A/B proof remains WARN.
+- Updated the Cycle 3 kickoff and completion audit scripts to emit
+  `vegetationNormalMapRemovalPolicy=rejected_for_default_policy_visual_warn`
+  and `vegetationNormalMapDefaultPolicy=unchanged` from WARN proof evidence.
+  The next KB-LOAD branch should target fanPalm with a latency guard, NPC
+  atlases, approved asset regeneration, or upload scheduling rather than
+  default no-normal removal.
+- Refreshed the static routing after the wording/script update:
+  `npm run check:projekt-143-cycle3-kickoff` PASS at
+  `artifacts/perf/2026-05-06T02-56-57-961Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  then `npm run check:projekt-143-completion-audit` wrote
+  `artifacts/perf/2026-05-06T03-01-02-879Z/projekt-143-completion-audit/completion-audit.json`
+  and remains `NOT_COMPLETE`. Blockers are still KB-LOAD, KB-TERRAIN,
+  KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 hydrology corridor helper
+- Added `src/systems/terrain/hydrology/HydrologyCorridor.ts` as a pure
+  world-space sampling helper over cached hydrology `channelPolylines`. It
+  classifies points as `channel`, `bank`, `wetland`, or `upland` from ordered
+  corridor radii and returns nearest projected-channel metadata.
+- Added `src/systems/terrain/hydrology/HydrologyCorridor.test.ts` so the
+  future river, bank vegetation, trail-crossing, audio, and water-mesh branches
+  can share one corridor contract without enabling any default runtime visuals.
+- Refreshed the hydrology audit after wiring the corridor sampler into the
+  static contract:
+  `artifacts/perf/2026-05-06T02-48-23-154Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`
+  remains WARN by design and now records
+  `corridorSamplerStatus=pure_world_space_helper`.
+- Validation: focused hydrology Vitest suite PASS with `4` files / `24` tests,
+  `npx tsc --noEmit --pretty false` PASS, `npm run check:hydrology-bakes`
+  PASS, `npm run check:projekt-143-cycle3-kickoff` PASS at
+  `artifacts/perf/2026-05-06T02-56-57-961Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  and `npm run check:projekt-143-completion-audit` remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T03-01-02-879Z/projekt-143-completion-audit/completion-audit.json`.
+
+2026-05-06 Projekt Objekt-143 KB-LOAD branch selector
+- Added `scripts/projekt-143-load-branch-selector.ts` and
+  `npm run check:projekt-143-load-branch`. The selector reads the latest
+  Pixel Forge texture audit, Open Frontier/Zone Control startup upload tables,
+  and vegetation-normal visual proof, then writes a branch-selection artifact.
+- Latest artifact:
+  `artifacts/perf/2026-05-06T02-56-15-735Z/projekt-143-load-branch-selector/load-branch-selector.json`.
+  Status is `ready_for_quiet_machine_proof`.
+- Selected branch: `vegetation-atlas-regeneration-retain-normals`. It targets
+  current repeated vegetation upload species (`bambooGrove`, `bananaPlant`,
+  `coconut`, `fanPalm`), preserves the accepted normal-map policy, and avoids
+  reopening NPC atlas regeneration while KB-OPTIK is owner-accepted with
+  caution. Static texture-audit estimate is `127.87MiB` mipmapped RGBA savings
+  for vegetation candidates only.
+- Explicit non-claim: this does not generate/import atlases and does not prove
+  startup improvement. The selected branch still needs Pixel Forge candidate
+  atlases, paired visual proof, and quiet-machine Open Frontier/Zone Control
+  before/after startup tables.
+- Refreshed routing after selector: Cycle 3 kickoff PASS at
+ `artifacts/perf/2026-05-06T02-56-57-961Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  completion audit remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T03-01-02-879Z/projekt-143-completion-audit/completion-audit.json`.
+
+2026-05-06 Projekt Objekt-143 Pixel Forge vegetation readiness
+- Added `scripts/projekt-143-pixel-forge-vegetation-readiness.ts` and
+  `npm run check:projekt-143-pixel-forge-vegetation-readiness`. The audit reads
+  the selected KB-LOAD branch, latest texture audit, and the local Pixel Forge
+  TIJ vegetation manifest without regenerating/importing assets.
+- Latest artifact:
+  `artifacts/perf/2026-05-06T03-24-43-522Z/projekt-143-pixel-forge-vegetation-readiness/vegetation-readiness.json`.
+  Status is PASS with
+  `branchExecutionState=ready_for_candidate_generation`.
+- Finding: Pixel Forge has the selected active variants
+  `bambooGrove/bamboo-google-2`, `bananaPlant/banana-tree-sean-tarrant`,
+  `coconut/coconut-palm-google`, and `fanPalm/lady-palm-google-1`; normal-lit
+  color/normal pairs are present and the selected KB-LOAD target is
+  `1024x1024` / `256px` tiles with normals retained. The local Pixel Forge TIJ
+  runner now exposes a review-only `kb-load-vegetation-256` profile, separate
+  `tij-candidates` output root, and selected-species validator. The next safe
+  step is candidate generation/validation in Pixel Forge, then side-by-side
+  visual proof before any import or quiet-machine startup claim.
+- Refreshed routing after the readiness audit: Cycle 3 kickoff PASS at
+  `artifacts/perf/2026-05-06T03-26-51-656Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  completion audit remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T03-37-37-441Z/projekt-143-completion-audit/completion-audit.json`.
+  Remaining blockers are KB-LOAD, KB-TERRAIN, KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 Pixel Forge manifest policy alignment
+- Updated local Pixel Forge `scripts/run-tij-pipeline.ts` and
+  `scripts/validate-tij-vegetation-package.ts` so `giantPalm` is an explicit
+  retired review/provenance species and blocked species remain blocked review
+  records. Added `bun run tij:vegetation-validate:review`.
+- Updated the local Pixel Forge review manifest so `giantPalm` has
+  `productionStatus=retired`; `fanPalm`, `coconut`, `bambooGrove`,
+  `bananaPlant`, `fern`, and `elephantEar` remain candidates; the six blocked
+  species remain blocked.
+- Validation: Pixel Forge targeted TypeScript check PASS, `bun run
+  tij:vegetation-validate:review` PASS for `13` species, and refreshed
+  KB-FORGE audit PASS at
+  `artifacts/perf/2026-05-06T03-37-10-850Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`
+  with `manifestPolicyAligned=true`. The refreshed completion audit no longer
+  lists Pixel Forge manifest refresh as a required action, but remains
+  `NOT_COMPLETE` on KB-LOAD, KB-TERRAIN, KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 Pixel Forge vegetation candidate proof harness
+- Added `scripts/projekt-143-vegetation-candidate-proof.ts` and
+  `npm run check:projekt-143-vegetation-candidate-proof` to compare the current
+  TIJ runtime vegetation atlases against the future Pixel Forge
+  `kb-load-vegetation-256` candidate output without importing anything.
+- Current proof artifact:
+  `artifacts/perf/2026-05-06T03-43-34-689Z/projekt-143-vegetation-candidate-proof/summary.json`;
+  contact sheet:
+  `artifacts/perf/2026-05-06T03-43-34-689Z/projekt-143-vegetation-candidate-proof/candidate-contact-sheet.png`.
+  Status is WARN with `0/4` complete pairs because the candidate manifest and
+  candidate color/normal/meta files do not exist yet. This is expected before
+  running the Pixel Forge candidate bake.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T03-44-21-500Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE` with blockers on KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release. The next KB-LOAD action is now explicit: run
+  `bun run tij:pipeline:kb-load-vegetation-256`, run
+  `bun run tij:vegetation-validate:kb-load-vegetation-256`, then rerun the
+  candidate proof and quiet-machine startup tables.
+
+2026-05-06 Projekt Objekt-143 Pixel Forge vegetation candidate bake
+- After the owner cleared machine resources, ran the review-only Pixel Forge
+  candidate bake in `C:\Users\Mattm\X\games-3d\pixel-forge`:
+  `bun run tij:pipeline:kb-load-vegetation-256`. It wrote under
+  `packages/server/output/tij-candidates/kb-load-vegetation-256` and did not
+  overwrite the accepted production gallery.
+- Pixel Forge selected-species validation passed:
+  `bun run tij:vegetation-validate:kb-load-vegetation-256` for `4` species.
+- TIJ candidate proof passed:
+  `artifacts/perf/2026-05-06T04-17-12-580Z/projekt-143-vegetation-candidate-proof/summary.json`;
+  contact sheet:
+  `artifacts/perf/2026-05-06T04-17-12-580Z/projekt-143-vegetation-candidate-proof/candidate-contact-sheet.png`.
+  The proof has `4/4` complete selected color/normal/meta pairs for
+  `bambooGrove/bamboo-google-2`, `bananaPlant/banana-tree-sean-tarrant`,
+  `coconut/coconut-palm-google`, and `fanPalm/lady-palm-google-1`, with
+  `256px` tiles, `1024x1024` atlases, `normalSpace=capture-view`,
+  `albedo,normal` aux layers, max opaque luma delta `1.53%`, and max
+  opaque-ratio delta `0.00714`.
+- Refreshed selectors after the bake: Pixel Forge vegetation readiness PASS at
+  `artifacts/perf/2026-05-06T04-17-34-839Z/projekt-143-pixel-forge-vegetation-readiness/vegetation-readiness.json`,
+  Cycle 3 kickoff PASS at
+  `artifacts/perf/2026-05-06T04-17-51-823Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  and completion audit remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T04-17-50-020Z/projekt-143-completion-audit/completion-audit.json`.
+  Remaining blockers are KB-LOAD owner visual acceptance/import/startup tables,
+  KB-TERRAIN, KB-CULL, and validation/release. No candidate atlas has been
+  imported into TIJ runtime yet.
+
+2026-05-06 Projekt Objekt-143 quiet-window hydrology/vegetation research
+- Used the owner-requested wait window for non-GPU research and local
+  architecture mapping only; no Pixel Forge candidate bake, headed screenshot,
+  or perf capture was run.
+- Updated `docs/PROJEKT_OBJEKT_143_HYDROLOGY.md` with primary-source-backed
+  direction: DEM flat/depression handling needs explicit outlet/breach policy,
+  procedural rivers should become carved riverbed/corridor/water-flow systems
+  rather than shader masks, Open Frontier should choose stable seed/outlet
+  channel rules before withheld seeds are accepted, and Vietnam vegetation
+  placement should use hydrology-aware bamboo/palm/understory clusters.
+- Updated `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md` with a fresh
+  `EZ-Tree` source-tool check: keep it as an offline GLB/PNG source pilot
+  feeding Pixel Forge review-only bakes, not a runtime dependency or asset
+  approval. Added cluster-zone acceptance language for channel, bank, wetland
+  shoulder, trail edge, upland, and far-canopy pockets.
+- Local integration finding: `TerrainFlowCompiler` is the right contract for
+  future riverbed/trail-crossing stamps, `VegetationScatterer` can already use
+  the feature-gated hydrology classifier, but `TerrainBiomeRuntimeConfig` and
+  `TerrainMaterial` are still elevation/slope material paths. A vegetation
+  hydrology proof must not be treated as full water/material proof.
+- Added the local data-source reconciliation finding: A Shau already has `70`
+  authored/imported river polylines in `public/data/vietnam/a-shau-rivers.json`
+  totaling about `77.0km`, while the generated hydrology cache has `12`
+  channel polylines totaling `94.8km` by stored length (`105.4km` by point
+  geometry), `4,120` wet candidate cells, and `1,322` channel cells. Open
+  Frontier seed 42 has only generated hydrology so far: `12` channels totaling
+  `9.8km` by stored length (`11.2km` by point geometry), `1,629` wet candidate
+  cells, and `1,322` channel cells. Next branch should decide snap/merge/source
+  authority instead of treating those layers as interchangeable.
+- Added the Pixel Forge bureau finding to
+  `docs/PROJEKT_OBJEKT_143_VEGETATION_SOURCE_PIPELINE.md`: the local repo
+  already has the TIJ pipeline entrypoints, production and candidate output
+  roots, atlas-profile validation, and review manifest surface needed for
+  vegetation work. The missing piece for `EZ-Tree` or similar source tools is a
+  provenance/source-adapter layer that records tool version, seed/preset,
+  license URL, source GLB metrics, and intended habitat zone before Pixel Forge
+  bakes review-only imposters.
+- Quiet static recheck: `npm run check:vegetation-grounding` passed at
+  `artifacts/perf/2026-05-06T04-09-22-289Z/vegetation-grounding-audit/summary.json`
+  with all `6` active runtime vegetation species covered and `0` flagged
+  species. This refreshes the earlier "make sure nothing else is half-buried"
+  finding without running browser or perf work.
+- Quiet KB-OPTIK lighting research: the darker-imposter concern is still best
+  treated as a material/lighting contract split, not a quick brightness tweak.
+  Pixel Forge's animated NPC bake renders original GLB materials with a fixed
+  ambient/key/fill setup, while TIJ runtime imposters use a custom unlit
+  `ShaderMaterial` with `npcExposure`, `minNpcLight`, `npcTopLight`,
+  `parityScale`, `parityLift`, `paritySaturation`, and optional
+  scene-atmosphere/fog uniforms. The expanded proof already measures luma
+  deltas against the close GLB path, so any future correction should use the
+  same-scene runtime review packet and avoid changing crop/scale/lighting in
+  one unreviewable patch.
+- Refreshed the local Pixel Forge bureau audit without mutating Pixel Forge:
+  `npm run check:projekt-143-pixel-forge` passed at
+  `artifacts/perf/2026-05-06T04-11-40-074Z/projekt-143-pixel-forge-bureau/pixel-forge-bureau.json`.
+  It still finds the sibling repo present, `109` manifest entries, `13`
+  vegetation packages, all `6` TIJ runtime vegetation species present, retired
+  `giantPalm` retained only as review/provenance, all `6` blocked species
+  retained as non-runtime records, `6` prop families, and `5` relevance queues.
+- Refreshed the quiet hydrology cache contract with `npm run
+  check:hydrology-bakes`: PASS, `2` public cache artifacts match
+  `public/data/hydrology/bake-manifest.json`. A Shau is still the DEM entry,
+  Open Frontier is still procedural seed `42`, and both are explicitly
+  `epsilon-fill` bakes rather than accepted river-rendering or breach-policy
+  implementations.
+- Refreshed the static vegetation/material distribution baseline with
+  `npm run check:projekt-143-terrain-distribution`: WARN only for the expected
+  AI Sandbox fixed fallback seed at
+  `artifacts/perf/2026-05-06T04-13-18-235Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+  A Shau still has no distribution flags and reports CPU biome coverage
+  `77.8%` denseJungle, `15.7%` riverbank, `4.04%` bambooGrove, and `2.46%`
+  swamp; vegetation relative density is still fern-heavy, with bambooGrove at
+  `1.25%`. This supports the next hydrology-aware placement branch rather than
+  closing the owner distribution concern.
+
+2026-05-06 Projekt Objekt-143 NPC recovery and resource-discipline follow-up
+- Implemented a narrow NPC navmesh recovery fix in
+  `src/systems/combat/CombatantMovement.ts`: backtracking now prefers
+  `movementLastGoodPosition`, rejects zero-distance current-position navmesh
+  snaps, falls back to scored terrain recovery, and clears cached nav paths when
+  a backtrack point changes.
+- Added focused behavior tests in `CombatantMovement.test.ts` for last-good
+  navmesh recovery and fallback when navmesh snapping would no-op. Validation:
+  `npx vitest run src/systems/combat/CombatantMovement.test.ts
+  src/systems/combat/StuckDetector.test.ts` PASS; later targeted harness pass
+  with `scripts/perf-harness/perf-active-driver.test.js` also PASS.
+- Static/runtime gates before the resource-contention pause: `npm run
+  check:projekt-143-terrain-routes` PASS at
+  `artifacts/perf/2026-05-06T17-00-32-294Z/projekt-143-terrain-route-audit/terrain-route-audit.json`;
+  `npm run build:perf` PASS with the usual Vite chunk-size warning.
+- A Shau after the NPC recovery fix:
+  `artifacts/perf/2026-05-06T04-46-26-097Z/summary.json` has measurement trust
+  PASS and clears the shot gate with `240` validation player shots / `170` hits
+  and `118` harness-driver shots / `44` kills. It remains WARN on p99
+  `45.70ms`, heap peak growth `47.81MB`, and repeated terrain backtracking, so
+  no A Shau route/nav acceptance.
+- Open Frontier after the same fix:
+  `artifacts/perf/2026-05-06T04-51-35-039Z/summary.json` has measurement trust
+  PASS but validation WARN on p99 `49.30ms`, heap peak growth `71.33MB`, and
+  low shots. NPC recovery telemetry improved versus the earlier resource-free
+  Open Frontier run, but the movement viewer still points at active-driver
+  route/engagement behavior and long low-combat PATROL stretches.
+- Rejected and reverted an Open Frontier frontline-compression harness
+  experiment. Artifact
+  `artifacts/perf/2026-05-06T04-58-04-461Z/summary.json` is diagnostic only:
+  validation FAIL with p99 `100ms`, `2.00%` frames over `50ms`, and only `12`
+  shots.
+- Hardened future headed captures in `scripts/perf-capture.ts` with fixed
+  `1920x1080` window position/size and device-scale-factor clamps so the
+  owner-reported multi-monitor browser span is less likely to contaminate
+  captures.
+- Folded the engine/platform-utilization objective into Projekt docs:
+  near-metal work in a browser means WebGL2 extension/GPU timer coverage,
+  WebGPU capability probes, OffscreenCanvas/worker feasibility, WASM
+  threads/SIMD preconditions behind cross-origin isolation, and device-class
+  policy. This is research/probe scope only, not a WebGPU or worker-renderer
+  migration approval.
+- Resource note: another browser/game agent and an SDS repo Claude overnight
+  shift may be active for several hours. Do not run or accept new headed/GPU
+  Projekt captures while they are consuming resources. After roughly three
+  hours, if the same stale browser/Node/Bun processes remain, it is acceptable
+  to clean them up before resuming resource-heavy Projekt work, then run one
+  final process check before capture.
+- Refreshed CPU-only routing after the docs/resource update:
+  `npm run check:projekt-143-cycle3-kickoff` PASS at
+  `artifacts/perf/2026-05-06T16-54-35-084Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`;
+  `npm run check:projekt-143-completion-audit` remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T05-53-50-518Z/projekt-143-completion-audit/completion-audit.json`
+  with blockers on KB-STRATEGIE browser capability probing, KB-LOAD,
+  KB-TERRAIN, KB-CULL, and validation/release.
+- CPU-only TypeScript validation after the movement/harness/doc updates:
+  `npm run typecheck` PASS.
+- Extended `scripts/webgpu-strategy-audit.ts` with a near-metal platform track:
+  it records current source matches for WebGL GPU timing, device-class policy,
+  OffscreenCanvas, SharedArrayBuffer, cross-origin isolation, and worker
+  rendering, and it lists the browser-backed capability fields to probe later.
+  Current static audit:
+  `artifacts/perf/2026-05-06T05-53-35-718Z/webgpu-strategy-audit/strategy-audit.json`
+  reports `activeWebgpuSourceMatches=0`, `webglRendererEntrypoints=12`,
+  `migrationBlockerMatches=113`, and
+  `nearMetalBrowserProbeStatus=deferred_resource_contention`.
+- Refreshed the static Projekt suite after the strategy-audit extension:
+  `artifacts/perf/2026-05-06T05-53-35-745Z/projekt-143-evidence-suite/suite-summary.json`
+  PASS. Refreshed routing after that: Cycle 3 kickoff PASS at
+  `artifacts/perf/2026-05-06T16-54-35-084Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`,
+  and completion audit remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T05-53-50-518Z/projekt-143-completion-audit/completion-audit.json`
+  with blockers on KB-STRATEGIE browser capability probing, KB-LOAD,
+  KB-TERRAIN, KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 guarded platform capability probe
+- Added `scripts/projekt-143-platform-capability-probe.ts` and package command
+  `npm run check:projekt-143-platform-capabilities`. Default runs are
+  no-browser/deferred and write an artifact without consuming GPU/browser
+  resources; the future quiet-machine form is
+  `npm run check:projekt-143-platform-capabilities -- --run-browser --headed --check-live-headers`.
+  The browser path will compare plain and COOP/COEP isolated local pages for
+  WebGL2 renderer/extensions, `EXT_disjoint_timer_query_webgl2`, WebGPU
+  adapter/features/limits, OffscreenCanvas WebGL2 support,
+  `crossOriginIsolated`/SharedArrayBuffer/Atomics, viewport/device scale,
+  hardware concurrency, and device memory.
+- Validation: default deferred probe PASS at
+  `artifacts/perf/2026-05-06T05-36-03-801Z/projekt-143-platform-capability-probe/summary.json`
+  with `browserRun=false`, `headerContract=pass`, live Pages COOP/COEP headers
+  present, and `npm run typecheck` PASS. This is read-only platform evidence
+  only; it does not approve WebGPU, worker rendering, WASM threads, or any
+  runtime performance claim.
+- Corrected `scripts/webgpu-strategy-audit.ts` so the platform probe script is
+  treated as tooling and does not pollute active-runtime WebGPU counts. A later
+  refresh also excludes the completion audit's KB-STRATEGIE field names from
+  the active-runtime scan. The refreshed static suite records the corrected
+  KB-STRATEGIE artifact at
+  `artifacts/perf/2026-05-06T05-53-35-718Z/webgpu-strategy-audit/strategy-audit.json`
+  with `activeWebgpuSourceMatches=0`, `webglRendererEntrypoints=12`,
+  `migrationBlockerMatches=113`, and
+  `nearMetalBrowserProbeStatus=deferred_resource_contention`.
+- Updated `scripts/projekt-143-completion-audit.ts` so KB-STRATEGIE is a real
+  prompt-to-artifact checklist item instead of a docs-only note. Latest
+  completion audit:
+  `artifacts/perf/2026-05-06T05-53-50-518Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` and now lists KB-STRATEGIE browser probing as deferred
+  until the local resource window is quiet.
+
+2026-05-06 Projekt Objekt-143 active-driver route-overlay follow-up
+- Current resource check at `2026-05-06T01:39:44-04:00` showed the Edge browser
+  group started around `12:36 AM`, so it was not stale enough for the owner's
+  three-hour cleanup window. No browser/Node/Bun processes were killed.
+- Follow-up resource check at `2026-05-06T01:55:13-04:00` found the same Edge
+  group still only about `1h18m` old, plus active SDS/TIJ dev-server and MCP
+  Node processes. Cleanup remains deferred until roughly the three-hour stale
+  window.
+- Diagnosed the Open Frontier after-NPC-recovery artifact
+  `artifacts/perf/2026-05-06T04-51-35-039Z/summary.json`: movement transitions
+  were healthy enough to avoid the stuck gate, but `waypointReplanFailures`
+  climbed to `157`, `waypointsFollowedCount` stalled at `103`, shots stopped at
+  `33`, and the final long PATROL stretch stayed low-combat. The code mismatch
+  was that `scripts/perf-active-driver.cjs` computed navmesh overlay path
+  points, but `PlayerMovement` consumes camera-relative movement; the driver
+  kept the camera on the far enemy/objective aim target, so "forward" could
+  still drive into terrain instead of along the path.
+- Added a harness `movementTarget` contract in
+  `src/dev/harness/playerBot/types.ts` and
+  `src/dev/harness/playerBot/PlayerBotController.ts`: while moving and not
+  firing, a route movement target can control the view; while firing, the
+  combat `aimTarget` still wins so the aim-dot gate remains intact.
+- Mirrored the behavior in `scripts/perf-active-driver.cjs` by copying
+  navmesh overlay points onto `step.intent.movementTarget` and selecting that
+  as the view target only when the bot is moving and not firing. Added focused
+  JS mirror tests in `scripts/perf-harness/perf-active-driver.test.js`.
+- Validation:
+  `npx vitest run src/dev/harness/playerBot/PlayerBotController.test.ts src/dev/harness/playerBot/states.test.ts src/dev/harness/PlayerBot.test.ts scripts/perf-harness/perf-active-driver.test.js`
+  PASS (`4` files, `210` tests), and `npm run typecheck` PASS.
+- Updated `scripts/projekt-143-completion-audit.ts` so KB-TERRAIN records
+  `activeDriverMovementTargetContract=true` while still marking runtime proof
+  pending. Fresh completion audit remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T05-53-50-518Z/projekt-143-completion-audit/completion-audit.json`.
+- Scoped whitespace validation after the docs/evidence refresh:
+  `git diff --check -- scripts/webgpu-strategy-audit.ts scripts/projekt-143-completion-audit.ts scripts/perf-active-driver.cjs scripts/perf-harness/perf-active-driver.test.js src/dev/harness/playerBot/types.ts src/dev/harness/playerBot/PlayerBotController.ts src/dev/harness/playerBot/PlayerBotController.test.ts docs/PERFORMANCE.md docs/PROJEKT_OBJEKT_143.md docs/PROJEKT_OBJEKT_143_HANDOFF.md progress.md`
+  passed; output was only the repo's normal LF-to-CRLF warnings.
+- This is CPU-only acceptance. Do not claim the player-stops-moving report fixed
+  until the machine is quiet and Open Frontier is rerun through the headed perf
+  harness with measurement trust and movement/shots checked.
+
+2026-05-06 Projekt Objekt-143 resource cleanup, platform probe, and route diagnostics
+- After the owner's stale-resource window, cleaned up stale dev-server process
+  trees for the SDS game stacks and stale TIJ Vite server only. Confirmed no
+  listeners remained on `3000`, `5173`, `8787`, `8788`, or `9100`. Did not kill
+  the newer Edge group, Claude/MCP nodes, Steam, or EdgeWebView processes.
+- Ran the guarded platform probe in headless browser mode:
+  `npm run check:projekt-143-platform-capabilities -- --run-browser --headless --check-live-headers`.
+  Artifact:
+  `artifacts/perf/2026-05-06T06-03-26-013Z/projekt-143-platform-capability-probe/summary.json`.
+  Status is WARN, not approval: WebGL2 is available through SwiftShader,
+  `EXT_disjoint_timer_query_webgl2` is unavailable, `navigator.gpu` exists but
+  no WebGPU adapter is available, OffscreenCanvas WebGL2 and isolated
+  SharedArrayBuffer pass, and local/live COOP/COEP headers pass.
+- Refreshed completion audit after the platform probe:
+  `artifacts/perf/2026-05-06T06-30-31-073Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE`. KB-STRATEGIE now passes its guarded inventory item;
+  remaining blockers are KB-LOAD, KB-TERRAIN, KB-CULL, and validation/release.
+- Open Frontier headless diagnostic before route recovery:
+  `artifacts/perf/2026-05-06T06-04-57-681Z/summary.json` failed validation and
+  measurement trust. It reproduced the route-stuck shape: `harness_max_stuck`
+  `176.1s`, player `blockedByTerrain=275`, `avgRequestedSpeed=19.10m/s`,
+  `avgActualSpeed=0`, and `0` shots.
+- Added active-driver route-overlay recovery in `scripts/perf-active-driver.cjs`:
+  while following navmesh overlay points and not firing, route movement walks
+  instead of sprinting, applies a small alternating strafe after `2s` stuck, and
+  can skip a non-final waypoint after `4.5s` stuck. The capture stop log now
+  reports `stuckWaypointSkips`.
+- Focused validation after recovery:
+  `npx vitest run scripts/perf-harness/perf-active-driver.test.js` PASS
+  (`139` tests), and scoped `git diff --check` PASS with only LF-to-CRLF
+  warnings.
+- Open Frontier headless diagnostic after recovery:
+  `artifacts/perf/2026-05-06T06-18-15-743Z/summary.json` still failed validation
+  and measurement trust (`probeAvg=2368.50ms`, `probeP95=2847ms`) and fired
+  `0` shots, so it is not acceptance. It does show the movement portion
+  improved: `harness_max_stuck_seconds=0`, `blockedByTerrain=0`,
+  `avgActualSpeed=8.82m/s`, `waypointReplanFailures=0`, and no console errors.
+  Next proof must be a quiet-machine headed Open Frontier/A Shau rerun that
+  checks movement, shots, and measurement trust together.
+- Final cheap validation for this pass:
+  `npx vitest run scripts/perf-harness/perf-active-driver.test.js` PASS
+  (`139` tests), `npm run typecheck` PASS, `npm run
+  check:projekt-143-completion-audit` wrote
+  `artifacts/perf/2026-05-06T06-30-31-073Z/projekt-143-completion-audit/completion-audit.json`
+  and remains `NOT_COMPLETE`, and scoped `git diff --check` passed with only
+  normal LF-to-CRLF warnings.
+
+2026-05-06 Projekt Objekt-143 active-driver combat-front routing
+- Root-cause follow-up on the Open Frontier zero-shot diagnostic: after movement
+  was unstuck, the driver stayed PATROL-only because large-mode capture-zone
+  objectives could still outrank the actual combat front while no OPFOR was
+  inside perception range.
+- Updated `scripts/perf-active-driver.cjs` so aggressive large-map patrol
+  prefers a nearest-live-OPFOR movement objective before falling back to
+  capture-zone routing. This is perf-harness proof routing only, not gameplay
+  AI behavior.
+- Added pure `selectPatrolObjective` tests covering aggressive combat-front
+  preference, non-aggressive zone-first routing, and fallback to engagement
+  center. Validation: `npx vitest run scripts/perf-harness/perf-active-driver.test.js`
+  PASS (`142` tests), `npm run typecheck` PASS, scoped `git diff --check` PASS
+  with only LF-to-CRLF warnings, and refreshed completion audit
+  `artifacts/perf/2026-05-06T06-41-21-019Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` with the expected blockers on KB-LOAD, KB-TERRAIN,
+  KB-CULL, and validation/release.
+- Accidental note: `npx tsx scripts/perf-capture.ts --help` is not a help-only
+  command and started a partial capture. I stopped the spawned Node processes,
+  confirmed port `9100` was cleared, and removed the generated
+  `artifacts/perf/2026-05-06T06-37-06-369Z` browser-profile directory after
+  verifying it was inside `artifacts/perf`. No evidence claim came from that
+  artifact.
+- Added an early `--help` / `-h` guard to `scripts/perf-capture.ts` so checking
+  flags prints usage and exits before creating a server, browser profile, or
+  artifact. Verified with `npx tsx scripts/perf-capture.ts --help`, then
+  confirmed the perf/dev ports remained clear.
+
+2026-05-06 Projekt Objekt-143 active-driver objective telemetry
+- Resource check at `2026-05-06T02:51:23-04:00`: no listeners on the watched
+  dev/perf ports. The Edge group from `12:36 AM` was still below the owner's
+  three-hour stale cleanup window, so it was left alone. The older Node process
+  was the active local Codex CLI, and the newer Node processes were Playwright
+  MCP / Context7 MCP, so none were cleaned up.
+- Added active-driver diagnostic telemetry for the next Open Frontier/A Shau
+  browser proof: `objectiveKind`, `objectiveDistance`, `objectiveZoneId`,
+  `nearestOpforDistance`, `nearestPerceivedEnemyDistance`,
+  `currentTargetDistance`, `pathTargetKind`, `pathTargetDistance`,
+  `pathQueryStatus`, `pathLength`, and `perceptionRange` now surface through
+  the CJS driver and `perf-capture.ts` runtime samples. The sample log also
+  prints compact objective/OPFOR/perceived/path distances when available.
+- Updated `scripts/projekt-143-completion-audit.ts` so KB-TERRAIN records the
+  objective telemetry contract while still keeping the target partial until
+  quiet-machine runtime proof exists.
+- Validation:
+  `node --check scripts/perf-active-driver.cjs` PASS,
+  `npx vitest run scripts/perf-harness/perf-active-driver.test.js` PASS
+  (`142` tests), `npm run typecheck` PASS, `npx tsx
+  scripts/perf-capture.ts --help` PASS without starting a server/browser, and
+  `npm run check:projekt-143-completion-audit` wrote
+  `artifacts/perf/2026-05-06T07-08-45-100Z/projekt-143-completion-audit/completion-audit.json`.
+  Completion remains `NOT_COMPLETE` with blockers on KB-LOAD, KB-TERRAIN,
+  KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 perf-capture post-sample timeout guard
+- Investigated the Open Frontier telemetry diagnostic at
+  `artifacts/perf/2026-05-06T06-44-42-668Z/summary.json`. It had useful runtime
+  samples and validation, but the process hit the global hard timeout at
+  `stage=write-artifacts`, so only emergency artifacts were written.
+- Updated `scripts/perf-capture.ts` to re-arm the hard timeout with a dedicated
+  `POST_CAPTURE_HARD_TIMEOUT_MS` margin before final artifact collection/writes.
+  This keeps runaway protection while preventing a slow, already-failed capture
+  from being killed mid-summary after the sampling loop has produced useful
+  evidence.
+- Validation: `npx tsx scripts/perf-capture.ts --help` PASS without starting
+  server/browser, `npm run typecheck` PASS, and scoped `git diff --check` PASS
+  with only normal LF-to-CRLF warnings.
+
+2026-05-06 Projekt Objekt-143 active-driver diagnostic reader
+- Added `scripts/projekt-143-active-driver-diagnostic.ts`, a standalone
+  runtime-sample reader that writes
+  `projekt-143-active-driver-diagnostic/active-driver-diagnostic.json` under a
+  capture artifact. It summarizes bot-state samples, objective kind/distance,
+  nearest OPFOR/perceived enemy distances, perception range, path target/query
+  state, stuck time, replan failures, shots, hits, and next probe questions.
+- Ran it against the old Open Frontier telemetry diagnostic:
+  `npx tsx scripts/projekt-143-active-driver-diagnostic.ts --artifact artifacts/perf/2026-05-06T06-44-42-668Z`.
+  Artifact:
+  `artifacts/perf/2026-05-06T06-44-42-668Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+  Status is FAIL as expected because that old capture predates the new
+  objective/path telemetry; it remains diagnostic-only and explicitly says to
+  rerun with current code.
+- Wired the latest active-driver diagnostic artifact into
+  `scripts/projekt-143-completion-audit.ts` as KB-TERRAIN evidence. The refreshed
+  audit at
+  `artifacts/perf/2026-05-06T07-08-45-100Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`.
+- Validation: `npm run typecheck` PASS, `npm run
+  check:projekt-143-completion-audit` PASS as a NOT_COMPLETE audit, and scoped
+  `git diff --check` PASS with only normal LF-to-CRLF warnings.
+
+2026-05-06 Projekt Objekt-143 active-driver diagnostic selection hardening
+- Resource check at `2026-05-06T03:10:33-04:00`: watched dev/perf ports were
+  clear. The Edge group from `12:36 AM` was still only about `154` minutes old,
+  so it remained below the owner's three-hour stale cleanup window and was left
+  running. The long-lived Node process is the local Codex CLI and the newer Node
+  processes are Playwright MCP / Context7 MCP, so none were cleaned up.
+- Hardened `scripts/projekt-143-active-driver-diagnostic.ts` so its default
+  latest-artifact lookup prefers the newest `runtime-samples.json` that already
+  contains objective/path telemetry, falling back to the newest legacy runtime
+  samples only when no telemetry-bearing capture exists. The script now has an
+  import guard and exports the report builder/selector for focused tests.
+- Added `scripts/perf-harness/projekt-143-active-driver-diagnostic.test.ts`
+  covering telemetry-preferred artifact selection, a healthy pass report, and a
+  legacy no-telemetry fail report.
+- Added `npm run check:projekt-143-active-driver-diagnostic` as the stable
+  entry point for the reader.
+- Validation: `npx vitest run
+  scripts/perf-harness/projekt-143-active-driver-diagnostic.test.ts
+  scripts/perf-harness/perf-active-driver.test.js` PASS (`145` tests) and
+  `npm run typecheck` PASS. `npm run
+  check:projekt-143-active-driver-diagnostic -- --artifact
+  artifacts/perf/2026-05-06T06-44-42-668Z` PASS as a known FAIL diagnostic for
+  the old no-telemetry capture. Scoped `git diff --check` PASS with only normal
+  LF-to-CRLF warnings.
+- Refreshed `npm run check:projekt-143-completion-audit` after the diagnostic
+  script hardening. Latest audit:
+  `artifacts/perf/2026-05-06T07-13-44-915Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE` with KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release blockers.
+
+2026-05-06 Projekt Objekt-143 resource-clean active-driver runtime pass
+- Resource cleanup: at `2026-05-06T03:37:33-04:00`, the old Edge group from
+  `12:36 AM` was just over the owner-approved three-hour stale window. Watched
+  ports were clear, so only those `msedge` PIDs were killed. The local Codex CLI
+  and MCP Node processes were left alone. A follow-up check showed no remaining
+  Edge processes and no watched dev/perf port listeners.
+- Ran a headed Open Frontier telemetry capture with current active-driver
+  objective/path telemetry:
+  `npx tsx scripts/perf-capture.ts --headed --mode open_frontier --npcs 120 --duration 60 --warmup 10 --sample-interval-ms 2000 --detail-every-samples 1 --runtime-preflight false --seed 42 --log-level=error`.
+  Artifact:
+  `artifacts/perf/2026-05-06T07-38-14-932Z/summary.json`.
+  Measurement trust PASS, validation FAIL. The useful answer is that objective
+  telemetry is present: `nearest_opfor` distance closes from about `1390m` to
+  `903m`; a perceived/current target appears around `724m`; path query status
+  remains `failed`; shots/hits stay `0`. Diagnostic:
+  `artifacts/perf/2026-05-06T07-38-14-932Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+- Hardened final telemetry reporting after that run: `perf-capture.ts` now keeps
+  final objective/path fields in `harnessDriverFinal`, and nullable telemetry
+  values no longer serialize `null` as `0`. The diagnostic reader now falls back
+  to the final runtime sample when older summaries lack the new final fields.
+- Rejected two active-driver path-planning experiments instead of carrying them
+  forward. Bounded long path segments produced partial `path=ok` samples but
+  still failed validation and regressed p99 at
+  `artifacts/perf/2026-05-06T07-45-35-107Z/summary.json`. Skipping path overlay
+  for far `nearest_opfor` objectives produced zero runtime samples and failed
+  measurement trust at
+  `artifacts/perf/2026-05-06T07-51-32-551Z/summary.json`; the confirmation run
+  after reverting that branch also missed all runtime samples at
+  `artifacts/perf/2026-05-06T07-54-19-080Z/summary.json`, so it is diagnostic
+  only. The experimental path-planning code was reverted; the retained code is
+  telemetry/reporting hardening.
+- Validation after reverting the bad path-planning branch:
+  `node --check scripts/perf-active-driver.cjs` PASS,
+  `npx vitest run scripts/perf-harness/perf-active-driver.test.js
+  scripts/perf-harness/projekt-143-active-driver-diagnostic.test.ts` PASS
+  (`145` tests), and `npm run typecheck` PASS.
+- Regenerated the active-driver diagnostic for the trustworthy telemetry-bearing
+  `07-38` capture so the completion audit does not anchor on the later rejected
+  zero-sample captures. Refreshed completion audit:
+  `artifacts/perf/2026-05-06T07-58-34-841Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE`.
+
+2026-05-06 Projekt Objekt-143 provisional hydrology river surfaces
+- Wired a first runtime water consumer for the hydrology cache:
+  `WaterSystem.ts` now builds one batched transparent mesh from hydrology
+  `channelPolylines`, and `ModeStartupPreparer.ts` feeds the loaded bake
+  artifact into it during terrain startup. This is independent from the
+  existing global Three.js water plane, so A Shau can keep the sea-level plane
+  disabled while still receiving DEM-following provisional stream strips.
+- Added WaterSystem behavior coverage for the important contract: disabling the
+  global water plane does not hide hydrology river strips, and switching to a
+  mode with no hydrology bake clears the strip mesh.
+- Refreshed the water-system audit:
+  `artifacts/perf/2026-05-06T10-07-20-371Z/projekt-143-water-system-audit/water-system-audit.json`.
+  It remains WARN by design and now records the provisional river-strip water
+  consumer plus startup wiring. Added the repeatable headed proof command
+  `npm run check:projekt-143-water-runtime-proof`; latest artifact:
+  `artifacts/perf/2026-05-06T10-26-04-620Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
+  It passes runtime mesh presence: Open Frontier reports `12` channels / `592`
+  segments with global water enabled, and A Shau reports `12` channels / `552`
+  segments with global water disabled. Refreshed completion audit:
+  `artifacts/perf/2026-05-06T10-28-08-726Z/projekt-143-completion-audit/completion-audit.json`;
+  Projekt remains `NOT_COMPLETE` with KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release blockers.
+- Validation: `npx vitest run src/systems/environment/WaterSystem.test.ts`
+  PASS (`6` tests), `npm run typecheck` PASS,
+  `npm run check:projekt-143-water-system` WARN as expected, and
+  `npm run check:projekt-143-water-runtime-proof` PASS. The packaged proof
+  screenshots were visually inspected and remain provisional. `npm run
+  check:projekt-143-completion-audit` PASS as a NOT_COMPLETE audit.
+- Non-claim: this is not accepted stream art yet. It still needs matched Open
+  Frontier/A Shau browser screenshots, perf captures on a quiet machine,
+  terrain crossing/bank polish, and human visual review before KB-TERRAIN can
+  treat water/river rendering as closed.
+
+2026-05-06 Projekt Objekt-143 hydrology runtime proxy cleanup
+- Removed broad dry-cell hydrology proxy rules from the large-map terrain
+  configs: A Shau no longer assigns low flats/shoulders to `swamp` or
+  `riverbank` by elevation alone, and Open Frontier no longer assigns base
+  `riverbank` by elevation alone. Baked hydrology masks now own wet/channel
+  vegetation classification through the runtime classifier path.
+- Added a narrow A Shau dry lowland `tallGrass` base rule for ground-cover
+  pockets outside hydrology corridors, so the distribution fix does not need to
+  widen swamp/riverbank bands.
+- Updated `scripts/projekt-143-terrain-hydrology-audit.ts` so the audit applies
+  `HydrologyBiomeClassifier` to the sampled cells before judging
+  riverbank/swamp coverage. Latest artifact:
+  `artifacts/perf/2026-05-06T17-01-02-257Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`.
+  It is PASS: A Shau wet candidates remain `6.24%`, Open Frontier wet
+  candidates remain `2.47%`, and both now show `100%` runtime wet-candidate
+  coverage with `0%` dense-jungle wet candidates.
+- Updated `scripts/projekt-143-terrain-distribution-audit.ts` so CPU biome and
+  vegetation density projections include runtime hydrology classification when
+  a baked classifier is enabled. Latest artifact:
+  `artifacts/perf/2026-05-06T17-00-32-427Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+  It clears A Shau's uniform-biome flag after adding the dry lowland
+  `tallGrass` ground-cover band, and remains WARN overall only because AI
+  Sandbox samples a random seed mode with the fixed audit fallback.
+- Updated the hydrology/projekt/handoff docs to point at the current runtime
+  classification evidence and to route the next KB-TERRAIN work toward
+  clustered ground cover, palm/understory pockets, bamboo/trail permissioning,
+  and visual acceptance instead of widening dry-cell hydrology corridors.
+- Validation: `npx vitest run src/systems/terrain/BiomeClassifier.test.ts
+  src/systems/terrain/hydrology/HydrologyBiomeClassifier.test.ts
+  src/systems/terrain/VegetationScatterer.test.ts
+  src/config/gameModeHydrology.test.ts` PASS (`22` tests);
+  `npm run typecheck` PASS; `npm run build:perf` PASS;
+  `npm run check:projekt-143-terrain-hydrology` PASS;
+  `npm run check:projekt-143-terrain-distribution` WARN as expected;
+  `npm run check:projekt-143-completion-audit` remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T10-55-02-880Z/projekt-143-completion-audit/completion-audit.json`.
+- Non-claim: this is static/runtime classification cleanup, not final terrain
+  ecology or river visual acceptance. KB-TERRAIN still needs ground-level and
+  elevated browser review, matched perf captures, and human acceptance.
+
+2026-05-06 Projekt Objekt-143 terrain horizon proof refresh
+- Ran `npm run check:projekt-143-terrain-baseline -- --no-build` after the
+  hydrology runtime proxy cleanup. Latest artifact:
+  `artifacts/perf/2026-05-06T10-51-52-518Z/projekt-143-terrain-horizon-baseline/summary.json`.
+  It is PASS: four Open Frontier/A Shau elevated screenshots were captured,
+  renderer/terrain/vegetation metrics were present for all shots, browser/page
+  errors were zero, and the proof linked trusted current Open Frontier/A Shau
+  perf-before summaries.
+- Refreshed `npm run check:projekt-143-completion-audit` afterward. It remains
+  `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T10-55-02-880Z/projekt-143-completion-audit/completion-audit.json`.
+  Remaining blockers are still KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release.
+- Updated the hydrology/projekt/handoff/state docs with the new terrain proof
+  and audit anchors.
+- Non-claim: this is runtime terrain evidence, not final human acceptance of
+  far-horizon art and not production parity.
+
+2026-05-06 Projekt Objekt-143 vegetation candidate import-plan dry run
+- Added `scripts/projekt-143-vegetation-candidate-import-plan.ts` and
+  `npm run check:projekt-143-vegetation-candidate-import-plan`. The command
+  verifies the selected Pixel Forge `kb-load-vegetation-256` candidate
+  color/normal/meta files against the current TIJ runtime destination paths
+  without copying anything by default. A future actual copy requires both
+  `--apply` and `--owner-accepted`.
+- Dry-run artifact:
+  `artifacts/perf/2026-05-06T11-03-21-671Z/projekt-143-vegetation-candidate-import-plan/import-plan.json`.
+  Status is PASS with `importState=dry_run_ready`, `4/4` selected replacements
+  ready, `1024x1024` color/normal dimensions, `256px` tile metadata,
+  `normalSpace=capture-view`, and `albedo,normal` aux-layer checks passing.
+- Wired the import-plan artifact into `scripts/projekt-143-completion-audit.ts`.
+  Refreshed completion audit:
+  `artifacts/perf/2026-05-06T11-03-38-131Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE`: KB-LOAD is still `ready_for_branch` because owner
+  visual acceptance, actual import, and quiet-machine startup before/after
+  tables are still open.
+- Validation: `npm run check:projekt-143-vegetation-candidate-import-plan`
+  PASS, `npm run check:projekt-143-completion-audit` PASS as a NOT_COMPLETE
+  audit, and `npm run typecheck` PASS.
+- Non-claim: this does not accept or import Pixel Forge candidate vegetation
+  into runtime and does not prove startup, in-game lighting, or production
+  parity.
+
+2026-05-06 Projekt Objekt-143 terrain visual-review packet and audit wiring
+- Ran the new KB-TERRAIN visual review path after the terrain horizon proof.
+  Artifact:
+  `artifacts/perf/2026-05-06T11-24-43-438Z/projekt-143-terrain-visual-review/visual-review.json`
+  with markdown summary
+  `artifacts/perf/2026-05-06T11-24-43-438Z/projekt-143-terrain-visual-review/visual-review.md`
+  and contact sheet
+  `artifacts/perf/2026-05-06T11-24-43-438Z/projekt-143-terrain-visual-review/terrain-visual-contact-sheet.png`.
+  It is PASS: eight Open Frontier/A Shau screenshots cover player-ground,
+  route/trail, river-oblique, and river-ground views with zero browser/page
+  errors and nonblank image checks.
+- Wired that visual-review artifact into
+  `scripts/projekt-143-completion-audit.ts` as KB-TERRAIN evidence. The audit
+  now records terrain visual-review status, screenshot count, hydrology shot
+  count, per-mode browser/page errors, and the packet non-claims without
+  promoting KB-TERRAIN to accepted.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T11-37-25-850Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE`; blockers are still KB-LOAD, KB-TERRAIN, KB-CULL,
+  and validation/release.
+- Validation: `npm run check:projekt-143-completion-audit` PASS as a
+  NOT_COMPLETE audit, and `npm run typecheck` PASS.
+- Resource note: the 07:18 local process check showed no Chrome/Edge/Bun/dev
+  server processes to clean up, only the local Codex Node process.
+- Non-claim: the visual-review packet does not accept terrain art,
+  hydrology river visuals, matched perf, runtime imports, release, or
+  production parity. It gives the owner a concrete packet to review next.
+
+2026-05-06 Projekt Objekt-143 terrain visual packet matched-perf rejection
+- Attempted the resource-free matched Open Frontier perf leg after the
+  terrain visual-review packet:
+  `artifacts/perf/2026-05-06T11-30-35-349Z/summary.json`.
+  The capture is rejected as KB-TERRAIN acceptance evidence because validation
+  failed.
+- Useful details: measurement trust PASS, `119` samples, frame progression
+  PASS, average frame `14.12ms` PASS, shots/hits PASS (`99` / `51`), max
+  harness stuck `1.0s` PASS, and end heap growth PASS (`15.74 MB`). The
+  blockers were heap peak growth FAIL at `137.50 MB` and peak p99 WARN at
+  `49.80ms`.
+- The heap spike peaked around `257.43 MB` used JS heap near sample `75`
+  (`2026-05-06T11:33:03.816Z`) and recovered `88.6%` by the end. Console
+  warnings included repeated terrain-stall/backtracking notices, but no
+  browser errors or crashes.
+- A Shau paired perf was not run from this acceptance slot because the first
+  leg of the pair was already invalid. Next work should investigate whether
+  the Open Frontier heap peak is terrain/vegetation streaming, active-driver
+  route churn, or a transient allocation/GC pattern before trying to claim
+  matched KB-TERRAIN perf.
+- Refreshed completion audit after wiring the latest perf-summary readback:
+  `artifacts/perf/2026-05-06T11-37-25-850Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE` and now records the rejected Open Frontier perf
+  attempt under KB-TERRAIN instead of leaving it as a loose artifact.
+
+2026-05-06 Projekt Objekt-143 perf heap diagnostic
+- Added `scripts/projekt-143-perf-heap-diagnostic.ts` and
+  `npm run check:projekt-143-perf-heap-diagnostic`. The script consumes a
+  perf artifact directory, summarizes heap baseline/peak/end/recovery,
+  renderer resource deltas, stream signals near the peak, console warning
+  counts, and a conservative classification.
+- Ran it against the rejected Open Frontier capture:
+  `artifacts/perf/2026-05-06T11-42-10-167Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`.
+  It is WARN by design because the source capture failed validation. It
+  classifies the failure as `transient_gc_wave` with likely source
+  `vegetation_cell_streaming_or_other_short_lived_runtime_allocations_near_player_traversal`:
+  baseline `124.70 MB`, peak `257.43 MB`, end `135.66 MB`, reclaimed-from-peak
+  ratio `0.9174`, renderer textures stable at `370`, and vegetation pending
+  observed near the peak.
+- Wired that diagnostic into `scripts/projekt-143-completion-audit.ts`.
+  Refreshed completion audit:
+  `artifacts/perf/2026-05-06T11-43-04-634Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE` with the same blockers, but KB-TERRAIN now carries
+  the rejected perf run plus heap-diagnostic classification.
+- Validation: `npm run check:projekt-143-perf-heap-diagnostic -- --artifact
+  artifacts/perf/2026-05-06T11-30-35-349Z` WARN as expected, `npm run
+  check:projekt-143-completion-audit` PASS as a NOT_COMPLETE audit, and
+  `npm run typecheck` PASS.
+- Non-claim: this does not reduce heap use, accept terrain perf, or close
+  KB-TERRAIN. Next useful runtime work is reducing/instrumenting short-lived
+  vegetation allocation around residency changes before rerunning the matched
+  Open Frontier/A Shau pair.
+
+2026-05-06 Projekt Objekt-143 active-driver/foundation follow-up
+- Hardened the active-driver stress harness against the owner-observed
+  close-contact twitch: target locks now hold through the intended stale
+  window, ENGAGE/ADVANCE transitions have dwell time, scripted ENGAGE strafe
+  is disabled by default, route progress/no-progress resets are telemetered
+  through `perf-capture`, and close current-target aim wins over route-facing.
+  Final local Open Frontier proof
+  `artifacts/perf/2026-05-06T12-25-16-980Z/summary.json` is measurement-trusted
+  OK/WARN only on peak p99, with `232` shots, `33` hits, max stuck `1.0s`,
+  `7` route-target resets, and `1` route no-progress reset. Treat compressed
+  frontline NPC proximity as stress-script behavior, not natural distribution
+  evidence.
+- Extended `scripts/projekt-143-terrain-visual-review.ts` from `8` terrain/
+  hydrology shots to `14` shots by adding airfield-foundation,
+  airfield-parking, and support-foundation views for both Open Frontier and
+  A Shau. The first rebuilt packet exposed foundation/helipad pad shoulder
+  problems that the static placement audit could not see.
+- Implemented the terrain-side candidate for visible foundation overhang:
+  generated airfield structures run through the footprint solver, large static
+  props search a wider flat candidate radius, and circular terrain stamps now
+  cover their authored surface outer radius with a graded helipad shoulder.
+  Rebuilt visual packet:
+  `artifacts/perf/2026-05-06T12-50-19-106Z/projekt-143-terrain-visual-review/visual-review.json`;
+  contact sheet:
+  `artifacts/perf/2026-05-06T12-50-19-106Z/projekt-143-terrain-visual-review/terrain-visual-contact-sheet.png`.
+  It is PASS for `14/14` screenshots and zero browser/page errors.
+- Validation: targeted active-driver/world/terrain/helipad Vitest slices pass,
+  `npm run typecheck` PASS, `npm run build:perf` PASS. The placement audit
+  was later tightened to flag large native relief under otherwise flat pads.
+  Open Frontier `supply_depot_main` / `zone_depot` moved from `(-800,-200)`
+  to nearby flatter terrain at `(-820,-160)`, clearing the Open Frontier
+  foundation-native-relief warning. The latest
+  `npm run check:projekt-143-terrain-placement` now exits 0 with WARN at
+  `artifacts/perf/2026-05-06T14-15-44-549Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  for several TDM/Zone Control seed-variant pads only. `npm run
+  check:projekt-143-completion-audit` remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T14-17-54-150Z/projekt-143-completion-audit/completion-audit.json`.
+- Non-claim: KB-TERRAIN is still not closed. The latest contact sheet is
+  improved but still shows steep artificial shoulders in places; Pixel Forge
+  upgraded building/vehicle GLBs are not imported, owner art acceptance and
+  matched Open Frontier/A Shau perf are open, and validation/release remains
+  blocked by uncommitted local work.
+- Asset-side note: refreshed `npm run check:projekt-143-terrain-assets` at
+  `artifacts/perf/2026-05-06T13-16-02-955Z/projekt-143-terrain-asset-inventory/terrain-asset-inventory.json`.
+  It is WARN/review-required with `12` building candidates, `5` Pixel Forge
+  ground-cover props, `12` terrain textures, and no missing assets. The new
+  GLB metadata pass records `5,704` candidate-building triangles, `7,528`
+  runtime structure/foundation triangles, and `30` medium/high optimization
+  risks, mostly from many small meshes/materials/primitives rather than heavy
+  triangle counts. It also catalogs the sibling Pixel Forge gallery as `19`
+  building GLBs totaling `18,338` triangles and `5` ground-vehicle GLBs
+  totaling `5,272` triangles, all review-only until side-by-side visuals,
+  footprint/collision, batching, and driving-surface probes pass. This is a
+  catalog anchor for the requested upgraded building/vehicle GLB path; no
+  replacement import or optimization claim is made yet.
+- Added `scripts/projekt-143-pixel-forge-structure-review.ts` and
+  `npm run check:projekt-143-pixel-forge-structure-review`, then wired it into
+  `npm run check:projekt-143`. Latest review:
+  `artifacts/perf/2026-05-06T13-23-33-214Z/projekt-143-pixel-forge-structure-review/structure-review.json`;
+  contact sheet:
+  `artifacts/perf/2026-05-06T13-23-33-214Z/projekt-143-pixel-forge-structure-review/structure-contact-sheet.png`.
+  It is WARN/review-required: `19/19` Pixel Forge building candidates have
+  source validation grids, `0/5` current Pixel Forge ground-vehicle GLBs have
+  matching grids, and `4` ground-vehicle grids are orphaned from older
+  validation assets. This makes the building replacement shortlist
+  reviewable, but vehicle-driving candidates still need fresh Pixel Forge-side
+  grids plus wheel/contact/pivot checks before TIJ import.
+- Refreshed `npm run check:projekt-143` at
+  `artifacts/perf/2026-05-06T13-23-35-289Z/projekt-143-evidence-suite/suite-summary.json`;
+  it now includes the Pixel Forge structure review step and remains PASS.
+
+2026-05-06 Projekt Objekt-143 KB-CULL visible draw-call attribution
+- Extended `scripts/projekt-143-scene-attribution.ts` and `scripts/perf-capture.ts`
+  with visible mesh/instance/draw-call-like counters so hidden static sectors
+  do not have to be inferred from total resident mesh counts.
+- Updated `scripts/projekt-143-culling-owner-baseline.ts` to use
+  `ownerVisibleDrawCallLike` for the selected world-static/visible-helicopter
+  owner-path guardrails while retaining total draw-call-like as resident cost
+  context. Updated `scripts/projekt-143-cycle3-kickoff.ts` to compare visible
+  owner draw-call deltas, with fallback for older artifacts.
+- Refreshed `npm run check:projekt-143-culling-baseline`:
+  `artifacts/perf/2026-05-06T13-30-08-586Z/projekt-143-culling-owner-baseline/summary.json`.
+  It is PASS and records the selected owner path guardrails as Open Frontier
+  visible owner draw-call-like `<353`, A Shau visible owner draw-call-like
+  `<656`, Open Frontier total renderer draw calls `<=926`, and A Shau total
+  renderer draw calls `<=206` for a future matched after slice.
+- Refreshed `npm run check:projekt-143-cycle3-kickoff`:
+  `artifacts/perf/2026-05-06T13-30-39-190Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  and `npm run check:projekt-143-completion-audit`:
+  `artifacts/perf/2026-05-06T14-17-54-150Z/projekt-143-completion-audit/completion-audit.json`.
+  Projekt remains `NOT_COMPLETE`; KB-CULL still needs a matched after change
+  proving lower visible owner draw calls or triangles without total draw-call
+  or interaction regressions.
+
+2026-05-06 Projekt Objekt-143 close-pressure cover/driver twitch follow-up
+- Human observation still showed close-contact twitching and lots of apparent
+  cover behavior under compressed-frontline stress near the player/HQ. The
+  frontline compression script can intentionally move OPFOR close to the
+  player in Open Frontier/A Shau, so do not treat those captures as natural NPC
+  distribution evidence.
+- Patched the utility-AI fire-and-fade route in `AIStateEngage` so it respects
+  the same `lastCoverSeekTime` cooldown window as the legacy cover finder
+  before re-entering `SEEKING_COVER`. This should reduce repeated cover-hop
+  state churn when many combatants are close and under pressure.
+- Patched `scripts/perf-active-driver.cjs` so the injected perf player-bot
+  holds and shoots inside the mode close-contact distance (`retreatDistance`)
+  instead of continuing to close to a hardcoded `8m`. The bot still never
+  back-pedals; it simply stops charging through crowded targets.
+- Validation: `npx vitest run src/systems/combat/ai/utility/UtilityScorer.test.ts
+  src/dev/harness/playerBot/states.test.ts --reporter=dot` PASS (`52` tests)
+  and `npx vitest run scripts/perf-harness/perf-active-driver.test.js
+  --reporter=dot` PASS (`159` tests). An attempted `node --test
+  scripts/perf-harness/perf-active-driver.test.js` was the wrong runner for
+  this Vitest-global test file and failed before the corrected run.
+- Final focused validation for this slice: `node --check
+  scripts/perf-active-driver.cjs` PASS, `npx tsc --noEmit --pretty false`
+  PASS, combined targeted Vitest PASS (`3` files / `211` tests), and scoped
+  `git diff --check` PASS. Refreshed completion audit:
+  `artifacts/perf/2026-05-06T14-17-54-150Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` with KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release still open.
+- Non-claim: no browser capture has accepted this as a skilled-player proxy
+  yet. Next runtime proof should rerun trusted Open Frontier/A Shau
+  active-driver captures and check objective progress, kill/hit gates, route
+  reset counts, and whether close-contact yaw/cover twitch is visually gone.
+
+2026-05-06 Projekt Objekt-143 close-pressure runtime proof rerun
+- Ran trusted headed Open Frontier after the close-pressure patch:
+  `artifacts/perf/2026-05-06T13-45-41-194Z/summary.json` with diagnostic
+  `artifacts/perf/2026-05-06T13-45-41-194Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+  Capture status is OK, measurement trust PASS, validation WARN only on peak
+  p99 `46.40ms`; active-driver gates pass with `150` shots, `17` hits, max
+  stuck `4.3s`, `8` movement transitions, `0` terrain blocks, and `780.67m`
+  player travel. Diagnostic PASS records `4` route objective-progress resets
+  and ends in `ADVANCE` toward a far current target around `450m`; this is
+  useful liveness evidence, not a final skilled-player/objective-progress
+  acceptance.
+- Ran trusted headed A Shau after the same patch:
+  `artifacts/perf/2026-05-06T13-49-19-901Z/summary.json` with diagnostic
+  `artifacts/perf/2026-05-06T13-49-19-901Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+  Capture status is OK, measurement trust PASS, validation WARN on heap
+  growth/recovery only. Active-driver gates pass with `49` shots, `6` hits,
+  max stuck `1.5s`, `3` movement transitions, `0` terrain blocks, and
+  `935.70m` player travel. Diagnostic PASS ends in `PATROL` on a zone
+  objective and closes objective distance by `500.45m` with one route
+  no-progress reset.
+- Visual read: the A Shau final frame still shows close bright fern/ground
+  cover that reads too neon/noisy in rain. Keep it as KB-TERRAIN visual polish
+  alongside the existing distribution/ground-cover pass; no new runtime change
+  was made in this slice.
+- Non-claim: close-pressure behavior is improved enough for continued testing,
+  but not accepted as final player-bot skill. Open Frontier still needs a
+  clearer objective/target policy decision for far OPFOR chasing versus
+  zone/frontline progress, and both modes need owner visual review for any
+  remaining twitch under dense close-contact pressure.
+
+2026-05-06 Projekt Objekt-143 active-driver/foundation hardening follow-up
+- Folded the latest owner observations into code and docs: close-contact
+  behavior should make progress toward mode objectives and emulate a skilled
+  player, not cover-hop or oscillate when many NPCs are near the player/HQ.
+  The compressed-frontline harness can intentionally create that crowding, so
+  treat dense HQ-side OPFOR as stress-script evidence until natural spawn/
+  distribution work is separately reviewed.
+- Player-bot changes: PATROL now keeps the mode objective unless a visible
+  target is inside the mode-specific acquisition band, ADVANCE/ENGAGE hold
+  close targets instead of charging through them, and the injected
+  `scripts/perf-active-driver.cjs` mirror reduced player-anchored compression
+  pressure. Added/updated behavior coverage in
+  `src/dev/harness/playerBot/states.test.ts` and
+  `scripts/perf-harness/perf-active-driver.test.js`.
+- Combat AI change: `AIStateEngage` now suppresses utility/legacy cover-seek
+  transitions while the target is already inside close range, so close contact
+  should resolve as fight/hold instead of repeated cover churn.
+- Player movement change: loosened the single-step ground-rise clamp from
+  `0.5m` to `0.75m`, with tests proving a `0.6m` stamped terrain lip does not
+  stall movement while a large terrain jump still does not launch the player.
+- Terrain/foundation change: moved the remaining TDM and Zone Control
+  flat-pad placements away from high native relief after the tightened audit
+  flagged seed-variant foundation overhang risk. `npm run
+  check:projekt-143-terrain-placement` is now PASS at
+  `artifacts/perf/2026-05-06T14-51-23-773Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`.
+  This clears the static foundation-relief audit only; owner visual review,
+  matched perf, and Pixel Forge upgraded building/vehicle GLB replacement
+  remain open.
+- Fresh Open Frontier proof after the selector/movement-clamp patch:
+  `artifacts/perf/2026-05-06T14-44-44-702Z/summary.json` with diagnostic
+  `artifacts/perf/2026-05-06T14-44-44-702Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+  Capture is OK, measurement trust PASS, validation WARN on p99/heap peak
+  only. Active-driver gates pass with `102` shots, `17` hits, `37` movement
+  transitions, max stuck `0.3s`, `0` route no-progress resets,
+  `blockReason=none`, and `465.97m` player travel. Diagnostic PASS only notes
+  shallow final objective closure (`17.9m`) while the bot fights a nearby OPFOR
+  inside the acquisition band.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T14-52-08-277Z/projekt-143-completion-audit/completion-audit.json`.
+  Projekt remains `NOT_COMPLETE`: KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release are still open, and the working tree is uncommitted.
+- Validation so far for this slice: `npm run build:perf` PASS,
+  `npm run check:projekt-143-active-driver-diagnostic -- --artifact
+  artifacts/perf/2026-05-06T14-44-44-702Z` PASS, and
+  `npm run check:projekt-143-completion-audit` PASS as a NOT_COMPLETE audit.
+  Final focused sweep also passed:
+  `npx vitest run src/systems/player/PlayerMovement.test.ts
+  src/dev/harness/playerBot/states.test.ts
+  src/systems/combat/ai/utility/UtilityScorer.test.ts
+  scripts/perf-harness/perf-active-driver.test.js
+  src/systems/terrain/TerrainFeatureCompiler.test.ts
+  src/systems/world/AirfieldLayoutGenerator.test.ts
+  src/systems/world/WorldFeatureSystem.test.ts --reporter=dot` (`299` tests),
+  `npx tsc --noEmit --pretty false` PASS, `node --check
+  scripts/perf-active-driver.cjs` PASS, `npm run
+  check:projekt-143-terrain-placement` PASS, and scoped `git diff --check`
+  PASS with line-ending warnings only.
+
+2026-05-06 Projekt Objekt-143 close-pressure suppression/player-driver follow-up
+- Fixed a second close-pressure cover-flicker source in
+  `CombatantSuppression`: heavy near-miss suppression now records
+  `nearMissCount`, `suppressionLevel`, and `panicLevel` without forcing
+  `SEEKING_COVER` unless the combatant already has a concrete
+  `coverPosition` and `destinationPoint`. This prevents orphan
+  `ENGAGING -> SEEKING_COVER -> ENGAGING` churn when dense nearby fire has no
+  valid cover anchor yet; real cover selection remains owned by
+  `AIStateEngage`.
+- Realigned the injected `scripts/perf-active-driver.cjs` mirror with the
+  TypeScript player-bot camera contract: while moving and not firing the bot
+  faces the route/objective movement target, and while firing it faces the
+  combat aim target. This removes the close-combat mismatch where the CJS
+  harness could look at an enemy while still issuing camera-relative forward
+  movement toward a different route target.
+- Fixed the close occluded-target stop. ADVANCE and transient lost-LOS ENGAGE
+  now keep repositioning toward occluded targets until a `6m` point-blank hold
+  distance instead of parking at the mode `pushInDistance` band (`15-18m` in
+  current stress profiles). Harness stuck telemetry now counts only when the
+  driver is actually requesting forward/strafe movement, so intentional
+  close-range hold-and-fire no longer looks like a movement stall.
+- Runtime diagnostics are behavior evidence only, not perf acceptance:
+  `artifacts/perf/2026-05-06T16-21-27-610Z` reproduced the close occluded
+  stop before the fix (`ADVANCE`, final objective distance `13.72m`,
+  requested speed `0`, max stuck `6.2s`). After the movement fix,
+  `artifacts/perf/2026-05-06T16-25-07-821Z` showed player travel
+  (`37.65m`) and nonzero requested/actual speed, but exposed the misleading
+  stuck timer during intentional firing holds. After the stuck-telemetry fix,
+  `artifacts/perf/2026-05-06T16-27-52-490Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  is WARN only because the capture failed perf/heap validation and closed only
+  `13.2m` of objective distance; behavior gates are healthy with `63` shots,
+  `7` hits, `3` kills, max stuck `0.2s`, `125.99m` player travel, average
+  requested speed `3.04`, average actual speed `3.51`, and movement block
+  reason `none`.
+- Validation: `npx vitest run
+  src/systems/combat/CombatantSuppression.test.ts
+  src/systems/combat/ai/AIStateEngage.test.ts --reporter=dot` PASS
+  (`51` tests), `npx vitest run src/dev/harness/playerBot/states.test.ts
+  scripts/perf-harness/perf-active-driver.test.js --reporter=dot` PASS
+  (`204` tests), `npx vitest run
+  scripts/perf-harness/perf-active-driver.test.js --reporter=dot` PASS
+  (`170` tests), `node --check scripts/perf-active-driver.cjs` PASS, and
+  `npx tsc --noEmit --pretty false` PASS before this docs update. Final
+  post-doc focused sweep also passed: combined targeted Vitest PASS (`4` files /
+  `257` tests), `node --check scripts/perf-active-driver.cjs` PASS,
+  `npx tsc --noEmit --pretty false` PASS, scoped `git diff --check` PASS with
+  line-ending warnings only, and `npm run check:projekt-143-completion-audit`
+  PASS as a NOT_COMPLETE audit at
+  `artifacts/perf/2026-05-06T17-02-15-898Z/projekt-143-completion-audit/completion-audit.json`.
+- Non-claim: this does not prove natural NPC distribution, broad AI cover
+  quality, close-pool/HLOD acceptance, matched perf, or release parity. The
+  120/60 NPC captures still log terrain-stall/backtracking and close-NPC pool
+  pressure under dense harness conditions, so KB-TERRAIN and KB-CULL remain
+  open.
+
+2026-05-06 Projekt Objekt-143 Pixel Forge structure/vehicle review-grid bridge
+- Added an opt-in source-gallery render path to
+  `scripts/projekt-143-pixel-forge-structure-review.ts`:
+  `--render-missing-ground-vehicles` renders current Pixel Forge ground-vehicle
+  GLBs into TIJ artifact grids without mutating Pixel Forge `war-assets`.
+  Default `npm run check:projekt-143-pixel-forge-structure-review` now reuses
+  the latest generated TIJ grids so the review remains stable without making
+  the static suite depend on a fresh browser/CDN render every run.
+- Fresh generated-grid pass:
+  `artifacts/perf/2026-05-06T16-40-53-448Z/projekt-143-pixel-forge-structure-review/structure-review.json`
+  PASS, with `19/19` building review grids, `5/5` current ground-vehicle
+  review grids, `5` generated ground-vehicle grids, and contact sheet
+  `artifacts/perf/2026-05-06T16-40-53-448Z/projekt-143-pixel-forge-structure-review/structure-contact-sheet.png`.
+- Fresh default check:
+  `npm run check:projekt-143-pixel-forge-structure-review` PASS at
+  `artifacts/perf/2026-05-06T16-45-59-860Z/projekt-143-pixel-forge-structure-review/structure-review.json`,
+  reusing the generated vehicle grids and keeping Pixel Forge clean.
+- Non-claim: this does not import upgraded building/vehicle GLBs, does not
+  accept replacements, does not certify wheel/contact/pivot points, collision
+  proxies, driving surfaces, LOD/HLOD, or runtime perf. It only removes the
+  source-gallery visual evidence gap for current Pixel Forge ground vehicles
+  before future replacement/driving decisions.
+
+2026-05-06 Projekt Objekt-143 foundation placement evidence refresh
+- Refreshed `npm run check:projekt-143-terrain-placement` after the structure
+  review bridge. The audit passed at
+  `artifacts/perf/2026-05-06T16-50-24-263Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  with `9` audited mode/seed entries, `57` flattened features, and `fail=0` /
+  `warn=0`.
+- Focused validation for the owner placement path passed:
+  `npx vitest run src/systems/world/AirfieldLayoutGenerator.test.ts
+  src/systems/world/WorldFeatureSystem.test.ts --reporter=dot` (`2` files /
+  `31` tests).
+- Non-claim: this is still static placement and unit-test evidence. It does
+  not accept Pixel Forge building/vehicle replacements, does not certify
+  wheel/contact/pivot points or future driving surfaces, and does not replace
+  human review of foundation shoulders in the latest screenshot packet.
+
+2026-05-06 Projekt Objekt-143 terrain route/distribution/hydrology refresh
+- Refreshed the non-mutating KB-TERRAIN static audits after the later placement
+  and culling evidence updates. `npm run check:projekt-143-terrain-routes`
+  passed at
+  `artifacts/perf/2026-05-06T17-00-32-294Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
+  with required route-aware modes using full `jungle_trail` stamping and no
+  route-policy flags.
+- `npm run check:projekt-143-terrain-distribution` wrote
+  `artifacts/perf/2026-05-06T17-00-32-427Z/projekt-143-terrain-distribution-audit/terrain-distribution-audit.json`.
+  It remains WARN only because AI Sandbox is a random-seed mode sampled with
+  fixed fallback seed `42`; Open Frontier and A Shau hydrology/material
+  distribution had no mode flags.
+- `npm run check:projekt-143-terrain-hydrology` passed at
+  `artifacts/perf/2026-05-06T17-01-02-257Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`.
+  A Shau wet candidates remain covered by runtime hydrology (`6.24%` current
+  hydrology, `100%` wet coverage, `0%` dense wet leakage), and Open Frontier
+  covers its wet/channel candidates without broad dry-cell leakage.
+- Non-claim: this refreshes static route/distribution/hydrology evidence only.
+  It does not accept final trail art, water/river visuals, imported
+  ground-cover assets, matched terrain perf, or human visual review.
+
+2026-05-06 Projekt Objekt-143 generated-placement foundation audit and close-pressure lock follow-up
+- Reopened the owner-observed airfield/building/vehicle foundation issue from
+  evidence rather than treating the prior PASS as final. The generated airfield
+  placement audit had a bug: `rotatePlacementOffset()` returns a
+  `THREE.Vector2`, but generated placements were sampled through `world.z`, so
+  large airfield building/aircraft/vehicle placements effectively reported
+  `0m` native relief.
+- Patched `scripts/projekt-143-terrain-placement-audit.ts` with generated
+  aircraft/building/ground-vehicle footprint proxies and native-relief warnings.
+  Latest `npm run check:projekt-143-terrain-placement` is WARN at
+  `artifacts/perf/2026-05-06T17-11-14-436Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  with `fail=0` / `warn=2`: Open Frontier `airfield_main` has `9` generated
+  placements over the native-relief review threshold, worst `parking_0` A-1 at
+  `32.03m` source span; A Shau `tabat_airstrip` flags the A-1 parking placement
+  at `8.54m` source span.
+- Patched `scripts/projekt-143-completion-audit.ts` so KB-TERRAIN now ingests
+  route, distribution, hydrology, and generated-placement relief evidence. The
+  completion audit remains NOT_COMPLETE at
+  `artifacts/perf/2026-05-06T17-15-24-908Z/projekt-143-completion-audit/completion-audit.json`
+  with KB-LOAD, KB-TERRAIN, KB-CULL, and validation/release still blocking.
+- Folded the latest owner observation into the close-pressure record: dense
+  nearby NPCs can still produce cover-like pacing/yaw twitch. Patched
+  `scripts/perf-active-driver.cjs` and `src/dev/harness/PlayerBot.ts` so active
+  close targets hold through brief LOS/nearest-enemy churn; tests were added for
+  the driver and TypeScript player bot.
+- Non-claim: no Pixel Forge structure/vehicle GLB has been imported or accepted,
+  no future driving surface/collision/pivot check has passed, no browser visual
+  proof shows the close-pressure twitch is gone, and no matched perf or
+  production parity is claimed.
+
+2026-05-06 Projekt Objekt-143 close-pressure browser diagnostic after target-lock patch
+- Ran a fresh headed compressed Open Frontier active-driver probe after the
+  target-lock patch:
+  `artifacts/perf/2026-05-06T17-25-29-462Z/summary.json`.
+  Measurement trust passed and movement liveness improved enough to avoid a
+  hard stuck failure: max stuck `0.3s`, `40` movement transitions, `237`
+  waypoints followed, `46` player shots, and `793.56m` player movement.
+- The run still failed validation and cannot be accepted as a skilled-player
+  proxy. Heap recovery failed, hit count was only `1`, route target resets were
+  `10`, route no-progress resets were `6`, and final objective closure was
+  negative (`-88.51m`). The diagnostic reader wrote
+  `artifacts/perf/2026-05-06T17-25-29-462Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  with WARN status.
+- Non-claim: the unit-level target-lock churn path is covered, but browser
+  evidence still rejects the close-pressure driver as a skilled objective
+  proxy. The next pass should inspect why compressed Open Frontier keeps
+  bouncing target/objective route ownership and why shots are not converting to
+  hits under this pressure.
+
+2026-05-06 Projekt Objekt-143 active-driver pure-pursuit/world-intent follow-up
+- Patched the retained active-driver path instead of carrying the rejected
+  blunt endpoint-snap/deadband experiment. `scripts/perf-active-driver.cjs`
+  now projects the player onto the current route before choosing a lookahead
+  point, falls back to aim-target world movement only for forward advance, and
+  uses a tactical hold distance below max fire range so the bot keeps closing
+  without diving into the noisy point-blank cluster. The TypeScript player-bot
+  state mirror uses the same tactical hold band.
+- Added movement-artifact heading-flip analysis to
+  `scripts/projekt-143-active-driver-diagnostic.ts`. The diagnostic now reports
+  player heading reversals and short-hop pacing reversals from
+  `movement-artifacts.json`, and returns WARN whenever findings are present
+  instead of printing PASS with warnings hidden in the payload.
+- Current best headed compressed Open Frontier proof:
+  `artifacts/perf/2026-05-06T18-24-22-092Z/summary.json` and
+  `artifacts/perf/2026-05-06T18-24-22-092Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+  Measurement trust PASS, validation WARN, `82` shots / `16` hits / `4` kills,
+  max stuck `0.5s`, `64` movement transitions, `148` waypoints followed, `2`
+  route no-progress resets, average frame `9.31ms`, p99 `35.80ms`, heap peak
+  growth `39.38MB`, and no console errors.
+- Non-claim: the visual hesitation is improved, not closed. The diagnostic is
+  WARN because final objective closure is only `15.2m` and the movement track
+  still records `22` heading reversals over `120` degrees, all short-hop pacing
+  reversals. This is far better than the rejected 90-plus-flip close-range
+  experiment, but it is not skilled-player acceptance.
+- Folded owner-observed NPC speed and foundation concerns into the current
+  blocker record. The speed suspicion needs a formal telemetry sanity gate:
+  latest spot checks show the largest spikes are often initial harness
+  relocation/compression segments, but some non-initial terrain
+  backtracking/recovery segments still exceed plausible run limits. Foundation
+  risk remains WARN at
+  `artifacts/perf/2026-05-06T17-11-14-436Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`,
+  with Open Frontier `airfield_main` and A Shau `tabat_airstrip` generated
+  placement relief warnings. Pixel Forge upgraded building/vehicle GLBs are
+  still review-only and future driving contact/pivot/collision surfaces are not
+  accepted.
+- Validation: combined targeted Vitest PASS (`5` files / `294` tests),
+  `node --check scripts/perf-active-driver.cjs` PASS, `npx tsc --noEmit
+  --pretty false` PASS, scoped `git diff --check` PASS with line-ending
+  warnings only, and
+  `npm run check:projekt-143-active-driver-diagnostic -- --artifact
+  artifacts/perf/2026-05-06T18-24-22-092Z` reran as WARN with the same
+  `15.2m` objective-closure and `22` short-hop heading-reversal findings.
+  `npm run check:projekt-143-completion-audit` remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-06T18-36-51-770Z/projekt-143-completion-audit/completion-audit.json`
+  with blockers on KB-LOAD, KB-TERRAIN, KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 rejected active-driver handoff/near-route fallback
+- Tested a narrow hypothesis from the `18-24-22-092Z` movement artifact:
+  residual reversals clustered around zero-move ENGAGE-to-ADVANCE handoff ticks
+  and near-exhausted route points. The attempted patch kept movement through
+  an occluded midrange ENGAGE-to-ADVANCE handoff and made a too-close route
+  movement target fall back to the far aim anchor.
+- Result: reject and revert. The browser proof
+  `artifacts/perf/2026-05-06T18-44-37-468Z/summary.json` failed validation.
+  It improved combat volume to `120` shots / `17` hits / `5` kills and kept
+  max stuck at `0.3s`, but the diagnostic
+  `artifacts/perf/2026-05-06T18-44-37-468Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  worsened the pacing metric to `46` heading reversals over `120` degrees
+  (`45` short-hop reversals), versus `22` on the current best artifact.
+- Validation after reverting the failed experiment:
+  `npx vitest run src/dev/harness/playerBot/states.test.ts
+  scripts/perf-harness/perf-active-driver.test.js --reporter=dot` PASS
+  (`2` files / `225` tests), `node --check scripts/perf-active-driver.cjs`
+  PASS, and the rejected helper/test strings are absent from the retained tree.
+ Current best evidence remains
+  `artifacts/perf/2026-05-06T18-24-22-092Z/summary.json`; continue from that
+  baseline rather than the reverted `18-44-37-468Z` branch.
+
+2026-05-06 Projekt Objekt-143 retained active-driver route micro-target fix
+- Added movement-artifact telemetry buckets for requested speed, actual speed,
+  movement intent, and terrain-block flags. The annotated no-behavior-change
+  baseline at
+  `artifacts/perf/2026-05-06T18-52-22-338Z/summary.json` proved the remaining
+  hesitation was commanded by the driver, not terrain collision drift: `79`
+  heading reversals over `120` degrees, `77` short-hop pacing reversals, `65`
+  requested-move pacing flips, `12` actual-only flips, and `0`
+  terrain-blocked flips.
+- Retained the narrow route-overlay micro-target fix in
+  `scripts/perf-active-driver.cjs`: when pure-pursuit returns a tiny route
+  overlay point while the real anchor is still far away, the driver invalidates
+  that stale route and replans instead of steering into a local oscillation or
+  falling back to the far aim anchor.
+- Current 90s headed Open Frontier proof:
+  `artifacts/perf/2026-05-06T18-57-51-385Z/summary.json` and
+  `artifacts/perf/2026-05-06T18-57-51-385Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+  Measurement trust PASS, validation WARN, `126` shots / `18` hits / `4`
+  kills, max stuck `0.3s`, `719.70m` player travel, `98.68m` objective
+  closure, `1` route no-progress reset, `9` heading reversals, `8` short-hop
+  pacing reversals, `8` requested-move pacing flips, `0` actual-only flips,
+  and `0` terrain-blocked flips.
+- Longer 180s headed Open Frontier check:
+  `artifacts/perf/2026-05-06T19-02-39-418Z/summary.json` and
+  `artifacts/perf/2026-05-06T19-02-39-418Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+  Measurement trust PASS, validation WARN, `36` shots / `6` hits / `1` kill,
+  max stuck `0.5s`, `1262.93m` player travel, `176.78m` objective closure,
+  `2` route no-progress resets, `20` heading reversals, `16` short-hop pacing
+  reversals, `15` requested-move pacing flips, `1` actual-only flip, and `0`
+  terrain-blocked flips. The visually inspected final frame shows the player
+  upright on the Ridge route rather than trapped; the back half is a low-contact
+  zone route with perceived enemies hundreds of meters away.
+- Validation: targeted Vitest PASS (`3` files / `207` tests),
+  `npx tsc --noEmit --pretty false` PASS, and both latest active-driver
+  diagnostics reran as WARN only for route no-progress resets, not heading
+  reversal findings.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T19-11-51-517Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE` with KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release blocking; validation/release also fails because the working
+  tree is dirty and local `master` is ahead of `origin/master`.
+- Quick NPC speed spot-check from `movement-artifacts.json` supports keeping
+  the owner-reported speed-spike issue open. The biggest apparent spikes are
+  usually first tracked segments after harness relocation/compression, but the
+  latest Open Frontier 180s proof still has `2` non-initial NPC route-follow
+  segments above `20m/s` after excluding first segments and requiring
+  `dt >= 0.25s`. Recent A Shau accepted route-stall proof
+  `artifacts/perf/2026-05-06T15-32-02-870Z/summary.json` shows `0`
+  non-initial NPC segments above `12m/s` by the same rough filter. Next pass
+  should formalize this as an artifact gate with explicit run/sprint/recovery
+  envelopes instead of relying on manual spot checks.
+- Non-claim: this fixes the route micro-target pacing mechanism well enough to
+  keep, but it is still not skilled-player acceptance. Remaining work is
+  combat pressure/target-distribution quality, NPC speed-spike telemetry that
+  excludes initial harness relocation/compression, and the already-open
+  terrain/foundation/vehicle-driving acceptance path.
+
+2026-05-06 Projekt Objekt-143 retained active-driver zone-gate/anchor-continuation and NPC speed-clock fix
+- Formalized the owner-observed NPC overspeed suspicion as a retained diagnostic
+  path instead of leaving it as a manual spot check. The bad reference artifact
+  `artifacts/perf/2026-05-06T19-20-55-127Z` recorded `2` non-initial hard
+  speed spikes with max non-initial speed `21.94m/s`. Root cause was stale
+  medium-LOD catch-up after high-LOD combatant updates: the high-LOD paths moved
+  NPCs without advancing `combatant.lastUpdateTime`, then a later medium-LOD
+  tick applied an oversized delta. `CombatantLODManager` now stamps
+  `lastUpdateTime` after high-LOD visual/ultralight/full updates, with unit
+  coverage for both clock stamping and stale catch-up prevention.
+- Retained the active-driver/player-bot routing fixes that address the hard
+  start-cluster pacing signature: zone objectives no longer let ALERT/ADVANCE
+  reacquire ungated far enemies, aggressive large-map objective selection can
+  route toward combat fronts beyond the old short target-acquisition band, route
+  exhaustion falls forward through the remembered route direction or direct
+  anchor continuation, and stale micro-route targets now recover toward the real
+  anchor instead of zeroing movement. The TypeScript harness mirror has the same
+  objective-aware ungated-target suppression as the injected CJS driver.
+- Rejected diagnostics kept for traceability: `artifacts/perf/2026-05-06T19-56-06-419Z`
+  proved the first fix still fell into a long zone loop (`96` heading reversals,
+  `94` short-hop pacing reversals); `artifacts/perf/2026-05-06T20-05-44-589Z`
+  fixed the zone loop but exposed route-exhaustion zero movement; and
+  `artifacts/perf/2026-05-06T20-10-49-441Z` restored movement/combat volume
+  (`96` shots / `11` hits) but failed validation on heap recovery and still had
+  `49` heading/pacing reversals. Do not use those as retained acceptance
+  evidence.
+- Current retained headed Open Frontier proof:
+  `artifacts/perf/2026-05-06T20-14-36-990Z/summary.json` and
+  `artifacts/perf/2026-05-06T20-14-36-990Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`.
+  Measurement trust PASS, capture OK with validation WARN only on p99
+  `31.10ms` and heap peak growth `38.72MB`, `150` shots / `18` hits / `6`
+  kills, max stuck `0.3s`, `64` movement transitions, `120` waypoints followed,
+  `201/365` nonzero movement-intent calls, `480.99m` player travel, final
+  objective kind `nearest_opfor`, objective distance `154.14m -> 129.89m`,
+  objective closure `24.25m`, `1` route no-progress reset, and the diagnostic
+  no longer reports heading-reversal or short-hop pacing findings. The paired
+  NPC speed diagnostic is PASS with max non-initial speed `6.1m/s` and `0`
+  non-initial hard/review spikes.
+- Validation: `npx vitest run scripts/perf-harness/perf-active-driver.test.js
+  src/dev/harness/playerBot/states.test.ts src/dev/harness/PlayerBot.test.ts
+  src/systems/combat/CombatantLODManager.test.ts
+  src/systems/combat/CombatantMovement.test.ts
+  scripts/perf-harness/projekt-143-npc-speed-diagnostic.test.ts
+  scripts/perf-harness/projekt-143-active-driver-diagnostic.test.ts
+  --reporter=dot` PASS (`7` files / `323` tests), `npx tsc --noEmit --pretty
+  false` PASS, `node --check scripts/perf-active-driver.cjs` PASS, and
+  `npm run build:perf` PASS with only the usual Vite chunk-size warning.
+- Non-claim: this fixes the hard twitch/stall mechanism enough to retain and
+  removes the current formal speed-spike failure, but it is still not
+  skilled-player or objective-flow acceptance. Objective closure remains modest,
+  route/objective quality still needs longer proof, and broader terrain
+  distribution/foundation/driving/KB-TERRAIN plus KB-LOAD/KB-CULL/release
+  blockers remain open.
+
+2026-05-06 Projekt Objekt-143 A Shau retained active-driver proof and completion-audit correction
+- Refreshed the formal completion audit before doing more work. It wrote
+  `artifacts/perf/2026-05-06T20-22-46-828Z/projekt-143-completion-audit/completion-audit.json`
+  and remained `NOT_COMPLETE`: KB-LOAD, KB-TERRAIN, KB-CULL, and
+  validation/release were still blockers.
+- Ran headed A Shau Valley browser proof against the retained active-driver and
+  NPC-speed fixes:
+  `artifacts/perf/2026-05-06T20-23-31-045Z/summary.json`. Measurement trust
+  PASS, capture OK, validation WARN only on heap peak growth `81.63MB`, average
+  frame `5.58ms`, peak p99 `13.90ms`, `389` shots / `98` hits / `23` kills,
+  max stuck `0.3s`, `454.31m` player travel, `22` movement transitions, `27`
+  waypoints followed, `0` route no-progress resets, and `0` browser errors.
+- Formal diagnostics on the same A Shau artifact:
+  `artifacts/perf/2026-05-06T20-23-31-045Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  is WARN only because objective distance closed `0.0m` by the current
+  final-sample metric; it reports no heading reversals, no pacing flips, no
+  terrain blocking, no route no-progress resets, and movement block reason
+  `none`. `artifacts/perf/2026-05-06T20-23-31-045Z/projekt-143-npc-speed-diagnostic/npc-speed-diagnostic.json`
+  is PASS with `0` initial/non-initial review or hard spikes and max
+  non-initial speed `4.5m/s`.
+- Corrected `scripts/projekt-143-completion-audit.ts` so the KB-TERRAIN
+  checklist no longer says active-driver browser proof is missing after it has
+  trusted Open Frontier and A Shau mode-pair evidence. The refreshed audit at
+  `artifacts/perf/2026-05-06T20-29-26-656Z/projekt-143-completion-audit/completion-audit.json`
+  still remains `NOT_COMPLETE`, but now records:
+  Open Frontier trusted proof `true`, A Shau trusted proof `true`, mode-pair
+  proof `true`, pacing signature clear `true`, and objective-flow still WARN
+  `true`.
+- Validation: `npx tsc --noEmit --pretty false` PASS and
+  `npm run check:projekt-143-completion-audit` PASS as a `NOT_COMPLETE` audit.
+- Non-claim: this is a meaningful closeout of the telemetry pacing/stuck
+  signature across Open Frontier and A Shau, but it does not complete
+  KB-TERRAIN. Remaining terrain blockers include objective-flow/human visual
+  acceptance, foundation/airfield relief, hydrology/water art/perf acceptance,
+  ground-cover runtime imports, and broader KB-LOAD/KB-CULL/release work.
+
+2026-05-06 Projekt Objekt-143 close-pressure combat movement follow-up
+- Fixed two movement-contract issues behind the owner-observed close-pressure
+  pacing/stall loop: generic ENGAGING backpedal now only happens under the
+  `6m` near-collision band instead of across the full close-combat range, and
+  RETREATING now has a `CombatantMovement` branch that walks toward its fallback
+  destination instead of carrying stale combat velocity.
+- Validation: focused movement/retreat/utility Vitest slice PASS (`4` files /
+  `73` tests), `npx tsc --noEmit --pretty false` PASS, `npm run build:perf`
+  PASS with the usual Vite chunk-size warning, broader targeted suite PASS
+  (`10` files / `380` tests), and scoped `git diff --check` on movement files
+  clean except CRLF warnings.
+- Runtime proof:
+  `artifacts/perf/2026-05-06T20-55-52-422Z/summary.json`. Measurement trust
+  PASS, capture OK, validation WARN on peak p99 `33.80ms`, `149` shots / `12`
+  hits / `4` kills, max stuck `0.3s`, `499.86m` player travel, `32` movement
+  transitions, `2` route no-progress resets, and final movement block reason
+  `none`.
+- Formal diagnostics on the same artifact:
+  `artifacts/perf/2026-05-06T20-55-52-422Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  remains WARN because objective distance closed only `-1.8m` by the final
+  sample and route objective-progress recovery reset path `2` times; it reports
+  `13` heading flips, `13` pacing flips, `12` requested-move pacing flips, and
+  `0` blocked-terrain flips.
+  `artifacts/perf/2026-05-06T20-55-52-422Z/projekt-143-npc-speed-diagnostic/npc-speed-diagnostic.json`
+  is PASS with max non-initial speed `6.08m/s`.
+- Manual movement-artifact comparison against the retained
+  `20-14-36-990Z` Open Frontier proof improved tracked-NPC worst path/net ratio
+  `12.2x -> 2.2x`, worst reversals `15 -> 4`, backtrack hotspots `33 -> 9`,
+  and pinned events `56 -> 35`. Contour activations rose (`655 -> 22043`), so
+  this is retained close-pressure/NPC-loop evidence, not final NPC pathing,
+  objective-flow, or skilled-player acceptance.
+
+2026-05-06 Projekt Objekt-143 terrain placement/foundation follow-up
+- Closed the static generated-placement warning left by the foundation audit.
+  `scripts/projekt-143-terrain-placement-audit.ts` now records exact-placement
+  core-span detail and scopes generated-placement core/native-relief warnings
+  to exact/no-flat-search parked aircraft, because generated structures use
+  the runtime flat-search solver and need screenshot review rather than a
+  pre-search static failure.
+- Forward-strip parking fix: moved the Huey to the taxi pad, moved the A-1
+  stand and route entry onto the apron, and added a dedicated packed-earth A-1
+  parking pad so the large A-1 footprint no longer straddles conflicting stamp
+  targets on A Shau's Tabat strip.
+- Static placement proof:
+  `artifacts/perf/2026-05-06T21-15-18-611Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  is PASS with `fail=0` / `warn=0` across AI Sandbox, TDM seeds `42`/`137`/`2718`,
+  Zone Control seeds `42`/`137`/`2718`, Open Frontier seed `42`, and A Shau.
+- Runtime visual packet:
+  `artifacts/perf/2026-05-06T21-16-29-510Z/projekt-143-terrain-visual-review/visual-review.json`
+  is PASS for Open Frontier and A Shau with zero browser/page errors. This is
+  review-packet evidence only; human foundation/art acceptance, matched perf,
+  Pixel Forge building/vehicle replacement, and future driving-surface checks
+  remain open.
+- Validation: `npx vitest run src/systems/terrain/TerrainFeatureCompiler.test.ts
+  src/systems/world/AirfieldLayoutGenerator.test.ts
+  src/systems/world/WorldFeatureSystem.test.ts --reporter=dot` PASS (`3` files /
+  `41` tests), `npx tsc --noEmit --pretty false` PASS, and `npm run build:perf`
+  PASS with the usual Vite chunk-size warning.
+- Completion audit refresh:
+  `artifacts/perf/2026-05-06T21-28-30-554Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`: KB-LOAD, broad KB-TERRAIN, KB-CULL, and
+  validation/release are still partial/failing. The audit now keeps the narrow
+  `20-55-52-422Z` movement diagnostic from downgrading the retained
+  active-driver pacing baseline: pacing/terrain findings are clear, while
+  objective closure and route-progress recovery remain WARN. The current
+  terrain placement warning itself is cleared, but Projekt Objekt-143 is not
+  complete.
+
+2026-05-06 Projekt Objekt-143 KB-LOAD banana candidate import guard
+- Hardened `scripts/projekt-143-vegetation-candidate-import-plan.ts` so the
+  selected Pixel Forge vegetation import plan now records candidate quality and
+  blocks `bananaPlant/banana-tree-sean-tarrant` when strong cyan-blue opaque
+  stem pixels are present. This directly protects the cleaned runtime banana
+  atlas from being overwritten by a generated candidate that still has the
+  owner-reported blue lower-stem artifact.
+- Refreshed import-plan evidence:
+  `artifacts/perf/2026-05-06T21-31-34-473Z/projekt-143-vegetation-candidate-import-plan/import-plan.json`
+  intentionally FAILS with `importState=blocked`: `3/4` selected vegetation
+  replacement sets are ready by path, dimension, metadata, and normal-map
+  contract, but the banana candidate has `4101` strong cyan-blue opaque stem
+  pixels.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T21-32-40-288Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`: KB-LOAD, broad KB-TERRAIN, KB-CULL, and
+  validation/release are still blockers. The KB-LOAD next step is to repair or
+  regenerate the Pixel Forge banana candidate before any
+  `--apply --owner-accepted` import can proceed.
+- Validation: `npx tsc --noEmit --pretty false` PASS, and
+  `npm run check:projekt-143-vegetation-candidate-import-plan` fails by design
+  as the guard artifact above. Treat that failure as the correct current state,
+  not as a broken script.
+
+2026-05-06 Projekt Objekt-143 KB-LOAD banana candidate repair
+- Repaired the Pixel Forge side of the banana blue-stem issue instead of only
+  blocking it downstream. In `C:\Users\Mattm\X\games-3d\pixel-forge`,
+  `scripts/run-tij-pipeline.ts` now postprocesses the known
+  `bananaPlant/banana-tree-sean-tarrant` atlas to recolor strong cyan-blue
+  opaque stem pixels to green during vegetation candidate generation, and
+  `scripts/validate-tij-vegetation-package.ts` now fails banana atlases with
+  nonzero strong cyan-blue stem pixels.
+- Ran `bun run tij:pipeline:kb-load-vegetation-256` in Pixel Forge, then
+  `bun run tij:vegetation-validate:kb-load-vegetation-256` PASS. Direct sharp
+  inspection of
+  `packages/server/output/tij-candidates/kb-load-vegetation-256/vegetation/bananaPlant/banana-tree-sean-tarrant/imposter.png`
+  reports `0` strong cyan-blue opaque pixels.
+- Refreshed TIJ candidate proof:
+  `artifacts/perf/2026-05-06T21-40-40-049Z/projekt-143-vegetation-candidate-proof/summary.json`
+  PASS with `4/4` selected color/normal/meta pairs complete and contact sheet
+  `artifacts/perf/2026-05-06T21-40-40-049Z/projekt-143-vegetation-candidate-proof/candidate-contact-sheet.png`.
+- Refreshed TIJ import plan after the new candidate proof:
+  `artifacts/perf/2026-05-06T21-41-01-701Z/projekt-143-vegetation-candidate-import-plan/import-plan.json`
+  PASS with `importState=dry_run_ready`, `4/4` ready items, and banana candidate
+  `strongCyanStemPixels=0`. No runtime assets were copied.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T21-41-18-896Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`: KB-LOAD is still `ready_for_branch`, not
+  `evidence_complete`, because owner visual acceptance, runtime import,
+  startup tables, and production parity are not claimed. Broad KB-TERRAIN,
+  KB-CULL, and validation/release remain blockers too.
+
+2026-05-06 Projekt Objekt-143 kickoff/culling evidence refresh
+- Wired `scripts/projekt-143-cycle3-kickoff.ts` to ingest the latest
+  `projekt-143-vegetation-candidate-proof` and
+  `projekt-143-vegetation-candidate-import-plan` artifacts. The kickoff now
+  reports the KB-LOAD 256px Pixel Forge vegetation candidate as proof/import
+  dry-run ready instead of still saying candidate generation is next.
+- Refreshed deterministic KB-CULL evidence:
+  `artifacts/perf/2026-05-06T21-46-53-599Z/projekt-143-culling-proof/summary.json`
+  PASS. The representative visible categories are world static features
+  `420` visible triangles / `35` draw-call-like, fixed-wing aircraft `2144` /
+  `58`, helicopters `1184` / `28`, vegetation imposters `2` / `1`, NPC
+  imposters `4` / `1`, and close NPC GLBs `659` / `7`.
+- Refreshed owner baseline:
+  `artifacts/perf/2026-05-06T21-47-00-204Z/projekt-143-culling-owner-baseline/summary.json`
+  PASS, selecting `large-mode-world-static-and-visible-helicopters` from the
+  latest trusted Open Frontier/A Shau scene attribution. Open Frontier owner
+  visible draw-call-like is `130` with visible unattributed triangles `1.073%`;
+  A Shau owner visible draw-call-like is `65` with visible unattributed
+  triangles `4.107%`.
+- Refreshed Cycle 3 kickoff:
+  `artifacts/perf/2026-05-06T21-49-41-394Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  PASS. KB-OPTIK and KB-EFFECTS remain `evidence_complete`; KB-LOAD,
+  KB-TERRAIN, and KB-CULL remain `ready_for_branch`.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T21-49-59-697Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` with the same blockers: KB-LOAD, broad KB-TERRAIN,
+  broad KB-CULL, and validation/release.
+- Validation: `npx tsc --noEmit --pretty false` PASS after the kickoff-script
+  change; `npm run check:projekt-143-culling-proof`,
+  `npm run check:projekt-143-culling-baseline`,
+  `npm run check:projekt-143-cycle3-kickoff`, and
+  `npm run check:projekt-143-completion-audit` all completed with the statuses
+  above.
+
+2026-05-06 Projekt Objekt-143 matched terrain/perf pair refresh
+- Parsed the latest sequential Open Frontier and A Shau captures after the
+  KB-LOAD candidate/import-plan and KB-CULL evidence refresh.
+- Open Frontier:
+  `artifacts/perf/2026-05-06T21-54-56-334Z/summary.json` is OK with
+  measurement trust PASS and validation WARN on peak p99 `34.00ms` plus heap
+  peak growth `57.77MB`; it recorded `159` shots / `15` hits / `4` kills and
+  `1576.68m` player travel.
+- A Shau:
+  `artifacts/perf/2026-05-06T21-58-44-146Z/summary.json` is OK with
+  measurement trust PASS and validation PASS; peak p99 is `11.70ms`, peak max
+  frame is `27.40ms`, and it recorded `639` shots / `86` hits / `25` kills and
+  `1167.65m` player travel.
+- Ran paired diagnostics for both artifact roots. NPC speed diagnostics PASS:
+  Open Frontier max non-initial speed `6.11m/s`; A Shau max non-initial speed
+  `4.5m/s`. Active-driver diagnostics remain WARN: Open Frontier has `9`
+  route objective-progress resets and `61` heading reversals over `120`
+  degrees; A Shau has `5` route objective-progress resets and `33` heading
+  reversals. Treat this as trusted liveness/perf evidence, not final
+  skilled-player, objective-flow, terrain-route, or human visual acceptance.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T22-07-06-284Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`: KB-LOAD, KB-TERRAIN, KB-CULL, and validation/release
+  are still blockers.
+
+2026-05-06 Projekt Objekt-143 KB-CULL air-vehicle frustum render-cull slice
+- Added conservative camera-frustum render gating to
+  `src/systems/vehicle/AirVehicleVisibility.ts` for unpiloted/non-near air
+  vehicles. Piloted vehicles still always render, near aircraft inside `120m`
+  stay visible even outside the frustum, and the test uses an `80m` bounding
+  sphere rather than a center-point check.
+- Added behavior coverage in `src/systems/vehicle/AirVehicleVisibility.test.ts`
+  for in-frustum rendering, behind-camera culling, and near off-frustum
+  visibility. Validation: `npx vitest run
+  src/systems/vehicle/AirVehicleVisibility.test.ts
+  src/systems/helicopter/HelicopterInteraction.test.ts
+  src/systems/vehicle/FixedWingInteraction.test.ts --reporter=dot` PASS
+  (`3` files / `19` tests), `npx tsc --noEmit --pretty false` PASS, and
+  `npm run build:perf` PASS with the usual Vite chunk-size warning.
+- Refreshed deterministic culling proof:
+  `artifacts/perf/2026-05-06T22-12-58-306Z/projekt-143-culling-proof/summary.json`
+  PASS.
+- Fresh matched after captures:
+  `artifacts/perf/2026-05-06T22-13-31-657Z/summary.json` (Open Frontier, OK,
+  measurement trust PASS, validation WARN on peak p99 `33.60ms` and heap peak
+  growth `41.60MB`) and
+  `artifacts/perf/2026-05-06T22-17-13-350Z/summary.json` (A Shau, OK,
+  measurement trust PASS, validation WARN on heap peak growth `44.04MB`, peak
+  p99 `11.80ms`, peak max frame `22.00ms`).
+- Culling owner baseline:
+  `artifacts/perf/2026-05-06T22-22-09-798Z/projekt-143-culling-owner-baseline/summary.json`
+  PASS. Open Frontier selected-owner visible draw-call-like is `117`
+  (`world_static_features=117`, `helicopters=0`), A Shau selected-owner visible
+  draw-call-like is `52` (`world_static_features=39`, `helicopters=13`), and
+  visible-unattributed triangles remain under `10%`.
+- Refreshed Cycle 3 kickoff:
+  `artifacts/perf/2026-05-06T22-23-06-483Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  PASS. It records the selected static-feature/visible-helicopter owner path as
+  scoped `evidence_complete`, while KB-CULL remains `ready_for_branch` at the
+  whole-bureau level because broad HLOD, parked-aircraft playtest, future
+  vehicle driving, and vegetation culling remain open.
+- Paired active-driver diagnostics remain WARN:
+  `artifacts/perf/2026-05-06T22-13-31-657Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  reports `9` route no-progress resets and `161` short-hop pacing reversals;
+  `artifacts/perf/2026-05-06T22-17-13-350Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  reports `30` waypoint replan failures and `7` route no-progress resets.
+  NPC speed diagnostics PASS in both after roots.
+- Refreshed completion audit:
+ `artifacts/perf/2026-05-06T22-22-48-759Z/projekt-143-completion-audit/completion-audit.json`
+ remains `NOT_COMPLETE`: KB-LOAD, broad KB-TERRAIN, broad KB-CULL, and
+ validation/release remain blockers.
+
+2026-05-06 Projekt Objekt-143 active-driver direct-combat fallback and owner water/combined-arms note
+- Retained a narrow active-driver fix in `scripts/perf-active-driver.cjs`:
+  route-overlay steering is skipped while the perf player is visibly firing and
+  closing, and current combat-target navmesh snap failure is surfaced as
+  `direct_combat_fallback` instead of repeated waypoint replan failures. Added
+  focused coverage in `scripts/perf-harness/perf-active-driver.test.js`.
+- Rejected and reverted a closer-target-lock override after fresh Open Frontier
+  proof worsened pacing. Rejected artifact:
+  `artifacts/perf/2026-05-06T22-39-50-930Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  (`125` heading reversals, `11` route no-progress resets).
+- Open Frontier retained-slice diagnostic:
+  `artifacts/perf/2026-05-06T22-34-05-681Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  remains WARN with `9` route no-progress resets and `45` short-hop pacing
+  reversals, but improves the earlier `161` reversal signal from
+  `22-13-31-657Z`.
+- A Shau retained-slice proof:
+  `artifacts/perf/2026-05-06T22-44-28-979Z/summary.json` is OK with validation
+  PASS and measurement trust PASS; paired diagnostic
+  `artifacts/perf/2026-05-06T22-44-28-979Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  records `333` shots / `46` hits / `14` kills, `0` waypoint replan failures,
+  objective closure `295.15m`, `9` heading reversals, and WARN only on `8`
+  route no-progress resets.
+- Validation: `node --check scripts/perf-active-driver.cjs` PASS,
+  `npx vitest run scripts/perf-harness/perf-active-driver.test.js
+  --reporter=dot` PASS (`203` tests), `npx tsc --noEmit --pretty false` PASS,
+  and `npm run build:perf` PASS with the usual Vite chunk-size warning.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T22-50-55-192Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE` with KB-LOAD, broad KB-TERRAIN, broad KB-CULL, and
+  validation/release still blocking.
+- Folded the owner note into `docs/PROJEKT_OBJEKT_143.md` and
+  `docs/PROJEKT_OBJEKT_143_HANDOFF.md`: current water is not natural enough and
+  remains a KB-TERRAIN human art blocker despite hydrology/runtime mesh proof;
+  NPC muddling remains a combined-arms objective-flow blocker requiring visible
+  objectives, support activity, movement pressure, and battlefield life.
+
+2026-05-06 Projekt Objekt-143 water naturalism mitigation
+- Mitigated the owner-rejected water look without claiming final acceptance.
+  `src/systems/environment/WaterSystem.ts` now uses a darker lower-distortion
+  global water profile and builds hydrology channels as narrower darker RGBA
+  ribbons with bank-to-channel vertex alpha instead of a flat emissive teal
+  strip. `src/systems/terrain/TerrainSurfaceRuntime.ts` now feathers the
+  hydrology terrain mask and uses linear filtering; `TerrainMaterial.ts` now
+  blends hydrology terrain contribution proportionally at very low strength
+  instead of replacing whole grid cells.
+- Hardened `scripts/projekt-143-water-runtime-proof.ts`: Playwright contexts
+  now block service workers, and the proof camera focuses on a representative
+  channel centerline rather than the full hydrology bounding box. The proof also
+  requires the `natural_channel_gradient` material profile and RGBA color
+  attribute.
+- Focused validation passed:
+  `npx vitest run src/systems/environment/WaterSystem.test.ts
+  src/systems/terrain/TerrainSystem.test.ts
+  src/systems/terrain/TerrainMaterial.test.ts --reporter=dot` (`3` files /
+  `30` tests), `node --check scripts/projekt-143-water-runtime-proof.ts`,
+  `node --check scripts/projekt-143-water-system-audit.ts`,
+  `npx tsc --noEmit --pretty false`, and `npm run build:perf` with the usual
+  Vite chunk-size warning.
+- Refreshed evidence:
+  `artifacts/perf/2026-05-06T23-23-35-936Z/projekt-143-water-system-audit/water-system-audit.json`
+  remains WARN by design and records the feathered terrain material mask plus
+  bank-to-channel river consumer;
+  `artifacts/perf/2026-05-06T23-26-44-103Z/projekt-143-water-runtime-proof/water-runtime-proof.json`
+  PASS with screenshots
+  `artifacts/perf/2026-05-06T23-26-44-103Z/projekt-143-water-runtime-proof/open_frontier-river-proof.png`
+  and
+  `artifacts/perf/2026-05-06T23-26-44-103Z/projekt-143-water-runtime-proof/a_shau_valley-river-proof.png`.
+- Non-claim: the latest close A Shau screenshot is better evidence but still
+  not final water art acceptance. KB-TERRAIN still needs a real stream/lake/flow
+  art pass and human review before water closes.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-06T23-31-20-865Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`. KB-LOAD, broad KB-TERRAIN, broad KB-CULL, and
+  validation/release still block completion; validation/release also notes the
+  current uncommitted working tree.
+
+2026-05-06 Projekt Objekt-143 combined-arms liveness mitigation
+- Fixed a concrete strategic-order bug in `src/systems/strategy/StrategicDirector.ts`:
+  the director now iterates the active factions present in the war state instead
+  of issuing orders only to hardcoded `US` and `NVA`. Defense, retreat, and
+  forward-reinforcement zone selection now uses alliance ownership, so ARVN
+  squads can defend US-owned objectives and VC squads retreat toward OPFOR
+  zones rather than the nearest enemy home base.
+- Added `src/systems/strategy/StrategicDirector.test.ts` coverage for both
+  mixed-faction cases. Focused validation passed:
+  `npx vitest run src/systems/strategy/StrategicDirector.test.ts
+  src/systems/strategy/WarSimulator.test.ts --reporter=dot` (`2` files / `8`
+  tests), broader strategy/combat-adjacent validation passed:
+  `npx vitest run src/systems/strategy/StrategicDirector.test.ts
+  src/systems/strategy/WarSimulator.test.ts src/systems/combat/SquadManager.test.ts
+  src/systems/combat/SpawnPositionCalculator.test.ts --reporter=dot` (`4`
+  files / `75` tests), `npx tsc --noEmit --pretty false` PASS, and
+  `npm run build:perf` PASS with the usual Vite chunk-size warning.
+- Non-claim: this is a tactical liveness fix for mixed-faction orders, not
+  complete combined-arms battlefield-feel acceptance. It still needs a browser
+  proof/playtest that objective pressure, support activity, and movement fronts
+  visibly reduce local NPC crowd churn.
+- Refreshed completion audit:
+ `artifacts/perf/2026-05-06T23-42-25-116Z/projekt-143-completion-audit/completion-audit.json`
+ remains `NOT_COMPLETE` with the same blockers: KB-LOAD, broad KB-TERRAIN,
+ broad KB-CULL, and validation/release.
+
+2026-05-06 Projekt Objekt-143 headed Open Frontier liveness proof after strategy fix
+- The first short headless Open Frontier capture
+  `artifacts/perf/2026-05-06T23-49-58-230Z/summary.json` failed diagnostic
+  trust: startup phase was live and `gameStarted=true`, but metrics frame
+  progression did not reach the default stabilization threshold, the active
+  driver never started, and measurement trust failed. Treat it as harness-noise
+  evidence only.
+- Forced-threshold headless rerun
+  `artifacts/perf/2026-05-06T23-53-26-820Z/summary.json` produced active-driver
+  telemetry but still failed measurement trust. It showed a perceived OPFOR at
+  roughly `202m` and a valid path, but only `3.8m` player movement and `0`
+  shots, so it is diagnostic only.
+- Headed Open Frontier rerun
+  `artifacts/perf/2026-05-06T23-55-53-018Z/summary.json` is the trustworthy
+  proof: capture OK, measurement trust PASS, validation WARN only on peak p99
+  and heap peak growth. The paired diagnostic
+  `artifacts/perf/2026-05-06T23-55-53-018Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  is PASS with `50` shots, `7` hits, `1` kill, max stuck `0.3s`, `17`
+  movement transitions, and objective pressure against nearest OPFOR.
+- Residual issue: the same headed run still logs NPC terrain-stall/backtracking
+  warnings, and `movement-artifacts.json` shows a large `npc_contour` hotspot
+  near `(-12, -1356)`. This means the active driver is functioning, but broad
+  NPC route/terrain flow and combined-arms battlefield-life acceptance remain
+  open.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-07T00-01-10-047Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`. KB-LOAD, broad KB-TERRAIN, broad KB-CULL, and
+  validation/release still block completion; validation/release still sees the
+  dirty working tree.
+
+2026-05-07T00Z Projekt Objekt-143 NPC terrain-route waypoint-skip mitigation
+- Patched `src/systems/combat/CombatantMovement.ts` so an NPC following a
+  navmesh route can skip a terrain-blocked intermediate waypoint when a later
+  waypoint on the same already-planned route is immediately walkable. This is
+  deliberately narrower than replanning or smoothing the route: it preserves the
+  route but avoids local terrain-lip contour/backtrack churn.
+- Added focused coverage in `src/systems/combat/CombatantMovement.test.ts` for
+  a blocked first waypoint with a walkable side waypoint.
+- Validation passed:
+  `npx vitest run src/systems/combat/CombatantMovement.test.ts --reporter=dot`
+  (`18` tests),
+  `npx vitest run src/systems/combat/CombatantMovement.test.ts
+  src/systems/combat/StuckDetector.test.ts
+  src/systems/combat/CombatantMovementStates.test.ts
+  src/systems/strategy/StrategicDirector.test.ts
+  src/systems/strategy/WarSimulator.test.ts --reporter=dot` (`5` files / `70`
+  tests), `npx tsc --noEmit --pretty false` PASS, and `npm run build:perf` PASS
+  with the usual Vite chunk-size warning.
+- Headed Open Frontier proof after the patch:
+  `artifacts/perf/2026-05-07T00-05-21-283Z/summary.json` is OK with measurement
+  trust PASS and validation WARN only on peak p99. Active-driver diagnostic
+  `artifacts/perf/2026-05-07T00-05-21-283Z/projekt-143-active-driver-diagnostic/active-driver-diagnostic.json`
+  is WARN only for `1` route objective-progress reset; it records `34` shots,
+  `6` hits, `2` kills, max stuck `0.0s`, objective closure `34.51m`, `198.80m`
+  player movement, and no heading/pacing flips.
+- NPC speed diagnostic PASS:
+  `artifacts/perf/2026-05-07T00-05-21-283Z/projekt-143-npc-speed-diagnostic/npc-speed-diagnostic.json`
+  (ignored `10` first tracked relocation/compression segments above `20m/s`;
+  no non-initial speed issue).
+- Movement artifact comparison versus the prior headed proof
+  `23-55-53-018Z`: `npc_contour` total improved `5355 -> 473`, `npc_backtrack`
+  `11 -> 0`, pinned events `17 -> 5`, and max pinned time `13.35s -> 6.67s`.
+  This supports keeping the waypoint-skip mitigation.
+- Non-claim: final-frame inspection still shows steep hillside combat and a
+  cliff-edge structure placement problem. This is an NPC route/terrain-stall
+  mitigation, not final combined-arms battlefield-feel or KB-TERRAIN placement
+  acceptance.
+- Refreshed completion audit:
+  `artifacts/perf/2026-05-07T00-10-28-535Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`. KB-LOAD, broad KB-TERRAIN, broad KB-CULL, and
+  validation/release still block completion; validation/release still sees the
+  dirty working tree.
+
+2026-05-07T00Z Projekt Objekt-143 KB-LOAD proof-only vegetation candidate startup evidence
+- Built fresh retail `dist/` with `npm run build`; prebuild regenerated stale
+  Open Frontier / Zone Control / TDM navmesh and heightmap prebakes, then Vite
+  and `cloudflare:assets:manifest` passed with the usual chunk-size warning.
+- Captured current-before startup tables from the same retail bundle:
+  Open Frontier
+  `artifacts/perf/2026-05-07T00-17-33-822Z/startup-ui-open-frontier/summary.json`
+  averaged `4387ms` mode-click-to-playable, `3654.7ms`
+  deploy-click-to-playable, `385.467ms` WebGL upload total, and `29.633ms`
+  average max upload; Zone Control
+  `artifacts/perf/2026-05-07T00-18-29-720Z/startup-ui-zone-control/summary.json`
+  averaged `4465.3ms` mode-click-to-playable, `3947ms`
+  deploy-click-to-playable, `395.833ms` WebGL upload total, and `33.9ms`
+  average max upload.
+- Added a proof-only candidate substitution mode to `scripts/perf-startup-ui.ts`.
+  `--use-vegetation-candidates` reads a PASS/dry-run-ready vegetation candidate
+  import plan and serves candidate color/normal/meta files for the matching
+  runtime vegetation URLs during the benchmark. It does not copy assets and does
+  not imply owner acceptance.
+- Captured after-candidate startup tables with the explicit import plan
+  `artifacts/perf/2026-05-06T21-41-01-701Z/projekt-143-vegetation-candidate-import-plan/import-plan.json`:
+  Open Frontier
+  `artifacts/perf/2026-05-07T00-21-34-591Z/startup-ui-open-frontier-vegetation-candidates/summary.json`
+  averaged `2049.7ms` mode-click-to-playable, `1417.3ms`
+  deploy-click-to-playable, `232.4ms` WebGL upload total, and `21.9ms`
+  average max upload; Zone Control
+  `artifacts/perf/2026-05-07T00-22-34-000Z/startup-ui-zone-control-vegetation-candidates/summary.json`
+  averaged `1934.7ms` mode-click-to-playable, `1369.3ms`
+  deploy-click-to-playable, `254.333ms` WebGL upload total, and `24.7ms`
+  average max upload.
+- Wired the candidate startup pair into
+  `scripts/projekt-143-load-branch-selector.ts` and
+  `scripts/projekt-143-cycle3-kickoff.ts`. Refreshed selector:
+  `artifacts/perf/2026-05-07T00-26-06-920Z/projekt-143-load-branch-selector/load-branch-selector.json`
+  reports `candidate_startup_proof_ready`, `12` candidate substitutions,
+  Open Frontier mode-click delta `-2337.333ms`, Zone Control mode-click delta
+  `-2530.666ms`, Open Frontier upload-total delta `-153.067ms`, and Zone
+  upload-total delta `-141.5ms`.
+- Refreshed Cycle 3 kickoff:
+  `artifacts/perf/2026-05-07T00-26-45-885Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`
+  remains PASS but keeps KB-LOAD `READY_FOR_BRANCH`, correctly noting that the
+  proof-only candidate startup win still requires owner visual acceptance,
+  accepted import, and real runtime proof.
+- Refreshed completion audit after the revised stabilization objective:
+ `artifacts/perf/2026-05-07T01-14-59-420Z/projekt-143-completion-audit/completion-audit.json`
+ remains `NOT_COMPLETE`: KB-LOAD, broad KB-TERRAIN, and broad KB-CULL are now
+ accepted only as captured roadmap/backlog signal, while validation/release
+ still blocks completion.
+
+2026-05-07T00Z Projekt Objekt-143 KB-TERRAIN placement and visual-review refresh
+- Refreshed the static placement/foundation audit:
+  `artifacts/perf/2026-05-07T00-32-41-375Z/projekt-143-terrain-placement-audit/terrain-placement-audit.json`
+  PASS with `57` audited features, `0` fails, and `0` warns across all audited
+  modes and seed variants. This is static source/stamp evidence only.
+- Refreshed the terrain visual-review packet once as a plain presence check,
+  then tightened `scripts/projekt-143-terrain-visual-review.ts` so it now
+  records `lumaMean`, `overexposedRatio`, and a
+  `terrain_water_exposure_review` check. The latest visual-review packet is:
+  `artifacts/perf/2026-05-07T01-03-50-825Z/projekt-143-terrain-visual-review/visual-review.json`
+  plus contact sheet
+  `artifacts/perf/2026-05-07T01-03-50-825Z/projekt-143-terrain-visual-review/terrain-visual-contact-sheet.png`.
+  It captured `14/14` expected Open Frontier/A Shau player-ground, route/trail,
+  airfield-foundation, airfield-parking, support-foundation, river-oblique, and
+  river-ground screenshots with zero browser/page errors, but now reports WARN
+  because the Open Frontier parking/river shots are washed out:
+  `overexposedRatio=0.7448`, `0.8115`, and `0.8309`, with luma means around
+  `233-237`.
+- Manual contact-sheet inspection keeps this as review evidence, not
+  acceptance: Open Frontier water and some pad/foundation compositions still
+  read flat/artificial, A Shau foundation shots are glare-heavy, and the river
+  views prove hydrology/water presence rather than natural final stream art.
+  KB-TERRAIN therefore remains open for owner visual acceptance, water art,
+  matched Open Frontier/A Shau perf, Pixel Forge building/vehicle replacement,
+  ground-cover/trail polish, and future vehicle-driving surface acceptance.
+- Refreshed completion audit after the revised stabilization objective:
+ `artifacts/perf/2026-05-07T01-14-59-420Z/projekt-143-completion-audit/completion-audit.json`
+  remains `NOT_COMPLETE`. KB-LOAD, broad KB-TERRAIN, and broad KB-CULL are now
+  treated as roadmap/backlog-captured future work for the stabilization closeout;
+  validation/release correctly remains blocked by the dirty working tree.
+
+2026-05-07 Projekt Objekt-143 objective revision to stabilization closeout
+- Owner direction changed: stop trying to force every experimental KB-LOAD,
+  KB-TERRAIN, and KB-CULL branch to final `evidence_complete` before release.
+  Revised target is to stabilize the useful current stack, preserve evidence,
+  fold unresolved research/TODOs into roadmap/backlog/handoff docs, then
+  validate, commit, push to `master`, deploy, and live-verify production.
+- Updated the control docs:
+  `docs/PROJEKT_OBJEKT_143.md` now defines "Projekt Objekt-143 Stabilization
+  Closeout"; `docs/PROJEKT_OBJEKT_143_HANDOFF.md` now carries the
+  "Stabilization Closeout Target"; `docs/ROADMAP.md` records that the next
+  Projekt revamp is deferred until after stabilization; `docs/BACKLOG.md`
+  carries the stabilization closeout checklist and deferred work list; and
+  `docs/STATE_OF_REPO.md` reflects the new current-state direction.
+- Updated `scripts/projekt-143-completion-audit.ts` so the completion gate now
+  treats unresolved KB-LOAD/KB-TERRAIN/KB-CULL work as acceptable only if it is
+  captured as future roadmap/backlog signal. The release gate still requires a
+  clean validated repo, push, deploy, and live production verification before
+  the objective can complete.
+- Refreshed `npm run check:projekt-143-completion-audit` after the pivot:
+  `artifacts/perf/2026-05-07T01-14-59-420Z/projekt-143-completion-audit/completion-audit.json`.
+  The revised audit passes every non-release item, including the roadmap/backlog
+  capture item, and fails only `validation-and-release` because the repo is
+  still dirty, unpushed, undeployed, and not live-verified.
+
+2026-05-07 Projekt Objekt-143 stabilization release prep
+- Refreshed the revised completion audit again:
+  `artifacts/perf/2026-05-07T01-22-12-487Z/projekt-143-completion-audit/completion-audit.json`.
+  It remains `NOT_COMPLETE` only because `validation-and-release` is blocked by
+  the dirty/unpushed/undeployed working tree; every non-release bureau,
+  owner-specific, and roadmap/backlog capture item passes under the revised
+  stabilization objective.
+- Ran `npm run validate:fast` after the pivot. It passed Pixel Forge cutover,
+  Pixel Forge NPC crop freshness, typecheck, lint, and `test:quick` with `262`
+  test files / `4075` tests passing.
+- Ran `npm run validate`. It passed lint, full Vitest (`262` files / `4075`
+  tests), production build, Cloudflare asset manifest generation, and local
+  production smoke at `http://127.0.0.1:54097/`. Remaining release work is to
+  commit the dirty tree, push `master`, run remote CI/deploy, and verify live
+  production parity.

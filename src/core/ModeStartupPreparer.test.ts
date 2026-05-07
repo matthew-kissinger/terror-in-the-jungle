@@ -10,6 +10,54 @@ import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../systems/terrain/NoiseHeightProvider';
 import { ASHAU_DEM_ASSET_ID, resetGameAssetManifestForTests } from './GameAssetManifest';
 
+const HYDROLOGY_MANIFEST = {
+  schemaVersion: 1,
+  generator: 'test',
+  entries: [
+    {
+      modeId: 'open_frontier',
+      source: 'procedural-noise',
+      seed: 42,
+      signature: 'hydrology-test-frontier-42',
+      hydrologyAsset: '/data/hydrology/open_frontier-42-hydrology.json',
+      worldSize: 3200,
+      sampleGridSize: 2,
+      sampleWorldInsetPercent: 4,
+      sampleSpacingMeters: 12,
+      depressionHandling: 'epsilon-fill',
+      wetCandidateAccumulationQuantile: 0.92,
+      channelCandidateAccumulationQuantile: 0.98,
+      wetCandidateSlopeMaxDegrees: 16,
+      wetCandidateElevationMaxMeters: 35,
+      currentHydrologyBiomeIds: ['riverbank'],
+    },
+  ],
+};
+
+const HYDROLOGY_ARTIFACT = {
+  schemaVersion: 1,
+  width: 2,
+  height: 2,
+  cellSizeMeters: 12,
+  depressionHandling: 'epsilon-fill',
+  transform: {
+    originX: -12,
+    originZ: -12,
+    cellSizeMeters: 12,
+  },
+  thresholds: {
+    accumulationP90Cells: 1,
+    accumulationP95Cells: 2,
+    accumulationP98Cells: 3,
+    accumulationP99Cells: 4,
+  },
+  masks: {
+    wetCandidateCells: [3],
+    channelCandidateCells: [3],
+  },
+  channelPolylines: [],
+};
+
 describe('ModeStartupPreparer', () => {
   beforeEach(() => {
     resetHeightQueryCache();
@@ -233,5 +281,154 @@ describe('ModeStartupPreparer', () => {
     expect(result.preparedHeightmap?.workerConfig.type).toBe('noise');
     expect(provider).toBeInstanceOf(BakedHeightProvider);
     expect((config as any).__prebakedHeightmap).toBeUndefined();
+  });
+
+  it('does not fetch hydrology caches unless the preload gate is enabled', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await configureHeightSource({} as any, GameMode.OPEN_FRONTIER, {
+      id: GameMode.OPEN_FRONTIER,
+      worldSize: 3200,
+      terrainSeed: 42,
+    } as any);
+
+    expect(result.kind).toBe('procedural');
+    expect(result.hydrologyBake).toBeNull();
+    expect(fetchMock.mock.calls.map(call => call[0])).not.toContain('/data/hydrology/bake-manifest.json');
+  });
+
+  it('preloads a seeded hydrology bake behind the explicit feature gate', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url === '/data/heightmaps/open_frontier-42.f32') {
+        return {
+          ok: false,
+          status: 404,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        };
+      }
+      if (url === '/data/hydrology/bake-manifest.json') {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => HYDROLOGY_MANIFEST,
+        };
+      }
+      if (url === '/data/hydrology/open_frontier-42-hydrology.json') {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => HYDROLOGY_ARTIFACT,
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await configureHeightSource({} as any, GameMode.OPEN_FRONTIER, {
+      id: GameMode.OPEN_FRONTIER,
+      worldSize: 3200,
+      terrainSeed: 42,
+      hydrology: {
+        preload: true,
+        manifestUrl: '/data/hydrology/bake-manifest.json',
+      },
+    } as any);
+
+    expect(result.kind).toBe('procedural');
+    expect(result.hydrologyBake?.entry.signature).toBe('hydrology-test-frontier-42');
+    expect(result.hydrologyBake?.artifact.masks.wetCandidateCells).toEqual([3]);
+    expect(fetchMock.mock.calls.map(call => call[0])).toEqual([
+      '/data/heightmaps/open_frontier-42.f32',
+      '/data/hydrology/bake-manifest.json',
+      '/data/hydrology/open_frontier-42-hydrology.json',
+    ]);
+  });
+
+  it('preloads hydrology when the biome-classification candidate gate is enabled', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url === '/data/heightmaps/open_frontier-42.f32') {
+        return {
+          ok: false,
+          status: 404,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        };
+      }
+      if (url === '/data/hydrology/bake-manifest.json') {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => HYDROLOGY_MANIFEST,
+        };
+      }
+      if (url === '/data/hydrology/open_frontier-42-hydrology.json') {
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => HYDROLOGY_ARTIFACT,
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await configureHeightSource({} as any, GameMode.OPEN_FRONTIER, {
+      id: GameMode.OPEN_FRONTIER,
+      worldSize: 3200,
+      terrainSeed: 42,
+      hydrology: {
+        biomeClassification: { enabled: true },
+      },
+    } as any);
+
+    expect(result.hydrologyBake?.entry.signature).toBe('hydrology-test-frontier-42');
+    expect(fetchMock.mock.calls.map(call => call[0])).toContain('/data/hydrology/bake-manifest.json');
+  });
+
+  it('keeps optional hydrology preload failure from blocking terrain startup', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url === '/data/heightmaps/open_frontier-42.f32') {
+        return {
+          ok: false,
+          status: 404,
+          arrayBuffer: async () => new ArrayBuffer(0),
+        };
+      }
+      if (url === '/data/hydrology/bake-manifest.json') {
+        return {
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          json: async () => ({}),
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await configureHeightSource({} as any, GameMode.OPEN_FRONTIER, {
+      id: GameMode.OPEN_FRONTIER,
+      worldSize: 3200,
+      terrainSeed: 42,
+      hydrology: {
+        preload: true,
+        biomeClassification: { enabled: true },
+      },
+    } as any);
+
+    expect(result.kind).toBe('procedural');
+    expect(result.hydrologyBake).toBeNull();
+    expect(fetchMock.mock.calls.map(call => call[0])).toContain('/data/hydrology/bake-manifest.json');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

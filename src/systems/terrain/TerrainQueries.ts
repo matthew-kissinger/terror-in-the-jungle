@@ -6,6 +6,7 @@ import { getHeightQueryCache } from './HeightQueryCache';
 const _queryPos = new THREE.Vector3();
 const _rayTarget = new THREE.Vector3();
 const _collisionBox = new THREE.Box3();
+const MAX_IMPLICIT_SUPPORT_SURFACE_DELTA = 1.25;
 
 /**
  * Terrain query facade. Replaces ChunkTerrainQueries.
@@ -32,7 +33,7 @@ export class TerrainQueries {
   }
 
   /**
-   * Get effective height considering collision objects (e.g. sandbags).
+   * Get effective height considering low, standable collision surfaces.
    */
   getEffectiveHeightAt(x: number, z: number): number {
     let height = this.getHeightAt(x, z);
@@ -42,7 +43,13 @@ export class TerrainQueries {
       if (!obj.visible) continue;
       const box = this.getCollisionBounds(entry);
 
-      if (x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z) {
+      if (
+        x >= box.min.x
+        && x <= box.max.x
+        && z >= box.min.z
+        && z <= box.max.z
+        && this.canSupportEffectiveHeight(entry, box, height)
+      ) {
         height = Math.max(height, box.max.y);
       }
     }
@@ -141,5 +148,24 @@ export class TerrainQueries {
       entry.bounds.setFromObject(entry.object);
     }
     return entry.bounds;
+  }
+
+  private canSupportEffectiveHeight(
+    entry: {
+      object: THREE.Object3D;
+      dynamic: boolean;
+    },
+    box: THREE.Box3,
+    terrainHeight: number,
+  ): boolean {
+    if (entry.dynamic) {
+      return false;
+    }
+
+    if (entry.object.userData.type === 'helipad') {
+      return true;
+    }
+
+    return box.max.y - terrainHeight <= MAX_IMPLICIT_SUPPORT_SURFACE_DELTA;
   }
 }

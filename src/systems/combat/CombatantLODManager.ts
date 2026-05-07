@@ -375,11 +375,13 @@ export class CombatantLODManager {
       // Flat cascade: severe -> hard exceeded -> full update
       if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
         this.updateCombatantUltraLight(combatant, deltaTime);
+        combatant.lastUpdateTime = now;
         this.staggeredSkipCount++;
         return;
       }
       if (!enableAI || this.isAIBudgetExceeded(aiFrameStart)) {
         this.updateCombatantVisualOnly(combatant, deltaTime);
+        combatant.lastUpdateTime = now;
         this.staggeredSkipCount++;
         return;
       }
@@ -392,10 +394,12 @@ export class CombatantLODManager {
           return;
         }
         this.updateCombatantFull(combatant, deltaTime);
+        combatant.lastUpdateTime = now;
         this.highFullUpdatesThisFrame++;
       } else {
         // Off-frame: still update movement, rotation, spatial position for smooth visuals
         this.updateCombatantVisualOnly(combatant, deltaTime);
+        combatant.lastUpdateTime = now;
         this.staggeredSkipCount++;
       }
     });

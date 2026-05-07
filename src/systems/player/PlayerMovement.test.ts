@@ -220,6 +220,18 @@ describe('PlayerMovement', () => {
       expect(playerState.velocity.x).not.toBe(0);
     });
 
+    it('should honor world-space agent movement independent of camera yaw', () => {
+      mockCamera.position.set(0, PLAYER_EYE_HEIGHT, 0);
+      mockCamera.lookAt(10, PLAYER_EYE_HEIGHT, 0);
+      mockCamera.updateMatrixWorld(true);
+      playerMovement.setAgentWorldMovementIntent({ x: 0, z: -1 });
+
+      playerMovement.updateMovement(0.016, mockInput, mockCamera);
+
+      expect(playerState.velocity.z).toBeLessThan(0);
+      expect(Math.abs(playerState.velocity.x)).toBeLessThan(0.001);
+    });
+
     it('should apply friction when no movement keys pressed', () => {
       playerState.velocity.set(5, 0, 5);
 
@@ -350,11 +362,26 @@ describe('PlayerMovement', () => {
 
       // Rise per fixed step is bounded; one 16ms tick must not launch the
       // camera by more than a metre even if the resolved ground demanded
-      // +30m. The exact bound mirrors PLAYER_MAX_GROUND_RISE_PER_STEP.
+      // +30m.
       const riseThisFrame = playerState.position.y - initialY;
       expect(riseThisFrame).toBeLessThanOrEqual(0.55); // 0.5 + float slack
       expect(playerState.position.x).toBeCloseTo(initialX, 5);
       expect(playerState.velocity.x).toBe(0);
+    });
+
+    it('does not stall on a borderline stamped terrain rise', () => {
+      vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
+      playerState.position.y = PLAYER_EYE_HEIGHT;
+      playerState.speed = 100;
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => (x > 0.05 ? 0.6 : 0));
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => (x > 0.05 ? 0.6 : 0));
+
+      const initialX = playerState.position.x;
+      playerMovement.updateMovement(0.016, mockInput, mockCamera);
+
+      expect(playerState.position.x).toBeGreaterThan(initialX);
+      expect(playerState.position.y).toBeGreaterThan(PLAYER_EYE_HEIGHT);
+      expect(playerState.velocity.x).toBeGreaterThan(0);
     });
 
     it('still snaps to ground on respawn / first-frame spawn correction', () => {

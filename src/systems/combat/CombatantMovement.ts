@@ -12,9 +12,10 @@ import {
   updateCoverSeekingMovement,
   updateDefendingMovement,
   updatePatrolMovement,
+  updateRetreatingMovement,
   updateSuppressingMovement
 } from './CombatantMovementStates';
-import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import { NPC_MAX_SPEED, NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { NavmeshMovementAdapter } from '../navigation/NavmeshMovementAdapter';
 import { StuckDetector, type StuckRecoveryAction } from './StuckDetector';
@@ -52,6 +53,7 @@ const NPC_RECOVERY_RADIUS_STEP = 1.25;
 const NPC_RECOVERY_MAX_RADIUS = 6.5;
 const NPC_RECOVERY_HEADING_SAMPLES = 8;
 const NPC_RECOVERY_LAST_GOOD_MAX_DISTANCE_SQ = 100;
+const NPC_NAVMESH_RECOVERY_SEARCH_RADIUS = 10;
 
 // ── Navmesh path-following ──
 /** Distance threshold: use navmesh path above this, terrain solver below. */
@@ -91,6 +93,13 @@ const _pseudoAnchor = new THREE.Vector3();
 const _recoveryDirection = new THREE.Vector3();
 const _recoveryCandidate = new THREE.Vector3();
 const _recoveryForward = new THREE.Vector3();
+const _navWaypointDirection = new THREE.Vector3();
+
+function horizontalDistanceSq(a: THREE.Vector3, b: THREE.Vector3): number {
+  const dx = a.x - b.x;
+  const dz = a.z - b.z;
+  return dx * dx + dz * dz;
+}
 
 export class CombatantMovement {
   private static readonly TAU = Math.PI * 2;
@@ -172,6 +181,8 @@ export class CombatantMovement {
       updateCoverSeekingMovement(combatant);
     } else if (combatant.state === CombatantState.DEFENDING) {
       updateDefendingMovement(combatant);
+    } else if (combatant.state === CombatantState.RETREATING) {
+      updateRetreatingMovement(combatant);
     }
 
     // Apply friendly spacing force to prevent bunching
@@ -179,6 +190,7 @@ export class CombatantMovement {
     if (!options?.disableSpacing && this.spatialGridManager) {
       clusterManager.calculateSpacingForce(combatant, combatants, this.spatialGridManager, this._spacingForce);
       combatant.velocity.add(this._spacingForce);
+      this.clampHorizontalVelocity(combatant, NPC_MAX_SPEED);
     }
 
     // Unregister from crowd (crowd steering disabled; path queries used instead).
@@ -188,16 +200,29 @@ export class CombatantMovement {
 
     const now = performance.now();
 
-    // TODO: Navmesh route guidance disabled pending WASM navmesh validation.
-    // When navmesh is confirmed generating correctly, re-enable:
-    //   const goalAnchor = this.resolvePrimaryGoalAnchor(combatant);
-    //   const speed = combatant.velocity.length();
-    //   if (goalAnchor && speed > 0.01) {
-    //     const waypoint = this.resolveNavmeshWaypoint(combatant, goalAnchor, now);
-    //     if (waypoint) { /* redirect velocity toward waypoint */ }
-    //   }
+    const goalAnchorForStuck = this.resolvePrimaryGoalAnchor(combatant);
+    const speed = combatant.velocity.length();
+    const navmeshWaypoint = !combatant.movementBacktrackPoint && goalAnchorForStuck && speed > 0.01
+      ? this.resolveNavmeshWaypoint(combatant, goalAnchorForStuck, now)
+      : null;
+    if (navmeshWaypoint) {
+      _navWaypointDirection.subVectors(navmeshWaypoint, combatant.position).setY(0);
+      if (_navWaypointDirection.lengthSq() > 0.0001) {
+        _navWaypointDirection.normalize();
+        combatant.velocity.x = _navWaypointDirection.x * speed;
+        combatant.velocity.z = _navWaypointDirection.z * speed;
+      }
+    } else if (combatant.movementBacktrackPoint && speed > 0.01) {
+      _navWaypointDirection.subVectors(combatant.movementBacktrackPoint, combatant.position).setY(0);
+      if (_navWaypointDirection.lengthSq() > 0.0001) {
+        _navWaypointDirection.normalize();
+        combatant.velocity.x = _navWaypointDirection.x * speed;
+        combatant.velocity.z = _navWaypointDirection.z * speed;
+      }
+    }
 
-    const steering = this.applyTerrainAwareVelocity(combatant, now);
+    const steering = this.applyTerrainAwareVelocity(combatant, now, navmeshWaypoint);
+    this.clampHorizontalVelocity(combatant, NPC_MAX_SPEED);
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
     combatant.position.addScaledVector(combatant.velocity, deltaTime);
@@ -216,7 +241,6 @@ export class CombatantMovement {
     // transient movement anchor flips between a backtrack point and the goal.
     // This is what allows repeated-stall escalation (-> 'hold') to actually
     // fire when an NPC is stuck against an unreachable objective.
-    const goalAnchorForStuck = this.resolvePrimaryGoalAnchor(combatant);
     const stuckAction: StuckRecoveryAction = this.stuckDetector.checkAndRecover(
       combatant,
       now,
@@ -255,6 +279,16 @@ export class CombatantMovement {
     );
   }
 
+  private clampHorizontalVelocity(combatant: Combatant, maxSpeed: number): void {
+    const max = Math.max(0, maxSpeed);
+    const speedSq = combatant.velocity.x * combatant.velocity.x + combatant.velocity.z * combatant.velocity.z;
+    const maxSq = max * max;
+    if (!Number.isFinite(speedSq) || speedSq <= maxSq || maxSq <= 0) return;
+    const scale = max / Math.sqrt(speedSq);
+    combatant.velocity.x *= scale;
+    combatant.velocity.z *= scale;
+  }
+
   updateRotation(combatant: Combatant, _deltaTime: number): void {
     // Guard against NaN/Infinity to avoid unbounded normalization loops on bad state.
     if (!Number.isFinite(combatant.rotation)) {
@@ -273,8 +307,9 @@ export class CombatantMovement {
   private applyTerrainAwareVelocity(
     combatant: Combatant,
     now: number,
+    anchorOverride?: THREE.Vector3 | null,
   ): { anchorDistanceBeforeSq: number; contourActivated: boolean } {
-    const anchor = this.resolveMovementAnchor(combatant);
+    const anchor = anchorOverride ?? this.resolveMovementAnchor(combatant);
     if (anchor) {
       this.setMovementAnchor(combatant, anchor, now);
     } else {
@@ -402,7 +437,11 @@ export class CombatantMovement {
     if (combatant.state === CombatantState.PATROLLING || combatant.state === CombatantState.DEFENDING) {
       return 'route_follow';
     }
-    if (combatant.state === CombatantState.ADVANCING || combatant.state === CombatantState.ENGAGING) {
+    if (
+      combatant.state === CombatantState.ADVANCING ||
+      combatant.state === CombatantState.ENGAGING ||
+      combatant.state === CombatantState.RETREATING
+    ) {
       return 'direct_push';
     }
     return 'hold';
@@ -423,7 +462,7 @@ export class CombatantMovement {
   ): THREE.Vector3 | null {
     if (!this.navmeshSystem?.isReady()) return null;
 
-    const distToAnchorSq = combatant.position.distanceToSquared(anchor);
+    const distToAnchorSq = horizontalDistanceSq(combatant.position, anchor);
 
     // Close enough: let terrain-aware solver handle directly
     if (distToAnchorSq <= PATH_FOLLOW_THRESHOLD_SQ) {
@@ -442,12 +481,26 @@ export class CombatantMovement {
     const prevIndex = path.currentIndex;
     while (
       path.currentIndex < path.waypoints.length - 1 &&
-      combatant.position.distanceToSquared(path.waypoints[path.currentIndex]) < WAYPOINT_ARRIVAL_RADIUS_SQ
+      horizontalDistanceSq(combatant.position, path.waypoints[path.currentIndex]) < WAYPOINT_ARRIVAL_RADIUS_SQ
     ) {
       path.currentIndex++;
     }
     if (path.currentIndex !== prevIndex) {
       path.waypointStartTime = now;
+    }
+
+    if (path.currentIndex < path.waypoints.length - 1) {
+      const currentWaypoint = path.waypoints[path.currentIndex];
+      if (this.isWaypointDirectionBlocked(combatant.position, currentWaypoint)) {
+        for (let i = path.currentIndex + 1; i < path.waypoints.length; i++) {
+          if (!this.isWaypointDirectionBlocked(combatant.position, path.waypoints[i])) {
+            path.currentIndex = i;
+            path.waypointStartTime = now;
+            combatant.movementContourSign = undefined;
+            break;
+          }
+        }
+      }
     }
 
     // Stall detection: if stuck at same waypoint too long, invalidate path
@@ -459,13 +512,22 @@ export class CombatantMovement {
     // If at the last waypoint and close: switch to direct terrain solver
     if (path.currentIndex >= path.waypoints.length - 1) {
       const lastWp = path.waypoints[path.waypoints.length - 1];
-      if (combatant.position.distanceToSquared(lastWp) < PATH_FOLLOW_THRESHOLD_SQ) {
+      if (horizontalDistanceSq(combatant.position, lastWp) < PATH_FOLLOW_THRESHOLD_SQ) {
         this.navPaths.delete(combatant.id);
         return null;
       }
     }
 
     return path.waypoints[path.currentIndex];
+  }
+
+  private isWaypointDirectionBlocked(position: THREE.Vector3, waypoint: THREE.Vector3): boolean {
+    _navWaypointDirection.subVectors(waypoint, position).setY(0);
+    if (_navWaypointDirection.lengthSq() <= WAYPOINT_ARRIVAL_RADIUS_SQ) {
+      return false;
+    }
+    _navWaypointDirection.normalize();
+    return this.isForwardBlocked(position, _navWaypointDirection);
   }
 
   private getOrQueryPath(
@@ -740,22 +802,30 @@ export class CombatantMovement {
   }
 
   private activateBacktrack(combatant: Combatant): boolean {
-    // Prefer navmesh-based recovery: find nearest walkable point
+    // Prefer navmesh-backed recovery at an actual progress point. Snapping the
+    // current position can produce a zero-distance backtrack and immediate
+    // retry loop on terrain lips.
     if (this.navmeshSystem?.isReady()) {
-      const terrainY = combatant.position.y - NPC_Y_OFFSET;
-      const queryPos = _pseudoAnchor.set(combatant.position.x, terrainY, combatant.position.z);
-      const nearest = this.navmeshSystem.findNearestPoint(queryPos, 10);
-      if (nearest) {
-        nearest.y += NPC_Y_OFFSET;
-        if (combatant.movementBacktrackPoint) {
-          combatant.movementBacktrackPoint.copy(nearest);
-        } else {
-          combatant.movementBacktrackPoint = nearest.clone();
-        }
-        combatant.movementIntent = 'backtrack';
-        combatant.movementContourSign = undefined;
+      const lastGoodPosition = combatant.movementLastGoodPosition;
+      if (
+        lastGoodPosition &&
+        horizontalDistanceSq(combatant.position, lastGoodPosition) > NPC_BACKTRACK_ARRIVAL_RADIUS_SQ &&
+        this.trySetNavmeshBacktrackPoint(combatant, lastGoodPosition)
+      ) {
         return true;
       }
+
+      const recoveryPoint = this.selectRecoveryPoint(combatant);
+      if (recoveryPoint) {
+        if (this.trySetNavmeshBacktrackPoint(combatant, recoveryPoint)) {
+          return true;
+        }
+
+        this.setBacktrackPoint(combatant, recoveryPoint);
+        return true;
+      }
+
+      return false;
     }
 
     // Fallback: existing terrain-based recovery scoring
@@ -764,14 +834,43 @@ export class CombatantMovement {
       return false;
     }
 
-    if (combatant.movementBacktrackPoint) {
-      combatant.movementBacktrackPoint.copy(recoveryPoint);
-    } else {
-      combatant.movementBacktrackPoint = recoveryPoint.clone();
+    this.setBacktrackPoint(combatant, recoveryPoint);
+    return true;
+  }
+
+  private trySetNavmeshBacktrackPoint(combatant: Combatant, candidate: THREE.Vector3): boolean {
+    if (!this.navmeshSystem?.isReady()) {
+      return false;
     }
+
+    const queryPos = _pseudoAnchor.set(
+      candidate.x,
+      candidate.y - NPC_Y_OFFSET,
+      candidate.z,
+    );
+    const nearest = this.navmeshSystem.findNearestPoint(queryPos, NPC_NAVMESH_RECOVERY_SEARCH_RADIUS);
+    if (!nearest) {
+      return false;
+    }
+
+    nearest.y += NPC_Y_OFFSET;
+    if (horizontalDistanceSq(combatant.position, nearest) <= NPC_BACKTRACK_ARRIVAL_RADIUS_SQ) {
+      return false;
+    }
+
+    this.setBacktrackPoint(combatant, nearest);
+    return true;
+  }
+
+  private setBacktrackPoint(combatant: Combatant, point: THREE.Vector3): void {
+    if (combatant.movementBacktrackPoint) {
+      combatant.movementBacktrackPoint.copy(point);
+    } else {
+      combatant.movementBacktrackPoint = point.clone();
+    }
+    this.navPaths.delete(combatant.id);
     combatant.movementIntent = 'backtrack';
     combatant.movementContourSign = undefined;
-    return true;
   }
 
   private selectRecoveryPoint(combatant: Combatant): THREE.Vector3 | undefined {

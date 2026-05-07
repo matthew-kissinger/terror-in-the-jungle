@@ -1,6 +1,6 @@
 # Projekt Objekt-143 Vegetation Source Pipeline Review
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 
 Status: decision packet and source-pipeline guidance only. This file now sits
 under KB-FORGE, the Projekt bureau that treats the sibling Pixel Forge repo as
@@ -40,6 +40,40 @@ Pixel Forge prop families, vegetation packages, and review queues covering
 ground-cover budget replacement, route/trail surfaces, base/foundation kits,
 far-canopy/tree variety, and NPC/weapon packaging.
 
+## Local Pixel Forge Bureau Findings
+
+The sibling repo already has enough TIJ-specific structure to act as a bureau
+for this work:
+
+- `bun run tij:pipeline` remains the production pipeline entrypoint, while
+  `bun run tij:pipeline:kb-load-vegetation-256` is the narrow review-only
+  candidate branch for `bambooGrove`, `bananaPlant`, `coconut`, and `fanPalm`.
+- Production review output is rooted at
+  `packages/server/output/tij/gallery-manifest.json`; the KB-LOAD candidate
+  branch writes separately to
+  `packages/server/output/tij-candidates/kb-load-vegetation-256/` so candidate
+  bakes do not silently replace accepted gallery output.
+- The validator has atlas-profile rules for `ground-compact`, `mid-balanced`,
+  `canopy-balanced`, and `canopy-hero`. Profiles above ground cover require
+  normal atlases with `normalSpace=capture-view`, which matches the current
+  normal-lit vegetation direction.
+- The current local TIJ gallery manifest reports `13` vegetation entries and
+  `80` prop entries. The prop side includes survival-kit-style ground and trail
+  candidates such as `grass`, `grass-large`, `patch-grass`, `patch-grass-large`,
+  flat rocks, logs, fences, and structure parts. Treat those as review-source
+  material for trail/ground-cover experiments, not as accepted runtime
+  vegetation.
+- There is no dedicated `EZ-Tree` adapter yet. A sensible pilot is a small
+  source-adapter script that records tool version, seed/preset, license URL,
+  source GLB path, dimensions, triangle/material counts, and intended habitat
+  zone before handing the GLB to the existing bake/manifest path.
+
+The practical gap is provenance and candidate cataloging, not rendering
+infrastructure. The bureau should accept source GLBs, classify their intended
+use (`channel`, `bank`, `wetland-shoulder`, `trail-edge`, `upland`,
+`far-canopy`), then bake and validate with the existing Pixel Forge output
+contract.
+
 ## Source Tool Read
 
 | Source | Fit | Use | Blockers |
@@ -49,6 +83,21 @@ far-canopy/tree variety, and NPC/weapon packaging.
 | botaniq | Strong candidate for fast art variety if commercial license/export terms are acceptable. It is a Blender tree/grass/plant asset library with tropical vegetation, grass, weeds, ferns, ivy, and scatter presets. | Ground cover, trail-edge plants, tropical understory references, and possible source GLBs. | Commercial asset-license review, texture budget, export workflow, LOD/imposter bake compatibility. Not a procedural source we control. |
 | Shizen | Tropical overlap with bamboo, banana, coconut palms, and other palms. | Reference or paid-source candidate for tropical tree/plant shapes. | Older Blender addon target, commercial purchase/license review, unknown export and texture budget. |
 | Blender Sapling / Tree-Gen | Free/open experimentation path for parameterized shapes. | Fallback for internal prototypes or silhouettes if EZ-Tree is insufficient. | Art quality, material setup, and license details must be checked before game-distributed assets. |
+
+Current external-source check on 2026-05-06:
+
+- `EZ-Tree` remains the best controlled tree-source pilot. The official
+  repository describes a JavaScript/Three.js procedural tree generator with
+  tunable parameters, deterministic seed control, standalone library use, and a
+  browser app that can export `.PNG` and `.GLB`. The repository lists an MIT
+  license and latest release `v1.1.0` on 2026-01-15. Treat that as source-tool
+  provenance, not runtime approval.
+- The Vietnam ecology reference added to the hydrology track supports a more
+  structured placement model: bamboo communities are associated with stream
+  corridors, water bodies, increased moisture, and dendritic stream structure.
+  For TIJ, new bamboo, palm, grass, and ground-cover candidates should be
+  reviewed against hydrology corridors and disturbed trail edges rather than
+  added as another evenly scattered species.
 
 ## Recommendation
 
@@ -65,12 +114,16 @@ library review (`botaniq` or Shizen) or a custom low-card ground-cover bake.
 The first runtime branch should be narrow enough to prove the whole path:
 
 1. Generate or source one tall canopy/emergent tree family.
-2. Generate or source one understory/edge plant family.
-3. Generate or source one grass/ground-cover clump set.
+2. Generate or source one wet-bank understory/edge plant family.
+3. Generate or source one grass/ground-cover clump set for trail and disturbed
+   low vegetation.
 4. Bake each through Pixel Forge into `review-only` output with `lod0.glb`,
    `imposter.png`, optional `imposter.normal.png`, and `imposter.json`.
 5. Review side-by-side in a gallery before any `public/assets` or runtime
    registry import.
+6. Accept placement only after a deterministic cluster audit shows where each
+   candidate is allowed: channel, bank, wetland shoulder, trail edge, upland,
+   or far-canopy pocket.
 
 ## Acceptance Checklist
 
@@ -92,6 +145,18 @@ The first runtime branch should be narrow enough to prove the whole path:
 - Outer canopy work keeps the Cycle 3 budget: no more than `+1.5ms` p95 and no
   more than `+10%` draw-call growth unless the owner explicitly accepts an
   exception.
+- Placement acceptance includes a distribution audit: no candidate can be
+  approved solely by looking good in isolation if it makes A Shau or Open
+  Frontier read as uniform scatter.
+
+## Source Links
+
+- `EZ-Tree` official repository:
+  https://github.com/dgreenheck/ez-tree
+- `EZ-Tree` browser app:
+  https://www.eztree.dev/
+- Vietnam bamboo/moisture landscape pattern reference:
+  https://www.mdpi.com/2073-445X/14/10/2003
 
 ## Non-Claims
 

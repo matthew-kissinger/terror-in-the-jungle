@@ -4,8 +4,29 @@ import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { AIRFIELD_TEMPLATES, type AirfieldTemplate } from './AirfieldTemplates';
 import { airfieldEnvelopeInnerLateral } from '../terrain/TerrainFeatureCompiler';
 
+type GeneratedAirfieldLayout = ReturnType<typeof generateAirfieldLayout>;
+type GeneratedPlacement = GeneratedAirfieldLayout['placements'][number];
+type GeneratedSurfacePatch = GeneratedAirfieldLayout['surfacePatches'][number];
+
 function collectPerimeterModelPaths(template: AirfieldTemplate): Set<string> {
   return new Set(template.pool.filter((entry) => entry.zone === 'perimeter').map((entry) => entry.modelPath));
+}
+
+function placementCenterInsideSurfacePatch(
+  placement: GeneratedPlacement,
+  patch: GeneratedSurfacePatch,
+  layoutCenter: THREE.Vector3,
+): boolean {
+  const worldX = layoutCenter.x + placement.offset.x;
+  const worldZ = layoutCenter.z + placement.offset.z;
+  const dx = worldX - patch.x;
+  const dz = worldZ - patch.z;
+  const yaw = patch.yaw ?? 0;
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const localX = dx * cos + dz * sin;
+  const localZ = -dx * sin + dz * cos;
+  return Math.abs(localX) <= patch.width * 0.5 && Math.abs(localZ) <= patch.length * 0.5;
 }
 
 describe('AirfieldLayoutGenerator', () => {
@@ -44,15 +65,17 @@ describe('AirfieldLayoutGenerator', () => {
       expect(parkingA.map((p) => p.offset.toArray())).toEqual(parkingB.map((p) => p.offset.toArray()));
     });
 
-    it('arranges fixed-wing parking spots side-by-side on the apron', () => {
+    it('keeps fixed-wing parking spots on the packed-earth apron without overlap', () => {
       const layout = generateAirfieldLayout(template, center, heading);
       const parkingPlacements = layout.placements.filter(p => p.id?.startsWith('parking'));
-      const apronLateral = parkingPlacements.map((p) => p.offset.x);
-      const alongOffsets = parkingPlacements.map((p) => p.offset.z);
+      const fixedWingParking = parkingPlacements.filter((p) => p.fixedWingSpawn);
 
-      expect(new Set(apronLateral).size).toBe(1);
-      expect(Math.min(...alongOffsets)).toBeLessThan(0);
-      expect(Math.max(...alongOffsets)).toBeGreaterThan(0);
+      expect(fixedWingParking.length).toBeGreaterThan(0);
+      for (const placement of fixedWingParking) {
+        expect(Math.abs(placement.offset.z)).toBeLessThanOrEqual(110);
+        expect(placement.offset.x).toBeGreaterThanOrEqual(52);
+        expect(placement.offset.x).toBeLessThanOrEqual(140);
+      }
     });
 
     it('orients each parked aircraft toward the first non-coincident taxi-route waypoint', () => {
@@ -90,7 +113,7 @@ describe('AirfieldLayoutGenerator', () => {
       expect(fixedWingParking[0].fixedWingSpawn).toEqual(expect.objectContaining({
         standId: 'stand_a1',
         taxiRoute: expect.any(Array),
-        runwayStart: expect.objectContaining({ id: 'south_departure' }),
+        runwayStart: expect.objectContaining({ id: 'north_departure' }),
       }));
       expect(fixedWingParking[1].fixedWingSpawn?.standId).toBe('stand_ac47');
       expect(fixedWingParking[2].fixedWingSpawn?.runwayStart?.id).toBe('north_departure');
@@ -123,38 +146,20 @@ describe('AirfieldLayoutGenerator', () => {
       }
     });
 
-    it('perimeter structures opt in to the footprint solver while interior structures keep the flat-snap fast path', () => {
-      // us_airbase includes perimeter entries (guard tower, ZPU-4 AA) and
-      // interior entries (warehouse, fuel drums). Perimeter placements must
-      // route through `resolveTerrainPlacement` (skipFlatSearch falsy) so the
-      // foundation does not float / sink against sub-footprint height variation
-      // at the envelope shoulder. Interior placements stay on the flat apron
-      // and can keep the cheap centroid-Y snap (skipFlatSearch true).
+    it('routes generated structures through the footprint solver', () => {
+      // Human review caught runway-side/dispersal buildings and vehicles with
+      // foundations overhanging hill edges, so every generated structure now
+      // keeps the runtime flat-search pass. Parked aircraft still keep their
+      // exact taxi/stand offsets separately.
       const layout = generateAirfieldLayout(template, center, heading);
       const structures = layout.placements.filter((p) => p.id?.startsWith('struct'));
       expect(structures.length).toBeGreaterThan(0);
 
-      const perimeterPaths = new Set(
-        template.pool.filter((e) => e.zone === 'perimeter').map((e) => e.modelPath),
-      );
-      const interiorPaths = new Set(
-        template.pool
-          .filter((e) => e.zone === 'runway_side' || e.zone === 'dispersal')
-          .map((e) => e.modelPath),
-      );
-
       for (const placement of structures) {
-        if (perimeterPaths.has(placement.modelPath) && !interiorPaths.has(placement.modelPath)) {
-          expect(
-            placement.skipFlatSearch,
-            `${placement.id} (${placement.modelPath}) is a perimeter structure and must run the footprint solver`,
-          ).toBeFalsy();
-        } else if (interiorPaths.has(placement.modelPath) && !perimeterPaths.has(placement.modelPath)) {
-          expect(
-            placement.skipFlatSearch,
-            `${placement.id} (${placement.modelPath}) is an interior structure and should keep the fast-path snap`,
-          ).toBe(true);
-        }
+        expect(
+          placement.skipFlatSearch,
+          `${placement.id} (${placement.modelPath}) must run the footprint solver`,
+        ).toBeFalsy();
       }
     });
 
@@ -237,6 +242,21 @@ describe('AirfieldLayoutGenerator', () => {
         standId: 'strip_a1',
         runwayStart: expect.objectContaining({ id: 'strip_south_departure' }),
       }));
+    });
+
+    it('keeps exact parking centers on forward-strip packed-earth pads', () => {
+      const strip = generateAirfieldLayout(AIRFIELD_TEMPLATES.forward_strip, center, heading);
+      const parkingSpots = strip.placements.filter((p) => p.id?.startsWith('parking'));
+      const packedEarthPatches = strip.surfacePatches.filter((p) => p.surface === 'packed_earth');
+
+      expect(parkingSpots.length).toBe(AIRFIELD_TEMPLATES.forward_strip.parkingSpots.length);
+      for (const spot of parkingSpots) {
+        expect(spot.skipFlatSearch).toBe(true);
+        expect(
+          packedEarthPatches.some((patch) => placementCenterInsideSurfacePatch(spot, patch, center)),
+          `${spot.id} (${spot.modelPath}) must sit on a graded apron or taxi pad`,
+        ).toBe(true);
+      }
     });
 
     it('places every perimeter structure inside the envelope flat zone', () => {

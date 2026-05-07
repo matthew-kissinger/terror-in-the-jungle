@@ -22,6 +22,10 @@ const _upAxis = new THREE.Vector3(0, 1, 0);
 const _placementBounds = new THREE.Box3();
 const _placementSize = new THREE.Vector3();
 const _placementNormal = new THREE.Vector3();
+const _featureSectorBounds = new THREE.Box3();
+const _featureFrustum = new THREE.Frustum();
+const _featureViewProjection = new THREE.Matrix4();
+const _featureCameraInverse = new THREE.Matrix4();
 
 /**
  * Global scale multiplier for placed structures.
@@ -33,7 +37,9 @@ const STRUCTURE_SCALE = 2.5;
 const WORLD_FEATURE_FLAT_SPAN_TARGET = 0.7;
 const WORLD_FEATURE_MIN_SEARCH_RADIUS = 1.5;
 const WORLD_FEATURE_MAX_SEARCH_RADIUS_SMALL = 8;
-const WORLD_FEATURE_MAX_SEARCH_RADIUS_LARGE = 3.5;
+const WORLD_FEATURE_MAX_SEARCH_RADIUS_LARGE = 24;
+const WORLD_FEATURE_MAX_PLACEMENT_FOOTPRINT_RADIUS = 24;
+const WORLD_FEATURE_MAX_PLACEMENT_SAMPLE_RADIUS = 18;
 const WORLD_FEATURE_SAMPLE_DIRECTIONS = 8;
 /**
  * Minimum horizontal footprint (meters) for a static placement to be registered
@@ -44,6 +50,10 @@ const WORLD_FEATURE_SAMPLE_DIRECTIONS = 8;
 const BUILDING_LOS_MIN_FOOTPRINT_M = 3;
 const WORLD_FEATURE_RENDER_DISTANCE_M = 900;
 const WORLD_FEATURE_RENDER_HYSTERESIS_M = 80;
+const WORLD_FEATURE_BATCH_SECTOR_SIZE_M = 700;
+const WORLD_FEATURE_FRUSTUM_ALWAYS_VISIBLE_M = 180;
+const WORLD_FEATURE_SECTOR_MIN_Y = -120;
+const WORLD_FEATURE_SECTOR_MAX_Y = 420;
 
 interface TerrainPlacementCandidate {
   x: number;
@@ -60,11 +70,14 @@ interface SpawnedFeatureObject {
   losObstacleIds: string[];
 }
 
-interface WorldFeatureRenderGroup {
+interface WorldFeatureRenderSector {
   id: string;
-  anchor: THREE.Vector3;
   group: THREE.Group;
   visible: boolean;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
 }
 
 interface WorldFeatureSystemDependencies {
@@ -81,7 +94,7 @@ export class WorldFeatureSystem implements GameSystem {
   private fixedWingModel?: FixedWingModel;
   private losAccelerator?: LOSAccelerator;
   private spawnedObjects: SpawnedFeatureObject[] = [];
-  private featureGroups: WorldFeatureRenderGroup[] = [];
+  private featureGroups: WorldFeatureRenderSector[] = [];
   private staticFeatureRoot: THREE.Group | null = null;
   private buildInFlight = false;
   private builtModeId: string | null = null;
@@ -169,8 +182,10 @@ export class WorldFeatureSystem implements GameSystem {
     try {
       for (const feature of features) {
         const featureGroup = this.createFeatureGroup(feature);
-        await this.spawnFeature(feature, featureGroup.group);
-        this.optimizeStaticFeatureGroup(featureGroup.group);
+        await this.spawnFeature(feature, featureGroup);
+      }
+      for (const sector of this.featureGroups) {
+        this.optimizeStaticFeatureGroup(sector.group);
       }
       this.updateFeatureVisibility();
       this.builtModeId = modeId;
@@ -180,20 +195,56 @@ export class WorldFeatureSystem implements GameSystem {
     }
   }
 
-  private createFeatureGroup(feature: MapFeatureDefinition): WorldFeatureRenderGroup {
+  private createFeatureGroup(feature: MapFeatureDefinition): THREE.Group {
+    const sector = this.getOrCreateFeatureSector(feature.position);
+    this.expandFeatureSectorBounds(sector, feature);
+
     const group = new THREE.Group();
     group.name = `WorldFeature_${feature.id}`;
     group.userData.perfCategory = 'world_static_features';
+    sector.group.add(group);
+    return group;
+  }
+
+  private getOrCreateFeatureSector(position: THREE.Vector3): WorldFeatureRenderSector {
+    const sectorX = Math.floor(position.x / WORLD_FEATURE_BATCH_SECTOR_SIZE_M);
+    const sectorZ = Math.floor(position.z / WORLD_FEATURE_BATCH_SECTOR_SIZE_M);
+    const id = `${sectorX},${sectorZ}`;
+    const existing = this.featureGroups.find((entry) => entry.id === id);
+    if (existing) {
+      return existing;
+    }
+
+    const group = new THREE.Group();
+    group.name = `WorldFeatureSector_${id}`;
+    group.userData.perfCategory = 'world_static_features';
     this.staticFeatureRoot?.add(group);
 
-    const renderGroup: WorldFeatureRenderGroup = {
-      id: feature.id,
-      anchor: feature.position.clone(),
+    const sector: WorldFeatureRenderSector = {
+      id,
       group,
       visible: true,
+      minX: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      minZ: Number.POSITIVE_INFINITY,
+      maxZ: Number.NEGATIVE_INFINITY,
     };
-    this.featureGroups.push(renderGroup);
-    return renderGroup;
+    this.featureGroups.push(sector);
+    return sector;
+  }
+
+  private expandFeatureSectorBounds(sector: WorldFeatureRenderSector, feature: MapFeatureDefinition): void {
+    const radius = feature.footprint?.shape === 'circle'
+      ? feature.footprint.radius
+      : feature.footprint?.shape === 'rect' || feature.footprint?.shape === 'strip'
+        ? Math.hypot(feature.footprint.width, feature.footprint.length) * 0.5
+        : feature.footprint?.shape === 'polygon'
+          ? Math.max(0, ...feature.footprint.points.map((point) => Math.hypot(point.x, point.z)))
+        : 0;
+    sector.minX = Math.min(sector.minX, feature.position.x - radius);
+    sector.maxX = Math.max(sector.maxX, feature.position.x + radius);
+    sector.minZ = Math.min(sector.minZ, feature.position.z - radius);
+    sector.maxZ = Math.max(sector.maxZ, feature.position.z + radius);
   }
 
   private async spawnFeature(feature: MapFeatureDefinition, parent: THREE.Object3D): Promise<void> {
@@ -317,14 +368,19 @@ export class WorldFeatureSystem implements GameSystem {
     const showDistanceSq = WORLD_FEATURE_RENDER_DISTANCE_M * WORLD_FEATURE_RENDER_DISTANCE_M;
     const hideDistance = WORLD_FEATURE_RENDER_DISTANCE_M + WORLD_FEATURE_RENDER_HYSTERESIS_M;
     const hideDistanceSq = hideDistance * hideDistance;
+    this.camera.updateMatrixWorld(true);
+    _featureCameraInverse.copy(this.camera.matrixWorld).invert();
+    _featureViewProjection.multiplyMatrices(this.camera.projectionMatrix, _featureCameraInverse);
+    _featureFrustum.setFromProjectionMatrix(_featureViewProjection);
 
     for (const entry of this.featureGroups) {
-      const dx = entry.anchor.x - cameraX;
-      const dz = entry.anchor.z - cameraZ;
-      const distanceSq = dx * dx + dz * dz;
-      const shouldBeVisible = entry.visible
+      const distanceSq = this.horizontalDistanceToSectorBoundsSq(entry, cameraX, cameraZ);
+      const insideRenderDistance = entry.visible
         ? distanceSq <= hideDistanceSq
         : distanceSq <= showDistanceSq;
+      const closeEnoughToSkipFrustum = distanceSq <= WORLD_FEATURE_FRUSTUM_ALWAYS_VISIBLE_M * WORLD_FEATURE_FRUSTUM_ALWAYS_VISIBLE_M;
+      const insideView = closeEnoughToSkipFrustum || this.sectorIntersectsCameraView(entry);
+      const shouldBeVisible = insideRenderDistance && insideView;
 
       if (entry.visible === shouldBeVisible) {
         continue;
@@ -332,6 +388,39 @@ export class WorldFeatureSystem implements GameSystem {
       entry.visible = shouldBeVisible;
       entry.group.visible = shouldBeVisible;
     }
+  }
+
+  private horizontalDistanceToSectorBoundsSq(
+    sector: WorldFeatureRenderSector,
+    x: number,
+    z: number,
+  ): number {
+    const dx = x < sector.minX
+      ? sector.minX - x
+      : x > sector.maxX
+        ? x - sector.maxX
+        : 0;
+    const dz = z < sector.minZ
+      ? sector.minZ - z
+      : z > sector.maxZ
+        ? z - sector.maxZ
+        : 0;
+    return dx * dx + dz * dz;
+  }
+
+  private sectorIntersectsCameraView(sector: WorldFeatureRenderSector): boolean {
+    if (
+      !Number.isFinite(sector.minX)
+      || !Number.isFinite(sector.maxX)
+      || !Number.isFinite(sector.minZ)
+      || !Number.isFinite(sector.maxZ)
+    ) {
+      return true;
+    }
+
+    _featureSectorBounds.min.set(sector.minX, WORLD_FEATURE_SECTOR_MIN_Y, sector.minZ);
+    _featureSectorBounds.max.set(sector.maxX, WORLD_FEATURE_SECTOR_MAX_Y, sector.maxZ);
+    return _featureFrustum.intersectsBox(_featureSectorBounds);
   }
 
   /**
@@ -621,7 +710,7 @@ export class WorldFeatureSystem implements GameSystem {
     return THREE.MathUtils.clamp(
       Math.max(_placementSize.x, _placementSize.z) * 0.5,
       1.25,
-      10,
+      WORLD_FEATURE_MAX_PLACEMENT_FOOTPRINT_RADIUS,
     );
   }
 
@@ -636,7 +725,11 @@ export class WorldFeatureSystem implements GameSystem {
       return { x, y: 0, z, score: Number.POSITIVE_INFINITY, heightSpan: Number.POSITIVE_INFINITY };
     }
 
-    const sampleRadius = THREE.MathUtils.clamp(footprintRadius * 0.55, 1.1, 5.5);
+    const sampleRadius = THREE.MathUtils.clamp(
+      footprintRadius * 0.75,
+      1.1,
+      WORLD_FEATURE_MAX_PLACEMENT_SAMPLE_RADIUS,
+    );
     const samples = [
       [0, 0],
       [1, 0],

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "generator": "scripts/prebake-hydrology.ts",
+  "entries": [
+    {
+      "modeId": "a_shau_valley",
+      "source": "dem",
+      "seed": null,
+      "signature": "hydrology-bake-v1-2e629bd2bc887f4e",
+      "hydrologyAsset": "/data/hydrology/a_shau_valley-hydrology.json",
+      "worldSize": 21136,
+      "sampleGridSize": 257,
+      "sampleWorldInsetPercent": 4,
+      "sampleSpacingMeters": 79.26,
+      "depressionHandling": "epsilon-fill",
+      "wetCandidateAccumulationQuantile": 0.92,
+      "channelCandidateAccumulationQuantile": 0.98,
+      "wetCandidateSlopeMaxDegrees": 16,
+      "wetCandidateElevationMaxMeters": 980,
+      "currentHydrologyBiomeIds": [
+        "riverbank",
+        "swamp"
+      ]
+    },
+    {
+      "modeId": "open_frontier",
+      "source": "procedural-noise",
+      "seed": 42,
+      "signature": "hydrology-bake-v1-1cb0c92afd500c72",
+      "hydrologyAsset": "/data/hydrology/open_frontier-42-hydrology.json",
+      "worldSize": 3200,
+      "sampleGridSize": 257,
+      "sampleWorldInsetPercent": 4,
+      "sampleSpacingMeters": 12,
+      "depressionHandling": "epsilon-fill",
+      "wetCandidateAccumulationQuantile": 0.92,
+      "channelCandidateAccumulationQuantile": 0.98,
+      "wetCandidateSlopeMaxDegrees": 16,
+      "wetCandidateElevationMaxMeters": 35,
+      "currentHydrologyBiomeIds": [
+        "riverbank"
+      ]
+    }
+  ]
+}

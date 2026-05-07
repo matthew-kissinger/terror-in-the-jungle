@@ -57,14 +57,34 @@ const PLAYER_STEEP_FLOW_MIN_SPEED = 1.4;
 const PLAYER_STEEP_FLOW_LERP = 0.58;
 const PLAYER_TERRAIN_LIP_RISE = 0.45;
 // Maximum upward step the player's eye can take in a single fixed-step frame
-// while already grounded. Real terrain is continuous so a grounded player
-// walking at runSpeed can only gain a small amount of height per tick; when
-// the ground-clamp would teleport them up by more than this the driver has
-// walked into an overhanging collision box (parked aircraft bounding box,
-// edge of a stamped structure) or a cliff seam. Clamping the rise prevents
-// the camera from launching skyward on that one bad frame — the player
-// still tracks terrain smoothly on legitimate climbs.
-const PLAYER_MAX_GROUND_RISE_PER_STEP = 0.5;
+// while already grounded. Keep this high enough for noisy stamped/terrain
+// samples, but far below the multi-metre jumps produced by collision-box or
+// cliff seams.
+const PLAYER_MAX_GROUND_RISE_PER_STEP = 0.75;
+
+export interface PlayerMovementDebugSnapshot {
+  blockReason: string;
+  requestedSpeed: number;
+  actualHorizontalSpeed: number;
+  blockedByTerrain: boolean;
+  grounded: boolean;
+  walking: boolean;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  candidateX: number;
+  candidateZ: number;
+  currentTerrainHeight: number | null;
+  targetTerrainHeight: number | null;
+  currentGroundHeight: number | null;
+  targetGroundHeight: number | null;
+  terrainRise: number | null;
+  effectiveRise: number | null;
+  obstacleStepRise: number | null;
+  targetSlopeValue: number | null;
+  supportSlopeValue: number | null;
+  grade: number;
+}
 
 export class PlayerMovement {
   static readonly FIXED_STEP_SECONDS = 0.016;
@@ -78,12 +98,18 @@ export class PlayerMovement {
   private readonly supportNormal = new THREE.Vector3(0, 1, 0);
   private readonly sampledSupportNormal = new THREE.Vector3(0, 1, 0);
   private lastGroundWalkable = true;
+  private lastDebugSnapshot: PlayerMovementDebugSnapshot | null = null;
   /**
    * Agent-driven movement intent in camera-relative coordinates (forward, strafe).
    * When active, overrides keyboard/touch input in the movement loop. See
    * `AgentController` in `src/systems/agent/`.
    */
   private agentMovementIntent: { forward: number; strafe: number } | null = null;
+  /**
+   * Agent-driven movement intent in world X/Z. This is for route/path drivers
+   * that must move independently from camera aim.
+   */
+  private agentWorldMovementIntent: { x: number; z: number } | null = null;
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
@@ -95,6 +121,17 @@ export class PlayerMovement {
    */
   setAgentMovementIntent(intent: { forward: number; strafe: number } | null): void {
     this.agentMovementIntent = intent;
+    this.agentWorldMovementIntent = null;
+  }
+
+  /**
+   * Set a world-space movement intent driven by an external agent.
+   * `null` clears world-space intent and hands control back to the normal
+   * camera-relative agent, touch, or keyboard path.
+   */
+  setAgentWorldMovementIntent(intent: { x: number; z: number } | null): void {
+    this.agentWorldMovementIntent = intent;
+    this.agentMovementIntent = null;
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
@@ -126,6 +163,10 @@ export class PlayerMovement {
     this.playerState.isRunning = running;
   }
 
+  getDebugSnapshot(): PlayerMovementDebugSnapshot | null {
+    return this.lastDebugSnapshot ? { ...this.lastDebugSnapshot } : null;
+  }
+
   handleJump(): void {
     if (this.playerState.isGrounded && !this.playerState.isJumping) {
       this.playerState.velocity.y = this.playerState.jumpForce;
@@ -153,16 +194,31 @@ export class PlayerMovement {
       baseSpeed *= CROUCH_SPEED_MULTIPLIER;
     }
 
-    // Calculate movement direction based on camera orientation.
-    // Priority: agent-driven intent (if set) > touch joystick > keyboard.
+    let requestedSpeed = 0;
+    let requestedMoveX = 0;
+    let requestedMoveZ = 0;
+
+    // Calculate movement direction.
+    // Priority: world-space agent intent > camera-relative agent intent >
+    // touch joystick > keyboard.
+    const agentWorldIntent = this.agentWorldMovementIntent;
+    let hasWorldMovementIntent = false;
+    if (agentWorldIntent && Math.hypot(agentWorldIntent.x, agentWorldIntent.z) > 0.01) {
+      const worldLen = Math.hypot(agentWorldIntent.x, agentWorldIntent.z);
+      requestedMoveX = agentWorldIntent.x / worldLen;
+      requestedMoveZ = agentWorldIntent.z / worldLen;
+      requestedSpeed = baseSpeed;
+      hasWorldMovementIntent = true;
+    }
+
     const agentIntent = this.agentMovementIntent;
-    if (agentIntent && (Math.abs(agentIntent.forward) > 0.01 || Math.abs(agentIntent.strafe) > 0.01)) {
+    if (!hasWorldMovementIntent && agentIntent && (Math.abs(agentIntent.forward) > 0.01 || Math.abs(agentIntent.strafe) > 0.01)) {
       // Agent intent is in camera-relative axes already: forward along camera,
       // strafe along camera right. Match the touch-joystick convention where
       // -z is forward, +x is strafe right.
       moveVector.x = agentIntent.strafe;
       moveVector.z = -agentIntent.forward;
-    } else {
+    } else if (!hasWorldMovementIntent) {
       const touchMove = input.getTouchMovementVector();
       if (Math.abs(touchMove.x) > 0.1 || Math.abs(touchMove.z) > 0.1) {
         // Use touch joystick values directly
@@ -185,11 +241,7 @@ export class PlayerMovement {
       }
     }
 
-    let requestedSpeed = 0;
-    let requestedMoveX = 0;
-    let requestedMoveZ = 0;
-
-    if (moveVector.length() > 0) {
+    if (!hasWorldMovementIntent && moveVector.length() > 0) {
       moveVector.normalize();
 
       const cameraDirection = _cameraDirection;
@@ -231,7 +283,7 @@ export class PlayerMovement {
     );
 
     // Normalize movement vector
-    if (moveVector.length() > 0) {
+    if (hasWorldMovementIntent || moveVector.length() > 0) {
       const worldMoveVector = _worldMoveVector.set(requestedMoveX, 0, requestedMoveZ);
       if (this.playerState.isGrounded) {
         worldMoveVector.projectOnPlane(normal);
@@ -272,6 +324,13 @@ export class PlayerMovement {
     // Update position
     const movement = _cameraRight.copy(this.playerState.velocity).multiplyScalar(deltaTime);
     const newPosition = _cameraDirection.copy(this.playerState.position).add(movement);
+    let blockReason = 'none';
+    let currentTerrainHeight: number | null = null;
+    let targetTerrainHeight: number | null = null;
+    let terrainRise: number | null = null;
+    let effectiveRise: number | null = null;
+    let obstacleStepRise: number | null = null;
+    let targetSlopeValue: number | null = null;
 
     // Check sandbag collision before applying movement
     if (this.sandbagSystem && this.sandbagSystem.checkCollision(newPosition, PLAYER_COLLISION_RADIUS)) {
@@ -297,6 +356,7 @@ export class PlayerMovement {
         newPosition.z = this.playerState.position.z;
         this.playerState.velocity.x = 0;
         this.playerState.velocity.z = 0;
+        blockReason = 'sandbag';
       }
     }
 
@@ -325,11 +385,11 @@ export class PlayerMovement {
     // retain hard step-up blocking.
     let blockedByTerrain = false;
     if (this.playerState.isGrounded && this.terrainSystem) {
-      const currentTerrainHeight = Number(this.terrainSystem.getHeightAt(
+      currentTerrainHeight = Number(this.terrainSystem.getHeightAt(
         this.playerState.position.x,
         this.playerState.position.z,
       ));
-      const targetTerrainHeight = Number(this.terrainSystem.getHeightAt(newPosition.x, newPosition.z));
+      targetTerrainHeight = Number(this.terrainSystem.getHeightAt(newPosition.x, newPosition.z));
       const targetSupportNormal = this.sampleSupportNormal(
         newPosition.x,
         newPosition.z,
@@ -338,12 +398,12 @@ export class PlayerMovement {
         _terrainNormal,
         false,
       );
-      const targetSlopeValue = computeSlopeValueFromNormal(targetSupportNormal);
-      const terrainRise = Number.isFinite(currentTerrainHeight) && Number.isFinite(targetTerrainHeight)
+      targetSlopeValue = computeSlopeValueFromNormal(targetSupportNormal);
+      terrainRise = Number.isFinite(currentTerrainHeight) && Number.isFinite(targetTerrainHeight)
         ? targetTerrainHeight - currentTerrainHeight
         : 0;
-      const effectiveRise = groundHeight - currentGroundHeight;
-      const obstacleStepRise = Math.max(0, effectiveRise - Math.max(terrainRise, 0));
+      effectiveRise = groundHeight - currentGroundHeight;
+      obstacleStepRise = Math.max(0, effectiveRise - Math.max(terrainRise, 0));
       const blockedBySteepTerrain = terrainRise > PLAYER_TERRAIN_LIP_RISE && !isWalkableSlope(targetSlopeValue);
       const blockedByRaisedSurface = obstacleStepRise > 0.05 && !canStepUp(currentGroundHeight, groundHeight);
 
@@ -353,6 +413,7 @@ export class PlayerMovement {
         this.playerState.velocity.x = 0;
         this.playerState.velocity.z = 0;
         blockedByTerrain = true;
+        blockReason = 'raised_surface';
 
         const resetGroundHeight = Number(this.terrainSystem.getEffectiveHeightAt(
           this.playerState.position.x,
@@ -370,6 +431,7 @@ export class PlayerMovement {
           deltaTime,
         );
         if (blockedByTerrain) {
+          blockReason = 'steep_terrain_flow';
           const flowedGroundHeight = Number(this.terrainSystem.getEffectiveHeightAt(newPosition.x, newPosition.z));
           if (Number.isFinite(flowedGroundHeight)) {
             groundHeight = flowedGroundHeight + eyeHeight;
@@ -390,6 +452,7 @@ export class PlayerMovement {
       this.playerState.velocity.x = 0;
       this.playerState.velocity.z = 0;
       blockedByTerrain = true;
+      blockReason = 'ground_rise_clamp';
       groundHeight = currentGroundHeight;
     }
 
@@ -451,6 +514,29 @@ export class PlayerMovement {
 
     this.playerState.position.copy(newPosition);
     const actualHorizontalSpeed = Math.hypot(this.playerState.velocity.x, this.playerState.velocity.z);
+    this.lastDebugSnapshot = {
+      blockReason,
+      requestedSpeed,
+      actualHorizontalSpeed,
+      blockedByTerrain,
+      grounded: this.playerState.isGrounded,
+      walking,
+      positionX: this.playerState.position.x,
+      positionY: this.playerState.position.y,
+      positionZ: this.playerState.position.z,
+      candidateX: newPosition.x,
+      candidateZ: newPosition.z,
+      currentTerrainHeight: Number.isFinite(currentTerrainHeight) ? currentTerrainHeight : null,
+      targetTerrainHeight: Number.isFinite(targetTerrainHeight) ? targetTerrainHeight : null,
+      currentGroundHeight: Number.isFinite(currentGroundHeight) ? currentGroundHeight : null,
+      targetGroundHeight: Number.isFinite(groundHeight) ? groundHeight : null,
+      terrainRise: Number.isFinite(terrainRise) ? terrainRise : null,
+      effectiveRise: Number.isFinite(effectiveRise) ? effectiveRise : null,
+      obstacleStepRise: Number.isFinite(obstacleStepRise) ? obstacleStepRise : null,
+      targetSlopeValue: Number.isFinite(targetSlopeValue) ? targetSlopeValue : null,
+      supportSlopeValue,
+      grade,
+    };
     performanceTelemetry.recordPlayerMovementSample(
       this.playerState.isGrounded,
       normal.y,

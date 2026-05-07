@@ -29,9 +29,19 @@ export interface BiomeClassificationRule {
   priority: number;          // higher wins ties
 }
 
+export interface TerrainFarCanopyTintConfig {
+  enabled: boolean;
+  startDistance?: number;
+  endDistance?: number;
+  strength?: number;
+  fogStrength?: number;
+  color?: readonly [number, number, number];
+}
+
 export interface TerrainConfig {
   defaultBiome: string;                       // BiomeConfig.id used when no rules match
   biomeRules?: BiomeClassificationRule[];     // optional elevation/slope classification (DEM)
+  farCanopyTint?: TerrainFarCanopyTintConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,10 +97,11 @@ const BIOME_RIVERBANK: BiomeConfig = {
   groundTileScale: 0.1,
   groundRoughness: 0.9,
   vegetationPalette: [
-    { typeId: 'elephantEar',   densityMultiplier: 1.2 },
-    { typeId: 'fanPalm',      densityMultiplier: 0.8 },
-    { typeId: 'coconut',      densityMultiplier: 1.0 },
-    { typeId: 'fern',         densityMultiplier: 0.5 },
+    { typeId: 'elephantEar',   densityMultiplier: 1.45 },
+    { typeId: 'fanPalm',      densityMultiplier: 1.35 },
+    { typeId: 'coconut',      densityMultiplier: 1.25 },
+    { typeId: 'fern',         densityMultiplier: 0.65 },
+    { typeId: 'bananaPlant',  densityMultiplier: 0.45 },
   ],
 };
 
@@ -149,10 +160,11 @@ const BIOME_SWAMP: BiomeConfig = {
   groundTileScale: 0.14,
   groundRoughness: 0.96,
   vegetationPalette: [
-    { typeId: 'coconut',       densityMultiplier: 0.7 },
-    { typeId: 'fanPalm',       densityMultiplier: 0.6 },
-    { typeId: 'elephantEar',   densityMultiplier: 0.8 },
-    { typeId: 'fern',          densityMultiplier: 0.6 },
+    { typeId: 'coconut',       densityMultiplier: 1.0 },
+    { typeId: 'fanPalm',       densityMultiplier: 0.9 },
+    { typeId: 'elephantEar',   densityMultiplier: 1.2 },
+    { typeId: 'fern',          densityMultiplier: 0.75 },
+    { typeId: 'bananaPlant',   densityMultiplier: 0.55 },
   ],
 };
 

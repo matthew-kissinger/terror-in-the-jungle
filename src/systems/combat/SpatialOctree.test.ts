@@ -110,48 +110,40 @@ describe('SpatialOctree', () => {
       expect(octree.queryRadius(new THREE.Vector3(621, 726, -871), 600)).toContain('ridge-target');
     });
 
-    it('is within a reasonable factor of linear scan for large datasets', () => {
+    it('matches a linear scan across a large deterministic dataset', () => {
       const octree = new SpatialOctree();
       const entityCount = 1000;
       const positions = new Map<string, THREE.Vector3>();
       for (let i = 0; i < entityCount; i++) {
         const pos = new THREE.Vector3(
-          (Math.random() - 0.5) * 2000,
-          (Math.random() - 0.5) * 100,
-          (Math.random() - 0.5) * 2000
+          (((i * 37) % 2000) - 1000),
+          (((i * 17) % 100) - 50),
+          (((i * 53) % 2000) - 1000)
         );
         positions.set(`entity${i}`, pos);
         octree.updatePosition(`entity${i}`, pos);
       }
 
-      for (let i = 0; i < 10; i++) {
-        octree.queryRadius(new THREE.Vector3(0, 0, 0), 500);
-        for (const [, pos] of positions) {
-          pos.distanceToSquared(new THREE.Vector3(0, 0, 0));
-        }
-      }
+      const queryCenters = [
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(350, 12, -420),
+        new THREE.Vector3(-720, -20, 640),
+      ];
 
-      const octreeStart = performance.now();
-      for (let i = 0; i < 100; i++) {
-        octree.queryRadius(new THREE.Vector3(0, 0, 0), 500);
-      }
-      const octreeTime = performance.now() - octreeStart;
+      for (const center of queryCenters) {
+        const radius = 500;
+        const radiusSq = radius * radius;
+        const octreeResults = octree.queryRadius(center, radius).sort();
+        const linearResults: string[] = [];
 
-      const linearStart = performance.now();
-      for (let i = 0; i < 100; i++) {
-        const results: string[] = [];
-        const center = new THREE.Vector3(0, 0, 0);
-        const radiusSq = 500 * 500;
         for (const [id, pos] of positions) {
           if (pos.distanceToSquared(center) <= radiusSq) {
-            results.push(id);
+            linearResults.push(id);
           }
         }
-      }
-      const linearTime = performance.now() - linearStart;
 
-      // Octree should not be dramatically slower than linear scan.
-      expect(octreeTime).toBeLessThan(linearTime * 5.0);
+        expect(octreeResults).toEqual(linearResults.sort());
+      }
     });
   });
 
