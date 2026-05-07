@@ -357,7 +357,14 @@ export class FixedWingModel implements GameSystem {
       group.visible = shouldRender;
 
       if (shouldRender) {
-        this.animation.update(aircraftId, currentSnapshot.throttle, deltaTime);
+        // Parked unpiloted aircraft (no pilot, grounded, near-zero airspeed) freeze
+        // their propellers so flying past idle aircraft on the airfield doesn't show
+        // them spinning.
+        const isAircraftActive = isPiloted
+          || npcPilot !== undefined
+          || currentFlightState !== 'grounded'
+          || currentSnapshot.airspeed > FixedWingModel.IDLE_SIMULATION_SPEED;
+        this.animation.update(aircraftId, currentSnapshot.throttle, deltaTime, isAircraftActive);
       }
 
       if (isPiloted && this.playerController) {
@@ -435,9 +442,10 @@ export class FixedWingModel implements GameSystem {
 
     try {
       const { scene: innerModel, animations } = await this.modelLoader.loadAnimatedModel(modelPath);
-      // GLB faces +Z but physics forward is -Z. Rotate inner model 180° on Y
-      // so it visually aligns with the physics forward direction.
-      innerModel.rotation.y = Math.PI;
+      // Most GLBs face +Z but physics forward is -Z, so default to a 180° Y flip.
+      // Per-aircraft override (`modelYawOffset` on FixedWingDisplayInfo) handles
+      // GLBs authored facing -Z (e.g. A-1 Skyraider) — they override to 0.
+      innerModel.rotation.y = display.modelYawOffset ?? Math.PI;
       this.optimizeLoadedAircraft(innerModel, configKey);
 
       // Outer group is driven by physics quaternion (position + attitude).

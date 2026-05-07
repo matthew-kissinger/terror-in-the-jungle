@@ -177,10 +177,15 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
     ],
     taxiRoutes: [
       {
+        // Aircraft are parked in a clean row on the apron centerline at
+        // lateral=105 (well inside the apron's outer edge of 140) so they read
+        // as proper parking stands instead of edge-clumped overflow. Each
+        // route's point[0] matches the stand; point[1] enters the main
+        // parallel taxiway at lateral=58.
         id: 'a1_north_route',
         points: [
-          { offsetAlongRunway: 110, offsetLateral: 140 },
-          { offsetAlongRunway: 110, offsetLateral: 58 },
+          { offsetAlongRunway: 70, offsetLateral: 105 },
+          { offsetAlongRunway: 70, offsetLateral: 58 },
           { offsetAlongRunway: 194, offsetLateral: 58 },
           { offsetAlongRunway: 194, offsetLateral: 0 },
         ],
@@ -188,8 +193,8 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       {
         id: 'ac47_south_route',
         points: [
-          { offsetAlongRunway: 24, offsetLateral: 84 },
-          { offsetAlongRunway: 24, offsetLateral: 58 },
+          { offsetAlongRunway: -70, offsetLateral: 105 },
+          { offsetAlongRunway: -70, offsetLateral: 58 },
           { offsetAlongRunway: -194, offsetLateral: 58 },
           { offsetAlongRunway: -194, offsetLateral: 0 },
         ],
@@ -197,8 +202,8 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       {
         id: 'f4_north_route',
         points: [
-          { offsetAlongRunway: 66, offsetLateral: 120 },
-          { offsetAlongRunway: 66, offsetLateral: 58 },
+          { offsetAlongRunway: 0, offsetLateral: 105 },
+          { offsetAlongRunway: 0, offsetLateral: 58 },
           { offsetAlongRunway: 194, offsetLateral: 58 },
           { offsetAlongRunway: 194, offsetLateral: 0 },
         ],
@@ -227,30 +232,28 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       },
     ],
     parkingSpots: [
+      // Three aircraft parked in a clean row on the apron centerline (lateral=105),
+      // spaced ~70m apart along the runway. Previously each used a different
+      // lateral and along position which read as edge-clumped overflow — the
+      // A-1 specifically sat at lateral=140 (the apron's outer edge), with
+      // its footprint extending past the packed-earth surface. The new layout
+      // keeps every aircraft inside the apron with consistent visual ordering.
       {
         standId: 'stand_a1',
         modelPath: AircraftModels.A1_SKYRAIDER,
-        offsetAlongRunway: 110,
-        offsetLateral: 140,
+        offsetAlongRunway: 70,
+        offsetLateral: 105,
         // Yaw is computed at spawn time from the first taxi-route point.
         // See `computeParkingYaw` in AirfieldLayoutGenerator.
         clearanceRadius: 22,
         taxiRouteId: 'a1_north_route',
         runwayStartId: 'north_departure',
-        // A-1 spawns parked and claimable by the player. Previously carried
-        // an `npcAutoFlight: { kind: 'ferry', ... }` field which ferried the
-        // aircraft off the field within seconds of world boot — useful as an
-        // integration test of `npc-fixed-wing-pilot-ai`, but it meant the
-        // player never saw the A-1 at the airfield. Removed in
-        // `aircraft-a1-spawn-regression` (2026-04-20). A ferry sortie can be
-        // reintroduced on a different template if the departing-plane visual
-        // is desired.
       },
       {
         standId: 'stand_ac47',
         modelPath: AircraftModels.AC47_SPOOKY,
-        offsetAlongRunway: 24,
-        offsetLateral: 84,
+        offsetAlongRunway: -70,
+        offsetLateral: 105,
         clearanceRadius: 30,
         taxiRouteId: 'ac47_south_route',
         runwayStartId: 'south_departure',
@@ -258,8 +261,8 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       {
         standId: 'stand_f4',
         modelPath: AircraftModels.F4_PHANTOM,
-        offsetAlongRunway: 66,
-        offsetLateral: 120,
+        offsetAlongRunway: 0,
+        offsetLateral: 105,
         clearanceRadius: 24,
         taxiRouteId: 'f4_north_route',
         runwayStartId: 'north_departure',

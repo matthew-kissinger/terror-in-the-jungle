@@ -93,6 +93,14 @@ export interface FixedWingDisplayInfo {
   cameraHeight: number;
   fovWidenEnabled: boolean;
   seats: number;
+  /**
+   * Per-aircraft visual yaw offset (radians) applied to the inner GLB model so
+   * it visually aligns with the physics forward direction. Defaults to Math.PI
+   * for GLBs authored facing +Z (the convention for the F-4 and AC-47). The
+   * A-1 Skyraider GLB is authored facing -Z and overrides this to 0 to avoid
+   * the universal flip rotating it tail-first.
+   */
+  modelYawOffset?: number;
 }
 
 const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
@@ -105,6 +113,7 @@ const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
     cameraHeight: 8,
     fovWidenEnabled: false,
     seats: 1,
+    modelYawOffset: 0,
   },
   AC47_SPOOKY: {
     displayName: 'AC-47 Spooky',

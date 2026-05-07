@@ -96,6 +96,30 @@ describe('FixedWingAnimation', () => {
     expect(Math.abs(propHigh.rotation.z)).toBeGreaterThan(Math.abs(propLow.rotation.z));
   });
 
+  it('does not spin when isActive is false (parked unpiloted aircraft)', () => {
+    const group = createGroupWithPropeller('propeller');
+    animation.initialize('fw-parked', 'A1_SKYRAIDER', group);
+
+    for (let i = 0; i < 60; i++) {
+      animation.update('fw-parked', 0, 1 / 60, false);
+    }
+
+    const prop = group.getObjectByName('propeller')!;
+    expect(prop.rotation.z).toBe(0);
+  });
+
+  it('still spins at idle (throttle=0) when isActive is true (idle floor)', () => {
+    const group = createGroupWithPropeller('propeller');
+    animation.initialize('fw-idle', 'A1_SKYRAIDER', group);
+
+    for (let i = 0; i < 60; i++) {
+      animation.update('fw-idle', 0, 1 / 60, true);
+    }
+
+    const prop = group.getObjectByName('propeller')!;
+    expect(prop.rotation.z).not.toBe(0);
+  });
+
   it('cleans up on dispose', () => {
     const group = createGroupWithPropeller('propeller');
     animation.initialize('fw1', 'A1_SKYRAIDER', group);

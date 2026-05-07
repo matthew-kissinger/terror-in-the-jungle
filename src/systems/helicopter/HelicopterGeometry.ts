@@ -83,7 +83,7 @@ function wireRotorGroups(
 
     if (rotorType) {
       child.userData.type = rotorType;
-      child.userData.spinAxis = animationAxes.get(name) ?? (rotorType === 'mainBlades' ? 'y' : 'z');
+      child.userData.spinAxis = animationAxes.get(name) ?? (rotorType === 'mainBlades' ? 'y' : 'x');
     }
 
     if (isMainRotorPartName(name)) {
@@ -117,7 +117,7 @@ function wireRotorGroups(
   }
   if (tailBladeNodes.length === 0 && !hasGroupedTail) {
     const tailBlades = createSyntheticTailRotor();
-    tailBlades.userData.spinAxis = 'z';
+    tailBlades.userData.spinAxis = 'x';
     tailBlades.position.set(-6, 2.5, 0);
     helicopterGroup.add(tailBlades);
     Logger.debug('helicopter', 'Added synthetic tail rotor blades');

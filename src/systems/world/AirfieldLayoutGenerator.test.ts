@@ -78,6 +78,27 @@ describe('AirfieldLayoutGenerator', () => {
       }
     });
 
+    it('parks all fixed-wing aircraft on a clean row (consistent lateral) instead of edge-clumped', () => {
+      const layout = generateAirfieldLayout(template, center, heading);
+      const fixedWingParking = layout.placements
+        .filter(p => p.id?.startsWith('parking'))
+        .filter((p) => p.fixedWingSpawn);
+
+      expect(fixedWingParking.length).toBeGreaterThanOrEqual(3);
+
+      // All aircraft sit at the same lateral offset → reads as a parking row,
+      // not edge-clumped overflow. Previously the A-1 was at the apron edge
+      // (lateral=140) while the AC-47 was at lateral=84.
+      const lateralValues = fixedWingParking.map((p) => p.offset.x);
+      const lateralSet = new Set(lateralValues);
+      expect(lateralSet.size).toBe(1);
+
+      // The shared lateral must keep clearance to the apron's outer edge
+      // (140) so visual footprints don't overflow onto unpaved terrain.
+      const sharedLateral = lateralValues[0];
+      expect(140 - sharedLateral).toBeGreaterThanOrEqual(20);
+    });
+
     it('orients each parked aircraft toward the first non-coincident taxi-route waypoint', () => {
       const layout = generateAirfieldLayout(template, center, heading);
       const fixedWingParking = layout.placements.filter((p) => p.fixedWingSpawn);

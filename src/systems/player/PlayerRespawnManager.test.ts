@@ -997,7 +997,7 @@ describe('PlayerRespawnManager', () => {
       const helipadSpawn = respawnManager['availableSpawnPoints'].find(p => p.id === 'helipad_main');
       expect(helipadSpawn).toBeDefined();
       expect(helipadSpawn!.name).toContain('Helipad');
-      expect(helipadSpawn!.position.x).toBe(52);
+      expect(helipadSpawn!.position.x).toBe(28);
       expect(helipadSpawn!.position.z).toBe(-1400);
     });
 
@@ -1015,7 +1015,7 @@ describe('PlayerRespawnManager', () => {
       expect(helipadSpawn).toBeDefined();
       expect(helipadSpawn?.kind).toBe('helipad');
       expect(helipadSpawn?.priority).toBe(25);
-      expect(helipadSpawn?.position.x).toBe(52);
+      expect(helipadSpawn?.position.x).toBe(28);
       expect(helipadSpawn?.position.z).toBe(-1400);
     });
   });

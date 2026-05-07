@@ -339,7 +339,9 @@ export class SpawnPointSelector {
   }
 
   private getHelipadInfantrySpawnPosition(helipadPosition: THREE.Vector3): THREE.Vector3 {
-    return helipadPosition.clone().add(new THREE.Vector3(HELIPAD_INFANTRY_STANDOFF_METERS, 0, 0));
+    // Standoff in -X (was +X). The +X side of the Open Frontier main helipad
+    // sits on the helipad-mound slope; -X drops onto flatter ground.
+    return helipadPosition.clone().add(new THREE.Vector3(-HELIPAD_INFANTRY_STANDOFF_METERS, 0, 0));
   }
 
   private getPolicyDrivenPressureSpawnPosition(): THREE.Vector3 | null {

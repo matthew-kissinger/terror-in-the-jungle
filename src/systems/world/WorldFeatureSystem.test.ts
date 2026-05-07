@@ -120,8 +120,11 @@ describe('WorldFeatureSystem', () => {
     const fixedWingCalls = fixedWingModel.createAircraftAtSpot.mock.calls;
     expect(fixedWingCalls).toHaveLength(3);
     const worldPositions = fixedWingCalls.map((call) => call[2] as THREE.Vector3);
-    expect(worldPositions.map((p) => Number(p.z.toFixed(2)))).toEqual([-220, -164, -200]);
-    expect(worldPositions.map((p) => Number(p.x.toFixed(2)))).toEqual([230, 144, 186]);
+    // Aircraft are parked in a clean row at apron-centerline lateral=105 with
+    // along offsets [70, -70, 0] for A-1 / AC-47 / F-4. Center at (120, -80),
+    // heading π/2 → world.x = center.x + along, world.z = center.z - lateral.
+    expect(worldPositions.map((p) => Number(p.z.toFixed(2)))).toEqual([-185, -185, -185]);
+    expect(worldPositions.map((p) => Number(p.x.toFixed(2)))).toEqual([190, 50, 120]);
     expect(fixedWingCalls[0][4]).toEqual(expect.objectContaining({
       standId: 'stand_a1',
       taxiRoute: expect.any(Array),

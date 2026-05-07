@@ -57,10 +57,14 @@ export class FixedWingAnimation {
   /**
    * Spin propellers based on throttle. Called each frame.
    * Propeller rotation axis is Z (forward-facing prop spins around its local Z).
+   * When `isActive` is false (parked unpiloted aircraft), the propeller stops
+   * entirely — no idle-floor spin.
    */
-  update(aircraftId: string, throttle: number, dt: number): void {
+  update(aircraftId: string, throttle: number, dt: number, isActive: boolean = true): void {
     const state = this.propellers.get(aircraftId);
     if (!state) return;
+
+    if (!isActive) return;
 
     // Propeller speed proportional to throttle, with minimum idle spin
     const speed = (0.1 + throttle * 0.9) * 80; // radians/sec at full throttle
