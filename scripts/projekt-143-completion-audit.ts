@@ -484,6 +484,51 @@ interface GitState {
   dirty: boolean;
 }
 
+interface LiveReleaseProof {
+  status?: string;
+  git?: {
+    head?: string;
+    branchLine?: string;
+    dirty?: boolean;
+  };
+  github?: {
+    ci?: { databaseId?: number; conclusion?: string; status?: string; headSha?: string; url?: string } | null;
+    deploy?: { databaseId?: number; conclusion?: string; status?: string; headSha?: string; url?: string } | null;
+  };
+  manifest?: {
+    gitSha?: string | null;
+    generatedAt?: string | null;
+    assetBaseUrl?: string | null;
+  };
+  pagesHeaders?: Array<{
+    path?: string;
+    status?: number;
+    contentType?: string | null;
+    cacheControl?: string | null;
+    coop?: string | null;
+    coep?: string | null;
+  }>;
+  r2AshauDem?: {
+    status?: number;
+    url?: string;
+    contentType?: string | null;
+    contentLength?: string | null;
+    expectedSize?: number | null;
+    cacheControl?: string | null;
+    cors?: string | null;
+  } | null;
+  browserSmoke?: {
+    menuText?: string | null;
+    modeVisible?: boolean;
+    deployUiVisible?: boolean;
+    retryVisible?: boolean;
+    consoleErrors?: string[];
+    pageErrors?: string[];
+    requestErrors?: string[];
+  } | null;
+  checks?: Array<{ id?: string; status?: string; detail?: string }>;
+}
+
 interface CompletionAuditReport {
   createdAt: string;
   mode: 'projekt-143-completion-audit';
@@ -772,6 +817,7 @@ function buildReport(): CompletionAuditReport {
   const webgpuStrategyPath = latestFile(files, (path) => path.endsWith(join('webgpu-strategy-audit', 'strategy-audit.json')));
   const platformCapabilityProbePath = latestFile(files, (path) => path.endsWith(join('projekt-143-platform-capability-probe', 'summary.json')));
   const activeDriverDiagnosticPath = latestFile(files, (path) => path.endsWith(join('projekt-143-active-driver-diagnostic', 'active-driver-diagnostic.json')));
+  const liveReleaseProofPath = latestFile(files, (path) => path.endsWith(join('projekt-143-live-release-proof', 'release-proof.json')));
   const hydrologyBakeManifestPath = existsSync(HYDROLOGY_BAKE_MANIFEST_PATH) ? HYDROLOGY_BAKE_MANIFEST_PATH : null;
   const hydrologyBakeLoaderPath = existsSync(HYDROLOGY_BAKE_LOADER_PATH) ? HYDROLOGY_BAKE_LOADER_PATH : null;
   const hydrologyBiomeClassifierPath = existsSync(HYDROLOGY_BIOME_CLASSIFIER_PATH) ? HYDROLOGY_BIOME_CLASSIFIER_PATH : null;
@@ -803,6 +849,7 @@ function buildReport(): CompletionAuditReport {
   const webgpuStrategy = readJson<WebgpuStrategyAudit>(webgpuStrategyPath);
   const platformCapabilityProbe = readJson<PlatformCapabilityProbe>(platformCapabilityProbePath);
   const activeDriverDiagnostic = readJson<ActiveDriverDiagnostic>(activeDriverDiagnosticPath);
+  const liveReleaseProof = readJson<LiveReleaseProof>(liveReleaseProofPath);
   const closeModelCullingBeforeOpenFrontier = readJson<PerfCaptureSummary>(
     existsSync(CLOSE_MODEL_CULL_BEFORE_OPEN_FRONTIER_PATH) ? CLOSE_MODEL_CULL_BEFORE_OPEN_FRONTIER_PATH : null,
   );
@@ -848,6 +895,7 @@ function buildReport(): CompletionAuditReport {
     webgpuStrategy: rel(webgpuStrategyPath),
     platformCapabilityProbe: rel(platformCapabilityProbePath),
     activeDriverDiagnostic: rel(activeDriverDiagnosticPath),
+    liveReleaseProof: rel(liveReleaseProofPath),
     closeModelCullingBeforeOpenFrontier: rel(existsSync(CLOSE_MODEL_CULL_BEFORE_OPEN_FRONTIER_PATH) ? CLOSE_MODEL_CULL_BEFORE_OPEN_FRONTIER_PATH : null),
     closeModelCullingAfterOpenFrontier: rel(existsSync(CLOSE_MODEL_CULL_AFTER_OPEN_FRONTIER_PATH) ? CLOSE_MODEL_CULL_AFTER_OPEN_FRONTIER_PATH : null),
     closeModelCullingAfterAShau: rel(existsSync(CLOSE_MODEL_CULL_AFTER_A_SHAU_PATH) ? CLOSE_MODEL_CULL_AFTER_A_SHAU_PATH : null),
@@ -1674,38 +1722,81 @@ function buildReport(): CompletionAuditReport {
     proxyWarning: 'Capturing future work in docs is not the same as implementing it; this item only verifies the revised objective and roadmap handoff.',
   });
 
+  const releaseProofChecks = liveReleaseProof?.checks ?? [];
+  const failedReleaseProofChecks = releaseProofChecks
+    .filter((check) => check.status !== 'pass')
+    .map((check) => `${check.id ?? 'unknown'}: ${check.detail ?? 'failed'}`);
+  const releaseProofMatchesHead = liveReleaseProof?.git?.head === git.head
+    && liveReleaseProof?.manifest?.gitSha === git.head;
+  const releaseProofPasses = liveReleaseProof?.status === 'pass' && releaseProofMatchesHead;
+  const releaseGatePasses = !git.dirty
+    && git.aheadOfOriginMaster === 0
+    && git.behindOriginMaster === 0
+    && releaseProofPasses;
+
   addItem(items, {
     id: 'validation-and-release',
     requirement: 'The complete Projekt state is validated, committed, pushed, deployed, and live production parity is verified.',
-    namedEvidence: ['git status --short --branch', 'origin/master', 'live /asset-manifest.json'].filter(Boolean),
+    namedEvidence: [
+      'git status --short --branch',
+      'origin/master',
+      'GitHub CI and Deploy runs',
+      inputs.liveReleaseProof,
+    ].filter((entry): entry is string => Boolean(entry)),
     inspectedEvidence: {
       branchLine: git.branchLine,
       dirty: git.dirty,
       shortStatus: git.shortStatus,
       aheadOfOriginMaster: git.aheadOfOriginMaster,
       behindOriginMaster: git.behindOriginMaster,
+      liveReleaseProofStatus: liveReleaseProof?.status ?? null,
+      liveReleaseProofMatchesHead: releaseProofMatchesHead,
+      liveManifestGitSha: liveReleaseProof?.manifest?.gitSha ?? null,
+      ciRun: liveReleaseProof?.github?.ci ?? null,
+      deployRun: liveReleaseProof?.github?.deploy ?? null,
+      pagesHeaders: liveReleaseProof?.pagesHeaders ?? null,
+      r2AshauDem: liveReleaseProof?.r2AshauDem ?? null,
+      browserSmoke: liveReleaseProof?.browserSmoke
+        ? {
+          menuText: liveReleaseProof.browserSmoke.menuText ?? null,
+          modeVisible: liveReleaseProof.browserSmoke.modeVisible ?? null,
+          deployUiVisible: liveReleaseProof.browserSmoke.deployUiVisible ?? null,
+          retryVisible: liveReleaseProof.browserSmoke.retryVisible ?? null,
+          consoleErrors: liveReleaseProof.browserSmoke.consoleErrors?.length ?? null,
+          pageErrors: liveReleaseProof.browserSmoke.pageErrors?.length ?? null,
+          requestErrors: liveReleaseProof.browserSmoke.requestErrors?.length ?? null,
+        }
+        : null,
     },
-    status: !git.dirty && git.aheadOfOriginMaster === 0 ? 'partial' : 'fail',
-    coverage: 'Local git state is inspected directly.',
+    status: releaseGatePasses ? 'pass' : (!git.dirty && git.aheadOfOriginMaster === 0 && git.behindOriginMaster === 0 ? 'partial' : 'fail'),
+    coverage: releaseGatePasses
+      ? 'Local git state, GitHub CI/deploy runs, live manifest SHA, Pages headers, R2 DEM headers, and live browser smoke are all verified for HEAD.'
+      : 'Local git state and any available live-release proof are inspected directly.',
     missingOrWeak: [
       git.dirty ? 'Working tree has uncommitted changes.' : '',
       git.aheadOfOriginMaster && git.aheadOfOriginMaster > 0 ? `Local master is ahead of origin/master by ${git.aheadOfOriginMaster} commits.` : '',
-      'No fresh push, CI, manual deploy, live manifest, service-worker, R2 DEM, or browser smoke evidence for the current local state is present in this audit.',
+      git.behindOriginMaster && git.behindOriginMaster > 0 ? `Local master is behind origin/master by ${git.behindOriginMaster} commits.` : '',
+      liveReleaseProof ? '' : 'No live release proof artifact is present. Run npm run check:projekt-143-live-release-proof after deploy.',
+      liveReleaseProof && liveReleaseProof.status !== 'pass' ? `Live release proof status is ${liveReleaseProof.status}.` : '',
+      liveReleaseProof && !releaseProofMatchesHead ? 'Live release proof does not match current HEAD and live manifest SHA.' : '',
+      ...failedReleaseProofChecks,
     ].filter(Boolean),
-    proxyWarning: 'Local validation or passing artifact checks do not prove production parity.',
+    proxyWarning: 'This item requires live-release proof for the current HEAD; local validation alone is not production parity.',
   });
 
   const blockers = items
     .filter((item) => statusBlocksCompletion(item.status))
     .map((item) => `${item.id}: ${item.missingOrWeak[0] ?? item.coverage}`);
 
-  const nextRequiredActions = [
-    stabilizationScopeCaptured
-      ? null
-      : 'Record the revised stabilization objective in the Projekt ledger, handoff, roadmap, and backlog before release.',
-    'Run the selected stabilization validation gate for the current local stack: at minimum typecheck, targeted tests for touched systems, build/build:perf, and the Projekt completion audit.',
-    'Commit the current local stack, push, run required CI/deploy, and verify live production state before any release-complete claim.',
-  ].filter((action): action is string => Boolean(action));
+  const nextRequiredActions = blockers.length === 0
+    ? []
+    : [
+      stabilizationScopeCaptured
+        ? null
+        : 'Record the revised stabilization objective in the Projekt ledger, handoff, roadmap, and backlog before release.',
+      'Run the selected stabilization validation gate for the current local stack: at minimum typecheck, targeted tests for touched systems, build/build:perf, and the Projekt completion audit.',
+      'Commit the current local stack, push, run required CI/deploy, and verify live production state before any release-complete claim.',
+    ].filter((action): action is string => Boolean(action));
 
   return {
     createdAt: new Date().toISOString(),
@@ -1731,7 +1822,7 @@ function buildReport(): CompletionAuditReport {
       'This audit explicitly does not accept vegetation normal-map removal for default policy.',
       'This audit does not accept any Pixel Forge candidate for runtime.',
       'This audit does not claim final water, terrain, culling/HLOD, vehicle-driving, or skilled-player acceptance when those items are recorded as roadmap work.',
-      'This audit does not claim production parity for the unpushed local stack.',
+      'This audit does not claim completion for any future Projekt revamp item that was intentionally deferred to roadmap/backlog.',
     ],
   };
 }

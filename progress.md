@@ -6253,3 +6253,11 @@ TODO
   production smoke at `http://127.0.0.1:54097/`. Remaining release work is to
   commit the dirty tree, push `master`, run remote CI/deploy, and verify live
   production parity.
+- Pushed the stabilization stack to `origin/master` and verified GitHub CI run
+  `25470721988` PASS for lint, build, test, perf, production smoke, and mobile
+  UI. Manual deploy run `25471425322` PASS.
+- Added `npm run check:projekt-143-live-release-proof` so future release claims
+  are scripted instead of hand-written: it checks the current `master` SHA
+  against successful GitHub CI/deploy runs, live `/asset-manifest.json`, Pages
+  headers, A Shau R2 DEM headers, and a live Pages browser smoke. The final
+  completion audit depends on this proof plus clean local/remote git parity.

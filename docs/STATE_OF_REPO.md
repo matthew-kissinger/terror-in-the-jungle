@@ -11,13 +11,18 @@ the current truth anchor.
 ## Current Stabilization Direction On 2026-05-07
 
 Projekt Objekt-143 has shifted from exhaustive experimental bureau completion
-to a stabilization closeout. Current repo truth should preserve the useful
-fixes and evidence from the long agent/orchestration cycle, record unresolved
-KB-LOAD, KB-TERRAIN, KB-CULL, water, vegetation, Pixel Forge, culling/HLOD, and
-combined-arms findings as roadmap/backlog work, then validate, commit, push,
-deploy, and live-verify the current stack. Do not claim final water art,
-accepted Pixel Forge candidate import, broad HLOD/culling, future driving
-surfaces, or skilled combined-arms feel from the current partial artifacts.
+to a stabilization closeout. The current stack has been shepherded through the
+release path: local validation, commit to `master`, push to `origin/master`,
+GitHub CI, manual Cloudflare Pages deploy, and live Pages/R2/browser
+verification. Exact production SHA remains the live `/asset-manifest.json`
+source of truth; do not freeze it into this doc.
+
+The release preserves the useful fixes and evidence from the long
+agent/orchestration cycle and records unresolved KB-LOAD, KB-TERRAIN, KB-CULL,
+water, vegetation, Pixel Forge, culling/HLOD, and combined-arms findings as
+roadmap/backlog work. Do not claim final water art, accepted Pixel Forge
+candidate import, broad HLOD/culling, future driving surfaces, or skilled
+combined-arms feel from the current partial artifacts.
 
 ## Stable-Ground Snapshot On 2026-05-02
 

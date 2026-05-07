@@ -32,6 +32,12 @@ release. The revised closeout target is:
 4. Run the stabilization validation gate, commit the local stack, push to
    `master`, deploy, and verify live Pages production parity.
 
+Release proof is now a first-class script: run
+`npm run check:projekt-143-live-release-proof` after deployment, then
+`npm run check:projekt-143-completion-audit`. The live release proof checks the
+current `master` SHA against GitHub CI/deploy runs, live `/asset-manifest.json`,
+Pages headers, the A Shau R2 DEM, and a live Pages browser smoke.
+
 Deferred work remains real work. It should not be erased or treated as solved:
 water naturalism, A Shau route/nav quality, vegetation distribution and ground
 cover, Pixel Forge candidate imports, broad HLOD/culling, future driving
@@ -65,7 +71,7 @@ web.dev OffscreenCanvas
 | --- | --- | --- |
 | Phase 1 - Inspectorate of Foundations | SIGNED 2026-05-02 | Read-only audit completed against code, docs, live Pages state, GitHub Actions, perf artifacts, and static asset inventory. |
 | Phase 2 - Specialist Bureaus | ACTIVE | Cycle 1 baseline bundle is filed with WARN status. The initial docs/tooling release deployed at `806d5fa43d63854dd80496a67e8aaef4a741c627`; the follow-up agent-DX release deployed at `f68f09afdd537d4cbe3db3ab5f10d90a13944e6e`; release-DX hardening deployed at `5f46713d101f6fea974da6d77f303c95df58000c`; Cycle 2 aircraft delivery deployed at `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`. Exact production SHA remains `/asset-manifest.json`. Cycle 2 visual/runtime proof is evidence-complete PASS through `artifacts/perf/2026-05-03T16-48-58-020Z/projekt-143-cycle2-proof-suite/cycle2-proof-summary.json`, with KB-CULL renderer/category proof at `artifacts/perf/2026-05-03T10-21-12-603Z/projekt-143-culling-proof/summary.json` and KB-OPTIK matched proof refreshed after the selected-lighting luma slice at `artifacts/perf/2026-05-03T16-48-28-452Z/projekt-143-optics-scale-proof/summary.json`. Commit `b7bcd0e25b09f89c8f2416d8ec1b3c7a7cd4abc9` drops the NPC runtime target to `2.95m` and adds generated per-tile imposter crop maps; commit `1395198da4db95611457ecde769b611e3d36354e` adds faction imposter material tuning. Matched visible-height ratios improved from the Cycle 2 before range `0.52-0.54x` to `0.861-0.895x`, and selected-lighting luma delta now ranges `-0.44%` to `0.36%`. No perf improvement, final visual parity, aircraft-scale acceptance, or production parity is claimed. KB-METRIK remains first and blocks optimization claims from other bureaus. |
-| Phase 3 - Multi-Cycle Engineering Plan | REVISED TO STABILIZATION CLOSEOUT 2026-05-07 | Dependency-aware cycle plan exists below, but the closeout target is now stabilization and release, not exhaustive experimental branch completion. Latest Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-07T00-26-45-885Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`: KB-OPTIK and KB-EFFECTS have scoped evidence-complete decisions; KB-LOAD, KB-TERRAIN, and KB-CULL have valuable branch-ready evidence and clear unresolved work. Under the revised objective, those unresolved items must be folded into roadmap/backlog/handoff records rather than forced into new runtime scope before release. Production parity is still not claimed until the current local stack is validated, committed, pushed, deployed, and live-verified. |
+| Phase 3 - Multi-Cycle Engineering Plan | REVISED TO STABILIZATION CLOSEOUT 2026-05-07 | Dependency-aware cycle plan exists below, but the closeout target is now stabilization and release, not exhaustive experimental branch completion. Latest Cycle 3 readiness is mechanically summarized by `artifacts/perf/2026-05-07T00-26-45-885Z/projekt-143-cycle3-kickoff/cycle3-kickoff-summary.json`: KB-OPTIK and KB-EFFECTS have scoped evidence-complete decisions; KB-LOAD, KB-TERRAIN, and KB-CULL have valuable branch-ready evidence and clear unresolved work. Under the revised objective, those unresolved items are folded into roadmap/backlog/handoff records rather than forced into new runtime scope before release. Production parity is verified by the live release proof and completion audit after deployment. |
 
 Phase 3 note, 2026-05-07: the table row above is superseded for hydrology by
 the current KB-TERRAIN evidence below. Latest hydrology classification audit is
@@ -87,11 +93,10 @@ foundation, parking, support, and hydrology screenshots with zero browser
 errors; the new `terrain_water_exposure_review` check flags the Open Frontier
 river/parking screenshots as washed out (`0.7448`, `0.8115`, and `0.8309`
 overexposed ratio), so water/terrain naturalism remains deferred follow-up
-rather than stabilization-release acceptance. The revised completion audit
-remains `NOT_COMPLETE` at
-`artifacts/perf/2026-05-07T01-14-59-420Z/projekt-143-completion-audit/completion-audit.json`
-only because validation/release is still blocked by a dirty, unpushed,
-undeployed working tree.
+rather than stabilization-release acceptance. The revised completion audit is
+paired with `npm run check:projekt-143-live-release-proof` for the final
+release gate; live `/asset-manifest.json` remains the exact production SHA
+source of truth.
 KB-LOAD candidate import is back to dry-run-ready after repairing the Pixel
 Forge banana candidate. The refreshed candidate proof at
 `artifacts/perf/2026-05-06T21-40-40-049Z/projekt-143-vegetation-candidate-proof/summary.json`
@@ -271,10 +276,11 @@ KB-TERRAIN, and KB-CULL remain `ready_for_branch` at their broad target level,
 and KB-FORGE remains PASS for local Pixel Forge liaison/catalog scope. The
 latest explicit completion audit is
 `artifacts/perf/2026-05-07T01-14-59-420Z/projekt-143-completion-audit/completion-audit.json`.
-It reports `NOT_COMPLETE` under the revised stabilization objective: all named
-bureau/roadmap-capture items are PASS for current evidence or explicit deferral,
-and the remaining blocker is `validation-and-release` because the repo is still
-dirty, unpushed, and undeployed. KB-STRATEGIE now has a guarded browser-backed
+It reports `NOT_COMPLETE` under the revised stabilization objective before the
+final release-proof script is run: all named bureau/roadmap-capture items are
+PASS for current evidence or explicit deferral, and `validation-and-release`
+requires clean git, pushed `master`, CI, deploy, live manifest/header/R2 checks,
+and browser smoke evidence. KB-STRATEGIE now has a guarded browser-backed
 capability artifact at
 `artifacts/perf/2026-05-06T06-03-26-013Z/projekt-143-platform-capability-probe/summary.json`,
 but it is WARN/headless inventory only: WebGL2 is available through SwiftShader,
@@ -282,8 +288,7 @@ but it is WARN/headless inventory only: WebGL2 is available through SwiftShader,
 a WebGPU adapter, OffscreenCanvas WebGL2 and isolated SharedArrayBuffer pass,
 and local/live COOP/COEP headers pass. Owner vegetation specifics are PASS for retiring the
 short palm, preserving `fanPalm`/`coconut`, and keeping ground-cover budget
-directed toward fern/elephantEar/trail candidates, but the repo remains dirty,
-unpushed, and undeployed, so validation/release remains FAIL.
+directed toward fern/elephantEar/trail candidates.
 The latest active-driver runtime pair after objective-aware target locking is
 Open Frontier
 `artifacts/perf/2026-05-06T15-09-39-654Z/summary.json` and A Shau

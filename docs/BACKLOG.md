@@ -11,8 +11,8 @@ capability.
 ### Projekt Objekt-143 Stabilization Closeout
 
 The 2026-05-07 owner direction changes Projekt Objekt-143 from exhaustive
-experimental bureau completion into a stabilization closeout. Required before
-calling this cycle done:
+experimental bureau completion into a stabilization closeout. The release path
+for this cycle is now scripted and evidence-backed:
 
 - Preserve the accepted/scoped improvements already made in the local stack.
 - Keep unresolved KB-LOAD, KB-TERRAIN, KB-CULL, water, vegetation, active-driver,
@@ -21,7 +21,8 @@ calling this cycle done:
   claim final water art, broad HLOD/culling, asset-import, vehicle-driving, or
   skilled-player acceptance from partial evidence.
 - Commit the local stack, push to `master`, run CI/deploy, and verify live
-  Pages production parity.
+  Pages production parity with `npm run check:projekt-143-live-release-proof`
+  followed by `npm run check:projekt-143-completion-audit`.
 
 Deferred to the next Projekt revamp:
 
@@ -39,9 +40,9 @@ Deferred to the next Projekt revamp:
 - WebGPU/worker/WASM/native-backed browser capability branches after WebGL
   stabilization.
 
-- Deploy the final accepted `master` SHA after CI is green, then verify live
-  `/asset-manifest.json`, `/sw.js`, Pages headers, R2 DEM headers, Recast WASM,
-  Zone Control browser smoke, and one A Shau startup path.
+- For future releases, deploy the final accepted `master` SHA after CI is green,
+  then verify live `/asset-manifest.json`, `/sw.js`, Pages headers, R2 DEM
+  headers, Recast WASM, Zone Control browser smoke, and one A Shau startup path.
 - Keep `game-field-kits` reproducible: if TIJ file dependencies or CI checkout
   scripts change, validate both repos and the deploy-key checkout path.
 - Review retained unmerged task/spike branches in batches. Delete only branches

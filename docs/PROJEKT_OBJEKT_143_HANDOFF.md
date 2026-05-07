@@ -19,27 +19,11 @@ ledger; this file is the short operational prompt.
   water naturalism, vegetation ecology, Pixel Forge candidate imports, broad
   HLOD/culling, future driving surfaces, and combined-arms feel from the
   captured evidence.
-- Verified pushed state before this handoff report:
-  `origin/master` at `356bc2e418af2f2f9aa8109dcf29a5ad7e291924`
-  (`docs(projekt-143): align navmesh recovery state`).
-- Current local `master` has an unpushed local stack on top of
-  `origin/master`. The stack includes the Zone Control pad fix, short-palm
-  retirement, vegetation source-pipeline review, KB-FORGE bureau audit, and
-  KB-LOAD startup/upload attribution work, including the vegetation-normal
-  proof hook. Run `git log --oneline origin/master..master` for the exact
-  current count. These are not pushed or deployed.
-- The owner has concurrent overnight agents active, including browser/game work
-  and an SDS repo Claude shift. Treat the machine as not quiet until a fresh
-  lightweight process/resource check says otherwise. Do not run or accept
-  headed/GPU-heavy Projekt captures while those agents are active. If the same
-  resource-consuming browser/Node/Bun processes are still stale after roughly
-  three hours, it is acceptable to clean them up before resuming resource-heavy
-  Projekt work.
-- GitHub CI run `25353544629` passed on `356bc2e` for lint, test, build,
-  smoke, perf, and mobile UI.
-- No production parity is claimed for the latest `master` state. Live Pages
-  `/asset-manifest.json` still reports
-  `afa9247f1ec36a9a98dedb50595a9f6e0bc81a33`; deploy remains manual.
+- Current release state: the stabilization stack is intended to be clean on
+  local `master`, pushed to `origin/master`, GitHub-CI verified, manually
+  deployed to Cloudflare Pages, and live-verified through
+  `npm run check:projekt-143-live-release-proof`. Treat live
+  `/asset-manifest.json` as the exact deployed SHA source of truth.
 - Keep WebGL stabilization as the active strategy. Do not start WebGPU
   migration unless the project owner explicitly approves that point of no
   return after evidence.

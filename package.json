@@ -126,6 +126,7 @@
     "check:projekt-143-perf-heap-diagnostic": "npx tsx scripts/projekt-143-perf-heap-diagnostic.ts",
     "check:projekt-143-water-system": "npx tsx scripts/projekt-143-water-system-audit.ts",
     "check:projekt-143-water-runtime-proof": "npx tsx scripts/projekt-143-water-runtime-proof.ts",
+    "check:projekt-143-live-release-proof": "npx tsx scripts/projekt-143-live-release-proof.ts",
     "check:hydrology-bakes": "npx tsx scripts/prebake-hydrology.ts --check",
     "check:projekt-143-pixel-forge": "npx tsx scripts/projekt-143-pixel-forge-bureau.ts",
     "check:projekt-143-completion-audit": "npx tsx scripts/projekt-143-completion-audit.ts",

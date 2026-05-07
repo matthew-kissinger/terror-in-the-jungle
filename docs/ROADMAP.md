@@ -19,11 +19,11 @@ Current truthful framing: the engine already supports large strategic population
 
 ## Projekt Objekt-143 Follow-Up
 
-Projekt Objekt-143 follow-up is intentionally deferred until the current local
-stabilization stack is validated, committed, pushed to `master`, deployed, and
-live-verified. The 2026-05 experimental/orchestration cycle produced useful
-code, tools, and evidence, but the next step is repo stabilization rather than
-another scope expansion.
+Projekt Objekt-143 follow-up is intentionally deferred until after the current
+stabilization release. The 2026-05 experimental/orchestration cycle produced
+useful code, tools, and evidence; the repo now treats those findings as
+captured signal for the next Projekt revamp rather than as permission for
+another pre-release scope expansion.
 
 Carry these findings into the next Projekt revamp:
 
