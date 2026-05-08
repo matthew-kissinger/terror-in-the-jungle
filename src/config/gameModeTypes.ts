@@ -32,6 +32,13 @@ export interface ZoneConfig {
   isHomeBase: boolean;
   owner: Faction | null;
   ticketBleedRate: number;
+  /**
+   * If `true` (or omitted), the post-placement terrain validator may nudge
+   * this zone out of a ditch / off a steep slope after `findSuitableZonePosition`
+   * has run. Set to `false` for sacrosanct authored coords (HQs, named landmarks,
+   * airfield zones).
+   */
+  validateTerrain?: boolean;
 }
 
 export interface ScaleConfig {
