@@ -50,3 +50,23 @@ export const NPC_HEALTH = 100;
 
 /** Probability that OPFOR NPC spawns as objective-focused (0-1). */
 export const OPFOR_OBJECTIVE_FOCUS_CHANCE = 0.4;
+
+/**
+ * Live-tunable LOD/perception knobs covering distant-NPC freeze and squad/stuck
+ * deadlock breakers (see docs/tasks/npc-unfreeze-and-stuck.md).
+ *
+ * Plain mutable object so the live-tuning Tweakpane panel can write through
+ * directly. Do NOT freeze.
+ */
+export const NpcLodConfig = {
+  /** Integrate cached velocity on visual-only LOD ticks so distant NPCs do not freeze between full updates. */
+  visualOnlyIntegrateVelocity: true,
+  /** Squared speed below which we treat the NPC as not moving (0.2 m/s)^2. */
+  idleEpsilonSq: 0.04,
+  /** Max time (ms) a follower can sit in `isRejoiningSquad` before falling back to normal patrol. */
+  rejoinTimeoutMs: 5000,
+  /** Max time (ms) a follower clamps to its leader's idle stance before re-evaluating its own goal. */
+  squadFollowStaleMs: 4000,
+  /** Distant culled-bucket simulation interval (ms). Lower = more frequent but more cost. */
+  culledDistantSimIntervalMs: 8000,
+};

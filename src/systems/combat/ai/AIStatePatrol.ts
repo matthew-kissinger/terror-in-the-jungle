@@ -4,6 +4,7 @@ import { ZoneManager } from '../../world/ZoneManager'
 import { Logger } from '../../../utils/Logger'
 import { ISpatialQuery } from '../SpatialOctree'
 import { clusterManager } from '../ClusterManager'
+import { NpcLodConfig } from '../../../config/CombatantConfig'
 
 const _toTarget = new THREE.Vector3()
 const _offset = new THREE.Vector3()
@@ -64,7 +65,16 @@ export class AIStatePatrol {
     const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
 
     if (combatant.isRejoiningSquad) {
-      return;
+      // Rejoin watchdog: if rejoin has dragged on, drop the gate so engagement
+      // detection resumes. Movement-side handler also clears the flag, but
+      // doing it here too prevents skipping a tick of perception.
+      if (combatant.rejoinStartedAtMs !== undefined &&
+          performance.now() - combatant.rejoinStartedAtMs > NpcLodConfig.rejoinTimeoutMs) {
+        combatant.isRejoiningSquad = false;
+        combatant.rejoinStartedAtMs = undefined;
+      } else {
+        return;
+      }
     }
 
     if (squad?.isPlayerControlled && squad.currentCommand &&

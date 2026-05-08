@@ -149,6 +149,13 @@ export interface Combatant extends ITargetable {
   distanceSq?: number;
   isObjectiveFocused?: boolean;
   isRejoiningSquad?: boolean;
+  /**
+   * Wall-clock timestamp (performance.now()) when this combatant last entered
+   * the rejoining-squad state. Cleared when the rejoin completes or the
+   * watchdog timeout fires (NpcLodConfig.rejoinTimeoutMs). See
+   * docs/tasks/npc-unfreeze-and-stuck.md.
+   */
+  rejoinStartedAtMs?: number;
   coverPosition?: THREE.Vector3;
   lastCoverSeekTime?: number;
   inCover?: boolean;
@@ -204,6 +211,12 @@ export interface Squad {
   isPlayerControlled?: boolean;
   currentCommand?: SquadCommand;
   commandPosition?: THREE.Vector3;
+  /**
+   * Wall-clock timestamp (performance.now()) when the leader was first
+   * observed idle. Cleared when the leader starts moving again. Followers
+   * use this to escape leader-idle deadlock after NpcLodConfig.squadFollowStaleMs.
+   */
+  leaderIdleSinceMs?: number;
 }
 
 export enum GrenadeType {
