@@ -15,6 +15,12 @@ interface RenderState {
   selectedSpawnPointId?: string;
 }
 
+interface SpawnPointLabelPlacement {
+  x: number;
+  y: number;
+  align: CanvasTextAlign;
+}
+
 export class OpenFrontierRespawnMapRenderer {
   static render(
     ctx: CanvasRenderingContext2D,
@@ -221,6 +227,115 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.beginPath();
     ctx.arc(x, y, innerRadius, 0, Math.PI * 2);
     ctx.fill();
+
+    const textLabel = `${this.getSpawnPointKindLabel(spawnPoint)} ${spawnPoint.name}`;
+    ctx.font = 'bold 11px monospace';
+    const metrics = ctx.measureText(textLabel);
+    const padding = 5;
+    const height = 15;
+    const placement = this.getSpawnPointLabelPlacement(spawnPoint, x, y, outerRadius, metrics.width, padding);
+    const backgroundX = placement.align === 'left'
+      ? placement.x - padding
+      : placement.align === 'right'
+        ? placement.x - metrics.width - padding
+        : placement.x - (metrics.width / 2) - padding;
+
+    ctx.strokeStyle = color.replace('0.95', '0.55');
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(placement.x, placement.y);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(4, 8, 5, 0.84)';
+    ctx.fillRect(
+      backgroundX,
+      placement.y - 11,
+      metrics.width + padding * 2,
+      height
+    );
+    ctx.textAlign = placement.align;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = color;
+    ctx.fillText(textLabel, placement.x, placement.y);
+  }
+
+  private static getSpawnPointLabelPlacement(
+    spawnPoint: RespawnSpawnPoint,
+    x: number,
+    y: number,
+    outerRadius: number,
+    labelWidth: number,
+    padding: number
+  ): SpawnPointLabelPlacement {
+    const horizontalOffset = outerRadius + 16;
+    const verticalOffset = outerRadius + 18;
+    let placement: SpawnPointLabelPlacement;
+
+    switch (spawnPoint.kind) {
+      case 'home_base':
+        placement = { x: x + horizontalOffset, y: y - 5, align: 'left' };
+        break;
+      case 'helipad':
+        placement = { x: x + horizontalOffset, y: y - 18, align: 'left' };
+        break;
+      case 'insertion':
+        placement = { x: x + horizontalOffset, y: y + 18, align: 'left' };
+        break;
+      case 'zone':
+      case 'default':
+      default:
+        placement = { x, y: y + verticalOffset, align: 'center' };
+        break;
+    }
+
+    return this.clampSpawnPointLabelPlacement(placement, labelWidth, padding);
+  }
+
+  private static clampSpawnPointLabelPlacement(
+    placement: SpawnPointLabelPlacement,
+    labelWidth: number,
+    padding: number
+  ): SpawnPointLabelPlacement {
+    const edgePadding = 8;
+    const width = labelWidth + padding * 2;
+    const minY = 20;
+    const maxY = MAP_SIZE - 12;
+    let x = placement.x;
+    const y = Math.min(maxY, Math.max(minY, placement.y));
+
+    if (placement.align === 'left' && x + width > MAP_SIZE - edgePadding) {
+      x = MAP_SIZE - edgePadding;
+      return { x, y, align: 'right' };
+    }
+
+    if (placement.align === 'right' && x - width < edgePadding) {
+      x = edgePadding;
+      return { x, y, align: 'left' };
+    }
+
+    if (placement.align === 'center') {
+      const halfWidth = width / 2;
+      x = Math.min(MAP_SIZE - edgePadding - halfWidth, Math.max(edgePadding + halfWidth, x));
+    }
+
+    return { ...placement, x, y };
+  }
+
+  private static getSpawnPointKindLabel(spawnPoint: RespawnSpawnPoint): string {
+    switch (spawnPoint.kind) {
+      case 'home_base':
+        return 'BASE';
+      case 'zone':
+        return 'ZONE';
+      case 'helipad':
+        return 'HELIPAD';
+      case 'insertion':
+        return 'INSERT';
+      case 'default':
+      default:
+        return 'DEFAULT';
+    }
   }
 
   private static drawSelectionHighlight(ctx: CanvasRenderingContext2D, spawnPoint: RespawnSpawnPoint): void {

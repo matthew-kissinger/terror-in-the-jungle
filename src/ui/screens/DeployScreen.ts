@@ -11,6 +11,7 @@
 import { UIComponent } from '../engine/UIComponent';
 import type { DeploySessionModel } from '../../systems/world/runtime/DeployFlowSession';
 import type { LoadoutPresentationModel } from '../../systems/player/LoadoutService';
+import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 import {
   getEquipmentLabel,
   getWeaponLabel,
@@ -38,12 +39,16 @@ export class DeployScreen extends UIComponent {
   private headerModeValue?: HTMLDivElement;
   private headerFlowValue?: HTMLDivElement;
   private headerLoadoutValue?: HTMLDivElement;
+  private headerAllianceValue?: HTMLDivElement;
   private mapTitle?: HTMLDivElement;
   private selectedName?: HTMLDivElement;
   private selectedStatus?: HTMLDivElement;
   private selectedTitle?: HTMLHeadingElement;
+  private decisionMetric?: HTMLDivElement;
   private sequenceTitle?: HTMLHeadingElement;
   private sequenceSteps?: HTMLDivElement;
+  private spawnOptionsPanel?: HTMLDivElement;
+  private spawnOptionsList?: HTMLDivElement;
   private timerDisplay?: HTMLDivElement;
   private respawnButton?: HTMLButtonElement;
   private secondaryActionButton?: HTMLButtonElement;
@@ -57,11 +62,14 @@ export class DeployScreen extends UIComponent {
   private presetSaveButton?: HTMLButtonElement;
   private onRespawnClick?: () => void;
   private onCancelClick?: () => void;
+  private onSpawnOptionSelected?: (spawnPointId: string, spawnPointName: string) => void;
   private onLoadoutChange?: (field: LoadoutFieldKey, direction: 1 | -1) => void;
   private onPresetCycle?: (direction: 1 | -1) => void;
   private onPresetSave?: () => void;
   private deploySession?: DeploySessionModel;
   private loadoutPresentation?: LoadoutPresentationModel;
+  private decisionStartedAtMs: number | null = null;
+  private decisionElapsedMs: number | null = null;
   private readonly loadoutControls = new Map<LoadoutFieldKey, LoadoutFieldControl>();
 
   constructor() {
@@ -77,7 +85,7 @@ export class DeployScreen extends UIComponent {
     this.root.style.display = 'none';
     (this.root.style as CSSStyleDeclaration & { cssText?: string }).cssText = 'display: none;';
 
-    const stage = this.createDiv(styles.stage);
+    const stage = this.createDiv(styles.stage, 'respawn-stage');
     const layout = this.createDiv(styles.layout);
 
     // Header
@@ -89,16 +97,19 @@ export class DeployScreen extends UIComponent {
     headerCopy.appendChild(this.headerTitle);
     headerCopy.appendChild(this.headerStatus);
 
-    const headerMeta = this.createDiv(styles.headerMeta);
+    const headerMeta = this.createDiv(styles.headerMeta, 'respawn-header-meta');
     const modeRow = this.createMetaRow('Mode', 'Zone Control');
     this.headerModeValue = modeRow.value;
     const flowRow = this.createMetaRow('Flow', 'Frontline deployment');
     this.headerFlowValue = flowRow.value;
     const loadoutRow = this.createMetaRow('Loadout', 'Editable');
     this.headerLoadoutValue = loadoutRow.value;
+    const allianceRow = this.createMetaRow('Alliance', 'BLUFOR / US');
+    this.headerAllianceValue = allianceRow.value;
     headerMeta.appendChild(modeRow.row);
     headerMeta.appendChild(flowRow.row);
     headerMeta.appendChild(loadoutRow.row);
+    headerMeta.appendChild(allianceRow.row);
 
     header.appendChild(headerCopy);
     header.appendChild(headerMeta);
@@ -120,6 +131,7 @@ export class DeployScreen extends UIComponent {
     const sidePanel = this.createDiv(styles.sidePanel);
     sidePanel.appendChild(this.createSelectedPanel());
     const sideScroll = this.createDiv(styles.sideScroll, 'respawn-side-scroll');
+    sideScroll.appendChild(this.createSpawnOptionsPanel());
     sideScroll.appendChild(this.createSequencePanel());
     sideScroll.appendChild(this.createLoadoutPanel());
     sideScroll.appendChild(this.createLegendPanel());
@@ -218,6 +230,7 @@ export class DeployScreen extends UIComponent {
 
   updateLoadoutPresentation(model: LoadoutPresentationModel): void {
     this.loadoutPresentation = model;
+    this.updateAlliance(model.context.alliance, model.factionLabel);
     if (this.loadoutFactionValue) this.loadoutFactionValue.textContent = model.factionLabel;
     if (this.loadoutPresetName) {
       this.loadoutPresetName.textContent = `${model.presetName} (${model.presetIndex + 1}/${model.presetCount})`;
@@ -230,10 +243,13 @@ export class DeployScreen extends UIComponent {
 
   show(): void {
     this.root.style.display = 'flex';
+    this.setDecisionTimerStarted();
   }
 
   hide(): void {
     this.root.style.display = 'none';
+    this.decisionStartedAtMs = null;
+    this.decisionElapsedMs = null;
   }
 
   updateTimerDisplay(respawnTimer: number, hasSelectedSpawn: boolean): void {
@@ -261,6 +277,7 @@ export class DeployScreen extends UIComponent {
     if (this.selectedStatus) {
       this.selectedStatus.textContent = this.deploySession?.readySelectionText ?? 'Ready to deploy';
     }
+    this.recordDecisionTime();
   }
 
   resetSelectedSpawn(): void {
@@ -278,6 +295,70 @@ export class DeployScreen extends UIComponent {
     this.onCancelClick = callback;
   }
 
+  setSpawnOptionClickCallback(callback: (spawnPointId: string, spawnPointName: string) => void): void {
+    this.onSpawnOptionSelected = callback;
+  }
+
+  updateAlliance(alliance: string, faction?: string): void {
+    const allianceLabel = String(alliance).split('_').join(' ').toUpperCase();
+    const factionLabel = faction ? String(faction).split('_').join(' ').toUpperCase() : '';
+    const label = factionLabel ? `${allianceLabel} / ${factionLabel}` : allianceLabel;
+    if (this.headerAllianceValue) {
+      this.headerAllianceValue.textContent = label;
+    }
+    if (this.root.dataset) {
+      this.root.dataset.alliance = allianceLabel;
+      this.root.dataset.faction = factionLabel;
+    }
+  }
+
+  updateSpawnOptions(spawnPoints: RespawnSpawnPoint[], selectedSpawnPointId?: string): void {
+    if (!this.spawnOptionsList) return;
+    this.spawnOptionsList.innerHTML = '';
+
+    if (spawnPoints.length === 0) {
+      const empty = this.createDiv(styles.spawnOptionEmpty);
+      empty.textContent = 'No deployment points available.';
+      this.spawnOptionsList.appendChild(empty);
+      return;
+    }
+
+    for (const group of this.groupSpawnPoints(spawnPoints)) {
+      const groupEl = this.createDiv(styles.spawnOptionGroup);
+      const heading = this.createDiv(styles.spawnOptionGroupTitle);
+      heading.textContent = group.label;
+      groupEl.appendChild(heading);
+
+      for (const spawnPoint of group.points) {
+        const option = this.makeSpawnOptionButton(spawnPoint, spawnPoint.id === selectedSpawnPointId);
+        groupEl.appendChild(option);
+      }
+
+      this.spawnOptionsList.appendChild(groupEl);
+    }
+  }
+
+  setDecisionTimerStarted(startedAtMs = DeployScreen.nowMs()): void {
+    this.decisionStartedAtMs = startedAtMs;
+    this.decisionElapsedMs = null;
+    if (this.root.dataset) {
+      this.root.dataset.decisionStartedAtMs = String(Math.round(startedAtMs));
+      delete this.root.dataset.decisionElapsedMs;
+    }
+    this.updateDecisionMetric(0);
+  }
+
+  recordDecisionTime(nowMs = DeployScreen.nowMs()): number | null {
+    if (this.decisionStartedAtMs === null) return null;
+    if (this.decisionElapsedMs !== null) return this.decisionElapsedMs;
+    this.decisionElapsedMs = Math.max(0, nowMs - this.decisionStartedAtMs);
+    if (this.root.dataset) {
+      this.root.dataset.decisionElapsedMs = String(Math.round(this.decisionElapsedMs));
+    }
+    this.updateDecisionMetric(this.decisionElapsedMs);
+    return this.decisionElapsedMs;
+  }
+
   override dispose(): void {
     super.dispose();
   }
@@ -291,9 +372,21 @@ export class DeployScreen extends UIComponent {
     this.selectedName.textContent = 'NONE';
     this.selectedStatus = this.createDiv(styles.statusText, 'selected-spawn-status');
     this.selectedStatus.textContent = 'Select a spawn point on the map';
+    this.decisionMetric = this.createDiv(styles.decisionMetric, 'respawn-decision-time');
+    this.decisionMetric.textContent = 'Decision time 0.0s';
     panel.appendChild(this.selectedTitle);
     panel.appendChild(this.selectedName);
     panel.appendChild(this.selectedStatus);
+    panel.appendChild(this.decisionMetric);
+    return panel;
+  }
+
+  private createSpawnOptionsPanel(): HTMLDivElement {
+    const panel = this.createDiv(styles.spawnOptionsPanel, 'respawn-spawn-options-panel');
+    this.spawnOptionsPanel = panel;
+    panel.appendChild(this.createHeading('h3', undefined, styles.panelTitle, 'AVAILABLE SPAWNS'));
+    this.spawnOptionsList = this.createDiv(styles.spawnOptionsList, 'respawn-spawn-options');
+    panel.appendChild(this.spawnOptionsList);
     return panel;
   }
 
@@ -515,5 +608,76 @@ export class DeployScreen extends UIComponent {
       return;
     }
     this.loadoutStatus.textContent = 'Two weapon slots and one equipment slot. Adjust before deploying.';
+  }
+
+  private makeSpawnOptionButton(spawnPoint: RespawnSpawnPoint, selected: boolean): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = selected
+      ? `${styles.spawnOption} ${styles.spawnOptionSelected}`
+      : styles.spawnOption;
+    button.textContent = '';
+    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    button.setAttribute('aria-label', `${this.getSpawnKindLabel(spawnPoint)} ${spawnPoint.name}`);
+    if (button.dataset) {
+      button.dataset.spawnId = spawnPoint.id;
+      button.dataset.spawnKind = spawnPoint.kind;
+      button.dataset.selectionClass = spawnPoint.selectionClass;
+    }
+    button.addEventListener('pointerdown', () => {
+      this.onSpawnOptionSelected?.(spawnPoint.id, spawnPoint.name);
+    });
+
+    const label = this.createDiv(styles.spawnOptionLabel);
+    label.textContent = spawnPoint.name;
+    const meta = this.createDiv(styles.spawnOptionMeta);
+    const safety = spawnPoint.safe ? 'CLEAR' : 'HOT';
+    meta.textContent = `${this.getSpawnKindLabel(spawnPoint)} / ${safety} / ${Math.round(spawnPoint.position.x)}, ${Math.round(spawnPoint.position.z)}`;
+    button.appendChild(label);
+    button.appendChild(meta);
+    return button;
+  }
+
+  private groupSpawnPoints(spawnPoints: RespawnSpawnPoint[]): Array<{ label: string; points: RespawnSpawnPoint[] }> {
+    const groups: Array<{ kind: RespawnSpawnPoint['kind']; label: string; points: RespawnSpawnPoint[] }> = [
+      { kind: 'home_base', label: 'ALLIANCE BASES', points: [] },
+      { kind: 'zone', label: 'CONTROLLED ZONES', points: [] },
+      { kind: 'helipad', label: 'HELIPADS', points: [] },
+      { kind: 'insertion', label: 'INSERTION POINTS', points: [] },
+      { kind: 'default', label: 'DEFAULT', points: [] },
+    ];
+
+    for (const spawnPoint of spawnPoints) {
+      const group = groups.find((entry) => entry.kind === spawnPoint.kind) ?? groups[groups.length - 1];
+      group.points.push(spawnPoint);
+    }
+
+    return groups.filter((group) => group.points.length > 0);
+  }
+
+  private getSpawnKindLabel(spawnPoint: RespawnSpawnPoint): string {
+    switch (spawnPoint.kind) {
+      case 'home_base':
+        return 'BASE';
+      case 'zone':
+        return 'ZONE';
+      case 'helipad':
+        return 'HELIPAD';
+      case 'insertion':
+        return 'INSERTION';
+      case 'default':
+      default:
+        return 'DEFAULT';
+    }
+  }
+
+  private updateDecisionMetric(elapsedMs: number): void {
+    if (!this.decisionMetric) return;
+    const seconds = Math.max(0, elapsedMs / 1000);
+    this.decisionMetric.textContent = `Decision time ${seconds.toFixed(1)}s`;
+  }
+
+  private static nowMs(): number {
+    return globalThis.performance?.now?.() ?? Date.now();
   }
 }
