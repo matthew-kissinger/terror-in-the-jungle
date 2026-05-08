@@ -2,6 +2,79 @@ import * as THREE from 'three';
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import type { CDLODTile } from './CDLODQuadtree';
 
+/**
+ * CDLOD tile base geometry: NxN XZ grid (`isSkirt=0`) plus a perimeter
+ * skirt ring (`isSkirt=1`). The vertex shader drops skirt verts by a
+ * per-LOD amount to hide sub-pixel cracks at chunk borders. Stage D2 of
+ * `terrain-cdlod-seam`. Total verts = N*N + 4*N - 4.
+ */
+export function createTileGeometry(tileResolution: number): THREE.BufferGeometry {
+  const N = tileResolution;
+  const interiorCount = N * N;
+  const totalVerts = interiorCount + 4 * N - 4;
+  const positions = new Float32Array(totalVerts * 3);
+  const isSkirtArr = new Float32Array(totalVerts);
+
+  // Interior grid mirrors PlaneGeometry(1,1,N-1,N-1) post-rotateX(-π/2):
+  // y -> -z, so x in [-0.5, 0.5], z in [-0.5, 0.5]. Existing shader code
+  // indexes by position.xz so we keep that exact layout.
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const base = (j * N + i) * 3;
+      positions[base] = i / (N - 1) - 0.5;
+      positions[base + 2] = -((j / (N - 1)) - 0.5);
+    }
+  }
+
+  // Skirt ring duplicates each perimeter vertex (corners shared between
+  // sides), tagged isSkirt=1. Walk the perimeter once.
+  const skirtIndexOf = new Int32Array(interiorCount).fill(-1);
+  let cursor = interiorCount;
+  const dup = (interiorIdx: number): void => {
+    if (skirtIndexOf[interiorIdx] !== -1) return;
+    const ib = interiorIdx * 3;
+    const sb = cursor * 3;
+    positions[sb] = positions[ib];
+    positions[sb + 2] = positions[ib + 2];
+    isSkirtArr[cursor] = 1;
+    skirtIndexOf[interiorIdx] = cursor;
+    cursor++;
+  };
+  for (let i = 0; i < N; i++) dup(i);                            // top
+  for (let j = 1; j < N; j++) dup(j * N + (N - 1));              // right
+  for (let i = N - 2; i >= 0; i--) dup((N - 1) * N + i);          // bottom
+  for (let j = N - 2; j >= 1; j--) dup(j * N + 0);                // left
+
+  // Indices: interior triangles (PlaneGeometry winding) + skirt strip.
+  const indexCount = ((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 2) * 3;
+  const indices = totalVerts > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
+  let k = 0;
+  for (let j = 0; j < N - 1; j++) {
+    for (let i = 0; i < N - 1; i++) {
+      const a = j * N + i, b = a + 1, c = a + N, d = c + 1;
+      indices[k++] = a; indices[k++] = c; indices[k++] = b;
+      indices[k++] = b; indices[k++] = c; indices[k++] = d;
+    }
+  }
+  // Skirt strips: connect each perimeter edge's two interior endpoints
+  // with their skirt duplicates so the skirt drops vertically.
+  const addQuad = (ia: number, ib: number): void => {
+    const sa = skirtIndexOf[ia], sb = skirtIndexOf[ib];
+    indices[k++] = ia; indices[k++] = sa; indices[k++] = ib;
+    indices[k++] = ib; indices[k++] = sa; indices[k++] = sb;
+  };
+  for (let i = 0; i < N - 1; i++) addQuad(i, i + 1);
+  for (let j = 0; j < N - 1; j++) addQuad(j * N + (N - 1), (j + 1) * N + (N - 1));
+  for (let i = 0; i < N - 1; i++) addQuad((N - 1) * N + (i + 1), (N - 1) * N + i);
+  for (let j = 0; j < N - 1; j++) addQuad((j + 1) * N + 0, j * N + 0);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('isSkirt', new THREE.BufferAttribute(isSkirtArr, 1));
+  geo.setIndex(new THREE.BufferAttribute(indices, 1));
+  return geo;
+}
+
 function readBooleanQueryFlag(name: string): boolean {
   if (typeof window === 'undefined') return false;
   try {
@@ -43,11 +116,12 @@ export class CDLODRenderer {
   ) {
     this.maxInstances = maxInstances;
 
-    // Shared base geometry: a flat XZ plane with 1x1 dimensions
-    // Each instance scales this to the tile's world size.
-    const geo = new THREE.PlaneGeometry(1, 1, tileResolution - 1, tileResolution - 1);
-    // Rotate from XY to XZ plane
-    geo.rotateX(-Math.PI / 2);
+    // Shared base geometry: a flat XZ plane with 1x1 dimensions plus a
+    // perimeter skirt ring tagged with `isSkirt = 1`. Each instance scales
+    // this to the tile's world size. The vertex shader drops skirt verts
+    // by a per-LOD amount to hide sub-pixel cracks at chunk borders. See
+    // `createTileGeometry` and `terrain-cdlod-seam` Stage D2.
+    const geo = createTileGeometry(tileResolution);
 
     this.mesh = new THREE.InstancedMesh(geo, material, maxInstances);
     this.mesh.frustumCulled = false; // Quadtree already culls

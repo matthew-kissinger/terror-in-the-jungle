@@ -75,14 +75,18 @@ export class TerrainRenderRuntime {
    * Re-runs tile selection against the current camera and returns a snapshot
    * of the CDLOD tiles the terrain renderer would draw this frame. Additive
    * accessor added for `world-overlay-debugger`; O(tiles) + frustum update.
+   * `morphFactor` is included so the `terrain-seam` overlay can highlight
+   * adjacent tiles with mismatched morph blends; older callers consuming
+   * the narrower {x,z,size,lodLevel} shape are unaffected (TS structural
+   * subtyping keeps them happy).
    */
-  getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number }> {
+  getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number; morphFactor: number }> {
     this.updateFrustumPlanes();
     const tiles = this.quadtree.selectTiles(
       this.camera.position.x, this.camera.position.y, this.camera.position.z,
       this.frustumPlanes,
     );
-    return tiles.map((t) => ({ x: t.x, z: t.z, size: t.size, lodLevel: t.lodLevel }));
+    return tiles.map((t) => ({ x: t.x, z: t.z, size: t.size, lodLevel: t.lodLevel, morphFactor: t.morphFactor }));
   }
 
   dispose(): void {

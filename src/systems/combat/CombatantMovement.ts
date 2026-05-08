@@ -256,8 +256,15 @@ export class CombatantMovement {
         this.warnStuckRecovery(combatant.id, 'backtrack', now);
       }
     } else if (stuckAction === 'hold') {
+      // Force the combatant out of whatever state it was anchored on so it
+      // re-targets next tick instead of holding indefinitely. Without this
+      // sequence, NPCs with unreachable goals freeze visibly. See
+      // docs/tasks/npc-unfreeze-and-stuck.md.
       combatant.movementBacktrackPoint = undefined;
       combatant.destinationPoint = undefined;
+      combatant.target = null;
+      combatant.state = CombatantState.PATROLLING;
+      combatant.lastZoneEvalTime = 0;
       combatant.movementIntent = 'hold';
       combatant.velocity.set(0, 0, 0);
       this.warnStuckRecovery(combatant.id, 'hold', now);

@@ -119,6 +119,7 @@ export class ZoneInitializer {
       owner: Faction | null;
       isHomeBase: boolean;
       ticketBleedRate: number;
+      validateTerrain?: boolean;
     },
     zones: Map<string, CaptureZone>,
     occupants: Map<string, { us: number; opfor: number }>
@@ -137,6 +138,7 @@ export class ZoneInitializer {
       captureSpeed: this.gameModeConfig?.captureSpeed || 1,
       isHomeBase: config.isHomeBase,
       ticketBleedRate: config.ticketBleedRate,
+      validateTerrain: config.validateTerrain,
       currentFlagHeight: 0
     };
 
@@ -173,7 +175,8 @@ export class ZoneInitializer {
           radius: zoneConfig.radius,
           owner: zoneConfig.owner,
           isHomeBase: zoneConfig.isHomeBase,
-          ticketBleedRate: zoneConfig.ticketBleedRate
+          ticketBleedRate: zoneConfig.ticketBleedRate,
+          validateTerrain: zoneConfig.validateTerrain
         },
         zones,
         occupants

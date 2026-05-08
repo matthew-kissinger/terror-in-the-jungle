@@ -17,6 +17,10 @@ import {
 } from './ai/CombatFireRaycastBudget';
 import { resetCoverSearchBudget } from './ai/CoverSearchBudget';
 import { Logger } from '../../utils/Logger';
+import { NpcLodConfig } from '../../config/CombatantConfig';
+import { DESTINATION_ARRIVAL_RADIUS } from './CombatantMovementStates';
+
+const DESTINATION_ARRIVAL_RADIUS_SQ = DESTINATION_ARRIVAL_RADIUS * DESTINATION_ARRIVAL_RADIUS;
 
 // Stagger periods: how many frames between full AI updates per LOD tier
 const STAGGER_HIGH = 3;
@@ -104,7 +108,10 @@ export class CombatantLODManager {
   private readonly AI_SEVERE_OVER_BUDGET_MULTIPLIER = 2.5;
   private readonly AI_SOFT_BUDGET_RATIO = 0.75;
   private readonly CULLED_LOOP_BUDGET_MS = 1.5;
-  private readonly CULLED_DISTANT_SIM_INTERVAL_MS = 45000;
+  /** Live-tunable distant-sim cadence (ms). See NpcLodConfig.culledDistantSimIntervalMs. */
+  private get CULLED_DISTANT_SIM_INTERVAL_MS(): number {
+    return NpcLodConfig.culledDistantSimIntervalMs;
+  }
   private maxHighFullUpdatesPerFrame = 20;
   private maxMediumFullUpdatesPerFrame = 24;
   private highFullUpdatesThisFrame = 0;
@@ -688,6 +695,7 @@ export class CombatantLODManager {
       this.squadManager.getAllSquads(),
       this.combatants
     );
+    this.integrateVisualVelocityIfMoving(combatant, deltaTime);
     this.combatantMovement.updateRotation(combatant, deltaTime);
     this.recordSpatialUpdate(combatant);
   }
@@ -703,9 +711,33 @@ export class CombatantLODManager {
       this.squadManager.getAllSquads(),
       this.combatants
     );
+    this.integrateVisualVelocityIfMoving(combatant, deltaTime);
     this.combatantRenderer.updateCombatantTexture(combatant);
     this.combatantMovement.updateRotation(combatant, deltaTime);
     this.recordSpatialUpdate(combatant);
+  }
+
+  /**
+   * Visual-continuity safeguard: when the LOD scheduler degrades a combatant
+   * to a non-AI tick, distant clusters can appear frozen between full updates
+   * if the cached velocity is not consumed. This adds a small extra horizontal
+   * step gated by NpcLodConfig.visualOnlyIntegrateVelocity. Y is left to
+   * terrain sync. Skipped when the combatant is idle or at its destination.
+   * See docs/tasks/npc-unfreeze-and-stuck.md.
+   */
+  private integrateVisualVelocityIfMoving(combatant: Combatant, deltaTime: number): void {
+    if (!NpcLodConfig.visualOnlyIntegrateVelocity) return;
+    const vx = combatant.velocity.x;
+    const vz = combatant.velocity.z;
+    const speedSq = vx * vx + vz * vz;
+    if (speedSq <= NpcLodConfig.idleEpsilonSq) return;
+    const dest = combatant.destinationPoint;
+    if (!dest) return;
+    const dx = dest.x - combatant.position.x;
+    const dz = dest.z - combatant.position.z;
+    if (dx * dx + dz * dz <= DESTINATION_ARRIVAL_RADIUS_SQ) return;
+    combatant.position.x += vx * deltaTime;
+    combatant.position.z += vz * deltaTime;
   }
 
   /**

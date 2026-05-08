@@ -1,15 +1,38 @@
 import * as THREE from 'three';
 import { Combatant, Squad, SquadCommand } from './types';
 import { objectPool } from '../../utils/ObjectPoolManager';
+import { NpcLodConfig } from '../../config/CombatantConfig';
+
+/**
+ * Stamp the start of a rejoin so the watchdog in handleRejoiningMovement can
+ * break a stuck rejoin after NpcLodConfig.rejoinTimeoutMs. Callers set
+ * isRejoiningSquad = true outside this module (e.g. RespawnManager).
+ * See docs/tasks/npc-unfreeze-and-stuck.md.
+ */
+export function beginRejoiningSquad(combatant: Combatant): void {
+  combatant.isRejoiningSquad = true;
+  combatant.rejoinStartedAtMs = performance.now();
+}
 
 export function handleRejoiningMovement(
   combatant: Combatant,
   squad: Squad,
   combatants: Map<string, Combatant>
 ): void {
+  // Rejoin watchdog: if we've been trying to rejoin too long, fall back to
+  // normal patrol. Prevents followers anchored on an unreachable squad
+  // centroid from freezing indefinitely.
+  if (combatant.rejoinStartedAtMs !== undefined &&
+      performance.now() - combatant.rejoinStartedAtMs > NpcLodConfig.rejoinTimeoutMs) {
+    combatant.isRejoiningSquad = false;
+    combatant.rejoinStartedAtMs = undefined;
+    return;
+  }
+
   const squadCentroid = getSquadCentroid(squad, combatants);
   if (!squadCentroid) {
     combatant.isRejoiningSquad = false;
+    combatant.rejoinStartedAtMs = undefined;
     return;
   }
 
@@ -17,6 +40,7 @@ export function handleRejoiningMovement(
 
   if (distanceToSquad < 15) {
     combatant.isRejoiningSquad = false;
+    combatant.rejoinStartedAtMs = undefined;
     combatant.velocity.set(0, 0, 0);
     objectPool.releaseVector3(squadCentroid);
   } else {
