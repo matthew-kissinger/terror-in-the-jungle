@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../../core/PerfDiagnostics', () => ({
+  isPerfDiagnosticsEnabled: vi.fn(() => false),
+}));
+
 // Mock Three.js
 vi.mock('three', () => {
   class MockBufferGeometry {
@@ -61,13 +65,27 @@ vi.mock('three', () => {
   };
 });
 
+import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import { CDLODRenderer } from './CDLODRenderer';
 import type { CDLODTile } from './CDLODQuadtree';
+
+const mockIsPerfDiagnosticsEnabled = vi.mocked(isPerfDiagnosticsEnabled);
+
+function setRuntimeSearch(search: string): void {
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      location: { search },
+    },
+  });
+}
 
 describe('CDLODRenderer', () => {
   let renderer: CDLODRenderer;
 
   beforeEach(() => {
+    mockIsPerfDiagnosticsEnabled.mockReturnValue(false);
+    setRuntimeSearch('');
     renderer = new CDLODRenderer({} as any, 33, 256);
   });
 
@@ -97,6 +115,21 @@ describe('CDLODRenderer', () => {
     renderer.updateInstances(tiles);
     // Should not exceed maxInstances (256 in this test)
     expect(renderer.getMesh().count).toBeLessThanOrEqual(256);
+  });
+
+  it('keeps terrain shadow casting enabled by default', () => {
+    expect(renderer.getMesh().castShadow).toBe(true);
+    expect(renderer.getMesh().receiveShadow).toBe(true);
+  });
+
+  it('disables only terrain shadow casting under the perf isolation flag', () => {
+    mockIsPerfDiagnosticsEnabled.mockReturnValue(true);
+    setRuntimeSearch('?perf=1&perfDisableTerrainShadows=1');
+
+    const isolatedRenderer = new CDLODRenderer({} as any, 33, 256);
+
+    expect(isolatedRenderer.getMesh().castShadow).toBe(false);
+    expect(isolatedRenderer.getMesh().receiveShadow).toBe(true);
   });
 
 });
