@@ -34,7 +34,15 @@ type GlbJson = {
     }>;
   }>;
   accessors?: Array<{
+    bufferView?: number;
+    byteOffset?: number;
+    componentType?: number;
     count?: number;
+    type?: string;
+  }>;
+  bufferViews?: Array<{
+    byteOffset?: number;
+    byteStride?: number;
   }>;
   animations?: Array<{
     name?: string;
@@ -79,6 +87,7 @@ type ImportRecord = {
   animationNames: string[];
   animatedNodes: string[];
   appliedAxisNormalization: string;
+  tailRotorSpinAxisInspection: TailRotorSpinAxisInspection;
   structuralWarnings: string[];
 };
 
@@ -93,8 +102,29 @@ const AIRCRAFT: AircraftSlug[] = [
 
 const JSON_CHUNK_TYPE = 0x4e4f534a;
 const BIN_CHUNK_TYPE = 0x004e4942;
+const FLOAT_COMPONENT_TYPE = 5126;
 const AXIS_NORMALIZE_NODE_NAME = 'TIJ_AxisNormalize_XForward_To_ZForward';
 const X_FORWARD_TO_Z_FORWARD_QUATERNION = [0, -Math.SQRT1_2, 0, Math.SQRT1_2];
+const TAIL_ROTOR_NODE_NAME = 'Joint_tailRotor';
+const QUATERNION_FLOAT_COUNT = 4;
+const QUATERNION_BYTE_SIZE = QUATERNION_FLOAT_COUNT * 4;
+const HELICOPTER_AIRCRAFT = new Set<AircraftSlug>(['uh1-huey', 'uh1c-gunship', 'ah1-cobra']);
+
+type SpinAxis = 'x' | 'y' | 'z';
+
+type TailRotorSpinAxisInspection = {
+  status: 'not-applicable' | 'missing' | 'preserved' | 'corrected' | 'no-spin-axis';
+  nodeName: string;
+  sourceAxis: SpinAxis | null;
+  importedAxis: SpinAxis | null;
+  keyframes: number;
+  bytesAffected: number;
+  reason?: string;
+};
+
+const TAIL_ROTOR_SPIN_AXIS_CORRECTIONS: Partial<Record<AircraftSlug, SpinAxis>> = {
+  'ah1-cobra': 'z',
+};
 
 function argValue(name: string, fallback: string): string {
   const eq = process.argv.find((arg) => arg.startsWith(`${name}=`));
@@ -202,6 +232,170 @@ function normalizeAxis(json: GlbJson): void {
   json.asset.generator = `${generator}TIJ Pixel Forge aircraft import axis-normalized +X to +Z`;
 }
 
+function inferQuaternionAxis(values: number[][]): SpinAxis | null {
+  let maxX = 0;
+  let maxY = 0;
+  let maxZ = 0;
+  for (const value of values) {
+    maxX = Math.max(maxX, Math.abs(value[0] ?? 0));
+    maxY = Math.max(maxY, Math.abs(value[1] ?? 0));
+    maxZ = Math.max(maxZ, Math.abs(value[2] ?? 0));
+  }
+
+  if (maxX < 0.5 && maxY < 0.5 && maxZ < 0.5) return null;
+  if (maxX >= maxY && maxX >= maxZ) return 'x';
+  if (maxY >= maxX && maxY >= maxZ) return 'y';
+  return 'z';
+}
+
+function findNodeIndexByName(json: GlbJson, nodeName: string): number {
+  return json.nodes?.findIndex((node) => node.name === nodeName) ?? -1;
+}
+
+function findRotationAccessorForNode(json: GlbJson, nodeIndex: number): number {
+  for (const animation of json.animations ?? []) {
+    const channels = animation.channels ?? [];
+    const samplers = animation.samplers ?? [];
+    for (const channel of channels) {
+      if (channel.target?.node !== nodeIndex || channel.target?.path !== 'rotation') continue;
+      return samplers[channel.sampler]?.output ?? -1;
+    }
+  }
+  return -1;
+}
+
+function getQuaternionAccessorLayout(json: GlbJson, accessorIndex: number): {
+  offset: number;
+  stride: number;
+  count: number;
+} | null {
+  const accessor = json.accessors?.[accessorIndex];
+  if (
+    !accessor
+    || accessor.bufferView === undefined
+    || accessor.componentType !== FLOAT_COMPONENT_TYPE
+    || accessor.type !== 'VEC4'
+  ) {
+    return null;
+  }
+  const bufferView = json.bufferViews?.[accessor.bufferView];
+  if (!bufferView) return null;
+  return {
+    offset: (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0),
+    stride: bufferView.byteStride ?? QUATERNION_BYTE_SIZE,
+    count: accessor.count ?? 0,
+  };
+}
+
+function readQuaternions(binChunk: Buffer, layout: { offset: number; stride: number; count: number }): number[][] {
+  const values: number[][] = [];
+  for (let i = 0; i < layout.count; i++) {
+    const offset = layout.offset + i * layout.stride;
+    values.push([
+      binChunk.readFloatLE(offset),
+      binChunk.readFloatLE(offset + 4),
+      binChunk.readFloatLE(offset + 8),
+      binChunk.readFloatLE(offset + 12),
+    ]);
+  }
+  return values;
+}
+
+function writeQuaternionAxis(
+  binChunk: Buffer,
+  layout: { offset: number; stride: number; count: number },
+  sourceAxis: SpinAxis,
+  targetAxis: SpinAxis,
+): number {
+  if (sourceAxis === targetAxis) return 0;
+  const axisIndex: Record<SpinAxis, number> = { x: 0, y: 1, z: 2 };
+  for (let i = 0; i < layout.count; i++) {
+    const offset = layout.offset + i * layout.stride;
+    const values = [
+      binChunk.readFloatLE(offset),
+      binChunk.readFloatLE(offset + 4),
+      binChunk.readFloatLE(offset + 8),
+      binChunk.readFloatLE(offset + 12),
+    ];
+    values[axisIndex[targetAxis]] = values[axisIndex[sourceAxis]];
+    values[axisIndex[sourceAxis]] = 0;
+    binChunk.writeFloatLE(values[0], offset);
+    binChunk.writeFloatLE(values[1], offset + 4);
+    binChunk.writeFloatLE(values[2], offset + 8);
+    binChunk.writeFloatLE(values[3], offset + 12);
+  }
+  return layout.count * QUATERNION_BYTE_SIZE;
+}
+
+function inspectHelicopterTailRotorSpinAxis(
+  slug: AircraftSlug,
+  json: GlbJson,
+  binChunk: Buffer | null,
+): TailRotorSpinAxisInspection {
+  const notApplicable = {
+    status: 'not-applicable' as const,
+    nodeName: TAIL_ROTOR_NODE_NAME,
+    sourceAxis: null,
+    importedAxis: null,
+    keyframes: 0,
+    bytesAffected: 0,
+  };
+  if (!HELICOPTER_AIRCRAFT.has(slug)) return notApplicable;
+  if (!binChunk) {
+    return { ...notApplicable, status: 'missing', reason: 'GLB has no BIN chunk.' };
+  }
+
+  const nodeIndex = findNodeIndexByName(json, TAIL_ROTOR_NODE_NAME);
+  if (nodeIndex < 0) {
+    return { ...notApplicable, status: 'missing', reason: `${TAIL_ROTOR_NODE_NAME} node is absent.` };
+  }
+
+  const accessorIndex = findRotationAccessorForNode(json, nodeIndex);
+  if (accessorIndex < 0) {
+    return { ...notApplicable, status: 'missing', reason: `${TAIL_ROTOR_NODE_NAME} rotation channel is absent.` };
+  }
+
+  const layout = getQuaternionAccessorLayout(json, accessorIndex);
+  if (!layout) {
+    return { ...notApplicable, status: 'missing', reason: `${TAIL_ROTOR_NODE_NAME} rotation accessor is not FLOAT VEC4.` };
+  }
+
+  const quaternions = readQuaternions(binChunk, layout);
+  const axis = inferQuaternionAxis(quaternions);
+  if (!axis) {
+    return {
+      status: 'no-spin-axis',
+      nodeName: TAIL_ROTOR_NODE_NAME,
+      sourceAxis: null,
+      importedAxis: null,
+      keyframes: layout.count,
+      bytesAffected: 0,
+      reason: `${TAIL_ROTOR_NODE_NAME} rotation channel does not expose a dominant spin axis.`,
+    };
+  }
+  const correctedAxis = TAIL_ROTOR_SPIN_AXIS_CORRECTIONS[slug];
+  if (correctedAxis && correctedAxis !== axis) {
+    const bytesAffected = writeQuaternionAxis(binChunk, layout, axis, correctedAxis);
+    return {
+      status: 'corrected',
+      nodeName: TAIL_ROTOR_NODE_NAME,
+      sourceAxis: axis,
+      importedAxis: correctedAxis,
+      keyframes: layout.count,
+      bytesAffected,
+      reason: `${slug} source ${TAIL_ROTOR_NODE_NAME} rotates around ${axis}; TIJ side-mounted tail-rotor contract requires ${correctedAxis}.`,
+    };
+  }
+  return {
+    status: 'preserved',
+    nodeName: TAIL_ROTOR_NODE_NAME,
+    sourceAxis: axis,
+    importedAxis: axis,
+    keyframes: layout.count,
+    bytesAffected: 0,
+  };
+}
+
 function accessorCount(json: GlbJson, index: number | undefined): number {
   return index === undefined ? 0 : json.accessors?.[index]?.count ?? 0;
 }
@@ -288,6 +482,7 @@ function main(): void {
     const { json, binChunk } = readGlb(sourceGlb);
     const sourceStats = analyzeGlb(json);
     normalizeAxis(json);
+    const tailRotorSpinAxisInspection = inspectHelicopterTailRotorSpinAxis(slug, json, binChunk);
 
     if (!dryRun) {
       writeGlb(targetGlb, json, binChunk);
@@ -310,6 +505,7 @@ function main(): void {
       animationNames: sourceStats.animationNames,
       animatedNodes: sourceStats.animatedNodes,
       appliedAxisNormalization: '+X forward source wrapped to +Z forward TIJ runtime storage contract',
+      tailRotorSpinAxisInspection,
       structuralWarnings: provenance.extras?.structuralWarnings ?? [],
     });
   }
@@ -335,6 +531,12 @@ function main(): void {
     console.log(
       `- ${basename(record.targetGlb)}: ${record.sourceTriangles} tris, ${record.meshCount} meshes, ${record.materialCount} materials, animations=${record.animationNames.join(',') || 'none'}`,
     );
+    if (record.tailRotorSpinAxisInspection.status !== 'not-applicable') {
+      console.log(
+        `  tailRotor=${record.tailRotorSpinAxisInspection.status} `
+          + `axis=${record.tailRotorSpinAxisInspection.importedAxis ?? 'none'}`,
+      );
+    }
   }
 }
 
