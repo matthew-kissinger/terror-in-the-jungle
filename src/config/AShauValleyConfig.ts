@@ -551,7 +551,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       radius: 45,
       isHomeBase: true,
       owner: Faction.US,
-      ticketBleedRate: 0
+      ticketBleedRate: 0,
+      validateTerrain: false
     },
     {
       id: 'us_hq_east',
@@ -560,7 +561,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       radius: 40,
       isHomeBase: true,
       owner: Faction.US,
-      ticketBleedRate: 0
+      ticketBleedRate: 0,
+      validateTerrain: false
     },
     {
       id: 'us_hq_south',
@@ -569,7 +571,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       radius: 35,
       isHomeBase: true,
       owner: Faction.US,
-      ticketBleedRate: 0
+      ticketBleedRate: 0,
+      validateTerrain: false
     },
 
     // ===== NVA Base Areas (western mountains + valley floor) =====
@@ -583,7 +586,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       radius: 50,
       isHomeBase: true,
       owner: Faction.NVA,
-      ticketBleedRate: 0
+      ticketBleedRate: 0,
+      validateTerrain: false
     },
     {
       id: 'opfor_hq_north',
@@ -592,7 +596,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       radius: 45,
       isHomeBase: true,
       owner: Faction.NVA,
-      ticketBleedRate: 0
+      ticketBleedRate: 0,
+      validateTerrain: false
     },
     {
       id: 'opfor_hq_south',
@@ -601,7 +606,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       radius: 40,
       isHomeBase: true,
       owner: Faction.NVA,
-      ticketBleedRate: 0
+      ticketBleedRate: 0,
+      validateTerrain: false
     },
 
     // ===== Strategic Objectives =====
@@ -630,7 +636,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       radius: 50,
       isHomeBase: false,
       owner: Faction.NVA,          // NVA controls valley floor
-      ticketBleedRate: 4
+      ticketBleedRate: 4,
+      validateTerrain: false       // Airfield coord is sacrosanct (footprint flattening)
     },
 
     // A Luoi Airfield - another French-era strip, further south.
@@ -642,7 +649,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       radius: 45,
       isHomeBase: false,
       owner: null,                   // Contested - valley floor fight
-      ticketBleedRate: 4
+      ticketBleedRate: 4,
+      validateTerrain: false         // Airfield coord is sacrosanct (footprint flattening)
     },
 
     // Firebase Ripcord - hilltop firebase, site of the 1970 siege.

@@ -46,6 +46,10 @@ export interface CaptureZone {
   // Strategic value
   isHomeBase: boolean;
   ticketBleedRate: number;
+
+  /** Mirror of ZoneConfig.validateTerrain so the manager can opt zones in/out
+   *  of post-placement nudge. Defaults to true when omitted. */
+  validateTerrain?: boolean;
 }
 
 export class ZoneManager implements GameSystem {
@@ -262,12 +266,29 @@ export class ZoneManager implements GameSystem {
       Logger.info('world', ' Creating zones with terrain mapping...');
       this.zoneInitializer.createDefaultZones(this.zones, this.occupants);
 
+      this.validateAndNudgeZones();
+
       // Seed previousZoneState to prevent false capture notifications on first frame
       for (const zone of this.zones.values()) {
         this.previousZoneState.set(zone.id, zone.owner);
       }
 
       Logger.info('world', ` Zones created with terrain mapping: ${this.zones.size} zones`);
+    }
+  }
+
+  /**
+   * Post-placement validator: walks every zone with `validateTerrain !== false`
+   * and asks the terrain adapter to nudge it out of a ditch / off a steep slope.
+   * Mutates `zone.position` in place when a better candidate is found.
+   * Idempotent and safe to call after init or after `setGameModeConfig`.
+   */
+  private validateAndNudgeZones(): void {
+    if (!this.terrainSystem) return;
+    for (const zone of this.zones.values()) {
+      if (zone.validateTerrain === false) continue;
+      const nudged = this.terrainAdapter.validateAndNudge(zone.position, { zoneLabel: zone.name });
+      zone.position.copy(nudged);
     }
   }
 
@@ -278,6 +299,8 @@ export class ZoneManager implements GameSystem {
     this.zoneInitializer.setGameModeConfig(config);
     this.clearAllZones();
     this.zoneInitializer.createZonesFromConfig(this.zones, this.occupants);
+
+    this.validateAndNudgeZones();
 
     // Seed previousZoneState so the first update() frame doesn't treat
     // pre-owned zones as newly-captured and spam notifications.

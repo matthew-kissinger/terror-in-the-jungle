@@ -2,6 +2,21 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
+// Validation knobs for post-placement nudge (A Shau pilot). Conservative defaults.
+const ZONE_VALIDATE_MAX_SLOPE = 0.25;
+const ZONE_VALIDATE_DITCH_THRESHOLD_M = 4;
+const ZONE_VALIDATE_RING_RADIUS_M = 25;
+const ZONE_VALIDATE_RING_SAMPLES = 8;
+const ZONE_VALIDATE_NUDGE_DISTANCES_M = [15, 30, 45];
+const ZONE_VALIDATE_NUDGE_DIRECTIONS = 12;
+const ZONE_VALIDATE_HEIGHT_FUDGE_M = 1;
+
+export interface ValidateAndNudgeOptions {
+  maxSlope?: number;
+  ditchThresholdM?: number;
+  zoneLabel?: string;
+}
+
 export class ZoneTerrainAdapter {
   private terrainSystem?: ITerrainRuntime;
 
@@ -52,29 +67,91 @@ export class ZoneTerrainAdapter {
 
     Logger.info('world', `Zone placed at (${bestPosition.x.toFixed(1)}, ${bestPosition.y.toFixed(1)}, ${bestPosition.z.toFixed(1)}) with slope ${bestSlope.toFixed(2)}`);
 
-    // Special handling for problematic zones (like Alpha zone)
-    if (Math.abs(bestPosition.x + 120) < 10) {
-      Logger.warn('world', `Alpha zone terrain check: desired=(${desiredPosition.x}, ${desiredPosition.z}), final=(${bestPosition.x}, ${bestPosition.y}, ${bestPosition.z})`);
+    return bestPosition;
+  }
 
-      if (bestPosition.y < -5 || bestPosition.y > 50) {
-        Logger.warn('world', `Alpha zone height ${bestPosition.y} seems problematic, adjusting...`);
+  /**
+   * Validate a zone position against slope and ditch heuristics; if it fails,
+   * search neighbouring cells for a flatter, not-significantly-lower spot and
+   * return the nudged position. If no better candidate exists within the
+   * configured search ring, returns the original position unchanged (warns).
+   * Designed for post-placement correction of hand-authored A Shau zones.
+   */
+  validateAndNudge(
+    desiredPosition: THREE.Vector3,
+    options: ValidateAndNudgeOptions = {}
+  ): THREE.Vector3 {
+    const terrainSystem = this.requireTerrainSystem();
+    const maxSlope = options.maxSlope ?? ZONE_VALIDATE_MAX_SLOPE;
+    const ditchThresholdM = options.ditchThresholdM ?? ZONE_VALIDATE_DITCH_THRESHOLD_M;
+    const label = options.zoneLabel ?? 'zone';
+    const centerX = desiredPosition.x;
+    const centerZ = desiredPosition.z;
+    const centerHeight = terrainSystem.getHeightAt(centerX, centerZ);
+    const centerSlope = this.calculateTerrainSlope(centerX, centerZ);
+    const ringMean = this.sampleRingMeanHeight(centerX, centerZ, ZONE_VALIDATE_RING_RADIUS_M, ZONE_VALIDATE_RING_SAMPLES);
+    const tooSteep = centerSlope > maxSlope;
+    const inDitch = centerHeight < ringMean - ditchThresholdM;
 
-        // Try positions closer to center
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const testX = -80 + attempt * 10;
-          const testZ = 30 + attempt * 10;
-          const testHeight = terrainSystem.getHeightAt(testX, testZ);
+    if (!tooSteep && !inDitch) {
+      return new THREE.Vector3(centerX, centerHeight, centerZ);
+    }
 
-          if (testHeight > -2 && testHeight < 30) {
-            bestPosition = new THREE.Vector3(testX, testHeight, testZ);
-            Logger.info('world', `Alpha zone relocated to (${testX}, ${testHeight.toFixed(1)}, ${testZ})`);
-            break;
-          }
-        }
+    const reason = inDitch
+      ? `ditch (drop=${(ringMean - centerHeight).toFixed(1)} m)`
+      : `slope=${centerSlope.toFixed(2)}`;
+
+    // Score: slope dominates; in-ditch cases get a height-deficit penalty so
+    // the validator climbs back to plateau level instead of resting on the
+    // ditch floor (where slope is also flat). Seed with the center + epsilon.
+    const heightFloor = centerHeight - ZONE_VALIDATE_HEIGHT_FUDGE_M;
+    let bestCandidate: THREE.Vector3 | null = null;
+    let bestScore = this.scoreCandidate(centerSlope, centerHeight, centerHeight, inDitch) + 1e-6;
+
+    for (const distance of ZONE_VALIDATE_NUDGE_DISTANCES_M) {
+      for (let i = 0; i < ZONE_VALIDATE_NUDGE_DIRECTIONS; i++) {
+        const angle = (i / ZONE_VALIDATE_NUDGE_DIRECTIONS) * Math.PI * 2;
+        const testX = centerX + Math.cos(angle) * distance;
+        const testZ = centerZ + Math.sin(angle) * distance;
+        const testHeight = terrainSystem.getHeightAt(testX, testZ);
+        const testSlope = this.calculateTerrainSlope(testX, testZ);
+        if (testHeight < heightFloor) continue;
+        if (testSlope > maxSlope) continue;
+        const score = this.scoreCandidate(testSlope, testHeight, centerHeight, inDitch);
+        if (score >= bestScore) continue;
+        bestScore = score;
+        bestCandidate = new THREE.Vector3(testX, testHeight, testZ);
       }
     }
 
-    return bestPosition;
+    if (bestCandidate) {
+      Logger.info(
+        'world',
+        `Zone "${label}" nudged (${centerX.toFixed(1)}, ${centerHeight.toFixed(1)}, ${centerZ.toFixed(1)}) -> ` +
+          `(${bestCandidate.x.toFixed(1)}, ${bestCandidate.y.toFixed(1)}, ${bestCandidate.z.toFixed(1)}) [${reason}]`
+      );
+      return bestCandidate;
+    }
+
+    Logger.warn('world', `Zone "${label}" failed validation [${reason}], no flatter candidate within ${ZONE_VALIDATE_NUDGE_DISTANCES_M[ZONE_VALIDATE_NUDGE_DISTANCES_M.length - 1]} m`);
+    return new THREE.Vector3(centerX, centerHeight, centerZ);
+  }
+
+  private scoreCandidate(slope: number, height: number, centerHeight: number, inDitch: boolean): number {
+    if (!inDitch) return slope;
+    // 0.05/m: clearly-flatter candidate at same height still wins; climbing
+    // out of a 4 m+ ditch dominates a slope-tie.
+    return slope + (centerHeight - height) * 0.05;
+  }
+
+  private sampleRingMeanHeight(x: number, z: number, radius: number, samples: number): number {
+    const terrainSystem = this.requireTerrainSystem();
+    let sum = 0;
+    for (let i = 0; i < samples; i++) {
+      const angle = (i / samples) * Math.PI * 2;
+      sum += terrainSystem.getHeightAt(x + Math.cos(angle) * radius, z + Math.sin(angle) * radius);
+    }
+    return sum / samples;
   }
 
   private calculateTerrainSlope(x: number, z: number): number {
