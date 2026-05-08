@@ -1,5 +1,15 @@
 import * as THREE from 'three';
 
+export const EXPLOSION_EFFECT_REPRESENTATION = {
+  flashPrimitive: 'pooled_unlit_billboard_flash',
+  smokePrimitive: 'pooled_points',
+  firePrimitive: 'pooled_points',
+  debrisPrimitive: 'pooled_points',
+  shockwavePrimitive: 'pooled_mesh_ring',
+  dynamicLights: false,
+  legacyFallback: false,
+} as const;
+
 export interface ExplosionEffect {
   flashSprite: THREE.Sprite;
   smokeParticles: THREE.Points;
@@ -29,6 +39,10 @@ export function createExplosionEffect(
     opacity: 1
   });
   const flashSprite = new THREE.Sprite(flashSpriteMaterial);
+  flashSprite.name = 'ExplosionFlashBillboard';
+  flashSprite.userData.perfCategory = 'explosion_fx';
+  flashSprite.userData.representation = EXPLOSION_EFFECT_REPRESENTATION.flashPrimitive;
+  flashSprite.userData.legacyFallback = EXPLOSION_EFFECT_REPRESENTATION.legacyFallback;
   flashSprite.scale.set(12, 12, 1);
   flashSprite.visible = false;
   flashSprite.matrixAutoUpdate = true;
@@ -48,6 +62,9 @@ export function createExplosionEffect(
     depthWrite: false
   });
   const smokeParticles = new THREE.Points(smokeGeometry, smokeMaterial);
+  smokeParticles.name = 'ExplosionSmokePoints';
+  smokeParticles.userData.perfCategory = 'explosion_fx';
+  smokeParticles.userData.representation = EXPLOSION_EFFECT_REPRESENTATION.smokePrimitive;
   smokeParticles.visible = false;
   smokeParticles.matrixAutoUpdate = true;
 
@@ -66,6 +83,9 @@ export function createExplosionEffect(
     depthWrite: false
   });
   const fireParticles = new THREE.Points(fireGeometry, fireMaterial);
+  fireParticles.name = 'ExplosionFirePoints';
+  fireParticles.userData.perfCategory = 'explosion_fx';
+  fireParticles.userData.representation = EXPLOSION_EFFECT_REPRESENTATION.firePrimitive;
   fireParticles.visible = false;
   fireParticles.matrixAutoUpdate = true;
 
@@ -84,6 +104,9 @@ export function createExplosionEffect(
     depthWrite: false
   });
   const debrisParticles = new THREE.Points(debrisGeometry, debrisMaterial);
+  debrisParticles.name = 'ExplosionDebrisPoints';
+  debrisParticles.userData.perfCategory = 'explosion_fx';
+  debrisParticles.userData.representation = EXPLOSION_EFFECT_REPRESENTATION.debrisPrimitive;
   debrisParticles.visible = false;
   debrisParticles.matrixAutoUpdate = true;
 
@@ -99,6 +122,9 @@ export function createExplosionEffect(
     depthWrite: false
   });
   const shockwaveRing = new THREE.Mesh(ringGeometry, ringMaterial);
+  shockwaveRing.name = 'ExplosionShockwaveRing';
+  shockwaveRing.userData.perfCategory = 'explosion_fx';
+  shockwaveRing.userData.representation = EXPLOSION_EFFECT_REPRESENTATION.shockwavePrimitive;
   shockwaveRing.rotation.x = -Math.PI / 2;
   shockwaveRing.visible = false;
   shockwaveRing.matrixAutoUpdate = true;

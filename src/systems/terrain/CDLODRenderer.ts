@@ -1,5 +1,24 @@
 import * as THREE from 'three';
+import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import type { CDLODTile } from './CDLODQuadtree';
+
+function readBooleanQueryFlag(name: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const value = new URLSearchParams(window.location.search).get(name);
+    if (value === null) return false;
+    const normalized = value.toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+  } catch {
+    return false;
+  }
+}
+
+export function isTerrainShadowPerfIsolationEnabled(): boolean {
+  return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
+    && isPerfDiagnosticsEnabled()
+    && readBooleanQueryFlag('perfDisableTerrainShadows');
+}
 
 /**
  * Renders all terrain as a single THREE.InstancedMesh.
@@ -45,8 +64,10 @@ export class CDLODRenderer {
     geo.setAttribute('lodLevel', this.lodLevelAttr);
     geo.setAttribute('morphFactor', this.morphFactorAttr);
 
-    // Enable shadow casting/receiving
-    this.mesh.castShadow = true;
+    // Diagnostic-only terrain shadow isolation. Terrain still receives shadows
+    // so this isolates CDLOD shadow-caster submissions without changing the
+    // rest of the scene's shadow contract.
+    this.mesh.castShadow = !isTerrainShadowPerfIsolationEnabled();
     this.mesh.receiveShadow = true;
   }
 
