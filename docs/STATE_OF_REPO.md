@@ -1,6 +1,6 @@
 # State Of Repo
 
-Last updated: 2026-05-07
+Last updated: 2026-05-08
 
 This file is the current-state snapshot for the repo. [ROADMAP.md](ROADMAP.md)
 remains aspirational. [BACKLOG.md](BACKLOG.md) tracks queued work. This
@@ -8,14 +8,26 @@ document answers the narrower question: what is verified in the current repo
 state. Historical cycle/archive docs remain historical evidence; this file is
 the current truth anchor.
 
-## Current Stabilization Direction On 2026-05-07
+## Current Stabilization Direction On 2026-05-08
 
-Projekt Objekt-143 has shifted from exhaustive experimental bureau completion
-to a stabilization closeout. The current stack has been shepherded through the
-release path: local validation, commit to `master`, push to `origin/master`,
-GitHub CI, manual Cloudflare Pages deploy, and live Pages/R2/browser
-verification. Exact production SHA remains the live `/asset-manifest.json`
-source of truth; do not freeze it into this doc.
+`cycle-2026-05-08-stabilizat-2-closeout` closed 2026-05-08. Six themed PRs
+(helicopter rotor axis, water audits, terrain+effects, UX respawn, combat
+AI/squad/core mega-cluster with documented GOST-TIJ-001 exception, docs +
+audit script catalog) shepherded the codex agent's 143-file working tree to
+`master`. Live release verified at SHA `babae19a76e5ff622976a632e10f7055315d2698`
+on `https://terror-in-the-jungle.pages.dev` (live-release-proof 7/7 PASS).
+Codex revision 1.3 — 2026-05-08, Politburo seal applied for STABILIZAT-2/3,
+SVYAZ-1, SVYAZ-2, UX-1. STABILIZAT-1 deferred to Strategic Reserve under
+Politburo direction. AVIATSIYA-1 / DEFEKT-5 source evidence complete; human
+visual review remains pending. DEFEKT-2 14-day live drift watch active from
+T+0 = 2026-05-08. Cycle retrospective:
+`docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md`.
+
+The earlier release path is preserved: local validation, commit to `master`,
+push to `origin/master`, GitHub CI, manual Cloudflare Pages deploy via
+`deploy.yml`, and live Pages/R2/browser verification via
+`check:projekt-143-live-release-proof`. Exact production SHA remains the live
+`/asset-manifest.json` source of truth; do not freeze it into this doc.
 
 The release preserves the useful fixes and evidence from the long
 agent/orchestration cycle and records unresolved KB-LOAD, KB-TERRAIN, KB-CULL,
