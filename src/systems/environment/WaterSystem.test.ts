@@ -114,7 +114,18 @@ describe('WaterSystem sun direction from atmosphere', () => {
 
     expect(system.isEnabled()).toBe(false);
     expect(system.isUnderwater(new THREE.Vector3(0, -10, 0))).toBe(false);
+    expect(system.getWaterSurfaceY(new THREE.Vector3(0, -10, 0))).toBeNull();
+    expect(system.getWaterDepth(new THREE.Vector3(0, -10, 0))).toBe(0);
     expect(system.getDebugInfo().cameraUnderwater).toBe(false);
+  });
+
+  it('reports global water surface and depth while the global plane is active', () => {
+    const system = makeSystem();
+
+    expect(system.getWaterSurfaceY(new THREE.Vector3(45, 12, -20))).toBe(0);
+    expect(system.getWaterDepth(new THREE.Vector3(45, -2.5, -20))).toBeCloseTo(2.5, 5);
+    expect(system.isUnderwater(new THREE.Vector3(45, -0.25, -20))).toBe(true);
+    expect(system.isUnderwater(new THREE.Vector3(45, 0.25, -20))).toBe(false);
   });
 
   it('disabling water clears an active underwater state', () => {
@@ -154,7 +165,11 @@ describe('WaterSystem sun direction from atmosphere', () => {
     system.setHydrologyChannels(makeHydrologyArtifact());
 
     expect(fakeWater.visible).toBe(false);
-    expect(system.isUnderwater(new THREE.Vector3(0, -1, 0))).toBe(false);
+    expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 0))).toBeCloseTo(1.85, 5);
+    expect(system.getWaterDepth(new THREE.Vector3(5, 1, 0))).toBeCloseTo(0.85, 5);
+    expect(system.isUnderwater(new THREE.Vector3(5, 1, 0))).toBe(true);
+    expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 10))).toBeNull();
+    expect(system.getWaterDepth(new THREE.Vector3(5, 1, 10))).toBe(0);
 
     system.setHydrologyChannels(null);
     expect(fakeWater.visible).toBe(true);

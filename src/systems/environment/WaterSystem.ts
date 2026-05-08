@@ -25,6 +25,16 @@ interface HydrologyRiverMeshStats {
   maxAccumulationCells: number;
 }
 
+interface HydrologyWaterQuerySegment {
+  startX: number;
+  startZ: number;
+  endX: number;
+  endZ: number;
+  startSurfaceY: number;
+  endSurfaceY: number;
+  halfWidth: number;
+}
+
 interface WaterDebugInfo {
   enabled: boolean;
   waterLevel: number;
@@ -70,6 +80,7 @@ export class WaterSystem implements GameSystem {
   private hydrologyRiverGroup?: THREE.Group;
   private hydrologyRiverMesh?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
   private hydrologyRiverStats: HydrologyRiverMeshStats = { ...EMPTY_HYDROLOGY_RIVER_STATS };
+  private hydrologyWaterQuerySegments: HydrologyWaterQuerySegment[] = [];
   private assetLoader: AssetLoader;
   private weatherSystem?: WeatherSystem;
   private atmosphereSystem?: ISkyRuntime;
@@ -229,7 +240,7 @@ export class WaterSystem implements GameSystem {
   }
 
   private checkUnderwaterState(): void {
-    const isUnderwater = this.isGlobalWaterPlaneActive() && this.camera.position.y < this.WATER_LEVEL;
+    const isUnderwater = this.isUnderwater(this.camera.position);
     this.setUnderwaterState(isUnderwater);
   }
 
@@ -313,7 +324,27 @@ export class WaterSystem implements GameSystem {
    * Check if a position is underwater
    */
   isUnderwater(position: THREE.Vector3): boolean {
-    return this.isGlobalWaterPlaneActive() && position.y < this.WATER_LEVEL;
+    return this.getWaterDepth(position) > 0;
+  }
+
+  /**
+   * Return the water surface at a gameplay position, or null when dry.
+   */
+  getWaterSurfaceY(position: THREE.Vector3): number | null {
+    const hydrologySurfaceY = this.getHydrologyWaterSurfaceY(position.x, position.z);
+    if (hydrologySurfaceY !== null) {
+      return hydrologySurfaceY;
+    }
+    return this.isGlobalWaterPlaneActive() ? this.WATER_LEVEL : null;
+  }
+
+  /**
+   * Return water depth above the supplied position. Dry positions report 0.
+   */
+  getWaterDepth(position: THREE.Vector3): number {
+    const surfaceY = this.getWaterSurfaceY(position);
+    if (surfaceY === null) return 0;
+    return Math.max(0, surfaceY - position.y);
   }
   
   /**
@@ -367,7 +398,7 @@ export class WaterSystem implements GameSystem {
       enabled: this.enabled,
       waterLevel: this.WATER_LEVEL,
       waterVisible: Boolean(this.water?.visible),
-      cameraUnderwater: this.isGlobalWaterPlaneActive() && this.camera.position.y < this.WATER_LEVEL,
+      cameraUnderwater: this.isUnderwater(this.camera.position),
       size: this.worldWaterSize,
       hydrologyRiverMaterialProfile: this.hydrologyRiverMesh ? HYDROLOGY_RIVER_MATERIAL_PROFILE : 'none',
       hydrologyRiverVisible: Boolean(this.hydrologyRiverGroup?.visible),
@@ -403,6 +434,7 @@ export class WaterSystem implements GameSystem {
     this.hydrologyRiverGroup = group;
     this.hydrologyRiverMesh = meshBuild.mesh;
     this.hydrologyRiverStats = meshBuild.stats;
+    this.hydrologyWaterQuerySegments = meshBuild.querySegments;
     this.updateGlobalWaterVisibility();
     Logger.info(
       'environment',
@@ -440,6 +472,7 @@ export class WaterSystem implements GameSystem {
     this.hydrologyRiverGroup = undefined;
     this.hydrologyRiverMesh = undefined;
     this.hydrologyRiverStats = { ...EMPTY_HYDROLOGY_RIVER_STATS };
+    this.hydrologyWaterQuerySegments = [];
     this.updateGlobalWaterVisibility();
   }
 
@@ -455,7 +488,11 @@ export class WaterSystem implements GameSystem {
 
   private buildHydrologyRiverMesh(
     artifact: HydrologyBakeArtifact,
-  ): { mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>; stats: HydrologyRiverMeshStats } | null {
+  ): {
+    mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+    stats: HydrologyRiverMeshStats;
+    querySegments: HydrologyWaterQuerySegment[];
+  } | null {
     const geometryBuild = this.buildHydrologyRiverGeometry(artifact);
     if (!geometryBuild) return null;
 
@@ -479,12 +516,16 @@ export class WaterSystem implements GameSystem {
     mesh.name = 'hydrology-river-surface-mesh';
     mesh.frustumCulled = true;
     mesh.renderOrder = 2;
-    return { mesh, stats: geometryBuild.stats };
+    return { mesh, stats: geometryBuild.stats, querySegments: geometryBuild.querySegments };
   }
 
   private buildHydrologyRiverGeometry(
     artifact: HydrologyBakeArtifact,
-  ): { geometry: THREE.BufferGeometry; stats: HydrologyRiverMeshStats } | null {
+  ): {
+    geometry: THREE.BufferGeometry;
+    stats: HydrologyRiverMeshStats;
+    querySegments: HydrologyWaterQuerySegment[];
+  } | null {
     const sortedChannels = [...artifact.channelPolylines]
       .sort((a, b) => b.maxAccumulationCells - a.maxAccumulationCells || b.lengthMeters - a.lengthMeters)
       .slice(0, MAX_HYDROLOGY_RIVER_CHANNELS);
@@ -493,6 +534,7 @@ export class WaterSystem implements GameSystem {
     const uvs: number[] = [];
     const colors: number[] = [];
     const indices: number[] = [];
+    const querySegments: HydrologyWaterQuerySegment[] = [];
     let segmentCount = 0;
     let totalLengthMeters = 0;
     let maxAccumulationCells = 0;
@@ -564,6 +606,15 @@ export class WaterSystem implements GameSystem {
 
         segmentCount++;
         totalLengthMeters += length;
+        querySegments.push({
+          startX: start.x,
+          startZ: start.z,
+          endX: end.x,
+          endZ: end.z,
+          startSurfaceY: startY,
+          endSurfaceY: endY,
+          halfWidth,
+        });
       }
       if (segmentCount >= MAX_HYDROLOGY_RIVER_SEGMENTS) break;
     }
@@ -583,6 +634,7 @@ export class WaterSystem implements GameSystem {
 
     return {
       geometry,
+      querySegments,
       stats: {
         channelCount: sortedChannels.filter(channel => channel.points.length >= 2).length,
         segmentCount,
@@ -613,6 +665,26 @@ export class WaterSystem implements GameSystem {
       0,
       1,
     );
+  }
+
+  private getHydrologyWaterSurfaceY(x: number, z: number): number | null {
+    let nearest: { distanceSq: number; surfaceY: number } | null = null;
+    for (const segment of this.hydrologyWaterQuerySegments) {
+      const dx = segment.endX - segment.startX;
+      const dz = segment.endZ - segment.startZ;
+      const lengthSq = dx * dx + dz * dz;
+      if (lengthSq <= 0) continue;
+      const t = clamp(((x - segment.startX) * dx + (z - segment.startZ) * dz) / lengthSq, 0, 1);
+      const sampleX = segment.startX + dx * t;
+      const sampleZ = segment.startZ + dz * t;
+      const distanceSq = (x - sampleX) ** 2 + (z - sampleZ) ** 2;
+      if (distanceSq > segment.halfWidth ** 2) continue;
+      const surfaceY = segment.startSurfaceY + (segment.endSurfaceY - segment.startSurfaceY) * t;
+      if (!nearest || distanceSq < nearest.distanceSq) {
+        nearest = { distanceSq, surfaceY };
+      }
+    }
+    return nearest?.surfaceY ?? null;
   }
 }
 
