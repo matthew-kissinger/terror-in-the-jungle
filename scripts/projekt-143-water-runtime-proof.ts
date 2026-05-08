@@ -38,6 +38,11 @@ interface RuntimeProofResult {
     colorAttributePresent: boolean;
     colorAttributeItemSize: number;
     focusPoint: { x: number; y: number; z: number } | null;
+    queryProbe: {
+      surfaceY: number | null;
+      depthOneMeterBelowSurface: number | null;
+      underwaterOneMeterBelowSurface: boolean | null;
+    } | null;
     boundingBox: {
       min: { x: number; y: number; z: number };
       max: { x: number; y: number; z: number };
@@ -67,6 +72,9 @@ interface HarnessWindow extends Window {
     systemManager?: {
       waterSystem?: {
         getDebugInfo?: () => WaterDebugInfo;
+        getWaterSurfaceY?: (position: { x: number; y: number; z: number }) => number | null;
+        getWaterDepth?: (position: { x: number; y: number; z: number }) => number;
+        isUnderwater?: (position: { x: number; y: number; z: number }) => boolean;
       };
     };
   };
@@ -224,6 +232,27 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
       engine.renderer.setOverrideCamera(camera);
     }
 
+    const waterSystem = engine?.systemManager?.waterSystem;
+    let queryProbe = null;
+    if (
+      focusPoint
+      && typeof waterSystem?.getWaterSurfaceY === 'function'
+      && typeof waterSystem.getWaterDepth === 'function'
+      && typeof waterSystem.isUnderwater === 'function'
+    ) {
+      const surfaceY = waterSystem.getWaterSurfaceY(focusPoint);
+      const belowSurface = surfaceY === null ? null : {
+        x: focusPoint.x,
+        y: surfaceY - 1,
+        z: focusPoint.z,
+      };
+      queryProbe = {
+        surfaceY,
+        depthOneMeterBelowSurface: belowSurface ? waterSystem.getWaterDepth(belowSurface) : null,
+        underwaterOneMeterBelowSurface: belowSurface ? waterSystem.isUnderwater(belowSurface) : null,
+      };
+    }
+
     return {
       waterInfo,
       groupPresent: Boolean(group),
@@ -234,6 +263,7 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
       colorAttributePresent: Boolean(colorAttr?.count && positionAttr?.count && colorAttr.count === positionAttr.count),
       colorAttributeItemSize: colorAttr?.itemSize ?? 0,
       focusPoint,
+      queryProbe,
       boundingBox: box && center
         ? {
           min: { x: box.min.x, y: box.min.y, z: box.min.z },
@@ -258,7 +288,10 @@ function resultPassed(result: RuntimeProofResult): boolean {
     && result.proof.waterInfo?.hydrologyRiverMaterialProfile === 'natural_channel_gradient'
     && result.proof.colorAttributePresent
     && result.proof.colorAttributeItemSize === 4
-    && (result.proof.waterInfo?.hydrologySegmentCount ?? 0) > 0;
+    && (result.proof.waterInfo?.hydrologySegmentCount ?? 0) > 0
+    && Number.isFinite(result.proof.queryProbe?.surfaceY ?? NaN)
+    && (result.proof.queryProbe?.depthOneMeterBelowSurface ?? 0) > 0.9
+    && result.proof.queryProbe?.underwaterOneMeterBelowSurface === true;
 }
 
 function toMarkdown(report: RuntimeProofReport): string {
@@ -283,6 +316,7 @@ function toMarkdown(report: RuntimeProofReport): string {
       `- Hydrology color attribute present: ${String(result.proof.colorAttributePresent)}`,
       `- Hydrology color attribute item size: ${String(result.proof.colorAttributeItemSize)}`,
       `- Hydrology focus point: ${JSON.stringify(result.proof.focusPoint)}`,
+      `- Query probe: ${JSON.stringify(result.proof.queryProbe)}`,
       `- Hydrology channels: ${String(result.proof.waterInfo?.hydrologyChannelCount ?? null)}`,
       `- Hydrology segments: ${String(result.proof.waterInfo?.hydrologySegmentCount ?? null)}`,
       '',
@@ -341,8 +375,8 @@ async function main(): Promise<void> {
     options,
     results,
     nonClaims: [
-      'This proof checks runtime mesh presence and screenshot capture only.',
-      'This proof does not accept final river art, stream flow, crossings, gameplay water queries, or perf.',
+      'This proof checks runtime mesh presence, public water query probes, and screenshot capture only.',
+      'This proof does not accept final river art, stream flow, crossings, consumer adoption of water queries, or perf.',
       'Human visual acceptance is still required before KB-TERRAIN water can close.',
     ],
   };

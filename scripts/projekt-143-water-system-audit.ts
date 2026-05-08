@@ -36,6 +36,9 @@ interface WaterSystemAuditReport {
     globalWaterPlaneSuppressedByHydrology: boolean;
     hydrologyRiverNaturalMaterialProfilePresent: boolean;
     hydrologyRiverVertexColorGradientPresent: boolean;
+    publicWaterQueryApiPresent: boolean;
+    hydrologyWaterQuerySurfacePresent: boolean;
+    waterQueryTestCoveragePresent: boolean;
   };
   findings: string[];
   nextBranchRequirements: string[];
@@ -47,6 +50,7 @@ const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 
 const SOURCE_PATHS = {
   waterSystem: join(process.cwd(), 'src', 'systems', 'environment', 'WaterSystem.ts'),
+  waterSystemTest: join(process.cwd(), 'src', 'systems', 'environment', 'WaterSystem.test.ts'),
   systemManager: join(process.cwd(), 'src', 'core', 'SystemManager.ts'),
   gameModeTypes: join(process.cwd(), 'src', 'config', 'gameModeTypes.ts'),
   openFrontierConfig: join(process.cwd(), 'src', 'config', 'OpenFrontierConfig.ts'),
@@ -87,6 +91,7 @@ function readJson<T>(path: string): T | null {
 
 function main(): void {
   const waterSystem = readText(SOURCE_PATHS.waterSystem);
+  const waterSystemTest = readText(SOURCE_PATHS.waterSystemTest);
   const systemManager = readText(SOURCE_PATHS.systemManager);
   const gameModeTypes = readText(SOURCE_PATHS.gameModeTypes);
   const openFrontierConfig = readText(SOURCE_PATHS.openFrontierConfig);
@@ -150,6 +155,16 @@ function main(): void {
       && waterSystem.includes('pushHydrologyRiverColor(colors, centerColor, HYDROLOGY_RIVER_CENTER_ALPHA)')
       && waterSystem.includes('HYDROLOGY_RIVER_CENTER_ALPHA')
       && waterSystem.includes('vertexColors: true'),
+    publicWaterQueryApiPresent: waterSystem.includes('isUnderwater(position: THREE.Vector3)')
+      && waterSystem.includes('getWaterSurfaceY(position: THREE.Vector3): number | null')
+      && waterSystem.includes('getWaterDepth(position: THREE.Vector3): number'),
+    hydrologyWaterQuerySurfacePresent: waterSystem.includes('hydrologyWaterQuerySegments')
+      && waterSystem.includes('getHydrologyWaterSurfaceY')
+      && waterSystem.includes('startSurfaceY')
+      && waterSystem.includes('halfWidth'),
+    waterQueryTestCoveragePresent: waterSystemTest.includes('reports global water surface and depth while the global plane is active')
+      && waterSystemTest.includes('getWaterSurfaceY(new THREE.Vector3(5, 1, 0))')
+      && waterSystemTest.includes('getWaterDepth(new THREE.Vector3(5, 1, 0))'),
   };
 
   const missingCore = [
@@ -199,17 +214,22 @@ function main(): void {
             : 'The hydrology bake manifest and typed loader can preload behind an explicit feature gate, but remain visually inert.'
           : 'The hydrology bake manifest and typed loader are present, but intentionally unwired from mode startup and rendering.'
         : 'The hydrology manifest/loader contract is incomplete.',
+      currentContract.publicWaterQueryApiPresent && currentContract.hydrologyWaterQuerySurfacePresent && currentContract.waterQueryTestCoveragePresent
+        ? 'WaterSystem now exposes the public VODA-1 gameplay query API for global water and hydrology channel surfaces, with focused regression coverage.'
+        : 'WaterSystem public gameplay water query acceptance remains incomplete.',
     ],
     nextBranchRequirements: [
       'Keep WaterSystem as the global ocean/lake fallback; hydrology river surfaces must remain a separate map-space consumer, not a clipped/scaled global plane.',
       'Treat hydrology river strips as provisional until matched Open Frontier/A Shau browser screenshots and perf captures pass.',
       'Refine river mesh strips from accepted channel polylines instead of scaling or clipping the global water plane.',
       'Feed bank/wetness masks into route/trail crossings and water queries before final ecology acceptance.',
-      'Replace simple y<0 water-contact assumptions only after gameplay queries have hydrology-backed masks and regression tests.',
+      'Route future gameplay consumers through WaterSystem queries instead of reintroducing simple y<0 water-contact assumptions.',
       'Require matched Open Frontier/A Shau screenshots and clean perf captures before accepting runtime river visuals.',
     ],
     nonClaims: [
-      'This audit does not accept runtime water meshes or gameplay water queries.',
+      currentContract.publicWaterQueryApiPresent && currentContract.hydrologyWaterQuerySurfacePresent
+        ? 'This audit accepts the source/test query API surface only; it does not prove every future gameplay consumer uses it.'
+        : 'This audit does not accept gameplay water queries.',
       'This audit does not accept A Shau streams or Open Frontier rivers.',
       'This audit does not provide perf evidence.',
     ],
