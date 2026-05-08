@@ -10,6 +10,22 @@ the current truth anchor.
 
 ## Current Stabilization Direction On 2026-05-08
 
+`cycle-2026-05-08-perception-and-stuck` closed 2026-05-08 on top of the
+prior STABILIZAT-2 closeout. Single integration PR
+[#165](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/165)
+shepherded four parallel task branches to `master`:
+`npc-unfreeze-and-stuck`, `npc-imposter-distance-priority`,
+`zone-validate-nudge-ashau`, `terrain-cdlod-seam`. Behaviour changes are
+gated by config flags exposed in the existing Tweakpane (`\` toggle) so
+the human can A/B at runtime. Live deploy at SHA `e34cc6d` (or later
+docs-only commit) on `https://terror-in-the-jungle.pages.dev`. CI green
+on lint + test (4153 tests) + build + smoke + perf (combat120 5m47s
+within baseline) + mobile-ui. Reviewers (combat-reviewer,
+terrain-nav-reviewer) APPROVE-WITH-NOTES; notes captured in the cycle
+retrospective as deferred follow-ups (no blockers). Cycle retrospective:
+`docs/cycles/cycle-2026-05-08-perception-and-stuck/RESULT.md`.
+
+Prior cycle remains the active stabilization anchor: 
 `cycle-2026-05-08-stabilizat-2-closeout` closed 2026-05-08. Six themed PRs
 (helicopter rotor axis, water audits, terrain+effects, UX respawn, combat
 AI/squad/core mega-cluster with documented GOST-TIJ-001 exception, docs +

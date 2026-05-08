@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last updated: 2026-04-22
+Last updated: 2026-05-08
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). Up to 3,000 AI combatants, stable frame-time tails, real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages.
 
@@ -21,9 +21,11 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-`cycle-2026-04-23-debug-cleanup` closed on 2026-04-22 (two merged PRs: `preserve-drawing-buffer-dev-gate` (#147), `world-overlay-debugger` (#145, rebased + CI-fixed)). It was a cleanup pass on top of `cycle-2026-04-23-debug-and-test-modes` (closed 2026-04-22, seven merged PRs) which shipped the current diagnostic surface: backtick HUD registry, `\`-toggled Tweakpane live-tuning, `Shift+\` six-overlay debugger, V/B free-fly + entity inspector, TimeScale pause/step/slow/fast, F9 playtest capture, and a `?mode=terrain-sandbox` URL-gated dev mode.
+`cycle-2026-05-08-perception-and-stuck` closed 2026-05-08 (single integration PR [#165](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/165)). Four parallel task branches landed via executor subagents and shipped behind config flags exposed in the existing Tweakpane (`\` toggle): `npc-unfreeze-and-stuck` (visual-only velocity integration on the LOD over-budget path; rejoin-timeout + squad-leader-stale watchdog; StuckDetector `'hold'` now forces destination/target clear and patrol re-entry; `CULLED_DISTANT_SIM_INTERVAL_MS` 45000 → 8000), `npc-imposter-distance-priority` (close-model distance 64 → 120 m via config; on-screen-aware priority score replaces closest-N; velocity-keyed billboard cadence without shader change), `zone-validate-nudge-ashau` (post-placement `validateAndNudge` lifts capturable zones out of ditches; A Shau pilot), `terrain-cdlod-seam` (AABB-distance morph metric + downward skirt geometry kill chunk-edge seams; new `Shift+\` → `Y` seam diagnostic overlay). Live deploy at SHA `e34cc6d` (or later docs-only commit) verified.
 
-Active carry-overs: (1) residual +8.36 MB `heap_end_growth` on combat120 (down 4.7 MB from the pre-cycle +13.08 MB but still above the +2 MB target — WorldOverlayRegistry boot-time footprint + single-run variance are the main suspects; variance read before chasing); (2) combat AI p99 ~34 ms, anchored on synchronous cover search in `AIStateEngage.initiateSquadSuppression()`; (3) NPC slope-stuck / navmesh crowd disabled / terrain-aware solver stall loops; (4) AC-47 low-pitch takeoff single-bounce; (5) helicopter parity audit (`HelicopterVehicleAdapter` / `HelicopterPlayerAdapter`).
+Prior cycle: `cycle-2026-04-23-debug-cleanup` (closed 2026-04-22) shipped the diagnostic surface this cycle's overlay extends: backtick HUD registry, `\`-toggled Tweakpane live-tuning, `Shift+\` six-overlay debugger, V/B free-fly + entity inspector, TimeScale pause/step/slow/fast, F9 playtest capture, `?mode=terrain-sandbox` URL-gated dev mode.
+
+Active carry-overs after this cycle: (1) combat AI p99 ~34 ms anchored on synchronous cover search in `AIStateEngage.initiateSquadSuppression()` (DEFEKT-3, untouched this cycle); (2) NPC slope-stuck / navmesh crowd disabled / terrain-aware solver stall loops (Issue A's watchdogs treat the symptoms not the cause); (3) AC-47 low-pitch takeoff single-bounce; (4) helicopter parity audit (`HelicopterVehicleAdapter` / `HelicopterPlayerAdapter`); (5) reviewer follow-ups from this cycle: position-Y drift on slopes during visual-only integration (call `syncTerrainHeight` or document drift bound), `RespawnManager` should use the new `beginRejoiningSquad` helper, `findSuitableZonePosition` spiral-search determinism (`Math.random`), Stage D3 (DEM edge padding) gated on visual review of D1+D2.
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle IDs.
 
