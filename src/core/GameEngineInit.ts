@@ -11,6 +11,7 @@ import { createAircraftContactOverlay } from '../ui/debug/worldOverlays/aircraft
 import { createLosRayOverlay } from '../ui/debug/worldOverlays/losRayOverlay';
 import { createSquadInfluenceOverlay } from '../ui/debug/worldOverlays/squadInfluenceOverlay';
 import { createTerrainChunkOverlay } from '../ui/debug/worldOverlays/terrainChunkOverlay';
+import { createTerrainSeamOverlay } from '../ui/debug/worldOverlays/terrainSeamOverlay';
 import { WorldOverlayControlPanel } from '../ui/debug/WorldOverlayControlPanel';
 
 type StartGamePipeline = {
@@ -291,6 +292,10 @@ function wireWorldOverlays(engine: GameEngine): void {
     getCameraPosition: cameraPos,
   }));
   overlays.register(createTerrainChunkOverlay({
+    getActiveTiles: () => terrainSystem.getActiveTilesForDebug?.() ?? [],
+    getHeightAt: (x, z) => (typeof terrainSystem.getHeightAt === 'function' ? terrainSystem.getHeightAt(x, z) : 0),
+  }));
+  overlays.register(createTerrainSeamOverlay({
     getActiveTiles: () => terrainSystem.getActiveTilesForDebug?.() ?? [],
     getHeightAt: (x, z) => (typeof terrainSystem.getHeightAt === 'function' ? terrainSystem.getHeightAt(x, z) : 0),
   }));

@@ -8,9 +8,18 @@ vi.mock('../../core/PerfDiagnostics', () => ({
 vi.mock('three', () => {
   class MockBufferGeometry {
     attributes: Record<string, any> = {};
+    index: any = null;
     setAttribute(name: string, attr: any) { this.attributes[name] = attr; }
+    setIndex(idx: any) { this.index = idx; }
     rotateX() { return this; }
     dispose = vi.fn();
+  }
+
+  class MockBufferAttribute {
+    array: any;
+    itemSize: number;
+    needsUpdate = false;
+    constructor(arr: any, size: number) { this.array = arr; this.itemSize = size; }
   }
 
   class MockInstancedMesh {
@@ -54,6 +63,8 @@ vi.mock('three', () => {
 
   return {
     PlaneGeometry: MockBufferGeometry,
+    BufferGeometry: MockBufferGeometry,
+    BufferAttribute: MockBufferAttribute,
     InstancedMesh: MockInstancedMesh,
     InstancedBufferAttribute: class {
       array: Float32Array;
@@ -66,7 +77,7 @@ vi.mock('three', () => {
 });
 
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
-import { CDLODRenderer } from './CDLODRenderer';
+import { CDLODRenderer, createTileGeometry } from './CDLODRenderer';
 import type { CDLODTile } from './CDLODQuadtree';
 
 const mockIsPerfDiagnosticsEnabled = vi.mocked(isPerfDiagnosticsEnabled);
@@ -132,4 +143,48 @@ describe('CDLODRenderer', () => {
     expect(isolatedRenderer.getMesh().receiveShadow).toBe(true);
   });
 
+});
+
+// Stage D2 (terrain-cdlod-seam): the tile geometry must carry an interior
+// NxN grid plus a perimeter skirt ring so the vertex shader can drop the
+// skirt verts to hide LOD-transition cracks. Asserts the contract, not
+// the exact triangle layout.
+describe('createTileGeometry', () => {
+  it('separates interior NxN grid from a perimeter skirt ring via isSkirt attribute', () => {
+    const N = 33;
+    const geo: any = createTileGeometry(N);
+    expect(geo.attributes.position).toBeDefined();
+    expect(geo.attributes.isSkirt).toBeDefined();
+    const isSkirt = geo.attributes.isSkirt.array as Float32Array;
+    let interior = 0, skirt = 0;
+    for (let i = 0; i < isSkirt.length; i++) {
+      if (isSkirt[i] >= 0.5) skirt++; else interior++;
+    }
+    expect(interior).toBe(N * N);
+    expect(skirt).toBe(4 * N - 4);
+    expect(geo.attributes.position.array.length / 3).toBe(N * N + 4 * N - 4);
+  });
+
+  it('skirt verts share XZ with their interior duplicates so the drop is purely vertical', () => {
+    const N = 17;
+    const geo: any = createTileGeometry(N);
+    const pos = geo.attributes.position.array as Float32Array;
+    const isSkirt = geo.attributes.isSkirt.array as Float32Array;
+    for (let i = 0; i < isSkirt.length; i++) {
+      if (isSkirt[i] < 0.5) continue;
+      const sx = pos[i * 3], sz = pos[i * 3 + 2];
+      let matched = false;
+      for (let j = 0; j < N * N && !matched; j++) {
+        if (Math.abs(pos[j * 3] - sx) < 1e-6 && Math.abs(pos[j * 3 + 2] - sz) < 1e-6) matched = true;
+      }
+      expect(matched).toBe(true);
+    }
+  });
+
+  it('emits indexed triangles for both interior and skirt strips', () => {
+    const N = 33;
+    const geo: any = createTileGeometry(N);
+    expect(geo.index).not.toBeNull();
+    expect(geo.index.array.length).toBe(((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 2) * 3);
+  });
 });

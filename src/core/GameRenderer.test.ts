@@ -13,7 +13,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { shouldPreserveDrawingBuffer } from './GameRenderer';
+import { INITIAL_FOG_COLOR, shouldPreserveDrawingBuffer } from './GameRenderer';
 
 const originalHref = window.location.href;
 
@@ -51,5 +51,28 @@ describe('shouldPreserveDrawingBuffer', () => {
   it('honors ?capture=0 as an explicit opt-out', () => {
     setSearch('?capture=0');
     expect(shouldPreserveDrawingBuffer()).toBe(false);
+  });
+});
+
+// Clear-colour guardrail (terrain-cdlod-seam): the scene background must
+// stay a neutral horizon grey, never pure white. White amplifies any
+// sub-pixel CDLOD seam crack at chunk borders into visible streaks. The
+// real `HosekWilkieSkyBackend` dome paints over this each frame, so the
+// constant only matters for the pre-atmosphere first frame and any
+// chunk-boundary slivers that bleed through the dome — but those are the
+// exact cases that read as white when the constant ever drifts.
+describe('INITIAL_FOG_COLOR', () => {
+  it('is not pure white (would amplify CDLOD seam cracks)', () => {
+    expect(INITIAL_FOG_COLOR).not.toBe(0xffffff);
+  });
+
+  it('is a neutral mid-tone (each channel between 0x40 and 0xc0)', () => {
+    const r = (INITIAL_FOG_COLOR >> 16) & 0xff;
+    const g = (INITIAL_FOG_COLOR >> 8) & 0xff;
+    const b = INITIAL_FOG_COLOR & 0xff;
+    for (const c of [r, g, b]) {
+      expect(c).toBeGreaterThanOrEqual(0x40);
+      expect(c).toBeLessThanOrEqual(0xc0);
+    }
   });
 });

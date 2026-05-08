@@ -413,7 +413,7 @@ export class TerrainSystem implements GameSystem {
   }
 
   /** Additive debug accessor for `world-overlay-debugger`. See TerrainRenderRuntime. */
-  getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number }> {
+  getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number; morphFactor: number }> {
     return this.renderRuntime?.getActiveTilesForDebug() ?? [];
   }
 

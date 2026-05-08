@@ -21,6 +21,7 @@ uniform bool debugWireframe;
 
 attribute float lodLevel;
 attribute float morphFactor;
+attribute float isSkirt;
 
 varying vec3 vWorldPosition;
 varying vec2 vWorldUV;
@@ -56,6 +57,14 @@ vWorldUV = clamp(normalizedPos * uvScale + texelHalf, 0.0, 1.0);
 
 float terrainH = texture2D(terrainHeightmap, vWorldUV).r;
 worldPos4.y = terrainH;
+
+// CDLOD skirt: perimeter-ring duplicate vertices drop below the heightmap
+// to hide sub-pixel cracks at chunk borders. Coarser tiles (higher
+// lodLevel) get larger drops because their seam-cracks scale with tile
+// size. Skirts only ever drop, never rise — guarantees no poke-through
+// into adjacent tiles. See terrain-cdlod-seam Stage D2.
+float skirtDrop = max(2.0, 4.0 * (lodLevel + 1.0));
+worldPos4.y -= step(0.5, isSkirt) * skirtDrop;
 
 vWorldPosition = worldPos4.xyz;
 vLodLevel = lodLevel;

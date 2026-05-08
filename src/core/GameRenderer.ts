@@ -10,6 +10,15 @@ import { ViewportInfo, ViewportManager } from '../ui/design/responsive';
 import { WorldOverlayRegistry } from '../ui/debug/WorldOverlayRegistry';
 
 /**
+ * Default fog / scene-background colour applied before the analytic sky
+ * backend overrides it each frame. Exported for tests so the GameRenderer
+ * background-colour assertion can lock the constant against drift back to
+ * a pure-white clear (which would amplify any residual CDLOD seam crack —
+ * see `terrain-cdlod-seam`).
+ */
+export const INITIAL_FOG_COLOR = 0x7a8f88;
+
+/**
  * Determine whether the WebGLRenderer should preserve its drawing buffer.
  *
  * Required by PlaytestCaptureManager (F9) for `renderer.domElement.toBlob()`
@@ -138,7 +147,6 @@ export class GameRenderer {
     // horizon seam between terrain and sky vanishes at every sun angle.
     // `scene.background` is a static fallback only — the analytic
     // `HosekWilkieSkyBackend` dome renders in front of it each frame.
-    const INITIAL_FOG_COLOR = 0x7a8f88;
     this.scene.background = new THREE.Color(INITIAL_FOG_COLOR);
 
     // Exponential fog. Bootstrap density only — per-scenario fog density
