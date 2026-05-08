@@ -70,52 +70,43 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-05-08-perception-and-stuck
-
-Started 2026-05-08. Goal: ship the smallest set of low-risk, perf-safe fixes
-that materially improve four user-reported gameplay issues — distant NPCs
-appear frozen until camera approaches; PixelForge imposter switch is too
-close so distant groups look static; A Shau Zone Control zone closest to
-NVA HQ is in a ditch; white CDLOD seams on A Shau (and suspected Open
-Frontier).
-
-Approved plan: `C:\Users\Mattm\.claude\plans\mutable-conjuring-ripple.md`.
-
-**Concurrency cap:** 4 (this cycle).
-**PR policy this cycle:** Executors push their `task/<slug>` branches but
-DO NOT open PRs. Orchestrator integrates branches into a cycle integration
-branch and pushes that branch. Final PR opens after cycle-level validation
-passes.
-
-### Round 1 tasks (parallel)
-
-| Slug | Brief | Touches |
-|---|---|---|
-| `npc-unfreeze-and-stuck` | `docs/tasks/npc-unfreeze-and-stuck.md` | `src/systems/combat/CombatantLODManager.ts`, `CombatantMovementStates.ts`, `CombatantMovementCommands.ts`, `ai/AIStatePatrol.ts`, `StuckDetector.ts` callers, `types.ts`, `src/config/CombatantConfig.ts`, `src/ui/debug/tuning/tuneCombat.ts` |
-| `npc-imposter-distance-priority` | `docs/tasks/npc-imposter-distance-priority.md` | `src/systems/combat/PixelForgeNpcRuntime.ts`, `CombatantRenderer.ts`, impostor frame-swap module, `src/ui/debug/tuning/tuneCombat.ts` |
-| `zone-validate-nudge-ashau` | `docs/tasks/zone-validate-nudge-ashau.md` | `src/systems/world/ZoneTerrainAdapter.ts`, `ZoneManager.ts`, `src/config/AShauValleyConfig.ts` |
-| `terrain-cdlod-seam` | `docs/tasks/terrain-cdlod-seam.md` | `src/systems/terrain/CDLODQuadtree.ts`, `CDLODRenderer.ts`, `TerrainMaterial.ts`, `src/ui/debug/worldOverlays/terrainSeamOverlay.ts` (new), `WorldOverlayRegistry.ts`, `src/core/GameRenderer.test.ts` |
-
-### Dependencies
-
-None. All four tasks are disjoint scoping and can land in any order.
+## Current cycle: none (between cycles)
 
 ### Last closed cycle
 
-`cycle-2026-05-08-stabilizat-2-closeout` closed 2026-05-08. Retrospective:
-`docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md`.
+`cycle-2026-05-08-perception-and-stuck` closed 2026-05-08. Retrospective:
+`docs/cycles/cycle-2026-05-08-perception-and-stuck/RESULT.md`.
 
-Six PRs merged covering helicopter rotor axis, water audits, terrain+effects,
-UX respawn, combat AI mega-cluster (GOST-TIJ-001 exception documented),
-docs+scripts catalog. Live deploy at SHA `babae19` verified by
-`check:projekt-143-live-release-proof`. Codex revision 1.3 with Politburo seal.
-DEFEKT-2 14-day live drift watch begins T+0 = 2026-05-08; target close T+14 =
-2026-05-22.
+Single integration PR (#165) merged to master via `--merge` fallback (cycle
+branch contained internal merge commits). Four task branches landed in
+parallel via executor subagents: `npc-unfreeze-and-stuck`,
+`npc-imposter-distance-priority`, `zone-validate-nudge-ashau`,
+`terrain-cdlod-seam`. Live deploy at SHA `e34cc6d`. CI gates green:
+lint+test+build+smoke+perf+mobile-ui. Reviewers (combat-reviewer,
+terrain-nav-reviewer) both APPROVE-WITH-NOTES; notes captured in the
+retrospective as follow-ups.
 
-Open follow-ups (not active directives unless reopened by Politburo):
-AVIATSIYA-1 / DEFEKT-5 human visual review packet; STABILIZAT-1 baseline refresh
-on a quiet machine; DEFEKT-3 runtime perf fix; DEFEKT-4 NPC route quality
-runtime acceptance.
+Open follow-ups (not active directives):
+- Position-Y drift in visual-only velocity integration on slopes (call
+  `syncTerrainHeight` or document drift bound).
+- `RespawnManager` should use the new `beginRejoiningSquad` helper.
+- `findSuitableZonePosition` spiral-search determinism (`Math.random`).
+- Stage D3 DEM edge padding gated on visual review of D1+D2.
+
+Carry-overs from prior cycles still open: AVIATSIYA-1 / DEFEKT-5 human
+visual review packet; STABILIZAT-1 baseline refresh on a quiet machine;
+DEFEKT-3 runtime perf fix; DEFEKT-4 NPC route quality runtime acceptance;
+NPC slope-stuck / navmesh crowd disabled / terrain-aware solver stall;
+helicopter parity audit; cover-search synchronous p99 anchor in
+`AIStateEngage.initiateSquadSuppression`.
+
+### Next cycle
+
+The next cycle is empty. Read `docs/PROJEKT_OBJEKT_143.md` Article III for the
+active directive board, pick a directive whose evidence chain you can advance
+in a bounded session, and seed a new `cycle-YYYY-MM-DD-<slug>` with task briefs
+under `docs/tasks/<slug>.md`. Default concurrency cap 5 for normal multi-PR
+cycles.
 
 ## Dispatch protocol
 
