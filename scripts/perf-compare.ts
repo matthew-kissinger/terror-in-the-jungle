@@ -68,6 +68,10 @@ type CaptureSummary = {
     mode: string;
     requestedMode: string;
   };
+  perfRuntime?: {
+    npcCloseModelsDisabled?: boolean;
+    terrainShadowsDisabled?: boolean;
+  };
 };
 
 type Threshold = { pass: number; warn: number };
@@ -127,11 +131,31 @@ function avg(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-function listCaptureDirs(): string[] {
+function isDiagnosticRuntimeVariant(summary: Partial<CaptureSummary>): boolean {
+  return summary.perfRuntime?.npcCloseModelsDisabled === true
+    || summary.perfRuntime?.terrainShadowsDisabled === true;
+}
+
+function listCaptureDirs(options: { includeDiagnosticRuntimeVariants?: boolean } = {}): string[] {
   if (!existsSync(ARTIFACT_ROOT)) return [];
   return readdirSync(ARTIFACT_ROOT, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
+    .filter(name => {
+      const summaryPath = join(ARTIFACT_ROOT, name, 'summary.json');
+      const samplesPath = join(ARTIFACT_ROOT, name, 'runtime-samples.json');
+      if (!existsSync(summaryPath) || !existsSync(samplesPath)) return false;
+      try {
+        const summary = JSON.parse(readFileSync(summaryPath, 'utf-8')) as Partial<CaptureSummary>;
+        const samples = JSON.parse(readFileSync(samplesPath, 'utf-8')) as unknown;
+        if (summary.status === 'failed') return false;
+        if (!options.includeDiagnosticRuntimeVariants && isDiagnosticRuntimeVariant(summary)) return false;
+        const finalFrameCount = Number(summary.finalFrameCount ?? 0);
+        return Array.isArray(samples) && (samples.length > 0 || finalFrameCount > 0);
+      } catch {
+        return false;
+      }
+    })
     .sort();
 }
 
@@ -423,9 +447,9 @@ function main(): void {
   const opts = parseArgs();
 
   // Find artifact directory
-  const dirs = listCaptureDirs();
+  const dirs = listCaptureDirs({ includeDiagnosticRuntimeVariants: Boolean(opts.dir) });
   if (dirs.length === 0) {
-    console.error('No capture artifacts found under artifacts/perf/');
+    console.error('No complete capture artifacts found under artifacts/perf/');
     process.exit(2);
   }
 

@@ -37,6 +37,8 @@ npm run check:mobile-ui          # Built-app phone viewport flow gate
 npm run check:states             # State coverage probe
 npm run check:hud                # HUD layout validator
 npm run check:memory             # Memory growth tracker
+npm run check:projekt-143-svyaz-ping-command # SVYAZ-2 source/test/browser artifact audit
+npm run check:projekt-143-svyaz-ping-command-browser # SVYAZ-2 map/world marker browser proof
 npm run check:projekt-143-culling-proof  # Headed deterministic renderer/category proof
 npm run check:projekt-143-culling-baseline # Culling owner-path before packet
 npm run check:projekt-143-terrain-baseline # Elevated terrain horizon before proof
