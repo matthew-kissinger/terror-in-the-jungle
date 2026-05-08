@@ -1,13 +1,17 @@
 import type { GameEngine } from '../../../core/GameEngine';
 import { Alliance, Faction } from '../../../systems/combat/types';
 import { NpcLodConfig } from '../../../config/CombatantConfig';
+import { PixelForgeNpcDistanceConfig } from '../../../systems/combat/PixelForgeNpcRuntime';
 import type { PaneLike, TuningState } from '../LiveTuningPanel';
 
 /**
  * Combat folder: global combat-mute toggle + read-only faction counts +
  * the LOD/perception knobs that gate distant-NPC unfreeze and squad/stuck
- * watchdogs (see docs/tasks/npc-unfreeze-and-stuck.md). Knobs write through
- * to `NpcLodConfig` so changes apply on the next tick without restart.
+ * watchdogs (see docs/tasks/npc-unfreeze-and-stuck.md). The PixelForge
+ * subfolder exposes the most common impostor / close-model tunables (see
+ * docs/tasks/npc-imposter-distance-priority.md). All knobs write through
+ * to their live config object so changes apply on the next tick without
+ * restart.
  */
 
 const COMBAT_MUTED_KEY = 'combat.muted';
@@ -17,6 +21,11 @@ const LOD_VISUAL_VEL_KEY = 'combat.lod.visualOnlyIntegrateVelocity';
 const LOD_REJOIN_TIMEOUT_KEY = 'combat.lod.rejoinTimeoutMs';
 const LOD_SQUAD_STALE_KEY = 'combat.lod.squadFollowStaleMs';
 const LOD_CULLED_INTERVAL_KEY = 'combat.lod.culledDistantSimIntervalMs';
+
+const PF_CLOSE_DISTANCE_KEY = 'combat.pixelForge.closeModelDistanceMeters';
+const PF_ON_SCREEN_WEIGHT_KEY = 'combat.pixelForge.onScreenWeight';
+const PF_SQUAD_WEIGHT_KEY = 'combat.pixelForge.squadWeight';
+const PF_RECENTLY_VISIBLE_MS_KEY = 'combat.pixelForge.recentlyVisibleMs';
 
 interface WarFacade {
   isEnabled(): boolean;
@@ -34,6 +43,10 @@ export function captureCombatDefaults(engine: GameEngine): TuningState {
     [LOD_REJOIN_TIMEOUT_KEY]: NpcLodConfig.rejoinTimeoutMs,
     [LOD_SQUAD_STALE_KEY]: NpcLodConfig.squadFollowStaleMs,
     [LOD_CULLED_INTERVAL_KEY]: NpcLodConfig.culledDistantSimIntervalMs,
+    [PF_CLOSE_DISTANCE_KEY]: PixelForgeNpcDistanceConfig.closeModelDistanceMeters,
+    [PF_ON_SCREEN_WEIGHT_KEY]: PixelForgeNpcDistanceConfig.onScreenWeight,
+    [PF_SQUAD_WEIGHT_KEY]: PixelForgeNpcDistanceConfig.squadWeight,
+    [PF_RECENTLY_VISIBLE_MS_KEY]: PixelForgeNpcDistanceConfig.recentlyVisibleMs,
   };
 }
 
@@ -53,6 +66,22 @@ export function applyCombatState(engine: GameEngine, state: TuningState): void {
   }
   if (typeof state[LOD_CULLED_INTERVAL_KEY] === 'number') {
     NpcLodConfig.culledDistantSimIntervalMs = state[LOD_CULLED_INTERVAL_KEY] as number;
+  }
+  const closeDistance = state[PF_CLOSE_DISTANCE_KEY];
+  if (typeof closeDistance === 'number' && Number.isFinite(closeDistance)) {
+    PixelForgeNpcDistanceConfig.closeModelDistanceMeters = closeDistance;
+  }
+  const onScreenWeight = state[PF_ON_SCREEN_WEIGHT_KEY];
+  if (typeof onScreenWeight === 'number' && Number.isFinite(onScreenWeight)) {
+    PixelForgeNpcDistanceConfig.onScreenWeight = onScreenWeight;
+  }
+  const squadWeight = state[PF_SQUAD_WEIGHT_KEY];
+  if (typeof squadWeight === 'number' && Number.isFinite(squadWeight)) {
+    PixelForgeNpcDistanceConfig.squadWeight = squadWeight;
+  }
+  const recentlyVisibleMs = state[PF_RECENTLY_VISIBLE_MS_KEY];
+  if (typeof recentlyVisibleMs === 'number' && Number.isFinite(recentlyVisibleMs)) {
+    PixelForgeNpcDistanceConfig.recentlyVisibleMs = recentlyVisibleMs;
   }
 }
 
@@ -80,6 +109,22 @@ export function bindCombatKnobs(
     .on('change', onChange);
   state[COMBAT_BLUFOR_COUNT_KEY] = countAlliance(engine, Alliance.BLUFOR);
   state[COMBAT_OPFOR_COUNT_KEY] = countAlliance(engine, Alliance.OPFOR);
+
+  const pixelForge = (typeof folder.addFolder === 'function')
+    ? folder.addFolder({ title: 'PixelForge', expanded: false })
+    : folder;
+  pixelForge
+    .addBinding(state, PF_CLOSE_DISTANCE_KEY, { label: 'close-model dist (m)', min: 64, max: 200, step: 4 })
+    .on('change', onChange);
+  pixelForge
+    .addBinding(state, PF_ON_SCREEN_WEIGHT_KEY, { label: 'on-screen weight', min: 0, max: 50, step: 1 })
+    .on('change', onChange);
+  pixelForge
+    .addBinding(state, PF_SQUAD_WEIGHT_KEY, { label: 'squad weight', min: 0, max: 50, step: 1 })
+    .on('change', onChange);
+  pixelForge
+    .addBinding(state, PF_RECENTLY_VISIBLE_MS_KEY, { label: 'recently visible (ms)', min: 0, max: 3000, step: 100 })
+    .on('change', onChange);
 }
 
 function countAlliance(engine: GameEngine, alliance: Alliance): number {

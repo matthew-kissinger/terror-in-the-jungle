@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   getPixelForgeClipHorizontalNetDisplacement,
+  getPixelForgeNpcCloseModelDistanceMeters,
+  getPixelForgeNpcCloseModelDistanceSq,
   getPixelForgeNpcRuntimeClip,
-  PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
   PIXEL_FORGE_NPC_RUNTIME_FACTIONS,
+  PixelForgeNpcDistanceConfig,
   sanitizePixelForgeNpcAnimationClip,
 } from './PixelForgeNpcRuntime';
 import { Combatant, CombatantState, Faction } from './types';
@@ -62,8 +65,28 @@ describe('PixelForgeNpcRuntime', () => {
     }
   });
 
-  it('keeps the hard close range beyond the visible-near impostor band', () => {
-    expect(PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS).toBe(64);
+  it('keeps the close-model radius live-tunable and well above the legacy 64 m threshold', () => {
+    // The cycle brief widens the close-model radius so flyovers see distant
+    // NPCs as 3D actors instead of static billboards. The exact value is a
+    // tuning knob; we assert the floor and the live-getter contract here.
+    expect(getPixelForgeNpcCloseModelDistanceMeters()).toBeGreaterThan(64);
+  });
+
+  it('exposes a squared-distance accessor that tracks the live config', () => {
+    const original = PixelForgeNpcDistanceConfig.closeModelDistanceMeters;
+    try {
+      PixelForgeNpcDistanceConfig.closeModelDistanceMeters = 100;
+      expect(getPixelForgeNpcCloseModelDistanceSq()).toBeCloseTo(100 * 100);
+
+      PixelForgeNpcDistanceConfig.closeModelDistanceMeters = 150;
+      expect(getPixelForgeNpcCloseModelDistanceSq()).toBeCloseTo(150 * 150);
+    } finally {
+      PixelForgeNpcDistanceConfig.closeModelDistanceMeters = original;
+    }
+  });
+
+  it('keeps the close-model GPU cap unchanged so the GPU budget is flat', () => {
+    expect(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP).toBe(8);
   });
 
   it('maps moving combat states away from advance_fire root motion', () => {
