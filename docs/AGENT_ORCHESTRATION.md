@@ -70,84 +70,32 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: architecture recovery stabilization
+## Current cycle: none (between cycles)
 
-### Cycle ID
+### Last closed cycle
 
-`architecture-recovery-cycle0-12` — active board:
-`docs/ARCHITECTURE_RECOVERY.md`. The last closed multi-agent PR cycle remains
-`cycle-2026-04-23-debug-cleanup` on 2026-04-22 (retrospective:
-`docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md`).
+`cycle-2026-05-08-stabilizat-2-closeout` closed 2026-05-08. Retrospective:
+`docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md`.
 
-### Why this cycle exists
+Six PRs merged covering helicopter rotor axis, water audits, terrain+effects,
+UX respawn, combat AI mega-cluster (GOST-TIJ-001 exception documented),
+docs+scripts catalog. Live deploy at SHA `babae19` verified by
+`check:projekt-143-live-release-proof`. Codex revision 1.3 with Politburo seal.
+DEFEKT-2 14-day live drift watch begins T+0 = 2026-05-08; target close T+14 =
+2026-05-22.
 
-Recover architecture drift after many unsupervised agent passes. The current
-goals are single runtime authority for vehicle sessions, explicit terrain/nav
-and atmosphere evidence, fallback retirement, trustworthy probes, and a final
-human playtest gate.
+Open follow-ups (not active directives unless reopened by Politburo):
+AVIATSIYA-1 / DEFEKT-5 human visual review packet; STABILIZAT-1 baseline refresh
+on a quiet machine; DEFEKT-3 runtime perf fix; DEFEKT-4 NPC route quality
+runtime acceptance.
 
-### Tasks in this cycle
+### Next cycle
 
-See `docs/ARCHITECTURE_RECOVERY.md` for the cycle board, current evidence,
-residual risks, and follow-up gates. Do not seed duplicate task briefs from
-stale backlog text.
-
-### Round schedule
-
-Serial release-owner pass. Broad parallel executor dispatch is paused until
-the recovery commit is merged, deployed, and live-site evidence is checked.
-
-### Concurrency cap
-
-1 for release-owner work. Restore the default only when a new PR-based cycle is
-seeded with bounded task briefs.
-
-### Dependencies
-
-Current dependency order: docs/current-state alignment -> local validation ->
-commit -> merge to `master` -> push -> manual deploy -> production header/live
-checks -> human playtest.
-
-### Playtest policy
-
-Deferred until the end of the recovery run per user direction. Final playtest
-uses `docs/PLAYTEST_CHECKLIST.md` plus
-`docs/playtest/PLAYTEST_2026-04-23_ARCHITECTURE_RECOVERY_CYCLE.md`.
-
-### Perf policy
-
-Use current baselines. Local perf remains authoritative; GitHub-hosted perf is
-advisory. Treat the 2026-04-24 combat120 heap-recovery split as PASS/WARN until
-a quiet-machine `validate:full` rerun refreshes the signal.
-
-### Failure handling
-
-Current hard stops: fenced interface change without approval, hidden fallback
-that masks required A Shau terrain/nav assets, duplicate runtime authority for
-vehicle session state, or live deploy serving stale app/manifest/WASM assets.
-
-### Visual checkpoints (orchestrator-gated)
-
-Final human playtest required before game-feel closure. Production deploy
-verification can proceed before that because the user asked to playtest at the
-end of the cycle.
-
-### skip-confirm
-
-YES for the current release-owner pass.
-
-### Cycle-specific notes
-
-Archived docs remain historical; current truth anchors are
-`docs/STATE_OF_REPO.md`, `docs/ARCHITECTURE_RECOVERY.md`, and
-`docs/DEPLOY_WORKFLOW.md`.
-
-### Pre-flight acknowledgement
-
-Prior closed cycle:
-`docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md`. Current recovery work
-is not a normal multi-PR cycle; see `docs/ARCHITECTURE_RECOVERY.md` before
-dispatching more agents.
+The next cycle is empty. Read `docs/PROJEKT_OBJEKT_143.md` Article III for the
+active directive board, pick a directive whose evidence chain you can advance
+in a bounded session, and seed a new `cycle-YYYY-MM-DD-<slug>` with task briefs
+under `docs/tasks/<slug>.md`. Default concurrency cap 5 for normal multi-PR
+cycles.
 
 ## Dispatch protocol
 

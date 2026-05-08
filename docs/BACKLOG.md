@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-05-07
+Last updated: 2026-05-08
 
 This file is the compact Strategic Reserve index. Active directives live in
 `docs/PROJEKT_OBJEKT_143.md` Article III. Current verified state lives in
@@ -116,6 +116,7 @@ opens or reassigns them.
 
 | Cycle | Record |
 |---|---|
+| cycle-2026-05-08-stabilizat-2-closeout | `docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md` |
 | cycle-2026-04-23-debug-cleanup | `docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md` |
 | cycle-2026-04-23-debug-and-test-modes | `docs/cycles/cycle-2026-04-23-debug-and-test-modes/RESULT.md` |
 | cycle-2026-04-22-heap-and-polish | `docs/cycles/cycle-2026-04-22-heap-and-polish/RESULT.md` |
