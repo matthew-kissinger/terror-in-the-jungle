@@ -602,7 +602,9 @@ describe('CombatantRenderer', () => {
 
     it('lets the Pixel Forge death impostor clip own pose without procedural shrink', () => {
       const combatants = new Map<string, Combatant>();
-      const dyingCombatant = createMockCombatant('dying-pf', Faction.NVA, new THREE.Vector3(120, 0, 0), CombatantState.DEAD);
+      // Distance >> close-model radius so the death pose runs through the
+      // impostor path (this test cares about impostor death behavior).
+      const dyingCombatant = createMockCombatant('dying-pf', Faction.NVA, new THREE.Vector3(160, 0, 0), CombatantState.DEAD);
       dyingCombatant.isDying = true;
       dyingCombatant.deathProgress = 0.04;
       dyingCombatant.deathAnimationType = 'fallback';
@@ -633,10 +635,11 @@ describe('CombatantRenderer', () => {
       const maps = renderer as unknown as { factionMeshes: Map<string, THREE.InstancedMesh> };
       maps.factionMeshes.delete('NVA_walk_fight_forward');
       const combatants = new Map<string, Combatant>();
+      // Distance >> close-model radius so the impostor bucket is exercised.
       const combatant = createMockCombatant(
         'engaging-far',
         Faction.NVA,
-        new THREE.Vector3(120, 0, 0),
+        new THREE.Vector3(160, 0, 0),
         CombatantState.ENGAGING
       );
       combatants.set('engaging-far', combatant);
@@ -659,7 +662,9 @@ describe('CombatantRenderer', () => {
 
     it('grounds faction markers at combatant terrain height on elevated terrain', () => {
       const combatants = new Map<string, Combatant>();
-      const combatant = createMockCombatant('ridge-1', Faction.US, new THREE.Vector3(80, 54.9, 0));
+      // Distance >> close-model radius so the impostor + ground-marker path
+      // is exercised. Marker grounding behaves identically near and far.
+      const combatant = createMockCombatant('ridge-1', Faction.US, new THREE.Vector3(160, 54.9, 0));
       combatants.set('ridge-1', combatant);
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 54.9, 0));
@@ -762,7 +767,8 @@ describe('CombatantRenderer', () => {
 
     it('drives far death impostors with one-shot frame progress and fade opacity', () => {
       const combatants = new Map<string, Combatant>();
-      const dyingCombatant = createMockCombatant('dying-far', Faction.US, new THREE.Vector3(120, 0, 0), CombatantState.DEAD);
+      // Distance >> close-model radius so the death-impostor path is exercised.
+      const dyingCombatant = createMockCombatant('dying-far', Faction.US, new THREE.Vector3(160, 0, 0), CombatantState.DEAD);
       dyingCombatant.isDying = true;
       dyingCombatant.deathProgress = 0.95;
       dyingCombatant.deathAnimationType = 'fallback';
@@ -901,6 +907,224 @@ describe('CombatantRenderer', () => {
       expect(opforCombatant.billboardIndex).toBeDefined();
       expect(squadMember.billboardIndex).toBeDefined();
       expect(dyingCombatant.billboardIndex).toBeDefined();
+    });
+  });
+
+  describe('close-model priority score', () => {
+    async function growPool(faction: Faction): Promise<void> {
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        faction,
+        getPixelForgeNpcRuntimeFaction(faction),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+    }
+
+    function configureCameraTowardPlusX(): void {
+      camera.position.set(0, 5, 0);
+      (camera as THREE.PerspectiveCamera).lookAt(50, 0, 0);
+      camera.updateMatrixWorld(true);
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    }
+
+    it('caps active close models at the GPU budget when more candidates lie within radius', async () => {
+      await growPool(Faction.NVA);
+      configureCameraTowardPlusX();
+
+      const combatants = new Map<string, Combatant>();
+      // 12 NPCs along the camera-facing axis, all within close-model radius.
+      for (let i = 0; i < 12; i++) {
+        const c = createMockCombatant(
+          `nva-prio-${i}`,
+          Faction.NVA,
+          new THREE.Vector3(20 + i * 3, 0, 0),
+        );
+        combatants.set(c.id, c);
+      }
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const active = (renderer as unknown as {
+        activeCloseModels: Map<string, unknown>;
+      }).activeCloseModels;
+      expect(active.size).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+    });
+
+    it('prefers on-screen candidates over equally-distant off-screen candidates', async () => {
+      await growPool(Faction.NVA);
+      configureCameraTowardPlusX();
+
+      const combatants = new Map<string, Combatant>();
+      // 7 on-screen NPCs in front of camera (camera looks toward +X).
+      for (let i = 0; i < 7; i++) {
+        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(20 + i, 0, 0));
+        combatants.set(c.id, c);
+      }
+      // 7 off-screen NPCs behind the camera, slightly closer by raw distance.
+      for (let i = 0; i < 7; i++) {
+        const c = createMockCombatant(`back-${i}`, Faction.NVA, new THREE.Vector3(-(15 + i), 0, 0));
+        combatants.set(c.id, c);
+      }
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const active = (renderer as unknown as {
+        activeCloseModels: Map<string, unknown>;
+      }).activeCloseModels;
+      // Every on-screen NPC must win a slot; the 8th slot goes to the closest
+      // off-screen candidate.
+      for (let i = 0; i < 7; i++) expect(active.has(`front-${i}`)).toBe(true);
+      expect(active.size).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+    });
+
+    it('keeps player-squad members in close-model slots even when off-screen', async () => {
+      await growPool(Faction.NVA);
+      await growPool(Faction.US);
+      configureCameraTowardPlusX();
+      renderer.setPlayerSquadId('squad-1');
+
+      const combatants = new Map<string, Combatant>();
+      // 7 on-screen non-squad NPCs filling the front slots.
+      for (let i = 0; i < 7; i++) {
+        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(20 + i, 0, 0));
+        combatants.set(c.id, c);
+      }
+      // One off-screen player-squad member.
+      const squadMate = createMockCombatant(
+        'squad-mate',
+        Faction.US,
+        new THREE.Vector3(-30, 0, 0),
+      );
+      squadMate.squadId = 'squad-1';
+      combatants.set('squad-mate', squadMate);
+      // One off-screen non-squad member at a closer distance than the squad-mate.
+      const closerBack = createMockCombatant(
+        'closer-back',
+        Faction.NVA,
+        new THREE.Vector3(-10, 0, 0),
+      );
+      combatants.set('closer-back', closerBack);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const active = (renderer as unknown as {
+        activeCloseModels: Map<string, unknown>;
+      }).activeCloseModels;
+      expect(active.has('squad-mate')).toBe(true);
+      expect(active.has('closer-back')).toBe(false);
+    });
+
+    it('debounces brief off-screen flicker so close-model slots do not thrash', async () => {
+      await growPool(Faction.NVA);
+      configureCameraTowardPlusX();
+
+      const combatants = new Map<string, Combatant>();
+      for (let i = 0; i < 8; i++) {
+        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(20 + i, 0, 0));
+        combatants.set(c.id, c);
+      }
+
+      // First update: front-0..front-7 on-screen take all 8 slots.
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+      let active = (renderer as unknown as {
+        activeCloseModels: Map<string, unknown>;
+      }).activeCloseModels;
+      for (let i = 0; i < 8; i++) expect(active.has(`front-${i}`)).toBe(true);
+
+      // Turn the camera away so all front-i drop off-screen, and add a single
+      // newly visible candidate. The recently-visible debounce should keep
+      // most of the prior selection from immediately getting kicked out.
+      (camera as THREE.PerspectiveCamera).lookAt(0, 5, -50);
+      camera.updateMatrixWorld(true);
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+      const newcomer = createMockCombatant(
+        'newcomer',
+        Faction.NVA,
+        new THREE.Vector3(0, 0, -25),
+      );
+      combatants.set('newcomer', newcomer);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+      active = (renderer as unknown as {
+        activeCloseModels: Map<string, unknown>;
+      }).activeCloseModels;
+      let survivors = 0;
+      for (let i = 0; i < 8; i++) if (active.has(`front-${i}`)) survivors++;
+      expect(survivors).toBeGreaterThanOrEqual(7);
+      expect(active.size).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+    });
+  });
+
+  describe('velocity-keyed impostor cadence', () => {
+    function decodeImpostorFrameFromMockCall(
+      callIndex: number,
+      clipDuration: number,
+      framesPerClip: number,
+    ): number | undefined {
+      const calls = vi.mocked(CombatantMeshFactoryModule.setPixelForgeNpcImpostorAttributes).mock.calls;
+      if (callIndex >= calls.length) return undefined;
+      const phase = calls[callIndex][2];
+      const elapsedTime = (renderer as unknown as { elapsedTime: number }).elapsedTime;
+      const raw = ((elapsedTime + phase * clipDuration) / clipDuration) * framesPerClip;
+      // Match the GLSL `mod()` semantics for negative inputs.
+      const wrapped = ((raw % framesPerClip) + framesPerClip) % framesPerClip;
+      return Math.floor(wrapped);
+    }
+
+    it('holds a stationary NPC on the same impostor frame across many ticks', () => {
+      const combatants = new Map<string, Combatant>();
+      // Place beyond close-model radius so the impostor path runs.
+      const stationary = createMockCombatant(
+        'stationary',
+        Faction.NVA,
+        new THREE.Vector3(160, 0, 0),
+        CombatantState.PATROLLING,
+      );
+      combatants.set(stationary.id, stationary);
+
+      const samples: number[] = [];
+      for (let i = 0; i < 60; i++) {
+        vi.mocked(CombatantMeshFactoryModule.setPixelForgeNpcImpostorAttributes).mockClear();
+        renderer.updateWalkFrame(0.016);
+        renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+        const frame = decodeImpostorFrameFromMockCall(0, 1.0, 8);
+        if (frame !== undefined) samples.push(frame);
+      }
+      expect(samples.length).toBeGreaterThan(30);
+      expect(new Set(samples).size).toBe(1);
+    });
+
+    it('cycles a moving NPC through impostor frames in proportion to distance traveled', () => {
+      const combatants = new Map<string, Combatant>();
+      const moving = createMockCombatant(
+        'moving',
+        Faction.NVA,
+        new THREE.Vector3(160, 0, 0),
+        CombatantState.PATROLLING,
+      );
+      moving.velocity.set(4, 0, 0);
+      combatants.set(moving.id, moving);
+
+      const seen = new Set<number>();
+      const dt = 1 / 60;
+      const ticks = 60;
+      for (let i = 0; i < ticks; i++) {
+        vi.mocked(CombatantMeshFactoryModule.setPixelForgeNpcImpostorAttributes).mockClear();
+        renderer.updateWalkFrame(dt);
+        moving.position.x += moving.velocity.x * dt;
+        renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+        const frame = decodeImpostorFrameFromMockCall(0, 1.0, 8);
+        if (frame !== undefined) seen.add(frame);
+      }
+      // 4 m/s for 1 s ~= 4 m of travel. At ~1 cycle / 0.6 m the NPC visits
+      // multiple distinct impostor frames within the run; we allow slack
+      // for exact-frame timing.
+      expect(seen.size).toBeGreaterThanOrEqual(4);
     });
   });
 });

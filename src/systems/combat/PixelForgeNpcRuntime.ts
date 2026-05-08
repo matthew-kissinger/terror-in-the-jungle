@@ -43,7 +43,56 @@ export interface PixelForgeNpcImposterMaterialTuning {
   paritySaturation: number;
 }
 
-export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS = 64;
+/**
+ * Runtime-mutable Pixel Forge impostor / close-model distance + selection config.
+ *
+ * The values here are intentionally writable so the live tuning panel and
+ * future LOD work can adjust them without touching constant exports. The
+ * "constant" exports below remain for callers that read once at startup, but
+ * new consumers should prefer `getPixelForgeNpcCloseModelDistanceMeters()`
+ * and friends so changes from the tuning panel take effect immediately.
+ */
+export const PixelForgeNpcDistanceConfig = {
+  /** Radius (meters) within which an NPC is eligible to render as a 3D close model. */
+  closeModelDistanceMeters: 120,
+  /** Selection priority weight for combatants whose AABB lies inside the camera frustum. */
+  onScreenWeight: 10,
+  /** Selection priority weight for combatants in the player's squad. */
+  squadWeight: 4,
+  /** Selection priority weight for the inverse-distance term. */
+  distanceWeight: 1,
+  /** Selection priority weight for combatants seen on-screen within `recentlyVisibleMs`. */
+  recentlyVisibleWeight: 0.5,
+  /** Debounce window (ms) to avoid rapid swap thrash when a combatant flickers off-screen. */
+  recentlyVisibleMs: 800,
+  /**
+   * Velocity-squared threshold below which an impostor holds its idle frame.
+   * Roughly (0.2 m/s)^2.
+   */
+  idleVelocitySq: 0.04,
+  /** Frames advanced per meter of horizontal travel (~1 cycle every 0.6 m). */
+  framesPerMeter: 1 / 0.6,
+};
+
+export function getPixelForgeNpcCloseModelDistanceMeters(): number {
+  return PixelForgeNpcDistanceConfig.closeModelDistanceMeters;
+}
+
+export function getPixelForgeNpcCloseModelDistanceSq(): number {
+  const meters = PixelForgeNpcDistanceConfig.closeModelDistanceMeters;
+  return meters * meters;
+}
+
+/**
+ * @deprecated Read `getPixelForgeNpcCloseModelDistanceMeters()` so tuning-panel
+ * edits take effect at runtime. Retained for callers that snapshot at startup.
+ */
+export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS =
+  PixelForgeNpcDistanceConfig.closeModelDistanceMeters;
+/**
+ * @deprecated Read `getPixelForgeNpcCloseModelDistanceSq()` so tuning-panel
+ * edits take effect at runtime.
+ */
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ =
   PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS * PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP = 8;

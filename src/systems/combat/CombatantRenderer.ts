@@ -25,25 +25,42 @@ import {
   writeCombatantHitProxies,
   type CombatantHitProxy,
 } from './CombatantBodyMetrics';
-import { type PixelForgeNpcClipId } from '../../config/pixelForgeAssets';
+import { PIXEL_FORGE_NPC_CLIPS, type PixelForgeNpcClipId } from '../../config/pixelForgeAssets';
 import {
+  getPixelForgeNpcCloseModelDistanceMeters,
+  getPixelForgeNpcCloseModelDistanceSq,
   getPixelForgeNpcPoolKey,
   getPixelForgeNpcRuntimeFaction,
   PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING,
-  PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS,
-  PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ,
   PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
   PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOP_UP_BATCH,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
   PIXEL_FORGE_NPC_RUNTIME_FACTIONS,
+  PixelForgeNpcDistanceConfig,
   sanitizePixelForgeNpcAnimationClip,
   type PixelForgeNpcFactionRuntimeConfig,
   type PixelForgeNpcPoolKey,
   type PixelForgeNpcWeaponRuntimeConfig,
 } from './PixelForgeNpcRuntime';
 import { getPixelForgeNpcViewTileForCamera } from './PixelForgeNpcView';
+
+/**
+ * Per-clip impostor metadata used by velocity-keyed cadence. Mirrors the values
+ * fed to the impostor shader uniforms but materialized as a plain map so the
+ * renderer can compute frame indices without poking shader state.
+ */
+const IMPOSTOR_CLIP_METADATA: Map<PixelForgeNpcClipId, { framesPerClip: number; durationSec: number }> =
+  new Map(PIXEL_FORGE_NPC_CLIPS.map((c) => [c.id, { framesPerClip: c.framesPerClip, durationSec: c.durationSec }]));
+
+/** Looping clips that should cycle in proportion to horizontal travel. */
+const VELOCITY_DRIVEN_CLIPS: ReadonlySet<PixelForgeNpcClipId> = new Set<PixelForgeNpcClipId>([
+  'patrol_walk',
+  'traverse_run',
+  'advance_fire',
+  'walk_fight_forward',
+]);
 
 /** Y bob amplitude in world units. */
 const BOB_AMPLITUDE = 0.12;
@@ -119,6 +136,10 @@ interface CloseModelCandidate {
   combatant: Combatant;
   distanceSq: number;
   poolKey: PixelForgeNpcPoolKey;
+  isOnScreen: boolean;
+  recentlyVisible: boolean;
+  isPlayerSquad: boolean;
+  priorityScore: number;
 }
 
 export interface CloseModelFallbackRecord {
@@ -154,7 +175,7 @@ function createCloseModelFallbackCounts(): Record<CloseModelFallbackReason, numb
 
 function createEmptyCloseModelRuntimeStats(): CloseModelRuntimeStats {
   return {
-    closeRadiusMeters: PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS,
+    closeRadiusMeters: getPixelForgeNpcCloseModelDistanceMeters(),
     closeModelActiveCap: PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
     candidatesWithinCloseRadius: 0,
     renderedCloseModels: 0,
@@ -225,6 +246,13 @@ export class CombatantRenderer {
   private readonly closeModelOverflowLastLog = new Map<string, number>();
   private readonly closeModelOverflowReportedThisUpdate = new Set<string>();
   private readonly closeModelFallbackRecords = new Map<string, CloseModelFallbackRecord>();
+  // Tracks the most recent wall-clock time (ms) at which each combatant was on-screen.
+  // Used by the close-model priority score to debounce rapid in/out frustum flicker.
+  private readonly lastVisibleAtMsByCombatant = new Map<string, number>();
+  // Per-combatant velocity-driven impostor frame accumulator. Advances proportional
+  // to horizontal distance traveled so stationary NPCs hold their frame and moving
+  // NPCs cycle frames at a cadence of `framesPerMeter`.
+  private readonly impostorFrameAccumulator = new Map<string, number>();
   private closeModelRuntimeStats = createEmptyCloseModelRuntimeStats();
   private disposed = false;
 
@@ -232,6 +260,14 @@ export class CombatantRenderer {
   private walkFrameTimer = 0;
   private currentWalkFrame: 'a' | 'b' = 'a';
   private elapsedTime = 0;
+  /**
+   * Most recent `deltaTime` accepted by `updateWalkFrame`, consumed once by
+   * the next `updateBillboards` call to drive the impostor frame accumulator.
+   * Falls back to wall-clock dt if `updateWalkFrame` was never called.
+   */
+  private pendingBillboardDeltaSec = 0;
+  /** Last wall-clock ms `updateBillboards` ran; fallback dt source. */
+  private lastBillboardUpdateMs = -1;
 
   // Scratch objects to avoid per-frame allocation
   private readonly scratchMatrix = new THREE.Matrix4();
@@ -251,6 +287,9 @@ export class CombatantRenderer {
   private readonly scratchMarkerMatrix = new THREE.Matrix4();
   private readonly scratchBounds = new THREE.Box3();
   private readonly scratchBoundsSize = new THREE.Vector3();
+  private readonly scratchFrustum = new THREE.Frustum();
+  private readonly scratchFrustumMatrix = new THREE.Matrix4();
+  private readonly scratchOnScreenSphere = new THREE.Sphere();
   private readonly renderWriteCounts = new Map<string, number>();
   private readonly renderCombatStates = new Map<string, number>();
   private readonly hitboxDebugEnabled = isHitboxDebugEnabled();
@@ -799,6 +838,7 @@ export class CombatantRenderer {
   updateWalkFrame(deltaTime: number): void {
     this.elapsedTime += deltaTime;
     this.walkFrameTimer += deltaTime;
+    this.pendingBillboardDeltaSec += deltaTime;
     this.activeCloseModels.forEach((instance) => instance.mixer.update(deltaTime));
     this.factionMaterials.forEach((material) => {
       if (material.uniforms.time) {
@@ -813,15 +853,43 @@ export class CombatantRenderer {
   ): { closeModelIds: Set<string>; suppressedImpostorIds: Set<string> } {
     this.closeModelOverflowReportedThisUpdate.clear();
     this.closeModelFallbackRecords.clear();
+
+    const closeRadiusSq = getPixelForgeNpcCloseModelDistanceSq();
+    const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    this.refreshFrustum();
+
     const candidates: CloseModelCandidate[] = [];
     combatants.forEach((combatant) => {
       if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
       const distanceSq = combatant.position.distanceToSquared(playerPosition);
-      if (distanceSq > PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ) return;
+      if (distanceSq > closeRadiusSq) return;
       const poolKey = getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
-      candidates.push({ combatant, distanceSq, poolKey });
+
+      const isOnScreen = this.isCombatantOnScreen(combatant);
+      if (isOnScreen) this.lastVisibleAtMsByCombatant.set(combatant.id, nowMs);
+      const lastVisibleAt = this.lastVisibleAtMsByCombatant.get(combatant.id);
+      const recentlyVisible =
+        lastVisibleAt !== undefined &&
+        (nowMs - lastVisibleAt) <= PixelForgeNpcDistanceConfig.recentlyVisibleMs;
+      const isPlayerSquad = poolKey === 'SQUAD';
+      const distance = Math.sqrt(distanceSq);
+      const priorityScore =
+        PixelForgeNpcDistanceConfig.onScreenWeight * (isOnScreen ? 1 : 0) +
+        PixelForgeNpcDistanceConfig.squadWeight * (isPlayerSquad ? 1 : 0) +
+        PixelForgeNpcDistanceConfig.distanceWeight * (1 / Math.max(distance, 4)) +
+        PixelForgeNpcDistanceConfig.recentlyVisibleWeight * (recentlyVisible && !isOnScreen ? 1 : 0);
+
+      candidates.push({
+        combatant,
+        distanceSq,
+        poolKey,
+        isOnScreen,
+        recentlyVisible,
+        isPlayerSquad,
+        priorityScore,
+      });
     });
-    candidates.sort((a, b) => a.distanceSq - b.distanceSq);
+    candidates.sort((a, b) => b.priorityScore - a.priorityScore);
 
     if (this.closeModelPerfIsolationEnabled) {
       this.activeCloseModels.forEach((instance, combatantId) => {
@@ -867,6 +935,31 @@ export class CombatantRenderer {
     return { closeModelIds: selected, suppressedImpostorIds };
   }
 
+  /**
+   * Recompute the camera frustum for this update tick. Cheap (one matrix
+   * multiply) and lets selection / visibility checks reuse the same value.
+   */
+  private refreshFrustum(): void {
+    const proj = (this.camera as THREE.PerspectiveCamera | THREE.OrthographicCamera).projectionMatrix;
+    const view = this.camera.matrixWorldInverse;
+    if (!proj || !view) return;
+    this.scratchFrustumMatrix.multiplyMatrices(proj, view);
+    this.scratchFrustum.setFromProjectionMatrix(this.scratchFrustumMatrix);
+  }
+
+  /**
+   * Returns true when the combatant's body bounding sphere intersects the
+   * current camera frustum. Used to bias close-model slots toward NPCs the
+   * player can actually see.
+   */
+  private isCombatantOnScreen(combatant: Combatant): boolean {
+    const sourcePosition = combatant.renderedPosition ?? combatant.position;
+    // Body radius ~1.2 m; centered roughly at chest height above the foot anchor.
+    this.scratchOnScreenSphere.center.set(sourcePosition.x, sourcePosition.y + 0.9, sourcePosition.z);
+    this.scratchOnScreenSphere.radius = 1.2;
+    return this.scratchFrustum.intersectsSphere(this.scratchOnScreenSphere);
+  }
+
   private recordCloseModelFallback(candidate: CloseModelCandidate, reason: CloseModelFallbackReason): void {
     this.closeModelFallbackRecords.set(candidate.combatant.id, {
       combatantId: candidate.combatant.id,
@@ -894,7 +987,7 @@ export class CombatantRenderer {
     });
 
     this.closeModelRuntimeStats = {
-      closeRadiusMeters: PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS,
+      closeRadiusMeters: getPixelForgeNpcCloseModelDistanceMeters(),
       closeModelActiveCap: PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
       candidatesWithinCloseRadius,
       renderedCloseModels,
@@ -1200,6 +1293,54 @@ export class CombatantRenderer {
     return getPixelForgeNpcViewTileForCamera(sourcePosition, this.camera.position, combatant.visualRotation);
   }
 
+  /**
+   * Returns the per-instance `phase` value to feed the impostor shader so the
+   * displayed frame is keyed to the combatant's accumulated horizontal travel
+   * instead of wall-clock time.
+   *
+   * Background: the impostor fragment shader computes
+   *   loopFrame = floor(mod((time/duration + phase) * framesPerClip, framesPerClip))
+   * For non-velocity clips (`idle`, death poses) we keep the original behavior:
+   * `phase = stableHash01(id)` cycles each NPC at clip duration with a per-NPC
+   * stagger.
+   *
+   * For velocity-driven walk/run clips we pick `phase` so the formula evaluates
+   * to a velocity-keyed accumulator:
+   *   `phase = stableHash + accumulator/framesPerClip - time/duration`
+   * which collapses the time-driven cycle and replaces it with a frame index
+   * advanced by `velocity * dt * framesPerMeter`. Idle (velocity below
+   * `idleVelocitySq`) NPCs hold their stableHash-derived frame across ticks.
+   */
+  private computeVelocityKeyedImpostorPhase(
+    combatant: Combatant,
+    clipId: PixelForgeNpcClipId,
+    deltaTimeSec: number,
+  ): number {
+    const stableHash = this.stableHash01(combatant.id);
+    if (!VELOCITY_DRIVEN_CLIPS.has(clipId) || combatant.isDying) {
+      // Non-walk clips keep the original time-keyed cycle for visual continuity.
+      return stableHash;
+    }
+    const meta = IMPOSTOR_CLIP_METADATA.get(clipId);
+    if (!meta || meta.framesPerClip <= 0 || meta.durationSec <= 0) return stableHash;
+
+    const velocity = combatant.velocity;
+    const horizontalSpeedSq =
+      velocity ? velocity.x * velocity.x + velocity.z * velocity.z : 0;
+
+    let accumulator = this.impostorFrameAccumulator.get(combatant.id) ?? 0;
+    if (horizontalSpeedSq < PixelForgeNpcDistanceConfig.idleVelocitySq) {
+      // Stationary: hold the current accumulator (and therefore the current frame).
+    } else {
+      const horizontalSpeed = Math.sqrt(horizontalSpeedSq);
+      accumulator += horizontalSpeed * deltaTimeSec * PixelForgeNpcDistanceConfig.framesPerMeter;
+    }
+    this.impostorFrameAccumulator.set(combatant.id, accumulator);
+
+    const timeOverDuration = this.elapsedTime / meta.durationSec;
+    return stableHash + accumulator / meta.framesPerClip - timeOverDuration;
+  }
+
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
     const { closeModelIds, suppressedImpostorIds } = this.updateCloseModels(combatants, playerPosition);
     this.factionMeshes.forEach(mesh => mesh.count = 0);
@@ -1212,6 +1353,22 @@ export class CombatantRenderer {
       this.renderWriteCounts.set(key, 0);
       this.renderCombatStates.set(key, 0);
     });
+
+    // Pull the deltaTime accumulated since the last `updateBillboards` call.
+    // `updateWalkFrame` accepts the authoritative game-loop dt and feeds the
+    // accumulator below; if it was never called this tick we fall back to a
+    // wall-clock estimate. Clamp to a sane range so a long pause cannot
+    // advance every NPC by hundreds of frames in one tick.
+    const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const fallbackWallClockDt = this.lastBillboardUpdateMs >= 0
+      ? Math.min(0.25, Math.max(0, (nowMs - this.lastBillboardUpdateMs) / 1000))
+      : 0;
+    const billboardDeltaSec = Math.min(
+      0.25,
+      this.pendingBillboardDeltaSec > 0 ? this.pendingBillboardDeltaSec : fallbackWallClockDt,
+    );
+    this.pendingBillboardDeltaSec = 0;
+    this.lastBillboardUpdateMs = nowMs;
 
     const matrix = this.scratchMatrix;
     this.camera.getWorldDirection(this.scratchCameraDir);
@@ -1460,10 +1617,11 @@ export class CombatantRenderer {
       matrix.multiply(this.scratchScaleMatrix);
       mesh.setMatrixAt(index, matrix);
       const viewTile = this.getImpostorViewTile(combatant);
+      const impostorPhase = this.computeVelocityKeyedImpostorPhase(combatant, clipId, billboardDeltaSec);
       setPixelForgeNpcImpostorAttributes(
         mesh,
         index,
-        this.stableHash01(combatant.id),
+        impostorPhase,
         viewTile.column,
         viewTile.row,
         impostorAnimationProgress,
