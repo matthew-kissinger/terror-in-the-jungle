@@ -24,6 +24,927 @@ roadmap/backlog work. Do not claim final water art, accepted Pixel Forge
 candidate import, broad HLOD/culling, future driving surfaces, or skilled
 combined-arms feel from the current partial artifacts.
 
+Latest positive STABILIZAT-1 / DEFEKT-3 sparse owner-review decision is
+`artifacts/perf/2026-05-07T22-29-58-460Z/projekt-143-sparse-owner-acceptance-audit/sparse-owner-acceptance-audit.json`;
+latest bounded owner-split audit is
+`artifacts/perf/2026-05-07T22-49-28-445Z/projekt-143-defekt-render-owner-split-audit/render-owner-split-audit.json`;
+latest bounded terrain contribution audit is
+`artifacts/perf/2026-05-07T22-56-02-642Z/projekt-143-defekt-terrain-contribution-audit/terrain-contribution-audit.json`;
+latest bounded render pass-metadata audit is
+`artifacts/perf/2026-05-07T23-08-28-327Z/projekt-143-defekt-render-pass-metadata-audit/pass-metadata-audit.json`;
+latest bounded terrain-shadow diagnostic audit is
+`artifacts/perf/2026-05-07T23-20-53-503Z/projekt-143-defekt-terrain-shadow-diagnostic-audit/terrain-shadow-diagnostic-audit.json`;
+latest visual fallback / directionality audit is
+`artifacts/perf/2026-05-08T01-23-26-506Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`;
+latest aircraft import / rotor-axis packet is
+`artifacts/perf/2026-05-08T01-23-12-400Z/pixel-forge-aircraft-import/summary.json`;
+latest aircraft readiness bridge packet is
+`artifacts/perf/2026-05-08T00-11-04-505Z/projekt-143-aviatsiya-aircraft-readiness/summary.json`;
+latest fixed-wing runtime proof packet is
+`artifacts/perf/2026-05-08T00-56-34-511Z/projekt-143-fixed-wing-clean-gate/summary.json`;
+latest VODA exposure source audit is
+`artifacts/perf/2026-05-08T01-15-33-373Z/projekt-143-voda-exposure-source-audit/summary.json`;
+the accepted post-tag proof remains
+`artifacts/perf/2026-05-07T17-28-02-506Z/projekt-143-ground-marker-tagging-proof/ground-marker-tagging-proof.json`,
+and the paired KB-METRIK measurement-path packet is
+`artifacts/perf/2026-05-07T17-28-02-506Z/projekt-143-measurement-path-inspection/measurement-path-inspection.json`.
+The sparse rebuilt headed combat120 capture is status `ok`, validation `warn`,
+and measurement trust WARN with `87` runtime samples and `3` render-submission
+drain samples. `perf:compare -- --scenario combat120` selects this capture and
+fails with `6 pass, 1 warn, 1 fail`: avg frame `16.19ms` WARN, p99 `34.20ms`
+PASS, max-frame `100.00ms` FAIL, heap end-growth `6.51MB`, and heap recovery
+`86.2%`. Raw probe evidence records p50 `21ms`, p95 `30ms`, avg `28.93ms`,
+max `348ms`, `3/87` samples over `75ms`, and `3505993` render-submission bytes,
+so sparse drain avoids the per-sample overhead class proven by the failed
+17:19 packet. The proof records `unattributed` draw-share movement from
+`0.2991` to `0.0202` and new `npc_ground_markers` draw share `0.3232` after the
+source edit tagged `PixelForgeNpcGroundMarker.${key}` with
+`userData.perfCategory = 'npc_ground_markers'`. The sparse-owner audit records
+PASS, `8/8` criteria passing, `sparse_owner_review_accepted`, raw probe over-75
+rate `0.0345`, over-150 rate `0.0345`, and avg-without-max delta `3.37ms`
+versus the accepted reference. It accepts the post-tag packet for owner review
+only. The owner-split audit records WARN, `post_tag_renderer_owner_split_divergent`,
+and `owner_review_only`: post-tag top draw is `npc_ground_markers` at `0.3232`,
+post-tag top triangles are terrain at `0.7174`, `npc_close_glb` draw submissions
+move `36->14`, and renderer reconciliation remains partial at draw `0.4583` /
+triangles `0.7276`. The terrain contribution audit records WARN,
+`terrain_triangle_axis_source_bound_timing_unisolated`, and `owner_review_only`:
+terrain contributes `2` draw submissions at `0.0202` draw share, `163840`
+submitted triangles at `0.7174` triangle share, `80` submitted instances,
+`2048` triangles per terrain instance, and `0.5219` of peak renderer triangles;
+source anchors bind the path to the CDLOD InstancedMesh, selected-tile instance
+updates, default `33` vertex tile resolution, and device-adaptive shadow
+capability. The pass-metadata audit records WARN,
+`render_pass_metadata_bound_timing_unisolated`, and `owner_review_only` from
+capture `artifacts/perf/2026-05-07T23-05-54-437Z`: capture status `ok`,
+validation `warn`, measurement trust `warn`, exact peak frame `3035`, frame
+pass types `main:124, shadow:1`, terrain pass types `main:2, shadow:1`,
+terrain `3` draw submissions, terrain triangle share `0.7095`, top draw
+`npc_close_glb`, top triangles `terrain`, and renderer reconciliation draw
+`0.7022` / triangles `0.9987`. Because formal measurement trust remains WARN,
+the controlling
+production-shaped owner packet for regression comparison remains the
+measurement-PASS packet at
+`artifacts/perf/2026-05-07T16-23-11-889Z/projekt-143-render-submission-category-attribution/render-submission-category-attribution.json`.
+Baseline refresh remains blocked; the next DEFEKT-3 terrain step must run a
+controlled terrain-shadow or tile-resolution diagnostic against the same
+combat120 shape.
+Ground-marker/imposter draw batching and renderer-submission reconciliation
+remain separate open axes. The next step is not per-sample render-submission
+drain or a baseline update.
+
+The controlled terrain-shadow diagnostic at
+`artifacts/perf/2026-05-07T23-20-53-503Z/projekt-143-defekt-terrain-shadow-diagnostic-audit/terrain-shadow-diagnostic-audit.json`
+records WARN status, `7/7` checks passing, classification
+`terrain_shadow_contribution_isolated_timing_still_untrusted`, and
+`owner_review_only` acceptance. The shadow-off capture
+`artifacts/perf/2026-05-07T23-18-42-597Z` records
+`perfRuntime.terrainShadowsDisabled=true`, removes the terrain shadow pass
+(`main:99`; terrain pass types `main:2`), and keeps terrain as the top triangle
+category. It does not improve timing: control avg/p99 is `17.57/34.3ms`,
+shadow-off avg/p99 is `20.49/45.3ms`, and max-frame remains `100ms`. Do not
+disable terrain shadows as the DEFEKT-3 fix from this packet.
+
+DEFEKT-5 is now open for visual fallback and directionality integrity. The
+visual-integrity audit at
+`artifacts/perf/2026-05-08T01-23-26-506Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`
+records PASS status for source-bound visual integrity and classifies the packet
+as `visual_integrity_source_bound_human_review_pending`. It verifies that
+Pixel Forge dying NPCs select `death_fall_back`, that the shader runs it as a
+one-shot atlas clip, and that `CombatantRenderer` no longer applies the old
+procedural billboard death shrink to that clip. It verifies the Pixel Forge
+cutover gate against old NPC sprite/source-soldier assets. It now records close
+NPC exceptions as instrumented runtime policy: the close-model distance remains
+`64m`, and `CombatantRenderer` exposes fallback records plus runtime stats for
+`perf-isolation`, `pool-loading`, `pool-empty`, and `total-cap`, including
+counts, distance bounds, pool loads, pool targets, and pool availability.
+Explosion visuals are now explicitly classified as the active optimized pooled
+unlit billboard flash plus point particles and shockwave ring:
+`EXPLOSION_EFFECT_REPRESENTATION` marks `dynamicLights=false` and
+`legacyFallback=false`. The aircraft import proof at
+`artifacts/perf/2026-05-08T01-23-12-400Z/pixel-forge-aircraft-import/summary.json`
+records runtime-axis alignment instead of blind source preservation: Huey `z`
+and UH-1C Gunship `z` are preserved with `bytesAffected=0`, while AH-1 Cobra
+is corrected from source `x` to imported/runtime `z` with `bytesAffected=48`.
+The DEFEKT-5 review packet at
+`artifacts/perf/2026-05-08T01-23-33-556Z/projekt-143-defekt5-human-review/review-summary.json`
+records `needs_human_decision`. The remaining acceptance gap is human visual
+review of death animation, close-NPC LOD feel, explosion appearance, and rotor
+appearance; this packet also does not certify combat120 or stress-scene grenade
+performance.
+
+The aircraft readiness bridge packet at
+`artifacts/perf/2026-05-08T00-11-04-505Z/projekt-143-aviatsiya-aircraft-readiness/summary.json`
+records WARN classification
+`aircraft_static_source_ready_runtime_probe_partial`: targeted aircraft tests
+pass (`20` files / `322` tests), `check:projekt-143-visual-integrity` passes,
+the older Pixel Forge aircraft dry-run preserves Huey `z`, UH-1C Gunship `z`,
+and AH-1 Cobra `x` tail-rotor axes with `bytesAffected=0`, and the copied
+fixed-wing browser probe is PARTIAL. A-1 Skyraider entry, liftoff, climb,
+approach, bailout, and NPC handoff are positive in that partial packet, but it
+does not certify full fixed-wing runtime acceptance, human rotor review, live
+release proof, or combat120 baseline refresh.
+
+The follow-up fixed-wing runtime proof packet at
+`artifacts/perf/2026-05-08T00-34-03-449Z/projekt-143-fixed-wing-runtime-proof/summary.json`
+records WARN classification `fixed_wing_runtime_passed_harness_teardown_warn`.
+The copied probe summary is `passed` for A-1 Skyraider, F-4 Phantom, and AC-47
+Spooky. All three record `success=true`, liftoff, climb, approach, bailout, and
+NPC handoff; AC-47 also records `orbitValid=true`. The wrapper command timed
+out after `900000ms` and left the perf preview server to be stopped manually,
+so this is runtime scenario evidence with a harness-teardown warning, not a
+clean command gate, human flight-feel acceptance, live production parity, or
+combat120 baseline proof.
+
+The later fixed-wing clean gate at
+`artifacts/perf/2026-05-08T00-56-34-511Z/projekt-143-fixed-wing-clean-gate/summary.json`
+supersedes the teardown warning for the functional browser gate. The command
+`npm run probe:fixed-wing -- --boot-attempts=1 --port 4175` exited `0`; the copied probe
+summary is `passed` for A-1 Skyraider, F-4 Phantom, and AC-47 Spooky; all three
+record entry, liftoff, climb, approach, bailout, and NPC handoff; AC-47 records
+`orbitValid=true`; the residue scan found no listener on port `4175` and no
+fixed-wing probe or preview command line after teardown. The Politburo reported
+local games and other agents active on the same PC, so the packet is functional
+evidence only. It rejects frame-time acceptance, wall-time acceptance, perf
+baseline refresh, optimization claims, and resource-isolation claims.
+
+AVIATSIYA-1 has fresh rotor-axis evidence.
+`npm run assets:import-pixel-forge-aircraft` wrote
+`artifacts/perf/2026-05-08T01-23-12-400Z/pixel-forge-aircraft-import/summary.json`:
+the importer preserves the declared Huey and UH-1C Gunship `z` tail-rotor spin
+axes and applies an explicit AH-1 Cobra `x->z` correction because the TIJ
+side-mounted tail-rotor contract requires runtime `z`. The packet records
+Cobra `sourceAxis=x`, `importedAxis=z`, `keyframes=3`, and
+`bytesAffected=48`. The latest visual-integrity audit verifies public runtime
+axes against expected axes: Huey `z`, UH-1C Gunship `z`, and AH-1 Cobra
+public/expected `z` with correction `source-x-to-runtime-z`. The aircraft
+readiness bridge packet adds targeted test evidence, and the fixed-wing runtime
+proof adds passed A-1/F-4/AC-47 scenario evidence with a clean functional gate
+after the later port-4175 rerun. This is source, asset, and local runtime
+evidence only; human visual playtest acceptance, CI/PR/merge, live production
+parity, and quiet-machine performance evidence are still required.
+
+DEFEKT-4 now has an executable route-quality source/static-policy gate:
+`npm run check:projekt-143-defekt-route-quality`. Latest packet
+`artifacts/perf/2026-05-07T22-42-23-479Z/projekt-143-defekt-route-quality-audit/route-quality-audit.json`
+records WARN status, `npc_route_quality_guardrails_present_runtime_acceptance_missing`,
+and `source_and_static_route_policy_only`. It anchors `CombatantMovement`,
+`StuckDetector`, route/stuck behavior tests, `perf-active-driver.cjs`
+route-recovery telemetry, the `perf-capture` `harness_max_stuck_seconds` gate,
+and active-driver diagnostic route/stuck findings. The paired terrain-route
+audit
+`artifacts/perf/2026-05-07T22-40-26-760Z/projekt-143-terrain-route-audit/terrain-route-audit.json`
+passes static route policy with `3` route-aware modes, `87931.1m` total route
+length, and `2882` route capsule stamps. This is not runtime acceptance:
+DEFEKT-4 remains open until A Shau plus Open Frontier active-driver captures
+pass measurement trust, record route/stuck telemetry, and satisfy explicit
+bounds for max stuck seconds, route no-progress resets, waypoint replan
+failures, path-query status, and terrain-stall warning rate.
+
+DEFEKT-1 now has an executable stale-baseline audit:
+`npm run check:projekt-143-stale-baseline-audit -- --as-of 2026-05-07`.
+Latest packet
+`artifacts/perf/2026-05-07T22-04-54-994Z/projekt-143-stale-baseline-audit/stale-baseline-audit.json`
+records WARN status, `4` tracked scenarios, `0` current, `0`
+refresh-eligible, `4` blocked, and `4` stale by age. The tracked
+`perf-baselines.json` date remains 2026-04-20. `combat120` is blocked by
+validation WARN / measurement trust WARN / max-frame FAIL, `openfrontier:short`
+by validation WARN, `ashau:short` by compare FAIL, and `frontier30m` by failed
+latest detected soak capture. This packet audits the baseline gate only; it
+does not refresh baselines or prove a runtime fix.
+
+DEFEKT-2 has an executable drift gate: `npm run check:doc-drift -- --as-of
+2026-05-08`. The failing packet
+`artifacts/perf/2026-05-07T17-38-11.026Z/projekt-143-doc-drift/doc-drift.json`
+found three codex future-date errors for Article III / Annex A May 8, 2026
+status claims and stale historical command references. The codex date claims
+were reissued to `2026-05-07`, and sibling-workspace command references were
+clarified. Current aircraft rotor closeout pass packet
+`artifacts/perf/2026-05-08T01-26-06.909Z/projekt-143-doc-drift/doc-drift.json`
+records zero future-date findings, zero missing concrete artifact references,
+zero missing package scripts, `573` checked artifact references, and `276`
+checked package command references after the AVIATSIYA-1 / DEFEKT-5 evidence
+update.
+This is doc-drift evidence, not runtime or live-production evidence.
+
+The `check:projekt-143-completion-audit` alias now routes to
+`scripts/projekt-143-current-completion-audit.ts`, which measures the current
+codex Article III / Article VII board instead of the retired pre-codex bureau
+board. Current packet
+`artifacts/perf/2026-05-08T01-26-26-320Z/projekt-143-completion-audit/completion-audit.json`
+is `NOT_COMPLETE`: `34` Article III directives parsed, `10` closed, `24` open,
+`0` deferred, zero missing cited artifacts, stale live release proof at SHA
+`ab0cfd0e9a0f39ebe8b3a87f316b9287edfd3289`, dirty local HEAD
+`aff1abd4da769e2a04e6e5f9b39d241296a60ada`, DEFEKT local drift proof pass at
+`artifacts/perf/2026-05-08T01-26-06.909Z/projekt-143-doc-drift/doc-drift.json`,
+no Politburo seal marker, no 14-day live drift watch, and `29` closeout
+blockers. The prompt-to-artifact checklist fails Article III completion,
+live-release verification, Politburo seal, and 14-day live drift; it passes the
+30-day ARKHIV strategic-reserve audit. This is a current closeout audit, not a
+production deploy, baseline refresh, or goal-completion claim.
+
+ARKHIV-1 supporting-doc disposition is now audited locally. The handoff,
+hydrology, and vegetation source pipeline docs remain topic-specific references;
+the old 24-hour status snapshot moved to
+`docs/archive/PROJEKT_OBJEKT_143_24H_STATUS_2026-05-04.md`. Latest audit
+packet:
+`artifacts/perf/2026-05-07T17-47-15.786Z/projekt-143-arkhiv-supporting-doc-audit/supporting-doc-audit.json`.
+This is document-graph evidence, not runtime or production evidence.
+
+ARKHIV-2 backlog consolidation is now audited locally. `docs/BACKLOG.md` is a
+compact Strategic Reserve index at `133/200` measured lines. Active directive
+status routes to `docs/PROJEKT_OBJEKT_143.md` Article III, and historical cycle
+records route to `docs/cycles/<cycle-id>/RESULT.md`. Latest audit packet:
+`artifacts/perf/2026-05-07T18-01-14.369Z/projekt-143-arkhiv-backlog-consolidation-audit/backlog-consolidation-audit.json`.
+This is document-graph evidence, not runtime or production evidence.
+
+ARKHIV-3 spike memo disposition is now audited locally. The archive index at
+`docs/archive/E_TRACK_SPIKE_MEMO_INDEX_2026-05-07.md` records E1-E6 source
+refs, current SHAs, branch memo paths, folded decisions, and branch-deletion
+constraints. Latest audit packet:
+`artifacts/perf/2026-05-07T18-07-09.771Z/projekt-143-arkhiv-spike-memo-audit/spike-memo-audit.json`.
+It records `6/6` spike refs present, `9/9` branch memo paths present, and `6/6`
+checks passing. This is document-graph evidence, not runtime or production
+evidence.
+
+DIZAYN-1 now has a charter memo at `docs/dizayn/vision-charter.md`. The audit
+packet
+`artifacts/perf/2026-05-07T17-49-40.255Z/projekt-143-dizayn-vision-charter-audit/vision-charter-audit.json`
+passes `6/6` required surfaces: water, air combat, squad command, deploy flow,
+art-direction gate, and bureau interfaces. This is design-governance evidence,
+not runtime acceptance, human playtest acceptance, or production evidence.
+
+DIZAYN-2 now has an invocable KB-DIZAYN art-direction gate at
+`docs/dizayn/art-direction-gate.md`. The audit packet
+`artifacts/perf/2026-05-07T17-55-41.245Z/projekt-143-dizayn-art-direction-gate-audit/art-direction-gate-audit.json`
+passes `6/6` required gate surfaces: invocation, evidence trust, decision
+vocabulary, source operating docs, non-claims, and KB-METRIK boundary. This is
+gate-procedure evidence, not visual signoff for any runtime directive.
+
+SVYAZ-1 now has an executable neutral-command source/test audit:
+`npm run check:projekt-143-svyaz-neutral-command`. Latest packet
+`artifacts/perf/2026-05-07T18-45-48-457Z/projekt-143-svyaz-neutral-command-audit/neutral-command-audit.json`
+records `15` pass, `0` warn, and `0` fail checks across `13` source and test
+files. Browser proof
+`artifacts/perf/2026-05-07T18-59-28-353Z/projekt-143-svyaz-standdown-browser-proof/standdown-browser-proof.json`
+records the live command overlay exposing `STAND DOWN`, suppressing the old
+`FREE ROAM` label, converting a directed `hold_position` squad to `free_roam`,
+clearing the prior command position, and preserving the selected `wedge`
+formation. Escape/backdrop cancel remains modal close by policy; slot 5 is the
+explicit squad stand-down order. SVYAZ-1 is evidence-complete in
+`docs/PROJEKT_OBJEKT_143.md`. This is source/test and browser-runtime evidence,
+not mobile UX signoff, human playtest, production deploy proof, or a claim that
+SVYAZ-2/3 command surfaces exist.
+
+SVYAZ-2 is evidence-complete in `docs/PROJEKT_OBJEKT_143.md`. The executable
+source/test audit `npm run check:projekt-143-svyaz-ping-command` now passes at
+`artifacts/perf/2026-05-07T21-42-23-342Z/projekt-143-svyaz-ping-command-audit/ping-command-audit.json`
+with `18` pass, `0` warn, and `0` fail checks across `16` source and test files.
+It consumes browser proof
+`artifacts/perf/2026-05-07T21-41-01-140Z/projekt-143-svyaz-ping-command-browser-proof/ping-command-browser-proof.json`,
+which records `11` pass, `0` warn, `0` fail, zero browser errors, a retained
+live `attack_here` command position, a visible in-world
+`SquadCommandWorldMarker`, tactical-map command-marker pixels, and screenshot
+artifacts. The accepted scope is squad ping command availability, map/world
+marker visibility, travel engagement behavior, and documented
+movement-versus-combat priority. This does not prove mobile command ergonomics,
+live production parity, or SVYAZ-3 air-support radio.
+
+UX-1 now has source/test, production-build browser, multi-spawn visual, and local
+KB-DIZAYN evidence. `npm run check:projekt-143-ux-respawn` produced
+`artifacts/perf/2026-05-07T20-30-26-829Z/projekt-143-ux-respawn-audit/ux-respawn-audit.json`
+with `15` pass, `0` warn, `0` fail, and `acceptanceReady=true`. `npm run
+check:projekt-143-ux-respawn-browser` produced
+`artifacts/perf/2026-05-07T20-35-21-453Z/projekt-143-ux-respawn-browser-proof/ux-respawn-browser-proof.json`
+with `8` pass, `0` warn, `0` fail, zero browser errors, desktop/mobile
+screenshots, visible alliance, grouped spawn options, selected-spawn state,
+decision timing, and 48px mobile spawn targets after a fresh `npm run build`.
+That production-build proof verifies the current `dist/` Zone Control deploy
+surface and exposes only the live single home-base spawn case. `npm run
+check:projekt-143-ux-respawn-multispawn` produced
+`artifacts/perf/2026-05-07T20-27-26-789Z/projekt-143-ux-respawn-multispawn-proof/ux-respawn-multispawn-proof.json`
+with `10` pass, `0` warn, `0` fail, zero browser errors, required
+home-base/zone/helipad/insertion classes on desktop and mobile, mobile 48px
+spawn targets, and map/spawn-option screenshots. `npm run check:mobile-ui`
+completed at `artifacts/mobile-ui/2026-05-07T19-46-27-777Z/mobile-ui-check`
+with `72` checks, `3` policy skips, and zero page, request, or console errors.
+The first KB-DIZAYN gate packet
+`artifacts/perf/2026-05-07T20-07-49-954Z/projekt-143-ux-respawn-dizayn-gate/ux-respawn-dizayn-gate.json`
+returned UX-1 with notes. The signed follow-up gate
+`artifacts/perf/2026-05-07T20-28-48-561Z/projekt-143-ux-respawn-dizayn-gate/ux-respawn-dizayn-gate.json`
+accepts the local visual packet after the multi-spawn proof, map-label anchor
+correction, and mobile metadata stacking correction. UX-1 remains open for live
+production parity or explicit Politburo deferral to STABILIZAT; this does not
+close UX-2, UX-3, or UX-4.
+
+AVIATSIYA-3 now has a helicopter player/session parity memo at
+`docs/rearch/helicopter-parity-audit.md`. The audit packet
+`artifacts/perf/2026-05-07T18-11-27.481Z/projekt-143-aviatsiya-helicopter-parity-audit/helicopter-parity-audit.json`
+passes `6/6` required surfaces: scope/source paths, authority map,
+state-authority gaps, recommended consolidation, fixed-wing parity comparison,
+and validation boundaries. The memo records `VehicleSessionController` as the
+player-session authority, `HelicopterPlayerAdapter` as player helicopter
+control authority, `HelicopterVehicleAdapter` as the `IVehicle` seat facade,
+and duplicated helicopter exit placement as the main consolidation target.
+This is architecture-audit evidence, not helicopter feel, rotor visual parity,
+runtime implementation, human playtest acceptance, or production evidence.
+
+STABILIZAT-1 remains blocked after the 2026-05-07 rerun at
+`artifacts/perf/2026-05-07T04-11-20-627Z/validation.json`. The capture failed:
+avg frame `94.34ms`, peak p99 `100.00ms`, frames >50ms `86.78%`, over-budget
+samples `100%`, Combat dominated every sample over 16.67ms, heap end-growth
+`29.88MB` WARN, heap peak-growth `257.69MB` FAIL, heap recovery `88.4%` PASS,
+and measurement trust WARN. No `perf-baselines.json` refresh is authorized from
+this artifact.
+
+DEFEKT-3 now has a follow-up dominance audit at
+`artifacts/perf/2026-05-07T04-19-12-176Z/projekt-143-defekt-combat120-dominance-audit/summary.json`.
+The old suppression-only explanation is incomplete in the current repo: Combat
+tail evidence splits across high-LOD AI update, close GLB / weapon rendering,
+close-model pool exhaustion, and NPC movement pressure.
+
+The next DEFEKT-3 isolation run at
+`artifacts/perf/2026-05-07T04-28-10-437Z/projekt-143-close-npc-isolation/summary.json`
+attributes the dominant release blocker to close-actor rendering. With
+`perfDisableNpcCloseModels=1`, validation moves from FAIL to WARN, measurement
+trust passes, avg frame moves `94.34ms` to `18.98ms`, Combat avg `24.96ms` to
+`5.14ms`, billboard/render avg `14.32ms` to `0.54ms`, average draw calls
+`3680.91` to `247.14`, weapon and close-NPC GLB visible draw-call-like entries
+drop to `0`, and close-model pool-empty warnings drop `165` to `0`. This is not
+baseline or release evidence because it removes the production close-actor
+visual contract.
+
+The follow-up production-path DEFEKT-3 remediation at
+`artifacts/perf/2026-05-07T04-51-00-922Z/projekt-143-close-actor-remediation/summary.json`
+keeps a limited close-actor visual contract instead of disabling close models:
+attached weapon clones merge to one render mesh, active close GLB actors cap at
+`16`, overflow close actors render as impostors, and desktop high/medium AI
+full-update caps drop to `12/16`. The standard `npm run perf:capture:combat120`
+artifact remains validation FAIL but measurement trust passes. It records avg
+frame `19.82ms`, peak p99 `70.50ms`, frames >50ms `0.11%`, over-budget
+`0.35%`, Combat avg `5.93ms`, AI avg `3.82ms`, billboard/render avg `2.05ms`,
+draw-call avg `286.72`, visible weapon draw-call-like `16`, visible close-NPC
+GLB draw-call-like `112`, visible NPC impostor instances `73`, close-model
+pool-empty warnings `0`, AI starvation avg `1.58`, heap end-growth `-25.67MB`,
+heap peak-growth `18.33MB`, and heap recovery `240.0%`. STABILIZAT-1 remains
+blocked because peak p99 fails and avg frame is still above the codex `<=17ms`
+baseline criterion. The next blocker is residual capture-start/tail spikes plus
+human visual acceptance of the lower close-model cap.
+
+The next DEFEKT-3 metric-window remediation at
+`artifacts/perf/2026-05-07T05-00-06-198Z/projekt-143-tail-window-remediation/summary.json`
+moves in-page metrics, perf telemetry, and browser-stall observer reset after
+the active scenario driver restart. The standard `npm run
+perf:capture:combat120` command now exits successfully with validation WARN and
+measurement trust PASS. It records avg frame `19.24ms`, peak p99 `37.70ms`,
+frames >50ms `0.11%`, over-budget `0.36%`, Combat avg `6.44ms`, AI avg
+`4.41ms`, billboard/render avg `2.00ms`, draw-call avg `227.65`, visible
+weapon draw-call-like `16`, visible close-NPC GLB draw-call-like `112`, visible
+NPC impostor instances `95`, close-model pool-empty warnings `0`, AI
+starvation avg `2.65`, heap end-growth `25.28MB`, heap peak-growth `61.13MB`,
+and heap recovery `58.7%`. STABILIZAT-1 remains blocked because only the heap
+recovery criterion passes; avg frame, p99, and heap end-growth still miss the
+codex baseline thresholds. No `perf-baselines.json` refresh is authorized.
+
+The next standard DEFEKT-3 repeatability pass at
+`artifacts/perf/2026-05-07T05-10-12-139Z/projekt-143-repeatability-check/summary.json`
+keeps measurement trust PASS but fails validation on heap recovery. It records
+avg frame `19.27ms`, peak p99 `36.70ms`, frames >50ms `0.06%`, over-budget
+`0.33%`, Combat avg `5.55ms`, AI avg `3.52ms`, billboard/render avg `1.99ms`,
+draw-call avg `241.24`, visible weapon draw-call-like `16`, visible close-NPC
+GLB draw-call-like `112`, visible NPC impostor instances `93`, heap end-growth
+`40.45MB`, heap peak-growth `47.49MB`, and heap recovery `14.8%`. The current
+blocker is no longer close-render dominance alone. STABILIZAT-1 remains blocked
+by repeatable avg-frame, p99, heap-recovery, and heap-end-growth misses.
+
+The current close-model-disabled DEFEKT-3 diagnostic at
+`artifacts/perf/2026-05-07T05-19-21-519Z/projekt-143-heap-close-model-isolation/summary.json`
+narrows the blocker to the close-model resource path on the current harness.
+With `perfDisableNpcCloseModels=1`, validation is WARN, measurement trust is
+PASS, avg frame is `14.21ms`, peak p99 is `33.40ms`, heap end-growth is
+`-14.97MB`, heap recovery is `155.7%`, Combat avg is `4.00ms`, AI avg is
+`3.50ms`, and billboard/render avg is `0.46ms`. The diagnostic is not baseline
+evidence because close GLB actors are removed. It shows that the production
+close-model path is the active STABILIZAT-1 blocker: production repeat texture
+count moved `199 -> 309` and geometry count `238 -> 272`; close-model isolation
+moved texture count only `52 -> 54` and geometry count `203 -> 231`.
+
+The accepted production DEFEKT-3 close-model pool-bound remediation at
+`artifacts/perf/2026-05-07T05-26-55-636Z/projekt-143-close-model-pool-bound/summary.json`
+keeps close GLB actors enabled while bounding resource growth. Active close GLB
+actors now cap at `8`; the per-faction pool cap is coupled to that active cap;
+initial per-faction pool seed is `4`; top-up batch is `2`. The standard
+`npm run perf:capture:combat120` command records validation WARN with
+measurement trust PASS: avg frame `17.50ms`, peak p99 `34.20ms`, frames >50ms
+`0.02%`, over-budget `0.15%`, heap end-growth `4.64MB`, heap peak-growth
+`37.43MB`, heap recovery `87.6%`, texture count `137 -> 165`, geometry count
+`234 -> 267`, visible weapon draw-call-like `8`, visible close-NPC GLB
+draw-call-like `56`, and visible NPC impostor instances `105`. The follow-up
+scheduler trim artifact `artifacts/perf/2026-05-07T05-30-03-496Z` was rejected
+and reverted because avg frame and heap recovery worsened. STABILIZAT-1 remains
+open because avg frame still misses the `<=17ms` criterion by `0.50ms`, and the
+lower close-actor cap still requires visual acceptance.
+
+The follow-up STABILIZAT-1 pool-bound repeatability capture at
+`artifacts/perf/2026-05-07T05-38-56-942Z/projekt-143-pool-bound-repeatability/summary.json`
+keeps the same production close-actor contract and remains measurement-trusted.
+It records validation WARN, avg frame `17.36ms`, peak p99 `34.50ms`, frames
+>50ms `0.06%`, over-budget `0.28%`, heap end-growth `13.94MB`, heap
+peak-growth `47.37MB`, heap recovery `70.6%`, texture count `136 -> 166`,
+geometry count `218 -> 256`, visible weapon draw-call-like `8`, visible
+close-NPC GLB draw-call-like `56`, and visible NPC impostor instances `103`.
+This capture improves the average-frame miss but blocks baseline refresh
+because it still misses avg `<=17ms` by `0.36ms` and heap end-growth `<=10MB`
+by `3.94MB`.
+
+The residual DEFEKT-3 heap diagnostic at
+`artifacts/perf/2026-05-07T05-47-22-079Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`
+consumes the trusted pool-bound repeatability capture and classifies the heap
+shape as `transient_gc_wave` from short-lived runtime allocations after renderer
+resources stabilized. It records peak heap `131.74MB`, end heap `98.31MB`,
+reclaimed ratio `0.776`, renderer texture delta `+30` start-to-peak and `+0`
+peak-to-end, renderer geometry delta `+32` start-to-peak and `+6`
+peak-to-end, `343` terrain-stall backtracking console signals, `19` AI-budget
+warnings, and `15` system-budget warnings. This is attribution evidence only:
+it does not prove a heap fix, does not refresh baselines, and does not certify
+the lower close-actor visual contract.
+
+The current DEFEKT-3 terrain-stall warning-bound packet at
+`artifacts/perf/2026-05-07T05-54-31-155Z/projekt-143-stuck-warning-bound/summary.json`
+records a callsite rate limiter for terrain-stall recovery warnings before
+per-NPC message formatting. The standard `npm run perf:capture:combat120`
+artifact at `artifacts/perf/2026-05-07T05-54-31-155Z` remains
+measurement-trusted but fails validation: avg frame `17.85ms`, peak p99
+`78.10ms`, frames >50ms `0.06%`, over-budget `0.34%`, heap end-growth
+`16.26MB`, heap peak-growth `38.15MB`, and heap recovery `57.4%`. Console
+terrain-stall backtracking signals drop from `343` to `21`, with `20`
+suppression summaries proving the limiter activated. STABILIZAT-1 remains open:
+this reduces warning churn only and does not authorize a `perf-baselines.json`
+refresh.
+
+The current DEFEKT-3 heap-sampling attribution packet at
+`artifacts/perf/2026-05-07T06-18-22-151Z/projekt-143-heap-sampling-attribution/summary.json`
+consumes the dev-shape deep-CDP combat120 capture
+`artifacts/perf/2026-05-07T06-13-38-855Z`. The capture is measurement-trusted
+but fails validation under profiler overhead: avg frame `21.42ms`, peak p99
+`85.70ms`, heap end-growth `1.02MB`, heap peak-growth `42.49MB`, and heap
+recovery `97.6%`. Its `heap-sampling.json` records `132238` allocation samples
+and `4275.84MB` sampled self-size allocation volume. The top categories are
+`three_renderer_math_and_skinning` (`53.08%`), `terrain_height_sampling`
+(`10.15%`), `browser_or_unknown` (`10.00%`),
+`native_array_string_or_eval_churn` (`8.91%`),
+`combatant_renderer_runtime` (`6.30%`), and
+`combat_movement_terrain_queries` (`4.14%`). Top source URL owners are
+`three.module`, native churn, `CombatantRenderer.ts`,
+`GameplaySurfaceSampling.ts`, `CombatantMovement.ts`, `HeightQueryCache.ts`,
+and `InfluenceMapComputations.ts`. This is attribution evidence only; it does
+not prove a heap fix or authorize baseline refresh.
+
+The current DEFEKT-3 close-model material-state bound stops steady close GLB
+opacity updates from forcing `material.needsUpdate` every frame. The next
+standard combat120 artifact at `artifacts/perf/2026-05-07T06-24-48-025Z`
+records validation PASS and measurement trust PASS: avg frame `16.99ms`, peak
+p99 `34.30ms`, frames >50ms `0.11%`, over-budget `0.33%`, heap end-growth
+`16.26MB`, heap peak-growth `44.23MB`, and heap recovery `63.2%`. This meets
+the codex avg-frame, p99, and heap-recovery thresholds, but it still misses the
+codex heap end-growth threshold `<=10MB`. The sidecar at
+`artifacts/perf/2026-05-07T06-27-39-705Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`
+classifies the remaining heap as `retained_or_unrecovered_peak`. `perf:compare -- --scenario combat120` now reaches the correct capture after filtering
+non-capture artifact folders, but still fails release comparison with `6 pass,
+1 warn, 1 fail`; the fail is `maxFrameMs` at `100.00ms`. No
+`perf-baselines.json` refresh is authorized.
+
+The latest DEFEKT-3 WebGL-attributed repeat capture at
+`artifacts/perf/2026-05-07T06-36-34-481Z` records validation WARN and
+measurement trust PASS: avg frame `17.15ms`, peak p99 `34.20ms`, frames >50ms
+`0.08%`, heap end-growth `-19.39MB`, heap peak-growth `22.89MB`, heap recovery
+`184.7%`, and peak max-frame `100.00ms`. The heap sidecar at
+`artifacts/perf/2026-05-07T06-39-17-152Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`
+classifies the heap shape as `transient_gc_wave`. The max-frame sidecar at
+`artifacts/perf/2026-05-07T06-41-29-405Z/projekt-143-maxframe-diagnostic/maxframe-diagnostic.json`
+classifies the first max-frame event as
+`longtask_without_webgl_upload_or_system-timing_owner`: first peak sample index
+`5`, long task `167ms`, long-animation-frame `169.7ms`, WebGL texture upload
+max `0.1ms`, and max observed system timing `9.2ms`. The latest
+`perf:compare -- --scenario combat120` result is `6 pass, 0 warn, 2 fail`;
+failures are `avgFrameMs` at `17.15ms` and `maxFrameMs` at `100.00ms`.
+Baseline refresh remains blocked.
+
+The follow-up DEFEKT-3 deep-CDP attribution packet at
+`artifacts/perf/2026-05-07T06-46-38-609Z` is diagnostic evidence only. The
+capture writes `cpu-profile.cpuprofile` and `heap-sampling.json`; `chrome-trace.json`
+did not write because trace shutdown timed out. The capture remains
+measurement-trusted but fails validation under profiler overhead: avg frame
+`22.49ms`, peak p99 `79.80ms`, heap end-growth `6.60MB`, heap recovery
+`87.5%`, and peak max-frame `100.00ms`. The production heap sidecar at
+`artifacts/perf/2026-05-07T06-50-10-651Z/projekt-143-heap-sampling-attribution/summary.json`
+records `205766` allocation samples and `6660.98MB` sampled self-size volume;
+top categories are `three_renderer_math_and_skinning`, `gameplay_bundle_other`,
+`browser_or_unknown`, and `native_array_string_or_eval_churn`. The production
+CPU sidecar at
+`artifacts/perf/2026-05-07T06-52-40-345Z/projekt-143-cpu-profile-attribution/cpu-profile-attribution.json`
+records five long-task samples and six >50ms hitch events; top CPU categories
+are `three_matrix_skinning_and_scenegraph` (`67.60%`),
+`gameplay_bundle_other` (`6.70%`), `system_update_timing` (`5.63%`), and
+`terrain_height_sampling` (`3.30%`). The source-shaped CPU sidecar at
+`artifacts/perf/2026-05-07T06-52-40-297Z/projekt-143-cpu-profile-attribution/cpu-profile-attribution.json`
+maps the same work class to source owners led by Three scenegraph/render-program
+work, then `CombatantRenderer.ts`, `CombatantMovement.ts`,
+`CombatantLODManager.ts`, `HeightQueryCache.ts`, and
+`GameplaySurfaceSampling.ts`. Baseline refresh remains blocked; the next
+accepted action is narrow source instrumentation or targeted owner work, not
+another broad cap. `perf:compare -- --scenario combat120` now excludes failed
+diagnostic captures before selecting the latest successful capture, so it again
+compares `artifacts/perf/2026-05-07T06-36-34-481Z` and reports `6 pass, 0
+warn, 2 fail`.
+
+The latest DEFEKT-3 close-model overflow-bound packet at
+`artifacts/perf/2026-05-07T07-00-28-388Z/projekt-143-close-model-overflow-bound/summary.json`
+adds a per-update overflow-report guard in `CombatantRenderer` and verifies the
+bound with `CombatantRenderer.test.ts`. The standard combat120 artifact
+`artifacts/perf/2026-05-07T07-00-28-388Z` remains production-shaped with close
+GLB actors enabled and records validation WARN with measurement trust PASS: avg
+`17.14ms`, peak p99 `34.50ms`, frames >50ms `0.06%`, over-budget `0.51%`, heap
+end-growth `-5.08MB`, heap peak-growth `29.85MB`, heap recovery `117.0%`,
+visible close-NPC GLB draw-call-like `56`, visible weapon draw-call-like `8`,
+visible NPC impostor instances `106`, textures `137 -> 166`, and geometries
+`224 -> 257`. `npm run perf:compare -- --scenario combat120` auto-selects this
+artifact and fails with `6 pass, 0 warn, 2 fail`: `avgFrameMs` is `17.14ms` and
+`maxFrameMs` is `100.00ms`. STABILIZAT-1 remains blocked; no baseline refresh is
+authorized.
+
+The prior DEFEKT-3 post-distribution max-frame attribution sidecar at
+`artifacts/perf/2026-05-07T09-41-19-775Z/projekt-143-max-frame-attribution/max-frame-attribution.json`
+consumes the latest status-ok combat120 capture after the target-distribution
+stability-bound change. The source artifact records validation WARN and
+measurement trust PASS: avg `15.47ms`, peak p99 `34.30ms`, max-frame
+`100.00ms`, heap end-growth `-2.30MB`, heap recovery `106.4%`, and AI budget
+starvation `0.98` PASS. The first peak is sample index `5`: runtime frame-event
+frame `392` at `100ms`, long task `127ms`, long-animation-frame `126.7ms`,
+blocking `76.73ms`, WebGL texture-upload max `17.9ms`, and top user timing
+`SystemUpdater.Combat` at `7.8ms`. The sidecar classifies the event as
+`mixed_or_insufficient_attribution` with low confidence.
+`perf:compare -- --scenario combat120` remains red with `6 pass, 1 warn, 1
+fail`; `avgFrameMs` is WARN and `maxFrameMs` remains the failing comparison
+gate. This is diagnostic evidence only; it does not refresh baselines.
+
+The prior DEFEKT-3 focused max-frame trace probe at
+`artifacts/perf/2026-05-07T10-02-39-414Z/projekt-143-max-frame-trace-probe/trace-probe.json`
+uses the new opt-in `perf-capture.ts` trace window flags
+`--trace-window-start-ms` and `--trace-window-duration-ms`. It records a focused
+Chrome trace window after the status-ok attribution packet, but the capture is
+diagnostic-only: validation FAIL, measurement trust FAIL, probe average
+`1388.82ms`, probe p95 `1549.00ms`, avg frame `100.00ms`, and frames >50ms
+`100%`. The packet still advances ownership evidence because it writes
+`chrome-trace.json` (`5739628` bytes, `24539` events, `9994.77ms` span), CPU
+profile, and heap sampling. The sidecar classifies the trace as
+`trace_captured_under_untrusted_deep_cdp_gpu_commit_stalls` with low confidence:
+longest trace event `RunTask` `2544.94ms`, GPU-like max `2517.15ms`,
+render/commit-like max `2513.04ms`, GC-like count `76`, and GC-like max
+`0.90ms`. This separates GC from the observed trace-window stall class but does
+not prove a production owner or authorize baseline refresh.
+
+The prior DEFEKT-3 production-shaped trace-overhead isolation packet at
+`artifacts/perf/2026-05-07T10-32-39-527Z/projekt-143-trace-overhead-isolation/isolation.json`
+supersedes the short/headless diagnostic chain. The headed combat120 trace-only
+capture at `artifacts/perf/2026-05-07T10-32-39-527Z` uses seed `2718`, starts
+the trace window at capture-window zero, suppresses CPU profile and heap
+sampling, and writes `chrome-trace.json` (`149320928` bytes, `704069` events,
+`12323.96ms` span). Measurement trust PASSES with probe avg `19.39ms`, p95
+`29.00ms`, and missed samples `0.0%`; runtime validation still FAILS on
+`9.25s` frame-progression stall and `60.00ms` peak p99. The max-frame trace
+sidecar records the first `100ms` max frame event at frame `22`, page time
+`24141.6ms`, and classifies `focused_trace_only_measurement_trusted` with medium
+confidence: longest trace event `RunTask` `163.26ms`, GPU-like max `52.85ms`,
+render/commit-like max `1.01ms`, and GC-like max `9.39ms`. The isolation packet
+compares against the trusted non-trace control
+`artifacts/perf/2026-05-07T09-41-19-775Z` and classifies
+`trace_collection_overhead_not_detected` with medium confidence; probe deltas
+are avg `+1.46ms` and p95 `+2.00ms`. This keeps Chrome trace collection out of
+the measured overhead-owner path, but it does not fix the runtime stall or
+authorize a baseline refresh.
+
+The prior DEFEKT-3 trace-boundary attribution packet at
+`artifacts/perf/2026-05-07T10-32-39-527Z/projekt-143-trace-boundary-attribution/boundary-attribution.json`
+consumes the same production-shaped trace-only headed combat120 artifact and
+classifies `runtime_combat_spike_plus_late_raf_gpu_clusters` with medium
+confidence. Runtime evidence reports `6` unique frames at or above `50ms`: the
+first boundary is frame `5` at page time `23745.9ms` for `60ms`, the max boundary
+is frame `22` at `100ms`, and the same observer window records
+`SystemUpdater.Combat` max `136.4ms`. Console evidence records `[AI spike]`
+`133.1ms` for `combatant_12` in `patrolling` state, squad `squad_NVA_3`, target
+`none`, followed by a `138.0ms` slow frame attributed to `Combat(136.4ms)`.
+Chrome trace evidence records renderer-main `FunctionCall` `161.84ms` at
+`index-DgRsSaJr.js:1736:12289`, GPU command-buffer
+`ThreadControllerImpl::RunTask` `52.86ms`, and trace-start
+`CpuProfiler::StartProfiling` `131.33ms` isolated as trace-internal. This is
+owner-review evidence only: it separates the first game-side combat spike from
+late RAF/GPU clusters, but it does not resolve the TypeScript callsite, prove a
+runtime fix, or authorize baseline refresh.
+
+The prior DEFEKT-3 bundle-callsite resolution packet at
+`artifacts/perf/2026-05-07T10-58-00-876Z/projekt-143-bundle-callsite-resolution/callsite-resolution.json`
+consumes the trace-boundary packet and resolves the renderer-main
+`FunctionCall` source `index-DgRsSaJr.js:1736:12289` to the
+`GameEngineLoop.animate` / `RenderMain` boundary. Vite sourcemaps are disabled
+(`sourcemap: false`), the perf bundle has no `sourceMappingURL`, and no
+adjacent `.map` file exists. Static resolution still matches
+`dist-perf/build-assets/index-DgRsSaJr.js` (`1002733` bytes), finds `8/11`
+readable minified-loop markers in the callsite window, and scores
+`src/core/GameEngineLoop.ts` at `11/11` source anchors. This proves the late
+renderer-main trace cluster is the main-loop render boundary, not a direct
+Combat AI method location. The first game-side Combat spike still requires
+source-level timing around the patrolling/high-LOD CombatantAI path before any
+behavior change or baseline refresh.
+
+The prior DEFEKT-3 AI method-attribution packet at
+`artifacts/perf/2026-05-07T11-09-31-428Z/projekt-143-ai-method-attribution/ai-method-attribution.json`
+consumes a fresh headed standard combat120 capture with status `ok`, validation
+WARN, and measurement trust PASS. Runtime samples number `88`; `82` carry
+`combatBreakdown.aiMethodMs` and `16` carry `combatBreakdown.aiSlowestUpdate`.
+The frame-event ring reports `3` unique frames at or above `50ms`: first
+boundary frame `246` at `81.8ms` and max boundary frame `523` at `100ms`. The
+max boundary leaders are `SystemUpdater.Combat:7.2ms`,
+`SystemUpdater.Other:0.8ms`, and AI methods `state.alert:0.1ms`,
+`state.engaging:0.1ms`. Aggregate method leaders are `state.engaging:44.7ms`,
+`state.patrolling:32.7ms`, `patrol.canSeeTarget:25.6ms`, and
+`patrol.findNearestEnemy:6.1ms`; the slowest sampled update is `9.4ms` in
+`state.engaging`. No console `[AI spike]` line reproduces in the standard
+capture. `perf:compare -- --scenario combat120` still reports `6 pass, 1 warn,
+1 fail`: avg frame `15.23ms` is WARN and `maxFrameMs` `100.00ms` is FAIL.
+Baseline refresh remains blocked.
+
+The prior DEFEKT-3 browser-boundary attribution packet at
+`artifacts/perf/2026-05-07T11-09-31-428Z/projekt-143-browser-boundary-attribution/browser-boundary-attribution.json`
+consumes the same status-ok, measurement-trusted combat120 artifact and
+classifies the residual max-frame blocker as
+`browser_longtask_loaf_without_instrumented_system_ai_or_webgl_owner` with high
+confidence. The runtime boundary ring records `3` unique frames at or above
+`50ms`; max boundary frame `523` records `100ms`, long task `177ms`,
+long-animation-frame `177.4ms`, blocking `127.28ms`, WebGL upload `0.1ms`,
+top user timing `SystemUpdater.Combat:7.2ms`, and AI method leaders
+`state.alert:0.1ms` and `state.engaging:0.1ms`. Console counts are `[AI spike]`
+`0`, AI-budget warnings `18`, slow frames `6`, system-budget warnings `11`,
+and terrain-stall signals `21`. The packet is diagnostic-only: it blocks AI
+behavior tuning for this max-frame failure and sends the next accepted proof to
+focused browser/native render-present or main-thread task-slice attribution.
+
+The prior DEFEKT-3 corrected trace-category packet at
+`artifacts/perf/2026-05-07T11-32-00-011Z/projekt-143-max-frame-trace-probe/trace-probe.json`
+follows the pre-fix focused trace-only capture at
+`artifacts/perf/2026-05-07T11-28-18-728Z`, where the trace still recorded
+`CpuProfiler::StartProfiling` at `144.45ms` even though CPU profiling and heap
+sampling were disabled. `perf-capture.ts` now keeps
+`disabled-by-default-v8.cpu_profiler` out of focused trace-only captures unless
+`--cdp-profiler` is enabled. The corrected capture is measurement-trusted but
+validation-failed: avg `17.03ms`, peak p99 `65.50ms`, max-frame `100ms`, heap
+end-growth `2.67MB`, and heap recovery `92.6%`. It writes `46999648` trace
+bytes across `216933` events, records longest trace event `RunTask` at
+`29.8ms`, GC-like max `10.28ms`, GPU-like max `3.02ms`, and no long
+trace-start instrumentation event. The paired trace-boundary sidecar at
+`artifacts/perf/2026-05-07T11-32-00-011Z/projekt-143-trace-boundary-attribution/boundary-attribution.json`
+classifies `trace_boundary_owner_unresolved`; it records `4` runtime frames at
+or above `50ms`, no console combat-AI spike at or above `50ms`, no renderer-main
+RAF/FunctionCall boundary above `50ms`, and no GPU command-buffer boundary
+above `40ms`. This is owner-review evidence only and does not authorize
+baseline refresh. `perf:compare -- --scenario combat120` currently selects the
+latest status-ok capture at `artifacts/perf/2026-05-07T11-28-18-728Z` and
+fails with `5 pass, 1 warn, 2 fail`: avg `16.43ms` WARN, p99 `46.00ms` FAIL,
+and max-frame `100.00ms` FAIL.
+
+The prior DEFEKT-3 bundle-callsite resolution packet at
+`artifacts/perf/2026-05-07T11-45-11-238Z/projekt-143-bundle-callsite-resolution/callsite-resolution.json`
+consumes the corrected trace-boundary packet and resolves the source-bearing
+renderer-main `FunctionCall` from `rendererMainTop`, not the obsolete
+`rendererMainLongOver50Ms` threshold. It parses `index-BsYYgvZn.js:1736:12289`,
+matches `dist-perf/build-assets/index-BsYYgvZn.js` (`1005347` bytes), records
+Vite `sourcemap: false`, no `sourceMappingURL`, and no adjacent `.map` file.
+Static anchor scoring maps the bundle window to `src/core/GameEngineLoop.ts`
+with `11/11` loop anchors and classifies
+`bundle_callsite_resolved_to_game_engine_loop_render_boundary` with medium
+confidence. This packet resolves the renderer-main bundle owner to the
+`GameEngineLoop` / `RenderMain` boundary; it does not assign the remaining
+runtime Combat timing to a specific Combat AI TypeScript callsite.
+
+The prior DEFEKT-3 repeatability/max-frame packet at
+`artifacts/perf/2026-05-07T14-29-53-738Z/projekt-143-max-frame-attribution/max-frame-attribution.json`
+consumes the measurement-trusted combat120 repeatability capture at
+`artifacts/perf/2026-05-07T14-29-53-738Z` plus avg-frame, combat-phase,
+suppression cover-cache, and suppression raycast-cost sidecars. The source
+capture is status-ok, validation-WARN, and measurement-trusted, with avg
+`15.14ms`, peak p99 `33.90ms`, max-frame `100.00ms`, frames >50ms `0.03%`,
+over-budget `0.04%`, heap end-growth `12.61MB`, heap peak-growth `55.18MB`,
+and heap recovery `77.2%`. `perf:compare -- --scenario combat120` selects this
+repeatability capture and fails with `6 pass, 1 warn, 1 fail`: avg `15.14ms`
+WARN and max-frame `100.00ms` FAIL. The score-gate sidecar still classifies
+`suppression_raycast_score_gate_reduces_raycastTerrain_under_two_search_cap`
+with high confidence and records `52` suppression cover searches, `51` uncached
+searches, `1224` height queries, `404` score-gate skips, `100` terrain
+raycasts, and raycasts per uncached search moving `7.51 -> 1.961` against the
+prior cost packet. The max-frame sidecar classifies
+`browser_native_gc_or_uninstrumented_render_present` with high confidence:
+first peak sample index `7`, runtime frame event `509` at `100ms`, long task
+`286ms`, long-animation-frame `290.5ms`, blocking `236.08ms`, WebGL upload max
+`0.1ms`, and top user timing `SystemUpdater.Combat` at `7.8ms`. Baseline
+refresh remains blocked.
+
+The prior DEFEKT-3 focused trace-boundary packet at
+`artifacts/perf/2026-05-07T14-38-32-797Z/projekt-143-trace-boundary-attribution/boundary-attribution.json`
+consumes the headed combat120 trace-only capture at
+`artifacts/perf/2026-05-07T14-38-32-797Z`, the max-frame trace probe, and the
+trace-overhead isolation sidecar. The capture is status-ok, validation-WARN,
+and measurement-trusted, with avg `15.52ms`, peak p99 `47.60ms`, max-frame
+`100.00ms`, `81` runtime samples, and `5825` final frames.
+`perf:compare -- --scenario combat120` now selects this status-ok trace packet and fails with
+`5 pass, 1 warn, 2 fail`: avg `15.52ms` WARN, p99 `47.60ms` FAIL, and
+max-frame `100.00ms` FAIL. The trace probe classifies
+`focused_trace_only_measurement_trusted`: `121935286` Chrome trace bytes,
+`564184` trace events, `12336.68ms` trace span, first >50ms runtime frame `5`
+at `63ms`, max runtime frame `494` at `100ms`, longest trace event `RunTask`
+`31.53ms`, GPU-like max `4.09ms`, render/commit-like max `0.58ms`, and
+GC-like max `10.72ms`. The isolation sidecar compares against the non-trace
+control `artifacts/perf/2026-05-07T14-29-53-738Z`, records probe avg/p95
+deltas `0.86ms/2.00ms`, and classifies
+`trace_collection_overhead_not_detected`. Boundary attribution remains
+`trace_boundary_owner_unresolved`: no >=50ms renderer-main RAF/FunctionCall
+slice, no >=40ms GPU command-buffer slice, and no exact clock identity between
+runtime frame events and Chrome trace relative times. Baseline refresh remains
+blocked.
+
+The prior DEFEKT-3 bundle-callsite resolution packet at
+`artifacts/perf/2026-05-07T14-38-32-797Z/projekt-143-bundle-callsite-resolution/callsite-resolution.json`
+consumes the same trace-boundary packet and resolves the source-bearing
+renderer-main `FunctionCall`. It parses
+`index-BLeRv-jb.js:1736:12289`, matches
+`dist-perf/build-assets/index-BLeRv-jb.js` (`1011535` bytes), records Vite
+`sourcemap: false`, no `sourceMappingURL`, no adjacent `.map` file, and
+`8/11` readable minified-loop markers. Static anchor scoring maps the bundle
+window to `src/core/GameEngineLoop.ts` with `11/11` source anchors and
+classifies `bundle_callsite_resolved_to_game_engine_loop_render_boundary` with
+medium confidence. This packet resolves the traced renderer-main boundary to
+`GameEngineLoop` / `RenderMain`; it does not assign the remaining runtime
+Combat timing to a Combat AI TypeScript callsite, prove a runtime fix, or
+authorize baseline refresh.
+
+The current DEFEKT-3 render-boundary timing packet at
+`artifacts/perf/2026-05-07T14-53-44-437Z/projekt-143-render-boundary-timing/render-boundary-timing.json`
+consumes the standard headed combat120 capture at
+`artifacts/perf/2026-05-07T14-53-44-437Z` plus the prior callsite packet. The
+capture is status-ok, validation-WARN, and measurement-trusted with `88`
+runtime samples, avg `16.82ms`, peak p99 `34.50ms`, max-frame `100.00ms`, heap
+end-growth `10.99MB`, and heap recovery `62.5%`. `perf:compare -- --scenario
+combat120` selects this capture and fails with `6 pass, 1 warn, 1 fail`: avg
+WARN and max-frame FAIL. The peak sample records runtime frame `37` at `100ms`,
+long task `120ms`, long-animation-frame `121.20ms`, blocking `71.12ms`, WebGL
+upload max `0.10ms`, and peak-sample `GameEngineLoop.RenderMain.renderer.render`
+max `116.10ms`. Cumulative `renderer.render` timing records count `5391`,
+total `53128.10ms`, mean `9.855ms`, and max `308.90ms`. The packet classifies
+`render_main_renderer_render_user_timing_contains_peak_longtask` with high
+confidence. It advances the active owner to the render call boundary; it does
+not prove a runtime fix or authorize baseline refresh.
+
+The current DEFEKT-3 avg-frame attribution sidecar at
+`artifacts/perf/2026-05-07T07-27-02-293Z/projekt-143-avg-frame-attribution/avg-frame-attribution.json`
+uses the same rebuilt trusted standard capture and classifies the residual avg
+warning as `late_combat_phase_cpu_pressure_not_renderer_or_terrain_stream_growth`.
+Average frame time rises `13.15ms -> 18.44ms` from early to late capture windows
+while draw calls fall `212.83 -> 191.63`, Combat total rises `4.60ms -> 5.94ms`,
+AI rises `3.42ms -> 4.51ms`, shots rise `0 -> 435`, and terrain stream max
+stays `0.04ms`. The next DEFEKT-3 work should target late engagement-phase
+Combat CPU pressure before visual caps or baseline refresh.
+
+The current DEFEKT-3 combat-phase attribution sidecar at
+`artifacts/perf/2026-05-07T07-27-02-293Z/projekt-143-combat-phase-attribution/combat-phase-attribution.json`
+uses the same trusted capture and narrows the residual avg-frame owner to
+`late_close_engagement_pressure_not_renderer_or_movement_volume`. Average frame
+time rises `13.15ms -> 18.44ms`, current target distance falls
+`15.49m -> 8.20m`, nearest OPFOR distance falls `14.96m -> 8.18m`, shots
+delta rises `0 -> 259`, damage-taken delta rises `317.62 -> 1941.51`, draw
+calls fall `212.83 -> 191.63`, and NPC movement sample delta falls
+`218826 -> 170988`. The next DEFEKT-3 source action should instrument or target
+`AIStateEngage`, `AITargeting` LOS miss paths, and close-contact target
+distribution before further visual caps.
+
+The latest DEFEKT-3 close-engagement source audit at
+`artifacts/perf/2026-05-07T07-56-12-331Z/projekt-143-close-engagement-source-audit/source-audit.json`
+consumes the combat-phase packet and binds the remaining owner path to current
+source files. It ranks `AIStateEngage.ts` first for the close-range engage
+ladder, `AILineOfSight.ts` second for LOS miss pressure, and
+`AITargetAcquisition.ts` plus `ClusterManager.ts` third for close-contact target
+distribution. The audit confirms existing tests cover close full-auto behavior,
+nearby-enemy burst behavior, suppression transition, LOS heightfield prefilter,
+and target distribution primitives, but they do not prove combat120 perf
+ownership. The next accepted action is narrow runtime counters for close-range
+full-auto activations, nearby-enemy burst triggers, suppression transitions,
+target-distance buckets, and LOS miss/full-raycast/cache outcomes.
+
+The prior DEFEKT-3 close-engagement counter-bearing combat120 packet at
+`artifacts/perf/2026-05-07T08-18-45-389Z/projekt-143-close-engagement-counter-packet/counter-packet.json`
+supersedes the source-only counter packet. The first capture after the counter
+plumbing was rejected for this purpose because stale `dist-perf` omitted
+`combatBreakdown.closeEngagement`. After `npm run build:perf`, the trusted
+capture recorded 88/88 runtime samples with close-engagement counters,
+validation WARN, measurement trust PASS, avg `16.38ms`, peak p99 `34.20ms`,
+heap end-growth `33.25MB` WARN, heap recovery `30.3%` WARN, and
+`perf:compare -- --scenario combat120` FAIL (`5 pass, 2 warn, 1 fail`) on
+`maxFrameMs` `100.00ms`. The sidecar records early/middle/late deltas for
+close-range full-auto, nearby-enemy burst, suppression, target-distance, LOS
+full-evaluation/raycast, target-acquisition, and target-distribution churn.
+
+The current DEFEKT-3 close-engagement owner-attribution packet at
+`artifacts/perf/2026-05-07T08-29-10-043Z/projekt-143-close-engagement-owner-attribution/owner-attribution.json`
+consumes that counter-bearing capture and ranks late-phase pressure under
+`AILineOfSight.ts` first and `ClusterManager.ts` second. Early/middle/late avg
+frame is `13.72/16.17/19.15ms`; LOS markers rise `6855 -> 11044`;
+target-distribution markers rise `3012 -> 7131`; target-acquisition markers
+fall `7710 -> 6408`; engage markers fall `2546 -> 2081`. The classification is
+`target_acquisition_distribution_fanout_with_los_execution_cost`. This is owner
+evidence only; it does not prove a fix or authorize a baseline refresh.
+
+The current DEFEKT-3 LOS/distribution separation packet at
+`artifacts/perf/2026-05-07T08-39-12-950Z/projekt-143-los-distribution-separation/separation.json`
+consumes the owner-attribution sidecar and classifies the path as
+`coupled_distribution_scheduling_with_separate_los_execution`.
+`AITargetAcquisition.ts` and `ClusterManager.ts` have no direct LOS reference;
+LOS execution is anchored in `AILineOfSight.ts` and the state-handler
+`canSeeTarget` calls. Early/middle/late distribution scheduling deltas are
+`3012/4658/7131`; LOS execution deltas are `6855/7889/11044`; late LOS full
+evaluations per distribution call are `1.174`; LOS/distribution delta
+correlation is `0.871`. This keeps the next action on LOS cadence or a bounded
+distribution-stability A/B diagnostic, not baseline refresh.
+
+The DEFEKT-3 target-distribution stability-bound packet at
+`artifacts/perf/2026-05-07T09-43-39-502Z/projekt-143-target-distribution-stability-bound/target-distribution-stability-bound.json`
+binds the `ClusterManager.ts` source change, targeted ClusterManager/patrol/AI
+tests, the follow-up callsite packet, and the post-change status-ok combat120
+capture at `artifacts/perf/2026-05-07T09-41-19-775Z`. The source change holds a
+still-valid distributed target for `500ms`, preventing per-frame target churn
+from invalidating the patrol LOS cadence. Late-window assignment churn moves
+`4016 -> 425`, `patrolDetection` calls move `3947 -> 674`, LOS full evaluations
+move `5202 -> 1655`, and late-window avg frame moves `19.92ms -> 17.22ms`. The
+post-change capture records avg `15.47ms`, peak p99 `34.30ms`, max-frame
+`100.00ms`, heap end-growth `-2.30MB`, heap recovery `106.4%`, validation WARN,
+and measurement trust PASS. `perf:compare -- --scenario combat120` still reports
+`6 pass, 1 warn, 1 fail`: `avgFrameMs` is WARN and `maxFrameMs` remains FAIL.
+Baseline refresh remains blocked; the next bounded source target is the residual
+engage-suppression callsite or the max-frame path if the Politburo keeps
+DEFEKT-3 as driver.
+
+The prior DEFEKT-3 post-distribution max-frame attribution packet at
+`artifacts/perf/2026-05-07T09-41-19-775Z/projekt-143-max-frame-attribution/max-frame-attribution.json`
+consumes that same status-ok capture and records first peak sample index `5`,
+runtime frame-event frame `392` at `100ms`, long task `127ms`,
+long-animation-frame `126.7ms`, blocking `76.73ms`, WebGL texture-upload max
+`17.9ms` from the NVA `traverse_run` animated albedo atlas, and top user timing
+`SystemUpdater.Combat` at `7.8ms`. Classification is
+`mixed_or_insufficient_attribution` with low confidence. The next bounded
+source target is a focused CDP trace/render-present/GC probe around this
+max-frame boundary, not a baseline refresh.
+
+The prior DEFEKT-3 focused max-frame trace probe at
+`artifacts/perf/2026-05-07T10-02-39-414Z/projekt-143-max-frame-trace-probe/trace-probe.json`
+confirms that the lower-level trace path can now write a focused
+`chrome-trace.json`, but it also proves that the present deep-CDP configuration
+invalidates regression measurement. Treat the next bounded packet as
+measurement-harness refinement: isolate trace collection from full CPU/heap
+profiling, or otherwise reduce probe overhead, before making runtime tuning
+claims from this trace.
+
+The prior DEFEKT-3 trace-overhead isolation packet at
+`artifacts/perf/2026-05-07T10-18-11-490Z/projekt-143-trace-overhead-isolation/isolation.json`
+adds `perf-capture.ts` switches `--cdp-profiler <true|false>` and
+`--cdp-heap-sampling <true|false>`, then compares a trace-only focused capture
+against an identical no-CDP control. The trace-only artifact
+`artifacts/perf/2026-05-07T10-18-11-490Z` writes `chrome-trace.json` while
+suppressing CPU profile and heap sampling, but validation and measurement trust
+still FAIL: probe avg `1704.13ms`, p95 `1829.00ms`, samples `15`, avg frame
+`100.00ms`. The no-CDP control
+`artifacts/perf/2026-05-07T10-22-24-265Z` also FAILS measurement trust in the
+same short/headless seed-42 shape: probe avg `1639.11ms`, p95 `1779.00ms`,
+samples `18`, avg frame `100.00ms`. Classification is
+`control_capture_shape_untrusted_before_trace` with high confidence. The next
+trace packet must align to the production-shaped combat120 command before CDP
+trace data can be used as owner proof.
+
+The prior DEFEKT-3 production-shaped trace-overhead isolation packet at
+`artifacts/perf/2026-05-07T10-32-39-527Z/projekt-143-trace-overhead-isolation/isolation.json`
+uses the headed combat120 command shape, seed `2718`, trace window
+`0-12000ms`, and Chrome trace only. The trace capture writes `chrome-trace.json`
+(`149320928` bytes, `704069` events, `12323.96ms` span) with CPU profile and
+heap sampling suppressed. Measurement trust PASSES with probe avg `19.39ms`,
+p95 `29.00ms`, and missed samples `0.0%`; runtime validation FAILS on
+`9.25s` frame-progression stall and `60.00ms` peak p99. The sidecar records
+the first `100ms` max frame event at frame `22`, page time `24141.6ms`, and
+classifies the trace as `focused_trace_only_measurement_trusted` with medium confidence:
+longest trace event `RunTask` `163.26ms`, GPU-like max `52.85ms`,
+render/commit-like max `1.01ms`, GC-like count `4315`, and GC-like max
+`9.39ms`. The isolation sidecar compares the trace packet to the trusted
+non-trace control `artifacts/perf/2026-05-07T09-41-19-775Z`, records probe
+deltas avg `+1.46ms` and p95 `+2.00ms`, and classifies
+`trace_collection_overhead_not_detected` with medium confidence. This packet is
+owner-review evidence only; it does not prove a runtime fix, does not refresh
+baselines, and leaves `maxFrameMs` as the active STABILIZAT-1 blocker.
+
 ## Stable-Ground Snapshot On 2026-05-02
 
 - Latest pushed repo state before the 24-hour handoff report:
@@ -383,8 +1304,8 @@ combined-arms feel from the current partial artifacts.
   pushed, deployed, and live-verified.
 - Sibling `game-field-kits` is part of the current control plane. Its
   `master`/`origin/master` pointed at
-  `a7b71f1e9af61e2f89bb0adefae5121891896f62`; `npm ci`,
-  `npm run check`, and `npm run smoke:browser` passed on 2026-05-02.
+  `a7b71f1e9af61e2f89bb0adefae5121891896f62`; `npm ci`, its `check` script,
+  and its `smoke:browser` script passed on 2026-05-02.
 - Stale open PRs `#47` and `#148` through `#153` were closed, and their head
   branches were deleted. Other unmerged task/spike branches remain retained
   inventory until reviewed for unique work.
@@ -566,17 +1487,32 @@ What is not ready to claim:
   Durable tracked cache paths are `public/data/hydrology/bake-manifest.json`,
   `public/data/hydrology/a_shau_valley-hydrology.json`, and
   `public/data/hydrology/open_frontier-42-hydrology.json`.
-  A static water-system contract audit at
-  `artifacts/perf/2026-05-06T10-07-20-371Z/projekt-143-water-system-audit/water-system-audit.json`
+  The 2026-05-07 VODA-1 refresh found stale hydrology bake-manifest signatures
+  with `npm run check:hydrology-bakes`, regenerated them with
+  `npm run hydrology:generate`, and restored the cache check to PASS. The source
+  artifacts did not change; `public/data/hydrology/bake-manifest.json` now
+  matches the durable A Shau and Open Frontier cache files. A follow-up static
+  water-system contract audit at
+  `artifacts/perf/2026-05-07T21-57-51-480Z/projekt-143-water-system-audit/water-system-audit.json`
   records the current renderer truth: `WaterSystem` still owns the global
-  Open Frontier water plane, and it now also has a provisional hydrology
-  river-strip mesh consumer wired from startup. Runtime proof at
-  `artifacts/perf/2026-05-06T10-26-04-620Z/projekt-143-water-runtime-proof/water-runtime-proof.json`
-  confirms Open Frontier has `12` hydrology channels / `592` segments with
-  global water enabled and A Shau has `12` channels / `552` segments with the
-  global water plane disabled. This is runtime presence proof only; final
-  stream visuals, flow, crossings, gameplay water queries, perf, and human
-  visual acceptance remain open.
+  Open Frontier water fallback, hydrology river-strip meshes are wired from
+  startup, A Shau suppresses the global plane, the hydrology river material
+  profile remains `natural_channel_gradient`, and public
+  `getWaterSurfaceY` / `getWaterDepth` queries exist with focused regression
+  coverage. The runtime proof gate then started the perf Vite server and passed
+  at
+  `artifacts/perf/2026-05-07T21-55-25-154Z/projekt-143-water-runtime-proof/water-runtime-proof.json`
+  with screenshot artifacts, zero browser errors, and live hydrology query
+  probes: Open Frontier has `12` hydrology channels / `592` segments with
+  global water enabled, and A Shau has `12` channels / `552` segments with the
+  global water plane disabled. The VODA-1 atmosphere evidence refresh at
+  `artifacts/perf/2026-05-07T22-13-21-685Z/projekt-143-voda-atmosphere-evidence/summary.json`
+  rebuilt `dist-perf` and captured `15` screenshots across A Shau, Open
+  Frontier, TDM, Zone Control, and combat120 with zero browser errors; the
+  packet records cloud-follow PASS in every scenario, A Shau nav ready and
+  connected, Open Frontier nav ready and connected, and hydrology river visuals
+  present in both large maps. It also records `106` browser warnings, so it is
+  evidence, not final acceptance.
   Current elevated terrain horizon proof at
   `artifacts/perf/2026-05-06T10-51-52-518Z/projekt-143-terrain-horizon-baseline/summary.json`
   is PASS for four Open Frontier/A Shau screenshots with renderer, terrain,
@@ -584,13 +1520,33 @@ What is not ready to claim:
   runtime evidence only; final far-horizon appearance still needs human visual
   acceptance and matched after captures for any future branch.
   Current terrain visual-review packet at
-  `artifacts/perf/2026-05-06T11-24-43-438Z/projekt-143-terrain-visual-review/visual-review.json`
-  is PASS for eight Open Frontier/A Shau player-ground, route/trail,
-  river-oblique, and river-ground screenshots with zero browser/page errors,
-  plus a review contact sheet at
-  `artifacts/perf/2026-05-06T11-24-43-438Z/projekt-143-terrain-visual-review/terrain-visual-contact-sheet.png`.
-  This is review packet evidence only; it does not accept terrain art,
-  hydrology river visuals, perf, or production parity.
+  `artifacts/perf/2026-05-07T22-17-52-232Z/projekt-143-terrain-visual-review/visual-review.json`
+  is WARN for `14` Open Frontier/A Shau screenshots with zero browser/page
+  errors and a contact sheet at
+  `artifacts/perf/2026-05-07T22-17-52-232Z/projekt-143-terrain-visual-review/terrain-visual-contact-sheet.png`.
+  It passes expected screenshots, browser-error clearance, nonblank visual
+  content, hydrology review shots, and foundation review shots, but
+  `terrain_water_exposure_review` warns on Open Frontier airfield and river
+  shots: luma means `229.37` to `236.60`, overexposed ratios `0.6786` to
+  `0.8286`, and green ratios `0.0082` to `0.0393`. A Shau river review passes
+  in the same packet. This is review packet evidence only; it does not accept
+  terrain art, hydrology river visuals, perf, production parity, or VODA-1
+  completion. A follow-up source-only exposure audit at
+  `artifacts/perf/2026-05-08T01-15-33-373Z/projekt-143-voda-exposure-source-audit/summary.json`
+  records WARN classification
+  `voda_exposure_warning_review_composition_before_water_material_tuning`
+  without launching a browser or perf capture on the resource-contended
+  machine. It classifies `4` Open Frontier exposure-risk shots, `0` risk shots
+  with global water visible, and `4` risk shots with hydrology river surfaces
+  visible. It also binds `natural_channel_gradient` to opacity `0.55`, dark
+  hydrology source luma values `50.81`, `68.08`, and `36.13`, and middle/bottom
+  neutral-overexposure ratios from `0.8681` to `0.9454` in the warned
+  sightlines. Do not tune the Three.js global water shader or hydrology material
+  as the first answer to this warning; inspect Open Frontier camera review
+  angles, sky exposure, pale airfield/foundation materials, and terrain-water
+  sightline composition first. VODA-1 remains blocked on final stream art, Open
+  Frontier exposure correction, matched quiet-machine perf, consumer adoption
+  of water queries, and human visual acceptance.
   The attempted matched Open Frontier perf leg at
   `artifacts/perf/2026-05-06T11-30-35-349Z/summary.json` is rejected as
   KB-TERRAIN acceptance evidence: measurement trust, shots/hits, average frame,
@@ -899,8 +1855,8 @@ What is not ready to claim:
   `@game-field-kits/three-model-optimizer`. TIJ uses local `file:`
   dependencies plus `.npmrc` `install-links=true` so Three peer dependencies
   resolve through the game repo.
-- Starter-kits validation passed: `npm ci`, `npm run check`, and
-  `npm run smoke:browser`. The smoke gate starts seven visual workspaces and
+- Starter-kits validation passed in the sibling workspace: `npm ci`, its
+  `check` script, and its `smoke:browser` script. The smoke gate starts seven visual workspaces and
   captures desktop/mobile Playwright screenshots while asserting no page
   errors, no console errors, nonblank canvas output, and in-viewport overlays.
 - TIJ Wave 1 backport validation passed: `npm install`, `npm run typecheck`,
@@ -1444,11 +2400,265 @@ What is not ready to claim:
    complete. The final playtest must still cover grounded exits, in-flight
    bailout, helicopter entry/exit and rotor feel, AC-47 orbit, A Shau
    forward-strip taxi/takeoff, pointer-lock fallback, and keyboard/touch paths.
-7. Re-run combat120 `validate:full` from a quiet-machine session before
-   claiming perf sign-off or refreshing baselines. The 2026-05-02 stabilization
-   run passed unit/build stages but failed local combat120 frame-time gates with
-   avg/p99 pinned at 100.00ms, so the current evidence is a blocker candidate,
-   not baseline-quality data.
+7. Continue combat120 remediation before claiming perf sign-off or refreshing
+   baselines. DEFEKT-3 now has a standard repeatability artifact at
+   `artifacts/perf/2026-05-07T05-10-12-139Z/projekt-143-repeatability-check/summary.json`
+   with measurement trust PASS, validation FAIL, avg `19.27ms`, p99 `36.70ms`,
+   heap end-growth `40.45MB`, and heap recovery `14.8%`. The follow-up
+   diagnostic at
+   `artifacts/perf/2026-05-07T05-19-21-519Z/projekt-143-heap-close-model-isolation/summary.json`
+   clears the numeric thresholds only by disabling close models, so the next
+   accepted production artifact is
+   `artifacts/perf/2026-05-07T05-26-55-636Z/projekt-143-close-model-pool-bound/summary.json`.
+   It fixes heap end-growth/recovery and p99 under the codex thresholds while
+   keeping close GLB actors enabled, but avg frame remains `17.50ms` and the
+   lower close-actor cap still needs visual acceptance. The latest
+   repeatability artifact,
+   `artifacts/perf/2026-05-07T05-38-56-942Z/projekt-143-pool-bound-repeatability/summary.json`,
+   keeps measurement trust PASS and records avg `17.36ms`, p99 `34.50ms`,
+   heap end-growth `13.94MB`, and heap recovery `70.6%`. Baseline refresh
+   remains blocked on avg-frame and heap-end-growth gates. The residual heap
+   diagnostic at
+   `artifacts/perf/2026-05-07T05-47-22-079Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`
+   points the next investigation away from retained renderer resources and
+   toward short-lived combat runtime allocations, with terrain-stall
+   backtracking as the largest captured console signal. The warning-bound
+   packet at
+   `artifacts/perf/2026-05-07T05-54-31-155Z/projekt-143-stuck-warning-bound/summary.json`
+   reduces terrain-stall console churn from `343` lines to `21`, but the
+   standard capture still fails validation with avg `17.85ms`, p99 `78.10ms`,
+   and heap end-growth `16.26MB`. The dev-shape deep-CDP attribution packet at
+   `artifacts/perf/2026-05-07T06-18-22-151Z/projekt-143-heap-sampling-attribution/summary.json`
+   identifies allocation churn ownership led by three.js math/skinning, then
+   native churn, `CombatantRenderer.ts`, terrain height sampling,
+   `CombatantMovement.ts`, and `InfluenceMapComputations.ts`. The close-model
+   material-state bound artifact `artifacts/perf/2026-05-07T06-24-48-025Z`
+   reaches validation PASS with avg `16.99ms`, p99 `34.30ms`, and recovery
+   `63.2%`, but heap end-growth remains `16.26MB`; the sidecar
+   `artifacts/perf/2026-05-07T06-27-39-705Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`
+   classifies the remaining heap as `retained_or_unrecovered_peak`; and
+   `perf:compare -- --scenario combat120` still fails on `maxFrameMs`
+   `100.00ms`. The close-model overflow-bound packet at
+   `artifacts/perf/2026-05-07T07-00-28-388Z/projekt-143-close-model-overflow-bound/summary.json`
+   improves heap cleanliness with heap end-growth `-5.08MB` and heap recovery
+   `117.0%` while preserving visible close GLB actors, but compare still fails
+   on avg `17.14ms` and max-frame `100.00ms`. The RuntimeMetrics frame-event
+   ring packet at
+   `artifacts/perf/2026-05-07T07-27-02-293Z/projekt-143-max-frame-attribution/max-frame-attribution.json`
+   records the first peak boundary in `runtime-samples.json`: frame event `540`
+   at `100ms`, long-animation-frame `175.8ms`, WebGL upload max `0.1ms`, and
+   top SystemUpdater timing `9.4ms`. The current max-frame owner is browser
+   LoAF work outside instrumented SystemUpdater and WebGL-upload attribution.
+   The avg-frame attribution sidecar at
+   `artifacts/perf/2026-05-07T07-27-02-293Z/projekt-143-avg-frame-attribution/avg-frame-attribution.json`
+   classifies the avg warning as late engagement-phase Combat CPU pressure:
+   avg frame `13.15ms -> 18.44ms`, Combat total `4.60ms -> 5.94ms`, AI
+   `3.42ms -> 4.51ms`, shots `0 -> 435`, draw calls `212.83 -> 191.63`, and
+   terrain stream max `0.04ms`.
+   The combat-phase sidecar at
+   `artifacts/perf/2026-05-07T07-27-02-293Z/projekt-143-combat-phase-attribution/combat-phase-attribution.json`
+   narrows the next owner to close-contact engagement pressure, not renderer or
+   NPC movement volume: shots-delta correlation `0.761`, damage-taken
+   correlation `0.574`, current-target distance correlation `-0.637`, and NPC
+   movement delta correlation `-0.863`.
+   The close-engagement source audit at
+   `artifacts/perf/2026-05-07T07-56-12-331Z/projekt-143-close-engagement-source-audit/source-audit.json`
+   ranks `AIStateEngage.ts`, `AILineOfSight.ts`, and `AITargetAcquisition.ts`
+   plus `ClusterManager.ts` as the current source-owner chain and requires
+   runtime counters before tuning or baseline refresh.
+   The counter-bearing combat120 packet at
+   `artifacts/perf/2026-05-07T08-18-45-389Z/projekt-143-close-engagement-counter-packet/counter-packet.json`
+   proves `combatBreakdown.closeEngagement` samples and phase deltas under load,
+   but remains WARN because validation still reports heap end-growth/recovery
+   warnings and `perf:compare` still fails `maxFrameMs`. Baseline refresh
+   remains blocked.
+   The owner-attribution packet at
+   `artifacts/perf/2026-05-07T08-29-10-043Z/projekt-143-close-engagement-owner-attribution/owner-attribution.json`
+   ranks the remaining owner path as LOS full-evaluation/raycast pressure first
+   and target-distribution churn second. Next action belongs to
+   target-acquisition/distribution scheduling and LOS pressure separation, not
+   baseline refresh.
+   The LOS/distribution separation packet at
+   `artifacts/perf/2026-05-07T08-39-12-950Z/projekt-143-los-distribution-separation/separation.json`
+   proves the scheduling/execution split: distribution chooses targets without
+   direct LOS calls; LOS cost executes in state-handler visibility checks after
+   selection.
+   The target-distribution stability-bound packet at
+   `artifacts/perf/2026-05-07T09-43-39-502Z/projekt-143-target-distribution-stability-bound/target-distribution-stability-bound.json`
+   proves the `500ms` distributed-target stickiness bound: assignment churn
+   moves `4016 -> 425`, `patrolDetection` moves `3947 -> 674`, and LOS full
+   evaluations move `5202 -> 1655`; baseline refresh remains blocked by
+   `perf:compare` max-frame failure.
+   The post-distribution max-frame attribution packet at
+   `artifacts/perf/2026-05-07T09-41-19-775Z/projekt-143-max-frame-attribution/max-frame-attribution.json`
+   records the remaining blocker: first peak sample index `5`, runtime
+   frame-event frame `392` at `100ms`, long task `127ms`,
+   long-animation-frame `126.7ms`, blocking `76.73ms`, WebGL upload max
+   `17.9ms`, and low-confidence `mixed_or_insufficient_attribution`.
+   The focused trace packet at
+   `artifacts/perf/2026-05-07T10-02-39-414Z/projekt-143-max-frame-trace-probe/trace-probe.json`
+   writes `chrome-trace.json`, CPU profile, and heap sampling, then classifies
+   the packet as low-confidence
+   `trace_captured_under_untrusted_deep_cdp_gpu_commit_stalls`. Measurement
+   trust fails under deep-CDP overhead, so the next action is trace-harness
+   refinement before using CDP trace data as owner proof. The short/headless
+   trace-overhead isolation packet at
+   `artifacts/perf/2026-05-07T10-18-11-490Z/projekt-143-trace-overhead-isolation/isolation.json`
+   shows the same short/headless seed-42 shape fails measurement trust even
+   without CDP; classification is `control_capture_shape_untrusted_before_trace`.
+   The production-shaped trace-overhead isolation packet at
+   `artifacts/perf/2026-05-07T10-32-39-527Z/projekt-143-trace-overhead-isolation/isolation.json`
+   now uses headed combat120 seed `2718`, writes `149320928` trace bytes across
+   `704069` events, keeps measurement trust PASS, and classifies
+   `trace_collection_overhead_not_detected`; `maxFrameMs` remains the blocker.
+   The follow-up AI method-attribution packet at
+   `artifacts/perf/2026-05-07T11-09-31-428Z/projekt-143-ai-method-attribution/ai-method-attribution.json`
+   records method timing in standard combat120 runtime samples, but the `100ms`
+   max-frame boundary does not align with a slow AI method and no console
+   `[AI spike]` reproduces. The browser-boundary attribution packet at
+   `artifacts/perf/2026-05-07T11-09-31-428Z/projekt-143-browser-boundary-attribution/browser-boundary-attribution.json`
+   then classifies the same boundary as a browser long-task/long-animation-frame
+   event without an instrumented SystemUpdater, AI method, or WebGL-upload owner:
+   long task `177ms`, long-animation-frame `177.4ms`, blocking `127.28ms`,
+   `SystemUpdater.Combat:7.2ms`, WebGL upload `0.1ms`, AI method leaders
+   `0.1ms`, and no console `[AI spike]`. The corrected trace-category packet at
+   `artifacts/perf/2026-05-07T11-32-00-011Z/projekt-143-max-frame-trace-probe/trace-probe.json`
+   proves focused trace-only capture no longer records the earlier
+   `CpuProfiler::StartProfiling` trace-start event when CPU profiling is
+   disabled. That packet remains validation-failed but measurement-trusted:
+   avg `17.03ms`, p99 `65.50ms`, heap end-growth `2.67MB`, heap recovery
+   `92.6%`, longest trace event `RunTask:29.8ms`, GPU-like max `3.02ms`, and
+   no long trace-start instrumentation event. The paired trace-boundary packet
+   still classifies `trace_boundary_owner_unresolved`. Current
+   `perf:compare -- --scenario combat120` selects the latest status-ok capture
+   at `artifacts/perf/2026-05-07T11-28-18-728Z` and fails with `5 pass, 1 warn,
+   2 fail`. The bundle-callsite resolution packet at
+   `artifacts/perf/2026-05-07T11-45-11-238Z/projekt-143-bundle-callsite-resolution/callsite-resolution.json`
+   resolves the source-bearing renderer-main `FunctionCall` to
+   `src/core/GameEngineLoop.ts` / `RenderMain` with `11/11` loop anchors and
+   no sourcemap present. The repeatability/max-frame packet at
+   `artifacts/perf/2026-05-07T14-29-53-738Z/projekt-143-max-frame-attribution/max-frame-attribution.json`
+   consumes the current status-ok, validation-WARN, measurement-trusted
+   combat120 repeatability capture. It proves the score gate repeats
+   (`404` score-gate skips, `100` raycasts, raycasts per uncached search
+   `7.51 -> 1.961`), but `perf:compare -- --scenario combat120` fails again
+   with `6 pass, 1 warn, 1 fail` because `maxFrameMs` returns to `100.00ms`.
+   The max-frame sidecar classifies the first peak as
+   `browser_native_gc_or_uninstrumented_render_present` with high confidence.
+   The focused trace-boundary packet at
+   `artifacts/perf/2026-05-07T14-38-32-797Z/projekt-143-trace-boundary-attribution/boundary-attribution.json`
+   superseded it as the trace owner-review packet. The bundle-callsite
+   resolution packet at
+   `artifacts/perf/2026-05-07T14-38-32-797Z/projekt-143-bundle-callsite-resolution/callsite-resolution.json`
+   resolved the source-bearing renderer-main `FunctionCall` to
+   `src/core/GameEngineLoop.ts` / `RenderMain` with `11/11` source anchors and
+   no sourcemap present. The render-boundary timing packet at
+   `artifacts/perf/2026-05-07T14-53-44-437Z/projekt-143-render-boundary-timing/render-boundary-timing.json`
+   proved the first trusted `100ms` max-frame event sits inside
+   `GameEngineLoop.RenderMain.renderer.render`. The prior render-present
+   subdivision packet at
+   `artifacts/perf/2026-05-07T15-12-59-293Z/projekt-143-render-present-subdivision/render-present-subdivision.json`
+   consumes a fresh standard headed combat120 capture: avg `15.87ms`, p99
+   `34.00ms`, max-frame `100.00ms`, heap end-growth `2.60MB`, heap recovery
+   `91.1%`, measurement trust PASS. `perf:compare -- --scenario combat120`
+   fails with `6 pass, 1 warn, 1 fail`; the remaining hard blocker is
+   max-frame. Peak sample frame `1062` records `100ms`, long task `194ms`, LoAF
+   `193.80ms`, WebGL upload `0.10ms`, and `GameEngineLoop.RenderMain.renderer.render`
+   `185.40ms`. The peak LoAF carries script detail: `193.00ms` script work,
+   script share `0.9959`, forced style/layout `0ms`, and post-script render tail
+   `0.80ms`. The RAF callback source-resolution packet at
+   `artifacts/perf/2026-05-07T15-12-59-293Z/projekt-143-raf-callback-source-resolution/raf-callback-source-resolution.json`
+   resolves the minified `FrameRequestCallback` at `build-assets/index-CLD_euaE.js`
+   char `993470` to bundle line `1736`, column `12524`, enclosing scheduler
+   `Nk`, target frame function `Pk`, and `src/core/GameEngineLoop.ts` with
+   `13/13` source anchors and `18/18` loop markers. Classification is
+   `raf_callback_resolved_to_game_engine_loop_animate_render_main` with high
+   confidence. The accepted runtime render-category packet at
+   `artifacts/perf/2026-05-07T15-50-09-399Z/projekt-143-render-runtime-category-attribution/render-runtime-category-attribution.json`
+   consumes a fresh headed combat120 capture plus the static scene-category
+   sidecar and classifies
+   `runtime_renderer_category_candidates_diverge_and_counters_remain_partial`
+   with high confidence. The source capture is status `ok`, validation `warn`,
+   measurement trust PASS, avg `16.36ms`, p99 `45.00ms`, max-frame `100.00ms`,
+   heap end-growth `13.37MB`, and heap recovery `62.1%`; `perf:compare -- --scenario combat120`
+   fails with `5 pass, 1 warn, 2 fail`. The packet
+   records peak sample `26`, frame `2029` at `100ms`, renderer draw calls
+   `275`, renderer triangles `290782`, `renderer.render` max `65.80ms`, long
+   task `143ms`, LoAF `142.70ms`, and WebGL upload `17.30ms`. Same-sample
+   runtime scene attribution records `115` visible draw-call-like entries,
+   `125398` visible triangles, and `6868` visible instances, reconciling only
+   `0.4182` of sampled renderer draw calls and `0.4312` of sampled renderer
+   triangles. Terrain leads visible triangles at `0.588` share;
+   `npc_close_glb` leads visible draw-call-like entries at `0.487` share;
+   `vegetation_imposters` leads visible instances at `0.9525` share; the
+   unattributed visible draw share is `0.2261`. The accepted follow-up
+   render-submission packet at
+   `artifacts/perf/2026-05-07T16-23-11-889Z/projekt-143-render-submission-category-attribution/render-submission-category-attribution.json`
+   captures the exact peak frame `1123` with high-confidence classification
+   `render_submission_category_candidates_diverge_at_peak_frame`: `132` draw
+   submissions, `181270` triangles, `13586` instances, draw reconciliation
+   `0.5156`, triangle reconciliation `0.7379`, `unattributed` draw share
+   `0.3106`, `npc_close_glb` draw share `0.2727`, `npc_imposters` draw share
+   `0.2424`, terrain triangle share `0.6101`, and vegetation-imposter instance
+   share `0.9591`. The follow-up source-shape packet at
+   `artifacts/perf/2026-05-07T16-32-55-557Z/projekt-143-render-submission-category-attribution/render-submission-category-attribution.json`
+   is corroborating only because measurement trust is WARN; it captures exact
+   peak frame `1158` with `unattributed` draw share `0.2991`, terrain triangle
+   share `0.6910`, and exact-frame `unattributed` examples as unnamed
+   `MeshBasicMaterial` meshes with no `modelPath`. The source audit at
+   `artifacts/perf/2026-05-07T16-32-55-557Z/projekt-143-unattributed-render-source-audit/unattributed-render-source-audit.json`
+   classifies `combatant_ground_marker_attribution_gap` with WARN status and
+   medium confidence. The four exact-frame examples are `32` triangles per
+   instance, matching the `CombatantMeshFactory.ts:418` NPC ground marker
+   `RingGeometry(1.8, 3.0, 16)` / `MeshBasicMaterial` / `InstancedMesh`
+   constructor; the marker block has no `perfCategory` tag and no stable
+   `name`, and `CombatantRenderer.ts` writes marker matrices/counts at lines
+   `1360` and `1392`. The follow-up source edit tags that marker with stable
+   name `PixelForgeNpcGroundMarker.${key}` and `userData.perfCategory =
+   'npc_ground_markers'`. After `npm run build:perf`, the rebuilt-bundle
+   combat120 capture `artifacts/perf/2026-05-07T16-53-56-704Z` first records
+   status `ok`, validation `warn`, measurement trust WARN, avg `14.95ms`, p99
+   `34.10ms`, max-frame `100.00ms`, heap end-growth `14.33MB`, and heap
+   recovery `78.3%`. The proof packet
+   `artifacts/perf/2026-05-07T16-53-56-704Z/projekt-143-ground-marker-tagging-proof/ground-marker-tagging-proof.json`
+   records `unattributed` draw-share movement `0.2991 -> 0.0242`, new
+   `npc_ground_markers` draw share `0.2581`, `32` ground-marker draw
+   submissions, `214` instances, and `7360` triangles. The follow-up
+   lower-overhead capture `artifacts/perf/2026-05-07T17-03-50-248Z` remains
+   status `ok`, validation `warn`, and measurement trust WARN (`probeAvg=30ms`),
+   but corroborates the tag movement with exact peak frame `591`,
+   `unattributed` draw-share movement `0.2991 -> 0.0873`, `npc_ground_markers`
+   draw share `0.2540`, `32` ground-marker draw submissions, `184` instances,
+   and `6400` triangles. The subsequent low-drain measurement rerun
+   `artifacts/perf/2026-05-07T17-11-26-382Z` also remains status `ok`,
+   validation `warn`, and measurement trust WARN (`probeAvg=31.73ms`); its
+   ground-marker proof sidecar fails with `ground_marker_tagging_not_proven`
+   despite `unattributed` draw-share movement `0.2991 -> 0.0609`,
+   `npc_ground_markers` draw share `0.1624`, `32` draw submissions, `222`
+   instances, and `7552` triangles. `perf:compare -- --scenario combat120` now
+   selects `2026-05-07T17-11-26-382Z` and fails with `6 pass, 0 warn, 2 fail`:
+   avg `18.28ms` FAIL and max-frame `100.00ms` FAIL. The DEFEKT-3
+   measurement-path packet at
+   `artifacts/perf/2026-05-07T17-19-54-240Z/projekt-143-measurement-path-inspection/measurement-path-inspection.json`
+   persists raw `probeRoundTripSamplesMs` and classifies
+   `per_sample_render_submission_probe_overhead_captured` with high confidence:
+   `78/78` raw probes exceed `75ms`, p95 is `218ms`, and the per-sample
+   render-submission drain writes `59000325` bytes. The follow-up sparse packet
+   `artifacts/perf/2026-05-07T17-28-02-506Z/projekt-143-ground-marker-tagging-proof/ground-marker-tagging-proof.json`
+   avoids that overhead class and records exact peak-frame `npc_ground_markers`
+   draw share `0.3232`, `unattributed` draw share `0.0202`, and raw probe p95
+   `30ms`, but formal measurement trust remains WARN because probe avg is
+   `28.93ms` and three raw probes exceed `75ms`. The sparse-owner acceptance
+   audit at
+   `artifacts/perf/2026-05-07T22-29-58-460Z/projekt-143-sparse-owner-acceptance-audit/sparse-owner-acceptance-audit.json`
+   records PASS, `8/8` criteria passing, classification
+   `sparse_owner_review_accepted`, acceptance `owner_review_only`, raw probe
+   over-75 rate `0.0345`, over-150 rate `0.0345`, avg-without-max delta
+   `3.37ms` versus the accepted reference, and `3505993` render-submission
+   bytes. The current DEFEKT-3 action is the remaining owner split across
+   `npc_close_glb` draw submissions, `npc_ground_markers` draw submissions, and
+   terrain triangle dominance; it is not further probe-drain reduction,
+   suppression raycast cost, GPU present, or baseline refresh.
 8. Keep the manual deploy/header spot-check in `docs/DEPLOY_WORKFLOW.md` as a
    release gate. The 2026-04-24 release bridged local-vs-prod evidence; repeat
    the check after every push intended for player testing, then replace the
@@ -1456,4 +2666,3 @@ What is not ready to claim:
 9. Treat local perf-preview screenshots as non-deployed truth until the live
    Pages URL serves the same `asset-manifest.json`, R2 DEM, service worker,
    WASM, and content-hashed build assets.
-

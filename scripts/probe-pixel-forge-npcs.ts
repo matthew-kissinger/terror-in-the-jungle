@@ -13,6 +13,7 @@ type ProbeNpcRow = {
   renderMode: 'close-glb' | 'impostor' | 'culled';
   clip: string | null;
   hasWeapon: boolean;
+  closeFallbackReason: string | null;
 };
 
 type ProbeSummary = {
@@ -24,6 +25,8 @@ type ProbeSummary = {
   closeModelPoolLoads: number;
   closeModelPoolTargets: Record<string, number>;
   closeModelPoolAvailable: Record<string, number>;
+  closeModelRuntimeStats: unknown;
+  closeModelFallbacks: unknown[];
   nearest: ProbeNpcRow[];
   failures: string[];
 };
@@ -112,6 +115,15 @@ try {
     const closeModelPoolLoads = renderer?.closeModelPoolLoads instanceof Map
       ? renderer.closeModelPoolLoads.size
       : 0;
+    const closeModelRuntimeStats = typeof renderer?.getCloseModelRuntimeStats === 'function'
+      ? renderer.getCloseModelRuntimeStats()
+      : null;
+    const closeModelFallbacks = typeof renderer?.getCloseModelFallbackRecords === 'function'
+      ? renderer.getCloseModelFallbackRecords()
+      : [];
+    const fallbackById = new Map(
+      closeModelFallbacks.map((record: any) => [String(record.combatantId), String(record.reason)]),
+    );
     const rows: ProbeNpcRow[] = Array.from(combat.combatants.values()).map((combatant: any) => {
       const dx = combatant.position.x - playerPosition.x;
       const dy = combatant.position.y - playerPosition.y;
@@ -131,6 +143,7 @@ try {
         renderMode,
         clip: closeInstance?.activeClip ?? null,
         hasWeapon: Boolean(closeInstance?.hasWeapon),
+        closeFallbackReason: fallbackById.get(String(combatant.id)) ?? null,
       };
     }).sort((a, b) => a.distance - b.distance);
 
@@ -157,6 +170,8 @@ try {
       closeModelPoolLoads,
       closeModelPoolTargets,
       closeModelPoolAvailable,
+      closeModelRuntimeStats,
+      closeModelFallbacks,
       nearest,
       failures,
     };

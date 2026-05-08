@@ -1,6 +1,6 @@
 # Projekt Objekt-143 Hydrology Track
 
-Last updated: 2026-05-06
+Last updated: 2026-05-07
 
 This note folds the owner request for reusable procedural hydrology into
 Projekt Objekt-143 KB-TERRAIN. The target is not another flat/global water
@@ -44,11 +44,13 @@ Frontier.
   `artifacts/perf/2026-05-06T09-51-26-258Z/summary.json` for Open Frontier and
   `artifacts/perf/2026-05-06T09-52-17-998Z/summary.json` for A Shau.
 - Current water-system contract audit:
-  `artifacts/perf/2026-05-06T10-07-20-371Z/projekt-143-water-system-audit/water-system-audit.json`.
+  `artifacts/perf/2026-05-07T18-19-23-592Z/projekt-143-water-system-audit/water-system-audit.json`.
+- Current hydrology cache integrity check: `npm run check:hydrology-bakes`
+  PASS after regenerating stale bake-manifest signatures on 2026-05-07.
 - Current completion audit:
   `artifacts/perf/2026-05-06T11-03-38-131Z/projekt-143-completion-audit/completion-audit.json`.
-- Current headed runtime water proof:
-  `artifacts/perf/2026-05-06T10-26-04-620Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
+- Current headless runtime water proof:
+  `artifacts/perf/2026-05-07T18-23-25-934Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
 - Latest audit:
   `artifacts/perf/2026-05-06T10-46-48-051Z/projekt-143-terrain-hydrology-audit/hydrology-audit.json`.
 - Latest terrain distribution audit:
@@ -140,7 +142,7 @@ runtime rivers. The latest JSON also stores bounded world-space
 `channelPolylines` for the top paths so the next branch can start from map-space
 river corridor candidates instead of re-deriving pixel paths inside the runtime.
 
-The water-system audit makes the current renderer baseline explicit:
+The refreshed 2026-05-07 water-system audit makes the current renderer baseline explicit:
 `WaterSystem` is a camera-following global `Y=0` Three.js water plane, A Shau
 disables that plane, and Open Frontier still combines the default global water
 with procedural negative-height water/lake/river-valley carving. A Shau already
@@ -152,6 +154,12 @@ as `default_mode_preload`, the vegetation classifier as
 provisional river-strip water consumer as wired. It still keeps final stream
 visuals, water gameplay queries, and hydrology ecology acceptance open until
 matched browser screenshots/perf and human review exist.
+
+The 2026-05-07 runtime proof records Open Frontier with `12` channels / `592`
+segments, A Shau with `12` channels / `552` segments, screenshot artifacts for
+both modes, and zero browser errors. That packet proves runtime mesh presence
+against refreshed cache signatures; it does not accept final river art, stream
+flow, crossings, gameplay water queries, or perf.
 
 The latest terrain horizon proof is PASS at
 `artifacts/perf/2026-05-06T10-51-52-518Z/projekt-143-terrain-horizon-baseline/summary.json`.

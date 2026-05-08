@@ -19,12 +19,27 @@ import {
   type MovementArtifactReportForViewer,
   type MovementTerrainOverlayArtifact,
 } from './perfMovementViewerTemplate';
-import { PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE } from './projekt-143-scene-attribution';
+import {
+  PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE,
+  PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_RESET_SOURCE,
+  PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE,
+} from './projekt-143-scene-attribution';
 
 type ConsoleEntry = {
   ts: string;
   type: string;
   text: string;
+};
+
+type RuntimeFrameEventSample = {
+  frameCount: number;
+  frameMs: number;
+  atMs: number;
+  previousMaxFrameMs: number;
+  newMax: boolean;
+  hitch33: boolean;
+  hitch50: boolean;
+  hitch100: boolean;
 };
 
 type RuntimeSample = {
@@ -37,6 +52,7 @@ type RuntimeSample = {
   hitch33Count?: number;
   hitch50Count?: number;
   hitch100Count?: number;
+  frameEvents?: RuntimeFrameEventSample[];
   combatantCount: number;
   overBudgetPercent: number;
   shotsThisSession?: number;
@@ -53,6 +69,18 @@ type RuntimeSample = {
     effectPoolsMs: number;
     influenceMapMs: number;
     aiStateMs?: Record<string, number>;
+    aiMethodMs?: Record<string, number>;
+    aiMethodCounts?: Record<string, number>;
+    aiMethodTotalCounts?: Record<string, number>;
+    aiSlowestUpdate?: {
+      combatantId: string;
+      stateAtStart: string;
+      stateAtEnd: string;
+      lodLevel: string;
+      totalMs: number;
+      methodMs: Record<string, number>;
+      methodCounts?: Record<string, number>;
+    } | null;
     losCache?: {
       hits: number;
       misses: number;
@@ -60,6 +88,29 @@ type RuntimeSample = {
       budgetDenials: number;
       prefilterPasses?: number;
       prefilterRejects?: number;
+      fullEvaluations?: number;
+      terrainRaycasts?: number;
+      fullEvaluationClear?: number;
+      fullEvaluationBlocked?: number;
+    };
+    closeEngagement?: {
+      engagement?: {
+        closeRangeFullAutoActivations: number;
+        nearbyEnemyBurstTriggers: number;
+        suppressionTransitions: number;
+        nearbyEnemyCountSamples: number;
+        nearbyEnemyCountTotal: number;
+        nearbyEnemyCountMax: number;
+        suppressionFlankDestinationComputations?: number;
+        suppressionFlankCoverSearches?: number;
+        suppressionFlankCoverSearchReuseSkips?: number;
+        suppressionFlankCoverSearchCapSkips?: number;
+        targetDistanceBuckets?: Record<string, number>;
+      };
+      targetAcquisition?: Record<string, number>;
+      targetDistribution?: Record<string, number>;
+      lineOfSight?: Record<string, number>;
+      losCallsites?: Record<string, Record<string, number>>;
     };
     raycastBudget?: {
       maxPerFrame: number;
@@ -101,11 +152,16 @@ type RuntimeSample = {
     textures: number;
     programs: number;
   };
+  sceneAttribution?: SceneAttributionEntry[] | null;
+  sceneAttributionError?: string | null;
+  renderSubmissions?: RuntimeRenderSubmissionDrain | null;
+  renderSubmissionError?: string | null;
   browserStalls?: {
     support: {
       longtask: boolean;
       longAnimationFrame: boolean;
       userTiming: boolean;
+      webglTextureUpload?: boolean;
     };
     totals: {
       longTaskCount: number;
@@ -115,6 +171,14 @@ type RuntimeSample = {
       longAnimationFrameTotalDurationMs: number;
       longAnimationFrameMaxDurationMs: number;
       longAnimationFrameBlockingDurationMs: number;
+      webglTextureUploadCount?: number;
+      webglTextureUploadTotalDurationMs?: number;
+      webglTextureUploadMaxDurationMs?: number;
+      webglTextureUploadByOperation?: Record<string, {
+        count: number;
+        totalDurationMs: number;
+        maxDurationMs: number;
+      }>;
       userTimingByName?: Record<string, {
         count: number;
         totalDurationMs: number;
@@ -126,14 +190,62 @@ type RuntimeSample = {
         count: number;
         totalDurationMs: number;
         maxDurationMs: number;
-        entries: Array<{ name: string; startTime: number; duration: number }>;
+        entries: Array<{
+          name: string;
+          startTime: number;
+          duration: number;
+          attribution?: Array<{
+            name: string;
+            entryType: string;
+            startTime: number;
+            duration: number;
+            containerType: string;
+            containerSrc: string;
+            containerId: string;
+            containerName: string;
+          }>;
+        }>;
       };
+      webglTextureUploadTop?: Array<{
+        operation: string;
+        startTime: number;
+        duration: number;
+        target: string;
+        textureId: number;
+        width: number;
+        height: number;
+        sourceType: string;
+        sourceUrl: string;
+        sourceWidth: number;
+        sourceHeight: number;
+        byteLength: number;
+      }>;
       longAnimationFrames: {
         count: number;
         totalDurationMs: number;
         maxDurationMs: number;
         blockingDurationMs: number;
-        entries: Array<{ startTime: number; duration: number; blockingDuration: number }>;
+        entries: Array<{
+          startTime: number;
+          duration: number;
+          blockingDuration: number;
+          renderStart: number;
+          styleAndLayoutStart: number;
+          firstUIEventTimestamp: number;
+          scripts: Array<{
+            name: string;
+            invoker: string;
+            invokerType: string;
+            sourceURL: string;
+            sourceFunctionName: string;
+            sourceCharPosition: number;
+            windowAttribution: string;
+            executionStart: number;
+            duration: number;
+            pauseDuration: number;
+            forcedStyleAndLayoutDuration: number;
+          }>;
+        }>;
       };
       userTimingByName?: Record<string, {
         count: number;
@@ -395,6 +507,7 @@ type CaptureSummary = {
   perfRuntime?: {
     matchDurationSeconds?: number;
     victoryConditionsDisabled: boolean;
+    npcCloseModelsDisabled: boolean;
   };
   // Match-end lifecycle (harness-lifecycle-halt-on-match-end).
   // matchEndedAtMs is wall-clock-ms-since-capture-start when the harness
@@ -452,6 +565,7 @@ type MeasurementTrustReport = {
   probeRoundTripAvgMs: number;
   probeRoundTripP95Ms: number;
   probeRoundTripMaxMs: number;
+  probeRoundTripSamplesMs: number[];
   sampleCount: number;
   missedSamples: number;
   missedSampleRate: number;
@@ -496,6 +610,64 @@ type SceneAttributionEntry = {
   }>;
 };
 
+type RuntimeSceneAttributionSample = {
+  sampleIndex: number;
+  ts: string;
+  frameCount: number;
+  maxFrameMs: number | null;
+  renderer: RuntimeSample['renderer'] | null;
+  sceneAttribution: SceneAttributionEntry[] | null;
+  sceneAttributionError: string | null;
+};
+
+type RuntimeRenderSubmissionCategory = {
+  category: string;
+  drawSubmissions: number;
+  triangles: number;
+  instances: number;
+  meshes: number;
+  materials: number;
+  geometries: number;
+  examples?: Array<{
+    nameChain: string;
+    type: string;
+    modelPath: string | null;
+    materialType: string | null;
+    triangles: number;
+    instances: number;
+  }>;
+};
+
+type RuntimeRenderSubmissionFrame = {
+  frameCount: number;
+  firstAtMs: number;
+  lastAtMs: number;
+  drawSubmissions: number;
+  triangles: number;
+  instances: number;
+  categories: RuntimeRenderSubmissionCategory[];
+};
+
+type RuntimeRenderSubmissionDrain = {
+  installedCount: number;
+  installPasses: number;
+  frameCountStart: number | null;
+  frameCountEnd: number | null;
+  frames: RuntimeRenderSubmissionFrame[];
+  totals: RuntimeRenderSubmissionCategory[];
+  errors?: string[];
+};
+
+type RuntimeRenderSubmissionSample = {
+  sampleIndex: number;
+  ts: string;
+  frameCount: number;
+  maxFrameMs: number | null;
+  renderer: RuntimeSample['renderer'] | null;
+  renderSubmissions: RuntimeRenderSubmissionDrain | null;
+  renderSubmissionError: string | null;
+};
+
 const DEV_SERVER_PORT = 9100;
 const DEFAULT_DURATION_SECONDS = 90;
 const DEFAULT_WARMUP_SECONDS = 15;
@@ -521,8 +693,8 @@ const STEP_TIMEOUT_MS = 30_000;
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const MIN_RUN_HARD_TIMEOUT_MS = 120_000;
 const LOCK_FILE = join(process.cwd(), 'tmp', 'perf-capture.lock');
-const CDP_STOP_TIMEOUT_MS = 3_000;
-const TRACE_STOP_TIMEOUT_MS = 5_000;
+const CDP_STOP_TIMEOUT_MS = 10_000;
+const TRACE_STOP_TIMEOUT_MS = 15_000;
 const SCENARIO_SETUP_TIMEOUT_MS = 10_000;
 const POST_CAPTURE_HARD_TIMEOUT_MS = 120_000;
 const PERF_SERVER_HOST = '127.0.0.1';
@@ -785,7 +957,18 @@ Common options:
   --seed <number>
   --sample-interval-ms <ms>
   --detail-every-samples <count>
+  --runtime-scene-attribution <true|false>
+  --runtime-scene-attribution-every-samples <count>
+  --runtime-render-submission-attribution <true|false>
+  --runtime-render-submission-every-samples <count>
   --runtime-preflight <true|false>
+  --disable-npc-close-models
+  --disable-terrain-shadows
+  --deep-cdp
+  --cdp-profiler <true|false>
+  --cdp-heap-sampling <true|false>
+  --trace-window-start-ms <ms>
+  --trace-window-duration-ms <ms>
   --server-mode <perf|dev|preview>
   --headed
   --help
@@ -910,6 +1093,7 @@ function computeMeasurementTrust(options: {
     probeRoundTripAvgMs,
     probeRoundTripP95Ms,
     probeRoundTripMaxMs,
+    probeRoundTripSamplesMs: [...options.probeRoundTripMs],
     sampleCount: options.probeRoundTripMs.length,
     missedSamples: options.missedSamples,
     missedSampleRate,
@@ -1040,6 +1224,42 @@ async function captureMovementViewerPayload(page: Page): Promise<MovementViewerP
 
 async function captureSceneAttribution(page: Page): Promise<SceneAttributionEntry[] | null> {
   return page.evaluate(PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE) as Promise<SceneAttributionEntry[] | null>;
+}
+
+function collectRuntimeSceneAttributionSamples(runtimeSamples: RuntimeSample[]): RuntimeSceneAttributionSample[] {
+  return runtimeSamples.flatMap((sample, sampleIndex) => {
+    if (typeof sample.sceneAttribution === 'undefined' && !sample.sceneAttributionError) {
+      return [];
+    }
+
+    return [{
+      sampleIndex,
+      ts: sample.ts,
+      frameCount: sample.frameCount,
+      maxFrameMs: typeof sample.maxFrameMs === 'number' ? sample.maxFrameMs : null,
+      renderer: sample.renderer ?? null,
+      sceneAttribution: sample.sceneAttribution ?? null,
+      sceneAttributionError: sample.sceneAttributionError ?? null
+    }];
+  });
+}
+
+function collectRuntimeRenderSubmissionSamples(runtimeSamples: RuntimeSample[]): RuntimeRenderSubmissionSample[] {
+  return runtimeSamples.flatMap((sample, sampleIndex) => {
+    if (typeof sample.renderSubmissions === 'undefined' && !sample.renderSubmissionError) {
+      return [];
+    }
+
+    return [{
+      sampleIndex,
+      ts: sample.ts,
+      frameCount: sample.frameCount,
+      maxFrameMs: typeof sample.maxFrameMs === 'number' ? sample.maxFrameMs : null,
+      renderer: sample.renderer ?? null,
+      renderSubmissions: sample.renderSubmissions ?? null,
+      renderSubmissionError: sample.renderSubmissionError ?? null
+    }];
+  });
 }
 
 type HarnessModeThresholds = {
@@ -2027,18 +2247,24 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
   };
 }
 
-async function startChromeTracing(cdp: CDPSession): Promise<void> {
+async function startChromeTracing(
+  cdp: CDPSession,
+  options: { includeV8CpuProfiler: boolean }
+): Promise<void> {
+  const categories = [
+    '-*',
+    'devtools.timeline',
+    'toplevel',
+    'v8',
+    'blink.user_timing',
+    'disabled-by-default-devtools.timeline'
+  ];
+  if (options.includeV8CpuProfiler) {
+    categories.push('disabled-by-default-v8.cpu_profiler');
+  }
   await cdp.send('Tracing.start', {
     transferMode: 'ReturnAsStream',
-    categories: [
-      '-*',
-      'devtools.timeline',
-      'toplevel',
-      'v8',
-      'blink.user_timing',
-      'disabled-by-default-v8.cpu_profiler',
-      'disabled-by-default-devtools.timeline'
-    ].join(',')
+    categories: categories.join(',')
   });
 }
 
@@ -2091,6 +2317,22 @@ async function runCapture(): Promise<void> {
   const devtools = hasFlag('devtools');
   const playwrightTrace = hasFlag('playwright-trace') || process.env.PERF_PLAYWRIGHT_TRACE === '1';
   const deepCdp = hasFlag('deep-cdp') || process.env.PERF_DEEP_CDP === '1';
+  const cdpProfiler = deepCdp && parseBooleanFlag('cdp-profiler', true);
+  const cdpHeapSampling = deepCdp && parseBooleanFlag('cdp-heap-sampling', true);
+  const traceWindowStartMsArg = parseNumberFlag('trace-window-start-ms', Number.NaN);
+  const traceWindowDurationMsArg = parseNumberFlag('trace-window-duration-ms', Number.NaN);
+  const traceWindowStartMs = deepCdp && Number.isFinite(traceWindowStartMsArg) && traceWindowStartMsArg >= 0
+    ? Math.floor(traceWindowStartMsArg)
+    : null;
+  const traceWindowDurationMs = traceWindowStartMs !== null
+    && Number.isFinite(traceWindowDurationMsArg)
+    && traceWindowDurationMsArg > 0
+    ? Math.floor(traceWindowDurationMsArg)
+    : null;
+  const focusedChromeTrace = traceWindowStartMs !== null && traceWindowDurationMs !== null;
+  const traceWindowLabel = focusedChromeTrace
+    ? `${traceWindowStartMs!}-${traceWindowStartMs! + traceWindowDurationMs!}ms`
+    : 'full';
   const enableCombat = parseBooleanFlag('combat', true);
   const requestedMode = normalizeGameMode(parseStringFlag('mode', DEFAULT_GAME_MODE));
   const activePlayerScenario = parseBooleanFlag('active-player', DEFAULT_ACTIVE_PLAYER);
@@ -2108,6 +2350,16 @@ async function runCapture(): Promise<void> {
       durationSeconds >= 900 ? 5 : DEFAULT_DETAIL_EVERY_SAMPLES
     )
   );
+  const runtimeSceneAttribution = parseBooleanFlag('runtime-scene-attribution', false);
+  const runtimeSceneAttributionEverySamples = Math.max(
+    1,
+    parseNumberFlag('runtime-scene-attribution-every-samples', detailEverySamples)
+  );
+  const runtimeRenderSubmissionAttribution = parseBooleanFlag('runtime-render-submission-attribution', false);
+  const runtimeRenderSubmissionEverySamples = Math.max(
+    1,
+    parseNumberFlag('runtime-render-submission-every-samples', detailEverySamples)
+  );
   const prewarm = parseBooleanFlag('prewarm', DEFAULT_PREWARM);
   const runtimePreflight = parseBooleanFlag('runtime-preflight', DEFAULT_RUNTIME_PREFLIGHT);
   const matchDurationArg = parseNumberFlag('match-duration', Number.NaN);
@@ -2115,6 +2367,8 @@ async function runCapture(): Promise<void> {
     ? Math.ceil(matchDurationArg)
     : null;
   const disableVictory = parseBooleanFlag('disable-victory', false);
+  const disableNpcCloseModels = parseBooleanFlag('disable-npc-close-models', false);
+  const disableTerrainShadows = parseBooleanFlag('disable-terrain-shadows', false);
   const sandboxMode = parseBooleanFlag(
     'sandbox',
     requestedMode === 'ai_sandbox' ? true : DEFAULT_SANDBOX_MODE
@@ -2142,7 +2396,7 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} disableVictory=${disableVictory} reuseServer=${reuseServer} serverMode=${serverMode}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} reuseServer=${reuseServer} serverMode=${serverMode}`);
 
   let server: ServerHandle | null = null;
   let context: BrowserContext | null = null;
@@ -2170,7 +2424,9 @@ async function runCapture(): Promise<void> {
     ? `&perfMatchDuration=${perfMatchDurationSeconds}`
     : '';
   const disableVictoryQuery = disableVictory ? '&perfDisableVictory=1' : '';
-  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}`;
+  const disableNpcCloseModelsQuery = disableNpcCloseModels ? '&perfDisableNpcCloseModels=1' : '';
+  const disableTerrainShadowsQuery = disableTerrainShadows ? '&perfDisableTerrainShadows=1' : '';
+  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}`;
   const query = sandboxMode
     ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}${perfRuntimeQuery}`
     : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}${perfRuntimeQuery}`;
@@ -2212,6 +2468,8 @@ async function runCapture(): Promise<void> {
   let activeScenarioStarted = false;
   let harnessDriverFinal: HarnessDriverFinal | null = null;
   let cdpStarted = false;
+  let chromeTracingStarted = false;
+  let chromeTracingStopped = false;
   let playwrightTracingStarted = false;
   let stage = 'init';
   let hardTimeout: NodeJS.Timeout | null = null;
@@ -2462,12 +2720,19 @@ async function runCapture(): Promise<void> {
     if (deepCdp) {
       stage = 'start-cdp';
       cdp = await context.newCDPSession(page);
-      await cdp.send('Profiler.enable');
-      await cdp.send('Profiler.setSamplingInterval', { interval: 100 });
-      await cdp.send('HeapProfiler.enable');
-      await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
-      await cdp.send('Profiler.start');
-      await startChromeTracing(cdp);
+      if (cdpProfiler) {
+        await cdp.send('Profiler.enable');
+        await cdp.send('Profiler.setSamplingInterval', { interval: 100 });
+        await cdp.send('Profiler.start');
+      }
+      if (cdpHeapSampling) {
+        await cdp.send('HeapProfiler.enable');
+        await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+      }
+      if (!focusedChromeTrace) {
+        await startChromeTracing(cdp, { includeV8CpuProfiler: cdpProfiler });
+        chromeTracingStarted = true;
+      }
       cdpStarted = true;
     }
 
@@ -2547,17 +2812,15 @@ async function runCapture(): Promise<void> {
         activeScenarioStarted = activePlayerScenario;
       }
       await foregroundCapturePage(page);
+      if (runtimeRenderSubmissionAttribution) {
+        const installResult = await safeAwait(
+          'install render submission attribution',
+          page.evaluate(PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE),
+          10_000
+        );
+        logStep(`🎯 Render submission attribution installed (${JSON.stringify(installResult)})`);
+      }
       await warmupRuntime(page, warmupSeconds);
-      // Reset rolling metrics so sampling reflects steady-state window, not startup cost.
-      await safeAwait(
-        'reset in-page metrics',
-        page.evaluate(() => {
-          (window as any).__metrics?.reset?.();
-          (window as any).perf?.reset?.();
-          (window as any).__perfHarnessObservers?.reset?.();
-        }),
-        3000
-      );
       if (activePlayerScenario) {
         await stopActiveScenarioDriver(page);
         await setupActiveScenarioDriver(page, {
@@ -2571,6 +2834,26 @@ async function runCapture(): Promise<void> {
           frontlineTriggerDistance,
           maxCompressedPerFaction
         });
+      }
+      await foregroundCapturePage(page);
+      // Reset rolling metrics after the active driver is live so sampling
+      // reflects the steady-state window, not startup or harness restart cost.
+      await safeAwait(
+        'reset in-page metrics',
+        page.evaluate(() => {
+          (window as any).__metrics?.reset?.();
+          (window as any).perf?.reset?.();
+          (window as any).__perfHarnessObservers?.reset?.();
+        }),
+        3000
+      );
+      if (runtimeRenderSubmissionAttribution) {
+        const resetResult = await safeAwait(
+          'reset render submission attribution',
+          page.evaluate(PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_RESET_SOURCE),
+          10_000
+        );
+        logStep(`🎯 Render submission attribution reset (${JSON.stringify(resetResult)})`);
       }
       await foregroundCapturePage(page);
     }
@@ -2591,12 +2874,57 @@ async function runCapture(): Promise<void> {
     const startMs = Date.now();
     let sampleTick = 0;
     while (Date.now() - startMs < durationSeconds * 1000) {
+      const elapsedMs = Date.now() - startMs;
+      if (
+        cdpStarted
+        && cdp
+        && focusedChromeTrace
+        && !chromeTracingStarted
+        && traceWindowStartMs !== null
+        && elapsedMs >= traceWindowStartMs
+      ) {
+        try {
+          await startChromeTracing(cdp, { includeV8CpuProfiler: cdpProfiler });
+          chromeTracingStarted = true;
+          logStep(`🎞 Focused Chrome trace started at +${elapsedMs}ms`);
+        } catch (error) {
+          logStep(`⚠ focused Chrome trace start failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      if (
+        cdpStarted
+        && cdp
+        && focusedChromeTrace
+        && chromeTracingStarted
+        && !chromeTracingStopped
+        && traceWindowStartMs !== null
+        && traceWindowDurationMs !== null
+        && elapsedMs >= traceWindowStartMs + traceWindowDurationMs
+      ) {
+        try {
+          chromeTrace = await stopChromeTracing(cdp);
+          chromeTracingStopped = true;
+          logStep(`🎞 Focused Chrome trace stopped at +${elapsedMs}ms (${chromeTrace.length} bytes)`);
+        } catch (error) {
+          logStep(`⚠ focused Chrome trace stop failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
       await sleep(sampleIntervalMs);
       let sample: RuntimeSample | null = null;
       try {
         const probeStart = Date.now();
         const includeDetails = sampleTick % detailEverySamples === 0;
-        const raw = await withTimeout('runtime sample', page.evaluate((shouldIncludeDetails: boolean) => {
+        const shouldCaptureSceneAttribution = runtimeSceneAttribution
+          && sampleTick % runtimeSceneAttributionEverySamples === 0;
+        const shouldCaptureRenderSubmissions = runtimeRenderSubmissionAttribution
+          && sampleTick % runtimeRenderSubmissionEverySamples === 0;
+        const raw = await withTimeout('runtime sample', page.evaluate((options: {
+          shouldIncludeDetails: boolean;
+          shouldCaptureSceneAttribution: boolean;
+          shouldCaptureRenderSubmissions: boolean;
+          sceneAttributionEvaluateSource: string;
+        }) => {
+          const shouldIncludeDetails = options.shouldIncludeDetails;
           const metrics = (window as any).__metrics;
           const perf = (window as any).perf;
           const engine = (window as any).__engine;
@@ -2615,10 +2943,72 @@ async function runCapture(): Promise<void> {
             : null;
           const memory = (performance as any).memory;
           const snapshot = metrics?.getSnapshot?.();
+          const frameEvents = Array.isArray(snapshot?.frameEvents)
+            ? snapshot.frameEvents.slice(-64).map((entry: any) => ({
+                frameCount: Number(entry?.frameCount ?? 0),
+                frameMs: Number(entry?.frameMs ?? 0),
+                atMs: Number(entry?.atMs ?? 0),
+                previousMaxFrameMs: Number(entry?.previousMaxFrameMs ?? 0),
+                newMax: Boolean(entry?.newMax),
+                hitch33: Boolean(entry?.hitch33),
+                hitch50: Boolean(entry?.hitch50),
+                hitch100: Boolean(entry?.hitch100)
+              }))
+            : [];
           const sampleHelpers = (window as any).__perfCaptureHarnessHelpers;
           const nullableNumber = sampleHelpers.nullableNumber;
           const objectOrNull = sampleHelpers.objectOrNull;
           const normalizeRuntimeLiveness = sampleHelpers.normalizeRuntimeLiveness;
+          let sceneAttribution: any[] | null = null;
+          let sceneAttributionError: string | null = null;
+          let renderSubmissions: any | null = null;
+          let renderSubmissionError: string | null = null;
+          if (options.shouldCaptureSceneAttribution) {
+            try {
+              const rawSceneAttribution = Function(
+                `"use strict"; return (${options.sceneAttributionEvaluateSource});`
+              )();
+              if (Array.isArray(rawSceneAttribution)) {
+                sceneAttribution = rawSceneAttribution.map((entry: any) => ({
+                  category: String(entry?.category ?? 'unattributed'),
+                  objects: Number(entry?.objects ?? 0),
+                  visibleObjects: Number(entry?.visibleObjects ?? 0),
+                  meshes: Number(entry?.meshes ?? 0),
+                  visibleMeshes: Number(entry?.visibleMeshes ?? 0),
+                  instancedMeshes: Number(entry?.instancedMeshes ?? 0),
+                  visibleInstancedMeshes: Number(entry?.visibleInstancedMeshes ?? 0),
+                  drawCallLike: Number(entry?.drawCallLike ?? 0),
+                  visibleDrawCallLike: Number(entry?.visibleDrawCallLike ?? 0),
+                  instances: Number(entry?.instances ?? 0),
+                  visibleInstances: Number(entry?.visibleInstances ?? 0),
+                  triangles: Number(entry?.triangles ?? 0),
+                  visibleTriangles: Number(entry?.visibleTriangles ?? 0),
+                  materials: Number(entry?.materials ?? 0),
+                  geometries: Number(entry?.geometries ?? 0)
+                }));
+              } else {
+                sceneAttributionError = rawSceneAttribution === null
+                  ? 'scene_attribution_unavailable'
+                  : 'scene_attribution_non_array';
+              }
+            } catch (error) {
+              sceneAttributionError = error instanceof Error ? error.message : String(error);
+            }
+          }
+          if (options.shouldCaptureRenderSubmissions) {
+            try {
+              const tracker = (window as any).__projekt143RenderSubmissionAttribution;
+              tracker?.install?.();
+              const rawRenderSubmissions = tracker?.drain?.() ?? null;
+              if (rawRenderSubmissions && typeof rawRenderSubmissions === 'object' && !rawRenderSubmissions.error) {
+                renderSubmissions = rawRenderSubmissions;
+              } else {
+                renderSubmissionError = String(rawRenderSubmissions?.error ?? 'render_submission_tracker_unavailable');
+              }
+            } catch (error) {
+              renderSubmissionError = error instanceof Error ? error.message : String(error);
+            }
+          }
           return {
             frameCount: Number(snapshot?.frameCount ?? 0),
             avgFrameMs: Number(snapshot?.avgFrameMs ?? 0),
@@ -2628,6 +3018,7 @@ async function runCapture(): Promise<void> {
             hitch33Count: Number(snapshot?.hitch33Count ?? 0),
             hitch50Count: Number(snapshot?.hitch50Count ?? 0),
             hitch100Count: Number(snapshot?.hitch100Count ?? 0),
+            frameEvents,
             combatantCount: Number(snapshot?.combatantCount ?? 0),
             overBudgetPercent: Number(basicValidation?.frameBudget?.overBudgetPercent ?? report?.overBudgetPercent ?? 0),
             shotsThisSession: Number(basicValidation?.hitDetection?.shotsThisSession ?? report?.hitDetection?.shotsThisSession ?? 0),
@@ -2643,11 +3034,24 @@ async function runCapture(): Promise<void> {
               textures: Number(rendererStats.textures ?? 0),
               programs: Number(rendererStats.programs ?? 0)
             } : undefined,
+            ...(options.shouldCaptureSceneAttribution || sceneAttributionError
+              ? {
+                  sceneAttribution,
+                  sceneAttributionError
+                }
+              : {}),
+            ...(options.shouldCaptureRenderSubmissions || renderSubmissionError
+              ? {
+                  renderSubmissions,
+                  renderSubmissionError
+                }
+              : {}),
             browserStalls: browserStalls ? {
               support: {
                 longtask: Boolean(browserStalls.support?.longtask),
                 longAnimationFrame: Boolean(browserStalls.support?.longAnimationFrame),
-                userTiming: Boolean(browserStalls.support?.measure)
+                userTiming: Boolean(browserStalls.support?.measure),
+                webglTextureUpload: Boolean(browserStalls.support?.webglTextureUpload)
               },
               totals: {
                 longTaskCount: Number(browserStalls.totals?.longTaskCount ?? 0),
@@ -2657,6 +3061,21 @@ async function runCapture(): Promise<void> {
                 longAnimationFrameTotalDurationMs: Number(browserStalls.totals?.longAnimationFrameTotalDurationMs ?? 0),
                 longAnimationFrameMaxDurationMs: Number(browserStalls.totals?.longAnimationFrameMaxDurationMs ?? 0),
                 longAnimationFrameBlockingDurationMs: Number(browserStalls.totals?.longAnimationFrameBlockingDurationMs ?? 0),
+                webglTextureUploadCount: Number(browserStalls.totals?.webglTextureUploadCount ?? 0),
+                webglTextureUploadTotalDurationMs: Number(browserStalls.totals?.webglTextureUploadTotalDurationMs ?? 0),
+                webglTextureUploadMaxDurationMs: Number(browserStalls.totals?.webglTextureUploadMaxDurationMs ?? 0),
+                webglTextureUploadByOperation: browserStalls.totals?.webglTextureUploadByOperation && typeof browserStalls.totals.webglTextureUploadByOperation === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(browserStalls.totals.webglTextureUploadByOperation).map(([name, value]: [string, any]) => [
+                        String(name),
+                        {
+                          count: Number(value?.count ?? 0),
+                          totalDurationMs: Number(value?.totalDurationMs ?? 0),
+                          maxDurationMs: Number(value?.maxDurationMs ?? 0)
+                        }
+                      ])
+                    )
+                  : undefined,
                 userTimingByName: browserStalls.totals?.userTimingByName && typeof browserStalls.totals.userTimingByName === 'object'
                   ? Object.fromEntries(
                       Object.entries(browserStalls.totals.userTimingByName).map(([name, value]: [string, any]) => [
@@ -2679,10 +3098,38 @@ async function runCapture(): Promise<void> {
                     ? browserStalls.recent.longTasks.entries.map((entry: any) => ({
                         name: String(entry.name ?? 'longtask'),
                         startTime: Number(entry.startTime ?? 0),
-                        duration: Number(entry.duration ?? 0)
+                        duration: Number(entry.duration ?? 0),
+                        attribution: Array.isArray(entry.attribution)
+                          ? entry.attribution.slice(0, 8).map((item: any) => ({
+                              name: String(item.name ?? ''),
+                              entryType: String(item.entryType ?? ''),
+                              startTime: Number(item.startTime ?? 0),
+                              duration: Number(item.duration ?? 0),
+                              containerType: String(item.containerType ?? ''),
+                              containerSrc: String(item.containerSrc ?? ''),
+                              containerId: String(item.containerId ?? ''),
+                              containerName: String(item.containerName ?? '')
+                            }))
+                          : []
                       }))
                     : []
                 },
+                webglTextureUploadTop: Array.isArray(browserStalls.recent?.webglTextureUploadTop)
+                  ? browserStalls.recent.webglTextureUploadTop.slice(0, 8).map((entry: any) => ({
+                      operation: String(entry.operation ?? ''),
+                      startTime: Number(entry.startTime ?? 0),
+                      duration: Number(entry.duration ?? 0),
+                      target: String(entry.target ?? ''),
+                      textureId: Number(entry.textureId ?? 0),
+                      width: Number(entry.width ?? 0),
+                      height: Number(entry.height ?? 0),
+                      sourceType: String(entry.sourceType ?? ''),
+                      sourceUrl: String(entry.sourceUrl ?? ''),
+                      sourceWidth: Number(entry.sourceWidth ?? 0),
+                      sourceHeight: Number(entry.sourceHeight ?? 0),
+                      byteLength: Number(entry.byteLength ?? 0)
+                    }))
+                  : [],
                 longAnimationFrames: {
                   count: Number(browserStalls.recent?.longAnimationFrames?.count ?? 0),
                   totalDurationMs: Number(browserStalls.recent?.longAnimationFrames?.totalDurationMs ?? 0),
@@ -2692,7 +3139,25 @@ async function runCapture(): Promise<void> {
                     ? browserStalls.recent.longAnimationFrames.entries.map((entry: any) => ({
                         startTime: Number(entry.startTime ?? 0),
                         duration: Number(entry.duration ?? 0),
-                        blockingDuration: Number(entry.blockingDuration ?? 0)
+                        blockingDuration: Number(entry.blockingDuration ?? 0),
+                        renderStart: Number(entry.renderStart ?? 0),
+                        styleAndLayoutStart: Number(entry.styleAndLayoutStart ?? 0),
+                        firstUIEventTimestamp: Number(entry.firstUIEventTimestamp ?? 0),
+                        scripts: Array.isArray(entry.scripts)
+                          ? entry.scripts.slice(0, 8).map((script: any) => ({
+                              name: String(script.name ?? ''),
+                              invoker: String(script.invoker ?? ''),
+                              invokerType: String(script.invokerType ?? ''),
+                              sourceURL: String(script.sourceURL ?? ''),
+                              sourceFunctionName: String(script.sourceFunctionName ?? ''),
+                              sourceCharPosition: Number(script.sourceCharPosition ?? 0),
+                              windowAttribution: String(script.windowAttribution ?? ''),
+                              executionStart: Number(script.executionStart ?? 0),
+                              duration: Number(script.duration ?? 0),
+                              pauseDuration: Number(script.pauseDuration ?? 0),
+                              forcedStyleAndLayoutDuration: Number(script.forcedStyleAndLayoutDuration ?? 0)
+                            }))
+                          : []
                       }))
                     : []
                 },
@@ -2795,13 +3260,84 @@ async function runCapture(): Promise<void> {
                   effectPoolsMs: Number(combatProfile.timing.effectPoolsMs ?? 0),
                   influenceMapMs: Number(combatProfile.timing.influenceMapMs ?? 0),
                   aiStateMs: typeof combatProfile.timing.aiStateMs === 'object' ? combatProfile.timing.aiStateMs : undefined,
+                  aiMethodMs: typeof combatProfile.timing.aiMethodMs === 'object' ? combatProfile.timing.aiMethodMs : undefined,
+                  aiMethodCounts: typeof combatProfile.timing.aiMethodCounts === 'object' ? combatProfile.timing.aiMethodCounts : undefined,
+                  aiMethodTotalCounts: typeof combatProfile.timing.aiMethodTotalCounts === 'object' ? combatProfile.timing.aiMethodTotalCounts : undefined,
+                  aiSlowestUpdate: combatProfile.timing.aiSlowestUpdate && typeof combatProfile.timing.aiSlowestUpdate === 'object'
+                    ? {
+                        combatantId: String(combatProfile.timing.aiSlowestUpdate.combatantId ?? 'unknown'),
+                        stateAtStart: String(combatProfile.timing.aiSlowestUpdate.stateAtStart ?? 'unknown'),
+                        stateAtEnd: String(combatProfile.timing.aiSlowestUpdate.stateAtEnd ?? 'unknown'),
+                        lodLevel: String(combatProfile.timing.aiSlowestUpdate.lodLevel ?? 'unknown'),
+                        totalMs: Number(combatProfile.timing.aiSlowestUpdate.totalMs ?? 0),
+                        methodMs: typeof combatProfile.timing.aiSlowestUpdate.methodMs === 'object'
+                          ? combatProfile.timing.aiSlowestUpdate.methodMs
+                          : {},
+                        methodCounts: typeof combatProfile.timing.aiSlowestUpdate.methodCounts === 'object'
+                          ? combatProfile.timing.aiSlowestUpdate.methodCounts
+                          : {}
+                      }
+                    : null,
                   losCache: combatProfile.timing.losCache ? {
                     hits: Number(combatProfile.timing.losCache.hits ?? 0),
                     misses: Number(combatProfile.timing.losCache.misses ?? 0),
                     hitRate: Number(combatProfile.timing.losCache.hitRate ?? 0),
                     budgetDenials: Number(combatProfile.timing.losCache.budgetDenials ?? 0),
                     prefilterPasses: Number(combatProfile.timing.losCache.prefilterPasses ?? 0),
-                    prefilterRejects: Number(combatProfile.timing.losCache.prefilterRejects ?? 0)
+                    prefilterRejects: Number(combatProfile.timing.losCache.prefilterRejects ?? 0),
+                    fullEvaluations: Number(combatProfile.timing.losCache.fullEvaluations ?? 0),
+                    terrainRaycasts: Number(combatProfile.timing.losCache.terrainRaycasts ?? 0),
+                    fullEvaluationClear: Number(combatProfile.timing.losCache.fullEvaluationClear ?? 0),
+                    fullEvaluationBlocked: Number(combatProfile.timing.losCache.fullEvaluationBlocked ?? 0)
+                  } : undefined,
+                  closeEngagement: combatProfile.timing.closeEngagement ? {
+                    engagement: combatProfile.timing.closeEngagement.engagement ? {
+                      closeRangeFullAutoActivations: Number(combatProfile.timing.closeEngagement.engagement.closeRangeFullAutoActivations ?? 0),
+                      nearbyEnemyBurstTriggers: Number(combatProfile.timing.closeEngagement.engagement.nearbyEnemyBurstTriggers ?? 0),
+                      suppressionTransitions: Number(combatProfile.timing.closeEngagement.engagement.suppressionTransitions ?? 0),
+                      nearbyEnemyCountSamples: Number(combatProfile.timing.closeEngagement.engagement.nearbyEnemyCountSamples ?? 0),
+                      nearbyEnemyCountTotal: Number(combatProfile.timing.closeEngagement.engagement.nearbyEnemyCountTotal ?? 0),
+                      nearbyEnemyCountMax: Number(combatProfile.timing.closeEngagement.engagement.nearbyEnemyCountMax ?? 0),
+                      suppressionFlankDestinationComputations: Number(combatProfile.timing.closeEngagement.engagement.suppressionFlankDestinationComputations ?? 0),
+                      suppressionFlankCoverSearches: Number(combatProfile.timing.closeEngagement.engagement.suppressionFlankCoverSearches ?? 0),
+                      suppressionFlankCoverSearchReuseSkips: Number(combatProfile.timing.closeEngagement.engagement.suppressionFlankCoverSearchReuseSkips ?? 0),
+                      suppressionFlankCoverSearchCapSkips: Number(combatProfile.timing.closeEngagement.engagement.suppressionFlankCoverSearchCapSkips ?? 0),
+                      targetDistanceBuckets: Object.fromEntries(
+                        Object.entries(combatProfile.timing.closeEngagement.engagement.targetDistanceBuckets ?? {}).map(([key, value]) => [
+                          key,
+                          Number(value ?? 0)
+                        ])
+                      )
+                    } : undefined,
+                    targetAcquisition: Object.fromEntries(
+                      Object.entries(combatProfile.timing.closeEngagement.targetAcquisition ?? {}).map(([key, value]) => [
+                        key,
+                        Number(value ?? 0)
+                      ])
+                    ),
+                    targetDistribution: Object.fromEntries(
+                      Object.entries(combatProfile.timing.closeEngagement.targetDistribution ?? {}).map(([key, value]) => [
+                        key,
+                        Number(value ?? 0)
+                      ])
+                    ),
+                    lineOfSight: Object.fromEntries(
+                      Object.entries(combatProfile.timing.closeEngagement.lineOfSight ?? {}).map(([key, value]) => [
+                        key,
+                        Number(value ?? 0)
+                      ])
+                    ),
+                    losCallsites: Object.fromEntries(
+                      Object.entries(combatProfile.timing.closeEngagement.losCallsites ?? {}).map(([key, value]) => [
+                        key,
+                        Object.fromEntries(
+                          Object.entries(value ?? {}).map(([metricKey, metricValue]) => [
+                            metricKey,
+                            Number(metricValue ?? 0)
+                          ])
+                        )
+                      ])
+                    )
                   } : undefined,
                   raycastBudget: combatProfile.timing.raycastBudget ? {
                     maxPerFrame: Number(combatProfile.timing.raycastBudget.maxPerFrame ?? 0),
@@ -2942,7 +3478,12 @@ async function runCapture(): Promise<void> {
                 }))
               : []
           };
-        }, includeDetails), 8000);
+        }, {
+          shouldIncludeDetails: includeDetails,
+          shouldCaptureSceneAttribution,
+          shouldCaptureRenderSubmissions,
+          sceneAttributionEvaluateSource: PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE
+        }), 8000);
         probeRoundTripMs.push(Date.now() - probeStart);
         sample = { ts: nowIso(), ...raw };
         sampleTick++;
@@ -3071,20 +3612,27 @@ async function runCapture(): Promise<void> {
     let heapProfile: any = null;
     const shouldAttemptHeavyCdpShutdown = startupState.started && missedSamples === 0;
     if (cdpStarted && cdp && shouldAttemptHeavyCdpShutdown) {
-      try {
-        cpuProfile = await withTimeout('Profiler.stop', cdp.send('Profiler.stop'), CDP_STOP_TIMEOUT_MS);
-      } catch (error) {
-        logStep(`⚠ Profiler.stop failed: ${error instanceof Error ? error.message : String(error)}`);
+      if (cdpProfiler) {
+        try {
+          cpuProfile = await withTimeout('Profiler.stop', cdp.send('Profiler.stop'), CDP_STOP_TIMEOUT_MS);
+        } catch (error) {
+          logStep(`⚠ Profiler.stop failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
-      try {
-        heapProfile = await withTimeout('HeapProfiler.stopSampling', cdp.send('HeapProfiler.stopSampling'), CDP_STOP_TIMEOUT_MS);
-      } catch (error) {
-        logStep(`⚠ HeapProfiler.stopSampling failed: ${error instanceof Error ? error.message : String(error)}`);
+      if (cdpHeapSampling) {
+        try {
+          heapProfile = await withTimeout('HeapProfiler.stopSampling', cdp.send('HeapProfiler.stopSampling'), CDP_STOP_TIMEOUT_MS);
+        } catch (error) {
+          logStep(`⚠ HeapProfiler.stopSampling failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
-      try {
-        chromeTrace = await stopChromeTracing(cdp);
-      } catch (error) {
-        logStep(`⚠ stopChromeTracing failed: ${error instanceof Error ? error.message : String(error)}`);
+      if (chromeTracingStarted && !chromeTracingStopped) {
+        try {
+          chromeTrace = await stopChromeTracing(cdp);
+          chromeTracingStopped = true;
+        } catch (error) {
+          logStep(`⚠ stopChromeTracing failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
     } else if (cdpStarted) {
       logStep('⚠ Skipping heavy CDP shutdown capture due unstable startup or blocked runtime samples');
@@ -3220,6 +3768,22 @@ async function runCapture(): Promise<void> {
       if (page) {
         writeFileSync(join(artifactDir, 'console.json'), JSON.stringify(consoleEntries, null, 2), 'utf-8');
         writeFileSync(join(artifactDir, 'runtime-samples.json'), JSON.stringify(runtimeSamples, null, 2), 'utf-8');
+        const runtimeSceneAttributionSamples = collectRuntimeSceneAttributionSamples(runtimeSamples);
+        if (runtimeSceneAttributionSamples.length > 0) {
+          writeFileSync(
+            join(artifactDir, 'runtime-scene-attribution-samples.json'),
+            JSON.stringify(runtimeSceneAttributionSamples, null, 2),
+            'utf-8'
+          );
+        }
+        const runtimeRenderSubmissionSamples = collectRuntimeRenderSubmissionSamples(runtimeSamples);
+        if (runtimeRenderSubmissionSamples.length > 0) {
+          writeFileSync(
+            join(artifactDir, 'runtime-render-submission-samples.json'),
+            JSON.stringify(runtimeRenderSubmissionSamples, null, 2),
+            'utf-8'
+          );
+        }
       }
       writeFileSync(join(artifactDir, 'measurement-trust.json'), JSON.stringify(measurementTrust, null, 2), 'utf-8');
       if (validation.checks.length === 0) {
@@ -3306,7 +3870,9 @@ async function runCapture(): Promise<void> {
         },
         perfRuntime: {
           matchDurationSeconds: perfMatchDurationSeconds ?? undefined,
-          victoryConditionsDisabled: disableVictory
+          victoryConditionsDisabled: disableVictory,
+          npcCloseModelsDisabled: disableNpcCloseModels,
+          terrainShadowsDisabled: disableTerrainShadows
         },
         matchEndedAtMs: matchEndedAtRelMs,
         matchOutcome: matchOutcome,

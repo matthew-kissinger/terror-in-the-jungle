@@ -360,6 +360,39 @@ function classify(report: Pick<HeapDiagnosticReport, 'heap' | 'rendererDeltas' |
   };
 }
 
+function nextActionsForMode(mode: string | null, classification: HeapDiagnosticReport['classification']): string[] {
+  if (mode === 'ai_sandbox') {
+    const sourceAction = classification.likelySource === 'short_lived_runtime_allocations_after_renderer_resources_stabilized'
+      ? 'Inspect combat120 short-lived runtime allocations after renderer resources stabilize; start with combat movement/backtracking and active-player firefight churn before retained renderer resources.'
+      : 'Add targeted combat120 allocation attribution before changing runtime policy.';
+    return [
+      'Do not use this diagnostic to refresh the STABILIZAT-1 combat120 baseline.',
+      sourceAction,
+      'If the next standard combat120 capture still misses heap end-growth with strong recovery, add allocation counters or heap-sampling attribution around the trusted-window tail before applying another performance cap.',
+    ];
+  }
+  return [
+    'Do not use this perf capture for KB-TERRAIN acceptance.',
+    'Instrument or reduce short-lived vegetation/runtime allocation around cell residency changes before rerunning the matched Open Frontier/A Shau perf pair.',
+    'If the next run still fails on peak heap with strong recovery, inspect allocation churn rather than renderer retained resources first.',
+  ];
+}
+
+function nonClaimsForMode(mode: string | null): string[] {
+  if (mode === 'ai_sandbox') {
+    return [
+      'This diagnostic does not prove a heap fix.',
+      'This diagnostic does not authorize a combat120 baseline refresh.',
+      'This diagnostic does not certify close-actor visual acceptance.',
+    ];
+  }
+  return [
+    'This diagnostic does not prove a heap fix.',
+    'This diagnostic does not certify matched terrain perf or production parity.',
+    'This diagnostic does not replace owner terrain visual review.',
+  ];
+}
+
 function markdown(report: HeapDiagnosticReport): string {
   return [
     '# Projekt Objekt-143 Perf Heap Diagnostic',
@@ -528,6 +561,8 @@ function buildReport(artifactDir: string, outputDir: string): HeapDiagnosticRepo
       .filter((entry): entry is HeapSampleSummary => Boolean(entry)),
   };
   const partialReport = { heap, rendererDeltas, streamSignalsNearPeak };
+  const classification = classify(partialReport);
+  const scenarioMode = summary.scenario?.mode ?? null;
   const report: HeapDiagnosticReport = {
     createdAt: new Date().toISOString(),
     sourceGitSha: gitSha(),
@@ -543,7 +578,7 @@ function buildReport(artifactDir: string, outputDir: string): HeapDiagnosticRepo
     sourceSummary: {
       startedAt: summary.startedAt ?? null,
       endedAt: summary.endedAt ?? null,
-      scenarioMode: summary.scenario?.mode ?? null,
+      scenarioMode,
       status: summary.status ?? null,
       validation: summary.validation?.overall ?? null,
       measurementTrust: summary.measurementTrust?.status ?? null,
@@ -562,17 +597,9 @@ function buildReport(artifactDir: string, outputDir: string): HeapDiagnosticRepo
     rendererDeltas,
     streamSignalsNearPeak,
     consoleSignals: consoleSignals(existsSync(consolePath) ? consolePath : null),
-    classification: classify(partialReport),
-    nextActions: [
-      'Do not use this perf capture for KB-TERRAIN acceptance.',
-      'Instrument or reduce short-lived vegetation/runtime allocation around cell residency changes before rerunning the matched Open Frontier/A Shau perf pair.',
-      'If the next run still fails on peak heap with strong recovery, inspect allocation churn rather than renderer retained resources first.',
-    ],
-    nonClaims: [
-      'This diagnostic does not prove a heap fix.',
-      'This diagnostic does not certify matched terrain perf or production parity.',
-      'This diagnostic does not replace owner terrain visual review.',
-    ],
+    classification,
+    nextActions: nextActionsForMode(scenarioMode, classification),
+    nonClaims: nonClaimsForMode(scenarioMode),
     files: {
       summary: rel(join(outputDir, 'heap-diagnostic.json')) ?? '',
       markdown: rel(join(outputDir, 'heap-diagnostic.md')) ?? '',

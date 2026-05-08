@@ -1,5 +1,938 @@
 Original prompt: we had an intern come in a really both things up recently - can you take sober look at all the code end to end and come up with a plan to right the wrongs and properly bring this engine back up to speed with latest tech, standards, practices, techniques, novel implementation and referring to docs and code and not assuming but validating. look at handoff perf harness and understand it could be a symptom of a larger system issue.
 
+2026-05-08 Projekt Objekt-143 AVIATSIYA-1 Cobra tail-rotor runtime-axis correction
+- Continued under the active Objekt-143 goal, reread `docs/PROJEKT_OBJEKT_143.md`
+  end to end, and selected AVIATSIYA-1 / DEFEKT-5 because the Politburo
+  reported AH-1 Cobra tail-rotor directionality drift and requested aircraft
+  focus first.
+- Source diagnosis: the reverted source-preservation path was wrong for AH-1
+  Cobra. Huey and UH-1C Gunship source/public tail rotors spin on `z`; AH-1
+  Cobra source spins `Joint_tailRotor` on longitudinal `x`, which violates the
+  TIJ side-mounted tail-rotor runtime contract.
+- Source change: `scripts/import-pixel-forge-aircraft.ts` now applies an
+  explicit `ah1-cobra` tail-rotor spin-axis correction from source `x` to
+  imported/runtime `z`. `src/systems/helicopter/HelicopterGeometry.ts` now
+  uses `z` for missing/synthetic tail-rotor spin-axis fallback so old fallback
+  paths do not silently diverge from the runtime contract.
+- Evidence packet:
+  `artifacts/perf/2026-05-08T01-23-12-400Z/pixel-forge-aircraft-import/summary.json`
+  records Huey preserved `z`, UH-1C Gunship preserved `z`, and AH-1 Cobra
+  corrected `sourceAxis=x -> importedAxis=z` over `3` keyframes /
+  `48` bytes. Public GLB inspection shows all three runtime tail-rotor
+  quaternion tracks now spin on `z`.
+- Visual-integrity packet:
+  `artifacts/perf/2026-05-08T01-23-26-506Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`
+  records PASS for `helicopter_tail_rotor_axes_runtime_aligned`: Huey `z`,
+  UH-1C Gunship `z`, AH-1 Cobra source `x`, public/expected `z`, correction
+  `source-x-to-runtime-z`.
+- Human review packet:
+  `artifacts/perf/2026-05-08T01-23-33-556Z/projekt-143-defekt5-human-review/review-summary.json`
+  remains `needs_human_decision`; source and asset evidence do not certify the
+  player-view rotor appearance.
+- Validation: `npx vitest run src/systems/helicopter/HelicopterAnimation.test.ts
+  src/systems/helicopter/HelicopterGeometry.test.ts --reporter=dot` passed
+  (`2` files / `8` tests), `npm run typecheck` passed, and
+  `npm run check:pixel-forge-cutover` passed.
+- Closeout gates after ledger update: `npm run check:doc-drift -- --as-of
+  2026-05-08` passed at
+  `artifacts/perf/2026-05-08T01-26-06.909Z/projekt-143-doc-drift/doc-drift.json`.
+  `npm run check:projekt-143-completion-audit` remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-08T01-26-26-320Z/projekt-143-completion-audit/completion-audit.json`
+  with `29` blockers.
+
+2026-05-08 Projekt Objekt-143 VODA-1 exposure source audit under resource contention
+- Continued under the active Objekt-143 goal and selected VODA-1 after the
+  Politburo prioritized aircraft first, then water, then design/UX/perf.
+- Added `scripts/projekt-143-voda-exposure-source-audit.ts` and package alias
+  `npm run check:projekt-143-voda-exposure-source`. The audit reads the prior
+  terrain visual-review artifact and source only; it launches no browser or
+  perf capture on the resource-contended machine.
+- Evidence packet:
+  `artifacts/perf/2026-05-08T01-15-33-373Z/projekt-143-voda-exposure-source-audit/summary.json`
+  records WARN classification
+  `voda_exposure_warning_review_composition_before_water_material_tuning`.
+  It finds `4` Open Frontier exposure-risk shots, `0` risk shots with global
+  water visible, and `4` risk shots with hydrology river surfaces visible. It
+  also records hydrology material opacity `0.55`, dark source luma values
+  `50.81` / `68.08` / `36.13`, and middle/bottom neutral overexposure from
+  `0.8681` to `0.9454` across warned sightlines.
+- Directive result: VODA-1 remains open. The next visual investigation is Open
+  Frontier camera review angles, sky exposure, pale airfield/foundation
+  materials, and terrain-water sightline composition before any global water
+  shader or hydrology material tuning.
+- Validation before doc closeout: `npm run check:projekt-143-voda-exposure-source`
+  completed with WARN artifact output; `npm run typecheck` passed; `npx vitest
+  run src/systems/environment/WaterSystem.test.ts` passed (`1` file, `9` tests).
+- Continued the same VODA-1 source chain by strengthening the audit to extract
+  actual hydrology material opacity and source color luma, plus
+  neutral-overexposure band metrics for warned shots.
+- Validation after audit strengthening: `npm run
+  check:projekt-143-voda-exposure-source -- --source
+  artifacts/perf/2026-05-07T22-17-52-232Z/projekt-143-terrain-visual-review/visual-review.json`
+  completed with WARN artifact output at the `01-15-33-373Z` path above; `npm
+  run typecheck` passed.
+- Closeout gates after ledger update: `npm run check:doc-drift -- --as-of
+  2026-05-08` passed at
+  `artifacts/perf/2026-05-08T01-17-09.717Z/projekt-143-doc-drift/doc-drift.json`.
+  `npm run check:projekt-143-completion-audit` remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-08T01-17-22-608Z/projekt-143-completion-audit/completion-audit.json`
+  with `29` blockers.
+
+2026-05-08 Projekt Objekt-143 fixed-wing clean functional gate under resource contention
+- Continued under the active Objekt-143 goal after the 4174 fixed-wing packet
+  carried a harness-teardown warning.
+- Re-ran `npm run probe:fixed-wing -- --boot-attempts=1 --port 4175`.
+  The command exited `0`; `artifacts/fixed-wing-runtime-probe/summary.json`
+  records `status: passed` for A-1 Skyraider, F-4 Phantom, and AC-47 Spooky.
+- Packeted the clean functional gate at
+  `artifacts/perf/2026-05-08T00-56-34-511Z/projekt-143-fixed-wing-clean-gate/summary.json`.
+  It copies the probe summary and three screenshots, records no listener on
+  port `4175`, and records no fixed-wing probe or preview command-line residue.
+- Resource doctrine: the Politburo reported games and other agents active on
+  the same PC. This packet proves the functional fixed-wing browser gate only.
+  It does not prove frame-time acceptance, wall-time acceptance, optimization,
+  baseline refresh, live production parity, or human flight-feel/rotor visual
+  acceptance.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so
+  AVIATSIYA-1, STABILIZAT-2, and DEFEKT-5 point at the clean functional gate
+  while retaining CI/PR/merge/deploy, combat120/perf, and human review blockers.
+- Validation after documentation update: `npm run check:doc-drift -- --as-of
+  2026-05-08` passed at
+  `artifacts/perf/2026-05-08T01-00-26.310Z/projekt-143-doc-drift/doc-drift.json`.
+  `npm run check:projekt-143-completion-audit` remains `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-08T01-00-50-627Z/projekt-143-completion-audit/completion-audit.json`
+  with `34` Article III directives, `10` closed, `24` open, and `29` blockers.
+
+2026-05-08 Projekt Objekt-143 fixed-wing runtime proof with harness teardown warning
+- Continued under the active Objekt-143 goal after the aircraft readiness packet
+  still carried a PARTIAL fixed-wing runtime result.
+- Re-ran production-shaped `npm run probe:fixed-wing -- --boot-attempts=1
+  --port 4174` with a `900000ms` shell timeout. The command itself timed out,
+  but `artifacts/fixed-wing-runtime-probe/summary.json` had already reached
+  `status: passed` for A-1 Skyraider, F-4 Phantom, and AC-47 Spooky.
+- Stopped the leftover `preview:perf` / Vite preview processes on port `4174`
+  after the shell timeout and verified no fixed-wing probe or perf-preview
+  process remained.
+- Copied the passed probe summary and inspected screenshots into
+  `artifacts/perf/2026-05-08T00-34-03-449Z/projekt-143-fixed-wing-runtime-proof/`.
+  The packet records WARN classification
+  `fixed_wing_runtime_passed_harness_teardown_warn`: runtime scenario evidence
+  is positive, but harness teardown is not a clean command gate.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so
+  STABILIZAT-2/AVIATSIYA aircraft status records A-1/F-4/AC-47 probe PASS
+  while retaining live playtest, clean harness exit, CI/PR, deploy, and
+  human rotor acceptance as blockers.
+
+2026-05-08 Projekt Objekt-143 AVIATSIYA aircraft readiness and perf bridge
+- Continued under the active Objekt-143 goal, reread `docs/PROJEKT_OBJEKT_143.md`
+  end to end, and selected aircraft first per Politburo priority, with perf and
+  optimization treated as release gates rather than separate expansion scope.
+- Cleaned up the orphaned fixed-wing probe / perf-preview processes left by the
+  timed-out browser run; no fixed-wing probe or preview server remained after
+  cleanup.
+- Evidence packet:
+  `artifacts/perf/2026-05-08T00-11-04-505Z/projekt-143-aviatsiya-aircraft-readiness/summary.json`
+  records WARN classification
+  `aircraft_static_source_ready_runtime_probe_partial`.
+- Validation inside the packet: targeted aircraft Vitest pass (`20` files /
+  `322` tests), `check:projekt-143-visual-integrity` PASS, Pixel Forge aircraft
+  dry-run PASS with Huey `z`, UH-1C Gunship `z`, and AH-1 Cobra `x` tail-rotor
+  axes preserved with `bytesAffected=0`.
+- Runtime probe result: copied `artifacts/fixed-wing-runtime-probe/summary.json`
+  is PARTIAL after timeout. A-1 Skyraider entry, liftoff, climb, approach,
+  bailout, and NPC handoff are positive, but the packet does not certify
+  full-roster fixed-wing acceptance, rotor visual acceptance, live release proof,
+  or combat120 baseline refresh.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so
+  AVIATSIYA-1, STABILIZAT-2, and DEFEKT-5 point at the current aircraft
+  evidence path without declaring completion.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-5 Cobra rotor-axis correction and human review packet
+- Continued under the active Objekt-143 goal, reread `docs/PROJEKT_OBJEKT_143.md`
+  end to end, and selected DEFEKT-5 because the Politburo reported Cobra
+  tail-rotor visual drift, close NPC impostor doubts, and hidden legacy fallback
+  risk.
+- Source diagnosis: the prior rotor proof was too blunt. It forced AH-1 Cobra
+  `Joint_tailRotor` animation from source axis `x` to `z` even though the
+  runtime already reads and honors per-asset rotor spin axes.
+- Source change: `scripts/import-pixel-forge-aircraft.ts` now preserves and
+  reports each helicopter tail-rotor source axis. Huey remains `z`, UH-1C
+  Gunship remains `z`, and AH-1 Cobra remains `x`; no tail-rotor animation
+  bytes are rewritten.
+- Audit change: `scripts/projekt-143-visual-integrity-audit.ts` now compares
+  source GLB and public GLB tail-rotor axes instead of demanding forced axis
+  equality, while also anchoring runtime per-asset spin-axis resolution.
+- Evidence: aircraft import summary at
+  `artifacts/perf/2026-05-07T23-55-40-613Z/pixel-forge-aircraft-import/summary.json`
+  records preserved axes and `bytesAffected=0`; visual-integrity audit at
+  `artifacts/perf/2026-05-07T23-56-08-551Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`
+  records PASS with Huey `z`, Gunship `z`, and Cobra `x` source/public parity.
+- Review packet: `npm run check:projekt-143-defekt5-human-review` wrote
+  `artifacts/perf/2026-05-07T23-56-47-585Z/projekt-143-defekt5-human-review/review-summary.json`
+  with status `needs_human_decision` for NPC death animation, close-NPC LOD
+  feel, explosion appearance, and rotor appearance.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so DEFEKT-5
+  records source evidence complete with a human visual decision packet ready.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-5 explosion representation packet
+- Continued under the active Objekt-143 goal, reread `docs/PROJEKT_OBJEKT_143.md`
+  end to end, and selected the remaining DEFEKT-5 explosion representation
+  branch because the close-impostor exception was already instrumented.
+- Source diagnosis: explosion visuals are not a silent legacy fallback. The
+  active path is the post-KB-EFFECTS unlit pooled explosion contract created
+  after dynamic `THREE.PointLight` explosion rendering caused first-use WebGL
+  stalls. The current visual stack is pooled billboard flash, point particles,
+  debris points, and shockwave ring.
+- Source change: `ExplosionEffectFactory` now exports
+  `EXPLOSION_EFFECT_REPRESENTATION` and tags effect objects with
+  `perfCategory='explosion_fx'`, representation names, and
+  `legacyFallback=false`. The source contract records `dynamicLights=false`.
+- Test change: `ExplosionEffectsPool.test.ts` now proves the active grenade
+  explosion path remains unlit and that the visible flash object carries the
+  pooled unlit billboard representation metadata.
+- Evidence: refreshed visual-integrity audit at
+  `artifacts/perf/2026-05-07T23-45-45-561Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`
+  records PASS and `visual_integrity_source_bound_human_review_pending`.
+- Validation: `npx vitest run src/systems/effects/ExplosionEffectsPool.test.ts`
+  passed `1/1`; `npm run typecheck` passed; `npm run
+  check:pixel-forge-cutover` passed.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so DEFEKT-5
+  records source evidence complete with human visual acceptance pending.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-5 close-impostor telemetry packet
+- Continued under the active Objekt-143 goal, reread `docs/PROJEKT_OBJEKT_143.md`
+  end to end, and selected the remaining close-impostor exception inside
+  DEFEKT-5 because the previous packet still classified it as WARN without
+  runtime reason accounting.
+- Source change: `CombatantRenderer` now exposes `getCloseModelRuntimeStats()`
+  and `getCloseModelFallbackRecords()`. Close-radius impostor exceptions are
+  classified as `perf-isolation`, `pool-loading`, `pool-empty`, or `total-cap`,
+  with counts, nearest/farthest fallback distance, active close-model count,
+  pool loads, pool targets, and pool availability.
+- Probe support: `scripts/probe-pixel-forge-npcs.ts` now includes close-model
+  runtime stats, fallback records, and per-row close fallback reason so browser
+  evidence can distinguish cap policy from hidden legacy fallback.
+- Evidence: refreshed visual-integrity audit at
+  `artifacts/perf/2026-05-07T23-40-49-413Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`
+  records close-impostor instrumentation PASS while preserving WARN for the
+  unresolved explosion `THREE.Sprite` representation decision.
+- Validation: `npx vitest run src/systems/combat/CombatantRenderer.test.ts`
+  passed `33/33`; `npm run typecheck` passed; `npm run
+  check:pixel-forge-cutover` passed.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so the
+  directive board points at the new evidence path.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-5 visual fallback and AVIATSIYA rotor directionality audit
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end in the engagement, surveyed
+  Article III across active bureaus, and folded the Politburo's NPC impostor,
+  hidden fallback, explosion-FX, Cobra tail-rotor, and gunship terminology
+  observations into a bounded visual-integrity packet.
+- Source diagnosis: Pixel Forge dying NPCs already selected `death_fall_back`,
+  but `CombatantRenderer` also applied the old procedural billboard death
+  transform during the same window. The fix gates that legacy transform away
+  from the Pixel Forge one-shot death clip and adds a regression test proving
+  death impostor scale stays unshrunk while animation progress advances.
+- Source diagnosis: close NPCs are not distance-only. The hard close band is
+  `64m`, but pool loading, pool-empty, and the total active close-model cap can
+  render overflow close actors as impostors. This remains an explicit open
+  owner decision, not a silent fallback.
+- Source diagnosis: explosion visuals still use a pooled `THREE.Sprite` flash
+  plus particles. The audit classifies this as current primary FX code, not a
+  hidden legacy fallback; replacement or acceptance remains open.
+- Aircraft correction: `scripts/import-pixel-forge-aircraft.ts` now normalizes
+  helicopter `Joint_tailRotor` spin axes for Huey, UH-1C Gunship, and AH-1
+  Cobra. Import evidence at
+  `artifacts/perf/2026-05-07T23-28-50-762Z/pixel-forge-aircraft-import/summary.json`
+  records Huey and UH-1C already lateral `z`, and AH-1 Cobra normalized
+  `x->z` across `3` keyframes / `48` bytes.
+- Visual-integrity audit at
+  `artifacts/perf/2026-05-07T23-30-48-740Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`
+  records WARN, `visual_integrity_source_bound_with_open_owner_decisions`,
+  passes NPC death clip/shrink removal, Pixel Forge cutover, helicopter rotor
+  axes, and aircraft roster terminology checks, and warns on close-impostor cap
+  behavior plus current Sprite explosion FX.
+- Validation: `npx vitest run src/systems/combat/CombatantRenderer.test.ts
+  src/systems/helicopter/HelicopterAnimation.test.ts
+  src/systems/helicopter/HelicopterGeometry.test.ts` passed `41/41`; `npm run
+  check:pixel-forge-cutover` passed; `npm run typecheck` passed.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` with
+  AVIATSIYA-1, DEFEKT-3 terrain-shadow diagnostic, and new DEFEKT-5 status.
+  Human visual playtest remains required before claiming rotor/death-animation
+  feel acceptance.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-3 render pass-metadata audit
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end in the engagement, surveyed
+  Article III across active bureaus, and selected DEFEKT-3 because the current
+  board required pass-aware render-submission metadata or a controlled
+  terrain-shadow/tile-resolution diagnostic after the terrain contribution
+  packet.
+- Read `docs/STATE_OF_REPO.md`, `scripts/projekt-143-scene-attribution.ts`,
+  `scripts/projekt-143-render-submission-category-attribution.ts`, Three's
+  `Object3D.onBeforeShadow` type contract, and
+  `node_modules/three/src/renderers/webgl/WebGLShadowMap.js`.
+- Added pass metadata to the render-submission tracker: `onBeforeRender`
+  records `main`, `onBeforeShadow` records `shadow`, frame and category buckets
+  serialize `passTypes`, and examples carry `passType`. Added packet propagation
+  in `scripts/projekt-143-render-submission-category-attribution.ts`.
+- Added `scripts/projekt-143-defekt-render-pass-metadata-audit.ts` and package
+  command `npm run check:projekt-143-defekt-render-pass-metadata`.
+- Rebuilt the perf harness with `npm run build:perf`, then ran the production
+  shaped headed combat120 capture:
+  `npx tsx scripts/perf-capture.ts --headed --mode ai_sandbox --npcs 120 --duration 90 --warmup 15 --seed 2718 --runtime-render-submission-attribution true --runtime-render-submission-every-samples 30`.
+  Capture artifact:
+  `artifacts/perf/2026-05-07T23-05-54-437Z`.
+- Generated category packet
+  `artifacts/perf/2026-05-07T23-05-54-437Z/projekt-143-render-submission-category-attribution/render-submission-category-attribution.json`.
+  The packet is exact at frame `3035`; capture status is `ok`, validation
+  `warn`, measurement trust `warn`; frame pass types are `main:124, shadow:1`;
+  terrain pass types are `main:2, shadow:1`; terrain records `3` draw
+  submissions and `0.7095` triangle share; top draw is `npc_close_glb`; top
+  triangles are `terrain`; renderer reconciliation is draw `0.7022` /
+  triangles `0.9987`.
+- Validation WARN at
+  `artifacts/perf/2026-05-07T23-08-28-327Z/projekt-143-defekt-render-pass-metadata-audit/pass-metadata-audit.json`
+  records `render_pass_metadata_bound_timing_unisolated`, confidence `high`,
+  acceptance `owner_review_only`, and `7/7` checks passing.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to keep
+  DEFEKT-3 active. The next terrain packet must run a controlled terrain-shadow
+  or tile-resolution diagnostic under the same combat120 shape. No runtime fix,
+  per-pass timing isolation, DEFEKT-3 completion, combat-feel certification,
+  regression-reference replacement, terrain quality authorization, or baseline
+  refresh is claimed.
+- Closeout checks: `npm run check:doc-drift -- --as-of 2026-05-07` passed at
+  `artifacts/perf/2026-05-07T23-10-35.478Z/projekt-143-doc-drift/doc-drift.json`;
+  `npm run check:projekt-143-completion-audit` recorded NOT_COMPLETE at
+  `artifacts/perf/2026-05-07T23-10-51-111Z/projekt-143-completion-audit/completion-audit.json`
+  with `33` directives, `10` closed, `23` open, and `28` blockers; scoped
+  `git diff --check` reported line-ending warnings only.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-3 terrain contribution audit
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end in the engagement, surveyed
+  Article III across active bureaus, and selected DEFEKT-3 because the current
+  board required one next isolation axis after the owner-split packet. The
+  selected axis was terrain triangle/render-cost contribution.
+- Read `docs/STATE_OF_REPO.md`, `src/systems/terrain/CDLODRenderer.ts`,
+  `src/systems/terrain/TerrainRenderRuntime.ts`,
+  `src/systems/terrain/TerrainConfig.ts`, `src/core/GameRenderer.ts`, the
+  owner-split packet at
+  `artifacts/perf/2026-05-07T22-49-28-445Z/projekt-143-defekt-render-owner-split-audit/render-owner-split-audit.json`,
+  and the post-tag exact-frame render-submission packet at
+  `artifacts/perf/2026-05-07T17-28-02-506Z/projekt-143-render-submission-category-attribution/render-submission-category-attribution.json`.
+- Added `scripts/projekt-143-defekt-terrain-contribution-audit.ts` and package
+  command `npm run check:projekt-143-defekt-terrain-contribution`. Validation
+  WARN at
+  `artifacts/perf/2026-05-07T22-56-02-642Z/projekt-143-defekt-terrain-contribution-audit/terrain-contribution-audit.json`
+  records `terrain_triangle_axis_source_bound_timing_unisolated`, confidence
+  `high`, and acceptance `owner_review_only`.
+- Evidence: post-tag peak frame `1027` records terrain as top triangle category
+  at `0.7174` while top draw remains `npc_ground_markers`; terrain records `2`
+  draw submissions, `0.0202` draw share, `163840` submitted triangles, `80`
+  submitted instances, `2048` triangles per terrain instance, and `0.5219` of
+  peak renderer triangles. Source anchors prove the current terrain path is one
+  CDLOD InstancedMesh updated by selected tiles with default `33` vertex tile
+  resolution and device-adaptive shadow capability.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to keep
+  DEFEKT-3 active. The next terrain packet must add pass-aware
+  render-submission metadata or run a controlled terrain-shadow/tile-resolution
+  diagnostic against the same combat120 shape. No terrain quality change,
+  runtime fix, terrain-stall ownership claim, DEFEKT-3 completion, combat-feel
+  certification, regression-reference replacement, or baseline refresh is
+  claimed.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-3 render owner-split audit
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end in the engagement, surveyed
+  Article III across active bureaus, and selected DEFEKT-3 because the current
+  board named the remaining owner split across `npc_close_glb` draw submissions,
+  `npc_ground_markers` draw submissions, and terrain triangle dominance.
+- Read `docs/STATE_OF_REPO.md`, the accepted 16:23 render-submission packet at
+  `artifacts/perf/2026-05-07T16-23-11-889Z/projekt-143-render-submission-category-attribution/render-submission-category-attribution.json`,
+  the post-tag 17:28 render-submission packet at
+  `artifacts/perf/2026-05-07T17-28-02-506Z/projekt-143-render-submission-category-attribution/render-submission-category-attribution.json`,
+  and the sparse-owner acceptance packet at
+  `artifacts/perf/2026-05-07T22-29-58-460Z/projekt-143-sparse-owner-acceptance-audit/sparse-owner-acceptance-audit.json`.
+- Added `scripts/projekt-143-defekt-render-owner-split-audit.ts` and package
+  command `npm run check:projekt-143-defekt-render-owner-split`. Validation
+  WARN at
+  `artifacts/perf/2026-05-07T22-49-28-445Z/projekt-143-defekt-render-owner-split-audit/render-owner-split-audit.json`
+  records `post_tag_renderer_owner_split_divergent`, confidence `high`, and
+  acceptance `owner_review_only`.
+- Evidence: reference top draw is unattributed at `0.3106` and reference top
+  triangles are terrain at `0.6101`; post-tag top draw is
+  `npc_ground_markers` at `0.3232`, post-tag top triangles are terrain at
+  `0.7174`, `npc_close_glb` draw submissions move `36->14`, and renderer
+  reconciliation remains partial at draw `0.4583` / triangles `0.7276`.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to keep
+  DEFEKT-3 active and require one next isolation axis: batch/reduce
+  ground-marker/imposter draw submissions, test terrain triangle/render-cost
+  contribution, or improve renderer-submission reconciliation. No runtime fix,
+  DEFEKT-3 completion, combat-feel certification, regression-reference
+  replacement, or baseline refresh is claimed.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-4 NPC route-quality source/static-policy audit
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end in the engagement, surveyed
+  Article III, and selected DEFEKT-4 because the directive was still carryover
+  and lacked a current artifact-backed route-quality packet.
+- Read `docs/STATE_OF_REPO.md`, `package.json`,
+  `scripts/projekt-143-terrain-route-audit.ts`, `scripts/perf-active-driver.cjs`,
+  `scripts/perf-capture.ts`, `scripts/projekt-143-active-driver-diagnostic.ts`,
+  `src/systems/combat/CombatantMovement.ts`,
+  `src/systems/combat/StuckDetector.ts`, and their route/stuck tests.
+- Validation: `npm run check:projekt-143-terrain-routes` PASS at
+  `artifacts/perf/2026-05-07T22-40-26-760Z/projekt-143-terrain-route-audit/terrain-route-audit.json`.
+  The static route-policy packet records `3` route-aware modes, `87931.1m`
+  total route length, `2882` route capsule stamps, `0` warn modes, and `0` fail
+  modes.
+- Added `scripts/projekt-143-defekt-route-quality-audit.ts` and package command
+  `npm run check:projekt-143-defekt-route-quality`. Validation WARN at
+  `artifacts/perf/2026-05-07T22-42-23-479Z/projekt-143-defekt-route-quality-audit/route-quality-audit.json`
+  records `npc_route_quality_guardrails_present_runtime_acceptance_missing`,
+  anchors `CombatantMovement`, `StuckDetector`, active-driver route telemetry,
+  `perf-capture` stuck gates, and active-driver diagnostic route/stuck findings.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to keep
+  DEFEKT-4 open. The next required evidence is A Shau plus Open Frontier
+  active-driver route-quality runtime capture with measurement trust pass and
+  explicit bounds for max stuck seconds, route no-progress resets, waypoint
+  replan failures, path-query status, and terrain-stall warning rate.
+- Closeout checks: `npm run check:doc-drift -- --as-of 2026-05-07` PASS at
+  `artifacts/perf/2026-05-07T22-43-28.310Z/projekt-143-doc-drift/doc-drift.json`;
+  `npm run check:projekt-143-completion-audit` records NOT_COMPLETE at
+  `artifacts/perf/2026-05-07T22-43-38-384Z/projekt-143-completion-audit/completion-audit.json`
+  with `28` blockers. Scoped `git diff --check` reports line-ending warnings
+  only.
+
+2026-05-07 Projekt Objekt-143 STABILIZAT-3 current completion audit refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end, surveyed Article III across
+  active bureaus, and selected STABILIZAT-3 because the codex and state still
+  cited the older `22-02-21-527Z` completion packet after later DEFEKT-3 sparse
+  owner-review evidence changed the directive board.
+- Read `docs/STATE_OF_REPO.md`, `package.json`,
+  `scripts/projekt-143-current-completion-audit.ts`, and the current completion
+  packet. The gate parses Article III, maps Article VII requirements to concrete
+  artifacts, inspects git state, latest live-release proof, latest doc-drift
+  proof, missing evidence references, and the Politburo seal marker.
+- Validation: `npm run check:projekt-143-completion-audit` PASS as a
+  `NOT_COMPLETE` audit at
+  `artifacts/perf/2026-05-07T22-34-04-082Z/projekt-143-completion-audit/completion-audit.json`.
+  The packet records `canMarkGoalComplete=false`, `33` Article III directives,
+  `10` closed, `23` open, `0` deferred, `0` unknown, zero missing evidence
+  refs, `28` blockers, stale live release proof at SHA
+  `ab0cfd0e9a0f39ebe8b3a87f316b9287edfd3289`, dirty local HEAD
+  `aff1abd4da769e2a04e6e5f9b39d241296a60ada`, and latest local doc-drift pass
+  `artifacts/perf/2026-05-07T22-31-59.731Z/projekt-143-doc-drift/doc-drift.json`.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so
+  STABILIZAT-3 points at the refreshed packet and records the prompt-to-artifact
+  checklist: Article III completion FAIL, live-release verification FAIL,
+  ARKHIV strategic-reserve audit PASS, Politburo seal FAIL, and 14-day live
+  drift watch FAIL. This does not deploy production, close the goal, refresh
+  baselines, or certify live parity.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-3 sparse owner-review acceptance
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end in the engagement, surveyed
+  Article III, and selected DEFEKT-3 because the directive's next action was a
+  measurement decision on sparse-owner acceptance or removal of the remaining
+  raw-probe outliers.
+- Read `docs/STATE_OF_REPO.md`, `scripts/projekt-143-measurement-path-inspection.ts`,
+  `scripts/projekt-143-ground-marker-tagging-proof.ts`, `package.json`, and the
+  current DEFEKT-3 packets at
+  `artifacts/perf/2026-05-07T17-28-02-506Z/projekt-143-measurement-path-inspection/measurement-path-inspection.json`,
+  `artifacts/perf/2026-05-07T17-28-02-506Z/projekt-143-ground-marker-tagging-proof/ground-marker-tagging-proof.json`,
+  and
+  `artifacts/perf/2026-05-07T16-23-11-889Z/projekt-143-render-submission-category-attribution/render-submission-category-attribution.json`.
+- Added `scripts/projekt-143-sparse-owner-acceptance-audit.ts` and package
+  command `npm run check:projekt-143-sparse-owner-acceptance`. The rule
+  `sparse_owner_review_only_acceptance_v1` accepts sparse packets for owner
+  review only when a measurement-PASS reference exists, the target capture is
+  usable, raw probes are persisted, the tail is bounded, the non-outlier probe
+  body stays near the accepted reference, render-submission drain is sparse,
+  ground-marker movement is material, and the exact peak frame is source
+  anchored.
+- Validation: `npm run check:projekt-143-sparse-owner-acceptance` PASS at
+  `artifacts/perf/2026-05-07T22-29-58-460Z/projekt-143-sparse-owner-acceptance-audit/sparse-owner-acceptance-audit.json`.
+  The packet records `8/8` criteria passing, classification
+  `sparse_owner_review_accepted`, acceptance `owner_review_only`, raw probe p95
+  `30ms`, raw probe max `348ms`, over-75 rate `0.0345`, over-150 rate `0.0345`,
+  avg-without-max delta `3.37ms` versus the accepted reference, `3`
+  render-submission samples, `3505993` bytes, `unattributed` draw-share delta
+  `-0.2789`, and `npc_ground_markers` draw share `0.3232`.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to record
+  the post-tag packet as accepted sparse owner-review evidence only. The
+  measurement-PASS 16:23 packet remains the controlling production-shaped owner
+  reference for regression comparison. No runtime fix, DEFEKT-3 completion,
+  combat-feel certification, or baseline refresh is claimed.
+
+2026-05-07 Projekt Objekt-143 VODA-1 atmosphere and exposure evidence refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end, surveyed Article III across
+  active bureaus, and selected VODA-1 because the directive still named
+  `evidence:atmosphere` and `terrain_water_exposure_review` as open acceptance
+  gaps after the query/runtime proof slice.
+- Read `docs/STATE_OF_REPO.md`, `package.json`,
+  `scripts/capture-atmosphere-recovery-shots.ts`, and
+  `scripts/projekt-143-terrain-visual-review.ts`. The atmosphere command
+  rebuilds the perf bundle, captures A Shau / Open Frontier / TDM / Zone
+  Control / combat120 screenshots, and records water, nav, cloud, and browser
+  diagnostics. The terrain visual review captures Open Frontier and A Shau
+  river, terrain, airfield, and foundation review shots and evaluates the
+  explicit `terrain_water_exposure_review` check.
+- Validation: `npm run evidence:atmosphere -- --out-dir
+  artifacts/perf/2026-05-07T22-13-21-685Z/projekt-143-voda-atmosphere-evidence`
+  PASS by command exit after `npm run build:perf`; artifact
+  `artifacts/perf/2026-05-07T22-13-21-685Z/projekt-143-voda-atmosphere-evidence/summary.json`
+  records `5` scenarios, `15` screenshots, zero scenario errors, zero browser
+  errors, and `106` browser warnings. A Shau and Open Frontier hydrology river
+  visuals are present with `552` and `592` segments; TDM, Zone Control, and
+  combat120 keep global water visible; all scenarios record cloud legibility
+  PASS and cloud-follow PASS.
+- Validation: `npx tsx scripts/projekt-143-terrain-visual-review.ts` PASS as
+  WARN at
+  `artifacts/perf/2026-05-07T22-17-52-232Z/projekt-143-terrain-visual-review/visual-review.json`.
+  The packet records `14/14` screenshots, zero browser/page errors, `5/6`
+  checks passing, and A Shau river review passing. The remaining warning is
+  `terrain_water_exposure_review`: Open Frontier airfield and river shots have
+  luma means `229.37` to `236.60`, overexposed ratios `0.6786` to `0.8286`,
+  and green ratios `0.0082` to `0.0393`.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to record
+  the new VODA-1 atmosphere/exposure evidence while keeping VODA-1 open for
+  final water art, Open Frontier exposure correction, matched perf, human visual
+  acceptance, and consumer adoption of the public water queries.
+- Validation: `npm run check:doc-drift -- --as-of 2026-05-07` PASS at
+  `artifacts/perf/2026-05-07T22-23-53.396Z/projekt-143-doc-drift/doc-drift.json`
+  with `3` docs scanned, `520` checked artifact references, `273` checked
+  package command references, and zero findings.
+- Sidecar Article VII check: `npm run check:projekt-143-completion-audit`
+  PASS as `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-07T22-24-10-087Z/projekt-143-completion-audit/completion-audit.json`;
+  `canMarkGoalComplete=false`, `33` Article III directives parsed, `10`
+  closed, `23` open, `0` deferred, `28` blockers, and dirty local tree at HEAD
+  `aff1abd4da769e2a04e6e5f9b39d241296a60ada`.
+- Validation: `git diff --check -- docs/PROJEKT_OBJEKT_143.md
+  docs/STATE_OF_REPO.md progress.md` reported line-ending warnings only.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-2 doc-drift evidence refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end, surveyed Article III across
+  active bureaus, and selected DEFEKT-2 because later VODA-1, STABILIZAT-3,
+  and DEFEKT-1 record updates made the directive's cited pass packet stale.
+- Read `docs/STATE_OF_REPO.md`, `package.json`, and
+  `scripts/projekt-143-doc-drift.ts`. The gate scans the codex, current-state
+  snapshot, performance doc, concrete artifact references, and documented
+  `npm run` command references.
+- Validation: `npm run check:doc-drift -- --as-of 2026-05-07` PASS at
+  `artifacts/perf/2026-05-07T22-08-10.810Z/projekt-143-doc-drift/doc-drift.json`.
+  The packet records `3` docs scanned, `516` checked artifact references,
+  `272` checked package command references, `0` future-date findings, `0`
+  missing artifact references, and `0` missing package scripts.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  DEFEKT-2 at the refreshed packet and preserve the non-claim that this local
+  doc-drift pass does not validate runtime behavior, prove live production
+  parity, or satisfy the Article VII 14-day live drift watch.
+- Post-update validation: `npm run check:doc-drift -- --as-of 2026-05-07`
+  PASS at
+  `artifacts/perf/2026-05-07T22-09-16.432Z/projekt-143-doc-drift/doc-drift.json`
+  with `3` docs scanned, `515` checked artifact references, `272` checked
+  package command references, and zero findings.
+- Final guard: `npm run check:doc-drift -- --as-of 2026-05-07` PASS at
+  `artifacts/perf/2026-05-07T22-10-42.533Z/projekt-143-doc-drift/doc-drift.json`
+  with the same `3` docs, `515` artifact references, `272` package command
+  references, and zero findings.
+- Sidecar Article VII check: `npm run check:projekt-143-completion-audit`
+  PASS as `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-07T22-10-58-885Z/projekt-143-completion-audit/completion-audit.json`;
+  `canMarkGoalComplete=false`, `33` Article III directives parsed, `10`
+  closed, `23` open, `0` deferred, `28` blockers, stale live release proof at
+  SHA `ab0cfd0e9a0f39ebe8b3a87f316b9287edfd3289`, dirty local tree at HEAD
+  `aff1abd4da769e2a04e6e5f9b39d241296a60ada`, no Politburo seal marker, and
+  no 14-day live drift watch.
+- Validation: `git diff --check -- docs/PROJEKT_OBJEKT_143.md
+  docs/STATE_OF_REPO.md progress.md` reported line-ending warnings only.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-1 stale baseline audit refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end, surveyed Article III, and
+  selected DEFEKT-1 because the stale-baseline directive had an older packet
+  while the executable audit can refresh the release-blocking baseline truth
+  without mutating `perf-baselines.json`.
+- Read `docs/STATE_OF_REPO.md`, `perf-baselines.json`, `package.json`, and
+  `scripts/projekt-143-stale-baseline-audit.ts`. The gate compares the
+  2026-04-20 tracked baselines against detected captures under
+  `artifacts/perf/` and writes a WARN packet when refresh is blocked.
+- Validation: `npm run check:projekt-143-stale-baseline-audit -- --as-of
+  2026-05-07` PASS as WARN at
+  `artifacts/perf/2026-05-07T22-04-54-994Z/projekt-143-stale-baseline-audit/stale-baseline-audit.json`.
+  The packet records `4` tracked scenarios, `0` current, `0`
+  refresh-eligible, `4` blocked, and `4` stale by age. `combat120` is blocked
+  by validation WARN / measurement trust WARN / max-frame FAIL;
+  `openfrontier:short` is blocked by validation WARN; `ashau:short` is blocked
+  by compare FAIL; `frontier30m` is blocked by a failed latest detected soak
+  capture.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  DEFEKT-1 at the refreshed packet and preserve the non-claim that no baseline
+  refresh, runtime performance fix, local quiet-machine certification, or live
+  production performance proof occurred.
+
+2026-05-07 Projekt Objekt-143 STABILIZAT-3 current completion audit refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` end to end, surveyed Article III across
+  active bureaus, and selected STABILIZAT-3 because the closeout audit status
+  still cited the older `20-51-55-791Z` packet after newer VODA and SVYAZ
+  evidence changed the Article III counts.
+- Read the current state snapshot and the routed completion-audit script
+  `scripts/projekt-143-current-completion-audit.ts`; the script measures
+  Article III directive state, cited evidence existence, live-release proof,
+  local git state, and DEFEKT doc-drift proof.
+- Validation: `npm run check:projekt-143-completion-audit` PASS as a
+  `NOT_COMPLETE` audit at
+  `artifacts/perf/2026-05-07T22-02-21-527Z/projekt-143-completion-audit/completion-audit.json`.
+  The packet records `canMarkGoalComplete=false`, `33` Article III directives,
+  `10` closed, `23` open, `0` deferred, zero missing cited artifacts, dirty
+  local tree at HEAD `aff1abd4da769e2a04e6e5f9b39d241296a60ada`, stale live
+  release proof at SHA `ab0cfd0e9a0f39ebe8b3a87f316b9287edfd3289`, no
+  Politburo seal marker, no 14-day live drift watch, and `28` closeout
+  blockers.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so
+  STABILIZAT-3 points at the refreshed packet and does not claim live release,
+  baseline refresh, production parity, or active-goal completion.
+
+2026-05-07 Projekt Objekt-143 VODA-1 water query API slice
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected the VODA-1 query acceptance
+  gap from Article III after the latest water runtime proof still left public
+  `getWaterDepth` / `getWaterSurfaceY` acceptance open.
+- Added public `WaterSystem.getWaterSurfaceY(position)` and
+  `WaterSystem.getWaterDepth(position)` queries, backed them with hydrology
+  channel query segments from the same accepted channel geometry that builds
+  runtime river meshes, and routed underwater classification through the query
+  contract.
+- Added focused `WaterSystem` regression coverage for disabled water, global
+  water-plane depth, and hydrology channel surface/depth classification. The
+  first focused test run failed on the stale assumption that hydrology channels
+  were not underwater; the test was corrected to the accepted query contract.
+- Validation: `npx vitest run src/systems/environment/WaterSystem.test.ts` PASS
+  with `9` tests.
+- Validation: `npm run build:perf` PASS.
+- Validation: `npm run check:projekt-143-water-runtime-proof -- --headless`
+  PASS at
+  `artifacts/perf/2026-05-07T21-55-25-154Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
+  The packet records zero browser errors, screenshot artifacts, and live query
+  probes for Open Frontier and A Shau hydrology surfaces. Screenshot inspection
+  preserves the visual caveat: Open Frontier remains overexposed and is not art
+  acceptance.
+- Validation: `npm run check:projekt-143-water-system` PASS as WARN at
+  `artifacts/perf/2026-05-07T21-57-51-480Z/projekt-143-water-system-audit/water-system-audit.json`.
+  The packet accepts the source/test query API surface and preserves open work
+  for final water art, perf, `evidence:atmosphere`,
+  `terrain_water_exposure_review`, human visual acceptance, and consumer
+  adoption of the public queries.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  VODA-1 at the refreshed source/test/browser query evidence while keeping the
+  directive evidence-in-progress.
+
+2026-05-07 Projekt Objekt-143 SVYAZ-2 browser visibility closeout
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected the remaining SVYAZ-2
+  acceptance gap: browser proof for map and in-world ping marker visibility.
+- Added `scripts/projekt-143-svyaz-ping-command-browser-proof.ts` and package
+  command `npm run check:projekt-143-svyaz-ping-command-browser`.
+- Updated `scripts/projekt-143-svyaz-ping-command-audit.ts` so the static
+  audit consumes the latest passing browser proof packet instead of hardcoding
+  the browser visibility warning.
+- Validation: initial `npm run check:projekt-143-svyaz-ping-command` remained
+  WARN at
+  `artifacts/perf/2026-05-07T21-33-44-693Z/projekt-143-svyaz-ping-command-audit/ping-command-audit.json`
+  because no browser proof existed.
+- Validation: `npm run check:projekt-143-svyaz-ping-command-browser` forced
+  `npm run build:perf` successfully, then the first browser attempt failed on
+  a `page.evaluate` helper serialization error before writing a proof packet.
+- Validation: `npm run check:projekt-143-svyaz-ping-command-browser -- --no-build`
+  PASS at
+  `artifacts/perf/2026-05-07T21-41-01-140Z/projekt-143-svyaz-ping-command-browser-proof/ping-command-browser-proof.json`
+  with `11` pass, `0` warn, `0` fail, zero browser errors, in-world marker
+  screenshot, and command-map marker screenshot.
+- Validation: `npm run check:projekt-143-svyaz-ping-command` PASS at
+  `artifacts/perf/2026-05-07T21-42-23-342Z/projekt-143-svyaz-ping-command-audit/ping-command-audit.json`
+  with `18` pass, `0` warn, `0` fail, and `acceptanceReady=true`.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to mark
+  SVYAZ-2 evidence-complete and preserve non-claims for mobile ergonomics,
+  live deploy parity, and SVYAZ-3.
+- Updated `AGENTS.md` command inventory for the new SVYAZ-2 browser proof gate.
+
+2026-05-07 Projekt Objekt-143 SVYAZ-2 in-world ping marker slice
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected the remaining SVYAZ-2
+  source/test visual gap: placed squad commands had map/minimap markers but no
+  scene-attached marker path.
+- Added `SquadCommandWorldMarker`, wired it through `PlayerSquadController`
+  construction with terrain-height sampling, and kept stand-down / neutral
+  commands hiding the marker.
+- Updated focused tests so directed squad commands prove a visible scene marker
+  and stand-down proves the marker clears with the command position.
+- Validation: `npx vitest run src/systems/combat/PlayerSquadController.test.ts
+  src/systems/combat/CommandInputManager.test.ts
+  src/ui/hud/CommandModeOverlay.test.ts
+  src/systems/combat/ai/AIStatePatrol.test.ts
+  src/systems/combat/CombatantAI.test.ts` PASS with `5` files and `83` tests.
+- Validation: `npm run typecheck` PASS.
+- Validation: `npm run check:projekt-143-svyaz-ping-command` PASS as WARN at
+  `artifacts/perf/2026-05-07T21-23-38-724Z/projekt-143-svyaz-ping-command-audit/ping-command-audit.json`
+  with `17` pass, `1` warn, and `0` fail checks. The remaining SVYAZ-2 gap is
+  browser visibility proof for map and in-world markers.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  SVYAZ-2 at the refreshed packet and preserve that the directive remains open.
+
+2026-05-07 Projekt Objekt-143 SVYAZ-2 attack-here command slice
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected the remaining SVYAZ-2
+  command-vocabulary gap from the `21-09-24-481Z` audit packet: attack-here
+  was absent while in-world ping markers remained a separate visual scope.
+- Added internal `SquadCommand.ATTACK_HERE`, exposed it as slot `6` with
+  `ATTACK HERE` presentation, routed it through existing tactical-map placement,
+  and preserved slot `5` as `STAND DOWN`.
+- Added patrol-state and combat-priority handling so attack-here moves
+  non-combat squad members toward the marked point while preserving active
+  combat priority.
+- Updated focused tests for command presentation, placement dispatch,
+  `PlayerSquadController` command position storage, `AIStatePatrol`, and
+  `CombatantAI`.
+- Validation: `npx vitest run src/systems/combat/PlayerSquadController.test.ts
+  src/systems/combat/CommandInputManager.test.ts
+  src/ui/hud/CommandModeOverlay.test.ts
+  src/systems/combat/ai/AIStatePatrol.test.ts
+  src/systems/combat/CombatantAI.test.ts` PASS with `5` files and `82` tests.
+- Validation: `npm run check:projekt-143-svyaz-ping-command` PASS as WARN at
+  `artifacts/perf/2026-05-07T21-15-22-016Z/projekt-143-svyaz-ping-command-audit/ping-command-audit.json`
+  with `15` pass, `1` warn, and `0` fail checks. The only remaining SVYAZ-2
+  audit gap is the in-world ping marker path; browser visibility proof remains
+  unclaimed.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  SVYAZ-2 at the refreshed packet and preserve that the directive remains open.
+
+2026-05-07 Projekt Objekt-143 SVYAZ-2 fall-back presentation alignment
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected the smallest remaining
+  SVYAZ-2 command-surface gap from the `21-05-42-727Z` audit packet:
+  player-facing fall-back wording still read `RETREAT`.
+- Kept internal `SquadCommand.RETREAT` stable and relabeled the player-facing
+  quick-command and command-overlay language to `FALL BACK`.
+- Updated `scripts/projekt-143-svyaz-ping-command-audit.ts` so the audit
+  accepts `FALL BACK` as the visible prose while preserving the internal
+  retreat command as the fall-back equivalent.
+- Validation: `npx vitest run src/ui/hud/CommandModeOverlay.test.ts
+  src/systems/combat/CommandInputManager.test.ts` PASS with `2` files and `16`
+  tests.
+- Validation: `npm run check:projekt-143-svyaz-ping-command` PASS as WARN at
+  `artifacts/perf/2026-05-07T21-09-24-481Z/projekt-143-svyaz-ping-command-audit/ping-command-audit.json`
+  with `14` pass, `2` warn, and `0` fail checks. Remaining SVYAZ-2 gaps are
+  explicit attack-here support, in-world ping markers, and browser visibility
+  proof.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  SVYAZ-2 at the refreshed packet and preserve that the directive remains open.
+
+2026-05-07 Projekt Objekt-143 SVYAZ-2 ping command audit
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected SVYAZ-2 because the directive
+  was still opened with no evidence packet while existing command plumbing
+  could be measured locally without broad gameplay edits.
+- Added `scripts/projekt-143-svyaz-ping-command-audit.ts` and package command
+  `npm run check:projekt-143-svyaz-ping-command`.
+- Validation: `npm run check:projekt-143-svyaz-ping-command` PASS as WARN at
+  `artifacts/perf/2026-05-07T21-05-42-727Z/projekt-143-svyaz-ping-command-audit/ping-command-audit.json`
+  with `13` pass, `3` warn, and `0` fail checks across `14` source and test
+  files. The packet records existing Hold, Patrol, and Retreat ground orders,
+  tested tactical-map placement dispatch, minimap command markers, and partial
+  travel-engagement evidence.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to record
+  SVYAZ-2 as evidence-in-progress and preserve the gaps: no attack-here command
+  surface, fall-back wording still presented as `RETREAT`, no in-world ping
+  marker path, and no browser visibility proof.
+
+2026-05-07 Projekt Objekt-143 VODA-1 water runtime evidence refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected VODA-1 because the directive
+  had older static and browser proof packets while the local gates can refresh
+  evidence without deploy or baseline mutation.
+- Validation: `npm run check:projekt-143-water-system` PASS as WARN at
+  `artifacts/perf/2026-05-07T20-57-19-957Z/projekt-143-water-system-audit/water-system-audit.json`.
+  The packet records the current provisional contract: `WaterSystem` remains
+  the global water fallback, A Shau suppresses that plane, hydrology channel
+  strips are wired from durable cache, and final stream visuals still need
+  browser proof and human acceptance.
+- Validation: `npm run check:projekt-143-water-runtime-proof` PASS at
+  `artifacts/perf/2026-05-07T20-57-29-406Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
+  The packet records zero browser errors and screenshot artifacts for Open
+  Frontier and A Shau; Open Frontier has `12` hydrology channels / `592`
+  segments with global water enabled, and A Shau has `12` channels / `552`
+  segments with the global plane disabled.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  VODA-1 at the refreshed evidence and preserve the non-claim that final water
+  art, perf, `evidence:atmosphere`, `terrain_water_exposure_review`, gameplay
+  query acceptance, and human visual acceptance remain open.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-1 stale-baseline evidence refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected DEFEKT-1 because the directive
+  had an older stale-baseline packet while the gate can be refreshed locally
+  without mutating `perf-baselines.json`.
+- Validation: `npm run check:projekt-143-stale-baseline-audit -- --as-of
+  2026-05-07` PASS as WARN at
+  `artifacts/perf/2026-05-07T20-54-16-906Z/projekt-143-stale-baseline-audit/stale-baseline-audit.json`.
+  The packet records `4` tracked scenarios, `0` current, `0` refresh-eligible,
+  `4` blocked, and `4` stale by age. `combat120` is blocked by validation WARN
+  / measurement trust WARN / max-frame FAIL; `openfrontier:short` by validation
+  WARN; `ashau:short` by compare FAIL; `frontier30m` by failed latest detected
+  soak capture.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  DEFEKT-1 at the `20-54-16-906Z` packet and preserve the non-claim that no
+  baseline refresh or runtime fix is authorized.
+- Validation: `npm run check:doc-drift -- --as-of 2026-05-07` PASS at
+  `artifacts/perf/2026-05-07T20-55-23.462Z/projekt-143-doc-drift/doc-drift.json`
+  with `futureDates=0`, `missingArtifacts=0`, and `missingScripts=0`.
+- Validation: `git diff --check -- docs/PROJEKT_OBJEKT_143.md
+  docs/STATE_OF_REPO.md progress.md` reported line-ending warnings only.
+
+2026-05-07 Projekt Objekt-143 current completion audit repair
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected the STABILIZAT-3 /
+  DEFEKT-2 completion-audit chain because the named closeout command still
+  measured the retired pre-codex directive model.
+- Added `scripts/projekt-143-current-completion-audit.ts` and routed
+  `npm run check:projekt-143-completion-audit` to it. The legacy
+  `scripts/projekt-143-completion-audit.ts` remains in place for historical
+  comparison.
+- Validation: `npm run check:projekt-143-completion-audit` PASS as a
+  `NOT_COMPLETE` current-codex audit at
+  `artifacts/perf/2026-05-07T20-45-16-604Z/projekt-143-completion-audit/completion-audit.json`.
+  The packet parses `33` Article III directives, records `9` closed and `24`
+  open, finds zero missing cited artifacts, rejects live release parity because
+  the latest live proof is for SHA
+  `ab0cfd0e9a0f39ebe8b3a87f316b9287edfd3289` while local HEAD is
+  `aff1abd4da769e2a04e6e5f9b39d241296a60ada`, and records the missing
+  Politburo seal plus missing 14-day live drift watch.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` so the
+  directive board reflects the current completion-audit evidence path and does
+  not inflate the negative audit into release proof.
+- Validation: `npm run check:doc-drift -- --as-of 2026-05-07` PASS at
+  `artifacts/perf/2026-05-07T20-46-40.235Z/projekt-143-doc-drift/doc-drift.json`
+  with `futureDates=0`, `missingArtifacts=0`, and `missingScripts=0`.
+- Validation: `git diff --check -- scripts/projekt-143-current-completion-audit.ts
+  package.json docs/PROJEKT_OBJEKT_143.md docs/STATE_OF_REPO.md progress.md`
+  reported line-ending warnings only.
+
+2026-05-07 Projekt Objekt-143 DEFEKT-2 drift evidence refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected DEFEKT-2 because the local
+  drift gate had a newer pass packet after the completion-audit repair, while
+  the codex still named the earlier drift packet as the latest evidence path.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to cite the
+  follow-up pass packet
+  `artifacts/perf/2026-05-07T20-46-40.235Z/projekt-143-doc-drift/doc-drift.json`
+  and preserve the limitation that local doc/code/artifact drift does not
+  satisfy Article VII's 14-day live deployment drift watch.
+- Validation: `npm run check:doc-drift -- --as-of 2026-05-07` PASS at
+  `artifacts/perf/2026-05-07T20-49-35.515Z/projekt-143-doc-drift/doc-drift.json`
+  with `futureDates=0`, `missingArtifacts=0`, `missingScripts=0`,
+  `artifactRefsChecked=508`, and `packageCommandRefsChecked=272`.
+- Sidecar Article VII check: `npm run check:projekt-143-completion-audit` PASS
+  as `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-07T20-49-52-180Z/projekt-143-completion-audit/completion-audit.json`;
+  `canMarkGoalComplete=false`, `33` Article III directives parsed, `9` closed,
+  `24` open, `0` deferred, and DEFEKT 14-day live drift remains failing.
+
+2026-05-07 Projekt Objekt-143 STABILIZAT-3 completion evidence refresh
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected STABILIZAT-3 because the
+  directive still cited the older current-codex completion packet after the
+  DEFEKT-2 follow-up drift proof.
+- Validation: `npm run check:projekt-143-completion-audit` PASS as
+  `NOT_COMPLETE` at
+  `artifacts/perf/2026-05-07T20-51-55-791Z/projekt-143-completion-audit/completion-audit.json`.
+  The packet records `canMarkGoalComplete=false`, `33` Article III directives
+  parsed, `9` closed, `24` open, `0` deferred, zero missing cited artifacts,
+  latest local drift proof pass at
+  `artifacts/perf/2026-05-07T20-49-35.515Z/projekt-143-doc-drift/doc-drift.json`,
+  and failed STABILIZAT-3 live release plus failed 14-day live drift criteria.
+- Updated `docs/PROJEKT_OBJEKT_143.md` and `docs/STATE_OF_REPO.md` to point
+  STABILIZAT-3 / current closeout state at the `20-51-55-791Z` packet.
+- Validation: `npm run check:doc-drift -- --as-of 2026-05-07` PASS at
+  `artifacts/perf/2026-05-07T20-52-55.308Z/projekt-143-doc-drift/doc-drift.json`
+  with `futureDates=0`, `missingArtifacts=0`, and `missingScripts=0`.
+- Validation: `git diff --check -- docs/PROJEKT_OBJEKT_143.md
+  docs/STATE_OF_REPO.md progress.md` reported line-ending warnings only.
+
+2026-05-07 Projekt Objekt-143 UX-1 respawn surface audit
+- Read `docs/PROJEKT_OBJEKT_143.md` and selected UX-1 because the directive
+  had source/test gaps and no runtime proof packet.
+- Follow-up multi-spawn proof: added
+  `scripts/projekt-143-ux-respawn-multispawn-proof.ts` and package command
+  `npm run check:projekt-143-ux-respawn-multispawn`. Latest proof PASS at
+  `artifacts/perf/2026-05-07T20-27-26-789Z/projekt-143-ux-respawn-multispawn-proof/ux-respawn-multispawn-proof.json`
+  with `10` pass, `0` warn, `0` fail, zero browser errors, required
+  home-base/zone/helipad/insertion classes on desktop and mobile, mobile 48px
+  spawn targets, and screenshot evidence.
+- KB-DIZAYN follow-up gate: signed the local UX-1 visual packet at
+  `artifacts/perf/2026-05-07T20-28-48-561Z/projekt-143-ux-respawn-dizayn-gate/ux-respawn-dizayn-gate.json`
+  after map-label anchoring, responsive mobile metadata correction, and
+  multi-spawn-class proof. UX-1 remains open only for live production parity or
+  explicit Politburo deferral to STABILIZAT.
+- Previous KB-DIZAYN gate: reviewed the trusted desktop/mobile screenshots
+  from the UX-1 browser proof and recorded `returned_with_notes` at
+  `artifacts/perf/2026-05-07T20-07-49-954Z/projekt-143-ux-respawn-dizayn-gate/ux-respawn-dizayn-gate.json`.
+  The gate does not sign UX-1 because the proof shows only the home-base spawn
+  case and the mobile map labels crowd at the selected base marker.
+- Added `scripts/projekt-143-ux-respawn-audit.ts`,
+  `scripts/projekt-143-ux-respawn-browser-proof.ts`, and package commands
+  `npm run check:projekt-143-ux-respawn` /
+  `npm run check:projekt-143-ux-respawn-browser`.
+- Implemented explicit alliance metadata, grouped textual spawn choices,
+  spawn-class map labels, death-to-decision timing, and mobile deploy layout
+  corrections preserving `#respawn-side-scroll` as the mobile scroll owner.
+- Implemented map-label placement by spawn kind with leader lines and clamped
+  anchors, and stacked mobile header metadata so long mode/flow values stay
+  inside the panel.
+- Validation: `npm run check:projekt-143-ux-respawn` PASS at
+  `artifacts/perf/2026-05-07T20-30-26-829Z/projekt-143-ux-respawn-audit/ux-respawn-audit.json`
+  with `15` pass, `0` warn, `0` fail, and `acceptanceReady=true`.
+- Validation: `npm run build` PASS after the UX-1 map-label and mobile-header
+  corrections; Vite emitted the existing large-chunk warning and wrote
+  `dist/asset-manifest.json`.
+- Validation: `npm run check:projekt-143-ux-respawn-browser` PASS at
+  `artifacts/perf/2026-05-07T20-35-21-453Z/projekt-143-ux-respawn-browser-proof/ux-respawn-browser-proof.json`
+  against the fresh production bundle with `8` pass, `0` warn, `0` fail, zero
+  browser errors, desktop/mobile screenshots, visible alliance, decision
+  timing, and 48px mobile spawn targets. This proof covers the current
+  production-build Zone Control surface and shows only the live single
+  home-base spawn case; multi-spawn class spread remains covered by the
+  source-served multi-spawn proof above.
+- Validation: `npx vitest run src/systems/player/RespawnUI.test.ts
+  src/systems/player/PlayerRespawnManager.test.ts` PASS with `2` files and
+  `118` tests.
+- Validation: `npm run build` PASS; latest build wrote `dist/asset-manifest.json`.
+- Validation: `npm run check:mobile-ui` PASS at
+  `artifacts/mobile-ui/2026-05-07T19-46-27-777Z/mobile-ui-check` with `72`
+  checks, `3` policy skips, and zero page, request, or console errors.
+- Remaining UX-1 gap: live production parity, unless the Politburo explicitly
+  defers live UX-1 proof to STABILIZAT.
+- Doctrine reconciliation: `npm run check:doc-drift -- --as-of 2026-05-07`
+  PASS at
+  `artifacts/perf/2026-05-07T20-09-22.156Z/projekt-143-doc-drift/doc-drift.json`
+  with `futureDates=0`, `missingArtifacts=0`, and `missingScripts=0`.
+
+2026-05-07 Projekt Objekt-143 SVYAZ-1 stand-down command implementation
+- Continued from the SVYAZ-1 neutral-command audit packet at
+  `artifacts/perf/2026-05-07T18-39-06-317Z/projekt-143-svyaz-neutral-command-audit/neutral-command-audit.json`.
+- Changed the existing `FREE_ROAM` quick command presentation from `AUTO` /
+  `FREE ROAM` to explicit `STAND DOWN` language, preserving the existing enum
+  and non-targeted command slot instead of adding a new command type.
+- Updated `PlayerSquadController` so stand-down clears the prior
+  `commandPosition` while preserving the selected squad and formation.
+- Locked the UX policy that Escape/backdrop cancel remains modal close only;
+  slot 5 is the explicit squad stand-down order.
+- Added focused tests for stand-down label exposure, command-position clearing,
+  formation preservation, and command-input cancel policy.
+- Validation: `npm run check:projekt-143-svyaz-neutral-command` PASS at
+  `artifacts/perf/2026-05-07T18-45-48-457Z/projekt-143-svyaz-neutral-command-audit/neutral-command-audit.json`
+  with `15` pass, `0` warn, and `0` fail checks.
+- Validation: targeted Vitest command for
+  `PlayerSquadController.test.ts`, `CommandInputManager.test.ts`,
+  `CommandModeOverlay.test.ts`, `CombatantAI.test.ts`,
+  `AIStatePatrol.test.ts`, and `CombatantMovementStates.test.ts` PASS with
+  `104` tests.
+- Validation: browser stand-down proof PASS at
+  `artifacts/perf/2026-05-07T18-59-28-353Z/projekt-143-svyaz-standdown-browser-proof/standdown-browser-proof.json`.
+  It proves the overlay exposes `STAND DOWN`, slot 5 issues `free_roam`,
+  the prior command position clears, and `wedge` formation remains intact.
+- Caveat: `npm run check:hud` timed out during the broader HUD gate on this
+  machine. The narrower SVYAZ-1 browser proof passed and wrote a web-game
+  smoke screenshot under the same artifact root.
+- Doctrine reconciliation: `npm run check:doc-drift -- --as-of 2026-05-07`
+  PASS at
+  `artifacts/perf/2026-05-07T19-03-50.180Z/projekt-143-doc-drift/doc-drift.json`
+  with `futureDates=0`, `missingArtifacts=0`, and `missingScripts=0`.
+
 2026-05-06 Projekt Objekt-143 KB-CULL vehicle interaction safety slice
 - Fixed a cross-vehicle prompt bug in `HelicopterInteraction`: helicopter
   proximity and entry now suppress while the player is already in any vehicle,
