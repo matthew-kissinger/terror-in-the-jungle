@@ -189,6 +189,7 @@ export class RespawnManager {
     );
 
     newMember.isRejoiningSquad = true;
+    newMember.rejoinStartedAtMs = performance.now();
 
     squad.members.push(newMember.id);
     this.combatants.set(newMember.id, newMember);
