@@ -19,6 +19,8 @@ class MockHTMLElement {
   children: MockHTMLElement[] = [];
   parentElement: MockHTMLElement | null = null;
   disabled: boolean = false;
+  dataset: Record<string, string> = {};
+  private attributes: Map<string, string> = new Map();
   
   // Event handlers
   onclick: (() => void) | null = null;
@@ -68,6 +70,14 @@ class MockHTMLElement {
       child.parentElement = null;
     }
     return child;
+  }
+
+  setAttribute(name: string, value: string) {
+    this.attributes.set(name, value);
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributes.get(name) ?? null;
   }
 }
 
@@ -173,6 +183,9 @@ describe('DeployScreen', () => {
       expect(elementMap.has('loadout-primaryWeapon-value')).toBe(true);
       expect(elementMap.has('loadout-secondaryWeapon-value')).toBe(true);
       expect(elementMap.has('loadout-equipment-value')).toBe(true);
+      expect(elementMap.has('respawn-spawn-options-panel')).toBe(true);
+      expect(elementMap.has('respawn-spawn-options')).toBe(true);
+      expect(elementMap.has('respawn-decision-time')).toBe(true);
     });
 
     it('should expose map container', () => {
@@ -344,6 +357,8 @@ describe('DeployScreen', () => {
       expect(elementMap.get('respawn-loadout-status')?.textContent).toBe('NVA preset 3/3. Adjust two weapons and one equipment slot before deploying.');
       expect(elementMap.get('respawn-loadout-preset-save')?.textContent).toBe('Save Preset');
       expect(elementMap.get('respawn-loadout-preset-save')?.disabled).toBe(false);
+      expect((ui.getContainer() as any).dataset.alliance).toBe('OPFOR');
+      expect((ui.getContainer() as any).dataset.faction).toBe('NVA');
     });
 
     it('should route preset button presses to the callback', () => {
@@ -395,13 +410,80 @@ describe('DeployScreen', () => {
   });
 
   describe('Spawn Selection', () => {
+    it('renders grouped spawn choices with class labels', () => {
+      ui.updateSpawnOptions([
+        {
+          id: 'us_base',
+          name: 'US Base',
+          position: { x: 0, y: 0, z: -50 } as any,
+          safe: true,
+          kind: 'home_base',
+          selectionClass: 'home_base',
+        },
+        {
+          id: 'zone_alpha',
+          name: 'Zone Alpha',
+          position: { x: 100, y: 0, z: 100 } as any,
+          safe: true,
+          kind: 'zone',
+          selectionClass: 'nearest_controlled_zone',
+        },
+        {
+          id: 'helipad_main',
+          name: 'Helipad: UH1 HUEY',
+          position: { x: 28, y: 0, z: -1400 } as any,
+          safe: true,
+          kind: 'helipad',
+          selectionClass: 'helipad',
+        },
+        {
+          id: 'direct_insertion',
+          name: 'Tactical Insertion',
+          position: { x: -400, y: 0, z: 200 } as any,
+          safe: false,
+          kind: 'insertion',
+          selectionClass: 'direct_insertion',
+        },
+      ], 'helipad_main');
+
+      const list = elementMap.get('respawn-spawn-options');
+      expect(list?.children).toHaveLength(4);
+      const helipadGroup = list?.children[2];
+      const helipadButton = helipadGroup?.children[1];
+      expect(helipadButton?.getAttribute('aria-pressed')).toBe('true');
+      expect((helipadButton as any)?.dataset.spawnKind).toBe('helipad');
+    });
+
+    it('routes spawn option button presses to the callback', () => {
+      const callback = vi.fn();
+      ui.setSpawnOptionClickCallback(callback);
+      ui.updateSpawnOptions([
+        {
+          id: 'direct_insertion',
+          name: 'Tactical Insertion',
+          position: { x: -400, y: 0, z: 200 } as any,
+          safe: false,
+          kind: 'insertion',
+          selectionClass: 'direct_insertion',
+        },
+      ]);
+
+      const list = elementMap.get('respawn-spawn-options');
+      const button = list?.children[0]?.children[1];
+      button?.dispatchEvent(new Event('pointerdown'));
+
+      expect(callback).toHaveBeenCalledWith('direct_insertion', 'Tactical Insertion');
+    });
+
     it('should update selected spawn info', () => {
+      ui.setDecisionTimerStarted(1000);
       ui.updateSelectedSpawn('Alpha Base');
       const name = elementMap.get('selected-spawn-name');
       const status = elementMap.get('selected-spawn-status');
       
       expect(name?.textContent).toBe('Alpha Base');
       expect(status?.textContent).toBe('Ready to deploy');
+      expect(Number((ui.getContainer() as any).dataset.decisionElapsedMs)).toBeGreaterThanOrEqual(0);
     });
 
     it('should reset selected spawn info', () => {

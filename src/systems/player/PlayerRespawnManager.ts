@@ -114,6 +114,9 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnUI.setCancelClickCallback(() => {
       this.cancelActiveDeployFlow();
     });
+    this.respawnUI.setSpawnOptionClickCallback((spawnPointId, spawnPointName) => {
+      this.selectSpawnPointOnMap(spawnPointId, spawnPointName);
+    });
     this.respawnUI.setLoadoutChangeCallback((field, direction) => {
       this.handleLoadoutChange(field, direction);
     });
@@ -407,12 +410,14 @@ export class PlayerRespawnManager implements GameSystem {
       ?? createDeploySession(getGameModeDefinition(GameMode.ZONE_CONTROL), kind);
     this.deployFlow.open(kind, deploySession);
     this.respawnUI.configureSession(deploySession);
+    this.respawnUI.updateAlliance(this.spawnPointSelector.getCurrentAlliance());
     this.respawnUI.setMapInteractionEnabled(deploySession.allowSpawnSelection);
     this.syncLoadoutPreview();
 
     // Update available spawn points
     this.updateAvailableSpawnPoints();
     this.mapController.setSpawnPoints(this.availableSpawnPoints);
+    this.respawnUI.updateSpawnOptions(this.availableSpawnPoints, this.selectedSpawnPoint);
 
     // Release pointer lock and set menu context so the cursor is free
     InputContextManager.getInstance().setContext('menu');
@@ -427,6 +432,7 @@ export class PlayerRespawnManager implements GameSystem {
 
     this.selectedSpawnPoint = undefined;
     this.applyInitialSpawnSelection(kind === 'initial');
+    this.respawnUI.updateSpawnOptions(this.availableSpawnPoints, this.selectedSpawnPoint);
     this.lastTimerDisplaySecond = -1;
     this.lastTimerDisplayHasSelection = false;
 
@@ -445,6 +451,7 @@ export class PlayerRespawnManager implements GameSystem {
     this.selectedSpawnPoint = zoneId;
     this.mapController.setSelectedSpawnPoint?.(zoneId);
     this.respawnUI.updateSelectedSpawn(zoneName);
+    this.respawnUI.updateSpawnOptions(this.availableSpawnPoints, zoneId);
     this.updateTimerDisplay();
   }
 
@@ -455,6 +462,7 @@ export class PlayerRespawnManager implements GameSystem {
     if (!spawnPoint) return;
 
     Logger.info('player', ` Deploying at ${spawnPoint.name}`);
+    this.respawnUI.recordDecisionTime();
     const finalPosition = this.createDeployPosition(spawnPoint.position);
     const flowKind = this.deployFlow.confirm(finalPosition);
     this.hideRespawnUI();
@@ -536,6 +544,7 @@ export class PlayerRespawnManager implements GameSystem {
   private applyInitialSpawnSelection(preselectDefaultSpawn: boolean): void {
     if (!preselectDefaultSpawn && this.deploySession?.allowSpawnSelection !== false) {
       this.respawnUI.resetSelectedSpawn();
+      this.respawnUI.updateSpawnOptions(this.availableSpawnPoints, undefined);
       return;
     }
 
@@ -544,12 +553,14 @@ export class PlayerRespawnManager implements GameSystem {
     );
     if (!fallbackSpawn) {
       this.respawnUI.resetSelectedSpawn();
+      this.respawnUI.updateSpawnOptions(this.availableSpawnPoints, undefined);
       return;
     }
 
     this.selectedSpawnPoint = fallbackSpawn.id;
     this.mapController.setSelectedSpawnPoint?.(fallbackSpawn.id);
     this.respawnUI.updateSelectedSpawn(fallbackSpawn.name);
+    this.respawnUI.updateSpawnOptions(this.availableSpawnPoints, fallbackSpawn.id);
     this.mapController.focusSpawnPoints?.(fallbackSpawn.id);
   }
 

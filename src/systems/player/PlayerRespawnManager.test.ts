@@ -195,6 +195,10 @@ describe('PlayerRespawnManager', () => {
       setPresetSaveCallback: vi.fn(),
       setRespawnClickCallback: vi.fn(),
       setCancelClickCallback: vi.fn(),
+      setSpawnOptionClickCallback: vi.fn(),
+      updateAlliance: vi.fn(),
+      updateSpawnOptions: vi.fn(),
+      recordDecisionTime: vi.fn(),
       updateTimerDisplay: vi.fn(),
       updateLoadout: vi.fn(),
       updateLoadoutPresentation: vi.fn(),
@@ -1059,6 +1063,38 @@ describe('PlayerRespawnManager', () => {
 
       expect(respawnManager['selectedSpawnPoint']).toBe('us_base');
       expect(mockDeployScreen.updateSelectedSpawn).toHaveBeenCalledWith('US Base');
+      expect((mockDeployScreen as any).updateSpawnOptions).toHaveBeenLastCalledWith(
+        expect.any(Array),
+        'us_base'
+      );
+    });
+
+    it('publishes alliance and grouped spawn options when the deploy UI opens', () => {
+      respawnManager.onPlayerDeath();
+
+      expect((mockDeployScreen as any).updateAlliance).toHaveBeenCalledWith(Alliance.BLUFOR);
+      expect((mockDeployScreen as any).updateSpawnOptions).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'us_base', kind: 'home_base' }),
+          expect.objectContaining({ id: 'zone_a', kind: 'zone' }),
+        ]),
+        undefined
+      );
+    });
+
+    it('routes textual spawn option selection through the same selection path as the map', async () => {
+      await respawnManager.init();
+      respawnManager.onPlayerDeath();
+
+      const callback = vi.mocked((mockDeployScreen as any).setSpawnOptionClickCallback).mock.calls[0][0];
+      callback('zone_a', 'Zone Alpha');
+
+      expect(respawnManager['selectedSpawnPoint']).toBe('zone_a');
+      expect(mockDeployScreen.updateSelectedSpawn).toHaveBeenCalledWith('Zone Alpha');
+      expect((mockDeployScreen as any).updateSpawnOptions).toHaveBeenLastCalledWith(
+        expect.any(Array),
+        'zone_a'
+      );
     });
 
     it('preselects the preferred insertion point for initial deploy', async () => {
