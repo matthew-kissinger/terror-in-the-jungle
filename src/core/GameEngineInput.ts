@@ -143,9 +143,9 @@ export function disposeEventListeners(): void {
 }
 
 /**
- * Dispatch an N/L/I/T/C/X keypress to the matching world overlay. Only fires
- * when the overlay master is already visible (opted-in via Shift+\) so the
- * keys do not shadow gameplay bindings during normal play.
+ * Dispatch an N/L/I/T/C/X/Y keypress to the matching world overlay. Only
+ * fires when the overlay master is already visible (opted-in via Shift+\)
+ * so the keys do not shadow gameplay bindings during normal play.
  */
 function handleWorldOverlayHotkey(engine: GameEngine, event: KeyboardEvent): boolean {
   const overlays = engine.renderer.worldOverlays;
@@ -159,6 +159,7 @@ function handleWorldOverlayHotkey(engine: GameEngine, event: KeyboardEvent): boo
     t: 'lod-tier',
     c: 'aircraft-contact',
     x: 'terrain-chunks',
+    y: 'terrain-seams',
   };
   const id = map[k];
   if (!id) return false;

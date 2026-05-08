@@ -105,10 +105,16 @@ export class CDLODQuadtree {
       return;
     }
 
-    // Distance from camera to node center (XZ plane)
-    const dx = camX - cx;
-    const dz = camZ - cz;
-    const dist = Math.sqrt(dx * dx + camY * camY + dz * dz);
+    // Distance from camera to *nearest point* of this tile's XZ AABB
+    // (not the node center). Adjacent tiles meeting at a shared edge then
+    // return identical XZ-distance contributions when the camera is outside
+    // their shared edge, so their morph factors line up at that edge and
+    // the shader cannot produce a sub-pixel height crack between them.
+    // See docs/tasks/terrain-cdlod-seam.md (Stage D1).
+    const halfSize = size / 2;
+    const cdx = Math.max(Math.abs(camX - cx) - halfSize, 0);
+    const cdz = Math.max(Math.abs(camZ - cz) - halfSize, 0);
+    const dist = Math.sqrt(cdx * cdx + camY * camY + cdz * cdz);
 
     const range = this.lodRanges[lodLevel] ?? this.lodRanges[this.lodRanges.length - 1];
 
