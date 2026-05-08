@@ -5,11 +5,20 @@ import { Logger } from '../../../utils/Logger'
 const _toDestination = new THREE.Vector3()
 const _toTarget = new THREE.Vector3()
 const _toCover = new THREE.Vector3()
+const SEEKING_COVER_VISIBILITY_RECHECK_MS = 250
+
+interface SeekingCoverVisibilitySample {
+  targetId: string
+  checkedAtMs: number
+  visible: boolean
+}
 
 /**
  * Handles movement-related AI states (advancing, seeking cover)
  */
 export class AIStateMovement {
+  private seekingCoverVisibilityByCombatant = new WeakMap<Combatant, SeekingCoverVisibilitySample>()
+
   handleAdvancing(
     combatant: Combatant,
     deltaTime: number,
@@ -92,17 +101,50 @@ export class AIStateMovement {
       combatant.inCover = true;
       combatant.state = CombatantState.ENGAGING;
       Logger.info('combat-ai', ` ${combatant.faction} unit reached cover, switching to peek-and-fire`);
-      
+
     }
 
     const toCover = _toCover.subVectors(combatant.coverPosition, combatant.position).normalize();
     combatant.rotation = Math.atan2(toCover.z, toCover.x);
 
-    if (combatant.target && !canSeeTarget(combatant, combatant.target, playerPosition)) {
+    if (
+      combatant.target &&
+      !this.hasSeekingCoverLineOfSight(combatant, combatant.target, playerPosition, canSeeTarget)
+    ) {
       combatant.state = CombatantState.ENGAGING;
       combatant.destinationPoint = undefined;
       combatant.inCover = false;
     }
+  }
+
+  private hasSeekingCoverLineOfSight(
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3,
+    canSeeTarget: (
+      combatant: Combatant,
+      target: ITargetable,
+      playerPosition: THREE.Vector3
+    ) => boolean
+  ): boolean {
+    const now = Date.now()
+    const sample = this.seekingCoverVisibilityByCombatant.get(combatant)
+    if (
+      sample &&
+      sample.visible &&
+      sample.targetId === target.id &&
+      now - sample.checkedAtMs < SEEKING_COVER_VISIBILITY_RECHECK_MS
+    ) {
+      return true
+    }
+
+    const visible = canSeeTarget(combatant, target, playerPosition)
+    this.seekingCoverVisibilityByCombatant.set(combatant, {
+      targetId: target.id,
+      checkedAtMs: now,
+      visible,
+    })
+    return visible
   }
 
 }

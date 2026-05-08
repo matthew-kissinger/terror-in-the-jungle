@@ -92,6 +92,7 @@ export function handlePlayerCommand(
       break;
 
     case SquadCommand.PATROL_HERE:
+    case SquadCommand.ATTACK_HERE:
       if (combatant.destinationPoint) {
         const toDestination = objectPool.getVector3();
         toDestination.subVectors(combatant.destinationPoint, combatant.position);

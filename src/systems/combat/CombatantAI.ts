@@ -7,14 +7,53 @@ import { ISpatialQuery } from './SpatialOctree'
 import { ZoneManager } from '../world/ZoneManager'
 import { TicketSystem } from '../world/TicketSystem'
 import { AIStatePatrol } from './ai/AIStatePatrol'
-import { AIStateEngage } from './ai/AIStateEngage'
+import { AIStateEngage, type CloseEngagementTelemetry } from './ai/AIStateEngage'
 import { AIStateMovement } from './ai/AIStateMovement'
 import { AIStateDefend } from './ai/AIStateDefend'
 import { AIStateRetreat } from './ai/AIStateRetreat'
 import { AITargeting } from './ai/AITargeting'
+import type { TargetAcquisitionTelemetry } from './ai/AITargetAcquisition'
 import { AICoverSystem } from './ai/AICoverSystem'
 import { AIFlankingSystem } from './ai/AIFlankingSystem'
 import { UtilityScorer, DEFAULT_UTILITY_ACTIONS } from './ai/utility'
+
+export type LosCallsiteName =
+  | 'patrolDetection'
+  | 'alertConfirmation'
+  | 'engageSuppressionCheck'
+  | 'advancingDetection'
+  | 'seekingCoverValidation'
+  | 'defendDetection'
+
+export interface LosCallsiteTelemetryBucket {
+  calls: number
+  visible: number
+  blocked: number
+}
+
+export type LosCallsiteTelemetry = Record<LosCallsiteName, LosCallsiteTelemetryBucket>
+
+export interface AiUpdateBreakdown {
+  combatantId: string
+  stateAtStart: string
+  stateAtEnd: string
+  lodLevel: 'high' | 'medium'
+  totalMs: number
+  methodMs: Record<string, number>
+  methodCounts: Record<string, number>
+}
+
+function createLosCallsiteTelemetry(): LosCallsiteTelemetry {
+  return {
+    patrolDetection: { calls: 0, visible: 0, blocked: 0 },
+    alertConfirmation: { calls: 0, visible: 0, blocked: 0 },
+    engageSuppressionCheck: { calls: 0, visible: 0, blocked: 0 },
+    advancingDetection: { calls: 0, visible: 0, blocked: 0 },
+    seekingCoverValidation: { calls: 0, visible: 0, blocked: 0 },
+    defendDetection: { calls: 0, visible: 0, blocked: 0 }
+  }
+}
+
 /**
  * Thin orchestrator for AI state machine - delegates to focused state handler modules
  */
@@ -34,6 +73,43 @@ export class CombatantAI {
   private flankingSystem: AIFlankingSystem
   private ticketSystem?: TicketSystem
   private flankingUpdatedSquadsThisFrame: Set<string> = new Set()
+  private losCallsiteTelemetry: LosCallsiteTelemetry = createLosCallsiteTelemetry()
+
+  private readonly canSeeTargetForPatrolDetection = (
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3
+  ): boolean => this.canSeeTargetForCallsite('patrolDetection', combatant, target, playerPosition)
+
+  private readonly canSeeTargetForAlertConfirmation = (
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3
+  ): boolean => this.canSeeTargetForCallsite('alertConfirmation', combatant, target, playerPosition)
+
+  private readonly canSeeTargetForEngageSuppressionCheck = (
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3
+  ): boolean => this.canSeeTargetForCallsite('engageSuppressionCheck', combatant, target, playerPosition)
+
+  private readonly canSeeTargetForAdvancingDetection = (
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3
+  ): boolean => this.canSeeTargetForCallsite('advancingDetection', combatant, target, playerPosition)
+
+  private readonly canSeeTargetForSeekingCoverValidation = (
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3
+  ): boolean => this.canSeeTargetForCallsite('seekingCoverValidation', combatant, target, playerPosition)
+
+  private readonly canSeeTargetForDefendDetection = (
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3
+  ): boolean => this.canSeeTargetForCallsite('defendDetection', combatant, target, playerPosition)
 
   private squads: Map<string, Squad> = new Map()
   private aiStateMs: Record<string, number> = {
@@ -46,6 +122,13 @@ export class CombatantAI {
     defending: 0,
     retreating: 0
   }
+  private aiMethodMs: Record<string, number> = {}
+  private aiMethodCounts: Record<string, number> = {}
+  private aiMethodTotalCounts: Record<string, number> = {}
+  private activeUpdateMethodMs: Record<string, number> | null = null
+  private activeUpdateMethodCounts: Record<string, number> | null = null
+  private lastUpdateBreakdown: AiUpdateBreakdown | null = null
+  private slowestUpdateBreakdown: AiUpdateBreakdown | null = null
 
   // Proxy combatant reused by the utility-AI cover-bearing probe. Mutated in
   // place so the probe allocates nothing on the hot path.
@@ -61,9 +144,12 @@ export class CombatantAI {
     this.coverSystem = new AICoverSystem()
     this.flankingSystem = new AIFlankingSystem()
 
+    this.targeting.setMethodTimer((name, fn) => this.withAiMethodTiming(name, fn))
+
     // Wire tactical systems to engage handler
     this.engageHandler.setCoverSystem(this.coverSystem)
     this.engageHandler.setFlankingSystem(this.flankingSystem)
+    this.engageHandler.setMethodTimer((name, fn) => this.withAiMethodTiming(name, fn))
 
     // Wire C1 utility-AI prototype. Factions opt in via
     // FACTION_COMBAT_TUNING[faction].useUtilityAI — currently only VC.
@@ -112,16 +198,30 @@ export class CombatantAI {
       return
     }
 
+    const updateStart = performance.now()
+    const stateAtStart = combatant.state
+    const methodMs: Record<string, number> = {}
+    const methodCounts: Record<string, number> = {}
+    const previousActiveUpdateMethodMs = this.activeUpdateMethodMs
+    const previousActiveUpdateMethodCounts = this.activeUpdateMethodCounts
+    this.activeUpdateMethodMs = methodMs
+    this.activeUpdateMethodCounts = methodCounts
+
+    try {
     const isMediumLOD = lodLevel === 'medium'
 
     // Apply squad command overrides before state machine processing
     // At MEDIUM LOD, skip for non-player-controlled squads
     if (!isMediumLOD || this.isPlayerControlledSquad(combatant)) {
-      this.applySquadCommandOverride(combatant, playerPosition)
+      this.withAiMethodTiming('squadCommandOverride', () => {
+        this.applySquadCommandOverride(combatant, playerPosition)
+      })
     }
 
     // Decay suppression effects over time
-    this.decaySuppressionEffects(combatant, deltaTime)
+    this.withAiMethodTiming('suppressionDecay', () => {
+      this.decaySuppressionEffects(combatant, deltaTime)
+    })
 
     // Update flanking operations for squad members (skip at MEDIUM LOD)
     if (!isMediumLOD && combatant.squadId) {
@@ -129,107 +229,136 @@ export class CombatantAI {
       if (operation && !this.flankingUpdatedSquadsThisFrame.has(combatant.squadId)) {
         const squad = this.squads.get(combatant.squadId)
         if (squad) {
-          this.flankingSystem.updateFlankingOperation(operation, squad, allCombatants)
+          this.withAiMethodTiming('flankingOperation', () => {
+            this.flankingSystem.updateFlankingOperation(operation, squad, allCombatants)
+          })
           this.flankingUpdatedSquadsThisFrame.add(combatant.squadId)
         }
       }
     }
 
-    const stateAtStart = combatant.state
     const stateStart = performance.now()
     // Delegate to appropriate state handler
     switch (combatant.state) {
       case CombatantState.PATROLLING:
-        this.patrolHandler.handlePatrolling(
-          combatant,
-          deltaTime,
-          playerPosition,
-          allCombatants,
-          spatialGrid,
-          this.findNearestEnemy.bind(this),
-          this.canSeeTarget.bind(this),
-          this.shouldEngage.bind(this),
-          this.getClusterDensity.bind(this)
-        )
+        this.withAiMethodTiming('state.patrolling', () => {
+          this.patrolHandler.handlePatrolling(
+            combatant,
+            deltaTime,
+            playerPosition,
+            allCombatants,
+            spatialGrid,
+            (unit, playerPos, combatants, grid) =>
+              this.withAiMethodTiming('patrol.findNearestEnemy', () =>
+                this.findNearestEnemy(unit, playerPos, combatants, grid)
+              ),
+            (unit, target, playerPos) =>
+              this.withAiMethodTiming('patrol.canSeeTarget', () =>
+                this.canSeeTargetForPatrolDetection(unit, target, playerPos)
+              ),
+            (unit, distance) =>
+              this.withAiMethodTiming('patrol.shouldEngage', () =>
+                this.shouldEngage(unit, distance)
+              ),
+            (unit, combatants, grid) =>
+              this.withAiMethodTiming('patrol.getClusterDensity', () =>
+                this.getClusterDensity(unit, combatants, grid)
+              )
+          )
+        })
         break
 
       case CombatantState.ALERT:
-        this.engageHandler.handleAlert(
-          combatant,
-          deltaTime,
-          playerPosition,
-          this.canSeeTarget.bind(this)
-        )
+        this.withAiMethodTiming('state.alert', () => {
+          this.engageHandler.handleAlert(
+            combatant,
+            deltaTime,
+            playerPosition,
+            this.canSeeTargetForAlertConfirmation
+          )
+        })
         break
 
       case CombatantState.ENGAGING:
         if (isMediumLOD) {
           // Simplified engagement: skip countNearbyEnemies, isCoverFlanked, suppression initiation
-          this.engageHandler.handleEngaging(
-            combatant,
-            deltaTime,
-            playerPosition,
-            allCombatants,
-            spatialGrid,
-            this.canSeeTarget.bind(this),
-            this.shouldSeekCoverMediumLOD.bind(this),
-            this.findNearestCover.bind(this),
-            this.countNearbyEnemiesNoop,
-            this.isCoverFlankedNoop
-          )
+          this.withAiMethodTiming('state.engaging', () => {
+            this.engageHandler.handleEngaging(
+              combatant,
+              deltaTime,
+              playerPosition,
+              allCombatants,
+              spatialGrid,
+              this.canSeeTargetForEngageSuppressionCheck,
+              this.shouldSeekCoverMediumLOD.bind(this),
+              this.findNearestCover.bind(this),
+              this.countNearbyEnemiesNoop,
+              this.isCoverFlankedNoop
+            )
+          })
         } else {
-          this.engageHandler.handleEngaging(
-            combatant,
-            deltaTime,
-            playerPosition,
-            allCombatants,
-            spatialGrid,
-            this.canSeeTarget.bind(this),
-            this.shouldSeekCover.bind(this),
-            this.findNearestCover.bind(this),
-            this.countNearbyEnemies.bind(this),
-            this.isCoverFlanked.bind(this)
-          )
+          this.withAiMethodTiming('state.engaging', () => {
+            this.engageHandler.handleEngaging(
+              combatant,
+              deltaTime,
+              playerPosition,
+              allCombatants,
+              spatialGrid,
+              this.canSeeTargetForEngageSuppressionCheck,
+              this.shouldSeekCover.bind(this),
+              this.findNearestCover.bind(this),
+              this.countNearbyEnemies.bind(this),
+              this.isCoverFlanked.bind(this)
+            )
+          })
         }
         break
 
       case CombatantState.SUPPRESSING:
-        this.engageHandler.handleSuppressing(combatant, deltaTime)
+        this.withAiMethodTiming('state.suppressing', () => {
+          this.engageHandler.handleSuppressing(combatant, deltaTime)
+        })
         break
 
       case CombatantState.ADVANCING:
-        this.movementHandler.handleAdvancing(
-          combatant,
-          deltaTime,
-          playerPosition,
-          allCombatants,
-          spatialGrid,
-          this.findNearestEnemy.bind(this),
-          this.canSeeTarget.bind(this)
-        )
+        this.withAiMethodTiming('state.advancing', () => {
+          this.movementHandler.handleAdvancing(
+            combatant,
+            deltaTime,
+            playerPosition,
+            allCombatants,
+            spatialGrid,
+            this.findNearestEnemy.bind(this),
+            this.canSeeTargetForAdvancingDetection
+          )
+        })
         break
 
       case CombatantState.SEEKING_COVER:
-        this.movementHandler.handleSeekingCover(
-          combatant,
-          deltaTime,
-          playerPosition,
-          allCombatants,
-          this.canSeeTarget.bind(this)
-        )
+        this.withAiMethodTiming('state.seeking_cover', () => {
+          this.movementHandler.handleSeekingCover(
+            combatant,
+            deltaTime,
+            playerPosition,
+            allCombatants,
+            this.canSeeTargetForSeekingCoverValidation
+          )
+        })
         break
 
       case CombatantState.DEFENDING:
-        this.defendHandler.handleDefending(
-          combatant,
-          deltaTime,
-          playerPosition,
-          allCombatants,
-          spatialGrid,
-          this.findNearestEnemy.bind(this),
-          this.canSeeTarget.bind(this),
-          this.getClusterDensity.bind(this)
-        )
+        this.withAiMethodTiming('state.defending', () => {
+          this.defendHandler.handleDefending(
+            combatant,
+            deltaTime,
+            playerPosition,
+            allCombatants,
+            spatialGrid,
+            this.findNearestEnemy.bind(this),
+            this.canSeeTargetForDefendDetection,
+            this.getClusterDensity.bind(this)
+          )
+        })
         break
 
       case CombatantState.RETREATING: {
@@ -240,14 +369,33 @@ export class CombatantAI {
         const threatPos = combatant.target
           ? (combatant.target.id === 'PLAYER' ? playerPosition : combatant.target.position)
           : (combatant.lastKnownTargetPos ?? playerPosition)
-        this.retreatHandler.handleRetreating(combatant, deltaTime, threatPos)
+        this.withAiMethodTiming('state.retreating', () => {
+          this.retreatHandler.handleRetreating(combatant, deltaTime, threatPos)
+        })
         break
       }
     }
     const stateDuration = performance.now() - stateStart
     const key = this.getStateTimingKey(stateAtStart)
     this.aiStateMs[key] = (this.aiStateMs[key] || 0) + stateDuration
-
+    } finally {
+      const totalMs = performance.now() - updateStart
+      this.activeUpdateMethodMs = previousActiveUpdateMethodMs
+      this.activeUpdateMethodCounts = previousActiveUpdateMethodCounts
+      const breakdown: AiUpdateBreakdown = {
+        combatantId: combatant.id,
+        stateAtStart,
+        stateAtEnd: combatant.state,
+        lodLevel,
+        totalMs,
+        methodMs: { ...methodMs },
+        methodCounts: { ...methodCounts }
+      }
+      this.lastUpdateBreakdown = breakdown
+      if (!this.slowestUpdateBreakdown || totalMs > this.slowestUpdateBreakdown.totalMs) {
+        this.slowestUpdateBreakdown = breakdown
+      }
+    }
   }
 
   beginFrame(): void {
@@ -255,10 +403,69 @@ export class CombatantAI {
     for (const key of Object.keys(this.aiStateMs)) {
       this.aiStateMs[key] = 0
     }
+    this.aiMethodMs = {}
+    this.aiMethodCounts = {}
+    this.lastUpdateBreakdown = null
+    this.slowestUpdateBreakdown = null
   }
 
   getFrameStateProfile(): Record<string, number> {
     return { ...this.aiStateMs }
+  }
+
+  getFrameMethodProfile(): Record<string, number> {
+    return { ...this.aiMethodMs }
+  }
+
+  getFrameMethodCountProfile(): Record<string, number> {
+    return { ...this.aiMethodCounts }
+  }
+
+  getMethodTotalCountProfile(): Record<string, number> {
+    return { ...this.aiMethodTotalCounts }
+  }
+
+  getLastUpdateBreakdown(): AiUpdateBreakdown | null {
+    return this.lastUpdateBreakdown
+      ? {
+          ...this.lastUpdateBreakdown,
+          methodMs: { ...this.lastUpdateBreakdown.methodMs },
+          methodCounts: { ...this.lastUpdateBreakdown.methodCounts }
+        }
+      : null
+  }
+
+  getSlowestUpdateBreakdown(): AiUpdateBreakdown | null {
+    return this.slowestUpdateBreakdown
+      ? {
+          ...this.slowestUpdateBreakdown,
+          methodMs: { ...this.slowestUpdateBreakdown.methodMs },
+          methodCounts: { ...this.slowestUpdateBreakdown.methodCounts }
+        }
+      : null
+  }
+
+  getCloseEngagementTelemetry(): CloseEngagementTelemetry {
+    return this.engageHandler.getCloseEngagementTelemetry()
+  }
+
+  getLosCallsiteTelemetry(): LosCallsiteTelemetry {
+    return {
+      patrolDetection: { ...this.losCallsiteTelemetry.patrolDetection },
+      alertConfirmation: { ...this.losCallsiteTelemetry.alertConfirmation },
+      engageSuppressionCheck: { ...this.losCallsiteTelemetry.engageSuppressionCheck },
+      advancingDetection: { ...this.losCallsiteTelemetry.advancingDetection },
+      seekingCoverValidation: { ...this.losCallsiteTelemetry.seekingCoverValidation },
+      defendDetection: { ...this.losCallsiteTelemetry.defendDetection }
+    }
+  }
+
+  resetLosCallsiteTelemetry(): void {
+    this.losCallsiteTelemetry = createLosCallsiteTelemetry()
+  }
+
+  getTargetAcquisitionTelemetry(): TargetAcquisitionTelemetry {
+    return this.targeting.getTargetAcquisitionTelemetry()
   }
 
   private getStateTimingKey(state: CombatantState): string {
@@ -275,13 +482,31 @@ export class CombatantAI {
     }
   }
 
+  private withAiMethodTiming<T>(name: string, fn: () => T): T {
+    const start = performance.now()
+    try {
+      return fn()
+    } finally {
+      const duration = performance.now() - start
+      this.aiMethodMs[name] = (this.aiMethodMs[name] || 0) + duration
+      this.aiMethodCounts[name] = (this.aiMethodCounts[name] || 0) + 1
+      this.aiMethodTotalCounts[name] = (this.aiMethodTotalCounts[name] || 0) + 1
+      if (this.activeUpdateMethodMs) {
+        this.activeUpdateMethodMs[name] = (this.activeUpdateMethodMs[name] || 0) + duration
+      }
+      if (this.activeUpdateMethodCounts) {
+        this.activeUpdateMethodCounts[name] = (this.activeUpdateMethodCounts[name] || 0) + 1
+      }
+    }
+  }
+
   /**
    * Check if a player-controlled squad's currentCommand should override the combatant's
    * current AI state. Only affects US faction combatants in player squads.
    *
    * - FOLLOW_ME / RETREAT: interrupt combat states (ENGAGING, SUPPRESSING, ALERT, SEEKING_COVER)
    * - HOLD_POSITION: transition non-combat states to DEFENDING (does NOT override active combat)
-   * - PATROL_HERE: ensure non-combat states stay in PATROLLING (does NOT override active combat)
+   * - PATROL_HERE / ATTACK_HERE: ensure non-combat states stay in PATROLLING (does NOT override active combat)
    * - FREE_ROAM / NONE: clear command-driven overrides, return to normal AI
    */
   private applySquadCommandOverride(combatant: Combatant, _playerPosition: THREE.Vector3): void {
@@ -345,6 +570,7 @@ export class CombatantAI {
         break
 
       case SquadCommand.PATROL_HERE:
+      case SquadCommand.ATTACK_HERE:
         // Does NOT interrupt active combat - ensure non-combat states are PATROLLING
         if (!isInCombat && combatant.state === CombatantState.DEFENDING) {
           combatant.state = CombatantState.PATROLLING
@@ -405,6 +631,23 @@ export class CombatantAI {
     playerPosition: THREE.Vector3
   ): boolean {
     return this.targeting.canSeeTarget(combatant, target, playerPosition)
+  }
+
+  private canSeeTargetForCallsite(
+    callsite: LosCallsiteName,
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3
+  ): boolean {
+    const visible = this.canSeeTarget(combatant, target, playerPosition)
+    const bucket = this.losCallsiteTelemetry[callsite]
+    bucket.calls++
+    if (visible) {
+      bucket.visible++
+    } else {
+      bucket.blocked++
+    }
+    return visible
   }
 
   private shouldEngage(combatant: Combatant, distance: number): boolean {

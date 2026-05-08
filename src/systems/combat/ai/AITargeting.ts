@@ -4,9 +4,11 @@ import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
 import { ISpatialQuery } from '../SpatialOctree';
-import { AITargetAcquisition } from './AITargetAcquisition';
+import { AITargetAcquisition, type TargetAcquisitionTelemetry } from './AITargetAcquisition';
 import { AILineOfSight } from './AILineOfSight';
 import { AICoverFinding } from './AICoverFinding';
+
+type AiMethodTimer = <T>(name: string, fn: () => T) => T;
 
 /**
  * Handles target acquisition, line of sight checks, and cover finding
@@ -25,6 +27,10 @@ export class AITargeting {
     this.targetAcquisition = new AITargetAcquisition();
     this.lineOfSight = new AILineOfSight();
     this.coverFinding = new AICoverFinding();
+  }
+
+  setMethodTimer(timer: AiMethodTimer): void {
+    this.coverFinding.setMethodTimer(timer);
   }
 
   beginFrame(): void {
@@ -119,5 +125,9 @@ export class AITargeting {
 
   isCoverFlanked(combatant: Combatant, threatPos: THREE.Vector3): boolean {
     return this.coverFinding.isCoverFlanked(combatant, threatPos);
+  }
+
+  getTargetAcquisitionTelemetry(): TargetAcquisitionTelemetry {
+    return this.targetAcquisition.getTelemetry();
   }
 }

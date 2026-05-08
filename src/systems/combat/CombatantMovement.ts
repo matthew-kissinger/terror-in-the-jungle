@@ -54,6 +54,7 @@ const NPC_RECOVERY_MAX_RADIUS = 6.5;
 const NPC_RECOVERY_HEADING_SAMPLES = 8;
 const NPC_RECOVERY_LAST_GOOD_MAX_DISTANCE_SQ = 100;
 const NPC_NAVMESH_RECOVERY_SEARCH_RADIUS = 10;
+const NPC_STUCK_RECOVERY_WARN_INTERVAL_MS = 5000;
 
 // ── Navmesh path-following ──
 /** Distance threshold: use navmesh path above this, terrain solver below. */
@@ -114,6 +115,8 @@ export class CombatantMovement {
   private readonly stuckDetector = new StuckDetector();
   private readonly navPaths = new Map<string, CachedNavPath>();
   private pathQueriesThisFrame = 0;
+  private nextStuckRecoveryWarnAtMs = 0;
+  private suppressedStuckRecoveryWarns = 0;
 
   constructor(terrainSystem?: ITerrainRuntime, zoneManager?: ZoneManager) {
     this.terrainSystem = terrainSystem;
@@ -250,14 +253,14 @@ export class CombatantMovement {
     if (stuckAction === 'backtrack') {
       backtrackActivated = this.activateBacktrack(combatant);
       if (backtrackActivated) {
-        Logger.warn('combat', `NPC ${combatant.id} stalled on terrain, backtracking to last good progress point`);
+        this.warnStuckRecovery(combatant.id, 'backtrack', now);
       }
     } else if (stuckAction === 'hold') {
       combatant.movementBacktrackPoint = undefined;
       combatant.destinationPoint = undefined;
       combatant.movementIntent = 'hold';
       combatant.velocity.set(0, 0, 0);
-      Logger.warn('combat', `NPC ${combatant.id} exceeded max recovery attempts, holding position`);
+      this.warnStuckRecovery(combatant.id, 'hold', now);
     }
 
     const telemetryIntent: CombatantMovementIntent = backtrackActivated
@@ -873,6 +876,24 @@ export class CombatantMovement {
     combatant.movementContourSign = undefined;
   }
 
+  private warnStuckRecovery(combatantId: string, action: 'backtrack' | 'hold', now: number): void {
+    this.suppressedStuckRecoveryWarns++;
+    if (now < this.nextStuckRecoveryWarnAtMs) {
+      return;
+    }
+
+    const suppressed = Math.max(0, this.suppressedStuckRecoveryWarns - 1);
+    this.suppressedStuckRecoveryWarns = 0;
+    this.nextStuckRecoveryWarnAtMs = now + NPC_STUCK_RECOVERY_WARN_INTERVAL_MS;
+    const actionText = action === 'backtrack'
+      ? 'stalled on terrain, backtracking to last good progress point'
+      : 'exceeded max recovery attempts, holding position';
+    const suffix = suppressed > 0
+      ? ` (${suppressed} additional terrain-stall recoveries suppressed)`
+      : '';
+    Logger.warn('combat', `NPC ${combatantId} ${actionText}${suffix}`);
+  }
+
   private selectRecoveryPoint(combatant: Combatant): THREE.Vector3 | undefined {
     const currentPos = combatant.position;
     const goalAnchor = this.resolvePrimaryGoalAnchor(combatant);
@@ -1103,6 +1124,8 @@ export class CombatantMovement {
   /** Reset stuck detection state (call on round/mode transitions). */
   resetStuckDetector(): void {
     this.stuckDetector.clear();
+    this.nextStuckRecoveryWarnAtMs = 0;
+    this.suppressedStuckRecoveryWarns = 0;
   }
 
   private getEnemyBasePosition(faction: Faction): THREE.Vector3 {

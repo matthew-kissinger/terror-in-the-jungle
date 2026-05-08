@@ -65,6 +65,21 @@ describe('CommandModeOverlay', () => {
     expect(holdButton?.classList.contains('command-mode-overlay__button--active')).toBe(false);
   });
 
+  it('shows stand down as the explicit neutral command', () => {
+    overlay.setState({
+      hasSquad: true,
+      currentCommand: SquadCommand.FREE_ROAM,
+      memberCount: 6,
+      commandPosition: null,
+      pendingCommand: null
+    });
+    overlay.setVisible(true);
+
+    const standDownButton = document.querySelector<HTMLButtonElement>('[data-action="slot-5"]');
+    expect(document.body.textContent).toContain('STAND DOWN');
+    expect(standDownButton?.classList.contains('command-mode-overlay__button--active')).toBe(true);
+  });
+
   it('emits command, map selection, and close callbacks from the overlay controls', () => {
     const onQuickCommandSelected = vi.fn();
     const onCloseRequested = vi.fn();
@@ -78,6 +93,9 @@ describe('CommandModeOverlay', () => {
       pendingCommand: SquadCommand.RETREAT
     });
     overlay.setVisible(true);
+
+    expect(document.body.textContent).toContain('FALL BACK');
+    expect(document.body.textContent).toContain('ATTACK');
 
     document.querySelector<HTMLButtonElement>('[data-action="slot-4"]')?.click();
     const canvas = document.querySelector<HTMLCanvasElement>('.command-tactical-map__canvas');

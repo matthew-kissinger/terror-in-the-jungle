@@ -59,6 +59,7 @@ export const NPC_SPRITE_RENDER_Y_OFFSET = NPC_SPRITE_HEIGHT / 2 - NPC_Y_OFFSET;
 export const NPC_CLOSE_MODEL_TARGET_HEIGHT = NPC_SPRITE_HEIGHT;
 export const DEFAULT_MESH_BUCKET_CAPACITY = 512;
 export const MOUNTED_MESH_BUCKET_CAPACITY = 128;
+const NPC_GROUND_MARKER_PERF_CATEGORY = 'npc_ground_markers';
 // KB-LOAD: allocate only the common startup loops during combat-system init.
 // Other faction/clip pairs are created on demand for the first visible far NPC,
 // keeping unused Pixel Forge atlases out of first reveal.
@@ -424,6 +425,8 @@ export class CombatantMeshFactory {
       depthWrite: false,
     });
     const marker = new THREE.InstancedMesh(markerGeometry, markerMaterial, maxInstances);
+    marker.name = `PixelForgeNpcGroundMarker.${key}`;
+    marker.userData.perfCategory = NPC_GROUND_MARKER_PERF_CATEGORY;
     marker.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     marker.frustumCulled = false;
     marker.count = 0;

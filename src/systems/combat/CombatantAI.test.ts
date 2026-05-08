@@ -62,6 +62,7 @@ vi.mock('./ai/AIStateEngage', () => ({
     initiateSquadSuppression = vi.fn()
     setCoverSystem = vi.fn()
     setFlankingSystem = vi.fn()
+    setMethodTimer = vi.fn()
     setSquads = vi.fn()
     setUtilityScorer = vi.fn()
     setCoverBearingProbe = vi.fn()
@@ -94,6 +95,7 @@ vi.mock('./ai/AITargeting', () => ({
     shouldSeekCover = vi.fn(() => false)
     findNearestCover = vi.fn(() => null)
     isCoverFlanked = vi.fn(() => false)
+    setMethodTimer = vi.fn()
     setTerrainSystem = vi.fn()
     setSandbagSystem = vi.fn()
     setSmokeCloudSystem = vi.fn()
@@ -190,6 +192,46 @@ describe('CombatantAI', () => {
       ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid)
 
       expect(decaySpy).toHaveBeenCalledWith(mockCombatant, 0.016)
+    })
+  })
+
+  describe('LOS callsite telemetry', () => {
+    it('should record state-handler visibility callbacks by callsite', () => {
+      const target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
+      const targeting = (ai as any).targeting
+
+      const invokeCallsite = (
+        state: CombatantState,
+        handlerField: string,
+        handlerMethod: string,
+        callbackIndex: number,
+        visible: boolean
+      ) => {
+        targeting.canSeeTarget.mockReturnValueOnce(visible)
+        mockCombatant.state = state
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid)
+
+        const handler = (ai as any)[handlerField]
+        const calls = handler[handlerMethod].mock.calls
+        const callback = calls[calls.length - 1][callbackIndex]
+        return callback(mockCombatant, target, mockPlayerPosition)
+      }
+
+      expect(invokeCallsite(CombatantState.PATROLLING, 'patrolHandler', 'handlePatrolling', 6, true)).toBe(true)
+      expect(invokeCallsite(CombatantState.ALERT, 'engageHandler', 'handleAlert', 3, false)).toBe(false)
+      expect(invokeCallsite(CombatantState.ENGAGING, 'engageHandler', 'handleEngaging', 5, false)).toBe(false)
+      expect(invokeCallsite(CombatantState.ADVANCING, 'movementHandler', 'handleAdvancing', 6, true)).toBe(true)
+      expect(invokeCallsite(CombatantState.SEEKING_COVER, 'movementHandler', 'handleSeekingCover', 4, false)).toBe(false)
+      expect(invokeCallsite(CombatantState.DEFENDING, 'defendHandler', 'handleDefending', 6, true)).toBe(true)
+
+      expect(ai.getLosCallsiteTelemetry()).toEqual({
+        patrolDetection: { calls: 1, visible: 1, blocked: 0 },
+        alertConfirmation: { calls: 1, visible: 0, blocked: 1 },
+        engageSuppressionCheck: { calls: 1, visible: 0, blocked: 1 },
+        advancingDetection: { calls: 1, visible: 1, blocked: 0 },
+        seekingCoverValidation: { calls: 1, visible: 0, blocked: 1 },
+        defendDetection: { calls: 1, visible: 1, blocked: 0 }
+      })
     })
   })
 
@@ -515,6 +557,34 @@ describe('CombatantAI', () => {
         ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
 
         expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+      })
+    })
+
+    describe('ATTACK_HERE command', () => {
+      beforeEach(() => {
+        squad.currentCommand = SquadCommand.ATTACK_HERE
+        const THREE = require('three')
+        squad.commandPosition = new THREE.Vector3(50, 0, 50)
+      })
+
+      it('should transition DEFENDING combatant to PATROLLING', () => {
+        const THREE = require('three')
+        mockCombatant.state = CombatantState.DEFENDING
+        mockCombatant.defensePosition = new THREE.Vector3(50, 0, 50)
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.defensePosition).toBeUndefined()
+      })
+
+      it('should NOT interrupt ENGAGING state', () => {
+        mockCombatant.state = CombatantState.ENGAGING
+        const engageHandler = (ai as any).engageHandler
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(engageHandler.handleEngaging).toHaveBeenCalled()
       })
     })
 

@@ -29,14 +29,20 @@ export const SQUAD_QUICK_COMMAND_OPTIONS: SquadQuickCommandOption[] = [
   {
     slot: 4,
     command: SquadCommand.RETREAT,
-    shortLabel: 'RETREAT',
-    fullLabel: 'RETREAT'
+    shortLabel: 'FALL BACK',
+    fullLabel: 'FALL BACK'
   },
   {
     slot: 5,
     command: SquadCommand.FREE_ROAM,
-    shortLabel: 'AUTO',
-    fullLabel: 'FREE ROAM'
+    shortLabel: 'STAND DOWN',
+    fullLabel: 'STAND DOWN'
+  },
+  {
+    slot: 6,
+    command: SquadCommand.ATTACK_HERE,
+    shortLabel: 'ATTACK',
+    fullLabel: 'ATTACK HERE'
   }
 ];
 
@@ -44,8 +50,9 @@ const COMMAND_LABELS: Record<SquadCommand, { short: string; full: string }> = {
   [SquadCommand.FOLLOW_ME]: { short: 'FOLLOW', full: 'FOLLOW ME' },
   [SquadCommand.HOLD_POSITION]: { short: 'HOLD', full: 'HOLD POSITION' },
   [SquadCommand.PATROL_HERE]: { short: 'PATROL', full: 'PATROL HERE' },
-  [SquadCommand.RETREAT]: { short: 'RETREAT', full: 'RETREAT' },
-  [SquadCommand.FREE_ROAM]: { short: 'AUTO', full: 'FREE ROAM' },
+  [SquadCommand.ATTACK_HERE]: { short: 'ATTACK', full: 'ATTACK HERE' },
+  [SquadCommand.RETREAT]: { short: 'FALL BACK', full: 'FALL BACK' },
+  [SquadCommand.FREE_ROAM]: { short: 'STAND DOWN', full: 'STAND DOWN' },
   [SquadCommand.NONE]: { short: 'AUTO', full: 'AUTO (NPC)' }
 };
 
@@ -56,6 +63,7 @@ export function getQuickCommandOption(slot: number): SquadQuickCommandOption | u
 export function requiresCommandTarget(command: SquadCommand): boolean {
   return command === SquadCommand.HOLD_POSITION
     || command === SquadCommand.PATROL_HERE
+    || command === SquadCommand.ATTACK_HERE
     || command === SquadCommand.RETREAT;
 }
 

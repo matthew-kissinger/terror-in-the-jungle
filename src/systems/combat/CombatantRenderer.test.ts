@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { CombatantRenderer } from './CombatantRenderer';
 import { Combatant, CombatantState, Faction } from './types';
@@ -11,7 +11,9 @@ import {
   getPixelForgeNpcRuntimeFaction,
   PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
 } from './PixelForgeNpcRuntime';
+import { Logger } from '../../utils/Logger';
 
 const CLIPS = [
   'idle',
@@ -68,12 +70,18 @@ vi.mock('../assets/ModelLoader', () => ({
     })),
     loadModel: vi.fn().mockImplementation(async () => {
       const root = new THREE.Group();
-      const mesh = new THREE.Mesh(
+      const receiver = new THREE.Mesh(
         new THREE.BoxGeometry(1, 0.1, 0.08),
         new THREE.MeshStandardMaterial({ name: 'weapon', color: 0x333333 }),
       );
-      mesh.name = 'Mesh_Barrel';
-      root.add(mesh);
+      receiver.name = 'Mesh_Receiver';
+      const barrel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 0.04, 0.04),
+        new THREE.MeshStandardMaterial({ name: 'weapon', color: 0x222222 }),
+      );
+      barrel.name = 'Mesh_Barrel';
+      barrel.position.x = 0.65;
+      root.add(receiver, barrel);
       return root;
     }),
     disposeInstance: vi.fn(),
@@ -230,6 +238,36 @@ function createMockCombatant(
   } as Combatant;
 }
 
+type CloseModelStatsProbe = {
+  candidatesWithinCloseRadius: number;
+  renderedCloseModels: number;
+  fallbackCount: number;
+  fallbackCounts: Record<string, number>;
+  nearestFallbackDistanceMeters: number | null;
+  farthestFallbackDistanceMeters: number | null;
+  poolLoads: number;
+};
+
+type CloseModelFallbackProbe = {
+  combatantId: string;
+  reason: string;
+  distanceMeters: number;
+};
+
+function readCloseModelTelemetry(target: CombatantRenderer): {
+  stats: CloseModelStatsProbe;
+  records: CloseModelFallbackProbe[];
+} {
+  const probe = target as unknown as {
+    getCloseModelRuntimeStats(): CloseModelStatsProbe;
+    getCloseModelFallbackRecords(): CloseModelFallbackProbe[];
+  };
+  return {
+    stats: probe.getCloseModelRuntimeStats(),
+    records: probe.getCloseModelFallbackRecords(),
+  };
+}
+
 describe('CombatantRenderer', () => {
   let renderer: CombatantRenderer;
   let scene: THREE.Scene;
@@ -237,6 +275,7 @@ describe('CombatantRenderer', () => {
   let assetLoader: AssetLoader;
 
   beforeEach(async () => {
+    vi.unstubAllGlobals();
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     camera.position.set(0, 5, 10);
@@ -247,6 +286,10 @@ describe('CombatantRenderer', () => {
     await renderer.createFactionBillboards({ eagerCloseModelPools: true });
 
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   describe('updateBillboards', () => {
@@ -273,6 +316,46 @@ describe('CombatantRenderer', () => {
       expect(activeCloseModels.get('near-1')?.weaponRoot).toBeDefined();
     });
 
+    it('collapses attached close-model weapon clones into one render mesh', () => {
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('near-weapon-merge', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      combatants.set('near-weapon-merge', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, { weaponRoot?: THREE.Object3D }> }).activeCloseModels;
+      const weaponRoot = activeCloseModels.get('near-weapon-merge')?.weaponRoot;
+      const weaponMeshes: THREE.Mesh[] = [];
+      weaponRoot?.traverse((child) => {
+        if (child instanceof THREE.Mesh) weaponMeshes.push(child);
+      });
+      expect(weaponMeshes).toHaveLength(1);
+      expect(weaponMeshes[0].name).toContain('optimized_weapon');
+    });
+
+    it('renders hard-close NPCs as impostors when perf isolation disables close models', async () => {
+      vi.stubGlobal('window', { location: { search: '?perf=1&perfDisableNpcCloseModels=1' } });
+      const isolatedRenderer = new CombatantRenderer(scene, camera, assetLoader);
+      await isolatedRenderer.createFactionBillboards({ eagerCloseModelPools: true });
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('near-isolated', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      combatants.set('near-isolated', combatant);
+
+      isolatedRenderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (isolatedRenderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      const { stats, records } = readCloseModelTelemetry(isolatedRenderer);
+      expect(combatant.billboardIndex).toBe(0);
+      expect(activeCloseModels.has('near-isolated')).toBe(false);
+      expect(modelLoader.loadAnimatedModel).not.toHaveBeenCalled();
+      expect(stats.fallbackCounts['perf-isolation']).toBe(1);
+      expect(records).toEqual([
+        expect.objectContaining({ combatantId: 'near-isolated', reason: 'perf-isolation' }),
+      ]);
+
+      isolatedRenderer.dispose();
+    });
+
     it('keeps close-model body and weapon meshes eligible for frustum culling', () => {
       const combatants = new Map<string, Combatant>();
       const combatant = createMockCombatant('near-cull', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
@@ -293,6 +376,31 @@ describe('CombatantRenderer', () => {
 
       expect(meshCullingStates.length).toBeGreaterThan(0);
       expect(meshCullingStates.every(Boolean)).toBe(true);
+    });
+
+    it('keeps steady close-model materials out of the shader update path', () => {
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('near-steady-material', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      combatants.set('near-steady-material', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as {
+        activeCloseModels: Map<string, { root: THREE.Group }>;
+      }).activeCloseModels;
+      const instance = activeCloseModels.get('near-steady-material');
+      const materials: THREE.Material[] = [];
+      instance?.root.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const childMaterials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.push(...childMaterials);
+      });
+      const versions = materials.map((material) => material.version);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      expect(materials.length).toBeGreaterThan(0);
+      expect(materials.map((material) => material.version)).toEqual(versions);
     });
 
     it('eager close-model pools only seed the initial demand size', async () => {
@@ -381,9 +489,20 @@ describe('CombatantRenderer', () => {
       expect(activeCloseModels.has('nva-47')).toBe(false);
       expect(state.closeModelPoolLoads.has(Faction.NVA)).toBe(true);
       expect(combatants.get('nva-47')?.billboardIndex).toBeGreaterThanOrEqual(0);
+
+      const { stats, records } = readCloseModelTelemetry(renderer);
+      expect(stats.candidatesWithinCloseRadius).toBe(48);
+      expect(stats.renderedCloseModels).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION);
+      expect(stats.fallbackCounts['pool-loading']).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION);
+      expect(stats.fallbackCount).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION);
+      expect(stats.poolLoads).toBe(1);
+      expect(records).toContainEqual(expect.objectContaining({
+        combatantId: 'nva-47',
+        reason: 'pool-loading',
+      }));
     });
 
-    it('suppresses only after the per-faction close-model pool reaches its hard cap', async () => {
+    it('keeps overflow close actors as impostors after the close-model active cap', async () => {
       await (renderer as unknown as {
         createCloseModelPool(
           poolKey: Faction,
@@ -406,9 +525,54 @@ describe('CombatantRenderer', () => {
 
       const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
       expect(activeCloseModels.has('nva-0')).toBe(true);
-      expect(activeCloseModels.has('nva-39')).toBe(true);
+      expect(activeCloseModels.has(`nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP - 1}`)).toBe(true);
+      expect(activeCloseModels.has(`nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP}`)).toBe(false);
       expect(activeCloseModels.has('nva-47')).toBe(false);
-      expect(combatants.get('nva-47')?.billboardIndex).toBe(-1);
+      expect(combatants.get('nva-47')?.billboardIndex).toBeGreaterThanOrEqual(0);
+
+      const { stats, records } = readCloseModelTelemetry(renderer);
+      expect(stats.candidatesWithinCloseRadius).toBe(48);
+      expect(stats.renderedCloseModels).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+      expect(stats.fallbackCounts['total-cap']).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+      expect(stats.fallbackCount).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+      expect(stats.nearestFallbackDistanceMeters).toBeCloseTo(2 + PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+      expect(records).toContainEqual(expect.objectContaining({
+        combatantId: `nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP}`,
+        reason: 'total-cap',
+      }));
+    });
+
+    it('bounds repeated close-model overflow reports within one update', async () => {
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        Faction.NVA,
+        getPixelForgeNpcRuntimeFaction(Faction.NVA),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+      const infoSpy = vi.spyOn(Logger, 'info').mockImplementation(() => undefined);
+
+      try {
+        const combatants = new Map<string, Combatant>();
+        for (let i = 0; i < 48; i++) {
+          const combatant = createMockCombatant(`nva-${i}`, Faction.NVA, new THREE.Vector3(2 + i, 0, 0));
+          combatants.set(combatant.id, combatant);
+        }
+
+        renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+        const overflowReports = infoSpy.mock.calls.filter((call) => (
+          call[0] === 'combat-renderer'
+          && String(call[1]).includes('Pixel Forge close NPC total-cap')
+        ));
+        expect(overflowReports).toHaveLength(1);
+      } finally {
+        infoSpy.mockRestore();
+      }
     });
 
     it('skips dead non-dying combatants', () => {
@@ -434,6 +598,35 @@ describe('CombatantRenderer', () => {
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
       expect(dyingCombatant.billboardIndex).toBeDefined();
+    });
+
+    it('lets the Pixel Forge death impostor clip own pose without procedural shrink', () => {
+      const combatants = new Map<string, Combatant>();
+      const dyingCombatant = createMockCombatant('dying-pf', Faction.NVA, new THREE.Vector3(120, 0, 0), CombatantState.DEAD);
+      dyingCombatant.isDying = true;
+      dyingCombatant.deathProgress = 0.04;
+      dyingCombatant.deathAnimationType = 'fallback';
+      dyingCombatant.deathDirection = new THREE.Vector3(1, 0, 0);
+      combatants.set('dying-pf', dyingCombatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const mesh = (renderer as unknown as { factionMeshes: Map<string, THREE.InstancedMesh> })
+        .factionMeshes.get('NVA_death_fall_back')!;
+      const matrix = new THREE.Matrix4();
+      const position = new THREE.Vector3();
+      const rotation = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      mesh.getMatrixAt(0, matrix);
+      matrix.decompose(position, rotation, scale);
+      const attributeCalls = vi.mocked(CombatantMeshFactoryModule.setPixelForgeNpcImpostorAttributes).mock.calls
+        .filter((call) => call[0] === mesh);
+      const latestAttributes = attributeCalls[attributeCalls.length - 1];
+
+      expect(mesh.count).toBe(1);
+      expect(scale.y).toBeCloseTo(1);
+      expect(latestAttributes?.[5]).toBeGreaterThan(0.45);
+      expect(latestAttributes?.[5]).toBeLessThan(0.55);
     });
 
     it('lazy-creates a Pixel Forge impostor bucket when a non-startup clip first appears', () => {

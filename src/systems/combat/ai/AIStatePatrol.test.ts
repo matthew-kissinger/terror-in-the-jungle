@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { AIStatePatrol } from './AIStatePatrol';
 import { Combatant, CombatantState, Faction, Squad, SquadCommand } from '../types';
@@ -76,6 +76,10 @@ describe('AIStatePatrol', () => {
     const canSeeTarget = vi.fn();
     const shouldEngage = vi.fn();
 
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should not do anything if combatant is rejoining squad', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.isRejoiningSquad = true;
@@ -120,6 +124,69 @@ describe('AIStatePatrol', () => {
         findNearestEnemy, canSeeTarget, shouldEngage
       );
 
+      expect(combatant.state).toBe(CombatantState.ALERT);
+      expect(combatant.target).toBe(enemy);
+      expect(canSeeTarget).not.toHaveBeenCalled();
+    });
+
+    it('reuses a recent blocked patrol LOS result inside the cadence window', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(100, 0, 100));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(130, 0, 100));
+
+      findNearestEnemy.mockReturnValue(enemy);
+      canSeeTarget.mockReturnValue(false);
+      shouldEngage.mockReturnValue(true);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+      expect(canSeeTarget).toHaveBeenCalledTimes(1);
+      expect(combatant.state).toBe(CombatantState.PATROLLING);
+
+      canSeeTarget.mockClear();
+      canSeeTarget.mockReturnValue(true);
+      vi.setSystemTime(10_100);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(canSeeTarget).not.toHaveBeenCalled();
+      expect(combatant.state).toBe(CombatantState.PATROLLING);
+      expect(combatant.target).toBeUndefined();
+    });
+
+    it('rechecks patrol LOS after the cadence window expires', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(20_000);
+
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(100, 0, 100));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(130, 0, 100));
+
+      findNearestEnemy.mockReturnValue(enemy);
+      canSeeTarget.mockReturnValue(false);
+      shouldEngage.mockReturnValue(true);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      canSeeTarget.mockClear();
+      canSeeTarget.mockReturnValue(true);
+      vi.setSystemTime(20_251);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(canSeeTarget).toHaveBeenCalledTimes(1);
       expect(combatant.state).toBe(CombatantState.ALERT);
       expect(combatant.target).toBe(enemy);
     });
@@ -208,6 +275,19 @@ describe('AIStatePatrol', () => {
 
       expect(combatant.destinationPoint).toBeDefined();
       expect(combatant.destinationPoint?.distanceTo(squad.commandPosition!)).toBeLessThanOrEqual(20);
+    });
+
+    it('should handle ATTACK_HERE command as a directed attack point', () => {
+      squad.currentCommand = SquadCommand.ATTACK_HERE;
+      const attackPos = new THREE.Vector3(60, 0, 40);
+      squad.commandPosition = attackPos;
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(combatant.destinationPoint?.clone()).toEqual(attackPos);
     });
 
     it('should handle RETREAT command', () => {

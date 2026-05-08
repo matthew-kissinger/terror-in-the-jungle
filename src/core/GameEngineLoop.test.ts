@@ -18,7 +18,9 @@ describe('GameEngineLoop', () => {
   afterEach(() => {
     globalThis.requestAnimationFrame = originalRequestAnimationFrame;
     globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    vi.restoreAllMocks();
     resetState();
+    delete (globalThis as { __ENABLE_PERF_DIAGNOSTICS__?: boolean }).__ENABLE_PERF_DIAGNOSTICS__;
   });
 
   function createEngine(overrides: Partial<any> = {}): any {
@@ -71,5 +73,77 @@ describe('GameEngineLoop', () => {
 
     expect(globalThis.requestAnimationFrame).not.toHaveBeenCalled();
     expect(engine.animationFrameId).toBeNull();
+  });
+
+  it('records render-boundary user timings when perf diagnostics are enabled', () => {
+    (globalThis as { __ENABLE_PERF_DIAGNOSTICS__?: boolean }).__ENABLE_PERF_DIAGNOSTICS__ = true;
+    const measureSpy = vi.spyOn(performance, 'measure');
+    vi.spyOn(performance, 'mark');
+    vi.spyOn(performance, 'clearMarks');
+
+    const renderer = {
+      render: vi.fn(),
+      clearDepth: vi.fn(),
+      autoClear: true,
+    };
+    const postProcessing = {
+      beginFrame: vi.fn(),
+      endFrame: vi.fn(),
+    };
+    const engine = createEngine({
+      isLoopRunning: true,
+      isInitialized: true,
+      gameStarted: true,
+      clock: {
+        update: vi.fn(),
+        getDelta: vi.fn(() => 0.016),
+      },
+      timeScale: {
+        get: vi.fn(() => 1),
+        postDispatch: vi.fn(),
+      },
+      systemManager: {
+        updateSystems: vi.fn(),
+        atmosphereSystem: {
+          syncDomePosition: vi.fn(),
+          setTerrainYAtCamera: vi.fn(),
+        },
+        terrainSystem: {
+          getHeightAt: vi.fn(() => 0),
+        },
+        mortarSystem: null,
+        firstPersonWeapon: null,
+        grenadeSystem: null,
+        inventoryManager: null,
+      },
+      renderer: {
+        getActiveCamera: vi.fn(() => ({ position: { x: 0, y: 0, z: 0 } })),
+        beginFrameStats: vi.fn(),
+        postProcessing,
+        renderer,
+        scene: {},
+        worldOverlays: null,
+      },
+      runtimeMetrics: null,
+      performanceOverlay: { isVisible: vi.fn(() => false) },
+      logOverlay: { isVisible: vi.fn(() => false) },
+      debugHud: { update: vi.fn() },
+    });
+
+    animate(engine, 1000);
+
+    expect(measureSpy).toHaveBeenCalledWith(
+      'GameEngineLoop.RenderMain.renderer.render',
+      'GameEngineLoop.RenderMain.renderer.render.start',
+      'GameEngineLoop.RenderMain.renderer.render.end'
+    );
+    expect(measureSpy).toHaveBeenCalledWith(
+      'GameEngineLoop.RenderOverlay.postProcessing.endFrame',
+      'GameEngineLoop.RenderOverlay.postProcessing.endFrame.start',
+      'GameEngineLoop.RenderOverlay.postProcessing.endFrame.end'
+    );
+    expect(renderer.render).toHaveBeenCalledTimes(1);
+    expect(postProcessing.beginFrame).toHaveBeenCalledTimes(1);
+    expect(postProcessing.endFrame).toHaveBeenCalledTimes(1);
   });
 });

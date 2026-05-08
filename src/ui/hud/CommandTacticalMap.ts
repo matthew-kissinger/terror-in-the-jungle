@@ -179,8 +179,8 @@ export class CommandTacticalMap {
         : `${Math.round(this.renderState.worldSize)}m tactical window centered on player`;
     } else {
       this.detail.textContent = this.inputMode === 'gamepad'
-        ? 'Select a friendly squad with X or A, or arm Hold, Patrol, or Retreat with the D-pad.'
-        : 'Choose Hold, Patrol, or Retreat, then place it on the map.';
+        ? 'Select a friendly squad with X or A, or arm Hold, Patrol, Fall Back, or Attack with the D-pad.'
+        : 'Choose Hold, Patrol, Fall Back, or Attack, then place it on the map.';
     }
 
     renderMinimap({

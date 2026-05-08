@@ -75,6 +75,14 @@ describe('AITargetAcquisition', () => {
     expect(clusterDensity).toBeCloseTo(0.1);
     expect(spatialGrid.queryRadius).toHaveBeenCalledTimes(1);
     expect(spatialGrid.queryRadius).toHaveBeenCalledWith(combatant.position, 100);
+    const telemetry = acquisition.getTelemetry();
+    expect(telemetry.findNearestEnemyCalls).toBe(1);
+    expect(telemetry.potentialTargetsTotal).toBe(1);
+    expect(telemetry.nearbyEnemyCountCalls).toBe(1);
+    expect(telemetry.nearbyEnemyCountTotal).toBe(1);
+    expect(telemetry.clusterDensityCalls).toBe(1);
+    expect(telemetry.spatialQueryCacheMisses).toBe(1);
+    expect(telemetry.spatialQueryCacheHits).toBe(2);
   });
 
   it('refreshes the cache when a later call needs a wider radius', () => {
@@ -97,5 +105,9 @@ describe('AITargetAcquisition', () => {
     expect(spatialGrid.queryRadius).toHaveBeenCalledTimes(2);
     expect(spatialGrid.queryRadius.mock.calls[0]?.[1]).toBe(20);
     expect(spatialGrid.queryRadius.mock.calls[1]?.[1]).toBe(100);
+    const telemetry = acquisition.getTelemetry();
+    expect(telemetry.nearbyEnemyCountCalls).toBe(1);
+    expect(telemetry.findNearestEnemyCalls).toBe(1);
+    expect(telemetry.spatialQueryCacheMisses).toBe(2);
   });
 });

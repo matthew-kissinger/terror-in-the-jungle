@@ -247,6 +247,26 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     texture.dispose();
   });
 
+  it('marks NPC ground markers for render attribution', () => {
+    const scene = new THREE.Scene();
+    const texture = new THREE.Texture();
+    const assetLoader = {
+      getTexture: vi.fn(() => texture),
+    } as unknown as AssetLoader;
+    const factory = new CombatantMeshFactory(scene, assetLoader);
+
+    const bucket = factory.createFactionImpostorBucket(Faction.US, 'idle');
+
+    expect(bucket?.marker.name).toBe('PixelForgeNpcGroundMarker.US_idle');
+    expect(bucket?.marker.userData.perfCategory).toBe('npc_ground_markers');
+
+    bucket?.mesh.geometry.dispose();
+    if (bucket?.mesh.material instanceof THREE.Material) bucket.mesh.material.dispose();
+    bucket?.marker.geometry.dispose();
+    if (bucket?.marker.material instanceof THREE.Material) bucket.marker.material.dispose();
+    texture.dispose();
+  });
+
   it('configures a light floor and exposure for billboarded NPCs', () => {
     const scene = new THREE.Scene();
     const texture = new THREE.Texture();

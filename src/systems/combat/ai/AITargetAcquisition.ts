@@ -21,6 +21,44 @@ const CLUSTER_RADIUS_SQ = CLUSTER_RADIUS * CLUSTER_RADIUS;
 const CLUSTER_THRESHOLD = 4;
 const MAX_EXPECTED_CLUSTER_NEIGHBORS = 10;
 
+export interface TargetAcquisitionTelemetry {
+  findNearestEnemyCalls: number;
+  potentialTargetsTotal: number;
+  playerTargetCandidates: number;
+  clusterDistributionCalls: number;
+  clusterDistributionPotentialTargets: number;
+  noTargetSelections: number;
+  singleTargetSelections: number;
+  nearestTargetSelections: number;
+  nearbyEnemyCountCalls: number;
+  nearbyEnemyCountTotal: number;
+  nearbyEnemyCountMax: number;
+  clusterDensityCalls: number;
+  clusterDensityTotal: number;
+  spatialQueryCacheHits: number;
+  spatialQueryCacheMisses: number;
+}
+
+function createTargetAcquisitionTelemetry(): TargetAcquisitionTelemetry {
+  return {
+    findNearestEnemyCalls: 0,
+    potentialTargetsTotal: 0,
+    playerTargetCandidates: 0,
+    clusterDistributionCalls: 0,
+    clusterDistributionPotentialTargets: 0,
+    noTargetSelections: 0,
+    singleTargetSelections: 0,
+    nearestTargetSelections: 0,
+    nearbyEnemyCountCalls: 0,
+    nearbyEnemyCountTotal: 0,
+    nearbyEnemyCountMax: 0,
+    clusterDensityCalls: 0,
+    clusterDensityTotal: 0,
+    spatialQueryCacheHits: 0,
+    spatialQueryCacheMisses: 0,
+  };
+}
+
 type SpatialQueryCacheEntry = {
   radius: number;
   ids: readonly string[];
@@ -32,9 +70,18 @@ type SpatialQueryCacheEntry = {
 export class AITargetAcquisition {
   private readonly spatialQueryCache = new Map<string, SpatialQueryCacheEntry>();
   private playerFaction: Faction = Faction.US;
+  private telemetry: TargetAcquisitionTelemetry = createTargetAcquisitionTelemetry();
 
   beginFrame(): void {
     this.spatialQueryCache.clear();
+  }
+
+  getTelemetry(): TargetAcquisitionTelemetry {
+    return { ...this.telemetry };
+  }
+
+  resetTelemetry(): void {
+    this.telemetry = createTargetAcquisitionTelemetry();
   }
 
   getClusterDensity(
@@ -45,6 +92,7 @@ export class AITargetAcquisition {
     if (!spatialGrid) {
       return 0;
     }
+    this.telemetry.clusterDensityCalls++;
 
     const nearbyIds = this.getNearbyIds(combatant, CLUSTER_RADIUS, spatialGrid);
     let nearbyFriendlies = 0;
@@ -62,7 +110,9 @@ export class AITargetAcquisition {
       }
     }
 
-    return Math.min(1, nearbyFriendlies / MAX_EXPECTED_CLUSTER_NEIGHBORS);
+    const density = Math.min(1, nearbyFriendlies / MAX_EXPECTED_CLUSTER_NEIGHBORS);
+    this.telemetry.clusterDensityTotal += density;
+    return density;
   }
 
   /**
@@ -74,6 +124,7 @@ export class AITargetAcquisition {
     allCombatants: Map<string, Combatant>,
     spatialGrid?: ISpatialQuery
   ): ITargetable | null {
+    this.telemetry.findNearestEnemyCalls++;
     const visualRange = combatant.skillProfile.visualRange;
     const visualRangeSq = visualRange * visualRange;
     const potentialTargets = _potentialTargetsScratch;
@@ -87,6 +138,7 @@ export class AITargetAcquisition {
         _playerTarget.faction = this.playerFaction;
         _playerTarget.position.copy(playerPosition);
         potentialTargets.push(_playerTarget);
+        this.telemetry.playerTargetCandidates++;
       }
     }
 
@@ -136,9 +188,13 @@ export class AITargetAcquisition {
       inCluster = nearbyFriendlies >= CLUSTER_THRESHOLD;
     }
 
+    this.telemetry.potentialTargetsTotal += potentialTargets.length;
+
     // Use cluster-aware target distribution when in a cluster
     // This prevents all NPCs from focusing the same enemy
     if (inCluster) {
+      this.telemetry.clusterDistributionCalls++;
+      this.telemetry.clusterDistributionPotentialTargets += potentialTargets.length;
       const target = clusterManager.assignDistributedTarget(combatant, potentialTargets, allCombatants);
       potentialTargets.length = 0;
       return target;
@@ -146,11 +202,13 @@ export class AITargetAcquisition {
 
     // Not in cluster - just pick nearest target
     if (potentialTargets.length === 0) {
+      this.telemetry.noTargetSelections++;
       potentialTargets.length = 0;
       return null;
     }
     if (potentialTargets.length === 1) {
       const target = potentialTargets[0];
+      this.telemetry.singleTargetSelections++;
       potentialTargets.length = 0;
       return target;
     }
@@ -168,6 +226,7 @@ export class AITargetAcquisition {
     }
 
     potentialTargets.length = 0;
+    if (nearestEnemy) this.telemetry.nearestTargetSelections++;
     return nearestEnemy;
   }
 
@@ -208,6 +267,7 @@ export class AITargetAcquisition {
     allCombatants: Map<string, Combatant>,
     spatialGrid?: ISpatialQuery
   ): number {
+    this.telemetry.nearbyEnemyCountCalls++;
     let count = 0;
     const radiusSq = radius * radius;
 
@@ -239,6 +299,8 @@ export class AITargetAcquisition {
       });
     }
 
+    this.telemetry.nearbyEnemyCountTotal += count;
+    this.telemetry.nearbyEnemyCountMax = Math.max(this.telemetry.nearbyEnemyCountMax, count);
     return count;
   }
 
@@ -253,9 +315,11 @@ export class AITargetAcquisition {
   ): readonly string[] {
     const cached = this.spatialQueryCache.get(combatant.id);
     if (cached && cached.radius >= radius) {
+      this.telemetry.spatialQueryCacheHits++;
       return cached.ids;
     }
 
+    this.telemetry.spatialQueryCacheMisses++;
     const ids = spatialGrid.queryRadius(combatant.position, radius);
     this.spatialQueryCache.set(combatant.id, { radius, ids });
     return ids;

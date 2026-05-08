@@ -187,6 +187,7 @@ export interface Combatant extends ITargetable {
 export enum SquadCommand {
   FOLLOW_ME = 'follow_me',
   PATROL_HERE = 'patrol_here',
+  ATTACK_HERE = 'attack_here',
   RETREAT = 'retreat',
   HOLD_POSITION = 'hold_position',
   FREE_ROAM = 'free_roam',

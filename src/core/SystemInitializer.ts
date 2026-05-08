@@ -169,7 +169,10 @@ export class SystemInitializer {
 
     // Initialize new squad/inventory/grenade systems
     const squadManager = (refs.combatantSystem as any).squadManager;
-    refs.playerSquadController = new PlayerSquadController(squadManager);
+    refs.playerSquadController = new PlayerSquadController(squadManager, {
+      scene,
+      terrainHeightAt: (x, z) => refs.terrainSystem?.getHeightAt(x, z) ?? 0,
+    });
     refs.commandInputManager = new CommandInputManager(refs.playerSquadController);
     refs.inventoryManager = new InventoryManager();
     refs.inventoryManager.setSuppressUI(true); // UnifiedWeaponBar replaces built-in hotbar

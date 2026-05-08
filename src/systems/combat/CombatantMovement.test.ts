@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantState } from './types';
 import { createTestCombatant, mockTerrainRuntime } from '../../test-utils';
 import { NPC_MAX_SPEED, NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import { Logger } from '../../utils/Logger';
 
 function mockNavmeshAdapter(agentIds: Set<string> = new Set()) {
   return {
@@ -40,6 +41,10 @@ describe('CombatantMovement', () => {
   beforeEach(() => {
     terrain = mockTerrainRuntime();
     movement = new CombatantMovement(terrain);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('unregisters legacy navmesh crowd agents and uses the terrain-aware mover', () => {
@@ -415,6 +420,52 @@ describe('CombatantMovement', () => {
 
     it('resetStuckDetector does not throw', () => {
       expect(() => movement.resetStuckDetector()).not.toThrow();
+    });
+
+    const triggerTerrainStallRecovery = (id: string, startMs: number): void => {
+      const stalled = createTestCombatant({
+        id,
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+        movementLastGoodPosition: new THREE.Vector3(-8, NPC_Y_OFFSET, 0),
+        lodLevel: 'high',
+      });
+
+      for (const now of [startMs, startMs + 700, startMs + 1400]) {
+        vi.spyOn(performance, 'now').mockReturnValue(now);
+        movement.updateMovement(stalled, 0, new Map(), new Map(), {
+          disableSpacing: true,
+          disableTerrainSample: true,
+        });
+      }
+    };
+
+    it('rate-limits terrain-stall recovery warnings before formatting per-NPC spam', () => {
+      const warn = vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+
+      triggerTerrainStallRecovery('npc-a', 1000);
+      triggerTerrainStallRecovery('npc-b', 3100);
+      triggerTerrainStallRecovery('npc-c', 5200);
+      triggerTerrainStallRecovery('npc-d', 7500);
+
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(warn.mock.calls[0][1]).toContain('NPC npc-a stalled on terrain');
+      expect(warn.mock.calls[1][1]).toContain('NPC npc-d stalled on terrain');
+      expect(warn.mock.calls[1][1]).toContain('2 additional terrain-stall recoveries suppressed');
+    });
+
+    it('clears terrain-stall warning suppression on stuck-detector reset', () => {
+      const warn = vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+
+      triggerTerrainStallRecovery('npc-a', 1000);
+      triggerTerrainStallRecovery('npc-b', 3100);
+      movement.resetStuckDetector();
+      triggerTerrainStallRecovery('npc-c', 5200);
+
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(warn.mock.calls[1][1]).toContain('NPC npc-c stalled on terrain');
+      expect(warn.mock.calls[1][1]).not.toContain('suppressed');
     });
   });
 });

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Combatant, CombatantState, Faction } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
 import {
@@ -17,7 +18,7 @@ import {
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
-import { isDiagEnabled } from '../../core/PerfDiagnostics';
+import { isDiagEnabled, isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import { modelLoader } from '../assets/ModelLoader';
 import {
   createCombatantHitProxyScratch,
@@ -29,6 +30,7 @@ import {
   getPixelForgeNpcPoolKey,
   getPixelForgeNpcRuntimeFaction,
   PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS,
   PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ,
   PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
@@ -59,6 +61,7 @@ const DEATH_FADEOUT_PHASE = DEATH_FADEOUT_DURATION_SECONDS / DEATH_TOTAL_DURATIO
 const DEATH_FADE_START_PHASE = DEATH_FALL_PHASE + DEATH_GROUND_PHASE;
 const DEATH_CLIP_HOLD_PROGRESS = 0.999;
 const CLOSE_MODEL_FADE_EPSILON = 0.01;
+const OPTIMIZED_WEAPON_RESOURCE_KEY = '__tijOptimizedNpcWeaponResource';
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
@@ -86,6 +89,10 @@ function isOneShotDeathClip(clipId: PixelForgeNpcClipId): boolean {
   return clipId === 'death_fall_back';
 }
 
+function shouldApplyLegacyImpostorDeathTransform(clipId: PixelForgeNpcClipId): boolean {
+  return !isOneShotDeathClip(clipId);
+}
+
 function isHitboxDebugEnabled(): boolean {
   if (!isDiagEnabled() || typeof window === 'undefined') return false;
   try {
@@ -94,6 +101,72 @@ function isHitboxDebugEnabled(): boolean {
   } catch {
     return false;
   }
+}
+
+function isNpcCloseModelPerfIsolationEnabled(): boolean {
+  if (!isPerfDiagnosticsEnabled() || typeof window === 'undefined') return false;
+  try {
+    const value = new URLSearchParams(window.location.search).get('perfDisableNpcCloseModels');
+    return value === '1' || value === 'true' || value === 'yes' || value === 'on';
+  } catch {
+    return false;
+  }
+}
+
+type CloseModelFallbackReason = 'perf-isolation' | 'pool-loading' | 'pool-empty' | 'total-cap';
+
+interface CloseModelCandidate {
+  combatant: Combatant;
+  distanceSq: number;
+  poolKey: PixelForgeNpcPoolKey;
+}
+
+export interface CloseModelFallbackRecord {
+  combatantId: string;
+  poolKey: PixelForgeNpcPoolKey;
+  distanceMeters: number;
+  reason: CloseModelFallbackReason;
+}
+
+export interface CloseModelRuntimeStats {
+  closeRadiusMeters: number;
+  closeModelActiveCap: number;
+  candidatesWithinCloseRadius: number;
+  renderedCloseModels: number;
+  activeCloseModels: number;
+  fallbackCount: number;
+  fallbackCounts: Record<CloseModelFallbackReason, number>;
+  nearestFallbackDistanceMeters: number | null;
+  farthestFallbackDistanceMeters: number | null;
+  poolLoads: number;
+  poolTargets: Record<string, number>;
+  poolAvailable: Record<string, number>;
+}
+
+function createCloseModelFallbackCounts(): Record<CloseModelFallbackReason, number> {
+  return {
+    'perf-isolation': 0,
+    'pool-loading': 0,
+    'pool-empty': 0,
+    'total-cap': 0,
+  };
+}
+
+function createEmptyCloseModelRuntimeStats(): CloseModelRuntimeStats {
+  return {
+    closeRadiusMeters: PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS,
+    closeModelActiveCap: PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+    candidatesWithinCloseRadius: 0,
+    renderedCloseModels: 0,
+    activeCloseModels: 0,
+    fallbackCount: 0,
+    fallbackCounts: createCloseModelFallbackCounts(),
+    nearestFallbackDistanceMeters: null,
+    farthestFallbackDistanceMeters: null,
+    poolLoads: 0,
+    poolTargets: {},
+    poolAvailable: {},
+  };
 }
 
 interface CloseModelInstance {
@@ -150,6 +223,9 @@ export class CombatantRenderer {
   private closeModelPoolTargets: Map<PixelForgeNpcPoolKey, number> = new Map();
   private activeCloseModels: Map<string, CloseModelInstance> = new Map();
   private readonly closeModelOverflowLastLog = new Map<string, number>();
+  private readonly closeModelOverflowReportedThisUpdate = new Set<string>();
+  private readonly closeModelFallbackRecords = new Map<string, CloseModelFallbackRecord>();
+  private closeModelRuntimeStats = createEmptyCloseModelRuntimeStats();
   private disposed = false;
 
   // Walk animation state
@@ -178,6 +254,7 @@ export class CombatantRenderer {
   private readonly renderWriteCounts = new Map<string, number>();
   private readonly renderCombatStates = new Map<string, number>();
   private readonly hitboxDebugEnabled = isHitboxDebugEnabled();
+  private readonly closeModelPerfIsolationEnabled = isNpcCloseModelPerfIsolationEnabled();
   private readonly hitboxDebugGroup = new THREE.Group();
   private readonly hitboxDebugProxies = createCombatantHitProxyScratch();
   private readonly hitboxDebugUp = new THREE.Vector3(0, 1, 0);
@@ -223,7 +300,7 @@ export class CombatantRenderer {
     this.soldierTextures = assets.soldierTextures;
     this.factionMaterials = assets.factionMaterials;
     this.walkFrameTextures = assets.walkFrameTextures;
-    if (options.eagerCloseModelPools) {
+    if (options.eagerCloseModelPools && !this.closeModelPerfIsolationEnabled) {
       await this.createCloseModelPools();
     }
   }
@@ -253,6 +330,19 @@ export class CombatantRenderer {
     this.playerSquadId = squadId;
     this.playerSquadDetected = false;
     Logger.info('combat-renderer', ` Renderer: Player squad ID set to: ${squadId}`);
+  }
+
+  getCloseModelRuntimeStats(): CloseModelRuntimeStats {
+    return {
+      ...this.closeModelRuntimeStats,
+      fallbackCounts: { ...this.closeModelRuntimeStats.fallbackCounts },
+      poolTargets: { ...this.closeModelRuntimeStats.poolTargets },
+      poolAvailable: { ...this.closeModelRuntimeStats.poolAvailable },
+    };
+  }
+
+  getCloseModelFallbackRecords(): CloseModelFallbackRecord[] {
+    return Array.from(this.closeModelFallbackRecords.values()).map((record) => ({ ...record }));
   }
 
   private async createCloseModelPools(): Promise<void> {
@@ -376,7 +466,8 @@ export class CombatantRenderer {
         weaponPivot.name = `${factionConfig.weapon.id}_weapon_socket`;
         weaponPivot.visible = true;
         this.normalizeWeaponRoot(weaponRoot, factionConfig.weapon);
-        weaponPivot.add(weaponRoot);
+        const optimizedWeaponRoot = this.createOptimizedWeaponRoot(weaponRoot, factionConfig.weapon);
+        weaponPivot.add(optimizedWeaponRoot);
         model.scene.add(weaponPivot);
         model.scene.visible = false;
         this.configureCloseModelFrustumCulling(model.scene);
@@ -392,7 +483,7 @@ export class CombatantRenderer {
           poolKey,
           factionConfig,
           weaponPivot,
-          weaponRoot,
+          weaponRoot: optimizedWeaponRoot,
           weaponConfig: factionConfig.weapon,
           bones,
           hasWeapon: bones.has(factionConfig.rightHandSocket) && bones.has(factionConfig.leftHandSocket),
@@ -410,8 +501,7 @@ export class CombatantRenderer {
 
     if (this.disposed) {
       for (const instance of created) {
-        instance.mixer.stopAllAction();
-        modelLoader.disposeInstance(instance.root);
+        this.disposeCloseModelInstance(instance);
       }
       return;
     }
@@ -562,10 +652,18 @@ export class CombatantRenderer {
     const clamped = clamp01(opacity);
     for (const state of instance.materialStates) {
       const material = state.material;
-      material.opacity = state.opacity * clamped;
-      material.transparent = state.transparent || clamped < 0.999;
-      material.depthWrite = clamped >= 0.999 ? state.depthWrite : false;
-      material.needsUpdate = true;
+      const nextOpacity = state.opacity * clamped;
+      const nextTransparent = state.transparent || clamped < 0.999;
+      const nextDepthWrite = clamped >= 0.999 ? state.depthWrite : false;
+      const renderStateChanged =
+        material.transparent !== nextTransparent ||
+        material.depthWrite !== nextDepthWrite;
+      material.opacity = nextOpacity;
+      material.transparent = nextTransparent;
+      material.depthWrite = nextDepthWrite;
+      if (renderStateChanged) {
+        material.needsUpdate = true;
+      }
     }
   }
 
@@ -604,6 +702,61 @@ export class CombatantRenderer {
       ? transformLocal(support).sub(transformLocal(grip))
       : new THREE.Vector3(0.28, 0.02, 0);
     root.updateMatrixWorld(true);
+  }
+
+  private createOptimizedWeaponRoot(root: THREE.Group, weapon: PixelForgeNpcWeaponRuntimeConfig): THREE.Group {
+    root.updateMatrixWorld(true);
+    const sourceGeometries: THREE.BufferGeometry[] = [];
+    let sourceMaterial: THREE.Material | undefined;
+    const rootWorldInverse = root.matrixWorld.clone().invert();
+
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const geometry = child.geometry?.clone();
+      if (!geometry) return;
+      child.updateMatrixWorld(true);
+      geometry.applyMatrix4(new THREE.Matrix4().multiplyMatrices(rootWorldInverse, child.matrixWorld));
+      for (const attributeName of Object.keys(geometry.attributes)) {
+        if (attributeName !== 'position' && attributeName !== 'normal') {
+          geometry.deleteAttribute(attributeName);
+        }
+      }
+      if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
+      sourceGeometries.push(geometry);
+      if (!sourceMaterial) {
+        sourceMaterial = Array.isArray(child.material) ? child.material[0] : child.material;
+      }
+    });
+
+    const merged = sourceGeometries.length > 0
+      ? BufferGeometryUtils.mergeGeometries(sourceGeometries, false)
+      : null;
+    for (const geometry of sourceGeometries) geometry.dispose();
+    if (!merged) return root;
+
+    merged.computeBoundingBox();
+    merged.computeBoundingSphere();
+    const material = sourceMaterial
+      ? sourceMaterial.clone()
+      : new THREE.MeshStandardMaterial({ color: 0x2f2f2b, roughness: 0.85, metalness: 0.1 });
+    const mesh = new THREE.Mesh(merged, material);
+    mesh.name = `${weapon.id}_optimized_weapon`;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = true;
+    mesh.userData[OPTIMIZED_WEAPON_RESOURCE_KEY] = true;
+
+    const optimized = new THREE.Group();
+    optimized.name = root.name || `${weapon.id}_weapon`;
+    optimized.position.copy(root.position);
+    optimized.quaternion.copy(root.quaternion);
+    optimized.scale.copy(root.scale);
+    optimized.userData.stockOffset = root.userData.stockOffset;
+    optimized.userData.supportOffset = root.userData.supportOffset;
+    optimized.userData.modelPath = root.userData.modelPath;
+    optimized.userData.optimizedWeaponMesh = true;
+    optimized.add(mesh);
+    return optimized;
   }
 
   private findNamed(root: THREE.Object3D, names: string[]): THREE.Object3D | undefined {
@@ -658,7 +811,9 @@ export class CombatantRenderer {
     combatants: Map<string, Combatant>,
     playerPosition: THREE.Vector3,
   ): { closeModelIds: Set<string>; suppressedImpostorIds: Set<string> } {
-    const candidates: Array<{ combatant: Combatant; distanceSq: number; poolKey: PixelForgeNpcPoolKey }> = [];
+    this.closeModelOverflowReportedThisUpdate.clear();
+    this.closeModelFallbackRecords.clear();
+    const candidates: CloseModelCandidate[] = [];
     combatants.forEach((combatant) => {
       if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
       const distanceSq = combatant.position.distanceToSquared(playerPosition);
@@ -668,21 +823,34 @@ export class CombatantRenderer {
     });
     candidates.sort((a, b) => a.distanceSq - b.distanceSq);
 
+    if (this.closeModelPerfIsolationEnabled) {
+      this.activeCloseModels.forEach((instance, combatantId) => {
+        this.releaseCloseModel(combatantId, instance);
+      });
+      for (const candidate of candidates) {
+        this.recordCloseModelFallback(candidate, 'perf-isolation');
+      }
+      this.captureCloseModelRuntimeStats(candidates.length, 0);
+      return { closeModelIds: new Set(), suppressedImpostorIds: new Set() };
+    }
+
     const selected = new Set<string>();
     const suppressedImpostorIds = new Set<string>();
     for (const candidate of candidates) {
       if (selected.size >= PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP) {
-        suppressedImpostorIds.add(candidate.combatant.id);
-        this.reportCloseModelOverflow(candidate.poolKey, candidate.distanceSq, 'total-cap');
+        this.recordCloseModelFallback(candidate, 'total-cap');
+        this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, 'total-cap');
         continue;
       }
       const instance = this.ensureCloseModel(candidate.combatant.id, candidate.poolKey);
       if (!instance) {
         if (this.queueCloseModelPoolGrowth(candidate.poolKey)) {
+          this.recordCloseModelFallback(candidate, 'pool-loading');
+          this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, 'pool-loading');
           continue;
         }
-        suppressedImpostorIds.add(candidate.combatant.id);
-        this.reportCloseModelOverflow(candidate.poolKey, candidate.distanceSq, 'pool-empty');
+        this.recordCloseModelFallback(candidate, 'pool-empty');
+        this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, 'pool-empty');
         continue;
       }
       selected.add(candidate.combatant.id);
@@ -695,7 +863,50 @@ export class CombatantRenderer {
       }
     });
 
+    this.captureCloseModelRuntimeStats(candidates.length, selected.size);
     return { closeModelIds: selected, suppressedImpostorIds };
+  }
+
+  private recordCloseModelFallback(candidate: CloseModelCandidate, reason: CloseModelFallbackReason): void {
+    this.closeModelFallbackRecords.set(candidate.combatant.id, {
+      combatantId: candidate.combatant.id,
+      poolKey: candidate.poolKey,
+      distanceMeters: Math.sqrt(candidate.distanceSq),
+      reason,
+    });
+  }
+
+  private captureCloseModelRuntimeStats(candidatesWithinCloseRadius: number, renderedCloseModels: number): void {
+    const fallbackCounts = createCloseModelFallbackCounts();
+    const distances: number[] = [];
+    this.closeModelFallbackRecords.forEach((record) => {
+      fallbackCounts[record.reason] += 1;
+      distances.push(record.distanceMeters);
+    });
+
+    const poolTargets: Record<string, number> = {};
+    this.closeModelPoolTargets.forEach((target, key) => {
+      poolTargets[String(key)] = target;
+    });
+    const poolAvailable: Record<string, number> = {};
+    this.closeModelPools.forEach((pool, key) => {
+      poolAvailable[String(key)] = pool.length;
+    });
+
+    this.closeModelRuntimeStats = {
+      closeRadiusMeters: PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS,
+      closeModelActiveCap: PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      candidatesWithinCloseRadius,
+      renderedCloseModels,
+      activeCloseModels: this.activeCloseModels.size,
+      fallbackCount: this.closeModelFallbackRecords.size,
+      fallbackCounts,
+      nearestFallbackDistanceMeters: distances.length > 0 ? Math.min(...distances) : null,
+      farthestFallbackDistanceMeters: distances.length > 0 ? Math.max(...distances) : null,
+      poolLoads: this.closeModelPoolLoads.size,
+      poolTargets,
+      poolAvailable,
+    };
   }
 
   private ensureCloseModel(combatantId: string, poolKey: PixelForgeNpcPoolKey): CloseModelInstance | undefined {
@@ -735,6 +946,20 @@ export class CombatantRenderer {
     instance.combatantId = undefined;
     const pool = this.closeModelPools.get(instance.poolKey);
     if (pool) pool.push(instance);
+  }
+
+  private disposeCloseModelInstance(instance: CloseModelInstance): void {
+    instance.mixer.stopAllAction();
+    instance.root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || child.userData[OPTIMIZED_WEAPON_RESOURCE_KEY] !== true) return;
+      child.geometry.dispose();
+      if (Array.isArray(child.material)) {
+        child.material.forEach((material) => material.dispose());
+      } else {
+        child.material.dispose();
+      }
+    });
+    modelLoader.disposeInstance(instance.root);
   }
 
   private updateCloseModelInstance(instance: CloseModelInstance, combatant: Combatant, poolKey: PixelForgeNpcPoolKey): void {
@@ -792,16 +1017,23 @@ export class CombatantRenderer {
     action.paused = clipProgress >= DEATH_CLIP_HOLD_PROGRESS;
   }
 
-  private reportCloseModelOverflow(poolKey: PixelForgeNpcPoolKey, distanceSq: number, reason: string): void {
+  private reportCloseModelOverflow(poolKey: PixelForgeNpcPoolKey, distanceSq: number, reason: CloseModelFallbackReason): void {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const key = `${poolKey}:${reason}`;
     const last = this.closeModelOverflowLastLog.get(key);
     if (last !== undefined && now - last < 1000) return;
     this.closeModelOverflowLastLog.set(key, now);
-    Logger.warn(
+    Logger.info(
       'combat-renderer',
-      `Pixel Forge close NPC ${reason} for ${poolKey} at ${Math.sqrt(distanceSq).toFixed(1)}m; suppressing near impostor fallback`,
+      `Pixel Forge close NPC ${reason} for ${poolKey} at ${Math.sqrt(distanceSq).toFixed(1)}m; using impostor fallback`,
     );
+  }
+
+  private reportCloseModelOverflowOnce(poolKey: PixelForgeNpcPoolKey, distanceSq: number, reason: CloseModelFallbackReason): void {
+    const key = `${poolKey}:${reason}`;
+    if (this.closeModelOverflowReportedThisUpdate.has(key)) return;
+    this.closeModelOverflowReportedThisUpdate.add(key);
+    this.reportCloseModelOverflow(poolKey, distanceSq, reason);
   }
 
   private updateWeaponSocket(instance: CloseModelInstance): void {
@@ -1038,8 +1270,11 @@ export class CombatantRenderer {
         finalPosition.y += bobY;
       }
 
-      // Death animation
-      if (combatant.isDying && combatant.deathProgress !== undefined) {
+      if (
+        combatant.isDying
+        && combatant.deathProgress !== undefined
+        && shouldApplyLegacyImpostorDeathTransform(clipId)
+      ) {
           const FALL_PHASE = DEATH_FALL_PHASE;
           const GROUND_PHASE = DEATH_GROUND_PHASE;
           const FADEOUT_PHASE = DEATH_FADEOUT_PHASE;
@@ -1408,14 +1643,12 @@ export class CombatantRenderer {
     this.hitboxBodyMaterial.dispose();
     this.scene.remove(this.hitboxDebugGroup);
     this.activeCloseModels.forEach((instance) => {
-      instance.mixer.stopAllAction();
-      modelLoader.disposeInstance(instance.root);
+      this.disposeCloseModelInstance(instance);
     });
     this.activeCloseModels.clear();
     this.closeModelPools.forEach((pool) => {
       for (const instance of pool) {
-        instance.mixer.stopAllAction();
-        modelLoader.disposeInstance(instance.root);
+        this.disposeCloseModelInstance(instance);
       }
     });
     this.closeModelPools.clear();

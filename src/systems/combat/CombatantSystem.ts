@@ -33,9 +33,10 @@ import { CombatantProfiler } from './CombatantProfiler';
 import { CombatantSystemDamage } from './CombatantSystemDamage';
 import { CombatantSystemUpdate } from './CombatantSystemUpdate';
 import { AILineOfSight } from './ai/AILineOfSight';
+import { clusterManager } from './ClusterManager';
 import { getRaycastBudgetStats } from './ai/RaycastBudget';
 import { getCombatFireRaycastBudgetStats } from './ai/CombatFireRaycastBudget';
-import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
+import { isPerfDiagnosticsEnabled, isPerfUserTimingEnabled } from '../../core/PerfDiagnostics';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 
@@ -93,6 +94,10 @@ export class CombatantSystem implements GameSystem {
   private playerPosition = new THREE.Vector3();
   private autonomousSpawningEnabled = true;
   private combatEnabled = false;
+  private readonly perfUserTimingEnabled =
+    (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfUserTimingEnabled();
+  private readonly COMBAT_AI_USER_TIMING_MIN_MS = 0.25;
+  private readonly COMBAT_AI_USER_TIMING_METHOD_LIMIT = 10;
 
   // Player squad
   public shouldCreatePlayerSquad = false;
@@ -222,6 +227,10 @@ export class CombatantSystem implements GameSystem {
       const duration = performance.now() - updateStart;
       this.profiler.updateTiming(duration);
       this.profiler.profiling.aiStateMs = {};
+      this.profiler.profiling.aiMethodMs = {};
+      this.profiler.profiling.aiMethodCounts = {};
+      this.profiler.profiling.aiMethodTotalCounts = {};
+      this.profiler.profiling.aiSlowestUpdate = null;
       this.profiler.profiling.aiUpdateMs = 0;
       return;
     }
@@ -253,8 +262,25 @@ export class CombatantSystem implements GameSystem {
     this.lodManager.updateCombatants(deltaTime);
     this.profiler.profiling.aiUpdateMs = performance.now() - t0;
     this.profiler.profiling.aiStateMs = this.combatantAI.getFrameStateProfile();
+    this.profiler.profiling.aiMethodMs = this.combatantAI.getFrameMethodProfile();
+    this.profiler.profiling.aiMethodCounts = this.combatantAI.getFrameMethodCountProfile();
+    this.profiler.profiling.aiMethodTotalCounts = this.combatantAI.getMethodTotalCountProfile();
+    this.profiler.profiling.aiSlowestUpdate = this.combatantAI.getSlowestUpdateBreakdown();
+    this.recordCombatAiUserTiming(
+      this.profiler.profiling.aiUpdateMs,
+      this.profiler.profiling.aiMethodMs,
+      this.profiler.profiling.aiSlowestUpdate
+    );
     this.profiler.profiling.aiScheduling = this.lodManager.getFrameSchedulingStats();
-    this.profiler.profiling.losCache = AILineOfSight.getCacheStats();
+    const losStats = AILineOfSight.getCacheStats();
+    this.profiler.profiling.losCache = losStats;
+    this.profiler.profiling.closeEngagement = {
+      engagement: this.combatantAI.getCloseEngagementTelemetry(),
+      targetAcquisition: this.combatantAI.getTargetAcquisitionTelemetry(),
+      targetDistribution: clusterManager.getTargetDistributionTelemetry(),
+      lineOfSight: losStats,
+      losCallsites: this.combatantAI.getLosCallsiteTelemetry()
+    };
     this.profiler.profiling.raycastBudget = getRaycastBudgetStats();
     this.profiler.profiling.combatFireRaycastBudget = getCombatFireRaycastBudgetStats();
 
@@ -286,6 +312,56 @@ export class CombatantSystem implements GameSystem {
     const duration = performance.now() - updateStart;
     this.profiler.profiling.totalMs = duration;
     this.profiler.updateTiming(duration);
+  }
+
+  private recordCombatAiUserTiming(
+    aiUpdateMs: number,
+    aiMethodMs: Record<string, number>,
+    aiSlowestUpdate: { stateAtStart: string; lodLevel: string; totalMs: number } | null
+  ): void {
+    if (!this.perfUserTimingEnabled) return;
+
+    this.measureCombatAiDuration('CombatAI.frame.total', aiUpdateMs);
+
+    const methodEntries = Object.entries(aiMethodMs)
+      .filter(([, durationMs]) => Number.isFinite(durationMs) && durationMs >= this.COMBAT_AI_USER_TIMING_MIN_MS)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, this.COMBAT_AI_USER_TIMING_METHOD_LIMIT);
+
+    for (const [methodName, durationMs] of methodEntries) {
+      this.measureCombatAiDuration(`CombatAI.method.${this.sanitizeUserTimingName(methodName)}`, durationMs);
+    }
+
+    if (aiSlowestUpdate && aiSlowestUpdate.totalMs >= this.COMBAT_AI_USER_TIMING_MIN_MS) {
+      this.measureCombatAiDuration(
+        `CombatAI.slowest.${this.sanitizeUserTimingName(aiSlowestUpdate.stateAtStart)}.${this.sanitizeUserTimingName(aiSlowestUpdate.lodLevel)}`,
+        aiSlowestUpdate.totalMs
+      );
+    }
+  }
+
+  private measureCombatAiDuration(name: string, durationMs: number): void {
+    if (
+      !Number.isFinite(durationMs)
+      || durationMs < this.COMBAT_AI_USER_TIMING_MIN_MS
+      || typeof performance === 'undefined'
+      || typeof performance.measure !== 'function'
+    ) {
+      return;
+    }
+
+    try {
+      performance.measure(name, {
+        start: Math.max(0, performance.now() - durationMs),
+        duration: durationMs
+      });
+    } catch {
+      // Diagnostic-only timing must never affect simulation behavior.
+    }
+  }
+
+  private sanitizeUserTimingName(value: string): string {
+    return value.replace(/[^a-zA-Z0-9_.:-]/g, '_');
   }
 
   // Reseed forces when switching game modes to honor new HQ layouts and caps

@@ -42,7 +42,7 @@ const LOD_RANGES_MEDIUM_GPU = { high: 120, medium: 250, low: 450 };
 const LOD_RANGES_LOW_GPU = { high: 60, medium: 120, low: 250 };
 
 // ── Update caps by GPU tier ──
-const UPDATE_CAPS_DESKTOP = { high: 20, medium: 24 };
+const UPDATE_CAPS_DESKTOP = { high: 12, medium: 16 };
 const UPDATE_CAPS_MEDIUM_GPU = { high: 12, medium: 16 };
 const UPDATE_CAPS_LOW_GPU = { high: 8, medium: 10 };
 
@@ -600,9 +600,10 @@ export class CombatantLODManager {
     const now = performance.now();
     if (aiMs > 50 && now - this.lastAiSpikeLogMs > this.AI_LOG_THROTTLE_MS) {
       this.lastAiSpikeLogMs = now;
+      const aiBreakdown = this.formatAiMethodBreakdown(this.combatantAI.getLastUpdateBreakdown()?.methodMs);
       Logger.warn(
         'combat-ai',
-        `[AI spike] ${aiMs.toFixed(1)}ms combatant=${combatant.id} state=${combatant.state} squad=${combatant.squadId ?? 'none'} target=${combatant.target?.id ?? 'none'}`
+        `[AI spike] ${aiMs.toFixed(1)}ms combatant=${combatant.id} state=${combatant.state} squad=${combatant.squadId ?? 'none'} target=${combatant.target?.id ?? 'none'} methods=${aiBreakdown}`
       );
     }
     const moveStart = performance.now();
@@ -657,6 +658,16 @@ export class CombatantLODManager {
     );
     this.combatantMovement.updateRotation(combatant, deltaTime);
     this.recordSpatialUpdate(combatant);
+  }
+
+  private formatAiMethodBreakdown(methodMs: Record<string, number> | undefined): string {
+    if (!methodMs) return 'none';
+    const entries = Object.entries(methodMs)
+      .filter(([, value]) => Number.isFinite(value) && value > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([name, value]) => `${name}:${value.toFixed(1)}`);
+    return entries.length > 0 ? entries.join(',') : 'none';
   }
 
   private updateCombatantBasic(combatant: Combatant, deltaTime: number, options?: { lowCost?: boolean; updateSpatial?: boolean }): void {
