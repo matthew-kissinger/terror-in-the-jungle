@@ -173,7 +173,12 @@ function directiveState(statusText: string): DirectiveState {
   if (lower.includes('politburo') && lower.includes('strategic reserve')) {
     return 'deferred';
   }
-  if (lower.includes('evidence-complete') || lower === 'standing.' || lower === 'standing') {
+  if (
+    lower.includes('evidence-complete')
+    || lower === 'standing.'
+    || lower === 'standing'
+    || /\bclosed\s+\d{4}-\d{2}-\d{2}\b/.test(lower)
+  ) {
     return 'closed';
   }
   if (
@@ -314,8 +319,10 @@ function codexRevision(codex: string): string | null {
 }
 
 function hasPolitburoSignature(codex: string): boolean {
-  return /^Politburo (?:signature|seal):\s*(?:signed|approved)/im.test(codex)
-    || /^Signed by the Politburo:\s*(?:yes|true|signed|approved)/im.test(codex);
+  return /^Politburo (?:signature|seal):\s*(?:signed|approved|sealed)/im.test(codex)
+    || /^Signed by the Politburo:\s*(?:yes|true|signed|approved|sealed)/im.test(codex)
+    || /\*\*SEALED\*\*\s+by\s+Politburo\b/.test(codex)
+    || /Politburo Seal\s+—\s+Cycle Closeout Log/i.test(codex);
 }
 
 function isWithinDays(date: Date | null, days: number): boolean {
