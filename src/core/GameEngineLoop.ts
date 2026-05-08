@@ -1,6 +1,7 @@
 import { Logger } from '../utils/Logger';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import type { GameEngine } from './GameEngine';
+import { isPerfUserTimingEnabled } from './PerfDiagnostics';
 
 // Crash tracking for frame loop resilience
 let crashCount = 0;
@@ -8,6 +9,26 @@ let lastCrashTime = 0;
 const CRASH_WINDOW_MS = 5000; // 5 seconds
 const MAX_CRASHES = 3;
 let errorOverlayShown = false;
+
+function withLoopUserTiming<T>(name: string, fn: () => T): T {
+  if (!isPerfUserTimingEnabled()) {
+    return fn();
+  }
+
+  const measureName = `GameEngineLoop.${name}`;
+  const startMark = `${measureName}.start`;
+  const endMark = `${measureName}.end`;
+
+  performance.mark(startMark);
+  try {
+    return fn();
+  } finally {
+    performance.mark(endMark);
+    performance.measure(measureName, startMark, endMark);
+    performance.clearMarks(startMark);
+    performance.clearMarks(endMark);
+  }
+}
 
 export function start(engine: GameEngine): void {
   if (engine.isLoopRunning || engine.isDisposed) {
@@ -98,9 +119,13 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     const mortarCamera = mortarSystem?.getMortarCamera();
 
     // Collect GPU timing from previous frame
-    performanceTelemetry.collectGPUTime();
+    withLoopUserTiming('RenderMain.collectGPUTime', () => {
+      performanceTelemetry.collectGPUTime();
+    });
 
-    engine.renderer.beginFrameStats();
+    withLoopUserTiming('RenderMain.beginFrameStats', () => {
+      engine.renderer.beginFrameStats();
+    });
     performanceTelemetry.beginSystem('RenderMain');
     performanceTelemetry.beginGPUTimer();
 
@@ -108,23 +133,33 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     const renderer = engine.renderer.renderer;
 
     // Begin post-processing frame (redirects all rendering to low-res target)
-    if (pp && !usingMortarCamera) pp.beginFrame();
-
-    // Render the main scene
-    if (usingMortarCamera && mortarCamera) {
-      renderer.render(engine.renderer.scene, mortarCamera);
-    } else {
-      renderer.render(engine.renderer.scene, activeCamera);
+    if (pp && !usingMortarCamera) {
+      withLoopUserTiming('RenderMain.postProcessing.beginFrame', () => {
+        pp.beginFrame();
+      });
     }
 
-    performanceTelemetry.endGPUTimer();
+    // Render the main scene
+    withLoopUserTiming('RenderMain.renderer.render', () => {
+      if (usingMortarCamera && mortarCamera) {
+        renderer.render(engine.renderer.scene, mortarCamera);
+      } else {
+        renderer.render(engine.renderer.scene, activeCamera);
+      }
+    });
+
+    withLoopUserTiming('RenderMain.endGPUTimer', () => {
+      performanceTelemetry.endGPUTimer();
+    });
     performanceTelemetry.endSystem('RenderMain');
 
     // Render weapon + grenade overlays (into the same post-processing target)
     performanceTelemetry.beginSystem('RenderOverlay');
     if (!usingMortarCamera) {
       if (engine.systemManager.firstPersonWeapon) {
-        engine.systemManager.firstPersonWeapon.renderWeapon(renderer);
+        withLoopUserTiming('RenderOverlay.weapon', () => {
+          engine.systemManager.firstPersonWeapon?.renderWeapon(renderer);
+        });
       }
 
       const currentAutoClear = renderer.autoClear;
@@ -134,8 +169,10 @@ export function animate(engine: GameEngine, timestamp?: number): void {
         const grenadeScene = engine.systemManager.grenadeSystem.getGrenadeOverlayScene();
         const grenadeCamera = engine.systemManager.grenadeSystem.getGrenadeOverlayCamera();
         if (grenadeScene && grenadeCamera) {
-          renderer.clearDepth();
-          renderer.render(grenadeScene, grenadeCamera);
+          withLoopUserTiming('RenderOverlay.grenade', () => {
+            renderer.clearDepth();
+            renderer.render(grenadeScene, grenadeCamera);
+          });
         }
       }
 
@@ -143,7 +180,11 @@ export function animate(engine: GameEngine, timestamp?: number): void {
     }
 
     // End post-processing frame (blits low-res target to screen with retro effect)
-    if (pp && !usingMortarCamera) pp.endFrame();
+    if (pp && !usingMortarCamera) {
+      withLoopUserTiming('RenderOverlay.postProcessing.endFrame', () => {
+        pp.endFrame();
+      });
+    }
 
     performanceTelemetry.endSystem('RenderOverlay');
 

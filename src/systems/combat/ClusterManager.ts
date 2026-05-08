@@ -2,6 +2,36 @@ import * as THREE from 'three'
 import { Combatant, CombatantState, ITargetable } from './types'
 import { SpatialGridManager } from './SpatialGridManager'
 
+export interface TargetDistributionTelemetry {
+  distributionCalls: number
+  zeroTargetCalls: number
+  singleTargetCalls: number
+  multiTargetCalls: number
+  potentialTargetsTotal: number
+  targetCountRebuilds: number
+  assignments: number
+  assignmentChurn: number
+  targeterCountSamples: number
+  targeterCountTotal: number
+  targeterCountMax: number
+}
+
+function createTargetDistributionTelemetry(): TargetDistributionTelemetry {
+  return {
+    distributionCalls: 0,
+    zeroTargetCalls: 0,
+    singleTargetCalls: 0,
+    multiTargetCalls: 0,
+    potentialTargetsTotal: 0,
+    targetCountRebuilds: 0,
+    assignments: 0,
+    assignmentChurn: 0,
+    targeterCountSamples: 0,
+    targeterCountTotal: 0,
+    targeterCountMax: 0
+  }
+}
+
 /**
  * Manages clustered NPC behavior to improve performance and gameplay experience.
  *
@@ -18,6 +48,7 @@ export class ClusterManager {
   private readonly CLUSTER_RADIUS = 15.0           // Radius to check for clustering
   private readonly CLUSTER_THRESHOLD = 4           // Number of nearby friendlies to be "clustered"
   private readonly TARGET_REASSIGN_INTERVAL = 2000 // ms between target distribution checks
+  private readonly TARGET_STICKINESS_MS = 500      // Minimum time to hold a still-valid distributed target
 
   // Scratch vectors to avoid allocations
   private readonly scratchVec1 = new THREE.Vector3()
@@ -26,7 +57,10 @@ export class ClusterManager {
 
   // Target assignment tracking - which enemies are being targeted by how many
   private targetCounts: Map<string, number> = new Map()
+  private lastAssignedTargetByCombatant: Map<string, string> = new Map()
+  private lastAssignedAtByCombatant: Map<string, number> = new Map()
   private lastTargetDistribution = 0
+  private telemetry: TargetDistributionTelemetry = createTargetDistributionTelemetry()
 
   /**
    * Calculate spacing force to push combatant away from nearby friendlies.
@@ -172,14 +206,33 @@ export class ClusterManager {
     potentialTargets: ITargetable[],
     allCombatants: Map<string, Combatant>
   ): ITargetable | null {
-    if (potentialTargets.length === 0) return null
-    if (potentialTargets.length === 1) return potentialTargets[0]
+    this.telemetry.distributionCalls++
+    this.telemetry.potentialTargetsTotal += potentialTargets.length
+
+    if (potentialTargets.length === 0) {
+      this.telemetry.zeroTargetCalls++
+      return null
+    }
+    if (potentialTargets.length === 1) {
+      this.telemetry.singleTargetCalls++
+      this.recordTargetAssignment(combatant.id, potentialTargets[0].id, Date.now())
+      return potentialTargets[0]
+    }
+
+    this.telemetry.multiTargetCalls++
 
     // Rebuild target counts periodically
     const now = Date.now()
+    const stickyTarget = this.getStickyTarget(combatant.id, potentialTargets, now)
+    if (stickyTarget) {
+      this.recordTargetAssignment(combatant.id, stickyTarget.id)
+      return stickyTarget
+    }
+
     if (now - this.lastTargetDistribution > this.TARGET_REASSIGN_INTERVAL) {
       this.rebuildTargetCounts(allCombatants)
       this.lastTargetDistribution = now
+      this.telemetry.targetCountRebuilds++
     }
 
     // Score targets - prefer less-targeted enemies
@@ -190,6 +243,9 @@ export class ClusterManager {
       const targetId = target.id
       const currentTargeters = this.targetCounts.get(targetId) || 0
       const distance = combatant.position.distanceTo(target.position)
+      this.telemetry.targeterCountSamples++
+      this.telemetry.targeterCountTotal += currentTargeters
+      this.telemetry.targeterCountMax = Math.max(this.telemetry.targeterCountMax, currentTargeters)
 
       // Score: prefer closer targets with fewer attackers
       // Lower targeter count = higher score
@@ -209,6 +265,7 @@ export class ClusterManager {
     if (bestTarget) {
       const count = this.targetCounts.get(bestTarget.id) || 0
       this.targetCounts.set(bestTarget.id, count + 1)
+      this.recordTargetAssignment(combatant.id, bestTarget.id, now)
     }
 
     return bestTarget
@@ -270,7 +327,35 @@ export class ClusterManager {
    */
   reset(): void {
     this.targetCounts.clear()
+    this.lastAssignedTargetByCombatant.clear()
+    this.lastAssignedAtByCombatant.clear()
     this.lastTargetDistribution = 0
+    this.telemetry = createTargetDistributionTelemetry()
+  }
+
+  getTargetDistributionTelemetry(): TargetDistributionTelemetry {
+    return { ...this.telemetry }
+  }
+
+  private getStickyTarget(combatantId: string, potentialTargets: ITargetable[], now: number): ITargetable | null {
+    const previousTargetId = this.lastAssignedTargetByCombatant.get(combatantId)
+    const assignedAt = this.lastAssignedAtByCombatant.get(combatantId)
+    if (!previousTargetId || assignedAt === undefined || now - assignedAt >= this.TARGET_STICKINESS_MS) {
+      return null
+    }
+    return potentialTargets.find(target => target.id === previousTargetId) ?? null
+  }
+
+  private recordTargetAssignment(combatantId: string, targetId: string, assignedAtMs?: number): void {
+    const previousTarget = this.lastAssignedTargetByCombatant.get(combatantId)
+    if (previousTarget && previousTarget !== targetId) {
+      this.telemetry.assignmentChurn++
+    }
+    this.lastAssignedTargetByCombatant.set(combatantId, targetId)
+    if (assignedAtMs !== undefined || !this.lastAssignedAtByCombatant.has(combatantId)) {
+      this.lastAssignedAtByCombatant.set(combatantId, assignedAtMs ?? Date.now())
+    }
+    this.telemetry.assignments++
   }
 }
 

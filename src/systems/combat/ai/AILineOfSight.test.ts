@@ -64,6 +64,9 @@ describe('AILineOfSight heightfield prefilter', () => {
     expect(terrainSystem.raycastTerrain).toHaveBeenCalled();
     const stats = AILineOfSight.getCacheStats();
     expect(stats.prefilterPasses).toBeGreaterThan(0);
+    expect(stats.fullEvaluations).toBe(1);
+    expect(stats.terrainRaycasts).toBe(1);
+    expect(stats.fullEvaluationClear).toBe(1);
   });
 
   it('does not double-raise player eye position for full LOS terrain raycasts', () => {

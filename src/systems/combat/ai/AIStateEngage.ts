@@ -39,6 +39,7 @@ const SUPPRESSION_FIRE_PAUSE_MS = 150
 const SUPPRESSION_BASE_DURATION_MS = 3000
 const SUPPRESSION_JITTER_MS = 2000
 const SUPPRESSION_COOLDOWN_MS = 10000
+const SUPPRESSION_VISIBILITY_RECHECK_MS = 250
 
 // ── Squad suppression initiation ──
 const SQUAD_MIN_SIZE_FOR_SUPPRESSION = 3
@@ -50,6 +51,56 @@ const SUPPRESSION_HEALTH_THRESHOLD = 0.4
 // ── Flanking ──
 const FLANK_BASE_DISTANCE = 25
 const FLANK_DISTANCE_JITTER = 15
+
+export interface CloseEngagementTelemetry {
+  closeRangeFullAutoActivations: number
+  nearbyEnemyBurstTriggers: number
+  suppressionTransitions: number
+  nearbyEnemyCountSamples: number
+  nearbyEnemyCountTotal: number
+  nearbyEnemyCountMax: number
+  suppressionFlankDestinationComputations: number
+  suppressionFlankCoverSearches: number
+  suppressionFlankCoverSearchReuseSkips: number
+  suppressionFlankCoverSearchCapSkips: number
+  targetDistanceBuckets: {
+    lt5m: number
+    m5to10: number
+    m10to15: number
+    m15to30: number
+    gte30: number
+  }
+}
+
+interface SuppressionVisibilitySample {
+  targetId: string
+  checkedAtMs: number
+  visible: boolean
+}
+
+type EngageMethodTimer = <T>(name: string, fn: () => T) => T
+
+function createCloseEngagementTelemetry(): CloseEngagementTelemetry {
+  return {
+    closeRangeFullAutoActivations: 0,
+    nearbyEnemyBurstTriggers: 0,
+    suppressionTransitions: 0,
+    nearbyEnemyCountSamples: 0,
+    nearbyEnemyCountTotal: 0,
+    nearbyEnemyCountMax: 0,
+    suppressionFlankDestinationComputations: 0,
+    suppressionFlankCoverSearches: 0,
+    suppressionFlankCoverSearchReuseSkips: 0,
+    suppressionFlankCoverSearchCapSkips: 0,
+    targetDistanceBuckets: {
+      lt5m: 0,
+      m5to10: 0,
+      m10to15: 0,
+      m15to30: 0,
+      gte30: 0
+    }
+  }
+}
 
 /**
  * Handles engaging and suppressing combat states
@@ -100,6 +151,9 @@ export class AIStateEngage {
   // consult ctx.hasCoverInBearing.
   private scratchProbeBoundTo: Combatant | null = null
   private scratchCoverProbe: ((bearingRad: number, radius: number) => boolean) | undefined
+  private telemetry: CloseEngagementTelemetry = createCloseEngagementTelemetry()
+  private suppressionVisibilityByCombatant = new WeakMap<Combatant, SuppressionVisibilitySample>()
+  private methodTimer?: EngageMethodTimer
 
   setSquads(squads: Map<string, Squad>): void {
     this.squads = squads
@@ -131,6 +185,21 @@ export class AIStateEngage {
     probe: (origin: THREE.Vector3, bearingRad: number, radius: number) => boolean
   ): void {
     this.hasCoverInBearing = probe
+  }
+
+  getCloseEngagementTelemetry(): CloseEngagementTelemetry {
+    return {
+      ...this.telemetry,
+      targetDistanceBuckets: { ...this.telemetry.targetDistanceBuckets }
+    }
+  }
+
+  resetCloseEngagementTelemetry(): void {
+    this.telemetry = createCloseEngagementTelemetry()
+  }
+
+  setMethodTimer(timer: EngageMethodTimer | undefined): void {
+    this.methodTimer = timer
   }
 
   handleEngaging(
@@ -176,6 +245,7 @@ export class AIStateEngage {
 
     const targetDistance = combatant.position.distanceTo(targetPos)
     combatant.isFullAuto = false
+    this.recordTargetDistance(targetDistance)
 
     // Peek-and-fire behavior when in cover
     if (combatant.inCover) {
@@ -184,7 +254,9 @@ export class AIStateEngage {
 
       // Use improved cover evaluation
       if (this.coverSystem && combatant.coverPosition) {
-        const coverEval = this.coverSystem.evaluateCurrentCover(combatant, targetPos)
+        const coverEval = this.measureEngageMethod('engage.cover.evaluateCurrentCover', () =>
+          this.coverSystem!.evaluateCurrentCover(combatant, targetPos)
+        )
         if (!coverEval.effective) {
           Logger.warn('combat-ai', ` ${combatant.faction} unit's cover is compromised, repositioning`)
           this.coverSystem.releaseCover(combatant.id)
@@ -193,7 +265,9 @@ export class AIStateEngage {
 
           // Immediately seek new cover if should reposition
           if (coverEval.shouldReposition && targetDistance >= CLOSE_RANGE_DISTANCE) {
-            const newCover = this.coverSystem.findBestCover(combatant, targetPos, allCombatants)
+            const newCover = this.measureEngageMethod('engage.cover.findBestCover', () =>
+              this.coverSystem!.findBestCover(combatant, targetPos, allCombatants)
+            )
             if (newCover) {
               combatant.state = CombatantState.SEEKING_COVER
               combatant.coverPosition = newCover.position.clone()
@@ -204,7 +278,7 @@ export class AIStateEngage {
             }
           }
         }
-      } else if (isCoverFlanked(combatant, targetPos)) {
+      } else if (this.measureEngageMethod('engage.cover.isFlanked', () => isCoverFlanked(combatant, targetPos))) {
         // Fallback to old method if no cover system
         Logger.warn('combat-ai', ` ${combatant.faction} unit's cover is flanked, repositioning`)
         combatant.inCover = false
@@ -213,6 +287,7 @@ export class AIStateEngage {
     } else {
       // Normal engagement behavior when not in cover
       if (targetDistance < CLOSE_RANGE_DISTANCE) {
+        this.telemetry.closeRangeFullAutoActivations++
         combatant.isFullAuto = true
         combatant.skillProfile.burstLength = CLOSE_RANGE_BURST
         combatant.skillProfile.burstPauseMs = CLOSE_RANGE_PAUSE_MS
@@ -240,7 +315,9 @@ export class AIStateEngage {
         getFactionCombatTuning(combatant.faction).useUtilityAI
       ) {
         const ctx = this.buildUtilityContext(combatant, targetPos)
-        const pick = this.utilityScorer.pick(ctx)
+        const pick = this.measureEngageMethod('engage.utility.pick', () =>
+          this.utilityScorer!.pick(ctx)
+        )
         const intent = pick.intent
         if (intent && intent.kind === 'seekCoverInBearing') {
           const now = Date.now()
@@ -289,19 +366,25 @@ export class AIStateEngage {
       }
 
       // Check if should seek cover - use improved cover system if available
-      if (targetDistance >= CLOSE_RANGE_DISTANCE && shouldSeekCover(combatant)) {
+      const shouldRunCoverSearch = targetDistance >= CLOSE_RANGE_DISTANCE &&
+        this.measureEngageMethod('engage.cover.shouldSeekCover', () => shouldSeekCover(combatant))
+      if (shouldRunCoverSearch) {
         let coverPosition: THREE.Vector3 | null = null
 
         if (this.coverSystem) {
           // Use advanced cover system with occupation tracking
-          const coverSpot = this.coverSystem.findBestCover(combatant, targetPos, allCombatants)
+          const coverSpot = this.measureEngageMethod('engage.cover.findBestCover', () =>
+            this.coverSystem!.findBestCover(combatant, targetPos, allCombatants)
+          )
           if (coverSpot) {
             coverPosition = coverSpot.position.clone()
             this.coverSystem.claimCover(combatant, coverPosition)
           }
         } else {
           // Fallback to basic cover finding
-          coverPosition = findNearestCover(combatant, targetPos)
+          coverPosition = this.measureEngageMethod('engage.cover.findNearestCover', () =>
+            findNearestCover(combatant, targetPos)
+          )
         }
 
         if (coverPosition) {
@@ -314,8 +397,12 @@ export class AIStateEngage {
         }
       }
 
-      const nearbyEnemyCount = countNearbyEnemies(combatant, NEARBY_ENEMY_RADIUS, playerPosition, allCombatants, spatialGrid)
+      const nearbyEnemyCount = this.measureEngageMethod('engage.nearbyEnemyCount', () =>
+        countNearbyEnemies(combatant, NEARBY_ENEMY_RADIUS, playerPosition, allCombatants, spatialGrid)
+      )
+      this.recordNearbyEnemyCount(nearbyEnemyCount)
       if (nearbyEnemyCount > NEARBY_ENEMY_BURST_THRESHOLD) {
+        this.telemetry.nearbyEnemyBurstTriggers++
         combatant.isFullAuto = true
         combatant.skillProfile.burstLength = NEARBY_ENEMY_BURST
       }
@@ -323,9 +410,11 @@ export class AIStateEngage {
       // Check if squad should initiate flanking maneuver (uses new flanking system)
       if (combatant.squadId && this.flankingSystem) {
         const squad = this.squads.get(combatant.squadId)
-        if (squad && !this.flankingSystem.hasActiveFlank(squad.id)) {
-          if (this.flankingSystem.shouldInitiateFlank(squad, allCombatants, targetPos)) {
-            const operation = this.flankingSystem.initiateFlank(squad, allCombatants, targetPos)
+        if (squad && !this.measureEngageMethod('engage.flank.hasActive', () => this.flankingSystem!.hasActiveFlank(squad.id))) {
+          if (this.measureEngageMethod('engage.flank.shouldInitiate', () => this.flankingSystem!.shouldInitiateFlank(squad, allCombatants, targetPos))) {
+            const operation = this.measureEngageMethod('engage.flank.initiate', () =>
+              this.flankingSystem!.initiateFlank(squad, allCombatants, targetPos)
+            )
             if (operation) {
               // Operation started - combatant behavior will be controlled by flanking system
               return
@@ -335,8 +424,12 @@ export class AIStateEngage {
       }
 
       // Fallback: Check if squad should initiate basic suppression
-      if (this.shouldInitiateSquadSuppression(combatant, targetPos, allCombatants, countNearbyEnemies, playerPosition, spatialGrid)) {
-        this.initiateSquadSuppression(combatant, targetPos, allCombatants, findNearestCover)
+      if (this.measureEngageMethod('engage.suppression.shouldInitiate', () =>
+        this.shouldInitiateSquadSuppression(combatant, targetPos, allCombatants, countNearbyEnemies, playerPosition, spatialGrid)
+      )) {
+        this.measureEngageMethod('engage.suppression.initiate', () => {
+          this.initiateSquadSuppression(combatant, targetPos, allCombatants, findNearestCover)
+        })
         return
       }
 
@@ -353,7 +446,10 @@ export class AIStateEngage {
       }
     }
 
-    if (!canSeeTarget(combatant, target, playerPosition)) {
+    if (!this.measureEngageMethod('engage.suppression.lineOfSight', () =>
+      this.hasSuppressionLineOfSight(combatant, target, playerPosition, canSeeTarget)
+    )) {
+      this.telemetry.suppressionTransitions++
       combatant.lastKnownTargetPos = target.position.clone()
       combatant.state = CombatantState.SUPPRESSING
       combatant.isFullAuto = true
@@ -460,6 +556,62 @@ export class AIStateEngage {
     return ctx as UtilityContext
   }
 
+  private recordTargetDistance(distance: number): void {
+    if (!Number.isFinite(distance)) return
+    if (distance < 5) {
+      this.telemetry.targetDistanceBuckets.lt5m++
+    } else if (distance < 10) {
+      this.telemetry.targetDistanceBuckets.m5to10++
+    } else if (distance < CLOSE_RANGE_DISTANCE) {
+      this.telemetry.targetDistanceBuckets.m10to15++
+    } else if (distance < 30) {
+      this.telemetry.targetDistanceBuckets.m15to30++
+    } else {
+      this.telemetry.targetDistanceBuckets.gte30++
+    }
+  }
+
+  private recordNearbyEnemyCount(count: number): void {
+    if (!Number.isFinite(count)) return
+    this.telemetry.nearbyEnemyCountSamples++
+    this.telemetry.nearbyEnemyCountTotal += count
+    this.telemetry.nearbyEnemyCountMax = Math.max(this.telemetry.nearbyEnemyCountMax, count)
+  }
+
+  private measureEngageMethod<T>(name: string, fn: () => T): T {
+    return this.methodTimer ? this.methodTimer(name, fn) : fn()
+  }
+
+  private hasSuppressionLineOfSight(
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3,
+    canSeeTarget: (
+      combatant: Combatant,
+      target: ITargetable,
+      playerPosition: THREE.Vector3
+    ) => boolean
+  ): boolean {
+    const now = Date.now()
+    const sample = this.suppressionVisibilityByCombatant.get(combatant)
+    if (
+      sample &&
+      sample.targetId === target.id &&
+      sample.visible &&
+      now - sample.checkedAtMs < SUPPRESSION_VISIBILITY_RECHECK_MS
+    ) {
+      return true
+    }
+
+    const visible = canSeeTarget(combatant, target, playerPosition)
+    this.suppressionVisibilityByCombatant.set(combatant, {
+      targetId: target.id,
+      checkedAtMs: now,
+      visible,
+    })
+    return visible
+  }
+
   private shouldInitiateSquadSuppression(
     combatant: Combatant,
     targetPos: THREE.Vector3,
@@ -519,62 +671,78 @@ export class AIStateEngage {
       if (!member || member.state === CombatantState.DEAD) return
 
       if (member.squadRole === 'leader' || index === 1) {
-        member.state = CombatantState.SUPPRESSING
-        if (member.suppressionTarget) {
-          member.suppressionTarget.copy(targetPos)
-        } else {
-          member.suppressionTarget = targetPos.clone()
-        }
-        member.suppressionEndTime = now + SUPPRESSION_BASE_DURATION_MS + SeededRandom.random() * SUPPRESSION_JITTER_MS
-        if (member.lastKnownTargetPos) {
-          member.lastKnownTargetPos.copy(targetPos)
-        } else {
-          member.lastKnownTargetPos = targetPos.clone()
-        }
-        member.alertTimer = SUPPRESSION_ALERT_TIMER
-        member.isFullAuto = true
-        member.skillProfile.burstLength = SUPPRESSION_FIRE_BURST
-        member.skillProfile.burstPauseMs = SUPPRESSION_FIRE_PAUSE_MS
+        this.measureEngageMethod('engage.suppression.initiate.assignSuppressor', () => {
+          member.state = CombatantState.SUPPRESSING
+          if (member.suppressionTarget) {
+            member.suppressionTarget.copy(targetPos)
+          } else {
+            member.suppressionTarget = targetPos.clone()
+          }
+          member.suppressionEndTime = now + SUPPRESSION_BASE_DURATION_MS + SeededRandom.random() * SUPPRESSION_JITTER_MS
+          if (member.lastKnownTargetPos) {
+            member.lastKnownTargetPos.copy(targetPos)
+          } else {
+            member.lastKnownTargetPos = targetPos.clone()
+          }
+          member.alertTimer = SUPPRESSION_ALERT_TIMER
+          member.isFullAuto = true
+          member.skillProfile.burstLength = SUPPRESSION_FIRE_BURST
+          member.skillProfile.burstPauseMs = SUPPRESSION_FIRE_PAUSE_MS
+        })
       } else {
         member.state = CombatantState.ADVANCING
 
-        const flankLeft = index % 2 === 0
-        const flankingAngle = this.calculateFlankingAngle(member.position, targetPos, flankLeft)
-        const flankingDistance = FLANK_BASE_DISTANCE + Math.random() * FLANK_DISTANCE_JITTER
+        const flankDestination = this.measureEngageMethod('engage.suppression.initiate.computeFlankDestination', () => {
+          const flankLeft = index % 2 === 0
+          const flankingAngle = this.calculateFlankingAngle(member.position, targetPos, flankLeft)
+          const flankingDistance = FLANK_BASE_DISTANCE + Math.random() * FLANK_DISTANCE_JITTER
 
-        const flankingPos = _flankingPos.set(
-          targetPos.x + Math.cos(flankingAngle) * flankingDistance,
-          member.position.y,
-          targetPos.z + Math.sin(flankingAngle) * flankingDistance
-        )
+          return _flankingPos.set(
+            targetPos.x + Math.cos(flankingAngle) * flankingDistance,
+            member.position.y,
+            targetPos.z + Math.sin(flankingAngle) * flankingDistance
+          )
+        })
 
         const existingDestination = member.destinationPoint
         const hasReusableFlankDestination = !!existingDestination
-          && existingDestination.distanceToSquared(flankingPos) <= this.FLANK_DESTINATION_REUSE_RADIUS_SQ
+          && existingDestination.distanceToSquared(flankDestination) <= this.FLANK_DESTINATION_REUSE_RADIUS_SQ
+        this.telemetry.suppressionFlankDestinationComputations++
 
         let coverNearFlank: THREE.Vector3 | null = null
-        if (!hasReusableFlankDestination && flankCoverSearches < this.MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION) {
-          flankCoverProbe.position.copy(flankingPos)
-          coverNearFlank = findNearestCover(flankCoverProbe, targetPos)
-          flankCoverSearches++
+        if (hasReusableFlankDestination) {
+          this.telemetry.suppressionFlankCoverSearchReuseSkips++
+        } else if (flankCoverSearches >= this.MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION) {
+          this.telemetry.suppressionFlankCoverSearchCapSkips++
+        } else {
+          coverNearFlank = this.measureEngageMethod('engage.suppression.initiate.coverSearch', () => {
+            flankCoverProbe.position.copy(flankDestination)
+            flankCoverSearches++
+            this.telemetry.suppressionFlankCoverSearches++
+            return findNearestCover(flankCoverProbe, targetPos)
+          })
         }
 
-        if (coverNearFlank) {
-          if (existingDestination) {
-            existingDestination.copy(coverNearFlank)
-          } else {
-            member.destinationPoint = coverNearFlank
+        this.measureEngageMethod('engage.suppression.initiate.assignFlanker', () => {
+          if (coverNearFlank) {
+            if (existingDestination) {
+              existingDestination.copy(coverNearFlank)
+            } else {
+              member.destinationPoint = coverNearFlank
+            }
+          } else if (!hasReusableFlankDestination && existingDestination) {
+            existingDestination.copy(flankDestination)
+          } else if (!existingDestination) {
+            member.destinationPoint = flankDestination.clone()
           }
-        } else if (!hasReusableFlankDestination && existingDestination) {
-          existingDestination.copy(flankingPos)
-        } else if (!existingDestination) {
-          member.destinationPoint = flankingPos.clone()
-        }
-        member.isFlankingMove = true
+          member.isFlankingMove = true
+        })
       }
     })
 
-    Logger.info('combat-ai', ` Squad ${combatant.squadId} initiating coordinated suppression & flank on target at (${Math.floor(targetPos.x)}, ${Math.floor(targetPos.z)})`)
+    this.measureEngageMethod('engage.suppression.initiate.log', () => {
+      Logger.info('combat-ai', ` Squad ${combatant.squadId} initiating coordinated suppression & flank on target at (${Math.floor(targetPos.x)}, ${Math.floor(targetPos.z)})`)
+    })
   }
 
   private calculateFlankingAngle(

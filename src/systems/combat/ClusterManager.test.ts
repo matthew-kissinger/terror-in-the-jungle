@@ -528,6 +528,8 @@ describe('ClusterManager', () => {
       allCombatants.set('e2', enemy2)
 
       clusterManager.reset()
+      let mockTime = 10_000
+      const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockTime)
 
       // Assign multiple times to establish a pattern
       // With random component up to 10 points and 20 point penalty per targeter,
@@ -540,7 +542,9 @@ describe('ClusterManager', () => {
           allCombatants
         )
         if (target) targets.push(target)
+        mockTime += 501
       }
+      dateSpy.mockRestore()
 
       // Both targets should be selected at least once (distribution working)
       const e1Count = targets.filter(t => t.id === 'e1').length
@@ -599,6 +603,74 @@ describe('ClusterManager', () => {
       // Second combatant should also get enemy (only option), but count should be updated
       const target2 = clusterManager.assignDistributedTarget(combatant2, [enemy], allCombatants)
       expect(target2).toBe(enemy)
+    })
+
+    it('keeps a prior distributed target inside the stickiness window', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
+      const enemy1 = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(20, 0, 0))
+      const enemy2 = createMockCombatant('e2', Faction.NVA, new THREE.Vector3(40, 0, 0))
+      allCombatants.set('c1', combatant)
+      allCombatants.set('e1', enemy1)
+      allCombatants.set('e2', enemy2)
+      clusterManager.reset()
+
+      let mockTime = 30_000
+      const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockTime)
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+
+      const first = clusterManager.assignDistributedTarget(combatant, [enemy1, enemy2], allCombatants)
+      enemy1.position.set(100, 0, 0)
+      mockTime += 250
+      const second = clusterManager.assignDistributedTarget(combatant, [enemy1, enemy2], allCombatants)
+
+      randomSpy.mockRestore()
+      dateSpy.mockRestore()
+
+      expect(first).toBe(enemy1)
+      expect(second).toBe(enemy1)
+      const telemetry = clusterManager.getTargetDistributionTelemetry()
+      expect(telemetry.distributionCalls).toBe(2)
+      expect(telemetry.multiTargetCalls).toBe(2)
+      expect(telemetry.assignments).toBe(2)
+      expect(telemetry.assignmentChurn).toBe(0)
+      expect(telemetry.targeterCountSamples).toBe(2)
+    })
+
+    it('records distribution telemetry and reassignment churn', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
+      const enemy1 = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(20, 0, 0))
+      const enemy2 = createMockCombatant('e2', Faction.NVA, new THREE.Vector3(40, 0, 0))
+      allCombatants.set('c1', combatant)
+      allCombatants.set('e1', enemy1)
+      allCombatants.set('e2', enemy2)
+      clusterManager.reset()
+
+      let mockTime = 40_000
+      const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockTime)
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+
+      const first = clusterManager.assignDistributedTarget(combatant, [enemy1, enemy2], allCombatants)
+      if (first!.id === 'e1') {
+        enemy1.position.set(100, 0, 0)
+      } else {
+        enemy2.position.set(100, 0, 0)
+      }
+      mockTime += 501
+      const second = clusterManager.assignDistributedTarget(combatant, [enemy1, enemy2], allCombatants)
+
+      randomSpy.mockRestore()
+      dateSpy.mockRestore()
+
+      expect(first).toBeDefined()
+      expect(second).toBeDefined()
+      expect(first!.id).not.toBe(second!.id)
+      const telemetry = clusterManager.getTargetDistributionTelemetry()
+      expect(telemetry.distributionCalls).toBe(2)
+      expect(telemetry.multiTargetCalls).toBe(2)
+      expect(telemetry.potentialTargetsTotal).toBe(4)
+      expect(telemetry.assignments).toBe(2)
+      expect(telemetry.assignmentChurn).toBe(1)
+      expect(telemetry.targeterCountSamples).toBe(4)
     })
   })
 

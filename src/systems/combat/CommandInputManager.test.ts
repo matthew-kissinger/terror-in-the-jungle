@@ -204,6 +204,54 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
+  it('arms attack-here as a placed squad command', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.setGameModeManager({
+      getCurrentConfig: () => ({ minimapScale: 400 })
+    } as any);
+    manager.setPlayerController(createPlayerControllerStub(new THREE.Vector3(25, 3, 75)) as any);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+
+    manager.toggleCommandMode();
+    manager.update(0.1);
+    document.body.querySelector<HTMLButtonElement>('[data-action="slot-6"]')?.click();
+
+    const canvas = document.body.querySelector<HTMLCanvasElement>('.command-tactical-map__canvas');
+    Object.defineProperty(canvas!, 'getBoundingClientRect', {
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: 320,
+        height: 320,
+        right: 320,
+        bottom: 320,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }),
+      configurable: true
+    });
+    canvas?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 160, clientY: 160, button: 0 }));
+
+    expect(controller.issueCommandAtPosition).toHaveBeenCalledWith(
+      SquadCommand.ATTACK_HERE,
+      expect.objectContaining({ x: 25, y: 3, z: 75 })
+    );
+
+    manager.dispose();
+    layout.dispose();
+  });
+
   it('supports gamepad confirmation for armed placement orders in the overlay', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
@@ -320,6 +368,62 @@ describe('CommandInputManager', () => {
     manager.dispose();
     layout.dispose();
   });
+
+  it('executes stand down immediately and clears the prior command point', () => {
+    const controller = createSquadControllerStub();
+    controller.emit({
+      ...controller.getCommandState(),
+      currentCommand: SquadCommand.HOLD_POSITION,
+      commandPosition: new THREE.Vector3(42, 0, -20)
+    });
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+
+    manager.toggleCommandMode();
+    document.body.querySelector<HTMLButtonElement>('[data-action="slot-5"]')?.click();
+
+    expect(controller.issueQuickCommand).toHaveBeenCalledWith(5);
+    expect(controller.getCommandState().currentCommand).toBe(SquadCommand.FREE_ROAM);
+    expect(controller.getCommandState().commandPosition).toBeUndefined();
+    expect(document.body.querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('keeps cancel as modal close instead of issuing stand down implicitly', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+
+    manager.toggleCommandMode();
+    expect(manager.handleCancel()).toBe(true);
+
+    expect(controller.issueQuickCommand).not.toHaveBeenCalled();
+    expect(controller.getCommandState().currentCommand).toBe(SquadCommand.NONE);
+    expect(document.body.querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
+
+    manager.dispose();
+    layout.dispose();
+  });
 });
 
 function createSquadControllerStub() {
@@ -357,7 +461,11 @@ function createSquadControllerStub() {
     issueQuickCommand: vi.fn((slot: number) => {
       const option = getQuickCommandOption(slot);
       if (!option) return;
-      state = { ...state, currentCommand: option.command };
+      state = {
+        ...state,
+        currentCommand: option.command,
+        commandPosition: option.command === SquadCommand.FREE_ROAM ? undefined : state.commandPosition
+      };
       emitState(listeners, state);
     }),
     issueCommandAtPosition: vi.fn((command: SquadCommand, position: THREE.Vector3) => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { AIStateEngage } from './AIStateEngage';
 import { Combatant, CombatantState, Faction, Squad } from '../types';
@@ -179,6 +179,9 @@ describe('AIStateEngage', () => {
       invokeHandleEngaging(combatant);
 
       expect(combatant.isFullAuto).toBe(true);
+      const telemetry = aiStateEngage.getCloseEngagementTelemetry();
+      expect(telemetry.closeRangeFullAutoActivations).toBe(1);
+      expect(telemetry.targetDistanceBuckets.m10to15).toBe(1);
     });
 
     it('stays on controlled bursts at medium range', () => {
@@ -245,6 +248,32 @@ describe('AIStateEngage', () => {
       invokeHandleEngaging(combatant);
 
       expect(combatant.isFullAuto).toBe(true);
+      const telemetry = aiStateEngage.getCloseEngagementTelemetry();
+      expect(telemetry.nearbyEnemyBurstTriggers).toBe(1);
+      expect(telemetry.nearbyEnemyCountSamples).toBe(1);
+      expect(telemetry.nearbyEnemyCountTotal).toBe(4);
+      expect(telemetry.nearbyEnemyCountMax).toBe(4);
+    });
+
+    it('emits diagnostic subphase timings without changing engagement behavior', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
+      const timedMethods: string[] = [];
+      combatant.target = target;
+      aiStateEngage.setMethodTimer((name, fn) => {
+        timedMethods.push(name);
+        return fn();
+      });
+
+      invokeHandleEngaging(combatant);
+
+      expect(combatant.state).toBe(CombatantState.ENGAGING);
+      expect(timedMethods).toEqual(expect.arrayContaining([
+        'engage.cover.shouldSeekCover',
+        'engage.nearbyEnemyCount',
+        'engage.suppression.shouldInitiate',
+        'engage.suppression.lineOfSight',
+      ]));
     });
 
     it('transitions to SUPPRESSING when the target is not visible', () => {
@@ -257,6 +286,55 @@ describe('AIStateEngage', () => {
 
       expect(combatant.state).toBe(CombatantState.SUPPRESSING);
       expect(combatant.lastKnownTargetPos).toBeDefined();
+      expect(aiStateEngage.getCloseEngagementTelemetry().suppressionTransitions).toBe(1);
+    });
+
+    describe('suppression visibility cadence', () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('reuses a recent visible suppression LOS result inside the cadence window', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(10_000);
+
+        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
+        combatant.target = target;
+
+        invokeHandleEngaging(combatant);
+        expect(canSeeTarget).toHaveBeenCalledTimes(1);
+
+        canSeeTarget.mockClear();
+        canSeeTarget.mockReturnValue(false);
+        vi.setSystemTime(10_100);
+
+        invokeHandleEngaging(combatant);
+
+        expect(canSeeTarget).not.toHaveBeenCalled();
+        expect(combatant.state).toBe(CombatantState.ENGAGING);
+        expect(aiStateEngage.getCloseEngagementTelemetry().suppressionTransitions).toBe(0);
+      });
+
+      it('rechecks suppression LOS after the cadence window expires', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(20_000);
+
+        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
+        combatant.target = target;
+
+        invokeHandleEngaging(combatant);
+        canSeeTarget.mockClear();
+        canSeeTarget.mockReturnValue(false);
+        vi.setSystemTime(20_251);
+
+        invokeHandleEngaging(combatant);
+
+        expect(canSeeTarget).toHaveBeenCalledTimes(1);
+        expect(combatant.state).toBe(CombatantState.SUPPRESSING);
+        expect(aiStateEngage.getCloseEngagementTelemetry().suppressionTransitions).toBe(1);
+      });
     });
 
     it('transitions to SEEKING_COVER and records a cover position when cover is needed', () => {
@@ -557,6 +635,41 @@ describe('AIStateEngage', () => {
       expect(flanker.state).toBe(CombatantState.ADVANCING);
     });
 
+    it('emits suppression initiation subphase timings without changing squad orders', () => {
+      const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 5, 0));
+      const suppressor = createMockCombatant('c2', Faction.US, new THREE.Vector3(5, 9, 0));
+      const flanker = createMockCombatant('c3', Faction.US, new THREE.Vector3(-5, 14, 0));
+      const targetPos = new THREE.Vector3(50, 0, 0);
+      const timedMethods: string[] = [];
+      leader.squadId = 'squad-1';
+      leader.squadRole = 'leader';
+
+      allCombatants.set('c1', leader);
+      allCombatants.set('c2', suppressor);
+      allCombatants.set('c3', flanker);
+
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2', 'c3'] } as Squad);
+      aiStateEngage.setSquads(squads);
+      aiStateEngage.setMethodTimer((name, fn) => {
+        timedMethods.push(name);
+        return fn();
+      });
+      findNearestCover.mockReturnValue(null);
+
+      aiStateEngage.initiateSquadSuppression(leader, targetPos, allCombatants, findNearestCover);
+
+      expect(leader.state).toBe(CombatantState.SUPPRESSING);
+      expect(suppressor.state).toBe(CombatantState.SUPPRESSING);
+      expect(flanker.state).toBe(CombatantState.ADVANCING);
+      expect(timedMethods).toEqual(expect.arrayContaining([
+        'engage.suppression.initiate.assignSuppressor',
+        'engage.suppression.initiate.computeFlankDestination',
+        'engage.suppression.initiate.coverSearch',
+        'engage.suppression.initiate.assignFlanker',
+        'engage.suppression.initiate.log',
+      ]));
+    });
+
     it('reuses a nearby existing flank destination instead of re-searching cover', () => {
       const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 2, 0));
       const suppressor = createMockCombatant('c2', Faction.US, new THREE.Vector3(5, 4, 0));
@@ -582,6 +695,12 @@ describe('AIStateEngage', () => {
       expect(findNearestCover).not.toHaveBeenCalled();
       expect(flanker.state).toBe(CombatantState.ADVANCING);
       expect(flanker.destinationPoint!.distanceTo(new THREE.Vector3(50, 7, -20))).toBeLessThan(0.001);
+      expect(aiStateEngage.getCloseEngagementTelemetry()).toMatchObject({
+        suppressionFlankDestinationComputations: 1,
+        suppressionFlankCoverSearches: 0,
+        suppressionFlankCoverSearchReuseSkips: 1,
+        suppressionFlankCoverSearchCapSkips: 0,
+      });
     });
 
     it('caps flank cover searches per suppression initiation for larger squads', () => {
@@ -610,6 +729,12 @@ describe('AIStateEngage', () => {
 
       // Cover search is budget-capped per initiation (currently 2).
       expect(findNearestCover).toHaveBeenCalledTimes(2);
+      expect(aiStateEngage.getCloseEngagementTelemetry()).toMatchObject({
+        suppressionFlankDestinationComputations: 4,
+        suppressionFlankCoverSearches: 2,
+        suppressionFlankCoverSearchReuseSkips: 0,
+        suppressionFlankCoverSearchCapSkips: 2,
+      });
       for (const member of members.slice(2)) {
         expect(member.state).toBe(CombatantState.ADVANCING);
         expect(member.destinationPoint).toBeDefined();

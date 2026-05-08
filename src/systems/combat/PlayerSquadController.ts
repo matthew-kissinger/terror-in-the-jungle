@@ -9,6 +9,7 @@ import {
   SQUAD_QUICK_COMMAND_OPTIONS,
   type SquadQuickCommandOption
 } from './SquadCommandPresentation';
+import { SquadCommandWorldMarker } from './SquadCommandWorldMarker';
 
 export interface SquadCommandState {
   hasSquad: boolean;
@@ -24,16 +25,27 @@ export interface SquadCommandState {
 
 type SquadCommandStateListener = (state: SquadCommandState) => void;
 
+interface PlayerSquadControllerOptions {
+  scene?: THREE.Scene;
+  terrainHeightAt?: (x: number, z: number) => number;
+}
+
 export class PlayerSquadController implements GameSystem {
   private squadManager: SquadManager;
   private playerSquadId?: string;
   private playerPosition = new THREE.Vector3();
   private currentCommand: SquadCommand = SquadCommand.NONE;
   private commandIndicatorElement?: HTMLElement;
+  private readonly commandWorldMarker?: SquadCommandWorldMarker;
   private readonly commandStateListeners = new Set<SquadCommandStateListener>();
 
-  constructor(squadManager: SquadManager) {
+  constructor(squadManager: SquadManager, options: PlayerSquadControllerOptions = {}) {
     this.squadManager = squadManager;
+    if (options.scene) {
+      this.commandWorldMarker = new SquadCommandWorldMarker(options.scene, {
+        terrainHeightAt: options.terrainHeightAt,
+      });
+    }
   }
 
   async init(): Promise<void> {
@@ -42,12 +54,18 @@ export class PlayerSquadController implements GameSystem {
   }
 
   update(_deltaTime: number): void {
+    if (this.commandWorldMarker?.isVisible()) {
+      const state = this.getCommandState();
+      this.commandWorldMarker.setCommand(state.currentCommand, state.commandPosition);
+    }
   }
 
   dispose(): void {
     if (this.commandIndicatorElement && this.commandIndicatorElement.parentNode) {
       this.commandIndicatorElement.parentNode.removeChild(this.commandIndicatorElement);
     }
+    this.commandWorldMarker?.dispose();
+    this.commandStateListeners.clear();
   }
 
   assignPlayerSquad(squadId: string): void {
@@ -108,7 +126,9 @@ export class PlayerSquadController implements GameSystem {
     if (!squad) return;
 
     squad.currentCommand = command;
-    squad.commandPosition = explicitPosition?.clone() ?? this.playerPosition.clone();
+    squad.commandPosition = command === SquadCommand.FREE_ROAM || command === SquadCommand.NONE
+      ? undefined
+      : explicitPosition?.clone() ?? this.playerPosition.clone();
     this.currentCommand = command;
     const commandLabel = getSquadCommandLabel(command, 'full');
     Logger.info('squad', ` Squad Command Issued: ${commandLabel}`);
@@ -245,6 +265,7 @@ export class PlayerSquadController implements GameSystem {
 
   private emitCommandState(): void {
     const state = this.getCommandState();
+    this.commandWorldMarker?.setCommand(state.currentCommand, state.commandPosition);
     for (const listener of this.commandStateListeners) {
       listener(state);
     }

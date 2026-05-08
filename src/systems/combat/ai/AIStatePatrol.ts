@@ -8,6 +8,13 @@ import { clusterManager } from '../ClusterManager'
 const _toTarget = new THREE.Vector3()
 const _offset = new THREE.Vector3()
 const _awayDir = new THREE.Vector3()
+const PATROL_VISIBILITY_RECHECK_MS = 250
+
+interface PatrolVisibilitySample {
+  targetId: string
+  checkedAtMs: number
+  visible: boolean
+}
 
 /**
  * Handles patrolling and defending AI states
@@ -16,6 +23,7 @@ export class AIStatePatrol {
   private zoneManager?: ZoneManager;
   private squads: Map<string, Squad> = new Map();
   private zoneDefenders: Map<string, Set<string>> = new Map();
+  private patrolVisibilityByCombatant = new WeakMap<Combatant, PatrolVisibilitySample>();
 
   setSquads(squads: Map<string, Squad>): void {
     this.squads = squads;
@@ -84,7 +92,7 @@ export class AIStatePatrol {
       // regardless of LOS checks - they would hear footsteps, see peripheral movement, etc.
       const veryCloseRange = distance < 15;
 
-      if (veryCloseRange || canSeeTarget(combatant, enemy, playerPosition)) {
+      if (veryCloseRange || this.hasPatrolLineOfSight(combatant, enemy, playerPosition, canSeeTarget)) {
         // At close range, always engage. At longer range, use probability
         if (veryCloseRange || shouldEngage(combatant, distance)) {
           combatant.state = CombatantState.ALERT;
@@ -167,6 +175,14 @@ export class AIStatePatrol {
         }
         break;
 
+      case SquadCommand.ATTACK_HERE:
+        if (squad.commandPosition && combatant.position.distanceTo(squad.commandPosition) > 5) {
+          combatant.destinationPoint = squad.commandPosition.clone();
+        } else {
+          combatant.destinationPoint = undefined;
+        }
+        break;
+
       case SquadCommand.RETREAT:
         if (squad.commandPosition) {
           const retreatDistance = 50;
@@ -189,6 +205,35 @@ export class AIStatePatrol {
       default:
         break;
     }
+  }
+
+  private hasPatrolLineOfSight(
+    combatant: Combatant,
+    target: ITargetable,
+    playerPosition: THREE.Vector3,
+    canSeeTarget: (
+      combatant: Combatant,
+      target: ITargetable,
+      playerPosition: THREE.Vector3
+    ) => boolean
+  ): boolean {
+    const now = Date.now();
+    const sample = this.patrolVisibilityByCombatant.get(combatant);
+    if (
+      sample &&
+      sample.targetId === target.id &&
+      now - sample.checkedAtMs < PATROL_VISIBILITY_RECHECK_MS
+    ) {
+      return sample.visible;
+    }
+
+    const visible = canSeeTarget(combatant, target, playerPosition);
+    this.patrolVisibilityByCombatant.set(combatant, {
+      targetId: target.id,
+      checkedAtMs: now,
+      visible,
+    });
+    return visible;
   }
 
   private shouldAssignZoneDefense(combatant: Combatant): boolean {

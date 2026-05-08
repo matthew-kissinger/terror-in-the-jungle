@@ -188,6 +188,71 @@ describe('AICoverFinding', () => {
       }
     });
 
+    it('does not raycast lower-scored terrain candidates after the best-scored candidate blocks', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const threatPos = new THREE.Vector3(30, 0, 0);
+
+      mockHeightQueryCache.getHeightAt = vi.fn(() => 1.2);
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+        hit: true,
+        distance: maxDistance - 2,
+      }));
+
+      const cover = coverFinding.findNearestCover(combatant, threatPos);
+
+      expect(cover).not.toBeNull();
+      if (cover) {
+        expect(Math.hypot(cover.x - combatant.position.x, cover.z - combatant.position.z)).toBeCloseTo(10, 2);
+      }
+      expect(mockTerrainSystem.raycastTerrain).toHaveBeenCalledTimes(1);
+    });
+
+    it('emits cover-search subphase timings without changing terrain cover selection', () => {
+      const labels: string[] = [];
+      coverFinding.setMethodTimer((name, fn) => {
+        labels.push(name);
+        return fn();
+      });
+
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const threatPos = new THREE.Vector3(30, 0, 0);
+
+      mockHeightQueryCache.getHeightAt = vi.fn((x: number) => {
+        if (x >= 9 && x <= 11) return 1.2;
+        return 0;
+      });
+
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+        hit: true,
+        distance: maxDistance - 2,
+      }));
+
+      const cover = coverFinding.findNearestCover(combatant, threatPos);
+
+      expect(cover).not.toBeNull();
+      if (cover) {
+        expect(cover.x).toBeCloseTo(10, 1);
+      }
+      expect(labels).toEqual(expect.arrayContaining([
+        'cover.findNearestCover.budget',
+        'cover.findNearestCover.sandbagScan',
+        'cover.findNearestCover.vegetationScan',
+        'cover.findNearestCover.vegetationScore',
+        'cover.findNearestCover.terrainScan',
+        'cover.findNearestCover.terrainScan.heightQuery',
+        'cover.findNearestCover.terrainScan.coverTest',
+        'cover.findNearestCover.terrainScan.coverTest.heightGate',
+        'cover.findNearestCover.terrainScan.coverTest.scoreGate',
+        'cover.findNearestCover.terrainScan.coverTest.distance',
+        'cover.findNearestCover.terrainScan.coverTest.eyeSetup',
+        'cover.findNearestCover.terrainScan.coverTest.direction',
+        'cover.findNearestCover.terrainScan.coverTest.raycastTerrain',
+        'cover.findNearestCover.terrainScan.coverTest.hitResult',
+        'cover.findNearestCover.terrainScan.score',
+        'cover.findNearestCover.cacheStore',
+      ]));
+    });
+
     it('returns null when terrain height difference is insufficient', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const threatPos = new THREE.Vector3(30, 0, 0);
@@ -328,6 +393,29 @@ describe('AICoverFinding', () => {
       const cover = coverFinding.findNearestCover(combatant, threatPos);
 
       expect(cover).toBeNull();
+      expect(mockTerrainSystem.raycastTerrain).not.toHaveBeenCalled();
+    });
+
+    it('does not raycast terrain candidates that cannot beat an existing cover score', () => {
+      const labels: string[] = [];
+      coverFinding.setMethodTimer((name, fn) => {
+        labels.push(name);
+        return fn();
+      });
+
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const threatPos = new THREE.Vector3(10, 0, 0);
+      const sandbag = makeSandbagBounds(new THREE.Vector3(5, 0, 0), new THREE.Vector3(2, 4, 2));
+      (mockSandbagSystem.getSandbagBounds as any).mockReturnValue([sandbag]);
+      mockHeightQueryCache.getHeightAt = vi.fn(() => 1.2);
+
+      const cover = coverFinding.findNearestCover(combatant, threatPos);
+
+      expect(cover).not.toBeNull();
+      if (cover) {
+        expect(cover.x).toBeLessThan(5);
+      }
+      expect(labels).toContain('cover.findNearestCover.terrainScan.coverTest.scoreGate');
       expect(mockTerrainSystem.raycastTerrain).not.toHaveBeenCalled();
     });
 

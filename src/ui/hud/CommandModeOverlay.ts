@@ -163,7 +163,7 @@ export class CommandModeOverlay implements LayoutComponent {
 
     const note = document.createElement('span');
     note.className = 'command-mode-overlay__note';
-    note.textContent = 'Follow and Auto execute immediately. Hold, Patrol, and Retreat place a ground point.';
+    note.textContent = 'Follow and Stand Down execute immediately. Hold, Patrol, Fall Back, and Attack place a ground point.';
 
     footer.appendChild(this.hintValue);
     footer.appendChild(note);
@@ -380,7 +380,7 @@ export class CommandModeOverlay implements LayoutComponent {
       case 'touch':
         return 'TAP / HOLD';
       case 'gamepad':
-        return slot <= 4 ? `D-${['UP', 'R', 'DN', 'L'][slot - 1]}` : 'AUTO';
+        return slot <= 4 ? `D-${['UP', 'R', 'DN', 'L'][slot - 1]}` : slot === 5 ? 'STAND' : 'ATTK';
       default:
         return `SHIFT+${slot}`;
     }
@@ -389,11 +389,11 @@ export class CommandModeOverlay implements LayoutComponent {
   private getFooterHint(): string {
     switch (this.inputMode) {
       case 'touch':
-        return 'Quick tap or hold a command. For Hold/Patrol/Retreat, then tap the map. Follow / Auto fire immediately.';
+        return 'Quick tap or hold a command. For Hold/Patrol/Fall Back/Attack, then tap the map. Follow / Stand Down execute immediately.';
       case 'gamepad':
         return 'Use D-pad to arm orders, move the cursor with the left stick, A to confirm, and X to select a squad.';
       default:
-        return 'Choose Hold, Patrol, or Retreat, then click the map. Follow and Auto fire immediately.';
+        return 'Choose Hold, Patrol, Fall Back, or Attack, then click the map. Follow and Stand Down execute immediately.';
     }
   }
 

@@ -31,6 +31,48 @@ const MAX_VEG_CANDIDATES = 4;
 const _vegBuffer: THREE.Vector3[] = [];
 for (let i = 0; i < MAX_VEG_CANDIDATES; i++) _vegBuffer.push(new THREE.Vector3());
 
+interface TerrainCoverCandidate {
+  position: THREE.Vector3;
+  score: number;
+  sourceIndex: number;
+}
+
+const TERRAIN_COVER_HEIGHT_THRESHOLD = 1.0;
+const TERRAIN_COVER_SEARCH_SAMPLES = 8;
+const TERRAIN_COVER_RADII = [10, 20, 30] as const;
+const MAX_TERRAIN_COVER_CANDIDATES = TERRAIN_COVER_SEARCH_SAMPLES * TERRAIN_COVER_RADII.length;
+const _terrainCoverCandidates: TerrainCoverCandidate[] = [];
+for (let i = 0; i < MAX_TERRAIN_COVER_CANDIDATES; i++) {
+  _terrainCoverCandidates.push({
+    position: new THREE.Vector3(),
+    score: -Infinity,
+    sourceIndex: i,
+  });
+}
+
+type CoverMethodTimer = <T>(name: string, fn: () => T) => T;
+
+function sortTerrainCoverCandidates(count: number): void {
+  for (let i = 1; i < count; i++) {
+    const current = _terrainCoverCandidates[i];
+    let j = i - 1;
+    while (
+      j >= 0 &&
+      (
+        _terrainCoverCandidates[j].score < current.score ||
+        (
+          _terrainCoverCandidates[j].score === current.score &&
+          _terrainCoverCandidates[j].sourceIndex > current.sourceIndex
+        )
+      )
+    ) {
+      _terrainCoverCandidates[j + 1] = _terrainCoverCandidates[j];
+      j--;
+    }
+    _terrainCoverCandidates[j + 1] = current;
+  }
+}
+
 /**
  * Handles cover finding and cover viability checks
  */
@@ -40,6 +82,7 @@ export class AICoverFinding {
   private readonly COVER_SEARCH_CACHE_GRID_METERS = 6;
   private readonly MAX_COVER_SEARCH_CACHE_ENTRIES = 256;
   private coverSearchCache: Map<string, THREE.Vector3 | null> = new Map();
+  private methodTimer: CoverMethodTimer | null = null;
 
   beginFrame(): void {
     this.coverSearchCache.clear();
@@ -51,6 +94,10 @@ export class AICoverFinding {
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
     this.sandbagSystem = sandbagSystem;
+  }
+
+  setMethodTimer(timer: CoverMethodTimer): void {
+    this.methodTimer = timer;
   }
 
   /**
@@ -87,16 +134,17 @@ export class AICoverFinding {
   findNearestCover(combatant: Combatant, threatPosition: THREE.Vector3): THREE.Vector3 | null {
     const MAX_SEARCH_RADIUS = 30;
     const MAX_SEARCH_RADIUS_SQ = MAX_SEARCH_RADIUS * MAX_SEARCH_RADIUS;
-    const SEARCH_SAMPLES = 8;
     const SANDBAG_PREFERRED_DISTANCE = 15;
     const cacheKey = this.getCoverSearchCacheKey(combatant.position, threatPosition);
     const cachedCover = this.coverSearchCache.get(cacheKey);
     if (cachedCover !== undefined) {
-      return cachedCover ? cachedCover.clone() : null;
+      return this.measureCoverMethod('cover.findNearestCover.cacheHit', () =>
+        cachedCover ? cachedCover.clone() : null
+      );
     }
 
     // Gate expensive searches behind per-frame budget
-    if (!tryConsumeCoverSearch()) {
+    if (!this.measureCoverMethod('cover.findNearestCover.budget', () => tryConsumeCoverSearch())) {
       return null;
     }
 
@@ -105,109 +153,152 @@ export class AICoverFinding {
 
     // Check sandbags first
     if (this.sandbagSystem) {
-      const sandbagBounds = this.sandbagSystem.getSandbagBounds();
+      this.measureCoverMethod('cover.findNearestCover.sandbagScan', () => {
+        const sandbagBounds = this.sandbagSystem!.getSandbagBounds();
 
-      for (const bounds of sandbagBounds) {
-        bounds.getCenter(_sandbagCenter);
-        bounds.getSize(_sandbagSize);
+        for (const bounds of sandbagBounds) {
+          bounds.getCenter(_sandbagCenter);
+          bounds.getSize(_sandbagSize);
 
-        const distanceToSandbagSq = combatant.position.distanceToSquared(_sandbagCenter);
+          const distanceToSandbagSq = combatant.position.distanceToSquared(_sandbagCenter);
 
-        if (distanceToSandbagSq > MAX_SEARCH_RADIUS_SQ) continue;
+          if (distanceToSandbagSq > MAX_SEARCH_RADIUS_SQ) continue;
 
-        _threatToSandbag.subVectors(_sandbagCenter, threatPosition).normalize();
-        const coverOffset = Math.max(0.6, Math.min(_sandbagSize.x, _sandbagSize.z) * 0.5 + 0.35);
+          _threatToSandbag.subVectors(_sandbagCenter, threatPosition).normalize();
+          const coverOffset = Math.max(0.6, Math.min(_sandbagSize.x, _sandbagSize.z) * 0.5 + 0.35);
 
-        _coverPos.copy(_sandbagCenter).addScaledVector(_threatToSandbag, coverOffset);
+          _coverPos.copy(_sandbagCenter).addScaledVector(_threatToSandbag, coverOffset);
 
-        if (this.isSandbagCover(_coverPos, _sandbagCenter, bounds, threatPosition)) {
-          const distanceToCombatantSq = combatant.position.distanceToSquared(_coverPos);
-          const distanceToCombatant = Math.sqrt(distanceToCombatantSq);
-          const distanceToSandbag = Math.sqrt(distanceToSandbagSq);
+          if (this.isSandbagCover(_coverPos, _sandbagCenter, bounds, threatPosition)) {
+            const distanceToCombatantSq = combatant.position.distanceToSquared(_coverPos);
+            const distanceToCombatant = Math.sqrt(distanceToCombatantSq);
+            const distanceToSandbag = Math.sqrt(distanceToSandbagSq);
 
-          let score = 1 / (distanceToCombatant + 1);
+            let score = 1 / (distanceToCombatant + 1);
 
-          if (distanceToSandbag < SANDBAG_PREFERRED_DISTANCE) {
-            score *= 2.0;
-          }
+            if (distanceToSandbag < SANDBAG_PREFERRED_DISTANCE) {
+              score *= 2.0;
+            }
 
-          if (distanceToCombatant < distanceToSandbag) {
-            score *= 1.5;
-          }
-
-          if (score > bestCoverScore) {
-            bestCoverScore = score;
-            _bestCover.copy(_coverPos);
-            bestCoverFound = true;
-          }
-        }
-      }
-    }
-
-    // Check vegetation cover (uses pre-allocated buffer)
-    if (this.terrainSystem) {
-      const vegCount = this.findVegetationCoverIntoBuffer(combatant.position, threatPosition, MAX_SEARCH_RADIUS);
-
-      for (let vi = 0; vi < vegCount; vi++) {
-        const vegPos = _vegBuffer[vi];
-        const distanceToCombatantSq = combatant.position.distanceToSquared(vegPos);
-        const distanceToCombatant = Math.sqrt(distanceToCombatantSq);
-        const distanceToThreatSq = vegPos.distanceToSquared(threatPosition);
-
-        _toThreat.subVectors(threatPosition, vegPos).normalize();
-        _toCombatant.subVectors(combatant.position, vegPos).normalize();
-        const flankingAngle = Math.abs(_toThreat.dot(_toCombatant));
-        const flankingScore = 1 - flankingAngle;
-
-        let score = (1 / (distanceToCombatant + 1)) * 1.5;
-        score *= (1 + flankingScore * 0.5);
-
-        if (distanceToCombatantSq < distanceToThreatSq) {
-          score *= 1.3;
-        }
-
-        if (score > bestCoverScore) {
-          bestCoverScore = score;
-          _bestCover.copy(vegPos);
-          bestCoverFound = true;
-        }
-      }
-    }
-
-    // Check terrain cover
-    if (this.terrainSystem) {
-      for (let i = 0; i < SEARCH_SAMPLES; i++) {
-        const angle = (i / SEARCH_SAMPLES) * Math.PI * 2;
-
-        for (const radius of [10, 20, 30]) {
-          _testPos.set(
-            combatant.position.x + Math.cos(angle) * radius,
-            0,
-            combatant.position.z + Math.sin(angle) * radius
-          );
-
-          const terrainHeight = this.terrainSystem.getHeightAt(_testPos.x, _testPos.z);
-          _testPos.y = terrainHeight;
-
-          if (this.isPositionCover(_testPos, combatant.position, threatPosition)) {
-            const distanceToCombatantSq = combatant.position.distanceToSquared(_testPos);
-            const heightDifference = Math.abs(_testPos.y - combatant.position.y);
-
-            const score = (1 / (Math.sqrt(distanceToCombatantSq) + 1)) * heightDifference;
+            if (distanceToCombatant < distanceToSandbag) {
+              score *= 1.5;
+            }
 
             if (score > bestCoverScore) {
               bestCoverScore = score;
-              _bestCover.copy(_testPos);
+              _bestCover.copy(_coverPos);
               bestCoverFound = true;
             }
           }
         }
-      }
+      });
+    }
+
+    // Check vegetation cover (uses pre-allocated buffer)
+    if (this.terrainSystem) {
+      const vegCount = this.measureCoverMethod('cover.findNearestCover.vegetationScan', () =>
+        this.findVegetationCoverIntoBuffer(combatant.position, threatPosition, MAX_SEARCH_RADIUS)
+      );
+
+      this.measureCoverMethod('cover.findNearestCover.vegetationScore', () => {
+        for (let vi = 0; vi < vegCount; vi++) {
+          const vegPos = _vegBuffer[vi];
+          const distanceToCombatantSq = combatant.position.distanceToSquared(vegPos);
+          const distanceToCombatant = Math.sqrt(distanceToCombatantSq);
+          const distanceToThreatSq = vegPos.distanceToSquared(threatPosition);
+
+          _toThreat.subVectors(threatPosition, vegPos).normalize();
+          _toCombatant.subVectors(combatant.position, vegPos).normalize();
+          const flankingAngle = Math.abs(_toThreat.dot(_toCombatant));
+          const flankingScore = 1 - flankingAngle;
+
+          let score = (1 / (distanceToCombatant + 1)) * 1.5;
+          score *= (1 + flankingScore * 0.5);
+
+          if (distanceToCombatantSq < distanceToThreatSq) {
+            score *= 1.3;
+          }
+
+          if (score > bestCoverScore) {
+            bestCoverScore = score;
+            _bestCover.copy(vegPos);
+            bestCoverFound = true;
+          }
+        }
+      });
+    }
+
+    // Check terrain cover
+    if (this.terrainSystem) {
+      this.measureCoverMethod('cover.findNearestCover.terrainScan', () => {
+        let candidateCount = 0;
+        let sourceIndex = 0;
+        for (let i = 0; i < TERRAIN_COVER_SEARCH_SAMPLES; i++) {
+          const angle = (i / TERRAIN_COVER_SEARCH_SAMPLES) * Math.PI * 2;
+
+          for (const radius of TERRAIN_COVER_RADII) {
+            _testPos.set(
+              combatant.position.x + Math.cos(angle) * radius,
+              0,
+              combatant.position.z + Math.sin(angle) * radius
+            );
+
+            const terrainHeight = this.measureCoverMethod('cover.findNearestCover.terrainScan.heightQuery', () =>
+              this.terrainSystem!.getHeightAt(_testPos.x, _testPos.z)
+            );
+            _testPos.y = terrainHeight;
+
+            const heightDifference = this.measureCoverMethod('cover.findNearestCover.terrainScan.coverTest.heightGate', () =>
+              _testPos.y - combatant.position.y
+            );
+            if (heightDifference >= TERRAIN_COVER_HEIGHT_THRESHOLD) {
+              const terrainScore = this.measureCoverMethod('cover.findNearestCover.terrainScan.coverTest.scoreGate', () => {
+                const distanceToCombatantSq = combatant.position.distanceToSquared(_testPos);
+                return (1 / (Math.sqrt(distanceToCombatantSq) + 1)) * heightDifference;
+              });
+
+              if (Number.isFinite(terrainScore) && terrainScore > bestCoverScore) {
+                const candidate = _terrainCoverCandidates[candidateCount];
+                candidate.position.copy(_testPos);
+                candidate.score = terrainScore;
+                candidate.sourceIndex = sourceIndex;
+                candidateCount++;
+              }
+            }
+
+            sourceIndex++;
+          }
+        }
+
+        sortTerrainCoverCandidates(candidateCount);
+
+        for (let i = 0; i < candidateCount; i++) {
+          const candidate = _terrainCoverCandidates[i];
+          if (candidate.score <= bestCoverScore) break;
+
+          const isCover = this.measureCoverMethod('cover.findNearestCover.terrainScan.coverTest', () =>
+            this.isPositionTerrainCover(candidate.position, threatPosition)
+          );
+
+          if (isCover) {
+            const terrainScore = candidate.score;
+            if (terrainScore > bestCoverScore) {
+              this.measureCoverMethod('cover.findNearestCover.terrainScan.score', () => {
+                bestCoverScore = terrainScore;
+                _bestCover.copy(candidate.position);
+                bestCoverFound = true;
+              });
+            }
+          }
+        }
+      });
     }
 
     // Single clone at exit -- caller owns this copy
     const result = bestCoverFound ? _bestCover.clone() : null;
-    this.cacheCoverSearchResult(cacheKey, result);
+    this.measureCoverMethod('cover.findNearestCover.cacheStore', () => {
+      this.cacheCoverSearchResult(cacheKey, result);
+    });
     return result;
   }
 
@@ -316,33 +407,42 @@ export class AICoverFinding {
     this.coverSearchCache.set(cacheKey, coverPosition);
   }
 
-  private isPositionCover(
+  private measureCoverMethod<T>(name: string, fn: () => T): T {
+    return this.methodTimer ? this.methodTimer(name, fn) : fn();
+  }
+
+  private isPositionTerrainCover(
     coverPos: THREE.Vector3,
-    combatantPos: THREE.Vector3,
     threatPos: THREE.Vector3
   ): boolean {
     if (!this.terrainSystem) {
       return false;
     }
 
-    const heightDifference = coverPos.y - combatantPos.y;
-    if (heightDifference < 1.0) {
-      return false;
-    }
+    const distance = this.measureCoverMethod('cover.findNearestCover.terrainScan.coverTest.distance', () =>
+      coverPos.distanceTo(threatPos)
+    );
 
-    const distance = coverPos.distanceTo(threatPos);
+    this.measureCoverMethod('cover.findNearestCover.terrainScan.coverTest.eyeSetup', () => {
+      copyActorEyePosition(_threatEyePos, threatPos);
 
-    copyActorEyePosition(_threatEyePos, threatPos);
+      _coverEyePos.copy(coverPos);
+      // Terrain defilade: combatant crouches behind terrain feature (no sandbag)
+      _coverEyePos.y += 0.9;
+    });
 
-    _coverEyePos.copy(coverPos);
-    // Terrain defilade: combatant crouches behind terrain feature (no sandbag)
-    _coverEyePos.y += 0.9;
+    this.measureCoverMethod('cover.findNearestCover.terrainScan.coverTest.direction', () => {
+      _direction.subVectors(_coverEyePos, _threatEyePos).normalize();
+    });
 
-    _direction.subVectors(_coverEyePos, _threatEyePos).normalize();
+    const terrainHit = this.measureCoverMethod('cover.findNearestCover.terrainScan.coverTest.raycastTerrain', () =>
+      this.terrainSystem!.raycastTerrain(_threatEyePos, _direction, distance)
+    );
 
-    const terrainHit = this.terrainSystem.raycastTerrain(_threatEyePos, _direction, distance);
-
-    return terrainHit.hit && terrainHit.distance! < distance - 1;
+    const isCover = this.measureCoverMethod('cover.findNearestCover.terrainScan.coverTest.hitResult', () =>
+      terrainHit.hit && terrainHit.distance! < distance - 1
+    );
+    return isCover;
   }
 
   private isSandbagCover(

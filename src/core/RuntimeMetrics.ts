@@ -1,5 +1,16 @@
 import { isPerfDiagnosticsEnabled, isDiagEnabled } from './PerfDiagnostics';
 
+export interface RuntimeFrameEvent {
+  frameCount: number;
+  frameMs: number;
+  atMs: number;
+  previousMaxFrameMs: number;
+  newMax: boolean;
+  hitch33: boolean;
+  hitch50: boolean;
+  hitch100: boolean;
+}
+
 interface RuntimeMetricsSnapshot {
   frameCount: number;
   avgFrameMs: number;
@@ -12,14 +23,19 @@ interface RuntimeMetricsSnapshot {
   combatantCount: number;
   firingCount: number;
   engagingCount: number;
+  frameEvents: RuntimeFrameEvent[];
 }
 
 export class RuntimeMetrics {
   private readonly maxSamples = 300;
+  private readonly maxFrameEvents = 64;
   // Ring buffer for O(1) push instead of Array.shift() O(n)
   private readonly ringBuffer = new Float64Array(300);
+  private readonly frameEventRing: Array<RuntimeFrameEvent | undefined> = new Array(this.maxFrameEvents);
   private ringHead = 0;
   private ringCount = 0;
+  private frameEventHead = 0;
+  private frameEventCount = 0;
   // Cache for percentile calculations - invalidated on each push
   private percentileCacheDirty = true;
   private cachedP95 = 0;
@@ -53,6 +69,7 @@ export class RuntimeMetrics {
       const getCombatantCount = () => this.combatantCount;
       const getFiringCount = () => this.firingCount;
       const getEngagingCount = () => this.engagingCount;
+      const getFrameEvents = () => this.getFrameEvents();
       const getSnapshot = () => this.getSnapshot();
       const reset = () => this.reset();
 
@@ -68,6 +85,8 @@ export class RuntimeMetrics {
         get combatantCount() { return getCombatantCount(); },
         get firingCount() { return getFiringCount(); },
         get engagingCount() { return getEngagingCount(); },
+        get frameEvents() { return getFrameEvents(); },
+        getFrameEvents,
         getSnapshot,
         reset
       };
@@ -78,11 +97,20 @@ export class RuntimeMetrics {
     const frameMs = deltaTimeSeconds * 1000;
     if (!Number.isFinite(frameMs)) return;
 
+    const previousMaxFrameMs = this.maxFrameMs;
     this.frameCount += 1;
-    if (frameMs > this.maxFrameMs) this.maxFrameMs = frameMs;
-    if (frameMs > 33.33) this.hitch33Count += 1;
-    if (frameMs > 50) this.hitch50Count += 1;
-    if (frameMs > 100) this.hitch100Count += 1;
+    const newMax = frameMs > previousMaxFrameMs;
+    const hitch33 = frameMs > 33.33;
+    const hitch50 = frameMs > 50;
+    const hitch100 = frameMs > 100;
+
+    if (newMax) this.maxFrameMs = frameMs;
+    if (hitch33) this.hitch33Count += 1;
+    if (hitch50) this.hitch50Count += 1;
+    if (hitch100) this.hitch100Count += 1;
+    if (hitch33 || (newMax && frameMs >= 25)) {
+      this.recordFrameEvent(frameMs, previousMaxFrameMs, newMax, hitch33, hitch50, hitch100);
+    }
 
     // Ring buffer: O(1) insert, no shift needed
     this.ringBuffer[this.ringHead] = frameMs;
@@ -109,13 +137,16 @@ export class RuntimeMetrics {
       hitch100Count: this.hitch100Count,
       combatantCount: this.combatantCount,
       firingCount: this.firingCount,
-      engagingCount: this.engagingCount
+      engagingCount: this.engagingCount,
+      frameEvents: this.getFrameEvents()
     };
   }
 
   reset(): void {
     this.ringHead = 0;
     this.ringCount = 0;
+    this.frameEventHead = 0;
+    this.frameEventCount = 0;
     this.percentileCacheDirty = true;
     this.cachedP95 = 0;
     this.cachedP99 = 0;
@@ -136,6 +167,44 @@ export class RuntimeMetrics {
       sum += this.ringBuffer[i];
     }
     return sum / this.ringCount;
+  }
+
+  private recordFrameEvent(
+    frameMs: number,
+    previousMaxFrameMs: number,
+    newMax: boolean,
+    hitch33: boolean,
+    hitch50: boolean,
+    hitch100: boolean
+  ): void {
+    this.frameEventRing[this.frameEventHead] = {
+      frameCount: this.frameCount,
+      frameMs,
+      atMs: RuntimeMetrics.nowMs(),
+      previousMaxFrameMs,
+      newMax,
+      hitch33,
+      hitch50,
+      hitch100
+    };
+    this.frameEventHead = (this.frameEventHead + 1) % this.maxFrameEvents;
+    if (this.frameEventCount < this.maxFrameEvents) this.frameEventCount++;
+  }
+
+  private getFrameEvents(): RuntimeFrameEvent[] {
+    const events: RuntimeFrameEvent[] = [];
+    for (let i = 0; i < this.frameEventCount; i++) {
+      const index = (this.frameEventHead - this.frameEventCount + i + this.maxFrameEvents) % this.maxFrameEvents;
+      const event = this.frameEventRing[index];
+      if (event) events.push(event);
+    }
+    return events;
+  }
+
+  private static nowMs(): number {
+    return typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
   }
 
   private computePercentiles(): void {

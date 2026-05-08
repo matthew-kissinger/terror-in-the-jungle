@@ -1,5 +1,102 @@
 import { Combatant, CombatantState } from './types';
 import { spatialGridManager } from './SpatialGridManager';
+import type { CloseEngagementTelemetry } from './ai/AIStateEngage';
+import type { TargetAcquisitionTelemetry } from './ai/AITargetAcquisition';
+import type { TargetDistributionTelemetry } from './ClusterManager';
+import type { AiUpdateBreakdown, LosCallsiteTelemetry } from './CombatantAI';
+
+interface CombatLineOfSightTelemetry {
+  hits: number;
+  misses: number;
+  hitRate: number;
+  budgetDenials: number;
+  prefilterPasses: number;
+  prefilterRejects: number;
+  fullEvaluations: number;
+  terrainRaycasts: number;
+  fullEvaluationClear: number;
+  fullEvaluationBlocked: number;
+}
+
+export interface CloseEngagementProfile {
+  engagement: CloseEngagementTelemetry;
+  targetAcquisition: TargetAcquisitionTelemetry;
+  targetDistribution: TargetDistributionTelemetry;
+  lineOfSight: CombatLineOfSightTelemetry;
+  losCallsites: LosCallsiteTelemetry;
+}
+
+const emptyCloseEngagementProfile = (): CloseEngagementProfile => ({
+  engagement: {
+    closeRangeFullAutoActivations: 0,
+    nearbyEnemyBurstTriggers: 0,
+    suppressionTransitions: 0,
+    nearbyEnemyCountSamples: 0,
+    nearbyEnemyCountTotal: 0,
+    nearbyEnemyCountMax: 0,
+    suppressionFlankDestinationComputations: 0,
+    suppressionFlankCoverSearches: 0,
+    suppressionFlankCoverSearchReuseSkips: 0,
+    suppressionFlankCoverSearchCapSkips: 0,
+    targetDistanceBuckets: {
+      lt5m: 0,
+      m5to10: 0,
+      m10to15: 0,
+      m15to30: 0,
+      gte30: 0
+    }
+  },
+  targetAcquisition: {
+    findNearestEnemyCalls: 0,
+    potentialTargetsTotal: 0,
+    playerTargetCandidates: 0,
+    clusterDistributionCalls: 0,
+    clusterDistributionPotentialTargets: 0,
+    noTargetSelections: 0,
+    singleTargetSelections: 0,
+    nearestTargetSelections: 0,
+    nearbyEnemyCountCalls: 0,
+    nearbyEnemyCountTotal: 0,
+    nearbyEnemyCountMax: 0,
+    clusterDensityCalls: 0,
+    clusterDensityTotal: 0,
+    spatialQueryCacheHits: 0,
+    spatialQueryCacheMisses: 0
+  },
+  targetDistribution: {
+    distributionCalls: 0,
+    zeroTargetCalls: 0,
+    singleTargetCalls: 0,
+    multiTargetCalls: 0,
+    potentialTargetsTotal: 0,
+    targetCountRebuilds: 0,
+    assignments: 0,
+    assignmentChurn: 0,
+    targeterCountSamples: 0,
+    targeterCountTotal: 0,
+    targeterCountMax: 0
+  },
+  lineOfSight: {
+    hits: 0,
+    misses: 0,
+    hitRate: 0,
+    budgetDenials: 0,
+    prefilterPasses: 0,
+    prefilterRejects: 0,
+    fullEvaluations: 0,
+    terrainRaycasts: 0,
+    fullEvaluationClear: 0,
+    fullEvaluationBlocked: 0
+  },
+  losCallsites: {
+    patrolDetection: { calls: 0, visible: 0, blocked: 0 },
+    alertConfirmation: { calls: 0, visible: 0, blocked: 0 },
+    engageSuppressionCheck: { calls: 0, visible: 0, blocked: 0 },
+    advancingDetection: { calls: 0, visible: 0, blocked: 0 },
+    seekingCoverValidation: { calls: 0, visible: 0, blocked: 0 },
+    defendDetection: { calls: 0, visible: 0, blocked: 0 }
+  }
+});
 
 /**
  * Manages profiling and telemetry for the combat system
@@ -18,6 +115,10 @@ export class CombatantProfiler {
   profiling = {
     aiUpdateMs: 0,
     aiStateMs: {} as Record<string, number>,
+    aiMethodMs: {} as Record<string, number>,
+    aiMethodCounts: {} as Record<string, number>,
+    aiMethodTotalCounts: {} as Record<string, number>,
+    aiSlowestUpdate: null as AiUpdateBreakdown | null,
     spatialSyncMs: 0,
     billboardUpdateMs: 0,
     effectPoolsMs: 0,
@@ -31,7 +132,11 @@ export class CombatantProfiler {
       hitRate: 0,
       budgetDenials: 0,
       prefilterPasses: 0,
-      prefilterRejects: 0
+      prefilterRejects: 0,
+      fullEvaluations: 0,
+      terrainRaycasts: 0,
+      fullEvaluationClear: 0,
+      fullEvaluationBlocked: 0
     },
     raycastBudget: {
       maxPerFrame: 0,
@@ -64,7 +169,8 @@ export class CombatantProfiler {
       maxMediumFullUpdatesPerFrame: 0,
       aiBudgetExceededEvents: 0,
       aiSevereOverBudgetEvents: 0
-    }
+    },
+    closeEngagement: emptyCloseEngagementProfile()
   };
 
   constructor(
@@ -111,6 +217,10 @@ export class CombatantProfiler {
     timing: {
       aiUpdateMs: number;
       aiStateMs: Record<string, number>;
+      aiMethodMs: Record<string, number>;
+      aiMethodCounts: Record<string, number>;
+      aiMethodTotalCounts: Record<string, number>;
+      aiSlowestUpdate: AiUpdateBreakdown | null;
       spatialSyncMs: number;
       billboardUpdateMs: number;
       effectPoolsMs: number;
@@ -125,6 +235,10 @@ export class CombatantProfiler {
         budgetDenials: number;
         prefilterPasses: number;
         prefilterRejects: number;
+        fullEvaluations: number;
+        terrainRaycasts: number;
+        fullEvaluationClear: number;
+        fullEvaluationBlocked: number;
       };
       raycastBudget: {
         maxPerFrame: number;
@@ -158,6 +272,7 @@ export class CombatantProfiler {
         aiBudgetExceededEvents: number;
         aiSevereOverBudgetEvents: number;
       };
+      closeEngagement: CloseEngagementProfile;
     };
     counts: { total: number; high: number; medium: number; low: number; culled: number };
     lod: { engaging: number; firing: number };

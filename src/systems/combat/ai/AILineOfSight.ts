@@ -41,6 +41,10 @@ export class AILineOfSight {
   static budgetDenials = 0;
   static prefilterPasses = 0;
   static prefilterRejects = 0;
+  static fullEvaluations = 0;
+  static terrainRaycasts = 0;
+  static fullEvaluationClear = 0;
+  static fullEvaluationBlocked = 0;
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
@@ -76,10 +80,14 @@ export class AILineOfSight {
   static getCacheStats(): {
     hits: number;
     misses: number;
-    hitRate: number;
-    budgetDenials: number;
-    prefilterPasses: number;
-    prefilterRejects: number;
+      hitRate: number;
+      budgetDenials: number;
+      prefilterPasses: number;
+      prefilterRejects: number;
+      fullEvaluations: number;
+      terrainRaycasts: number;
+      fullEvaluationClear: number;
+      fullEvaluationBlocked: number;
   } {
     const total = AILineOfSight.cacheHits + AILineOfSight.cacheMisses;
     return {
@@ -89,6 +97,10 @@ export class AILineOfSight {
       budgetDenials: AILineOfSight.budgetDenials,
       prefilterPasses: AILineOfSight.prefilterPasses,
       prefilterRejects: AILineOfSight.prefilterRejects,
+      fullEvaluations: AILineOfSight.fullEvaluations,
+      terrainRaycasts: AILineOfSight.terrainRaycasts,
+      fullEvaluationClear: AILineOfSight.fullEvaluationClear,
+      fullEvaluationBlocked: AILineOfSight.fullEvaluationBlocked,
     };
   }
 
@@ -101,6 +113,10 @@ export class AILineOfSight {
     AILineOfSight.budgetDenials = 0;
     AILineOfSight.prefilterPasses = 0;
     AILineOfSight.prefilterRejects = 0;
+    AILineOfSight.fullEvaluations = 0;
+    AILineOfSight.terrainRaycasts = 0;
+    AILineOfSight.fullEvaluationClear = 0;
+    AILineOfSight.fullEvaluationBlocked = 0;
   }
 
   /**
@@ -178,7 +194,13 @@ export class AILineOfSight {
     }
 
     // --- Full LOS evaluation ---
+    AILineOfSight.fullEvaluations++;
     const result = this.evaluateFullLOS(combatant, targetPos, distance);
+    if (result) {
+      AILineOfSight.fullEvaluationClear++;
+    } else {
+      AILineOfSight.fullEvaluationBlocked++;
+    }
 
     // Store in cache
     this.losCache.set(cacheKey, { result, timestamp: now });
@@ -201,6 +223,7 @@ export class AILineOfSight {
     if (this.terrainSystem && combatant.lodLevel &&
         (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
       _direction.subVectors(_targetEyePos, _eyePos).normalize();
+      AILineOfSight.terrainRaycasts++;
 
       const terrainHit = this.terrainSystem.raycastTerrain(_eyePos, _direction, distance);
 
