@@ -129,6 +129,35 @@ diffs yourself unless you are deciding a borderline merge.
 - Do not read every PR diff. Trust executor reports; reviewers and CI catch
   real issues.
 
+## Campaign auto-advance (2026-05-09 realignment)
+
+If the campaign manifest at `docs/CAMPAIGN_2026-05-09.md` (or any
+`docs/CAMPAIGN_*.md` named in `docs/AGENT_ORCHESTRATION.md` "Current
+campaign") declares `auto-advance: yes` and the current cycle did NOT hit
+a hard-stop, after running the end-of-cycle ritual:
+
+1. Read the campaign manifest. Find the next cycle in the queue not yet
+   marked `done`.
+2. Update `docs/AGENT_ORCHESTRATION.md` "Current cycle" to point at the
+   next cycle's brief.
+3. Mark the just-closed cycle `done` in the campaign manifest.
+4. Commit with `docs(campaign): advance to <next-cycle-slug>`.
+5. Re-enter the dispatch loop for the next cycle. Do NOT prompt the
+   human. Do NOT spawn a new orchestrator session.
+
+Hard-stops always halt the campaign and surface to the human. Stops:
+- Fence change proposed
+- >2 CI red / blocked in a single round
+- Perf regression >5% p99 on combat120
+- Carry-over count grew (cycle INCOMPLETE)
+- isolation=worktree failure
+- Reviewer returns CHANGES-REQUESTED twice on the same task
+
+When a hard-stop fires: stop the campaign, set the failed cycle's status
+in the campaign manifest to `BLOCKED` with a one-line cause, leave
+"Current cycle" pointing at the failed cycle so a human resume picks up
+where you left off, and print a clear summary.
+
 ## End-of-run
 
 Print the end-of-run summary in the shape the current cycle declares in
