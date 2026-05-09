@@ -199,11 +199,11 @@ describe('createTileGeometry', () => {
     const pos = geo.attributes.position.array as Float32Array;
     const idx = geo.index.array as Uint16Array | Uint32Array;
     const ia = idx[0], ib = idx[1], ic = idx[2];
-    const ax = pos[ia * 3], ay = pos[ia * 3 + 1], az = pos[ia * 3 + 2];
-    const bx = pos[ib * 3], by = pos[ib * 3 + 1], bz = pos[ib * 3 + 2];
-    const cx = pos[ic * 3], cy = pos[ic * 3 + 1], cz = pos[ic * 3 + 2];
-    const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
-    const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
+    const ax = pos[ia * 3], az = pos[ia * 3 + 2];
+    const bx = pos[ib * 3], bz = pos[ib * 3 + 2];
+    const cx = pos[ic * 3], cz = pos[ic * 3 + 2];
+    const e1x = bx - ax, e1z = bz - az;
+    const e2x = cx - ax, e2z = cz - az;
     const ny = e1z * e2x - e1x * e2z;
     expect(ny).toBeGreaterThan(0);
   });
