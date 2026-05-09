@@ -11,10 +11,12 @@
 
 [▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Codex (operating doc)](docs/PROJEKT_OBJEKT_143.md) · [Current state](docs/STATE_OF_REPO.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
 
-> Up to ~3,000 strategic combatants per A Shau Valley deployment, real DEM elevation
-> on a 21 km map, side-mounted helicopter rotors over a Huey at low altitude, A-1
-> Skyraiders coming in for the napalm pass — all running in a browser tab without
-> hidden fallbacks.
+> **Engine architected for 3,000 combatants via materialization tiers; live-fire
+> combat verified at 120 NPCs while the ECS hot path is built out (Phase F).**
+> A Shau Valley uses real DEM elevation on a 21 km map, side-mounted helicopter
+> rotors over a Huey at low altitude, A-1 Skyraiders coming in for the napalm
+> pass — all running in a browser tab without hidden fallbacks. See
+> [docs/ROADMAP.md](docs/ROADMAP.md) for the canonical phase status.
 
 The project is in active development under a single operating doc:
 [docs/PROJEKT_OBJEKT_143.md](docs/PROJEKT_OBJEKT_143.md). It is the codex — directives,
@@ -31,8 +33,10 @@ codex is reissued.
 - **Real terrain target.** A Shau Valley uses real elevation data through a
   Cloudflare R2 manifest path with an explicit terrain/nav startup gate. No
   silent TileCache fallback; if the asset isn't loadable, the mode tells you.
-- **Large-scale combat.** A Shau is a ~3,000-unit strategic simulation with
-  selective local materialization rather than 3,000 fully live NPC meshes.
+- **Large-scale combat.** A Shau is architected as a ~3,000-unit strategic
+  simulation through materialization tiers; the verified live-fire combat
+  frontier is currently 120 NPCs while the ECS hot path is built out
+  ([Phase F](docs/ROADMAP.md)).
 - **Squad command surface.** RTS-style direct orders with Vietnam-era prose:
   Hold, Patrol, Attack Here, Fall Back, Stand Down — issued from minimap
   taps or keyboard, dispatched to AI states with terrain-height-aware world
@@ -60,7 +64,7 @@ codex is reissued.
 | **Zone Control** | Small objective battle | Capture zones and drain enemy tickets. |
 | **Team Deathmatch** | Small combat loop | Fast infantry and vehicle combat smoke. |
 | **Open Frontier** | Larger sandbox | Airfields, vehicles, helicopters, armor staging, 120-NPC perf checks. |
-| **A Shau Valley** | Real-terrain strategic mode | 3,000-unit strategic layer with local materialization on DEM-backed terrain. |
+| **A Shau Valley** | Real-terrain strategic mode | Architected for ~3,000-unit strategic layer via materialization tiers; live combat verified at 120, on DEM-backed terrain. |
 | **AI Sandbox** | Configurable simulation | Observation, tuning, perf capture, combat diagnostics. |
 
 ## Latest Cycle

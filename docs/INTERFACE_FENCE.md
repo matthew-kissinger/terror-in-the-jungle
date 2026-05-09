@@ -1,6 +1,6 @@
 # Interface Fence
 
-Last updated: 2026-04-16
+Last verified: 2026-05-09
 
 This file defines the rules for changing contract interfaces. **Interfaces inside `src/types/SystemInterfaces.ts` are fenced.** Everything else is free to refactor.
 
@@ -45,12 +45,22 @@ Any change to any method signature, any parameter type, any return type on a fen
 A PR that modifies a fenced interface must:
 
 1. Include `[interface-change]` in the title.
-2. List every consumer (other file that imports the changed interface).
-3. State whether the change is:
+2. Include `[interface-change]` in the commit message subject.
+3. List every consumer (other file that imports the changed interface).
+4. State whether the change is:
    - **Additive** (new optional method, new optional field): generally safe, still requires review.
    - **Breaking** (removed method, renamed method, required-to-optional, narrower type): requires explicit human approval and a migration note.
-4. Update consumers in the same PR. No staged fence changes.
-5. Explain *why* the interface is changing — usually it's one of: adding a new capability the caller needs, unifying a drifted pattern, removing unused surface.
+5. Update consumers in the same PR. No staged fence changes.
+6. Explain *why* the interface is changing — usually it's one of: adding a new capability the caller needs, unifying a drifted pattern, removing unused surface.
+
+### Pre-flight (Phase 0, 2026-05-09)
+
+Run `npx tsx scripts/check-fence.ts` (or `npm run check:fence`) locally
+before pushing. It compares the working tree against `origin/master` (or
+`HEAD~1` if origin isn't accessible), verifies that any change to
+`src/types/SystemInterfaces.ts` is paired with the `[interface-change]`
+marker in the latest commit subject, and exits non-zero if the marker is
+missing. Pass `--pr-title "<title>"` to also verify the PR title in CI.
 
 ## Default posture
 

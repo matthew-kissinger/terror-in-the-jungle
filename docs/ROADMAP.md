@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-05-07
+Last verified: 2026-05-09
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 > For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
@@ -15,7 +15,11 @@ Vietnam War is the first theater. Architecture generalizes to any war with diffe
 
 Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain materials and post-processing are ported.
 
-Current truthful framing: the engine already supports large strategic populations through materialization tiers; the verified fully materialized perf frontier is still centered on 120-NPC scenarios, not 3,000 simultaneous live combatants. Architecture recovery is currently prioritizing state ownership, A Shau terrain/nav truth, airfield surfaces, and render/LOD evidence before new feature expansion.
+**Canonical vision sentence (copy verbatim into other docs that need to state it):**
+
+> Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F, ~weeks 7–12 of the 2026-05-09 realignment plan).
+
+Phase F is the work that makes the 3,000 line true: bitECS port of combatants, async / precomputed cover-search to close DEFEKT-3, a 1,000-NPC perf gate, and a determinism pilot. Until Phase F lands, all public-facing claims about scale must include the qualifier above.
 
 ## Projekt Objekt-143 Follow-Up
 
