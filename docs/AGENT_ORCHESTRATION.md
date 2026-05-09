@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last updated: 2026-04-24 (architecture recovery run tracked in `docs/ARCHITECTURE_RECOVERY.md`)
+Last verified: 2026-05-09 (Phase 0 realignment: reviewer-pre-merge, cycle stoplist, carry-over discipline)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -58,6 +58,23 @@ first-line format: `<type>(<scope>): <summary> (<slug>)`.
 **Dependencies** are declared via `addBlockedBy` on task slugs inside the
 current cycle's DAG (see the "Dependencies" subsection of "Current cycle").
 
+### Cycle-name stoplist (Phase 0 rule, enforced by `scripts/cycle-validate.ts`)
+
+New cycle slugs **cannot** contain any of these substrings: `polish`,
+`cleanup`, `drift-correction`, `stabilization-reset`, `debug-cleanup`,
+`housekeeping`, `tidy`, `chore-only`. Each cycle must close one
+user-observable gap or feature; doctor-doc work happens inside a feature
+cycle, not as its own. Run `npx tsx scripts/cycle-validate.ts <slug>` before
+seeding a new cycle to verify.
+
+### Carry-over discipline
+
+`docs/CARRY_OVERS.md` is the single source of truth for unresolved items.
+At cycle close, the orchestrator measures active count vs. cycle-start. If
+the count grew, the cycle is **INCOMPLETE**; the cycle ID is reused with a
+`-2` suffix until the count holds or shrinks. Carry-overs open ≥5 cycles are
+red-flagged and must be named in the next cycle's plan.
+
 **End-of-cycle ritual** (run as the last orchestrator action, or as a
 standalone bookkeeping pass):
 
@@ -70,43 +87,91 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: none (between cycles)
+## Current cycle: cycle-2026-05-09-doc-decomposition-and-wiring
+
+**Phase 1 of the realignment plan**
+(`C:/Users/Mattm/.claude/plans/can-we-make-a-lexical-mitten.md`). Queued for
+overnight `/orchestrate` run.
+
+**Cycle brief:** [docs/tasks/cycle-2026-05-09-doc-decomposition-and-wiring.md](tasks/cycle-2026-05-09-doc-decomposition-and-wiring.md)
+
+**Skip-confirm: yes.** The orchestrator dispatches Round 1 without waiting
+for "go". Hard-stops still surface (fence change, >2 CI red in a round,
+perf regression >5% p99).
+
+### Round schedule
+
+| Round | Tasks (parallel) | Cap |
+|-------|------------------|-----|
+| 1 | `state-doc-split`, `perf-doc-split`, `codex-decomposition`, `script-triage`, `artifact-gc` | 5 |
+| 2 | `worldbuilder-wiring` | 1 |
+
+### Tasks in this cycle
+
+Each brief is in `docs/tasks/<slug>.md`:
+
+- [state-doc-split](tasks/state-doc-split.md) — split STATE_OF_REPO.md (2,708 LOC) into `docs/state/`
+- [perf-doc-split](tasks/perf-doc-split.md) — split PERFORMANCE.md (2,332 LOC) into `docs/perf/`
+- [codex-decomposition](tasks/codex-decomposition.md) — extract DIRECTIVES.md, archive PROJEKT_OBJEKT_143 prose
+- [script-triage](tasks/script-triage.md) — 89 `check:projekt-143-*` → 12 plain-named retained scripts
+- [artifact-gc](tasks/artifact-gc.md) — apply retention prune + weekly CI job
+- [worldbuilder-wiring](tasks/worldbuilder-wiring.md) — wire 6 god-mode flags into engine consumers (Round 2 only; combat-reviewer + playtest required)
+
+### Dependencies
+
+```
+state-doc-split    ─┐
+perf-doc-split     ─┤
+codex-decomposition ┼─→ (Round 1 complete) ─→ worldbuilder-wiring
+script-triage      ─┤
+artifact-gc        ─┘
+```
+
+### Reviewer policy (per Phase 0 rule)
+
+- **Round 1:** none of the 5 tasks touch `src/systems/combat/**` or
+  `src/systems/terrain/**` or `src/systems/navigation/**`. No reviewer
+  required pre-merge.
+- **Round 2 (`worldbuilder-wiring`):** combat-reviewer pre-merge. Touches
+  `PlayerHealthSystem`, `AmmoSupplySystem`, `PlayerMovement`,
+  `PostProcessingManager`, `AtmosphereSystem`, `AudioManager`. Playtest
+  also required.
+
+### Cycle-level success criteria
+
+See [the cycle brief](tasks/cycle-2026-05-09-doc-decomposition-and-wiring.md#success-criteria-cycle-level)
+for the 10-point list. Highlights:
+
+- `du -sh docs/` reduced ≥40%
+- `du -sh artifacts/` <2 GB
+- `grep -c '"check:projekt-143' package.json` returns 0
+- `grep -r "Politburo\|Bureau\|Codex\|Article III" docs/ --exclude-dir=archive` returns 0
+- `STATE_OF_REPO.md` and `PERFORMANCE.md` replaced by redirect stubs
+- 6 worldbuilder-wiring carry-overs in `docs/CARRY_OVERS.md` move to Closed
+- `combat120` p99 within ±2%
 
 ### Last closed cycle
 
-`cycle-2026-05-08-perception-and-stuck` closed 2026-05-08. Retrospective:
-`docs/cycles/cycle-2026-05-08-perception-and-stuck/RESULT.md`.
+`cycle-2026-05-09-phase-0-foundation` closed 2026-05-09. Retrospective:
+the cycle brief itself ([docs/tasks/cycle-2026-05-09-phase-0-foundation.md](tasks/cycle-2026-05-09-phase-0-foundation.md)) — moves to
+`docs/tasks/archive/cycle-2026-05-09-phase-0-foundation/` per ritual.
 
-Single integration PR (#165) merged to master via `--merge` fallback (cycle
-branch contained internal merge commits). Four task branches landed in
-parallel via executor subagents: `npc-unfreeze-and-stuck`,
-`npc-imposter-distance-priority`, `zone-validate-nudge-ashau`,
-`terrain-cdlod-seam`. Live deploy at SHA `e34cc6d`. CI gates green:
-lint+test+build+smoke+perf+mobile-ui. Reviewers (combat-reviewer,
-terrain-nav-reviewer) both APPROVE-WITH-NOTES; notes captured in the
-retrospective as follow-ups.
+Phase 0 installed: max-LOC + max-method lint with grandfather list,
+doc date-header lint, fenced-interface pre-flight, banned cycle-name
+keywords, reviewer-pre-merge gate, scenario smoke screenshot gate,
+artifact-prune retention script, the WorldBuilder dev console
+(`Shift+G`), tightened `.claude/settings.local.json`. No game-code
+changes — substrate only.
 
-Open follow-ups (not active directives):
-- Position-Y drift in visual-only velocity integration on slopes (call
-  `syncTerrainHeight` or document drift bound).
-- `RespawnManager` should use the new `beginRejoiningSquad` helper.
-- `findSuitableZonePosition` spiral-search determinism (`Math.random`).
-- Stage D3 DEM edge padding gated on visual review of D1+D2.
+Spawned 6 `worldbuilder-wiring` carry-overs in `docs/CARRY_OVERS.md` for
+this Phase 1 cycle to close.
 
-Carry-overs from prior cycles still open: AVIATSIYA-1 / DEFEKT-5 human
-visual review packet; STABILIZAT-1 baseline refresh on a quiet machine;
-DEFEKT-3 runtime perf fix; DEFEKT-4 NPC route quality runtime acceptance;
-NPC slope-stuck / navmesh crowd disabled / terrain-aware solver stall;
-helicopter parity audit; cover-search synchronous p99 anchor in
-`AIStateEngage.initiateSquadSuppression`.
-
-### Next cycle
-
-The next cycle is empty. Read `docs/PROJEKT_OBJEKT_143.md` Article III for the
-active directive board, pick a directive whose evidence chain you can advance
-in a bounded session, and seed a new `cycle-YYYY-MM-DD-<slug>` with task briefs
-under `docs/tasks/<slug>.md`. Default concurrency cap 5 for normal multi-PR
-cycles.
+Carry-overs from prior cycles still open (legacy 7, see
+[docs/CARRY_OVERS.md](CARRY_OVERS.md)): DEFEKT-3 (combat AI p99),
+DEFEKT-4 (NPC route quality), STABILIZAT-1 (combat120 baseline refresh),
+AVIATSIYA-1 / DEFEKT-5 (visual review pending),
+AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3 (helicopter parity audit),
+KB-LOAD residual.
 
 ## Dispatch protocol
 
@@ -130,10 +195,17 @@ For each round, in a single orchestrator turn:
      `gh pr view <url> --json statusCheckRollup,mergeable` or stream via
      `Monitor` on `gh pr checks <url> --watch`.
 5. On CI green:
-   - Spawn `combat-reviewer` if the diff touches `src/systems/combat/**`.
-   - Spawn `terrain-nav-reviewer` if the diff touches terrain/nav.
-   - Merge via `gh pr merge <url> --rebase` (fast-forward preferred; fall
-     back to `--merge` only if branch protection blocks rebase).
+   - **Reviewer runs BEFORE merge for combat / terrain-nav PRs (Phase 0
+     change, 2026-05-09).** Spawn `combat-reviewer` if the diff touches
+     `src/systems/combat/**`; spawn `terrain-nav-reviewer` if the diff
+     touches `src/systems/terrain/**` or `src/systems/navigation/**`. CI
+     green is necessary, not sufficient; the reviewer report must read
+     APPROVE or APPROVE-WITH-NOTES before the merge step.
+   - If reviewer returns CHANGES-REQUESTED: `TaskUpdate` to `in_progress`,
+     re-dispatch the executor with the reviewer notes, do not merge.
+   - On reviewer APPROVE / APPROVE-WITH-NOTES: merge via
+     `gh pr merge <url> --rebase` (fast-forward preferred; fall back to
+     `--merge` only if branch protection blocks rebase).
    - `TaskUpdate` to `completed` with the PR URL.
    - Advance any dependent tasks that just unblocked.
 6. On CI red: `TaskUpdate` to `blocked`; do not retry.
@@ -152,8 +224,14 @@ For each round, in a single orchestrator turn:
   `src/integration/**combat*` → `combat-reviewer`.
 - Terrain / nav PRs: touch any file under `src/systems/terrain/**` or
   `src/systems/navigation/**` → `terrain-nav-reviewer`.
-- The reviewer reads the diff, reports findings to the orchestrator, and does
-  not block merge unless it flags a fence change or scope violation.
+- The reviewer reads the diff, reports findings to the orchestrator. As of
+  Phase 0 (2026-05-09), the reviewer **runs before merge and gates merge**
+  for combat / terrain-nav PRs. Outcomes:
+  - `APPROVE` → orchestrator merges.
+  - `APPROVE-WITH-NOTES` → orchestrator merges; notes captured in cycle
+    retro for follow-up.
+  - `CHANGES-REQUESTED` → orchestrator re-dispatches the executor with the
+    notes, does not merge.
 
 ## Ground rules for dispatched agents
 
@@ -167,7 +245,15 @@ Every task brief ends up in an executor prompt along with these:
    code (B1 is the one task that can go larger), stop and reassess.
 4. Do not modify files outside the task's `Files touched` scope.
 5. Verify locally before pushing: `npm run lint`, `npm run test:run`,
-   `npm run build`.
+   `npm run build`. New rules as of Phase 0 (2026-05-09):
+   - Files ≤700 LOC and ≤50 public methods (grandfathered exceptions
+     listed in `eslint.config.js`).
+   - New `src/systems/**/*.ts` requires a sibling `*.test.ts`.
+   - PR description names a closed carry-over by ID (from
+     `docs/CARRY_OVERS.md`) OR the user-observable gap shipped.
+   - Touch to `src/types/SystemInterfaces.ts` requires `[interface-change]`
+     in PR title and commit message; pre-flight via
+     `npx tsx scripts/check-fence.ts`.
 6. Branch: `task/<slug>`. Commit first line:
    `<type>(<scope>): <summary> (<slug>)`.
 7. Never push to master directly.

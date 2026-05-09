@@ -46,14 +46,20 @@ The `/orchestrate` slash command tells the main session to read this file and
      `gh pr view <url> --json statusCheckRollup,mergeable` or stream via
      `Monitor` on `gh pr checks <url> --watch`.
 5. On CI green:
-   - Spawn the relevant reviewer if the diff touches its scope:
+   - **Reviewer is a pre-merge gate for combat / terrain-nav PRs (Phase 0
+     change, 2026-05-09).** Spawn first, await the structured report,
+     then act:
      - `combat-reviewer` for `src/systems/combat/**` or
        `src/integration/**combat*`
      - `terrain-nav-reviewer` for `src/systems/terrain/**` or
        `src/systems/navigation/**`
-   - Merge: `gh pr merge <url> --rebase` (fall back to `--merge` if branch
-     protection requires it).
-   - `TaskUpdate` to `completed` with the PR URL in metadata.
+   - Reviewer outcomes:
+     - `APPROVE` or `APPROVE-WITH-NOTES` → merge via
+       `gh pr merge <url> --rebase` (fall back to `--merge` if branch
+       protection requires it).
+     - `CHANGES-REQUESTED` → `TaskUpdate` to `in_progress`, re-dispatch
+       the executor with the notes attached, do not merge.
+   - On merge: `TaskUpdate` to `completed` with the PR URL in metadata.
    - Advance any dependent tasks that just unblocked.
 6. On CI red or unresolved fence proposal: `TaskUpdate` to `blocked`, surface
    to the user, move on.
@@ -104,6 +110,14 @@ diffs yourself unless you are deciding a borderline merge.
 - Perf regression > 5% p99 on `combat120` after any round.
 - Any executor reports `isolation=worktree` failure (branch already exists,
   push rejected, gh auth broken).
+- **Cycle slug contains a banned keyword** (`polish`, `cleanup`,
+  `drift-correction`, `stabilization-reset`, `debug-cleanup`, `housekeeping`,
+  `tidy`, `chore-only`). Each cycle must close one user-observable gap;
+  doctor-doc work happens inside a feature cycle. Run
+  `npx tsx scripts/cycle-validate.ts <slug>` to verify before seeding.
+- **Carry-over count grew during the cycle.** Per
+  `docs/CARRY_OVERS.md`, the cycle is INCOMPLETE; reuse the cycle ID with
+  a `-2` suffix and surface to the human.
 
 ## What you do not do
 

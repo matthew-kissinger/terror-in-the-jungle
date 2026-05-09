@@ -1,11 +1,14 @@
 # Backlog
 
-Last updated: 2026-05-08
+Last verified: 2026-05-09
 
-This file is the compact Strategic Reserve index. Active directives live in
-`docs/PROJEKT_OBJEKT_143.md` Article III. Current verified state lives in
-`docs/STATE_OF_REPO.md`. Historical cycle records live under
-`docs/cycles/<cycle-id>/RESULT.md`.
+This file is the compact Strategic Reserve index. **Active carry-overs and
+unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
+realignment, 2026-05-09). Active directives still live in
+`docs/PROJEKT_OBJEKT_143.md` Article III pending the Phase 1 codex
+decomposition. Current verified state lives in
+`docs/STATE_OF_REPO.md` (also targeted for Phase 1 split into `docs/state/`).
+Historical cycle records live under `docs/cycles/<cycle-id>/RESULT.md`.
 
 ARKHIV-2 contract: keep this file at or below 200 measured lines. Do not place
 long cycle retrospectives, PR logs, or active directive status here.

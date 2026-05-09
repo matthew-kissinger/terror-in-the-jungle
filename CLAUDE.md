@@ -1,8 +1,8 @@
 # Project Notes (Claude Code)
 
-Last updated: 2026-05-08
+Last verified: 2026-05-09
 
-Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). Up to 3,000 AI combatants, stable frame-time tails, real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages.
+Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Read First
 
@@ -21,14 +21,38 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-`cycle-2026-05-08-perception-and-stuck` closed 2026-05-08 (single integration PR [#165](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/165)). Four parallel task branches landed via executor subagents and shipped behind config flags exposed in the existing Tweakpane (`\` toggle): `npc-unfreeze-and-stuck` (visual-only velocity integration on the LOD over-budget path; rejoin-timeout + squad-leader-stale watchdog; StuckDetector `'hold'` now forces destination/target clear and patrol re-entry; `CULLED_DISTANT_SIM_INTERVAL_MS` 45000 → 8000), `npc-imposter-distance-priority` (close-model distance 64 → 120 m via config; on-screen-aware priority score replaces closest-N; velocity-keyed billboard cadence without shader change), `zone-validate-nudge-ashau` (post-placement `validateAndNudge` lifts capturable zones out of ditches; A Shau pilot), `terrain-cdlod-seam` (AABB-distance morph metric + downward skirt geometry kill chunk-edge seams; new `Shift+\` → `Y` seam diagnostic overlay).
+**`cycle-2026-05-09-phase-0-foundation` (in review).** Foundation cycle of the
+12-week realignment plan at
+`C:/Users/Mattm/.claude/plans/can-we-make-a-lexical-mitten.md`. Installs the
+durable rules layer (max-LOC + max-method lint with grandfather list, doc
+date-header lint, fenced-interface pre-flight, banned cycle-name keywords,
+reviewer-pre-merge gate, scenario smoke screenshot gate, artifact-prune
+retention) and ships the **WorldBuilder dev console** (`Shift+G`) as an
+isolation/validation tool. Deliberately no game-code changes; engine-side
+wiring of WorldBuilder god-mode flags is filed for Phase 1.
 
-Hotfix on top of the cycle (2026-05-08): Stage D2's `createTileGeometry` shipped with an extra negation on per-vertex Z (`z = 0.5 - j/(N-1)` instead of the rotated `PlaneGeometry`'s `z = j/(N-1) - 0.5`), which inverted triangle winding so every interior face had a -Y normal. Default `MeshStandardMaterial(FrontSide)` backface-culled the terrain from above on every map (user-reported "unsynced and largely unaligned"). Fix at `src/systems/terrain/CDLODRenderer.ts:25` removes the negation; D1 + D2 anti-seam mechanisms both survive. Regression test in `CDLODRenderer.test.ts` asserts +Y face normals so a future winding flip cannot slip through CI again.
+Single source of truth for unresolved items: [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md).
+Current legacy carry-overs (each open ≥3 cycles, all targeted by the
+realignment plan): DEFEKT-3 (combat AI p99 cover search), DEFEKT-4 (NPC
+route quality), STABILIZAT-1 (combat120 baseline refresh), AVIATSIYA-1 /
+DEFEKT-5 (visual review pending), AVIATSIYA-2 (AC-47 takeoff bounce),
+AVIATSIYA-3 (helicopter parity audit). Phase 0 also spawns 6 new
+`worldbuilder-wiring` carry-overs for Phase 1 engine wiring.
 
-Prior cycle: `cycle-2026-04-23-debug-cleanup` (closed 2026-04-22) shipped the diagnostic surface this cycle's overlay extends: backtick HUD registry, `\`-toggled Tweakpane live-tuning, `Shift+\` six-overlay debugger, V/B free-fly + entity inspector, TimeScale pause/step/slow/fast, F9 playtest capture, `?mode=terrain-sandbox` URL-gated dev mode.
+Prior cycle: `cycle-2026-05-08-perception-and-stuck` closed 2026-05-08
+(single integration PR [#165](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/165), four
+parallel task branches landed behind Tweakpane config flags). Hotfix on
+top: `createTileGeometry` Z-coordinate sign flip backface-culled terrain
+on every map; fix at `src/systems/terrain/CDLODRenderer.ts:25` and
+regression test in `CDLODRenderer.test.ts`. The Z-flip is the cautionary
+tale that motivated the new scenario-smoke screenshot gate
+([scripts/scenario-smoke.ts](scripts/scenario-smoke.ts)).
 
-Active carry-overs after this cycle: (1) combat AI p99 ~34 ms anchored on synchronous cover search in `AIStateEngage.initiateSquadSuppression()` (DEFEKT-3, untouched this cycle); (2) NPC slope-stuck / navmesh crowd disabled / terrain-aware solver stall loops (Issue A's watchdogs treat the symptoms not the cause); (3) AC-47 low-pitch takeoff single-bounce; (4) helicopter parity audit (`HelicopterVehicleAdapter` / `HelicopterPlayerAdapter`); (5) reviewer follow-ups from this cycle: position-Y drift on slopes during visual-only integration (call `syncTerrainHeight` or document drift bound), `RespawnManager` should use the new `beginRejoiningSquad` helper, `findSuitableZonePosition` spiral-search determinism (`Math.random`), Stage D3 (DEM edge padding) gated on visual review of D1+D2 — only meaningful now that the hotfix restored visible terrain.
+Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
+descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle
+IDs. Banned-keyword stoplist enforced by
+`npx tsx scripts/cycle-validate.ts <slug>`.
 
-Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle IDs.
-
-See [docs/BACKLOG.md](docs/BACKLOG.md) for open items and recently completed work.
+See [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md) for the active carry-over
+registry, [docs/BACKLOG.md](docs/BACKLOG.md) for the strategic-reserve index, and
+[docs/dev/worldbuilder.md](docs/dev/worldbuilder.md) for the new console.

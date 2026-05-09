@@ -63,6 +63,7 @@ export class GameEngine {
   };
   public runtimeMetrics?: RuntimeMetrics;
   public liveTuningPanel?: import('../ui/debug/LiveTuningPanel').LiveTuningPanel;
+  public worldBuilderConsole?: import('../dev/worldBuilder/WorldBuilderConsole').WorldBuilderConsole;
   public playtestCaptureManager: PlaytestCaptureManager;
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
@@ -152,6 +153,15 @@ export class GameEngine {
         await this.liveTuningPanel.register(this.debugHud);
       } catch (err) {
         Logger.warn('core', 'LiveTuningPanel init failed:', err);
+      }
+      // WorldBuilder dev console (Shift+G) — sits alongside LiveTuningPanel.
+      // Failure must not block engine init.
+      try {
+        const { WorldBuilderConsole } = await import('../dev/worldBuilder/WorldBuilderConsole');
+        this.worldBuilderConsole = new WorldBuilderConsole(this);
+        await this.worldBuilderConsole.register(this.debugHud);
+      } catch (err) {
+        Logger.warn('core', 'WorldBuilderConsole init failed:', err);
       }
     }
     markStartup('engine.initialize.end');
