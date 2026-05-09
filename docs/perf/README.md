@@ -15,10 +15,29 @@ Pre-split full-history copy lives at `docs/archive/PERFORMANCE.md`.
 - [playbook.md](playbook.md) — how to investigate a regression, common
   bottleneck classes, validation gates.
 
-Artifact retention: `artifacts/perf/` is pruned weekly by the artifact-gc
-workflow (see [BACKLOG.md](../BACKLOG.md) "artifact-gc"). Long-term reference
+## Artifact retention policy
+
+Perf captures land in `artifacts/perf/<timestamp>/`. The `artifacts/` tree is
+gitignored, so retention is enforced by [`scripts/artifact-prune.ts`](../../scripts/artifact-prune.ts):
+captures older than 30 days are deleted unless they are cited by name in any
+`docs/**/*.md` file or pinned in `perf-baselines.json`. Long-term reference
 captures should be linked from a cycle doc or carry-over, not assumed to live
 forever in `artifacts/perf/`.
+
+The [`artifact-prune` GitHub Actions workflow](../../.github/workflows/artifact-prune.yml)
+runs every Sunday at 04:00 UTC (and on `workflow_dispatch`). To inspect runs:
+
+```
+gh run list --workflow=artifact-prune.yml
+gh run view <run-id> --log
+```
+
+To run the prune locally:
+
+```
+npm run artifact:prune          # dry-run report
+npm run artifact:prune:apply    # actually delete prunable dirs
+```
 
 ## Build targets
 
