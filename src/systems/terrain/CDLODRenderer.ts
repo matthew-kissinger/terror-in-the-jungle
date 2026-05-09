@@ -16,13 +16,16 @@ export function createTileGeometry(tileResolution: number): THREE.BufferGeometry
   const isSkirtArr = new Float32Array(totalVerts);
 
   // Interior grid mirrors PlaneGeometry(1,1,N-1,N-1) post-rotateX(-π/2):
-  // y -> -z, so x in [-0.5, 0.5], z in [-0.5, 0.5]. Existing shader code
-  // indexes by position.xz so we keep that exact layout.
+  // rotateX(-π/2) maps (x, y_orig, 0) -> (x, 0, -y_orig). PlaneGeometry's
+  // y_orig at row j is 0.5 - j/(N-1), so post-rotation z = j/(N-1) - 0.5.
+  // Z must increase with j to preserve PlaneGeometry's CCW triangle winding;
+  // otherwise interior face normals flip to -Y and FrontSide culling hides
+  // the entire terrain when viewed from above.
   for (let j = 0; j < N; j++) {
     for (let i = 0; i < N; i++) {
       const base = (j * N + i) * 3;
       positions[base] = i / (N - 1) - 0.5;
-      positions[base + 2] = -((j / (N - 1)) - 0.5);
+      positions[base + 2] = j / (N - 1) - 0.5;
     }
   }
 

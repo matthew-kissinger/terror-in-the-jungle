@@ -17,13 +17,25 @@ shepherded four parallel task branches to `master`:
 `npc-unfreeze-and-stuck`, `npc-imposter-distance-priority`,
 `zone-validate-nudge-ashau`, `terrain-cdlod-seam`. Behaviour changes are
 gated by config flags exposed in the existing Tweakpane (`\` toggle) so
-the human can A/B at runtime. Live deploy at SHA `e34cc6d` (or later
-docs-only commit) on `https://terror-in-the-jungle.pages.dev`. CI green
-on lint + test (4153 tests) + build + smoke + perf (combat120 5m47s
-within baseline) + mobile-ui. Reviewers (combat-reviewer,
-terrain-nav-reviewer) APPROVE-WITH-NOTES; notes captured in the cycle
-retrospective as deferred follow-ups (no blockers). Cycle retrospective:
+the human can A/B at runtime. CI green on lint + test (4153 tests) +
+build + smoke + perf (combat120 5m47s within baseline) + mobile-ui.
+Reviewers (combat-reviewer, terrain-nav-reviewer) APPROVE-WITH-NOTES;
+notes captured in the cycle retrospective as deferred follow-ups (no
+blockers). Cycle retrospective:
 `docs/cycles/cycle-2026-05-08-perception-and-stuck/RESULT.md`.
+
+A user-reported regression on top of that cycle landed as a hotfix on
+2026-05-08. Stage D2's `createTileGeometry` shipped with an inverted
+Z coordinate (`z = 0.5 - j/(N-1)` vs the rotated PlaneGeometry's
+`z = j/(N-1) - 0.5`), which flipped triangle winding so every interior
+face had a -Y normal; default `MeshStandardMaterial(FrontSide)`
+backface-culled the terrain from above on every map. The hotfix removes
+the extra negation in `src/systems/terrain/CDLODRenderer.ts` and adds a
+face-normal regression test in `CDLODRenderer.test.ts`. Stage D1
+(AABB-distance morph) and Stage D2 (skirt ring + per-LOD vertex drop)
+both survive the hotfix unchanged. Live deploy SHA updates with this
+hotfix on `https://terror-in-the-jungle.pages.dev`; verify via
+`/asset-manifest.json gitSha`.
 
 Prior cycle remains the active stabilization anchor: 
 `cycle-2026-05-08-stabilizat-2-closeout` closed 2026-05-08. Six themed PRs

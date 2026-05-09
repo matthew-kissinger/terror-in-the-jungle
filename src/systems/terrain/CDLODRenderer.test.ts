@@ -187,4 +187,24 @@ describe('createTileGeometry', () => {
     expect(geo.index).not.toBeNull();
     expect(geo.index.array.length).toBe(((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 2) * 3);
   });
+
+  // Regression: the cycle-2026-05-08 seam fix shipped with z = 0.5 - j/(N-1),
+  // which inverted the triangle winding so every interior face had a -Y normal.
+  // MeshStandardMaterial's default FrontSide culled the entire terrain when
+  // viewed from above. Compute the first interior triangle's normal and assert
+  // y > 0 so this can't recur silently.
+  it('produces +Y interior face normals so MeshStandardMaterial(FrontSide) does not cull the terrain', () => {
+    const N = 17;
+    const geo: any = createTileGeometry(N);
+    const pos = geo.attributes.position.array as Float32Array;
+    const idx = geo.index.array as Uint16Array | Uint32Array;
+    const ia = idx[0], ib = idx[1], ic = idx[2];
+    const ax = pos[ia * 3], ay = pos[ia * 3 + 1], az = pos[ia * 3 + 2];
+    const bx = pos[ib * 3], by = pos[ib * 3 + 1], bz = pos[ib * 3 + 2];
+    const cx = pos[ic * 3], cy = pos[ic * 3 + 1], cz = pos[ic * 3 + 2];
+    const e1x = bx - ax, e1y = by - ay, e1z = bz - az;
+    const e2x = cx - ax, e2y = cy - ay, e2z = cz - az;
+    const ny = e1z * e2x - e1x * e2z;
+    expect(ny).toBeGreaterThan(0);
+  });
 });

@@ -92,3 +92,11 @@ New diagnostic overlay (Shift+\ → Y): `terrainSeamOverlay` highlights at-risk 
 - A Shau north ridgeline + multiple altitudes: confirm white seams gone. Toggle Shift+\ → Y to overlay-confirm zero or near-zero red edges.
 - Open Frontier flyover and stuck-squad checks: should be unchanged or improved.
 - Tweakpane sanity: with `\` open, toggle `visualOnlyIntegrateVelocity` and `closeModelDistanceMeters`; verify both visibly change behavior without restart.
+
+## Hotfix on top of this cycle (2026-05-08)
+
+Stage D2 (`createTileGeometry` in `src/systems/terrain/CDLODRenderer.ts`) shipped with one extra negation on the per-vertex Z coordinate (`z = 0.5 - j/(N-1)` instead of the rotated `PlaneGeometry`'s `z = j/(N-1) - 0.5`). With the index ordering unchanged, every interior triangle's normal flipped from +Y to -Y. `MeshStandardMaterial` defaults to `side: THREE.FrontSide`, so backface culling hid most of the terrain when viewed from above — visibly across all maps (Open Frontier, A Shau, Team Deathmatch). The reviewer-noted "visual review of D1+D2" gate was not closed before merge; CI mocks Three.js entirely, so geometry winding regressions are invisible to `npm run test:run`.
+
+Fix: drop the leading negation at `CDLODRenderer.ts:25`. Anti-seam mechanisms (Stage D1 AABB-distance morph, Stage D2 skirt ring + per-LOD vertex drop, Shift+\ → Y diagnostic overlay) all survive unchanged — the Z-flip was an unrelated transcription error inside the geometry rebuild, not part of the seam protection.
+
+Regression test: `CDLODRenderer.test.ts` now asserts `triangleNormal.y > 0` on the first interior face, so a future winding flip cannot slip through CI again.
