@@ -114,82 +114,60 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-05-10-zone-manager-decoupling
+## Current cycle: STABILIZATION CHECKPOINT (campaign paused)
 
-**Phase 2 of the realignment campaign** (cycle 2 of 9 in
-[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md)). Auto-advanced from
-Phase 1 close.
+The 9-cycle realignment campaign at
+[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md) is **paused after Phase 2**
+at the campaign owner's request. No cycle is dispatching now.
 
-**Cycle brief:** [docs/tasks/cycle-2026-05-10-zone-manager-decoupling.md](tasks/cycle-2026-05-10-zone-manager-decoupling.md)
+**Comprehensive checkpoint:** [docs/STABILIZATION_CHECKPOINT_2026-05-09.md](STABILIZATION_CHECKPOINT_2026-05-09.md)
+— full audit findings, Phases 0–2 outcomes, recommended Phase 2.5
+"stabilization-fixes" cycle, Phase 3+ scope notes, resume instructions.
 
-**Skip-confirm: yes.**
+To resume the campaign:
 
-**Why this cycle now:** `ZoneManager` has fan-in 52 — highest in the repo.
-Must drop to ≤20 before the Phase 3 god-module splits start, or those splits
-will re-create the coupling problem in new files.
-
-### Round schedule
-
-| Round | Tasks (parallel) | Cap |
-|-------|------------------|-----|
-| 1 | `zone-manager-design-memo`, `izone-query-fence` | 2 |
-| 2 | `zone-decoupling-batch-a-readonly`, `zone-decoupling-batch-b-state-driven`, `zone-decoupling-batch-c-owners` | 3 |
-
-### Tasks in this cycle
-
-- [zone-manager-design-memo](tasks/zone-manager-design-memo.md) — doc-only; lays out 11 caller surfaces
-- [izone-query-fence](tasks/izone-query-fence.md) — `[interface-change]` PR; adds read-only `IZoneQuery` to `src/types/SystemInterfaces.ts` (terrain-nav-reviewer pre-merge)
-- [zone-decoupling-batch-a-readonly](tasks/zone-decoupling-batch-a-readonly.md) — HUD/Compass/Minimap/FullMap → `IZoneQuery` only
-- [zone-decoupling-batch-b-state-driven](tasks/zone-decoupling-batch-b-state-driven.md) — Combat/Tickets/WarSim → events + `IZoneQuery` (combat-reviewer)
-- [zone-decoupling-batch-c-owners](tasks/zone-decoupling-batch-c-owners.md) — PlayerRespawn + ZoneManager-internal cleanup (combat-reviewer)
-
-### Dependencies
-
-```
-zone-manager-design-memo ─→ izone-query-fence ─→ batch-a ─┐
-                                              ─→ batch-b ─┼─→ (cycle close)
-                                              ─→ batch-c ─┘
-```
-
-### Reviewer policy
-
-- `izone-query-fence`: terrain-nav-reviewer pre-merge (touches
-  `src/types/SystemInterfaces.ts`; pre-authorized fence change).
-- `zone-decoupling-batch-b-state-driven`: combat-reviewer pre-merge.
-- `zone-decoupling-batch-c-owners`: combat-reviewer pre-merge.
-
-### Cycle-level success criteria
-
-See [the cycle brief](tasks/cycle-2026-05-10-zone-manager-decoupling.md#cycle-level-success-criteria).
-Highlights: `IZoneQuery` exported, ZoneManager fan-in ≤20, parity test green,
-`combat120` p99 within ±2%.
+1. Read the checkpoint doc.
+2. Optionally insert a Phase 2.5 "stabilization-fixes" cycle in
+   `docs/CAMPAIGN_2026-05-09.md` and create the brief at
+   `docs/tasks/cycle-<date>-stabilization-fixes.md`.
+3. Edit `docs/CAMPAIGN_2026-05-09.md` to flip `Auto-advance: PAUSED ...`
+   back to `Auto-advance: yes`.
+4. Edit this file's "Current cycle" section to point at the next cycle
+   (Phase 2.5 stabilization-fixes if added, otherwise Phase 3
+   combatant-renderer-split).
+5. Run `/orchestrate`.
 
 ### Last closed cycle
 
-`cycle-2026-05-09-doc-decomposition-and-wiring` closed 2026-05-09. 6 PRs
-merged ([#167](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/167),
-[#168](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/168),
-[#169](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/169),
-[#170](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/170),
-[#171](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/171),
-[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)).
-Phase 1 split STATE_OF_REPO.md and PERFORMANCE.md into focused subdirs,
-archived PROJEKT_OBJEKT_143 prose into `docs/archive/`, extracted
-`docs/DIRECTIVES.md` (199 LOC) as the plain-English directive registry,
-triaged 89 `check:projekt-143-*` scripts to 12 retained, applied artifact
-prune retention + weekly CI job, and wired 6 WorldBuilder god-mode flags
-into their consumer systems (all DEV-gated, Vite DCE-confirmed). Cycle
-retrospective: see [docs/BACKLOG.md](BACKLOG.md) "Recently Completed". 6
-worldbuilder-wiring carry-overs closed; 2 new tooling carry-overs filed
-(`artifact-prune-baseline-pin-fix`, `worldbuilder-oneshotkills-wiring`).
-Active count 13 → 9.
+`cycle-2026-05-10-zone-manager-decoupling` closed 2026-05-09 with 5 PRs
+merged ([#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173),
+[#174](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/174),
+[#175](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/175),
+[#176](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/176),
+[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177)).
+Phase 2 added `IZoneQuery` to the fenced interfaces (PR #174,
+terrain-nav-reviewer APPROVE), then migrated 11 ZoneManager consumers
+(HUD/Compass/Minimap/FullMap, Combat/Tickets/WarSim, PlayerRespawn +
+CommandInputManager) to either the read-only interface or a
+GameEventBus-driven event cache. ZoneManager fan-in 52 → 17 read / 5
+concrete (the 5 are the deferred weapons cluster). ZoneManager removed
+from `scripts/lint-source-budget.ts` GRANDFATHER. combat-reviewer +
+terrain-nav-reviewer all APPROVE / APPROVE-WITH-NOTES. Cycle retro:
+[docs/BACKLOG.md](BACKLOG.md) "Recently Completed (cycle-2026-05-10-...)".
 
-Carry-overs from prior cycles still open (legacy 7, see
-[docs/CARRY_OVERS.md](CARRY_OVERS.md)): DEFEKT-3 (combat AI p99 — first
-surgical pass in this Phase 2 cycle), DEFEKT-4 (NPC route quality),
-STABILIZAT-1 (combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual
-review pending), AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3
-(helicopter parity audit), KB-LOAD residual.
+3 new carry-overs filed at the stabilization checkpoint:
+`cloudflare-stabilization-followups`, `weapons-cluster-zonemanager-migration`,
+`perf-doc-script-paths-drift`. Active count 9 → 12 (at the ≤12 rule limit).
+
+Carry-overs from prior cycles still open (legacy 7 + 2 from Phase 1 close +
+3 from Phase 2 stabilization checkpoint = 12, see
+[docs/CARRY_OVERS.md](CARRY_OVERS.md)): DEFEKT-3 (combat AI p99),
+DEFEKT-4 (NPC route quality), STABILIZAT-1 (combat120 baseline refresh),
+AVIATSIYA-1 / DEFEKT-5 (visual review pending), AVIATSIYA-2 (AC-47 takeoff
+bounce), AVIATSIYA-3 (helicopter parity audit), KB-LOAD residual,
+artifact-prune-baseline-pin-fix, worldbuilder-oneshotkills-wiring,
+cloudflare-stabilization-followups, weapons-cluster-zonemanager-migration,
+perf-doc-script-paths-drift.
 
 ## Dispatch protocol
 

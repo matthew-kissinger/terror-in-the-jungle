@@ -36,6 +36,30 @@ Use [docs/DIRECTIVES.md](DIRECTIVES.md) instead of duplicating active work here.
 | Combat120 baseline and live release | STABILIZAT-1 through STABILIZAT-3 |
 | Baseline drift, doc/code drift, combat p99 (`DEFEKT-3`), route quality | DEFEKT-1 through DEFEKT-4 |
 
+## Recently Completed (cycle-2026-05-10-zone-manager-decoupling)
+
+Phase 2 of the realignment campaign. ZoneManager fan-in 52 → 17 read / 5
+concrete via `IZoneQuery` interface. **Stabilization checkpoint after this
+cycle**; campaign auto-advance paused.
+
+- [#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173) `zone-manager-design-memo` — `docs/rearch/zone-manager-decoupling.md` (303 LOC), 6-method `IZoneQuery` shape proposal, batch plan
+- [#174](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/174) `izone-query-fence` — `[interface-change]` PR; `IZoneQuery` added to fence; ZoneManager implements; +3 trivial accessors (`getZoneAt`/`getZoneById`/`getCapturableZones`); terrain-nav-reviewer APPROVE
+- [#175](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/175) `zone-decoupling-batch-a-readonly` — HUD/Compass/Minimap/FullMap migrated to `IZoneQuery`
+- [#176](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/176) `zone-decoupling-batch-b-state-driven` — Combat/Tickets/WarSim migrated; ZoneManager.update() now publishes `zone_captured`/`zone_lost` events; combat-reviewer APPROVE-WITH-NOTES
+- [#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177) `zone-decoupling-batch-c-owners` — PlayerRespawn + CommandInputManager migrated; adapter shims dropped; ZoneManager removed from lint-source-budget grandfather list; `docs/ARCHITECTURE.md` heatmap updated; combat-reviewer APPROVE-WITH-NOTES
+
+Carry-over delta: −0 closed, +3 opened (`cloudflare-stabilization-followups`,
+`weapons-cluster-zonemanager-migration`, `perf-doc-script-paths-drift`).
+Active 9 → 12 (at the `≤12 active` rule limit). The +3 are deferred work
+formally registered as part of the **stabilization checkpoint**; the cycle
+ships its user-observable feature (fan-in reduction) and would be COMPLETE
+under the "ship a feature" half of the rule but registers INCOMPLETE under
+the strict-decrease half — flagged for the next cycle's plan to close ≥2
+of the 12 active before Phase 3 dispatches.
+
+Comprehensive context: [docs/STABILIZATION_CHECKPOINT_2026-05-09.md](STABILIZATION_CHECKPOINT_2026-05-09.md).
+Live audit findings: `artifacts/live-audit-2026-05-09/FINDINGS.md`.
+
 ## Recently Completed (cycle-2026-05-09-doc-decomposition-and-wiring)
 
 Phase 1 of the 12-week realignment campaign. Doc surface decomposed and
@@ -138,6 +162,7 @@ owner opens or reassigns them.
 
 | Cycle | Record |
 |---|---|
+| cycle-2026-05-10-zone-manager-decoupling | `docs/tasks/archive/cycle-2026-05-10-zone-manager-decoupling/cycle-2026-05-10-zone-manager-decoupling.md` |
 | cycle-2026-05-09-doc-decomposition-and-wiring | `docs/tasks/archive/cycle-2026-05-09-doc-decomposition-and-wiring/cycle-2026-05-09-doc-decomposition-and-wiring.md` |
 | cycle-2026-05-09-phase-0-foundation | `docs/tasks/archive/cycle-2026-05-09-phase-0-foundation/cycle-2026-05-09-phase-0-foundation.md` |
 | cycle-2026-05-08-stabilizat-2-closeout | `docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md` |

@@ -21,35 +21,41 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-**`cycle-2026-05-10-zone-manager-decoupling` (Phase 2, running).** Drops the
-worst coupling junction in the repo: `ZoneManager` fan-in 52 → ≤20 before
-Phase 3 god-module splits. Adds read-only `IZoneQuery` to
-`src/types/SystemInterfaces.ts` (pre-authorized fence change), then migrates
-HUD/Compass/Minimap/FullMap to the read interface, Combat/Tickets/WarSim to
-events + read interface, and PlayerRespawn + ZoneManager-internal cleanup.
-Dispatched via auto-advance after Phase 1 close.
+**STABILIZATION CHECKPOINT (campaign paused 2026-05-09).** Phases 0, 1, 2
+of the 9-cycle realignment campaign are complete. Phase 2
+(`cycle-2026-05-10-zone-manager-decoupling`) closed with 5 PRs merged
+([#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173)–[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177))
+shipping the user-observable feature: `ZoneManager` fan-in dropped from 52
+to 17 read / 5 concrete via the new fenced `IZoneQuery` read-only
+interface, with consumers migrated across HUD/Compass/Minimap/FullMap +
+Combat/Tickets/WarSim + PlayerRespawn + CommandInputManager.
 
-Phase 1 (`cycle-2026-05-09-doc-decomposition-and-wiring`) closed 2026-05-09
-with 6 PRs merged ([#167](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/167)–[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)):
-split `STATE_OF_REPO.md` and `PERFORMANCE.md` into focused subdirs, archived
-PROJEKT_OBJEKT_143 prose, extracted `docs/DIRECTIVES.md`, triaged 89
-`check:projekt-143-*` scripts to 12 retained, applied artifact prune +
-weekly CI job, and wired all 6 WorldBuilder god-mode flags into engine
-consumers behind `import.meta.env.DEV` (Vite DCE-confirmed). Carry-over
-delta −4 (active 13 → 9). Combat-reviewer APPROVE-WITH-NOTES on
-[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172).
+The campaign is **paused at this checkpoint** for human review before the
+more invasive Phase 3+ god-module surgery. See
+[docs/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/STABILIZATION_CHECKPOINT_2026-05-09.md)
+for: full audit findings (Cloudflare live deploy: LCP 280ms / CLS 0.02 /
+HTTP/3 / Vite DCE confirmed / PostCSS CVE flagged / `_headers` file gap
+identified), Phases 0–2 cumulative outcomes, recommended Phase 2.5
+"stabilization-fixes" cycle, Phase 3+ scope notes, resume instructions.
 
-Single source of truth for unresolved items: [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md).
-Current legacy carry-overs: DEFEKT-3 (combat AI p99 — first surgical pass
-in this Phase 2 cycle), DEFEKT-4 (NPC route quality), STABILIZAT-1
-(combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
-pending), AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3 (helicopter
-parity audit), KB-LOAD residual. New tooling carry-overs from Phase 1:
-`artifact-prune-baseline-pin-fix`, `worldbuilder-oneshotkills-wiring`.
+Single source of truth for unresolved items:
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is 12 (at the
+≤12 rule limit) after the +3 stabilization-checkpoint carry-overs:
+`cloudflare-stabilization-followups` (PostCSS CVE + missing security
+headers + missing robots.txt + missing meta-description + 2 unused preload
+hints + Cloudflare Web Analytics), `weapons-cluster-zonemanager-migration`
+(deferred 5 imports from Phase 2), `perf-doc-script-paths-drift` (deferred
+from Phase 1). Legacy carry-overs still open: DEFEKT-3 (combat AI p99),
+DEFEKT-4 (NPC route quality), STABILIZAT-1 (combat120 baseline refresh),
+AVIATSIYA-1 / DEFEKT-5 (visual review pending), AVIATSIYA-2 (AC-47 takeoff
+bounce), AVIATSIYA-3 (helicopter parity audit), KB-LOAD residual,
+artifact-prune-baseline-pin-fix, worldbuilder-oneshotkills-wiring.
 
 Campaign manifest: [docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md)
-(9 cycles, auto-advance: yes). Active campaign cycle queue is the source of
-truth for what runs next.
+(9 cycles; auto-advance currently PAUSED at stabilization checkpoint).
+Phases 3–9 are queued but not dispatched. To resume: edit the campaign
+manifest, optionally insert a Phase 2.5 stabilization-fixes cycle, and
+re-run `/orchestrate`.
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle
