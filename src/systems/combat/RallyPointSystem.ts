@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { Faction, isBlufor, getAlliance } from './types';
-import { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { Logger } from '../../utils/Logger';
 import { freezeTransform } from '../../utils/SceneUtils';
 
@@ -21,7 +21,7 @@ interface RallyPoint {
 export class RallyPointSystem implements GameSystem {
   private scene: THREE.Scene;
   private rallyPoints: Map<string, RallyPoint> = new Map(); // keyed by squadId
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private playerSquadId?: string;
 
   // Rally point configuration
@@ -94,8 +94,8 @@ export class RallyPointSystem implements GameSystem {
     this.rallyPoints.clear();
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
   }
 
   setPlayerSquadId(squadId: string): void {
@@ -221,11 +221,11 @@ export class RallyPointSystem implements GameSystem {
   }
 
   private isNearFriendlyZone(position: THREE.Vector3, faction: Faction): boolean {
-    if (!this.zoneManager) {
+    if (!this.zoneQuery) {
       return false;
     }
 
-    const zones = this.zoneManager.getAllZones();
+    const zones = this.zoneQuery.getAllZones();
 
     const factionAlliance = getAlliance(faction);
     for (const zone of zones) {

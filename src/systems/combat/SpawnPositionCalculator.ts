@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { Faction, Alliance, getAlliance, isBlufor } from './types';
-import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
+import { ZoneState, CaptureZone } from '../world/ZoneManager';
 import { GameModeConfig } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
-import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import type { ITerrainRuntime, IZoneQuery } from '../../types/SystemInterfaces';
 import { SeededRandom } from '../../core/SeededRandom';
 
 // Module-level scratch vectors to avoid per-call allocations
@@ -64,13 +64,13 @@ export class SpawnPositionCalculator {
    * Get a spawn position at a home base
    */
   static getBaseSpawnPosition(
-    faction: Faction, 
-    zoneManager?: ZoneManager, 
+    faction: Faction,
+    zoneQuery?: IZoneQuery,
     gameModeConfig?: GameModeConfig,
     terrainSystem?: ITerrainRuntime,
   ): THREE.Vector3 {
-    if (zoneManager) {
-      const allZones = zoneManager.getAllZones();
+    if (zoneQuery) {
+      const allZones = zoneQuery.getAllZones();
       const factionAlliance = getAlliance(faction);
       const ownedBases: CaptureZone[] = [];
       for (const z of allZones) {
@@ -104,13 +104,13 @@ export class SpawnPositionCalculator {
    * Get a spawn position near an owned zone (contested preferred)
    */
   static getSpawnPosition(
-    faction: Faction, 
-    zoneManager?: ZoneManager, 
+    faction: Faction,
+    zoneQuery?: IZoneQuery,
     gameModeConfig?: GameModeConfig,
     terrainSystem?: ITerrainRuntime,
   ): THREE.Vector3 {
-    if (zoneManager) {
-      const allZones = zoneManager.getAllZones();
+    if (zoneQuery) {
+      const allZones = zoneQuery.getAllZones();
       const factionAlliance = getAlliance(faction);
       
       let contestedAnchor: CaptureZone | null = null;
@@ -269,15 +269,15 @@ export class SpawnPositionCalculator {
   /**
    * Get all relevant anchors (zones) for a faction
    */
-  static getFactionAnchors(faction: Faction, zoneManager?: ZoneManager): THREE.Vector3[] {
-    if (!zoneManager) return [];
-    
+  static getFactionAnchors(faction: Faction, zoneQuery?: IZoneQuery): THREE.Vector3[] {
+    if (!zoneQuery) return [];
+
     const factionAlliance = getAlliance(faction);
     const contested: THREE.Vector3[] = [];
     const captured: THREE.Vector3[] = [];
     const hqs: THREE.Vector3[] = [];
 
-    for (const z of zoneManager.getAllZones()) {
+    for (const z of zoneQuery.getAllZones()) {
       if (z.owner === null || getAlliance(z.owner as Faction) !== factionAlliance) continue;
       
       if (z.isHomeBase) {

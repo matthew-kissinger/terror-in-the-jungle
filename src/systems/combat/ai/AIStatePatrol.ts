@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState, ITargetable, Squad, SquadCommand, isPlayerTarget } from '../types'
-import { ZoneManager } from '../../world/ZoneManager'
+import type { IZoneQuery } from '../../../types/SystemInterfaces'
 import { Logger } from '../../../utils/Logger'
 import { ISpatialQuery } from '../SpatialOctree'
 import { clusterManager } from '../ClusterManager'
@@ -21,7 +21,7 @@ interface PatrolVisibilitySample {
  * Handles patrolling and defending AI states
  */
 export class AIStatePatrol {
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private squads: Map<string, Squad> = new Map();
   private zoneDefenders: Map<string, Set<string>> = new Map();
   private patrolVisibilityByCombatant = new WeakMap<Combatant, PatrolVisibilitySample>();
@@ -30,8 +30,8 @@ export class AIStatePatrol {
     this.squads = squads;
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
   }
 
   getZoneDefenders(): Map<string, Set<string>> {
@@ -247,7 +247,7 @@ export class AIStatePatrol {
   }
 
   private shouldAssignZoneDefense(combatant: Combatant): boolean {
-    if (!this.zoneManager) return false;
+    if (!this.zoneQuery) return false;
     if (combatant.squadRole === 'leader') return false;
     if (combatant.isObjectiveFocused) return false;
     if (!combatant.squadId) return false;
@@ -266,12 +266,12 @@ export class AIStatePatrol {
   }
 
   private assignZoneDefense(combatant: Combatant): void {
-    if (!this.zoneManager) return;
+    if (!this.zoneQuery) return;
 
     combatant.lastDefenseReassignTime = Date.now();
 
     // Find nearby zones owned by this faction
-    const nearbyOwnedZones = this.zoneManager.getAllZones()
+    const nearbyOwnedZones = this.zoneQuery.getAllZones()
       .filter(zone => {
         if (zone.owner !== combatant.faction) return false;
         if (zone.isHomeBase) return false;

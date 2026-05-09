@@ -7,7 +7,7 @@ import { CombatantRenderer } from './CombatantRenderer';
 import { CombatantRenderInterpolator } from './CombatantRenderInterpolator';
 import { SquadManager } from './SquadManager';
 import type { SpatialGridManager } from './SpatialGridManager';
-import { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { GameModeManager } from '../world/GameModeManager';
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 import { resetRaycastBudget } from './ai/RaycastBudget';
@@ -74,7 +74,7 @@ export class CombatantLODManager {
   private readonly _scratchOffset = new THREE.Vector3();
   private playerPosition: THREE.Vector3;
   private gameModeManager?: GameModeManager;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private navmeshSystem?: import('../navigation/NavmeshSystem').NavmeshSystem;
 
   // Performance scaling parameters
@@ -191,8 +191,8 @@ export class CombatantLODManager {
     this.applyPerformanceScaling();
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
   }
 
   setNavmeshSystem(navmeshSystem: import('../navigation/NavmeshSystem').NavmeshSystem): void {
@@ -820,10 +820,10 @@ export class CombatantLODManager {
   }
 
   private simulateDistantAI(combatant: Combatant): void {
-    if (!this.zoneManager) return;
+    if (!this.zoneQuery) return;
     const distanceToMove = DISTANT_SIM_SPEED * DISTANT_SIM_TIME_STEP;
 
-    const zones = this.zoneManager.getAllZones();
+    const zones = this.zoneQuery.getAllZones();
     const targetZones = zones.filter(zone => {
       return !zone.isHomeBase && (
         zone.owner !== combatant.faction || zone.state === 'contested'

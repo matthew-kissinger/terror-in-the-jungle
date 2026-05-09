@@ -24,6 +24,7 @@ describe('AIStateDefend', () => {
 
     mockZoneManager = {
       getAllZones: vi.fn(() => []),
+      getZoneById: vi.fn(() => null),
     };
 
     aiStateDefend.setZoneManager(mockZoneManager as any);
@@ -83,7 +84,7 @@ describe('AIStateDefend', () => {
       combatant.defensePosition = defensePos;
       combatant.defendingZoneId = 'zone-1';
 
-      mockZoneManager.getAllZones.mockReturnValue([{ id: 'zone-1', position: zonePos }]);
+      mockZoneManager.getZoneById.mockReturnValue({ id: 'zone-1', position: zonePos });
 
       aiStateDefend.handleDefending(
         combatant, 0.016, playerPosition, allCombatants, undefined,

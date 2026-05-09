@@ -250,7 +250,7 @@ export class SquadManager {
   assignSquadObjective(
     squad: Squad,
     squadLeaderPos: THREE.Vector3,
-    zones: CaptureZone[]
+    zones: readonly CaptureZone[]
   ): CaptureZone | null {
     if (!this.influenceMap) {
       // Fallback to random zone selection

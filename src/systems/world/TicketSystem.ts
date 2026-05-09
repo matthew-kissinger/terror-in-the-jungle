@@ -1,6 +1,6 @@
 import { GameSystem } from '../../types';
 import { Faction, isBlufor } from '../combat/types';
-import { ZoneManager } from './ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { Logger } from '../../utils/Logger';
 import { TicketSystemPhases, GamePhase } from './TicketSystemPhases';
 import { TicketBleedCalculator, TicketBleedRate } from './TicketBleedCalculator';
@@ -25,7 +25,7 @@ export class TicketSystem implements GameSystem {
   private killTarget = 0;
   private isTDM = false;
 
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private gameState: GameState = {
     gameActive: true,
     matchDuration: 0,
@@ -94,9 +94,9 @@ export class TicketSystem implements GameSystem {
   }
 
   private updateTicketBleed(deltaTime: number): void {
-    if (!this.zoneManager) return;
+    if (!this.zoneQuery) return;
 
-    const bleedRates = this.bleedCalculator.calculateTicketBleed(this.zoneManager);
+    const bleedRates = this.bleedCalculator.calculateTicketBleed(this.zoneQuery);
     const result = this.bleedCalculator.applyTicketBleed(
       this.usTickets,
       this.opforTickets,
@@ -119,7 +119,7 @@ export class TicketSystem implements GameSystem {
       opforKills: this.opforKills,
       usTickets: this.usTickets,
       opforTickets: this.opforTickets,
-      zoneManager: this.zoneManager,
+      zoneManager: this.zoneQuery,
       currentPhase: this.gameState.phase,
       matchDuration: this.gameState.matchDuration,
       phaseTimings: this.phaseManager.getPhaseTimings()
@@ -188,7 +188,7 @@ export class TicketSystem implements GameSystem {
   }
 
   getTicketBleedRate(): TicketBleedRate {
-    return this.bleedCalculator.calculateTicketBleed(this.zoneManager);
+    return this.bleedCalculator.calculateTicketBleed(this.zoneQuery);
   }
 
   // Testing/debug access to internal values
@@ -225,8 +225,8 @@ export class TicketSystem implements GameSystem {
 
   // System connections
 
-  setZoneManager(manager: ZoneManager | undefined): void {
-    this.zoneManager = manager;
+  setZoneManager(manager: IZoneQuery | undefined): void {
+    this.zoneQuery = manager;
   }
 
   // Game mode configuration methods

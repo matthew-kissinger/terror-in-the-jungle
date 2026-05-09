@@ -13,11 +13,13 @@ vi.mock('../../utils/Logger', () => ({
   },
 }));
 
-// Helper to create a mock ZoneManager
+// Helper to create a mock ZoneManager (satisfies the IZoneQuery surface that
+// TicketSystem + VictoryConditions consume).
 const createMockZoneManager = (zones: CaptureZone[] = []): ZoneManager => {
   const mockZoneManager: Partial<ZoneManager> = {
     getAllZones: vi.fn(() => zones),
-    getZoneById: vi.fn((id: string) => zones.find(z => z.id === id)),
+    getCapturableZones: vi.fn(() => zones.filter(z => !z.isHomeBase)),
+    getZoneById: vi.fn((id: string) => zones.find(z => z.id === id) ?? null),
   };
   return mockZoneManager as ZoneManager;
 };

@@ -33,7 +33,7 @@ export class InfluenceMapSystem implements GameSystem {
 
   // External dependencies
   private combatants: Map<string, Combatant> = new Map();
-  private zones: CaptureZone[] = [];
+  private zones: readonly CaptureZone[] = [];
   private playerPosition = new THREE.Vector3();
   private sandbagBounds: THREE.Box3[] = [];
 
@@ -242,7 +242,7 @@ export class InfluenceMapSystem implements GameSystem {
     this.combatants = combatants;
   }
 
-  setZones(zones: CaptureZone[]): void {
+  setZones(zones: readonly CaptureZone[]): void {
     this.zones = zones;
   }
 

@@ -10,6 +10,7 @@ import { ZoneTerrainAdapter } from './ZoneTerrainAdapter';
 import { ZoneInitializer } from './ZoneInitializer';
 import { GameModeConfig } from '../../config/gameModeTypes';
 import type { IHUDSystem, ITerrainRuntime, IZoneQuery } from '../../types/SystemInterfaces';
+import { GameEventBus } from '../../core/GameEventBus';
 
 export enum ZoneState {
   NEUTRAL = 'neutral',
@@ -197,6 +198,28 @@ export class ZoneManager implements GameSystem, IZoneQuery {
       if (previousAlliance === this.playerAlliance && currentAlliance !== null && currentAlliance !== this.playerAlliance && !zone.isHomeBase) {
         if (this.hudSystem && typeof this.hudSystem.addZoneCapture === 'function') {
           this.hudSystem.addZoneCapture(zone.name, true);
+        }
+      }
+
+      // Publish ownership transitions on the typed event bus so consumers can
+      // react to zone state changes without polling every frame. The HUD
+      // direct-call above stays until Batch A migrates the toast subscription.
+      // Skip home bases (they should not change owner during a match) and
+      // first-frame transitions where previousOwner is undefined (initial seed).
+      if (!zone.isHomeBase && previousOwner !== undefined && previousOwner !== zone.owner) {
+        if (previousOwner !== null) {
+          GameEventBus.emit('zone_lost', {
+            zoneId: zone.id,
+            zoneName: zone.name,
+            faction: previousOwner,
+          });
+        }
+        if (zone.owner !== null) {
+          GameEventBus.emit('zone_captured', {
+            zoneId: zone.id,
+            zoneName: zone.name,
+            faction: zone.owner,
+          });
         }
       }
 

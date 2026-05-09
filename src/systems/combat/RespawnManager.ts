@@ -4,7 +4,7 @@ import { SquadManager } from './SquadManager';
 import { CombatantFactory } from './CombatantFactory';
 import { RallyPointSystem } from './RallyPointSystem';
 import { SpawnPositionCalculator } from './SpawnPositionCalculator';
-import { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
 import { spatialGridManager } from './SpatialGridManager';
@@ -104,13 +104,13 @@ export class RespawnManager {
   /**
    * Handle pending respawns
    */
-  handlePendingRespawns(rallyPointSystem?: RallyPointSystem, zoneManager?: ZoneManager, gameModeManager?: GameModeManager): void {
+  handlePendingRespawns(rallyPointSystem?: RallyPointSystem, zoneQuery?: IZoneQuery, gameModeManager?: GameModeManager): void {
     const now = Date.now();
     const readyToRespawn = this.pendingRespawns.filter(r => r.respawnTime <= now);
 
     readyToRespawn.forEach(respawn => {
       Logger.info('combat', `RESPAWN TRIGGERED at ${now} (was scheduled for ${respawn.respawnTime})`);
-      this.respawnSquadMember(respawn.squadId, rallyPointSystem, zoneManager, gameModeManager);
+      this.respawnSquadMember(respawn.squadId, rallyPointSystem, zoneQuery, gameModeManager);
     });
 
     this.pendingRespawns = this.pendingRespawns.filter(r => r.respawnTime > now);
@@ -120,9 +120,9 @@ export class RespawnManager {
    * Respawn a specific squad member
    */
   respawnSquadMember(
-    squadId: string, 
-    rallyPointSystem?: RallyPointSystem, 
-    zoneManager?: ZoneManager, 
+    squadId: string,
+    rallyPointSystem?: RallyPointSystem,
+    zoneQuery?: IZoneQuery,
     gameModeManager?: GameModeManager
   ): void {
     const squad = this.squadManager.getSquad(squadId);
@@ -160,7 +160,7 @@ export class RespawnManager {
       } else {
         spawnPos = SpawnPositionCalculator.getBaseSpawnPosition(
           squad.faction,
-          zoneManager,
+          zoneQuery,
           gameModeManager?.getCurrentConfig(),
           this.terrainSystem,
         );
@@ -168,7 +168,7 @@ export class RespawnManager {
     } else {
       spawnPos = SpawnPositionCalculator.getBaseSpawnPosition(
         squad.faction,
-        zoneManager,
+        zoneQuery,
         gameModeManager?.getCurrentConfig(),
         this.terrainSystem,
       );
@@ -202,12 +202,12 @@ export class RespawnManager {
    * Spawn a reinforcement wave for a faction
    */
   spawnReinforcementWave(
-    faction: Faction, 
+    faction: Faction,
     maxCombatants: number,
     squadSizeMin: number,
     squadSizeMax: number,
     spawnSquadFn: (faction: Faction, pos: THREE.Vector3, size: number) => void,
-    zoneManager?: ZoneManager,
+    zoneQuery?: IZoneQuery,
     gameModeManager?: GameModeManager
   ): void {
     const targetPerFaction = Math.floor(maxCombatants / 2);
@@ -220,12 +220,12 @@ export class RespawnManager {
     const maxSquadsThisWave = Math.max(1, Math.min(3, Math.ceil(missing / avgSquadSize / 2)));
 
     // Choose anchors across owned zones (contested first)
-    const anchors = SpawnPositionCalculator.getFactionAnchors(faction, zoneManager);
+    const anchors = SpawnPositionCalculator.getFactionAnchors(faction, zoneQuery);
     if (anchors.length === 0) {
       // Fallback: spawn near default base pos
       const pos = SpawnPositionCalculator.getSpawnPosition(
         faction,
-        zoneManager,
+        zoneQuery,
         gameModeManager?.getCurrentConfig(),
         this.terrainSystem,
       );
