@@ -73,8 +73,8 @@ const TEXT_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs', '.md', '.
 const ACTIVE_DIRS = ['src', 'scripts', 'public'];
 const TOOLING_SELF_EXCLUDES = new Set([
   'scripts/webgpu-strategy-audit.ts',
-  'scripts/projekt-143-completion-audit.ts',
-  'scripts/projekt-143-platform-capability-probe.ts',
+  'scripts/audit-archive/completion-audit.ts',
+  'scripts/check-platform-capabilities.ts',
 ]);
 const SEARCH_EXCLUDES = new Set([
   'node_modules',
@@ -267,7 +267,7 @@ function buildAudit(): WebgpuStrategyAudit {
         'Whether the capture window is single-monitor, fixed 1920x1080, and deviceScaleFactor=1.',
       ],
       nextActions: [
-        'Run npm run check:projekt-143-platform-capabilities -- --run-browser --headed only when the machine is quiet.',
+        'Run npm run check:platform-capabilities -- --run-browser --headed only when the machine is quiet.',
         'Keep the probe read-only; it must not select WebGPU or OffscreenCanvas runtime code by itself.',
         'Use the probe to decide whether WebGL2 timer coverage, WASM threads, worker rendering, or WebGPU spikes are even viable on the owner machine and deployed Pages.',
       ],

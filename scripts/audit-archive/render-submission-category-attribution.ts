@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { PROJEKT_143_REQUIRED_SCENE_CATEGORIES } from './projekt-143-scene-attribution';
+import { PROJEKT_143_REQUIRED_SCENE_CATEGORIES } from './scene-attribution';
 
 type Status = 'pass' | 'warn' | 'fail';
 

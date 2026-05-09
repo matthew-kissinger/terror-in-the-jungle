@@ -6,7 +6,7 @@ import { join, relative } from 'path';
 import {
   PROJEKT_143_REQUIRED_SCENE_CATEGORIES,
   type SceneAttributionEntry,
-} from './projekt-143-scene-attribution';
+} from './scene-attribution';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
 
