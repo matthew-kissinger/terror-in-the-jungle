@@ -49,7 +49,8 @@ const GRANDFATHER_DATE: Set<string> = new Set([
 ]);
 
 const GRANDFATHER_LOC: Set<string> = new Set([
-  'docs/PERFORMANCE.md',          // 2333 LOC → split into docs/perf/ in Phase 1
+  // docs/PERFORMANCE.md split into docs/perf/ in cycle-2026-05-09-doc-decomposition-and-wiring (Phase 1).
+  // docs/STATE_OF_REPO.md split into docs/state/ in cycle-2026-05-09-doc-decomposition-and-wiring (Phase 1).
   'docs/FLIGHT_REBUILD_ORCHESTRATION.md', // 1160 LOC → archive after Phase 4 F5
   'docs/STARTER_KIT_EXTRACTION_STRATEGY_2026-04-28.md', // 1227 LOC
   'docs/SYSTEM_PACKAGEABILITY_AUDIT_2026-04-28.md',     // 1261 LOC

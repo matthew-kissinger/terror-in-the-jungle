@@ -314,7 +314,7 @@ doctrine question remains a Phase F candidate.
 ## Perf Budget
 
 Combat's tracked budget is **5ms/frame** (see `docs/ARCHITECTURE.md`
-tick graph). Current status per `docs/PERFORMANCE.md`:
+tick graph). Current status per `docs/perf/baselines.md`:
 
 | Scenario | NPCs | Avg | p95 | p99 | Status |
 |----------|-----:|----:|----:|----:|--------|
@@ -329,7 +329,7 @@ Frame-level budgets (`combat120` at 120 NPCs):
 
 As of 2026-04-19, only `combat120` has a fresh local post-PR #96 capture.
 The other scenario rows above remain the last accepted warm captures reflected
-in [docs/PERFORMANCE.md](PERFORMANCE.md).
+in [docs/perf/baselines.md](perf/baselines.md).
 
 At 240 NPCs and above, combat avg frame is not baselined. The rule of
 thumb is that AI update scales roughly linearly with count while LOS

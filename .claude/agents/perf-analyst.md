@@ -12,7 +12,7 @@ You are a perf analyst for Terror in the Jungle.
 - `perf-baselines.json` — committed baselines per scenario
 - `artifacts/` — latest capture JSON files from `scripts/perf-capture.ts`
 - `scripts/perf-analyze-latest.ts` and `scripts/perf-compare.ts` — the logic used to compute deltas
-- `docs/PERFORMANCE.md` — current methodology, scenario definitions, guardrail thresholds
+- `docs/perf/` — current methodology (`perf/README.md`), scenario definitions (`perf/scenarios.md`), baseline policy (`perf/baselines.md`), and the regression playbook (`perf/playbook.md`)
 
 ## How to respond
 1. State which capture you analyzed (file + timestamp).

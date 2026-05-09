@@ -126,7 +126,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | [docs/COMBAT.md](docs/COMBAT.md) | Combat subsystem architecture (new, D1 2026-04-17) |
 | [docs/TESTING.md](docs/TESTING.md) | Four-layer test contract. Read before writing tests. |
 | [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced interfaces in `src/types/SystemInterfaces.ts` |
-| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Profiling commands, scenarios, validation gates |
+| [docs/perf/](docs/perf/) | Profiling commands, scenarios, baselines, regression playbook (see `perf/README.md` for the index) |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Dev setup, validation, deployment, pre-push checklist |
 | [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) | Cloudflare Pages deploy + cache/service-worker strategy |
 | [docs/CLOUDFLARE_STACK.md](docs/CLOUDFLARE_STACK.md) | Target Cloudflare architecture for Pages, R2 assets, Workers, and interaction services |
