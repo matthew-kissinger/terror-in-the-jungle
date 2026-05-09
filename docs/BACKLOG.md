@@ -36,6 +36,27 @@ Use [docs/DIRECTIVES.md](DIRECTIVES.md) instead of duplicating active work here.
 | Combat120 baseline and live release | STABILIZAT-1 through STABILIZAT-3 |
 | Baseline drift, doc/code drift, combat p99 (`DEFEKT-3`), route quality | DEFEKT-1 through DEFEKT-4 |
 
+## Recently Completed (cycle-2026-05-09-doc-decomposition-and-wiring)
+
+Phase 1 of the 12-week realignment campaign. Doc surface decomposed and
+WorldBuilder god-mode flags wired into engine consumers.
+
+- [#167](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/167) `state-doc-split` — `docs/STATE_OF_REPO.md` (2,708 LOC) → `docs/state/` (3 files ≤140 LOC each)
+- [#168](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/168) `codex-decomposition` — `docs/PROJEKT_OBJEKT_143*.md` archived; `docs/DIRECTIVES.md` (199 LOC) replaces Article III
+- [#169](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/169) `perf-doc-split` — `docs/PERFORMANCE.md` (2,332 LOC) → `docs/perf/` (4 files ≤200 LOC each)
+- [#170](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/170) `script-triage` — 89 `check:projekt-143-*` → 12 plain-named retained; 80 archived under `scripts/audit-archive/`
+- [#171](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/171) `artifact-gc` — weekly `artifact-prune.yml` workflow; ~7.4 GB local prune
+- [#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172) `worldbuilder-wiring` — 6 god-mode flags wired into PlayerHealthSystem, AmmoManager, PlayerMovement, PostProcessingManager, AtmosphereSystem, AudioManager (all DEV-gated, Vite DCE confirmed)
+
+Carry-over delta: −6 worldbuilder-wiring closed, +2 opened (artifact-prune
+baseline-pin fix; `oneShotKills` 7th flag wiring). Net −4. Active count
+13 → 9. Cycle COMPLETE.
+
+Follow-ups for next cycles (combat-reviewer notes from PR #172):
+- Update stale "703 LOC" reason text in `scripts/lint-source-budget.ts:54` (file is now 718 LOC).
+- `oneShotKills` flag wiring (carry-over filed).
+- `artifact-prune.ts` baseline-pin regex fix (carry-over filed).
+
 ## Strategic Reserve
 
 Items below are acknowledged but not active directives unless the project
@@ -117,6 +138,8 @@ owner opens or reassigns them.
 
 | Cycle | Record |
 |---|---|
+| cycle-2026-05-09-doc-decomposition-and-wiring | `docs/tasks/archive/cycle-2026-05-09-doc-decomposition-and-wiring/cycle-2026-05-09-doc-decomposition-and-wiring.md` |
+| cycle-2026-05-09-phase-0-foundation | `docs/tasks/archive/cycle-2026-05-09-phase-0-foundation/cycle-2026-05-09-phase-0-foundation.md` |
 | cycle-2026-05-08-stabilizat-2-closeout | `docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md` |
 | cycle-2026-04-23-debug-cleanup | `docs/cycles/cycle-2026-04-23-debug-cleanup/RESULT.md` |
 | cycle-2026-04-23-debug-and-test-modes | `docs/cycles/cycle-2026-04-23-debug-and-test-modes/RESULT.md` |

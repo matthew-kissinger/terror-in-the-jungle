@@ -24,13 +24,15 @@ started, the cycle is `INCOMPLETE` per the rule in
 
 | ID | Title | Opened | Cycles open | Owning subsystem | Blocking? | Notes |
 |----|-------|--------|------------:|------------------|-----------|-------|
-| DEFEKT-3 | Combat AI p99 — synchronous cover search in `AIStateEngage.initiateSquadSuppression` | cycle-2026-04-17-drift-correction-run | 5 | combat | yes (gates Phase F) | Phase 4 F2 (CoverQueryService → precomputed field + worker fallback). First surgical pass in Phase 3 R2. |
-| DEFEKT-4 | NPC route-follow quality not signed off (slope-stuck, navmesh crowd disabled, terrain solver stalls) | cycle-2026-04-17-drift-correction-run | 5 | navigation | no | Phase 3 R5 (NavmeshSystem split) creates the seam; runtime acceptance after that. |
-| STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 4 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. |
-| AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 3 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
-| AVIATSIYA-3 | Helicopter parity audit: HelicopterVehicleAdapter vs HelicopterPlayerAdapter | cycle-2026-04-22-heap-and-polish | 4 | aviation | no | Phase 4 F5 close-out. Audit memo exists at `docs/rearch/helicopter-parity-audit.md`. |
-| AVIATSIYA-2 | AC-47 low-pitch takeoff single-bounce | cycle-2026-04-21-stabilization-reset | 4 | aviation | no | Anchor at `Airframe` ground rolling. Phase 3 R4 adds Airframe tests; Phase 4 F5 fixes. |
-| KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 1 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
+| DEFEKT-3 | Combat AI p99 — synchronous cover search in `AIStateEngage.initiateSquadSuppression` | cycle-2026-04-17-drift-correction-run | 6 | combat | yes (gates Phase F) | Phase 4 F2 (CoverQueryService → precomputed field + worker fallback). First surgical pass in Phase 3 R2. |
+| DEFEKT-4 | NPC route-follow quality not signed off (slope-stuck, navmesh crowd disabled, terrain solver stalls) | cycle-2026-04-17-drift-correction-run | 6 | navigation | no | Phase 3 R5 (NavmeshSystem split) creates the seam; runtime acceptance after that. |
+| STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 5 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. |
+| AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 4 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
+| AVIATSIYA-3 | Helicopter parity audit: HelicopterVehicleAdapter vs HelicopterPlayerAdapter | cycle-2026-04-22-heap-and-polish | 5 | aviation | no | Phase 4 F5 close-out. Audit memo exists at `docs/rearch/helicopter-parity-audit.md`. |
+| AVIATSIYA-2 | AC-47 low-pitch takeoff single-bounce | cycle-2026-04-21-stabilization-reset | 5 | aviation | no | Anchor at `Airframe` ground rolling. Phase 3 R4 adds Airframe tests; Phase 4 F5 fixes. |
+| KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 2 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
+| artifact-prune-baseline-pin-fix | `scripts/artifact-prune.ts` baseline-pin regex requires `artifacts/perf/` prefix but `perf-baselines.json` stores bare dir names — pinned dirs reported as 0, can be deleted by `--apply` | cycle-2026-05-09-doc-decomposition-and-wiring | 1 | perf-harness | no | Trivial fix; flagged by perf-analyst + artifact-gc executor. Bake into a future tooling sweep. |
+| worldbuilder-oneshotkills-wiring | 7th god-mode flag `oneShotKills` is published in `WorldBuilderState` / dev console but unwired to any combat consumer | cycle-2026-05-09-doc-decomposition-and-wiring | 1 | weapons / combat | no | Out-of-scope for Phase 1 brief (which named 6 flags). Wire to projectile damage path or `PlayerHealthSystem.takeDamage` from-NPC branch. |
 
 ## Closed
 

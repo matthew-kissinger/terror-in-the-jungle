@@ -114,91 +114,82 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-05-09-doc-decomposition-and-wiring
+## Current cycle: cycle-2026-05-10-zone-manager-decoupling
 
-**Phase 1 of the realignment plan**
-(`C:/Users/Mattm/.claude/plans/can-we-make-a-lexical-mitten.md`). Queued for
-overnight `/orchestrate` run.
+**Phase 2 of the realignment campaign** (cycle 2 of 9 in
+[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md)). Auto-advanced from
+Phase 1 close.
 
-**Cycle brief:** [docs/tasks/cycle-2026-05-09-doc-decomposition-and-wiring.md](tasks/cycle-2026-05-09-doc-decomposition-and-wiring.md)
+**Cycle brief:** [docs/tasks/cycle-2026-05-10-zone-manager-decoupling.md](tasks/cycle-2026-05-10-zone-manager-decoupling.md)
 
-**Skip-confirm: yes.** The orchestrator dispatches Round 1 without waiting
-for "go". Hard-stops still surface (fence change, >2 CI red in a round,
-perf regression >5% p99).
+**Skip-confirm: yes.**
+
+**Why this cycle now:** `ZoneManager` has fan-in 52 — highest in the repo.
+Must drop to ≤20 before the Phase 3 god-module splits start, or those splits
+will re-create the coupling problem in new files.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `state-doc-split`, `perf-doc-split`, `codex-decomposition`, `script-triage`, `artifact-gc` | 5 |
-| 2 | `worldbuilder-wiring` | 1 |
+| 1 | `zone-manager-design-memo`, `izone-query-fence` | 2 |
+| 2 | `zone-decoupling-batch-a-readonly`, `zone-decoupling-batch-b-state-driven`, `zone-decoupling-batch-c-owners` | 3 |
 
 ### Tasks in this cycle
 
-Each brief is in `docs/tasks/<slug>.md`:
-
-- [state-doc-split](tasks/state-doc-split.md) — split STATE_OF_REPO.md (2,708 LOC) into `docs/state/`
-- [perf-doc-split](tasks/perf-doc-split.md) — split PERFORMANCE.md (2,332 LOC) into `docs/perf/`
-- [codex-decomposition](tasks/codex-decomposition.md) — extract DIRECTIVES.md, archive PROJEKT_OBJEKT_143 prose
-- [script-triage](tasks/script-triage.md) — 89 `check:projekt-143-*` → 12 plain-named retained scripts
-- [artifact-gc](tasks/artifact-gc.md) — apply retention prune + weekly CI job
-- [worldbuilder-wiring](tasks/worldbuilder-wiring.md) — wire 6 god-mode flags into engine consumers (Round 2 only; combat-reviewer + playtest required)
+- [zone-manager-design-memo](tasks/zone-manager-design-memo.md) — doc-only; lays out 11 caller surfaces
+- [izone-query-fence](tasks/izone-query-fence.md) — `[interface-change]` PR; adds read-only `IZoneQuery` to `src/types/SystemInterfaces.ts` (terrain-nav-reviewer pre-merge)
+- [zone-decoupling-batch-a-readonly](tasks/zone-decoupling-batch-a-readonly.md) — HUD/Compass/Minimap/FullMap → `IZoneQuery` only
+- [zone-decoupling-batch-b-state-driven](tasks/zone-decoupling-batch-b-state-driven.md) — Combat/Tickets/WarSim → events + `IZoneQuery` (combat-reviewer)
+- [zone-decoupling-batch-c-owners](tasks/zone-decoupling-batch-c-owners.md) — PlayerRespawn + ZoneManager-internal cleanup (combat-reviewer)
 
 ### Dependencies
 
 ```
-state-doc-split    ─┐
-perf-doc-split     ─┤
-codex-decomposition ┼─→ (Round 1 complete) ─→ worldbuilder-wiring
-script-triage      ─┤
-artifact-gc        ─┘
+zone-manager-design-memo ─→ izone-query-fence ─→ batch-a ─┐
+                                              ─→ batch-b ─┼─→ (cycle close)
+                                              ─→ batch-c ─┘
 ```
 
-### Reviewer policy (per Phase 0 rule)
+### Reviewer policy
 
-- **Round 1:** none of the 5 tasks touch `src/systems/combat/**` or
-  `src/systems/terrain/**` or `src/systems/navigation/**`. No reviewer
-  required pre-merge.
-- **Round 2 (`worldbuilder-wiring`):** combat-reviewer pre-merge. Touches
-  `PlayerHealthSystem`, `AmmoSupplySystem`, `PlayerMovement`,
-  `PostProcessingManager`, `AtmosphereSystem`, `AudioManager`. Playtest
-  also required.
+- `izone-query-fence`: terrain-nav-reviewer pre-merge (touches
+  `src/types/SystemInterfaces.ts`; pre-authorized fence change).
+- `zone-decoupling-batch-b-state-driven`: combat-reviewer pre-merge.
+- `zone-decoupling-batch-c-owners`: combat-reviewer pre-merge.
 
 ### Cycle-level success criteria
 
-See [the cycle brief](tasks/cycle-2026-05-09-doc-decomposition-and-wiring.md#success-criteria-cycle-level)
-for the 10-point list. Highlights:
-
-- `du -sh docs/` reduced ≥40%
-- `du -sh artifacts/` <2 GB
-- `grep -c '"check:projekt-143' package.json` returns 0
-- `grep -r "Politburo\|Bureau\|Codex\|Article III" docs/ --exclude-dir=archive` returns 0
-- `STATE_OF_REPO.md` and `PERFORMANCE.md` replaced by redirect stubs
-- 6 worldbuilder-wiring carry-overs in `docs/CARRY_OVERS.md` move to Closed
-- `combat120` p99 within ±2%
+See [the cycle brief](tasks/cycle-2026-05-10-zone-manager-decoupling.md#cycle-level-success-criteria).
+Highlights: `IZoneQuery` exported, ZoneManager fan-in ≤20, parity test green,
+`combat120` p99 within ±2%.
 
 ### Last closed cycle
 
-`cycle-2026-05-09-phase-0-foundation` closed 2026-05-09. Retrospective:
-the cycle brief itself ([docs/tasks/cycle-2026-05-09-phase-0-foundation.md](tasks/cycle-2026-05-09-phase-0-foundation.md)) — moves to
-`docs/tasks/archive/cycle-2026-05-09-phase-0-foundation/` per ritual.
-
-Phase 0 installed: max-LOC + max-method lint with grandfather list,
-doc date-header lint, fenced-interface pre-flight, banned cycle-name
-keywords, reviewer-pre-merge gate, scenario smoke screenshot gate,
-artifact-prune retention script, the WorldBuilder dev console
-(`Shift+G`), tightened `.claude/settings.local.json`. No game-code
-changes — substrate only.
-
-Spawned 6 `worldbuilder-wiring` carry-overs in `docs/CARRY_OVERS.md` for
-this Phase 1 cycle to close.
+`cycle-2026-05-09-doc-decomposition-and-wiring` closed 2026-05-09. 6 PRs
+merged ([#167](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/167),
+[#168](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/168),
+[#169](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/169),
+[#170](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/170),
+[#171](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/171),
+[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)).
+Phase 1 split STATE_OF_REPO.md and PERFORMANCE.md into focused subdirs,
+archived PROJEKT_OBJEKT_143 prose into `docs/archive/`, extracted
+`docs/DIRECTIVES.md` (199 LOC) as the plain-English directive registry,
+triaged 89 `check:projekt-143-*` scripts to 12 retained, applied artifact
+prune retention + weekly CI job, and wired 6 WorldBuilder god-mode flags
+into their consumer systems (all DEV-gated, Vite DCE-confirmed). Cycle
+retrospective: see [docs/BACKLOG.md](BACKLOG.md) "Recently Completed". 6
+worldbuilder-wiring carry-overs closed; 2 new tooling carry-overs filed
+(`artifact-prune-baseline-pin-fix`, `worldbuilder-oneshotkills-wiring`).
+Active count 13 → 9.
 
 Carry-overs from prior cycles still open (legacy 7, see
-[docs/CARRY_OVERS.md](CARRY_OVERS.md)): DEFEKT-3 (combat AI p99),
-DEFEKT-4 (NPC route quality), STABILIZAT-1 (combat120 baseline refresh),
-AVIATSIYA-1 / DEFEKT-5 (visual review pending),
-AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3 (helicopter parity audit),
-KB-LOAD residual.
+[docs/CARRY_OVERS.md](CARRY_OVERS.md)): DEFEKT-3 (combat AI p99 — first
+surgical pass in this Phase 2 cycle), DEFEKT-4 (NPC route quality),
+STABILIZAT-1 (combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual
+review pending), AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3
+(helicopter parity audit), KB-LOAD residual.
 
 ## Dispatch protocol
 

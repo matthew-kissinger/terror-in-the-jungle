@@ -21,32 +21,35 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-**`cycle-2026-05-09-phase-0-foundation` (in review).** Foundation cycle of the
-12-week realignment plan at
-`C:/Users/Mattm/.claude/plans/can-we-make-a-lexical-mitten.md`. Installs the
-durable rules layer (max-LOC + max-method lint with grandfather list, doc
-date-header lint, fenced-interface pre-flight, banned cycle-name keywords,
-reviewer-pre-merge gate, scenario smoke screenshot gate, artifact-prune
-retention) and ships the **WorldBuilder dev console** (`Shift+G`) as an
-isolation/validation tool. Deliberately no game-code changes; engine-side
-wiring of WorldBuilder god-mode flags is filed for Phase 1.
+**`cycle-2026-05-10-zone-manager-decoupling` (Phase 2, running).** Drops the
+worst coupling junction in the repo: `ZoneManager` fan-in 52 → ≤20 before
+Phase 3 god-module splits. Adds read-only `IZoneQuery` to
+`src/types/SystemInterfaces.ts` (pre-authorized fence change), then migrates
+HUD/Compass/Minimap/FullMap to the read interface, Combat/Tickets/WarSim to
+events + read interface, and PlayerRespawn + ZoneManager-internal cleanup.
+Dispatched via auto-advance after Phase 1 close.
+
+Phase 1 (`cycle-2026-05-09-doc-decomposition-and-wiring`) closed 2026-05-09
+with 6 PRs merged ([#167](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/167)–[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)):
+split `STATE_OF_REPO.md` and `PERFORMANCE.md` into focused subdirs, archived
+PROJEKT_OBJEKT_143 prose, extracted `docs/DIRECTIVES.md`, triaged 89
+`check:projekt-143-*` scripts to 12 retained, applied artifact prune +
+weekly CI job, and wired all 6 WorldBuilder god-mode flags into engine
+consumers behind `import.meta.env.DEV` (Vite DCE-confirmed). Carry-over
+delta −4 (active 13 → 9). Combat-reviewer APPROVE-WITH-NOTES on
+[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172).
 
 Single source of truth for unresolved items: [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md).
-Current legacy carry-overs (each open ≥3 cycles, all targeted by the
-realignment plan): DEFEKT-3 (combat AI p99 cover search), DEFEKT-4 (NPC
-route quality), STABILIZAT-1 (combat120 baseline refresh), AVIATSIYA-1 /
-DEFEKT-5 (visual review pending), AVIATSIYA-2 (AC-47 takeoff bounce),
-AVIATSIYA-3 (helicopter parity audit). Phase 0 also spawns 6 new
-`worldbuilder-wiring` carry-overs for Phase 1 engine wiring.
+Current legacy carry-overs: DEFEKT-3 (combat AI p99 — first surgical pass
+in this Phase 2 cycle), DEFEKT-4 (NPC route quality), STABILIZAT-1
+(combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
+pending), AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3 (helicopter
+parity audit), KB-LOAD residual. New tooling carry-overs from Phase 1:
+`artifact-prune-baseline-pin-fix`, `worldbuilder-oneshotkills-wiring`.
 
-Prior cycle: `cycle-2026-05-08-perception-and-stuck` closed 2026-05-08
-(single integration PR [#165](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/165), four
-parallel task branches landed behind Tweakpane config flags). Hotfix on
-top: `createTileGeometry` Z-coordinate sign flip backface-culled terrain
-on every map; fix at `src/systems/terrain/CDLODRenderer.ts:25` and
-regression test in `CDLODRenderer.test.ts`. The Z-flip is the cautionary
-tale that motivated the new scenario-smoke screenshot gate
-([scripts/scenario-smoke.ts](scripts/scenario-smoke.ts)).
+Campaign manifest: [docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md)
+(9 cycles, auto-advance: yes). Active campaign cycle queue is the source of
+truth for what runs next.
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle
