@@ -7,7 +7,7 @@
  *
  * See `docs/INTERFACE_FENCE.md` for rules, procedure, and rationale.
  *
- * Last fence review: 2026-04-16 (F1+F2 foundation pass).
+ * Last fence review: 2026-05-09 (added IZoneQuery for ZoneManager decoupling).
  * Only interfaces actively imported by other modules belong here.
  */
 
@@ -31,7 +31,7 @@ import type { HelipadSystem } from '../systems/helicopter/HelipadSystem';
 import type { AircraftRole } from '../systems/helicopter/AircraftConfigs';
 import type { HelicopterControls } from '../systems/helicopter/HelicopterPhysics';
 import type { CombatantSystem } from '../systems/combat/CombatantSystem';
-import type { ZoneManager } from '../systems/world/ZoneManager';
+import type { CaptureZone, ZoneManager } from '../systems/world/ZoneManager';
 import type {
   ActorMode,
   GameplayInputMode,
@@ -315,6 +315,39 @@ export interface ICloudRuntime {
   getCoverage(): number;
   /** Sets cloud coverage; values are clamped into [0, 1] by the implementation. */
   setCoverage(v: number): void;
+}
+
+/**
+ * Read-only query surface over capture zones. Implemented by `ZoneManager`.
+ *
+ * Consumers that only need to *read* zone state should depend on this
+ * interface instead of importing the concrete `ZoneManager`. Returned arrays
+ * are `readonly` so consumers cannot mutate manager state through the seam.
+ *
+ * See `docs/rearch/zone-manager-decoupling.md` for the design memo.
+ */
+export interface IZoneQuery {
+  /** All zones, including home bases. Order is insertion order. */
+  getAllZones(): readonly CaptureZone[];
+
+  /** All zones with `isHomeBase === false`. */
+  getCapturableZones(): readonly CaptureZone[];
+
+  /** Zone whose horizontal radius contains `position`, or `null`. */
+  getZoneAt(position: THREE.Vector3): CaptureZone | null;
+
+  /** Zone with the given id, or `null`. */
+  getZoneById(id: string): CaptureZone | null;
+
+  /** All zones owned by `faction`. */
+  getZonesByOwner(faction: Faction): readonly CaptureZone[];
+
+  /**
+   * Nearest zone to `position` that is not owned by `faction` (or the nearest
+   * non-home-base zone when `faction` is omitted). Returns `null` when no
+   * candidate exists.
+   */
+  getNearestCapturableZone(position: THREE.Vector3, faction?: Faction): CaptureZone | null;
 }
 
 /**
