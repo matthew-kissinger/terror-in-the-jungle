@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Logger } from '../../utils/Logger';
 import { isMobileGPU } from '../../utils/DeviceDetector';
+import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 /**
  * Retro post-processing: pixelation + color quantization.
@@ -112,15 +113,27 @@ export class PostProcessingManager {
 
   /** Redirect all subsequent renderer.render() calls into the low-res target. */
   beginFrame(): void {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.isPostProcessAllowed()) return;
     this.renderer.setRenderTarget(this.renderTarget);
   }
 
   /** Blit low-res target to screen with color quantization. */
   endFrame(): void {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.isPostProcessAllowed()) return;
     this.renderer.setRenderTarget(null);
     this.renderer.render(this.blitScene, this.blitCamera);
+  }
+
+  /**
+   * Honor the WorldBuilder `postProcessEnabled` flag (dev-only, gated by
+   * Vite DCE in retail). When the dev console is registered and the flag is
+   * false, both begin/end pass into the low-res target are skipped so the
+   * scene renders straight to the back buffer at native resolution.
+   */
+  private isPostProcessAllowed(): boolean {
+    if (!import.meta.env.DEV) return true;
+    const wb = getWorldBuilderState();
+    return !wb || wb.postProcessEnabled;
   }
 
   setSize(width: number, height: number): void {

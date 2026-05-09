@@ -7,6 +7,7 @@ import { AmbientSoundManager } from './AmbientSoundManager';
 import { AudioWeaponSounds } from './AudioWeaponSounds';
 import { Logger } from '../../utils/Logger';
 import { GameEventBus } from '../../core/GameEventBus';
+import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 export class AudioManager implements GameSystem {
     private scene: THREE.Scene;
@@ -29,6 +30,11 @@ export class AudioManager implements GameSystem {
     private static loggedOptionalMissing: Set<string> = new Set();
     private hitFeedbackMissingLogged = false;
     private eventUnsubscribes: (() => void)[] = [];
+    // WorldBuilder ambient-mute tracker (dev-only, gated by Vite DCE in
+    // retail). When the flag toggles we apply 0 or 1 to ambient volume once
+    // per transition rather than every frame, so user/scene volume edits
+    // outside the dev console aren't clobbered.
+    private worldBuilderAmbientMuted = false;
 
     constructor(scene: THREE.Scene, camera: THREE.Camera) {
         this.scene = scene;
@@ -290,6 +296,16 @@ export class AudioManager implements GameSystem {
     update(deltaTime: number): void {
         // Update audio ducking for combat emphasis
         this.duckingSystem.update(deltaTime, this.ambientManager.getAmbientSounds());
+        this.applyWorldBuilderAmbientFlag();
+    }
+
+    private applyWorldBuilderAmbientFlag(): void {
+        if (!import.meta.env.DEV) return;
+        const wb = getWorldBuilderState();
+        const shouldMute = Boolean(wb && wb.ambientAudioEnabled === false);
+        if (shouldMute === this.worldBuilderAmbientMuted) return;
+        this.worldBuilderAmbientMuted = shouldMute;
+        this.ambientManager.setVolume(shouldMute ? 0 : 1);
     }
 
     /**

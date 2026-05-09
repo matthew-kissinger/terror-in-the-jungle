@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { PostProcessingManager } from './PostProcessingManager';
 
@@ -41,6 +41,87 @@ describe('PostProcessingManager', () => {
     expect(material.uniforms.uExposure.value).toBe(1.0);
 
     pp.dispose();
+  });
+
+  describe('WorldBuilder postProcessEnabled wiring', () => {
+    const FULL_WB_STATE = {
+      invulnerable: false,
+      infiniteAmmo: false,
+      noClip: false,
+      oneShotKills: false,
+      shadowsEnabled: true,
+      postProcessEnabled: true,
+      hudVisible: true,
+      ambientAudioEnabled: true,
+      npcTickPaused: false,
+      forceTimeOfDay: -1,
+      active: true,
+    };
+
+    afterEach(() => {
+      delete (globalThis as any).window?.__worldBuilder;
+    });
+
+    function makeRecordingRenderer(): {
+      renderer: THREE.WebGLRenderer;
+      setRenderTargetCalls: (THREE.WebGLRenderTarget | null)[];
+      renderCalls: number;
+    } {
+      const setRenderTargetCalls: (THREE.WebGLRenderTarget | null)[] = [];
+      let renderCalls = 0;
+      const renderer = {
+        getSize: (target: THREE.Vector2) => target.set(1920, 1080),
+        setRenderTarget: (target: THREE.WebGLRenderTarget | null) => {
+          setRenderTargetCalls.push(target);
+        },
+        render: () => {
+          renderCalls++;
+        },
+      } as unknown as THREE.WebGLRenderer;
+      return {
+        renderer,
+        setRenderTargetCalls,
+        get renderCalls() {
+          return renderCalls;
+        },
+      };
+    }
+
+    it('skips begin/end render when postProcessEnabled flag is false', () => {
+      (globalThis as any).window = (globalThis as any).window ?? {};
+      (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, postProcessEnabled: false };
+
+      const rec = makeRecordingRenderer();
+      const pp = new PostProcessingManager(rec.renderer, new THREE.Scene(), new THREE.PerspectiveCamera());
+
+      pp.beginFrame();
+      pp.endFrame();
+
+      expect(rec.setRenderTargetCalls.length).toBe(0);
+      expect(rec.renderCalls).toBe(0);
+
+      pp.dispose();
+    });
+
+    it('runs the begin/end pass when postProcessEnabled flag is true', () => {
+      (globalThis as any).window = (globalThis as any).window ?? {};
+      (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, postProcessEnabled: true };
+
+      const rec = makeRecordingRenderer();
+      const pp = new PostProcessingManager(rec.renderer, new THREE.Scene(), new THREE.PerspectiveCamera());
+
+      pp.beginFrame();
+      pp.endFrame();
+
+      // beginFrame redirects to the low-res target; endFrame restores null
+      // and triggers one render call (the blit).
+      expect(rec.setRenderTargetCalls.length).toBe(2);
+      expect(rec.setRenderTargetCalls[0]).not.toBeNull();
+      expect(rec.setRenderTargetCalls[1]).toBeNull();
+      expect(rec.renderCalls).toBe(1);
+
+      pp.dispose();
+    });
   });
 
   it('tone-maps HDR color BEFORE the Bayer dither + 24-level quantize so near-1.0 warm hues do not uniformly clip to white', () => {

@@ -247,6 +247,57 @@ describe('PlayerHealthSystem', () => {
     });
   });
 
+  describe('WorldBuilder invulnerable flag', () => {
+    afterEach(() => {
+      delete (globalThis as any).window?.__worldBuilder;
+    });
+
+    it('takeDamage is a no-op when window.__worldBuilder.invulnerable is true', () => {
+      (globalThis as any).window = (globalThis as any).window ?? {};
+      (globalThis as any).window.__worldBuilder = {
+        invulnerable: true,
+        infiniteAmmo: false,
+        noClip: false,
+        oneShotKills: false,
+        shadowsEnabled: true,
+        postProcessEnabled: true,
+        hudVisible: true,
+        ambientAudioEnabled: true,
+        npcTickPaused: false,
+        forceTimeOfDay: -1,
+        active: true,
+      };
+
+      const startHealth = system.getHealth();
+      const result = system.takeDamage(50);
+
+      expect(result).toBe(false);
+      expect(system.getHealth()).toBe(startHealth);
+      expect(system.isAlive()).toBe(true);
+    });
+
+    it('takeDamage applies normally when invulnerable is false', () => {
+      (globalThis as any).window = (globalThis as any).window ?? {};
+      (globalThis as any).window.__worldBuilder = {
+        invulnerable: false,
+        infiniteAmmo: false,
+        noClip: false,
+        oneShotKills: false,
+        shadowsEnabled: true,
+        postProcessEnabled: true,
+        hudVisible: true,
+        ambientAudioEnabled: true,
+        npcTickPaused: false,
+        forceTimeOfDay: -1,
+        active: true,
+      };
+
+      const startHealth = system.getHealth();
+      system.takeDamage(25);
+      expect(system.getHealth()).toBeLessThan(startHealth);
+    });
+  });
+
   describe('System Connections', () => {
     it('should pass zone manager to respawn manager', () => {
       const mockZoneManager = {} as any;

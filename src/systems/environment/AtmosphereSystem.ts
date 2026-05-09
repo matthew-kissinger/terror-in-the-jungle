@@ -14,6 +14,7 @@ import {
 } from './atmosphere/ScenarioAtmospherePresets';
 import { GameMode } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
+import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 /**
  * Hard-override color for the submerged fog path. Matches the legacy
@@ -146,6 +147,16 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // static preset angle (set in `applyScenarioPreset`).
     this.simulationTimeSeconds += deltaTime;
     const preset = this.getCurrentPreset();
+    // WorldBuilder force-time-of-day override (dev-only, gated by Vite DCE in
+    // retail). When the flag is in [0,1] and the active preset carries a
+    // `todCycle`, snap simulated time to that fraction of the day so the sun
+    // pin-locks at dawn / noon / dusk regardless of natural advance.
+    if (import.meta.env.DEV && preset?.todCycle) {
+      const wb = getWorldBuilderState();
+      if (wb && wb.forceTimeOfDay >= 0 && wb.forceTimeOfDay <= 1) {
+        this.simulationTimeSeconds = wb.forceTimeOfDay * preset.todCycle.dayLengthSeconds;
+      }
+    }
     if (preset?.todCycle) {
       computeSunDirectionAtTime(preset, this.simulationTimeSeconds, this.sunDirection);
     }
