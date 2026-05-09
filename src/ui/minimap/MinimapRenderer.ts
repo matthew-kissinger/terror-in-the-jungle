@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
+import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { isBlufor } from '../../systems/combat/types';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
@@ -35,7 +36,7 @@ type MinimapRenderState = {
   playerPosition: THREE.Vector3;
   playerRotation: number;
   camera: THREE.Camera;
-  zoneManager?: ZoneManager;
+  zoneQuery?: IZoneQuery;
   combatantSystem?: CombatantSystem;
   warSimulator?: WarSimulator;
   playerSquadId?: string;
@@ -60,8 +61,8 @@ export function renderMinimap(state: MinimapRenderState): void {
   drawGrid(ctx, size, renderScale);
   drawTerrainFlowPaths(ctx, state, renderScale);
 
-  if (state.zoneManager) {
-    const zones = state.zoneManager.getAllZones();
+  if (state.zoneQuery) {
+    const zones = state.zoneQuery.getAllZones();
     zones.forEach(zone => drawZone(ctx, zone, state, renderScale));
   }
 

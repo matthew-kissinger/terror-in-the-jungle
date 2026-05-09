@@ -1,4 +1,5 @@
-import { ZoneManager, ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
+import { ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { Alliance, getAlliance } from '../../systems/combat/types';
 import { HUDElements } from './HUDElements';
 
@@ -20,14 +21,14 @@ export class HUDZoneDisplay {
     this.playerAlliance = alliance;
   }
 
-  updateObjectivesDisplay(zoneManager: ZoneManager, isTDM: boolean = false, playerPosition?: { x: number; y: number; z: number }): void {
+  updateObjectivesDisplay(zoneQuery: IZoneQuery, isTDM: boolean = false, playerPosition?: { x: number; y: number; z: number }): void {
     if (isTDM) {
       this.elements.objectivesList.style.display = 'none';
       return;
     }
     this.elements.objectivesList.style.display = 'block';
 
-    const zones = zoneManager.getAllZones();
+    const zones = zoneQuery.getAllZones();
     const capturableZones = zones.filter(z => !z.isHomeBase);
     const zoneIds = capturableZones.map(zone => zone.id);
     const titleElement = this.elements.objectivesList.querySelector('.objectives-title');
