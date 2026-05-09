@@ -37,10 +37,8 @@ const DATE_RE = /^Last (verified|updated):\s*\d{4}-\d{2}-\d{2}/m;
  * authors cannot add to this list without orchestrator note.
  */
 const GRANDFATHER_DATE: Set<string> = new Set([
-  'docs/dizayn/art-direction-gate.md',
   'docs/playtest/PLAYTEST_2026-04-22.md',
   'docs/playtest/PLAYTEST_2026-04-23_ARCHITECTURE_RECOVERY_CYCLE.md',
-  'docs/PROJEKT_OBJEKT_143.md',
   'docs/rearch/CONTINUOUS_CONTACT_CONTRACT.md',
   'docs/rearch/deadcode-triage-2026-04-21.md',
   'docs/rearch/E1-ecs-evaluation.md',
@@ -53,7 +51,6 @@ const GRANDFATHER_DATE: Set<string> = new Set([
 const GRANDFATHER_LOC: Set<string> = new Set([
   'docs/PERFORMANCE.md',          // 2333 LOC → split into docs/perf/ in Phase 1
   'docs/FLIGHT_REBUILD_ORCHESTRATION.md', // 1160 LOC → archive after Phase 4 F5
-  'docs/PROJEKT_OBJEKT_143_HANDOFF.md',   // 1340 LOC → archive in Phase 1
   'docs/STARTER_KIT_EXTRACTION_STRATEGY_2026-04-28.md', // 1227 LOC
   'docs/SYSTEM_PACKAGEABILITY_AUDIT_2026-04-28.md',     // 1261 LOC
 ]);

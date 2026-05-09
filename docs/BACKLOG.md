@@ -4,19 +4,18 @@ Last verified: 2026-05-09
 
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
-realignment, 2026-05-09). Active directives still live in
-`docs/PROJEKT_OBJEKT_143.md` Article III pending the Phase 1 codex
-decomposition. Current verified state lives in
+realignment, 2026-05-09). Active directives live in
+[docs/DIRECTIVES.md](DIRECTIVES.md). Current verified state lives in
 `docs/STATE_OF_REPO.md` (also targeted for Phase 1 split into `docs/state/`).
 Historical cycle records live under `docs/cycles/<cycle-id>/RESULT.md`.
 
-ARKHIV-2 contract: keep this file at or below 200 measured lines. Do not place
-long cycle retrospectives, PR logs, or active directive status here.
+Keep this file at or below 200 measured lines. Do not place long cycle
+retrospectives, PR logs, or active directive status here.
 
 ## Current Release Routing
 
 1. Stabilization closeout remains the release posture.
-2. Runtime claims require the codex directive board plus artifact paths.
+2. Runtime claims require an entry in `docs/DIRECTIVES.md` plus artifact paths.
 3. Live release claims require STABILIZAT-3 evidence.
 4. Performance baseline refresh remains blocked until STABILIZAT-1 passes from
    a trusted combat120 chain.
@@ -25,9 +24,9 @@ long cycle retrospectives, PR logs, or active directive status here.
 
 ## Active Directive Routing
 
-Use Article III instead of duplicating active work here.
+Use [docs/DIRECTIVES.md](DIRECTIVES.md) instead of duplicating active work here.
 
-| Work area | Article III owner |
+| Work area | Directive |
 |---|---|
 | Water surface, hydrology placement, water query API | VODA-1 |
 | Ground vehicles and stationary weapons | VEKHIKL-1 / VEKHIKL-2 |
@@ -36,12 +35,11 @@ Use Article III instead of duplicating active work here.
 | Respawn, map spawn, loadout, deploy flow | UX-1 through UX-4 |
 | Combat120 baseline and live release | STABILIZAT-1 through STABILIZAT-3 |
 | Baseline drift, doc/code drift, combat p99 (`DEFEKT-3`), route quality | DEFEKT-1 through DEFEKT-4 |
-| Backlog and document pruning | ARKHIV-2 / ARKHIV-3 |
 
 ## Strategic Reserve
 
-Items below are acknowledged but not active directives unless the Politburo
-opens or reassigns them.
+Items below are acknowledged but not active directives unless the project
+owner opens or reassigns them.
 
 ### KB-LOAD
 
@@ -79,7 +77,7 @@ opens or reassigns them.
 ### KB-STRATEGIE
 
 - WebGPU, OffscreenCanvas worker render, WASM-SIMD, SharedArrayBuffer, and
-  cross-origin isolation branches. Reopen only with Politburo direction.
+  cross-origin isolation branches. Reopen only with project-owner direction.
 - Multiplayer and networking.
 - Destructible structures.
 - Survival / roguelite mode.

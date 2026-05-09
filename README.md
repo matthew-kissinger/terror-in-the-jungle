@@ -9,7 +9,7 @@
 
 **A browser-based combined-arms FPS / RTS sandbox set in the Vietnam theater, late 1960s.**
 
-[▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Codex (operating doc)](docs/PROJEKT_OBJEKT_143.md) · [Current state](docs/STATE_OF_REPO.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
+[▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Directives](docs/DIRECTIVES.md) · [Current state](docs/STATE_OF_REPO.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
 
 > **Engine architected for 3,000 combatants via materialization tiers; live-fire
 > combat verified at 120 NPCs while the ECS hot path is built out (Phase F).**
@@ -18,11 +18,10 @@
 > pass — all running in a browser tab without hidden fallbacks. See
 > [docs/ROADMAP.md](docs/ROADMAP.md) for the canonical phase status.
 
-The project is in active development under a single operating doc:
-[docs/PROJEKT_OBJEKT_143.md](docs/PROJEKT_OBJEKT_143.md). It is the codex — directives,
-acceptance criteria, evidence chain, Politburo seal log. When in doubt, read the
-codex; when the codex disagrees with the repository, the repository wins and the
-codex is reissued.
+Active directives, success criteria, and evidence links live in
+[docs/DIRECTIVES.md](docs/DIRECTIVES.md). Carry-overs live in
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). When a doc disagrees with the
+repository, believe the repository and update the doc.
 
 ## Highlights
 
@@ -86,8 +85,8 @@ combat120 baseline refresh deferred to Strategic Reserve. Full retrospective:
 Active areas remain DEFEKT-3 combat AI p99 anchor, DEFEKT-4 NPC route quality
 runtime acceptance, VODA-1 Open Frontier exposure correction, AVIATSIYA-2/4-7
 weapon and maneuver implementations, SVYAZ-3 air-support call-in radio,
-VEKHIKL ground-vehicle runtime, and UX-2/3/4 deploy/loadout polish. See the
-codex Article III directive board for live status.
+VEKHIKL ground-vehicle runtime, and UX-2/3/4 deploy/loadout polish. See
+[docs/DIRECTIVES.md](docs/DIRECTIVES.md) for live status.
 
 ## Controls
 
@@ -214,7 +213,7 @@ fenced-interface boundary at `src/types/SystemInterfaces.ts`.
 | [src/systems/player](src/systems/player) | Player respawn manager, controller, deploy flow. |
 | [src/ui](src/ui) | HUD, controls, screens, icons, loading, deploy / respawn UI, command overlays, tactical map. |
 | [scripts](scripts) | Probes, perf capture, deployment helpers, evidence generation, ~70 `projekt-143-*` audit scripts. |
-| [docs](docs) | Codex, architecture, testing, deployment, cycles, dizayn charters. |
+| [docs](docs) | Directives, architecture, testing, deployment, cycles, archives. |
 | [docs/cycles/](docs/cycles) | Per-cycle retrospectives (`<cycle-id>/RESULT.md`). |
 
 ## Documentation
@@ -223,7 +222,7 @@ Start here:
 
 | Doc | Use it for |
 | --- | --- |
-| [docs/PROJEKT_OBJEKT_143.md](docs/PROJEKT_OBJEKT_143.md) | **The codex.** Operating doctrine, bureau organization, active directive board, GOST-TIJ engineering standards, validation protocol, acceptance criteria, Politburo seal log. |
+| [docs/DIRECTIVES.md](docs/DIRECTIVES.md) | Active directive list with status, owning subsystem, success criteria, and latest evidence link. |
 | [AGENTS.md](AGENTS.md) | Daily loop, commands, conventions, hard rules. Agent-agnostic. |
 | [CLAUDE.md](CLAUDE.md) | Claude-Code-specific harness pieces (slash commands, subagents). |
 | [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) | Verified current state, post-cycle. |
@@ -235,8 +234,7 @@ Start here:
 | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Perf scenarios, capture workflow, baseline policy. |
 | [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) | Cloudflare Pages / R2 deploy and cache verification. |
 | [docs/PLAYTEST_CHECKLIST.md](docs/PLAYTEST_CHECKLIST.md) | Human playtest form for feel-sensitive changes. |
-| [docs/BACKLOG.md](docs/BACKLOG.md) | Strategic Reserve index. Active work routes through codex Article III. |
-| [docs/dizayn/](docs/dizayn) | KB-DIZAYN visual charter and art-direction gate procedure. |
+| [docs/BACKLOG.md](docs/BACKLOG.md) | Strategic Reserve index. Active work routes through `docs/DIRECTIVES.md`. |
 
 ## Contributing
 
@@ -259,7 +257,7 @@ probe that matches the subsystem you touched. Hard rules:
   or tuning constants.
 - Don't push directly to `master`. Open a PR; rebase-merge via `gh pr merge --rebase`.
 - Don't use `--no-verify` to bypass hooks.
-- Don't refresh `perf-baselines.json` without Politburo authorization.
+- Don't refresh `perf-baselines.json` without project-owner authorization.
 
 Branch naming:
 
