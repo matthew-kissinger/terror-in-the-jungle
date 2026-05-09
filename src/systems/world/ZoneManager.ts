@@ -9,7 +9,7 @@ import { ZoneCaptureLogic } from './ZoneCaptureLogic';
 import { ZoneTerrainAdapter } from './ZoneTerrainAdapter';
 import { ZoneInitializer } from './ZoneInitializer';
 import { GameModeConfig } from '../../config/gameModeTypes';
-import type { IHUDSystem, ITerrainRuntime } from '../../types/SystemInterfaces';
+import type { IHUDSystem, ITerrainRuntime, IZoneQuery } from '../../types/SystemInterfaces';
 
 export enum ZoneState {
   NEUTRAL = 'neutral',
@@ -52,7 +52,7 @@ export interface CaptureZone {
   validateTerrain?: boolean;
 }
 
-export class ZoneManager implements GameSystem {
+export class ZoneManager implements GameSystem, IZoneQuery {
   private scene: THREE.Scene;
   private zones: Map<string, CaptureZone> = new Map();
   private combatantSystem?: CombatantSystem;
@@ -231,8 +231,22 @@ export class ZoneManager implements GameSystem {
     return null;
   }
 
+  /** IZoneQuery alias for `getZoneAtPosition`. Existing callers keep working. */
+  getZoneAt(position: THREE.Vector3): CaptureZone | null {
+    return this.getZoneAtPosition(position);
+  }
+
+  getZoneById(id: string): CaptureZone | null {
+    return this.zones.get(id) ?? null;
+  }
+
   getAllZones(): CaptureZone[] {
     return Array.from(this.zones.values());
+  }
+
+  /** Formalizes the `!isHomeBase` filter that nine call sites perform inline today. */
+  getCapturableZones(): readonly CaptureZone[] {
+    return this.getAllZones().filter(z => !z.isHomeBase);
   }
 
   getZonesByOwner(faction: Faction): CaptureZone[] {

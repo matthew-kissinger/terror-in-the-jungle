@@ -28,6 +28,7 @@ Every exported interface in `src/types/SystemInterfaces.ts`, specifically:
 - `IAudioManager`
 - `IAmmoManager`
 - `IFlashbangScreenEffect`
+- `IZoneQuery`
 - `IGameRenderer`
 
 Any change to any method signature, any parameter type, any return type on a fenced interface is a **fence change**.
