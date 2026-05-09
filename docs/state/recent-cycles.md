@@ -13,12 +13,46 @@ For older cycle outcomes, browse `docs/cycles/` or
 
 ---
 
-## cycle-2026-05-09-phase-0-foundation (in review)
+## cycle-2026-05-09-doc-decomposition-and-wiring (closed 2026-05-09)
 
-Foundation cycle of the 12-week realignment plan
-(`C:/Users/Mattm/.claude/plans/can-we-make-a-lexical-mitten.md`).
-Deliberately no game-code changes; engine-side wiring of WorldBuilder
-god-mode flags is filed for Phase 1.
+Phase 1 of the realignment campaign. 6 PRs merged
+([#167](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/167),
+[#168](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/168),
+[#169](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/169),
+[#170](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/170),
+[#171](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/171),
+[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)).
+
+**Shipped:**
+
+- `STATE_OF_REPO.md` (2,708 LOC) split into `docs/state/`; `PERFORMANCE.md`
+  (2,332 LOC) split into `docs/perf/`; both originals archived.
+- PROJEKT_OBJEKT_143 prose archived; `docs/DIRECTIVES.md` (199 LOC)
+  replaces Article III as plain-English directive registry.
+- 89 `check:projekt-143-*` scripts triaged → 12 retained with plain names
+  (`check:live-release`, `check:cycle-close`, `check:culling-baseline`,
+  etc.); 80 archived under `scripts/audit-archive/`.
+- Weekly `artifact-prune.yml` GitHub Actions workflow + ~7.4 GB local
+  retention prune.
+- All 6 WorldBuilder god-mode flags wired into engine consumers behind
+  `import.meta.env.DEV` (Vite DCE confirmed). Combat-reviewer
+  APPROVE-WITH-NOTES on PR #172.
+
+**Carry-over delta:** −6 worldbuilder-wiring closed; +2 opened
+(`artifact-prune-baseline-pin-fix`, `worldbuilder-oneshotkills-wiring`).
+Active count 13 → 9.
+
+**CI:** all 6 PRs landed lint+test+build+perf+smoke+mobile-ui green.
+perf-analyst: no regression (no source-tree change in 5 of 6 PRs;
+worldbuilder-wiring is DEV-gated).
+
+---
+
+## cycle-2026-05-09-phase-0-foundation (closed 2026-05-09, PR [#166](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/166))
+
+Foundation cycle of the 12-week realignment plan. Deliberately no
+game-code changes; engine-side wiring of WorldBuilder god-mode flags
+filed as 6 carry-overs for Phase 1 (all closed in Phase 1's PR #172).
 
 **Shipped:**
 
@@ -27,15 +61,6 @@ god-mode flags is filed for Phase 1.
   keywords, reviewer-pre-merge gate, scenario smoke screenshot gate,
   artifact-prune retention.
 - WorldBuilder dev console (`Shift+G`) as an isolation/validation tool.
-
-**Spawned carry-overs (6, all Phase 1 wiring tasks):**
-
-- worldbuilder-invulnerable-wiring
-- worldbuilder-infinite-ammo-wiring
-- worldbuilder-noclip-wiring
-- worldbuilder-postprocess-wiring
-- worldbuilder-tod-wiring
-- worldbuilder-ambient-audio-wiring
 
 See `docs/dev/worldbuilder.md` for the dev-console usage.
 
@@ -90,41 +115,17 @@ Cycle retrospective:
 
 ---
 
-## cycle-2026-05-08-stabilizat-2-closeout (closed 2026-05-08)
-
-Six themed PRs (helicopter rotor axis, water audits, terrain+effects, UX
-respawn, combat AI/squad/core mega-cluster with documented GOST-TIJ-001
-exception, docs + audit script catalog) shepherded the codex agent's
-143-file working tree to `master`.
-
-**Live release verified** at SHA
-`babae19a76e5ff622976a632e10f7055315d2698` on
-`https://terror-in-the-jungle.pages.dev` (live-release-proof 7/7 PASS).
-Codex revision 1.3 — 2026-05-08, Politburo seal applied for STABILIZAT-2/3,
-SVYAZ-1, SVYAZ-2, UX-1.
-
-**Carry-over outcomes:**
-
-- STABILIZAT-1 deferred to Strategic Reserve under Politburo direction
-  (still active in [docs/CARRY_OVERS.md](../CARRY_OVERS.md)).
-- AVIATSIYA-1 / DEFEKT-5 source evidence complete; human visual review
-  remains pending.
-- DEFEKT-2 14-day live drift watch active from T+0 = 2026-05-08.
-- KB-LOAD residual (Pixel Forge vegetation candidate import) opened as
-  Strategic Reserve.
-
-Cycle retrospective:
-`docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md`.
-
----
-
 ## Reading the cycle history
 
-The release path through this period was: local validation → commit to
-`master` → push to `origin/master` → GitHub CI → manual Cloudflare Pages
-deploy via `deploy.yml` → live Pages/R2/browser verification via
-`check:projekt-143-live-release-proof`. Exact production SHA is the live
-`/asset-manifest.json` source of truth.
+For older cycle outcomes (cycle-2026-05-08-stabilizat-2-closeout and
+prior), browse `docs/cycles/<cycle-id>/RESULT.md` or
+`docs/tasks/archive/<cycle-id>/`.
+
+The release path is: local validation → commit to `master` → push to
+`origin/master` → GitHub CI → manual Cloudflare Pages deploy via
+`deploy.yml` → live Pages/R2/browser verification via `check:live-release`
+(renamed from `check:projekt-143-live-release-proof` in Phase 1). Exact
+production SHA is the live `/asset-manifest.json` source of truth.
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. Cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>`

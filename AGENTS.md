@@ -37,16 +37,21 @@ npm run check:mobile-ui          # Built-app phone viewport flow gate
 npm run check:states             # State coverage probe
 npm run check:hud                # HUD layout validator
 npm run check:memory             # Memory growth tracker
-npm run check:projekt-143-svyaz-ping-command # SVYAZ-2 source/test/browser artifact audit
-npm run check:projekt-143-svyaz-ping-command-browser # SVYAZ-2 map/world marker browser proof
-npm run check:projekt-143-culling-proof  # Headed deterministic renderer/category proof
-npm run check:projekt-143-culling-baseline # Culling owner-path before packet
-npm run check:projekt-143-terrain-baseline # Elevated terrain horizon before proof
-npm run check:projekt-143-terrain-distribution # Ground material/vegetation distribution audit
-npm run check:projekt-143-terrain-placement # Terrain feature footprint/foundation audit
-npm run check:projekt-143-terrain-assets # Terrain texture/foliage/building candidate inventory
-npm run check:projekt-143-terrain-routes # Route/trail smoothing and surface policy audit
-npm run check:projekt-143-cycle2-proof  # Cycle 2 visual/runtime proof bundle
+# Phase 1 `script-triage` (2026-05-09) renamed the 12 retained audit scripts
+# from `check:projekt-143-*` to plain `check:*` names. 80 one-off cycle-specific
+# audits moved to `scripts/audit-archive/` and dropped from package.json.
+npm run check:culling-proof      # Headed deterministic renderer/category proof
+npm run check:culling-baseline   # Culling owner-path before packet
+npm run check:terrain-baseline   # Elevated terrain horizon before proof
+npm run check:terrain-visual     # Terrain visual review
+npm run check:water-system       # Water system audit
+npm run check:water-runtime      # Water runtime proof
+npm run check:visual-integrity   # Visual integrity audit
+npm run check:route-quality      # NPC route quality audit
+npm run check:helicopter-parity  # Helicopter Vehicle/Player adapter parity
+npm run check:platform-capabilities # Platform capability probe
+npm run check:cycle-close        # Current-completion audit
+npm run check:live-release       # Live release proof (7-gate Cloudflare verification)
 npm run probe                    # Engine health probe
 npm run probe:fixed-wing         # Browser-level fixed-wing takeoff/climb/orbit/handoff/approach probe
 npm run playtest:mobile          # Mobile playtest driver
@@ -211,16 +216,16 @@ camera/render shake questions have an evidence-backed decision.
 - **Don't anchor on doc claims against current file state.** Briefs and backlogs drift. Verify with Read against the current file before proposing a fix. If the brief's premise is wrong, stop and escalate, don't rationalize an outdated task.
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.
-- **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:projekt-143-culling-proof` and then `npm run check:projekt-143-cycle2-proof`; the proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
+- **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:culling-proof` (renamed from `check:projekt-143-culling-proof` in Phase 1); the cycle2-proof bundle is archived under `scripts/audit-archive/cycle2-proof.ts`. The proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
 - **Cycle 3 KB-CULL owner baseline.** Before changing culling, HLOD, static
   features, vehicle visibility, or pool residency, run
-  `npm run check:projekt-143-culling-baseline`. It selects a representative
+  `npm run check:culling-baseline`. It selects a representative
   owner path from trusted Open Frontier/A Shau scene attribution and keeps
   close-NPC pool residency diagnostic-only until combat stress measurement
   trust passes.
 - **Cycle 3 KB-TERRAIN before proof.** Before changing far vegetation,
   canopy, terrain fog, or view-distance policy, run
-  `npm run check:projekt-143-terrain-baseline`. It force-builds the perf target
+  `npm run check:terrain-baseline`. It force-builds the perf target
   by default, captures elevated Open Frontier and A Shau horizon screenshots,
   records renderer/terrain/vegetation/browser metadata, and links the latest
   trusted perf-before summaries. Treat it as before evidence only; rerun it

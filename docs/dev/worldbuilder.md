@@ -38,29 +38,25 @@ realignment plan
 ### 1. God Mode
 
 Per-flag toggles that publish to `window.__worldBuilder` so engine systems can
-consult them. **Most flags are not yet wired into the engine** — see the
-"Engine wiring status" table below.
+consult them. **All 6 named flags wired in Phase 1** ([PR #172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)) behind
+`import.meta.env.DEV` so retail builds dead-code-eliminate the wires.
 
-| Toggle | Effective today? | Engine consumer to add (Phase 1 follow-up) |
+| Toggle | Effective today? | Engine consumer |
 |---|---|---|
-| Invulnerable | no | `PlayerHealthSystem.takeDamage()` should early-return when active |
-| Infinite ammo | no | `FirstPersonWeapon.tryFire()` / `AmmoManager.consume()` should skip decrement |
-| No-clip | no | `PlayerMovement` should skip terrain collision and gravity |
-| One-shot kills | no | `WeaponShotExecutor` damage application |
+| Invulnerable | yes | `PlayerHealthSystem.takeDamage()` early-returns when active |
+| Infinite ammo | yes | `AmmoManager.consumeRound()` returns true without decrement when active |
+| No-clip | yes | `PlayerMovement` skips terrain collision + gravity + boundary clamps when active |
+| One-shot kills | not wired | open carry-over `worldbuilder-oneshotkills-wiring` (out-of-scope for Phase 1 brief) |
 | **Heal & Refill** (button) | best-effort | calls `playerHealth.reset/revive`, `ammoManager.refillAll/setReserveFull`, `firstPersonWeapon.reload` if those methods exist on the system surfaces today |
-
-These are intentionally not wired in Phase 0 — wiring is real game-code that
-should ride through a normal cycle, not a foundation cycle. The flags exist
-and persist so the next cycle's tasks can wire them up systematically.
 
 ### 2. System Toggles
 
 | Toggle | Effective today? | How |
 |---|---|---|
 | Shadows | yes | `engine.renderer.renderer.shadowMap.enabled` |
-| Post-process | flag-only | (Phase 1 wiring) PostProcessingManager.setEnabled |
+| Post-process | yes | `PostProcessingManager.beginFrame/endFrame` consults `getWorldBuilderState()` (wired Phase 1) |
 | HUD visible | yes | toggles `[data-hud-root]` elements via DOM `display` |
-| Ambient audio | flag-only | (Phase 1 wiring) AudioManager.setAmbientGain |
+| Ambient audio | yes | `AudioManager.update` scales ambient gain to 0/1 on flag flip (wired Phase 1) |
 
 ### 3. Debug Viz
 
@@ -79,7 +75,7 @@ No state of its own.
 | Control | Effective today? | How |
 |---|---|---|
 | NPC tick paused | yes (engine-wide) | `engine.timeScale.pause()` / `resume()` |
-| Force time-of-day | flag-only | (Phase 1 wiring) AtmosphereSystem.setSimulationTime |
+| Force time-of-day | yes | `AtmosphereSystem.update` snaps `simulationTimeSeconds` to `forceTimeOfDay * dayLengthSeconds` when in [0,1] (wired Phase 1) |
 | **Pause All** button | yes | engine.timeScale.pause() |
 | **Resume** button | yes | engine.timeScale.resume() |
 | **Step One Frame** button | yes | engine.timeScale.stepOneFrame() |
@@ -87,9 +83,20 @@ No state of its own.
 
 ## Engine wiring status
 
-Phase 0 ships the WorldBuilder UI and the `window.__worldBuilder` global.
-Phase 1 wires the per-system consumers. Each consumer is a 1-3 line check
-guarded behind `import.meta.env.DEV` so retail builds carry no overhead.
+Phase 0 shipped the WorldBuilder UI and the `window.__worldBuilder` global.
+**Phase 1 wired all 6 named flags into their consumers** ([PR #172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)). Each consumer is a 1-3 line
+check guarded behind `import.meta.env.DEV` so retail builds carry no
+overhead (`grep -r isWorldBuilderFlagActive dist/` returns zero hits — Vite
+DCE confirmed).
+
+| Flag | Consumer file | Method |
+|---|---|---|
+| `invulnerable` | `src/systems/player/PlayerHealthSystem.ts` | `takeDamage()` |
+| `infiniteAmmo` | `src/systems/weapons/AmmoManager.ts` | `consumeRound()` |
+| `noClip` | `src/systems/player/PlayerMovement.ts` | `simulateMovementStep()` |
+| `postProcessEnabled` | `src/systems/effects/PostProcessingManager.ts` | `beginFrame/endFrame` |
+| `forceTimeOfDay` | `src/systems/environment/AtmosphereSystem.ts` | `update()` |
+| `ambientAudioEnabled` | `src/systems/audio/AudioManager.ts` | `update()` |
 
 The recommended consumer pattern:
 
@@ -157,18 +164,14 @@ npm run dev
 < { invulnerable: false, infiniteAmmo: false, ..., active: true }
 ```
 
-## Phase 1 follow-ups (next cycle)
+## Phase 1 wiring outcome
 
-Each lives in its own task brief / PR; do not bundle into Phase 0.
+All 6 carry-overs from the `worldbuilder-wiring` family closed in
+[PR #172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172) (cycle `cycle-2026-05-09-doc-decomposition-and-wiring`):
+`worldbuilder-invulnerable-wiring`, `-infinite-ammo-wiring`,
+`-noclip-wiring`, `-postprocess-wiring`, `-tod-wiring`,
+`-ambient-audio-wiring`. Combat-reviewer APPROVE-WITH-NOTES.
 
-- `worldbuilder-invulnerable-wiring` — `PlayerHealthSystem.takeDamage` skip when flag active.
-- `worldbuilder-infinite-ammo-wiring` — `AmmoManager` / weapon-fire path skip decrement.
-- `worldbuilder-noclip-wiring` — `PlayerMovement` collision + gravity skip.
-- `worldbuilder-postprocess-wiring` — `PostProcessingManager.setEnabled`.
-- `worldbuilder-tod-wiring` — atmosphere force time-of-day.
-- `worldbuilder-ambient-audio-wiring` — `AudioManager.setAmbientGain`.
-
-These are tracked in [docs/CARRY_OVERS.md](../CARRY_OVERS.md) under the
-`worldbuilder-wiring` family. The carry-over count grows by 6 to capture
-this — that's allowed during Phase 0 because the Phase 0 cycle is the
-foundation cycle and carry-over discipline starts in Phase 1.
+One open follow-up carry-over: `worldbuilder-oneshotkills-wiring` — the
+7th flag is still published but unwired (out-of-scope for the Phase 1
+brief which named only 6). See [docs/CARRY_OVERS.md](../CARRY_OVERS.md).

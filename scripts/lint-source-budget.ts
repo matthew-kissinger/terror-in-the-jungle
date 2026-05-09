@@ -51,7 +51,7 @@ const GRANDFATHER: Record<string, { round: string; reason: string }> = {
   // but already over the new limit. Each gets a queued split target.
   'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: '704 LOC → split during AVIATSIYA-3 helicopter parity work' },
   'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: '727 LOC → split alongside PlayerController in R3' },
-  'src/systems/player/PlayerMovement.ts': { round: 'P3R3', reason: '703 LOC → split alongside PlayerController in R3' },
+  'src/systems/player/PlayerMovement.ts': { round: 'P3R3', reason: '718 LOC (Phase 1 added DEV-gated noClip wires) → split alongside PlayerController in R3' },
   'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: '53 methods → use beginRejoiningSquad helper, see docs/CARRY_OVERS.md' },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: '728 LOC → split into placement / compile policy' },
   'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: '1039 LOC → split shader uniforms / atlas / impostor sampling' },

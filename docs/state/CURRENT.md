@@ -26,24 +26,25 @@ and phase summary.
 
 ## Current focus (2026-05-09)
 
-`cycle-2026-05-09-phase-0-foundation` is in review. Foundation cycle of the
-12-week realignment plan at
-`C:/Users/Mattm/.claude/plans/can-we-make-a-lexical-mitten.md`.
+`cycle-2026-05-10-zone-manager-decoupling` is **Phase 2** of the 9-cycle
+realignment campaign at
+[docs/CAMPAIGN_2026-05-09.md](../CAMPAIGN_2026-05-09.md). Drops `ZoneManager`
+fan-in 52 → ≤20 before Phase 3 god-module splits start. Adds read-only
+`IZoneQuery` to the fence (PR #174 in flight), then migrates HUD/Compass/
+Minimap/FullMap (Batch A), Combat/Tickets/WarSim (Batch B), and
+PlayerRespawn + cleanup (Batch C).
 
-Phase 0 installs durable rules without touching game code:
+Phase 0 (`cycle-2026-05-09-phase-0-foundation`) closed 2026-05-09 with the
+durable rules layer + WorldBuilder dev console (substrate only, no game
+code).
 
-- max-LOC + max-method lint with grandfather list (eslint-plugin-local rules)
-- doc date-header lint (`scripts/lint-docs.ts`)
-- fenced-interface pre-flight + reviewer-pre-merge gate
-- banned cycle-name keywords (`scripts/cycle-validate.ts`)
-- scenario smoke screenshot gate (`scripts/scenario-smoke.ts`)
-- artifact-prune retention CI
-
-Phase 0 also ships the **WorldBuilder dev console** (`Shift+G`) as an
-isolation/validation tool. Engine-side wiring of WorldBuilder god-mode
-flags is filed as 6 carry-overs (`worldbuilder-*-wiring`) for Phase 1.
-
-Phase 1 is the doc-decomposition cycle currently dispatching this task.
+Phase 1 (`cycle-2026-05-09-doc-decomposition-and-wiring`) closed 2026-05-09
+with 6 PRs ([#167](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/167)–[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)): split STATE_OF_REPO/PERFORMANCE
+docs, archived PROJEKT_OBJEKT_143 prose, extracted DIRECTIVES.md, triaged
+89 audit scripts to 12 retained, applied artifact prune + weekly CI job,
+wired all 6 WorldBuilder god-mode flags into engine consumers (DEV-gated,
+Vite DCE-confirmed). Carry-over delta −4 (active 13 → 9). See
+[docs/BACKLOG.md](../BACKLOG.md) "Recently Completed" for PR list.
 
 ## What is real today
 
@@ -90,8 +91,8 @@ this doc.
 
 To verify the current production state, fetch
 `https://terror-in-the-jungle.pages.dev/asset-manifest.json` and read
-`gitSha`. The release-proof check is
-`check:projekt-143-live-release-proof`.
+`gitSha`. The release-proof check is `check:live-release` (renamed from
+`check:projekt-143-live-release-proof` in Phase 1's `script-triage`).
 
 ## Drift watch
 

@@ -46,15 +46,16 @@ repository, believe the repository and update the doc.
   Tweakpane live-tuning panel (dev-only), `?mode=terrain-sandbox` URL gate.
 - **Game-feel instrumentation.** Fixed-wing probes, perf captures (sparse and
   full combat120), HUD validators, mobile-UI gates, atmosphere evidence, doc
-  drift gate, ~70 dedicated `check:projekt-143-*` audit scripts. Tests are
-  sensors, not truth.
+  drift gate, 12 retained plain-named `check:*` audit scripts (after Phase 1
+  `script-triage` archived 80 one-off cycle-specific audits to
+  `scripts/audit-archive/`). Tests are sensors, not truth.
 - **Mobile is not an afterthought.** Touch controls, tactical map command
   dispatch, and HUD layout are covered by dedicated validation scripts.
 - **Agent-resistant architecture.** Fenced interfaces in
   [src/types/SystemInterfaces.ts](src/types/SystemInterfaces.ts), explicit
-  ownership docs, the codex directive board, and a doc-drift gate so multiple
-  humans and coding agents can collaborate without inventing duplicate
-  authorities.
+  ownership docs, the [DIRECTIVES.md](docs/DIRECTIVES.md) directive registry,
+  and a doc-drift gate so multiple humans and coding agents can collaborate
+  without inventing duplicate authorities.
 
 ## Playable Modes
 
@@ -172,8 +173,8 @@ npm run check:mobile-ui              # actionability + scroll on mobile viewport
 npm run check:hud                    # HUD layout
 npm run perf:capture:combat120       # 90s combat sim, 120 NPCs, seed 2718
 npm run perf:compare                 # latest capture vs perf-baselines.json
-npm run check:doc-drift              # codex / state / performance ↔ artifact paths
-npm run check:projekt-143-completion-audit
+npm run check:doc-drift              # docs / state / performance ↔ artifact paths
+npm run check:cycle-close            # current-completion audit (renamed from check:projekt-143-completion-audit in Phase 1)
 ```
 
 Game-feel changes still require a human pass through
@@ -212,7 +213,7 @@ fenced-interface boundary at `src/types/SystemInterfaces.ts`.
 | [src/systems/environment](src/systems/environment) | Atmosphere, sky, clouds, weather, water, hydrology. |
 | [src/systems/player](src/systems/player) | Player respawn manager, controller, deploy flow. |
 | [src/ui](src/ui) | HUD, controls, screens, icons, loading, deploy / respawn UI, command overlays, tactical map. |
-| [scripts](scripts) | Probes, perf capture, deployment helpers, evidence generation, ~70 `projekt-143-*` audit scripts. |
+| [scripts](scripts) | Probes, perf capture, deployment helpers, evidence generation, 12 retained plain-named `check:*` audit scripts. Archived one-off audits live in [scripts/audit-archive](scripts/audit-archive). |
 | [docs](docs) | Directives, architecture, testing, deployment, cycles, archives. |
 | [docs/cycles/](docs/cycles) | Per-cycle retrospectives (`<cycle-id>/RESULT.md`). |
 
@@ -290,7 +291,7 @@ Pushing to `master` is **not** proof of production freshness — CI runs but
 deploy does not. Live release verification:
 
 ```bash
-npm run check:projekt-143-live-release-proof
+npm run check:live-release
 ```
 
 Verifies seven gates: local-head-pushed, ci-success-for-head, deploy-success-for-head,
