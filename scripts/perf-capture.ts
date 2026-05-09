@@ -23,7 +23,7 @@ import {
   PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE,
   PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_RESET_SOURCE,
   PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE,
-} from './projekt-143-scene-attribution';
+} from './audit-archive/scene-attribution';
 
 type ConsoleEntry = {
   ts: string;

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildReport,
   latestRuntimeSamples,
-} from '../projekt-143-active-driver-diagnostic';
+} from './active-driver-diagnostic';
 
 const tempRoots: string[] = [];
 

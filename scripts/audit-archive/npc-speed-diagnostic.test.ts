@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildReport,
   computeNpcSpeedSegments,
-} from '../projekt-143-npc-speed-diagnostic';
+} from './npc-speed-diagnostic';
 
 const tempRoots: string[] = [];
 

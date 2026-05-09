@@ -281,7 +281,7 @@ function loadVegetationCandidateAssetMap(importPlanPath: string | null): { map: 
     : latestVegetationCandidateImportPlan();
   const map: CandidateAssetMap = new Map();
   if (!resolvedImportPlanPath || !existsSync(resolvedImportPlanPath)) {
-    throw new Error('Vegetation candidate import plan not found. Run npm run check:projekt-143-vegetation-candidate-import-plan first or pass --vegetation-candidate-import-plan <path>.');
+    throw new Error('Vegetation candidate import plan not found. Run npx tsx scripts/audit-archive/vegetation-candidate-import-plan.ts first or pass --vegetation-candidate-import-plan <path>.');
   }
 
   const importPlan = JSON.parse(readFileSync(resolvedImportPlanPath, 'utf-8')) as CandidateImportPlan;
