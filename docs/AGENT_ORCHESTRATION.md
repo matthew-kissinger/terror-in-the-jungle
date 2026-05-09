@@ -75,6 +75,33 @@ the count grew, the cycle is **INCOMPLETE**; the cycle ID is reused with a
 `-2` suffix until the count holds or shrinks. Carry-overs open ≥5 cycles are
 red-flagged and must be named in the next cycle's plan.
 
+### Campaign auto-advance (Phase 0 + realignment plan, 2026-05-09)
+
+A **campaign** is an ordered sequence of cycles queued in
+[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md). When the active
+campaign declares `auto-advance: yes`, the orchestrator chains cycles
+without human input:
+
+1. Run the current cycle's dispatch loop normally.
+2. At end-of-cycle, run the ritual (move briefs, append BACKLOG, refresh
+   `docs/CARRY_OVERS.md` via `npm run check:cycle -- <slug> --close`).
+3. Read the campaign manifest. If a `next-cycle` is queued and not
+   gated by a hard-stop, update this file's "Current cycle" section to
+   point at the next cycle's brief and **continue without prompting**.
+4. Hard-stops still surface and halt the campaign:
+   - Fence-change proposal in any executor report
+   - >2 CI red or blocked tasks in a single round
+   - Perf regression >5% p99 on `combat120` after any round
+   - Carry-over count grew during a cycle (cycle becomes INCOMPLETE; campaign halts)
+   - Any executor reports `isolation=worktree` failure
+5. Hard-stops surface as: print the failure summary, set "Current cycle"
+   in this file to the **failed** cycle (with status `INCOMPLETE` /
+   `BLOCKED`), and halt. The human resumes the campaign manually.
+
+Without `auto-advance: yes`, the orchestrator stops after each cycle close
+and waits for the next `/orchestrate` invocation. That's the legacy
+single-cycle pattern.
+
 **End-of-cycle ritual** (run as the last orchestrator action, or as a
 standalone bookkeeping pass):
 
