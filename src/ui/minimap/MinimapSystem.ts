@@ -2,6 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { createMinimapDOM } from './MinimapDOMBuilder';
 import { DEFAULT_WORLD_SIZE, MINIMAP_SIZE } from './MinimapStyles';
@@ -16,7 +17,7 @@ const _v1 = new THREE.Vector3();
 
 export class MinimapSystem implements GameSystem {
   private camera: THREE.Camera;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private combatantSystem?: CombatantSystem;
   private warSimulator?: WarSimulator;
   private playerSquadId?: string;
@@ -139,8 +140,17 @@ export class MinimapSystem implements GameSystem {
 
   // System connections
 
+  setZoneQuery(query: IZoneQuery): void {
+    this.zoneQuery = query;
+  }
+
+  /**
+   * Backwards-compatible adapter retained for one cycle so wiring composers
+   * keep working while consumers migrate to `setZoneQuery`. Delete after
+   * Batch C of cycle-2026-05-10-zone-manager-decoupling.
+   */
   setZoneManager(manager: ZoneManager): void {
-    this.zoneManager = manager;
+    this.setZoneQuery(manager);
   }
 
   setCombatantSystem(system: CombatantSystem): void {
@@ -198,7 +208,7 @@ export class MinimapSystem implements GameSystem {
       playerPosition: this.playerPosition,
       playerRotation: this.playerRotation,
       camera: this.camera,
-      zoneManager: this.zoneManager,
+      zoneQuery: this.zoneQuery,
       combatantSystem: this.combatantSystem,
       warSimulator: this.warSimulator,
       playerSquadId: this.playerSquadId,

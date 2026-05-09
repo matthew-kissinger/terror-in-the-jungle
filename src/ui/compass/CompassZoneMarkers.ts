@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Faction, isOpfor } from '../../systems/combat/types';
-import { CaptureZone, ZoneManager, ZoneState } from '../../systems/world/ZoneManager';
+import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 
 const _cameraPos = new THREE.Vector3();
 const _dirToZone = new THREE.Vector3();
@@ -12,7 +13,7 @@ type ZoneMarkerState = {
 
 type UpdateZoneMarkersParams = {
   camera: THREE.Camera;
-  zoneManager: ZoneManager;
+  zoneQuery: IZoneQuery;
   markersContainer: HTMLDivElement;
   playerHeadingDegrees: number;
   state: ZoneMarkerState;
@@ -20,14 +21,14 @@ type UpdateZoneMarkersParams = {
 
 export function updateZoneMarkers({
   camera,
-  zoneManager,
+  zoneQuery,
   markersContainer,
   playerHeadingDegrees,
   state
 }: UpdateZoneMarkersParams): void {
   camera.getWorldPosition(_cameraPos);
 
-  const zones = zoneManager.getAllZones();
+  const zones = zoneQuery.getAllZones();
   if (!zones.length) return;
 
   const compassWidth = 200;

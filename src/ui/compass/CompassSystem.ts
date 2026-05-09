@@ -2,12 +2,13 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { createCompassDOM } from './CompassDOMBuilder';
 import { updateZoneMarkers, type ZoneMarkerState } from './CompassZoneMarkers';
 
 export class CompassSystem implements GameSystem {
   private camera: THREE.Camera;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
 
   private compassContainer!: HTMLDivElement;
   private compassRose!: HTMLDivElement;
@@ -60,12 +61,12 @@ export class CompassSystem implements GameSystem {
     const offset = -headingDegrees * pixelsPerDegree + 720;
     this.compassRose.style.transform = `translate(calc(-50% + ${offset}px), -50%)`;
 
-    if (this.zoneManager) {
+    if (this.zoneQuery) {
       this.zoneUpdateTimer += deltaTime * 1000;
       if (this.zoneUpdateTimer >= CompassSystem.ZONE_UPDATE_INTERVAL) {
         updateZoneMarkers({
           camera: this.camera,
-          zoneManager: this.zoneManager,
+          zoneQuery: this.zoneQuery,
           markersContainer: this.markersContainer,
           playerHeadingDegrees: headingDegrees,
           state: this.zoneMarkerState
@@ -83,8 +84,17 @@ export class CompassSystem implements GameSystem {
     parent.appendChild(this.compassContainer);
   }
 
+  setZoneQuery(query: IZoneQuery): void {
+    this.zoneQuery = query;
+  }
+
+  /**
+   * Backwards-compatible adapter retained for one cycle so wiring composers
+   * keep working while consumers migrate to `setZoneQuery`. Delete after
+   * Batch C of cycle-2026-05-10-zone-manager-decoupling.
+   */
   setZoneManager(manager: ZoneManager): void {
-    this.zoneManager = manager;
+    this.setZoneQuery(manager);
   }
 
   dispose(): void {

@@ -4,6 +4,7 @@ import { GameSystem } from '../../types';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { Faction } from '../../systems/combat/types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { TicketSystem, GameState } from '../../systems/world/TicketSystem';
 import { HUDStyles } from './HUDStyles';
 import { HUDElements } from './HUDElements';
@@ -34,7 +35,7 @@ import type {
 
 interface HUDSystemDependencies {
   combatantSystem: CombatantSystem;
-  zoneManager: ZoneManager;
+  zoneManager: IZoneQuery;
   ticketSystem: TicketSystem;
   audioManager: AudioManager;
   grenadeSystem: GrenadeSystem;
@@ -43,7 +44,7 @@ interface HUDSystemDependencies {
 
 export class HUDSystem implements GameSystem, IHUDSystem {
   private combatantSystem?: CombatantSystem;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private ticketSystem?: TicketSystem;
   private playerHealthSystem?: PlayerHealthSystem;
   private grenadeSystem?: GrenadeSystem;
@@ -174,8 +175,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     // 2Hz - objectives
     if (this.objectiveAccumulator >= this.OBJECTIVE_INTERVAL) {
-      if (this.zoneManager) {
-        this.zoneDisplay.updateObjectivesDisplay(this.zoneManager, isTDM, this.camera?.position);
+      if (this.zoneQuery) {
+        this.zoneDisplay.updateObjectivesDisplay(this.zoneQuery, isTDM, this.camera?.position);
       }
       if (this.ticketSystem) {
         this.updateGameStatus(this.ticketSystem);
@@ -269,7 +270,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   configureDependencies(dependencies: HUDSystemDependencies): void {
     this.setCombatantSystem(dependencies.combatantSystem);
-    this.setZoneManager(dependencies.zoneManager);
+    this.setZoneQuery(dependencies.zoneManager);
     this.setTicketSystem(dependencies.ticketSystem);
     this.setAudioManager(dependencies.audioManager);
     this.setGrenadeSystem(dependencies.grenadeSystem);
@@ -434,8 +435,17 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.combatantSystem = system;
   }
 
+  setZoneQuery(query: IZoneQuery): void {
+    this.zoneQuery = query;
+  }
+
+  /**
+   * Backwards-compatible adapter retained for one cycle so wiring composers
+   * keep working while consumers migrate to `setZoneQuery`. Delete after
+   * Batch C of cycle-2026-05-10-zone-manager-decoupling.
+   */
   setZoneManager(manager: ZoneManager): void {
-    this.zoneManager = manager;
+    this.setZoneQuery(manager);
   }
 
   setTicketSystem(system: TicketSystem): void {
