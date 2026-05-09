@@ -175,6 +175,8 @@ describe('Combat Flow Integration', () => {
 
     const mockZoneManager = {
       getAllZones: () => zonesArray,
+      getCapturableZones: () => zonesArray.filter(z => !z.isHomeBase),
+      getZoneById: (id: string) => zonesArray.find(z => z.id === id) ?? null,
     } as any;
 
     scenario.ticketSystem.setMaxTickets(300);

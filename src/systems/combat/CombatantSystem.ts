@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { AssetLoader } from '../assets/AssetLoader';
-import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import type { ITerrainRuntime, IZoneQuery, IHUDSystem } from '../../types/SystemInterfaces';
 import { Combatant, CombatantState, Faction, isBlufor } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
@@ -10,7 +10,6 @@ import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { TicketSystem } from '../world/TicketSystem';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
-import { ZoneManager } from '../world/ZoneManager';
 import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
@@ -24,7 +23,6 @@ import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
 import { SpatialGridManager, spatialGridManager as defaultSpatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
-import { IHUDSystem } from '../../types/SystemInterfaces';
 
 // New focused modules
 import { CombatantSpawnManager } from './CombatantSpawnManager';
@@ -45,7 +43,7 @@ interface CombatantSystemDependencies {
   camera: THREE.Camera;
   ticketSystem: TicketSystem;
   playerHealthSystem: PlayerHealthSystem;
-  zoneManager: ZoneManager;
+  zoneManager: IZoneQuery;
   gameModeManager: GameModeManager;
   hudSystem: IHUDSystem;
   audioManager: AudioManager;
@@ -60,7 +58,7 @@ export class CombatantSystem implements GameSystem {
   private terrainSystem?: ITerrainRuntime;
   private ticketSystem?: TicketSystem;
   private playerHealthSystem?: PlayerHealthSystem;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private audioManager?: AudioManager;
   private hudSystem?: IHUDSystem;
   private gameModeManager?: GameModeManager;
@@ -245,9 +243,9 @@ export class CombatantSystem implements GameSystem {
 
     // Update influence map with current game state
     let t0 = performance.now();
-    if (this.influenceMap && this.zoneManager) {
+    if (this.influenceMap && this.zoneQuery) {
       this.influenceMap.setCombatants(this.combatants);
-      this.influenceMap.setZones(this.zoneManager.getAllZones());
+      this.influenceMap.setZones(this.zoneQuery.getAllZones());
       this.influenceMap.setPlayerPosition(this.playerPosition);
       // Update sandbag bounds if available
       const sandbagSystem = (this as any).sandbagSystem;
@@ -544,12 +542,12 @@ export class CombatantSystem implements GameSystem {
     this.combatantCombat.setPlayerHealthSystem(playerHealthSystem);
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
-    this.updateHelpers.setZoneManager(zoneManager);
-    this.combatantMovement.setZoneManager(zoneManager);
-    this.spawnManager.setZoneManager(zoneManager);
-    this.lodManager.setZoneManager(zoneManager);
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
+    this.updateHelpers.setZoneManager(zoneQuery);
+    this.combatantMovement.setZoneManager(zoneQuery);
+    this.spawnManager.setZoneManager(zoneQuery);
+    this.lodManager.setZoneManager(zoneQuery);
   }
 
   setHUDSystem(hudSystem: IHUDSystem): void {

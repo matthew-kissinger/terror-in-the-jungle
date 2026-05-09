@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, ITargetable, isPlayerTarget } from '../types';
 import { ISpatialQuery } from '../SpatialOctree';
-import { ZoneManager } from '../../world/ZoneManager';
+import type { IZoneQuery } from '../../../types/SystemInterfaces';
 import { clusterManager } from '../ClusterManager';
 
 const _toTarget = new THREE.Vector3();
@@ -12,10 +12,10 @@ const _toZone = new THREE.Vector3();
  * Handles defensive zone holding behavior
  */
 export class AIStateDefend {
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
   }
 
   handleDefending(
@@ -99,9 +99,8 @@ export class AIStateDefend {
       combatant.rotation = Math.atan2(_toDefensePos.z, _toDefensePos.x);
     } else {
       combatant.destinationPoint = undefined;
-      if (combatant.defendingZoneId && this.zoneManager) {
-        const zone = this.zoneManager.getAllZones()
-          .find(z => z.id === combatant.defendingZoneId);
+      if (combatant.defendingZoneId && this.zoneQuery) {
+        const zone = this.zoneQuery.getZoneById(combatant.defendingZoneId);
         if (zone) {
           _toZone
             .subVectors(zone.position, combatant.position);

@@ -15,9 +15,9 @@ import { StrategicDirector } from './StrategicDirector';
 import { PersistenceSystem } from './PersistenceSystem';
 import { StrategicRoutePlanner, type StrategicRouteTopologyInput } from './StrategicRoutePlanner';
 import type { CombatantSystem } from '../combat/CombatantSystem';
-import type { ZoneManager } from '../world/ZoneManager';
 import type { TicketSystem } from '../world/TicketSystem';
 import type { InfluenceMapSystem } from '../combat/InfluenceMapSystem';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 
 const WAR_STATE_SCHEMA_VERSION = 1;
 const DEFAULT_STRATEGIC_SPAWN_SPREAD_M = 100;
@@ -76,7 +76,7 @@ export class WarSimulator implements GameSystem {
 
   // Dependencies (set via setters)
   private combatantSystem: CombatantSystem | null = null;
-  private zoneManager: ZoneManager | null = null;
+  private zoneQuery: IZoneQuery | null = null;
   private ticketSystem: TicketSystem | null = null;
   private influenceMap: InfluenceMapSystem | null = null;
 
@@ -176,7 +176,7 @@ export class WarSimulator implements GameSystem {
       config,
       this.events,
       this.ticketSystem ?? undefined,
-      this.zoneManager ?? undefined
+      this.zoneQuery ?? undefined
     );
 
     this.director = new StrategicDirector(
@@ -184,12 +184,12 @@ export class WarSimulator implements GameSystem {
       this.agents,
       config,
       this.events,
-      this.zoneManager ?? undefined
+      this.zoneQuery ?? undefined
     );
 
     // Cache zone names for event messages
-    if (this.zoneManager) {
-      for (const zone of this.zoneManager.getAllZones()) {
+    if (this.zoneQuery) {
+      for (const zone of this.zoneQuery.getAllZones()) {
         this.zoneNames.set(zone.id, zone.name);
       }
     }
@@ -484,11 +484,11 @@ export class WarSimulator implements GameSystem {
   }
 
   private resolveSquadGoalRadius(squad: StrategicSquad): number {
-    if (!this.zoneManager || !squad.objectiveZoneId) {
+    if (!this.zoneQuery || !squad.objectiveZoneId) {
       return 26;
     }
 
-    const zone = this.zoneManager.getAllZones().find((entry) => entry.id === squad.objectiveZoneId);
+    const zone = this.zoneQuery.getZoneById(squad.objectiveZoneId);
     if (!zone) {
       return 26;
     }
@@ -621,8 +621,8 @@ export class WarSimulator implements GameSystem {
     this.combatantSystem = system;
   }
 
-  setZoneManager(manager: ZoneManager): void {
-    this.zoneManager = manager;
+  setZoneManager(manager: IZoneQuery): void {
+    this.zoneQuery = manager;
   }
 
   setTicketSystem(system: TicketSystem): void {
@@ -704,8 +704,8 @@ export class WarSimulator implements GameSystem {
       agents: Array.from(this.agents.values()),
       squads: Array.from(this.squads.values()),
       factions: { ...this.factionStats },
-      zones: this.zoneManager
-        ? this.zoneManager.getAllZones().map(z => ({
+      zones: this.zoneQuery
+        ? this.zoneQuery.getAllZones().map(z => ({
             id: z.id,
             owner: z.owner,
             captureProgress: z.captureProgress ?? 0

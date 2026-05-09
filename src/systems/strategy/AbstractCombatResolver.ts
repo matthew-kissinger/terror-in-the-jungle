@@ -3,7 +3,7 @@ import { WarSimulatorConfig } from '../../config/gameModeTypes';
 import { AgentTier, StrategicAgent, StrategicSquad } from './types';
 import { WarEventEmitter } from './WarEventEmitter';
 import type { TicketSystem } from '../world/TicketSystem';
-import type { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 
 /**
  * Abstract Combat Resolver.
@@ -28,7 +28,7 @@ export class AbstractCombatResolver {
   private config: WarSimulatorConfig;
   private events: WarEventEmitter;
   private ticketSystem?: TicketSystem;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
 
   private lastUpdateTime = 0;
 
@@ -51,14 +51,14 @@ export class AbstractCombatResolver {
     config: WarSimulatorConfig,
     events: WarEventEmitter,
     ticketSystem?: TicketSystem,
-    zoneManager?: ZoneManager
+    zoneQuery?: IZoneQuery
   ) {
     this.agents = agents;
     this.squads = squads;
     this.config = config;
     this.events = events;
     this.ticketSystem = ticketSystem;
-    this.zoneManager = zoneManager;
+    this.zoneQuery = zoneQuery;
   }
 
   setPlayerPosition(x: number, z: number): void {
@@ -230,10 +230,9 @@ export class AbstractCombatResolver {
   }
 
   private isDefendingOwnZone(squad: StrategicSquad): boolean {
-    if (!this.zoneManager || !squad.objectiveZoneId) return false;
+    if (!this.zoneQuery || !squad.objectiveZoneId) return false;
 
-    const zones = this.zoneManager.getAllZones();
-    const zone = zones.find(z => z.id === squad.objectiveZoneId);
+    const zone = this.zoneQuery.getZoneById(squad.objectiveZoneId);
     if (!zone) return false;
 
     // Defending if the zone is owned by the squad's faction and squad is within radius

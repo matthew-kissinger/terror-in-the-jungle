@@ -1,5 +1,6 @@
 import { Faction } from '../combat/types';
-import { ZoneManager, ZoneState } from './ZoneManager';
+import { ZoneState } from './ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { GamePhase, PhaseTimings } from './TicketSystemPhases';
 
 export type VictoryReason = 'KILL_TARGET_REACHED' | 'TICKETS_DEPLETED' | 'TOTAL_CONTROL' | 'TIME_LIMIT' | 'ADMIN_COMMAND';
@@ -22,7 +23,7 @@ interface VictoryCheckParams {
   opforTickets: number;
 
   // Zone control params
-  zoneManager: ZoneManager | undefined;
+  zoneManager: IZoneQuery | undefined;
 
   // Phase params
   currentPhase: GamePhase;
@@ -77,9 +78,8 @@ export class VictoryConditions {
   /**
    * Check if either faction controls all capturable zones
    */
-  private checkTotalZoneControl(zoneManager: ZoneManager): VictoryResult {
-    const zones = zoneManager.getAllZones();
-    const capturableZones = zones.filter(z => !z.isHomeBase);
+  private checkTotalZoneControl(zoneQuery: IZoneQuery): VictoryResult {
+    const capturableZones = zoneQuery.getCapturableZones();
 
     // Only check total control if there are capturable zones
     if (capturableZones.length > 0) {

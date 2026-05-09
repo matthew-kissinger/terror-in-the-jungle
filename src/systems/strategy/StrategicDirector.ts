@@ -2,7 +2,8 @@ import { Faction, getAlliance, isBlufor, isOpfor, getEnemyAlliance } from '../co
 import { WarSimulatorConfig } from '../../config/gameModeTypes';
 import { StrategicAgent, StrategicSquad, AgentTier } from './types';
 import { WarEventEmitter } from './WarEventEmitter';
-import type { ZoneManager, CaptureZone } from '../world/ZoneManager';
+import type { CaptureZone } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 
 const OBJECTIVE_SCATTER_RADIUS_SCALE = 0.38;
 const HOME_OBJECTIVE_SCATTER_RADIUS_SCALE = 0.5;
@@ -29,7 +30,7 @@ export class StrategicDirector {
   private agents: Map<string, StrategicAgent>;
   private config: WarSimulatorConfig;
   private events: WarEventEmitter;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
 
   private lastUpdateTime = 0;
   private lastReinforcementTime: Record<string, number> = {};
@@ -50,13 +51,13 @@ export class StrategicDirector {
     agents: Map<string, StrategicAgent>,
     config: WarSimulatorConfig,
     events: WarEventEmitter,
-    zoneManager?: ZoneManager
+    zoneQuery?: IZoneQuery
   ) {
     this.squads = squads;
     this.agents = agents;
     this.config = config;
     this.events = events;
-    this.zoneManager = zoneManager;
+    this.zoneQuery = zoneQuery;
   }
 
   setPlayerPosition(x: number, z: number): void {
@@ -68,9 +69,9 @@ export class StrategicDirector {
     if (elapsedTime - this.lastUpdateTime < this.config.directorUpdateInterval / 1000) return;
     this.lastUpdateTime = elapsedTime;
 
-    if (!this.zoneManager) return;
+    if (!this.zoneQuery) return;
 
-    const zones = this.zoneManager.getAllZones();
+    const zones = this.zoneQuery.getAllZones();
     if (zones.length === 0) return;
 
     // Score zones
@@ -89,7 +90,7 @@ export class StrategicDirector {
     this.handleReinforcements(elapsedTime, zones);
   }
 
-  private scoreZones(zones: CaptureZone[]): Map<string, number> {
+  private scoreZones(zones: readonly CaptureZone[]): Map<string, number> {
     const scores = new Map<string, number>();
 
     for (const zone of zones) {
@@ -161,7 +162,7 @@ export class StrategicDirector {
 
   private assignFactionSquads(
     faction: Faction,
-    zones: CaptureZone[],
+    zones: readonly CaptureZone[],
     zoneScores: Map<string, number>
   ): void {
     const factionSquads = Array.from(this.squads.values())
@@ -329,7 +330,7 @@ export class StrategicDirector {
     };
   }
 
-  private handleReinforcements(elapsedTime: number, zones: CaptureZone[]): void {
+  private handleReinforcements(elapsedTime: number, zones: readonly CaptureZone[]): void {
     const cooldown = this.config.reinforcementCooldown;
 
     for (const faction of this.getActiveFactions()) {

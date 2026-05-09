@@ -18,7 +18,7 @@ export interface ComputationParams {
   cellSize: number;
   worldOffset: THREE.Vector2;
   combatants: Map<string, Combatant>;
-  zones: CaptureZone[];
+  zones: readonly CaptureZone[];
   playerPosition: THREE.Vector3;
   sandbagBounds: THREE.Box3[];
 }

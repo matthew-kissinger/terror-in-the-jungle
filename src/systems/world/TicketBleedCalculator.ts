@@ -1,4 +1,5 @@
-import { ZoneManager, ZoneState } from './ZoneManager';
+import { ZoneState } from './ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 
 export interface TicketBleedRate {
   usTickets: number;
@@ -19,13 +20,12 @@ export class TicketBleedCalculator {
   /**
    * Calculate ticket bleed rates based on zone control
    */
-  calculateTicketBleed(zoneManager: ZoneManager | undefined): TicketBleedRate {
-    if (!zoneManager) {
+  calculateTicketBleed(zoneQuery: IZoneQuery | undefined): TicketBleedRate {
+    if (!zoneQuery) {
       return { usTickets: 0, opforTickets: 0, bleedPerSecond: 0 };
     }
 
-    const zones = zoneManager.getAllZones();
-    const capturableZones = zones.filter(z => !z.isHomeBase);
+    const capturableZones = zoneQuery.getCapturableZones();
 
     if (capturableZones.length === 0) {
       return { usTickets: 0, opforTickets: 0, bleedPerSecond: 0 };

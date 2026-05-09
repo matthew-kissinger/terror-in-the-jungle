@@ -4,7 +4,7 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
 import { ISpatialQuery } from './SpatialOctree'
-import { ZoneManager } from '../world/ZoneManager'
+import type { IZoneQuery } from '../../types/SystemInterfaces'
 import { TicketSystem } from '../world/TicketSystem'
 import { AIStatePatrol } from './ai/AIStatePatrol'
 import { AIStateEngage, type CloseEngagementTelemetry } from './ai/AIStateEngage'
@@ -722,9 +722,9 @@ export class CombatantAI {
     this.coverSystem.setSandbagSystem(sandbagSystem)
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.patrolHandler.setZoneManager(zoneManager)
-    this.defendHandler.setZoneManager(zoneManager)
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.patrolHandler.setZoneManager(zoneQuery)
+    this.defendHandler.setZoneManager(zoneQuery)
   }
 
   setSmokeCloudSystem(smokeCloudSystem: SmokeCloudSystem): void {

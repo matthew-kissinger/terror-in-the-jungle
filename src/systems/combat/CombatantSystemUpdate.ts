@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Combatant } from './types';
 import { SquadManager } from './SquadManager';
-import { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 
 /**
  * Update loop helper methods for CombatantSystem
@@ -14,14 +14,14 @@ export class CombatantSystemUpdate {
   constructor(
     private combatants: Map<string, Combatant>,
     private squadManager: SquadManager,
-    private zoneManager?: ZoneManager
+    private zoneQuery?: IZoneQuery
   ) {}
 
   /**
    * Update squad objective timer and reassign objectives if needed
    */
   updateSquadObjectives(deltaTime: number): void {
-    if (!this.zoneManager) return;
+    if (!this.zoneQuery) return;
 
     this.squadObjectiveTimer += deltaTime;
     if (this.squadObjectiveTimer < this.SQUAD_OBJECTIVE_REASSIGN_INTERVAL) {
@@ -30,7 +30,7 @@ export class CombatantSystemUpdate {
 
     this.squadObjectiveTimer = 0;
 
-    const zones = this.zoneManager.getAllZones();
+    const zones = this.zoneQuery.getAllZones();
     const squads = this.squadManager.getAllSquads();
 
     squads.forEach(squad => {
@@ -61,7 +61,7 @@ export class CombatantSystemUpdate {
     });
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
   }
 }

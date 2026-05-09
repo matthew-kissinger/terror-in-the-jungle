@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Combatant, CombatantMovementIntent, CombatantState, Faction, Squad, isBlufor } from './types';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
-import { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { TicketSystem } from '../world/TicketSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { clusterManager } from './ClusterManager';
@@ -105,7 +105,7 @@ function horizontalDistanceSq(a: THREE.Vector3, b: THREE.Vector3): number {
 export class CombatantMovement {
   private static readonly TAU = Math.PI * 2;
   private terrainSystem?: ITerrainRuntime;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private ticketSystem?: TicketSystem;
   private gameModeManager?: GameModeManager;
   private spatialGridManager?: SpatialGridManager;
@@ -118,9 +118,9 @@ export class CombatantMovement {
   private nextStuckRecoveryWarnAtMs = 0;
   private suppressedStuckRecoveryWarns = 0;
 
-  constructor(terrainSystem?: ITerrainRuntime, zoneManager?: ZoneManager) {
+  constructor(terrainSystem?: ITerrainRuntime, zoneQuery?: IZoneQuery) {
     this.terrainSystem = terrainSystem;
-    this.zoneManager = zoneManager;
+    this.zoneQuery = zoneQuery;
   }
 
   setSpatialGridManager(spatialGridManager: SpatialGridManager): void {
@@ -171,7 +171,7 @@ export class CombatantMovement {
     // Movement based on state
     if (combatant.state === CombatantState.PATROLLING) {
       updatePatrolMovement(combatant, deltaTime, squads, combatants, {
-        zoneManager: this.zoneManager,
+        zoneManager: this.zoneQuery,
         getEnemyBasePosition: (faction: Faction) => this.getEnemyBasePosition(faction)
       });
     } else if (combatant.state === CombatantState.ENGAGING) {
@@ -1098,8 +1098,8 @@ export class CombatantMovement {
     this.terrainSystem = terrainSystem;
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
   }
 
   setGameModeManager(gameModeManager: GameModeManager): void {

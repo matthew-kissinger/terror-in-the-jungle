@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Combatant, Faction, Squad, SquadCommand } from './types';
-import { ZoneManager, ZoneState } from '../world/ZoneManager';
+import { ZoneState } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { handlePlayerCommand, handleRejoiningMovement } from './CombatantMovementCommands';
 import { NPC_MAX_SPEED, NpcLodConfig } from '../../config/CombatantConfig';
 
@@ -64,7 +65,7 @@ const STRAFE_AMPLITUDE = 0.5;
 const _moveVec = new THREE.Vector3();
 const _moveVec2 = new THREE.Vector3();
 interface PatrolMovementDependencies {
-  zoneManager?: ZoneManager;
+  zoneManager?: IZoneQuery;
   getEnemyBasePosition: (faction: Faction) => THREE.Vector3;
 }
 export function updatePatrolMovement(
@@ -211,9 +212,9 @@ export function updatePatrolMovement(
  * block above; used by the follower watchdog when a stale leader forces the
  * follower to pick its own goal.
  */
-function runZoneTargetingTick(combatant: Combatant, zoneManager: ZoneManager): void {
+function runZoneTargetingTick(combatant: Combatant, zoneQuery: IZoneQuery): void {
   combatant.lastZoneEvalTime = performance.now();
-  const allZones = zoneManager.getAllZones();
+  const allZones = zoneQuery.getAllZones();
   let top1Zone = null, top1Score = -1;
   let top2Zone = null, top2Score = -1;
   let top3Zone = null, top3Score = -1;

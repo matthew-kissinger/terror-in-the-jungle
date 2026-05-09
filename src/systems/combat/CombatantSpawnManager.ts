@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, Alliance, getAlliance, isBlufor, isOpfor, SquadCommand } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
-import { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { GameModeManager } from '../world/GameModeManager';
 import { RallyPointSystem } from './RallyPointSystem';
 import { TicketSystem } from '../world/TicketSystem';
@@ -25,7 +25,7 @@ export class CombatantSpawnManager {
   private combatants: Map<string, Combatant>;
   private combatantFactory: CombatantFactory;
   private squadManager: SquadManager;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private gameModeManager?: GameModeManager;
   private rallyPointSystem?: RallyPointSystem;
   private terrainSystem?: ITerrainRuntime;
@@ -63,8 +63,8 @@ export class CombatantSpawnManager {
     );
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
+  setZoneManager(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
   }
 
   setGameModeManager(gameModeManager: GameModeManager): void {
@@ -316,7 +316,7 @@ export class CombatantSpawnManager {
     }
 
     // Handle pending respawns for player squad members
-    this.respawnManager.handlePendingRespawns(this.rallyPointSystem, this.zoneManager, this.gameModeManager);
+    this.respawnManager.handlePendingRespawns(this.rallyPointSystem, this.zoneQuery, this.gameModeManager);
 
     // Remove all dead combatants immediately - no body persistence
     const toRemove: string[] = [];
@@ -371,7 +371,7 @@ export class CombatantSpawnManager {
         } else {
           pos = SpawnPositionCalculator.getSpawnPosition(
             faction,
-            this.zoneManager,
+            this.zoneQuery,
             this.gameModeManager?.getCurrentConfig(),
             this.terrainSystem,
           );
@@ -425,7 +425,7 @@ export class CombatantSpawnManager {
       this.squadSizeMin,
       this.squadSizeMax,
       spawnHandler,
-      this.zoneManager,
+      this.zoneQuery,
       this.gameModeManager
     );
   }
@@ -487,7 +487,7 @@ export class CombatantSpawnManager {
   }
 
   private getReinforcementAnchors(faction: Faction): THREE.Vector3[] {
-    const anchors = SpawnPositionCalculator.getFactionAnchors(faction, this.zoneManager);
+    const anchors = SpawnPositionCalculator.getFactionAnchors(faction, this.zoneQuery);
     const config = this.gameModeManager?.getCurrentConfig();
     if (!config || config.id !== 'open_frontier') {
       return anchors;
@@ -535,9 +535,9 @@ export class CombatantSpawnManager {
    */
   respawnSquadMember(squadId: string): void {
     this.respawnManager.respawnSquadMember(
-      squadId, 
-      this.rallyPointSystem, 
-      this.zoneManager, 
+      squadId,
+      this.rallyPointSystem,
+      this.zoneQuery,
       this.gameModeManager
     );
   }
