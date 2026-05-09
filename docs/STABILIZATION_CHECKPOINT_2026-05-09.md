@@ -38,6 +38,25 @@ Each cycle's full PR list lives in [docs/BACKLOG.md](BACKLOG.md) "Recently Compl
 Captured during Phase 2 R2 wait via chrome-devtools MCP + curl + WebFetch
 research. Full evidence: `artifacts/live-audit-2026-05-09/FINDINGS.md`.
 
+**Account-level audit added later via claude-in-chrome MCP** (logged-in
+dashboard session, queried via `/api/v4/*` endpoints): see
+`artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md`. Highlights:
+
+- Production deploy at SHA `08fc34203bb1` (the close + stabilization commit)
+  is **live and successful**. Last 5 deploys all SUCCESS.
+- **Web Analytics token + snippet already provisioned** for this project but
+  the ruleset is **unattached** — zero RUM data flowing today. **Closing
+  this is a 1-click toggle** in the Pages dashboard (Settings → Web
+  Analytics → Enabled + Auto-install). Lowest-effort highest-value item.
+- R2 prod bucket has correct CORS (`public-game-asset-read`) and
+  `Default Multipart Abort` lifecycle. Preview/prod separation is healthy.
+- Pages bindings: zero env vars, zero secrets, zero KV/D1/R2 bindings, zero
+  services, zero Functions. Pure static SPA — minimal attack surface.
+- Deploy mode is **Direct Upload** (driven by `gh workflow run deploy.yml`).
+- Account `enforce_twofactor: false` (orthogonal note).
+- No custom domain on either Pages or R2 (zone-level features like Cache
+  Reserve / Smart Tiered Cache remain N/A until a custom domain is added).
+
 ### What's healthy
 
 - Cross-origin isolated: true (COOP+COEP working). Unlocks `SharedArrayBuffer`.
