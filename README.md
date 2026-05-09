@@ -231,7 +231,7 @@ Start here:
 | [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced-interface change rules. |
 | [docs/COMBAT.md](docs/COMBAT.md) | Combat ownership, AI, movement, LOD, scale rules. |
 | [docs/TESTING.md](docs/TESTING.md) | Four-layer testing contract. Read before adding tests. |
-| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Perf scenarios, capture workflow, baseline policy. |
+| [docs/perf/](docs/perf/) | Perf scenarios, capture workflow, baseline policy, regression playbook. |
 | [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) | Cloudflare Pages / R2 deploy and cache verification. |
 | [docs/PLAYTEST_CHECKLIST.md](docs/PLAYTEST_CHECKLIST.md) | Human playtest form for feel-sensitive changes. |
 | [docs/BACKLOG.md](docs/BACKLOG.md) | Strategic Reserve index. Active work routes through `docs/DIRECTIVES.md`. |

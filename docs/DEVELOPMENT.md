@@ -67,7 +67,7 @@ npx tsx scripts/fixed-wing-runtime-probe.ts --server-mode dev # debug against de
 
 `fixed-wing-runtime-probe.ts` boots Open Frontier in Playwright, forces desktop input semantics, steps the live game deterministically through `window.advanceTime(ms)`, and validates runway takeoff, climb, AC-47 orbit hold, player/NPC handoff, and short-final approach setup for the A-1, F-4, and AC-47. Artifacts land in `artifacts/fixed-wing-runtime-probe/`.
 
-Post-C1 (2026-04-17), the probe defaults to the `perf` build target served via `vite preview` rather than sharing a dev server. See PERFORMANCE.md "Build targets" for the why.
+Post-C1 (2026-04-17), the probe defaults to the `perf` build target served via `vite preview` rather than sharing a dev server. See [perf/README.md](perf/README.md) "Build targets" for the why.
 
 `cycle-2026-04-21-stabilization-reset` restored this probe as a maintained
 gate. Treat it as required evidence for fixed-wing/airfield changes.
@@ -93,7 +93,7 @@ npm run perf:compare:strict      # Treat warnings as failures too
 npm run validate:full            # test + build + combat120 + compare
 ```
 
-See [PERFORMANCE.md](PERFORMANCE.md) for full profiling docs.
+See [perf/README.md](perf/README.md) for full profiling docs (build targets, capture commands, artifacts), [perf/baselines.md](perf/baselines.md) for tracked baselines and refresh procedure, [perf/scenarios.md](perf/scenarios.md) for scenario definitions, and [perf/playbook.md](perf/playbook.md) for the regression investigation playbook.
 
 For world-size, staged-prop, aircraft, vehicle, terrain-query, or hit-detection changes, `combat120` is not enough. Run `npm run perf:capture:openfrontier:short` and compare that scenario explicitly before you push.
 
