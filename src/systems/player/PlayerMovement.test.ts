@@ -612,4 +612,69 @@ describe('PlayerMovement', () => {
       expect(playerState.velocity.y).toBeGreaterThan(0);
     });
   });
+
+  describe('WorldBuilder noClip flag', () => {
+    const FULL_WB_STATE = {
+      invulnerable: false,
+      infiniteAmmo: false,
+      noClip: true,
+      oneShotKills: false,
+      shadowsEnabled: true,
+      postProcessEnabled: true,
+      hudVisible: true,
+      ambientAudioEnabled: true,
+      npcTickPaused: false,
+      forceTimeOfDay: -1,
+      active: true,
+    };
+
+    beforeEach(() => {
+      playerMovement.setTerrainSystem(mockTerrainSystem);
+      playerMovement.setSandbagSystem(mockSandbagSystem);
+      (globalThis as any).window = (globalThis as any).window ?? {};
+    });
+
+    afterEach(() => {
+      delete (globalThis as any).window?.__worldBuilder;
+    });
+
+    it('skips gravity accumulation when noClip is active', () => {
+      (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, noClip: true };
+      playerState.position.y = 100;
+      playerState.isGrounded = false;
+      playerState.velocity.y = -10;
+
+      playerMovement.updateMovement(0.016, mockInput, mockCamera);
+
+      // Without noClip, gravity (-30) over 0.016s would push velocity.y past
+      // -10. With noClip, vertical velocity is held at zero so the player
+      // floats freely.
+      expect(playerState.velocity.y).toBe(0);
+    });
+
+    it('does not snap player onto ground when noClip is active', () => {
+      (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, noClip: true };
+      // Place player above ground; ground height (with eye height) sits near
+      // PLAYER_EYE_HEIGHT. Without noClip we'd be snapped down to PLAYER_EYE_HEIGHT.
+      playerState.position.y = 50;
+      playerState.isGrounded = false;
+
+      playerMovement.updateMovement(0.016, mockInput, mockCamera);
+
+      expect(playerState.isGrounded).toBe(false);
+      expect(playerState.position.y).toBeGreaterThan(PLAYER_EYE_HEIGHT + 1);
+    });
+
+    it('still applies gravity when noClip is false', () => {
+      (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, noClip: false };
+      playerState.position.y = 100;
+      playerState.isGrounded = false;
+      playerState.velocity.y = 0;
+
+      playerMovement.updateMovement(0.016, mockInput, mockCamera);
+
+      // Gravity must have pulled velocity downward.
+      expect(playerState.velocity.y).toBeLessThan(0);
+    });
+  });
 });

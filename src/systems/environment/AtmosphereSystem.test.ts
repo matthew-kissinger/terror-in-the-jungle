@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { AtmosphereSystem } from './AtmosphereSystem';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
@@ -641,5 +641,90 @@ describe('AtmosphereSystem (preset-driven fog density)', () => {
     // Menu-phase AtmosphereSystem has no renderer yet; applying a preset
     // must still succeed and return true.
     expect(system.applyScenarioPreset('combat120')).toBe(true);
+  });
+});
+
+/**
+ * Behavior contract for the WorldBuilder `forceTimeOfDay` wiring
+ * (cycle-2026-05-09-doc-decomposition-and-wiring, Phase 1 R2). The dev
+ * console publishes a [-1, 1] knob on `window.__worldBuilder`; values in
+ * [0, 1] pin simulated time to that fraction of the active preset's
+ * `todCycle.dayLengthSeconds`. The static-sun fallback (`combat120`) must
+ * be unaffected since it has no `todCycle`.
+ */
+describe('AtmosphereSystem (WorldBuilder forceTimeOfDay wiring)', () => {
+  const FULL_WB_STATE = {
+    invulnerable: false,
+    infiniteAmmo: false,
+    noClip: false,
+    oneShotKills: false,
+    shadowsEnabled: true,
+    postProcessEnabled: true,
+    hudVisible: true,
+    ambientAudioEnabled: true,
+    npcTickPaused: false,
+    forceTimeOfDay: -1,
+    active: true,
+  };
+
+  afterEach(() => {
+    delete (globalThis as any).window?.__worldBuilder;
+  });
+
+  it('snaps simulated time to forceTimeOfDay * dayLengthSeconds when the flag is in [0,1]', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('ashau');
+    const dayLen = system.getCurrentPreset()!.todCycle!.dayLengthSeconds;
+
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, forceTimeOfDay: 0.5 };
+
+    // Update — wiring should snap simulated time to ~0.5 * dayLen this frame.
+    system.update(0.016);
+    expect(system.getSimulationTimeSeconds()).toBeCloseTo(0.5 * dayLen, 3);
+
+    // Subsequent frames stay pinned even though natural advance would tick.
+    system.update(0.016);
+    expect(system.getSimulationTimeSeconds()).toBeCloseTo(0.5 * dayLen, 3);
+  });
+
+  it('lets simulated time advance naturally when forceTimeOfDay is -1', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('ashau');
+
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, forceTimeOfDay: -1 };
+
+    const before = system.getSimulationTimeSeconds();
+    system.update(2.5);
+    expect(system.getSimulationTimeSeconds()).toBeGreaterThan(before + 2);
+  });
+
+  it('different forceTimeOfDay fractions produce different sun directions', () => {
+    const dawn = new AtmosphereSystem();
+    dawn.applyScenarioPreset('openfrontier');
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, forceTimeOfDay: 0.0 };
+    dawn.update(0.016);
+    const dawnDir = dawn.getSunDirection(new THREE.Vector3()).clone();
+
+    const noon = new AtmosphereSystem();
+    noon.applyScenarioPreset('openfrontier');
+    (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, forceTimeOfDay: 0.25 };
+    noon.update(0.016);
+    const noonDir = noon.getSunDirection(new THREE.Vector3());
+
+    const distance = Math.hypot(noonDir.x - dawnDir.x, noonDir.y - dawnDir.y, noonDir.z - dawnDir.z);
+    expect(distance).toBeGreaterThan(0.05);
+  });
+
+  it('does not throw on a static-sun preset (no todCycle) when the flag is set', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('combat120');
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (globalThis as any).window.__worldBuilder = { ...FULL_WB_STATE, forceTimeOfDay: 0.5 };
+
+    // combat120 carries no todCycle; flag must be silently ignored.
+    expect(() => system.update(0.016)).not.toThrow();
   });
 });

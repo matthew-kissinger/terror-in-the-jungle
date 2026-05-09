@@ -19,6 +19,7 @@ import {
   computeSlopeValueFromNormal,
   computeSmoothedSupportNormal,
 } from '../terrain/GameplaySurfaceSampling';
+import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -318,8 +319,18 @@ export class PlayerMovement {
       sliding = true;
     }
 
+    // WorldBuilder no-clip (dev-only, gated by Vite DCE in retail). Skips
+    // gravity, terrain ground-snap, sandbag/terrain blocking, and world
+    // boundary so the player can free-fly through geometry. Movement still
+    // uses the camera-relative input vector applied above.
+    const noClipActive = import.meta.env.DEV && isWorldBuilderFlagActive('noClip');
+
     // Apply gravity
-    this.playerState.velocity.y += this.playerState.gravity * deltaTime;
+    if (!noClipActive) {
+      this.playerState.velocity.y += this.playerState.gravity * deltaTime;
+    } else {
+      this.playerState.velocity.y = 0;
+    }
 
     // Update position
     const movement = _cameraRight.copy(this.playerState.velocity).multiplyScalar(deltaTime);
@@ -332,8 +343,8 @@ export class PlayerMovement {
     let obstacleStepRise: number | null = null;
     let targetSlopeValue: number | null = null;
 
-    // Check sandbag collision before applying movement
-    if (this.sandbagSystem && this.sandbagSystem.checkCollision(newPosition, PLAYER_COLLISION_RADIUS)) {
+    // Check sandbag collision before applying movement (skipped in noClip).
+    if (!noClipActive && this.sandbagSystem && this.sandbagSystem.checkCollision(newPosition, PLAYER_COLLISION_RADIUS)) {
       // Try to slide along the obstacle
       const slideX = _worldMoveVector.copy(this.playerState.position);
       slideX.x = newPosition.x;
@@ -384,7 +395,7 @@ export class PlayerMovement {
     // faces redirect motion along the contour; only raised collision surfaces
     // retain hard step-up blocking.
     let blockedByTerrain = false;
-    if (this.playerState.isGrounded && this.terrainSystem) {
+    if (!noClipActive && this.playerState.isGrounded && this.terrainSystem) {
       currentTerrainHeight = Number(this.terrainSystem.getHeightAt(
         this.playerState.position.x,
         this.playerState.position.z,
@@ -467,9 +478,12 @@ export class PlayerMovement {
       }
     }
 
-    // Check for landing and play landing sound
+    // Check for landing and play landing sound. In noClip the player floats
+    // free and is never grounded; skip the ground-snap branch entirely.
     const impactVelocityY = this.playerState.velocity.y;
-    if (newPosition.y <= groundHeight) {
+    if (noClipActive) {
+      this.playerState.isGrounded = false;
+    } else if (newPosition.y <= groundHeight) {
       // Player is on or below ground.
       // Upward-rise clamp (walking only): when the player is already
       // grounded AND moved horizontally this frame, the resolved ground
@@ -503,12 +517,13 @@ export class PlayerMovement {
       this.playerState.isGrounded = false;
     }
 
-    // Bounce off world boundary (read directly from terrain system)
+    // Bounce off world boundary (read directly from terrain system).
+    // Skipped in noClip so the dev tool can fly past the playable bounds.
     if (this.terrainSystem) {
       const ws = this.terrainSystem.getPlayableWorldSize();
       if (ws > 0) this.worldHalfExtent = ws * 0.5;
     }
-    if (this.worldHalfExtent > 0) {
+    if (!noClipActive && this.worldHalfExtent > 0) {
       this.enforceWorldBoundary(newPosition, this.worldHalfExtent);
     }
 

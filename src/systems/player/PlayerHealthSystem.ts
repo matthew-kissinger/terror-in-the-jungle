@@ -10,6 +10,7 @@ import { Logger } from '../../utils/Logger';
 import type { PlayerController } from './PlayerController';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import type { FirstPersonWeapon } from './FirstPersonWeapon';
+import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 const _cameraDir = new THREE.Vector3();
 
@@ -150,6 +151,10 @@ export class PlayerHealthSystem implements GameSystem {
   // Public API
 
   takeDamage(amount: number, sourcePosition?: THREE.Vector3, playerPosition?: THREE.Vector3): boolean {
+    // WorldBuilder god-mode invulnerability (dev-only, gated by Vite DCE in retail).
+    if (import.meta.env.DEV && isWorldBuilderFlagActive('invulnerable')) {
+      return false;
+    }
     if (this.playerState.isDead || this.playerState.invulnerabilityTime > 0) {
       return false;
     }

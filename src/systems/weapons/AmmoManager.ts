@@ -2,6 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { ZoneManager, CaptureZone } from '../world/ZoneManager';
 import { Faction } from '../combat/types';
+import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 export interface AmmoState {
   currentMagazine: number;
@@ -49,6 +50,12 @@ export class AmmoManager {
 
   consumeRound(): boolean {
     if (!this.canFire()) return false;
+
+    // WorldBuilder infinite-ammo (dev-only, gated by Vite DCE in retail). Shot
+    // succeeds but magazine is not decremented, so reload state never trips.
+    if (import.meta.env.DEV && isWorldBuilderFlagActive('infiniteAmmo')) {
+      return true;
+    }
 
     this.state.currentMagazine--;
     this.state.needsReload = this.state.currentMagazine === 0;
