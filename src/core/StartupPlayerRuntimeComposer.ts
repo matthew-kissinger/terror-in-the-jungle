@@ -295,7 +295,7 @@ function wireHUDRuntime(runtime: StartupPlayerRuntimeGroups['hudRuntime']): void
     });
   } else {
     hudSystem.setCombatantSystem(combatantSystem);
-    hudSystem.setZoneManager(zoneManager);
+    hudSystem.setZoneQuery(zoneManager);
     hudSystem.setTicketSystem(ticketSystem);
     hudSystem.setAudioManager(audioManager);
     hudSystem.setGrenadeSystem(grenadeSystem);
@@ -314,14 +314,14 @@ function wireHUDRuntime(runtime: StartupPlayerRuntimeGroups['hudRuntime']): void
   );
   commandInputManager.mountTo(layout);
 
-  compassSystem.setZoneManager(zoneManager);
-  minimapSystem.setZoneManager(zoneManager);
+  compassSystem.setZoneQuery(zoneManager);
+  minimapSystem.setZoneQuery(zoneManager);
   minimapSystem.setCombatantSystem(combatantSystem);
-  fullMapSystem.setZoneManager(zoneManager);
+  fullMapSystem.setZoneQuery(zoneManager);
   fullMapSystem.setCombatantSystem(combatantSystem);
   fullMapSystem.setGameModeManager(gameModeManager);
 
-  commandInputManager.setZoneManager(zoneManager);
+  commandInputManager.setZoneQuery(zoneManager);
   commandInputManager.setCombatantSystem(combatantSystem);
   commandInputManager.setGameModeManager(gameModeManager);
   commandInputManager.setPlayerController(playerController);

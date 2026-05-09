@@ -8,7 +8,7 @@ import type { SquadCommandState } from './PlayerSquadController';
 import { PlayerSquadController } from './PlayerSquadController';
 import { SquadCommand } from './types';
 import { getQuickCommandOption, requiresCommandTarget } from './SquadCommandPresentation';
-import type { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import type { CombatantSystem } from './CombatantSystem';
 import type { GameModeManager } from '../world/GameModeManager';
 import type { PlayerController } from '../player/PlayerController';
@@ -20,7 +20,7 @@ export class CommandInputManager implements GameSystem {
   private readonly commandModeOverlay: CommandModeOverlay;
   private layout?: HUDLayout;
   private inputManager?: InputManager;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private combatantSystem?: CombatantSystem;
   private gameModeManager?: GameModeManager;
   private playerController?: PlayerController;
@@ -92,7 +92,7 @@ export class CommandInputManager implements GameSystem {
       playerPosition,
       playerRotation,
       worldSize: minimapScale,
-      zoneManager: this.zoneManager,
+      zoneQuery: this.zoneQuery,
       combatantSystem: this.combatantSystem,
       playerSquadId: this.playerSquadController.getPlayerSquadId(),
       commandPosition: this.latestSquadState.commandPosition
@@ -130,8 +130,8 @@ export class CommandInputManager implements GameSystem {
     });
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
-    this.zoneManager = zoneManager;
+  setZoneQuery(zoneQuery: IZoneQuery): void {
+    this.zoneQuery = zoneQuery;
   }
 
   setCombatantSystem(combatantSystem: CombatantSystem): void {

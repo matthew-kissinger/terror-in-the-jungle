@@ -1,4 +1,5 @@
-import { ZoneManager, CaptureZone } from '../../systems/world/ZoneManager';
+import { CaptureZone } from '../../systems/world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import {
   MAP_SIZE,
   WORLD_SIZE,
@@ -25,7 +26,7 @@ export class OpenFrontierRespawnMapRenderer {
   static render(
     ctx: CanvasRenderingContext2D,
     state: RenderState,
-    zoneManager?: ZoneManager,
+    zoneQuery?: IZoneQuery,
     spawnPoints: RespawnSpawnPoint[] = []
   ): void {
     const size = MAP_SIZE;
@@ -47,8 +48,8 @@ export class OpenFrontierRespawnMapRenderer {
     this.drawGrid(ctx);
 
     // Draw all zones
-    if (zoneManager) {
-      const zones = zoneManager.getAllZones();
+    if (zoneQuery) {
+      const zones = zoneQuery.getAllZones();
 
       // Draw zones in layers for better visibility
       // First pass: draw zone areas
@@ -74,7 +75,7 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.restore();
 
     // Draw minimap overlay
-    this.drawMinimap(ctx, state, zoneManager, spawnPoints);
+    this.drawMinimap(ctx, state, zoneQuery, spawnPoints);
 
     // Draw controls hint
     this.drawControlsHint(ctx);
@@ -359,9 +360,9 @@ export class OpenFrontierRespawnMapRenderer {
   }
 
   private static drawMinimap(
-    ctx: CanvasRenderingContext2D, 
-    state: RenderState, 
-    zoneManager?: ZoneManager,
+    ctx: CanvasRenderingContext2D,
+    state: RenderState,
+    zoneQuery?: IZoneQuery,
     spawnPoints: RespawnSpawnPoint[] = []
   ): void {
     const minimapSize = 120;
@@ -376,8 +377,8 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.strokeRect(x, y, minimapSize, minimapSize);
 
     // Draw zones on minimap
-    if (zoneManager) {
-      const zones = zoneManager.getAllZones();
+    if (zoneQuery) {
+      const zones = zoneQuery.getAllZones();
       zones.forEach(zone => {
         const scale = minimapSize / WORLD_SIZE;
         const zx = x + (WORLD_SIZE / 2 - zone.position.x) * scale;

@@ -2,13 +2,12 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { getAlliance } from '../combat/types';
-import { ZoneManager } from '../world/ZoneManager';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
 import { DeployScreen } from '../../ui/screens/DeployScreen';
 import { RespawnMapController } from './RespawnMapController';
-import type { IFirstPersonWeapon, IPlayerController, ITerrainRuntime } from '../../types/SystemInterfaces';
+import type { IFirstPersonWeapon, IPlayerController, ITerrainRuntime, IZoneQuery } from '../../types/SystemInterfaces';
 import type { WarSimulator } from '../strategy/WarSimulator';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { HelipadSystem } from '../helicopter/HelipadSystem';
@@ -33,7 +32,7 @@ import { PLAYER_EYE_HEIGHT } from './PlayerMovement';
 
 interface PlayerRespawnManagerDependencies {
   playerHealthSystem: PlayerHealthSystem;
-  zoneManager: ZoneManager;
+  zoneManager: IZoneQuery;
   gameModeManager: GameModeManager;
   playerController: IPlayerController;
   firstPersonWeapon: IFirstPersonWeapon;
@@ -48,7 +47,7 @@ interface PlayerRespawnManagerDependencies {
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private playerHealthSystem?: PlayerHealthSystem;
   private playerController?: IPlayerController;
   private firstPersonWeapon?: IFirstPersonWeapon;
@@ -184,10 +183,10 @@ export class PlayerRespawnManager implements GameSystem {
     this.setHelipadSystem(dependencies.helipadSystem);
   }
 
-  setZoneManager(manager: ZoneManager): void {
-    this.zoneManager = manager;
-    this.spawnPointSelector.setZoneManager(manager);
-    this.mapController.setZoneManager(manager);
+  setZoneManager(query: IZoneQuery): void {
+    this.zoneQuery = query;
+    this.spawnPointSelector.setZoneManager(query);
+    this.mapController.setZoneManager(query);
   }
 
   setPlayerHealthSystem(system: PlayerHealthSystem): void {
@@ -254,7 +253,7 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   respawnAtBase(): void {
-    if (!this.zoneManager) {
+    if (!this.zoneQuery) {
       this.respawn(new THREE.Vector3(0, 5, -50));
       return;
     }
@@ -267,7 +266,7 @@ export class PlayerRespawnManager implements GameSystem {
     }
 
     const playerAlliance = this.spawnPointSelector.getCurrentAlliance();
-    const homeBase = this.zoneManager.getAllZones().find(
+    const homeBase = this.zoneQuery.getAllZones().find(
       z => z.isHomeBase && z.owner !== null && getAlliance(z.owner) === playerAlliance
     );
 
@@ -277,9 +276,9 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   respawnAtSpecificZone(zoneId: string): void {
-    if (!this.zoneManager) return;
+    if (!this.zoneQuery) return;
 
-    const zone = this.zoneManager.getAllZones().find(z => z.id === zoneId);
+    const zone = this.zoneQuery.getAllZones().find(z => z.id === zoneId);
     if (!zone) return;
 
     const target = zone.position.clone().add(new THREE.Vector3(5, 2, 5));

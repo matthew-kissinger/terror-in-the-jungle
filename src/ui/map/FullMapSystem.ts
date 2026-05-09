@@ -1,7 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
+import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { isBlufor } from '../../systems/combat/types';
@@ -598,15 +598,6 @@ export class FullMapSystem implements GameSystem {
   // System connections
   setZoneQuery(query: IZoneQuery): void {
     this.zoneQuery = query;
-  }
-
-  /**
-   * Backwards-compatible adapter retained for one cycle so wiring composers
-   * keep working while consumers migrate to `setZoneQuery`. Delete after
-   * Batch C of cycle-2026-05-10-zone-manager-decoupling.
-   */
-  setZoneManager(manager: ZoneManager): void {
-    this.setZoneQuery(manager);
   }
 
   setCombatantSystem(system: CombatantSystem): void {
