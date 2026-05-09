@@ -38,11 +38,11 @@ function createRefs() {
       setCombatantSystem: vi.fn(),
       setGameModeManager: vi.fn(),
       setPlayerController: vi.fn(),
-      setZoneManager: vi.fn(),
+      setZoneQuery: vi.fn(),
     },
     compassSystem: {
       mountTo: vi.fn(),
-      setZoneManager: vi.fn(),
+      setZoneQuery: vi.fn(),
     },
     firstPersonWeapon: {
       setAudioManager: vi.fn(),
@@ -61,7 +61,7 @@ function createRefs() {
     fullMapSystem: {
       setCombatantSystem: vi.fn(),
       setGameModeManager: vi.fn(),
-      setZoneManager: vi.fn(),
+      setZoneQuery: vi.fn(),
     },
     gameModeManager: {},
     grenadeSystem: {},
@@ -74,7 +74,7 @@ function createRefs() {
       setGrenadeSystem: vi.fn(),
       setMortarSystem: vi.fn(),
       setTicketSystem: vi.fn(),
-      setZoneManager: vi.fn(),
+      setZoneQuery: vi.fn(),
     },
     inventoryManager: {
       setLoadout: vi.fn(),
@@ -86,7 +86,7 @@ function createRefs() {
     minimapSystem: {
       mountTo: vi.fn(),
       setCombatantSystem: vi.fn(),
-      setZoneManager: vi.fn(),
+      setZoneQuery: vi.fn(),
     },
     mortarSystem: {},
     playerController: {

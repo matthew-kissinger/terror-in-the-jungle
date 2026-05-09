@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { Logger } from '../../utils/Logger';
 import { Alliance, getAlliance, getEnemyAlliance } from '../combat/types';
-import { ZoneManager, ZoneState, type CaptureZone } from '../world/ZoneManager';
+import { ZoneState, type CaptureZone } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
-import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import type { ITerrainRuntime, IZoneQuery } from '../../types/SystemInterfaces';
 import type { WarSimulator } from '../strategy/WarSimulator';
 import type { HelipadSystem } from '../helicopter/HelipadSystem';
 import type { LoadoutService } from './LoadoutService';
@@ -27,7 +27,7 @@ const HELIPAD_INFANTRY_STANDOFF_METERS = 12;
  * lifecycle, UI management, and deploy flow orchestration.
  */
 export class SpawnPointSelector {
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private gameModeManager?: GameModeManager;
   private warSimulator?: WarSimulator;
   private terrainSystem?: ITerrainRuntime;
@@ -36,8 +36,8 @@ export class SpawnPointSelector {
 
   // --- Dependency setters ------------------------------------------------
 
-  setZoneManager(manager: ZoneManager): void {
-    this.zoneManager = manager;
+  setZoneManager(query: IZoneQuery): void {
+    this.zoneQuery = query;
   }
 
   setGameModeManager(manager: GameModeManager): void {
@@ -63,7 +63,7 @@ export class SpawnPointSelector {
   // --- Public API --------------------------------------------------------
 
   getSpawnableZones(): Array<{ id: string; name: string; position: THREE.Vector3 }> {
-    if (!this.zoneManager) {
+    if (!this.zoneQuery) {
       return [];
     }
 
@@ -71,7 +71,7 @@ export class SpawnPointSelector {
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
     const playerAlliance = this.getCurrentAlliance();
 
-    const zones = this.zoneManager.getAllZones().filter(z => {
+    const zones = this.zoneQuery.getAllZones().filter(z => {
       return this.isZoneSpawnableForAlliance(z, playerAlliance, canSpawnAtZones);
     });
 
@@ -85,14 +85,14 @@ export class SpawnPointSelector {
   }
 
   canSpawnAtZone(): boolean {
-    if (!this.zoneManager || !this.gameModeManager) return false;
+    if (!this.zoneQuery || !this.gameModeManager) return false;
 
     // Check if game mode allows spawning at zones
     if (!this.gameModeManager.canPlayerSpawnAtZones()) {
       return false;
     }
 
-    const zones = this.zoneManager.getAllZones();
+    const zones = this.zoneQuery.getAllZones();
     const playerAlliance = this.getCurrentAlliance();
     return zones.some(zone => this.isZoneSpawnableForAlliance(zone, playerAlliance, true) && !zone.isHomeBase);
   }
@@ -106,7 +106,7 @@ export class SpawnPointSelector {
     deploySession: DeploySessionModel | undefined,
     activeDeployFlowKind: DeploySessionKind | null
   ): RespawnSpawnPoint[] {
-    if (!this.zoneManager) {
+    if (!this.zoneQuery) {
       return [{
         id: 'default',
         name: 'Base',
@@ -119,7 +119,7 @@ export class SpawnPointSelector {
 
     const definition = this.gameModeManager?.getCurrentDefinition?.();
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
-    const zones = this.zoneManager.getAllZones();
+    const zones = this.zoneQuery.getAllZones();
     const playerAlliance = this.getCurrentAlliance();
 
     const spawnPoints: RespawnSpawnPoint[] = zones
@@ -345,11 +345,13 @@ export class SpawnPointSelector {
   }
 
   private getPolicyDrivenPressureSpawnPosition(): THREE.Vector3 | null {
-    if (!this.zoneManager) return null;
+    if (!this.zoneQuery) return null;
     const respawnPolicy = this.gameModeManager?.getRespawnPolicy();
     if (!respawnPolicy) return null;
     return resolveRespawnFallbackPosition(respawnPolicy, {
-      zones: this.zoneManager.getAllZones(),
+      // Shallow copy: ModeSpawnResolver expects mutable CaptureZone[] but
+      // IZoneQuery returns readonly. The function only filters, never mutates.
+      zones: [...this.zoneQuery.getAllZones()],
       alliance: this.getCurrentAlliance(),
       warSimulator: this.warSimulator,
       terrainReadyAt: (x: number, z: number) => this.isTerrainReadyAt(x, z)

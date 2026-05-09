@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import type { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { getAlliance } from '../../systems/combat/types';
-import type { ZoneManager } from '../../systems/world/ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { renderMinimap } from '../minimap/MinimapRenderer';
 import type { InputMode } from '../../systems/input/InputManager';
@@ -10,14 +9,8 @@ export interface CommandTacticalMapRenderState {
   playerPosition: THREE.Vector3;
   playerRotation: number;
   worldSize: number;
-  /**
-   * Preferred read-only zone query. Either name is accepted while batch B
-   * (`zone-decoupling-batch-b-state-driven`) migrates the upstream
-   * `CommandInputManager` call site.
-   */
+  /** Read-only zone query (implemented by ZoneManager). */
   zoneQuery?: IZoneQuery;
-  /** @deprecated alias for `zoneQuery`; kept for one cycle. */
-  zoneManager?: ZoneManager;
   combatantSystem?: CombatantSystem;
   playerSquadId?: string;
   commandPosition?: THREE.Vector3;
@@ -207,7 +200,7 @@ export class CommandTacticalMap {
           return target;
         }
       } as THREE.Camera,
-      zoneQuery: this.renderState.zoneQuery ?? this.renderState.zoneManager,
+      zoneQuery: this.renderState.zoneQuery,
       combatantSystem: this.renderState.combatantSystem,
       playerSquadId: this.renderState.playerSquadId,
       commandPosition: this.renderState.commandPosition

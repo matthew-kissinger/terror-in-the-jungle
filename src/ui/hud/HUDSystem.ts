@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { Faction } from '../../systems/combat/types';
-import { ZoneManager } from '../../systems/world/ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { TicketSystem, GameState } from '../../systems/world/TicketSystem';
 import { HUDStyles } from './HUDStyles';
@@ -437,15 +436,6 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   setZoneQuery(query: IZoneQuery): void {
     this.zoneQuery = query;
-  }
-
-  /**
-   * Backwards-compatible adapter retained for one cycle so wiring composers
-   * keep working while consumers migrate to `setZoneQuery`. Delete after
-   * Batch C of cycle-2026-05-10-zone-manager-decoupling.
-   */
-  setZoneManager(manager: ZoneManager): void {
-    this.setZoneQuery(manager);
   }
 
   setTicketSystem(system: TicketSystem): void {

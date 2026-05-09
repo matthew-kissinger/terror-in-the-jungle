@@ -182,7 +182,7 @@ describe('FullMapSystem', () => {
 
   describe('visibility', () => {
     beforeEach(() => {
-      system.setZoneManager(mockZoneManager);
+      system.setZoneQuery(mockZoneManager);
       system.setCombatantSystem(mockCombatantSystem);
       system.setGameModeManager(mockGameModeManager);
     });
@@ -219,7 +219,7 @@ describe('FullMapSystem', () => {
 
   describe('rendering does not throw on edge inputs', () => {
     beforeEach(() => {
-      system.setZoneManager(mockZoneManager);
+      system.setZoneQuery(mockZoneManager);
       system.setCombatantSystem(mockCombatantSystem);
       system.setGameModeManager(mockGameModeManager);
     });

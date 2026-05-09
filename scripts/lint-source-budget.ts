@@ -46,7 +46,10 @@ const GRANDFATHER: Record<string, { round: string; reason: string }> = {
   'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: '757 LOC → split into 3 files' },
   'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: '740 LOC → split into 4 files' },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '665 LOC, 0 direct tests → split + tests' },
-  'src/systems/world/ZoneManager.ts': { round: 'P2', reason: 'fan-in 52 → 20 via IZoneQuery' },
+  // ZoneManager removed from grandfather list 2026-05-09 (Phase 2): fan-in
+  // dropped from 52 → ≤20 via IZoneQuery seam (Batches A+B+C of
+  // cycle-2026-05-10-zone-manager-decoupling). File is well under both LOC and
+  // method limits; no further grandfathering needed.
   // Additional offenders surfaced at Phase 0 install. Not in original god-module top-15
   // but already over the new limit. Each gets a queued split target.
   'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: '704 LOC → split during AVIATSIYA-3 helicopter parity work' },

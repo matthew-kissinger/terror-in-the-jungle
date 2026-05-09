@@ -160,14 +160,23 @@ Most-depended-on systems:
 
 | System | Fan-In | Key Dependents |
 |--------|-------:|----------------|
-| ZoneManager | 11 | Combat, Compass, FullMap, HUD, Minimap, PlayerRespawn, Tickets, WarSim |
 | TicketSystem | 9 | Combat, Grenade, HUD, Mortar, PlayerCtrl, PlayerHealth, Sandbag, WarSim |
 | CombatantSystem | 8 | FullMap, Grenade, HUD, Minimap, Mortar, WarSim, ZoneMgr |
 | AudioManager | 7 | Combat, FPWeapon, Grenade, Helicopter, Mortar, StratFeedback, Weather |
-| TerrainSystem | 7 | Combat, Footstep, Helicopter, Helipad, PlayerCtrl, PlayerRespawn, ZoneMgr |
+| TerrainSystem | 7 | Combat, Footstep, Helicopter, Helipad, PlayerCtrl, PlayerRespawn |
 | PlayerController | 7 | FPWeapon, Grenade, Helicopter, PlayerHealth, PlayerRespawn, Suppression |
+| IZoneQuery (read seam) | ~17 | Combat, Compass, FullMap, HUD, Minimap, PlayerRespawn, Tickets, WarSim — read consumers depend on the interface, not the concrete class |
+| ZoneManager (concrete) | 5 | SystemManager + composers (owner edge); plus a player+weapons cluster carry-over (FirstPersonWeapon, AmmoManager, AmmoSupplySystem, PlayerHealthSystem, WeaponAmmo) deferred from Batch B |
 
-Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> FirstPersonWeapon, CombatantSystem <-> HUDSystem, PlayerHealthSystem <-> PlayerRespawnManager.
+Notes on ZoneManager decoupling: as of 2026-05-09 (cycle
+`cycle-2026-05-10-zone-manager-decoupling`), all read consumers depend on the
+read-only `IZoneQuery` interface from `src/types/SystemInterfaces.ts` instead of
+the concrete `ZoneManager`. The remaining concrete-class importers are the
+lifecycle owner edge plus a five-file player+weapons cluster
+(`FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`,
+`PlayerHealthSystem`) that was deferred from Batch B and remains a follow-up.
+
+Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <-> HUDSystem, PlayerHealthSystem <-> PlayerRespawnManager. The former CombatantSystem <-> ZoneManager mutual dep is now CombatantSystem -> IZoneQuery (one-way) plus ZoneManager -> GameEventBus event publication.
 
 ## Singletons
 

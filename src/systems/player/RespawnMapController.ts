@@ -1,8 +1,8 @@
 import { GameMode } from '../../config/gameModeTypes';
 import { OpenFrontierRespawnMap } from '../../ui/map/OpenFrontierRespawnMap';
-import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
 
 /**
@@ -19,8 +19,8 @@ export class RespawnMapController {
     this.openFrontierRespawnMap = new OpenFrontierRespawnMap();
   }
 
-  setZoneManager(manager: ZoneManager): void {
-    this.openFrontierRespawnMap.setZoneManager(manager);
+  setZoneManager(query: IZoneQuery): void {
+    this.openFrontierRespawnMap.setZoneQuery(query);
   }
 
   setGameModeManager(manager: GameModeManager): void {

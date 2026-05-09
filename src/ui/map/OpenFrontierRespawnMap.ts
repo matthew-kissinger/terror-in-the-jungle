@@ -1,4 +1,4 @@
-import { ZoneManager } from '../../systems/world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 import { OpenFrontierRespawnMapRenderer } from './OpenFrontierRespawnMapRenderer';
 import {
@@ -15,7 +15,7 @@ const VIEW_PADDING = 96;
 const SINGLE_SPAWN_ZOOM = 2.2;
 
 export class OpenFrontierRespawnMap {
-  private zoneManager?: ZoneManager;
+  private zoneQuery?: IZoneQuery;
   private gameModeManager?: GameModeManager;
 
   // Canvas elements
@@ -259,7 +259,7 @@ export class OpenFrontierRespawnMap {
         panOffset: this.panOffset,
         selectedSpawnPointId: this.selectedZoneId
       },
-      this.zoneManager,
+      this.zoneQuery,
       this.spawnPoints
     );
   }
@@ -269,8 +269,8 @@ export class OpenFrontierRespawnMap {
     return this.mapCanvas;
   }
 
-  setZoneManager(manager: ZoneManager): void {
-    this.zoneManager = manager;
+  setZoneQuery(query: IZoneQuery): void {
+    this.zoneQuery = query;
   }
 
   setWorldSize(size: number): void {
@@ -388,7 +388,7 @@ export class OpenFrontierRespawnMap {
     }
 
     this.onZoneSelected = undefined;
-    this.zoneManager = undefined;
+    this.zoneQuery = undefined;
     this.gameModeManager = undefined;
   }
 
