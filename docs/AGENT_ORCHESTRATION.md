@@ -114,81 +114,74 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-05-10-stabilization-fixes
+## Current cycle: cycle-2026-05-09-cdlod-edge-morph
 
-**Phase 2.5 of the realignment campaign** (inserted between Phase 2 and
-Phase 3 at the stabilization checkpoint). Bundles 4 small fixes
-addressing findings from the live Cloudflare audit at the close of
-Phase 2.
+**Hot-fix cycle, inserted ahead of Phase 2.5** to address a P1
+user-reported visual regression: white seam cracks at terrain
+chunk borders from helicopter altitude on A Shau (screenshot
+2026-05-09). The Stage D1+D2 fix from `terrain-cdlod-seam`
+(cycle-2026-05-08) closed same-LOD parity but explicitly deferred
+the LOD-transition T-junction case. This cycle ships the canonical
+Strugar-style fix.
 
-**Cycle brief:** [docs/tasks/cycle-2026-05-10-stabilization-fixes.md](tasks/cycle-2026-05-10-stabilization-fixes.md)
+**Cycle brief:** [docs/tasks/cycle-2026-05-09-cdlod-edge-morph.md](tasks/cycle-2026-05-09-cdlod-edge-morph.md)
 
-**Comprehensive checkpoint context:**
-[docs/STABILIZATION_CHECKPOINT_2026-05-09.md](STABILIZATION_CHECKPOINT_2026-05-09.md)
-— full audit findings, Phases 0–2 outcomes, Phase 3+ scope notes.
+**Task brief:** [docs/tasks/cdlod-edge-morph.md](tasks/cdlod-edge-morph.md)
+— full diagnosis with line citations, three-stage plan, hard stops,
+rollback plan, sources from CDLOD literature.
 
-**Skip-confirm: NO.** `web-analytics-enable` (Round 2) requires a human
-to do a manual Cloudflare dashboard toggle (Pages → Settings → Web
-Analytics → Enabled + Auto-install) BEFORE the orchestrator dispatches
-the executor's verification step. The orchestrator pauses for the human
-to confirm "done" before spawning the Round 2 executor. Round 1 is
-auto-dispatched on `/orchestrate` start.
+**Skip-confirm: YES.** Single-task cycle, no manual human gate. Stage 0
+(diagnosis pre-check via the existing `Shift+\` → `Y` seam overlay) is
+OPTIONAL human pre-flight; if skipped, Stage 5 post-impl visual A/B is
+the gate.
 
 **Campaign auto-advance:** PAUSED (per
-[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md)). The orchestrator
-runs Phase 2.5, closes it, and **stops** at the next checkpoint instead
-of chaining into Phase 3 god-module surgery. To re-enable chaining:
-flip `Auto-advance: PAUSED` to `Auto-advance: yes` in the campaign
-manifest before re-running `/orchestrate`.
+[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md)). After this
+hot-fix cycle closes, the orchestrator stops; "Current cycle" is
+restored to point at Phase 2.5 (`cycle-2026-05-10-stabilization-fixes`),
+which is unchanged and still ready.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `postcss-cve-bump`, `cloudflare-headers-file`, `seo-essentials-pass` | 3 |
-| 2 | `web-analytics-enable` (manual + verify) | 1 |
+| 1 | `cdlod-edge-morph` | 1 |
 
 ### Tasks in this cycle
 
 Each brief is in `docs/tasks/<slug>.md`:
 
-- [postcss-cve-bump](tasks/postcss-cve-bump.md) — bump postcss 8.5.8 → ≥8.5.10 via `package.json` overrides; closes Dependabot #26
-- [cloudflare-headers-file](tasks/cloudflare-headers-file.md) — add `public/_headers` with HSTS + permissive CSP + Permissions-Policy
-- [seo-essentials-pass](tasks/seo-essentials-pass.md) — `public/robots.txt` + `<meta name="description">` + drop 2 unused preload hints from `index.html`
-- [web-analytics-enable](tasks/web-analytics-enable.md) — manual Pages dashboard toggle + verify Cloudflare Insights snippet appears in live HTML (token already provisioned, just unattached)
+- [cdlod-edge-morph](tasks/cdlod-edge-morph.md) — fix LOD-transition seam cracks via per-edge `edgeMorphMask` instanced attribute + shader force-morph + corrected `parentStep = 2/(N-1)` snap math. Three commits (snap-math / quadtree+attribute / shader+force-morph), ≤500 LOC source + ≤300 LOC tests.
 
 ### Dependencies
 
-```
-postcss-cve-bump        ─┐
-cloudflare-headers-file ─┼─→ (Round 1 closes) ─→ web-analytics-enable
-seo-essentials-pass     ─┘
-```
-
-The Round 2 → Round 1 edge is soft (web-analytics-enable doesn't strictly
-need Round 1 in master) — present to keep the orchestrator's attention
-serial across the manual gate.
+None — single task. Three internal stages are sequenced inside the task
+itself across three commits.
 
 ### Reviewer policy
 
-- **Round 1:** none of the 3 tasks touch `src/systems/combat/**`,
-  `src/systems/terrain/**`, or `src/systems/navigation/**`. **No reviewer
-  required pre-merge.**
-- **Round 2 (`web-analytics-enable`):** none required (manual dashboard
-  toggle + executor verification only; no source change).
+- **`terrain-nav-reviewer` gates merge** (Phase 0 pre-merge rule — touches `src/systems/terrain/**`).
+- No `combat-reviewer` (no combat surface touched).
 
 ### Cycle-level success criteria
 
-See [the cycle brief](tasks/cycle-2026-05-10-stabilization-fixes.md#cycle-level-success-criteria)
+See [the cycle brief](tasks/cycle-2026-05-09-cdlod-edge-morph.md#cycle-level-success-criteria)
 for the 10-point list. Highlights:
 
-- `npm ls postcss` shows ≥8.5.10; Dependabot #26 closes
-- HSTS + CSP + Permissions-Policy headers appear on live responses
-- `robots.txt` returns `text/plain` (not SPA fallback)
-- Lighthouse SEO 82/83 → ≥90
-- Web Analytics RUM data appears within 24 hr
-- `combat120` p99 within ±2%
-- Closes `cloudflare-stabilization-followups` carry-over
+- Visual A/B at A Shau north ridgeline (helicopter altitude): white cracks gone or near-zero
+- `Shift+\` → `Y` seam overlay red-line count drops ≥80% at the same camera position
+- `combat120` p99 within ±2% of pre-cycle baseline
+- Same-LOD parity test (`CDLODQuadtree.test.ts:130`) stays green — non-regression for predecessor Stage D1
+- New tests green: snap-math parity, edge-mask correctness, shader morph parity at LOD-transition
+- Carry-over count holds at 12 or drops (no new carry-overs unless Stage 3 follow-up filed)
+- `terrain-nav-reviewer` APPROVE or APPROVE-WITH-NOTES before merge
+
+### Next cycle (queued, undispatched)
+
+`cycle-2026-05-10-stabilization-fixes` (Phase 2.5, ready). Bundles 4
+Cloudflare-audit fixes (PostCSS CVE bump, `_headers` file, SEO
+essentials, Web Analytics enablement). Resumes after this hot-fix
+closes; brief at [docs/tasks/cycle-2026-05-10-stabilization-fixes.md](tasks/cycle-2026-05-10-stabilization-fixes.md).
 
 ### Last closed cycle
 

@@ -21,13 +21,29 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-**`cycle-2026-05-10-stabilization-fixes` (Phase 2.5, READY to dispatch).**
-The Current cycle in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md)
-is fully wired — running `/orchestrate` next session dispatches Round 1
-(3 parallel scoped fixes: `postcss-cve-bump`, `cloudflare-headers-file`,
-`seo-essentials-pass`) immediately, then pauses for the human to do the
-Cloudflare dashboard toggle for `web-analytics-enable` (Round 2) before
-the verification step.
+**`cycle-2026-05-09-cdlod-edge-morph` (hot-fix 2.4, READY to dispatch).**
+Single-task hot-fix addressing a P1 user-reported visual regression:
+white seam cracks at terrain chunk borders from helicopter altitude on
+A Shau (screenshot 2026-05-09). The predecessor `terrain-cdlod-seam`
+(cycle-2026-05-08) closed same-LOD parity but explicitly deferred the
+LOD-transition T-junction case. This cycle ships the canonical
+Strugar-style fix: per-edge `edgeMorphMask` instanced attribute +
+shader force-morph at coarser-neighbor edges + corrected
+`parentStep = 2/(N-1)` snap math. Three commits, ≤500 LOC source +
+≤300 LOC tests, `terrain-nav-reviewer` gates merge. Stage 0 (diagnosis
+pre-check via `Shift+\` → `Y` seam overlay) is OPTIONAL human pre-flight;
+if skipped, post-impl visual A/B at A Shau north ridgeline is the gate.
+Briefs: [docs/tasks/cycle-2026-05-09-cdlod-edge-morph.md](docs/tasks/cycle-2026-05-09-cdlod-edge-morph.md)
++ [docs/tasks/cdlod-edge-morph.md](docs/tasks/cdlod-edge-morph.md).
+Running `/orchestrate` next session dispatches the single Round 1 task
+immediately.
+
+**Phase 2.5 (`cycle-2026-05-10-stabilization-fixes`) remains authored
+and ready, queued behind the hot-fix.** Bundles 4 Cloudflare-audit
+fixes: `postcss-cve-bump`, `cloudflare-headers-file`, `seo-essentials-pass`,
+`web-analytics-enable` (manual dashboard step). Dispatches on the
+`/orchestrate` invocation AFTER the hot-fix closes — the end-of-cycle
+ritual for 2.4 restores Current cycle to point at 2.5.
 
 Phases 0, 1, 2 of the 9-cycle realignment campaign are complete. Phase 2
 (`cycle-2026-05-10-zone-manager-decoupling`) closed with 5 PRs merged
