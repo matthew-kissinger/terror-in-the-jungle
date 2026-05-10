@@ -404,6 +404,7 @@ Branch state:
   - `72c566e feat(konveyer): add strict WebGPU TSL foundation`
   - `67879b1 feat(konveyer): add measured TSL impostor slices`
   - `c831e6d feat(konveyer): add compute-ready carrier probes`
+  - `913f602 test(konveyer): add renderer backend matrix`
 
 Default-on decision:
 
