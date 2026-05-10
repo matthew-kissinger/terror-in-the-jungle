@@ -20,7 +20,8 @@ type CompletionAudit = {
   head: string;
   completionStatus: 'complete' | 'blocked';
   checklist: ChecklistEntry[];
-  blockerSummary: Record<string, number>;
+  rawBlockerSummary: Record<string, number>;
+  productionBlockerSummary: Record<string, number>;
   nextActions: string[];
 };
 
@@ -73,18 +74,32 @@ function rel(path: string): string {
   return relative(process.cwd(), path).replaceAll('\\', '/');
 }
 
-function blockerSummary(strategyPath: string | null): Record<string, number> {
-  if (!strategyPath) return {};
+function summarizeBlockers(strategyPath: string | null): {
+  raw: Record<string, number>;
+  production: Record<string, number>;
+} {
+  const empty = { raw: {}, production: {} };
+  if (!strategyPath) return empty;
   const strategy = readJson<{
     activeRuntime?: {
-      migrationBlockers?: Array<{ pattern: string; matches: unknown[] }>;
+      migrationBlockers?: Array<{ pattern: string; matches: Array<{ file: string }> }>;
     };
   }>(strategyPath);
-  const summary: Record<string, number> = {};
+  const raw: Record<string, number> = {};
+  const production: Record<string, number> = {};
   for (const blocker of strategy.activeRuntime?.migrationBlockers ?? []) {
-    summary[blocker.pattern] = blocker.matches.length;
+    raw[blocker.pattern] = blocker.matches.length;
+    production[blocker.pattern] = blocker.matches.filter((match) => isProductionBlocker(match.file)).length;
   }
-  return summary;
+  return { raw, production };
+}
+
+function isProductionBlocker(file: string): boolean {
+  const normalized = file.replaceAll('\\', '/');
+  if (!normalized.startsWith('src/')) return false;
+  if (normalized.includes('.test.') || normalized.includes('.spec.')) return false;
+  if (normalized.startsWith('src/dev/')) return false;
+  return true;
 }
 
 function rendererStrictStatus(matrixPath: string | null): EvidenceStatus {
@@ -117,8 +132,9 @@ function main(): void {
   const vegetationPath = findLatestArtifact((path) => path.endsWith('konveyer-vegetation-slice\\slice.json') || path.endsWith('konveyer-vegetation-slice/slice.json'));
   const combatantPath = findLatestArtifact((path) => path.endsWith('konveyer-combatant-slice\\slice.json') || path.endsWith('konveyer-combatant-slice/slice.json'));
   const computePath = findLatestArtifact((path) => path.endsWith('konveyer-compute-carriers\\carriers.json') || path.endsWith('konveyer-compute-carriers/carriers.json'));
-  const blockers = blockerSummary(strategyPath);
-  const remainingBlockerCount = Object.values(blockers).reduce((sum, count) => sum + count, 0);
+  const blockers = summarizeBlockers(strategyPath);
+  const rawBlockerCount = Object.values(blockers.raw).reduce((sum, count) => sum + count, 0);
+  const productionBlockerCount = Object.values(blockers.production).reduce((sum, count) => sum + count, 0);
   const strictStatus = rendererStrictStatus(matrixPath);
 
   const checklist: ChecklistEntry[] = [
@@ -160,18 +176,23 @@ function main(): void {
     },
     {
       requirement: 'Production custom WebGL shader/render-target blockers are migrated or explicitly retired.',
-      status: remainingBlockerCount === 0 ? 'pass' : 'blocked',
-      evidence: strategyPath ? [rel(strategyPath), `remainingBlockers=${remainingBlockerCount}`] : [`remainingBlockers=${remainingBlockerCount}`],
-      gap: remainingBlockerCount === 0 ? null : 'Static audit still finds active ShaderMaterial, RawShaderMaterial, onBeforeCompile, or WebGL context blockers.',
+      status: productionBlockerCount === 0 ? 'pass' : 'blocked',
+      evidence: strategyPath ? [
+        rel(strategyPath),
+        `productionBlockers=${productionBlockerCount}`,
+        `rawBlockers=${rawBlockerCount}`,
+      ] : [`productionBlockers=${productionBlockerCount}`, `rawBlockers=${rawBlockerCount}`],
+      gap: productionBlockerCount === 0 ? null : 'Static audit still finds active production ShaderMaterial, RawShaderMaterial, onBeforeCompile, or WebGL context blockers.',
     },
     {
       requirement: 'Default-on WebGPU with WebGL fallback is ready for reviewer approval.',
-      status: strictStatus === 'pass' && remainingBlockerCount === 0 ? 'pass' : 'blocked',
+      status: strictStatus === 'pass' && productionBlockerCount === 0 ? 'pass' : 'blocked',
       evidence: [
         `strictWebGPU=${strictStatus}`,
-        `remainingBlockers=${remainingBlockerCount}`,
+        `productionBlockers=${productionBlockerCount}`,
+        `rawBlockers=${rawBlockerCount}`,
       ],
-      gap: strictStatus === 'pass' && remainingBlockerCount === 0 ? null : 'Default-on is not approved until strict WebGPU passes and production blocker count is zero or policy-retired.',
+      gap: strictStatus === 'pass' && productionBlockerCount === 0 ? null : 'Default-on is not approved until strict WebGPU passes and production blocker count is zero or policy-retired.',
     },
   ];
 
@@ -183,13 +204,14 @@ function main(): void {
     head,
     completionStatus,
     checklist,
-    blockerSummary: blockers,
+    rawBlockerSummary: blockers.raw,
+    productionBlockerSummary: blockers.production,
     nextActions: completionStatus === 'complete'
       ? []
       : [
           'Run strict renderer matrix on headed hardware with a real WebGPU adapter.',
           'Port or explicitly retire remaining production ShaderMaterial, RawShaderMaterial, onBeforeCompile, and WebGL context access blockers.',
-          'Rerun webgpu strategy audit until remainingBlockers is zero or each residual blocker has a reviewed policy exemption.',
+          'Rerun webgpu strategy audit and completion audit until productionBlockers is zero or each residual blocker has a reviewed policy exemption.',
         ],
   };
 
@@ -200,7 +222,8 @@ function main(): void {
 
   console.log(`KONVEYER completion audit written to ${artifactPath}`);
   console.log(`completionStatus=${completionStatus}`);
-  console.log(`remainingBlockers=${remainingBlockerCount}`);
+  console.log(`productionBlockers=${productionBlockerCount}`);
+  console.log(`rawBlockers=${rawBlockerCount}`);
   console.log(`strictWebGPU=${strictStatus}`);
   for (const entry of checklist) {
     console.log(`${entry.status.toUpperCase()}: ${entry.requirement}`);
