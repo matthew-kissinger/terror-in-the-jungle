@@ -20,6 +20,7 @@ import {
   PIXEL_FORGE_NPC_IMPOSTER_MATERIAL_TUNING,
   type PixelForgeNpcImposterMaterialTuning,
 } from './PixelForgeNpcRuntime';
+import type { CombatantUniformMaterial } from './CombatantShaders';
 
 export type ViewDirection = 'front' | 'back' | 'side';
 export type WalkFrameMap = Map<string, { a: THREE.Texture; b: THREE.Texture }>;
@@ -29,7 +30,7 @@ interface CombatantMeshAssets {
   factionAuraMeshes: Map<string, THREE.InstancedMesh>;
   factionGroundMarkers: Map<string, THREE.InstancedMesh>;
   soldierTextures: Map<string, THREE.Texture>;
-  factionMaterials: Map<string, THREE.ShaderMaterial>;
+  factionMaterials: Map<string, CombatantUniformMaterial>;
   walkFrameTextures: WalkFrameMap;
 }
 
@@ -38,7 +39,7 @@ export interface CombatantImpostorBucketAssets {
   mesh: THREE.InstancedMesh;
   marker: THREE.InstancedMesh;
   texture: THREE.Texture;
-  material: THREE.ShaderMaterial;
+  material: CombatantUniformMaterial;
 }
 
 const FACTION_MARKER_COLORS: Record<Faction | 'SQUAD', THREE.Color> = {
@@ -332,7 +333,7 @@ export class CombatantMeshFactory {
     clipId: PixelForgeNpcClipId,
     readabilityColor: THREE.Color,
     tuning: PixelForgeNpcImposterMaterialTuning,
-  ): THREE.ShaderMaterial {
+  ): CombatantUniformMaterial {
     const clip = PIXEL_FORGE_NPC_CLIPS.find((candidate) => candidate.id === clipId);
     if (!clip) {
       throw new Error(`Unknown Pixel Forge NPC clip: ${clipId}`);
@@ -392,7 +393,7 @@ export class CombatantMeshFactory {
     markerColor: THREE.Color,
     packageFaction: PixelForgeNpcFactionAsset['packageFaction'],
     maxInstances: number,
-  ): { mesh: THREE.InstancedMesh; material: THREE.ShaderMaterial; marker: THREE.InstancedMesh } {
+  ): { mesh: THREE.InstancedMesh; material: CombatantUniformMaterial; marker: THREE.InstancedMesh } {
     const geometry = new THREE.PlaneGeometry(NPC_SPRITE_WIDTH, NPC_SPRITE_HEIGHT);
     geometry.setAttribute('instancePhase', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
     geometry.setAttribute('instanceViewColumn', new THREE.InstancedBufferAttribute(new Float32Array(maxInstances), 1));
@@ -474,7 +475,7 @@ export class CombatantMeshFactory {
     const factionAuraMeshes = new Map<string, THREE.InstancedMesh>();
     const factionGroundMarkers = new Map<string, THREE.InstancedMesh>();
     const soldierTextures = new Map<string, THREE.Texture>();
-    const factionMaterials = new Map<string, THREE.ShaderMaterial>();
+    const factionMaterials = new Map<string, CombatantUniformMaterial>();
     const walkFrameTextures: WalkFrameMap = new Map();
 
     const registerBucket = (bucket: CombatantImpostorBucketAssets | null): void => {

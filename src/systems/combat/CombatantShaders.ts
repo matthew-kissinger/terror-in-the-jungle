@@ -16,6 +16,26 @@ export interface ShaderUniformSettings {
   auraIntensity: number;
 }
 
+type UniformSlot<T> = { value: T };
+
+export interface CombatantUniformMaterial extends THREE.Material {
+  uniforms?: {
+    time?: UniformSlot<number>;
+    cameraPosition?: UniformSlot<THREE.Vector3>;
+    npcLightingEnabled?: UniformSlot<number>;
+    npcAtmosphereLightScale?: UniformSlot<number>;
+    npcSkyColor?: UniformSlot<THREE.Color>;
+    npcGroundColor?: UniformSlot<THREE.Color>;
+    npcSunColor?: UniformSlot<THREE.Color>;
+    npcFogMode?: UniformSlot<number>;
+    npcFogColor?: UniformSlot<THREE.Color>;
+    npcFogDensity?: UniformSlot<number>;
+    npcFogNear?: UniformSlot<number>;
+    npcFogFar?: UniformSlot<number>;
+    combatState?: UniformSlot<number>;
+  };
+}
+
 const defaultShaderUniformSettings: ShaderUniformSettings = {
   celShadingEnabled: 1.0,
   rimLightingEnabled: 1.0,
@@ -217,7 +237,7 @@ export class CombatantShaderSettingsManager {
 }
 
 export const updateShaderUniforms = (
-  materials: Map<string, THREE.ShaderMaterial>,
+  materials: Map<string, CombatantUniformMaterial>,
   camera: THREE.Camera,
   scene?: THREE.Scene
 ): void => {
@@ -225,7 +245,7 @@ export const updateShaderUniforms = (
   const atmosphere = resolveNpcAtmosphereSnapshot(scene);
 
   materials.forEach(material => {
-    if (material instanceof THREE.ShaderMaterial && material.uniforms) {
+    if (material.uniforms) {
       if (material.uniforms.time) {
         material.uniforms.time.value = time;
       }
@@ -285,63 +305,3 @@ export const setDamageFlash = (
     }, 100);
   }
 };
-
-export const createOutlineMaterial = (
-  texture: THREE.Texture,
-  outlineColor: THREE.Color
-): THREE.ShaderMaterial => {
-  return new THREE.ShaderMaterial({
-    vertexShader: getOutlineVertexShader(),
-    fragmentShader: getOutlineFragmentShader(),
-    uniforms: {
-      map: { value: texture },
-      outlineColor: { value: outlineColor },
-      combatState: { value: 0.0 },
-      time: { value: 0.0 }
-    },
-    transparent: true,
-    side: THREE.DoubleSide,
-    depthWrite: false
-  });
-};
-
-function getOutlineVertexShader(): string {
-  return `
-      varying vec2 vUv;
-
-      void main() {
-        vUv = uv;
-
-        // Standard billboard transformation
-        vec4 worldPos = instanceMatrix * vec4(position, 1.0);
-        gl_Position = projectionMatrix * modelViewMatrix * worldPos;
-      }
-    `;
-}
-
-function getOutlineFragmentShader(): string {
-  return `
-      uniform sampler2D map;
-      uniform vec3 outlineColor;
-      uniform float combatState;
-      uniform float time;
-
-      varying vec2 vUv;
-
-      void main() {
-        // Sample the texture
-        vec4 texColor = texture2D(map, vUv);
-
-        // Only show outline where sprite has alpha
-        if (texColor.a < 0.3) discard;
-
-        // Pulse brightness during combat
-        float pulse = 1.0 + sin(time * 4.0) * 0.2 * combatState;
-        float brightness = 0.8 + combatState * 0.2;
-        brightness *= pulse;
-
-        // Output solid outline color
-        gl_FragColor = vec4(outlineColor * brightness, texColor.a);
-      }
-    `;
-}

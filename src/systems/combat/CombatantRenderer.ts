@@ -15,7 +15,7 @@ import {
   updateCombatantTexture,
   type WalkFrameMap,
 } from './CombatantMeshFactory';
-import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
+import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type CombatantUniformMaterial, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { isDiagEnabled, isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
@@ -233,7 +233,7 @@ export class CombatantRenderer {
   private factionAuraMeshes: Map<string, THREE.InstancedMesh> = new Map();
   private factionGroundMarkers: Map<string, THREE.InstancedMesh> = new Map();
   private soldierTextures: Map<string, THREE.Texture> = new Map();
-  private factionMaterials: Map<string, THREE.ShaderMaterial> = new Map();
+  private factionMaterials: Map<string, CombatantUniformMaterial> = new Map();
   private walkFrameTextures: WalkFrameMap = new Map();
   private playerSquadId?: string;
   private playerSquadDetected = false;
@@ -841,7 +841,7 @@ export class CombatantRenderer {
     this.pendingBillboardDeltaSec += deltaTime;
     this.activeCloseModels.forEach((instance) => instance.mixer.update(deltaTime));
     this.factionMaterials.forEach((material) => {
-      if (material.uniforms.time) {
+      if (material.uniforms?.time) {
         material.uniforms.time.value = this.elapsedTime;
       }
     });
@@ -1684,7 +1684,7 @@ export class CombatantRenderer {
         }
       }
       const outlineMaterial = this.factionMaterials.get(key);
-      if (outlineMaterial && outlineMaterial instanceof THREE.ShaderMaterial) {
+      if (outlineMaterial?.uniforms?.combatState) {
         outlineMaterial.uniforms.combatState.value = this.renderCombatStates.get(key) ?? 0;
       }
     });

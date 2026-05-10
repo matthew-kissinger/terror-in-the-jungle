@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WebGLNodesHandler } from 'three/addons/tsl/WebGLNodesHandler.js';
 
 export type RendererBackendMode = 'webgl' | 'webgpu' | 'webgpu-force-webgl' | 'webgpu-strict';
 export type ResolvedRendererBackend = 'webgl' | 'webgpu' | 'webgpu-webgl-fallback' | 'unknown';
@@ -28,6 +29,10 @@ export type CommonRenderer = THREE.WebGLRenderer & {
     isWebGPUBackend?: boolean;
     isWebGLBackend?: boolean;
   };
+};
+
+type WebGLRendererWithNodes = THREE.WebGLRenderer & {
+  setNodesHandler?: (handler: WebGLNodesHandler) => void;
 };
 
 type NavigatorGpuAdapter = {
@@ -85,11 +90,14 @@ export function resolveRendererBackendMode(): RendererBackendMode {
 }
 
 export function createWebGLRenderer(preserveDrawingBuffer: boolean): THREE.WebGLRenderer {
-  return new THREE.WebGLRenderer({
+  const renderer = new THREE.WebGLRenderer({
     antialias: true,
     powerPreference: 'high-performance',
     preserveDrawingBuffer,
   });
+  const rendererWithNodes = renderer as WebGLRendererWithNodes;
+  rendererWithNodes.setNodesHandler?.(new WebGLNodesHandler());
+  return rendererWithNodes;
 }
 
 export function createInitialRendererCapabilities(

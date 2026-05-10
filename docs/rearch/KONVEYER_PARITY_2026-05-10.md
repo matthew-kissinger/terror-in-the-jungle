@@ -19,7 +19,7 @@ Blocker split from the audit:
 | Pattern | Matches |
 | --- | ---: |
 | `ShaderMaterial` | 73 initially, 69 after K7 post-processing retirement |
-| `RawShaderMaterial` | 6 |
+| `RawShaderMaterial` | 6 initially, 4 after K7 vegetation billboard port |
 | `onBeforeCompile` | 11 |
 | `WebGLRenderTarget` | 5 initially, 0 after K7 post-processing retirement |
 | Direct WebGL context or GPU timer access | 22 |
@@ -103,7 +103,7 @@ Current Three.js guidance relevant to this repo:
 
 | Surface | Status | Current owner path | WebGPU migration note |
 | --- | --- | --- | --- |
-| Main renderer boot | needs-port | `src/core/GameRenderer.ts` | Constructor is `THREE.WebGLRenderer`; startup assumes sync renderer availability and uses WebGL extension checks for shader precompile. |
+| Main renderer boot | needs-port | `src/core/GameRenderer.ts` | Constructor is `THREE.WebGLRenderer`; startup now installs Three's WebGL node handler so TSL materials exercise the default WebGL path, but default-on still needs strict WebGPU hardware proof. |
 | Engine render loop | unknown | `src/core/GameEngine.ts`, `src/core/GameEngineLoop.ts` | Mostly calls common `render`, `clearDepth`, `shadowMap`, and `info` APIs, but must not run before async WebGPU init. |
 | Fenced renderer contract | blocked | `src/types/SystemInterfaces.ts` | `IGameRenderer.renderer` and weapon rendering methods are typed as `THREE.WebGLRenderer`; branch must use an internal adapter/cast and avoid fence edits. |
 | GPU timing telemetry | blocked | `src/systems/debug/GPUTimingTelemetry.ts`, `src/systems/debug/PerformanceTelemetry.ts` | Uses `renderer.getContext()` and `EXT_disjoint_timer_query_webgl2`; WebGPU needs timestamp-query or disabled telemetry fallback. |
@@ -111,7 +111,7 @@ Current Three.js guidance relevant to this repo:
 | Post-processing | retired | `src/systems/effects/PostProcessingManager.ts` | Runtime draws straight to back buffer. K7 removed the dormant low-res blit resources so this is no longer a hidden WebGPU blocker; any future post path must use Three's node post stack. |
 | Terrain material | blocked | `src/systems/terrain/TerrainMaterial.ts` | Large `MeshStandardMaterial.onBeforeCompile` CDLOD shader injection. Tail work, not first port. |
 | Terrain renderer | needs-port | `src/systems/terrain/CDLODRenderer.ts` | Instanced CDLOD geometry is valuable for WebGPU, but material dependency blocks default-on parity. |
-| Vegetation billboards | needs-port | `src/systems/world/billboard/BillboardBufferManager.ts` | `RawShaderMaterial` instanced impostors with custom fog/lighting. Best first high-value TSL material slice. |
+| Vegetation billboards | ported-needs-visual-proof | `src/systems/world/billboard/BillboardBufferManager.ts` | K7 moved production instanced vegetation off `RawShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with atlas, wind, fog, lighting, and premultiplied alpha. Needs Open Frontier/A Shau visual and perf captures on hardware. |
 | Combatant impostors | needs-port | `src/systems/combat/CombatantShaders.ts`, `src/systems/combat/CombatantMeshFactory.ts` | `ShaderMaterial` instanced sprite/impostor path. Do isolated bucket after vegetation fixture. |
 | Combatant close GLBs | ready | `src/systems/combat/CombatantRenderer.ts` | Mostly standard/skinned GLB materials. Must prove skinning, shadows, and perf under WebGPU separately. |
 | Muzzle flashes | ported | `src/systems/effects/MuzzleFlashSystem.ts` | K5 follow-up replaced the custom points material with standard `PointsMaterial`, generated radial texture, and vertex colors. |
@@ -260,10 +260,10 @@ Measured vegetation slice:
 
 Current limitation:
 
-- This is a TSL instanced impostor slice, not the full production vegetation
-  shader port. It proves material and buffer shape first; K7 still owns full
-  wind, atlas, atmosphere, fog, and visual-parity migration against the
-  current `GPUBillboardVegetation` GLSL path.
+- This was the first TSL instanced impostor slice. K7 has since promoted the
+  production `GPUBillboardVegetation` path onto a TSL node material too. The
+  remaining vegetation risk is visual/perf acceptance on real scenes and
+  headed WebGPU hardware, not a `RawShaderMaterial` production dependency.
 
 ## KONVEYER-4 Checkpoint
 
@@ -368,7 +368,7 @@ disabled by scenario policy:
 | Terrain CDLOD | Replace `TerrainMaterial.onBeforeCompile` with node-material displacement and shading, then keep CPU/query parity against `HeightmapGPU`. | Open Frontier and A Shau screenshots plus perf captures before/after. |
 | Global water | Standard material plane is now the fallback/ocean path; hydrology river mesh stays standard material. Future work is visual acceptance and flow, not a WebGL-only material port. | Water-system audit plus water-enabled screenshots/perf in Open Frontier and A Shau hydrology paths. |
 | Post-processing | Keep runtime disabled or move to Three WebGPU node `PostProcessing`; do not re-enable classic WebGL render-target composer as WebGPU proof. | Built-app renderer matrix plus visual-integrity audit. |
-| Vegetation production path | Expand the K3 TSL slice to full atlas, wind, fog, and atmosphere parity. | Vegetation horizon/grounding audits plus Open Frontier/A Shau captures. |
+| Vegetation production path | Production material is now TSL/node based; remaining route is visual parity, bundle/perf measurement, and strict WebGPU hardware proof. | Vegetation horizon/grounding audits plus Open Frontier/A Shau captures. |
 | Combatant production path | Expand the K4 TSL slice to Pixel Forge animation atlas, crop-map, aura/outline, and close-GLB skinning proof. | Combat120 capture and Pixel Forge NPC probe. |
 
 This route is the review boundary for actual default-on approval. The branch
@@ -419,6 +419,35 @@ K7 post-processing tail reduction:
   `npm run audit:konveyer-completion` recorded `productionBlockers=25`,
   `productionRenderBlockers=16`, and `unexpectedContextBlockers=0` while the
   tree was dirty.
+- The production vegetation billboard path was then ported from
+  `RawShaderMaterial` plus GLSL shader strings to a TSL `MeshBasicNodeMaterial`
+  graph. The graph preserves instanced positions/scales/rotations, atlas
+  azimuth/elevation selection, wind sway, height fog, atmosphere lighting,
+  normal-atlas lighting, alpha hardening, and premultiplied blending. The
+  default WebGL renderer now installs Three's WebGL node handler so this path
+  is exercised before default-on WebGPU.
+- `npx vitest run src/systems/world/billboard/BillboardBufferManager.test.ts src/systems/world/billboard/GPUBillboardSystem.test.ts`: PASS
+- `npm run typecheck`: PASS
+- `npm run lint`: PASS
+- `npm run build`: PASS
+- `npm run smoke:prod`: PASS
+- `npx tsx scripts/konveyer-completion-audit.ts` after this port recorded
+  `productionBlockers=23`, `productionRenderBlockers=14`,
+  `unexpectedContextBlockers=0`, and `rawBlockers=100` while the tree was
+  dirty.
+- The combatant support layer was then narrowed so only the active Pixel Forge
+  impostor material remains a production `ShaderMaterial` blocker. Unused
+  outline shader creation was removed, and combatant material plumbing now
+  updates a renderer-agnostic uniform-material contract so the coming TSL
+  impostor port does not have to preserve `ShaderMaterial` types.
+- `npx vitest run src/systems/combat/CombatantShaders.test.ts src/systems/combat/CombatantMeshFactory.test.ts src/systems/combat/CombatantRenderer.test.ts`: PASS
+- `npm run check:webgpu-strategy`: PASS,
+  `artifacts/perf/2026-05-10T15-45-40-071Z/webgpu-strategy-audit/strategy-audit.json`
+- `npx tsx scripts/konveyer-completion-audit.ts` after this cleanup recorded
+  `productionBlockers=12`, `productionRenderBlockers=3`,
+  `unexpectedContextBlockers=0`, and `rawBlockers=89` while the tree was
+  dirty. The remaining production render blockers are the active Pixel Forge
+  NPC impostor material and terrain CDLOD `onBeforeCompile`.
 
 ## KONVEYER-8 Validation Matrix
 
