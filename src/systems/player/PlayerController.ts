@@ -417,7 +417,7 @@ export class PlayerController implements GameSystem {
   }
 
   private handleAirSupportRequest(): void {
-    this.vehicleController.handleAirSupportRequest(this.playerState.position, this.camera);
+    this.commandInputManager?.toggleRadioMenu();
   }
 
   private handleToggleMouseControl(): void {

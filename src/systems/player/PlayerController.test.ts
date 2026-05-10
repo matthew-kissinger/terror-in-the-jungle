@@ -237,6 +237,7 @@ describe('PlayerController', () => {
     mockCommandInputManager = {
       bindInputManager: vi.fn(),
       toggleCommandMode: vi.fn(),
+      toggleRadioMenu: vi.fn(),
       issueQuickCommand: vi.fn(),
       handleCancel: vi.fn(() => false),
     };
@@ -288,6 +289,15 @@ describe('PlayerController', () => {
 
       expect(mockCommandInputManager.toggleCommandMode).toHaveBeenCalled();
       expect(mockCommandInputManager.issueQuickCommand).toHaveBeenCalledWith(3);
+    });
+
+    it('routes the air-support hotkey to the radio shell', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+
+      const callbacks = (playerController['input'].setCallbacks as any).mock.calls[0][0];
+      callbacks.onAirSupportMenu();
+
+      expect(mockCommandInputManager.toggleRadioMenu).toHaveBeenCalledTimes(1);
     });
 
     it('lets command input consume escape before pointer unlock logic runs', () => {

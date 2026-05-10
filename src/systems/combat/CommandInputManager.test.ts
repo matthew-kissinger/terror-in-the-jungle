@@ -38,6 +38,7 @@ describe('CommandInputManager', () => {
     manager.mountTo(layout);
 
     expect(document.body.querySelector('.command-mode-overlay')).toBeTruthy();
+    expect(document.body.querySelector('[role="dialog"]')).toBeTruthy();
     expect(layout.getSlot('center').querySelector('.command-mode-overlay')).toBeNull();
 
     manager.dispose();
@@ -117,6 +118,90 @@ describe('CommandInputManager', () => {
     manager.handleCancel();
     expect(overlay?.dataset.visible).toBe('false');
     expect(relockPointer).toHaveBeenCalledTimes(1);
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('opens the radio shell from the squad overlay without issuing a squad command', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+
+    manager.toggleCommandMode();
+    document.body.querySelector<HTMLButtonElement>('.command-mode-overlay__radio')?.click();
+
+    expect(document.body.querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
+    expect(document.body.querySelector<HTMLElement>('[role="dialog"]')?.dataset.visible).toBe('true');
+    expect(document.body.textContent).toContain('Air Support');
+    expect(controller.issueQuickCommand).not.toHaveBeenCalled();
+    expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('opens the radio shell directly and keeps cooldown state in the HUD', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    const relockPointer = vi.fn();
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer,
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+
+    manager.setRadioCooldowns({ ac47_orbit: 75 });
+    manager.toggleRadioMenu();
+
+    const radio = document.body.querySelector<HTMLElement>('[role="dialog"]');
+    expect(radio?.dataset.visible).toBe('true');
+    expect(document.body.textContent).toContain('5/6 ready');
+    expect(document.body.querySelector<HTMLButtonElement>('[data-radio-asset="ac47_orbit"]')?.disabled).toBe(true);
+
+    expect(manager.handleCancel()).toBe(true);
+    expect(radio?.dataset.visible).toBe('false');
+    expect(relockPointer).toHaveBeenCalledTimes(1);
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('records radio selections as UI shell state only', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+
+    manager.toggleRadioMenu();
+    document.body.querySelector<HTMLButtonElement>('[data-radio-marking="position_only"]')?.click();
+    document.body.querySelector<HTMLButtonElement>('[data-radio-asset="f4_bombs"]')?.click();
+
+    expect(document.body.textContent).toContain('POSITION ONLY target mark selected');
+    expect(controller.issueQuickCommand).not.toHaveBeenCalled();
+    expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
 
     manager.dispose();
     layout.dispose();
