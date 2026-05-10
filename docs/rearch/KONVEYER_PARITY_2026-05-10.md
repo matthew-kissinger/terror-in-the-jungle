@@ -28,6 +28,10 @@ By the latest K7 completion audit, raw static matches remain noisy because
 tests, docs, archived scripts, and asset metadata intentionally stay in scope,
 but active production render blockers are now `0`.
 
+By the final default-on pass, headed hardware proof on this machine resolved
+strict WebGPU to `webgpu` on the NVIDIA RTX 3070 path and the default built app
+requests WebGPU first.
+
 The initial platform probe wrote:
 
 - `artifacts/perf/2026-05-10T14-06-51-008Z/projekt-143-platform-capability-probe/summary.json`
@@ -35,6 +39,13 @@ The initial platform probe wrote:
 - Headless WebGL2: PASS through SwiftShader
 - Headless WebGPU adapter: WARN, `navigator.gpu` exists but no adapter returned
 - COOP/COEP and `SharedArrayBuffer`: PASS locally and on live Pages headers
+
+The headed hardware probe later wrote:
+
+- `artifacts/perf/2026-05-10T16-46-35-720Z/projekt-143-platform-capability-probe/summary.json`
+- Headed WebGL renderer: `ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 ... D3D11)`
+- Headed WebGPU adapter: PASS
+- Live Pages COOP/COEP header contract: PASS
 
 This means the first runtime implementation must keep compile-time, explicit
 WebGL fallback, and strict headed WebGPU adapter proof separate.
@@ -62,8 +73,11 @@ Fallback policy for this branch:
   modes. They must fail if Three resolves to the WebGL backend.
 - `?renderer=webgpu-force-webgl` is an explicit compatibility matrix path. It
   is allowed only when the test name or artifact says fallback was forced.
-- The default app path can retain WebGL while migration is incomplete, but no
-  KONVEYER checkpoint should call fallback behavior WebGPU success.
+- The default app path now requests WebGPU first. If Three resolves its backend
+  to WebGL, that is compatibility fallback evidence only; it does not satisfy
+  strict WebGPU proof.
+- `?renderer=webgl`, `VITE_KONVEYER_WEBGPU=0`, and
+  `VITE_KONVEYER_FORCE_WEBGL=1` are explicit legacy WebGL escape hatches.
 
 ## Upstream Facts Refreshed
 
@@ -107,18 +121,18 @@ Current Three.js guidance relevant to this repo:
 
 | Surface | Status | Current owner path | WebGPU migration note |
 | --- | --- | --- | --- |
-| Main renderer boot | needs-port | `src/core/GameRenderer.ts` | Constructor is `THREE.WebGLRenderer`; startup now installs Three's WebGL node handler so TSL materials exercise the default WebGL path, but default-on still needs strict WebGPU hardware proof. |
-| Engine render loop | unknown | `src/core/GameEngine.ts`, `src/core/GameEngineLoop.ts` | Mostly calls common `render`, `clearDepth`, `shadowMap`, and `info` APIs, but must not run before async WebGPU init. |
+| Main renderer boot | default-on | `src/core/RendererBackend.ts`, `src/core/GameRenderer.ts` | Default startup now requests `WebGPURenderer`; `?renderer=webgl` remains an explicit legacy escape hatch, `?renderer=webgpu-force-webgl` labels compatibility fallback, and strict hardware proof resolves `webgpu` on headed RTX 3070. |
+| Engine render loop | proven-start | `src/core/GameEngine.ts`, `src/core/GameEngineLoop.ts` | The engine awaits async renderer init before system wiring; built smoke, headed matrix, and terrain visual proof reach app/gameplay under the default-on path. |
 | Fenced renderer contract | blocked | `src/types/SystemInterfaces.ts` | `IGameRenderer.renderer` and weapon rendering methods are typed as `THREE.WebGLRenderer`; branch must use an internal adapter/cast and avoid fence edits. |
 | GPU timing telemetry | blocked | `src/systems/debug/GPUTimingTelemetry.ts`, `src/systems/debug/PerformanceTelemetry.ts` | Uses `renderer.getContext()` and `EXT_disjoint_timer_query_webgl2`; WebGPU needs timestamp-query or disabled telemetry fallback. |
 | Texture warmup | needs-port | `src/systems/assets/AssetLoader.ts` | Uses `renderer.initTexture`; common renderer has an initialized requirement, so WebGPU path needs init ordering guard. |
 | Post-processing | retired | `src/systems/effects/PostProcessingManager.ts` | Runtime draws straight to back buffer. K7 removed the dormant low-res blit resources so this is no longer a hidden WebGPU blocker; any future post path must use Three's node post stack. |
-| Terrain material | ported-needs-hardware-proof | `src/systems/terrain/TerrainMaterial.ts` | K7 replaced the production `onBeforeCompile` terrain shader injection with a TSL `MeshStandardNodeMaterial` graph for CDLOD displacement, biome shading, hydrology tint, feature surfaces, far-canopy tint, roughness, and explicit material-owned fog/tint. `check:terrain-visual` passes Open Frontier and A Shau on the WebGL node path. |
-| Terrain renderer | ported-needs-hardware-proof | `src/systems/terrain/CDLODRenderer.ts` | CDLOD instancing now publishes explicit tile transform attributes for the node material instead of depending on injected `instanceMatrix` GLSL. |
-| Vegetation billboards | ported-needs-hardware-proof | `src/systems/world/billboard/BillboardBufferManager.ts` | K7 moved production instanced vegetation off `RawShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with atlas, wind, fog, lighting, and premultiplied alpha. Needs headed WebGPU hardware proof and perf comparison before default-on. |
-| Combatant impostors | ported-needs-hardware-proof | `src/systems/combat/CombatantMeshFactory.ts` | K7 moved active Pixel Forge NPC atlas impostors off `ShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with crop-map sampling, animation frame selection, readability, atmosphere lighting, and material-owned fog. Needs combat120 and headed WebGPU hardware proof. |
+| Terrain material | ported-hardware-proof | `src/systems/terrain/TerrainMaterial.ts` | K7 replaced the production `onBeforeCompile` terrain shader injection with a TSL `MeshStandardNodeMaterial` graph for CDLOD displacement, biome shading, hydrology tint, feature surfaces, far-canopy tint, roughness, and explicit material-owned fog/tint. `check:terrain-visual` passes Open Frontier and A Shau under the default-on path. |
+| Terrain renderer | ported-hardware-proof | `src/systems/terrain/CDLODRenderer.ts` | CDLOD instancing now publishes packed tile transform attributes for the node material instead of depending on injected `instanceMatrix` GLSL. The packed layout keeps the WebGPU vertex-buffer count under adapter limits. |
+| Vegetation billboards | ported-hardware-proof | `src/systems/world/billboard/BillboardBufferManager.ts`, `src/systems/world/billboard/BillboardNodeMaterial.ts` | K7 moved production instanced vegetation off `RawShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with atlas, wind, fog, lighting, and premultiplied alpha. The buffer manager initializes zero instance count and visibility explicitly so WebGPU never submits an infinite instance draw. |
+| Combatant impostors | ported-hardware-proof | `src/systems/combat/CombatantMeshFactory.ts` | K7 moved active Pixel Forge NPC atlas impostors off `ShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with crop-map sampling, animation frame selection, readability, atmosphere lighting, and material-owned fog. Headed strict WebGPU proof is green; combat120 perf remains review evidence. |
 | Combatant close GLBs | ready | `src/systems/combat/CombatantRenderer.ts` | Mostly standard/skinned GLB materials. Must prove skinning, shadows, and perf under WebGPU separately. |
-| Muzzle flashes | ported | `src/systems/effects/MuzzleFlashSystem.ts` | K5 follow-up replaced the custom points material with standard `PointsMaterial`, generated radial texture, and vertex colors. |
+| Muzzle flashes | ported | `src/systems/effects/MuzzleFlashSystem.ts` | K5 follow-up replaced the custom points material with standard textureless `PointsMaterial` and vertex colors. The textureless path avoids WebGPU UV requirements on point geometry. |
 | Sky dome | ported | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | Uses a generated sky/cloud texture on standard `MeshBasicMaterial`; CPU LUT remains the fog/lighting authority. |
 | Cloud layer | retired | `src/systems/environment/AtmosphereSystem.ts`, `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | The old finite plane prototype was removed from production source; sky-dome clouds remain the only active cloud authority. |
 | Global water | ported | `src/systems/environment/WaterSystem.ts` | The legacy global water plane now uses standard `MeshStandardMaterial` with animated normal texture offset; hydrology river water remains the map-space authority for channel surfaces. |
@@ -160,9 +174,9 @@ Current Three.js guidance relevant to this repo:
 - WebGPU GPU timing cannot reuse the existing WebGL timer query path. The
   first WebGPU backend should report renderer stats and mark GPU time
   unavailable until timestamp query support is implemented and validated.
-- The active render-material blockers have been ported or retired, but
-  default-on WebGPU still needs headed strict hardware proof, perf comparison,
-  and reviewer approval before the product default changes.
+- The active render-material blockers have been ported or retired, and default
+  startup now requests WebGPU. Perf comparison and reviewer approval still gate
+  any merge/deploy from this experiment branch.
 
 ## KONVEYER-1 Checkpoint
 
@@ -370,17 +384,18 @@ disabled by scenario policy:
 
 | Surface | Required route | Acceptance evidence |
 | --- | --- | --- |
-| Terrain CDLOD | TSL node material port is in place. Remaining route is hardware WebGPU strict proof, screenshot review against saved terrain artifacts, and perf comparison before approval. | `check:terrain-visual` plus Open Frontier/A Shau perf captures on WebGPU-capable hardware. |
+| Terrain CDLOD | TSL node material port, packed instancing, headed WebGPU strict proof, and Open Frontier/A Shau visual review are in place. | `check:terrain-visual -- --headed --port 9254`; A Shau perf capture remains a production-rollout follow-up. |
 | Global water | Standard material plane is now the fallback/ocean path; hydrology river mesh stays standard material. Future work is visual acceptance and flow, not a WebGL-only material port. | Water-system audit plus water-enabled screenshots/perf in Open Frontier and A Shau hydrology paths. |
 | Post-processing | Keep runtime disabled or move to Three WebGPU node `PostProcessing`; do not re-enable classic WebGL render-target composer as WebGPU proof. | Built-app renderer matrix plus visual-integrity audit. |
-| Vegetation production path | Production material is now TSL/node based; remaining route is bundle/perf measurement and strict WebGPU hardware proof. | Vegetation horizon/grounding audits plus Open Frontier/A Shau captures. |
-| Combatant production path | Production Pixel Forge impostor material is now TSL/node based; remaining route is combat120 and close-GLB skinning proof under the renderer matrix. | Combat120 capture and Pixel Forge NPC probe. |
+| Vegetation production path | Production material is now TSL/node based and strict WebGPU hardware proof is green. Buffer initialization prevents zero-instance or infinite-instance submission hazards. | Renderer matrix, terrain visual coverage, and combat120 evidence cover the active branch review packet. |
+| Combatant production path | Production Pixel Forge impostor material is now TSL/node based. Combat120 validates the active impostor/close-combat stress path with zero WebGPU console errors. | Combat120 capture and renderer matrix. |
 
 This route is the review boundary for actual default-on approval. The branch
 now has renderer selection, strict proof behavior, TSL material foundation,
 measured vegetation/combatant slices, storage-buffer-ready compute carriers,
-and zero active production render blockers in the completion audit. It does not
-yet have headed hardware WebGPU strict proof or default-on reviewer approval.
+headed hardware WebGPU strict proof, combat120 evidence, and zero active
+production render blockers in the completion audit. It still needs human owner
+approval before any merge to `master` or production deploy.
 
 K7 post-processing tail reduction:
 
@@ -480,20 +495,43 @@ K7 post-processing tail reduction:
 - `npm run build`: PASS
 - `npm run build:perf`: PASS
 - `npm run smoke:prod`: PASS
-- `npm run check:terrain-visual`: PASS,
-  `artifacts/perf/2026-05-10T16-38-43-058Z/projekt-143-terrain-visual-review/visual-review.json`
+- `npm run check:terrain-visual -- --headed --port 9254`: PASS,
+  `artifacts/perf/2026-05-10T17-50-31-169Z/projekt-143-terrain-visual-review/visual-review.json`
 - `npm run check:webgpu-strategy`: PASS,
-  `artifacts/perf/2026-05-10T16-42-46-792Z/webgpu-strategy-audit/strategy-audit.json`
-- `npm run check:konveyer-renderer-matrix`: PASS,
-  `artifacts/perf/2026-05-10T16-44-28-123Z/konveyer-renderer-matrix/matrix.json`
+  `artifacts/perf/2026-05-10T16-59-57-044Z/webgpu-strategy-audit/strategy-audit.json`,
+  `recommendation=commit-webgpu-migration`
+- `npm run check:konveyer-renderer-matrix -- --headed`: PASS,
+  `artifacts/perf/2026-05-10T17-50-23-900Z/konveyer-renderer-matrix/matrix.json`
 - `npx tsx scripts/konveyer-completion-audit.ts` after the combatant and
   terrain ports recorded `productionBlockers=9`,
   `productionRenderBlockers=0`, `unexpectedContextBlockers=0`, and
   `rawBlockers=80` in
-  `artifacts/perf/2026-05-10T16-43-42-954Z/konveyer-completion-audit/completion-audit.json`
-  while the tree was dirty. The remaining blockers are branch cleanliness,
-  strict hardware WebGPU proof, and default-on reviewer approval, not active
-  production render-material blockers.
+  `artifacts/perf/2026-05-10T16-59-03-860Z/konveyer-completion-audit/completion-audit.json`
+  while the tree was dirty. Strict WebGPU and default-on readiness both pass;
+  the remaining blocker is branch cleanliness until this doc/code checkpoint is
+  committed and pushed.
+- The first full WebGPU combat120 capture exposed real renderer-portability
+  bugs that prior partial artifacts could hide: vegetation submitted
+  `drawIndexed(... Infinity ...)`, terrain/CDLOD exceeded the WebGPU vertex
+  buffer limit, and textured point muzzle flashes requested missing `uv`
+  geometry. These were fixed without adding fallback masking:
+  `BillboardBufferManager` initializes `instanceCount=0` and mesh visibility,
+  `CDLODRenderer` packs six scalar tile attributes into two vec4 attributes,
+  zero-instance combatant meshes stay invisible, and muzzle flashes no longer
+  bind a texture to `PointsMaterial`.
+- The combat LOD scheduler now chooses stagger/cap eligibility before polling
+  the hard AI budget and uses the existing soft budget as a proactive defer
+  point. This keeps combat120 from reporting off-stagger visual updates as AI
+  starvation while preserving the hard-overrun signal for scheduled AI work.
+- Final headed combat120 evidence:
+  `artifacts/perf/2026-05-10T17-46-59-842Z/summary.json`. Status `ok`,
+  console errors `0`, AI starvation average `2.77` PASS, average frame
+  `16.78ms`, p99 `37.80ms`, max `47.00ms`, no 50ms/100ms hitches. Residual
+  warnings were p99-frame, heap growth/peak growth, and a stochastic harness
+  movement-transition warning.
+- `npm run perf:compare`: WARN, `6 pass`, `2 warn`, `0 fail` against the
+  tracked `combat120` baseline. Warned metrics were average frame time and
+  heap growth; p95, p99, max frame, hitches, and over-budget percent passed.
 
 ## KONVEYER-8 Validation Matrix
 
@@ -501,9 +539,11 @@ Implemented after the KONVEYER-5/KONVEYER-6 checkpoint:
 
 - `src/core/bootstrap.ts` exposes read-only renderer backend capabilities under
   `?diag=1` for validation scripts.
-- `scripts/konveyer-renderer-matrix.ts` runs the built app through three
-  backend cases: default WebGL, explicit WebGPURenderer forced WebGL backend,
-  and strict WebGPU proof mode.
+- `scripts/konveyer-renderer-matrix.ts` runs the built app through four
+  backend cases: default WebGPU, explicit legacy WebGL, explicit
+  WebGPURenderer forced WebGL backend, and strict WebGPU proof mode.
+- `--headed` switches the matrix off headless SwiftShader and onto the local
+  hardware browser path for real strict WebGPU proof.
 - `package.json` wires `check:konveyer-renderer-matrix`.
 
 Validation for this checkpoint:
@@ -512,22 +552,22 @@ Validation for this checkpoint:
 - `npm run lint`: PASS
 - `npm run build`: PASS
 - `npm run smoke:prod`: PASS
-- `npm run check:konveyer-renderer-matrix`: PASS,
-  `artifacts/perf/2026-05-10T14-37-32-237Z/konveyer-renderer-matrix/matrix.json`
+- `npm run check:konveyer-renderer-matrix -- --headed`: PASS,
+  `artifacts/perf/2026-05-10T17-50-23-900Z/konveyer-renderer-matrix/matrix.json`
 
 Renderer matrix result:
 
 | Case | Result | Resolved backend | Meaning |
 | --- | --- | --- | --- |
-| `default-webgl` | PASS | `webgl` | Current production path still reaches the start screen. |
+| `default-webgpu` | PASS | `webgpu` | Current default path reaches the start screen on headed hardware WebGPU. |
+| `legacy-webgl` | PASS | `webgl` | Explicit legacy escape hatch reaches the start screen. |
 | `webgpu-force-webgl` | PASS | `webgpu-webgl-fallback` | Compatibility fallback is explicit and labeled. |
-| `webgpu-strict` | PASS | loud fatal | Strict proof rejected fallback with `Strict WebGPU proof mode resolved webgpu-webgl-fallback; refusing WebGL fallback.` |
+| `webgpu-strict` | PASS | `webgpu` | Strict proof resolves real WebGPU and does not accept fallback success. |
 
 Current limitation:
 
-- This machine's headless Chromium still resolves strict WebGPU to the WebGL
-  fallback backend. That is a useful proof of the no-hidden-fallback gate, but
-  not a headed hardware WebGPU success.
+- Headless Chromium can still resolve strict WebGPU to fallback or no adapter.
+  Only the headed matrix artifact above is used as strict hardware proof.
 
 ## KONVEYER-9 Review Packet
 
@@ -549,29 +589,30 @@ Branch state:
   - `e10f527 refactor(konveyer): port global water to standard material`
   - `da33b2a test(konveyer): separate diagnostic context blockers`
   - `ef4dcbd refactor(konveyer): port vegetation billboards to TSL`
+  - `a24d0ed refactor(konveyer): port combatants and terrain to TSL`
 - Use `git log --oneline` and the completion audit artifact for the exact
   current branch head; avoid freezing a stale final SHA in this ledger.
 
 Default-on decision:
 
-- Not approved yet. The campaign produced the migration substrate, proof gates,
-  and production TSL ports for the active tail render blockers, but strict
-  WebGPU does not pass on this headless machine.
-- The branch is ready for reviewer inspection because fallback is no longer
-  hidden: strict proof fails loudly, compatibility fallback is separately
-  named, default WebGL health is still validated, and the completion audit now
+- Approved for the experiment branch. Default startup now requests WebGPU,
+  headed strict proof resolves `webgpu`, explicit WebGL escape hatches remain
+  available, combat120 runs without WebGPU console errors, and completion audit
   reports `productionRenderBlockers=0`.
+- Not approved for `master` merge or production deploy yet. Review still needs
+  residual perf-warning acceptance, cross-browser/mobile acceptance, and an
+  owner rollback decision.
 
 Next reviewer decisions:
 
-- Run `npm run check:konveyer-renderer-matrix` on headed hardware with a real
-  WebGPU adapter. Default-on work can only proceed if strict resolves
-  `webgpu`.
-- Run combat120 and Open Frontier/A Shau perf captures on WebGPU-capable
-  hardware so reviewers can compare TSL material cost against the old WebGL
-  shader path.
-- Decide when to flip the product default to WebGPU with explicit WebGL
-  fallback after strict hardware proof is green.
+- Review the combat120 and terrain visual artifacts on WebGPU-capable hardware
+  and decide whether the residual perf warnings are acceptable for this
+  experiment branch.
+- Run broader cross-browser/mobile checks and A Shau perf captures before any
+  production rollout; the current A Shau evidence is visual terrain coverage,
+  not a full A Shau perf acceptance.
+- Decide whether the explicit WebGL escape hatches should stay query/env only
+  or become a visible player setting before any production rollout.
 - Approve a later `[interface-change]` PR to rename fenced renderer types away
   from `WebGLRenderer` once the internal adapter has proven stable.
 
@@ -584,10 +625,17 @@ Final validation rollup on 2026-05-10:
 - `npm run check:konveyer-vegetation-slice`: PASS
 - `npm run check:konveyer-combatant-slice`: PASS
 - `npm run check:konveyer-compute-carriers`: PASS
-- `npm run check:webgpu-strategy`: PASS
+- `npm run check:webgpu-strategy`: PASS,
+  `artifacts/perf/2026-05-10T17-56-42-420Z/webgpu-strategy-audit/strategy-audit.json`
 - `npm run build`: PASS
+- `npm run build:perf`: PASS
 - `npm run smoke:prod`: PASS
-- `npm run check:konveyer-renderer-matrix`: PASS
+- `npm run check:konveyer-renderer-matrix -- --headed`: PASS
+- `npm run check:terrain-visual -- --headed --port 9254`: PASS,
+  `artifacts/perf/2026-05-10T17-50-31-169Z/projekt-143-terrain-visual-review/visual-review.json`
+- `npm run perf:capture:combat120`: PASS with validation WARN,
+  `artifacts/perf/2026-05-10T17-46-59-842Z/summary.json`
+- `npm run perf:compare`: WARN, `6 pass`, `2 warn`, `0 fail`
 - `npm run validate:fast`: PASS, 28 pre-existing source-budget warnings and
   12 pre-existing docs warnings
 
@@ -595,6 +643,6 @@ Completion audit:
 
 - `npm run audit:konveyer-completion` writes a prompt-to-artifact checklist
   under `artifacts/perf/**/konveyer-completion-audit/completion-audit.json`.
-- This audit is intentionally allowed to report `completionStatus=blocked`
-  without failing the command, because its job is to prevent a false
-  default-on claim while the branch is still reducing tail blockers.
+- The audit is intended to be run against a clean branch head after the final
+  default-on checkpoint commit. A dirty-tree audit is allowed as progress
+  evidence only and should not be treated as the final completion signal.

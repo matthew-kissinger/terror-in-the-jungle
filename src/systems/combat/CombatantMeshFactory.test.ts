@@ -238,6 +238,8 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
 
     expect(bucket?.key).toBe('NVA_advance_fire');
     expect(bucket?.mesh.count).toBe(0);
+    expect(bucket?.mesh.visible).toBe(false);
+    expect(bucket?.marker.visible).toBe(false);
     expect(bucket?.material.uniforms.animationMode.value).toBe(0);
 
     bucket?.mesh.geometry.dispose();

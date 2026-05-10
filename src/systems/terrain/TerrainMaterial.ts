@@ -212,12 +212,14 @@ function edgeBit(edgeMorphMask: TslNode, bit: number): TslNode {
 }
 
 function createTerrainPositionNode(uniforms: TerrainUniforms): TslNode {
-  const tileCenterX = tslAttribute('tileCenterX', 'float');
-  const tileCenterZ = tslAttribute('tileCenterZ', 'float');
-  const tileSize = tslAttribute('tileSize', 'float');
-  const lodLevel = tslAttribute('lodLevel', 'float');
-  const morphFactor = tslAttribute('morphFactor', 'float');
-  const edgeMorphMask = tslAttribute('edgeMorphMask', 'float');
+  const tileParams0 = tslAttribute('tileParams0', 'vec4');
+  const tileParams1 = tslAttribute('tileParams1', 'vec4');
+  const tileCenterX = tileParams0.x;
+  const tileCenterZ = tileParams0.y;
+  const tileSize = tileParams0.z;
+  const lodLevel = tileParams0.w;
+  const morphFactor = tileParams1.x;
+  const edgeMorphMask = tileParams1.y;
   const isSkirt = tslAttribute('isSkirt', 'float');
   const tileGridResolution = tslReference('float', uniforms.tileGridResolution);
   const gridPos = tslPositionGeometry.xz.add(tslVec2(0.5, 0.5));
@@ -549,8 +551,10 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
     .mul(tslReference('float', uniforms.farCanopyTintFogStrength));
   finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
 
-  const lodLevel = tslAttribute('lodLevel', 'float');
-  const morphFactor = tslAttribute('morphFactor', 'float');
+  const tileParams0 = tslAttribute('tileParams0', 'vec4');
+  const tileParams1 = tslAttribute('tileParams1', 'vec4');
+  const lodLevel = tileParams0.w;
+  const morphFactor = tileParams1.x;
   let lodColor = tslVec3(0, 1, 0);
   lodColor = tslMix(lodColor, tslVec3(0, 0.5, 1), step(tslFloat(0.5), lodLevel));
   lodColor = tslMix(lodColor, tslVec3(1, 1, 0), step(tslFloat(1.5), lodLevel));

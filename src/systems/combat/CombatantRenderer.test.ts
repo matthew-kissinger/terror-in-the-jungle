@@ -626,6 +626,7 @@ describe('CombatantRenderer', () => {
       const latestAttributes = attributeCalls[attributeCalls.length - 1];
 
       expect(mesh.count).toBe(1);
+      expect(mesh.visible).toBe(true);
       expect(scale.y).toBeCloseTo(1);
       expect(latestAttributes?.[5]).toBeGreaterThan(0.45);
       expect(latestAttributes?.[5]).toBeLessThan(0.55);
@@ -677,6 +678,7 @@ describe('CombatantRenderer', () => {
       markerPosition.setFromMatrixPosition(markerMatrix);
 
       expect(markerMesh.count).toBe(1);
+      expect(markerMesh.visible).toBe(true);
       expect(markerPosition.y).toBeCloseTo(54.9 - NPC_Y_OFFSET + 0.08);
     });
 

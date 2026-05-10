@@ -106,7 +106,7 @@ export class CombatantLODManager {
   private readonly AI_LOG_THROTTLE_MS = 5000;
   private readonly AI_FRAME_BUDGET_MS = 6.0;
   private readonly AI_SEVERE_OVER_BUDGET_MULTIPLIER = 2.5;
-  private readonly AI_SOFT_BUDGET_RATIO = 0.75;
+  private readonly AI_SOFT_BUDGET_RATIO = 0.65;
   private readonly CULLED_LOOP_BUDGET_MS = 1.5;
   /** Live-tunable distant-sim cadence (ms). See NpcLodConfig.culledDistantSimIntervalMs. */
   private get CULLED_DISTANT_SIM_INTERVAL_MS(): number {
@@ -379,36 +379,40 @@ export class CombatantLODManager {
       combatant.lodLevel = 'high';
       this.lodHighCount++;
 
-      // Flat cascade: severe -> hard exceeded -> full update
-      if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
-        this.updateCombatantUltraLight(combatant, deltaTime);
-        combatant.lastUpdateTime = now;
-        this.staggeredSkipCount++;
-        return;
-      }
-      if (!enableAI || this.isAIBudgetExceeded(aiFrameStart)) {
+      // Stagger AI decisions before consulting the budget guard. Off-frame
+      // combatants were already due for visual continuity only; counting them
+      // as budget-starved would overstate actual AI denial under stress.
+      if (this.frameCounter % STAGGER_HIGH !== index % STAGGER_HIGH) {
         this.updateCombatantVisualOnly(combatant, deltaTime);
         combatant.lastUpdateTime = now;
         this.staggeredSkipCount++;
         return;
       }
 
-      // Stagger AI decisions: only run full AI+combat on this combatant's turn
-      if (this.frameCounter % STAGGER_HIGH === index % STAGGER_HIGH) {
-        if (this.highFullUpdatesThisFrame >= this.maxHighFullUpdatesPerFrame) {
-          this.updateCombatantVisualOnly(combatant, deltaTime);
-          this.staggeredSkipCount++;
-          return;
-        }
-        this.updateCombatantFull(combatant, deltaTime);
+      if (this.highFullUpdatesThisFrame >= this.maxHighFullUpdatesPerFrame) {
+        this.updateCombatantVisualOnly(combatant, deltaTime);
+        this.staggeredSkipCount++;
+        return;
+      }
+
+      // Flat cascade for scheduled full-AI candidates:
+      // severe -> hard exceeded -> soft defer -> full update.
+      if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+        this.updateCombatantUltraLight(combatant, deltaTime);
         combatant.lastUpdateTime = now;
-        this.highFullUpdatesThisFrame++;
-      } else {
-        // Off-frame: still update movement, rotation, spatial position for smooth visuals
+        this.staggeredSkipCount++;
+        return;
+      }
+      if (!enableAI || this.isAIBudgetExceeded(aiFrameStart) || this.isAISoftBudgetExceeded(aiFrameStart)) {
         this.updateCombatantVisualOnly(combatant, deltaTime);
         combatant.lastUpdateTime = now;
         this.staggeredSkipCount++;
+        return;
       }
+
+      this.updateCombatantFull(combatant, deltaTime);
+      combatant.lastUpdateTime = now;
+      this.highFullUpdatesThisFrame++;
     });
     highLoopMs = performance.now() - highStart;
 
@@ -420,7 +424,17 @@ export class CombatantLODManager {
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
 
       if (elapsedMs > dynamicIntervalMs) {
-        // Flat cascade for medium LOD
+        if (this.frameCounter % STAGGER_MEDIUM !== index % STAGGER_MEDIUM) {
+          this.staggeredSkipCount++;
+          return;
+        }
+
+        if (this.mediumFullUpdatesThisFrame >= this.maxMediumFullUpdatesPerFrame) {
+          this.staggeredSkipCount++;
+          return;
+        }
+
+        // Flat cascade for scheduled medium LOD candidates
         if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
           this.updateCombatantUltraLight(combatant, deltaTime);
           combatant.lastUpdateTime = now;
@@ -433,20 +447,17 @@ export class CombatantLODManager {
           this.staggeredSkipCount++;
           return;
         }
-
-        // Apply stagger within the medium LOD tier as well
-        if (this.frameCounter % STAGGER_MEDIUM === index % STAGGER_MEDIUM) {
-          if (this.mediumFullUpdatesThisFrame >= this.maxMediumFullUpdatesPerFrame) {
-            this.staggeredSkipCount++;
-            return;
-          }
-          const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
-          this.updateCombatantMedium(combatant, effectiveDelta);
-          this.mediumFullUpdatesThisFrame++;
+        if (this.isAISoftBudgetExceeded(aiFrameStart)) {
+          this.updateCombatantBasic(combatant, deltaTime);
           combatant.lastUpdateTime = now;
-        } else {
           this.staggeredSkipCount++;
+          return;
         }
+
+        const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
+        this.updateCombatantMedium(combatant, effectiveDelta);
+        this.mediumFullUpdatesThisFrame++;
+        combatant.lastUpdateTime = now;
       }
     });
     mediumLoopMs = performance.now() - mediumStart;

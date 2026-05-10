@@ -26,7 +26,6 @@ const MAX_NPC    = 64;  // ring buffer shared across all NPC weapons
 const HIDDEN_POINT = 99999;
 const PLAYER_POINT_SIZE = 12;
 const NPC_POINT_SIZE = 0.55;
-const MUZZLE_TEXTURE_SIZE = 32;
 
 // CPU-side particle state (plain arrays for tight memory layout)
 interface CpuParticle {
@@ -43,46 +42,6 @@ function makeCpuSlots(n: number): CpuParticle[] {
     x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
     life: 0, decay: 0, r: 1, g: 1, b: 1, size: 10,
   }));
-}
-
-let sharedMuzzleTexture: THREE.Texture | null = null;
-
-function getMuzzleTexture(): THREE.Texture {
-  if (sharedMuzzleTexture) return sharedMuzzleTexture;
-
-  if (typeof document === 'undefined') {
-    const data = new Uint8Array([255, 244, 224, 255]);
-    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
-    texture.needsUpdate = true;
-    sharedMuzzleTexture = texture;
-    return texture;
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = MUZZLE_TEXTURE_SIZE;
-  canvas.height = MUZZLE_TEXTURE_SIZE;
-  const context = canvas.getContext('2d');
-  if (!context) {
-    const data = new Uint8Array([255, 244, 224, 255]);
-    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
-    texture.needsUpdate = true;
-    sharedMuzzleTexture = texture;
-    return texture;
-  }
-
-  const radius = MUZZLE_TEXTURE_SIZE / 2;
-  const gradient = context.createRadialGradient(radius, radius, 0, radius, radius, radius);
-  gradient.addColorStop(0, 'rgba(255, 250, 232, 1)');
-  gradient.addColorStop(0.42, 'rgba(255, 198, 88, 0.82)');
-  gradient.addColorStop(1, 'rgba(255, 96, 22, 0)');
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, MUZZLE_TEXTURE_SIZE, MUZZLE_TEXTURE_SIZE);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
-  sharedMuzzleTexture = texture;
-  return texture;
 }
 
 function buildPoints(max: number, options: { size: number; sizeAttenuation: boolean; name: string }): {
@@ -109,7 +68,6 @@ function buildPoints(max: number, options: { size: number; sizeAttenuation: bool
 
   const mat = new THREE.PointsMaterial({
     name: options.name,
-    map: getMuzzleTexture(),
     size: options.size,
     sizeAttenuation: options.sizeAttenuation,
     vertexColors: true,

@@ -71,6 +71,9 @@ export function resolveRendererBackendMode(): RendererBackendMode {
     if (requested === 'webgpu' || requested === '1' || requested === 'true') {
       return 'webgpu';
     }
+    if (requested === 'webgl' || requested === '0' || requested === 'false') {
+      return 'webgl';
+    }
     if (requested === 'webgpu-strict' || requested === 'strict') {
       return 'webgpu-strict';
     }
@@ -86,7 +89,13 @@ export function resolveRendererBackendMode(): RendererBackendMode {
   if (import.meta.env.VITE_KONVEYER_WEBGPU_STRICT === '1') {
     return 'webgpu-strict';
   }
-  return import.meta.env.VITE_KONVEYER_WEBGPU === '1' ? 'webgpu' : 'webgl';
+  if (
+    import.meta.env.VITE_KONVEYER_WEBGPU === '0'
+    || import.meta.env.VITE_KONVEYER_FORCE_WEBGL === '1'
+  ) {
+    return 'webgl';
+  }
+  return 'webgpu';
 }
 
 export function createWebGLRenderer(preserveDrawingBuffer: boolean): THREE.WebGLRenderer {

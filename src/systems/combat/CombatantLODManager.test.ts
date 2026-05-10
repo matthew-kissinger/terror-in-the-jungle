@@ -386,6 +386,27 @@ describe('CombatantLODManager', () => {
       expect(combatant.lastUpdateTime).toBeGreaterThan(0);
     });
 
+    it('does not report off-stagger high LOD visual updates as AI budget starvation', () => {
+      let perfNow = 0;
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => perfNow);
+      vi.mocked(combatantAI.updateAI).mockImplementation(() => {
+        perfNow += 7;
+      });
+
+      try {
+        for (let i = 0; i < 9; i++) {
+          combatants.set(`high-${i}`, createMockCombatant(`high-${i}`, new THREE.Vector3(10 + i, 0, 0)));
+        }
+
+        manager.updateCombatants(0.016);
+
+        expect(combatantAI.updateAI).toHaveBeenCalledTimes(1);
+        expect(manager.getFrameSchedulingStats().aiBudgetExceededEvents).toBe(2);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
+
     it('stamps high LOD update time so medium LOD cannot inherit stale catch-up delta', () => {
       const combatant = createMockCombatant('high-to-medium', new THREE.Vector3(10, 0, 0));
       combatant.lastUpdateTime = 1;

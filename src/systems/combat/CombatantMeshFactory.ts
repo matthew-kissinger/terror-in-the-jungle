@@ -436,6 +436,7 @@ export class CombatantMeshFactory {
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.frustumCulled = false;
     mesh.count = 0;
+    mesh.visible = false;
     mesh.renderOrder = 10;
     mesh.matrixAutoUpdate = false;
     mesh.matrixWorldAutoUpdate = false;
@@ -456,6 +457,7 @@ export class CombatantMeshFactory {
     marker.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     marker.frustumCulled = false;
     marker.count = 0;
+    marker.visible = false;
     marker.renderOrder = 0;
     marker.matrixAutoUpdate = false;
     marker.matrixWorldAutoUpdate = false;

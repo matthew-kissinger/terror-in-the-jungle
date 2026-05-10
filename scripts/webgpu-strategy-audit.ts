@@ -278,12 +278,12 @@ function buildAudit(): WebgpuStrategyAudit {
     },
     priorSpike: getPriorSpike(),
     recommendation: {
-      decision: 'reinforce-webgl',
+      decision: 'commit-webgpu-migration',
       rationale: [
-        'The active runtime has no deployable WebGPU renderer path.',
-        'Current high-count NPC rendering is already instanced and the E2 spike did not identify rendering as the active combat bottleneck.',
-        'Current recovery blockers are texture upload, asset budgets, imposter contracts, first-use effects, culling certification, and terrain horizon representation; WebGPU does not remove those authoring and pipeline duties.',
-        'Current source has many ShaderMaterial, RawShaderMaterial, onBeforeCompile, WebGLRenderTarget, and direct WebGL context dependencies that must be ported or abstracted for WebGPURenderer.',
+        'The active runtime now has a deployable WebGPURenderer path and default startup requests WebGPU.',
+        'Strict WebGPU proof is separated from fallback behavior; strict must resolve backend=webgpu and the forced fallback path is explicitly labeled.',
+        'Production custom shader and render-target blockers have been ported or retired in the completion audit; remaining raw matches are docs, tests, archived scripts, asset metadata, and diagnostics.',
+        'Remaining review risk is perf/browser acceptance and GPU timing telemetry policy, not renderer construction or active production GLSL material blockers.',
       ],
       webgpuUnlocks: [
         'Compute-driven terrain and vegetation culling.',
@@ -292,18 +292,18 @@ function buildAudit(): WebgpuStrategyAudit {
         'Modern post-processing and MRT composition through Three WebGPU/TSL.',
       ],
       migrationEstimate: {
-        calendarWeeks: '6-10 weeks for production replacement; 3-5 weeks for a credible dual-backend prototype',
-        engineerHours: '240-400h for production replacement; 120-220h for prototype',
+        calendarWeeks: 'branch migration is review-ready; expect 1-2 weeks for hardware matrix, perf hardening, and rollout approval',
+        engineerHours: '40-80h for reviewer hardening and cross-browser/default-on release checks',
         notes: [
-          'Estimate is based on active source dependency count, not a completed port.',
-          'The critical path is shader/material/post-processing/telemetry migration plus cross-browser validation, not only swapping renderer construction.',
-          'Any WebGPU route needs a WebGL fallback or explicit browser-support decision.',
+          'Estimate now assumes the KONVEYER branch ports stay accepted and no cross-browser WebGPU renderer regressions appear.',
+          'The critical path after this point is perf evidence, headed hardware coverage, telemetry policy, and release rollback behavior.',
+          'WebGL remains available as an explicit compatibility path; fallback success must not satisfy strict WebGPU proof.',
         ],
       },
       nextActions: [
-        'Do not commit to WebGPU migration in the stabilization cycle.',
-        'Keep WebGL and fix measured blockers first: texture upload policy, asset acceptance, imposter parity, effect warmup, culling certification, and outer canopy representation.',
-        'After stabilization, run a contained WebGPU/TSL spike for one isolated renderer path before any point-of-no-return migration.',
+        'Keep the default-on WebGPU branch isolated until headed renderer matrix, terrain visual, combat120, and perf comparison evidence are reviewed.',
+        'Run strict WebGPU proof only on hardware adapter runs; use headless fallback artifacts as compatibility evidence, not success proof.',
+        'Plan a separate GPU timing telemetry follow-up for WebGPU timestamp query support or explicit unavailable status.',
       ],
     },
   };

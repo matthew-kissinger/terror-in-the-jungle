@@ -18,6 +18,7 @@ describe('MuzzleFlashSystem', () => {
     expect(scene.children).toContain(internals.npcMesh);
     expect(internals.npcMesh.material).toBeInstanceOf(THREE.PointsMaterial);
     expect((internals.npcMesh.material as THREE.PointsMaterial).vertexColors).toBe(true);
+    expect((internals.npcMesh.material as THREE.PointsMaterial).map).toBeNull();
 
     system.dispose();
   });
@@ -49,6 +50,7 @@ describe('MuzzleFlashSystem', () => {
     expect(overlayScene.children).toContain(internals.playerMesh);
     expect(internals.playerMesh?.material).toBeInstanceOf(THREE.PointsMaterial);
     expect((internals.playerMesh?.material as THREE.PointsMaterial).sizeAttenuation).toBe(false);
+    expect((internals.playerMesh?.material as THREE.PointsMaterial).map).toBeNull();
 
     system.dispose();
     expect(scene.children).not.toContain(internals.npcMesh);

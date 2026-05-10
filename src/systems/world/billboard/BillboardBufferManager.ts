@@ -49,8 +49,12 @@ export class GPUBillboardVegetation {
 
     // Convert to InstancedBufferGeometry
     this.geometry = new THREE.InstancedBufferGeometry();
-    this.geometry.index = planeGeometry.index;
-    this.geometry.attributes = planeGeometry.attributes;
+    this.geometry.setIndex(planeGeometry.index);
+    Object.entries(planeGeometry.attributes).forEach(([name, attribute]) => {
+      this.geometry.setAttribute(name, attribute);
+    });
+    this.geometry.instanceCount = 0;
+    planeGeometry.dispose();
 
     // Initialize instance arrays
     this.positions = new Float32Array(this.maxInstances * 3);
@@ -83,6 +87,7 @@ export class GPUBillboardVegetation {
     // Create mesh
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false; // Disable frustum culling for instanced geometry
+    this.mesh.visible = false;
     this.mesh.matrixAutoUpdate = false;
     this.mesh.matrixWorldAutoUpdate = false;
     this.scene.add(this.mesh);
@@ -138,6 +143,7 @@ export class GPUBillboardVegetation {
     }
 
     this.geometry.instanceCount = this.highWaterMark;
+    this.mesh.visible = this.liveCount > 0;
 
     const addedCount = this.liveCount - startLiveCount;
     if (addedCount > 0) {
@@ -194,6 +200,7 @@ export class GPUBillboardVegetation {
     if (compacted) {
       this.geometry.instanceCount = this.highWaterMark;
     }
+    this.mesh.visible = this.liveCount > 0;
     
     if (this.highWaterMark < this.maxInstances) {
       this.warnedCapacity = false;
@@ -211,6 +218,7 @@ export class GPUBillboardVegetation {
     this.liveCount = 0;
     this.freeSlots.clear();
     this.geometry.instanceCount = 0;
+    this.mesh.visible = false;
     this.pendingPositionUpdate = true;
     this.pendingScaleUpdate = true;
     this.pendingRotationUpdate = true;

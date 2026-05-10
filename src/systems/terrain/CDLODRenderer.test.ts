@@ -28,6 +28,7 @@ vi.mock('three', () => {
     name = '';
     castShadow = false;
     receiveShadow = false;
+    visible = true;
     geometry: MockBufferGeometry;
     material: any;
     instanceMatrix = { needsUpdate: false };
@@ -68,8 +69,12 @@ vi.mock('three', () => {
     InstancedMesh: MockInstancedMesh,
     InstancedBufferAttribute: class {
       array: Float32Array;
+      itemSize: number;
       needsUpdate = false;
-      constructor(arr: Float32Array, _size: number) { this.array = arr; }
+      constructor(arr: Float32Array, size: number) {
+        this.array = arr;
+        this.itemSize = size;
+      }
     },
     Matrix4: MockMatrix4,
     Material: class {},
@@ -103,6 +108,7 @@ describe('CDLODRenderer', () => {
   it('creates mesh with zero initial instances', () => {
     const mesh = renderer.getMesh();
     expect(mesh.count).toBe(0);
+    expect(mesh.visible).toBe(false);
   });
 
   it('updates instance count to match tile count', () => {
@@ -115,6 +121,7 @@ describe('CDLODRenderer', () => {
     renderer.updateInstances(tiles);
 
     expect(renderer.getMesh().count).toBe(3);
+    expect(renderer.getMesh().visible).toBe(true);
   });
 
   it('clamps to max instances', () => {
@@ -128,17 +135,20 @@ describe('CDLODRenderer', () => {
     expect(renderer.getMesh().count).toBeLessThanOrEqual(256);
   });
 
-  // Stage cdlod-edge-morph (cycle-2026-05-09): the renderer must expose
-  // the per-instance edgeMorphMask attribute so the vertex shader can
-  // force-morph edges abutting coarser neighbours. Tests the contract,
-  // not the exact float layout.
-  it('exposes a per-instance edgeMorphMask attribute on the geometry', () => {
+  it('packs CDLOD instance data into two vec4 attributes for WebGPU vertex-buffer limits', () => {
     const mesh: any = renderer.getMesh();
-    expect(mesh.geometry.attributes.edgeMorphMask).toBeDefined();
-    expect(mesh.geometry.attributes.edgeMorphMask.array.length).toBe(256);
+    expect(mesh.geometry.attributes.tileParams0).toBeDefined();
+    expect(mesh.geometry.attributes.tileParams1).toBeDefined();
+    expect(mesh.geometry.attributes.tileParams0.itemSize).toBe(4);
+    expect(mesh.geometry.attributes.tileParams1.itemSize).toBe(4);
+    expect(mesh.geometry.attributes.tileParams0.array.length).toBe(256 * 4);
+    expect(mesh.geometry.attributes.tileParams1.array.length).toBe(256 * 4);
+    expect(mesh.geometry.attributes.lodLevel).toBeUndefined();
+    expect(mesh.geometry.attributes.morphFactor).toBeUndefined();
+    expect(mesh.geometry.attributes.edgeMorphMask).toBeUndefined();
   });
 
-  it('writes each tile.edgeMorphMask into the attribute slot at its instance index', () => {
+  it('writes tile center, size, lod, morph, and edge mask into packed instance params', () => {
     const tiles: CDLODTile[] = [
       { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 5 },
       { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.5, edgeMorphMask: 10 },
@@ -146,11 +156,23 @@ describe('CDLODRenderer', () => {
     ];
     renderer.updateInstances(tiles);
     const mesh: any = renderer.getMesh();
-    const arr = mesh.geometry.attributes.edgeMorphMask.array as Float32Array;
-    expect(arr[0]).toBe(5);
-    expect(arr[1]).toBe(10);
-    expect(arr[2]).toBe(15);
-    expect(mesh.geometry.attributes.edgeMorphMask.needsUpdate).toBe(true);
+    const params0 = mesh.geometry.attributes.tileParams0.array as Float32Array;
+    const params1 = mesh.geometry.attributes.tileParams1.array as Float32Array;
+    expect(Array.from(params0.slice(0, 12))).toEqual([
+      0, 0, 64, 0,
+      64, 0, 64, 1,
+      0, 64, 128, 2,
+    ]);
+    expect(Array.from(params1.slice(0, 8))).toEqual([
+      0, 5, 0, 0,
+      0.5, 10, 0, 0,
+    ]);
+    expect(params1[8]).toBeCloseTo(0.8);
+    expect(params1[9]).toBe(15);
+    expect(params1[10]).toBe(0);
+    expect(params1[11]).toBe(0);
+    expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
   });
 
   it('keeps terrain shadow casting enabled by default', () => {

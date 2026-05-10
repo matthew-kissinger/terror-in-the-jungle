@@ -16,6 +16,7 @@ function setSearch(search: string): void {
 
 beforeEach(() => {
   vi.stubEnv('VITE_KONVEYER_WEBGPU', '');
+  vi.stubEnv('VITE_KONVEYER_FORCE_WEBGL', '');
   vi.stubEnv('VITE_KONVEYER_WEBGPU_STRICT', '');
   setSearch('');
 });
@@ -26,13 +27,18 @@ afterEach(() => {
 });
 
 describe('resolveRendererBackendMode', () => {
-  it('keeps WebGL as the default runtime backend', () => {
-    expect(resolveRendererBackendMode()).toBe('webgl');
+  it('requests WebGPU as the default runtime backend', () => {
+    expect(resolveRendererBackendMode()).toBe('webgpu');
   });
 
   it('selects the experimental WebGPU backend from the renderer query param', () => {
     setSearch('?renderer=webgpu');
     expect(resolveRendererBackendMode()).toBe('webgpu');
+  });
+
+  it('allows explicit legacy WebGL selection from the renderer query param', () => {
+    setSearch('?renderer=webgl');
+    expect(resolveRendererBackendMode()).toBe('webgl');
   });
 
   it('selects the WebGPURenderer WebGL fallback backend for forced fallback testing', () => {
@@ -45,9 +51,14 @@ describe('resolveRendererBackendMode', () => {
     expect(resolveRendererBackendMode()).toBe('webgpu-strict');
   });
 
-  it('allows build-time opt-in for experimental branches', () => {
-    vi.stubEnv('VITE_KONVEYER_WEBGPU', '1');
-    expect(resolveRendererBackendMode()).toBe('webgpu');
+  it('allows build-time legacy WebGL opt-out for compatibility runs', () => {
+    vi.stubEnv('VITE_KONVEYER_WEBGPU', '0');
+    expect(resolveRendererBackendMode()).toBe('webgl');
+  });
+
+  it('allows explicit build-time force-WebGL compatibility runs', () => {
+    vi.stubEnv('VITE_KONVEYER_FORCE_WEBGL', '1');
+    expect(resolveRendererBackendMode()).toBe('webgl');
   });
 
   it('allows build-time strict proof opt-in for migration gates', () => {

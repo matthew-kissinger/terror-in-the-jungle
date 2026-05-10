@@ -3,7 +3,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'http';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { extname, join, normalize } from 'path';
-import { chromium } from 'playwright';
+import { chromium, type Browser } from 'playwright';
 
 const HOST = '127.0.0.1';
 const DIST_ROOT = join(process.cwd(), 'dist');
@@ -38,7 +38,7 @@ type RendererBackendCapabilitiesSnapshot = {
 };
 
 type RendererMatrixScenario = {
-  name: 'default-webgl' | 'webgpu-force-webgl' | 'webgpu-strict';
+  name: 'default-webgpu' | 'legacy-webgl' | 'webgpu-force-webgl' | 'webgpu-strict';
   query: string;
 };
 
@@ -60,18 +60,55 @@ type RendererMatrixResult = {
 type RendererMatrixArtifact = {
   createdAt: string;
   source: string;
+  config: {
+    headed: boolean;
+    browserArgs: string[];
+  };
   userAgent: string | null;
   results: RendererMatrixResult[];
   nonClaims: string[];
 };
 
 const scenarios: RendererMatrixScenario[] = [
-  { name: 'default-webgl', query: '?diag=1' },
+  { name: 'default-webgpu', query: '?diag=1' },
+  { name: 'legacy-webgl', query: '?diag=1&renderer=webgl' },
   { name: 'webgpu-force-webgl', query: '?diag=1&renderer=webgpu-force-webgl' },
   { name: 'webgpu-strict', query: '?diag=1&renderer=webgpu-strict' },
 ];
 
 let activePort = 0;
+
+function hasFlag(name: string): boolean {
+  return process.argv.includes(name);
+}
+
+function browserArgsForRun(headed: boolean): string[] {
+  if (headed) {
+    return [
+      '--window-position=0,0',
+      '--window-size=1280,720',
+      '--force-device-scale-factor=1',
+      '--enable-unsafe-webgpu',
+    ];
+  }
+
+  return ['--use-angle=swiftshader', '--enable-webgl', '--enable-unsafe-webgpu'];
+}
+
+function parseRunConfig(): RendererMatrixArtifact['config'] {
+  const headed = hasFlag('--headed');
+  return {
+    headed,
+    browserArgs: browserArgsForRun(headed),
+  };
+}
+
+async function launchMatrixBrowser(config: RendererMatrixArtifact['config']): Promise<Browser> {
+  return chromium.launch({
+    headless: !config.headed,
+    args: config.browserArgs,
+  });
+}
 
 function timestampSlug(): string {
   return new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
@@ -124,7 +161,8 @@ function resolveListeningPort(server: ReturnType<typeof createServer>): number {
 }
 
 function expectedForScenario(name: RendererMatrixScenario['name']): string {
-  if (name === 'default-webgl') return 'Start screen with resolvedBackend=webgl.';
+  if (name === 'default-webgpu') return 'Start screen with WebGPU requested and either resolvedBackend=webgpu or explicit WebGPURenderer fallback.';
+  if (name === 'legacy-webgl') return 'Start screen with explicit legacy WebGL renderer selection.';
   if (name === 'webgpu-force-webgl') return 'Start screen with explicit WebGPURenderer WebGL backend or fallback-webgl status.';
   return 'Strict WebGPU either resolves backend=webgpu or shows a fatal strict WebGPU failure; fallback success is not allowed.';
 }
@@ -133,11 +171,23 @@ function evaluateScenario(result: Omit<RendererMatrixResult, 'status' | 'expecte
   const failures: string[] = [];
   const capabilities = result.capabilities;
 
-  if (result.name === 'default-webgl') {
-    if (!result.startVisible) failures.push('Default WebGL did not reach the start screen.');
-    if (result.fatalVisible) failures.push('Default WebGL showed the fatal overlay.');
-    if (capabilities?.resolvedBackend !== 'webgl') {
-      failures.push(`Default WebGL resolved backend ${capabilities?.resolvedBackend ?? 'missing'}.`);
+  if (result.name === 'default-webgpu') {
+    if (!result.startVisible) failures.push('Default WebGPU did not reach the start screen.');
+    if (result.fatalVisible) failures.push('Default WebGPU showed the fatal overlay.');
+    if (capabilities?.requestedMode !== 'webgpu') {
+      failures.push(`Default mode requested ${capabilities?.requestedMode ?? 'missing'} instead of webgpu.`);
+    }
+    const validDefaultBackend = capabilities?.resolvedBackend === 'webgpu'
+      || capabilities?.resolvedBackend === 'webgpu-webgl-fallback'
+      || capabilities?.initStatus === 'fallback-webgl';
+    if (!validDefaultBackend) {
+      failures.push(`Default WebGPU resolved unexpected backend ${capabilities?.resolvedBackend ?? 'missing'} status=${capabilities?.initStatus ?? 'missing'}.`);
+    }
+  } else if (result.name === 'legacy-webgl') {
+    if (!result.startVisible) failures.push('Explicit legacy WebGL did not reach the start screen.');
+    if (result.fatalVisible) failures.push('Explicit legacy WebGL showed the fatal overlay.');
+    if (capabilities?.requestedMode !== 'webgl' || capabilities?.resolvedBackend !== 'webgl') {
+      failures.push(`Legacy WebGL reported requested=${capabilities?.requestedMode ?? 'missing'} resolved=${capabilities?.resolvedBackend ?? 'missing'}.`);
     }
   } else if (result.name === 'webgpu-force-webgl') {
     if (!result.startVisible) failures.push('Forced WebGL backend did not reach the start screen.');
@@ -173,11 +223,12 @@ function evaluateScenario(result: Omit<RendererMatrixResult, 'status' | 'expecte
   };
 }
 
-async function runScenario(baseUrl: string, scenario: RendererMatrixScenario): Promise<RendererMatrixResult> {
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--use-angle=swiftshader', '--enable-webgl', '--enable-unsafe-webgpu'],
-  });
+async function runScenario(
+  baseUrl: string,
+  scenario: RendererMatrixScenario,
+  config: RendererMatrixArtifact['config'],
+): Promise<RendererMatrixResult> {
+  const browser = await launchMatrixBrowser(config);
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   try {
@@ -246,6 +297,7 @@ async function runScenario(baseUrl: string, scenario: RendererMatrixScenario): P
 
 async function main(): Promise<void> {
   ensureBuildExists();
+  const config = parseRunConfig();
   const server = createServer(serveFile);
   await new Promise<void>((resolve) => server.listen(0, HOST, resolve));
   activePort = resolveListeningPort(server);
@@ -255,9 +307,9 @@ async function main(): Promise<void> {
     const results: RendererMatrixResult[] = [];
     let userAgent: string | null = null;
     for (const scenario of scenarios) {
-      const result = await runScenario(baseUrl, scenario);
+      const result = await runScenario(baseUrl, scenario, config);
       results.push(result);
-      userAgent ??= await chromium.launch({ headless: true })
+      userAgent ??= await launchMatrixBrowser(config)
         .then(async (browser) => {
           const page = await browser.newPage();
           const ua = await page.evaluate(() => navigator.userAgent);
@@ -270,6 +322,7 @@ async function main(): Promise<void> {
     const artifact: RendererMatrixArtifact = {
       createdAt: new Date().toISOString(),
       source: 'scripts/konveyer-renderer-matrix.ts',
+      config,
       userAgent,
       results,
       nonClaims: [

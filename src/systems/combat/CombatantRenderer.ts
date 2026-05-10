@@ -1343,9 +1343,18 @@ export class CombatantRenderer {
 
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
     const { closeModelIds, suppressedImpostorIds } = this.updateCloseModels(combatants, playerPosition);
-    this.factionMeshes.forEach(mesh => mesh.count = 0);
-    this.factionAuraMeshes.forEach(mesh => mesh.count = 0);
-    this.factionGroundMarkers.forEach(mesh => mesh.count = 0);
+    this.factionMeshes.forEach(mesh => {
+      mesh.count = 0;
+      mesh.visible = false;
+    });
+    this.factionAuraMeshes.forEach(mesh => {
+      mesh.count = 0;
+      mesh.visible = false;
+    });
+    this.factionGroundMarkers.forEach(mesh => {
+      mesh.count = 0;
+      mesh.visible = false;
+    });
     const RENDER_DISTANCE_SQ = 400 * 400;
     this.renderWriteCounts.clear();
     this.renderCombatStates.clear();
@@ -1664,6 +1673,7 @@ export class CombatantRenderer {
       const written = this.renderWriteCounts.get(key) ?? 0;
       const previousCount = mesh.count;
       mesh.count = written;
+      mesh.visible = written > 0;
       if (written > 0 || previousCount !== written) {
         mesh.instanceMatrix.needsUpdate = true;
       }
@@ -1671,6 +1681,7 @@ export class CombatantRenderer {
       if (outlineMesh) {
         const previousOutlineCount = outlineMesh.count;
         outlineMesh.count = written;
+        outlineMesh.visible = written > 0;
         if (written > 0 || previousOutlineCount !== written) {
           outlineMesh.instanceMatrix.needsUpdate = true;
         }
@@ -1679,6 +1690,7 @@ export class CombatantRenderer {
       if (markerMesh) {
         const previousMarkerCount = markerMesh.count;
         markerMesh.count = written;
+        markerMesh.visible = written > 0;
         if (written > 0 || previousMarkerCount !== written) {
           markerMesh.instanceMatrix.needsUpdate = true;
         }
