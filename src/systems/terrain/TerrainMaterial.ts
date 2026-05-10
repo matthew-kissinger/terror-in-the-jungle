@@ -22,6 +22,7 @@ uniform bool debugWireframe;
 attribute float lodLevel;
 attribute float morphFactor;
 attribute float isSkirt;
+attribute float edgeMorphMask;
 
 varying vec3 vWorldPosition;
 varying vec2 vWorldUV;
@@ -41,11 +42,26 @@ const TERRAIN_VERTEX_MAIN = /* glsl */ `
 // their coarse neighbours' actual vertex positions at full morph.
 float parentStep = 2.0 / (tileGridResolution - 1.0);
 vec2 gridPos = position.xz + 0.5;
+
+// Force full morph on edges abutting a coarser-LOD neighbour. The
+// neighbour's vertex grid spacing is 2x ours; without the force-morph
+// our edge vertices drift between the neighbour's verts at any partial
+// morphFactor and reopen the T-junction crack. Bits: 1=+Z(N), 2=+X(E),
+// 4=-Z(S), 8=-X(W). Perimeter verts hit gridPos==0 or gridPos==1 exactly
+// (PlaneGeometry-derived; see createTileGeometry).
+float effectiveMorph = morphFactor;
+const float EDGE_EPS = 1.0e-4;
+int mask = int(edgeMorphMask + 0.5);
+if (gridPos.y >= 1.0 - EDGE_EPS && (mask & 1) != 0) effectiveMorph = 1.0;
+if (gridPos.x >= 1.0 - EDGE_EPS && (mask & 2) != 0) effectiveMorph = 1.0;
+if (gridPos.y <= EDGE_EPS         && (mask & 4) != 0) effectiveMorph = 1.0;
+if (gridPos.x <= EDGE_EPS         && (mask & 8) != 0) effectiveMorph = 1.0;
+
 vec2 snapped = floor(gridPos / parentStep + 0.5) * parentStep;
 vec3 morphedPos = vec3(
-  mix(gridPos.x, snapped.x, morphFactor) - 0.5,
+  mix(gridPos.x, snapped.x, effectiveMorph) - 0.5,
   position.y,
-  mix(gridPos.y, snapped.y, morphFactor) - 0.5
+  mix(gridPos.y, snapped.y, effectiveMorph) - 0.5
 );
 
 vec4 worldPos4 = instanceMatrix * vec4(morphedPos, 1.0);
