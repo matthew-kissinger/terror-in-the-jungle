@@ -410,7 +410,7 @@ Branch state:
 
 - Branch: `exp/konveyer-webgpu-migration`
 - Scope: experimental only, no `master` merge and no production deploy.
-- Commits pushed for review:
+- Checkpoint commits pushed for review include:
   - `7ee1b59 docs(konveyer): add WebGPU parity ledger`
   - `38d6d71 feat(konveyer): add experimental WebGPU renderer boot path`
   - `72c566e feat(konveyer): add strict WebGPU TSL foundation`
@@ -418,6 +418,8 @@ Branch state:
   - `c831e6d feat(konveyer): add compute-ready carrier probes`
   - `913f602 test(konveyer): add renderer backend matrix`
   - `4d9174c refactor(konveyer): retire legacy post-processing blocker`
+- Use `git log --oneline` and the completion audit artifact for the exact
+  current branch head; avoid freezing a stale final SHA in this ledger.
 
 Default-on decision:
 
