@@ -31,8 +31,15 @@ varying float vMorphFactor;
 `;
 
 const TERRAIN_VERTEX_MAIN = /* glsl */ `
-// CDLOD morph: snap fine-grid vertices toward parent LOD grid for smooth transitions
-float parentStep = 2.0 / tileGridResolution;
+// CDLOD morph: snap fine-grid vertices toward parent LOD grid for smooth transitions.
+// parentStep is the spacing of the parent LOD vertex grid in tile-local
+// gridPos units (gridPos = position.xz + 0.5, range [0,1]). The
+// interior vertex spacing in gridPos units is 1/(N-1), and the parent
+// grid hits every other vertex, so spacing = 2/(N-1). The earlier
+// 2/tileGridResolution form drifted by (N-1)/N from the true parent
+// grid (~3% for N=33), preventing fine edge vertices from landing on
+// their coarse neighbours' actual vertex positions at full morph.
+float parentStep = 2.0 / (tileGridResolution - 1.0);
 vec2 gridPos = position.xz + 0.5;
 vec2 snapped = floor(gridPos / parentStep + 0.5) * parentStep;
 vec3 morphedPos = vec3(
