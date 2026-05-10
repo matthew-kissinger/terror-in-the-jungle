@@ -13,7 +13,10 @@ Core loop: **Play in first person AND command simultaneously.** The player holds
 
 Vietnam War is the first theater. Architecture generalizes to any war with different factions, terrain, vehicles, and doctrine.
 
-Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain materials and post-processing are ported.
+Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL is not a production
+path. KONVEYER-0 is the proposed experimental recon branch that will decide
+whether the migration should start with GPU-driven vegetation/combatants
+instead of terrain materials and post-processing.
 
 **Canonical vision sentence (copy verbatim into other docs that need to state it):**
 

@@ -9,20 +9,23 @@ ground vehicles (VEKHIKL-1/2)**. It is a one-shot decision aid for the next
 
 If this memo is older than 30 days, distrust it; the cycle landscape moves.
 
-## Where we are (post cycle-2026-05-09-cdlod-edge-morph close)
+## Where we are (after release stewardship 2026-05-10)
 
-- Master at `d71c3f4` (cycle 2.4 hot-fix merged 2026-05-10T03:54:26Z).
-- Phase 0/1/2 of the realignment campaign: **done**. ZoneManager fan-in
-  52 → 17 read / 5 concrete. WorldBuilder god-mode flags wired.
-- Phase 2.5 (`cycle-2026-05-10-stabilization-fixes`): **ready to dispatch.**
-  4 small fixes (PostCSS CVE bump, `_headers`, SEO essentials, Web Analytics
-  enable). Closes the `cloudflare-stabilization-followups` carry-over.
-- Phases 3–9: **queued, undispatched**, all internal architecture refactor:
-  combatant-renderer-split → movement/AI splits → player-controller split →
-  fixed-wing/airframe tests → telemetry/warsim/navmesh → Phase F (bitECS
-  go/no-go) → Phase 5 new-normal.
-- Active carry-overs: **12** (at the ≤12 limit). DEFEKT-3 (combat AI p99) is
-  the 7-cycle-open anchor and the campaign's load-bearing blocker.
+- Release-stewardship work through `f8c92bc` is on `master`: stabilization
+  fixes, CDLOD white-crack skirt hardening, PlayerMovement split, pool/BVH
+  memos, SVYAZ-3 radio shell first slice, M151 world-feature vehicle
+  registration, cover-query TTL cache first slice, Cloudflare/header/SEO
+  cleanup, and CI perf-advisory surfacing.
+- Phase 2.5's code-side Cloudflare/SEO work has effectively shipped.
+  `cloudflare-stabilization-followups` remains open only for the Web Analytics
+  dashboard toggle and live beacon verification.
+- VODA-1, VEKHIKL-1, and SVYAZ-3 have first slices on `master`; follow-on
+  feature work still needs human playtest and directive-specific cycles.
+- DEFEKT-3/STABILIZAT-1 remain open. Local combat120 still blocks baseline
+  refresh, and CI perf remains advisory.
+- The next owner-named architecture direction is KONVEYER: a WebGPU/TSL
+  renderer migration campaign. It is approved only as KONVEYER-0 recon until
+  the parity/spike packet proves the path.
 
 ## The mismatch the owner named
 
@@ -164,23 +167,19 @@ only hard blocker on a side-track. Then the refactor cycles resume with
 a cleaner narrative ("we shipped features and now we're cleaning up")
 instead of the current ("we're refactoring; features later").
 
-## Concrete next-cycle proposal
+## Updated next-run proposal
 
-If Option 1 is approved, the orchestrator authors these three new cycle
-briefs (in addition to the already-ready `cycle-2026-05-10-stabilization-fixes`):
+The feature-pivot first slices landed during release stewardship. The next
+long-running autonomous run should not reopen that queue blindly; it should
+prepare the KONVEYER renderer campaign as an experimental branch:
 
-1. `docs/tasks/cycle-2026-05-11-voda-1-query-api.md` — VODA-1 first slice
-2. `docs/tasks/cycle-2026-05-12-vekhikl-1-jeep-spawn-drive.md` — VEKHIKL-1
-   first slice
-3. `docs/tasks/cycle-2026-05-13-cover-query-service.md` — DEFEKT-3 first
-   surgical pass
-
-Each is a single-task or small-DAG cycle with the user-observable gap rule
-honored (closes one directive's first slice, or one carry-over).
-
-The campaign manifest (`docs/CAMPAIGN_2026-05-09.md`) gets revised to
-inject these three cycles ahead of cycle 3 (combatant-renderer-split),
-which becomes cycle 6 in the new ordering.
+1. `docs/tasks/konveyer-0-autonomous-renderer-recon.md` — 20-hour WebGPU/TSL
+   research, parity audit, one contained spike, and review packet.
+2. Follow-on DEFEKT-3 work remains important, but it should be scheduled after
+   the KONVEYER-0 packet clarifies whether cover/AI sensor compute belongs in
+   the renderer campaign or stays a CPU/worker refactor.
+3. The campaign manifest (`docs/CAMPAIGN_2026-05-09.md`) remains unchanged
+   until the owner accepts the KONVEYER-0 packet.
 
 ## What this memo does NOT change
 

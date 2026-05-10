@@ -46,6 +46,13 @@ Web Analytics still requires the Pages dashboard toggle and live beacon
 verification because Cloudflare API access returned authentication error
 10000 in this session.
 
+The next proposed autonomous branch is KONVEYER-0, documented in
+`docs/rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md` and
+`docs/tasks/konveyer-0-autonomous-renderer-recon.md`. Treat it as
+experimental WebGPU/TSL recon only: no production renderer flip, no
+`master` merge, no perf-baseline update, and no campaign-manifest rewrite
+until the review packet exists.
+
 ## What is real today
 
 - Repo builds, lints, smoke-tests, and runs the mobile UI gate. CI perf
