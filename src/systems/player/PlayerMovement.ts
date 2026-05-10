@@ -20,6 +20,10 @@ import {
   computeSmoothedSupportNormal,
 } from '../terrain/GameplaySurfaceSampling';
 import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
+import {
+  enforceWorldBoundary,
+  resolveMovementIntent,
+} from './movement/MovementKinematics';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -35,7 +39,6 @@ const _uphillDirection = new THREE.Vector3();
 const _contourA = new THREE.Vector3();
 const _contourB = new THREE.Vector3();
 
-// ── Player movement tuning ──
 const MOVEMENT_ACCELERATION = 5;
 const FRICTION_RATE = 8;
 // Player eye height. Raised from 2 → 2.2 so a typical soldier (NVA/VC/US) on
@@ -57,10 +60,7 @@ const PLAYER_STEEP_FLOW_SPEED_FACTOR = 0.82;
 const PLAYER_STEEP_FLOW_MIN_SPEED = 1.4;
 const PLAYER_STEEP_FLOW_LERP = 0.58;
 const PLAYER_TERRAIN_LIP_RISE = 0.45;
-// Maximum upward step the player's eye can take in a single fixed-step frame
-// while already grounded. Keep this high enough for noisy stamped/terrain
-// samples, but far below the multi-metre jumps produced by collision-box or
-// cliff seams.
+// Bound one-frame grounded rises from collision boxes, cliff seams, or stamped lips.
 const PLAYER_MAX_GROUND_RISE_PER_STEP = 0.75;
 
 export interface PlayerMovementDebugSnapshot {
@@ -100,36 +100,18 @@ export class PlayerMovement {
   private readonly sampledSupportNormal = new THREE.Vector3(0, 1, 0);
   private lastGroundWalkable = true;
   private lastDebugSnapshot: PlayerMovementDebugSnapshot | null = null;
-  /**
-   * Agent-driven movement intent in camera-relative coordinates (forward, strafe).
-   * When active, overrides keyboard/touch input in the movement loop. See
-   * `AgentController` in `src/systems/agent/`.
-   */
   private agentMovementIntent: { forward: number; strafe: number } | null = null;
-  /**
-   * Agent-driven movement intent in world X/Z. This is for route/path drivers
-   * that must move independently from camera aim.
-   */
   private agentWorldMovementIntent: { x: number; z: number } | null = null;
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
   }
 
-  /**
-   * Set the camera-relative movement intent driven by an external agent.
-   * `null` to clear and hand control back to keyboard/touch input.
-   */
   setAgentMovementIntent(intent: { forward: number; strafe: number } | null): void {
     this.agentMovementIntent = intent;
     this.agentWorldMovementIntent = null;
   }
 
-  /**
-   * Set a world-space movement intent driven by an external agent.
-   * `null` clears world-space intent and hands control back to the normal
-   * camera-relative agent, touch, or keyboard path.
-   */
   setAgentWorldMovementIntent(intent: { x: number; z: number } | null): void {
     this.agentWorldMovementIntent = intent;
     this.agentMovementIntent = null;
@@ -195,71 +177,23 @@ export class PlayerMovement {
       baseSpeed *= CROUCH_SPEED_MULTIPLIER;
     }
 
-    let requestedSpeed = 0;
-    let requestedMoveX = 0;
-    let requestedMoveZ = 0;
-
-    // Calculate movement direction.
-    // Priority: world-space agent intent > camera-relative agent intent >
-    // touch joystick > keyboard.
-    const agentWorldIntent = this.agentWorldMovementIntent;
-    let hasWorldMovementIntent = false;
-    if (agentWorldIntent && Math.hypot(agentWorldIntent.x, agentWorldIntent.z) > 0.01) {
-      const worldLen = Math.hypot(agentWorldIntent.x, agentWorldIntent.z);
-      requestedMoveX = agentWorldIntent.x / worldLen;
-      requestedMoveZ = agentWorldIntent.z / worldLen;
-      requestedSpeed = baseSpeed;
-      hasWorldMovementIntent = true;
-    }
-
-    const agentIntent = this.agentMovementIntent;
-    if (!hasWorldMovementIntent && agentIntent && (Math.abs(agentIntent.forward) > 0.01 || Math.abs(agentIntent.strafe) > 0.01)) {
-      // Agent intent is in camera-relative axes already: forward along camera,
-      // strafe along camera right. Match the touch-joystick convention where
-      // -z is forward, +x is strafe right.
-      moveVector.x = agentIntent.strafe;
-      moveVector.z = -agentIntent.forward;
-    } else if (!hasWorldMovementIntent) {
-      const touchMove = input.getTouchMovementVector();
-      if (Math.abs(touchMove.x) > 0.1 || Math.abs(touchMove.z) > 0.1) {
-        // Use touch joystick values directly
-        moveVector.x = touchMove.x;
-        moveVector.z = touchMove.z;
-      } else {
-        // Keyboard input
-        if (input.isKeyPressed('keyw')) {
-          moveVector.z -= 1;
-        }
-        if (input.isKeyPressed('keys')) {
-          moveVector.z += 1;
-        }
-        if (input.isKeyPressed('keya')) {
-          moveVector.x -= 1;
-        }
-        if (input.isKeyPressed('keyd')) {
-          moveVector.x += 1;
-        }
-      }
-    }
-
-    if (!hasWorldMovementIntent && moveVector.length() > 0) {
-      moveVector.normalize();
-
-      const cameraDirection = _cameraDirection;
-      camera.getWorldDirection(cameraDirection);
-      cameraDirection.y = 0;
-      cameraDirection.normalize();
-
-      const cameraRight = _cameraRight;
-      cameraRight.crossVectors(cameraDirection, _upVector);
-
-      const worldMoveVector = _worldMoveVector.set(0, 0, 0);
-      worldMoveVector.addScaledVector(cameraDirection, -moveVector.z);
-      worldMoveVector.addScaledVector(cameraRight, moveVector.x);
-      requestedMoveX = worldMoveVector.x;
-      requestedMoveZ = worldMoveVector.z;
-      requestedSpeed = baseSpeed;
-    }
+    const {
+      requestedSpeed,
+      requestedMoveX,
+      requestedMoveZ,
+      hasWorldMovementIntent,
+    } = resolveMovementIntent({
+      input,
+      camera,
+      baseSpeed,
+      agentMovementIntent: this.agentMovementIntent,
+      agentWorldMovementIntent: this.agentWorldMovementIntent,
+      moveVector,
+      cameraDirection: _cameraDirection,
+      cameraRight: _cameraRight,
+      worldMoveVector: _worldMoveVector,
+      upVector: _upVector,
+    });
 
     _previousTerrainNormal.copy(this.supportNormal);
     const normal = this.sampleSupportNormal(
@@ -294,18 +228,15 @@ export class PlayerMovement {
       }
       worldMoveVector.normalize();
 
-      // Apply movement with acceleration (only horizontal components)
       const acceleration = baseSpeed * MOVEMENT_ACCELERATION;
       const targetVelocity = worldMoveVector.multiplyScalar(baseSpeed);
       const horizontalVelocity = _horizontalVelocity.set(this.playerState.velocity.x, 0, this.playerState.velocity.z);
 
       horizontalVelocity.lerp(targetVelocity, Math.min(deltaTime * acceleration, 1));
 
-      // Update only horizontal components, preserve Y velocity for jumping/gravity
       this.playerState.velocity.x = horizontalVelocity.x;
       this.playerState.velocity.z = horizontalVelocity.z;
     } else {
-      // Apply friction when not moving (only horizontal components)
       const frictionFactor = Math.max(0, 1 - deltaTime * FRICTION_RATE);
       this.playerState.velocity.x *= frictionFactor;
       this.playerState.velocity.z *= frictionFactor;
@@ -319,20 +250,15 @@ export class PlayerMovement {
       sliding = true;
     }
 
-    // WorldBuilder no-clip (dev-only, gated by Vite DCE in retail). Skips
-    // gravity, terrain ground-snap, sandbag/terrain blocking, and world
-    // boundary so the player can free-fly through geometry. Movement still
-    // uses the camera-relative input vector applied above.
+    // Dev-only noClip skips gravity, ground-snap, blocking, and world boundary.
     const noClipActive = import.meta.env.DEV && isWorldBuilderFlagActive('noClip');
 
-    // Apply gravity
     if (!noClipActive) {
       this.playerState.velocity.y += this.playerState.gravity * deltaTime;
     } else {
       this.playerState.velocity.y = 0;
     }
 
-    // Update position
     const movement = _cameraRight.copy(this.playerState.velocity).multiplyScalar(deltaTime);
     const newPosition = _cameraDirection.copy(this.playerState.position).add(movement);
     let blockReason = 'none';
@@ -343,26 +269,19 @@ export class PlayerMovement {
     let obstacleStepRise: number | null = null;
     let targetSlopeValue: number | null = null;
 
-    // Check sandbag collision before applying movement (skipped in noClip).
     if (!noClipActive && this.sandbagSystem && this.sandbagSystem.checkCollision(newPosition, PLAYER_COLLISION_RADIUS)) {
-      // Try to slide along the obstacle
       const slideX = _worldMoveVector.copy(this.playerState.position);
       slideX.x = newPosition.x;
       const slideZ = _horizontalVelocity.copy(this.playerState.position);
       slideZ.z = newPosition.z;
 
-      // Try moving only in X direction
       if (!this.sandbagSystem.checkCollision(slideX, PLAYER_COLLISION_RADIUS)) {
         newPosition.z = this.playerState.position.z;
         this.playerState.velocity.z = 0;
-      }
-      // Try moving only in Z direction
-      else if (!this.sandbagSystem.checkCollision(slideZ, PLAYER_COLLISION_RADIUS)) {
+      } else if (!this.sandbagSystem.checkCollision(slideZ, PLAYER_COLLISION_RADIUS)) {
         newPosition.x = this.playerState.position.x;
         this.playerState.velocity.x = 0;
-      }
-      // Can't move at all - stop completely
-      else {
+      } else {
         newPosition.x = this.playerState.position.x;
         newPosition.z = this.playerState.position.z;
         this.playerState.velocity.x = 0;
@@ -371,10 +290,8 @@ export class PlayerMovement {
       }
     }
 
-    // Check ground collision using TerrainSystem if available, otherwise use flat baseline
-    // getEffectiveHeightAt includes collision objects (helipad, helicopter, etc.)
     const eyeHeight = this.playerState.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
-    let groundHeight = eyeHeight; // flat world fallback
+    let groundHeight = eyeHeight;
     let currentGroundHeight = this.playerState.position.y;
     if (this.terrainSystem) {
       const currentEffectiveHeight = Number(this.terrainSystem.getEffectiveHeightAt(
@@ -391,9 +308,6 @@ export class PlayerMovement {
       }
     }
 
-    // Terrain should bias movement flow, not become an authority wall. Steep
-    // faces redirect motion along the contour; only raised collision surfaces
-    // retain hard step-up blocking.
     let blockedByTerrain = false;
     if (!noClipActive && this.playerState.isGrounded && this.terrainSystem) {
       currentTerrainHeight = Number(this.terrainSystem.getHeightAt(
@@ -467,7 +381,6 @@ export class PlayerMovement {
       groundHeight = currentGroundHeight;
     }
 
-    // Allow standing on top of sandbags
     if (this.sandbagSystem) {
       const sandbagTop = this.sandbagSystem.getStandingHeight(newPosition.x, newPosition.z);
       if (sandbagTop !== null) {
@@ -478,25 +391,12 @@ export class PlayerMovement {
       }
     }
 
-    // Check for landing and play landing sound. In noClip the player floats
-    // free and is never grounded; skip the ground-snap branch entirely.
     const impactVelocityY = this.playerState.velocity.y;
     if (noClipActive) {
       this.playerState.isGrounded = false;
     } else if (newPosition.y <= groundHeight) {
-      // Player is on or below ground.
-      // Upward-rise clamp (walking only): when the player is already
-      // grounded AND moved horizontally this frame, the resolved ground
-      // height cannot jump up by more than PLAYER_MAX_GROUND_RISE_PER_STEP.
-      // That rise is bigger than any legitimate per-step terrain grade at
-      // walking speed, so a larger resolved rise means the clamp just
-      // walked into an overhanging collision box, cliff seam, or stamped
-      // structure lip. The horizontal step is rejected above before this
-      // clamp runs so the camera cannot be left inside the terrain surface.
-      //
-      // The clamp is scoped to `walking` so first-frame spawn corrections,
-      // respawn, and vertical landings (wasGrounded=false) still snap the
-      // player to the correct ground height.
+      // Scope the rise cap to walking so spawn, respawn, and vertical landing
+      // snaps still resolve to the authoritative ground height.
       if (walking) {
         const maxGroundY = this.playerState.position.y + PLAYER_MAX_GROUND_RISE_PER_STEP;
         newPosition.y = Math.min(groundHeight, maxGroundY);
@@ -504,7 +404,6 @@ export class PlayerMovement {
         newPosition.y = groundHeight;
       }
 
-      // Play landing sound if we just landed
       if (!wasGrounded && impactVelocityY < LANDING_SOUND_THRESHOLD && this.footstepAudioSystem) {
         this.footstepAudioSystem.playLandingSound(newPosition, Math.abs(impactVelocityY));
       }
@@ -513,7 +412,6 @@ export class PlayerMovement {
       this.playerState.isGrounded = true;
       this.playerState.isJumping = false;
     } else {
-      // Player is in the air
       this.playerState.isGrounded = false;
     }
 
@@ -524,7 +422,12 @@ export class PlayerMovement {
       if (ws > 0) this.worldHalfExtent = ws * 0.5;
     }
     if (!noClipActive && this.worldHalfExtent > 0) {
-      this.enforceWorldBoundary(newPosition, this.worldHalfExtent);
+      enforceWorldBoundary(
+        newPosition,
+        this.playerState.velocity,
+        this.worldHalfExtent,
+        BOUNDARY_BOUNCE_FACTOR,
+      );
     }
 
     this.playerState.position.copy(newPosition);
@@ -581,7 +484,6 @@ export class PlayerMovement {
       this.lastGroundWalkable = walkableSupport;
     }
 
-    // Play footstep sounds when moving on ground
     if (this.footstepAudioSystem && !this.playerState.isInHelicopter && !this.playerState.isInFixedWing) {
       const isMoving = moveVector.length() > 0;
       this.footstepAudioSystem.playPlayerFootstep(
@@ -590,24 +492,6 @@ export class PlayerMovement {
         deltaTime,
         isMoving && this.playerState.isGrounded
       );
-    }
-  }
-
-  /** Clamp position to world boundary and bounce velocity inward. */
-  private enforceWorldBoundary(position: THREE.Vector3, halfExtent: number): void {
-    if (position.x > halfExtent) {
-      position.x = halfExtent;
-      this.playerState.velocity.x = -Math.abs(this.playerState.velocity.x) * BOUNDARY_BOUNCE_FACTOR;
-    } else if (position.x < -halfExtent) {
-      position.x = -halfExtent;
-      this.playerState.velocity.x = Math.abs(this.playerState.velocity.x) * BOUNDARY_BOUNCE_FACTOR;
-    }
-    if (position.z > halfExtent) {
-      position.z = halfExtent;
-      this.playerState.velocity.z = -Math.abs(this.playerState.velocity.z) * BOUNDARY_BOUNCE_FACTOR;
-    } else if (position.z < -halfExtent) {
-      position.z = -halfExtent;
-      this.playerState.velocity.z = Math.abs(this.playerState.velocity.z) * BOUNDARY_BOUNCE_FACTOR;
     }
   }
 
