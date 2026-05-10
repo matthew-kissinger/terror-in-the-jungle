@@ -77,10 +77,10 @@ or target-distribution markers grow late; `[AI spike]` console line.
 Investigation: look at `combatBreakdown.aiMethodMs` aggregate leaders
 (`state.engaging`, `state.patrolling`, `patrol.canSeeTarget`,
 `patrol.findNearestEnemy`) and the slowest sampled update.
-`scripts/projekt-143-los-callsite-cadence.ts` produces a per-callsite cadence
-sidecar; `scripts/projekt-143-engage-suppression-cadence-bound.ts` and the
-related `*-cadence-bound.ts` packets prove before/after for state-handler
-LOS reuse changes.
+`scripts/audit-archive/los-callsite-cadence.ts` produces a per-callsite
+cadence sidecar; `scripts/audit-archive/engage-suppression-cadence-bound.ts`
+and the related `*-cadence-bound.ts` packets prove before/after for
+state-handler LOS reuse changes.
 
 Production remediation: 250 ms positive-visibility reuse in
 `AIStateEngage` / `AIStatePatrol` / `AIStateMovement`; 500 ms stable-target
@@ -92,9 +92,9 @@ without regressing the others.
 Symptoms: aggregate `cover.findNearestCover.terrainScan.coverTest.raycastTerrain`
 high in `combatBreakdown.aiMethodMs`; raycasts-per-uncached-search above 2.
 
-Investigation: `scripts/projekt-143-cover-search-attribution.ts`,
-`scripts/projekt-143-suppression-cover-cache-review.ts`,
-`scripts/projekt-143-suppression-raycast-cost-review.ts`. Look for
+Investigation: `scripts/audit-archive/cover-search-attribution.ts`,
+`scripts/audit-archive/suppression-cover-cache-review.ts`,
+`scripts/audit-archive/suppression-raycast-cost-review.ts`. Look for
 score-gate skips and cache hits.
 
 Production remediation: sorted score-gate raycast reduction in
@@ -106,11 +106,11 @@ Production remediation: sorted score-gate raycast reduction in
 Symptoms: heap end-growth above `10 MB`, heap peak-growth above `40 MB`,
 heap recovery below `60 %`. Frame numbers may pass.
 
-Investigation: `scripts/projekt-143-perf-heap-diagnostic.ts` classifies the
+Investigation: `scripts/audit-archive/perf-heap-diagnostic.ts` classifies the
 shape — `transient_gc_wave`, `retained_or_unrecovered_peak`, etc. Pair with
 deep-CDP heap sampling
 (`PERF_DEEP_CDP=1` or `--cdp-heap-sampling true`) and run
-`scripts/projekt-143-heap-sampling-attribution.ts`. Top owners over the long
+`scripts/audit-archive/heap-sampling-attribution.ts`. Top owners over the long
 term: `three.module` (math/skinning), `CombatantRenderer.ts`,
 `GameplaySurfaceSampling.ts`, `CombatantMovement.ts`, `HeightQueryCache.ts`,
 `InfluenceMapComputations.ts`.
@@ -125,15 +125,15 @@ gate. `runtime-samples.json` shows long task `~150 ms`, LoAF
 `~150 ms`, blocking `~100 ms`, WebGL upload `<1 ms`, top user timing
 `SystemUpdater.Combat` only `~7 ms`.
 
-Investigation: `scripts/projekt-143-max-frame-attribution.ts` then
-`scripts/projekt-143-render-boundary-timing.ts`,
-`scripts/projekt-143-render-present-subdivision.ts`, and
-`scripts/projekt-143-raf-callback-source-resolution.ts`. Focused trace
+Investigation: `scripts/audit-archive/max-frame-attribution.ts` then
+`scripts/audit-archive/render-boundary-timing.ts`,
+`scripts/audit-archive/render-present-subdivision.ts`, and
+`scripts/audit-archive/raf-callback-source-resolution.ts`. Focused trace
 windows are available via `perf-capture.ts --trace-window-start-ms <ms>
 --trace-window-duration-ms <ms>` with CPU profiler and heap sampling
 suppressed (`--cdp-profiler false --cdp-heap-sampling false`) so trace
 overhead is not the owner. Verify with
-`scripts/projekt-143-trace-overhead-isolation.ts` against a non-trace
+`scripts/audit-archive/trace-overhead-isolation.ts` against a non-trace
 control.
 
 The bundle callsite usually resolves to
@@ -171,11 +171,11 @@ independent of backtrack-anchor flips.
 
 ## Diagnostic packets and decision packets
 
-The `scripts/projekt-143-*.ts` family produces narrow packets that consume an
-existing capture and write a sidecar JSON inside the same artifact directory.
-Run them with `-- --artifact <artifact dir>`. They never modify the source
-capture; they classify it. The full list lives in `package.json` under
-`scripts.check:projekt-143-*` and is enumerated in
+The archived diagnostic scripts under `scripts/audit-archive/*.ts` produce
+narrow packets that consume an existing capture and write a sidecar JSON inside
+the same artifact directory. Run them with `-- --artifact <artifact dir>`.
+They never modify the source capture; they classify it. Retained package
+commands now use plain `check:*` names; see `package.json` and
 [README.md](README.md) "Capture commands".
 
 A diagnostic packet's `status: pass` does not authorize a baseline refresh.

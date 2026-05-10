@@ -26,6 +26,7 @@ import {
   copyNpcMuzzlePosition,
   copyPlayerCenterMassPosition,
 } from './CombatantBodyMetrics';
+import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -352,7 +353,10 @@ export class CombatantCombat {
     }
 
     if (hit) {
-      const damage = damageCalculator(hit.distance, hit.headshot);
+      const baseDamage = damageCalculator(hit.distance, hit.headshot);
+      const damage = import.meta.env.DEV && isWorldBuilderFlagActive('oneShotKills')
+        ? Math.max(baseDamage, hit.combatant.health)
+        : baseDamage;
       const targetHealth = hit.combatant.health;
       // Keep proxy position current so deathDirection / AI threat bearing are
       // oriented from where the player actually stood when the shot resolved.

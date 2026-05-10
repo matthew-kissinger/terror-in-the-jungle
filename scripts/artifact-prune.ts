@@ -73,10 +73,20 @@ function baselinePinnedDirs(): Set<string> {
   try {
     const raw = readFileSync(BASELINES_FILE, 'utf8');
     const json = JSON.parse(raw) as Record<string, unknown>;
+    const addPinnedDir = (value: string): void => {
+      const normalized = value.replace(/\\/g, '/');
+      const prefixed = /artifacts\/perf\/([\w\-:.]+)/.exec(normalized);
+      if (prefixed) {
+        pinned.add(prefixed[1]);
+        return;
+      }
+      if (/^\d{4}-\d{2}-\d{2}T[\w\-:.]+Z$/.test(normalized)) {
+        pinned.add(normalized);
+      }
+    };
     const flatten = (obj: unknown): void => {
       if (typeof obj === 'string') {
-        const m = /artifacts\/perf\/([\w\-:.]+)/.exec(obj.replace(/\\/g, '/'));
-        if (m) pinned.add(m[1]);
+        addPinnedDir(obj);
       } else if (Array.isArray(obj)) {
         for (const v of obj) flatten(v);
       } else if (obj && typeof obj === 'object') {

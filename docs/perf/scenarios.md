@@ -90,8 +90,9 @@ Most steady-state scenarios run with the `PerfActivePlayerBot` enabled
   diagnostics can separate objective routing from perception range from
   nav/path failure.
 
-`npm run check:projekt-143-active-driver-diagnostic` reads those samples and
-prefers the newest telemetry-bearing capture when no artifact path is passed.
+`npx tsx scripts/audit-archive/active-driver-diagnostic.ts` reads those
+samples and prefers the newest telemetry-bearing capture when no artifact path
+is passed.
 
 ## Pre-baked seed registry
 

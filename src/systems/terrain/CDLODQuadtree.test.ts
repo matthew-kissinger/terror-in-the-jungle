@@ -213,11 +213,8 @@ describe('CDLODQuadtree', () => {
     });
 
     // A Shau worldSize is 21000m (non-power-of-2). The base tile size
-    // worldSize / 2^maxLOD = 21000 / 256 ≈ 82.03m is non-dyadic, so
-    // string-templated Map keys built from raw float centres can drop
-    // hits if the recursion path and the probe path produce centres
-    // that print differently. Integer-cell tileKey() is the fix; this
-    // test is the regression guard.
+    // worldSize / 2^maxLOD = 21000 / 256 is non-dyadic, so this keeps
+    // the edge-mask path covered at A Shau scale.
     it('emits edge-morph masks correctly at A Shau worldSize (non-dyadic baseTileSize)', () => {
       const ashauWorld = 21000;
       const ashauLOD = 8;
@@ -228,11 +225,8 @@ describe('CDLODQuadtree', () => {
       const tiles = qt.selectTiles(0, 50, 0, null);
       expect(new Set(tiles.map(t => t.lodLevel)).size).toBeGreaterThan(1);
       const flagged = tiles.filter(t => t.edgeMorphMask !== 0);
-      // Stronger than > 0: the helicopter-altitude seam case requires
-      // the integer-cell tileKey to drop zero hits at A Shau scale, so
-      // we expect a non-trivial population of flagged edges. Loosen
-      // this floor only if the LOD layout for this camera placement
-      // changes deliberately.
+      // This is a broad regression guard for A Shau-scale edge masks, not
+      // proof of a specific keying implementation.
       expect(flagged.length).toBeGreaterThan(4);
     });
   });

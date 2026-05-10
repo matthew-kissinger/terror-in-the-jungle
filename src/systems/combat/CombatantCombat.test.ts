@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { CombatantCombat } from './CombatantCombat';
 import { Combatant, CombatantState, Faction } from './types';
@@ -36,6 +36,31 @@ const mockTerrainSystem: TerrainSystem = {
 } as any;
 
 const mockScene = new THREE.Scene();
+
+type WorldBuilderTestWindow = { __worldBuilder?: unknown };
+type WorldBuilderTestGlobal = typeof globalThis & { window?: WorldBuilderTestWindow };
+
+function clearWorldBuilderState(): void {
+  delete (globalThis as WorldBuilderTestGlobal).window?.__worldBuilder;
+}
+
+function publishWorldBuilderState(oneShotKills: boolean): void {
+  const global = globalThis as WorldBuilderTestGlobal;
+  global.window = global.window ?? {};
+  global.window.__worldBuilder = {
+    invulnerable: false,
+    infiniteAmmo: false,
+    noClip: false,
+    oneShotKills,
+    shadowsEnabled: true,
+    postProcessEnabled: true,
+    hudVisible: true,
+    ambientAudioEnabled: true,
+    npcTickPaused: false,
+    forceTimeOfDay: -1,
+    active: true,
+  };
+}
 
 function createMockCombatant(
   id: string,
@@ -101,6 +126,8 @@ describe('CombatantCombat', () => {
   let combatantCombat: CombatantCombat;
 
   beforeEach(() => {
+    clearWorldBuilderState();
+
     combatantCombat = new CombatantCombat(
       mockScene,
       mockTracerPool,
@@ -267,6 +294,10 @@ describe('CombatantCombat', () => {
   //    signal (hit flag + attacker bearing) so AI can react, and the kill feed
   //    path must not double-count player kills.
   describe('handlePlayerShot - NPC response contract (B1)', () => {
+    afterEach(() => {
+      clearWorldBuilderState();
+    });
+
     it('flags lastHitTime and raises suppressionLevel on the shot target', () => {
       const target = createMockCombatant('target-1', Faction.NVA, 100, CombatantState.PATROLLING);
       const allCombatants = new Map<string, Combatant>([['target-1', target]]);
@@ -334,6 +365,27 @@ describe('CombatantCombat', () => {
       const calls = (mockHUDSystem.addKillToFeed as any).mock.calls;
       expect(calls.length).toBe(1);
       expect(calls[0][0]).toBe('PLAYER');
+    });
+
+    it('lets the WorldBuilder one-shot flag make player hits lethal', () => {
+      publishWorldBuilderState(true);
+
+      const target = createMockCombatant('target-1', Faction.NVA, 100);
+      const allCombatants = new Map<string, Combatant>([['target-1', target]]);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(10, 0, 0),
+        distance: 10,
+        headshot: false,
+      });
+
+      const result = combatantCombat.handlePlayerShot(ray, () => 1, allCombatants, 'rifle');
+
+      expect(result.killed).toBe(true);
+      expect(target.state).toBe(CombatantState.DEAD);
+      expect(result.damage).toBe(100);
     });
   });
 

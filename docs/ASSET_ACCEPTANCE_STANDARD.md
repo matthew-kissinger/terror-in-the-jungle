@@ -73,15 +73,15 @@ Mechanical supporting gates:
 
 ```bash
 npm run check:pixel-forge-optics
-npm run check:projekt-143-optics-scale-proof
+npx tsx scripts/audit-archive/optics-scale-proof.ts
 npm run check:vegetation-horizon
 ```
 
 `check:pixel-forge-optics` and `check:vegetation-horizon` are static audits.
-`check:projekt-143-optics-scale-proof` is the matched close-GLB/imposter crop
-and same-scale aircraft reference proof. Passing the proof only means the
-evidence is trusted enough for review; visual-scale, luma, shader, atlas, or
-aircraft-size changes still need before/after proof.
+`scripts/audit-archive/optics-scale-proof.ts` is the matched
+close-GLB/imposter crop and same-scale aircraft reference proof. Passing the
+proof only means the evidence is trusted enough for review; visual-scale, luma,
+shader, atlas, or aircraft-size changes still need before/after proof.
 
 ## Normal Maps
 
@@ -186,7 +186,7 @@ draw-call and renderer telemetry.
 Cycle 1 benchmark bundles are certified with:
 
 ```bash
-npm run check:projekt-143-cycle1-bundle -- \
+npx tsx scripts/audit-archive/cycle1-benchmark-bundle.ts -- \
   --startup-open <startup-ui-open-frontier-dir> \
   --startup-zone <startup-ui-zone-control-dir> \
   --combat120 <combat120-artifact-dir> \

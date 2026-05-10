@@ -113,8 +113,8 @@ npm run perf:update-baseline            # Refresh baselines from latest capture 
 list.
 
 Static-evidence audits (KB-* commands like `check:pixel-forge-optics`,
-`check:vegetation-horizon`, `check:webgpu-strategy`,
-`check:projekt-143-*`) live alongside the perf harness but write to
+`check:vegetation-horizon`, `check:webgpu-strategy`, and the retained
+plain-named `check:*` audits) live alongside the perf harness but write to
 `artifacts/perf/<timestamp>/<audit-name>/`. They are inventory and decision
 input, not steady-state frame evidence. The full list is enumerated under
 `package.json` `scripts.check:*`.

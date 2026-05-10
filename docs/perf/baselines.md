@@ -14,7 +14,7 @@ gate `perf:compare`.
 
 The current tracked baselines were refreshed on **2026-04-20** after the
 atmosphere/airfield/harness cycle. The DEFEKT-1 audit at
-`scripts/projekt-143-stale-baseline-audit.ts` classifies all four scenarios as
+`scripts/audit-archive/stale-baseline-audit.ts` classifies all four scenarios as
 stale-by-age but currently `0/4` as refresh-eligible because every recent
 capture either fails validation or fails measurement trust.
 
@@ -65,7 +65,7 @@ pre-split full diagnostic chain is preserved in
    diagnostic only — do not promote.
 5. Run `npm run perf:compare -- --scenario <scenario>`. All gates must be
    `pass` (or `warn` if you intend to widen the baseline window).
-6. Run `npm run check:projekt-143-stale-baseline-audit -- --as-of <today>`.
+6. Run `npx tsx scripts/audit-archive/stale-baseline-audit.ts --as-of <today>`.
    The scenario must classify as `eligible`, not `stale_by_age` or
    `blocked_by_validation`.
 7. Capture twice more for repeatability. All three captures must pass the

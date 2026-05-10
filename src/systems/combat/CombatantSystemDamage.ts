@@ -6,6 +6,7 @@ import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
 import { IHUDSystem } from '../../types/SystemInterfaces';
+import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
@@ -43,6 +44,9 @@ export class CombatantSystemDamage {
   applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number, attackerId?: string, weaponType = 'grenade'): void {
     let hitCount = 0;
     const killedCombatants: Combatant[] = [];
+    const playerOneShotActive = attackerId === 'PLAYER'
+      && import.meta.env.DEV
+      && isWorldBuilderFlagActive('oneShotKills');
 
     this.combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD) return;
@@ -51,7 +55,10 @@ export class CombatantSystemDamage {
 
       if (distance <= radius) {
         const damagePercent = 1.0 - (distance / radius);
-        const damage = maxDamage * damagePercent;
+        const baseDamage = maxDamage * damagePercent;
+        const damage = playerOneShotActive && baseDamage > 0
+          ? Math.max(baseDamage, combatant.health)
+          : baseDamage;
         const wasAlive = combatant.health > 0;
 
         // Track damage for assist system

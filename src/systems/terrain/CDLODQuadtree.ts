@@ -152,6 +152,7 @@ export class CDLODQuadtree {
     }
   }
 
+  // Callers must skip world-edge probes before building neighbor keys.
   // Integer-cell keys are ulp-stable across the recursion path (binary
   // subdivision: tile centres land exactly on `(integer + 0.5) * size`)
   // and the probe path (`Math.floor((p + halfWorld) / s) * s + s/2 - halfWorld`),
