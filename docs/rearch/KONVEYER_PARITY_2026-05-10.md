@@ -417,6 +417,7 @@ Branch state:
   - `67879b1 feat(konveyer): add measured TSL impostor slices`
   - `c831e6d feat(konveyer): add compute-ready carrier probes`
   - `913f602 test(konveyer): add renderer backend matrix`
+  - `4d9174c refactor(konveyer): retire legacy post-processing blocker`
 
 Default-on decision:
 
@@ -454,3 +455,11 @@ Final validation rollup on 2026-05-10:
 - `npm run check:konveyer-renderer-matrix`: PASS
 - `npm run validate:fast`: PASS, 28 pre-existing source-budget warnings and
   12 pre-existing docs warnings
+
+Completion audit:
+
+- `npm run audit:konveyer-completion` writes a prompt-to-artifact checklist
+  under `artifacts/perf/**/konveyer-completion-audit/completion-audit.json`.
+- This audit is intentionally allowed to report `completionStatus=blocked`
+  without failing the command, because its job is to prevent a false
+  default-on claim while the branch is still reducing tail blockers.
