@@ -23,8 +23,9 @@ landed across `cycle-2026-04-20-atmosphere-foundation` and
 - Hemisphere, directional, water, terrain, and vegetation lighting now read from
   the same atmosphere snapshot.
 - `HosekWilkieSkyBackend` owns the visible sky-dome cloud pass. It receives
-  weather/scenario coverage from `AtmosphereSystem` and avoids the old finite
-  cloud-plane horizon divider.
+  weather/scenario coverage from `AtmosphereSystem`, paints a generated sky
+  texture on a standard Three material, and avoids the old finite cloud-plane
+  horizon divider.
 - The old planar `CloudLayer` prototype has been removed from the active source
   tree. Do not reintroduce a finite cloud plane as WebGPU evidence; future
   cloud work should extend the sky-dome or an explicitly reviewed volume path.
@@ -74,9 +75,9 @@ hardcoded sky/fog/light colors for local fixes.
   nav connectivity as passing, but route/NPC movement quality and airfield use
   still need play-path validation. The run also proves the A Shau work did not
   prevent Open Frontier, TDM, Zone Control, or combat120 from entering live mode.
-- The current backend uses a CPU LUT and simplified Hosek-Wilkie/Preetham-style
-  math. It is designed for stable low cost, not physically exhaustive sky
-  rendering.
+- The current backend uses a CPU LUT plus a generated sky texture from
+  simplified Hosek-Wilkie/Preetham-style math. It is designed for stable low
+  cost and WebGPU compatibility, not physically exhaustive sky rendering.
 - Time-of-day is scenario-driven, not a gameplay system with mission scheduling,
   darkness adaptation, or AI visibility effects.
 - Human screenshot/playtest review is still required for visible atmosphere

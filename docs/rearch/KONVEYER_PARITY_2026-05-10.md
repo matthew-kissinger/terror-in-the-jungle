@@ -115,7 +115,7 @@ Current Three.js guidance relevant to this repo:
 | Combatant impostors | needs-port | `src/systems/combat/CombatantShaders.ts`, `src/systems/combat/CombatantMeshFactory.ts` | `ShaderMaterial` instanced sprite/impostor path. Do isolated bucket after vegetation fixture. |
 | Combatant close GLBs | ready | `src/systems/combat/CombatantRenderer.ts` | Mostly standard/skinned GLB materials. Must prove skinning, shadows, and perf under WebGPU separately. |
 | Muzzle flashes | ported | `src/systems/effects/MuzzleFlashSystem.ts` | K5 follow-up replaced the custom points material with standard `PointsMaterial`, generated radial texture, and vertex colors. |
-| Sky dome | needs-port | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | `ShaderMaterial` dome. TSL port is feasible but visual parity-sensitive. |
+| Sky dome | ported | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | Uses a generated sky/cloud texture on standard `MeshBasicMaterial`; CPU LUT remains the fog/lighting authority. |
 | Cloud layer | retired | `src/systems/environment/AtmosphereSystem.ts`, `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | The old finite plane prototype was removed from production source; sky-dome clouds remain the only active cloud authority. |
 | Global water | blocked | `src/systems/environment/WaterSystem.ts` | Three examples `Water` object owns a shader material and render targets internally; keep WebGL fallback until replaced or disabled per scenario. |
 | Hydrology river water | ready | `src/systems/environment/WaterSystem.ts` | Uses `MeshStandardMaterial` vertex colors and CPU query segments. WebGPU-compatible candidate once renderer boots. |
@@ -396,6 +396,14 @@ K7 post-processing tail reduction:
   instead of porting an unused fallback-looking path.
 - `npm run audit:konveyer-completion` after this retirement recorded
   `productionBlockers=34` while the tree was dirty; the branch still needs a
+  clean completion audit after commit/push.
+- The active sky dome was then moved off its custom material path by generating
+  the analytic sky/cloud texture on CPU and rendering it with standard
+  `MeshBasicMaterial`. This preserves the existing CPU atmosphere LUT for fog
+  and lighting while removing the visible sky dome from the custom shader
+  inventory.
+- `npm run audit:konveyer-completion` after the sky-dome material port recorded
+  `productionBlockers=31` while the tree was dirty; the branch still needs a
   clean completion audit after commit/push.
 
 ## KONVEYER-8 Validation Matrix

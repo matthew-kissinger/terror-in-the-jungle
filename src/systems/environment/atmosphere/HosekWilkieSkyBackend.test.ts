@@ -21,6 +21,7 @@ describe('HosekWilkieSkyBackend (via AtmosphereSystem)', () => {
     system.attachScene(scene);
     const skyMesh = scene.children.find((c) => c.name === 'HosekWilkieSkyDome');
     expect(skyMesh).toBeDefined();
+    expect((skyMesh as THREE.Mesh).material).toBeInstanceOf(THREE.MeshBasicMaterial);
   });
 
   it('reapplies the same preset cleanly without duplicating the dome', () => {
