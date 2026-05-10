@@ -47,7 +47,7 @@ export class CDLODQuadtree {
   private tileCount = 0;
 
   // Reused index map for the neighbor-resolution pass. Cleared and refilled
-  // each frame; key = `${cx}|${cz}|${size}` -> tile index in tileBuffer.
+  // each frame; integer-cell key (see tileKey()) -> tile index in tileBuffer.
   private readonly tileIndex: Map<string, number> = new Map();
 
   constructor(worldSize: number, maxLOD: number, lodRanges: readonly number[], morphStart = 0.8) {
@@ -152,8 +152,17 @@ export class CDLODQuadtree {
     }
   }
 
+  // Integer-cell keys are ulp-stable across the recursion path (binary
+  // subdivision: tile centres land exactly on `(integer + 0.5) * size`)
+  // and the probe path (`Math.floor((p + halfWorld) / s) * s + s/2 - halfWorld`),
+  // so non-dyadic worldSize (e.g. A Shau 21000m, baseTileSize ≈ 82.03m)
+  // can't drop Map hits via float-formatting drift in template literals.
   private tileKey(cx: number, cz: number, size: number): string {
-    return `${cx}|${cz}|${size}`;
+    const halfWorld = this.worldSize / 2;
+    const ix = Math.floor((cx + halfWorld) / size);
+    const iz = Math.floor((cz + halfWorld) / size);
+    const li = Math.round(Math.log2(this.worldSize / size));
+    return `${ix}|${iz}|${li}`;
   }
 
   /**
