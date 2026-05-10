@@ -18,10 +18,10 @@ Blocker split from the audit:
 
 | Pattern | Matches |
 | --- | ---: |
-| `ShaderMaterial` | 73 |
+| `ShaderMaterial` | 73 initially, 69 after K7 post-processing retirement |
 | `RawShaderMaterial` | 6 |
 | `onBeforeCompile` | 11 |
-| `WebGLRenderTarget` | 5 |
+| `WebGLRenderTarget` | 5 initially, 0 after K7 post-processing retirement |
 | Direct WebGL context or GPU timer access | 22 |
 
 The initial platform probe wrote:
@@ -108,7 +108,7 @@ Current Three.js guidance relevant to this repo:
 | Fenced renderer contract | blocked | `src/types/SystemInterfaces.ts` | `IGameRenderer.renderer` and weapon rendering methods are typed as `THREE.WebGLRenderer`; branch must use an internal adapter/cast and avoid fence edits. |
 | GPU timing telemetry | blocked | `src/systems/debug/GPUTimingTelemetry.ts`, `src/systems/debug/PerformanceTelemetry.ts` | Uses `renderer.getContext()` and `EXT_disjoint_timer_query_webgl2`; WebGPU needs timestamp-query or disabled telemetry fallback. |
 | Texture warmup | needs-port | `src/systems/assets/AssetLoader.ts` | Uses `renderer.initTexture`; common renderer has an initialized requirement, so WebGPU path needs init ordering guard. |
-| Post-processing | blocked | `src/systems/effects/PostProcessingManager.ts` | Uses `WebGLRenderTarget` plus `ShaderMaterial`; replace with TSL render pipeline before enabling for WebGPU. Runtime currently disables this path. |
+| Post-processing | retired | `src/systems/effects/PostProcessingManager.ts` | Runtime draws straight to back buffer. K7 removed the dormant low-res blit resources so this is no longer a hidden WebGPU blocker; any future post path must use Three's node post stack. |
 | Terrain material | blocked | `src/systems/terrain/TerrainMaterial.ts` | Large `MeshStandardMaterial.onBeforeCompile` CDLOD shader injection. Tail work, not first port. |
 | Terrain renderer | needs-port | `src/systems/terrain/CDLODRenderer.ts` | Instanced CDLOD geometry is valuable for WebGPU, but material dependency blocks default-on parity. |
 | Vegetation billboards | needs-port | `src/systems/world/billboard/BillboardBufferManager.ts` | `RawShaderMaterial` instanced impostors with custom fog/lighting. Best first high-value TSL material slice. |
@@ -357,6 +357,18 @@ This route is the review boundary for actual default-on approval. The branch
 now has renderer selection, strict proof behavior, TSL material foundation,
 measured vegetation/combatant slices, and storage-buffer-ready compute
 carriers. It does not yet have the tail visual parity work above.
+
+K7 post-processing tail reduction:
+
+- `src/systems/effects/PostProcessingManager.ts` is now an explicit no-op
+  compatibility shim. It preserves input/toggle compatibility but owns no
+  render target or shader blit resources.
+- `src/systems/effects/PostProcessingManager.test.ts` now asserts the no-op
+  contract and pixel-size compatibility state.
+- `npm run check:webgpu-strategy` after this change wrote
+  `artifacts/perf/2026-05-10T14-42-46-903Z/webgpu-strategy-audit/strategy-audit.json`.
+- Static blocker count moved from `117` at KONVEYER-0 to `108`; the
+  `WebGLRenderTarget` category is now `0`.
 
 ## KONVEYER-8 Validation Matrix
 
