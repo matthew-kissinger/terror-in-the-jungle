@@ -1,6 +1,6 @@
 # Recent Cycle Outcomes
 
-Last verified: 2026-05-09
+Last verified: 2026-05-10
 
 Last 3 cycles, summarized. Companion docs:
 
@@ -10,6 +10,29 @@ Last 3 cycles, summarized. Companion docs:
 
 For older cycle outcomes, browse `docs/cycles/` or
 `docs/tasks/archive/<cycle-id>/`.
+
+---
+
+## release-stewardship-2026-05-10 (in release validation)
+
+Continuation pass after Phase 2 and Phase 2.4 were merged. This is not a
+normal cycle record, but it is the current release truth until the next formal
+cycle closes.
+
+**Shipped locally before final push/deploy:**
+
+- CDLOD two-sided skirt-wall hardening for the white terrain crack report.
+- M151 world-feature placements register as `ground` vehicles with seats.
+- SVYAZ-3 radio shell first slice is on `master`.
+- PostCSS resolves to 8.5.14; `_headers`, `robots.txt`, meta description,
+  and preload cleanup are ready for deploy.
+- Cover-query TTL cache first slice is behavior-green but combat120 still
+  fails `perf:compare`; DEFEKT-3/STABILIZAT-1 stay open.
+
+**Carry-over delta:** −3 known stale actives moved closed
+(`artifact-prune-baseline-pin-fix`, `worldbuilder-oneshotkills-wiring`,
+`perf-doc-script-paths-drift`). `cloudflare-stabilization-followups` remains
+open only for the Web Analytics dashboard toggle and live beacon verification.
 
 ---
 

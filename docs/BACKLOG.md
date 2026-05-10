@@ -1,6 +1,6 @@
 # Backlog
 
-Last verified: 2026-05-09
+Last verified: 2026-05-10
 
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
@@ -42,8 +42,10 @@ Hot-fix cycle 2.4 (single task), inserted ahead of Phase 2.5 to address a
 P1 user-reported visual regression: white seam cracks at terrain chunk
 borders from helicopter altitude on A Shau. Predecessor `terrain-cdlod-seam`
 (cycle-2026-05-08) closed same-LOD parity but explicitly deferred the
-LOD-transition T-junction case; this cycle ships the canonical
-Strugar-style fix.
+LOD-transition T-junction case; this cycle shipped the canonical
+Strugar-style fix. The first live deployment still left user-visible white
+crack risk, so the 2026-05-10 release-stewardship pass added two-sided CDLOD
+skirt walls in `5e3436c`.
 
 - [#178](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/178) `cdlod-edge-morph` — 4 commits (3 staged + 1 harden). Stage 2 ships: per-edge `edgeMorphMask` attribute on `CDLODTile` + integer-cell-keyed neighbor pass in `CDLODQuadtree.resolveEdgeMorphMasks` + `Float32Array` per-instance attribute on `CDLODRenderer` + shader force-morph at coarser-neighbor edges. Stage 1 (snap-math) reverted in harden commit — terrain-nav-reviewer caught a wiring conflation in the brief (`tileResolution` vertex count vs. `tileGridResolution` quad count). Master's pre-PR `parentStep = 2/tileGridResolution` was geometrically correct. Net diff: +410 / -9 across 6 files. terrain-nav-reviewer APPROVE-WITH-NOTES.
 
@@ -52,31 +54,19 @@ the ≤12 limit). Cycle ships a user-observable feature (closes the seam
 regression) — COMPLETE under the "ship a user-observable gap" half of the
 rule.
 
-Follow-ups for the next cycles (NOT filed as new carry-overs to respect the
-≤12 limit; bundle into the next cycle that touches the relevant area):
+Post-cycle follow-up status:
 
-- **A Shau-scale mask test claim is overstated.** `flagged.length > 4` is a
-  general regression guard but doesn't specifically guard against
-  integer-cell-key removal — executor's probe confirmed the old
-  float-string keys produced identical results on V8 24. Soften the comment
-  in `CDLODQuadtree.test.ts` next time it's edited.
-- **Perf ceiling 1.0ms with local mean 0.38ms** (~2.6× headroom). If the
-  perf test flakes once on CI, bump to 2.0ms rather than reverting.
-- **`tileKey()` doc-comment** is good for the recursion+probe paths but
-  doesn't note that callers must filter world-edge probes upstream. Add a
-  one-line guard comment when next touched.
-- **mobile-ui CI timeout at 25 min has only ~2.5 min historical headroom.**
-  The harden SHA hit the cap twice in a row (26 min each). Branch was
-  unprotected and the gate is a UI-shell smoke flow that cannot be slowed
-  by CDLOD internals. Bump `.github/workflows/ci.yml:160` from 25 → 30 min
-  in the next cycle that touches CI config (or roll into Phase 2.5 if it
-  makes the cut).
-- **No post-d71c3f4 combat120 capture in artifacts/perf/.** CI's perf check
-  on harden commit returned SUCCESS but the CI artifact isn't local. Run
-  `npm run perf:capture:combat120` and `npm run perf:capture:ashau:short`
-  on a quiet machine when convenient — those captures (especially A Shau,
-  where the integer-cell Map keys actually matter at non-dyadic worldSize)
-  are the load-bearing post-merge evidence. STABILIZAT-1 still open.
+- A Shau mask-test claim softening, the CDLOD perf ceiling, and the
+  `tileKey()` guard comment were closed by `a9ebfbe`.
+- Mobile UI CI timeout was bumped from 25 to 30 minutes by `6892a36`.
+- Post-merge combat120 evidence exists at
+  `artifacts/perf/2026-05-10T10-45-07-263Z`, but `perf:compare` still fails
+  avg, p99, and max-frame gates. STABILIZAT-1 remains open.
+- Terrain visual evidence exists at
+  `artifacts/perf/2026-05-10T10-53-32-328Z/projekt-143-terrain-visual-review/visual-review.json`.
+  The gate WARNs because one A Shau river-ground screenshot timed out and
+  Open Frontier water/exposure remains washed out; it recorded zero browser
+  errors and no automated white-crack failure.
 - **Visual A/B at A Shau north ridgeline** (helicopter altitude, screenshot
   coordinate from the original 2026-05-09 user report) is the human gate
   per the cycle brief. Save before/after PNGs into

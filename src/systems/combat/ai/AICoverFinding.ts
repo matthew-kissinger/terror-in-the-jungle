@@ -37,6 +37,11 @@ interface TerrainCoverCandidate {
   sourceIndex: number;
 }
 
+interface CoverSearchCacheEntry {
+  cover: THREE.Vector3 | null;
+  expiresAtMs: number;
+}
+
 const TERRAIN_COVER_HEIGHT_THRESHOLD = 1.0;
 const TERRAIN_COVER_SEARCH_SAMPLES = 8;
 const TERRAIN_COVER_RADII = [10, 20, 30] as const;
@@ -81,19 +86,24 @@ export class AICoverFinding {
   private sandbagSystem?: SandbagSystem;
   private readonly COVER_SEARCH_CACHE_GRID_METERS = 6;
   private readonly MAX_COVER_SEARCH_CACHE_ENTRIES = 256;
-  private coverSearchCache: Map<string, THREE.Vector3 | null> = new Map();
+  private readonly COVER_SEARCH_CACHE_TTL_MS = 750;
+  private coverSearchCache: Map<string, CoverSearchCacheEntry> = new Map();
   private methodTimer: CoverMethodTimer | null = null;
 
   beginFrame(): void {
-    this.coverSearchCache.clear();
+    if (this.coverSearchCache.size >= this.MAX_COVER_SEARCH_CACHE_ENTRIES) {
+      this.pruneExpiredCoverSearches(Date.now());
+    }
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
+    this.coverSearchCache.clear();
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
     this.sandbagSystem = sandbagSystem;
+    this.coverSearchCache.clear();
   }
 
   setMethodTimer(timer: CoverMethodTimer): void {
@@ -136,7 +146,8 @@ export class AICoverFinding {
     const MAX_SEARCH_RADIUS_SQ = MAX_SEARCH_RADIUS * MAX_SEARCH_RADIUS;
     const SANDBAG_PREFERRED_DISTANCE = 15;
     const cacheKey = this.getCoverSearchCacheKey(combatant.position, threatPosition);
-    const cachedCover = this.coverSearchCache.get(cacheKey);
+    const now = Date.now();
+    const cachedCover = this.getCachedCoverSearchResult(cacheKey, now);
     if (cachedCover !== undefined) {
       return this.measureCoverMethod('cover.findNearestCover.cacheHit', () =>
         cachedCover ? cachedCover.clone() : null
@@ -297,7 +308,7 @@ export class AICoverFinding {
     // Single clone at exit -- caller owns this copy
     const result = bestCoverFound ? _bestCover.clone() : null;
     this.measureCoverMethod('cover.findNearestCover.cacheStore', () => {
-      this.cacheCoverSearchResult(cacheKey, result);
+      this.cacheCoverSearchResult(cacheKey, result, now);
     });
     return result;
   }
@@ -399,12 +410,39 @@ export class AICoverFinding {
     return `${px},${pz}:${tx},${tz}`;
   }
 
-  private cacheCoverSearchResult(cacheKey: string, coverPosition: THREE.Vector3 | null): void {
-    if (this.coverSearchCache.size >= this.MAX_COVER_SEARCH_CACHE_ENTRIES) {
-      this.coverSearchCache.clear();
+  private getCachedCoverSearchResult(cacheKey: string, now: number): THREE.Vector3 | null | undefined {
+    const entry = this.coverSearchCache.get(cacheKey);
+    if (!entry) return undefined;
+    if (entry.expiresAtMs < now) {
+      this.coverSearchCache.delete(cacheKey);
+      return undefined;
     }
-    // coverPosition is already a fresh clone (or null) from the caller -- cache takes ownership
-    this.coverSearchCache.set(cacheKey, coverPosition);
+    return entry.cover;
+  }
+
+  private cacheCoverSearchResult(cacheKey: string, coverPosition: THREE.Vector3 | null, now: number): void {
+    if (this.coverSearchCache.size >= this.MAX_COVER_SEARCH_CACHE_ENTRIES) {
+      this.pruneExpiredCoverSearches(now);
+      if (this.coverSearchCache.size >= this.MAX_COVER_SEARCH_CACHE_ENTRIES) {
+        const oldestKey = this.coverSearchCache.keys().next().value as string | undefined;
+        if (oldestKey) {
+          this.coverSearchCache.delete(oldestKey);
+        }
+      }
+    }
+    this.coverSearchCache.set(cacheKey, {
+      // coverPosition is already a fresh clone (or null) from the caller; cache takes ownership.
+      cover: coverPosition,
+      expiresAtMs: now + this.COVER_SEARCH_CACHE_TTL_MS,
+    });
+  }
+
+  private pruneExpiredCoverSearches(now: number): void {
+    for (const [key, entry] of this.coverSearchCache.entries()) {
+      if (entry.expiresAtMs < now) {
+        this.coverSearchCache.delete(key);
+      }
+    }
   }
 
   private measureCoverMethod<T>(name: string, fn: () => T): T {

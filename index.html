@@ -8,11 +8,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="description" content="Browser-based 3D Vietnam War combat game with helicopters, fixed-wing aircraft, large-scale AI battles, and real A Shau Valley terrain." />
     <meta name="theme-color" content="#0a0e0c" />
     <link rel="manifest" href="/manifest.json" />
     <title>Terror in the Jungle</title>
-    <link rel="preload" as="image" href="./assets/ui/icons/reticle-cobra-gun.png">
-    <link rel="preload" as="image" href="./assets/ui/icons/reticle-rocket.png">
   </head>
   <body>
     <div id="boot-splash" style="
@@ -36,12 +35,5 @@
       <style>@keyframes boot-pulse{0%{width:20%;margin-left:0}100%{width:40%;margin-left:60%}}</style>
     </div>
     <script type="module" src="/src/main.ts"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
-      }
-    </script>
   </body>
 </html>

@@ -195,10 +195,14 @@ function wireVehicleRuntime(runtime: OperationalRuntimeGroups['vehicleRuntime'])
     runtime.worldFeatureSystem.configureDependencies({
       terrainManager: runtime.terrainSystem,
       gameModeManager: runtime.gameModeManager,
+      vehicleManager: runtime.vehicleManager,
     });
   } else {
     runtime.worldFeatureSystem.setTerrainManager(runtime.terrainSystem);
     runtime.worldFeatureSystem.setGameModeManager(runtime.gameModeManager);
+    if (typeof runtime.worldFeatureSystem.setVehicleManager === 'function') {
+      runtime.worldFeatureSystem.setVehicleManager(runtime.vehicleManager);
+    }
   }
   // Give WorldFeatureSystem direct access to the LOS accelerator so spawned
   // buildings participate in aircraft terrain sweeps; ITerrainRuntime does

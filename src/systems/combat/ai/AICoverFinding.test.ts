@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { AICoverFinding } from './AICoverFinding';
 import { Combatant, CombatantState, Faction } from '../types';
@@ -63,6 +63,10 @@ describe('AICoverFinding', () => {
     mockHeightQueryCache.getHeightAt = vi.fn(() => 0);
     (mockTerrainSystem.raycastTerrain as any).mockImplementation(() => ({ hit: false, distance: undefined }));
     (mockSandbagSystem.getSandbagBounds as any).mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('findNearestCover', () => {
@@ -461,7 +465,10 @@ describe('AICoverFinding', () => {
       expect(mockTerrainSystem.raycastTerrain).toHaveBeenCalledTimes(raycastsAfterFirstSearch);
     });
 
-    it('clears the frame-local cache on beginFrame', () => {
+    it('reuses cover query work across adjacent frames until the cache expires', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+
       const threatPos = new THREE.Vector3(30, 0, 0);
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const nearbyCombatant = createMockCombatant('c2', Faction.US, new THREE.Vector3(1, 0, 1));
@@ -478,7 +485,15 @@ describe('AICoverFinding', () => {
 
       coverFinding.findNearestCover(combatant, threatPos);
       const heightCallsAfterFirstSearch = (mockHeightQueryCache.getHeightAt as any).mock.calls.length;
+      const raycastsAfterFirstSearch = (mockTerrainSystem.raycastTerrain as any).mock.calls.length;
 
+      coverFinding.beginFrame();
+      coverFinding.findNearestCover(nearbyCombatant, threatPos);
+
+      expect(mockHeightQueryCache.getHeightAt).toHaveBeenCalledTimes(heightCallsAfterFirstSearch);
+      expect(mockTerrainSystem.raycastTerrain).toHaveBeenCalledTimes(raycastsAfterFirstSearch);
+
+      vi.setSystemTime(10_751);
       coverFinding.beginFrame();
       coverFinding.findNearestCover(nearbyCombatant, threatPos);
 

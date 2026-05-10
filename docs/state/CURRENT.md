@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-09
+Last verified: 2026-05-10
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -24,27 +24,27 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-05-09)
+## Current focus (2026-05-10)
 
-`cycle-2026-05-10-zone-manager-decoupling` is **Phase 2** of the 9-cycle
-realignment campaign at
-[docs/CAMPAIGN_2026-05-09.md](../CAMPAIGN_2026-05-09.md). Drops `ZoneManager`
-fan-in 52 → ≤20 before Phase 3 god-module splits start. Adds read-only
-`IZoneQuery` to the fence (PR #174 in flight), then migrates HUD/Compass/
-Minimap/FullMap (Batch A), Combat/Tickets/WarSim (Batch B), and
-PlayerRespawn + cleanup (Batch C).
+`master` is in release-stewardship mode after the overnight multi-stream pass.
+Merged work now includes:
 
-Phase 0 (`cycle-2026-05-09-phase-0-foundation`) closed 2026-05-09 with the
-durable rules layer + WorldBuilder dev console (substrate only, no game
-code).
+- stabilization sweep `a9ebfbe` (artifact-prune pin fix, `oneShotKills`
+  wiring, perf-doc path drift, CDLOD retro nits);
+- CDLOD skirt hardening `5e3436c` for the white-crack terrain seam report;
+- code-golf split of `PlayerMovement` (`2ac4438`);
+- optimization memos for pool sizing and BVH rebuild threshold (`d50649b`);
+- SVYAZ-3 radio shell first slice (`665b0c5`);
+- mobile UI CI timeout headroom (`6892a36`);
+- current release-stewardship changes: M151 world-feature placements register
+  as ground vehicles, cover-query cache TTL first slice, PostCSS/header/SEO
+  deployment hygiene, and doc alignment.
 
-Phase 1 (`cycle-2026-05-09-doc-decomposition-and-wiring`) closed 2026-05-09
-with 6 PRs ([#167](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/167)–[#172](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/172)): split STATE_OF_REPO/PERFORMANCE
-docs, archived PROJEKT_OBJEKT_143 prose, extracted DIRECTIVES.md, triaged
-89 audit scripts to 12 retained, applied artifact prune + weekly CI job,
-wired all 6 WorldBuilder god-mode flags into engine consumers (DEV-gated,
-Vite DCE-confirmed). Carry-over delta −4 (active 13 → 9). See
-[docs/BACKLOG.md](../BACKLOG.md) "Recently Completed" for PR list.
+Phase 2 (`cycle-2026-05-10-zone-manager-decoupling`) is merged. Phase 2.5's
+code-side Cloudflare/SEO tasks are being folded into this release pass, but
+Web Analytics still requires the Pages dashboard toggle and live beacon
+verification because Cloudflare API access returned authentication error
+10000 in this session.
 
 ## What is real today
 
@@ -80,7 +80,9 @@ and adds a face-normal regression test in `CDLODRenderer.test.ts`.
 This is the cautionary tale that motivated the new scenario-smoke
 screenshot gate ([scripts/scenario-smoke.ts](../../scripts/scenario-smoke.ts)).
 Stage D1 (AABB-distance morph) and Stage D2 (skirt ring + per-LOD vertex
-drop) survive the hotfix unchanged.
+drop) survive the hotfix unchanged. The later `5e3436c` hardening makes skirt
+walls emit both triangle windings so backface culling cannot expose bright
+terrain cracks when the camera is above or far from LOD borders.
 
 ## Live deploy verification
 

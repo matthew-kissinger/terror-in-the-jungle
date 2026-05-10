@@ -13,8 +13,10 @@ import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
+import { GroundVehicle, isM151ModelPath } from '../vehicle/GroundVehicle';
 import { FixedWingModel } from '../vehicle/FixedWingModel';
 import type { FixedWingSpawnMetadata } from '../vehicle/FixedWingOperations';
+import type { VehicleManager } from '../vehicle/VehicleManager';
 import type { LOSAccelerator } from '../combat/LOSAccelerator';
 
 const _rotatedOffset = new THREE.Vector3();
@@ -68,6 +70,7 @@ interface SpawnedFeatureObject {
   object: THREE.Object3D;
   collisionRegistered: boolean;
   losObstacleIds: string[];
+  vehicleId?: string;
 }
 
 interface WorldFeatureRenderSector {
@@ -83,6 +86,7 @@ interface WorldFeatureRenderSector {
 interface WorldFeatureSystemDependencies {
   terrainManager: ITerrainRuntime;
   gameModeManager: GameModeManager;
+  vehicleManager?: VehicleManager;
 }
 
 export class WorldFeatureSystem implements GameSystem {
@@ -92,6 +96,7 @@ export class WorldFeatureSystem implements GameSystem {
   private gameModeManager?: GameModeManager;
   private navmeshSystem?: NavmeshSystem;
   private fixedWingModel?: FixedWingModel;
+  private vehicleManager?: VehicleManager;
   private losAccelerator?: LOSAccelerator;
   private spawnedObjects: SpawnedFeatureObject[] = [];
   private featureGroups: WorldFeatureRenderSector[] = [];
@@ -111,6 +116,9 @@ export class WorldFeatureSystem implements GameSystem {
   configureDependencies(dependencies: WorldFeatureSystemDependencies): void {
     this.setTerrainManager(dependencies.terrainManager);
     this.setGameModeManager(dependencies.gameModeManager);
+    if (dependencies.vehicleManager) {
+      this.setVehicleManager(dependencies.vehicleManager);
+    }
   }
 
   setTerrainManager(terrainManager: ITerrainRuntime): void {
@@ -127,6 +135,10 @@ export class WorldFeatureSystem implements GameSystem {
 
   setFixedWingModel(fixedWingModel: FixedWingModel): void {
     this.fixedWingModel = fixedWingModel;
+  }
+
+  setVehicleManager(vehicleManager: VehicleManager): void {
+    this.vehicleManager = vehicleManager;
   }
 
   /**
@@ -328,12 +340,14 @@ export class WorldFeatureSystem implements GameSystem {
       }
 
       const losObstacleIds = this.registerPlacementWithLOS(objectId, object);
+      const vehicleId = this.registerGroundVehiclePlacement(objectId, placement, object);
 
       this.spawnedObjects.push({
         id: objectId,
         object,
         collisionRegistered,
         losObstacleIds,
+        vehicleId,
       });
     }
   }
@@ -347,7 +361,7 @@ export class WorldFeatureSystem implements GameSystem {
       batchNamePrefix: 'world_static_features',
       strategy: 'batch',
       minBucketSize: 2,
-      excludeMesh: (mesh) => (mesh as THREE.BatchedMesh).isBatchedMesh === true,
+      excludeMesh: (mesh) => (mesh as THREE.BatchedMesh).isBatchedMesh === true || this.isGroundVehicleMesh(mesh),
     });
 
     if (result.sourceMeshCount > 1 && result.mergedMeshCount > 0) {
@@ -462,6 +476,32 @@ export class WorldFeatureSystem implements GameSystem {
     return ids;
   }
 
+  private registerGroundVehiclePlacement(
+    objectId: string,
+    placement: StaticModelPlacementConfig,
+    object: THREE.Object3D,
+  ): string | undefined {
+    if (!this.vehicleManager || !isM151ModelPath(placement.modelPath)) {
+      return undefined;
+    }
+
+    object.userData.worldFeatureGroundVehicleId = objectId;
+    const vehicle = new GroundVehicle(objectId, object);
+    this.vehicleManager.register(vehicle);
+    return objectId;
+  }
+
+  private isGroundVehicleMesh(mesh: THREE.Mesh): boolean {
+    let current: THREE.Object3D | null = mesh;
+    while (current) {
+      if (typeof current.userData.worldFeatureGroundVehicleId === 'string') {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
   private resolvePlacements(feature: MapFeatureDefinition): StaticModelPlacementConfig[] {
     const prefab = getWorldFeaturePrefab(feature);
     const prefabPlacements = prefab?.placements ?? [];
@@ -503,6 +543,9 @@ export class WorldFeatureSystem implements GameSystem {
 
   private clearSpawnedObjects(): void {
     for (const entry of this.spawnedObjects) {
+      if (entry.vehicleId && this.vehicleManager) {
+        this.vehicleManager.unregister(entry.vehicleId);
+      }
       if (typeof (modelLoader as any).disposeInstance === 'function') {
         modelLoader.disposeInstance(entry.object);
       } else {

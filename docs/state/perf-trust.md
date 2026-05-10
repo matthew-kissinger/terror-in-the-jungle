@@ -1,6 +1,6 @@
 # Perf Measurement-Chain Trust Status
 
-Last verified: 2026-05-09
+Last verified: 2026-05-10
 
 Current trust state of the combat120 perf baseline and the chain of evidence
 behind STABILIZAT-1 (combat120 baseline refresh blocked) and DEFEKT-3
@@ -15,18 +15,18 @@ behind STABILIZAT-1 (combat120 baseline refresh blocked) and DEFEKT-3
 
 ## TL;DR
 
-- **combat120 baseline refresh: BLOCKED.** Measurement trust still WARN on
-  the latest sparse-owner acceptance audit. Running on a quiet machine after
-  Phase 0 lint installs, paired with the artifact-prune CI, is the planned
-  unblock path.
+- **combat120 baseline refresh: BLOCKED.** A fresh 2026-05-10 local capture
+  after the cover-cache first slice still fails the comparison gates
+  (`avgFrameMs`, `p99FrameMs`, `maxFrameMs`). It is evidence, not a baseline
+  refresh.
 - **Owner attribution: PARTIAL.** Render-submission category attribution
   reconciles ~44% of sampled draw calls and ~43% of triangles to named
   owners; the remaining unattributed share moved from 0.30 to 0.02 after the
   `npc_ground_markers` `userData.perfCategory` source edit.
 - **DEFEKT-3 root cause: synchronous cover search.** Anchored in
-  `AIStateEngage.initiateSquadSuppression()`. Phase 4 F2
-  (`CoverQueryService` → precomputed field + worker fallback) is the
-  planned closeout. First surgical pass in Phase 3 R2.
+  `AIStateEngage.initiateSquadSuppression()`. The 2026-05-10 TTL cache first
+  slice is behavior-green but does not close the perf gate; the next real
+  closeout remains `CoverQueryService` → precomputed field + worker fallback.
 
 ## What "measurement trust" means
 
@@ -59,6 +59,11 @@ exceed `75ms`.
 `perf:compare -- --scenario combat120` against this capture reports
 `6 pass, 1 warn, 1 fail`: avg frame `16.19ms` WARN, p99 `34.20ms` PASS,
 max-frame `100.00ms` FAIL, heap end-growth `6.51MB`, heap recovery `86.2%`.
+
+The latest local release-stewardship combat120 capture is
+`artifacts/perf/2026-05-10T10-45-07-263Z`. `npm run perf:compare` reports
+`5 pass, 0 warn, 3 fail`: avg frame `20.15ms` FAIL, p95 `36.20ms` PASS,
+p99 `47.10ms` FAIL, max-frame `100.00ms` FAIL, heap growth `2.23MB` PASS.
 
 Baseline refresh remains blocked. The next bounded source target is the
 remaining owner split across `npc_close_glb` draw submissions,
@@ -131,8 +136,9 @@ that overhead class.
 Phase 4 F2 is the engineering closeout for DEFEKT-3:
 `CoverQueryService` becomes a precomputed cover field with worker
 fallback, removing the synchronous cover search from
-`AIStateEngage.initiateSquadSuppression`. Phase 3 R2 lands the first
-surgical pass.
+`AIStateEngage.initiateSquadSuppression`. The 2026-05-10 TTL cache slice is
+documented at [docs/rearch/cover-query-precompute.md](../rearch/cover-query-precompute.md);
+do not spend another pass on blind TTL tuning without cache-hit counters.
 
 STABILIZAT-1 unblock is paired with the Phase 0 artifact-prune CI plus a
 quiet-machine baseline refresh. Until that lands, every perf claim carries

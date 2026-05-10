@@ -1,6 +1,6 @@
 # Directives
 
-Last verified: 2026-05-09
+Last verified: 2026-05-10
 
 Active directive list. Each entry has binary `open` / `done` status, owning
 subsystem, opening cycle, latest evidence link, and plain-English success
@@ -10,7 +10,7 @@ criteria. Closed items stay as evidence trail. Carry-over discipline:
 
 ## VODA-1 — Visible water surface and query API
 Status: open. Owning subsystem: environment / water. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-08T01-15-33-373Z/projekt-143-voda-exposure-source-audit/summary.json`
+Latest evidence: query API first slice covered by `src/systems/environment/WaterSystem.test.ts`; visual/exposure evidence remains `artifacts/perf/2026-05-08T01-15-33-373Z/projekt-143-voda-exposure-source-audit/summary.json`.
 Success criteria:
 - `WaterSystem` renders a visible water surface across Open Frontier and A Shau, lit by `AtmosphereSystem`, with no clipping artifacts at terrain intersections.
 - Hydrology channels drive water-surface placement.
@@ -33,7 +33,7 @@ Success criteria:
 
 ## VEKHIKL-1 — M151 jeep ground vehicle
 Status: open. Owning subsystem: vehicle (ground). Opened: cycle-2026-05-04.
-Latest evidence: GLB at `public/models/vehicles/ground/m151-jeep.glb`.
+Latest evidence: GLB at `public/models/vehicles/ground/m151-jeep.glb`; M151 world-feature placements register as `ground` vehicles with seats in the 2026-05-10 release-stewardship pass (`GroundVehicle.test.ts`, `WorldFeatureSystem.test.ts`).
 Success criteria:
 - M151 spawnable in Open Frontier; player enters/exits via `VehicleSessionController`.
 - Basic driving (forward, back, turn) over terrain.
@@ -102,6 +102,7 @@ Latest evidence: `artifacts/perf/2026-05-07T21-41-01-140Z/projekt-143-svyaz-ping
 
 ## SVYAZ-3 — Air-support call-in radio
 Status: open. Owning subsystem: combat / UI / aviation. Opened: cycle-2026-05-04.
+Latest evidence: radio UI shell, asset list, target-mode selector, and cooldown HUD first slice merged in `665b0c5`.
 Success criteria:
 - Radio menu reachable from squad UI or hotkey.
 - Target marking by smoke, willie pete, or position-only.
@@ -141,7 +142,7 @@ Success criteria:
 
 ## STABILIZAT-1 — Refresh combat120 perf baseline
 Status: open. Owning subsystem: perf-harness. Opened: cycle-2026-04-21.
-Latest evidence: `artifacts/perf/2026-05-07T23-08-28-327Z/projekt-143-defekt-render-pass-metadata-audit/pass-metadata-audit.json`
+Latest evidence: `artifacts/perf/2026-05-10T10-45-07-263Z` (`perf:compare`: 5 pass, 0 warn, 3 fail; avg 20.15ms FAIL, p99 47.10ms FAIL, max 100ms FAIL).
 Success criteria:
 - `npm run perf:capture:combat120` from a quiet machine produces avg ≤17ms, p99 ≤35ms, heap_recovery ≥0.5, heap_end_growth ≤+10MB.
 - Refreshed baseline committed to `perf-baselines.json`.
@@ -152,7 +153,7 @@ Latest evidence: master at `babae19a76e5ff622976a632e10f7055315d2698`.
 
 ## STABILIZAT-3 — Live release verification
 Status: done. Owning subsystem: deploy. Opened: cycle-2026-05-04.
-Latest evidence: master at `babae19a76e5ff622976a632e10f7055315d2698`; deploy run [25533692241](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/runs/25533692241).
+Latest evidence: previous release proof `artifacts/perf/2026-05-10T06-55-51-733Z/projekt-143-live-release-proof/release-proof.json`; production SHA remains live `/asset-manifest.json` truth.
 
 ## DEFEKT-1 — Stale baseline audit
 Status: open. Owning subsystem: perf-harness. Opened: cycle-2026-05-04.
@@ -170,7 +171,7 @@ Success criteria:
 
 ## DEFEKT-3 — Combat AI p99 anchor
 Status: open. Owning subsystem: combat. Opened: cycle-2026-04-17.
-Latest evidence: `artifacts/perf/2026-05-07T23-20-53-503Z/projekt-143-defekt-terrain-shadow-diagnostic-audit/terrain-shadow-diagnostic-audit.json`
+Latest evidence: TTL cache first slice and failed combat120 compare documented at `docs/rearch/cover-query-precompute.md`.
 Success criteria:
 - Synchronous cover search in `AIStateEngage.initiateSquadSuppression` no longer dominates p99.
 - `combat120` p99 ≤35ms with measurement trust PASS.

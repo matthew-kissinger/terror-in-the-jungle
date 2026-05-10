@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GameMode } from '../../config/gameModeTypes';
 import { WorldFeatureSystem } from './WorldFeatureSystem';
 import { modelLoader } from '../assets/ModelLoader';
-import { BuildingModels } from '../assets/modelPaths';
+import { BuildingModels, GroundVehicleModels } from '../assets/modelPaths';
 
 vi.mock('../assets/ModelLoader', () => ({
   modelLoader: {
@@ -264,6 +264,59 @@ describe('WorldFeatureSystem', () => {
     });
 
     expect(meshCount).toBe(1);
+  });
+
+  it('registers M151 placements as ground vehicles without batching their meshes', async () => {
+    const vehicleManager = {
+      register: vi.fn(),
+      unregister: vi.fn(),
+    };
+    system.setVehicleManager(vehicleManager as any);
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'test_motor_pool',
+          kind: 'village',
+          position: new THREE.Vector3(10, 0, 20),
+          staticPlacements: [
+            {
+              id: 'm151',
+              modelPath: GroundVehicleModels.M151_JEEP,
+              offset: new THREE.Vector3(0, 0, 0),
+              registerCollision: true,
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    expect(vehicleManager.register).toHaveBeenCalledTimes(1);
+    const vehicle = vehicleManager.register.mock.calls[0][0];
+    expect(vehicle.vehicleId).toBe('test_motor_pool_m151');
+    expect(vehicle.category).toBe('ground');
+    expect(vehicle.hasFreeSeats('pilot')).toBe(true);
+    expect(vehicle.getPosition().y).toBeCloseTo(5);
+
+    let meshCount = 0;
+    scene.children[0].traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        meshCount++;
+      }
+    });
+    expect(meshCount).toBe(2);
+
+    currentConfig = {
+      id: GameMode.TEAM_DEATHMATCH,
+      features: [],
+    };
+    system.update(0.016);
+    await flushPromises();
+
+    expect(vehicleManager.unregister).toHaveBeenCalledWith('test_motor_pool_m151');
   });
 
   it('batches compatible static placements across features in the same culling sector', async () => {

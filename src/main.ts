@@ -14,6 +14,18 @@ import './ui/engine/theme.css';
 import { bootstrapGame } from './core/bootstrap';
 import { Logger } from './utils/Logger';
 
+function registerServiceWorker(): void {
+  if (!('serviceWorker' in navigator)) {
+    return;
+  }
+
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+  });
+}
+
+registerServiceWorker();
+
 bootstrapGame().catch((err) => {
   Logger.error('bootstrap', 'Bootstrap entry failed', err);
 });
