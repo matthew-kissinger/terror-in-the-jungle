@@ -297,3 +297,44 @@ Current limitation:
   capacity shape. It does not yet replace the production animated Pixel Forge
   NPC atlas shader, crop-map sampling, aura/outline behavior, or close-GLB
   skinning proof.
+
+## KONVEYER-5 And KONVEYER-6 Checkpoint
+
+Implemented after the KONVEYER-4 checkpoint:
+
+- `src/rendering/KonveyerComputeCarrier.ts` adds fixed vec4-pair carrier
+  layouts for effect particles and sensor/cover samples.
+- The effect carrier is the K5 path for particles, muzzle, impact, and
+  projectile-adjacent visual compute work.
+- The sensor/cover carrier is the K6 path for future cover, visibility, and
+  sensing compute slices while CPU gameplay authority remains intact.
+- `createKonveyerStorageBufferAttribute()` bridges the CPU-authored carriers
+  into Three WebGPU `StorageBufferAttribute` objects.
+- `scripts/konveyer-compute-carrier-probe.ts` writes repeatable artifacts for
+  both carrier kinds.
+- `package.json` wires `check:konveyer-compute-carriers`.
+
+Validation for this checkpoint:
+
+- `npm run typecheck`: PASS
+- `npx vitest run src/rendering/KonveyerComputeCarrier.test.ts`: PASS
+- `npm run check:konveyer-compute-carriers`: PASS,
+  `artifacts/perf/2026-05-10T14-29-45-395Z/konveyer-compute-carriers/carriers.json`
+- `npm run lint`: PASS
+- `npm run lint:docs`: PASS, 12 pre-existing grandfathered warnings
+- `npm run check:webgpu-strategy`: PASS,
+  `artifacts/perf/2026-05-10T14-30-38-862Z/webgpu-strategy-audit/strategy-audit.json`
+- `npm run build`: PASS
+
+Measured compute carriers:
+
+| Carrier | Capacity | Active samples | Byte length | Storage vec4 count |
+| --- | ---: | ---: | ---: | ---: |
+| `effect-particle` | 4096 | 512 | 131072 | 8192 |
+| `sensor-cover` | 3000 | 120 | 96000 | 6000 |
+
+Current limitation:
+
+- These are storage-buffer-ready data carriers, not a compute shader dispatch.
+  They intentionally preserve CPU authority until a later gate proves WebGPU
+  compute execution, readback cost, determinism, and fallback policy.
