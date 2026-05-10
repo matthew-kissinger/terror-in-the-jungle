@@ -251,7 +251,7 @@ src/
     assets/       AssetLoader, ModelLoader
     audio/        AudioManager, FootstepAudio, WeaponSounds
     effects/      TracerPool, MuzzleFlash, PostProcessing, CameraShake
-    environment/  AtmosphereSystem, CloudLayer, WeatherSystem, WaterSystem
+    environment/  AtmosphereSystem, HosekWilkieSkyBackend, WeatherSystem, WaterSystem
     input/        InputContextManager
     debug/        PerformanceTelemetry, PerformanceBenchmark
   ui/

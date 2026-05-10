@@ -116,7 +116,7 @@ Current Three.js guidance relevant to this repo:
 | Combatant close GLBs | ready | `src/systems/combat/CombatantRenderer.ts` | Mostly standard/skinned GLB materials. Must prove skinning, shadows, and perf under WebGPU separately. |
 | Muzzle flashes | ported | `src/systems/effects/MuzzleFlashSystem.ts` | K5 follow-up replaced the custom points material with standard `PointsMaterial`, generated radial texture, and vertex colors. |
 | Sky dome | needs-port | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | `ShaderMaterial` dome. TSL port is feasible but visual parity-sensitive. |
-| Cloud layer | needs-port | `src/systems/environment/atmosphere/CloudLayer.ts` | `ShaderMaterial` procedural plane. Good isolated TSL candidate after simpler fixtures. |
+| Cloud layer | retired | `src/systems/environment/AtmosphereSystem.ts`, `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | The old finite plane prototype was removed from production source; sky-dome clouds remain the only active cloud authority. |
 | Global water | blocked | `src/systems/environment/WaterSystem.ts` | Three examples `Water` object owns a shader material and render targets internally; keep WebGL fallback until replaced or disabled per scenario. |
 | Hydrology river water | ready | `src/systems/environment/WaterSystem.ts` | Uses `MeshStandardMaterial` vertex colors and CPU query segments. WebGPU-compatible candidate once renderer boots. |
 | First-person weapon overlay | needs-port | `src/systems/player/FirstPersonWeapon.ts`, `src/systems/player/weapon/WeaponModel.ts` | API is fenced to `WebGLRenderer`; calls common `render` but type and ordering need adapter handling. |
@@ -390,6 +390,13 @@ K7 post-processing tail reduction:
 - After the K5 muzzle flash material port, the production blocker count moved
   to `36`; raw static matches remain noisy because docs and tests are still in
   the strategy audit scope.
+- The old `CloudLayer` plane was retired after confirming `AtmosphereSystem`
+  already forced it invisible and routed effective weather/scenario coverage
+  into the sky-dome backend. This removes a dead production shader surface
+  instead of porting an unused fallback-looking path.
+- `npm run audit:konveyer-completion` after this retirement recorded
+  `productionBlockers=34` while the tree was dirty; the branch still needs a
+  clean completion audit after commit/push.
 
 ## KONVEYER-8 Validation Matrix
 

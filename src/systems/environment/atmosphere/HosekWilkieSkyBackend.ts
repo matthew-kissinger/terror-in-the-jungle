@@ -157,9 +157,8 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   }
 
   /**
-   * Sky-integrated cloud coverage. This is intentionally separate from
-   * `CloudLayer`: the dome pass guarantees visible clouds in ordinary sky
-   * views without a finite flat-plane horizon.
+   * Sky-integrated cloud coverage. The dome pass guarantees visible clouds
+   * in ordinary sky views without a finite flat-plane horizon.
    */
   setCloudCoverage(value: number): void {
     this.cloudCoverage = Math.max(0, Math.min(1, value));

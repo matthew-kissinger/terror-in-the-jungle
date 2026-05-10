@@ -51,7 +51,7 @@ Runtime composers (extracted from SystemConnector):
 | Input | `src/systems/input/` | InputContextManager (singleton) | untracked |
 | Audio | `src/systems/audio/` | AudioManager, FootstepAudioSystem | untracked |
 | Effects | `src/systems/effects/` | ExplosionEffectsPool, ImpactEffectsPool, SmokeCloudSystem, TracerPool, PostProcessingManager, CameraShakeSystem | untracked |
-| Environment | `src/systems/environment/` | AtmosphereSystem, CloudLayer, WeatherSystem, WaterSystem | untracked |
+| Environment | `src/systems/environment/` | AtmosphereSystem, HosekWilkieSkyBackend, WeatherSystem, WaterSystem | untracked |
 | Debug | `src/systems/debug/` | PerformanceTelemetry (singleton) | untracked |
 | UI | `src/ui/` | HUDSystem, GameUI, TouchControls, MinimapSystem, FullMapSystem | 1.5ms |
 | Config | `src/config/` | gameModeTypes, *Config, MapSeedRegistry, CombatantConfig, FactionCombatTuning | - |
@@ -223,8 +223,8 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    `PlayerInput` reports lock failures. FPS mouse-look still needs one
    long-term owner plus human validation of the embedded-browser fallback.
 4. **Atmosphere v1 representation limits** - visible clouds now come from the
-   `HosekWilkieSkyBackend` sky-dome pass, and the old `CloudLayer` plane is
-   hidden so it cannot draw the hard horizon divider / "one tile" artifact.
+   `HosekWilkieSkyBackend` sky-dome pass, and the old finite cloud plane was
+   retired so it cannot draw the hard horizon divider / "one tile" artifact.
    Current Cycle 9 evidence validates all five modes after preview builds began
    emitting `asset-manifest.json`; the shader now uses a seamless cloud-deck
    projection instead of azimuth-wrapped UVs. Open Frontier and combat120 are

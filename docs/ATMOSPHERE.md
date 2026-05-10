@@ -1,6 +1,6 @@
 # Atmosphere System
 
-Last updated: 2026-04-24
+Last updated: 2026-05-10
 
 This document describes the current sky / sun / fog / cloud / ambient stack and
 the remaining atmosphere roadmap. The v1 atmosphere foundation and polish cycles
@@ -25,9 +25,9 @@ landed across `cycle-2026-04-20-atmosphere-foundation` and
 - `HosekWilkieSkyBackend` owns the visible sky-dome cloud pass. It receives
   weather/scenario coverage from `AtmosphereSystem` and avoids the old finite
   cloud-plane horizon divider.
-- `CloudLayer` still exists as legacy/prototype code, but `AtmosphereSystem`
-  keeps its mesh invisible in the active runtime. Do not use the old plane as
-  evidence that player-visible clouds are correct.
+- The old planar `CloudLayer` prototype has been removed from the active source
+  tree. Do not reintroduce a finite cloud plane as WebGPU evidence; future
+  cloud work should extend the sky-dome or an explicitly reviewed volume path.
 - `PostProcessingManager` applies ACES tone mapping before the 24-level quantize
   and Bayer dither pass so warm dawn/dusk colors survive the retro post chain.
 
@@ -58,7 +58,7 @@ hardcoded sky/fog/light colors for local fixes.
   collision, fly-through cloud interior, or aircraft-specific cloud lighting.
 - Clouds are wired in all five current game modes through the sky dome. The old
   "one tile" report was valid for the former visible `CloudLayer` plane; that
-  plane is now hidden. The visible sky shader now uses a seamless cloud-deck
+  plane is now retired. The visible sky shader now uses a seamless cloud-deck
   projection instead of azimuth-wrapped sky UVs. A Shau, TDM, and Zone Control
   read as heavier broken cloud layers; Open Frontier and combat120 intentionally
   read as lighter scattered-cloud presets but still need art review.

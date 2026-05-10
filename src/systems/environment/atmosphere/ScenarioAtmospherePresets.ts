@@ -82,7 +82,7 @@ export interface AtmospherePreset {
   /**
    * Baseline cloud coverage for this scenario in [0, 1]. Omitted means
    * "no clouds at boot" — `AtmosphereSystem` treats it as 0 and the
-   * cloud layer stays hidden. Weather state (STORM, HEAVY_RAIN, ...)
+   * sky-dome cloud pass stays clear. Weather state (STORM, HEAVY_RAIN, ...)
    * layers a higher coverage target on top of this baseline via
    * `setCloudCoverageIntent`; the effective coverage is `max(preset,
    * weather)` so a heavily-clouded preset never unfills under weather.
@@ -91,9 +91,8 @@ export interface AtmospherePreset {
   /**
    * Optional per-scenario cloud-feature scale in meters-per-first-octave.
    * Larger = larger, sparser puffs (fair-weather cumulus); smaller =
-   * denser, tighter puffs (overcast). Omitted preserves the cloud-layer
-   * default (~900m). Applied at preset swap via
-   * `CloudLayer.setFeatureScaleMeters`.
+   * denser, tighter puffs (overcast). Omitted preserves the sky-dome cloud
+   * default (~900m).
    */
   cloudScaleMetersPerFeature?: number;
 }
