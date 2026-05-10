@@ -114,49 +114,115 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: STABILIZATION CHECKPOINT (campaign paused; Phase 2.5 ready)
+## Current cycle: cycle-2026-05-10-stabilization-fixes
 
-The 9-cycle realignment campaign at
-[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md) is **paused after Phase 2**
-at the campaign owner's request. **Phase 2.5 is authored and ready to
-dispatch when the human resumes.**
-
-### Comprehensive checkpoint
-
-[docs/STABILIZATION_CHECKPOINT_2026-05-09.md](STABILIZATION_CHECKPOINT_2026-05-09.md)
-— full audit findings, Phases 0–2 outcomes, Phase 3+ scope notes.
-
-### Phase 2.5: cycle-2026-05-10-stabilization-fixes (READY)
+**Phase 2.5 of the realignment campaign** (inserted between Phase 2 and
+Phase 3 at the stabilization checkpoint). Bundles 4 small fixes
+addressing findings from the live Cloudflare audit at the close of
+Phase 2.
 
 **Cycle brief:** [docs/tasks/cycle-2026-05-10-stabilization-fixes.md](tasks/cycle-2026-05-10-stabilization-fixes.md)
 
-Bundles 4 small fixes addressing the live Cloudflare audit findings:
+**Comprehensive checkpoint context:**
+[docs/STABILIZATION_CHECKPOINT_2026-05-09.md](STABILIZATION_CHECKPOINT_2026-05-09.md)
+— full audit findings, Phases 0–2 outcomes, Phase 3+ scope notes.
+
+**Skip-confirm: NO.** `web-analytics-enable` (Round 2) requires a human
+to do a manual Cloudflare dashboard toggle (Pages → Settings → Web
+Analytics → Enabled + Auto-install) BEFORE the orchestrator dispatches
+the executor's verification step. The orchestrator pauses for the human
+to confirm "done" before spawning the Round 2 executor. Round 1 is
+auto-dispatched on `/orchestrate` start.
+
+**Campaign auto-advance:** PAUSED (per
+[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md)). The orchestrator
+runs Phase 2.5, closes it, and **stops** at the next checkpoint instead
+of chaining into Phase 3 god-module surgery. To re-enable chaining:
+flip `Auto-advance: PAUSED` to `Auto-advance: yes` in the campaign
+manifest before re-running `/orchestrate`.
+
+### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
 | 1 | `postcss-cve-bump`, `cloudflare-headers-file`, `seo-essentials-pass` | 3 |
-| 2 | `web-analytics-enable` (manual dashboard step + verify) | 1 |
+| 2 | `web-analytics-enable` (manual + verify) | 1 |
 
-Closes the `cloudflare-stabilization-followups` carry-over and Dependabot
-alert #26. Lighthouse SEO 82/83 → ≥90 (target). Web Analytics RUM data
-starts flowing within 24 hr.
+### Tasks in this cycle
 
-### To resume the campaign
+Each brief is in `docs/tasks/<slug>.md`:
 
-1. Read the checkpoint doc + [Phase 2.5 brief](tasks/cycle-2026-05-10-stabilization-fixes.md).
-2. Edit [docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md) → flip
-   `Auto-advance: PAUSED ...` back to `Auto-advance: yes` (or keep paused
-   and just dispatch Phase 2.5 + re-pause).
-3. Edit this file's "Current cycle" section to point at Phase 2.5
-   (replace the placeholder copy below with a `### Round schedule` /
-   `### Tasks in this cycle` / `### Reviewer policy` block based on the
-   Phase 2.5 brief).
-4. Run `/orchestrate`. The orchestrator reads this file's current-cycle
-   section and dispatches.
+- [postcss-cve-bump](tasks/postcss-cve-bump.md) — bump postcss 8.5.8 → ≥8.5.10 via `package.json` overrides; closes Dependabot #26
+- [cloudflare-headers-file](tasks/cloudflare-headers-file.md) — add `public/_headers` with HSTS + permissive CSP + Permissions-Policy
+- [seo-essentials-pass](tasks/seo-essentials-pass.md) — `public/robots.txt` + `<meta name="description">` + drop 2 unused preload hints from `index.html`
+- [web-analytics-enable](tasks/web-analytics-enable.md) — manual Pages dashboard toggle + verify Cloudflare Insights snippet appears in live HTML (token already provisioned, just unattached)
 
-**OR**, to skip Phase 2.5: mark cycle 2.5 `skipped` in
-`docs/CAMPAIGN_2026-05-09.md` and resume into Phase 3
-(`cycle-2026-05-11-combatant-renderer-split`).
+### Dependencies
+
+```
+postcss-cve-bump        ─┐
+cloudflare-headers-file ─┼─→ (Round 1 closes) ─→ web-analytics-enable
+seo-essentials-pass     ─┘
+```
+
+The Round 2 → Round 1 edge is soft (web-analytics-enable doesn't strictly
+need Round 1 in master) — present to keep the orchestrator's attention
+serial across the manual gate.
+
+### Reviewer policy
+
+- **Round 1:** none of the 3 tasks touch `src/systems/combat/**`,
+  `src/systems/terrain/**`, or `src/systems/navigation/**`. **No reviewer
+  required pre-merge.**
+- **Round 2 (`web-analytics-enable`):** none required (manual dashboard
+  toggle + executor verification only; no source change).
+
+### Cycle-level success criteria
+
+See [the cycle brief](tasks/cycle-2026-05-10-stabilization-fixes.md#cycle-level-success-criteria)
+for the 10-point list. Highlights:
+
+- `npm ls postcss` shows ≥8.5.10; Dependabot #26 closes
+- HSTS + CSP + Permissions-Policy headers appear on live responses
+- `robots.txt` returns `text/plain` (not SPA fallback)
+- Lighthouse SEO 82/83 → ≥90
+- Web Analytics RUM data appears within 24 hr
+- `combat120` p99 within ±2%
+- Closes `cloudflare-stabilization-followups` carry-over
+
+### Last closed cycle
+
+`cycle-2026-05-10-zone-manager-decoupling` closed 2026-05-09 with 5 PRs
+merged ([#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173),
+[#174](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/174),
+[#175](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/175),
+[#176](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/176),
+[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177)).
+Phase 2 added `IZoneQuery` to the fenced interfaces (PR #174,
+terrain-nav-reviewer APPROVE), then migrated 11 ZoneManager consumers
+(HUD/Compass/Minimap/FullMap, Combat/Tickets/WarSim, PlayerRespawn +
+CommandInputManager) to either the read-only interface or a
+GameEventBus-driven event cache. ZoneManager fan-in 52 → 17 read / 5
+concrete (the 5 are the deferred weapons cluster). ZoneManager removed
+from `scripts/lint-source-budget.ts` GRANDFATHER. combat-reviewer +
+terrain-nav-reviewer all APPROVE / APPROVE-WITH-NOTES. Cycle retro:
+[docs/BACKLOG.md](BACKLOG.md) "Recently Completed (cycle-2026-05-10-...)".
+
+3 new carry-overs filed at the stabilization checkpoint:
+`cloudflare-stabilization-followups`, `weapons-cluster-zonemanager-migration`,
+`perf-doc-script-paths-drift`. Active count 9 → 12 (at the ≤12 rule limit).
+Phase 2.5 (this cycle) closes `cloudflare-stabilization-followups`,
+returning the active count to 11.
+
+Carry-overs from prior cycles still open (legacy 7 + 2 from Phase 1 close +
+3 from Phase 2 stabilization checkpoint = 12, see
+[docs/CARRY_OVERS.md](CARRY_OVERS.md)): DEFEKT-3 (combat AI p99),
+DEFEKT-4 (NPC route quality), STABILIZAT-1 (combat120 baseline refresh),
+AVIATSIYA-1 / DEFEKT-5 (visual review pending), AVIATSIYA-2 (AC-47 takeoff
+bounce), AVIATSIYA-3 (helicopter parity audit), KB-LOAD residual,
+artifact-prune-baseline-pin-fix, worldbuilder-oneshotkills-wiring,
+cloudflare-stabilization-followups (closes when this cycle closes),
+weapons-cluster-zonemanager-migration, perf-doc-script-paths-drift.
 
 ### Last closed cycle
 

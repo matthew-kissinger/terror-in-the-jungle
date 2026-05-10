@@ -21,30 +21,33 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-**STABILIZATION CHECKPOINT (campaign paused 2026-05-09).** Phases 0, 1, 2
-of the 9-cycle realignment campaign are complete. Phase 2
+**`cycle-2026-05-10-stabilization-fixes` (Phase 2.5, READY to dispatch).**
+The Current cycle in [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md)
+is fully wired — running `/orchestrate` next session dispatches Round 1
+(3 parallel scoped fixes: `postcss-cve-bump`, `cloudflare-headers-file`,
+`seo-essentials-pass`) immediately, then pauses for the human to do the
+Cloudflare dashboard toggle for `web-analytics-enable` (Round 2) before
+the verification step.
+
+Phases 0, 1, 2 of the 9-cycle realignment campaign are complete. Phase 2
 (`cycle-2026-05-10-zone-manager-decoupling`) closed with 5 PRs merged
 ([#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173)–[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177))
 shipping the user-observable feature: `ZoneManager` fan-in dropped from 52
 to 17 read / 5 concrete via the new fenced `IZoneQuery` read-only
-interface, with consumers migrated across HUD/Compass/Minimap/FullMap +
-Combat/Tickets/WarSim + PlayerRespawn + CommandInputManager.
+interface.
 
-The campaign is **paused at this checkpoint** for human review before the
-more invasive Phase 3+ god-module surgery. See
-[docs/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/STABILIZATION_CHECKPOINT_2026-05-09.md)
-for: full audit findings (Cloudflare live deploy: LCP 280ms / CLS 0.02 /
-HTTP/3 / Vite DCE confirmed / PostCSS CVE flagged / `_headers` file gap
-identified), Phases 0–2 cumulative outcomes, Phase 3+ scope notes, resume
-instructions.
+Campaign-level **auto-advance is PAUSED** (per
+[docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md)) — the
+orchestrator runs Phase 2.5, closes it, and stops at the next checkpoint
+instead of chaining into Phase 3 god-module surgery. To re-enable
+chaining: flip `Auto-advance: PAUSED` to `Auto-advance: yes` in the
+campaign manifest before re-running `/orchestrate`.
 
-**Phase 2.5 (`cycle-2026-05-10-stabilization-fixes`) is now authored and
-ready** ([cycle brief](docs/tasks/cycle-2026-05-10-stabilization-fixes.md))
-— 4 task briefs (`postcss-cve-bump`, `cloudflare-headers-file`,
-`seo-essentials-pass`, `web-analytics-enable`) that close all 5 sub-findings
-in the `cloudflare-stabilization-followups` carry-over. Round 1 dispatches 3
-parallel scoped fixes; Round 2 is a manual-then-verify dashboard step.
-Awaits human resume.
+For full context (audit findings, Phases 0–2 outcomes, Phase 3+ scope):
+[docs/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/STABILIZATION_CHECKPOINT_2026-05-09.md).
+Cloudflare account-level audit:
+`artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored;
+live findings).
 
 Single source of truth for unresolved items:
 [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is 12 (at the
