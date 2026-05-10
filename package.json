@@ -115,6 +115,7 @@
     "check:konveyer-vegetation-slice": "npx tsx scripts/konveyer-slice-probe.ts --surface vegetation",
     "check:konveyer-combatant-slice": "npx tsx scripts/konveyer-slice-probe.ts --surface combatant",
     "check:konveyer-compute-carriers": "npx tsx scripts/konveyer-compute-carrier-probe.ts --kind all",
+    "check:konveyer-renderer-matrix": "npx tsx scripts/konveyer-renderer-matrix.ts",
     "check:doc-drift": "npx tsx scripts/audit-archive/doc-drift.ts",
     "check:hydrology-bakes": "npx tsx scripts/prebake-hydrology.ts --check",
     "check:cycle-close": "npx tsx scripts/check-cycle-close.ts",

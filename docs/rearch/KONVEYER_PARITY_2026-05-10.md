@@ -244,7 +244,7 @@ Validation for this checkpoint:
 - `npm run typecheck`: PASS
 - `npx vitest run src/rendering/KonveyerInstancedSlice.test.ts src/core/TslMaterialFactory.test.ts`: PASS
 - `npm run check:konveyer-vegetation-slice`: PASS,
-  `artifacts/perf/2026-05-10T14-26-16-531Z/konveyer-vegetation-slice/slice.json`
+  `artifacts/perf/2026-05-10T14-37-17-283Z/konveyer-vegetation-slice/slice.json`
 - `npm run lint`: PASS
 - `npm run lint:docs`: PASS, 12 pre-existing grandfathered warnings
 - `npm run build`: PASS
@@ -278,7 +278,7 @@ Implemented after the KONVEYER-3 checkpoint:
 Validation for this checkpoint:
 
 - `npm run check:konveyer-combatant-slice`: PASS,
-  `artifacts/perf/2026-05-10T14-26-51-828Z/konveyer-combatant-slice/slice.json`
+  `artifacts/perf/2026-05-10T14-37-17-259Z/konveyer-combatant-slice/slice.json`
 - Shared K3/K4 code validation used the same lint, docs, targeted Vitest, and
   production build gates listed in KONVEYER-3.
 
@@ -319,11 +319,11 @@ Validation for this checkpoint:
 - `npm run typecheck`: PASS
 - `npx vitest run src/rendering/KonveyerComputeCarrier.test.ts`: PASS
 - `npm run check:konveyer-compute-carriers`: PASS,
-  `artifacts/perf/2026-05-10T14-29-45-395Z/konveyer-compute-carriers/carriers.json`
+  `artifacts/perf/2026-05-10T14-37-17-228Z/konveyer-compute-carriers/carriers.json`
 - `npm run lint`: PASS
 - `npm run lint:docs`: PASS, 12 pre-existing grandfathered warnings
 - `npm run check:webgpu-strategy`: PASS,
-  `artifacts/perf/2026-05-10T14-30-38-862Z/webgpu-strategy-audit/strategy-audit.json`
+  `artifacts/perf/2026-05-10T14-37-26-961Z/webgpu-strategy-audit/strategy-audit.json`
 - `npm run build`: PASS
 
 Measured compute carriers:
@@ -338,3 +338,104 @@ Current limitation:
 - These are storage-buffer-ready data carriers, not a compute shader dispatch.
   They intentionally preserve CPU authority until a later gate proves WebGPU
   compute execution, readback cost, determinism, and fallback policy.
+
+## KONVEYER-7 Tail Route
+
+KONVEYER-7 is the remaining full-scene parity route. It is not safe to call
+default-on WebGPU complete until these surfaces are migrated or explicitly
+disabled by scenario policy:
+
+| Surface | Required route | Acceptance evidence |
+| --- | --- | --- |
+| Terrain CDLOD | Replace `TerrainMaterial.onBeforeCompile` with node-material displacement and shading, then keep CPU/query parity against `HeightmapGPU`. | Open Frontier and A Shau screenshots plus perf captures before/after. |
+| Global water | Replace Three examples `Water` render-target shader or keep it scenario-disabled under WebGPU. Hydrology river mesh can stay standard material. | Water-system audit plus WebGPU strict scene smoke in a water-enabled scenario. |
+| Post-processing | Keep runtime disabled or move to Three WebGPU node `PostProcessing`; do not re-enable classic WebGL render-target composer as WebGPU proof. | Built-app renderer matrix plus visual-integrity audit. |
+| Vegetation production path | Expand the K3 TSL slice to full atlas, wind, fog, and atmosphere parity. | Vegetation horizon/grounding audits plus Open Frontier/A Shau captures. |
+| Combatant production path | Expand the K4 TSL slice to Pixel Forge animation atlas, crop-map, aura/outline, and close-GLB skinning proof. | Combat120 capture and Pixel Forge NPC probe. |
+
+This route is the review boundary for actual default-on approval. The branch
+now has renderer selection, strict proof behavior, TSL material foundation,
+measured vegetation/combatant slices, and storage-buffer-ready compute
+carriers. It does not yet have the tail visual parity work above.
+
+## KONVEYER-8 Validation Matrix
+
+Implemented after the KONVEYER-5/KONVEYER-6 checkpoint:
+
+- `src/core/bootstrap.ts` exposes read-only renderer backend capabilities under
+  `?diag=1` for validation scripts.
+- `scripts/konveyer-renderer-matrix.ts` runs the built app through three
+  backend cases: default WebGL, explicit WebGPURenderer forced WebGL backend,
+  and strict WebGPU proof mode.
+- `package.json` wires `check:konveyer-renderer-matrix`.
+
+Validation for this checkpoint:
+
+- `npm run typecheck`: PASS
+- `npm run lint`: PASS
+- `npm run build`: PASS
+- `npm run smoke:prod`: PASS
+- `npm run check:konveyer-renderer-matrix`: PASS,
+  `artifacts/perf/2026-05-10T14-37-32-237Z/konveyer-renderer-matrix/matrix.json`
+
+Renderer matrix result:
+
+| Case | Result | Resolved backend | Meaning |
+| --- | --- | --- | --- |
+| `default-webgl` | PASS | `webgl` | Current production path still reaches the start screen. |
+| `webgpu-force-webgl` | PASS | `webgpu-webgl-fallback` | Compatibility fallback is explicit and labeled. |
+| `webgpu-strict` | PASS | loud fatal | Strict proof rejected fallback with `Strict WebGPU proof mode resolved webgpu-webgl-fallback; refusing WebGL fallback.` |
+
+Current limitation:
+
+- This machine's headless Chromium still resolves strict WebGPU to the WebGL
+  fallback backend. That is a useful proof of the no-hidden-fallback gate, but
+  not a headed hardware WebGPU success.
+
+## KONVEYER-9 Review Packet
+
+Branch state:
+
+- Branch: `exp/konveyer-webgpu-migration`
+- Scope: experimental only, no `master` merge and no production deploy.
+- Commits pushed for review:
+  - `7ee1b59 docs(konveyer): add WebGPU parity ledger`
+  - `38d6d71 feat(konveyer): add experimental WebGPU renderer boot path`
+  - `72c566e feat(konveyer): add strict WebGPU TSL foundation`
+  - `67879b1 feat(konveyer): add measured TSL impostor slices`
+  - `c831e6d feat(konveyer): add compute-ready carrier probes`
+
+Default-on decision:
+
+- Not approved yet. The campaign produced the migration substrate and proof
+  gates, but strict WebGPU does not pass on this headless machine and the full
+  production GLSL surfaces listed in KONVEYER-7 remain unported.
+- The branch is ready for reviewer inspection because fallback is no longer
+  hidden: strict proof fails loudly, compatibility fallback is separately
+  named, and default WebGL health is still validated.
+
+Next reviewer decisions:
+
+- Run `npm run check:konveyer-renderer-matrix` on headed hardware with a real
+  WebGPU adapter. Default-on work can only proceed if strict resolves
+  `webgpu`.
+- Approve or reject the K3/K4 instanced TSL slice as the production migration
+  substrate for vegetation and combatant impostors.
+- Choose whether terrain/water/post are ported before default-on, disabled per
+  scenario under WebGPU, or kept behind explicit WebGL-only policy.
+- Approve a later `[interface-change]` PR to rename fenced renderer types away
+  from `WebGLRenderer` once the internal adapter has proven stable.
+
+Final validation rollup on 2026-05-10:
+
+- `npm run typecheck`: PASS
+- `npm run lint`: PASS
+- `npm run lint:docs`: PASS, 12 pre-existing grandfathered warnings
+- `npx vitest run src/core/RendererBackend.test.ts src/core/TslMaterialFactory.test.ts src/rendering/KonveyerInstancedSlice.test.ts src/rendering/KonveyerComputeCarrier.test.ts`: PASS
+- `npm run check:konveyer-vegetation-slice`: PASS
+- `npm run check:konveyer-combatant-slice`: PASS
+- `npm run check:konveyer-compute-carriers`: PASS
+- `npm run check:webgpu-strategy`: PASS
+- `npm run build`: PASS
+- `npm run smoke:prod`: PASS
+- `npm run check:konveyer-renderer-matrix`: PASS

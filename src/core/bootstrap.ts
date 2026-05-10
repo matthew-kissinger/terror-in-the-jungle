@@ -173,6 +173,10 @@ export async function bootstrapGame(): Promise<void> {
         };
       };
 
+      (window as any).__rendererBackendCapabilities = () => (
+        engine.renderer.getRendererBackendCapabilities()
+      );
+
       (window as any).__engineHealth = () => {
         const snap = engine.runtimeMetrics?.getSnapshot();
         const avgMs = snap?.avgFrameMs ?? 0;
