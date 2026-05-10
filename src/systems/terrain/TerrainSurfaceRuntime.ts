@@ -7,6 +7,7 @@ import type { TerrainSurfacePatch } from './TerrainFeatureTypes';
 import { HeightmapGPU } from './HeightmapGPU';
 import {
   createTerrainMaterial,
+  type TerrainMaterial,
   type TerrainHydrologyMaskMaterialConfig,
   updateTerrainMaterialFarCanopyTint,
   updateTerrainMaterialTextures,
@@ -54,7 +55,7 @@ export class TerrainSurfaceRuntime {
   private readonly splatmap: SplatmapConfig;
   private readonly heightmapGPU: HeightmapGPU;
   private readonly tileGridResolution: number;
-  private terrainMaterial: THREE.MeshStandardMaterial | null = null;
+  private terrainMaterial: TerrainMaterial | null = null;
   private surfaceWetness = 0;
   private farCanopyTint: TerrainFarCanopyTintConfig = { enabled: false };
   private hydrologyMaskMaterial: TerrainHydrologyMaskMaterialConfig | null = null;
@@ -76,7 +77,7 @@ export class TerrainSurfaceRuntime {
     worldSize: number,
     defaultBiomeId: string,
     biomeRules: BiomeClassificationRule[],
-  ): THREE.MeshStandardMaterial {
+  ): TerrainMaterial {
     this.currentWorldSize = worldSize;
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
@@ -121,7 +122,7 @@ export class TerrainSurfaceRuntime {
     worldSize: number,
     defaultBiomeId: string,
     biomeRules: BiomeClassificationRule[],
-  ): THREE.MeshStandardMaterial {
+  ): TerrainMaterial {
     this.currentWorldSize = worldSize;
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
@@ -171,7 +172,7 @@ export class TerrainSurfaceRuntime {
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
   }
 
-  getMaterial(): THREE.MeshStandardMaterial {
+  getMaterial(): TerrainMaterial {
     if (!this.terrainMaterial) {
       throw new Error('Terrain material requested before initialization');
     }

@@ -1,4 +1,31 @@
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import {
+  abs,
+  attribute,
+  cameraPosition,
+  clamp as tslClampBase,
+  cos,
+  dot,
+  float,
+  floor,
+  fract,
+  length as tslLengthBase,
+  max as tslMaxBase,
+  min as tslMinBase,
+  mix,
+  normalize,
+  positionGeometry,
+  positionWorld,
+  pow,
+  reference,
+  sin,
+  smoothstep,
+  step,
+  texture as tslTextureNode,
+  vec2,
+  vec3,
+} from 'three/tsl';
 import type { SplatmapConfig } from './TerrainConfig';
 import type { TerrainSurfaceKind, TerrainSurfacePatch } from './TerrainFeatureTypes';
 import type { TerrainFarCanopyTintConfig } from '../../config/biomes';
@@ -11,25 +38,29 @@ const MAX_BIOME_RULES = 8;
 // invisible-but-collidable terrain surface.
 const MAX_FEATURE_SURFACE_PATCHES = 8;
 
-const TERRAIN_VERTEX_PARS = /* glsl */ `
-uniform sampler2D terrainHeightmap;
-uniform sampler2D terrainNormalMap;
-uniform float terrainWorldSize;
-uniform float heightmapGridSize;
-uniform float tileGridResolution;
-uniform bool debugWireframe;
+type UniformSlot<T = unknown> = { value: T };
+type TerrainUniforms = Record<string, UniformSlot>;
+type TslNode = any;
 
-attribute float lodLevel;
-attribute float morphFactor;
-attribute float isSkirt;
-attribute float edgeMorphMask;
+export type TerrainMaterial = MeshStandardNodeMaterial & {
+  uniforms: TerrainUniforms;
+  isKonveyerTerrainNodeMaterial: true;
+};
 
-varying vec3 vWorldPosition;
-varying vec2 vWorldUV;
-varying vec3 vTerrainNormal;
-varying float vLodLevel;
-varying float vMorphFactor;
-`;
+const tslAttribute = (name: string, type: string): TslNode => attribute(name, type) as TslNode;
+const tslVec2 = (...args: TslNode[]): TslNode => (vec2 as (...values: TslNode[]) => TslNode)(...args);
+const tslVec3 = (...args: TslNode[]): TslNode => (vec3 as (...values: TslNode[]) => TslNode)(...args);
+const tslMix = (...args: TslNode[]): TslNode => (mix as (...values: TslNode[]) => TslNode)(...args);
+const tslFloat = (value: number): TslNode => float(value) as TslNode;
+const tslReference = (type: string, uniform: UniformSlot): TslNode => reference('value', type, uniform) as TslNode;
+const tslTexture = (source: THREE.Texture, sampleUv: TslNode): TslNode => tslTextureNode(source, sampleUv) as TslNode;
+const tslClamp = (...args: TslNode[]): TslNode => (tslClampBase as (...values: TslNode[]) => TslNode)(...args);
+const tslLength = (value: TslNode): TslNode => (tslLengthBase as (node: TslNode) => TslNode)(value);
+const tslMax = (...args: TslNode[]): TslNode => (tslMaxBase as (...values: TslNode[]) => TslNode)(...args);
+const tslMin = (...args: TslNode[]): TslNode => (tslMinBase as (...values: TslNode[]) => TslNode)(...args);
+const tslPositionGeometry = positionGeometry as TslNode;
+const tslPositionWorld = positionWorld as TslNode;
+const tslCameraPosition = cameraPosition as TslNode;
 
 export const TERRAIN_VERTEX_MAIN = /* glsl */ `
 // CDLOD morph: snap fine-grid vertices toward parent LOD grid for smooth transitions.
@@ -103,498 +134,6 @@ vTerrainNormal = normalize(nSample);
 transformed = morphedPos;
 `;
 
-const TERRAIN_FRAGMENT_PARS = /* glsl */ `
-uniform sampler2D biomeTexture0;
-uniform sampler2D biomeTexture1;
-uniform sampler2D biomeTexture2;
-uniform sampler2D biomeTexture3;
-uniform sampler2D biomeTexture4;
-uniform sampler2D biomeTexture5;
-uniform sampler2D biomeTexture6;
-uniform sampler2D biomeTexture7;
-
-uniform float biomeTileScale[8];
-uniform float biomeRoughness[8];
-uniform float biomeRuleBiomeSlot[8];
-uniform float biomeRuleMinElevation[8];
-uniform float biomeRuleMaxElevation[8];
-uniform float biomeRuleElevationBlendWidth[8];
-uniform float biomeRuleMinUpDot[8];
-uniform float biomeRulePriority[8];
-uniform float biomeRuleEnabled[8];
-uniform float cliffRockBiomeSlot;
-uniform float antiTilingStrength;
-uniform float triplanarSlopeThreshold;
-uniform float environmentWetness;
-uniform float featureSurfacePatchCount;
-uniform float featureSurfaceShape[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceType[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceX[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceZ[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceInnerRadius[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceOuterRadius[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceHalfWidth[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceHalfLength[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceBlend[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceYawCos[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float featureSurfaceYawSin[${MAX_FEATURE_SURFACE_PATCHES}];
-uniform float farCanopyTintEnabled;
-uniform float farCanopyTintStartDistance;
-uniform float farCanopyTintEndDistance;
-uniform float farCanopyTintStrength;
-uniform float farCanopyTintFogStrength;
-uniform vec3 farCanopyTintColor;
-uniform sampler2D hydrologyMaskTexture;
-uniform float hydrologyMaskEnabled;
-uniform vec2 hydrologyMaskOrigin;
-uniform vec2 hydrologyMaskTextureSize;
-uniform float hydrologyMaskCellSize;
-uniform float hydrologyWetBiomeSlot;
-uniform float hydrologyChannelBiomeSlot;
-uniform float hydrologyWetStrength;
-uniform float hydrologyChannelStrength;
-uniform bool debugWireframe;
-
-varying vec3 vWorldPosition;
-varying vec2 vWorldUV;
-varying vec3 vTerrainNormal;
-varying float vLodLevel;
-varying float vMorphFactor;
-
-float hashUV(vec2 p) {
-  vec2 q = fract(p * vec2(123.34, 456.21));
-  q += dot(q, q + 45.32);
-  return fract(q.x * q.y);
-}
-
-vec2 rotateUv(vec2 uv, float angle) {
-  float s = sin(angle);
-  float c = cos(angle);
-  return mat2(c, -s, s, c) * uv;
-}
-
-float computeFeatureSurfaceMask(int patchIndex, vec2 worldPos) {
-  float shape = featureSurfaceShape[patchIndex];
-  vec2 center = vec2(featureSurfaceX[patchIndex], featureSurfaceZ[patchIndex]);
-
-  if (shape < 1.5) {
-    float innerRadius = featureSurfaceInnerRadius[patchIndex];
-    float outerRadius = max(innerRadius, featureSurfaceOuterRadius[patchIndex]);
-    float dist = distance(worldPos, center);
-    return 1.0 - smoothstep(innerRadius, outerRadius, dist);
-  }
-
-  vec2 offset = worldPos - center;
-  float yawCos = featureSurfaceYawCos[patchIndex];
-  float yawSin = featureSurfaceYawSin[patchIndex];
-  vec2 localPos = vec2(
-    offset.x * yawCos + offset.y * yawSin,
-    -offset.x * yawSin + offset.y * yawCos
-  );
-  vec2 halfSize = vec2(featureSurfaceHalfWidth[patchIndex], featureSurfaceHalfLength[patchIndex]);
-  vec2 q = abs(localPos) - halfSize;
-  float outsideDistance = length(max(q, vec2(0.0)));
-  float sdf = outsideDistance + min(max(q.x, q.y), 0.0);
-  float blend = max(0.01, featureSurfaceBlend[patchIndex]);
-  return 1.0 - smoothstep(0.0, blend, max(sdf, 0.0));
-}
-
-float featureSurfaceWeight(float surfaceTypeId, vec2 worldPos) {
-  float weight = 0.0;
-  for (int i = 0; i < ${MAX_FEATURE_SURFACE_PATCHES}; i++) {
-    if (float(i) >= featureSurfacePatchCount) {
-      continue;
-    }
-    if (abs(featureSurfaceType[i] - surfaceTypeId) > 0.1) {
-      continue;
-    }
-    weight = max(weight, computeFeatureSurfaceMask(i, worldPos));
-  }
-  return clamp(weight, 0.0, 1.0);
-}
-
-float biomeElevationWeight(float elevation, float minElevation, float maxElevation, float blendWidth) {
-  float weight = 1.0;
-  if (minElevation > -99999999.0) {
-    weight *= smoothstep(minElevation - blendWidth, minElevation + blendWidth, elevation);
-  }
-  if (maxElevation < 99999999.0) {
-    weight *= 1.0 - smoothstep(maxElevation - blendWidth, maxElevation + blendWidth, elevation);
-  }
-  return weight;
-}
-
-float biomeSlopeWeight(float slopeUp, float minUpDot, float blendWidth) {
-  if (minUpDot <= -0.5) {
-    return 1.0;
-  }
-  return smoothstep(minUpDot - blendWidth, minUpDot + blendWidth, slopeUp);
-}
-
-float computeBiomeRuleWeight(int ruleIndex, float elevation, float slopeUp) {
-  float elevationWeight = biomeElevationWeight(
-    elevation,
-    biomeRuleMinElevation[ruleIndex],
-    biomeRuleMaxElevation[ruleIndex],
-    biomeRuleElevationBlendWidth[ruleIndex]
-  );
-  float slopeWeight = biomeSlopeWeight(slopeUp, biomeRuleMinUpDot[ruleIndex], 0.08);
-  float priorityBias = 1.0 + max(0.0, biomeRulePriority[ruleIndex]) * 0.02;
-  return elevationWeight * slopeWeight * priorityBias;
-}
-
-void classifyBiomeBlend(vec3 normal, out float primarySlot, out float secondarySlot, out float secondaryBlend) {
-  float elevation = vWorldPosition.y;
-  float slopeUp = clamp(dot(normal, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
-  float bestSlot = 0.0;
-  float bestWeight = 0.35;
-  float secondSlot = 0.0;
-  float secondWeight = 0.0;
-
-  for (int i = 0; i < 8; i++) {
-    if (biomeRuleEnabled[i] < 0.5) {
-      continue;
-    }
-
-    float ruleWeight = computeBiomeRuleWeight(i, elevation, slopeUp);
-    if (ruleWeight <= 0.001) {
-      continue;
-    }
-
-    if (ruleWeight > bestWeight) {
-      secondSlot = bestSlot;
-      secondWeight = bestWeight;
-      bestSlot = biomeRuleBiomeSlot[i];
-      bestWeight = ruleWeight;
-    } else if (ruleWeight > secondWeight) {
-      secondSlot = biomeRuleBiomeSlot[i];
-      secondWeight = ruleWeight;
-    }
-  }
-
-  primarySlot = bestSlot;
-  secondarySlot = secondSlot;
-  secondaryBlend = secondWeight <= 0.001 ? 0.0 : clamp(secondWeight / (bestWeight + secondWeight), 0.0, 0.5);
-}
-
-vec2 sampleHydrologyMask(vec2 worldPos) {
-  if (hydrologyMaskEnabled < 0.5 || hydrologyMaskCellSize <= 0.0) {
-    return vec2(0.0);
-  }
-
-  vec2 gridUv = ((worldPos - hydrologyMaskOrigin) / hydrologyMaskCellSize + vec2(0.5)) / hydrologyMaskTextureSize;
-  if (gridUv.x < 0.0 || gridUv.x > 1.0 || gridUv.y < 0.0 || gridUv.y > 1.0) {
-    return vec2(0.0);
-  }
-
-  return texture2D(hydrologyMaskTexture, gridUv).rg;
-}
-
-void applyHydrologyBiomeBlend(
-  vec2 worldPos,
-  inout float primarySlot,
-  inout float secondarySlot,
-  inout float secondaryBlend
-) {
-  vec2 hydrologyMask = sampleHydrologyMask(worldPos);
-  float channelWeight = smoothstep(0.2, 0.8, hydrologyMask.g) * hydrologyChannelStrength;
-  float wetWeight = smoothstep(0.2, 0.8, hydrologyMask.r) * hydrologyWetStrength;
-  float hydrologyWeight = max(channelWeight, wetWeight);
-  if (hydrologyWeight <= 0.001) {
-    return;
-  }
-
-  float originalPrimary = primarySlot;
-  primarySlot = channelWeight >= wetWeight ? hydrologyChannelBiomeSlot : hydrologyWetBiomeSlot;
-  secondarySlot = originalPrimary;
-  secondaryBlend = clamp(1.0 - hydrologyWeight, 0.0, 1.0);
-}
-
-vec4 sampleBiomeTextureRaw(float biomeSlot, vec2 uv) {
-  if (biomeSlot < 0.5) return texture2D(biomeTexture0, uv);
-  if (biomeSlot < 1.5) return texture2D(biomeTexture1, uv);
-  if (biomeSlot < 2.5) return texture2D(biomeTexture2, uv);
-  if (biomeSlot < 3.5) return texture2D(biomeTexture3, uv);
-  if (biomeSlot < 4.5) return texture2D(biomeTexture4, uv);
-  if (biomeSlot < 5.5) return texture2D(biomeTexture5, uv);
-  if (biomeSlot < 6.5) return texture2D(biomeTexture6, uv);
-  return texture2D(biomeTexture7, uv);
-}
-
-float sampleBiomeTileScale(float biomeSlot) {
-  if (biomeSlot < 0.5) return biomeTileScale[0];
-  if (biomeSlot < 1.5) return biomeTileScale[1];
-  if (biomeSlot < 2.5) return biomeTileScale[2];
-  if (biomeSlot < 3.5) return biomeTileScale[3];
-  if (biomeSlot < 4.5) return biomeTileScale[4];
-  if (biomeSlot < 5.5) return biomeTileScale[5];
-  if (biomeSlot < 6.5) return biomeTileScale[6];
-  return biomeTileScale[7];
-}
-
-vec4 sampleBiomeTexture(float biomeSlot, vec2 worldUv, vec2 uvOffset) {
-  float tileScale = sampleBiomeTileScale(biomeSlot);
-  vec2 primaryUv = worldUv * tileScale + uvOffset;
-  vec2 rotatedUv = rotateUv(worldUv, 0.67) * (tileScale * 0.63) + uvOffset * 1.7 + vec2(17.13, 9.71);
-  vec4 primarySample = sampleBiomeTextureRaw(biomeSlot, primaryUv);
-  vec4 rotatedSample = sampleBiomeTextureRaw(biomeSlot, rotatedUv);
-  float breakup = hashUV(worldUv * 0.25 + uvOffset * 10.0);
-  return mix(primarySample, rotatedSample, 0.32 + breakup * 0.18);
-}
-
-vec4 sampleBiomeTriplanar(float biomeSlot, vec3 worldPos, vec3 worldNormal, vec2 uvOffset) {
-  vec3 blend = abs(worldNormal);
-  blend = pow(blend, vec3(4.0));
-  blend /= max(dot(blend, vec3(1.0)), 0.0001);
-
-  vec4 sampleX = sampleBiomeTexture(biomeSlot, worldPos.zy, uvOffset);
-  vec4 sampleY = sampleBiomeTexture(biomeSlot, worldPos.xz, uvOffset);
-  vec4 sampleZ = sampleBiomeTexture(biomeSlot, worldPos.xy, uvOffset);
-  return sampleX * blend.x + sampleY * blend.y + sampleZ * blend.z;
-}
-
-float sampleBiomeRoughness(float biomeSlot) {
-  if (biomeSlot < 0.5) return biomeRoughness[0];
-  if (biomeSlot < 1.5) return biomeRoughness[1];
-  if (biomeSlot < 2.5) return biomeRoughness[2];
-  if (biomeSlot < 3.5) return biomeRoughness[3];
-  if (biomeSlot < 4.5) return biomeRoughness[4];
-  if (biomeSlot < 5.5) return biomeRoughness[5];
-  if (biomeSlot < 6.5) return biomeRoughness[6];
-  return biomeRoughness[7];
-}
-
-float macroVariation(vec2 worldPos) {
-  float base = sin(worldPos.x * 0.012 + sin(worldPos.y * 0.007) * 1.7);
-  float detail = cos(worldPos.y * 0.016 + sin(worldPos.x * 0.011) * 1.3);
-  return clamp(1.0 + (base * 0.06 + detail * 0.04), 0.9, 1.12);
-}
-
-vec3 jungleHumidityTint(vec3 color, float slopeUp, float elevation) {
-  float lowlandFactor = 1.0 - smoothstep(900.0, 1500.0, elevation);
-  float flatFactor = smoothstep(0.45, 0.95, slopeUp);
-  vec3 humidTint = vec3(0.93, 1.01, 0.94);
-  return mix(color, color * humidTint, lowlandFactor * flatFactor * 0.22);
-}
-
-float lowlandWetnessMask(float slopeUp, float elevation) {
-  float lowlandFactor = 1.0 - smoothstep(700.0, 1200.0, elevation);
-  float flatFactor = smoothstep(0.58, 0.98, slopeUp);
-  return lowlandFactor * flatFactor * mix(0.35, 1.0, clamp(environmentWetness, 0.0, 1.0));
-}
-
-vec3 applyLowlandWetness(vec3 color, float slopeUp, float elevation) {
-  float wetness = lowlandWetnessMask(slopeUp, elevation);
-  if (wetness <= 0.001) {
-    return color;
-  }
-
-  vec3 wetTint = vec3(0.82, 0.9, 0.84);
-  vec3 darkened = color * wetTint;
-  return mix(color, darkened, wetness * 0.35);
-}
-
-vec3 applyCliffRockAccent(vec3 color, float slopeUp, float elevation, vec2 worldUv, vec2 uvOffset) {
-  float cliffMask = 1.0 - smoothstep(0.50, 0.74, slopeUp);
-  float proceduralHillMask = smoothstep(20.0, 60.0, elevation) * (1.0 - smoothstep(150.0, 300.0, elevation));
-  float demRidgeMask = smoothstep(450.0, 950.0, elevation);
-  float elevationMask = max(proceduralHillMask, demRidgeMask);
-  float rockBlend = cliffMask * elevationMask * 0.26;
-  if (rockBlend <= 0.001) {
-    return color;
-  }
-
-  vec4 rockPlanar = sampleBiomeTexture(cliffRockBiomeSlot, worldUv, uvOffset);
-  vec3 mossyRock = mix(rockPlanar.rgb, rockPlanar.rgb * vec3(0.66, 0.86, 0.68), 0.45);
-  return mix(color, mossyRock, rockBlend);
-}
-
-float farCanopyTintMask(float slopeUp, float elevation, vec2 worldPos) {
-  if (farCanopyTintEnabled < 0.5) {
-    return 0.0;
-  }
-
-  float distanceMask = smoothstep(
-    farCanopyTintStartDistance,
-    max(farCanopyTintStartDistance + 1.0, farCanopyTintEndDistance),
-    distance(cameraPosition.xz, worldPos)
-  );
-  float slopeMask = smoothstep(0.18, 0.72, slopeUp);
-  float elevationMask = 1.0 - smoothstep(2400.0, 3800.0, elevation);
-  float breakup = mix(
-    0.74,
-    1.12,
-    hashUV(worldPos * 0.003 + vec2(3.71, 5.19))
-  );
-
-  return clamp(
-    farCanopyTintStrength * distanceMask * slopeMask * elevationMask * breakup,
-    0.0,
-    0.65
-  );
-}
-
-vec3 applyFarCanopyTint(vec3 color, float slopeUp, float elevation, vec2 worldPos) {
-  float mask = farCanopyTintMask(slopeUp, elevation, worldPos);
-  if (mask <= 0.001) {
-    return color;
-  }
-
-  vec3 canopyColor = farCanopyTintColor * mix(
-    0.82,
-    1.18,
-    hashUV(worldPos * 0.007 + vec2(1.37, 8.53))
-  );
-  return mix(color, canopyColor, mask);
-}
-
-vec3 applyFeatureSurfaceColor(vec3 color, vec2 worldPos) {
-  float packedEarthWeight = featureSurfaceWeight(1.0, worldPos);
-  if (packedEarthWeight > 0.001) {
-    vec3 packedEarthColor = vec3(0.47, 0.38, 0.24);
-    color = mix(color, packedEarthColor, packedEarthWeight * 0.78);
-  }
-
-  float runwayWeight = featureSurfaceWeight(2.0, worldPos);
-  if (runwayWeight > 0.001) {
-    vec3 runwayColor = vec3(0.41, 0.39, 0.36);
-    color = mix(color, runwayColor, runwayWeight * 0.82);
-  }
-
-  float dirtRoadWeight = featureSurfaceWeight(3.0, worldPos);
-  if (dirtRoadWeight > 0.001) {
-    vec3 dirtRoadColor = vec3(0.45, 0.35, 0.22);
-    color = mix(color, dirtRoadColor, dirtRoadWeight * 0.70);
-  }
-
-  float gravelRoadWeight = featureSurfaceWeight(4.0, worldPos);
-  if (gravelRoadWeight > 0.001) {
-    vec3 gravelRoadColor = vec3(0.48, 0.44, 0.38);
-    color = mix(color, gravelRoadColor, gravelRoadWeight * 0.75);
-  }
-
-  float jungleTrailWeight = featureSurfaceWeight(5.0, worldPos);
-  if (jungleTrailWeight > 0.001) {
-    vec3 jungleTrailColor = vec3(0.32, 0.26, 0.18);
-    color = mix(color, jungleTrailColor, jungleTrailWeight * 0.50);
-  }
-
-  return color;
-}
-`;
-
-const TERRAIN_FRAGMENT_MAP = /* glsl */ `
-float primaryBiomeSlot;
-float secondaryBiomeSlot;
-float secondaryBiomeBlend;
-classifyBiomeBlend(normalize(vTerrainNormal), primaryBiomeSlot, secondaryBiomeSlot, secondaryBiomeBlend);
-applyHydrologyBiomeBlend(vWorldPosition.xz, primaryBiomeSlot, secondaryBiomeSlot, secondaryBiomeBlend);
-vec2 uvOffset = vec2(0.0);
-if (antiTilingStrength > 0.0) {
-  float noise = hashUV(vWorldUV * 7.0);
-  uvOffset = vec2(noise, hashUV(vWorldUV * 11.0 + 0.5)) * antiTilingStrength * 0.02;
-}
-float slopeUp = clamp(dot(normalize(vTerrainNormal), vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
-float triplanarBlend = 1.0 - smoothstep(
-  max(0.0, triplanarSlopeThreshold - 0.2),
-  triplanarSlopeThreshold,
-  slopeUp
-);
-vec4 primaryPlanarSample = sampleBiomeTexture(primaryBiomeSlot, vWorldPosition.xz, uvOffset);
-vec4 primaryTriplanarSample = sampleBiomeTriplanar(primaryBiomeSlot, vWorldPosition, normalize(vTerrainNormal), uvOffset);
-vec4 primaryBiomeSample = mix(primaryPlanarSample, primaryTriplanarSample, triplanarBlend);
-vec4 biomeSample = primaryBiomeSample;
-if (secondaryBiomeBlend > 0.001) {
-  vec4 secondaryPlanarSample = sampleBiomeTexture(secondaryBiomeSlot, vWorldPosition.xz, uvOffset);
-  vec4 secondaryTriplanarSample = sampleBiomeTriplanar(secondaryBiomeSlot, vWorldPosition, normalize(vTerrainNormal), uvOffset);
-  vec4 secondaryBiomeSample = mix(secondaryPlanarSample, secondaryTriplanarSample, triplanarBlend);
-  biomeSample = mix(primaryBiomeSample, secondaryBiomeSample, secondaryBiomeBlend);
-}
-vec3 finalColor = biomeSample.rgb * macroVariation(vWorldPosition.xz);
-finalColor = jungleHumidityTint(finalColor, slopeUp, vWorldPosition.y);
-finalColor = applyLowlandWetness(finalColor, slopeUp, vWorldPosition.y);
-finalColor = applyCliffRockAccent(finalColor, slopeUp, vWorldPosition.y, vWorldPosition.xz, uvOffset);
-finalColor = applyFarCanopyTint(finalColor, slopeUp, vWorldPosition.y, vWorldPosition.xz);
-finalColor = applyFeatureSurfaceColor(finalColor, vWorldPosition.xz);
-diffuseColor.rgb = finalColor;
-if (debugWireframe) {
-  // Color-code LOD levels for visual debugging
-  vec3 lodColors[5];
-  lodColors[0] = vec3(0.0, 1.0, 0.0); // LOD 0: green (finest)
-  lodColors[1] = vec3(0.0, 0.5, 1.0); // LOD 1: blue
-  lodColors[2] = vec3(1.0, 1.0, 0.0); // LOD 2: yellow
-  lodColors[3] = vec3(1.0, 0.5, 0.0); // LOD 3: orange
-  lodColors[4] = vec3(1.0, 0.0, 0.0); // LOD 4: red (coarsest)
-  int lodIdx = clamp(int(vLodLevel), 0, 4);
-  vec3 lodColor = lodColors[lodIdx];
-  // Blend morph factor as brightness
-  diffuseColor.rgb = lodColor * (0.5 + 0.5 * (1.0 - vMorphFactor));
-}
-`;
-
-const TERRAIN_FRAGMENT_ROUGHNESS = /* glsl */ `
-float primaryRoughnessBiomeSlot;
-float secondaryRoughnessBiomeSlot;
-float roughnessSecondaryBlend;
-classifyBiomeBlend(normalize(vTerrainNormal), primaryRoughnessBiomeSlot, secondaryRoughnessBiomeSlot, roughnessSecondaryBlend);
-applyHydrologyBiomeBlend(vWorldPosition.xz, primaryRoughnessBiomeSlot, secondaryRoughnessBiomeSlot, roughnessSecondaryBlend);
-float roughnessSample = sampleBiomeRoughness(primaryRoughnessBiomeSlot);
-if (roughnessSecondaryBlend > 0.001) {
-  float secondaryRoughness = sampleBiomeRoughness(secondaryRoughnessBiomeSlot);
-  roughnessSample = mix(roughnessSample, secondaryRoughness, roughnessSecondaryBlend);
-}
-float wetness = lowlandWetnessMask(
-  clamp(dot(normalize(vTerrainNormal), vec3(0.0, 1.0, 0.0)), 0.0, 1.0),
-  vWorldPosition.y
-);
-roughnessSample = mix(roughnessSample, roughnessSample * 0.72, wetness);
-float packedEarthWeight = featureSurfaceWeight(1.0, vWorldPosition.xz);
-if (packedEarthWeight > 0.001) {
-  roughnessSample = mix(roughnessSample, 0.96, packedEarthWeight);
-}
-float runwayWeight = featureSurfaceWeight(2.0, vWorldPosition.xz);
-if (runwayWeight > 0.001) {
-  roughnessSample = mix(roughnessSample, 0.82, runwayWeight);
-}
-float dirtRoadWeightR = featureSurfaceWeight(3.0, vWorldPosition.xz);
-if (dirtRoadWeightR > 0.001) {
-  roughnessSample = mix(roughnessSample, 0.94, dirtRoadWeightR);
-}
-float gravelRoadWeightR = featureSurfaceWeight(4.0, vWorldPosition.xz);
-if (gravelRoadWeightR > 0.001) {
-  roughnessSample = mix(roughnessSample, 0.90, gravelRoadWeightR);
-}
-float jungleTrailWeightR = featureSurfaceWeight(5.0, vWorldPosition.xz);
-if (jungleTrailWeightR > 0.001) {
-  roughnessSample = mix(roughnessSample, 0.95, jungleTrailWeightR);
-}
-float farCanopyRoughnessMask = farCanopyTintMask(
-  clamp(dot(normalize(vTerrainNormal), vec3(0.0, 1.0, 0.0)), 0.0, 1.0),
-  vWorldPosition.y,
-  vWorldPosition.xz
-);
-roughnessSample = mix(roughnessSample, max(roughnessSample, 0.92), farCanopyRoughnessMask * 0.55);
-roughnessFactor *= roughnessSample;
-`;
-
-const TERRAIN_FRAGMENT_NORMAL_OVERRIDE = /* glsl */ `
-normal = normalize(vTerrainNormal);
-nonPerturbedNormal = normal;
-`;
-
-const TERRAIN_FRAGMENT_FOG_TINT = /* glsl */ `
-#include <fog_fragment>
-float farCanopyFogMask = farCanopyTintMask(
-  clamp(dot(normalize(vTerrainNormal), vec3(0.0, 1.0, 0.0)), 0.0, 1.0),
-  vWorldPosition.y,
-  vWorldPosition.xz
-);
-if (farCanopyFogMask > 0.001) {
-  vec3 foggedCanopy = farCanopyTintColor * 0.86;
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, foggedCanopy, farCanopyFogMask * farCanopyTintFogStrength);
-}
-`;
-
 export interface TerrainBiomeLayerConfig {
   biomeId: string;
   texture: THREE.Texture;
@@ -643,13 +182,430 @@ interface TerrainMaterialOptions {
   surfacePatches?: TerrainSurfacePatch[];
 }
 
-export function createTerrainMaterial(options: TerrainMaterialOptions): THREE.MeshStandardMaterial {
-  const material = new THREE.MeshStandardMaterial({
+function uniformTexture(uniforms: TerrainUniforms, key: string): THREE.Texture {
+  return uniforms[key].value as THREE.Texture;
+}
+
+function uniformNumber(uniforms: TerrainUniforms, key: string): number {
+  return uniforms[key].value as number;
+}
+
+function uniformArrayValue(uniforms: TerrainUniforms, key: string, index: number): number {
+  return (uniforms[key].value as Float32Array)[index] ?? 0;
+}
+
+function createTerrainWorldUvNode(uniforms: TerrainUniforms, worldPos: TslNode): TslNode {
+  const terrainWorldSize = tslReference('float', uniforms.terrainWorldSize);
+  const heightmapGridSize = tslReference('float', uniforms.heightmapGridSize);
+  const halfWorld = terrainWorldSize.mul(0.5);
+  const texelHalf = tslFloat(0.5).div(heightmapGridSize);
+  const uvScale = heightmapGridSize.sub(1).div(heightmapGridSize);
+  const normalizedPos = tslVec2(
+    worldPos.x.add(halfWorld).div(terrainWorldSize),
+    worldPos.z.add(halfWorld).div(terrainWorldSize),
+  );
+  return tslClamp(normalizedPos.mul(uvScale).add(texelHalf), tslVec2(0, 0), tslVec2(1, 1));
+}
+
+function edgeBit(edgeMorphMask: TslNode, bit: number): TslNode {
+  return step(tslFloat(0.5), floor(edgeMorphMask.div(bit)).mod(2)) as TslNode;
+}
+
+function createTerrainPositionNode(uniforms: TerrainUniforms): TslNode {
+  const tileCenterX = tslAttribute('tileCenterX', 'float');
+  const tileCenterZ = tslAttribute('tileCenterZ', 'float');
+  const tileSize = tslAttribute('tileSize', 'float');
+  const lodLevel = tslAttribute('lodLevel', 'float');
+  const morphFactor = tslAttribute('morphFactor', 'float');
+  const edgeMorphMask = tslAttribute('edgeMorphMask', 'float');
+  const isSkirt = tslAttribute('isSkirt', 'float');
+  const tileGridResolution = tslReference('float', uniforms.tileGridResolution);
+  const gridPos = tslPositionGeometry.xz.add(tslVec2(0.5, 0.5));
+  const edgeEps = tslFloat(1.0e-4);
+  const north = step(tslFloat(1).sub(edgeEps), gridPos.y).mul(edgeBit(edgeMorphMask, 1));
+  const east = step(tslFloat(1).sub(edgeEps), gridPos.x).mul(edgeBit(edgeMorphMask, 2));
+  const south = step(gridPos.y, edgeEps).mul(edgeBit(edgeMorphMask, 4));
+  const west = step(gridPos.x, edgeEps).mul(edgeBit(edgeMorphMask, 8));
+  const forcedMorph = tslMax(tslMax(north, east), tslMax(south, west));
+  const effectiveMorph = tslMix(morphFactor, tslFloat(1), forcedMorph);
+  const parentStep = tslFloat(2).div(tileGridResolution);
+  const snapped = floor(gridPos.div(parentStep).add(0.5)).mul(parentStep);
+  const morphedX = tslMix(gridPos.x, snapped.x, effectiveMorph).sub(0.5);
+  const morphedZ = tslMix(gridPos.y, snapped.y, effectiveMorph).sub(0.5);
+  const worldPos = tslVec3(
+    tileCenterX.add(morphedX.mul(tileSize)),
+    tslFloat(0),
+    tileCenterZ.add(morphedZ.mul(tileSize)),
+  );
+  const worldUv = createTerrainWorldUvNode(uniforms, worldPos);
+  const terrainHeight = tslTexture(uniformTexture(uniforms, 'terrainHeightmap'), worldUv).r;
+  const skirtDrop = tslMax(tslFloat(2), lodLevel.add(1).mul(4));
+  return tslVec3(
+    worldPos.x,
+    terrainHeight.sub(step(tslFloat(0.5), isSkirt).mul(skirtDrop)),
+    worldPos.z,
+  );
+}
+
+function createTerrainNormalNode(uniforms: TerrainUniforms, worldPos: TslNode = tslPositionWorld): TslNode {
+  const worldUv = createTerrainWorldUvNode(uniforms, worldPos);
+  return normalize(tslTexture(uniformTexture(uniforms, 'terrainNormalMap'), worldUv).rgb.mul(2).sub(1)) as TslNode;
+}
+
+function hashUvNode(p: TslNode): TslNode {
+  const q = fract(p.mul(tslVec2(123.34, 456.21))) as TslNode;
+  return fract(q.x.mul(q.y).add(dot(q, q.add(45.32)))) as TslNode;
+}
+
+function rotateUvNode(sampleUv: TslNode, angle: TslNode): TslNode {
+  const s = sin(angle) as TslNode;
+  const c = cos(angle) as TslNode;
+  return tslVec2(
+    c.mul(sampleUv.x).sub(s.mul(sampleUv.y)),
+    s.mul(sampleUv.x).add(c.mul(sampleUv.y)),
+  );
+}
+
+function sampleBiomeTextureRaw(biomeSlot: TslNode, sampleUv: TslNode, uniforms: TerrainUniforms): TslNode {
+  let sample = tslTexture(uniformTexture(uniforms, 'biomeTexture0'), sampleUv);
+  for (let i = 1; i < MAX_BIOME_TEXTURES; i++) {
+    sample = tslMix(
+      sample,
+      tslTexture(uniformTexture(uniforms, `biomeTexture${i}`), sampleUv),
+      step(tslFloat(i - 0.5), biomeSlot),
+    );
+  }
+  return sample;
+}
+
+function sampleBiomeScalar(biomeSlot: TslNode, uniforms: TerrainUniforms, key: string): TslNode {
+  let value = tslFloat(uniformArrayValue(uniforms, key, 0));
+  for (let i = 1; i < MAX_BIOME_TEXTURES; i++) {
+    value = tslMix(value, tslFloat(uniformArrayValue(uniforms, key, i)), step(tslFloat(i - 0.5), biomeSlot));
+  }
+  return value;
+}
+
+function sampleBiomeTexture(biomeSlot: TslNode, worldUv: TslNode, uvOffset: TslNode, uniforms: TerrainUniforms): TslNode {
+  const tileScale = sampleBiomeScalar(biomeSlot, uniforms, 'biomeTileScale');
+  const primaryUv = worldUv.mul(tileScale).add(uvOffset);
+  const rotatedUv = rotateUvNode(worldUv, tslFloat(0.67))
+    .mul(tileScale.mul(0.63))
+    .add(uvOffset.mul(1.7))
+    .add(tslVec2(17.13, 9.71));
+  const primarySample = sampleBiomeTextureRaw(biomeSlot, primaryUv, uniforms);
+  const rotatedSample = sampleBiomeTextureRaw(biomeSlot, rotatedUv, uniforms);
+  const breakup = hashUvNode(worldUv.mul(0.25).add(uvOffset.mul(10)));
+  return tslMix(primarySample, rotatedSample, tslFloat(0.32).add(breakup.mul(0.18)));
+}
+
+function sampleBiomeTriplanar(biomeSlot: TslNode, worldPos: TslNode, worldNormal: TslNode, uvOffset: TslNode, uniforms: TerrainUniforms): TslNode {
+  let blend = pow(abs(worldNormal), tslVec3(4, 4, 4)) as TslNode;
+  blend = blend.div(tslMax(dot(blend, tslVec3(1, 1, 1)), tslFloat(0.0001)));
+  const sampleX = sampleBiomeTexture(biomeSlot, worldPos.zy, uvOffset, uniforms);
+  const sampleY = sampleBiomeTexture(biomeSlot, worldPos.xz, uvOffset, uniforms);
+  const sampleZ = sampleBiomeTexture(biomeSlot, worldPos.xy, uvOffset, uniforms);
+  return sampleX.mul(blend.x).add(sampleY.mul(blend.y)).add(sampleZ.mul(blend.z));
+}
+
+function biomeElevationWeight(elevation: TslNode, minElevation: number, maxElevation: number, blendWidth: number): TslNode {
+  let weight = tslFloat(1);
+  if (minElevation > -99999999) {
+    weight = weight.mul(smoothstep(tslFloat(minElevation - blendWidth), tslFloat(minElevation + blendWidth), elevation));
+  }
+  if (maxElevation < 99999999) {
+    weight = weight.mul(tslFloat(1).sub(smoothstep(tslFloat(maxElevation - blendWidth), tslFloat(maxElevation + blendWidth), elevation)));
+  }
+  return weight;
+}
+
+function biomeSlopeWeight(slopeUp: TslNode, minUpDot: number): TslNode {
+  if (minUpDot <= -0.5) return tslFloat(1);
+  return smoothstep(tslFloat(minUpDot - 0.08), tslFloat(minUpDot + 0.08), slopeUp) as TslNode;
+}
+
+function classifyBiomeBlend(worldPos: TslNode, terrainNormal: TslNode, uniforms: TerrainUniforms): {
+  primarySlot: TslNode;
+  secondarySlot: TslNode;
+  secondaryBlend: TslNode;
+  slopeUp: TslNode;
+} {
+  const slopeUp = tslClamp(dot(terrainNormal, tslVec3(0, 1, 0)), tslFloat(0), tslFloat(1));
+  let bestSlot = tslFloat(0);
+  let bestWeight = tslFloat(0.35);
+  let secondSlot = tslFloat(0);
+  let secondWeight = tslFloat(0);
+
+  for (let i = 0; i < MAX_BIOME_RULES; i++) {
+    const enabled = uniformArrayValue(uniforms, 'biomeRuleEnabled', i);
+    if (enabled < 0.5) continue;
+    const slot = uniformArrayValue(uniforms, 'biomeRuleBiomeSlot', i);
+    const minElevation = uniformArrayValue(uniforms, 'biomeRuleMinElevation', i);
+    const maxElevation = uniformArrayValue(uniforms, 'biomeRuleMaxElevation', i);
+    const blendWidth = uniformArrayValue(uniforms, 'biomeRuleElevationBlendWidth', i);
+    const minUpDot = uniformArrayValue(uniforms, 'biomeRuleMinUpDot', i);
+    const priority = uniformArrayValue(uniforms, 'biomeRulePriority', i);
+    const ruleWeight = biomeElevationWeight(worldPos.y, minElevation, maxElevation, blendWidth)
+      .mul(biomeSlopeWeight(slopeUp, minUpDot))
+      .mul(1 + Math.max(0, priority) * 0.02);
+    const oldBestSlot = bestSlot;
+    const oldBestWeight = bestWeight;
+    const isBest = step(bestWeight.add(0.0001), ruleWeight) as TslNode;
+    const isSecond = step(secondWeight.add(0.0001), ruleWeight).mul(tslFloat(1).sub(isBest));
+    secondSlot = tslMix(secondSlot, tslFloat(slot), isSecond);
+    secondWeight = tslMix(secondWeight, ruleWeight, isSecond);
+    bestSlot = tslMix(bestSlot, tslFloat(slot), isBest);
+    bestWeight = tslMix(bestWeight, ruleWeight, isBest);
+    secondSlot = tslMix(secondSlot, oldBestSlot, isBest);
+    secondWeight = tslMix(secondWeight, oldBestWeight, isBest);
+  }
+
+  const blendActive = step(tslFloat(0.001), secondWeight) as TslNode;
+  const secondaryBlend = tslMix(
+    tslFloat(0),
+    tslClamp(secondWeight.div(bestWeight.add(secondWeight)), tslFloat(0), tslFloat(0.5)),
+    blendActive,
+  );
+  return { primarySlot: bestSlot, secondarySlot: secondSlot, secondaryBlend, slopeUp };
+}
+
+function applyHydrologyBiomeBlend(
+  worldPos: TslNode,
+  primarySlot: TslNode,
+  secondarySlot: TslNode,
+  secondaryBlend: TslNode,
+  uniforms: TerrainUniforms,
+): { primarySlot: TslNode; secondarySlot: TslNode; secondaryBlend: TslNode } {
+  const enabled = tslReference('float', uniforms.hydrologyMaskEnabled);
+  const cellSize = tslReference('float', uniforms.hydrologyMaskCellSize);
+  const origin = tslReference('vec2', uniforms.hydrologyMaskOrigin);
+  const textureSize = tslReference('vec2', uniforms.hydrologyMaskTextureSize);
+  const gridUv = worldPos.xz.sub(origin).div(cellSize).add(tslVec2(0.5, 0.5)).div(textureSize);
+  const inside = step(tslFloat(0), gridUv.x)
+    .mul(step(gridUv.x, tslFloat(1)))
+    .mul(step(tslFloat(0), gridUv.y))
+    .mul(step(gridUv.y, tslFloat(1)))
+    .mul(step(tslFloat(0.5), enabled))
+    .mul(step(tslFloat(0.0001), cellSize));
+  const hydrologyMask = tslTexture(
+    uniformTexture(uniforms, 'hydrologyMaskTexture'),
+    tslClamp(gridUv, tslVec2(0, 0), tslVec2(1, 1)),
+  ).rg.mul(inside);
+  const channelWeight = (smoothstep(tslFloat(0.2), tslFloat(0.8), hydrologyMask.g) as TslNode)
+    .mul(tslReference('float', uniforms.hydrologyChannelStrength));
+  const wetWeight = (smoothstep(tslFloat(0.2), tslFloat(0.8), hydrologyMask.r) as TslNode)
+    .mul(tslReference('float', uniforms.hydrologyWetStrength));
+  const hydrologyWeight = tslMax(channelWeight, wetWeight);
+  const hydrologyActive = step(tslFloat(0.001), hydrologyWeight) as TslNode;
+  const channelWins = step(wetWeight, channelWeight) as TslNode;
+  const hydrologySlot = tslMix(
+    tslReference('float', uniforms.hydrologyWetBiomeSlot),
+    tslReference('float', uniforms.hydrologyChannelBiomeSlot),
+    channelWins,
+  );
+  return {
+    primarySlot: tslMix(primarySlot, hydrologySlot, hydrologyActive),
+    secondarySlot: tslMix(secondarySlot, primarySlot, hydrologyActive),
+    secondaryBlend: tslMix(secondaryBlend, tslClamp(tslFloat(1).sub(hydrologyWeight), tslFloat(0), tslFloat(1)), hydrologyActive),
+  };
+}
+
+function macroVariation(worldPos: TslNode): TslNode {
+  const base = sin(worldPos.x.mul(0.012).add(sin(worldPos.y.mul(0.007)).mul(1.7)));
+  const detail = cos(worldPos.y.mul(0.016).add(sin(worldPos.x.mul(0.011)).mul(1.3)));
+  return tslClamp(tslFloat(1).add(base.mul(0.06).add(detail.mul(0.04))), tslFloat(0.9), tslFloat(1.12));
+}
+
+function lowlandWetnessMask(slopeUp: TslNode, elevation: TslNode, uniforms: TerrainUniforms): TslNode {
+  const lowlandFactor = tslFloat(1).sub(smoothstep(tslFloat(700), tslFloat(1200), elevation));
+  const flatFactor = smoothstep(tslFloat(0.58), tslFloat(0.98), slopeUp);
+  const wetness = tslClamp(tslReference('float', uniforms.environmentWetness), tslFloat(0), tslFloat(1));
+  return lowlandFactor.mul(flatFactor).mul(tslMix(tslFloat(0.35), tslFloat(1), wetness));
+}
+
+function farCanopyTintMask(slopeUp: TslNode, elevation: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
+  const enabled = step(tslFloat(0.5), tslReference('float', uniforms.farCanopyTintEnabled));
+  const start = tslReference('float', uniforms.farCanopyTintStartDistance);
+  const end = tslMax(start.add(1), tslReference('float', uniforms.farCanopyTintEndDistance));
+  const cameraDistance = tslLength(tslCameraPosition.xz.sub(worldPos.xz));
+  const distanceMask = smoothstep(start, end, cameraDistance);
+  const slopeMask = smoothstep(tslFloat(0.18), tslFloat(0.72), slopeUp);
+  const elevationMask = tslFloat(1).sub(smoothstep(tslFloat(2400), tslFloat(3800), elevation));
+  const breakup = tslMix(tslFloat(0.74), tslFloat(1.12), hashUvNode(worldPos.xz.mul(0.003).add(tslVec2(3.71, 5.19))));
+  return tslClamp(
+    tslReference('float', uniforms.farCanopyTintStrength)
+      .mul(distanceMask)
+      .mul(slopeMask)
+      .mul(elevationMask)
+      .mul(breakup)
+      .mul(enabled),
+    tslFloat(0),
+    tslFloat(0.65),
+  );
+}
+
+function featureSurfaceWeight(surfaceTypeId: number, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
+  let weight = tslFloat(0);
+  const patchCount = uniformNumber(uniforms, 'featureSurfacePatchCount');
+  for (let i = 0; i < Math.min(patchCount, MAX_FEATURE_SURFACE_PATCHES); i++) {
+    const shape = uniformArrayValue(uniforms, 'featureSurfaceShape', i);
+    const type = uniformArrayValue(uniforms, 'featureSurfaceType', i);
+    if (Math.abs(type - surfaceTypeId) > 0.1) continue;
+    const center = tslVec2(
+      uniformArrayValue(uniforms, 'featureSurfaceX', i),
+      uniformArrayValue(uniforms, 'featureSurfaceZ', i),
+    );
+    const circleDistance = tslLength(worldPos.xz.sub(center));
+    const circleMask = tslFloat(1).sub(smoothstep(
+      tslFloat(uniformArrayValue(uniforms, 'featureSurfaceInnerRadius', i)),
+      tslFloat(Math.max(
+        uniformArrayValue(uniforms, 'featureSurfaceInnerRadius', i),
+        uniformArrayValue(uniforms, 'featureSurfaceOuterRadius', i),
+      )),
+      circleDistance,
+    ));
+    const offset = worldPos.xz.sub(center);
+    const yawCos = tslFloat(uniformArrayValue(uniforms, 'featureSurfaceYawCos', i));
+    const yawSin = tslFloat(uniformArrayValue(uniforms, 'featureSurfaceYawSin', i));
+    const localPos = tslVec2(
+      offset.x.mul(yawCos).add(offset.y.mul(yawSin)),
+      offset.y.mul(yawCos).sub(offset.x.mul(yawSin)),
+    );
+    const halfSize = tslVec2(
+      uniformArrayValue(uniforms, 'featureSurfaceHalfWidth', i),
+      uniformArrayValue(uniforms, 'featureSurfaceHalfLength', i),
+    );
+    const q = (abs(localPos) as TslNode).sub(halfSize);
+    const outsideDistance = tslLength(tslMax(q, tslVec2(0, 0)));
+    const sdf = outsideDistance.add(tslMin(tslMax(q.x, q.y), tslFloat(0)));
+    const boxMask = tslFloat(1).sub(smoothstep(tslFloat(0), tslFloat(Math.max(0.01, uniformArrayValue(uniforms, 'featureSurfaceBlend', i))), tslMax(sdf, tslFloat(0))));
+    weight = tslMax(weight, shape < 1.5 ? circleMask : boxMask);
+  }
+  return tslClamp(weight, tslFloat(0), tslFloat(1));
+}
+
+function applyFeatureSurfaceColor(color: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
+  const packedEarthWeight = featureSurfaceWeight(1, worldPos, uniforms);
+  const runwayWeight = featureSurfaceWeight(2, worldPos, uniforms);
+  const dirtRoadWeight = featureSurfaceWeight(3, worldPos, uniforms);
+  const gravelRoadWeight = featureSurfaceWeight(4, worldPos, uniforms);
+  const jungleTrailWeight = featureSurfaceWeight(5, worldPos, uniforms);
+  let result = tslMix(color, tslVec3(0.47, 0.38, 0.24), packedEarthWeight.mul(0.78));
+  result = tslMix(result, tslVec3(0.41, 0.39, 0.36), runwayWeight.mul(0.82));
+  result = tslMix(result, tslVec3(0.45, 0.35, 0.22), dirtRoadWeight.mul(0.70));
+  result = tslMix(result, tslVec3(0.48, 0.44, 0.38), gravelRoadWeight.mul(0.75));
+  result = tslMix(result, tslVec3(0.32, 0.26, 0.18), jungleTrailWeight.mul(0.50));
+  return result;
+}
+
+function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
+  const worldPos = tslPositionWorld;
+  const terrainNormal = createTerrainNormalNode(uniforms, worldPos);
+  const biomeBlend = classifyBiomeBlend(worldPos, terrainNormal, uniforms);
+  const hydrologyBlend = applyHydrologyBiomeBlend(
+    worldPos,
+    biomeBlend.primarySlot,
+    biomeBlend.secondarySlot,
+    biomeBlend.secondaryBlend,
+    uniforms,
+  );
+  const antiTilingStrength = tslReference('float', uniforms.antiTilingStrength);
+  const uvOffset = tslVec2(
+    hashUvNode(createTerrainWorldUvNode(uniforms, worldPos).mul(7)),
+    hashUvNode(createTerrainWorldUvNode(uniforms, worldPos).mul(11).add(0.5)),
+  ).mul(antiTilingStrength).mul(0.02);
+  const triplanarBlend = tslFloat(1).sub(smoothstep(
+    tslMax(tslFloat(0), tslReference('float', uniforms.triplanarSlopeThreshold).sub(0.2)),
+    tslReference('float', uniforms.triplanarSlopeThreshold),
+    biomeBlend.slopeUp,
+  ));
+  const primaryPlanar = sampleBiomeTexture(hydrologyBlend.primarySlot, worldPos.xz, uvOffset, uniforms);
+  const primaryTriplanar = sampleBiomeTriplanar(hydrologyBlend.primarySlot, worldPos, terrainNormal, uvOffset, uniforms);
+  const primarySample = tslMix(primaryPlanar, primaryTriplanar, triplanarBlend);
+  const secondaryPlanar = sampleBiomeTexture(hydrologyBlend.secondarySlot, worldPos.xz, uvOffset, uniforms);
+  const secondaryTriplanar = sampleBiomeTriplanar(hydrologyBlend.secondarySlot, worldPos, terrainNormal, uvOffset, uniforms);
+  const secondarySample = tslMix(secondaryPlanar, secondaryTriplanar, triplanarBlend);
+  const secondaryActive = step(tslFloat(0.001), hydrologyBlend.secondaryBlend);
+  const biomeSample = tslMix(primarySample, tslMix(primarySample, secondarySample, hydrologyBlend.secondaryBlend), secondaryActive);
+  let finalColor = biomeSample.rgb.mul(macroVariation(worldPos.xz));
+  const lowlandFactor = tslFloat(1).sub(smoothstep(tslFloat(900), tslFloat(1500), worldPos.y));
+  const flatFactor = smoothstep(tslFloat(0.45), tslFloat(0.95), biomeBlend.slopeUp);
+  finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.93, 1.01, 0.94)), lowlandFactor.mul(flatFactor).mul(0.22));
+  finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.82, 0.9, 0.84)), lowlandWetnessMask(biomeBlend.slopeUp, worldPos.y, uniforms).mul(0.35));
+  const cliffMask = tslFloat(1).sub(smoothstep(tslFloat(0.50), tslFloat(0.74), biomeBlend.slopeUp));
+  const proceduralHillMask = smoothstep(tslFloat(20), tslFloat(60), worldPos.y)
+    .mul(tslFloat(1).sub(smoothstep(tslFloat(150), tslFloat(300), worldPos.y)));
+  const demRidgeMask = smoothstep(tslFloat(450), tslFloat(950), worldPos.y);
+  const rockBlend = cliffMask.mul(tslMax(proceduralHillMask, demRidgeMask)).mul(0.26);
+  const rockPlanar = sampleBiomeTexture(tslReference('float', uniforms.cliffRockBiomeSlot), worldPos.xz, uvOffset, uniforms);
+  const mossyRock = tslMix(rockPlanar.rgb, rockPlanar.rgb.mul(tslVec3(0.66, 0.86, 0.68)), tslFloat(0.45));
+  finalColor = tslMix(finalColor, mossyRock, rockBlend);
+  const farCanopyMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms);
+  const canopyColor = tslReference('color', uniforms.farCanopyTintColor)
+    .mul(tslMix(tslFloat(0.82), tslFloat(1.18), hashUvNode(worldPos.xz.mul(0.007).add(tslVec2(1.37, 8.53)))));
+  finalColor = tslMix(finalColor, canopyColor, farCanopyMask);
+  finalColor = applyFeatureSurfaceColor(finalColor, worldPos, uniforms);
+  const farCanopyFogMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms)
+    .mul(tslReference('float', uniforms.farCanopyTintFogStrength));
+  finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
+
+  const lodLevel = tslAttribute('lodLevel', 'float');
+  const morphFactor = tslAttribute('morphFactor', 'float');
+  let lodColor = tslVec3(0, 1, 0);
+  lodColor = tslMix(lodColor, tslVec3(0, 0.5, 1), step(tslFloat(0.5), lodLevel));
+  lodColor = tslMix(lodColor, tslVec3(1, 1, 0), step(tslFloat(1.5), lodLevel));
+  lodColor = tslMix(lodColor, tslVec3(1, 0.5, 0), step(tslFloat(2.5), lodLevel));
+  lodColor = tslMix(lodColor, tslVec3(1, 0, 0), step(tslFloat(3.5), lodLevel));
+  const debugWireframe = tslReference('float', uniforms.debugWireframe);
+  const debugColor = lodColor.mul(tslFloat(0.5).add(tslFloat(0.5).mul(tslFloat(1).sub(morphFactor))));
+  return tslMix(finalColor, debugColor, step(tslFloat(0.5), debugWireframe));
+}
+
+function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
+  const worldPos = tslPositionWorld;
+  const terrainNormal = createTerrainNormalNode(uniforms, worldPos);
+  const biomeBlend = classifyBiomeBlend(worldPos, terrainNormal, uniforms);
+  const hydrologyBlend = applyHydrologyBiomeBlend(
+    worldPos,
+    biomeBlend.primarySlot,
+    biomeBlend.secondarySlot,
+    biomeBlend.secondaryBlend,
+    uniforms,
+  );
+  let roughnessSample = sampleBiomeScalar(hydrologyBlend.primarySlot, uniforms, 'biomeRoughness');
+  const secondaryRoughness = sampleBiomeScalar(hydrologyBlend.secondarySlot, uniforms, 'biomeRoughness');
+  roughnessSample = tslMix(roughnessSample, secondaryRoughness, hydrologyBlend.secondaryBlend);
+  const wetness = lowlandWetnessMask(biomeBlend.slopeUp, worldPos.y, uniforms);
+  roughnessSample = tslMix(roughnessSample, roughnessSample.mul(0.72), wetness);
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.96), featureSurfaceWeight(1, worldPos, uniforms));
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.82), featureSurfaceWeight(2, worldPos, uniforms));
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.94), featureSurfaceWeight(3, worldPos, uniforms));
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.90), featureSurfaceWeight(4, worldPos, uniforms));
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.95), featureSurfaceWeight(5, worldPos, uniforms));
+  const farCanopyRoughnessMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms);
+  return tslMix(roughnessSample, tslMax(roughnessSample, tslFloat(0.92)), farCanopyRoughnessMask.mul(0.55));
+}
+
+function configureTerrainNodeMaterial(material: TerrainMaterial, uniforms: TerrainUniforms): void {
+  material.uniforms = uniforms;
+  material.isKonveyerTerrainNodeMaterial = true;
+  // TSL owns terrain fog/tint in colorNode; disabling legacy fog avoids
+  // WebGLRenderer's fixed fog uniform path for node-generated programs.
+  material.fog = false;
+  material.positionNode = createTerrainPositionNode(uniforms);
+  material.normalNode = createTerrainNormalNode(uniforms);
+  material.colorNode = createTerrainColorNode(uniforms);
+  material.roughnessNode = createTerrainRoughnessNode(uniforms);
+  material.metalnessNode = tslFloat(0);
+}
+
+export function createTerrainMaterial(options: TerrainMaterialOptions): TerrainMaterial {
+  const material = new MeshStandardNodeMaterial({
     color: 0xffffff,
     roughness: 1.0,
     metalness: 0.0,
     flatShading: false,
-  });
+  }) as TerrainMaterial;
 
   applyTerrainMaterialOptions(material, options);
   material.needsUpdate = true;
@@ -657,7 +613,7 @@ export function createTerrainMaterial(options: TerrainMaterialOptions): THREE.Me
 }
 
 export function updateTerrainMaterialTextures(
-  material: THREE.MeshStandardMaterial,
+  material: TerrainMaterial,
   heightTexture: THREE.DataTexture,
   normalTexture: THREE.DataTexture,
   worldSize: number,
@@ -686,7 +642,7 @@ export function updateTerrainMaterialTextures(
 }
 
 export function updateTerrainMaterialWetness(
-  material: THREE.MeshStandardMaterial,
+  material: TerrainMaterial,
   surfaceWetness: number,
 ): void {
   const clampedWetness = THREE.MathUtils.clamp(surfaceWetness, 0, 1);
@@ -698,7 +654,7 @@ export function updateTerrainMaterialWetness(
 }
 
 export function updateTerrainMaterialFarCanopyTint(
-  material: THREE.MeshStandardMaterial,
+  material: TerrainMaterial,
   farCanopyTint?: TerrainFarCanopyTintConfig,
 ): void {
   const normalized = normalizeFarCanopyTint(farCanopyTint);
@@ -719,89 +675,38 @@ export function updateTerrainMaterialFarCanopyTint(
 }
 
 function applyTerrainMaterialOptions(
-  material: THREE.MeshStandardMaterial,
+  material: TerrainMaterial,
   options: TerrainMaterialOptions,
 ): void {
   const shaderBindings = createShaderBindings(options);
   material.userData ??= {};
 
-  const existingUniforms = material.userData.terrainUniforms as Record<string, { value: unknown }> | undefined;
+  const existingUniforms = material.userData.terrainUniforms as TerrainUniforms | undefined;
 
   if (existingUniforms) {
-    // Update existing uniform values IN PLACE to preserve shader references.
-    // Creating new uniform objects would orphan the compiled shader's references.
+    const debugWireframe = existingUniforms.debugWireframe?.value;
     for (const [key, uniform] of Object.entries(shaderBindings.uniforms)) {
       if (existingUniforms[key]) {
-        existingUniforms[key].value = (uniform as { value: unknown }).value;
+        existingUniforms[key].value = (uniform as UniformSlot).value;
       } else {
-        existingUniforms[key] = uniform as { value: unknown };
+        existingUniforms[key] = uniform as UniformSlot;
       }
+    }
+    if (debugWireframe !== undefined && existingUniforms.debugWireframe) {
+      existingUniforms.debugWireframe.value = debugWireframe;
     }
     material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
     material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
+    configureTerrainNodeMaterial(material, existingUniforms);
+    material.needsUpdate = true;
     return;
   }
 
-  // First-time setup: store uniforms and install onBeforeCompile
   material.userData.terrainUniforms = shaderBindings.uniforms;
   material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
   material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
-
-  // Unique program cache key so Three.js never serves a cached plain
-  // MeshStandardMaterial program for this terrain shader.
-  material.customProgramCacheKey = () => 'TerrainCDLOD_v3_hydrology_mask';
-
-  material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, shaderBindings.uniforms);
-
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <common>',
-      '#include <common>\n' + TERRAIN_VERTEX_PARS,
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      '#include <begin_vertex>\n' + TERRAIN_VERTEX_MAIN,
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <project_vertex>',
-      `
-      vec4 mvPosition = modelViewMatrix * worldPos4;
-      gl_Position = projectionMatrix * mvPosition;
-      `,
-    );
-    // worldPos4 already includes instanceMatrix + heightmap displacement.
-    // The default worldpos_vertex would apply instanceMatrix to 'transformed'
-    // a second time, producing wildly wrong shadow/fog coordinates.
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <worldpos_vertex>',
-      `
-      #if defined( USE_ENVMAP ) || defined( DISTANCE ) || defined ( USE_SHADOWMAP ) || defined ( USE_TRANSMISSION )
-        vec4 worldPosition = modelMatrix * worldPos4;
-      #endif
-      `,
-    );
-
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <common>',
-      '#include <common>\n' + TERRAIN_FRAGMENT_PARS,
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <map_fragment>',
-      TERRAIN_FRAGMENT_MAP,
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <roughnessmap_fragment>',
-      '#include <roughnessmap_fragment>\n' + TERRAIN_FRAGMENT_ROUGHNESS,
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <normal_fragment_begin>',
-      '#include <normal_fragment_begin>\n' + TERRAIN_FRAGMENT_NORMAL_OVERRIDE,
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <fog_fragment>',
-      TERRAIN_FRAGMENT_FOG_TINT,
-    );
-  };
+  material.customProgramCacheKey = () => 'KonveyerTerrainTSL_v1';
+  configureTerrainNodeMaterial(material, shaderBindings.uniforms);
 }
 
 function surfaceKindToShaderId(kind: TerrainSurfaceKind): number {
@@ -924,7 +829,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     terrainWorldSize: { value: worldSize },
     heightmapGridSize: { value: heightmapGridSize },
     tileGridResolution: { value: tileGridRes },
-    debugWireframe: { value: false },
+    debugWireframe: { value: 0 },
     antiTilingStrength: { value: splatmap.antiTilingStrength },
     triplanarSlopeThreshold: { value: splatmap.triplanarSlopeThreshold },
     environmentWetness: { value: surfaceWetness },
@@ -1056,7 +961,7 @@ function resolveHydrologyMaskMaterial(
   };
 }
 
-function readCurrentSurfaceWetness(material: THREE.MeshStandardMaterial): number {
+function readCurrentSurfaceWetness(material: TerrainMaterial): number {
   const currentWetness = material.userData.terrainSurfaceWetness;
   return typeof currentWetness === 'number' ? currentWetness : 0;
 }

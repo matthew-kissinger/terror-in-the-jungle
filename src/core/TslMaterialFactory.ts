@@ -29,6 +29,7 @@ export type KonveyerNodeMaterial = THREE.Material & {
   opacityNode?: unknown;
   alphaTestNode?: unknown;
   forceSinglePass?: boolean;
+  fog?: boolean;
 };
 
 const DEFAULT_ALPHA_TEST = 0.25;
@@ -87,6 +88,7 @@ export async function createAlphaTextureNodeMaterial(
     forceSinglePass: options.forceSinglePass ?? true,
   }) as KonveyerNodeMaterial;
 
+  material.fog = false;
   const sample = tsl.texture(options.texture, tsl.uv());
   material.colorNode = sample.rgb;
   material.opacityNode = sample.a;

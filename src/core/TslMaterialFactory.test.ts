@@ -80,6 +80,7 @@ describe('createAlphaTextureNodeMaterial', () => {
     expect(material.colorNode).toBeDefined();
     expect(material.opacityNode).toBeDefined();
     expect(material.alphaTestNode).toBeDefined();
+    expect(material.fog).toBe(false);
     expect(material.alphaTest).toBe(0.3);
   });
 });

@@ -206,6 +206,7 @@ describe('GPUBillboardVegetation', () => {
     expect(internal.material).toBeTruthy()
     expect(internal.material.isNodeMaterial).toBe(true)
     expect(internal.material.isKonveyerBillboardNodeMaterial).toBe(true)
+    expect(internal.material.fog).toBe(false)
     expect(internal.material.vertexShader).toBeUndefined()
     expect(internal.mesh).toBeTruthy()
     expect(internal.mesh.frustumCulled).toBe(false)

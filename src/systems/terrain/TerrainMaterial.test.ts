@@ -83,16 +83,12 @@ const testSplatmap: SplatmapConfig = {
   antiTilingStrength: 0.3,
 };
 
-function makeShader() {
-  return {
-    uniforms: {} as Record<string, any>,
-    vertexShader: '#include <common>\n#include <begin_vertex>\n#include <project_vertex>',
-    fragmentShader: '#include <common>\n#include <map_fragment>\n#include <roughnessmap_fragment>\n#include <normal_fragment_begin>\n#include <fog_fragment>',
-  };
+function terrainUniforms(mat: ReturnType<typeof createTerrainMaterial>): Record<string, any> {
+  return mat.userData.terrainUniforms as Record<string, any>;
 }
 
 describe('TerrainMaterial', () => {
-  it('creates a terrain material that exposes terrain uniforms after shader compile', () => {
+  it('creates a terrain node material that exposes terrain uniforms', () => {
     const mat = createTerrainMaterial({
       heightTexture: makeMockTexture(),
       normalTexture: makeMockTexture(),
@@ -102,22 +98,26 @@ describe('TerrainMaterial', () => {
     });
 
     expect(mat).toBeDefined();
-    expect(mat.onBeforeCompile).toBeDefined();
-
-    const shader = makeShader();
-    mat.onBeforeCompile(shader as any, null as any);
+    expect(mat.isNodeMaterial).toBe(true);
+    expect(mat.isKonveyerTerrainNodeMaterial).toBe(true);
+    expect(mat.fog).toBe(false);
+    expect(mat.positionNode).toBeDefined();
+    expect(mat.normalNode).toBeDefined();
+    expect(mat.colorNode).toBeDefined();
+    expect(mat.roughnessNode).toBeDefined();
+    const uniforms = terrainUniforms(mat);
 
     // Observable: the material publishes terrain-specific uniforms bound to the
     // provided world size and textures. Downstream consumers rely on these.
-    expect(shader.uniforms.terrainHeightmap).toBeDefined();
-    expect(shader.uniforms.terrainNormalMap).toBeDefined();
-    expect(shader.uniforms.terrainWorldSize.value).toBe(512);
-    expect(shader.uniforms.biomeTexture0).toBeDefined();
-    expect(shader.uniforms.biomeRuleElevationBlendWidth).toBeDefined();
-    expect(shader.uniforms.cliffRockBiomeSlot.value).toBe(1);
+    expect(uniforms.terrainHeightmap).toBeDefined();
+    expect(uniforms.terrainNormalMap).toBeDefined();
+    expect(uniforms.terrainWorldSize.value).toBe(512);
+    expect(uniforms.biomeTexture0).toBeDefined();
+    expect(uniforms.biomeRuleElevationBlendWidth).toBeDefined();
+    expect(uniforms.cliffRockBiomeSlot.value).toBe(1);
   });
 
-  it('binds far-canopy tint uniforms and shader logic when enabled', () => {
+  it('binds far-canopy tint uniforms and node graph when enabled', () => {
     const mat = createTerrainMaterial({
       heightTexture: makeMockTexture(),
       normalTexture: makeMockTexture(),
@@ -134,21 +134,18 @@ describe('TerrainMaterial', () => {
       },
     });
 
-    const shader = makeShader();
-    mat.onBeforeCompile(shader as any, null as any);
+    const uniforms = terrainUniforms(mat);
 
-    expect(shader.uniforms.farCanopyTintEnabled.value).toBe(1);
-    expect(shader.uniforms.farCanopyTintStartDistance.value).toBe(560);
-    expect(shader.uniforms.farCanopyTintEndDistance.value).toBe(1250);
-    expect(shader.uniforms.farCanopyTintStrength.value).toBeCloseTo(0.28);
-    expect(shader.uniforms.farCanopyTintFogStrength.value).toBeCloseTo(0.72);
-    expect(shader.fragmentShader).toContain('applyFarCanopyTint');
-    expect(shader.fragmentShader).toContain('distance(cameraPosition.xz, worldPos)');
-    expect(shader.fragmentShader).toContain('farCanopyFogMask');
-    expect(shader.fragmentShader).toContain('gl_FragColor.rgb = mix(gl_FragColor.rgb, foggedCanopy');
+    expect(uniforms.farCanopyTintEnabled.value).toBe(1);
+    expect(uniforms.farCanopyTintStartDistance.value).toBe(560);
+    expect(uniforms.farCanopyTintEndDistance.value).toBe(1250);
+    expect(uniforms.farCanopyTintStrength.value).toBeCloseTo(0.28);
+    expect(uniforms.farCanopyTintFogStrength.value).toBeCloseTo(0.72);
+    expect(mat.colorNode).toBeDefined();
+    expect(mat.roughnessNode).toBeDefined();
   });
 
-  it('binds hydrology mask uniforms and shader logic when a mask is available', () => {
+  it('binds hydrology mask uniforms and node graph when a mask is available', () => {
     const hydrologyBiomeConfig = {
       layers: [
         { biomeId: 'denseJungle', texture: makeMockTexture(), tileScale: 0.1, roughness: 0.85 },
@@ -177,22 +174,20 @@ describe('TerrainMaterial', () => {
       },
     });
 
-    const shader = makeShader();
-    mat.onBeforeCompile(shader as any, null as any);
+    const uniforms = terrainUniforms(mat);
 
-    expect(shader.uniforms.hydrologyMaskEnabled.value).toBe(1);
-    expect(shader.uniforms.hydrologyMaskTextureSize.value.x).toBe(257);
-    expect(shader.uniforms.hydrologyMaskOrigin.value.x).toBe(-1520);
-    expect(shader.uniforms.hydrologyWetBiomeSlot.value).toBe(1);
-    expect(shader.uniforms.hydrologyChannelBiomeSlot.value).toBe(2);
-    expect(shader.uniforms.hydrologyWetStrength.value).toBeCloseTo(0.08);
-    expect(shader.uniforms.hydrologyChannelStrength.value).toBeCloseTo(0.14);
-    expect(shader.fragmentShader).toContain('sampleHydrologyMask');
-    expect(shader.fragmentShader).toContain('applyHydrologyBiomeBlend');
-    expect(shader.fragmentShader).toContain('secondaryBlend = clamp(1.0 - hydrologyWeight');
+    expect(uniforms.hydrologyMaskEnabled.value).toBe(1);
+    expect(uniforms.hydrologyMaskTextureSize.value.x).toBe(257);
+    expect(uniforms.hydrologyMaskOrigin.value.x).toBe(-1520);
+    expect(uniforms.hydrologyWetBiomeSlot.value).toBe(1);
+    expect(uniforms.hydrologyChannelBiomeSlot.value).toBe(2);
+    expect(uniforms.hydrologyWetStrength.value).toBeCloseTo(0.08);
+    expect(uniforms.hydrologyChannelStrength.value).toBeCloseTo(0.14);
+    expect(mat.colorNode).toBeDefined();
+    expect(mat.roughnessNode).toBeDefined();
   });
 
-  it('updateTerrainMaterialTextures marks the material dirty for shader recompile', () => {
+  it('updateTerrainMaterialTextures refreshes uniforms and node graph', () => {
     const mat = createTerrainMaterial({
       heightTexture: makeMockTexture(),
       normalTexture: makeMockTexture(),
@@ -200,6 +195,7 @@ describe('TerrainMaterial', () => {
       splatmap: testSplatmap,
       biomeConfig: testBiomeConfig,
     });
+    const previousPositionNode = mat.positionNode;
 
     updateTerrainMaterialTextures(
       mat,
@@ -210,7 +206,9 @@ describe('TerrainMaterial', () => {
       testSplatmap,
     );
 
-    expect(mat.needsUpdate).toBe(true);
+    expect(terrainUniforms(mat).terrainWorldSize.value).toBe(2048);
+    expect(mat.positionNode).toBeDefined();
+    expect(mat.positionNode).not.toBe(previousPositionNode);
   });
 
   it('updateTerrainMaterialWetness reaches through to the live shader uniform', () => {
@@ -222,11 +220,9 @@ describe('TerrainMaterial', () => {
       biomeConfig: testBiomeConfig,
     });
 
-    const shader = makeShader();
-    mat.onBeforeCompile(shader as any, null as any);
     updateTerrainMaterialWetness(mat, 0.8);
 
-    expect(shader.uniforms.environmentWetness.value).toBe(0.8);
+    expect(terrainUniforms(mat).environmentWetness.value).toBe(0.8);
   });
 
   it('updateTerrainMaterialFarCanopyTint updates the live shader uniforms without recompiling', () => {
@@ -238,8 +234,6 @@ describe('TerrainMaterial', () => {
       biomeConfig: testBiomeConfig,
     });
 
-    const shader = makeShader();
-    mat.onBeforeCompile(shader as any, null as any);
     updateTerrainMaterialFarCanopyTint(mat, {
       enabled: true,
       startDistance: 600,
@@ -249,9 +243,10 @@ describe('TerrainMaterial', () => {
       color: [0.11, 0.25, 0.10],
     });
 
-    expect(shader.uniforms.farCanopyTintEnabled.value).toBe(1);
-    expect(shader.uniforms.farCanopyTintEndDistance.value).toBe(1600);
-    expect(shader.uniforms.farCanopyTintFogStrength.value).toBeCloseTo(0.78);
-    expect(shader.uniforms.farCanopyTintColor.value.g).toBeCloseTo(0.25);
+    const uniforms = terrainUniforms(mat);
+    expect(uniforms.farCanopyTintEnabled.value).toBe(1);
+    expect(uniforms.farCanopyTintEndDistance.value).toBe(1600);
+    expect(uniforms.farCanopyTintFogStrength.value).toBeCloseTo(0.78);
+    expect(uniforms.farCanopyTintColor.value.g).toBeCloseTo(0.25);
   });
 });

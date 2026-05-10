@@ -116,6 +116,9 @@ export class CDLODRenderer {
   private lodLevelAttr: THREE.InstancedBufferAttribute;
   private morphFactorAttr: THREE.InstancedBufferAttribute;
   private edgeMorphMaskAttr: THREE.InstancedBufferAttribute;
+  private tileCenterXAttr: THREE.InstancedBufferAttribute;
+  private tileCenterZAttr: THREE.InstancedBufferAttribute;
+  private tileSizeAttr: THREE.InstancedBufferAttribute;
   private readonly maxInstances: number;
 
   // Scratch matrix for setting instance transforms
@@ -146,15 +149,24 @@ export class CDLODRenderer {
     const lodData = new Float32Array(maxInstances);
     const morphData = new Float32Array(maxInstances);
     const edgeMaskData = new Float32Array(maxInstances);
+    const tileCenterXData = new Float32Array(maxInstances);
+    const tileCenterZData = new Float32Array(maxInstances);
+    const tileSizeData = new Float32Array(maxInstances);
     this.lodLevelAttr = new THREE.InstancedBufferAttribute(lodData, 1);
     this.morphFactorAttr = new THREE.InstancedBufferAttribute(morphData, 1);
     // edgeMorphMask is logically a bitmask but is stored as float for GLSL
     // attribute compatibility (Three.js r184 InstancedBufferAttribute is
     // most reliable with Float32Array; the shader rounds to int).
     this.edgeMorphMaskAttr = new THREE.InstancedBufferAttribute(edgeMaskData, 1);
+    this.tileCenterXAttr = new THREE.InstancedBufferAttribute(tileCenterXData, 1);
+    this.tileCenterZAttr = new THREE.InstancedBufferAttribute(tileCenterZData, 1);
+    this.tileSizeAttr = new THREE.InstancedBufferAttribute(tileSizeData, 1);
     geo.setAttribute('lodLevel', this.lodLevelAttr);
     geo.setAttribute('morphFactor', this.morphFactorAttr);
     geo.setAttribute('edgeMorphMask', this.edgeMorphMaskAttr);
+    geo.setAttribute('tileCenterX', this.tileCenterXAttr);
+    geo.setAttribute('tileCenterZ', this.tileCenterZAttr);
+    geo.setAttribute('tileSize', this.tileSizeAttr);
 
     // Diagnostic-only terrain shadow isolation. Terrain still receives shadows
     // so this isolates CDLOD shadow-caster submissions without changing the
@@ -189,12 +201,18 @@ export class CDLODRenderer {
       this.lodLevelAttr.array[i] = tile.lodLevel;
       this.morphFactorAttr.array[i] = tile.morphFactor;
       this.edgeMorphMaskAttr.array[i] = tile.edgeMorphMask;
+      this.tileCenterXAttr.array[i] = tile.x;
+      this.tileCenterZAttr.array[i] = tile.z;
+      this.tileSizeAttr.array[i] = tile.size;
     }
 
     this.mesh.instanceMatrix.needsUpdate = true;
     this.lodLevelAttr.needsUpdate = true;
     this.morphFactorAttr.needsUpdate = true;
     this.edgeMorphMaskAttr.needsUpdate = true;
+    this.tileCenterXAttr.needsUpdate = true;
+    this.tileCenterZAttr.needsUpdate = true;
+    this.tileSizeAttr.needsUpdate = true;
   }
 
   /**

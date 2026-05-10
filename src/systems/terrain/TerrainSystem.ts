@@ -127,7 +127,7 @@ export class TerrainSystem implements GameSystem {
     if (this.isInitialized) return;
 
     const cache = getHeightQueryCache();
-    let terrainMaterial: THREE.MeshStandardMaterial;
+    let terrainMaterial: THREE.Material;
     try {
       terrainMaterial = this.createSurfaceMaterial(cache.getProvider());
     } catch (error) {
@@ -397,7 +397,7 @@ export class TerrainSystem implements GameSystem {
       const mat = this.surfaceRuntime.getMaterial();
       const terrainUniforms = mat.userData.terrainUniforms as Record<string, { value: unknown }> | undefined;
       if (terrainUniforms?.debugWireframe) {
-        terrainUniforms.debugWireframe.value = enabled;
+        terrainUniforms.debugWireframe.value = enabled ? 1 : 0;
       }
       mat.wireframe = enabled;
       mat.needsUpdate = true;
@@ -638,7 +638,7 @@ export class TerrainSystem implements GameSystem {
     return this.explicitWorldSize ?? (this.chunkSize * this.renderDistance * 2);
   }
 
-  private createSurfaceMaterial(provider: IHeightProvider): THREE.MeshStandardMaterial {
+  private createSurfaceMaterial(provider: IHeightProvider): THREE.Material {
     if (this.preparedHeightmap) {
       markStartup('terrain.heightmap.from-prebaked.begin');
       const material = this.surfaceRuntime.initializeFromPrebakedGrid(
