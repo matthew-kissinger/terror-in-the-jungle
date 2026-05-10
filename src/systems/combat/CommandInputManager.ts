@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import type { InputManager } from '../input/InputManager';
 import type { HUDLayout } from '../../ui/layout/HUDLayout';
+import type { AirSupportRadioCooldowns } from '../airsupport/AirSupportRadioCatalog';
 import { CommandModeOverlay } from '../../ui/hud/CommandModeOverlay';
+import { AirSupportRadioMenu, type AirSupportRadioSelection } from '../../ui/hud/AirSupportRadioMenu';
 import type { InputMode } from '../input/InputManager';
 import type { SquadCommandState } from './PlayerSquadController';
 import { PlayerSquadController } from './PlayerSquadController';
@@ -18,6 +20,7 @@ export class CommandInputManager implements GameSystem {
 
   private readonly playerSquadController: PlayerSquadController;
   private readonly commandModeOverlay: CommandModeOverlay;
+  private readonly airSupportRadioMenu: AirSupportRadioMenu;
   private layout?: HUDLayout;
   private inputManager?: InputManager;
   private zoneQuery?: IZoneQuery;
@@ -33,6 +36,7 @@ export class CommandInputManager implements GameSystem {
     commandPosition: undefined
   };
   private overlayVisible = false;
+  private radioVisible = false;
   private pendingPlacementCommand: SquadCommand | null = null;
   private mapUpdateAccumulator = 0;
   private readonly mapDirection = new THREE.Vector3();
@@ -44,11 +48,17 @@ export class CommandInputManager implements GameSystem {
   constructor(playerSquadController: PlayerSquadController) {
     this.playerSquadController = playerSquadController;
     this.commandModeOverlay = new CommandModeOverlay();
+    this.airSupportRadioMenu = new AirSupportRadioMenu();
     this.commandModeOverlay.setCallbacks({
       onQuickCommandSelected: (slot) => this.handleOverlayCommandSelection(slot),
       onMapPointSelected: (position) => this.applyPlacementCommand(position),
       onSquadSelected: (squadId) => this.handleSquadSelection(squadId),
-      onCloseRequested: () => this.closeOverlay()
+      onCloseRequested: () => this.closeOverlay(),
+      onRadioRequested: () => this.openRadioMenu()
+    });
+    this.airSupportRadioMenu.setCallbacks({
+      onCloseRequested: () => this.closeRadioMenu(),
+      onAssetSelected: (selection) => this.handleRadioSelection(selection)
     });
 
     this.unsubscribeCommandState = this.playerSquadController.onCommandStateChange((state) => {
@@ -107,17 +117,26 @@ export class CommandInputManager implements GameSystem {
       this.closeOverlayTouchPassThrough();
       this.commandModeOverlay.setVisible(false);
     }
+    if (this.radioVisible) {
+      this.radioVisible = false;
+      this.closeOverlayTouchPassThrough();
+      this.airSupportRadioMenu.setVisible(false);
+    }
     this.commandModeOverlay.unmount();
+    this.airSupportRadioMenu.unmount();
     this.layout = undefined;
     this.commandModeOverlay.dispose();
+    this.airSupportRadioMenu.dispose();
   }
 
   mountTo(layout: HUDLayout): void {
     if (this.layout === layout) return;
 
     this.commandModeOverlay.unmount();
+    this.airSupportRadioMenu.unmount();
     this.layout = layout;
     this.commandModeOverlay.mount(document.body);
+    this.airSupportRadioMenu.mount(document.body);
   }
 
   bindInputManager(inputManager: InputManager): void {
@@ -148,7 +167,7 @@ export class CommandInputManager implements GameSystem {
 
   onVisibilityChange(listener: (visible: boolean) => void): () => void {
     this.visibilityListeners.add(listener);
-    listener(this.overlayVisible);
+    listener(this.isModalVisible());
     return () => this.visibilityListeners.delete(listener);
   }
 
@@ -173,6 +192,10 @@ export class CommandInputManager implements GameSystem {
   }
 
   handleCancel(): boolean {
+    if (this.radioVisible) {
+      this.closeRadioMenu();
+      return true;
+    }
     if (this.overlayVisible) {
       this.closeOverlay();
       return true;
@@ -195,6 +218,10 @@ export class CommandInputManager implements GameSystem {
   }
 
   handleGamepadCancel(): boolean {
+    if (this.radioVisible) {
+      this.closeRadioMenu();
+      return true;
+    }
     if (!this.overlayVisible || this.inputMode !== 'gamepad') {
       return false;
     }
@@ -202,7 +229,22 @@ export class CommandInputManager implements GameSystem {
     return true;
   }
 
+  toggleRadioMenu(): void {
+    if (this.radioVisible) {
+      this.closeRadioMenu();
+    } else {
+      this.openRadioMenu();
+    }
+  }
+
+  setRadioCooldowns(cooldowns: AirSupportRadioCooldowns): void {
+    this.airSupportRadioMenu.setCooldowns(cooldowns);
+  }
+
   private openOverlay(): void {
+    if (this.radioVisible) {
+      this.closeRadioMenu(false);
+    }
     this.overlayVisible = true;
     this.pendingPlacementCommand = this.getDefaultPlacementCommand();
     this.mapUpdateAccumulator = CommandInputManager.MAP_UPDATE_INTERVAL;
@@ -223,6 +265,28 @@ export class CommandInputManager implements GameSystem {
     }
     this.emitVisibility();
     this.syncPresentation();
+  }
+
+  private openRadioMenu(): void {
+    if (this.overlayVisible) {
+      this.closeOverlay(false);
+    }
+    this.radioVisible = true;
+    this.inputManager?.unlockPointer?.();
+    this.openOverlayTouchPassThrough();
+    this.airSupportRadioMenu.setVisible(true);
+    this.airSupportRadioMenu.setState({ statusText: 'Select aircraft and target mark' });
+    this.emitVisibility();
+  }
+
+  private closeRadioMenu(relockPointer = true): void {
+    this.radioVisible = false;
+    this.airSupportRadioMenu.setVisible(false);
+    this.closeOverlayTouchPassThrough();
+    if (relockPointer) {
+      this.inputManager?.relockPointer?.();
+    }
+    this.emitVisibility();
   }
 
   /** Let squad / tactical map receive touches above body-level touch controls (see TouchControls.beginModalOverlays). */
@@ -256,7 +320,7 @@ export class CommandInputManager implements GameSystem {
 
   private emitVisibility(): void {
     for (const listener of this.visibilityListeners) {
-      listener(this.overlayVisible);
+      listener(this.isModalVisible());
     }
   }
 
@@ -293,10 +357,23 @@ export class CommandInputManager implements GameSystem {
     }
   }
 
+  private handleRadioSelection(selection: AirSupportRadioSelection): void {
+    const marking = selection.targetMarking.replace(/_/g, ' ').toUpperCase();
+    this.airSupportRadioMenu.setState({
+      selectedAssetId: selection.assetId,
+      selectedMarking: selection.targetMarking,
+      statusText: `${marking} target mark selected`,
+    });
+  }
+
   private getDefaultPlacementCommand(): SquadCommand | null {
     if (requiresCommandTarget(this.latestSquadState.currentCommand)) {
       return this.latestSquadState.currentCommand;
     }
     return null;
+  }
+
+  private isModalVisible(): boolean {
+    return this.overlayVisible || this.radioVisible;
   }
 }

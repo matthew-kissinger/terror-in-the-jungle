@@ -56,6 +56,7 @@ export class CommandModeOverlay implements LayoutComponent {
   };
   private onQuickCommandSelected?: (slot: number) => void;
   private onCloseRequested?: () => void;
+  private onRadioRequested?: () => void;
   private onMapPointSelected?: (position: THREE.Vector3) => void;
   private onSquadSelected?: (squadId: string) => void;
   private backdropPointerId: number | null = null;
@@ -104,14 +105,25 @@ export class CommandModeOverlay implements LayoutComponent {
     titleWrap.appendChild(eyebrow);
     titleWrap.appendChild(title);
 
+    const actionWrap = document.createElement('div');
+    actionWrap.className = 'command-mode-overlay__actions';
+
+    const radioButton = document.createElement('button');
+    radioButton.type = 'button';
+    radioButton.className = 'command-mode-overlay__radio';
+    radioButton.textContent = 'RADIO';
+    radioButton.addEventListener('click', () => this.onRadioRequested?.());
+
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
     closeButton.className = 'command-mode-overlay__close';
     closeButton.textContent = 'CLOSE';
     closeButton.addEventListener('click', () => this.onCloseRequested?.());
 
+    actionWrap.appendChild(radioButton);
+    actionWrap.appendChild(closeButton);
     header.appendChild(titleWrap);
-    header.appendChild(closeButton);
+    header.appendChild(actionWrap);
     this.panel.appendChild(header);
 
     const summary = document.createElement('div');
@@ -176,11 +188,13 @@ export class CommandModeOverlay implements LayoutComponent {
   setCallbacks(callbacks: {
     onQuickCommandSelected?: (slot: number) => void;
     onCloseRequested?: () => void;
+    onRadioRequested?: () => void;
     onMapPointSelected?: (position: THREE.Vector3) => void;
     onSquadSelected?: (squadId: string) => void;
   }): void {
     this.onQuickCommandSelected = callbacks.onQuickCommandSelected;
     this.onCloseRequested = callbacks.onCloseRequested;
+    this.onRadioRequested = callbacks.onRadioRequested;
     this.onMapPointSelected = callbacks.onMapPointSelected;
     this.onSquadSelected = callbacks.onSquadSelected;
   }
@@ -464,6 +478,11 @@ export class CommandModeOverlay implements LayoutComponent {
         gap: 4px;
       }
 
+      .command-mode-overlay__actions {
+        display: flex;
+        gap: 8px;
+      }
+
       .command-mode-overlay__eyebrow,
       .command-mode-overlay__summary-key,
       .command-mode-overlay__button-hint,
@@ -490,7 +509,8 @@ export class CommandModeOverlay implements LayoutComponent {
         color: rgba(244, 242, 236, 0.96);
       }
 
-      .command-mode-overlay__close {
+      .command-mode-overlay__close,
+      .command-mode-overlay__radio {
         padding: 8px 10px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 10px;
@@ -502,6 +522,12 @@ export class CommandModeOverlay implements LayoutComponent {
         letter-spacing: 0.12em;
         text-transform: uppercase;
         cursor: pointer;
+      }
+
+      .command-mode-overlay__radio {
+        border-color: rgba(92, 184, 92, 0.24);
+        color: rgba(178, 234, 178, 0.9);
+        letter-spacing: 0;
       }
 
       .command-mode-overlay__body {
@@ -695,6 +721,12 @@ export class CommandModeOverlay implements LayoutComponent {
           font-size: 13px;
         }
 
+        .command-mode-overlay__radio {
+          min-width: 56px;
+          min-height: 40px;
+          font-size: 13px;
+        }
+
         .command-mode-overlay__body {
           grid-template-columns: 1fr;
         }
@@ -766,6 +798,12 @@ export class CommandModeOverlay implements LayoutComponent {
         }
 
         .command-mode-overlay__close {
+          min-width: 56px;
+          min-height: 40px;
+          font-size: 13px;
+        }
+
+        .command-mode-overlay__radio {
           min-width: 56px;
           min-height: 40px;
           font-size: 13px;

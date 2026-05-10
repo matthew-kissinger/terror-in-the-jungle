@@ -1,0 +1,294 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(12px, env(safe-area-inset-top, 0px))
+    max(12px, env(safe-area-inset-right, 0px))
+    max(12px, env(safe-area-inset-bottom, 0px))
+    max(12px, env(safe-area-inset-left, 0px));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  z-index: 13;
+}
+
+.overlay[data-visible="true"] {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.58));
+}
+
+.panel {
+  position: relative;
+  width: min(100%, 720px);
+  max-height: calc(100dvh - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  overflow: auto;
+  border: 1px solid rgba(214, 165, 89, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(15, 18, 14, 0.96), rgba(8, 10, 11, 0.94)),
+    radial-gradient(circle at top right, rgba(92, 184, 92, 0.09), transparent 58%);
+  box-shadow: 0 24px 40px rgba(0, 0, 0, 0.34);
+  pointer-events: auto;
+}
+
+.header,
+.summary,
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header {
+  align-items: flex-start;
+}
+
+.titleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eyebrow,
+.summaryKey,
+.buttonMeta,
+.assetMeta {
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: rgba(205, 196, 171, 0.64);
+}
+
+.eyebrow,
+.summaryKey,
+.buttonMeta,
+.assetMeta {
+  font-size: 11px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: rgba(244, 242, 236, 0.96);
+}
+
+.close {
+  min-width: 66px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(29, 32, 34, 0.86);
+  color: rgba(240, 239, 235, 0.9);
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  background: rgba(26, 30, 28, 0.66);
+}
+
+.summaryValue {
+  overflow: hidden;
+  color: rgba(243, 241, 233, 0.95);
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.markingGroup {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.markingButton {
+  min-height: 52px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(33, 38, 35, 0.76);
+  color: rgba(243, 241, 233, 0.92);
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.markingButton[aria-pressed="true"] {
+  border-color: rgba(92, 184, 92, 0.48);
+  background: rgba(32, 58, 39, 0.92);
+}
+
+.assetList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.assetButton {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  min-height: 94px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  background: rgba(33, 38, 35, 0.76);
+  text-align: left;
+  cursor: pointer;
+}
+
+.assetButton:hover:not(:disabled) {
+  border-color: rgba(214, 165, 89, 0.38);
+  background: rgba(48, 56, 50, 0.9);
+}
+
+.assetButton:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.assetButton[aria-pressed="true"] {
+  border-color: rgba(92, 184, 92, 0.52);
+  background: rgba(32, 58, 39, 0.92);
+}
+
+.assetLabel {
+  overflow-wrap: anywhere;
+  color: rgba(243, 241, 233, 0.96);
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.assetStatus {
+  color: rgba(92, 184, 92, 0.92);
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.assetButton:disabled .assetStatus {
+  color: rgba(214, 165, 89, 0.9);
+}
+
+.cooldownTrack {
+  grid-column: 1 / -1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cooldownFill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: rgba(214, 165, 89, 0.72);
+  transition: width 120ms ease;
+}
+
+.footer {
+  align-items: center;
+}
+
+.statusText {
+  color: rgba(243, 241, 233, 0.88);
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .overlay {
+    align-items: flex-end;
+    padding: 8px;
+  }
+
+  .panel {
+    width: 100%;
+    max-height: 86vh;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .title {
+    font-size: 20px;
+  }
+
+  .summary,
+  .assetList {
+    grid-template-columns: 1fr;
+  }
+
+  .markingGroup {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .markingButton {
+    min-height: 44px;
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .assetButton {
+    min-height: 76px;
+  }
+
+  .footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .statusText {
+    text-align: left;
+  }
+}

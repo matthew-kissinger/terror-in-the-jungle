@@ -84,7 +84,8 @@ describe('CommandModeOverlay', () => {
     const onQuickCommandSelected = vi.fn();
     const onCloseRequested = vi.fn();
     const onMapPointSelected = vi.fn();
-    overlay.setCallbacks({ onQuickCommandSelected, onCloseRequested, onMapPointSelected });
+    const onRadioRequested = vi.fn();
+    overlay.setCallbacks({ onQuickCommandSelected, onCloseRequested, onMapPointSelected, onRadioRequested });
     overlay.setState({
       hasSquad: true,
       currentCommand: SquadCommand.NONE,
@@ -114,10 +115,12 @@ describe('CommandModeOverlay', () => {
       configurable: true
     });
     canvas?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 160, clientY: 160, button: 0 }));
+    document.querySelector<HTMLButtonElement>('.command-mode-overlay__radio')?.click();
     document.querySelector<HTMLButtonElement>('.command-mode-overlay__close')?.click();
 
     expect(onQuickCommandSelected).toHaveBeenCalledWith(4);
     expect(onMapPointSelected).toHaveBeenCalledWith(expect.objectContaining({ x: 0, y: 0, z: 0 }));
+    expect(onRadioRequested).toHaveBeenCalledTimes(1);
     expect(onCloseRequested).toHaveBeenCalledTimes(1);
   });
 });
