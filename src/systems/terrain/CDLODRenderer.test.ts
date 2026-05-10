@@ -206,11 +206,28 @@ describe('createTileGeometry', () => {
     }
   });
 
-  it('emits indexed triangles for both interior and skirt strips', () => {
+  it('emits indexed triangles for both interior and two-sided skirt strips', () => {
     const N = 33;
     const geo: any = createTileGeometry(N);
     expect(geo.index).not.toBeNull();
-    expect(geo.index.array.length).toBe(((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 2) * 3);
+    expect(geo.index.array.length).toBe(((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 4) * 3);
+  });
+
+  it('duplicates skirt wall winding so seam covers survive FrontSide culling from either side', () => {
+    const N = 5;
+    const geo: any = createTileGeometry(N);
+    const idx = Array.from(geo.index.array as Uint16Array | Uint32Array);
+    const interiorIndexCount = (N - 1) * (N - 1) * 2 * 3;
+    const firstTopSkirt = idx.slice(interiorIndexCount, interiorIndexCount + 12);
+    const skirt0 = N * N;
+    const skirt1 = skirt0 + 1;
+
+    expect(firstTopSkirt).toEqual([
+      0, skirt0, 1,
+      1, skirt0, skirt1,
+      0, 1, skirt0,
+      1, skirt1, skirt0,
+    ]);
   });
 
   // Regression: the cycle-2026-05-08 seam fix shipped with z = 0.5 - j/(N-1),

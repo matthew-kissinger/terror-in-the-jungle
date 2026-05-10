@@ -5,8 +5,10 @@ import type { CDLODTile } from './CDLODQuadtree';
 /**
  * CDLOD tile base geometry: NxN XZ grid (`isSkirt=0`) plus a perimeter
  * skirt ring (`isSkirt=1`). The vertex shader drops skirt verts by a
- * per-LOD amount to hide sub-pixel cracks at chunk borders. Stage D2 of
- * `terrain-cdlod-seam`. Total verts = N*N + 4*N - 4.
+ * per-LOD amount to hide sub-pixel cracks at chunk borders. Skirt walls
+ * are indexed with both windings so FrontSide terrain material cannot
+ * cull the seam cover from oblique helicopter/far-horizon views. Stage
+ * D2/D3 of `terrain-cdlod-seam`. Total verts = N*N + 4*N - 4.
  */
 export function createTileGeometry(tileResolution: number): THREE.BufferGeometry {
   const N = tileResolution;
@@ -48,8 +50,10 @@ export function createTileGeometry(tileResolution: number): THREE.BufferGeometry
   for (let i = N - 2; i >= 0; i--) dup((N - 1) * N + i);          // bottom
   for (let j = N - 2; j >= 1; j--) dup(j * N + 0);                // left
 
-  // Indices: interior triangles (PlaneGeometry winding) + skirt strip.
-  const indexCount = ((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 2) * 3;
+  // Indices: interior triangles (PlaneGeometry winding) + two-sided
+  // skirt strips. Only skirt walls duplicate winding; the terrain top
+  // remains FrontSide so we do not pay a full-material DoubleSide cost.
+  const indexCount = ((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 4) * 3;
   const indices = totalVerts > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
   let k = 0;
   for (let j = 0; j < N - 1; j++) {
@@ -60,11 +64,15 @@ export function createTileGeometry(tileResolution: number): THREE.BufferGeometry
     }
   }
   // Skirt strips: connect each perimeter edge's two interior endpoints
-  // with their skirt duplicates so the skirt drops vertically.
+  // with their skirt duplicates so the skirt drops vertically. Emit both
+  // windings because the seam may be viewed from either adjacent tile at
+  // helicopter/far-camera angles while the material remains FrontSide.
   const addQuad = (ia: number, ib: number): void => {
     const sa = skirtIndexOf[ia], sb = skirtIndexOf[ib];
     indices[k++] = ia; indices[k++] = sa; indices[k++] = ib;
     indices[k++] = ib; indices[k++] = sa; indices[k++] = sb;
+    indices[k++] = ia; indices[k++] = ib; indices[k++] = sa;
+    indices[k++] = ib; indices[k++] = sb; indices[k++] = sa;
   };
   for (let i = 0; i < N - 1; i++) addQuad(i, i + 1);
   for (let j = 0; j < N - 1; j++) addQuad(j * N + (N - 1), (j + 1) * N + (N - 1));
