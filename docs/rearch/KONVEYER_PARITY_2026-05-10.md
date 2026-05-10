@@ -1,0 +1,134 @@
+# KONVEYER Parity And Migration Ledger
+
+Last verified: 2026-05-10
+
+Branch: `exp/konveyer-webgpu-migration`
+
+## KONVEYER-0 Summary
+
+KONVEYER starts from a WebGL2 production runtime with no active WebGPU runtime
+source path. The first static audit on this branch wrote:
+
+- `artifacts/perf/2026-05-10T14-06-41-625Z/webgpu-strategy-audit/strategy-audit.json`
+- `activeWebgpuSourceMatches=0`
+- `webglRendererEntrypoints=13`
+- `migrationBlockerMatches=117`
+
+Blocker split from the audit:
+
+| Pattern | Matches |
+| --- | ---: |
+| `ShaderMaterial` | 73 |
+| `RawShaderMaterial` | 6 |
+| `onBeforeCompile` | 11 |
+| `WebGLRenderTarget` | 5 |
+| Direct WebGL context or GPU timer access | 22 |
+
+The initial platform probe wrote:
+
+- `artifacts/perf/2026-05-10T14-06-51-008Z/projekt-143-platform-capability-probe/summary.json`
+- Chromium `147.0.7727.15`
+- Headless WebGL2: PASS through SwiftShader
+- Headless WebGPU adapter: WARN, `navigator.gpu` exists but no adapter returned
+- COOP/COEP and `SharedArrayBuffer`: PASS locally and on live Pages headers
+
+This means the first runtime implementation must keep compile-time and WebGL
+fallback proof separate from headed WebGPU adapter proof.
+
+## Upstream Facts Refreshed
+
+Sources checked on 2026-05-10:
+
+- Three.js WebGPURenderer docs:
+  https://threejs.org/docs/pages/WebGPURenderer.html
+- Three.js WebGPURenderer manual:
+  https://threejs.org/manual/en/webgpurenderer
+- Three.js TSL docs:
+  https://threejs.org/docs/TSL.html
+- Three.js WebGPU capability helper:
+  https://threejs.org/docs/pages/WebGPU.html
+- MDN WebGPU API:
+  https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API
+- Chrome WebGPU overview:
+  https://developer.chrome.com/docs/web-platform/webgpu/overview
+- WebKit Safari Technology Preview WebGPU note:
+  https://webkit.org/blog/14879/webgpu-now-available-for-testing-in-safari-technology-preview/
+
+Current Three.js guidance relevant to this repo:
+
+- `WebGPURenderer` is imported through the WebGPU build, normally
+  `three/webgpu`.
+- `WebGPURenderer` initializes asynchronously. A requestAnimationFrame loop
+  must not call `render()` before `await renderer.init()`, unless it uses the
+  renderer-managed animation loop.
+- The renderer tries WebGPU first and can fall back to a WebGL2 backend. The
+  `forceWebGL` option is the explicit test path.
+- `ShaderMaterial`, `RawShaderMaterial`, and `onBeforeCompile` customizations
+  are not migration-complete WebGPU surfaces. They need TSL/node material ports.
+- Classic `EffectComposer`-style post-processing is not a drop-in WebGPU
+  path. Post-processing moves to the node render pipeline.
+- TSL can generate WGSL for WebGPU and GLSL for WebGL2, which makes it the
+  correct bridge for dual-backend shader work.
+- WebGPU is still not a universal browser baseline. MDN marks it limited
+  availability and secure-context-only. Chrome documents broad support, but
+  platform-specific fallback remains required.
+
+## Repo Parity Matrix
+
+| Surface | Status | Current owner path | WebGPU migration note |
+| --- | --- | --- | --- |
+| Main renderer boot | needs-port | `src/core/GameRenderer.ts` | Constructor is `THREE.WebGLRenderer`; startup assumes sync renderer availability and uses WebGL extension checks for shader precompile. |
+| Engine render loop | unknown | `src/core/GameEngine.ts`, `src/core/GameEngineLoop.ts` | Mostly calls common `render`, `clearDepth`, `shadowMap`, and `info` APIs, but must not run before async WebGPU init. |
+| Fenced renderer contract | blocked | `src/types/SystemInterfaces.ts` | `IGameRenderer.renderer` and weapon rendering methods are typed as `THREE.WebGLRenderer`; branch must use an internal adapter/cast and avoid fence edits. |
+| GPU timing telemetry | blocked | `src/systems/debug/GPUTimingTelemetry.ts`, `src/systems/debug/PerformanceTelemetry.ts` | Uses `renderer.getContext()` and `EXT_disjoint_timer_query_webgl2`; WebGPU needs timestamp-query or disabled telemetry fallback. |
+| Texture warmup | needs-port | `src/systems/assets/AssetLoader.ts` | Uses `renderer.initTexture`; common renderer has an initialized requirement, so WebGPU path needs init ordering guard. |
+| Post-processing | blocked | `src/systems/effects/PostProcessingManager.ts` | Uses `WebGLRenderTarget` plus `ShaderMaterial`; replace with TSL render pipeline before enabling for WebGPU. Runtime currently disables this path. |
+| Terrain material | blocked | `src/systems/terrain/TerrainMaterial.ts` | Large `MeshStandardMaterial.onBeforeCompile` CDLOD shader injection. Tail work, not first port. |
+| Terrain renderer | needs-port | `src/systems/terrain/CDLODRenderer.ts` | Instanced CDLOD geometry is valuable for WebGPU, but material dependency blocks default-on parity. |
+| Vegetation billboards | needs-port | `src/systems/world/billboard/BillboardBufferManager.ts` | `RawShaderMaterial` instanced impostors with custom fog/lighting. Best first high-value TSL material slice. |
+| Combatant impostors | needs-port | `src/systems/combat/CombatantShaders.ts`, `src/systems/combat/CombatantMeshFactory.ts` | `ShaderMaterial` instanced sprite/impostor path. Do isolated bucket after vegetation fixture. |
+| Combatant close GLBs | ready | `src/systems/combat/CombatantRenderer.ts` | Mostly standard/skinned GLB materials. Must prove skinning, shadows, and perf under WebGPU separately. |
+| Muzzle flashes | needs-port | `src/systems/effects/MuzzleFlashSystem.ts` | Small `ShaderMaterial` points system. Good KONVEYER-5 compute/material fixture candidate. |
+| Sky dome | needs-port | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | `ShaderMaterial` dome. TSL port is feasible but visual parity-sensitive. |
+| Cloud layer | needs-port | `src/systems/environment/atmosphere/CloudLayer.ts` | `ShaderMaterial` procedural plane. Good isolated TSL candidate after simpler fixtures. |
+| Global water | blocked | `src/systems/environment/WaterSystem.ts` | Three examples `Water` object owns a shader material and render targets internally; keep WebGL fallback until replaced or disabled per scenario. |
+| Hydrology river water | ready | `src/systems/environment/WaterSystem.ts` | Uses `MeshStandardMaterial` vertex colors and CPU query segments. WebGPU-compatible candidate once renderer boots. |
+| First-person weapon overlay | needs-port | `src/systems/player/FirstPersonWeapon.ts`, `src/systems/player/weapon/WeaponModel.ts` | API is fenced to `WebGLRenderer`; calls common `render` but type and ordering need adapter handling. |
+| Dev viewers and tools | unknown | `src/dev/*`, `public/vehicle-viewer.html`, `tools/vehicle-viewer.html` | Not production boot blockers. Keep WebGL until runtime path proves out. |
+| Minimap and DOM UI | ready | `src/ui/minimap`, HUD DOM | DOM/UI should stay outside renderer migration except for world projection calls. |
+
+## Execution Order
+
+1. KONVEYER-1: Add internal renderer backend selection and capability reporting.
+   Keep WebGL default unless `?renderer=webgpu` or an explicit env flag is set.
+2. KONVEYER-2: Add TSL helper module and a small node material fixture. Do not
+   start with terrain or post.
+3. KONVEYER-3: Port or parallel-prototype the vegetation billboard material
+   path because it is high draw-volume and less simulation-entangled than NPCs.
+4. KONVEYER-4: Port an isolated combatant impostor material bucket. Close GLBs
+   stay on standard material first.
+5. KONVEYER-5: Build a small compute/material proof around muzzle particles or
+   projectile/effect buffer ownership.
+6. KONVEYER-6: Add GPU-ready data packing for cover/sensor queries, with CPU
+   authority retained.
+7. KONVEYER-7: Write and prove the terrain, water, and post-processing parity
+   route. Port the smallest safe tail item only after earlier slices run.
+8. KONVEYER-8: Expand validation to WebGPU/WebGL forced backend matrix, headed
+   adapter probe, A Shau/Open Frontier coverage, and fallback policy.
+9. KONVEYER-9: Produce default-on readiness packet, rollback plan, and owner
+   review decisions. No `master` merge or production deploy from this branch.
+
+## Hard Decisions For Review
+
+- A true default-on WebGPU game path requires TSL ports for all active custom
+  shader materials, not only swapping renderer construction.
+- The fenced `IGameRenderer` shape still names `WebGLRenderer`. This campaign
+  can avoid a fence change with an internal adapter, but the long-term API
+  should eventually become renderer-agnostic in a reviewed `[interface-change]`
+  PR.
+- WebGPU GPU timing cannot reuse the existing WebGL timer query path. The
+  first WebGPU backend should report renderer stats and mark GPU time
+  unavailable until timestamp query support is implemented and validated.
+- The global `Water` example and terrain `onBeforeCompile` material are the
+  main blockers for full-scene default-on parity. They are tail work by design.
+
