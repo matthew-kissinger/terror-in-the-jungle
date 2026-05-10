@@ -19,6 +19,15 @@ export interface CDLODTile {
   lodLevel: number;
   /** Morph factor [0,1] for smooth transition to parent LOD */
   morphFactor: number;
+  /**
+   * Bitmask flagging which of this tile's four edges abut a coarser-LOD
+   * (larger `size`) neighbour. The vertex shader force-morphs vertices on
+   * those edges so they land exactly on the coarser neighbour's vertex
+   * grid, closing T-junction cracks at LOD transitions.
+   *
+   * Bit layout: 1 = +Z (north), 2 = +X (east), 4 = -Z (south), 8 = -X (west).
+   */
+  edgeMorphMask: number;
 }
 
 export interface FrustumPlane {
@@ -37,6 +46,10 @@ export class CDLODQuadtree {
   private readonly tileBuffer: CDLODTile[] = [];
   private tileCount = 0;
 
+  // Reused index map for the neighbor-resolution pass. Cleared and refilled
+  // each frame; key = `${cx}|${cz}|${size}` -> tile index in tileBuffer.
+  private readonly tileIndex: Map<string, number> = new Map();
+
   constructor(worldSize: number, maxLOD: number, lodRanges: readonly number[], morphStart = 0.8) {
     this.worldSize = worldSize;
     this.maxLOD = maxLOD;
@@ -45,7 +58,7 @@ export class CDLODQuadtree {
 
     // Pre-allocate tile objects
     for (let i = 0; i < MAX_TILES; i++) {
-      this.tileBuffer.push({ x: 0, z: 0, size: 0, lodLevel: 0, morphFactor: 0 });
+      this.tileBuffer.push({ x: 0, z: 0, size: 0, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 });
     }
   }
 
@@ -82,7 +95,65 @@ export class CDLODQuadtree {
       );
     }
 
+    this.resolveEdgeMorphMasks();
+
     return this.tileBuffer.slice(0, this.tileCount);
+  }
+
+  /**
+   * Post-recursion neighbour pass: for every emitted tile, set bits in
+   * `edgeMorphMask` for each of its four edges that abut a coarser-LOD
+   * (larger `size`) tile. Tiles meet edge-to-edge by construction, so
+   * walking up the size ladder from `tile.size * 2` to the world size
+   * and snapping to that level's grid will hit the unique containing
+   * tile if one was emitted at that scale.
+   *
+   * Costs O(tiles * 4 * maxLOD) Map lookups; typical tile count is < 256
+   * and lookup is O(1), well under the 0.05 ms additional budget called
+   * out in the brief.
+   */
+  private resolveEdgeMorphMasks(): void {
+    this.tileIndex.clear();
+    for (let i = 0; i < this.tileCount; i++) {
+      const t = this.tileBuffer[i];
+      this.tileIndex.set(this.tileKey(t.x, t.z, t.size), i);
+    }
+
+    const halfWorld = this.worldSize / 2;
+    for (let i = 0; i < this.tileCount; i++) {
+      const t = this.tileBuffer[i];
+      const half = t.size / 2;
+
+      // Probe points just outside each edge, then walk up the size
+      // ladder snapping to that scale's centred grid.
+      // Bit layout: 1=+Z (N), 2=+X (E), 4=-Z (S), 8=-X (W)
+      const probes: ReadonlyArray<readonly [number, number, number]> = [
+        [t.x, t.z + half + 1e-3, 1],
+        [t.x + half + 1e-3, t.z, 2],
+        [t.x, t.z - half - 1e-3, 4],
+        [t.x - half - 1e-3, t.z, 8],
+      ];
+
+      for (const [px, pz, bit] of probes) {
+        // Probe outside the world bounds means the world edge - leave bit 0.
+        if (px < -halfWorld || px > halfWorld || pz < -halfWorld || pz > halfWorld) continue;
+
+        for (let s = t.size * 2; s <= this.worldSize; s *= 2) {
+          // Snap probe point to the centred grid at scale `s`. Tiles of
+          // size `s` have centres at `floor((p + halfWorld) / s) * s + s/2 - halfWorld`.
+          const cx = Math.floor((px + halfWorld) / s) * s + s / 2 - halfWorld;
+          const cz = Math.floor((pz + halfWorld) / s) * s + s / 2 - halfWorld;
+          if (this.tileIndex.has(this.tileKey(cx, cz, s))) {
+            t.edgeMorphMask |= bit;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  private tileKey(cx: number, cz: number, size: number): string {
+    return `${cx}|${cz}|${size}`;
   }
 
   /**
@@ -155,6 +226,7 @@ export class CDLODQuadtree {
     tile.size = size;
     tile.lodLevel = lodLevel;
     tile.morphFactor = morphFactor;
+    tile.edgeMorphMask = 0;
     this.tileCount++;
   }
 

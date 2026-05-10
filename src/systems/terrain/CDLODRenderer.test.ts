@@ -107,9 +107,9 @@ describe('CDLODRenderer', () => {
 
   it('updates instance count to match tile count', () => {
     const tiles: CDLODTile[] = [
-      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0 },
-      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.5 },
-      { x: 0, z: 64, size: 128, lodLevel: 2, morphFactor: 0.8 },
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 },
+      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.5, edgeMorphMask: 0 },
+      { x: 0, z: 64, size: 128, lodLevel: 2, morphFactor: 0.8, edgeMorphMask: 0 },
     ];
 
     renderer.updateInstances(tiles);
@@ -120,12 +120,37 @@ describe('CDLODRenderer', () => {
   it('clamps to max instances', () => {
     const tiles: CDLODTile[] = [];
     for (let i = 0; i < 300; i++) {
-      tiles.push({ x: i * 10, z: 0, size: 10, lodLevel: 0, morphFactor: 0 });
+      tiles.push({ x: i * 10, z: 0, size: 10, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 });
     }
 
     renderer.updateInstances(tiles);
     // Should not exceed maxInstances (256 in this test)
     expect(renderer.getMesh().count).toBeLessThanOrEqual(256);
+  });
+
+  // Stage cdlod-edge-morph (cycle-2026-05-09): the renderer must expose
+  // the per-instance edgeMorphMask attribute so the vertex shader can
+  // force-morph edges abutting coarser neighbours. Tests the contract,
+  // not the exact float layout.
+  it('exposes a per-instance edgeMorphMask attribute on the geometry', () => {
+    const mesh: any = renderer.getMesh();
+    expect(mesh.geometry.attributes.edgeMorphMask).toBeDefined();
+    expect(mesh.geometry.attributes.edgeMorphMask.array.length).toBe(256);
+  });
+
+  it('writes each tile.edgeMorphMask into the attribute slot at its instance index', () => {
+    const tiles: CDLODTile[] = [
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 5 },
+      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.5, edgeMorphMask: 10 },
+      { x: 0, z: 64, size: 128, lodLevel: 2, morphFactor: 0.8, edgeMorphMask: 15 },
+    ];
+    renderer.updateInstances(tiles);
+    const mesh: any = renderer.getMesh();
+    const arr = mesh.geometry.attributes.edgeMorphMask.array as Float32Array;
+    expect(arr[0]).toBe(5);
+    expect(arr[1]).toBe(10);
+    expect(arr[2]).toBe(15);
+    expect(mesh.geometry.attributes.edgeMorphMask.needsUpdate).toBe(true);
   });
 
   it('keeps terrain shadow casting enabled by default', () => {

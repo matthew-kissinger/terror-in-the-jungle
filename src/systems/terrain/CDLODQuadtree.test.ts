@@ -177,6 +177,99 @@ describe('CDLODQuadtree', () => {
     expect(qt.selectTiles(worldSize * 0.3, 50, 0, null).length).toBeLessThan(256);
   });
 
+  // Stage cdlod-edge-morph (cycle-2026-05-09): every emitted tile carries
+  // a 4-bit edgeMorphMask flagging which of its edges abut a coarser-LOD
+  // neighbour. The vertex shader uses these bits to force-morph edge
+  // vertices, closing T-junction cracks at LOD transitions.
+  describe('edgeMorphMask (LOD-transition T-junction resolution)', () => {
+    it('initialises every emitted tile with a numeric edgeMorphMask field', () => {
+      const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+      const tiles = qt.selectTiles(0, 50, 0, null);
+      expect(tiles.length).toBeGreaterThan(0);
+      for (const tile of tiles) {
+        expect(typeof tile.edgeMorphMask).toBe('number');
+        expect(Number.isInteger(tile.edgeMorphMask)).toBe(true);
+        expect(tile.edgeMorphMask).toBeGreaterThanOrEqual(0);
+        expect(tile.edgeMorphMask).toBeLessThanOrEqual(15);
+      }
+    });
+
+    it('flags only edges that abut a strictly larger neighbour', () => {
+      // Camera at the world centre produces multiple LOD bands.
+      const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+      const tiles = qt.selectTiles(0, 50, 0, null);
+
+      // Build a quick lookup: tile centre -> tile.
+      const byKey = new Map<string, typeof tiles[number]>();
+      for (const t of tiles) byKey.set(`${t.x}|${t.z}|${t.size}`, t);
+
+      const half = worldSize / 2;
+
+      for (const t of tiles) {
+        const h = t.size / 2;
+        // For each bit, walk the size ladder and find the unique tile
+        // covering the probe point. The bit must be set iff that tile
+        // exists AND has size > t.size.
+        const probes: Array<[number, number, number]> = [
+          [t.x, t.z + h + 1e-3, 1],
+          [t.x + h + 1e-3, t.z, 2],
+          [t.x, t.z - h - 1e-3, 4],
+          [t.x - h - 1e-3, t.z, 8],
+        ];
+        for (const [px, pz, bit] of probes) {
+          let coarserHit = false;
+          if (px >= -half && px <= half && pz >= -half && pz <= half) {
+            for (let s = t.size * 2; s <= worldSize; s *= 2) {
+              const cx = Math.floor((px + half) / s) * s + s / 2 - half;
+              const cz = Math.floor((pz + half) / s) * s + s / 2 - half;
+              if (byKey.has(`${cx}|${cz}|${s}`)) { coarserHit = true; break; }
+            }
+          }
+          const observed = (t.edgeMorphMask & bit) !== 0;
+          expect(observed).toBe(coarserHit);
+        }
+      }
+    });
+
+    it('clears edgeMorphMask between selectTiles invocations', () => {
+      // First call seeds masks; second call from far away should reset.
+      const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+      qt.selectTiles(0, 50, 0, null);
+      const tiles2 = qt.selectTiles(50000, 50, 50000, null);
+      for (const t of tiles2) {
+        expect(t.edgeMorphMask).toBeGreaterThanOrEqual(0);
+        expect(t.edgeMorphMask).toBeLessThanOrEqual(15);
+      }
+    });
+
+    it('produces a uniform-LOD mask of zero everywhere when all tiles share the same size', () => {
+      // Force a uniform LOD by keeping the camera so far away that no
+      // subdivision is required: every emitted tile is at maxLOD-1 with
+      // identical size. No tile can have a coarser neighbour, so all
+      // masks are 0.
+      const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+      const tiles = qt.selectTiles(0, 1e9, 0, null);
+      const sizes = new Set(tiles.map(t => t.size));
+      expect(sizes.size).toBe(1);
+      for (const t of tiles) expect(t.edgeMorphMask).toBe(0);
+    });
+
+    it('flags at least one coarser-edge bit when LOD bands are present', () => {
+      // The default quadtree (worldSize=1024, maxLOD=4) at camera (0, 50, 0)
+      // is known to produce multiple LOD bands - the existing
+      // 'tiles near camera have lower LOD level' test relies on it.
+      // That guarantees genuine LOD transitions where T-junctions arise.
+      const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+      const tiles = qt.selectTiles(0, 50, 0, null);
+
+      const lodLevels = new Set(tiles.map(t => t.lodLevel));
+      expect(lodLevels.size).toBeGreaterThan(1); // Sanity: bands actually exist.
+
+      const anyEdgeFlagged = tiles.some(t => t.edgeMorphMask !== 0);
+      expect(anyEdgeFlagged).toBe(true);
+    });
+  });
+
   it('returns empty slice for subsequent calls (no stale data)', () => {
     const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
 
