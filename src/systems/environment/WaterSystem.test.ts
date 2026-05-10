@@ -16,10 +16,10 @@ vi.mock('../../utils/Logger');
  * `ISkyRuntime` is bound, water reflections must track the atmosphere's
  * sun direction.
  *
- * We intentionally do NOT exercise `WaterSystem.init()` (which loads a
- * texture + constructs a Three.js Water shader against a jsdom WebGL
- * stub). The behavior under test is the sun-sync contract exposed via
- * `setAtmosphereSystem` and the private `sun` vector.
+ * Most tests intentionally do NOT exercise `WaterSystem.init()` because it
+ * loads textures and touches the DOM overlay. The behavior under test is the
+ * sun-sync contract exposed via `setAtmosphereSystem`, the private `sun`
+ * vector, and the standard-material water control surface.
  */
 
 function makeAtmosphere(dir: THREE.Vector3): ISkyRuntime {
@@ -173,6 +173,27 @@ describe('WaterSystem sun direction from atmosphere', () => {
 
     system.setHydrologyChannels(null);
     expect(fakeWater.visible).toBe(true);
+  });
+
+  it('applies global water color to the standard material', () => {
+    const system = makeSystem();
+    const material = new THREE.MeshStandardMaterial();
+    (system as unknown as { water: { material: THREE.MeshStandardMaterial } }).water = { material };
+
+    system.setWaterColor(0x123456);
+
+    expect(material.color.getHex()).toBe(0x123456);
+  });
+
+  it('maps global water distortion requests onto normal-map scale', () => {
+    const system = makeSystem();
+    const material = new THREE.MeshStandardMaterial();
+    (system as unknown as { water: { material: THREE.MeshStandardMaterial } }).water = { material };
+
+    system.setDistortionScale(2.35);
+
+    expect(material.normalScale.x).toBeCloseTo(0.18, 5);
+    expect(material.normalScale.y).toBeCloseTo(0.18, 5);
   });
 
   it('builds hydrology river surfaces with bank-to-channel vertex color coverage', () => {

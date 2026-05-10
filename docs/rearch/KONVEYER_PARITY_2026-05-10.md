@@ -117,7 +117,7 @@ Current Three.js guidance relevant to this repo:
 | Muzzle flashes | ported | `src/systems/effects/MuzzleFlashSystem.ts` | K5 follow-up replaced the custom points material with standard `PointsMaterial`, generated radial texture, and vertex colors. |
 | Sky dome | ported | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | Uses a generated sky/cloud texture on standard `MeshBasicMaterial`; CPU LUT remains the fog/lighting authority. |
 | Cloud layer | retired | `src/systems/environment/AtmosphereSystem.ts`, `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | The old finite plane prototype was removed from production source; sky-dome clouds remain the only active cloud authority. |
-| Global water | blocked | `src/systems/environment/WaterSystem.ts` | Three examples `Water` object owns a shader material and render targets internally; keep WebGL fallback until replaced or disabled per scenario. |
+| Global water | ported | `src/systems/environment/WaterSystem.ts` | The legacy global water plane now uses standard `MeshStandardMaterial` with animated normal texture offset; hydrology river water remains the map-space authority for channel surfaces. |
 | Hydrology river water | ready | `src/systems/environment/WaterSystem.ts` | Uses `MeshStandardMaterial` vertex colors and CPU query segments. WebGPU-compatible candidate once renderer boots. |
 | First-person weapon overlay | needs-port | `src/systems/player/FirstPersonWeapon.ts`, `src/systems/player/weapon/WeaponModel.ts` | API is fenced to `WebGLRenderer`; calls common `render` but type and ordering need adapter handling. |
 | Dev viewers and tools | unknown | `src/dev/*`, `public/vehicle-viewer.html`, `tools/vehicle-viewer.html` | Not production boot blockers. Keep WebGL until runtime path proves out. |
@@ -366,7 +366,7 @@ disabled by scenario policy:
 | Surface | Required route | Acceptance evidence |
 | --- | --- | --- |
 | Terrain CDLOD | Replace `TerrainMaterial.onBeforeCompile` with node-material displacement and shading, then keep CPU/query parity against `HeightmapGPU`. | Open Frontier and A Shau screenshots plus perf captures before/after. |
-| Global water | Replace Three examples `Water` render-target shader or keep it scenario-disabled under WebGPU. Hydrology river mesh can stay standard material. | Water-system audit plus WebGPU strict scene smoke in a water-enabled scenario. |
+| Global water | Standard material plane is now the fallback/ocean path; hydrology river mesh stays standard material. Future work is visual acceptance and flow, not a WebGL-only material port. | Water-system audit plus water-enabled screenshots/perf in Open Frontier and A Shau hydrology paths. |
 | Post-processing | Keep runtime disabled or move to Three WebGPU node `PostProcessing`; do not re-enable classic WebGL render-target composer as WebGPU proof. | Built-app renderer matrix plus visual-integrity audit. |
 | Vegetation production path | Expand the K3 TSL slice to full atlas, wind, fog, and atmosphere parity. | Vegetation horizon/grounding audits plus Open Frontier/A Shau captures. |
 | Combatant production path | Expand the K4 TSL slice to Pixel Forge animation atlas, crop-map, aura/outline, and close-GLB skinning proof. | Combat120 capture and Pixel Forge NPC probe. |
@@ -404,6 +404,12 @@ K7 post-processing tail reduction:
   inventory.
 - `npm run audit:konveyer-completion` after the sky-dome material port recorded
   `productionBlockers=31` while the tree was dirty; the branch still needs a
+  clean completion audit after commit/push.
+- The global water plane was then moved from Three's example `Water` object to
+  a standard `MeshStandardMaterial` plane with normal-map offset animation.
+  Hydrology river surfaces and water query semantics stayed intact.
+- `npm run audit:konveyer-completion` after the water material port recorded
+  `productionBlockers=26` while the tree was dirty; the branch still needs a
   clean completion audit after commit/push.
 
 ## KONVEYER-8 Validation Matrix
