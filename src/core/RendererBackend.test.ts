@@ -16,6 +16,7 @@ function setSearch(search: string): void {
 
 beforeEach(() => {
   vi.stubEnv('VITE_KONVEYER_WEBGPU', '');
+  vi.stubEnv('VITE_KONVEYER_WEBGPU_STRICT', '');
   setSearch('');
 });
 
@@ -39,9 +40,20 @@ describe('resolveRendererBackendMode', () => {
     expect(resolveRendererBackendMode()).toBe('webgpu-force-webgl');
   });
 
+  it('selects strict WebGPU proof mode when fallback would hide migration failures', () => {
+    setSearch('?renderer=webgpu-strict');
+    expect(resolveRendererBackendMode()).toBe('webgpu-strict');
+  });
+
   it('allows build-time opt-in for experimental branches', () => {
     vi.stubEnv('VITE_KONVEYER_WEBGPU', '1');
     expect(resolveRendererBackendMode()).toBe('webgpu');
+  });
+
+  it('allows build-time strict proof opt-in for migration gates', () => {
+    vi.stubEnv('VITE_KONVEYER_WEBGPU', '1');
+    vi.stubEnv('VITE_KONVEYER_WEBGPU_STRICT', '1');
+    expect(resolveRendererBackendMode()).toBe('webgpu-strict');
   });
 });
 
@@ -58,6 +70,14 @@ describe('createInitialRendererCapabilities', () => {
     expect(caps.requestedMode).toBe('webgpu');
     expect(caps.resolvedBackend).toBe('unknown');
     expect(caps.initStatus).toBe('pending');
+    expect(caps.strictWebGPU).toBe(false);
+  });
+
+  it('marks strict WebGPU proof mode as pending and non-fallbackable', () => {
+    const caps = createInitialRendererCapabilities('webgpu-strict');
+    expect(caps.requestedMode).toBe('webgpu-strict');
+    expect(caps.resolvedBackend).toBe('unknown');
+    expect(caps.initStatus).toBe('pending');
+    expect(caps.strictWebGPU).toBe(true);
   });
 });
-

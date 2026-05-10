@@ -248,6 +248,14 @@ export class GameRenderer {
       this.applyCommonRendererSettings(renderer);
       renderer.domElement.style.display = previousDisplay;
       await initializeCommonRenderer(renderer);
+      const resolvedBackend = inspectResolvedRendererBackend(renderer);
+
+      if (capabilities.strictWebGPU && resolvedBackend !== 'webgpu') {
+        renderer.dispose();
+        throw new Error(
+          `Strict WebGPU proof mode resolved ${resolvedBackend}; refusing WebGL fallback.`,
+        );
+      }
 
       const previousParent = previousRenderer.domElement.parentElement;
       if (previousParent) {
@@ -260,11 +268,11 @@ export class GameRenderer {
       this.renderer = renderer;
       this.rendererCapabilities = {
         ...capabilities,
-        resolvedBackend: inspectResolvedRendererBackend(renderer),
+        resolvedBackend,
         initStatus: 'ready',
         notes: [
           ...capabilities.notes,
-          `Renderer initialized as ${inspectResolvedRendererBackend(renderer)}.`,
+          `Renderer initialized as ${resolvedBackend}.`,
         ],
       };
 
@@ -273,16 +281,26 @@ export class GameRenderer {
         `KONVEYER renderer backend initialized (${this.rendererCapabilities.resolvedBackend})`
       );
     } catch (error) {
+      const errorMessage = toErrorMessage(error);
       this.rendererCapabilities = {
         ...this.rendererCapabilities,
-        resolvedBackend: 'webgl',
-        initStatus: 'fallback-webgl',
-        error: toErrorMessage(error),
+        resolvedBackend: this.rendererBackendMode === 'webgpu-strict' ? 'unknown' : 'webgl',
+        initStatus: this.rendererBackendMode === 'webgpu-strict' ? 'failed' : 'fallback-webgl',
+        error: errorMessage,
         notes: [
           ...this.rendererCapabilities.notes,
-          'WebGPU renderer initialization failed; keeping the WebGL bootstrap renderer.',
+          this.rendererBackendMode === 'webgpu-strict'
+            ? 'Strict WebGPU renderer initialization failed; refusing to keep the WebGL bootstrap renderer as proof.'
+            : 'WebGPU renderer initialization failed; keeping the WebGL bootstrap renderer.',
         ],
       };
+      if (this.rendererBackendMode === 'webgpu-strict') {
+        Logger.warn(
+          'Renderer',
+          `KONVEYER strict WebGPU init failed: ${this.rendererCapabilities.error}`
+        );
+        throw error instanceof Error ? error : new Error(errorMessage);
+      }
       Logger.warn(
         'Renderer',
         `KONVEYER WebGPU init failed; continuing with WebGL renderer: ${this.rendererCapabilities.error}`

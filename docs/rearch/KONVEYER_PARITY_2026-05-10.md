@@ -32,8 +32,34 @@ The initial platform probe wrote:
 - Headless WebGPU adapter: WARN, `navigator.gpu` exists but no adapter returned
 - COOP/COEP and `SharedArrayBuffer`: PASS locally and on live Pages headers
 
-This means the first runtime implementation must keep compile-time and WebGL
-fallback proof separate from headed WebGPU adapter proof.
+This means the first runtime implementation must keep compile-time, explicit
+WebGL fallback, and strict headed WebGPU adapter proof separate.
+
+## Architecture Posture
+
+Three.js remains the chosen renderer path for KONVEYER. The experiment is not
+permission to pivot to another browser renderer framework. The long-term
+"native or port-ready" posture is instead:
+
+- Make the renderer boundary backend-agnostic inside the engine while leaving
+  the fenced public interface alone until a reviewed interface-change PR.
+- Move shader code from GLSL strings toward TSL/node graphs so the same intent
+  can target WGSL for WebGPU and GLSL for explicit WebGL2 fallback.
+- Keep simulation authority on CPU-side data contracts that can later move
+  toward WASM, worker, or native-hosted builds without coupling game state to a
+  specific browser graphics context.
+- Treat Vite config and tests as migration infrastructure. A WebGPU proof gate
+  must fail loudly when the WebGPU backend is missing, even though the product
+  runtime can keep a separately tested WebGL fallback path.
+
+Fallback policy for this branch:
+
+- `?renderer=webgpu-strict` and `VITE_KONVEYER_WEBGPU_STRICT=1` are proof
+  modes. They must fail if Three resolves to the WebGL backend.
+- `?renderer=webgpu-force-webgl` is an explicit compatibility matrix path. It
+  is allowed only when the test name or artifact says fallback was forced.
+- The default app path can retain WebGL while migration is incomplete, but no
+  KONVEYER checkpoint should call fallback behavior WebGPU success.
 
 ## Upstream Facts Refreshed
 
@@ -113,8 +139,9 @@ Current Three.js guidance relevant to this repo:
    authority retained.
 7. KONVEYER-7: Write and prove the terrain, water, and post-processing parity
    route. Port the smallest safe tail item only after earlier slices run.
-8. KONVEYER-8: Expand validation to WebGPU/WebGL forced backend matrix, headed
-   adapter probe, A Shau/Open Frontier coverage, and fallback policy.
+8. KONVEYER-8: Expand validation to WebGPU strict proof, WebGPU-forced-WebGL
+   compatibility, headed adapter probe, A Shau/Open Frontier coverage, and
+   explicit fallback policy.
 9. KONVEYER-9: Produce default-on readiness packet, rollback plan, and owner
    review decisions. No `master` merge or production deploy from this branch.
 
@@ -165,3 +192,34 @@ Current limitation:
 - The opt-in WebGPU renderer boot path is present, but full game rendering is
   still blocked by the custom GLSL material inventory above. That is expected
   until KONVEYER-2 through KONVEYER-7 replace or route those surfaces.
+
+## KONVEYER-2 Checkpoint
+
+Implemented after the KONVEYER-1 checkpoint:
+
+- `src/core/RendererBackend.ts` adds strict WebGPU proof selection through
+  `?renderer=webgpu-strict` and `VITE_KONVEYER_WEBGPU_STRICT=1`.
+- `src/core/GameRenderer.ts` refuses to swap to a WebGPURenderer instance that
+  resolved to the WebGL backend when strict proof mode is active.
+- `src/core/TslMaterialFactory.ts` adds the first typed TSL material fixture:
+  an alpha-tested texture node material with no GLSL shader strings.
+- `evaluateNodeMaterialReadiness()` centralizes the rule that strict WebGPU
+  material slices must not hide behind backend fallback.
+- `src/core/TslMaterialFactory.test.ts` covers the strict/fallback readiness
+  split and verifies the TSL node material is created from Three's node stack.
+
+Validation for this checkpoint:
+
+- `npm run typecheck`: PASS
+- `npx vitest run src/core/RendererBackend.test.ts src/core/TslMaterialFactory.test.ts src/core/GameRenderer.test.ts`: PASS
+- `npm run lint`: PASS
+- `npm run lint:docs`: PASS, 12 pre-existing grandfathered warnings
+- `npm run check:webgpu-strategy`: PASS,
+  `artifacts/perf/2026-05-10T14-23-23-107Z/webgpu-strategy-audit/strategy-audit.json`
+- `npm run build`: PASS
+
+Current limitation:
+
+- K2 proves the foundation and failure posture only. Vegetation and combatant
+  production materials still need K3/K4 slice ports before strict scene proof
+  can claim WebGPU visual parity.

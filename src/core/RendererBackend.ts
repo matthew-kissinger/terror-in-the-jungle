@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type RendererBackendMode = 'webgl' | 'webgpu' | 'webgpu-force-webgl';
+export type RendererBackendMode = 'webgl' | 'webgpu' | 'webgpu-force-webgl' | 'webgpu-strict';
 export type ResolvedRendererBackend = 'webgl' | 'webgpu' | 'webgpu-webgl-fallback' | 'unknown';
 export type RendererInitStatus = 'ready' | 'pending' | 'fallback-webgl' | 'failed';
 
@@ -10,6 +10,7 @@ export interface RendererBackendCapabilities {
   initStatus: RendererInitStatus;
   isWebGPURenderer: boolean;
   forceWebGL: boolean;
+  strictWebGPU: boolean;
   navigatorGpuAvailable: boolean;
   adapterAvailable: boolean | null;
   adapterName: string | null;
@@ -65,6 +66,9 @@ export function resolveRendererBackendMode(): RendererBackendMode {
     if (requested === 'webgpu' || requested === '1' || requested === 'true') {
       return 'webgpu';
     }
+    if (requested === 'webgpu-strict' || requested === 'strict') {
+      return 'webgpu-strict';
+    }
     if (
       requested === 'webgpu-force-webgl'
       || requested === 'force-webgl'
@@ -74,6 +78,9 @@ export function resolveRendererBackendMode(): RendererBackendMode {
     }
   }
 
+  if (import.meta.env.VITE_KONVEYER_WEBGPU_STRICT === '1') {
+    return 'webgpu-strict';
+  }
   return import.meta.env.VITE_KONVEYER_WEBGPU === '1' ? 'webgpu' : 'webgl';
 }
 
@@ -94,6 +101,7 @@ export function createInitialRendererCapabilities(
     initStatus: requestedMode === 'webgl' ? 'ready' : 'pending',
     isWebGPURenderer: false,
     forceWebGL: requestedMode === 'webgpu-force-webgl',
+    strictWebGPU: requestedMode === 'webgpu-strict',
     navigatorGpuAvailable: getNavigatorGpuAvailable(),
     adapterAvailable: null,
     adapterName: null,
@@ -102,12 +110,14 @@ export function createInitialRendererCapabilities(
     error: null,
     notes: requestedMode === 'webgl'
       ? ['WebGL renderer selected by default.']
-      : ['WebGPU renderer requested; bootstrapping through async renderer init.'],
+      : [requestedMode === 'webgpu-strict'
+        ? 'Strict WebGPU proof mode requested; backend fallback must fail loudly.'
+        : 'WebGPU renderer requested; bootstrapping through async renderer init.'],
   };
 }
 
 export async function createWebGPURenderer(
-  requestedMode: Extract<RendererBackendMode, 'webgpu' | 'webgpu-force-webgl'>,
+  requestedMode: Extract<RendererBackendMode, 'webgpu' | 'webgpu-force-webgl' | 'webgpu-strict'>,
 ): Promise<{ renderer: CommonRenderer; capabilities: RendererBackendCapabilities }> {
   const webgpuModule = await import('three/webgpu');
   const renderer = new webgpuModule.WebGPURenderer({
@@ -126,6 +136,7 @@ export async function createWebGPURenderer(
       initStatus: 'pending',
       isWebGPURenderer: true,
       forceWebGL: requestedMode === 'webgpu-force-webgl',
+      strictWebGPU: requestedMode === 'webgpu-strict',
       navigatorGpuAvailable: adapter.navigatorGpuAvailable,
       adapterAvailable: adapter.adapterAvailable,
       adapterName: adapter.adapterName,
@@ -189,7 +200,7 @@ async function collectNavigatorWebGPUCapabilities(): Promise<{
       adapterFeatures: [],
       adapterLimits: {},
       error: null,
-      notes: ['navigator.gpu is unavailable; WebGPU renderer will rely on fallback.'],
+      notes: ['navigator.gpu is unavailable before renderer init. Strict proof mode must treat this as a blocker.'],
     };
   }
 
@@ -224,7 +235,7 @@ async function collectNavigatorWebGPUCapabilities(): Promise<{
       adapterFeatures: [],
       adapterLimits: {},
       error: toErrorMessage(error),
-      notes: ['WebGPU adapter probe threw; renderer fallback is still allowed.'],
+      notes: ['WebGPU adapter probe threw before renderer init. Strict proof mode must treat this as a blocker.'],
     };
   }
 }
@@ -232,4 +243,3 @@ async function collectNavigatorWebGPUCapabilities(): Promise<{
 function getNavigatorGpuAvailable(): boolean {
   return typeof navigator !== 'undefined' && Boolean((navigator as NavigatorWithGpu).gpu);
 }
-
