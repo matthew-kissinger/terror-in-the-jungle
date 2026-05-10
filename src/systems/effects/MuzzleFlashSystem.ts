@@ -23,66 +23,10 @@ const PRESETS = [
 const MAX_PLAYER = 32;  // ring buffer for player weapon overlay
 const MAX_NPC    = 64;  // ring buffer shared across all NPC weapons
 
-// ---- Player overlay shader (orthographic camera, fixed pixel size) ----
-const PLAYER_VERT = /* glsl */`
-  attribute float aLife;
-  attribute float aBaseSize;
-  attribute vec3  aColor;
-  varying vec3  vColor;
-  varying float vLife;
-
-  void main() {
-    vColor = aColor;
-    vLife  = aLife;
-    if (aLife <= 0.0) {
-      gl_Position = vec4(99999.0, 99999.0, 0.0, 1.0);
-      gl_PointSize = 0.0;
-      return;
-    }
-    gl_Position  = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aBaseSize * aLife;
-  }
-`;
-
-// ---- NPC scene shader (perspective camera, distance-attenuated size) ----
-const NPC_VERT = /* glsl */`
-  attribute float aLife;
-  attribute float aBaseSize;
-  attribute vec3  aColor;
-  varying vec3  vColor;
-  varying float vLife;
-
-  void main() {
-    vColor = aColor;
-    vLife  = aLife;
-    if (aLife <= 0.0) {
-      gl_Position = vec4(99999.0, 99999.0, 0.0, 1.0);
-      gl_PointSize = 0.0;
-      return;
-    }
-    vec4 mvPos   = modelViewMatrix * vec4(position, 1.0);
-    gl_Position  = projectionMatrix * mvPos;
-    // world-unit base size, divided by view-space depth for perspective
-    gl_PointSize = (aBaseSize * aLife * 40.0) / -mvPos.z;
-  }
-`;
-
-// Shared fragment shader: soft radial circle, bright core
-const SHARED_FRAG = /* glsl */`
-  varying vec3  vColor;
-  varying float vLife;
-
-  void main() {
-    if (vLife <= 0.0) discard;
-    vec2  coord = gl_PointCoord * 2.0 - 1.0;
-    float d     = length(coord);
-    if (d > 1.0) discard;
-    float alpha = (1.0 - d * d) * vLife * 0.85;
-    // hot white core, variant color at edge
-    vec3  col   = mix(vColor, vec3(1.0, 0.96, 0.90), max(0.0, 1.0 - d * 1.8));
-    gl_FragColor = vec4(col * 1.6, alpha);
-  }
-`;
+const HIDDEN_POINT = 99999;
+const PLAYER_POINT_SIZE = 12;
+const NPC_POINT_SIZE = 0.55;
+const MUZZLE_TEXTURE_SIZE = 32;
 
 // CPU-side particle state (plain arrays for tight memory layout)
 interface CpuParticle {
@@ -101,37 +45,86 @@ function makeCpuSlots(n: number): CpuParticle[] {
   }));
 }
 
-function buildPoints(max: number, vertexShader: string): {
+let sharedMuzzleTexture: THREE.Texture | null = null;
+
+function getMuzzleTexture(): THREE.Texture {
+  if (sharedMuzzleTexture) return sharedMuzzleTexture;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([255, 244, 224, 255]);
+    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
+    texture.needsUpdate = true;
+    sharedMuzzleTexture = texture;
+    return texture;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = MUZZLE_TEXTURE_SIZE;
+  canvas.height = MUZZLE_TEXTURE_SIZE;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    const data = new Uint8Array([255, 244, 224, 255]);
+    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
+    texture.needsUpdate = true;
+    sharedMuzzleTexture = texture;
+    return texture;
+  }
+
+  const radius = MUZZLE_TEXTURE_SIZE / 2;
+  const gradient = context.createRadialGradient(radius, radius, 0, radius, radius, radius);
+  gradient.addColorStop(0, 'rgba(255, 250, 232, 1)');
+  gradient.addColorStop(0.42, 'rgba(255, 198, 88, 0.82)');
+  gradient.addColorStop(1, 'rgba(255, 96, 22, 0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, MUZZLE_TEXTURE_SIZE, MUZZLE_TEXTURE_SIZE);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  sharedMuzzleTexture = texture;
+  return texture;
+}
+
+function buildPoints(max: number, options: { size: number; sizeAttenuation: boolean; name: string }): {
   points: THREE.Points;
   positions: Float32Array;
   colors: Float32Array;
   lives: Float32Array;
-  sizes: Float32Array;
 } {
   const positions = new Float32Array(max * 3);
   const colors    = new Float32Array(max * 3);
   const lives     = new Float32Array(max);
-  const sizes     = new Float32Array(max);
+
+  for (let i = 0; i < max; i++) {
+    const i3 = i * 3;
+    positions[i3] = HIDDEN_POINT;
+    positions[i3 + 1] = HIDDEN_POINT;
+    positions[i3 + 2] = HIDDEN_POINT;
+  }
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position',  new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('aColor',    new THREE.BufferAttribute(colors,    3));
-  geo.setAttribute('aLife',     new THREE.BufferAttribute(lives,     1));
-  geo.setAttribute('aBaseSize', new THREE.BufferAttribute(sizes,     1));
+  geo.setAttribute('color',     new THREE.BufferAttribute(colors,    3));
+  (geo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
 
-  const mat = new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader: SHARED_FRAG,
-    blending:      THREE.AdditiveBlending,
-    depthWrite:    false,
-    depthTest:     true,
-    transparent:   true,
+  const mat = new THREE.PointsMaterial({
+    name: options.name,
+    map: getMuzzleTexture(),
+    size: options.size,
+    sizeAttenuation: options.sizeAttenuation,
+    vertexColors: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: true,
+    transparent: true,
+    alphaTest: 0.02,
+    opacity: 1,
   });
 
   const points = new THREE.Points(geo, mat);
   points.frustumCulled = false;
 
-  return { points, positions, colors, lives, sizes };
+  return { points, positions, colors, lives };
 }
 
 // Emit one particle into a slot
@@ -173,25 +166,28 @@ function uploadSlots(
   positions: Float32Array,
   colors: Float32Array,
   lives: Float32Array,
-  sizes: Float32Array,
   geo: THREE.BufferGeometry,
 ): void {
   for (let i = 0; i < slots.length; i++) {
     const s = slots[i];
     const i3 = i * 3;
-    positions[i3]     = s.x;
-    positions[i3 + 1] = s.y;
-    positions[i3 + 2] = s.z;
-    colors[i3]        = s.r;
-    colors[i3 + 1]    = s.g;
-    colors[i3 + 2]    = s.b;
+    if (s.life > 0) {
+      positions[i3]     = s.x;
+      positions[i3 + 1] = s.y;
+      positions[i3 + 2] = s.z;
+    } else {
+      positions[i3]     = HIDDEN_POINT;
+      positions[i3 + 1] = HIDDEN_POINT;
+      positions[i3 + 2] = HIDDEN_POINT;
+    }
+    const intensity = s.life * 1.6;
+    colors[i3]        = s.r * intensity;
+    colors[i3 + 1]    = s.g * intensity;
+    colors[i3 + 2]    = s.b * intensity;
     lives[i]          = s.life;
-    sizes[i]          = s.size;
   }
   (geo.getAttribute('position')  as THREE.BufferAttribute).needsUpdate = true;
-  (geo.getAttribute('aColor')    as THREE.BufferAttribute).needsUpdate = true;
-  (geo.getAttribute('aLife')     as THREE.BufferAttribute).needsUpdate = true;
-  (geo.getAttribute('aBaseSize') as THREE.BufferAttribute).needsUpdate = true;
+  (geo.getAttribute('color')     as THREE.BufferAttribute).needsUpdate = true;
 }
 
 // Scratch vectors to avoid allocation
@@ -216,7 +212,6 @@ export class MuzzleFlashSystem {
   private playerPos!: Float32Array;
   private playerCol!: Float32Array;
   private playerLif!: Float32Array;
-  private playerSiz!: Float32Array;
   private playerMesh?: THREE.Points;
   private playerScene: THREE.Scene | null = null;
 
@@ -227,18 +222,20 @@ export class MuzzleFlashSystem {
   private npcPos:   Float32Array;
   private npcCol:   Float32Array;
   private npcLif:   Float32Array;
-  private npcSiz:   Float32Array;
   private npcMesh:  THREE.Points;
 
   constructor(scene: THREE.Scene, _maxInstances = 64) {
     // NPC pool lives in the main scene from construction
-    const npc = buildPoints(MAX_NPC, NPC_VERT);
+    const npc = buildPoints(MAX_NPC, {
+      size: NPC_POINT_SIZE,
+      sizeAttenuation: true,
+      name: 'NPCMuzzleFlashPointsMaterial',
+    });
     this.npcSlots = makeCpuSlots(MAX_NPC);
     this.npcGeo   = npc.points.geometry as THREE.BufferGeometry;
     this.npcPos   = npc.positions;
     this.npcCol   = npc.colors;
     this.npcLif   = npc.lives;
-    this.npcSiz   = npc.sizes;
     this.npcMesh  = npc.points;
     this.npcMesh.matrixAutoUpdate = true;
     scene.add(this.npcMesh);
@@ -279,13 +276,16 @@ export class MuzzleFlashSystem {
       if (this.playerMesh && this.playerScene) {
         this.playerScene.remove(this.playerMesh);
       }
-      const player = buildPoints(MAX_PLAYER, PLAYER_VERT);
+      const player = buildPoints(MAX_PLAYER, {
+        size: PLAYER_POINT_SIZE,
+        sizeAttenuation: false,
+        name: 'PlayerMuzzleFlashPointsMaterial',
+      });
       this.playerSlots = makeCpuSlots(MAX_PLAYER);
       this.playerGeo   = player.points.geometry as THREE.BufferGeometry;
       this.playerPos   = player.positions;
       this.playerCol   = player.colors;
       this.playerLif   = player.lives;
-      this.playerSiz   = player.sizes;
       this.playerMesh  = player.points;
       this.playerRing  = 0;
       overlayScene.add(this.playerMesh);
@@ -334,7 +334,7 @@ export class MuzzleFlashSystem {
         }
       }
       if (playerDirty) {
-        uploadSlots(this.playerSlots, this.playerPos, this.playerCol, this.playerLif, this.playerSiz, this.playerGeo);
+        uploadSlots(this.playerSlots, this.playerPos, this.playerCol, this.playerLif, this.playerGeo);
       }
     }
 
@@ -351,18 +351,18 @@ export class MuzzleFlashSystem {
       }
     }
     if (npcDirty) {
-      uploadSlots(this.npcSlots, this.npcPos, this.npcCol, this.npcLif, this.npcSiz, this.npcGeo);
+      uploadSlots(this.npcSlots, this.npcPos, this.npcCol, this.npcLif, this.npcGeo);
     }
   }
 
   dispose(): void {
     this.npcMesh.geometry.dispose();
-    (this.npcMesh.material as THREE.ShaderMaterial).dispose();
+    (this.npcMesh.material as THREE.PointsMaterial).dispose();
     this.npcMesh.parent?.remove(this.npcMesh);
 
     if (this.playerMesh) {
       this.playerMesh.geometry.dispose();
-      (this.playerMesh.material as THREE.ShaderMaterial).dispose();
+      (this.playerMesh.material as THREE.PointsMaterial).dispose();
       this.playerScene?.remove(this.playerMesh);
     }
   }

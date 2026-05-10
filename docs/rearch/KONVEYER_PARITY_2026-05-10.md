@@ -114,7 +114,7 @@ Current Three.js guidance relevant to this repo:
 | Vegetation billboards | needs-port | `src/systems/world/billboard/BillboardBufferManager.ts` | `RawShaderMaterial` instanced impostors with custom fog/lighting. Best first high-value TSL material slice. |
 | Combatant impostors | needs-port | `src/systems/combat/CombatantShaders.ts`, `src/systems/combat/CombatantMeshFactory.ts` | `ShaderMaterial` instanced sprite/impostor path. Do isolated bucket after vegetation fixture. |
 | Combatant close GLBs | ready | `src/systems/combat/CombatantRenderer.ts` | Mostly standard/skinned GLB materials. Must prove skinning, shadows, and perf under WebGPU separately. |
-| Muzzle flashes | needs-port | `src/systems/effects/MuzzleFlashSystem.ts` | Small `ShaderMaterial` points system. Good KONVEYER-5 compute/material fixture candidate. |
+| Muzzle flashes | ported | `src/systems/effects/MuzzleFlashSystem.ts` | K5 follow-up replaced the custom points material with standard `PointsMaterial`, generated radial texture, and vertex colors. |
 | Sky dome | needs-port | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | `ShaderMaterial` dome. TSL port is feasible but visual parity-sensitive. |
 | Cloud layer | needs-port | `src/systems/environment/atmosphere/CloudLayer.ts` | `ShaderMaterial` procedural plane. Good isolated TSL candidate after simpler fixtures. |
 | Global water | blocked | `src/systems/environment/WaterSystem.ts` | Three examples `Water` object owns a shader material and render targets internally; keep WebGL fallback until replaced or disabled per scenario. |
@@ -339,6 +339,24 @@ Current limitation:
   They intentionally preserve CPU authority until a later gate proves WebGPU
   compute execution, readback cost, determinism, and fallback policy.
 
+K5 production particle material reduction:
+
+- `src/systems/effects/MuzzleFlashSystem.ts` now uses standard
+  `THREE.PointsMaterial` for NPC and player muzzle flashes instead of custom
+  GLSL point programs.
+- The pooled point representation stayed intact: NPC flashes remain
+  perspective attenuated, player overlay flashes stay fixed-pixel, active
+  particles are vertex-colored by life, and inactive slots move to the hidden
+  sentinel position.
+- `src/systems/effects/MuzzleFlashSystem.test.ts` covers the material type,
+  attribute contract, particle upload path, and scene cleanup.
+- `npx vitest run src/systems/effects/MuzzleFlashSystem.test.ts`: PASS
+- `npm run check:webgpu-strategy`: PASS,
+  `artifacts/perf/2026-05-10T14-58-05-913Z/webgpu-strategy-audit/strategy-audit.json`
+- `npm run audit:konveyer-completion`: BLOCKED as expected while the tree was
+  dirty, but it recorded `productionBlockers=36`, down from `39` after the
+  prior clean checkpoint.
+
 ## KONVEYER-7 Tail Route
 
 KONVEYER-7 is the remaining full-scene parity route. It is not safe to call
@@ -369,6 +387,9 @@ K7 post-processing tail reduction:
   `artifacts/perf/2026-05-10T14-42-46-903Z/webgpu-strategy-audit/strategy-audit.json`.
 - Static blocker count moved from `117` at KONVEYER-0 to `108`; the
   `WebGLRenderTarget` category is now `0`.
+- After the K5 muzzle flash material port, the production blocker count moved
+  to `36`; raw static matches remain noisy because docs and tests are still in
+  the strategy audit scope.
 
 ## KONVEYER-8 Validation Matrix
 
