@@ -132,3 +132,36 @@ Current Three.js guidance relevant to this repo:
 - The global `Water` example and terrain `onBeforeCompile` material are the
   main blockers for full-scene default-on parity. They are tail work by design.
 
+## KONVEYER-1 Checkpoint
+
+Implemented after the KONVEYER-0 checkpoint:
+
+- `src/core/RendererBackend.ts` adds the internal renderer backend selector,
+  capability object, async WebGPURenderer creation, and resolved-backend
+  inspection.
+- `src/core/GameRenderer.ts` keeps WebGL as the default constructor path and
+  adds `initializeRendererBackend()` for explicit `?renderer=webgpu` and
+  `?renderer=webgpu-force-webgl` opt-in paths.
+- `src/core/GameEngine.ts` awaits renderer backend initialization before
+  system wiring and refreshes capture/context-guard references after a renderer
+  swap.
+- `src/systems/debug/GPUTimingTelemetry.ts` now treats non-WebGL renderers as
+  GPU-timer unavailable instead of assuming `getContext()`.
+- `src/core/RendererBackend.test.ts` covers backend selection and initial
+  capability state.
+
+Validation for this checkpoint:
+
+- `npm run typecheck`: PASS
+- `npx vitest run src/core/RendererBackend.test.ts src/core/GameRenderer.test.ts`: PASS
+- `npm run lint`: PASS
+- `npm run build`: PASS
+- `npm run smoke:prod`: PASS, default WebGL app reached the deploy UI
+- `npm run check:webgpu-strategy`: PASS,
+  `artifacts/perf/2026-05-10T14-14-01-807Z/webgpu-strategy-audit/strategy-audit.json`
+
+Current limitation:
+
+- The opt-in WebGPU renderer boot path is present, but full game rendering is
+  still blocked by the custom GLSL material inventory above. That is expected
+  until KONVEYER-2 through KONVEYER-7 replace or route those surfaces.

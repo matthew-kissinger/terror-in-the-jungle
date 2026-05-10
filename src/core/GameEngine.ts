@@ -141,6 +141,10 @@ export class GameEngine {
    */
   public async initialize(): Promise<void> {
     markStartup('engine.initialize.begin');
+    await this.renderer.initializeRendererBackend();
+    this.contextRecovery.dispose();
+    this.contextRecovery = new WebGLContextGuard(this.renderer);
+    this.playtestCaptureManager.setContext(this.buildCaptureContext());
     await this.initializeSystems();
     // Dev-only live tuning panel. Tweakpane is gated behind `import.meta.env.DEV`
     // so Vite dead-code eliminates it from retail bundles. Failure inside

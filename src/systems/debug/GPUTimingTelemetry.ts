@@ -29,7 +29,7 @@ export class GPUTimingTelemetry {
       return
     }
 
-    const gl = renderer.getContext() as WebGL2RenderingContext
+    const gl = this.getWebGL2Context()
 
     if (!gl) {
       Logger.warn('performance', '[Perf] WebGL2 context not available for GPU timing')
@@ -52,7 +52,8 @@ export class GPUTimingTelemetry {
   beginTimer(): void {
     if (!this.gpuTimingAvailable || !this.renderer || this.gpuQuery) return
 
-    const gl = this.renderer.getContext() as WebGL2RenderingContext
+    const gl = this.getWebGL2Context()
+    if (!gl) return
     this.gpuQuery = gl.createQuery()
 
     if (this.gpuQuery) {
@@ -66,7 +67,8 @@ export class GPUTimingTelemetry {
   endTimer(): void {
     if (!this.gpuTimingAvailable || !this.renderer || !this.gpuQuery) return
 
-    const gl = this.renderer.getContext() as WebGL2RenderingContext
+    const gl = this.getWebGL2Context()
+    if (!gl) return
     gl.endQuery(this.gpuTimerExt.TIME_ELAPSED_EXT)
   }
 
@@ -77,7 +79,8 @@ export class GPUTimingTelemetry {
   collectTime(): void {
     if (!this.gpuQuery || !this.renderer) return
 
-    const gl = this.renderer.getContext() as WebGL2RenderingContext
+    const gl = this.getWebGL2Context()
+    if (!gl) return
     const available = gl.getQueryParameter(this.gpuQuery, gl.QUERY_RESULT_AVAILABLE)
     const disjoint = gl.getParameter(this.gpuTimerExt.GPU_DISJOINT_EXT)
 
@@ -136,5 +139,17 @@ export class GPUTimingTelemetry {
     } catch {
       return false;
     }
+  }
+
+  private getWebGL2Context(): WebGL2RenderingContext | null {
+    const renderer = this.renderer as (THREE.WebGLRenderer & {
+      getContext?: () => WebGLRenderingContext | WebGL2RenderingContext | null;
+      isWebGPURenderer?: boolean;
+    }) | null;
+    if (!renderer || renderer.isWebGPURenderer === true || typeof renderer.getContext !== 'function') {
+      return null;
+    }
+    const gl = renderer.getContext();
+    return typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext ? gl : null;
   }
 }
