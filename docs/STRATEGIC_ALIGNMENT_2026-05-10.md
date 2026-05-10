@@ -23,9 +23,10 @@ If this memo is older than 30 days, distrust it; the cycle landscape moves.
   feature work still needs human playtest and directive-specific cycles.
 - DEFEKT-3/STABILIZAT-1 remain open. Local combat120 still blocks baseline
   refresh, and CI perf remains advisory.
-- The next owner-named architecture direction is KONVEYER: a WebGPU/TSL
-  renderer migration campaign. It is approved only as KONVEYER-0 recon until
-  the parity/spike packet proves the path.
+- The next owner-named architecture direction is KONVEYER: a full WebGPU/TSL
+  renderer migration campaign on an experimental branch, progressing from
+  KONVEYER-0 recon through KONVEYER-9 default-on readiness. The owner reviews
+  the branch before any `master` merge or production deploy.
 
 ## The mismatch the owner named
 
@@ -173,13 +174,13 @@ The feature-pivot first slices landed during release stewardship. The next
 long-running autonomous run should not reopen that queue blindly; it should
 prepare the KONVEYER renderer campaign as an experimental branch:
 
-1. `docs/tasks/konveyer-0-autonomous-renderer-recon.md` — 20-hour WebGPU/TSL
-   research, parity audit, one contained spike, and review packet.
-2. Follow-on DEFEKT-3 work remains important, but it should be scheduled after
-   the KONVEYER-0 packet clarifies whether cover/AI sensor compute belongs in
-   the renderer campaign or stays a CPU/worker refactor.
+1. `docs/tasks/konveyer-full-autonomous-migration.md` — full autonomous
+   WebGPU/TSL migration on `exp/konveyer-webgpu-migration`, starting with
+   KONVEYER-0 and continuing through staged implementation toward KONVEYER-9.
+2. DEFEKT-3 remains important, but KONVEYER-6 owns the question of whether
+   cover/AI sensor data becomes a GPU compute carrier or stays CPU/worker-only.
 3. The campaign manifest (`docs/CAMPAIGN_2026-05-09.md`) remains unchanged
-   until the owner accepts the KONVEYER-0 packet.
+   until the owner reviews the experimental branch.
 
 ## What this memo does NOT change
 

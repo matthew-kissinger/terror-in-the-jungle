@@ -31,9 +31,9 @@ cycle closes.
 - Redeploy validation found a CI perf artifact with `finalFrameCount: 0`
   despite the advisory perf job going green; CI now emits an explicit perf
   advisory summary/warning so that drift is visible.
-- KONVEYER-0 docs now define the next autonomous experimental branch for
-  WebGPU/TSL recon and one contained renderer spike; this is not a production
-  renderer migration approval.
+- KONVEYER docs now define the next autonomous experimental branch as a full
+  WebGPU/TSL migration pass from KONVEYER-0 through KONVEYER-9, with human
+  review before any `master` merge or production deploy.
 
 **Carry-over delta:** −3 known stale actives moved closed
 (`artifact-prune-baseline-pin-fix`, `worldbuilder-oneshotkills-wiring`,
