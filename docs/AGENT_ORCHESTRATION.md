@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-09 (Phase 0 realignment: reviewer-pre-merge, cycle stoplist, carry-over discipline)
+Last verified: 2026-05-10 (cycle 2.4 cdlod-edge-morph closed; Phase 2.5 restored as Current cycle)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -114,139 +114,106 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-05-09-cdlod-edge-morph
+## Current cycle: cycle-2026-05-10-stabilization-fixes (Phase 2.5)
 
-**Hot-fix cycle, inserted ahead of Phase 2.5** to address a P1
-user-reported visual regression: white seam cracks at terrain
-chunk borders from helicopter altitude on A Shau (screenshot
-2026-05-09). The Stage D1+D2 fix from `terrain-cdlod-seam`
-(cycle-2026-05-08) closed same-LOD parity but explicitly deferred
-the LOD-transition T-junction case. This cycle ships the canonical
-Strugar-style fix.
+**Restored as Current after cycle 2.4 hot-fix closed** ([PR #178](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/178)
+merged 2026-05-10 as `d71c3f4`). Phase 2.5 bundles 4 small fixes addressing
+the live Cloudflare audit findings: PostCSS CVE bump, `_headers` file
+(HSTS + CSP + Permissions-Policy), SEO essentials (robots.txt + meta
+description + drop unused preload hints), and Web Analytics enablement
+(manual dashboard step + verify).
 
-**Cycle brief:** [docs/tasks/cycle-2026-05-09-cdlod-edge-morph.md](tasks/cycle-2026-05-09-cdlod-edge-morph.md)
+**Cycle brief:** [docs/tasks/cycle-2026-05-10-stabilization-fixes.md](tasks/cycle-2026-05-10-stabilization-fixes.md)
 
-**Task brief:** [docs/tasks/cdlod-edge-morph.md](tasks/cdlod-edge-morph.md)
-— full diagnosis with line citations, three-stage plan, hard stops,
-rollback plan, sources from CDLOD literature.
+**Task briefs:** `docs/tasks/{postcss-cve-bump,cloudflare-headers-file,seo-essentials-pass,web-analytics-enable}.md`
 
-**Skip-confirm: YES.** Single-task cycle, no manual human gate. Stage 0
-(diagnosis pre-check via the existing `Shift+\` → `Y` seam overlay) is
-OPTIONAL human pre-flight; if skipped, Stage 5 post-impl visual A/B is
-the gate.
+**Skip-confirm: NO.** `web-analytics-enable` requires a human dashboard
+toggle (Pages Settings → Web Analytics → Enabled + Auto-install) before
+the orchestrator can run the verification step.
 
 **Campaign auto-advance:** PAUSED (per
-[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md)). After this
-hot-fix cycle closes, the orchestrator stops; "Current cycle" is
-restored to point at Phase 2.5 (`cycle-2026-05-10-stabilization-fixes`),
-which is unchanged and still ready.
+[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md)). The owner has
+indicated they want to consider feature-trajectory pivot
+(VODA-1 / VEKHIKL-1 / DEFEKT-3 first slices ahead of Phases 3–9 refactor)
+before re-enabling auto-advance. See
+[docs/STRATEGIC_ALIGNMENT_2026-05-10.md](STRATEGIC_ALIGNMENT_2026-05-10.md)
+for the recommended sequencing options.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `cdlod-edge-morph` | 1 |
+| 1 | `postcss-cve-bump`, `cloudflare-headers-file`, `seo-essentials-pass` | 3 |
+| 2 | `web-analytics-enable` (manual + verify) | 1 |
 
 ### Tasks in this cycle
 
 Each brief is in `docs/tasks/<slug>.md`:
 
-- [cdlod-edge-morph](tasks/cdlod-edge-morph.md) — fix LOD-transition seam cracks via per-edge `edgeMorphMask` instanced attribute + shader force-morph + corrected `parentStep = 2/(N-1)` snap math. Three commits (snap-math / quadtree+attribute / shader+force-morph), ≤500 LOC source + ≤300 LOC tests.
+- [postcss-cve-bump](tasks/postcss-cve-bump.md) — bump postcss 8.5.8 → ≥8.5.10 to close Dependabot #26
+- [cloudflare-headers-file](tasks/cloudflare-headers-file.md) — add `public/_headers` with HSTS + CSP + Permissions-Policy
+- [seo-essentials-pass](tasks/seo-essentials-pass.md) — `public/robots.txt`, `<meta name="description">`, drop 2 unused preload hints
+- [web-analytics-enable](tasks/web-analytics-enable.md) — manual Pages dashboard toggle + verify snippet injection
 
 ### Dependencies
 
-None — single task. Three internal stages are sequenced inside the task
-itself across three commits.
+```
+postcss-cve-bump        ─┐
+cloudflare-headers-file ─┼─→ (Round 1 closes) ─→ web-analytics-enable
+seo-essentials-pass     ─┘
+```
 
 ### Reviewer policy
 
-- **`terrain-nav-reviewer` gates merge** (Phase 0 pre-merge rule — touches `src/systems/terrain/**`).
-- No `combat-reviewer` (no combat surface touched).
+No reviewer required (none touch `src/systems/combat/**` or
+`src/systems/terrain/**` / `src/systems/navigation/**`).
 
 ### Cycle-level success criteria
 
-See [the cycle brief](tasks/cycle-2026-05-09-cdlod-edge-morph.md#cycle-level-success-criteria)
-for the 10-point list. Highlights:
-
-- Visual A/B at A Shau north ridgeline (helicopter altitude): white cracks gone or near-zero
-- `Shift+\` → `Y` seam overlay red-line count drops ≥80% at the same camera position
-- `combat120` p99 within ±2% of pre-cycle baseline
-- Same-LOD parity test (`CDLODQuadtree.test.ts:130`) stays green — non-regression for predecessor Stage D1
-- New tests green: snap-math parity, edge-mask correctness, shader morph parity at LOD-transition
-- Carry-over count holds at 12 or drops (no new carry-overs unless Stage 3 follow-up filed)
-- `terrain-nav-reviewer` APPROVE or APPROVE-WITH-NOTES before merge
-
-### Next cycle (queued, undispatched)
-
-`cycle-2026-05-10-stabilization-fixes` (Phase 2.5, ready). Bundles 4
-Cloudflare-audit fixes (PostCSS CVE bump, `_headers` file, SEO
-essentials, Web Analytics enablement). Resumes after this hot-fix
-closes; brief at [docs/tasks/cycle-2026-05-10-stabilization-fixes.md](tasks/cycle-2026-05-10-stabilization-fixes.md).
+Full list in
+[the cycle brief](tasks/cycle-2026-05-10-stabilization-fixes.md#cycle-level-success-criteria).
+Highlights: PostCSS ≥8.5.10, security headers visible via curl,
+robots.txt + meta-description live, preload hints removed, Web Analytics
+RUM data within 24 hr, Lighthouse SEO 82/83 → ≥90, combat120 p99 ±2%,
+`validate:fast` clean, closes `cloudflare-stabilization-followups`.
 
 ### Last closed cycle
 
-`cycle-2026-05-10-zone-manager-decoupling` closed 2026-05-09 with 5 PRs
-merged ([#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173),
-[#174](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/174),
-[#175](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/175),
-[#176](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/176),
-[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177)).
-Phase 2 added `IZoneQuery` to the fenced interfaces (PR #174,
-terrain-nav-reviewer APPROVE), then migrated 11 ZoneManager consumers
-(HUD/Compass/Minimap/FullMap, Combat/Tickets/WarSim, PlayerRespawn +
-CommandInputManager) to either the read-only interface or a
-GameEventBus-driven event cache. ZoneManager fan-in 52 → 17 read / 5
-concrete (the 5 are the deferred weapons cluster). ZoneManager removed
-from `scripts/lint-source-budget.ts` GRANDFATHER. combat-reviewer +
-terrain-nav-reviewer all APPROVE / APPROVE-WITH-NOTES. Cycle retro:
-[docs/BACKLOG.md](BACKLOG.md) "Recently Completed (cycle-2026-05-10-...)".
+`cycle-2026-05-09-cdlod-edge-morph` closed 2026-05-10 with [PR #178](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/178)
+merged as `d71c3f4`. Single-task hot-fix; 4 commits (3 staged + 1 harden).
+Stage 2 ships: per-edge `edgeMorphMask` attribute on `CDLODTile` +
+integer-cell-keyed neighbor pass + `Float32Array` per-instance attribute on
+`CDLODRenderer` + shader force-morph at coarser-neighbor edges in
+`TerrainMaterial.ts` vertex shader. Stage 1 (snap-math) reverted in harden
+commit — terrain-nav-reviewer caught a wiring conflation in the brief
+(`tileResolution` vertex count vs. `tileGridResolution` quad count); master
+was already correct. Net diff: +410 / -9 across 6 files.
+terrain-nav-reviewer **APPROVE-WITH-NOTES**. mobile-ui CI cancelled twice
+(25-min timeout with ~2.5min historical headroom; UI-shell smoke flow
+unrelated to CDLOD changes; branch unprotected; merged on owner approval).
+Cycle retro: [docs/BACKLOG.md](BACKLOG.md) "Recently Completed
+(cycle-2026-05-09-cdlod-edge-morph)".
 
-3 new carry-overs filed at the stabilization checkpoint:
-`cloudflare-stabilization-followups`, `weapons-cluster-zonemanager-migration`,
-`perf-doc-script-paths-drift`. Active count 9 → 12 (at the ≤12 rule limit).
-Phase 2.5 (this cycle) closes `cloudflare-stabilization-followups`,
-returning the active count to 11.
+Carry-over delta: −0 closed, +0 opened. Active count holds at **12** (at
+the ≤12 limit). Cycle ships a user-observable feature (closes the seam-
+crack regression) — COMPLETE under the "ship a user-observable gap" half
+of the rule. Four cycle-retro nits captured in the BACKLOG retro entry,
+NOT filed as new carry-overs to respect the ≤12 limit (they bundle into
+the next cycle that touches the relevant area).
 
-Carry-overs from prior cycles still open (legacy 7 + 2 from Phase 1 close +
-3 from Phase 2 stabilization checkpoint = 12, see
-[docs/CARRY_OVERS.md](CARRY_OVERS.md)): DEFEKT-3 (combat AI p99),
-DEFEKT-4 (NPC route quality), STABILIZAT-1 (combat120 baseline refresh),
-AVIATSIYA-1 / DEFEKT-5 (visual review pending), AVIATSIYA-2 (AC-47 takeoff
-bounce), AVIATSIYA-3 (helicopter parity audit), KB-LOAD residual,
-artifact-prune-baseline-pin-fix, worldbuilder-oneshotkills-wiring,
-cloudflare-stabilization-followups (closes when this cycle closes),
-weapons-cluster-zonemanager-migration, perf-doc-script-paths-drift.
+Predecessor cycle: `cycle-2026-05-10-zone-manager-decoupling` closed
+2026-05-09 with PRs [#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173)–[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177)
+(ZoneManager fan-in 52 → 17 read / 5 concrete via `IZoneQuery` interface).
+Full retro in [docs/BACKLOG.md](BACKLOG.md) "Recently Completed
+(cycle-2026-05-10-zone-manager-decoupling)".
 
-### Last closed cycle
-
-`cycle-2026-05-10-zone-manager-decoupling` closed 2026-05-09 with 5 PRs
-merged ([#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173),
-[#174](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/174),
-[#175](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/175),
-[#176](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/176),
-[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177)).
-Phase 2 added `IZoneQuery` to the fenced interfaces (PR #174,
-terrain-nav-reviewer APPROVE), then migrated 11 ZoneManager consumers
-(HUD/Compass/Minimap/FullMap, Combat/Tickets/WarSim, PlayerRespawn +
-CommandInputManager) to either the read-only interface or a
-GameEventBus-driven event cache. ZoneManager fan-in 52 → 17 read / 5
-concrete (the 5 are the deferred weapons cluster). ZoneManager removed
-from `scripts/lint-source-budget.ts` GRANDFATHER. combat-reviewer +
-terrain-nav-reviewer all APPROVE / APPROVE-WITH-NOTES. Cycle retro:
-[docs/BACKLOG.md](BACKLOG.md) "Recently Completed (cycle-2026-05-10-...)".
-
-3 new carry-overs filed at the stabilization checkpoint:
-`cloudflare-stabilization-followups`, `weapons-cluster-zonemanager-migration`,
-`perf-doc-script-paths-drift`. Active count 9 → 12 (at the ≤12 rule limit).
-
-Carry-overs from prior cycles still open (legacy 7 + 2 from Phase 1 close +
-3 from Phase 2 stabilization checkpoint = 12, see
-[docs/CARRY_OVERS.md](CARRY_OVERS.md)): DEFEKT-3 (combat AI p99),
-DEFEKT-4 (NPC route quality), STABILIZAT-1 (combat120 baseline refresh),
-AVIATSIYA-1 / DEFEKT-5 (visual review pending), AVIATSIYA-2 (AC-47 takeoff
-bounce), AVIATSIYA-3 (helicopter parity audit), KB-LOAD residual,
-artifact-prune-baseline-pin-fix, worldbuilder-oneshotkills-wiring,
-cloudflare-stabilization-followups, weapons-cluster-zonemanager-migration,
+Carry-overs still open (12, see [docs/CARRY_OVERS.md](CARRY_OVERS.md)):
+DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality), STABILIZAT-1
+(combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
+pending), AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3 (helicopter
+parity audit), KB-LOAD residual, artifact-prune-baseline-pin-fix,
+worldbuilder-oneshotkills-wiring, cloudflare-stabilization-followups
+(Phase 2.5 closes), weapons-cluster-zonemanager-migration,
 perf-doc-script-paths-drift.
 
 ## Dispatch protocol

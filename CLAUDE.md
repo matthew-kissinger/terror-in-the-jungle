@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-09
+Last verified: 2026-05-10
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -21,68 +21,61 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-**`cycle-2026-05-09-cdlod-edge-morph` (hot-fix 2.4, READY to dispatch).**
-Single-task hot-fix addressing a P1 user-reported visual regression:
-white seam cracks at terrain chunk borders from helicopter altitude on
-A Shau (screenshot 2026-05-09). The predecessor `terrain-cdlod-seam`
-(cycle-2026-05-08) closed same-LOD parity but explicitly deferred the
-LOD-transition T-junction case. This cycle ships the canonical
-Strugar-style fix: per-edge `edgeMorphMask` instanced attribute +
-shader force-morph at coarser-neighbor edges + corrected
-`parentStep = 2/(N-1)` snap math. Three commits, ≤500 LOC source +
-≤300 LOC tests, `terrain-nav-reviewer` gates merge. Stage 0 (diagnosis
-pre-check via `Shift+\` → `Y` seam overlay) is OPTIONAL human pre-flight;
-if skipped, post-impl visual A/B at A Shau north ridgeline is the gate.
-Briefs: [docs/tasks/cycle-2026-05-09-cdlod-edge-morph.md](docs/tasks/cycle-2026-05-09-cdlod-edge-morph.md)
-+ [docs/tasks/cdlod-edge-morph.md](docs/tasks/cdlod-edge-morph.md).
-Running `/orchestrate` next session dispatches the single Round 1 task
-immediately.
+**`cycle-2026-05-10-stabilization-fixes` (Phase 2.5, READY to dispatch).**
+Restored as Current cycle after hot-fix 2.4 closed 2026-05-10 ([PR #178](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/178)
+merged as `d71c3f4`). Bundles 4 Cloudflare-audit fixes:
+`postcss-cve-bump`, `cloudflare-headers-file`, `seo-essentials-pass`,
+`web-analytics-enable` (manual dashboard step). Skip-confirm: NO
+(web-analytics-enable requires a human dashboard toggle before the
+verification step). Cycle brief at
+[docs/tasks/cycle-2026-05-10-stabilization-fixes.md](docs/tasks/cycle-2026-05-10-stabilization-fixes.md).
 
-**Phase 2.5 (`cycle-2026-05-10-stabilization-fixes`) remains authored
-and ready, queued behind the hot-fix.** Bundles 4 Cloudflare-audit
-fixes: `postcss-cve-bump`, `cloudflare-headers-file`, `seo-essentials-pass`,
-`web-analytics-enable` (manual dashboard step). Dispatches on the
-`/orchestrate` invocation AFTER the hot-fix closes — the end-of-cycle
-ritual for 2.4 restores Current cycle to point at 2.5.
+**Owner is considering a feature-trajectory pivot** before resuming
+Phases 3–9 refactor — see
+[docs/STRATEGIC_ALIGNMENT_2026-05-10.md](docs/STRATEGIC_ALIGNMENT_2026-05-10.md)
+for the recommended Option 1 (insert VODA-1 / VEKHIKL-1 / DEFEKT-3 first
+slices ahead of cycle 3). The campaign queue in
+[docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md) reflects the
+ORIGINAL plan and gets revised if Option 1 is approved.
 
-Phases 0, 1, 2 of the 9-cycle realignment campaign are complete. Phase 2
-(`cycle-2026-05-10-zone-manager-decoupling`) closed with 5 PRs merged
-([#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173)–[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177))
-shipping the user-observable feature: `ZoneManager` fan-in dropped from 52
-to 17 read / 5 concrete via the new fenced `IZoneQuery` read-only
-interface.
+**Engineering culture** for unattended overnight agents (Codex / Claude /
+Cursor multi-stream R&D runs covering stabilization + code-golf +
+optimization + perf + features) lives in
+[docs/ENGINEERING_CULTURE.md](docs/ENGINEERING_CULTURE.md) — single-read
+synthesis covering five work modes, diff/file budgets, comment
+discipline, parallel R&D protocol, and reporting standard.
+
+Phases 0/1/2/2.4 done. Phase 2.5 ready. Phases 3–9 queued (refactor
+campaign). Auto-advance PAUSED per the campaign manifest.
 
 Campaign-level **auto-advance is PAUSED** (per
-[docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md)) — the
-orchestrator runs Phase 2.5, closes it, and stops at the next checkpoint
-instead of chaining into Phase 3 god-module surgery. To re-enable
+[docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md)). To re-enable
 chaining: flip `Auto-advance: PAUSED` to `Auto-advance: yes` in the
 campaign manifest before re-running `/orchestrate`.
 
 For full context (audit findings, Phases 0–2 outcomes, Phase 3+ scope):
 [docs/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/STABILIZATION_CHECKPOINT_2026-05-09.md).
 Cloudflare account-level audit:
-`artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored;
-live findings).
+`artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored).
 
 Single source of truth for unresolved items:
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is 12 (at the
-≤12 rule limit) after the +3 stabilization-checkpoint carry-overs:
-`cloudflare-stabilization-followups` (PostCSS CVE + missing security
-headers + missing robots.txt + missing meta-description + 2 unused preload
-hints + Cloudflare Web Analytics), `weapons-cluster-zonemanager-migration`
-(deferred 5 imports from Phase 2), `perf-doc-script-paths-drift` (deferred
-from Phase 1). Legacy carry-overs still open: DEFEKT-3 (combat AI p99),
-DEFEKT-4 (NPC route quality), STABILIZAT-1 (combat120 baseline refresh),
-AVIATSIYA-1 / DEFEKT-5 (visual review pending), AVIATSIYA-2 (AC-47 takeoff
-bounce), AVIATSIYA-3 (helicopter parity audit), KB-LOAD residual,
-artifact-prune-baseline-pin-fix, worldbuilder-oneshotkills-wiring.
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count holds at **12**
+(at the ≤12 rule limit) after cycle 2.4 close (no opens, no closes):
+DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality), STABILIZAT-1
+(combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
+pending), AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3 (helicopter
+parity audit), KB-LOAD residual, artifact-prune-baseline-pin-fix,
+worldbuilder-oneshotkills-wiring, cloudflare-stabilization-followups
+(Phase 2.5 closes), weapons-cluster-zonemanager-migration,
+perf-doc-script-paths-drift.
+
+4 cycle-retro nits from cycle 2.4 captured in BACKLOG retro (NOT new
+carry-overs to respect ≤12 limit; bundle into next cycle that touches
+relevant area): A Shau test claim softening; perf ceiling 1.0→2.0ms if
+flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
 Campaign manifest: [docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md)
-(9 cycles; auto-advance currently PAUSED at stabilization checkpoint).
-Phases 3–9 are queued but not dispatched. To resume: edit the campaign
-manifest, optionally insert a Phase 2.5 stabilization-fixes cycle, and
-re-run `/orchestrate`.
+(9 cycles; auto-advance currently PAUSED).
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle

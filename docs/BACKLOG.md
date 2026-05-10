@@ -36,6 +36,55 @@ Use [docs/DIRECTIVES.md](DIRECTIVES.md) instead of duplicating active work here.
 | Combat120 baseline and live release | STABILIZAT-1 through STABILIZAT-3 |
 | Baseline drift, doc/code drift, combat p99 (`DEFEKT-3`), route quality | DEFEKT-1 through DEFEKT-4 |
 
+## Recently Completed (cycle-2026-05-09-cdlod-edge-morph)
+
+Hot-fix cycle 2.4 (single task), inserted ahead of Phase 2.5 to address a
+P1 user-reported visual regression: white seam cracks at terrain chunk
+borders from helicopter altitude on A Shau. Predecessor `terrain-cdlod-seam`
+(cycle-2026-05-08) closed same-LOD parity but explicitly deferred the
+LOD-transition T-junction case; this cycle ships the canonical
+Strugar-style fix.
+
+- [#178](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/178) `cdlod-edge-morph` — 4 commits (3 staged + 1 harden). Stage 2 ships: per-edge `edgeMorphMask` attribute on `CDLODTile` + integer-cell-keyed neighbor pass in `CDLODQuadtree.resolveEdgeMorphMasks` + `Float32Array` per-instance attribute on `CDLODRenderer` + shader force-morph at coarser-neighbor edges. Stage 1 (snap-math) reverted in harden commit — terrain-nav-reviewer caught a wiring conflation in the brief (`tileResolution` vertex count vs. `tileGridResolution` quad count). Master's pre-PR `parentStep = 2/tileGridResolution` was geometrically correct. Net diff: +410 / -9 across 6 files. terrain-nav-reviewer APPROVE-WITH-NOTES.
+
+Carry-over delta: −0 closed, +0 opened. Active count holds at **12** (at
+the ≤12 limit). Cycle ships a user-observable feature (closes the seam
+regression) — COMPLETE under the "ship a user-observable gap" half of the
+rule.
+
+Follow-ups for the next cycles (NOT filed as new carry-overs to respect the
+≤12 limit; bundle into the next cycle that touches the relevant area):
+
+- **A Shau-scale mask test claim is overstated.** `flagged.length > 4` is a
+  general regression guard but doesn't specifically guard against
+  integer-cell-key removal — executor's probe confirmed the old
+  float-string keys produced identical results on V8 24. Soften the comment
+  in `CDLODQuadtree.test.ts` next time it's edited.
+- **Perf ceiling 1.0ms with local mean 0.38ms** (~2.6× headroom). If the
+  perf test flakes once on CI, bump to 2.0ms rather than reverting.
+- **`tileKey()` doc-comment** is good for the recursion+probe paths but
+  doesn't note that callers must filter world-edge probes upstream. Add a
+  one-line guard comment when next touched.
+- **mobile-ui CI timeout at 25 min has only ~2.5 min historical headroom.**
+  The harden SHA hit the cap twice in a row (26 min each). Branch was
+  unprotected and the gate is a UI-shell smoke flow that cannot be slowed
+  by CDLOD internals. Bump `.github/workflows/ci.yml:160` from 25 → 30 min
+  in the next cycle that touches CI config (or roll into Phase 2.5 if it
+  makes the cut).
+- **No post-d71c3f4 combat120 capture in artifacts/perf/.** CI's perf check
+  on harden commit returned SUCCESS but the CI artifact isn't local. Run
+  `npm run perf:capture:combat120` and `npm run perf:capture:ashau:short`
+  on a quiet machine when convenient — those captures (especially A Shau,
+  where the integer-cell Map keys actually matter at non-dyadic worldSize)
+  are the load-bearing post-merge evidence. STABILIZAT-1 still open.
+- **Visual A/B at A Shau north ridgeline** (helicopter altitude, screenshot
+  coordinate from the original 2026-05-09 user report) is the human gate
+  per the cycle brief. Save before/after PNGs into
+  `artifacts/cdlod-edge-morph/{before,after}/`.
+
+Comprehensive context: cycle brief at
+`docs/tasks/archive/cycle-2026-05-09-cdlod-edge-morph/cycle-2026-05-09-cdlod-edge-morph.md`.
+
 ## Recently Completed (cycle-2026-05-10-zone-manager-decoupling)
 
 Phase 2 of the realignment campaign. ZoneManager fan-in 52 → 17 read / 5
