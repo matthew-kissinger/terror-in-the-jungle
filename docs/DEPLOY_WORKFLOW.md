@@ -84,7 +84,9 @@ Key facts:
 - `npm run build` writes a preview `dist/asset-manifest.json` from local or pinned R2 metadata so local retail previews can resolve required A Shau assets. After that, the deploy workflow runs `npm run cloudflare:assets:upload` with `TITJ_SKIP_R2_UPLOAD=1`, overwrites/refreshes `dist/asset-manifest.json`, and validates public size/content-type/cache/CORS before Pages upload.
 - GitHub Actions fresh checkouts do not contain gitignored A Shau source files. For the current immutable objects, the asset script uses pinned R2 metadata in CI and validates the live object URLs. Local runs with source files present still hash and upload the real files.
 - The GitHub `CLOUDFLARE_API_TOKEN` currently has enough permission for Pages Direct Upload but not R2 object writes. Update that secret to include Account -> Workers R2 Storage -> Edit before removing `TITJ_SKIP_R2_UPLOAD=1`.
-- CI `perf` runs on every push, uploads artifacts, and is intentionally advisory. See `docs/DEVELOPMENT.md` for why.
+- CI `perf` runs on every push, uploads artifacts, and is intentionally
+  advisory. Inspect the perf advisory step summary before using a green CI run
+  as release evidence; see `docs/DEVELOPMENT.md` for why perf does not block.
 - PRs do not auto-deploy. Preview deploys are not currently configured; see "Open Items" below.
 - The build does not emit `.gz` or `.br` sidecar files. Cloudflare negotiates
   visitor-facing compression for supported content types, including JavaScript,

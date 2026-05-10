@@ -28,6 +28,9 @@ cycle closes.
   and preload cleanup are ready for deploy.
 - Cover-query TTL cache first slice is behavior-green but combat120 still
   fails `perf:compare`; DEFEKT-3/STABILIZAT-1 stay open.
+- Redeploy validation found a CI perf artifact with `finalFrameCount: 0`
+  despite the advisory perf job going green; CI now emits an explicit perf
+  advisory summary/warning so that drift is visible.
 
 **Carry-over delta:** −3 known stale actives moved closed
 (`artifact-prune-baseline-pin-fix`, `worldbuilder-oneshotkills-wiring`,

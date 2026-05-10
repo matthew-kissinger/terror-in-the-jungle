@@ -48,8 +48,9 @@ verification because Cloudflare API access returned authentication error
 
 ## What is real today
 
-- Repo builds, lints, smoke-tests, runs the mobile UI gate, and compares
-  perf against refreshed baselines.
+- Repo builds, lints, smoke-tests, and runs the mobile UI gate. CI perf
+  capture/compare is advisory; baseline refresh remains blocked per
+  [docs/state/perf-trust.md](perf-trust.md).
 - Playable combined-arms browser game, not just an engine shell.
 - Helicopters and three flyable fixed-wing aircraft (A-1, F-4, AC-47) are
   live in runtime with HUD/control law.
@@ -86,10 +87,10 @@ terrain cracks when the camera is above or far from LOD borders.
 
 ## Live deploy verification
 
-Live release is gated on CI (lint + test + build + smoke + perf + mobile-ui)
-plus manual Cloudflare Pages deploy via `deploy.yml`. Production deploy SHA
-is the live `/asset-manifest.json` source of truth — do not freeze it into
-this doc.
+Live release is gated on blocking CI (lint + test + build + smoke +
+mobile-ui), review of the advisory perf artifact, and manual Cloudflare Pages
+deploy via `deploy.yml`. Production deploy SHA is the live
+`/asset-manifest.json` source of truth — do not freeze it into this doc.
 
 To verify the current production state, fetch
 `https://terror-in-the-jungle.pages.dev/asset-manifest.json` and read

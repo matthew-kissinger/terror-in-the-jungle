@@ -65,6 +65,14 @@ The latest local release-stewardship combat120 capture is
 `5 pass, 0 warn, 3 fail`: avg frame `20.15ms` FAIL, p95 `36.20ms` PASS,
 p99 `47.10ms` FAIL, max-frame `100.00ms` FAIL, heap growth `2.23MB` PASS.
 
+The 2026-05-10 manual CI redeploy validation exposed a CI-specific perf
+artifact failure at
+`artifacts/github/25629236699/2026-05-10T12-54-10-984Z`: the capture hard
+timed out during `navigate-and-startup` with `finalFrameCount: 0`. CI perf is
+intentionally advisory, so the workflow can still go green; the workflow now
+emits an explicit perf advisory summary/warning for this case. This does not
+unblock STABILIZAT-1 and must not be treated as a baseline refresh.
+
 Baseline refresh remains blocked. The next bounded source target is the
 remaining owner split across `npc_close_glb` draw submissions,
 `npc_ground_markers` draw submissions, and terrain triangle dominance —
