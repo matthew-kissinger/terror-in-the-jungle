@@ -97,8 +97,8 @@ export class SystemUpdater {
         // Snapshot the atmosphere's current sun + hemisphere colors into the
         // reusable billboard lighting struct. Terrain picks these up through
         // MeshStandardMaterial + the renderer's moonLight/hemisphereLight;
-        // vegetation is a RawShaderMaterial with no lighting pipeline, so we
-        // forward the same colors as uniforms to keep the two in parity
+        // vegetation owns a custom billboard material, so we forward the same
+        // colors as uniforms to keep the two in parity
         // across TOD, weather, and underwater transitions.
         let lighting: typeof this.billboardLighting | undefined;
         if (refs.atmosphereSystem) {

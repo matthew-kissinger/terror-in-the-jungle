@@ -22,6 +22,8 @@ type CompletionAudit = {
   checklist: ChecklistEntry[];
   rawBlockerSummary: Record<string, number>;
   productionBlockerSummary: Record<string, number>;
+  productionRenderBlockerSummary: Record<string, number>;
+  diagnosticWebglContextSummary: Record<string, number>;
   nextActions: string[];
 };
 
@@ -77,8 +79,10 @@ function rel(path: string): string {
 function summarizeBlockers(strategyPath: string | null): {
   raw: Record<string, number>;
   production: Record<string, number>;
+  productionRender: Record<string, number>;
+  diagnosticContext: Record<string, number>;
 } {
-  const empty = { raw: {}, production: {} };
+  const empty = { raw: {}, production: {}, productionRender: {}, diagnosticContext: {} };
   if (!strategyPath) return empty;
   const strategy = readJson<{
     activeRuntime?: {
@@ -87,11 +91,20 @@ function summarizeBlockers(strategyPath: string | null): {
   }>(strategyPath);
   const raw: Record<string, number> = {};
   const production: Record<string, number> = {};
+  const productionRender: Record<string, number> = {};
+  const diagnosticContext: Record<string, number> = {};
   for (const blocker of strategy.activeRuntime?.migrationBlockers ?? []) {
     raw[blocker.pattern] = blocker.matches.length;
-    production[blocker.pattern] = blocker.matches.filter((match) => isProductionBlocker(match.file)).length;
+    const productionMatches = blocker.matches.filter((match) => isProductionBlocker(match.file));
+    production[blocker.pattern] = productionMatches.length;
+    productionRender[blocker.pattern] = productionMatches
+      .filter((match) => isRenderBlockerPattern(blocker.pattern) && !isAllowedDiagnosticContext(match.file))
+      .length;
+    diagnosticContext[blocker.pattern] = productionMatches
+      .filter((match) => blocker.pattern.includes('WebGL context access') && isAllowedDiagnosticContext(match.file))
+      .length;
   }
-  return { raw, production };
+  return { raw, production, productionRender, diagnosticContext };
 }
 
 function isProductionBlocker(file: string): boolean {
@@ -100,6 +113,19 @@ function isProductionBlocker(file: string): boolean {
   if (normalized.includes('.test.') || normalized.includes('.spec.')) return false;
   if (normalized.startsWith('src/dev/')) return false;
   return true;
+}
+
+function isRenderBlockerPattern(pattern: string): boolean {
+  return pattern === 'ShaderMaterial'
+    || pattern === 'RawShaderMaterial'
+    || pattern === 'onBeforeCompile'
+    || pattern === 'WebGLRenderTarget';
+}
+
+function isAllowedDiagnosticContext(file: string): boolean {
+  const normalized = file.replaceAll('\\', '/');
+  return normalized.startsWith('src/systems/debug/')
+    || normalized === 'src/utils/DeviceDetector.ts';
 }
 
 function rendererStrictStatus(matrixPath: string | null): EvidenceStatus {
@@ -135,6 +161,10 @@ function main(): void {
   const blockers = summarizeBlockers(strategyPath);
   const rawBlockerCount = Object.values(blockers.raw).reduce((sum, count) => sum + count, 0);
   const productionBlockerCount = Object.values(blockers.production).reduce((sum, count) => sum + count, 0);
+  const productionRenderBlockerCount = Object.values(blockers.productionRender).reduce((sum, count) => sum + count, 0);
+  const diagnosticContextCount = Object.values(blockers.diagnosticContext).reduce((sum, count) => sum + count, 0);
+  const productionContextCount = blockers.production['renderer.getContext / WebGL context access'] ?? 0;
+  const unexpectedContextCount = productionContextCount - diagnosticContextCount;
   const strictStatus = rendererStrictStatus(matrixPath);
 
   const checklist: ChecklistEntry[] = [
@@ -176,23 +206,36 @@ function main(): void {
     },
     {
       requirement: 'Production custom WebGL shader/render-target blockers are migrated or explicitly retired.',
-      status: productionBlockerCount === 0 ? 'pass' : 'blocked',
+      status: productionRenderBlockerCount === 0 ? 'pass' : 'blocked',
       evidence: strategyPath ? [
         rel(strategyPath),
         `productionBlockers=${productionBlockerCount}`,
+        `productionRenderBlockers=${productionRenderBlockerCount}`,
         `rawBlockers=${rawBlockerCount}`,
-      ] : [`productionBlockers=${productionBlockerCount}`, `rawBlockers=${rawBlockerCount}`],
-      gap: productionBlockerCount === 0 ? null : 'Static audit still finds active production ShaderMaterial, RawShaderMaterial, onBeforeCompile, or WebGL context blockers.',
+      ] : [`productionBlockers=${productionBlockerCount}`, `productionRenderBlockers=${productionRenderBlockerCount}`, `rawBlockers=${rawBlockerCount}`],
+      gap: productionRenderBlockerCount === 0 ? null : 'Static audit still finds active production ShaderMaterial, RawShaderMaterial, onBeforeCompile, or WebGL render-target blockers.',
+    },
+    {
+      requirement: 'WebGL context access is confined to explicit diagnostics and capability probes.',
+      status: unexpectedContextCount === 0 ? 'pass' : 'blocked',
+      evidence: [
+        `productionContextBlockers=${productionContextCount}`,
+        `diagnosticContextBlockers=${diagnosticContextCount}`,
+        `unexpectedContextBlockers=${unexpectedContextCount}`,
+      ],
+      gap: unexpectedContextCount === 0 ? null : 'A non-diagnostic runtime path still reaches direct WebGL context APIs.',
     },
     {
       requirement: 'Default-on WebGPU with WebGL fallback is ready for reviewer approval.',
-      status: strictStatus === 'pass' && productionBlockerCount === 0 ? 'pass' : 'blocked',
+      status: strictStatus === 'pass' && productionRenderBlockerCount === 0 && unexpectedContextCount === 0 ? 'pass' : 'blocked',
       evidence: [
         `strictWebGPU=${strictStatus}`,
         `productionBlockers=${productionBlockerCount}`,
+        `productionRenderBlockers=${productionRenderBlockerCount}`,
+        `unexpectedContextBlockers=${unexpectedContextCount}`,
         `rawBlockers=${rawBlockerCount}`,
       ],
-      gap: strictStatus === 'pass' && productionBlockerCount === 0 ? null : 'Default-on is not approved until strict WebGPU passes and production blocker count is zero or policy-retired.',
+      gap: strictStatus === 'pass' && productionRenderBlockerCount === 0 && unexpectedContextCount === 0 ? null : 'Default-on is not approved until strict WebGPU passes, render blocker count is zero or policy-retired, and context access remains diagnostics-only.',
     },
   ];
 
@@ -206,12 +249,15 @@ function main(): void {
     checklist,
     rawBlockerSummary: blockers.raw,
     productionBlockerSummary: blockers.production,
+    productionRenderBlockerSummary: blockers.productionRender,
+    diagnosticWebglContextSummary: blockers.diagnosticContext,
     nextActions: completionStatus === 'complete'
       ? []
       : [
           'Run strict renderer matrix on headed hardware with a real WebGPU adapter.',
-          'Port or explicitly retire remaining production ShaderMaterial, RawShaderMaterial, onBeforeCompile, and WebGL context access blockers.',
-          'Rerun webgpu strategy audit and completion audit until productionBlockers is zero or each residual blocker has a reviewed policy exemption.',
+          'Port or explicitly retire remaining production ShaderMaterial, RawShaderMaterial, onBeforeCompile, and WebGL render-target blockers.',
+          'Keep direct WebGL context access confined to explicit diagnostics or capability probes so it cannot masquerade as WebGPU success.',
+          'Rerun webgpu strategy audit and completion audit until productionRenderBlockers is zero or each residual blocker has a reviewed policy exemption.',
         ],
   };
 
@@ -223,6 +269,8 @@ function main(): void {
   console.log(`KONVEYER completion audit written to ${artifactPath}`);
   console.log(`completionStatus=${completionStatus}`);
   console.log(`productionBlockers=${productionBlockerCount}`);
+  console.log(`productionRenderBlockers=${productionRenderBlockerCount}`);
+  console.log(`unexpectedContextBlockers=${unexpectedContextCount}`);
   console.log(`rawBlockers=${rawBlockerCount}`);
   console.log(`strictWebGPU=${strictStatus}`);
   for (const entry of checklist) {

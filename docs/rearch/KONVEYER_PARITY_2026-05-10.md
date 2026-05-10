@@ -411,6 +411,14 @@ K7 post-processing tail reduction:
 - `npm run audit:konveyer-completion` after the water material port recorded
   `productionBlockers=26` while the tree was dirty; the branch still needs a
   clean completion audit after commit/push.
+- Completion audit refinement now reports direct WebGL context access
+  separately from active render-material blockers. The remaining context hits
+  are confined to `GPUTimingTelemetry` and `DeviceDetector`, so they are
+  policy-visible diagnostics/capability probes, not default-on render proof.
+- After removing a comment-only `RawShaderMaterial` false positive,
+  `npm run audit:konveyer-completion` recorded `productionBlockers=25`,
+  `productionRenderBlockers=16`, and `unexpectedContextBlockers=0` while the
+  tree was dirty.
 
 ## KONVEYER-8 Validation Matrix
 
