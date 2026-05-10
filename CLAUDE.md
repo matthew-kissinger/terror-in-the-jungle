@@ -35,8 +35,16 @@ more invasive Phase 3+ god-module surgery. See
 [docs/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/STABILIZATION_CHECKPOINT_2026-05-09.md)
 for: full audit findings (Cloudflare live deploy: LCP 280ms / CLS 0.02 /
 HTTP/3 / Vite DCE confirmed / PostCSS CVE flagged / `_headers` file gap
-identified), Phases 0–2 cumulative outcomes, recommended Phase 2.5
-"stabilization-fixes" cycle, Phase 3+ scope notes, resume instructions.
+identified), Phases 0–2 cumulative outcomes, Phase 3+ scope notes, resume
+instructions.
+
+**Phase 2.5 (`cycle-2026-05-10-stabilization-fixes`) is now authored and
+ready** ([cycle brief](docs/tasks/cycle-2026-05-10-stabilization-fixes.md))
+— 4 task briefs (`postcss-cve-bump`, `cloudflare-headers-file`,
+`seo-essentials-pass`, `web-analytics-enable`) that close all 5 sub-findings
+in the `cloudflare-stabilization-followups` carry-over. Round 1 dispatches 3
+parallel scoped fixes; Round 2 is a manual-then-verify dashboard step.
+Awaits human resume.
 
 Single source of truth for unresolved items:
 [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is 12 (at the

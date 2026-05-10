@@ -114,28 +114,49 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: STABILIZATION CHECKPOINT (campaign paused)
+## Current cycle: STABILIZATION CHECKPOINT (campaign paused; Phase 2.5 ready)
 
 The 9-cycle realignment campaign at
 [docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md) is **paused after Phase 2**
-at the campaign owner's request. No cycle is dispatching now.
+at the campaign owner's request. **Phase 2.5 is authored and ready to
+dispatch when the human resumes.**
 
-**Comprehensive checkpoint:** [docs/STABILIZATION_CHECKPOINT_2026-05-09.md](STABILIZATION_CHECKPOINT_2026-05-09.md)
-— full audit findings, Phases 0–2 outcomes, recommended Phase 2.5
-"stabilization-fixes" cycle, Phase 3+ scope notes, resume instructions.
+### Comprehensive checkpoint
 
-To resume the campaign:
+[docs/STABILIZATION_CHECKPOINT_2026-05-09.md](STABILIZATION_CHECKPOINT_2026-05-09.md)
+— full audit findings, Phases 0–2 outcomes, Phase 3+ scope notes.
 
-1. Read the checkpoint doc.
-2. Optionally insert a Phase 2.5 "stabilization-fixes" cycle in
-   `docs/CAMPAIGN_2026-05-09.md` and create the brief at
-   `docs/tasks/cycle-<date>-stabilization-fixes.md`.
-3. Edit `docs/CAMPAIGN_2026-05-09.md` to flip `Auto-advance: PAUSED ...`
-   back to `Auto-advance: yes`.
-4. Edit this file's "Current cycle" section to point at the next cycle
-   (Phase 2.5 stabilization-fixes if added, otherwise Phase 3
-   combatant-renderer-split).
-5. Run `/orchestrate`.
+### Phase 2.5: cycle-2026-05-10-stabilization-fixes (READY)
+
+**Cycle brief:** [docs/tasks/cycle-2026-05-10-stabilization-fixes.md](tasks/cycle-2026-05-10-stabilization-fixes.md)
+
+Bundles 4 small fixes addressing the live Cloudflare audit findings:
+
+| Round | Tasks (parallel) | Cap |
+|-------|------------------|-----|
+| 1 | `postcss-cve-bump`, `cloudflare-headers-file`, `seo-essentials-pass` | 3 |
+| 2 | `web-analytics-enable` (manual dashboard step + verify) | 1 |
+
+Closes the `cloudflare-stabilization-followups` carry-over and Dependabot
+alert #26. Lighthouse SEO 82/83 → ≥90 (target). Web Analytics RUM data
+starts flowing within 24 hr.
+
+### To resume the campaign
+
+1. Read the checkpoint doc + [Phase 2.5 brief](tasks/cycle-2026-05-10-stabilization-fixes.md).
+2. Edit [docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md) → flip
+   `Auto-advance: PAUSED ...` back to `Auto-advance: yes` (or keep paused
+   and just dispatch Phase 2.5 + re-pause).
+3. Edit this file's "Current cycle" section to point at Phase 2.5
+   (replace the placeholder copy below with a `### Round schedule` /
+   `### Tasks in this cycle` / `### Reviewer policy` block based on the
+   Phase 2.5 brief).
+4. Run `/orchestrate`. The orchestrator reads this file's current-cycle
+   section and dispatches.
+
+**OR**, to skip Phase 2.5: mark cycle 2.5 `skipped` in
+`docs/CAMPAIGN_2026-05-09.md` and resume into Phase 3
+(`cycle-2026-05-11-combatant-renderer-split`).
 
 ### Last closed cycle
 
