@@ -13,13 +13,13 @@ For older cycle outcomes, browse `docs/cycles/` or
 
 ---
 
-## release-stewardship-2026-05-10 (in release validation)
+## release-stewardship-2026-05-10 (deployed)
 
 Continuation pass after Phase 2 and Phase 2.4 were merged. This is not a
 normal cycle record, but it is the current release truth until the next formal
 cycle closes.
 
-**Shipped locally before final push/deploy:**
+**Shipped to production:**
 
 - CDLOD two-sided skirt-wall hardening for the white terrain crack report.
 - M151 world-feature placements register as `ground` vehicles with seats.

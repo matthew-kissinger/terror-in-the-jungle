@@ -153,7 +153,7 @@ Latest evidence: master at `babae19a76e5ff622976a632e10f7055315d2698`.
 
 ## STABILIZAT-3 — Live release verification
 Status: done. Owning subsystem: deploy. Opened: cycle-2026-05-04.
-Latest evidence: previous release proof `artifacts/perf/2026-05-10T06-55-51-733Z/projekt-143-live-release-proof/release-proof.json`; production SHA remains live `/asset-manifest.json` truth.
+Latest evidence: `npm run check:live-release` PASS after the 2026-05-10 release-stewardship deploy; production SHA remains live `/asset-manifest.json` truth.
 
 ## DEFEKT-1 — Stale baseline audit
 Status: open. Owning subsystem: perf-harness. Opened: cycle-2026-05-04.

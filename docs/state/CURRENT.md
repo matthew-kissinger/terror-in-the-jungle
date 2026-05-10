@@ -36,12 +36,12 @@ Merged work now includes:
 - optimization memos for pool sizing and BVH rebuild threshold (`d50649b`);
 - SVYAZ-3 radio shell first slice (`665b0c5`);
 - mobile UI CI timeout headroom (`6892a36`);
-- current release-stewardship changes: M151 world-feature placements register
+- release-stewardship changes in the production deploy: M151 world-feature placements register
   as ground vehicles, cover-query cache TTL first slice, PostCSS/header/SEO
   deployment hygiene, and doc alignment.
 
 Phase 2 (`cycle-2026-05-10-zone-manager-decoupling`) is merged. Phase 2.5's
-code-side Cloudflare/SEO tasks are being folded into this release pass, but
+code-side Cloudflare/SEO tasks were folded into this release pass, but
 Web Analytics still requires the Pages dashboard toggle and live beacon
 verification because Cloudflare API access returned authentication error
 10000 in this session.
