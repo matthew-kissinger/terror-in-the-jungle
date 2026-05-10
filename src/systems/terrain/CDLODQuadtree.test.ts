@@ -211,6 +211,46 @@ describe('CDLODQuadtree', () => {
       expect(new Set(tiles.map(t => t.lodLevel)).size).toBeGreaterThan(1);
       expect(tiles.some(t => t.edgeMorphMask !== 0)).toBe(true);
     });
+
+    // A Shau worldSize is 21000m (non-power-of-2). The base tile size
+    // worldSize / 2^maxLOD = 21000 / 256 ≈ 82.03m is non-dyadic, so
+    // string-templated Map keys built from raw float centres can drop
+    // hits if the recursion path and the probe path produce centres
+    // that print differently. Integer-cell tileKey() is the fix; this
+    // test is the regression guard.
+    it('emits edge-morph masks correctly at A Shau worldSize (non-dyadic baseTileSize)', () => {
+      const ashauWorld = 21000;
+      const ashauLOD = 8;
+      const ashauRanges = computeDefaultLODRanges(ashauWorld, ashauLOD);
+      const qt = new CDLODQuadtree(ashauWorld, ashauLOD, ashauRanges);
+      // Ground-level camera near origin forces an LOD0/LOD1 boundary
+      // close to the camera and guarantees T-junctions.
+      const tiles = qt.selectTiles(0, 50, 0, null);
+      expect(new Set(tiles.map(t => t.lodLevel)).size).toBeGreaterThan(1);
+      const flagged = tiles.filter(t => t.edgeMorphMask !== 0);
+      // Stronger than > 0: the helicopter-altitude seam case requires
+      // the integer-cell tileKey to drop zero hits at A Shau scale, so
+      // we expect a non-trivial population of flagged edges. Loosen
+      // this floor only if the LOD layout for this camera placement
+      // changes deliberately.
+      expect(flagged.length).toBeGreaterThan(4);
+    });
+  });
+
+  // Brief-promised perf assertion. CDLOD selection runs every frame and
+  // the original < 0.3 ms budget is the file-level docstring contract.
+  // The 1.0 ms ceiling is wide enough for slow CI runners but tight
+  // enough to catch quadratic-blowup regressions (e.g. accidental
+  // O(tiles^2) neighbour resolution).
+  it('selectTiles stays under perf budget at default tile count', () => {
+    const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+    // Warm-up to amortise V8 JIT and one-time Map growth.
+    for (let i = 0; i < 10; i++) qt.selectTiles(0, 100, 0, null);
+    const N = 200;
+    const start = performance.now();
+    for (let i = 0; i < N; i++) qt.selectTiles(0, 100, 0, null);
+    const elapsedMean = (performance.now() - start) / N;
+    expect(elapsedMean).toBeLessThan(1.0);
   });
 
   it('returns empty slice for subsequent calls (no stale data)', () => {

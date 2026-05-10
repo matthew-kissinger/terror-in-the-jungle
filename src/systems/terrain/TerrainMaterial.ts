@@ -31,16 +31,16 @@ varying float vLodLevel;
 varying float vMorphFactor;
 `;
 
-const TERRAIN_VERTEX_MAIN = /* glsl */ `
+export const TERRAIN_VERTEX_MAIN = /* glsl */ `
 // CDLOD morph: snap fine-grid vertices toward parent LOD grid for smooth transitions.
-// parentStep is the spacing of the parent LOD vertex grid in tile-local
-// gridPos units (gridPos = position.xz + 0.5, range [0,1]). The
-// interior vertex spacing in gridPos units is 1/(N-1), and the parent
-// grid hits every other vertex, so spacing = 2/(N-1). The earlier
-// 2/tileGridResolution form drifted by (N-1)/N from the true parent
-// grid (~3% for N=33), preventing fine edge vertices from landing on
-// their coarse neighbours' actual vertex positions at full morph.
-float parentStep = 2.0 / (tileGridResolution - 1.0);
+// tileGridResolution is the QUAD count (e.g. 32 for the default 33-vertex
+// tile), set via tileResolution - 1 at TerrainSystem.ts:114 -> wired into
+// TerrainSurfaceRuntime.ts:67 as the uniform value. Vertex spacing in
+// tile-local gridPos units (gridPos = position.xz + 0.5, range [0,1]) is
+// 1/tileGridResolution; the parent LOD grid hits every other vertex, so
+// parent spacing is 2/tileGridResolution. Don't change this without also
+// updating the JS port in TerrainMaterial.morph.test.ts.
+float parentStep = 2.0 / tileGridResolution;
 vec2 gridPos = position.xz + 0.5;
 
 // Force full morph on edges abutting a coarser-LOD neighbour. The
