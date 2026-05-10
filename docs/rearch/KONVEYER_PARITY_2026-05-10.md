@@ -440,3 +440,5 @@ Final validation rollup on 2026-05-10:
 - `npm run build`: PASS
 - `npm run smoke:prod`: PASS
 - `npm run check:konveyer-renderer-matrix`: PASS
+- `npm run validate:fast`: PASS, 28 pre-existing source-budget warnings and
+  12 pre-existing docs warnings
