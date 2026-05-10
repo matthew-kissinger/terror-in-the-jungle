@@ -223,3 +223,77 @@ Current limitation:
 - K2 proves the foundation and failure posture only. Vegetation and combatant
   production materials still need K3/K4 slice ports before strict scene proof
   can claim WebGPU visual parity.
+
+## KONVEYER-3 Checkpoint
+
+Implemented after the KONVEYER-2 checkpoint:
+
+- `src/rendering/KonveyerInstancedSlice.ts` adds a reusable TSL instanced
+  impostor slice that can model vegetation, combatants, or effect particles
+  without `ShaderMaterial`, `RawShaderMaterial`, or GLSL shader strings.
+- `scripts/konveyer-slice-probe.ts` writes measured slice artifacts under
+  `artifacts/perf/**/konveyer-*-slice/slice.json`.
+- `package.json` wires `check:konveyer-vegetation-slice` and
+  `check:konveyer-combatant-slice` so the measured slices are repeatable.
+- `src/rendering/KonveyerInstancedSlice.test.ts` verifies the vegetation slice
+  creates a node material, stays single-draw in the slice model, and reports no
+  GLSL shader strings.
+
+Validation for this checkpoint:
+
+- `npm run typecheck`: PASS
+- `npx vitest run src/rendering/KonveyerInstancedSlice.test.ts src/core/TslMaterialFactory.test.ts`: PASS
+- `npm run check:konveyer-vegetation-slice`: PASS,
+  `artifacts/perf/2026-05-10T14-26-16-531Z/konveyer-vegetation-slice/slice.json`
+- `npm run lint`: PASS
+- `npm run lint:docs`: PASS, 12 pre-existing grandfathered warnings
+- `npm run build`: PASS
+
+Measured vegetation slice:
+
+- Surface: `vegetation-billboard`
+- Capacity: `16384`
+- Active instances: `8192`
+- Estimated GPU-writable bytes: `1048716`
+- Node material: `true`
+- GLSL shader strings: `0`
+
+Current limitation:
+
+- This is a TSL instanced impostor slice, not the full production vegetation
+  shader port. It proves material and buffer shape first; K7 still owns full
+  wind, atlas, atmosphere, fog, and visual-parity migration against the
+  current `GPUBillboardVegetation` GLSL path.
+
+## KONVEYER-4 Checkpoint
+
+Implemented after the KONVEYER-3 checkpoint:
+
+- The shared `KonveyerInstancedSlice` substrate is exercised as a combatant
+  impostor slice with the project target scale of 3,000 capacity and a 120 NPC
+  active stress slice.
+- `check:konveyer-combatant-slice` writes a separate artifact from vegetation
+  so reviewers can compare surface-specific capacities and bytes.
+
+Validation for this checkpoint:
+
+- `npm run check:konveyer-combatant-slice`: PASS,
+  `artifacts/perf/2026-05-10T14-26-51-828Z/konveyer-combatant-slice/slice.json`
+- Shared K3/K4 code validation used the same lint, docs, targeted Vitest, and
+  production build gates listed in KONVEYER-3.
+
+Measured combatant slice:
+
+- Surface: `combatant-impostor`
+- Capacity: `3000`
+- Active instances: `120`
+- Estimated GPU-writable bytes: `192140`
+- Node material: `true`
+- GLSL shader strings: `0`
+
+Current limitation:
+
+- The combatant slice proves the TSL instanced impostor substrate at Phase F
+  capacity shape. It does not yet replace the production animated Pixel Forge
+  NPC atlas shader, crop-map sampling, aura/outline behavior, or close-GLB
+  skinning proof.
