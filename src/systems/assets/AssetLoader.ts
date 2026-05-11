@@ -172,6 +172,11 @@ export class AssetLoader implements GameSystem {
     }
 
     if (category === AssetCategory.GROUND) {
+      // Ground textures are albedo color maps. WebGPU/TSL PBR lighting expects
+      // them to be decoded from sRGB, otherwise noon scenes over-brighten.
+      if (colorSpace !== 'linear') {
+        texture.colorSpace = THREE.SRGBColorSpace;
+      }
       // Terrain surfaces need linear filtering and mipmaps. Nearest filtering
       // causes visible shimmer and aliasing at gameplay camera distances.
       texture.magFilter = THREE.LinearFilter;
@@ -225,10 +230,12 @@ export class AssetLoader implements GameSystem {
         return null;
       }
       const canvasTex = new THREE.CanvasTexture(canvas);
-      canvasTex.magFilter = THREE.NearestFilter;
-      canvasTex.minFilter = THREE.NearestFilter;
-      canvasTex.wrapS = THREE.RepeatWrapping;
-      canvasTex.wrapT = THREE.RepeatWrapping;
+      canvasTex.colorSpace = texture.colorSpace;
+      canvasTex.magFilter = texture.magFilter;
+      canvasTex.minFilter = texture.minFilter;
+      canvasTex.wrapS = texture.wrapS;
+      canvasTex.wrapT = texture.wrapT;
+      canvasTex.generateMipmaps = texture.generateMipmaps;
       texture.dispose();
       return canvasTex;
     } catch (e) {

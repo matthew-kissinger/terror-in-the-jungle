@@ -82,7 +82,7 @@ Renderer policy for this branch:
 
 ## Upstream Facts Refreshed
 
-Sources checked on 2026-05-10:
+Sources checked on 2026-05-11:
 
 - Three.js WebGPURenderer docs:
   https://threejs.org/docs/pages/WebGPURenderer.html
@@ -130,7 +130,7 @@ Current Three.js guidance relevant to this repo:
 | GPU timing telemetry | blocked | `src/systems/debug/GPUTimingTelemetry.ts`, `src/systems/debug/PerformanceTelemetry.ts` | Uses `renderer.getContext()` and `EXT_disjoint_timer_query_webgl2`; WebGPU needs timestamp-query or disabled telemetry fallback. |
 | Texture warmup | needs-port | `src/systems/assets/AssetLoader.ts` | Uses `renderer.initTexture`; common renderer has an initialized requirement, so WebGPU path needs init ordering guard. |
 | Post-processing | retired | `src/systems/effects/PostProcessingManager.ts` | Runtime draws straight to back buffer. K7 removed the dormant low-res blit resources so this is no longer a hidden WebGPU blocker; any future post path must use Three's node post stack. |
-| Terrain material | ported-but-visually-blocked | `src/systems/terrain/TerrainMaterial.ts` | K7 replaced the production `onBeforeCompile` terrain shader injection with a TSL `MeshStandardNodeMaterial` graph for CDLOD displacement, biome shading, hydrology tint, feature surfaces, far-canopy tint, roughness, and explicit material-owned fog/tint. The 2026-05-11 strict WebGPU visual gate rejects Open Frontier ground tone, so this is not art/parity accepted. |
+| Terrain material | ported-visual-proof | `src/systems/terrain/TerrainMaterial.ts` | K7 replaced the production `onBeforeCompile` terrain shader injection with a TSL `MeshStandardNodeMaterial` graph for CDLOD displacement, biome shading, hydrology tint, feature surfaces, far-canopy tint, roughness, and explicit material-owned fog/tint. The 2026-05-11 strict WebGPU terrain/lighting repair restores solid CDLOD placement, bounded sky/fog lighting, sRGB terrain albedo policy, render-camera-aware visual proof, and Open Frontier/A Shau ground-tone acceptance. |
 | Terrain renderer | ported-hardware-proof | `src/systems/terrain/CDLODRenderer.ts` | CDLOD instancing now publishes packed tile transform attributes for the node material instead of depending on injected `instanceMatrix` GLSL. The packed layout keeps the WebGPU vertex-buffer count under adapter limits. |
 | Vegetation billboards | ported-hardware-proof | `src/systems/world/billboard/BillboardBufferManager.ts`, `src/systems/world/billboard/BillboardNodeMaterial.ts` | K7 moved production instanced vegetation off `RawShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with atlas, wind, fog, lighting, and premultiplied alpha. The buffer manager initializes zero instance count and visibility explicitly so WebGPU never submits an infinite instance draw. |
 | Combatant impostors | ported-hardware-proof | `src/systems/combat/CombatantMeshFactory.ts` | K7 moved active Pixel Forge NPC atlas impostors off `ShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with crop-map sampling, animation frame selection, readability, atmosphere lighting, and material-owned fog. Headed strict WebGPU proof is green; combat120 perf remains review evidence. |
@@ -387,7 +387,7 @@ disabled by scenario policy:
 
 | Surface | Required route | Acceptance evidence |
 | --- | --- | --- |
-| Terrain CDLOD | TSL node material port, packed instancing, headed WebGPU strict proof, and Open Frontier/A Shau visual review are in place. | `check:terrain-visual -- --headed --port 9254`; A Shau perf capture remains a production-rollout follow-up. |
+| Terrain CDLOD | TSL node material port, packed instancing, headed WebGPU strict proof, and Open Frontier/A Shau visual review are in place. | `npx tsx scripts/check-terrain-visual.ts --headed --port 9271 --renderer webgpu-strict`, `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.json`; A Shau perf capture remains a production-rollout follow-up. |
 | Global water | Standard material plane is now the fallback/ocean path; hydrology river mesh stays standard material. Future work is visual acceptance and flow, not a WebGL-only material port. | Water-system audit plus water-enabled screenshots/perf in Open Frontier and A Shau hydrology paths. |
 | Post-processing | Keep runtime disabled or move to Three WebGPU node `PostProcessing`; do not re-enable classic WebGL render-target composer as WebGPU proof. | Built-app renderer matrix plus visual-integrity audit. |
 | Vegetation production path | Production material is now TSL/node based and strict WebGPU hardware proof is green. Buffer initialization prevents zero-instance or infinite-instance submission hazards. | Renderer matrix, terrain visual coverage, and combat120 evidence cover the active branch review packet. |
@@ -483,6 +483,13 @@ K7 post-processing tail reduction:
   attributes for node-material displacement, and terrain shading owns biome
   blending, hydrology masks, feature surfaces, far-canopy tint, roughness, and
   debug LOD color through node fields.
+- The strict WebGPU terrain/lighting repair fixed the remaining visual
+  blocker without adding WebGL fallback masking: the TSL terrain position node
+  now returns tile-local X/Z for instanced CDLOD placement, biome sampling wraps
+  UVs in shader space, visual proof tile selection follows the explicit render
+  camera override, analytic sky/fog radiance is bounded before becoming scene
+  lighting, terrain ground albedo keeps sRGB texture policy, and vegetation
+  billboards now use material-owned exposure/chroma/light clamps.
 - K7 node materials explicitly disable Three's legacy WebGL fixed fog uniform
   path because terrain, NPC impostors, vegetation, and fixture materials own
   fog/tint in their node graphs. This is not a hidden fallback: strict WebGPU
@@ -535,6 +542,17 @@ K7 post-processing tail reduction:
 - `npm run perf:compare`: WARN, `6 pass`, `2 warn`, `0 fail` against the
   tracked `combat120` baseline. Warned metrics were average frame time and
   heap growth; p95, p99, max frame, hitches, and over-budget percent passed.
+- 2026-05-11 terrain/lighting repair validation:
+  - `npx vitest run src/systems/world/billboard/BillboardBufferManager.test.ts src/systems/world/billboard/GPUBillboardSystem.test.ts src/systems/assets/AssetLoader.test.ts src/systems/terrain/TerrainMaterial.test.ts src/systems/terrain/TerrainRenderRuntime.test.ts src/systems/environment/AtmosphereSystem.test.ts src/systems/environment/atmosphere/HosekWilkieSkyBackend.test.ts`: PASS
+  - `npm run typecheck`: PASS
+  - `npm run lint`: PASS
+  - `npm run test:quick`: PASS, 279 files / 4224 tests
+  - `npm run build`: PASS
+  - `npm run build:perf`: PASS
+  - `npx tsx scripts/check-terrain-visual.ts --headed --port 9271 --renderer webgpu-strict`: PASS,
+    `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.json`
+  - `npx tsx scripts/konveyer-completion-audit.ts`: COMPLETE,
+    `artifacts/perf/2026-05-11T02-08-44-493Z/konveyer-completion-audit/completion-audit.json`
 
 ## KONVEYER-8 Validation Matrix
 
@@ -602,28 +620,27 @@ Branch state:
 
 Default-on decision:
 
-- Blocked for the experiment branch after the 2026-05-11 visual override.
-  Default startup requests WebGPU and strict proof resolves `webgpu`, but
-  Open Frontier terrain/lighting is visually rejected and completion audit now
-  requires a strict WebGPU terrain visual pass.
+- Visual blocker cleared for the experiment branch after the 2026-05-11
+  strict WebGPU terrain/lighting repair. Default startup requests WebGPU,
+  strict proof resolves `webgpu`, and the latest strict terrain visual review
+  accepts Open Frontier and A Shau ground tone.
 - Not approved for `master` merge or production deploy yet. Review still needs
-  residual perf-warning acceptance, cross-browser/mobile acceptance, and an
-  owner rollback decision.
+  residual perf-warning acceptance, cross-browser/mobile acceptance, A Shau
+  perf acceptance, and an owner rollback decision.
 
-2026-05-11 visual override:
+2026-05-11 visual repair:
 
-- The default-on decision above is superseded for visual acceptance by
-  `docs/rearch/KONVEYER_TERRAIN_LIGHTING_ANALYSIS_2026-05-11.md`.
 - The branch should use strict WebGPU-only proof. WebGL may remain as named
   diagnostic comparison, but it must not count as fallback success,
   completion-audit success, or demo-readiness evidence.
-- Open Frontier terrain/lighting is visually rejected. Strict WebGPU renders
-  the scene with zero browser errors, but airfield, parking, river-oblique, and
-  river-ground shots are over-bright and low contrast.
-- Current warning artifact:
-  `artifacts/perf/2026-05-11T00-26-31-266Z/projekt-143-terrain-visual-review/visual-review.md`.
-- Do not merge or deploy this branch while Open Frontier terrain reads as
-  white.
+- The prior Open Frontier white/low-contrast terrain rejection is superseded by
+  `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.md`.
+- The latest visual artifact passes all required terrain checks with
+  `renderer=webgpu-strict`, zero browser/page errors, and Open Frontier/A Shau
+  river, foundation, parking, support, and player-ground coverage.
+- Asset caveat: close vegetation still inherits source-atlas silhouette limits.
+  The WebGPU material now avoids washed-out/neon presentation, but final art
+  polish should still come from Pixel Forge source atlas or mesh-LOD upgrades.
 
 Next reviewer decisions:
 

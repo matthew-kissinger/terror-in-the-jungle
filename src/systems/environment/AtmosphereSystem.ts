@@ -24,10 +24,28 @@ const UNDERWATER_FOG_COLOR = 0x003344;
 
 /** Distance from origin at which the directional "sun" light is placed. */
 const SUN_LIGHT_DISTANCE = 500;
+/**
+ * The analytic sky backend stores HDR-ish radiance values. Those values are
+ * fine for the baked sky texture, but fog and hemisphere lights need bounded
+ * presentation colors or noon scenes collapse into a white fill under WebGPU.
+ */
+const SKY_LIGHT_MAX_COMPONENT = 0.84;
+const SKY_FOG_MAX_COMPONENT = 0.74;
 /** Scales horizon color to approximate ground bounce (not a pure mirror of horizon). */
 const HEMISPHERE_GROUND_DARKEN = 0.55;
 /** Minimum Y for the sun light position — prevents degenerate shadow camera when sun is at/below horizon. */
 const MIN_SUN_Y = 20;
+
+function compressSkyRadianceForRenderer(color: THREE.Color, maxComponent: number): THREE.Color {
+  const peak = Math.max(color.r, color.g, color.b);
+  if (peak > maxComponent && peak > 1e-6) {
+    color.multiplyScalar(maxComponent / peak);
+  }
+  color.r = Math.max(0, Math.min(maxComponent, color.r));
+  color.g = Math.max(0, Math.min(maxComponent, color.g));
+  color.b = Math.max(0, Math.min(maxComponent, color.b));
+  return color;
+}
 
 /**
  * Architectural seam for sky / sun / cloud state. See `docs/ATMOSPHERE.md`
@@ -372,6 +390,8 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     if (renderer.hemisphereLight) {
       this.backend.getZenith(this.scratchZenith);
       this.backend.getHorizon(this.scratchHorizon);
+      compressSkyRadianceForRenderer(this.scratchZenith, SKY_LIGHT_MAX_COMPONENT);
+      compressSkyRadianceForRenderer(this.scratchHorizon, SKY_LIGHT_MAX_COMPONENT);
       renderer.hemisphereLight.color.copy(this.scratchZenith);
       renderer.hemisphereLight.groundColor
         .copy(this.scratchHorizon)
@@ -400,6 +420,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     }
 
     this.backend.getHorizon(this.scratchHorizon);
+    compressSkyRadianceForRenderer(this.scratchHorizon, SKY_FOG_MAX_COMPONENT);
     const f = this.fogDarkenFactor;
     fog.color.setRGB(
       this.scratchHorizon.r * f,
@@ -419,15 +440,18 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   }
 
   getSkyColorAtDirection(dir: THREE.Vector3, out: THREE.Color): THREE.Color {
-    return this.backend.sample(dir, out);
+    this.backend.sample(dir, out);
+    return compressSkyRadianceForRenderer(out, SKY_LIGHT_MAX_COMPONENT);
   }
 
   getZenithColor(out: THREE.Color): THREE.Color {
-    return this.backend.getZenith(out);
+    this.backend.getZenith(out);
+    return compressSkyRadianceForRenderer(out, SKY_LIGHT_MAX_COMPONENT);
   }
 
   getHorizonColor(out: THREE.Color): THREE.Color {
-    return this.backend.getHorizon(out);
+    this.backend.getHorizon(out);
+    return compressSkyRadianceForRenderer(out, SKY_LIGHT_MAX_COMPONENT);
   }
 
   /**

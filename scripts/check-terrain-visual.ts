@@ -208,6 +208,7 @@ interface HarnessTerrainSystem {
   isAreaReadyAt?: (x: number, z: number) => boolean;
   getActiveTerrainTileCount?: () => number;
   getBillboardDebugInfo?: () => Record<string, unknown>;
+  setRenderCameraOverride?: (camera: HarnessCamera | null) => void;
   updatePlayerPosition?: (position: { x: number; y: number; z: number }) => void;
   update?: (dt: number) => void;
 }
@@ -603,6 +604,7 @@ async function captureShot(page: Page, plan: ShotPlan, mode: string, artifactDir
     activeCamera.updateProjectionMatrix?.();
     activeCamera.updateMatrixWorld?.(true);
     renderer.setOverrideCamera?.(activeCamera);
+    terrain.setRenderCameraOverride?.(activeCamera);
 
     terrain.updatePlayerPosition?.(activeCamera.position);
     for (let i = 0; i < 20; i++) terrain.update?.(0.016);

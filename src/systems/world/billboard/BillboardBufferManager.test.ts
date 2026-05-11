@@ -261,12 +261,14 @@ describe('GPUBillboardVegetation', () => {
     const manager = new GPUBillboardVegetation(scene, createConfig())
     const internal = manager as any
 
-    expect(internal.material.uniforms.colorTint.value.r).toBeCloseTo(1.04)
-    expect(internal.material.uniforms.colorTint.value.g).toBeCloseTo(1.08)
-    expect(internal.material.uniforms.colorTint.value.b).toBeCloseTo(1.0)
-    expect(internal.material.uniforms.vegetationExposure.value).toBeCloseTo(1.18)
+    expect(internal.material.uniforms.colorTint.value.r).toBeCloseTo(0.88)
+    expect(internal.material.uniforms.colorTint.value.g).toBeCloseTo(0.98)
+    expect(internal.material.uniforms.colorTint.value.b).toBeCloseTo(0.82)
+    expect(internal.material.uniforms.vegetationSaturation.value).toBeCloseTo(0.74)
+    expect(internal.material.uniforms.vegetationExposure.value).toBeCloseTo(0.88)
     expect(internal.material.uniforms.nearLightBoostDistance.value).toBe(85)
-    expect(internal.material.uniforms.minVegetationLight.value).toBeCloseTo(0.68)
+    expect(internal.material.uniforms.minVegetationLight.value).toBeCloseTo(0.40)
+    expect(internal.material.uniforms.maxVegetationLight.value).toBeCloseTo(0.86)
   })
 
   it('configures GPU wind sway uniforms without per-instance CPU animation', () => {

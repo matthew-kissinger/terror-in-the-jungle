@@ -68,10 +68,12 @@ interface BillboardMaterialUniforms {
   viewMatrix: BillboardMaterialUniform<THREE.Matrix4>;
   colorTint: BillboardMaterialUniform<THREE.Color>;
   gammaAdjust: BillboardMaterialUniform<number>;
+  vegetationSaturation: BillboardMaterialUniform<number>;
   nearAlphaSolidDistance: BillboardMaterialUniform<number>;
   vegetationExposure: BillboardMaterialUniform<number>;
   nearLightBoostDistance: BillboardMaterialUniform<number>;
   minVegetationLight: BillboardMaterialUniform<number>;
+  maxVegetationLight: BillboardMaterialUniform<number>;
   windStrength: BillboardMaterialUniform<number>;
   windSpeed: BillboardMaterialUniform<number>;
   windSpatialScale: BillboardMaterialUniform<number>;
@@ -131,12 +133,14 @@ export function createBillboardNodeMaterial(
     nearFadeDistance: { value: 0.0 },
     lodDistances: { value: new THREE.Vector2(150, 300) },
     viewMatrix: { value: new THREE.Matrix4() },
-    colorTint: { value: new THREE.Color(1.04, 1.08, 1.0) },
+    colorTint: { value: new THREE.Color(0.88, 0.98, 0.82) },
     gammaAdjust: { value: 1.0 },
+    vegetationSaturation: { value: 0.74 },
     nearAlphaSolidDistance: { value: 30.0 },
-    vegetationExposure: { value: 1.18 },
+    vegetationExposure: { value: 0.88 },
     nearLightBoostDistance: { value: 85.0 },
-    minVegetationLight: { value: 0.68 },
+    minVegetationLight: { value: 0.40 },
+    maxVegetationLight: { value: 0.86 },
     windStrength: { value: resolveWindStrength(config.height, config.atlasProfile) },
     windSpeed: { value: 1.15 },
     windSpatialScale: { value: 0.055 },
@@ -227,13 +231,19 @@ export function createBillboardNodeMaterial(
   const finalAlpha = vegetationAlpha.mul(fadeFactor);
   const gammaAdjust = tslReference('float', uniforms.gammaAdjust);
   const colorTint = tslReference('color', uniforms.colorTint);
+  const vegetationSaturation = tslReference('float', uniforms.vegetationSaturation);
   const vegetationExposure = tslReference('float', uniforms.vegetationExposure);
   const nearLightBoostDistance = tslReference('float', uniforms.nearLightBoostDistance);
   const nearLightBoost = tslFloat(1).add(
-    tslFloat(0.14).mul(tslFloat(1).sub(smoothstep(tslFloat(0), nearLightBoostDistance, cameraDistance))),
+    tslFloat(0.08).mul(tslFloat(1).sub(smoothstep(tslFloat(0), nearLightBoostDistance, cameraDistance))),
   );
+  const tintedColor = pow(texColor.rgb.mul(colorTint), tslVec3(gammaAdjust)) as TslNode;
+  const foliageLuma = tintedColor.r.mul(0.2126)
+    .add(tintedColor.g.mul(0.7152))
+    .add(tintedColor.b.mul(0.0722));
+  const colorManaged = tslMix(tslVec3(foliageLuma), tintedColor, vegetationSaturation);
   const litColor = createBillboardLightingNode(
-    pow(texColor.rgb.mul(colorTint), tslVec3(gammaAdjust)),
+    colorManaged,
     normalColor,
     cameraDistance,
     uniforms,
@@ -366,8 +376,9 @@ function createBillboardLightingNode(
   const skyColor = tslReference('color', uniforms.skyColor);
   const groundColor = tslReference('color', uniforms.groundColor);
   const minVegetationLight = tslReference('float', uniforms.minVegetationLight);
+  const maxVegetationLight = tslReference('float', uniforms.maxVegetationLight);
   const ambient = mix(groundColor, skyColor, tslFloat(0.5).add(uv().y.mul(0.5)));
-  const hemiLight = ambient.add(sunColor.mul(0.35));
+  const hemiLight = ambient.mul(0.82).add(sunColor.mul(0.22));
   const imposterNormal = normalColor.rgb.mul(2).sub(1).normalize();
   const captureSun = tslVec3(0.35, 0.65, 0.68).normalize();
   const ndotl = tslMax(imposterNormal.dot(captureSun), tslFloat(0));
@@ -376,9 +387,18 @@ function createBillboardLightingNode(
     skyColor,
     tslFloat(0.62).add(tslFloat(0.38).mul(tslClamp(imposterNormal.y, tslFloat(-1), tslFloat(1)))),
   );
-  const normalLight = normalAmbient.add(sunColor.mul(tslFloat(0.28).add(tslFloat(0.50).mul(ndotl))));
-  const selectedLight = select(normalMapEnabled, normalLight, hemiLight);
-  const light = tslMax(selectedLight, tslVec3(minVegetationLight));
+  const normalLight = normalAmbient.mul(0.82).add(sunColor.mul(tslFloat(0.16).add(tslFloat(0.34).mul(ndotl))));
+  const verticalOcclusion = tslMix(
+    tslFloat(0.68),
+    tslFloat(1.0),
+    smoothstep(tslFloat(0.08), tslFloat(0.95), uv().y),
+  );
+  const selectedLight = select(normalMapEnabled, normalLight, hemiLight).mul(verticalOcclusion);
+  const light = tslClamp(
+    selectedLight,
+    tslVec3(minVegetationLight),
+    tslVec3(maxVegetationLight),
+  );
   const shaded = baseColor.mul(light);
 
   return select(lightingEnabled, shaded, baseColor).mul(

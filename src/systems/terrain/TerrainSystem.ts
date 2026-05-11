@@ -235,6 +235,10 @@ export class TerrainSystem implements GameSystem {
     this.playerPosition.copy(position);
   }
 
+  setRenderCameraOverride(camera: THREE.PerspectiveCamera | null): void {
+    this.renderRuntime?.setCameraOverride(camera);
+  }
+
   setSurfaceWetness(wetness: number): void {
     const clampedWetness = THREE.MathUtils.clamp(wetness, 0, 1);
     if (Math.abs(clampedWetness - this.surfaceWetness) < 0.001) {

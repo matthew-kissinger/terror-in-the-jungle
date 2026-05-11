@@ -242,10 +242,12 @@ function createTerrainPositionNode(uniforms: TerrainUniforms): TslNode {
   const worldUv = createTerrainWorldUvNode(uniforms, worldPos);
   const terrainHeight = tslTexture(uniformTexture(uniforms, 'terrainHeightmap'), worldUv).r;
   const skirtDrop = tslMax(tslFloat(2), lodLevel.add(1).mul(4));
+  // Return tile-local X/Z: InstancedMesh applies the tile matrix after
+  // positionNode. Height is already world-space Y because instance Y scale is 1.
   return tslVec3(
-    worldPos.x,
+    morphedX,
     terrainHeight.sub(step(tslFloat(0.5), isSkirt).mul(skirtDrop)),
-    worldPos.z,
+    morphedZ,
   );
 }
 
@@ -269,11 +271,12 @@ function rotateUvNode(sampleUv: TslNode, angle: TslNode): TslNode {
 }
 
 function sampleBiomeTextureRaw(biomeSlot: TslNode, sampleUv: TslNode, uniforms: TerrainUniforms): TslNode {
-  let sample = tslTexture(uniformTexture(uniforms, 'biomeTexture0'), sampleUv);
+  const wrappedUv = fract(sampleUv) as TslNode;
+  let sample = tslTexture(uniformTexture(uniforms, 'biomeTexture0'), wrappedUv);
   for (let i = 1; i < MAX_BIOME_TEXTURES; i++) {
     sample = tslMix(
       sample,
-      tslTexture(uniformTexture(uniforms, `biomeTexture${i}`), sampleUv),
+      tslTexture(uniformTexture(uniforms, `biomeTexture${i}`), wrappedUv),
       step(tslFloat(i - 0.5), biomeSlot),
     );
   }

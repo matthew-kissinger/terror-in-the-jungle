@@ -23,6 +23,7 @@ export class TerrainRenderRuntime {
   private config: TerrainRenderRuntimeConfig;
   private quadtree: CDLODQuadtree;
   private renderer: CDLODRenderer;
+  private cameraOverride: THREE.PerspectiveCamera | null = null;
 
   constructor(
     scene: THREE.Scene,
@@ -42,14 +43,19 @@ export class TerrainRenderRuntime {
   }
 
   update(): void {
-    this.updateFrustumPlanes();
+    const camera = this.getSelectionCamera();
+    this.updateFrustumPlanes(camera);
     const tiles = this.quadtree.selectTiles(
-      this.camera.position.x,
-      this.camera.position.y,
-      this.camera.position.z,
+      camera.position.x,
+      camera.position.y,
+      camera.position.z,
       this.frustumPlanes,
     );
     this.renderer.updateInstances(tiles);
+  }
+
+  setCameraOverride(camera: THREE.PerspectiveCamera | null): void {
+    this.cameraOverride = camera;
   }
 
   reconfigure(config: TerrainRenderRuntimeConfig): void {
@@ -81,9 +87,10 @@ export class TerrainRenderRuntime {
    * subtyping keeps them happy).
    */
   getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number; morphFactor: number }> {
-    this.updateFrustumPlanes();
+    const camera = this.getSelectionCamera();
+    this.updateFrustumPlanes(camera);
     const tiles = this.quadtree.selectTiles(
-      this.camera.position.x, this.camera.position.y, this.camera.position.z,
+      camera.position.x, camera.position.y, camera.position.z,
       this.frustumPlanes,
     );
     return tiles.map((t) => ({ x: t.x, z: t.z, size: t.size, lodLevel: t.lodLevel, morphFactor: t.morphFactor }));
@@ -94,10 +101,14 @@ export class TerrainRenderRuntime {
     this.renderer.dispose();
   }
 
-  private updateFrustumPlanes(): void {
+  private getSelectionCamera(): THREE.PerspectiveCamera {
+    return this.cameraOverride ?? this.camera;
+  }
+
+  private updateFrustumPlanes(camera: THREE.PerspectiveCamera): void {
     this.projScreenMatrix.multiplyMatrices(
-      this.camera.projectionMatrix,
-      this.camera.matrixWorldInverse,
+      camera.projectionMatrix,
+      camera.matrixWorldInverse,
     );
     this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
 
