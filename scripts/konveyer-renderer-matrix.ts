@@ -38,7 +38,7 @@ type RendererBackendCapabilitiesSnapshot = {
 };
 
 type RendererMatrixScenario = {
-  name: 'default-webgpu' | 'legacy-webgl' | 'webgpu-force-webgl' | 'webgpu-strict';
+  name: 'default-webgpu' | 'webgpu-strict';
   query: string;
 };
 
@@ -71,8 +71,6 @@ type RendererMatrixArtifact = {
 
 const scenarios: RendererMatrixScenario[] = [
   { name: 'default-webgpu', query: '?diag=1' },
-  { name: 'legacy-webgl', query: '?diag=1&renderer=webgl' },
-  { name: 'webgpu-force-webgl', query: '?diag=1&renderer=webgpu-force-webgl' },
   { name: 'webgpu-strict', query: '?diag=1&renderer=webgpu-strict' },
 ];
 
@@ -161,10 +159,8 @@ function resolveListeningPort(server: ReturnType<typeof createServer>): number {
 }
 
 function expectedForScenario(name: RendererMatrixScenario['name']): string {
-  if (name === 'default-webgpu') return 'Start screen with WebGPU requested and either resolvedBackend=webgpu or explicit WebGPURenderer fallback.';
-  if (name === 'legacy-webgl') return 'Start screen with explicit legacy WebGL renderer selection.';
-  if (name === 'webgpu-force-webgl') return 'Start screen with explicit WebGPURenderer WebGL backend or fallback-webgl status.';
-  return 'Strict WebGPU either resolves backend=webgpu or shows a fatal strict WebGPU failure; fallback success is not allowed.';
+  if (name === 'default-webgpu') return 'Start screen with default WebGPU requested and resolvedBackend=webgpu; fallback success is rejected.';
+  return 'Strict WebGPU reaches the start screen with resolvedBackend=webgpu; fallback success and loud failure both block proof.';
 }
 
 function evaluateScenario(result: Omit<RendererMatrixResult, 'status' | 'expected' | 'failures'>): RendererMatrixResult {
@@ -177,37 +173,23 @@ function evaluateScenario(result: Omit<RendererMatrixResult, 'status' | 'expecte
     if (capabilities?.requestedMode !== 'webgpu') {
       failures.push(`Default mode requested ${capabilities?.requestedMode ?? 'missing'} instead of webgpu.`);
     }
-    const validDefaultBackend = capabilities?.resolvedBackend === 'webgpu'
-      || capabilities?.resolvedBackend === 'webgpu-webgl-fallback'
-      || capabilities?.initStatus === 'fallback-webgl';
-    if (!validDefaultBackend) {
+    if (capabilities?.resolvedBackend !== 'webgpu') {
       failures.push(`Default WebGPU resolved unexpected backend ${capabilities?.resolvedBackend ?? 'missing'} status=${capabilities?.initStatus ?? 'missing'}.`);
     }
-  } else if (result.name === 'legacy-webgl') {
-    if (!result.startVisible) failures.push('Explicit legacy WebGL did not reach the start screen.');
-    if (result.fatalVisible) failures.push('Explicit legacy WebGL showed the fatal overlay.');
-    if (capabilities?.requestedMode !== 'webgl' || capabilities?.resolvedBackend !== 'webgl') {
-      failures.push(`Legacy WebGL reported requested=${capabilities?.requestedMode ?? 'missing'} resolved=${capabilities?.resolvedBackend ?? 'missing'}.`);
-    }
-  } else if (result.name === 'webgpu-force-webgl') {
-    if (!result.startVisible) failures.push('Forced WebGL backend did not reach the start screen.');
-    if (result.fatalVisible) failures.push('Forced WebGL backend showed the fatal overlay.');
-    if (capabilities?.requestedMode !== 'webgpu-force-webgl') {
-      failures.push(`Forced backend requested mode ${capabilities?.requestedMode ?? 'missing'}.`);
-    }
-    const explicitFallback = capabilities?.resolvedBackend === 'webgpu-webgl-fallback'
-      || capabilities?.initStatus === 'fallback-webgl';
-    if (!explicitFallback) {
-      failures.push(`Forced backend did not report explicit fallback; resolved=${capabilities?.resolvedBackend ?? 'missing'} status=${capabilities?.initStatus ?? 'missing'}.`);
+    if (capabilities?.initStatus === 'fallback-webgl' || capabilities?.resolvedBackend === 'webgpu-webgl-fallback') {
+      failures.push('Default WebGPU reported WebGL fallback success, which is not allowed for migration proof.');
     }
   } else {
     const strictPassed = result.startVisible
       && capabilities?.requestedMode === 'webgpu-strict'
       && capabilities.resolvedBackend === 'webgpu';
-    const strictFailedLoudly = result.fatalVisible
-      && (result.fatalText?.toLowerCase().includes('webgpu') ?? false);
-    if (!strictPassed && !strictFailedLoudly) {
-      failures.push('Strict WebGPU neither resolved backend=webgpu nor failed loudly with a WebGPU fatal overlay.');
+    if (!strictPassed) {
+      failures.push(
+        `Strict WebGPU did not resolve backend=webgpu and reach the start screen; resolved=${capabilities?.resolvedBackend ?? 'missing'} status=${capabilities?.initStatus ?? 'missing'}.`,
+      );
+    }
+    if (result.fatalVisible && !(result.fatalText?.toLowerCase().includes('webgpu') ?? false)) {
+      failures.push('Strict WebGPU showed a fatal overlay that did not identify WebGPU.');
     }
     if (capabilities?.resolvedBackend === 'webgpu-webgl-fallback' || capabilities?.initStatus === 'fallback-webgl') {
       failures.push('Strict WebGPU reported fallback success, which is not allowed for migration proof.');
@@ -327,8 +309,8 @@ async function main(): Promise<void> {
       results,
       nonClaims: [
         'This matrix proves built-app backend selection behavior, not full visual parity.',
-        'Strict WebGPU pass requires resolvedBackend=webgpu; fallback success is rejected.',
-        'A strict loud-failure result on this machine means headed hardware WebGPU proof is still required before default-on review.',
+        'Default and strict WebGPU pass only when resolvedBackend=webgpu; fallback success is rejected.',
+        'Explicit WebGL diagnostics live outside this matrix and do not count as KONVEYER proof.',
       ],
     };
 

@@ -250,10 +250,10 @@ export class GameRenderer {
       await initializeCommonRenderer(renderer);
       const resolvedBackend = inspectResolvedRendererBackend(renderer);
 
-      if (capabilities.strictWebGPU && resolvedBackend !== 'webgpu') {
+      if (resolvedBackend !== 'webgpu') {
         renderer.dispose();
         throw new Error(
-          `Strict WebGPU proof mode resolved ${resolvedBackend}; refusing WebGL fallback.`,
+          `WebGPU renderer request resolved ${resolvedBackend}; refusing WebGL fallback.`,
         );
       }
 
@@ -284,27 +284,19 @@ export class GameRenderer {
       const errorMessage = toErrorMessage(error);
       this.rendererCapabilities = {
         ...this.rendererCapabilities,
-        resolvedBackend: this.rendererBackendMode === 'webgpu-strict' ? 'unknown' : 'webgl',
-        initStatus: this.rendererBackendMode === 'webgpu-strict' ? 'failed' : 'fallback-webgl',
+        resolvedBackend: 'unknown',
+        initStatus: 'failed',
         error: errorMessage,
         notes: [
           ...this.rendererCapabilities.notes,
-          this.rendererBackendMode === 'webgpu-strict'
-            ? 'Strict WebGPU renderer initialization failed; refusing to keep the WebGL bootstrap renderer as proof.'
-            : 'WebGPU renderer initialization failed; keeping the WebGL bootstrap renderer.',
+          'WebGPU renderer initialization failed; refusing to keep the WebGL bootstrap renderer.',
         ],
       };
-      if (this.rendererBackendMode === 'webgpu-strict') {
-        Logger.warn(
-          'Renderer',
-          `KONVEYER strict WebGPU init failed: ${this.rendererCapabilities.error}`
-        );
-        throw error instanceof Error ? error : new Error(errorMessage);
-      }
       Logger.warn(
         'Renderer',
-        `KONVEYER WebGPU init failed; continuing with WebGL renderer: ${this.rendererCapabilities.error}`
+        `KONVEYER WebGPU init failed: ${this.rendererCapabilities.error}`
       );
+      throw error instanceof Error ? error : new Error(errorMessage);
     }
   }
 

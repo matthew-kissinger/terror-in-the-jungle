@@ -144,6 +144,44 @@ function rendererStrictStatus(matrixPath: string | null): EvidenceStatus {
   return 'blocked';
 }
 
+function rendererMatrixPolicyStatus(matrixPath: string | null): EvidenceStatus {
+  if (!matrixPath) return 'missing';
+  const matrix = readJson<{
+    results?: Array<{
+      name: string;
+      status?: string;
+      capabilities?: { resolvedBackend?: string; initStatus?: string } | null;
+    }>;
+  }>(matrixPath);
+  const results = matrix.results ?? [];
+  const names = new Set(results.map((result) => result.name));
+  if (names.has('legacy-webgl') || names.has('webgpu-force-webgl')) return 'blocked';
+  const defaultWebGPU = results.find((result) => result.name === 'default-webgpu');
+  const strict = results.find((result) => result.name === 'webgpu-strict');
+  const defaultPass = defaultWebGPU?.status === 'pass'
+    && defaultWebGPU.capabilities?.resolvedBackend === 'webgpu'
+    && defaultWebGPU.capabilities?.initStatus !== 'fallback-webgl';
+  const strictPass = strict?.status === 'pass'
+    && strict.capabilities?.resolvedBackend === 'webgpu'
+    && strict.capabilities?.initStatus !== 'fallback-webgl';
+  return defaultPass && strictPass ? 'pass' : 'blocked';
+}
+
+function terrainVisualStatus(visualPath: string | null): EvidenceStatus {
+  if (!visualPath) return 'missing';
+  const review = readJson<{
+    status?: string;
+    options?: { renderer?: string };
+    checks?: Array<{ id: string; status?: string }>;
+  }>(visualPath);
+  const groundTone = review.checks?.find((entry) => entry.id === 'terrain_ground_tone_review');
+  return review.status === 'pass'
+    && review.options?.renderer === 'webgpu-strict'
+    && groundTone?.status === 'pass'
+    ? 'pass'
+    : 'blocked';
+}
+
 function allDocSectionsPresent(ledger: string): boolean {
   return REQUIRED_DOC_SECTIONS.every((section) => ledger.includes(`## ${section}`));
 }
@@ -158,6 +196,7 @@ function main(): void {
   const vegetationPath = findLatestArtifact((path) => path.endsWith('konveyer-vegetation-slice\\slice.json') || path.endsWith('konveyer-vegetation-slice/slice.json'));
   const combatantPath = findLatestArtifact((path) => path.endsWith('konveyer-combatant-slice\\slice.json') || path.endsWith('konveyer-combatant-slice/slice.json'));
   const computePath = findLatestArtifact((path) => path.endsWith('konveyer-compute-carriers\\carriers.json') || path.endsWith('konveyer-compute-carriers/carriers.json'));
+  const terrainVisualPath = findLatestArtifact((path) => path.endsWith('projekt-143-terrain-visual-review\\visual-review.json') || path.endsWith('projekt-143-terrain-visual-review/visual-review.json'));
   const blockers = summarizeBlockers(strategyPath);
   const rawBlockerCount = Object.values(blockers.raw).reduce((sum, count) => sum + count, 0);
   const productionBlockerCount = Object.values(blockers.production).reduce((sum, count) => sum + count, 0);
@@ -166,6 +205,8 @@ function main(): void {
   const productionContextCount = blockers.production['renderer.getContext / WebGL context access'] ?? 0;
   const unexpectedContextCount = productionContextCount - diagnosticContextCount;
   const strictStatus = rendererStrictStatus(matrixPath);
+  const matrixPolicyStatus = rendererMatrixPolicyStatus(matrixPath);
+  const visualStatus = terrainVisualStatus(terrainVisualPath);
 
   const checklist: ChecklistEntry[] = [
     {
@@ -187,10 +228,10 @@ function main(): void {
       gap: ledger.includes('Three.js WebGPURenderer docs') && ledger.includes('Three.js TSL docs') ? null : 'Upstream source section is missing or incomplete.',
     },
     {
-      requirement: 'Renderer backend can select default WebGL, forced fallback, and strict WebGPU proof.',
-      status: matrixPath ? 'pass' : 'missing',
+      requirement: 'Renderer matrix proves default and strict WebGPU without WebGL fallback proof paths.',
+      status: matrixPolicyStatus,
       evidence: matrixPath ? [rel(matrixPath)] : [],
-      gap: matrixPath ? null : 'Renderer matrix artifact is missing.',
+      gap: matrixPolicyStatus === 'pass' ? null : 'Renderer matrix must exclude fallback scenarios and show default + strict resolvedBackend=webgpu.',
     },
     {
       requirement: 'Strict WebGPU succeeds without hidden fallback.',
@@ -203,6 +244,12 @@ function main(): void {
       status: vegetationPath && combatantPath && computePath ? 'pass' : 'missing',
       evidence: [vegetationPath, combatantPath, computePath].filter((path): path is string => Boolean(path)).map(rel),
       gap: vegetationPath && combatantPath && computePath ? null : 'One or more measured slice artifacts are missing.',
+    },
+    {
+      requirement: 'Strict WebGPU terrain visual review accepts Open Frontier and A Shau ground tone.',
+      status: visualStatus,
+      evidence: terrainVisualPath ? [rel(terrainVisualPath)] : [],
+      gap: visualStatus === 'pass' ? null : 'Strict WebGPU terrain visual review is missing or still warns; Open Frontier ground tone remains a demo blocker.',
     },
     {
       requirement: 'Production custom WebGL shader/render-target blockers are migrated or explicitly retired.',
@@ -226,16 +273,30 @@ function main(): void {
       gap: unexpectedContextCount === 0 ? null : 'A non-diagnostic runtime path still reaches direct WebGL context APIs.',
     },
     {
-      requirement: 'Default-on WebGPU with WebGL fallback is ready for reviewer approval.',
-      status: strictStatus === 'pass' && productionRenderBlockerCount === 0 && unexpectedContextCount === 0 ? 'pass' : 'blocked',
+      requirement: 'Strict default-on WebGPU is ready for reviewer approval.',
+      status: strictStatus === 'pass'
+        && matrixPolicyStatus === 'pass'
+        && visualStatus === 'pass'
+        && productionRenderBlockerCount === 0
+        && unexpectedContextCount === 0
+        ? 'pass'
+        : 'blocked',
       evidence: [
         `strictWebGPU=${strictStatus}`,
+        `rendererMatrixPolicy=${matrixPolicyStatus}`,
+        `terrainVisual=${visualStatus}`,
         `productionBlockers=${productionBlockerCount}`,
         `productionRenderBlockers=${productionRenderBlockerCount}`,
         `unexpectedContextBlockers=${unexpectedContextCount}`,
         `rawBlockers=${rawBlockerCount}`,
       ],
-      gap: strictStatus === 'pass' && productionRenderBlockerCount === 0 && unexpectedContextCount === 0 ? null : 'Default-on is not approved until strict WebGPU passes, render blocker count is zero or policy-retired, and context access remains diagnostics-only.',
+      gap: strictStatus === 'pass'
+        && matrixPolicyStatus === 'pass'
+        && visualStatus === 'pass'
+        && productionRenderBlockerCount === 0
+        && unexpectedContextCount === 0
+        ? null
+        : 'Default-on is not approved until strict WebGPU passes, fallback scenarios are excluded from proof, terrain visual review passes, render blocker count is zero or policy-retired, and context access remains diagnostics-only.',
     },
   ];
 
@@ -252,9 +313,10 @@ function main(): void {
     productionRenderBlockerSummary: blockers.productionRender,
     diagnosticWebglContextSummary: blockers.diagnosticContext,
     nextActions: completionStatus === 'complete'
-      ? []
-      : [
-          'Run strict renderer matrix on headed hardware with a real WebGPU adapter.',
+        ? []
+        : [
+          'Run strict renderer matrix on headed hardware with a real WebGPU adapter; fallback scenarios must not count as proof.',
+          'Fix Open Frontier terrain material, lighting, fog, or biome color calibration, then rerun strict WebGPU terrain visual review until terrain_ground_tone_review passes.',
           'Port or explicitly retire remaining production ShaderMaterial, RawShaderMaterial, onBeforeCompile, and WebGL render-target blockers.',
           'Keep direct WebGL context access confined to explicit diagnostics or capability probes so it cannot masquerade as WebGPU success.',
           'Rerun webgpu strategy audit and completion audit until productionRenderBlockers is zero or each residual blocker has a reviewed policy exemption.',

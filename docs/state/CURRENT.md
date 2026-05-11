@@ -50,9 +50,9 @@ The next proposed autonomous branch is the full KONVEYER migration, documented i
 `docs/rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md` and
 `docs/tasks/konveyer-full-autonomous-migration.md`. Treat it as the agent's
 experimental branch work: progress from KONVEYER-0 through KONVEYER-9 toward
-WebGPU default-on readiness, but do not merge to `master`, deploy
-experimental renderer code, update perf baselines, or remove WebGL fallback
-before human review.
+strict WebGPU readiness, but do not merge to `master`, deploy experimental
+renderer code, update perf baselines, or require WebGL fallback in the
+migration proof path.
 
 ## What is real today
 

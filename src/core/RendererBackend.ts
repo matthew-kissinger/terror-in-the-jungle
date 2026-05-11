@@ -126,10 +126,10 @@ export function createInitialRendererCapabilities(
     adapterLimits: {},
     error: null,
     notes: requestedMode === 'webgl'
-      ? ['WebGL renderer selected by default.']
+      ? ['Explicit WebGL diagnostic renderer selected.']
       : [requestedMode === 'webgpu-strict'
         ? 'Strict WebGPU proof mode requested; backend fallback must fail loudly.'
-        : 'WebGPU renderer requested; bootstrapping through async renderer init.'],
+        : 'WebGPU renderer requested; WebGL fallback is disabled for KONVEYER proof.'],
   };
 }
 

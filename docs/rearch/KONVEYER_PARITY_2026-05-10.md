@@ -1,6 +1,6 @@
 # KONVEYER Parity And Migration Ledger
 
-Last verified: 2026-05-10
+Last verified: 2026-05-11
 
 Branch: `exp/konveyer-webgpu-migration`
 
@@ -47,8 +47,9 @@ The headed hardware probe later wrote:
 - Headed WebGPU adapter: PASS
 - Live Pages COOP/COEP header contract: PASS
 
-This means the first runtime implementation must keep compile-time, explicit
-WebGL fallback, and strict headed WebGPU adapter proof separate.
+This means the first runtime implementation must keep compile-time capability,
+explicit WebGL diagnostics, and strict headed WebGPU adapter proof separate.
+WebGL is not a fallback success path for this branch.
 
 ## Architecture Posture
 
@@ -59,25 +60,25 @@ permission to pivot to another browser renderer framework. The long-term
 - Make the renderer boundary backend-agnostic inside the engine while leaving
   the fenced public interface alone until a reviewed interface-change PR.
 - Move shader code from GLSL strings toward TSL/node graphs so the same intent
-  can target WGSL for WebGPU and GLSL for explicit WebGL2 fallback.
+  can target WGSL for WebGPU. TSL's GLSL output is useful context, but it is
+  not a passing fallback path for KONVEYER proof.
 - Keep simulation authority on CPU-side data contracts that can later move
   toward WASM, worker, or native-hosted builds without coupling game state to a
   specific browser graphics context.
 - Treat Vite config and tests as migration infrastructure. A WebGPU proof gate
-  must fail loudly when the WebGPU backend is missing, even though the product
-  runtime can keep a separately tested WebGL fallback path.
+  must fail loudly when the WebGPU backend is missing. Product compatibility
+  planning belongs in a separate design pass, not in this migration proof.
 
-Fallback policy for this branch:
+Renderer policy for this branch:
 
-- `?renderer=webgpu-strict` and `VITE_KONVEYER_WEBGPU_STRICT=1` are proof
-  modes. They must fail if Three resolves to the WebGL backend.
-- `?renderer=webgpu-force-webgl` is an explicit compatibility matrix path. It
-  is allowed only when the test name or artifact says fallback was forced.
-- The default app path now requests WebGPU first. If Three resolves its backend
-  to WebGL, that is compatibility fallback evidence only; it does not satisfy
-  strict WebGPU proof.
+- The default app path and `?renderer=webgpu-strict` both require
+  `resolvedBackend=webgpu`. If Three resolves to WebGL, initialization must
+  fail loudly.
+- `?renderer=webgpu-force-webgl` is no longer an acceptance scenario. If it is
+  run manually, it is a negative diagnostic only and must not appear in proof
+  matrices.
 - `?renderer=webgl`, `VITE_KONVEYER_WEBGPU=0`, and
-  `VITE_KONVEYER_FORCE_WEBGL=1` are explicit legacy WebGL escape hatches.
+  `VITE_KONVEYER_FORCE_WEBGL=1` are explicit legacy WebGL diagnostics only.
 
 ## Upstream Facts Refreshed
 
@@ -112,22 +113,24 @@ Current Three.js guidance relevant to this repo:
 - Classic `EffectComposer`-style post-processing is not a drop-in WebGPU
   path. Post-processing moves to the node render pipeline.
 - TSL can generate WGSL for WebGPU and GLSL for WebGL2, which makes it the
-  correct bridge for dual-backend shader work.
+  correct shader graph path while migrating away from GLSL strings. Cross
+  backend success is not WebGPU proof.
 - WebGPU is still not a universal browser baseline. MDN marks it limited
   availability and secure-context-only. Chrome documents broad support, but
-  platform-specific fallback remains required.
+  platform-specific compatibility should be designed separately from the
+  strict KONVEYER migration gate.
 
 ## Repo Parity Matrix
 
 | Surface | Status | Current owner path | WebGPU migration note |
 | --- | --- | --- | --- |
-| Main renderer boot | default-on | `src/core/RendererBackend.ts`, `src/core/GameRenderer.ts` | Default startup now requests `WebGPURenderer`; `?renderer=webgl` remains an explicit legacy escape hatch, `?renderer=webgpu-force-webgl` labels compatibility fallback, and strict hardware proof resolves `webgpu` on headed RTX 3070. |
+| Main renderer boot | strict-default | `src/core/RendererBackend.ts`, `src/core/GameRenderer.ts` | Default startup now requests `WebGPURenderer` and must resolve `webgpu`; `?renderer=webgl` remains an explicit diagnostic, `?renderer=webgpu-force-webgl` is excluded from proof, and strict hardware proof resolves `webgpu` on headed RTX 3070. |
 | Engine render loop | proven-start | `src/core/GameEngine.ts`, `src/core/GameEngineLoop.ts` | The engine awaits async renderer init before system wiring; built smoke, headed matrix, and terrain visual proof reach app/gameplay under the default-on path. |
 | Fenced renderer contract | blocked | `src/types/SystemInterfaces.ts` | `IGameRenderer.renderer` and weapon rendering methods are typed as `THREE.WebGLRenderer`; branch must use an internal adapter/cast and avoid fence edits. |
 | GPU timing telemetry | blocked | `src/systems/debug/GPUTimingTelemetry.ts`, `src/systems/debug/PerformanceTelemetry.ts` | Uses `renderer.getContext()` and `EXT_disjoint_timer_query_webgl2`; WebGPU needs timestamp-query or disabled telemetry fallback. |
 | Texture warmup | needs-port | `src/systems/assets/AssetLoader.ts` | Uses `renderer.initTexture`; common renderer has an initialized requirement, so WebGPU path needs init ordering guard. |
 | Post-processing | retired | `src/systems/effects/PostProcessingManager.ts` | Runtime draws straight to back buffer. K7 removed the dormant low-res blit resources so this is no longer a hidden WebGPU blocker; any future post path must use Three's node post stack. |
-| Terrain material | ported-hardware-proof | `src/systems/terrain/TerrainMaterial.ts` | K7 replaced the production `onBeforeCompile` terrain shader injection with a TSL `MeshStandardNodeMaterial` graph for CDLOD displacement, biome shading, hydrology tint, feature surfaces, far-canopy tint, roughness, and explicit material-owned fog/tint. `check:terrain-visual` passes Open Frontier and A Shau under the default-on path. |
+| Terrain material | ported-but-visually-blocked | `src/systems/terrain/TerrainMaterial.ts` | K7 replaced the production `onBeforeCompile` terrain shader injection with a TSL `MeshStandardNodeMaterial` graph for CDLOD displacement, biome shading, hydrology tint, feature surfaces, far-canopy tint, roughness, and explicit material-owned fog/tint. The 2026-05-11 strict WebGPU visual gate rejects Open Frontier ground tone, so this is not art/parity accepted. |
 | Terrain renderer | ported-hardware-proof | `src/systems/terrain/CDLODRenderer.ts` | CDLOD instancing now publishes packed tile transform attributes for the node material instead of depending on injected `instanceMatrix` GLSL. The packed layout keeps the WebGPU vertex-buffer count under adapter limits. |
 | Vegetation billboards | ported-hardware-proof | `src/systems/world/billboard/BillboardBufferManager.ts`, `src/systems/world/billboard/BillboardNodeMaterial.ts` | K7 moved production instanced vegetation off `RawShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with atlas, wind, fog, lighting, and premultiplied alpha. The buffer manager initializes zero instance count and visibility explicitly so WebGPU never submits an infinite instance draw. |
 | Combatant impostors | ported-hardware-proof | `src/systems/combat/CombatantMeshFactory.ts` | K7 moved active Pixel Forge NPC atlas impostors off `ShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with crop-map sampling, animation frame selection, readability, atmosphere lighting, and material-owned fog. Headed strict WebGPU proof is green; combat120 perf remains review evidence. |
@@ -185,9 +188,9 @@ Implemented after the KONVEYER-0 checkpoint:
 - `src/core/RendererBackend.ts` adds the internal renderer backend selector,
   capability object, async WebGPURenderer creation, and resolved-backend
   inspection.
-- `src/core/GameRenderer.ts` keeps WebGL as the default constructor path and
-  adds `initializeRendererBackend()` for explicit `?renderer=webgpu` and
-  `?renderer=webgpu-force-webgl` opt-in paths.
+- `src/core/GameRenderer.ts` creates a temporary bootstrap canvas before
+  `initializeRendererBackend()` swaps in WebGPU. A WebGPU request now fails
+  loudly if it cannot resolve `webgpu`.
 - `src/core/GameEngine.ts` awaits renderer backend initialization before
   system wiring and refreshes capture/context-guard references after a renderer
   swap.
@@ -202,7 +205,7 @@ Validation for this checkpoint:
 - `npx vitest run src/core/RendererBackend.test.ts src/core/GameRenderer.test.ts`: PASS
 - `npm run lint`: PASS
 - `npm run build`: PASS
-- `npm run smoke:prod`: PASS, default WebGL app reached the deploy UI
+- `npm run smoke:prod`: PASS for the historical K1 boot path
 - `npm run check:webgpu-strategy`: PASS,
   `artifacts/perf/2026-05-10T14-14-01-807Z/webgpu-strategy-audit/strategy-audit.json`
 
@@ -445,8 +448,8 @@ K7 post-processing tail reduction:
   graph. The graph preserves instanced positions/scales/rotations, atlas
   azimuth/elevation selection, wind sway, height fog, atmosphere lighting,
   normal-atlas lighting, alpha hardening, and premultiplied blending. The
-  default WebGL renderer now installs Three's WebGL node handler so this path
-  is exercised before default-on WebGPU.
+  explicit WebGL diagnostic renderer installs Three's WebGL node handler for
+  comparison only; strict WebGPU proof remains the acceptance path.
 - `npx vitest run src/systems/world/billboard/BillboardBufferManager.test.ts src/systems/world/billboard/GPUBillboardSystem.test.ts`: PASS
 - `npm run typecheck`: PASS
 - `npm run lint`: PASS
@@ -539,9 +542,9 @@ Implemented after the KONVEYER-5/KONVEYER-6 checkpoint:
 
 - `src/core/bootstrap.ts` exposes read-only renderer backend capabilities under
   `?diag=1` for validation scripts.
-- `scripts/konveyer-renderer-matrix.ts` runs the built app through four
-  backend cases: default WebGPU, explicit legacy WebGL, explicit
-  WebGPURenderer forced WebGL backend, and strict WebGPU proof mode.
+- `scripts/konveyer-renderer-matrix.ts` runs the built app through two proof
+  cases: default WebGPU and strict WebGPU. Explicit WebGL diagnostics are kept
+  out of this matrix so they cannot count as fallback success.
 - `--headed` switches the matrix off headless SwiftShader and onto the local
   hardware browser path for real strict WebGPU proof.
 - `package.json` wires `check:konveyer-renderer-matrix`.
@@ -555,19 +558,23 @@ Validation for this checkpoint:
 - `npm run check:konveyer-renderer-matrix -- --headed`: PASS,
   `artifacts/perf/2026-05-10T17-50-23-900Z/konveyer-renderer-matrix/matrix.json`
 
-Renderer matrix result:
+Renderer matrix result from the 2026-05-10 artifact:
 
 | Case | Result | Resolved backend | Meaning |
 | --- | --- | --- | --- |
 | `default-webgpu` | PASS | `webgpu` | Current default path reaches the start screen on headed hardware WebGPU. |
-| `legacy-webgl` | PASS | `webgl` | Explicit legacy escape hatch reaches the start screen. |
-| `webgpu-force-webgl` | PASS | `webgpu-webgl-fallback` | Compatibility fallback is explicit and labeled. |
 | `webgpu-strict` | PASS | `webgpu` | Strict proof resolves real WebGPU and does not accept fallback success. |
+
+2026-05-11 policy update:
+
+- The renderer matrix script now fails unless both default and strict WebGPU
+  resolve `webgpu`.
+- `legacy-webgl` and `webgpu-force-webgl` are no longer proof cases.
 
 Current limitation:
 
-- Headless Chromium can still resolve strict WebGPU to fallback or no adapter.
-  Only the headed matrix artifact above is used as strict hardware proof.
+- Headless Chromium can still miss a hardware WebGPU adapter. That is an
+  environment failure, not a WebGL fallback pass.
 
 ## KONVEYER-9 Review Packet
 
@@ -595,13 +602,28 @@ Branch state:
 
 Default-on decision:
 
-- Approved for the experiment branch. Default startup now requests WebGPU,
-  headed strict proof resolves `webgpu`, explicit WebGL escape hatches remain
-  available, combat120 runs without WebGPU console errors, and completion audit
-  reports `productionRenderBlockers=0`.
+- Blocked for the experiment branch after the 2026-05-11 visual override.
+  Default startup requests WebGPU and strict proof resolves `webgpu`, but
+  Open Frontier terrain/lighting is visually rejected and completion audit now
+  requires a strict WebGPU terrain visual pass.
 - Not approved for `master` merge or production deploy yet. Review still needs
   residual perf-warning acceptance, cross-browser/mobile acceptance, and an
   owner rollback decision.
+
+2026-05-11 visual override:
+
+- The default-on decision above is superseded for visual acceptance by
+  `docs/rearch/KONVEYER_TERRAIN_LIGHTING_ANALYSIS_2026-05-11.md`.
+- The branch should use strict WebGPU-only proof. WebGL may remain as named
+  diagnostic comparison, but it must not count as fallback success,
+  completion-audit success, or demo-readiness evidence.
+- Open Frontier terrain/lighting is visually rejected. Strict WebGPU renders
+  the scene with zero browser errors, but airfield, parking, river-oblique, and
+  river-ground shots are over-bright and low contrast.
+- Current warning artifact:
+  `artifacts/perf/2026-05-11T00-26-31-266Z/projekt-143-terrain-visual-review/visual-review.md`.
+- Do not merge or deploy this branch while Open Frontier terrain reads as
+  white.
 
 Next reviewer decisions:
 

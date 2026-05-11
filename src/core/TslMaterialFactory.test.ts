@@ -49,7 +49,7 @@ describe('evaluateNodeMaterialReadiness', () => {
     expect(result.reason).toContain('refusing to hide');
   });
 
-  it('allows initialized WebGPURenderer node materials on the explicit fallback backend', () => {
+  it('rejects initialized WebGPURenderer node materials on the explicit fallback backend', () => {
     const result = evaluateNodeMaterialReadiness(
       capabilities({
         requestedMode: 'webgpu-force-webgl',
@@ -59,8 +59,9 @@ describe('evaluateNodeMaterialReadiness', () => {
       }),
       'proof-fixture',
     );
-    expect(result.ready).toBe(true);
-    expect(result.strictFailure).toBe(false);
+    expect(result.ready).toBe(false);
+    expect(result.strictFailure).toBe(true);
+    expect(result.reason).toContain('refusing to hide');
   });
 });
 

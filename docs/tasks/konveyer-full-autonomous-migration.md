@@ -1,25 +1,27 @@
 # KONVEYER Full Autonomous WebGPU Migration
 
-Last verified: 2026-05-10
+Last verified: 2026-05-11
 
 ## Goal
 
 Run the full KONVEYER WebGPU migration campaign on an experimental branch,
 starting with recon and continuing through staged implementation toward a
-production-ready `WebGPURenderer` + TSL path with WebGL fallback retained for
-human review.
+production-ready strict `WebGPURenderer` + TSL path. WebGL is diagnostic only
+and must not be treated as a migration fallback, acceptance path, or demo proof.
 
 Pasteable directive:
 
 > Run the full KONVEYER WebGPU migration campaign on
 > `exp/konveyer-webgpu-migration`: begin with KONVEYER-0 recon, then
 > autonomously progress through staged WebGPURenderer + TSL migration work
-> toward default-on WebGPU with WebGL fallback. Research current upstream
-> Three.js/WebGPU guidance, audit and port repo rendering surfaces
-> incrementally, build measured vegetation/combatant/compute slices, document
-> the KONVEYER-0 through KONVEYER-9 path, commit and push often for human
-> review, and stop only for fenced-interface changes, perf-baseline updates,
-> master merges, or production deploys.
+> toward strict default-on WebGPU with no WebGL fallback in the proof path.
+> Research current upstream Three.js/WebGPU guidance, audit and port repo
+> rendering surfaces incrementally, build measured
+> vegetation/combatant/compute slices, document the KONVEYER-0 through
+> KONVEYER-9 path, commit and push often for human review, and stop only for
+> fenced-interface changes, perf-baseline updates, master merges, production
+> deploys, or a renderer/visual regression that would make the game unfit for
+> playtest.
 
 ## Branch
 
@@ -37,8 +39,9 @@ current `origin/master`.
 5. `docs/state/CURRENT.md`
 6. `docs/state/perf-trust.md`
 7. `docs/rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md`
-8. `scripts/webgpu-strategy-audit.ts`
-9. `scripts/check-platform-capabilities.ts`
+8. `docs/rearch/KONVEYER_TERRAIN_LIGHTING_ANALYSIS_2026-05-11.md`
+9. `scripts/webgpu-strategy-audit.ts`
+10. `scripts/check-platform-capabilities.ts`
 
 ## Campaign Slices
 
@@ -52,34 +55,35 @@ current `origin/master`.
 
 ### KONVEYER-1 - Dual Renderer Boot Path
 
-- Add an opt-in WebGPU renderer path behind an explicit experimental flag.
-- Preserve WebGL default.
+- Add a strict WebGPU renderer path behind an explicit experimental flag.
+- Do not preserve WebGL as the experiment proof path.
 - Record backend capability data.
-- Add startup smoke evidence for WebGL default and WebGPU opt-in where
-  available.
+- Add startup smoke evidence for strict WebGPU where available.
 
 ### KONVEYER-2 - TSL Material Foundation
 
 - Add reusable TSL/node material helpers.
 - Port one low-risk material fixture.
-- Keep old material path available.
+- Keep old material path only as named diagnostic evidence outside the proof
+  path.
 
 ### KONVEYER-3 - Vegetation GPU-Driven Slice
 
 - Implement a contained vegetation visibility/culling or draw-submission path.
-- Keep WebGL fallback.
+- Prove it under strict WebGPU.
 - Capture local evidence.
 
 ### KONVEYER-4 - Combatant Render Slice
 
 - Port an isolated combatant render bucket or impostor material path.
 - Do not change combat simulation authority.
-- Validate at low count before scaling.
+- Validate at low count under strict WebGPU before scaling.
 
 ### KONVEYER-5 - Particles, Projectiles, And Effects Compute
 
 - Prototype one compute-backed effect or projectile broadphase path.
-- Keep CPU/WebGL fallback.
+- Keep CPU determinism authority until proven; do not use WebGL as a renderer
+  fallback for the proof path.
 - Document determinism boundaries.
 
 ### KONVEYER-6 - Cover And AI Sensor Compute Carrier
@@ -93,11 +97,11 @@ current `origin/master`.
 - Decide terrain material, water material, and post-processing parity path.
 - Port only the smallest safe tail item needed to prove the route.
 
-### KONVEYER-8 - Cross-Backend Validation And Fallback
+### KONVEYER-8 - Strict WebGPU Validation Policy
 
-- Build the WebGPU/WebGL support matrix.
-- Document fallback policy and validation commands.
-- Preserve WebGL until human review approves removal.
+- Build a strict WebGPU support matrix.
+- Document any diagnostic WebGL comparisons as non-proof.
+- Fail any migration packet that succeeds only through WebGL.
 
 ### KONVEYER-9 - Default-On Readiness Packet
 
@@ -110,7 +114,7 @@ current `origin/master`.
 - Continue to the next viable KONVEYER slice when blocked.
 - Memo blocked slices with exact file/API reasons.
 - Add adapters instead of changing fenced interfaces.
-- Keep WebGL fallback alive.
+- Keep strict WebGPU proof alive and visible.
 - Use explicit experimental flags or dev query params.
 - Commit and push branch progress frequently.
 - Do not wait for owner input unless a hard stop is hit.
@@ -123,7 +127,7 @@ Stop implementation and write a handoff note if any of these are required:
 - update `perf-baselines.json`
 - merge to `master`
 - deploy experimental renderer code
-- remove WebGL fallback
+- require WebGL fallback for migration proof
 - conceal a known renderer regression
 
 ## Validation
@@ -148,4 +152,3 @@ The final branch must include:
 - evidence artifact paths
 - validation results
 - final recommendation for default-on readiness or remaining blockers
-

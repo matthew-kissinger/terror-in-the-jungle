@@ -54,11 +54,11 @@ export function evaluateNodeMaterialReadiness(
     };
   }
 
-  if (capabilities.strictWebGPU && capabilities.resolvedBackend !== 'webgpu') {
+  if (capabilities.resolvedBackend !== 'webgpu') {
     return {
       ready: false,
-      strictFailure: true,
-      reason: `${surface} strict proof resolved ${capabilities.resolvedBackend}; refusing to hide migration failure behind fallback.`,
+      strictFailure: capabilities.strictWebGPU || capabilities.isWebGPURenderer,
+      reason: `${surface} TSL path resolved ${capabilities.resolvedBackend}; refusing to hide migration failure behind fallback.`,
     };
   }
 

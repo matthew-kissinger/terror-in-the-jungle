@@ -41,7 +41,7 @@ describe('resolveRendererBackendMode', () => {
     expect(resolveRendererBackendMode()).toBe('webgl');
   });
 
-  it('selects the WebGPURenderer WebGL fallback backend for forced fallback testing', () => {
+  it('selects the forced-WebGL negative diagnostic mode from the renderer query param', () => {
     setSearch('?renderer=webgpu-force-webgl');
     expect(resolveRendererBackendMode()).toBe('webgpu-force-webgl');
   });
@@ -69,7 +69,7 @@ describe('resolveRendererBackendMode', () => {
 });
 
 describe('createInitialRendererCapabilities', () => {
-  it('records the default WebGL backend as ready', () => {
+  it('records explicit WebGL diagnostic mode as ready', () => {
     const caps = createInitialRendererCapabilities('webgl');
     expect(caps.requestedMode).toBe('webgl');
     expect(caps.resolvedBackend).toBe('webgl');

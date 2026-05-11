@@ -13,10 +13,12 @@ Core loop: **Play in first person AND command simultaneously.** The player holds
 
 Vietnam War is the first theater. Architecture generalizes to any war with different factions, terrain, vehicles, and doctrine.
 
-Current renderer: `WebGLRenderer`. The KONVEYER experimental branch is the
-planned full migration pass toward `WebGPURenderer` + TSL, GPU-driven
-vegetation/combatants, compute-backed effects and cover-query carriers, and a
-human-reviewed default-on WebGPU path with WebGL fallback retained.
+Current production renderer: `WebGLRenderer`. The KONVEYER experimental branch
+is the planned strict migration pass toward `WebGPURenderer` + TSL,
+GPU-driven vegetation/combatants, compute-backed effects and cover-query
+carriers, and a human-reviewed default-on WebGPU path. WebGL is diagnostic
+only for that branch; it must not be used as a fallback success path for
+WebGPU migration proof.
 
 **Canonical vision sentence (copy verbatim into other docs that need to state it):**
 
