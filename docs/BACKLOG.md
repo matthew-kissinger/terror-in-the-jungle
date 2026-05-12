@@ -175,8 +175,12 @@ owner opens or reassigns them.
 
 - E1: ECS evaluation remains deferred; bitECS measured about parity with the
   current Vector3-shaped runtime in the old spike.
-- E2: GPU-driven rendering and WebGPU migration stay deferred for the rendering
-  question; fix concrete instancing-capacity cliffs in place.
+- E2: GPU-driven rendering and WebGPU migration are now active on
+  `exp/konveyer-webgpu-migration` (KONVEYER-0 through KONVEYER-10). The
+  scene/material/materialization rearchitecture memo lives at
+  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`; concrete
+  instancing-capacity cliffs may still be fixed in place on `master` while
+  the experimental branch matures.
 - E3: Utility-AI combat layer expansion remains a design candidate; do not
   block present faction tuning on it.
 - E4: Agent/player API unification needs a minimal movement/observation

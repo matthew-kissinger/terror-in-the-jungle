@@ -252,9 +252,18 @@ Recommended next asset spike:
   weapons, and the same public materialization telemetry/body-bound crop path.
   It remains WARN for probe-shape reasons: the generic NPC impostor crop has no
   candidate after nearby actors promote to close GLBs, and the isolated close
-  crop is bright against a neutral hidden-terrain/vegetation frame. Treat the
-  remaining work as multi-mode reserve verification, cap/budget review, and
-  Phase F materialization-tier policy.
+  crop is bright against a neutral hidden-terrain/vegetation frame.
+- Multi-mode reserve verification has since landed at
+  `artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  and the parallel-state confirmation at
+  `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+  All five modes resolve strict WebGPU with zero console/page errors. Cap
+  policy is now the open architectural decision: combat120 surfaces ~29-32
+  candidates against a 12-slot cap, and faction-pool sizing is asymmetric.
+  The Phase F materialization-tier draft at
+  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md` proposes the
+  budget arbiter, hard-near reserve generalization, and silhouette/cluster
+  render lanes that replace uniform-cap tuning.
 - The same proof adds startup `terrain-features.compile` attribution for the
   UI "Compiling features" step: the Open Frontier cost is dominated by the
   1024-grid stamped heightmap rebake (~52.1ms), not shader compilation.
