@@ -226,34 +226,92 @@ is in. Bundle them.
   to make. Those tracks remain blocked on owner design decisions.
 
 ## Recommended slice order (post-spike, revised 2026-05-12 after
-slice-12 empirical findings)
+slices 12-15 shipped)
+
+### Shipped checkpoints (slices 12-15)
 
 1. **Slice 12 (shipped, checkpoint) — LUT-driven CPU sky refresh.**
    Bilinear LUT sample replaces per-pixel `evaluateAnalytic`.
 2. **Slice 13 (shipped, checkpoint) — DataTexture + 2 s refresh
-   period + LUT sample.** Replaces `CanvasTexture` with
-   `DataTexture`, bumps `SKY_TEXTURE_REFRESH_SECONDS` 0.5 → 2.0.
-   None of slice 12 or 13 moves the SkyTexture EMA from ~5 ms.
-   Confirms measurement is either artifactual or the cost lives in
-   a path not addressable by the refresh-body. **Empirical
-   exhaustion of CPU-side levers.**
-3. **Slice 14 — TSL fragment-shader sky port (LOAD-BEARING).** Port
-   Hosek-Wilkie analytic + sun disc + cloud-deck to a TSL fragment
-   shader on the dome mesh. Retire `CanvasTexture` and the entire
-   `refreshSkyTexture` path entirely. ~5 ms saving expected across
-   all modes if measurement reflects reality; if measurement is
-   artifactual the EMA will still drop because we delete the
-   `beginSystem('World.Atmosphere.SkyTexture')` call. Either way,
-   slice 14 is the diagnostically dispositive next step. References:
-   three.js `examples/jsm/objects/Sky.js` (Preetham, fragment-
-   shader), discourse threads on CanvasTexture+WebGPU anti-pattern.
-4. **Slice 15 — Weather event-driven (3.a)**. ~0.7 ms.
-5. **Slice 16 — Cover-candidate spatial grid (2.b)**. ~1.0–2.0 ms.
-   Closes DEFEKT-3 surface.
-6. **Slice 17 — Squad-aggregated strategic sim (2.d, Phase F memo
-   slice 3)**. The 3,000-combatant scaling primitive.
-7. **Slice 18 — WebGPU compute pipeline shape**. Cover visibility
-   (2.c). Earns its weight by composing with other GPU work.
+   period.** Replaces `CanvasTexture` with `DataTexture`, bumps
+   `SKY_TEXTURE_REFRESH_SECONDS` 0.5 → 2.0.
+3. **Slice 14 (shipped) — refresh-counter diagnostic.** Closed the
+   "phantom EMA" puzzle. The crop probe runs `vite preview --outDir
+   dist-perf` against a pre-built bundle that does NOT auto-rebuild;
+   `npm run build:perf` is now a required step before every probe
+   run. After rebuilding, slices 12+13 were correctly reflected
+   (SkyTexture EMA dropped from 5.0-6.0 ms to 3.2-3.5 ms).
+4. **Slice 15 (shipped, load-bearing) — idempotent
+   `setCloudCoverage`.** Slice 14's refresh counter exposed sky-texture
+   refresh firing ~16×/sec across all modes despite
+   `SKY_TEXTURE_REFRESH_SECONDS=2.0`. `WeatherAtmosphere.update()`
+   was calling `hosekBackend.setCloudCoverage(effective)` every frame,
+   which unconditionally called `markSkyTextureDirty()`. One-line
+   early-return when the clamped value equals the current value.
+   Result: SkyTexture EMA 3.3 ms → 0.5 ms across all modes (refresh
+   fires 73 → 5-10 per 4.5 s window); total Atmosphere now <1 ms
+   across all five modes; A Shau Atmosphere 5.99 ms → 0.52 ms over
+   the slice 9-15 arc.
+
+**Architectural finding from the slice 9-15 arc**: the TSL
+fragment-shader port (1.f) is no longer the highest-leverage next
+slice. Atmosphere total is <1 ms; saving the remaining ~0.4-0.6 ms
+costs a few hundred lines of TSL plus uniform plumbing and the risk
+of regressing the already-cheap path. Park 1.f unless a future
+slice surfaces a regression. The empirically dispositive next step
+was NOT a new primitive — it was finding the dirty-flag origin.
+
+### Next priority order (KONVEYER-11 cycle, slice 16+)
+
+Combat is now the relatively-largest CPU contributor at 1.5-6.5 ms
+across modes. Combat has NO sub-attribution yet
+(`CombatantSystem.update` has internal `profiler.profiling.*`
+tracking but no `performanceTelemetry.beginSystem` children).
+
+5. **Slice 16 — Combat sub-attribution.** Wrap each
+   `t0 = performance.now(); ... profiler.profiling.XxxMs = ...` block
+   in `CombatantSystem.update` with `performanceTelemetry.beginSystem(
+   'Combat.{Influence,AI,Billboards,Effects}')`. Probe-side capture
+   of `systemBreakdown.Combat.*`. Diagnostic input for slice 17.
+6. **Slice 17 — Cover-candidate spatial grid (primitive 2.b).**
+   Replace synchronous BVH cover search in
+   `AIStateEngage.initiateSquadSuppression` with 8 m uniform spatial
+   grid. Reuses existing `SpatialGrid` telemetry. Closes DEFEKT-3
+   surface. ~1-2 ms saving.
+7. **Slice 18 — Lane-rename refactor.** Pure refactor:
+   `Combatant.lodLevel` → `simLane`; introduce `renderLane`. No
+   behavior change. Surface for slice 20's arbiter v2.
+8. **Slice 19 — Render-silhouette lane.** Single-sprite billboard
+   between impostor and culled, capped per CDLOD cluster. Lets A Shau
+   read as populated from flight-altitude views.
+9. **Slice 20 — Budget arbiter v2.** Single function consuming camera
+   frustum, active-zone list, frame budget, sorted candidates →
+   assigns `simLane` + `renderLane` per combatant with explicit
+   budget accounting.
+10. **Slice 21 — Squad-aggregated strategic sim (primitive 2.d, Phase F
+    memo slice 3).** Per-squad CULLED-tier tick via `SquadManager` +
+    `WarSimulator`. O(squads), not O(entities). The 3,000-combatant
+    scaling primitive.
+11. **Slice 22 — Render-cluster lane.** One billboard per squad with
+    count badge, beyond silhouette range.
+12. **Slice 23 — Sky-refresh residual investigation.** Why does
+    refresh still fire 5-10×/sec despite
+    `SKY_TEXTURE_REFRESH_SECONDS=2.0` and idempotent
+    `setCloudCoverage`? Likely `LUT_REBAKE_COS_THRESHOLD` on small
+    sun motion in `todCycle` modes. ~0.4 ms saving — smaller than
+    slice 17 but still measurable.
+
+### Parked
+
+- **1.f TSL fragment-shader sky port.** Atmosphere is <1 ms;
+  remaining saving ~0.4 ms. Park unless a future regression
+  resurfaces the cost.
+- **2.c GPU compute visibility (cover ray-march vs heightmap).**
+  Higher complexity than slice 17's spatial grid; revisit only if
+  slice 17 fails to meet the 1.0 ms saving target.
+- **2.e bitECS storage.** Per Phase F memo guidance: do not ship
+  without a measured prototype showing >0.5 ms savings on the hot
+  path.
 
 ## Evidence inputs
 

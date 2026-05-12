@@ -1,6 +1,6 @@
 # KONVEYER Full Autonomous WebGPU Migration
 
-Last verified: 2026-05-11
+Last verified: 2026-05-12 (KONVEYER-11 added; scene-parity cycle closed atmosphere CPU collapse)
 
 ## Goal
 
@@ -164,6 +164,64 @@ current `origin/master`.
   prove hydrology meshes, queries, and `sampleWaterInteraction` in Open
   Frontier and A Shau. This does not accept final water shader/art, terrain
   intersections, flow, swimming/buoyancy physics, or watercraft.
+
+### KONVEYER-11 - Materialization Rearchitecture (Phase F Continuation)
+
+KONVEYER-10 scene parity closed the rest-of-scene visual gap and an
+unexpected CPU bottleneck. Slices 9 through 15 shipped on
+`exp/konveyer-webgpu-migration`: perf-window gate, system-timings
+attribution, atmosphere sub-attribution, terrain roughness floor (A Shau
+glass-reflection fix), LUT-driven sky refresh, DataTexture + 2 s timer,
+refresh-counter diagnostic, and idempotent `setCloudCoverage`. The
+atmosphere CPU collapse is the headline win: total Atmosphere dropped
+from ~5-6 ms in every mode to <1 ms (A Shau worst case 5.99 ms → 0.52 ms).
+The refresh-counter diagnostic also resolved the "phantom EMA" puzzle —
+the crop probe runs `vite preview --outDir dist-perf` against a pre-built
+bundle and DOES NOT auto-rebuild on source changes; `npm run build:perf`
+is now a required step before every probe run.
+
+Atmosphere is no longer the bottleneck. Combat is now the
+relatively-largest CPU contributor at 1.5-6.5 ms across modes with no
+sub-attribution yet — `CombatantSystem.update` has internal
+`profiler.profiling.*` tracking but no `performanceTelemetry.beginSystem`
+children.
+
+KONVEYER-11 owns the Phase F materialization rearch slices named in
+`docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md` and
+`docs/rearch/KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md`:
+
+- Combat sub-attribution (Influence / AI / Billboards / Effects).
+- Lane-rename refactor: `Combatant.lodLevel` → `simLane` + introduce
+  `renderLane`. Pure refactor, wide blast radius, surface for arbiter v2.
+- Sky-refresh residual investigation (~5-10 fires/sec post slice 15).
+- Cover-candidate spatial grid (primitive-spike 2.b) — closes DEFEKT-3
+  surface, reuses existing `SpatialGrid` telemetry, ~1-2 ms saving.
+- Render-silhouette lane — single billboard between impostor and culled.
+- Squad-aggregated strategic sim (Phase F memo slice 3) — O(squads)
+  CULLED tier; the 3,000-combatant scaling primitive.
+- Budget arbiter v2 — single function assigning `simLane` + `renderLane`
+  per combatant with explicit budget accounting.
+- Render-cluster lane — one billboard per squad with count badge.
+- Strict-WebGPU multi-mode proof v2 (A Shau p99 ≤33 ms gate held).
+- Review-packet update.
+
+Cycle brief:
+[docs/tasks/cycle-2026-05-13-konveyer-materialization-rearch.md](cycle-2026-05-13-konveyer-materialization-rearch.md).
+Pickup point: `origin/exp/konveyer-webgpu-migration` HEAD (`1b31379c`
+at the time of writing; use the branch head, not a frozen SHA).
+
+KONVEYER-11 deliberately does NOT touch the following blocked tracks
+(owner decisions or art/pipeline pending):
+
+- A Shau finite-edge (KONVEYER-12 — DEM/boundary owner decision).
+- Cloud representation (volumetric / Pixel Forge cloud asset pass).
+- Vegetation + NPC asset acceptance (Pixel Forge regen / impostor
+  rebake).
+- Water shader / art / physics (VODA-1/2/3).
+- Terrain / fire authority shared pass (DEFEKT-6).
+- Startup stamped-heightmap rebake worker (~48 ms one-time).
+- TSL fragment-shader sky port — Atmosphere is <1 ms; saving ~0.4 ms,
+  parked unless a regression resurfaces it.
 
 ## Autonomy Rules
 
