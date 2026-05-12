@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings attribution shipped, KONVEYER review packet drafted)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings + slice 11 atmosphere sub-attribution + terrain roughness fix shipped, KONVEYER review packet drafted)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -13,6 +13,8 @@ Top-level current-truth snapshot for the repo. Companion docs:
   WebGPU/TSL research spike and follow-up architecture direction
 - [docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md](../rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md) —
   reviewer-ready synthesis of what is accepted, what is blocked, what needs rearchitecture, and the WebGPU/TSL verdict
+- [docs/rearch/KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md](../rearch/KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md) —
+  research spike: better compute primitives for the expensive systems (SkyTexture, Combat, World) identified by slices 10–11
 
 Historical full-fat snapshot (pre-Phase-1) lives at
 `docs/archive/STATE_OF_REPO.md`. Future audit summaries link to artifact
@@ -469,6 +471,42 @@ Atmosphere child timings (`World.Atmosphere.SkyTexture`,
 through `performanceTelemetry.beginSystem` / `endSystem` and surface
 through `window.perf.report().systemBreakdown`. Sub-attribution is
 the slice 11 follow-up.
+
+Atmosphere sub-attribution (shipped 2026-05-12, probe-side slice 11):
+the perf-window now also drains `window.perf.report().systemBreakdown`
+which carries the PerformanceTelemetry-side per-system breakdown
+including nested sub-systems. Strict WebGPU multi-mode evidence:
+`artifacts/perf/2026-05-12T16-22-28-343Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+
+Per-mode atmosphere split (EMA over the 4500 ms window):
+
+| Mode | Atmosphere | SkyTexture | LightFog | Clouds |
+| --- | ---: | ---: | ---: | ---: |
+| `open_frontier` | 5.06 | 5.03 (99.4%) | 0.01 | 0.01 |
+| `zone_control` | 5.17 | 5.14 (99.4%) | 0.02 | 0.00 |
+| `team_deathmatch` | 5.40 | 5.39 (99.8%) | 0.00 | 0.00 |
+| `ai_sandbox` | 5.23 | 5.21 (99.6%) | 0.02 | 0.00 |
+| `a_shau_valley` | 5.99 | 5.96 (99.5%) | 0.02 | 0.00 |
+
+**Architectural finding**: `World.Atmosphere.SkyTexture` is 99%+ of
+the Atmosphere cost in every mode. The hot path is
+`this.backend.update(deltaTime, this.sunDirection)` — the
+Hosek-Wilkie sky dome backend update. `LightFog` (applyToRenderer +
+applyFogColor) and `Clouds` (updateCloudCoverage) are both correctly
+cheap at <0.05 ms combined. The fix target is the sky backend.
+
+The Hosek-Wilkie backend update does not need to happen every frame
+— sun direction changes are tiny per-frame and sky color depends only
+on sun direction + scenario preset. Throttling backend update from
+60 Hz to ~5 Hz would drop SkyTexture from ~5 ms to ~0.4 ms across all
+modes, freeing ~4.5 ms per frame. That is the slice 12 plan.
+
+This run also captured the terrain roughness fix (587da7c2 — floor at
+0.88 to kill A Shau glass-like reflections); the run remained clean
+across all modes (no console errors / page errors / request failures).
+A Shau p99 hit 34.8 ms in this run with a single max=100 ms outlier;
+likely run variance not regression — the steady atmosphere cost is
+unchanged. Re-measure after the sky-throttle slice.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

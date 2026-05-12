@@ -143,6 +143,20 @@ interface SystemTimingSample {
   budgetMs: number;
 }
 
+interface PerfTelemetrySystemTiming {
+  // Slice 11: per-system breakdown from `window.perf.report().systemBreakdown`.
+  // This is the PerformanceTelemetry-side timing list which includes nested
+  // sub-systems like `World.Atmosphere.SkyTexture`, `World.Atmosphere.Clouds`,
+  // and `World.Atmosphere.LightFog` that the SystemUpdater-level
+  // `getSystemTimings()` rollup does not expose. Used to split the dominant
+  // `World.Atmosphere` cost into its actual sub-paths.
+  name: string;
+  emaMs: number;
+  lastMs: number;
+  peakMs: number;
+  budgetMs: number;
+}
+
 interface MaterializationPerfWindow {
   // Slice 9: falsifiable perf bar for the materialization review pose.
   // The probe drains `window.__metrics` (300-sample ring), waits a fixed
@@ -172,6 +186,12 @@ interface MaterializationPerfWindow {
   // the accessor is unavailable.
   systemTimings: SystemTimingSample[];
   systemTimingsTotalMs: number;
+  // Slice 11: per-system breakdown from `window.perf.report().systemBreakdown`,
+  // which includes sub-system timings (e.g. `World.Atmosphere.SkyTexture`).
+  // Used to split the dominant `World.Atmosphere` cost into its actual
+  // sub-paths. Empty array when `window.perf` is unavailable.
+  perfTelemetryTimings: PerfTelemetrySystemTiming[];
+  atmosphereSubTimings: PerfTelemetrySystemTiming[];
 }
 
 interface CloseGlbComparison {
@@ -1230,6 +1250,8 @@ async function captureMaterializationPerfWindow(
       fallbackCount: 0,
       systemTimings: [],
       systemTimingsTotalMs: 0,
+      perfTelemetryTimings: [],
+      atmosphereSubTimings: [],
     };
   }
   await page.waitForTimeout(durationMs);
@@ -1259,6 +1281,29 @@ async function captureMaterializationPerfWindow(
       .filter((entry: { emaMs: number }) => Number.isFinite(entry.emaMs))
       .sort((a: { emaMs: number }, b: { emaMs: number }) => b.emaMs - a.emaMs);
     const sysTotalMs = sysTimings.reduce((sum: number, entry: { emaMs: number }) => sum + entry.emaMs, 0);
+    // Slice 11: pull the richer PerformanceTelemetry breakdown which
+    // includes sub-system timings (e.g. World.Atmosphere.SkyTexture).
+    const perfReport = typeof (window as any).perf?.report === 'function'
+      ? (window as any).perf.report()
+      : null;
+    const perfBreakdownRaw = Array.isArray(perfReport?.systemBreakdown)
+      ? perfReport.systemBreakdown
+      : [];
+    const perfTimings = perfBreakdownRaw
+      .map((entry: any) => ({
+        name: String(entry?.name ?? 'unknown'),
+        emaMs: Number(entry?.emaMs ?? 0),
+        lastMs: Number(entry?.lastMs ?? 0),
+        peakMs: Number(entry?.peakMs ?? 0),
+        budgetMs: Number(entry?.budgetMs ?? 0),
+      }))
+      .filter((entry: { emaMs: number }) => Number.isFinite(entry.emaMs))
+      .sort((a: { emaMs: number }, b: { emaMs: number }) => b.emaMs - a.emaMs);
+    const atmosphereSubs = perfTimings.filter(
+      (entry: { name: string }) =>
+        entry.name.startsWith('World.Atmosphere.')
+        || entry.name === 'World.Atmosphere',
+    );
     return {
       attempted: true,
       reason: null,
@@ -1279,6 +1324,8 @@ async function captureMaterializationPerfWindow(
       fallbackCount: Number(stats?.fallbackCount ?? 0),
       systemTimings: sysTimings,
       systemTimingsTotalMs: sysTotalMs,
+      perfTelemetryTimings: perfTimings,
+      atmosphereSubTimings: atmosphereSubs,
     };
   }, durationMs);
 }
@@ -1674,6 +1721,15 @@ async function captureCloseGlbComparison(
       findings.push(`top-systems:${top};systems-total=${perfWindow.systemTimingsTotalMs.toFixed(2)}ms`);
     } else {
       findings.push('top-systems:unavailable');
+    }
+    if (perfWindow.atmosphereSubTimings.length > 0) {
+      const subSplit = perfWindow.atmosphereSubTimings
+        .filter(entry => entry.name !== 'World.Atmosphere')
+        .map(entry => `${entry.name.replace('World.Atmosphere.', '')}=${entry.emaMs.toFixed(2)}ms`)
+        .join(',');
+      findings.push(`atmosphere-subs:${subSplit || 'no-children-recorded'}`);
+    } else {
+      findings.push('atmosphere-subs:perf-report-unavailable');
     }
   } else if (perfWindow) {
     findings.push(`perf-window:not-attempted:${perfWindow.reason ?? 'unknown'}`);

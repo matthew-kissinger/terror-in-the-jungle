@@ -171,19 +171,25 @@ remaining fallback is at the designed materialization-tier cap boundary.
 
 ### Atmosphere over-budget (re-prioritization, found 2026-05-12)
 
-- Slice 10's system-timings probe extension found that
-  `World.Atmosphere` is the dominant CPU contributor in every mode at
-  5.16–6.39 ms vs a 0.38 ms budget — a 13.6× to 16.8× over-budget.
-  In front of `Combat` (1.55–3.24 ms), `World` (0.40–1.43 ms),
-  `Terrain` (0.07–0.60 ms), `WarSim` (0.26 ms in A Shau).
-- Evidence:
-  `artifacts/perf/2026-05-12T16-06-33-882Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Slice 10's system-timings probe extension found `World.Atmosphere`
+  is the dominant CPU contributor in every mode at 5.16–6.39 ms vs
+  a 0.38 ms budget (13.6×–16.8× over). In front of `Combat` (1.55–
+  3.24 ms), `World` (0.40–1.43 ms), `Terrain` (0.07–0.60 ms),
+  `WarSim` (0.26 ms in A Shau).
+- Slice 11 sub-attribution: 99%+ of the Atmosphere cost is in
+  `World.Atmosphere.SkyTexture` (the Hosek-Wilkie backend update).
+  `LightFog` and `Clouds` are correctly cheap at <0.05 ms combined.
+  Evidence:
+  `artifacts/perf/2026-05-12T16-22-28-343Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- The Hosek-Wilkie backend does not need a 60 Hz update — sun
+  direction changes are small per frame and the sky depends only on
+  `(sun, scenario preset)`. Throttling backend update to ~5 Hz
+  should drop SkyTexture from ~5 ms to ~0.4 ms, freeing ~4.5 ms per
+  frame across all modes. **Targeted-restructure fix; slice 12.**
 - This is a re-prioritization signal. The materialization rearch
   slices (sim-strategic, render-silhouette, render-cluster, lane
   refactor) remain architecturally correct but their frame-budget
-  payoff will stay invisible until Atmosphere stops dominating.
-  Atmosphere sub-attribution (SkyTexture / LightFog / Clouds) is the
-  next probe slice.
+  payoff will stay invisible until the sky throttle lands.
 
 ### Startup stamped-heightmap rebake (KONVEYER-10 perf attribution)
 
@@ -345,6 +351,9 @@ slice landing on this branch:
 - `docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md` —
   WebGPU/TSL stack research spike (terrain, clouds, water, assets,
   ECS/materialization vocabulary).
+- `docs/rearch/KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md` — research
+  spike: better compute primitives for the expensive systems
+  (SkyTexture, Combat, World) identified by slices 10–11.
 - `docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md` — active cycle
   brief.
 - `docs/CARRY_OVERS.md` — single source of truth for unresolved items.
