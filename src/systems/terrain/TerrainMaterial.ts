@@ -599,14 +599,27 @@ function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
   const secondaryRoughness = sampleBiomeScalar(hydrologyBlend.secondarySlot, uniforms, 'biomeRoughness');
   roughnessSample = tslMix(roughnessSample, secondaryRoughness, hydrologyBlend.secondaryBlend);
   const wetness = lowlandWetnessMask(biomeBlend.slopeUp, worldPos.y, uniforms);
-  roughnessSample = tslMix(roughnessSample, roughnessSample.mul(0.72), wetness);
+  // Wet ground reads darker (handled in colorNode at line 553), not glossier.
+  // Old value 0.72 dropped roughness 28% which produced glass-like specular
+  // highlights at low sun angles, especially on highland (base 0.78) in A
+  // Shau. 0.94 keeps a subtle wet sheen without going to glass.
+  roughnessSample = tslMix(roughnessSample, roughnessSample.mul(0.94), wetness);
   roughnessSample = tslMix(roughnessSample, tslFloat(0.96), featureSurfaceWeight(1, worldPos, uniforms));
   roughnessSample = tslMix(roughnessSample, tslFloat(0.82), featureSurfaceWeight(2, worldPos, uniforms));
   roughnessSample = tslMix(roughnessSample, tslFloat(0.94), featureSurfaceWeight(3, worldPos, uniforms));
   roughnessSample = tslMix(roughnessSample, tslFloat(0.90), featureSurfaceWeight(4, worldPos, uniforms));
   roughnessSample = tslMix(roughnessSample, tslFloat(0.95), featureSurfaceWeight(5, worldPos, uniforms));
   const farCanopyRoughnessMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms);
-  return tslMix(roughnessSample, tslMax(roughnessSample, tslFloat(0.92)), farCanopyRoughnessMask.mul(0.55));
+  const farCanopyAdjusted = tslMix(
+    roughnessSample,
+    tslMax(roughnessSample, tslFloat(0.92)),
+    farCanopyRoughnessMask.mul(0.55),
+  );
+  // Vietnam-jungle matte floor. Highland (base 0.78) is the lowest biome
+  // and is rocky-looking; combined with wetness/feature mixing it can drift
+  // to specular territory. 0.88 keeps a matte read across all biome × mask
+  // combinations while still letting the relative variation through.
+  return tslMax(farCanopyAdjusted, tslFloat(0.88));
 }
 
 function configureTerrainNodeMaterial(material: TerrainMaterial, uniforms: TerrainUniforms): void {
