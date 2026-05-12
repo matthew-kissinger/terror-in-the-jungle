@@ -10,15 +10,15 @@ import { resolveModeSpawnPosition } from './ModeSpawnPosition';
 import { resolveNearbySafeSpawnPosition, resolveOpenSpawnFacingYaw } from './SpawnFacing';
 import { PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES } from '../config/pixelForgeAssets';
 import {
+  PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP,
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
-  PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
 } from '../systems/combat/PixelForgeNpcRuntime';
 
 const LIVE_ENTRY_FRAME_YIELD_TIMEOUT_MS = 100;
 const NPC_CLOSE_MODEL_PREWARM_TIMEOUT_MS = 1800;
 const NPC_CLOSE_MODEL_PREWARM_MAX_ACTIVE =
-  PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP;
+  PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
 
 export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): void {
   if (engine.gameStarted) {

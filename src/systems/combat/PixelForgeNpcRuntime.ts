@@ -51,6 +51,18 @@ export interface PixelForgeNpcImposterMaterialTuning {
  * "constant" exports below remain for callers that read once at startup, but
  * new consumers should prefer `getPixelForgeNpcCloseModelDistanceMeters()`
  * and friends so changes from the tuning panel take effect immediately.
+ *
+ * Close-model materialization policy (Phase F slice 1):
+ * - Steady-state cap is `PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP` active GLBs.
+ * - A `hardNearReserve*` bubble around the player allows a bounded number of
+ *   extra GLBs when the cluster inside that bubble overflows the steady cap.
+ * - The trigger is real-time density (every-frame distance check), not a
+ *   spawn-time snapshot. The legacy name "spawn-residency" was misleading;
+ *   the policy serves any dense cluster (spawn, contested objective, midgame
+ *   firefight), not only the first reveal.
+ * - Beyond the reserve, additional close-radius actors render as impostors.
+ *   That is the designed materialization tier, not a failure: capping close
+ *   GLBs preserves frame budget at high combatant counts.
  */
 export const PixelForgeNpcDistanceConfig = {
   /** Radius (meters) within which an NPC is eligible to render as a 3D close model. */
@@ -63,15 +75,20 @@ export const PixelForgeNpcDistanceConfig = {
   /** Priority boost for actors inside `hardNearDistanceMeters`. */
   hardNearWeight: 20,
   /**
-   * Initial-spawn residency bubble. Actors this close to the player are allowed
-   * to use a small reserve above the steady close-model cap so a crowded first
-   * reveal does not begin as impostors directly beside the player.
+   * Hard-near cluster reserve bubble (meters). Actors inside this radius are
+   * counted toward the cluster-density signal that lifts the close-model cap.
+   * Replaces the former `spawnResidencyDistanceMeters`; the bubble is
+   * evaluated every frame, not at spawn time.
    */
-  spawnResidencyDistanceMeters: 64,
-  /** Extra close-model slots available only for spawn-resident actors. */
-  spawnResidencyExtraCap: 4,
-  /** Priority boost for actors inside the spawn-residency bubble. */
-  spawnResidencyWeight: 12,
+  hardNearReserveDistanceMeters: 64,
+  /**
+   * Maximum extra close-model slots available when the hard-near cluster
+   * overflows `PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP`. Scales effective cap
+   * from the steady value up to `TOTAL_CAP + hardNearReserveExtraCap`.
+   */
+  hardNearReserveExtraCap: 6,
+  /** Priority boost for actors inside the hard-near reserve bubble. */
+  hardNearReserveWeight: 12,
   /** Selection priority weight for combatants whose AABB lies inside the camera frustum. */
   onScreenWeight: 10,
   /** Selection priority weight for combatants in the player's squad. */
@@ -113,9 +130,21 @@ export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS =
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ =
   PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS * PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP = 8;
-export const PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP = 4;
+/**
+ * Maximum extra close-model slots above `PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP`
+ * granted when the hard-near cluster around the player overflows the steady
+ * cap. The effective cap therefore ranges from `TOTAL_CAP` up to
+ * `TOTAL_CAP + HARD_NEAR_RESERVE_EXTRA_CAP`. This replaces the former
+ * `*_SPAWN_RESIDENCY_EXTRA_CAP` constant (kept as a deprecated alias for
+ * one cycle) and serves any dense close-range cluster, not only the first
+ * reveal.
+ */
+export const PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP = 6;
+/** @deprecated Use `PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP`. */
+export const PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP =
+  PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION =
-  PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP;
+  PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION = 4;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOP_UP_BATCH = 2;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG = '__TIJ_ALLOW_NPC_CLOSE_MODEL_LAZY_LOAD__';

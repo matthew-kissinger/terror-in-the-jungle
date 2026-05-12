@@ -55,15 +55,40 @@ Fallback reasons recorded per candidate: `perf-isolation`, `pool-loading`,
 `pool-empty`, `total-cap`. The public dev surface is
 `window.npcMaterializationProfile(maxRows)`.
 
-### Spawn residency (added 2026-05-11)
+### Hard-near cluster reserve (renamed 2026-05-12 from "spawn residency")
 
-The spawn-residency reserve lifts the close-GLB cap from 8 to up to 12 when
-multiple combatants land inside `spawnResidencyDistanceMeters` (64 m) of the
-player at game start. The proof for Open Frontier is
-`artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`:
-11 visible close GLBs, zero fallback records, effective cap 11. Multi-mode
-verification across Zone Control, Team Deathmatch, combat120, and A Shau is
-the immediate follow-up tracked in the live cycle brief.
+The reserve lifts the close-GLB cap above the steady value
+`PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP` (8) whenever the density of
+combatants inside `hardNearReserveDistanceMeters` (64 m) overflows it. The
+formula is `effectiveCap = TOTAL_CAP + clamp(reserveCount - TOTAL_CAP, 0,
+hardNearReserveExtraCap)`. The trigger is real-time density (every-frame
+distance check), not a spawn-time snapshot — the legacy "spawn-residency"
+naming was misleading. The policy serves any dense close cluster (initial
+reveal, contested objective, midgame firefight), not just first reveal.
+
+Phase F slice 1 (shipped 2026-05-12) renamed the config keys
+(`spawnResidency*` → `hardNearReserve*`) and bumped
+`hardNearReserveExtraCap` from 4 to 6 so dense modes get more close-GLB
+slots. Per-faction pool size grows from 12 to 14.
+
+Multi-mode strict-WebGPU verification under the new policy is recorded at
+`artifacts/perf/2026-05-12T02-24-10-594Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+All five modes resolve `resolvedBackend=webgpu` with zero console/page errors.
+Per-mode effective cap and review-pose fallback counts versus the prior
+`01-50-30-290Z` evidence (TOTAL_CAP+4):
+
+| Mode | Prior cap | New cap | Prior fallbacks | New review fallbacks |
+| --- | ---: | ---: | --- | --- |
+| `open_frontier` | 8 | 10 | total-cap:4 | none |
+| `zone_control` | 9 | 11 | total-cap:3 | none |
+| `team_deathmatch` | 12 | 14 | total-cap:4 | total-cap:1 |
+| `ai_sandbox` (combat120) | 12 | 14 | total-cap:18, pool-empty:2 | total-cap:5, pool-empty:6 |
+| `a_shau_valley` | 8 | 8 | 0 candidates | 0 candidates |
+
+Combat120 retains a residual `pool-empty:6` finding: with 25 close-radius
+candidates the US pool exhausts at the new 14-slot limit while the NVA pool
+keeps 4 slack. Faction-asymmetric pool sizing is the next slice (faction
+balance for the budget-arbiter v1), not a re-cap question.
 
 ## Gaps Versus Vision
 
@@ -160,6 +185,14 @@ camera without each entity costing an instanced draw.
 
 These are independently shippable. Each one assumes branch hard-stops.
 
+0. **Hard-near cluster reserve generalization (shipped 2026-05-12).**
+   Renamed `spawnResidency*` config/constants to `hardNearReserve*` so the
+   policy is named for its real semantics (real-time cluster density, not a
+   spawn-time snapshot). Bumped `hardNearReserveExtraCap` from 4 to 6 so
+   dense modes (Team Deathmatch, combat120, Zone Control) get a measurable
+   benefit. Pool size per faction grew from 12 to 14. Evidence is recorded
+   above; the next density-driven sizing question is per-faction pool slack
+   in combat120, not a steady-cap bump.
 1. **Lane-naming refactor.** Rename current `lodLevel` to `simLane` and
    introduce `renderLane` as a separate field on `Combatant`. No behavior
    change. Adds the surface that the arbiter writes to.

@@ -9,10 +9,10 @@ import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { modelLoader } from '../assets/ModelLoader';
 import {
   getPixelForgeNpcRuntimeFaction,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP,
   PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
   PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
-  PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
 } from './PixelForgeNpcRuntime';
 import { Logger } from '../../utils/Logger';
@@ -627,7 +627,7 @@ describe('CombatantRenderer', () => {
       }));
     });
 
-    it('uses a bounded spawn-residency reserve so nearby spawn clusters do not start as impostors', async () => {
+    it('uses the hard-near cluster reserve so dense near-player clusters do not start as impostors', async () => {
       await (renderer as unknown as {
         createCloseModelPool(
           poolKey: Faction,
@@ -640,27 +640,27 @@ describe('CombatantRenderer', () => {
         PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
       );
 
-      const spawnResidentCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
-        + PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP;
+      const hardNearReserveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
+        + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
       const combatants = new Map<string, Combatant>();
-      for (let i = 0; i < spawnResidentCap; i++) {
-        const combatant = createMockCombatant(`spawn-near-${i}`, Faction.NVA, new THREE.Vector3(18 + i, 0, 0));
+      for (let i = 0; i < hardNearReserveCap; i++) {
+        const combatant = createMockCombatant(`hard-near-${i}`, Faction.NVA, new THREE.Vector3(18 + i, 0, 0));
         combatants.set(combatant.id, combatant);
       }
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
       const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
-      expect(activeCloseModels.size).toBe(spawnResidentCap);
-      expect(activeCloseModels.has(`spawn-near-${spawnResidentCap - 1}`)).toBe(true);
+      expect(activeCloseModels.size).toBe(hardNearReserveCap);
+      expect(activeCloseModels.has(`hard-near-${hardNearReserveCap - 1}`)).toBe(true);
 
       const { stats } = readCloseModelTelemetry(renderer);
-      expect(stats.closeModelActiveCap).toBe(spawnResidentCap);
-      expect(stats.renderedCloseModels).toBe(spawnResidentCap);
+      expect(stats.closeModelActiveCap).toBe(hardNearReserveCap);
+      expect(stats.renderedCloseModels).toBe(hardNearReserveCap);
       expect(stats.fallbackCount).toBe(0);
     });
 
-    it('keeps the spawn-residency reserve bounded when the nearby cluster is larger than the reserve', async () => {
+    it('keeps the hard-near cluster reserve bounded when the nearby cluster overflows the reserve', async () => {
       await (renderer as unknown as {
         createCloseModelPool(
           poolKey: Faction,
@@ -673,26 +673,26 @@ describe('CombatantRenderer', () => {
         PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
       );
 
-      const spawnResidentCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
-        + PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP;
+      const hardNearReserveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
+        + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
       const combatants = new Map<string, Combatant>();
-      for (let i = 0; i < spawnResidentCap + 4; i++) {
-        const combatant = createMockCombatant(`spawn-crowd-${i}`, Faction.NVA, new THREE.Vector3(18 + i, 0, 0));
+      for (let i = 0; i < hardNearReserveCap + 4; i++) {
+        const combatant = createMockCombatant(`hard-near-crowd-${i}`, Faction.NVA, new THREE.Vector3(18 + i, 0, 0));
         combatants.set(combatant.id, combatant);
       }
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
       const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
-      expect(activeCloseModels.size).toBe(spawnResidentCap);
-      expect(activeCloseModels.has(`spawn-crowd-${spawnResidentCap - 1}`)).toBe(true);
-      expect(activeCloseModels.has(`spawn-crowd-${spawnResidentCap}`)).toBe(false);
+      expect(activeCloseModels.size).toBe(hardNearReserveCap);
+      expect(activeCloseModels.has(`hard-near-crowd-${hardNearReserveCap - 1}`)).toBe(true);
+      expect(activeCloseModels.has(`hard-near-crowd-${hardNearReserveCap}`)).toBe(false);
 
       const { stats, records } = readCloseModelTelemetry(renderer);
-      expect(stats.closeModelActiveCap).toBe(spawnResidentCap);
+      expect(stats.closeModelActiveCap).toBe(hardNearReserveCap);
       expect(stats.fallbackCounts['total-cap']).toBe(4);
       expect(records).toContainEqual(expect.objectContaining({
-        combatantId: `spawn-crowd-${spawnResidentCap}`,
+        combatantId: `hard-near-crowd-${hardNearReserveCap}`,
         reason: 'total-cap',
       }));
     });

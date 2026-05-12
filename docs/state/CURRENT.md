@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12
+Last verified: 2026-05-12 (Phase F slice 1 — hard-near cluster reserve generalization shipped)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -280,6 +280,32 @@ are under `artifacts/perf/2026-05-11T20-30-tall-grass-palette/`; the live asset
 has been changed from bright lime grass to dark humid olive grass. This is an
 asset-level correction, not a claim that all terrain/lighting color questions
 are closed.
+
+Phase F slice 1 (shipped 2026-05-12): the close-model reserve has been
+generalized from the misleading "spawn-residency" naming to "hard-near
+cluster reserve" semantics, and `hardNearReserveExtraCap` magnitude bumped
+from 4 to 6. The trigger is real-time density (every frame), not a
+spawn-time snapshot, so the reserve serves any dense close cluster (initial
+reveal, contested objective, midgame firefight). Per-faction pool size grew
+from 12 to 14. Strict WebGPU multi-mode proof:
+`artifacts/perf/2026-05-12T02-24-10-594Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+All five modes resolve strict WebGPU with zero console/page errors.
+Review-pose close-radius outcomes vs the prior `01-50-30-290Z` baseline:
+
+| Mode | Cap before | Cap after | Fallbacks before | Fallbacks after (review) |
+| --- | ---: | ---: | --- | --- |
+| `open_frontier` | 8 | 10 | total-cap:4 | none |
+| `zone_control` | 9 | 11 | total-cap:3 | none |
+| `team_deathmatch` | 12 | 14 | total-cap:4 | total-cap:1 |
+| `ai_sandbox` (combat120) | 12 | 14 | total-cap:18, pool-empty:2 | total-cap:5, pool-empty:6 |
+| `a_shau_valley` | 8 | 8 | 0 candidates | 0 candidates |
+
+combat120 retains 6 `pool-empty` fallbacks because the US faction pool
+exhausts at the new 14-slot cap while the NVA pool keeps 4 slack — that is
+faction-asymmetric pool sizing, the next slice (budget arbiter v1), not a
+steady-cap question. A Shau still materializes zero live combatants inside
+the close radius from the steady review pose; a directed player-warp or
+AI-convergence probe is the next A Shau materialization step.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

@@ -141,7 +141,12 @@ interface CloseModelCandidate {
   isOnScreen: boolean;
   recentlyVisible: boolean;
   isPlayerSquad: boolean;
-  isSpawnResident: boolean;
+  /**
+   * True when the actor lies inside `hardNearReserveDistanceMeters`. Cluster
+   * density of these actors drives the close-model reserve above the steady
+   * cap. Real-time signal, not a spawn-time snapshot.
+   */
+  isInHardNearReserveBubble: boolean;
   priorityScore: number;
 }
 
@@ -1077,9 +1082,10 @@ export class CombatantRenderer {
       const isPlayerSquad = poolKey === 'SQUAD';
       const distance = Math.sqrt(distanceSq);
       const isHardNear = distance <= PixelForgeNpcDistanceConfig.hardNearDistanceMeters;
-      const isSpawnResident = distance <= PixelForgeNpcDistanceConfig.spawnResidencyDistanceMeters;
+      const isInHardNearReserveBubble =
+        distance <= PixelForgeNpcDistanceConfig.hardNearReserveDistanceMeters;
       const priorityScore =
-        PixelForgeNpcDistanceConfig.spawnResidencyWeight * (isSpawnResident ? 1 : 0) +
+        PixelForgeNpcDistanceConfig.hardNearReserveWeight * (isInHardNearReserveBubble ? 1 : 0) +
         PixelForgeNpcDistanceConfig.hardNearWeight * (isHardNear ? 1 : 0) +
         PixelForgeNpcDistanceConfig.onScreenWeight * (isOnScreen ? 1 : 0) +
         PixelForgeNpcDistanceConfig.squadWeight * (isPlayerSquad ? 1 : 0) +
@@ -1093,7 +1099,7 @@ export class CombatantRenderer {
         isOnScreen,
         recentlyVisible,
         isPlayerSquad,
-        isSpawnResident,
+        isInHardNearReserveBubble,
         priorityScore,
       });
     });
@@ -1106,13 +1112,13 @@ export class CombatantRenderer {
   }
 
   private resolveCloseModelActiveCap(candidates: CloseModelCandidate[], requestedMaxActive?: number): number {
-    const spawnResidentCount = candidates.reduce(
-      (count, candidate) => count + (candidate.isSpawnResident ? 1 : 0),
+    const hardNearReserveCount = candidates.reduce(
+      (count, candidate) => count + (candidate.isInHardNearReserveBubble ? 1 : 0),
       0,
     );
     const extraCap = Math.min(
-      Math.max(0, Math.floor(PixelForgeNpcDistanceConfig.spawnResidencyExtraCap)),
-      Math.max(0, spawnResidentCount - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP),
+      Math.max(0, Math.floor(PixelForgeNpcDistanceConfig.hardNearReserveExtraCap)),
+      Math.max(0, hardNearReserveCount - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP),
     );
     const effectiveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + extraCap;
     if (requestedMaxActive === undefined) {
