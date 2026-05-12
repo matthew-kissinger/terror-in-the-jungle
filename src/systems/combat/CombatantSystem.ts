@@ -333,7 +333,7 @@ export class CombatantSystem implements GameSystem {
   private recordCombatAiUserTiming(
     aiUpdateMs: number,
     aiMethodMs: Record<string, number>,
-    aiSlowestUpdate: { stateAtStart: string; lodLevel: string; totalMs: number } | null
+    aiSlowestUpdate: { stateAtStart: string; simLane: string; totalMs: number } | null
   ): void {
     if (!this.perfUserTimingEnabled) return;
 
@@ -350,7 +350,7 @@ export class CombatantSystem implements GameSystem {
 
     if (aiSlowestUpdate && aiSlowestUpdate.totalMs >= this.COMBAT_AI_USER_TIMING_MIN_MS) {
       this.measureCombatAiDuration(
-        `CombatAI.slowest.${this.sanitizeUserTimingName(aiSlowestUpdate.stateAtStart)}.${this.sanitizeUserTimingName(aiSlowestUpdate.lodLevel)}`,
+        `CombatAI.slowest.${this.sanitizeUserTimingName(aiSlowestUpdate.stateAtStart)}.${this.sanitizeUserTimingName(aiSlowestUpdate.simLane)}`,
         aiSlowestUpdate.totalMs
       );
     }

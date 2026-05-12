@@ -32,7 +32,8 @@ function makeCombatant(overrides: Partial<Combatant> = {}): Combatant {
     position: new THREE.Vector3(10, 3, 20),
     velocity: new THREE.Vector3(1, 0, 1),
     destinationPoint: new THREE.Vector3(50, 3, 60),
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     ...overrides,
   });
 }

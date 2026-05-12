@@ -235,7 +235,8 @@ function createMockCombatant(
     timeToDirectionChange: 0,
     lastUpdateTime: 0,
     updatePriority: 0,
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     kills: 0,
     deaths: 0,
   } as Combatant;
@@ -515,7 +516,7 @@ describe('CombatantRenderer', () => {
     it('does not let low-LOD classification force a near impostor inside the hard close radius', () => {
       const combatants = new Map<string, Combatant>();
       const combatant = createMockCombatant('near-low-lod', Faction.VC, new THREE.Vector3(20, 0, 0));
-      combatant.lodLevel = 'low';
+      combatant.simLane = 'low';
       combatants.set('near-low-lod', combatant);
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));

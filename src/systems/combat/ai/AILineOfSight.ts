@@ -179,8 +179,8 @@ export class AILineOfSight {
     // --- Raycast budget gate ---
     // Terrain and sandbag checks are the expensive part.
     // If budget is exhausted, return conservative default (can't see).
-    const needsTerrainRaycast = this.terrainSystem && combatant.lodLevel &&
-      (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium');
+    const needsTerrainRaycast = this.terrainSystem && combatant.simLane &&
+      (combatant.simLane === 'high' || combatant.simLane === 'medium');
 
     if (needsTerrainRaycast) {
       if (!tryConsumeRaycast()) {
@@ -220,8 +220,8 @@ export class AILineOfSight {
     copyActorEyePosition(_targetEyePos, targetPos);
 
     // Terrain LOS check (high/medium LOD only)
-    if (this.terrainSystem && combatant.lodLevel &&
-        (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
+    if (this.terrainSystem && combatant.simLane &&
+        (combatant.simLane === 'high' || combatant.simLane === 'medium')) {
       _direction.subVectors(_targetEyePos, _eyePos).normalize();
       AILineOfSight.terrainRaycasts++;
 

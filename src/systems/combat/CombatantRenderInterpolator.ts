@@ -138,7 +138,7 @@ export class CombatantRenderInterpolator {
       rendered.y += yStep;
     }
 
-    if (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium') {
+    if (combatant.simLane === 'high' || combatant.simLane === 'medium') {
       rendered.y = THREE.MathUtils.clamp(
         rendered.y,
         combatant.position.y - MAX_GROUNDED_RENDER_OFFSET_M,

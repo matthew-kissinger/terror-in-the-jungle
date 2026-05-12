@@ -515,7 +515,8 @@ describe('CombatantHitDetection', () => {
         position: new THREE.Vector3(55, NPC_Y_OFFSET, 0),
         renderedPosition: new THREE.Vector3(55, NPC_Y_OFFSET, 0),
         state: CombatantState.ENGAGING,
-        lodLevel: 'low',
+        simLane: 'low',
+        renderLane: 'culled',
       });
 
       mockGridManager.queryRadius = vi.fn().mockReturnValue(['enemy1']);

@@ -275,7 +275,7 @@ export class CombatantMovement {
       : (combatant.movementIntent ?? 'hold');
     performanceTelemetry.recordNPCMovementSample(
       combatant.id,
-      combatant.lodLevel,
+      combatant.simLane,
       telemetryIntent,
       progress.progressDelta,
       progress.lowProgress,
@@ -1049,9 +1049,9 @@ export class CombatantMovement {
   private getTerrainHeightForCombatant(combatant: Combatant): number {
     const now = performance.now();
     const intervalMs =
-      combatant.lodLevel === 'high' ? TERRAIN_SAMPLE_INTERVAL_HIGH :
-      combatant.lodLevel === 'medium' ? TERRAIN_SAMPLE_INTERVAL_MEDIUM :
-      combatant.lodLevel === 'low' ? TERRAIN_SAMPLE_INTERVAL_LOW : TERRAIN_SAMPLE_INTERVAL_CULLED;
+      combatant.simLane === 'high' ? TERRAIN_SAMPLE_INTERVAL_HIGH :
+      combatant.simLane === 'medium' ? TERRAIN_SAMPLE_INTERVAL_MEDIUM :
+      combatant.simLane === 'low' ? TERRAIN_SAMPLE_INTERVAL_LOW : TERRAIN_SAMPLE_INTERVAL_CULLED;
 
     const lastX = combatant.terrainSampleX;
     const lastZ = combatant.terrainSampleZ;
