@@ -228,12 +228,16 @@ Deliver:
   clouds or the dome travel with the player. The first implementation slice is
   camera-followed dome plus world/altitude-projected cloud-deck sampling,
   proved at
-  `artifacts/perf/2026-05-11T21-11-29-948Z/konveyer-scene-parity/scene-parity.json`;
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`;
   cloud art direction, shadows/occlusion, weather layering, and possible
   authored/Pixel Forge cloud assets remain follow-up work.
 - a finite-map terrain-edge strategy for Zone Control and other small maps
 - strict-WebGPU Open Frontier, Zone Control, Team Deathmatch, combat120, and
   A Shau short captures
+- current branch checkpoint `ca587625` on
+  `origin/exp/konveyer-webgpu-migration`; latest close-NPC materialization and
+  startup compile proof is
+  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`
 
 Rules:
 

@@ -103,6 +103,18 @@ Original prompt: we had an intern come in a really both things up recently - can
   compile ~60.7ms. Treat the heightmap rebake as the first optimization target,
   not WebGPU shader compilation.
 
+2026-05-12 KONVEYER docs alignment for next agent
+- Pushed checkpoint `ca587625` to `origin/exp/konveyer-webgpu-migration`.
+- Aligned `docs/AGENT_ORCHESTRATION.md`, `docs/state/CURRENT.md`,
+  `docs/state/recent-cycles.md`, `docs/DIRECTIVES.md`, `docs/CARRY_OVERS.md`,
+  `docs/ROADMAP.md`, `docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md`,
+  and KONVEYER rearch/task docs so the next agent starts from the current
+  strict WebGPU proof and blockers instead of the older K0-K9 packet.
+- Next-agent priority remains: spawn-proximity close-model residency, multi-mode
+  feature-compile attribution/heightmap-rebake optimization, A Shau finite-edge
+  decision, cloud/weather art representation, water shader/intersections plus
+  one interaction consumer, then principles-first renderer rearchitecture.
+
 2026-05-08 Projekt Objekt-143 fixed-wing clean functional gate under resource contention
 - Continued under the active Objekt-143 goal after the 4174 fixed-wing packet
   carried a harness-teardown warning.

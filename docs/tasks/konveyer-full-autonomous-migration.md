@@ -131,7 +131,7 @@ current `origin/master`.
   clouds or the dome feel attached to the player. First slice is in place:
   camera-followed dome plus world/altitude-projected cloud-deck sampling,
   proved at
-  `artifacts/perf/2026-05-11T21-11-29-948Z/konveyer-scene-parity/scene-parity.json`.
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
   Do not call this final cloud art direction; blocky puffs, cloud shadows,
   weather layering, and possible authored/Pixel Forge cloud assets remain open.
 - Propose a finite-map edge strategy for Zone Control and other small maps:
@@ -139,6 +139,13 @@ current `origin/master`.
   implementation.
 - Validate with strict WebGPU Open Frontier, Zone Control, Team Deathmatch,
   combat120, and A Shau short captures before any new default-on claim.
+- Latest branch checkpoint is `ca587625` on
+  `origin/exp/konveyer-webgpu-migration`; do not restart from the K0-K9 packet.
+  Close-NPC materialization and startup compile proof is
+  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+  It proves public materialization telemetry, geometry-derived close-GLB body
+  bounds, and a visible strict-WebGPU close soldier/weapon crop, while keeping
+  total-cap fallback and the stamped heightmap rebake as open work.
 - Water/hydrology bridge proof is now part of the follow-up loop: source audit
   `artifacts/perf/2026-05-11T21-33-05-844Z/projekt-143-water-system-audit/water-system-audit.json`
   and runtime proof

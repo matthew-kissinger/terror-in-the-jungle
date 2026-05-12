@@ -162,7 +162,7 @@ Each task scope is defined in
 - `atmosphere-sky-anchor` - decide and prove the sky/cloud anchoring model
   so it no longer reads as terrain-traveling scenery. First slice is the
   camera-followed dome plus world/altitude-projected cloud deck proved in
-  `artifacts/perf/2026-05-11T21-11-29-948Z/konveyer-scene-parity/scene-parity.json`;
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`;
   final cloud art/weather representation remains open.
 - `finite-map-edge-strategy` - propose and prototype the sharp terrain-edge
   treatment for finite maps such as Zone Control.
@@ -173,6 +173,31 @@ Each task scope is defined in
   sample without accepting final shader/art/physics.
 - `docs-review-packet` - close the cycle with source-of-truth docs and a
   reviewer-ready packet.
+
+### Current checkpoint for next agent
+
+Remote branch `origin/exp/konveyer-webgpu-migration` is checkpointed at
+`ca587625` (`feat(konveyer): stabilize webgpu scene parity cycle`). Do not
+restart from the K0-K9 packet. Start from the current docs and artifacts:
+
+- Scene/terrain/sky/water packet:
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
+- Close-NPC materialization and startup compile packet:
+  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Water/hydrology runtime bridge:
+  `artifacts/perf/2026-05-11T21-33-31-662Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
+
+The next high-value work is not more threshold tuning. Continue with:
+
+- deterministic spawn-proximity close-model residency instead of startup
+  impostor pop for nearby actors;
+- multi-mode attribution/optimization of the stamped heightmap rebake behind
+  the UI "Compiling features" step;
+- A Shau finite-edge decision using real outer DEM/source data, explicit
+  flight/camera boundary policy, or a documented hybrid;
+- cloud representation/art review beyond the first anchoring fix;
+- water shader/intersection/interaction consumer work before the
+  principles-first renderer rearchitecture review.
 
 ### Dependencies
 

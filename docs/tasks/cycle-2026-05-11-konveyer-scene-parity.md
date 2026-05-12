@@ -152,6 +152,11 @@ compensation on top of bad source data.
 
 ## Current Evidence Notes
 
+- Remote checkpoint for fresh agents:
+  `ca587625` on `origin/exp/konveyer-webgpu-migration`
+  (`feat(konveyer): stabilize webgpu scene parity cycle`). Continue from this
+  branch head; do not restart from the older KONVEYER-0 through KONVEYER-9
+  packet.
 - Strict WebGPU renderer matrix: `artifacts/perf/2026-05-11T18-17-20-942Z/konveyer-renderer-matrix/matrix.json`.
 - Scene parity probe, Open Frontier + Zone Control:
   `artifacts/perf/2026-05-11T18-30-56-546Z/konveyer-scene-parity/scene-parity.json`.
@@ -260,6 +265,22 @@ compensation on top of bad source data.
 - The first failed scene probe at
   `artifacts/perf/2026-05-11T18-16-29-104Z/konveyer-scene-parity/scene-parity.json`
   is browser-target-closed noise and should not be used for visual acceptance.
+
+## Next Agent Pickup
+
+1. Preserve the hard stops: no `master` merge, no deploy, no baseline update,
+   no fenced interface edit, no WebGL fallback proof.
+2. Use `window.npcMaterializationProfile(24)` in dev/perf builds to inspect
+   nearby NPC materialization. The next implementation target is deterministic
+   spawn-proximity close-model residency for actors near first reveal, not
+   more crop-threshold tuning.
+3. Attribute the "Compiling features" UI delay across more than Open Frontier,
+   then choose whether stamped heightmap rebake should be prebuilt, chunked, or
+   worker-backed.
+4. Resolve A Shau finite-edge presentation with real outer DEM/source data,
+   flight/camera boundary policy, or a documented hybrid.
+5. Continue cloud/weather representation and water/hydrology work before the
+   principles-first WebGPU/TSL renderer rearchitecture review.
 
 ## Hard Stops
 

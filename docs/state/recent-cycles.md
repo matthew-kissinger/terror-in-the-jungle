@@ -13,6 +13,36 @@ For older cycle outcomes, browse `docs/cycles/` or
 
 ---
 
+## konveyer-scene-parity-checkpoint-2026-05-12 (experimental, not deployed)
+
+Checkpoint on `exp/konveyer-webgpu-migration` at `ca587625`. This is remote
+branch truth for the next agent, not a production release and not a `master`
+merge approval.
+
+**Current KONVEYER-10 progress:**
+
+- Strict WebGPU scene/terrain/sky/water packet:
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
+- Close-NPC materialization and startup compile packet:
+  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Nearby NPC debug surface: dev/perf builds expose
+  `window.npcMaterializationProfile(24)` for nearest NPC render mode, close-GLB
+  weapon presence, and fallback reasons.
+- Startup UI "Compiling features" is attributed to terrain feature work, mostly
+  the 1024-grid stamped heightmap rebake, not WebGPU shader compilation.
+
+**Still open:**
+
+- Deterministic spawn-proximity close-model residency for crowded starts.
+- A Shau finite-edge strategy using real outer source data, flight/camera
+  boundary policy, or an explicit hybrid.
+- Cloud representation/art quality after the world/altitude anchoring slice.
+- Water shader/intersections plus one interaction/buoyancy/swimming consumer.
+- Principles-first renderer architecture review after hydrology/water and
+  scoped migration/parity objectives are reviewed.
+
+---
+
 ## konveyer-branch-review-2026-05-11 (experimental, not deployed)
 
 Continuation on `exp/konveyer-webgpu-migration`. This is not production
@@ -31,8 +61,8 @@ release truth and does not authorize a `master` merge.
   A Shau terrain ground tone at
   `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.json`.
 
-**Next cycle:** KONVEYER-10 - rest-of-scene parity and frame-budget
-attribution. Terrain color is accepted for now; remaining work is
+**Follow-on cycle:** KONVEYER-10 - rest-of-scene parity and frame-budget
+attribution. Terrain color is accepted for now; remaining work was
 vegetation/NPC washout, atmosphere/sky/cloud behavior, `World` timing
 decomposition, skyward triangle attribution, finite-map edge presentation,
 cross-browser/mobile proof, and A Shau perf acceptance.

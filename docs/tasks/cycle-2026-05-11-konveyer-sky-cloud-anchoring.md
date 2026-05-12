@@ -47,7 +47,7 @@ sprite sheet or skybox decal.
   passed with 67 tests.
 - TypeScript proof: `npm run typecheck` passed.
 - Strict WebGPU all-mode proof:
-  `artifacts/perf/2026-05-11T21-11-29-948Z/konveyer-scene-parity/scene-parity.json`.
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
 
 That strict proof covers Open Frontier, Zone Control, actual Team Deathmatch,
 combat120, and A Shau with:

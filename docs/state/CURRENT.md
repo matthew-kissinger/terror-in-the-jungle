@@ -49,13 +49,14 @@ verification because Cloudflare API access returned authentication error
 10000 in this session.
 
 The KONVEYER experimental branch is now active at
-`exp/konveyer-webgpu-migration`. KONVEYER-0 through KONVEYER-9 have a branch
-review packet with strict WebGPU startup proof, production render blockers at
-zero, and terrain ground-tone acceptance. This does not make the branch
-production-ready. The next cycle is KONVEYER-10: rest-of-scene visual parity
-and frame-budget attribution. It owns vegetation/NPC washout, atmosphere/sky
-anchoring, world-budget decomposition, skyward triangle attribution, and
-finite-map terrain-edge presentation.
+`exp/konveyer-webgpu-migration`; remote checkpoint `ca587625` is the current
+pickup point. KONVEYER-0 through KONVEYER-9 have a branch review packet with
+strict WebGPU startup proof, production render blockers at zero, and terrain
+ground-tone acceptance. This does not make the branch production-ready. The
+active cycle is KONVEYER-10: rest-of-scene visual parity and frame-budget
+attribution. It owns vegetation/NPC washout, atmosphere/sky anchoring,
+world-budget decomposition, skyward triangle attribution, and finite-map
+terrain-edge presentation.
 
 The current research spike for the new stack is
 [docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md](../rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md).

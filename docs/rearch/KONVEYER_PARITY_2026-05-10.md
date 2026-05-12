@@ -777,7 +777,7 @@ KONVEYER-10 implementation direction selected on 2026-05-11:
   a human review decision should choose the renderer model that best serves the
   game vision.
 
-KONVEYER-10 work-in-progress evidence on 2026-05-11 is indexed in
+KONVEYER-10 work-in-progress evidence through checkpoint `ca587625` is indexed in
 `docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md` and `docs/DIRECTIVES.md`.
 Current finding summary: strict WebGPU scene probes pass across the requested
 modes; skyward triangle count is terrain/pass dominated; source-backed visual
@@ -785,8 +785,13 @@ extent is the selected small-map edge direction; A Shau remains blocked after
 the rejected 1600m synthetic-collar proof; cloud anchoring improved to a
 world/altitude-projected deck on a camera-followed dome; water now has a
 proved hydrology/query/interaction bridge but no accepted shader, flow,
-physics, or visual art; strict `perf-capture` is still blocked by
-browser-target closure before samples.
+physics, or visual art; close-NPC proof now uses public
+`window.npcMaterializationProfile()` telemetry plus geometry-derived body
+bounds and shows a strict-WebGPU close soldier/weapon in the isolated material
+crop at
+`artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`;
+the UI "Compiling features" step is attributed mostly to the stamped heightmap
+rebake rather than shader compilation.
 Research spike: `docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md`
 sets WebGPU/TSL as the principles-first baseline; ECSY is reference vocabulary only.
 

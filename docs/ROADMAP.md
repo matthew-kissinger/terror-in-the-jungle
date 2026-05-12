@@ -24,6 +24,11 @@ presentation, cross-browser/mobile proof, and A Shau perf acceptance. WebGL is
 diagnostic only for that branch; it must not be used as a fallback success path
 for WebGPU migration proof.
 
+Latest experimental checkpoint: `ca587625` on
+`origin/exp/konveyer-webgpu-migration`. It adds strict close-NPC
+materialization telemetry/body-bound proof and startup feature-compile
+attribution, but it does not close the rollout gate.
+
 KONVEYER edge work is now vision-first, not probe-first. Source-backed visual
 terrain extent is the direction for finite procedural maps; A Shau needs real
 outer DEM/source data, an explicit flight/camera boundary, or a documented

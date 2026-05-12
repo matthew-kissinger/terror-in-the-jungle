@@ -408,7 +408,11 @@ Recommended next water spike:
 
 ## Recommended Follow-Up Order
 
-1. Finish KONVEYER-10 strict WebGPU proof and blockers.
+1. Continue from remote checkpoint `ca587625` on
+   `exp/konveyer-webgpu-migration`. The latest strict WebGPU close-NPC and
+   startup-compile proof is
+   `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+   Do not restart from the older K0-K9 branch-review packet.
 2. K11 terrain budget spike: CDLOD node/ring evidence, main-vs-shadow terrain
    ownership, and a flight/elevated skyward proof. First pass complete in
    `artifacts/perf/2026-05-11T19-27-26-995Z/konveyer-scene-parity/scene-parity.json`
