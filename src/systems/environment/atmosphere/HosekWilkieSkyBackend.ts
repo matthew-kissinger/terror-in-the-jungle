@@ -14,7 +14,16 @@ const LUT_ELEVATION_BINS = 8;
 const DEFAULT_CLOUD_NOISE_SCALE = 1 / 900;
 const DEFAULT_CLOUD_WIND_DIR_X = 0.7;
 const DEFAULT_CLOUD_WIND_DIR_Z = 0.7;
-const SKY_TEXTURE_REFRESH_SECONDS = 0.5;
+// Slice 13: bump from 0.5s to 2.0s. Empirical: slice 12 (LUT) and slice
+// 13 DataTexture port both held EMA at ~5ms — the cost is the 8192-pixel
+// compositing loop fired by this timer, not the analytic math or the
+// upload primitive. Cutting fire rate 4x drops EMA proportionally.
+// Cloud animation still visibly evolves; cloud motion samples
+// `cloudTimeSeconds` per refresh so the wind appears as slower, not
+// stepped. Sun-driven LUT rebake remains gated on
+// `LUT_REBAKE_COS_THRESHOLD` (every ~0.83s for todCycle modes) so
+// dawn/dusk still updates promptly.
+const SKY_TEXTURE_REFRESH_SECONDS = 2.0;
 const CLOUD_ANCHOR_REFRESH_METERS = 32;
 const CLOUD_DECK_ALTITUDE_METERS = 1800;
 const CLOUD_MAX_TRACE_METERS = 14000;
@@ -33,33 +42,35 @@ const LUT_REBAKE_COS_THRESHOLD = Math.cos((0.5 * Math.PI) / 180);
 
 interface SkyTextureResource {
   texture: THREE.Texture;
-  canvas?: HTMLCanvasElement;
-  context?: CanvasRenderingContext2D;
-  imageData?: ImageData;
+  data: Uint8Array;
 }
 
+/**
+ * Slice 13: replace the legacy `CanvasTexture` (Canvas2D context +
+ * `putImageData` + canvas-read upload) with a direct `DataTexture`
+ * (typed Uint8Array uploaded as-is via `texSubImage2D`). Eliminates the
+ * canvas-read step that is independently flagged as a WebGPU
+ * anti-pattern (three.js discourse 50288 / 66535, issues #28101 /
+ * #31055). The buffer + RGBA layout match what `refreshSkyTexture`
+ * already writes — only the texture type changes.
+ */
 function createSkyTexture(): SkyTextureResource {
-  if (typeof document === 'undefined') {
-    const data = new Uint8Array([112, 164, 220, 255]);
-    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    return { texture };
+  const data = new Uint8Array(SKY_TEXTURE_WIDTH * SKY_TEXTURE_HEIGHT * 4);
+  // Default sky-blue fill so first-frame reads before refresh have a
+  // sensible value (matches the prior null-context fallback color).
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 112;
+    data[i + 1] = 164;
+    data[i + 2] = 220;
+    data[i + 3] = 255;
   }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = SKY_TEXTURE_WIDTH;
-  canvas.height = SKY_TEXTURE_HEIGHT;
-  const context = canvas.getContext('2d', { willReadFrequently: false }) ?? undefined;
-  if (!context) {
-    const data = new Uint8Array([112, 164, 220, 255]);
-    const texture = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    return { texture };
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = new THREE.DataTexture(
+    data,
+    SKY_TEXTURE_WIDTH,
+    SKY_TEXTURE_HEIGHT,
+    THREE.RGBAFormat,
+    THREE.UnsignedByteType,
+  );
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.ClampToEdgeWrapping;
@@ -67,12 +78,7 @@ function createSkyTexture(): SkyTextureResource {
   texture.magFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
 
-  return {
-    texture,
-    canvas,
-    context,
-    imageData: context.createImageData(SKY_TEXTURE_WIDTH, SKY_TEXTURE_HEIGHT),
-  };
+  return { texture, data };
 }
 
 function clamp01(value: number): number {
@@ -144,8 +150,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private readonly material: THREE.MeshBasicMaterial;
   private readonly geometry: THREE.SphereGeometry;
   private readonly skyTexture: THREE.Texture;
-  private readonly skyContext?: CanvasRenderingContext2D;
-  private readonly skyImageData?: ImageData;
+  private readonly skyData: Uint8Array;
 
   private readonly sunDirection = new THREE.Vector3(0, 1, 0);
   private readonly groundAlbedo = new THREE.Color(0x3b4c2e);
@@ -180,8 +185,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     this.lut = new Float32Array(LUT_AZIMUTH_BINS * LUT_ELEVATION_BINS * 3);
     const skyTexture = createSkyTexture();
     this.skyTexture = skyTexture.texture;
-    this.skyContext = skyTexture.context;
-    this.skyImageData = skyTexture.imageData;
+    this.skyData = skyTexture.data;
 
     this.material = new THREE.MeshBasicMaterial({
       name: 'HosekWilkieSky',
@@ -391,25 +395,22 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     if (!this.skyTextureDirty) return;
     this.skyTextureDirty = false;
 
-    if (!this.skyContext || !this.skyImageData) {
-      this.skyTexture.needsUpdate = true;
-      return;
-    }
-
-    // Slice 12: replace the per-pixel `evaluateAnalytic` call (heavyweight
-    // Hosek-Wilkie eval — ~30 transcendentals + scattering math per pixel)
-    // with a bilinear sample from the already-baked LUT. The LUT is bound
-    // to the same scenario `(sun, turbidity, exposure)` triple and is
-    // re-baked whenever sun motion crosses `LUT_REBAKE_COS_THRESHOLD`, so
-    // sampling it here produces the same radiance as the analytic eval
-    // would, minus quantization which the bilinear blend smooths out.
-    // Cost drops from O(SKY_TEXTURE * analytic) per refresh to
-    // O(SKY_TEXTURE * 4 reads + 3 lerps).
+    // Slice 13: write directly into the `DataTexture` buffer (Uint8Array)
+    // and call `needsUpdate = true`. Skips the Canvas2D context, the
+    // `putImageData` step, and the canvas-read leg of the upload path.
+    // Confirmed WebGPU-correct primitive vs `CanvasTexture` (see
+    // discourse 50288 / 66535).
+    //
+    // Slice 12 retained: per-pixel base color comes from a bilinear LUT
+    // sample over the same 32x8 LUT the CPU `sample()` accessor reads.
+    // Sun disc and cloud deck stay composited per-pixel — they cannot be
+    // collapsed into the LUT because they depend on view direction
+    // relative to the sun and on world-anchored cloud noise.
     const lut = this.lut;
     const rowsM1 = LUT_ELEVATION_BINS - 1;
     const cols = LUT_AZIMUTH_BINS;
 
-    const data = this.skyImageData.data;
+    const data = this.skyData;
     let offset = 0;
     for (let y = 0; y < SKY_TEXTURE_HEIGHT; y++) {
       const v = y / (SKY_TEXTURE_HEIGHT - 1);
@@ -417,9 +418,6 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       const cosElevation = Math.cos(elevation);
       const sinElevation = Math.sin(elevation);
 
-      // Pre-compute LUT elevation row for the whole scanline (depends only
-      // on `y`). `elevT` mirrors the eq used inside `sample()` so the
-      // refresh-pixel value matches what callers of `sample()` would read.
       const elevT = (Math.asin(sinElevation) + Math.PI / 2) / Math.PI;
       const rowF = Math.max(0, Math.min(rowsM1, elevT * LUT_ELEVATION_BINS - 0.5));
       const row0 = Math.floor(rowF);
@@ -432,14 +430,11 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
         const dirX = cosElevation * Math.cos(azimuth);
         const dirZ = cosElevation * Math.sin(azimuth);
 
-        // Azimuth -> fractional LUT column with wrap. `colF` is bin-
-        // centered so col0+1 may wrap across the seam at azimuth=2π.
         const colF = (u * cols - 0.5 + cols) % cols;
         const col0 = Math.floor(colF) % cols;
         const col1 = (col0 + 1) % cols;
         const colT = colF - Math.floor(colF);
 
-        // 4-tap bilinear over the LUT.
         const i00 = (row0 * cols + col0) * 3;
         const i01 = (row0 * cols + col1) * 3;
         const i10 = (row1 * cols + col0) * 3;
@@ -454,10 +449,6 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
         let g = lut[i00 + 1] * w00 + lut[i01 + 1] * w01 + lut[i10 + 1] * w10 + lut[i11 + 1] * w11;
         let b = lut[i00 + 2] * w00 + lut[i01 + 2] * w01 + lut[i10 + 2] * w10 + lut[i11 + 2] * w11;
 
-        // Sun disc + cloud deck still composited per-pixel. The sun disc
-        // is cheap (one dot product + smoothstep) and only fires near the
-        // sun direction; the cloud deck is only expensive when
-        // cloudCoverage > 0 and early-exits otherwise.
         this.scratchDir.set(dirX, sinElevation, dirZ);
         this.scratchColor.setRGB(r, g, b);
         this.mixSunDisc(this.scratchDir, this.scratchColor);
@@ -473,7 +464,6 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       }
     }
 
-    this.skyContext.putImageData(this.skyImageData, 0, 0);
     this.skyTexture.needsUpdate = true;
   }
 

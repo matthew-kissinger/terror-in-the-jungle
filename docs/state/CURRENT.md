@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings + slice 11 atmosphere sub-attribution + terrain roughness fix shipped, KONVEYER review packet drafted)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings + slice 11 atmosphere sub-attribution + slice 12 LUT refresh + slice 13 DataTexture+2s refresh + terrain roughness fix shipped; SkyTexture EMA empirically exhausted; slice 14 TSL fragment-shader port queued as load-bearing fix)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -471,6 +471,40 @@ Atmosphere child timings (`World.Atmosphere.SkyTexture`,
 through `performanceTelemetry.beginSystem` / `endSystem` and surface
 through `window.perf.report().systemBreakdown`. Sub-attribution is
 the slice 11 follow-up.
+
+Slice 13 (shipped 2026-05-12): three architecturally-correct CPU-side
+improvements to the sky refresh path:
+
+1. `CanvasTexture` retired; `DataTexture` (Uint8Array, direct
+   `texSubImage2D` upload) replaces it. Eliminates the canvas-read
+   leg of the upload (independently flagged WebGPU anti-pattern per
+   three.js discourse 50288 / 66535 and issues #28101 / #31055).
+2. `SKY_TEXTURE_REFRESH_SECONDS` bumped 0.5 s → 2.0 s. Cloud
+   animation samples `cloudTimeSeconds` per refresh so wind reads as
+   slower, not stepped.
+3. `refreshSkyTexture` body uses bilinear LUT sample (slice 12) over
+   the same 32×8 LUT the CPU `sample()` accessor reads.
+
+Strict WebGPU multi-mode evidence (RTX 3070, headed):
+`artifacts/perf/2026-05-12T17-29-04-810Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+All five modes resolve `webgpu` with zero console/page/request
+errors. A Shau frame avg 20.2 → 14.0 ms, p99 34.8 → 24.1 ms
+(combination of slice 12+13 + run variance).
+
+**Empirical exhaustion of CPU-side levers.** Slice 12 LUT + slice 13
+DataTexture + slice 13 refresh-period bump did NOT individually move
+the SkyTexture EMA from ~5 ms. Diagnostic experiments confirmed
+even with the entire refresh body bypassed AND the
+`trackAtmosphereTiming` wrapper removed, the EMA still reports
+~5 ms. The measurement is either artifactual (singleton state
+leaking across mode switches in the same browser tab, HMR-stale
+module, or instrumentation-chain bug) or reflects a cost in a path
+that triggers `beginSystem('World.Atmosphere.SkyTexture')`
+indirectly. Either way, the only remaining lever is slice 14: port
+the Hosek-Wilkie analytic + sun disc + cloud composition to a TSL
+fragment shader on the dome mesh, retiring `CanvasTexture` and the
+entire `refreshSkyTexture` path. Reference: three.js
+`examples/jsm/objects/Sky.js` does Preetham this way.
 
 Atmosphere sub-attribution (shipped 2026-05-12, probe-side slice 11):
 the perf-window now also drains `window.perf.report().systemBreakdown`

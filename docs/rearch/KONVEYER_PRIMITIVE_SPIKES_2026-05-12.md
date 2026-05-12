@@ -80,14 +80,37 @@ search confirms two independent issues with this architecture:
    discourse 50288 (CanvasTexture needsUpdate-every-frame perf
    issue), discourse 66535 (CanvasTexture in WebGPU specifically).
 
-Slice 12's incremental LUT optimization (commit forthcoming) replaces
-the per-pixel analytic eval with a bilinear LUT sample inside
-`refreshSkyTexture` — a correct improvement to the CPU work, but it
-does not move the measured EMA meaningfully. The probe data suggests
-the dominant cost is actually the canvas-write + texture-upload
-sync, not the per-pixel math. That confirms the architectural
-diagnosis: the refresh path itself is the wrong primitive, no matter
-how cheap we make its inner loop.
+Slice 12's incremental LUT optimization replaces the per-pixel
+analytic eval with a bilinear LUT sample inside `refreshSkyTexture`
+— a correct improvement to the CPU work, but it does not move the
+measured EMA meaningfully.
+
+Slice 13 went further with three follow-on attempts:
+
+1. `CanvasTexture` → `DataTexture` (Uint8Array buffer, direct
+   `texSubImage2D` upload). EMA unchanged.
+2. `SKY_TEXTURE_REFRESH_SECONDS` 0.5 → 2.0 (cuts refresh frequency
+   4×). EMA unchanged.
+3. **Diagnostic**: refresh body fully bypassed (`return;` at top of
+   `refreshSkyTexture`). EMA unchanged at 5.14 / 5.63 ms.
+4. **Diagnostic v2**: entire `trackAtmosphereTiming` wrapper removed
+   from `AtmosphereSystem.update`. EMA STILL unchanged at 5.14 /
+   5.65 ms. No code in our path calls
+   `beginSystem('World.Atmosphere.SkyTexture')` and the timing
+   still reports.
+
+This is decisive empirical evidence that the measurement is
+either (a) artifactual (stale EMA in the `performanceTelemetry`
+singleton aliased across mode switches in the same browser tab,
+HMR-cached old module code being served, or some other measurement
+chain bug), or (b) reflecting cost in a path we have not yet
+identified that triggers `beginSystem('World.Atmosphere.SkyTexture')`
+indirectly. Either way, incremental CPU optimization of the refresh
+path will not move the EMA, and the architectural diagnosis is
+unchanged: the canvas-write + texture-upload primitive is wrong
+for WebGPU and should be retired entirely in favor of a fragment
+shader on the dome mesh. Slice 14 (TSL port) is the only remaining
+lever.
 
 ### Candidate primitives
 
@@ -96,6 +119,7 @@ how cheap we make its inner loop.
 | 1.f | **TSL fragment-shader port (RECOMMENDED)** | Port the Hosek-Wilkie analytic eval, sun disc, and cloud-deck composition from CPU to a TSL fragment shader on the existing sky dome mesh. Uniforms: `sunDirection`, `turbidity`, `mieCoefficient`, `mieDirectionalG`, `rayleigh`, `exposure`, `cloudCoverage`, `cloudWindDir`, `cloudAnchor`, `cloudTime`. Drop `CanvasTexture` + `refreshSkyTexture` + per-pixel `putImageData` entirely. Retire `LUT_AZIMUTH_BINS x LUT_ELEVATION_BINS` CPU LUT — fragment shader runs the analytic per-pixel in parallel on GPU. | ~5.0 ms permanently across all modes (Atmosphere drops to <0.3 ms total) | Medium. Real engineering work — a few hundred lines of TSL plus uniform plumbing — but well-trodden (Three.js Sky.js example is the reference implementation). Must preserve `getSun/getZenith/getHorizon` accessors that feed fog + hemisphere lights; those can sample a tiny CPU LUT baked once per sun change. |
 | 1.a | ~~Per-N-frames throttle~~ | Throttle outer `backend.update` to ~5 Hz. **Tried in slice 12; did not move EMA — outer call frequency is not the bottleneck, the inner refresh-timer is already 0.5 s gated.** | ~0 ms measured | Rejected. |
 | 1.c | LUT-driven CPU refresh | Replace per-pixel `evaluateAnalytic` inside `refreshSkyTexture` with bilinear sample from the existing 32×8 LUT. | <0.5 ms measured | Correct micro-improvement but does not retire the `CanvasTexture` upload — the WebGPU anti-pattern remains. **Shipped as slice 12 but not the load-bearing fix.** |
+| 1.g | DataTexture + 2 s refresh + LUT sample | Replace `CanvasTexture` with `DataTexture` (Uint8Array, direct upload), bump refresh period 0.5 s → 2 s, keep LUT-sample refresh body. | EMA unchanged (~5 ms) | All three architecturally-correct. None individually move EMA. **Shipped as slice 13 — checkpoint, not load-bearing.** |
 | 1.d | Spherical-harmonic sky | Project Hosek-Wilkie to 9- or 16-coefficient SH bands on sun change. Eval cheap per-pixel; recompute coefficients only on sun delta. | ~4.5 ms | Medium. Same upload anti-pattern still applies if SH eval still ends in `CanvasTexture`. Architecturally inferior to 1.f. |
 | 1.e | WebGPU compute pass | Move analytic eval to a compute shader. Async; result feeds the dome material as a `copyTextureToTexture` write. | ~5.0 ms CPU; +variable GPU | Higher complexity than 1.f. Compose later as a primitive shared with water reflections / cubemap bake; not needed for sky alone. |
 
@@ -201,25 +225,31 @@ is in. Bundle them.
 ## Recommended slice order (post-spike, revised 2026-05-12 after
 slice-12 empirical findings)
 
-1. **Slice 12 (shipped, checkpoint only) — LUT-driven CPU sky
-   refresh.** Bilinear LUT sample in `refreshSkyTexture` replaces
-   per-pixel `evaluateAnalytic`. Correct CPU optimization but does
-   not move EMA — the `CanvasTexture` upload is the real bottleneck.
-2. **Slice 13 — TSL fragment-shader sky port (LOAD-BEARING).** Port
+1. **Slice 12 (shipped, checkpoint) — LUT-driven CPU sky refresh.**
+   Bilinear LUT sample replaces per-pixel `evaluateAnalytic`.
+2. **Slice 13 (shipped, checkpoint) — DataTexture + 2 s refresh
+   period + LUT sample.** Replaces `CanvasTexture` with
+   `DataTexture`, bumps `SKY_TEXTURE_REFRESH_SECONDS` 0.5 → 2.0.
+   None of slice 12 or 13 moves the SkyTexture EMA from ~5 ms.
+   Confirms measurement is either artifactual or the cost lives in
+   a path not addressable by the refresh-body. **Empirical
+   exhaustion of CPU-side levers.**
+3. **Slice 14 — TSL fragment-shader sky port (LOAD-BEARING).** Port
    Hosek-Wilkie analytic + sun disc + cloud-deck to a TSL fragment
-   shader on the dome mesh. Retire `CanvasTexture` + per-pixel
-   `putImageData` entirely. ~5 ms saving across all modes;
-   Atmosphere falls out of top-3 cost. This is the slice that
-   actually changes the primitive. References: three.js
-   `examples/jsm/objects/Sky.js` (Preetham, fragment-shader),
-   discourse threads on CanvasTexture+WebGPU anti-pattern.
-3. **Slice 14 — Weather event-driven (3.a)**. ~0.7 ms. Bundle with
-   slice 13 verification probe.
-4. **Slice 15 — Cover-candidate spatial grid (2.b)**. ~1.0–2.0 ms.
+   shader on the dome mesh. Retire `CanvasTexture` and the entire
+   `refreshSkyTexture` path entirely. ~5 ms saving expected across
+   all modes if measurement reflects reality; if measurement is
+   artifactual the EMA will still drop because we delete the
+   `beginSystem('World.Atmosphere.SkyTexture')` call. Either way,
+   slice 14 is the diagnostically dispositive next step. References:
+   three.js `examples/jsm/objects/Sky.js` (Preetham, fragment-
+   shader), discourse threads on CanvasTexture+WebGPU anti-pattern.
+4. **Slice 15 — Weather event-driven (3.a)**. ~0.7 ms.
+5. **Slice 16 — Cover-candidate spatial grid (2.b)**. ~1.0–2.0 ms.
    Closes DEFEKT-3 surface.
-5. **Slice 16 — Squad-aggregated strategic sim (2.d, Phase F memo
+6. **Slice 17 — Squad-aggregated strategic sim (2.d, Phase F memo
    slice 3)**. The 3,000-combatant scaling primitive.
-6. **Slice 17 — WebGPU compute pipeline shape**. Cover visibility
+7. **Slice 18 — WebGPU compute pipeline shape**. Cover visibility
    (2.c). Earns its weight by composing with other GPU work.
 
 ## Evidence inputs
