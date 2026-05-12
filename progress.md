@@ -7248,3 +7248,39 @@ TODO
   against successful GitHub CI/deploy runs, live `/asset-manifest.json`, Pages
   headers, A Shau R2 DEM headers, and a live Pages browser smoke. The final
   completion audit depends on this proof plus clean local/remote git parity.
+
+2026-05-12 KONVEYER-10 multi-mode close-model reserve verification (loop)
+- Continued `exp/konveyer-webgpu-migration` from `01da7abb`. Verified the
+  bounded spawn-residency close-model reserve under strict WebGPU across Open
+  Frontier, Zone Control, Team Deathmatch, `ai_sandbox` (combat120), and
+  A Shau Valley. Two paired probe runs landed:
+  `artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  and
+  `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Both runs resolved `resolvedBackend=webgpu`, `strictWebGPUReady=true`, zero
+  console errors, zero page errors, zero request failures. The +4 reserve
+  activated when actors were inside the 64m spawn-residency bubble (Zone
+  Control +1, TDM +4, combat120 +4); Open Frontier varied with framing as
+  designed; A Shau placed no live combatants inside the 120m close radius
+  from the spawn pose.
+- combat120 surfaced the densest cluster: ~29-32 candidates against a 12-slot
+  cap with 14-18 `total-cap` fallbacks and 2-3 `pool-empty` fallbacks. The
+  per-faction pool was asymmetric (`US` exhausted while `NVA` retained slack),
+  so the next architecture decision is Phase F materialization-tier policy
+  rather than uniform-cap tuning.
+- No code changes. Doc updates only:
+  `docs/state/CURRENT.md`, `docs/state/recent-cycles.md`,
+  `docs/DIRECTIVES.md`, `docs/rearch/KONVEYER_PARITY_2026-05-10.md`,
+  `docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md`,
+  `docs/tasks/konveyer-full-autonomous-migration.md`, and the new draft
+  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md` (sim/render
+  lanes, budget arbiter, silhouette/cluster render proposals toward 3,000
+  combatants).
+- Validation: `npx vitest run src/systems/combat/CombatantRenderer.test.ts`
+  passed (44 tests), `npx vitest run src/systems/combat/PixelForgeNpcRuntime.test.ts`
+  passed (7 tests), `npm run lint:docs` passed (0 failures; 13 grandfathered
+  warnings including a +1 soft-limit nudge on `KONVEYER_PARITY_2026-05-10.md`
+  that already exceeded 800 LOC before this update).
+- Hard stops preserved: no `master` merge, no production deploy, no
+  `perf-baselines.json` change, no `src/types/SystemInterfaces.ts` edit, no
+  WebGL fallback acceptance in the proof path.

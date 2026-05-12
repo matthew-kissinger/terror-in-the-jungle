@@ -25,21 +25,38 @@ production release and not a `master` merge approval.
   `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
 - Close-NPC materialization and startup compile packet:
   `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Multi-mode close-model reserve verification under strict WebGPU across
+  Open Frontier, Zone Control, Team Deathmatch, combat120 (`ai_sandbox`),
+  and A Shau Valley:
+  `artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  and
+  `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+  Both runs resolve `webgpu` with zero console/page errors per mode; the
+  parity ledger has the consolidated per-mode tables.
 - Nearby NPC debug surface: dev/perf builds expose
   `window.npcMaterializationProfile(24)` for nearest NPC render mode, close-GLB
   weapon presence, and fallback reasons.
 - Bounded spawn-residency reserve: Open Frontier strict WebGPU proof records
   11 nearby close GLBs, effective close cap 11, and zero fallback records for
-  the nearest startup/review actors.
+  the nearest startup/review actors. Multi-mode evidence shows the +4 reserve
+  activates per design when actors lie inside the 64m spawn-residency bubble
+  (Zone Control +1, TDM +4, combat120 +4); combat120 still sees ~29-32
+  candidates against the 12-slot cap, so cap policy is now a Phase F
+  budget-arbiter decision rather than steady-state tuning.
+- Phase F materialization-tier draft memo:
+  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`.
 - Startup UI "Compiling features" is attributed to terrain feature work, mostly
   the 1024-grid stamped heightmap rebake, not WebGPU shader compilation.
 
 **Still open:**
 
-- Multi-mode verification and Phase F policy for the spawn-residency reserve
-  and broader materialization tiers.
+- Phase F materialization-tier policy and budget-arbiter slice: per-mode cap
+  scaling, faction-balanced pool sizing, and silhouette/cluster render lanes
+  for the 3,000-unit scale.
 - A Shau finite-edge strategy using real outer source data, flight/camera
-  boundary policy, or an explicit hybrid.
+  boundary policy, or an explicit hybrid; A Shau also needs a directed
+  player-warp or AI-convergence close-model probe so the front-line
+  materialization path can be evidenced beyond the empty spawn pose.
 - Cloud representation/art quality after the world/altitude anchoring slice.
 - Water shader/intersections plus one interaction/buoyancy/swimming consumer.
 - Principles-first renderer architecture review after hydrology/water and
