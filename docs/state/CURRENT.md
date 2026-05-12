@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slice 1, close-model churn pre-release, and A Shau directed-warp evidence shipped)
+Last verified: 2026-05-12 (Phase F slice 1, close-model churn pre-release, A Shau directed-warp, and MaterializationProfile v2 shipped)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -343,6 +343,20 @@ pool-loading across all five modes. The 5865 ms spawn cadence after a
 player warp is a separate finding worth profiling (WarSimulator
 strategic-spawn tick interval) but is not a materialization-tier
 blocker; all close-radius work caps at the designed boundary.
+
+MaterializationProfile v2 (shipped 2026-05-12): `CombatantMaterializationRow`
+now carries `reason` and `inActiveCombat` (parseable render-lane reason
+string and active-firefight flag). Surfaced through
+`window.npcMaterializationProfile()` and the crop probe's `nearest[]`
+projection. Strict WebGPU multi-mode proof at
+`artifacts/perf/2026-05-12T04-48-59-955Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+First architectural finding the diagnostic surfaces: A Shau's review
+pose contains actors with `inActiveCombat=true` stuck on
+`impostor:total-cap` (e.g., combatant_40 at 7.9 m) — exactly the case
+the Phase F memo names for the budget arbiter to handle. The current
+cap policy is distance-priority only; the arbiter will incorporate
+combat state. The diagnostic surface ships now; the arbiter is the
+next slice.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

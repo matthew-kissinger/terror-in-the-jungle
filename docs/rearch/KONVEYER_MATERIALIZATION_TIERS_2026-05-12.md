@@ -210,6 +210,27 @@ These are independently shippable. Each one assumes branch hard-stops.
     because the steady review pose has no actor inside the 64 m hard-near
     bubble — the reserve correctly does not engage. Behavior is consistent
     with slice 0; not a regression.
+0c. **MaterializationProfile v2 (shipped 2026-05-12).**
+    `CombatantMaterializationRow` now carries `reason` and `inActiveCombat`,
+    surfaced through `window.npcMaterializationProfile()` and the crop
+    probe's `nearest[]` projection. `reason` is parseable
+    (`close-glb:active`, `impostor:total-cap`, `impostor:pool-empty`,
+    `impostor:pool-loading`, `impostor:perf-isolation`,
+    `impostor:beyond-close-radius`, `impostor:not-prioritized`,
+    `culled:lod-culled`, `culled:no-billboard`). `inActiveCombat` is true
+    when state is ENGAGING/SUPPRESSING/ADVANCING. This is the budget
+    arbiter's input surface — slice 5 of the Phase F memo. Strict WebGPU
+    multi-mode proof:
+    `artifacts/perf/2026-05-12T04-48-59-955Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    First architectural finding the diagnostic surfaces: A Shau's
+    review-pose `nearest[]` contains actors with `inActiveCombat=true`
+    stuck on `impostor:total-cap` (e.g., combatant_40 at 7.9 m) — exactly
+    the case the Phase F memo names ("a combatant currently being shot
+    at by the player or shooting back is render-close eligible even at
+    130 m"). The current cap policy does not promote based on combat
+    state; the budget arbiter v1 will. This slice ships the input
+    surface; the arbiter is the next slice.
+
 0b. **A Shau directed-warp evidence (shipped 2026-05-12, probe-only).**
     The crop probe now performs a directed warp to a contested zone
     (Hill 937 / Hamburger Hill) when running in `a_shau_valley`, waits

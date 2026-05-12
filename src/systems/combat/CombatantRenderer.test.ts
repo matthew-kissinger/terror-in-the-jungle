@@ -337,12 +337,17 @@ describe('CombatantRenderer', () => {
         closeFallbackReason: null,
         hasCloseModelWeapon: true,
         billboardIndex: -1,
+        // Slice 4 (MaterializationProfile v2): reason + inActiveCombat.
+        reason: 'close-glb:active',
+        inActiveCombat: true,
       });
       expect(rows[1]).toMatchObject({
         combatantId: 'mid-impostor',
         renderMode: 'impostor',
         closeFallbackReason: null,
         hasCloseModelWeapon: false,
+        reason: 'impostor:beyond-close-radius',
+        inActiveCombat: false,
       });
       expect(rows[1].billboardIndex).toBeGreaterThanOrEqual(0);
       expect(rows[2]).toMatchObject({
@@ -350,7 +355,55 @@ describe('CombatantRenderer', () => {
         renderMode: 'culled',
         closeFallbackReason: null,
         billboardIndex: null,
+        // The test mock's LOD remains at its default ('high') because the LOD
+        // manager is not driven here; the rendering pipeline declines to give
+        // a billboard slot at 450 m, so the reason is `culled:no-billboard`.
+        reason: 'culled:no-billboard',
+        inActiveCombat: false,
       });
+    });
+
+    it('records impostor:total-cap reason when close-radius candidates exceed the cap', async () => {
+      // Slice 4 regression: when the cluster overflows the active cap,
+      // the materialization profile must surface `impostor:total-cap` so
+      // budget-arbiter diagnostics can distinguish fallback kinds.
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        Faction.NVA,
+        getPixelForgeNpcRuntimeFaction(Faction.NVA),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+
+      const hardNearReserveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
+        + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
+      const overflow = hardNearReserveCap + 3;
+      const combatants = new Map<string, Combatant>();
+      for (let i = 0; i < overflow; i++) {
+        const combatant = createMockCombatant(
+          `cluster-${i}`,
+          Faction.NVA,
+          new THREE.Vector3(18 + i * 0.5, 0, 0),
+          CombatantState.ENGAGING,
+        );
+        combatants.set(combatant.id, combatant);
+      }
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+      const rows = renderer.getNearestCombatantMaterializationRows(combatants, new THREE.Vector3(0, 0, 0), overflow);
+
+      const closeGlbRows = rows.filter((row) => row.renderMode === 'close-glb');
+      const totalCapRows = rows.filter((row) => row.reason === 'impostor:total-cap');
+      expect(closeGlbRows).toHaveLength(hardNearReserveCap);
+      expect(totalCapRows).toHaveLength(overflow - hardNearReserveCap);
+      // Every active-combat actor that materialized is marked accordingly.
+      expect(closeGlbRows.every((row) => row.inActiveCombat)).toBe(true);
+      // Each close-GLB row carries the active reason; total-cap rows do not.
+      expect(closeGlbRows.every((row) => row.reason === 'close-glb:active')).toBe(true);
     });
 
     it('collapses attached close-model weapon clones into one render mesh', () => {

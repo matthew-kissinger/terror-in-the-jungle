@@ -172,6 +172,27 @@ export interface CloseModelRuntimeStats {
   poolAvailable: Record<string, number>;
 }
 
+/**
+ * Why a combatant is at its current render lane. Surfaced via
+ * `window.npcMaterializationProfile()` for the crop probe and Phase F
+ * budget-arbiter diagnostics. The string is parseable: the slot before the
+ * colon is the render lane (`close-glb` / `impostor` / `culled`), the slot
+ * after the colon is the specific reason within that lane.
+ *
+ * Examples:
+ * - `close-glb:active` — combatant has a live close-GLB instance this frame.
+ * - `impostor:total-cap` — close-radius candidate displaced by the cap.
+ * - `impostor:pool-empty` — close-radius candidate with no pool slot available.
+ * - `impostor:pool-loading` — close-radius candidate while pool grows lazily.
+ * - `impostor:perf-isolation` — close-models disabled by perf-isolation flag.
+ * - `impostor:beyond-close-radius` — outside the 120 m close radius.
+ * - `impostor:not-prioritized` — inside close radius but not in the top-N
+ *   prospective set (rare with the hard-near reserve, possible at scale).
+ * - `culled:lod-culled` — sim LOD says CULLED; no draw.
+ * - `culled:no-billboard` — no billboardIndex assigned this frame.
+ */
+export type CombatantMaterializationReason = string;
+
 export interface CombatantMaterializationRow {
   combatantId: string;
   faction: Faction;
@@ -186,6 +207,14 @@ export interface CombatantMaterializationRow {
   billboardIndex: number | null;
   hasCloseModelWeapon: boolean;
   closeFallbackReason: CloseModelFallbackReason | null;
+  /** Parseable render-lane reason; see {@link CombatantMaterializationReason}. */
+  reason: CombatantMaterializationReason;
+  /**
+   * True when the combatant is in an active firefight (engaging, suppressing,
+   * or advancing). Phase F budget-arbiter input: these combatants should
+   * remain render-close even at the edge of the close radius.
+   */
+  inActiveCombat: boolean;
 }
 
 export interface CloseModelPrewarmOptions {
@@ -437,6 +466,8 @@ export class CombatantRenderer {
     );
     if (rowLimit === 0) return [];
 
+    const closeRadiusMeters = getPixelForgeNpcCloseModelDistanceMeters();
+
     return Array.from(combatants.values())
       .map((combatant): CombatantMaterializationRow => {
         const closeModel = this.activeCloseModels.get(combatant.id);
@@ -449,13 +480,28 @@ export class CombatantRenderer {
             : 'culled';
         const poolKey = closeModel?.poolKey ?? fallback?.poolKey ?? getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
         const position = combatant.renderedPosition ?? combatant.position;
+        const distanceMeters = combatant.position.distanceTo(playerPosition);
+        const inActiveCombat = combatant.state === CombatantState.ENGAGING
+          || combatant.state === CombatantState.SUPPRESSING
+          || combatant.state === CombatantState.ADVANCING;
+        const reason: CombatantMaterializationReason = (() => {
+          if (renderMode === 'close-glb') return 'close-glb:active';
+          if (renderMode === 'impostor') {
+            if (fallback?.reason) return `impostor:${fallback.reason}`;
+            if (distanceMeters > closeRadiusMeters) return 'impostor:beyond-close-radius';
+            return 'impostor:not-prioritized';
+          }
+          // renderMode === 'culled'
+          if (combatant.lodLevel === 'culled') return 'culled:lod-culled';
+          return 'culled:no-billboard';
+        })();
 
         return {
           combatantId: combatant.id,
           faction: combatant.faction,
           state: combatant.state,
           lodLevel: combatant.lodLevel,
-          distanceMeters: combatant.position.distanceTo(playerPosition),
+          distanceMeters,
           position: {
             x: position.x,
             y: position.y,
@@ -468,6 +514,8 @@ export class CombatantRenderer {
           billboardIndex,
           hasCloseModelWeapon: closeModel?.hasWeapon ?? false,
           closeFallbackReason: fallback?.reason ?? null,
+          reason,
+          inActiveCombat,
         };
       })
       .sort((a, b) => a.distanceMeters - b.distanceMeters || a.combatantId.localeCompare(b.combatantId))

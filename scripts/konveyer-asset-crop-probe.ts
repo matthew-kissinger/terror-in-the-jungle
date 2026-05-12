@@ -60,6 +60,9 @@ interface CloseGlbNpcRow {
   clip: string | null;
   hasWeapon: boolean;
   closeFallbackReason: string | null;
+  // Slice 4 (MaterializationProfile v2): exposed via window.npcMaterializationProfile().
+  reason: string | null;
+  inActiveCombat: boolean;
 }
 
 interface CloseModelRuntimeStats {
@@ -873,6 +876,8 @@ async function getCloseModelTelemetry(page: Page): Promise<CloseGlbTelemetry> {
         clip: row.clipId == null ? null : String(row.clipId),
         hasWeapon: Boolean(row.hasCloseModelWeapon ?? row.hasWeapon),
         closeFallbackReason: row.closeFallbackReason == null ? null : String(row.closeFallbackReason),
+        reason: row.reason == null ? null : String(row.reason),
+        inActiveCombat: Boolean(row.inActiveCombat),
       })).sort((a: CloseGlbNpcRow, b: CloseGlbNpcRow) => a.distance - b.distance)
       : null;
     const activeCloseModels = renderer?.activeCloseModels instanceof Map
@@ -925,6 +930,11 @@ async function getCloseModelTelemetry(page: Page): Promise<CloseGlbTelemetry> {
         clip: closeInstance?.activeClip ?? null,
         hasWeapon: Boolean(closeInstance?.hasWeapon),
         closeFallbackReason: fallbackById.get(String(combatant.id)) ?? null,
+        // Renderer-private fallback path does not have the v2 fields; leave
+        // them as defaults so the artifact shape is uniform with the public
+        // profile path.
+        reason: null,
+        inActiveCombat: false,
       };
     }).sort((a, b) => a.distance - b.distance);
     const materializationProfileSource: MaterializationProfileSource = publicRows
