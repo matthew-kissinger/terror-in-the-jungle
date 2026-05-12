@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e shipped + KONVEYER review packet drafted)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f shipped + KONVEYER review packet drafted)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -388,6 +388,22 @@ already batched + flushed end-of-frame, so emitting adds no synchronous
 fan-out cost. Strict WebGPU multi-mode regression proof:
 `artifacts/perf/2026-05-12T12-55-00-499Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
 No close-NPC materialization regressions vs slice 5.
+
+Tier-transition event capture (shipped 2026-05-12, probe-side
+extension of slice 6): `bootstrap.ts` exposes
+`window.__materializationTierEvents()` under `?diag=1`, draining a
+bounded ring of events from `GameEventBus`. The crop probe records
+empirical materialization flow during the directed-warp + review
+window per mode. Evidence:
+`artifacts/perf/2026-05-12T13-59-07-487Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+First architectural finding: A Shau captures 199 events in a single
+window (94 first-observation→impostor, 60 impostor→close-glb
+promotions, 41 close-glb→impostor demotions, 4 first→close-glb). This
+quantifies the cap-boundary churn during dense strategic-tier
+materialization. combat120 shows the same pattern in miniature (43
+events, 23 promotions, 20 demotions). TDM shows pure promotion (8 of
+8) — cap unexhausted at review pose. OF shows only far-LOD
+first-observations.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

@@ -210,6 +210,46 @@ These are independently shippable. Each one assumes branch hard-stops.
     because the steady review pose has no actor inside the 64 m hard-near
     bubble — the reserve correctly does not engage. Behavior is consistent
     with slice 0; not a regression.
+0f. **Tier-transition event capture (shipped 2026-05-12, probe-side).**
+    `bootstrap.ts` now exposes `window.__materializationTierEvents()`
+    under `?diag=1`, draining a bounded ring of
+    `materialization_tier_changed` events from `GameEventBus`. The crop
+    probe consumes this in `captureTierTransitionEvents` to record an
+    empirical view of the materialization flow during the directed-warp
+    + lazy-load + review window per mode. No game-code behavior change;
+    the slice extends the diagnostic surface added by slice 0e.
+
+    Strict WebGPU multi-mode evidence:
+    `artifacts/perf/2026-05-12T13-59-07-487Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+
+    Per-mode capture (counts of transitions in a single probe window):
+
+    | Mode | Total | impostor→close-glb | close-glb→impostor | null→close-glb | null→impostor | null→culled |
+    | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+    | `open_frontier` | 7 | 0 | 0 | 0 | 0 | 7 |
+    | `zone_control` | 21 | 11 | 9 | 0 | 0 | 0 |
+    | `team_deathmatch` | 8 | 8 | 0 | 0 | 0 | 0 |
+    | `ai_sandbox` (combat120) | 43 | 23 | 20 | 0 | 0 | 0 |
+    | `a_shau_valley` | 199 | 60 | 41 | 4 | 94 | 0 |
+
+    Findings:
+    - **A Shau** is the high-churn case: 41 close-glb→impostor
+      demotions and 60 impostor→close-glb promotions in one window
+      reflect cap-boundary cycling as the WarSimulator materializes
+      strategic-tier units into Hill 937. Slice 2 pre-release handles
+      this without `pool-empty` (zero observed), but the visual pop-in
+      cadence is worth a follow-up review.
+    - **combat120** shows the same two-way churn pattern in miniature:
+      23 promotions, 20 demotions.
+    - **TDM** shows pure promotion (8 of 8) — the cap is not exhausted
+      at the review pose, so no demotion cycle.
+    - **Open Frontier** shows only `null→culled` transitions for
+      first-observation of far-LOD combatants beyond billboard range.
+    - **A Shau** has 85 `impostor:pool-loading` reason events, which
+      confirms the lazy-growth path fires hard during the
+      directed-warp materialization spike but settles to zero by
+      review pose.
+
 0e. **Tier-transition events (shipped 2026-05-12, Phase F memo slice 6).**
     `CombatantRenderer.updateBillboards` now emits a typed
     `materialization_tier_changed` event on `GameEventBus` whenever a

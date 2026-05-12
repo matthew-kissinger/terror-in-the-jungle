@@ -118,6 +118,25 @@ interface DirectedZoneWarp {
   waitMsObserved: number;
 }
 
+interface TierEventCapture {
+  // Slice 8: empirical tier-transition flow captured during the probe.
+  // `available` reflects whether `__materializationTierEvents` is exposed
+  // (requires `?diag=1` and KONVEYER slice-6 bus subscription).
+  available: boolean;
+  totalEvents: number;
+  byTransition: Record<string, number>;
+  byReason: Record<string, number>;
+  inActiveCombatPromotions: number;
+  firstObservationToCloseGlb: number;
+  sample: Array<{
+    combatantId: string;
+    fromRender: string | null;
+    toRender: string;
+    reason: string;
+    distanceMeters: number;
+  }>;
+}
+
 interface CloseGlbComparison {
   visibleNpcCloseGlbCount: number;
   status: ProbeStatus;
@@ -125,6 +144,7 @@ interface CloseGlbComparison {
   cropIsolation: string[];
   initialTelemetry: CloseGlbTelemetry;
   startupPrewarmMarks: { name: string; sinceStartMs: number }[];
+  tierEvents: TierEventCapture | null;
   directedZoneWarp: DirectedZoneWarp | null;
   reviewPose: CloseGlbReviewPose | null;
   telemetry: CloseGlbTelemetry;
@@ -1140,6 +1160,56 @@ async function prepareDirectedZoneWarp(
   };
 }
 
+async function captureTierTransitionEvents(page: Page): Promise<TierEventCapture> {
+  return page.evaluate(() => {
+    const reader = (window as any).__materializationTierEvents;
+    if (typeof reader !== 'function') {
+      return {
+        available: false,
+        totalEvents: 0,
+        byTransition: {},
+        byReason: {},
+        inActiveCombatPromotions: 0,
+        firstObservationToCloseGlb: 0,
+        sample: [],
+      };
+    }
+    const events = reader({ clear: true });
+    const byTransition: Record<string, number> = {};
+    const byReason: Record<string, number> = {};
+    let firstObservationToCloseGlb = 0;
+    for (const event of events) {
+      const transitionKey = `${String(event.fromRender ?? 'null')}->${String(event.toRender)}`;
+      byTransition[transitionKey] = (byTransition[transitionKey] ?? 0) + 1;
+      const reasonKey = String(event.reason ?? 'unknown');
+      byReason[reasonKey] = (byReason[reasonKey] ?? 0) + 1;
+      if (event.fromRender === null && event.toRender === 'close-glb') {
+        firstObservationToCloseGlb += 1;
+      }
+    }
+    // `inActiveCombatPromotions` would require correlating against the
+    // current state; from the event payload alone we cannot know whether
+    // the combatant was in active combat. The probe records 0 here and
+    // leaves this signal to the slice-4 nearest[] view; future probe
+    // versions can correlate by id if budget arbiter evidence is needed.
+    return {
+      available: true,
+      totalEvents: events.length,
+      byTransition,
+      byReason,
+      inActiveCombatPromotions: 0,
+      firstObservationToCloseGlb,
+      sample: events.slice(-12).map((event: any) => ({
+        combatantId: String(event.combatantId ?? ''),
+        fromRender: event.fromRender == null ? null : String(event.fromRender),
+        toRender: String(event.toRender),
+        reason: String(event.reason ?? ''),
+        distanceMeters: Number(event.distanceMeters ?? 0),
+      })),
+    };
+  });
+}
+
 async function prepareCloseGlbReviewPose(page: Page): Promise<CloseGlbReviewPose> {
   return page.evaluate(() => {
     const engine = (window as any).__engine;
@@ -1338,6 +1408,10 @@ async function captureCloseGlbComparison(
     // The telemetry below records lazyLoadAllowed=false; keep the proof non-fatal.
   }
 
+  // Slice 8: drain any pre-warp tier-transition events so the post-warp
+  // capture window is clean. The directed warp + review pose are the
+  // interesting window for materialization flow.
+  await captureTierTransitionEvents(page);
   const directedZoneWarp = await prepareDirectedZoneWarp(page, probeMode, closeModelWaitMs);
   const reviewPose = await prepareCloseGlbReviewPose(page);
   if (reviewPose.attempted) {
@@ -1450,6 +1524,15 @@ async function captureCloseGlbComparison(
     }
   }
 
+  // Drain the tier-transition buffer after all the materialization work is
+  // done. This window covers directed-warp + lazy-load gate + review pose.
+  const tierEvents = await captureTierTransitionEvents(page);
+  if (tierEvents.available) {
+    findings.push(`tier-events:total=${tierEvents.totalEvents},firstToCloseGlb=${tierEvents.firstObservationToCloseGlb}`);
+  } else {
+    findings.push('tier-events:not-available-without-diag');
+  }
+
   const status: ProbeStatus = visibleNpcCloseGlbCount > 0 && findings.length === 0 ? 'pass' : 'warn';
   return {
     visibleNpcCloseGlbCount,
@@ -1458,6 +1541,7 @@ async function captureCloseGlbComparison(
     cropIsolation,
     initialTelemetry,
     startupPrewarmMarks,
+    tierEvents,
     directedZoneWarp,
     reviewPose,
     telemetry,
