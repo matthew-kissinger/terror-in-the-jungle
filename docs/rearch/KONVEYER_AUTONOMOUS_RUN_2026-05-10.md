@@ -234,10 +234,10 @@ Deliver:
 - a finite-map terrain-edge strategy for Zone Control and other small maps
 - strict-WebGPU Open Frontier, Zone Control, Team Deathmatch, combat120, and
   A Shau short captures
-- current branch checkpoint `ca587625` on
-  `origin/exp/konveyer-webgpu-migration`; latest close-NPC materialization and
-  startup compile proof is
-  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+- current branch work on `origin/exp/konveyer-webgpu-migration`; use the remote
+  branch head rather than a frozen SHA in this brief. Latest close-NPC
+  materialization and startup compile proof is
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`
 
 Rules:
 

@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-11
+Last verified: 2026-05-12
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -26,7 +26,7 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-05-11)
+## Current focus (2026-05-12)
 
 `master` is in release-stewardship mode after the overnight multi-stream pass.
 Merged work now includes:
@@ -49,14 +49,15 @@ verification because Cloudflare API access returned authentication error
 10000 in this session.
 
 The KONVEYER experimental branch is now active at
-`exp/konveyer-webgpu-migration`; remote checkpoint `ca587625` is the current
-pickup point. KONVEYER-0 through KONVEYER-9 have a branch review packet with
-strict WebGPU startup proof, production render blockers at zero, and terrain
-ground-tone acceptance. This does not make the branch production-ready. The
-active cycle is KONVEYER-10: rest-of-scene visual parity and frame-budget
-attribution. It owns vegetation/NPC washout, atmosphere/sky anchoring,
-world-budget decomposition, skyward triangle attribution, and finite-map
-terrain-edge presentation.
+`exp/konveyer-webgpu-migration`; use `origin/exp/konveyer-webgpu-migration`
+branch head as the current pickup point rather than a frozen SHA in this doc.
+KONVEYER-0 through KONVEYER-9 have a branch review packet with strict WebGPU
+startup proof, production render blockers at zero, and terrain ground-tone
+acceptance. This does not make the branch production-ready. The active cycle
+is KONVEYER-10: rest-of-scene visual parity and frame-budget attribution. It
+owns vegetation/NPC washout, atmosphere/sky anchoring, world-budget
+decomposition, skyward triangle attribution, finite-map terrain-edge
+presentation, and materialization policy needed for readable close combatants.
 
 The current research spike for the new stack is
 [docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md](../rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md).
@@ -113,42 +114,44 @@ Follow-up close-model telemetry at
 proves the bounded startup prewarm path now runs before first reveal under
 strict WebGPU. It records startup marks for
 `engine-init.startup-flow.npc-close-model-prewarm.*` and shows 8 active Open
-Frontier close GLBs, with weapons present on active rows. It also confirms the
-remaining materialization-policy issue: 14 NPCs were inside the initial close
-radius, so 6 still rendered as impostors because the current cap/pool policy
-cannot materialize the whole crowded spawn cluster. The correct design
-direction is a deterministic spawn-proximity close-model residency policy,
-plus the dev/perf `window.npcMaterializationProfile()` debug surface that
-lists nearest NPC render modes and fallback reasons.
+Frontier close GLBs, with weapons present on active rows. It also exposed the
+materialization-policy issue that the later bounded spawn-residency reserve
+addresses for Open Frontier: 14 NPCs were inside the initial close radius and
+6 rendered as impostors under the old fixed cap/pool policy. The durable
+debug surface is the dev/perf `window.npcMaterializationProfile()` profile,
+which lists nearest NPC render modes and fallback reasons.
 Follow-up public-profile proof at
 `artifacts/perf/2026-05-11T23-56-05-104Z/konveyer-asset-crop-probe/asset-crop-probe.json`
 confirms the strict WebGPU probe now sources both initial and review nearest
 rows from `window.npcMaterializationProfile()`. The close-model priority now
 has a hard-near anti-pop bubble, so the nearest review rows are close GLBs with
-weapons and `pool-loading` clears to zero. It remains WARN: crowded starts can
-still exceed the fixed total cap, leaving total-cap impostors. The same proof
-includes the first fern source-atlas palette edit: vegetation luma drops into
-a darker humid-olive range, but the simple green-dominance crop metric still
-warns and should be treated as a probe/segmentation weakness plus a Pixel Forge
-asset-review carry-over, not as a reason to keep darkening blindly.
+weapons and `pool-loading` clears to zero. It still showed total-cap impostors
+under the old fixed cap; that Open Frontier startup symptom is superseded by
+the current 01:26 proof below. The same proof includes the first fern
+source-atlas palette edit: vegetation luma drops into a darker humid-olive
+range, but the simple green-dominance crop metric still warns and should be
+treated as a probe/segmentation weakness plus a Pixel Forge asset-review
+carry-over, not as a reason to keep darkening blindly.
 The current isolated close-GLB material proof is
-`artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+`artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
 It binds the crop to a preferred active review-pose combatant when possible,
-records 8 visible close GLBs with weapons, no request failures, public
-`window.npcMaterializationProfile()` telemetry, and geometry-derived body
-bounds. The crop now shows the strict-WebGPU close soldier and weapon after
-hiding vegetation and terrain for material isolation. It still warns because
-crowded starts leave total-cap fallback impostors and the isolated crop is
-bright against a neutral hidden-terrain frame. Do not solve this by overfitting
-crop thresholds; the needed work is deterministic spawn-proximity residency
-policy plus integrated object/body-bound visual probes.
+records 11 visible close GLBs with weapons, an effective close cap of 11, no
+close fallback records, public `window.npcMaterializationProfile()` telemetry,
+and geometry-derived body bounds. The crop shows the strict-WebGPU close
+soldier and weapon after hiding vegetation and terrain for material isolation.
+It still warns because the generic NPC impostor crop has no candidate after
+nearby actors promote to close GLBs and the isolated crop is bright against a
+neutral hidden-terrain frame. Do not solve this by overfitting crop thresholds;
+the next work is multi-mode spawn-residency reserve verification, cap/budget
+review, and integrated object/body-bound visual probes for Phase F
+materialization tiers.
 
 Startup UI "Compiling features" is not currently shader compilation. The same
 strict WebGPU proof records Open Frontier terrain feature compile marks:
-feature list compile about 5.5ms for 1,363 stamps, 67 surface patches, 8
-exclusion zones, and 36 flow paths; stamped-provider creation about 2.6ms;
-1024-grid heightmap rebake about 52.1ms; total terrain-feature compile about
-60.7ms. The first optimization candidate is prebaking or chunking the stamped
+feature list compile about 5.2ms for 1,363 stamps, 67 surface patches, 8
+exclusion zones, and 36 flow paths; stamped-provider creation about 2.1ms;
+1024-grid heightmap rebake about 48.5ms; total terrain-feature compile about
+55.9ms. The first optimization candidate is prebaking or chunking the stamped
 heightmap rebake.
 
 Current KONVEYER-10 scene probes are under

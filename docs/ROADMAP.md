@@ -1,6 +1,6 @@
 # Roadmap
 
-Last verified: 2026-05-11
+Last verified: 2026-05-12
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 > For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
@@ -24,10 +24,11 @@ presentation, cross-browser/mobile proof, and A Shau perf acceptance. WebGL is
 diagnostic only for that branch; it must not be used as a fallback success path
 for WebGPU migration proof.
 
-Latest experimental checkpoint: `ca587625` on
-`origin/exp/konveyer-webgpu-migration`. It adds strict close-NPC
-materialization telemetry/body-bound proof and startup feature-compile
-attribution, but it does not close the rollout gate.
+Latest experimental work is on `origin/exp/konveyer-webgpu-migration`. Use the
+remote branch head rather than a frozen SHA in this roadmap. The branch now has
+strict close-NPC materialization telemetry/body-bound proof, a bounded
+spawn-residency reserve for first-reveal close actors, and startup
+feature-compile attribution, but it does not close the rollout gate.
 
 KONVEYER edge work is now vision-first, not probe-first. Source-backed visual
 terrain extent is the direction for finite procedural maps; A Shau needs real

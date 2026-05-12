@@ -139,13 +139,16 @@ current `origin/master`.
   implementation.
 - Validate with strict WebGPU Open Frontier, Zone Control, Team Deathmatch,
   combat120, and A Shau short captures before any new default-on claim.
-- Latest branch checkpoint is `ca587625` on
-  `origin/exp/konveyer-webgpu-migration`; do not restart from the K0-K9 packet.
+- Latest branch work is on `origin/exp/konveyer-webgpu-migration`; use the
+  remote branch head rather than a frozen SHA in this brief and do not restart
+  from the K0-K9 packet.
   Close-NPC materialization and startup compile proof is
-  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
   It proves public materialization telemetry, geometry-derived close-GLB body
-  bounds, and a visible strict-WebGPU close soldier/weapon crop, while keeping
-  total-cap fallback and the stamped heightmap rebake as open work.
+  bounds, a visible strict-WebGPU close soldier/weapon crop, and a bounded
+  Open Frontier spawn-residency reserve with 11 close GLBs and zero fallback
+  records for the nearest actors. Multi-mode reserve verification and the
+  stamped heightmap rebake remain open work.
 - Water/hydrology bridge proof is now part of the follow-up loop: source audit
   `artifacts/perf/2026-05-11T21-33-05-844Z/projekt-143-water-system-audit/water-system-audit.json`
   and runtime proof

@@ -215,21 +215,19 @@ Recommended next asset spike:
   `artifacts/perf/2026-05-11T23-18-06-820Z/konveyer-asset-crop-probe/asset-crop-probe.json`
   proves the bounded startup prewarm now runs before first reveal in Open
   Frontier: startup marks record `npc-close-model-prewarm.*`, and 8 close GLBs
-  are active under strict WebGPU. It also proves the remaining policy problem:
+  are active under strict WebGPU. It also proved the then-open policy problem:
   14 NPCs were inside the initial close radius and 6 remained impostors because
-  the current close cap/pool policy cannot materialize the whole crowded spawn
-  cluster. K14/Phase F should formalize spawn-proximity residency and add a
-  nearest-NPC render-mode debug surface before changing Pixel Forge source
-  assets for this specific symptom. Dev/perf builds now expose that first
-  surface as `window.npcMaterializationProfile()`.
+  the old fixed close cap/pool policy could not materialize the whole crowded
+  spawn cluster. Dev/perf builds now expose the first nearest-NPC render-mode
+  debug surface as `window.npcMaterializationProfile()`.
 - Follow-up proof
   `artifacts/perf/2026-05-11T23-56-05-104Z/konveyer-asset-crop-probe/asset-crop-probe.json`
   confirms the strict WebGPU crop probe consumes
   `window.npcMaterializationProfile()` rather than private renderer maps for
   nearest materialization rows. The hard-near anti-pop priority makes nearest
   review rows close GLBs with weapons and clears `pool-loading` to zero. The
-  residual signal is still architectural: crowded starts can exceed the fixed
-  total cap and leave fallback impostors.
+  residual signal at that checkpoint was still architectural: crowded starts
+  could exceed the old fixed total cap and leave fallback impostors.
 - The same proof plus
   `artifacts/perf/2026-05-11T23-56-fern-palette/metrics.json` records the
   first fern source-atlas palette edit toward darker humid olive. Final
@@ -244,9 +242,19 @@ Recommended next asset spike:
   geometry, and hides terrain/vegetation for the material crop. It records 8
   visible close GLBs, weapons present, no request failures,
   `selectionReason=preferred-active-close-model`, and a visible soldier/weapon
-  crop under strict WebGPU. The remaining warning is a cap/materialization and
-  integrated-scene policy problem, not evidence that nearby WebGPU NPCs must
-  start as impostors.
+  crop under strict WebGPU. The warning at that checkpoint was a
+  cap/materialization and integrated-scene policy problem, not evidence that
+  nearby WebGPU NPCs must start as impostors.
+- The bounded spawn-residency proof at
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  records 11 visible nearby close GLBs, effective close cap 11, zero close
+  fallback records, all nearest startup/review rows as `close-glb` with
+  weapons, and the same public materialization telemetry/body-bound crop path.
+  It remains WARN for probe-shape reasons: the generic NPC impostor crop has no
+  candidate after nearby actors promote to close GLBs, and the isolated close
+  crop is bright against a neutral hidden-terrain/vegetation frame. Treat the
+  remaining work as multi-mode reserve verification, cap/budget review, and
+  Phase F materialization-tier policy.
 - The same proof adds startup `terrain-features.compile` attribution for the
   UI "Compiling features" step: the Open Frontier cost is dominated by the
   1024-grid stamped heightmap rebake (~52.1ms), not shader compilation.
@@ -278,10 +286,11 @@ Recommended next materialization spike:
    service-style managers.
 3. Keep rendering materialization separate from simulation truth.
 4. Design for 120 live combat proof now and 3,000 combatant tiers later.
-5. Define the initial-spawn residency contract: combatants within the
-   close-model radius or first camera frustum should either have prewarmed
-   close-model pool slots before reveal or be deliberately classified as
-   acceptable impostors with a visible fallback reason.
+5. Extend the initial-spawn residency contract beyond the first Open Frontier
+   proof: combatants within the close-model radius or first camera frustum
+   should either have prewarmed close-model pool slots before reveal or be
+   deliberately classified as acceptable impostors with a visible fallback
+   reason, with per-mode cap/budget data.
 
 ## Spike 7: Terrain Occlusion And Fire Authority
 
@@ -408,10 +417,9 @@ Recommended next water spike:
 
 ## Recommended Follow-Up Order
 
-1. Continue from remote checkpoint `ca587625` on
-   `exp/konveyer-webgpu-migration`. The latest strict WebGPU close-NPC and
-   startup-compile proof is
-   `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+1. Continue from the remote branch head on `exp/konveyer-webgpu-migration`.
+   The latest strict WebGPU close-NPC and startup-compile proof is
+   `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
    Do not restart from the older K0-K9 branch-review packet.
 2. K11 terrain budget spike: CDLOD node/ring evidence, main-vs-shadow terrain
    ownership, and a flight/elevated skyward proof. First pass complete in

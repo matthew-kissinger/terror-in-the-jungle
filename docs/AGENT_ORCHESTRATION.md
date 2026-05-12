@@ -176,21 +176,21 @@ Each task scope is defined in
 
 ### Current checkpoint for next agent
 
-Remote branch `origin/exp/konveyer-webgpu-migration` is checkpointed at
-`ca587625` (`feat(konveyer): stabilize webgpu scene parity cycle`). Do not
-restart from the K0-K9 packet. Start from the current docs and artifacts:
+Remote branch `origin/exp/konveyer-webgpu-migration` is the pickup branch.
+Use the branch head rather than a frozen SHA in this doc; do not restart from
+the K0-K9 packet. Start from the current docs and artifacts:
 
 - Scene/terrain/sky/water packet:
   `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
 - Close-NPC materialization and startup compile packet:
-  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
 - Water/hydrology runtime bridge:
   `artifacts/perf/2026-05-11T21-33-31-662Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
 
 The next high-value work is not more threshold tuning. Continue with:
 
-- deterministic spawn-proximity close-model residency instead of startup
-  impostor pop for nearby actors;
+- multi-mode verification of the bounded spawn-residency close-model reserve
+  and its cap/budget impact beyond Open Frontier;
 - multi-mode attribution/optimization of the stamped heightmap rebake behind
   the UI "Compiling features" step;
 - A Shau finite-edge decision using real outer DEM/source data, explicit

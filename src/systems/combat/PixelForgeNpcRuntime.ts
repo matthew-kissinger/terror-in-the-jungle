@@ -62,6 +62,16 @@ export const PixelForgeNpcDistanceConfig = {
   hardNearDistanceMeters: 32,
   /** Priority boost for actors inside `hardNearDistanceMeters`. */
   hardNearWeight: 20,
+  /**
+   * Initial-spawn residency bubble. Actors this close to the player are allowed
+   * to use a small reserve above the steady close-model cap so a crowded first
+   * reveal does not begin as impostors directly beside the player.
+   */
+  spawnResidencyDistanceMeters: 64,
+  /** Extra close-model slots available only for spawn-resident actors. */
+  spawnResidencyExtraCap: 4,
+  /** Priority boost for actors inside the spawn-residency bubble. */
+  spawnResidencyWeight: 12,
   /** Selection priority weight for combatants whose AABB lies inside the camera frustum. */
   onScreenWeight: 10,
   /** Selection priority weight for combatants in the player's squad. */
@@ -103,7 +113,9 @@ export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS =
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ =
   PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS * PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP = 8;
-export const PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP;
+export const PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP = 4;
+export const PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION =
+  PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION = 4;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOP_UP_BATCH = 2;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG = '__TIJ_ALLOW_NPC_CLOSE_MODEL_LAZY_LOAD__';

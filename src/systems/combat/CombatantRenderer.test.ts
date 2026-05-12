@@ -12,6 +12,7 @@ import {
   PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
   PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
 } from './PixelForgeNpcRuntime';
 import { Logger } from '../../utils/Logger';
@@ -600,7 +601,7 @@ describe('CombatantRenderer', () => {
 
       const combatants = new Map<string, Combatant>();
       for (let i = 0; i < 48; i++) {
-        const combatant = createMockCombatant(`nva-${i}`, Faction.NVA, new THREE.Vector3(2 + i, 0, 0));
+        const combatant = createMockCombatant(`nva-${i}`, Faction.NVA, new THREE.Vector3(70 + i * 0.5, 0, 0));
         combatants.set(combatant.id, combatant);
       }
 
@@ -618,9 +619,80 @@ describe('CombatantRenderer', () => {
       expect(stats.renderedCloseModels).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
       expect(stats.fallbackCounts['total-cap']).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
       expect(stats.fallbackCount).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
-      expect(stats.nearestFallbackDistanceMeters).toBeCloseTo(2 + PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+      expect(stats.closeModelActiveCap).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+      expect(stats.nearestFallbackDistanceMeters).toBeCloseTo(70 + PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP * 0.5);
       expect(records).toContainEqual(expect.objectContaining({
         combatantId: `nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP}`,
+        reason: 'total-cap',
+      }));
+    });
+
+    it('uses a bounded spawn-residency reserve so nearby spawn clusters do not start as impostors', async () => {
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        Faction.NVA,
+        getPixelForgeNpcRuntimeFaction(Faction.NVA),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+
+      const spawnResidentCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
+        + PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP;
+      const combatants = new Map<string, Combatant>();
+      for (let i = 0; i < spawnResidentCap; i++) {
+        const combatant = createMockCombatant(`spawn-near-${i}`, Faction.NVA, new THREE.Vector3(18 + i, 0, 0));
+        combatants.set(combatant.id, combatant);
+      }
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      expect(activeCloseModels.size).toBe(spawnResidentCap);
+      expect(activeCloseModels.has(`spawn-near-${spawnResidentCap - 1}`)).toBe(true);
+
+      const { stats } = readCloseModelTelemetry(renderer);
+      expect(stats.closeModelActiveCap).toBe(spawnResidentCap);
+      expect(stats.renderedCloseModels).toBe(spawnResidentCap);
+      expect(stats.fallbackCount).toBe(0);
+    });
+
+    it('keeps the spawn-residency reserve bounded when the nearby cluster is larger than the reserve', async () => {
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        Faction.NVA,
+        getPixelForgeNpcRuntimeFaction(Faction.NVA),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+
+      const spawnResidentCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
+        + PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP;
+      const combatants = new Map<string, Combatant>();
+      for (let i = 0; i < spawnResidentCap + 4; i++) {
+        const combatant = createMockCombatant(`spawn-crowd-${i}`, Faction.NVA, new THREE.Vector3(18 + i, 0, 0));
+        combatants.set(combatant.id, combatant);
+      }
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      expect(activeCloseModels.size).toBe(spawnResidentCap);
+      expect(activeCloseModels.has(`spawn-crowd-${spawnResidentCap - 1}`)).toBe(true);
+      expect(activeCloseModels.has(`spawn-crowd-${spawnResidentCap}`)).toBe(false);
+
+      const { stats, records } = readCloseModelTelemetry(renderer);
+      expect(stats.closeModelActiveCap).toBe(spawnResidentCap);
+      expect(stats.fallbackCounts['total-cap']).toBe(4);
+      expect(records).toContainEqual(expect.objectContaining({
+        combatantId: `spawn-crowd-${spawnResidentCap}`,
         reason: 'total-cap',
       }));
     });
@@ -642,7 +714,7 @@ describe('CombatantRenderer', () => {
       try {
         const combatants = new Map<string, Combatant>();
         for (let i = 0; i < 48; i++) {
-          const combatant = createMockCombatant(`nva-${i}`, Faction.NVA, new THREE.Vector3(2 + i, 0, 0));
+          const combatant = createMockCombatant(`nva-${i}`, Faction.NVA, new THREE.Vector3(70 + i * 0.5, 0, 0));
           combatants.set(combatant.id, combatant);
         }
 
@@ -1022,12 +1094,13 @@ describe('CombatantRenderer', () => {
       configureCameraTowardPlusX();
 
       const combatants = new Map<string, Combatant>();
-      // 12 NPCs along the camera-facing axis, all within close-model radius.
+      // 12 NPCs along the camera-facing axis, all within close-model radius
+      // but outside the spawn-residency reserve.
       for (let i = 0; i < 12; i++) {
         const c = createMockCombatant(
           `nva-prio-${i}`,
           Faction.NVA,
-          new THREE.Vector3(20 + i * 3, 0, 0),
+          new THREE.Vector3(70 + i * 3, 0, 0),
         );
         combatants.set(c.id, c);
       }
@@ -1047,13 +1120,13 @@ describe('CombatantRenderer', () => {
       const combatants = new Map<string, Combatant>();
       // 7 on-screen NPCs in front of camera (camera looks toward +X).
       for (let i = 0; i < 7; i++) {
-        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(40 + i, 0, 0));
+        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(70 + i, 0, 0));
         combatants.set(c.id, c);
       }
       // 7 off-screen NPCs behind the camera, slightly closer by raw distance
       // but outside the hard-near anti-pop bubble.
       for (let i = 0; i < 7; i++) {
-        const c = createMockCombatant(`back-${i}`, Faction.NVA, new THREE.Vector3(-(35 + i), 0, 0));
+        const c = createMockCombatant(`back-${i}`, Faction.NVA, new THREE.Vector3(-(65 + i), 0, 0));
         combatants.set(c.id, c);
       }
 
@@ -1100,14 +1173,14 @@ describe('CombatantRenderer', () => {
       const combatants = new Map<string, Combatant>();
       // 7 on-screen non-squad NPCs filling the front slots.
       for (let i = 0; i < 7; i++) {
-        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(20 + i, 0, 0));
+        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(70 + i, 0, 0));
         combatants.set(c.id, c);
       }
       // One off-screen player-squad member.
       const squadMate = createMockCombatant(
         'squad-mate',
         Faction.US,
-        new THREE.Vector3(-30, 0, 0),
+        new THREE.Vector3(-72, 0, 0),
       );
       squadMate.squadId = 'squad-1';
       combatants.set('squad-mate', squadMate);
@@ -1115,7 +1188,7 @@ describe('CombatantRenderer', () => {
       const closerBack = createMockCombatant(
         'closer-back',
         Faction.NVA,
-        new THREE.Vector3(-10, 0, 0),
+        new THREE.Vector3(-66, 0, 0),
       );
       combatants.set('closer-back', closerBack);
 
@@ -1134,7 +1207,7 @@ describe('CombatantRenderer', () => {
 
       const combatants = new Map<string, Combatant>();
       for (let i = 0; i < 8; i++) {
-        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(20 + i, 0, 0));
+        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(70 + i, 0, 0));
         combatants.set(c.id, c);
       }
 
@@ -1154,7 +1227,7 @@ describe('CombatantRenderer', () => {
       const newcomer = createMockCombatant(
         'newcomer',
         Faction.NVA,
-        new THREE.Vector3(0, 0, -25),
+        new THREE.Vector3(0, 0, -70),
       );
       combatants.set('newcomer', newcomer);
 

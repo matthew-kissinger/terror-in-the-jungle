@@ -141,6 +141,7 @@ interface CloseModelCandidate {
   isOnScreen: boolean;
   recentlyVisible: boolean;
   isPlayerSquad: boolean;
+  isSpawnResident: boolean;
   priorityScore: number;
 }
 
@@ -474,13 +475,6 @@ export class CombatantRenderer {
     options: CloseModelPrewarmOptions = {},
   ): Promise<CloseModelPrewarmSummary> {
     const startMs = performance.now();
-    const maxActive = Math.max(
-      0,
-      Math.min(
-        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
-        Math.floor(options.maxActive ?? PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP),
-      ),
-    );
     const emptySummary = (
       skippedReason: CloseModelPrewarmSummary['skippedReason'],
       candidatesWithinCloseRadius = 0,
@@ -495,7 +489,7 @@ export class CombatantRenderer {
       durationMs: performance.now() - startMs,
     });
 
-    if (this.closeModelPerfIsolationEnabled || maxActive <= 0) {
+    if (this.closeModelPerfIsolationEnabled) {
       return emptySummary('perf-isolation');
     }
 
@@ -504,6 +498,11 @@ export class CombatantRenderer {
     const candidates = this.collectCloseModelCandidates(combatants, playerPosition, nowMs);
     if (candidates.length === 0) {
       return emptySummary('no-candidates');
+    }
+
+    const maxActive = this.resolveCloseModelActiveCap(candidates, options.maxActive);
+    if (maxActive <= 0) {
+      return emptySummary('perf-isolation', candidates.length);
     }
 
     const requestedPoolTargets: Record<string, number> = {};
@@ -1024,8 +1023,9 @@ export class CombatantRenderer {
 
     const selected = new Set<string>();
     const suppressedImpostorIds = new Set<string>();
+    const effectiveActiveCap = this.resolveCloseModelActiveCap(candidates);
     for (const candidate of candidates) {
-      if (selected.size >= PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP) {
+      if (selected.size >= effectiveActiveCap) {
         this.recordCloseModelFallback(candidate, 'total-cap');
         this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, 'total-cap');
         continue;
@@ -1051,7 +1051,7 @@ export class CombatantRenderer {
       }
     });
 
-    this.captureCloseModelRuntimeStats(candidates.length, selected.size);
+    this.captureCloseModelRuntimeStats(candidates.length, selected.size, effectiveActiveCap);
     return { closeModelIds: selected, suppressedImpostorIds };
   }
 
@@ -1077,7 +1077,9 @@ export class CombatantRenderer {
       const isPlayerSquad = poolKey === 'SQUAD';
       const distance = Math.sqrt(distanceSq);
       const isHardNear = distance <= PixelForgeNpcDistanceConfig.hardNearDistanceMeters;
+      const isSpawnResident = distance <= PixelForgeNpcDistanceConfig.spawnResidencyDistanceMeters;
       const priorityScore =
+        PixelForgeNpcDistanceConfig.spawnResidencyWeight * (isSpawnResident ? 1 : 0) +
         PixelForgeNpcDistanceConfig.hardNearWeight * (isHardNear ? 1 : 0) +
         PixelForgeNpcDistanceConfig.onScreenWeight * (isOnScreen ? 1 : 0) +
         PixelForgeNpcDistanceConfig.squadWeight * (isPlayerSquad ? 1 : 0) +
@@ -1091,11 +1093,32 @@ export class CombatantRenderer {
         isOnScreen,
         recentlyVisible,
         isPlayerSquad,
+        isSpawnResident,
         priorityScore,
       });
     });
-    candidates.sort((a, b) => b.priorityScore - a.priorityScore);
+    candidates.sort((a, b) =>
+      b.priorityScore - a.priorityScore
+      || a.distanceSq - b.distanceSq
+      || a.combatant.id.localeCompare(b.combatant.id)
+    );
     return candidates;
+  }
+
+  private resolveCloseModelActiveCap(candidates: CloseModelCandidate[], requestedMaxActive?: number): number {
+    const spawnResidentCount = candidates.reduce(
+      (count, candidate) => count + (candidate.isSpawnResident ? 1 : 0),
+      0,
+    );
+    const extraCap = Math.min(
+      Math.max(0, Math.floor(PixelForgeNpcDistanceConfig.spawnResidencyExtraCap)),
+      Math.max(0, spawnResidentCount - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP),
+    );
+    const effectiveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + extraCap;
+    if (requestedMaxActive === undefined) {
+      return effectiveCap;
+    }
+    return Math.max(0, Math.min(effectiveCap, Math.floor(requestedMaxActive)));
   }
 
   /**
@@ -1132,7 +1155,11 @@ export class CombatantRenderer {
     });
   }
 
-  private captureCloseModelRuntimeStats(candidatesWithinCloseRadius: number, renderedCloseModels: number): void {
+  private captureCloseModelRuntimeStats(
+    candidatesWithinCloseRadius: number,
+    renderedCloseModels: number,
+    closeModelActiveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+  ): void {
     const fallbackCounts = createCloseModelFallbackCounts();
     const distances: number[] = [];
     this.closeModelFallbackRecords.forEach((record) => {
@@ -1151,7 +1178,7 @@ export class CombatantRenderer {
 
     this.closeModelRuntimeStats = {
       closeRadiusMeters: getPixelForgeNpcCloseModelDistanceMeters(),
-      closeModelActiveCap: PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      closeModelActiveCap,
       candidatesWithinCloseRadius,
       renderedCloseModels,
       activeCloseModels: this.activeCloseModels.size,

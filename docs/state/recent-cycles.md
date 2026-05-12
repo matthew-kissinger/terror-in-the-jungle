@@ -1,6 +1,6 @@
 # Recent Cycle Outcomes
 
-Last verified: 2026-05-11
+Last verified: 2026-05-12
 
 Last 3 cycles, summarized. Companion docs:
 
@@ -15,25 +15,29 @@ For older cycle outcomes, browse `docs/cycles/` or
 
 ## konveyer-scene-parity-checkpoint-2026-05-12 (experimental, not deployed)
 
-Checkpoint on `exp/konveyer-webgpu-migration` at `ca587625`. This is remote
-branch truth for the next agent, not a production release and not a `master`
-merge approval.
+Checkpoint on `exp/konveyer-webgpu-migration`. Use the remote branch head as
+branch truth for the next agent, not a frozen SHA in this doc. This is not a
+production release and not a `master` merge approval.
 
 **Current KONVEYER-10 progress:**
 
 - Strict WebGPU scene/terrain/sky/water packet:
   `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
 - Close-NPC materialization and startup compile packet:
-  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
 - Nearby NPC debug surface: dev/perf builds expose
   `window.npcMaterializationProfile(24)` for nearest NPC render mode, close-GLB
   weapon presence, and fallback reasons.
+- Bounded spawn-residency reserve: Open Frontier strict WebGPU proof records
+  11 nearby close GLBs, effective close cap 11, and zero fallback records for
+  the nearest startup/review actors.
 - Startup UI "Compiling features" is attributed to terrain feature work, mostly
   the 1024-grid stamped heightmap rebake, not WebGPU shader compilation.
 
 **Still open:**
 
-- Deterministic spawn-proximity close-model residency for crowded starts.
+- Multi-mode verification and Phase F policy for the spawn-residency reserve
+  and broader materialization tiers.
 - A Shau finite-edge strategy using real outer source data, flight/camera
   boundary policy, or an explicit hybrid.
 - Cloud representation/art quality after the world/altitude anchoring slice.

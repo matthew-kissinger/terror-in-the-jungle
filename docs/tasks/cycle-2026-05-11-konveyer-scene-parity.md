@@ -152,11 +152,10 @@ compensation on top of bad source data.
 
 ## Current Evidence Notes
 
-- Remote checkpoint for fresh agents:
-  `ca587625` on `origin/exp/konveyer-webgpu-migration`
-  (`feat(konveyer): stabilize webgpu scene parity cycle`). Continue from this
-  branch head; do not restart from the older KONVEYER-0 through KONVEYER-9
-  packet.
+- Remote pickup for fresh agents:
+  `origin/exp/konveyer-webgpu-migration` branch head. Continue from the branch
+  head; do not rely on a frozen SHA in this brief, and do not restart from the
+  older KONVEYER-0 through KONVEYER-9 packet.
 - Strict WebGPU renderer matrix: `artifacts/perf/2026-05-11T18-17-20-942Z/konveyer-renderer-matrix/matrix.json`.
 - Scene parity probe, Open Frontier + Zone Control:
   `artifacts/perf/2026-05-11T18-30-56-546Z/konveyer-scene-parity/scene-parity.json`.
@@ -190,11 +189,11 @@ compensation on top of bad source data.
   resolves strict WebGPU in Open Frontier and records the bounded startup
   close-model prewarm before first reveal. It proves the close-GLB path is live
   (`activeClose=8`, weapons present on active nearest rows), but it also proves
-  the remaining startup/materialization weakness: 14 NPCs were inside the
-  initial close radius and 6 stayed impostors because the current close cap and
-  pool policy cannot materialize the whole crowded spawn cluster. The design
-  fix is deterministic initial close-model residency policy for spawn-adjacent
-  actors, not WebGL parity tuning. Dev/perf builds now expose
+  the then-open startup/materialization weakness: 14 NPCs were inside the
+  initial close radius and 6 stayed impostors because the old fixed cap and
+  pool policy could not materialize the whole crowded spawn cluster. The later
+  spawn-residency reserve proof below addresses that Open Frontier symptom;
+  do not regress it back into WebGL parity tuning. Dev/perf builds now expose
   `window.npcMaterializationProfile()` so reviewers can inspect the nearest NPC
   render modes and fallback reasons without reaching into renderer internals.
 - Public-profile crop probe:
@@ -202,9 +201,9 @@ compensation on top of bad source data.
   confirms the strict WebGPU crop probe now consumes
   `window.npcMaterializationProfile()` for both initial and review telemetry.
   After the hard-near anti-pop priority slice, `pool-loading` clears to zero
-  and nearest review rows are close GLBs with weapons. It remains WARN because
-  crowded starts can still exceed the fixed close-GLB cap and leave total-cap
-  fallback impostors.
+  and nearest review rows are close GLBs with weapons. It still showed
+  crowded-start total-cap fallback under the old fixed close-GLB cap; that
+  Open Frontier startup symptom is superseded by the 01:26 proof below.
 - Fern palette slice:
   `artifacts/perf/2026-05-11T23-56-fern-palette/metrics.json` records the
   source-atlas candidate used for the fern imposter. The latest crop proof
@@ -218,23 +217,24 @@ compensation on top of bad source data.
   frame, but it still does not reliably capture a full readable soldier. The
   next proof should use object-ID, stencil, or known combatant skeleton/body
   bounds rather than color-dominance heuristics.
-- Target-bound close-GLB proof:
-  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+- Target-bound close-GLB and spawn-residency proof:
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`
   prefers the review-pose combatant in active close-model selection and records
-  `selectionReason=preferred-active-close-model`. It proves the inspected
-  nearby actor can be a close GLB with weapon under strict WebGPU, with 8
-  visible close GLBs, no request failures, public materialization telemetry,
-  and geometry-derived body bounds. The isolated material crop hides
-  vegetation and terrain so the soldier/weapon is visible for review. The
-  proof remains WARN because total-cap fallback can still leave some
-  crowded-spawn actors as impostors and the isolated crop is bright against the
-  neutral proof frame. This is a materialization-tier policy question, not a
-  WebGL parity target.
+  a bounded spawn-residency reserve under strict WebGPU. It proves the
+  inspected nearby actor can be a close GLB with weapon, with 11 visible close
+  GLBs, effective close cap 11, no close fallback records, public
+  materialization telemetry, and geometry-derived body bounds. The isolated
+  material crop hides vegetation and terrain so the soldier/weapon is visible
+  for review. The proof remains WARN because the generic NPC impostor crop has
+  no candidate after nearby actors promote to close GLBs and the isolated crop
+  is bright against the neutral proof frame. This leaves multi-mode reserve
+  verification and Phase F materialization-tier policy, not an Open Frontier
+  startup total-cap failure or WebGL parity target.
 - Startup "Compiling features" attribution:
   the same strict WebGPU proof records Open Frontier terrain feature compile
   marks. The UI wait is mostly the 1024-grid stamped heightmap rebake
-  (~52.1ms), not shader compilation; feature list compile is ~5.5ms and
-  stamped-provider creation is ~2.6ms. First optimization candidate:
+  (~48.5ms), not shader compilation; feature list compile is ~5.2ms and
+  stamped-provider creation is ~2.1ms. First optimization candidate:
   prebake or chunk the stamped heightmap rebake after multi-mode evidence.
 - Cloud anchoring first slice:
   `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`
@@ -271,9 +271,9 @@ compensation on top of bad source data.
 1. Preserve the hard stops: no `master` merge, no deploy, no baseline update,
    no fenced interface edit, no WebGL fallback proof.
 2. Use `window.npcMaterializationProfile(24)` in dev/perf builds to inspect
-   nearby NPC materialization. The next implementation target is deterministic
-   spawn-proximity close-model residency for actors near first reveal, not
-   more crop-threshold tuning.
+   nearby NPC materialization. The next implementation target is multi-mode
+   verification of the bounded spawn-residency reserve and its cap/budget
+   effect, not more crop-threshold tuning.
 3. Attribute the "Compiling features" UI delay across more than Open Frontier,
    then choose whether stamped heightmap rebake should be prebuilt, chunked, or
    worker-backed.
