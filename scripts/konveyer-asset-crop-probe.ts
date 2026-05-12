@@ -137,6 +137,31 @@ interface TierEventCapture {
   }>;
 }
 
+interface MaterializationPerfWindow {
+  // Slice 9: falsifiable perf bar for the materialization review pose.
+  // The probe drains `window.__metrics` (300-sample ring), waits a fixed
+  // window with the steady review pose held, then reads
+  // `getSnapshot()`. Percentiles cover the captured window; activeRender*
+  // / candidate counts are sampled at end of window.
+  attempted: boolean;
+  reason: string | null;
+  durationMs: number;
+  frameCount: number;
+  avgFrameMs: number;
+  p95FrameMs: number;
+  p99FrameMs: number;
+  maxFrameMs: number;
+  hitch33Count: number;
+  hitch50Count: number;
+  hitch100Count: number;
+  combatantCount: number;
+  firingCount: number;
+  engagingCount: number;
+  activeCloseModels: number;
+  candidatesWithinCloseRadius: number;
+  fallbackCount: number;
+}
+
 interface CloseGlbComparison {
   visibleNpcCloseGlbCount: number;
   status: ProbeStatus;
@@ -147,6 +172,7 @@ interface CloseGlbComparison {
   tierEvents: TierEventCapture | null;
   directedZoneWarp: DirectedZoneWarp | null;
   reviewPose: CloseGlbReviewPose | null;
+  perfWindow: MaterializationPerfWindow | null;
   telemetry: CloseGlbTelemetry;
   candidate: CandidateInfo | null;
   screenshot: string | null;
@@ -1160,6 +1186,74 @@ async function prepareDirectedZoneWarp(
   };
 }
 
+async function captureMaterializationPerfWindow(
+  page: Page,
+  durationMs: number,
+): Promise<MaterializationPerfWindow> {
+  // Reset the RuntimeMetrics ring so the captured window starts clean.
+  const resetOk = await page.evaluate(() => {
+    const metrics = (window as any).__metrics;
+    if (typeof metrics?.reset !== 'function') return false;
+    metrics.reset();
+    return true;
+  });
+  if (!resetOk) {
+    return {
+      attempted: false,
+      reason: 'metrics-not-exposed',
+      durationMs: 0,
+      frameCount: 0,
+      avgFrameMs: 0,
+      p95FrameMs: 0,
+      p99FrameMs: 0,
+      maxFrameMs: 0,
+      hitch33Count: 0,
+      hitch50Count: 0,
+      hitch100Count: 0,
+      combatantCount: 0,
+      firingCount: 0,
+      engagingCount: 0,
+      activeCloseModels: 0,
+      candidatesWithinCloseRadius: 0,
+      fallbackCount: 0,
+    };
+  }
+  await page.waitForTimeout(durationMs);
+  // Throttled percentile cache flushes every 500 ms; wait one more interval
+  // so the final snapshot reflects the full window rather than the cached
+  // value from 500 ms before the end of the sample period.
+  await page.waitForTimeout(550);
+  return page.evaluate((requestedDurationMs: number) => {
+    const metrics = (window as any).__metrics;
+    const snapshot = typeof metrics?.getSnapshot === 'function'
+      ? metrics.getSnapshot()
+      : null;
+    const profile = typeof (window as any).npcMaterializationProfile === 'function'
+      ? (window as any).npcMaterializationProfile(24)
+      : null;
+    const stats = profile?.closeModelStats ?? null;
+    return {
+      attempted: true,
+      reason: null,
+      durationMs: requestedDurationMs,
+      frameCount: Number(snapshot?.frameCount ?? 0),
+      avgFrameMs: Number(snapshot?.avgFrameMs ?? 0),
+      p95FrameMs: Number(snapshot?.p95FrameMs ?? 0),
+      p99FrameMs: Number(snapshot?.p99FrameMs ?? 0),
+      maxFrameMs: Number(snapshot?.maxFrameMs ?? 0),
+      hitch33Count: Number(snapshot?.hitch33Count ?? 0),
+      hitch50Count: Number(snapshot?.hitch50Count ?? 0),
+      hitch100Count: Number(snapshot?.hitch100Count ?? 0),
+      combatantCount: Number(snapshot?.combatantCount ?? 0),
+      firingCount: Number(snapshot?.firingCount ?? 0),
+      engagingCount: Number(snapshot?.engagingCount ?? 0),
+      activeCloseModels: Number(stats?.activeCloseModels ?? 0),
+      candidatesWithinCloseRadius: Number(stats?.candidatesWithinCloseRadius ?? 0),
+      fallbackCount: Number(stats?.fallbackCount ?? 0),
+    };
+  }, durationMs);
+}
+
 async function captureTierTransitionEvents(page: Page): Promise<TierEventCapture> {
   return page.evaluate(() => {
     const reader = (window as any).__materializationTierEvents;
@@ -1442,6 +1536,13 @@ async function captureCloseGlbComparison(
 
   const telemetry = await getCloseModelTelemetry(page);
   const visibleNpcCloseGlbCount = await closeGlbCount(page);
+  // Slice 9: capture a steady-state perf window at the review pose, with
+  // full scene visible (vegetation + terrain still on). Placed here before
+  // the candidate-crop block which hides vegetation/terrain and runs a
+  // static-frame screenshot path that would skew sample frame times.
+  const perfWindow = reviewPose.attempted
+    ? await captureMaterializationPerfWindow(page, 4500)
+    : null;
   const candidate = visibleNpcCloseGlbCount > 0
     ? await selectCloseGlbCandidate(page, reviewPose.targetCombatantId)
     : null;
@@ -1533,6 +1634,16 @@ async function captureCloseGlbComparison(
     findings.push('tier-events:not-available-without-diag');
   }
 
+  if (perfWindow?.attempted) {
+    findings.push(
+      `perf-window:frames=${perfWindow.frameCount},avg=${perfWindow.avgFrameMs.toFixed(1)}ms,p95=${perfWindow.p95FrameMs.toFixed(1)}ms,p99=${perfWindow.p99FrameMs.toFixed(1)}ms,hitch33=${perfWindow.hitch33Count}`,
+    );
+  } else if (perfWindow) {
+    findings.push(`perf-window:not-attempted:${perfWindow.reason ?? 'unknown'}`);
+  } else {
+    findings.push('perf-window:review-pose-not-attempted');
+  }
+
   const status: ProbeStatus = visibleNpcCloseGlbCount > 0 && findings.length === 0 ? 'pass' : 'warn';
   return {
     visibleNpcCloseGlbCount,
@@ -1544,6 +1655,7 @@ async function captureCloseGlbComparison(
     tierEvents,
     directedZoneWarp,
     reviewPose,
+    perfWindow,
     telemetry,
     candidate,
     screenshot,

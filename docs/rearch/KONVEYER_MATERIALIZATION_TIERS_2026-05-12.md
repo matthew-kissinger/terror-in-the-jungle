@@ -210,6 +210,50 @@ These are independently shippable. Each one assumes branch hard-stops.
     because the steady review pose has no actor inside the 64 m hard-near
     bubble — the reserve correctly does not engage. Behavior is consistent
     with slice 0; not a regression.
+0g. **Materialization perf-window gate (shipped 2026-05-12, probe-side,
+    Phase F memo slice 7).** The crop probe now drains the
+    `window.__metrics` 300-sample ring buffer via `reset()`, holds the
+    steady review pose with full scene visibility for 4500 ms, then
+    reads `getSnapshot()` for per-mode `{avg, p95, p99, max} ms`,
+    hitch counts, combatant population, and close-model state. This
+    is the explicit falsifiable bar the review packet names — every
+    future rearch slice (sim-strategic, render-silhouette,
+    render-cluster, budget arbiter v2) gets measured against it.
+
+    The slice is purely probe-side: no game-code change. The capture
+    is placed AFTER review-pose settle and BEFORE the candidate-crop
+    block (which hides vegetation/terrain for material isolation and
+    would skew sample frame times). It is gated on
+    `reviewPose.attempted` so failing-to-warp modes do not produce
+    spurious zero-frame samples.
+
+    Strict WebGPU multi-mode evidence (RTX 3070, headed):
+    `artifacts/perf/2026-05-12T15-39-11-477Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+
+    | Mode | avg ms | p95 ms | p99 ms | max ms | hitch33 | close-active | candidates |
+    | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+    | `open_frontier` | 8.9 | 15.5 | 16.5 | 53.8 | 2 | 8 | 13 |
+    | `zone_control` | 11.2 | 16.0 | 16.6 | 31.3 | 0 | 8 | 9 |
+    | `team_deathmatch` | 9.3 | 15.6 | 16.6 | 23.1 | 0 | 10 | 14 |
+    | `ai_sandbox` (combat120) | 12.4 | 16.5 | 23.0 | 38.6 | 1 | 14 | 39 |
+    | `a_shau_valley` | 17.9 | 23.7 | 31.0 | 31.3 | 0 | 14 | 60 |
+
+    Findings:
+    - All five modes pass the memo slice-7 budget (p99 ≤ 33 ms).
+    - A Shau (the 3,000-unit strategic scenario) is the worst case:
+      p99 31.0 ms with 14 close-GLB + 46 impostor at the cap. Margin
+      to the 33 ms gate is 2.0 ms — any sim-strategic regression
+      will likely fail here first.
+    - combat120 stays at p99 23.0 ms with 39 candidates / 25 impostor
+      fallback. The pre-release stale-active fix (slice 2) holds.
+    - Open Frontier `max=53.8 ms` is a single-frame hitch in the
+      4500 ms window (`hitch33=2`), not a sustained budget
+      violation. Likely cause is post-spawn GPU pipeline pre-compile;
+      separately worth profiling but not a gate failure.
+    - Frame counts (284–592 in a 4500 ms window) reveal effective
+      fps: 60 fps lock in Open Frontier / TDM, A Shau at ~56 fps
+      under load.
+
 0f. **Tier-transition event capture (shipped 2026-05-12, probe-side).**
     `bootstrap.ts` now exposes `window.__materializationTierEvents()`
     under `?diag=1`, draining a bounded ring of

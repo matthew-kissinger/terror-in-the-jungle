@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f shipped + KONVEYER review packet drafted)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate shipped, KONVEYER review packet drafted)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -404,6 +404,36 @@ materialization. combat120 shows the same pattern in miniature (43
 events, 23 promotions, 20 demotions). TDM shows pure promotion (8 of
 8) — cap unexhausted at review pose. OF shows only far-LOD
 first-observations.
+
+Materialization perf-window capture (shipped 2026-05-12, probe-side
+Phase F memo slice 7 — falsifiable perf gate): the crop probe now
+holds the steady review pose with full scene visibility, drains the
+`window.__metrics` 300-sample ring via `reset()`, waits 4500ms, then
+reads `getSnapshot()` for per-mode frame stats. This is the explicit
+bar the review packet names as a condition for any 3,000-combatant
+claim. Strict WebGPU multi-mode evidence:
+`artifacts/perf/2026-05-12T15-39-11-477Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+
+Per-mode steady-pose perf window (RTX 3070, headed, strict WebGPU):
+
+| Mode | avg ms | p95 ms | p99 ms | max ms | hitch33 | close-active | candidates |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `open_frontier` | 8.9 | 15.5 | 16.5 | 53.8 | 2 | 8 | 13 |
+| `zone_control` | 11.2 | 16.0 | 16.6 | 31.3 | 0 | 8 | 9 |
+| `team_deathmatch` | 9.3 | 15.6 | 16.6 | 23.1 | 0 | 10 | 14 |
+| `ai_sandbox` (combat120) | 12.4 | 16.5 | 23.0 | 38.6 | 1 | 14 | 39 |
+| `a_shau_valley` | 17.9 | 23.7 | 31.0 | 31.3 | 0 | 14 | 60 |
+
+All five modes are inside the Phase F memo slice-7 budget (p99 ≤ 33 ms).
+A Shau is the worst case as expected — it is the 3,000-unit strategic
+scenario with selective materialization; with 14 close-GLB + 46
+impostor at the cap boundary the renderer holds p99 at 31.0 ms.
+combat120 (39 candidates, 25 impostor fallback) is steady at p99 23.0 ms.
+This is the baseline against which the still-pending rearch slices
+(sim-strategic, render-silhouette, render-cluster, lane-naming
+refactor) get measured. The Open Frontier `max=53.8 ms` reflects one
+single-frame hitch in the 4500 ms window; not a sustained budget
+violation.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

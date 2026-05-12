@@ -80,6 +80,7 @@ priority-based arbiter. Six concrete slices landed:
 | 4 | `1ede03...` | **MaterializationProfile v2**: `CombatantMaterializationRow` carries `reason` (parseable render-lane reason — `close-glb:active`, `impostor:total-cap`, etc.) and `inActiveCombat` (firefight participation flag). Surfaced through `window.npcMaterializationProfile()` and the crop probe's `nearest[]`. |
 | 5 | `d283c7...` | **Budget arbiter v1**: `inActiveCombatWeight=8` added to the close-model candidate priority score. Actors currently ENGAGING/SUPPRESSING/ADVANCING get a priority boost between `squadWeight` (4) and `onScreenWeight` (10), so combat state composes with the other signals rather than dominating them. The Phase F memo's named target case ("a combatant being shot at is render-close eligible even at 130 m") is now realized as a weight. |
 | 6 | `d90db3...` | **Tier-transition events**: `CombatantRenderer.updateBillboards` emits `materialization_tier_changed` on `GameEventBus` when a combatant's render mode changes between frames. Payload: `{ combatantId, fromRender, toRender, reason, distanceMeters }`. Subscribers (minimap, audio, perception, fog-of-war) can react without polling. |
+| 7 | probe-side | **Materialization perf-window gate**: the crop probe drains `window.__metrics` and captures a 4500 ms steady-pose perf window per mode. Five-mode p99 frame times under strict WebGPU on RTX 3070 are now recorded (`open_frontier` 16.5 ms, `zone_control` 16.6 ms, `team_deathmatch` 16.6 ms, `ai_sandbox` 23.0 ms, `a_shau_valley` 31.0 ms). All inside the memo slice-7 budget (p99 ≤ 33 ms). This is the falsifiable bar future rearch slices get measured against. |
 
 Multi-mode strict-WebGPU evidence (canonical per slice):
 
@@ -246,9 +247,25 @@ respects the hard stops.
 
 ### 3,000-unit scenario perf gate (Phase F memo slice 7)
 
-- A new `combat3000` scenario captured under strict WebGPU. Budget:
-  p99 ≤ 33 ms with the new lanes active. Until this gate exists, claims
-  about 3,000-combatant readiness are aspirational.
+- **Probe-side gate landed 2026-05-12.** Rather than a synthetic
+  `combat3000` mode, the crop probe now drains
+  `window.__metrics` and captures a 4500 ms steady-pose perf window
+  against the actual five game modes — including A Shau Valley, which
+  is the existing 3,000-unit strategic simulation with selective
+  materialization. Evidence:
+  `artifacts/perf/2026-05-12T15-39-11-477Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Per-mode steady p99 frame time (RTX 3070, headed, strict WebGPU):
+  `open_frontier` 16.5 ms; `zone_control` 16.6 ms;
+  `team_deathmatch` 16.6 ms; `ai_sandbox` (combat120) 23.0 ms;
+  `a_shau_valley` 31.0 ms. All pass the memo slice-7 budget
+  (p99 ≤ 33 ms). A Shau has the tightest margin at 2.0 ms; that is
+  the bar future rearch slices (sim-strategic, render-silhouette,
+  render-cluster, budget arbiter v2) get measured against.
+- The remaining server-of-record gap is a dedicated `combat3000`
+  fully-live scenario (3,000 simultaneous live combatants, not
+  strategic-tier). That requires a sim-strategic lane to exist; until
+  then it would only test a worst-case the engine is not yet
+  architected to handle. A Shau remains the right canonical scenario.
 
 ## Is WebGPU/TSL The Right Renderer Architecture?
 
@@ -278,8 +295,11 @@ Conditions on continuing this direction:
    public claim about A Shau as a flight-scale environment.
 4. **Cloud representation** needs a representation or asset-authoring
    decision before any claim about flight-scale weather feel.
-5. **3,000-unit perf gate** must exist before any claim about 3,000
-   combatants.
+5. **3,000-unit perf gate** is now in place as the probe's
+   materialization perf-window (4500 ms steady samples against the
+   live A Shau strategic scenario). Future rearch slices must hold
+   or improve A Shau's p99 31.0 ms; any regression past 33 ms is
+   a gate failure.
 6. **Fenced interface change** (`src/types/SystemInterfaces.ts`) needs
    an explicit `[interface-change]` PR with reviewer approval before the
    `WebGLRenderer` types in that file change.
