@@ -210,6 +210,32 @@ These are independently shippable. Each one assumes branch hard-stops.
     because the steady review pose has no actor inside the 64 m hard-near
     bubble — the reserve correctly does not engage. Behavior is consistent
     with slice 0; not a regression.
+0e. **Tier-transition events (shipped 2026-05-12, Phase F memo slice 6).**
+    `CombatantRenderer.updateBillboards` now emits a typed
+    `materialization_tier_changed` event on `GameEventBus` whenever a
+    combatant's render mode (`close-glb` / `impostor` / `culled`) changes
+    between frames. Payload carries `{ combatantId, fromRender, toRender,
+    reason, distanceMeters }`. First observation of a combatant emits
+    with `fromRender: null`. Pruning runs every frame so the
+    `previousRenderModes` map stays bounded.
+
+    Subscribers can now react to materialization changes without polling
+    the renderer: minimap dot promotion, audio mixer ducking, perception
+    onset, future fog-of-war reveal, telemetry sinks. The bus is already
+    batched and flushed end-of-frame, so emitting here adds no
+    synchronous fan-out cost.
+
+    Strict WebGPU multi-mode regression proof:
+    `artifacts/perf/2026-05-12T12-55-00-499Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    No close-NPC materialization regressions vs slice 5: per-mode caps,
+    rendered counts, and fallback counts are equivalent.
+
+    New unit test asserts the contract: first observation emits with
+    `fromRender: null`; steady frames emit nothing; mode transitions
+    (close-glb → impostor when distance crosses the close radius) emit
+    a single event with the correct from/to/reason. Re-appearance of a
+    pruned ID emits as a first observation again.
+
 0d. **Budget arbiter v1: combat-state promotion (shipped 2026-05-12).**
     `PixelForgeNpcDistanceConfig.inActiveCombatWeight=8` is added to the
     close-model candidate priority score. The `CloseModelCandidate` now

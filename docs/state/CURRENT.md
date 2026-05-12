@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slice 1, close-model churn pre-release, A Shau directed-warp, MaterializationProfile v2, and budget arbiter v1 shipped)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e shipped: hard-near reserve + churn pre-release + A Shau directed-warp + MaterializationProfile v2 + budget arbiter v1 + tier-transition events)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -374,6 +374,18 @@ non-combat actors closer in still outrank off-screen in-combat actors
 at hard-near distances, by design. The Phase F memo's named target
 case ("a combatant being shot at... is render-close eligible even at
 130 m") is now realized as a weight, not a hard override.
+
+Tier-transition events (shipped 2026-05-12, Phase F memo slice 6):
+`CombatantRenderer.updateBillboards` now emits a typed
+`materialization_tier_changed` event on `GameEventBus` whenever a
+combatant's render mode changes between frames. Payload carries
+`{ combatantId, fromRender, toRender, reason, distanceMeters }`; first
+observation emits with `fromRender: null`. Subscribers (minimap, audio,
+perception, future fog-of-war) can react without polling. The bus is
+already batched + flushed end-of-frame, so emitting adds no synchronous
+fan-out cost. Strict WebGPU multi-mode regression proof:
+`artifacts/perf/2026-05-12T12-55-00-499Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+No close-NPC materialization regressions vs slice 5.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

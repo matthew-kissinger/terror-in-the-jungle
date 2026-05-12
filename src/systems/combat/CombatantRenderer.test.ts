@@ -16,6 +16,7 @@ import {
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
 } from './PixelForgeNpcRuntime';
 import { Logger } from '../../utils/Logger';
+import { GameEventBus } from '../../core/GameEventBus';
 
 const CLIPS = [
   'idle',
@@ -867,6 +868,93 @@ describe('CombatantRenderer', () => {
       expect(fighterRow?.renderMode).toBe('close-glb');
       expect(fighterRow?.reason).toBe('close-glb:active');
       expect(fighterRow?.inActiveCombat).toBe(true);
+    });
+
+    it('emits materialization_tier_changed only on render-mode transitions', async () => {
+      // Phase F slice 6 (tier-transition events): subscribers should receive
+      // a typed event when a combatant's render mode changes, and only then.
+      // Steady-state frames must not produce spurious events.
+      type Event = {
+        combatantId: string;
+        fromRender: 'close-glb' | 'impostor' | 'culled' | null;
+        toRender: 'close-glb' | 'impostor' | 'culled';
+        reason: string;
+        distanceMeters: number;
+      };
+      // Drain any events queued by earlier tests in this suite so we can
+      // assert exact counts against the events this test produces.
+      GameEventBus.clear();
+      const events: Event[] = [];
+      const unsubscribe = GameEventBus.subscribe('materialization_tier_changed', (e: Event) => events.push(e));
+
+      try {
+        await (renderer as unknown as {
+          createCloseModelPool(
+            poolKey: Faction,
+            factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+            targetSize: number,
+          ): Promise<void>;
+        }).createCloseModelPool(
+          Faction.NVA,
+          getPixelForgeNpcRuntimeFaction(Faction.NVA),
+          PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+        );
+
+        // Frame 1: new actor at 12m -> close-glb. First-observation event.
+        const combatants = new Map<string, Combatant>();
+        const target = createMockCombatant('mover-1', Faction.NVA, new THREE.Vector3(12, 0, 0));
+        combatants.set(target.id, target);
+        renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+        GameEventBus.flush();
+        expect(events).toHaveLength(1);
+        expect(events[0]).toMatchObject({
+          combatantId: 'mover-1',
+          fromRender: null,
+          toRender: 'close-glb',
+          reason: 'close-glb:active',
+        });
+        expect(events[0].distanceMeters).toBeGreaterThan(11);
+        events.length = 0;
+
+        // Frame 2: no change. No new events.
+        renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+        GameEventBus.flush();
+        expect(events).toHaveLength(0);
+
+        // Frame 3: actor moves to 200m -> impostor:beyond-close-radius.
+        target.position.set(200, 0, 0);
+        renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+        GameEventBus.flush();
+        expect(events).toHaveLength(1);
+        expect(events[0]).toMatchObject({
+          combatantId: 'mover-1',
+          fromRender: 'close-glb',
+          toRender: 'impostor',
+          reason: 'impostor:beyond-close-radius',
+        });
+        events.length = 0;
+
+        // Frame 4: actor removed from world -> prune entry, no event.
+        combatants.delete('mover-1');
+        renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+        GameEventBus.flush();
+        expect(events).toHaveLength(0);
+
+        // Frame 5: same id re-appears at 10m -> first-observation again.
+        const revived = createMockCombatant('mover-1', Faction.NVA, new THREE.Vector3(10, 0, 0));
+        combatants.set(revived.id, revived);
+        renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+        GameEventBus.flush();
+        expect(events).toHaveLength(1);
+        expect(events[0]).toMatchObject({
+          combatantId: 'mover-1',
+          fromRender: null,
+          toRender: 'close-glb',
+        });
+      } finally {
+        unsubscribe();
+        GameEventBus.clear();
+      }
     });
 
     it('bounds repeated close-model overflow reports within one update', async () => {

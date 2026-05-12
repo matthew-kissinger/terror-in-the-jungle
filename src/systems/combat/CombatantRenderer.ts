@@ -17,6 +17,7 @@ import {
 } from './CombatantMeshFactory';
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type CombatantUniformMaterial, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
+import { GameEventBus } from '../../core/GameEventBus';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { isDiagEnabled, isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import { modelLoader } from '../assets/ModelLoader';
@@ -329,6 +330,15 @@ export class CombatantRenderer {
   // NPCs cycle frames at a cadence of `framesPerMeter`.
   private readonly impostorFrameAccumulator = new Map<string, number>();
   private closeModelRuntimeStats = createEmptyCloseModelRuntimeStats();
+  /**
+   * Per-combatant render mode observed at the end of the previous
+   * updateBillboards. Phase F slice 6 (tier-transition events) diffs this
+   * against the current frame's render mode to emit
+   * `materialization_tier_changed` events through {@link GameEventBus}.
+   * Entries are pruned when combatants are removed (see
+   * {@link emitMaterializationTierTransitions}).
+   */
+  private readonly previousRenderModes = new Map<string, CombatantMaterializationRenderMode>();
   private disposed = false;
 
   // Walk animation state
@@ -1981,6 +1991,66 @@ export class CombatantRenderer {
     });
 
     this.updateHitboxDebugOverlay(combatants, playerPosition);
+    this.emitMaterializationTierTransitions(combatants, playerPosition);
+  }
+
+  /**
+   * Phase F slice 6 (tier-transition events): walk every combatant in the
+   * current frame's view, compare its render mode to the previous frame's
+   * recorded mode, and emit `materialization_tier_changed` on diff. Also
+   * prunes entries for combatants that have been removed since last frame
+   * so the diff map stays bounded.
+   *
+   * Cost is one Map lookup per combatant per frame plus event-bus emit on
+   * transitions only. The event bus batches and flushes at end-of-frame, so
+   * emitting here adds no synchronous fan-out cost to subscribers.
+   */
+  private emitMaterializationTierTransitions(
+    combatants: Map<string, Combatant>,
+    playerPosition: THREE.Vector3,
+  ): void {
+    const seen = new Set<string>();
+    combatants.forEach((combatant) => {
+      const id = combatant.id;
+      seen.add(id);
+      const hasCloseModel = this.activeCloseModels.has(id);
+      const billboardIndex = typeof combatant.billboardIndex === 'number' ? combatant.billboardIndex : null;
+      const currentRenderMode: CombatantMaterializationRenderMode = hasCloseModel
+        ? 'close-glb'
+        : billboardIndex !== null && billboardIndex >= 0
+          ? 'impostor'
+          : 'culled';
+      const previous = this.previousRenderModes.get(id) ?? null;
+      if (previous === currentRenderMode) return;
+
+      const fallback = this.closeModelFallbackRecords.get(id);
+      const distanceMeters = combatant.position.distanceTo(playerPosition);
+      const reason: string = (() => {
+        if (currentRenderMode === 'close-glb') return 'close-glb:active';
+        if (currentRenderMode === 'impostor') {
+          if (fallback?.reason) return `impostor:${fallback.reason}`;
+          if (distanceMeters > getPixelForgeNpcCloseModelDistanceMeters()) return 'impostor:beyond-close-radius';
+          return 'impostor:not-prioritized';
+        }
+        if (combatant.lodLevel === 'culled') return 'culled:lod-culled';
+        return 'culled:no-billboard';
+      })();
+
+      GameEventBus.emit('materialization_tier_changed', {
+        combatantId: id,
+        fromRender: previous,
+        toRender: currentRenderMode,
+        reason,
+        distanceMeters,
+      });
+      this.previousRenderModes.set(id, currentRenderMode);
+    });
+    // Prune entries for combatants no longer present this frame.
+    if (this.previousRenderModes.size > seen.size) {
+      this.previousRenderModes.forEach((_value, id) => {
+        if (!seen.has(id)) this.previousRenderModes.delete(id);
+      });
+    }
   }
 
   private updateHitboxDebugOverlay(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {

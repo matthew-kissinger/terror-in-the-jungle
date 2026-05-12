@@ -24,6 +24,26 @@ interface GameEvents extends Record<string, unknown> {
   air_support_active: { type: string; missionId: string };
   air_support_complete: { type: string; missionId: string };
   mode_load_progress: { phase: string; progress: number; label: string };
+  /**
+   * Phase F materialization tier transition: fires when a combatant's render
+   * mode changes between updateBillboards frames. Subscribers (minimap,
+   * audio, perception, fog-of-war) can react without polling the renderer.
+   *
+   * - `fromRender`: previous mode (`'close-glb'` / `'impostor'` / `'culled'`),
+   *   or `null` for first observation.
+   * - `toRender`: new mode this frame.
+   * - `reason`: parseable render-lane reason from the materialization profile
+   *   (`'close-glb:active'`, `'impostor:total-cap'`, etc.).
+   * - `distanceMeters`: combatant distance to player at the moment of
+   *   transition.
+   */
+  materialization_tier_changed: {
+    combatantId: string;
+    fromRender: 'close-glb' | 'impostor' | 'culled' | null;
+    toRender: 'close-glb' | 'impostor' | 'culled';
+    reason: string;
+    distanceMeters: number;
+  };
 }
 
 /**
