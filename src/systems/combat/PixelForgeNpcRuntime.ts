@@ -89,6 +89,15 @@ export const PixelForgeNpcDistanceConfig = {
   hardNearReserveExtraCap: 6,
   /** Priority boost for actors inside the hard-near reserve bubble. */
   hardNearReserveWeight: 12,
+  /**
+   * Priority boost for combatants in active combat (ENGAGING / SUPPRESSING /
+   * ADVANCING). Phase F budget arbiter v1: an actor currently shooting or
+   * being shot at should render as a close GLB even when distance priority
+   * alone would relegate it to impostor. Sized between `squadWeight` (4) and
+   * `onScreenWeight` (10) so it composes naturally with the other priority
+   * terms without dominating the hard-near reserve.
+   */
+  inActiveCombatWeight: 8,
   /** Selection priority weight for combatants whose AABB lies inside the camera frustum. */
   onScreenWeight: 10,
   /** Selection priority weight for combatants in the player's squad. */

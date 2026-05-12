@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slice 1, close-model churn pre-release, A Shau directed-warp, and MaterializationProfile v2 shipped)
+Last verified: 2026-05-12 (Phase F slice 1, close-model churn pre-release, A Shau directed-warp, MaterializationProfile v2, and budget arbiter v1 shipped)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -357,6 +357,23 @@ the Phase F memo names for the budget arbiter to handle. The current
 cap policy is distance-priority only; the arbiter will incorporate
 combat state. The diagnostic surface ships now; the arbiter is the
 next slice.
+
+Budget arbiter v1 (shipped 2026-05-12, Phase F memo slice 5):
+`PixelForgeNpcDistanceConfig.inActiveCombatWeight=8` is added to the
+close-model candidate priority score. Actors currently
+ENGAGING/SUPPRESSING/ADVANCING get a priority boost sized between
+`squadWeight` (4) and `onScreenWeight` (10), so combat state composes
+with the other signals (hard-near reserve, hard-near, on-screen, squad,
+distance, recently-visible) rather than dominating them. Strict WebGPU
+multi-mode proof at
+`artifacts/perf/2026-05-12T09-45-53-698Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+Effect on the densest mode (combat120): 7 of the 14 close-GLB slots
+are now in-combat actors (slice 4 had 0 measured). The arbiter
+correctly composes: in-combat actors win at the cap edge but on-screen
+non-combat actors closer in still outrank off-screen in-combat actors
+at hard-near distances, by design. The Phase F memo's named target
+case ("a combatant being shot at... is render-close eligible even at
+130 m") is now realized as a weight, not a hard override.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

@@ -804,6 +804,71 @@ describe('CombatantRenderer', () => {
       expect(stats.fallbackCounts['total-cap']).toBe(hardNearReserveCap);
     });
 
+    it('budget arbiter v1: active-combat actors outrank closer non-combat actors at the cap edge', async () => {
+      // Phase F slice 5 regression: when the close-radius cluster overflows
+      // the active cap, the selector must prefer in-combat actors over
+      // out-of-combat actors that happen to be slightly closer to the
+      // player. This is the case the slice-4 evidence surfaced: A Shau had
+      // `inActiveCombat=true` actors stuck on `impostor:total-cap` while
+      // non-combat actors won the close-GLB slots by distance alone.
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        Faction.NVA,
+        getPixelForgeNpcRuntimeFaction(Faction.NVA),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+
+      const hardNearReserveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
+        + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
+      const combatants = new Map<string, Combatant>();
+
+      // Cap-full cohort: non-combat actors at distances 80..(80 + cap*0.5),
+      // outside the 64m hard-near reserve bubble so they share priority weights
+      // with the active-combat actor below.
+      for (let i = 0; i < hardNearReserveCap; i++) {
+        const combatant = createMockCombatant(
+          `idle-${i}`,
+          Faction.NVA,
+          new THREE.Vector3(80 + i * 0.5, 0, 0),
+          CombatantState.PATROLLING,
+        );
+        combatants.set(combatant.id, combatant);
+      }
+      // The arbiter target: an ENGAGING actor at 100m, farther than every
+      // idle actor. Without the inActiveCombat weight it would lose to all
+      // 14 idle actors by distance.
+      const fighter = createMockCombatant(
+        'fighter-1',
+        Faction.NVA,
+        new THREE.Vector3(100, 0, 0),
+        CombatantState.ENGAGING,
+      );
+      combatants.set(fighter.id, fighter);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      // The fighter wins a close-GLB slot despite being farthest.
+      expect(activeCloseModels.has('fighter-1')).toBe(true);
+      // The farthest idle actor is displaced (total-cap) to make room.
+      expect(activeCloseModels.has(`idle-${hardNearReserveCap - 1}`)).toBe(false);
+
+      const rows = renderer.getNearestCombatantMaterializationRows(
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        combatants.size,
+      );
+      const fighterRow = rows.find((row) => row.combatantId === 'fighter-1');
+      expect(fighterRow?.renderMode).toBe('close-glb');
+      expect(fighterRow?.reason).toBe('close-glb:active');
+      expect(fighterRow?.inActiveCombat).toBe(true);
+    });
+
     it('bounds repeated close-model overflow reports within one update', async () => {
       await (renderer as unknown as {
         createCloseModelPool(

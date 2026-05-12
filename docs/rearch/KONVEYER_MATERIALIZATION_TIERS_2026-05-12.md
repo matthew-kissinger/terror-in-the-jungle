@@ -210,6 +210,37 @@ These are independently shippable. Each one assumes branch hard-stops.
     because the steady review pose has no actor inside the 64 m hard-near
     bubble — the reserve correctly does not engage. Behavior is consistent
     with slice 0; not a regression.
+0d. **Budget arbiter v1: combat-state promotion (shipped 2026-05-12).**
+    `PixelForgeNpcDistanceConfig.inActiveCombatWeight=8` is added to the
+    close-model candidate priority score. The `CloseModelCandidate` now
+    carries `isInActiveCombat` derived from `combatant.state` at
+    selection time. Actors currently ENGAGING / SUPPRESSING / ADVANCING
+    get a priority boost sized between `squadWeight` (4) and
+    `onScreenWeight` (10), so combat state composes with the other
+    signals (hard-near reserve, hard-near, on-screen, squad, distance,
+    recently-visible) instead of dominating them. The Phase F memo
+    target case ("a combatant being shot at by the player or shooting
+    back is render-close eligible even at 130 m") is now realized as a
+    weight, not a hard override.
+
+    Strict WebGPU multi-mode proof:
+    `artifacts/perf/2026-05-12T09-45-53-698Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    Effect on the densest mode (combat120 / ai_sandbox): 7 of the 14
+    close-GLB slots are now in-combat actors (slice 4 had 0 measured
+    in-combat promotions). The single remaining "missed" in-combat
+    actor in combat120 is at 88.1 m — outside the hard-near reserve
+    bubble (64 m); the weight composition correctly lets a closer
+    on-screen non-combat actor outrank it. A Shau directed-warp
+    similarly promoted 1 in-combat actor to close-GLB and left 2
+    in-combat misses at hard-near distances; investigation shows those
+    are most likely off-screen actors outranked by on-screen non-combat
+    actors (on-screen weight 10 > in-combat weight 8). This is by
+    design: in-combat is a strong signal but not absolute.
+
+    New unit test locks the arbiter behavior: an ENGAGING actor at 100 m
+    wins a close-GLB slot over a non-combat cluster at 80..87 m that
+    would otherwise fill the cap by distance alone.
+
 0c. **MaterializationProfile v2 (shipped 2026-05-12).**
     `CombatantMaterializationRow` now carries `reason` and `inActiveCombat`,
     surfaced through `window.npcMaterializationProfile()` and the crop

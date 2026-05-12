@@ -147,6 +147,13 @@ interface CloseModelCandidate {
    * cap. Real-time signal, not a spawn-time snapshot.
    */
   isInHardNearReserveBubble: boolean;
+  /**
+   * True when the combatant is in active combat (ENGAGING / SUPPRESSING /
+   * ADVANCING). Phase F budget arbiter v1 priority signal: an active-combat
+   * actor at the edge of the close radius should outrank a non-combat actor
+   * closer to the player.
+   */
+  isInActiveCombat: boolean;
   priorityScore: number;
 }
 
@@ -1155,10 +1162,14 @@ export class CombatantRenderer {
       const isHardNear = distance <= PixelForgeNpcDistanceConfig.hardNearDistanceMeters;
       const isInHardNearReserveBubble =
         distance <= PixelForgeNpcDistanceConfig.hardNearReserveDistanceMeters;
+      const isInActiveCombat = combatant.state === CombatantState.ENGAGING
+        || combatant.state === CombatantState.SUPPRESSING
+        || combatant.state === CombatantState.ADVANCING;
       const priorityScore =
         PixelForgeNpcDistanceConfig.hardNearReserveWeight * (isInHardNearReserveBubble ? 1 : 0) +
         PixelForgeNpcDistanceConfig.hardNearWeight * (isHardNear ? 1 : 0) +
         PixelForgeNpcDistanceConfig.onScreenWeight * (isOnScreen ? 1 : 0) +
+        PixelForgeNpcDistanceConfig.inActiveCombatWeight * (isInActiveCombat ? 1 : 0) +
         PixelForgeNpcDistanceConfig.squadWeight * (isPlayerSquad ? 1 : 0) +
         PixelForgeNpcDistanceConfig.distanceWeight * (1 / Math.max(distance, 4)) +
         PixelForgeNpcDistanceConfig.recentlyVisibleWeight * (recentlyVisible && !isOnScreen ? 1 : 0);
@@ -1171,6 +1182,7 @@ export class CombatantRenderer {
         recentlyVisible,
         isPlayerSquad,
         isInHardNearReserveBubble,
+        isInActiveCombat,
         priorityScore,
       });
     });
