@@ -147,8 +147,16 @@ current `origin/master`.
   It proves public materialization telemetry, geometry-derived close-GLB body
   bounds, a visible strict-WebGPU close soldier/weapon crop, and a bounded
   Open Frontier spawn-residency reserve with 11 close GLBs and zero fallback
-  records for the nearest actors. Multi-mode reserve verification and the
-  stamped heightmap rebake remain open work.
+  records for the nearest actors. Multi-mode reserve verification now exists
+  at
+  `artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`:
+  Open Frontier 10/10 close-GLB residents, Zone Control 11/13 with two
+  total-cap fallbacks, Team Deathmatch 12/16 with four total-cap fallbacks,
+  combat120 12/29 with three pool-empty and fourteen total-cap fallbacks at
+  ~23 m, and A Shau Valley with no combatants inside the close radius from
+  the current spawn pose. Phase F materialization tier draft is
+  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`. The stamped
+  heightmap rebake remains open work.
 - Water/hydrology bridge proof is now part of the follow-up loop: source audit
   `artifacts/perf/2026-05-11T21-33-05-844Z/projekt-143-water-system-audit/water-system-audit.json`
   and runtime proof

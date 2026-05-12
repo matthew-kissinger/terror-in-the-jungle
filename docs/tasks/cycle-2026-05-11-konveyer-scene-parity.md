@@ -1,6 +1,6 @@
 # Cycle: KONVEYER Scene Parity And Frame-Budget Attribution
 
-Last verified: 2026-05-11
+Last verified: 2026-05-12
 
 ## Objective
 
@@ -230,6 +230,38 @@ compensation on top of bad source data.
   is bright against the neutral proof frame. This leaves multi-mode reserve
   verification and Phase F materialization-tier policy, not an Open Frontier
   startup total-cap failure or WebGL parity target.
+- Multi-mode close-model reserve verification on `01da7abb`:
+  `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  runs `webgpu-strict` for `open_frontier`, `zone_control`, `team_deathmatch`,
+  `ai_sandbox` (combat120 alias), and `a_shau_valley`. Every mode resolves
+  `resolvedBackend=webgpu`, `strictWebGPUReady=true`, zero console errors, and
+  zero page errors. The bounded reserve activates as designed in dense modes
+  but is undersized for combat120:
+  - `open_frontier`: cap 8, 12 candidates, 4 `total-cap` fallbacks, 0
+    `pool-loading`/`pool-empty`. Reserve did not activate because the steady
+    review pose left no actor inside the 64m spawn-residency bubble after
+    initial dispersal; the +4 reserve correctly only applies when
+    `isSpawnResident=true` candidates exist.
+  - `zone_control`: cap 9, 12 candidates, 3 `total-cap` fallbacks, 0
+    `pool-loading`/`pool-empty`. Reserve activated +1.
+  - `team_deathmatch`: cap 12, 16 candidates, 4 `total-cap` fallbacks, 0
+    `pool-loading`/`pool-empty`. Reserve fully activated +4.
+  - `ai_sandbox` (combat120): cap 12, 32 candidates, 18 `total-cap` plus 2
+    `pool-empty` fallbacks. Reserve fully activated +4 but density is roughly
+    2.7x the cap; faction pool sizing is asymmetric (`US` target 12 exhausts
+    while `NVA` keeps 4 available), so faction skew amplifies pool-empty
+    behaviour beyond the cap question.
+  - `a_shau_valley`: 0 combatants live at probe time. The strategic
+    simulation does not materialize live combatants into the review pose's
+    close radius, so no reserve activation is observable from the front-line
+    impostor path. This is Phase F materialization-tier policy, not a
+    renderer regression.
+  The multi-mode artifact preserves the hard stops: no `master` merge, no
+  deploy, no `perf-baselines.json` change, no WebGL fallback proof, and no
+  fenced-interface edit. Vegetation/NPC impostor crops repeat the prior WARN
+  pattern (green/saturated for vegetation, background-dominant or absent for
+  NPC); these remain Pixel Forge/asset-review carry-overs, not new
+  materialization findings.
 - Startup "Compiling features" attribution:
   the same strict WebGPU proof records Open Frontier terrain feature compile
   marks. The UI wait is mostly the 1024-grid stamped heightmap rebake
@@ -270,15 +302,25 @@ compensation on top of bad source data.
 
 1. Preserve the hard stops: no `master` merge, no deploy, no baseline update,
    no fenced interface edit, no WebGL fallback proof.
-2. Use `window.npcMaterializationProfile(24)` in dev/perf builds to inspect
-   nearby NPC materialization. The next implementation target is multi-mode
-   verification of the bounded spawn-residency reserve and its cap/budget
-   effect, not more crop-threshold tuning.
+2. Multi-mode reserve verification packet is recorded at
+   `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+   The next architecture decision is Phase F materialization-tier policy for
+   the close-model cap: should `PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP` and
+   `spawnResidencyExtraCap` scale by mode density and faction balance, or
+   should combat120/TDM continue to accept `total-cap` impostor fallback for
+   actors past the steady-state cap? combat120 sees ~32 candidates against a
+   12-slot cap, so a per-mode policy or impostor-LOD acceptance is the
+   choice, not more uniform-cap tuning. Faction pool asymmetry
+   (`pool-empty` in combat120 with one faction's pool exhausted while the
+   other has slack) is a separate sizing fix for the same decision.
 3. Attribute the "Compiling features" UI delay across more than Open Frontier,
    then choose whether stamped heightmap rebake should be prebuilt, chunked, or
    worker-backed.
 4. Resolve A Shau finite-edge presentation with real outer DEM/source data,
-   flight/camera boundary policy, or a documented hybrid.
+   flight/camera boundary policy, or a documented hybrid. The multi-mode probe
+   also exposes that A Shau materializes zero live combatants at the review
+   pose; that is strategic-simulation behaviour and a Phase F
+   materialization-tier policy question, not a close-model bug.
 5. Continue cloud/weather representation and water/hydrology work before the
    principles-first WebGPU/TSL renderer rearchitecture review.
 

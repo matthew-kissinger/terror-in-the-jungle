@@ -796,6 +796,96 @@ rebake rather than shader compilation.
 Research spike: `docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md`
 sets WebGPU/TSL as the principles-first baseline; ECSY is reference vocabulary only.
 
+## KONVEYER-10 Multi-Mode Materialization Evidence (2026-05-12)
+
+Multi-mode strict-WebGPU asset crop probe across Open Frontier, Zone Control,
+Team Deathmatch, combat120 (ai_sandbox), and A Shau Valley:
+
+- `artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  (with spawn-residency reserve engaged in Open Frontier)
+- `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  (parallel run with a wider initial player frame, so the Open Frontier
+  spawn-residency reserve did not engage and 4 close-radius actors fell back
+  to impostor; the cap-policy story is the same)
+
+All five modes resolve `resolvedBackend=webgpu` with `strictWebGPUReady=true`,
+zero console errors, zero page errors, zero request failures. Per-mode close
+model residency under the current 8 + 4-spawn-reserve cap:
+
+Run 1 (`01-50-01-495Z`):
+
+| Mode | Candidates ≤120 m | Active close-GLBs | Effective cap | Fallbacks | Nearest fallback (m) |
+| --- | ---: | ---: | ---: | --- | ---: |
+| `open_frontier` | 10 | 10 | 10 | none | n/a |
+| `zone_control` | 13 | 11 | 11 | `total-cap:2` | 65.0 |
+| `team_deathmatch` | 16 | 12 | 12 | `total-cap:4` | 36.0 |
+| `ai_sandbox` (combat120) | 29 | 12 | 12 | `pool-empty:3, total-cap:14` | 23.3 |
+| `a_shau_valley` | 0 | 0 | 8 | none | n/a |
+
+Run 2 (`01-50-30-290Z`), camera framed wider so OF reserve did not engage:
+
+| Mode | Candidates ≤120 m | Active close-GLBs | Effective cap | Fallbacks |
+| --- | ---: | ---: | ---: | --- |
+| `open_frontier` | 12 | 8 | 8 | `total-cap:4` |
+| `zone_control` | 12 | 9 | 9 | `total-cap:3` |
+| `team_deathmatch` | 16 | 12 | 12 | `total-cap:4` |
+| `ai_sandbox` (combat120) | 32 | 12 | 12 | `pool-empty:2, total-cap:18` |
+| `a_shau_valley` | 0 | 0 | 8 | none |
+
+What this proves:
+
+- The spawn-residency reserve closes Open Frontier's crowded-spawn symptom
+  cleanly: 10 of 10 candidates within close radius render as close GLBs with
+  no fallback records.
+- Zone Control and Team Deathmatch still drop spawn-cluster actors to
+  impostor inside the close radius. The current reserve raised the effective
+  cap above the 8-slot baseline but did not cover all spawn residents.
+- combat120 has 29 candidates inside the 120 m close radius. Even with the
+  full reserve the cap holds at 12, so 17 close-radius actors render as
+  impostors (3 of those because the per-faction pool ran empty before the
+  total cap was hit, 14 because the cap is the hard limit). Nearest fallback
+  is at 23.3 m. This is the densest close-NPC cluster the proof has seen.
+- A Shau Valley has zero combatants inside the 120 m close radius from the
+  current player spawn pose. This is consistent with A Shau's strategic-tier
+  spawn distribution (3,000-unit simulation; close materialization happens
+  only where the player walks into action), but it also means the probe
+  cannot accept or reject A Shau close-GLB behavior from spawn alone.
+
+What this does not prove:
+
+- The right cap size for the experimental branch. Raising the cap will spend
+  frame budget; lowering it will keep more actors as impostors. The decision
+  belongs with the budget-arbiter slice in
+  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`, not with this
+  probe.
+- That the spawn-residency reserve is the correct policy for non-spawn
+  clusters. The combat120 evidence shows the densest clusters happen mid-game
+  (actors converging on AI sandbox waypoints, not at spawn position). The
+  reserve as authored only covers initial spawn density. The Phase F arbiter
+  is expected to subsume the spawn-residency policy under a per-cluster
+  hard-near reserve once it exists.
+- A Shau visual-acceptance for close NPCs. A directed probe that warps the
+  player into an A Shau action zone (or waits for AI convergence) is the
+  next evidence step there.
+
+This evidence is the input for Phase F materialization tier work and the
+KONVEYER-10 budget-arbiter slice. Hard stops remain in force: no master
+merge, no perf baseline refresh, no fenced-interface edit, no WebGL fallback
+proof. The probe is repeatable with:
+
+```
+npx tsx scripts/konveyer-asset-crop-probe.ts --headed --port 9281 \
+  --modes open_frontier,zone_control,team_deathmatch,combat120,a_shau_valley \
+  --close-model-wait-ms 12000
+```
+
+Phase F materialization tier draft:
+`docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`. It records the
+current sim/render lanes, names the spawn-residency reserve as a special case
+of a broader per-cluster hard-near reserve, and proposes a budget arbiter
+plus two new render lanes (silhouette and cluster) to scale toward 3,000
+combatants without each entity costing a draw call.
+
 Hard stops remain unchanged: no `master` merge, no production deploy, no
 `perf-baselines.json` refresh, no fenced-interface edit, and no fallback-based
 WebGPU proof.

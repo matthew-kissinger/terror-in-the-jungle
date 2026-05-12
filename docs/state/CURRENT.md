@@ -146,6 +146,25 @@ the next work is multi-mode spawn-residency reserve verification, cap/budget
 review, and integrated object/body-bound visual probes for Phase F
 materialization tiers.
 
+Multi-mode strict-WebGPU close-NPC materialization proof landed 2026-05-12 at
+`artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+and the parallel-state confirmation
+`artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+All five modes resolve strict WebGPU with zero console/page errors. Per-mode
+close-radius residency from run 1: Open Frontier 10/10 with no fallbacks (the
+spawn-residency reserve raised the cap to 10); Zone Control 11/13 (2
+total-cap, nearest fallback 65 m); Team Deathmatch 12/16 (4 total-cap,
+nearest fallback 36 m); combat120/ai_sandbox 12/29 (3 pool-empty + 14
+total-cap, nearest fallback 23 m); A Shau Valley 0/0 from the current player
+spawn pose. Run 2 captured Open Frontier without the spawn-residency reserve
+engaged (12 candidates, 8 active, 4 total-cap fallbacks), confirming the
+reserve is sensitive to the spawn-cluster framing rather than guaranteed.
+combat120 makes it obvious that the current spawn-only reserve does not cover
+dense mid-game clusters, and A Shau evidence will require a directed
+player-warp or AI-convergence probe. This is the input for the Phase F budget
+arbiter slice; the architectural memo lives at
+[docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md](../rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md).
+
 Startup UI "Compiling features" is not currently shader compilation. The same
 strict WebGPU proof records Open Frontier terrain feature compile marks:
 feature list compile about 5.2ms for 1,363 stamps, 67 surface patches, 8
