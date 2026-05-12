@@ -1029,6 +1029,25 @@ export class CombatantRenderer {
     const selected = new Set<string>();
     const suppressedImpostorIds = new Set<string>();
     const effectiveActiveCap = this.resolveCloseModelActiveCap(candidates);
+
+    // Pre-pass: release any active close model whose combatant is not in this
+    // frame's top-`effectiveActiveCap` prospective set. The candidates list is
+    // already sorted by priority. Without this pre-pass, prior-frame actives
+    // hold pool slots through the iteration below, and new higher-priority
+    // candidates of the same faction can hit a phantom `pool-empty` even when
+    // the released slot would have served them. Pre-releasing eliminates that
+    // cross-frame churn artifact without changing the overall behavior for
+    // steady-state frames (no actives outside prospective ⇒ no releases here).
+    const prospectiveIds = new Set<string>();
+    for (let i = 0; i < candidates.length && prospectiveIds.size < effectiveActiveCap; i++) {
+      prospectiveIds.add(candidates[i].combatant.id);
+    }
+    this.activeCloseModels.forEach((instance, combatantId) => {
+      if (!prospectiveIds.has(combatantId)) {
+        this.releaseCloseModel(combatantId, instance);
+      }
+    });
+
     for (const candidate of candidates) {
       if (selected.size >= effectiveActiveCap) {
         this.recordCloseModelFallback(candidate, 'total-cap');
@@ -1050,6 +1069,10 @@ export class CombatantRenderer {
       this.updateCloseModelInstance(instance, candidate.combatant, candidate.poolKey);
     }
 
+    // Second release pass catches active models that lost their slot during
+    // iteration (e.g., total-cap displaced them after the pre-pass admitted
+    // them). The pre-pass handles most cases; this guards against the edge
+    // where prospectiveIds does not exactly match the final selected set.
     this.activeCloseModels.forEach((instance, combatantId) => {
       if (!selected.has(combatantId)) {
         this.releaseCloseModel(combatantId, instance);

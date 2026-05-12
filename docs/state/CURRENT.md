@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slice 1 — hard-near cluster reserve generalization shipped)
+Last verified: 2026-05-12 (Phase F slice 1 + close-model churn pre-release shipped)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -306,6 +306,19 @@ faction-asymmetric pool sizing, the next slice (budget arbiter v1), not a
 steady-cap question. A Shau still materializes zero live combatants inside
 the close radius from the steady review pose; a directed player-warp or
 AI-convergence probe is the next A Shau materialization step.
+
+Follow-up slice (shipped 2026-05-12): the close-model selector now
+pre-releases stale actives — active close models whose combatant is not in
+this frame's top-`effectiveActiveCap` prospective set are released before
+the candidate iteration. Previously, prior-frame actives held pool slots
+through the iteration, so new higher-priority candidates of the same faction
+hit a phantom `pool-empty` fallback. Strict WebGPU multi-mode proof:
+`artifacts/perf/2026-05-12T03-06-33-332Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+combat120 review fallback profile changed from `total-cap:5 +
+pool-empty:6` to `total-cap:22 + pool-empty:0` (overall fallback count is
+larger because the candidate set grew from 25 to 36, but every fallback
+is now at the cap boundary, the designed materialization tier
+boundary).
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

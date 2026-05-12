@@ -697,6 +697,60 @@ describe('CombatantRenderer', () => {
       }));
     });
 
+    it('pre-releases stale actives so churned high-priority candidates do not pool-empty', async () => {
+      // Slice 2 regression: when the active set churns between frames, the
+      // top-priority new candidates of the same faction must reclaim the
+      // pool slots held by lower-priority actives from the prior frame
+      // rather than hitting a phantom pool-empty fallback.
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        Faction.NVA,
+        getPixelForgeNpcRuntimeFaction(Faction.NVA),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+
+      const hardNearReserveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP
+        + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
+
+      // Frame 1: cluster A occupies all NVA close-model slots at near positions.
+      const frame1 = new Map<string, Combatant>();
+      for (let i = 0; i < hardNearReserveCap; i++) {
+        const combatant = createMockCombatant(`nva-a-${i}`, Faction.NVA, new THREE.Vector3(18 + i * 0.5, 0, 0));
+        frame1.set(combatant.id, combatant);
+      }
+      renderer.updateBillboards(frame1, new THREE.Vector3(0, 0, 0));
+      const activeAfterFrame1 = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      expect(activeAfterFrame1.size).toBe(hardNearReserveCap);
+
+      // Frame 2: a new, higher-priority NVA cluster (cluster B, closer) appears
+      // while cluster A is still in the candidate list but now lower priority.
+      const frame2 = new Map<string, Combatant>(frame1);
+      for (let i = 0; i < hardNearReserveCap; i++) {
+        const combatant = createMockCombatant(`nva-b-${i}`, Faction.NVA, new THREE.Vector3(8 + i * 0.5, 0, 0));
+        frame2.set(combatant.id, combatant);
+      }
+      renderer.updateBillboards(frame2, new THREE.Vector3(0, 0, 0));
+
+      const activeAfterFrame2 = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      expect(activeAfterFrame2.size).toBe(hardNearReserveCap);
+      // The closer cluster B should fully displace cluster A as close-GLBs.
+      for (let i = 0; i < hardNearReserveCap; i++) {
+        expect(activeAfterFrame2.has(`nva-b-${i}`)).toBe(true);
+      }
+
+      const { stats } = readCloseModelTelemetry(renderer);
+      expect(stats.renderedCloseModels).toBe(hardNearReserveCap);
+      // Critically: zero phantom pool-empty fallbacks from churn.
+      expect(stats.fallbackCounts['pool-empty']).toBe(0);
+      // Cluster A is displaced via total-cap, not pool-empty.
+      expect(stats.fallbackCounts['total-cap']).toBe(hardNearReserveCap);
+    });
+
     it('bounds repeated close-model overflow reports within one update', async () => {
       await (renderer as unknown as {
         createCloseModelPool(

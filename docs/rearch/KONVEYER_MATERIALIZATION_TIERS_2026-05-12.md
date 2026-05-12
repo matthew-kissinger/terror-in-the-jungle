@@ -193,6 +193,23 @@ These are independently shippable. Each one assumes branch hard-stops.
    benefit. Pool size per faction grew from 12 to 14. Evidence is recorded
    above; the next density-driven sizing question is per-faction pool slack
    in combat120, not a steady-cap bump.
+0a. **Close-model active-set churn pre-release (shipped 2026-05-12).**
+    `CombatantRenderer.updateCloseModels` now pre-releases active close
+    models that fall outside this frame's top-`effectiveActiveCap`
+    prospective set, before the candidate iteration. This eliminates the
+    phantom `pool-empty` fallback that combat120 review showed (6
+    fallbacks under slice 0): when the active set churned, prior-frame
+    actives held pool slots through iteration and new higher-priority
+    candidates of the same faction hit a false pool-empty even though the
+    slot would have been released milliseconds later. Multi-mode strict
+    WebGPU verification:
+    `artifacts/perf/2026-05-12T03-06-33-332Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    combat120 review: `pool-empty:6` → `pool-empty:0`; all 22 fallbacks now
+    `total-cap`, which is the designed materialization tier boundary.
+    Open Frontier and Zone Control regressed to cap 8 in this run only
+    because the steady review pose has no actor inside the 64 m hard-near
+    bubble — the reserve correctly does not engage. Behavior is consistent
+    with slice 0; not a regression.
 1. **Lane-naming refactor.** Rename current `lodLevel` to `simLane` and
    introduce `renderLane` as a separate field on `Combatant`. No behavior
    change. Adds the surface that the arbiter writes to.
