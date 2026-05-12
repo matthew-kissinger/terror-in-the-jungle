@@ -296,6 +296,19 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.hosekBackend.setCloudWorldAnchor(cameraPosition);
   }
 
+  /**
+   * Slice 14 diagnostic: surface the sky-backend refresh activity
+   * counter so the crop probe can compare real refresh cost against the
+   * `World.Atmosphere.SkyTexture` EMA.
+   */
+  getSkyRefreshStatsForDebug(): { fireCount: number; totalMs: number; lastMs: number; avgMs: number } {
+    return this.hosekBackend.getRefreshStatsForDebug();
+  }
+
+  resetSkyRefreshStatsForDebug(): void {
+    this.hosekBackend.resetRefreshStatsForDebug();
+  }
+
   getCloudAnchorDebug(): {
     model: 'camera-followed-dome-world-altitude-clouds';
     anchorX: number;

@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings + slice 11 atmosphere sub-attribution + slice 12 LUT refresh + slice 13 DataTexture+2s refresh + terrain roughness fix shipped; SkyTexture EMA empirically exhausted; slice 14 TSL fragment-shader port queued as load-bearing fix)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings + slice 11 atmosphere sub-attribution + slice 12 LUT refresh + slice 13 DataTexture+2s refresh + terrain roughness fix + slice 14 refresh-counter diagnostic shipped; SkyTexture EMA dropped 5ms -> 3.3ms after bundle rebuild; phantom-cost diagnosis was a stale dist-perf bundle artifact)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -491,20 +491,46 @@ All five modes resolve `webgpu` with zero console/page/request
 errors. A Shau frame avg 20.2 → 14.0 ms, p99 34.8 → 24.1 ms
 (combination of slice 12+13 + run variance).
 
-**Empirical exhaustion of CPU-side levers.** Slice 12 LUT + slice 13
-DataTexture + slice 13 refresh-period bump did NOT individually move
-the SkyTexture EMA from ~5 ms. Diagnostic experiments confirmed
-even with the entire refresh body bypassed AND the
-`trackAtmosphereTiming` wrapper removed, the EMA still reports
-~5 ms. The measurement is either artifactual (singleton state
-leaking across mode switches in the same browser tab, HMR-stale
-module, or instrumentation-chain bug) or reflects a cost in a path
-that triggers `beginSystem('World.Atmosphere.SkyTexture')`
-indirectly. Either way, the only remaining lever is slice 14: port
-the Hosek-Wilkie analytic + sun disc + cloud composition to a TSL
-fragment shader on the dome mesh, retiring `CanvasTexture` and the
-entire `refreshSkyTexture` path. Reference: three.js
-`examples/jsm/objects/Sky.js` does Preetham this way.
+Slice 14 diagnostic (shipped 2026-05-12): `refreshSkyTexture`
+instrumented with a fire-count + total-ms counter, surfaced via
+`AtmosphereSystem.getSkyRefreshStatsForDebug()` and probed by the
+crop probe alongside the perf window. **Resolves the earlier
+"phantom EMA" puzzle.** The crop probe's `dist-perf` bundle was
+serving a STALE build relative to source — `npm run build:perf` was
+the missing step. After rebuilding the bundle the slice 12+13 work
+is correctly reflected in the EMA.
+
+Strict WebGPU final five-mode evidence (RTX 3070, headed, after
+`build:perf`):
+`artifacts/perf/2026-05-12T18-59-46-847Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+
+| Mode | avg ms | p99 ms | SkyTexture EMA | Refresh fires (4.5s window) | Real /frame |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `open_frontier` | 7.8 | 15.5 | 3.26 | 73 | 0.35 |
+| `zone_control` | 8.5 | 16.1 | 3.22 | 72 | 0.39 |
+| `team_deathmatch` | 7.7 | 8.6 | 3.43 | 73 | 0.37 |
+| `ai_sandbox` | 11.2 | 23.0 | 3.32 | 71 | 0.50 |
+| `a_shau_valley` | 12.8 | 23.1 | 3.47 | 71 | 0.63 |
+
+**Empirical conclusions**:
+
+1. Slice 12 (LUT-driven refresh) + slice 13 (DataTexture + 2 s
+   refresh period) genuinely save ~1.5–2.5 ms across all modes.
+   Slice 11 baseline SkyTexture EMA was 5.03–5.96 ms; now 3.22–3.47 ms.
+2. The EMA reports **per-fire cost** (~3 ms each), not per-frame
+   amortized. Real per-frame cost is 0.35–0.63 ms — much smaller.
+   Earlier "no improvement" readings were a stale-bundle artifact.
+3. A Shau frame avg 17.9 → 12.8 ms; p99 31.0 → 23.1 ms — solid
+   margin inside the 33 ms gate.
+4. Refresh fires ~16×/sec across all modes despite
+   `SKY_TEXTURE_REFRESH_SECONDS=2.0`. Investigation pending — likely
+   the LUT-rebake threshold fires more often than calculated for
+   `todCycle` modes, but the cost per fire is small enough that this
+   is no longer the dominant frame-budget concern.
+5. The full TSL fragment-shader port (slice 15) would eliminate the
+   remaining ~0.4–0.6 ms by moving composition to GPU, but is no
+   longer the highest-leverage next slice — Combat (1.5–3.2 ms) and
+   World residuals are now relatively larger.
 
 Atmosphere sub-attribution (shipped 2026-05-12, probe-side slice 11):
 the perf-window now also drains `window.perf.report().systemBreakdown`

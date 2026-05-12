@@ -157,6 +157,20 @@ interface PerfTelemetrySystemTiming {
   budgetMs: number;
 }
 
+interface SkyRefreshDiagnostic {
+  // Slice 14: real refresh-loop activity captured during the perf
+  // window. If `fireCount` is small or `totalMs` is near zero while
+  // the World.Atmosphere.SkyTexture EMA reports ~5 ms, the EMA is
+  // measurement-artifactual (singleton state leak, HMR cache, or
+  // instrumentation-chain bug) and slice 14 (TSL port) is the only
+  // way to eliminate the timing.
+  available: boolean;
+  fireCount: number;
+  totalMs: number;
+  lastMs: number;
+  avgMs: number;
+}
+
 interface MaterializationPerfWindow {
   // Slice 9: falsifiable perf bar for the materialization review pose.
   // The probe drains `window.__metrics` (300-sample ring), waits a fixed
@@ -192,6 +206,10 @@ interface MaterializationPerfWindow {
   // sub-paths. Empty array when `window.perf` is unavailable.
   perfTelemetryTimings: PerfTelemetrySystemTiming[];
   atmosphereSubTimings: PerfTelemetrySystemTiming[];
+  // Slice 14: real refresh-loop activity (counter + total ms in body)
+  // captured over the same window the EMA is taken from. Distinguishes
+  // genuine refresh cost from phantom EMA.
+  skyRefresh: SkyRefreshDiagnostic;
 }
 
 interface CloseGlbComparison {
@@ -1223,10 +1241,21 @@ async function captureMaterializationPerfWindow(
   durationMs: number,
 ): Promise<MaterializationPerfWindow> {
   // Reset the RuntimeMetrics ring so the captured window starts clean.
+  // Also reset the slice 14 sky-refresh diagnostic counter so the window
+  // measures real refresh activity not the lifetime accumulation.
   const resetOk = await page.evaluate(() => {
     const metrics = (window as any).__metrics;
     if (typeof metrics?.reset !== 'function') return false;
     metrics.reset();
+    try {
+      const engine = (window as any).__engine;
+      const atmosphere = engine?.systemManager?.atmosphereSystem;
+      if (atmosphere && typeof atmosphere.resetSkyRefreshStatsForDebug === 'function') {
+        atmosphere.resetSkyRefreshStatsForDebug();
+      }
+    } catch {
+      // Best-effort reset; absence of the diagnostic is reported by skyRefresh.available.
+    }
     return true;
   });
   if (!resetOk) {
@@ -1252,6 +1281,13 @@ async function captureMaterializationPerfWindow(
       systemTimingsTotalMs: 0,
       perfTelemetryTimings: [],
       atmosphereSubTimings: [],
+      skyRefresh: {
+        available: false,
+        fireCount: 0,
+        totalMs: 0,
+        lastMs: 0,
+        avgMs: 0,
+      },
     };
   }
   await page.waitForTimeout(durationMs);
@@ -1326,6 +1362,33 @@ async function captureMaterializationPerfWindow(
       systemTimingsTotalMs: sysTotalMs,
       perfTelemetryTimings: perfTimings,
       atmosphereSubTimings: atmosphereSubs,
+      skyRefresh: (() => {
+        try {
+          const engine = (window as any).__engine;
+          const hasEngine = engine != null;
+          const sm = engine?.systemManager;
+          const hasSm = sm != null;
+          const atmosphere = sm?.atmosphereSystem;
+          const hasAtmosphere = atmosphere != null;
+          const hasMethod = atmosphere && typeof atmosphere.getSkyRefreshStatsForDebug === 'function';
+          if (!hasMethod) {
+            // The diagnostic accessor is missing — most commonly means the
+            // dist-perf bundle is stale relative to source. Run
+            // `npm run build:perf` before re-running the probe.
+            return { available: false, fireCount: 0, totalMs: 0, lastMs: 0, avgMs: 0 };
+          }
+          const r = atmosphere.getSkyRefreshStatsForDebug() ?? { fireCount: 0, totalMs: 0, lastMs: 0, avgMs: 0 };
+          return {
+            available: true,
+            fireCount: Number(r.fireCount ?? 0),
+            totalMs: Number(r.totalMs ?? 0),
+            lastMs: Number(r.lastMs ?? 0),
+            avgMs: Number(r.avgMs ?? 0),
+          };
+        } catch {
+          return { available: false, fireCount: 0, totalMs: 0, lastMs: 0, avgMs: 0 };
+        }
+      })(),
     };
   }, durationMs);
 }
@@ -1730,6 +1793,12 @@ async function captureCloseGlbComparison(
       findings.push(`atmosphere-subs:${subSplit || 'no-children-recorded'}`);
     } else {
       findings.push('atmosphere-subs:perf-report-unavailable');
+    }
+    if (perfWindow.skyRefresh.available) {
+      const sr = perfWindow.skyRefresh;
+      findings.push(`sky-refresh:fires=${sr.fireCount},totalMs=${sr.totalMs.toFixed(2)},avgPerFire=${sr.avgMs.toFixed(2)}`);
+    } else {
+      findings.push('sky-refresh:diag-not-exposed');
     }
   } else if (perfWindow) {
     findings.push(`perf-window:not-attempted:${perfWindow.reason ?? 'unknown'}`);

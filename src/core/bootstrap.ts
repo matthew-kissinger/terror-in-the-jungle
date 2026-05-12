@@ -178,6 +178,19 @@ export async function bootstrapGame(): Promise<void> {
         engine.renderer.getRendererBackendCapabilities()
       );
 
+      // Slice 14 diagnostic: sky-backend refresh activity stats. Probe
+      // calls reset before its perf-window starts and reads at the end
+      // to compare real refresh activity against the SkyTexture EMA.
+      (window as any).__atmosphereSkyRefreshStats = (options: { reset?: boolean } = {}) => {
+        const atmosphere = engine.systemManager.atmosphereSystem;
+        if (!atmosphere) return null;
+        const stats = atmosphere.getSkyRefreshStatsForDebug();
+        if (options.reset) {
+          atmosphere.resetSkyRefreshStatsForDebug();
+        }
+        return stats;
+      };
+
       (window as any).__engineHealth = () => {
         const snap = engine.runtimeMetrics?.getSnapshot();
         const avgMs = snap?.avgFrameMs ?? 0;

@@ -80,37 +80,40 @@ search confirms two independent issues with this architecture:
    discourse 50288 (CanvasTexture needsUpdate-every-frame perf
    issue), discourse 66535 (CanvasTexture in WebGPU specifically).
 
-Slice 12's incremental LUT optimization replaces the per-pixel
-analytic eval with a bilinear LUT sample inside `refreshSkyTexture`
-— a correct improvement to the CPU work, but it does not move the
-measured EMA meaningfully.
+Slice 12 (LUT-driven CPU refresh) and slice 13 (DataTexture +
+`SKY_TEXTURE_REFRESH_SECONDS` 0.5 → 2.0) DO save ~1.5–2.5 ms
+across all modes — but this was hidden by a stale `dist-perf`
+bundle.
 
-Slice 13 went further with three follow-on attempts:
+**Slice 14 diagnostic resolved the "phantom EMA" puzzle.** The
+crop probe uses `vite preview --outDir dist-perf` against a
+pre-built bundle, NOT dev-mode HMR source. After running
+`npm run build:perf` to rebuild against current source, the
+slice 12+13 EMA improvements appeared correctly. Earlier
+diagnostic experiments (bypass refresh body / remove
+`trackAtmosphereTiming`) had been running against the
+pre-slice-12 build the whole time. Probe artifact
+`2026-05-12T18-59-46-847Z` is the corrected baseline:
 
-1. `CanvasTexture` → `DataTexture` (Uint8Array buffer, direct
-   `texSubImage2D` upload). EMA unchanged.
-2. `SKY_TEXTURE_REFRESH_SECONDS` 0.5 → 2.0 (cuts refresh frequency
-   4×). EMA unchanged.
-3. **Diagnostic**: refresh body fully bypassed (`return;` at top of
-   `refreshSkyTexture`). EMA unchanged at 5.14 / 5.63 ms.
-4. **Diagnostic v2**: entire `trackAtmosphereTiming` wrapper removed
-   from `AtmosphereSystem.update`. EMA STILL unchanged at 5.14 /
-   5.65 ms. No code in our path calls
-   `beginSystem('World.Atmosphere.SkyTexture')` and the timing
-   still reports.
+| Mode | SkyTexture EMA (slice 11 baseline → slice 14) | Real per-frame |
+| --- | ---: | ---: |
+| `open_frontier` | 5.03 → 3.26 | 0.35 |
+| `zone_control` | 5.14 → 3.22 | 0.39 |
+| `team_deathmatch` | 5.39 → 3.43 | 0.37 |
+| `ai_sandbox` | 5.21 → 3.32 | 0.50 |
+| `a_shau_valley` | 5.96 → 3.47 | 0.63 |
 
-This is decisive empirical evidence that the measurement is
-either (a) artifactual (stale EMA in the `performanceTelemetry`
-singleton aliased across mode switches in the same browser tab,
-HMR-cached old module code being served, or some other measurement
-chain bug), or (b) reflecting cost in a path we have not yet
-identified that triggers `beginSystem('World.Atmosphere.SkyTexture')`
-indirectly. Either way, incremental CPU optimization of the refresh
-path will not move the EMA, and the architectural diagnosis is
-unchanged: the canvas-write + texture-upload primitive is wrong
-for WebGPU and should be retired entirely in favor of a fragment
-shader on the dome mesh. Slice 14 (TSL port) is the only remaining
-lever.
+The EMA reports per-fire cost (~3 ms each); the actual per-frame
+amortized cost is 0.35–0.63 ms — much smaller than the EMA
+suggested. Refresh fires ~16×/sec across all modes despite the
+2 s timer; investigation pending but the per-frame cost is small
+enough that this is no longer the dominant concern.
+
+**Process improvement**: the probe's `dist-perf` bundle must be
+rebuilt before perf measurements (`npm run build:perf`). The crop
+probe should either force a rebuild or detect-and-rebuild on a
+stale-output check; this gap caused several false-negative
+measurements in slices 11–13.
 
 ### Candidate primitives
 

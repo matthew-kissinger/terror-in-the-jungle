@@ -152,6 +152,17 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private readonly skyTexture: THREE.Texture;
   private readonly skyData: Uint8Array;
 
+  // Slice 14 diagnostic: count refresh-loop activity so probes can
+  // distinguish real refresh cost from phantom EMA. `refreshFireCount`
+  // increments every time the loop body runs (skyTextureDirty was true).
+  // `refreshTotalMs` accumulates wall-clock time spent inside the loop.
+  // `refreshLastMs` is the most recent fire duration. Cleared by
+  // `resetRefreshStatsForDebug()` so the probe can capture a clean
+  // window aligned with its perf-window sample.
+  private refreshFireCount = 0;
+  private refreshTotalMs = 0;
+  private refreshLastMs = 0;
+
   private readonly sunDirection = new THREE.Vector3(0, 1, 0);
   private readonly groundAlbedo = new THREE.Color(0x3b4c2e);
   private turbidity = 3.0;
@@ -395,6 +406,13 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     if (!this.skyTextureDirty) return;
     this.skyTextureDirty = false;
 
+    // Slice 14 diagnostic: time the refresh body so probes can compare
+    // wall-clock refresh cost against the `World.Atmosphere.SkyTexture`
+    // EMA. If the EMA reports ~5 ms but this counter shows total ~0 ms
+    // or few fires, the EMA is artifactual.
+    const refreshStart = performance.now();
+    this.refreshFireCount += 1;
+
     // Slice 13: write directly into the `DataTexture` buffer (Uint8Array)
     // and call `needsUpdate = true`. Skips the Canvas2D context, the
     // `putImageData` step, and the canvas-read leg of the upload path.
@@ -465,6 +483,32 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     }
 
     this.skyTexture.needsUpdate = true;
+
+    // Slice 14 diagnostic counter completion.
+    const elapsed = performance.now() - refreshStart;
+    this.refreshLastMs = elapsed;
+    this.refreshTotalMs += elapsed;
+  }
+
+  /**
+   * Slice 14 diagnostic: returns the current refresh-loop activity stats
+   * so probes can distinguish "real refresh cost" from "phantom EMA on
+   * `World.Atmosphere.SkyTexture`". Call `resetRefreshStatsForDebug()`
+   * at the start of a measurement window and read these at the end.
+   */
+  getRefreshStatsForDebug(): { fireCount: number; totalMs: number; lastMs: number; avgMs: number } {
+    return {
+      fireCount: this.refreshFireCount,
+      totalMs: this.refreshTotalMs,
+      lastMs: this.refreshLastMs,
+      avgMs: this.refreshFireCount > 0 ? this.refreshTotalMs / this.refreshFireCount : 0,
+    };
+  }
+
+  resetRefreshStatsForDebug(): void {
+    this.refreshFireCount = 0;
+    this.refreshTotalMs = 0;
+    this.refreshLastMs = 0;
   }
 
   private mixSunDisc(direction: THREE.Vector3, color: THREE.Color): void {
