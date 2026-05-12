@@ -210,6 +210,47 @@ These are independently shippable. Each one assumes branch hard-stops.
     because the steady review pose has no actor inside the 64 m hard-near
     bubble — the reserve correctly does not engage. Behavior is consistent
     with slice 0; not a regression.
+0h. **System-timings frame attribution (shipped 2026-05-12, probe-side
+    slice 10).** The materialization perf-window now also drains
+    `engine.systemManager.getSystemTimings()` at end of window,
+    capturing per-system EMA timings sorted descending. This is the
+    frame-budget child timing the review packet names as an
+    actionable input for "renderer/world budgets attribution".
+
+    Strict WebGPU multi-mode evidence (RTX 3070, headed):
+    `artifacts/perf/2026-05-12T16-06-33-882Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+
+    Top contributor per mode:
+
+    | Mode | top system | top ms | budget | over | systems-total ms |
+    | --- | --- | ---: | ---: | ---: | ---: |
+    | `open_frontier` | World.Atmosphere | 5.16 | 0.38 | 13.6× | 7.83 |
+    | `zone_control` | World.Atmosphere | 5.16 | 0.38 | 13.6× | 8.71 |
+    | `team_deathmatch` | World.Atmosphere | 5.30 | 0.38 | 13.9× | 8.49 |
+    | `ai_sandbox` | World.Atmosphere | 5.33 | 0.38 | 14.0× | 9.31 |
+    | `a_shau_valley` | World.Atmosphere | 6.39 | 0.38 | 16.8× | 13.64 |
+
+    **Architectural finding (re-prioritization signal)**: the
+    materialization track (slices 0–8) is correct as designed but is
+    NOT the current frame-budget bottleneck. `World.Atmosphere` at
+    5–6 ms is the dominant CPU contributor in every mode, in front
+    of `Combat` (1.5–3.2 ms), `World` (0.4–1.4 ms), `Terrain`
+    (0.07–0.60 ms), and `WarSim` (0.26 ms in A Shau). The atmosphere
+    budget of 0.38 ms in `WORLD_CHILD_BUDGET_MS` is unrealistic for
+    the current implementation cost.
+
+    Next slices:
+    - **Atmosphere sub-attribution** via
+      `window.perf.report().systemBreakdown` to split the 5–6 ms
+      across `SkyTexture` / `LightFog` / `Clouds` and identify the
+      actual hot path.
+    - **Atmosphere optimization or budget reset** based on the
+      sub-attribution: SkyTexture (Hosek-Wilkie backend update) and
+      Clouds (`updateCloudCoverage`) are the likely contributors.
+    - Future Phase F render-silhouette / sim-strategic slices remain
+      architecturally correct but their frame-budget payoff will
+      stay invisible until Atmosphere stops dominating.
+
 0g. **Materialization perf-window gate (shipped 2026-05-12, probe-side,
     Phase F memo slice 7).** The crop probe now drains the
     `window.__metrics` 300-sample ring buffer via `reset()`, holds the

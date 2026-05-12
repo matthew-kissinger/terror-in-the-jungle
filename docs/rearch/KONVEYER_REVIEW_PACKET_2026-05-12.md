@@ -169,6 +169,22 @@ remaining fallback is at the designed materialization-tier cap boundary.
 - Strict WebGPU browser proof of the patched case:
   `artifacts/perf/2026-05-11T19-14-54-162Z/konveyer-terrain-fire-authority/terrain-fire-authority.json`.
 
+### Atmosphere over-budget (re-prioritization, found 2026-05-12)
+
+- Slice 10's system-timings probe extension found that
+  `World.Atmosphere` is the dominant CPU contributor in every mode at
+  5.16–6.39 ms vs a 0.38 ms budget — a 13.6× to 16.8× over-budget.
+  In front of `Combat` (1.55–3.24 ms), `World` (0.40–1.43 ms),
+  `Terrain` (0.07–0.60 ms), `WarSim` (0.26 ms in A Shau).
+- Evidence:
+  `artifacts/perf/2026-05-12T16-06-33-882Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- This is a re-prioritization signal. The materialization rearch
+  slices (sim-strategic, render-silhouette, render-cluster, lane
+  refactor) remain architecturally correct but their frame-budget
+  payoff will stay invisible until Atmosphere stops dominating.
+  Atmosphere sub-attribution (SkyTexture / LightFog / Clouds) is the
+  next probe slice.
+
 ### Startup stamped-heightmap rebake (KONVEYER-10 perf attribution)
 
 - ~48.5 ms in Open Frontier startup, dominated by grid iteration over

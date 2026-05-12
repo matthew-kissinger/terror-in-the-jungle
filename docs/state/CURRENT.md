@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate shipped, KONVEYER review packet drafted)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings attribution shipped, KONVEYER review packet drafted)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -434,6 +434,41 @@ This is the baseline against which the still-pending rearch slices
 refactor) get measured. The Open Frontier `max=53.8 ms` reflects one
 single-frame hitch in the 4500 ms window; not a sustained budget
 violation.
+
+Per-system frame attribution (shipped 2026-05-12, probe-side slice 10):
+the perf-window now also drains
+`engine.systemManager.getSystemTimings()` at end of window, sorting
+EMA timings descending. This is the frame-budget child timing the
+review packet names as a missing actionable input. Strict WebGPU
+multi-mode evidence:
+`artifacts/perf/2026-05-12T16-06-33-882Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+
+Top-system attribution per mode (RTX 3070, headed, strict WebGPU, EMA):
+
+| Mode | top system | top ms | budget ms | over | second | second ms |
+| --- | --- | ---: | ---: | ---: | --- | ---: |
+| `open_frontier` | World.Atmosphere | 5.16 | 0.38 | **13.6×** | Combat | 1.55 |
+| `zone_control` | World.Atmosphere | 5.16 | 0.38 | **13.6×** | Combat | 1.42 |
+| `team_deathmatch` | World.Atmosphere | 5.30 | 0.38 | **13.9×** | Combat | 2.06 |
+| `ai_sandbox` (combat120) | World.Atmosphere | 5.33 | 0.38 | **14.0×** | Combat | 3.05 |
+| `a_shau_valley` | World.Atmosphere | 6.39 | 0.38 | **16.8×** | Combat | 3.24 |
+
+**Architectural finding**: `World.Atmosphere` (registered in
+`SystemUpdater` at 0.38 ms budget) is the dominant CPU contributor in
+every mode at 5–6 ms — a 14×+ over-budget, in front of `Combat`
+which is the next biggest at 1.5–3.2 ms. The materialization arbiter
+work (slices 0–8) is correct but does not move the frame-budget
+needle because materialization is not the bottleneck. The Atmosphere
+budget either needs to be raised to reflect actual cost (cosmetic
+fix), or the Atmosphere work needs restructuring (real fix); the
+review packet's K10 frame-budget-attribution thread now has
+actionable child timings.
+
+Atmosphere child timings (`World.Atmosphere.SkyTexture`,
+`World.Atmosphere.LightFog`, `World.Atmosphere.Clouds`) are tracked
+through `performanceTelemetry.beginSystem` / `endSystem` and surface
+through `window.perf.report().systemBreakdown`. Sub-attribution is
+the slice 11 follow-up.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.

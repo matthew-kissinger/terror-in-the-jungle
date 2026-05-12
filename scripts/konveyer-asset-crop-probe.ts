@@ -137,6 +137,12 @@ interface TierEventCapture {
   }>;
 }
 
+interface SystemTimingSample {
+  name: string;
+  emaMs: number;
+  budgetMs: number;
+}
+
 interface MaterializationPerfWindow {
   // Slice 9: falsifiable perf bar for the materialization review pose.
   // The probe drains `window.__metrics` (300-sample ring), waits a fixed
@@ -160,6 +166,12 @@ interface MaterializationPerfWindow {
   activeCloseModels: number;
   candidatesWithinCloseRadius: number;
   fallbackCount: number;
+  // Slice 10: per-system EMA timings captured at end of window via
+  // `engine.systemManager.getSystemTimings()`. Sorted descending so the
+  // first entries are the largest CPU contributors. Empty array when
+  // the accessor is unavailable.
+  systemTimings: SystemTimingSample[];
+  systemTimingsTotalMs: number;
 }
 
 interface CloseGlbComparison {
@@ -1216,6 +1228,8 @@ async function captureMaterializationPerfWindow(
       activeCloseModels: 0,
       candidatesWithinCloseRadius: 0,
       fallbackCount: 0,
+      systemTimings: [],
+      systemTimingsTotalMs: 0,
     };
   }
   await page.waitForTimeout(durationMs);
@@ -1232,6 +1246,19 @@ async function captureMaterializationPerfWindow(
       ? (window as any).npcMaterializationProfile(24)
       : null;
     const stats = profile?.closeModelStats ?? null;
+    const engine = (window as any).__engine;
+    const sysTimingsRaw = typeof engine?.systemManager?.getSystemTimings === 'function'
+      ? engine.systemManager.getSystemTimings()
+      : [];
+    const sysTimings = (Array.isArray(sysTimingsRaw) ? sysTimingsRaw : [])
+      .map((entry: any) => ({
+        name: String(entry?.name ?? 'unknown'),
+        emaMs: Number(entry?.timeMs ?? 0),
+        budgetMs: Number(entry?.budgetMs ?? 0),
+      }))
+      .filter((entry: { emaMs: number }) => Number.isFinite(entry.emaMs))
+      .sort((a: { emaMs: number }, b: { emaMs: number }) => b.emaMs - a.emaMs);
+    const sysTotalMs = sysTimings.reduce((sum: number, entry: { emaMs: number }) => sum + entry.emaMs, 0);
     return {
       attempted: true,
       reason: null,
@@ -1250,6 +1277,8 @@ async function captureMaterializationPerfWindow(
       activeCloseModels: Number(stats?.activeCloseModels ?? 0),
       candidatesWithinCloseRadius: Number(stats?.candidatesWithinCloseRadius ?? 0),
       fallbackCount: Number(stats?.fallbackCount ?? 0),
+      systemTimings: sysTimings,
+      systemTimingsTotalMs: sysTotalMs,
     };
   }, durationMs);
 }
@@ -1638,6 +1667,14 @@ async function captureCloseGlbComparison(
     findings.push(
       `perf-window:frames=${perfWindow.frameCount},avg=${perfWindow.avgFrameMs.toFixed(1)}ms,p95=${perfWindow.p95FrameMs.toFixed(1)}ms,p99=${perfWindow.p99FrameMs.toFixed(1)}ms,hitch33=${perfWindow.hitch33Count}`,
     );
+    if (perfWindow.systemTimings.length > 0) {
+      const top = perfWindow.systemTimings.slice(0, 3)
+        .map(entry => `${entry.name}=${entry.emaMs.toFixed(2)}ms`)
+        .join(',');
+      findings.push(`top-systems:${top};systems-total=${perfWindow.systemTimingsTotalMs.toFixed(2)}ms`);
+    } else {
+      findings.push('top-systems:unavailable');
+    }
   } else if (perfWindow) {
     findings.push(`perf-window:not-attempted:${perfWindow.reason ?? 'unknown'}`);
   } else {
