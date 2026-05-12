@@ -221,6 +221,38 @@ describe('HosekWilkieSkyBackend (LUT rebake threshold)', () => {
     const distance = Math.sqrt(dr * dr + dg * dg + db * db);
     expect(distance).toBeGreaterThan(0.01);
   });
+
+  it('continuous sun motion does not refresh the sky texture every LUT rebake', () => {
+    // Simulates a 4.5s window of todCycle-style continuous sun sweep at
+    // ~0.6deg/sec. Without the refresh-cadence gate this would mark the
+    // texture dirty every ~0.83s (5-6 fires); with the gate the timer
+    // caps the expensive 8192-pixel composite at the refresh cadence
+    // (2 s) so it runs at most a small number of times in the window.
+    const backend = new HosekWilkieSkyBackend();
+    backend.applyPreset(SCENARIO_ATMOSPHERE_PRESETS.ashau);
+    backend.resetRefreshStatsForDebug();
+
+    const totalSeconds = 4.5;
+    const dt = 1 / 60;
+    const azimuthRatePerSec = (0.6 * Math.PI) / 180;
+    const startAzimuth = SCENARIO_ATMOSPHERE_PRESETS.ashau.sunAzimuthRad;
+    const elevation = SCENARIO_ATMOSPHERE_PRESETS.ashau.sunElevationRad;
+    const cosE = Math.cos(elevation);
+    const sinE = Math.sin(elevation);
+    const sun = new THREE.Vector3();
+    let elapsed = 0;
+    while (elapsed < totalSeconds) {
+      elapsed += dt;
+      const az = startAzimuth + azimuthRatePerSec * elapsed;
+      sun.set(cosE * Math.cos(az), sinE, cosE * Math.sin(az)).normalize();
+      backend.update(dt, sun);
+    }
+
+    const stats = backend.getRefreshStatsForDebug();
+    // Cadence ceiling: at most ceil(window / refreshSeconds) fires.
+    // Window 4.5s and refresh cadence 2s permits up to 3.
+    expect(stats.fireCount).toBeLessThanOrEqual(3);
+  });
 });
 
 describe('HosekWilkieSkyBackend (sky-integrated cloud coverage)', () => {
