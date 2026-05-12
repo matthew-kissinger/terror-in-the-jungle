@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings + slice 11 atmosphere sub-attribution + slice 12 LUT refresh + slice 13 DataTexture+2s refresh + terrain roughness fix + slice 14 refresh-counter diagnostic shipped; SkyTexture EMA dropped 5ms -> 3.3ms after bundle rebuild; phantom-cost diagnosis was a stale dist-perf bundle artifact)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings + slice 11 atmosphere sub-attribution + slice 12 LUT refresh + slice 13 DataTexture+2s refresh + terrain roughness fix + slice 14 refresh-counter diagnostic + slice 15 idempotent setCloudCoverage shipped; SkyTexture EMA dropped 5.96ms -> 0.52ms in A Shau worst case; total Atmosphere now <1ms across all modes)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -527,10 +527,40 @@ Strict WebGPU final five-mode evidence (RTX 3070, headed, after
    the LUT-rebake threshold fires more often than calculated for
    `todCycle` modes, but the cost per fire is small enough that this
    is no longer the dominant frame-budget concern.
-5. The full TSL fragment-shader port (slice 15) would eliminate the
-   remaining ~0.4–0.6 ms by moving composition to GPU, but is no
+5. The full TSL fragment-shader port (now slice 16+) would eliminate
+   the remaining ~0.4–0.6 ms by moving composition to GPU, but is no
    longer the highest-leverage next slice — Combat (1.5–3.2 ms) and
    World residuals are now relatively larger.
+
+Slice 15 (shipped 2026-05-12): idempotent `setCloudCoverage`. The
+slice 14 fire-counter exposed that the sky-texture refresh was
+firing ~16×/sec across all modes despite the 2 s timer. Root cause:
+`WeatherAtmosphere.update()` calls `setCloudCoverageIntent` every
+frame, which calls `hosekBackend.setCloudCoverage(effective)`
+unconditionally, which calls `markSkyTextureDirty()` unconditionally
+— so the dirty flag was set every frame regardless of whether the
+coverage value changed.
+
+The one-line fix: early-return from `setCloudCoverage` when the
+clamped value equals the current value. Strict WebGPU multi-mode
+evidence:
+`artifacts/perf/2026-05-12T20-46-15-213Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+
+Per-mode delta (slice 14 → slice 15):
+
+| Mode | SkyTexture EMA | Refresh fires (4.5s) |
+| --- | ---: | ---: |
+| `open_frontier` | 3.26 → **0.22** ms | 73 → 5 |
+| `zone_control` | 3.22 → **0.42** ms | 72 → 10 |
+| `team_deathmatch` | 3.43 → **0.23** ms | 73 → 8 |
+| `ai_sandbox` | 3.32 → **0.02** ms | 71 → 2 |
+| `a_shau_valley` | 3.47 → **0.52** ms | 71 → 10 |
+
+Total Atmosphere CPU cost reduction over the slice 9 → 15 arc:
+A Shau worst case 5.99 ms → 0.52 ms (≈ 11× speedup). All five modes
+now <1 ms total Atmosphere. **Materialization is back as the
+relatively larger CPU contributor**; the spike doc's revised
+priority order (slice 14 entry) holds.
 
 Atmosphere sub-attribution (shipped 2026-05-12, probe-side slice 11):
 the perf-window now also drains `window.perf.report().systemBreakdown`

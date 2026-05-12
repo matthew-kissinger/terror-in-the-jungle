@@ -275,7 +275,15 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
    * in ordinary sky views without a finite flat-plane horizon.
    */
   setCloudCoverage(value: number): void {
-    this.cloudCoverage = Math.max(0, Math.min(1, value));
+    // Slice 15: only mark dirty when the value actually changes. The
+    // WeatherAtmosphere update path calls this every frame with a steady
+    // value during clear/stable weather, which previously caused the sky
+    // refresh to fire ~every frame (~16/sec observed in slice 14) even
+    // though the cloud field was unchanged. Same applies to setter calls
+    // from scenario boot where coverage rarely changes.
+    const next = Math.max(0, Math.min(1, value));
+    if (next === this.cloudCoverage) return;
+    this.cloudCoverage = next;
     this.markSkyTextureDirty();
   }
 
