@@ -1,37 +1,40 @@
-# KONVEYER Terrain And Lighting Analysis
+# KONVEYER Terrain, Lighting, And Scene-Parity Analysis
 
 Last verified: 2026-05-11
 
 ## Decision
 
-The migration branch should pivot from "WebGPU with WebGL fallback" to strict
-WebGPU-only proof. WebGL may be used as a named diagnostic comparison, but it
-must not be accepted as a migration pass, fallback success, demo-readiness
-claim, or default-on proof.
+The migration branch has already pivoted from "WebGPU with WebGL fallback" to
+strict WebGPU-only proof. WebGL may be used as a named diagnostic comparison,
+but it must not be accepted as a migration pass, fallback success,
+demo-readiness claim, or default-on proof.
 
-The game is mechanically playable on strict WebGPU on this machine, but terrain
-and lighting are not visually acceptable for a demo. Open Frontier ground,
-river, and foundation views are over-bright, low-tint, and low-contrast enough
-to read as unfinished white terrain even while the renderer reports zero
-browser errors.
+The earlier Open Frontier terrain-color rejection in this memo is superseded by
+the later strict WebGPU terrain visual packet. Terrain color is accepted for now
+unless new evidence reopens it. The next blocker is broader scene parity:
+vegetation and NPC impostors look washed or detached, sky/cloud behavior feels
+camera-attached in flight, the finite map edge is visible from the air, and the
+`World` frame-budget bucket is too coarse to optimize safely.
 
 ## Evidence
 
 | Run | Command | Result | Important signal |
 | --- | --- | --- | --- |
+| Strict WebGPU terrain visual after repair | `npx tsx scripts/check-terrain-visual.ts --headed --port 9271 --renderer webgpu-strict` | PASS | Supersedes the earlier Open Frontier terrain-color rejection. Open Frontier and A Shau terrain checks pass with zero browser/page errors. Artifact: `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.md`. |
+| KONVEYER completion audit | `npm run audit:konveyer-completion` | PASS | KONVEYER-0 through KONVEYER-9 branch-review packet complete; production render blockers are zero, WebGL context use is diagnostic-only. Artifact: `artifacts/perf/2026-05-11T02-10-59-661Z/konveyer-completion-audit/completion-audit.json`. |
 | Strict WebGPU terrain visual | `npx tsx scripts/check-terrain-visual.ts --headed --port 9268 --renderer webgpu-strict` | WARN | Zero browser errors, but `terrain_ground_tone_review` rejects Open Frontier airfield/river shots. Artifact: `artifacts/perf/2026-05-11T00-26-31-266Z/projekt-143-terrain-visual-review/visual-review.md`. |
 | Strict WebGPU terrain visual before guardrail | `npx tsx scripts/check-terrain-visual.ts --headed --port 9267 --renderer webgpu-strict` | PASS | Same visual problem was present, proving the previous visual gate was too weak. Artifact: `artifacts/perf/2026-05-11T00-21-20-417Z/projekt-143-terrain-visual-review/visual-review.md`. |
 | Explicit WebGL diagnostic comparison | `npx tsx scripts/check-terrain-visual.ts --headed --port 9266 --renderer webgl` | WARN | Open Frontier is similarly washed out, so the terrain/lighting problem is shared, not solely a WebGPU backend break. A Shau also emits repeated `THREE.WebGLRenderer: Maximum number of simultaneously usable uniforms groups reached.` Artifact: `artifacts/perf/2026-05-11T00-18-38-171Z/projekt-143-terrain-visual-review/visual-review.md`. |
 | Open Frontier WebGPU perf capture | `npx tsx scripts/perf-capture.ts --headed --mode open_frontier --npcs 80 --duration 45 --warmup 8 --sample-interval-ms 1500 --detail-every-samples 2 --runtime-preflight false --port 9261` | WARN | Functional loop runs with zero errors after particle cleanup, but final-frame review is visually washed out. Artifact: `artifacts/perf/2026-05-11T00-12-40-838Z/summary.json`. |
 
-Representative Open Frontier strict WebGPU metrics from the current guard:
+Representative strict WebGPU terrain metrics after the repair:
 
-| Shot | Luma mean | Green dominance | Edge contrast | Read |
+| Shot | Luma mean | Edge contrast | Renderer triangles | Read |
 | --- | ---: | ---: | ---: | --- |
-| `airfield-foundation` | 209.97 | 0.0159 | 2.93 | Rejected: pale ground and weak terrain detail. |
-| `airfield-parking` | 210.35 | 0.0257 | 3.21 | Rejected: pale pad/ground with little tint. |
-| `river-oblique` | 212.31 | 0.0033 | 2.30 | Rejected: terrain/water view is nearly neutral white/grey. |
-| `river-ground` | 212.20 | 0.0041 | 2.71 | Rejected: river-adjacent ground lacks readable material tone. |
+| Open Frontier `airfield-foundation` | 146.81 | 4.62 | 1,192,656 | Accepted for terrain-color review; still not perf acceptance. |
+| Open Frontier `river-ground` | 59.62 | 3.31 | 1,366,688 | Accepted for terrain-color review; hydrology/gameplay water remains separate. |
+| A Shau `player-ground` | 59.76 | 8.92 | 1,763,488 | Accepted for terrain-color review; A Shau perf remains separate. |
+| A Shau `river-ground` | 52.01 | 2.50 | 2,176,050 | Accepted for terrain-color review; high triangle counters need attribution. |
 
 ## Current Pipeline
 
@@ -54,9 +57,11 @@ Lighting and atmosphere:
   albedo. Open Frontier is clear/noon; A Shau is dawn/light-rain and visibly
   darker.
 - `src/systems/environment/WeatherAtmosphere.ts` multiplies light intensities
-  and fog density by weather state. This means the current readable A Shau image
-  is partly protected by rain/dawn settings, while Open Frontier exposes the
-  clear/noon over-bright path.
+  and fog density by weather state. This still needs parity review against
+  vegetation and NPC impostor material-owned fog/lighting.
+- `todCycle.startHour` exists in preset data, but the current sun-direction
+  function derives phase from elapsed seconds only. KONVEYER-10 should fix or
+  document that drift before tuning atmosphere by eye.
 
 Terrain render path:
 
@@ -68,9 +73,9 @@ Terrain render path:
   with custom `positionNode`, `normalNode`, `colorNode`, and `roughnessNode`.
   It disables legacy material fog and owns terrain tint/fog-like effects in the
   node graph.
-- The material has no runtime visual-debug modes for "raw albedo", "normal",
-  "biome slot", "surface patch", "lit color", or "fog/tint contribution", so
-  screenshot failures cannot currently be traced to a specific node stage.
+- Terrain color is no longer the primary blocker. Keep terrain debug stages as
+  useful future observability, but prioritize vegetation/NPC/sky parity for
+  the next cycle.
 
 Validation:
 
@@ -79,6 +84,9 @@ Validation:
 - The same script now warns on high-luma, low-green, low-edge terrain views via
   `terrain_ground_tone_review`. This catches the Open Frontier problem that the
   previous nonblank/exposure checks missed.
+- The validator remains a terrain-color packet only. It does not prove
+  vegetation/NPC parity, full A Shau perf, finite-map edge quality, or
+  production rollout readiness.
 
 ## Research Notes
 
@@ -113,92 +121,98 @@ Sources:
 
 ## Root Cause Assessment
 
-1. Open Frontier terrain/lighting is a shared calibration failure, not just a
-   WebGPU backend failure. Strict WebGPU and explicit WebGL both show the same
-   over-bright Open Frontier terrain.
-2. The previous visual proof was too permissive. It treated nonblank terrain as
-   acceptable and missed high-luma/low-tint terrain surfaces.
-3. The default/fallback renderer policy is now actively harmful to migration
-   truth. It can make a renderer pass mean "WebGPU path requested" instead of
-   "WebGPU backend rendered this scene."
-4. The terrain material lacks stage-level observability. The team cannot yet
-   tell from one capture whether the failure is texture color space, biome
-   selection, surface-patch tint, PBR lighting, tone mapping, far-canopy tint,
-   or a TSL graph issue.
-5. Explicit WebGL fallback is not a safe comfort path for this branch. The A
-   Shau WebGL comparison emits repeated uniform-group warnings with node
-   materials, which is consistent with a migration surface that has outgrown
-   WebGL proof.
+1. The strict WebGPU proof policy is now correct: default and strict WebGPU
+   must resolve to the WebGPU backend, while WebGL remains named diagnostic
+   evidence only.
+2. The earlier broad terrain-color issue is currently closed by the later
+   terrain visual repair. Do not churn terrain color unless new captures fail
+   the terrain packet again, but treat source texture outliers separately.
+   The 2026-05-11 `tall-grass.webp` correction is an example: fix an obviously
+   non-Vietnam asset at the source instead of hiding it in shader code.
+3. Rest-of-scene washout is likely a material-model parity problem, not one
+   global exposure knob. Terrain, vegetation, NPC impostors, close GLBs, water,
+   and sky now use different mixes of PBR, `MeshBasicNodeMaterial`, manual
+   atmosphere tint, manual fog, readability lift, and tone mapping.
+4. Vegetation has explicit desaturation/exposure/light clamps in its node graph.
+   NPC impostors have readability/parity/exposure/fog boosts. Those were useful
+   to regain readability but can now over-lift the scene under strict WebGPU.
+5. `World` over-budget reports are not actionable until atmosphere, weather,
+   water, zone, and ticket work are timed separately.
+6. High triangle counts need attribution before optimization. Existing terrain
+   review shots already show 1M+ renderer triangle counters, and skyward
+   reports may include CDLOD selection, shadow submissions, vegetation, or
+   renderer-info aggregation.
+7. The sky dome is camera-followed to avoid clipping. That is defensible for a
+   distant sky, but clouds baked into that dome can feel player-attached during
+   flight.
+8. Zone Control and similar finite maps use visual margins, not a horizon
+   solution. Sharp air-visible edges are expected until a terrain apron,
+   low-res far ring, edge fade, or flight constraint is chosen.
 
-## Implementation Path
+## KONVEYER-10 Implementation Path
 
-### 1. Make the experiment strict WebGPU-only
+### 1. Decompose the `World` budget
 
-- Change the migration branch default to strict WebGPU proof. `webgpu` should
-  either mean strict WebGPU or be retired in favor of `webgpu-strict`.
-- Remove `webgpu-force-webgl` from acceptance matrices. If retained, label it
-  `diagnostic-webgl-backend` and keep it out of completion audits.
-- Treat `?renderer=webgl` as a separate legacy diagnostic, not a supported
-  migration fallback.
-- Update `scripts/konveyer-renderer-matrix.ts` and
-  `scripts/konveyer-completion-audit.ts` so fallback success fails the
-  migration packet.
+- Add or expose sub-timings for atmosphere sky texture refresh, atmosphere
+  light/fog application, weather updates, water updates, and zone/ticket work.
+- Keep the existing `World` bucket for continuity, but make the child timings
+  visible in runtime samples and perf summaries.
+- Do not optimize from the aggregate `World` label alone.
 
-### 2. Add terrain material debug stages
+### 2. Add vegetation and NPC parity observability
 
-Add a strict-WebGPU-only terrain debug mode controlled by a query param such as
-`?terrainDebug=albedo|normal|biome|surface|lit|fog|final`.
+- Add strict-WebGPU visual/debug evidence for vegetation: raw atlas, alpha/crop,
+  material lighting, fog contribution, and final output.
+- Add the same staged evidence for Pixel Forge NPC impostors.
+- Compare impostors to close GLBs where possible so "readable" does not become
+  "washed out."
+- Keep broad terrain color as a regression target, not the tuning target; fix
+  individual source assets when visual review identifies a real palette miss.
 
-Required outputs:
+### 3. Correct atmosphere drift before tuning by eye
 
-- `albedo`: raw biome texture sample before lighting/tint.
-- `biome`: false-color biome slot classification.
-- `surface`: false-color feature surface weights.
-- `normal`: world normal visualization.
-- `lit`: MeshStandard lighting without far-canopy/fog-like terrain tint.
-- `final`: shipping terrain color.
+- Fix or document `todCycle.startHour` so scenario labels like dawn/noon/dusk
+  match the runtime sun phase.
+- Recheck Open Frontier, Team Deathmatch, Zone Control, combat120, and A Shau
+  after the sun-phase decision.
+- Keep cloud coverage and fog density changes tied to artifacts, not subjective
+  single screenshots.
 
-The validator should capture all modes in strict WebGPU and write per-shot
-luma, green dominance, and edge contrast.
+### 4. Attribute skyward triangles
 
-### 3. Recalibrate terrain and atmosphere from measurements
+- Capture skyward renderer counters with scene attribution and pass separation
+  before changing CDLOD, shadows, or vegetation density.
+- Record active CDLOD tile count, terrain triangles, vegetation instances,
+  world-feature visibility, and shadow/overlay contribution.
+- If renderer counters aggregate passes differently under WebGPU, document that
+  before setting triangle-count success thresholds.
 
-- Audit ground texture color spaces. Terrain albedo textures should have an
-  explicit color-space contract; height, normal, and mask textures should stay
-  linear.
-- Measure raw terrain albedo on GPU before changing light values. Do not tune
-  lights until the albedo/debug stages prove the sampled color is sane.
-- Rebalance Open Frontier first because it is the clear/noon case that exposes
-  the failure. A Shau should remain a regression target, not the tuning source.
-- Revisit global light intensities in `GameRenderer` and scenario exposure in
-  `ScenarioAtmospherePresets` as a single calibration pass. The current
-  ambient/directional/hemisphere stack is likely too blunt for terrain under
-  WebGPU node materials.
-- Revisit feature-surface colors for runway, packed earth, roads, and river
-  shoulders after base terrain albedo is proven.
+### 5. Choose sky/cloud and finite-edge strategies
 
-### 4. Build acceptance gates around visual truth
+- Keep the far sky safe from clipping, but make cloud perception stable during
+  flight. Candidate approaches: world/altitude-anchored cloud layer, dome UVs
+  derived from world position, or reduced cloud motion/coverage in flight.
+- For small maps, choose a finite-edge strategy before polishing camera flight:
+  terrain apron, low-res far ring, edge fade, flight clamp, or a documented
+  equivalent.
 
-Minimum strict WebGPU terrain gate before demo-ready claims:
+### 6. Build acceptance gates around scene truth
 
-- `browser_errors_clear=PASS`
-- `terrain_ground_tone_review=PASS`
-- Open Frontier and A Shau both captured in strict WebGPU
-- no fallback backend in renderer capabilities
-- artifact contact sheet reviewed by a human
+Minimum strict WebGPU scene-parity gate:
 
-Minimum playability gate after terrain/lighting is corrected:
-
-- Open Frontier 60-90s active capture, strict WebGPU, no errors
-- Zone Control and Team Deathmatch short captures, strict WebGPU, no errors
-- A Shau short capture, strict WebGPU, no errors
-- HUD/mobile checks only after the rendering issue is fixed, because current
-  visuals are not acceptable enough to make UI polish the bottleneck
+- default and `renderer=webgpu-strict` both resolve `webgpu`
+- vegetation/NPC parity artifacts captured in at least Open Frontier and A Shau
+- `World` child timings present in runtime samples
+- skyward triangle attribution artifact linked
+- Zone Control finite-edge decision documented
+- Open Frontier, Zone Control, Team Deathmatch, combat120, and A Shau short
+  captures linked with zero browser/page errors
+- human review packet explicitly states remaining visual risks
 
 ## Do Not Do
 
 - Do not declare visual parity from WebGL fallback.
-- Do not accept nonblank terrain as terrain-art acceptance.
-- Do not tune only screenshots without adding terrain debug stages.
-- Do not hide WebGPU failures behind `WebGPURenderer`'s WebGL2 backend.
-- Do not merge or deploy this branch while Open Frontier terrain reads as white.
+- Do not reopen terrain-color tuning unless the strict terrain packet fails.
+- Do not optimize from aggregate `World` timing alone.
+- Do not hide the finite terrain edge with undocumented fog-only tuning.
+- Do not merge or deploy this branch before KONVEYER-10 evidence is reviewed.

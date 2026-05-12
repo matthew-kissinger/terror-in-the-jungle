@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-10 (cycle 2.4 cdlod-edge-morph closed; Phase 2.5 restored as Current cycle)
+Last verified: 2026-05-11 (KONVEYER-10 scene-parity cycle selected)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -114,107 +114,104 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-05-10-stabilization-fixes (Phase 2.5)
+## Current cycle: cycle-2026-05-11-konveyer-scene-parity (KONVEYER-10)
 
-**Restored as Current after cycle 2.4 hot-fix closed** ([PR #178](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/178)
-merged 2026-05-10 as `d71c3f4`). Phase 2.5 bundles 4 small fixes addressing
-the live Cloudflare audit findings: PostCSS CVE bump, `_headers` file
-(HSTS + CSP + Permissions-Policy), SEO essentials (robots.txt + meta
-description + drop unused preload hints), and Web Analytics enablement
-(manual dashboard step + verify).
+**Current branch:** `exp/konveyer-webgpu-migration`
 
-**Cycle brief:** [docs/tasks/cycle-2026-05-10-stabilization-fixes.md](tasks/cycle-2026-05-10-stabilization-fixes.md)
+**Cycle brief:** [docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md](tasks/cycle-2026-05-11-konveyer-scene-parity.md)
 
-**Task briefs:** `docs/tasks/{postcss-cve-bump,cloudflare-headers-file,seo-essentials-pass,web-analytics-enable}.md`
+**Parent campaign brief:** [docs/tasks/konveyer-full-autonomous-migration.md](tasks/konveyer-full-autonomous-migration.md)
 
-**Skip-confirm: NO.** `web-analytics-enable` requires a human dashboard
-toggle (Pages Settings → Web Analytics → Enabled + Auto-install) before
-the orchestrator can run the verification step.
+**Skip-confirm: NO.** Human review is still required before merging to
+`master`, deploying, updating performance baselines, changing fenced
+interfaces, or accepting any WebGL/fallback route as rollout-compatible.
 
-**Campaign auto-advance:** PAUSED (per
-[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md)). The owner has
-indicated they want to consider feature-trajectory pivot
-(VODA-1 / VEKHIKL-1 / DEFEKT-3 first slices ahead of Phases 3–9 refactor)
-before re-enabling auto-advance. See
-[docs/STRATEGIC_ALIGNMENT_2026-05-10.md](STRATEGIC_ALIGNMENT_2026-05-10.md)
-for the recommended sequencing options.
+**Campaign auto-advance:** PAUSED. This is experimental branch work. Do
+not auto-advance into `master` or production deploy without a fresh human
+approval step.
+
+KONVEYER-0 through KONVEYER-9 branch-review evidence exists on the WebGPU
+migration branch: strict WebGPU startup proof, TSL/WebGPU renderer ports,
+zero current production render blockers in the completion audit, and
+accepted terrain ground tone. The current blocker is not terrain color.
+KONVEYER-10 owns rest-of-scene parity and performance attribution:
+vegetation/NPC washout, atmosphere/lighting drift, sky/cloud anchoring,
+World-frame-budget decomposition, skyward high-triangle attribution, and
+finite-map edge presentation.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `postcss-cve-bump`, `cloudflare-headers-file`, `seo-essentials-pass` | 3 |
-| 2 | `web-analytics-enable` (manual + verify) | 1 |
+| 1 | `world-budget-attribution`, `vegetation-npc-parity-probes`, `skyward-triangle-attribution` | 3 |
+| 2 | `atmosphere-sky-anchor`, `finite-map-edge-strategy` | 2 |
+| 3 | `strict-webgpu-cross-mode-proof`, `docs-review-packet` | 2 |
 
 ### Tasks in this cycle
 
-Each brief is in `docs/tasks/<slug>.md`:
+Each task scope is defined in
+[the cycle brief](tasks/cycle-2026-05-11-konveyer-scene-parity.md#task-scope).
 
-- [postcss-cve-bump](tasks/postcss-cve-bump.md) — bump postcss 8.5.8 → ≥8.5.10 to close Dependabot #26
-- [cloudflare-headers-file](tasks/cloudflare-headers-file.md) — add `public/_headers` with HSTS + CSP + Permissions-Policy
-- [seo-essentials-pass](tasks/seo-essentials-pass.md) — `public/robots.txt`, `<meta name="description">`, drop 2 unused preload hints
-- [web-analytics-enable](tasks/web-analytics-enable.md) — manual Pages dashboard toggle + verify snippet injection
+- `world-budget-attribution` - split `World` timing into terrain,
+  vegetation, feature placement, sky/cloud/water, and residual buckets.
+- `vegetation-npc-parity-probes` - capture material, exposure, lighting,
+  and representation evidence for vegetation and NPC impostor/GLB washout.
+- `skyward-triangle-attribution` - identify why looking upward can report
+  roughly 1.5M triangles and whether renderer-info accounting or real draws
+  are responsible.
+- `atmosphere-sky-anchor` - decide and prove the sky/cloud anchoring model
+  so it no longer reads as terrain-traveling scenery. First slice is the
+  camera-followed dome plus world/altitude-projected cloud deck proved in
+  `artifacts/perf/2026-05-11T21-11-29-948Z/konveyer-scene-parity/scene-parity.json`;
+  final cloud art/weather representation remains open.
+- `finite-map-edge-strategy` - propose and prototype the sharp terrain-edge
+  treatment for finite maps such as Zone Control.
+- `strict-webgpu-cross-mode-proof` - prove the candidate on strict WebGPU
+  across Open Frontier, TDM, Zone Control, A Shau, and combat120.
+- `water-hydrology-bridge` - connect the KONVEYER scene-architecture review to
+  VODA by proving hydrology meshes, water queries, and the first interaction
+  sample without accepting final shader/art/physics.
+- `docs-review-packet` - close the cycle with source-of-truth docs and a
+  reviewer-ready packet.
 
 ### Dependencies
 
 ```
-postcss-cve-bump        ─┐
-cloudflare-headers-file ─┼─→ (Round 1 closes) ─→ web-analytics-enable
-seo-essentials-pass     ─┘
+world-budget-attribution      ─┐
+vegetation-npc-parity-probes  ├─→ strict-webgpu-cross-mode-proof ─→ docs-review-packet
+skyward-triangle-attribution  ─┘
+atmosphere-sky-anchor         ─┐
+finite-map-edge-strategy      ─┘
 ```
 
 ### Reviewer policy
 
-No reviewer required (none touch `src/systems/combat/**` or
-`src/systems/terrain/**` / `src/systems/navigation/**`).
+Use `terrain-nav-reviewer` for terrain-edge, CDLOD, terrain visibility, or
+navigation-adjacent edits. Use `combat-reviewer` if NPC materialization,
+combatant renderer, impostor, or close-GLB behavior changes. Run perf
+analysis after the cross-mode proof packet, not before the attribution
+tasks are in place.
 
 ### Cycle-level success criteria
 
 Full list in
-[the cycle brief](tasks/cycle-2026-05-10-stabilization-fixes.md#cycle-level-success-criteria).
-Highlights: PostCSS ≥8.5.10, security headers visible via curl,
-robots.txt + meta-description live, preload hints removed, Web Analytics
-RUM data within 24 hr, Lighthouse SEO 82/83 → ≥90, combat120 p99 ±2%,
-`validate:fast` clean, closes `cloudflare-stabilization-followups`.
+[the cycle brief](tasks/cycle-2026-05-11-konveyer-scene-parity.md#success-criteria).
+Highlights: strict WebGPU only; no fallback acceptance; terrain color
+remains accepted; rest-of-scene parity has visual evidence; `World` budget
+is decomposed; skyward triangle count has an owner; sky/cloud anchoring and
+finite-map edge strategy are explicit; cross-mode evidence is attached.
 
 ### Last closed cycle
 
-`cycle-2026-05-09-cdlod-edge-morph` closed 2026-05-10 with [PR #178](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/178)
-merged as `d71c3f4`. Single-task hot-fix; 4 commits (3 staged + 1 harden).
-Stage 2 ships: per-edge `edgeMorphMask` attribute on `CDLODTile` +
-integer-cell-keyed neighbor pass + `Float32Array` per-instance attribute on
-`CDLODRenderer` + shader force-morph at coarser-neighbor edges in
-`TerrainMaterial.ts` vertex shader. Stage 1 (snap-math) reverted in harden
-commit — terrain-nav-reviewer caught a wiring conflation in the brief
-(`tileResolution` vertex count vs. `tileGridResolution` quad count); master
-was already correct. Net diff: +410 / -9 across 6 files.
-terrain-nav-reviewer **APPROVE-WITH-NOTES**. mobile-ui CI cancelled twice
-(25-min timeout with ~2.5min historical headroom; UI-shell smoke flow
-unrelated to CDLOD changes; branch unprotected; merged on owner approval).
-Cycle retro: [docs/BACKLOG.md](BACKLOG.md) "Recently Completed
-(cycle-2026-05-09-cdlod-edge-morph)".
+The relevant predecessor is the KONVEYER branch-review pass, not the
+older master stabilization campaign. KONVEYER-0 through KONVEYER-9 closed
+the first experimental migration review route with branch-local evidence,
+but did not certify production rollout. See
+[docs/state/recent-cycles.md](state/recent-cycles.md#konveyer-branch-review-2026-05-11-experimental-not-deployed)
+and [docs/rearch/KONVEYER_PARITY_2026-05-10.md](rearch/KONVEYER_PARITY_2026-05-10.md#konveyer-10-next-cycle-scene-parity-and-frame-budget-attribution).
 
-Carry-over delta: −0 closed, +0 opened. Active count holds at **12** (at
-the ≤12 limit). Cycle ships a user-observable feature (closes the seam-
-crack regression) — COMPLETE under the "ship a user-observable gap" half
-of the rule. Four cycle-retro nits captured in the BACKLOG retro entry,
-NOT filed as new carry-overs to respect the ≤12 limit (they bundle into
-the next cycle that touches the relevant area).
-
-Predecessor cycle: `cycle-2026-05-10-zone-manager-decoupling` closed
-2026-05-09 with PRs [#173](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/173)–[#177](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/177)
-(ZoneManager fan-in 52 → 17 read / 5 concrete via `IZoneQuery` interface).
-Full retro in [docs/BACKLOG.md](BACKLOG.md) "Recently Completed
-(cycle-2026-05-10-zone-manager-decoupling)".
-
-Carry-overs still open (12, see [docs/CARRY_OVERS.md](CARRY_OVERS.md)):
-DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality), STABILIZAT-1
-(combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
-pending), AVIATSIYA-2 (AC-47 takeoff bounce), AVIATSIYA-3 (helicopter
-parity audit), KB-LOAD residual, artifact-prune-baseline-pin-fix,
-worldbuilder-oneshotkills-wiring, cloudflare-stabilization-followups
-(Phase 2.5 closes), weapons-cluster-zonemanager-migration,
-perf-doc-script-paths-drift.
+Carry-overs still open: see [docs/CARRY_OVERS.md](CARRY_OVERS.md).
+KONVEYER-10 has been added as the active WebGPU rollout-gating carry-over.
 
 ## Dispatch protocol
 

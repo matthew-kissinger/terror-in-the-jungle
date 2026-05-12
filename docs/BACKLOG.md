@@ -1,6 +1,6 @@
 # Backlog
 
-Last verified: 2026-05-10
+Last verified: 2026-05-11
 
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
@@ -28,13 +28,14 @@ Use [docs/DIRECTIVES.md](DIRECTIVES.md) instead of duplicating active work here.
 
 | Work area | Directive |
 |---|---|
-| Water surface, hydrology placement, water query API | VODA-1 |
+| Water surface, hydrology placement, water query/interaction API | VODA-1 |
 | Ground vehicles and stationary weapons | VEKHIKL-1 / VEKHIKL-2 |
 | Helicopter parity, aircraft weapons, maneuvers, Cobra import | AVIATSIYA-3 through AVIATSIYA-7 |
 | Squad commands, pings, air-support radio | SVYAZ-1 through SVYAZ-4 |
 | Respawn, map spawn, loadout, deploy flow | UX-1 through UX-4 |
 | Combat120 baseline and live release | STABILIZAT-1 through STABILIZAT-3 |
 | Baseline drift, doc/code drift, combat p99 (`DEFEKT-3`), route quality | DEFEKT-1 through DEFEKT-4 |
+| WebGPU scene parity and rollout gating | KONVEYER-10 |
 
 ## Recently Completed (cycle-2026-05-09-cdlod-edge-morph)
 
@@ -64,9 +65,11 @@ Post-cycle follow-up status:
   avg, p99, and max-frame gates. STABILIZAT-1 remains open.
 - Terrain visual evidence exists at
   `artifacts/perf/2026-05-10T10-53-32-328Z/projekt-143-terrain-visual-review/visual-review.json`.
-  The gate WARNs because one A Shau river-ground screenshot timed out and
-  Open Frontier water/exposure remains washed out; it recorded zero browser
-  errors and no automated white-crack failure.
+  That historical gate WARNed because one A Shau river-ground screenshot timed
+  out and Open Frontier water/exposure remained washed out. The later KONVEYER
+  strict-WebGPU terrain packet supersedes the terrain-color concern; water
+  polish remains routed through VODA and rest-of-scene WebGPU parity through
+  KONVEYER-10.
 - **Visual A/B at A Shau north ridgeline** (helicopter altitude, screenshot
   coordinate from the original 2026-05-09 user report) is the human gate
   per the cycle brief. Save before/after PNGs into

@@ -55,6 +55,13 @@ export interface PixelForgeNpcImposterMaterialTuning {
 export const PixelForgeNpcDistanceConfig = {
   /** Radius (meters) within which an NPC is eligible to render as a 3D close model. */
   closeModelDistanceMeters: 120,
+  /**
+   * Hard-near bubble where turn-pop is more damaging than spending a close
+   * slot on a currently off-screen actor.
+   */
+  hardNearDistanceMeters: 32,
+  /** Priority boost for actors inside `hardNearDistanceMeters`. */
+  hardNearWeight: 20,
   /** Selection priority weight for combatants whose AABB lies inside the camera frustum. */
   onScreenWeight: 10,
   /** Selection priority weight for combatants in the player's squad. */

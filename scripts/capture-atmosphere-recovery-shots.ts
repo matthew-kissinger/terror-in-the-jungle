@@ -373,6 +373,7 @@ async function poseAndRender(page: Page, view: ViewPlan): Promise<unknown> {
       const cloud = scene.getObjectByName?.('CloudLayer') as any;
       const fog = renderer?.fog;
       const preset = atmosphere?.getCurrentPreset?.();
+      const cloudAnchorDebug = atmosphere?.getCloudAnchorDebug?.() ?? null;
       const rendererInfo = typeof (window as any).__rendererInfo === 'function'
         ? (window as any).__rendererInfo()
         : null;
@@ -456,6 +457,7 @@ async function poseAndRender(page: Page, view: ViewPlan): Promise<unknown> {
           fogColorHex: fog?.color?.getHexString?.() ?? null,
           cloudCoverage: atmosphere?.getCoverage?.() ?? null,
           cloudScaleMetersPerFeature: preset?.cloudScaleMetersPerFeature ?? null,
+          cloudAnchor: cloudAnchorDebug,
         },
         cloud: cloud
           ? {
@@ -485,14 +487,17 @@ async function cloudFollowCheck(page: Page): Promise<unknown> {
     const atmosphere = engine?.systemManager?.atmosphereSystem;
     const terrain = engine?.systemManager?.terrainSystem;
     const cloud = scene?.getObjectByName?.('CloudLayer') as any;
-    if (!camera || !atmosphere || !cloud) return { available: false };
+    if (!camera || !atmosphere) return { available: false };
 
     const samples: Array<{
       cameraX: number;
       cameraZ: number;
-      cloudX: number;
-      cloudZ: number;
-      cloudY: number;
+      anchorX: number | null;
+      anchorZ: number | null;
+      cloudX: number | null;
+      cloudZ: number | null;
+      cloudY: number | null;
+      model: string | null;
     }> = [];
     const positions = [
       { x: 0, z: 0 },
@@ -510,27 +515,37 @@ async function cloudFollowCheck(page: Page): Promise<unknown> {
       atmosphere.syncDomePosition?.(camera.position);
       atmosphere.setTerrainYAtCamera?.(terrainY);
       atmosphere.update?.(0);
+      const cloudAnchor = atmosphere.getCloudAnchorDebug?.() ?? null;
       samples.push({
         cameraX: camera.position.x,
         cameraZ: camera.position.z,
-        cloudX: cloud.position.x,
-        cloudZ: cloud.position.z,
-        cloudY: cloud.position.y,
+        anchorX: typeof cloudAnchor?.anchorX === 'number' ? cloudAnchor.anchorX : null,
+        anchorZ: typeof cloudAnchor?.anchorZ === 'number' ? cloudAnchor.anchorZ : null,
+        cloudX: typeof cloud?.position?.x === 'number' ? cloud.position.x : null,
+        cloudZ: typeof cloud?.position?.z === 'number' ? cloud.position.z : null,
+        cloudY: typeof cloud?.position?.y === 'number' ? cloud.position.y : null,
+        model: typeof cloudAnchor?.model === 'string' ? cloudAnchor.model : null,
       });
     }
 
     const a = samples[0];
     const b = samples[1];
+    const anchorDeltaX = (b.anchorX ?? 0) - (a.anchorX ?? 0);
+    const anchorDeltaZ = (b.anchorZ ?? 0) - (a.anchorZ ?? 0);
+    const cameraDeltaX = b.cameraX - a.cameraX;
+    const cameraDeltaZ = b.cameraZ - a.cameraZ;
     return {
       available: true,
+      finiteCloudLayerPresent: Boolean(cloud),
+      model: b.model ?? a.model ?? null,
       first: a,
       second: b,
-      cloudDeltaX: b.cloudX - a.cloudX,
-      cloudDeltaZ: b.cloudZ - a.cloudZ,
-      cameraDeltaX: b.cameraX - a.cameraX,
-      cameraDeltaZ: b.cameraZ - a.cameraZ,
-      followsCameraXZ: Math.abs((b.cloudX - a.cloudX) - (b.cameraX - a.cameraX)) < 0.01
-        && Math.abs((b.cloudZ - a.cloudZ) - (b.cameraZ - a.cameraZ)) < 0.01,
+      anchorDeltaX,
+      anchorDeltaZ,
+      cameraDeltaX,
+      cameraDeltaZ,
+      anchorTracksCameraXZ: Math.abs(anchorDeltaX - cameraDeltaX) < 0.01
+        && Math.abs(anchorDeltaZ - cameraDeltaZ) < 0.01,
     };
   });
 }

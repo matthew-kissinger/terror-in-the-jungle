@@ -114,30 +114,48 @@ function resolveHydrologyBiomePolicy(config: ReturnType<typeof getGameModeConfig
   };
 }
 
-function compileStartupTerrainFeatures(
+export function compileStartupTerrainFeatures(
   config: ReturnType<typeof getGameModeConfig>,
   preparedTerrainSource: PreparedTerrainSource,
 ): CompiledStartupTerrainFeatures {
+  const telemetryPrefix = `engine-init.start-game.${config.id}.terrain-features.compile`;
   const heightCache = getHeightQueryCache();
   const baseProvider = heightCache.getProvider();
+
+  markStartup(`${telemetryPrefix}.features.begin`);
   const compiledFeatures = compileTerrainFeatures(
     config,
     (x, z) => heightCache.getHeightAt(x, z),
   );
+  markStartup(`${telemetryPrefix}.features.end`);
+  markStartup(`${telemetryPrefix}.stats.stamps-${compiledFeatures.stamps.length}`);
+  markStartup(`${telemetryPrefix}.stats.surface-patches-${compiledFeatures.surfacePatches.length}`);
+  markStartup(`${telemetryPrefix}.stats.exclusion-zones-${compiledFeatures.vegetationExclusionZones.length}`);
+  markStartup(`${telemetryPrefix}.stats.flow-paths-${compiledFeatures.flowPaths.length}`);
 
   if (compiledFeatures.stamps.length > 0) {
+    markStartup(`${telemetryPrefix}.stamped-provider.begin`);
     heightCache.setProvider(new StampedHeightProvider(baseProvider, compiledFeatures.stamps));
+    markStartup(`${telemetryPrefix}.stamped-provider.end`);
     if (preparedTerrainSource.preparedHeightmap) {
+      markStartup(`${telemetryPrefix}.heightmap-rebake.begin`);
+      const rebakedHeightmap = bakeStampedPreparedHeightmap(
+        preparedTerrainSource.preparedHeightmap,
+        config.worldSize,
+        baseProvider,
+        compiledFeatures.stamps,
+      );
       preparedTerrainSource = {
         ...preparedTerrainSource,
-        preparedHeightmap: bakeStampedPreparedHeightmap(
-          preparedTerrainSource.preparedHeightmap,
-          config.worldSize,
-          baseProvider,
-          compiledFeatures.stamps,
-        ),
+        preparedHeightmap: rebakedHeightmap,
       };
+      markStartup(`${telemetryPrefix}.heightmap-rebake.end`);
+      markStartup(`${telemetryPrefix}.stats.heightmap-grid-${rebakedHeightmap.gridSize}`);
+    } else {
+      markStartup(`${telemetryPrefix}.heightmap-rebake.skipped-no-prepared-heightmap`);
     }
+  } else {
+    markStartup(`${telemetryPrefix}.stamps.none`);
   }
 
   return { compiledFeatures, preparedTerrainSource };

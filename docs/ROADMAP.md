@@ -1,6 +1,6 @@
 # Roadmap
 
-Last verified: 2026-05-09
+Last verified: 2026-05-11
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 > For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
@@ -14,11 +14,20 @@ Core loop: **Play in first person AND command simultaneously.** The player holds
 Vietnam War is the first theater. Architecture generalizes to any war with different factions, terrain, vehicles, and doctrine.
 
 Current production renderer: `WebGLRenderer`. The KONVEYER experimental branch
-is the planned strict migration pass toward `WebGPURenderer` + TSL,
-GPU-driven vegetation/combatants, compute-backed effects and cover-query
-carriers, and a human-reviewed default-on WebGPU path. WebGL is diagnostic
-only for that branch; it must not be used as a fallback success path for
-WebGPU migration proof.
+(`exp/konveyer-webgpu-migration`) now has branch-review evidence for strict
+`WebGPURenderer` startup, TSL production material ports, zero active
+production render blockers, and terrain ground-tone acceptance. It is not a
+production rollout yet. KONVEYER-10 owns rest-of-scene parity and attribution:
+vegetation/NPC washout, atmosphere/sky/cloud behavior, `World` timing
+decomposition, skyward triangle attribution, finite-map terrain-edge
+presentation, cross-browser/mobile proof, and A Shau perf acceptance. WebGL is
+diagnostic only for that branch; it must not be used as a fallback success path
+for WebGPU migration proof.
+
+KONVEYER edge work is now vision-first, not probe-first. Source-backed visual
+terrain extent is the direction for finite procedural maps; A Shau needs real
+outer DEM/source data, an explicit flight/camera boundary, or a documented
+hybrid because synthetic collar tuning still reads unfinished from the air.
 
 **Canonical vision sentence (copy verbatim into other docs that need to state it):**
 
@@ -36,9 +45,10 @@ another pre-release scope expansion.
 
 Carry these findings into the next Projekt revamp:
 
-- Water and hydrology: keep the hydrology corridor/bake work, but treat natural
-  river/lake rendering, crossings, gameplay water queries, and watercraft-grade
-  physics as future terrain-engine work.
+- Water and hydrology: keep the hydrology corridor/bake work and the
+  `WaterSystem` query/interaction contract, but treat natural river/lake
+  rendering, crossings, shader/intersection work, swimming/buoyancy consumers,
+  and watercraft-grade physics as future terrain-engine work.
 - Vegetation ecology: use the short-palm retirement, bamboo/ground-cover
   distribution audits, and Pixel Forge candidate proofs as starting evidence
   for clustered jungle, hydrology-aware palms/understory, trail edges, and grass
@@ -53,7 +63,8 @@ Carry these findings into the next Projekt revamp:
 - Culling/HLOD: keep the scoped culling evidence and interaction-safety tests,
   then revisit broad HLOD, vegetation culling, parked-aircraft playtest, and
   future vehicle-driving surfaces after the release cutoff.
-- Platform utilization: stay WebGL-first for stabilization; reopen WebGPU,
+- Platform utilization: production stays WebGL-first until the KONVEYER branch
+  earns human review and production-rollout acceptance. Continue WebGPU,
   OffscreenCanvas, worker simulation, and WASM/threading only as proof-gated
   architecture branches.
 
@@ -74,7 +85,7 @@ Carry these findings into the next Projekt revamp:
 | 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), animals (6/6), structures integrated. Fixed-wing runtime is live; ground vehicles remain static only. |
 | 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. Fixed-wing feel/interpolation sign-off, NPC transport, ground vehicles, and aircraft combat integration remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
-| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water exists as a legacy plane, but hydrology/watercraft-grade rendering is not started. |
+| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water has a legacy global plane plus hydrology channel surfaces and query/interaction samples; shader/intersection acceptance and watercraft-grade physics are not started. |
 | 6: Ground Vehicles | NOT STARTED | GLBs exist (jeep, APC, truck, tank, PT-76). No driving runtime. |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
 | 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
@@ -120,7 +131,7 @@ Carry these findings into the next Projekt revamp:
 | Loadout | Default presets + fully customizable. Changeable on respawn. |
 | Command mode | Fully real-time. No time slowdown. |
 | Water | Terrain engine module. Sandbox test first. |
-| NPC rendering | Sprites now. 3D later if performant. |
+| NPC rendering | Pixel Forge impostors are production truth with limited close-GLB materialization; KONVEYER-10 owns WebGPU visual parity for impostors vs close GLBs. |
 | Campaign | Engine module. Linear, dynamic, and sandbox modes possible. Not near-term. |
 | Multiplayer | Don't block it, but not building now. Single-player AI focus. |
 | Historical accuracy | Case-by-case. |

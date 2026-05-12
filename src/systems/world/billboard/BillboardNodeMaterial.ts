@@ -31,6 +31,10 @@ import type { GPUVegetationConfig } from './BillboardTypes';
 
 const DEFAULT_BILLBOARD_FOG_DENSITY = 0.00055;
 const BILLBOARD_ALPHA_TEST = 0.25;
+const HUMID_JUNGLE_VEGETATION_TINT = { r: 0.72, g: 0.82, b: 0.58 } as const;
+const HUMID_JUNGLE_VEGETATION_SATURATION = 0.58;
+const HUMID_JUNGLE_VEGETATION_EXPOSURE = 0.82;
+const HUMID_JUNGLE_MAX_VEGETATION_LIGHT = 0.78;
 
 const clampValue = (value: number, min: number, max: number): number => (
   Math.min(max, Math.max(min, value))
@@ -133,14 +137,20 @@ export function createBillboardNodeMaterial(
     nearFadeDistance: { value: 0.0 },
     lodDistances: { value: new THREE.Vector2(150, 300) },
     viewMatrix: { value: new THREE.Matrix4() },
-    colorTint: { value: new THREE.Color(0.88, 0.98, 0.82) },
+    colorTint: {
+      value: new THREE.Color(
+        HUMID_JUNGLE_VEGETATION_TINT.r,
+        HUMID_JUNGLE_VEGETATION_TINT.g,
+        HUMID_JUNGLE_VEGETATION_TINT.b,
+      ),
+    },
     gammaAdjust: { value: 1.0 },
-    vegetationSaturation: { value: 0.74 },
+    vegetationSaturation: { value: HUMID_JUNGLE_VEGETATION_SATURATION },
     nearAlphaSolidDistance: { value: 30.0 },
-    vegetationExposure: { value: 0.88 },
+    vegetationExposure: { value: HUMID_JUNGLE_VEGETATION_EXPOSURE },
     nearLightBoostDistance: { value: 85.0 },
     minVegetationLight: { value: 0.40 },
-    maxVegetationLight: { value: 0.86 },
+    maxVegetationLight: { value: HUMID_JUNGLE_MAX_VEGETATION_LIGHT },
     windStrength: { value: resolveWindStrength(config.height, config.atlasProfile) },
     windSpeed: { value: 1.15 },
     windSpatialScale: { value: 0.055 },

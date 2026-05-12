@@ -41,6 +41,21 @@ interface WaterDebugInfo {
   hydrologyMaxAccumulationCells: number;
 }
 
+export type WaterSurfaceSource = 'none' | 'global' | 'hydrology';
+
+export interface WaterInteractionSample {
+  source: WaterSurfaceSource;
+  surfaceY: number | null;
+  depth: number;
+  submerged: boolean;
+  immersion01: number;
+  buoyancyScalar: number;
+}
+
+export interface WaterInteractionOptions {
+  immersionDepthMeters?: number;
+}
+
 const EMPTY_HYDROLOGY_RIVER_STATS: HydrologyRiverMeshStats = {
   channelCount: 0,
   segmentCount: 0,
@@ -63,6 +78,7 @@ const HYDROLOGY_RIVER_SHALLOW_COLOR = new THREE.Color(0x1e4e52);
 const HYDROLOGY_RIVER_DEEP_COLOR = new THREE.Color(0x0b2a34);
 const HYDROLOGY_RIVER_BANK_ALPHA = 0.01;
 const HYDROLOGY_RIVER_CENTER_ALPHA = 0.32;
+const DEFAULT_WATER_IMMERSION_DEPTH_METERS = 1.6;
 
 export class WaterSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -316,20 +332,50 @@ export class WaterSystem implements GameSystem {
    * Return the water surface at a gameplay position, or null when dry.
    */
   getWaterSurfaceY(position: THREE.Vector3): number | null {
-    const hydrologySurfaceY = this.getHydrologyWaterSurfaceY(position.x, position.z);
-    if (hydrologySurfaceY !== null) {
-      return hydrologySurfaceY;
-    }
-    return this.isGlobalWaterPlaneActive() ? this.WATER_LEVEL : null;
+    return this.resolveWaterSurface(position).surfaceY;
   }
 
   /**
    * Return water depth above the supplied position. Dry positions report 0.
    */
   getWaterDepth(position: THREE.Vector3): number {
-    const surfaceY = this.getWaterSurfaceY(position);
-    if (surfaceY === null) return 0;
-    return Math.max(0, surfaceY - position.y);
+    return this.sampleWaterInteraction(position).depth;
+  }
+
+  /**
+   * Shared gameplay sample for swimming, buoyancy, watercraft, and bank
+   * interactions. It intentionally reports a scalar only; force application
+   * belongs in the future physics consumer, not in the renderer-owned system.
+   */
+  sampleWaterInteraction(
+    position: THREE.Vector3,
+    options: WaterInteractionOptions = {},
+  ): WaterInteractionSample {
+    const surface = this.resolveWaterSurface(position);
+    if (surface.surfaceY === null) {
+      return {
+        source: 'none',
+        surfaceY: null,
+        depth: 0,
+        submerged: false,
+        immersion01: 0,
+        buoyancyScalar: 0,
+      };
+    }
+
+    const depth = Math.max(0, surface.surfaceY - position.y);
+    const immersionDepthMeters = Number.isFinite(options.immersionDepthMeters)
+      ? Math.max(0.01, options.immersionDepthMeters ?? DEFAULT_WATER_IMMERSION_DEPTH_METERS)
+      : DEFAULT_WATER_IMMERSION_DEPTH_METERS;
+    const immersion01 = clamp(depth / immersionDepthMeters, 0, 1);
+    return {
+      source: surface.source,
+      surfaceY: surface.surfaceY,
+      depth,
+      submerged: depth > 0,
+      immersion01,
+      buoyancyScalar: immersion01,
+    };
   }
   
   /**
@@ -464,6 +510,16 @@ export class WaterSystem implements GameSystem {
     if (this.water) {
       this.water.visible = this.isGlobalWaterPlaneActive();
     }
+  }
+
+  private resolveWaterSurface(position: THREE.Vector3): { source: WaterSurfaceSource; surfaceY: number | null } {
+    const hydrologySurfaceY = this.getHydrologyWaterSurfaceY(position.x, position.z);
+    if (hydrologySurfaceY !== null) {
+      return { source: 'hydrology', surfaceY: hydrologySurfaceY };
+    }
+    return this.isGlobalWaterPlaneActive()
+      ? { source: 'global', surfaceY: this.WATER_LEVEL }
+      : { source: 'none', surfaceY: null };
   }
 
   private buildHydrologyRiverMesh(

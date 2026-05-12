@@ -14,6 +14,7 @@ import {
 import { GameMode } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
 import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
 /**
  * Hard-override color for the submerged fog path. Matches the legacy
@@ -169,10 +170,16 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       computeSunDirectionAtTime(preset, this.simulationTimeSeconds, this.sunDirection);
     }
 
-    this.backend.update(deltaTime, this.sunDirection);
-    this.applyToRenderer();
-    this.applyFogColor();
-    this.updateCloudCoverage(deltaTime);
+    this.trackAtmosphereTiming('World.Atmosphere.SkyTexture', () => {
+      this.backend.update(deltaTime, this.sunDirection);
+    });
+    this.trackAtmosphereTiming('World.Atmosphere.LightFog', () => {
+      this.applyToRenderer();
+      this.applyFogColor();
+    });
+    this.trackAtmosphereTiming('World.Atmosphere.Clouds', () => {
+      this.updateCloudCoverage(deltaTime);
+    });
   }
 
   dispose(): void {
@@ -286,6 +293,21 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   syncDomePosition(cameraPosition: THREE.Vector3): void {
     this.domeMesh.position.copy(cameraPosition);
     this.cameraPosition.copy(cameraPosition);
+    this.hosekBackend.setCloudWorldAnchor(cameraPosition);
+  }
+
+  getCloudAnchorDebug(): {
+    model: 'camera-followed-dome-world-altitude-clouds';
+    anchorX: number;
+    anchorZ: number;
+    refreshMeters: number;
+    deckAltitudeMeters: number;
+    maxTraceMeters: number;
+    horizonFadeStartY: number;
+    horizonFadeFullY: number;
+    cloudNoiseScale: number;
+  } {
+    return this.hosekBackend.getCloudAnchorDebug();
   }
 
   /**
@@ -397,6 +419,15 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
         .copy(this.scratchHorizon)
         .multiplyScalar(HEMISPHERE_GROUND_DARKEN);
       renderer.hemisphereLight.updateMatrixWorld();
+    }
+  }
+
+  private trackAtmosphereTiming(name: string, updateFn: () => void): void {
+    performanceTelemetry.beginSystem(name);
+    try {
+      updateFn();
+    } finally {
+      performanceTelemetry.endSystem(name);
     }
   }
 

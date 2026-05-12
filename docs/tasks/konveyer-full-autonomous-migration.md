@@ -4,21 +4,25 @@ Last verified: 2026-05-11
 
 ## Goal
 
-Run the full KONVEYER WebGPU migration campaign on an experimental branch,
-starting with recon and continuing through staged implementation toward a
-production-ready strict `WebGPURenderer` + TSL path. WebGL is diagnostic only
-and must not be treated as a migration fallback, acceptance path, or demo proof.
+Continue the full KONVEYER WebGPU migration campaign on the experimental
+branch. KONVEYER-0 through KONVEYER-9 now have branch-review evidence: strict
+WebGPU starts, default startup requests WebGPU, active production render
+blockers are migrated or retired, and the latest terrain ground-tone packet
+passes. The next cycle is KONVEYER-10: rest-of-scene visual parity and
+frame-budget attribution. WebGL is diagnostic only and must not be treated as a
+migration fallback, acceptance path, or demo proof.
 
 Pasteable directive:
 
-> Run the full KONVEYER WebGPU migration campaign on
-> `exp/konveyer-webgpu-migration`: begin with KONVEYER-0 recon, then
-> autonomously progress through staged WebGPURenderer + TSL migration work
-> toward strict default-on WebGPU with no WebGL fallback in the proof path.
-> Research current upstream Three.js/WebGPU guidance, audit and port repo
-> rendering surfaces incrementally, build measured
-> vegetation/combatant/compute slices, document the KONVEYER-0 through
-> KONVEYER-9 path, commit and push often for human review, and stop only for
+> Continue `exp/konveyer-webgpu-migration` from the completed KONVEYER-0
+> through KONVEYER-9 branch-review packet into KONVEYER-10. Preserve strict
+> WebGPU proof with no WebGL fallback in the acceptance path. Focus the next
+> cycle on rest-of-scene visual parity and frame-budget attribution: vegetation
+> and NPC washout, atmosphere/sky/cloud behavior, world-budget decomposition,
+> skyward triangle attribution, and finite-map terrain-edge presentation. Keep
+> terrain color treated as accepted for now unless new evidence reopens it;
+> source assets that visibly fight the Vietnam palette remain fair game.
+> Commit and push coherent milestones for human review, and stop only for
 > fenced-interface changes, perf-baseline updates, master merges, production
 > deploys, or a renderer/visual regression that would make the game unfit for
 > playtest.
@@ -39,9 +43,10 @@ current `origin/master`.
 5. `docs/state/CURRENT.md`
 6. `docs/state/perf-trust.md`
 7. `docs/rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md`
-8. `docs/rearch/KONVEYER_TERRAIN_LIGHTING_ANALYSIS_2026-05-11.md`
-9. `scripts/webgpu-strategy-audit.ts`
-10. `scripts/check-platform-capabilities.ts`
+8. `docs/rearch/KONVEYER_PARITY_2026-05-10.md`
+9. `docs/rearch/KONVEYER_TERRAIN_LIGHTING_ANALYSIS_2026-05-11.md`
+10. `scripts/webgpu-strategy-audit.ts`
+11. `scripts/check-platform-capabilities.ts`
 
 ## Campaign Slices
 
@@ -109,6 +114,39 @@ current `origin/master`.
 - Include proposed default-on patch only if isolated and reversible.
 - Include rollback plan, remaining blockers, and human-review decisions.
 
+### KONVEYER-10 - Scene Parity And Frame-Budget Attribution
+
+- Split the overloaded `World` timing bucket into actionable sub-timings:
+  atmosphere sky texture, atmosphere light/fog, weather, water, and zone/ticket
+  work.
+- Add strict-WebGPU visual/debug evidence for vegetation and NPC impostors:
+  raw atlas/crop, material lighting, fog contribution, and final output.
+- Treat terrain color as generally accepted for now, but fix source texture
+  outliers when screenshot review shows they fight the Vietnam jungle palette.
+- Fix or document the `todCycle.startHour` drift so scenario sun phase matches
+  preset intent.
+- Capture skyward renderer counters with scene/pass attribution before changing
+  CDLOD, shadows, or vegetation budgets.
+- Decide and prototype the sky/cloud anchoring route so flying no longer makes
+  clouds or the dome feel attached to the player. First slice is in place:
+  camera-followed dome plus world/altitude-projected cloud-deck sampling,
+  proved at
+  `artifacts/perf/2026-05-11T21-11-29-948Z/konveyer-scene-parity/scene-parity.json`.
+  Do not call this final cloud art direction; blocky puffs, cloud shadows,
+  weather layering, and possible authored/Pixel Forge cloud assets remain open.
+- Propose a finite-map edge strategy for Zone Control and other small maps:
+  terrain apron, low-res far ring, edge fade, flight clamp, or another measured
+  implementation.
+- Validate with strict WebGPU Open Frontier, Zone Control, Team Deathmatch,
+  combat120, and A Shau short captures before any new default-on claim.
+- Water/hydrology bridge proof is now part of the follow-up loop: source audit
+  `artifacts/perf/2026-05-11T21-33-05-844Z/projekt-143-water-system-audit/water-system-audit.json`
+  and runtime proof
+  `artifacts/perf/2026-05-11T21-33-31-662Z/projekt-143-water-runtime-proof/water-runtime-proof.json`
+  prove hydrology meshes, queries, and `sampleWaterInteraction` in Open
+  Frontier and A Shau. This does not accept final water shader/art, terrain
+  intersections, flow, swimming/buoyancy physics, or watercraft.
+
 ## Autonomy Rules
 
 - Continue to the next viable KONVEYER slice when blocked.
@@ -139,6 +177,7 @@ npm run lint
 npm run test:run
 npm run build
 npm run check:webgpu-strategy
+npm run audit:konveyer-completion
 ```
 
 Also run targeted tests/probes for each implemented KONVEYER slice.
@@ -149,6 +188,7 @@ The final branch must include:
 
 - `docs/rearch/KONVEYER_PARITY_2026-05-10.md`
 - implementation notes for KONVEYER slices attempted
+- KONVEYER-10 rest-of-scene parity notes, including unresolved visual issues
 - evidence artifact paths
 - validation results
 - final recommendation for default-on readiness or remaining blockers

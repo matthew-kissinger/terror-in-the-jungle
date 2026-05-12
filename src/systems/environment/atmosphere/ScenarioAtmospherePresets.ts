@@ -101,6 +101,24 @@ export interface AtmospherePreset {
 const DEFAULT_MIN_SUN_ELEVATION_DEG = -10;
 /** Clamp upper bound for sun elevation (radians). ~+70deg keeps sun from true zenith. */
 const DEFAULT_MAX_SUN_ELEVATION_DEG = 70;
+const HOURS_PER_DAY = 24;
+const SUNRISE_HOUR = 6;
+
+function normalizeUnit(value: number): number {
+  return ((value % 1) + 1) % 1;
+}
+
+function normalizeHour(hour: number): number {
+  return ((hour % HOURS_PER_DAY) + HOURS_PER_DAY) % HOURS_PER_DAY;
+}
+
+function clockElevationAtHour(hour: number, minElevRad: number, maxElevRad: number): number {
+  const hourPhase = normalizeHour(hour) / HOURS_PER_DAY;
+  const daylightSine = Math.sin(2 * Math.PI * (hourPhase - SUNRISE_HOUR / HOURS_PER_DAY));
+  return daylightSine >= 0
+    ? daylightSine * maxElevRad
+    : -daylightSine * minElevRad;
+}
 
 /**
  * Compute the animated sun direction for a preset at a given simulated-time
@@ -124,15 +142,20 @@ export function computeSunDirectionAtTime(
   const maxElevRad = (maxElevDeg * Math.PI) / 180;
 
   const dayLen = Math.max(1e-3, cycle.dayLengthSeconds);
-  const phase = (((simulationTimeSeconds / dayLen) % 1) + 1) % 1;
+  const elapsedDayFraction = normalizeUnit(simulationTimeSeconds / dayLen);
+  const startHour = normalizeHour(cycle.startHour);
+  const currentHour = startHour + elapsedDayFraction * HOURS_PER_DAY;
+  const startClockElevation = clockElevationAtHour(startHour, minElevRad, maxElevRad);
+  const currentClockElevation = clockElevationAtHour(currentHour, minElevRad, maxElevRad);
+  const authoredMinElevation = Math.min(minElevRad, preset.sunElevationRad);
+  const authoredMaxElevation = Math.max(maxElevRad, preset.sunElevationRad);
+  const elevation = THREE.MathUtils.clamp(
+    preset.sunElevationRad + currentClockElevation - startClockElevation,
+    authoredMinElevation,
+    authoredMaxElevation
+  );
 
-  const elevSine = Math.sin(2 * Math.PI * phase);
-  const baseElev = preset.sunElevationRad;
-  const elevation = elevSine >= 0
-    ? baseElev + elevSine * (maxElevRad - baseElev)
-    : baseElev + elevSine * (baseElev - minElevRad);
-
-  const azimuth = preset.sunAzimuthRad + 2 * Math.PI * phase;
+  const azimuth = preset.sunAzimuthRad + 2 * Math.PI * elapsedDayFraction;
 
   const cosE = Math.cos(elevation);
   target.set(

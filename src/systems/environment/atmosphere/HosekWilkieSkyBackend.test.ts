@@ -247,6 +247,48 @@ describe('HosekWilkieSkyBackend (sky-integrated cloud coverage)', () => {
     expect(Number.isFinite(zenith.g)).toBe(true);
     expect(Number.isFinite(zenith.b)).toBe(true);
   });
+
+  it('tracks a coarse world and altitude anchor for sky-dome cloud features', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.setCloudCoverage(0.5);
+
+    backend.setCloudWorldAnchor(new THREE.Vector3(120, 40, -80));
+    const first = backend.getCloudAnchorDebug();
+    backend.setCloudWorldAnchor(new THREE.Vector3(124, 42, -76));
+    const withinThreshold = backend.getCloudAnchorDebug();
+    backend.setCloudWorldAnchor(new THREE.Vector3(180, 40, -20));
+    const moved = backend.getCloudAnchorDebug();
+
+    expect(first.model).toBe('camera-followed-dome-world-altitude-clouds');
+    expect(first.deckAltitudeMeters).toBeGreaterThan(1000);
+    expect(first.maxTraceMeters).toBeGreaterThan(first.deckAltitudeMeters);
+    expect(first.horizonFadeStartY).toBeGreaterThan(0);
+    expect(first.horizonFadeFullY).toBeGreaterThan(first.horizonFadeStartY);
+    expect(withinThreshold.anchorX).toBe(first.anchorX);
+    expect(withinThreshold.anchorZ).toBe(first.anchorZ);
+    expect(moved.anchorX).toBe(180);
+    expect(moved.anchorZ).toBe(-20);
+  });
+
+  it('samples clouds from direction/world position rather than texture U seams', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.setCloudCoverage(1);
+    backend.setCloudFeatureScaleMeters(1400);
+    backend.setCloudWorldAnchor(new THREE.Vector3(120, 40, -80));
+
+    const rightOfWrap = new THREE.Vector3(1, 0.35, 0.002).normalize();
+    const leftOfWrap = new THREE.Vector3(1, 0.35, -0.002).normalize();
+    const rightMask = backend.sampleCloudMaskForDebug(rightOfWrap);
+    const leftMask = backend.sampleCloudMaskForDebug(leftOfWrap);
+
+    expect(Number.isFinite(rightMask)).toBe(true);
+    expect(Number.isFinite(leftMask)).toBe(true);
+    expect(rightMask).toBeGreaterThanOrEqual(0);
+    expect(rightMask).toBeLessThanOrEqual(1);
+    expect(leftMask).toBeGreaterThanOrEqual(0);
+    expect(leftMask).toBeLessThanOrEqual(1);
+    expect(Math.abs(rightMask - leftMask)).toBeLessThan(0.08);
+  });
 });
 
 describe('ScenarioAtmospherePresets', () => {

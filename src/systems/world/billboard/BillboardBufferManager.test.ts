@@ -257,18 +257,17 @@ describe('GPUBillboardVegetation', () => {
     expect(internal.material.uniforms.nearAlphaSolidDistance.value).toBe(30)
   })
 
-  it('configures Pixel Forge vegetation lighting readability defaults', () => {
+  it('configures Pixel Forge vegetation lighting for humid jungle readability', () => {
     const manager = new GPUBillboardVegetation(scene, createConfig())
     const internal = manager as any
 
-    expect(internal.material.uniforms.colorTint.value.r).toBeCloseTo(0.88)
-    expect(internal.material.uniforms.colorTint.value.g).toBeCloseTo(0.98)
-    expect(internal.material.uniforms.colorTint.value.b).toBeCloseTo(0.82)
-    expect(internal.material.uniforms.vegetationSaturation.value).toBeCloseTo(0.74)
-    expect(internal.material.uniforms.vegetationExposure.value).toBeCloseTo(0.88)
+    expect(internal.material.uniforms.colorTint.value.g).toBeLessThan(0.9)
+    expect(internal.material.uniforms.colorTint.value.r).toBeGreaterThan(internal.material.uniforms.colorTint.value.b)
+    expect(internal.material.uniforms.vegetationSaturation.value).toBeLessThan(0.7)
+    expect(internal.material.uniforms.vegetationExposure.value).toBeLessThan(0.86)
     expect(internal.material.uniforms.nearLightBoostDistance.value).toBe(85)
     expect(internal.material.uniforms.minVegetationLight.value).toBeCloseTo(0.40)
-    expect(internal.material.uniforms.maxVegetationLight.value).toBeCloseTo(0.86)
+    expect(internal.material.uniforms.maxVegetationLight.value).toBeLessThan(0.82)
   })
 
   it('configures GPU wind sway uniforms without per-instance CPU animation', () => {

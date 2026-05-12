@@ -173,6 +173,8 @@ interface TerrainMaterialOptions {
   heightTexture: THREE.DataTexture;
   normalTexture: THREE.DataTexture;
   worldSize: number;
+  playableWorldSize?: number;
+  visualMargin?: number;
   splatmap: SplatmapConfig;
   biomeConfig: TerrainBiomeMaterialConfig;
   hydrologyMask?: TerrainHydrologyMaskMaterialConfig | null;
@@ -449,6 +451,18 @@ function farCanopyTintMask(slopeUp: TslNode, elevation: TslNode, worldPos: TslNo
   );
 }
 
+function visualEdgeTintMask(worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
+  const playableWorldSize = tslReference('float', uniforms.terrainPlayableWorldSize);
+  const visualMargin = tslReference('float', uniforms.terrainVisualMargin);
+  const halfPlayable = playableWorldSize.mul(0.5);
+  const outsideX = tslMax(abs(worldPos.x).sub(halfPlayable), tslFloat(0));
+  const outsideZ = tslMax(abs(worldPos.z).sub(halfPlayable), tslFloat(0));
+  const outsideDistance = tslMax(outsideX, outsideZ);
+  const enabled = step(tslFloat(1), visualMargin);
+  return smoothstep(tslFloat(0), tslMax(tslFloat(1), visualMargin.mul(0.25)), outsideDistance)
+    .mul(enabled) as TslNode;
+}
+
 function featureSurfaceWeight(surfaceTypeId: number, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
   let weight = tslFloat(0);
   const patchCount = uniformNumber(uniforms, 'featureSurfacePatchCount');
@@ -550,6 +564,8 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
     .mul(tslMix(tslFloat(0.82), tslFloat(1.18), hashUvNode(worldPos.xz.mul(0.007).add(tslVec2(1.37, 8.53)))));
   finalColor = tslMix(finalColor, canopyColor, farCanopyMask);
   finalColor = applyFeatureSurfaceColor(finalColor, worldPos, uniforms);
+  const visualEdgeMask = visualEdgeTintMask(worldPos, uniforms);
+  finalColor = tslMix(finalColor, canopyColor.mul(0.78), visualEdgeMask.mul(0.92));
   const farCanopyFogMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms)
     .mul(tslReference('float', uniforms.farCanopyTintFogStrength));
   finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
@@ -629,11 +645,15 @@ export function updateTerrainMaterialTextures(
   surfacePatches?: TerrainSurfacePatch[],
   farCanopyTint?: TerrainFarCanopyTintConfig,
   hydrologyMask?: TerrainHydrologyMaskMaterialConfig | null,
+  playableWorldSize?: number,
+  visualMargin?: number,
 ): void {
   applyTerrainMaterialOptions(material, {
     heightTexture,
     normalTexture,
     worldSize,
+    playableWorldSize,
+    visualMargin,
     biomeConfig,
     hydrologyMask,
     farCanopyTint,
@@ -729,6 +749,8 @@ function surfaceKindToShaderId(kind: TerrainSurfaceKind): number {
 
 function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Record<string, { value: unknown }> } {
   const { heightTexture, normalTexture, worldSize, biomeConfig, splatmap } = options;
+  const playableWorldSize = options.playableWorldSize ?? worldSize;
+  const visualMargin = options.visualMargin ?? Math.max(0, (worldSize - playableWorldSize) * 0.5);
   const layers = biomeConfig.layers;
   const rules = biomeConfig.rules;
   const surfacePatches = options.surfacePatches ?? [];
@@ -834,6 +856,8 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     terrainHeightmap: { value: heightTexture },
     terrainNormalMap: { value: normalTexture },
     terrainWorldSize: { value: worldSize },
+    terrainPlayableWorldSize: { value: playableWorldSize },
+    terrainVisualMargin: { value: visualMargin },
     heightmapGridSize: { value: heightmapGridSize },
     tileGridResolution: { value: tileGridRes },
     debugWireframe: { value: 0 },

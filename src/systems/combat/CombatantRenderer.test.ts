@@ -10,6 +10,7 @@ import { modelLoader } from '../assets/ModelLoader';
 import {
   getPixelForgeNpcRuntimeFaction,
   PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
+  PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
   PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
 } from './PixelForgeNpcRuntime';
@@ -316,6 +317,41 @@ describe('CombatantRenderer', () => {
       expect(activeCloseModels.get('near-1')?.weaponRoot).toBeDefined();
     });
 
+    it('reports nearest NPC materialization modes for spawn-adjacent diagnosis', () => {
+      const combatants = new Map<string, Combatant>();
+      const closeCombatant = createMockCombatant('near-mesh', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      const impostorCombatant = createMockCombatant('mid-impostor', Faction.US, new THREE.Vector3(180, 0, 0), CombatantState.PATROLLING);
+      const culledCombatant = createMockCombatant('far-culled', Faction.VC, new THREE.Vector3(450, 0, 0), CombatantState.IDLE);
+      combatants.set(closeCombatant.id, closeCombatant);
+      combatants.set(impostorCombatant.id, impostorCombatant);
+      combatants.set(culledCombatant.id, culledCombatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const rows = renderer.getNearestCombatantMaterializationRows(combatants, new THREE.Vector3(0, 0, 0), 3);
+      expect(rows.map((row) => row.combatantId)).toEqual(['near-mesh', 'mid-impostor', 'far-culled']);
+      expect(rows[0]).toMatchObject({
+        combatantId: 'near-mesh',
+        renderMode: 'close-glb',
+        closeFallbackReason: null,
+        hasCloseModelWeapon: true,
+        billboardIndex: -1,
+      });
+      expect(rows[1]).toMatchObject({
+        combatantId: 'mid-impostor',
+        renderMode: 'impostor',
+        closeFallbackReason: null,
+        hasCloseModelWeapon: false,
+      });
+      expect(rows[1].billboardIndex).toBeGreaterThanOrEqual(0);
+      expect(rows[2]).toMatchObject({
+        combatantId: 'far-culled',
+        renderMode: 'culled',
+        closeFallbackReason: null,
+        billboardIndex: null,
+      });
+    });
+
     it('collapses attached close-model weapon clones into one render mesh', () => {
       const combatants = new Map<string, Combatant>();
       const combatant = createMockCombatant('near-weapon-merge', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
@@ -463,10 +499,57 @@ describe('CombatantRenderer', () => {
       expect(lazyState.activeCloseModels.has('near-lazy')).toBe(false);
       expect(lazyState.closeModelPoolLoads.has(Faction.NVA)).toBe(true);
       expect(combatant.billboardIndex).toBe(0);
+      expect(lazyRenderer.getNearestCombatantMaterializationRows(combatants, new THREE.Vector3(0, 0, 0), 1)[0]).toMatchObject({
+        combatantId: 'near-lazy',
+        renderMode: 'impostor',
+        closeFallbackReason: 'pool-loading',
+        hasCloseModelWeapon: false,
+      });
 
       lazyRenderer.dispose();
       await vi.runOnlyPendingTimersAsync();
       vi.useRealTimers();
+    });
+
+    it('prewarms spawn-adjacent close models before the lazy-load gate opens', async () => {
+      vi.useFakeTimers();
+      vi.stubGlobal('window', {
+        location: { search: '' },
+        [PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG]: false,
+      });
+      const lazyRenderer = new CombatantRenderer(scene, camera, assetLoader);
+      try {
+        await lazyRenderer.createFactionBillboards();
+        const combatants = new Map<string, Combatant>();
+        for (let i = 0; i < 6; i++) {
+          const combatant = createMockCombatant(`spawn-near-${i}`, Faction.NVA, new THREE.Vector3(8 + i, 0, 0));
+          combatants.set(combatant.id, combatant);
+        }
+
+        const summary = await lazyRenderer.prewarmCloseModelsForSpawn(
+          combatants,
+          new THREE.Vector3(0, 0, 0),
+          { maxActive: 3 },
+        );
+
+        const state = lazyRenderer as unknown as {
+          activeCloseModels: Map<string, unknown>;
+          closeModelPoolLoads: Map<string, Promise<void>>;
+        };
+        expect(summary.skippedReason).toBe('none');
+        expect(summary.candidatesWithinCloseRadius).toBe(6);
+        expect(summary.requestedPoolTargets[Faction.NVA]).toBe(3);
+        expect(summary.renderedCloseModels).toBe(3);
+        expect(summary.fallbackCounts['pool-loading']).toBe(3);
+        expect(state.activeCloseModels.size).toBe(3);
+        expect(state.closeModelPoolLoads.has(Faction.NVA)).toBe(true);
+        expect(modelLoader.loadAnimatedModel).toHaveBeenCalledTimes(3);
+        expect(modelLoader.loadModel).toHaveBeenCalledTimes(3);
+      } finally {
+        lazyRenderer.dispose();
+        await vi.runOnlyPendingTimersAsync();
+        vi.useRealTimers();
+      }
     });
 
     it('keeps overflow close actors as impostors while a demand pool can grow', () => {
@@ -957,19 +1040,20 @@ describe('CombatantRenderer', () => {
       expect(active.size).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
     });
 
-    it('prefers on-screen candidates over equally-distant off-screen candidates', async () => {
+    it('prefers on-screen candidates over non-adjacent off-screen candidates', async () => {
       await growPool(Faction.NVA);
       configureCameraTowardPlusX();
 
       const combatants = new Map<string, Combatant>();
       // 7 on-screen NPCs in front of camera (camera looks toward +X).
       for (let i = 0; i < 7; i++) {
-        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(20 + i, 0, 0));
+        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(40 + i, 0, 0));
         combatants.set(c.id, c);
       }
-      // 7 off-screen NPCs behind the camera, slightly closer by raw distance.
+      // 7 off-screen NPCs behind the camera, slightly closer by raw distance
+      // but outside the hard-near anti-pop bubble.
       for (let i = 0; i < 7; i++) {
-        const c = createMockCombatant(`back-${i}`, Faction.NVA, new THREE.Vector3(-(15 + i), 0, 0));
+        const c = createMockCombatant(`back-${i}`, Faction.NVA, new THREE.Vector3(-(35 + i), 0, 0));
         combatants.set(c.id, c);
       }
 
@@ -981,6 +1065,29 @@ describe('CombatantRenderer', () => {
       // Every on-screen NPC must win a slot; the 8th slot goes to the closest
       // off-screen candidate.
       for (let i = 0; i < 7; i++) expect(active.has(`front-${i}`)).toBe(true);
+      expect(active.size).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
+    });
+
+    it('prioritizes spawn-adjacent hard-near actors over farther on-screen actors', async () => {
+      await growPool(Faction.NVA);
+      configureCameraTowardPlusX();
+
+      const combatants = new Map<string, Combatant>();
+      for (let i = 0; i < 8; i++) {
+        const c = createMockCombatant(`front-${i}`, Faction.NVA, new THREE.Vector3(70 + i, 0, 0));
+        combatants.set(c.id, c);
+      }
+      for (let i = 0; i < 4; i++) {
+        const c = createMockCombatant(`hard-near-${i}`, Faction.NVA, new THREE.Vector3(-(16 + i), 0, 0));
+        combatants.set(c.id, c);
+      }
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const active = (renderer as unknown as {
+        activeCloseModels: Map<string, unknown>;
+      }).activeCloseModels;
+      for (let i = 0; i < 4; i++) expect(active.has(`hard-near-${i}`)).toBe(true);
       expect(active.size).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
     });
 

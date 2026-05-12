@@ -12,6 +12,8 @@ import { PIXEL_FORGE_STARTUP_TEXTURE_UPLOAD_WARMUP_NAMES } from '../config/pixel
 import { PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG } from '../systems/combat/PixelForgeNpcRuntime';
 
 const LIVE_ENTRY_FRAME_YIELD_TIMEOUT_MS = 100;
+const NPC_CLOSE_MODEL_PREWARM_TIMEOUT_MS = 1800;
+const NPC_CLOSE_MODEL_PREWARM_MAX_ACTIVE = 8;
 
 export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): void {
   if (engine.gameStarted) {
@@ -129,6 +131,11 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     markStepEnd('texture-upload-warmup');
   }
 
+  markStepBegin('npc-close-model-prewarm');
+  markPhase('npc-close-model-prewarm', 'PRIMING NEARBY COMBATANTS', 'Preparing close-range NPC models around insertion...');
+  await prewarmNearbyNpcCloseModels(engine);
+  markStepEnd('npc-close-model-prewarm');
+
   void nextFrame().then((frameYield) => {
     markStartup(`engine-init.startup-flow.flush-chunk-update.post-reveal-yield-${frameYield}`);
     schedulePostRevealBackgroundTasks();
@@ -181,6 +188,40 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
 function setNpcCloseModelLazyLoadAllowed(allowed: boolean): void {
   if (typeof window === 'undefined') return;
   (window as unknown as Record<string, boolean>)[PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG] = allowed;
+}
+
+async function prewarmNearbyNpcCloseModels(engine: GameEngine): Promise<void> {
+  const prewarmPromise = engine.systemManager.combatantSystem
+    .prewarmCloseModelsNearPlayer({ maxActive: NPC_CLOSE_MODEL_PREWARM_MAX_ACTIVE })
+    .catch((error) => {
+      Logger.warn('engine-init', 'NPC close-model prewarm failed:', error);
+      return null;
+    });
+  const timeoutPromise = new Promise<'timeout'>((resolve) => {
+    window.setTimeout(() => resolve('timeout'), NPC_CLOSE_MODEL_PREWARM_TIMEOUT_MS);
+  });
+  const result = await Promise.race([prewarmPromise, timeoutPromise]);
+  if (result === 'timeout') {
+    Logger.warn(
+      'engine-init',
+      `NPC close-model prewarm exceeded ${NPC_CLOSE_MODEL_PREWARM_TIMEOUT_MS}ms; continuing startup with lazy close-model completion`,
+    );
+    markStartup('engine-init.startup-flow.npc-close-model-prewarm.timeout');
+    return;
+  }
+  if (!result) {
+    markStartup('engine-init.startup-flow.npc-close-model-prewarm.failed');
+    return;
+  }
+  markStartup(`engine-init.startup-flow.npc-close-model-prewarm.candidates-${result.candidatesWithinCloseRadius}`);
+  markStartup(`engine-init.startup-flow.npc-close-model-prewarm.rendered-${result.renderedCloseModels}`);
+  markStartup(`engine-init.startup-flow.npc-close-model-prewarm.fallbacks-${result.fallbackCount}`);
+  Logger.info(
+    'engine-init',
+    `NPC close-model prewarm ${result.skippedReason}: candidates=${result.candidatesWithinCloseRadius}, `
+      + `rendered=${result.renderedCloseModels}, fallbacks=${result.fallbackCount}, `
+      + `duration=${result.durationMs.toFixed(1)}ms`,
+  );
 }
 
 function nextFrame(): Promise<'raf' | 'timeout'> {

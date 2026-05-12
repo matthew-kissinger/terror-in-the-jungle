@@ -136,10 +136,10 @@ Current Three.js guidance relevant to this repo:
 | Combatant impostors | ported-hardware-proof | `src/systems/combat/CombatantMeshFactory.ts` | K7 moved active Pixel Forge NPC atlas impostors off `ShaderMaterial` onto a TSL `MeshBasicNodeMaterial` graph with crop-map sampling, animation frame selection, readability, atmosphere lighting, and material-owned fog. Headed strict WebGPU proof is green; combat120 perf remains review evidence. |
 | Combatant close GLBs | ready | `src/systems/combat/CombatantRenderer.ts` | Mostly standard/skinned GLB materials. Must prove skinning, shadows, and perf under WebGPU separately. |
 | Muzzle flashes | ported | `src/systems/effects/MuzzleFlashSystem.ts` | K5 follow-up replaced the custom points material with standard textureless `PointsMaterial` and vertex colors. The textureless path avoids WebGPU UV requirements on point geometry. |
-| Sky dome | ported | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | Uses a generated sky/cloud texture on standard `MeshBasicMaterial`; CPU LUT remains the fog/lighting authority. |
-| Cloud layer | retired | `src/systems/environment/AtmosphereSystem.ts`, `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | The old finite plane prototype was removed from production source; sky-dome clouds remain the only active cloud authority. |
-| Global water | ported | `src/systems/environment/WaterSystem.ts` | The legacy global water plane now uses standard `MeshStandardMaterial` with animated normal texture offset; hydrology river water remains the map-space authority for channel surfaces. |
-| Hydrology river water | ready | `src/systems/environment/WaterSystem.ts` | Uses `MeshStandardMaterial` vertex colors and CPU query segments. WebGPU-compatible candidate once renderer boots. |
+| Sky dome | ported | `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | Uses a generated sky/cloud texture on standard `MeshBasicMaterial`; CPU LUT remains the fog/lighting authority. K13 first slice keeps the dome camera-followed but samples clouds from a world/altitude-projected deck instead of sky texture `u/v`. |
+| Cloud layer | retired | `src/systems/environment/AtmosphereSystem.ts`, `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts` | The old finite plane prototype was removed from production source; sky-dome clouds remain the only active cloud authority. Strict proof records `camera-followed-dome-world-altitude-clouds`, but final cloud art/weather representation remains open. |
+| Global water | ported | `src/systems/environment/WaterSystem.ts` | The legacy global water plane now uses standard `MeshStandardMaterial` with animated normal texture offset; hydrology river water remains the map-space authority for channel surfaces. Future shader work should not contort the global plane into map-space rivers. |
+| Hydrology river water | ready-needs-art-acceptance | `src/systems/environment/WaterSystem.ts` | Uses `MeshStandardMaterial` vertex colors, CPU query segments, and `sampleWaterInteraction` for future gameplay consumers. Runtime proof passes in Open Frontier/A Shau, but water shader, intersections, flow, and visual acceptance remain open. |
 | First-person weapon overlay | needs-port | `src/systems/player/FirstPersonWeapon.ts`, `src/systems/player/weapon/WeaponModel.ts` | API is fenced to `WebGLRenderer`; calls common `render` but type and ordering need adapter handling. |
 | Dev viewers and tools | unknown | `src/dev/*`, `public/vehicle-viewer.html`, `tools/vehicle-viewer.html` | Not production boot blockers. Keep WebGL until runtime path proves out. |
 | Minimap and DOM UI | ready | `src/ui/minimap`, HUD DOM | DOM/UI should stay outside renderer migration except for world projection calls. |
@@ -655,6 +655,145 @@ Next reviewer decisions:
 - Approve a later `[interface-change]` PR to rename fenced renderer types away
   from `WebGLRenderer` once the internal adapter has proven stable.
 
+## KONVEYER-10 Next Cycle: Scene Parity And Frame-Budget Attribution
+
+KONVEYER-0 through KONVEYER-9 close the branch-review migration route, not the
+production-rollout route. Terrain color is accepted for now based on the latest
+strict WebGPU terrain packet, but the rest of the scene still needs parity and
+budget work before this can claim to be better than the WebGL production path.
+
+KONVEYER-10 definition of parity: use WebGL as evidence of the intended game,
+not as a pixel-perfect target. The WebGL path was the first implementation
+attempt for the vision, and it had known visual weaknesses. WebGPU work should
+keep what served the vision and replace what did not, especially around jungle
+density, combatant readability, atmosphere depth, flight-scale horizons, and
+performance attribution for materialization-tier scale.
+
+Closure rule: after the initially scoped migration/parity objectives are met,
+run a separate principles-first rearchitecture review. That review should ask
+what the scene, material, atmosphere, culling, edge, and materialization systems
+should be for this game now that WebGPU/TSL is the baseline, rather than
+cementing WebGL-era compromises because they happened to be migrated.
+
+Water-loop rule: insert a hydrology/water pass before that larger
+first-principles review. The scene architecture cannot be judged complete
+without reviewing visible hydrology, water shader/material behavior,
+water/terrain intersections, interaction, buoyancy/swimming, and eventual
+watercraft as connected systems.
+
+Asset rule: strict WebGPU parity evidence must be allowed to indict source
+assets and bakes. Vegetation/NPC impostor atlases, alpha crops, normal maps,
+LOD source, compression, and texture color space may have been authored around
+the old WebGL material path. If WebGPU exposes those assumptions, the preferred
+fix can be Pixel Forge regeneration, impostor rebake, texture edit, or
+source-asset cleanup rather than shader compensation.
+
+Current symptoms to treat as open engineering work:
+
+- Vegetation and NPC impostors can read washed, pale, or detached from terrain
+  because they use material-owned `MeshBasicNodeMaterial` lighting/fog models
+  while terrain and close GLBs use different lighting paths.
+- `World` timing is too coarse. It groups zone, tickets, weather, atmosphere,
+  and water under a 1ms budget, so over-budget reports are not actionable yet.
+- Water is now wired through hydrology surfaces and a shared interaction
+  sample, but the visual material is still provisional. Do not treat global
+  water, hydrology strip rendering, shader design, terrain intersections,
+  buoyancy/swimming, and watercraft as separate architecture decisions.
+- Sky/cloud behavior used to feel attached to the player in flight because the
+  dome is camera-followed and clouds were sampled from sky texture coordinates
+  rather than authored as a world/altitude-anchored layer. K13 first slice now
+  projects cloud sampling through a 1,800m world deck while keeping the dome
+  camera-followed for clipping safety.
+- Clouds also showed obvious representation defects before this cycle:
+  straight-line cutoffs, hard bands, and alignment seams. Those are not solved
+  by color parity; they require a representation or asset-authoring decision.
+- Renderer triangle counters can reach 1M+ in ordinary strict-WebGPU review
+  shots. Skyward 1.5M reports need scene/pass attribution before CDLOD, shadow,
+  or vegetation budgets are changed.
+- Small finite maps such as Zone Control still expose hard terrain edges from
+  the air. Visual margins are not a horizon strategy.
+
+KONVEYER-10 acceptance criteria:
+
+1. Split `SystemUpdater.World` evidence into named sub-timings for atmosphere
+   sky texture, atmosphere light/fog, weather, water, and zone/ticket work.
+2. Add strict-WebGPU debug/evidence modes or probes for vegetation and NPC
+   impostors that separate raw atlas/crop, material lighting, fog contribution,
+   and final output.
+3. Fix or explicitly document the `todCycle.startHour` phase drift so scenario
+   sun intent matches runtime behavior.
+4. Capture skyward renderer counters with scene/pass attribution and preserve
+   the artifact path in this ledger.
+5. Select a sky/cloud anchoring approach that keeps flight views stable without
+   bringing back a finite flat cloud plane as a WebGPU blocker.
+6. Select a finite-map edge approach for Zone Control and similar modes:
+   terrain apron, low-res far ring, edge fade, flight clamp, or a documented
+   equivalent.
+7. Run strict-WebGPU Open Frontier, Zone Control, Team Deathmatch, combat120,
+   and A Shau short captures before any renewed default-on or rollout claim.
+
+KONVEYER-10 implementation direction selected on 2026-05-11:
+
+- `World` stays as the aggregate frame-budget bucket for continuity, but child
+  timings must be visible as `World.Zone`, `World.Tickets`, `World.Weather`,
+  `World.Atmosphere`, `World.Water`, plus atmosphere-internal sky texture,
+  light/fog, and cloud timings.
+- Sky dome remains camera-followed so aircraft cannot clip through it. The
+  cloud model should not remain player-attached: active work samples the cloud
+  noise field through a world/altitude deck, giving flight a more stable
+  weather read without reintroducing the retired finite flat cloud plane.
+- Strict WebGPU proof for this cloud-deck anchoring slice is
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`;
+  it records the new cloud model across Open Frontier, Zone Control, actual
+  Team Deathmatch, combat120, and A Shau with zero console/page errors.
+- The current sky-dome texture cloud pass is interim. If hard cloud cutoffs or
+  visible seams remain after anchoring, the next proper solution is a
+  world/altitude-authored cloud representation or regenerated cloud asset
+  approach, not more one-off color tuning.
+- Finite-map edge handling is a presentation problem, not a terrain-color
+  problem. Source-backed visual extent is the selected direction for
+  procedural/small maps where the source can continue past the playable square.
+  A Shau is different: its current DEM has no outer source data, and the
+  1600m DEM-edge extrapolation/tint experiment still read as a tan/gold
+  synthetic band. Do not keep tuning that probe into acceptance; choose real
+  DEM/source collar data, explicit flight/camera boundary, or a documented
+  hybrid.
+- Vegetation and NPC impostor tuning should be judged against the intended
+  visual hierarchy. The target is dark, dense jungle mass with readable but
+  grounded soldiers, not maximum brightness or exact WebGL color matching.
+- Vegetation/NPC evidence should explicitly separate "bad material model" from
+  "bad source bake." Pixel Forge rebakes or asset edits are valid next actions
+  if raw atlas/crop/normal data is the root cause.
+- Water/hydrology evidence has the same rule: if the current normal texture,
+  strip mesh, or material colors fight the Vietnam scene, use a water material
+  or asset-authoring pass rather than trying to make the old global plane serve
+  every river, pond, and gameplay interaction.
+- First water bridge proof is
+  `artifacts/perf/2026-05-11T21-33-31-662Z/projekt-143-water-runtime-proof/water-runtime-proof.json`;
+  it proves hydrology meshes, channel queries, and `sampleWaterInteraction`
+  in Open Frontier and A Shau, but does not accept shader/art/physics.
+- Probe output is evidence, not the design target. A probe can identify the
+  raw atlas, crop, material lighting, fog, and final-output contributions, but
+  a human review decision should choose the renderer model that best serves the
+  game vision.
+
+KONVEYER-10 work-in-progress evidence on 2026-05-11 is indexed in
+`docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md` and `docs/DIRECTIVES.md`.
+Current finding summary: strict WebGPU scene probes pass across the requested
+modes; skyward triangle count is terrain/pass dominated; source-backed visual
+extent is the selected small-map edge direction; A Shau remains blocked after
+the rejected 1600m synthetic-collar proof; cloud anchoring improved to a
+world/altitude-projected deck on a camera-followed dome; water now has a
+proved hydrology/query/interaction bridge but no accepted shader, flow,
+physics, or visual art; strict `perf-capture` is still blocked by
+browser-target closure before samples.
+Research spike: `docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md`
+sets WebGPU/TSL as the principles-first baseline; ECSY is reference vocabulary only.
+
+Hard stops remain unchanged: no `master` merge, no production deploy, no
+`perf-baselines.json` refresh, no fenced-interface edit, and no fallback-based
+WebGPU proof.
+
 Final validation rollup on 2026-05-10:
 
 - `npm run typecheck`: PASS
@@ -664,16 +803,13 @@ Final validation rollup on 2026-05-10:
 - `npm run check:konveyer-vegetation-slice`: PASS
 - `npm run check:konveyer-combatant-slice`: PASS
 - `npm run check:konveyer-compute-carriers`: PASS
-- `npm run check:webgpu-strategy`: PASS,
-  `artifacts/perf/2026-05-10T17-56-42-420Z/webgpu-strategy-audit/strategy-audit.json`
+- `npm run check:webgpu-strategy`: PASS
 - `npm run build`: PASS
 - `npm run build:perf`: PASS
 - `npm run smoke:prod`: PASS
 - `npm run check:konveyer-renderer-matrix -- --headed`: PASS
-- `npm run check:terrain-visual -- --headed --port 9254`: PASS,
-  `artifacts/perf/2026-05-10T17-50-31-169Z/projekt-143-terrain-visual-review/visual-review.json`
-- `npm run perf:capture:combat120`: PASS with validation WARN,
-  `artifacts/perf/2026-05-10T17-46-59-842Z/summary.json`
+- `npm run check:terrain-visual -- --headed --port 9254`: PASS
+- `npm run perf:capture:combat120`: PASS with validation WARN
 - `npm run perf:compare`: WARN, `6 pass`, `2 warn`, `0 fail`
 - `npm run validate:fast`: PASS, 28 pre-existing source-budget warnings and
   12 pre-existing docs warnings

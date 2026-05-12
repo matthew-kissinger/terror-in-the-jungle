@@ -3,6 +3,11 @@ import * as THREE from 'three';
 import { AtmosphereSystem } from './AtmosphereSystem';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import type { IGameRenderer } from '../../types/SystemInterfaces';
+import {
+  SCENARIO_ATMOSPHERE_PRESETS,
+  computeSunDirectionAtTime,
+  type AtmospherePreset,
+} from './atmosphere/ScenarioAtmospherePresets';
 
 function makeRendererStub(): IGameRenderer {
   const moonLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -303,6 +308,29 @@ describe('AtmosphereSystem (day/night cycle)', () => {
     expect(after.x).toBeCloseTo(start.x, 4);
     expect(after.y).toBeCloseTo(start.y, 4);
     expect(after.z).toBeCloseTo(start.z, 4);
+  });
+
+  it('uses todCycle startHour as the cycle phase without shifting the boot direction', () => {
+    const base = SCENARIO_ATMOSPHERE_PRESETS.openfrontier;
+    const dayLengthSeconds = base.todCycle?.dayLengthSeconds ?? 600;
+    const withStartHour = (startHour: number): AtmospherePreset => ({
+      ...base,
+      todCycle: { dayLengthSeconds, startHour },
+    });
+
+    const dawnPreset = withStartHour(6);
+    const noonPreset = withStartHour(12);
+    const authoredDirection = computeSunDirectionAtTime(base, 0);
+    const dawnBoot = computeSunDirectionAtTime(dawnPreset, 0);
+    const noonBoot = computeSunDirectionAtTime(noonPreset, 0);
+
+    expect(dawnBoot.distanceTo(authoredDirection)).toBeLessThan(0.00001);
+    expect(noonBoot.distanceTo(authoredDirection)).toBeLessThan(0.00001);
+
+    const sameElapsed = dayLengthSeconds * 0.125;
+    const dawnLater = computeSunDirectionAtTime(dawnPreset, sameElapsed);
+    const noonLater = computeSunDirectionAtTime(noonPreset, sameElapsed);
+    expect(dawnLater.distanceTo(noonLater)).toBeGreaterThan(0.02);
   });
 
   it('sun elevation stays above the analytic sky danger zone across a full day', () => {

@@ -1,6 +1,6 @@
 # Strategic Alignment — 2026-05-10
 
-Last verified: 2026-05-10
+Last verified: 2026-05-11
 
 This memo aligns the campaign queue with the owner's stated feature
 trajectory: **radio-in airstrikes (SVYAZ-3), proper hydrology (VODA-1/2/3),
@@ -23,10 +23,11 @@ If this memo is older than 30 days, distrust it; the cycle landscape moves.
   feature work still needs human playtest and directive-specific cycles.
 - DEFEKT-3/STABILIZAT-1 remain open. Local combat120 still blocks baseline
   refresh, and CI perf remains advisory.
-- The next owner-named architecture direction is KONVEYER: a full WebGPU/TSL
-  renderer migration campaign on an experimental branch, progressing from
-  KONVEYER-0 recon through KONVEYER-9 default-on readiness. The owner reviews
-  the branch before any `master` merge or production deploy.
+- The owner-named architecture direction is KONVEYER. The experimental branch
+  `exp/konveyer-webgpu-migration` now has KONVEYER-0 through KONVEYER-9
+  branch-review evidence. The next cycle is KONVEYER-10: rest-of-scene visual
+  parity and frame-budget attribution before any `master` merge or production
+  deploy can be considered.
 
 ## The mismatch the owner named
 
@@ -172,27 +173,31 @@ instead of the current ("we're refactoring; features later").
 
 The feature-pivot first slices landed during release stewardship. The next
 long-running autonomous run should not reopen that queue blindly; it should
-prepare the KONVEYER renderer campaign as an experimental branch:
+continue the KONVEYER renderer campaign as an experimental branch:
 
 1. `docs/tasks/konveyer-full-autonomous-migration.md` — full autonomous
-   WebGPU/TSL migration on `exp/konveyer-webgpu-migration`, starting with
-   KONVEYER-0 and continuing through staged implementation toward KONVEYER-9.
+   WebGPU/TSL migration on `exp/konveyer-webgpu-migration`, continuing from
+   the KONVEYER-0 through KONVEYER-9 branch-review packet into KONVEYER-10.
+   Terrain color is accepted for now; KONVEYER-10 owns vegetation/NPC washout,
+   atmosphere/sky/cloud behavior, `World` timing decomposition, skyward
+   triangle attribution, finite-map edge presentation, cross-browser/mobile
+   proof, and A Shau perf acceptance.
 2. DEFEKT-3 remains important, but KONVEYER-6 owns the question of whether
    cover/AI sensor data becomes a GPU compute carrier or stays CPU/worker-only.
-3. The campaign manifest (`docs/CAMPAIGN_2026-05-09.md`) remains unchanged
-   until the owner reviews the experimental branch.
+3. The campaign manifest (`docs/CAMPAIGN_2026-05-09.md`) now marks the
+   original realignment queue as paused/historical while the KONVEYER branch
+   cycle runs.
 
 ## What this memo does NOT change
 
-- `docs/AGENT_ORCHESTRATION.md` "Current cycle" still points at Phase 2.5
-  per the standard cycle-close ritual. This memo is a recommendation; the
-  campaign manifest revision is a separate decision-and-commit by the
-  owner.
-- `docs/CARRY_OVERS.md` is unchanged.
-- The 9-cycle queue in `docs/CAMPAIGN_2026-05-09.md` is unchanged. If
-  Option 1 is approved, the next `/orchestrate` invocation pauses on
-  `cycle-2026-05-10-stabilization-fixes` and the owner edits the campaign
-  manifest before resuming.
+- The master-branch 9-cycle realignment queue still exists in
+  `docs/CAMPAIGN_2026-05-09.md`, but it is not the active next-run pointer.
+- `docs/CARRY_OVERS.md` remains the source of truth for unresolved
+  carry-overs; KONVEYER-10 is now recorded there as the active WebGPU
+  rollout-gating item.
+- Merging, deploying, baseline updates, fenced interface changes, and
+  fallback acceptance still require human approval after the experimental
+  branch review packet.
 
 ## Honest risks of Option 1
 

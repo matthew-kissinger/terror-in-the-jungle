@@ -19,7 +19,13 @@ import { CombatantFactory } from './CombatantFactory';
 import { CombatantAI } from './CombatantAI';
 import { CombatantCombat, CombatHitResult } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
-import { CombatantRenderer } from './CombatantRenderer';
+import {
+  CombatantRenderer,
+  type CombatantMaterializationRow,
+  type CloseModelPrewarmOptions,
+  type CloseModelPrewarmSummary,
+  type CloseModelRuntimeStats,
+} from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
 import { SpatialGridManager, spatialGridManager as defaultSpatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
@@ -48,6 +54,13 @@ interface CombatantSystemDependencies {
   hudSystem: IHUDSystem;
   audioManager: AudioManager;
   playerSuppressionSystem: PlayerSuppressionSystem;
+}
+
+export interface CombatantMaterializationProfile {
+  checkedAtMs: number;
+  playerPosition: { x: number; y: number; z: number };
+  closeModelStats: CloseModelRuntimeStats;
+  rows: CombatantMaterializationRow[];
 }
 
 export class CombatantSystem implements GameSystem {
@@ -192,12 +205,17 @@ export class CombatantSystem implements GameSystem {
     // Expose profiling only for harness/dev diagnostics. Gate matches
     // src/core/PerfDiagnostics.ts: DEV or VITE_PERF_HARNESS build.
     if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
-      (window as any).combatProfile = () => this.getCombatProfile();
+      const diagnosticsWindow = window as Window & {
+        combatProfile?: () => ReturnType<CombatantSystem['getCombatProfile']>;
+        npcMaterializationProfile?: (limit?: number) => CombatantMaterializationProfile;
+      };
+      diagnosticsWindow.combatProfile = () => this.getCombatProfile();
+      diagnosticsWindow.npcMaterializationProfile = (limit?: number) => this.getNearestCombatantMaterializationProfile(limit);
     }
 
     Logger.info('Combat', 'Combatant System initialized');
     if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled()) {
-      Logger.info('Combat', 'Use window.combatProfile() in console to see combat performance breakdown');
+      Logger.info('Combat', 'Use window.combatProfile() for combat timing and window.npcMaterializationProfile() for nearest NPC render modes');
     }
   }
   /**
@@ -639,6 +657,30 @@ export class CombatantSystem implements GameSystem {
   // Get the renderer for external configuration
   getRenderer(): CombatantRenderer {
     return this.combatantRenderer;
+  }
+
+  prewarmCloseModelsNearPlayer(options?: CloseModelPrewarmOptions): Promise<CloseModelPrewarmSummary> {
+    this.camera.getWorldPosition(this.playerPosition);
+    this.lodManager.setPlayerPosition(this.playerPosition);
+    return this.combatantRenderer.prewarmCloseModelsForSpawn(this.combatants, this.playerPosition, options);
+  }
+
+  getNearestCombatantMaterializationProfile(limit = 24): CombatantMaterializationProfile {
+    this.camera.getWorldPosition(this.playerPosition);
+    return {
+      checkedAtMs: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+      playerPosition: {
+        x: this.playerPosition.x,
+        y: this.playerPosition.y,
+        z: this.playerPosition.z,
+      },
+      closeModelStats: this.combatantRenderer.getCloseModelRuntimeStats(),
+      rows: this.combatantRenderer.getNearestCombatantMaterializationRows(
+        this.combatants,
+        this.playerPosition,
+        limit,
+      ),
+    };
   }
 
   getTelemetry() {

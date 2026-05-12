@@ -291,8 +291,27 @@ describe('TerrainSystem', () => {
       expect(mockVegetationSetWorldBounds).toHaveBeenLastCalledWith(500, 320);
     });
 
-    it('prepared heightmap uploads replace the need to rebake from the provider', async () => {
+    it('rebakes from the provider when a visual margin needs source-backed terrain beyond the prepared map', async () => {
       await terrain.init();
+      mockBakeFromProvider.mockClear();
+      mockUploadPrebakedGrid.mockClear();
+
+      terrain.setPreparedHeightmap({
+        data: new Float32Array(16),
+        gridSize: 4,
+        workerConfig: { type: 'noise', seed: 12345 },
+      });
+      terrain.setWorldSize(3200);
+
+      expect(mockBakeFromProvider).toHaveBeenCalled();
+      expect(mockUploadPrebakedGrid).not.toHaveBeenCalled();
+    });
+
+    it('uses prepared heightmaps directly when there is no visual margin to extend', async () => {
+      await terrain.init();
+      terrain.setVisualMargin(0);
+      mockBakeFromProvider.mockClear();
+      mockUploadPrebakedGrid.mockClear();
 
       terrain.setPreparedHeightmap({
         data: new Float32Array(16),
@@ -302,6 +321,7 @@ describe('TerrainSystem', () => {
       terrain.setWorldSize(3200);
 
       expect(mockUploadPrebakedGrid).toHaveBeenCalled();
+      expect(mockBakeFromProvider).not.toHaveBeenCalled();
     });
 
     it('stores a preloaded hydrology bake without changing terrain or vegetation state', () => {

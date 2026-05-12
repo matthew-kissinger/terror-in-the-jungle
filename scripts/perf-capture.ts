@@ -299,6 +299,13 @@ type RuntimeSample = {
     };
   };
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
+  systemBreakdown: Array<{
+    name: string;
+    budgetMs: number;
+    lastMs: number;
+    emaMs: number;
+    peakMs: number;
+  }>;
   harnessDriver?: {
     mode: string;
     // `botState` is the canonical bot state-machine label
@@ -649,8 +656,10 @@ type RuntimeRenderSubmissionFrame = {
 };
 
 type RuntimeRenderSubmissionDrain = {
+  mode?: string;
   installedCount: number;
   installPasses: number;
+  rawFrameCount?: number;
   frameCountStart: number | null;
   frameCountEnd: number | null;
   frames: RuntimeRenderSubmissionFrame[];
@@ -961,7 +970,9 @@ Common options:
   --runtime-scene-attribution-every-samples <count>
   --runtime-render-submission-attribution <true|false>
   --runtime-render-submission-every-samples <count>
+  --runtime-render-submission-mode <full|summary>
   --runtime-preflight <true|false>
+  --renderer <webgpu-strict|webgpu|webgl>
   --disable-npc-close-models
   --disable-terrain-shadows
   --deep-cdp
@@ -2360,6 +2371,9 @@ async function runCapture(): Promise<void> {
     1,
     parseNumberFlag('runtime-render-submission-every-samples', detailEverySamples)
   );
+  const runtimeRenderSubmissionMode = parseStringFlag('runtime-render-submission-mode', 'full').toLowerCase() === 'summary'
+    ? 'summary'
+    : 'full';
   const prewarm = parseBooleanFlag('prewarm', DEFAULT_PREWARM);
   const runtimePreflight = parseBooleanFlag('runtime-preflight', DEFAULT_RUNTIME_PREFLIGHT);
   const matchDurationArg = parseNumberFlag('match-duration', Number.NaN);
@@ -2382,6 +2396,7 @@ async function runCapture(): Promise<void> {
   const seedArg = parseNumberFlag('seed', Number.NaN);
   const seedPin = Number.isFinite(seedArg) && seedArg >= 0 ? Math.floor(seedArg) : null;
   const logLevel = String(process.env.PERF_LOG_LEVEL ?? process.argv.find(a => a.startsWith('--log-level='))?.split('=')[1] ?? 'warn');
+  const rendererMode = parseStringFlag('renderer', '').trim();
   // Default OFF: fresh spawn + explicit teardown per run. Opt in with --reuse-server
   // (or --reuse-dev-server for back-compat) when iterating locally.
   const reuseServer = parseBooleanFlag('reuse-server', parseBooleanFlag('reuse-dev-server', false));
@@ -2396,7 +2411,7 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} reuseServer=${reuseServer} serverMode=${serverMode}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} reuseServer=${reuseServer} serverMode=${serverMode}`);
 
   let server: ServerHandle | null = null;
   let context: BrowserContext | null = null;
@@ -2419,6 +2434,7 @@ async function runCapture(): Promise<void> {
   const losPrefilterParam = losHeightPrefilter ? '1' : '0';
   const uiTransitionsParam = '0';
   const diagnosticsQuery = 'perf=1';
+  const rendererQuery = rendererMode ? `&renderer=${encodeURIComponent(rendererMode)}` : '';
   const seedQuery = seedPin !== null ? `&seed=${seedPin}` : '';
   const matchDurationQuery = perfMatchDurationSeconds !== null
     ? `&perfMatchDuration=${perfMatchDurationSeconds}`
@@ -2428,10 +2444,10 @@ async function runCapture(): Promise<void> {
   const disableTerrainShadowsQuery = disableTerrainShadows ? '&perfDisableTerrainShadows=1' : '';
   const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}`;
   const query = sandboxMode
-    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}${perfRuntimeQuery}`
-    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}${perfRuntimeQuery}`;
+    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${perfRuntimeQuery}`
+    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${perfRuntimeQuery}`;
   const url = `http://${PERF_SERVER_HOST}:${port}/${query}`;
-  const preflightUrl = `http://${PERF_SERVER_HOST}:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`;
+  const preflightUrl = `http://${PERF_SERVER_HOST}:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}${rendererQuery}`;
   const primaryPath = new URL(url).pathname + new URL(url).search;
   const prewarmPaths = sandboxMode
     ? [
@@ -2605,6 +2621,7 @@ async function runCapture(): Promise<void> {
         '--window-position=0,0',
         '--window-size=1920,1080',
         '--force-device-scale-factor=1',
+        ...(rendererMode.toLowerCase().includes('webgpu') ? ['--enable-unsafe-webgpu'] : []),
       ],
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 1,
@@ -2922,6 +2939,7 @@ async function runCapture(): Promise<void> {
           shouldIncludeDetails: boolean;
           shouldCaptureSceneAttribution: boolean;
           shouldCaptureRenderSubmissions: boolean;
+          renderSubmissionMode: 'full' | 'summary';
           sceneAttributionEvaluateSource: string;
         }) => {
           const shouldIncludeDetails = options.shouldIncludeDetails;
@@ -2999,7 +3017,9 @@ async function runCapture(): Promise<void> {
             try {
               const tracker = (window as any).__projekt143RenderSubmissionAttribution;
               tracker?.install?.();
-              const rawRenderSubmissions = tracker?.drain?.() ?? null;
+              const rawRenderSubmissions = options.renderSubmissionMode === 'summary'
+                ? tracker?.drainSummary?.() ?? tracker?.drain?.() ?? null
+                : tracker?.drain?.() ?? null;
               if (rawRenderSubmissions && typeof rawRenderSubmissions === 'object' && !rawRenderSubmissions.error) {
                 renderSubmissions = rawRenderSubmissions;
               } else {
@@ -3476,12 +3496,22 @@ async function runCapture(): Promise<void> {
                   emaMs: Number(s.emaMs ?? 0),
                   peakMs: Number(s.peakMs ?? 0)
                 }))
+              : [],
+            systemBreakdown: Array.isArray(report?.systemBreakdown)
+              ? report.systemBreakdown.map((s: any) => ({
+                  name: String(s.name ?? 'unknown'),
+                  budgetMs: Number(s.budgetMs ?? 0),
+                  lastMs: Number(s.lastMs ?? 0),
+                  emaMs: Number(s.emaMs ?? 0),
+                  peakMs: Number(s.peakMs ?? 0)
+                }))
               : []
           };
         }, {
           shouldIncludeDetails: includeDetails,
           shouldCaptureSceneAttribution,
           shouldCaptureRenderSubmissions,
+          renderSubmissionMode: runtimeRenderSubmissionMode,
           sceneAttributionEvaluateSource: PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE
         }), 8000);
         probeRoundTripMs.push(Date.now() - probeStart);

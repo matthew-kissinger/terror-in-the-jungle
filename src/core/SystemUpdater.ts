@@ -16,6 +16,14 @@ interface SystemTimingEntry {
   emaMs: number;
 }
 
+const WORLD_CHILD_BUDGET_MS = {
+  Zone: 0.12,
+  Tickets: 0.08,
+  Weather: 0.12,
+  Atmosphere: 0.38,
+  Water: 0.30,
+} as const;
+
 /**
  * Handles update loop orchestration and performance tracking
  */
@@ -205,19 +213,39 @@ export class SystemUpdater {
     this.trackSystemUpdate('World', SYSTEM_UPDATE_BUDGET_MS.World, () => {
       performanceTelemetry.beginSystem('World');
       if (worldDelta !== null) {
-        if (refs.zoneManager) refs.zoneManager.update(worldDelta);
+        if (refs.zoneManager) {
+          this.trackInstrumentedSystemUpdate('World.Zone', WORLD_CHILD_BUDGET_MS.Zone, () => {
+            refs.zoneManager.update(worldDelta);
+          });
+        }
 
         // Gate ticket and weather systems before game starts
         if (gameStarted) {
-          if (refs.ticketSystem) refs.ticketSystem.update(worldDelta);
-          if (refs.weatherSystem) refs.weatherSystem.update(worldDelta);
+          if (refs.ticketSystem) {
+            this.trackInstrumentedSystemUpdate('World.Tickets', WORLD_CHILD_BUDGET_MS.Tickets, () => {
+              refs.ticketSystem.update(worldDelta);
+            });
+          }
+          if (refs.weatherSystem) {
+            this.trackInstrumentedSystemUpdate('World.Weather', WORLD_CHILD_BUDGET_MS.Weather, () => {
+              refs.weatherSystem.update(worldDelta);
+            });
+          }
         }
 
         // Atmosphere shares the World budget; runs every frame so backends
         // (Hosek-Wilkie, prebaked cubemap) can drive sun/sky state pre-render.
-        if (refs.atmosphereSystem) refs.atmosphereSystem.update(worldDelta);
+        if (refs.atmosphereSystem) {
+          this.trackInstrumentedSystemUpdate('World.Atmosphere', WORLD_CHILD_BUDGET_MS.Atmosphere, () => {
+            refs.atmosphereSystem.update(worldDelta);
+          });
+        }
 
-        if (refs.waterSystem) refs.waterSystem.update(worldDelta);
+        if (refs.waterSystem) {
+          this.trackInstrumentedSystemUpdate('World.Water', WORLD_CHILD_BUDGET_MS.Water, () => {
+            refs.waterSystem.update(worldDelta);
+          });
+        }
       }
       performanceTelemetry.endSystem('World');
     });
@@ -243,6 +271,17 @@ export class SystemUpdater {
 
     // End frame telemetry
     performanceTelemetry.endFrame();
+  }
+
+  private trackInstrumentedSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {
+    this.trackSystemUpdate(name, budgetMs, () => {
+      performanceTelemetry.beginSystem(name);
+      try {
+        updateFn();
+      } finally {
+        performanceTelemetry.endSystem(name);
+      }
+    });
   }
 
   private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {

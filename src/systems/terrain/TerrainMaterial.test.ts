@@ -112,9 +112,29 @@ describe('TerrainMaterial', () => {
     expect(uniforms.terrainHeightmap).toBeDefined();
     expect(uniforms.terrainNormalMap).toBeDefined();
     expect(uniforms.terrainWorldSize.value).toBe(512);
+    expect(uniforms.terrainPlayableWorldSize.value).toBe(512);
+    expect(uniforms.terrainVisualMargin.value).toBe(0);
     expect(uniforms.biomeTexture0).toBeDefined();
     expect(uniforms.biomeRuleElevationBlendWidth).toBeDefined();
     expect(uniforms.cliffRockBiomeSlot.value).toBe(1);
+  });
+
+  it('binds playable and visual terrain extents for edge-only visual tinting', () => {
+    const mat = createTerrainMaterial({
+      heightTexture: makeMockTexture(),
+      normalTexture: makeMockTexture(),
+      worldSize: 35200,
+      playableWorldSize: 32000,
+      visualMargin: 1600,
+      splatmap: testSplatmap,
+      biomeConfig: testBiomeConfig,
+    });
+
+    const uniforms = terrainUniforms(mat);
+    expect(uniforms.terrainWorldSize.value).toBe(35200);
+    expect(uniforms.terrainPlayableWorldSize.value).toBe(32000);
+    expect(uniforms.terrainVisualMargin.value).toBe(1600);
+    expect(mat.colorNode).toBeDefined();
   });
 
   it('binds far-canopy tint uniforms and node graph when enabled', () => {

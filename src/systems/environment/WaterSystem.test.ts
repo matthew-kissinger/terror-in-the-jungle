@@ -116,6 +116,14 @@ describe('WaterSystem sun direction from atmosphere', () => {
     expect(system.isUnderwater(new THREE.Vector3(0, -10, 0))).toBe(false);
     expect(system.getWaterSurfaceY(new THREE.Vector3(0, -10, 0))).toBeNull();
     expect(system.getWaterDepth(new THREE.Vector3(0, -10, 0))).toBe(0);
+    expect(system.sampleWaterInteraction(new THREE.Vector3(0, -10, 0))).toMatchObject({
+      source: 'none',
+      surfaceY: null,
+      depth: 0,
+      submerged: false,
+      immersion01: 0,
+      buoyancyScalar: 0,
+    });
     expect(system.getDebugInfo().cameraUnderwater).toBe(false);
   });
 
@@ -126,6 +134,16 @@ describe('WaterSystem sun direction from atmosphere', () => {
     expect(system.getWaterDepth(new THREE.Vector3(45, -2.5, -20))).toBeCloseTo(2.5, 5);
     expect(system.isUnderwater(new THREE.Vector3(45, -0.25, -20))).toBe(true);
     expect(system.isUnderwater(new THREE.Vector3(45, 0.25, -20))).toBe(false);
+
+    const sample = system.sampleWaterInteraction(new THREE.Vector3(45, -0.5, -20), {
+      immersionDepthMeters: 2,
+    });
+    expect(sample.source).toBe('global');
+    expect(sample.surfaceY).toBe(0);
+    expect(sample.depth).toBeCloseTo(0.5, 5);
+    expect(sample.submerged).toBe(true);
+    expect(sample.immersion01).toBeCloseTo(0.25, 5);
+    expect(sample.buoyancyScalar).toBeCloseTo(0.25, 5);
   });
 
   it('disabling water clears an active underwater state', () => {
@@ -168,8 +186,17 @@ describe('WaterSystem sun direction from atmosphere', () => {
     expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 0))).toBeCloseTo(1.85, 5);
     expect(system.getWaterDepth(new THREE.Vector3(5, 1, 0))).toBeCloseTo(0.85, 5);
     expect(system.isUnderwater(new THREE.Vector3(5, 1, 0))).toBe(true);
+    const sample = system.sampleWaterInteraction(new THREE.Vector3(5, 1, 0), {
+      immersionDepthMeters: 2,
+    });
+    expect(sample.source).toBe('hydrology');
+    expect(sample.surfaceY).toBeCloseTo(1.85, 5);
+    expect(sample.depth).toBeCloseTo(0.85, 5);
+    expect(sample.immersion01).toBeCloseTo(0.425, 5);
+    expect(sample.buoyancyScalar).toBeCloseTo(0.425, 5);
     expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 10))).toBeNull();
     expect(system.getWaterDepth(new THREE.Vector3(5, 1, 10))).toBe(0);
+    expect(system.sampleWaterInteraction(new THREE.Vector3(5, 1, 10)).source).toBe('none');
 
     system.setHydrologyChannels(null);
     expect(fakeWater.visible).toBe(true);

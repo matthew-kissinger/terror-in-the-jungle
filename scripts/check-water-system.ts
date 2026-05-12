@@ -39,6 +39,8 @@ interface WaterSystemAuditReport {
     publicWaterQueryApiPresent: boolean;
     hydrologyWaterQuerySurfacePresent: boolean;
     waterQueryTestCoveragePresent: boolean;
+    waterInteractionSampleApiPresent: boolean;
+    waterInteractionSampleTestCoveragePresent: boolean;
   };
   findings: string[];
   nextBranchRequirements: string[];
@@ -165,6 +167,13 @@ function main(): void {
     waterQueryTestCoveragePresent: waterSystemTest.includes('reports global water surface and depth while the global plane is active')
       && waterSystemTest.includes('getWaterSurfaceY(new THREE.Vector3(5, 1, 0))')
       && waterSystemTest.includes('getWaterDepth(new THREE.Vector3(5, 1, 0))'),
+    waterInteractionSampleApiPresent: waterSystem.includes('sampleWaterInteraction(')
+      && waterSystem.includes('WaterInteractionSample')
+      && waterSystem.includes('buoyancyScalar')
+      && waterSystem.includes("source: WaterSurfaceSource"),
+    waterInteractionSampleTestCoveragePresent: waterSystemTest.includes('sampleWaterInteraction(new THREE.Vector3(45, -0.5, -20)')
+      && waterSystemTest.includes("expect(sample.source).toBe('hydrology')")
+      && waterSystemTest.includes('expect(sample.buoyancyScalar).toBeCloseTo(0.425, 5)'),
   };
 
   const missingCore = [
@@ -215,7 +224,9 @@ function main(): void {
           : 'The hydrology bake manifest and typed loader are present, but intentionally unwired from mode startup and rendering.'
         : 'The hydrology manifest/loader contract is incomplete.',
       currentContract.publicWaterQueryApiPresent && currentContract.hydrologyWaterQuerySurfacePresent && currentContract.waterQueryTestCoveragePresent
-        ? 'WaterSystem now exposes the public VODA-1 gameplay query API for global water and hydrology channel surfaces, with focused regression coverage.'
+        ? currentContract.waterInteractionSampleApiPresent && currentContract.waterInteractionSampleTestCoveragePresent
+          ? 'WaterSystem now exposes the public VODA-1 gameplay query API plus a VODA-2 interaction sample for global water and hydrology channel surfaces, with focused regression coverage.'
+          : 'WaterSystem now exposes the public VODA-1 gameplay query API for global water and hydrology channel surfaces, with focused regression coverage.'
         : 'WaterSystem public gameplay water query acceptance remains incomplete.',
     ],
     nextBranchRequirements: [
@@ -224,11 +235,14 @@ function main(): void {
       'Refine river mesh strips from accepted channel polylines instead of scaling or clipping the global water plane.',
       'Feed bank/wetness masks into route/trail crossings and water queries before final ecology acceptance.',
       'Route future gameplay consumers through WaterSystem queries instead of reintroducing simple y<0 water-contact assumptions.',
+      'Route first buoyancy, swimming, wading, and watercraft prototypes through WaterSystem.sampleWaterInteraction before adding force/application code.',
       'Require matched Open Frontier/A Shau screenshots and clean perf captures before accepting runtime river visuals.',
     ],
     nonClaims: [
       currentContract.publicWaterQueryApiPresent && currentContract.hydrologyWaterQuerySurfacePresent
-        ? 'This audit accepts the source/test query API surface only; it does not prove every future gameplay consumer uses it.'
+        ? currentContract.waterInteractionSampleApiPresent
+          ? 'This audit accepts the source/test query and interaction-sample API surface only; it does not prove any physics, swimming, or watercraft consumer uses it yet.'
+          : 'This audit accepts the source/test query API surface only; it does not prove every future gameplay consumer uses it.'
         : 'This audit does not accept gameplay water queries.',
       'This audit does not accept A Shau streams or Open Frontier rivers.',
       'This audit does not provide perf evidence.',

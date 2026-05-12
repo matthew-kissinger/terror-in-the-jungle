@@ -1,6 +1,6 @@
 # Recent Cycle Outcomes
 
-Last verified: 2026-05-10
+Last verified: 2026-05-11
 
 Last 3 cycles, summarized. Companion docs:
 
@@ -10,6 +10,32 @@ Last 3 cycles, summarized. Companion docs:
 
 For older cycle outcomes, browse `docs/cycles/` or
 `docs/tasks/archive/<cycle-id>/`.
+
+---
+
+## konveyer-branch-review-2026-05-11 (experimental, not deployed)
+
+Continuation on `exp/konveyer-webgpu-migration`. This is not production
+release truth and does not authorize a `master` merge.
+
+**Branch-review progress:**
+
+- KONVEYER-0 through KONVEYER-9 are documented in
+  `docs/rearch/KONVEYER_PARITY_2026-05-10.md`.
+- Default and strict WebGPU resolve to real `webgpu` on headed hardware in
+  `artifacts/perf/2026-05-11T00-40-14-309Z/konveyer-renderer-matrix/matrix.json`.
+- The completion audit at
+  `artifacts/perf/2026-05-11T02-10-59-661Z/konveyer-completion-audit/completion-audit.json`
+  records active production render blockers at zero.
+- The latest strict-WebGPU terrain visual packet accepts Open Frontier and
+  A Shau terrain ground tone at
+  `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.json`.
+
+**Next cycle:** KONVEYER-10 - rest-of-scene parity and frame-budget
+attribution. Terrain color is accepted for now; remaining work is
+vegetation/NPC washout, atmosphere/sky/cloud behavior, `World` timing
+decomposition, skyward triangle attribution, finite-map edge presentation,
+cross-browser/mobile proof, and A Shau perf acceptance.
 
 ---
 

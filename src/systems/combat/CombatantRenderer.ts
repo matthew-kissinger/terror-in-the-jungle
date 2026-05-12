@@ -79,6 +79,7 @@ const DEATH_FADE_START_PHASE = DEATH_FALL_PHASE + DEATH_GROUND_PHASE;
 const DEATH_CLIP_HOLD_PROGRESS = 0.999;
 const CLOSE_MODEL_FADE_EPSILON = 0.01;
 const OPTIMIZED_WEAPON_RESOURCE_KEY = '__tijOptimizedNpcWeaponResource';
+const MAX_MATERIALIZATION_PROFILE_ROWS = 120;
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
@@ -130,7 +131,8 @@ function isNpcCloseModelPerfIsolationEnabled(): boolean {
   }
 }
 
-type CloseModelFallbackReason = 'perf-isolation' | 'pool-loading' | 'pool-empty' | 'total-cap';
+export type CloseModelFallbackReason = 'perf-isolation' | 'pool-loading' | 'pool-empty' | 'total-cap';
+export type CombatantMaterializationRenderMode = 'close-glb' | 'impostor' | 'culled';
 
 interface CloseModelCandidate {
   combatant: Combatant;
@@ -162,6 +164,37 @@ export interface CloseModelRuntimeStats {
   poolLoads: number;
   poolTargets: Record<string, number>;
   poolAvailable: Record<string, number>;
+}
+
+export interface CombatantMaterializationRow {
+  combatantId: string;
+  faction: Faction;
+  state: CombatantState;
+  lodLevel: Combatant['lodLevel'];
+  distanceMeters: number;
+  position: { x: number; y: number; z: number };
+  renderMode: CombatantMaterializationRenderMode;
+  clipId: PixelForgeNpcClipId;
+  poolKey: PixelForgeNpcPoolKey;
+  isPlayerSquad: boolean;
+  billboardIndex: number | null;
+  hasCloseModelWeapon: boolean;
+  closeFallbackReason: CloseModelFallbackReason | null;
+}
+
+export interface CloseModelPrewarmOptions {
+  maxActive?: number;
+}
+
+export interface CloseModelPrewarmSummary {
+  skippedReason: 'none' | 'perf-isolation' | 'no-candidates';
+  candidatesWithinCloseRadius: number;
+  requestedPoolTargets: Record<string, number>;
+  renderedCloseModels: number;
+  fallbackCount: number;
+  fallbackCounts: Record<CloseModelFallbackReason, number>;
+  poolLoads: number;
+  durationMs: number;
 }
 
 function createCloseModelFallbackCounts(): Record<CloseModelFallbackReason, number> {
@@ -382,6 +415,126 @@ export class CombatantRenderer {
 
   getCloseModelFallbackRecords(): CloseModelFallbackRecord[] {
     return Array.from(this.closeModelFallbackRecords.values()).map((record) => ({ ...record }));
+  }
+
+  getNearestCombatantMaterializationRows(
+    combatants: Map<string, Combatant>,
+    playerPosition: THREE.Vector3,
+    limit = 24,
+  ): CombatantMaterializationRow[] {
+    const rowLimit = Math.max(
+      0,
+      Math.min(
+        MAX_MATERIALIZATION_PROFILE_ROWS,
+        Math.floor(Number.isFinite(limit) ? limit : 24),
+      ),
+    );
+    if (rowLimit === 0) return [];
+
+    return Array.from(combatants.values())
+      .map((combatant): CombatantMaterializationRow => {
+        const closeModel = this.activeCloseModels.get(combatant.id);
+        const fallback = this.closeModelFallbackRecords.get(combatant.id);
+        const billboardIndex = typeof combatant.billboardIndex === 'number' ? combatant.billboardIndex : null;
+        const renderMode: CombatantMaterializationRenderMode = closeModel
+          ? 'close-glb'
+          : billboardIndex !== null && billboardIndex >= 0
+            ? 'impostor'
+            : 'culled';
+        const poolKey = closeModel?.poolKey ?? fallback?.poolKey ?? getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
+        const position = combatant.renderedPosition ?? combatant.position;
+
+        return {
+          combatantId: combatant.id,
+          faction: combatant.faction,
+          state: combatant.state,
+          lodLevel: combatant.lodLevel,
+          distanceMeters: combatant.position.distanceTo(playerPosition),
+          position: {
+            x: position.x,
+            y: position.y,
+            z: position.z,
+          },
+          renderMode,
+          clipId: closeModel?.activeClip ?? getPixelForgeNpcClipForCombatant(combatant),
+          poolKey,
+          isPlayerSquad: poolKey === 'SQUAD',
+          billboardIndex,
+          hasCloseModelWeapon: closeModel?.hasWeapon ?? false,
+          closeFallbackReason: fallback?.reason ?? null,
+        };
+      })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters || a.combatantId.localeCompare(b.combatantId))
+      .slice(0, rowLimit);
+  }
+
+  async prewarmCloseModelsForSpawn(
+    combatants: Map<string, Combatant>,
+    playerPosition: THREE.Vector3,
+    options: CloseModelPrewarmOptions = {},
+  ): Promise<CloseModelPrewarmSummary> {
+    const startMs = performance.now();
+    const maxActive = Math.max(
+      0,
+      Math.min(
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+        Math.floor(options.maxActive ?? PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP),
+      ),
+    );
+    const emptySummary = (
+      skippedReason: CloseModelPrewarmSummary['skippedReason'],
+      candidatesWithinCloseRadius = 0,
+    ): CloseModelPrewarmSummary => ({
+      skippedReason,
+      candidatesWithinCloseRadius,
+      requestedPoolTargets: {},
+      renderedCloseModels: this.closeModelRuntimeStats.renderedCloseModels,
+      fallbackCount: this.closeModelRuntimeStats.fallbackCount,
+      fallbackCounts: { ...this.closeModelRuntimeStats.fallbackCounts },
+      poolLoads: this.closeModelRuntimeStats.poolLoads,
+      durationMs: performance.now() - startMs,
+    });
+
+    if (this.closeModelPerfIsolationEnabled || maxActive <= 0) {
+      return emptySummary('perf-isolation');
+    }
+
+    const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    this.refreshFrustum();
+    const candidates = this.collectCloseModelCandidates(combatants, playerPosition, nowMs);
+    if (candidates.length === 0) {
+      return emptySummary('no-candidates');
+    }
+
+    const requestedPoolTargets: Record<string, number> = {};
+    const requestedByPool = new Map<PixelForgeNpcPoolKey, number>();
+    for (const candidate of candidates.slice(0, maxActive)) {
+      requestedByPool.set(candidate.poolKey, (requestedByPool.get(candidate.poolKey) ?? 0) + 1);
+    }
+
+    for (const [poolKey, requestedCount] of requestedByPool) {
+      const currentTotal = this.countCloseModelInstances(poolKey);
+      const target = Math.min(
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+        Math.max(currentTotal, requestedCount),
+      );
+      requestedPoolTargets[String(poolKey)] = target;
+      this.closeModelPoolTargets.set(poolKey, target);
+      await this.createCloseModelPool(poolKey, getPixelForgeNpcRuntimeFaction(poolKey), target);
+    }
+
+    this.updateBillboards(combatants, playerPosition);
+    const stats = this.getCloseModelRuntimeStats();
+    return {
+      skippedReason: 'none',
+      candidatesWithinCloseRadius: stats.candidatesWithinCloseRadius,
+      requestedPoolTargets,
+      renderedCloseModels: stats.renderedCloseModels,
+      fallbackCount: stats.fallbackCount,
+      fallbackCounts: stats.fallbackCounts,
+      poolLoads: stats.poolLoads,
+      durationMs: performance.now() - startMs,
+    };
   }
 
   private async createCloseModelPools(): Promise<void> {
@@ -854,42 +1007,9 @@ export class CombatantRenderer {
     this.closeModelOverflowReportedThisUpdate.clear();
     this.closeModelFallbackRecords.clear();
 
-    const closeRadiusSq = getPixelForgeNpcCloseModelDistanceSq();
     const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     this.refreshFrustum();
-
-    const candidates: CloseModelCandidate[] = [];
-    combatants.forEach((combatant) => {
-      if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
-      const distanceSq = combatant.position.distanceToSquared(playerPosition);
-      if (distanceSq > closeRadiusSq) return;
-      const poolKey = getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
-
-      const isOnScreen = this.isCombatantOnScreen(combatant);
-      if (isOnScreen) this.lastVisibleAtMsByCombatant.set(combatant.id, nowMs);
-      const lastVisibleAt = this.lastVisibleAtMsByCombatant.get(combatant.id);
-      const recentlyVisible =
-        lastVisibleAt !== undefined &&
-        (nowMs - lastVisibleAt) <= PixelForgeNpcDistanceConfig.recentlyVisibleMs;
-      const isPlayerSquad = poolKey === 'SQUAD';
-      const distance = Math.sqrt(distanceSq);
-      const priorityScore =
-        PixelForgeNpcDistanceConfig.onScreenWeight * (isOnScreen ? 1 : 0) +
-        PixelForgeNpcDistanceConfig.squadWeight * (isPlayerSquad ? 1 : 0) +
-        PixelForgeNpcDistanceConfig.distanceWeight * (1 / Math.max(distance, 4)) +
-        PixelForgeNpcDistanceConfig.recentlyVisibleWeight * (recentlyVisible && !isOnScreen ? 1 : 0);
-
-      candidates.push({
-        combatant,
-        distanceSq,
-        poolKey,
-        isOnScreen,
-        recentlyVisible,
-        isPlayerSquad,
-        priorityScore,
-      });
-    });
-    candidates.sort((a, b) => b.priorityScore - a.priorityScore);
+    const candidates = this.collectCloseModelCandidates(combatants, playerPosition, nowMs);
 
     if (this.closeModelPerfIsolationEnabled) {
       this.activeCloseModels.forEach((instance, combatantId) => {
@@ -933,6 +1053,49 @@ export class CombatantRenderer {
 
     this.captureCloseModelRuntimeStats(candidates.length, selected.size);
     return { closeModelIds: selected, suppressedImpostorIds };
+  }
+
+  private collectCloseModelCandidates(
+    combatants: Map<string, Combatant>,
+    playerPosition: THREE.Vector3,
+    nowMs: number,
+  ): CloseModelCandidate[] {
+    const closeRadiusSq = getPixelForgeNpcCloseModelDistanceSq();
+    const candidates: CloseModelCandidate[] = [];
+    combatants.forEach((combatant) => {
+      if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
+      const distanceSq = combatant.position.distanceToSquared(playerPosition);
+      if (distanceSq > closeRadiusSq) return;
+      const poolKey = getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
+
+      const isOnScreen = this.isCombatantOnScreen(combatant);
+      if (isOnScreen) this.lastVisibleAtMsByCombatant.set(combatant.id, nowMs);
+      const lastVisibleAt = this.lastVisibleAtMsByCombatant.get(combatant.id);
+      const recentlyVisible =
+        lastVisibleAt !== undefined &&
+        (nowMs - lastVisibleAt) <= PixelForgeNpcDistanceConfig.recentlyVisibleMs;
+      const isPlayerSquad = poolKey === 'SQUAD';
+      const distance = Math.sqrt(distanceSq);
+      const isHardNear = distance <= PixelForgeNpcDistanceConfig.hardNearDistanceMeters;
+      const priorityScore =
+        PixelForgeNpcDistanceConfig.hardNearWeight * (isHardNear ? 1 : 0) +
+        PixelForgeNpcDistanceConfig.onScreenWeight * (isOnScreen ? 1 : 0) +
+        PixelForgeNpcDistanceConfig.squadWeight * (isPlayerSquad ? 1 : 0) +
+        PixelForgeNpcDistanceConfig.distanceWeight * (1 / Math.max(distance, 4)) +
+        PixelForgeNpcDistanceConfig.recentlyVisibleWeight * (recentlyVisible && !isOnScreen ? 1 : 0);
+
+      candidates.push({
+        combatant,
+        distanceSq,
+        poolKey,
+        isOnScreen,
+        recentlyVisible,
+        isPlayerSquad,
+        priorityScore,
+      });
+    });
+    candidates.sort((a, b) => b.priorityScore - a.priorityScore);
+    return candidates;
   }
 
   /**

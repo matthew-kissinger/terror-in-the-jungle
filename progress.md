@@ -78,6 +78,31 @@ Original prompt: we had an intern come in a really both things up recently - can
   `artifacts/perf/2026-05-08T01-17-22-608Z/projekt-143-completion-audit/completion-audit.json`
   with `29` blockers.
 
+2026-05-11/12 KONVEYER-10 nearby NPC materialization probe
+- Added/validated the dev/perf `window.npcMaterializationProfile()` path and
+  target-bound close-GLB crop selection for spawn-nearby NPC diagnosis.
+- Latest strict WebGPU proof:
+  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  records 8 visible close GLBs with weapons, no request failures,
+  geometry-derived body bounds, and `selectionReason=preferred-active-close-model`.
+  The isolated crop now shows the strict-WebGPU soldier/weapon after hiding
+  terrain and vegetation for material review. Remaining WARNs are the fixed
+  close-GLB cap/total-cap fallbacks and the bright neutral proof frame.
+- User-facing diagnostic trick: in a dev/perf build with `?perf=1&diag=1`, run
+  `window.npcMaterializationProfile(24)` and inspect nearest rows for
+  `distanceMeters`, `renderMode`, `hasCloseModelWeapon`, and
+  `closeFallbackReason`.
+
+2026-05-12 KONVEYER-10 startup feature compile attribution
+- Added startup marks under `terrain-features.compile` so the "Compiling
+  features" UI step is attributable. Latest strict WebGPU Open Frontier proof:
+  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Current attribution: feature list compile ~5.5ms for 1,363 stamps, 67
+  surface patches, 8 exclusion zones, and 36 flow paths; stamped-provider
+  creation ~2.6ms; 1024-grid heightmap rebake ~52.1ms; total terrain-feature
+  compile ~60.7ms. Treat the heightmap rebake as the first optimization target,
+  not WebGPU shader compilation.
+
 2026-05-08 Projekt Objekt-143 fixed-wing clean functional gate under resource contention
 - Continued under the active Objekt-143 goal after the 4174 fixed-wing packet
   carried a harness-teardown warning.

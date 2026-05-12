@@ -15,6 +15,11 @@ const DEFAULT_CLOUD_NOISE_SCALE = 1 / 900;
 const DEFAULT_CLOUD_WIND_DIR_X = 0.7;
 const DEFAULT_CLOUD_WIND_DIR_Z = 0.7;
 const SKY_TEXTURE_REFRESH_SECONDS = 0.5;
+const CLOUD_ANCHOR_REFRESH_METERS = 32;
+const CLOUD_DECK_ALTITUDE_METERS = 1800;
+const CLOUD_MAX_TRACE_METERS = 14000;
+const CLOUD_HORIZON_FADE_START_Y = 0.035;
+const CLOUD_HORIZON_FADE_FULL_Y = 0.2;
 
 /**
  * Angular threshold (cosine form) at which a sun-direction change forces a
@@ -152,6 +157,8 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private cloudCoverage = 0;
   private cloudNoiseScale = DEFAULT_CLOUD_NOISE_SCALE;
   private cloudTimeSeconds = 0;
+  private cloudAnchorX = 0;
+  private cloudAnchorZ = 0;
   private readonly cloudWindDir = new THREE.Vector2(DEFAULT_CLOUD_WIND_DIR_X, DEFAULT_CLOUD_WIND_DIR_Z);
 
   // Ring/zenith cache + LUT, refreshed when the sun direction changes.
@@ -274,6 +281,55 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     return this.cloudCoverage;
   }
 
+  /**
+   * The dome itself follows the camera for clipping safety, but the cloud
+   * noise field is projected through a world/altitude deck so cloud features
+   * read as distant weather instead of a pattern glued to the player.
+   */
+  setCloudWorldAnchor(position: THREE.Vector3): void {
+    if (!Number.isFinite(position.x) || !Number.isFinite(position.z)) return;
+    const dx = position.x - this.cloudAnchorX;
+    const dz = position.z - this.cloudAnchorZ;
+    if ((dx * dx + dz * dz) < CLOUD_ANCHOR_REFRESH_METERS * CLOUD_ANCHOR_REFRESH_METERS) {
+      return;
+    }
+    this.cloudAnchorX = position.x;
+    this.cloudAnchorZ = position.z;
+    if (this.cloudCoverage > 0.001) {
+      this.markSkyTextureDirty();
+    }
+  }
+
+  getCloudAnchorDebug(): {
+    model: 'camera-followed-dome-world-altitude-clouds';
+    anchorX: number;
+    anchorZ: number;
+    refreshMeters: number;
+    deckAltitudeMeters: number;
+    maxTraceMeters: number;
+    horizonFadeStartY: number;
+    horizonFadeFullY: number;
+    cloudNoiseScale: number;
+  } {
+    return {
+      model: 'camera-followed-dome-world-altitude-clouds',
+      anchorX: this.cloudAnchorX,
+      anchorZ: this.cloudAnchorZ,
+      refreshMeters: CLOUD_ANCHOR_REFRESH_METERS,
+      deckAltitudeMeters: CLOUD_DECK_ALTITUDE_METERS,
+      maxTraceMeters: CLOUD_MAX_TRACE_METERS,
+      horizonFadeStartY: CLOUD_HORIZON_FADE_START_Y,
+      horizonFadeFullY: CLOUD_HORIZON_FADE_FULL_Y,
+      cloudNoiseScale: this.cloudNoiseScale,
+    };
+  }
+
+  sampleCloudMaskForDebug(direction: THREE.Vector3): number {
+    const len = Math.hypot(direction.x, direction.y, direction.z) || 1;
+    this.scratchDir.set(direction.x / len, direction.y / len, direction.z / len);
+    return this.cloudMaskAtDirection(this.scratchDir);
+  }
+
   sample(dir: THREE.Vector3, out: THREE.Color): THREE.Color {
     this.ensureLUT();
     const len = Math.hypot(dir.x, dir.y, dir.z) || 1;
@@ -358,7 +414,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
         );
         this.evaluateAnalytic(this.scratchDir, this.scratchColor);
         this.mixSunDisc(this.scratchDir, this.scratchColor);
-        this.mixCloudDeck(this.scratchDir, u, v, this.scratchColor);
+        this.mixCloudDeck(this.scratchDir, this.scratchColor);
 
         data[offset++] = Math.round(Math.sqrt(clamp01(this.scratchColor.r)) * 255);
         data[offset++] = Math.round(Math.sqrt(clamp01(this.scratchColor.g)) * 255);
@@ -381,23 +437,11 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     color.lerp(this.sunColor, strength);
   }
 
-  private mixCloudDeck(direction: THREE.Vector3, u: number, v: number, color: THREE.Color): void {
-    if (this.cloudCoverage <= 0.001 || direction.y <= -0.08) return;
-
-    const featureScale = DEFAULT_CLOUD_NOISE_SCALE / Math.max(this.cloudNoiseScale, 1e-6);
-    const windLength = Math.hypot(this.cloudWindDir.x, this.cloudWindDir.y) || 1;
-    const windX = this.cloudWindDir.x / windLength;
-    const windY = this.cloudWindDir.y / windLength;
-    const windOffset = this.cloudTimeSeconds * 0.012;
-    const px = (u * 8 + windX * windOffset) / Math.max(0.25, featureScale);
-    const py = (v * 4 + windY * windOffset) / Math.max(0.25, featureScale);
-    const large = 0.5 + 0.5 * smoothstep(0.2, 0.7, fbm(px * 0.22, py * 0.22));
-    const field = fbm(px, py) * large;
-    const lower = 0.82 + (0.22 - 0.82) * clamp01(this.cloudCoverage);
-    const mask = smoothstep(lower, lower + 0.24, field);
+  private mixCloudDeck(direction: THREE.Vector3, color: THREE.Color): void {
+    const mask = this.cloudMaskAtDirection(direction);
     if (mask <= 0.001) return;
 
-    const horizonFade = smoothstep(-0.02, 0.18, direction.y);
+    const horizonFade = smoothstep(CLOUD_HORIZON_FADE_START_Y, CLOUD_HORIZON_FADE_FULL_Y, direction.y);
     const cloudWeight = mask * horizonFade * (0.18 + 0.58 * clamp01(this.cloudCoverage));
     this.scratchCloudColor.setRGB(
       0.78 + this.sunColor.r * 0.16,
@@ -405,6 +449,32 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       0.84 + this.sunColor.b * 0.12
     );
     color.lerp(this.scratchCloudColor, clamp01(cloudWeight));
+  }
+
+  private cloudMaskAtDirection(direction: THREE.Vector3): number {
+    if (this.cloudCoverage <= 0.001) return 0;
+
+    const horizonFade = smoothstep(CLOUD_HORIZON_FADE_START_Y, CLOUD_HORIZON_FADE_FULL_Y, direction.y);
+    if (horizonFade <= 0.001) return 0;
+
+    const windLength = Math.hypot(this.cloudWindDir.x, this.cloudWindDir.y) || 1;
+    const windX = this.cloudWindDir.x / windLength;
+    const windY = this.cloudWindDir.y / windLength;
+    const windOffset = this.cloudTimeSeconds * 0.012;
+
+    const traceMeters = Math.min(
+      CLOUD_MAX_TRACE_METERS,
+      CLOUD_DECK_ALTITUDE_METERS / Math.max(CLOUD_HORIZON_FADE_START_Y, direction.y)
+    );
+    const sampleX = this.cloudAnchorX + direction.x * traceMeters;
+    const sampleZ = this.cloudAnchorZ + direction.z * traceMeters;
+    const px = sampleX * this.cloudNoiseScale + windX * windOffset;
+    const py = sampleZ * this.cloudNoiseScale + windY * windOffset;
+    const large = 0.5 + 0.5 * smoothstep(0.2, 0.7, fbm(px * 0.22, py * 0.22));
+    const field = fbm(px, py) * large;
+    const lower = 0.82 + (0.22 - 0.82) * clamp01(this.cloudCoverage);
+    const mask = smoothstep(lower, lower + 0.24, field);
+    return mask * horizonFade;
   }
 
   dispose(): void {
