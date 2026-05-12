@@ -396,6 +396,19 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       return;
     }
 
+    // Slice 12: replace the per-pixel `evaluateAnalytic` call (heavyweight
+    // Hosek-Wilkie eval — ~30 transcendentals + scattering math per pixel)
+    // with a bilinear sample from the already-baked LUT. The LUT is bound
+    // to the same scenario `(sun, turbidity, exposure)` triple and is
+    // re-baked whenever sun motion crosses `LUT_REBAKE_COS_THRESHOLD`, so
+    // sampling it here produces the same radiance as the analytic eval
+    // would, minus quantization which the bilinear blend smooths out.
+    // Cost drops from O(SKY_TEXTURE * analytic) per refresh to
+    // O(SKY_TEXTURE * 4 reads + 3 lerps).
+    const lut = this.lut;
+    const rowsM1 = LUT_ELEVATION_BINS - 1;
+    const cols = LUT_AZIMUTH_BINS;
+
     const data = this.skyImageData.data;
     let offset = 0;
     for (let y = 0; y < SKY_TEXTURE_HEIGHT; y++) {
@@ -404,21 +417,58 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       const cosElevation = Math.cos(elevation);
       const sinElevation = Math.sin(elevation);
 
+      // Pre-compute LUT elevation row for the whole scanline (depends only
+      // on `y`). `elevT` mirrors the eq used inside `sample()` so the
+      // refresh-pixel value matches what callers of `sample()` would read.
+      const elevT = (Math.asin(sinElevation) + Math.PI / 2) / Math.PI;
+      const rowF = Math.max(0, Math.min(rowsM1, elevT * LUT_ELEVATION_BINS - 0.5));
+      const row0 = Math.floor(rowF);
+      const row1 = Math.min(rowsM1, row0 + 1);
+      const rowT = rowF - row0;
+
       for (let x = 0; x < SKY_TEXTURE_WIDTH; x++) {
         const u = x / SKY_TEXTURE_WIDTH;
         const azimuth = u * Math.PI * 2;
-        this.scratchDir.set(
-          cosElevation * Math.cos(azimuth),
-          sinElevation,
-          cosElevation * Math.sin(azimuth)
-        );
-        this.evaluateAnalytic(this.scratchDir, this.scratchColor);
+        const dirX = cosElevation * Math.cos(azimuth);
+        const dirZ = cosElevation * Math.sin(azimuth);
+
+        // Azimuth -> fractional LUT column with wrap. `colF` is bin-
+        // centered so col0+1 may wrap across the seam at azimuth=2π.
+        const colF = (u * cols - 0.5 + cols) % cols;
+        const col0 = Math.floor(colF) % cols;
+        const col1 = (col0 + 1) % cols;
+        const colT = colF - Math.floor(colF);
+
+        // 4-tap bilinear over the LUT.
+        const i00 = (row0 * cols + col0) * 3;
+        const i01 = (row0 * cols + col1) * 3;
+        const i10 = (row1 * cols + col0) * 3;
+        const i11 = (row1 * cols + col1) * 3;
+        const oneMinusRow = 1 - rowT;
+        const oneMinusCol = 1 - colT;
+        const w00 = oneMinusRow * oneMinusCol;
+        const w01 = oneMinusRow * colT;
+        const w10 = rowT * oneMinusCol;
+        const w11 = rowT * colT;
+        let r = lut[i00] * w00 + lut[i01] * w01 + lut[i10] * w10 + lut[i11] * w11;
+        let g = lut[i00 + 1] * w00 + lut[i01 + 1] * w01 + lut[i10 + 1] * w10 + lut[i11 + 1] * w11;
+        let b = lut[i00 + 2] * w00 + lut[i01 + 2] * w01 + lut[i10 + 2] * w10 + lut[i11 + 2] * w11;
+
+        // Sun disc + cloud deck still composited per-pixel. The sun disc
+        // is cheap (one dot product + smoothstep) and only fires near the
+        // sun direction; the cloud deck is only expensive when
+        // cloudCoverage > 0 and early-exits otherwise.
+        this.scratchDir.set(dirX, sinElevation, dirZ);
+        this.scratchColor.setRGB(r, g, b);
         this.mixSunDisc(this.scratchDir, this.scratchColor);
         this.mixCloudDeck(this.scratchDir, this.scratchColor);
+        r = this.scratchColor.r;
+        g = this.scratchColor.g;
+        b = this.scratchColor.b;
 
-        data[offset++] = Math.round(Math.sqrt(clamp01(this.scratchColor.r)) * 255);
-        data[offset++] = Math.round(Math.sqrt(clamp01(this.scratchColor.g)) * 255);
-        data[offset++] = Math.round(Math.sqrt(clamp01(this.scratchColor.b)) * 255);
+        data[offset++] = Math.round(Math.sqrt(clamp01(r)) * 255);
+        data[offset++] = Math.round(Math.sqrt(clamp01(g)) * 255);
+        data[offset++] = Math.round(Math.sqrt(clamp01(b)) * 255);
         data[offset++] = 255;
       }
     }
