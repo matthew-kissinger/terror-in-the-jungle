@@ -101,6 +101,20 @@ interface CloseGlbReviewPose {
   distanceMeters: number | null;
 }
 
+interface DirectedZoneWarp {
+  attempted: boolean;
+  reason: string | null;
+  modeName: string | null;
+  zoneId: string | null;
+  zoneName: string | null;
+  zonePosition: { x: number; y: number; z: number } | null;
+  warpedPlayerPosition: { x: number; y: number; z: number } | null;
+  liveCombatantsBefore: number;
+  liveCombatantsAfter: number;
+  combatantsWithinCloseRadiusAfter: number;
+  waitMsObserved: number;
+}
+
 interface CloseGlbComparison {
   visibleNpcCloseGlbCount: number;
   status: ProbeStatus;
@@ -108,6 +122,7 @@ interface CloseGlbComparison {
   cropIsolation: string[];
   initialTelemetry: CloseGlbTelemetry;
   startupPrewarmMarks: { name: string; sinceStartMs: number }[];
+  directedZoneWarp: DirectedZoneWarp | null;
   reviewPose: CloseGlbReviewPose | null;
   telemetry: CloseGlbTelemetry;
   candidate: CandidateInfo | null;
@@ -961,6 +976,160 @@ async function getStartupMarksMatching(page: Page, match: string): Promise<{ nam
   }, match);
 }
 
+/**
+ * Modes whose initial player spawn pose is far from any live action zone (e.g.
+ * A Shau Valley's 21km strategic simulation places live combatants near
+ * contested zones, not the LZ spawn). Without a directed warp, the crop probe
+ * cannot reach the close-NPC materialization path in these modes.
+ */
+const DIRECTED_WARP_MODES = new Set<string>(['a_shau_valley']);
+
+async function prepareDirectedZoneWarp(
+  page: Page,
+  probeMode: string,
+  waitMs: number,
+): Promise<DirectedZoneWarp> {
+  if (!DIRECTED_WARP_MODES.has(probeMode)) {
+    return {
+      attempted: false,
+      reason: 'mode-does-not-require-directed-warp',
+      modeName: probeMode,
+      zoneId: null,
+      zoneName: null,
+      zonePosition: null,
+      warpedPlayerPosition: null,
+      liveCombatantsBefore: 0,
+      liveCombatantsAfter: 0,
+      combatantsWithinCloseRadiusAfter: 0,
+      waitMsObserved: 0,
+    };
+  }
+
+  const warpResult = await page.evaluate(() => {
+    const engine = (window as any).__engine;
+    const systems = engine?.systemManager;
+    const zoneManager = systems?.zoneManager;
+    const playerController = systems?.playerController;
+    const terrain = systems?.terrainSystem;
+    const combat = systems?.combatantSystem;
+    const camera = engine?.renderer?.camera ?? (window as any).__renderer?.camera;
+    const liveBefore = combat?.getAllCombatants?.().filter((c: any) => c?.state !== 'dead' && Number(c?.health ?? 0) > 0).length
+      ?? 0;
+    if (!zoneManager?.getAllZones || !playerController?.setPosition || !camera?.position?.constructor) {
+      return {
+        warped: false,
+        reason: 'zone-or-player-controller-unavailable',
+        zoneId: null,
+        zoneName: null,
+        zonePosition: null,
+        warpedPlayerPosition: null,
+        liveCombatantsBefore: liveBefore,
+      };
+    }
+    const zones = zoneManager.getAllZones() as any[];
+    const contestedFirst = zones.find((z: any) => !z.isHomeBase && (z.owner === null || z.owner === undefined));
+    const fallbackNonHome = zones.find((z: any) => !z.isHomeBase);
+    const target = contestedFirst ?? fallbackNonHome ?? null;
+    if (!target?.position) {
+      return {
+        warped: false,
+        reason: 'no-eligible-zone-found',
+        zoneId: null,
+        zoneName: null,
+        zonePosition: null,
+        warpedPlayerPosition: null,
+        liveCombatantsBefore: liveBefore,
+      };
+    }
+    const Vector3 = camera.position.constructor;
+    const zoneX = Number(target.position.x ?? 0);
+    const zoneZ = Number(target.position.z ?? 0);
+    const terrainY = Number(
+      terrain?.getEffectiveHeightAt?.(zoneX, zoneZ)
+      ?? terrain?.getHeightAt?.(zoneX, zoneZ)
+      ?? target.position.y
+      ?? 0,
+    );
+    const playerY = (Number.isFinite(terrainY) ? terrainY : 0) + 2.2;
+    const playerPos = new Vector3(zoneX, playerY, zoneZ);
+    playerController.setPosition(playerPos, 'harness.konveyer-a-shau-directed-warp');
+    terrain?.updatePlayerPosition?.(playerPos);
+    terrain?.update?.(0.016);
+    return {
+      warped: true,
+      reason: null,
+      zoneId: String(target.id ?? ''),
+      zoneName: String(target.name ?? ''),
+      zonePosition: { x: zoneX, y: Number(target.position.y ?? 0), z: zoneZ },
+      warpedPlayerPosition: { x: zoneX, y: playerY, z: zoneZ },
+      liveCombatantsBefore: liveBefore,
+    };
+  });
+
+  if (!warpResult.warped) {
+    return {
+      attempted: false,
+      reason: warpResult.reason ?? 'warp-failed',
+      modeName: probeMode,
+      zoneId: warpResult.zoneId,
+      zoneName: warpResult.zoneName,
+      zonePosition: warpResult.zonePosition,
+      warpedPlayerPosition: warpResult.warpedPlayerPosition,
+      liveCombatantsBefore: warpResult.liveCombatantsBefore,
+      liveCombatantsAfter: warpResult.liveCombatantsBefore,
+      combatantsWithinCloseRadiusAfter: 0,
+      waitMsObserved: 0,
+    };
+  }
+
+  const waitStart = Date.now();
+  try {
+    await page.waitForFunction(() => {
+      const engine = (window as any).__engine;
+      const combat = engine?.systemManager?.combatantSystem;
+      const renderer = combat?.combatantRenderer ?? combat?.getRenderer?.();
+      const stats = typeof renderer?.getCloseModelRuntimeStats === 'function'
+        ? renderer.getCloseModelRuntimeStats()
+        : null;
+      const candidates = Number(stats?.candidatesWithinCloseRadius ?? 0);
+      return candidates > 0;
+    }, null, { timeout: Math.max(2000, waitMs) });
+  } catch {
+    // Materialization may simply not happen within the wait window; the
+    // telemetry below records the post-wait state for diagnosis.
+  }
+  const waitMsObserved = Date.now() - waitStart;
+
+  const postState = await page.evaluate(() => {
+    const engine = (window as any).__engine;
+    const combat = engine?.systemManager?.combatantSystem;
+    const renderer = combat?.combatantRenderer ?? combat?.getRenderer?.();
+    const live = combat?.getAllCombatants?.().filter((c: any) => c?.state !== 'dead' && Number(c?.health ?? 0) > 0).length
+      ?? 0;
+    const stats = typeof renderer?.getCloseModelRuntimeStats === 'function'
+      ? renderer.getCloseModelRuntimeStats()
+      : null;
+    return {
+      liveCombatantsAfter: live,
+      combatantsWithinCloseRadiusAfter: Number(stats?.candidatesWithinCloseRadius ?? 0),
+    };
+  });
+
+  return {
+    attempted: true,
+    reason: null,
+    modeName: probeMode,
+    zoneId: warpResult.zoneId,
+    zoneName: warpResult.zoneName,
+    zonePosition: warpResult.zonePosition,
+    warpedPlayerPosition: warpResult.warpedPlayerPosition,
+    liveCombatantsBefore: warpResult.liveCombatantsBefore,
+    liveCombatantsAfter: postState.liveCombatantsAfter,
+    combatantsWithinCloseRadiusAfter: postState.combatantsWithinCloseRadiusAfter,
+    waitMsObserved,
+  };
+}
+
 async function prepareCloseGlbReviewPose(page: Page): Promise<CloseGlbReviewPose> {
   return page.evaluate(() => {
     const engine = (window as any).__engine;
@@ -1140,7 +1309,12 @@ async function captureSurfaceCrop(page: Page, modeDir: string, surface: CropSurf
   };
 }
 
-async function captureCloseGlbComparison(page: Page, modeDir: string, closeModelWaitMs: number): Promise<CloseGlbComparison> {
+async function captureCloseGlbComparison(
+  page: Page,
+  modeDir: string,
+  closeModelWaitMs: number,
+  probeMode: string,
+): Promise<CloseGlbComparison> {
   await clearCameraOverride(page);
   const initialTelemetry = await getCloseModelTelemetry(page);
   const startupPrewarmMarks = await getStartupPrewarmMarks(page);
@@ -1154,6 +1328,7 @@ async function captureCloseGlbComparison(page: Page, modeDir: string, closeModel
     // The telemetry below records lazyLoadAllowed=false; keep the proof non-fatal.
   }
 
+  const directedZoneWarp = await prepareDirectedZoneWarp(page, probeMode, closeModelWaitMs);
   const reviewPose = await prepareCloseGlbReviewPose(page);
   if (reviewPose.attempted) {
     try {
@@ -1257,6 +1432,14 @@ async function captureCloseGlbComparison(page: Page, modeDir: string, closeModel
     }
   }
 
+  if (directedZoneWarp.attempted) {
+    if (directedZoneWarp.combatantsWithinCloseRadiusAfter === 0) {
+      findings.push(`directed-warp-no-materialization:zone=${directedZoneWarp.zoneId},waitMs=${directedZoneWarp.waitMsObserved}`);
+    } else {
+      findings.push(`directed-warp-materialized:zone=${directedZoneWarp.zoneId},candidates=${directedZoneWarp.combatantsWithinCloseRadiusAfter},waitMs=${directedZoneWarp.waitMsObserved}`);
+    }
+  }
+
   const status: ProbeStatus = visibleNpcCloseGlbCount > 0 && findings.length === 0 ? 'pass' : 'warn';
   return {
     visibleNpcCloseGlbCount,
@@ -1265,6 +1448,7 @@ async function captureCloseGlbComparison(page: Page, modeDir: string, closeModel
     cropIsolation,
     initialTelemetry,
     startupPrewarmMarks,
+    directedZoneWarp,
     reviewPose,
     telemetry,
     candidate,
@@ -1327,7 +1511,7 @@ async function runMode(
     await captureSurfaceCrop(page, modeDir, 'vegetation'),
     await captureSurfaceCrop(page, modeDir, 'npc'),
   ];
-  const closeGlbComparison = await captureCloseGlbComparison(page, modeDir, closeModelWaitMs);
+  const closeGlbComparison = await captureCloseGlbComparison(page, modeDir, closeModelWaitMs, mode);
   const startupTerrainFeatureCompileMarks = await getStartupTerrainFeatureCompileMarks(page);
   const partial = {
     mode,

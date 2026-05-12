@@ -210,6 +210,28 @@ These are independently shippable. Each one assumes branch hard-stops.
     because the steady review pose has no actor inside the 64 m hard-near
     bubble — the reserve correctly does not engage. Behavior is consistent
     with slice 0; not a regression.
+0b. **A Shau directed-warp evidence (shipped 2026-05-12, probe-only).**
+    The crop probe now performs a directed warp to a contested zone
+    (Hill 937 / Hamburger Hill) when running in `a_shau_valley`, waits
+    for the WarSimulator to materialize live combatants near the new
+    player position, then runs the normal close-NPC review pose. No
+    game-code change — `prepareDirectedZoneWarp` in
+    `scripts/konveyer-asset-crop-probe.ts` reads
+    `engine.systemManager.zoneManager.getAllZones()` and warps to the
+    first contested non-home-base zone. Five-mode strict WebGPU proof
+    after slices 0/0a/0b:
+    `artifacts/perf/2026-05-12T03-33-59-816Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    A Shau wait observation: 5865 ms from warp to first live combatants
+    (0 → 4 within close radius); by review phase the WarSimulator
+    populated 60 candidates inside the close radius, of which 14 render
+    as close GLBs (cap=14) and 46 fall back to impostor (`total-cap:46`,
+    the designed materialization tier boundary). Zero pool-empty / zero
+    pool-loading across all five modes; every fallback is now at the
+    cap, not at the pool. A Shau's strategic-tier simulation is
+    materializing live close-radius combatants as designed. The 5865 ms
+    spawn cadence after a player warp is a separate finding worth
+    profiling (WarSimulator strategic-spawn tick interval) but is not a
+    materialization-tier blocker.
 1. **Lane-naming refactor.** Rename current `lodLevel` to `simLane` and
    introduce `renderLane` as a separate field on `Combatant`. No behavior
    change. Adds the surface that the arbiter writes to.

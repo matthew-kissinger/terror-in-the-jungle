@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slice 1 + close-model churn pre-release shipped)
+Last verified: 2026-05-12 (Phase F slice 1, close-model churn pre-release, and A Shau directed-warp evidence shipped)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -319,6 +319,30 @@ pool-empty:6` to `total-cap:22 + pool-empty:0` (overall fallback count is
 larger because the candidate set grew from 25 to 36, but every fallback
 is now at the cap boundary, the designed materialization tier
 boundary).
+
+A Shau directed-warp evidence (shipped 2026-05-12, probe-only): the crop
+probe now warps the player to a contested A Shau zone (Hill 937 /
+Hamburger Hill) before running the close-NPC review pose, then waits for
+the WarSimulator to materialize live combatants. Five-mode strict
+WebGPU proof:
+`artifacts/perf/2026-05-12T03-33-59-816Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+Per-mode close-radius outcomes (review pose):
+
+| Mode | Cap | Candidates | Rendered | Fallbacks |
+| --- | ---: | ---: | ---: | --- |
+| `open_frontier` | 10 | 10 | 10 | none |
+| `zone_control` | 8 | 14 | 8 | total-cap:6 |
+| `team_deathmatch` | 14 | 16 | 14 | total-cap:2 |
+| `ai_sandbox` (combat120) | 14 | 29 | 14 | total-cap:15 |
+| `a_shau_valley` | 14 | 60 | 14 | total-cap:46 |
+
+A Shau's directed warp observed 5865 ms between player teleport and the
+first live combatants in close radius (0 → 4); by review pose the
+WarSimulator had populated 60 candidates. Zero pool-empty / zero
+pool-loading across all five modes. The 5865 ms spawn cadence after a
+player warp is a separate finding worth profiling (WarSimulator
+strategic-spawn tick interval) but is not a materialization-tier
+blocker; all close-radius work caps at the designed boundary.
 
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.
