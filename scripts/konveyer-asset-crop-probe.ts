@@ -206,6 +206,12 @@ interface MaterializationPerfWindow {
   // sub-paths. Empty array when `window.perf` is unavailable.
   perfTelemetryTimings: PerfTelemetrySystemTiming[];
   atmosphereSubTimings: PerfTelemetrySystemTiming[];
+  // konveyer-combat-sub-attribution: per-step breakdown of the Combat
+  // bucket (Combat.Influence, Combat.AI, Combat.Billboards, Combat.Effects)
+  // captured via the same `systemBreakdown` rollup. Used to size R2's
+  // cover-spatial-grid against the AI sub-step rather than the Combat
+  // aggregate. Empty array when `window.perf` is unavailable.
+  combatSubTimings: PerfTelemetrySystemTiming[];
   // Slice 14: real refresh-loop activity (counter + total ms in body)
   // captured over the same window the EMA is taken from. Distinguishes
   // genuine refresh cost from phantom EMA.
@@ -1281,6 +1287,7 @@ async function captureMaterializationPerfWindow(
       systemTimingsTotalMs: 0,
       perfTelemetryTimings: [],
       atmosphereSubTimings: [],
+      combatSubTimings: [],
       skyRefresh: {
         available: false,
         fireCount: 0,
@@ -1340,6 +1347,15 @@ async function captureMaterializationPerfWindow(
         entry.name.startsWith('World.Atmosphere.')
         || entry.name === 'World.Atmosphere',
     );
+    // konveyer-combat-sub-attribution: peel the Combat bucket into its
+    // four sub-steps (Combat.Influence, Combat.AI, Combat.Billboards,
+    // Combat.Effects). `Combat` itself is included so the report can
+    // verify that the sum of children matches the aggregate within ~5%.
+    const combatSubs = perfTimings.filter(
+      (entry: { name: string }) =>
+        entry.name.startsWith('Combat.')
+        || entry.name === 'Combat',
+    );
     return {
       attempted: true,
       reason: null,
@@ -1362,6 +1378,7 @@ async function captureMaterializationPerfWindow(
       systemTimingsTotalMs: sysTotalMs,
       perfTelemetryTimings: perfTimings,
       atmosphereSubTimings: atmosphereSubs,
+      combatSubTimings: combatSubs,
       skyRefresh: (() => {
         try {
           const engine = (window as any).__engine;
@@ -1793,6 +1810,24 @@ async function captureCloseGlbComparison(
       findings.push(`atmosphere-subs:${subSplit || 'no-children-recorded'}`);
     } else {
       findings.push('atmosphere-subs:perf-report-unavailable');
+    }
+    if (perfWindow.combatSubTimings.length > 0) {
+      // konveyer-combat-sub-attribution: surface the four Combat.* child
+      // EMAs plus the aggregate. sumChildren/aggregate ratio tells R2
+      // sizing whether the wrapping overhead is acceptable (≤5% gap).
+      const children = perfWindow.combatSubTimings.filter(entry => entry.name !== 'Combat');
+      const aggregate = perfWindow.combatSubTimings.find(entry => entry.name === 'Combat');
+      const subSplit = children
+        .map(entry => `${entry.name.replace('Combat.', '')}=${entry.emaMs.toFixed(2)}ms`)
+        .join(',');
+      const sumChildren = children.reduce((acc, entry) => acc + entry.emaMs, 0);
+      const aggregateMs = aggregate ? aggregate.emaMs : 0;
+      const ratio = aggregateMs > 0 ? sumChildren / aggregateMs : 0;
+      findings.push(
+        `combat-subs:${subSplit || 'no-children-recorded'};sum=${sumChildren.toFixed(2)}ms;aggregate=${aggregateMs.toFixed(2)}ms;ratio=${ratio.toFixed(2)}`,
+      );
+    } else {
+      findings.push('combat-subs:perf-report-unavailable');
     }
     if (perfWindow.skyRefresh.available) {
       const sr = perfWindow.skyRefresh;
