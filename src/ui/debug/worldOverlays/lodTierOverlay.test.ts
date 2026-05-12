@@ -3,9 +3,9 @@ import * as THREE from 'three';
 import { createLodTierOverlay } from './lodTierOverlay';
 import type { Combatant } from '../../../systems/combat/types';
 
-function mkCombatant(id: string, lod: Combatant['lodLevel']): Combatant {
+function mkCombatant(id: string, lod: Combatant['simLane']): Combatant {
   return {
-    id, lodLevel: lod,
+    id, simLane: lod,
     position: new THREE.Vector3(0, 0, 0),
     velocity: new THREE.Vector3(),
     rotation: 0, visualRotation: 0, rotationVelocity: 0,

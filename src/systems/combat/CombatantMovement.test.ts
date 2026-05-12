@@ -58,7 +58,8 @@ describe('CombatantMovement', () => {
       squadRole: 'leader' as const,
       position: new THREE.Vector3(0, 0, 0),
       destinationPoint: new THREE.Vector3(20, 0, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
 
     movement.updateMovement(c, 0.016, new Map(), new Map(), {
@@ -88,7 +89,8 @@ describe('CombatantMovement', () => {
       state: CombatantState.ADVANCING,
       position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
       destinationPoint: destination.clone(),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
 
     movement.updateMovement(c, 0.016, new Map(), new Map(), {
@@ -124,7 +126,8 @@ describe('CombatantMovement', () => {
       state: CombatantState.ADVANCING,
       position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
       destinationPoint: destination.clone(),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
 
     movement.updateMovement(c, 0.016, new Map(), new Map(), {
@@ -154,7 +157,8 @@ describe('CombatantMovement', () => {
       state: CombatantState.ADVANCING,
       position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
       destinationPoint: new THREE.Vector3(120, 0, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
     c.movementBacktrackPoint = backtrackPoint.clone();
 
@@ -185,7 +189,8 @@ describe('CombatantMovement', () => {
       position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
       destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
       movementLastGoodPosition: new THREE.Vector3(-8, NPC_Y_OFFSET, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
 
     const activated = (movement as unknown as {
@@ -214,7 +219,8 @@ describe('CombatantMovement', () => {
       position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
       destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
       movementLastGoodPosition: new THREE.Vector3(-8, NPC_Y_OFFSET, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
 
     const activated = (movement as unknown as {
@@ -236,7 +242,8 @@ describe('CombatantMovement', () => {
       squadRole: 'leader' as const,
       position: new THREE.Vector3(0, 0, 0),
       destinationPoint: new THREE.Vector3(30, 0, 0),
-      lodLevel: 'low',
+      simLane: 'low',
+      renderLane: 'culled',
     });
 
     movement.updateMovement(c, 0.016, new Map(), new Map(), {
@@ -255,7 +262,8 @@ describe('CombatantMovement', () => {
       state: CombatantState.ADVANCING,
       position: new THREE.Vector3(0, 0, 0),
       destinationPoint: new THREE.Vector3(80, 0, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
 
     movement.updateMovement(c, 0.016, new Map(), new Map(), {
@@ -274,7 +282,8 @@ describe('CombatantMovement', () => {
       position: new THREE.Vector3(0, 0, 0),
       destinationPoint: new THREE.Vector3(40, 0, 0),
       velocity: new THREE.Vector3(-2, 0, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
 
     movement.updateMovement(c, 0.016, new Map(), new Map(), {
@@ -296,7 +305,8 @@ describe('CombatantMovement', () => {
       squadRole: 'leader' as const,
       position: new THREE.Vector3(0, 0, 0),
       destinationPoint: new THREE.Vector3(200, 0, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
     const neighbor = createTestCombatant({
       id: 'npc-spacing-neighbor',
@@ -325,7 +335,8 @@ describe('CombatantMovement', () => {
       state: CombatantState.ADVANCING,
       position: new THREE.Vector3(0, 0, 0),
       destinationPoint: new THREE.Vector3(80, 0, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
 
     movement.updateMovement(c, 0.016, new Map(), new Map(), {
@@ -343,7 +354,8 @@ describe('CombatantMovement', () => {
       state: CombatantState.SUPPRESSING,
       position: new THREE.Vector3(0, 0, 0),
       suppressionTarget: new THREE.Vector3(25, 0, 0),
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
     });
     c.velocity.set(4, 0, 1);
 
@@ -361,7 +373,8 @@ describe('CombatantMovement', () => {
     const c = createTestCombatant({
       id: 'npc-low-cost',
       position: new THREE.Vector3(20, 42, 0),
-      lodLevel: 'low',
+      simLane: 'low',
+      renderLane: 'culled',
     });
 
     expect(movement.syncTerrainHeight(c)).toBe(true);
@@ -429,7 +442,8 @@ describe('CombatantMovement', () => {
         position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
         destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
         movementLastGoodPosition: new THREE.Vector3(-8, NPC_Y_OFFSET, 0),
-        lodLevel: 'high',
+        simLane: 'high',
+        renderLane: 'culled',
       });
 
       for (const now of [startMs, startMs + 700, startMs + 1400]) {

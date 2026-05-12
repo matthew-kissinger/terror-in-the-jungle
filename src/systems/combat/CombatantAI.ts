@@ -37,7 +37,7 @@ export interface AiUpdateBreakdown {
   combatantId: string
   stateAtStart: string
   stateAtEnd: string
-  lodLevel: 'high' | 'medium'
+  simLane: 'high' | 'medium'
   totalMs: number
   methodMs: Record<string, number>
   methodCounts: Record<string, number>
@@ -191,7 +191,7 @@ export class CombatantAI {
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
     spatialGrid?: ISpatialQuery,
-    lodLevel: 'high' | 'medium' = 'high'
+    simLane: 'high' | 'medium' = 'high'
   ): void {
     // Stop AI updates if game is not active
     if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
@@ -208,7 +208,7 @@ export class CombatantAI {
     this.activeUpdateMethodCounts = methodCounts
 
     try {
-    const isMediumLOD = lodLevel === 'medium'
+    const isMediumLOD = simLane === 'medium'
 
     // Apply squad command overrides before state machine processing
     // At MEDIUM LOD, skip for non-player-controlled squads
@@ -386,7 +386,7 @@ export class CombatantAI {
         combatantId: combatant.id,
         stateAtStart,
         stateAtEnd: combatant.state,
-        lodLevel,
+        simLane,
         totalMs,
         methodMs: { ...methodMs },
         methodCounts: { ...methodCounts }

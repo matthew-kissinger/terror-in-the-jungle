@@ -59,7 +59,8 @@ function createMockCombatant(
     timeToDirectionChange: 0,
     lastUpdateTime: 0,
     updatePriority: 0,
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     kills: 0,
     deaths: 0,
   } as Combatant;

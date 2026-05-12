@@ -354,7 +354,7 @@ export class CombatantLODManager {
           Math.abs(combatant.position.z) > worldSize) {
         this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
         combatant.position.addScaledVector(this.scratchVector, 0.2 * deltaTime);
-        combatant.lodLevel = 'culled';
+        combatant.simLane = 'culled';
         this.lodCulledCount++;
         return;
       }
@@ -376,7 +376,7 @@ export class CombatantLODManager {
 
     const highStart = performance.now();
     this.highBucket.forEach((combatant, index) => {
-      combatant.lodLevel = 'high';
+      combatant.simLane = 'high';
       this.lodHighCount++;
 
       // Stagger AI decisions before consulting the budget guard. Off-frame
@@ -418,7 +418,7 @@ export class CombatantLODManager {
 
     const mediumStart = performance.now();
     this.mediumBucket.forEach((combatant, index) => {
-      combatant.lodLevel = 'medium';
+      combatant.simLane = 'medium';
       this.lodMediumCount++;
       const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(combatant.distanceSq!) * this.intervalScale;
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
@@ -464,7 +464,7 @@ export class CombatantLODManager {
 
     const lowStart = performance.now();
     this.lowBucket.forEach((combatant, index) => {
-      combatant.lodLevel = 'low';
+      combatant.simLane = 'low';
       this.lodLowCount++;
       if (isLargeWorldMode && this.frameCounter % STAGGER_LOW !== index % STAGGER_LOW) {
         this.staggeredSkipCount++;
@@ -492,7 +492,7 @@ export class CombatantLODManager {
     let culledDeferred = 0;
     for (let index = 0; index < this.culledBucket.length; index++) {
       const combatant = this.culledBucket[index];
-      combatant.lodLevel = 'culled';
+      combatant.simLane = 'culled';
       this.lodCulledCount++;
       if (isLargeWorldMode) {
         const culledElapsedMs = performance.now() - culledStart;
@@ -654,7 +654,7 @@ export class CombatantLODManager {
       this.lastFullUpdateSpikeLogMs = now;
       Logger.warn(
         'combat-ai',
-        `[AI full-update spike] total=${totalMs.toFixed(1)}ms ai=${aiMs.toFixed(1)} move=${moveMs.toFixed(1)} combat=${combatMs.toFixed(1)} render=${renderMs.toFixed(1)} spatial=${spatialMs.toFixed(1)} combatant=${combatant.id} state=${combatant.state} lod=${combatant.lodLevel}`
+        `[AI full-update spike] total=${totalMs.toFixed(1)}ms ai=${aiMs.toFixed(1)} move=${moveMs.toFixed(1)} combat=${combatMs.toFixed(1)} render=${renderMs.toFixed(1)} spatial=${spatialMs.toFixed(1)} combatant=${combatant.id} state=${combatant.state} lod=${combatant.simLane}`
       );
     }
   }

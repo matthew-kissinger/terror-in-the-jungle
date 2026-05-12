@@ -114,7 +114,7 @@ export class AICoverFinding {
    * Determine if a combatant should seek cover
    */
   shouldSeekCover(combatant: Combatant): boolean {
-    if (combatant.lodLevel !== 'high' && combatant.lodLevel !== 'medium') {
+    if (combatant.simLane !== 'high' && combatant.simLane !== 'medium') {
       return false;
     }
 

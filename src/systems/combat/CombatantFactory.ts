@@ -58,7 +58,8 @@ export class CombatantFactory {
 
       lastUpdateTime: 0,
       updatePriority: 0,
-      lodLevel: 'high',
+      simLane: 'high',
+      renderLane: 'culled',
 
       isObjectiveFocused: isOpfor(faction) && SeededRandom.random() < OPFOR_OBJECTIVE_FOCUS_CHANCE,
 

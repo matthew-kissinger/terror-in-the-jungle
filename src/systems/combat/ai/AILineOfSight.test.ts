@@ -9,7 +9,8 @@ function makeCombatant(id: string, x: number, z: number): any {
     id,
     position: new THREE.Vector3(x, NPC_Y_OFFSET, z),
     rotation: 0,
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     skillProfile: {
       visualRange: 400,
       fieldOfView: 180

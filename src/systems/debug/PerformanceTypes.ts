@@ -117,7 +117,7 @@ export interface MovementArtifactTrackPoint {
 export interface MovementArtifactTrack {
   id: string
   subject: 'player' | 'npc'
-  lodLevel?: 'high' | 'medium' | 'low' | 'culled'
+  simLane?: 'high' | 'medium' | 'low' | 'culled'
   points: MovementArtifactTrackPoint[]
 }
 

@@ -205,7 +205,7 @@ export interface CombatantMaterializationRow {
   combatantId: string;
   faction: Faction;
   state: CombatantState;
-  lodLevel: Combatant['lodLevel'];
+  simLane: Combatant['simLane'];
   distanceMeters: number;
   position: { x: number; y: number; z: number };
   renderMode: CombatantMaterializationRenderMode;
@@ -509,7 +509,7 @@ export class CombatantRenderer {
             return 'impostor:not-prioritized';
           }
           // renderMode === 'culled'
-          if (combatant.lodLevel === 'culled') return 'culled:lod-culled';
+          if (combatant.simLane === 'culled') return 'culled:lod-culled';
           return 'culled:no-billboard';
         })();
 
@@ -517,7 +517,7 @@ export class CombatantRenderer {
           combatantId: combatant.id,
           faction: combatant.faction,
           state: combatant.state,
-          lodLevel: combatant.lodLevel,
+          simLane: combatant.simLane,
           distanceMeters,
           position: {
             x: position.x,
@@ -2020,6 +2020,11 @@ export class CombatantRenderer {
         : billboardIndex !== null && billboardIndex >= 0
           ? 'impostor'
           : 'culled';
+      // Mirror the current renderer decision onto the combatant. `silhouette`
+      // and `cluster` are reserved for the v2 budget arbiter
+      // (cycle-2026-05-13 R2/R4) and not emitted here. Pure-rename slice
+      // (konveyer-materialization-lane-rename) preserves today's behavior.
+      combatant.renderLane = currentRenderMode;
       const previous = this.previousRenderModes.get(id) ?? null;
       if (previous === currentRenderMode) return;
 
@@ -2032,7 +2037,7 @@ export class CombatantRenderer {
           if (distanceMeters > getPixelForgeNpcCloseModelDistanceMeters()) return 'impostor:beyond-close-radius';
           return 'impostor:not-prioritized';
         }
-        if (combatant.lodLevel === 'culled') return 'culled:lod-culled';
+        if (combatant.simLane === 'culled') return 'culled:lod-culled';
         return 'culled:no-billboard';
       })();
 

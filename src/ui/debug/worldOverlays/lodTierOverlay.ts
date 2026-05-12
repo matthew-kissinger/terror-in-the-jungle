@@ -6,7 +6,7 @@ interface CombatantLodSource {
   combatants: Map<string, Combatant>;
 }
 
-const TIER_COLORS: Record<Combatant['lodLevel'], number> = {
+const TIER_COLORS: Record<Combatant['simLane'], number> = {
   high: 0xff5533, medium: 0xffaa22, low: 0x33aaff, culled: 0x777777,
 };
 const MARKER_HEIGHT_OFFSET = 2.4;
@@ -69,7 +69,7 @@ export function createLodTierOverlay(source: CombatantLodSource): WorldOverlay {
         posArr[i * 3] = p.x;
         posArr[i * 3 + 1] = p.y + MARKER_HEIGHT_OFFSET;
         posArr[i * 3 + 2] = p.z;
-        c.setHex(TIER_COLORS[combatant.lodLevel] ?? 0xffffff);
+        c.setHex(TIER_COLORS[combatant.simLane] ?? 0xffffff);
         colArr[i * 3] = c.r; colArr[i * 3 + 1] = c.g; colArr[i * 3 + 2] = c.b;
         i++;
       }

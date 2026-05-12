@@ -107,7 +107,8 @@ export class CombatantCombat {
     timeToDirectionChange: 0,
     lastUpdateTime: 0,
     updatePriority: 0,
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     kills: 0,
     deaths: 0,
   } as Combatant;
@@ -220,8 +221,8 @@ export class CombatantCombat {
       }
 
       // Check terrain obstruction before firing - only for high/medium LOD combatants
-      if (this.terrainSystem && combatant.lodLevel &&
-          (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
+      if (this.terrainSystem && combatant.simLane &&
+          (combatant.simLane === 'high' || combatant.simLane === 'medium')) {
         // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
         if (!tryConsumeCombatFireRaycast()) {
           combatant.currentBurst--; // Undo burst increment
