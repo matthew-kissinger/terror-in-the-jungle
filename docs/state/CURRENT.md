@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e shipped: hard-near reserve + churn pre-release + A Shau directed-warp + MaterializationProfile v2 + budget arbiter v1 + tier-transition events)
+Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e shipped + KONVEYER review packet drafted)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -11,6 +11,8 @@ Top-level current-truth snapshot for the repo. Companion docs:
 - [docs/BACKLOG.md](../BACKLOG.md) — strategic-reserve index
 - [docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md](../rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md) —
   WebGPU/TSL research spike and follow-up architecture direction
+- [docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md](../rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md) —
+  reviewer-ready synthesis of what is accepted, what is blocked, what needs rearchitecture, and the WebGPU/TSL verdict
 
 Historical full-fat snapshot (pre-Phase-1) lives at
 `docs/archive/STATE_OF_REPO.md`. Future audit summaries link to artifact
