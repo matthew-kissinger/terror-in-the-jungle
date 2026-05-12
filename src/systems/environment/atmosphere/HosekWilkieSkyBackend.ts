@@ -191,6 +191,12 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private readonly lastSunDir = new THREE.Vector3();
   private skyTextureDirty = true;
   private skyTextureRefreshTimer = 0;
+  // Slice 16: set whenever something that affects the composited sky
+  // texture changes (LUT rebake from sun motion, cloud coverage step,
+  // cloud anchor step, etc.) and cleared on `refreshSkyTexture`. Lets
+  // the 2 s refresh cadence skip true no-op scenarios (static sun, no
+  // clouds, no anchor motion) while still firing on real visible change.
+  private skyContentChanged = true;
 
   constructor() {
     this.lut = new Float32Array(LUT_AZIMUTH_BINS * LUT_ELEVATION_BINS * 3);
@@ -250,18 +256,35 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
 
     this.sunDirection.set(nx, ny, nz);
 
+    // LUT rebake stays at the 0.5° threshold — it's cheap (256 directions)
+    // and consumers of `sample()` / `getZenith()` / `getHorizon()` need
+    // accurate values for the dawn/dusk fog tint. A rebake flags
+    // `skyContentChanged` so the 2 s refresh timer below knows the
+    // texture's gradient + sun-disc position no longer match the LUT.
     const shouldRebake = this.lutDirty || cosDelta < LUT_REBAKE_COS_THRESHOLD;
     if (shouldRebake) {
       this.lastSunDir.set(nx, ny, nz);
       this.bakeLUT();
       this.lutDirty = false;
-      this.markSkyTextureDirty();
+      this.skyContentChanged = true;
     }
 
+    // Sky-texture refresh (the expensive 8192-pixel compositing loop)
+    // is gated on the 2 s refresh cadence. Slice 15 made the cloud-
+    // coverage setter idempotent; the residual ~5–10 fires per 4.5 s
+    // came from the LUT-rebake path marking the texture dirty every
+    // ~0.83 s in todCycle modes. The texture's sky gradient and sun-
+    // disc position only need to visibly track sun motion at the same
+    // cadence we already accept for cloud animation.
+    // `skyContentChanged` lets a true no-op scenario (static sun, no
+    // clouds, no anchor motion) skip the 2 s refresh of an unchanged
+    // texture; `cloudCoverage > 0` keeps cloud animation refreshing
+    // even when the LUT is steady.
     if (Number.isFinite(_deltaTime) && _deltaTime > 0) {
       this.cloudTimeSeconds += _deltaTime;
       this.skyTextureRefreshTimer += _deltaTime;
-      if (this.cloudCoverage > 0 && this.skyTextureRefreshTimer >= SKY_TEXTURE_REFRESH_SECONDS) {
+      const needsRefresh = this.skyContentChanged || this.cloudCoverage > 0;
+      if (needsRefresh && this.skyTextureRefreshTimer >= SKY_TEXTURE_REFRESH_SECONDS) {
         this.skyTextureRefreshTimer = 0;
         this.markSkyTextureDirty();
       }
@@ -413,6 +436,9 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private refreshSkyTexture(): void {
     if (!this.skyTextureDirty) return;
     this.skyTextureDirty = false;
+    // Slice 16: cleared on every refresh — the 2 s timer reads this
+    // to decide whether to schedule a follow-up refresh.
+    this.skyContentChanged = false;
 
     // Slice 14 diagnostic: time the refresh body so probes can compare
     // wall-clock refresh cost against the `World.Atmosphere.SkyTexture`
