@@ -41,6 +41,7 @@ import { clusterManager } from './ClusterManager';
 import { getRaycastBudgetStats } from './ai/RaycastBudget';
 import { getCombatFireRaycastBudgetStats } from './ai/CombatFireRaycastBudget';
 import { isPerfDiagnosticsEnabled, isPerfUserTimingEnabled } from '../../core/PerfDiagnostics';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 
@@ -261,21 +262,31 @@ export class CombatantSystem implements GameSystem {
 
     // Update influence map with current game state
     let t0 = performance.now();
-    if (this.influenceMap && this.zoneQuery) {
-      this.influenceMap.setCombatants(this.combatants);
-      this.influenceMap.setZones(this.zoneQuery.getAllZones());
-      this.influenceMap.setPlayerPosition(this.playerPosition);
-      // Update sandbag bounds if available
-      const sandbagSystem = (this as any).sandbagSystem;
-      if (sandbagSystem && typeof sandbagSystem.getSandbagBounds === 'function') {
-        this.influenceMap.setSandbagBounds(sandbagSystem.getSandbagBounds());
+    performanceTelemetry.beginSystem('Combat.Influence');
+    try {
+      if (this.influenceMap && this.zoneQuery) {
+        this.influenceMap.setCombatants(this.combatants);
+        this.influenceMap.setZones(this.zoneQuery.getAllZones());
+        this.influenceMap.setPlayerPosition(this.playerPosition);
+        // Update sandbag bounds if available
+        const sandbagSystem = (this as any).sandbagSystem;
+        if (sandbagSystem && typeof sandbagSystem.getSandbagBounds === 'function') {
+          this.influenceMap.setSandbagBounds(sandbagSystem.getSandbagBounds());
+        }
       }
+    } finally {
+      performanceTelemetry.endSystem('Combat.Influence');
     }
     this.profiler.profiling.influenceMapMs = performance.now() - t0;
 
     // Update combatants (AI, movement, combat) with LOD scheduling
     t0 = performance.now();
-    this.lodManager.updateCombatants(deltaTime);
+    performanceTelemetry.beginSystem('Combat.AI');
+    try {
+      this.lodManager.updateCombatants(deltaTime);
+    } finally {
+      performanceTelemetry.endSystem('Combat.AI');
+    }
     this.profiler.profiling.aiUpdateMs = performance.now() - t0;
     this.profiler.profiling.aiStateMs = this.combatantAI.getFrameStateProfile();
     this.profiler.profiling.aiMethodMs = this.combatantAI.getFrameMethodProfile();
@@ -313,16 +324,26 @@ export class CombatantSystem implements GameSystem {
 
     // Update billboard rotations and walk animation
     t0 = performance.now();
-    this.combatantRenderer.updateWalkFrame(deltaTime);
-    this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
-    this.combatantRenderer.updateShaderUniforms(deltaTime);
+    performanceTelemetry.beginSystem('Combat.Billboards');
+    try {
+      this.combatantRenderer.updateWalkFrame(deltaTime);
+      this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
+      this.combatantRenderer.updateShaderUniforms(deltaTime);
+    } finally {
+      performanceTelemetry.endSystem('Combat.Billboards');
+    }
     this.profiler.profiling.billboardUpdateMs = performance.now() - t0;
 
     // Update effect pools
     t0 = performance.now();
-    this.tracerPool.update();
-    this.muzzleFlashSystem.update(deltaTime);
-    this.impactEffectsPool.update(deltaTime);
+    performanceTelemetry.beginSystem('Combat.Effects');
+    try {
+      this.tracerPool.update();
+      this.muzzleFlashSystem.update(deltaTime);
+      this.impactEffectsPool.update(deltaTime);
+    } finally {
+      performanceTelemetry.endSystem('Combat.Effects');
+    }
     this.profiler.profiling.effectPoolsMs = performance.now() - t0;
 
     const duration = performance.now() - updateStart;
