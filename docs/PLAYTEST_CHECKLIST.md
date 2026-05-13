@@ -1,6 +1,6 @@
 # Playtest Checklist
 
-Last updated: 2026-04-24
+Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge)
 
 Agents can run tests and probes. They cannot feel the game. Any PR that touches flight, driving, combat rhythm, or UI responsiveness must be validated against this checklist by a human pressing keys and watching the screen. Tests green + build green != feel green.
 
@@ -64,6 +64,7 @@ Check each item. Unchecked items are failures. Add notes for anything that borde
 
 - [ ] Build source is recorded: local dev, local preview, or live production
 - [ ] If this playtest informs a release, live production has been checked after deploy; local preview evidence alone is not treated as live-site truth
+- [ ] Renderer backend resolved as expected: default 'webgpu' on a current Chrome/Edge/Firefox 147+/Safari 18.2+ should report a WebGPU adapter at startup (check via the renderer-capabilities diagnostic / console). On a non-WebGPU browser (Safari < 26, Firefox < 147, iOS 17, or `?renderer=webgpu-force-webgl`), the game must still boot via the automatic WebGL2 fallback with no console errors. Strict mode (`?renderer=webgpu-strict`) should refuse the fallback and surface the rejection loudly — it is for evidence captures, not for play.
 - [ ] Desktop ground-FPS mouse look works in a normal browser through pointer lock
 - [ ] Embedded/in-app browser playtest either obtains pointer lock or exposes a usable drag-look/fallback path
 - [ ] Frame pacing feels smooth (no ~300 ms spikes every few seconds)
