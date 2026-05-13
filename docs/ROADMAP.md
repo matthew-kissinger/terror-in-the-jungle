@@ -13,16 +13,23 @@ Core loop: **Play in first person AND command simultaneously.** The player holds
 
 Vietnam War is the first theater. Architecture generalizes to any war with different factions, terrain, vehicles, and doctrine.
 
-Current production renderer: `WebGLRenderer`. The KONVEYER experimental branch
-(`exp/konveyer-webgpu-migration`) now has branch-review evidence for strict
-`WebGPURenderer` startup, TSL production material ports, zero active
-production render blockers, and terrain ground-tone acceptance. It is not a
-production rollout yet. KONVEYER-10 owns rest-of-scene parity and attribution:
-vegetation/NPC washout, atmosphere/sky/cloud behavior, `World` timing
-decomposition, skyward triangle attribution, finite-map terrain-edge
-presentation, cross-browser/mobile proof, and A Shau perf acceptance. WebGL is
-diagnostic only for that branch; it must not be used as a fallback success path
-for WebGPU migration proof.
+Active production direction: **WebGPU + TSL**. Three.js 0.184's `WebGPURenderer`
+is the renderer the project is pursuing, in active development on the
+experimental branch (`exp/konveyer-webgpu-migration`); target for master merge
+after the materialization rearch (KONVEYER-10/11) completes. The branch has
+strict `WebGPURenderer` startup, TSL production material ports, zero active
+production render blockers, and terrain ground-tone acceptance. KONVEYER-10
+owns rest-of-scene parity and attribution: vegetation/NPC washout,
+atmosphere/sky/cloud behavior, `World` timing decomposition, skyward triangle
+attribution, finite-map terrain-edge presentation, cross-browser/mobile proof,
+and A Shau perf acceptance. Forward-leaning WebGPU tech the project will
+pursue on this trajectory: compute shaders (spatial grid, influence map),
+indirect drawing + GPU-side culling, TSL ComputeNode for particles,
+storage-texture-backed terrain deformation, GPU timestamp queries, subgroup
+operations. WebGL is diagnostic only on this branch; it must not be used as a
+fallback success path for WebGPU migration proof. The current `master` branch
+still ships `WebGLRenderer` until the experimental branch earns human review
+and rearch acceptance.
 
 Latest experimental work is on `origin/exp/konveyer-webgpu-migration`. Use the
 remote branch head rather than a frozen SHA in this roadmap. The branch now has
@@ -92,7 +99,7 @@ Carry these findings into the next Projekt revamp:
 | 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. Fixed-wing feel/interpolation sign-off, NPC transport, ground vehicles, and aircraft combat integration remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
 | 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water has a legacy global plane plus hydrology channel surfaces and query/interaction samples; shader/intersection acceptance and watercraft-grade physics are not started. |
-| 6: Ground Vehicles | NOT STARTED | GLBs exist (jeep, APC, truck, tank, PT-76). No driving runtime. |
+| 6: Ground Vehicles | IN PROGRESS | M151 jeep physics MVP (VEKHIKL-1) queued via [docs/tasks/vekhikl-1-jeep-spike.md](tasks/vekhikl-1-jeep-spike.md); architecture rearch memos in flight at `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` (wheeled physics, Ackermann steering, ground-normal conform) and `docs/rearch/TANK_SYSTEMS_2026-05-13.md` (skid-steer, independent turret, gunner seat, ballistic cannon, damage states). Cars first, tanks second. GLBs exist (jeep, APC, truck, tank, PT-76); `IVehicle` already accepts `'ground'` and `src/systems/vehicle/GroundVehicle.ts` holds the M151 stub. |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
 | 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
 | 9: Faction Expansion | PARTIAL | 4 factions in loadout context (US, ARVN, NVA, VC). AI doctrine per faction not started. |
