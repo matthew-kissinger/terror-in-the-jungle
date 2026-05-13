@@ -8,6 +8,8 @@
  * - generateVegetation: 3-pass placement for a cell
  */
 
+import { bakePreparedVisualGrid, generateNormalData } from './terrainPreparedVisualBake';
+
 // ── Height provider reconstruction ──
 // We can't import the real classes because workers get a separate module graph.
 // Instead we reconstruct the minimal height computation from config data.
@@ -65,7 +67,20 @@ interface StampedConfig {
   stamps: Array<FlattenCircleStampConfig | FlattenCapsuleStampConfig>;
 }
 
-type HeightProviderConfig = NoiseConfig | DEMConfig | StampedConfig;
+interface VisualExtentConfig {
+  type: 'visualExtent';
+  base: HeightProviderConfig;
+  source: HeightProviderConfig;
+  playableWorldSize: number;
+  visualMargin: number;
+}
+
+type HeightProviderConfig = NoiseConfig | DEMConfig | StampedConfig | VisualExtentConfig;
+
+const SOURCE_DELTA_EPSILON_METERS = 0.01;
+const MIN_EDGE_SLOPE_SAMPLE_METERS = 8;
+const MAX_EDGE_SLOPE_SAMPLE_METERS = 64;
+const MAX_EDGE_EXTRAPOLATION_METERS = 320;
 
 // ── Perlin noise (must match NoiseHeightProvider exactly) ──
 
@@ -206,6 +221,22 @@ function getHeight(worldX: number, worldZ: number): number {
   return sampleProviderHeight(activeProviderConfig, worldX, worldZ);
 }
 
+function bakeProviderGrid(providerConfig: HeightProviderConfig, gridSize: number, worldSize: number): Float32Array {
+  const data = new Float32Array(gridSize * gridSize);
+  const halfWorld = worldSize / 2;
+  const step = worldSize / (gridSize - 1);
+
+  for (let z = 0; z < gridSize; z++) {
+    for (let x = 0; x < gridSize; x++) {
+      const wx = -halfWorld + x * step;
+      const wz = -halfWorld + z * step;
+      data[z * gridSize + x] = sampleProviderHeight(providerConfig, wx, wz);
+    }
+  }
+
+  return data;
+}
+
 function sampleProviderHeight(config: HeightProviderConfig, worldX: number, worldZ: number): number {
   switch (config.type) {
     case 'noise':
@@ -225,9 +256,82 @@ function sampleProviderHeight(config: HeightProviderConfig, worldX: number, worl
       }
       return height;
     }
+    case 'visualExtent':
+      return sampleVisualExtentHeight(config, worldX, worldZ);
     default:
       return 0;
   }
+}
+
+function sampleVisualExtentHeight(config: VisualExtentConfig, worldX: number, worldZ: number): number {
+  const halfPlayable = Math.max(0, config.playableWorldSize * 0.5);
+  const halfVisual = halfPlayable + Math.max(0, config.visualMargin);
+  const clampedX = clamp(worldX, -halfPlayable, halfPlayable);
+  const clampedZ = clamp(worldZ, -halfPlayable, halfPlayable);
+
+  if (worldX === clampedX && worldZ === clampedZ) {
+    return sampleProviderHeight(config.base, worldX, worldZ);
+  }
+
+  const sampleX = clamp(worldX, -halfVisual, halfVisual);
+  const sampleZ = clamp(worldZ, -halfVisual, halfVisual);
+  const edgeBaseHeight = sampleProviderHeight(config.base, clampedX, clampedZ);
+  const sourceDelta = sampleProviderHeight(config.source, sampleX, sampleZ)
+    - sampleProviderHeight(config.source, clampedX, clampedZ);
+
+  if (Math.abs(sourceDelta) > SOURCE_DELTA_EPSILON_METERS) {
+    return edgeBaseHeight + sourceDelta;
+  }
+
+  return edgeBaseHeight + estimateVisualEdgeSlopeDelta(config.base, worldX, worldZ, clampedX, clampedZ, halfPlayable, halfVisual);
+}
+
+function estimateVisualEdgeSlopeDelta(
+  baseConfig: HeightProviderConfig,
+  worldX: number,
+  worldZ: number,
+  clampedX: number,
+  clampedZ: number,
+  halfPlayable: number,
+  halfVisual: number,
+): number {
+  const outsideX = worldX - clampedX;
+  const outsideZ = worldZ - clampedZ;
+  const outsideDistance = Math.hypot(outsideX, outsideZ);
+  if (outsideDistance <= 0) return 0;
+
+  const sampleStep = clamp(halfPlayable / 128, MIN_EDGE_SLOPE_SAMPLE_METERS, MAX_EDGE_SLOPE_SAMPLE_METERS);
+  let delta = 0;
+  let weight = 0;
+
+  if (Math.abs(outsideX) > 0) {
+    const signX = Math.sign(outsideX);
+    const innerX = clamp(clampedX - signX * sampleStep, -halfPlayable, halfPlayable);
+    const inwardDistance = Math.abs(clampedX - innerX);
+    if (inwardDistance > 0) {
+      const edge = sampleProviderHeight(baseConfig, clampedX, clampedZ);
+      const inner = sampleProviderHeight(baseConfig, innerX, clampedZ);
+      delta += ((edge - inner) / inwardDistance) * Math.abs(outsideX);
+      weight++;
+    }
+  }
+
+  if (Math.abs(outsideZ) > 0) {
+    const signZ = Math.sign(outsideZ);
+    const innerZ = clamp(clampedZ - signZ * sampleStep, -halfPlayable, halfPlayable);
+    const inwardDistance = Math.abs(clampedZ - innerZ);
+    if (inwardDistance > 0) {
+      const edge = sampleProviderHeight(baseConfig, clampedX, clampedZ);
+      const inner = sampleProviderHeight(baseConfig, clampedX, innerZ);
+      delta += ((edge - inner) / inwardDistance) * Math.abs(outsideZ);
+      weight++;
+    }
+  }
+
+  if (weight === 0) return 0;
+  const averagedDelta = delta / weight;
+  const fade = 1 - clamp(outsideDistance / Math.max(1, halfVisual - halfPlayable), 0, 1) * 0.35;
+  return clamp(averagedDelta * fade, -MAX_EDGE_EXTRAPOLATION_METERS, MAX_EDGE_EXTRAPOLATION_METERS);
 }
 
 function applyResolvedStamp(
@@ -342,6 +446,18 @@ interface BakeHeightmapMsg {
   requestId: number;
   gridSize: number;
   worldSize: number;
+  providerConfig?: HeightProviderConfig;
+}
+
+interface BakePreparedVisualHeightmapMsg {
+  type: 'bakePreparedVisualHeightmap';
+  requestId: number;
+  preparedData: Float32Array;
+  preparedGridSize: number;
+  playableWorldSize: number;
+  visualMargin: number;
+  sourceConfig: HeightProviderConfig;
+  gridSize: number;
 }
 
 interface GenerateChunkMsg {
@@ -354,7 +470,7 @@ interface GenerateChunkMsg {
   seed: number;
 }
 
-type WorkerMessage = SetProviderMsg | BakeHeightmapMsg | GenerateChunkMsg;
+type WorkerMessage = SetProviderMsg | BakeHeightmapMsg | BakePreparedVisualHeightmapMsg | GenerateChunkMsg;
 
 self.onmessage = function (event: MessageEvent<WorkerMessage>) {
   const msg = event.data;
@@ -368,21 +484,34 @@ self.onmessage = function (event: MessageEvent<WorkerMessage>) {
 
     case 'bakeHeightmap': {
       const { requestId, gridSize, worldSize } = msg;
-      const data = new Float32Array(gridSize * gridSize);
-      const halfWorld = worldSize / 2;
-      const step = worldSize / (gridSize - 1);
-
-      for (let z = 0; z < gridSize; z++) {
-        for (let x = 0; x < gridSize; x++) {
-          const wx = -halfWorld + x * step;
-          const wz = -halfWorld + z * step;
-          data[z * gridSize + x] = getHeight(wx, wz);
-        }
-      }
+      const providerConfig = msg.providerConfig ?? activeProviderConfig;
+      const data = bakeProviderGrid(providerConfig, gridSize, worldSize);
+      const normalData = generateNormalData(data, gridSize, gridSize, worldSize);
 
       (self as unknown as Worker).postMessage(
-        { type: 'heightmapResult', requestId, data, gridSize, worldSize },
-        [data.buffer],
+        { type: 'heightmapResult', requestId, data, normalData, gridSize, worldSize },
+        [data.buffer, normalData.buffer],
+      );
+      break;
+    }
+
+    case 'bakePreparedVisualHeightmap': {
+      const worldSize = msg.playableWorldSize + msg.visualMargin * 2;
+      const data = bakePreparedVisualGrid(
+        msg.preparedData,
+        msg.preparedGridSize,
+        msg.playableWorldSize,
+        msg.visualMargin,
+        msg.sourceConfig,
+        sampleProviderHeight,
+        msg.gridSize,
+        worldSize,
+      );
+      const normalData = generateNormalData(data, msg.gridSize, msg.gridSize, worldSize);
+
+      (self as unknown as Worker).postMessage(
+        { type: 'heightmapResult', requestId: msg.requestId, data, normalData, gridSize: msg.gridSize, worldSize },
+        [data.buffer, normalData.buffer],
       );
       break;
     }

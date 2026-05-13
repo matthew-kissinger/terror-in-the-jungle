@@ -30,4 +30,11 @@ export type HeightProviderConfig =
       type: 'stamped';
       base: HeightProviderConfig;
       stamps: ResolvedTerrainStampConfig[];
+    }
+  | {
+      type: 'visualExtent';
+      base: HeightProviderConfig;
+      source: HeightProviderConfig;
+      playableWorldSize: number;
+      visualMargin: number;
     };

@@ -173,6 +173,24 @@ count becomes a Pages-upload problem. The current issue is not Cloudflare
 delivery for prebaked modes; it is runtime route-follow quality and validation,
 especially for A Shau.
 
+### Mode-Startup Cache vs Runtime CPU
+
+The 2026-05-13 mode-startup investigation verified a common false lead: slow
+mode selection was not caused by stale Recast WASM, bad WASM MIME, or missing
+navmesh cache headers. Live checks showed content-hashed build assets, Recast
+WASM, and `public/data/navmesh/*` already followed the immutable-cache contract.
+
+The measured blocker was synchronous terrain surface baking after mode select.
+That class of issue belongs in runtime startup architecture, not the deploy
+cache contract. The active spike branch is
+`task/mode-startup-terrain-spike`; design and evidence are in
+`docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md`.
+
+Release implication: after deployment, still verify `/sw.js`,
+`/asset-manifest.json`, Recast WASM/build-asset headers, and navmesh headers,
+but do not treat those checks as sufficient proof for mode-start responsiveness.
+Run `scripts/perf-startup-ui.ts` on the deployed or production-shaped bundle.
+
 ### Local vs Live Evidence Gap
 
 For A Shau and other asset-heavy modes, the dev gap is usually not TypeScript

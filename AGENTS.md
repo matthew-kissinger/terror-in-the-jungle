@@ -61,6 +61,7 @@ npm run perf:capture:combat120      # Primary regression target, 120 NPC AI stre
 npm run perf:capture:openfrontier:short
 npm run perf:capture:ashau:short
 npm run perf:capture:frontier30m    # 30min soak
+npm run perf:startup:openfrontier   # Retail startup benchmark (mode select -> deploy -> playable)
 npm run perf:quick                  # Smoke capture (not a baseline)
 npm run perf:compare                # Compare latest vs tracked baselines
 npm run perf:compare:strict         # Same, but fail on warnings too
@@ -217,6 +218,7 @@ camera/render shake questions have an evidence-backed decision.
 - **Don't anchor on doc claims against current file state.** Briefs and backlogs drift. Verify with Read against the current file before proposing a fix. If the brief's premise is wrong, stop and escalate, don't rationalize an outdated task.
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.
+- **Mode-startup stalls are not automatically cache bugs.** The 2026-05-13 spike showed Recast WASM/build/navmesh cache headers can be correct while synchronous terrain surface baking still blocks mode selection. For startup work, run `scripts/perf-startup-ui.ts` and check `startup-marks.json` before changing Cloudflare cache policy. Current memo: `docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md`.
 - **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:culling-proof` (renamed from `check:projekt-143-culling-proof` in Phase 1); the cycle2-proof bundle is archived under `scripts/audit-archive/cycle2-proof.ts`. The proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
 - **Cycle 3 KB-CULL owner baseline.** Before changing culling, HLOD, static
   features, vehicle visibility, or pool residency, run

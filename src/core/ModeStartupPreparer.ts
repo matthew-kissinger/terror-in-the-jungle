@@ -392,32 +392,24 @@ async function configureTerrainAndNavigation(
 
   const terrainSystem = engine.systemManager.terrainSystem;
   const hydrologyBake = preparedTerrainSource.hydrologyBake ?? null;
-  terrainSystem.setPreparedHeightmap(preparedTerrainSource.preparedHeightmap ?? null);
   terrainSystem.setHydrologyBake(hydrologyBake);
   terrainSystem.setHydrologyBiomePolicy(resolveHydrologyBiomePolicy(config));
   engine.systemManager.waterSystem.setHydrologyChannels(hydrologyBake?.artifact ?? null);
-  const previousWorldSize = terrainSystem.getPlayableWorldSize();
-  const targetWorldSize = config.worldSize ?? previousWorldSize;
-  const worldSizeChanged = targetWorldSize !== previousWorldSize;
 
   if (config.worldSize) {
-    terrainSystem.setWorldSize(config.worldSize);
     engine.systemManager.playerController.setWorldSize(config.worldSize);
-  }
-  terrainSystem.setVisualMargin(config.visualMargin ?? 200);
-
-  if (config.chunkSize && config.chunkSize !== terrainSystem.getChunkSize()) {
-    terrainSystem.setChunkSize(config.chunkSize);
-  }
-  if (config.chunkRenderDistance) {
-    terrainSystem.setRenderDistance(config.chunkRenderDistance);
-  }
-  if (!worldSizeChanged) {
-    terrainSystem.rebakeHeightmap();
   }
 
   const defaultBiome = config.terrain?.defaultBiome ?? 'denseJungle';
-  terrainSystem.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
+  await terrainSystem.configureModeSurface({
+    preparedHeightmap: preparedTerrainSource.preparedHeightmap ?? null,
+    worldSize: config.worldSize,
+    visualMargin: config.visualMargin ?? 200,
+    chunkSize: config.chunkSize,
+    renderDistance: config.chunkRenderDistance,
+    defaultBiomeId: defaultBiome,
+    biomeRules: config.terrain?.biomeRules,
+  });
   terrainSystem.setFarCanopyTint(config.terrain?.farCanopyTint);
   markStartup(`engine-init.start-game.${config.id}.terrain-config.end`);
 

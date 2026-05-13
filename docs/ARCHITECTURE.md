@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge)
+Last verified: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge; mode-start terrain-bake spike)
 
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -56,6 +56,14 @@ GAME_START Position player, enable combat, start ambient audio
 TICK       RAF loop -> SystemUpdater.updateSystems() per frame
 MATCH_END  TicketSystem -> HUDSystem.handleGameEnd()
 ```
+
+Mode-start terrain configuration is intentionally batched. The
+`task/mode-startup-terrain-spike` branch routes prepared visual-heightmap
+surface baking through `TerrainWorkerPool` and transfers worker-generated
+height/normal buffers back to `HeightmapGPU`. Do not reintroduce a sequence of
+main-thread terrain setters that each rebake or repropagate terrain state during
+mode selection. Background and evidence:
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 
 Runtime composers (extracted from SystemConnector):
 - `StartupPlayerRuntimeComposer` - player/UI/deploy wiring

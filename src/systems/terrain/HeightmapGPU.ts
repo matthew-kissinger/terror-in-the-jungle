@@ -52,12 +52,16 @@ export class HeightmapGPU {
    * Upload a pre-computed height grid directly (from worker bake or pre-baked asset).
    * Skips the per-sample provider loop entirely.
    */
-  uploadPrebakedGrid(data: Float32Array, gridSize: number, worldSize: number): void {
+  uploadPrebakedGrid(data: Float32Array, gridSize: number, worldSize: number, normalData?: Uint8Array): void {
     this.gridSize = gridSize;
     this.worldSize = worldSize;
     this.heightData = new Float32Array(data);
     this.createHeightTexture(this.heightData, gridSize, gridSize);
-    this.generateNormalMap(this.heightData, gridSize, gridSize, worldSize);
+    if (normalData) {
+      this.createNormalTexture(new Uint8Array(normalData), gridSize, gridSize);
+    } else {
+      this.generateNormalMap(this.heightData, gridSize, gridSize, worldSize);
+    }
   }
 
   /**
@@ -133,6 +137,25 @@ export class HeightmapGPU {
     this.heightTexture.needsUpdate = true;
   }
 
+  private createNormalTexture(data: Uint8Array, width: number, height: number): void {
+    if (this.normalTexture) {
+      this.normalTexture.dispose();
+    }
+
+    this.normalTexture = new THREE.DataTexture(
+      data,
+      width,
+      height,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType,
+    );
+    this.normalTexture.minFilter = THREE.LinearFilter;
+    this.normalTexture.magFilter = THREE.LinearFilter;
+    this.normalTexture.wrapS = THREE.ClampToEdgeWrapping;
+    this.normalTexture.wrapT = THREE.ClampToEdgeWrapping;
+    this.normalTexture.needsUpdate = true;
+  }
+
   private generateNormalMap(
     heightData: Float32Array, width: number, height: number, worldSize: number,
   ): void {
@@ -176,18 +199,7 @@ export class HeightmapGPU {
       }
     }
 
-    this.normalTexture = new THREE.DataTexture(
-      normalData,
-      width,
-      height,
-      THREE.RGBAFormat,
-      THREE.UnsignedByteType,
-    );
-    this.normalTexture.minFilter = THREE.LinearFilter;
-    this.normalTexture.magFilter = THREE.LinearFilter;
-    this.normalTexture.wrapS = THREE.ClampToEdgeWrapping;
-    this.normalTexture.wrapT = THREE.ClampToEdgeWrapping;
-    this.normalTexture.needsUpdate = true;
+    this.createNormalTexture(normalData, width, height);
   }
 
   dispose(): void {

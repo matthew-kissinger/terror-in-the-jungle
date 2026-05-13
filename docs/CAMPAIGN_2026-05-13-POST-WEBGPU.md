@@ -12,6 +12,12 @@ follow-ups vs. driveable land vehicles) takes the next slot. The
 manifest catalogues both queues so `/orchestrate` can pick up either
 without first re-deriving the queue.
 
+Current branch overlay: `task/mode-startup-terrain-spike` addresses a
+user-visible mode-startup stall discovered after the WebGPU merge. It is a
+targeted branch, not a replacement for either vision track. The branch should
+either merge as a startup hardening slice or leave behind `KB-STARTUP-1` with
+its visual-review and persistent-cache follow-up criteria intact.
+
 ## Predecessor
 
 This manifest supersedes
@@ -94,6 +100,24 @@ New files: `src/systems/vehicle/GroundVehiclePhysics.ts`,
   library; the four-trigger Rapier-reevaluation gate
   (multi-vehicle collision / ragdoll / watercraft buoyancy /
   articulated trucks) is not fired by one MVP.
+
+### `cycle-mode-startup-terrain-bake-hardening`
+
+Production hardening for `task/mode-startup-terrain-spike` if the branch is
+not merged directly. The branch already proves the primary issue: cache headers
+and Recast WASM delivery were correct, while terrain surface baking blocked the
+mode-click path. This cycle owns the merge-quality finish:
+
+- Keep terrain surface baking off the main thread through module workers and
+  transferable height/normal buffers.
+- Preserve the batched `TerrainSystem.configureModeSurface(...)` contract.
+- Visually review Open Frontier and A Shau finite-edge views before accepting
+  the coarse source-delta cache used for the render-only visual margin.
+- If that approximation fails visual review, replace it with persistent or
+  prebaked visual-surface artifacts, or an IndexedDB/OPFS runtime bake cache.
+
+Evidence memo:
+`docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md`.
 
 ### `cycle-konveyer-11-spatial-grid-compute`
 
@@ -184,9 +208,9 @@ regardless of which slot is active:
   `cycle-stabilizat-1-baselines-refresh` has refreshed the baseline.
   Until then, the prior baseline plus the WebGPU-migration steady-pose
   proof in `KONVEYER_REVIEW_PACKET_2026-05-12.md` is the bar.
-- **Carry-over count growth past the policy bound.** Active count was
-  9 at master-merge gate (8 after the vision pivot park; +1 for
-  konveyer-large-file-splits opened at merge-prep). Growth beyond
+- **Carry-over count growth past the policy bound.** Active count is
+  9 after `KB-STARTUP-1` opened for the mode-startup terrain-bake spike
+  (8 after the KONVEYER-10 master merge; +1 for this branch). Growth beyond
   policy bound triggers a backlog-prune cycle ahead of the next
   feature slot.
 - **WebGL fallback accepted as new evidence.** The fallback is

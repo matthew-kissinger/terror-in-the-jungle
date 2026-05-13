@@ -52,6 +52,14 @@ cycle selection waits for owner direction. Option 1 from
 (insert VODA-1 / VEKHIKL-1 / DEFEKT-3 first slices ahead of cycle 3) remains
 the active feature-pivot recommendation.
 
+**Active spike branch:** `task/mode-startup-terrain-spike` addresses the
+post-click mode-startup stall. The investigation found the Recast
+WASM/build/navmesh cache path healthy; the blocker was synchronous terrain
+surface baking after mode select. The branch moves surface baking into the
+terrain worker pool with transferable height/normal grids and records merge
+criteria in
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
+
 **Engineering culture** for unattended overnight agents (Codex / Claude /
 Cursor multi-stream R&D runs covering stabilization + code-golf +
 optimization + perf + features) lives in
@@ -71,22 +79,24 @@ Cloudflare account-level audit:
 `artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored).
 
 Single source of truth for unresolved items:
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count was **9** pre-merge;
-becomes **8** after KONVEYER-10 closes with PR #192 (still under the ≤12
-rule). Active items: DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality),
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count was **8** after
+KONVEYER-10 closed with PR #192 and is now **9** after KB-STARTUP-1 opened for
+the mode-startup terrain-bake hardening branch (still under the ≤12 rule).
+Active items: DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality),
 STABILIZAT-1 (combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual
-review pending), KB-LOAD residual, cloudflare-stabilization-followups,
-weapons-cluster-zonemanager-migration, konveyer-large-file-splits. New IDs
-(KONVEYER-11 spatial-grid, VEKHIKL-3 jeep-drivable, etc.) open with their
-respective cycle launches.
+review pending), KB-LOAD residual, KB-STARTUP-1, cloudflare-stabilization
+followups, weapons-cluster-zonemanager-migration, konveyer-large-file-splits.
+New IDs (KONVEYER-11 spatial-grid, VEKHIKL-3 jeep-drivable, etc.) open with
+their respective cycle launches.
 
 4 cycle-retro nits from cycle 2.4 captured in BACKLOG retro (NOT new
 carry-overs to respect ≤12 limit; bundle into next cycle that touches
 relevant area): A Shau test claim softening; perf ceiling 1.0→2.0ms if
 flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
-Campaign manifest: [docs/archive/CAMPAIGN_2026-05-09.md](docs/archive/CAMPAIGN_2026-05-09.md)
-(9 cycles; auto-advance currently PAUSED).
+Campaign manifest:
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+(post-WebGPU queue; auto-advance currently PAUSED).
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle

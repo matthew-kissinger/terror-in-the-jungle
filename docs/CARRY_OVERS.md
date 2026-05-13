@@ -29,6 +29,7 @@ started, the cycle is `INCOMPLETE` per the rule in
 | STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 7 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. |
 | AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 6 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
 | KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 4 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
+| KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 0 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
 | cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 2 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
 | weapons-cluster-zonemanager-migration | Finish the IZoneQuery migration for the 5 remaining concrete `ZoneManager` imports in the weapons cluster: `FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`, `PlayerHealthSystem` | cycle-2026-05-10-zone-manager-decoupling | 2 | weapons | no | Out-of-scope for Phase 2 R2 batches A/B/C; aspirational ≤5 ZoneManager-import target missed. Phase 3+ can finish; cycle-2026-05-10's ≤20 success criterion was met (achieved 17 read / 5 concrete). |
 | konveyer-large-file-splits | Two KONVEYER-grown files added to `lint-source-budget.ts` grandfather list at the 2026-05-12 master-merge gate: `HosekWilkieSkyBackend.ts` (807 LOC, slated for the TSL fragment-shader sky port) and `WaterSystem.ts` (733 LOC, slated for VODA-1 water-shader work) | exp→master merge prep 2026-05-12 | 0 | environment | no | Split-debt tracking. Both files grew during the KONVEYER campaign (sky through slices 13-15 + sky-refresh fix; water during the scene-parity standard-material port). Each is grandfathered with a named follow-up round in `scripts/lint-source-budget.ts`. Closes when the named follow-up cycles ship and the files drop below 700 LOC. |
@@ -55,6 +56,10 @@ History log:
   [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
   (commit `1df141ca`), which folded the `exp/konveyer-webgpu-migration` branch
   into `master`. Active count: 9 → 8.
+- 2026-05-13 — mode-startup spike: KB-STARTUP-1 opened from the user-reported
+  "mode selection takes forever" issue. `task/mode-startup-terrain-spike`
+  moved terrain surface baking off the mode-click main-thread path and proved
+  the cache/Recast path was not the blocker. Active count: 8 → 9.
 
 ## Closed
 
