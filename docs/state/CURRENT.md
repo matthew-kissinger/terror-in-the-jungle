@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-12 (Phase F slices 1/0a/0b/0c/0d/0e/0f + slice 7 perf-window gate + slice 10 system-timings + slice 11 atmosphere sub-attribution + slice 12 LUT refresh + slice 13 DataTexture+2s refresh + terrain roughness fix + slice 14 refresh-counter diagnostic + slice 15 idempotent setCloudCoverage shipped; SkyTexture EMA dropped 5.96ms -> 0.52ms in A Shau worst case; total Atmosphere now <1ms across all modes)
+Last verified: 2026-05-13 (KONVEYER campaign closed by `master` merge of `exp/konveyer-webgpu-migration` via PR #192 / commit `1df141ca`; master is now the WebGPU + TSL renderer branch with automatic WebGL2 fallback for unsupported environments)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -29,6 +29,103 @@ paths; do not paraphrase audit JSON into this doc.
 That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
+
+## Current focus (2026-05-13, post-WebGPU master merge)
+
+The KONVEYER campaign closed when `exp/konveyer-webgpu-migration` merged into
+`master` via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
+on 2026-05-13T02:06:03Z. Master is now the WebGPU + TSL renderer branch by
+default. The renderer instantiates Three.js r184 `WebGPURenderer` from
+`three/webgpu`; environments without WebGPU adapter support (Chrome <113,
+Firefox <147, Safari <26, headless runners with no GPU) fall back to the
+existing WebGL2 path automatically. Strict mode (`?renderer=webgpu-strict`)
+remains the acceptance bar for KONVEYER review evidence; production startup
+without the flag does not fail loudly on WebGL.
+
+Merge commit: `1df141ca`. The WebGL-fallback gate was added immediately
+after the migration merge as `4aec731e`
+(`fix(renderer): gate WebGL-fallback rejection on strict mode only`), so the
+fallback path is governed by mode and reviewer evidence, not by silent
+acceptance. The merge ran 5 of 6 CI checks green at decision time (lint,
+test, build, perf, smoke); mobile-ui was still running and is informational
+rather than a required gate per
+`gh api repos/.../branches/master/protection` (no protection rules set).
+
+What is stable on master now:
+
+- WebGPU `WebGPURenderer` + TSL node materials across terrain, vegetation
+  impostors, NPC impostors, and the LUT-driven Hosek-Wilkie atmosphere
+  surface (KONVEYER-0..9).
+- Automatic WebGL2 fallback for environments that fail the strict-WebGPU
+  adapter probe. Strict mode still rejects fallback as migration proof; the
+  `4aec731e` fix narrows the rejection to strict mode so production deploys
+  on legacy browsers do not crash on the WebGPU rejection branch.
+- Phase F materialization rearch R1: combat sub-attribution
+  (`5432a316`), materialization lane rename `lodLevel` → `simLane` +
+  `renderLane` (`bad935c2`), and idempotent `setCloudCoverage` /
+  sky-refresh gating at the 2 s cadence (`7e8433b4` + slice 15
+  `1b31379c`).
+- Atmosphere CPU cost reduced 11x in the A Shau worst case (5.96 ms →
+  0.52 ms across the slice 9 → 15 arc); all five game modes now hold
+  total Atmosphere under 1 ms.
+- Vision-alignment doc bundle: ROADMAP + AGENTS + CLAUDE.md + carry-over
+  registry now reflect the 2026-05-12 owner-confirmed two-vision split
+  (experimental WebGPU + driveable land vehicles).
+- Three new rearch memos under `docs/rearch/2026-05-13`:
+  `GROUND_VEHICLE_PHYSICS_2026-05-13.md`, `TANK_SYSTEMS_2026-05-13.md`,
+  `BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`. One amended memo:
+  `ENGINE_TRAJECTORY_2026-04-23.md` carries a 2026-05-13 addendum
+  extending the "no external physics lib" stance to ground vehicles
+  with a four-trigger Rapier reevaluation gate.
+
+What is queued as fast-follow on master:
+
+- **Phase F R2-R4** (rebased from the experimental branch): cover
+  spatial-grid for DEFEKT-3 surface close (`cycle-konveyer-11`),
+  render-silhouette + render-cluster lanes, squad-aggregated strategic
+  sim, budget arbiter v2, and a multi-mode strict-WebGPU proof v2.
+- **File-split debt**: `HosekWilkieSkyBackend.ts` (807 LOC; slated for
+  the TSL fragment-shader sky port) and `WaterSystem.ts` (733 LOC;
+  slated for VODA-1 water shader work). Both are temporarily on the
+  source-budget grandfather list per merge-prep commit `95eefed8`.
+- **STABILIZAT-1**: `perf-baselines.json` refresh on the new master
+  baseline (the policy block from the experimental branch lifts on
+  merge; the actual refresh has not run yet).
+- **VEKHIKL-1 jeep spike**: unblocked by
+  `GROUND_VEHICLE_PHYSICS_2026-05-13.md`, queued in the new campaign
+  manifest.
+
+What still needs proof on production hardware variety:
+
+The WebGL2 fallback path was exercised by the PR #192 smoke re-run at
+`4aec731e` on the GitHub Actions Linux runner (Chromium + swiftshader,
+no GPU). Native WebGPU on Chrome 113+ Windows + dedicated GPU, Safari on
+macOS Sequoia, Safari on iOS 18+, Firefox 147+, and the mobile fallback
+(Android Chrome, Safari iOS 17) have not yet been spot-checked on real
+hardware post-deploy. mobile-ui CI was still running at merge time and
+provides additional automated coverage of the mobile fallback path. The
+owner spot-check post-deploy is the validation step.
+
+Owner vision (2026-05-12, restated here for traceability after master
+merge):
+
+- **A.** Forward-leaning experimental WebGPU / browser-primitive tech —
+  KONVEYER follow-ups (compute spatial-grid, indirect drawing, TSL
+  ComputeNode particles, storage textures) plus classic primitives
+  where they earn their keep. Rust → WASM is a spike-only candidate;
+  the named first pilot is the tank-cannon ballistic solver
+  (`TANK_SYSTEMS_2026-05-13.md`).
+- **B.** Driveable land vehicles — M151 jeep MVP first (VEKHIKL-1),
+  then tanks (VEKHIKL-3/4) with skid-steer, turret, cannon, damage
+  states.
+
+Both directions are first-class. The original 9-cycle stabilization
+campaign in `docs/CAMPAIGN_2026-05-09.md` is historical; the active
+campaign manifest is now
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+
+Milestone memo with the full lineage:
+[docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).
 
 ## Current focus (2026-05-12)
 
@@ -601,6 +698,13 @@ unchanged. Re-measure after the sky-throttle slice.
 Do not merge the KONVEYER branch to `master`, deploy experimental renderer
 code, update perf baselines, or accept WebGL fallback as migration proof.
 Explicit WebGL diagnostics are allowed only as named comparison evidence.
+
+**Superseded 2026-05-13.** PR #192 merged `exp/konveyer-webgpu-migration`
+into `master` and the `4aec731e` fix narrowed the WebGL-fallback rejection
+to strict mode only. The "do not merge / do not deploy" gate is closed; see
+the 2026-05-13 entry above for the current state. The 2026-05-12 entries
+below this point are preserved as historical evidence chain and are not the
+current top-of-stack guidance.
 
 ## What is real today
 
