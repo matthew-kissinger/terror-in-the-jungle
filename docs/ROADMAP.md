@@ -13,29 +13,22 @@ Core loop: **Play in first person AND command simultaneously.** The player holds
 
 Vietnam War is the first theater. Architecture generalizes to any war with different factions, terrain, vehicles, and doctrine.
 
-Active production direction: **WebGPU + TSL**. Three.js 0.184's `WebGPURenderer`
-is the renderer the project is pursuing, in active development on the
-experimental branch (`exp/konveyer-webgpu-migration`); target for master merge
-after the materialization rearch (KONVEYER-10/11) completes. The branch has
-strict `WebGPURenderer` startup, TSL production material ports, zero active
-production render blockers, and terrain ground-tone acceptance. KONVEYER-10
-owns rest-of-scene parity and attribution: vegetation/NPC washout,
-atmosphere/sky/cloud behavior, `World` timing decomposition, skyward triangle
-attribution, finite-map terrain-edge presentation, cross-browser/mobile proof,
-and A Shau perf acceptance. Forward-leaning WebGPU tech the project will
-pursue on this trajectory: compute shaders (spatial grid, influence map),
-indirect drawing + GPU-side culling, TSL ComputeNode for particles,
-storage-texture-backed terrain deformation, GPU timestamp queries, subgroup
-operations. WebGL is diagnostic only on this branch; it must not be used as a
-fallback success path for WebGPU migration proof. The current `master` branch
-still ships `WebGLRenderer` until the experimental branch earns human review
-and rearch acceptance.
+Current production renderer is **`WebGPURenderer`** (Three.js r184,
+`three/webgpu` import) with automatic WebGL2 fallback for browsers without
+WebGPU support. This landed on master on 2026-05-12 via
+[PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
+(merge commit `1df141ca`), folding in KONVEYER-0 through KONVEYER-10 plus the
+Phase F R1 materialization rearch slices. The WebGL2 fallback path is gated on
+`strictWebGPU` only — production users on browsers without WebGPU automatically
+hit Three.js's WebGL2 backend (commit `4aec731e`).
 
-Latest experimental work is on `origin/exp/konveyer-webgpu-migration`. Use the
-remote branch head rather than a frozen SHA in this roadmap. The branch now has
-strict close-NPC materialization telemetry/body-bound proof, a bounded
-spawn-residency reserve for first-reveal close actors, and startup
-feature-compile attribution, but it does not close the rollout gate.
+Forward-leaning WebGPU tech the project will pursue on this trajectory:
+compute shaders (spatial grid, influence map), indirect drawing + GPU-side
+culling, TSL ComputeNode for particles, storage-texture-backed terrain
+deformation, GPU timestamp queries, subgroup operations. R2-R4 of the Phase F
+materialization rearch (cover-spatial-grid, render-silhouette/cluster lanes,
+squad-aggregated strategic sim, budget arbiter v2) are queued as follow-up
+cycles on `master`.
 
 KONVEYER edge work is now vision-first, not probe-first. Source-backed visual
 terrain extent is the direction for finite procedural maps; A Shau needs real
@@ -76,10 +69,10 @@ Carry these findings into the next Projekt revamp:
 - Culling/HLOD: keep the scoped culling evidence and interaction-safety tests,
   then revisit broad HLOD, vegetation culling, parked-aircraft playtest, and
   future vehicle-driving surfaces after the release cutoff.
-- Platform utilization: production stays WebGL-first until the KONVEYER branch
-  earns human review and production-rollout acceptance. Continue WebGPU,
-  OffscreenCanvas, worker simulation, and WASM/threading only as proof-gated
-  architecture branches.
+- Platform utilization: production is now WebGPU-primary with automatic
+  WebGL2 fallback as of the 2026-05-12 master-merge (PR #192, commit
+  `1df141ca`). Continue OffscreenCanvas, worker simulation, and WASM/threading
+  only as proof-gated architecture branches.
 
 ## Architecture Principles
 

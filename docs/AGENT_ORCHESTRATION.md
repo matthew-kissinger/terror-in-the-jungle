@@ -114,180 +114,37 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-2026-05-13-konveyer-materialization-rearch (Phase F continuation)
+## Current cycle: (none — awaiting owner direction)
 
-**Current branch:** `exp/konveyer-webgpu-migration`
+**Current branch:** `master`
 
-**Pickup point:** `origin/exp/konveyer-webgpu-migration` HEAD (currently
-`1b31379c` — slice 15 idempotent `setCloudCoverage`). Use the branch
-head, not a frozen SHA.
+No cycle is active. The predecessor cycle
+`cycle-2026-05-13-konveyer-materialization-rearch` shipped its R1 slices
+(combat sub-attribution, materialization lane rename, sky-refresh
+idempotency) and landed on `master` via
+[PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
+on 2026-05-13 (merge commit `1df141ca`). The R2-R4 work
+(`konveyer-cover-spatial-grid`, `konveyer-render-silhouette-lane`,
+`konveyer-squad-aggregated-strategic-sim`, `konveyer-budget-arbiter-v2`,
+`konveyer-render-cluster-lane`, `konveyer-strict-webgpu-cross-mode-proof-v2`,
+`konveyer-docs-review-packet-v2`) is queued as follow-up cycles on master.
 
-**Cycle brief:** [docs/tasks/cycle-2026-05-13-konveyer-materialization-rearch.md](tasks/cycle-2026-05-13-konveyer-materialization-rearch.md)
-
-**Parent campaign brief:** [docs/tasks/konveyer-full-autonomous-migration.md](tasks/konveyer-full-autonomous-migration.md)
-
-**Skip-confirm: YES.** Autonomous continuation on the experimental
-branch. Hard stops still force a halt-and-surface (fenced-interface
-change, `perf-baselines.json` refresh, `master` merge, production
-deploy, WebGL-fallback acceptance, A Shau p99 regression past 33 ms,
-carry-over growth).
-
-**Campaign auto-advance:** PAUSED. Experimental-branch work. Cycle
-closes on the review packet update; next cycle selection waits for
-owner approval.
-
-The predecessor cycle
-[cycle-2026-05-11-konveyer-scene-parity](tasks/cycle-2026-05-11-konveyer-scene-parity.md)
-closed the scene-parity arc and shipped slices 9-15: perf-window
-gate, system-timings attribution, atmosphere sub-attribution, terrain
-roughness floor, LUT refresh, DataTexture + 2s timer, refresh-counter
-diagnostic, and idempotent `setCloudCoverage`. **Atmosphere CPU
-collapsed from 5-6 ms to <1 ms across all five modes**; A Shau
-worst-case 5.99 ms → 0.52 ms. Combat (1.5-6.5 ms) is now the
-relatively-largest CPU contributor.
-
-### Round schedule
-
-| Round | Tasks (parallel) | Cap |
-|-------|------------------|-----|
-| 1 | `konveyer-combat-sub-attribution`, `konveyer-materialization-lane-rename`, `konveyer-sky-refresh-investigate` | 3 |
-| 2 | `konveyer-cover-spatial-grid`, `konveyer-render-silhouette-lane` | 2 |
-| 3 | `konveyer-squad-aggregated-strategic-sim`, `konveyer-budget-arbiter-v2` | 2 |
-| 4 | `konveyer-render-cluster-lane`, `konveyer-strict-webgpu-cross-mode-proof-v2`, `konveyer-docs-review-packet-v2` | 3 |
-
-### Tasks in this cycle
-
-Each task scope is defined in
-[the cycle brief](tasks/cycle-2026-05-13-konveyer-materialization-rearch.md#task-scope).
-
-- `konveyer-combat-sub-attribution` — wrap `CombatantSystem.update`
-  internal `profiler.profiling.*` blocks with
-  `performanceTelemetry.beginSystem('Combat.Influence' | 'Combat.AI' |
-  'Combat.Billboards' | 'Combat.Effects')`. Probe-side capture of the
-  child breakdown. Diagnostic input for `konveyer-cover-spatial-grid`.
-- `konveyer-materialization-lane-rename` — pure refactor:
-  `Combatant.lodLevel` → `simLane`; introduce `renderLane`. No behavior
-  change. Surface for v2 arbiter.
-- `konveyer-sky-refresh-investigate` — diagnose why sky refresh still
-  fires 5-10×/sec post slice 15 (`LUT_REBAKE_COS_THRESHOLD` on small
-  sun motion in `todCycle` modes). Expected ~0.4 ms saving.
-- `konveyer-cover-spatial-grid` — replace synchronous BVH cover search
-  in `AIStateEngage.initiateSquadSuppression` with 8 m uniform spatial
-  grid (primitive-spike target 2.b). Reuses existing `SpatialGrid`
-  infrastructure. Closes DEFEKT-3 surface. ~1-2 ms saving.
-- `konveyer-render-silhouette-lane` — single-sprite, single-tone, no-
-  animation billboard tier between impostor and culled. Lets A Shau
-  read as populated from flight-altitude views.
-- `konveyer-squad-aggregated-strategic-sim` — per-squad CULLED-tier
-  tick via `SquadManager` + `WarSimulator`. O(squads), not O(entities).
-  The 3,000-combatant scaling primitive.
-- `konveyer-budget-arbiter-v2` — single function consuming camera
-  frustum, active-zone list, frame budget, sorted candidates → assigns
-  `simLane` + `renderLane` per combatant with explicit budget
-  accounting. Composes silhouette/cluster with close-GLB.
-- `konveyer-render-cluster-lane` — one billboard per squad with
-  squad-count badge, beyond silhouette range. `Combatant` records
-  persist as strategic state, just not draws.
-- `konveyer-strict-webgpu-cross-mode-proof-v2` — multi-mode strict
-  WebGPU evidence packet covering R1-R4 together. A Shau p99 must hold
-  ≤33 ms.
-- `konveyer-docs-review-packet-v2` — update review packet, primitive
-  spikes doc, and `docs/state/CURRENT.md` with post-cycle state.
-
-### Current checkpoint for next agent
-
-Remote branch `origin/exp/konveyer-webgpu-migration` is the pickup
-branch. Branch head is `1b31379c` (slice 15). The atmosphere arc is
-closed; total Atmosphere CPU is now <1 ms across all five modes (A Shau
-worst-case 5.99 ms → 0.52 ms over slices 9-15).
-
-The single most important process discipline for this cycle:
-
-> **Run `npm run build:perf` before every probe run after touching
-> source.** The crop probe uses `vite preview --outDir dist-perf`
-> against the pre-built bundle. Source changes are NOT auto-rebuilt.
-> Without the rebuild, your measurements are meaningless. Slice 14
-> spent ~30 minutes debugging this exact gap — do not repeat.
-
-The probe also requires `--headed` to reach WebGPU on this workstation
-(headless adapter resolves to swiftshader/CPU). Probe entrypoint:
-`scripts/konveyer-asset-crop-probe.ts`.
-
-Predecessor evidence (slice 15 baseline for delta tables):
-`artifacts/perf/2026-05-12T20-46-15-213Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
-
-### Dependencies
-
-```
-combat-sub-attribution      ─┐
-materialization-lane-rename ─┼─→ cover-spatial-grid       ─┐
-sky-refresh-investigate     ─┘  render-silhouette-lane     │
-                                                           ↓
-                          squad-aggregated-strategic-sim ──┐
-                          budget-arbiter-v2 ───────────────┤
-                                                           ↓
-                          render-cluster-lane ─────────────┼─→ strict-webgpu-cross-mode-proof-v2 ─→ docs-review-packet-v2
-```
-
-### Reviewer policy
-
-- `combat-reviewer` on touches to `src/systems/combat/**` or
-  `src/integration/**combat*` — applies to combat sub-attribution,
-  cover spatial grid, budget arbiter v2, and likely the silhouette /
-  cluster lanes.
-- `terrain-nav-reviewer` on touches to `src/systems/terrain/**` or
-  `src/systems/navigation/**` — none expected this cycle, but the
-  policy still applies.
-- `perf-analyst` after `konveyer-strict-webgpu-cross-mode-proof-v2`
-  publishes the multi-mode artifact.
-
-### Cycle-level success criteria
-
-Full list in
-[the cycle brief](tasks/cycle-2026-05-13-konveyer-materialization-rearch.md#cycle-level-success-criteria).
-Headline criteria:
-
-1. Combat sub-attribution shipped — probe shows
-   `Combat.{Influence,AI,Billboards,Effects}` across all five modes.
-2. Lane-rename refactor shipped — `simLane` + `renderLane` are
-   canonical; no behavior change.
-3. Cover-search spatial grid shipped — Combat aggregate drops ≥1.0 ms
-   on `ai_sandbox` and `a_shau_valley`; AI behavior unchanged.
-4. Silhouette + cluster lanes shipped — A Shau and flight-altitude
-   views read as populated.
-5. Squad-aggregated strategic sim shipped — CULLED tier scales
-   O(squads); strategic-spawn cadence holds.
-6. Budget arbiter v2 shipped — single function emitting both lanes
-   with explicit budget accounting.
-7. Strict-WebGPU multi-mode proof passes — all five modes; p99 ≤33 ms
-   held across cycle.
-8. Review packet updated.
-
-### Out of scope (parked / blocked)
-
-These remain blocked on owner decisions and do NOT progress this cycle:
-
-- A Shau finite-edge (KONVEYER-12) — owner DEM/boundary decision.
-- Cloud representation — art/representation decision.
-- Vegetation + NPC asset acceptance — Pixel Forge pipeline decision.
-- Water shader / art / physics (VODA-1/2/3).
-- Terrain / fire authority (DEFEKT-6) — shared-authority pass.
-- Startup stamped-heightmap rebake (~48 ms one-time, not runtime-gating).
-- TSL fragment-shader sky port — Atmosphere is <1 ms; saving ~0.4 ms,
-  parked unless a regression resurfaces it.
+Next cycle selection waits for owner direction. Fill this section in when the
+next cycle launches using the stub structure (cycle ID, branch, brief link,
+skip-confirm flag, round schedule, tasks, dependencies, reviewer policy,
+success criteria, out-of-scope).
 
 ### Last closed cycle
 
-`cycle-2026-05-11-konveyer-scene-parity` (KONVEYER-10) shipped the
-scene-parity arc + slices 9-15 (perf attribution, terrain roughness
-fix, atmosphere CPU collapse). See `docs/state/CURRENT.md` for the
-slice-by-slice evidence chain. KONVEYER-0..9 ledger:
+`cycle-2026-05-13-konveyer-materialization-rearch` R1 (KONVEYER-10 close)
+landed on master via PR #192 on 2026-05-13. KONVEYER-0..9 ledger:
 [docs/rearch/KONVEYER_PARITY_2026-05-10.md](rearch/KONVEYER_PARITY_2026-05-10.md).
+The predecessor scene-parity cycle
+`cycle-2026-05-11-konveyer-scene-parity` shipped slices 9-15 (atmosphere
+CPU collapsed from 5-6 ms to <1 ms across all five modes).
 
-Carry-overs still open: see [docs/CARRY_OVERS.md](CARRY_OVERS.md).
-KONVEYER-10 remains active as the WebGPU rollout-gating carry-over
-(closes when the master-merge decision lands, separate from this
-cycle).
+Carry-overs still open: see [docs/CARRY_OVERS.md](CARRY_OVERS.md). KONVEYER-10
+closed with the master-merge; active count holds at 8 post-merge.
 
 ## Dispatch protocol
 

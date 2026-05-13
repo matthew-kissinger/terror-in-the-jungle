@@ -21,39 +21,36 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-**Two parallel first-class directions** (owner confirmation, 2026-05-12):
+**Master is now the WebGPU + TSL branch.** The
+`exp/konveyer-webgpu-migration` branch merged to `master` on 2026-05-13 via
+[PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
+(merge commit `1df141ca`), folding in KONVEYER-0 through KONVEYER-10, Phase F
+materialization rearch R1, and the doc-vision-alignment pass. Default
+renderer mode is `'webgpu'` with automatic WebGL2 fallback for browsers
+without WebGPU support — the fallback gate is `strictWebGPU`-only as of
+commit `4aec731e`. **Carry-over KONVEYER-10 closes with this merge** (it
+explicitly named the master-merge as its close condition).
 
-- **Vision A — Experimental WebGPU tech.** Compute shaders, indirect
-  drawing, TSL ComputeNode, storage textures, GPU timestamps. Lives on
-  the `exp/konveyer-webgpu-migration` branch. KONVEYER-10 remains the
-  rollout-gating carry-over.
-- **Vision B — Driveable land vehicles.** M151 jeep MVP first, then
-  tanks (skid-steer + turret + cannon + damage states). Successor IDs
-  open as VEKHIKL-3+ when those cycles launch.
+**Phase F materialization rearch R1 landed.** Combat sub-attribution
+(`Combat.{Influence,AI,Billboards,Effects}` telemetry children), the lane
+rename (`Combatant.lodLevel` → `simLane` + `renderLane`), and sky-refresh
+idempotency at the 2 s cadence are now on master. R2-R4
+(cover-spatial-grid, render-silhouette/cluster lanes, squad-aggregated
+strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 
-Both directions are first-class; neither is subordinated to the
-stabilization-refactor campaign. The campaign queue in
-[docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md) still reflects
-the original 9-cycle plan and gets revised when Option 1 from
+**Five new rearch memos landed** alongside the merge:
+`docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md`,
+`docs/rearch/TANK_SYSTEMS_2026-05-13.md`,
+`docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`, the
+`docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
+KONVEYER review packet bundle.
+
+The active-cycle pointer in
+[docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md) is reset; next
+cycle selection waits for owner direction. Option 1 from
 [docs/STRATEGIC_ALIGNMENT_2026-05-10.md](docs/STRATEGIC_ALIGNMENT_2026-05-10.md)
-formally lands. Option 1 (insert VODA-1 / VEKHIKL-1 / DEFEKT-3 first
-slices ahead of cycle 3) is the active feature-pivot recommendation.
-
-**Phase F materialization rearch is PAUSED at R1-merged.** Three R1 PRs
-landed on `exp/konveyer-webgpu-migration`:
-combat sub-attribution, materialization lane rename
-(`lodLevel` → `simLane` + `renderLane`), and sky-refresh idempotency at
-the 2 s cadence. R2-R4 (cover-spatial-grid, render-silhouette-lane,
-squad-aggregated-strategic-sim, budget-arbiter-v2, render-cluster-lane,
-strict-WebGPU multi-mode proof, docs review packet) are not yet started.
-Pickup point: the experimental branch head, resumable via `/orchestrate`
-against `cycle-2026-05-13-konveyer-materialization-rearch`.
-
-**Doc-vision-alignment ad-hoc pass (in flight 2026-05-12).** This branch
-ships the alignment edits: amend CLAUDE.md "Current focus" to reflect
-the 2026-05-12 vision confirmation and park two non-vision-critical
-AVIATSIYA carry-overs (see CARRY_OVERS.md edits below). It does not
-touch engine or test code.
+(insert VODA-1 / VEKHIKL-1 / DEFEKT-3 first slices ahead of cycle 3) remains
+the active feature-pivot recommendation.
 
 **Engineering culture** for unattended overnight agents (Codex / Claude /
 Cursor multi-stream R&D runs covering stabilization + code-golf +
@@ -63,8 +60,8 @@ synthesis covering five work modes, diff/file budgets, comment
 discipline, parallel R&D protocol, and reporting standard.
 
 Phases 0/1/2/2.4/2.5 done. Phases 3–9 queued (refactor campaign,
-deprioritized behind the two vision directions). Auto-advance PAUSED per
-the campaign manifest. To re-enable chaining: flip
+deprioritized behind the WebGPU + ground-vehicle vision directions).
+Auto-advance PAUSED per the campaign manifest. To re-enable chaining: flip
 `Auto-advance: PAUSED` to `Auto-advance: yes` in the campaign manifest
 before re-running `/orchestrate`.
 
@@ -74,17 +71,13 @@ Cloudflare account-level audit:
 `artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored).
 
 Single source of truth for unresolved items:
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count on the
-experimental branch is **9** as of the 2026-05-12 master-merge gate
-(8 after the vision-pivot park; +1 for konveyer-large-file-splits
-opened at merge-prep to track the two KONVEYER-grown files added to
-the lint-budget grandfather list). Active items:
-DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality), STABILIZAT-1
-(combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
-pending), KB-LOAD residual, cloudflare-stabilization-followups,
-weapons-cluster-zonemanager-migration, KONVEYER-10 (WebGPU
-rollout-gating), konveyer-large-file-splits. New IDs (KONVEYER-11
-spatial-grid, VEKHIKL-3 jeep-drivable, etc.) open with their
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count was **9** pre-merge;
+becomes **8** after KONVEYER-10 closes with PR #192 (still under the ≤12
+rule). Active items: DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality),
+STABILIZAT-1 (combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual
+review pending), KB-LOAD residual, cloudflare-stabilization-followups,
+weapons-cluster-zonemanager-migration, konveyer-large-file-splits. New IDs
+(KONVEYER-11 spatial-grid, VEKHIKL-3 jeep-drivable, etc.) open with their
 respective cycle launches.
 
 4 cycle-retro nits from cycle 2.4 captured in BACKLOG retro (NOT new
