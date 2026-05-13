@@ -55,10 +55,21 @@ export function evaluateNodeMaterialReadiness(
   }
 
   if (capabilities.resolvedBackend !== 'webgpu') {
+    if (capabilities.strictWebGPU) {
+      return {
+        ready: false,
+        strictFailure: true,
+        reason: `${surface} TSL path resolved ${capabilities.resolvedBackend}; refusing to hide migration failure behind fallback in strict WebGPU mode.`,
+      };
+    }
+    // Non-strict mode: accept Three.js's automatic WebGL2 fallback. TSL node
+    // materials are backend-agnostic since r171 (the `three/webgpu` renderer
+    // falls back to a WebGL2 backend and TSL still works). This is the
+    // production code path for users without WebGPU support.
     return {
-      ready: false,
-      strictFailure: capabilities.strictWebGPU || capabilities.isWebGPURenderer,
-      reason: `${surface} TSL path resolved ${capabilities.resolvedBackend}; refusing to hide migration failure behind fallback.`,
+      ready: true,
+      strictFailure: false,
+      reason: `${surface} TSL path allowed on ${capabilities.resolvedBackend} fallback backend.`,
     };
   }
 

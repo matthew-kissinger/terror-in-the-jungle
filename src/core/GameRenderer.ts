@@ -251,9 +251,21 @@ export class GameRenderer {
       const resolvedBackend = inspectResolvedRendererBackend(renderer);
 
       if (resolvedBackend !== 'webgpu') {
-        renderer.dispose();
-        throw new Error(
-          `WebGPU renderer request resolved ${resolvedBackend}; refusing WebGL fallback.`,
+        if (capabilities.strictWebGPU) {
+          renderer.dispose();
+          throw new Error(
+            `Strict WebGPU mode resolved ${resolvedBackend}; refusing WebGL fallback.`,
+          );
+        }
+        // Non-strict mode (default 'webgpu' or 'webgpu-force-webgl'): accept
+        // Three.js's automatic WebGL2 fallback. Since r171 the WebGPURenderer
+        // from `three/webgpu` falls back to a WebGL2 backend when navigator.gpu
+        // is unavailable, and TSL node materials work on both backends. This
+        // path is what production users on macOS Sonoma + Safari, iOS 17,
+        // older Firefox, or any swiftshader/GPU-less environment hit.
+        Logger.warn(
+          'Renderer',
+          `WebGPU unavailable; rendering on ${resolvedBackend} backend.`,
         );
       }
 

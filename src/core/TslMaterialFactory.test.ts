@@ -49,7 +49,12 @@ describe('evaluateNodeMaterialReadiness', () => {
     expect(result.reason).toContain('refusing to hide');
   });
 
-  it('rejects initialized WebGPURenderer node materials on the explicit fallback backend', () => {
+  it('accepts initialized WebGPURenderer node materials on the explicit fallback backend in non-strict mode', () => {
+    // 2026-05-12: contract shift at the master-merge gate. Non-strict modes
+    // ('webgpu' default and 'webgpu-force-webgl') now accept Three.js's
+    // automatic WebGL2 fallback so production users without WebGPU support
+    // get a working game on the fallback backend. Strict mode (separate test
+    // above) still fails loudly.
     const result = evaluateNodeMaterialReadiness(
       capabilities({
         requestedMode: 'webgpu-force-webgl',
@@ -59,9 +64,25 @@ describe('evaluateNodeMaterialReadiness', () => {
       }),
       'proof-fixture',
     );
-    expect(result.ready).toBe(false);
-    expect(result.strictFailure).toBe(true);
-    expect(result.reason).toContain('refusing to hide');
+    expect(result.ready).toBe(true);
+    expect(result.strictFailure).toBe(false);
+    expect(result.reason).toContain('fallback backend');
+  });
+
+  it('accepts initialized WebGPURenderer node materials on the default webgpu mode resolving to fallback', () => {
+    // Production path: user has no WebGPU support, default `?renderer=` mode
+    // resolves to webgpu-webgl-fallback via Three.js's automatic fallback.
+    const result = evaluateNodeMaterialReadiness(
+      capabilities({
+        requestedMode: 'webgpu',
+        resolvedBackend: 'webgpu-webgl-fallback',
+        isWebGPURenderer: true,
+      }),
+      'combatant-impostor',
+    );
+    expect(result.ready).toBe(true);
+    expect(result.strictFailure).toBe(false);
+    expect(result.reason).toContain('fallback backend');
   });
 });
 
