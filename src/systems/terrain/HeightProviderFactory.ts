@@ -2,6 +2,7 @@ import { DEMHeightProvider } from './DEMHeightProvider';
 import type { HeightProviderConfig, IHeightProvider } from './IHeightProvider';
 import { NoiseHeightProvider } from './NoiseHeightProvider';
 import { StampedHeightProvider } from './StampedHeightProvider';
+import { VisualExtentHeightProvider } from './VisualExtentHeightProvider';
 import type { TerrainStampConfig } from './TerrainFeatureTypes';
 
 export function createHeightProviderFromConfig(config: HeightProviderConfig): IHeightProvider {
@@ -24,6 +25,13 @@ export function createHeightProviderFromConfig(config: HeightProviderConfig): IH
           ...stamp,
           fixedTargetHeight: stamp.targetHeight,
         } satisfies TerrainStampConfig)),
+      );
+    case 'visualExtent':
+      return new VisualExtentHeightProvider(
+        createHeightProviderFromConfig(config.base),
+        createHeightProviderFromConfig(config.source),
+        config.playableWorldSize,
+        config.visualMargin,
       );
     default: {
       const exhaustive: never = config;

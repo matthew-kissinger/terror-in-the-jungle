@@ -184,11 +184,18 @@ export class TerrainSurfaceRuntime {
     worldSize: number,
     defaultBiomeId: string,
     biomeRules: BiomeClassificationRule[],
+    options: {
+      normalData?: Uint8Array;
+      playableWorldSize?: number;
+      visualMargin?: number;
+    } = {},
   ): void {
     this.currentWorldSize = worldSize;
+    this.currentPlayableWorldSize = options.playableWorldSize ?? worldSize;
+    this.currentVisualMargin = options.visualMargin ?? Math.max(0, (worldSize - this.currentPlayableWorldSize) * 0.5);
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
-    this.heightmapGPU.uploadPrebakedGrid(data, gridSize, worldSize);
+    this.heightmapGPU.uploadPrebakedGrid(data, gridSize, worldSize, options.normalData);
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
   }
 

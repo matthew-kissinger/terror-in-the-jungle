@@ -1,6 +1,6 @@
 # Roadmap
 
-Last verified: 2026-05-12
+Last verified: 2026-05-13
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 > For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
@@ -34,6 +34,14 @@ KONVEYER edge work is now vision-first, not probe-first. Source-backed visual
 terrain extent is the direction for finite procedural maps; A Shau needs real
 outer DEM/source data, an explicit flight/camera boundary, or a documented
 hybrid because synthetic collar tuning still reads unfinished from the air.
+
+Mode startup now has a separate hardening lane. The 2026-05-13
+`task/mode-startup-terrain-spike` branch proved the slow mode-selection
+symptom was synchronous terrain surface baking, not Recast/WASM cache delivery.
+The durable direction is worker-backed terrain surface baking, batched mode
+terrain configuration, and visual review of the render-only terrain apron
+before merge. See
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 
 **Canonical vision sentence (copy verbatim into other docs that need to state it):**
 

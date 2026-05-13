@@ -1,6 +1,6 @@
 # Backlog
 
-Last verified: 2026-05-11
+Last verified: 2026-05-13
 
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
@@ -14,12 +14,16 @@ retrospectives, PR logs, or active directive status here.
 
 ## Current Release Routing
 
-1. Stabilization closeout remains the release posture.
+1. Post-WebGPU master is the release posture: WebGPU + TSL default, automatic
+   WebGL2 fallback, strict WebGPU evidence for renderer claims.
 2. Runtime claims require an entry in `docs/DIRECTIVES.md` plus artifact paths.
-3. Live release claims require STABILIZAT-3 evidence.
+3. Live release claims require `check:live-release` evidence after manual
+   deploy.
 4. Performance baseline refresh remains blocked until STABILIZAT-1 passes from
    a trusted combat120 chain.
-5. Human playtest remains required for flight, driving, combat rhythm, and UI
+5. Mode-startup claims must separate cache delivery from runtime CPU bake.
+   `KB-STARTUP-1` owns the active terrain-bake hardening branch.
+6. Human playtest remains required for flight, driving, combat rhythm, and UI
    responsiveness.
 
 ## Active Directive Routing
@@ -35,7 +39,25 @@ Use [docs/DIRECTIVES.md](DIRECTIVES.md) instead of duplicating active work here.
 | Respawn, map spawn, loadout, deploy flow | UX-1 through UX-4 |
 | Combat120 baseline and live release | STABILIZAT-1 through STABILIZAT-3 |
 | Baseline drift, doc/code drift, combat p99 (`DEFEKT-3`), route quality | DEFEKT-1 through DEFEKT-4 |
-| WebGPU scene parity and rollout gating | KONVEYER-10 |
+| WebGPU scene parity and rollout gating | KONVEYER-10 (closed; follow-ups through post-WebGPU campaign) |
+| Mode-start terrain surface bake and startup UI delay | KB-STARTUP-1 |
+
+## Active Branch (task/mode-startup-terrain-spike)
+
+Opened 2026-05-13 for the user-reported "click a game mode and it takes
+forever" issue. The investigation found that Cloudflare/Recast/WASM cache
+delivery was already correct; the stall was synchronous terrain surface baking
+after mode select.
+
+The branch moves mode-start terrain surface baking to the terrain worker pool,
+uses transferable typed arrays for height/normal buffers, and batches mode
+terrain configuration through `TerrainSystem.configureModeSurface(...)`.
+Spike memo and evidence:
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
+
+Merge-hardening left: Open Frontier and A Shau visual review of the coarse
+source-delta cache used for the render-only visual margin; if rejected, promote
+persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
 ## Recently Completed (cycle-2026-05-13-konveyer-materialization-rearch + doc-vision-alignment + master-merge)
 

@@ -13,6 +13,20 @@ For older cycle outcomes, browse `docs/cycles/` or
 
 ---
 
+## Active branch: task/mode-startup-terrain-spike (opened 2026-05-13)
+
+Not a closed cycle yet. This branch addresses the user-reported mode-selection
+stall. Baseline evidence showed Zone Control taking 27.8s from mode click to
+deploy UI and Open Frontier timing out past 120s; cache/header checks showed
+Recast WASM, build assets, and prebaked navmesh delivery were already correct.
+The blocker was synchronous terrain surface baking after mode select.
+
+Current branch evidence and acceptance criteria live in
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](../rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
+Carry-over: `KB-STARTUP-1`.
+
+---
+
 ## cycle-2026-05-13-konveyer-materialization-rearch — R1 only (closed 2026-05-13)
 
 R1 slices of the Phase F materialization rearch landed via three commits on

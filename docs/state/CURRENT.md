@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-13 (KONVEYER campaign closed by `master` merge of `exp/konveyer-webgpu-migration` via PR #192 / commit `1df141ca`; master is now the WebGPU + TSL renderer branch with automatic WebGL2 fallback for unsupported environments)
+Last verified: 2026-05-13 (KONVEYER campaign closed by `master` merge of `exp/konveyer-webgpu-migration` via PR #192 / commit `1df141ca`; master is now the WebGPU + TSL renderer branch with automatic WebGL2 fallback for unsupported environments; active spike branch is `task/mode-startup-terrain-spike`)
 
 Top-level current-truth snapshot for the repo. Companion docs:
 
@@ -15,10 +15,10 @@ Top-level current-truth snapshot for the repo. Companion docs:
   reviewer-ready synthesis of what is accepted, what is blocked, what needs rearchitecture, and the WebGPU/TSL verdict
 - [docs/rearch/KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md](../rearch/KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md) —
   research spike: better compute primitives for the expensive systems (SkyTexture, Combat, World) identified by slices 10–11
+- [docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](../rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md) —
+  current spike: mode-selection delay traced to synchronous terrain surface baking, not WASM/navmesh cache delivery
 
-Historical full-fat snapshot (pre-Phase-1) lives at
-`docs/archive/STATE_OF_REPO.md`. Future audit summaries link to artifact
-paths; do not paraphrase audit JSON into this doc.
+Historical full-fat snapshot (pre-Phase-1) lives at `docs/archive/STATE_OF_REPO.md`; link future audit summaries to artifact paths instead of paraphrasing JSON here.
 
 ## Vision
 
@@ -126,6 +126,30 @@ campaign manifest is now
 
 Milestone memo with the full lineage:
 [docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).
+
+## Active branch (2026-05-13 mode startup)
+
+`task/mode-startup-terrain-spike` is the active branch for the user-reported
+"click a game mode and it takes forever" issue. Header checks showed the
+Cloudflare/Recast path already has the right shape: content-hashed build assets
+and Recast WASM are immutable, navmesh binaries are cacheable, and the WASM MIME
+type is correct. Startup marks instead isolated the stall to terrain surface
+baking after mode selection.
+
+The branch changes the terrain startup contract: `ModeStartupPreparer` calls
+one async `TerrainSystem.configureModeSurface(...)`, prepared visual-heightmap
+and provider bakes run in `TerrainWorkerPool`, and `HeightmapGPU` uploads
+worker-generated height/normal buffers. Production-build probe evidence:
+Zone Control `1156ms` to deploy UI, Open Frontier `3387ms`, Team Deathmatch
+`1185ms`; artifact paths live in
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](../rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
+
+The prepared visual-margin path uses a coarse source-delta cache for the
+render-only apron. Treat that as terrain LOD requiring Open Frontier and A Shau
+visual review before production acceptance. If the visual review fails, the
+next durable path is persistent/prebaked visual-surface artifacts or an
+IndexedDB/OPFS runtime bake cache, not returning the full bake to the mode-click
+main-thread path.
 
 ## Current focus (2026-05-12)
 

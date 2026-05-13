@@ -118,6 +118,27 @@ Original prompt: we had an intern come in a really both things up recently - can
   bright against the neutral hidden-terrain/vegetation frame. Treat that as
   probe shape plus material review, not as a remaining Open Frontier
   total-cap startup failure.
+
+2026-05-13 mode-select terrain startup spike
+- Diagnosed mode-card selection stalls with `scripts/perf-startup-ui.ts`.
+  Zone Control reached deploy UI only after ~27.8s, with one ~26.7s main-thread
+  task inside `terrain-config`; Open Frontier did not reach deploy UI inside the
+  120s benchmark wait.
+- Cache research/current repo checks show the old WebGL/Recast freshness path is
+  still correct: hashed `/build-assets/*` and prebaked navmesh assets are
+  immutable, Recast `.wasm` is served as `application/wasm`, and Zone Control
+  logs a prebaked navmesh load. The new blocker is synchronous terrain surface
+  baking after mode selection.
+- Spike branch `task/mode-startup-terrain-spike` now routes mode-start terrain
+  surface baking through the existing module worker pattern and transferable
+  typed arrays. It adds a batched `TerrainSystem.configureModeSurface()` path so
+  startup can apply world size, visual margin, chunks, biome state, and one
+  surface bake together instead of cascading sync rebakes.
+- Current implementation direction: prepared heightmap + visual margin uses a
+  worker visual-extent bake that samples the prepared grid inside the playable
+  world and source provider deltas only in the visual apron. Procedural fallback
+  uses a serializable `visualExtent` worker provider config. Validation still
+  needs typecheck, focused terrain tests, build, and startup benchmark numbers.
 - Use `origin/exp/konveyer-webgpu-migration` branch head as the pickup point;
   avoid freezing branch SHAs inside docs that should remain current after each
   checkpoint commit.
@@ -7284,3 +7305,42 @@ TODO
 - Hard stops preserved: no `master` merge, no production deploy, no
   `perf-baselines.json` change, no `src/types/SystemInterfaces.ts` edit, no
   WebGL fallback acceptance in the proof path.
+
+2026-05-13 mode-startup terrain bake spike
+- Diagnosed the "mode selection takes forever" symptom on `master` before
+  editing. Live cache headers for Recast WASM/build assets and prebaked
+  navmesh were already correct; the startup probe showed the blocker was
+  synchronous terrain surface baking after mode select, not WASM/navmesh
+  caching.
+- Created `task/mode-startup-terrain-spike` and moved mode-start terrain
+  surface baking onto the existing module worker path with transferable typed
+  arrays. `ModeStartupPreparer` now uses one batched
+  `TerrainSystem.configureModeSurface(...)` call instead of a chain of terrain
+  setters that repropagated state and rebaked surfaces during mode start.
+- Added worker serialization for visual-extent height providers and a prepared
+  visual-heightmap bake path. The worker returns height and normal buffers so
+  `HeightmapGPU` can upload prebaked data without regenerating normals on the
+  main thread.
+- The visual-margin path currently uses a coarse source-delta cache over the
+  render-only apron. Treat that as spike-level terrain LOD: it is structurally
+  reasonable, but should get Open Frontier/A Shau visual review before this is
+  merged as final production policy.
+- Production-build startup probes after the split:
+  `artifacts/perf/2026-05-13T04-30-36-660Z/startup-ui-zone-control`
+  (`modeClickToDeployVisible=1156ms`, `modeClickToPlayable=6796ms`,
+  worker bake `523.4ms`);
+  `artifacts/perf/2026-05-13T04-31-26-223Z/startup-ui-open-frontier`
+  (`modeClickToDeployVisible=3387ms`, `modeClickToPlayable=6432ms`,
+  worker bake `2374.7ms`);
+  `artifacts/perf/2026-05-13T04-34-04-814Z/startup-ui-tdm`
+  (`modeClickToDeployVisible=1185ms`, `modeClickToPlayable=6530ms`,
+  worker bake `236.8ms`). Baseline before the spike was roughly 27.8s to
+  deploy UI for Zone Control and Open Frontier timed out past 120s.
+- Validation: `npm run typecheck`, focused terrain Vitest
+  (`TerrainSystem`, `VisualExtentHeightProvider`, `HeightmapGPU`), isolated
+  `CDLODQuadtree` Vitest, standalone `npm run test:quick`, `npm run
+  lint:budget`, and `npm run build` passed. `npm run validate:fast` is still
+  blocked by the existing flaky CDLOD micro-timing assertion
+  (`selectTiles` mean about 1.16ms vs a 1.0ms budget) even though the isolated
+  CDLOD suite and one standalone full quick suite passed; the spike did not
+  modify `CDLODQuadtree` or its test.

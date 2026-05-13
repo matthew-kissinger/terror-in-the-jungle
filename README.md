@@ -13,9 +13,10 @@
 
 > **Engine architected for 3,000 combatants via materialization tiers; live-fire
 > combat verified at 120 NPCs while the ECS hot path is built out (Phase F).**
-> A Shau Valley uses real DEM elevation on a 21 km map, side-mounted helicopter
-> rotors over a Huey at low altitude, A-1 Skyraiders coming in for the napalm
-> pass — all running in a browser tab without hidden fallbacks. See
+> The production renderer is WebGPU + TSL by default, with automatic WebGL2
+> fallback for browsers without WebGPU support. A Shau Valley uses real DEM
+> elevation on a 21 km map, side-mounted helicopter rotors over a Huey at low
+> altitude, and A-1 Skyraiders coming in for the napalm pass. See
 > [docs/ROADMAP.md](docs/ROADMAP.md) for the canonical phase status.
 
 Active directives, success criteria, and evidence links live in
@@ -32,6 +33,14 @@ repository, believe the repository and update the doc.
 - **Real terrain target.** A Shau Valley uses real elevation data through a
   Cloudflare R2 manifest path with an explicit terrain/nav startup gate. No
   silent TileCache fallback; if the asset isn't loadable, the mode tells you.
+- **WebGPU-first renderer.** `master` defaults to Three.js r184
+  `WebGPURenderer` / TSL after PR #192, with a production WebGL2 fallback and
+  strict WebGPU mode retained for renderer evidence.
+- **Mode startup architecture.** The active `task/mode-startup-terrain-spike`
+  branch moves mode-start terrain surface baking into module workers with
+  transferable height/normal grids. Zone Control and TDM now show deploy UI in
+  about 1.2s from mode click in the spike evidence; Open Frontier is about
+  3.4s, down from a timeout-class baseline.
 - **Large-scale combat.** A Shau is architected as a ~3,000-unit strategic
   simulation through materialization tiers; the verified live-fire combat
   frontier is currently 120 NPCs while the ECS hot path is built out
@@ -67,27 +76,26 @@ repository, believe the repository and update the doc.
 | **A Shau Valley** | Real-terrain strategic mode | Architected for ~3,000-unit strategic layer via materialization tiers; live combat verified at 120, on DEM-backed terrain. |
 | **AI Sandbox** | Configurable simulation | Observation, tuning, perf capture, combat diagnostics. |
 
-## Latest Cycle
+## Current Alignment
 
-`cycle-2026-05-08-stabilizat-2-closeout` closed **2026-05-08**. Eight PRs
-merged, codex revision 1.3 sealed, live release verified at
-`https://terror-in-the-jungle.pages.dev/`. Six-themed PR train shepherded
-a 143-file working tree (helicopter rotor axis, water audits, terrain +
-explosion FX, UX respawn flow, combat AI / squad command / core engine
-mega-cluster, docs + 70-script audit catalog) → `master` → CI green →
-Cloudflare Pages deploy → 7/7 live-release-proof PASS.
+As of 2026-05-13, PR #192 merged `exp/konveyer-webgpu-migration` into
+`master`. The shipped baseline is now WebGPU + TSL first, automatic WebGL2
+fallback second, and strict WebGPU proof mode for renderer acceptance. The
+active campaign is
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 
-Closed this cycle: STABILIZAT-2/3, SVYAZ-1 stand-down command, SVYAZ-2 squad
-pings (Hold / Patrol / Attack Here / Fall Back), UX-1 respawn flow, AVIATSIYA-1
-helicopter rotor parity, DEFEKT-5 visual fallback / directionality. STABILIZAT-1
-combat120 baseline refresh deferred to Strategic Reserve. Full retrospective:
-[docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md](docs/cycles/cycle-2026-05-08-stabilizat-2-closeout/RESULT.md).
+The current task branch is `task/mode-startup-terrain-spike`. It addresses the
+user-visible delay after clicking a game mode. Research and live-header checks
+showed Recast WASM/build-asset caching was already correct; the measured
+blocker was synchronous terrain surface baking in the mode-start path. The
+branch moves that work into the terrain worker pool and records the decision in
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 
-Active areas remain DEFEKT-3 combat AI p99 anchor, DEFEKT-4 NPC route quality
-runtime acceptance, VODA-1 Open Frontier exposure correction, AVIATSIYA-2/4-7
-weapon and maneuver implementations, SVYAZ-3 air-support call-in radio,
-VEKHIKL ground-vehicle runtime, and UX-2/3/4 deploy/loadout polish. See
-[docs/DIRECTIVES.md](docs/DIRECTIVES.md) for live status.
+Active areas now route through [docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md): Phase F materialization/scaling,
+DEFEKT-3 combat p99, DEFEKT-4 route quality, STABILIZAT-1 baseline refresh,
+VODA water work, VEKHIKL driveable land vehicles, and the mode-startup terrain
+surface hardening opened by this branch.
 
 ## Controls
 
@@ -177,6 +185,7 @@ npm run check:mobile-ui              # actionability + scroll on mobile viewport
 npm run check:hud                    # HUD layout
 npm run perf:capture:combat120       # 90s combat sim, 120 NPCs, seed 2718
 npm run perf:compare                 # latest capture vs perf-baselines.json
+npm run perf:startup:openfrontier    # production-shaped mode-start UI timing
 npm run check:doc-drift              # docs / state / performance ↔ artifact paths
 npm run check:cycle-close            # current-completion audit (renamed from check:projekt-143-completion-audit in Phase 1)
 ```

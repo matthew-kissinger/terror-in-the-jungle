@@ -62,7 +62,13 @@ export class VisualExtentHeightProvider implements IHeightProvider {
   }
 
   getWorkerConfig(): HeightProviderConfig {
-    return this.baseProvider.getWorkerConfig();
+    return {
+      type: 'visualExtent',
+      base: this.baseProvider.getWorkerConfig(),
+      source: this.sourceProvider.getWorkerConfig(),
+      playableWorldSize: this.halfPlayable * 2,
+      visualMargin: Math.max(0, this.halfVisual - this.halfPlayable),
+    };
   }
 
   private estimateEdgeSlopeDelta(worldX: number, worldZ: number, clampedX: number, clampedZ: number): number {

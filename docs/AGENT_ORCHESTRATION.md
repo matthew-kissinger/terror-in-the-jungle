@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-13 (exp/konveyer-webgpu-migration merged to master via PR #192; KONVEYER campaign closed; post-WebGPU master is the active branch)
+Last verified: 2026-05-13 (exp/konveyer-webgpu-migration merged to master via PR #192; KONVEYER campaign closed; mode-startup terrain-bake spike active on task branch)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -114,11 +114,17 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: (none — awaiting owner direction)
+## Current cycle: task/mode-startup-terrain-spike
 
-**Current branch:** `master`
+**Current branch:** `task/mode-startup-terrain-spike`
 
-No cycle is active. The predecessor cycle
+No orchestrated multi-agent cycle is active. A targeted single-branch spike is
+active for the user-reported mode-selection stall. The branch proves the
+cache/Recast/WASM delivery path is not the blocker and moves mode-start terrain
+surface baking into the terrain worker pool. Handoff and acceptance criteria:
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
+
+The predecessor cycle
 `cycle-2026-05-13-konveyer-materialization-rearch` shipped its R1 slices
 (combat sub-attribution, materialization lane rename, sky-refresh
 idempotency) and landed on `master` via
@@ -129,10 +135,14 @@ on 2026-05-13 (merge commit `1df141ca`). The R2-R4 work
 `konveyer-render-cluster-lane`, `konveyer-strict-webgpu-cross-mode-proof-v2`,
 `konveyer-docs-review-packet-v2`) is queued as follow-up cycles on master.
 
-Next cycle selection waits for owner direction. Fill this section in when the
-next cycle launches using the stub structure (cycle ID, branch, brief link,
-skip-confirm flag, round schedule, tasks, dependencies, reviewer policy,
-success criteria, out-of-scope).
+Next formal cycle selection still waits for owner direction. If the startup
+branch is promoted into the campaign, use
+`cycle-mode-startup-terrain-bake-hardening` from
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+Otherwise fill this section in when the next owner-directed cycle launches
+using the stub structure (cycle ID, branch, brief link, skip-confirm flag,
+round schedule, tasks, dependencies, reviewer policy, success criteria,
+out-of-scope).
 
 ### Last closed cycle
 
@@ -144,7 +154,8 @@ The predecessor scene-parity cycle
 CPU collapsed from 5-6 ms to <1 ms across all five modes).
 
 Carry-overs still open: see [docs/CARRY_OVERS.md](CARRY_OVERS.md). KONVEYER-10
-closed with the master-merge; active count holds at 8 post-merge.
+closed with the master-merge; KB-STARTUP-1 opened for this branch. Active count
+is 9.
 
 ## Dispatch protocol
 

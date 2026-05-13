@@ -21,7 +21,7 @@ import {
 
 import { TerrainRenderRuntime } from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
-import { TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
+import { computeTerrainSurfaceGridSize, TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
 import { TerrainQueries } from './TerrainQueries';
 import { VisualExtentHeightProvider } from './VisualExtentHeightProvider';
 import { VegetationScatterer, type VegetationScattererDebugInfo } from './VegetationScatterer';
@@ -40,6 +40,16 @@ interface TerrainStreamingMetricDebug {
   debug?: {
     vegetation?: VegetationScattererDebugInfo;
   };
+}
+
+interface TerrainModeSurfaceOptions {
+  preparedHeightmap: PreparedHeightmapGrid | null;
+  worldSize?: number;
+  visualMargin: number;
+  chunkSize?: number;
+  renderDistance?: number;
+  defaultBiomeId: string;
+  biomeRules?: BiomeClassificationRule[];
 }
 
 /**
@@ -454,6 +464,41 @@ export class TerrainSystem implements GameSystem {
     this.preparedHeightmap = preparedHeightmap;
   }
 
+  async configureModeSurface(options: TerrainModeSurfaceOptions): Promise<void> {
+    this.preparedHeightmap = options.preparedHeightmap;
+    if (Number.isFinite(options.chunkSize) && options.chunkSize! > 0) {
+      this.chunkSize = options.chunkSize!;
+    }
+    if (Number.isFinite(options.renderDistance) && options.renderDistance! > 0) {
+      this.renderDistance = options.renderDistance!;
+    }
+    if (Number.isFinite(options.worldSize) && options.worldSize! > 0) {
+      this.explicitWorldSize = options.worldSize!;
+    }
+
+    this.config.worldSize = this.computeWorldSize();
+    this.config.visualMargin = Math.max(0, options.visualMargin);
+    this.defaultBiomeId = options.defaultBiomeId;
+    this.biomeRules = options.biomeRules ?? [];
+    this.recomputeLodConfig();
+    this.vegetationScatterer.setWorldBounds(this.config.worldSize, this.config.visualMargin);
+    this.applyVegetationConfig();
+
+    if (!this.isInitialized) return;
+
+    this.renderRuntime?.reconfigure({
+      worldSize: this.config.worldSize,
+      visualMargin: this.config.visualMargin,
+      maxLODLevels: this.config.maxLODLevels,
+      lodRanges: this.config.lodRanges,
+      tileResolution: this.config.tileResolution,
+    });
+    await this.rebakeSurfaceHeightmapAsync();
+    this.propagateTerrainSourceChanges();
+
+    Logger.info('terrain', `Mode surface configured: ${this.config.worldSize}m world, visualMargin=${this.config.visualMargin}m, chunk=${this.chunkSize}, renderDist=${this.renderDistance}`);
+  }
+
   setHydrologyBake(hydrologyBake: LoadedHydrologyBake | null): void {
     this.hydrologyBake = hydrologyBake;
     this.surfaceRuntime.setHydrologyMaterialMask(this.hydrologyBake, this.hydrologyBiomePolicy);
@@ -693,6 +738,76 @@ export class TerrainSystem implements GameSystem {
       this.config.visualMargin,
     );
     markStartup('terrain.heightmap.from-provider.end');
+  }
+
+  private async rebakeSurfaceHeightmapAsync(): Promise<void> {
+    if (this.preparedHeightmap && this.config.visualMargin <= 0) {
+      this.rebakeSurfaceHeightmap();
+      return;
+    }
+
+    const cache = getHeightQueryCache();
+    const surfaceWorldSize = this.getVisualWorldSize();
+    const surfaceGridSize = computeTerrainSurfaceGridSize(surfaceWorldSize);
+
+    if (this.preparedHeightmap) {
+      markStartup('terrain.heightmap.from-prepared-visual-worker.begin');
+      try {
+        const result = await this.workerPool.bakePreparedVisualHeightmap(
+          this.preparedHeightmap,
+          this.config.worldSize,
+          this.config.visualMargin,
+          cache.getProvider().getWorkerConfig(),
+          surfaceGridSize,
+        );
+        this.surfaceRuntime.rebakeFromPrebakedGrid(
+          result.heightData,
+          result.gridSize,
+          result.worldSize,
+          this.defaultBiomeId,
+          this.biomeRules,
+          {
+            normalData: result.normalData,
+            playableWorldSize: this.config.worldSize,
+            visualMargin: this.config.visualMargin,
+          },
+        );
+        markStartup('terrain.heightmap.from-prepared-visual-worker.end');
+        return;
+      } catch (error) {
+        markStartup('terrain.heightmap.from-prepared-visual-worker.failed');
+        Logger.warn('terrain', 'Prepared visual heightmap worker bake failed; falling back to provider bake', error);
+      }
+    }
+
+    const surfaceProvider = this.createVisualExtentProvider(cache.getProvider());
+    markStartup('terrain.heightmap.from-provider-worker.begin');
+    try {
+      const result = await this.workerPool.bakeHeightmapSurface(
+        surfaceProvider.getWorkerConfig(),
+        surfaceGridSize,
+        surfaceWorldSize,
+      );
+      this.surfaceRuntime.rebakeFromPrebakedGrid(
+        result.heightData,
+        result.gridSize,
+        result.worldSize,
+        this.defaultBiomeId,
+        this.biomeRules,
+        {
+          normalData: result.normalData,
+          playableWorldSize: this.config.worldSize,
+          visualMargin: this.config.visualMargin,
+        },
+      );
+      markStartup('terrain.heightmap.from-provider-worker.end');
+      return;
+    } catch (error) {
+      markStartup('terrain.heightmap.from-provider-worker.failed');
+      Logger.warn('terrain', 'Provider heightmap worker bake failed; falling back to synchronous provider bake', error);
+    }
+
+    this.rebakeSurfaceHeightmap();
   }
 
   private recomputeLodConfig(): void {

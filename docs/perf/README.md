@@ -1,6 +1,6 @@
 # Performance and Profiling
 
-Last verified: 2026-05-09
+Last verified: 2026-05-13
 
 Index for the perf-harness docs. The original 2,332-LOC `docs/PERFORMANCE.md`
 was split into focused topics on `cycle-2026-05-09-doc-decomposition-and-wiring`.
@@ -151,6 +151,21 @@ and `cpu-profile-iteration-N.cpuprofile`. These measure operator-visible
 phases from title screen through deploy and playable HUD; they do not write
 `measurement-trust.json` and do not replace `perf-capture.ts` for steady-state
 frame claims.
+
+The 2026-05-13 mode-startup spike used this path to separate cache delivery
+from runtime CPU work. Recast WASM/navmesh headers were already correct; the
+blocking work was terrain surface baking after mode select. For any future
+startup change, capture at least:
+
+```bash
+npm run build
+npx tsx scripts/perf-startup-ui.ts --mode zone_control --runs 1
+npx tsx scripts/perf-startup-ui.ts --mode open_frontier --runs 1
+npx tsx scripts/perf-startup-ui.ts --mode tdm --runs 1
+```
+
+Design memo and current evidence:
+`docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md`.
 
 ## Diagnostics surface
 

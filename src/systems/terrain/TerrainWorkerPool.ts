@@ -1,5 +1,13 @@
 import { Logger } from '../../utils/Logger';
 import type { HeightProviderConfig } from './IHeightProvider';
+import type { PreparedHeightmapGrid } from './PreparedTerrainSource';
+
+export interface TerrainSurfaceBakeResult {
+  heightData: Float32Array;
+  normalData: Uint8Array;
+  gridSize: number;
+  worldSize: number;
+}
 
 function cloneHeightProviderConfig(config: HeightProviderConfig): HeightProviderConfig {
   switch (config.type) {
@@ -14,6 +22,12 @@ function cloneHeightProviderConfig(config: HeightProviderConfig): HeightProvider
         base: cloneHeightProviderConfig(config.base),
         stamps: config.stamps.map((stamp) => ({ ...stamp })),
       };
+    case 'visualExtent':
+      return {
+        ...config,
+        base: cloneHeightProviderConfig(config.base),
+        source: cloneHeightProviderConfig(config.source),
+      };
     case 'noise':
     default:
       return { ...config };
@@ -27,6 +41,10 @@ function collectTransferables(config: HeightProviderConfig, transferables: Trans
       return;
     case 'stamped':
       collectTransferables(config.base, transferables);
+      return;
+    case 'visualExtent':
+      collectTransferables(config.base, transferables);
+      collectTransferables(config.source, transferables);
       return;
     case 'noise':
     default:
@@ -132,6 +150,58 @@ export class TerrainWorkerPool {
    * Bake a heightmap grid in a worker. Returns Float32Array of heights.
    */
   async bakeHeightmap(gridSize: number, worldSize: number): Promise<Float32Array> {
+    const result = await this.enqueueHeightmapBake({
+      type: 'bakeHeightmap',
+      gridSize,
+      worldSize,
+    });
+    return result.heightData;
+  }
+
+  async bakeHeightmapSurface(
+    providerConfig: HeightProviderConfig,
+    gridSize: number,
+    worldSize: number,
+  ): Promise<TerrainSurfaceBakeResult> {
+    const clonedConfig = cloneHeightProviderConfig(providerConfig);
+    const transferables: Transferable[] = [];
+    collectTransferables(clonedConfig, transferables);
+
+    return this.enqueueHeightmapBake({
+      type: 'bakeHeightmap',
+      gridSize,
+      worldSize,
+      providerConfig: clonedConfig,
+    }, transferables);
+  }
+
+  async bakePreparedVisualHeightmap(
+    preparedHeightmap: PreparedHeightmapGrid,
+    playableWorldSize: number,
+    visualMargin: number,
+    sourceConfig: HeightProviderConfig,
+    gridSize: number,
+  ): Promise<TerrainSurfaceBakeResult> {
+    const preparedData = new Float32Array(preparedHeightmap.data);
+    const clonedSourceConfig = cloneHeightProviderConfig(sourceConfig);
+    const transferables: Transferable[] = [preparedData.buffer];
+    collectTransferables(clonedSourceConfig, transferables);
+
+    return this.enqueueHeightmapBake({
+      type: 'bakePreparedVisualHeightmap',
+      preparedData,
+      preparedGridSize: preparedHeightmap.gridSize,
+      playableWorldSize,
+      visualMargin,
+      sourceConfig: clonedSourceConfig,
+      gridSize,
+    }, transferables);
+  }
+
+  private async enqueueHeightmapBake(
+    message: Record<string, unknown>,
+    transferables: Transferable[] = [],
+  ): Promise<TerrainSurfaceBakeResult> {
     const workerIdx = this.getAvailableWorker();
     if (workerIdx < 0) {
       throw new Error('No workers available for heightmap bake');
@@ -141,19 +211,22 @@ export class TerrainWorkerPool {
     this.busyWorkers.add(workerIdx);
     this.taskStartTimes.set(requestId, performance.now());
 
-    return new Promise<Float32Array>((resolve, reject) => {
+    return new Promise<TerrainSurfaceBakeResult>((resolve, reject) => {
       this.pendingTasks.set(requestId, {
-        resolve: (data) => resolve(data.data as Float32Array),
+        resolve: (data) => resolve({
+          heightData: data.data as Float32Array,
+          normalData: data.normalData as Uint8Array,
+          gridSize: data.gridSize as number,
+          worldSize: data.worldSize as number,
+        }),
         reject,
         workerIdx,
       });
 
       this.workers[workerIdx].postMessage({
-        type: 'bakeHeightmap',
+        ...message,
         requestId,
-        gridSize,
-        worldSize,
-      });
+      }, transferables);
     });
   }
 

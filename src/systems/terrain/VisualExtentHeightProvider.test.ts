@@ -51,6 +51,20 @@ describe('VisualExtentHeightProvider', () => {
 
     expect(visual.getHeightAt(70, 0)).toBe(25);
   });
+
+  it('serializes the visual extent contract for worker baking', () => {
+    const base = provider(() => 20);
+    const source = provider(() => 25);
+    const visual = new VisualExtentHeightProvider(base, source, 100, 50);
+
+    expect(visual.getWorkerConfig()).toEqual({
+      type: 'visualExtent',
+      base: { type: 'noise', seed: 42 },
+      source: { type: 'noise', seed: 42 },
+      playableWorldSize: 100,
+      visualMargin: 50,
+    });
+  });
 });
 
 function clampForTest(value: number, min: number, max: number): number {

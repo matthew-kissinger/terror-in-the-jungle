@@ -17,6 +17,8 @@ const {
   mockVegetationDebugInfo,
   mockVegetationReadyAround,
   mockUpdateFarCanopyTint,
+  mockBakeHeightmapSurface,
+  mockBakePreparedVisualHeightmap,
 } = vi.hoisted(() => ({
   mockProviderGetHeightAt: vi.fn().mockReturnValue(10),
   mockCacheGetHeightAt: vi.fn().mockReturnValue(10),
@@ -50,6 +52,18 @@ const {
   }),
   mockVegetationReadyAround: vi.fn().mockReturnValue(true),
   mockUpdateFarCanopyTint: vi.fn(),
+  mockBakeHeightmapSurface: vi.fn().mockResolvedValue({
+    heightData: new Float32Array(16),
+    normalData: new Uint8Array(64),
+    gridSize: 4,
+    worldSize: 256,
+  }),
+  mockBakePreparedVisualHeightmap: vi.fn().mockResolvedValue({
+    heightData: new Float32Array(16),
+    normalData: new Uint8Array(64),
+    gridSize: 4,
+    worldSize: 256,
+  }),
 }));
 
 vi.mock('./HeightQueryCache', () => {
@@ -115,6 +129,8 @@ vi.mock('./TerrainMaterial', () => ({
 vi.mock('./TerrainWorkerPool', () => ({
   TerrainWorkerPool: class {
     sendHeightProvider = vi.fn();
+    bakeHeightmapSurface = mockBakeHeightmapSurface;
+    bakePreparedVisualHeightmap = mockBakePreparedVisualHeightmap;
     getStats = vi.fn().mockReturnValue({ enabled: true, queueLength: 0, busyWorkers: 0, totalWorkers: 2 });
     getTelemetry = vi.fn().mockReturnValue({ enabled: true, chunksGenerated: 0, avgGenerationTimeMs: 0, workersReady: 2, duplicatesAvoided: 0, queueLength: 0, busyWorkers: 0, inFlightChunks: 0 });
     dispose = vi.fn();
@@ -218,6 +234,8 @@ describe('TerrainSystem', () => {
     mockVegetationPendingCounts.mockClear();
     mockVegetationReadyAround.mockClear();
     mockUpdateFarCanopyTint.mockClear();
+    mockBakeHeightmapSurface.mockClear();
+    mockBakePreparedVisualHeightmap.mockClear();
     scene = makeMockScene();
     terrain = new TerrainSystem(
       scene,
@@ -322,6 +340,33 @@ describe('TerrainSystem', () => {
 
       expect(mockUploadPrebakedGrid).toHaveBeenCalled();
       expect(mockBakeFromProvider).not.toHaveBeenCalled();
+    });
+
+    it('batches mode surface configuration through the prepared visual worker path', async () => {
+      await terrain.init();
+      mockBakeFromProvider.mockClear();
+      mockUploadPrebakedGrid.mockClear();
+
+      await terrain.configureModeSurface({
+        preparedHeightmap: {
+          data: new Float32Array(16),
+          gridSize: 4,
+          workerConfig: { type: 'noise', seed: 12345 },
+        },
+        worldSize: 3200,
+        visualMargin: 1200,
+        chunkSize: 256,
+        renderDistance: 4,
+        defaultBiomeId: 'denseJungle',
+      });
+
+      expect(mockBakePreparedVisualHeightmap).toHaveBeenCalledOnce();
+      expect(mockBakeHeightmapSurface).not.toHaveBeenCalled();
+      expect(mockUploadPrebakedGrid).toHaveBeenCalled();
+      expect(mockBakeFromProvider).not.toHaveBeenCalled();
+      expect(terrain.getWorldSize()).toBe(3200);
+      expect(terrain.getVisualWorldSize()).toBe(5600);
+      expect(terrain.getChunkSize()).toBe(256);
     });
 
     it('stores a preloaded hydrology bake without changing terrain or vegetation state', () => {

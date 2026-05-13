@@ -106,6 +106,7 @@ still needs that human fixed-wing checklist before more vehicle types are added.
 ```bash
 npm run build:perf               # Build perf-harness bundle (dist-perf/)
 npm run preview:perf             # Preview dist-perf/ (harness-ready)
+npm run perf:startup:openfrontier # Production-shaped mode selection -> deploy -> playable timing
 npm run perf:capture:combat120   # Primary regression capture
 npm run perf:capture:openfrontier:short
 npm run perf:compare             # Compare against baselines
@@ -117,6 +118,20 @@ npm run validate:full            # test + build + combat120 + compare
 See [perf/README.md](perf/README.md) for full profiling docs (build targets, capture commands, artifacts), [perf/baselines.md](perf/baselines.md) for tracked baselines and refresh procedure, [perf/scenarios.md](perf/scenarios.md) for scenario definitions, and [perf/playbook.md](perf/playbook.md) for the regression investigation playbook.
 
 For world-size, staged-prop, aircraft, vehicle, terrain-query, or hit-detection changes, `combat120` is not enough. Run `npm run perf:capture:openfrontier:short` and compare that scenario explicitly before you push.
+
+For mode-startup or terrain-surface changes, use
+`scripts/perf-startup-ui.ts` against a production build. The 2026-05-13
+mode-startup spike showed why: Cloudflare/Recast/WASM delivery can be healthy
+while synchronous terrain surface baking still blocks the mode-click path. Use
+at least Zone Control, Open Frontier, and TDM when validating that class of
+change:
+
+```bash
+npm run build
+npx tsx scripts/perf-startup-ui.ts --mode zone_control --runs 1
+npx tsx scripts/perf-startup-ui.ts --mode open_frontier --runs 1
+npx tsx scripts/perf-startup-ui.ts --mode tdm --runs 1
+```
 
 For architecture-recovery releases, also run the mode-specific evidence script
 when atmosphere, terrain visibility, A Shau, or fallback behavior changed:
