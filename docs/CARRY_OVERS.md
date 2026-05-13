@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-10
+Last verified: 2026-05-13
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count

@@ -140,7 +140,11 @@ npm run dev      # vite dev server
 Requirements:
 
 - Node 24, pinned in [.nvmrc](.nvmrc)
-- A WebGL2-capable browser
+- A WebGPU-capable browser recommended (Chrome 113+ / Firefox 147+ /
+  Safari 26+); WebGL2 fallback is automatic on older browsers. Master ships
+  WebGPU + TSL by default after the 2026-05-13
+  [`exp/konveyer-webgpu-migration`](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
+  merge.
 - Playwright browsers for validation scripts (`npx playwright install`)
 
 Production-shaped local path:

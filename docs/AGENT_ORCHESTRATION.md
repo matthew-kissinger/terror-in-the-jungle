@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-12 (KONVEYER materialization rearch cycle queued; scene-parity cycle closed atmosphere CPU collapse)
+Last verified: 2026-05-13 (exp/konveyer-webgpu-migration merged to master via PR #192; KONVEYER campaign closed; post-WebGPU master is the active branch)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
