@@ -75,15 +75,17 @@ Cloudflare account-level audit:
 
 Single source of truth for unresolved items:
 [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count on the
-experimental branch is **8** after the 2026-05-12 vision-pivot park
-(AVIATSIYA-2 and AVIATSIYA-3 moved Active → Parked; see the Parked
-sub-list in CARRY_OVERS.md). Active items:
+experimental branch is **9** as of the 2026-05-12 master-merge gate
+(8 after the vision-pivot park; +1 for konveyer-large-file-splits
+opened at merge-prep to track the two KONVEYER-grown files added to
+the lint-budget grandfather list). Active items:
 DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality), STABILIZAT-1
 (combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
 pending), KB-LOAD residual, cloudflare-stabilization-followups,
 weapons-cluster-zonemanager-migration, KONVEYER-10 (WebGPU
-rollout-gating). New IDs (KONVEYER-11 spatial-grid, VEKHIKL-3
-jeep-drivable, etc.) open with their respective cycle launches.
+rollout-gating), konveyer-large-file-splits. New IDs (KONVEYER-11
+spatial-grid, VEKHIKL-3 jeep-drivable, etc.) open with their
+respective cycle launches.
 
 4 cycle-retro nits from cycle 2.4 captured in BACKLOG retro (NOT new
 carry-overs to respect ≤12 limit; bundle into next cycle that touches

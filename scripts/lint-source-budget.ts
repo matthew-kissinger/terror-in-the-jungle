@@ -62,6 +62,11 @@ const GRANDFATHER: Record<string, { round: string; reason: string }> = {
   'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: '742 LOC → split alongside HUDSystem in R3' },
   'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '763 LOC, 0 tests → split into terrain config + biome config + spawn data' },
   'src/core/SystemManager.ts': { round: 'P2-P3', reason: '60 methods → decompose system wiring + lifecycle into helpers' },
+  // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
+  // Both files grew through the KONVEYER campaign and are tracked as
+  // split-debt in docs/CARRY_OVERS.md (konveyer-large-file-splits).
+  'src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts': { round: 'P4-KONVEYER-followup', reason: '807 LOC; grew through slices 13-15 (DataTexture, refresh-counter, idempotent setCloudCoverage) + sky-refresh-investigate fix → split atmosphere LUT + sun model + cloud composition during the TSL fragment-shader sky port' },
+  'src/systems/environment/WaterSystem.ts': { round: 'P4-VODA-1', reason: '733 LOC; grew during KONVEYER scene-parity (port to standard material) → split water shader uniforms / surface / interaction during VODA-1 water shader work' },
 };
 
 const SKIP = (rel: string): boolean =>
