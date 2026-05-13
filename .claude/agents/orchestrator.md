@@ -131,7 +131,7 @@ diffs yourself unless you are deciding a borderline merge.
 
 ## Campaign auto-advance (2026-05-09 realignment)
 
-If the campaign manifest at `docs/CAMPAIGN_2026-05-09.md` (or any
+If the campaign manifest at `docs/archive/CAMPAIGN_2026-05-09.md` (or any
 `docs/CAMPAIGN_*.md` named in `docs/AGENT_ORCHESTRATION.md` "Current
 campaign") declares `auto-advance: yes` and the current cycle did NOT hit
 a hard-stop, after running the end-of-cycle ritual:

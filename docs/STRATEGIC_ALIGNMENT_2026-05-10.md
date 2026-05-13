@@ -184,14 +184,14 @@ continue the KONVEYER renderer campaign as an experimental branch:
    proof, and A Shau perf acceptance.
 2. DEFEKT-3 remains important, but KONVEYER-6 owns the question of whether
    cover/AI sensor data becomes a GPU compute carrier or stays CPU/worker-only.
-3. The campaign manifest (`docs/CAMPAIGN_2026-05-09.md`) now marks the
+3. The campaign manifest (`docs/archive/CAMPAIGN_2026-05-09.md`) now marks the
    original realignment queue as paused/historical while the KONVEYER branch
    cycle runs.
 
 ## What this memo does NOT change
 
 - The master-branch 9-cycle realignment queue still exists in
-  `docs/CAMPAIGN_2026-05-09.md`, but it is not the active next-run pointer.
+  `docs/archive/CAMPAIGN_2026-05-09.md`, but it is not the active next-run pointer.
 - `docs/CARRY_OVERS.md` remains the source of truth for unresolved
   carry-overs; KONVEYER-10 is now recorded there as the active WebGPU
   rollout-gating item.

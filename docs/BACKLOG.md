@@ -124,7 +124,7 @@ under the "ship a feature" half of the rule but registers INCOMPLETE under
 the strict-decrease half — flagged for the next cycle's plan to close ≥2
 of the 12 active before Phase 3 dispatches.
 
-Comprehensive context: [docs/STABILIZATION_CHECKPOINT_2026-05-09.md](STABILIZATION_CHECKPOINT_2026-05-09.md).
+Comprehensive context: [docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md](archive/STABILIZATION_CHECKPOINT_2026-05-09.md).
 Live audit findings: `artifacts/live-audit-2026-05-09/FINDINGS.md`.
 
 ## Recently Completed (cycle-2026-05-09-doc-decomposition-and-wiring)

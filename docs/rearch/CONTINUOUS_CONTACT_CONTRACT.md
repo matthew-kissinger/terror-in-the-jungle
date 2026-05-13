@@ -522,5 +522,5 @@ The user needs to decide these before the implementation cycle dispatches.
 | Visible hillside inside perimeter | (c) footprint-sampled placement | #132 (`airfield-envelope-ramp-softening`), #133 (`airfield-taxiway-widening`) | Envelope geometry that does not cover the declared flat zone |
 | Altitude-hold not engaging in normal flight | (b) single authoritative state | #126 (`airframe-altitude-hold-unification`), #128 (`airframe-climb-rate-pitch-damper`) | Two PDs covering disjoint conditions with no unifying selector |
 
-Cross-reference: `docs/FLIGHT_REBUILD_ORCHESTRATION.md` "Why this plan exists"
+Cross-reference: `docs/archive/FLIGHT_REBUILD_ORCHESTRATION.md` "Why this plan exists"
 and "Repo pulse at plan finalization (2026-04-22)" sections.

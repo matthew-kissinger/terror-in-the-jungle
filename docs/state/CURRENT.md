@@ -120,7 +120,7 @@ merge):
   states.
 
 Both directions are first-class. The original 9-cycle stabilization
-campaign in `docs/CAMPAIGN_2026-05-09.md` is historical; the active
+campaign in `docs/archive/CAMPAIGN_2026-05-09.md` is historical; the active
 campaign manifest is now
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 

@@ -66,7 +66,7 @@ Auto-advance PAUSED per the campaign manifest. To re-enable chaining: flip
 before re-running `/orchestrate`.
 
 For full context (audit findings, Phases 0–2 outcomes, Phase 3+ scope):
-[docs/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/STABILIZATION_CHECKPOINT_2026-05-09.md).
+[docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md).
 Cloudflare account-level audit:
 `artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored).
 
@@ -85,7 +85,7 @@ carry-overs to respect ≤12 limit; bundle into next cycle that touches
 relevant area): A Shau test claim softening; perf ceiling 1.0→2.0ms if
 flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
-Campaign manifest: [docs/CAMPAIGN_2026-05-09.md](docs/CAMPAIGN_2026-05-09.md)
+Campaign manifest: [docs/archive/CAMPAIGN_2026-05-09.md](docs/archive/CAMPAIGN_2026-05-09.md)
 (9 cycles; auto-advance currently PAUSED).
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
