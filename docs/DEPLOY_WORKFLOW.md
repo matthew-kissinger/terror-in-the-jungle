@@ -1,10 +1,21 @@
 # Deploy Workflow
 
-Last updated: 2026-05-05
+Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge; deploy path unchanged)
 
 Production: https://terror-in-the-jungle.pages.dev/
 
 This document captures how a commit becomes a live Cloudflare Pages deploy, how browser freshness is preserved for repeat players, and how to verify prod headers when users report stale assets or load failures.
+
+The 2026-05-13 KONVEYER WebGPU/TSL master merge (PR #192, merge commit
+`1df141ca`) did not change the build-to-deploy path. The Pages bundle now
+ships the `three/webgpu` WebGPURenderer surface as the default, with
+automatic WebGL2 fallback for browsers where `navigator.gpu` is unavailable
+or the adapter probe fails. The `three-*.js` chunk under `/build-assets/`
+grew to ~1.5 MB raw / ~403 KB gzip (from ~734 KB raw / ~187 KB gzip
+pre-merge); the immutable cache rule for `/build-assets/*` already handles
+that. Strict-mode evidence (`?renderer=webgpu-strict`) is a query-string
+flag against the deployed shell; production users hit the default 'webgpu'
+mode with the fallback gate.
 
 Current stable-ground finding on 2026-05-02: production was healthy but stale.
 `master` was at `f99181a0bf8a6b2a8684fc1ae3796022c16aad22`, while live

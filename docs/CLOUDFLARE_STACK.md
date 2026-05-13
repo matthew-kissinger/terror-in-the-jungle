@@ -1,10 +1,17 @@
 # Cloudflare Stack
 
-Last updated: 2026-04-24
+Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge; cache config unchanged)
 
 Production today: `https://terror-in-the-jungle.pages.dev/`
 
 This document is the deployment/storage target for the game. `docs/DEPLOY_WORKFLOW.md` remains the command-level deploy runbook; this file explains the Cloudflare architecture we should move toward before adding more terrain/model payloads or live user interaction.
+
+The 2026-05-13 KONVEYER WebGPU/TSL merge did not change the Cloudflare delivery
+shape. The `three-*.js` chunk now bundles the `three/webgpu` namespace and
+grew to ~1.5 MB raw / ~403 KB gzip (from ~734 KB raw / ~187 KB gzip
+pre-merge), and is still served from `/build-assets/*` with the 1-year
+immutable cache rule. The `recast-navigation.wasm-*` content-addressed
+delivery, R2 manifest pipeline, and `_headers` ruleset are unchanged.
 
 ## Current Check
 

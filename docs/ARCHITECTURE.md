@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-24 (architecture recovery validation pass)
+Last verified: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge)
 
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -14,6 +14,34 @@ index.html -> src/main.ts -> src/core/bootstrap.ts -> new GameEngine()
 - `GameEngineInit` coordinates startup: mode selection, terrain/navmesh prep, deploy flow.
 - `GameEngineInput` handles keyboard/pointer bindings.
 - `GameEngineLoop` runs the RAF loop via `SystemUpdater.updateSystems()`.
+
+## Renderer Backend
+
+Production renderer is the Three.js r184 `WebGPURenderer` from `three/webgpu`,
+with TSL node materials covering terrain CDLOD, vegetation/NPC impostors, the
+Hosek-Wilkie sky, and water. Backend selection lives in
+`src/core/RendererBackend.ts` (`resolveRendererBackendMode()` reads
+`?renderer=` / env), and `src/core/GameRenderer.ts` drives the swap from a
+WebGL bootstrap renderer to the WebGPU surface (`initializeRendererBackend()`,
+lines 233-310). Modes:
+
+- `'webgpu'` (default) — production path. Falls back to Three.js's automatic
+  WebGL2 backend when `navigator.gpu` is unavailable or the WebGPU adapter
+  probe fails. Production users on Safari < 26, Firefox < 147, Chrome < 113,
+  iOS 17, swiftshader, or other GPU-less environments hit this path.
+- `'webgpu-strict'` (`?renderer=webgpu-strict`) — KONVEYER acceptance bar.
+  Refuses any WebGL2 resolution; used for evidence captures and CI strict-mode
+  smoke runs.
+- `'webgpu-force-webgl'` (`?renderer=webgpu-force-webgl`) — instructs
+  `WebGPURenderer` to use its WebGL2 backend; useful for testing the fallback
+  surface against TSL node materials.
+- `'webgl'` (`?renderer=webgl`) — diagnostic plain `WebGLRenderer` with the
+  `WebGLNodesHandler` shim so TSL node materials still resolve. Pre-KONVEYER
+  parity check; not the production path.
+
+The `strictWebGPU` gate is the only place that rejects a WebGL2 resolution.
+Default 'webgpu' mode accepts the automatic fallback silently and logs the
+resolved backend.
 
 ## Startup Lifecycle
 

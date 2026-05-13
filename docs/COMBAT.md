@@ -1,6 +1,6 @@
 # Combat Subsystem
 
-Last updated: 2026-04-24
+Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge; Phase F R1 — combat sub-attribution + lane rename — landed)
 
 This document is the authoritative architecture reference for the combat
 subsystem (`src/systems/combat/`). Combat is the hot loop: AI decisions,
@@ -16,7 +16,9 @@ Read this before touching anything under `src/systems/combat/`. Read
 Combat owns:
 
 - NPC combatant state: position, health, faction, weapon, squad membership,
-  LOD bucket, and per-combatant AI scratch (`src/systems/combat/types.ts`).
+  `simLane` + `renderLane` materialization bands (renamed 2026-05-13 from the
+  single `lodLevel` field via commit `bad935c2`), and per-combatant AI scratch
+  (`src/systems/combat/types.ts`).
 - NPC AI: state machine, targeting, LOS, cover evaluation, flanking
   coordination, suppression effects (`CombatantAI`, `ai/*`).
 - Damage resolution: hit detection, damage application, death animation,
@@ -297,8 +299,13 @@ doctrine question remains a Phase F candidate.
   `CombatantMovementCommands` — terrain-aware movement solver. Uses
   `StuckDetector` (post-B3 goal-anchor-aware) to escalate out of stall
   loops.
-- `CombatantLODManager` — LOD bucketing (`high`/`medium`/`low`/`culled`)
-  and per-bucket update cadence.
+- `CombatantLODManager` — materialization-tier bucketing. Writes
+  `simLane` (`high`/`medium`/`low`/`culled`) for AI/movement cadence and
+  `renderLane` (`close-glb`/`impostor`/`silhouette`/`cluster`/`culled`) for
+  render assignment. `silhouette` and `cluster` are reserved write surfaces
+  for Phase F R2/R4 lanes; the current emitter uses `close-glb`, `impostor`,
+  and `culled`. The v2 budget arbiter will own both lane assignments in
+  Phase F R3.
 - `CombatantRenderer`, `CombatantMeshFactory`, `CombatantShaders` —
   billboard rendering.
 - `CombatantProfiler` — per-frame timing breakdown exposed through
@@ -334,6 +341,16 @@ in [docs/perf/baselines.md](perf/baselines.md).
 At 240 NPCs and above, combat avg frame is not baselined. The rule of
 thumb is that AI update scales roughly linearly with count while LOS
 cache hit rate drops, so expect more than 2x cost going 120 → 240.
+
+Combat sub-attribution telemetry (Phase F R1, commit `5432a316`,
+2026-05-13) splits the `Combat` tracked-group cost into
+`performanceTelemetry.beginSystem('Combat.{Influence,AI,Billboards,Effects}')`
+children. Use these probes to attribute Combat regressions to a specific
+lane before tuning. Post-WebGPU-merge, atmosphere CPU dropped below 1 ms
+across all five modes, and Combat is now the relatively-largest CPU
+contributor at ~1.5-6.5 ms across modes. Phase F R2-R4 (cover-spatial-grid,
+render-silhouette lane, squad-aggregated strategic sim, budget arbiter v2,
+render-cluster lane) are queued against the sub-attribution surface.
 
 Documented per-frame caps (do not exceed without re-baselining):
 - Cover searches per frame: **6** (`ai/CoverSearchBudget`).

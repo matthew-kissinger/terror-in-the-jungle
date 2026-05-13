@@ -1,11 +1,13 @@
 # Development Guide
 
-Last updated: 2026-05-02
+Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge)
 
 ## Prerequisites
 
 - Node 24 (pinned in `.nvmrc`)
-- Modern browser with WebGL2 support
+- Modern browser. The default renderer is WebGPU (`three/webgpu` from
+  Three.js r184) with automatic WebGL2 fallback; WebGL2 alone is still
+  sufficient.
 
 ## Quick Start
 
@@ -14,6 +16,25 @@ npm install
 npm run doctor           # Verify Node, dependencies, and Playwright browser setup
 npm run dev              # Vite dev server
 ```
+
+## Renderer Mode Selection
+
+Renderer backend is chosen by `src/core/RendererBackend.ts`
+(`resolveRendererBackendMode()`) at startup. Defaults and overrides:
+
+- Default: `'webgpu'`. `WebGPURenderer` boots; if `navigator.gpu` is
+  unavailable or the adapter probe fails, Three.js's automatic WebGL2
+  backend is accepted silently. This is the production path.
+- `?renderer=webgpu-strict` (or `VITE_KONVEYER_WEBGPU_STRICT=1`): strict
+  proof mode. Any WebGL2 resolution throws; used for KONVEYER evidence
+  captures.
+- `?renderer=webgpu-force-webgl`: forces the `WebGPURenderer`'s WebGL2
+  backend even when WebGPU is available. Useful for testing TSL node
+  materials on the fallback surface.
+- `?renderer=webgl` (or `VITE_KONVEYER_WEBGPU=0` /
+  `VITE_KONVEYER_FORCE_WEBGL=1`): diagnostic plain `WebGLRenderer` with the
+  `WebGLNodesHandler` shim so TSL node materials still resolve. Pre-KONVEYER
+  parity check, not the production path.
 
 TIJ currently consumes local `file:` packages from the sibling workspace
 `../game-field-kits`. For a fresh checkout or after moving that sibling repo,
@@ -206,10 +227,10 @@ CI still captures perf artifacts on every push, but the hosted-run perf outcome 
 
 ### Build Output
 
-Current large chunks:
-- `index`: ~851kB raw / ~221kB gzip
-- `three`: ~734kB raw / ~187kB gzip
-- `ui`: ~449kB raw / ~106kB gzip
+Current large chunks (post-WebGPU merge, 2026-05-13):
+- `index`: ~1004kB raw / ~263kB gzip
+- `three`: ~1505kB raw / ~403kB gzip (now bundles `three/webgpu` namespace)
+- `ui`: ~510kB raw / ~122kB gzip
 - `recast-navigation.wasm`: ~339kB WASM + ~275kB JS loader per main/worker graph
 
 `npm run build` intentionally does not emit `.gz` or `.br` sidecar files.
