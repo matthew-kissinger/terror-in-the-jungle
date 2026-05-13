@@ -107,15 +107,16 @@ export function isTerrainShadowPerfIsolationEnabled(): boolean {
 /**
  * Renders all terrain as a single THREE.InstancedMesh.
  * Each instance = one CDLOD tile, scaled/positioned via instance matrix.
- * Per-instance `lodLevel` and `morphFactor` attributes drive vertex shader morphing.
+ * Per-instance tile params drive vertex shader morphing. The attributes are
+ * packed into two vec4 buffers so WebGPU devices with 8 vertex-buffer slots
+ * can render terrain plus Three.js' instancing buffer without exceeding limits.
  *
  * One draw call for the entire terrain (vs ~100 chunk meshes before).
  */
 export class CDLODRenderer {
   private mesh: THREE.InstancedMesh;
-  private lodLevelAttr: THREE.InstancedBufferAttribute;
-  private morphFactorAttr: THREE.InstancedBufferAttribute;
-  private edgeMorphMaskAttr: THREE.InstancedBufferAttribute;
+  private tileParams0Attr: THREE.InstancedBufferAttribute;
+  private tileParams1Attr: THREE.InstancedBufferAttribute;
   private readonly maxInstances: number;
 
   // Scratch matrix for setting instance transforms
@@ -138,23 +139,20 @@ export class CDLODRenderer {
     this.mesh = new THREE.InstancedMesh(geo, material, maxInstances);
     this.mesh.frustumCulled = false; // Quadtree already culls
     this.mesh.count = 0;
+    this.mesh.visible = false;
     this.mesh.name = 'CDLODTerrain';
     this.mesh.matrixAutoUpdate = false;
     this.mesh.matrixWorldAutoUpdate = false;
 
-    // Per-instance attributes
-    const lodData = new Float32Array(maxInstances);
-    const morphData = new Float32Array(maxInstances);
-    const edgeMaskData = new Float32Array(maxInstances);
-    this.lodLevelAttr = new THREE.InstancedBufferAttribute(lodData, 1);
-    this.morphFactorAttr = new THREE.InstancedBufferAttribute(morphData, 1);
-    // edgeMorphMask is logically a bitmask but is stored as float for GLSL
-    // attribute compatibility (Three.js r184 InstancedBufferAttribute is
-    // most reliable with Float32Array; the shader rounds to int).
-    this.edgeMorphMaskAttr = new THREE.InstancedBufferAttribute(edgeMaskData, 1);
-    geo.setAttribute('lodLevel', this.lodLevelAttr);
-    geo.setAttribute('morphFactor', this.morphFactorAttr);
-    geo.setAttribute('edgeMorphMask', this.edgeMorphMaskAttr);
+    // Per-instance attributes:
+    // tileParams0 = centerX, centerZ, size, lodLevel
+    // tileParams1 = morphFactor, edgeMorphMask, reserved, reserved
+    // edgeMorphMask is logically a bitmask but is stored as float for WebGPU/
+    // WebGL attribute compatibility; the shader rounds via bit extraction.
+    this.tileParams0Attr = new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 4), 4);
+    this.tileParams1Attr = new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 4), 4);
+    geo.setAttribute('tileParams0', this.tileParams0Attr);
+    geo.setAttribute('tileParams1', this.tileParams1Attr);
 
     // Diagnostic-only terrain shadow isolation. Terrain still receives shadows
     // so this isolates CDLOD shadow-caster submissions without changing the
@@ -177,6 +175,7 @@ export class CDLODRenderer {
   updateInstances(tiles: readonly CDLODTile[]): void {
     const count = Math.min(tiles.length, this.maxInstances);
     this.mesh.count = count;
+    this.mesh.visible = count > 0;
 
     for (let i = 0; i < count; i++) {
       const tile = tiles[i];
@@ -186,15 +185,21 @@ export class CDLODRenderer {
       this._matrix.setPosition(tile.x, 0, tile.z);
 
       this.mesh.setMatrixAt(i, this._matrix);
-      this.lodLevelAttr.array[i] = tile.lodLevel;
-      this.morphFactorAttr.array[i] = tile.morphFactor;
-      this.edgeMorphMaskAttr.array[i] = tile.edgeMorphMask;
+
+      const base = i * 4;
+      this.tileParams0Attr.array[base] = tile.x;
+      this.tileParams0Attr.array[base + 1] = tile.z;
+      this.tileParams0Attr.array[base + 2] = tile.size;
+      this.tileParams0Attr.array[base + 3] = tile.lodLevel;
+      this.tileParams1Attr.array[base] = tile.morphFactor;
+      this.tileParams1Attr.array[base + 1] = tile.edgeMorphMask;
+      this.tileParams1Attr.array[base + 2] = 0;
+      this.tileParams1Attr.array[base + 3] = 0;
     }
 
     this.mesh.instanceMatrix.needsUpdate = true;
-    this.lodLevelAttr.needsUpdate = true;
-    this.morphFactorAttr.needsUpdate = true;
-    this.edgeMorphMaskAttr.needsUpdate = true;
+    this.tileParams0Attr.needsUpdate = true;
+    this.tileParams1Attr.needsUpdate = true;
   }
 
   /**

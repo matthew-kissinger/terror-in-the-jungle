@@ -238,6 +238,8 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
 
     expect(bucket?.key).toBe('NVA_advance_fire');
     expect(bucket?.mesh.count).toBe(0);
+    expect(bucket?.mesh.visible).toBe(false);
+    expect(bucket?.marker.visible).toBe(false);
     expect(bucket?.material.uniforms.animationMode.value).toBe(0);
 
     bucket?.mesh.geometry.dispose();
@@ -295,16 +297,19 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect(material?.uniforms.tileCropMap.value).toBeInstanceOf(THREE.DataTexture);
     expect(material?.uniforms.tileCropMapSize.value.x).toBe(28);
     expect(material?.uniforms.tileCropMapSize.value.y).toBe(14);
-    expect(material?.fragmentShader).toContain('tileCropMap');
-    expect(material?.fragmentShader).toContain('horizontalCropExpansion');
-    expect(material?.fragmentShader).toContain('cropCenterX');
-    expect(material?.fragmentShader).toContain('croppedUv');
-    expect(material?.fragmentShader).toContain('parityScale');
-    expect(material?.fragmentShader).toContain('paritySaturation');
-    expect(material?.fragmentShader).toContain('npcAtmosphereLightScale');
-    expect(material?.fragmentShader).toContain('npcFogMode');
-    expect(material?.fragmentShader).toContain('gl_FragColor = vec4(npcColor, alpha)');
-    expect(material?.fragmentShader).not.toContain('gl_FragColor = vec4(npcColor * alpha, alpha)');
+    const nodeMaterial = material as typeof material & {
+      isKonveyerNpcImpostorNodeMaterial?: boolean;
+      isNodeMaterial?: boolean;
+      colorNode?: unknown;
+      opacityNode?: unknown;
+      alphaTestNode?: unknown;
+    };
+    expect(nodeMaterial.isNodeMaterial).toBe(true);
+    expect(nodeMaterial.isKonveyerNpcImpostorNodeMaterial).toBe(true);
+    expect(nodeMaterial.fog).toBe(false);
+    expect(nodeMaterial.colorNode).toBeDefined();
+    expect(nodeMaterial.opacityNode).toBeDefined();
+    expect(nodeMaterial.alphaTestNode).toBeDefined();
 
     disposeCombatantMeshes(scene, assets);
     texture.dispose();
@@ -320,9 +325,20 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     const assets = factory.createFactionBillboards();
 
     expect(assets.factionMaterials.get('US_idle')?.uniforms.animationMode.value).toBe(0);
-    expect(assets.factionMaterials.get('US_death_fall_back')?.uniforms.animationMode.value).toBe(1);
-    expect(assets.factionMaterials.get('US_death_fall_back')?.fragmentShader).toContain('oneShotFrame');
-    expect(assets.factionMaterials.get('US_death_fall_back')?.fragmentShader).toContain('vOpacity');
+    const deathMaterial = assets.factionMaterials.get('US_death_fall_back') as
+      | (THREE.Material & {
+          isKonveyerNpcImpostorNodeMaterial?: boolean;
+          isNodeMaterial?: boolean;
+          colorNode?: unknown;
+          opacityNode?: unknown;
+          uniforms?: Record<string, { value: unknown }>;
+        })
+      | undefined;
+    expect(deathMaterial?.uniforms?.animationMode.value).toBe(1);
+    expect(deathMaterial?.isNodeMaterial).toBe(true);
+    expect(deathMaterial?.isKonveyerNpcImpostorNodeMaterial).toBe(true);
+    expect(deathMaterial?.colorNode).toBeDefined();
+    expect(deathMaterial?.opacityNode).toBeDefined();
 
     disposeCombatantMeshes(scene, assets);
     texture.dispose();

@@ -1,11 +1,15 @@
 # KONVEYER Full Autonomous WebGPU Migration
 
-Last verified: 2026-05-10
+Last verified: 2026-05-11
 
 This memo defines the autonomous experimental-branch objective for the
 KONVEYER renderer campaign: migrate Terror in the Jungle from the current
-`WebGLRenderer` runtime toward production-ready `WebGPURenderer` + TSL, with
-WebGL retained as a fallback until human review approves the default-on flip.
+`WebGLRenderer` production runtime toward production-ready strict
+`WebGPURenderer` + TSL. KONVEYER-0 through KONVEYER-9 now have branch-review
+evidence on `exp/konveyer-webgpu-migration`; the next cycle is KONVEYER-10,
+rest-of-scene parity and frame-budget attribution. WebGL is diagnostic only
+for this campaign and must not be counted as fallback success, completion
+success, or demo-readiness proof.
 
 This is agent work now. The owner reviews the branch at the end. The agent
 should keep progressing through the campaign map, committing and pushing
@@ -16,15 +20,17 @@ Three.js assumptions before using it.
 
 ## Directive
 
-Run the full KONVEYER WebGPU migration campaign on
-`exp/konveyer-webgpu-migration`: begin with KONVEYER-0 recon, then continue
-through staged WebGPURenderer + TSL migration work toward default-on WebGPU
-with WebGL fallback. Research current upstream Three.js/WebGPU guidance, audit
-and port repo rendering surfaces incrementally, build measured
-vegetation/combatant/compute slices, document the KONVEYER-0 through
-KONVEYER-9 path, commit and push often for human review, and stop only for
-fenced-interface changes, perf-baseline updates, master merges, or production
-deploys.
+Continue the KONVEYER WebGPU migration campaign on
+`exp/konveyer-webgpu-migration` from the completed KONVEYER-0 through
+KONVEYER-9 branch-review packet into KONVEYER-10. Preserve strict
+WebGPURenderer + TSL proof with no WebGL fallback in the acceptance path. Focus
+the next cycle on rest-of-scene visual parity and frame-budget attribution:
+vegetation and NPC washout, atmosphere/sky/cloud behavior, world-budget
+decomposition, skyward triangle attribution, finite-map terrain-edge
+presentation, cross-browser/mobile proof, and A Shau perf acceptance. Commit
+and push often for human review, and stop only for fenced-interface changes,
+perf-baseline updates, master merges, production deploys, or a renderer/visual
+regression that makes the game unfit for playtest.
 
 ## Branch Policy
 
@@ -51,8 +57,10 @@ Read these first, in order:
 6. `docs/state/perf-trust.md`
 7. `docs/rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md`
 8. `docs/tasks/konveyer-full-autonomous-migration.md`
-9. `scripts/webgpu-strategy-audit.ts`
-10. `scripts/check-platform-capabilities.ts`
+9. `docs/rearch/KONVEYER_PARITY_2026-05-10.md`
+10. `docs/rearch/KONVEYER_TERRAIN_LIGHTING_ANALYSIS_2026-05-11.md`
+11. `scripts/webgpu-strategy-audit.ts`
+12. `scripts/check-platform-capabilities.ts`
 
 Then refresh external facts from current official sources:
 
@@ -85,20 +93,21 @@ Scope:
 - Classify every row as `ready`, `needs-port`, `blocked`, or `unknown`.
 - Choose the first production-adjacent slice based on evidence, not preference.
 
-### KONVEYER-1 - Dual Renderer Boot Path
+### KONVEYER-1 - Strict Renderer Boot Path
 
 Deliver:
 
-- opt-in WebGPU renderer creation path behind an explicit runtime flag or dev
+- strict WebGPU renderer creation path behind an explicit runtime flag or dev
   query parameter
-- WebGL default unchanged
+- WebGL retained only as a named diagnostic outside the proof path
 - renderer capability object that records backend, adapter limits, and missing
   features
-- smoke test or browser probe proving WebGL default still starts
+- smoke test or browser probe proving strict WebGPU either starts or fails
+  loudly
 
 Rules:
 
-- No production default flip.
+- No fallback success in migration proof.
 - No fenced-interface change.
 - If a shared interface is needed, add an internal adapter outside the fence.
 
@@ -107,8 +116,9 @@ Rules:
 Deliver:
 
 - first reusable TSL/node material helpers
-- one low-risk material port with WebGL parity retained
-- tests or visual probe showing the old and new material paths can coexist
+- one low-risk material port under strict WebGPU
+- tests or visual probe showing the material path fails loudly when WebGPU
+  backend proof is unavailable
 
 Preferred first ports:
 
@@ -128,8 +138,8 @@ Deliver:
 
 - vegetation visibility/culling or draw-submission prototype using WebGPU where
   available
-- WebGL fallback path
-- local evidence comparing the same scene path before and after
+- strict WebGPU evidence
+- local diagnostics comparing before/after on the same strict WebGPU scene path
 
 This is the preferred first high-value implementation slice because it is less
 entangled with animation determinism than combatants.
@@ -140,8 +150,7 @@ Deliver:
 
 - isolated combatant bucket or impostor path on the WebGPU/TSL route
 - no change to combat simulation truth
-- WebGL fallback retained
-- perf and visual evidence at low count before scaling
+- strict WebGPU perf and visual evidence at low count before scaling
 
 Only scale after a small path is proven.
 
@@ -150,7 +159,7 @@ Only scale after a small path is proven.
 Deliver:
 
 - one compute-backed effect or projectile broadphase prototype
-- fallback CPU/WebGL path
+- CPU determinism path retained; no WebGL renderer fallback in proof
 - deterministic ownership boundaries documented
 
 Candidate paths:
@@ -180,17 +189,17 @@ Deliver:
 
 This is tail work. Do not start here unless earlier slices prove impossible.
 
-### KONVEYER-8 - Cross-Backend Validation And Fallback Policy
+### KONVEYER-8 - Strict WebGPU Validation Policy
 
 Deliver:
 
-- WebGPU/WebGL capability matrix
-- fallback policy
+- strict WebGPU capability matrix
+- diagnostic-only WebGL comparison policy
 - browser/platform support notes
 - validation commands and expected artifacts
 - documented user-visible risk list
 
-The WebGL path remains present until human review approves its deprecation.
+Any renderer result that resolves to WebGL is non-proof for this campaign.
 
 ### KONVEYER-9 - Default-On Readiness Packet
 
@@ -204,6 +213,41 @@ Deliver:
 
 Do not flip production default on `master`. The branch may include a proposed
 default-on patch if it is clearly isolated and reviewable.
+
+### KONVEYER-10 - Scene Parity And Frame-Budget Attribution
+
+Deliver:
+
+- decomposed `World` timing for atmosphere sky texture, atmosphere light/fog,
+  weather, water, and zone/ticket work
+- strict-WebGPU material/debug evidence for vegetation and NPC impostors:
+  raw atlas/crop, material lighting, fog contribution, and final output
+- a fix or documented decision for `todCycle.startHour` drift
+- skyward renderer-counter capture with scene/pass attribution
+- a sky/cloud anchoring decision that keeps flight views from reading as if
+  clouds or the dome travel with the player. The first implementation slice is
+  camera-followed dome plus world/altitude-projected cloud-deck sampling,
+  proved at
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`;
+  cloud art direction, shadows/occlusion, weather layering, and possible
+  authored/Pixel Forge cloud assets remain follow-up work.
+- a finite-map terrain-edge strategy for Zone Control and other small maps
+- strict-WebGPU Open Frontier, Zone Control, Team Deathmatch, combat120, and
+  A Shau short captures
+- current branch work on `origin/exp/konveyer-webgpu-migration`; use the remote
+  branch head rather than a frozen SHA in this brief. Latest close-NPC
+  materialization and startup compile proof is
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+
+Rules:
+
+- Treat terrain color as generally accepted for now unless new evidence
+  reopens it; source texture outliers that visibly fight the Vietnam palette
+  should be corrected at the asset level.
+- Do not refresh perf baselines from this branch.
+- Do not convert explicit WebGL diagnostics into product fallback proof.
+- Do not claim production rollout readiness until cross-browser/mobile and
+  A Shau perf acceptance are linked.
 
 ## Current Repo Rails
 
@@ -232,7 +276,7 @@ Initial 2026-05-10 inventory:
 - Prefer small runtime flags and explicit dev query parameters over broad
   abstractions.
 - Prefer compile/browser probes before large production integration.
-- Preserve WebGL fallback until owner review.
+- Preserve strict WebGPU truth over fallback comfort.
 - Treat CI perf as advisory. A green CI perf job does not close STABILIZAT-1.
 - Do not refresh baselines.
 - Do not ask for permission to continue after ordinary implementation
@@ -242,14 +286,15 @@ Initial 2026-05-10 inventory:
 
 - If upstream docs are unavailable: record failed URLs/commands, use installed
   package types/examples, mark upstream rows stale, and continue.
-- If WebGPU is unavailable in the current browser: complete compile-time and
-  WebGL-fallback work, document the browser block, and continue.
+- If WebGPU is unavailable in the current browser: complete compile-time work,
+  document the browser block, and continue only on tasks that do not claim
+  renderer proof.
 - If Three.js WebGPU APIs changed: pin findings to installed version, add a
   "latest differs" row, and keep implementation scoped.
 - If a slice fails twice for the same root cause: stop that slice, preserve the
   evidence, mark it blocked, and continue to the next KONVEYER slice.
-- If a production path would require WebGPU-only behavior: keep it behind the
-  experimental branch flag and document the fallback gap.
+- If a production path would require WebGPU-only behavior: keep it on the
+  experimental branch and document the platform support gap.
 - If GitHub auth blocks branch push: keep committing locally, write the exact
   push command and blocker, and continue local work.
 
@@ -261,7 +306,7 @@ Stop implementation and write a handoff note if any of these are required:
 - update `perf-baselines.json`
 - merge to `master`
 - deploy experimental renderer code
-- remove WebGL fallback
+- require WebGL fallback for migration proof
 - hide a known renderer regression
 
 ## Validation Standard
@@ -296,6 +341,7 @@ Campaign progress:
   - KONVEYER-1: <done/partial/blocked>
   - ...
   - KONVEYER-9: <done/partial/blocked>
+  - KONVEYER-10: <done/partial/blocked>
 
 Upstream facts refreshed:
   - <source/date/one-line finding>
@@ -315,4 +361,3 @@ Validation:
 Human review needed:
   - <decision>
 ```
-

@@ -33,7 +33,8 @@ function makeCombatant(id: string, position: THREE.Vector3, state: CombatantStat
     timeToDirectionChange: 0,
     lastUpdateTime: 0,
     updatePriority: 0,
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     kills: 0,
     deaths: 0,
   } as Combatant;
@@ -202,7 +203,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 3, 0));
-    c.lodLevel = 'culled';
+    c.simLane = 'culled';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 
@@ -227,7 +228,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 0, 0));
-    c.lodLevel = 'culled';
+    c.simLane = 'culled';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 
@@ -249,7 +250,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 0, 0));
-    c.lodLevel = 'culled';
+    c.simLane = 'culled';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 
@@ -309,7 +310,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 3, 0));
-    c.lodLevel = 'medium';
+    c.simLane = 'medium';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 
@@ -326,7 +327,7 @@ describe('CombatantRenderInterpolator', () => {
       maxVerticalNearMps: 8,
     });
     const c = makeCombatant('a', new THREE.Vector3(0, 3, 0));
-    c.lodLevel = 'culled';
+    c.simLane = 'culled';
     const combatants = new Map([[c.id, c]]);
     interp.update(combatants, 1 / 60);
 

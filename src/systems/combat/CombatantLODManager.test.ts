@@ -56,7 +56,8 @@ function createMockCombatant(
     timeToDirectionChange: 0,
     lastUpdateTime: 0,
     updatePriority: 0,
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     isDying,
     deathProgress: isDying ? 0 : undefined,
     kills: 0,
@@ -315,10 +316,10 @@ describe('CombatantLODManager', () => {
       expect(manager.lodCulledCount).toBe(1);
 
       // Check individual combatant LOD levels
-      expect(closeCombatant.lodLevel).toBe('high');
-      expect(mediumCombatant.lodLevel).toBe('medium');
-      expect(farCombatant.lodLevel).toBe('low');
-      expect(culledCombatant.lodLevel).toBe('culled');
+      expect(closeCombatant.simLane).toBe('high');
+      expect(mediumCombatant.simLane).toBe('medium');
+      expect(farCombatant.simLane).toBe('low');
+      expect(culledCombatant.simLane).toBe('culled');
     });
 
     it('should handle empty combatant map', () => {
@@ -337,7 +338,7 @@ describe('CombatantLODManager', () => {
       manager.updateCombatants(0.016);
 
       expect(manager.lodCulledCount).toBe(1);
-      expect(outsideCombatant.lodLevel).toBe('culled');
+      expect(outsideCombatant.simLane).toBe('culled');
     });
 
     it('should nudge off-map combatants toward center', () => {
@@ -386,6 +387,27 @@ describe('CombatantLODManager', () => {
       expect(combatant.lastUpdateTime).toBeGreaterThan(0);
     });
 
+    it('does not report off-stagger high LOD visual updates as AI budget starvation', () => {
+      let perfNow = 0;
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => perfNow);
+      vi.mocked(combatantAI.updateAI).mockImplementation(() => {
+        perfNow += 7;
+      });
+
+      try {
+        for (let i = 0; i < 9; i++) {
+          combatants.set(`high-${i}`, createMockCombatant(`high-${i}`, new THREE.Vector3(10 + i, 0, 0)));
+        }
+
+        manager.updateCombatants(0.016);
+
+        expect(combatantAI.updateAI).toHaveBeenCalledTimes(1);
+        expect(manager.getFrameSchedulingStats().aiBudgetExceededEvents).toBe(2);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
+
     it('stamps high LOD update time so medium LOD cannot inherit stale catch-up delta', () => {
       const combatant = createMockCombatant('high-to-medium', new THREE.Vector3(10, 0, 0));
       combatant.lastUpdateTime = 1;
@@ -394,7 +416,7 @@ describe('CombatantLODManager', () => {
 
       manager.updateCombatants(0.016);
 
-      expect(combatant.lodLevel).toBe('high');
+      expect(combatant.simLane).toBe('high');
       expect(combatant.lastUpdateTime).toBe(100_000);
       nowSpy.mockRestore();
     });
@@ -660,7 +682,7 @@ describe('CombatantLODManager', () => {
       manager.updateCombatants(0.016);
 
       // Combatant at (100, 0, 100) with player at (100, 0, 100) should be high LOD
-      expect(combatant.lodLevel).toBe('high');
+      expect(combatant.simLane).toBe('high');
     });
   });
 
@@ -745,15 +767,15 @@ describe('CombatantLODManager', () => {
       // Small world: 250 > 150 (highLODRange), so medium or lower
       manager.setGameModeManager(smallWorldManager);
       manager.updateCombatants(0.016);
-      const smallWorldLOD = combatant.lodLevel;
+      const smallWorldLOD = combatant.simLane;
 
       // Reset
-      combatant.lodLevel = 'high';
+      combatant.simLane = 'high';
 
       // Large world: 250 < 400 (mediumLODRange for large world), so medium
       manager.setGameModeManager(largeWorldManager);
       manager.updateCombatants(0.016);
-      const largeWorldLOD = combatant.lodLevel;
+      const largeWorldLOD = combatant.simLane;
 
       // Both should at least be medium or lower, but thresholds differ
       expect(['medium', 'low', 'culled']).toContain(smallWorldLOD);

@@ -28,11 +28,30 @@ started, the cycle is `INCOMPLETE` per the rule in
 | DEFEKT-4 | NPC route-follow quality not signed off (slope-stuck, navmesh crowd disabled, terrain solver stalls) | cycle-2026-04-17-drift-correction-run | 8 | navigation | no | Phase 3 R5 (NavmeshSystem split) creates the seam; runtime acceptance after that. |
 | STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 7 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. |
 | AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 6 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
-| AVIATSIYA-3 | Helicopter parity audit: HelicopterVehicleAdapter vs HelicopterPlayerAdapter | cycle-2026-04-22-heap-and-polish | 7 | aviation | no | Phase 4 F5 close-out. Audit memo exists at `docs/rearch/helicopter-parity-audit.md`. |
-| AVIATSIYA-2 | AC-47 low-pitch takeoff single-bounce | cycle-2026-04-21-stabilization-reset | 7 | aviation | no | Anchor at `Airframe` ground rolling. Phase 3 R4 adds Airframe tests; Phase 4 F5 fixes. |
 | KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 4 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
 | cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 2 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
 | weapons-cluster-zonemanager-migration | Finish the IZoneQuery migration for the 5 remaining concrete `ZoneManager` imports in the weapons cluster: `FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`, `PlayerHealthSystem` | cycle-2026-05-10-zone-manager-decoupling | 2 | weapons | no | Out-of-scope for Phase 2 R2 batches A/B/C; aspirational ≤5 ZoneManager-import target missed. Phase 3+ can finish; cycle-2026-05-10's ≤20 success criterion was met (achieved 17 read / 5 concrete). |
+| KONVEYER-10 | Rest-of-scene WebGPU parity and frame-budget attribution after K0-K9 branch-review completion | cycle-2026-05-11-konveyer-scene-parity | 1 | renderer / environment / world / perf-harness | no | Gates any WebGPU production-rollout claim. The experimental branch head proves strict close-NPC materialization telemetry/body bounds, startup feature-compile attribution, and a bounded spawn-residency close-model reserve for Open Frontier. Multi-mode materialization reserve verification, A Shau finite-edge strategy, final cloud/weather art, and water shader/interaction consumers remain open before principles-first rearchitecture. |
+| konveyer-large-file-splits | Two KONVEYER-grown files added to `lint-source-budget.ts` grandfather list at the 2026-05-12 master-merge gate: `HosekWilkieSkyBackend.ts` (807 LOC, slated for the TSL fragment-shader sky port) and `WaterSystem.ts` (733 LOC, slated for VODA-1 water-shader work) | exp→master merge prep 2026-05-12 | 0 | environment | no | Split-debt tracking. Both files grew during the KONVEYER campaign (sky through slices 13-15 + sky-refresh fix; water during the scene-parity standard-material port). Each is grandfathered with a named follow-up round in `scripts/lint-source-budget.ts`. Closes when the named follow-up cycles ship and the files drop below 700 LOC. |
+
+## Parked
+
+Items intentionally de-prioritized but not closed. They remain owed work;
+they just do not count against the ≤12 active rule while parked. To reactivate,
+move the row back into the Active table and reset its `Cycles open` counter to
+the cycle that re-opens it.
+
+| ID | Title | Parked | Origin | Reason | Reactivate when |
+|----|-------|--------|--------|--------|-----------------|
+| AVIATSIYA-2 | AC-47 low-pitch takeoff single-bounce | 2026-05-12 vision-pivot park | cycle-2026-04-21-stabilization-reset (7 cycles open at park) | Helicopter / fixed-wing polish. Not vision-critical under the 2026-05-12 directions (WebGPU experimental + driveable land vehicles). Anchor at `Airframe` ground rolling. | Phase 4 F5 close-out resumes, or a fixed-wing-feature cycle opens. |
+| AVIATSIYA-3 | Helicopter parity audit: HelicopterVehicleAdapter vs HelicopterPlayerAdapter | 2026-05-12 vision-pivot park | cycle-2026-04-22-heap-and-polish (7 cycles open at park) | Audit memo exists at `docs/rearch/helicopter-parity-audit.md`; work is documented, not actioned. Not vision-critical under the 2026-05-12 directions. | Phase 4 F5 close-out resumes, or the helicopter-adapter cluster is touched again. |
+
+History log:
+
+- 2026-05-12 — vision-pivot park: AVIATSIYA-2 and AVIATSIYA-3 moved Active → Parked
+  to free slots in the active-list budget for the WebGPU (KONVEYER-11 successor
+  IDs) and driveable-land-vehicle (VEKHIKL-3 successor IDs) directions confirmed
+  by the owner on 2026-05-12. No status change for the two items themselves.
 
 ## Closed
 

@@ -36,7 +36,7 @@ cycle reopens them.
 | HUD/presentation state | `GameplayPresentationController` through `HUDSystem` | touch controls, action bars, gameplay systems | High; UI should render vehicle facts, not decide gameplay mode. |
 | Terrain/collision truth | `TerrainSystem` plus legacy `HeightQueryCache` | vehicles, combatants, world features, probes | High; global cache is still a second authority. |
 | Airfield surface / aircraft staging height | terrain stamp datum: `TerrainFeatureCompiler`; staging still split across `WorldFeatureSystem` and `FixedWingModel` | fixed-wing spawn, taxi routes, runway helpers, terrain stamps | High; terrain stamps now share one generated airfield datum, but spawn metadata and runtime terrain/collision are not yet a unified airfield surface service. |
-| Atmosphere cloud/fog presentation | `AtmosphereSystem`, `HosekWilkieSkyBackend`, scenario presets | renderer, weather, perf captures, playtests | Medium; visible clouds now come from the sky-dome pass, the old `CloudLayer` plane is hidden, and the shader now uses a seamless cloud-deck projection. Open Frontier/combat120 are lighter scattered-cloud presets and still need art review. |
+| Atmosphere cloud/fog presentation | `AtmosphereSystem`, `HosekWilkieSkyBackend`, scenario presets | renderer, weather, perf captures, playtests | Medium; visible clouds now come from the sky-dome pass, the old finite cloud plane has been retired, and the shader now uses a seamless cloud-deck projection. Open Frontier/combat120 are lighter scattered-cloud presets and still need art review. |
 | World feature render/collision presence | `WorldFeatureSystem` plus per-model optimizer; aircraft use `AirVehicleVisibility` | terrain collision, LOS accelerator, renderer, perf probes | Medium; props/buildings do not yet have the same explicit render/sim visibility contract aircraft have. |
 | Combatant hot state | `CombatantSystem` object map | LOD manager, movement, AI, renderer, spatial grid | High; public maps and singleton spatial access remain scale risks. |
 | Actor height / combat verticality | `CombatantConfig`, `CombatantBodyMetrics`, `CombatantMeshFactory` | player respawn, NPC spawn/deploy, ballistics, LOS, hit zones, tracers, cover checks, billboard renderer | Medium; 2026-04-24 code now uses an eye-level actor-anchor contract and smaller billboard container, but human playtest still must confirm visual NPC/player scale and fire height. |
@@ -92,7 +92,7 @@ current-code fixes and automated evidence, but still need human playtest.
 | Pointer lock does not work in the Codex in-app browser. | Branch-local code now makes `PlayerInput` and `GameEngineInput` use `document.body`, and `PlayerInput` reports `pointerlockerror` / rejected requests. | Cycle 1 narrow input fix landed; Cycle 4 still owns boundary cleanup. | Human playtest must confirm the unlocked mouse-look fallback is usable in embedded browsers and does not fight ground FPS or vehicle look. |
 | Helicopter blades keep spinning after exit and do not visually read as high RPM in flight. | `HelicopterPhysics.updateEngine()` floors engine RPM at 0.2; `HelicopterAnimation` spins at `engineRPM * 20` with no blurred-disc state. | Cycle 2 vehicle feel/presentation. | Add explicit engine/rotor lifecycle states: stopped, idle, spool-up, flight RPM, and high-RPM blur. Inspect GLB nodes only after the lifecycle is correct. |
 | Airfield aircraft/taxi/runway height mismatch still appears in playtest. | Parked aircraft sample height at stand position; runway line-up samples height again at runway start; generated runway/apron/taxi stamps previously picked local target heights independently on slopes. | Cycle 2/6 bridge: airfield staging before Airframe scorch decision. | Branch-local patch gives generated airfield terrain stamps one runway datum and validates parking/taxi/runway route height deltas. Human playtest still needs to confirm A Shau usability, then Cycle 6 should unify terrain/collision/staging access. |
-| Fog/clouds can obscure whether terrain and airfields are correct. | Branch-local visible clouds moved into `HosekWilkieSkyBackend`; `AtmosphereSystem` keeps the old `CloudLayer` invisible so the finite plane cannot create a hard horizon divider. | Cycle 9 atmosphere pass. | Latest all-mode evidence shows sky coverage metrics in every mode and no visible cloud-plane authority. Human playtest must still judge whether Open Frontier/combat120 haze is acceptable cloud art. |
+| Fog/clouds can obscure whether terrain and airfields are correct. | Branch-local visible clouds moved into `HosekWilkieSkyBackend`; the old finite cloud plane has been retired so it cannot create a hard horizon divider. | Cycle 9 atmosphere pass. | Latest all-mode evidence shows sky coverage metrics in every mode and no visible cloud-plane authority. Human playtest must still judge whether Open Frontier/combat120 haze is acceptable cloud art. |
 | A Shau required terrain/nav can block evidence. | Branch-local `ModeStartupPreparer` now throws when the required DEM/manifest path fails; local perf preview now loads DEM-backed terrain. Large-world nav is explicit static-tiled generation, and A Shau startup fails if no navmesh is generated or pre-baked. | Cycle 10 fallback retirement plus Cycle 11 airfield validation. | Do not skip A Shau: keep fixing static-tiled nav quality and `tabat_airstrip` surface. The final pre-release all-mode evidence rerun after the NPC/README pass kept Open Frontier/TDM/ZC/combat120 entering live mode with `0` browser errors; rerun it again if more runtime code lands before deploy. |
 | Aircraft/buildings appear to hurt frames near airfields. | Aircraft have `AirVehicleVisibility`; world props load through `WorldFeatureSystem` and draw-call optimizer but lack an equivalent prop/building visibility contract. | Cycle 5/6 perf ownership. | Run an airfield perf capture with draw calls, triangles, collision objects, and LOS obstacle counts before replacing GLBs. |
 
@@ -484,9 +484,9 @@ Evidence confirmed:
 - all five modes had passing cloud-legibility image scores, cloud follow
   `true`, terrain ready at camera, and no captured camera-below-terrain or
   water-exposed-by-terrain-clip state;
-- the visible cloud authority is now `HosekWilkieSkyBackend`; `CloudLayer` is
-  still constructed for compatibility but is kept invisible so the old finite
-  plane cannot draw the hard horizontal divider seen in playtest screenshots;
+- the visible cloud authority is now `HosekWilkieSkyBackend`; the old finite
+  cloud plane has been retired so it cannot draw the hard horizontal divider
+  seen in playtest screenshots;
 - A Shau loaded real DEM height evidence after the build scripts generated
   `asset-manifest.json` into `dist/` and `dist-perf/`;
 - A Shau water is disabled in evidence (`enabled=false`, `waterVisible=false`,
@@ -511,8 +511,8 @@ Evidence confirmed:
   budget/slow-frame warnings that must stay visible before push/deploy.
 
 Cycle 9 code changes reduced per-scenario fog densities, moved the visible
-cloud pass into the sky dome, left the old planar cloud layer hidden, and
-replaced the azimuth-wrapped cloud UVs with a seamless cloud-deck projection.
+cloud pass into the sky dome, retired the old planar cloud layer, and replaced
+the azimuth-wrapped cloud UVs with a seamless cloud-deck projection.
 That removes the known hard plane/divider from the visible path. It does not
 make clouds a finished art or weather system: Open Frontier and combat120 now
 show lighter scattered cloud forms, while A Shau/TDM/ZC read as heavier broken

@@ -1,5 +1,7 @@
 # Stabilization Checkpoint — 2026-05-09
 
+> **HISTORICAL (as of 2026-05-12).** This checkpoint captured Phase 2 close on 2026-05-09. The Phases 3–9 refactor queue it references has been **superseded** by KONVEYER-10 (on `exp/konveyer-webgpu-migration`) + Option 1 (VODA-1 / VEKHIKL-1 / DEFEKT-3 first slices). See [docs/STRATEGIC_ALIGNMENT_2026-05-10.md](STRATEGIC_ALIGNMENT_2026-05-10.md). Findings and acceptance results below remain accurate as of 2026-05-09; routing/queue claims are superseded.
+
 Last verified: 2026-05-09
 
 This is the **stabilization checkpoint** at the close of Phase 2 of the

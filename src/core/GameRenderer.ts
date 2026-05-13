@@ -8,6 +8,19 @@ import { freezeTransform } from '../utils/SceneUtils';
 import { estimateGPUTier, isMobileGPU, shouldEnableShadows, getShadowMapSize, getMaxPixelRatio } from '../utils/DeviceDetector';
 import { ViewportInfo, ViewportManager } from '../ui/design/responsive';
 import { WorldOverlayRegistry } from '../ui/debug/WorldOverlayRegistry';
+import {
+  createInitialRendererCapabilities,
+  createWebGLRenderer,
+  createWebGPURenderer,
+  initializeCommonRenderer,
+  inspectResolvedRendererBackend,
+  isWebGPURenderer,
+  resolveRendererBackendMode,
+  toErrorMessage,
+  type CommonRenderer,
+  type RendererBackendCapabilities,
+  type RendererBackendMode,
+} from './RendererBackend';
 
 /**
  * Default fog / scene-background colour applied before the analytic sky
@@ -45,6 +58,8 @@ export class GameRenderer {
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
   public postProcessing?: PostProcessingManager;
+  private readonly rendererBackendMode: RendererBackendMode;
+  private rendererCapabilities: RendererBackendCapabilities;
   /**
    * Optional camera override. When set, the main render loop draws the scene
    * from this camera instead of `this.camera`. Used by FreeFlyCamera for
@@ -70,6 +85,8 @@ export class GameRenderer {
   public worldOverlays!: WorldOverlayRegistry;
 
   constructor() {
+    this.rendererBackendMode = resolveRendererBackendMode();
+    this.rendererCapabilities = createInitialRendererCapabilities(this.rendererBackendMode);
     this.scene = new THREE.Scene();
 
     this.camera = new THREE.PerspectiveCamera(
@@ -79,17 +96,7 @@ export class GameRenderer {
       1000
     );
 
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      powerPreference: 'high-performance',
-      // Required for the F9 playtest capture overlay to call
-      // `renderer.domElement.toBlob()` and get a non-blank PNG. Gated
-      // behind DEV or `?capture=1` so retail players don't pay the
-      // ~13 MB back-buffer residual when they'll never press F9. See
-      // `shouldPreserveDrawingBuffer` above and
-      // docs/tasks/preserve-drawing-buffer-dev-gate.md.
-      preserveDrawingBuffer: shouldPreserveDrawingBuffer()
-    });
+    this.renderer = createWebGLRenderer(shouldPreserveDrawingBuffer());
 
     this.setupRenderer();
     this.setupLighting();
@@ -104,23 +111,12 @@ export class GameRenderer {
     const gpuTier = estimateGPUTier();
     const isMobile = isMobileGPU();
 
-    Logger.info('Renderer', `Initializing renderer (Tier: ${gpuTier}, Mobile: ${isMobile})`);
+    Logger.info(
+      'Renderer',
+      `Initializing renderer (Tier: ${gpuTier}, Mobile: ${isMobile}, Requested: ${this.rendererBackendMode})`
+    );
 
-    // Aggregate stats across the whole frame; the loop resets once before rendering.
-    this.renderer.info.autoReset = false;
-
-    // Device-adaptive pixel ratio
-    this.renderer.setPixelRatio(getMaxPixelRatio());
-
-    const initialViewport = ViewportManager.getInstance().info;
-    this.renderer.setSize(initialViewport.width, initialViewport.height);
-
-    // Device-adaptive shadow settings
-    this.renderer.shadowMap.enabled = shouldEnableShadows();
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.applyCommonRendererSettings(this.renderer);
 
     document.body.appendChild(this.renderer.domElement);
 
@@ -130,6 +126,24 @@ export class GameRenderer {
     this.viewportUnsubscribe = ViewportManager.getInstance().subscribe((info) => {
       this.applyViewport(info);
     });
+  }
+
+  private applyCommonRendererSettings(renderer: THREE.WebGLRenderer): void {
+    // Aggregate stats across the whole frame; the loop resets once before rendering.
+    renderer.info.autoReset = false;
+
+    // Device-adaptive pixel ratio
+    renderer.setPixelRatio(getMaxPixelRatio());
+
+    const initialViewport = ViewportManager.getInstance().info;
+    renderer.setSize(initialViewport.width, initialViewport.height);
+
+    // Device-adaptive shadow settings
+    renderer.shadowMap.enabled = shouldEnableShadows();
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
   }
 
   private setupLighting(): void {
@@ -214,6 +228,97 @@ export class GameRenderer {
     // The old low-res quantized post pass made flat GLBs and vegetation harder
     // to read, so runtime rendering goes directly to the backbuffer for now.
     this.postProcessing = undefined;
+  }
+
+  async initializeRendererBackend(): Promise<void> {
+    if (this.rendererBackendMode === 'webgl') {
+      this.rendererCapabilities = {
+        ...this.rendererCapabilities,
+        resolvedBackend: 'webgl',
+        initStatus: 'ready',
+      };
+      return;
+    }
+
+    const previousRenderer = this.renderer;
+    const previousDisplay = previousRenderer.domElement.style.display;
+
+    try {
+      const { renderer, capabilities } = await createWebGPURenderer(this.rendererBackendMode);
+      this.applyCommonRendererSettings(renderer);
+      renderer.domElement.style.display = previousDisplay;
+      await initializeCommonRenderer(renderer);
+      const resolvedBackend = inspectResolvedRendererBackend(renderer);
+
+      if (resolvedBackend !== 'webgpu') {
+        if (capabilities.strictWebGPU) {
+          renderer.dispose();
+          throw new Error(
+            `Strict WebGPU mode resolved ${resolvedBackend}; refusing WebGL fallback.`,
+          );
+        }
+        // Non-strict mode (default 'webgpu' or 'webgpu-force-webgl'): accept
+        // Three.js's automatic WebGL2 fallback. Since r171 the WebGPURenderer
+        // from `three/webgpu` falls back to a WebGL2 backend when navigator.gpu
+        // is unavailable, and TSL node materials work on both backends. This
+        // path is what production users on macOS Sonoma + Safari, iOS 17,
+        // older Firefox, or any swiftshader/GPU-less environment hit.
+        Logger.warn(
+          'Renderer',
+          `WebGPU unavailable; rendering on ${resolvedBackend} backend.`,
+        );
+      }
+
+      const previousParent = previousRenderer.domElement.parentElement;
+      if (previousParent) {
+        previousParent.replaceChild(renderer.domElement, previousRenderer.domElement);
+      } else {
+        document.body.appendChild(renderer.domElement);
+      }
+      previousRenderer.dispose();
+
+      this.renderer = renderer;
+      this.rendererCapabilities = {
+        ...capabilities,
+        resolvedBackend,
+        initStatus: 'ready',
+        notes: [
+          ...capabilities.notes,
+          `Renderer initialized as ${resolvedBackend}.`,
+        ],
+      };
+
+      Logger.info(
+        'Renderer',
+        `KONVEYER renderer backend initialized (${this.rendererCapabilities.resolvedBackend})`
+      );
+    } catch (error) {
+      const errorMessage = toErrorMessage(error);
+      this.rendererCapabilities = {
+        ...this.rendererCapabilities,
+        resolvedBackend: 'unknown',
+        initStatus: 'failed',
+        error: errorMessage,
+        notes: [
+          ...this.rendererCapabilities.notes,
+          'WebGPU renderer initialization failed; refusing to keep the WebGL bootstrap renderer.',
+        ],
+      };
+      Logger.warn(
+        'Renderer',
+        `KONVEYER WebGPU init failed: ${this.rendererCapabilities.error}`
+      );
+      throw error instanceof Error ? error : new Error(errorMessage);
+    }
+  }
+
+  getRendererBackendCapabilities(): RendererBackendCapabilities {
+    return {
+      ...this.rendererCapabilities,
+      adapterFeatures: [...this.rendererCapabilities.adapterFeatures],
+      adapterLimits: { ...this.rendererCapabilities.adapterLimits },
+      notes: [...this.rendererCapabilities.notes],
+    };
   }
 
   /**
@@ -330,13 +435,21 @@ export class GameRenderer {
    * Call this after all systems are initialized but before gameplay starts.
    */
   precompileShaders(): void {
+    if (isWebGPURenderer(this.renderer)) {
+      Logger.warn('Renderer', 'Skipping legacy WebGL shader pre-compilation on WebGPURenderer path');
+      return;
+    }
+
     Logger.info('Renderer', 'Pre-compiling shaders...');
     const startTime = performance.now();
 
     const rendererAny = this.renderer as THREE.WebGLRenderer & {
       compileAsync?: (scene: THREE.Object3D, camera: THREE.Camera) => Promise<unknown>;
     };
-    const supportsParallelCompile = this.renderer.extensions.has('KHR_parallel_shader_compile');
+    const rendererWithExtensions = this.renderer as CommonRenderer & {
+      extensions?: { has: (name: string) => boolean };
+    };
+    const supportsParallelCompile = rendererWithExtensions.extensions?.has('KHR_parallel_shader_compile') === true;
 
     if (!supportsParallelCompile) {
       Logger.warn('Renderer', 'KHR_parallel_shader_compile unavailable; skipping async shader pre-compilation');

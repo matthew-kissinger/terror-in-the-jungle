@@ -21,6 +21,7 @@ describe('HosekWilkieSkyBackend (via AtmosphereSystem)', () => {
     system.attachScene(scene);
     const skyMesh = scene.children.find((c) => c.name === 'HosekWilkieSkyDome');
     expect(skyMesh).toBeDefined();
+    expect((skyMesh as THREE.Mesh).material).toBeInstanceOf(THREE.MeshBasicMaterial);
   });
 
   it('reapplies the same preset cleanly without duplicating the dome', () => {
@@ -220,6 +221,38 @@ describe('HosekWilkieSkyBackend (LUT rebake threshold)', () => {
     const distance = Math.sqrt(dr * dr + dg * dg + db * db);
     expect(distance).toBeGreaterThan(0.01);
   });
+
+  it('continuous sun motion does not refresh the sky texture every LUT rebake', () => {
+    // Simulates a 4.5s window of todCycle-style continuous sun sweep at
+    // ~0.6deg/sec. Without the refresh-cadence gate this would mark the
+    // texture dirty every ~0.83s (5-6 fires); with the gate the timer
+    // caps the expensive 8192-pixel composite at the refresh cadence
+    // (2 s) so it runs at most a small number of times in the window.
+    const backend = new HosekWilkieSkyBackend();
+    backend.applyPreset(SCENARIO_ATMOSPHERE_PRESETS.ashau);
+    backend.resetRefreshStatsForDebug();
+
+    const totalSeconds = 4.5;
+    const dt = 1 / 60;
+    const azimuthRatePerSec = (0.6 * Math.PI) / 180;
+    const startAzimuth = SCENARIO_ATMOSPHERE_PRESETS.ashau.sunAzimuthRad;
+    const elevation = SCENARIO_ATMOSPHERE_PRESETS.ashau.sunElevationRad;
+    const cosE = Math.cos(elevation);
+    const sinE = Math.sin(elevation);
+    const sun = new THREE.Vector3();
+    let elapsed = 0;
+    while (elapsed < totalSeconds) {
+      elapsed += dt;
+      const az = startAzimuth + azimuthRatePerSec * elapsed;
+      sun.set(cosE * Math.cos(az), sinE, cosE * Math.sin(az)).normalize();
+      backend.update(dt, sun);
+    }
+
+    const stats = backend.getRefreshStatsForDebug();
+    // Cadence ceiling: at most ceil(window / refreshSeconds) fires.
+    // Window 4.5s and refresh cadence 2s permits up to 3.
+    expect(stats.fireCount).toBeLessThanOrEqual(3);
+  });
 });
 
 describe('HosekWilkieSkyBackend (sky-integrated cloud coverage)', () => {
@@ -245,6 +278,48 @@ describe('HosekWilkieSkyBackend (sky-integrated cloud coverage)', () => {
     expect(Number.isFinite(zenith.r)).toBe(true);
     expect(Number.isFinite(zenith.g)).toBe(true);
     expect(Number.isFinite(zenith.b)).toBe(true);
+  });
+
+  it('tracks a coarse world and altitude anchor for sky-dome cloud features', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.setCloudCoverage(0.5);
+
+    backend.setCloudWorldAnchor(new THREE.Vector3(120, 40, -80));
+    const first = backend.getCloudAnchorDebug();
+    backend.setCloudWorldAnchor(new THREE.Vector3(124, 42, -76));
+    const withinThreshold = backend.getCloudAnchorDebug();
+    backend.setCloudWorldAnchor(new THREE.Vector3(180, 40, -20));
+    const moved = backend.getCloudAnchorDebug();
+
+    expect(first.model).toBe('camera-followed-dome-world-altitude-clouds');
+    expect(first.deckAltitudeMeters).toBeGreaterThan(1000);
+    expect(first.maxTraceMeters).toBeGreaterThan(first.deckAltitudeMeters);
+    expect(first.horizonFadeStartY).toBeGreaterThan(0);
+    expect(first.horizonFadeFullY).toBeGreaterThan(first.horizonFadeStartY);
+    expect(withinThreshold.anchorX).toBe(first.anchorX);
+    expect(withinThreshold.anchorZ).toBe(first.anchorZ);
+    expect(moved.anchorX).toBe(180);
+    expect(moved.anchorZ).toBe(-20);
+  });
+
+  it('samples clouds from direction/world position rather than texture U seams', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.setCloudCoverage(1);
+    backend.setCloudFeatureScaleMeters(1400);
+    backend.setCloudWorldAnchor(new THREE.Vector3(120, 40, -80));
+
+    const rightOfWrap = new THREE.Vector3(1, 0.35, 0.002).normalize();
+    const leftOfWrap = new THREE.Vector3(1, 0.35, -0.002).normalize();
+    const rightMask = backend.sampleCloudMaskForDebug(rightOfWrap);
+    const leftMask = backend.sampleCloudMaskForDebug(leftOfWrap);
+
+    expect(Number.isFinite(rightMask)).toBe(true);
+    expect(Number.isFinite(leftMask)).toBe(true);
+    expect(rightMask).toBeGreaterThanOrEqual(0);
+    expect(rightMask).toBeLessThanOrEqual(1);
+    expect(leftMask).toBeGreaterThanOrEqual(0);
+    expect(leftMask).toBeLessThanOrEqual(1);
+    expect(Math.abs(rightMask - leftMask)).toBeLessThan(0.08);
   });
 });
 

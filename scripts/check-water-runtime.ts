@@ -42,6 +42,14 @@ interface RuntimeProofResult {
       surfaceY: number | null;
       depthOneMeterBelowSurface: number | null;
       underwaterOneMeterBelowSurface: boolean | null;
+      interactionSampleOneMeterBelowSurface: {
+        source: string;
+        surfaceY: number | null;
+        depth: number;
+        submerged: boolean;
+        immersion01: number;
+        buoyancyScalar: number;
+      } | null;
     } | null;
     boundingBox: {
       min: { x: number; y: number; z: number };
@@ -75,6 +83,17 @@ interface HarnessWindow extends Window {
         getWaterSurfaceY?: (position: { x: number; y: number; z: number }) => number | null;
         getWaterDepth?: (position: { x: number; y: number; z: number }) => number;
         isUnderwater?: (position: { x: number; y: number; z: number }) => boolean;
+        sampleWaterInteraction?: (
+          position: { x: number; y: number; z: number },
+          options?: { immersionDepthMeters?: number },
+        ) => {
+          source: string;
+          surfaceY: number | null;
+          depth: number;
+          submerged: boolean;
+          immersion01: number;
+          buoyancyScalar: number;
+        };
       };
     };
   };
@@ -250,6 +269,9 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
         surfaceY,
         depthOneMeterBelowSurface: belowSurface ? waterSystem.getWaterDepth(belowSurface) : null,
         underwaterOneMeterBelowSurface: belowSurface ? waterSystem.isUnderwater(belowSurface) : null,
+        interactionSampleOneMeterBelowSurface: belowSurface && typeof waterSystem.sampleWaterInteraction === 'function'
+          ? waterSystem.sampleWaterInteraction(belowSurface, { immersionDepthMeters: 2 })
+          : null,
       };
     }
 
@@ -291,7 +313,10 @@ function resultPassed(result: RuntimeProofResult): boolean {
     && (result.proof.waterInfo?.hydrologySegmentCount ?? 0) > 0
     && Number.isFinite(result.proof.queryProbe?.surfaceY ?? NaN)
     && (result.proof.queryProbe?.depthOneMeterBelowSurface ?? 0) > 0.9
-    && result.proof.queryProbe?.underwaterOneMeterBelowSurface === true;
+    && result.proof.queryProbe?.underwaterOneMeterBelowSurface === true
+    && result.proof.queryProbe?.interactionSampleOneMeterBelowSurface?.source === 'hydrology'
+    && result.proof.queryProbe.interactionSampleOneMeterBelowSurface.submerged === true
+    && result.proof.queryProbe.interactionSampleOneMeterBelowSurface.buoyancyScalar >= 0.49;
 }
 
 function toMarkdown(report: RuntimeProofReport): string {
@@ -376,7 +401,7 @@ async function main(): Promise<void> {
     results,
     nonClaims: [
       'This proof checks runtime mesh presence, public water query probes, and screenshot capture only.',
-      'This proof does not accept final river art, stream flow, crossings, consumer adoption of water queries, or perf.',
+      'This proof does not accept final river art, stream flow, crossings, consumer adoption of water interaction samples, physics, or perf.',
       'Human visual acceptance is still required before KB-TERRAIN water can close.',
     ],
   };

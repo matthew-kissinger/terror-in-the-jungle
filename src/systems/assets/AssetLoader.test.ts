@@ -32,6 +32,24 @@ describe('AssetLoader GPU texture warmup', () => {
     performance.clearMeasures();
   });
 
+  it('configures terrain ground albedo textures as sRGB repeatable mipmapped surfaces', () => {
+    const loader = new AssetLoader();
+    const texture = makeTexture(512, 512);
+    const versionBefore = texture.version;
+
+    (loader as unknown as {
+      configureTextureForCategory(texture: THREE.Texture, category: AssetCategory): void;
+    }).configureTextureForCategory(texture, AssetCategory.GROUND);
+
+    expect(texture.colorSpace).toBe(THREE.SRGBColorSpace);
+    expect(texture.wrapS).toBe(THREE.RepeatWrapping);
+    expect(texture.wrapT).toBe(THREE.RepeatWrapping);
+    expect(texture.magFilter).toBe(THREE.LinearFilter);
+    expect(texture.minFilter).toBe(THREE.LinearMipmapLinearFilter);
+    expect(texture.generateMipmaps).toBe(true);
+    expect(texture.version).toBeGreaterThan(versionBefore);
+  });
+
   it('uploads requested loaded textures and records texture residency metadata', () => {
     const loader = new AssetLoader();
     const texture = makeTexture(4096, 2048);

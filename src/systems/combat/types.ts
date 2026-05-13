@@ -145,7 +145,26 @@ export interface Combatant extends ITargetable {
   lastUpdateTime: number;
   lastZoneEvalTime?: number;
   updatePriority: number;
-  lodLevel: 'high' | 'medium' | 'low' | 'culled';
+  /**
+   * Simulation lane. Renamed 2026-05-13 from `lodLevel`. Drives AI/movement
+   * cadence and update-cap accounting. Values preserve previous semantics:
+   * - `high`: full AI tick, every-frame movement, terrain raycast budget.
+   * - `medium`: simplified AI, dynamic-interval scheduling.
+   * - `low`: basic kinematic update, no combat AI.
+   * - `culled`: no update on the close cadence; distant-sim or noop.
+   */
+  simLane: 'high' | 'medium' | 'low' | 'culled';
+  /**
+   * Render lane assigned by the materialization pipeline. Added 2026-05-13
+   * alongside the `lodLevel`->`simLane` rename so the v2 budget arbiter has
+   * a separate write surface for render decisions:
+   * - `close-glb`: animated Pixel Forge GLB instance.
+   * - `impostor`: crop-atlas billboard (current default for visible NPCs).
+   * - `silhouette`: low-detail billboard (not yet emitted; reserved for R2).
+   * - `cluster`: squad-shaped scene proxy (not yet emitted; reserved for R4).
+   * - `culled`: no draw this frame.
+   */
+  renderLane: 'close-glb' | 'impostor' | 'silhouette' | 'cluster' | 'culled';
   distanceSq?: number;
   isObjectiveFocused?: boolean;
   isRejoiningSquad?: boolean;

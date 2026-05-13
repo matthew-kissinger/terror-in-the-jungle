@@ -88,10 +88,11 @@ export function computeDefaultLODRanges(worldSize: number, maxLODLevels: number)
  */
 export function createTerrainConfig(overrides: Partial<TerrainSystemConfig> = {}): TerrainSystemConfig {
   const worldSize = overrides.worldSize ?? 1024;
+  const visualMargin = overrides.visualMargin ?? 200;
   const maxLODLevels = overrides.maxLODLevels ?? 6;
   return {
     worldSize,
-    visualMargin: overrides.visualMargin ?? 200,
+    visualMargin,
     maxLODLevels,
     lodRanges: overrides.lodRanges ?? computeDefaultLODRanges(worldSize, maxLODLevels),
     tileResolution: overrides.tileResolution ?? 33,

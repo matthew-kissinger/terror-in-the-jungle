@@ -78,6 +78,60 @@ Original prompt: we had an intern come in a really both things up recently - can
   `artifacts/perf/2026-05-08T01-17-22-608Z/projekt-143-completion-audit/completion-audit.json`
   with `29` blockers.
 
+2026-05-11/12 KONVEYER-10 nearby NPC materialization probe
+- Added/validated the dev/perf `window.npcMaterializationProfile()` path and
+  target-bound close-GLB crop selection for spawn-nearby NPC diagnosis.
+- Earlier strict WebGPU proof:
+  `artifacts/perf/2026-05-12T01-03-47-834Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  records 8 visible close GLBs with weapons, no request failures,
+  geometry-derived body bounds, and `selectionReason=preferred-active-close-model`.
+  The isolated crop now shows the strict-WebGPU soldier/weapon after hiding
+  terrain and vegetation for material review. WARNs at that point were the old
+  fixed close-GLB cap/total-cap fallback and the bright neutral proof frame;
+  the later 01:26 proof below addresses the Open Frontier startup cap symptom.
+- User-facing diagnostic trick: in a dev/perf build with `?perf=1&diag=1`, run
+  `window.npcMaterializationProfile(24)` and inspect nearest rows for
+  `distanceMeters`, `renderMode`, `hasCloseModelWeapon`, and
+  `closeFallbackReason`.
+
+2026-05-12 KONVEYER-10 startup feature compile attribution
+- Added startup marks under `terrain-features.compile` so the "Compiling
+  features" UI step is attributable. Latest strict WebGPU Open Frontier proof:
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Current attribution: feature list compile ~5.2ms for 1,363 stamps, 67
+  surface patches, 8 exclusion zones, and 36 flow paths; stamped-provider
+  creation ~2.1ms; 1024-grid heightmap rebake ~48.5ms; total terrain-feature
+  compile ~55.9ms. Treat the heightmap rebake as the first optimization target,
+  not WebGPU shader compilation.
+
+2026-05-12 KONVEYER bounded spawn-residency reserve and docs alignment
+- Implemented a bounded spawn-residency close-model reserve so actors near the
+  first reveal can use a small reserve above the steady close-GLB cap instead
+  of starting as impostors beside the player.
+- Latest strict WebGPU Open Frontier proof:
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  records 11 visible close GLBs, effective close cap 11, zero close fallback
+  records, all nearest startup/review rows as `close-glb` with weapons, and
+  public `window.npcMaterializationProfile()` telemetry.
+- The proof still WARNs because the generic NPC impostor crop has no candidate
+  after nearby actors promote to close GLBs and the isolated close crop is
+  bright against the neutral hidden-terrain/vegetation frame. Treat that as
+  probe shape plus material review, not as a remaining Open Frontier
+  total-cap startup failure.
+- Use `origin/exp/konveyer-webgpu-migration` branch head as the pickup point;
+  avoid freezing branch SHAs inside docs that should remain current after each
+  checkpoint commit.
+- Aligned `docs/AGENT_ORCHESTRATION.md`, `docs/state/CURRENT.md`,
+  `docs/state/recent-cycles.md`, `docs/DIRECTIVES.md`, `docs/CARRY_OVERS.md`,
+  `docs/ROADMAP.md`, `docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md`,
+  and KONVEYER rearch/task docs so the next agent starts from the current
+  strict WebGPU proof and blockers instead of the older K0-K9 packet.
+- Next-agent priority is multi-mode spawn-residency reserve verification and
+  budget review, multi-mode feature-compile attribution/heightmap-rebake
+  optimization, A Shau finite-edge decision, cloud/weather art representation,
+  water shader/intersections plus one interaction consumer, then
+  principles-first renderer rearchitecture.
+
 2026-05-08 Projekt Objekt-143 fixed-wing clean functional gate under resource contention
 - Continued under the active Objekt-143 goal after the 4174 fixed-wing packet
   carried a harness-teardown warning.
@@ -7194,3 +7248,39 @@ TODO
   against successful GitHub CI/deploy runs, live `/asset-manifest.json`, Pages
   headers, A Shau R2 DEM headers, and a live Pages browser smoke. The final
   completion audit depends on this proof plus clean local/remote git parity.
+
+2026-05-12 KONVEYER-10 multi-mode close-model reserve verification (loop)
+- Continued `exp/konveyer-webgpu-migration` from `01da7abb`. Verified the
+  bounded spawn-residency close-model reserve under strict WebGPU across Open
+  Frontier, Zone Control, Team Deathmatch, `ai_sandbox` (combat120), and
+  A Shau Valley. Two paired probe runs landed:
+  `artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  and
+  `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Both runs resolved `resolvedBackend=webgpu`, `strictWebGPUReady=true`, zero
+  console errors, zero page errors, zero request failures. The +4 reserve
+  activated when actors were inside the 64m spawn-residency bubble (Zone
+  Control +1, TDM +4, combat120 +4); Open Frontier varied with framing as
+  designed; A Shau placed no live combatants inside the 120m close radius
+  from the spawn pose.
+- combat120 surfaced the densest cluster: ~29-32 candidates against a 12-slot
+  cap with 14-18 `total-cap` fallbacks and 2-3 `pool-empty` fallbacks. The
+  per-faction pool was asymmetric (`US` exhausted while `NVA` retained slack),
+  so the next architecture decision is Phase F materialization-tier policy
+  rather than uniform-cap tuning.
+- No code changes. Doc updates only:
+  `docs/state/CURRENT.md`, `docs/state/recent-cycles.md`,
+  `docs/DIRECTIVES.md`, `docs/rearch/KONVEYER_PARITY_2026-05-10.md`,
+  `docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md`,
+  `docs/tasks/konveyer-full-autonomous-migration.md`, and the new draft
+  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md` (sim/render
+  lanes, budget arbiter, silhouette/cluster render proposals toward 3,000
+  combatants).
+- Validation: `npx vitest run src/systems/combat/CombatantRenderer.test.ts`
+  passed (44 tests), `npx vitest run src/systems/combat/PixelForgeNpcRuntime.test.ts`
+  passed (7 tests), `npm run lint:docs` passed (0 failures; 13 grandfathered
+  warnings including a +1 soft-limit nudge on `KONVEYER_PARITY_2026-05-10.md`
+  that already exceeded 800 LOC before this update).
+- Hard stops preserved: no `master` merge, no production deploy, no
+  `perf-baselines.json` change, no `src/types/SystemInterfaces.ts` edit, no
+  WebGL fallback acceptance in the proof path.

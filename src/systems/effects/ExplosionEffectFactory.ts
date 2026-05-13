@@ -31,6 +31,8 @@ export function createExplosionEffect(
   flashTexture: THREE.Texture,
   debrisTexture: THREE.Texture
 ): ExplosionEffect {
+  void smokeTexture;
+  void debrisTexture;
   // Flash sprite for visual burst - larger initial size
   const flashSpriteMaterial = new THREE.SpriteMaterial({
     map: flashTexture,
@@ -54,7 +56,7 @@ export function createExplosionEffect(
   smokeGeometry.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
 
   const smokeMaterial = new THREE.PointsMaterial({
-    map: smokeTexture,
+    color: 0x8b8b80,
     size: 4,
     transparent: true,
     opacity: 0.8,
@@ -96,7 +98,7 @@ export function createExplosionEffect(
   debrisGeometry.setAttribute('position', new THREE.BufferAttribute(debrisPositions, 3));
 
   const debrisMaterial = new THREE.PointsMaterial({
-    map: debrisTexture,
+    color: 0x4a4032,
     size: 0.5,
     transparent: true,
     opacity: 1,

@@ -7,6 +7,7 @@ import type { TerrainSurfacePatch } from './TerrainFeatureTypes';
 import { HeightmapGPU } from './HeightmapGPU';
 import {
   createTerrainMaterial,
+  type TerrainMaterial,
   type TerrainHydrologyMaskMaterialConfig,
   updateTerrainMaterialFarCanopyTint,
   updateTerrainMaterialTextures,
@@ -54,13 +55,15 @@ export class TerrainSurfaceRuntime {
   private readonly splatmap: SplatmapConfig;
   private readonly heightmapGPU: HeightmapGPU;
   private readonly tileGridResolution: number;
-  private terrainMaterial: THREE.MeshStandardMaterial | null = null;
+  private terrainMaterial: TerrainMaterial | null = null;
   private surfaceWetness = 0;
   private farCanopyTint: TerrainFarCanopyTintConfig = { enabled: false };
   private hydrologyMaskMaterial: TerrainHydrologyMaskMaterialConfig | null = null;
   private hydrologyMaskTexture: THREE.DataTexture | null = null;
   private featureSurfacePatches: TerrainSurfacePatch[] = [];
   private currentWorldSize = 0;
+  private currentPlayableWorldSize = 0;
+  private currentVisualMargin = 0;
   private currentDefaultBiomeId = 'denseJungle';
   private currentBiomeRules: BiomeClassificationRule[] = [];
 
@@ -76,11 +79,14 @@ export class TerrainSurfaceRuntime {
     worldSize: number,
     defaultBiomeId: string,
     biomeRules: BiomeClassificationRule[],
-  ): THREE.MeshStandardMaterial {
-    this.currentWorldSize = worldSize;
+    surfaceWorldSize: number = worldSize,
+  ): TerrainMaterial {
+    this.currentWorldSize = surfaceWorldSize;
+    this.currentPlayableWorldSize = worldSize;
+    this.currentVisualMargin = Math.max(0, (surfaceWorldSize - worldSize) * 0.5);
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
-    this.heightmapGPU.bakeFromProvider(provider, computeTerrainSurfaceGridSize(worldSize), worldSize);
+    this.heightmapGPU.bakeFromProvider(provider, computeTerrainSurfaceGridSize(surfaceWorldSize), surfaceWorldSize);
     const heightTexture = this.heightmapGPU.getHeightTexture();
     const normalTexture = this.heightmapGPU.getNormalTexture();
 
@@ -91,7 +97,9 @@ export class TerrainSurfaceRuntime {
     this.terrainMaterial = createTerrainMaterial({
       heightTexture,
       normalTexture,
-      worldSize,
+      worldSize: surfaceWorldSize,
+      playableWorldSize: worldSize,
+      visualMargin: this.currentVisualMargin,
       splatmap: this.splatmap,
       biomeConfig: this.buildBiomeMaterialConfig(defaultBiomeId, biomeRules),
       hydrologyMask: this.hydrologyMaskMaterial,
@@ -121,8 +129,10 @@ export class TerrainSurfaceRuntime {
     worldSize: number,
     defaultBiomeId: string,
     biomeRules: BiomeClassificationRule[],
-  ): THREE.MeshStandardMaterial {
+  ): TerrainMaterial {
     this.currentWorldSize = worldSize;
+    this.currentPlayableWorldSize = worldSize;
+    this.currentVisualMargin = 0;
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
     this.heightmapGPU.uploadPrebakedGrid(data, gridSize, worldSize);
@@ -137,6 +147,8 @@ export class TerrainSurfaceRuntime {
       heightTexture,
       normalTexture,
       worldSize,
+      playableWorldSize: worldSize,
+      visualMargin: 0,
       splatmap: this.splatmap,
       biomeConfig: this.buildBiomeMaterialConfig(defaultBiomeId, biomeRules),
       hydrologyMask: this.hydrologyMaskMaterial,
@@ -149,8 +161,17 @@ export class TerrainSurfaceRuntime {
     return this.terrainMaterial;
   }
 
-  rebake(provider: IHeightProvider, worldSize: number, defaultBiomeId: string, biomeRules: BiomeClassificationRule[]): void {
+  rebake(
+    provider: IHeightProvider,
+    worldSize: number,
+    defaultBiomeId: string,
+    biomeRules: BiomeClassificationRule[],
+    playableWorldSize: number = worldSize,
+    visualMargin: number = Math.max(0, (worldSize - playableWorldSize) * 0.5),
+  ): void {
     this.currentWorldSize = worldSize;
+    this.currentPlayableWorldSize = playableWorldSize;
+    this.currentVisualMargin = visualMargin;
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
     this.heightmapGPU.bakeFromProvider(provider, computeTerrainSurfaceGridSize(worldSize), worldSize);
@@ -171,7 +192,7 @@ export class TerrainSurfaceRuntime {
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
   }
 
-  getMaterial(): THREE.MeshStandardMaterial {
+  getMaterial(): TerrainMaterial {
     if (!this.terrainMaterial) {
       throw new Error('Terrain material requested before initialization');
     }
@@ -285,11 +306,13 @@ export class TerrainSurfaceRuntime {
         defaultBiomeId ?? this.currentDefaultBiomeId,
         biomeRules ?? this.currentBiomeRules,
       ),
-      this.splatmap,
-      this.featureSurfacePatches,
-      this.farCanopyTint,
-      this.hydrologyMaskMaterial,
-    );
+    this.splatmap,
+    this.featureSurfacePatches,
+    this.farCanopyTint,
+    this.hydrologyMaskMaterial,
+    this.currentPlayableWorldSize,
+    this.currentVisualMargin,
+  );
     updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
   }
 

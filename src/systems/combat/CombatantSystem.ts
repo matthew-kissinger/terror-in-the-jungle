@@ -19,7 +19,13 @@ import { CombatantFactory } from './CombatantFactory';
 import { CombatantAI } from './CombatantAI';
 import { CombatantCombat, CombatHitResult } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
-import { CombatantRenderer } from './CombatantRenderer';
+import {
+  CombatantRenderer,
+  type CombatantMaterializationRow,
+  type CloseModelPrewarmOptions,
+  type CloseModelPrewarmSummary,
+  type CloseModelRuntimeStats,
+} from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
 import { SpatialGridManager, spatialGridManager as defaultSpatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
@@ -35,6 +41,7 @@ import { clusterManager } from './ClusterManager';
 import { getRaycastBudgetStats } from './ai/RaycastBudget';
 import { getCombatFireRaycastBudgetStats } from './ai/CombatFireRaycastBudget';
 import { isPerfDiagnosticsEnabled, isPerfUserTimingEnabled } from '../../core/PerfDiagnostics';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 
@@ -48,6 +55,13 @@ interface CombatantSystemDependencies {
   hudSystem: IHUDSystem;
   audioManager: AudioManager;
   playerSuppressionSystem: PlayerSuppressionSystem;
+}
+
+export interface CombatantMaterializationProfile {
+  checkedAtMs: number;
+  playerPosition: { x: number; y: number; z: number };
+  closeModelStats: CloseModelRuntimeStats;
+  rows: CombatantMaterializationRow[];
 }
 
 export class CombatantSystem implements GameSystem {
@@ -192,12 +206,17 @@ export class CombatantSystem implements GameSystem {
     // Expose profiling only for harness/dev diagnostics. Gate matches
     // src/core/PerfDiagnostics.ts: DEV or VITE_PERF_HARNESS build.
     if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
-      (window as any).combatProfile = () => this.getCombatProfile();
+      const diagnosticsWindow = window as Window & {
+        combatProfile?: () => ReturnType<CombatantSystem['getCombatProfile']>;
+        npcMaterializationProfile?: (limit?: number) => CombatantMaterializationProfile;
+      };
+      diagnosticsWindow.combatProfile = () => this.getCombatProfile();
+      diagnosticsWindow.npcMaterializationProfile = (limit?: number) => this.getNearestCombatantMaterializationProfile(limit);
     }
 
     Logger.info('Combat', 'Combatant System initialized');
     if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled()) {
-      Logger.info('Combat', 'Use window.combatProfile() in console to see combat performance breakdown');
+      Logger.info('Combat', 'Use window.combatProfile() for combat timing and window.npcMaterializationProfile() for nearest NPC render modes');
     }
   }
   /**
@@ -243,21 +262,31 @@ export class CombatantSystem implements GameSystem {
 
     // Update influence map with current game state
     let t0 = performance.now();
-    if (this.influenceMap && this.zoneQuery) {
-      this.influenceMap.setCombatants(this.combatants);
-      this.influenceMap.setZones(this.zoneQuery.getAllZones());
-      this.influenceMap.setPlayerPosition(this.playerPosition);
-      // Update sandbag bounds if available
-      const sandbagSystem = (this as any).sandbagSystem;
-      if (sandbagSystem && typeof sandbagSystem.getSandbagBounds === 'function') {
-        this.influenceMap.setSandbagBounds(sandbagSystem.getSandbagBounds());
+    performanceTelemetry.beginSystem('Combat.Influence');
+    try {
+      if (this.influenceMap && this.zoneQuery) {
+        this.influenceMap.setCombatants(this.combatants);
+        this.influenceMap.setZones(this.zoneQuery.getAllZones());
+        this.influenceMap.setPlayerPosition(this.playerPosition);
+        // Update sandbag bounds if available
+        const sandbagSystem = (this as any).sandbagSystem;
+        if (sandbagSystem && typeof sandbagSystem.getSandbagBounds === 'function') {
+          this.influenceMap.setSandbagBounds(sandbagSystem.getSandbagBounds());
+        }
       }
+    } finally {
+      performanceTelemetry.endSystem('Combat.Influence');
     }
     this.profiler.profiling.influenceMapMs = performance.now() - t0;
 
     // Update combatants (AI, movement, combat) with LOD scheduling
     t0 = performance.now();
-    this.lodManager.updateCombatants(deltaTime);
+    performanceTelemetry.beginSystem('Combat.AI');
+    try {
+      this.lodManager.updateCombatants(deltaTime);
+    } finally {
+      performanceTelemetry.endSystem('Combat.AI');
+    }
     this.profiler.profiling.aiUpdateMs = performance.now() - t0;
     this.profiler.profiling.aiStateMs = this.combatantAI.getFrameStateProfile();
     this.profiler.profiling.aiMethodMs = this.combatantAI.getFrameMethodProfile();
@@ -295,16 +324,26 @@ export class CombatantSystem implements GameSystem {
 
     // Update billboard rotations and walk animation
     t0 = performance.now();
-    this.combatantRenderer.updateWalkFrame(deltaTime);
-    this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
-    this.combatantRenderer.updateShaderUniforms(deltaTime);
+    performanceTelemetry.beginSystem('Combat.Billboards');
+    try {
+      this.combatantRenderer.updateWalkFrame(deltaTime);
+      this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
+      this.combatantRenderer.updateShaderUniforms(deltaTime);
+    } finally {
+      performanceTelemetry.endSystem('Combat.Billboards');
+    }
     this.profiler.profiling.billboardUpdateMs = performance.now() - t0;
 
     // Update effect pools
     t0 = performance.now();
-    this.tracerPool.update();
-    this.muzzleFlashSystem.update(deltaTime);
-    this.impactEffectsPool.update(deltaTime);
+    performanceTelemetry.beginSystem('Combat.Effects');
+    try {
+      this.tracerPool.update();
+      this.muzzleFlashSystem.update(deltaTime);
+      this.impactEffectsPool.update(deltaTime);
+    } finally {
+      performanceTelemetry.endSystem('Combat.Effects');
+    }
     this.profiler.profiling.effectPoolsMs = performance.now() - t0;
 
     const duration = performance.now() - updateStart;
@@ -315,7 +354,7 @@ export class CombatantSystem implements GameSystem {
   private recordCombatAiUserTiming(
     aiUpdateMs: number,
     aiMethodMs: Record<string, number>,
-    aiSlowestUpdate: { stateAtStart: string; lodLevel: string; totalMs: number } | null
+    aiSlowestUpdate: { stateAtStart: string; simLane: string; totalMs: number } | null
   ): void {
     if (!this.perfUserTimingEnabled) return;
 
@@ -332,7 +371,7 @@ export class CombatantSystem implements GameSystem {
 
     if (aiSlowestUpdate && aiSlowestUpdate.totalMs >= this.COMBAT_AI_USER_TIMING_MIN_MS) {
       this.measureCombatAiDuration(
-        `CombatAI.slowest.${this.sanitizeUserTimingName(aiSlowestUpdate.stateAtStart)}.${this.sanitizeUserTimingName(aiSlowestUpdate.lodLevel)}`,
+        `CombatAI.slowest.${this.sanitizeUserTimingName(aiSlowestUpdate.stateAtStart)}.${this.sanitizeUserTimingName(aiSlowestUpdate.simLane)}`,
         aiSlowestUpdate.totalMs
       );
     }
@@ -639,6 +678,30 @@ export class CombatantSystem implements GameSystem {
   // Get the renderer for external configuration
   getRenderer(): CombatantRenderer {
     return this.combatantRenderer;
+  }
+
+  prewarmCloseModelsNearPlayer(options?: CloseModelPrewarmOptions): Promise<CloseModelPrewarmSummary> {
+    this.camera.getWorldPosition(this.playerPosition);
+    this.lodManager.setPlayerPosition(this.playerPosition);
+    return this.combatantRenderer.prewarmCloseModelsForSpawn(this.combatants, this.playerPosition, options);
+  }
+
+  getNearestCombatantMaterializationProfile(limit = 24): CombatantMaterializationProfile {
+    this.camera.getWorldPosition(this.playerPosition);
+    return {
+      checkedAtMs: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+      playerPosition: {
+        x: this.playerPosition.x,
+        y: this.playerPosition.y,
+        z: this.playerPosition.z,
+      },
+      closeModelStats: this.combatantRenderer.getCloseModelRuntimeStats(),
+      rows: this.combatantRenderer.getNearestCombatantMaterializationRows(
+        this.combatants,
+        this.playerPosition,
+        limit,
+      ),
+    };
   }
 
   getTelemetry() {

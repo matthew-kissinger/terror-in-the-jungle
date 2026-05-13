@@ -1,4 +1,5 @@
 import { GameEngine } from './GameEngine';
+import { GameEventBus } from './GameEventBus';
 import { injectSharedStyles } from '../ui/design/styles';
 import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
@@ -173,6 +174,23 @@ export async function bootstrapGame(): Promise<void> {
         };
       };
 
+      (window as any).__rendererBackendCapabilities = () => (
+        engine.renderer.getRendererBackendCapabilities()
+      );
+
+      // Slice 14 diagnostic: sky-backend refresh activity stats. Probe
+      // calls reset before its perf-window starts and reads at the end
+      // to compare real refresh activity against the SkyTexture EMA.
+      (window as any).__atmosphereSkyRefreshStats = (options: { reset?: boolean } = {}) => {
+        const atmosphere = engine.systemManager.atmosphereSystem;
+        if (!atmosphere) return null;
+        const stats = atmosphere.getSkyRefreshStatsForDebug();
+        if (options.reset) {
+          atmosphere.resetSkyRefreshStatsForDebug();
+        }
+        return stats;
+      };
+
       (window as any).__engineHealth = () => {
         const snap = engine.runtimeMetrics?.getSnapshot();
         const avgMs = snap?.avgFrameMs ?? 0;
@@ -184,6 +202,40 @@ export async function bootstrapGame(): Promise<void> {
           combatantCount: snap?.combatantCount ?? 0,
           heapUsedMB: Math.round((performance as any).memory?.usedJSHeapSize / 1048576) || 0,
         };
+      };
+
+      // Phase F slice 6/8: capture `materialization_tier_changed` events into
+      // a bounded ring so probe scripts can inspect the actual flow of tier
+      // transitions during a session. The buffer is cleared on read by
+      // default so consecutive probe steps observe distinct windows.
+      const tierEventBuffer: Array<{
+        capturedAtMs: number;
+        combatantId: string;
+        fromRender: 'close-glb' | 'impostor' | 'culled' | null;
+        toRender: 'close-glb' | 'impostor' | 'culled';
+        reason: string;
+        distanceMeters: number;
+      }> = [];
+      const TIER_EVENT_BUFFER_LIMIT = 4096;
+      GameEventBus.subscribe('materialization_tier_changed', (event) => {
+        if (tierEventBuffer.length >= TIER_EVENT_BUFFER_LIMIT) {
+          tierEventBuffer.shift();
+        }
+        tierEventBuffer.push({
+          capturedAtMs: performance.now(),
+          ...event,
+        });
+      });
+      (window as any).__materializationTierEvents = (
+        options: { clear?: boolean; limit?: number } = {},
+      ) => {
+        const clear = options.clear !== false;
+        const limit = Number.isFinite(options.limit ?? NaN)
+          ? Math.max(0, Math.min(TIER_EVENT_BUFFER_LIMIT, Math.floor(options.limit as number)))
+          : tierEventBuffer.length;
+        const out = tierEventBuffer.slice(-limit);
+        if (clear) tierEventBuffer.length = 0;
+        return out;
       };
     }
 

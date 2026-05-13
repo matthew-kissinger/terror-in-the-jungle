@@ -8,7 +8,7 @@ import type { PaneLike, TuningState } from '../LiveTuningPanel';
  * Per-scenario cloud coverage + feature-scale knobs. Mutates the preset
  * objects in place — AtmosphereSystem reads these on the next scenario
  * swap. For the currently-active scenario, `tuneAtmosphere.apply` pushes
- * coverage straight into the live cloud layer so edits are visible now.
+ * coverage straight into the live sky-dome cloud pass so edits are visible now.
  *
  * Wind speed/direction are tracked in state for completeness but only
  * direction is actually exposed as a shader uniform today; speed is baked

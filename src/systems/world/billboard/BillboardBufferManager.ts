@@ -1,12 +1,9 @@
 import * as THREE from 'three';
 import { Logger } from '../../../utils/Logger';
-import { BILLBOARD_VERTEX_SHADER, BILLBOARD_FRAGMENT_SHADER } from './BillboardShaders';
-import type {
-  VegetationAtlasProfile,
-  VegetationImposterAtlasConfig,
-  VegetationRepresentation,
-  VegetationShaderProfile,
-} from '../../../config/vegetationTypes';
+import { createBillboardNodeMaterial, type BillboardNodeMaterial } from './BillboardNodeMaterial';
+import type { BillboardLighting, GPUVegetationConfig } from './BillboardTypes';
+
+export type { BillboardLighting, GPUVegetationConfig } from './BillboardTypes';
 
 const DEFAULT_BILLBOARD_FOG_DENSITY = 0.00055;
 const MAX_BILLBOARD_FOG_DENSITY = 0.002;
@@ -15,44 +12,9 @@ const clamp = (value: number, min: number, max: number): number => (
   Math.min(max, Math.max(min, value))
 );
 
-const resolveWindStrength = (height: number, profile: VegetationAtlasProfile): number => {
-  const profileMultiplier = profile === 'ground-compact'
-    ? 0.55
-    : profile === 'canopy-hero' || profile === 'canopy-balanced'
-      ? 1.15
-      : 0.85;
-  return clamp(height * 0.018 * profileMultiplier, 0.08, 0.34);
-};
-
-export interface GPUVegetationConfig {
-  maxInstances: number;
-  texture: THREE.Texture;
-  normalTexture?: THREE.Texture;
-  width: number;
-  height: number;
-  fadeDistance: number;
-  maxDistance: number;
-  representation: VegetationRepresentation;
-  atlasProfile: VegetationAtlasProfile;
-  shaderProfile: VegetationShaderProfile;
-  imposterAtlas?: VegetationImposterAtlasConfig;
-}
-
-/**
- * Per-frame lighting snapshot forwarded from AtmosphereSystem so billboard
- * vegetation shades with the same sun + hemisphere colors terrain picks up
- * through MeshStandardMaterial. Kept deliberately small — this is a cheap
- * hemispheric approximation, not a full PBR port.
- */
-export interface BillboardLighting {
-  sunColor: THREE.Color;
-  skyColor: THREE.Color;
-  groundColor: THREE.Color;
-}
-
 export class GPUBillboardVegetation {
   private geometry: THREE.InstancedBufferGeometry;
-  private material: THREE.RawShaderMaterial;
+  private material: BillboardNodeMaterial;
   private mesh: THREE.Mesh;
   private scene: THREE.Scene;
 
@@ -87,8 +49,12 @@ export class GPUBillboardVegetation {
 
     // Convert to InstancedBufferGeometry
     this.geometry = new THREE.InstancedBufferGeometry();
-    this.geometry.index = planeGeometry.index;
-    this.geometry.attributes = planeGeometry.attributes;
+    this.geometry.setIndex(planeGeometry.index);
+    Object.entries(planeGeometry.attributes).forEach(([name, attribute]) => {
+      this.geometry.setAttribute(name, attribute);
+    });
+    this.geometry.instanceCount = 0;
+    planeGeometry.dispose();
 
     // Initialize instance arrays
     this.positions = new Float32Array(this.maxInstances * 3);
@@ -110,69 +76,18 @@ export class GPUBillboardVegetation {
     this.geometry.setAttribute('instanceScale', this.scaleAttribute);
     this.geometry.setAttribute('instanceRotation', this.rotationAttribute);
 
-    // Create shader material with height fog support
-    this.material = new THREE.RawShaderMaterial({
-      uniforms: {
-        map: { value: config.texture },
-        normalMap: { value: config.normalTexture ?? config.texture },
-        normalMapEnabled: { value: Boolean(config.normalTexture && config.shaderProfile === 'normal-lit') },
-        imposterAtlasEnabled: { value: Boolean(config.imposterAtlas) },
-        imposterTiles: { value: new THREE.Vector2(config.imposterAtlas?.tilesX ?? 1, config.imposterAtlas?.tilesY ?? 1) },
-        imposterUvBounds: { value: new THREE.Vector4(alphaCrop.minU, alphaCrop.minV, alphaCrop.maxU, alphaCrop.maxV) },
-        stableAtlasAzimuth: { value: Number.isFinite(config.imposterAtlas?.stableAzimuthColumn) },
-        stableAtlasColumn: { value: config.imposterAtlas?.stableAzimuthColumn ?? 0 },
-        maxAtlasElevationRow: { value: config.imposterAtlas?.maxElevationRow ?? -1 },
-        time: { value: 0 },
-        cameraPosition: { value: new THREE.Vector3() },
-        fadeDistance: { value: config.fadeDistance },
-        maxDistance: { value: config.maxDistance },
-        // Pixel Forge vegetation is currently impostor-only at close range.
-        // A near fade without a close mesh replacement makes plants disappear
-        // when the player walks into them, so keep this disabled until a
-        // manifest-backed close LOD exists.
-        nearFadeDistance: { value: 0.0 },
-        lodDistances: { value: new THREE.Vector2(150, 300) },
-        viewMatrix: { value: new THREE.Matrix4() },
-        colorTint: { value: new THREE.Color(1.04, 1.08, 1.0) },
-        gammaAdjust: { value: 1.0 },
-        nearAlphaSolidDistance: { value: 30.0 },
-        vegetationExposure: { value: 1.18 },
-        nearLightBoostDistance: { value: 85.0 },
-        minVegetationLight: { value: 0.68 },
-        windStrength: { value: resolveWindStrength(config.height, config.atlasProfile) },
-        windSpeed: { value: 1.15 },
-        windSpatialScale: { value: 0.055 },
-        // Height fog uniforms - creates ground-level mist effect
-        fogColor: { value: new THREE.Color(0x5a7a6a) },
-        fogDensity: { value: DEFAULT_BILLBOARD_FOG_DENSITY }, // Kept in sync with scene fog in update().
-        fogHeightFalloff: { value: 0.03 },   // How quickly fog thins with altitude (lower = thicker at height)
-        fogStartDistance: { value: 100.0 },  // Fog doesn't appear until this distance
-        fogEnabled: { value: false },
-        // Atmosphere lighting uniforms (cycle-2026-04-21 parity pass). Start
-        // neutral so materials rendered before AtmosphereSystem is wired
-        // (tests, early boot, legacy callers) still see reasonable color.
-        sunColor: { value: new THREE.Color(1, 1, 1) },
-        skyColor: { value: new THREE.Color(0.7, 0.8, 1.0) },
-        groundColor: { value: new THREE.Color(0.3, 0.3, 0.25) },
-        lightingEnabled: { value: false },
-      },
-      vertexShader: BILLBOARD_VERTEX_SHADER,
-      fragmentShader: BILLBOARD_FRAGMENT_SHADER,
-      transparent: true,
-      side: THREE.DoubleSide,
-      depthWrite: true,
-      depthTest: true,
-      // Premultiplied alpha blending - eliminates dark halos at texture edges
-      blending: THREE.CustomBlending,
-      blendSrc: THREE.OneFactor,
-      blendDst: THREE.OneMinusSrcAlphaFactor,
-      blendSrcAlpha: THREE.OneFactor,
-      blendDstAlpha: THREE.OneMinusSrcAlphaFactor
-    });
+    this.material = createBillboardNodeMaterial(
+      config,
+      alphaCrop,
+      this.positionAttribute,
+      this.scaleAttribute,
+      this.rotationAttribute,
+    );
 
     // Create mesh
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false; // Disable frustum culling for instanced geometry
+    this.mesh.visible = false;
     this.mesh.matrixAutoUpdate = false;
     this.mesh.matrixWorldAutoUpdate = false;
     this.scene.add(this.mesh);
@@ -228,6 +143,7 @@ export class GPUBillboardVegetation {
     }
 
     this.geometry.instanceCount = this.highWaterMark;
+    this.mesh.visible = this.liveCount > 0;
 
     const addedCount = this.liveCount - startLiveCount;
     if (addedCount > 0) {
@@ -284,6 +200,7 @@ export class GPUBillboardVegetation {
     if (compacted) {
       this.geometry.instanceCount = this.highWaterMark;
     }
+    this.mesh.visible = this.liveCount > 0;
     
     if (this.highWaterMark < this.maxInstances) {
       this.warnedCapacity = false;
@@ -301,6 +218,7 @@ export class GPUBillboardVegetation {
     this.liveCount = 0;
     this.freeSlots.clear();
     this.geometry.instanceCount = 0;
+    this.mesh.visible = false;
     this.pendingPositionUpdate = true;
     this.pendingScaleUpdate = true;
     this.pendingRotationUpdate = true;

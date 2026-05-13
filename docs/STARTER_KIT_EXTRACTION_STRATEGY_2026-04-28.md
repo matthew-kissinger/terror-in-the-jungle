@@ -699,13 +699,13 @@ Source:
 
 - `AtmosphereSystem`;
 - `HosekWilkieSkyBackend`;
-- `hosekWilkie.glsl.ts`;
 - `ScenarioAtmospherePresets`;
 - `WeatherAtmosphere`.
 
 Honest framing:
 
-- This is a Preetham-style analytic skydome integration today.
+- This is a Preetham-style analytic skydome integration today, now rendered
+  through a generated texture on a standard Three material.
 - The reusable value is sky/sun/fog/light/weather agreement, not a novel sky
   model.
 

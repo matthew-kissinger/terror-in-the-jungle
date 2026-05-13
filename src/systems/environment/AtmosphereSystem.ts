@@ -3,7 +3,6 @@ import { GameSystem } from '../../types';
 import type { ICloudRuntime, IGameRenderer, ISkyRuntime } from '../../types/SystemInterfaces';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
-import { CloudLayer } from './atmosphere/CloudLayer';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
   computeSunDirectionAtTime,
@@ -15,6 +14,7 @@ import {
 import { GameMode } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
 import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
 /**
  * Hard-override color for the submerged fog path. Matches the legacy
@@ -25,10 +25,28 @@ const UNDERWATER_FOG_COLOR = 0x003344;
 
 /** Distance from origin at which the directional "sun" light is placed. */
 const SUN_LIGHT_DISTANCE = 500;
+/**
+ * The analytic sky backend stores HDR-ish radiance values. Those values are
+ * fine for the baked sky texture, but fog and hemisphere lights need bounded
+ * presentation colors or noon scenes collapse into a white fill under WebGPU.
+ */
+const SKY_LIGHT_MAX_COMPONENT = 0.84;
+const SKY_FOG_MAX_COMPONENT = 0.74;
 /** Scales horizon color to approximate ground bounce (not a pure mirror of horizon). */
 const HEMISPHERE_GROUND_DARKEN = 0.55;
 /** Minimum Y for the sun light position — prevents degenerate shadow camera when sun is at/below horizon. */
 const MIN_SUN_Y = 20;
+
+function compressSkyRadianceForRenderer(color: THREE.Color, maxComponent: number): THREE.Color {
+  const peak = Math.max(color.r, color.g, color.b);
+  if (peak > maxComponent && peak > 1e-6) {
+    color.multiplyScalar(maxComponent / peak);
+  }
+  color.r = Math.max(0, Math.min(maxComponent, color.r));
+  color.g = Math.max(0, Math.min(maxComponent, color.g));
+  color.b = Math.max(0, Math.min(maxComponent, color.b));
+  return color;
+}
 
 /**
  * Architectural seam for sky / sun / cloud state. See `docs/ATMOSPHERE.md`
@@ -51,10 +69,8 @@ const MIN_SUN_Y = 20;
  *
  * Cycle 2026-04-24 (`architecture-recovery-atmosphere-evidence`):
  * the analytic sky backend receives the effective cloud coverage. The old
- * planar `CloudLayer` render is held invisible because playtest evidence
- * showed a hard flat horizontal divider. The plane remains in code as a
- * disposable parallax prototype until a volumetric/sky-volume replacement
- * is designed.
+ * planar cloud render was retired because playtest evidence showed a hard
+ * flat horizontal divider.
  *
  * Prior cycles (kept here as history):
  * - Round 2 (`atmosphere-hosek-wilkie-sky`): introduced the analytic dome
@@ -80,8 +96,6 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private hosekBackend: HosekWilkieSkyBackend;
   private scene?: THREE.Scene;
   private domeMesh: THREE.Mesh;
-  private cloudLayer: CloudLayer;
-  private cloudMesh: THREE.Mesh;
   private currentScenario?: ScenarioAtmosphereKey;
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
   /** Per-scenario cloud coverage baseline (preset-driven). Weather multiplies on top. */
@@ -120,17 +134,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly scratchZenith = new THREE.Color();
   private readonly scratchHorizon = new THREE.Color();
   private readonly scratchSunPosition = new THREE.Vector3();
-  private readonly scratchCloudSunColor = new THREE.Color();
   private readonly cameraPosition = new THREE.Vector3();
-  /** Local terrain Y at the camera; 0 if no follow target. */
-  private terrainYAtCamera = 0;
 
   constructor() {
     this.hosekBackend = new HosekWilkieSkyBackend();
     this.backend = this.hosekBackend;
     this.domeMesh = this.hosekBackend.getMesh();
-    this.cloudLayer = new CloudLayer();
-    this.cloudMesh = this.cloudLayer.getMesh();
     // Apply bootstrap preset synchronously so the first render sees a real
     // sky — no NullSkyBackend flat-color frame, no legacy PNG fallback.
     this.applyScenarioPreset(AtmosphereSystem.BOOTSTRAP_PRESET);
@@ -161,20 +170,22 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       computeSunDirectionAtTime(preset, this.simulationTimeSeconds, this.sunDirection);
     }
 
-    this.backend.update(deltaTime, this.sunDirection);
-    this.applyToRenderer();
-    this.applyFogColor();
-    this.updateCloudLayer(deltaTime);
+    this.trackAtmosphereTiming('World.Atmosphere.SkyTexture', () => {
+      this.backend.update(deltaTime, this.sunDirection);
+    });
+    this.trackAtmosphereTiming('World.Atmosphere.LightFog', () => {
+      this.applyToRenderer();
+      this.applyFogColor();
+    });
+    this.trackAtmosphereTiming('World.Atmosphere.Clouds', () => {
+      this.updateCloudCoverage(deltaTime);
+    });
   }
 
   dispose(): void {
     if (this.scene && this.domeMesh) {
       this.scene.remove(this.domeMesh);
     }
-    if (this.scene && this.cloudMesh) {
-      this.scene.remove(this.cloudMesh);
-    }
-    this.cloudLayer.dispose();
     this.hosekBackend.dispose();
     this.renderer = undefined;
     this.followTarget = undefined;
@@ -188,11 +199,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     if (this.scene === scene) return;
     if (this.scene) {
       this.scene.remove(this.domeMesh);
-      this.scene.remove(this.cloudMesh);
     }
     this.scene = scene;
     this.scene.add(this.domeMesh);
-    this.scene.add(this.cloudMesh);
   }
 
   /**
@@ -230,12 +239,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.effectiveCloudCoverage = this.presetCloudCoverage;
     this.weatherCloudActive = false;
     this.weatherCloudCoverage = 0;
-    this.cloudLayer.setCoverage(0);
     if (preset.cloudScaleMetersPerFeature !== undefined) {
-      this.cloudLayer.setFeatureScaleMeters(preset.cloudScaleMetersPerFeature);
       this.hosekBackend.setCloudFeatureScaleMeters(preset.cloudScaleMetersPerFeature);
     } else {
-      this.cloudLayer.resetFeatureScale();
       this.hosekBackend.resetCloudFeatureScale();
     }
     this.hosekBackend.setCloudCoverage(this.presetCloudCoverage);
@@ -287,17 +293,42 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   syncDomePosition(cameraPosition: THREE.Vector3): void {
     this.domeMesh.position.copy(cameraPosition);
     this.cameraPosition.copy(cameraPosition);
+    this.hosekBackend.setCloudWorldAnchor(cameraPosition);
   }
 
   /**
-   * Optional local-terrain Y at the camera. When provided, the cloud
-   * plane sits at `terrainY + baseAltitude` so the flight-envelope clearance
-   * is measured above ground, not world origin. Defaults to 0 when unset.
+   * Slice 14 diagnostic: surface the sky-backend refresh activity
+   * counter so the crop probe can compare real refresh cost against the
+   * `World.Atmosphere.SkyTexture` EMA.
    */
-  setTerrainYAtCamera(y: number): void {
-    if (Number.isFinite(y)) {
-      this.terrainYAtCamera = y;
-    }
+  getSkyRefreshStatsForDebug(): { fireCount: number; totalMs: number; lastMs: number; avgMs: number } {
+    return this.hosekBackend.getRefreshStatsForDebug();
+  }
+
+  resetSkyRefreshStatsForDebug(): void {
+    this.hosekBackend.resetRefreshStatsForDebug();
+  }
+
+  getCloudAnchorDebug(): {
+    model: 'camera-followed-dome-world-altitude-clouds';
+    anchorX: number;
+    anchorZ: number;
+    refreshMeters: number;
+    deckAltitudeMeters: number;
+    maxTraceMeters: number;
+    horizonFadeStartY: number;
+    horizonFadeFullY: number;
+    cloudNoiseScale: number;
+  } {
+    return this.hosekBackend.getCloudAnchorDebug();
+  }
+
+  /**
+   * Retained for loop compatibility after the retired planar cloud path.
+   * The current sky-dome cloud pass does not need local terrain height.
+   */
+  setTerrainYAtCamera(_y: number): void {
+    // No-op.
   }
 
   /** Swap backends at runtime (used by future TOD presets and tests). */
@@ -394,11 +425,22 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     if (renderer.hemisphereLight) {
       this.backend.getZenith(this.scratchZenith);
       this.backend.getHorizon(this.scratchHorizon);
+      compressSkyRadianceForRenderer(this.scratchZenith, SKY_LIGHT_MAX_COMPONENT);
+      compressSkyRadianceForRenderer(this.scratchHorizon, SKY_LIGHT_MAX_COMPONENT);
       renderer.hemisphereLight.color.copy(this.scratchZenith);
       renderer.hemisphereLight.groundColor
         .copy(this.scratchHorizon)
         .multiplyScalar(HEMISPHERE_GROUND_DARKEN);
       renderer.hemisphereLight.updateMatrixWorld();
+    }
+  }
+
+  private trackAtmosphereTiming(name: string, updateFn: () => void): void {
+    performanceTelemetry.beginSystem(name);
+    try {
+      updateFn();
+    } finally {
+      performanceTelemetry.endSystem(name);
     }
   }
 
@@ -422,6 +464,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     }
 
     this.backend.getHorizon(this.scratchHorizon);
+    compressSkyRadianceForRenderer(this.scratchHorizon, SKY_FOG_MAX_COMPONENT);
     const f = this.fogDarkenFactor;
     fog.color.setRGB(
       this.scratchHorizon.r * f,
@@ -441,15 +484,18 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   }
 
   getSkyColorAtDirection(dir: THREE.Vector3, out: THREE.Color): THREE.Color {
-    return this.backend.sample(dir, out);
+    this.backend.sample(dir, out);
+    return compressSkyRadianceForRenderer(out, SKY_LIGHT_MAX_COMPONENT);
   }
 
   getZenithColor(out: THREE.Color): THREE.Color {
-    return this.backend.getZenith(out);
+    this.backend.getZenith(out);
+    return compressSkyRadianceForRenderer(out, SKY_LIGHT_MAX_COMPONENT);
   }
 
   getHorizonColor(out: THREE.Color): THREE.Color {
-    return this.backend.getHorizon(out);
+    this.backend.getHorizon(out);
+    return compressSkyRadianceForRenderer(out, SKY_LIGHT_MAX_COMPONENT);
   }
 
   /**
@@ -464,13 +510,10 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   }
 
   /**
-   * Per-frame cloud-layer update. Pushes the authoritative sun direction
-   * and sun color into the cloud shader and repositions the plane above
-   * the camera at the configured base altitude. Also forwards deltaTime
-   * so the shader can drift the cloud field with simulated wind. No-ops
-   * gracefully when no scene has been attached (menu/test phase).
+   * Per-frame sky-dome cloud update. Reconciles scenario and weather
+   * coverage and forwards the effective value to the active sky backend.
    */
-  private updateCloudLayer(deltaTime: number): void {
+  private updateCloudCoverage(_deltaTime: number): void {
     if (!this.scene) return;
 
     // Reconcile preset default with weather override. The weather path
@@ -482,17 +525,6 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       : this.presetCloudCoverage;
     this.effectiveCloudCoverage = effective;
     this.hosekBackend.setCloudCoverage(effective);
-
-    this.backend.getSun(this.scratchCloudSunColor);
-    this.cloudLayer.setCoverage(0);
-    this.cloudLayer.update(
-      this.cameraPosition,
-      this.terrainYAtCamera,
-      this.sunDirection,
-      this.scratchCloudSunColor,
-      deltaTime
-    );
-    this.cloudMesh.visible = false;
   }
 
   // --- ICloudRuntime ---
@@ -510,7 +542,6 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.effectiveCloudCoverage = clamped;
     this.weatherCloudActive = false;
     this.weatherCloudCoverage = 0;
-    this.cloudLayer.setCoverage(0);
     this.hosekBackend.setCloudCoverage(clamped);
   }
 }

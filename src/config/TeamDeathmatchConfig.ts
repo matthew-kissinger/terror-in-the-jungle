@@ -9,6 +9,7 @@ export const TEAM_DEATHMATCH_CONFIG: GameModeConfig = {
   description: 'Pure tactical combat. First team to reach the kill target wins. No zones, no bleed, just skill.',
 
   worldSize: 400,
+  visualMargin: 1200,
   chunkRenderDistance: 6,
   terrainSeed: 42,
   navmeshAsset: '/data/navmesh/tdm-42.bin',

@@ -9,6 +9,7 @@ export const AI_SANDBOX_CONFIG: GameModeConfig = {
   description: 'Automated AI combat sandbox for performance testing. No zones, no tickets, pure combat.',
 
   worldSize: 200,
+  visualMargin: 900,
   chunkRenderDistance: 4,
   terrainSeed: 'random',
   terrain: {

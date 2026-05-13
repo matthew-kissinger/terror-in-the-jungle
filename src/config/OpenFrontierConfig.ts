@@ -9,6 +9,7 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
   description: 'Large-scale warfare across 10 zones. Spawn at any controlled position and fight for map dominance.',
 
   worldSize: 3200, // ~2x2 miles
+  visualMargin: 1600,
   chunkRenderDistance: 10,
   terrainSeed: 42,
   navmeshAsset: '/data/navmesh/open_frontier-42.bin',

@@ -40,7 +40,10 @@ export class CombatantCombat {
   private readonly MAX_ENGAGEMENT_RANGE = 280;
   private readonly TERRAIN_SAMPLE_STEP = 2.0;
   private readonly TERRAIN_OCCLUSION_EPSILON = 0.15;
-  private readonly CLOSE_RANGE_OCCLUSION_BYPASS = 200;
+  private readonly CLOSE_RANGE_HEIGHT_PROFILE_DISTANCE = 200;
+  private readonly CLOSE_RANGE_HEIGHT_PROFILE_MARGIN = 1.0;
+  private readonly CLOSE_RANGE_HEIGHT_PROFILE_REQUIRED_SAMPLES = 2;
+  private readonly TERRAIN_PROFILE_ENDPOINT_PADDING = 4.0;
 
   private impactEffectsPool: ImpactEffectsPool;
   public hitDetection: CombatantHitDetection;
@@ -104,7 +107,8 @@ export class CombatantCombat {
     timeToDirectionChange: 0,
     lastUpdateTime: 0,
     updatePriority: 0,
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     kills: 0,
     deaths: 0,
   } as Combatant;
@@ -217,8 +221,8 @@ export class CombatantCombat {
       }
 
       // Check terrain obstruction before firing - only for high/medium LOD combatants
-      if (this.terrainSystem && combatant.lodLevel &&
-          (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
+      if (this.terrainSystem && combatant.simLane &&
+          (combatant.simLane === 'high' || combatant.simLane === 'medium')) {
         // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
         if (!tryConsumeCombatFireRaycast()) {
           combatant.currentBurst--; // Undo burst increment
@@ -460,50 +464,62 @@ export class CombatantCombat {
   }
 
   private isBlockedByHeightProfile(ray: THREE.Ray, maxDistance: number): boolean {
-    if (!this.terrainSystem) {
-      return false;
-    }
-
-    // Heightfield prefilter is too coarse for close combat on steep terrain.
-    if (maxDistance <= this.CLOSE_RANGE_OCCLUSION_BYPASS) {
-      return false;
-    }
-
-    const end = Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
-    if (!Number.isFinite(end) || end <= this.TERRAIN_SAMPLE_STEP) return false;
-
-    for (let d = this.TERRAIN_SAMPLE_STEP; d < end; d += this.TERRAIN_SAMPLE_STEP) {
-      this.scratchSamplePoint.copy(ray.origin).addScaledVector(ray.direction, d);
-      const terrainY = this.terrainSystem.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
-      if (terrainY + this.TERRAIN_OCCLUSION_EPSILON >= this.scratchSamplePoint.y) {
-        return true;
-      }
-    }
-
-    return false;
+    return this.findHeightProfileBlockCandidateDistance(ray, maxDistance) !== null;
   }
 
   private findHeightProfileBlockDistance(ray: THREE.Ray, maxDistance: number): number {
-    if (!this.terrainSystem) {
-      return Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
-    }
+    return this.findHeightProfileBlockCandidateDistance(ray, maxDistance)
+      ?? Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
+  }
 
-    if (maxDistance <= this.CLOSE_RANGE_OCCLUSION_BYPASS) {
-      return Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
+  private findHeightProfileBlockCandidateDistance(ray: THREE.Ray, maxDistance: number): number | null {
+    if (!this.terrainSystem) {
+      return null;
     }
 
     const end = Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
-    if (!Number.isFinite(end) || end <= this.TERRAIN_SAMPLE_STEP) return end;
+    if (!Number.isFinite(end) || end <= this.TERRAIN_SAMPLE_STEP) return null;
 
-    for (let d = this.TERRAIN_SAMPLE_STEP; d < end; d += this.TERRAIN_SAMPLE_STEP) {
+    const endpointPadding = Math.min(
+      this.TERRAIN_PROFILE_ENDPOINT_PADDING,
+      Math.max(0, end * 0.15),
+    );
+    const startDistance = Math.max(this.TERRAIN_SAMPLE_STEP, endpointPadding);
+    const stopDistance = end - endpointPadding;
+    if (stopDistance <= startDistance) return null;
+
+    const isCloseRange = end <= this.CLOSE_RANGE_HEIGHT_PROFILE_DISTANCE;
+    const requiredBlockingSamples = isCloseRange
+      ? this.CLOSE_RANGE_HEIGHT_PROFILE_REQUIRED_SAMPLES
+      : 1;
+    const occlusionMargin = isCloseRange
+      ? this.CLOSE_RANGE_HEIGHT_PROFILE_MARGIN
+      : -this.TERRAIN_OCCLUSION_EPSILON;
+    let firstBlockingDistance = 0;
+    let consecutiveBlockingSamples = 0;
+
+    for (let d = startDistance; d < stopDistance; d += this.TERRAIN_SAMPLE_STEP) {
       this.scratchSamplePoint.copy(ray.origin).addScaledVector(ray.direction, d);
       const terrainY = this.terrainSystem.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
-      if (terrainY + this.TERRAIN_OCCLUSION_EPSILON >= this.scratchSamplePoint.y) {
-        return d;
+      if (!Number.isFinite(terrainY)) {
+        consecutiveBlockingSamples = 0;
+        continue;
+      }
+
+      if (terrainY - this.scratchSamplePoint.y >= occlusionMargin) {
+        if (consecutiveBlockingSamples === 0) {
+          firstBlockingDistance = d;
+        }
+        consecutiveBlockingSamples++;
+        if (consecutiveBlockingSamples >= requiredBlockingSamples) {
+          return firstBlockingDistance;
+        }
+      } else {
+        consecutiveBlockingSamples = 0;
       }
     }
 
-    return end;
+    return null;
   }
 
   applyDamage(

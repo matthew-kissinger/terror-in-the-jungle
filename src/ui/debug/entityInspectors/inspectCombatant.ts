@@ -29,7 +29,7 @@ export function inspectCombatant(source: CombatantSource, id: string): Record<st
     suppression: c.suppressionLevel.toFixed(2),
     panic: c.panicLevel.toFixed(2),
     alertTimer: c.alertTimer.toFixed(2),
-    lod: c.lodLevel,
+    lod: c.simLane,
     inCover: c.inCover === true,
     kills: c.kills ?? 0,
     deaths: c.deaths ?? 0,

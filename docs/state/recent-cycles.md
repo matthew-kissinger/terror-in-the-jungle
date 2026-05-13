@@ -1,6 +1,6 @@
 # Recent Cycle Outcomes
 
-Last verified: 2026-05-10
+Last verified: 2026-05-12
 
 Last 3 cycles, summarized. Companion docs:
 
@@ -10,6 +10,83 @@ Last 3 cycles, summarized. Companion docs:
 
 For older cycle outcomes, browse `docs/cycles/` or
 `docs/tasks/archive/<cycle-id>/`.
+
+---
+
+## konveyer-scene-parity-checkpoint-2026-05-12 (experimental, not deployed)
+
+Checkpoint on `exp/konveyer-webgpu-migration`. Use the remote branch head as
+branch truth for the next agent, not a frozen SHA in this doc. This is not a
+production release and not a `master` merge approval.
+
+**Current KONVEYER-10 progress:**
+
+- Strict WebGPU scene/terrain/sky/water packet:
+  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
+- Close-NPC materialization and startup compile packet:
+  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+- Multi-mode close-model reserve verification under strict WebGPU across
+  Open Frontier, Zone Control, Team Deathmatch, combat120 (`ai_sandbox`),
+  and A Shau Valley:
+  `artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+  and
+  `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+  Both runs resolve `webgpu` with zero console/page errors per mode; the
+  parity ledger has the consolidated per-mode tables.
+- Nearby NPC debug surface: dev/perf builds expose
+  `window.npcMaterializationProfile(24)` for nearest NPC render mode, close-GLB
+  weapon presence, and fallback reasons.
+- Bounded spawn-residency reserve: Open Frontier strict WebGPU proof records
+  11 nearby close GLBs, effective close cap 11, and zero fallback records for
+  the nearest startup/review actors. Multi-mode evidence shows the +4 reserve
+  activates per design when actors lie inside the 64m spawn-residency bubble
+  (Zone Control +1, TDM +4, combat120 +4); combat120 still sees ~29-32
+  candidates against the 12-slot cap, so cap policy is now a Phase F
+  budget-arbiter decision rather than steady-state tuning.
+- Phase F materialization-tier draft memo:
+  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`.
+- Startup UI "Compiling features" is attributed to terrain feature work, mostly
+  the 1024-grid stamped heightmap rebake, not WebGPU shader compilation.
+
+**Still open:**
+
+- Phase F materialization-tier policy and budget-arbiter slice: per-mode cap
+  scaling, faction-balanced pool sizing, and silhouette/cluster render lanes
+  for the 3,000-unit scale.
+- A Shau finite-edge strategy using real outer source data, flight/camera
+  boundary policy, or an explicit hybrid; A Shau also needs a directed
+  player-warp or AI-convergence close-model probe so the front-line
+  materialization path can be evidenced beyond the empty spawn pose.
+- Cloud representation/art quality after the world/altitude anchoring slice.
+- Water shader/intersections plus one interaction/buoyancy/swimming consumer.
+- Principles-first renderer architecture review after hydrology/water and
+  scoped migration/parity objectives are reviewed.
+
+---
+
+## konveyer-branch-review-2026-05-11 (experimental, not deployed)
+
+Continuation on `exp/konveyer-webgpu-migration`. This is not production
+release truth and does not authorize a `master` merge.
+
+**Branch-review progress:**
+
+- KONVEYER-0 through KONVEYER-9 are documented in
+  `docs/rearch/KONVEYER_PARITY_2026-05-10.md`.
+- Default and strict WebGPU resolve to real `webgpu` on headed hardware in
+  `artifacts/perf/2026-05-11T00-40-14-309Z/konveyer-renderer-matrix/matrix.json`.
+- The completion audit at
+  `artifacts/perf/2026-05-11T02-10-59-661Z/konveyer-completion-audit/completion-audit.json`
+  records active production render blockers at zero.
+- The latest strict-WebGPU terrain visual packet accepts Open Frontier and
+  A Shau terrain ground tone at
+  `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.json`.
+
+**Follow-on cycle:** KONVEYER-10 - rest-of-scene parity and frame-budget
+attribution. Terrain color is accepted for now; remaining work was
+vegetation/NPC washout, atmosphere/sky/cloud behavior, `World` timing
+decomposition, skyward triangle attribution, finite-map edge presentation,
+cross-browser/mobile proof, and A Shau perf acceptance.
 
 ---
 

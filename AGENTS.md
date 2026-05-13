@@ -8,7 +8,7 @@ This is the authoritative, agent-agnostic operating guide for this repo. Every a
 
 Terror in the Jungle - a browser-based 3D combat game set in the Vietnam War. Three.js 0.184, TypeScript 6.0, Vite 8, Vitest 4, Node 24.
 
-Vision: **engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Stable frame-time tails under load, real-terrain scenarios (A Shau Valley 21km DEM). Ships to Cloudflare Pages at https://terror-in-the-jungle.pages.dev/. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md); do not restate it elsewhere.
+Vision: **engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** WebGPU + TSL (Three.js 0.184, `WebGPURenderer` exclusive, in active development on `exp/konveyer-webgpu-migration`) and driveable land vehicles (M151 jeep first, then tanks with skid-steer + independent turret + ballistic cannon) are parallel first-class directions alongside the 3,000-combatant scale commitment. Stable frame-time tails under load, real-terrain scenarios (A Shau Valley 21km DEM). Ships to Cloudflare Pages at https://terror-in-the-jungle.pages.dev/. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md); do not restate it elsewhere.
 
 ## Commands
 

@@ -16,10 +16,10 @@ vi.mock('../../utils/Logger');
  * `ISkyRuntime` is bound, water reflections must track the atmosphere's
  * sun direction.
  *
- * We intentionally do NOT exercise `WaterSystem.init()` (which loads a
- * texture + constructs a Three.js Water shader against a jsdom WebGL
- * stub). The behavior under test is the sun-sync contract exposed via
- * `setAtmosphereSystem` and the private `sun` vector.
+ * Most tests intentionally do NOT exercise `WaterSystem.init()` because it
+ * loads textures and touches the DOM overlay. The behavior under test is the
+ * sun-sync contract exposed via `setAtmosphereSystem`, the private `sun`
+ * vector, and the standard-material water control surface.
  */
 
 function makeAtmosphere(dir: THREE.Vector3): ISkyRuntime {
@@ -116,6 +116,14 @@ describe('WaterSystem sun direction from atmosphere', () => {
     expect(system.isUnderwater(new THREE.Vector3(0, -10, 0))).toBe(false);
     expect(system.getWaterSurfaceY(new THREE.Vector3(0, -10, 0))).toBeNull();
     expect(system.getWaterDepth(new THREE.Vector3(0, -10, 0))).toBe(0);
+    expect(system.sampleWaterInteraction(new THREE.Vector3(0, -10, 0))).toMatchObject({
+      source: 'none',
+      surfaceY: null,
+      depth: 0,
+      submerged: false,
+      immersion01: 0,
+      buoyancyScalar: 0,
+    });
     expect(system.getDebugInfo().cameraUnderwater).toBe(false);
   });
 
@@ -126,6 +134,16 @@ describe('WaterSystem sun direction from atmosphere', () => {
     expect(system.getWaterDepth(new THREE.Vector3(45, -2.5, -20))).toBeCloseTo(2.5, 5);
     expect(system.isUnderwater(new THREE.Vector3(45, -0.25, -20))).toBe(true);
     expect(system.isUnderwater(new THREE.Vector3(45, 0.25, -20))).toBe(false);
+
+    const sample = system.sampleWaterInteraction(new THREE.Vector3(45, -0.5, -20), {
+      immersionDepthMeters: 2,
+    });
+    expect(sample.source).toBe('global');
+    expect(sample.surfaceY).toBe(0);
+    expect(sample.depth).toBeCloseTo(0.5, 5);
+    expect(sample.submerged).toBe(true);
+    expect(sample.immersion01).toBeCloseTo(0.25, 5);
+    expect(sample.buoyancyScalar).toBeCloseTo(0.25, 5);
   });
 
   it('disabling water clears an active underwater state', () => {
@@ -168,11 +186,41 @@ describe('WaterSystem sun direction from atmosphere', () => {
     expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 0))).toBeCloseTo(1.85, 5);
     expect(system.getWaterDepth(new THREE.Vector3(5, 1, 0))).toBeCloseTo(0.85, 5);
     expect(system.isUnderwater(new THREE.Vector3(5, 1, 0))).toBe(true);
+    const sample = system.sampleWaterInteraction(new THREE.Vector3(5, 1, 0), {
+      immersionDepthMeters: 2,
+    });
+    expect(sample.source).toBe('hydrology');
+    expect(sample.surfaceY).toBeCloseTo(1.85, 5);
+    expect(sample.depth).toBeCloseTo(0.85, 5);
+    expect(sample.immersion01).toBeCloseTo(0.425, 5);
+    expect(sample.buoyancyScalar).toBeCloseTo(0.425, 5);
     expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 10))).toBeNull();
     expect(system.getWaterDepth(new THREE.Vector3(5, 1, 10))).toBe(0);
+    expect(system.sampleWaterInteraction(new THREE.Vector3(5, 1, 10)).source).toBe('none');
 
     system.setHydrologyChannels(null);
     expect(fakeWater.visible).toBe(true);
+  });
+
+  it('applies global water color to the standard material', () => {
+    const system = makeSystem();
+    const material = new THREE.MeshStandardMaterial();
+    (system as unknown as { water: { material: THREE.MeshStandardMaterial } }).water = { material };
+
+    system.setWaterColor(0x123456);
+
+    expect(material.color.getHex()).toBe(0x123456);
+  });
+
+  it('maps global water distortion requests onto normal-map scale', () => {
+    const system = makeSystem();
+    const material = new THREE.MeshStandardMaterial();
+    (system as unknown as { water: { material: THREE.MeshStandardMaterial } }).water = { material };
+
+    system.setDistortionScale(2.35);
+
+    expect(material.normalScale.x).toBeCloseTo(0.18, 5);
+    expect(material.normalScale.y).toBeCloseTo(0.18, 5);
   });
 
   it('builds hydrology river surfaces with bank-to-channel vertex color coverage', () => {

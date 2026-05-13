@@ -1,6 +1,5 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
-import { Water } from 'three/examples/jsm/objects/Water.js';
 import { GameSystem } from '../../types';
 import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import { AssetLoader } from '../assets/AssetLoader';
@@ -8,14 +7,6 @@ import { getAssetPath } from '../../config/paths';
 import { WeatherSystem } from './WeatherSystem';
 import { playElementAnimation } from '../../ui/engine/playElementAnimation';
 import type { HydrologyBakeArtifact } from '../terrain/hydrology/HydrologyBake';
-
-interface WaterUniforms {
-  time?: { value: number };
-  sunDirection?: { value: THREE.Vector3 };
-  waterColor?: { value: THREE.Color };
-  distortionScale?: { value: number };
-  [key: string]: { value: any } | undefined;
-}
 
 interface HydrologyRiverMeshStats {
   channelCount: number;
@@ -50,6 +41,21 @@ interface WaterDebugInfo {
   hydrologyMaxAccumulationCells: number;
 }
 
+export type WaterSurfaceSource = 'none' | 'global' | 'hydrology';
+
+export interface WaterInteractionSample {
+  source: WaterSurfaceSource;
+  surfaceY: number | null;
+  depth: number;
+  submerged: boolean;
+  immersion01: number;
+  buoyancyScalar: number;
+}
+
+export interface WaterInteractionOptions {
+  immersionDepthMeters?: number;
+}
+
 const EMPTY_HYDROLOGY_RIVER_STATS: HydrologyRiverMeshStats = {
   channelCount: 0,
   segmentCount: 0,
@@ -72,11 +78,13 @@ const HYDROLOGY_RIVER_SHALLOW_COLOR = new THREE.Color(0x1e4e52);
 const HYDROLOGY_RIVER_DEEP_COLOR = new THREE.Color(0x0b2a34);
 const HYDROLOGY_RIVER_BANK_ALPHA = 0.01;
 const HYDROLOGY_RIVER_CENTER_ALPHA = 0.32;
+const DEFAULT_WATER_IMMERSION_DEPTH_METERS = 1.6;
 
 export class WaterSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
-  private water?: Water;
+  private water?: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>;
+  private waterNormalTexture?: THREE.Texture;
   private hydrologyRiverGroup?: THREE.Group;
   private hydrologyRiverMesh?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
   private hydrologyRiverStats: HydrologyRiverMeshStats = { ...EMPTY_HYDROLOGY_RIVER_STATS };
@@ -128,11 +136,6 @@ export class WaterSystem implements GameSystem {
     if (this.sun.lengthSq() > 0) {
       this.sun.normalize();
     }
-    if (!this.water) return;
-    const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
-    if (waterUniforms && waterUniforms.sunDirection) {
-      waterUniforms.sunDirection.value.copy(this.sun);
-    }
   }
 
   async init(): Promise<void> {
@@ -157,20 +160,26 @@ export class WaterSystem implements GameSystem {
     // Configure texture wrapping for seamless tiling
     waterNormals.wrapS = waterNormals.wrapT = THREE.RepeatWrapping;
 
-    // Create water with shader
-    this.water = new Water(waterGeometry, {
-      textureWidth: 512,
-      textureHeight: 512,
-      waterNormals: waterNormals,
-      sunDirection: new THREE.Vector3(),
-      sunColor: 0xffffff,
-      waterColor: GLOBAL_WATER_COLOR,
-      distortionScale: GLOBAL_WATER_DISTORTION_SCALE,
-      fog: this.scene.fog !== undefined,
-      alpha: GLOBAL_WATER_ALPHA,
-    });
+    this.waterNormalTexture = waterNormals;
 
-    // Rotate to be horizontal (Water defaults to vertical)
+    const waterMaterial = new THREE.MeshStandardMaterial({
+      name: 'global-water-standard-material',
+      color: GLOBAL_WATER_COLOR,
+      roughness: 0.42,
+      metalness: 0,
+      transparent: true,
+      opacity: GLOBAL_WATER_ALPHA,
+      normalMap: waterNormals,
+      normalScale: new THREE.Vector2(0.18, 0.18),
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    waterMaterial.envMapIntensity = 0.35;
+
+    this.water = new THREE.Mesh(waterGeometry, waterMaterial);
+    this.water.name = 'global-water-standard-plane';
+
+    // PlaneGeometry is authored in XY; rotate so the surface lies on XZ.
     this.water.rotation.x = -Math.PI / 2;
     
     // Position at water level
@@ -218,10 +227,9 @@ export class WaterSystem implements GameSystem {
     }
 
     if (this.water.visible) {
-      // Update water time for wave animation
-      const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
-      if (waterUniforms && waterUniforms.time) {
-        waterUniforms.time.value += deltaTime * GLOBAL_WATER_TIME_SCALE;
+      if (this.waterNormalTexture) {
+        this.waterNormalTexture.offset.x += deltaTime * GLOBAL_WATER_TIME_SCALE * 0.015;
+        this.waterNormalTexture.offset.y += deltaTime * GLOBAL_WATER_TIME_SCALE * 0.008;
       }
 
       // Keep ocean centered under camera so map-edge seams are not visible in large worlds.
@@ -304,13 +312,6 @@ export class WaterSystem implements GameSystem {
   updateSunPosition(x: number, y: number, z: number): void {
     this.sun.set(x, y, z);
     this.sun.normalize();
-    
-    if (this.water) {
-      const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
-      if (waterUniforms && waterUniforms.sunDirection) {
-        waterUniforms.sunDirection.value.copy(this.sun);
-      }
-    }
   }
   
   /**
@@ -331,20 +332,50 @@ export class WaterSystem implements GameSystem {
    * Return the water surface at a gameplay position, or null when dry.
    */
   getWaterSurfaceY(position: THREE.Vector3): number | null {
-    const hydrologySurfaceY = this.getHydrologyWaterSurfaceY(position.x, position.z);
-    if (hydrologySurfaceY !== null) {
-      return hydrologySurfaceY;
-    }
-    return this.isGlobalWaterPlaneActive() ? this.WATER_LEVEL : null;
+    return this.resolveWaterSurface(position).surfaceY;
   }
 
   /**
    * Return water depth above the supplied position. Dry positions report 0.
    */
   getWaterDepth(position: THREE.Vector3): number {
-    const surfaceY = this.getWaterSurfaceY(position);
-    if (surfaceY === null) return 0;
-    return Math.max(0, surfaceY - position.y);
+    return this.sampleWaterInteraction(position).depth;
+  }
+
+  /**
+   * Shared gameplay sample for swimming, buoyancy, watercraft, and bank
+   * interactions. It intentionally reports a scalar only; force application
+   * belongs in the future physics consumer, not in the renderer-owned system.
+   */
+  sampleWaterInteraction(
+    position: THREE.Vector3,
+    options: WaterInteractionOptions = {},
+  ): WaterInteractionSample {
+    const surface = this.resolveWaterSurface(position);
+    if (surface.surfaceY === null) {
+      return {
+        source: 'none',
+        surfaceY: null,
+        depth: 0,
+        submerged: false,
+        immersion01: 0,
+        buoyancyScalar: 0,
+      };
+    }
+
+    const depth = Math.max(0, surface.surfaceY - position.y);
+    const immersionDepthMeters = Number.isFinite(options.immersionDepthMeters)
+      ? Math.max(0.01, options.immersionDepthMeters ?? DEFAULT_WATER_IMMERSION_DEPTH_METERS)
+      : DEFAULT_WATER_IMMERSION_DEPTH_METERS;
+    const immersion01 = clamp(depth / immersionDepthMeters, 0, 1);
+    return {
+      source: surface.source,
+      surfaceY: surface.surfaceY,
+      depth,
+      submerged: depth > 0,
+      immersion01,
+      buoyancyScalar: immersion01,
+    };
   }
   
   /**
@@ -352,10 +383,7 @@ export class WaterSystem implements GameSystem {
    */
   setWaterColor(color: number): void {
     if (this.water) {
-      const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
-      if (waterUniforms && waterUniforms.waterColor) {
-        waterUniforms.waterColor.value = new THREE.Color(color);
-      }
+      this.water.material.color.set(color);
     }
   }
   
@@ -364,10 +392,8 @@ export class WaterSystem implements GameSystem {
    */
   setDistortionScale(scale: number): void {
     if (this.water) {
-      const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
-      if (waterUniforms && waterUniforms.distortionScale) {
-        waterUniforms.distortionScale.value = scale;
-      }
+      const normalScale = Math.max(0, Math.min(0.8, (scale / GLOBAL_WATER_DISTORTION_SCALE) * 0.18));
+      this.water.material.normalScale.set(normalScale, normalScale);
     }
   }
 
@@ -484,6 +510,16 @@ export class WaterSystem implements GameSystem {
     if (this.water) {
       this.water.visible = this.isGlobalWaterPlaneActive();
     }
+  }
+
+  private resolveWaterSurface(position: THREE.Vector3): { source: WaterSurfaceSource; surfaceY: number | null } {
+    const hydrologySurfaceY = this.getHydrologyWaterSurfaceY(position.x, position.z);
+    if (hydrologySurfaceY !== null) {
+      return { source: 'hydrology', surfaceY: hydrologySurfaceY };
+    }
+    return this.isGlobalWaterPlaneActive()
+      ? { source: 'global', surfaceY: this.WATER_LEVEL }
+      : { source: 'none', surfaceY: null };
   }
 
   private buildHydrologyRiverMesh(

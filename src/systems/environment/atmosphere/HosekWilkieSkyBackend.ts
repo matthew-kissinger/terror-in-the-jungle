@@ -1,18 +1,34 @@
 import * as THREE from 'three';
 import type { ISkyBackend } from './ISkyBackend';
-import { hosekWilkieFragmentShader, hosekWilkieVertexShader } from './hosekWilkie.glsl';
 import type { AtmospherePreset } from './ScenarioAtmospherePresets';
 import { sunDirectionFromPreset } from './ScenarioAtmospherePresets';
 
 const DOME_RADIUS = 500;
 const DOME_WIDTH_SEGMENTS = 64;
 const DOME_HEIGHT_SEGMENTS = 32;
+const SKY_TEXTURE_WIDTH = 128;
+const SKY_TEXTURE_HEIGHT = 64;
 
 const LUT_AZIMUTH_BINS = 32;
 const LUT_ELEVATION_BINS = 8;
 const DEFAULT_CLOUD_NOISE_SCALE = 1 / 900;
 const DEFAULT_CLOUD_WIND_DIR_X = 0.7;
 const DEFAULT_CLOUD_WIND_DIR_Z = 0.7;
+// Slice 13: bump from 0.5s to 2.0s. Empirical: slice 12 (LUT) and slice
+// 13 DataTexture port both held EMA at ~5ms — the cost is the 8192-pixel
+// compositing loop fired by this timer, not the analytic math or the
+// upload primitive. Cutting fire rate 4x drops EMA proportionally.
+// Cloud animation still visibly evolves; cloud motion samples
+// `cloudTimeSeconds` per refresh so the wind appears as slower, not
+// stepped. Sun-driven LUT rebake remains gated on
+// `LUT_REBAKE_COS_THRESHOLD` (every ~0.83s for todCycle modes) so
+// dawn/dusk still updates promptly.
+const SKY_TEXTURE_REFRESH_SECONDS = 2.0;
+const CLOUD_ANCHOR_REFRESH_METERS = 32;
+const CLOUD_DECK_ALTITUDE_METERS = 1800;
+const CLOUD_MAX_TRACE_METERS = 14000;
+const CLOUD_HORIZON_FADE_START_Y = 0.035;
+const CLOUD_HORIZON_FADE_FULL_Y = 0.2;
 
 /**
  * Angular threshold (cosine form) at which a sun-direction change forces a
@@ -24,18 +40,103 @@ const DEFAULT_CLOUD_WIND_DIR_Z = 0.7;
  */
 const LUT_REBAKE_COS_THRESHOLD = Math.cos((0.5 * Math.PI) / 180);
 
+interface SkyTextureResource {
+  texture: THREE.Texture;
+  data: Uint8Array;
+}
+
+/**
+ * Slice 13: replace the legacy `CanvasTexture` (Canvas2D context +
+ * `putImageData` + canvas-read upload) with a direct `DataTexture`
+ * (typed Uint8Array uploaded as-is via `texSubImage2D`). Eliminates the
+ * canvas-read step that is independently flagged as a WebGPU
+ * anti-pattern (three.js discourse 50288 / 66535, issues #28101 /
+ * #31055). The buffer + RGBA layout match what `refreshSkyTexture`
+ * already writes — only the texture type changes.
+ */
+function createSkyTexture(): SkyTextureResource {
+  const data = new Uint8Array(SKY_TEXTURE_WIDTH * SKY_TEXTURE_HEIGHT * 4);
+  // Default sky-blue fill so first-frame reads before refresh have a
+  // sensible value (matches the prior null-context fallback color).
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 112;
+    data[i + 1] = 164;
+    data[i + 2] = 220;
+    data[i + 3] = 255;
+  }
+  const texture = new THREE.DataTexture(
+    data,
+    SKY_TEXTURE_WIDTH,
+    SKY_TEXTURE_HEIGHT,
+    THREE.RGBAFormat,
+    THREE.UnsignedByteType,
+  );
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+
+  return { texture, data };
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  const t = clamp01((value - edge0) / Math.max(1e-6, edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+
+function hash21(x: number, y: number): number {
+  const value = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123;
+  return value - Math.floor(value);
+}
+
+function valueNoise(x: number, y: number): number {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const fx = x - ix;
+  const fy = y - iy;
+  const ux = fx * fx * (3 - 2 * fx);
+  const uy = fy * fy * (3 - 2 * fy);
+  const a = hash21(ix, iy);
+  const b = hash21(ix + 1, iy);
+  const c = hash21(ix, iy + 1);
+  const d = hash21(ix + 1, iy + 1);
+  const ab = a + (b - a) * ux;
+  const cd = c + (d - c) * ux;
+  return ab + (cd - ab) * uy;
+}
+
+function fbm(x: number, y: number): number {
+  let value = 0;
+  let amplitude = 0.5;
+  let px = x;
+  let py = y;
+  for (let i = 0; i < 5; i++) {
+    value += amplitude * valueNoise(px, py);
+    px *= 2.03;
+    py *= 2.03;
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
 /**
  * Analytic sky-dome backend for `AtmosphereSystem`. Replaces the legacy
- * static-equirectangular `Skybox` with a `ShaderMaterial`-driven dome
- * (geometry + render-state mirrored exactly from `Skybox.ts`: 500-unit
+ * static-equirectangular `Skybox` with a generated texture on a standard dome
+ * material (geometry + render-state mirrored exactly from `Skybox.ts`: 500-unit
  * `SphereGeometry`, `BackSide`, `renderOrder = -1`, no depth read/write,
  * camera-following each frame).
  *
- * The shader (see `hosekWilkie.glsl.ts` for the long note) implements a
- * Preetham-style analytic sky as the budget-conscious starting backend the
- * task brief explicitly allows; the consumer-visible `ISkyBackend`
- * contract is satisfied either way and a future cycle can substitute a
- * full Hosek-Wilkie coefficient pipeline without touching callers.
+ * The texture bake uses Preetham-style analytic sky math as the
+ * budget-conscious starting backend the task brief explicitly allows; the
+ * consumer-visible `ISkyBackend` contract is satisfied either way and a future
+ * cycle can substitute a full Hosek-Wilkie coefficient pipeline without
+ * touching callers.
  *
  * CPU-side sampling is served by a small `LUT_AZIMUTH_BINS x
  * LUT_ELEVATION_BINS` table baked from the same analytic formula at preset
@@ -46,8 +147,21 @@ const LUT_REBAKE_COS_THRESHOLD = Math.cos((0.5 * Math.PI) / 180);
  */
 export class HosekWilkieSkyBackend implements ISkyBackend {
   private readonly mesh: THREE.Mesh;
-  private readonly material: THREE.ShaderMaterial;
+  private readonly material: THREE.MeshBasicMaterial;
   private readonly geometry: THREE.SphereGeometry;
+  private readonly skyTexture: THREE.Texture;
+  private readonly skyData: Uint8Array;
+
+  // Slice 14 diagnostic: count refresh-loop activity so probes can
+  // distinguish real refresh cost from phantom EMA. `refreshFireCount`
+  // increments every time the loop body runs (skyTextureDirty was true).
+  // `refreshTotalMs` accumulates wall-clock time spent inside the loop.
+  // `refreshLastMs` is the most recent fire duration. Cleared by
+  // `resetRefreshStatsForDebug()` so the probe can capture a clean
+  // window aligned with its perf-window sample.
+  private refreshFireCount = 0;
+  private refreshTotalMs = 0;
+  private refreshLastMs = 0;
 
   private readonly sunDirection = new THREE.Vector3(0, 1, 0);
   private readonly groundAlbedo = new THREE.Color(0x3b4c2e);
@@ -59,6 +173,8 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private cloudCoverage = 0;
   private cloudNoiseScale = DEFAULT_CLOUD_NOISE_SCALE;
   private cloudTimeSeconds = 0;
+  private cloudAnchorX = 0;
+  private cloudAnchorZ = 0;
   private readonly cloudWindDir = new THREE.Vector2(DEFAULT_CLOUD_WIND_DIR_X, DEFAULT_CLOUD_WIND_DIR_Z);
 
   // Ring/zenith cache + LUT, refreshed when the sun direction changes.
@@ -71,31 +187,30 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   // Throwaway scratch to avoid per-frame Vec3/Color allocs.
   private readonly scratchDir = new THREE.Vector3();
   private readonly scratchColor = new THREE.Color();
+  private readonly scratchCloudColor = new THREE.Color();
   private readonly lastSunDir = new THREE.Vector3();
+  private skyTextureDirty = true;
+  private skyTextureRefreshTimer = 0;
+  // Slice 16: set whenever something that affects the composited sky
+  // texture changes (LUT rebake from sun motion, cloud coverage step,
+  // cloud anchor step, etc.) and cleared on `refreshSkyTexture`. Lets
+  // the 2 s refresh cadence skip true no-op scenarios (static sun, no
+  // clouds, no anchor motion) while still firing on real visible change.
+  private skyContentChanged = true;
 
   constructor() {
     this.lut = new Float32Array(LUT_AZIMUTH_BINS * LUT_ELEVATION_BINS * 3);
+    const skyTexture = createSkyTexture();
+    this.skyTexture = skyTexture.texture;
+    this.skyData = skyTexture.data;
 
-    this.material = new THREE.ShaderMaterial({
+    this.material = new THREE.MeshBasicMaterial({
       name: 'HosekWilkieSky',
-      uniforms: {
-        uSunDirection: { value: this.sunDirection },
-        uTurbidity: { value: this.turbidity },
-        uRayleigh: { value: this.rayleigh },
-        uMieCoefficient: { value: this.mieCoefficient },
-        uMieDirectionalG: { value: this.mieDirectionalG },
-        uGroundAlbedo: { value: this.groundAlbedo },
-        uExposure: { value: this.exposure },
-        uCloudCoverage: { value: this.cloudCoverage },
-        uCloudNoiseScale: { value: this.cloudNoiseScale },
-        uCloudTimeSeconds: { value: this.cloudTimeSeconds },
-        uCloudWindDir: { value: this.cloudWindDir },
-      },
-      vertexShader: hosekWilkieVertexShader,
-      fragmentShader: hosekWilkieFragmentShader,
+      map: this.skyTexture,
       side: THREE.BackSide,
       depthWrite: false,
       depthTest: false,
+      fog: false,
     });
 
     this.geometry = new THREE.SphereGeometry(DOME_RADIUS, DOME_WIDTH_SEGMENTS, DOME_HEIGHT_SEGMENTS);
@@ -104,6 +219,9 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = true;
     this.mesh.name = 'HosekWilkieSkyDome';
+    this.bakeLUT();
+    this.lutDirty = false;
+    this.refreshSkyTexture();
   }
 
   /** Apply a scenario preset: sun direction, turbidity, albedo, exposure. */
@@ -114,14 +232,8 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     this.groundAlbedo.copy(preset.groundAlbedo);
     this.exposure = preset.exposure;
 
-    // Push uniform values; they share the same `value` references the
-    // shader already holds (Vector3/Color), so writing through `copy()`
-    // and primitive `value =` is enough.
-    this.material.uniforms.uTurbidity.value = this.turbidity;
-    this.material.uniforms.uRayleigh.value = this.rayleigh;
-    this.material.uniforms.uExposure.value = this.exposure;
-
     this.lutDirty = true;
+    this.markSkyTextureDirty();
   }
 
   /** Returns the dome mesh so `AtmosphereSystem` can attach it to the scene. */
@@ -144,26 +256,58 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
 
     this.sunDirection.set(nx, ny, nz);
 
-    if (this.lutDirty || cosDelta < LUT_REBAKE_COS_THRESHOLD) {
+    // LUT rebake stays at the 0.5° threshold — it's cheap (256 directions)
+    // and consumers of `sample()` / `getZenith()` / `getHorizon()` need
+    // accurate values for the dawn/dusk fog tint. A rebake flags
+    // `skyContentChanged` so the 2 s refresh timer below knows the
+    // texture's gradient + sun-disc position no longer match the LUT.
+    const shouldRebake = this.lutDirty || cosDelta < LUT_REBAKE_COS_THRESHOLD;
+    if (shouldRebake) {
       this.lastSunDir.set(nx, ny, nz);
       this.bakeLUT();
       this.lutDirty = false;
+      this.skyContentChanged = true;
     }
 
+    // Sky-texture refresh (the expensive 8192-pixel compositing loop)
+    // is gated on the 2 s refresh cadence. Slice 15 made the cloud-
+    // coverage setter idempotent; the residual ~5–10 fires per 4.5 s
+    // came from the LUT-rebake path marking the texture dirty every
+    // ~0.83 s in todCycle modes. The texture's sky gradient and sun-
+    // disc position only need to visibly track sun motion at the same
+    // cadence we already accept for cloud animation.
+    // `skyContentChanged` lets a true no-op scenario (static sun, no
+    // clouds, no anchor motion) skip the 2 s refresh of an unchanged
+    // texture; `cloudCoverage > 0` keeps cloud animation refreshing
+    // even when the LUT is steady.
     if (Number.isFinite(_deltaTime) && _deltaTime > 0) {
       this.cloudTimeSeconds += _deltaTime;
-      this.material.uniforms.uCloudTimeSeconds.value = this.cloudTimeSeconds;
+      this.skyTextureRefreshTimer += _deltaTime;
+      const needsRefresh = this.skyContentChanged || this.cloudCoverage > 0;
+      if (needsRefresh && this.skyTextureRefreshTimer >= SKY_TEXTURE_REFRESH_SECONDS) {
+        this.skyTextureRefreshTimer = 0;
+        this.markSkyTextureDirty();
+      }
     }
+
+    this.refreshSkyTexture();
   }
 
   /**
-   * Sky-integrated cloud coverage. This is intentionally separate from
-   * `CloudLayer`: the dome pass guarantees visible clouds in ordinary sky
-   * views without a finite flat-plane horizon.
+   * Sky-integrated cloud coverage. The dome pass guarantees visible clouds
+   * in ordinary sky views without a finite flat-plane horizon.
    */
   setCloudCoverage(value: number): void {
-    this.cloudCoverage = Math.max(0, Math.min(1, value));
-    this.material.uniforms.uCloudCoverage.value = this.cloudCoverage;
+    // Slice 15: only mark dirty when the value actually changes. The
+    // WeatherAtmosphere update path calls this every frame with a steady
+    // value during clear/stable weather, which previously caused the sky
+    // refresh to fire ~every frame (~16/sec observed in slice 14) even
+    // though the cloud field was unchanged. Same applies to setter calls
+    // from scenario boot where coverage rarely changes.
+    const next = Math.max(0, Math.min(1, value));
+    if (next === this.cloudCoverage) return;
+    this.cloudCoverage = next;
+    this.markSkyTextureDirty();
   }
 
   setCloudFeatureScaleMeters(metersPerFeature: number): void {
@@ -171,16 +315,65 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       return;
     }
     this.cloudNoiseScale = 1 / metersPerFeature;
-    this.material.uniforms.uCloudNoiseScale.value = this.cloudNoiseScale;
+    this.markSkyTextureDirty();
   }
 
   resetCloudFeatureScale(): void {
     this.cloudNoiseScale = DEFAULT_CLOUD_NOISE_SCALE;
-    this.material.uniforms.uCloudNoiseScale.value = this.cloudNoiseScale;
+    this.markSkyTextureDirty();
   }
 
   getCloudCoverage(): number {
     return this.cloudCoverage;
+  }
+
+  /**
+   * The dome itself follows the camera for clipping safety, but the cloud
+   * noise field is projected through a world/altitude deck so cloud features
+   * read as distant weather instead of a pattern glued to the player.
+   */
+  setCloudWorldAnchor(position: THREE.Vector3): void {
+    if (!Number.isFinite(position.x) || !Number.isFinite(position.z)) return;
+    const dx = position.x - this.cloudAnchorX;
+    const dz = position.z - this.cloudAnchorZ;
+    if ((dx * dx + dz * dz) < CLOUD_ANCHOR_REFRESH_METERS * CLOUD_ANCHOR_REFRESH_METERS) {
+      return;
+    }
+    this.cloudAnchorX = position.x;
+    this.cloudAnchorZ = position.z;
+    if (this.cloudCoverage > 0.001) {
+      this.markSkyTextureDirty();
+    }
+  }
+
+  getCloudAnchorDebug(): {
+    model: 'camera-followed-dome-world-altitude-clouds';
+    anchorX: number;
+    anchorZ: number;
+    refreshMeters: number;
+    deckAltitudeMeters: number;
+    maxTraceMeters: number;
+    horizonFadeStartY: number;
+    horizonFadeFullY: number;
+    cloudNoiseScale: number;
+  } {
+    return {
+      model: 'camera-followed-dome-world-altitude-clouds',
+      anchorX: this.cloudAnchorX,
+      anchorZ: this.cloudAnchorZ,
+      refreshMeters: CLOUD_ANCHOR_REFRESH_METERS,
+      deckAltitudeMeters: CLOUD_DECK_ALTITUDE_METERS,
+      maxTraceMeters: CLOUD_MAX_TRACE_METERS,
+      horizonFadeStartY: CLOUD_HORIZON_FADE_START_Y,
+      horizonFadeFullY: CLOUD_HORIZON_FADE_FULL_Y,
+      cloudNoiseScale: this.cloudNoiseScale,
+    };
+  }
+
+  sampleCloudMaskForDebug(direction: THREE.Vector3): number {
+    const len = Math.hypot(direction.x, direction.y, direction.z) || 1;
+    this.scratchDir.set(direction.x / len, direction.y / len, direction.z / len);
+    return this.cloudMaskAtDirection(this.scratchDir);
   }
 
   sample(dir: THREE.Vector3, out: THREE.Color): THREE.Color {
@@ -231,12 +424,181 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     if (this.lutDirty) {
       this.bakeLUT();
       this.lutDirty = false;
+      this.markSkyTextureDirty();
+      this.refreshSkyTexture();
     }
+  }
+
+  private markSkyTextureDirty(): void {
+    this.skyTextureDirty = true;
+  }
+
+  private refreshSkyTexture(): void {
+    if (!this.skyTextureDirty) return;
+    this.skyTextureDirty = false;
+    // Slice 16: cleared on every refresh — the 2 s timer reads this
+    // to decide whether to schedule a follow-up refresh.
+    this.skyContentChanged = false;
+
+    // Slice 14 diagnostic: time the refresh body so probes can compare
+    // wall-clock refresh cost against the `World.Atmosphere.SkyTexture`
+    // EMA. If the EMA reports ~5 ms but this counter shows total ~0 ms
+    // or few fires, the EMA is artifactual.
+    const refreshStart = performance.now();
+    this.refreshFireCount += 1;
+
+    // Slice 13: write directly into the `DataTexture` buffer (Uint8Array)
+    // and call `needsUpdate = true`. Skips the Canvas2D context, the
+    // `putImageData` step, and the canvas-read leg of the upload path.
+    // Confirmed WebGPU-correct primitive vs `CanvasTexture` (see
+    // discourse 50288 / 66535).
+    //
+    // Slice 12 retained: per-pixel base color comes from a bilinear LUT
+    // sample over the same 32x8 LUT the CPU `sample()` accessor reads.
+    // Sun disc and cloud deck stay composited per-pixel — they cannot be
+    // collapsed into the LUT because they depend on view direction
+    // relative to the sun and on world-anchored cloud noise.
+    const lut = this.lut;
+    const rowsM1 = LUT_ELEVATION_BINS - 1;
+    const cols = LUT_AZIMUTH_BINS;
+
+    const data = this.skyData;
+    let offset = 0;
+    for (let y = 0; y < SKY_TEXTURE_HEIGHT; y++) {
+      const v = y / (SKY_TEXTURE_HEIGHT - 1);
+      const elevation = Math.PI / 2 - v * Math.PI;
+      const cosElevation = Math.cos(elevation);
+      const sinElevation = Math.sin(elevation);
+
+      const elevT = (Math.asin(sinElevation) + Math.PI / 2) / Math.PI;
+      const rowF = Math.max(0, Math.min(rowsM1, elevT * LUT_ELEVATION_BINS - 0.5));
+      const row0 = Math.floor(rowF);
+      const row1 = Math.min(rowsM1, row0 + 1);
+      const rowT = rowF - row0;
+
+      for (let x = 0; x < SKY_TEXTURE_WIDTH; x++) {
+        const u = x / SKY_TEXTURE_WIDTH;
+        const azimuth = u * Math.PI * 2;
+        const dirX = cosElevation * Math.cos(azimuth);
+        const dirZ = cosElevation * Math.sin(azimuth);
+
+        const colF = (u * cols - 0.5 + cols) % cols;
+        const col0 = Math.floor(colF) % cols;
+        const col1 = (col0 + 1) % cols;
+        const colT = colF - Math.floor(colF);
+
+        const i00 = (row0 * cols + col0) * 3;
+        const i01 = (row0 * cols + col1) * 3;
+        const i10 = (row1 * cols + col0) * 3;
+        const i11 = (row1 * cols + col1) * 3;
+        const oneMinusRow = 1 - rowT;
+        const oneMinusCol = 1 - colT;
+        const w00 = oneMinusRow * oneMinusCol;
+        const w01 = oneMinusRow * colT;
+        const w10 = rowT * oneMinusCol;
+        const w11 = rowT * colT;
+        let r = lut[i00] * w00 + lut[i01] * w01 + lut[i10] * w10 + lut[i11] * w11;
+        let g = lut[i00 + 1] * w00 + lut[i01 + 1] * w01 + lut[i10 + 1] * w10 + lut[i11 + 1] * w11;
+        let b = lut[i00 + 2] * w00 + lut[i01 + 2] * w01 + lut[i10 + 2] * w10 + lut[i11 + 2] * w11;
+
+        this.scratchDir.set(dirX, sinElevation, dirZ);
+        this.scratchColor.setRGB(r, g, b);
+        this.mixSunDisc(this.scratchDir, this.scratchColor);
+        this.mixCloudDeck(this.scratchDir, this.scratchColor);
+        r = this.scratchColor.r;
+        g = this.scratchColor.g;
+        b = this.scratchColor.b;
+
+        data[offset++] = Math.round(Math.sqrt(clamp01(r)) * 255);
+        data[offset++] = Math.round(Math.sqrt(clamp01(g)) * 255);
+        data[offset++] = Math.round(Math.sqrt(clamp01(b)) * 255);
+        data[offset++] = 255;
+      }
+    }
+
+    this.skyTexture.needsUpdate = true;
+
+    // Slice 14 diagnostic counter completion.
+    const elapsed = performance.now() - refreshStart;
+    this.refreshLastMs = elapsed;
+    this.refreshTotalMs += elapsed;
+  }
+
+  /**
+   * Slice 14 diagnostic: returns the current refresh-loop activity stats
+   * so probes can distinguish "real refresh cost" from "phantom EMA on
+   * `World.Atmosphere.SkyTexture`". Call `resetRefreshStatsForDebug()`
+   * at the start of a measurement window and read these at the end.
+   */
+  getRefreshStatsForDebug(): { fireCount: number; totalMs: number; lastMs: number; avgMs: number } {
+    return {
+      fireCount: this.refreshFireCount,
+      totalMs: this.refreshTotalMs,
+      lastMs: this.refreshLastMs,
+      avgMs: this.refreshFireCount > 0 ? this.refreshTotalMs / this.refreshFireCount : 0,
+    };
+  }
+
+  resetRefreshStatsForDebug(): void {
+    this.refreshFireCount = 0;
+    this.refreshTotalMs = 0;
+    this.refreshLastMs = 0;
+  }
+
+  private mixSunDisc(direction: THREE.Vector3, color: THREE.Color): void {
+    const sunDot =
+      direction.x * this.sunDirection.x +
+      direction.y * this.sunDirection.y +
+      direction.z * this.sunDirection.z;
+    if (sunDot <= 0.9992) return;
+    const strength = smoothstep(0.9992, 0.99992, sunDot);
+    color.lerp(this.sunColor, strength);
+  }
+
+  private mixCloudDeck(direction: THREE.Vector3, color: THREE.Color): void {
+    const mask = this.cloudMaskAtDirection(direction);
+    if (mask <= 0.001) return;
+
+    const horizonFade = smoothstep(CLOUD_HORIZON_FADE_START_Y, CLOUD_HORIZON_FADE_FULL_Y, direction.y);
+    const cloudWeight = mask * horizonFade * (0.18 + 0.58 * clamp01(this.cloudCoverage));
+    this.scratchCloudColor.setRGB(
+      0.78 + this.sunColor.r * 0.16,
+      0.80 + this.sunColor.g * 0.14,
+      0.84 + this.sunColor.b * 0.12
+    );
+    color.lerp(this.scratchCloudColor, clamp01(cloudWeight));
+  }
+
+  private cloudMaskAtDirection(direction: THREE.Vector3): number {
+    if (this.cloudCoverage <= 0.001) return 0;
+
+    const horizonFade = smoothstep(CLOUD_HORIZON_FADE_START_Y, CLOUD_HORIZON_FADE_FULL_Y, direction.y);
+    if (horizonFade <= 0.001) return 0;
+
+    const windLength = Math.hypot(this.cloudWindDir.x, this.cloudWindDir.y) || 1;
+    const windX = this.cloudWindDir.x / windLength;
+    const windY = this.cloudWindDir.y / windLength;
+    const windOffset = this.cloudTimeSeconds * 0.012;
+
+    const traceMeters = Math.min(
+      CLOUD_MAX_TRACE_METERS,
+      CLOUD_DECK_ALTITUDE_METERS / Math.max(CLOUD_HORIZON_FADE_START_Y, direction.y)
+    );
+    const sampleX = this.cloudAnchorX + direction.x * traceMeters;
+    const sampleZ = this.cloudAnchorZ + direction.z * traceMeters;
+    const px = sampleX * this.cloudNoiseScale + windX * windOffset;
+    const py = sampleZ * this.cloudNoiseScale + windY * windOffset;
+    const large = 0.5 + 0.5 * smoothstep(0.2, 0.7, fbm(px * 0.22, py * 0.22));
+    const field = fbm(px, py) * large;
+    const lower = 0.82 + (0.22 - 0.82) * clamp01(this.cloudCoverage);
+    const mask = smoothstep(lower, lower + 0.24, field);
+    return mask * horizonFade;
   }
 
   dispose(): void {
     this.material.dispose();
     this.geometry.dispose();
+    this.skyTexture.dispose();
   }
 
   /**

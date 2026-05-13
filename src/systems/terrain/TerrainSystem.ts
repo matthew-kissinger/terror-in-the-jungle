@@ -7,6 +7,7 @@ import { LOSAccelerator } from '../combat/LOSAccelerator';
 import { Logger } from '../../utils/Logger';
 import { markStartup } from '../../core/StartupTelemetry';
 import { getHeightQueryCache } from './HeightQueryCache';
+import { createHeightProviderFromConfig } from './HeightProviderFactory';
 import { BakedHeightProvider } from './BakedHeightProvider';
 import type { IHeightProvider } from './IHeightProvider';
 import type { CompiledTerrainFeatureSet } from './TerrainFeatureTypes';
@@ -22,6 +23,7 @@ import { TerrainRenderRuntime } from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
 import { TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
 import { TerrainQueries } from './TerrainQueries';
+import { VisualExtentHeightProvider } from './VisualExtentHeightProvider';
 import { VegetationScatterer, type VegetationScattererDebugInfo } from './VegetationScatterer';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
 import { TerrainStreamingScheduler } from './streaming/TerrainStreamingScheduler';
@@ -108,7 +110,7 @@ export class TerrainSystem implements GameSystem {
     this.config = createTerrainConfig({
       worldSize,
       visualMargin: 200,
-      maxLODLevels: runtimeConfig.lodLevels,
+      maxLODLevels: computeMaxLODLevels(worldSize, 200, 32),
     });
 
     this.surfaceRuntime = new TerrainSurfaceRuntime(assetLoader, this.config.splatmap, this.config.tileResolution - 1);
@@ -127,7 +129,7 @@ export class TerrainSystem implements GameSystem {
     if (this.isInitialized) return;
 
     const cache = getHeightQueryCache();
-    let terrainMaterial: THREE.MeshStandardMaterial;
+    let terrainMaterial: THREE.Material;
     try {
       terrainMaterial = this.createSurfaceMaterial(cache.getProvider());
     } catch (error) {
@@ -233,6 +235,10 @@ export class TerrainSystem implements GameSystem {
 
   updatePlayerPosition(position: THREE.Vector3): void {
     this.playerPosition.copy(position);
+  }
+
+  setRenderCameraOverride(camera: THREE.PerspectiveCamera | null): void {
+    this.renderRuntime?.setCameraOverride(camera);
   }
 
   setSurfaceWetness(wetness: number): void {
@@ -397,7 +403,7 @@ export class TerrainSystem implements GameSystem {
       const mat = this.surfaceRuntime.getMaterial();
       const terrainUniforms = mat.userData.terrainUniforms as Record<string, { value: unknown }> | undefined;
       if (terrainUniforms?.debugWireframe) {
-        terrainUniforms.debugWireframe.value = enabled;
+        terrainUniforms.debugWireframe.value = enabled ? 1 : 0;
       }
       mat.wireframe = enabled;
       mat.needsUpdate = true;
@@ -506,6 +512,7 @@ export class TerrainSystem implements GameSystem {
     if (nextMargin === this.config.visualMargin) return;
 
     this.config.visualMargin = nextMargin;
+    this.recomputeLodConfig();
     this.vegetationScatterer.setWorldBounds(this.config.worldSize, this.config.visualMargin);
 
     if (this.isInitialized) {
@@ -516,6 +523,8 @@ export class TerrainSystem implements GameSystem {
         lodRanges: this.config.lodRanges,
         tileResolution: this.config.tileResolution,
       });
+      this.rebakeSurfaceHeightmap();
+      this.propagateTerrainSourceChanges();
     }
   }
 
@@ -542,7 +551,7 @@ export class TerrainSystem implements GameSystem {
 
     if (this.isInitialized) {
       this.surfaceRuntime.updateBiomeMaterial(
-        this.config.worldSize,
+        this.getVisualWorldSize(),
         this.defaultBiomeId,
         this.biomeRules,
       );
@@ -604,15 +613,7 @@ export class TerrainSystem implements GameSystem {
     if (newWorldSize === this.config.worldSize) return;
 
     this.config.worldSize = newWorldSize;
-    // Recompute LOD levels so vertex density stays sufficient at any world size.
-    // Without this, large worlds (3200m+) get LOD 0 tiles too coarse for the
-    // heightmap resolution, causing GPU mesh height to diverge from CPU queries.
-    this.config.maxLODLevels = computeMaxLODLevels(
-      newWorldSize,
-      this.config.visualMargin,
-      this.config.tileResolution - 1,
-    );
-    this.config.lodRanges = computeDefaultLODRanges(newWorldSize, this.config.maxLODLevels);
+    this.recomputeLodConfig();
     this.vegetationScatterer.setWorldBounds(newWorldSize, this.config.visualMargin);
 
     if (this.isInitialized) {
@@ -638,8 +639,9 @@ export class TerrainSystem implements GameSystem {
     return this.explicitWorldSize ?? (this.chunkSize * this.renderDistance * 2);
   }
 
-  private createSurfaceMaterial(provider: IHeightProvider): THREE.MeshStandardMaterial {
-    if (this.preparedHeightmap) {
+  private createSurfaceMaterial(provider: IHeightProvider): THREE.Material {
+    const surfaceProvider = this.createVisualExtentProvider(provider);
+    if (this.preparedHeightmap && this.config.visualMargin <= 0) {
       markStartup('terrain.heightmap.from-prebaked.begin');
       const material = this.surfaceRuntime.initializeFromPrebakedGrid(
         this.preparedHeightmap.data,
@@ -654,17 +656,21 @@ export class TerrainSystem implements GameSystem {
 
     markStartup('terrain.heightmap.from-provider.begin');
     const material = this.surfaceRuntime.initialize(
-      provider,
+      surfaceProvider,
       this.config.worldSize,
       this.defaultBiomeId,
       this.biomeRules,
+      this.getVisualWorldSize(),
     );
     markStartup('terrain.heightmap.from-provider.end');
     return material;
   }
 
   private rebakeSurfaceHeightmap(): void {
-    if (this.preparedHeightmap) {
+    const cache = getHeightQueryCache();
+    const surfaceProvider = this.createVisualExtentProvider(cache.getProvider());
+
+    if (this.preparedHeightmap && this.config.visualMargin <= 0) {
       markStartup('terrain.heightmap.from-prebaked.begin');
       this.surfaceRuntime.rebakeFromPrebakedGrid(
         this.preparedHeightmap.data,
@@ -677,15 +683,35 @@ export class TerrainSystem implements GameSystem {
       return;
     }
 
-    const cache = getHeightQueryCache();
     markStartup('terrain.heightmap.from-provider.begin');
     this.surfaceRuntime.rebake(
-      cache.getProvider(),
-      this.config.worldSize,
+      surfaceProvider,
+      this.getVisualWorldSize(),
       this.defaultBiomeId,
       this.biomeRules,
+      this.config.worldSize,
+      this.config.visualMargin,
     );
     markStartup('terrain.heightmap.from-provider.end');
+  }
+
+  private recomputeLodConfig(): void {
+    this.config.maxLODLevels = computeMaxLODLevels(
+      this.config.worldSize,
+      this.config.visualMargin,
+      this.config.tileResolution - 1,
+    );
+    this.config.lodRanges = computeDefaultLODRanges(this.config.worldSize, this.config.maxLODLevels);
+  }
+
+  private createVisualExtentProvider(provider: IHeightProvider): IHeightProvider {
+    if (this.config.visualMargin <= 0) return provider;
+    return new VisualExtentHeightProvider(
+      provider,
+      createHeightProviderFromConfig(provider.getWorkerConfig()),
+      this.config.worldSize,
+      this.config.visualMargin,
+    );
   }
 
   /**

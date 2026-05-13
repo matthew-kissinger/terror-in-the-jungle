@@ -116,7 +116,8 @@ function createMockCombatant(
     timeToDirectionChange: 0,
     lastUpdateTime: 0,
     updatePriority: 0,
-    lodLevel: 'high',
+    simLane: 'high',
+    renderLane: 'culled',
     kills: 0,
     deaths: 0,
   } as Combatant;
@@ -143,6 +144,8 @@ describe('CombatantCombat', () => {
     combatantCombat.setTerrainSystem(mockTerrainSystem);
 
     vi.clearAllMocks();
+    (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
+    (mockTerrainSystem.getEffectiveHeightAt as any).mockReturnValue(-1000);
   });
 
   describe('updateCombat', () => {
@@ -286,6 +289,52 @@ describe('CombatantCombat', () => {
       const result = combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
 
       expect(result.hit).toBe(false);
+      expect(target.health).toBe(100);
+    });
+
+    it('blocks a close-range hit when the BVH misses but the height profile shows a strong ridge', () => {
+      const target = createMockCombatant('target-1', Faction.NVA, 100);
+      const allCombatants = new Map<string, Combatant>([['target-1', target]]);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 1.2, 0), new THREE.Vector3(1, 0, 0));
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(80, 1.2, 0),
+        distance: 80,
+        headshot: false,
+      });
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
+      (mockTerrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number) => (
+        x >= 36 && x <= 44 ? 2.6 : 0
+      ));
+
+      const result = combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
+
+      expect(result.hit).toBe(false);
+      expect(result.point.x).toBeCloseTo(36, 5);
+      expect(target.health).toBe(100);
+    });
+
+    it('previews a close-range terrain block from the height profile when the BVH misses', () => {
+      const target = createMockCombatant('target-1', Faction.NVA, 100);
+      const allCombatants = new Map<string, Combatant>([['target-1', target]]);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 1.2, 0), new THREE.Vector3(1, 0, 0));
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(80, 1.2, 0),
+        distance: 80,
+        headshot: false,
+      });
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
+      (mockTerrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number) => (
+        x >= 36 && x <= 44 ? 2.6 : 0
+      ));
+
+      const result = combatantCombat.previewPlayerShot(ray, allCombatants);
+
+      expect(result.hit).toBe(false);
+      expect(result.point.x).toBeCloseTo(36, 5);
       expect(target.health).toBe(100);
     });
   });

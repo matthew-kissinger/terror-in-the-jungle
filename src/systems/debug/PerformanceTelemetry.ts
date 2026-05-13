@@ -73,7 +73,7 @@ interface SparseArtifactCell {
 
 interface TrackedNPCArtifactState {
   id: string
-  lodLevel: 'high' | 'medium' | 'low' | 'culled'
+  simLane: 'high' | 'medium' | 'low' | 'culled'
   points: MovementArtifactTrackPoint[]
   occupancyCooldownMs: number
   trackCooldownMs: number
@@ -413,7 +413,7 @@ export class PerformanceTelemetry {
 
   recordNPCMovementSample(
     id: string,
-    lodLevel: 'high' | 'medium' | 'low' | 'culled',
+    simLane: 'high' | 'medium' | 'low' | 'culled',
     intent: MovementIntentTelemetryKey,
     progressDelta: number,
     lowProgress: boolean,
@@ -431,10 +431,10 @@ export class PerformanceTelemetry {
     npc.samples++
     npc.progressSum += progressDelta
     npc.byIntent[intent] += 1
-    npc.samplesByLod[lodLevel] += 1
+    npc.samplesByLod[simLane] += 1
     if (lowProgress) {
       npc.lowProgressEvents++
-      npc.lowProgressByLod[lodLevel] += 1
+      npc.lowProgressByLod[simLane] += 1
     }
     if (contourActivated) npc.contourActivations++
     if (backtrackActivated) npc.backtrackActivations++
@@ -458,12 +458,12 @@ export class PerformanceTelemetry {
     }
     if (dwellUpdate.pinned) {
       npc.pinnedSamples++
-      npc.pinnedByLod[lodLevel] += 1
+      npc.pinnedByLod[simLane] += 1
     }
 
     this.recordNPCArtifacts(
       id,
-      lodLevel,
+      simLane,
       intent,
       deltaTime,
       positionX,
@@ -641,7 +641,7 @@ export class PerformanceTelemetry {
           .map((track): MovementArtifactTrack => ({
             id: track.id,
             subject: 'npc',
-            lodLevel: track.lodLevel,
+            simLane: track.simLane,
             points: track.points.slice(),
           })),
       ],
@@ -781,7 +781,7 @@ export class PerformanceTelemetry {
 
   private recordNPCArtifacts(
     id: string,
-    lodLevel: 'high' | 'medium' | 'low' | 'culled',
+    simLane: 'high' | 'medium' | 'low' | 'culled',
     intent: MovementIntentTelemetryKey,
     deltaTime: number,
     x: number,
@@ -808,10 +808,10 @@ export class PerformanceTelemetry {
 
     const existing = this.trackedNPCArtifacts.get(id)
     if (existing) {
-      existing.lodLevel = lodLevel
+      existing.simLane = simLane
     }
 
-    const trackState = existing ?? this.maybeTrackNPC(id, lodLevel, backtrackActivated || lowProgress || contourActivated)
+    const trackState = existing ?? this.maybeTrackNPC(id, simLane, backtrackActivated || lowProgress || contourActivated)
 
     const occupancyCooldown = trackState
       ? trackState.occupancyCooldownMs
@@ -820,9 +820,9 @@ export class PerformanceTelemetry {
     if (nextOccupancyCooldown <= 0) {
       this.bumpOccupancy(this.npcOccupancy, x, z)
       if (trackState) {
-        trackState.occupancyCooldownMs = NPC_OCCUPANCY_SAMPLE_MS_BY_LOD[lodLevel]
+        trackState.occupancyCooldownMs = NPC_OCCUPANCY_SAMPLE_MS_BY_LOD[simLane]
       } else {
-        this.npcOccupancyCooldowns.set(id, NPC_OCCUPANCY_SAMPLE_MS_BY_LOD[lodLevel])
+        this.npcOccupancyCooldowns.set(id, NPC_OCCUPANCY_SAMPLE_MS_BY_LOD[simLane])
       }
     } else if (trackState) {
       trackState.occupancyCooldownMs = nextOccupancyCooldown
@@ -837,7 +837,7 @@ export class PerformanceTelemetry {
     trackState.trackCooldownMs -= deltaTime * 1000
     if (trackState.trackCooldownMs <= 0) {
       this.appendTrackPoint(trackState.points, x, z, intent)
-      trackState.trackCooldownMs = NPC_TRACK_SAMPLE_MS_BY_LOD[lodLevel]
+      trackState.trackCooldownMs = NPC_TRACK_SAMPLE_MS_BY_LOD[simLane]
       if (trackState.points.length > MAX_TRACKED_NPC_TRACK_POINTS) {
         trackState.points.shift()
       }
@@ -846,10 +846,10 @@ export class PerformanceTelemetry {
 
   private maybeTrackNPC(
     id: string,
-    lodLevel: 'high' | 'medium' | 'low' | 'culled',
+    simLane: 'high' | 'medium' | 'low' | 'culled',
     forceTrack: boolean,
   ): TrackedNPCArtifactState | null {
-    if (!forceTrack && lodLevel !== 'high' && lodLevel !== 'medium') {
+    if (!forceTrack && simLane !== 'high' && simLane !== 'medium') {
       return null
     }
     if (this.trackedNPCArtifacts.size >= MAX_TRACKED_NPCS) {
@@ -858,7 +858,7 @@ export class PerformanceTelemetry {
 
     const track: TrackedNPCArtifactState = {
       id,
-      lodLevel,
+      simLane,
       points: [],
       occupancyCooldownMs: 0,
       trackCooldownMs: 0,

@@ -22,7 +22,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   description: 'Fast-paced combat over 3 strategic zones. Control the majority to drain enemy tickets.',
 
   worldSize: 800,
-  visualMargin: 360,
+  visualMargin: 1600,
   chunkRenderDistance: 5,
   terrainSeed: 42,
   navmeshAsset: '/data/navmesh/zone_control-42.bin',

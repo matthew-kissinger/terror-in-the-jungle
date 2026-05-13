@@ -3,6 +3,11 @@ import * as THREE from 'three';
 import { AtmosphereSystem } from './AtmosphereSystem';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import type { IGameRenderer } from '../../types/SystemInterfaces';
+import {
+  SCENARIO_ATMOSPHERE_PRESETS,
+  computeSunDirectionAtTime,
+  type AtmospherePreset,
+} from './atmosphere/ScenarioAtmospherePresets';
 
 function makeRendererStub(): IGameRenderer {
   const moonLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -68,7 +73,7 @@ describe('AtmosphereSystem (ISkyRuntime contract)', () => {
     const system = new AtmosphereSystem();
     const customSun = new THREE.Color(0x123456);
     const customZenith = new THREE.Color(0x654321);
-    const customHorizon = new THREE.Color(0xabcdef);
+    const customHorizon = new THREE.Color(0x6a7b84);
     const fakeBackend: ISkyBackend = {
       update: () => {},
       sample: (_dir, out) => out.copy(customZenith),
@@ -80,7 +85,7 @@ describe('AtmosphereSystem (ISkyRuntime contract)', () => {
 
     expect(system.getSunColor(new THREE.Color()).getHex()).toBe(0x123456);
     expect(system.getZenithColor(new THREE.Color()).getHex()).toBe(0x654321);
-    expect(system.getHorizonColor(new THREE.Color()).getHex()).toBe(0xabcdef);
+    expect(system.getHorizonColor(new THREE.Color()).getHex()).toBe(0x6a7b84);
   });
 
   it('forwards update() with current sun direction to the backend', () => {
@@ -150,14 +155,20 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     expect(target.z).toBeCloseTo(-40, 3);
   });
 
-  it('drives hemisphere sky color from the backend zenith sample', () => {
+  it('drives hemisphere sky color from the backend zenith sample without saturating HDR values', () => {
     const system = new AtmosphereSystem();
     const renderer = makeRendererStub();
 
     system.setRenderer(renderer);
 
     const zenith = system.getZenithColor(new THREE.Color());
-    expect(renderer.hemisphereLight!.color.getHex()).toBe(zenith.getHex());
+    const sky = renderer.hemisphereLight!.color;
+    expect(sky.b).toBeGreaterThan(sky.r);
+    expect(sky.b).toBeGreaterThan(sky.g);
+    expect(sky.getHex()).not.toBe(0xffffff);
+    expect(sky.r).toBeLessThanOrEqual(zenith.r);
+    expect(sky.g).toBeLessThanOrEqual(zenith.g);
+    expect(sky.b).toBeLessThanOrEqual(zenith.b);
   });
 
   it('drives hemisphere ground color darker than the backend horizon sample', () => {
@@ -178,6 +189,34 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     expect(ground.g).toBeLessThan(horizon.g);
     expect(ground.b).toBeLessThan(horizon.b);
     expect(ground.getHex()).not.toBe(0);
+  });
+
+  it('bounds HDR sky samples before using them as renderer fog and hemisphere light colors', () => {
+    const system = new AtmosphereSystem();
+    const backend: ISkyBackend = {
+      update: () => {},
+      sample: (_dir, out) => out,
+      getSun: (out) => out.setHex(0xffffff),
+      getZenith: (out) => out.setRGB(0.8, 1.8, 3.2),
+      getHorizon: (out) => out.setRGB(2.0, 2.2, 2.4),
+    };
+    const renderer = {
+      ...makeRendererStub(),
+      fog: new THREE.FogExp2(0x000000, 0.001),
+    };
+
+    system.setBackend(backend);
+    system.setRenderer(renderer);
+    system.update(0.016);
+
+    const { color, groundColor } = renderer.hemisphereLight!;
+    for (const c of [color, groundColor, renderer.fog.color]) {
+      expect(c.r).toBeLessThan(1);
+      expect(c.g).toBeLessThan(1);
+      expect(c.b).toBeLessThan(1);
+    }
+    expect(renderer.fog.color.getHex()).not.toBe(0xffffff);
+    expect(renderer.hemisphereLight!.groundColor.getHex()).not.toBe(0xffffff);
   });
 
   it('reapplies atmosphere state to the renderer on update()', () => {
@@ -269,6 +308,29 @@ describe('AtmosphereSystem (day/night cycle)', () => {
     expect(after.x).toBeCloseTo(start.x, 4);
     expect(after.y).toBeCloseTo(start.y, 4);
     expect(after.z).toBeCloseTo(start.z, 4);
+  });
+
+  it('uses todCycle startHour as the cycle phase without shifting the boot direction', () => {
+    const base = SCENARIO_ATMOSPHERE_PRESETS.openfrontier;
+    const dayLengthSeconds = base.todCycle?.dayLengthSeconds ?? 600;
+    const withStartHour = (startHour: number): AtmospherePreset => ({
+      ...base,
+      todCycle: { dayLengthSeconds, startHour },
+    });
+
+    const dawnPreset = withStartHour(6);
+    const noonPreset = withStartHour(12);
+    const authoredDirection = computeSunDirectionAtTime(base, 0);
+    const dawnBoot = computeSunDirectionAtTime(dawnPreset, 0);
+    const noonBoot = computeSunDirectionAtTime(noonPreset, 0);
+
+    expect(dawnBoot.distanceTo(authoredDirection)).toBeLessThan(0.00001);
+    expect(noonBoot.distanceTo(authoredDirection)).toBeLessThan(0.00001);
+
+    const sameElapsed = dayLengthSeconds * 0.125;
+    const dawnLater = computeSunDirectionAtTime(dawnPreset, sameElapsed);
+    const noonLater = computeSunDirectionAtTime(noonPreset, sameElapsed);
+    expect(dawnLater.distanceTo(noonLater)).toBeGreaterThan(0.02);
   });
 
   it('sun elevation stays above the analytic sky danger zone across a full day', () => {

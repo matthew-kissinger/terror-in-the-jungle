@@ -1,5 +1,7 @@
 # Rearchitecture — Open Paradigm Questions
 
+> **Status note (2026-05-12).** E2 (rendering paradigm at scale) has settled in favor of **WebGPU + TSL** — Three.js 0.184 `WebGPURenderer` is exclusive on `exp/konveyer-webgpu-migration`, target for master merge after the materialization rearch cycle completes. E1 (ECS), E3 (AI paradigm), and the remaining E-track questions remain open. See [docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md](rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md) for current state.
+
 Last updated: 2026-04-16
 
 This document names the architectural decisions that surgical cleanup work (Batches A-D) deliberately does **not** settle. Without explicit framing, those decisions get made by default — the "current shape" becomes "the correct shape" without anyone having argued for it.

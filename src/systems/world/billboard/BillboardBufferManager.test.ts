@@ -111,6 +111,10 @@ vi.mock('three', () => {
     instanceCount = 0
     dispose = vi.fn()
 
+    setIndex(index: any) {
+      this.index = index
+    }
+
     setAttribute(name: string, attr: any) {
       this.attributes[name] = attr
     }
@@ -119,43 +123,16 @@ vi.mock('three', () => {
   class PlaneGeometry {
     index = { id: 'index' }
     attributes = { position: { id: 'position' }, uv: { id: 'uv' } }
-  }
-
-  class RawShaderMaterial {
-    uniforms: Record<string, { value: any }>
-    vertexShader: string
-    fragmentShader: string
-    transparent: boolean
-    side: any
-    depthWrite: boolean
-    depthTest: boolean
-    blending: any
-    blendSrc: any
-    blendDst: any
-    blendSrcAlpha: any
-    blendDstAlpha: any
     dispose = vi.fn()
-
-    constructor(params: any) {
-      this.uniforms = params.uniforms
-      this.vertexShader = params.vertexShader
-      this.fragmentShader = params.fragmentShader
-      this.transparent = params.transparent
-      this.side = params.side
-      this.depthWrite = params.depthWrite
-      this.depthTest = params.depthTest
-      this.blending = params.blending
-      this.blendSrc = params.blendSrc
-      this.blendDst = params.blendDst
-      this.blendSrcAlpha = params.blendSrcAlpha
-      this.blendDstAlpha = params.blendDstAlpha
-    }
   }
 
   class Mesh {
     geometry: any
     material: any
     frustumCulled = true
+    visible = true
+    matrixAutoUpdate = true
+    matrixWorldAutoUpdate = true
 
     constructor(geometry: any, material: any) {
       this.geometry = geometry
@@ -180,7 +157,6 @@ vi.mock('three', () => {
     PlaneGeometry,
     InstancedBufferGeometry,
     InstancedBufferAttribute,
-    RawShaderMaterial,
     Mesh,
     Vector3,
     Vector2,
@@ -196,11 +172,6 @@ vi.mock('three', () => {
     OneMinusSrcAlphaFactor: 205,
   }
 })
-
-vi.mock('./BillboardShaders', () => ({
-  BILLBOARD_VERTEX_SHADER: 'vertex',
-  BILLBOARD_FRAGMENT_SHADER: 'fragment',
-}))
 
 vi.mock('../../../utils/Logger', () => ({
   Logger: {
@@ -241,9 +212,24 @@ describe('GPUBillboardVegetation', () => {
 
     expect(internal.geometry).toBeTruthy()
     expect(internal.material).toBeTruthy()
+    expect(internal.material.isNodeMaterial).toBe(true)
+    expect(internal.material.isKonveyerBillboardNodeMaterial).toBe(true)
+    expect(internal.material.fog).toBe(false)
+    expect(internal.material.vertexShader).toBeUndefined()
     expect(internal.mesh).toBeTruthy()
     expect(internal.mesh.frustumCulled).toBe(false)
+    expect(internal.mesh.visible).toBe(false)
+    expect(internal.mesh.matrixAutoUpdate).toBe(false)
+    expect(internal.mesh.matrixWorldAutoUpdate).toBe(false)
     expect(scene.add).toHaveBeenCalledWith(internal.mesh)
+  })
+
+  it('starts with zero renderable instances for WebGPU transparent draws', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    expect(internal.geometry.instanceCount).toBe(0)
+    expect(internal.mesh.visible).toBe(false)
   })
 
   it('configures imposter uniforms without requiring a normal atlas', () => {
@@ -271,16 +257,17 @@ describe('GPUBillboardVegetation', () => {
     expect(internal.material.uniforms.nearAlphaSolidDistance.value).toBe(30)
   })
 
-  it('configures Pixel Forge vegetation lighting readability defaults', () => {
+  it('configures Pixel Forge vegetation lighting for humid jungle readability', () => {
     const manager = new GPUBillboardVegetation(scene, createConfig())
     const internal = manager as any
 
-    expect(internal.material.uniforms.colorTint.value.r).toBeCloseTo(1.04)
-    expect(internal.material.uniforms.colorTint.value.g).toBeCloseTo(1.08)
-    expect(internal.material.uniforms.colorTint.value.b).toBeCloseTo(1.0)
-    expect(internal.material.uniforms.vegetationExposure.value).toBeCloseTo(1.18)
+    expect(internal.material.uniforms.colorTint.value.g).toBeLessThan(0.9)
+    expect(internal.material.uniforms.colorTint.value.r).toBeGreaterThan(internal.material.uniforms.colorTint.value.b)
+    expect(internal.material.uniforms.vegetationSaturation.value).toBeLessThan(0.7)
+    expect(internal.material.uniforms.vegetationExposure.value).toBeLessThan(0.86)
     expect(internal.material.uniforms.nearLightBoostDistance.value).toBe(85)
-    expect(internal.material.uniforms.minVegetationLight.value).toBeCloseTo(0.68)
+    expect(internal.material.uniforms.minVegetationLight.value).toBeCloseTo(0.40)
+    expect(internal.material.uniforms.maxVegetationLight.value).toBeLessThan(0.82)
   })
 
   it('configures GPU wind sway uniforms without per-instance CPU animation', () => {
@@ -410,6 +397,7 @@ describe('GPUBillboardVegetation', () => {
     manager.addInstances([createInstance(0, 0, 0), createInstance(1, 1, 1)])
 
     expect(internal.geometry.instanceCount).toBe(2)
+    expect(internal.mesh.visible).toBe(true)
   })
 
   it('addInstances returns empty array for empty input', () => {
@@ -496,6 +484,19 @@ describe('GPUBillboardVegetation', () => {
 
     expect(manager.getHighWaterMark()).toBe(1)
     expect(internal.geometry.instanceCount).toBe(1)
+    expect(internal.mesh.visible).toBe(true)
+  })
+
+  it('hides the mesh when all allocated slots are removed', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    const indices = manager.addInstances([createInstance(0, 0, 0), createInstance(1, 1, 1)])
+    manager.removeInstances(indices)
+
+    expect(manager.getInstanceCount()).toBe(0)
+    expect(internal.geometry.instanceCount).toBe(0)
+    expect(internal.mesh.visible).toBe(false)
   })
 
   it('compactHighWaterMark resets capacity warning when below max', () => {
@@ -523,6 +524,7 @@ describe('GPUBillboardVegetation', () => {
     expect(manager.getHighWaterMark()).toBe(0)
     expect(manager.getFreeSlotCount()).toBe(0)
     expect(internal.geometry.instanceCount).toBe(0)
+    expect(internal.mesh.visible).toBe(false)
   })
 
   it('update flushes pending buffer updates', () => {
@@ -662,11 +664,12 @@ describe('GPUBillboardVegetation', () => {
   it('dispose disposes geometry and material and removes mesh', () => {
     const manager = new GPUBillboardVegetation(scene, createConfig())
     const internal = manager as any
+    const disposeMaterial = vi.spyOn(internal.material, 'dispose')
 
     manager.dispose()
 
     expect(internal.geometry.dispose).toHaveBeenCalled()
-    expect(internal.material.dispose).toHaveBeenCalled()
+    expect(disposeMaterial).toHaveBeenCalled()
     expect(scene.remove).toHaveBeenCalledWith(internal.mesh)
   })
 

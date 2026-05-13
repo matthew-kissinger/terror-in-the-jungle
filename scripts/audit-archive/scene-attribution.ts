@@ -365,7 +365,7 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
     if (includeExamples) serialized.examples = bucket.examples;
     return serialized;
   };
-  const serializeFrame = (frame) => ({
+  const serializeFrame = (frame, includeExamples = true) => ({
     frameCount: frame.frameCount,
     firstAtMs: frame.firstAtMs,
     lastAtMs: frame.lastAtMs,
@@ -374,7 +374,7 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
     instances: frame.instances,
     passTypes: serializePassTypes(frame.passTypes),
     categories: Array.from(frame.categories.values())
-      .map((bucket) => serializeBucket(bucket, true))
+      .map((bucket) => serializeBucket(bucket, includeExamples))
       .sort((a, b) => b.drawSubmissions - a.drawSubmissions || b.triangles - a.triangles)
   });
   const selectFramesForExport = (frames) => {
@@ -401,6 +401,30 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       .slice(0, 24)
       .forEach(add);
     return [...selected].sort((a, b) => a.frameCount - b.frameCount).slice(0, 160);
+  };
+  const selectFramesForSummary = (frames) => {
+    const selected = new Set();
+    const add = (frame) => {
+      if (frame) selected.add(frame);
+    };
+    add(frames[0]);
+    add(frames[frames.length - 1]);
+    for (const frame of frames) {
+      if (state.interestingFrameCounts.has(frame.frameCount)) add(frame);
+    }
+    [...frames]
+      .sort((a, b) => b.drawSubmissions - a.drawSubmissions || b.triangles - a.triangles)
+      .slice(0, 4)
+      .forEach(add);
+    [...frames]
+      .sort((a, b) => b.triangles - a.triangles || b.drawSubmissions - a.drawSubmissions)
+      .slice(0, 4)
+      .forEach(add);
+    [...frames]
+      .sort((a, b) => b.instances - a.instances || b.drawSubmissions - a.drawSubmissions)
+      .slice(0, 2)
+      .forEach(add);
+    return [...selected].sort((a, b) => a.frameCount - b.frameCount).slice(0, 16);
   };
 
   const state = {
@@ -558,6 +582,35 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
         installPasses: state.installPasses,
         frameCountStart: frames[0]?.frameCount ?? null,
         frameCountEnd: frames[frames.length - 1]?.frameCount ?? null,
+        frames,
+        totals,
+        errors: state.errors.slice()
+      };
+      state.frames.clear();
+      state.totals.clear();
+      state.interestingFrameCounts.clear();
+      state.lastEventScanFrameCount = -1;
+      state.errors = [];
+      return result;
+    },
+    drainSummary() {
+      state.install();
+      addMetricEventFrames(globalScope.__metrics?.getSnapshot?.(), state.interestingFrameCounts);
+      const rawFrames = Array.from(state.frames.values())
+        .sort((a, b) => a.frameCount - b.frameCount);
+      const frames = selectFramesForSummary(rawFrames)
+        .map((frame) => serializeFrame(frame, false))
+        .sort((a, b) => a.frameCount - b.frameCount);
+      const totals = Array.from(state.totals.values())
+        .map((bucket) => serializeBucket(bucket, false))
+        .sort((a, b) => b.drawSubmissions - a.drawSubmissions || b.triangles - a.triangles);
+      const result = {
+        mode: 'summary',
+        installedCount: state.installedCount,
+        installPasses: state.installPasses,
+        rawFrameCount: rawFrames.length,
+        frameCountStart: rawFrames[0]?.frameCount ?? null,
+        frameCountEnd: rawFrames[rawFrames.length - 1]?.frameCount ?? null,
         frames,
         totals,
         errors: state.errors.slice()

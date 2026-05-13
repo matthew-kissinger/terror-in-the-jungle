@@ -25,6 +25,7 @@ type ShotKind =
 interface ReviewOptions {
   port: number;
   headless: boolean;
+  renderer: string;
 }
 
 interface Anchor {
@@ -207,6 +208,7 @@ interface HarnessTerrainSystem {
   isAreaReadyAt?: (x: number, z: number) => boolean;
   getActiveTerrainTileCount?: () => number;
   getBillboardDebugInfo?: () => Record<string, unknown>;
+  setRenderCameraOverride?: (camera: HarnessCamera | null) => void;
   updatePlayerPosition?: (position: { x: number; y: number; z: number }) => void;
   update?: (dt: number) => void;
 }
@@ -257,9 +259,11 @@ function argValue(name: string): string | null {
 
 function parseOptions(): ReviewOptions {
   const port = Number(argValue('--port') ?? DEFAULT_PORT);
+  const renderer = String(argValue('--renderer') ?? 'default');
   return {
     port: Number.isFinite(port) && port > 0 ? port : DEFAULT_PORT,
     headless: !process.argv.includes('--headed'),
+    renderer,
   };
 }
 
@@ -600,6 +604,7 @@ async function captureShot(page: Page, plan: ShotPlan, mode: string, artifactDir
     activeCamera.updateProjectionMatrix?.();
     activeCamera.updateMatrixWorld?.(true);
     renderer.setOverrideCamera?.(activeCamera);
+    terrain.setRenderCameraOverride?.(activeCamera);
 
     terrain.updatePlayerPosition?.(activeCamera.position);
     for (let i = 0; i < 20; i++) terrain.update?.(0.016);
@@ -675,14 +680,29 @@ function shotHasExposureRisk(shot: ReviewShot): boolean {
     && (metrics.edgeContrast < 4 || metrics.overexposedRatio > 0.45);
 }
 
-async function runScenario(page: Page, mode: string, config: GameModeConfig, artifactDir: string, port: number): Promise<ScenarioResult> {
+function shotHasGroundToneRisk(shot: ReviewShot): boolean {
+  const metrics = shot.imageMetrics;
+  return metrics.lumaMean >= 205
+    && metrics.greenDominanceRatio < 0.08
+    && metrics.edgeContrast < 3.6;
+}
+
+async function runScenario(
+  page: Page,
+  mode: string,
+  config: GameModeConfig,
+  artifactDir: string,
+  port: number,
+  renderer: string,
+): Promise<ScenarioResult> {
   const browserErrors: string[] = [];
   const pageErrors: string[] = [];
   page.on('console', (msg) => {
     if (msg.type() === 'error') browserErrors.push(msg.text());
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
-  await page.goto(`http://127.0.0.1:${port}/?perf=1&capture=1&logLevel=error`, {
+  const rendererQuery = renderer === 'default' ? '' : `&renderer=${encodeURIComponent(renderer)}`;
+  await page.goto(`http://127.0.0.1:${port}/?perf=1&capture=1&logLevel=error${rendererQuery}`, {
     waitUntil: 'domcontentloaded',
     timeout: 120_000,
   });
@@ -749,6 +769,7 @@ function markdown(report: TerrainVisualReviewReport): string {
     `Created: ${report.createdAt}`,
     `Status: ${report.status.toUpperCase()}`,
     `Headless: ${report.options.headless}`,
+    `Renderer: ${report.options.renderer}`,
     `Contact sheet: ${report.files.contactSheet}`,
     '',
     '## Shots',
@@ -798,7 +819,7 @@ async function main(): Promise<void> {
     for (const scenario of SCENARIOS) {
       const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
       try {
-        scenarios.push(await runScenario(page, scenario.mode, scenario.config, artifactDir, server.port));
+        scenarios.push(await runScenario(page, scenario.mode, scenario.config, artifactDir, server.port, options.renderer));
       } finally {
         await page.close().catch(() => {});
       }
@@ -816,11 +837,13 @@ async function main(): Promise<void> {
     || shot.kind === 'support-foundation'
   );
   const exposureRiskShots = allShots.filter(shotHasExposureRisk);
+  const groundToneRiskShots = allShots.filter(shotHasGroundToneRisk);
   const checks = [
     check('expected_screenshots_captured', allShots.length === expectedShots && allShots.every((shot) => Boolean(shot.file)), `${allShots.filter((shot) => Boolean(shot.file)).length}/${expectedShots}`, 'Captured all terrain visual review screenshots.'),
     check('browser_errors_clear', scenarios.every((scenario) => scenario.browserErrors.length === 0 && scenario.pageErrors.length === 0), scenarios.reduce((sum, scenario) => sum + scenario.browserErrors.length + scenario.pageErrors.length, 0), 'Captured zero browser/page errors.'),
     check('nonblank_visual_content', allShots.every(shotPassed), `${allShots.filter(shotPassed).length}/${allShots.length}`, 'Screenshots have nonblank terrain content and basic renderer/terrain metrics.'),
     check('terrain_water_exposure_review', exposureRiskShots.length === 0, exposureRiskShots.map((shot) => `${shot.file}: mean=${shot.imageMetrics.lumaMean}, over=${shot.imageMetrics.overexposedRatio}, green=${shot.imageMetrics.greenDominanceRatio}`).join('; ') || 'none', 'Terrain/water review screenshots are not washed out by sky/water glare.'),
+    check('terrain_ground_tone_review', groundToneRiskShots.length === 0, groundToneRiskShots.map((shot) => `${shot.file}: mean=${shot.imageMetrics.lumaMean}, green=${shot.imageMetrics.greenDominanceRatio}, edge=${shot.imageMetrics.edgeContrast}`).join('; ') || 'none', 'Terrain review screenshots retain enough ground tint and readable surface contrast.'),
     check('hydrology_review_shots_present', allShots.filter((shot) => shot.kind.startsWith('river') && Boolean(shot.file)).length === 4, allShots.filter((shot) => shot.kind.startsWith('river') && Boolean(shot.file)).length, 'Captured river oblique and ground-level shots for both large maps.'),
     check('foundation_review_shots_present', foundationShots.length === scenarios.length * 3 && foundationShots.every((shot) => Boolean(shot.file)), `${foundationShots.filter((shot) => Boolean(shot.file)).length}/${scenarios.length * 3}`, 'Captured airfield, parking, and support-foundation shots for both large maps.'),
   ];
@@ -846,6 +869,7 @@ async function main(): Promise<void> {
     requiredNextActions: [
       'Owner/human review should inspect these screenshots before any final terrain-art acceptance.',
       'Inspect the airfield, parking, and support-foundation shots specifically for buildings, parked aircraft, and vehicle props hanging off cliff or hill edges.',
+      'If terrain_ground_tone_review warns, treat the packet as visually rejected until terrain material, fog, exposure, or biome texture calibration restores readable ground color.',
       'If terrain_water_exposure_review warns, tune global-water reflection/exposure, hydrology strip material, camera review angles, or terrain/water compositing before treating the packet as visually acceptable.',
       'If accepted visually, pair this packet with matched Open Frontier/A Shau perf captures before moving any KB-TERRAIN target toward evidence_complete.',
       'If rejected visually, tune terrain pad stamps, airfield/support placement offsets, foundation kits, hydrology strip material, trail edges, or ground-cover distribution and rerun this packet.',
