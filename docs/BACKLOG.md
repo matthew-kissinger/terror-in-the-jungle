@@ -37,6 +37,31 @@ Use [docs/DIRECTIVES.md](DIRECTIVES.md) instead of duplicating active work here.
 | Baseline drift, doc/code drift, combat p99 (`DEFEKT-3`), route quality | DEFEKT-1 through DEFEKT-4 |
 | WebGPU scene parity and rollout gating | KONVEYER-10 |
 
+## Recently Completed (cycle-2026-05-13-konveyer-materialization-rearch + doc-vision-alignment + master-merge)
+
+R1 of the Phase F materialization rearch plus the doc-vision-alignment pass
+landed on the `exp/konveyer-webgpu-migration` branch and merged to `master`
+on 2026-05-13 as PR #192. **Master is now the WebGPU + TSL renderer branch
+by default**, with automatic WebGL2 fallback for browsers without WebGPU.
+KONVEYER-10 closes with this arc.
+
+- [#183](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/183) `konveyer-combat-sub-attribution` — `Combat.{Influence,AI,Billboards,Effects}` telemetry children wired into `CombatantSystem.update` blocks; probe-side child breakdown captured across all five modes.
+- [#184](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/184) `konveyer-materialization-lane-rename` — pure refactor: `Combatant.lodLevel` → `simLane` + `renderLane`. Surface for the budget arbiter v2.
+- [#185](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/185) `konveyer-sky-refresh-investigate` — sky-refresh idempotency at the 2 s cadence; `setCloudCoverage` no-op on unchanged input.
+- [#186](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/186) `doc-align-historical-headers` — historical "Last verified" headers added to `CAMPAIGN_2026-05-09.md`, `STABILIZATION_CHECKPOINT_2026-05-09.md`, and `REARCHITECTURE.md`.
+- [#187](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/187) `doc-align-roadmap-and-agents` — ROADMAP and AGENTS docs aligned with the 3,000-combatant vision sentence; Phase 6 Ground Vehicles flipped to IN PROGRESS.
+- [#188](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/188) `doc-align-claude-and-carryovers` — CLAUDE.md "Current focus" reflects the 2026-05-12 vision confirmation; AVIATSIYA-2/3 parked.
+- [#189](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/189) `rearch-ground-vehicle-physics` — `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` memo (wheeled physics, Ackermann steering, ground-normal conform) and the 2026-05-13 addendum to `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md`.
+- [#190](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/190) `rearch-tank-systems` — `docs/rearch/TANK_SYSTEMS_2026-05-13.md` memo (skid-steer, independent turret, gunner seat, ballistic cannon, damage states).
+- [#191](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/191) `rearch-browser-runtime-primitives` — `docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` memo (Rust-WASM, compute, audio, and related runtime primitives).
+- [#192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192) `exp→master merge` — `exp/konveyer-webgpu-migration` folded into `master` (merge commit `1df141ca`); WebGPU + TSL becomes the default production renderer.
+- Inline fix on PR #192 (commit `4aec731e`) — gate WebGL-fallback rejection on strict mode only. Production users without WebGPU now automatically hit Three.js's WebGL2 backend.
+
+Carry-over delta: −1 closed (KONVEYER-10), +0 opened. Active count: 9 → 8.
+Follow-up cycles queued on master: cover-spatial-grid, render-silhouette/cluster
+lanes, squad-aggregated strategic sim, budget arbiter v2, strict-WebGPU
+multi-mode proof, docs review packet v2.
+
 ## Recently Completed (cycle-2026-05-09-cdlod-edge-morph)
 
 Hot-fix cycle 2.4 (single task), inserted ahead of Phase 2.5 to address a

@@ -1,6 +1,6 @@
 # Rearchitecture — Open Paradigm Questions
 
-> **Status note (2026-05-12).** E2 (rendering paradigm at scale) has settled in favor of **WebGPU + TSL** — Three.js 0.184 `WebGPURenderer` is exclusive on `exp/konveyer-webgpu-migration`, target for master merge after the materialization rearch cycle completes. E1 (ECS), E3 (AI paradigm), and the remaining E-track questions remain open. See [docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md](rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md) for current state.
+> **Status note (2026-05-12).** E2 (rendering paradigm at scale) LANDED on master 2026-05-12 via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192) (commit `1df141ca`). WebGPU + TSL is now the production renderer; WebGL2 fallback automatic for unsupported environments. E1 (ECS), E3 (AI paradigm), and the remaining E-track questions remain open. See [docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md](rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md) for current state.
 
 Last updated: 2026-04-16
 

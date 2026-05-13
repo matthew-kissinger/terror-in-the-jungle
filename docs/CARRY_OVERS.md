@@ -31,7 +31,6 @@ started, the cycle is `INCOMPLETE` per the rule in
 | KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 4 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
 | cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 2 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
 | weapons-cluster-zonemanager-migration | Finish the IZoneQuery migration for the 5 remaining concrete `ZoneManager` imports in the weapons cluster: `FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`, `PlayerHealthSystem` | cycle-2026-05-10-zone-manager-decoupling | 2 | weapons | no | Out-of-scope for Phase 2 R2 batches A/B/C; aspirational ≤5 ZoneManager-import target missed. Phase 3+ can finish; cycle-2026-05-10's ≤20 success criterion was met (achieved 17 read / 5 concrete). |
-| KONVEYER-10 | Rest-of-scene WebGPU parity and frame-budget attribution after K0-K9 branch-review completion | cycle-2026-05-11-konveyer-scene-parity | 1 | renderer / environment / world / perf-harness | no | Gates any WebGPU production-rollout claim. The experimental branch head proves strict close-NPC materialization telemetry/body bounds, startup feature-compile attribution, and a bounded spawn-residency close-model reserve for Open Frontier. Multi-mode materialization reserve verification, A Shau finite-edge strategy, final cloud/weather art, and water shader/interaction consumers remain open before principles-first rearchitecture. |
 | konveyer-large-file-splits | Two KONVEYER-grown files added to `lint-source-budget.ts` grandfather list at the 2026-05-12 master-merge gate: `HosekWilkieSkyBackend.ts` (807 LOC, slated for the TSL fragment-shader sky port) and `WaterSystem.ts` (733 LOC, slated for VODA-1 water-shader work) | exp→master merge prep 2026-05-12 | 0 | environment | no | Split-debt tracking. Both files grew during the KONVEYER campaign (sky through slices 13-15 + sky-refresh fix; water during the scene-parity standard-material port). Each is grandfathered with a named follow-up round in `scripts/lint-source-budget.ts`. Closes when the named follow-up cycles ship and the files drop below 700 LOC. |
 
 ## Parked
@@ -52,6 +51,10 @@ History log:
   to free slots in the active-list budget for the WebGPU (KONVEYER-11 successor
   IDs) and driveable-land-vehicle (VEKHIKL-3 successor IDs) directions confirmed
   by the owner on 2026-05-12. No status change for the two items themselves.
+- 2026-05-12 — master-merge close: KONVEYER-10 moved Active → Closed via
+  [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
+  (commit `1df141ca`), which folded the `exp/konveyer-webgpu-migration` branch
+  into `master`. Active count: 9 → 8.
 
 ## Closed
 
@@ -66,6 +69,7 @@ History log:
 - artifact-prune-baseline-pin-fix | `artifact-prune` baseline-pin matching accepts both bare perf-baseline directory names and `artifacts/perf/` paths | closed in release-stewardship-2026-05-10 | fixed by `a9ebfbe` with source update in `scripts/artifact-prune.ts`.
 - worldbuilder-oneshotkills-wiring | `oneShotKills` WorldBuilder flag wired into NPC/projectile combat damage | closed in release-stewardship-2026-05-10 | fixed by `a9ebfbe` in `CombatantCombat` and `CombatantSystemDamage`, with behavior tests.
 - perf-doc-script-paths-drift | perf docs and asset acceptance references updated from retired `scripts/projekt-143-*` paths to retained commands/archive paths | closed in release-stewardship-2026-05-10 | fixed by `a9ebfbe` across `docs/perf/*` and `docs/ASSET_ACCEPTANCE_STANDARD.md`.
+- KONVEYER-10 | Rest-of-scene WebGPU parity and frame-budget attribution after K0-K9 branch-review completion | closed in 2026-05-12 master-merge (PR #192) | `exp/konveyer-webgpu-migration` merged into `master` via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192) (commit `1df141ca`); WebGPU + TSL becomes the default production renderer with WebGL2 fallback. R2-R4 follow-on materialization work queued as separate cycles on master.
 
 ## Reading the table
 
