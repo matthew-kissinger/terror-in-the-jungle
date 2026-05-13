@@ -15,7 +15,7 @@ without first re-deriving the queue.
 ## Predecessor
 
 This manifest supersedes
-[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md), which is flagged
+[docs/archive/CAMPAIGN_2026-05-09.md](archive/CAMPAIGN_2026-05-09.md), which is flagged
 historical at its first line. The 2026-05-09 manifest was the original
 9-cycle stabilization-refactor plan; it was paused on 2026-05-11 when
 the active run pivoted to KONVEYER-10 on the experimental branch and
@@ -233,7 +233,7 @@ past it.
 - [docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md](rearch/ENGINE_TRAJECTORY_2026-04-23.md)
   — "keep the stack" stance with the 2026-05-13 ground-vehicle
   addendum.
-- [docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md) — historical
+- [docs/archive/CAMPAIGN_2026-05-09.md](archive/CAMPAIGN_2026-05-09.md) — historical
   predecessor manifest.
 - [docs/state/CURRENT.md](state/CURRENT.md) — top-level current-truth
   snapshot; 2026-05-13 entry caps the KONVEYER campaign.

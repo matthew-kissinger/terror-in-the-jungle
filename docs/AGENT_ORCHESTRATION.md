@@ -78,7 +78,7 @@ red-flagged and must be named in the next cycle's plan.
 ### Campaign auto-advance (Phase 0 + realignment plan, 2026-05-09)
 
 A **campaign** is an ordered sequence of cycles queued in
-[docs/CAMPAIGN_2026-05-09.md](CAMPAIGN_2026-05-09.md). When the active
+[docs/archive/CAMPAIGN_2026-05-09.md](archive/CAMPAIGN_2026-05-09.md). When the active
 campaign declares `auto-advance: yes`, the orchestrator chains cycles
 without human input:
 

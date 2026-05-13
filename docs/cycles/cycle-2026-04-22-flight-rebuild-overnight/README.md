@@ -7,7 +7,7 @@ Mode: autonomous overnight (no human gates)
 
 Single-session autonomous run that lands Tier 0-3 as code (correctness, takeoff feel, climb stability, airfield placement) and Tier 4 as a design memo. Orchestrator advances R1 -> R2 -> R3 -> R4 without human intervention.
 
-Full plan: [docs/FLIGHT_REBUILD_ORCHESTRATION.md](../../FLIGHT_REBUILD_ORCHESTRATION.md).
+Full plan: [docs/archive/FLIGHT_REBUILD_ORCHESTRATION.md](../../archive/FLIGHT_REBUILD_ORCHESTRATION.md).
 
 ## Rounds
 
