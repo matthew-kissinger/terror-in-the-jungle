@@ -1,6 +1,6 @@
 # Recent Cycle Outcomes
 
-Last verified: 2026-05-12
+Last verified: 2026-05-13
 
 Last 3 cycles, summarized. Companion docs:
 
@@ -13,80 +13,84 @@ For older cycle outcomes, browse `docs/cycles/` or
 
 ---
 
-## konveyer-scene-parity-checkpoint-2026-05-12 (experimental, not deployed)
+## cycle-2026-05-13-konveyer-materialization-rearch — R1 only (closed 2026-05-13)
 
-Checkpoint on `exp/konveyer-webgpu-migration`. Use the remote branch head as
-branch truth for the next agent, not a frozen SHA in this doc. This is not a
-production release and not a `master` merge approval.
+R1 slices of the Phase F materialization rearch landed via three commits on
+the experimental branch, then folded into `master` with the KONVEYER campaign
+close via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
+(merge commit `1df141ca`) on 2026-05-13. PRs #183-#185 covered the
+component commits; the master-merge PR #192 carried them in.
 
-**Current KONVEYER-10 progress:**
+**Shipped (R1):**
 
-- Strict WebGPU scene/terrain/sky/water packet:
-  `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`.
-- Close-NPC materialization and startup compile packet:
-  `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
-- Multi-mode close-model reserve verification under strict WebGPU across
-  Open Frontier, Zone Control, Team Deathmatch, combat120 (`ai_sandbox`),
-  and A Shau Valley:
-  `artifacts/perf/2026-05-12T01-50-01-495Z/konveyer-asset-crop-probe/asset-crop-probe.json`
-  and
-  `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
-  Both runs resolve `webgpu` with zero console/page errors per mode; the
-  parity ledger has the consolidated per-mode tables.
-- Nearby NPC debug surface: dev/perf builds expose
-  `window.npcMaterializationProfile(24)` for nearest NPC render mode, close-GLB
-  weapon presence, and fallback reasons.
-- Bounded spawn-residency reserve: Open Frontier strict WebGPU proof records
-  11 nearby close GLBs, effective close cap 11, and zero fallback records for
-  the nearest startup/review actors. Multi-mode evidence shows the +4 reserve
-  activates per design when actors lie inside the 64m spawn-residency bubble
-  (Zone Control +1, TDM +4, combat120 +4); combat120 still sees ~29-32
-  candidates against the 12-slot cap, so cap policy is now a Phase F
-  budget-arbiter decision rather than steady-state tuning.
-- Phase F materialization-tier draft memo:
-  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`.
-- Startup UI "Compiling features" is attributed to terrain feature work, mostly
-  the 1024-grid stamped heightmap rebake, not WebGPU shader compilation.
+- Combat sub-attribution: `World.Combat` now reports per-system child timings
+  (`Combat.{Influence,AI,Billboards,Effects}`) through
+  `performanceTelemetry.beginSystem` / `endSystem`. Turns the "Combat
+  1.5-3.2 ms" bar into actionable lane-level inputs for the R2
+  cover-spatial-grid slice.
+- Materialization lane rename: `Combatant.lodLevel` → `Combatant.simLane`, and
+  separate `Combatant.renderLane` field introduced. No behavior change; the
+  rename is the surface that budget arbiter v2 writes to in R3-R4.
+- Idempotent `setCloudCoverage` + sky-refresh gate: closes the 16x/sec
+  sky-texture refresh that was firing despite the 2 s
+  `SKY_TEXTURE_REFRESH_SECONDS` knob. A Shau worst-case SkyTexture EMA
+  dropped 5.96 ms → 0.52 ms (~11x); all five modes hold total Atmosphere
+  CPU under 1 ms per frame.
 
-**Still open:**
-
-- Phase F materialization-tier policy and budget-arbiter slice: per-mode cap
-  scaling, faction-balanced pool sizing, and silhouette/cluster render lanes
-  for the 3,000-unit scale.
-- A Shau finite-edge strategy using real outer source data, flight/camera
-  boundary policy, or an explicit hybrid; A Shau also needs a directed
-  player-warp or AI-convergence close-model probe so the front-line
-  materialization path can be evidenced beyond the empty spawn pose.
-- Cloud representation/art quality after the world/altitude anchoring slice.
-- Water shader/intersections plus one interaction/buoyancy/swimming consumer.
-- Principles-first renderer architecture review after hydrology/water and
-  scoped migration/parity objectives are reviewed.
+**Rescoped:** R2-R4 (cover-spatial-grid, render-silhouette/cluster lanes,
+squad-aggregated strategic sim, budget arbiter v2, multi-mode strict-WebGPU
+proof v2) queued on master as
+[`cycle-phase-f-r2-r4-on-master`](../tasks/cycle-phase-f-r2-r4-on-master.md).
+Milestone memo:
+[docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).
 
 ---
 
-## konveyer-branch-review-2026-05-11 (experimental, not deployed)
+## cycle-2026-05-12-doc-vision-alignment (closed 2026-05-13 via post-merge cleanup)
 
-Continuation on `exp/konveyer-webgpu-migration`. This is not production
-release truth and does not authorize a `master` merge.
+Ad-hoc dispatch landing PRs #186-#191 ahead of the master merge plus
+post-merge cleanup PRs #193-#195. Doc-only across the run; no source code
+touched.
 
-**Branch-review progress:**
+**Pre-merge (PRs #186-#191, 2026-05-12):**
 
-- KONVEYER-0 through KONVEYER-9 are documented in
-  `docs/rearch/KONVEYER_PARITY_2026-05-10.md`.
-- Default and strict WebGPU resolve to real `webgpu` on headed hardware in
-  `artifacts/perf/2026-05-11T00-40-14-309Z/konveyer-renderer-matrix/matrix.json`.
-- The completion audit at
-  `artifacts/perf/2026-05-11T02-10-59-661Z/konveyer-completion-audit/completion-audit.json`
-  records active production render blockers at zero.
-- The latest strict-WebGPU terrain visual packet accepts Open Frontier and
-  A Shau terrain ground tone at
-  `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.json`.
+- Historical/status headers on superseded strategic docs (PR #186).
+- `docs/ROADMAP.md` + `AGENTS.md` aligned to the 2026-05-12 two-vision split
+  (experimental WebGPU + driveable land vehicles as parallel first-class
+  directions) (PR #187, commit `9e3ea821`).
+- `CLAUDE.md` "Current focus" amended; two non-vision AVIATSIYA carry-overs
+  parked (PR #188).
+- Three new rearch memos:
+  `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md`,
+  `docs/rearch/TANK_SYSTEMS_2026-05-13.md`,
+  `docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`, plus the
+  `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum
+  (PRs #189-#191).
 
-**Follow-on cycle:** KONVEYER-10 - rest-of-scene parity and frame-budget
-attribution. Terrain color is accepted for now; remaining work was
-vegetation/NPC washout, atmosphere/sky/cloud behavior, `World` timing
-decomposition, skyward triangle attribution, finite-map edge presentation,
-cross-browser/mobile proof, and A Shau perf acceptance.
+**Post-merge (PRs #193-#195, 2026-05-13):**
+
+- Strategic-doc alignment to post-master-merge WebGPU state (PR #193;
+  bundle 1).
+- New `docs/state/CURRENT.md` 2026-05-13 entry, milestone memo
+  [POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md),
+  and active campaign manifest
+  [CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+  (PR #194; bundle 2).
+- Task-brief archive + R2-R4 rescope on master via
+  [`cycle-phase-f-r2-r4-on-master`](../tasks/cycle-phase-f-r2-r4-on-master.md)
+  (PR #195; bundle 3).
+
+---
+
+## cycle-2026-05-11-konveyer-scene-parity (closed; archived)
+
+Closed on the experimental branch and folded into the master merge via
+PR #192. Shipped slices 9-15 of the KONVEYER campaign — atmosphere CPU
+collapsed from 5-6 ms to <1 ms across all five modes via the LUT-driven
+sky refresh (slice 12), `DataTexture` + 2 s refresh cadence (slice 13), the
+phantom-EMA stale-bundle diagnostic (slice 14), and idempotent
+`setCloudCoverage` (slice 15). Full retrospective archived at
+[`docs/tasks/archive/cycle-2026-05-11-konveyer-scene-parity/`](../tasks/archive/cycle-2026-05-11-konveyer-scene-parity/).
 
 ---
 
