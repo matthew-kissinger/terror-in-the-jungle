@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Logger } from '../utils/Logger';
 import { SettingsManager } from '../config/SettingsManager';
-import { shouldUseTouchControls } from '../utils/DeviceDetector';
+import { isMobileGPU, shouldUseTouchControls } from '../utils/DeviceDetector';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
@@ -136,10 +136,19 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     markStepEnd('texture-upload-warmup');
   }
 
-  markStepBegin('npc-close-model-prewarm');
-  markPhase('npc-close-model-prewarm', 'PRIMING NEARBY COMBATANTS', 'Preparing close-range NPC models around insertion...');
-  await prewarmNearbyNpcCloseModels(engine);
-  markStepEnd('npc-close-model-prewarm');
+  // Mobile GPUs cannot complete the close-model prewarm within the 1.8 s window
+  // (emulation captures always hit the timeout — see
+  // docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/mobile-startup-and-frame-budget.md
+  // §"NPC close-model prewarm timeout"). Skip the prewarm dispatch on mobile and
+  // rely on the lazy-load path that the post-reveal scheduler opens after 5 s.
+  if (!isMobileGPU()) {
+    markStepBegin('npc-close-model-prewarm');
+    markPhase('npc-close-model-prewarm', 'PRIMING NEARBY COMBATANTS', 'Preparing close-range NPC models around insertion...');
+    await prewarmNearbyNpcCloseModels(engine);
+    markStepEnd('npc-close-model-prewarm');
+  } else {
+    markStartup('engine-init.startup-flow.npc-close-model-prewarm.skipped-mobile');
+  }
 
   void nextFrame().then((frameYield) => {
     markStartup(`engine-init.startup-flow.flush-chunk-update.post-reveal-yield-${frameYield}`);
