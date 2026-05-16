@@ -253,6 +253,56 @@ describe('HosekWilkieSkyBackend (LUT rebake threshold)', () => {
     // Window 4.5s and refresh cadence 2s permits up to 3.
     expect(stats.fireCount).toBeLessThanOrEqual(3);
   });
+
+  it('stretching the refresh cadence reduces sky-texture fire rate over a fixed window', () => {
+    // Behavior contract for `setRefreshCadenceSeconds`. Drive identical
+    // continuous sun motion under two cadences and assert the longer
+    // cadence fires the expensive composite strictly less often. This is
+    // the load-bearing mobile knob (cycle-mobile-webgl2-fallback-fix) — we
+    // assert the observable reduction, not the specific cadence constant.
+    function fireCountForCadence(seconds: number): number {
+      const backend = new HosekWilkieSkyBackend();
+      backend.applyPreset(SCENARIO_ATMOSPHERE_PRESETS.ashau);
+      backend.setRefreshCadenceSeconds(seconds);
+      backend.resetRefreshStatsForDebug();
+
+      const totalSeconds = 16;
+      const dt = 1 / 60;
+      const azimuthRatePerSec = (0.6 * Math.PI) / 180;
+      const startAzimuth = SCENARIO_ATMOSPHERE_PRESETS.ashau.sunAzimuthRad;
+      const elevation = SCENARIO_ATMOSPHERE_PRESETS.ashau.sunElevationRad;
+      const cosE = Math.cos(elevation);
+      const sinE = Math.sin(elevation);
+      const sun = new THREE.Vector3();
+      let elapsed = 0;
+      while (elapsed < totalSeconds) {
+        elapsed += dt;
+        const az = startAzimuth + azimuthRatePerSec * elapsed;
+        sun.set(cosE * Math.cos(az), sinE, cosE * Math.sin(az)).normalize();
+        backend.update(dt, sun);
+      }
+      return backend.getRefreshStatsForDebug().fireCount;
+    }
+
+    const fastCadenceFires = fireCountForCadence(2);
+    const slowCadenceFires = fireCountForCadence(8);
+    // 4x cadence stretch should cut fire count roughly 4x; assert the
+    // observable direction (strictly fewer) plus a sane lower bound.
+    expect(slowCadenceFires).toBeLessThan(fastCadenceFires);
+    expect(slowCadenceFires).toBeLessThanOrEqual(Math.ceil(fastCadenceFires / 2));
+  });
+
+  it('ignores non-finite or non-positive refresh cadence overrides', () => {
+    // Defensive contract: callers that compute the cadence from a config
+    // path can hand us garbage during mode-switches. The backend must keep
+    // a sane cadence rather than disable the gate.
+    const backend = new HosekWilkieSkyBackend();
+    const before = backend.getRefreshCadenceSeconds();
+    backend.setRefreshCadenceSeconds(Number.NaN);
+    backend.setRefreshCadenceSeconds(0);
+    backend.setRefreshCadenceSeconds(-1);
+    expect(backend.getRefreshCadenceSeconds()).toBe(before);
+  });
 });
 
 describe('HosekWilkieSkyBackend (sky-integrated cloud coverage)', () => {
