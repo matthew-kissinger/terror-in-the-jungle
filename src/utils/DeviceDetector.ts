@@ -181,8 +181,18 @@ export function getRenderDistanceMultiplier(): number {
 
 /**
  * Returns maximum pixel ratio based on device capabilities.
+ *
+ * Mobile is capped at 1.0 because the post-KONVEYER WebGPU->WebGL2 fallback
+ * path is fragment-bound on mid-tier phones (TSL-translated terrain shader
+ * burns ~146 effective samples/fragment). A pixel ratio of 2 squares the
+ * fragment count vs 1.0, which is the difference between unplayable and
+ * directional-target fps on emulated and real mobile devices.
+ *
+ * Citation: docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/
+ * webgl-fallback-pipeline-diff.md (ranks the terrain fragment shader as the
+ * load-bearing post-merge cost contributor on the WebGL2 fallback path).
  */
 export function getMaxPixelRatio(): number {
   const mobile = isMobileGPU();
-  return mobile ? 2 : Math.min(window.devicePixelRatio, 2);
+  return mobile ? 1 : Math.min(window.devicePixelRatio, 2);
 }
