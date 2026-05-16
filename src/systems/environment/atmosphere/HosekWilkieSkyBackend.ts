@@ -6,8 +6,8 @@ import { sunDirectionFromPreset } from './ScenarioAtmospherePresets';
 const DOME_RADIUS = 500;
 const DOME_WIDTH_SEGMENTS = 64;
 const DOME_HEIGHT_SEGMENTS = 32;
-const SKY_TEXTURE_WIDTH = 128;
-const SKY_TEXTURE_HEIGHT = 64;
+const SKY_TEXTURE_WIDTH = 256;
+const SKY_TEXTURE_HEIGHT = 128;
 
 const LUT_AZIMUTH_BINS = 32;
 const LUT_ELEVATION_BINS = 8;
@@ -211,6 +211,11 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       depthWrite: false,
       depthTest: false,
       fog: false,
+      // Bypass the renderer's ACESFilmicToneMapping for the dome. The
+      // pre-merge Preetham GLSL deliberately bypassed tonemapping; routing
+      // the baked LUT through ACES desaturates and pulls to middle grey.
+      // See docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md.
+      toneMapped: false,
     });
 
     this.geometry = new THREE.SphereGeometry(DOME_RADIUS, DOME_WIDTH_SEGMENTS, DOME_HEIGHT_SEGMENTS);
