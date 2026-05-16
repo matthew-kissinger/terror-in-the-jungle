@@ -98,6 +98,43 @@ const HYDROLOGY_RIVER_BANK_ALPHA = 0.01;
 const HYDROLOGY_RIVER_CENTER_ALPHA = 0.32;
 const DEFAULT_WATER_IMMERSION_DEPTH_METERS = 1.6;
 
+// Flow visuals for `hydrology-river-flow-visuals` (VODA-1 R2).
+//
+//   - HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S: 0.45 m/s — the normal-map scrolls
+//     this far per second along the segment's flow direction. Tuned against
+//     A Shau valley: at 0.45 the river reads as a slow jungle current rather
+//     than a torrent (anything >1.0 looked like a flash flood), while still
+//     producing visible motion at the riverside POV the playtest evidence
+//     calls out. The normal scale (`HYDROLOGY_RIVER_NORMAL_SCALE`) is small
+//     enough that the ripple does not destabilise the bank → shallow → deep
+//     vertex-color gradient the R1 work landed.
+//   - HYDROLOGY_RIVER_NORMAL_REPEAT_M: 6 m wave-period along flow / 3 m
+//     across. Each `repeat` distance is one full tile of the shared
+//     `waternormals.jpg`; periods chosen so the river reads as small chop
+//     rather than ocean swell.
+//   - HYDROLOGY_RIVER_FOAM_NARROW_THRESHOLD: 0.6 — below this `flowFactor`
+//     (low-accumulation channels = narrow headwaters) the foam contribution
+//     ramps up. Combined with the slope foam below this produces the
+//     "where the channel narrows or passes over depth changes" effect the
+//     brief requires.
+//   - HYDROLOGY_RIVER_FOAM_SLOPE_M_PER_M: 0.05 — at this rise-over-run
+//     (≈5%) the slope-driven foam is fully on. Most A Shau headwater
+//     segments sit between 0.02 and 0.08; this brings rapids/cascades up
+//     visibly without lighting up the broad valley reach.
+//   - HYDROLOGY_RIVER_FOAM_INTENSITY: 0.45 — the brightness of the foam
+//     contribution above the bank → shallow → deep gradient. The
+//     terrain-water-edge foam (R1) uses 0.55; the river-flow foam is a
+//     hair softer so the two read as distinct effects (shore surf vs
+//     flowing-water cap).
+const HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S = 0.45;
+const HYDROLOGY_RIVER_NORMAL_REPEAT_ALONG_M = 6;
+const HYDROLOGY_RIVER_NORMAL_REPEAT_ACROSS_M = 3;
+const HYDROLOGY_RIVER_NORMAL_SCALE = 0.32;
+const HYDROLOGY_RIVER_FOAM_NARROW_THRESHOLD = 0.6;
+const HYDROLOGY_RIVER_FOAM_SLOPE_M_PER_M = 0.05;
+const HYDROLOGY_RIVER_FOAM_INTENSITY = 0.45;
+const HYDROLOGY_RIVER_FOAM_COLOR = new THREE.Color(0xe9efe8);
+
 // Foam-line band on the water side of the terrain-water intersection. The
 // band is parameterised in metres of effective water depth (waterY − sampled
 // terrainY). At zero depth the foam is fully opaque; it fades to 0 at
@@ -151,6 +188,22 @@ interface GlobalWaterShaderRefs {
   uCameraUnderwater: { value: number };
 }
 
+/**
+ * Uniforms captured at compile time on the hydrology river material's
+ * `onBeforeCompile` patch (see {@link installHydrologyRiverFlowPatch}).
+ * `uTime` is advanced from `update()`. The other slots stay constant after
+ * binding — they control the per-segment normal-scroll speed and the foam
+ * mix that fires where channels narrow or pass over a depth change.
+ */
+interface HydrologyRiverShaderRefs {
+  uTime: { value: number };
+  uFlowSpeed: { value: number };
+  uFoamIntensity: { value: number };
+  uFoamColor: { value: THREE.Color };
+  uRiverNormalMap: { value: THREE.Texture | null };
+  uRiverNormalScale: { value: number };
+}
+
 export class WaterSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -162,6 +215,7 @@ export class WaterSystem implements GameSystem {
   private hydrologyRiverMesh?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
   private hydrologyRiverStats: HydrologyRiverMeshStats = { ...EMPTY_HYDROLOGY_RIVER_STATS };
   private hydrologyWaterQuerySegments: HydrologyWaterQuerySegment[] = [];
+  private hydrologyRiverShaderRefs?: HydrologyRiverShaderRefs;
   private assetLoader: AssetLoader;
   private weatherSystem?: WeatherSystem;
   private atmosphereSystem?: ISkyRuntime;
@@ -523,6 +577,25 @@ outgoingLight = mix( outgoingLight, uUnderwaterTint * ( 0.6 + 0.4 * max( dot( no
       this.waterShaderRefs.uTime.value = this.waterTimeSeconds;
       this.waterShaderRefs.uSunDirection.value.copy(this.sun);
       this.waterShaderRefs.uCameraUnderwater.value = this.wasUnderwater ? 1 : 0;
+    }
+    // Tick the hydrology river time uniform on the same clock. The flow shader
+    // scrolls the normal-map along each segment's baked flow direction at
+    // `HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S`; the value here is plain seconds
+    // since the system started (no GLOBAL_WATER_TIME_SCALE multiplier — the
+    // river has its own physical speed and shouldn't be slaved to the
+    // ocean's normal-offset cadence).
+    if (this.hydrologyRiverShaderRefs) {
+      this.hydrologyRiverShaderRefs.uTime.value += deltaTime;
+      // Late-bind the shared waternormals texture if `setHydrologyChannels`
+      // fired before `init()` finished loading it. After the first bind this
+      // is a no-op (reference identity check), so the cost is one comparison
+      // per frame while the river is on screen.
+      if (
+        this.waterNormalTexture &&
+        this.hydrologyRiverShaderRefs.uRiverNormalMap.value !== this.waterNormalTexture
+      ) {
+        this.hydrologyRiverShaderRefs.uRiverNormalMap.value = this.waterNormalTexture;
+      }
     }
   }
 
@@ -891,6 +964,7 @@ if (waterEdgeBindingEnabled > 0.5) {
     this.hydrologyRiverMesh = undefined;
     this.hydrologyRiverStats = { ...EMPTY_HYDROLOGY_RIVER_STATS };
     this.hydrologyWaterQuerySegments = [];
+    this.hydrologyRiverShaderRefs = undefined;
     this.updateGlobalWaterVisibility();
   }
 
@@ -940,11 +1014,143 @@ if (waterEdgeBindingEnabled > 0.5) {
       polygonOffsetUnits: -2,
       side: THREE.DoubleSide,
     });
+    this.installHydrologyRiverFlowPatch(material);
     const mesh = new THREE.Mesh(geometryBuild.geometry, material);
     mesh.name = 'hydrology-river-surface-mesh';
     mesh.frustumCulled = true;
     mesh.renderOrder = 2;
     return { mesh, stats: geometryBuild.stats, querySegments: geometryBuild.querySegments };
+  }
+
+  /**
+   * Install the flow-visuals `onBeforeCompile` patch on the hydrology river
+   * material. The patch:
+   *   1. Adds two vertex attributes baked at build time:
+   *        - `aFlowDir` (vec2 in world XZ): unit-length per-segment flow
+   *          direction (segment start → end).
+   *        - `aFoamMask` (float in [0..1]): combined narrowness + slope
+   *          factor used to brighten foam-cap fragments.
+   *   2. Samples the shared `waternormals.jpg` along a UV that scrolls in
+   *      flow direction at `uFlowSpeed`. The lateral/longitudinal axes are
+   *      derived from `aFlowDir` and the perpendicular so the ripple aligns
+   *      with the riverbed rather than world space.
+   *   3. Adds a foam contribution where `vFoamMask > 0` (narrow channels or
+   *      steep drops). The base bank → shallow → deep vertex-color gradient
+   *      from R1 is preserved verbatim; foam is layered on top of
+   *      `outgoingLight` just before `<opaque_fragment>` composes the
+   *      final pixel.
+   *
+   * Mobile floor: no `WebGLRenderTarget`, no depth texture. The patch is a
+   * straight ALU + 1 normal-map fetch per fragment — within budget for the
+   * tiny rendered surface (river mesh caps at 24 channels × 2048 segments).
+   */
+  private installHydrologyRiverFlowPatch(material: THREE.MeshStandardMaterial): void {
+    const refs: HydrologyRiverShaderRefs = {
+      uTime: { value: 0 },
+      uFlowSpeed: { value: HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S },
+      uFoamIntensity: { value: HYDROLOGY_RIVER_FOAM_INTENSITY },
+      uFoamColor: { value: HYDROLOGY_RIVER_FOAM_COLOR.clone() },
+      uRiverNormalMap: { value: this.waterNormalTexture ?? null },
+      uRiverNormalScale: { value: HYDROLOGY_RIVER_NORMAL_SCALE },
+    };
+    this.hydrologyRiverShaderRefs = refs;
+
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = refs.uTime;
+      shader.uniforms.uFlowSpeed = refs.uFlowSpeed;
+      shader.uniforms.uFoamIntensity = refs.uFoamIntensity;
+      shader.uniforms.uFoamColor = refs.uFoamColor;
+      shader.uniforms.uRiverNormalMap = refs.uRiverNormalMap;
+      shader.uniforms.uRiverNormalScale = refs.uRiverNormalScale;
+      shader.uniforms.uNormalRepeatAlong = { value: HYDROLOGY_RIVER_NORMAL_REPEAT_ALONG_M };
+      shader.uniforms.uNormalRepeatAcross = { value: HYDROLOGY_RIVER_NORMAL_REPEAT_ACROSS_M };
+
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+attribute vec2 aFlowDir;
+attribute float aFoamMask;
+varying vec2 vFlowDir;
+varying float vFoamMask;
+varying vec3 vRiverWorldPos;`,
+        )
+        .replace(
+          '#include <worldpos_vertex>',
+          `#include <worldpos_vertex>
+vFlowDir = aFlowDir;
+vFoamMask = aFoamMask;
+vRiverWorldPos = worldPosition.xyz;`,
+        );
+
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
+uniform float uTime;
+uniform float uFlowSpeed;
+uniform float uFoamIntensity;
+uniform vec3 uFoamColor;
+uniform sampler2D uRiverNormalMap;
+uniform float uRiverNormalScale;
+uniform float uNormalRepeatAlong;
+uniform float uNormalRepeatAcross;
+varying vec2 vFlowDir;
+varying float vFoamMask;
+varying vec3 vRiverWorldPos;`,
+        )
+        // Layer a flow-aligned normal sample on top of the standard normal
+        // chunk. We rebuild the riverbed UV from world XZ projected onto
+        // the flow basis (along/across) and scroll in the along axis at
+        // `uFlowSpeed`. Falls through to the base normal if the flow
+        // direction is degenerate (zero vector) so this is robust to any
+        // builder regression.
+        .replace(
+          '#include <normal_fragment_maps>',
+          `#include <normal_fragment_maps>
+{
+  vec2 _flow = vFlowDir;
+  float _flowLen = length(_flow);
+  if (_flowLen > 0.001) {
+    _flow /= _flowLen;
+    vec2 _across = vec2(-_flow.y, _flow.x);
+    vec2 _bedXZ = vRiverWorldPos.xz;
+    float _along = dot(_bedXZ, _flow);
+    float _lateral = dot(_bedXZ, _across);
+    vec2 _bedUv = vec2(
+      _lateral / max(uNormalRepeatAcross, 0.001),
+      (_along - uTime * uFlowSpeed) / max(uNormalRepeatAlong, 0.001)
+    );
+    vec3 _flowN = texture2D(uRiverNormalMap, _bedUv).xyz * 2.0 - 1.0;
+    _flowN.xy *= uRiverNormalScale;
+    _flowN = normalize(_flowN);
+    // Surface normal is +Y in world space (the river mesh is built that
+    // way in buildHydrologyRiverGeometry). Blend toward the perturbed
+    // normal in world space directly — no tangent frame needed since the
+    // geometry has no tangents and the bed lies in the XZ plane.
+    vec3 _bedWorldN = normalize(vec3(_flowN.x, 1.0, _flowN.y));
+    normal = normalize(mix(normal, _bedWorldN, 0.55));
+  }
+}`,
+        )
+        // Foam cap. vFoamMask was packed at build time as the combined
+        // narrowness + slope factor; modulate by a slow time-varying
+        // jitter so the cap doesn't read as a static decal. Layered on
+        // outgoingLight before <opaque_fragment> writes gl_FragColor
+        // (same insertion-point convention as the global plane's
+        // injectSurfaceShaderChunks and injectEdgeFoamChunks).
+        .replace(
+          '#include <opaque_fragment>',
+          `{
+  float _foamJitter = 0.7 + 0.3 * sin(uTime * 1.7 + vRiverWorldPos.x * 0.35 + vRiverWorldPos.z * 0.27);
+  float _foam = clamp(vFoamMask, 0.0, 1.0) * _foamJitter * uFoamIntensity;
+  outgoingLight = mix(outgoingLight, uFoamColor, _foam);
+  diffuseColor.a = clamp(diffuseColor.a + _foam * 0.35, 0.0, 1.0);
+}
+#include <opaque_fragment>`,
+        );
+    };
+    material.needsUpdate = true;
   }
 
   private buildHydrologyRiverGeometry(
@@ -961,6 +1167,8 @@ if (waterEdgeBindingEnabled > 0.5) {
     const normals: number[] = [];
     const uvs: number[] = [];
     const colors: number[] = [];
+    const flowDirs: number[] = [];
+    const foamMasks: number[] = [];
     const indices: number[] = [];
     const querySegments: HydrologyWaterQuerySegment[] = [];
     let segmentCount = 0;
@@ -1017,6 +1225,35 @@ if (waterEdgeBindingEnabled > 0.5) {
         pushHydrologyRiverColor(colors, bankColor, HYDROLOGY_RIVER_BANK_ALPHA);
         pushHydrologyRiverColor(colors, centerColor, HYDROLOGY_RIVER_CENTER_ALPHA);
         pushHydrologyRiverColor(colors, bankColor, HYDROLOGY_RIVER_BANK_ALPHA);
+
+        // Flow direction (unit world-XZ) packed per vertex. All six vertices
+        // of the segment share the same flow vector so the fragment shader
+        // can rebuild the along/across basis without recomputing the
+        // segment's derivative.
+        const flowX = dx / length;
+        const flowZ = dz / length;
+        for (let v = 0; v < 6; v++) flowDirs.push(flowX, flowZ);
+
+        // Foam mask: combine narrowness (low flowFactor = headwater) with
+        // segment slope (rise over run). Both feed into the same per-vertex
+        // [0..1] value; the fragment shader brightens the bank/center
+        // colors where this is non-zero. Slope is signed because gravity
+        // matters — uphill segments are an artifact of the polyline winding
+        // and shouldn't foam; only downhill drops do.
+        const narrownessFoam = clamp(
+          (HYDROLOGY_RIVER_FOAM_NARROW_THRESHOLD - flowFactor) / HYDROLOGY_RIVER_FOAM_NARROW_THRESHOLD,
+          0,
+          1,
+        );
+        const slope = Math.max(0, startY - endY) / length;
+        const slopeFoam = clamp(slope / HYDROLOGY_RIVER_FOAM_SLOPE_M_PER_M, 0, 1);
+        const centerFoam = clamp(narrownessFoam * 0.55 + slopeFoam * 0.85, 0, 1);
+        // Six verts per segment: bank, center, bank (start row) then again
+        // for end row. Bank vertices get a small floor of foam so the cap
+        // bleeds into the bank rather than producing a hard center stripe;
+        // center vertices get the full mask.
+        const bankFoam = centerFoam * 0.25;
+        foamMasks.push(bankFoam, centerFoam, bankFoam, bankFoam, centerFoam, bankFoam);
         indices.push(
           vertexBase,
           vertexBase + 3,
@@ -1056,6 +1293,11 @@ if (waterEdgeBindingEnabled > 0.5) {
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+    // Flow-visuals attributes consumed by `installHydrologyRiverFlowPatch`.
+    // Per-vertex world-XZ flow direction + foam mask packed at build time so
+    // the GPU does not recompute the segment derivative each frame.
+    geometry.setAttribute('aFlowDir', new THREE.Float32BufferAttribute(flowDirs, 2));
+    geometry.setAttribute('aFoamMask', new THREE.Float32BufferAttribute(foamMasks, 1));
     geometry.setIndex(indices);
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
