@@ -98,6 +98,9 @@ public/asset-manifest.json
 # Example zoo (reference repos cloned for study, not part of project)
 example-zoo/
 examples/
+# Skill-shipped examples are vendored docs, not the scratch example zoo
+!.claude/skills/**/examples/
+!.claude/skills/**/examples/**
 
 # Local capture/debug screenshots
 gameplay-profile.png

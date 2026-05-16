@@ -146,6 +146,12 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | [docs/ASSET_MANIFEST.md](docs/ASSET_MANIFEST.md) | 75 GLBs, integration status |
 | [docs/UI_ICON_MANIFEST.md](docs/UI_ICON_MANIFEST.md) | Pixel-art UI icons |
 
+## Agent skills and rules
+
+- `.claude/skills/webgpu-threejs-tsl/` — WebGPU + TSL reference skill for Claude Code (Three.js node materials, compute shaders, TSL syntax, device-loss handling, WGSL integration). Auto-applies when Claude reads files whose topic matches the skill description.
+- `.cursor/rules/*.mdc` — same content surfaced as Cursor rules with glob-based auto-attach (`**/*.{js,jsx,ts,tsx,mjs}` for the entry rule; narrower globs for compute, post-processing, etc). The rules `@file`-reference `.claude/skills/webgpu-threejs-tsl/` directly, so edits flow through automatically.
+- Source: https://github.com/dgreenheck/webgpu-claude-skill, vendored 2026-05-15.
+
 ## Conventions
 
 ### Code Style
