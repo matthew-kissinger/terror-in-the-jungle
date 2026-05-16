@@ -9,7 +9,9 @@ import {
   dot,
   float,
   floor,
+  Fn,
   fract,
+  If,
   length as tslLengthBase,
   max as tslMaxBase,
   min as tslMinBase,
@@ -315,6 +317,38 @@ function sampleBiomeTriplanar(biomeSlot: TslNode, worldPos: TslNode, worldNormal
   return sampleX.mul(blend.x).add(sampleY.mul(blend.y)).add(sampleZ.mul(blend.z));
 }
 
+// Triplanar gate epsilon. Matches the smoothstep clip that produces
+// triplanarBlend (= 0 below threshold-0.2, lerp to 1 above threshold).
+// On flat surfaces triplanarBlend is exactly 0; the gate skips the 3-axis
+// triplanar sub-graph (6 biome-texture calls per slot, 48 effective texture
+// samples per fragment) and returns the planar sample directly. See
+// docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/tsl-shader-cost-audit.md.
+const TRIPLANAR_GATE_EPSILON = 0.001;
+
+// Selects planar-only vs mix(planar, triplanar, triplanarBlend), gating the
+// triplanar sample sub-graph behind a TSL `If` so the compiled fragment
+// shader skips it entirely on flat fragments. The Fn boundary establishes
+// the build context required by `If` + `.toVar()`.
+function sampleBiomeWithTriplanarGate(
+  biomeSlot: TslNode,
+  worldPos: TslNode,
+  worldNormal: TslNode,
+  uvOffset: TslNode,
+  triplanarBlend: TslNode,
+  uniforms: TerrainUniforms,
+): TslNode {
+  const gated = Fn(([slot, blend]: TslNode[]) => {
+    const planar = sampleBiomeTexture(slot, worldPos.xz, uvOffset, uniforms);
+    const result = planar.toVar();
+    If(blend.greaterThan(TRIPLANAR_GATE_EPSILON), () => {
+      const triplanar = sampleBiomeTriplanar(slot, worldPos, worldNormal, uvOffset, uniforms);
+      result.assign(tslMix(planar, triplanar, blend));
+    });
+    return result;
+  });
+  return gated(biomeSlot, triplanarBlend) as TslNode;
+}
+
 function biomeElevationWeight(elevation: TslNode, minElevation: number, maxElevation: number, blendWidth: number): TslNode {
   let weight = tslFloat(1);
   if (minElevation > -99999999) {
@@ -538,12 +572,22 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
     tslReference('float', uniforms.triplanarSlopeThreshold),
     biomeBlend.slopeUp,
   ));
-  const primaryPlanar = sampleBiomeTexture(hydrologyBlend.primarySlot, worldPos.xz, uvOffset, uniforms);
-  const primaryTriplanar = sampleBiomeTriplanar(hydrologyBlend.primarySlot, worldPos, terrainNormal, uvOffset, uniforms);
-  const primarySample = tslMix(primaryPlanar, primaryTriplanar, triplanarBlend);
-  const secondaryPlanar = sampleBiomeTexture(hydrologyBlend.secondarySlot, worldPos.xz, uvOffset, uniforms);
-  const secondaryTriplanar = sampleBiomeTriplanar(hydrologyBlend.secondarySlot, worldPos, terrainNormal, uvOffset, uniforms);
-  const secondarySample = tslMix(secondaryPlanar, secondaryTriplanar, triplanarBlend);
+  const primarySample = sampleBiomeWithTriplanarGate(
+    hydrologyBlend.primarySlot,
+    worldPos,
+    terrainNormal,
+    uvOffset,
+    triplanarBlend,
+    uniforms,
+  );
+  const secondarySample = sampleBiomeWithTriplanarGate(
+    hydrologyBlend.secondarySlot,
+    worldPos,
+    terrainNormal,
+    uvOffset,
+    triplanarBlend,
+    uniforms,
+  );
   const secondaryActive = step(tslFloat(0.001), hydrologyBlend.secondaryBlend);
   const biomeSample = tslMix(primarySample, tslMix(primarySample, secondarySample, hydrologyBlend.secondaryBlend), secondaryActive);
   let finalColor = biomeSample.rgb.mul(macroVariation(worldPos.xz));
