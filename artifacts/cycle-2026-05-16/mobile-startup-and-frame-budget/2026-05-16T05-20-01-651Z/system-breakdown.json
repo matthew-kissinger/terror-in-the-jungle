@@ -1,0 +1,3612 @@
+[
+  {
+    "tMs": 62965,
+    "fps": 2.1958717610963374,
+    "avgFrameMs": 455.3999999985099,
+    "overBudgetPercent": 100,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 122.05818000073063,
+        "lastMs": 24.299999997019768,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 89.34600000008942,
+        "lastMs": 10.199999995529652,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 59.73611999782698,
+        "lastMs": 8.699999995529652,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 55.93026999840664,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 55.78307999695838,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 8.023999996334314,
+        "lastMs": 12.199999995529652,
+        "peakMs": 33.30000000447035,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 6.993450001057984,
+        "lastMs": 9.899999998509884,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 6.664769999875128,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 13.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.3218600006945436,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 3.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.956789999157936,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 2.899999998509884,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 1.4396799982726578,
+        "lastMs": 4,
+        "peakMs": 4,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 1.0509999988228085,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 7.299999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 1.019660001514107,
+        "lastMs": 5,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.8692199982874096,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.7338800005555153,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.47826999735012654,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6999999955296516,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.4272900004066527,
+        "lastMs": 4.200000002980232,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.39515000025480984,
+        "lastMs": 0.5,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.21061000172272326,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2045100016318262,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.19021999653056265,
+        "lastMs": 0.5,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.18900000147521498,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.08361000124588609,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.027290000406652692,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.010000000149011612,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0,
+        "lastMs": 0,
+        "peakMs": 0,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 64347.79999999702,
+    "fps": 3.847633705273264,
+    "avgFrameMs": 259.8999999998645,
+    "overBudgetPercent": 81.81818181818183,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 85.13451583775172,
+        "lastMs": 11.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 55.50796048511984,
+        "lastMs": 8.199999995529652,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 36.8393201454028,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 36.692348785975625,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 34.1093092478411,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 15.963267082083002,
+        "lastMs": 2.399999998509884,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 10.454853634142289,
+        "lastMs": 16.200000002980232,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.480186461359913,
+        "lastMs": 0.6999999955296516,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.4651749899334234,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.2425640467637242,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.3866823007871467,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.6457635340330343,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.8688735054227876,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6777432311292452,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.5285686685227239,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.48560014546243563,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2990379146133046,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.29506918583121056,
+        "lastMs": 0,
+        "peakMs": 0.6999999955296516,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2352590123028013,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.227079425106112,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14553368993747504,
+        "lastMs": 0,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.12125214942352766,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.08246341034890192,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.059304968609663625,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.056243582848094685,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.009000000134110451,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 77485.59999999404,
+    "fps": 4.184829991292478,
+    "avgFrameMs": 238.95833333271244,
+    "overBudgetPercent": 75,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 77.07106425397656,
+        "lastMs": 4.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 50.15716443660786,
+        "lastMs": 2,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 33.15538813086252,
+        "lastMs": 0,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 33.02311390737806,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 30.738378322907977,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.55694037372569,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.429368270281026,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.042167815372934,
+        "lastMs": 1.1000000014901161,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.148657490642058,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 2.9283076422363634,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.178014070410409,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.4911871807787427,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7819861548805089,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6399689084633555,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4757118016704515,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.4370401309161921,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.3555622670990779,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 0.8999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.27913412255592773,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2217331112215328,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.21437148274451243,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14098032109273914,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.11912693463018652,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09421706961203495,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.053374471748697264,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.050619224563285214,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.008100000120699407,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 78973.89999999851,
+    "fps": 4.184829991292478,
+    "avgFrameMs": 238.95833333271244,
+    "overBudgetPercent": 75,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 77.07106425397656,
+        "lastMs": 4.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 50.15716443660786,
+        "lastMs": 2,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 33.15538813086252,
+        "lastMs": 0,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 33.02311390737806,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 30.738378322907977,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.55694037372569,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.429368270281026,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.042167815372934,
+        "lastMs": 1.1000000014901161,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.148657490642058,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 2.9283076422363634,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.178014070410409,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.4911871807787427,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7819861548805089,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6399689084633555,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4757118016704515,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.4370401309161921,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.3555622670990779,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 0.8999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.27913412255592773,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2217331112215328,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.21437148274451243,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14098032109273914,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.11912693463018652,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09421706961203495,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.053374471748697264,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.050619224563285214,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.008100000120699407,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 80390.79999999702,
+    "fps": 4.184829991292478,
+    "avgFrameMs": 238.95833333271244,
+    "overBudgetPercent": 75,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 77.07106425397656,
+        "lastMs": 4.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 50.15716443660786,
+        "lastMs": 2,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 33.15538813086252,
+        "lastMs": 0,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 33.02311390737806,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 30.738378322907977,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.55694037372569,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.429368270281026,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.042167815372934,
+        "lastMs": 1.1000000014901161,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.148657490642058,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 2.9283076422363634,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.178014070410409,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.4911871807787427,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7819861548805089,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6399689084633555,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4757118016704515,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.4370401309161921,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.3555622670990779,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 0.8999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.27913412255592773,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2217331112215328,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.21437148274451243,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14098032109273914,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.11912693463018652,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09421706961203495,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.053374471748697264,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.050619224563285214,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.008100000120699407,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 81753.79999999702,
+    "fps": 4.184829991292478,
+    "avgFrameMs": 238.95833333271244,
+    "overBudgetPercent": 75,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 77.07106425397656,
+        "lastMs": 4.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 50.15716443660786,
+        "lastMs": 2,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 33.15538813086252,
+        "lastMs": 0,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 33.02311390737806,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 30.738378322907977,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.55694037372569,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.429368270281026,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.042167815372934,
+        "lastMs": 1.1000000014901161,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.148657490642058,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 2.9283076422363634,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.178014070410409,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.4911871807787427,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7819861548805089,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6399689084633555,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4757118016704515,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.4370401309161921,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.3555622670990779,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 0.8999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.27913412255592773,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2217331112215328,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.21437148274451243,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14098032109273914,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.11912693463018652,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09421706961203495,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.053374471748697264,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.050619224563285214,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.008100000120699407,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 82977.59999999404,
+    "fps": 4.184829991292478,
+    "avgFrameMs": 238.95833333271244,
+    "overBudgetPercent": 75,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 77.07106425397656,
+        "lastMs": 4.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 50.15716443660786,
+        "lastMs": 2,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 33.15538813086252,
+        "lastMs": 0,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 33.02311390737806,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 30.738378322907977,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.55694037372569,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.429368270281026,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.042167815372934,
+        "lastMs": 1.1000000014901161,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.148657490642058,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 2.9283076422363634,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.178014070410409,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.4911871807787427,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7819861548805089,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6399689084633555,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4757118016704515,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.4370401309161921,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.3555622670990779,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 0.8999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.27913412255592773,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2217331112215328,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.21437148274451243,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14098032109273914,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.11912693463018652,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09421706961203495,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.053374471748697264,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.050619224563285214,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.008100000120699407,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 84678.09999999404,
+    "fps": 4.184829991292478,
+    "avgFrameMs": 238.95833333271244,
+    "overBudgetPercent": 75,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 77.07106425397656,
+        "lastMs": 4.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 50.15716443660786,
+        "lastMs": 2,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 33.15538813086252,
+        "lastMs": 0,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 33.02311390737806,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 30.738378322907977,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.55694037372569,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.429368270281026,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.042167815372934,
+        "lastMs": 1.1000000014901161,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.148657490642058,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 2.9283076422363634,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.178014070410409,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.4911871807787427,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7819861548805089,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6399689084633555,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4757118016704515,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.4370401309161921,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.3555622670990779,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 0.8999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.27913412255592773,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2217331112215328,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.21437148274451243,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14098032109273914,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.11912693463018652,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09421706961203495,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.053374471748697264,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.050619224563285214,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.008100000120699407,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 86941.39999999851,
+    "fps": 4.184829991292478,
+    "avgFrameMs": 238.95833333271244,
+    "overBudgetPercent": 75,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 77.07106425397656,
+        "lastMs": 4.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 50.15716443660786,
+        "lastMs": 2,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 33.15538813086252,
+        "lastMs": 0,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 33.02311390737806,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 30.738378322907977,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.55694037372569,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.429368270281026,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.042167815372934,
+        "lastMs": 1.1000000014901161,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.148657490642058,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 2.9283076422363634,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.178014070410409,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.4911871807787427,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7819861548805089,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6399689084633555,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4757118016704515,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.4370401309161921,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.3555622670990779,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 0.8999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.27913412255592773,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2217331112215328,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.21437148274451243,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14098032109273914,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.11912693463018652,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09421706961203495,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.053374471748697264,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.050619224563285214,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.008100000120699407,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 87957.89999999851,
+    "fps": 4.184829991292478,
+    "avgFrameMs": 238.95833333271244,
+    "overBudgetPercent": 75,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 77.07106425397656,
+        "lastMs": 4.5,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 50.15716443660786,
+        "lastMs": 2,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 33.15538813086252,
+        "lastMs": 0,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 33.02311390737806,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 30.738378322907977,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.55694037372569,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.429368270281026,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 5.042167815372934,
+        "lastMs": 1.1000000014901161,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.148657490642058,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 2.9283076422363634,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.178014070410409,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.4911871807787427,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7819861548805089,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6399689084633555,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4757118016704515,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.4370401309161921,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 0.3555622670990779,
+        "lastMs": 0.8999999985098839,
+        "peakMs": 0.8999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.27913412255592773,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2217331112215328,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.21437148274451243,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.14098032109273914,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.11912693463018652,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09421706961203495,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.053374471748697264,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.050619224563285214,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.008100000120699407,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 112685.5,
+    "fps": 4.377546553541497,
+    "avgFrameMs": 228.43846153754455,
+    "overBudgetPercent": 76.92307692307693,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 71.1639578285789,
+        "lastMs": 18,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 45.78144799279806,
+        "lastMs": 6.399999998509884,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 29.879849317627254,
+        "lastMs": 0.3999999985098839,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 29.720802516640255,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 28.924540490766194,
+        "lastMs": 12.600000001490116,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 14.211246336502132,
+        "lastMs": 11.100000001490116,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 9.746431443401935,
+        "lastMs": 12.600000001490116,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.927951034431687,
+        "lastMs": 3.9000000059604645,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.6154768777147037,
+        "lastMs": 9.799999997019768,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 3.3802126629223337,
+        "lastMs": 14.199999995529652,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 3.0237917414288407,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.5600060409852166,
+        "lastMs": 22.400000005960464,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.5020684628498802,
+        "lastMs": 1.6000000014901161,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.7237875389454232,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.6159720182130665,
+        "lastMs": 0.4000000059604645,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.4481406218014296,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3933361178245729,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.3212207105983582,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.2295597998013563,
+        "lastMs": 0.29999999701976776,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.1929343344700612,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.1468822885364304,
+        "lastMs": 0.19999999552965164,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.10721424116716786,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.09479536279984307,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.06555730240497992,
+        "lastMs": 0.20000000298023224,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04803702457382754,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.007290000108629466,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 113759.29999999702,
+    "fps": 5.013871711755781,
+    "avgFrameMs": 199.44666666587193,
+    "overBudgetPercent": 66.66666666666666,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 59.03880584071678,
+        "lastMs": 2.7999999970197678,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 37.31497287419623,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 26.901864386013543,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 26.74872226497623,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 23.455877797922952,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 11.998109532149495,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 7.94960946930458,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.036640337889667,
+        "lastMs": 0,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.263929190092245,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.7839722576525436,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 2.713271310840483,
+        "lastMs": 2.100000001490116,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.121604893913281,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.235675454446467,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.5862679065457929,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.5079373348866942,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.40332655962128666,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3276022555720145,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2890986395385224,
+        "lastMs": 0,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.20660381982122067,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.15627681092074958,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.12897465311846218,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.08684353534540598,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.07678424386787289,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.05310141494803374,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04323332211644479,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.00656100009776652,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 114822.09999999404,
+    "fps": 5.013871711755781,
+    "avgFrameMs": 199.44666666587193,
+    "overBudgetPercent": 66.66666666666666,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 59.03880584071678,
+        "lastMs": 2.7999999970197678,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 37.31497287419623,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 26.901864386013543,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 26.74872226497623,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 23.455877797922952,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 11.998109532149495,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 7.94960946930458,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.036640337889667,
+        "lastMs": 0,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.263929190092245,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.7839722576525436,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 2.713271310840483,
+        "lastMs": 2.100000001490116,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.121604893913281,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.235675454446467,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.5862679065457929,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.5079373348866942,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.40332655962128666,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3276022555720145,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2890986395385224,
+        "lastMs": 0,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.20660381982122067,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.15627681092074958,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.12897465311846218,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.08684353534540598,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.07678424386787289,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.05310141494803374,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04323332211644479,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.00656100009776652,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 115954.79999999702,
+    "fps": 5.013871711755781,
+    "avgFrameMs": 199.44666666587193,
+    "overBudgetPercent": 66.66666666666666,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 59.03880584071678,
+        "lastMs": 2.7999999970197678,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 37.31497287419623,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 26.901864386013543,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 26.74872226497623,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 23.455877797922952,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 11.998109532149495,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 7.94960946930458,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.036640337889667,
+        "lastMs": 0,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.263929190092245,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.7839722576525436,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 2.713271310840483,
+        "lastMs": 2.100000001490116,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.121604893913281,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.235675454446467,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.5862679065457929,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.5079373348866942,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.40332655962128666,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3276022555720145,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2890986395385224,
+        "lastMs": 0,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.20660381982122067,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.15627681092074958,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.12897465311846218,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.08684353534540598,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.07678424386787289,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.05310141494803374,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04323332211644479,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.00656100009776652,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 116996.19999999553,
+    "fps": 5.013871711755781,
+    "avgFrameMs": 199.44666666587193,
+    "overBudgetPercent": 66.66666666666666,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 59.03880584071678,
+        "lastMs": 2.7999999970197678,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 37.31497287419623,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 26.901864386013543,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 26.74872226497623,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 23.455877797922952,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 11.998109532149495,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 7.94960946930458,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.036640337889667,
+        "lastMs": 0,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.263929190092245,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.7839722576525436,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 2.713271310840483,
+        "lastMs": 2.100000001490116,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.121604893913281,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.235675454446467,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.5862679065457929,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.5079373348866942,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.40332655962128666,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3276022555720145,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2890986395385224,
+        "lastMs": 0,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.20660381982122067,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.15627681092074958,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.12897465311846218,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.08684353534540598,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.07678424386787289,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.05310141494803374,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04323332211644479,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.00656100009776652,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 118205.19999999553,
+    "fps": 5.013871711755781,
+    "avgFrameMs": 199.44666666587193,
+    "overBudgetPercent": 66.66666666666666,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 59.03880584071678,
+        "lastMs": 2.7999999970197678,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 37.31497287419623,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 26.901864386013543,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 26.74872226497623,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 23.455877797922952,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 11.998109532149495,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 7.94960946930458,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.036640337889667,
+        "lastMs": 0,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.263929190092245,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.7839722576525436,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 2.713271310840483,
+        "lastMs": 2.100000001490116,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.121604893913281,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.235675454446467,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.5862679065457929,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.5079373348866942,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.40332655962128666,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3276022555720145,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2890986395385224,
+        "lastMs": 0,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.20660381982122067,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.15627681092074958,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.12897465311846218,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.08684353534540598,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.07678424386787289,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.05310141494803374,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04323332211644479,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.00656100009776652,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 119978.89999999851,
+    "fps": 5.013871711755781,
+    "avgFrameMs": 199.44666666587193,
+    "overBudgetPercent": 66.66666666666666,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 59.03880584071678,
+        "lastMs": 2.7999999970197678,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 37.31497287419623,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 26.901864386013543,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 26.74872226497623,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 23.455877797922952,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 11.998109532149495,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 7.94960946930458,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.036640337889667,
+        "lastMs": 0,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.263929190092245,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.7839722576525436,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 2.713271310840483,
+        "lastMs": 2.100000001490116,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.121604893913281,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.235675454446467,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.5862679065457929,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.5079373348866942,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.40332655962128666,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3276022555720145,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2890986395385224,
+        "lastMs": 0,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.20660381982122067,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.15627681092074958,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.12897465311846218,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.08684353534540598,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.07678424386787289,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.05310141494803374,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04323332211644479,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.00656100009776652,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 121699.89999999851,
+    "fps": 5.013871711755781,
+    "avgFrameMs": 199.44666666587193,
+    "overBudgetPercent": 66.66666666666666,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 59.03880584071678,
+        "lastMs": 2.7999999970197678,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 37.31497287419623,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 26.901864386013543,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 26.74872226497623,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 23.455877797922952,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 11.998109532149495,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 7.94960946930458,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.036640337889667,
+        "lastMs": 0,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.263929190092245,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.7839722576525436,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 2.713271310840483,
+        "lastMs": 2.100000001490116,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.121604893913281,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.235675454446467,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.5862679065457929,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.5079373348866942,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.40332655962128666,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3276022555720145,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2890986395385224,
+        "lastMs": 0,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.20660381982122067,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.15627681092074958,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.12897465311846218,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.08684353534540598,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.07678424386787289,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.05310141494803374,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04323332211644479,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.00656100009776652,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  },
+  {
+    "tMs": 122734.79999999702,
+    "fps": 5.013871711755781,
+    "avgFrameMs": 199.44666666587193,
+    "overBudgetPercent": 66.66666666666666,
+    "systems": [
+      {
+        "name": "Combat",
+        "emaMs": 59.03880584071678,
+        "lastMs": 2.7999999970197678,
+        "peakMs": 989.2000000029802,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.AI",
+        "emaMs": 37.31497287419623,
+        "lastMs": 0.7000000029802322,
+        "peakMs": 954.4000000059605,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere",
+        "emaMs": 26.901864386013543,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 763.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "emaMs": 26.74872226497623,
+        "lastMs": 0,
+        "peakMs": 763.3999999985099,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World",
+        "emaMs": 23.455877797922952,
+        "lastMs": 0,
+        "peakMs": 764.6000000014901,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Billboards",
+        "emaMs": 11.998109532149495,
+        "lastMs": 1.8999999985098839,
+        "peakMs": 112.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Other",
+        "emaMs": 7.94960946930458,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 60.29999999701977,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "TacticalUI",
+        "emaMs": 4.036640337889667,
+        "lastMs": 0,
+        "peakMs": 28.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Zone",
+        "emaMs": 3.263929190092245,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 22.799999997019768,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Player",
+        "emaMs": 2.7839722576525436,
+        "lastMs": 0.10000000149011612,
+        "peakMs": 14.600000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Terrain",
+        "emaMs": 2.713271310840483,
+        "lastMs": 2.100000001490116,
+        "peakMs": 15.699999995529652,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Vehicles",
+        "emaMs": 2.121604893913281,
+        "lastMs": 0.30000000447034836,
+        "peakMs": 22.400000005960464,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Weapons",
+        "emaMs": 1.235675454446467,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 7.100000001490116,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "AirSupport",
+        "emaMs": 0.5862679065457929,
+        "lastMs": 0,
+        "peakMs": 11.300000004470348,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "HUD",
+        "emaMs": 0.5079373348866942,
+        "lastMs": 0,
+        "peakMs": 5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Water",
+        "emaMs": 0.40332655962128666,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Navigation",
+        "emaMs": 0.3276022555720145,
+        "lastMs": 0,
+        "peakMs": 1.2999999970197678,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Tickets",
+        "emaMs": 0.2890986395385224,
+        "lastMs": 0,
+        "peakMs": 0.7000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Weather",
+        "emaMs": 0.20660381982122067,
+        "lastMs": 0,
+        "peakMs": 0.5,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "ModeRuntime",
+        "emaMs": 0.15627681092074958,
+        "lastMs": 0,
+        "peakMs": 4.200000002980232,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Billboards",
+        "emaMs": 0.12897465311846218,
+        "lastMs": 0.09999999403953552,
+        "peakMs": 0.6000000014901161,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Effects",
+        "emaMs": 0.08684353534540598,
+        "lastMs": 0,
+        "peakMs": 1.2000000029802322,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "Combat.Influence",
+        "emaMs": 0.07678424386787289,
+        "lastMs": 0,
+        "peakMs": 1,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "WarSim",
+        "emaMs": 0.05310141494803374,
+        "lastMs": 0,
+        "peakMs": 0.20000000298023224,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "emaMs": 0.04323332211644479,
+        "lastMs": 0,
+        "peakMs": 0.3999999985098839,
+        "budgetMs": 4.1675
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "emaMs": 0.00656100009776652,
+        "lastMs": 0,
+        "peakMs": 0.10000000149011612,
+        "budgetMs": 4.1675
+      }
+    ]
+  }
+]

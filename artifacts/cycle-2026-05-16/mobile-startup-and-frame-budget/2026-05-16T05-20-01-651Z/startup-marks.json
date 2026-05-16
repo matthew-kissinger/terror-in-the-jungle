@@ -1,0 +1,741 @@
+{
+  "startedAtMs": 3523.5,
+  "totalElapsedMs": 59217.59999999404,
+  "marks": [
+    {
+      "name": "startup.reset",
+      "atMs": 3523.89999999851,
+      "sinceStartMs": 0.3999999985098839
+    },
+    {
+      "name": "bootstrap.begin",
+      "atMs": 3524.2999999970198,
+      "sinceStartMs": 0.7999999970197678
+    },
+    {
+      "name": "bootstrap.engine-constructed",
+      "atMs": 3934.0999999940395,
+      "sinceStartMs": 410.59999999403954
+    },
+    {
+      "name": "bootstrap.engine-initialize.begin",
+      "atMs": 3934.0999999940395,
+      "sinceStartMs": 410.59999999403954
+    },
+    {
+      "name": "engine.initialize.begin",
+      "atMs": 3934.2999999970198,
+      "sinceStartMs": 410.79999999701977
+    },
+    {
+      "name": "engine-init.initialize-systems.begin",
+      "atMs": 4123,
+      "sinceStartMs": 599.5
+    },
+    {
+      "name": "systems.initialize.begin",
+      "atMs": 4129.39999999851,
+      "sinceStartMs": 605.8999999985099
+    },
+    {
+      "name": "systems.assets.begin",
+      "atMs": 4215.29999999702,
+      "sinceStartMs": 691.7999999970198
+    },
+    {
+      "name": "systems.audio.begin",
+      "atMs": 4215.29999999702,
+      "sinceStartMs": 691.7999999970198
+    },
+    {
+      "name": "systems.assets.end",
+      "atMs": 33414.39999999851,
+      "sinceStartMs": 29890.89999999851
+    },
+    {
+      "name": "systems.audio.end",
+      "atMs": 36075.59999999404,
+      "sinceStartMs": 32552.09999999404
+    },
+    {
+      "name": "systems.init.assetLoader.skipped-preinitialized",
+      "atMs": 36794.39999999851,
+      "sinceStartMs": 33270.89999999851
+    },
+    {
+      "name": "systems.init.audioManager.skipped-preinitialized",
+      "atMs": 36794.39999999851,
+      "sinceStartMs": 33270.89999999851
+    },
+    {
+      "name": "systems.init.globalBillboardSystem.begin",
+      "atMs": 36794.39999999851,
+      "sinceStartMs": 33270.89999999851
+    },
+    {
+      "name": "systems.init.globalBillboardSystem.end",
+      "atMs": 36964.39999999851,
+      "sinceStartMs": 33440.89999999851
+    },
+    {
+      "name": "systems.init.terrainSystem.begin",
+      "atMs": 36964.39999999851,
+      "sinceStartMs": 33440.89999999851
+    },
+    {
+      "name": "terrain.heightmap.from-provider.begin",
+      "atMs": 36972.59999999404,
+      "sinceStartMs": 33449.09999999404
+    },
+    {
+      "name": "terrain.heightmap.from-provider.end",
+      "atMs": 37923.59999999404,
+      "sinceStartMs": 34400.09999999404
+    },
+    {
+      "name": "systems.init.terrainSystem.end",
+      "atMs": 38156.09999999404,
+      "sinceStartMs": 34632.59999999404
+    },
+    {
+      "name": "systems.init.waterSystem.begin",
+      "atMs": 38156.09999999404,
+      "sinceStartMs": 34632.59999999404
+    },
+    {
+      "name": "systems.init.waterSystem.end",
+      "atMs": 38177.79999999702,
+      "sinceStartMs": 34654.29999999702
+    },
+    {
+      "name": "systems.init.weatherSystem.begin",
+      "atMs": 38178,
+      "sinceStartMs": 34654.5
+    },
+    {
+      "name": "systems.init.weatherSystem.end",
+      "atMs": 38194.79999999702,
+      "sinceStartMs": 34671.29999999702
+    },
+    {
+      "name": "systems.init.atmosphereSystem.begin",
+      "atMs": 38194.79999999702,
+      "sinceStartMs": 34671.29999999702
+    },
+    {
+      "name": "systems.init.atmosphereSystem.end",
+      "atMs": 38196.39999999851,
+      "sinceStartMs": 34672.89999999851
+    },
+    {
+      "name": "systems.init.playerController.begin",
+      "atMs": 38196.39999999851,
+      "sinceStartMs": 34672.89999999851
+    },
+    {
+      "name": "systems.init.playerController.end",
+      "atMs": 38198.19999999553,
+      "sinceStartMs": 34674.69999999553
+    },
+    {
+      "name": "systems.init.firstPersonWeapon.begin",
+      "atMs": 38198.19999999553,
+      "sinceStartMs": 34674.69999999553
+    },
+    {
+      "name": "systems.init.firstPersonWeapon.end",
+      "atMs": 38819.39999999851,
+      "sinceStartMs": 35295.89999999851
+    },
+    {
+      "name": "systems.init.combatantSystem.begin",
+      "atMs": 38819.39999999851,
+      "sinceStartMs": 35295.89999999851
+    },
+    {
+      "name": "systems.init.combatantSystem.end",
+      "atMs": 38899.69999999553,
+      "sinceStartMs": 35376.19999999553
+    },
+    {
+      "name": "systems.init.zoneManager.begin",
+      "atMs": 38899.69999999553,
+      "sinceStartMs": 35376.19999999553
+    },
+    {
+      "name": "systems.init.zoneManager.end",
+      "atMs": 38899.79999999702,
+      "sinceStartMs": 35376.29999999702
+    },
+    {
+      "name": "systems.init.ticketSystem.begin",
+      "atMs": 38899.79999999702,
+      "sinceStartMs": 35376.29999999702
+    },
+    {
+      "name": "systems.init.ticketSystem.end",
+      "atMs": 38899.89999999851,
+      "sinceStartMs": 35376.39999999851
+    },
+    {
+      "name": "systems.init.playerHealthSystem.begin",
+      "atMs": 38899.89999999851,
+      "sinceStartMs": 35376.39999999851
+    },
+    {
+      "name": "systems.init.playerHealthSystem.end",
+      "atMs": 38901.69999999553,
+      "sinceStartMs": 35378.19999999553
+    },
+    {
+      "name": "systems.init.playerRespawnManager.begin",
+      "atMs": 38901.69999999553,
+      "sinceStartMs": 35378.19999999553
+    },
+    {
+      "name": "systems.init.playerRespawnManager.end",
+      "atMs": 38901.89999999851,
+      "sinceStartMs": 35378.39999999851
+    },
+    {
+      "name": "systems.init.minimapSystem.begin",
+      "atMs": 38901.89999999851,
+      "sinceStartMs": 35378.39999999851
+    },
+    {
+      "name": "systems.init.minimapSystem.end",
+      "atMs": 38902.09999999404,
+      "sinceStartMs": 35378.59999999404
+    },
+    {
+      "name": "systems.init.fullMapSystem.begin",
+      "atMs": 38902.09999999404,
+      "sinceStartMs": 35378.59999999404
+    },
+    {
+      "name": "systems.init.fullMapSystem.end",
+      "atMs": 38902.29999999702,
+      "sinceStartMs": 35378.79999999702
+    },
+    {
+      "name": "systems.init.compassSystem.begin",
+      "atMs": 38902.29999999702,
+      "sinceStartMs": 35378.79999999702
+    },
+    {
+      "name": "systems.init.compassSystem.end",
+      "atMs": 38902.5,
+      "sinceStartMs": 35379
+    },
+    {
+      "name": "systems.init.hudSystem.begin",
+      "atMs": 38902.5,
+      "sinceStartMs": 35379
+    },
+    {
+      "name": "systems.init.hudSystem.end",
+      "atMs": 38905.29999999702,
+      "sinceStartMs": 35381.79999999702
+    },
+    {
+      "name": "systems.init.worldFeatureSystem.begin",
+      "atMs": 38905.29999999702,
+      "sinceStartMs": 35381.79999999702
+    },
+    {
+      "name": "systems.init.worldFeatureSystem.end",
+      "atMs": 38905.5,
+      "sinceStartMs": 35382
+    },
+    {
+      "name": "systems.init.gameModeManager.begin",
+      "atMs": 38905.5,
+      "sinceStartMs": 35382
+    },
+    {
+      "name": "systems.init.gameModeManager.end",
+      "atMs": 38905.59999999404,
+      "sinceStartMs": 35382.09999999404
+    },
+    {
+      "name": "systems.init.playerSquadController.begin",
+      "atMs": 38905.59999999404,
+      "sinceStartMs": 35382.09999999404
+    },
+    {
+      "name": "systems.init.playerSquadController.end",
+      "atMs": 38906,
+      "sinceStartMs": 35382.5
+    },
+    {
+      "name": "systems.init.commandInputManager.begin",
+      "atMs": 38906,
+      "sinceStartMs": 35382.5
+    },
+    {
+      "name": "systems.init.commandInputManager.end",
+      "atMs": 38906.19999999553,
+      "sinceStartMs": 35382.69999999553
+    },
+    {
+      "name": "systems.init.inventoryManager.begin",
+      "atMs": 38906.19999999553,
+      "sinceStartMs": 35382.69999999553
+    },
+    {
+      "name": "systems.init.inventoryManager.end",
+      "atMs": 38906.5,
+      "sinceStartMs": 35383
+    },
+    {
+      "name": "systems.init.grenadeSystem.begin",
+      "atMs": 38906.5,
+      "sinceStartMs": 35383
+    },
+    {
+      "name": "systems.init.grenadeSystem.end",
+      "atMs": 38906.69999999553,
+      "sinceStartMs": 35383.19999999553
+    },
+    {
+      "name": "systems.init.mortarSystem.begin",
+      "atMs": 38906.69999999553,
+      "sinceStartMs": 35383.19999999553
+    },
+    {
+      "name": "systems.init.mortarSystem.end",
+      "atMs": 39156.19999999553,
+      "sinceStartMs": 35632.69999999553
+    },
+    {
+      "name": "systems.init.sandbagSystem.begin",
+      "atMs": 39156.19999999553,
+      "sinceStartMs": 35632.69999999553
+    },
+    {
+      "name": "systems.init.sandbagSystem.end",
+      "atMs": 39320.5,
+      "sinceStartMs": 35797
+    },
+    {
+      "name": "systems.init.cameraShakeSystem.begin",
+      "atMs": 39320.5,
+      "sinceStartMs": 35797
+    },
+    {
+      "name": "systems.init.cameraShakeSystem.end",
+      "atMs": 39320.79999999702,
+      "sinceStartMs": 35797.29999999702
+    },
+    {
+      "name": "systems.init.playerSuppressionSystem.begin",
+      "atMs": 39320.79999999702,
+      "sinceStartMs": 35797.29999999702
+    },
+    {
+      "name": "systems.init.playerSuppressionSystem.end",
+      "atMs": 39321.39999999851,
+      "sinceStartMs": 35797.89999999851
+    },
+    {
+      "name": "systems.init.flashbangScreenEffect.begin",
+      "atMs": 39321.39999999851,
+      "sinceStartMs": 35797.89999999851
+    },
+    {
+      "name": "systems.init.flashbangScreenEffect.end",
+      "atMs": 39321.5,
+      "sinceStartMs": 35798
+    },
+    {
+      "name": "systems.init.smokeCloudSystem.begin",
+      "atMs": 39321.5,
+      "sinceStartMs": 35798
+    },
+    {
+      "name": "systems.init.smokeCloudSystem.end",
+      "atMs": 39323.89999999851,
+      "sinceStartMs": 35800.39999999851
+    },
+    {
+      "name": "systems.init.influenceMapSystem.begin",
+      "atMs": 39323.89999999851,
+      "sinceStartMs": 35800.39999999851
+    },
+    {
+      "name": "systems.init.influenceMapSystem.end",
+      "atMs": 39324.5,
+      "sinceStartMs": 35801
+    },
+    {
+      "name": "systems.init.ammoSupplySystem.begin",
+      "atMs": 39324.5,
+      "sinceStartMs": 35801
+    },
+    {
+      "name": "systems.init.ammoSupplySystem.end",
+      "atMs": 39324.59999999404,
+      "sinceStartMs": 35801.09999999404
+    },
+    {
+      "name": "systems.init.warSimulator.begin",
+      "atMs": 39324.59999999404,
+      "sinceStartMs": 35801.09999999404
+    },
+    {
+      "name": "systems.init.warSimulator.end",
+      "atMs": 39324.69999999553,
+      "sinceStartMs": 35801.19999999553
+    },
+    {
+      "name": "systems.init.strategicFeedback.begin",
+      "atMs": 39324.69999999553,
+      "sinceStartMs": 35801.19999999553
+    },
+    {
+      "name": "systems.init.strategicFeedback.end",
+      "atMs": 39328.29999999702,
+      "sinceStartMs": 35804.79999999702
+    },
+    {
+      "name": "systems.init.airSupportManager.begin",
+      "atMs": 39328.29999999702,
+      "sinceStartMs": 35804.79999999702
+    },
+    {
+      "name": "systems.init.airSupportManager.end",
+      "atMs": 39328.29999999702,
+      "sinceStartMs": 35804.79999999702
+    },
+    {
+      "name": "systems.init.aaEmplacementSystem.begin",
+      "atMs": 39328.29999999702,
+      "sinceStartMs": 35804.79999999702
+    },
+    {
+      "name": "systems.init.aaEmplacementSystem.end",
+      "atMs": 39328.29999999702,
+      "sinceStartMs": 35804.79999999702
+    },
+    {
+      "name": "systems.init.vehicleManager.begin",
+      "atMs": 39328.29999999702,
+      "sinceStartMs": 35804.79999999702
+    },
+    {
+      "name": "systems.init.vehicleManager.end",
+      "atMs": 39328.29999999702,
+      "sinceStartMs": 35804.79999999702
+    },
+    {
+      "name": "engine-init.initialize-systems.end",
+      "atMs": 40292.59999999404,
+      "sinceStartMs": 36769.09999999404
+    },
+    {
+      "name": "engine.initialize.end",
+      "atMs": 40293,
+      "sinceStartMs": 36769.5
+    },
+    {
+      "name": "bootstrap.engine-initialize.end",
+      "atMs": 40293,
+      "sinceStartMs": 36769.5
+    },
+    {
+      "name": "bootstrap.engine-started",
+      "atMs": 40293.19999999553,
+      "sinceStartMs": 36769.69999999553
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.begin",
+      "atMs": 42288.89999999851,
+      "sinceStartMs": 38765.39999999851
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.height-source.begin",
+      "atMs": 42290.09999999404,
+      "sinceStartMs": 38766.59999999404
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.height-source.end",
+      "atMs": 42732.19999999553,
+      "sinceStartMs": 39208.69999999553
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.begin",
+      "atMs": 42756.89999999851,
+      "sinceStartMs": 39233.39999999851
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.features.begin",
+      "atMs": 42757,
+      "sinceStartMs": 39233.5
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.features.end",
+      "atMs": 42770,
+      "sinceStartMs": 39246.5
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.stats.stamps-1363",
+      "atMs": 42770,
+      "sinceStartMs": 39246.5
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.stats.surface-patches-67",
+      "atMs": 42770,
+      "sinceStartMs": 39246.5
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.stats.exclusion-zones-8",
+      "atMs": 42770,
+      "sinceStartMs": 39246.5
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.stats.flow-paths-36",
+      "atMs": 42770,
+      "sinceStartMs": 39246.5
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.stamped-provider.begin",
+      "atMs": 42770,
+      "sinceStartMs": 39246.5
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.stamped-provider.end",
+      "atMs": 42775.29999999702,
+      "sinceStartMs": 39251.79999999702
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.heightmap-rebake.begin",
+      "atMs": 42775.29999999702,
+      "sinceStartMs": 39251.79999999702
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.heightmap-rebake.end",
+      "atMs": 42995.39999999851,
+      "sinceStartMs": 39471.89999999851
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.stats.heightmap-grid-1024",
+      "atMs": 42995.39999999851,
+      "sinceStartMs": 39471.89999999851
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.compile.end",
+      "atMs": 42995.39999999851,
+      "sinceStartMs": 39471.89999999851
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-config.begin",
+      "atMs": 42997.79999999702,
+      "sinceStartMs": 39474.29999999702
+    },
+    {
+      "name": "terrain.heightmap.from-prepared-visual-worker.begin",
+      "atMs": 43290.09999999404,
+      "sinceStartMs": 39766.59999999404
+    },
+    {
+      "name": "terrain.heightmap.from-prepared-visual-worker.end",
+      "atMs": 49247.09999999404,
+      "sinceStartMs": 45723.59999999404
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-config.end",
+      "atMs": 49266.69999999553,
+      "sinceStartMs": 45743.19999999553
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.navmesh.begin",
+      "atMs": 49267.5,
+      "sinceStartMs": 45744
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.navmesh.end",
+      "atMs": 49355.19999999553,
+      "sinceStartMs": 45831.69999999553
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.apply.begin",
+      "atMs": 49390.5,
+      "sinceStartMs": 45867
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.terrain-features.apply.end",
+      "atMs": 49414.09999999404,
+      "sinceStartMs": 45890.59999999404
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.set-game-mode.begin",
+      "atMs": 49420.09999999404,
+      "sinceStartMs": 45896.59999999404
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.set-game-mode.end",
+      "atMs": 49604.59999999404,
+      "sinceStartMs": 46081.09999999404
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.deploy-select.begin",
+      "atMs": 49610,
+      "sinceStartMs": 46086.5
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.deploy-select.end",
+      "atMs": 49962.09999999404,
+      "sinceStartMs": 46438.59999999404
+    },
+    {
+      "name": "systems.pre-generate.begin",
+      "atMs": 49964.19999999553,
+      "sinceStartMs": 46440.69999999553
+    },
+    {
+      "name": "systems.pre-generate.end",
+      "atMs": 50976.59999999404,
+      "sinceStartMs": 47453.09999999404
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.post-pre-generate",
+      "atMs": 50976.59999999404,
+      "sinceStartMs": 47453.09999999404
+    },
+    {
+      "name": "engine-init.startup-flow.begin",
+      "atMs": 50978,
+      "sinceStartMs": 47454.5
+    },
+    {
+      "name": "engine-init.startup-flow.hide-loading.begin",
+      "atMs": 50978,
+      "sinceStartMs": 47454.5
+    },
+    {
+      "name": "engine-init.startup-flow.hide-loading.end",
+      "atMs": 50978.59999999404,
+      "sinceStartMs": 47455.09999999404
+    },
+    {
+      "name": "engine-init.startup-flow.position-player.begin",
+      "atMs": 50978.59999999404,
+      "sinceStartMs": 47455.09999999404
+    },
+    {
+      "name": "engine-init.startup-flow.position-player.end",
+      "atMs": 50979,
+      "sinceStartMs": 47455.5
+    },
+    {
+      "name": "engine-init.startup-flow.flush-chunk-update.begin",
+      "atMs": 50979,
+      "sinceStartMs": 47455.5
+    },
+    {
+      "name": "engine-init.startup-flow.flush-chunk-update.terrain-update-end",
+      "atMs": 50981.79999999702,
+      "sinceStartMs": 47458.29999999702
+    },
+    {
+      "name": "engine-init.startup-flow.npc-close-model-prewarm.begin",
+      "atMs": 50981.79999999702,
+      "sinceStartMs": 47458.29999999702
+    },
+    {
+      "name": "engine-init.start-game.open_frontier.end",
+      "atMs": 50984.79999999702,
+      "sinceStartMs": 47461.29999999702
+    },
+    {
+      "name": "engine-init.startup-flow.npc-close-model-prewarm.timeout",
+      "atMs": 57443,
+      "sinceStartMs": 53919.5
+    },
+    {
+      "name": "engine-init.startup-flow.npc-close-model-prewarm.end",
+      "atMs": 57443,
+      "sinceStartMs": 53919.5
+    },
+    {
+      "name": "engine-init.startup-flow.flush-chunk-update.yield-not-gated",
+      "atMs": 57443.09999999404,
+      "sinceStartMs": 53919.59999999404
+    },
+    {
+      "name": "engine-init.startup-flow.flush-chunk-update.end",
+      "atMs": 57443.09999999404,
+      "sinceStartMs": 53919.59999999404
+    },
+    {
+      "name": "engine-init.startup-flow.renderer-visible.begin",
+      "atMs": 57443.09999999404,
+      "sinceStartMs": 53919.59999999404
+    },
+    {
+      "name": "engine-init.startup-flow.renderer-visible.end",
+      "atMs": 57443.5,
+      "sinceStartMs": 53920
+    },
+    {
+      "name": "engine-init.startup-flow.enable-player-systems.begin",
+      "atMs": 57443.5,
+      "sinceStartMs": 53920
+    },
+    {
+      "name": "engine-init.startup-flow.enable-player-systems.end",
+      "atMs": 57460.59999999404,
+      "sinceStartMs": 53937.09999999404
+    },
+    {
+      "name": "engine-init.startup-flow.audio-start.begin",
+      "atMs": 57486.19999999553,
+      "sinceStartMs": 53962.69999999553
+    },
+    {
+      "name": "engine-init.startup-flow.audio-start.end",
+      "atMs": 57488.89999999851,
+      "sinceStartMs": 53965.39999999851
+    },
+    {
+      "name": "engine-init.startup-flow.combat-enable.begin",
+      "atMs": 57488.89999999851,
+      "sinceStartMs": 53965.39999999851
+    },
+    {
+      "name": "engine-init.startup-flow.combat-enable.end",
+      "atMs": 57489.09999999404,
+      "sinceStartMs": 53965.59999999404
+    },
+    {
+      "name": "engine-init.startup-flow.enter-live.begin",
+      "atMs": 57489.09999999404,
+      "sinceStartMs": 53965.59999999404
+    },
+    {
+      "name": "engine-init.startup-flow.enter-live.end",
+      "atMs": 57489.09999999404,
+      "sinceStartMs": 53965.59999999404
+    },
+    {
+      "name": "engine-init.startup-flow.interactive-ready",
+      "atMs": 57489.19999999553,
+      "sinceStartMs": 53965.69999999553
+    },
+    {
+      "name": "engine-init.startup-flow.flush-chunk-update.post-reveal-yield-raf",
+      "atMs": 60885,
+      "sinceStartMs": 57361.5
+    },
+    {
+      "name": "engine-init.startup-flow.background-tasks-schedule.begin",
+      "atMs": 60885.09999999404,
+      "sinceStartMs": 57361.59999999404
+    },
+    {
+      "name": "engine-init.startup-flow.background-tasks-schedule.end",
+      "atMs": 60885.19999999553,
+      "sinceStartMs": 57361.69999999553
+    }
+  ]
+}

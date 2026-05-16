@@ -1,0 +1,199 @@
+{
+  "createdAt": "2026-05-16T05:20:01.650Z",
+  "cycleId": "cycle-2026-05-16-mobile-webgpu-and-sky-recovery",
+  "taskSlug": "mobile-startup-and-frame-budget",
+  "emulation": {
+    "labeled": true,
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "deviceScaleFactor": 3
+    },
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.6367.111 Mobile/15E148 Safari/604.1",
+    "cpuThrottleRate": 4,
+    "network": {
+      "downloadKbps": 9000,
+      "uploadKbps": 4000,
+      "latencyMs": 170
+    },
+    "note": "Chrome DevTools mobile emulation via Playwright + CDP. Real-device evidence supersedes this."
+  },
+  "mode": "open_frontier",
+  "distRoot": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-ae49b40d8c2053b39\\dist-perf",
+  "usingPerfHarness": true,
+  "autoConfirmedDeploy": true,
+  "timings": {
+    "pageLoadToStartVisibleMs": 41290,
+    "startClickToModeVisibleMs": 815,
+    "modeClickToDeployVisibleMs": 0,
+    "modeClickToDeployReadyMs": 0,
+    "deployReadyToDeployClickMs": 0,
+    "deployClickToPlayableMs": 19341,
+    "modeClickToPlayableMs": 19341
+  },
+  "steadyState": {
+    "sampleCount": 19,
+    "avgFps": 4.42,
+    "avgFrameMs": 234.262,
+    "systems": [
+      {
+        "name": "Combat",
+        "avgEmaMs": 71.96,
+        "maxPeakMs": 989.2,
+        "sampleCount": 19
+      },
+      {
+        "name": "Combat.AI",
+        "avgEmaMs": 46.864,
+        "maxPeakMs": 954.4,
+        "sampleCount": 19
+      },
+      {
+        "name": "World.Atmosphere",
+        "avgEmaMs": 31.742,
+        "maxPeakMs": 763.6,
+        "sampleCount": 19
+      },
+      {
+        "name": "World.Atmosphere.SkyTexture",
+        "avgEmaMs": 31.598,
+        "maxPeakMs": 763.4,
+        "sampleCount": 19
+      },
+      {
+        "name": "World",
+        "avgEmaMs": 29.28,
+        "maxPeakMs": 764.6,
+        "sampleCount": 19
+      },
+      {
+        "name": "Combat.Billboards",
+        "avgEmaMs": 13.192,
+        "maxPeakMs": 112.5,
+        "sampleCount": 19
+      },
+      {
+        "name": "Other",
+        "avgEmaMs": 8.731,
+        "maxPeakMs": 60.3,
+        "sampleCount": 19
+      },
+      {
+        "name": "TacticalUI",
+        "avgEmaMs": 4.739,
+        "maxPeakMs": 28.5,
+        "sampleCount": 19
+      },
+      {
+        "name": "World.Zone",
+        "avgEmaMs": 3.044,
+        "maxPeakMs": 22.8,
+        "sampleCount": 19
+      },
+      {
+        "name": "Terrain",
+        "avgEmaMs": 2.865,
+        "maxPeakMs": 15.7,
+        "sampleCount": 19
+      },
+      {
+        "name": "Player",
+        "avgEmaMs": 2.515,
+        "maxPeakMs": 14.6,
+        "sampleCount": 19
+      },
+      {
+        "name": "Weapons",
+        "avgEmaMs": 1.417,
+        "maxPeakMs": 7.1,
+        "sampleCount": 19
+      },
+      {
+        "name": "Vehicles",
+        "avgEmaMs": 1.218,
+        "maxPeakMs": 22.4,
+        "sampleCount": 19
+      },
+      {
+        "name": "AirSupport",
+        "avgEmaMs": 0.67,
+        "maxPeakMs": 11.3,
+        "sampleCount": 19
+      },
+      {
+        "name": "HUD",
+        "avgEmaMs": 0.605,
+        "maxPeakMs": 5,
+        "sampleCount": 19
+      },
+      {
+        "name": "World.Water",
+        "avgEmaMs": 0.46,
+        "maxPeakMs": 1,
+        "sampleCount": 19
+      },
+      {
+        "name": "Navigation",
+        "avgEmaMs": 0.414,
+        "maxPeakMs": 1.3,
+        "sampleCount": 19
+      },
+      {
+        "name": "World.Tickets",
+        "avgEmaMs": 0.293,
+        "maxPeakMs": 0.7,
+        "sampleCount": 19
+      },
+      {
+        "name": "World.Weather",
+        "avgEmaMs": 0.216,
+        "maxPeakMs": 0.5,
+        "sampleCount": 19
+      },
+      {
+        "name": "ModeRuntime",
+        "avgEmaMs": 0.201,
+        "maxPeakMs": 4.2,
+        "sampleCount": 19
+      },
+      {
+        "name": "Billboards",
+        "avgEmaMs": 0.14,
+        "maxPeakMs": 0.6,
+        "sampleCount": 19
+      },
+      {
+        "name": "Combat.Effects",
+        "avgEmaMs": 0.109,
+        "maxPeakMs": 1.2,
+        "sampleCount": 19
+      },
+      {
+        "name": "Combat.Influence",
+        "avgEmaMs": 0.082,
+        "maxPeakMs": 1,
+        "sampleCount": 19
+      },
+      {
+        "name": "WarSim",
+        "avgEmaMs": 0.054,
+        "maxPeakMs": 0.2,
+        "sampleCount": 19
+      },
+      {
+        "name": "World.Atmosphere.LightFog",
+        "avgEmaMs": 0.048,
+        "maxPeakMs": 0.4,
+        "sampleCount": 19
+      },
+      {
+        "name": "World.Atmosphere.Clouds",
+        "avgEmaMs": 0.007,
+        "maxPeakMs": 0.1,
+        "sampleCount": 19
+      }
+    ]
+  },
+  "pageErrorCount": 0,
+  "consoleEntryCount": 299
+}

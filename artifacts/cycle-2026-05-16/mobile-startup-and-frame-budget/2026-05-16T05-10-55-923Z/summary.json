@@ -1,0 +1,41 @@
+{
+  "createdAt": "2026-05-16T05:10:55.923Z",
+  "cycleId": "cycle-2026-05-16-mobile-webgpu-and-sky-recovery",
+  "taskSlug": "mobile-startup-and-frame-budget",
+  "emulation": {
+    "labeled": true,
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "deviceScaleFactor": 3
+    },
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.6367.111 Mobile/15E148 Safari/604.1",
+    "cpuThrottleRate": 4,
+    "network": {
+      "downloadKbps": 9000,
+      "uploadKbps": 4000,
+      "latencyMs": 170
+    },
+    "note": "Chrome DevTools mobile emulation via Playwright + CDP. Real-device evidence supersedes this."
+  },
+  "mode": "open_frontier",
+  "distRoot": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-ae49b40d8c2053b39\\dist-perf",
+  "usingPerfHarness": true,
+  "timings": {
+    "pageLoadToStartVisibleMs": 35599,
+    "startClickToModeVisibleMs": 298,
+    "modeClickToDeployVisibleMs": 3823,
+    "modeClickToDeployReadyMs": 3829,
+    "deployReadyToDeployClickMs": 0,
+    "deployClickToPlayableMs": 7174,
+    "modeClickToPlayableMs": 11003
+  },
+  "steadyState": {
+    "sampleCount": 0,
+    "avgFps": 0,
+    "avgFrameMs": 0,
+    "systems": []
+  },
+  "pageErrorCount": 0,
+  "consoleEntryCount": 277
+}
