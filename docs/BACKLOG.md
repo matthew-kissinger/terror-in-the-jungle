@@ -1,6 +1,6 @@
 # Backlog
 
-Last verified: 2026-05-16 (post `cycle-sky-visual-restore` close)
+Last verified: 2026-05-16 (post `cycle-mobile-webgl2-fallback-fix` close)
 
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
@@ -58,6 +58,71 @@ Spike memo and evidence:
 Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
+
+## Recently Completed (cycle-mobile-webgl2-fallback-fix)
+
+Campaign position #2 of 12 in
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+(autonomous-loop posture). Three-round cycle, 9 PRs merged. Closes
+the shipped fix for `KB-MOBILE-WEBGPU` (the post-WebGPU-merge
+WebGL2-fallback mobile-unplayable regression).
+
+PRs merged in dispatch order across 3 rounds:
+
+R1 — Foundation (terrain TSL early-outs + telemetry plumbing):
+- [#213](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/213) `6e7a8879` `terrain-tsl-biome-early-out` — Replaces the 8-way `mix(prev,sample,step(N-0.5,biomeSlot))` unroll in `TerrainMaterial.sampleBiomeTextureRaw` with a TSL `If/ElseIf` chain inside `Fn(()=>...)`. terrain-nav-reviewer **APPROVE-WITH-NOTES**. Notes: compile-time sampler-count verification deferred to R3 `tsl-shader-cost-probe`; strict-WebGPU desktop visual deferred to owner walk-through.
+- [#211](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/211) `9e1ccab5` `terrain-tsl-triplanar-gate` — Wraps triplanar sample sub-graph in `If(triplanarBlend > 0.001)` so flat-terrain compiles skip the 6 triplanar samples. terrain-nav-reviewer **APPROVE-WITH-NOTES**. Identity-preservation argument: `mix(planar, triplanar, 0)` equals `planar`, so both branches yield byte-equivalent output.
+- [#212](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/212) `0b3b749d` `render-bucket-telemetry-fix` — Root cause was an ordering interaction in `SystemUpdater.updateSystems()` calling `endFrame()` before `GameEngineLoop.animate()` opened `RenderMain`/`RenderOverlay` buckets; the `currentFrame` was null and the `beginSystem`/`endSystem` short-circuit dropped every render sample. Fix tracks pending starts on a separate map. 4 new behavior tests.
+
+R2 — Mobile-specific knobs:
+- [#215](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/215) `99044966` `mobile-pixel-ratio-cap` — `DeviceDetector.ts` mobile UA returns 1.0 pixel ratio instead of 2.0; proportionally reduces render bandwidth.
+- [#214](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/214) `ca725369` `mobile-skip-npc-prewarm` — Gates the NPC close-model prewarm dispatch on `!isMobileGPU()` in `LiveEntryActivator.ts`; mobile-emulation was always hitting the 1.8s prewarm timeout for zero benefit. Adds a `npc-close-model-prewarm.skipped-mobile` startup mark for visibility.
+- [#216](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/216) `706ad344` `mobile-sky-cadence-gate` — `HosekWilkieSkyBackend` exposes `setRefreshCadenceSeconds()`; `AtmosphereSystem` calls it with `isMobileGPU() ? 8 : 2`. Mobile sky `World.Atmosphere.SkyTexture` avg-EMA expected to drop ~4x.
+- [#217](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/217) `83fb9fb0` `asset-audio-defer` — Splits audio init into boot-critical (ambient+UI) and background (SFX bank, music). Background decodes after first playable frame via new `whenSfxReady()` seam. **Measured: `modeClickToPlayableMs` 19,341ms → 11,349ms (−7,992ms)**. First-shot audio gap check deferred to PLAYTEST_PENDING.
+
+R3 — Validation (probe + harness):
+- [#218](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/218) `ff87e635` `tsl-shader-cost-probe` — New `scripts/perf-tsl-shader-cost.ts` (405 LOC) + dev-only `collectKonveyerNodeMaterialShaders()` surface on `RendererBackend.ts` (+278 LOC; dual-renderer-path: WebGL `_latestBuilder` vs WebGPU mangled `nodeBuilderCache`). `window.__tslShaderCost()` wired behind `?diag=1` gate. Closes the R1 terrain-nav-reviewer's "compile-time perf evidence deferred to R3" note.
+- [#219](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/219) `a81d8cda` `real-device-validation-harness` — New `scripts/real-device-validation.ts` (484 LOC) extends mobile-renderer-probe with Playwright remote-debug for `android-chrome-debug` + `ios-safari-manual`. Cycle close memo at `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/cycle-close-validation.md` documents owner-attach steps. Pixel 5 + iPhone 12 emulation captures (23.68 / 28.30 avgFps) committed; real-device walk-through deferred to PLAYTEST_PENDING.
+
+Out-of-band CI fix (root cause for the 30-min mobile-ui timeout flake):
+- `47c42216` `ci(mobile-ui): matrix fan-out 4 devices into parallel jobs` — 4 device cases × ~12 min each (post-WebGPU mode-startup bake) = ~48 min sequential vs 30 min timeout = impossible. Matrix-fans the 4 device cases into parallel jobs at 18-min per-job ceiling; wall time max-of-devices ≈ 3-10 min. New `scripts/mobile-ui-check.ts --device-id <id>` flag; local invocations unchanged. Verified on R2 PRs: all 4 mobile-ui matrix jobs pass under 10 min, no timeouts.
+
+Carry-over delta: 0. KB-MOBILE-WEBGPU was already in Closed at cycle start;
+the Closed entry is updated with all 9 merge SHAs, the CI-fix commit, and
+the harness/memo paths.
+
+Perf delta (post-R1 perf-analyst + post-R2 perf-analyst, both rounds): same
+pattern as cycle #1 — literal >5% p99 trip on `combat120` (R1 +34%, R2
++34%), both rounds explicitly diagnosed by perf-analyst as **runner-environment
+noise, NOT real signal**. Evidence: (1) per-PR p99 ordering placed the
+**telemetry-only PR #212 as the WORST** in R1 (an impossible GPU signal —
+proves variance dominates); (2) the R2 worst-by-p99 was **PR #215
+mobile-pixel-ratio-cap**, which only changes a UA-gated numeric constant
+that cannot affect desktop combat120; (3) all four R2 captures ran the
+WebGPU→WebGL2 fallback path on the CI Linux runner with mid-capture
+WebGL context loss spam, while the baseline is the WebGL-native pre-WebGPU
+build from 4 weeks ago. Campaign manifest explicitly defers strict 5% rule
+until cycle #12 baseline refresh. No PAUSE fired per the cycle #1 precedent;
+proper signal will come from the deferred real-device walk-through + the
+cycle #12 quiet-machine re-capture.
+
+Deferrals appended to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md):
+- `asset-audio-defer` first-shot audio gap (automated assertion too
+  heavyweight for single-task scope).
+- `real-device-validation-harness` walk-through on real Android Chrome +
+  real iOS Safari (run `scripts/real-device-validation.ts` per the
+  close-validation memo).
+
+Follow-ups for the next cycle (#3, `cycle-konveyer-11-spatial-grid-compute`):
+- The R1 terrain-nav-reviewer flagged `customProgramCacheKey 'KonveyerTerrainTSL_v1'`
+  not bumped after the structural change — bundle a `_v2` bump or removal
+  into the next terrain-material touch.
+- The R1 terrain-nav-reviewer flagged a `Switch(value).Case(N, fn)` TSL
+  alternative to chained `If/ElseIf` — re-bench with `tsl-shader-cost-probe`
+  in place. Low priority.
+- The triplanar-gate capture script names "strict" but captures
+  `webgpu-webgl-fallback` (truthfulness nit); rename or extend the script
+  on next terrain-touch.
 
 ## Recently Completed (cycle-sky-visual-restore)
 
@@ -373,6 +438,7 @@ owner opens or reassigns them.
 
 | Cycle | Record |
 |---|---|
+| cycle-mobile-webgl2-fallback-fix | `docs/tasks/archive/cycle-mobile-webgl2-fallback-fix/cycle-mobile-webgl2-fallback-fix.md` |
 | cycle-sky-visual-restore | `docs/tasks/archive/cycle-sky-visual-restore/cycle-sky-visual-restore.md` |
 | cycle-2026-05-10-zone-manager-decoupling | `docs/tasks/archive/cycle-2026-05-10-zone-manager-decoupling/cycle-2026-05-10-zone-manager-decoupling.md` |
 | cycle-2026-05-09-doc-decomposition-and-wiring | `docs/tasks/archive/cycle-2026-05-09-doc-decomposition-and-wiring/cycle-2026-05-09-doc-decomposition-and-wiring.md` |
