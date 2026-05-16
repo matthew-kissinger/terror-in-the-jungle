@@ -4,12 +4,44 @@ Last verified: 2026-05-16
 
 ## Status
 
-Queued. Launch PR pending merge before R1 dispatch.
+R1 dispatched 2026-05-16. All 5 executor PRs open on origin, awaiting
+CI green + orchestrator merge on next `/orchestrate` pass. No fence
+changes, no combat/terrain/nav touches, no hard-stops triggered.
+
+| Slug | PR | Headline |
+|------|----|----|
+| `mobile-renderer-mode-truth` | [#203](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/203) | Mobile lands on WebGL2 fallback of `WebGPURenderer` (`resolvedBackend === "webgpu-webgl-fallback"`). `navigator.gpu` present but `requestAdapter()` returns null on emulated Pixel 5 / iPhone 12. Strict-WebGPU mode correctly rejects (per `4aec731e`). Regression surface = hypothesis (c): WebGL2 fallback heavier than pre-migration WebGL. Probe shipped at `scripts/mobile-renderer-probe.ts`. |
+| `webgl-fallback-pipeline-diff` | [#207](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/207) | Top-3 WebGL2 cost contributors: (1) terrain `MeshStandardNodeMaterial` (`src/systems/terrain/TerrainMaterial.ts:639`), (2) renderer-construction overhead (`src/core/GameRenderer.ts:99,247,250,272-278`), (3) CPU-baked sky DataTexture refresh (`HosekWilkieSkyBackend.ts:436-525`). |
+| `tsl-shader-cost-audit` | [#204](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/204) | Lead finding: TerrainMaterial.ts:275-286 unrolled `mix(...)` biome sampler chain forces 8 texture samples/fragment vs pre-merge if-branched 1 sample → ~8x sampler amplification (~146 effective samples/fragment worst case). NPC impostor + vegetation billboard are smaller 10-20% ALU regressions. HosekWilkieSky is NOT TSL — that's the sky-bland memo's territory. |
+| `sky-visual-and-cost-regression` | [#205](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/205) | Sky-bland root cause: per-fragment Preetham `ShaderMaterial` → 128×64 CPU-baked `DataTexture` on `MeshBasicMaterial` at commit `8f3d560b`. ~3 orders of magnitude resolution drop; missing `toneMapped: false` routes dome through ACES; sun-disc normalised to peak 1.0 kills HDR pearl; `CloudLayer` retired at `09d0b562`. Top-3 fixes named in HosekWilkieSkyBackend.ts. Real paired pre/post screenshots committed. |
+| `mobile-startup-and-frame-budget` | [#206](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/206) | Mobile-emulation steady-state averages 4.42 fps. Top-3 startup: asset+audio load ~31.9 s overlapping, NPC close-model prewarm 6.5 s, terrain bake ~2 s. Top-3 steady-state buckets: `Combat.AI` 46.86 ms avg / peak 954 ms (DEFEKT-3 manifesting on mobile), `World.Atmosphere.SkyTexture` 31.60 ms / peak 763 ms, `Combat.Billboards` 13.19 ms. Probe shipped at `scripts/perf-startup-mobile.ts`. |
+
+### Known taint on R1 perf magnitudes (apply caveat in R2)
+
+PRs #203 and #206 ran wall-clock perf captures (Playwright + emulated
+mobile; CPU 4x throttle + 4G network throttle) on the host machine
+while the other R1 worktrees were concurrent. The qualitative ordering
+(Combat.AI > Sky > Billboards; renderer mode = WebGL2 fallback)
+is robust; the magnitudes (Combat.AI 954 ms peak, 31.9 s asset load,
+4.42 fps steady-state, the 5/30/60 s frame-time samples in #203) are
+host-contended and must be marked "directionally indicative; fix cycle
+re-captures on real device" in the R2 alignment memo. The structural
+findings from #204, #205, #207 are not affected (static analysis +
+visual capture).
+
+### Next-pass `/orchestrate` steps
+
+1. Confirm all 5 R1 PRs are CI-green via `gh pr view <n> --json statusCheckRollup`.
+2. Merge in order: #207, #204, #205, #203, #206 (file-size ascending; #206 has ~5.5k LOC of committed JSON artifacts and the largest probe — merge last so any rebase pain falls on the largest diff). Each via `gh pr merge <n> --rebase`.
+3. Author R2 alignment memo at `docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md` synthesizing the 5 R1 findings. Carry forward the perf-taint caveat above verbatim. Name ≥1 fix cycle slot and queue in `docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`.
+4. Close KB-MOBILE-WEBGPU + KB-SKY-BLAND in `docs/CARRY_OVERS.md` with "promoted to fix cycle `<slug>`" resolution. Carry-over count returns to 9.
+5. Run the end-of-cycle ritual: archive briefs, append BACKLOG entry, reset "Current cycle" stub.
 
 ## Skip-confirm: no
 
 Wait-for-go from the owner after the launch PR merges. Then `/orchestrate`
-re-enters and dispatches R1.
+re-enters and dispatches R1. (R1 dispatched 2026-05-16; next pass picks
+up at merge + R2 per the Status section above.)
 
 ## Concurrency cap: 5
 
