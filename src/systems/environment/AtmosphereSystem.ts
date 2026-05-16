@@ -3,6 +3,7 @@ import { GameSystem } from '../../types';
 import type { ICloudRuntime, IGameRenderer, ISkyRuntime } from '../../types/SystemInterfaces';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
+import { SunDiscMesh } from './atmosphere/SunDiscMesh';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
   computeSunDirectionAtTime,
@@ -25,6 +26,12 @@ const UNDERWATER_FOG_COLOR = 0x003344;
 
 /** Distance from origin at which the directional "sun" light is placed. */
 const SUN_LIGHT_DISTANCE = 500;
+/**
+ * Sky dome radius (mirrored from `HosekWilkieSkyBackend.DOME_RADIUS`). The
+ * additive sun-disc sprite sits at this radius * 0.99 so it composites
+ * on top of the dome's painted background.
+ */
+const SKY_DOME_RADIUS = 500;
 /**
  * The analytic sky backend stores HDR-ish radiance values. Those values are
  * fine for the baked sky texture, but fog and hemisphere lights need bounded
@@ -96,6 +103,14 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private hosekBackend: HosekWilkieSkyBackend;
   private scene?: THREE.Scene;
   private domeMesh: THREE.Mesh;
+  /**
+   * Additive HDR sun-disc sprite. Restores the pre-merge pearl-bright
+   * sun the dome's CPU-baked `DataTexture` cannot represent (radiance
+   * gets clamped to `[0,1]` at bake time). See `SunDiscMesh.ts` for the
+   * design rationale.
+   */
+  private sunDisc: SunDiscMesh;
+  private sunDiscMesh: THREE.Mesh;
   private currentScenario?: ScenarioAtmosphereKey;
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
   /** Per-scenario cloud coverage baseline (preset-driven). Weather multiplies on top. */
@@ -140,6 +155,8 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.hosekBackend = new HosekWilkieSkyBackend();
     this.backend = this.hosekBackend;
     this.domeMesh = this.hosekBackend.getMesh();
+    this.sunDisc = new SunDiscMesh(SKY_DOME_RADIUS);
+    this.sunDiscMesh = this.sunDisc.getMesh();
     // Apply bootstrap preset synchronously so the first render sees a real
     // sky — no NullSkyBackend flat-color frame, no legacy PNG fallback.
     this.applyScenarioPreset(AtmosphereSystem.BOOTSTRAP_PRESET);
@@ -176,6 +193,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.trackAtmosphereTiming('World.Atmosphere.LightFog', () => {
       this.applyToRenderer();
       this.applyFogColor();
+      this.updateSunDisc();
     });
     this.trackAtmosphereTiming('World.Atmosphere.Clouds', () => {
       this.updateCloudCoverage(deltaTime);
@@ -183,10 +201,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   }
 
   dispose(): void {
-    if (this.scene && this.domeMesh) {
-      this.scene.remove(this.domeMesh);
+    if (this.scene) {
+      if (this.domeMesh) this.scene.remove(this.domeMesh);
+      if (this.sunDiscMesh) this.scene.remove(this.sunDiscMesh);
     }
     this.hosekBackend.dispose();
+    this.sunDisc.dispose();
     this.renderer = undefined;
     this.followTarget = undefined;
   }
@@ -199,9 +219,11 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     if (this.scene === scene) return;
     if (this.scene) {
       this.scene.remove(this.domeMesh);
+      this.scene.remove(this.sunDiscMesh);
     }
     this.scene = scene;
     this.scene.add(this.domeMesh);
+    this.scene.add(this.sunDiscMesh);
   }
 
   /**
@@ -454,6 +476,19 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
    * analytic dome paints along `view.y ≈ 0`, so the terrain edge no
    * longer punches a hard line through the sky.
    */
+  /**
+   * Per-frame sun-disc placement + intensity. The additive sprite sits
+   * just inside the sky dome at the current sun direction and pulls its
+   * chromaticity from the backend's `getSun` transmittance path (warm at
+   * dawn, white-hot at noon). The disc hides itself when the sun drops
+   * below the horizon. Kept separate from `applyToRenderer` so the
+   * fog/light path stays usable without a sun-disc scene attachment.
+   */
+  private updateSunDisc(): void {
+    this.backend.getSun(this.scratchSunColor);
+    this.sunDisc.update(this.cameraPosition, this.sunDirection, this.scratchSunColor);
+  }
+
   private applyFogColor(): void {
     const fog = this.renderer?.fog;
     if (!fog) return;
