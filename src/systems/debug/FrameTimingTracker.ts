@@ -13,6 +13,13 @@ export class FrameTimingTracker {
     systems: Record<string, { start: number; duration?: number }>
   } | null = null
 
+  // System start times tracked independently of the frame bracket so that
+  // buckets opened/closed outside an explicit beginFrame/endFrame pair
+  // (notably `RenderMain` / `RenderOverlay`, which fire in GameEngineLoop
+  // after SystemUpdater already closed the frame) still produce EMA samples.
+  // Without this, `getSystemBreakdown()` would silently drop those buckets.
+  private pendingSystemStarts: Map<string, number> = new Map()
+
   // Slow frame logging
   private lastSlowFrameLog = 0
   private readonly SLOW_FRAME_LOG_INTERVAL_MS = 1000 // Max 1 log per second
@@ -31,20 +38,27 @@ export class FrameTimingTracker {
    * Call before updating a system
    */
   beginSystem(name: string): void {
-    if (!this.currentFrame) return
-    this.currentFrame.systems[name] = { start: performance.now() }
+    const start = performance.now()
+    this.pendingSystemStarts.set(name, start)
+    if (this.currentFrame) {
+      this.currentFrame.systems[name] = { start }
+    }
   }
 
   /**
    * Call after updating a system
    */
   endSystem(name: string): void {
-    if (!this.currentFrame) return
-    const sys = this.currentFrame.systems[name]
-    if (!sys) return
+    const start = this.pendingSystemStarts.get(name)
+    if (start === undefined) return
+    this.pendingSystemStarts.delete(name)
 
-    sys.duration = performance.now() - sys.start
-    this.updateSystemEMA(name, sys.duration)
+    const duration = performance.now() - start
+    if (this.currentFrame) {
+      const sys = this.currentFrame.systems[name]
+      if (sys) sys.duration = duration
+    }
+    this.updateSystemEMA(name, duration)
   }
 
   /**
@@ -163,5 +177,7 @@ export class FrameTimingTracker {
   reset(): void {
     this.systems.clear()
     this.frameHistory = []
+    this.pendingSystemStarts.clear()
+    this.currentFrame = null
   }
 }
