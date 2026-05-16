@@ -102,6 +102,46 @@ Without `auto-advance: yes`, the orchestrator stops after each cycle close
 and waits for the next `/orchestrate` invocation. That's the legacy
 single-cycle pattern.
 
+### Autonomous-loop posture (2026-05-16, `/goal`-aligned runs)
+
+When the campaign manifest declares **both** `auto-advance: yes` **and**
+`posture: autonomous-loop`, the orchestrator runs as an unattended
+all-night loop. Per-cycle playtest-required gates become deferred
+(not blocking) so the owner can walk through them after the campaign
+completes.
+
+Overrides under `posture: autonomous-loop`:
+
+1. **Owner-playtest tasks become Playwright smoke + screenshot capture.**
+   The executor runs the feature's golden-path smoke, commits
+   screenshots to `artifacts/cycle-<slug>/playtest-evidence/`, and
+   writes a `docs/playtests/<slug>.md` memo flagged "automated smoke;
+   owner walk-through pending."
+2. **"Owner playtest rejects twice → halt" hard-stops are removed.**
+   Replaced by "Playwright smoke errors twice → halt" (true
+   automation signal only).
+3. **"Real-device validation infeasible → halt" becomes a documented
+   limitation, NOT a hard stop.** Merge proceeds on CI green +
+   reviewer APPROVE. The cycle's close memo and
+   [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) get the deferral
+   note.
+4. **The orchestrator appends to
+   [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md)** at every cycle
+   close that had a playtest task, listing what the owner should
+   walk through post-campaign.
+5. **Cycle-close commits append `(playtest-deferred)`** to the subject
+   line when the cycle had playtest gates, so `git log` makes
+   deferred items easy to grep.
+
+The true hard-stops (fence change, >2 CI red, perf regression > 5%
+p99, carry-over growth, worktree failure, twice-rejected reviewer)
+still halt the autonomous loop and surface to the human.
+
+To exit `posture: autonomous-loop` mid-campaign: edit the campaign
+manifest and remove the `posture: autonomous-loop` line (or flip
+`auto-advance: yes` → `PAUSED`). The orchestrator finishes the
+in-flight cycle and stops.
+
 **End-of-cycle ritual** (run as the last orchestrator action, or as a
 standalone bookkeeping pass):
 

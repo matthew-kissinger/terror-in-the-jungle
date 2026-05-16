@@ -158,6 +158,54 @@ in the campaign manifest to `BLOCKED` with a one-line cause, leave
 "Current cycle" pointing at the failed cycle so a human resume picks up
 where you left off, and print a clear summary.
 
+## Autonomous-loop posture (2026-05-16, `/goal`-aligned runs)
+
+When the campaign manifest declares `posture: autonomous-loop` (in
+addition to `auto-advance: yes`), the orchestrator treats per-cycle
+playtest-required gates as **deferred**, not blocking. This is for
+all-night `/goal`-aligned runs where the owner is not at the
+keyboard to drive a playtest.
+
+Behavior overrides under `posture: autonomous-loop`:
+
+1. **Owner-playtest task tasks become Playwright smoke + screenshot
+   capture.** The orchestrator instructs the executor to run
+   `npm run build:perf` + a Playwright dev-preview smoke that drives
+   the feature's golden path, captures screenshots into
+   `artifacts/cycle-<slug>/playtest-evidence/`, and commits the
+   evidence + a memo at `docs/playtests/<slug>.md` noting "automated
+   smoke; owner walk-through pending."
+2. **"Owner playtest rejects twice → halt" hard-stops are removed.**
+   Replaced by "Playwright smoke errors twice → halt" (only a true
+   automation signal). Subjective rejection cannot fire without an
+   owner.
+3. **"Real-device validation infeasible → halt" becomes a documented
+   limitation, NOT a hard stop.** The orchestrator records the
+   limitation in the cycle's close memo and adds the cycle to
+   `docs/PLAYTEST_PENDING.md`. Merge proceeds on CI green + reviewer
+   APPROVE.
+4. **The orchestrator appends to `docs/PLAYTEST_PENDING.md`** at
+   every cycle close that had a playtest-required task, listing
+   the cycle slug + what the owner should walk through after the
+   campaign completes.
+5. **Cycle-close commits include `(playtest-deferred)`** in the
+   commit message subject line when the cycle had playtest gates,
+   so `git log` makes the deferred items easy to grep.
+
+The true hard-stops listed above (fence change, >2 CI red, perf
+regression, carry-over growth, worktree failure, twice-rejected
+reviewer) still halt the autonomous loop and surface to the human.
+
+To exit `posture: autonomous-loop` mid-campaign: edit the campaign
+manifest and remove the `posture: autonomous-loop` declaration (or
+flip `auto-advance: yes` → `PAUSED`). The orchestrator finishes the
+in-flight cycle and stops.
+
+`/goal`-aligned runs typically pass the high-level directive as an
+arg; the orchestrator's first action is to read the campaign manifest
+to confirm `posture: autonomous-loop` is declared, then act
+accordingly.
+
 ## End-of-run
 
 Print the end-of-run summary in the shape the current cycle declares in

@@ -9,14 +9,24 @@ can chain cycles autonomously.
 
 ## Status
 
-**ACTIVE.** Auto-advance: **yes**.
+**ACTIVE.** Auto-advance: **yes**. Posture: **autonomous-loop**.
 
 The owner reset the campaign on 2026-05-16 with a single instruction:
 queue every VODA, VEKHIKL, and DEFEKT directive plus the two
-post-WebGPU investigation fix cycles, and chain them without
-intervention. The orchestrator dispatches each cycle in queue order,
-runs its rounds, closes it, advances to the next, and only halts on
-the hard-stops listed at the bottom of this file.
+post-WebGPU investigation fix cycles, and chain them through an
+**all-night autonomous loop** via `/goal`. The orchestrator dispatches
+each cycle in queue order, runs its rounds, closes it, advances to
+the next, and only halts on the hard-stops listed at the bottom of
+this file.
+
+**`posture: autonomous-loop` overrides** (per
+[docs/AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md) §"Autonomous-loop
+posture"): per-cycle playtest-required gates are deferred — the
+orchestrator merges on CI green + reviewer APPROVE, captures
+Playwright smoke screenshots in lieu of owner walk-through, and
+appends to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) so the
+owner can sweep the deferred items after the campaign completes.
+Hard-stops below still halt the loop.
 
 The current cycle pointer lives in
 [docs/AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md) "Current cycle"
