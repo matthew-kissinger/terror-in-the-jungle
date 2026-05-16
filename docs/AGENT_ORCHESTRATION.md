@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-16 (12-cycle autonomous-chain campaign launched; auto-advance: yes; current cycle = cycle-sky-visual-restore)
+Last verified: 2026-05-16 (12-cycle autonomous chain advanced; cycle #1 cycle-sky-visual-restore closed at fd646aeb; current cycle = cycle-mobile-webgl2-fallback-fix)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,88 +154,111 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-sky-visual-restore
+## Current cycle: cycle-mobile-webgl2-fallback-fix
 
-**Cycle ID:** `cycle-sky-visual-restore`
-**Brief:** [docs/tasks/cycle-sky-visual-restore.md](tasks/cycle-sky-visual-restore.md)
-**Skip-confirm:** yes (campaign auto-advance is `yes`)
-**Concurrency cap:** 3
+**Cycle ID:** `cycle-mobile-webgl2-fallback-fix`
+**Brief:** [docs/tasks/cycle-mobile-webgl2-fallback-fix.md](tasks/cycle-mobile-webgl2-fallback-fix.md)
+**Skip-confirm:** yes (campaign auto-advance is `yes`; brief Skip-confirm:no
+gating is for owner real-device attach — under autonomous-loop posture
+that becomes a documented limitation, NOT a hard stop, and the cycle
+proceeds with emulation evidence + PLAYTEST_PENDING deferral)
+**Concurrency cap:** 5
 
-User-observable gap closed: post-WebGPU-merge sky-bland regression
-(KB-SKY-BLAND). Restores pre-merge saturation, sun pearl, horizon
-ring without re-introducing the per-fragment Preetham shader.
+User-observable gap closed: post-WebGPU-merge mobile-unplayable
+regression (KB-MOBILE-WEBGPU). Restores mobile playability on the
+WebGL2-fallback path of `WebGPURenderer`. Lead with the terrain TSL
+biome-sampler early-out (load-bearing per the R1 audit; 8x sampler
+amplification fix), then the mobile-specific knobs, then validate.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `sky-dome-tonemap-and-lut-resolution`, `sky-hdr-bake-restore`, `sky-sun-disc-restore` | 3 |
+| 1 | `terrain-tsl-biome-early-out`, `terrain-tsl-triplanar-gate`, `render-bucket-telemetry-fix` | 3 |
+| 2 | `mobile-pixel-ratio-cap`, `mobile-skip-npc-prewarm`, `mobile-sky-cadence-gate`, `asset-audio-defer` | 4 |
+| 3 | `tsl-shader-cost-probe`, `real-device-validation-harness` | 2 |
 
 ### Dependencies
 
-All 3 tasks independent. No DAG edges within this cycle.
+- R2 follows R1 (R2 tasks depend on R1's terrain TSL changes being landed
+  so emulation re-measurements are meaningful).
+- R3's `tsl-shader-cost-probe` runs first to gate R3's
+  `real-device-validation-harness` (probe validates the sampler-count drop
+  predicted by R1 changes).
+- Under autonomous-loop posture, R3's `real-device-validation-harness`
+  becomes a Playwright-emulation smoke + `docs/PLAYTEST_PENDING.md`
+  deferral (the brief's "merge gate" language is overridden by the
+  posture rule for autonomous runs).
 
 ### Reviewer policy
 
-Orchestrator-only memo review (no `combat-reviewer` /
-`terrain-nav-reviewer` — touches `src/systems/environment/**` only).
+- `terrain-nav-reviewer` is a **pre-merge gate** for
+  `terrain-tsl-biome-early-out` and `terrain-tsl-triplanar-gate` (both
+  touch `src/systems/terrain/**`).
+- No reviewer for the other tasks (none touch combat or navigation paths).
+- Orchestrator reviews each PR for acceptance + visual/perf evidence.
 
 ### Hard stops (cycle-specific)
 
-- LUT-bake EMA exceeds 12 ms on development machine → fall back
-  to 192×96 (still better than 128×64); do NOT halt (graceful
-  degradation).
-- Owner playtest rejects twice → halt.
+- **TSL early-out regresses strict-WebGPU desktop visual.** Visual parity
+  is mandatory on the production-default path.
+- **`?renderer=webgl` escape hatch breaks.** The explicit-WebGL path is
+  the A/B target; any regression on it halts.
+- **Perf regression > 5% p99 on `combat120`** (campaign-wide hard stop).
+
+Note: the brief's "Real-device-validation infeasible across the board → halt"
+is overridden by `posture: autonomous-loop` per
+[.claude/agents/orchestrator.md](../.claude/agents/orchestrator.md)
+§"Autonomous-loop posture" item 3. The orchestrator records the limitation
+in [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) and proceeds with merge.
 
 ### Success criteria
 
-See [docs/tasks/cycle-sky-visual-restore.md](tasks/cycle-sky-visual-restore.md)
-"Acceptance Criteria (cycle close)" section.
+See [docs/tasks/cycle-mobile-webgl2-fallback-fix.md](tasks/cycle-mobile-webgl2-fallback-fix.md)
+"Acceptance Criteria (cycle close)" section. Under autonomous-loop posture,
+the real-Android-Chrome / iOS-Safari fps targets become deferred-walk items
+in `docs/PLAYTEST_PENDING.md`, NOT merge gates. CI green + reviewer
+APPROVE + Playwright emulation smoke = merge gate.
 
 ### Out of scope
 
 See the brief's "Out of Scope" section. Notable: no perf-baseline
-refresh (cycle #12 owns), no cloud-shader work (defer).
+refresh (cycle #12 owns), no rolling back the WebGPU + TSL migration.
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #1** in the 12-cycle queue at
+This cycle is **position #2** in the 12-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
-`Auto-advance: yes` is set there. When this cycle closes,
-the orchestrator follows the "Orchestrator contract" section of
-the campaign manifest:
+`Auto-advance: yes` and `posture: autonomous-loop` are set there. When
+this cycle closes, the orchestrator follows the "Orchestrator contract"
+section of the campaign manifest:
 
-1. Mark cycle #1 row `done` in the campaign queue table with close-
-   commit SHA.
-2. Read the next not-done row (`cycle-mobile-webgl2-fallback-fix`).
-3. Mirror that cycle's brief content into this "Current cycle"
-   section (overwriting with the next cycle's values from
-   `docs/tasks/cycle-mobile-webgl2-fallback-fix.md`).
-4. Commit with message `docs(campaign): advance to cycle-mobile-webgl2-fallback-fix`.
+1. Mark cycle #2 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-konveyer-11-spatial-grid-compute`).
+3. Mirror that cycle's brief content into this "Current cycle" section.
+4. Commit with `docs(campaign): advance to cycle-konveyer-11-spatial-grid-compute`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops (per
 [.claude/agents/orchestrator.md](../.claude/agents/orchestrator.md))
-flip `Auto-advance: yes` → `PAUSED` in the campaign manifest, mark
-the failing cycle's row `BLOCKED` with cause, and halt.
+flip `Auto-advance: yes` → `PAUSED` in the campaign manifest, mark the
+failing cycle's row `BLOCKED` with cause, and halt.
 
 ### Last closed cycle
 
-`cycle-2026-05-16-mobile-webgpu-and-sky-recovery` (investigation
-cycle) closed on 2026-05-16. Five R1 memo PRs merged
-([#203](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/203),
-[#204](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/204),
-[#205](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/205),
-[#206](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/206),
-[#207](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/207))
-plus the R2 alignment memo at
-[docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
-Carry-over delta: 0. The alignment memo named the first two cycles
-of the active 12-cycle campaign queue (cycles #1 and #2 below).
+`cycle-sky-visual-restore` closed on 2026-05-16 at commit `fd646aeb`.
+Three R1 PRs merged ([#208](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/208)
+`2118177f`, [#210](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/210)
+`3455fa96`, [#209](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/209)
+`9e1ce7c7`), shipping the KB-SKY-BLAND fix promised by the predecessor
+investigation cycle. Carry-over delta: 0. Three owner-playtest items
+deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) under
+autonomous-loop posture.
 
-Concurrent branch on the side: `task/mode-startup-terrain-spike` is
-parked at 1 commit (no PR), held for absorption into cycle #2 if
-needed. Production hardening criteria for it live in
+Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
+parked at 1 commit (no PR), held for absorption into this cycle (cycle
+#2) if the mobile-fix work doesn't already pick up the synchronous-bake
+path. Production hardening criteria live in
 [docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 
 ## Dispatch protocol

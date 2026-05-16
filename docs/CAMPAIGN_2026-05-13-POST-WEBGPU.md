@@ -1,6 +1,6 @@
 # Campaign: 2026-05-13 Post-WebGPU master merge → 2026-05-16 feature-pivot expansion
 
-Last verified: 2026-05-16
+Last verified: 2026-05-16 (cycle #1 cycle-sky-visual-restore closed at fd646aeb; current pointer = cycle #2 cycle-mobile-webgl2-fallback-fix)
 
 Campaign manifest. Original trigger was the WebGPU + TSL master merge
 on 2026-05-13; expanded on 2026-05-16 to absorb all VODA, VEKHIKL,
@@ -30,8 +30,11 @@ Hard-stops below still halt the loop.
 
 The current cycle pointer lives in
 [docs/AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md) "Current cycle"
-and is updated at every advance. The first cycle to dispatch is
-**`cycle-sky-visual-restore`** (queued at position #1 below).
+and is updated at every advance. **As of 2026-05-16 close of cycle
+#1 at `fd646aeb`, the current cycle pointer is at position #2
+(`cycle-mobile-webgl2-fallback-fix`).** Cycle #1 (`cycle-sky-visual-restore`)
+landed three sky-restore PRs (#208, #210, #209) and is `done` in the
+queue below.
 
 ## Orchestrator contract (read this if you're the orchestrator)
 
@@ -66,7 +69,7 @@ new ordering at next advance.
 
 | # | Slug | Status | Closes | Brief | Notes |
 |---|------|--------|--------|-------|-------|
-| 1 | `cycle-sky-visual-restore` | queued | KB-SKY-BLAND | [brief](tasks/cycle-sky-visual-restore.md) | Lead with the small visual win. ~3 tasks, single round. |
+| 1 | `cycle-sky-visual-restore` | done | KB-SKY-BLAND | [brief](tasks/archive/cycle-sky-visual-restore/cycle-sky-visual-restore.md) | Closed 2026-05-16 at `fd646aeb`. 3 R1 PRs: #208 `2118177f`, #210 `3455fa96`, #209 `9e1ce7c7`. Owner playtest deferred to PLAYTEST_PENDING.md. |
 | 2 | `cycle-mobile-webgl2-fallback-fix` | queued | KB-MOBILE-WEBGPU | [brief](tasks/cycle-mobile-webgl2-fallback-fix.md) | Mobile playability. Real-device validation = merge gate. ~6-8 tasks, 2-3 rounds. |
 | 3 | `cycle-konveyer-11-spatial-grid-compute` | queued | DEFEKT-3 | [brief](tasks/cycle-konveyer-11-spatial-grid-compute.md) | Cover spatial grid; drops mobile `Combat.AI` steady-state bucket. ~3 tasks. |
 | 4 | `cycle-vekhikl-1-jeep-drivable` | queued | VEKHIKL-1 (unblocks VODA-3) | [brief](tasks/cycle-vekhikl-1-jeep-drivable.md) | M151 end-to-end on `GroundVehiclePhysics`. ~5 tasks, 2 rounds. |
