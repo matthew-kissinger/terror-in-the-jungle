@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-16 (12-cycle autonomous chain advanced; cycle #1 cycle-sky-visual-restore closed at fd646aeb; current cycle = cycle-mobile-webgl2-fallback-fix)
+Last verified: 2026-05-16 (12-cycle autonomous chain advanced; cycles #1+#2 closed at fd646aeb / 7931d179; current cycle = cycle-konveyer-11-spatial-grid-compute)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,111 +154,107 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-mobile-webgl2-fallback-fix
+## Current cycle: cycle-konveyer-11-spatial-grid-compute
 
-**Cycle ID:** `cycle-mobile-webgl2-fallback-fix`
-**Brief:** [docs/tasks/cycle-mobile-webgl2-fallback-fix.md](tasks/cycle-mobile-webgl2-fallback-fix.md)
-**Skip-confirm:** yes (campaign auto-advance is `yes`; brief Skip-confirm:no
-gating is for owner real-device attach — under autonomous-loop posture
-that becomes a documented limitation, NOT a hard stop, and the cycle
-proceeds with emulation evidence + PLAYTEST_PENDING deferral)
-**Concurrency cap:** 5
+**Cycle ID:** `cycle-konveyer-11-spatial-grid-compute`
+**Brief:** [docs/tasks/cycle-konveyer-11-spatial-grid-compute.md](tasks/cycle-konveyer-11-spatial-grid-compute.md)
+**Skip-confirm:** yes (campaign auto-advance is `yes`)
+**Concurrency cap:** 3
 
-User-observable gap closed: post-WebGPU-merge mobile-unplayable
-regression (KB-MOBILE-WEBGPU). Restores mobile playability on the
-WebGL2-fallback path of `WebGPURenderer`. Lead with the terrain TSL
-biome-sampler early-out (load-bearing per the R1 audit; 8x sampler
-amplification fix), then the mobile-specific knobs, then validate.
+User-observable gap closed: combat AI p99 from synchronous cover-search
+in `AIStateEngage.initiateSquadSuppression()` (DEFEKT-3, opened
+cycle-2026-04-17, 8 cycles open, blocking Phase F). Also benefits
+cycle #2 mobile-fix by dropping the `Combat.AI` 46.86 ms steady-state
+bucket on mobile.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `terrain-tsl-biome-early-out`, `terrain-tsl-triplanar-gate`, `render-bucket-telemetry-fix` | 3 |
-| 2 | `mobile-pixel-ratio-cap`, `mobile-skip-npc-prewarm`, `mobile-sky-cadence-gate`, `asset-audio-defer` | 4 |
-| 3 | `tsl-shader-cost-probe`, `real-device-validation-harness` | 2 |
+| 1 | `cover-spatial-grid-cpu`, `engage-state-grid-consumer`, `cover-grid-behavior-tests` | 3 |
+| 2 | `cover-spatial-grid-compute-proof` | 1 (conditional — runs only if R1 ships clean wins; otherwise skipped) |
 
 ### Dependencies
 
-- R2 follows R1 (R2 tasks depend on R1's terrain TSL changes being landed
-  so emulation re-measurements are meaningful).
-- R3's `tsl-shader-cost-probe` runs first to gate R3's
-  `real-device-validation-harness` (probe validates the sampler-count drop
-  predicted by R1 changes).
-- Under autonomous-loop posture, R3's `real-device-validation-harness`
-  becomes a Playwright-emulation smoke + `docs/PLAYTEST_PENDING.md`
-  deferral (the brief's "merge gate" language is overridden by the
-  posture rule for autonomous runs).
+- R1 ships the CPU 8 m uniform grid foundation in parallel: the grid
+  itself (`cover-spatial-grid-cpu`), the consumer wiring
+  (`engage-state-grid-consumer`), and the L3 integration test
+  (`cover-grid-behavior-tests`). Tasks are independent — they all touch
+  separate files — but the consumer + integration test logically build
+  on the grid type definitions; expect rebase work at merge time.
+- R2 is conditional on R1's perf wins. If R1's `Combat.AI` cost drops
+  meet the cycle acceptance bar, R2 may be skipped per the brief's
+  Skip condition.
 
 ### Reviewer policy
 
-- `terrain-nav-reviewer` is a **pre-merge gate** for
-  `terrain-tsl-biome-early-out` and `terrain-tsl-triplanar-gate` (both
-  touch `src/systems/terrain/**`).
-- No reviewer for the other tasks (none touch combat or navigation paths).
-- Orchestrator reviews each PR for acceptance + visual/perf evidence.
+- `combat-reviewer` is a **pre-merge gate for all tasks** (all touch
+  `src/systems/combat/**`).
+- No `terrain-nav-reviewer` (no terrain/nav touches expected).
+- Orchestrator reviews each PR for acceptance + perf evidence.
 
 ### Hard stops (cycle-specific)
 
-- **TSL early-out regresses strict-WebGPU desktop visual.** Visual parity
-  is mandatory on the production-default path.
-- **`?renderer=webgl` escape hatch breaks.** The explicit-WebGL path is
-  the A/B target; any regression on it halts.
-- **Perf regression > 5% p99 on `combat120`** (campaign-wide hard stop).
-
-Note: the brief's "Real-device-validation infeasible across the board → halt"
-is overridden by `posture: autonomous-loop` per
-[.claude/agents/orchestrator.md](../.claude/agents/orchestrator.md)
-§"Autonomous-loop posture" item 3. The orchestrator records the limitation
-in [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) and proceeds with merge.
+- Cover-query latency regresses past current synchronous-scan baseline
+  (peak > 954 ms) → halt.
+- Determinism regression: squad-target ordering changes unexpectedly
+  → halt. (Intentional documented randomization OK; unexplained drift
+  is not.)
+- `combat-reviewer` CHANGES-REQUESTED twice on same task → halt.
+- Standard: fence change, worktree isolation failure, twice-rejected reviewer.
+- Campaign-wide: perf regression > 5% p99 on `combat120` (deferred to
+  cycle #12 baseline refresh until that lands).
 
 ### Success criteria
 
-See [docs/tasks/cycle-mobile-webgl2-fallback-fix.md](tasks/cycle-mobile-webgl2-fallback-fix.md)
-"Acceptance Criteria (cycle close)" section. Under autonomous-loop posture,
-the real-Android-Chrome / iOS-Safari fps targets become deferred-walk items
-in `docs/PLAYTEST_PENDING.md`, NOT merge gates. CI green + reviewer
-APPROVE + Playwright emulation smoke = merge gate.
+See [docs/tasks/cycle-konveyer-11-spatial-grid-compute.md](tasks/cycle-konveyer-11-spatial-grid-compute.md)
+"Acceptance Criteria (cycle close)":
+- `combat120` `Combat.AI` avg-EMA: ≥3x drop.
+- `combat120` `Combat.AI` peak: ≥10x drop (from ~954 ms baseline).
+- Mobile-emulation steady-state `Combat.AI` bucket from cycle #2 baseline
+  drops proportionally.
+- `DEFEKT-3` row moves Active → Closed.
 
 ### Out of scope
 
-See the brief's "Out of Scope" section. Notable: no perf-baseline
-refresh (cycle #12 owns), no rolling back the WebGPU + TSL migration.
+Cover-asset placement changes; squad-AI logic beyond cover-query
+consumer wiring; terrain/navigation touches; fence changes.
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #2** in the 12-cycle queue at
+This cycle is **position #3** in the 12-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
-`Auto-advance: yes` and `posture: autonomous-loop` are set there. When
-this cycle closes, the orchestrator follows the "Orchestrator contract"
-section of the campaign manifest:
+`Auto-advance: yes` + `posture: autonomous-loop` are set there. When
+this cycle closes:
 
-1. Mark cycle #2 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-konveyer-11-spatial-grid-compute`).
+1. Mark cycle #3 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-vekhikl-1-jeep-drivable`).
 3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-konveyer-11-spatial-grid-compute`.
+4. Commit with `docs(campaign): advance to cycle-vekhikl-1-jeep-drivable`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
-Hard-stops (per
-[.claude/agents/orchestrator.md](../.claude/agents/orchestrator.md))
-flip `Auto-advance: yes` → `PAUSED` in the campaign manifest, mark the
-failing cycle's row `BLOCKED` with cause, and halt.
+Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
+mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-sky-visual-restore` closed on 2026-05-16 at commit `fd646aeb`.
-Three R1 PRs merged ([#208](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/208)
-`2118177f`, [#210](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/210)
-`3455fa96`, [#209](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/209)
-`9e1ce7c7`), shipping the KB-SKY-BLAND fix promised by the predecessor
-investigation cycle. Carry-over delta: 0. Three owner-playtest items
-deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) under
-autonomous-loop posture.
+`cycle-mobile-webgl2-fallback-fix` closed on 2026-05-16 at commit `7931d179`.
+9 PRs merged across 3 rounds (R1: #213/#211/#212; R2: #215/#214/#216/#217;
+R3: #218/#219), shipping the KB-MOBILE-WEBGPU fix promised by the
+predecessor investigation cycle. Carry-over delta: 0. Two new
+owner-playtest items deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md)
+under autonomous-loop posture (asset-audio-defer first-shot gap +
+real-device-validation walk-through on Android+iOS). Out-of-band CI fix
+`47c42216` matrix-fans the mobile-ui job (root-cause-closes the 30-min
+timeout flake; wall time 48 min sequential → 3-10 min per-device parallel).
+Asset-audio-defer measured `modeClickToPlayableMs` 19,341ms → 11,349ms
+(−7,992ms).
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
-parked at 1 commit (no PR), held for absorption into this cycle (cycle
-#2) if the mobile-fix work doesn't already pick up the synchronous-bake
-path. Production hardening criteria live in
+parked at 1 commit (no PR). The cycle #2 mode-startup work absorbed
+some of the synchronous-bake path concerns via the asset-audio-defer
++ mobile-skip-npc-prewarm tasks; the spike's terrain-bake-in-worker
+hardening criteria still live in
 [docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 
 ## Dispatch protocol
