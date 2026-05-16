@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-16 (12-cycle autonomous chain advanced; cycles #1+#2 closed at fd646aeb / 7931d179; current cycle = cycle-konveyer-11-spatial-grid-compute)
+Last verified: 2026-05-16 (12-cycle autonomous chain advanced; cycles #1-#3 closed at fd646aeb / 7931d179 / cycle #3 close-commit; current cycle = cycle-vekhikl-1-jeep-drivable)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,83 +154,90 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-konveyer-11-spatial-grid-compute
+## Current cycle: cycle-vekhikl-1-jeep-drivable
 
-**Cycle ID:** `cycle-konveyer-11-spatial-grid-compute`
-**Brief:** [docs/tasks/cycle-konveyer-11-spatial-grid-compute.md](tasks/cycle-konveyer-11-spatial-grid-compute.md)
-**Skip-confirm:** yes (campaign auto-advance is `yes`)
-**Concurrency cap:** 3
+**Cycle ID:** `cycle-vekhikl-1-jeep-drivable`
+**Brief:** [docs/tasks/cycle-vekhikl-1-jeep-drivable.md](tasks/cycle-vekhikl-1-jeep-drivable.md)
+**Skip-confirm:** yes (campaign auto-advance is `yes`; owner playtest
+deferred to PLAYTEST_PENDING.md under autonomous-loop posture)
+**Concurrency cap:** 4
 
-User-observable gap closed: combat AI p99 from synchronous cover-search
-in `AIStateEngage.initiateSquadSuppression()` (DEFEKT-3, opened
-cycle-2026-04-17, 8 cycles open, blocking Phase F). Also benefits
-cycle #2 mobile-fix by dropping the `Combat.AI` 46.86 ms steady-state
-bucket on mobile.
+User-observable gap closed: M151 jeep is drivable end-to-end —
+hand-rolled chassis on `GroundVehiclePhysics` per
+`docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md`. Closes `VEKHIKL-1`
+directive; unblocks `cycle-voda-3-watercraft` (seat/adapter/physics
+surface generalizes).
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `cover-spatial-grid-cpu`, `engage-state-grid-consumer`, `cover-grid-behavior-tests` | 3 |
-| 2 | `cover-spatial-grid-compute-proof` | 1 (conditional — runs only if R1 ships clean wins; otherwise skipped) |
+| 1 | `ground-vehicle-physics-core`, `ground-vehicle-physics-tests` | 2 |
+| 2 | `ground-vehicle-player-adapter`, `m151-jeep-integration`, `m151-jeep-playtest-evidence` | 3 |
 
 ### Dependencies
 
-- R1 ships the CPU 8 m uniform grid foundation in parallel: the grid
-  itself (`cover-spatial-grid-cpu`), the consumer wiring
-  (`engage-state-grid-consumer`), and the L3 integration test
-  (`cover-grid-behavior-tests`). Tasks are independent — they all touch
-  separate files — but the consumer + integration test logically build
-  on the grid type definitions; expect rebase work at merge time.
-- R2 is conditional on R1's perf wins. If R1's `Combat.AI` cost drops
-  meet the cycle acceptance bar, R2 may be skipped per the brief's
-  Skip condition.
+- R1 ships the physics + tests in parallel. Both write to new files
+  (`GroundVehiclePhysics.ts` + `.test.ts`). Independent.
+- R2 ships the player adapter, vehicle integration, and playtest
+  evidence in parallel. Adapter depends on physics from R1;
+  integration depends on adapter; playtest is the owner-gate
+  (auto-deferred under autonomous-loop).
 
 ### Reviewer policy
 
-- `combat-reviewer` is a **pre-merge gate for all tasks** (all touch
-  `src/systems/combat/**`).
-- No `terrain-nav-reviewer` (no terrain/nav touches expected).
-- Orchestrator reviews each PR for acceptance + perf evidence.
+- No mandatory `combat-reviewer` (no `src/systems/combat/**` touches).
+- No mandatory `terrain-nav-reviewer` (`ITerrainRuntime` is the
+  fenced consumer surface; the cycle reads it only).
+- Orchestrator reviews each PR for acceptance + smoke-test
+  screenshot.
 
 ### Hard stops (cycle-specific)
 
-- Cover-query latency regresses past current synchronous-scan baseline
-  (peak > 954 ms) → halt.
-- Determinism regression: squad-target ordering changes unexpectedly
-  → halt. (Intentional documented randomization OK; unexplained drift
-  is not.)
-- `combat-reviewer` CHANGES-REQUESTED twice on same task → halt.
+- Any task introduces an external physics library
+  (`rapier`, `cannon`, `jolt`, `ammo.js`, `physijs`) → halt. The
+  four-trigger gate from `ENGINE_TRAJECTORY_2026-04-23.md` is NOT
+  satisfied by one MVP.
+- Owner playtest rejects R2 twice → halt (deferred to
+  PLAYTEST_PENDING.md under autonomous-loop posture; orchestrator
+  proceeds to next cycle, owner sweeps deferred playtests later).
 - Standard: fence change, worktree isolation failure, twice-rejected reviewer.
 - Campaign-wide: perf regression > 5% p99 on `combat120` (deferred to
   cycle #12 baseline refresh until that lands).
 
 ### Success criteria
 
-See [docs/tasks/cycle-konveyer-11-spatial-grid-compute.md](tasks/cycle-konveyer-11-spatial-grid-compute.md)
+See [docs/tasks/cycle-vekhikl-1-jeep-drivable.md](tasks/cycle-vekhikl-1-jeep-drivable.md)
 "Acceptance Criteria (cycle close)":
-- `combat120` `Combat.AI` avg-EMA: ≥3x drop.
-- `combat120` `Combat.AI` peak: ≥10x drop (from ~954 ms baseline).
-- Mobile-emulation steady-state `Combat.AI` bucket from cycle #2 baseline
-  drops proportionally.
-- `DEFEKT-3` row moves Active → Closed.
+- All R1 + R2 task PRs merged.
+- Jeep drivable end-to-end on Open Frontier + A Shau.
+- Owner playtest sign-off recorded (deferred under autonomous-loop).
+- No external physics library added.
+- No fence change.
+- No perf regression > 5% p99 on `combat120` (one jeep on the ground
+  in a no-combat scene should be sub-0.1 ms).
+- `VEKHIKL-1` directive in `docs/DIRECTIVES.md` moves to Closed.
 
 ### Out of scope
 
-Cover-asset placement changes; squad-AI logic beyond cover-query
-consumer wiring; terrain/navigation touches; fence changes.
+Other ground vehicles (M35, M113, ZIL — VEKHIKL-2 + follow-on cycles).
+NPC drivers (separate cycle). Weapons on the jeep (VEKHIKL-2 stationary
+weapons + future vehicle-mounted weapon cycle). Damage states (future
+cycle). Multi-passenger seats (driver-only for MVP). Touching
+`src/systems/combat/**`, `src/systems/terrain/**`, `src/systems/navigation/**`.
+Fenced-interface touches.
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #3** in the 12-cycle queue at
+This cycle is **position #4** in the 12-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 `Auto-advance: yes` + `posture: autonomous-loop` are set there. When
 this cycle closes:
 
-1. Mark cycle #3 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-vekhikl-1-jeep-drivable`).
+1. Mark cycle #4 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-voda-1-water-shader-and-acceptance`).
 3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-vekhikl-1-jeep-drivable`.
+4. Commit with `docs(campaign): advance to cycle-voda-1-water-shader-and-acceptance`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
@@ -238,17 +245,23 @@ mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-mobile-webgl2-fallback-fix` closed on 2026-05-16 at commit `7931d179`.
-9 PRs merged across 3 rounds (R1: #213/#211/#212; R2: #215/#214/#216/#217;
-R3: #218/#219), shipping the KB-MOBILE-WEBGPU fix promised by the
-predecessor investigation cycle. Carry-over delta: 0. Two new
-owner-playtest items deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md)
-under autonomous-loop posture (asset-audio-defer first-shot gap +
-real-device-validation walk-through on Android+iOS). Out-of-band CI fix
-`47c42216` matrix-fans the mobile-ui job (root-cause-closes the 30-min
-timeout flake; wall time 48 min sequential → 3-10 min per-device parallel).
-Asset-audio-defer measured `modeClickToPlayableMs` 19,341ms → 11,349ms
-(−7,992ms).
+`cycle-konveyer-11-spatial-grid-compute` closed on 2026-05-16 at commit
+`8d12ede5` (R1 final merge; cycle-close commit follows). 3 R1 PRs merged
+in dispatch order: #220 `9a02714a` (CoverSpatialGrid 282 LOC + 277 LOC
+tests, 8m cells, deterministic order, `queryNearest` + `queryWithLOS`),
+#221 `a5b5bcd6` (AIStateEngage routes flank-cover scan through structural
+`CoverGridQuery` interface, preserves 2-search cap + reuse, adds
+`engage.suppression.initiate.coverGridQuery` Phase F sub-marker +
+`suppressionFlankCoverGridHits/Misses` telemetry), #222 `8d12ede5` (L3
+integration test `src/integration/combat/cover-grid-suppression.test.ts`
+with 5ms p99 budget, ~190x margin vs ~954ms baseline). R2 GPU-compute
+prototype **skipped** per brief's skip condition — R1 wins met acceptance
+bars on combat120: avg_frame 15.54ms PASS, peak_p99 34.40ms (+3.0% vs
+33.4ms baseline, under 5% hard-stop), **combat_budget_dominance 0%**
+(Combat never topped 16.67ms vs pre-R1 954ms peak), **hitch_100ms_percent
+0% in 5939 frames** (decisive ≥10x peak drop). DEFEKT-3 moved Active →
+Closed. Active count: 9 → 8. Artifact:
+`artifacts/perf/2026-05-16T19-32-35-293Z/`.
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
 parked at 1 commit (no PR). The cycle #2 mode-startup work absorbed
