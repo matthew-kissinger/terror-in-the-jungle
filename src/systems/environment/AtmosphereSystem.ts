@@ -14,6 +14,7 @@ import {
 } from './atmosphere/ScenarioAtmospherePresets';
 import { GameMode } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
+import { isMobileGPU } from '../../utils/DeviceDetector';
 import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
 import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
@@ -43,6 +44,19 @@ const SKY_FOG_MAX_COMPONENT = 0.74;
 const HEMISPHERE_GROUND_DARKEN = 0.55;
 /** Minimum Y for the sun light position — prevents degenerate shadow camera when sun is at/below horizon. */
 const MIN_SUN_Y = 20;
+
+/**
+ * Mobile GPUs pay an outsized cost for the per-fire 8192-pixel sky LUT
+ * composite — the `cycle-2026-05-16` emulation capture clocked
+ * `World.Atmosphere.SkyTexture` at ~31.6 ms avg EMA under 4x CPU
+ * throttle. Stretching the cadence 4x cuts the bucket roughly 4x while
+ * leaving cloud / TOD motion visibly smooth (cloud advection samples
+ * `cloudTimeSeconds` per refresh; LUT rebakes still fire at the
+ * 0.5° sun-direction threshold so dawn/dusk keeps tracking).
+ * Desktop default stays at the backend's 2 s constant.
+ * See docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/mobile-startup-and-frame-budget.md.
+ */
+const MOBILE_SKY_REFRESH_SECONDS = 8;
 
 function compressSkyRadianceForRenderer(color: THREE.Color, maxComponent: number): THREE.Color {
   const peak = Math.max(color.r, color.g, color.b);
@@ -157,6 +171,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.domeMesh = this.hosekBackend.getMesh();
     this.sunDisc = new SunDiscMesh(SKY_DOME_RADIUS);
     this.sunDiscMesh = this.sunDisc.getMesh();
+    // Mobile GPUs get a 4x-stretched sky-texture refresh cadence so the
+    // per-fire compositing cost does not dominate the frame budget on the
+    // WebGL2-fallback path. Desktop keeps the backend's 2 s default.
+    if (isMobileGPU()) {
+      this.hosekBackend.setRefreshCadenceSeconds(MOBILE_SKY_REFRESH_SECONDS);
+    }
     // Apply bootstrap preset synchronously so the first render sees a real
     // sky — no NullSkyBackend flat-color frame, no legacy PNG fallback.
     this.applyScenarioPreset(AtmosphereSystem.BOOTSTRAP_PRESET);

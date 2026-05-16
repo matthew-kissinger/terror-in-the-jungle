@@ -23,6 +23,14 @@ const DEFAULT_CLOUD_WIND_DIR_Z = 0.7;
 // stepped. Sun-driven LUT rebake remains gated on
 // `LUT_REBAKE_COS_THRESHOLD` (every ~0.83s for todCycle modes) so
 // dawn/dusk still updates promptly.
+//
+// `cycle-mobile-webgl2-fallback-fix` (mobile-sky-cadence-gate): default
+// remains 2.0 s for desktop. `AtmosphereSystem` bumps to 8 s on
+// `isMobileGPU()` via `setRefreshCadenceSeconds()` because the
+// emulation-mobile capture showed the `World.Atmosphere.SkyTexture`
+// EMA at ~31.6 ms under 4x CPU throttle — the per-fire 8192-pixel
+// composite cost dominates the bucket, so cutting fire rate 4x is the
+// load-bearing knob.
 const SKY_TEXTURE_REFRESH_SECONDS = 2.0;
 const CLOUD_ANCHOR_REFRESH_METERS = 32;
 const CLOUD_DECK_ALTITUDE_METERS = 1800;
@@ -210,6 +218,10 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private readonly lastSunDir = new THREE.Vector3();
   private skyTextureDirty = true;
   private skyTextureRefreshTimer = 0;
+  // Per-instance refresh cadence. Initialised from the module-level
+  // default; `AtmosphereSystem` overrides this on mobile via
+  // `setRefreshCadenceSeconds()`.
+  private skyTextureRefreshSeconds = SKY_TEXTURE_REFRESH_SECONDS;
   // Slice 16: set whenever something that affects the composited sky
   // texture changes (LUT rebake from sun motion, cloud coverage step,
   // cloud anchor step, etc.) and cleared on `refreshSkyTexture`. Lets
@@ -308,7 +320,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       this.cloudTimeSeconds += _deltaTime;
       this.skyTextureRefreshTimer += _deltaTime;
       const needsRefresh = this.skyContentChanged || this.cloudCoverage > 0;
-      if (needsRefresh && this.skyTextureRefreshTimer >= SKY_TEXTURE_REFRESH_SECONDS) {
+      if (needsRefresh && this.skyTextureRefreshTimer >= this.skyTextureRefreshSeconds) {
         this.skyTextureRefreshTimer = 0;
         this.markSkyTextureDirty();
       }
@@ -349,6 +361,24 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
 
   getCloudCoverage(): number {
     return this.cloudCoverage;
+  }
+
+  /**
+   * Override the sky-texture refresh cadence (seconds). Non-finite or
+   * non-positive values are ignored so callers can guard mode-switches
+   * without preflight validation. The default (`SKY_TEXTURE_REFRESH_SECONDS`)
+   * is appropriate for desktop; `AtmosphereSystem` bumps to 8 s on mobile
+   * GPUs to keep `World.Atmosphere.SkyTexture` inside a playable budget on
+   * the WebGL2-fallback path.
+   */
+  setRefreshCadenceSeconds(seconds: number): void {
+    if (!Number.isFinite(seconds) || seconds <= 0) return;
+    this.skyTextureRefreshSeconds = seconds;
+  }
+
+  /** Current refresh cadence in seconds (for tests / debug overlays). */
+  getRefreshCadenceSeconds(): number {
+    return this.skyTextureRefreshSeconds;
   }
 
   /**
