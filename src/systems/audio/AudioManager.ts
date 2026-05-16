@@ -8,6 +8,16 @@ import { AudioWeaponSounds } from './AudioWeaponSounds';
 import { Logger } from '../../utils/Logger';
 import { GameEventBus } from '../../core/GameEventBus';
 import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
+import { markStartup } from '../../core/StartupTelemetry';
+
+// Boot-critical sounds are awaited by `init()` so the ambient layer can
+// start the moment `startAmbient()` fires. Everything else (the SFX bank,
+// hit-feedback, etc.) decodes in the background so it does not block the
+// startup tail. Per `cycle-mobile-webgl2-fallback-fix` /
+// `asset-audio-defer`: mobile-emulation startup spent ~31 s in
+// `systems.audio.{begin,end}` awaiting the full bank; deferring SFX
+// trims that tail below the playable-frame bracket.
+const BOOT_CRITICAL_SOUND_KEYS: ReadonlyArray<string> = ['jungle1', 'jungle2'];
 
 export class AudioManager implements GameSystem {
     private scene: THREE.Scene;
@@ -30,6 +40,12 @@ export class AudioManager implements GameSystem {
     private static loggedOptionalMissing: Set<string> = new Set();
     private hitFeedbackMissingLogged = false;
     private eventUnsubscribes: (() => void)[] = [];
+
+    // Background SFX decode tracking. `init()` returns once the boot-critical
+    // ambient bank is decoded; the SFX bank decodes in parallel and lets
+    // first playable frame land sooner. `whenSfxReady()` is the test seam.
+    private backgroundDecodePromise: Promise<void> | null = null;
+    private sfxPoolsInitialized = false;
     // WorldBuilder ambient-mute tracker (dev-only, gated by Vite DCE in
     // retail). When the flag toggles we apply 0 or 1 to ambient volume once
     // per transition rather than every frame, so user/scene volume edits
@@ -78,11 +94,18 @@ export class AudioManager implements GameSystem {
     async init(onProgress?: (loaded: number, total: number) => void): Promise<void> {
         Logger.info('Audio', 'Initializing audio system...');
 
-        // Load all audio buffers
-        await this.loadAllAudio(onProgress);
+        const entries = Object.entries(this.soundConfigs);
+        const total = entries.length;
+        const counter = { loaded: 0 };
 
-        // Initialize sound pools
-        this.poolManager.initializePools();
+        const bootCriticalEntries = entries.filter(([key]) => BOOT_CRITICAL_SOUND_KEYS.includes(key));
+        const backgroundEntries = entries.filter(([key]) => !BOOT_CRITICAL_SOUND_KEYS.includes(key));
+
+        // Boot-critical: only the ambient tracks needed by `startAmbient()`.
+        // Awaiting these means the ambient layer is ready by the time mode
+        // startup calls `startAmbient()` while letting the SFX bank decode
+        // off the critical path.
+        await this.loadAudioBank(bootCriticalEntries, counter, total, onProgress);
 
         // Subscribe to game events (additive - direct play calls still work).
         // npc_killed and explosion audio is still handled by direct calls from
@@ -95,7 +118,13 @@ export class AudioManager implements GameSystem {
             }),
         );
 
-        Logger.info('Audio', 'Audio system initialized');
+        // Kick off SFX decode in the background. We DO NOT await this — the
+        // intent is to overlap decode with the rest of system construction
+        // and mode startup so the first playable frame lands sooner. Pools
+        // initialize once the bank lands, so the first shot finds them ready.
+        this.backgroundDecodePromise = this.loadBackgroundSfx(backgroundEntries, counter, total, onProgress);
+
+        Logger.info('Audio', 'Audio system initialized (boot-critical bank ready; SFX decoding in background)');
     }
 
     // Call this when the game actually starts
@@ -103,10 +132,43 @@ export class AudioManager implements GameSystem {
         this.ambientManager.start();
     }
 
-    private async loadAllAudio(onProgress?: (loaded: number, total: number) => void): Promise<void> {
-        const entries = Object.entries(this.soundConfigs);
-        const total = entries.length;
-        let loaded = 0;
+    /**
+     * Test/diagnostic seam: awaits the background SFX decode if one is in
+     * flight. Production code does NOT need to call this — the SFX pools
+     * are initialized when the bank lands, and pre-decode `play()` calls
+     * no-op gracefully via the `audioBuffers.get(...)` miss path.
+     */
+    public whenSfxReady(): Promise<void> {
+        return this.backgroundDecodePromise ?? Promise.resolve();
+    }
+
+    private async loadBackgroundSfx(
+        entries: Array<[string, SoundConfig]>,
+        counter: { loaded: number },
+        total: number,
+        onProgress?: (loaded: number, total: number) => void,
+    ): Promise<void> {
+        markStartup('systems.audio.background.begin');
+        await this.loadAudioBank(entries, counter, total, onProgress);
+        // Pools depend on the SFX buffers being decoded. Initialize once
+        // the bank lands so the first shot finds the pool populated.
+        if (!this.sfxPoolsInitialized) {
+            this.poolManager.initializePools();
+            this.sfxPoolsInitialized = true;
+        }
+        markStartup('systems.audio.background.end');
+    }
+
+    private async loadAudioBank(
+        entries: Array<[string, SoundConfig]>,
+        counter: { loaded: number },
+        total: number,
+        onProgress?: (loaded: number, total: number) => void,
+    ): Promise<void> {
+        if (entries.length === 0) {
+            onProgress?.(counter.loaded, Math.max(total, 1));
+            return;
+        }
         const loadPromises: Promise<{key: string, buffer?: AudioBuffer}>[] = [];
 
         for (const [key, config] of entries) {
@@ -122,8 +184,8 @@ export class AudioManager implements GameSystem {
                         return { key, buffer: undefined };
                     })
                     .then(result => {
-                        loaded++;
-                        onProgress?.(loaded, total);
+                        counter.loaded++;
+                        onProgress?.(counter.loaded, total);
                         return result;
                     })
             );

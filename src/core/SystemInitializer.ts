@@ -104,7 +104,13 @@ export class SystemInitializer {
     // GPUTerrain disabled - going with web workers approach instead
     onProgress('core', 1);
 
-    // Phase 2+3: Load textures and audio concurrently (they share no dependencies)
+    // Phase 2+3: Load textures and audio concurrently (they share no dependencies).
+    // `audioManager.init()` now awaits only the boot-critical ambient bank and
+    // kicks off the SFX bank decode in the background — see
+    // `AudioManager.loadBackgroundSfx` and the `asset-audio-defer` task brief
+    // in `docs/tasks/cycle-mobile-webgl2-fallback-fix.md`. The `systems.audio.end`
+    // mark below therefore lands earlier in the playable-frame bracket; the
+    // SFX bank decode is bracketed by `systems.audio.background.{begin,end}`.
     onProgress('textures', 0);
     onProgress('audio', 0);
     refs.audioManager = new AudioManager(scene, camera);
