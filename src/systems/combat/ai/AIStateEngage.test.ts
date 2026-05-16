@@ -740,5 +740,100 @@ describe('AIStateEngage', () => {
         expect(member.destinationPoint).toBeDefined();
       }
     });
+
+    describe('cover spatial-grid consumer', () => {
+      function buildSquad(memberCount: number): { leader: Combatant; members: Combatant[] } {
+        const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 2, 0));
+        leader.squadId = 'squad-1';
+        leader.squadRole = 'leader';
+        const members = [leader];
+        for (let i = 2; i <= memberCount; i++) {
+          const member = createMockCombatant(`c${i}`, Faction.US, new THREE.Vector3(i * 2, i, 0));
+          member.squadId = 'squad-1';
+          member.squadRole = 'follower';
+          members.push(member);
+        }
+        members.forEach(member => allCombatants.set(member.id, member));
+        squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: members.map(m => m.id) } as Squad);
+        aiStateEngage.setSquads(squads);
+        return { leader, members };
+      }
+
+      it('uses a grid candidate for flanker cover and skips the synchronous scan', () => {
+        const { leader, members } = buildSquad(3);
+        const gridSpot = new THREE.Vector3(42, 7, 7);
+        const queryWithLOS = vi.fn().mockReturnValue(gridSpot);
+        aiStateEngage.setCoverGridQuery({ queryWithLOS });
+
+        aiStateEngage.initiateSquadSuppression(leader, new THREE.Vector3(50, 0, 0), allCombatants, findNearestCover);
+
+        // Grid hit -> the legacy scan path is not consulted for that flanker.
+        expect(queryWithLOS).toHaveBeenCalledTimes(1);
+        expect(findNearestCover).not.toHaveBeenCalled();
+        const flanker = members[2];
+        expect(flanker.destinationPoint).toBeDefined();
+        // The flanker accepts the grid-served cover position.
+        expect(flanker.destinationPoint!.distanceTo(gridSpot)).toBeLessThan(0.001);
+        expect(aiStateEngage.getCloseEngagementTelemetry()).toMatchObject({
+          suppressionFlankCoverGridHits: 1,
+          suppressionFlankCoverGridMisses: 0,
+          suppressionFlankCoverSearches: 0,
+        });
+      });
+
+      it('falls back to the synchronous scan when the grid returns no candidate', () => {
+        const { leader } = buildSquad(3);
+        const queryWithLOS = vi.fn().mockReturnValue(null);
+        aiStateEngage.setCoverGridQuery({ queryWithLOS });
+        findNearestCover.mockReturnValue(new THREE.Vector3(1, 0, 1));
+
+        aiStateEngage.initiateSquadSuppression(leader, new THREE.Vector3(50, 0, 0), allCombatants, findNearestCover);
+
+        expect(queryWithLOS).toHaveBeenCalledTimes(1);
+        // Grid miss -> the legacy scan runs as a fallback.
+        expect(findNearestCover).toHaveBeenCalledTimes(1);
+        expect(aiStateEngage.getCloseEngagementTelemetry()).toMatchObject({
+          suppressionFlankCoverGridHits: 0,
+          suppressionFlankCoverGridMisses: 1,
+          suppressionFlankCoverSearches: 1,
+        });
+      });
+
+      it('honors the per-suppression cap across mixed grid and legacy candidates', () => {
+        // Larger squad: 5 flankers (members 3..6 plus the index===1 suppressor)
+        // would otherwise want 4 cover searches; the cap caps it at 2 total.
+        const { leader } = buildSquad(6);
+        // Alternate hit/miss/hit/miss so the grid serves the first slot, the
+        // legacy scan serves the second, and the cap absorbs the rest.
+        const gridSpot = new THREE.Vector3(33, 5, 5);
+        let call = 0;
+        const queryWithLOS = vi.fn(() => (++call % 2 === 1 ? gridSpot.clone() : null));
+        aiStateEngage.setCoverGridQuery({ queryWithLOS });
+        findNearestCover.mockReturnValue(new THREE.Vector3(7, 0, 7));
+
+        const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
+        aiStateEngage.initiateSquadSuppression(leader, new THREE.Vector3(60, 0, 0), allCombatants, findNearestCover);
+        randomSpy.mockRestore();
+
+        // Cap is 2 total cover-slot consumers. Hit (slot 1) + legacy (slot 2)
+        // then no more queries should run for the remaining flankers.
+        const telemetry = aiStateEngage.getCloseEngagementTelemetry();
+        expect(telemetry.suppressionFlankCoverGridHits + telemetry.suppressionFlankCoverSearches).toBe(2);
+        expect(telemetry.suppressionFlankCoverSearchCapSkips).toBeGreaterThanOrEqual(1);
+      });
+
+      it('preserves legacy behavior when the grid setter is cleared', () => {
+        const { leader } = buildSquad(3);
+        const queryWithLOS = vi.fn().mockReturnValue(new THREE.Vector3(1, 1, 1));
+        aiStateEngage.setCoverGridQuery({ queryWithLOS });
+        aiStateEngage.setCoverGridQuery(undefined);
+        findNearestCover.mockReturnValue(new THREE.Vector3(2, 0, 2));
+
+        aiStateEngage.initiateSquadSuppression(leader, new THREE.Vector3(50, 0, 0), allCombatants, findNearestCover);
+
+        expect(queryWithLOS).not.toHaveBeenCalled();
+        expect(findNearestCover).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 });

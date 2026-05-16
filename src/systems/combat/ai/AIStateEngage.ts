@@ -63,6 +63,8 @@ export interface CloseEngagementTelemetry {
   suppressionFlankCoverSearches: number
   suppressionFlankCoverSearchReuseSkips: number
   suppressionFlankCoverSearchCapSkips: number
+  suppressionFlankCoverGridHits: number
+  suppressionFlankCoverGridMisses: number
   targetDistanceBuckets: {
     lt5m: number
     m5to10: number
@@ -70,6 +72,31 @@ export interface CloseEngagementTelemetry {
     m15to30: number
     gte30: number
   }
+}
+
+/**
+ * Structural contract for a cover spatial-grid query consumer.
+ *
+ * The grid is authored under `cover-spatial-grid-cpu` (parallel R1 task).
+ * AIStateEngage doesn't import the concrete implementation — it duck-types
+ * against this minimal shape so the consumer wire-up here is decoupled from
+ * the grid's storage details (CPU 8 m uniform grid today, possible WebGPU
+ * compute follow-on per the cycle brief).
+ *
+ * `queryWithLOS` returns the best cover candidate (already line-of-sight
+ * filtered against `terrainRuntime`) near `origin` with respect to
+ * `targetPosition`, or `null` if no viable cover is indexed there.
+ *
+ * Per cycle brief §"Critical Process Notes": the grid must produce the same
+ * target ordering as the synchronous scan for identical inputs, modulo
+ * documented intentional randomization. Determinism is enforced by the
+ * grid's own behavior tests, not by this consumer.
+ */
+export interface CoverGridQuery {
+  queryWithLOS(
+    origin: THREE.Vector3,
+    targetPosition: THREE.Vector3
+  ): THREE.Vector3 | null
 }
 
 interface SuppressionVisibilitySample {
@@ -92,6 +119,8 @@ function createCloseEngagementTelemetry(): CloseEngagementTelemetry {
     suppressionFlankCoverSearches: 0,
     suppressionFlankCoverSearchReuseSkips: 0,
     suppressionFlankCoverSearchCapSkips: 0,
+    suppressionFlankCoverGridHits: 0,
+    suppressionFlankCoverGridMisses: 0,
     targetDistanceBuckets: {
       lt5m: 0,
       m5to10: 0,
@@ -113,6 +142,13 @@ export class AIStateEngage {
   private coverSystem?: AICoverSystem
   private flankingSystem?: AIFlankingSystem
   private utilityScorer?: UtilityScorer
+  // Optional cover spatial-grid query. When wired, squad-suppression flank
+  // cover-search consults the grid first (O(1) average cell lookup with LOS
+  // gate) and falls back to the synchronous `findNearestCover` scan only
+  // when the grid returns no candidate. The grid is authored by the sibling
+  // `cover-spatial-grid-cpu` R1 task; this consumer accepts any object
+  // implementing the `CoverGridQuery` structural shape.
+  private coverGridQuery?: CoverGridQuery
   // Caller-supplied: does terrain afford cover in `bearingRad` (radians)
   // within `radius` of `origin`? Left undefined when no terrain query is
   // wired — utility actions that depend on it will simply score 0.
@@ -175,6 +211,20 @@ export class AIStateEngage {
    */
   setUtilityScorer(scorer: UtilityScorer): void {
     this.utilityScorer = scorer
+  }
+
+  /**
+   * Opt-in cover spatial-grid query. When set, squad-suppression flank cover
+   * search consults the grid first; the synchronous `findNearestCover` scan
+   * is only used as a fallback when the grid returns no candidate. Leaving
+   * this unset preserves the legacy synchronous path verbatim (used by every
+   * existing test in this file).
+   *
+   * Pass `undefined` to disable the grid path again (used by tests and the
+   * mobile WebGL2 fallback that disables advanced AI knobs).
+   */
+  setCoverGridQuery(query: CoverGridQuery | undefined): void {
+    this.coverGridQuery = query
   }
 
   /**
@@ -715,12 +765,37 @@ export class AIStateEngage {
         } else if (flankCoverSearches >= this.MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION) {
           this.telemetry.suppressionFlankCoverSearchCapSkips++
         } else {
-          coverNearFlank = this.measureEngageMethod('engage.suppression.initiate.coverSearch', () => {
-            flankCoverProbe.position.copy(flankDestination)
-            flankCoverSearches++
-            this.telemetry.suppressionFlankCoverSearches++
-            return findNearestCover(flankCoverProbe, targetPos)
-          })
+          // Cover-spatial-grid fast path (DEFEKT-3 fix). The grid lookup is
+          // O(1) average on an 8 m uniform cell index and replaces the
+          // synchronous sandbag + vegetation + terrain raycast scan that
+          // peaked at ~954 ms on combat120. The cap still applies because
+          // even O(1) cell scans accumulate across a squad and the legacy
+          // fallback can still fire when the grid is empty in a region.
+          if (this.coverGridQuery) {
+            coverNearFlank = this.measureEngageMethod('engage.suppression.initiate.coverGridQuery', () =>
+              this.coverGridQuery!.queryWithLOS(flankDestination, targetPos)
+            )
+            if (coverNearFlank) {
+              this.telemetry.suppressionFlankCoverGridHits++
+              flankCoverSearches++
+            } else {
+              this.telemetry.suppressionFlankCoverGridMisses++
+            }
+          }
+          // Fallback to the legacy synchronous scan if the grid wasn't
+          // wired or returned no candidate. The cap is consulted again to
+          // honor the grid-served increment above.
+          if (!coverNearFlank && flankCoverSearches < this.MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION) {
+            coverNearFlank = this.measureEngageMethod('engage.suppression.initiate.coverSearch', () => {
+              flankCoverProbe.position.copy(flankDestination)
+              flankCoverSearches++
+              this.telemetry.suppressionFlankCoverSearches++
+              return findNearestCover(flankCoverProbe, targetPos)
+            })
+          } else if (!coverNearFlank) {
+            // Grid was queried, returned null, and the cap is now reached.
+            this.telemetry.suppressionFlankCoverSearchCapSkips++
+          }
         }
 
         this.measureEngageMethod('engage.suppression.initiate.assignFlanker', () => {
