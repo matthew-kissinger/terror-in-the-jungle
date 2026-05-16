@@ -1,5 +1,7 @@
 # Playtest evidence — sky-sun-disc-restore
 
+Last verified: 2026-05-16
+
 Cycle: `cycle-sky-visual-restore` (campaign position #1 of 12)
 Task slug: `sky-sun-disc-restore`
 Branch: `task/sky-sun-disc-restore`

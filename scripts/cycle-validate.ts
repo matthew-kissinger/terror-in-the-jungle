@@ -45,7 +45,11 @@ const BANNED_KEYWORDS = [
   'chore-only',
 ];
 
-const SLUG_RE = /^cycle-\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/;
+// Two accepted shapes:
+//   1. dated:  cycle-YYYY-MM-DD-<descriptive-slug>  (original convention, e.g. cycle-2026-05-16-mobile-webgpu-and-sky-recovery)
+//   2. bare:   cycle-<descriptive-slug>             (campaign-queue convention introduced 2026-05-13 for CAMPAIGN_2026-05-13-POST-WEBGPU.md, e.g. cycle-sky-visual-restore)
+// The bare shape was introduced when the post-WebGPU campaign manifest pre-authored a 12-cycle queue: dating the slugs locks dispatch order to a calendar that doesn't match reality if a cycle stretches or skips. Both shapes still carry the same banned-keyword discipline below.
+const SLUG_RE = /^cycle-(?:\d{4}-\d{2}-\d{2}-)?[a-z0-9-]+$/;
 
 function todayISO(): string {
   const d = new Date();
@@ -60,7 +64,7 @@ function validateSlug(slug: string): { ok: boolean; reason?: string } {
   if (!SLUG_RE.test(slug)) {
     return {
       ok: false,
-      reason: `Slug "${slug}" does not match cycle-YYYY-MM-DD-<descriptive-slug> shape.`,
+      reason: `Slug "${slug}" does not match cycle-<descriptive-slug> or cycle-YYYY-MM-DD-<descriptive-slug> shape.`,
     };
   }
   for (const banned of BANNED_KEYWORDS) {
