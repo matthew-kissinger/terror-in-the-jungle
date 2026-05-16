@@ -5,6 +5,7 @@ import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
 import { isBlufor, isOpfor } from '../systems/combat/types';
 import { isPerfDiagnosticsEnabled, isDiagEnabled } from './PerfDiagnostics';
+import { collectKonveyerNodeMaterialShaders } from './RendererBackend';
 import { Logger } from '../utils/Logger';
 import { preloadIcons } from '../ui/icons/IconRegistry';
 import { isFlightTestMode } from '../dev/flightTestMode';
@@ -177,6 +178,45 @@ export async function bootstrapGame(): Promise<void> {
       (window as any).__rendererBackendCapabilities = () => (
         engine.renderer.getRendererBackendCapabilities()
       );
+
+      // R3 TSL shader-cost probe surface. Returns per-material compiled
+      // GLSL + sampler / uniform / instruction counts for every TSL
+      // node-material tagged with a Konveyer marker. Used by
+      // `scripts/perf-tsl-shader-cost.ts` to verify the R1 terrain
+      // biome-sampler early-out drops the WebGL2-fallback sampler count
+      // by >= 4x. Optionally awaits `renderer.compileAsync(scene, camera)`
+      // first so the builder state is populated even before a render.
+      // See docs/tasks/cycle-mobile-webgl2-fallback-fix.md (R3).
+      (window as any).__tslShaderCost = async (
+        options: { compile?: boolean } = {},
+      ) => {
+        const threeRenderer = engine.renderer.renderer;
+        const threeScene = engine.renderer.scene;
+        const threeCamera = engine.renderer.camera;
+        if (!threeRenderer || !threeScene) {
+          return { error: 'renderer or scene not available', records: [] };
+        }
+        if (options.compile !== false) {
+          const compileAsync = (threeRenderer as unknown as {
+            compileAsync?: (s: unknown, c: unknown) => Promise<unknown>;
+          }).compileAsync;
+          if (typeof compileAsync === 'function') {
+            try {
+              await compileAsync.call(threeRenderer, threeScene, threeCamera);
+            } catch (e) {
+              // Don't fail the probe on compile error; report it.
+              return {
+                error: e instanceof Error ? e.message : String(e),
+                records: collectKonveyerNodeMaterialShaders(threeRenderer as any, threeScene),
+              };
+            }
+          }
+        }
+        return {
+          error: null,
+          records: collectKonveyerNodeMaterialShaders(threeRenderer as any, threeScene),
+        };
+      };
 
       // Slice 14 diagnostic: sky-backend refresh activity stats. Probe
       // calls reset before its perf-window starts and reads at the end
