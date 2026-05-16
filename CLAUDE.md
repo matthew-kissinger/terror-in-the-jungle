@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-13
+Last verified: 2026-05-16
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,12 +46,18 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-The active-cycle pointer in
-[docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md) is reset; next
-cycle selection waits for owner direction. Option 1 from
+**Active cycle (2026-05-16):**
+`cycle-2026-05-16-mobile-webgpu-and-sky-recovery` is queued and waiting on
+launch PR merge before R1 dispatch. Investigation cycle covering the
+owner-reported 2026-05-15 post-WebGPU-merge playtest regressions: mobile
+unplayable + sky bland. 5 parallel memos in R1, orchestrator-authored
+alignment memo in R2 that proposes the actual fix-cycle slot(s). Brief:
+[docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md](docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
+Option 1 from
 [docs/STRATEGIC_ALIGNMENT_2026-05-10.md](docs/STRATEGIC_ALIGNMENT_2026-05-10.md)
-(insert VODA-1 / VEKHIKL-1 / DEFEKT-3 first slices ahead of cycle 3) remains
-the active feature-pivot recommendation.
+(insert VODA-1 / VEKHIKL-1 / DEFEKT-3 first slices ahead of cycle 3)
+remains the active feature-pivot recommendation once this investigation
+cycle and its named fix cycle finish.
 
 **Active spike branch:** `task/mode-startup-terrain-spike` addresses the
 post-click mode-startup stall. The investigation found the Recast
@@ -80,15 +86,18 @@ Cloudflare account-level audit:
 `artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored).
 
 Single source of truth for unresolved items:
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count was **8** after
-KONVEYER-10 closed with PR #192 and is now **9** after KB-STARTUP-1 opened for
-the mode-startup terrain-bake hardening branch (still under the ≤12 rule).
-Active items: DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality),
-STABILIZAT-1 (combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual
-review pending), KB-LOAD residual, KB-STARTUP-1, cloudflare-stabilization
-followups, weapons-cluster-zonemanager-migration, konveyer-large-file-splits.
-New IDs (KONVEYER-11 spatial-grid, VEKHIKL-3 jeep-drivable, etc.) open with
-their respective cycle launches.
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is **11** after
+KB-MOBILE-WEBGPU and KB-SKY-BLAND opened with the
+`cycle-2026-05-16-mobile-webgpu-and-sky-recovery` launch (was 9 after
+KB-STARTUP-1, 8 after the KONVEYER-10 master merge). Still under the ≤12
+rule. Both new IDs close at investigation-cycle end with
+promotion-to-fix-cycle resolution (net cycle delta 0). Active items:
+DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality), STABILIZAT-1
+(combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
+pending), KB-LOAD residual, KB-STARTUP-1, KB-MOBILE-WEBGPU, KB-SKY-BLAND,
+cloudflare-stabilization followups, weapons-cluster-zonemanager-migration,
+konveyer-large-file-splits. Other IDs (KONVEYER-11 spatial-grid,
+VEKHIKL-3 jeep-drivable, etc.) open with their respective cycle launches.
 
 4 cycle-retro nits from cycle 2.4 captured in BACKLOG retro (NOT new
 carry-overs to respect ≤12 limit; bundle into next cycle that touches

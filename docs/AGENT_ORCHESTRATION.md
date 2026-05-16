@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-13 (exp/konveyer-webgpu-migration merged to master via PR #192; KONVEYER campaign closed; mode-startup terrain-bake spike active on task branch)
+Last verified: 2026-05-16 (cycle-2026-05-16-mobile-webgpu-and-sky-recovery launch; investigation cycle, 5 parallel R1 memos + 1 R2 alignment memo)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -114,35 +114,71 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: task/mode-startup-terrain-spike
+## Current cycle: cycle-2026-05-16-mobile-webgpu-and-sky-recovery
 
-**Current branch:** `task/mode-startup-terrain-spike`
+**Cycle ID:** `cycle-2026-05-16-mobile-webgpu-and-sky-recovery`
+**Brief:** [docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md](tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md)
+**Skip-confirm:** no — wait-for-go after launch PR merges
+**Concurrency cap:** 5
 
-No orchestrated multi-agent cycle is active. A targeted single-branch spike is
-active for the user-reported mode-selection stall. The branch proves the
-cache/Recast/WASM delivery path is not the blocker and moves mode-start terrain
-surface baking into the terrain worker pool. Handoff and acceptance criteria:
-[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
+User-observable gap closed: two post-WebGPU-merge regressions reported by
+the owner on 2026-05-15. (a) Mobile is unplayable post-merge (was playable
+on WebGL pre-merge). (b) Sky looks bland on master. Source of either
+regression not yet known.
 
-The predecessor cycle
-`cycle-2026-05-13-konveyer-materialization-rearch` shipped its R1 slices
-(combat sub-attribution, materialization lane rename, sky-refresh
-idempotency) and landed on `master` via
-[PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
-on 2026-05-13 (merge commit `1df141ca`). The R2-R4 work
-(`konveyer-cover-spatial-grid`, `konveyer-render-silhouette-lane`,
-`konveyer-squad-aggregated-strategic-sim`, `konveyer-budget-arbiter-v2`,
-`konveyer-render-cluster-lane`, `konveyer-strict-webgpu-cross-mode-proof-v2`,
-`konveyer-docs-review-packet-v2`) is queued as follow-up cycles on master.
+Investigation cycle. R1 ships 5 parallel memos under
+`docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/`. R2 is
+orchestrator-driven (no agents) — produces
+`docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md` proposing
+≥1 named fix cycle to queue at the front of the campaign manifest.
 
-Next formal cycle selection still waits for owner direction. If the startup
-branch is promoted into the campaign, use
-`cycle-mode-startup-terrain-bake-hardening` from
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
-Otherwise fill this section in when the next owner-directed cycle launches
-using the stub structure (cycle ID, branch, brief link, skip-confirm flag,
-round schedule, tasks, dependencies, reviewer policy, success criteria,
-out-of-scope).
+### Round schedule
+
+| Round | Tasks (parallel) | Cap |
+|-------|------------------|-----|
+| 1 | `mobile-renderer-mode-truth`, `webgl-fallback-pipeline-diff`, `tsl-shader-cost-audit`, `sky-visual-and-cost-regression`, `mobile-startup-and-frame-budget` | 5 |
+| 2 | `MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16` (orchestrator-only) | — |
+
+### Dependencies
+
+All 5 R1 tasks are independent — no DAG `addBlockedBy` edges. R2
+depends on all 5 R1 tasks merging.
+
+### Reviewer policy
+
+No mandatory `combat-reviewer` or `terrain-nav-reviewer` (no touches
+to those paths expected — if an investigator needs to, that is a
+scope-change signal). Orchestrator reviews each memo PR for memo-only
+diff, file:line citations, and acceptance-criteria match.
+
+### Hard stops (cycle-specific)
+
+- ≥3 of 5 investigators return "can't measure" → halt and surface.
+- Ambiguous renderer-mode answer from `mobile-renderer-mode-truth` →
+  halt (everything else depends on knowing what's running).
+- Real-mobile capture infeasible across the board → fall back to
+  Chrome DevTools Mobile Emulation + CPU 4x throttle + 4G network
+  throttle (documented limitation, NOT a hard stop).
+
+### Success criteria
+
+- 5 R1 memo PRs merged.
+- R2 alignment memo committed.
+- ≥1 named fix cycle queued in
+  [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+- KB-MOBILE-WEBGPU + KB-SKY-BLAND opened at launch, closed at cycle
+  close with promotion-to-fix-cycle resolution. Carry-over delta: 0.
+
+### Out of scope
+
+- No product-code fix ships in this cycle (the alignment memo proposes
+  the fix cycle).
+- No fenced-interface touches.
+- No `src/systems/combat/**`, `src/systems/terrain/**`, or
+  `src/systems/navigation/**` touches.
+- No `perf-baselines.json` refresh.
+- The active `task/mode-startup-terrain-spike` branch stays parked.
+- No deploy.
 
 ### Last closed cycle
 
@@ -153,9 +189,10 @@ The predecessor scene-parity cycle
 `cycle-2026-05-11-konveyer-scene-parity` shipped slices 9-15 (atmosphere
 CPU collapsed from 5-6 ms to <1 ms across all five modes).
 
-Carry-overs still open: see [docs/CARRY_OVERS.md](CARRY_OVERS.md). KONVEYER-10
-closed with the master-merge; KB-STARTUP-1 opened for this branch. Active count
-is 9.
+Concurrent branch on the side: `task/mode-startup-terrain-spike` is
+parked at 1 commit (no PR), out of scope for this cycle. Production
+hardening criteria for it live in
+[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 
 ## Dispatch protocol
 
