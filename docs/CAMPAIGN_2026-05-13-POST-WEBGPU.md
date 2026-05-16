@@ -1,6 +1,6 @@
 # Campaign: 2026-05-13 Post-WebGPU master merge → 2026-05-16 feature-pivot expansion
 
-Last verified: 2026-05-16 (cycles #1-#3 closed at fd646aeb / 7931d179 / cycle #3 close-commit; current pointer = cycle #4 cycle-vekhikl-1-jeep-drivable)
+Last verified: 2026-05-16 (cycles #1-#4 closed at fd646aeb / 7931d179 / b86cf027 / cycle #4 close-commit; current pointer = cycle #5 cycle-voda-1-water-shader-and-acceptance)
 
 Campaign manifest. Original trigger was the WebGPU + TSL master merge
 on 2026-05-13; expanded on 2026-05-16 to absorb all VODA, VEKHIKL,
@@ -31,11 +31,11 @@ Hard-stops below still halt the loop.
 The current cycle pointer lives in
 [docs/AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md) "Current cycle"
 and is updated at every advance. **As of 2026-05-16 close of cycle
-#3 at `8d12ede5`, the current cycle pointer is at position #4
-(`cycle-vekhikl-1-jeep-drivable`).** Cycles #1, #2 and #3 are
-`done` in the queue below; 15 PRs merged across the three cycles
-(#208-#212, #214-#222), plus the out-of-band CI fix `47c42216`
-that matrix-fans the mobile-ui job.
+#4 at `901ae017` (last R2 merge), the current cycle pointer is at
+position #5 (`cycle-voda-1-water-shader-and-acceptance`).** Cycles #1
+through #4 are `done` in the queue below; 20 PRs merged across the
+four cycles (#208-#212, #214-#227), plus the out-of-band CI fix
+`47c42216` that matrix-fans the mobile-ui job.
 
 ## Orchestrator contract (read this if you're the orchestrator)
 
@@ -73,7 +73,7 @@ new ordering at next advance.
 | 1 | `cycle-sky-visual-restore` | done | KB-SKY-BLAND | [brief](tasks/archive/cycle-sky-visual-restore/cycle-sky-visual-restore.md) | Closed 2026-05-16 at `fd646aeb`. 3 R1 PRs: #208 `2118177f`, #210 `3455fa96`, #209 `9e1ce7c7`. Owner playtest deferred to PLAYTEST_PENDING.md. |
 | 2 | `cycle-mobile-webgl2-fallback-fix` | done | KB-MOBILE-WEBGPU | [brief](tasks/archive/cycle-mobile-webgl2-fallback-fix/cycle-mobile-webgl2-fallback-fix.md) | Closed 2026-05-16 at `7931d179`. 9 PRs across R1/R2/R3: #213 `6e7a8879`, #211 `9e1ccab5`, #212 `0b3b749d`, #215 `99044966`, #214 `ca725369`, #216 `706ad344`, #217 `83fb9fb0`, #218 `ff87e635`, #219 `a81d8cda`. Plus out-of-band CI fix `47c42216` matrix-fan-out mobile-ui. Real-device walk-through deferred to PLAYTEST_PENDING.md (3rd active row); harness script `scripts/real-device-validation.ts` ready. |
 | 3 | `cycle-konveyer-11-spatial-grid-compute` | done | DEFEKT-3 | [brief](tasks/archive/cycle-konveyer-11-spatial-grid-compute/cycle-konveyer-11-spatial-grid-compute.md) | Closed 2026-05-16 at cycle close-commit. 3 R1 PRs: #220 `9a02714a` CoverSpatialGrid 8m-cell grid, #221 `a5b5bcd6` AIStateEngage consumer with structural CoverGridQuery + Phase F sub-marker, #222 `8d12ede5` L3 integration test with 5ms p99 budget. R2 GPU-compute prototype skipped — R1 wins met bars (combat_budget_dominance 0%, zero >100ms hitches in 5939 frames vs documented 954ms baseline, p99 +3.0% under 5% hard-stop). |
-| 4 | `cycle-vekhikl-1-jeep-drivable` | queued | VEKHIKL-1 (unblocks VODA-3) | [brief](tasks/cycle-vekhikl-1-jeep-drivable.md) | M151 end-to-end on `GroundVehiclePhysics`. ~5 tasks, 2 rounds. |
+| 4 | `cycle-vekhikl-1-jeep-drivable` | done | VEKHIKL-1 (unblocks VODA-3) | [brief](tasks/archive/cycle-vekhikl-1-jeep-drivable/cycle-vekhikl-1-jeep-drivable.md) | Closed 2026-05-16 at cycle close-commit. 5 PRs across 2 rounds. R1: #223 `6309558a` GroundVehiclePhysics (581 LOC fixed-step sim), #224 `e687e70a` tests (305 LOC, 7 behavior tests). R2: #226 GroundVehiclePlayerAdapter + VehicleManager helper, #227 `901ae017` M151 integration + smoke, #225 playtest evidence + capture script + PLAYTEST_PENDING row. Existing motor_pool world-feature prefabs satisfy "visible at spawn on both modes". VEKHIKL-1 promoted to code-complete; owner walk-through deferred to PLAYTEST_PENDING under autonomous-loop posture. |
 | 5 | `cycle-voda-1-water-shader-and-acceptance` | queued | VODA-1 + WaterSystem split | [brief](tasks/cycle-voda-1-water-shader-and-acceptance.md) | Water shader + intersections + flow visuals + owner acceptance. Co-dispatches the WaterSystem.ts split. ~6 tasks, 2 rounds. |
 | 6 | `cycle-vekhikl-2-stationary-weapons` | queued | VEKHIKL-2 | [brief](tasks/cycle-vekhikl-2-stationary-weapons.md) | Fixed emplacements; reuses VEKHIKL-1 seat-occupant surface. ~4 tasks, 1-2 rounds. |
 | 7 | `cycle-voda-2-buoyancy-swimming-wading` | queued | VODA-2 | [brief](tasks/cycle-voda-2-buoyancy-swimming-wading.md) | Wires `WaterSystem.sampleWaterInteraction` into physics + player state. ~5 tasks, 2 rounds. |

@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-16 (12-cycle autonomous chain advanced; cycles #1-#3 closed at fd646aeb / 7931d179 / cycle #3 close-commit; current cycle = cycle-vekhikl-1-jeep-drivable)
+Last verified: 2026-05-16 (12-cycle autonomous chain advanced; cycles #1-#4 closed at fd646aeb / 7931d179 / b86cf027 / 901ae017 + cycle close-commit; current cycle = cycle-voda-1-water-shader-and-acceptance)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,90 +154,93 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-vekhikl-1-jeep-drivable
+## Current cycle: cycle-voda-1-water-shader-and-acceptance
 
-**Cycle ID:** `cycle-vekhikl-1-jeep-drivable`
-**Brief:** [docs/tasks/cycle-vekhikl-1-jeep-drivable.md](tasks/cycle-vekhikl-1-jeep-drivable.md)
-**Skip-confirm:** yes (campaign auto-advance is `yes`; owner playtest
-deferred to PLAYTEST_PENDING.md under autonomous-loop posture)
+**Cycle ID:** `cycle-voda-1-water-shader-and-acceptance`
+**Brief:** [docs/tasks/cycle-voda-1-water-shader-and-acceptance.md](tasks/cycle-voda-1-water-shader-and-acceptance.md)
+**Skip-confirm:** yes (campaign auto-advance is `yes`; owner visual
+acceptance auto-deferred to PLAYTEST_PENDING.md under autonomous-loop
+posture)
 **Concurrency cap:** 4
 
-User-observable gap closed: M151 jeep is drivable end-to-end —
-hand-rolled chassis on `GroundVehiclePhysics` per
-`docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md`. Closes `VEKHIKL-1`
-directive; unblocks `cycle-voda-3-watercraft` (seat/adapter/physics
-surface generalizes).
+User-observable gap closed: VODA-1 — ship the production water shader,
+terrain-water intersections, river flow visuals, and (deferred) owner
+visual acceptance. Closes `VODA-1` directive (subject to deferred
+visual acceptance); closes the WaterSystem half of the
+`konveyer-large-file-splits` carry-over. Blocks
+`cycle-voda-2-buoyancy-swimming-wading`.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `ground-vehicle-physics-core`, `ground-vehicle-physics-tests` | 2 |
-| 2 | `ground-vehicle-player-adapter`, `m151-jeep-integration`, `m151-jeep-playtest-evidence` | 3 |
+| 1 | `water-surface-shader`, `terrain-water-intersection-mask` | 2 |
+| 2 | `hydrology-river-flow-visuals`, `water-system-file-split`, `voda-1-playtest-evidence` | 3 |
 
 ### Dependencies
 
-- R1 ships the physics + tests in parallel. Both write to new files
-  (`GroundVehiclePhysics.ts` + `.test.ts`). Independent.
-- R2 ships the player adapter, vehicle integration, and playtest
-  evidence in parallel. Adapter depends on physics from R1;
-  integration depends on adapter; playtest is the owner-gate
-  (auto-deferred under autonomous-loop).
+- R1 ships the surface shader + the terrain-water intersection in
+  parallel. Both touch material-setup paths; expect minor rebase work
+  if they overlap on WaterSystem.ts material-init lines.
+- R2 ships flow visuals + the WaterSystem.ts file split + the deferred
+  playtest evidence. The file split lands last to avoid rebase
+  thrash against the R1 shader edits.
 
 ### Reviewer policy
 
-- No mandatory `combat-reviewer` (no `src/systems/combat/**` touches).
-- No mandatory `terrain-nav-reviewer` (`ITerrainRuntime` is the
-  fenced consumer surface; the cycle reads it only).
-- Orchestrator reviews each PR for acceptance + smoke-test
-  screenshot.
+- `terrain-nav-reviewer` is a **pre-merge gate** for
+  `terrain-water-intersection-mask` (touches
+  `src/systems/terrain/TerrainMaterial.ts`).
+- No mandatory `combat-reviewer` (no combat touches).
+- Orchestrator reviews other PRs for visual fidelity vs the brief's
+  fidelity targets + perf evidence.
 
 ### Hard stops (cycle-specific)
 
-- Any task introduces an external physics library
-  (`rapier`, `cannon`, `jolt`, `ammo.js`, `physijs`) → halt. The
-  four-trigger gate from `ENGINE_TRAJECTORY_2026-04-23.md` is NOT
-  satisfied by one MVP.
-- Owner playtest rejects R2 twice → halt (deferred to
-  PLAYTEST_PENDING.md under autonomous-loop posture; orchestrator
-  proceeds to next cycle, owner sweeps deferred playtests later).
+- Any task adds a `WebGLRenderTarget` reflection pass to water →
+  halt (regresses the mobile no-RT win documented in
+  `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md`
+  item 8).
+- Owner playtest rejects visual twice → halt (deferred under
+  autonomous-loop; orchestrator proceeds, owner sweeps later).
+- `evidence:atmosphere` browser-errors-during-regeneration after the
+  cycle → halt.
 - Standard: fence change, worktree isolation failure, twice-rejected reviewer.
-- Campaign-wide: perf regression > 5% p99 on `combat120` (deferred to
-  cycle #12 baseline refresh until that lands).
+- Campaign-wide: perf regression > 5% p99 on `combat120`.
 
 ### Success criteria
 
-See [docs/tasks/cycle-vekhikl-1-jeep-drivable.md](tasks/cycle-vekhikl-1-jeep-drivable.md)
+See [docs/tasks/cycle-voda-1-water-shader-and-acceptance.md](tasks/cycle-voda-1-water-shader-and-acceptance.md)
 "Acceptance Criteria (cycle close)":
 - All R1 + R2 task PRs merged.
-- Jeep drivable end-to-end on Open Frontier + A Shau.
-- Owner playtest sign-off recorded (deferred under autonomous-loop).
-- No external physics library added.
-- No fence change.
-- No perf regression > 5% p99 on `combat120` (one jeep on the ground
-  in a no-combat scene should be sub-0.1 ms).
-- `VEKHIKL-1` directive in `docs/DIRECTIVES.md` moves to Closed.
+- 11 existing `WaterSystem.test.ts` tests continue passing without
+  modification.
+- `evidence:atmosphere` regenerates with water visible and zero
+  browser errors.
+- Open Frontier `terrain_water_exposure_review` flag resolved.
+- WaterSystem.ts ≤300 LOC after split; grandfather entry removed
+  from `scripts/lint-source-budget.ts`.
+- `VODA-1` directive moves Open → code-complete (full `done`
+  promotion blocks on owner walk-through deferred to PLAYTEST_PENDING).
 
 ### Out of scope
 
-Other ground vehicles (M35, M113, ZIL — VEKHIKL-2 + follow-on cycles).
-NPC drivers (separate cycle). Weapons on the jeep (VEKHIKL-2 stationary
-weapons + future vehicle-mounted weapon cycle). Damage states (future
-cycle). Multi-passenger seats (driver-only for MVP). Touching
-`src/systems/combat/**`, `src/systems/terrain/**`, `src/systems/navigation/**`.
-Fenced-interface touches.
+Buoyancy / swimming / wading (VODA-2). Watercraft (VODA-3). Terrain
+hydrology pipeline changes (already shipped in
+`cycle-2026-05-11-konveyer-water-hydrology`). Touching
+`src/systems/combat/**`, `src/systems/navigation/**`. Fenced-interface touches.
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #4** in the 12-cycle queue at
+This cycle is **position #5** in the 12-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 `Auto-advance: yes` + `posture: autonomous-loop` are set there. When
 this cycle closes:
 
-1. Mark cycle #4 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-voda-1-water-shader-and-acceptance`).
+1. Mark cycle #5 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-vekhikl-2-stationary-weapons`).
 3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-voda-1-water-shader-and-acceptance`.
+4. Commit with `docs(campaign): advance to cycle-vekhikl-2-stationary-weapons`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
@@ -245,23 +248,29 @@ mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-konveyer-11-spatial-grid-compute` closed on 2026-05-16 at commit
-`8d12ede5` (R1 final merge; cycle-close commit follows). 3 R1 PRs merged
-in dispatch order: #220 `9a02714a` (CoverSpatialGrid 282 LOC + 277 LOC
-tests, 8m cells, deterministic order, `queryNearest` + `queryWithLOS`),
-#221 `a5b5bcd6` (AIStateEngage routes flank-cover scan through structural
-`CoverGridQuery` interface, preserves 2-search cap + reuse, adds
-`engage.suppression.initiate.coverGridQuery` Phase F sub-marker +
-`suppressionFlankCoverGridHits/Misses` telemetry), #222 `8d12ede5` (L3
-integration test `src/integration/combat/cover-grid-suppression.test.ts`
-with 5ms p99 budget, ~190x margin vs ~954ms baseline). R2 GPU-compute
-prototype **skipped** per brief's skip condition — R1 wins met acceptance
-bars on combat120: avg_frame 15.54ms PASS, peak_p99 34.40ms (+3.0% vs
-33.4ms baseline, under 5% hard-stop), **combat_budget_dominance 0%**
-(Combat never topped 16.67ms vs pre-R1 954ms peak), **hitch_100ms_percent
-0% in 5939 frames** (decisive ≥10x peak drop). DEFEKT-3 moved Active →
-Closed. Active count: 9 → 8. Artifact:
-`artifacts/perf/2026-05-16T19-32-35-293Z/`.
+`cycle-vekhikl-1-jeep-drivable` closed on 2026-05-16 at the cycle
+close-commit (R2 final merge at `901ae017`). 5 PRs across 2 rounds.
+R1: #223 `6309558a` ground-vehicle-physics-core (`GroundVehiclePhysics`
+581 LOC, hand-rolled fixed-step rigid-body sim mirroring
+`HelicopterPhysics`, four wheel samples conformed to `ITerrainRuntime`,
+Ackermann steering kinematics, explicit Euler with exponential
+damping); #224 `e687e70a` ground-vehicle-physics-tests (305 LOC, 7
+behavior tests — stub→real swap committed after #223 landed). R2:
+#226 ground-vehicle-player-adapter (`GroundVehiclePlayerAdapter`
+W/S throttle, A/D steer, Space brake, F enter/exit, third-person
+follow; `VehicleManager.getGroundVehicleByOccupant` helper);
+#227 `901ae017` m151-jeep-integration (`GroundVehicle.update` wired to
+`GroundVehiclePhysics`; `VehicleManager.update` no-op fanned out to
+`vehicle.update` to actually step ground vehicles; existing
+`airfield_motor_pool` / `tabat_motor_pool` world-feature prefabs
+satisfy "M151 visible at spawn on both modes" — no new spawn
+edits needed; Playwright smoke verified visibility);
+#225 m151-jeep-playtest-evidence (`docs/playtests/cycle-vekhikl-1-jeep-drivable.md`
++ `scripts/capture-m151-jeep-playtest-shots.ts` + PLAYTEST_PENDING row,
+owner walk-through deferred under autonomous-loop). No fence change.
+No external physics library. VEKHIKL-1 promoted to code-complete in
+DIRECTIVES.md (full `done` blocks on owner walk-through). Carry-over
+count: 8 → 8 (VEKHIKL-1 lives in DIRECTIVES, not CARRY_OVERS).
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
 parked at 1 commit (no PR). The cycle #2 mode-startup work absorbed

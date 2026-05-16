@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-16 (post `cycle-konveyer-11-spatial-grid-compute` close)
+Last verified: 2026-05-16 (post `cycle-vekhikl-1-jeep-drivable` close)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -100,6 +100,22 @@ History log:
   hitches over 5939 frames; combat_budget_dominance dropped to 0% from prior
   spike pattern; p99 +3.0% vs baseline, under 5% hard-stop). DEFEKT-3 moved
   Active → Closed. Active count: 9 → 8.
+- 2026-05-16 — `cycle-vekhikl-1-jeep-drivable` close (autonomous-loop posture):
+  shipped VEKHIKL-1 code-complete as 5 PRs across 2 rounds. R1: #223
+  GroundVehiclePhysics (hand-rolled fixed-step rigid-body sim per
+  GROUND_VEHICLE_PHYSICS memo; FixedStepRunner; four wheel samples
+  conformed to ITerrainRuntime; Ackermann steering kinematics; explicit
+  Euler with exponential damping), #224 GroundVehiclePhysics tests
+  (post stub→real swap, 7 behavior tests against real impl). R2: #226
+  GroundVehiclePlayerAdapter (W/S throttle, A/D steer, Space brake, F
+  enter/exit, third-person follow), #227 M151 integration (existing
+  motor_pool prefab spawn points satisfy "visible on both modes"; the
+  documented no-op VehicleManager.update was fanned out to vehicle.update
+  to actually step ground vehicles), #225 playtest evidence + capture
+  script + PLAYTEST_PENDING row. VEKHIKL-1 in DIRECTIVES.md moved Open →
+  code-complete (full `done` promotion blocks on owner walk-through
+  deferred to PLAYTEST_PENDING). No carry-over delta (VEKHIKL-1 lives in
+  DIRECTIVES.md, not CARRY_OVERS Active). Active count: 8 → 8.
 
 ## Closed
 
