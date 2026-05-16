@@ -171,4 +171,52 @@ describe('DeviceDetector', () => {
     expect(ratio).toBeGreaterThan(0);
     expect(ratio).toBeLessThanOrEqual(2);
   });
+
+  it('getMaxPixelRatio caps mobile devices at 1.0 to reduce WebGL2-fallback fragment cost', async () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 ' +
+        '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      configurable: true,
+    });
+    Object.defineProperty(window, 'devicePixelRatio', {
+      value: 3,
+      configurable: true,
+    });
+
+    const { getMaxPixelRatio } = await loadDeviceDetector();
+    expect(getMaxPixelRatio()).toBe(1);
+  });
+
+  it('getMaxPixelRatio honors window.devicePixelRatio on desktop (capped at 2)', async () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+        '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      configurable: true,
+    });
+    Object.defineProperty(window, 'devicePixelRatio', {
+      value: 1.5,
+      configurable: true,
+    });
+
+    const { getMaxPixelRatio } = await loadDeviceDetector();
+    expect(getMaxPixelRatio()).toBe(1.5);
+  });
+
+  it('getMaxPixelRatio caps desktop devicePixelRatio at 2', async () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+        '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      configurable: true,
+    });
+    Object.defineProperty(window, 'devicePixelRatio', {
+      value: 4,
+      configurable: true,
+    });
+
+    const { getMaxPixelRatio } = await loadDeviceDetector();
+    expect(getMaxPixelRatio()).toBe(2);
+  });
 });
