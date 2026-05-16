@@ -1,0 +1,296 @@
+{
+  "createdAt": "2026-05-16T05:08:55.179Z",
+  "source": "scripts/mobile-renderer-probe.ts",
+  "baseUrl": "http://127.0.0.1:59146",
+  "headed": false,
+  "reports": [
+    {
+      "device": {
+        "id": "pixel5",
+        "label": "Android Chrome (Pixel 5 emulation)",
+        "userAgentHint": "Pixel 5 / Android 11 / Chrome",
+        "cpuThrottle": 4
+      },
+      "userAgent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.7727.15 Mobile Safari/537.36",
+      "results": [
+        {
+          "scenario": "default-mobile",
+          "url": "http://127.0.0.1:59146/?diag=1",
+          "startVisible": true,
+          "fatalVisible": false,
+          "fatalText": null,
+          "rendererClassName": null,
+          "rendererBackendIsWebGPU": null,
+          "rendererBackendIsWebGL": null,
+          "navigatorGpu": {
+            "hasNavigatorGpu": true,
+            "adapterRequested": true,
+            "adapterAvailable": false,
+            "adapterDescription": null,
+            "adapterVendor": null,
+            "adapterArchitecture": null,
+            "adapterDevice": null,
+            "adapterFeatures": [],
+            "adapterError": null
+          },
+          "capabilities": {
+            "requestedMode": "webgpu",
+            "resolvedBackend": "webgpu-webgl-fallback",
+            "initStatus": "ready",
+            "isWebGPURenderer": true,
+            "forceWebGL": false,
+            "strictWebGPU": false,
+            "navigatorGpuAvailable": true,
+            "adapterAvailable": false,
+            "adapterName": null,
+            "adapterFeatures": [],
+            "adapterLimits": {
+              "maxTextureDimension2D": null,
+              "maxBindGroups": null,
+              "maxBufferSize": null,
+              "maxStorageBufferBindingSize": null,
+              "maxUniformBufferBindingSize": null,
+              "maxVertexBuffers": null,
+              "maxVertexAttributes": null,
+              "maxComputeWorkgroupStorageSize": null,
+              "maxComputeInvocationsPerWorkgroup": null,
+              "maxComputeWorkgroupsPerDimension": null
+            },
+            "error": null,
+            "notes": [
+              "navigator.gpu exists but requestAdapter returned null.",
+              "Renderer initialized as webgpu-webgl-fallback."
+            ]
+          },
+          "consoleErrors": [],
+          "pageErrors": [],
+          "notes": [
+            "CPU throttle x4 applied via CDP."
+          ],
+          "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-acc025c72f46c2896\\artifacts\\mobile-renderer-probe\\2026-05-16T05-08-31-204Z\\pixel5-default-mobile.png"
+        },
+        {
+          "scenario": "strict-mobile",
+          "url": "http://127.0.0.1:59146/?diag=1&renderer=webgpu-strict",
+          "startVisible": false,
+          "fatalVisible": true,
+          "fatalText": "TERROR IN THE JUNGLE\nLOADING\nINITIALIZING...\nFailed to initialize. Please refresh the page.\nStrict WebGPU mode resolved webgpu-webgl-fallback; refusing WebGL fallback.\nRetry",
+          "rendererClassName": null,
+          "rendererBackendIsWebGPU": null,
+          "rendererBackendIsWebGL": null,
+          "navigatorGpu": {
+            "hasNavigatorGpu": true,
+            "adapterRequested": true,
+            "adapterAvailable": false,
+            "adapterDescription": null,
+            "adapterVendor": null,
+            "adapterArchitecture": null,
+            "adapterDevice": null,
+            "adapterFeatures": [],
+            "adapterError": null
+          },
+          "capabilities": null,
+          "consoleErrors": [
+            "[bootstrap] Bootstrap failed Error: Strict WebGPU mode resolved webgpu-webgl-fallback; refusing WebGL fallback.\n    at mj.initializeRendererBackend (http://127.0.0.1:59146/build-assets/index-KS-V0qVL.js:335:7790)\n    at async FM.initialize (http://127.0.0.1:59146/build-assets/index-KS-V0qVL.js:385:19563)\n    at async BM (http://127.0.0.1:59146/build-assets/index-KS-V0qVL.js:385:26406)"
+          ],
+          "pageErrors": [],
+          "notes": [
+            "CPU throttle x4 applied via CDP."
+          ],
+          "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-acc025c72f46c2896\\artifacts\\mobile-renderer-probe\\2026-05-16T05-08-31-204Z\\pixel5-strict-mobile.png"
+        },
+        {
+          "scenario": "force-webgl-mobile",
+          "url": "http://127.0.0.1:59146/?diag=1&renderer=webgl",
+          "startVisible": true,
+          "fatalVisible": false,
+          "fatalText": null,
+          "rendererClassName": null,
+          "rendererBackendIsWebGPU": null,
+          "rendererBackendIsWebGL": null,
+          "navigatorGpu": {
+            "hasNavigatorGpu": true,
+            "adapterRequested": true,
+            "adapterAvailable": false,
+            "adapterDescription": null,
+            "adapterVendor": null,
+            "adapterArchitecture": null,
+            "adapterDevice": null,
+            "adapterFeatures": [],
+            "adapterError": null
+          },
+          "capabilities": {
+            "requestedMode": "webgl",
+            "resolvedBackend": "webgl",
+            "initStatus": "ready",
+            "isWebGPURenderer": false,
+            "forceWebGL": false,
+            "strictWebGPU": false,
+            "navigatorGpuAvailable": true,
+            "adapterAvailable": null,
+            "adapterName": null,
+            "adapterFeatures": [],
+            "adapterLimits": {},
+            "error": null,
+            "notes": [
+              "Explicit WebGL diagnostic renderer selected."
+            ]
+          },
+          "consoleErrors": [],
+          "pageErrors": [],
+          "notes": [
+            "CPU throttle x4 applied via CDP."
+          ],
+          "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-acc025c72f46c2896\\artifacts\\mobile-renderer-probe\\2026-05-16T05-08-31-204Z\\pixel5-force-webgl-mobile.png"
+        }
+      ]
+    },
+    {
+      "device": {
+        "id": "iphone12",
+        "label": "iOS Safari (iPhone 12 emulation, Chromium engine)",
+        "userAgentHint": "iPhone 12 / iOS 14 (note: Chromium user-agent only — real Safari differs)",
+        "cpuThrottle": 4
+      },
+      "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Mobile/15E148 Safari/604.1",
+      "results": [
+        {
+          "scenario": "default-mobile",
+          "url": "http://127.0.0.1:59146/?diag=1",
+          "startVisible": true,
+          "fatalVisible": false,
+          "fatalText": null,
+          "rendererClassName": null,
+          "rendererBackendIsWebGPU": null,
+          "rendererBackendIsWebGL": null,
+          "navigatorGpu": {
+            "hasNavigatorGpu": true,
+            "adapterRequested": true,
+            "adapterAvailable": false,
+            "adapterDescription": null,
+            "adapterVendor": null,
+            "adapterArchitecture": null,
+            "adapterDevice": null,
+            "adapterFeatures": [],
+            "adapterError": null
+          },
+          "capabilities": {
+            "requestedMode": "webgpu",
+            "resolvedBackend": "webgpu-webgl-fallback",
+            "initStatus": "ready",
+            "isWebGPURenderer": true,
+            "forceWebGL": false,
+            "strictWebGPU": false,
+            "navigatorGpuAvailable": true,
+            "adapterAvailable": false,
+            "adapterName": null,
+            "adapterFeatures": [],
+            "adapterLimits": {
+              "maxTextureDimension2D": null,
+              "maxBindGroups": null,
+              "maxBufferSize": null,
+              "maxStorageBufferBindingSize": null,
+              "maxUniformBufferBindingSize": null,
+              "maxVertexBuffers": null,
+              "maxVertexAttributes": null,
+              "maxComputeWorkgroupStorageSize": null,
+              "maxComputeInvocationsPerWorkgroup": null,
+              "maxComputeWorkgroupsPerDimension": null
+            },
+            "error": null,
+            "notes": [
+              "navigator.gpu exists but requestAdapter returned null.",
+              "Renderer initialized as webgpu-webgl-fallback."
+            ]
+          },
+          "consoleErrors": [],
+          "pageErrors": [],
+          "notes": [
+            "CPU throttle x4 applied via CDP."
+          ],
+          "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-acc025c72f46c2896\\artifacts\\mobile-renderer-probe\\2026-05-16T05-08-31-204Z\\iphone12-default-mobile.png"
+        },
+        {
+          "scenario": "strict-mobile",
+          "url": "http://127.0.0.1:59146/?diag=1&renderer=webgpu-strict",
+          "startVisible": false,
+          "fatalVisible": true,
+          "fatalText": "TERROR IN THE JUNGLE\nLOADING\nINITIALIZING...\nFailed to initialize. Please refresh the page.\nStrict WebGPU mode resolved webgpu-webgl-fallback; refusing WebGL fallback.\nRetry",
+          "rendererClassName": null,
+          "rendererBackendIsWebGPU": null,
+          "rendererBackendIsWebGL": null,
+          "navigatorGpu": {
+            "hasNavigatorGpu": true,
+            "adapterRequested": true,
+            "adapterAvailable": false,
+            "adapterDescription": null,
+            "adapterVendor": null,
+            "adapterArchitecture": null,
+            "adapterDevice": null,
+            "adapterFeatures": [],
+            "adapterError": null
+          },
+          "capabilities": null,
+          "consoleErrors": [
+            "[bootstrap] Bootstrap failed Error: Strict WebGPU mode resolved webgpu-webgl-fallback; refusing WebGL fallback.\n    at mj.initializeRendererBackend (http://127.0.0.1:59146/build-assets/index-KS-V0qVL.js:335:7790)\n    at async FM.initialize (http://127.0.0.1:59146/build-assets/index-KS-V0qVL.js:385:19563)\n    at async BM (http://127.0.0.1:59146/build-assets/index-KS-V0qVL.js:385:26406)"
+          ],
+          "pageErrors": [],
+          "notes": [
+            "CPU throttle x4 applied via CDP."
+          ],
+          "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-acc025c72f46c2896\\artifacts\\mobile-renderer-probe\\2026-05-16T05-08-31-204Z\\iphone12-strict-mobile.png"
+        },
+        {
+          "scenario": "force-webgl-mobile",
+          "url": "http://127.0.0.1:59146/?diag=1&renderer=webgl",
+          "startVisible": true,
+          "fatalVisible": false,
+          "fatalText": null,
+          "rendererClassName": null,
+          "rendererBackendIsWebGPU": null,
+          "rendererBackendIsWebGL": null,
+          "navigatorGpu": {
+            "hasNavigatorGpu": true,
+            "adapterRequested": true,
+            "adapterAvailable": false,
+            "adapterDescription": null,
+            "adapterVendor": null,
+            "adapterArchitecture": null,
+            "adapterDevice": null,
+            "adapterFeatures": [],
+            "adapterError": null
+          },
+          "capabilities": {
+            "requestedMode": "webgl",
+            "resolvedBackend": "webgl",
+            "initStatus": "ready",
+            "isWebGPURenderer": false,
+            "forceWebGL": false,
+            "strictWebGPU": false,
+            "navigatorGpuAvailable": true,
+            "adapterAvailable": null,
+            "adapterName": null,
+            "adapterFeatures": [],
+            "adapterLimits": {},
+            "error": null,
+            "notes": [
+              "Explicit WebGL diagnostic renderer selected."
+            ]
+          },
+          "consoleErrors": [],
+          "pageErrors": [],
+          "notes": [
+            "CPU throttle x4 applied via CDP."
+          ],
+          "screenshotPath": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-acc025c72f46c2896\\artifacts\\mobile-renderer-probe\\2026-05-16T05-08-31-204Z\\iphone12-force-webgl-mobile.png"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Chrome DevTools Mobile Emulation (Playwright devices) — not a real device.",
+    "CPU throttle applied via CDP (Chromium only).",
+    "iPhone 12 case runs under Chromium engine; real iOS Safari may differ.",
+    "navigator.gpu in Chromium on Linux may be unavailable without --enable-unsafe-webgpu."
+  ]
+}
