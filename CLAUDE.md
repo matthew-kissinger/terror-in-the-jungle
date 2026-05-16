@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-16
+Last verified: 2026-05-16 (post 12-cycle autonomous campaign launch)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,18 +46,39 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active cycle (2026-05-16):**
-`cycle-2026-05-16-mobile-webgpu-and-sky-recovery` is queued and waiting on
-launch PR merge before R1 dispatch. Investigation cycle covering the
-owner-reported 2026-05-15 post-WebGPU-merge playtest regressions: mobile
-unplayable + sky bland. 5 parallel memos in R1, orchestrator-authored
-alignment memo in R2 that proposes the actual fix-cycle slot(s). Brief:
-[docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md](docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
-Option 1 from
-[docs/STRATEGIC_ALIGNMENT_2026-05-10.md](docs/STRATEGIC_ALIGNMENT_2026-05-10.md)
-(insert VODA-1 / VEKHIKL-1 / DEFEKT-3 first slices ahead of cycle 3)
-remains the active feature-pivot recommendation once this investigation
-cycle and its named fix cycle finish.
+**Active cycle (2026-05-16):** `cycle-sky-visual-restore` is position #1
+in a **12-cycle autonomous-chain campaign**. Owner reset the campaign on
+2026-05-16 with `auto-advance: yes` in
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md);
+fresh agent invocations of `/orchestrate` chain through all 12 cycles
+without intervention until a hard-stop fires. The chain covers all
+VODA, VEKHIKL, and DEFEKT directives plus the two post-WebGPU
+investigation fix cycles (mobile + sky).
+
+The queue:
+1. `cycle-sky-visual-restore` → KB-SKY-BLAND fix.
+2. `cycle-mobile-webgl2-fallback-fix` → KB-MOBILE-WEBGPU fix (real-device validation = merge gate).
+3. `cycle-konveyer-11-spatial-grid-compute` → DEFEKT-3 (cover spatial grid).
+4. `cycle-vekhikl-1-jeep-drivable` → M151 end-to-end.
+5. `cycle-voda-1-water-shader-and-acceptance` → water shader + acceptance + WaterSystem split.
+6. `cycle-vekhikl-2-stationary-weapons` → M2HB emplacements.
+7. `cycle-voda-2-buoyancy-swimming-wading` → physics + player swim.
+8. `cycle-vekhikl-3-tank-chassis` → M48 skid-steer chassis.
+9. `cycle-vekhikl-4-tank-turret-and-cannon` → turret + cannon + Rust→WASM ballistic-solver pilot.
+10. `cycle-voda-3-watercraft` → Sampan + PBR.
+11. `cycle-defekt-4-npc-route-quality` → slope-stuck + crowd + solver fixes.
+12. `cycle-stabilizat-1-baselines-refresh` → perf baseline refresh.
+
+Every cycle has a pre-authored brief at `docs/tasks/<slug>.md`. The
+orchestrator chains via the protocol in
+[.claude/agents/orchestrator.md](.claude/agents/orchestrator.md) §"Campaign
+auto-advance" — at every cycle close, advance the manifest pointer + the
+"Current cycle" section in `docs/AGENT_ORCHESTRATION.md` and re-enter
+dispatch without prompting.
+
+Hard-stops (fence change, >2 CI red, perf regression >5% p99, carry-over
+growth, worktree failure, twice-rejected reviewer) flip `auto-advance:
+yes` → `PAUSED` and surface to owner.
 
 **Active spike branch:** `task/mode-startup-terrain-spike` addresses the
 post-click mode-startup stall. The investigation found the Recast
@@ -76,9 +97,11 @@ discipline, parallel R&D protocol, and reporting standard.
 
 Phases 0/1/2/2.4/2.5 done. Phases 3–9 queued (refactor campaign,
 deprioritized behind the WebGPU + ground-vehicle vision directions).
-Auto-advance PAUSED per the campaign manifest. To re-enable chaining: flip
-`Auto-advance: PAUSED` to `Auto-advance: yes` in the campaign manifest
-before re-running `/orchestrate`.
+**Auto-advance is now `yes`** as of the 2026-05-16 12-cycle campaign
+launch. To pause chaining mid-campaign: flip `Auto-advance: yes` to
+`Auto-advance: PAUSED` in
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+The orchestrator finishes the in-flight cycle and stops.
 
 For full context (audit findings, Phases 0–2 outcomes, Phase 3+ scope):
 [docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md).
@@ -86,18 +109,15 @@ Cloudflare account-level audit:
 `artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored).
 
 Single source of truth for unresolved items:
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is **11** after
-KB-MOBILE-WEBGPU and KB-SKY-BLAND opened with the
-`cycle-2026-05-16-mobile-webgpu-and-sky-recovery` launch (was 9 after
-KB-STARTUP-1, 8 after the KONVEYER-10 master merge). Still under the ≤12
-rule. Both new IDs close at investigation-cycle end with
-promotion-to-fix-cycle resolution (net cycle delta 0). Active items:
-DEFEKT-3 (combat AI p99), DEFEKT-4 (NPC route quality), STABILIZAT-1
-(combat120 baseline refresh), AVIATSIYA-1 / DEFEKT-5 (visual review
-pending), KB-LOAD residual, KB-STARTUP-1, KB-MOBILE-WEBGPU, KB-SKY-BLAND,
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is **9** after
+the 2026-05-16 investigation cycle close (KB-MOBILE-WEBGPU + KB-SKY-BLAND
+opened then closed with promotion-to-fix-cycle resolution; both fixes are
+queue positions #1 and #2 of the active campaign). Active items: DEFEKT-3
+(closes at cycle #3), DEFEKT-4 (closes at cycle #11), STABILIZAT-1
+(closes at cycle #12), AVIATSIYA-1 / DEFEKT-5 (visual review pending),
+KB-LOAD residual, KB-STARTUP-1 (held; may be absorbed into cycle #2),
 cloudflare-stabilization followups, weapons-cluster-zonemanager-migration,
-konveyer-large-file-splits. Other IDs (KONVEYER-11 spatial-grid,
-VEKHIKL-3 jeep-drivable, etc.) open with their respective cycle launches.
+konveyer-large-file-splits (WaterSystem half closes at cycle #5).
 
 4 cycle-retro nits from cycle 2.4 captured in BACKLOG retro (NOT new
 carry-overs to respect ≤12 limit; bundle into next cycle that touches
@@ -106,7 +126,7 @@ flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
 Campaign manifest:
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
-(post-WebGPU queue; auto-advance currently PAUSED).
+(12-cycle autonomous chain; `auto-advance: yes`).
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle

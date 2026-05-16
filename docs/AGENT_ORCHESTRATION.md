@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-16 (cycle-2026-05-16-mobile-webgpu-and-sky-recovery closed; two fix cycles queued in CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+Last verified: 2026-05-16 (12-cycle autonomous-chain campaign launched; auto-advance: yes; current cycle = cycle-sky-visual-restore)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -114,44 +114,70 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: (stub — no active cycle)
+## Current cycle: cycle-sky-visual-restore
 
-No cycle is active. The owner picks the next slot from
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)
-and fills in the stub below before re-running `/orchestrate`.
+**Cycle ID:** `cycle-sky-visual-restore`
+**Brief:** [docs/tasks/cycle-sky-visual-restore.md](tasks/cycle-sky-visual-restore.md)
+**Skip-confirm:** yes (campaign auto-advance is `yes`)
+**Concurrency cap:** 3
 
-**Cycle ID:** `<cycle-id>`
-**Brief:** `docs/tasks/<slug>.md`
-**Skip-confirm:** `<yes|no>`
-**Concurrency cap:** `<N, default 5>`
-
-User-observable gap closed: `<one sentence>`.
+User-observable gap closed: post-WebGPU-merge sky-bland regression
+(KB-SKY-BLAND). Restores pre-merge saturation, sun pearl, horizon
+ring without re-introducing the per-fragment Preetham shader.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `<slug-a>`, `<slug-b>`, ... | 5 |
+| 1 | `sky-dome-tonemap-and-lut-resolution`, `sky-hdr-bake-restore`, `sky-sun-disc-restore` | 3 |
 
 ### Dependencies
 
-`<list addBlockedBy edges or "all independent">`.
+All 3 tasks independent. No DAG edges within this cycle.
 
 ### Reviewer policy
 
-`<combat-reviewer / terrain-nav-reviewer / orchestrator-only>`.
+Orchestrator-only memo review (no `combat-reviewer` /
+`terrain-nav-reviewer` — touches `src/systems/environment/**` only).
 
 ### Hard stops (cycle-specific)
 
-`<list>`.
+- LUT-bake EMA exceeds 12 ms on development machine → fall back
+  to 192×96 (still better than 128×64); do NOT halt (graceful
+  degradation).
+- Owner playtest rejects twice → halt.
 
 ### Success criteria
 
-`<bullet list>`.
+See [docs/tasks/cycle-sky-visual-restore.md](tasks/cycle-sky-visual-restore.md)
+"Acceptance Criteria (cycle close)" section.
 
 ### Out of scope
 
-`<bullet list>`.
+See the brief's "Out of Scope" section. Notable: no perf-baseline
+refresh (cycle #12 owns), no cloud-shader work (defer).
+
+### Campaign auto-advance protocol
+
+This cycle is **position #1** in the 12-cycle queue at
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+`Auto-advance: yes` is set there. When this cycle closes,
+the orchestrator follows the "Orchestrator contract" section of
+the campaign manifest:
+
+1. Mark cycle #1 row `done` in the campaign queue table with close-
+   commit SHA.
+2. Read the next not-done row (`cycle-mobile-webgl2-fallback-fix`).
+3. Mirror that cycle's brief content into this "Current cycle"
+   section (overwriting with the next cycle's values from
+   `docs/tasks/cycle-mobile-webgl2-fallback-fix.md`).
+4. Commit with message `docs(campaign): advance to cycle-mobile-webgl2-fallback-fix`.
+5. Re-enter dispatch loop. Do NOT prompt the human.
+
+Hard-stops (per
+[.claude/agents/orchestrator.md](../.claude/agents/orchestrator.md))
+flip `Auto-advance: yes` → `PAUSED` in the campaign manifest, mark
+the failing cycle's row `BLOCKED` with cause, and halt.
 
 ### Last closed cycle
 
@@ -164,16 +190,12 @@ cycle) closed on 2026-05-16. Five R1 memo PRs merged
 [#207](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/207))
 plus the R2 alignment memo at
 [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
-Carry-over delta: 0 (KB-MOBILE-WEBGPU + KB-SKY-BLAND opened at launch
-and closed at cycle end with promotion to `cycle-sky-visual-restore`
-and `cycle-mobile-webgl2-fallback-fix` — both queued at top of
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)).
-Predecessor: `cycle-2026-05-13-konveyer-materialization-rearch` R1
-(KONVEYER-10 close) landed on master via PR #192 on 2026-05-13.
+Carry-over delta: 0. The alignment memo named the first two cycles
+of the active 12-cycle campaign queue (cycles #1 and #2 below).
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike` is
-parked at 1 commit (no PR), out of scope. Production hardening
-criteria for it live in
+parked at 1 commit (no PR), held for absorption into cycle #2 if
+needed. Production hardening criteria for it live in
 [docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 
 ## Dispatch protocol
