@@ -157,8 +157,22 @@ jobs:
 
   mobile-ui:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Each device case observed taking ~12 min on the post-WebGPU mode-startup
+    # path (KB-STARTUP-1 mobile-emulation bake stall). 18 min per device gives
+    # 50% headroom; matrix fans the 4 devices out in parallel so the wall-time
+    # gate is max-of-devices, not sum. Pre-fan-out, the single sequential job
+    # took ~48 min and could never fit in any reasonable timeout.
+    timeout-minutes: 18
     needs: [lint, test]
+    strategy:
+      # Don't kill sibling devices when one fails — we want full coverage per push.
+      fail-fast: false
+      matrix:
+        device:
+          - android-390x844
+          - android-844x390
+          - android-740x360
+          - phone-667x375
 
     steps:
       - name: Checkout
@@ -188,13 +202,13 @@ jobs:
         run: npm run build
 
       - name: Mobile UI gate
-        run: npm run check:mobile-ui
+        run: npm run check:mobile-ui -- --device-id ${{ matrix.device }}
 
       - name: Upload mobile UI artifacts
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: mobile-ui-artifacts
+          name: mobile-ui-artifacts-${{ matrix.device }}
           path: artifacts/mobile-ui/**
           retention-days: 7
 

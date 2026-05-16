@@ -159,7 +159,7 @@ function timestampSlug(): string {
   return new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
 }
 
-function parseArgs(): { mode: string; port: number; headed: boolean; includeWebkit: boolean } {
+function parseArgs(): { mode: string; port: number; headed: boolean; includeWebkit: boolean; deviceId: string | null } {
   const args = process.argv.slice(2);
   const readValue = (flag: string, fallback: string): string => {
     const index = args.findIndex((arg) => arg === `--${flag}`);
@@ -169,11 +169,13 @@ function parseArgs(): { mode: string; port: number; headed: boolean; includeWebk
     return args[index + 1];
   };
 
+  const deviceIdArg = readValue('device-id', '');
   return {
     mode: readValue('mode', 'zone_control'),
     port: Number(readValue('port', String(DEFAULT_PORT))),
     headed: args.includes('--headed'),
     includeWebkit: args.includes('--include-webkit'),
+    deviceId: deviceIdArg.length > 0 ? deviceIdArg : null,
   };
 }
 
@@ -755,10 +757,18 @@ async function main(): Promise<void> {
     });
 
     const reports: DeviceReport[] = [];
-    const deviceCases = options.includeWebkit
+    const allDeviceCases = options.includeWebkit
       ? [...DEFAULT_DEVICE_CASES, ...WEBKIT_DEVICE_CASES]
       : DEFAULT_DEVICE_CASES;
-    if (options.includeWebkit) {
+    const deviceCases = options.deviceId === null
+      ? allDeviceCases
+      : allDeviceCases.filter((device) => device.id === options.deviceId);
+    if (deviceCases.length === 0) {
+      const knownIds = allDeviceCases.map((device) => device.id).join(', ');
+      throw new Error(`No device case matches --device-id "${options.deviceId}". Known ids: ${knownIds}`);
+    }
+    const needsWebkit = deviceCases.some((device) => device.browserKind === 'webkit');
+    if (needsWebkit) {
       browsers.webkit = await webkit.launch({
         headless: !options.headed,
       });
