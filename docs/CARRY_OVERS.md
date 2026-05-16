@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-16
+Last verified: 2026-05-16 (post `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` close)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -30,8 +30,6 @@ started, the cycle is `INCOMPLETE` per the rule in
 | AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 6 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
 | KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 4 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
 | KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 0 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
-| KB-MOBILE-WEBGPU | Mobile is unplayable post-WebGPU-merge; was playable on WebGL pre-merge. Source of regression unknown — could be WebGPU adapter stall, WebGL2-fallback path heavier than the pre-migration WebGL renderer, or TSL compiled-GLSL fragment cost. | cycle-2026-05-16-mobile-webgpu-and-sky-recovery | 0 | renderer / mobile / perf | yes (mobile production playability) | Investigation cycle scopes the regression via 5 parallel memos. Promoted to a named fix cycle by `MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md` at cycle close. |
-| KB-SKY-BLAND | Sky / clouds look bland on master post-WebGPU-merge. Owner playtest observation 2026-05-15. The Hosek-Wilkie TSL port (`HosekWilkieSkyBackend.ts`) is the most likely surface; not confirmed. | cycle-2026-05-16-mobile-webgpu-and-sky-recovery | 0 | environment / sky | no | Investigation cycle's `sky-visual-and-cost-regression` task covers both visual and cost angles. Promoted to a named fix cycle by the alignment memo. |
 | cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 2 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
 | weapons-cluster-zonemanager-migration | Finish the IZoneQuery migration for the 5 remaining concrete `ZoneManager` imports in the weapons cluster: `FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`, `PlayerHealthSystem` | cycle-2026-05-10-zone-manager-decoupling | 2 | weapons | no | Out-of-scope for Phase 2 R2 batches A/B/C; aspirational ≤5 ZoneManager-import target missed. Phase 3+ can finish; cycle-2026-05-10's ≤20 success criterion was met (achieved 17 read / 5 concrete). |
 | konveyer-large-file-splits | Two KONVEYER-grown files added to `lint-source-budget.ts` grandfather list at the 2026-05-12 master-merge gate: `HosekWilkieSkyBackend.ts` (807 LOC, slated for the TSL fragment-shader sky port) and `WaterSystem.ts` (733 LOC, slated for VODA-1 water-shader work) | exp→master merge prep 2026-05-12 | 0 | environment | no | Split-debt tracking. Both files grew during the KONVEYER campaign (sky through slices 13-15 + sky-refresh fix; water during the scene-parity standard-material port). Each is grandfathered with a named follow-up round in `scripts/lint-source-budget.ts`. Closes when the named follow-up cycles ship and the files drop below 700 LOC. |
@@ -64,6 +62,14 @@ History log:
   Both opened by the investigation cycle's launch PR; both close at cycle
   end with "promoted to fix cycle <fix-slug>" resolution. Active count
   9 → 11 → 9 (net 0).
+- 2026-05-16 — `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` close:
+  KB-MOBILE-WEBGPU and KB-SKY-BLAND moved Active → Closed via the R2
+  alignment memo at
+  [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
+  Fix work tracked under `cycle-sky-visual-restore` (KB-SKY-BLAND) and
+  `cycle-mobile-webgl2-fallback-fix` (KB-MOBILE-WEBGPU); both queued in
+  [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+  Active count: 11 → 9 (back to cycle-start level; net cycle delta 0).
 - 2026-05-13 — mode-startup spike: KB-STARTUP-1 opened from the user-reported
   "mode selection takes forever" issue. `task/mode-startup-terrain-spike`
   moved terrain surface baking off the mode-click main-thread path and proved
@@ -83,6 +89,8 @@ History log:
 - worldbuilder-oneshotkills-wiring | `oneShotKills` WorldBuilder flag wired into NPC/projectile combat damage | closed in release-stewardship-2026-05-10 | fixed by `a9ebfbe` in `CombatantCombat` and `CombatantSystemDamage`, with behavior tests.
 - perf-doc-script-paths-drift | perf docs and asset acceptance references updated from retired `scripts/projekt-143-*` paths to retained commands/archive paths | closed in release-stewardship-2026-05-10 | fixed by `a9ebfbe` across `docs/perf/*` and `docs/ASSET_ACCEPTANCE_STANDARD.md`.
 - KONVEYER-10 | Rest-of-scene WebGPU parity and frame-budget attribution after K0-K9 branch-review completion | closed in 2026-05-12 master-merge (PR #192) | `exp/konveyer-webgpu-migration` merged into `master` via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192) (commit `1df141ca`); WebGPU + TSL becomes the default production renderer with WebGL2 fallback. R2-R4 follow-on materialization work queued as separate cycles on master.
+- KB-MOBILE-WEBGPU | Mobile is unplayable post-WebGPU-merge; was playable on WebGL pre-merge | closed in cycle-2026-05-16-mobile-webgpu-and-sky-recovery | Investigation complete; root cause pinned to TSL-fragment-cost regression on WebGPURenderer's WebGL2 backend (mobile lands on `webgpu-webgl-fallback`; terrain TSL biome-sampler unroll ~8x amplification, ~146 effective samples/fragment vs ~19 pre-merge). Fix work tracked under `cycle-mobile-webgl2-fallback-fix` queued in [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md). Alignment memo: [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
+- KB-SKY-BLAND | Sky / clouds look bland on master post-WebGPU-merge | closed in cycle-2026-05-16-mobile-webgpu-and-sky-recovery | Investigation complete; root cause is visual-fidelity loss (not perf): 128×64 CPU-baked `DataTexture` replaced per-fragment Preetham `ShaderMaterial`, HDR clamped to [0,1] at bake time, missing `toneMapped: false` routes dome through ACES, sun-disc normalised to peak 1.0 kills HDR pearl. Fix work tracked under `cycle-sky-visual-restore` queued in [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md). Alignment memo: [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
 
 ## Reading the table
 

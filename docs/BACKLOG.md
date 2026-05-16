@@ -1,6 +1,6 @@
 # Backlog
 
-Last verified: 2026-05-13
+Last verified: 2026-05-16
 
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
@@ -58,6 +58,54 @@ Spike memo and evidence:
 Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
+
+## Recently Completed (cycle-2026-05-16-mobile-webgpu-and-sky-recovery)
+
+Investigation cycle covering two owner-reported 2026-05-15 post-WebGPU-merge
+playtest regressions: mobile unplayable + sky bland. Five parallel R1
+investigation memos landed under
+`docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/` with `file:line`
+citations, paired pre/post sky screenshots, mobile-emulation adapter-info
+evidence, and labelled-emulation perf magnitudes (with explicit
+host-contention perf-taint caveat carried into the R2 alignment memo).
+R2 alignment memo synthesised findings and named two fix cycles, both
+queued at the top of `docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`.
+
+Headline findings:
+- Mobile lands on `webgpu-webgl-fallback` (WebGL2 backend of `WebGPURenderer`),
+  not classic `WebGLRenderer`. `strictWebGPU=false` (commit `4aec731e`) is
+  the only reason mobile boots at all.
+- Terrain TSL biome-sampler chain unrolled into `mix(prev, sample, step(...))`
+  forces all 8 biome samplers per fragment → ~146 effective samples/fragment
+  vs ~19 pre-merge (8x amplification). Highest per-fragment cost lever.
+- Sky-bland is visual-fidelity only (not perf): 128×64 CPU-baked DataTexture
+  replaced per-fragment Preetham, HDR clamped to [0,1], missing
+  `toneMapped: false` routes dome through ACES, sun-disc normalised to peak
+  1.0 kills HDR pearl.
+
+PRs merged:
+
+- [#203](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/203) `mobile-renderer-mode-truth` — Pixel 5 + iPhone 12 Playwright emulation probe; `capabilities.resolvedBackend === "webgpu-webgl-fallback"` in both contexts. Ships `scripts/mobile-renderer-probe.ts` for fix-cycle re-validation.
+- [#204](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/204) `tsl-shader-cost-audit` — three production TSL materials inventoried; terrain TSL biome-sampler chain identified as the dominant per-fragment regression (~8x sampler amplification, ~146 effective samples/fragment worst case).
+- [#205](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/205) `sky-visual-and-cost-regression` — four-part visual diff + paired pre/post screenshots across 5 scenarios; root cause is `MeshBasicMaterial`+`DataTexture` resolution drop + HDR clamp + ACES on dome + sun-disc normalisation.
+- [#206](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/206) `mobile-startup-and-frame-budget` — mode-click → playable timings, 60s steady-state `systemBreakdown` (`Combat.AI` 46.86 ms / `World.Atmosphere.SkyTexture` 31.60 ms / `Combat.Billboards` 13.19 ms avg-EMA at 4.42 fps under 4x CPU throttle). Ships `scripts/perf-startup-mobile.ts`.
+- [#207](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/207) `webgl-fallback-pipeline-diff` — eight new pipeline elements in WebGL2-fallback path vs pre-merge; top-3 cost contributors flagged (terrain TSL, renderer construction overhead, CPU-baked sky refresh).
+- Plus the R2 alignment memo `docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md` (orchestrator-authored).
+
+Carry-over delta: +2 opened (`KB-MOBILE-WEBGPU`, `KB-SKY-BLAND`) at launch
+(9 → 11); −2 closed at cycle end with promotion-to-fix-cycle resolution
+(11 → 9). Net cycle delta: 0. Active count back to **9**.
+
+Fix cycles named:
+- `cycle-sky-visual-restore` (small, leads): set `toneMapped: false` on dome,
+  bump LUT resolution, restore HDR sun-disc.
+- `cycle-mobile-webgl2-fallback-fix` (larger, real-device validation = merge
+  gate): TSL terrain biome-sampler early-out, mobile pixel-ratio cap, skip
+  NPC prewarm, mobile-gated sky cadence.
+
+Optional sequencing: `cycle-konveyer-11-spatial-grid-compute` (already
+queued) closes the steady-state #1 mobile bucket (`Combat.AI` / `DEFEKT-3`)
+independently and can run in parallel.
 
 ## Recently Completed (cycle-2026-05-13-konveyer-materialization-rearch + doc-vision-alignment + master-merge)
 

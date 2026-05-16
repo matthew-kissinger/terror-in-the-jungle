@@ -1,6 +1,6 @@
 # Campaign: 2026-05-13 Post-WebGPU master merge
 
-Last verified: 2026-05-13
+Last verified: 2026-05-16
 
 Campaign manifest as of 2026-05-13, post-WebGPU master merge.
 
@@ -8,10 +8,14 @@ Campaign manifest as of 2026-05-13, post-WebGPU master merge.
 
 **ACTIVE.** Auto-advance: **PAUSED.** The
 `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` investigation cycle
-is queued at the front of the queue per owner direction on 2026-05-16,
-ahead of the two vision tracks. Its alignment memo will propose the
-next fix-cycle slot, which then resumes the vision-track choice
-(experimental WebGPU follow-ups vs. driveable land vehicles).
+closed on 2026-05-16 with the R2 alignment memo at
+[docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
+That memo names two follow-up fix cycles, both queued at the top of
+the queue below: `cycle-sky-visual-restore` (small, visual, leads) and
+`cycle-mobile-webgl2-fallback-fix` (larger, real-device-validation
+merge gate). Owner picks ordering at next `/orchestrate` dispatch.
+After those two finish, the vision-track choice (experimental WebGPU
+follow-ups vs. driveable land vehicles) resumes.
 
 Current branch overlay: `task/mode-startup-terrain-spike` addresses a
 user-visible mode-startup stall discovered after the WebGPU merge. It is a
@@ -89,22 +93,107 @@ stabilization-refactor backlog that the 2026-05-09 manifest tracked.
 The following cycles are **listed in dependency order**, not scheduled.
 `/orchestrate` selects the next one when the owner names the slot.
 
-### `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` (active, queued at top)
+### `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` (closed 2026-05-16)
 
-Owner-confirmed slot as of 2026-05-16. Investigation cycle — 5 parallel
-memos under `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/` covering
-the two post-WebGPU-merge user-observable regressions:
+Closed. Five R1 investigation memos merged
+([#203](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/203),
+[#204](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/204),
+[#205](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/205),
+[#206](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/206),
+[#207](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/207))
+under `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/`. R2
+alignment memo at
+[docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md)
+synthesised the findings and named two fix cycles, both queued below:
+`cycle-sky-visual-restore` and `cycle-mobile-webgl2-fallback-fix`.
 
-- Mobile unplayable post-merge (was playable on WebGL pre-merge).
-- Sky bland on master.
+Carry-over delta: opened `KB-MOBILE-WEBGPU` + `KB-SKY-BLAND` at launch
+(9 → 11); closed both at cycle end with promotion-to-fix-cycle
+resolution (11 → 9). Net cycle delta: 0.
 
-R2 produces `docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md`
-naming a fix cycle (or two) that gets prepended below this entry. Full
-brief: [docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md](tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
+### `cycle-sky-visual-restore` (queued, owner picks ordering)
 
-Opens `KB-MOBILE-WEBGPU` and `KB-SKY-BLAND` at launch (9 → 11), closes
-both at cycle end with promotion-to-fix-cycle resolution (11 → 9). Net
-cycle delta: 0.
+Restore the pre-merge sky visual fidelity (saturated horizon, visible
+sun pearl, deep noon blue) without re-introducing the per-fragment
+Preetham shader on the full dome.
+
+- **Closes:** `KB-SKY-BLAND`.
+- **Files touched (expected):**
+  `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts`
+  primarily; possibly `src/systems/environment/AtmosphereSystem.ts`
+  for the sun-disc sprite integration.
+- **Round structure (proposed):** single round, 2-3 tasks:
+  - `sky-dome-tonemap-and-lut-resolution` — set `toneMapped: false` on
+    the dome `MeshBasicMaterial`; bump `SKY_TEXTURE_WIDTH/HEIGHT` to
+    ≥256×128; measure refresh cost via existing
+    `getRefreshStatsForDebug`.
+  - `sky-hdr-bake-restore` — stop clamping radiance to `[0,1]` at
+    bake time; upload as `HalfFloatType` (or encoded exposure curve
+    that preserves sun spike).
+  - `sky-sun-disc-restore` — add additive HDR sun-disc sprite (or
+    composite at downstream stage) so the pearl returns.
+- **Acceptance:** owner-playtest sign-off against paired pre/post
+  screenshots in
+  [docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/img/](rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/img/);
+  no perf regression > 5% p99 on `combat120`.
+- **Out of scope:** re-introducing per-cloud highlight/shadow math;
+  re-introducing the `CloudLayer` plane; switching to a real
+  Hosek-Wilkie coefficient pipeline.
+
+### `cycle-mobile-webgl2-fallback-fix` (queued, owner picks ordering)
+
+Restore mobile playability on the WebGL2-fallback path of
+`WebGPURenderer`. Lead with the terrain TSL early-out (biggest
+per-fragment lever), then the mobile-specific knobs, then validate on
+real devices.
+
+- **Closes:** `KB-MOBILE-WEBGPU`.
+- **Files touched (expected):**
+  `src/systems/terrain/TerrainMaterial.ts` primarily (terrain TSL
+  early-outs); `src/utils/DeviceDetector.ts` (mobile pixel-ratio cap);
+  `src/core/LiveEntryActivator.ts` (mobile-skip prewarm);
+  `src/systems/environment/AtmosphereSystem.ts` +
+  `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts`
+  (mobile-gated sky cadence); `src/core/SystemInitializer.ts`
+  (asset/audio defer); `src/systems/debug/FrameTimingTracker.ts`
+  (`RenderMain` / `RenderOverlay` telemetry-gap fix); plus new
+  `scripts/perf-tsl-shader-cost.ts` and a real-device validation
+  harness.
+- **Round structure (proposed):** 2-3 rounds, 6-8 tasks:
+  - R1 (foundation): `terrain-tsl-biome-early-out`,
+    `terrain-tsl-triplanar-gate`, `render-bucket-telemetry-fix`.
+  - R2 (mobile knobs): `mobile-pixel-ratio-cap`,
+    `mobile-skip-npc-prewarm`, `mobile-sky-cadence-gate`,
+    `asset-audio-defer`.
+  - R3 (validation): `tsl-shader-cost-probe`,
+    `real-device-validation-harness`. Real-device sign-off on Android
+    Chrome + iOS Safari is the merge gate.
+- **Acceptance:**
+  - Steady-state `avgFps` ≥ 20 fps on the Pixel 5 emulation profile
+    (up from 4.42 fps; directional target per the alignment memo's
+    perf-taint caveat).
+  - Steady-state `avgFps` ≥ 30 fps on a real Android Chrome device
+    (mid-tier 2022+).
+  - Owner-playtest "playable" sign-off on a real iOS Safari device.
+  - No regression on desktop `combat120` perf baseline (>5% p99 is a
+    hard stop per this manifest).
+  - `RenderMain` / `RenderOverlay` buckets populated in
+    `systemBreakdown` on both desktop and mobile.
+- **Sequencing dependency on `cycle-konveyer-11-spatial-grid-compute`:**
+  optional. Closing `DEFEKT-3` removes the steady-state #1 bucket
+  (`Combat.AI`) independently. The mobile fix cycle's acceptance is
+  formulated such that running `cycle-konveyer-11` alongside
+  accelerates the playable-fps gate but is not strictly required.
+- **Hard stops (cycle-specific):**
+  - Any TSL early-out rewrite that regresses the strict-WebGPU path on
+    desktop. Strict-WebGPU evidence remains the renderer-architecture
+    acceptance bar.
+  - Real-device-validation infeasible. Cycle must produce real-device
+    evidence; emulation-only is not acceptable as merge evidence (it
+    is acceptable as scoping evidence).
+- **Out of scope:** rolling back the WebGPU + TSL migration;
+  re-introducing the classic `THREE.WebGLRenderer` as the production
+  renderer (the explicit `?renderer=webgl` escape hatch remains).
 
 ### `cycle-vekhikl-1-jeep-drivable`
 
@@ -229,14 +318,13 @@ regardless of which slot is active:
   Until then, the prior baseline plus the WebGPU-migration steady-pose
   proof in `KONVEYER_REVIEW_PACKET_2026-05-12.md` is the bar.
 - **Carry-over count growth past the policy bound.** Active count is
-  11 after `KB-MOBILE-WEBGPU` and `KB-SKY-BLAND` opened for the
-  `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` investigation
-  cycle on 2026-05-16 (was 9 after `KB-STARTUP-1` from the
-  mode-startup spike, 8 after the KONVEYER-10 master merge). Both new
-  carry-overs close at investigation-cycle end via
-  promotion-to-fix-cycle, net cycle delta 0. Growth beyond the policy
-  bound (12) triggers a backlog-prune cycle ahead of the next feature
-  slot.
+  back to **9** after the `cycle-2026-05-16-mobile-webgpu-and-sky-recovery`
+  investigation cycle closed on 2026-05-16 with promotion-to-fix-cycle
+  resolution on `KB-MOBILE-WEBGPU` and `KB-SKY-BLAND` (was 11 mid-cycle,
+  9 at cycle start, 9 after `KB-STARTUP-1` from the mode-startup spike,
+  8 after the KONVEYER-10 master merge). Net cycle delta: 0. Growth
+  beyond the policy bound (12) triggers a backlog-prune cycle ahead of
+  the next feature slot.
 - **WebGL fallback accepted as new evidence.** The fallback is
   production-load-bearing now (commit `4aec731e`), but strict-WebGPU
   evidence remains the acceptance bar for renderer-architecture
