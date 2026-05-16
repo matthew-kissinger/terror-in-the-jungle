@@ -38,6 +38,8 @@ const emptyCloseEngagementProfile = (): CloseEngagementProfile => ({
     suppressionFlankCoverSearches: 0,
     suppressionFlankCoverSearchReuseSkips: 0,
     suppressionFlankCoverSearchCapSkips: 0,
+    suppressionFlankCoverGridHits: 0,
+    suppressionFlankCoverGridMisses: 0,
     targetDistanceBuckets: {
       lt5m: 0,
       m5to10: 0,
