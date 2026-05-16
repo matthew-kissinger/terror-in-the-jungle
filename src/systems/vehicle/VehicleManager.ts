@@ -62,6 +62,17 @@ export class VehicleManager implements GameSystem {
     return null;
   }
 
+  /**
+   * Convenience lookup the GroundVehiclePlayerAdapter (and sibling
+   * ground-vehicle wiring) uses to resolve the player's active jeep
+   * without scanning every vehicle category. Returns null when the
+   * occupant is not seated in a ground vehicle.
+   */
+  getGroundVehicleByOccupant(occupantId: string): IVehicle | null {
+    const v = this.getVehicleByOccupant(occupantId);
+    return v && v.category === 'ground' ? v : null;
+  }
+
   getAllVehicles(): IVehicle[] {
     return Array.from(this.vehicles.values());
   }
