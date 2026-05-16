@@ -1,6 +1,6 @@
 # Playtest Pending
 
-Last verified: 2026-05-16
+Last verified: 2026-05-16 (post `cycle-sky-visual-restore` close)
 
 Single-source sink for cycles that closed under
 `posture: autonomous-loop` (per
@@ -19,11 +19,9 @@ NOT reverted automatically.
 
 ## Active deferrals
 
-(Empty until the autonomous loop closes its first playtest-gated
-cycle. The orchestrator appends rows here as cycles close.)
-
 | Cycle slug | Close commit | What to walk | Playwright smoke screenshots | Notes |
 |------------|--------------|--------------|------------------------------|-------|
+| `cycle-sky-visual-restore` | (this cycle's close commit) | (1) Noon sky reads saturated, horizon picks up blue/cyan, sun pearl visible; (2) Below-horizon (night/sunset) — sprite hidden, no pearl bleed through; (3) WebGPU vs `?renderer=webgl` parity. Compare against `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/img/openfrontier-noon-pre-merge.png`. | `artifacts/cycle-sky-visual-restore/playtest-evidence/sky-dome-tonemap-and-lut-resolution-noon.png`, `sky-hdr-bake-restore-{webgpu,webgl}.png`, `sky-sun-disc-restore-{noon,nadir}.png` | Three R1 PRs merged (#208 `2118177f`, #210 `3455fa96`, #209 `9e1ce7c7`). LUT-bake EMA capture also pending (executor flagged the 2s gate prevents harness re-trigger; ceiling per brief is 8 ms, fallback at 192×96 if observed >12 ms). mobile-ui CI job timeout flake hit each PR (known BACKLOG retro nit; cancelled at 30m boundary). |
 
 ## Walk-through protocol (for the owner)
 

@@ -1,6 +1,6 @@
 # Backlog
 
-Last verified: 2026-05-16
+Last verified: 2026-05-16 (post `cycle-sky-visual-restore` close)
 
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
@@ -58,6 +58,76 @@ Spike memo and evidence:
 Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
+
+## Recently Completed (cycle-sky-visual-restore)
+
+Campaign position #1 of 12 in
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+(autonomous-loop posture). Single-round cycle, three parallel R1 tasks all
+touching `src/systems/environment/atmosphere/**`. Closes the shipped fix for
+`KB-SKY-BLAND` (the post-WebGPU-merge sky-bland visual regression).
+
+PRs merged in dispatch order:
+
+- [#208](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/208)
+  `2118177f` `sky-dome-tonemap-and-lut-resolution` —
+  `MeshBasicMaterial` constructor on the dome gets `toneMapped: false`
+  (bypasses ACES in `GameRenderer`); `SKY_TEXTURE_WIDTH/HEIGHT` bumped from
+  128×64 to 256×128 in `HosekWilkieSkyBackend.ts`. LUT-bake EMA capture
+  deferred — the 2s-gated refresh path didn't fire during the harness sample
+  window; static reasoning (~18-20 ms projected, amortized 0.5% frame budget)
+  recorded in PR description.
+- [#210](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/210)
+  `3455fa96` `sky-hdr-bake-restore` — Sky LUT `DataTexture` migrates from
+  `UnsignedByteType` + sqrt-gamma + `clamp01` to `HalfFloatType` (`Uint16Array`
+  of `THREE.DataUtils.toHalfFloat` bit patterns; matches Three.js r184
+  `Float16BufferAttribute` storage and WebGPU `RGBA16Float` upload). Texture
+  `colorSpace` flips `SRGBColorSpace → LinearSRGBColorSpace` (correct for
+  fp16 linear payload). Analytic ceiling lifts `Math.min(8, …)` → `Math.min(64, …)`
+  so the sun-disc spike survives bake without overflowing fp16's exponent.
+  `compressSkyRadianceForRenderer` deliberately untouched (cap correct for
+  downstream fog + hemisphere readers).
+- [#209](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/209)
+  `9e1ce7c7` `sky-sun-disc-restore` — New `SunDiscMesh.ts` (196 LOC, under
+  200 cap) + 7-test sibling `SunDiscMesh.test.ts`. Additive HDR sprite
+  (`PlaneGeometry` + `MeshBasicMaterial` with `toneMapped: false`,
+  `AdditiveBlending`, `depthWrite/Test: false`) billboarded to the camera,
+  positioned at `sunDir * (domeRadius * 0.99)`. Hidden when sun
+  `.y < 0`. Existing dome `mixSunDisc` soft glow stays; sprite is the
+  bright pin-point on top.
+
+Carry-over delta: 0. KB-SKY-BLAND was already in Closed at cycle start;
+the Closed entry is updated with the three merge SHAs + Playwright
+screenshot evidence path (`artifacts/cycle-sky-visual-restore/playtest-evidence/`).
+
+Perf delta (post-round perf-analyst diff vs `perf-baselines.json` baseline,
+`combat120`): raw numbers show p99 +9.8 ms (+29.3%) on the cumulative final
+state vs the 4-week-old baseline, but the analyst reads this as no
+detectable sky-attributable regression after accounting for measurement
+trust (WARN on all three captures, probeP95 41-46 ms i.e. inside the
+delta), baseline staleness (STABILIZAT-1 has blocked baseline refresh for
+~4 weeks), and the within-cycle trajectory (p99 monotonically *improved*
+66.6 → 73.7 → 43.2 ms across the three merges in order — inconsistent with
+a sky-attributable cumulative regression). No >5% p99 hard-stop fired.
+Independent confirmation requires a quiet-machine re-capture, which is
+STABILIZAT-1 work (closes at campaign cycle #12).
+
+CI notes for the cycle retro: `mobile-ui` CI job timed out at exactly the
+30-minute mark on each of the three PRs — the known BACKLOG retro nit
+(timeout flake on a job unrelated to sky scope). Master is unprotected so
+merge was not blocked; flake count was 3-of-3 PRs in the round, well below
+any reasonable real-signal threshold for a known-flaky timer-bound job.
+
+Owner playtest deferred under autonomous-loop posture; the three sky
+deferrals are appended to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md)
+for the owner to walk after the 12-cycle campaign completes (or during a
+planned break).
+
+Follow-ups for the next cycle (#2, `cycle-mobile-webgl2-fallback-fix`):
+- Real-device validation can confirm the noon sky reads "right" on a phone.
+- LUT-bake EMA on a mobile-emulation capture can quantify whether the
+  256×128 step needs to fall back to 192×96 on phones (cycle-specific
+  graceful-degradation hard-stop is wired but uncaught here).
 
 ## Recently Completed (cycle-2026-05-16-mobile-webgpu-and-sky-recovery)
 
@@ -303,6 +373,7 @@ owner opens or reassigns them.
 
 | Cycle | Record |
 |---|---|
+| cycle-sky-visual-restore | `docs/tasks/archive/cycle-sky-visual-restore/cycle-sky-visual-restore.md` |
 | cycle-2026-05-10-zone-manager-decoupling | `docs/tasks/archive/cycle-2026-05-10-zone-manager-decoupling/cycle-2026-05-10-zone-manager-decoupling.md` |
 | cycle-2026-05-09-doc-decomposition-and-wiring | `docs/tasks/archive/cycle-2026-05-09-doc-decomposition-and-wiring/cycle-2026-05-09-doc-decomposition-and-wiring.md` |
 | cycle-2026-05-09-phase-0-foundation | `docs/tasks/archive/cycle-2026-05-09-phase-0-foundation/cycle-2026-05-09-phase-0-foundation.md` |

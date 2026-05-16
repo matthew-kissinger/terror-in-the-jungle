@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-16 (post `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` close)
+Last verified: 2026-05-16 (post `cycle-sky-visual-restore` close)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -74,6 +74,13 @@ History log:
   "mode selection takes forever" issue. `task/mode-startup-terrain-spike`
   moved terrain surface baking off the mode-click main-thread path and proved
   the cache/Recast path was not the blocker. Active count: 8 → 9.
+- 2026-05-16 — `cycle-sky-visual-restore` close (autonomous-loop posture):
+  shipped the KB-SKY-BLAND fix as 3 R1 PRs (#208, #210, #209). KB-SKY-BLAND
+  Closed entry updated above with merge SHAs and screenshot evidence path.
+  Owner playtest deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md);
+  merge gated on CI green + orchestrator memo APPROVE per posture rule.
+  No active carry-over churn (KB-SKY-BLAND already in Closed at cycle start).
+  Active count: 9 → 9 (no change).
 
 ## Closed
 
@@ -90,7 +97,7 @@ History log:
 - perf-doc-script-paths-drift | perf docs and asset acceptance references updated from retired `scripts/projekt-143-*` paths to retained commands/archive paths | closed in release-stewardship-2026-05-10 | fixed by `a9ebfbe` across `docs/perf/*` and `docs/ASSET_ACCEPTANCE_STANDARD.md`.
 - KONVEYER-10 | Rest-of-scene WebGPU parity and frame-budget attribution after K0-K9 branch-review completion | closed in 2026-05-12 master-merge (PR #192) | `exp/konveyer-webgpu-migration` merged into `master` via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192) (commit `1df141ca`); WebGPU + TSL becomes the default production renderer with WebGL2 fallback. R2-R4 follow-on materialization work queued as separate cycles on master.
 - KB-MOBILE-WEBGPU | Mobile is unplayable post-WebGPU-merge; was playable on WebGL pre-merge | closed in cycle-2026-05-16-mobile-webgpu-and-sky-recovery | Investigation complete; root cause pinned to TSL-fragment-cost regression on WebGPURenderer's WebGL2 backend (mobile lands on `webgpu-webgl-fallback`; terrain TSL biome-sampler unroll ~8x amplification, ~146 effective samples/fragment vs ~19 pre-merge). Fix work tracked under `cycle-mobile-webgl2-fallback-fix` queued in [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md). Alignment memo: [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
-- KB-SKY-BLAND | Sky / clouds look bland on master post-WebGPU-merge | closed in cycle-2026-05-16-mobile-webgpu-and-sky-recovery | Investigation complete; root cause is visual-fidelity loss (not perf): 128×64 CPU-baked `DataTexture` replaced per-fragment Preetham `ShaderMaterial`, HDR clamped to [0,1] at bake time, missing `toneMapped: false` routes dome through ACES, sun-disc normalised to peak 1.0 kills HDR pearl. Fix work tracked under `cycle-sky-visual-restore` queued in [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md). Alignment memo: [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
+- KB-SKY-BLAND | Sky / clouds look bland on master post-WebGPU-merge | closed in cycle-2026-05-16-mobile-webgpu-and-sky-recovery (investigation) + fix shipped in cycle-sky-visual-restore | Investigation complete; root cause is visual-fidelity loss (not perf): 128×64 CPU-baked `DataTexture` replaced per-fragment Preetham `ShaderMaterial`, HDR clamped to [0,1] at bake time, missing `toneMapped: false` routes dome through ACES, sun-disc normalised to peak 1.0 kills HDR pearl. **Fix landed via three R1 PRs in `cycle-sky-visual-restore`**: [#208](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/208) `2118177f` (toneMapped:false + 256×128 LUT), [#210](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/210) `3455fa96` (HalfFloatType HDR LUT + drop [0,1] clamp + ceiling 8→64), [#209](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/209) `9e1ce7c7` (additive HDR sun-disc sprite). Owner walk-through deferred under autonomous-loop posture; Playwright smoke screenshots under `artifacts/cycle-sky-visual-restore/playtest-evidence/` (5 PNGs: dome-noon, hdr-{webgpu,webgl}, sun-disc-{noon,nadir}); deferral tracked in [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md). Alignment memo: [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
 
 ## Reading the table
 
