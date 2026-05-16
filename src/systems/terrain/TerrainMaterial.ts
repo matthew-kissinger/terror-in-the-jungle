@@ -9,7 +9,9 @@ import {
   dot,
   float,
   floor,
+  Fn,
   fract,
+  If,
   length as tslLengthBase,
   max as tslMaxBase,
   min as tslMinBase,
@@ -25,6 +27,7 @@ import {
   texture as tslTextureNode,
   vec2,
   vec3,
+  vec4,
 } from 'three/tsl';
 import type { SplatmapConfig } from './TerrainConfig';
 import type { TerrainSurfaceKind, TerrainSurfacePatch } from './TerrainFeatureTypes';
@@ -273,16 +276,52 @@ function rotateUvNode(sampleUv: TslNode, angle: TslNode): TslNode {
 }
 
 function sampleBiomeTextureRaw(biomeSlot: TslNode, sampleUv: TslNode, uniforms: TerrainUniforms): TslNode {
-  const wrappedUv = fract(sampleUv) as TslNode;
-  let sample = tslTexture(uniformTexture(uniforms, 'biomeTexture0'), wrappedUv);
-  for (let i = 1; i < MAX_BIOME_TEXTURES; i++) {
-    sample = tslMix(
-      sample,
-      tslTexture(uniformTexture(uniforms, `biomeTexture${i}`), wrappedUv),
-      step(tslFloat(i - 0.5), biomeSlot),
-    );
-  }
-  return sample;
+  // TSL Fn wrapper lets the compiled GLSL emit a real `if/else if` chain
+  // over biomeSlot rather than the prior `mix(prev, sample, step(N-0.5,
+  // slot))` unroll. The unroll forced all 8 biome samplers per fragment
+  // (~8x sampler amplification on the WebGL2-fallback path that mobile
+  // lands on). With If/ElseIf the WebGL2 backend can short-circuit to a
+  // single sampler per fragment in the common case (terrain-fragment
+  // cost drops proportionally). See
+  // docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md and
+  // docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/tsl-shader-cost-audit.md.
+  //
+  // We bind the per-call uniforms object via closure rather than caching
+  // the Fn because `applyTerrainMaterialOptions` may swap the bound
+  // textures underneath an existing uniforms bundle, and we want the
+  // freshly-bound textures to flow through on the next node-graph rebuild.
+  const fn = Fn(([slot, sampleUvInner]: TslNode[]) => {
+    const wrappedUv = fract(sampleUvInner) as TslNode;
+    const result = (vec4 as (...values: TslNode[]) => TslNode)(0, 0, 0, 1).toVar();
+    // Round biomeSlot to nearest int before comparing. The classifier
+    // upstream emits whole-number slots, but direct float comparison is
+    // fragile; floor(slot + 0.5) yields a stable int-like value.
+    const slotIdx = floor(slot.add(0.5)) as TslNode;
+    // Construct each tslTexture node *inside* its branch so the compiled
+    // GLSL emits the texture() call inside the if-block rather than
+    // hoisting it to function scope. The result is a true per-fragment
+    // early-out: only one biome sampler is fetched per fragment in the
+    // common case (vs all 8 under the prior unroll).
+    If(slotIdx.lessThanEqual(0), () => {
+      result.assign(tslTexture(uniformTexture(uniforms, 'biomeTexture0'), wrappedUv));
+    }).ElseIf(slotIdx.equal(1), () => {
+      result.assign(tslTexture(uniformTexture(uniforms, 'biomeTexture1'), wrappedUv));
+    }).ElseIf(slotIdx.equal(2), () => {
+      result.assign(tslTexture(uniformTexture(uniforms, 'biomeTexture2'), wrappedUv));
+    }).ElseIf(slotIdx.equal(3), () => {
+      result.assign(tslTexture(uniformTexture(uniforms, 'biomeTexture3'), wrappedUv));
+    }).ElseIf(slotIdx.equal(4), () => {
+      result.assign(tslTexture(uniformTexture(uniforms, 'biomeTexture4'), wrappedUv));
+    }).ElseIf(slotIdx.equal(5), () => {
+      result.assign(tslTexture(uniformTexture(uniforms, 'biomeTexture5'), wrappedUv));
+    }).ElseIf(slotIdx.equal(6), () => {
+      result.assign(tslTexture(uniformTexture(uniforms, 'biomeTexture6'), wrappedUv));
+    }).Else(() => {
+      result.assign(tslTexture(uniformTexture(uniforms, 'biomeTexture7'), wrappedUv));
+    });
+    return result;
+  });
+  return fn(biomeSlot, sampleUv);
 }
 
 function sampleBiomeScalar(biomeSlot: TslNode, uniforms: TerrainUniforms, key: string): TslNode {
