@@ -71,9 +71,15 @@ export class VehicleManager implements GameSystem {
   }
 
   update(deltaTime: number): void {
-    // VehicleManager doesn't update vehicles directly - each vehicle system
-    // handles its own updates. This is here for the GameSystem interface.
-    void deltaTime;
+    // Helicopters and fixed-wing aircraft are stepped by their own dedicated
+    // systems (HelicopterModel / FixedWingModel); their IVehicle adapters
+    // implement update() as a no-op so this dispatch is safe to fan out
+    // across every registered vehicle. Ground vehicles own their physics step
+    // here because they have no parallel manager. See
+    // docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md.
+    for (const vehicle of this.vehicles.values()) {
+      vehicle.update(deltaTime);
+    }
   }
 
   dispose(): void {
