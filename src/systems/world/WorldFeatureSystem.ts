@@ -487,6 +487,9 @@ export class WorldFeatureSystem implements GameSystem {
 
     object.userData.worldFeatureGroundVehicleId = objectId;
     const vehicle = new GroundVehicle(objectId, object);
+    if (this.terrainManager) {
+      vehicle.setTerrain(this.terrainManager);
+    }
     this.vehicleManager.register(vehicle);
     return objectId;
   }
