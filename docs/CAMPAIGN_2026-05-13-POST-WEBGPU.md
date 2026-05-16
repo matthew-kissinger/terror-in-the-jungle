@@ -6,17 +6,20 @@ Campaign manifest as of 2026-05-13, post-WebGPU master merge.
 
 ## Status
 
-**ACTIVE.** Auto-advance: **PAUSED.** Cycle selection waits for owner
-direction on which of the two vision tracks (experimental WebGPU
-follow-ups vs. driveable land vehicles) takes the next slot. The
-manifest catalogues both queues so `/orchestrate` can pick up either
-without first re-deriving the queue.
+**ACTIVE.** Auto-advance: **PAUSED.** The
+`cycle-2026-05-16-mobile-webgpu-and-sky-recovery` investigation cycle
+is queued at the front of the queue per owner direction on 2026-05-16,
+ahead of the two vision tracks. Its alignment memo will propose the
+next fix-cycle slot, which then resumes the vision-track choice
+(experimental WebGPU follow-ups vs. driveable land vehicles).
 
 Current branch overlay: `task/mode-startup-terrain-spike` addresses a
 user-visible mode-startup stall discovered after the WebGPU merge. It is a
 targeted branch, not a replacement for either vision track. The branch should
 either merge as a startup hardening slice or leave behind `KB-STARTUP-1` with
-its visual-review and persistent-cache follow-up criteria intact.
+its visual-review and persistent-cache follow-up criteria intact. It is
+explicitly OUT OF SCOPE for the
+`cycle-2026-05-16-mobile-webgpu-and-sky-recovery` investigation cycle.
 
 ## Predecessor
 
@@ -85,6 +88,23 @@ stabilization-refactor backlog that the 2026-05-09 manifest tracked.
 
 The following cycles are **listed in dependency order**, not scheduled.
 `/orchestrate` selects the next one when the owner names the slot.
+
+### `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` (active, queued at top)
+
+Owner-confirmed slot as of 2026-05-16. Investigation cycle — 5 parallel
+memos under `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/` covering
+the two post-WebGPU-merge user-observable regressions:
+
+- Mobile unplayable post-merge (was playable on WebGL pre-merge).
+- Sky bland on master.
+
+R2 produces `docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md`
+naming a fix cycle (or two) that gets prepended below this entry. Full
+brief: [docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md](tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
+
+Opens `KB-MOBILE-WEBGPU` and `KB-SKY-BLAND` at launch (9 → 11), closes
+both at cycle end with promotion-to-fix-cycle resolution (11 → 9). Net
+cycle delta: 0.
 
 ### `cycle-vekhikl-1-jeep-drivable`
 
@@ -209,10 +229,14 @@ regardless of which slot is active:
   Until then, the prior baseline plus the WebGPU-migration steady-pose
   proof in `KONVEYER_REVIEW_PACKET_2026-05-12.md` is the bar.
 - **Carry-over count growth past the policy bound.** Active count is
-  9 after `KB-STARTUP-1` opened for the mode-startup terrain-bake spike
-  (8 after the KONVEYER-10 master merge; +1 for this branch). Growth beyond
-  policy bound triggers a backlog-prune cycle ahead of the next
-  feature slot.
+  11 after `KB-MOBILE-WEBGPU` and `KB-SKY-BLAND` opened for the
+  `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` investigation
+  cycle on 2026-05-16 (was 9 after `KB-STARTUP-1` from the
+  mode-startup spike, 8 after the KONVEYER-10 master merge). Both new
+  carry-overs close at investigation-cycle end via
+  promotion-to-fix-cycle, net cycle delta 0. Growth beyond the policy
+  bound (12) triggers a backlog-prune cycle ahead of the next feature
+  slot.
 - **WebGL fallback accepted as new evidence.** The fallback is
   production-load-bearing now (commit `4aec731e`), but strict-WebGPU
   evidence remains the acceptance bar for renderer-architecture
