@@ -40,38 +40,57 @@ const CLOUD_HORIZON_FADE_FULL_Y = 0.2;
  */
 const LUT_REBAKE_COS_THRESHOLD = Math.cos((0.5 * Math.PI) / 180);
 
+// Half-float bit pattern for 1.0 — precomputed so the per-pixel encode
+// loop doesn't pay the `toHalfFloat` cost on the (constant) alpha
+// channel of the sky LUT.
+const ALPHA_HALF_ONE = THREE.DataUtils.toHalfFloat(1);
+
 interface SkyTextureResource {
   texture: THREE.Texture;
-  data: Uint8Array;
+  data: Uint16Array;
 }
 
 /**
- * Slice 13: replace the legacy `CanvasTexture` (Canvas2D context +
- * `putImageData` + canvas-read upload) with a direct `DataTexture`
- * (typed Uint8Array uploaded as-is via `texSubImage2D`). Eliminates the
- * canvas-read step that is independently flagged as a WebGPU
- * anti-pattern (three.js discourse 50288 / 66535, issues #28101 /
- * #31055). The buffer + RGBA layout match what `refreshSkyTexture`
- * already writes — only the texture type changes.
+ * Sky LUT is uploaded as half-float (`THREE.HalfFloatType`) RGBA so the
+ * bake can keep linear-radiance values past the prior [0,1] clamp.
+ *
+ * Storage is `Uint16Array` holding the IEEE-754 fp16 bit pattern produced
+ * by `THREE.DataUtils.toHalfFloat`. Three.js' WebGL and WebGPU upload
+ * paths both consume `Uint16Array` for `RGBA16F` / `RGBA16Float`
+ * textures (see `WebGPUTextureUtils.getTypedArrayType` and
+ * `Float16BufferAttribute` in r184 — native `Float16Array` browser
+ * support is still uneven, so Three.js leans on Uint16Array).
+ *
+ * Color space is `LinearSRGBColorSpace` because the half-float values are
+ * already linear radiance; `SRGBColorSpace` would apply a spurious
+ * sRGB-to-linear decode on sample.
+ *
+ * Slice 13 retained: still a direct `DataTexture` (no Canvas2D round
+ * trip) — only the storage type changes.
  */
 function createSkyTexture(): SkyTextureResource {
-  const data = new Uint8Array(SKY_TEXTURE_WIDTH * SKY_TEXTURE_HEIGHT * 4);
+  const data = new Uint16Array(SKY_TEXTURE_WIDTH * SKY_TEXTURE_HEIGHT * 4);
   // Default sky-blue fill so first-frame reads before refresh have a
-  // sensible value (matches the prior null-context fallback color).
+  // sensible value. Linear-radiance approximations of the prior
+  // sqrt-gamma-encoded RGB (112,164,220) ≈ (0.193, 0.413, 0.744).
+  const fillR = THREE.DataUtils.toHalfFloat(0.193);
+  const fillG = THREE.DataUtils.toHalfFloat(0.413);
+  const fillB = THREE.DataUtils.toHalfFloat(0.744);
+  const fillA = THREE.DataUtils.toHalfFloat(1);
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = 112;
-    data[i + 1] = 164;
-    data[i + 2] = 220;
-    data[i + 3] = 255;
+    data[i] = fillR;
+    data[i + 1] = fillG;
+    data[i + 2] = fillB;
+    data[i + 3] = fillA;
   }
   const texture = new THREE.DataTexture(
     data,
     SKY_TEXTURE_WIDTH,
     SKY_TEXTURE_HEIGHT,
     THREE.RGBAFormat,
-    THREE.UnsignedByteType,
+    THREE.HalfFloatType,
   );
-  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.colorSpace = THREE.LinearSRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.minFilter = THREE.LinearFilter;
@@ -150,7 +169,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   private readonly material: THREE.MeshBasicMaterial;
   private readonly geometry: THREE.SphereGeometry;
   private readonly skyTexture: THREE.Texture;
-  private readonly skyData: Uint8Array;
+  private readonly skyData: Uint16Array;
 
   // Slice 14 diagnostic: count refresh-loop activity so probes can
   // distinguish real refresh cost from phantom EMA. `refreshFireCount`
@@ -452,8 +471,9 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     const refreshStart = performance.now();
     this.refreshFireCount += 1;
 
-    // Slice 13: write directly into the `DataTexture` buffer (Uint8Array)
-    // and call `needsUpdate = true`. Skips the Canvas2D context, the
+    // Slice 13 (+ sky-hdr-bake-restore): write directly into the
+    // `DataTexture` buffer (Uint16Array of fp16 bit patterns) and call
+    // `needsUpdate = true`. Skips the Canvas2D context, the
     // `putImageData` step, and the canvas-read leg of the upload path.
     // Confirmed WebGPU-correct primitive vs `CanvasTexture` (see
     // discourse 50288 / 66535).
@@ -514,10 +534,17 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
         g = this.scratchColor.g;
         b = this.scratchColor.b;
 
-        data[offset++] = Math.round(Math.sqrt(clamp01(r)) * 255);
-        data[offset++] = Math.round(Math.sqrt(clamp01(g)) * 255);
-        data[offset++] = Math.round(Math.sqrt(clamp01(b)) * 255);
-        data[offset++] = 255;
+        // Half-float HDR: write linear radiance directly. The prior
+        // sqrt-gamma + clamp01 + *255 path was a workaround for 8-bit
+        // sRGB storage that crushed the sun-disc spike and capped noon
+        // saturation. With fp16 we keep linear values up to ~65k; the
+        // dome material is `toneMapped: false` so the on-screen exposure
+        // is controlled by the upstream `evaluateAnalytic` ceiling
+        // (64.0) rather than this encode step.
+        data[offset++] = THREE.DataUtils.toHalfFloat(Math.max(0, r));
+        data[offset++] = THREE.DataUtils.toHalfFloat(Math.max(0, g));
+        data[offset++] = THREE.DataUtils.toHalfFloat(Math.max(0, b));
+        data[offset++] = ALPHA_HALF_ONE;
       }
     }
 
@@ -803,10 +830,16 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     g2c *= this.exposure;
     b *= this.exposure;
 
+    // Cycle sky-visual-restore: lift the prior 8.0 ceiling to 64.0 so
+    // the sun-disc spike survives into the half-float LUT without
+    // bumping into fp16's exponent range (max representable ~65504).
+    // Downstream consumers of `sample()` / `getZenith()` / `getHorizon()`
+    // still pass through `compressSkyRadianceForRenderer` in
+    // `AtmosphereSystem` for fog + hemisphere readers.
     out.setRGB(
-      Math.max(0, Math.min(8, r)),
-      Math.max(0, Math.min(8, g2c)),
-      Math.max(0, Math.min(8, b))
+      Math.max(0, Math.min(64, r)),
+      Math.max(0, Math.min(64, g2c)),
+      Math.max(0, Math.min(64, b))
     );
   }
 }
