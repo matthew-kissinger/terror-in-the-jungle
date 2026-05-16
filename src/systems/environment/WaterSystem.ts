@@ -80,6 +80,37 @@ const HYDROLOGY_RIVER_BANK_ALPHA = 0.01;
 const HYDROLOGY_RIVER_CENTER_ALPHA = 0.32;
 const DEFAULT_WATER_IMMERSION_DEPTH_METERS = 1.6;
 
+// Foam-line band on the water side of the terrain-water intersection. The
+// band is parameterised in metres of effective water depth (waterY − sampled
+// terrainY). At zero depth the foam is fully opaque; it fades to 0 at
+// `WATER_EDGE_FOAM_WIDTH_METERS`. Chosen for VODA-1
+// (cycle-voda-1-water-shader-and-acceptance):
+//   - WATER_EDGE_FOAM_WIDTH_METERS: 0.8 m — narrow enough to read as a
+//     surf-line at the shoreline rather than a beach-wide tint, wide enough
+//     to survive temporal aliasing as wavelets move.
+//   - WATER_EDGE_FOAM_INTENSITY: 0.55 — visible against the dark water base
+//     (GLOBAL_WATER_COLOR = 0x17362f) without blowing past LDR.
+// The companion terrain-side soft-blend distance is documented in
+// TerrainMaterial.ts (TERRAIN_WATER_EDGE_DEFAULT_SOFT_BLEND_DISTANCE = 1.5 m
+// — wider than the foam band so the wet-sand band reads through the foam).
+const WATER_EDGE_FOAM_WIDTH_METERS = 0.8;
+const WATER_EDGE_FOAM_INTENSITY = 0.55;
+const WATER_EDGE_SOFT_BLEND_DISTANCE_METERS = 1.5;
+
+export interface WaterTerrainHeightSamplerBinding {
+  texture: THREE.Texture;
+  worldSize: number;
+  // Bottom-left world-space corner of the heightmap coverage (matches the
+  // terrain's own UV remap: `(worldXZ + halfWorld) / worldSize`).
+  originX?: number;
+  originZ?: number;
+}
+
+export interface WaterEdgeBinding {
+  surfaceY: number;
+  softBlendDistance: number;
+}
+
 export class WaterSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -104,6 +135,22 @@ export class WaterSystem implements GameSystem {
   private wasUnderwater: boolean = false;
   private overlay?: HTMLDivElement;
   private enabled = true;
+
+  // Terrain-water intersection mask state.
+  // `terrainHeightBinding` is opt-in: if no caller wires the terrain heightmap
+  // through `bindTerrainHeightSampler`, the foam line stays disabled and the
+  // global water surface renders as it did pre-VODA-1. When bound, the global
+  // water material's onBeforeCompile patch reads the heightmap and emits the
+  // foam line wherever water depth (waterY − sampledTerrainY) is shallow.
+  private terrainHeightBinding: WaterTerrainHeightSamplerBinding | null = null;
+  private readonly waterEdgeFoamUniforms = {
+    terrainHeightmap: { value: null as THREE.Texture | null },
+    terrainHeightWorldSize: { value: 1 },
+    terrainHeightOrigin: { value: new THREE.Vector2(0, 0) },
+    waterEdgeFoamWidth: { value: WATER_EDGE_FOAM_WIDTH_METERS },
+    waterEdgeFoamIntensity: { value: WATER_EDGE_FOAM_INTENSITY },
+    waterEdgeBindingEnabled: { value: 0 },
+  };
   
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
@@ -175,6 +222,7 @@ export class WaterSystem implements GameSystem {
       side: THREE.DoubleSide,
     });
     waterMaterial.envMapIntensity = 0.35;
+    this.installWaterEdgeFoamPatch(waterMaterial);
 
     this.water = new THREE.Mesh(waterGeometry, waterMaterial);
     this.water.name = 'global-water-standard-plane';
@@ -434,6 +482,120 @@ export class WaterSystem implements GameSystem {
       hydrologyTotalLengthMeters: this.hydrologyRiverStats.totalLengthMeters,
       hydrologyMaxAccumulationCells: this.hydrologyRiverStats.maxAccumulationCells,
     };
+  }
+
+  /**
+   * Publish the live water-edge configuration for terrain-side consumers
+   * (`updateTerrainMaterialWaterEdge`). The runtime composer wires this
+   * through to TerrainMaterial in a follow-up; until then it is a read-only
+   * snapshot that downstream code can pick up.
+   */
+  getWaterEdgeBinding(): WaterEdgeBinding {
+    return {
+      surfaceY: this.WATER_LEVEL,
+      softBlendDistance: WATER_EDGE_SOFT_BLEND_DISTANCE_METERS,
+    };
+  }
+
+  /**
+   * Wire the terrain heightmap into the global water plane material so the
+   * water-side foam line lights up wherever the plane intersects terrain.
+   * Pass `null` to disable the foam line and revert to the pre-VODA-1
+   * water-plane look (useful when the heightmap is being rebaked or when a
+   * future scenario has no global plane). Safe to call before or after
+   * `init()`; if called pre-init the binding is replayed once the material
+   * exists.
+   */
+  bindTerrainHeightSampler(binding: WaterTerrainHeightSamplerBinding | null): void {
+    this.terrainHeightBinding = binding;
+    const uniforms = this.waterEdgeFoamUniforms;
+    if (!binding) {
+      uniforms.terrainHeightmap.value = null;
+      uniforms.waterEdgeBindingEnabled.value = 0;
+      return;
+    }
+    uniforms.terrainHeightmap.value = binding.texture;
+    uniforms.terrainHeightWorldSize.value = Math.max(1, binding.worldSize);
+    const halfWorld = (Math.max(1, binding.worldSize)) * 0.5;
+    uniforms.terrainHeightOrigin.value.set(
+      Number.isFinite(binding.originX) ? (binding.originX as number) : -halfWorld,
+      Number.isFinite(binding.originZ) ? (binding.originZ as number) : -halfWorld,
+    );
+    uniforms.waterEdgeBindingEnabled.value = 1;
+  }
+
+  /**
+   * Patch the global water plane material so the fragment shader emits a
+   * foam-line contribution where water depth is shallow. The patch is
+   * compile-once via `onBeforeCompile`; activation is gated at runtime by the
+   * `waterEdgeBindingEnabled` uniform so we can ship the shader path without
+   * forcing every caller to wire a terrain heightmap on day one.
+   *
+   * Uses MeshStandardMaterial includes so the existing PBR shading (sun
+   * specular, normalmap ripple, transparency) is preserved verbatim. The
+   * patch only nudges `diffuseColor.rgb` and `diffuseColor.a` after the
+   * lighting accumulation — no additional render targets, no depth texture.
+   */
+  private installWaterEdgeFoamPatch(material: THREE.MeshStandardMaterial): void {
+    const uniforms = this.waterEdgeFoamUniforms;
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.terrainHeightmap = uniforms.terrainHeightmap as unknown as THREE.IUniform;
+      shader.uniforms.terrainHeightWorldSize = uniforms.terrainHeightWorldSize as unknown as THREE.IUniform;
+      shader.uniforms.terrainHeightOrigin = uniforms.terrainHeightOrigin as unknown as THREE.IUniform;
+      shader.uniforms.waterEdgeFoamWidth = uniforms.waterEdgeFoamWidth as unknown as THREE.IUniform;
+      shader.uniforms.waterEdgeFoamIntensity = uniforms.waterEdgeFoamIntensity as unknown as THREE.IUniform;
+      shader.uniforms.waterEdgeBindingEnabled = uniforms.waterEdgeBindingEnabled as unknown as THREE.IUniform;
+
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vWorldPositionWaterEdge;`,
+      ).replace(
+        '#include <worldpos_vertex>',
+        `#include <worldpos_vertex>
+vWorldPositionWaterEdge = worldPosition.xyz;`,
+      );
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <common>',
+        `#include <common>
+uniform sampler2D terrainHeightmap;
+uniform float terrainHeightWorldSize;
+uniform vec2 terrainHeightOrigin;
+uniform float waterEdgeFoamWidth;
+uniform float waterEdgeFoamIntensity;
+uniform float waterEdgeBindingEnabled;
+varying vec3 vWorldPositionWaterEdge;`,
+      ).replace(
+        '#include <opaque_fragment>',
+        `// Water-side foam line. Inverse of the terrain-side soft-blend gradient:
+// terrain-side darkens within ±softBlendDistance of waterY; water-side
+// brightens within +waterEdgeFoamWidth of waterY (i.e. shallow depth).
+// Gated by waterEdgeBindingEnabled so the unbound path is a no-op.
+// Mutates outgoingLight and diffuseColor.a *before* opaque_fragment writes
+// the final gl_FragColor — that's the only slot in meshphysical's fragment
+// pipeline where both the post-lighting RGB and the alpha are still mutable.
+if (waterEdgeBindingEnabled > 0.5) {
+  vec2 hmUv = (vWorldPositionWaterEdge.xz - terrainHeightOrigin) / max(terrainHeightWorldSize, 1.0);
+  vec2 hmUvClamped = clamp(hmUv, vec2(0.0), vec2(1.0));
+  float terrainY = texture2D(terrainHeightmap, hmUvClamped).r;
+  float depth = vWorldPositionWaterEdge.y - terrainY;
+  float foam = 1.0 - smoothstep(0.0, max(waterEdgeFoamWidth, 0.001), depth);
+  foam *= step(0.0, depth); // only foam where water is over terrain, not under
+  // Inside-UV mask so the foam doesn't ring the world-edge texel clamp.
+  float insideU = step(0.0, hmUv.x) * step(hmUv.x, 1.0);
+  float insideV = step(0.0, hmUv.y) * step(hmUv.y, 1.0);
+  foam *= insideU * insideV;
+  float foamStrength = foam * waterEdgeFoamIntensity;
+  outgoingLight = mix(outgoingLight, vec3(0.92, 0.94, 0.93), foamStrength);
+  diffuseColor.a = clamp(diffuseColor.a + foamStrength * 0.5, 0.0, 1.0);
+}
+#include <opaque_fragment>`,
+      );
+    };
+    // Force a single recompile on the next render so onBeforeCompile runs
+    // against the freshly-installed patch even if Three.js cached the program.
+    material.needsUpdate = true;
   }
 
   /**

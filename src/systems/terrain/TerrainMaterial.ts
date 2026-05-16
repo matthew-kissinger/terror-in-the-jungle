@@ -185,7 +185,23 @@ interface TerrainMaterialOptions {
   surfaceWetness?: number;
   tileGridResolution?: number;
   surfacePatches?: TerrainSurfacePatch[];
+  waterEdge?: TerrainWaterEdgeConfig;
 }
+
+/**
+ * Shoreline soft-blend binding for the terrain-water intersection (VODA-1
+ * cycle-voda-1-water-shader-and-acceptance). When unbound, the shader
+ * leaves the mask disabled (sentinel `surfaceY = -1e9`). Default
+ * `softBlendDistance` of 1.5 m keeps the wet band readable across both Open
+ * Frontier and A Shau valley scales.
+ */
+export interface TerrainWaterEdgeConfig {
+  surfaceY: number;
+  softBlendDistance?: number;
+}
+
+const TERRAIN_WATER_EDGE_DISABLED_SURFACE_Y = -1e9;
+const TERRAIN_WATER_EDGE_DEFAULT_SOFT_BLEND_DISTANCE = 1.5;
 
 function uniformTexture(uniforms: TerrainUniforms, key: string): THREE.Texture {
   return uniforms[key].value as THREE.Texture;
@@ -501,6 +517,39 @@ function lowlandWetnessMask(slopeUp: TslNode, elevation: TslNode, uniforms: Terr
   return lowlandFactor.mul(flatFactor).mul(tslMix(tslFloat(0.35), tslFloat(1), wetness));
 }
 
+// Per-fragment soft-blend mask along the water shoreline. Returns 0 well above
+// the water surface, ramps up as the terrain dips toward `waterEdgeSurfaceY`,
+// and stays at full strength below it. Drives the wet-sand darkening + sheen
+// on the terrain side of the intersection. The complementary water-side foam
+// line lives in WaterSystem's global-water onBeforeCompile patch and uses the
+// inverse gradient (high near terrain peak, fades into deep water).
+//
+// Gradient parameters chosen for VODA-1 (cycle-voda-1-water-shader-and-acceptance):
+//   - waterEdgeSoftBlendDistance: 1.5 m — wide enough to read at jungle-foliage
+//     scale from a standing POV without rim-banding, narrow enough that beaches
+//     visibly transition rather than appearing uniformly wet.
+//   - waterEdgeMaxStrength: 0.42 — keeps wet sand readable as terrain (not
+//     blackened) and pairs with the existing `lowlandWetnessMask` mul(0.35).
+//   - waterEdgeSurfaceY default −1e9 means "unbound" — the mask is fully
+//     inactive until WaterSystem (or any caller) publishes the live water
+//     level via updateTerrainMaterialWaterEdge().
+function waterEdgeSoftBlendMask(worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
+  const surfaceY = tslReference('float', uniforms.waterEdgeSurfaceY);
+  const softBlend = tslMax(tslReference('float', uniforms.waterEdgeSoftBlendDistance), tslFloat(0.001));
+  // smoothstep ramps from 0 (terrain comfortably above water) to 1 (terrain at
+  // or below water). The +softBlend / -softBlend window is the shoreline band.
+  // Use 1 - smoothstep so the mask is 1 *near* the water and 0 far above.
+  const rawMask = tslFloat(1).sub(
+    smoothstep(surfaceY.sub(softBlend), surfaceY.add(softBlend), worldPos.y),
+  );
+  // Disable when surfaceY is left at the sentinel default (−1e9). Any caller
+  // that publishes a real water level (e.g. WATER_LEVEL = 0) leaves this
+  // multiplier at 1. The −1e8 gate is well above the sentinel and well below
+  // any real-world world-Y in either mode.
+  const enabled = step(tslFloat(-1e8), surfaceY) as TslNode;
+  return tslClamp(rawMask.mul(enabled), tslFloat(0), tslFloat(1));
+}
+
 function farCanopyTintMask(slopeUp: TslNode, elevation: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
   const enabled = step(tslFloat(0.5), tslReference('float', uniforms.farCanopyTintEnabled));
   const start = tslReference('float', uniforms.farCanopyTintStartDistance);
@@ -632,6 +681,11 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   const flatFactor = smoothstep(tslFloat(0.45), tslFloat(0.95), biomeBlend.slopeUp);
   finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.93, 1.01, 0.94)), lowlandFactor.mul(flatFactor).mul(0.22));
   finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.82, 0.9, 0.84)), lowlandWetnessMask(biomeBlend.slopeUp, worldPos.y, uniforms).mul(0.35));
+  // Shoreline wet-sand soft-blend. Darkens + cools terrain that falls within
+  // ±waterEdgeSoftBlendDistance of the live water surface. Multiplier 0.42
+  // matches waterEdgeMaxStrength documented at the mask helper.
+  const waterEdgeMask = waterEdgeSoftBlendMask(worldPos, uniforms);
+  finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.68, 0.78, 0.74)), waterEdgeMask.mul(0.42));
   const cliffMask = tslFloat(1).sub(smoothstep(tslFloat(0.50), tslFloat(0.74), biomeBlend.slopeUp));
   const proceduralHillMask = smoothstep(tslFloat(20), tslFloat(60), worldPos.y)
     .mul(tslFloat(1).sub(smoothstep(tslFloat(150), tslFloat(300), worldPos.y)));
@@ -685,6 +739,10 @@ function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
   // highlights at low sun angles, especially on highland (base 0.78) in A
   // Shau. 0.94 keeps a subtle wet sheen without going to glass.
   roughnessSample = tslMix(roughnessSample, roughnessSample.mul(0.94), wetness);
+  // Shoreline wet-sand sheen. 0.88 keeps the wet-sand band darker but readable;
+  // matched against the lowland 0.94 so beaches don't out-shimmer wet lowland.
+  const waterEdgeMask = waterEdgeSoftBlendMask(worldPos, uniforms);
+  roughnessSample = tslMix(roughnessSample, roughnessSample.mul(0.88), waterEdgeMask);
   roughnessSample = tslMix(roughnessSample, tslFloat(0.96), featureSurfaceWeight(1, worldPos, uniforms));
   roughnessSample = tslMix(roughnessSample, tslFloat(0.82), featureSurfaceWeight(2, worldPos, uniforms));
   roughnessSample = tslMix(roughnessSample, tslFloat(0.94), featureSurfaceWeight(3, worldPos, uniforms));
@@ -758,6 +816,7 @@ export function updateTerrainMaterialTextures(
     },
     surfaceWetness: readCurrentSurfaceWetness(material),
     surfacePatches,
+    waterEdge: readCurrentWaterEdge(material) ?? undefined,
   });
   material.needsUpdate = true;
 }
@@ -772,6 +831,57 @@ export function updateTerrainMaterialWetness(
   if (terrainUniforms?.environmentWetness) {
     terrainUniforms.environmentWetness.value = clampedWetness;
   }
+}
+
+/**
+ * Publish the live water surface to the terrain shader so the shoreline
+ * wet-sand band tracks rising / falling water (Open Frontier global plane,
+ * A Shau hydrology channels). Pass `null` to disable the band entirely.
+ *
+ * Designed as a runtime-cheap setter — only the two existing uniforms
+ * change, no node-graph rebuild. Safe to call from a per-frame consumer
+ * (e.g. a future tide system) without recompiling shaders.
+ */
+export function updateTerrainMaterialWaterEdge(
+  material: TerrainMaterial,
+  waterEdge: TerrainWaterEdgeConfig | null,
+): void {
+  const terrainUniforms = material.userData.terrainUniforms as Record<string, { value: unknown }> | undefined;
+  if (!terrainUniforms) return;
+  if (waterEdge === null) {
+    if (terrainUniforms.waterEdgeSurfaceY) {
+      terrainUniforms.waterEdgeSurfaceY.value = TERRAIN_WATER_EDGE_DISABLED_SURFACE_Y;
+    }
+    if (terrainUniforms.waterEdgeSoftBlendDistance) {
+      terrainUniforms.waterEdgeSoftBlendDistance.value = TERRAIN_WATER_EDGE_DEFAULT_SOFT_BLEND_DISTANCE;
+    }
+    material.userData.terrainWaterEdge = null;
+    return;
+  }
+  const normalized = normalizeWaterEdge(waterEdge);
+  if (terrainUniforms.waterEdgeSurfaceY) {
+    terrainUniforms.waterEdgeSurfaceY.value = normalized.surfaceY;
+  }
+  if (terrainUniforms.waterEdgeSoftBlendDistance) {
+    terrainUniforms.waterEdgeSoftBlendDistance.value = normalized.softBlendDistance;
+  }
+  material.userData.terrainWaterEdge = normalized;
+}
+
+function normalizeWaterEdge(waterEdge: TerrainWaterEdgeConfig | null | undefined): Required<TerrainWaterEdgeConfig> {
+  if (!waterEdge) {
+    return {
+      surfaceY: TERRAIN_WATER_EDGE_DISABLED_SURFACE_Y,
+      softBlendDistance: TERRAIN_WATER_EDGE_DEFAULT_SOFT_BLEND_DISTANCE,
+    };
+  }
+  const surfaceY = Number.isFinite(waterEdge.surfaceY)
+    ? waterEdge.surfaceY
+    : TERRAIN_WATER_EDGE_DISABLED_SURFACE_Y;
+  const softBlendDistance = Number.isFinite(waterEdge.softBlendDistance)
+    ? Math.max(0.05, waterEdge.softBlendDistance as number)
+    : TERRAIN_WATER_EDGE_DEFAULT_SOFT_BLEND_DISTANCE;
+  return { surfaceY, softBlendDistance };
 }
 
 export function updateTerrainMaterialFarCanopyTint(
@@ -818,6 +928,7 @@ function applyTerrainMaterialOptions(
     }
     material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
     material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
+    material.userData.terrainWaterEdge = normalizeWaterEdge(options.waterEdge);
     configureTerrainNodeMaterial(material, existingUniforms);
     material.needsUpdate = true;
     return;
@@ -826,6 +937,7 @@ function applyTerrainMaterialOptions(
   material.userData.terrainUniforms = shaderBindings.uniforms;
   material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
   material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
+  material.userData.terrainWaterEdge = normalizeWaterEdge(options.waterEdge);
   material.customProgramCacheKey = () => 'KonveyerTerrainTSL_v1';
   configureTerrainNodeMaterial(material, shaderBindings.uniforms);
 }
@@ -945,6 +1057,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   const tileGridRes = options.tileGridResolution ?? 32;
 
   const heightmapGridSize = heightTexture.image?.width ?? 512;
+  const waterEdge = normalizeWaterEdge(options.waterEdge);
 
   const uniforms: Record<string, { value: unknown }> = {
     terrainHeightmap: { value: heightTexture },
@@ -977,6 +1090,8 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     hydrologyChannelBiomeSlot: { value: hydrologyMask.channelBiomeSlot },
     hydrologyWetStrength: { value: hydrologyMask.wetStrength },
     hydrologyChannelStrength: { value: hydrologyMask.channelStrength },
+    waterEdgeSurfaceY: { value: waterEdge.surfaceY },
+    waterEdgeSoftBlendDistance: { value: waterEdge.softBlendDistance },
     featureSurfacePatchCount: { value: Math.min(surfacePatches.length, MAX_FEATURE_SURFACE_PATCHES) },
     cliffRockBiomeSlot: { value: biomeConfig.cliffRockBiomeSlot ?? 0 },
     featureSurfaceShape: { value: featureSurfaceShape },
@@ -1089,4 +1204,13 @@ function resolveHydrologyMaskMaterial(
 function readCurrentSurfaceWetness(material: TerrainMaterial): number {
   const currentWetness = material.userData.terrainSurfaceWetness;
   return typeof currentWetness === 'number' ? currentWetness : 0;
+}
+
+function readCurrentWaterEdge(material: TerrainMaterial): TerrainWaterEdgeConfig | null {
+  const stashed = material.userData.terrainWaterEdge as TerrainWaterEdgeConfig | null | undefined;
+  if (!stashed) return null;
+  if (!Number.isFinite(stashed.surfaceY) || stashed.surfaceY <= TERRAIN_WATER_EDGE_DISABLED_SURFACE_Y + 1) {
+    return null;
+  }
+  return stashed;
 }
