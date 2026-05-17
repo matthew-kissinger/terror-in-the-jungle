@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-17 (post `cycle-vekhikl-2-stationary-weapons` close + cycle #13 sun-and-atmosphere queue)
+Last verified: 2026-05-17 (post `cycle-voda-2-buoyancy-swimming-wading` close)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -169,6 +169,40 @@ History log:
   `konveyer-large-file-splits` water half closed; sky half remains active
   pending TSL fragment-shader sky port. Active count: 8 → 8 (no churn —
   carry-over notes column updated, sky still active).
+- 2026-05-17 — `cycle-voda-2-buoyancy-swimming-wading` close (autonomous-loop posture):
+  shipped VODA-2 code-complete as 7 PRs across 2 rounds. R1: [#239](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/239)
+  `89365f4c` buoyancy-physics (new `src/systems/environment/water/BuoyancyForce.ts`
+  + sibling test; `applyBuoyancyForce(body, dt, waterSystem)` reads
+  `sampleWaterInteraction(body.position)` and applies upward force
+  proportional to `buoyancyScalar × volume × g` with denser-medium
+  damping; behavior tests cover neutral float, sink, surface, dampened
+  oscillation), [#240](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/240)
+  `98ffeabc` npc-wade-behavior (CombatantMovement speed scales with
+  `1 - immersion01 × 0.6` in shallow water; nav cost up-weight verified
+  on water tiles; combat-reviewer APPROVE), [#241](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/241)
+  `83415458` player-swim-and-breath (PlayerMovement branches on
+  `sampleWaterInteraction(playerPos).submerged` → swim mode with WASD +
+  Space up + Ctrl down + depth-proportional drag; PlayerHealthSystem
+  breath timer at head position, gasp + damage past 45 s; new
+  PlayerSwimState module; HUD breath gauge). R2: [#242](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/242)
+  `2496b4e1` water-sampler-composer-wiring (activates the dormant R1
+  consumers by wiring the NPC water sampler adapter through the system
+  composer), [#245](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/245)
+  `163ecb73` river-flow-gameplay-current (extends BuoyancyForce with
+  horizontal flow force from hydrology channel direction × magnitude ×
+  body drag; visible swim-perpendicular drift in A Shau river per playtest
+  capture), [#244](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/244)
+  `0b24a19f` wade-foot-splash-visuals (new `src/systems/effects/WadeSplashEffect.ts`
+  triggered on footstep when `immersion01 ∈ [0.1, 0.5]`; reuses existing
+  impact-effects pool, no perf regression), [#243](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/243)
+  `47e394c2` voda-2-playtest-evidence (`docs/playtests/cycle-voda-2-buoyancy-swimming-wading.md`
+  + capture script + PLAYTEST_PENDING row, deferred under autonomous-loop
+  posture). VODA-2 in DIRECTIVES.md moved Open → code-complete (full
+  `done` promotion blocks on owner walk-through deferred to
+  PLAYTEST_PENDING per autonomous-loop posture). No fence change
+  (`sampleWaterInteraction` contract consumed, not modified). No
+  carry-over delta (VODA-2 lives in DIRECTIVES.md, not CARRY_OVERS
+  Active). Active count: 8 → 8.
 
 ## Closed
 

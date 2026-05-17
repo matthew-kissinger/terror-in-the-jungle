@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-17 (autonomous chain advanced + queue expanded to 13 cycles via cycle-sun-and-atmosphere-overhaul insertion; cycles #1-#6 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a; current cycle = cycle-voda-2-buoyancy-swimming-wading)
+Last verified: 2026-05-17 (autonomous chain advanced past cycle #7; cycles #1-#7 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a / cycle #7 close-commit; current cycle = cycle-vekhikl-3-tank-chassis)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,97 +154,99 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-voda-2-buoyancy-swimming-wading
+## Current cycle: cycle-vekhikl-3-tank-chassis
 
-**Cycle ID:** `cycle-voda-2-buoyancy-swimming-wading`
-**Brief:** [docs/tasks/cycle-voda-2-buoyancy-swimming-wading.md](tasks/cycle-voda-2-buoyancy-swimming-wading.md)
+**Cycle ID:** `cycle-vekhikl-3-tank-chassis`
+**Brief:** [docs/tasks/cycle-vekhikl-3-tank-chassis.md](tasks/cycle-vekhikl-3-tank-chassis.md)
 **Skip-confirm:** no (owner playtest required per the brief; auto-deferred
 to PLAYTEST_PENDING.md under autonomous-loop posture)
 **Concurrency cap:** 4
 
-User-observable gap closed: VODA-2 — wire
-`WaterSystem.sampleWaterInteraction` into physics and player state:
-(1) Rivers from hydrology channels carry visible flow (handed off
-from VODA-1; this cycle adds the gameplay effect — current pushes
-floating bodies + swimmers downstream). (2) Buoyancy physics for
-floating bodies (NPCs, dropped weapons, future watercraft hulls).
-(3) Player swimming with animation, stamina, breath, surfacing.
-(4) Wading and foot-splash visuals at the bank. Builds on VODA-1's
-visible water surface + sampler API (closed in cycle #5).
+User-observable gap closed: locomotion half of VEKHIKL-3 — ship a
+tank chassis (M48 Patton as the first tracked vehicle) with skid-steer
+locomotion, four-wheel terrain conform, ground-conform chassis tilt,
+and tracks-blown immobilization state. **Tanks are a sibling of the
+wheeled chassis, not a subclass** (per TANK_SYSTEMS memo). Reuse the
+chassis-conform pattern and fixed-1/60 s integration loop from
+`GroundVehiclePhysics` (cycle #4); substitute Ackermann with
+skid-steer (independent L + R track speed from W/S/A/D). Blocks
+`cycle-vekhikl-4-tank-turret-and-cannon` (cycle #9 mounts turret +
+cannon onto this chassis).
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `buoyancy-physics`, `player-swim-and-breath`, `npc-wade-behavior` | 3 |
-| 2 | `wade-foot-splash-visuals`, `river-flow-gameplay-current`, `voda-2-playtest-evidence` | 3 |
+| 1 | `tracked-vehicle-physics-core`, `tracked-vehicle-physics-tests` | 2 |
+| 2 | `tank-player-adapter`, `m48-tank-integration`, `vekhikl-3-playtest-evidence` | 3 |
 
 ### Dependencies
 
-- R1: buoyancy-physics (~250 LOC new `BuoyancyForce.ts`), player-swim-and-breath
-  (PlayerMovement + PlayerHealthSystem + possibly new PlayerSwimState.ts),
-  npc-wade-behavior (CombatantMovement + possibly nav cost weighting).
-  All three R1 tasks are independent — they consume the existing stable
-  `sampleWaterInteraction` contract.
-- R2: wade-foot-splash-visuals (effects pool consumer), river-flow-gameplay-current
-  (extends BuoyancyForce with channel flow direction; possibly adds
-  `getFlowDirectionAt` helper to WaterSystem), voda-2-playtest-evidence
+- R1: tracked-vehicle-physics-core (~500 LOC new
+  `TrackedVehiclePhysics.ts` per TANK_SYSTEMS memo — state +
+  skid-steer kinematics + per-track command smoothing + 4-corner
+  ground conform + tracks-blown state + fixed 1/60 step via
+  `FixedStepRunner`), tracked-vehicle-physics-tests (sibling
+  L2 single-system tests covering pure throttle, pure pivot,
+  combined motion+yaw, slope tilt, tracks-blown immobilization,
+  slope-stall, input smoothing).
+- R2: tank-player-adapter (~300 LOC new `TankPlayerAdapter.ts`
+  mirroring GroundVehiclePlayerAdapter with skid-steer input
+  model; W/S throttle, A/D turn track-differential, F enter/exit,
+  third-person orbit camera), m48-tank-integration (new `Tank.ts`
+  IVehicle impl + VehicleManager registration + M48 spawns on
+  Open Frontier US base + A Shau valley road), vekhikl-3-playtest-evidence
   (owner playtest, auto-deferred under autonomous-loop).
 
 ### Reviewer policy
 
-- `combat-reviewer` is a **pre-merge gate** for `npc-wade-behavior`
-  (touches `src/systems/combat/**`).
-- `terrain-nav-reviewer` is a **pre-merge gate** if `npc-wade-behavior`
-  also touches `src/systems/navigation/**` for the navmesh cost
-  weighting.
-- Orchestrator reviews other PRs for surface integrity + playtest
-  evidence.
+- No mandatory reviewer expected (no combat / terrain / navigation
+  touches per brief Out-of-Scope).
+- Orchestrator reviews each PR for surface integrity + smoke evidence.
 
 ### Hard stops (cycle-specific)
 
-- Cycle #5 VODA-1 not closed → halt at orchestrator dispatch.
-  (Pre-flight: cycle #5 closed 2026-05-16 at `f14400d2`; gate is
-  satisfied.)
-- Any task modifies the public `sampleWaterInteraction` API surface
-  → halt. The contract is stable; this cycle consumes it.
+- Any task introduces an external physics library → halt
+  (per ENGINE_TRAJECTORY addendum + TANK_SYSTEMS §"Decision").
 - Owner playtest rejects R2 twice → halt (deferred under
   autonomous-loop; orchestrator proceeds, owner sweeps later).
-- Standard: fence change, worktree isolation failure, twice-rejected
-  reviewer.
+- Standard: fence change, worktree isolation failure,
+  twice-rejected reviewer.
 - Campaign-wide: perf regression > 5% p99 on `combat120` (deferred to
   cycle #13 baseline refresh until that lands).
 
 ### Success criteria
 
-See [docs/tasks/cycle-voda-2-buoyancy-swimming-wading.md](tasks/cycle-voda-2-buoyancy-swimming-wading.md)
+See [docs/tasks/cycle-vekhikl-3-tank-chassis.md](tasks/cycle-vekhikl-3-tank-chassis.md)
 "Acceptance Criteria (cycle close)":
 - All R1 + R2 task PRs merged.
+- M48 chassis drivable on Open Frontier + A Shau.
+- Tracks-blown state observably immobilizes.
 - Owner playtest sign-off (deferred under autonomous-loop).
-- Swim + wade + breath all feel correct per owner.
-- NPCs visibly route around deep water or wade shallow fords.
+- No external physics library added.
 - No fence change.
 - No perf regression > 5% p99 on `combat120`.
-- `VODA-2` directive in `docs/DIRECTIVES.md` moves to Closed.
+- `VEKHIKL-3` directive (chassis half) progress recorded in
+  `docs/DIRECTIVES.md`; full close awaits cycle #9 turret + cannon.
 
 ### Out of scope
 
-Watercraft (VODA-3, cycle #10). Underwater combat / diving suits.
-Currents from ocean tides (no tide system yet). Touching
-`src/systems/terrain/**` (the navmesh cost-weighting may touch
-navigation — gated by reviewer). Fenced-interface touches.
+Turret, cannon, ammo, ballistic solver (cycle #9). AI gunner (cycle #9).
+Other tanks (T-54, M113, etc. — future cycles). Touching
+`src/systems/combat/**`, `src/systems/terrain/**`,
+`src/systems/navigation/**`. Fenced-interface touches.
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #7** in the now-13-cycle queue at
+This cycle is **position #8** in the 13-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 `Auto-advance: yes` + `posture: autonomous-loop` are set there. When
 this cycle closes:
 
-1. Mark cycle #7 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-vekhikl-3-tank-chassis`).
+1. Mark cycle #8 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-vekhikl-4-tank-turret-and-cannon`).
 3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-vekhikl-3-tank-chassis`.
+4. Commit with `docs(campaign): advance to cycle-vekhikl-4-tank-turret-and-cannon`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
@@ -252,36 +254,35 @@ mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-vekhikl-2-stationary-weapons` closed on 2026-05-17 at the
-cycle close-commit (last R3 merge at `78c9c55a` wiring
-M2HBEmplacementSystem in bootstrap + scenario spawns). **6 PRs across
-3 rounds** (one R2 iteration after combat-reviewer CHANGES-REQUESTED →
-APPROVE). R1: #233 `0096d825` Emplacement IVehicle surface
-(`VehicleCategory` extended with `'emplacement'` inside the IVehicle
-module — no fence touch per INTERFACE_FENCE.md), #234 `917d83df`
-EmplacementPlayerAdapter (mouse yaw/pitch within cone, first-person
-camera behind spade grips, F mount/dismount). R2: #235 `c9725b76`
-vekhikl-2-playtest-evidence (`docs/playtests/cycle-vekhikl-2-stationary-weapons.md`
-+ `scripts/capture-vekhikl-2-emplacement-shots.ts` + PLAYTEST_PENDING
-row; deferred under autonomous-loop), #237 `0732beaa`
-m2hb-weapon-integration (575 RPM, 250-round belt, tracer every 5th
-round, reload-on-dismount), #236 `afa90775` emplacement-npc-gunner
-(NPC mount via orderBoard + cached emplacement scan — reviewer
-CHANGES-REQUESTED → APPROVE iteration). R3: #238 `78c9c55a` system
-bootstrap wiring (M2HBEmplacementSystem registered; scenario spawns at
-Open Frontier US base + A Shau NVA bunker overlook). VEKHIKL-2 in
-DIRECTIVES.md moved Open → code-complete. No fence change. No
-external physics library added. Carry-over count: 8 → 8.
-
-**Queue grew to 13 cycles** during this close. `cycle-sun-and-atmosphere-overhaul`
-inserted at position #12 (between #11 defekt-4 and renumbered #13
-baselines-refresh) per the
-[SUN_AND_ATMOSPHERE_VISION_2026-05-16](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)
-spike recommendation. The new sky cost (+0.3-1.0ms p99 expected) must
-land BEFORE the baseline refresh so it becomes the new normal.
-`konveyer-large-file-splits` HosekWilkieSkyBackend half rolls into the
-new cycle #12 (no longer "off-queue" — see CARRY_OVERS.md and the
-campaign manifest hold list).
+`cycle-voda-2-buoyancy-swimming-wading` closed on 2026-05-17 at the
+cycle close-commit (last R2 merge at `47e394c2` shipping
+voda-2-playtest-evidence). **7 PRs across 2 rounds**. R1: #239
+`89365f4c` buoyancy-physics (new `src/systems/environment/water/BuoyancyForce.ts`
++ sibling test consuming `sampleWaterInteraction(body.position)`;
+upward force proportional to `buoyancyScalar × volume × g` with
+denser-medium damping; behavior tests cover neutral float, sink,
+surface, dampened oscillation), #240 `98ffeabc` npc-wade-behavior
+(CombatantMovement speed scales with `1 - immersion01 × 0.6` in
+shallow water; nav cost up-weight on water tiles; combat-reviewer
+APPROVE), #241 `83415458` player-swim-and-breath (PlayerMovement
+branches on `sampleWaterInteraction(playerPos).submerged` → swim mode
+with WASD + Space up + Ctrl down + depth-proportional drag;
+PlayerHealthSystem breath timer at head position, gasp + damage past
+45 s; new PlayerSwimState module; HUD breath gauge). R2: #242
+`2496b4e1` water-sampler-composer-wiring (activates the dormant R1
+NPC water sampler adapter via the system composer), #245 `163ecb73`
+river-flow-gameplay-current (BuoyancyForce extended with horizontal
+flow force from hydrology channel direction × magnitude × body drag;
+visible swim-perpendicular drift in A Shau river), #244 `0b24a19f`
+wade-foot-splash-visuals (new `src/systems/effects/WadeSplashEffect.ts`
+triggered on footstep when `immersion01 ∈ [0.1, 0.5]`; reuses
+existing impact-effects pool, no perf regression), #243 `47e394c2`
+voda-2-playtest-evidence (`docs/playtests/cycle-voda-2-buoyancy-swimming-wading.md`
++ capture script + PLAYTEST_PENDING row, deferred under
+autonomous-loop posture). VODA-2 in DIRECTIVES.md moved Open →
+code-complete. No fence change (`sampleWaterInteraction` contract
+consumed, not modified). No carry-over delta (VODA-2 lives in
+DIRECTIVES.md, not CARRY_OVERS Active). Carry-over count: 8 → 8.
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
 parked at 1 commit (no PR). The cycle #2 mode-startup work absorbed
