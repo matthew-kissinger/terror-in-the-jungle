@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Faction } from '../combat/types';
 
-export type VehicleCategory = 'helicopter' | 'fixed_wing' | 'ground' | 'watercraft';
+export type VehicleCategory = 'helicopter' | 'fixed_wing' | 'ground' | 'watercraft' | 'emplacement';
 export type SeatRole = 'pilot' | 'gunner' | 'passenger';
 
 export interface VehicleSeat {
