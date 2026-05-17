@@ -82,6 +82,10 @@ tmp/*.lock
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 
+# Rust target dir for the WASM pilot crate (committed artifacts live
+# under src/systems/combat/projectiles/wasm/ — see rust/tank-ballistic-solver/README.md)
+rust/*/target/
+
 # Vietnam terrain data (large binary files, downloaded via scripts)
 data/vietnam/terrain-tiles/
 data/vietnam/big-map/z13/
