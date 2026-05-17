@@ -101,6 +101,7 @@ export interface TrackedVehicleStateSnapshot {
   rightTrackSpeed: number;
   isGrounded: boolean;
   tracksBlown: boolean;
+  engineKilled: boolean;
 }
 
 interface InternalState {
@@ -114,6 +115,7 @@ interface InternalState {
   isGrounded: boolean;
   groundHeight: number;
   tracksBlown: boolean;
+  engineKilled: boolean;
   cornerSamples: CornerSample[];
 }
 
@@ -170,6 +172,7 @@ export class TrackedVehiclePhysics {
       isGrounded: true,
       groundHeight: grounded,
       tracksBlown: false,
+      engineKilled: false,
       cornerSamples: corners,
     };
   }
@@ -183,7 +186,16 @@ export class TrackedVehiclePhysics {
   }
 
   setControls(throttleAxis: number, turnAxis: number, brake: boolean): void {
-    this.rawControls.throttleAxis = THREE.MathUtils.clamp(throttleAxis, -1, 1);
+    // Engine-killed clamps throttle to 0 (no forward/reverse). Turn input
+    // is still recorded so the visual continuity story (skid-steer pivot
+    // from inertia) is preserved when only the engine is dead — but
+    // because forward velocity is integrated through the same per-track
+    // drive signal, killing throttle effectively kills locomotion. See
+    // `tank-damage-states` brief §"engine-killed".
+    const throttle = this.state.engineKilled
+      ? 0
+      : THREE.MathUtils.clamp(throttleAxis, -1, 1);
+    this.rawControls.throttleAxis = throttle;
     this.rawControls.turnAxis = THREE.MathUtils.clamp(turnAxis, -1, 1);
     this.rawControls.brake = brake ? 1 : 0;
   }
@@ -199,6 +211,7 @@ export class TrackedVehiclePhysics {
       rightTrackSpeed: this.state.rightTrackSpeed * this.cfg.maxTrackSpeed,
       isGrounded: this.state.isGrounded,
       tracksBlown: this.state.tracksBlown,
+      engineKilled: this.state.engineKilled,
     };
   }
 
@@ -229,6 +242,35 @@ export class TrackedVehiclePhysics {
       this.state.velocity.z = 0;
       this.state.angularVelocity.y = 0;
     }
+  }
+
+  isTracksBlown(): boolean {
+    return this.state.tracksBlown;
+  }
+
+  /**
+   * Damage-state hook (cycle-vekhikl-4-tank-turret-and-cannon R2,
+   * `tank-damage-states`). When set, `setControls()` clamps throttle to
+   * 0 — the chassis cannot drive forward or reverse. Turn input still
+   * reaches the integrator (skid-steer pivot from inertia stays
+   * possible if tracks are intact), but with no throttle the per-track
+   * target speeds are themselves zero, so the practical effect is "no
+   * motion." Existing momentum bleeds down through drag.
+   *
+   * Idempotent. Flipping back to `false` resumes normal throttle
+   * acceptance on subsequent `setControls()` calls.
+   */
+  setEngineKilled(engineKilled: boolean): void {
+    this.state.engineKilled = engineKilled;
+    if (engineKilled) {
+      // Re-apply the current control snapshot so the clamp takes effect
+      // immediately instead of waiting on the next `setControls()` call.
+      this.rawControls.throttleAxis = 0;
+    }
+  }
+
+  isEngineKilled(): boolean {
+    return this.state.engineKilled;
   }
 
   dispose(): void {
