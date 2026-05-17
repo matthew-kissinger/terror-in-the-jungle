@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-16 (post `cycle-vekhikl-1-jeep-drivable` close)
+Last verified: 2026-05-16 (post `cycle-voda-1-water-shader-and-acceptance` close)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -31,7 +31,7 @@ started, the cycle is `INCOMPLETE` per the rule in
 | KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 0 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
 | cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 2 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
 | weapons-cluster-zonemanager-migration | Finish the IZoneQuery migration for the 5 remaining concrete `ZoneManager` imports in the weapons cluster: `FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`, `PlayerHealthSystem` | cycle-2026-05-10-zone-manager-decoupling | 2 | weapons | no | Out-of-scope for Phase 2 R2 batches A/B/C; aspirational ≤5 ZoneManager-import target missed. Phase 3+ can finish; cycle-2026-05-10's ≤20 success criterion was met (achieved 17 read / 5 concrete). |
-| konveyer-large-file-splits | Two KONVEYER-grown files added to `lint-source-budget.ts` grandfather list at the 2026-05-12 master-merge gate: `HosekWilkieSkyBackend.ts` (807 LOC, slated for the TSL fragment-shader sky port) and `WaterSystem.ts` (733 LOC, slated for VODA-1 water-shader work) | exp→master merge prep 2026-05-12 | 0 | environment | no | Split-debt tracking. Both files grew during the KONVEYER campaign (sky through slices 13-15 + sky-refresh fix; water during the scene-parity standard-material port). Each is grandfathered with a named follow-up round in `scripts/lint-source-budget.ts`. Closes when the named follow-up cycles ship and the files drop below 700 LOC. |
+| konveyer-large-file-splits | HosekWilkieSkyBackend.ts (807 LOC, slated for the TSL fragment-shader sky port) — water half closed in cycle-voda-1-water-shader-and-acceptance | exp→master merge prep 2026-05-12 | 1 | environment | no | Split-debt tracking. WaterSystem.ts split landed (1125 → 300 LOC orchestrator + 4 modules ≤300 each) and grandfather entry removed in PR #232. Sky half still grandfathered. Closes fully when the TSL-fragment-shader sky port lands. |
 
 ## Parked
 
@@ -116,6 +116,32 @@ History log:
   code-complete (full `done` promotion blocks on owner walk-through
   deferred to PLAYTEST_PENDING). No carry-over delta (VEKHIKL-1 lives in
   DIRECTIVES.md, not CARRY_OVERS Active). Active count: 8 → 8.
+- 2026-05-16 — `cycle-voda-1-water-shader-and-acceptance` close (autonomous-loop posture):
+  shipped VODA-1 code-complete as 5 PRs across 2 rounds + the WaterSystem
+  half of `konveyer-large-file-splits`. R1: #228 terrain-water intersection
+  mask + foam line (opt-in, default-off binding; pre-VODA-1 visuals byte-
+  identical when unbound; terrain-nav-reviewer APPROVE), #229 production
+  water surface shader (`MeshStandardMaterial` + `onBeforeCompile` chosen
+  over TSL node material to preserve `?renderer=webgl` escape hatch and
+  avoid the mobile node-material cost regression; composed with #228's
+  foam patch into single `installWaterMaterialPatches()` at rebase time).
+  R2: #231 hydrology river flow visuals (per-vertex `aFlowDir`/`aFoamMask`
+  attributes + `installHydrologyRiverFlowPatch` shader patch; foam mask
+  composes narrownessFoam at flowFactor<0.6 + slopeFoam at 5% rise/run),
+  #232 WaterSystem.ts split (1125 → 300 LOC orchestrator + 5 modules:
+  HydrologyRiverSurface 144, HydrologyRiverGeometry 222, HydrologyRiverFlowPatch
+  178, WaterSurfaceBinding 299, WaterSurfaceSampler 146 — all ≤300 LOC;
+  the 5-file outcome from the 3-file plan was forced by integrating #231's
+  flow-patch logic at rebase time; grandfather entry removed from
+  `scripts/lint-source-budget.ts`; 11 existing WaterSystem.test.ts pass
+  byte-identical; +17 new sibling tests across the 3 originally-planned
+  modules), #230 playtest evidence + capture script + PLAYTEST_PENDING row.
+  No `WebGLRenderTarget` reflection pass added anywhere (mobile no-RT win
+  preserved). VODA-1 in DIRECTIVES.md moved Open → code-complete (full
+  `done` promotion blocks on owner walk-through deferred to PLAYTEST_PENDING).
+  `konveyer-large-file-splits` water half closed; sky half remains active
+  pending TSL fragment-shader sky port. Active count: 8 → 8 (no churn —
+  carry-over notes column updated, sky still active).
 
 ## Closed
 

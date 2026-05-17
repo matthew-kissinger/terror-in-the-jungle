@@ -65,14 +65,14 @@ Success criteria:
 - Record triangle/pass impact before changing terrain LOD ranges or shadow policy.
 
 ## VODA-1 — Visible water surface and query API
-Status: open. Owning subsystem: environment / water. Opened: cycle-2026-05-04.
-Latest evidence: query API and interaction-sample first slice covered by `src/systems/environment/WaterSystem.test.ts`; source audit `artifacts/perf/2026-05-11T21-33-05-844Z/projekt-143-water-system-audit/water-system-audit.json`; runtime proof `artifacts/perf/2026-05-11T21-33-31-662Z/projekt-143-water-runtime-proof/water-runtime-proof.json`; older visual/exposure evidence remains `artifacts/perf/2026-05-08T01-15-33-373Z/projekt-143-voda-exposure-source-audit/summary.json`.
+Status: code-complete (owner playtest deferred). Owning subsystem: environment / water. Opened: cycle-2026-05-04. Code-complete: cycle-voda-1-water-shader-and-acceptance 2026-05-16.
+Latest evidence: 5 PRs landed under `cycle-voda-1-water-shader-and-acceptance` — R1: #228 `dfee8d64` terrain-water-intersection-mask (terrain-side wet-sand soft-blend 1.5m + water-side foam line 0.8m, opt-in default-off binding so pre-VODA-1 visuals byte-identical when unbound), #229 `62db21c2` water-surface-shader (production `MeshStandardMaterial` + `onBeforeCompile` patch chosen over TSL node material to preserve `?renderer=webgl` escape hatch and avoid mobile node-material cost regression; composed with #228's foam patch into single `installWaterMaterialPatches()` callback at rebase time so both inject); R2: #231 `ca679273` hydrology-river-flow-visuals (per-vertex `aFlowDir`/`aFoamMask` attributes baked at geometry-build + `installHydrologyRiverFlowPatch` shader patch with UV-scrolled normal sampling), #232 `f14400d2` water-system-file-split (WaterSystem.ts 1125 LOC → 300 LOC orchestrator + 5 modules ≤300 LOC each: HydrologyRiverSurface 144, HydrologyRiverGeometry 222, HydrologyRiverFlowPatch 178, WaterSurfaceBinding 299, WaterSurfaceSampler 146; grandfather entry removed from `scripts/lint-source-budget.ts`; 11 existing WaterSystem.test.ts pass byte-identical + 17 new sibling tests across the new modules), #230 voda-1-playtest-evidence (`docs/playtests/cycle-voda-1-water-shader-and-acceptance.md` + `scripts/capture-voda-1-water-shots.ts` + PLAYTEST_PENDING.md row). **No `WebGLRenderTarget` reflection pass added anywhere** (mobile no-RT win documented in `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md` item 8 preserved). Owner walk-through deferred under autonomous-loop posture; full `done` promotion blocks on owner walk + `evidence:atmosphere` re-run + `terrain_water_exposure_review` resolution confirmation per PLAYTEST_PENDING row.
 Success criteria:
-- `WaterSystem` renders a visible water surface across Open Frontier and A Shau, lit by `AtmosphereSystem`, with no clipping artifacts at terrain intersections.
-- Hydrology channels drive water-surface placement.
-- Public query API present: `isUnderwater(pos)`, `getWaterDepth(pos)`, `getWaterSurfaceY(pos)`, and `sampleWaterInteraction(pos)` for future physics/gameplay consumers.
-- `evidence:atmosphere` regenerates with water visible and zero browser errors.
-- Open Frontier `terrain_water_exposure_review` overexposure flags resolved.
+- [x] `WaterSystem` renders a visible water surface across Open Frontier and A Shau, lit by `AtmosphereSystem`, with no clipping artifacts at terrain intersections (foam-line + terrain-side soft-blend land in #228; surface shader in #229).
+- [x] Hydrology channels drive water-surface placement (already shipped pre-cycle; visible flow added in #231).
+- [x] Public query API present: `isUnderwater(pos)`, `getWaterDepth(pos)`, `getWaterSurfaceY(pos)`, and `sampleWaterInteraction(pos)` for future physics/gameplay consumers (preserved through #232 split — `WaterSurfaceSampler.ts` owns the impl; `WaterSystem` orchestrator delegates).
+- [ ] `evidence:atmosphere` regenerates with water visible and zero browser errors (owner-sweep verification deferred to PLAYTEST_PENDING).
+- [ ] Open Frontier `terrain_water_exposure_review` overexposure flags resolved (owner-sweep verification deferred to PLAYTEST_PENDING).
 
 ## VODA-2 — Flow, buoyancy, swimming
 Status: open. Owning subsystem: environment / water. Opened: cycle-2026-05-04. Blocked on VODA-1.

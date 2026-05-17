@@ -1,6 +1,6 @@
 # Campaign: 2026-05-13 Post-WebGPU master merge → 2026-05-16 feature-pivot expansion
 
-Last verified: 2026-05-16 (cycles #1-#4 closed at fd646aeb / 7931d179 / b86cf027 / cycle #4 close-commit; current pointer = cycle #5 cycle-voda-1-water-shader-and-acceptance)
+Last verified: 2026-05-16 (cycles #1-#5 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / cycle #5 close-commit; current pointer = cycle #6 cycle-vekhikl-2-stationary-weapons)
 
 Campaign manifest. Original trigger was the WebGPU + TSL master merge
 on 2026-05-13; expanded on 2026-05-16 to absorb all VODA, VEKHIKL,
@@ -31,10 +31,10 @@ Hard-stops below still halt the loop.
 The current cycle pointer lives in
 [docs/AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md) "Current cycle"
 and is updated at every advance. **As of 2026-05-16 close of cycle
-#4 at `901ae017` (last R2 merge), the current cycle pointer is at
-position #5 (`cycle-voda-1-water-shader-and-acceptance`).** Cycles #1
-through #4 are `done` in the queue below; 20 PRs merged across the
-four cycles (#208-#212, #214-#227), plus the out-of-band CI fix
+#5 at `f14400d2` (last R2 merge), the current cycle pointer is at
+position #6 (`cycle-vekhikl-2-stationary-weapons`).** Cycles #1
+through #5 are `done` in the queue below; 25 PRs merged across the
+five cycles (#208-#212, #214-#232), plus the out-of-band CI fix
 `47c42216` that matrix-fans the mobile-ui job.
 
 ## Orchestrator contract (read this if you're the orchestrator)
@@ -74,7 +74,7 @@ new ordering at next advance.
 | 2 | `cycle-mobile-webgl2-fallback-fix` | done | KB-MOBILE-WEBGPU | [brief](tasks/archive/cycle-mobile-webgl2-fallback-fix/cycle-mobile-webgl2-fallback-fix.md) | Closed 2026-05-16 at `7931d179`. 9 PRs across R1/R2/R3: #213 `6e7a8879`, #211 `9e1ccab5`, #212 `0b3b749d`, #215 `99044966`, #214 `ca725369`, #216 `706ad344`, #217 `83fb9fb0`, #218 `ff87e635`, #219 `a81d8cda`. Plus out-of-band CI fix `47c42216` matrix-fan-out mobile-ui. Real-device walk-through deferred to PLAYTEST_PENDING.md (3rd active row); harness script `scripts/real-device-validation.ts` ready. |
 | 3 | `cycle-konveyer-11-spatial-grid-compute` | done | DEFEKT-3 | [brief](tasks/archive/cycle-konveyer-11-spatial-grid-compute/cycle-konveyer-11-spatial-grid-compute.md) | Closed 2026-05-16 at cycle close-commit. 3 R1 PRs: #220 `9a02714a` CoverSpatialGrid 8m-cell grid, #221 `a5b5bcd6` AIStateEngage consumer with structural CoverGridQuery + Phase F sub-marker, #222 `8d12ede5` L3 integration test with 5ms p99 budget. R2 GPU-compute prototype skipped — R1 wins met bars (combat_budget_dominance 0%, zero >100ms hitches in 5939 frames vs documented 954ms baseline, p99 +3.0% under 5% hard-stop). |
 | 4 | `cycle-vekhikl-1-jeep-drivable` | done | VEKHIKL-1 (unblocks VODA-3) | [brief](tasks/archive/cycle-vekhikl-1-jeep-drivable/cycle-vekhikl-1-jeep-drivable.md) | Closed 2026-05-16 at cycle close-commit. 5 PRs across 2 rounds. R1: #223 `6309558a` GroundVehiclePhysics (581 LOC fixed-step sim), #224 `e687e70a` tests (305 LOC, 7 behavior tests). R2: #226 GroundVehiclePlayerAdapter + VehicleManager helper, #227 `901ae017` M151 integration + smoke, #225 playtest evidence + capture script + PLAYTEST_PENDING row. Existing motor_pool world-feature prefabs satisfy "visible at spawn on both modes". VEKHIKL-1 promoted to code-complete; owner walk-through deferred to PLAYTEST_PENDING under autonomous-loop posture. |
-| 5 | `cycle-voda-1-water-shader-and-acceptance` | queued | VODA-1 + WaterSystem split | [brief](tasks/cycle-voda-1-water-shader-and-acceptance.md) | Water shader + intersections + flow visuals + owner acceptance. Co-dispatches the WaterSystem.ts split. ~6 tasks, 2 rounds. |
+| 5 | `cycle-voda-1-water-shader-and-acceptance` | done | VODA-1 + WaterSystem split | [brief](tasks/archive/cycle-voda-1-water-shader-and-acceptance/cycle-voda-1-water-shader-and-acceptance.md) | Closed 2026-05-16 at cycle close-commit. 5 PRs across 2 rounds. R1: #228 `dfee8d64` terrain-water-intersection-mask (terrain-nav-reviewer APPROVE; opt-in default-off binding), #229 `62db21c2` water-surface-shader (MeshStandardMaterial + onBeforeCompile chosen; sibling collision composed into single installWaterMaterialPatches). R2: #231 `ca679273` hydrology-river-flow-visuals (per-vertex flow/foam attributes + shader patch), #232 `f14400d2` water-system-file-split (1125 LOC → 300 LOC orchestrator + 5 modules ≤300 each; grandfather entry removed), #230 playtest evidence + capture script + PLAYTEST_PENDING row. No WebGLRenderTarget reflection (mobile no-RT win preserved). 11 existing tests pass byte-identical + 17 new sibling tests. VODA-1 code-complete; owner walk-through deferred. Closes konveyer-large-file-splits water half. |
 | 6 | `cycle-vekhikl-2-stationary-weapons` | queued | VEKHIKL-2 | [brief](tasks/cycle-vekhikl-2-stationary-weapons.md) | Fixed emplacements; reuses VEKHIKL-1 seat-occupant surface. ~4 tasks, 1-2 rounds. |
 | 7 | `cycle-voda-2-buoyancy-swimming-wading` | queued | VODA-2 | [brief](tasks/cycle-voda-2-buoyancy-swimming-wading.md) | Wires `WaterSystem.sampleWaterInteraction` into physics + player state. ~5 tasks, 2 rounds. |
 | 8 | `cycle-vekhikl-3-tank-chassis` | queued | VEKHIKL-3 (partial) | [brief](tasks/cycle-vekhikl-3-tank-chassis.md) | Skid-steer locomotion + ground-conform per `TANK_SYSTEMS_2026-05-13.md`. ~5 tasks, 2 rounds. |
