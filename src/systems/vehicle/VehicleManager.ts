@@ -10,6 +10,11 @@ import {
   spawnScenarioM2HBEmplacements,
   type M2HBScenarioMode,
 } from '../combat/weapons/M2HBEmplacementSpawn';
+import {
+  spawnScenarioM48Tanks,
+  type M48ScenarioMode,
+} from './M48TankSpawn';
+import { Tank } from './Tank';
 
 // Scratch vector for distance calculations
 const _diff = new THREE.Vector3();
@@ -140,6 +145,49 @@ export class VehicleManager implements GameSystem {
       resolvePosition: args.resolvePosition,
     });
     return spawned.map(s => s.vehicleId);
+  }
+
+  /**
+   * Scenario-time spawn entry for the M48 Patton tanks (Open Frontier
+   * US base + A Shau valley road) per `cycle-vekhikl-3-tank-chassis`.
+   * Each spawn registers a `Tank` with this manager; the caller is
+   * responsible for wiring the runtime terrain provider via
+   * `Tank.setTerrain` if terrain conform is wanted (mirrors the M151
+   * jeep path through `WorldFeatureSystem.registerGroundVehiclePlacement`).
+   *
+   * `resolvePosition` mirrors the M2HB spawn callback — typically a
+   * terrain-snap closure.
+   *
+   * Returns the registered vehicle ids so the composer / scenario
+   * runtime can tear them down on mode switch.
+   */
+  spawnScenarioM48Tanks(args: {
+    scene: THREE.Scene;
+    modes: M48ScenarioMode[];
+    resolvePosition?: (mode: M48ScenarioMode, base: THREE.Vector3) => THREE.Vector3;
+  }): string[] {
+    const spawned = spawnScenarioM48Tanks({
+      modes: args.modes,
+      scene: args.scene,
+      vehicleManager: this,
+      resolvePosition: args.resolvePosition,
+    });
+    return spawned.map(s => s.vehicleId);
+  }
+
+  /**
+   * Convenience lookup for the `TankPlayerAdapter`: resolve a tank by
+   * the seated occupant id, returning null when the occupant is not
+   * seated in a tank. Mirrors `getGroundVehicleByOccupant`, but pinned
+   * to the M48 / tracked-vehicle pattern via a `Tank` instanceof check
+   * (avoids confusing the adapter with a wheeled `GroundVehicle` that
+   * also reports `category === 'ground'`).
+   */
+  getTankByOccupant(occupantId: string): Tank | null {
+    const v = this.getVehicleByOccupant(occupantId);
+    if (!v || v.category !== 'ground') return null;
+    // `instanceof` keeps the wheeled M151 out of the tank-adapter path.
+    return v instanceof Tank ? v : null;
   }
 
   getAllVehicles(): IVehicle[] {

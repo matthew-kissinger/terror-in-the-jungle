@@ -8,7 +8,7 @@ import {
 function createRefs() {
   let helipadCallback: ((helipads: Array<{ id: string; position: THREE.Vector3 }>) => void) | undefined;
   let combatantProvider: (() => unknown[]) | undefined;
-  let modeChangedCallback: ((mode: string, config: unknown) => void) | undefined;
+  const modeChangedCallbacks: Array<(mode: string, config: unknown) => void> = [];
   const explosionEffectsPool = { id: 'explosion-pool' };
   const combatants = [{ id: 'c1' }, { id: 'c2' }];
   const listener = { id: 'listener' };
@@ -41,8 +41,8 @@ function createRefs() {
     },
     gameModeManager: {
       setWarSimulator: vi.fn(),
-      onModeChanged: vi.fn((callback: typeof modeChangedCallback) => {
-        modeChangedCallback = callback;
+      onModeChanged: vi.fn((callback: (mode: string, config: unknown) => void) => {
+        modeChangedCallbacks.push(callback);
       }),
     },
     fixedWingModel: {
@@ -108,6 +108,7 @@ function createRefs() {
     ticketSystem: {},
     vehicleManager: {
       spawnScenarioM2HBEmplacements: vi.fn(() => ['m2hb_scenario_id']),
+      spawnScenarioM48Tanks: vi.fn(() => ['m48_scenario_id']),
     },
     warSimulator: {
       setCombatantSystem: vi.fn(),
@@ -123,11 +124,19 @@ function createRefs() {
     zoneManager: {},
   } as any;
 
+  // Fan out a single mode-change invocation across every registered
+  // listener so wiring functions registered later (e.g. the M48 tank
+  // wire) still observe the event even though the mock's `onModeChanged`
+  // collects all callbacks rather than only the last one.
+  const fanout = (mode: string, config: unknown) => {
+    for (const cb of modeChangedCallbacks) cb(mode, config);
+  };
+
   return {
     refs,
     getHelipadCallback: () => helipadCallback,
     getCombatantProvider: () => combatantProvider,
-    getModeChangedCallback: () => modeChangedCallback,
+    getModeChangedCallback: () => fanout,
     combatants,
     explosionEffectsPool,
     listener,

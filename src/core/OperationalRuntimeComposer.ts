@@ -3,6 +3,7 @@ import type { SystemKeyToType } from './SystemRegistry';
 import { GameMode } from '../config/gameModeTypes';
 import { Logger } from '../utils/Logger';
 import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacementSpawn';
+import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
 
 type OperationalRuntimeRefs = Pick<
   SystemKeyToType,
@@ -239,6 +240,7 @@ function wireVehicleRuntime(
   runtime.npcVehicleController.setCombatantProvider(() => runtime.combatantSystem.combatants);
 
   wireM2HBEmplacementRuntime(runtime, options);
+  wireM48TankRuntime(runtime, options);
 }
 
 // Maps GameMode -> the scenario-spawn key understood by
@@ -305,6 +307,61 @@ function snapM2HBToTerrain(
     if (Number.isFinite(y)) _m2hbScratch.y = y;
   }
   return _m2hbScratch.clone();
+}
+
+// Maps GameMode -> the M48 scenario-spawn key. Same shape + same
+// scenarios as the M2HB wiring above (the tank spawns ride alongside
+// the emplacements, on Open Frontier US base + A Shau valley road).
+const M48_MODES_BY_GAMEMODE: Partial<Record<GameMode, M48ScenarioMode>> = {
+  [GameMode.OPEN_FRONTIER]: 'open_frontier',
+  [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
+};
+
+function wireM48TankRuntime(
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+  options: OperationalRuntimeOptions
+): void {
+  const scene = options.scene;
+  if (!scene) return;
+
+  const spawnedModes = new Set<M48ScenarioMode>();
+  runtime.gameModeManager.onModeChanged((mode) => {
+    const scenarioKey = M48_MODES_BY_GAMEMODE[mode];
+    if (!scenarioKey) return;
+    if (spawnedModes.has(scenarioKey)) return;
+    spawnedModes.add(scenarioKey);
+    // Defer one frame so the per-mode terrain provider is hot before
+    // resolvePosition runs `getHeightAt` — mirrors the M2HB wiring's
+    // setTimeout(0) deferral above.
+    setTimeout(() => {
+      try {
+        const ids = runtime.vehicleManager.spawnScenarioM48Tanks({
+          scene,
+          modes: [scenarioKey],
+          resolvePosition: (_m, base) => snapM48ToTerrain(base, runtime.terrainSystem),
+        });
+        Logger.info('vehicle', `M48 tank scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
+      } catch (error) {
+        // Roll back the reservation so a manual re-trigger can retry.
+        spawnedModes.delete(scenarioKey);
+        Logger.warn('vehicle', `M48 tank scenario spawn failed for ${scenarioKey}`, error);
+      }
+    }, 0);
+  });
+}
+
+const _m48Scratch = new THREE.Vector3();
+
+function snapM48ToTerrain(
+  base: THREE.Vector3,
+  terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
+): THREE.Vector3 {
+  _m48Scratch.copy(base);
+  if (typeof terrainSystem.getHeightAt === 'function') {
+    const y = terrainSystem.getHeightAt(base.x, base.z);
+    if (Number.isFinite(y)) _m48Scratch.y = y;
+  }
+  return _m48Scratch.clone();
 }
 
 function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRuntime']): void {
