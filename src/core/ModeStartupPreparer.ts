@@ -396,6 +396,15 @@ async function configureTerrainAndNavigation(
   terrainSystem.setHydrologyBiomePolicy(resolveHydrologyBiomePolicy(config));
   engine.systemManager.waterSystem.setHydrologyChannels(hydrologyBake?.artifact ?? null);
 
+  // VODA-2 swim/breath: wire the WaterSystem into the player so head
+  // submersion flips PlayerMovement into swim mode + drives the breath
+  // timer. Drowning damage routes through PlayerHealthSystem so spawn
+  // protection + death handling stay consistent with combat damage.
+  engine.systemManager.playerController.setWaterSystem(
+    engine.systemManager.waterSystem,
+    engine.systemManager.playerHealthSystem,
+  );
+
   if (config.worldSize) {
     engine.systemManager.playerController.setWorldSize(config.worldSize);
   }
