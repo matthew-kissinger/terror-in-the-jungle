@@ -342,4 +342,63 @@ describe('TankTurret', () => {
       expect(turret.getPitch()).toBe(0);
     });
   });
+
+  describe('jammed state (R2, tank-damage-states)', () => {
+    it('ignores setTargetYaw / setTargetPitch while jammed and resumes after unjam', () => {
+      const chassis = makeChassis();
+      const turret = new TankTurret(chassis, {
+        yawSlewRate: 1000 * DEG,
+        barrelPitchSlewRate: 1000 * DEG,
+      });
+
+      // Set a clear initial target and let it settle.
+      turret.setTargetYaw(30 * DEG);
+      turret.setTargetPitch(10 * DEG);
+      turret.update(1.0);
+      expect(turret.getYaw()).toBeCloseTo(30 * DEG, 5);
+      expect(turret.getPitch()).toBeCloseTo(10 * DEG, 5);
+
+      // Jam, then request a wildly different aim. Targets should not advance.
+      turret.setJammed(true);
+      expect(turret.isJammed()).toBe(true);
+      turret.setTargetYaw(-120 * DEG);
+      turret.setTargetPitch(-9 * DEG);
+      expect(turret.getTargetYaw()).toBeCloseTo(30 * DEG, 5);
+      expect(turret.getTargetPitch()).toBeCloseTo(10 * DEG, 5);
+
+      // Slewing settles toward the last target (already there) — barrel stays put.
+      turret.update(1.0);
+      expect(turret.getYaw()).toBeCloseTo(30 * DEG, 5);
+      expect(turret.getPitch()).toBeCloseTo(10 * DEG, 5);
+
+      // Unjam, request a new target — slewing resumes from current pose.
+      turret.setJammed(false);
+      expect(turret.isJammed()).toBe(false);
+      turret.setTargetYaw(-30 * DEG);
+      turret.setTargetPitch(0);
+      turret.update(1.0);
+      expect(turret.getYaw()).toBeCloseTo(-30 * DEG, 5);
+      expect(turret.getPitch()).toBeCloseTo(0, 5);
+    });
+
+    it('preserves the current pose when jammed (does not zero the barrel)', () => {
+      const chassis = makeChassis();
+      const turret = new TankTurret(chassis, {
+        yawSlewRate: 1000 * DEG,
+        barrelPitchSlewRate: 1000 * DEG,
+      });
+      turret.setTargetYaw(45 * DEG);
+      turret.setTargetPitch(15 * DEG);
+      turret.update(1.0);
+      const yawBefore = turret.getYaw();
+      const pitchBefore = turret.getPitch();
+
+      turret.setJammed(true);
+      // Many update ticks while jammed — pose must not drift.
+      for (let i = 0; i < 60; i += 1) turret.update(0.05);
+
+      expect(turret.getYaw()).toBeCloseTo(yawBefore, 5);
+      expect(turret.getPitch()).toBeCloseTo(pitchBefore, 5);
+    });
+  });
 });
