@@ -3,6 +3,7 @@ import { Faction, isAlly, CombatantState } from '../types';
 import type { CombatantSystem } from '../CombatantSystem';
 import type { ExplosionEffectsPool } from '../../effects/ExplosionEffectsPool';
 import { Logger } from '../../../utils/Logger';
+import type { TankBallisticSolver } from './TankBallisticSolver';
 
 /**
  * Tank main-cannon ballistic projectile system. Sibling to
@@ -377,4 +378,69 @@ export class TankCannonProjectileSystem {
       }
     }
   }
+}
+
+/**
+ * Predict the future world-space position a moving target will occupy when
+ * a shell launched now arrives. Closed-form first pass uses time-of-flight
+ * from the ballistic solver to advance the target by `targetVel * tof`;
+ * a single refinement pass re-queries the solver with the predicted lead
+ * position so the answer converges for moving targets.
+ *
+ * The function exists so the cycle #9 R2 `tank-ai-gunner-route` task can
+ * consume lead prediction through a stable surface without modifying the
+ * `TankCannonProjectileSystem.launch()` path the player uses. Player
+ * gunner fires immediately (no solver round-trip); only AI needs lead.
+ *
+ * Returns the predicted **world-space** lead position. If `targetVel` is
+ * zero, the result equals `targetPos` (the function is a no-op for
+ * stationary targets, which is the common case for static cover or
+ * suppressed combatants).
+ *
+ * Pure additive helper — no behaviour change to existing player firing.
+ * Pure helper from a runtime-cost perspective: the solver returns an
+ * array of trajectory samples, but only the last sample's `.time` is
+ * consumed (cheap regardless of sample count).
+ */
+export function predictLeadPosition(
+  solver: TankBallisticSolver,
+  muzzleVelocity: number,
+  shooterPos: THREE.Vector3,
+  targetPos: THREE.Vector3,
+  targetVel: THREE.Vector3,
+): THREE.Vector3 {
+  // Local coords: trajectory origin is always (0,0,0) and target is
+  // expressed as offset from shooter.
+  const targetLocal = new THREE.Vector3().subVectors(targetPos, shooterPos);
+
+  // Pitch estimate: aim along the line-of-sight; treat purely-horizontal
+  // shot as a flat trajectory (angle = 0). For an arc-fire correction the
+  // AI gunner should refine pitch separately; that's not this helper's job.
+  const horizDist = Math.hypot(targetLocal.x, targetLocal.z);
+  const angle = horizDist < 1e-6 ? 0 : Math.atan2(targetLocal.y, horizDist);
+
+  // First pass: time-of-flight to the *current* target position.
+  const samples0 = solver.solve(muzzleVelocity, angle, targetLocal);
+  const tof0 = samples0.length > 0 ? samples0[samples0.length - 1].time : 0;
+  if (tof0 <= 0 || targetVel.lengthSq() < 1e-8) {
+    return targetPos.clone();
+  }
+
+  // Lead the target by the first-pass ToF, then re-solve once for
+  // refinement. One pass is enough at human-target velocities (~5-10 m/s)
+  // and typical engagement ranges (50-500 m); deeper iteration is
+  // diminishing returns and forbidden by the helper's "cheap to call"
+  // contract.
+  const lead1 = new THREE.Vector3()
+    .copy(targetLocal)
+    .add(new THREE.Vector3().copy(targetVel).multiplyScalar(tof0));
+
+  const samples1 = solver.solve(muzzleVelocity, angle, lead1);
+  const tof1 = samples1.length > 0 ? samples1[samples1.length - 1].time : tof0;
+
+  const leadFinal = new THREE.Vector3()
+    .copy(targetPos)
+    .add(new THREE.Vector3().copy(targetVel).multiplyScalar(tof1));
+
+  return leadFinal;
 }
