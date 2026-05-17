@@ -109,6 +109,16 @@ export interface NpcWaterSampler {
   sampleImmersion01(x: number, z: number, surfaceY: number): number;
 }
 
+/**
+ * Splash-effect surface consumed for wade foot-puffs. Narrow shape so the
+ * effect can be optional + stubbed in tests; production binding is the
+ * `WadeSplashEffect` pool wired in `GameplayRuntimeComposer`.
+ */
+export interface NpcWadeSplashEmitter {
+  tryEmitForCombatant(combatantId: string, footPosition: THREE.Vector3, isGroundedAndMoving: boolean): boolean;
+  forgetEmitter(combatantId: string): void;
+}
+
 const _desiredDirection = new THREE.Vector3();
 const _anchorDirection = new THREE.Vector3();
 const _surfaceFlowDirection = new THREE.Vector3();
@@ -141,6 +151,7 @@ export class CombatantMovement {
   private navmeshSystem?: NavmeshSystem;
   private navmeshAdapter?: NavmeshMovementAdapter | null;
   private waterSampler?: NpcWaterSampler;
+  private wadeSplashEmitter?: NpcWadeSplashEmitter;
   private readonly _spacingForce = new THREE.Vector3();
   private readonly stuckDetector = new StuckDetector();
   private readonly navPaths = new Map<string, CachedNavPath>();
@@ -259,6 +270,14 @@ export class CombatantMovement {
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
     combatant.position.addScaledVector(combatant.velocity, deltaTime);
+
+    // Wade splash hook. Foot is approximately the combatant position (NPC
+    // origin sits near ground in this engine). Stride accumulation lives
+    // inside the emitter so the per-NPC budget is one method call.
+    if (this.wadeSplashEmitter) {
+      const moving = combatant.velocity.lengthSq() > 0.01;
+      this.wadeSplashEmitter.tryEmitForCombatant(combatant.id, combatant.position, moving);
+    }
 
     // Keep on terrain with sampled/cached updates to avoid per-frame height churn at scale.
     if (!options?.disableTerrainSample) {
@@ -1190,6 +1209,11 @@ export class CombatantMovement {
     this.waterSampler = sampler;
   }
 
+  /** Bind the wade-splash particle emitter. Unset = no splashes (legacy). */
+  setWadeSplashEmitter(emitter: NpcWadeSplashEmitter | undefined): void {
+    this.wadeSplashEmitter = emitter;
+  }
+
   /** Refresh the adapter reference (call after navmesh generation). */
   refreshNavmeshAdapter(): void {
     if (this.navmeshSystem) {
@@ -1203,6 +1227,7 @@ export class CombatantMovement {
       this.navmeshAdapter.unregisterAgent(id);
     }
     this.stuckDetector.remove(id);
+    this.wadeSplashEmitter?.forgetEmitter(id);
     performanceTelemetry.removeNPCMovementTracker(id);
   }
 
