@@ -1,13 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { TankPlayerAdapter, type ITankModel } from './TankPlayerAdapter';
-import { TrackedVehiclePhysics } from './TrackedVehiclePhysics';
+import { TankPlayerAdapter } from './TankPlayerAdapter';
+import { Tank } from './Tank';
+import { Faction } from '../combat/types';
 import type { VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
 import type { PlayerState } from '../../types';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 vi.mock('../../utils/Logger', () => ({
   Logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
+
+function makeFlatTerrain(height = 0): ITerrainRuntime {
+  return {
+    getHeightAt: () => height,
+    getEffectiveHeightAt: () => height,
+    getSlopeAt: () => 0,
+    getNormalAt: (_x, _z, target) => {
+      const v = target ?? new THREE.Vector3();
+      return v.set(0, 1, 0);
+    },
+    getPlayableWorldSize: () => 4000,
+    getWorldSize: () => 4000,
+    isTerrainReady: () => true,
+    hasTerrainAt: () => true,
+    getActiveTerrainTileCount: () => 1,
+    setSurfaceWetness: () => {},
+    updatePlayerPosition: () => {},
+    registerCollisionObject: () => {},
+    unregisterCollisionObject: () => {},
+    raycastTerrain: () => ({ hit: false }),
+  };
+}
 
 function createPlayerState(): PlayerState {
   return {
@@ -36,32 +60,13 @@ function createMockHudSystem() {
   };
 }
 
-interface MockTankModel extends ITankModel {
-  setEngineActive: ReturnType<typeof vi.fn>;
-  getPlayerExitPlan: ReturnType<typeof vi.fn>;
-  __physics: TrackedVehiclePhysics;
-}
-
-function createMockTankModel(
-  vehicleId = 'm48_1',
-  physicsAt: THREE.Vector3 = new THREE.Vector3(0, 1, 0),
-): MockTankModel {
-  const physics = new TrackedVehiclePhysics(physicsAt);
-  return {
-    vehicleId,
-    __physics: physics,
-    getVehiclePositionTo: vi.fn((_id: string, target: THREE.Vector3) => {
-      target.copy(physicsAt);
-      return true;
-    }),
-    getVehicleQuaternionTo: vi.fn((_id: string, target: THREE.Quaternion) => {
-      target.identity();
-      return true;
-    }),
-    getPhysics: vi.fn((_id: string) => physics),
-    getPlayerExitPlan: vi.fn(),
-    setEngineActive: vi.fn(),
-  };
+function createTank(
+  id = 'm48_1',
+  position: THREE.Vector3 = new THREE.Vector3(0, 1, 0),
+): Tank {
+  const object = new THREE.Object3D();
+  object.position.copy(position);
+  return new Tank(id, object, Faction.US);
 }
 
 function createTransitionContext(
@@ -111,11 +116,11 @@ function createUpdateContext(
 
 describe('TankPlayerAdapter', () => {
   let adapter: TankPlayerAdapter;
-  let model: MockTankModel;
+  let tank: Tank;
 
   beforeEach(() => {
-    model = createMockTankModel();
-    adapter = new TankPlayerAdapter(model);
+    tank = createTank();
+    adapter = new TankPlayerAdapter(tank);
   });
 
   it('identifies itself as a tank adapter on the gameplay input context with pilot seat', () => {
@@ -125,7 +130,7 @@ describe('TankPlayerAdapter', () => {
   });
 
   describe('entering the tank (F enter)', () => {
-    it('takes the player off their feet and into the driver hatch, spools the engine', () => {
+    it('takes the player off their feet and into the driver hatch', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
@@ -145,22 +150,21 @@ describe('TankPlayerAdapter', () => {
       expect(ctx.hudSystem!.setVehicleContext).toHaveBeenCalledWith(
         expect.objectContaining({ hudVariant: 'groundVehicle', role: 'pilot' }),
       );
-      // Engine spooled up.
-      expect(model.setEngineActive).toHaveBeenCalledWith('m48_1', true);
     });
 
-    it('records the active vehicle id and physics handle for the session', () => {
+    it('records the active vehicle id for the session', () => {
+      tank = createTank('m48_alpha');
+      adapter = new TankPlayerAdapter(tank);
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps, 'm48_alpha');
       adapter.onEnter(ctx);
 
       expect(adapter.getActiveVehicleId()).toBe('m48_alpha');
-      expect(adapter.getActivePhysics()).toBe(model.__physics);
     });
   });
 
   describe('exiting the tank (F exit)', () => {
-    it('puts the player back on their feet (restores camera, clears HUD, kills engine)', () => {
+    it('puts the player back on their feet (restores camera, clears HUD)', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
@@ -169,36 +173,36 @@ describe('TankPlayerAdapter', () => {
       expect(ctx.cameraController.restoreInfantryAngles).toHaveBeenCalled();
       expect(ctx.hudSystem!.setVehicleContext).toHaveBeenLastCalledWith(null);
       expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenLastCalledWith('infantry');
-      expect(model.setEngineActive).toHaveBeenLastCalledWith('m48_1', false);
       expect(adapter.getActiveVehicleId()).toBeNull();
-      expect(adapter.getActivePhysics()).toBeNull();
     });
 
-    it('delegates exit planning to the model when it provides a plan', () => {
+    it('parks the chassis on exit so the tank coasts to a stop instead of carrying last throttle', () => {
       const ps = createPlayerState();
-      const ctx = createTransitionContext(ps, 'm48_xyz');
-      const plannedExit = new THREE.Vector3(11, 2, 22);
-      (model.getPlayerExitPlan as ReturnType<typeof vi.fn>).mockReturnValue({
-        canExit: true,
-        mode: 'normal',
-        position: plannedExit,
-      });
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
 
-      const result = adapter.getExitPlan(ctx, { reason: 'input' });
+      // Hold W so the tank is under positive throttle at exit time.
+      (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (k: string) => k === 'keyw',
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
-      expect(model.getPlayerExitPlan).toHaveBeenCalledWith('m48_xyz');
-      expect(result.canExit).toBe(true);
-      expect(result.position).toBe(plannedExit);
+      adapter.onExit(ctx);
+
+      // Exit issues a zeroed, braked command so the unattended chassis
+      // doesn't carry the player's last throttle.
+      expect(setControlsSpy).toHaveBeenCalledWith(0, 0, true);
     });
 
-    it('falls back to ejecting on the positive-X side of the chassis when no model plan exists', () => {
+    it('falls back to ejecting on the positive-X side of the chassis (yaw-rotated)', () => {
       const physicsAt = new THREE.Vector3(100, 3, 200);
-      model = createMockTankModel('m48_drop', physicsAt);
-      (model.getPlayerExitPlan as ReturnType<typeof vi.fn>).mockReturnValue(null);
-      adapter = new TankPlayerAdapter(model);
+      tank = createTank('m48_drop', physicsAt);
+      adapter = new TankPlayerAdapter(tank);
 
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
       const plan = adapter.getExitPlan(ctx, {});
 
       expect(plan.canExit).toBe(true);
@@ -206,13 +210,32 @@ describe('TankPlayerAdapter', () => {
       expect(plan.position!.x).toBeCloseTo(103, 4);
       expect(plan.position!.z).toBeCloseTo(200, 4);
     });
+
+    it('rotates the exit offset with the tank yaw (player does not land in engine deck after turn)', () => {
+      const physicsAt = new THREE.Vector3(0, 1, 0);
+      tank = createTank('m48_yaw', physicsAt);
+      // Rotate the chassis 90 degrees CCW about Y so chassis-+X points to world-+Z.
+      tank.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+      adapter = new TankPlayerAdapter(tank);
+
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      const plan = adapter.getExitPlan(ctx, {});
+
+      // After 90° yaw about +Y, chassis-+X rotates from world-+X to
+      // world-(-Z) (right-hand rule). The key invariant is that the
+      // exit offset is no longer along world-+X — it follows the chassis.
+      expect(Math.abs(plan.position!.z)).toBeCloseTo(3, 4);
+      expect(Math.abs(plan.position!.x)).toBeLessThan(1e-3);
+    });
   });
 
   describe('skid-steer input forwarding', () => {
     it('does nothing when no vehicle is active', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
-      const setControlsSpy = vi.spyOn(model.__physics, 'setControls');
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
@@ -227,7 +250,7 @@ describe('TankPlayerAdapter', () => {
       (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
         (k: string) => k === 'keyw',
       );
-      const setControlsSpy = vi.spyOn(model.__physics, 'setControls');
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
@@ -244,7 +267,7 @@ describe('TankPlayerAdapter', () => {
       (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
         (k: string) => k === 'keys',
       );
-      const setControlsSpy = vi.spyOn(model.__physics, 'setControls');
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
@@ -259,7 +282,7 @@ describe('TankPlayerAdapter', () => {
       (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
         (k: string) => k === 'keyd',
       );
-      const setControlsSpy = vi.spyOn(model.__physics, 'setControls');
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
@@ -277,7 +300,7 @@ describe('TankPlayerAdapter', () => {
       (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
         (k: string) => k === 'keya',
       );
-      const setControlsSpy = vi.spyOn(model.__physics, 'setControls');
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
@@ -292,7 +315,7 @@ describe('TankPlayerAdapter', () => {
       (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
         (k: string) => k === 'keyw' || k === 'keyd',
       );
-      const setControlsSpy = vi.spyOn(model.__physics, 'setControls');
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
@@ -311,7 +334,7 @@ describe('TankPlayerAdapter', () => {
       (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
         (k: string) => k === 'space',
       );
-      const setControlsSpy = vi.spyOn(model.__physics, 'setControls');
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
@@ -331,7 +354,7 @@ describe('TankPlayerAdapter', () => {
         x: 0.7, // right swing → turn right
         z: -0.8, // forward (negative z = forward in touch convention)
       });
-      const setControlsSpy = vi.spyOn(model.__physics, 'setControls');
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
@@ -397,22 +420,13 @@ describe('TankPlayerAdapter', () => {
       // Look-target sits on the chassis center, lifted by cameraLookHeight.
       expect(lookAt.x).toBe(0);
       expect(lookAt.z).toBe(0);
-      expect(lookAt.y).toBeCloseTo(adapter.cameraLookHeight + 1, 4); // physicsAt.y = 1
+      expect(lookAt.y).toBeCloseTo(adapter.cameraLookHeight + 1, 4); // chassis y = 1
     });
 
     it('orbits with the chassis: rotating the tank 90° CCW about Y moves the camera to its world-+X side', () => {
-      // Rebuild the model so getVehicleQuaternionTo returns a non-identity
-      // pose — the adapter's camera math must respect it.
-      const physicsAt = new THREE.Vector3(0, 1, 0);
-      const yaw90 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-      model = {
-        ...createMockTankModel('m48_yaw', physicsAt),
-        getVehicleQuaternionTo: vi.fn((_id: string, target: THREE.Quaternion) => {
-          target.copy(yaw90);
-          return true;
-        }),
-      };
-      adapter = new TankPlayerAdapter(model);
+      tank = createTank('m48_yaw', new THREE.Vector3(0, 1, 0));
+      tank.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+      adapter = new TankPlayerAdapter(tank);
 
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps, 'm48_yaw');
@@ -435,21 +449,25 @@ describe('TankPlayerAdapter', () => {
   });
 
   describe('physics step delegation', () => {
-    it('steps the tracked-physics with the provided dt + terrain', () => {
+    it('steps the tank with the provided dt + terrain when mounted', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
 
-      const stepSpy = vi.spyOn(model.__physics, 'update');
-      adapter.stepPhysics(1 / 60, null);
+      const setTerrainSpy = vi.spyOn(tank, 'setTerrain');
+      const updateSpy = vi.spyOn(tank, 'update');
+      const terrain = makeFlatTerrain(0);
 
-      expect(stepSpy).toHaveBeenCalledWith(1 / 60, null);
+      adapter.stepPhysics(1 / 60, terrain);
+
+      expect(setTerrainSpy).toHaveBeenCalledWith(terrain);
+      expect(updateSpy).toHaveBeenCalledWith(1 / 60);
     });
 
-    it('is a no-op when no physics instance is attached', () => {
-      const stepSpy = vi.spyOn(model.__physics, 'update');
+    it('is a no-op when no vehicle is active (player not mounted)', () => {
+      const updateSpy = vi.spyOn(tank, 'update');
       adapter.stepPhysics(1 / 60, null);
-      expect(stepSpy).not.toHaveBeenCalled();
+      expect(updateSpy).not.toHaveBeenCalled();
     });
   });
 });
