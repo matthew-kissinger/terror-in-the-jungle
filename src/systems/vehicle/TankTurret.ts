@@ -132,6 +132,7 @@ export class TankTurret {
   private targetYaw = 0;
   private targetPitch = 0;
   private disposed = false;
+  private jammed = false;
 
   constructor(parentChassis: THREE.Object3D, config: Partial<TankTurretConfig> = {}) {
     this.chassis = parentChassis;
@@ -169,17 +170,46 @@ export class TankTurret {
    * Request a turret yaw target (radians, relative to chassis frame).
    * Yaw is unconstrained — any value is accepted; the integrator slews
    * along the shortest angular path and wraps to (-PI, PI].
+   *
+   * No-op when the turret is jammed (see `setJammed`): the target is
+   * held at its last value so the barrel settles at the previously
+   * commanded pose and refuses to track new aim commands.
    */
   setTargetYaw(yawRad: number): void {
+    if (this.jammed) return;
     this.targetYaw = wrapAnglePi(yawRad);
   }
 
   /**
    * Request a barrel-pitch target (radians; positive elevation, negative
    * depression). Clamped to the configured mechanical envelope.
+   *
+   * No-op when the turret is jammed.
    */
   setTargetPitch(pitchRad: number): void {
+    if (this.jammed) return;
     this.targetPitch = clamp(pitchRad, this.config.pitchLimits.min, this.config.pitchLimits.max);
+  }
+
+  /**
+   * Damage-state hook (cycle-vekhikl-4-tank-turret-and-cannon R2,
+   * `tank-damage-states`). When set, subsequent `setTargetYaw` /
+   * `setTargetPitch` calls become no-ops: aim targets freeze at their
+   * last commanded value and the barrel settles to that pose. Current
+   * pose is **not** zeroed — the barrel stays where the gunner last
+   * pointed it, mirroring a real turret with a hydraulic-traverse
+   * mechanical failure.
+   *
+   * Idempotent. Flipping back to `false` resumes normal slewing toward
+   * the (now stale) targets; callers can then issue fresh aim commands.
+   */
+  setJammed(jammed: boolean): void {
+    this.jammed = jammed;
+  }
+
+  /** Whether the turret traverse / elevation drive is jammed. */
+  isJammed(): boolean {
+    return this.jammed;
   }
 
   /** Current turret yaw (radians, wrapped to (-PI, PI]). */

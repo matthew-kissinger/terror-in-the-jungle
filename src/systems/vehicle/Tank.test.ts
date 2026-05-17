@@ -276,6 +276,289 @@ describe('M48 scenario spawn', () => {
   });
 });
 
+describe('Tank damage states (R2, tank-damage-states)', () => {
+  function makeTank(opts?: {
+    damageConfig?: Partial<import('./Tank').TankDamageConfig>;
+    rng?: () => number;
+  }) {
+    return new Tank(
+      'dmg_test',
+      new THREE.Object3D(),
+      Faction.US,
+      undefined,
+      undefined,
+      undefined,
+      { maxHp: 1000, ...(opts?.damageConfig ?? {}) },
+      opts?.rng,
+    );
+  }
+
+  const hp = (t: Tank) => t.getHp();
+  const origin = new THREE.Vector3();
+
+  describe('HP band ladder', () => {
+    it('reports healthy at full HP and transitions through damaged → critical → wrecked', () => {
+      // RNG always returns 1 → substate roll always misses (p < 1 always).
+      const tank = makeTank({ rng: () => 0.999999 });
+      expect(tank.getHpBand()).toBe('healthy');
+      expect(tank.getHealthPercent()).toBeCloseTo(1, 5);
+
+      // 100 → 60 (40% damage, fraction 0.60) → damaged threshold (<= 0.66).
+      const r1 = tank.applyDamage(400, origin, 'AP');
+      expect(hp(tank)).toBe(600);
+      expect(tank.getHpBand()).toBe('damaged');
+      expect(r1.bandTransition).toBe('damaged');
+
+      // 60 → 30 (another 30% damage, fraction 0.30) → critical (<= 0.33).
+      const r2 = tank.applyDamage(300, origin, 'AP');
+      expect(hp(tank)).toBe(300);
+      expect(tank.getHpBand()).toBe('critical');
+      expect(r2.bandTransition).toBe('critical');
+
+      // 30 → 0 (another 30%) → wrecked.
+      const r3 = tank.applyDamage(300, origin, 'AP');
+      expect(hp(tank)).toBe(0);
+      expect(tank.getHpBand()).toBe('wrecked');
+      expect(r3.bandTransition).toBe('wrecked');
+    });
+
+    it('does not transition bands when a hit lands within the same band', () => {
+      const tank = makeTank({ rng: () => 0.999999 });
+      // 100 → 80, still healthy (frac 0.80 > 0.66).
+      const r = tank.applyDamage(200, origin, 'HE');
+      expect(tank.getHpBand()).toBe('healthy');
+      expect(r.bandTransition).toBeUndefined();
+    });
+
+    it('fires the bandTransition listener exactly when bands change', () => {
+      const events: string[] = [];
+      const tank = makeTank({ rng: () => 0.999999 });
+      tank.setBandTransitionListener((b) => events.push(b));
+
+      tank.applyDamage(100, origin, 'AP'); // 1000 → 900 healthy
+      tank.applyDamage(300, origin, 'AP'); // 900 → 600 damaged
+      tank.applyDamage(310, origin, 'AP'); // 600 → 290 critical
+      tank.applyDamage(290, origin, 'AP'); // 290 → 0 wrecked
+
+      expect(events).toEqual(['damaged', 'critical', 'wrecked']);
+    });
+  });
+
+  describe('Substate triggers', () => {
+    it('do not fire when HP is above the critical threshold', () => {
+      // RNG would always pass the trigger probability if it were rolled.
+      const tank = makeTank({ rng: () => 0 });
+      tank.applyDamage(200, origin, 'AP'); // healthy → still healthy
+      tank.applyDamage(200, origin, 'AP'); // healthy → damaged
+
+      const flags = tank.getSubstates();
+      expect(flags.tracksBlown).toBe(false);
+      expect(flags.turretJammed).toBe(false);
+      expect(flags.engineKilled).toBe(false);
+    });
+
+    it('can fire at critical HP and surface through the result + listener', () => {
+      const events: string[] = [];
+      // RNG=0 forces every trigger roll to pass, so every critical-band hit
+      // fires a substate. We use small damage steps so we control exactly
+      // which hit is the "first critical hit."
+      const tank = makeTank({ rng: () => 0 });
+      tank.setSubstateListener((s) => events.push(s));
+
+      // Step down into critical with small hits that don't push through the
+      // threshold in one shot (so the critical-substate roll fires on the
+      // hit that *enters* critical, observable as the first listener event).
+      tank.applyDamage(200, origin, 'AP'); // 1000 → 800 healthy (frac 0.80)
+      tank.applyDamage(200, origin, 'AP'); // 800 → 600 damaged (frac 0.60)
+      expect(events).toHaveLength(0); // no substate above critical
+      tank.applyDamage(300, origin, 'AP'); // 600 → 300 critical — substate fires
+      expect(tank.getHpBand()).toBe('critical');
+      expect(events).toHaveLength(1);
+
+      // The triggered substate matches the listener event, and its flag is set.
+      const triggered = events[0] as 'tracks-blown' | 'turret-jammed' | 'engine-killed';
+      const flags = tank.getSubstates();
+      if (triggered === 'tracks-blown') expect(flags.tracksBlown).toBe(true);
+      if (triggered === 'turret-jammed') expect(flags.turretJammed).toBe(true);
+      if (triggered === 'engine-killed') expect(flags.engineKilled).toBe(true);
+    });
+
+    it('immobilizes the chassis when a tracks-blown substate fires', () => {
+      // rng=0 always triggers, and with rng=0 the weighted draw picks the
+      // first candidate in iteration order — `tracks-blown`. Test holds as
+      // long as `tracks-blown` is among the first candidates considered
+      // (iteration order is part of the implementation, not the public
+      // contract, so we keep the assertion to the observable effect).
+      const scene = new THREE.Scene();
+      const object = new THREE.Object3D();
+      object.position.set(0, 1, 0);
+      scene.add(object);
+
+      const tank = new Tank('t_blown_dmg', object, Faction.US,
+        undefined, undefined, undefined,
+        { maxHp: 1000 },
+        () => 0,
+      );
+      tank.setTerrain({
+        getHeightAt: () => 0,
+        getEffectiveHeightAt: () => 0,
+        getSlopeAt: () => 0,
+        getNormalAt: (_x, _z, t) => (t ?? new THREE.Vector3()).set(0, 1, 0),
+        getPlayableWorldSize: () => 4000,
+        getWorldSize: () => 4000,
+        isTerrainReady: () => true,
+        hasTerrainAt: () => true,
+        getActiveTerrainTileCount: () => 1,
+        setSurfaceWetness: () => {},
+        updatePlayerPosition: () => {},
+        registerCollisionObject: () => {},
+        unregisterCollisionObject: () => {},
+        raycastTerrain: () => ({ hit: false }),
+      });
+
+      // Drop into critical, then trigger the first substate. With rng=0 the
+      // weighted draw lands on the first candidate (tracks-blown).
+      tank.applyDamage(700, origin, 'HE');
+      tank.applyDamage(50, origin, 'HE');
+      expect(tank.getSubstates().tracksBlown).toBe(true);
+
+      // Drive the chassis: cannot move forward.
+      for (let i = 0; i < 30; i += 1) tank.update(0.02);
+      tank.setControls(1.0, 0, false);
+      const start = tank.getPosition().clone();
+      for (let i = 0; i < 240; i += 1) tank.update(0.02);
+      const end = tank.getPosition();
+      expect(Math.hypot(end.x - start.x, end.z - start.z)).toBeLessThan(0.5);
+    });
+
+    it('freezes turret aim when a turret-jammed substate fires', () => {
+      // Force the turret-jammed substate directly by triggering the random
+      // path until that flag is set. We rely only on the observable
+      // contract: after `setJammed(true)`, target updates are no-ops.
+      const tank = makeTank({ rng: () => 0 });
+      tank.applyDamage(700, origin, 'AP'); // → critical
+      // Repeated hits with rng=0 will fire substates until all three are
+      // active; once turret-jammed is set, the test invariant holds.
+      tank.applyDamage(50, origin, 'AP');
+      tank.applyDamage(50, origin, 'AP');
+      tank.applyDamage(50, origin, 'AP');
+      expect(tank.getSubstates().turretJammed).toBe(true);
+
+      const turret = tank.getTurret();
+      const yawBefore = turret.getTargetYaw();
+      turret.setTargetYaw(1.5);
+      expect(turret.getTargetYaw()).toBe(yawBefore); // jammed → no-op
+    });
+
+    it('clamps throttle when an engine-killed substate fires (chassis cannot drive)', () => {
+      // Force the engine-killed flag through the substate path. Same
+      // approach as the turret-jammed test: apply enough critical-band
+      // hits with rng=0 that all three substates trigger, then assert
+      // the observable contract on the chassis.
+      const scene = new THREE.Scene();
+      const obj = new THREE.Object3D();
+      obj.position.set(0, 1, 0);
+      scene.add(obj);
+      const drivenTank = new Tank(
+        't_eng_drive',
+        obj,
+        Faction.US,
+        undefined,
+        undefined,
+        undefined,
+        { maxHp: 1000 },
+        () => 0,
+      );
+      drivenTank.setTerrain({
+        getHeightAt: () => 0,
+        getEffectiveHeightAt: () => 0,
+        getSlopeAt: () => 0,
+        getNormalAt: (_x, _z, t) => (t ?? new THREE.Vector3()).set(0, 1, 0),
+        getPlayableWorldSize: () => 4000,
+        getWorldSize: () => 4000,
+        isTerrainReady: () => true,
+        hasTerrainAt: () => true,
+        getActiveTerrainTileCount: () => 1,
+        setSurfaceWetness: () => {},
+        updatePlayerPosition: () => {},
+        registerCollisionObject: () => {},
+        unregisterCollisionObject: () => {},
+        raycastTerrain: () => ({ hit: false }),
+      });
+      drivenTank.applyDamage(700, origin, 'HEAT');
+      // Fire substates until engine-killed lands. Bounded loop — at most
+      // three critical-band hits cover the worst case (engine-killed is
+      // last in the pool).
+      for (let i = 0; i < 3 && !drivenTank.getSubstates().engineKilled; i += 1) {
+        drivenTank.applyDamage(50, origin, 'HEAT');
+      }
+      expect(drivenTank.getSubstates().engineKilled).toBe(true);
+
+      // Settle, then floor it. The chassis will not advance because
+      // throttle is clamped — regardless of any other substate flags.
+      for (let i = 0; i < 30; i += 1) drivenTank.update(0.02);
+      drivenTank.setControls(1.0, 0, false);
+      const start = drivenTank.getPosition().clone();
+      for (let i = 0; i < 240; i += 1) drivenTank.update(0.02);
+      const end = drivenTank.getPosition();
+      expect(Math.hypot(end.x - start.x, end.z - start.z)).toBeLessThan(0.5);
+    });
+
+    it('can stack all three substates on the same vehicle', () => {
+      // Every roll triggers, every weighted pick lands on the first remaining bucket.
+      const tank = makeTank({ rng: () => 0 });
+      tank.applyDamage(700, origin, 'AP'); // → critical
+
+      // Three critical-band hits in a row — each triggers a fresh substate.
+      tank.applyDamage(50, origin, 'AP');
+      tank.applyDamage(50, origin, 'AP');
+      tank.applyDamage(50, origin, 'AP');
+
+      const flags = tank.getSubstates();
+      expect(flags.tracksBlown).toBe(true);
+      expect(flags.turretJammed).toBe(true);
+      expect(flags.engineKilled).toBe(true);
+      // Tank is fully crippled but not yet wrecked — still queryable.
+      expect(tank.isDestroyed()).toBe(false);
+      expect(tank.getTurret().getYaw()).toBe(0); // pose is still readable
+    });
+  });
+
+  describe('Wrecked state', () => {
+    it('reports zero HP and ignores further damage', () => {
+      const tank = makeTank({ rng: () => 0.99 });
+      tank.applyDamage(1000, origin, 'AP');
+      expect(tank.getHp()).toBe(0);
+      expect(tank.getHpBand()).toBe('wrecked');
+      expect(tank.getHealthPercent()).toBe(0);
+      expect(tank.isDestroyed()).toBe(true);
+
+      // Further damage is a no-op (no band change, no substate, HP stays 0).
+      const r = tank.applyDamage(500, origin, 'HE');
+      expect(r.newHp).toBe(0);
+      expect(r.bandTransition).toBeUndefined();
+      expect(r.substateTriggered).toBeUndefined();
+    });
+
+    it('forces engine-killed + turret-jammed on wreck regardless of prior substates', () => {
+      const tank = makeTank({ rng: () => 0.99 });
+      tank.applyDamage(1000, origin, 'AP');
+      const flags = tank.getSubstates();
+      expect(flags.engineKilled).toBe(true);
+      expect(flags.turretJammed).toBe(true);
+    });
+
+    it('ignores zero / negative damage even on a healthy tank', () => {
+      const tank = makeTank();
+      const r = tank.applyDamage(0, origin, 'AP');
+      expect(r.newHp).toBe(1000);
+      const r2 = tank.applyDamage(-10, origin, 'AP');
+      expect(r2.newHp).toBe(1000);
+      expect(tank.getHpBand()).toBe('healthy');
+    });
+  });
+});
+
 describe('VehicleManager.spawnScenarioM48Tanks surface', () => {
   it('registers M48 tanks through the VehicleManager pass-through method', () => {
     const scene = new THREE.Scene();

@@ -370,6 +370,67 @@ describe('TrackedVehiclePhysics', () => {
     });
   });
 
+  describe('Engine-killed (R2, tank-damage-states)', () => {
+    it('clamps throttle so the chassis cannot drive forward even at full input', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      settle(physics, flat, 30, DT);
+
+      // Sanity: undamaged chassis moves forward.
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 120; i += 1) physics.update(DT, flat);
+      expect(physics.getForwardSpeed()).toBeGreaterThan(0.5);
+
+      // Kill the engine. Driver continues to mash throttle.
+      physics.setEngineKilled(true);
+      expect(physics.isEngineKilled()).toBe(true);
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 240; i += 1) physics.update(DT, flat);
+
+      // Forward velocity must bleed down to near-zero (no drive, drag wins).
+      expect(Math.abs(physics.getForwardSpeed())).toBeLessThan(0.5);
+      // State flag surfaces on the snapshot.
+      expect(physics.getState().engineKilled).toBe(true);
+    });
+
+    it('still allows turn input through to the integrator (visual pivot)', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      settle(physics, flat, 30, DT);
+
+      physics.setEngineKilled(true);
+      physics.setControls(0, 1.0, false);
+      for (let i = 0; i < 60; i += 1) physics.update(DT, flat);
+
+      // Turn axis was not clamped — the rawControls path accepted the +1.
+      // With throttle == 0 the per-track commands are leftCmd = -1, rightCmd = +1
+      // (pivot), which the smoothing layer still ramps up. No assertion on
+      // yaw magnitude (engine-killed pivots only from inertia in
+      // typical play); the contract is that turn input is *accepted*.
+      const state = physics.getState();
+      // Left and right tracks counter-rotated under the pivot command.
+      expect(state.rightTrackSpeed - state.leftTrackSpeed).toBeGreaterThan(0);
+    });
+
+    it('returns to normal acceptance after engine-killed is cleared', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      settle(physics, flat, 30, DT);
+
+      physics.setEngineKilled(true);
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 60; i += 1) physics.update(DT, flat);
+      expect(Math.abs(physics.getForwardSpeed())).toBeLessThan(0.5);
+
+      physics.setEngineKilled(false);
+      expect(physics.isEngineKilled()).toBe(false);
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 240; i += 1) physics.update(DT, flat);
+
+      expect(physics.getForwardSpeed()).toBeGreaterThan(0.5);
+    });
+  });
+
   // Coverage sanity: ensure the forward axis derived from quaternion stays
   // unit-length under sustained yaw integration. Cheap, catches quaternion
   // normalization bugs in the integrator.
