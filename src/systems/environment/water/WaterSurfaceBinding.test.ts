@@ -72,6 +72,43 @@ describe('WaterSurfaceBinding', () => {
     expect(binding.getTerrainHeightBinding()).toBeNull();
   });
 
+  it('installs the river-flow patch on a separate material and ticks the time uniform', () => {
+    const binding = new WaterSurfaceBinding();
+    const riverMaterial = new THREE.MeshStandardMaterial();
+    const normalMap = new THREE.Texture();
+
+    const refs = binding.installRiverFlowPatch(riverMaterial, normalMap);
+
+    expect(riverMaterial.onBeforeCompile).toBeTypeOf('function');
+    expect(refs.uTime.value).toBe(0);
+    expect(refs.uRiverNormalMap.value).toBe(normalMap);
+
+    binding.tickRiverFlow(0.5, normalMap);
+    binding.tickRiverFlow(0.25, normalMap);
+    expect(refs.uTime.value).toBeCloseTo(0.75, 5);
+
+    // tickRiverFlow is a safe no-op when nothing is installed.
+    const fresh = new WaterSurfaceBinding();
+    expect(() => fresh.tickRiverFlow(1, normalMap)).not.toThrow();
+  });
+
+  it('late-binds the river normal map when one becomes available after install', () => {
+    const binding = new WaterSurfaceBinding();
+    const riverMaterial = new THREE.MeshStandardMaterial();
+    const refs = binding.installRiverFlowPatch(riverMaterial, null);
+    expect(refs.uRiverNormalMap.value).toBeNull();
+
+    const lateTexture = new THREE.Texture();
+    binding.tickRiverFlow(0.016, lateTexture);
+    expect(refs.uRiverNormalMap.value).toBe(lateTexture);
+
+    // clearRiverFlowPatch makes subsequent ticks no-op (refs detached).
+    binding.clearRiverFlowPatch();
+    const before = refs.uTime.value;
+    binding.tickRiverFlow(1, lateTexture);
+    expect(refs.uTime.value).toBe(before);
+  });
+
   it('injects surface + foam patches into the compiled shader', () => {
     const binding = new WaterSurfaceBinding();
     const material = new THREE.MeshStandardMaterial();

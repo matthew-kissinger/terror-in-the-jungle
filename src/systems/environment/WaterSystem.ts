@@ -49,12 +49,11 @@ const GLOBAL_WATER_TIME_SCALE = 0.36;
 
 /**
  * Orchestrator for the global water plane + hydrology river surfaces.
- * After water-system-file-split (VODA-1, 2026-05-16) this class owns the
- * lifecycle (init/update/dispose), the underwater overlay, the
- * camera-follow + sun-sync wiring, and the public API. The heavy work
- * delegates to `water/HydrologyRiverSurface` (hydrology-bake consumer +
- * mesh), `water/WaterSurfaceSampler` (runtime depth/buoyancy sampler),
- * and `water/WaterSurfaceBinding` (shader/material binding layer).
+ * Post water-system-file-split (VODA-1, 2026-05-16) owns the lifecycle,
+ * underwater overlay, camera-follow + sun-sync, and public API. Heavy
+ * work delegates to `water/HydrologyRiverSurface` (mesh + hydrology
+ * consumer), `water/WaterSurfaceSampler` (depth/buoyancy), and
+ * `water/WaterSurfaceBinding` (shader binding + river-flow patch).
  */
 export class WaterSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -86,8 +85,12 @@ export class WaterSystem implements GameSystem {
     this.camera = camera;
     this.assetLoader = assetLoader;
     this.sun = new THREE.Vector3();
-    this.riverSurface = new HydrologyRiverSurface(scene);
     this.binding = new WaterSurfaceBinding();
+    // River-flow patch installs at material build; tickRiverFlow late-binds
+    // the texture for the setHydrologyChannels-before-init() ordering.
+    this.riverSurface = new HydrologyRiverSurface(scene, {
+      onMaterialReady: (m) => this.binding.installRiverFlowPatch(m, this.waterNormalTexture ?? null),
+    });
     this.sampler = new WaterSurfaceSampler({
       globalWaterLevel: this.WATER_LEVEL,
       isGlobalPlaneActive: () => this.isGlobalWaterPlaneActive(),
@@ -131,11 +134,10 @@ export class WaterSystem implements GameSystem {
 
     this.water = new THREE.Mesh(geom, material);
     this.water.name = 'global-water-standard-plane';
-    // PlaneGeometry is XY; rotate so the surface lies on XZ.
-    this.water.rotation.x = -Math.PI / 2;
+    this.water.rotation.x = -Math.PI / 2; // PlaneGeometry is XY; rotate onto XZ.
     this.water.position.y = this.WATER_LEVEL;
-    this.updateWaterScale();
     this.water.matrixAutoUpdate = true;
+    this.updateWaterScale();
     this.scene.add(this.water);
 
     this.updateSunPosition(50, 100, 30);
@@ -148,8 +150,7 @@ export class WaterSystem implements GameSystem {
     Object.assign(overlay.style, {
       position: 'fixed', top: '0', left: '0', width: '100%', height: '100%',
       backgroundColor: '#004455', opacity: '0', pointerEvents: 'none',
-      transition: 'opacity 0.5s ease-out', zIndex: '900', display: 'none',
-      backdropFilter: 'blur(4px)',
+      transition: 'opacity 0.5s ease-out', zIndex: '900', display: 'none', backdropFilter: 'blur(4px)',
     });
     document.body.appendChild(overlay);
     this.overlay = overlay;
@@ -171,6 +172,8 @@ export class WaterSystem implements GameSystem {
     this.setUnderwaterState(this.isUnderwater(this.camera.position));
     this.waterTimeSeconds += deltaTime * GLOBAL_WATER_TIME_SCALE;
     this.binding.updateSurfaceUniforms(this.waterTimeSeconds, this.sun, this.wasUnderwater);
+    // River flow on plain seconds (no GLOBAL_WATER_TIME_SCALE); no-op without hydrology.
+    this.binding.tickRiverFlow(deltaTime, this.waterNormalTexture);
   }
 
   private setUnderwaterState(isUnderwater: boolean): void {
@@ -180,11 +183,7 @@ export class WaterSystem implements GameSystem {
     if (!this.overlay) return;
     if (isUnderwater) {
       this.overlay.style.display = 'block';
-      playElementAnimation(
-        this.overlay,
-        [{ opacity: 0 }, { opacity: 0.4 }],
-        { duration: 250, easing: 'ease-out', fill: 'forwards' },
-      );
+      playElementAnimation(this.overlay, [{ opacity: 0 }, { opacity: 0.4 }], { duration: 250, easing: 'ease-out', fill: 'forwards' });
     } else {
       this.overlay.style.opacity = '0';
       setTimeout(() => {
@@ -268,9 +267,11 @@ export class WaterSystem implements GameSystem {
   /**
    * Replace active hydrology surfaces or clear with `null`. Separate from
    * the global water plane so A Shau can keep the sea-level plane disabled
-   * while still drawing DEM-following water.
+   * while still drawing DEM-following water. On null, drop binding-layer
+   * river-flow refs so `tickRiverFlow` becomes a no-op.
    */
   setHydrologyChannels(artifact: HydrologyBakeArtifact | null): void {
+    if (!artifact) this.binding.clearRiverFlowPatch();
     this.riverSurface.setArtifact(artifact);
     this.updateGlobalWaterVisibility();
   }

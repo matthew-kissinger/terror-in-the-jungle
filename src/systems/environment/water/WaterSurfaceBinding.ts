@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import {
+  installHydrologyRiverFlowPatch,
+  type HydrologyRiverShaderRefs,
+} from './HydrologyRiverFlowPatch';
 
 // Shoreline fade reads transparency falling off near depth=0 so the
 // water-terrain seam reads as wet sand rather than a hard polygon edge.
@@ -125,6 +129,7 @@ if (waterEdgeBindingEnabled > 0.5) {
 export class WaterSurfaceBinding {
   private shaderRefs?: GlobalWaterShaderRefs;
   private terrainHeightBinding: WaterTerrainHeightSamplerBinding | null = null;
+  private hydrologyRiverRefs?: HydrologyRiverShaderRefs;
   private readonly waterEdgeFoamUniforms: WaterEdgeFoamUniforms = {
     terrainHeightmap: { value: null },
     terrainHeightWorldSize: { value: 1 },
@@ -173,6 +178,32 @@ export class WaterSurfaceBinding {
     this.shaderRefs.uTime.value = timeSeconds;
     this.shaderRefs.uSunDirection.value.copy(sun);
     this.shaderRefs.uCameraUnderwater.value = cameraUnderwater ? 1 : 0;
+  }
+
+  /**
+   * Install the flow-visuals patch on the hydrology river material and
+   * capture the uniform refs so the owning system can tick `uTime` per
+   * frame and late-bind the normal texture once `waternormals.jpg`
+   * loads. Replaces any prior install (river surface rebuilds material).
+   */
+  installRiverFlowPatch(material: THREE.MeshStandardMaterial, initialNormalMap: THREE.Texture | null): HydrologyRiverShaderRefs {
+    const refs = installHydrologyRiverFlowPatch(material, initialNormalMap);
+    this.hydrologyRiverRefs = refs;
+    return refs;
+  }
+
+  /** Advance river `uTime` + late-bind the normal map. No-op without install. */
+  tickRiverFlow(deltaTime: number, normalMap: THREE.Texture | undefined): void {
+    if (!this.hydrologyRiverRefs) return;
+    this.hydrologyRiverRefs.uTime.value += deltaTime;
+    if (normalMap && this.hydrologyRiverRefs.uRiverNormalMap.value !== normalMap) {
+      this.hydrologyRiverRefs.uRiverNormalMap.value = normalMap;
+    }
+  }
+
+  /** Drop the captured river refs when the river surface is torn down. */
+  clearRiverFlowPatch(): void {
+    this.hydrologyRiverRefs = undefined;
   }
 
   /**
