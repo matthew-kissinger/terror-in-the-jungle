@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { TankGunnerAdapter, type ITankTurretModel } from './TankGunnerAdapter';
+import { TankGunnerAdapter } from './TankGunnerAdapter';
 import { Tank } from './Tank';
+import { TankTurret } from './TankTurret';
 import { Faction } from '../combat/types';
 import type { VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
 import type { PlayerState } from '../../types';
@@ -11,50 +12,14 @@ vi.mock('../../utils/Logger', () => ({
 }));
 
 /**
- * Minimal in-test turret stub satisfying `ITankTurretModel`. Tracks the
- * last yaw/pitch the adapter requested and reports them back through
- * `getYaw / getPitch` (no slew lag — the adapter shouldn't care). Barrel
- * pose is a fixed pose so the camera math is exercisable.
- *
- * This stub stays at the adapter's seam — once `tank-turret-rig` lands
- * and the orchestrator's swap step replaces `ITankTurretModel` with the
- * real `TankTurret` in the adapter source, behavior tests covering "the
- * adapter forwards mouse-x to setTargetYaw" remain valid against the
- * real turret without rewriting.
+ * Drives a real `TankTurret` to its requested yaw / pitch targets without
+ * slew lag. The turret integrates with `update(dt)` capped by its configured
+ * slew rate; a large dt collapses any angular gap in a single call (see
+ * `approachAngular`'s shortest-path step). Used by tests that want to set
+ * up a specific barrel pose without simulating frames.
  */
-function makeTurretStub(opts?: {
-  yawLimits?: { min: number; max: number } | null;
-  pitchLimits?: { min: number; max: number };
-  barrelTip?: THREE.Vector3;
-  barrelDir?: THREE.Vector3;
-}): ITankTurretModel & {
-  setTargetYaw: ReturnType<typeof vi.fn>;
-  setTargetPitch: ReturnType<typeof vi.fn>;
-  yaw: number;
-  pitch: number;
-} {
-  const yawLimits = opts?.yawLimits === undefined ? null : opts.yawLimits;
-  const pitchLimits = opts?.pitchLimits ?? { min: -10 * Math.PI / 180, max: 20 * Math.PI / 180 };
-  const tip = opts?.barrelTip ?? new THREE.Vector3(0, 2.4, -3);
-  const dir = opts?.barrelDir ?? new THREE.Vector3(0, 0, -1);
-
-  const stub = {
-    yaw: 0,
-    pitch: 0,
-    setTargetYaw: vi.fn(function (y: number) { (stub as any).yaw = y; }),
-    setTargetPitch: vi.fn(function (p: number) { (stub as any).pitch = p; }),
-    getYaw(): number { return stub.yaw; },
-    getPitch(): number { return stub.pitch; },
-    getYawLimits() { return yawLimits; },
-    getPitchLimits() { return pitchLimits; },
-    getBarrelTipWorldPosition(target: THREE.Vector3) {
-      return target.copy(tip);
-    },
-    getBarrelDirectionWorld(target: THREE.Vector3) {
-      return target.copy(dir).normalize();
-    },
-  };
-  return stub;
+function snapTurretToTarget(turret: TankTurret): void {
+  turret.update(10);
 }
 
 function createPlayerState(): PlayerState {
@@ -90,6 +55,9 @@ function createTank(
 ): Tank {
   const object = new THREE.Object3D();
   object.position.copy(position);
+  // Add to a scene so updateMatrixWorld propagates from the root.
+  const scene = new THREE.Scene();
+  scene.add(object);
   return new Tank(id, object, Faction.US);
 }
 
@@ -142,11 +110,11 @@ function createUpdateContext(
 describe('TankGunnerAdapter', () => {
   let adapter: TankGunnerAdapter;
   let tank: Tank;
-  let turret: ReturnType<typeof makeTurretStub>;
+  let turret: TankTurret;
 
   beforeEach(() => {
     tank = createTank();
-    turret = makeTurretStub();
+    turret = tank.getTurret();
     adapter = new TankGunnerAdapter(tank, turret);
   });
 
@@ -184,6 +152,7 @@ describe('TankGunnerAdapter', () => {
 
     it('records the active vehicle id for the session', () => {
       tank = createTank('m48_alpha');
+      turret = tank.getTurret();
       adapter = new TankGunnerAdapter(tank, turret);
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps, 'm48_alpha');
@@ -208,6 +177,7 @@ describe('TankGunnerAdapter', () => {
     it('ejects on the +X side of the chassis, rotated by the tank yaw', () => {
       const physicsAt = new THREE.Vector3(100, 3, 200);
       tank = createTank('m48_drop', physicsAt);
+      turret = tank.getTurret();
       adapter = new TankGunnerAdapter(tank, turret);
 
       const ps = createPlayerState();
@@ -225,6 +195,7 @@ describe('TankGunnerAdapter', () => {
       tank = createTank('m48_yaw', new THREE.Vector3(0, 1, 0));
       // Rotate the chassis 90 degrees CCW about Y so chassis-+X points to world-(-Z).
       tank.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+      turret = tank.getTurret();
       adapter = new TankGunnerAdapter(tank, turret);
 
       const ps = createPlayerState();
@@ -242,12 +213,14 @@ describe('TankGunnerAdapter', () => {
     it('does nothing when no gunner seat is mounted', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
+      const yawBefore = turret.getTargetYaw();
+      const pitchBefore = turret.getTargetPitch();
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
-      expect(turret.setTargetYaw).not.toHaveBeenCalled();
-      expect(turret.setTargetPitch).not.toHaveBeenCalled();
+      expect(turret.getTargetYaw()).toBe(yawBefore);
+      expect(turret.getTargetPitch()).toBe(pitchBefore);
     });
 
-    it('forwards mouse-x as a yaw delta via setTargetYaw (pointer locked)', () => {
+    it('forwards mouse-x as a yaw delta to the turret (pointer locked)', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
@@ -257,16 +230,14 @@ describe('TankGunnerAdapter', () => {
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
-      expect(turret.setTargetYaw).toHaveBeenCalled();
-      const requestedYaw = turret.setTargetYaw.mock.calls[0][0] as number;
       // Right-drag (positive mouse-x) turns the turret right (negative yaw
       // in the convention shared with EmplacementPlayerAdapter).
-      expect(requestedYaw).toBeLessThan(0);
+      expect(turret.getTargetYaw()).toBeLessThan(0);
       // Mouse movement was consumed so the next frame starts fresh.
       expect(ctx.input.clearMouseMovement).toHaveBeenCalled();
     });
 
-    it('forwards mouse-y as a pitch delta via setTargetPitch (pointer locked)', () => {
+    it('forwards mouse-y as a pitch delta to the turret (pointer locked)', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
@@ -277,9 +248,7 @@ describe('TankGunnerAdapter', () => {
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
-      expect(turret.setTargetPitch).toHaveBeenCalled();
-      const requestedPitch = turret.setTargetPitch.mock.calls[0][0] as number;
-      expect(requestedPitch).toBeGreaterThan(0);
+      expect(turret.getTargetPitch()).toBeGreaterThan(0);
     });
 
     it('ignores mouse aim while pointer is unlocked', () => {
@@ -290,20 +259,28 @@ describe('TankGunnerAdapter', () => {
       (ctx.input.getIsPointerLocked as ReturnType<typeof vi.fn>).mockReturnValue(false);
       (ctx.input.getMouseMovement as ReturnType<typeof vi.fn>).mockReturnValue({ x: 50, y: 50 });
 
+      const yawBefore = turret.getTargetYaw();
+      const pitchBefore = turret.getTargetPitch();
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
-      expect(turret.setTargetYaw).not.toHaveBeenCalled();
-      expect(turret.setTargetPitch).not.toHaveBeenCalled();
+      expect(turret.getTargetYaw()).toBe(yawBefore);
+      expect(turret.getTargetPitch()).toBe(pitchBefore);
     });
 
     it('accumulates against the turret current aim — leaves clamping to the turret model', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
-      // Seed the turret with a non-zero starting aim. The adapter must add
-      // its delta to this, not overwrite it (otherwise consecutive inputs
-      // would walk the turret to mouse-delta only, losing the absolute aim).
-      turret.yaw = 0.5;
-      turret.pitch = 0.1;
+      // Seed the turret with a non-zero starting aim and let it slew to
+      // that target. The adapter must add its delta to the turret's
+      // current achieved aim, not overwrite it (otherwise consecutive
+      // inputs would walk the turret to mouse-delta only, losing the
+      // absolute aim).
+      turret.setTargetYaw(0.5);
+      turret.setTargetPitch(0.1);
+      snapTurretToTarget(turret);
+      expect(turret.getYaw()).toBeCloseTo(0.5, 5);
+      expect(turret.getPitch()).toBeCloseTo(0.1, 5);
+
       adapter.onEnter(ctx);
 
       (ctx.input.getIsPointerLocked as ReturnType<typeof vi.fn>).mockReturnValue(true);
@@ -311,10 +288,10 @@ describe('TankGunnerAdapter', () => {
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
-      const newYaw = turret.setTargetYaw.mock.calls[0][0] as number;
-      const newPitch = turret.setTargetPitch.mock.calls[0][0] as number;
-      // Both should differ from the raw mouse delta — they should be the
-      // starting aim plus the input delta.
+      const newYaw = turret.getTargetYaw();
+      const newPitch = turret.getTargetPitch();
+      // Both should differ from the raw mouse delta alone — they should be
+      // the starting aim plus the input delta.
       expect(newYaw).not.toBeCloseTo(-10 * 0.0022, 6);
       expect(newPitch).not.toBeCloseTo(10 * 0.0022, 6);
       // And they should land in the neighborhood of starting + delta.
@@ -333,10 +310,12 @@ describe('TankGunnerAdapter', () => {
         roll: 0.6,  // right on right stick → turret right
       });
 
+      const yawBefore = turret.getTargetYaw();
+      const pitchBefore = turret.getTargetPitch();
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
-      expect(turret.setTargetYaw).toHaveBeenCalled();
-      expect(turret.setTargetPitch).toHaveBeenCalled();
+      expect(turret.getTargetYaw()).not.toBe(yawBefore);
+      expect(turret.getTargetPitch()).not.toBe(pitchBefore);
       // Mouse path should not have been read.
       expect(ctx.input.getMouseMovement).not.toHaveBeenCalled();
     });
@@ -435,16 +414,18 @@ describe('TankGunnerAdapter', () => {
 
   describe('gunner-sight first-person camera (down-barrel POV)', () => {
     it('places the eye just behind the muzzle and looks along the barrel direction', () => {
-      // Barrel pointing world -Z from (0, 2.4, -3).
-      turret = makeTurretStub({
-        barrelTip: new THREE.Vector3(0, 2.4, -3),
-        barrelDir: new THREE.Vector3(0, 0, -1),
-      });
+      // Default turret with yaw=0, pitch=0: barrel points along chassis-(-Z).
+      // With chassis at (0, 1, 0) and identity quaternion, world barrel
+      // direction is world-(-Z) and the world barrel tip sits at the
+      // sum of the default offsets along -Z.
       adapter = new TankGunnerAdapter(tank, turret);
 
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
+
+      const tipProbe = new THREE.Vector3();
+      turret.getBarrelTipWorldPosition(tipProbe);
 
       const camPos = new THREE.Vector3();
       const lookAt = new THREE.Vector3();
@@ -452,18 +433,20 @@ describe('TankGunnerAdapter', () => {
 
       expect(ok).toBe(true);
       // Eye sits a hair ahead of the muzzle along the barrel direction
-      // (forward = -Z), so camPos.z < tip.z.
-      expect(camPos.z).toBeLessThan(-3);
-      // Look-target is one metre further along the barrel.
+      // (forward = -Z), so camPos.z < tipProbe.z.
+      expect(camPos.z).toBeLessThan(tipProbe.z);
+      // Look-target is further along the barrel.
       expect(lookAt.z).toBeLessThan(camPos.z);
     });
 
-    it('tracks the turret pose: rotating the barrel rotates the look-target', () => {
-      // Barrel pointing world +X (turret slewed 90° to the right).
-      turret = makeTurretStub({
-        barrelTip: new THREE.Vector3(0, 2.4, 0),
-        barrelDir: new THREE.Vector3(1, 0, 0),
-      });
+    it('tracks the turret pose: rotating the turret rotates the look-target', () => {
+      // Slew the turret 90° so the barrel points along world-+X. The
+      // mouse-x → yaw convention is "right drag turns turret right"
+      // (negative yaw), so commanding -π/2 puts the barrel along +X
+      // for an identity-orientation chassis.
+      turret.setTargetYaw(-Math.PI / 2);
+      snapTurretToTarget(turret);
+
       adapter = new TankGunnerAdapter(tank, turret);
 
       const ps = createPlayerState();
@@ -475,7 +458,7 @@ describe('TankGunnerAdapter', () => {
       const ok = adapter.computeGunnerSightCamera(camPos, lookAt);
 
       expect(ok).toBe(true);
-      // Look-target should be down-X of the camera.
+      // Look-target should be down-X of the camera (barrel points +X).
       expect(lookAt.x).toBeGreaterThan(camPos.x);
       // Z stays put.
       expect(Math.abs(lookAt.z - camPos.z)).toBeLessThan(1e-4);
