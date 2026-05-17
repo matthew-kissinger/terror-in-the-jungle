@@ -467,7 +467,25 @@ export class PlayerController implements GameSystem {
   }
 
   private updateHUD(): void {
-    if (this.hudSystem) this.hudSystem.updateElevation(this.playerState.position.y);
+    if (!this.hudSystem) return;
+    this.hudSystem.updateElevation(this.playerState.position.y);
+
+    // Breath gauge: visible while head submerged. The swim state machine
+    // owns the timer; we only mirror the snapshot into the HUD each frame.
+    // Defensive null-check on the swim handle so mocks / future composition
+    // changes that omit movement.getSwimState() don't crash the HUD path.
+    const swim = typeof this.movement.getSwimState === 'function'
+      ? this.movement.getSwimState()
+      : null;
+    if (!swim || typeof this.hudSystem.showBreathGauge !== 'function') return;
+    const breath = swim.getBreath();
+    const submergedNow = swim.getMode() === 'swim';
+    if (submergedNow) {
+      this.hudSystem.showBreathGauge();
+      this.hudSystem.updateBreathGauge(breath.remainingSeconds, breath.capacitySeconds);
+    } else if (this.hudSystem.isBreathGaugeVisible()) {
+      this.hudSystem.hideBreathGauge();
+    }
   }
 
   private updateWeaponSystems(): void {
@@ -954,6 +972,49 @@ export class PlayerController implements GameSystem {
     this.configureCombatController({ sandbagSystem });
   }
   setCameraShakeSystem(cameraShakeSystem: CameraShakeSystem): void { this.cameraShakeSystem = cameraShakeSystem; this.cameraController.setCameraShakeSystem(cameraShakeSystem); }
+  /**
+   * Wire the water sampler (typically the WaterSystem) into the movement
+   * subsystem so the swim/wade state machine drives 3D underwater movement
+   * + breath timer. Passing `null` disables the swim branch.
+   *
+   * Drowning damage flows through `PlayerHealthSystem.applyDrowningDamage`
+   * so spawn protection + death handling stay consistent with combat
+   * damage. The breath gauge tick lives in `update()` so the HUD reflects
+   * remaining breath every frame the gauge is visible.
+   */
+  setWaterSystem(
+    waterSystem: { sampleWaterInteraction: (...args: any[]) => any } | null,
+    playerHealthSystem?: { applyDrowningDamage: (amount: number) => boolean },
+  ): void {
+    this.movement.setWaterSampler(waterSystem as any);
+    if (waterSystem) {
+      this.movement.setSwimCallbacks({
+        onDrowningDamage: (amount: number) => {
+          playerHealthSystem?.applyDrowningDamage(amount);
+        },
+        onSurfaceGasp: () => {
+          // Hook point for gasp SFX / camera shake; intentionally empty so
+          // audio + shake systems wire in later without a fence change.
+        },
+      });
+    } else {
+      this.movement.setSwimCallbacks({});
+    }
+  }
+  /** Read the current swim state for HUD wiring (breath gauge + locomotion). */
+  getSwimStateSnapshot(): {
+    mode: 'walk' | 'wade' | 'swim';
+    breathRemainingSeconds: number;
+    breathCapacitySeconds: number;
+  } {
+    const swim = this.movement.getSwimState();
+    const breath = swim.getBreath();
+    return {
+      mode: swim.getMode(),
+      breathRemainingSeconds: breath.remainingSeconds,
+      breathCapacitySeconds: breath.capacitySeconds,
+    };
+  }
   setRallyPointSystem(rallyPointSystem: RallyPointSystem): void { this.rallyPointSystem = rallyPointSystem; }
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void { this.footstepAudioSystem = footstepAudioSystem; this.movement.setFootstepAudioSystem(footstepAudioSystem); }
   setPlayerSquadId(squadId: string): void { this.playerSquadId = squadId; }

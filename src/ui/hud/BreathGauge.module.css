@@ -1,0 +1,99 @@
+/**
+ * BreathGauge - Player breath bar visible while submerged.
+ *
+ * Design: compact bar with breath-remaining seconds label. Drains from
+ * full -> empty over 45 s; turns red + pulses below 25% to telegraph
+ * the impending gasp + drowning damage.
+ */
+
+.container {
+  width: 200px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  margin: 80px auto 0;
+}
+
+.visible {
+  display: flex;
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: var(--shadow-text);
+  margin-bottom: 4px;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.barContainer {
+  width: 100%;
+  height: 10px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(to right, var(--accent), var(--heal));
+  transition: width 0.08s linear, background 0.1s ease;
+  border-radius: 2px;
+}
+
+.fillCritical {
+  background: linear-gradient(to right, var(--danger), var(--faction-opfor));
+  animation: pulseGlow 0.4s infinite;
+}
+
+.text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  z-index: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.labelCritical {
+  color: var(--danger);
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (max-width: 768px) {
+  .container {
+    width: 160px;
+    margin-top: 60px;
+  }
+
+  .label {
+    font-size: var(--font-size-2xs);
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    width: 130px;
+    margin-top: 50px;
+  }
+}

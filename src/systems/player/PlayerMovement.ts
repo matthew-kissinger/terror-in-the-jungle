@@ -24,6 +24,11 @@ import {
   enforceWorldBoundary,
   resolveMovementIntent,
 } from './movement/MovementKinematics';
+import {
+  PlayerSwimState,
+  type LocomotionMode,
+  type WaterSampler,
+} from './PlayerSwimState';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -102,6 +107,25 @@ export class PlayerMovement {
   private lastDebugSnapshot: PlayerMovementDebugSnapshot | null = null;
   private agentMovementIntent: { forward: number; strafe: number } | null = null;
   private agentWorldMovementIntent: { x: number; z: number } | null = null;
+  private waterSampler: WaterSampler | null = null;
+  private readonly swimState = new PlayerSwimState();
+  private readonly headPositionScratch = new THREE.Vector3();
+  private readonly swimInputScratch = {
+    forward: 0,
+    strafe: 0,
+    ascend: false,
+    descend: false,
+  };
+  private readonly swimContextScratch = {
+    position: new THREE.Vector3(),
+    headPosition: new THREE.Vector3(),
+    camera: null as unknown as THREE.Camera,
+    baseSpeed: 0,
+    input: { forward: 0, strafe: 0, ascend: false, descend: false },
+    dt: 0,
+  };
+  private onDrowningDamage?: (damage: number) => void;
+  private onSurfaceGasp?: () => void;
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
@@ -131,6 +155,40 @@ export class PlayerMovement {
 
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void {
     this.footstepAudioSystem = footstepAudioSystem;
+  }
+
+  /**
+   * Bind the water sampler (typically the WaterSystem). When set, the player
+   * enters swim mode whenever the head sample reports `submerged === true`.
+   * Pass `null` to disable swim handling (e.g. during teardown or in modes
+   * that suppress water — keeps PlayerMovement decoupled from WaterSystem).
+   */
+  setWaterSampler(sampler: WaterSampler | null): void {
+    this.waterSampler = sampler;
+  }
+
+  /**
+   * Wire callbacks the swim state machine fires on resurface / drowning.
+   * `onSurfaceGasp` runs once when the gasp trigger has fired underwater and
+   * the player surfaces. `onDrowningDamage(amount)` runs each frame the
+   * player is still underwater past breath capacity.
+   */
+  setSwimCallbacks(callbacks: {
+    onDrowningDamage?: (damage: number) => void;
+    onSurfaceGasp?: () => void;
+  }): void {
+    this.onDrowningDamage = callbacks.onDrowningDamage;
+    this.onSurfaceGasp = callbacks.onSurfaceGasp;
+  }
+
+  /** Current locomotion mode for HUD / animation consumers. */
+  getLocomotionMode(): LocomotionMode {
+    return this.swimState.getMode();
+  }
+
+  /** Read-only handle to swim/breath/stamina state for HUD wiring. */
+  getSwimState(): PlayerSwimState {
+    return this.swimState;
   }
 
   setCrouching(crouching: boolean): void {
@@ -175,6 +233,56 @@ export class PlayerMovement {
     let baseSpeed = this.playerState.isRunning ? this.playerState.runSpeed : this.playerState.speed;
     if (this.playerState.isCrouching) {
       baseSpeed *= CROUCH_SPEED_MULTIPLIER;
+    }
+
+    // Swim/wade/walk state branch. Sample at head position (eye height) so
+    // wading in shoulder-deep water still counts as walk; only true head
+    // submersion flips into the swim path.
+    if (this.waterSampler) {
+      const eyeHeight = this.playerState.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
+      this.headPositionScratch
+        .copy(this.playerState.position)
+        .setY(this.playerState.position.y + (eyeHeight - PLAYER_EYE_HEIGHT));
+      this.swimInputScratch.forward =
+        (input.isKeyPressed('keyw') ? 1 : 0) - (input.isKeyPressed('keys') ? 1 : 0);
+      this.swimInputScratch.strafe =
+        (input.isKeyPressed('keyd') ? 1 : 0) - (input.isKeyPressed('keya') ? 1 : 0);
+      this.swimInputScratch.ascend = input.isKeyPressed('space');
+      this.swimInputScratch.descend =
+        input.isKeyPressed('controlleft') || input.isKeyPressed('controlright');
+      this.swimContextScratch.position = this.playerState.position;
+      this.swimContextScratch.headPosition = this.headPositionScratch;
+      this.swimContextScratch.camera = camera;
+      this.swimContextScratch.baseSpeed = baseSpeed;
+      this.swimContextScratch.dt = deltaTime;
+      this.swimContextScratch.input = this.swimInputScratch;
+
+      const swimResult = this.swimState.tick(this.waterSampler, this.swimContextScratch);
+
+      // Drowning damage tick + resurface gasp callback. The damage magnitude
+      // lives with the swim state machine; PlayerHealthSystem clamps + death.
+      if (this.swimState.isDrowning() && this.onDrowningDamage) {
+        this.onDrowningDamage(8 * deltaTime);
+      }
+      if (swimResult.surfacedThisStep && this.swimState.consumeGasp() && this.onSurfaceGasp) {
+        this.onSurfaceGasp();
+      }
+
+      if (swimResult.mode === 'swim') {
+        // 3D swim integration: no gravity, depth-scaled drag, transitions
+        // back through wade -> walk happen automatically once head clears.
+        const velocity = this.swimState.computeSwimVelocity(
+          this.swimContextScratch,
+          this.playerState.velocity,
+        );
+        this.playerState.velocity.copy(velocity);
+        this.playerState.position.addScaledVector(this.playerState.velocity, deltaTime);
+        // Treat the player as not grounded while swimming so jump + gravity
+        // resume cleanly on surface exit.
+        this.playerState.isGrounded = false;
+        this.playerState.isJumping = false;
+        return;
+      }
     }
 
     const {

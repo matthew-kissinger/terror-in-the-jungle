@@ -635,6 +635,23 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.updateGrenadePower(power);
   }
 
+  // Breath gauge methods (player swim/submerge feedback).
+  showBreathGauge(): void {
+    this.elements.showBreathGauge();
+  }
+
+  hideBreathGauge(): void {
+    this.elements.hideBreathGauge();
+  }
+
+  updateBreathGauge(remainingSeconds: number, capacitySeconds: number): void {
+    this.elements.updateBreath(remainingSeconds, capacitySeconds);
+  }
+
+  isBreathGaugeVisible(): boolean {
+    return this.elements.isBreathGaugeVisible();
+  }
+
   // Kill feed methods
   addKillToFeed(
     killerName: string,

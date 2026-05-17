@@ -18,6 +18,7 @@ import { HelicopterHUD } from './HelicopterHUD';
 import { FixedWingHUD } from './FixedWingHUD';
 import { InteractionPromptPanel } from './InteractionPromptPanel';
 import { GrenadeMeter } from './GrenadeMeter';
+import { BreathGauge } from './BreathGauge';
 import { MortarPanel } from './MortarPanel';
 import { ZoneCaptureNotification } from './ZoneCaptureNotification';
 import { zIndex, fontStack } from '../design/tokens';
@@ -44,6 +45,7 @@ export class HUDElements {
   // UIComponent-based elements (Phase 3)
   public interactionPromptPanel: InteractionPromptPanel;
   public grenadeMeter: GrenadeMeter;
+  public breathGauge: BreathGauge;
   public mortarPanel: MortarPanel;
 
   // UIComponent-based elements (Phase 4)
@@ -77,6 +79,7 @@ export class HUDElements {
     // Initialize Phase 3 UIComponent modules
     this.interactionPromptPanel = new InteractionPromptPanel();
     this.grenadeMeter = new GrenadeMeter();
+    this.breathGauge = new BreathGauge();
     this.mortarPanel = new MortarPanel();
 
     // Initialize Phase 4 UIComponent modules
@@ -130,6 +133,7 @@ export class HUDElements {
     this.helicopterHUD.mount(document.body);
     this.fixedWingHUD.mount(document.body);
     this.grenadeMeter.mount(this.hudContainer);
+    this.breathGauge.mount(this.hudContainer);
     this.mortarPanel.mount(this.hudContainer);
     // Removed respawn button from HUD
   }
@@ -336,6 +340,23 @@ export class HUDElements {
     this.grenadeMeter.setPower(power, estimatedDistance, cookingTime);
   }
 
+  // Breath gauge methods (submerge / surface).
+  showBreathGauge(): void {
+    this.breathGauge.show();
+  }
+
+  hideBreathGauge(): void {
+    this.breathGauge.hide();
+  }
+
+  updateBreath(remainingSeconds: number, capacitySeconds: number): void {
+    this.breathGauge.setBreath(remainingSeconds, capacitySeconds);
+  }
+
+  isBreathGaugeVisible(): boolean {
+    return this.breathGauge.isVisible();
+  }
+
   attachToDOM(layout: HUDLayout): void {
     // Mount UIComponent-based elements into grid slots
     this.ticketDisplay.unmount();
@@ -359,6 +380,9 @@ export class HUDElements {
 
     this.grenadeMeter.unmount();
     this.grenadeMeter.mount(layout.getSlot('center'));
+
+    this.breathGauge.unmount();
+    this.breathGauge.mount(layout.getSlot('center'));
 
     this.mortarPanel.unmount();
     this.mortarPanel.mount(layout.getSlot('center'));
@@ -497,6 +521,7 @@ export class HUDElements {
     this.mobileStatusBar.dispose();
     this.interactionPromptPanel.dispose();
     this.grenadeMeter.dispose();
+    this.breathGauge.dispose();
     this.mortarPanel.dispose();
     this.helicopterHUD.dispose();
     this.fixedWingHUD.dispose();

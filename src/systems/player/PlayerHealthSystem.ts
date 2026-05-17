@@ -187,6 +187,22 @@ export class PlayerHealthSystem implements GameSystem {
     return false;
   }
 
+  /**
+   * Apply per-frame drowning damage. The breath timer + gasp trigger live
+   * in `PlayerSwimState` (consumed by `PlayerMovement`); this entry point
+   * exists so the drown damage channel is explicit at the health-system
+   * surface and easy to find from gameplay-tuning scans. Routes through
+   * `takeDamage` so spawn protection + invulnerability + death handling
+   * stay consistent with combat damage.
+   *
+   * Caller should multiply the per-second drown rate by frame `dt` before
+   * passing in. Returns `true` if the damage killed the player.
+   */
+  applyDrowningDamage(amount: number): boolean {
+    if (amount <= 0) return false;
+    return this.takeDamage(amount);
+  }
+
   // Apply spawn protection for a duration (seconds)
   applySpawnProtection(durationSeconds: number): void {
     if (durationSeconds <= 0) return;
