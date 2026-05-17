@@ -1,6 +1,6 @@
 # Campaign: 2026-05-13 Post-WebGPU master merge → 2026-05-16 feature-pivot expansion
 
-Last verified: 2026-05-16 (cycles #1-#5 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / cycle #5 close-commit; current pointer = cycle #6 cycle-vekhikl-2-stationary-weapons)
+Last verified: 2026-05-17 (cycles #1-#6 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / cycle #5 close-commit / 78c9c55a; current pointer = cycle #7 cycle-voda-2-buoyancy-swimming-wading; queue expanded to 13 cycles via insertion of cycle-sun-and-atmosphere-overhaul at position #12)
 
 Campaign manifest. Original trigger was the WebGPU + TSL master merge
 on 2026-05-13; expanded on 2026-05-16 to absorb all VODA, VEKHIKL,
@@ -30,12 +30,19 @@ Hard-stops below still halt the loop.
 
 The current cycle pointer lives in
 [docs/AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md) "Current cycle"
-and is updated at every advance. **As of 2026-05-16 close of cycle
-#5 at `f14400d2` (last R2 merge), the current cycle pointer is at
-position #6 (`cycle-vekhikl-2-stationary-weapons`).** Cycles #1
-through #5 are `done` in the queue below; 25 PRs merged across the
-five cycles (#208-#212, #214-#232), plus the out-of-band CI fix
-`47c42216` that matrix-fans the mobile-ui job.
+and is updated at every advance. **As of 2026-05-17 close of cycle
+#6 at `78c9c55a` (last R3 merge wiring M2HBEmplacementSystem), the
+current cycle pointer is at position #7
+(`cycle-voda-2-buoyancy-swimming-wading`).** Cycles #1 through #6
+are `done` in the queue below; 31 PRs merged across the six cycles
+(#208-#212, #214-#238), plus the out-of-band CI fix `47c42216` that
+matrix-fans the mobile-ui job. The queue grew to **13 cycles** on
+2026-05-17 with the insertion of `cycle-sun-and-atmosphere-overhaul`
+at position #12 per the
+[SUN_AND_ATMOSPHERE_VISION_2026-05-16](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)
+spike recommendation; the original `cycle-stabilizat-1-baselines-refresh`
+shifts to position #13 so the baseline refresh captures the new sky
+cost as the new normal.
 
 ## Orchestrator contract (read this if you're the orchestrator)
 
@@ -75,13 +82,14 @@ new ordering at next advance.
 | 3 | `cycle-konveyer-11-spatial-grid-compute` | done | DEFEKT-3 | [brief](tasks/archive/cycle-konveyer-11-spatial-grid-compute/cycle-konveyer-11-spatial-grid-compute.md) | Closed 2026-05-16 at cycle close-commit. 3 R1 PRs: #220 `9a02714a` CoverSpatialGrid 8m-cell grid, #221 `a5b5bcd6` AIStateEngage consumer with structural CoverGridQuery + Phase F sub-marker, #222 `8d12ede5` L3 integration test with 5ms p99 budget. R2 GPU-compute prototype skipped — R1 wins met bars (combat_budget_dominance 0%, zero >100ms hitches in 5939 frames vs documented 954ms baseline, p99 +3.0% under 5% hard-stop). |
 | 4 | `cycle-vekhikl-1-jeep-drivable` | done | VEKHIKL-1 (unblocks VODA-3) | [brief](tasks/archive/cycle-vekhikl-1-jeep-drivable/cycle-vekhikl-1-jeep-drivable.md) | Closed 2026-05-16 at cycle close-commit. 5 PRs across 2 rounds. R1: #223 `6309558a` GroundVehiclePhysics (581 LOC fixed-step sim), #224 `e687e70a` tests (305 LOC, 7 behavior tests). R2: #226 GroundVehiclePlayerAdapter + VehicleManager helper, #227 `901ae017` M151 integration + smoke, #225 playtest evidence + capture script + PLAYTEST_PENDING row. Existing motor_pool world-feature prefabs satisfy "visible at spawn on both modes". VEKHIKL-1 promoted to code-complete; owner walk-through deferred to PLAYTEST_PENDING under autonomous-loop posture. |
 | 5 | `cycle-voda-1-water-shader-and-acceptance` | done | VODA-1 + WaterSystem split | [brief](tasks/archive/cycle-voda-1-water-shader-and-acceptance/cycle-voda-1-water-shader-and-acceptance.md) | Closed 2026-05-16 at cycle close-commit. 5 PRs across 2 rounds. R1: #228 `dfee8d64` terrain-water-intersection-mask (terrain-nav-reviewer APPROVE; opt-in default-off binding), #229 `62db21c2` water-surface-shader (MeshStandardMaterial + onBeforeCompile chosen; sibling collision composed into single installWaterMaterialPatches). R2: #231 `ca679273` hydrology-river-flow-visuals (per-vertex flow/foam attributes + shader patch), #232 `f14400d2` water-system-file-split (1125 LOC → 300 LOC orchestrator + 5 modules ≤300 each; grandfather entry removed), #230 playtest evidence + capture script + PLAYTEST_PENDING row. No WebGLRenderTarget reflection (mobile no-RT win preserved). 11 existing tests pass byte-identical + 17 new sibling tests. VODA-1 code-complete; owner walk-through deferred. Closes konveyer-large-file-splits water half. |
-| 6 | `cycle-vekhikl-2-stationary-weapons` | queued | VEKHIKL-2 | [brief](tasks/cycle-vekhikl-2-stationary-weapons.md) | Fixed emplacements; reuses VEKHIKL-1 seat-occupant surface. ~4 tasks, 1-2 rounds. |
+| 6 | `cycle-vekhikl-2-stationary-weapons` | done | VEKHIKL-2 | [brief](tasks/archive/cycle-vekhikl-2-stationary-weapons/cycle-vekhikl-2-stationary-weapons.md) | Closed 2026-05-17 at `78c9c55a`. 6 PRs across R1/R2/R3. R1: #233 `0096d825` Emplacement IVehicle surface, #234 `917d83df` EmplacementPlayerAdapter. R2: #235 `c9725b76` playtest-evidence (deferred), #237 `0732beaa` m2hb-weapon-integration, #236 `afa90775` emplacement-npc-gunner (reviewer CHANGES-REQUESTED → APPROVE iteration). R3: #238 `78c9c55a` system bootstrap wiring + scenario spawns. VEKHIKL-2 promoted to code-complete; owner walk-through deferred to PLAYTEST_PENDING. No fence change. |
 | 7 | `cycle-voda-2-buoyancy-swimming-wading` | queued | VODA-2 | [brief](tasks/cycle-voda-2-buoyancy-swimming-wading.md) | Wires `WaterSystem.sampleWaterInteraction` into physics + player state. ~5 tasks, 2 rounds. |
 | 8 | `cycle-vekhikl-3-tank-chassis` | queued | VEKHIKL-3 (partial) | [brief](tasks/cycle-vekhikl-3-tank-chassis.md) | Skid-steer locomotion + ground-conform per `TANK_SYSTEMS_2026-05-13.md`. ~5 tasks, 2 rounds. |
 | 9 | `cycle-vekhikl-4-tank-turret-and-cannon` | queued | VEKHIKL-3+4 | [brief](tasks/cycle-vekhikl-4-tank-turret-and-cannon.md) | Turret, cannon, ballistic solver. Named Rust→WASM pilot per `BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`. ~6 tasks, 2-3 rounds. |
 | 10 | `cycle-voda-3-watercraft` | queued | VODA-3 | [brief](tasks/cycle-voda-3-watercraft.md) | Sampan + PBR boat. Depends on VODA-2 + VEKHIKL-1 surface. ~5 tasks, 2 rounds. |
 | 11 | `cycle-defekt-4-npc-route-quality` | queued | DEFEKT-4 | [brief](tasks/cycle-defekt-4-npc-route-quality.md) | Slope-stuck, navmesh crowd re-enable, terrain solver fixes. `terrain-nav-reviewer`-gated. ~3 tasks. |
-| 12 | `cycle-stabilizat-1-baselines-refresh` | queued | DEFEKT-1 / STABILIZAT-1 | [brief](tasks/cycle-stabilizat-1-baselines-refresh.md) | Refresh `perf-baselines.json` after feature work. ~2 tasks. |
+| 12 | `cycle-sun-and-atmosphere-overhaul` | queued | KB-SKY-DEEP (new) / VODA-adjacent visual quality / closes HosekWilkieSkyBackend half of `konveyer-large-file-splits` | [brief](tasks/cycle-sun-and-atmosphere-overhaul.md) | Port `HosekWilkieSkyBackend.evaluateAnalytic` to a TSL fragment node (per-fragment Preetham + in-shader HDR sun-disc + horizon glow), swap ACES → AGX tonemap, fix night-red bug via elevation-keyed sun↔moon color blend, retire the 256×128 visual LUT (keep a 32×8 CPU LUT for fog/hemisphere readers), recalibrate per-scenario exposures. Inserted between #11 and previous #12 per [SUN_AND_ATMOSPHERE_VISION_2026-05-16](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md) — sky cost +0.5-1ms p99 lands BEFORE baselines refresh so it becomes the new normal. ~5 tasks, 2 rounds. |
+| 13 | `cycle-stabilizat-1-baselines-refresh` | queued | DEFEKT-1 / STABILIZAT-1 | [brief](tasks/cycle-stabilizat-1-baselines-refresh.md) | Refresh `perf-baselines.json` after feature work. Runs LAST so the baseline captures the cumulative effect of cycles #7-#12 (including the new sky cost from #12). ~2 tasks. |
 
 ## Hold list
 
@@ -93,7 +101,7 @@ sequenced into the active list above. They wait for the named trigger.
 | `cycle-mode-startup-terrain-bake-hardening` | KB-STARTUP-1 visual acceptance fails OR cycle #2 mobile-fix doesn't absorb the synchronous-bake path | Spike branch `task/mode-startup-terrain-spike` already merged the worker-bake path. Hardening is paged-in if needed during cycle #2 mobile-fix; otherwise this cycle never runs. |
 | `cycle-konveyer-12-indirect-draw-gpu-culling` | After cycle #5 VODA-1 lands and the water/vegetation overdraw picture stabilizes | Phase F R2/R3 follow-up; reduces draw count for distant impostors. Better measured against the post-VODA water+vegetation state. |
 | `cycle-phase-f-r2-r4-on-master` | After cycle #6 VEKHIKL-2 lands | Render-silhouette + cluster lanes + squad-aggregated strategic sim + budget arbiter v2. May split if budget arbiter v2 grows. |
-| `cycle-konveyer-large-file-splits` (HosekWilkieSkyBackend half) | When a TSL fragment-shader sky port lands (not on this queue) | The `WaterSystem.ts` half co-dispatches with cycle #5; the sky half awaits a TSL sky-port cycle that isn't queued today. |
+| `cycle-konveyer-large-file-splits` (HosekWilkieSkyBackend half) | Closed by cycle #12 `cycle-sun-and-atmosphere-overhaul` (queued 2026-05-17) | The `WaterSystem.ts` half co-dispatched with cycle #5; the sky half is now scheduled as part of cycle #12's TSL fragment-shader sky port (candidate F in [SUN_AND_ATMOSPHERE_VISION_2026-05-16](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)). No longer "off-queue". |
 
 ## Dependencies (DAG between queued cycles)
 
@@ -109,8 +117,17 @@ sequenced into the active list above. They wait for the named trigger.
 - #8 `cycle-vekhikl-3-tank-chassis` blocks #9
   `cycle-vekhikl-4-tank-turret-and-cannon` (turret + cannon mount
   onto the chassis surface).
-- #12 `cycle-stabilizat-1-baselines-refresh` runs last so the
-  baseline captures the cumulative effect of the feature work.
+- #12 `cycle-sun-and-atmosphere-overhaul` blocks #13
+  `cycle-stabilizat-1-baselines-refresh` — the new TSL per-fragment
+  sky + AGX tonemap add an expected +0.3-1.0ms p99 cost on combat120;
+  the baseline refresh must absorb that cost as the new normal,
+  otherwise the next post-#13 cycle that ships will see #12's cost as
+  a 5% p99 regression and trigger the campaign hard-stop. Per
+  [SUN_AND_ATMOSPHERE_VISION_2026-05-16](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)
+  Section 5.
+- #13 `cycle-stabilizat-1-baselines-refresh` runs last so the
+  baseline captures the cumulative effect of the feature work
+  (including the cycle #12 sky cost).
 
 Cycles #1-3 (sky-visual-restore, mobile-webgl2-fallback-fix,
 konveyer-11) and #11 (defekt-4) have no upstream dependencies in the
@@ -262,6 +279,11 @@ or in the hold list.
   — forward-looking primitive inventory; informs cycles #9, #11.
 - [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md)
   — input to cycles #1 and #2.
+- [docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)
+  — unblocks cycle #12 `cycle-sun-and-atmosphere-overhaul` (TSL per-fragment
+  sky port + AGX tonemap + night-red fix + sun-disc tuning). Section 5
+  documents the #12→#13 ordering constraint enforced in the Dependencies
+  section above.
 - [docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md](rearch/ENGINE_TRAJECTORY_2026-04-23.md)
   — "keep the stack" stance with the 2026-05-13 ground-vehicle
   addendum.

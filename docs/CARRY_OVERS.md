@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-16 (post `cycle-voda-1-water-shader-and-acceptance` close)
+Last verified: 2026-05-17 (post `cycle-vekhikl-2-stationary-weapons` close + cycle #13 sun-and-atmosphere queue)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -31,7 +31,7 @@ started, the cycle is `INCOMPLETE` per the rule in
 | KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 0 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
 | cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 2 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
 | weapons-cluster-zonemanager-migration | Finish the IZoneQuery migration for the 5 remaining concrete `ZoneManager` imports in the weapons cluster: `FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`, `PlayerHealthSystem` | cycle-2026-05-10-zone-manager-decoupling | 2 | weapons | no | Out-of-scope for Phase 2 R2 batches A/B/C; aspirational ≤5 ZoneManager-import target missed. Phase 3+ can finish; cycle-2026-05-10's ≤20 success criterion was met (achieved 17 read / 5 concrete). |
-| konveyer-large-file-splits | HosekWilkieSkyBackend.ts (807 LOC, slated for the TSL fragment-shader sky port) — water half closed in cycle-voda-1-water-shader-and-acceptance | exp→master merge prep 2026-05-12 | 1 | environment | no | Split-debt tracking. WaterSystem.ts split landed (1125 → 300 LOC orchestrator + 4 modules ≤300 each) and grandfather entry removed in PR #232. Sky half still grandfathered. Closes fully when the TSL-fragment-shader sky port lands. |
+| konveyer-large-file-splits | HosekWilkieSkyBackend.ts (807 LOC, slated for the TSL fragment-shader sky port) — water half closed in cycle-voda-1-water-shader-and-acceptance | exp→master merge prep 2026-05-12 | 2 | environment | no | Split-debt tracking. WaterSystem.ts split landed (1125 → 300 LOC orchestrator + 4 modules ≤300 each) and grandfather entry removed in PR #232. Sky half still grandfathered. **Cycle #13 `cycle-sun-and-atmosphere-overhaul` (queued 2026-05-17) absorbs the HosekWilkieSkyBackend half** — the TSL fragment-shader sky port per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md` candidate F retires the 256×128 LUT for visuals, keeps a 32×8 CPU LUT for fog/hemisphere readers, and ports `evaluateAnalytic` to a TSL node graph; closes fully when cycle #13 lands. |
 
 ## Parked
 
@@ -116,6 +116,33 @@ History log:
   code-complete (full `done` promotion blocks on owner walk-through
   deferred to PLAYTEST_PENDING). No carry-over delta (VEKHIKL-1 lives in
   DIRECTIVES.md, not CARRY_OVERS Active). Active count: 8 → 8.
+- 2026-05-17 — `cycle-vekhikl-2-stationary-weapons` close (autonomous-loop posture):
+  shipped VEKHIKL-2 code-complete as 6 PRs across 3 rounds (one R2 iteration
+  after combat-reviewer CHANGES-REQUESTED → APPROVE). R1: #233 `0096d825`
+  Emplacement IVehicle surface, #234 `917d83df` EmplacementPlayerAdapter.
+  R2: #235 `c9725b76` playtest-evidence (docs + capture script +
+  PLAYTEST_PENDING row, deferred under autonomous-loop posture), #237
+  `0732beaa` m2hb-weapon-integration, #236 `afa90775` emplacement-npc-gunner
+  (mount via orderBoard + cached emplacement scan after reviewer note).
+  R3: #238 `78c9c55a` system bootstrap wiring (M2HBEmplacementSystem
+  registration + scenario spawns at Open Frontier US base + A Shau NVA
+  bunker overlook). VEKHIKL-2 in DIRECTIVES.md moved Open → code-complete
+  (full `done` promotion blocks on owner walk-through deferred to
+  PLAYTEST_PENDING). No fence change (VehicleCategory extension stayed
+  inside the IVehicle module per INTERFACE_FENCE.md). No carry-over delta
+  (VEKHIKL-2 lives in DIRECTIVES.md, not CARRY_OVERS Active). Active count:
+  8 → 8.
+
+  Cycle #13 `cycle-sun-and-atmosphere-overhaul` queued in
+  [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+  at position #12 (inserted between cycle #11 defekt-4 and the renumbered
+  cycle #13 baselines-refresh) per
+  [docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)
+  recommendation (sun-and-atmosphere visual + perf cost lands BEFORE
+  baseline refresh so the +0.5-1ms p99 sky cost becomes the new normal).
+  Cycle #13 absorbs the HosekWilkieSkyBackend half of `konveyer-large-file-splits`
+  (notes column in the Active table updated to reflect cycle #13 closure
+  condition). `Cycles open` for `konveyer-large-file-splits` bumped 1 → 2.
 - 2026-05-16 — `cycle-voda-1-water-shader-and-acceptance` close (autonomous-loop posture):
   shipped VODA-1 code-complete as 5 PRs across 2 rounds + the WaterSystem
   half of `konveyer-large-file-splits`. R1: #228 terrain-water intersection

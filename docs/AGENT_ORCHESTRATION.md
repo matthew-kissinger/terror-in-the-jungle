@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-16 (12-cycle autonomous chain advanced; cycles #1-#5 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 + cycle close-commit; current cycle = cycle-vekhikl-2-stationary-weapons)
+Last verified: 2026-05-17 (autonomous chain advanced + queue expanded to 13 cycles via cycle-sun-and-atmosphere-overhaul insertion; cycles #1-#6 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a; current cycle = cycle-voda-2-buoyancy-swimming-wading)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,92 +154,97 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-vekhikl-2-stationary-weapons
+## Current cycle: cycle-voda-2-buoyancy-swimming-wading
 
-**Cycle ID:** `cycle-vekhikl-2-stationary-weapons`
-**Brief:** [docs/tasks/cycle-vekhikl-2-stationary-weapons.md](tasks/cycle-vekhikl-2-stationary-weapons.md)
-**Skip-confirm:** yes (campaign auto-advance is `yes`; owner playtest
-auto-deferred to PLAYTEST_PENDING.md under autonomous-loop posture)
+**Cycle ID:** `cycle-voda-2-buoyancy-swimming-wading`
+**Brief:** [docs/tasks/cycle-voda-2-buoyancy-swimming-wading.md](tasks/cycle-voda-2-buoyancy-swimming-wading.md)
+**Skip-confirm:** no (owner playtest required per the brief; auto-deferred
+to PLAYTEST_PENDING.md under autonomous-loop posture)
 **Concurrency cap:** 4
 
-User-observable gap closed: VEKHIKL-2 — ship fixed weapon emplacements
-(M2HB .50-cal heavy machine gun on tripod/sandbag) that the player
-mounts via the existing `IVehicle` seat-occupant surface. NPC gunners
-can also occupy via the existing `CombatantAI` target-acquisition
-pipeline. Builds on VEKHIKL-1's seat-occupant + PlayerVehicleAdapter
-surface.
+User-observable gap closed: VODA-2 — wire
+`WaterSystem.sampleWaterInteraction` into physics and player state:
+(1) Rivers from hydrology channels carry visible flow (handed off
+from VODA-1; this cycle adds the gameplay effect — current pushes
+floating bodies + swimmers downstream). (2) Buoyancy physics for
+floating bodies (NPCs, dropped weapons, future watercraft hulls).
+(3) Player swimming with animation, stamina, breath, surfacing.
+(4) Wading and foot-splash visuals at the bank. Builds on VODA-1's
+visible water surface + sampler API (closed in cycle #5).
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `emplacement-vehicle-surface`, `emplacement-player-adapter` | 2 |
-| 2 | `m2hb-weapon-integration`, `emplacement-npc-gunner`, `vekhikl-2-playtest-evidence` | 3 |
+| 1 | `buoyancy-physics`, `player-swim-and-breath`, `npc-wade-behavior` | 3 |
+| 2 | `wade-foot-splash-visuals`, `river-flow-gameplay-current`, `voda-2-playtest-evidence` | 3 |
 
 ### Dependencies
 
-- R1: emplacement-vehicle-surface (IVehicle impl, ~250 LOC, possibly
-  extends `VehicleCategory` with `'emplacement'`) + emplacement-
-  player-adapter (PlayerVehicleAdapter for mount/aim/fire). Adapter
-  depends on surface; the brief says "serialize within R1" — orchestrator
-  can dispatch in parallel using stub-then-swap pattern (proven in #224).
-- R2: m2hb-weapon-integration (M2HB ballistics + visual + sound),
-  emplacement-npc-gunner (CombatantAI hook for NPCs to occupy + fire),
-  vekhikl-2-playtest-evidence (owner playtest, auto-deferred under
-  autonomous-loop).
+- R1: buoyancy-physics (~250 LOC new `BuoyancyForce.ts`), player-swim-and-breath
+  (PlayerMovement + PlayerHealthSystem + possibly new PlayerSwimState.ts),
+  npc-wade-behavior (CombatantMovement + possibly nav cost weighting).
+  All three R1 tasks are independent — they consume the existing stable
+  `sampleWaterInteraction` contract.
+- R2: wade-foot-splash-visuals (effects pool consumer), river-flow-gameplay-current
+  (extends BuoyancyForce with channel flow direction; possibly adds
+  `getFlowDirectionAt` helper to WaterSystem), voda-2-playtest-evidence
+  (owner playtest, auto-deferred under autonomous-loop).
 
 ### Reviewer policy
 
-- `combat-reviewer` is a **pre-merge gate** for `m2hb-weapon-integration`
-  and `emplacement-npc-gunner` (touch `src/systems/combat/**`).
-- No mandatory `terrain-nav-reviewer` (no terrain/nav touches expected).
-- Orchestrator reviews other PRs for surface integrity + playtest evidence.
+- `combat-reviewer` is a **pre-merge gate** for `npc-wade-behavior`
+  (touches `src/systems/combat/**`).
+- `terrain-nav-reviewer` is a **pre-merge gate** if `npc-wade-behavior`
+  also touches `src/systems/navigation/**` for the navmesh cost
+  weighting.
+- Orchestrator reviews other PRs for surface integrity + playtest
+  evidence.
 
 ### Hard stops (cycle-specific)
 
-- Any task adds a new physics library (`rapier`/`cannon`/`jolt`/`ammo.js`/`physijs`)
-  → halt. Tripod is a static collider; M2HB barrel is a rotation rig
-  parented to it.
-- If extending `VehicleCategory` requires a fence change to
-  `src/types/SystemInterfaces.ts` → halt and surface (IVehicle is NOT
-  in the fence list per INTERFACE_FENCE.md, so this should be safe;
-  but verify the executor doesn't accidentally widen a fenced type).
-- Owner playtest rejects R2 twice → halt (deferred under autonomous-loop;
-  orchestrator proceeds, owner sweeps later).
-- Standard: fence change, worktree isolation failure, twice-rejected reviewer.
+- Cycle #5 VODA-1 not closed → halt at orchestrator dispatch.
+  (Pre-flight: cycle #5 closed 2026-05-16 at `f14400d2`; gate is
+  satisfied.)
+- Any task modifies the public `sampleWaterInteraction` API surface
+  → halt. The contract is stable; this cycle consumes it.
+- Owner playtest rejects R2 twice → halt (deferred under
+  autonomous-loop; orchestrator proceeds, owner sweeps later).
+- Standard: fence change, worktree isolation failure, twice-rejected
+  reviewer.
 - Campaign-wide: perf regression > 5% p99 on `combat120` (deferred to
-  cycle #12 baseline refresh until that lands).
+  cycle #13 baseline refresh until that lands).
 
 ### Success criteria
 
-See [docs/tasks/cycle-vekhikl-2-stationary-weapons.md](tasks/cycle-vekhikl-2-stationary-weapons.md)
+See [docs/tasks/cycle-voda-2-buoyancy-swimming-wading.md](tasks/cycle-voda-2-buoyancy-swimming-wading.md)
 "Acceptance Criteria (cycle close)":
 - All R1 + R2 task PRs merged.
-- M2HB emplacements spawnable + mountable by player + NPC gunners.
-- Owner playtest sign-off recorded (deferred under autonomous-loop).
-- No external physics library added.
+- Owner playtest sign-off (deferred under autonomous-loop).
+- Swim + wade + breath all feel correct per owner.
+- NPCs visibly route around deep water or wade shallow fords.
 - No fence change.
-- `VEKHIKL-2` directive moves Open → code-complete.
+- No perf regression > 5% p99 on `combat120`.
+- `VODA-2` directive in `docs/DIRECTIVES.md` moves to Closed.
 
 ### Out of scope
 
-Other emplacements (Mk-19, M60 nest, ZPU AA, MK60 mortar pit — future
-cycles). Helicopter-mounted M2 variants (separate cycle).
-Vehicle-mounted versions (post-VEKHIKL-4 cycle). Touching
-`src/systems/terrain/**`, `src/systems/navigation/**`. Fenced-interface
-touches.
+Watercraft (VODA-3, cycle #10). Underwater combat / diving suits.
+Currents from ocean tides (no tide system yet). Touching
+`src/systems/terrain/**` (the navmesh cost-weighting may touch
+navigation — gated by reviewer). Fenced-interface touches.
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #6** in the 12-cycle queue at
+This cycle is **position #7** in the now-13-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 `Auto-advance: yes` + `posture: autonomous-loop` are set there. When
 this cycle closes:
 
-1. Mark cycle #6 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-voda-2-buoyancy-swimming-wading`).
+1. Mark cycle #7 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-vekhikl-3-tank-chassis`).
 3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-voda-2-buoyancy-swimming-wading`.
+4. Commit with `docs(campaign): advance to cycle-vekhikl-3-tank-chassis`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
@@ -247,29 +252,36 @@ mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-voda-1-water-shader-and-acceptance` closed on 2026-05-16 at the
-cycle close-commit (last R2 merge at `f14400d2`). 5 PRs across 2 rounds.
-R1: #228 `dfee8d64` terrain-water-intersection-mask (terrain-nav-reviewer
-APPROVE; opt-in default-off binding so pre-VODA-1 visuals byte-identical
-when unbound; 1.5m terrain-side soft-blend + 0.8m water-side foam line),
-#229 `62db21c2` water-surface-shader (chose `MeshStandardMaterial` +
-`onBeforeCompile` over TSL node material to preserve `?renderer=webgl`
-escape hatch and avoid mobile node-material cost regression; sibling
-collision with #228 resolved at rebase by composing both into single
-`installWaterMaterialPatches()` callback). R2: #231 `ca679273`
-hydrology-river-flow-visuals (per-vertex `aFlowDir`/`aFoamMask`
-attributes + `installHydrologyRiverFlowPatch` shader patch; foam mask =
-clamp(narrownessFoam * 0.55 + slopeFoam * 0.85)), #232 `f14400d2`
-water-system-file-split (WaterSystem.ts 1125 LOC → 300 LOC orchestrator
-+ 5 modules ≤300 LOC each: HydrologyRiverSurface 144, HydrologyRiverGeometry
-222, HydrologyRiverFlowPatch 178, WaterSurfaceBinding 299, WaterSurfaceSampler
-146; grandfather entry removed; 11 existing WaterSystem.test.ts pass
-byte-identical + 17 new sibling tests), #230 voda-1-playtest-evidence
-(docs/playtests/* + scripts/capture-* + PLAYTEST_PENDING row, owner
-walk-through deferred). **No `WebGLRenderTarget` reflection pass added
-anywhere** (mobile no-RT win preserved per cycle hard-stop). VODA-1
-promoted to code-complete in DIRECTIVES.md. `konveyer-large-file-splits`
-water half closed. Carry-over count: 8 → 8.
+`cycle-vekhikl-2-stationary-weapons` closed on 2026-05-17 at the
+cycle close-commit (last R3 merge at `78c9c55a` wiring
+M2HBEmplacementSystem in bootstrap + scenario spawns). **6 PRs across
+3 rounds** (one R2 iteration after combat-reviewer CHANGES-REQUESTED →
+APPROVE). R1: #233 `0096d825` Emplacement IVehicle surface
+(`VehicleCategory` extended with `'emplacement'` inside the IVehicle
+module — no fence touch per INTERFACE_FENCE.md), #234 `917d83df`
+EmplacementPlayerAdapter (mouse yaw/pitch within cone, first-person
+camera behind spade grips, F mount/dismount). R2: #235 `c9725b76`
+vekhikl-2-playtest-evidence (`docs/playtests/cycle-vekhikl-2-stationary-weapons.md`
++ `scripts/capture-vekhikl-2-emplacement-shots.ts` + PLAYTEST_PENDING
+row; deferred under autonomous-loop), #237 `0732beaa`
+m2hb-weapon-integration (575 RPM, 250-round belt, tracer every 5th
+round, reload-on-dismount), #236 `afa90775` emplacement-npc-gunner
+(NPC mount via orderBoard + cached emplacement scan — reviewer
+CHANGES-REQUESTED → APPROVE iteration). R3: #238 `78c9c55a` system
+bootstrap wiring (M2HBEmplacementSystem registered; scenario spawns at
+Open Frontier US base + A Shau NVA bunker overlook). VEKHIKL-2 in
+DIRECTIVES.md moved Open → code-complete. No fence change. No
+external physics library added. Carry-over count: 8 → 8.
+
+**Queue grew to 13 cycles** during this close. `cycle-sun-and-atmosphere-overhaul`
+inserted at position #12 (between #11 defekt-4 and renumbered #13
+baselines-refresh) per the
+[SUN_AND_ATMOSPHERE_VISION_2026-05-16](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)
+spike recommendation. The new sky cost (+0.3-1.0ms p99 expected) must
+land BEFORE the baseline refresh so it becomes the new normal.
+`konveyer-large-file-splits` HosekWilkieSkyBackend half rolls into the
+new cycle #12 (no longer "off-queue" — see CARRY_OVERS.md and the
+campaign manifest hold list).
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
 parked at 1 commit (no PR). The cycle #2 mode-startup work absorbed
