@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { EmplacementPlayerAdapter, type IEmplacementModel } from './EmplacementPlayerAdapter';
+import { EmplacementPlayerAdapter } from './EmplacementPlayerAdapter';
+import { Emplacement } from './Emplacement';
+import { Faction } from '../combat/types';
 import type { VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
 import type { PlayerState } from '../../types';
 
@@ -8,37 +10,21 @@ vi.mock('../../utils/Logger', () => ({
   Logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
 
-interface MockEmplacementModel extends IEmplacementModel {
-  setEngaging: ReturnType<typeof vi.fn>;
-  getPlayerExitPlan: ReturnType<typeof vi.fn>;
-  applyAimDelta: ReturnType<typeof vi.fn>;
-  getMountPoint: ReturnType<typeof vi.fn>;
-  getYawPitch: ReturnType<typeof vi.fn>;
-  /** Current internal yaw/pitch — written by applyAimDelta in this mock. */
-  __yaw: number;
-  __pitch: number;
-}
-
-function createMockEmplacementModel(mountAt: THREE.Vector3 = new THREE.Vector3(20, 1.2, 30)): MockEmplacementModel {
-  const state = { yaw: 0, pitch: 0 };
-  const model: MockEmplacementModel = {
-    __yaw: 0,
-    __pitch: 0,
-    getYawPitch: vi.fn((_id: string) => ({ yaw: state.yaw, pitch: state.pitch })),
-    applyAimDelta: vi.fn((_id: string, dy: number, dp: number) => {
-      state.yaw += dy;
-      state.pitch += dp;
-      model.__yaw = state.yaw;
-      model.__pitch = state.pitch;
-    }),
-    getMountPoint: vi.fn((_id: string, target: THREE.Vector3) => {
-      target.copy(mountAt);
-      return true;
-    }),
-    getPlayerExitPlan: vi.fn(),
-    setEngaging: vi.fn(),
-  };
-  return model;
+/**
+ * Construct a real Emplacement at the given world position. We use a
+ * THREE.Object3D as the tripod node so getPosition() reports back the
+ * placement directly — the adapter relies on getPosition() for both
+ * mounting snap and barrel-camera math.
+ */
+function makeEmplacement(
+  vehicleId = 'm2hb_emp_1',
+  mountAt: THREE.Vector3 = new THREE.Vector3(20, 1.2, 30),
+): Emplacement {
+  const scene = new THREE.Scene();
+  const tripod = new THREE.Object3D();
+  tripod.position.copy(mountAt);
+  scene.add(tripod);
+  return new Emplacement(vehicleId, tripod, Faction.US);
 }
 
 function createPlayerState(): PlayerState {
@@ -113,10 +99,10 @@ function createUpdateContext(
 
 describe('EmplacementPlayerAdapter', () => {
   let adapter: EmplacementPlayerAdapter;
-  let model: MockEmplacementModel;
+  let model: Emplacement;
 
   beforeEach(() => {
-    model = createMockEmplacementModel();
+    model = makeEmplacement();
     adapter = new EmplacementPlayerAdapter(model);
   });
 
@@ -140,7 +126,7 @@ describe('EmplacementPlayerAdapter', () => {
       expect(ctx.setPosition).toHaveBeenCalled();
       const snapArgs = (ctx.setPosition as ReturnType<typeof vi.fn>).mock.calls[0];
       const snappedPos = snapArgs[0] as THREE.Vector3;
-      expect(snappedPos.y).toBeCloseTo(1.2, 4); // mount Y
+      expect(snappedPos.y).toBeCloseTo(1.2, 4); // mount Y (tripod world Y)
       expect(snapArgs[1]).toBe('emplacement.enter');
       // Camera saves infantry angles so dismount restores cleanly.
       expect(ctx.cameraController.saveInfantryAngles).toHaveBeenCalled();
@@ -150,11 +136,11 @@ describe('EmplacementPlayerAdapter', () => {
       expect(ctx.hudSystem!.setVehicleContext).toHaveBeenCalledWith(
         expect.objectContaining({ kind: 'turret', role: 'gunner', hudVariant: 'turret' }),
       );
-      // Model is told the player is now engaging.
-      expect(model.setEngaging).toHaveBeenCalledWith('m2hb_emp_1', true);
     });
 
-    it('records the active emplacement id for the session', () => {
+    it('records the active emplacement id (from the bound model) for the session', () => {
+      model = makeEmplacement('m2hb_bunker');
+      adapter = new EmplacementPlayerAdapter(model);
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps, 'm2hb_bunker');
       adapter.onEnter(ctx);
@@ -163,7 +149,7 @@ describe('EmplacementPlayerAdapter', () => {
   });
 
   describe('dismounting (onExit)', () => {
-    it('puts the player back on their feet (restores camera, clears HUD, marks idle)', () => {
+    it('puts the player back on their feet (restores camera, clears HUD)', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
@@ -172,37 +158,24 @@ describe('EmplacementPlayerAdapter', () => {
       expect(ctx.cameraController.restoreInfantryAngles).toHaveBeenCalled();
       expect(ctx.hudSystem!.setVehicleContext).toHaveBeenLastCalledWith(null);
       expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenLastCalledWith('infantry');
-      expect(model.setEngaging).toHaveBeenLastCalledWith('m2hb_emp_1', false);
       expect(adapter.getActiveEmplacementId()).toBeNull();
     });
 
-    it('delegates the exit plan to the model when one is provided', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps, 'emp_x');
-      const plannedExit = new THREE.Vector3(7, 1, 14);
-      model.getPlayerExitPlan.mockReturnValue({ canExit: true, mode: 'normal', position: plannedExit });
-
-      const result = adapter.getExitPlan(ctx, { reason: 'input' });
-
-      expect(model.getPlayerExitPlan).toHaveBeenCalledWith('emp_x');
-      expect(result.canExit).toBe(true);
-      expect(result.position).toBe(plannedExit);
-    });
-
-    it('falls back to ejecting beside the mount when no model plan exists', () => {
-      const mount = new THREE.Vector3(50, 1, 60);
-      model = createMockEmplacementModel(mount);
-      model.getPlayerExitPlan.mockReturnValue(null);
+    it('returns an exit plan beside the mount using the gunner seat offset', () => {
+      // Default gunner seat exitOffset is (0, 0, -1.8); placing the
+      // tripod at (50, 1, 60) should eject the gunner to (50, 1, 58.2).
+      model = makeEmplacement('emp_exit', new THREE.Vector3(50, 1, 60));
       adapter = new EmplacementPlayerAdapter(model);
 
       const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
+      const ctx = createTransitionContext(ps, 'emp_exit');
       const plan = adapter.getExitPlan(ctx, {});
 
       expect(plan.canExit).toBe(true);
-      // Offset 1.8m to the +X side of the mount.
-      expect(plan.position!.x).toBeCloseTo(51.8, 4);
-      expect(plan.position!.z).toBeCloseTo(60, 4);
+      expect(plan.mode).toBe('normal');
+      expect(plan.position!.x).toBeCloseTo(50, 4);
+      expect(plan.position!.y).toBeCloseTo(1, 4);
+      expect(plan.position!.z).toBeCloseTo(58.2, 4); // 60 + (-1.8)
     });
   });
 
@@ -211,7 +184,10 @@ describe('EmplacementPlayerAdapter', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
-      expect(model.applyAimDelta).not.toHaveBeenCalled();
+      // No aim set means the model's target aim is unchanged from default (0, 0).
+      const aim = model.getTargetAim();
+      expect(aim.yaw).toBe(0);
+      expect(aim.pitch).toBe(0);
     });
 
     it('forwards mouse-x as yaw delta and mouse-y as pitch delta (pointer locked)', () => {
@@ -224,12 +200,11 @@ describe('EmplacementPlayerAdapter', () => {
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
-      expect(model.applyAimDelta).toHaveBeenCalledTimes(1);
-      const [, dy, dp] = model.applyAimDelta.mock.calls[0];
+      const aim = model.getTargetAim();
       // Right-drag (positive x) turns barrel right (negative yaw in our convention).
-      expect(dy).toBeLessThan(0);
+      expect(aim.yaw).toBeLessThan(0);
       // Up-drag (negative y) raises barrel (positive pitch).
-      expect(dp).toBeGreaterThan(0);
+      expect(aim.pitch).toBeGreaterThan(0);
       // Mouse movement was consumed.
       expect(ctx.input.clearMouseMovement).toHaveBeenCalled();
     });
@@ -244,21 +219,27 @@ describe('EmplacementPlayerAdapter', () => {
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
-      expect(model.applyAimDelta).not.toHaveBeenCalled();
+      const aim = model.getTargetAim();
+      expect(aim.yaw).toBe(0);
+      expect(aim.pitch).toBe(0);
     });
 
-    it('relies on the model to clamp slew rates (adapter does not pre-clamp)', () => {
+    it('relies on the model to clamp aim (adapter does not pre-clamp deltas)', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
 
       (ctx.input.getIsPointerLocked as ReturnType<typeof vi.fn>).mockReturnValue(true);
-      // Huge mouse swing — adapter should still forward; model owns the cap.
-      (ctx.input.getMouseMovement as ReturnType<typeof vi.fn>).mockReturnValue({ x: 5000, y: 5000 });
+      // Huge mouse swing — adapter forwards the full delta; Emplacement
+      // clamps to the M2HB pitch envelope (-10° to +60°) automatically.
+      (ctx.input.getMouseMovement as ReturnType<typeof vi.fn>).mockReturnValue({ x: 5000, y: -5000 });
 
       adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
 
-      expect(model.applyAimDelta).toHaveBeenCalledTimes(1);
+      const limits = model.getPitchLimits();
+      const aim = model.getTargetAim();
+      // Pitch should be clamped to the upper limit (we tried to elevate massively).
+      expect(aim.pitch).toBeCloseTo(limits.max, 4);
     });
   });
 
@@ -321,8 +302,10 @@ describe('EmplacementPlayerAdapter', () => {
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
 
-      // Slew barrel ~45deg to the right (negative yaw in our convention).
-      model.applyAimDelta('m2hb_emp_1', -Math.PI / 4, 0);
+      // Slew barrel toward the right (negative yaw in our convention) and
+      // let it fully settle so getYaw() reflects the requested target.
+      model.setAim(-Math.PI / 4, 0);
+      model.update(10); // overshoot dt so the slew has converged
 
       const camPos = new THREE.Vector3();
       const lookAt = new THREE.Vector3();
@@ -331,25 +314,6 @@ describe('EmplacementPlayerAdapter', () => {
       expect(ok).toBe(true);
       // Forward should now have a +X component (looking right-and-forward).
       expect(lookAt.x).toBeGreaterThan(camPos.x);
-    });
-
-    it('prefers the model.getBarrelForward hook when supplied', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      // Override: model reports forward straight up (+Y).
-      (model as any).getBarrelForward = vi.fn((_id: string, target: THREE.Vector3) => {
-        target.set(0, 1, 0);
-        return true;
-      });
-      adapter.onEnter(ctx);
-
-      const camPos = new THREE.Vector3();
-      const lookAt = new THREE.Vector3();
-      adapter.computeBarrelCamera(camPos, lookAt);
-
-      // Look-target is above the eye.
-      expect(lookAt.y).toBeGreaterThan(camPos.y);
-      expect((model as any).getBarrelForward).toHaveBeenCalled();
     });
 
     it('returns false when no emplacement is mounted', () => {

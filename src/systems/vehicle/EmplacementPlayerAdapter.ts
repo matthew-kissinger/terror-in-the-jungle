@@ -10,70 +10,15 @@ import type {
 } from './PlayerVehicleAdapter';
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
+import type { Emplacement } from './Emplacement';
 
 // ── Emplacement aim / camera tuning ──
 const MOUSE_AIM_SENSITIVITY = 0.0022; // radians per mouse-pixel (yaw + pitch)
 const TOUCH_AIM_DEADZONE = 0.05;
 const TOUCH_AIM_SENSITIVITY = 1.6; // radians/sec at full deflection
-const DEFAULT_EXIT_OFFSET_M = 1.8; // metres to the +X side of mount on dismount
+const DEFAULT_EXIT_OFFSET_M = 1.8; // metres to the +X side of mount on dismount fallback
 const DEFAULT_CAMERA_FORWARD_OFFSET = 0.15; // metres ahead of mount along barrel
 const DEFAULT_CAMERA_UP_OFFSET = 0.05; // metres above mount (eye-line on sights)
-
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * IEmplacementModel — STUB CONTRACT (to be removed when sibling lands)
- * ─────────────────────────────────────────────────────────────────────────────
- *
- * Local structural interface describing the surface the parallel R1 task
- * `emplacement-vehicle-surface` will ship via the new
- * `src/systems/vehicle/Emplacement.ts` class. This adapter is built
- * against this stub so the two R1 PRs can land independently and then
- * be wired together in R2 (`m2hb-weapon-integration`).
- *
- * SWAP PROCEDURE (when sibling lands):
- *   1. Delete this `IEmplacementModel` interface block.
- *   2. Replace `import type { ... }` consumers below with the concrete
- *      class from `./Emplacement` if its shape matches; otherwise keep
- *      this local structural type but reference the concrete class in
- *      tests.
- *   3. Update `m2hb-weapon-integration` (R2) to also expose
- *      `setEngaging(active)` / `fire()` if not present.
- *
- * Kept local (not in `src/types/SystemInterfaces.ts`) per
- * `docs/INTERFACE_FENCE.md` default posture: no fence change required.
- * Mirrors `IGroundVehicleModel` (cycle #4) and `IHelicopterModel`
- * (HelicopterPlayerAdapter) patterns.
- */
-export interface IEmplacementModel {
-  /** Current barrel yaw + pitch in radians (world-space yaw, local pitch). */
-  getYawPitch(emplacementId: string): { yaw: number; pitch: number } | null;
-
-  /**
-   * Apply a slew delta to the barrel. Implementation is expected to
-   * clamp by its configured slew-rate caps (per brief: "capped slew
-   * rates") and yaw / pitch travel limits.
-   */
-  applyAimDelta(emplacementId: string, deltaYaw: number, deltaPitch: number): void;
-
-  /**
-   * World-space mount point — the gunner's eye position when seated.
-   * The adapter pins the camera here and looks along the barrel.
-   */
-  getMountPoint(emplacementId: string, target: THREE.Vector3): boolean;
-
-  /**
-   * Optional. World-space forward direction the barrel is currently
-   * pointing. When omitted, the adapter derives forward from
-   * `getYawPitch()` assuming Y-up + yaw-around-Y + pitch-around-local-X.
-   */
-  getBarrelForward?(emplacementId: string, target: THREE.Vector3): boolean;
-
-  /** Optional. Where to eject the player on a normal exit. */
-  getPlayerExitPlan?(emplacementId: string): VehicleExitPlan | null;
-
-  /** Optional. Hint sent on enter/exit so the model can play idle/engaged anims. */
-  setEngaging?(emplacementId: string, active: boolean): void;
-}
 
 function createEmplacementUIContext(): VehicleUIContext {
   return {
@@ -102,14 +47,19 @@ const _scratchForward = new THREE.Vector3();
  *
  * Mirrors `GroundVehiclePlayerAdapter` and `HelicopterPlayerAdapter`:
  * owns control state, orchestrates enter/exit/update, and forwards aim
- * input into the emplacement model. Firing input is surfaced via
- * `consumeFireRequest()` for the R2 weapon integration to consume; this
- * adapter does not call any weapon API directly.
+ * input into the bound `Emplacement` instance. Firing input is surfaced
+ * via `consumeFireRequest()` for the R2 weapon integration to consume;
+ * this adapter does not call any weapon API directly.
  *
  * Input mapping:
- *   Mouse XY   -> yaw / pitch slew (model clamps to its slew-rate caps)
- *   Left-click / Space -> fire (set as latched request; R2 wiring reads it)
+ *   Mouse XY            -> yaw / pitch slew (model clamps to its slew-rate caps)
+ *   Left-click / Space  -> fire (latched request; R2 wiring reads it)
  *   F (handled by VehicleSessionController) -> mount / dismount
+ *
+ * The adapter holds a per-instance `Emplacement` (assigned at construction
+ * time by the integration layer). Aim is forwarded by accumulating deltas
+ * against the model's current target aim and calling `setAim()` — the
+ * Emplacement owns slew rate caps and pitch/yaw envelope clamping.
  *
  * Camera: first-person, pinned to the emplacement mount point and
  * looking along the barrel. The integration layer reads
@@ -126,11 +76,11 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
   cameraForwardOffset = DEFAULT_CAMERA_FORWARD_OFFSET;
   cameraUpOffset = DEFAULT_CAMERA_UP_OFFSET;
 
-  private readonly model: IEmplacementModel;
-  private activeEmplacementId: string | null = null;
+  private readonly model: Emplacement;
+  private mounted = false;
   private fireRequested = false;
 
-  constructor(model: IEmplacementModel) {
+  constructor(model: Emplacement) {
     this.model = model;
   }
 
@@ -138,15 +88,13 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
 
   onEnter(ctx: VehicleTransitionContext): void {
     this.resetControlState();
-    this.activeEmplacementId = ctx.vehicleId;
+    this.mounted = true;
 
     // Take the player off their feet and snap them onto the gunner seat.
     ctx.playerState.velocity.set(0, 0, 0);
     ctx.playerState.isRunning = false;
-    const seatPos = _scratchMount;
-    const onSeat = this.model.getMountPoint(ctx.vehicleId, seatPos);
-    const enterPos = onSeat ? seatPos.clone() : ctx.position;
-    ctx.setPosition(enterPos, 'emplacement.enter');
+    _scratchMount.copy(this.model.getPosition());
+    ctx.setPosition(_scratchMount.clone(), 'emplacement.enter');
 
     // Emplacement is a ground-mounted system — clear any leftover flight
     // bookkeeping the same way the ground-vehicle adapter does.
@@ -168,8 +116,6 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     if (ctx.gameRenderer) {
       ctx.gameRenderer.setCrosshairMode('infantry');
     }
-
-    this.model.setEngaging?.(ctx.vehicleId, true);
 
     if (typeof ctx.input.relockPointer === 'function') {
       ctx.input.relockPointer();
@@ -196,23 +142,20 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
       ctx.gameRenderer.setCrosshairMode('infantry');
     }
 
-    if (this.activeEmplacementId) {
-      this.model.setEngaging?.(this.activeEmplacementId, false);
-    }
-    this.activeEmplacementId = null;
+    this.mounted = false;
     this.resetControlState();
   }
 
-  getExitPlan(ctx: VehicleTransitionContext, _options: VehicleExitOptions): VehicleExitPlan {
-    const modelPlan = this.model.getPlayerExitPlan?.(ctx.vehicleId);
-    if (modelPlan) return modelPlan;
-
-    // Default: eject the gunner DEFAULT_EXIT_OFFSET_M metres to the +X
-    // side of the mount point. Falls back to ctx.position when the
-    // mount cannot be resolved (e.g. force_cleanup path).
-    const exitPos = ctx.position.clone();
-    if (this.model.getMountPoint(ctx.vehicleId, _scratchMount)) {
-      exitPos.copy(_scratchMount);
+  getExitPlan(_ctx: VehicleTransitionContext, _options: VehicleExitOptions): VehicleExitPlan {
+    // Prefer the configured gunner-seat exit offset (Emplacement carries it
+    // per-seat). Fall back to a sideways step from the mount when no
+    // gunner seat exists (defensive — DEFAULT_SEATS always includes one).
+    const gunnerSeat = this.model.getSeats().find(seat => seat.role === 'gunner');
+    const mount = this.model.getPosition();
+    const exitPos = mount.clone();
+    if (gunnerSeat) {
+      exitPos.add(gunnerSeat.exitOffset);
+    } else {
       exitPos.x += DEFAULT_EXIT_OFFSET_M;
     }
     return {
@@ -223,7 +166,7 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
   }
 
   update(ctx: VehicleUpdateContext): void {
-    if (!this.activeEmplacementId) return;
+    if (!this.mounted) return;
 
     this.readAimInput(ctx.input, ctx.deltaTime);
     this.readFireInput(ctx.input);
@@ -235,8 +178,9 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
 
   // ── Public accessors (for integration + tests) ─────────────────────────────
 
+  /** Returns the bound emplacement's vehicleId while mounted, else null. */
   getActiveEmplacementId(): string | null {
-    return this.activeEmplacementId;
+    return this.mounted ? this.model.vehicleId : null;
   }
 
   /**
@@ -261,29 +205,18 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     outPosition: THREE.Vector3,
     outLookTarget: THREE.Vector3,
   ): boolean {
-    if (!this.activeEmplacementId) return false;
-    if (!this.model.getMountPoint(this.activeEmplacementId, _scratchMount)) {
-      return false;
-    }
+    if (!this.mounted) return false;
+    _scratchMount.copy(this.model.getPosition());
 
-    // Derive forward: prefer the model's authoritative direction; fall
-    // back to a yaw/pitch composition when not provided.
-    let haveForward = false;
-    if (this.model.getBarrelForward) {
-      haveForward = this.model.getBarrelForward(this.activeEmplacementId, _scratchForward);
-    }
-    if (!haveForward) {
-      const yp = this.model.getYawPitch(this.activeEmplacementId);
-      if (!yp) return false;
-      // Y-up, yaw around Y, pitch around local X. Forward when yaw=0,
-      // pitch=0 is world -Z (Three.js convention).
-      const cp = Math.cos(yp.pitch);
-      const sp = Math.sin(yp.pitch);
-      const cy = Math.cos(yp.yaw);
-      const sy = Math.sin(yp.yaw);
-      _scratchForward.set(-sy * cp, sp, -cy * cp);
-      haveForward = true;
-    }
+    // Derive forward from yaw + pitch. Y-up, yaw around Y, pitch around
+    // local X. Forward when yaw=0, pitch=0 is world -Z (Three.js convention).
+    const yaw = this.model.getYaw();
+    const pitch = this.model.getPitch();
+    const cp = Math.cos(pitch);
+    const sp = Math.sin(pitch);
+    const cy = Math.cos(yaw);
+    const sy = Math.sin(yaw);
+    _scratchForward.set(-sy * cp, sp, -cy * cp);
 
     // Sit the eye at the mount, lifted slightly to the sights line, and
     // nudged a hair forward so the player's view doesn't clip the
@@ -299,7 +232,7 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
   // ── Input plumbing ─────────────────────────────────────────────────────────
 
   private readAimInput(input: PlayerInput, deltaTime: number): void {
-    if (!this.activeEmplacementId) return;
+    if (!this.mounted) return;
 
     let dYaw = 0;
     let dPitch = 0;
@@ -334,7 +267,11 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     }
 
     if (dYaw !== 0 || dPitch !== 0) {
-      this.model.applyAimDelta(this.activeEmplacementId, dYaw, dPitch);
+      // Real Emplacement uses absolute setAim; accumulate against the
+      // model's current target. Emplacement clamps to pitch/yaw envelope
+      // and walks toward the target at its configured slew rate.
+      const cur = this.model.getTargetAim();
+      this.model.setAim(cur.yaw + dYaw, cur.pitch + dPitch);
     }
   }
 
