@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant, CombatantState, Faction, isAlly } from './types';
 import { SquadManager } from './SquadManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
@@ -39,9 +39,23 @@ export class CombatantSystemDamage {
   }
 
   /**
-   * Apply explosion damage to all combatants within radius
+   * Apply explosion damage to all combatants within radius.
+   *
+   * `shooterFaction` (optional, additive 2026-05-17 alongside the
+   * `tank-ai-gunner-route` cycle) filters out same-alliance combatants
+   * from radial damage. Callers that should never friendly-fire (tank
+   * main cannon, AT weapons) pass the shooter's faction; existing
+   * callers (grenades, air-support, mortars) keep their current
+   * un-filtered semantics by omitting the parameter.
    */
-  applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number, attackerId?: string, weaponType = 'grenade'): void {
+  applyExplosionDamage(
+    center: THREE.Vector3,
+    radius: number,
+    maxDamage: number,
+    attackerId?: string,
+    weaponType = 'grenade',
+    shooterFaction?: Faction,
+  ): void {
     let hitCount = 0;
     const killedCombatants: Combatant[] = [];
     const playerOneShotActive = attackerId === 'PLAYER'
@@ -50,6 +64,9 @@ export class CombatantSystemDamage {
 
     this.combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD) return;
+      // Friendly-fire exclusion when a shooter faction is provided.
+      // Same-alliance combatants are immune to the radial wave.
+      if (shooterFaction !== undefined && isAlly(combatant.faction, shooterFaction)) return;
 
       const distance = combatant.position.distanceTo(center);
 
@@ -129,13 +146,26 @@ export class CombatantSystemDamage {
     });
 
     const hudSystem = this.hudSystem;
-    // Report grenade kills to kill feed (grenades are player-thrown)
+    // Report kills to kill feed. Player-thrown explosions (grenades etc)
+    // come in as attackerId === 'PLAYER'; the historical code path used
+    // that shape unconditionally. NPC-attributed explosions (tank cannon,
+    // mortar, etc) carry the attacker's combatant id — resolve their
+    // faction + name lookup so the feed shows the real killer.
     if (hudSystem && killedCombatants.length > 0) {
+      const attackerCombatant = attackerId && attackerId !== 'PLAYER'
+        ? this.combatants.get(attackerId)
+        : undefined;
+      const killerId = attackerId === 'PLAYER'
+        ? 'PLAYER'
+        : (attackerCombatant
+          ? `${attackerCombatant.faction}-${attackerCombatant.id.slice(-4)}`
+          : 'PLAYER');
+      const killerFaction = attackerCombatant?.faction ?? Faction.US;
       killedCombatants.forEach(victim => {
         const victimName = `${victim.faction}-${victim.id.slice(-4)}`;
         hudSystem.addKillToFeed(
-          'PLAYER',
-          Faction.US,
+          killerId,
+          killerFaction,
           victimName,
           victim.faction,
           false, // Explosions don't have headshot tracking

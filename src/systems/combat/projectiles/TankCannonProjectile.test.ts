@@ -7,7 +7,7 @@ import {
 } from './TankCannonProjectile';
 import type { ExplosionEffectsPool } from '../../effects/ExplosionEffectsPool';
 import type { CombatantSystem } from '../CombatantSystem';
-import { Combatant, CombatantState, Faction } from '../types';
+import { Combatant, CombatantState, Faction, isAlly } from '../types';
 
 vi.mock('../../../utils/Logger', () => ({
   Logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
@@ -69,10 +69,46 @@ function makeMockCombatant(args: {
 
 function makeMockCombatantSystem(initial: Combatant[] = []) {
   const combatants = [...initial];
+  // Minimal stand-in for `CombatantSystem.applyExplosionDamage` so the
+  // projectile system can be exercised in isolation. Mirrors the
+  // behaviour of the production shared handler at the level tested here:
+  // skip dead + same-alliance combatants, apply radial-decay damage,
+  // mark kills. Kill-feed / squad bookkeeping is the production
+  // handler's job — out of scope for the projectile unit test.
+  const applyExplosionDamage = vi.fn(
+    (
+      center: THREE.Vector3,
+      radius: number,
+      maxDamage: number,
+      _attackerId?: string,
+      _weaponType: string = 'grenade',
+      shooterFaction?: Faction,
+    ) => {
+      for (const c of combatants) {
+        if (!c) continue;
+        if (c.state === CombatantState.DEAD) continue;
+        if (shooterFaction !== undefined && isAlly(c.faction, shooterFaction)) continue;
+        const dist = c.position.distanceTo(center);
+        if (dist > radius) continue;
+        const damage = maxDamage * (1 - dist / radius);
+        if (damage <= 0) continue;
+        c.health -= damage;
+        if (c.health <= 0) {
+          c.health = 0;
+          c.state = CombatantState.DEAD;
+          c.deaths = (c.deaths ?? 0) + 1;
+        }
+      }
+    },
+  );
   return {
     getAllCombatants: vi.fn(() => combatants),
+    applyExplosionDamage,
     push(c: Combatant) { combatants.push(c); },
-  } as unknown as CombatantSystem & { push: (c: Combatant) => void };
+  } as unknown as CombatantSystem & {
+    push: (c: Combatant) => void;
+    applyExplosionDamage: typeof applyExplosionDamage;
+  };
 }
 
 // ────────── Damage resolver ──────────
