@@ -16,6 +16,28 @@ import type { TargetAcquisitionTelemetry } from './ai/AITargetAcquisition'
 import { AICoverSystem } from './ai/AICoverSystem'
 import { AIFlankingSystem } from './ai/AIFlankingSystem'
 import { UtilityScorer, DEFAULT_UTILITY_ACTIONS } from './ai/utility'
+import {
+  TankAIGunnerRoute,
+  type ITankBallisticSolver,
+  type ITankCannonSystem,
+  type ITankChassis,
+  type ITankTurret,
+} from './ai/TankAIGunnerRoute'
+
+/**
+ * Resolved per-tick context for the tank-gunner firing route. The
+ * `CombatantSystem` (or test fixture) builds this on demand for any
+ * combatant whose `state === IN_VEHICLE` and whose vehicle is a tank
+ * with this combatant in the gunner seat. Returning `null` from the
+ * provider skips the route for that combatant — used for crew that are
+ * mounted but not on a gunner-firing seat (driver, loader, commander).
+ */
+export interface TankGunnerContext {
+  tank: ITankChassis
+  turret: ITankTurret
+  cannon: ITankCannonSystem
+  solver: ITankBallisticSolver
+}
 
 export type LosCallsiteName =
   | 'patrolDetection'
@@ -75,6 +97,15 @@ export class CombatantAI {
   private flankingUpdatedSquadsThisFrame: Set<string> = new Set()
   private losCallsiteTelemetry: LosCallsiteTelemetry = createLosCallsiteTelemetry()
 
+  // Tank-mounted NPC firing route (cycle-vekhikl-4 R2, tank-ai-gunner-route).
+  // Stays optional: if the route + context provider are not wired, the
+  // IN_VEHICLE branch is a no-op and the AI just leaves the combatant
+  // riding the vehicle (rifle infantry behaviour is unchanged either way).
+  private tankGunnerRoute: TankAIGunnerRoute | null = null
+  private tankGunnerContextProvider:
+    | ((combatant: Combatant) => TankGunnerContext | null)
+    | null = null
+
   private readonly canSeeTargetForPatrolDetection = (
     combatant: Combatant,
     target: ITargetable,
@@ -120,7 +151,8 @@ export class CombatantAI {
     advancing: 0,
     seeking_cover: 0,
     defending: 0,
-    retreating: 0
+    retreating: 0,
+    in_vehicle: 0
   }
   private aiMethodMs: Record<string, number> = {}
   private aiMethodCounts: Record<string, number> = {}
@@ -183,6 +215,21 @@ export class CombatantAI {
 
   setTicketSystem(ticketSystem: TicketSystem): void {
     this.ticketSystem = ticketSystem
+  }
+
+  /**
+   * Wire the NPC tank-gunner firing route + a per-combatant context
+   * resolver. The resolver is called once per tick for combatants in
+   * `IN_VEHICLE` state; returning a context routes the combatant through
+   * `TankAIGunnerRoute.evaluateLeadAndFire`. Returning `null` falls
+   * through to the default IN_VEHICLE no-op (rider).
+   */
+  setTankGunnerRoute(
+    route: TankAIGunnerRoute,
+    contextProvider: (combatant: Combatant) => TankGunnerContext | null,
+  ): void {
+    this.tankGunnerRoute = route
+    this.tankGunnerContextProvider = contextProvider
   }
 
   updateAI(
@@ -361,6 +408,43 @@ export class CombatantAI {
         })
         break
 
+      case CombatantState.IN_VEHICLE:
+        // Tank-mounted NPC firing route. Acquires a target through the
+        // same `findNearestEnemy` pipeline the rifle infantry uses, then
+        // delegates to `TankAIGunnerRoute` for lead prediction, turret
+        // slew, and cannon fire. When the route + context provider are
+        // not wired (or the combatant is not a tank gunner), this falls
+        // through to a no-op — the rider's position is managed by
+        // `NPCVehicleController.updateRiding`.
+        if (this.tankGunnerRoute && this.tankGunnerContextProvider) {
+          const ctx = this.tankGunnerContextProvider(combatant)
+          if (ctx) {
+            this.withAiMethodTiming('state.in_vehicle.tank_gunner', () => {
+              // Reuse the rifle pipeline for target acquisition so behaviour
+              // stays consistent with the rest of the AI. The gunner does
+              // not need LOS pre-check here because the cannon is an arcing
+              // round that doesn't require line-of-sight to engage.
+              const target = this.findNearestEnemy(
+                combatant,
+                playerPosition,
+                allCombatants,
+                spatialGrid,
+              )
+              combatant.target = target ?? null
+              this.tankGunnerRoute!.evaluateLeadAndFire(
+                combatant,
+                ctx.tank,
+                ctx.turret,
+                target,
+                ctx.cannon,
+                ctx.solver,
+                Date.now(),
+              )
+            })
+          }
+        }
+        break
+
       case CombatantState.RETREATING: {
         // Threat anchor: prefer current target, fall back to the last-known
         // target position so the bearing-flip guard still fires if the
@@ -478,6 +562,7 @@ export class CombatantAI {
       case CombatantState.SEEKING_COVER: return 'seeking_cover'
       case CombatantState.DEFENDING: return 'defending'
       case CombatantState.RETREATING: return 'retreating'
+      case CombatantState.IN_VEHICLE: return 'in_vehicle'
       default: return 'patrolling'
     }
   }

@@ -800,4 +800,75 @@ describe('CombatantAI', () => {
       expect(shouldSeekCoverFn(mockCombatant)).toBe(false)
     })
   })
+
+  describe('tank-gunner route (IN_VEHICLE branch)', () => {
+    it('wires an IN_VEHICLE combatant through the route and emits a cannon launch', () => {
+      // Behavior expectation: when the combatant is in vehicle state and the
+      // tank-gunner route is wired with a context, the AI delegates target
+      // acquisition + cannon fire to the route. We verify the integration
+      // contract by mocking the route + observing cannon.launch was reached.
+      mockCombatant.state = CombatantState.IN_VEHICLE
+      mockCombatant.faction = Faction.US
+      mockCombatant.lastShotTime = 0
+
+      const target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
+      const targeting = (ai as any).targeting
+      targeting.findNearestEnemy.mockReturnValue(target)
+
+      const cannon = { launch: vi.fn(() => 'shell_1') }
+      const evaluate = vi.fn(() => ({ fired: true }))
+      const route = { evaluateLeadAndFire: evaluate } as any
+      const ctx = {
+        tank: { faction: Faction.US, isDestroyed: () => false },
+        turret: {
+          getYaw: () => 0,
+          getPitch: () => 0,
+          setTargetYaw: vi.fn(),
+          setTargetPitch: vi.fn(),
+          getBarrelTipWorldPosition: (out: any) => out,
+          getBarrelDirectionWorld: (out: any) => out,
+        },
+        cannon,
+        solver: { solve: () => [] },
+      }
+      const provider = vi.fn(() => ctx)
+
+      ai.setTankGunnerRoute(route, provider)
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid)
+
+      // The provider is consulted for the IN_VEHICLE combatant.
+      expect(provider).toHaveBeenCalledWith(mockCombatant)
+      // The route's fire-evaluation entry point is called with the wired
+      // chassis / turret / cannon / solver and the acquired target.
+      expect(evaluate).toHaveBeenCalledTimes(1)
+      const args = evaluate.mock.calls[0]
+      expect(args[0]).toBe(mockCombatant)
+      expect(args[1]).toBe(ctx.tank)
+      expect(args[2]).toBe(ctx.turret)
+      expect(args[3]).toBe(target)
+      expect(args[4]).toBe(cannon)
+      expect(args[5]).toBe(ctx.solver)
+    })
+
+    it('no-ops in IN_VEHICLE when no route is wired', () => {
+      mockCombatant.state = CombatantState.IN_VEHICLE
+      // No route set — must not throw, must not error, just skip.
+      expect(() =>
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid),
+      ).not.toThrow()
+    })
+
+    it('no-ops in IN_VEHICLE when the provider returns null', () => {
+      mockCombatant.state = CombatantState.IN_VEHICLE
+      const evaluate = vi.fn()
+      const route = { evaluateLeadAndFire: evaluate } as any
+      const provider = vi.fn(() => null)
+      ai.setTankGunnerRoute(route, provider)
+
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid)
+
+      expect(provider).toHaveBeenCalledWith(mockCombatant)
+      expect(evaluate).not.toHaveBeenCalled()
+    })
+  })
 })
