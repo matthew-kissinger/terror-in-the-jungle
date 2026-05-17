@@ -18,11 +18,11 @@ import { AIFlankingSystem } from './ai/AIFlankingSystem'
 import { UtilityScorer, DEFAULT_UTILITY_ACTIONS } from './ai/utility'
 import {
   TankAIGunnerRoute,
-  type ITankBallisticSolver,
   type ITankCannonSystem,
   type ITankChassis,
   type ITankTurret,
 } from './ai/TankAIGunnerRoute'
+import type { TankBallisticSolver } from './projectiles/TankBallisticSolver'
 
 /**
  * Resolved per-tick context for the tank-gunner firing route. The
@@ -36,7 +36,7 @@ export interface TankGunnerContext {
   tank: ITankChassis
   turret: ITankTurret
   cannon: ITankCannonSystem
-  solver: ITankBallisticSolver
+  solver: TankBallisticSolver
 }
 
 export type LosCallsiteName =

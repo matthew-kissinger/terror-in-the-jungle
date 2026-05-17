@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { Combatant, Faction, ITargetable, isAlly, isTargetAlive } from '../types'
+import type { TankBallisticSolver } from '../projectiles/TankBallisticSolver'
 
 /**
  * NPC tank-gunner firing route (cycle-vekhikl-4-tank-turret-and-cannon R2,
@@ -23,13 +24,12 @@ import { Combatant, Faction, ITargetable, isAlly, isTargetAlive } from '../types
  *      the cannon. Otherwise, hold fire and let the turret continue
  *      slewing; the next tick re-evaluates.
  *
- * Stub-then-swap pattern: the ballistic solver lives in a sibling R2
- * task (`tank-ballistic-solver-wasm-pilot`) that has not yet merged.
- * To keep this PR independent, the route depends on a *structural*
- * `ITankBallisticSolver` interface declared in this file. Once the
- * sibling PR lands, the orchestrator will dispatch a swap step that
- * replaces this interface with the real import; no consumer of this
- * file needs to change because the structural shape matches.
+ * Solver dependency: the ballistic solver is the real
+ * `TankBallisticSolver` from `../projectiles/TankBallisticSolver`
+ * (Rust→WASM pilot with TS fallback). The route depends only on the
+ * `solve()` method via `Pick<TankBallisticSolver, 'solve'>` so test
+ * fakes can supply a one-method stub without instantiating the WASM
+ * wrapper.
  *
  * Damage attribution: the cannon's projectile system handles kill
  * accounting downstream. This route just emits a fire request — same
@@ -38,25 +38,6 @@ import { Combatant, Faction, ITargetable, isAlly, isTargetAlive } from '../types
  */
 
 // ── Structural contracts (duck-typed so test fakes are one-liners) ───────────
-
-/**
- * Minimal structural surface for the ballistic solver. Matches the public
- * shape the sibling-PR Rust→WASM wrapper will expose:
- *   `class TankBallisticSolver { solve(v, angle, target, gravity?): TrajectorySample[] }`.
- * The TS solver path (`solveTS`) is a superset; we depend only on `solve`.
- *
- * The `solve()` return value samples the trajectory in time order from
- * launch; we only need the apex/landing structure indirectly (we read the
- * final sample to validate the solver agrees the shell reaches the lead).
- */
-export interface ITankBallisticSolver {
-  solve(
-    muzzleVelocity: number,
-    elevationAngleRad: number,
-    target: THREE.Vector3,
-    gravity?: number,
-  ): ReadonlyArray<{ time: number; x: number; y: number; z: number }>
-}
 
 /**
  * Subset of `Tank` the route needs to gate firing on chassis state. The
@@ -217,7 +198,7 @@ export class TankAIGunnerRoute {
     turret: ITankTurret,
     target: ITargetable | null | undefined,
     cannon: ITankCannonSystem,
-    solver: ITankBallisticSolver,
+    solver: TankBallisticSolver,
     nowMs: number,
   ): TankAIGunnerRouteResult {
     // 1. Chassis gates: wrecked + turret-jammed both kill the firing route
@@ -305,16 +286,16 @@ export class TankAIGunnerRoute {
    * passes converge well within turret cone tolerance for typical engagement
    * geometry; the slew cap on the turret swallows any residual error.
    *
-   * The solver-call path is the swap point: today it depends on the
-   * structural `ITankBallisticSolver`; post-merge the orchestrator points
-   * it at the real `TankBallisticSolver` from the sibling WASM-pilot PR.
+   * The solver is the real `TankBallisticSolver` from the WASM pilot; the
+   * route only consumes its `solve()` method, so tests pass a one-method
+   * fake cast through `unknown`.
    *
    * Writes the computed lead position into `out`.
    */
   private computeLeadPosition(
     turret: ITankTurret,
     target: ITargetable,
-    solver: ITankBallisticSolver,
+    solver: TankBallisticSolver,
     out: THREE.Vector3,
   ): void {
     turret.getBarrelTipWorldPosition(_barrelTip)

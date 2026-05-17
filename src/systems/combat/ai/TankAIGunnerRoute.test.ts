@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as THREE from 'three'
 import {
   TankAIGunnerRoute,
-  type ITankBallisticSolver,
   type ITankCannonSystem,
   type ITankChassis,
   type ITankTurret,
 } from './TankAIGunnerRoute'
+import type { TankBallisticSolver } from '../projectiles/TankBallisticSolver'
 import { Combatant, CombatantState, Faction, ITargetable } from '../types'
 
 /**
@@ -142,8 +142,12 @@ function makeCannon(): ITankCannonSystem & { launchCalls: any[] } {
 /**
  * Solver fake that always reports a flight-time of `tof` seconds, regardless
  * of the inputs. Lets us control the lead-time prediction deterministically.
+ *
+ * Cast through `unknown` because `TankBallisticSolver` carries private fields
+ * (the WASM loader state) that block plain-object structural assignment.
+ * Tests only exercise the `solve()` slice.
  */
-function makeSolver(tof = 0.5): ITankBallisticSolver & { solveCalls: number } {
+function makeSolver(tof = 0.5): TankBallisticSolver & { solveCalls: number } {
   const solver: any = {
     solveCalls: 0,
     solve: (
@@ -157,7 +161,7 @@ function makeSolver(tof = 0.5): ITankBallisticSolver & { solveCalls: number } {
       return [{ time: tof, x: target.x, y: target.y, z: target.z }]
     },
   }
-  return solver
+  return solver as unknown as TankBallisticSolver & { solveCalls: number }
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
@@ -389,9 +393,9 @@ describe('TankAIGunnerRoute', () => {
       // Stationary target — the fallback is exercised by an empty-solver
       // return but the resulting lead must still match the static position.
       const target = makeTarget({ position: new THREE.Vector3(0, 2, -50) })
-      const emptySolver: ITankBallisticSolver = {
+      const emptySolver = {
         solve: () => [],
-      }
+      } as unknown as TankBallisticSolver
 
       // The route must not throw on an empty solver result; the turret is
       // still slewed and (with the barrel already aimed at -Z onto the
