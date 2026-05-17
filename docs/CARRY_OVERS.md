@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-17 (post `cycle-voda-2-buoyancy-swimming-wading` close)
+Last verified: 2026-05-17 (post `cycle-vekhikl-3-tank-chassis` close)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -203,6 +203,53 @@ History log:
   (`sampleWaterInteraction` contract consumed, not modified). No
   carry-over delta (VODA-2 lives in DIRECTIVES.md, not CARRY_OVERS
   Active). Active count: 8 → 8.
+- 2026-05-17 — `cycle-vekhikl-3-tank-chassis` close (autonomous-loop posture):
+  shipped VEKHIKL-3 chassis half code-complete as 5 PRs across 2 rounds.
+  R1: [#246](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/246)
+  `6ab6ade5` tracked-vehicle-physics-core (new
+  `src/systems/vehicle/TrackedVehiclePhysics.ts` per
+  `docs/rearch/TANK_SYSTEMS_2026-05-13.md`; skid-steer kinematics
+  with W/S throttle + A/D turn → independent L/R track speeds via
+  `smoothControlInputs` lerp; four-corner ground conform through
+  `ITerrainRuntime`; tracks-blown state zeroes forward velocity
+  contribution; fixed 1/60 s step via `FixedStepRunner`; reuses the
+  `GroundVehiclePhysics` integration loop shape with skid-steer
+  substituted for Ackermann),
+  [#247](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/247)
+  `23410433` tracked-vehicle-physics-tests (7 L2 behavior tests:
+  pure forward throttle → forward motion + zero yaw, pure turn
+  axis → in-place pivot, throttle+turn combined, chassis tilt on
+  slope per-corner ground sample, tracks-blown immobilization,
+  slope-stall scaling, input smoothing → no instantaneous jump).
+  R2: [#249](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/249)
+  `bc4ec779` vekhikl-3-playtest-evidence (`docs/playtests/cycle-vekhikl-3-tank-chassis.md`
+  + capture script + PLAYTEST_PENDING row, deferred under
+  autonomous-loop posture),
+  [#250](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/250)
+  `a08b878a` m48-tank-integration (new `src/systems/vehicle/Tank.ts`
+  IVehicle impl + `m48-config.ts` chassis dims/mass/track speed cap;
+  `VehicleManager` registration; M48 spawns on Open Frontier US base
+  + A Shau valley road; `update(dt)` delegates to
+  `TrackedVehiclePhysics.step()`),
+  [#248](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/248)
+  `a11c1ddf` tank-player-adapter (new
+  `src/systems/vehicle/TankPlayerAdapter.ts` mirroring
+  `GroundVehiclePlayerAdapter` with skid-steer input model: W/S
+  throttle, A/D turn — NOT steer angle, F enter/exit, player seat =
+  `'pilot'`, external orbit-tank third-person camera for the
+  chassis-only slice; turret first-person comes in cycle #9; stub
+  was swapped to the real Tank instance in the merge commit
+  `a11c1ddf`). VEKHIKL-3 in DIRECTIVES.md moved Open →
+  code-complete-partial (chassis half complete; turret + cannon
+  awaits cycle #9 `cycle-vekhikl-4-tank-turret-and-cannon` for full
+  close). Owner playtest deferred to
+  [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) under
+  autonomous-loop posture. No fence change (`VehicleCategory` /
+  `SeatRole` extensions stayed inside the IVehicle module per
+  INTERFACE_FENCE.md). No external physics library added (per
+  ENGINE_TRAJECTORY addendum + TANK_SYSTEMS §"Decision"). No
+  carry-over delta (VEKHIKL-3 lives in DIRECTIVES.md, not
+  CARRY_OVERS Active). Active count: 8 → 8.
 
 ## Closed
 

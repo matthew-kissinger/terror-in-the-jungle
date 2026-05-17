@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-17 (post `cycle-voda-2-buoyancy-swimming-wading` close; VODA-2 code-complete; campaign pointer advanced to cycle #8 `cycle-vekhikl-3-tank-chassis`)
+Last verified: 2026-05-17 (post `cycle-vekhikl-3-tank-chassis` close; VEKHIKL-3 chassis half code-complete-partial; campaign pointer advanced to cycle #9 `cycle-vekhikl-4-tank-turret-and-cannon`)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,8 +46,8 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active cycle (2026-05-17):** `cycle-vekhikl-3-tank-chassis`
-is position #8 in a **13-cycle autonomous-chain campaign** (expanded
+**Active cycle (2026-05-17):** `cycle-vekhikl-4-tank-turret-and-cannon`
+is position #9 in a **13-cycle autonomous-chain campaign** (expanded
 from 12 on 2026-05-17 via insertion of `cycle-sun-and-atmosphere-overhaul`
 at position #12). Owner originally launched the campaign on 2026-05-16
 with `auto-advance: yes` in
@@ -58,7 +58,7 @@ VODA, VEKHIKL, and DEFEKT directives plus the two post-WebGPU
 investigation fix cycles (mobile + sky) plus the sun-and-atmosphere
 overhaul (new TSL fragment-shader sky + AGX tonemap + night-red fix).
 
-The queue (cycles #1-#7 closed; #8 active):
+The queue (cycles #1-#8 closed; #9 active):
 1. `cycle-sky-visual-restore` → KB-SKY-BLAND fix. **DONE** (`fd646aeb`).
 2. `cycle-mobile-webgl2-fallback-fix` → KB-MOBILE-WEBGPU fix (real-device validation = merge gate). **DONE** (`7931d179`).
 3. `cycle-konveyer-11-spatial-grid-compute` → DEFEKT-3 (cover spatial grid). **DONE** (`b86cf027`).
@@ -66,8 +66,8 @@ The queue (cycles #1-#7 closed; #8 active):
 5. `cycle-voda-1-water-shader-and-acceptance` → water shader + acceptance + WaterSystem split. **DONE** (`f14400d2`).
 6. `cycle-vekhikl-2-stationary-weapons` → M2HB emplacements. **DONE** (`78c9c55a`).
 7. `cycle-voda-2-buoyancy-swimming-wading` → physics + player swim. **DONE** (cycle close-commit; 7 PRs #239-#245; VODA-2 code-complete, owner playtest deferred).
-8. `cycle-vekhikl-3-tank-chassis` → M48 skid-steer chassis. **ACTIVE**.
-9. `cycle-vekhikl-4-tank-turret-and-cannon` → turret + cannon + Rust→WASM ballistic-solver pilot.
+8. `cycle-vekhikl-3-tank-chassis` → M48 skid-steer chassis. **DONE** (cycle close-commit; 5 PRs #246-#250; VEKHIKL-3 chassis half code-complete, owner playtest deferred; turret + cannon awaits cycle #9).
+9. `cycle-vekhikl-4-tank-turret-and-cannon` → turret + cannon + Rust→WASM ballistic-solver pilot. **ACTIVE**.
 10. `cycle-voda-3-watercraft` → Sampan + PBR.
 11. `cycle-defekt-4-npc-route-quality` → slope-stuck + crowd + solver fixes.
 12. `cycle-sun-and-atmosphere-overhaul` → TSL fragment-shader Preetham + AGX tonemap + night-red fix + sun-disc tuning (NEW 2026-05-17 per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md`; closes HosekWilkieSkyBackend half of `konveyer-large-file-splits`).
@@ -114,10 +114,10 @@ Cloudflare account-level audit:
 
 Single source of truth for unresolved items:
 [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is **8** after
-the 2026-05-17 cycle #7 close (cycles #1-#3 closed DEFEKT-3 +
-KB-MOBILE-WEBGPU + KB-SKY-BLAND; net cycle delta from #4-#7 was 0
-because VEKHIKL-1, VODA-1, VEKHIKL-2, and VODA-2 live in DIRECTIVES.md
-not CARRY_OVERS Active). Active items: DEFEKT-4 (closes at cycle #11),
+the 2026-05-17 cycle #8 close (cycles #1-#3 closed DEFEKT-3 +
+KB-MOBILE-WEBGPU + KB-SKY-BLAND; net cycle delta from #4-#8 was 0
+because VEKHIKL-1, VODA-1, VEKHIKL-2, VODA-2, and VEKHIKL-3 live in
+DIRECTIVES.md not CARRY_OVERS Active). Active items: DEFEKT-4 (closes at cycle #11),
 STABILIZAT-1 (closes at cycle #13 — renumbered after sun-and-atmosphere
 insertion), AVIATSIYA-1 / DEFEKT-5 (visual review pending), KB-LOAD
 residual, KB-STARTUP-1 (held; cycle #2 mobile work absorbed parts),
