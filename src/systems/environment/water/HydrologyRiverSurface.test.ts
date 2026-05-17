@@ -111,4 +111,50 @@ describe('HydrologyRiverSurface', () => {
       expect(length).toBeGreaterThan(0);
     }
   });
+
+  it('bakes per-vertex flow-direction and foam-mask attributes for the river-flow shader patch', () => {
+    const scene = new THREE.Scene();
+    const surface = new HydrologyRiverSurface(scene);
+    surface.setArtifact(makeArtifact());
+
+    const mesh = scene.getObjectByName('hydrology-river-surface-mesh') as THREE.Mesh<
+      THREE.BufferGeometry,
+      THREE.MeshStandardMaterial
+    >;
+    const flowDir = mesh.geometry.getAttribute('aFlowDir');
+    const foamMask = mesh.geometry.getAttribute('aFoamMask');
+
+    expect(flowDir.itemSize).toBe(2);
+    expect(foamMask.itemSize).toBe(1);
+    // One vec2 + float per vertex; vertex count matches positions.
+    expect(flowDir.count).toBe(mesh.geometry.getAttribute('position').count);
+    expect(foamMask.count).toBe(flowDir.count);
+    // Test artifact goes from (-5,0) to (15,0): unit flow along +X.
+    expect(flowDir.getX(0)).toBeCloseTo(1, 5);
+    expect(flowDir.getY(0)).toBeCloseTo(0, 5);
+    // Foam mask non-negative for every vertex.
+    for (let i = 0; i < foamMask.count; i++) {
+      expect(foamMask.getX(i)).toBeGreaterThanOrEqual(0);
+      expect(foamMask.getX(i)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('invokes onMaterialReady once with the river material before scene attach', () => {
+    const scene = new THREE.Scene();
+    const seen: THREE.MeshStandardMaterial[] = [];
+    const surface = new HydrologyRiverSurface(scene, {
+      onMaterialReady: (m) => seen.push(m),
+    });
+
+    surface.setArtifact(makeArtifact());
+
+    expect(seen.length).toBe(1);
+    expect(seen[0]).toBeInstanceOf(THREE.MeshStandardMaterial);
+    // Same material as the attached mesh.
+    const mesh = scene.getObjectByName('hydrology-river-surface-mesh') as THREE.Mesh<
+      THREE.BufferGeometry,
+      THREE.MeshStandardMaterial
+    >;
+    expect(mesh.material).toBe(seen[0]);
+  });
 });
