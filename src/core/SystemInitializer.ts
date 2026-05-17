@@ -43,6 +43,7 @@ import { AirSupportManager } from '../systems/airsupport/AirSupportManager';
 import { AAEmplacementSystem } from '../systems/airsupport/AAEmplacement';
 import { VehicleManager } from '../systems/vehicle/VehicleManager';
 import { NPCVehicleController } from '../systems/vehicle/NPCVehicleController';
+import { M2HBEmplacementSystem } from '../systems/combat/weapons/M2HBEmplacement';
 import type { IGameRenderer } from '../types/SystemInterfaces';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
@@ -172,6 +173,12 @@ export class SystemInitializer {
     refs.aaEmplacementSystem = new AAEmplacementSystem(scene);
     refs.vehicleManager = new VehicleManager();
     refs.npcVehicleController = new NPCVehicleController();
+    // M2HB emplacement system owns weapon bindings + fire routing for the
+    // scenario-spawned tripod guns (Open Frontier US base, A Shau NVA
+    // bunker overlook). Scenario spawns are wired in OperationalRuntime
+    // and triggered by GameModeManager.onModeChanged once mode startup
+    // sets the height provider -- see `wireVehicleRuntime`.
+    refs.m2hbEmplacementSystem = new M2HBEmplacementSystem(scene);
 
     // Initialize new squad/inventory/grenade systems
     const squadManager = (refs.combatantSystem as any).squadManager;
@@ -243,7 +250,8 @@ export class SystemInitializer {
       refs.strategicFeedback,
       refs.airSupportManager,
       refs.aaEmplacementSystem,
-      refs.vehicleManager
+      refs.vehicleManager,
+      refs.m2hbEmplacementSystem
     ];
 
     // Registry keys survive production minification; constructor names do not.

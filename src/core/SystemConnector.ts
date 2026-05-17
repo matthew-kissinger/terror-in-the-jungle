@@ -25,13 +25,13 @@ import {
 export class SystemConnector {
   connectSystems(
     refs: SystemKeyToType,
-    _scene: THREE.Scene,
+    scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     renderer?: IGameRenderer
   ): void {
     wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), { camera, renderer });
     wireGameplayRuntime(createGameplayRuntimeGroups(refs), { camera, renderer });
-    wireOperationalRuntime(createOperationalRuntimeGroups(refs));
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene });
     this.wireNavigation(refs);
     this.wireTelemetry(refs, renderer);
   }

@@ -80,6 +80,7 @@ export class SystemUpdater {
     this.trackSystemUpdate('Combat', SYSTEM_UPDATE_BUDGET_MS.Combat, () => {
       performanceTelemetry.beginSystem('Combat');
       if (refs.combatantSystem) refs.combatantSystem.update(deltaTime);
+      if (refs.m2hbEmplacementSystem) refs.m2hbEmplacementSystem.update(deltaTime);
       performanceTelemetry.endSystem('Combat');
     });
 
