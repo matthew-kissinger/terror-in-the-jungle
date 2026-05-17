@@ -19,6 +19,15 @@ export interface HydrologyWaterQuerySegment {
   startSurfaceY: number;
   endSurfaceY: number;
   halfWidth: number;
+  /** Unit-length flow direction in world-XZ (segment start -> end). */
+  flowX: number;
+  flowZ: number;
+  /**
+   * Per-segment flow speed in m/s, scaled by accumulation factor so larger
+   * channels carry more current. Consumed by `WaterSurfaceSampler` to fill
+   * `WaterInteractionSample.flowVelocity`; buoyancy + swim apply the push.
+   */
+  flowSpeedMetersPerSecond: number;
 }
 
 export const EMPTY_HYDROLOGY_RIVER_STATS: HydrologyRiverMeshStats = {

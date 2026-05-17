@@ -44,6 +44,24 @@ class StubWaterSampler implements WaterSampler {
       submerged,
       immersion01: submerged ? 1 : 0,
       buoyancyScalar: submerged ? 1 : 0,
+      flowVelocity: new THREE.Vector3(),
+    };
+  }
+
+  /**
+   * Place the player in a river: submerged with a horizontal flow vector.
+   * Used by the flow-push behavior test to confirm swim mode consumes
+   * `headSample.flowVelocity` as a downstream drift.
+   */
+  setRiver(flow: THREE.Vector3, depth = 1.6): void {
+    this.nextSample = {
+      source: 'hydrology',
+      surfaceY: 0,
+      depth,
+      submerged: true,
+      immersion01: 1,
+      buoyancyScalar: 1,
+      flowVelocity: flow.clone(),
     };
   }
 
@@ -82,6 +100,7 @@ describe('PlayerSwimState', () => {
       submerged: false,
       immersion01: 0,
       buoyancyScalar: 0,
+      flowVelocity: new THREE.Vector3(),
     });
   });
 
@@ -261,6 +280,58 @@ describe('PlayerSwimState', () => {
       });
       const v = swim.computeSwimVelocity(ctx, new THREE.Vector3());
       expect(Math.abs(v.y)).toBeLessThan(0.5);
+    });
+  });
+
+  describe('river flow push', () => {
+    it('swim velocity drifts toward the head-sample flow vector', () => {
+      // Strong eastward river (+X). Player swims forward (camera looks -Z,
+      // so forward intent has no X component) and over several ticks the
+      // X velocity converges toward the flow.
+      sampler.setRiver(new THREE.Vector3(0.6, 0, 0));
+      const ctx = makeContext({
+        input: { forward: 1, strafe: 0, ascend: false, descend: false },
+        baseSpeed: 5,
+        dt: 1 / 60,
+      });
+
+      // Establish swim mode + capture initial flow.
+      swim.tick(sampler, ctx);
+
+      let velocity = new THREE.Vector3();
+      // Step several seconds; without flow, x stays ~0 (swim is along -Z).
+      for (let i = 0; i < 60 * 3; i++) {
+        swim.tick(sampler, ctx);
+        velocity = swim.computeSwimVelocity(ctx, velocity).clone();
+      }
+
+      // The downstream-axis component of swim velocity is clearly
+      // positive (flow pushes east). Steady-state magnitude depends on the
+      // drag/flow blend ratio; >0.15 is comfortably above noise and tracks
+      // the qualitative "current pushes the swimmer" feel.
+      expect(velocity.x).toBeGreaterThan(0.15);
+      expect(Math.abs(velocity.z)).toBeGreaterThan(0); // forward intent still active
+    });
+
+    it('still water (zero flow) leaves swim velocity unaffected by the flow blend', () => {
+      // Submerge but no flow.
+      sampler.setSubmerged(true);
+      const ctx = makeContext({
+        input: { forward: 0, strafe: 0, ascend: false, descend: false },
+        baseSpeed: 5,
+        dt: 1 / 60,
+      });
+      swim.tick(sampler, ctx);
+
+      // Start velocity = zero; no inputs; flow zero. Velocity must stay
+      // small (drag only) — no spurious push from an empty flow vector.
+      let velocity = new THREE.Vector3();
+      for (let i = 0; i < 60; i++) {
+        swim.tick(sampler, ctx);
+        velocity = swim.computeSwimVelocity(ctx, velocity).clone();
+      }
+      expect(Math.abs(velocity.x)).toBeLessThan(1e-3);
+      expect(Math.abs(velocity.z)).toBeLessThan(1e-3);
     });
   });
 

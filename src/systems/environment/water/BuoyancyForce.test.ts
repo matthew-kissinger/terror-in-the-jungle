@@ -31,9 +31,14 @@ const DEFAULT_IMMERSION_DEPTH_METERS = 1.6;
 /**
  * Stub sampler: water surface lives at `surfaceY`; immersion saturates over
  * `immersionDepthMeters` so the buoyancyScalar behaves the way the real
- * WaterSurfaceSampler does. No hydrology, no global-plane gating.
+ * WaterSurfaceSampler does. No hydrology, no global-plane gating. The
+ * `flow` option lets a river-flow test inject a horizontal flow vector
+ * everywhere below the surface; default is no flow (still water).
  */
-function makeFlatWater(surfaceY = 0): BuoyancySamplerLike {
+function makeFlatWater(
+  surfaceY = 0,
+  flow: THREE.Vector3 = new THREE.Vector3(),
+): BuoyancySamplerLike {
   return {
     sampleWaterInteraction(
       position: THREE.Vector3,
@@ -52,6 +57,7 @@ function makeFlatWater(surfaceY = 0): BuoyancySamplerLike {
         submerged: depth > 0,
         immersion01,
         buoyancyScalar: immersion01,
+        flowVelocity: depth > 0 ? flow.clone() : new THREE.Vector3(),
       };
     },
   };
@@ -275,6 +281,65 @@ describe('applyBuoyancyForce — behavior contract', () => {
     for (const body of bodies) {
       expect(body.velocity.lengthSq()).toBeGreaterThan(0);
     }
+  });
+
+  it('a body in a flowing channel drifts toward the flow vector over time', () => {
+    // Flowing river along +X at 0.5 m/s. A floating body released at rest in
+    // the channel should be carried downstream by horizontal flow drag.
+    const sampler = makeFlatWater(0, new THREE.Vector3(0.5, 0, 0));
+    const body = makeBody({
+      mass: 1,
+      volume: 0.005,
+      dragCoefficient: 4.0,
+      position: new THREE.Vector3(0, -0.2, 0),
+    });
+
+    simulate(body, sampler, 4);
+
+    // After a few seconds the body has been pushed downstream (+X) by the
+    // flow. Cross-axis (Z) motion stays roughly zero — flow only pushes
+    // along its own direction.
+    expect(body.position.x).toBeGreaterThan(0.3);
+    expect(Math.abs(body.position.z)).toBeLessThan(0.1);
+    // Horizontal velocity asymptotes near the flow speed.
+    expect(body.velocity.x).toBeGreaterThan(0.2);
+  });
+
+  it('a dry body is unaffected by the flow vector (only submerged bodies feel current)', () => {
+    const sampler = makeFlatWater(0, new THREE.Vector3(0.5, 0, 0));
+    const body = makeBody({
+      mass: 1,
+      volume: 0.005,
+      dragCoefficient: 4.0,
+      position: new THREE.Vector3(0, 5, 0),
+    });
+
+    const startX = body.position.x;
+    // Short step before the body falls into the water.
+    applyBuoyancyForce(body, 0.05, sampler);
+    // X velocity stays zero (dry, no flow drag); only Y is changing.
+    expect(body.velocity.x).toBeCloseTo(0, 5);
+    expect(body.position.x).toBeCloseTo(startX, 5);
+  });
+
+  it('zero flow leaves horizontal velocity decaying to rest (no spurious push)', () => {
+    // Still water (default flow zero). A body with zero horizontal velocity
+    // must stay at zero horizontally; drag may only damp, never amplify.
+    const sampler = makeFlatWater(0);
+    const body = makeBody({
+      mass: 1,
+      volume: 0.005,
+      dragCoefficient: 4.0,
+      position: new THREE.Vector3(0, -0.2, 0),
+    });
+
+    simulate(body, sampler, 4);
+
+    expect(Math.abs(body.velocity.x)).toBeLessThan(1e-3);
+    expect(Math.abs(body.velocity.z)).toBeLessThan(1e-3);
+    // Position barely moves horizontally either.
+    expect(Math.abs(body.position.x)).toBeLessThan(1e-2);
+    expect(Math.abs(body.position.z)).toBeLessThan(1e-2);
   });
 
   it('uses caller-provided immersionDepthMeters so callers can tune saturation', () => {
