@@ -12,6 +12,7 @@ import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 import type { SeatRole } from './IVehicle';
 import type { Tank } from './Tank';
+import { TankTurret } from './TankTurret';
 
 // ── Turret aim / camera tuning ──
 const MOUSE_AIM_SENSITIVITY = 0.0022; // radians per mouse-pixel (yaw + pitch)
@@ -20,34 +21,6 @@ const TOUCH_AIM_SENSITIVITY = 1.2; // radians/sec at full deflection (slower tha
 const DEFAULT_EXIT_SIDE_OFFSET_M = 3.0; // metres to the +X side of chassis on dismount fallback
 const DEFAULT_SIGHT_FORWARD_OFFSET = 0.25; // metres ahead of barrel tip along sight line
 const DEFAULT_SIGHT_UP_OFFSET = 0.0; // metres above barrel tip (gunner sight is barrel-axis)
-
-/**
- * Sibling-PR coordination — structural duck-type stub for `TankTurret`.
- *
- * The real `TankTurret` lands in the parallel `tank-turret-rig` task. Until
- * that PR merges, this adapter binds to any object that satisfies the shape
- * below. After `tank-turret-rig` merges, the orchestrator dispatches a swap
- * step to replace `ITankTurretModel` with the real `TankTurret` import
- * (same pattern used by the chassis-side `TankPlayerAdapter` ↔ `Tank`).
- *
- * The shape mirrors what a turret mounted on a tank chassis needs to expose
- * to a player adapter:
- *   - `setTargetYaw / setTargetPitch`: aim intent (turret applies slew + clamps)
- *   - `getYaw / getPitch`: current achieved aim (for camera + telemetry)
- *   - `getYawLimits / getPitchLimits`: envelope reporting (null yaw = 360°)
- *   - `getBarrelTipWorldPosition / getBarrelDirectionWorld`: muzzle pose for
- *     the gunner-sight camera + R2 cannon spawn point
- */
-export interface ITankTurretModel {
-  setTargetYaw(yawRad: number): void;
-  setTargetPitch(pitchRad: number): void;
-  getYaw(): number;
-  getPitch(): number;
-  getYawLimits(): { min: number; max: number } | null;
-  getPitchLimits(): { min: number; max: number };
-  getBarrelTipWorldPosition(target: THREE.Vector3): THREE.Vector3;
-  getBarrelDirectionWorld(target: THREE.Vector3): THREE.Vector3;
-}
 
 function createTankGunnerUIContext(): VehicleUIContext {
   // Gunner POV reuses the 'turret' HUD bucket (same as M2HB tripod); the
@@ -123,11 +96,11 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
   sightUpOffset = DEFAULT_SIGHT_UP_OFFSET;
 
   private readonly chassis: Tank;
-  private readonly turret: ITankTurretModel;
+  private readonly turret: TankTurret;
   private mounted = false;
   private fireRequested = false;
 
-  constructor(chassis: Tank, turret: ITankTurretModel) {
+  constructor(chassis: Tank, turret: TankTurret) {
     this.chassis = chassis;
     this.turret = turret;
   }
