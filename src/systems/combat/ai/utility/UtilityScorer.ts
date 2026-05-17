@@ -68,6 +68,23 @@ export interface UtilityContext {
   readonly coverQualityHere?: number
   /** Proximity proxy in [0,1] to the squad's objective. 1 = on it. */
   readonly objectiveProximity?: number
+  /**
+   * Optional candidate emplacement the unit could mount this tick. Populated
+   * by the caller (`EmplacementSeekHelper.buildEmplacementContext`) when an
+   * unoccupied friendly emplacement sits within range AND the current threat
+   * is inside its field-of-fire cone. When unset, `mountEmplacementAction`
+   * scores 0 and the unit falls through to the normal engage ladder.
+   *
+   * Carries pre-computed values so the action can stay allocation-free per
+   * tick: vehicleId routes the eventual mount via VehicleManager, distance
+   * lets the score taper with range, and threatInCone short-circuits the
+   * action when the gunner would have no shot from the seat.
+   */
+  readonly nearbyEmplacement?: {
+    readonly vehicleId: string
+    readonly distance: number
+    readonly threatInCone: boolean
+  }
 }
 
 /**
@@ -109,6 +126,17 @@ export type UtilityIntent =
        * the ENGAGING state with inCover=true semantics; no movement target.
        */
       readonly kind: 'holdPosition'
+    }
+  | {
+      /**
+       * Move onto a stationary heavy-weapon emplacement (e.g. M2HB tripod)
+       * and crew it. Caller transitions the unit to BOARDING with
+       * destinationPoint set to the emplacement, then promotes to IN_VEHICLE
+       * once within mount range. See `EmplacementSeekHelper` (sibling module)
+       * for the dismount predicates (ammo empty, target out of cone > 5 s).
+       */
+      readonly kind: 'mountEmplacement'
+      readonly vehicleId: string
     }
 
 /**

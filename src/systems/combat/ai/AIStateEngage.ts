@@ -7,6 +7,12 @@ import { Logger } from '../../../utils/Logger'
 import { getFactionCombatTuning } from '../../../config/FactionCombatTuning'
 import { UtilityScorer, UtilityContext } from './utility'
 import { SeededRandom } from '../../../core/SeededRandom'
+import {
+  buildEmplacementContext,
+  INpcEmplacementQuery,
+  INpcEmplacementWeapon,
+  EmplacementMountTracker,
+} from './EmplacementSeekHelper'
 
 const _toTarget = new THREE.Vector3()
 const _flankingPos = new THREE.Vector3()
@@ -153,6 +159,19 @@ export class AIStateEngage {
   // within `radius` of `origin`? Left undefined when no terrain query is
   // wired — utility actions that depend on it will simply score 0.
   private hasCoverInBearing?: (origin: THREE.Vector3, bearingRad: number, radius: number) => boolean
+  // Optional emplacement query. When set, the utility-AI pre-pass also
+  // populates `ctx.nearbyEmplacement` so the `mountEmplacementAction` can
+  // win. Leaving this unset preserves the legacy engage ladder for callers
+  // that don't ship stationary heavy weapons in their scenario.
+  private emplacementQuery?: INpcEmplacementQuery
+  // Optional resolver for the live emplacement weapon at a given vehicleId.
+  // The sibling `m2hb-weapon-integration` task will provide this once the
+  // M2HBEmplacement weapon ships; until then the helper falls back to a
+  // synthetic cone (see EmplacementSeekHelper.buildEmplacementContext).
+  private resolveEmplacementWeapon?: (vehicleId: string) => INpcEmplacementWeapon | null
+  // Per-combatant mount-lifecycle tracker. Owned here so the WeakMap stays
+  // in sync with the AIStateEngage instance lifetime.
+  private readonly emplacementMountTracker = new EmplacementMountTracker()
   // Scratch UtilityContext reused across every handleEngaging() call. The
   // scorer reads fields synchronously and does not retain references, so a
   // single instance is safe. Writable fields are reassigned per tick below;
@@ -169,6 +188,7 @@ export class AIStateEngage {
     squadCohesion: number | undefined
     coverQualityHere: number | undefined
     objectiveProximity: number | undefined
+    nearbyEmplacement: { vehicleId: string; distance: number; threatInCone: boolean } | undefined
   } = {
     self: null,
     threatPosition: new THREE.Vector3(),
@@ -180,6 +200,7 @@ export class AIStateEngage {
     squadCohesion: undefined,
     coverQualityHere: undefined,
     objectiveProximity: undefined,
+    nearbyEmplacement: undefined,
   }
   // The combatant whose position the cached scratchCoverProbe is currently
   // bound to. When it changes, we rebuild the closure; otherwise the closure
@@ -235,6 +256,38 @@ export class AIStateEngage {
     probe: (origin: THREE.Vector3, bearingRad: number, radius: number) => boolean
   ): void {
     this.hasCoverInBearing = probe
+  }
+
+  /**
+   * Opt-in vehicle query for the NPC-gunner emplacement-seek action. When
+   * set, the utility-AI pre-pass populates `ctx.nearbyEmplacement` so that
+   * `mountEmplacementAction` can score above zero. Pass `undefined` to
+   * disable the path again (used by tests and by scenarios without
+   * stationary heavy weapons).
+   */
+  setEmplacementQuery(query: INpcEmplacementQuery | undefined): void {
+    this.emplacementQuery = query
+  }
+
+  /**
+   * Opt-in resolver for the live emplacement weapon. The sibling
+   * `m2hb-weapon-integration` task supplies this once `M2HBEmplacement`
+   * ships; until then the helper falls back to a synthetic cone aimed at
+   * the threat. Pass `undefined` to disable.
+   */
+  setEmplacementWeaponResolver(
+    resolver: ((vehicleId: string) => INpcEmplacementWeapon | null) | undefined
+  ): void {
+    this.resolveEmplacementWeapon = resolver
+  }
+
+  /**
+   * Tracker for the per-combatant dismount predicates (ammo empty / target
+   * out of cone > 5 s). Exposed for the integration layer that drives the
+   * mounted-update tick.
+   */
+  getEmplacementMountTracker(): EmplacementMountTracker {
+    return this.emplacementMountTracker
   }
 
   getCloseEngagementTelemetry(): CloseEngagementTelemetry {
@@ -412,6 +465,24 @@ export class AIStateEngage {
           // the existing engage logic further down.
           // (Intentional no-op: existing in-cover / peek-and-fire code
           // below already handles the "stay put and fire" behavior.)
+        }
+        if (intent && intent.kind === 'mountEmplacement') {
+          // The unit yields the engage ladder and routes to BOARDING via
+          // the existing seat-occupant pipeline. The integration layer
+          // (NPCVehicleController.orderBoard, called by the dispatch on
+          // the next tick once we've set BOARDING) handles the actual
+          // seat-claim + position snap. We only need to mark the state
+          // transition + destination here. Reset the mount tracker so the
+          // stale-target dismount window starts fresh on mount.
+          combatant.state = CombatantState.BOARDING
+          // The vehicleId on the combatant is the canonical handle the
+          // integration layer reads; set it now so NPCVehicleController's
+          // current-vehicle resolution finds the right candidate.
+          combatant.vehicleId = intent.vehicleId
+          combatant.inCover = false
+          combatant.isFlankingMove = false
+          this.emplacementMountTracker.reset(combatant)
+          return
         }
       }
 
@@ -603,6 +674,25 @@ export class AIStateEngage {
     ctx.squadCohesion = undefined
     ctx.coverQualityHere = undefined
     ctx.objectiveProximity = undefined
+    // Populate nearby-emplacement when a vehicle query is wired. The helper
+    // is allocation-frugal but does scan candidates in the radius; gating
+    // on `emplacementQuery` keeps scenarios without stationary weapons free
+    // of the per-tick scan. The weapon resolver runs lazily — only after a
+    // candidate is found — so callers without a live M2HBEmplacement wired
+    // up get the synthetic-cone fallback for free.
+    if (this.emplacementQuery) {
+      ctx.nearbyEmplacement =
+        buildEmplacementContext(
+          combatant,
+          targetPos,
+          this.emplacementQuery,
+          this.resolveEmplacementWeapon
+            ? (vehicleId: string) => this.resolveEmplacementWeapon!(vehicleId) ?? undefined
+            : undefined
+        ) ?? undefined
+    } else {
+      ctx.nearbyEmplacement = undefined
+    }
     return ctx as UtilityContext
   }
 
