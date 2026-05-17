@@ -35,6 +35,13 @@ export interface FactionActionWeights {
   readonly reposition: number;
   readonly regroup: number;
   readonly hold: number;
+  /**
+   * Weight for `mountEmplacementAction`. >1 amplifies crew-served preference
+   * (US, NVA dug-in doctrine); <1 dampens (VC guerrilla — ambush, don't crew
+   * a tripod that pins them in place). Defaults to 1.0 via DEFAULT_WEIGHTS so
+   * existing tuning entries don't need to enumerate this explicitly.
+   */
+  readonly mountEmplacement: number;
 }
 
 interface FactionCombatTuning {
@@ -110,6 +117,7 @@ const DEFAULT_WEIGHTS: FactionActionWeights = {
   reposition: 1.0,
   regroup: 1.0,
   hold: 1.0,
+  mountEmplacement: 1.0,
 };
 
 /**
@@ -134,6 +142,8 @@ export const FACTION_COMBAT_TUNING: Record<Faction, FactionCombatTuning> = {
       suppress: 0.5,
       hold: 0.3,
       regroup: 0.9,
+      // VC guerrilla doctrine: do not crew a tripod that pins you in place.
+      mountEmplacement: 0.3,
     },
     frontlineElasticityM: 22,
   },
@@ -150,6 +160,8 @@ export const FACTION_COMBAT_TUNING: Record<Faction, FactionCombatTuning> = {
       suppress: 1.3,
       hold: 1.7,
       regroup: 0.7,
+      // NVA dug-in doctrine: crew-served weapons hold ground.
+      mountEmplacement: 1.4,
     },
     frontlineElasticityM: 6,
   },
@@ -166,6 +178,8 @@ export const FACTION_COMBAT_TUNING: Record<Faction, FactionCombatTuning> = {
       suppress: 1.6,
       hold: 1.0,
       regroup: 1.0,
+      // US fire-and-maneuver: heavy weapons get crewed when contact develops.
+      mountEmplacement: 1.5,
     },
     frontlineElasticityM: 12,
   },
@@ -182,6 +196,9 @@ export const FACTION_COMBAT_TUNING: Record<Faction, FactionCombatTuning> = {
       suppress: 0.9,
       hold: 0.8,
       regroup: 1.5,
+      // ARVN mirrors US doctrine on crew-served weapons; cohesion varies but
+      // when a tripod is available the unit will try to crew it.
+      mountEmplacement: 1.2,
     },
     frontlineElasticityM: 16,
   },

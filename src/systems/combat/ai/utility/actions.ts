@@ -6,6 +6,7 @@ import {
   UtilityIntent,
   bearingAwayFromThreat,
 } from './UtilityScorer'
+import { mountEmplacementAction } from '../EmplacementSeekHelper'
 
 /**
  * Three doctrine actions from docs/rearch/E3-combat-ai-evaluation.md. All
@@ -275,4 +276,10 @@ export const DEFAULT_UTILITY_ACTIONS: readonly UtilityAction[] = [
   requestSupportAction,
   repositionAction,
   holdAction,
+  // Authored in EmplacementSeekHelper to keep the emplacement vocabulary
+  // (vehicle queries, weapon stub, cone math) out of the generic doctrine
+  // table. Action scores 0 unless the caller populates ctx.nearbyEmplacement
+  // via `buildEmplacementContext`, so factions / scenarios without
+  // stationary heavy weapons stay unaffected.
+  mountEmplacementAction,
 ]
