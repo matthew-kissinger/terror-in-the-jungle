@@ -11,33 +11,11 @@ import type {
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 import type { SeatRole } from './IVehicle';
-import type { TrackedVehiclePhysics } from './TrackedVehiclePhysics';
+import type { Tank } from './Tank';
 
 // ── Tank chassis control tuning ──
 const TOUCH_DEADZONE = 0.1;
-
-// STUB: will swap for real Tank import after m48-tank-integration merges.
-// The m48-tank-integration sibling PR ships `src/systems/vehicle/Tank.ts`
-// implementing `IVehicle` for the M48. Until that lands we work against a
-// structural duck-type defined locally so this file builds in isolation;
-// the real Tank class will satisfy this interface without modification.
-//
-// Kept local (NOT in src/types/SystemInterfaces.ts) to avoid a fenced
-// interface change — mirrors the IGroundVehicleModel / Emplacement
-// adapter pattern.
-export interface ITankModel {
-  readonly vehicleId: string;
-  /** Returns true and writes world-space position when the tank exists. */
-  getVehiclePositionTo(vehicleId: string, target: THREE.Vector3): boolean;
-  /** Returns true and writes world-space orientation when the tank exists. */
-  getVehicleQuaternionTo(vehicleId: string, target: THREE.Quaternion): boolean;
-  /** Returns the live tracked-physics instance for the named tank, or null. */
-  getPhysics(vehicleId: string): TrackedVehiclePhysics | null;
-  /** Optional exit-plan override (e.g. side-hatch placement). */
-  getPlayerExitPlan?(vehicleId: string): VehicleExitPlan | null;
-  /** Toggles the engine on entry/exit for cosmetic RPM spool-up/down. */
-  setEngineActive?(vehicleId: string, active: boolean): void;
-}
+const DEFAULT_EXIT_SIDE_OFFSET_M = 3.0; // metres to the +X side of chassis on dismount fallback
 
 function createTankUIContext(): VehicleUIContext {
   // Reuse 'car' / 'groundVehicle' HUD bucket — VehicleKind doesn't have a
@@ -62,7 +40,7 @@ function createTankUIContext(): VehicleUIContext {
   };
 }
 
-const _scratchVec = new THREE.Vector3();
+const _scratchSide = new THREE.Vector3();
 
 /**
  * Tank player adapter (M48 Patton chassis slice).
@@ -86,6 +64,11 @@ const _scratchVec = new THREE.Vector3();
  * Camera: external orbit-tank (third-person). Same follow math as the
  * jeep adapter — distance + height tuned slightly larger for chassis size.
  * Turret first-person camera lands in cycle #9.
+ *
+ * The adapter binds to a concrete `Tank` instance at construction time,
+ * mirroring the `EmplacementPlayerAdapter` (real Emplacement instance, no
+ * registry indirection). The earlier sibling-PR stub `ITankModel` was
+ * dropped on master-merge in favor of the real Tank surface.
  */
 export class TankPlayerAdapter implements PlayerVehicleAdapter {
   readonly vehicleType = 'tank';
@@ -105,19 +88,18 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   cameraHeight = 5.5;
   cameraLookHeight = 2.0;
 
-  // Smoothed control axes, forwarded each frame into the physics layer
-  // via TrackedVehiclePhysics.setControls(throttle, turn, brake).
+  // Smoothed control axes, forwarded each frame into the tank via
+  // Tank.setControls(throttle, turn, brake).
   private controls = {
     throttleAxis: 0,
     turnAxis: 0,
     brake: false,
   };
 
-  private readonly model: ITankModel;
-  private activeVehicleId: string | null = null;
-  private activePhysics: TrackedVehiclePhysics | null = null;
+  private readonly model: Tank;
+  private mounted = false;
 
-  constructor(model: ITankModel) {
+  constructor(model: Tank) {
     this.model = model;
   }
 
@@ -125,8 +107,7 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
 
   onEnter(ctx: VehicleTransitionContext): void {
     this.resetControlState();
-    this.activeVehicleId = ctx.vehicleId;
-    this.activePhysics = this.model.getPhysics(ctx.vehicleId);
+    this.mounted = true;
 
     // Player out of infantry motion, snapped onto the driver hatch.
     ctx.playerState.velocity.set(0, 0, 0);
@@ -154,8 +135,6 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
       ctx.gameRenderer.setCrosshairMode('infantry');
     }
 
-    this.model.setEngineActive?.(ctx.vehicleId, true);
-
     // Re-acquire pointer lock so mouse-look (free orbital) keeps working.
     if (typeof ctx.input.relockPointer === 'function') {
       ctx.input.relockPointer();
@@ -182,35 +161,23 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
       ctx.gameRenderer.setCrosshairMode('infantry');
     }
 
-    if (this.activeVehicleId) {
-      this.model.setEngineActive?.(this.activeVehicleId, false);
-    }
-    this.activeVehicleId = null;
-    this.activePhysics = null;
+    // Park the chassis: zero the driver inputs so the tank coasts to a
+    // stop under the physics layer's drag rather than carrying the
+    // player's last throttle into the unattended state.
+    this.model.setControls(0, 0, true);
+
+    this.mounted = false;
     this.resetControlState();
   }
 
-  getExitPlan(ctx: VehicleTransitionContext, _options: VehicleExitOptions): VehicleExitPlan {
-    const modelPlan = this.model.getPlayerExitPlan?.(ctx.vehicleId);
-    if (modelPlan) {
-      return modelPlan;
-    }
+  getExitPlan(_ctx: VehicleTransitionContext, _options: VehicleExitOptions): VehicleExitPlan {
     // Default: eject on the +X side of the chassis (driver hatch clear of
     // the engine deck). M48 is ~3.6 m wide so a 3 m sideways step lands
-    // the player just past the track skirt. Fallback to ctx.position when
-    // we cannot resolve the chassis pose (e.g. force_cleanup path).
-    const exitPos = ctx.position.clone();
-    const pos = _scratchVec;
-    if (this.model.getVehiclePositionTo(ctx.vehicleId, pos)) {
-      const quat = new THREE.Quaternion();
-      if (this.model.getVehicleQuaternionTo(ctx.vehicleId, quat)) {
-        const sideOffset = new THREE.Vector3(3.0, 0, 0).applyQuaternion(quat);
-        exitPos.copy(pos).add(sideOffset);
-      } else {
-        exitPos.copy(pos);
-        exitPos.x += 3.0;
-      }
-    }
+    // the player just past the track skirt. Direction respects the tank's
+    // current yaw so the player doesn't land in the engine deck after a
+    // turn.
+    _scratchSide.set(DEFAULT_EXIT_SIDE_OFFSET_M, 0, 0).applyQuaternion(this.model.quaternion);
+    const exitPos = this.model.position.clone().add(_scratchSide);
     return {
       canExit: true,
       mode: 'normal',
@@ -219,40 +186,39 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   }
 
   update(ctx: VehicleUpdateContext): void {
-    if (!this.activeVehicleId) return;
+    if (!this.mounted) return;
 
     this.readInputs(ctx.input);
 
-    // Forward intent to the tracked-physics instance. Note the positional
-    // signature: setControls(throttleAxis, turnAxis, brake) — not the object
-    // shape used by GroundVehiclePhysics.
-    if (this.activePhysics) {
-      this.activePhysics.setControls(
-        this.controls.throttleAxis,
-        this.controls.turnAxis,
-        this.controls.brake,
-      );
-    }
+    // Forward intent through the Tank, which delegates straight through
+    // to the TrackedVehiclePhysics layer. Signature is positional:
+    // setControls(throttleAxis, turnAxis, brake).
+    this.model.setControls(
+      this.controls.throttleAxis,
+      this.controls.turnAxis,
+      this.controls.brake,
+    );
 
     // Update HUD widgets for ground vehicles (forward speed readout).
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
-    if (hudSystem && this.activePhysics) {
-      const speed = this.activePhysics.getForwardSpeed();
+    if (hudSystem) {
       // Reuse the elevation slot for ground vehicles as a generic readout —
       // the helicopter HUD uses it for AGL; here, m/s forward speed.
-      hudSystem.updateElevation?.(speed);
+      hudSystem.updateElevation?.(this.model.getForwardSpeed());
     }
   }
 
   /**
-   * Step the physics with terrain. Called by the integration layer once
-   * per frame (or by tests) so the adapter never needs its own
-   * `ITerrainRuntime` reference.
+   * Step the tank's physics with terrain. Called by the integration layer
+   * once per frame (or by tests) so the adapter never needs its own
+   * `ITerrainRuntime` reference. Mirrors Tank.update(dt) but with explicit
+   * terrain wiring — Tank reads its own `terrain` field set via
+   * `setTerrain`, so the adapter just forwards the integration step.
    */
   stepPhysics(deltaTime: number, terrain: ITerrainRuntime | null): void {
-    if (this.activePhysics) {
-      this.activePhysics.update(deltaTime, terrain);
-    }
+    if (!this.mounted) return;
+    this.model.setTerrain(terrain);
+    this.model.update(deltaTime);
   }
 
   resetControlState(): void {
@@ -267,12 +233,9 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     return this.controls;
   }
 
+  /** Returns the bound tank's vehicleId while mounted, else null. */
   getActiveVehicleId(): string | null {
-    return this.activeVehicleId;
-  }
-
-  getActivePhysics(): TrackedVehiclePhysics | null {
-    return this.activePhysics;
+    return this.mounted ? this.model.id : null;
   }
 
   /**
@@ -290,18 +253,13 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     outPosition: THREE.Vector3,
     outLookTarget: THREE.Vector3,
   ): boolean {
-    if (!this.activeVehicleId) return false;
-
-    const pos = new THREE.Vector3();
-    const quat = new THREE.Quaternion();
-    if (!this.model.getVehiclePositionTo(this.activeVehicleId, pos)) return false;
-    if (!this.model.getVehicleQuaternionTo(this.activeVehicleId, quat)) return false;
+    if (!this.mounted) return false;
 
     // TrackedVehiclePhysics uses local -Z as forward; +Z is behind the chassis.
-    const back = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
-    outPosition.copy(pos).addScaledVector(back, this.cameraDistance);
+    const back = new THREE.Vector3(0, 0, 1).applyQuaternion(this.model.quaternion);
+    outPosition.copy(this.model.position).addScaledVector(back, this.cameraDistance);
     outPosition.y += this.cameraHeight;
-    outLookTarget.copy(pos);
+    outLookTarget.copy(this.model.position);
     outLookTarget.y += this.cameraLookHeight;
     return true;
   }
