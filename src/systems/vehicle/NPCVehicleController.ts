@@ -3,6 +3,7 @@ import { Logger } from '../../utils/Logger';
 import { CombatantState } from '../combat/types';
 import type { Combatant } from '../combat/types';
 import type { VehicleManager } from './VehicleManager';
+import type { SeatRole } from './IVehicle';
 
 const BOARD_RANGE = 5; // meters - NPC must be within this to board
 const DISMOUNT_DELAY = 0.5; // seconds of dismount animation
@@ -14,6 +15,15 @@ interface BoardingOrder {
   combatantId: string;
   vehicleId: string;
   elapsed: number;
+  /**
+   * Seat role to claim when the NPC reaches the vehicle. The original
+   * passenger-only contract is preserved by defaulting to 'passenger' at
+   * the `orderBoard()` entry point; the NPC-gunner emplacement-seek path
+   * (`emplacement-npc-gunner`) calls `orderBoard(id, vid, 'gunner')` so
+   * the eventual `enterVehicle()` lands the unit on the spade-grip seat
+   * instead of the ammo-handler seat.
+   */
+  seatRole: SeatRole;
 }
 
 interface DismountOrder {
@@ -43,11 +53,23 @@ export class NPCVehicleController {
 
   /**
    * Order an NPC to move toward a vehicle and board it.
+   *
+   * `seatRole` defaults to `'passenger'` to preserve the original contract
+   * used by air-transport boarding. The emplacement-NPC-gunner path
+   * (`AIStateEngage.handleEngaging` routing `mountEmplacement` intents)
+   * passes `'gunner'` so the unit lands on the spade-grip seat rather
+   * than the ammo-handler seat — and the free-seat check below honors the
+   * requested role so an emplacement with the gunner seat occupied (but
+   * the passenger seat free) correctly rejects a `'gunner'` boarding.
+   *
+   * The state transition into `BOARDING` happens here so the caller does
+   * NOT pre-set `combatant.state` or `combatant.vehicleId` — `vehicleId`
+   * is reserved for the `IN_VEHICLE` transition inside `updateBoarding()`.
    */
-  orderBoard(combatantId: string, vehicleId: string): boolean {
+  orderBoard(combatantId: string, vehicleId: string, seatRole: SeatRole = 'passenger'): boolean {
     if (!this.vehicleManager) return false;
     const vehicle = this.vehicleManager.getVehicle(vehicleId);
-    if (!vehicle || !vehicle.hasFreeSeats('passenger')) return false;
+    if (!vehicle || !vehicle.hasFreeSeats(seatRole)) return false;
 
     const combatant = this.getCombatant(combatantId);
     if (!combatant) return false;
@@ -57,7 +79,7 @@ export class NPCVehicleController {
     combatant.state = CombatantState.BOARDING;
     combatant.destinationPoint = vehicle.getPosition().clone();
 
-    this.boardingOrders.push({ combatantId, vehicleId, elapsed: 0 });
+    this.boardingOrders.push({ combatantId, vehicleId, elapsed: 0, seatRole });
     return true;
   }
 
@@ -145,8 +167,9 @@ export class NPCVehicleController {
       }
 
       const vehicle = this.vehicleManager?.getVehicle(order.vehicleId);
-      if (!vehicle || !vehicle.hasFreeSeats()) {
-        // Vehicle gone or full - cancel boarding
+      if (!vehicle || !vehicle.hasFreeSeats(order.seatRole)) {
+        // Vehicle gone or the requested seat-role was claimed by another
+        // unit while this NPC was en route - cancel boarding.
         combatant.state = CombatantState.PATROLLING;
         this.boardingOrders.splice(i, 1);
         continue;
@@ -158,8 +181,9 @@ export class NPCVehicleController {
       const dist = _diff.length();
 
       if (dist < BOARD_RANGE) {
-        // Board the vehicle
-        const seatIndex = vehicle.enterVehicle(order.combatantId, 'passenger');
+        // Board the vehicle in the originally requested seat role (gunner
+        // for emplacement-seek; passenger for the legacy transport path).
+        const seatIndex = vehicle.enterVehicle(order.combatantId, order.seatRole);
         if (seatIndex !== null) {
           combatant.state = CombatantState.IN_VEHICLE;
           combatant.vehicleId = order.vehicleId;

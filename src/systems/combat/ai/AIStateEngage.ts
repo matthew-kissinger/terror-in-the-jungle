@@ -11,7 +11,9 @@ import {
   buildEmplacementContext,
   INpcEmplacementQuery,
   INpcEmplacementWeapon,
+  INpcVehicleBoarding,
   EmplacementMountTracker,
+  EmplacementCandidateCache,
 } from './EmplacementSeekHelper'
 
 const _toTarget = new THREE.Vector3()
@@ -162,16 +164,28 @@ export class AIStateEngage {
   // Optional emplacement query. When set, the utility-AI pre-pass also
   // populates `ctx.nearbyEmplacement` so the `mountEmplacementAction` can
   // win. Leaving this unset preserves the legacy engage ladder for callers
-  // that don't ship stationary heavy weapons in their scenario.
+  // that don't ship stationary heavy weapons in their scenario. The query
+  // is only consulted when a weapon resolver is ALSO set — the pair is
+  // load-bearing because the helper now hard-fails on unknown vehicleIds.
   private emplacementQuery?: INpcEmplacementQuery
-  // Optional resolver for the live emplacement weapon at a given vehicleId.
-  // The sibling `m2hb-weapon-integration` task will provide this once the
-  // M2HBEmplacement weapon ships; until then the helper falls back to a
-  // synthetic cone (see EmplacementSeekHelper.buildEmplacementContext).
+  // Resolver for the live emplacement weapon at a given vehicleId. The
+  // live M2HB landed on master at 0732beaa; the production wire-up uses
+  // `NpcM2HBAdapter` to build this. Tests pass a fake. Required when
+  // `emplacementQuery` is set (see EmplacementSeekHelper hard-fail note).
   private resolveEmplacementWeapon?: (vehicleId: string) => INpcEmplacementWeapon | null
+  // Boarding controller. When set, a winning `mountEmplacement` intent
+  // routes through `orderBoard(id, vid, 'gunner')` instead of pre-setting
+  // state directly — the controller drives the BOARDING -> IN_VEHICLE
+  // transition itself via its per-frame loop, preserving the seat-claim
+  // and free-seat-by-role invariants. Leaving this unset disables the
+  // mount path entirely (intent is dropped on the floor).
+  private npcVehicleBoarding?: INpcVehicleBoarding
   // Per-combatant mount-lifecycle tracker. Owned here so the WeakMap stays
   // in sync with the AIStateEngage instance lifetime.
   private readonly emplacementMountTracker = new EmplacementMountTracker()
+  // Per-combatant TTL cache for buildEmplacementContext results. Keeps the
+  // O(N_vehicles) live scan off the per-tick combat hot path (B2 fix).
+  private readonly emplacementCandidateCache = new EmplacementCandidateCache()
   // Scratch UtilityContext reused across every handleEngaging() call. The
   // scorer reads fields synchronously and does not retain references, so a
   // single instance is safe. Writable fields are reassigned per tick below;
@@ -270,15 +284,29 @@ export class AIStateEngage {
   }
 
   /**
-   * Opt-in resolver for the live emplacement weapon. The sibling
-   * `m2hb-weapon-integration` task supplies this once `M2HBEmplacement`
-   * ships; until then the helper falls back to a synthetic cone aimed at
-   * the threat. Pass `undefined` to disable.
+   * Resolver for the live emplacement weapon. Required whenever
+   * `setEmplacementQuery` is also set — `EmplacementSeekHelper`
+   * hard-fails on a candidate the resolver doesn't recognise (a
+   * registered vehicle without a matching M2HB binding is a wiring
+   * contract violation). Production callers obtain the resolver from
+   * `NpcM2HBAdapter`; tests pass a fake. Pass `undefined` to disable.
    */
   setEmplacementWeaponResolver(
     resolver: ((vehicleId: string) => INpcEmplacementWeapon | null) | undefined
   ): void {
     this.resolveEmplacementWeapon = resolver
+  }
+
+  /**
+   * Boarding controller. When set, a winning `mountEmplacement` intent
+   * is routed through `orderBoard(id, vid, 'gunner')` — the controller
+   * owns the BOARDING -> IN_VEHICLE state transition. Leaving this
+   * unset silently drops the mount intent (the unit stays in the
+   * normal engage ladder), which preserves the legacy behaviour for
+   * test/composer paths that don't yet wire boarding.
+   */
+  setNpcVehicleBoarding(boarding: INpcVehicleBoarding | undefined): void {
+    this.npcVehicleBoarding = boarding
   }
 
   /**
@@ -288,6 +316,16 @@ export class AIStateEngage {
    */
   getEmplacementMountTracker(): EmplacementMountTracker {
     return this.emplacementMountTracker
+  }
+
+  /**
+   * Per-combatant candidate cache. Exposed so tests can assert call counts
+   * (B2 hot-path budget) and so the integration layer can `invalidate()`
+   * on mount / death — the cache holds string keys so dead-NPC entries
+   * would otherwise linger until the TTL expires.
+   */
+  getEmplacementCandidateCache(): EmplacementCandidateCache {
+    return this.emplacementCandidateCache
   }
 
   getCloseEngagementTelemetry(): CloseEngagementTelemetry {
@@ -467,22 +505,38 @@ export class AIStateEngage {
           // below already handles the "stay put and fire" behavior.)
         }
         if (intent && intent.kind === 'mountEmplacement') {
-          // The unit yields the engage ladder and routes to BOARDING via
-          // the existing seat-occupant pipeline. The integration layer
-          // (NPCVehicleController.orderBoard, called by the dispatch on
-          // the next tick once we've set BOARDING) handles the actual
-          // seat-claim + position snap. We only need to mark the state
-          // transition + destination here. Reset the mount tracker so the
-          // stale-target dismount window starts fresh on mount.
-          combatant.state = CombatantState.BOARDING
-          // The vehicleId on the combatant is the canonical handle the
-          // integration layer reads; set it now so NPCVehicleController's
-          // current-vehicle resolution finds the right candidate.
-          combatant.vehicleId = intent.vehicleId
-          combatant.inCover = false
-          combatant.isFlankingMove = false
-          this.emplacementMountTracker.reset(combatant)
-          return
+          // Route through NPCVehicleController.orderBoard for the gunner
+          // seat. The controller owns the BOARDING -> IN_VEHICLE
+          // transition: it sets state=BOARDING on enqueue here, then
+          // calls vehicle.enterVehicle(id, 'gunner') from its per-frame
+          // updateBoarding() once the unit is within BOARD_RANGE, at
+          // which point combatant.vehicleId and combatant.state are
+          // updated. We MUST NOT pre-set combatant.vehicleId — the
+          // controller rejects orderBoard() for combatants whose
+          // vehicleId is already set, which was the original deadlock.
+          //
+          // The order may be rejected (vehicle gone, gunner seat taken
+          // by another NPC between the score and the apply tick) — in
+          // that case the unit stays in ENGAGING and the legacy ladder
+          // runs next. Invalidate the cache on a successful order so a
+          // mounted gunner is not re-considered as a candidate before
+          // the TTL expires.
+          if (this.npcVehicleBoarding) {
+            const accepted = this.npcVehicleBoarding.orderBoard(
+              combatant.id,
+              intent.vehicleId,
+              'gunner'
+            )
+            if (accepted) {
+              combatant.inCover = false
+              combatant.isFlankingMove = false
+              this.emplacementMountTracker.reset(combatant)
+              this.emplacementCandidateCache.invalidate(combatant.id)
+              return
+            }
+          }
+          // Boarding controller absent or rejected the order: fall
+          // through to the normal engage ladder this tick.
         }
       }
 
@@ -674,22 +728,29 @@ export class AIStateEngage {
     ctx.squadCohesion = undefined
     ctx.coverQualityHere = undefined
     ctx.objectiveProximity = undefined
-    // Populate nearby-emplacement when a vehicle query is wired. The helper
-    // is allocation-frugal but does scan candidates in the radius; gating
-    // on `emplacementQuery` keeps scenarios without stationary weapons free
-    // of the per-tick scan. The weapon resolver runs lazily — only after a
-    // candidate is found — so callers without a live M2HBEmplacement wired
-    // up get the synthetic-cone fallback for free.
-    if (this.emplacementQuery) {
-      ctx.nearbyEmplacement =
-        buildEmplacementContext(
-          combatant,
-          targetPos,
-          this.emplacementQuery,
-          this.resolveEmplacementWeapon
-            ? (vehicleId: string) => this.resolveEmplacementWeapon!(vehicleId) ?? undefined
-            : undefined
-        ) ?? undefined
+    // Populate nearby-emplacement when BOTH a vehicle query and a weapon
+    // resolver are wired. The helper is allocation-frugal but does scan
+    // candidates in the radius and the synthetic-cone fallback was
+    // removed — a candidate without a registered weapon binding throws
+    // (see EmplacementSeekHelper.buildEmplacementContext). The query is
+    // a live O(N_vehicles) scan, so we cache the result per-combatant
+    // for 500 ms (B2 fix) — emplacements are static and the apply()
+    // step revalidates the in-cone gate.
+    if (this.emplacementQuery && this.resolveEmplacementWeapon) {
+      const query = this.emplacementQuery
+      const resolver = this.resolveEmplacementWeapon
+      const cached = this.emplacementCandidateCache.getOrCompute(
+        combatant.id,
+        performance.now(),
+        () =>
+          buildEmplacementContext(
+            combatant,
+            targetPos,
+            query,
+            (vehicleId: string) => resolver(vehicleId) ?? undefined
+          )
+      )
+      ctx.nearbyEmplacement = cached ?? undefined
     } else {
       ctx.nearbyEmplacement = undefined
     }

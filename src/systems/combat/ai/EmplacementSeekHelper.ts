@@ -16,25 +16,23 @@ import {
  * BOARDING, dismount predicates) lives in AIStateEngage so the rest of the
  * engage ladder stays untouched.
  *
- * Sibling-PR coordination — STUB-THEN-SWAP:
- * The real M2HB weapon (`src/systems/combat/weapons/M2HBEmplacement.ts`) is
- * being built in PARALLEL by the `m2hb-weapon-integration` task. To unblock
- * THIS task without depending on that file landing first we define local
- * structural duck-types (`INpcEmplacementWeapon`, `INpcEmplacementVehicle`,
- * `INpcEmplacementQuery`) and consume the live weapon through an injected
- * resolver. After the sibling task merges the orchestrator will dispatch a
- * swap step to replace the stub imports with the real `M2HBEmplacement`.
- * Search this file for `// STUB: will swap` to find the swap points.
+ * Live M2HB integration (post-master-0732beaa):
+ * The real M2HB weapon (`src/systems/combat/weapons/M2HBEmplacement.ts`)
+ * landed on master alongside this helper. We keep the structural
+ * duck-types (`INpcEmplacementWeapon`, `INpcEmplacementVehicle`,
+ * `INpcEmplacementQuery`) here so the combat-AI tree stays decoupled
+ * from the vehicle/weapon trees — production wires the live system via
+ * `NpcM2HBAdapter` (in `src/systems/combat/weapons/NpcM2HBAdapter.ts`),
+ * which yields the resolver this helper consumes. Tests pass one-line
+ * fakes (see `EmplacementSeekHelper.test.ts`).
  */
 
-// ── Sibling-PR stub contracts ──────────────────────────────────────────────
+// ── Duck-typed contracts ──────────────────────────────────────────────────
 
 /**
- * STUB: will swap for real `M2HBEmplacement` import after
- * `m2hb-weapon-integration` merges.
- *
- * Minimal structural surface the NPC gunner needs from a crew-served weapon.
- * The real M2HB will expose at least these three.
+ * Minimal structural surface the NPC gunner needs from a crew-served
+ * weapon. Satisfied by the live M2HB adapter (`NpcM2HBAdapter`) and by
+ * test fakes; both expose `tryFire`, `isEmpty`, and `getFieldOfFireCone`.
  */
 export interface INpcEmplacementWeapon {
   /**
@@ -82,10 +80,42 @@ export interface INpcEmplacementQuery {
   ): readonly INpcEmplacementVehicle[]
 }
 
+/**
+ * Minimal seat-occupant boarding surface AIStateEngage needs from
+ * `NPCVehicleController`. Defined locally so the combat-AI tree avoids a
+ * direct import of the vehicle controller (which would couple combat to
+ * the vehicle subsystem in a way that the test harness has to mock).
+ *
+ * The real controller's `orderBoard()` returns true iff the order was
+ * accepted (vehicle exists, requested seat free, combatant alive and not
+ * already mounted) and from that point drives the BOARDING -> IN_VEHICLE
+ * transition itself via its per-frame `updateBoarding()` loop.
+ */
+export interface INpcVehicleBoarding {
+  orderBoard(combatantId: string, vehicleId: string, seatRole: 'gunner'): boolean
+}
+
 // ── Tuning constants ──────────────────────────────────────────────────────
 
 /** Max range an NPC will divert to mount an emplacement (cycle brief). */
 export const MOUNT_SEEK_RADIUS_M = 8
+
+/**
+ * Per-combatant `buildEmplacementContext()` cache lifetime.
+ *
+ * Rationale: emplacements are static (the IVehicle position never moves)
+ * and the candidate set rarely changes between ticks. With 4 factions
+ * opted into utility-AI (`FactionCombatTuning.ts`) and every engaging NPC
+ * at distance >= 15 m running `buildUtilityContext()` per tick, the live
+ * `VehicleManager.getVehiclesInRadius()` scan is O(N_vehicles) on the
+ * combat hot path and competes with the same budget DEFEKT-3 was opened
+ * to address. Caching at 500 ms is short enough that staleness during the
+ * window is harmless — the apply() step revalidates via the in-cone gate,
+ * and a freshly-spawned (or freshly-occupied) emplacement will be picked
+ * up on the next refresh. Wall-clock (`performance.now()`) is used so the
+ * cache is not affected by `TimeScale` pauses or scaled deltaTime.
+ */
+export const EMPLACEMENT_CANDIDATE_CACHE_TTL_MS = 500
 
 /**
  * Default field-of-fire cone half-angle (radians) used by the synthetic-cone
@@ -228,6 +258,10 @@ export class EmplacementMountTracker {
    * Condition (2) only fires after `markThreatInCone` has been called at
    * least once during the current mount session — a freshly-mounted gunner
    * isn't dismounted just because no cone sample has been recorded yet.
+   *
+   * `nowMs` MUST be `performance.now()` (wall clock), NOT a scaled
+   * `deltaTime` accumulator. The 5 s stale-target window is doctrine-tied
+   * and should not stretch when the player engages bullet-time / pause.
    */
   shouldDismount(
     combatant: Combatant,
@@ -244,47 +278,110 @@ export class EmplacementMountTracker {
 
 // ── Context-builder ───────────────────────────────────────────────────────
 
-// Scratch direction reused inside the synthetic-cone fallback so the
-// builder stays allocation-free per tick when no live weapon is wired.
-const _coneDirScratch = new THREE.Vector3()
-
 /**
  * Convenience builder used by AIStateEngage (and tests) to populate
  * `UtilityContext.nearbyEmplacement`. Returns the scorer fields or null
  * when no in-range candidate exists.
  *
- * `weaponResolver` is optional — when absent (or returning undefined for
- * the chosen candidate) the cone is synthesized aiming from the emplacement
- * at the threat. STUB: this fallback exists only while the M2HB weapon is
- * authored in parallel; the swap will plug the live resolver in and the
- * cone will reflect actual barrel pose.
+ * `weaponResolver` is now REQUIRED: the synthetic-cone fallback that
+ * shipped while the real M2HB weapon was authored in parallel has been
+ * removed. The live `M2HBEmplacementSystem` (master 0732beaa) exposes the
+ * barrel-pose cone via the per-vehicle weapon binding, and an emplacement
+ * the resolver doesn't recognise is a wiring bug, not silently-OK input —
+ * the builder throws so the misconfiguration surfaces in dev/test rather
+ * than the unit silently failing to score above zero.
+ *
+ * Production callers obtain the resolver from the M2HB adapter
+ * (`NpcM2HBAdapter` in `src/systems/combat/weapons/`); tests pass a
+ * one-line fake (see `EmplacementSeekHelper.test.ts`).
  */
 export function buildEmplacementContext(
   combatant: Combatant,
   threatPosition: THREE.Vector3,
   query: INpcEmplacementQuery,
-  weaponResolver?: (vehicleId: string) => INpcEmplacementWeapon | undefined,
+  weaponResolver: (vehicleId: string) => INpcEmplacementWeapon | undefined,
   radius: number = MOUNT_SEEK_RADIUS_M
 ): { vehicleId: string; distance: number; threatInCone: boolean } | null {
   const candidate = findMountableEmplacement(combatant, combatant.position, query, radius)
   if (!candidate) return null
-  const weapon = weaponResolver ? weaponResolver(candidate.vehicleId) : undefined
-  let cone: { origin: THREE.Vector3; direction: THREE.Vector3; halfAngleRad: number }
-  if (weapon) {
-    cone = weapon.getFieldOfFireCone()
-  } else {
-    // STUB: will swap once the real M2HB exposes getFieldOfFireCone()
-    // through the live weapon resolver. Direction is normalized from
-    // emplacement to target (assumes the gunner can swing onto the threat).
-    const origin = candidate.getPosition()
-    _coneDirScratch.subVectors(threatPosition, origin)
-    if (_coneDirScratch.lengthSq() > 1e-6) _coneDirScratch.normalize()
-    else _coneDirScratch.set(0, 0, 1)
-    cone = { origin, direction: _coneDirScratch, halfAngleRad: DEFAULT_FOV_HALF_ANGLE_RAD }
+  const weapon = weaponResolver(candidate.vehicleId)
+  if (!weapon) {
+    // Hard fail: a candidate the query returned but the resolver doesn't
+    // know about is a wiring contract violation (vehicle registered in
+    // VehicleManager without a corresponding M2HB binding). Throwing here
+    // forces the misconfiguration to surface immediately instead of
+    // silently degrading to "never mounts".
+    throw new Error(
+      `EmplacementSeekHelper: no weapon binding for emplacement '${candidate.vehicleId}' (resolver returned undefined). ` +
+      `Check that NpcM2HBAdapter / M2HBEmplacementSystem registered the binding when the vehicle was spawned.`
+    )
   }
+  const cone = weapon.getFieldOfFireCone()
   return {
     vehicleId: candidate.vehicleId,
     distance: Math.sqrt(candidate.getPosition().distanceToSquared(combatant.position)),
     threatInCone: enemyInFieldOfFire(cone, threatPosition),
+  }
+}
+
+// ── Per-combatant candidate cache ─────────────────────────────────────────
+
+interface CachedEmplacementCandidate {
+  result: { vehicleId: string; distance: number; threatInCone: boolean } | null
+  expiresAtMs: number
+}
+
+/**
+ * Per-combatant TTL cache for `buildEmplacementContext()` results. Owned
+ * by `AIStateEngage` (one instance per AIStateEngage). Combatants are
+ * looked up by id (string) so re-entry on the same tick (different
+ * AIStateEngage call sites) reuses the prior result.
+ *
+ * Cache invalidates after `EMPLACEMENT_CANDIDATE_CACHE_TTL_MS` of wall
+ * clock time — see the TTL constant for the rationale (emplacements are
+ * static; the apply() step revalidates the in-cone gate; staleness inside
+ * the window does not affect correctness, only the latency of "this new
+ * emplacement just spawned" recognition).
+ *
+ * Tests can call `clear()` between scenarios to defeat the cache for
+ * deterministic assertions about call counts.
+ */
+export class EmplacementCandidateCache {
+  private readonly byCombatantId = new Map<string, CachedEmplacementCandidate>()
+
+  /**
+   * Return the cached result if non-expired, otherwise call `compute()`
+   * (the live scan) and memoize. `nowMs` should be `performance.now()` —
+   * the cache uses wall clock so `TimeScale` pauses do not artificially
+   * extend the cache lifetime.
+   */
+  getOrCompute(
+    combatantId: string,
+    nowMs: number,
+    compute: () => { vehicleId: string; distance: number; threatInCone: boolean } | null
+  ): { vehicleId: string; distance: number; threatInCone: boolean } | null {
+    const cached = this.byCombatantId.get(combatantId)
+    if (cached && cached.expiresAtMs > nowMs) return cached.result
+    const result = compute()
+    this.byCombatantId.set(combatantId, {
+      result,
+      expiresAtMs: nowMs + EMPLACEMENT_CANDIDATE_CACHE_TTL_MS,
+    })
+    return result
+  }
+
+  /** Drop the entry for a combatant — e.g. on death or on mount. */
+  invalidate(combatantId: string): void {
+    this.byCombatantId.delete(combatantId)
+  }
+
+  /** Drop every cached entry. Used by tests for deterministic call counts. */
+  clear(): void {
+    this.byCombatantId.clear()
+  }
+
+  /** Cache occupancy — exposed for the per-tick scan-budget tests. */
+  size(): number {
+    return this.byCombatantId.size
   }
 }

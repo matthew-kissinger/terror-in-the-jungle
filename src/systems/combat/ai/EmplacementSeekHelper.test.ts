@@ -209,11 +209,44 @@ describe('enemyInFieldOfFire (cone test)', () => {
 })
 
 describe('buildEmplacementContext: candidate selection', () => {
+  // Resolver that returns a cone aimed at the threat from the emplacement
+  // position — equivalent to the old synthetic fallback, but expressed
+  // explicitly per the new "resolver required" contract.
+  function makeAimAtThreatResolver(
+    threatPos: THREE.Vector3,
+  ): (vehicleId: string) => INpcEmplacementWeapon | undefined {
+    return (_vehicleId: string) => {
+      const dir = new THREE.Vector3()
+      return {
+        tryFire: () => true,
+        isEmpty: () => false,
+        getFieldOfFireCone: () => {
+          // Direction is computed lazily so a single resolver works for
+          // every candidate (the helper passes the candidate's vehicleId
+          // but the cone needs the candidate's POSITION; we approximate
+          // by aiming from origin toward the threat — fine because each
+          // candidate's emplacement sits at the same position in tests).
+          dir.copy(threatPos).normalize()
+          return {
+            origin: new THREE.Vector3(0, 0, 0),
+            direction: dir,
+            halfAngleRad: Math.PI / 6,
+          }
+        },
+      }
+    }
+  }
+
   it('returns null when no friendly-faction emplacement is in range', () => {
     const self = makeCombatant('c', Faction.US, new THREE.Vector3())
     const enemyEmp = makeFakeEmplacement('nva_1', new THREE.Vector3(2, 0, 0), Faction.NVA)
     const query = makeFakeQuery([enemyEmp])
-    const ctx = buildEmplacementContext(self, new THREE.Vector3(20, 0, 0), query)
+    const ctx = buildEmplacementContext(
+      self,
+      new THREE.Vector3(20, 0, 0),
+      query,
+      makeAimAtThreatResolver(new THREE.Vector3(20, 0, 0)),
+    )
     expect(ctx).toBeNull()
   })
 
@@ -221,7 +254,12 @@ describe('buildEmplacementContext: candidate selection', () => {
     const self = makeCombatant('c', Faction.US, new THREE.Vector3())
     const occupied = makeFakeEmplacement('us_1', new THREE.Vector3(2, 0, 0), Faction.US, { gunnerOccupied: true })
     const query = makeFakeQuery([occupied])
-    const ctx = buildEmplacementContext(self, new THREE.Vector3(20, 0, 0), query)
+    const ctx = buildEmplacementContext(
+      self,
+      new THREE.Vector3(20, 0, 0),
+      query,
+      makeAimAtThreatResolver(new THREE.Vector3(20, 0, 0)),
+    )
     expect(ctx).toBeNull()
   })
 
@@ -230,18 +268,13 @@ describe('buildEmplacementContext: candidate selection', () => {
     const closer = makeFakeEmplacement('us_close', new THREE.Vector3(2, 0, 0), Faction.US)
     const farther = makeFakeEmplacement('us_far', new THREE.Vector3(6, 0, 0), Faction.US)
     const query = makeFakeQuery([farther, closer])
-    const ctx = buildEmplacementContext(self, new THREE.Vector3(20, 0, 0), query)
+    const ctx = buildEmplacementContext(
+      self,
+      new THREE.Vector3(20, 0, 0),
+      query,
+      makeAimAtThreatResolver(new THREE.Vector3(20, 0, 0)),
+    )
     expect(ctx?.vehicleId).toBe('us_close')
-  })
-
-  it('marks threatInCone=true when the synthetic cone (no live weapon) aims at the threat', () => {
-    const self = makeCombatant('c', Faction.US, new THREE.Vector3())
-    const emp = makeFakeEmplacement('us_1', new THREE.Vector3(2, 0, 0), Faction.US)
-    const query = makeFakeQuery([emp])
-    // No weaponResolver supplied -> synthetic cone is aimed at the threat,
-    // which trivially contains the threat (this is the documented fallback).
-    const ctx = buildEmplacementContext(self, new THREE.Vector3(20, 0, 0), query)
-    expect(ctx?.threatInCone).toBe(true)
   })
 
   it('uses a live weapon cone when the resolver returns one (threat outside cone -> false)', () => {
@@ -258,16 +291,39 @@ describe('buildEmplacementContext: candidate selection', () => {
       self,
       new THREE.Vector3(-20, 0, 0),
       query,
-      () => weapon
+      () => weapon,
     )
     expect(ctx?.threatInCone).toBe(false)
+  })
+
+  it('throws when the resolver returns undefined for a known candidate', () => {
+    // Hard-fail behaviour replaces the old synthetic-cone fallback. A
+    // candidate the query returns but the resolver doesn't recognise is
+    // a wiring contract violation (the per-vehicle M2HB binding is
+    // missing) — must not silently degrade to "never mounts".
+    const self = makeCombatant('c', Faction.US, new THREE.Vector3())
+    const emp = makeFakeEmplacement('us_1', new THREE.Vector3(2, 0, 0), Faction.US)
+    const query = makeFakeQuery([emp])
+    expect(() =>
+      buildEmplacementContext(
+        self,
+        new THREE.Vector3(20, 0, 0),
+        query,
+        () => undefined,
+      ),
+    ).toThrow(/no weapon binding/)
   })
 
   it('accepts an ARVN candidate for a US combatant (alliance, not faction)', () => {
     const self = makeCombatant('c', Faction.US, new THREE.Vector3())
     const arvn = makeFakeEmplacement('arvn_1', new THREE.Vector3(2, 0, 0), Faction.ARVN)
     const query = makeFakeQuery([arvn])
-    const ctx = buildEmplacementContext(self, new THREE.Vector3(20, 0, 0), query)
+    const ctx = buildEmplacementContext(
+      self,
+      new THREE.Vector3(20, 0, 0),
+      query,
+      makeAimAtThreatResolver(new THREE.Vector3(20, 0, 0)),
+    )
     expect(ctx?.vehicleId).toBe('arvn_1')
   })
 })
@@ -279,7 +335,60 @@ describe('AIStateEngage: routing the mountEmplacement intent', () => {
   let findNearestCover: ReturnType<typeof vi.fn>
   let countNearbyEnemies: ReturnType<typeof vi.fn>
   let isCoverFlanked: ReturnType<typeof vi.fn>
+  let boardingCalls: Array<{ combatantId: string; vehicleId: string; seatRole: string }>
   const playerPosition = new THREE.Vector3(0, 0, 0)
+  /**
+   * Fake boarding controller that records every orderBoard call and (by
+   * default) advances the combatant straight to IN_VEHICLE so tests can
+   * assert the end-to-end transition. Pass `accept: false` to model a
+   * rejected order (seat taken, vehicle gone).
+   */
+  function makeFakeBoarding(
+    combatants: Map<string, Combatant>,
+    options: { accept?: boolean } = {},
+  ) {
+    const accept = options.accept ?? true
+    return {
+      orderBoard(combatantId: string, vehicleId: string, seatRole: 'gunner'): boolean {
+        boardingCalls.push({ combatantId, vehicleId, seatRole })
+        if (!accept) return false
+        const c = combatants.get(combatantId)
+        if (c) {
+          // Mirror NPCVehicleController.orderBoard's BOARDING transition,
+          // then complete to IN_VEHICLE on the same tick for compactness
+          // — the real controller takes one or more frames depending on
+          // distance (the end-to-end L3 test in the integration suite
+          // exercises the multi-frame path).
+          c.state = CombatantState.IN_VEHICLE
+          c.vehicleId = vehicleId
+        }
+        return true
+      },
+    }
+  }
+
+  // Resolver that returns a cone aimed from the emplacement toward the
+  // threat so the in-cone gate trivially passes. Replaces the old
+  // synthetic-cone fallback now that buildEmplacementContext requires a
+  // resolver. The emplacement position is passed in so the cone origin
+  // is correct for the cone math.
+  function makeAimAtThreatResolver(
+    empPos: THREE.Vector3,
+    threatPos: THREE.Vector3,
+  ): (vehicleId: string) => INpcEmplacementWeapon | null {
+    const dir = threatPos.clone().sub(empPos)
+    if (dir.lengthSq() > 1e-6) dir.normalize()
+    else dir.set(0, 0, 1)
+    return (_vehicleId: string) => ({
+      tryFire: () => true,
+      isEmpty: () => false,
+      getFieldOfFireCone: () => ({
+        origin: empPos.clone(),
+        direction: dir.clone(),
+        halfAngleRad: Math.PI / 6,
+      }),
+    })
+  }
 
   beforeEach(() => {
     engage = new AIStateEngage()
@@ -288,6 +397,7 @@ describe('AIStateEngage: routing the mountEmplacement intent', () => {
     findNearestCover = vi.fn(() => null)
     countNearbyEnemies = vi.fn(() => 0)
     isCoverFlanked = vi.fn(() => false)
+    boardingCalls = []
   })
 
   function tick(combatant: Combatant) {
@@ -305,21 +415,32 @@ describe('AIStateEngage: routing the mountEmplacement intent', () => {
     )
   }
 
-  it('transitions the unit to BOARDING and assigns vehicleId when an emplacement is in range with enemy in cone', () => {
+  it('routes the mount intent through orderBoard(gunner) when an emplacement is in range with enemy in cone', () => {
     // US combatant at origin; friendly M2HB 3 m away; enemy 20 m down-X.
-    // The synthetic cone (no live weapon) is aimed at the threat from the
-    // emplacement, so the in-cone gate trivially passes.
+    // Resolver supplies a cone aimed at the threat.
     const us = makeCombatant('us', Faction.US, new THREE.Vector3())
     const target = makeCombatant('target', Faction.NVA, new THREE.Vector3(20, 0, 0))
     us.target = target
 
-    const emp = makeFakeEmplacement('m2hb_close', new THREE.Vector3(3, 0, 0), Faction.US)
+    const empPos = new THREE.Vector3(3, 0, 0)
+    const emp = makeFakeEmplacement('m2hb_close', empPos, Faction.US)
+    const combatants = new Map<string, Combatant>([['us', us]])
     engage.setUtilityScorer(new UtilityScorer([mountEmplacementAction]))
     engage.setEmplacementQuery(makeFakeQuery([emp]))
+    engage.setEmplacementWeaponResolver(makeAimAtThreatResolver(empPos, new THREE.Vector3(20, 0, 0)))
+    engage.setNpcVehicleBoarding(makeFakeBoarding(combatants))
 
     tick(us)
 
-    expect(us.state).toBe(CombatantState.BOARDING)
+    // orderBoard was called with the gunner seat (B1 fix).
+    expect(boardingCalls).toHaveLength(1)
+    expect(boardingCalls[0]).toEqual({
+      combatantId: 'us',
+      vehicleId: 'm2hb_close',
+      seatRole: 'gunner',
+    })
+    // The fake boarding controller advanced us to IN_VEHICLE on accept.
+    expect(us.state).toBe(CombatantState.IN_VEHICLE)
     expect(us.vehicleId).toBe('m2hb_close')
     expect(us.inCover).toBe(false)
   })
@@ -340,11 +461,13 @@ describe('AIStateEngage: routing the mountEmplacement intent', () => {
     engage.setUtilityScorer(new UtilityScorer([mountEmplacementAction]))
     engage.setEmplacementQuery(makeFakeQuery([emp]))
     engage.setEmplacementWeaponResolver(() => makeFakeWeapon(cone))
+    engage.setNpcVehicleBoarding(makeFakeBoarding(new Map([['us', us]])))
 
     tick(us)
 
     expect(us.state).toBe(CombatantState.ENGAGING)
     expect(us.vehicleId).toBeUndefined()
+    expect(boardingCalls).toHaveLength(0)
   })
 
   it('does NOT mount when no friendly emplacement is in range', () => {
@@ -355,11 +478,13 @@ describe('AIStateEngage: routing the mountEmplacement intent', () => {
     us.target = target
 
     engage.setUtilityScorer(new UtilityScorer([mountEmplacementAction]))
+    engage.setNpcVehicleBoarding(makeFakeBoarding(new Map([['us', us]])))
 
     tick(us)
 
     expect(us.state).toBe(CombatantState.ENGAGING)
     expect(us.vehicleId).toBeUndefined()
+    expect(boardingCalls).toHaveLength(0)
   })
 
   it('falls through when the candidate is enemy-faction', () => {
@@ -370,31 +495,64 @@ describe('AIStateEngage: routing the mountEmplacement intent', () => {
     const enemyEmp = makeFakeEmplacement('nva_emp', new THREE.Vector3(3, 0, 0), Faction.NVA)
     engage.setUtilityScorer(new UtilityScorer([mountEmplacementAction]))
     engage.setEmplacementQuery(makeFakeQuery([enemyEmp]))
+    engage.setEmplacementWeaponResolver(makeAimAtThreatResolver(
+      new THREE.Vector3(3, 0, 0),
+      new THREE.Vector3(20, 0, 0),
+    ))
+    engage.setNpcVehicleBoarding(makeFakeBoarding(new Map([['us', us]])))
 
     tick(us)
 
     expect(us.state).toBe(CombatantState.ENGAGING)
     expect(us.vehicleId).toBeUndefined()
+    expect(boardingCalls).toHaveLength(0)
   })
 
   it('integration: mountEmplacement wins over fireAndFade when both gates pass', () => {
     // Both actions are eligible (cover available behind, emplacement in range
     // with threat in cone). The faction weights amplify US mountEmplacement;
-    // we assert the OUTCOME (state == BOARDING), not the score.
+    // we assert the OUTCOME (orderBoard was called for the gunner seat),
+    // not the raw score.
     const us = makeCombatant('us', Faction.US, new THREE.Vector3())
     const target = makeCombatant('target', Faction.NVA, new THREE.Vector3(20, 0, 0))
     us.target = target
     us.panicLevel = 0.9
     us.lastHitTime = Date.now() - 500
 
-    const emp = makeFakeEmplacement('m2hb_x', new THREE.Vector3(3, 0, 0), Faction.US)
+    const empPos = new THREE.Vector3(3, 0, 0)
+    const emp = makeFakeEmplacement('m2hb_x', empPos, Faction.US)
     engage.setUtilityScorer(new UtilityScorer(DEFAULT_UTILITY_ACTIONS))
     engage.setCoverBearingProbe(() => true)
     engage.setEmplacementQuery(makeFakeQuery([emp]))
+    engage.setEmplacementWeaponResolver(makeAimAtThreatResolver(empPos, new THREE.Vector3(20, 0, 0)))
+    engage.setNpcVehicleBoarding(makeFakeBoarding(new Map([['us', us]])))
 
     tick(us)
 
-    expect(us.state).toBe(CombatantState.BOARDING)
+    expect(boardingCalls).toHaveLength(1)
+    expect(boardingCalls[0].seatRole).toBe('gunner')
+  })
+
+  it('stays in ENGAGING when the boarding controller rejects the order (seat just taken)', () => {
+    // Models the race where another NPC mounted between the score and apply
+    // ticks. The intent is dropped silently and the unit re-enters the
+    // legacy ladder; vehicleId stays undefined so no deadlock at BOARDING.
+    const us = makeCombatant('us', Faction.US, new THREE.Vector3())
+    const target = makeCombatant('target', Faction.NVA, new THREE.Vector3(20, 0, 0))
+    us.target = target
+
+    const empPos = new THREE.Vector3(3, 0, 0)
+    const emp = makeFakeEmplacement('m2hb_close', empPos, Faction.US)
+    engage.setUtilityScorer(new UtilityScorer([mountEmplacementAction]))
+    engage.setEmplacementQuery(makeFakeQuery([emp]))
+    engage.setEmplacementWeaponResolver(makeAimAtThreatResolver(empPos, new THREE.Vector3(20, 0, 0)))
+    engage.setNpcVehicleBoarding(makeFakeBoarding(new Map([['us', us]]), { accept: false }))
+
+    tick(us)
+
+    expect(boardingCalls).toHaveLength(1)
+    expect(us.state).toBe(CombatantState.ENGAGING)
+    expect(us.vehicleId).toBeUndefined()
   })
 })
 
