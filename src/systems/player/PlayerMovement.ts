@@ -29,6 +29,7 @@ import {
   type LocomotionMode,
   type WaterSampler,
 } from './PlayerSwimState';
+import type { WadeSplashEffect } from '../effects/WadeSplashEffect';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -126,6 +127,7 @@ export class PlayerMovement {
   };
   private onDrowningDamage?: (damage: number) => void;
   private onSurfaceGasp?: () => void;
+  private wadeSplashEffect: WadeSplashEffect | null = null;
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
@@ -155,6 +157,17 @@ export class PlayerMovement {
 
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void {
     this.footstepAudioSystem = footstepAudioSystem;
+  }
+
+  /**
+   * Bind the wade-splash particle pool. The effect spawns a small water
+   * puff on foot impact when the foot sample reports `immersion01 ∈
+   * [0.1, 0.5]` (shallow wade). Pass `null` to disable. The effect owns
+   * its own immersion sampler — `PlayerMovement` only tells it when a
+   * foot is grounded + moving so it can advance the stride accumulator.
+   */
+  setWadeSplashEffect(effect: WadeSplashEffect | null): void {
+    this.wadeSplashEffect = effect;
   }
 
   /**
@@ -599,6 +612,17 @@ export class PlayerMovement {
         this.playerState.isRunning,
         deltaTime,
         isMoving && this.playerState.isGrounded
+      );
+    }
+
+    // Wade splash: spawn a foot-impact puff while walking through shallow
+    // water. Mirrors the footstep audio guard so splashes do not fire while
+    // in a vehicle, mid-jump, or swimming (swim path returns earlier).
+    if (this.wadeSplashEffect && !this.playerState.isInHelicopter && !this.playerState.isInFixedWing) {
+      const isMoving = moveVector.length() > 0;
+      this.wadeSplashEffect.tryEmitForPlayer(
+        this.playerState.position,
+        isMoving && this.playerState.isGrounded,
       );
     }
   }
