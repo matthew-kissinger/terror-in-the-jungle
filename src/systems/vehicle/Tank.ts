@@ -5,6 +5,7 @@ import {
   TrackedVehiclePhysics,
   type TrackedVehiclePhysicsConfig,
 } from './TrackedVehiclePhysics';
+import { TankTurret, type TankTurretConfig } from './TankTurret';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 /**
@@ -57,6 +58,7 @@ export class Tank implements IVehicle {
   private readonly velocity = new THREE.Vector3();
   private destroyed = false;
   private readonly physics: TrackedVehiclePhysics;
+  private readonly turret: TankTurret;
   private terrain: ITerrainRuntime | null = null;
 
   constructor(
@@ -65,6 +67,7 @@ export class Tank implements IVehicle {
     faction: Faction = Faction.US,
     seats: VehicleSeat[] = DEFAULT_M48_SEATS,
     physicsConfig?: Partial<TrackedVehiclePhysicsConfig>,
+    turretConfig?: Partial<TankTurretConfig>,
   ) {
     this.faction = faction;
     this.seats = seats.map((seat) => ({
@@ -81,6 +84,12 @@ export class Tank implements IVehicle {
     if (object.quaternion) {
       this.physics.setQuaternion(object.quaternion);
     }
+
+    // Mount the turret rig as a child of the chassis object. The turret
+    // owns its yaw + pitch nodes and parents them under `object`; cycle
+    // #9 sibling tasks (gunner adapter, cannon projectile) read its
+    // world-space barrel transform.
+    this.turret = new TankTurret(this.object, turretConfig);
   }
 
   // ---------- ITankModel structural shape (sibling-PR coordination) ----------
@@ -116,6 +125,11 @@ export class Tank implements IVehicle {
 
   getPhysics(): TrackedVehiclePhysics {
     return this.physics;
+  }
+
+  /** Turret rig (cycle #9 R1). Owned by this Tank; mounted on the chassis. */
+  getTurret(): TankTurret {
+    return this.turret;
   }
 
   /**
@@ -219,11 +233,16 @@ export class Tank implements IVehicle {
     this.object.position.copy(state.position);
     this.object.quaternion.copy(state.quaternion);
     this.velocity.copy(state.velocity);
+
+    // Slew the turret after the chassis pose is written so the turret's
+    // world transform composes correctly off the new chassis matrix.
+    this.turret.update(dt);
   }
 
   dispose(): void {
     this.destroyed = true;
     this.physics.dispose();
+    this.turret.dispose();
     this.object.removeFromParent();
   }
 }
