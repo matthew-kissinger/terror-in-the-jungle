@@ -438,7 +438,7 @@ export class CombatantAI {
                 target,
                 ctx.cannon,
                 ctx.solver,
-                Date.now(),
+                performance.now(),
               )
             })
           }

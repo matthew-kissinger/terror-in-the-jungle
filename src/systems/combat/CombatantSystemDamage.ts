@@ -7,6 +7,7 @@ import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
+import { GameEventBus } from '../../core/GameEventBus';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
@@ -116,8 +117,8 @@ export class CombatantSystemDamage {
           _deathDir.y = 0; // Keep horizontal
           combatant.deathDirection = _deathDir.clone();
 
-          if (this.ticketSystem && typeof (this.ticketSystem as any).onCombatantKilled === 'function') {
-            (this.ticketSystem as any).onCombatantKilled(combatant.faction);
+          if (this.ticketSystem) {
+            this.ticketSystem.onCombatantDeath(combatant.faction);
           }
 
           // Queue respawn for player squad members
@@ -146,31 +147,54 @@ export class CombatantSystemDamage {
     });
 
     const hudSystem = this.hudSystem;
-    // Report kills to kill feed. Player-thrown explosions (grenades etc)
-    // come in as attackerId === 'PLAYER'; the historical code path used
-    // that shape unconditionally. NPC-attributed explosions (tank cannon,
-    // mortar, etc) carry the attacker's combatant id — resolve their
-    // faction + name lookup so the feed shows the real killer.
-    if (hudSystem && killedCombatants.length > 0) {
-      const attackerCombatant = attackerId && attackerId !== 'PLAYER'
+    // Report kills to kill feed + emit `npc_killed` so subscribers
+    // (objectives, telemetry, audio) react identically to rifle-pipeline
+    // deaths. Player-thrown explosions come in as `attackerId === 'PLAYER'`
+    // — the player's separate `player_kill` emission covers those, so we
+    // skip `npc_killed` for the proxy to avoid double-counting (mirrors
+    // CombatantDamage.handleDeath). NPC-attributed explosions (tank
+    // cannon, mortar) carry the attacker's combatant id so we resolve
+    // their faction for both surfaces.
+    if (killedCombatants.length > 0) {
+      const attackerIsPlayerProxy = attackerId === 'PLAYER';
+      const attackerCombatant = attackerId && !attackerIsPlayerProxy
         ? this.combatants.get(attackerId)
         : undefined;
-      const killerId = attackerId === 'PLAYER'
+      const killerName = attackerIsPlayerProxy
         ? 'PLAYER'
         : (attackerCombatant
           ? `${attackerCombatant.faction}-${attackerCombatant.id.slice(-4)}`
           : 'PLAYER');
-      const killerFaction = attackerCombatant?.faction ?? Faction.US;
+      // Resolve killer faction: attacker combatant if known, else fall back
+      // to the explicit shooterFaction param (tank cannon supplies this),
+      // else default to US to preserve the historical kill-feed behaviour.
+      const killerFaction = attackerCombatant?.faction
+        ?? shooterFaction
+        ?? Faction.US;
+
       killedCombatants.forEach(victim => {
         const victimName = `${victim.faction}-${victim.id.slice(-4)}`;
-        hudSystem.addKillToFeed(
-          killerId,
-          killerFaction,
-          victimName,
-          victim.faction,
-          false, // Explosions don't have headshot tracking
-          weaponType
-        );
+        if (hudSystem) {
+          hudSystem.addKillToFeed(
+            killerName,
+            killerFaction,
+            victimName,
+            victim.faction,
+            false, // Explosions don't have headshot tracking
+            weaponType
+          );
+        }
+        if (!attackerIsPlayerProxy) {
+          GameEventBus.emit('npc_killed', {
+            killerId: attackerCombatant?.id ?? attackerId ?? 'unknown',
+            victimId: victim.id,
+            killerFaction,
+            victimFaction: victim.faction,
+            isHeadshot: false,
+            weaponType,
+            position: victim.position,
+          });
+        }
       });
     }
 
