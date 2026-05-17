@@ -50,6 +50,7 @@ function createRefs() {
       setPlayerSuppressionSystem: vi.fn(),
       setTerrainSystem: vi.fn(),
       setTicketSystem: vi.fn(),
+      setWaterSampler: vi.fn(),
       setZoneManager: vi.fn(),
       influenceMap: undefined,
     },
@@ -117,6 +118,7 @@ function createRefs() {
       setFogTintIntentReceiver: vi.fn(),
     },
     waterSystem: {
+      sampleWaterInteraction: vi.fn(() => ({ immersion01: 0 })),
       setAtmosphereSystem: vi.fn(),
       setWeatherSystem: vi.fn(),
     },
@@ -242,5 +244,26 @@ describe('GameplayRuntimeComposer', () => {
     expect(refs.atmosphereSystem.setRenderer).toHaveBeenCalledWith(renderer);
     expect(refs.atmosphereSystem.setShadowFollowTarget).toHaveBeenCalledWith(camera);
     expect(refs.waterSystem.setAtmosphereSystem).toHaveBeenCalledWith(refs.atmosphereSystem);
+  });
+
+  it('wires an NPC water-sampler adapter so wade behavior reaches CombatantSystem at runtime', () => {
+    const { refs, renderer } = createRefs();
+    refs.waterSystem.sampleWaterInteraction = vi.fn(() => ({ immersion01: 0.75 }));
+
+    wireGameplayRuntime(createGameplayRuntimeGroups(refs), {
+      camera: new THREE.PerspectiveCamera(),
+      renderer,
+    });
+
+    expect(refs.combatantSystem.setWaterSampler).toHaveBeenCalledTimes(1);
+    const sampler = refs.combatantSystem.setWaterSampler.mock.calls[0][0];
+    expect(typeof sampler.sampleImmersion01).toBe('function');
+
+    // The adapter must read from the WaterSystem on each call so any change
+    // (hydrology bake landing, global plane toggle) is observed without
+    // re-wiring.
+    const immersion = sampler.sampleImmersion01(10, 20, 5);
+    expect(immersion).toBe(0.75);
+    expect(refs.waterSystem.sampleWaterInteraction).toHaveBeenCalledTimes(1);
   });
 });
