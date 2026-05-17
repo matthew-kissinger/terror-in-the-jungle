@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-17 (post `cycle-vekhikl-3-tank-chassis` close; VEKHIKL-3 chassis half code-complete-partial; campaign pointer advanced to cycle #9 `cycle-vekhikl-4-tank-turret-and-cannon`)
+Last verified: 2026-05-17 (post `cycle-vekhikl-4-tank-turret-and-cannon` close; VEKHIKL-3 + VEKHIKL-4 closed; campaign pointer advanced to cycle #10 `cycle-voda-3-watercraft`)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,8 +46,8 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active cycle (2026-05-17):** `cycle-vekhikl-4-tank-turret-and-cannon`
-is position #9 in a **13-cycle autonomous-chain campaign** (expanded
+**Active cycle (2026-05-17):** `cycle-voda-3-watercraft`
+is position #10 in a **13-cycle autonomous-chain campaign** (expanded
 from 12 on 2026-05-17 via insertion of `cycle-sun-and-atmosphere-overhaul`
 at position #12). Owner originally launched the campaign on 2026-05-16
 with `auto-advance: yes` in
@@ -58,7 +58,7 @@ VODA, VEKHIKL, and DEFEKT directives plus the two post-WebGPU
 investigation fix cycles (mobile + sky) plus the sun-and-atmosphere
 overhaul (new TSL fragment-shader sky + AGX tonemap + night-red fix).
 
-The queue (cycles #1-#8 closed; #9 active):
+The queue (cycles #1-#9 closed; #10 active):
 1. `cycle-sky-visual-restore` → KB-SKY-BLAND fix. **DONE** (`fd646aeb`).
 2. `cycle-mobile-webgl2-fallback-fix` → KB-MOBILE-WEBGPU fix (real-device validation = merge gate). **DONE** (`7931d179`).
 3. `cycle-konveyer-11-spatial-grid-compute` → DEFEKT-3 (cover spatial grid). **DONE** (`b86cf027`).
@@ -67,8 +67,8 @@ The queue (cycles #1-#8 closed; #9 active):
 6. `cycle-vekhikl-2-stationary-weapons` → M2HB emplacements. **DONE** (`78c9c55a`).
 7. `cycle-voda-2-buoyancy-swimming-wading` → physics + player swim. **DONE** (cycle close-commit; 7 PRs #239-#245; VODA-2 code-complete, owner playtest deferred).
 8. `cycle-vekhikl-3-tank-chassis` → M48 skid-steer chassis. **DONE** (cycle close-commit; 5 PRs #246-#250; VEKHIKL-3 chassis half code-complete, owner playtest deferred; turret + cannon awaits cycle #9).
-9. `cycle-vekhikl-4-tank-turret-and-cannon` → turret + cannon + Rust→WASM ballistic-solver pilot. **ACTIVE**.
-10. `cycle-voda-3-watercraft` → Sampan + PBR.
+9. `cycle-vekhikl-4-tank-turret-and-cannon` → turret + cannon + Rust→WASM ballistic-solver pilot. **DONE** (cycle close-commit; 8 PRs #251-#258; VEKHIKL-3+4 code-complete, owner playtest deferred).
+10. `cycle-voda-3-watercraft` → Sampan + PBR. **ACTIVE**.
 11. `cycle-defekt-4-npc-route-quality` → slope-stuck + crowd + solver fixes.
 12. `cycle-sun-and-atmosphere-overhaul` → TSL fragment-shader Preetham + AGX tonemap + night-red fix + sun-disc tuning (NEW 2026-05-17 per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md`; closes HosekWilkieSkyBackend half of `konveyer-large-file-splits`).
 13. `cycle-stabilizat-1-baselines-refresh` → perf baseline refresh (now runs last so it captures cycle #12's +0.3-1.0ms p99 sky cost as the new normal).

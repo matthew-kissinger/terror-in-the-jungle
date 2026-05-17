@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-17 (autonomous chain advanced past cycle #8; cycles #1-#8 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a / cycle #7 close-commit / cycle #8 close-commit; current cycle = cycle-vekhikl-4-tank-turret-and-cannon)
+Last verified: 2026-05-17 (autonomous chain advanced past cycle #9; cycles #1-#9 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a / cycle #7 close-commit / cycle #8 close-commit / cycle #9 close-commit; current cycle = cycle-voda-3-watercraft)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,118 +154,110 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-vekhikl-4-tank-turret-and-cannon
+## Current cycle: cycle-voda-3-watercraft
 
-**Cycle ID:** `cycle-vekhikl-4-tank-turret-and-cannon`
-**Brief:** [docs/tasks/cycle-vekhikl-4-tank-turret-and-cannon.md](tasks/cycle-vekhikl-4-tank-turret-and-cannon.md)
+**Cycle ID:** `cycle-voda-3-watercraft`
+**Brief:** [docs/tasks/cycle-voda-3-watercraft.md](tasks/cycle-voda-3-watercraft.md)
 **Skip-confirm:** no (owner playtest required per the brief; auto-deferred
 to PLAYTEST_PENDING.md under autonomous-loop posture)
-**Concurrency cap:** 5
+**Concurrency cap:** 4
 
-User-observable gap closed: turret + cannon + AI gunner + damage states
-half of VEKHIKL-3 (closes `VEKHIKL-3+4` — both directives close with
-this cycle). Add the three primitives the tank needs to be a combat
-platform: (1) turret rig with capped yaw + barrel pitch slew, (2)
-gunner seat reusing the helicopter seat-swap pattern, (3) ballistic
-main-cannon projectile (`TankCannonProjectile`) with gravity-only arc
-+ arming distance + damage-type resolution, plus HP bands with three
-visual transitions + turret-jammed + engine-killed substates (tracks-blown
-already in cycle #8). Named **Rust → WASM pilot** for the ballistic
-solver per `BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` + `TANK_SYSTEMS_2026-05-13.md`.
-Blocked on cycle #8 (turret mounts onto the chassis surface shipped there).
+User-observable gap closed: VODA-3 watercraft. Ship two watercraft —
+the Sampan (light Vietnamese river boat) and the PBR (Patrol Boat
+River, US riverine craft with twin M2HB mounts) — both drivable and
+mountable. Both float on the buoyancy contract from VODA-2 and mount
+via the seat/adapter surface from VEKHIKL-1. Plus: river crossings,
+bridge interactions, and beach/bank docking. Blocked on cycle #4
+(VEKHIKL-1 seat/adapter pattern) and cycle #7 (VODA-2 buoyancy
+contract) — both `done` in the queue.
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap |
 |-------|------------------|-----|
-| 1 | `tank-turret-rig`, `tank-cannon-projectile`, `tank-gunner-seat-adapter` | 3 |
-| 2 | `tank-ballistic-solver-wasm-pilot`, `tank-damage-states`, `tank-ai-gunner-route`, `vekhikl-4-playtest-evidence` | 4 |
+| 1 | `watercraft-physics-core`, `watercraft-physics-tests` | 2 |
+| 2 | `sampan-integration`, `pbr-integration`, `voda-3-playtest-evidence` | 3 |
 
 ### Dependencies
 
-- R1: tank-turret-rig (~300 LOC new `TankTurret.ts` — yaw 360° with
-  slew cap ~30°/s, barrel pitch clamped [-10°, +20°] with slew cap
-  ~8°/s, parent-child mount onto `Tank.ts` chassis), tank-cannon-projectile
-  (~350 LOC new `src/systems/combat/projectiles/TankCannonProjectile.ts`
-  per `MortarBallistics.ts:22` template — gravity-only arc, ~400 m/s
-  muzzle velocity, 20 m arming distance, AP damage-type resolution,
-  reuses `ExplosionEffectsPool`), tank-gunner-seat-adapter (~250 LOC
-  new `TankGunnerAdapter.ts` — `IVehicle.enterVehicle(_, 'gunner')`,
-  mouse drives yaw + pitch, LMB fires cannon, first-person gunner
-  sight, pilot↔gunner seat swap).
-- R2: tank-ballistic-solver-wasm-pilot (new Rust crate
-  `rust/tank-ballistic-solver/` with `solveTrajectory()`; `wasm-pack
-  build --target web`; TS wrapper at
-  `src/systems/combat/projectiles/TankBallisticSolver.ts`; pilot
-  success bar = ≥3x speedup vs TS baseline or revert + document),
-  tank-damage-states (HP bands 100/66/33/0 with smoke wisps → plume
-  → on-fire → wreck; random hit < 33% HP triggers tracks-blown /
-  turret-jammed / engine-killed substates; combinations possible),
-  tank-ai-gunner-route (extend `CombatantAI.acquireTarget()` with
-  tank-mounted branch; NPC computes lead via solver, slews turret,
-  fires when within cone tolerance; MVP gunner-only on parked tanks),
-  vekhikl-4-playtest-evidence (owner playtest; auto-deferred under
-  autonomous-loop).
+- R1: watercraft-physics-core (~450 LOC new
+  `src/systems/vehicle/WatercraftPhysics.ts` — generalizes
+  `GroundVehiclePhysics` chassis-conform with water-surface conform
+  via the buoyancy contract; state = position/velocity/angular
+  velocity/quaternion/enginePower + hull-sample-points; per-hull-sample
+  buoyancy via `BuoyancyForce.applyAtPoint`; throttle drives forward
+  force; rudder drives yaw; quadratic drag; river current force from
+  VODA-2 flow contract; wave heave + pitch from per-sample y-variance;
+  beach/bank docking via `ITerrainRuntime.getHeightAt` grounded-state
+  transition), watercraft-physics-tests (7 L2 behavior tests: neutral
+  buoyancy float, throttle forward, rudder yaw, current drift on
+  stationary hull, beach grounded transition, bridge clearance,
+  wave heave oscillation).
+- R2: sampan-integration (~250 LOC new
+  `src/systems/vehicle/Sampan.ts` — 6m × 2m, low power, single
+  seat; `WatercraftPlayerAdapter` with W/S throttle, A/D rudder, F
+  enter/exit; third-person follow camera; one spawn on A Shau
+  riverbank), pbr-integration (~300 LOC new
+  `src/systems/vehicle/PBR.ts` — 9.4m, twin water-jet drive, two
+  M2HB twin mounts forward + aft, driver + two gunners + one
+  passenger; reuses WatercraftPlayerAdapter for driver seat; M2HB
+  twins via cycle #6 emplacement pattern parented to PBR hull; one
+  spawn at US river outpost on A Shau), voda-3-playtest-evidence
+  (owner playtest; auto-deferred under autonomous-loop).
 
 ### Reviewer policy
 
-- `combat-reviewer` pre-merge gate for tank-cannon-projectile,
-  tank-ballistic-solver-wasm-pilot, tank-damage-states,
-  tank-ai-gunner-route.
-- Orchestrator reviews other PRs (tank-turret-rig,
-  tank-gunner-seat-adapter, vekhikl-4-playtest-evidence).
+- `combat-reviewer` pre-merge gate for `pbr-integration` (M2HB
+  twin-mount wiring through combat-system path).
+- Orchestrator reviews other PRs (watercraft-physics-core,
+  watercraft-physics-tests, sampan-integration,
+  voda-3-playtest-evidence).
 
 ### Hard stops (cycle-specific)
 
-- WASM pilot adds ≥600 KB gzipped to the bundle AND fails the ≥3x
-  speedup bar → halt and surface (the size cost crosses the
-  Rapier-evaluation gate per `ENGINE_TRAJECTORY` addendum and
-  needs owner direction).
+- Cycles #4 OR #7 not closed → halt at dispatch (both verified
+  `done` at this dispatch).
+- Any new external physics library → halt (hand-rolled buoyancy
+  from VODA-2 carries to watercraft).
 - Owner playtest rejects twice → halt (deferred under
   autonomous-loop; orchestrator proceeds, owner sweeps later).
-- Any new external physics library → halt.
 - Standard: fence change, worktree isolation failure,
   twice-rejected reviewer.
-- Campaign-wide: perf regression > 5% p99 on `combat120` (deferred to
-  cycle #13 baseline refresh until that lands; tank combat budgeted
-  per memo).
+- Campaign-wide: perf regression > 5% p99 on `combat120` (deferred
+  to cycle #13 baseline refresh until that lands).
 
 ### Success criteria
 
-See [docs/tasks/cycle-vekhikl-4-tank-turret-and-cannon.md](tasks/cycle-vekhikl-4-tank-turret-and-cannon.md)
+See [docs/tasks/cycle-voda-3-watercraft.md](tasks/cycle-voda-3-watercraft.md)
 "Acceptance Criteria (cycle close)":
 - All R1 + R2 task PRs merged.
-- M48 fully combat-capable: drive, gun, take damage, observe
-  transitions.
+- Sampan + PBR drivable on A Shau river.
+- M2HB twin on PBR firable + gunnable from passenger seat.
 - Owner playtest sign-off (deferred under autonomous-loop).
-- WASM pilot outcome documented (kept or reverted).
 - No fence change.
-- No perf regression > 5% p99 on `combat120` (tank combat is more
-  expensive than rifle combat; budget pre-allocated per memo).
-- `VEKHIKL-3` + `VEKHIKL-4` directives in `docs/DIRECTIVES.md`
-  move to Closed with this cycle's close-commit SHA.
+- No external physics library.
+- No perf regression > 5% p99 on `combat120`.
+- `VODA-3` directive in `docs/DIRECTIVES.md` moves to Closed.
 
 ### Out of scope
 
-T-54, M113, other tracked vehicles (future cycles). Coax MG on the
-turret (future cycle — adapt M2HB-style emplacement pattern from
-cycle #6). Multi-shell types (HEAT, HE, smoke — single AP at MVP).
-Vehicle-vs-vehicle penetration tables (single AP, single damage
-curve). Multiplayer / lobby (out of scope across the campaign).
-Touching `src/systems/terrain/**`, `src/systems/navigation/**`.
-Fenced-interface touches.
+Other watercraft (Junk Force boats, etc.) — future cycles.
+Watercraft damage states beyond destroyed/intact — future. Submerged
+operation / submarines — far future. Multiplayer boat sharing —
+out of scope across campaign. Touching `src/systems/terrain/**`,
+`src/systems/navigation/**`. Fenced-interface touches.
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #9** in the 13-cycle queue at
+This cycle is **position #10** in the 13-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 `Auto-advance: yes` + `posture: autonomous-loop` are set there. When
 this cycle closes:
 
-1. Mark cycle #9 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-voda-3-watercraft`).
+1. Mark cycle #10 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-defekt-4-npc-route-quality`).
 3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-voda-3-watercraft`.
+4. Commit with `docs(campaign): advance to cycle-defekt-4-npc-route-quality`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
@@ -273,48 +265,38 @@ mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-vekhikl-3-tank-chassis` closed on 2026-05-17 at the cycle
-close-commit (last R2 merge at `a11c1ddf` swapping the
-TankPlayerAdapter stub for the real Tank instance). **5 PRs across 2
-rounds**. R1: [#246](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/246)
-`6ab6ade5` tracked-vehicle-physics-core (new
-`src/systems/vehicle/TrackedVehiclePhysics.ts` per
-`docs/rearch/TANK_SYSTEMS_2026-05-13.md`; skid-steer kinematics with
-W/S throttle + A/D turn → independent L/R track speeds via
-`smoothControlInputs` lerp; four-corner ground conform through
-`ITerrainRuntime`; tracks-blown state zeroes forward velocity
-contribution; fixed 1/60 s step via `FixedStepRunner`; reuses the
-`GroundVehiclePhysics` integration loop shape with skid-steer
-substituted for Ackermann),
-[#247](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/247)
-`23410433` tracked-vehicle-physics-tests (7 L2 behavior tests: pure
-forward throttle → forward motion + zero yaw, pure turn axis →
-in-place pivot, throttle+turn combined, chassis tilt on slope
-per-corner ground sample, tracks-blown immobilization, slope-stall
-scaling, input smoothing → no instantaneous jump). R2:
-[#249](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/249)
-`bc4ec779` vekhikl-3-playtest-evidence (`docs/playtests/cycle-vekhikl-3-tank-chassis.md`
-+ capture script + PLAYTEST_PENDING row, deferred under
-autonomous-loop posture),
-[#250](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/250)
-`a08b878a` m48-tank-integration (new `src/systems/vehicle/Tank.ts`
-IVehicle impl + M48 chassis config; `VehicleManager` registration;
-M48 spawns on Open Frontier US base + A Shau valley road;
-`update(dt)` delegates to `TrackedVehiclePhysics.step()`),
-[#248](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/248)
-`a11c1ddf` tank-player-adapter (new
-`src/systems/vehicle/TankPlayerAdapter.ts` mirroring
-`GroundVehiclePlayerAdapter` with skid-steer input model: W/S
-throttle, A/D turn — NOT steer angle; F enter/exit; player seat =
-`'pilot'`; external orbit-tank third-person camera for the
-chassis-only slice; turret first-person comes in cycle #9; stub
-swapped to real Tank instance at merge commit `a11c1ddf`). VEKHIKL-3
-in DIRECTIVES.md moved Open → code-complete-partial (chassis half
-complete; turret + cannon awaits this cycle for full close). No
-fence change (`VehicleCategory` / `SeatRole` reused per
-INTERFACE_FENCE.md). No external physics library added (per
-ENGINE_TRAJECTORY addendum + TANK_SYSTEMS §"Decision"). No
-carry-over delta (VEKHIKL-3 lives in DIRECTIVES.md, not CARRY_OVERS
+`cycle-vekhikl-4-tank-turret-and-cannon` closed on 2026-05-17 at the
+cycle close-commit (last R3 merge at `0791d73e` swapping the
+TankAIGunnerRoute stub for the real TankBallisticSolver). **8 PRs
+across R1/R2/R3**. R1: [#252](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/252)
+`2026-05-17T17:24:26Z` TankTurret rig (capped yaw 30°/s + pitch
+8°/s + envelope [-10°, +20°]), [#253](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/253)
+`18:15:46Z` TankCannonProjectile (400 m/s muzzle + 20m arming +
+AP/HEAT/HE resolver + 9m blast radius + gravity-only arc per
+MortarBallistics template), [#251](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/251)
+`18:28:27Z` TankGunnerAdapter (post-merge stub→real swap on top).
+R2: [#254](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/254)
+`20:04:21Z` tank-ballistic-solver-wasm-pilot —
+**KEEP-INCONCLUSIVE** (1.79x speedup vs ≥3x bar AND 8.92 KB gz vs
+600 KB ceiling — under both gates so kept per brief rule; first
+pilot data, not codebase commitment), [#256](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/256)
+`20:04:32Z` Tank HP bands + substates (100/66/33/0% bands +
+tracks-blown / turret-jammed / engine-killed substates +
+damage-type-biased weight table), [#257](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/257)
+`21:47:09Z` NPC tank gunner with lead prediction + kill-attribution
+refactor (closes #253 reviewer kill-attribution gap via shared
+`CombatantSystemDamage.applyExplosionDamage` handler;
+CHANGES-REQUESTED → APPROVE iteration), [#255](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/255)
+`21:49:42Z` vekhikl-4-playtest-evidence (deferred under
+autonomous-loop). R3: [#258](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/258)
+`22:28:22Z` tank-ai-gunner-route-swap-real-solver (post-merge
+stub→real `TankBallisticSolver` swap once #254 + #257 both on
+master). VEKHIKL-3 + VEKHIKL-4 in DIRECTIVES.md moved Open →
+Closed (full M48 combat platform). combat120 p99 intra-cycle +1.4%
+(49.00 → 49.70 ms across cycle's PRs) — well under 5% gate. No
+fence change. No external physics library added. Owner walk-through
+deferred under autonomous-loop posture. No carry-over delta
+(VEKHIKL-3 + VEKHIKL-4 live in DIRECTIVES.md, not CARRY_OVERS
 Active). Carry-over count: 8 → 8.
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
