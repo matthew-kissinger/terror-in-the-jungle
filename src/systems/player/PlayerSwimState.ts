@@ -104,6 +104,12 @@ export const SWIM_VERTICAL_SPEED = 3.5;
 export const SWIM_DRAG_PER_SECOND = 2.2;
 /** Immersion01 (head-sample) below which we treat as wade. */
 export const WADE_IMMERSION_THRESHOLD = 0.05;
+/**
+ * Per-second blend toward the head-sample's river flow vector while swimming.
+ * Below SWIM_DRAG_PER_SECOND so the swimmer can still steer cross-current
+ * while drifting downstream (target: visible meters of drift across A Shau).
+ */
+export const SWIM_FLOW_PUSH_PER_SECOND = 1.2;
 
 // ---------- Scratch vectors (module-local; no per-call allocation) ----------
 
@@ -111,6 +117,7 @@ const _camForward = new THREE.Vector3();
 const _camRight = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const _velocity = new THREE.Vector3();
+const _zeroFlow = new THREE.Vector3();
 
 // ---------- State holder ----------
 
@@ -118,6 +125,7 @@ export class PlayerSwimState {
   private mode: LocomotionMode = 'walk';
   private wasSubmerged = false;
   private readonly velocity = _velocity;
+  private readonly lastFlow = new THREE.Vector3();
   private breath: BreathState = {
     remainingSeconds: BREATH_CAPACITY_SECONDS,
     capacitySeconds: BREATH_CAPACITY_SECONDS,
@@ -197,6 +205,11 @@ export class PlayerSwimState {
       }
     }
 
+    // Capture the latest flow vector so `computeSwimVelocity` can push the
+    // player downstream without a second sample. Zero outside hydrology
+    // channels; the swim integrator treats (0,0,0) as a no-op.
+    this.lastFlow.copy(sample.flowVelocity ?? _zeroFlow);
+
     this.mode = nextMode;
     this.wasSubmerged = submerged;
     return { mode: nextMode, surfacedThisStep, headSample: sample };
@@ -237,6 +250,15 @@ export class PlayerSwimState {
     this.velocity.z = currentVelocity.z * dragFactor + this.velocity.z * (1 - dragFactor);
     // Vertical: blend toward intent so divers don't snap.
     this.velocity.y = currentVelocity.y * dragFactor + this.velocity.y * (1 - dragFactor);
+
+    // River flow push: in a hydrology channel the head sample carries a
+    // non-zero `flowVelocity`. Blend horizontal velocity toward flow at a
+    // gentle rate so swimming perpendicular to the current visibly drifts
+    // downstream without making the player feel pinned. Outside channels
+    // `lastFlow` is (0,0,0), so this reduces to a no-op.
+    const flowBlend = 1 - Math.exp(-SWIM_FLOW_PUSH_PER_SECOND * ctx.dt);
+    this.velocity.x += (this.lastFlow.x - this.velocity.x) * flowBlend;
+    this.velocity.z += (this.lastFlow.z - this.velocity.z) * flowBlend;
     return this.velocity;
   }
 
@@ -251,6 +273,7 @@ export class PlayerSwimState {
     this.breath.gasping = false;
     this.stamina.remaining01 = 1;
     this.gaspEdgeArmed = false;
+    this.lastFlow.set(0, 0, 0);
   }
 
   /**

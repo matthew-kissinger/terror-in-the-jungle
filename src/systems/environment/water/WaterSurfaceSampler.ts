@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { HydrologyWaterQuerySegment } from './HydrologyRiverSurface';
 
 export type WaterSurfaceSource = 'none' | 'global' | 'hydrology';
@@ -10,6 +10,19 @@ export interface WaterInteractionSample {
   submerged: boolean;
   immersion01: number;
   buoyancyScalar: number;
+  /**
+   * Horizontal flow velocity in m/s (world XZ; `y` is always 0). Populated
+   * from the matched hydrology segment when the sample falls inside a
+   * channel; (0,0,0) for the global plane and dry samples. Consumers:
+   * `BuoyancyForce` blends body horizontal velocity toward this; the
+   * player swim path adds it as a downstream push.
+   *
+   * The vector is freshly allocated per call so callers may keep, copy,
+   * or mutate it without affecting subsequent samples. Cost: one Vector3
+   * per query, bounded by the few-dozen-bodies-per-frame regime this
+   * targets.
+   */
+  flowVelocity: THREE.Vector3;
 }
 
 export interface WaterInteractionOptions {
@@ -81,6 +94,7 @@ export class WaterSurfaceSampler {
         submerged: false,
         immersion01: 0,
         buoyancyScalar: 0,
+        flowVelocity: new THREE.Vector3(),
       };
     }
 
@@ -89,6 +103,13 @@ export class WaterSurfaceSampler {
       ? Math.max(0.01, options.immersionDepthMeters ?? DEFAULT_WATER_IMMERSION_DEPTH_METERS)
       : DEFAULT_WATER_IMMERSION_DEPTH_METERS;
     const immersion01 = clamp(depth / immersionDepthMeters, 0, 1);
+    // Flow vector freshly allocated per call so consumers can copy or
+    // mutate without aliasing. Zero outside hydrology channels.
+    const flowVelocity = new THREE.Vector3();
+    if (surface.flowSegment) {
+      const seg = surface.flowSegment;
+      flowVelocity.set(seg.flowX * seg.flowSpeedMetersPerSecond, 0, seg.flowZ * seg.flowSpeedMetersPerSecond);
+    }
     return {
       source: surface.source,
       surfaceY: surface.surfaceY,
@@ -96,32 +117,44 @@ export class WaterSurfaceSampler {
       submerged: depth > 0,
       immersion01,
       buoyancyScalar: immersion01,
+      flowVelocity,
     };
   }
 
   /**
    * Resolve which water source (hydrology, global plane, or none) covers
    * the given XZ. Hydrology takes priority so per-river surfaces override
-   * the global plane in the overlap.
+   * the global plane in the overlap. When a hydrology segment matches,
+   * its reference is returned so the sampler can derive flow velocity
+   * from the same segment without a second walk.
    */
-  private resolveWaterSurface(position: THREE.Vector3): { source: WaterSurfaceSource; surfaceY: number | null } {
-    const hydrologySurfaceY = this.sampleHydrology(position.x, position.z);
-    if (hydrologySurfaceY !== null) {
-      return { source: 'hydrology', surfaceY: hydrologySurfaceY };
+  private resolveWaterSurface(position: THREE.Vector3): {
+    source: WaterSurfaceSource;
+    surfaceY: number | null;
+    flowSegment: HydrologyWaterQuerySegment | null;
+  } {
+    const hydrology = this.sampleHydrology(position.x, position.z);
+    if (hydrology !== null) {
+      return { source: 'hydrology', surfaceY: hydrology.surfaceY, flowSegment: hydrology.segment };
     }
-    return this.bindings.isGlobalPlaneActive()
-      ? { source: 'global', surfaceY: this.bindings.globalWaterLevel }
-      : { source: 'none', surfaceY: null };
+    if (this.bindings.isGlobalPlaneActive()) {
+      return { source: 'global', surfaceY: this.bindings.globalWaterLevel, flowSegment: null };
+    }
+    return { source: 'none', surfaceY: null, flowSegment: null };
   }
 
   /**
    * Walk the hydrology river segments and return the surface Y of the
    * nearest covered segment, or null if no segment contains the point
-   * within its half-width.
+   * within its half-width. Returns the matched segment alongside so the
+   * caller can derive flow direction without a second walk.
    */
-  private sampleHydrology(x: number, z: number): number | null {
+  private sampleHydrology(
+    x: number,
+    z: number,
+  ): { surfaceY: number; segment: HydrologyWaterQuerySegment } | null {
     const segments = this.bindings.getHydrologyQuerySegments();
-    let nearest: { distanceSq: number; surfaceY: number } | null = null;
+    let nearest: { distanceSq: number; surfaceY: number; segment: HydrologyWaterQuerySegment } | null = null;
     for (const segment of segments) {
       const dx = segment.endX - segment.startX;
       const dz = segment.endZ - segment.startZ;
@@ -134,10 +167,10 @@ export class WaterSurfaceSampler {
       if (distanceSq > segment.halfWidth ** 2) continue;
       const surfaceY = segment.startSurfaceY + (segment.endSurfaceY - segment.startSurfaceY) * t;
       if (!nearest || distanceSq < nearest.distanceSq) {
-        nearest = { distanceSq, surfaceY };
+        nearest = { distanceSq, surfaceY, segment };
       }
     }
-    return nearest?.surfaceY ?? null;
+    return nearest === null ? null : { surfaceY: nearest.surfaceY, segment: nearest.segment };
   }
 }
 

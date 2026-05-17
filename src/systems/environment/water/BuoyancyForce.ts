@@ -124,9 +124,16 @@ export function applyBuoyancyForce(
     if (k > 0) {
       const verticalDecay = Math.exp(-k * dt);
       const horizontalDecay = Math.exp(-k * cfg.horizontalDragScale * dt);
+      // River flow push: blend horizontal velocity toward the channel's
+      // flow vector at the same rate water drags coasting motion. Net
+      // effect over time: a body floating freely converges to the
+      // segment's flow velocity, scaled by immersion + drag. Outside a
+      // channel `flowVelocity` is (0,0,0) so this reduces to plain drag.
+      const flow = sample.flowVelocity;
+      const blend = 1 - horizontalDecay;
+      body.velocity.x = body.velocity.x * horizontalDecay + flow.x * blend;
+      body.velocity.z = body.velocity.z * horizontalDecay + flow.z * blend;
       body.velocity.y *= verticalDecay;
-      body.velocity.x *= horizontalDecay;
-      body.velocity.z *= horizontalDecay;
     }
   }
 

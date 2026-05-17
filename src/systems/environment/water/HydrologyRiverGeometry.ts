@@ -27,6 +27,15 @@ const HYDROLOGY_RIVER_FOAM_NARROW_WEIGHT = 0.55;
 const HYDROLOGY_RIVER_FOAM_SLOPE_WEIGHT = 0.85;
 const HYDROLOGY_RIVER_FOAM_BANK_FLOOR_FRACTION = 0.25;
 
+// Gameplay flow speeds (m/s) consumed by `WaterSurfaceSampler.sample()` to
+// fill `WaterInteractionSample.flowVelocity`. Headwaters get a small floor
+// so even a tiny stream nudges floating bodies downstream; main channels
+// (accumulation p99) get the max. Mirrors the visual `HYDROLOGY_RIVER_
+// FLOW_SPEED_M_PER_S = 0.45` in feel — gameplay is half a notch faster so
+// the perpendicular swim drift is observable in playtest.
+const HYDROLOGY_RIVER_GAMEPLAY_FLOW_MIN_M_PER_S = 0.15;
+const HYDROLOGY_RIVER_GAMEPLAY_FLOW_MAX_M_PER_S = 0.6;
+
 export interface HydrologyRiverGeometryBuild {
   geometry: THREE.BufferGeometry;
   stats: HydrologyRiverMeshStats;
@@ -151,11 +160,20 @@ export function buildHydrologyRiverGeometry(
 
       segmentCount++;
       totalLengthMeters += length;
+      // Gameplay flow magnitude scales with accumulation factor (bigger
+      // channels = stronger current). The min floor keeps headwaters
+      // pushable even when flowFactor is near zero.
+      const flowSpeedMetersPerSecond =
+        HYDROLOGY_RIVER_GAMEPLAY_FLOW_MIN_M_PER_S
+        + (HYDROLOGY_RIVER_GAMEPLAY_FLOW_MAX_M_PER_S - HYDROLOGY_RIVER_GAMEPLAY_FLOW_MIN_M_PER_S) * flowFactor;
       querySegments.push({
         startX: start.x, startZ: start.z,
         endX: end.x, endZ: end.z,
         startSurfaceY: startY, endSurfaceY: endY,
         halfWidth,
+        flowX,
+        flowZ,
+        flowSpeedMetersPerSecond,
       });
     }
     if (segmentCount >= MAX_HYDROLOGY_RIVER_SEGMENTS) break;
