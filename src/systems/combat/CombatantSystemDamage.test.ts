@@ -6,6 +6,8 @@ import { createTestCombatant } from '../../test-utils';
 import { KillAssistTracker } from './KillAssistTracker';
 import type { SquadManager } from './SquadManager';
 import type { CombatantSpawnManager } from './CombatantSpawnManager';
+import type { TicketSystem } from '../world/TicketSystem';
+import { GameEventBus } from '../../core/GameEventBus';
 
 vi.mock('./KillAssistTracker', () => ({
   KillAssistTracker: {
@@ -20,6 +22,10 @@ describe('CombatantSystemDamage', () => {
 
   beforeEach(() => {
     clearWorldBuilderState();
+    // Drain any cross-test event-bus residue so subscribers in this file
+    // do not see emissions queued by prior tests / files.
+    GameEventBus.flush();
+    GameEventBus.clear();
     combatants = new Map();
     damage = new CombatantSystemDamage(
       combatants,
@@ -31,6 +37,8 @@ describe('CombatantSystemDamage', () => {
 
   afterEach(() => {
     clearWorldBuilderState();
+    GameEventBus.flush();
+    GameEventBus.clear();
   });
 
   it('keeps player-authored explosion damage scaled by distance by default', () => {
@@ -81,6 +89,127 @@ describe('CombatantSystemDamage', () => {
 
     expect(target.health).toBeCloseTo(80);
     expect(target.state).not.toBe(CombatantState.DEAD);
+  });
+
+  describe('kill attribution on tank-cannon lethal impact', () => {
+    it('debits tickets via TicketSystem.onCombatantDeath when an NPC tank cannon kills a combatant', () => {
+      const onCombatantDeath = vi.fn();
+      const ticketSystem = { onCombatantDeath } as unknown as TicketSystem;
+      damage.setTicketSystem(ticketSystem);
+
+      const shooter = createTestCombatant({
+        id: 'shooter-1',
+        faction: Faction.US,
+        position: new THREE.Vector3(50, 0, 0),
+      });
+      combatants.set(shooter.id, shooter);
+
+      const victim = createTestCombatant({
+        id: 'victim-1',
+        faction: Faction.NVA,
+        health: 50, // low enough that the 200-damage profile kills outright
+        position: new THREE.Vector3(0, 0, 0),
+      });
+      combatants.set(victim.id, victim);
+
+      // Tank cannon profile from resolveTankAmmoDamage('AP'): radius 9, maxDamage 200.
+      damage.applyExplosionDamage(
+        new THREE.Vector3(0, 0, 0),
+        9,
+        200,
+        shooter.id,
+        'tank_cannon',
+        Faction.US,
+      );
+
+      expect(victim.state).toBe(CombatantState.DEAD);
+      expect(onCombatantDeath).toHaveBeenCalledTimes(1);
+      expect(onCombatantDeath).toHaveBeenCalledWith(Faction.NVA);
+    });
+
+    it("emits 'npc_killed' on the GameEventBus when a tank cannon kills a combatant", () => {
+      const events: Array<{ killerId: string; victimId: string; killerFaction: Faction; victimFaction: Faction; weaponType?: string }> = [];
+      const unsubscribe = GameEventBus.subscribe('npc_killed', (e) => {
+        events.push({
+          killerId: e.killerId,
+          victimId: e.victimId,
+          killerFaction: e.killerFaction,
+          victimFaction: e.victimFaction,
+          weaponType: e.weaponType,
+        });
+      });
+
+      try {
+        const shooter = createTestCombatant({
+          id: 'shooter-2',
+          faction: Faction.US,
+          position: new THREE.Vector3(50, 0, 0),
+        });
+        combatants.set(shooter.id, shooter);
+
+        const victim = createTestCombatant({
+          id: 'victim-2',
+          faction: Faction.NVA,
+          health: 50,
+          position: new THREE.Vector3(0, 0, 0),
+        });
+        combatants.set(victim.id, victim);
+
+        damage.applyExplosionDamage(
+          new THREE.Vector3(0, 0, 0),
+          9,
+          200,
+          shooter.id,
+          'tank_cannon',
+          Faction.US,
+        );
+
+        // Flush queued bus events so the subscriber sees them.
+        GameEventBus.flush();
+
+        expect(victim.state).toBe(CombatantState.DEAD);
+        expect(events).toHaveLength(1);
+        expect(events[0].victimId).toBe('victim-2');
+        expect(events[0].victimFaction).toBe(Faction.NVA);
+        expect(events[0].killerId).toBe('shooter-2');
+        expect(events[0].killerFaction).toBe(Faction.US);
+        expect(events[0].weaponType).toBe('tank_cannon');
+      } finally {
+        unsubscribe();
+      }
+    });
+
+    it("does not emit 'npc_killed' when the player kills via explosion (PLAYER attribution path)", () => {
+      // Player kills emit 'player_kill' separately; subscribers to
+      // 'npc_killed' should not double-count player explosions.
+      const events: unknown[] = [];
+      const unsubscribe = GameEventBus.subscribe('npc_killed', (e) => events.push(e));
+
+      try {
+        const victim = createTestCombatant({
+          id: 'victim-3',
+          faction: Faction.NVA,
+          health: 10,
+          position: new THREE.Vector3(0, 0, 0),
+        });
+        combatants.set(victim.id, victim);
+
+        damage.applyExplosionDamage(
+          new THREE.Vector3(0, 0, 0),
+          5,
+          100,
+          'PLAYER',
+          'grenade',
+        );
+
+        GameEventBus.flush();
+
+        expect(victim.state).toBe(CombatantState.DEAD);
+        expect(events).toHaveLength(0);
+      } finally {
+        unsubscribe();
+      }
+    });
   });
 });
 
