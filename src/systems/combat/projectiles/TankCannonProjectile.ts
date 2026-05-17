@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction, isAlly, CombatantState } from '../types';
+import { Faction } from '../types';
 import type { CombatantSystem } from '../CombatantSystem';
 import type { ExplosionEffectsPool } from '../../effects/ExplosionEffectsPool';
 import { Logger } from '../../../utils/Logger';
@@ -25,13 +25,14 @@ import { Logger } from '../../../utils/Logger';
  *      resolver fn exists so future shell types drop in without
  *      changing this file's shape.
  *   5. On armed impact: the projectile spawns an explosion via the
- *      injected `ExplosionEffectsPool` and applies radial damage by
- *      iterating live combatants directly through the public
- *      `CombatantSystem.getAllCombatants()` surface. Same-faction
- *      combatants are filtered out (friendly-fire exclusion) — the
- *      existing `applyExplosionDamage()` path does not support that
- *      filter, so we apply HP damage per-combatant without modifying
- *      the shared damage handler.
+ *      injected `ExplosionEffectsPool` and routes damage through
+ *      `CombatantSystem.applyExplosionDamage()` with the shooter's
+ *      faction — the shared handler honours kill-tickets, kill-assist
+ *      tracking, squad-member-removal, kill-feed entries, and the
+ *      `npc_killed` event-bus emission, so tank kills get the same
+ *      attribution as grenades + air-support. Friendly-fire is
+ *      filtered inside the shared handler when `shooterFaction`
+ *      is provided (additive-only signature change).
  *
  * The class is the NPC fire entry point: `launch()` is the same method
  * the player adapter and the AI gunner (cycle #9 R2 task
@@ -338,43 +339,20 @@ export class TankCannonProjectileSystem {
     // Visual: spawn explosion via the existing pool. We do not modify the pool.
     this.explosionPool.spawn(impactPos);
 
-    // Damage: iterate live combatants and apply HP loss, filtering same-faction
-    // (friendly-fire exclusion). We bypass `CombatantSystem.applyExplosionDamage`
-    // because that path does not honour shooterFaction — and we are forbidden
-    // from modifying the shared damage handler in this task.
-    this.applyRadialDamage(impactPos, profile, slot);
-  }
-
-  private applyRadialDamage(
-    center: THREE.Vector3,
-    profile: TankAmmoDamageProfile,
-    slot: ProjectileSlot,
-  ): void {
-    const combatants = this.combatantSystem.getAllCombatants();
-    for (const c of combatants) {
-      if (!c) continue;
-      if (c.state === CombatantState.DEAD) continue;
-      if (isAlly(c.faction, slot.shooterFaction)) continue;
-
-      const dist = c.position.distanceTo(center);
-      if (dist > profile.radius) continue;
-
-      const damagePercent = 1 - dist / profile.radius;
-      const damage = profile.maxDamage * damagePercent;
-      if (damage <= 0) continue;
-
-      c.health -= damage;
-      c.lastHitTime = Date.now();
-      if (c.health <= 0) {
-        c.health = 0;
-        c.state = CombatantState.DEAD;
-        c.deaths = (c.deaths ?? 0) + 1;
-        c.isDying = true;
-        c.deathProgress = 0;
-        c.deathStartTime = performance.now();
-        c.deathAnimationType = 'shatter';
-        c.deathDirection = c.position.clone().sub(center).setY(0).normalize();
-      }
-    }
+    // Damage: route through the shared `applyExplosionDamage` so kill-
+    // attribution (tickets, kill counts, kill-assist tracking, squad
+    // removal, kill-feed entries, `npc_killed` event) all fire the same
+    // way they do for grenades / air-support. The `shooterFaction`
+    // parameter (added 2026-05-17 in this cycle) filters allied units
+    // out of the radial wave — same friendly-fire exclusion the inline
+    // path used previously, without rebuilding death-state by hand.
+    this.combatantSystem.applyExplosionDamage(
+      impactPos,
+      profile.radius,
+      profile.maxDamage,
+      slot.shooterId,
+      'tank_cannon',
+      slot.shooterFaction,
+    );
   }
 }
