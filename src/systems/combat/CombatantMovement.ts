@@ -68,6 +68,21 @@ const PATH_MAX_AGE_MS = 10_000;
 /** Max path queries per updateMovement call (amortization). */
 const PATH_QUERIES_PER_FRAME = 4;
 
+// ── Water wade / route-around ──
+/**
+ * Wade-slowdown weight applied to `immersion01` ∈ [0, 1). NPC ground speed scales
+ * with `1 - immersion01 * WADE_SPEED_IMMERSION_WEIGHT` while in shallow water.
+ * Calibrated against the VODA-2 brief (R1, npc-wade-behavior).
+ */
+const WADE_SPEED_IMMERSION_WEIGHT = 0.6;
+/**
+ * Deep-water threshold. `immersion01 >= DEEP_WATER_IMMERSION_THRESHOLD` is treated
+ * as swim-required terrain: NPCs in R1 cannot swim, so the navmesh path-follower
+ * skips waypoints lying in deep water and invalidates the cached path to force a
+ * re-route. Player-swim handling lives in `player-swim-and-breath`.
+ */
+const DEEP_WATER_IMMERSION_THRESHOLD = 1.0;
+
 /** Max time (ms) to reach a single waypoint before path is invalidated. */
 const WAYPOINT_STALL_TIMEOUT_MS = 3000;
 
@@ -78,6 +93,20 @@ interface CachedNavPath {
   queryTime: number;
   /** Time when current waypoint index was set (for stall detection). */
   waypointStartTime: number;
+}
+
+/**
+ * Minimal water-sampler shape consumed by NPC wade behavior. Provided by
+ * `WaterSystem.sampleWaterInteraction`; intentionally narrow so tests can
+ * stub it without standing up the full water system.
+ *
+ * `immersion01` ∈ [0, 1] is the water depth normalized against
+ * `DEFAULT_WATER_IMMERSION_DEPTH_METERS` (1.6m). 0 means dry, 1 means deep
+ * enough to require swimming. NPCs (R1) cannot swim, so deep readings
+ * trigger route-around at the navmesh layer.
+ */
+export interface NpcWaterSampler {
+  sampleImmersion01(x: number, z: number, surfaceY: number): number;
 }
 
 const _desiredDirection = new THREE.Vector3();
@@ -111,6 +140,7 @@ export class CombatantMovement {
   private spatialGridManager?: SpatialGridManager;
   private navmeshSystem?: NavmeshSystem;
   private navmeshAdapter?: NavmeshMovementAdapter | null;
+  private waterSampler?: NpcWaterSampler;
   private readonly _spacingForce = new THREE.Vector3();
   private readonly stuckDetector = new StuckDetector();
   private readonly navPaths = new Map<string, CachedNavPath>();
@@ -501,14 +531,25 @@ export class CombatantMovement {
 
     if (path.currentIndex < path.waypoints.length - 1) {
       const currentWaypoint = path.waypoints[path.currentIndex];
-      if (this.isWaypointDirectionBlocked(combatant.position, currentWaypoint)) {
+      const currentBlocked = this.isWaypointDirectionBlocked(combatant.position, currentWaypoint)
+        || this.isDeepWaterAt(currentWaypoint.x, currentWaypoint.z);
+      if (currentBlocked) {
+        let advanced = false;
         for (let i = path.currentIndex + 1; i < path.waypoints.length; i++) {
-          if (!this.isWaypointDirectionBlocked(combatant.position, path.waypoints[i])) {
-            path.currentIndex = i;
-            path.waypointStartTime = now;
-            combatant.movementContourSign = undefined;
-            break;
-          }
+          const wp = path.waypoints[i];
+          if (this.isDeepWaterAt(wp.x, wp.z)) continue;
+          if (this.isWaypointDirectionBlocked(combatant.position, wp)) continue;
+          path.currentIndex = i;
+          path.waypointStartTime = now;
+          combatant.movementContourSign = undefined;
+          advanced = true;
+          break;
+        }
+        // No dry alternative in the cached path: invalidate so the next
+        // `getOrQueryPath` call can produce a route around the river.
+        if (!advanced && this.isDeepWaterAt(currentWaypoint.x, currentWaypoint.z)) {
+          this.navPaths.delete(combatant.id);
+          return null;
         }
       }
     }
@@ -772,7 +813,13 @@ export class CombatantMovement {
       ? NPC_TRAVERSAL_MIN_UPHILL_SPEED_FACTOR
       : NPC_COMBAT_MIN_UPHILL_SPEED_FACTOR;
     const uphillDrag = traversalIntent ? NPC_TRAVERSAL_UPHILL_DRAG : NPC_COMBAT_UPHILL_DRAG;
-    return THREE.MathUtils.clamp(1 - uphillGrade * uphillDrag, minSpeedFactor, 1);
+    const uphillFactor = THREE.MathUtils.clamp(1 - uphillGrade * uphillDrag, minSpeedFactor, 1);
+    // Wade slowdown: linear with immersion in shallow water. Deep water is
+    // route-around territory (no swim in R1) — clamp the wade factor at the
+    // shallow boundary so a one-tick deep crossing does not stall NPCs to 0.
+    const immersion = Math.min(this.getWaterImmersion(combatant.position.x, combatant.position.z), 1);
+    const wadeFactor = 1 - immersion * WADE_SPEED_IMMERSION_WEIGHT;
+    return uphillFactor * wadeFactor;
   }
 
   private updateProgressTracking(
@@ -1046,6 +1093,27 @@ export class CombatantMovement {
     return this.terrainSystem.getHeightAt(x, z);
   }
 
+  /**
+   * Sample `immersion01` ∈ [0, 1] at the given XZ. Returns 0 when no water
+   * sampler is bound or the position is dry. Surface Y is taken from the
+   * terrain height so the sampler can resolve depth against the ground.
+   */
+  private getWaterImmersion(x: number, z: number): number {
+    if (!this.waterSampler) return 0;
+    const surfaceY = this.getTerrainHeight(x, z);
+    const immersion = this.waterSampler.sampleImmersion01(x, z, surfaceY);
+    return Number.isFinite(immersion) ? Math.max(0, immersion) : 0;
+  }
+
+  /**
+   * True when the given XZ lies in water deep enough to require swimming.
+   * R1 NPCs cannot swim, so this guard is used by the navmesh waypoint
+   * follower to skip deep-water waypoints and re-route.
+   */
+  private isDeepWaterAt(x: number, z: number): boolean {
+    return this.getWaterImmersion(x, z) >= DEEP_WATER_IMMERSION_THRESHOLD;
+  }
+
   private getTerrainHeightForCombatant(combatant: Combatant): number {
     const now = performance.now();
     const intervalMs =
@@ -1110,6 +1178,16 @@ export class CombatantMovement {
     this.navmeshSystem = navmeshSystem;
     // Adapter is retrieved lazily when navmesh becomes ready
     this.navmeshAdapter = navmeshSystem.getAdapter();
+  }
+
+  /**
+   * Bind the wade water sampler. Optional: when unset, NPC movement is
+   * unaffected by water (legacy behavior). When set, ground speed scales
+   * down in shallow water and the navmesh path-follower routes around
+   * deep water (NPCs do not swim in R1).
+   */
+  setWaterSampler(sampler: NpcWaterSampler | undefined): void {
+    this.waterSampler = sampler;
   }
 
   /** Refresh the adapter reference (call after navmesh generation). */

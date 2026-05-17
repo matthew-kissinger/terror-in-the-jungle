@@ -482,4 +482,171 @@ describe('CombatantMovement', () => {
       expect(warn.mock.calls[1][1]).not.toContain('suppressed');
     });
   });
+
+  // ── Wade / route-around water (npc-wade-behavior, R1 of VODA-2) ─────────
+  describe('wade behavior + deep-water route-around', () => {
+    /**
+     * Build a water sampler that returns a constant `immersion01` for points
+     * inside an XZ band, dry elsewhere. The band represents a river crossing
+     * the NPC's intended path.
+     */
+    function bandSampler(opts: {
+      zMin: number;
+      zMax: number;
+      immersion: number;
+    }) {
+      return {
+        sampleImmersion01: vi.fn((_x: number, z: number) =>
+          z >= opts.zMin && z <= opts.zMax ? opts.immersion : 0,
+        ),
+      };
+    }
+
+    it('slows wade speed proportional to immersion in a shallow ford', () => {
+      // Two identical NPCs, one in dry terrain, one wading mid-shin (immersion01 = 0.5).
+      // Wade formula: speed *= 1 - 0.5 * 0.6 = 0.7. Dry NPC should travel ~1/0.7 farther.
+      const dryMovement = new CombatantMovement(mockTerrainRuntime());
+      const wetMovement = new CombatantMovement(mockTerrainRuntime());
+      wetMovement.setWaterSampler(bandSampler({ zMin: -1000, zMax: 1000, immersion: 0.5 }));
+
+      const dryNpc = createTestCombatant({
+        id: 'npc-ford-dry',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(80, NPC_Y_OFFSET, 0),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+      const wetNpc = createTestCombatant({
+        id: 'npc-ford-wet',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(80, NPC_Y_OFFSET, 0),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      dryMovement.updateMovement(dryNpc, 0.016, new Map(), new Map(), {
+        disableSpacing: true,
+        disableTerrainSample: true,
+      });
+      wetMovement.updateMovement(wetNpc, 0.016, new Map(), new Map(), {
+        disableSpacing: true,
+        disableTerrainSample: true,
+      });
+
+      // Wet NPC moves strictly slower than the dry one along the same axis.
+      expect(Math.abs(wetNpc.velocity.x)).toBeGreaterThan(0);
+      expect(Math.abs(wetNpc.velocity.x)).toBeLessThan(Math.abs(dryNpc.velocity.x));
+      // Linear scaling: roughly 0.7x dry speed (allow 5% slack for axis projection / probes).
+      const ratio = Math.abs(wetNpc.velocity.x) / Math.abs(dryNpc.velocity.x);
+      expect(ratio).toBeGreaterThan(0.66);
+      expect(ratio).toBeLessThan(0.74);
+    });
+
+    it('skips a navmesh waypoint that lands in deep water and picks the next dry one', () => {
+      // Path: start -> deep-water waypoint -> dry detour waypoint -> destination.
+      // NPC should advance past the deep waypoint and steer toward the dry detour.
+      const adapter = mockNavmeshAdapter();
+      const navSystem = mockNavmeshSystem(adapter);
+      const start = new THREE.Vector3(0, 0, 0);
+      const deepCrossing = new THREE.Vector3(40, 0, 0); // dead-ahead, in the river
+      const dryDetour = new THREE.Vector3(0, 0, 80);
+      const destination = new THREE.Vector3(120, 0, 80);
+      navSystem.queryPath.mockReturnValue([start, deepCrossing, dryDetour, destination]);
+
+      const movementWithWater = new CombatantMovement(mockTerrainRuntime());
+      // Deep-water band is a vertical river at x ∈ [30, 50]; dry detour at z=80 is clear.
+      movementWithWater.setWaterSampler({
+        sampleImmersion01: vi.fn((x: number, _z: number) =>
+          x >= 30 && x <= 50 ? 1.0 : 0,
+        ),
+      });
+      movementWithWater.setNavmeshSystem(navSystem as any);
+
+      const c = createTestCombatant({
+        id: 'npc-river-skip',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: destination.clone(),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      movementWithWater.updateMovement(c, 0.016, new Map(), new Map(), {
+        disableSpacing: true,
+        disableTerrainSample: true,
+      });
+
+      // Movement anchor steered to the dry detour waypoint, not the deep crossing.
+      expect(c.movementAnchor?.x).toBeCloseTo(dryDetour.x);
+      expect(c.movementAnchor?.z).toBeCloseTo(dryDetour.z);
+      // Velocity carries the NPC primarily along +Z toward the detour, not +X into the river.
+      expect(c.velocity.z).toBeGreaterThan(Math.abs(c.velocity.x));
+    });
+
+    it('routes around a deep river by invalidating the cached path when no dry waypoint remains', () => {
+      // Only path waypoint sits in deep water; no dry alternative cached. NPC must
+      // drop the path so the next tick can re-query a different route.
+      const adapter = mockNavmeshAdapter();
+      const navSystem = mockNavmeshSystem(adapter);
+      const start = new THREE.Vector3(0, 0, 0);
+      const deepCrossing = new THREE.Vector3(40, 0, 0);
+      const destination = new THREE.Vector3(120, 0, 0); // also in the deep band ahead
+      navSystem.queryPath.mockReturnValue([start, deepCrossing, destination]);
+
+      const movementWithWater = new CombatantMovement(mockTerrainRuntime());
+      movementWithWater.setWaterSampler({
+        sampleImmersion01: vi.fn((x: number, _z: number) =>
+          x >= 30 && x <= 130 ? 1.0 : 0,
+        ),
+      });
+      movementWithWater.setNavmeshSystem(navSystem as any);
+
+      const c = createTestCombatant({
+        id: 'npc-river-reroute',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: destination.clone(),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      movementWithWater.updateMovement(c, 0.016, new Map(), new Map(), {
+        disableSpacing: true,
+        disableTerrainSample: true,
+      });
+
+      // Path was queried but discarded; movementAnchor falls back to the destination
+      // (which is also deep — outer planner is responsible for re-picking the goal).
+      // Critical contract: the cached deep-water waypoint was NOT adopted as the anchor.
+      expect(c.movementAnchor?.x).not.toBeCloseTo(deepCrossing.x);
+      // Trigger a second tick — without the cache, queryPath is asked again
+      // (this is the "route around" signal the strategic layer hooks into).
+      movementWithWater.resetPathQueryBudget();
+      movementWithWater.updateMovement(c, 0.016, new Map(), new Map(), {
+        disableSpacing: true,
+        disableTerrainSample: true,
+      });
+      expect(navSystem.queryPath).toHaveBeenCalledTimes(2);
+    });
+
+    it('leaves NPC movement unaffected when no water sampler is bound', () => {
+      // Regression guard for scenarios without water: never call into the
+      // sampler, never alter speed factors.
+      const dryNpc = createTestCombatant({
+        id: 'npc-no-water-baseline',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(80, NPC_Y_OFFSET, 0),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+      movement.updateMovement(dryNpc, 0.016, new Map(), new Map(), {
+        disableSpacing: true,
+        disableTerrainSample: true,
+      });
+      expect(dryNpc.velocity.x).toBeGreaterThan(4);
+    });
+  });
 });
