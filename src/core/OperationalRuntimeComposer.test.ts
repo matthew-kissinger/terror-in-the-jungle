@@ -8,6 +8,7 @@ import {
 function createRefs() {
   let helipadCallback: ((helipads: Array<{ id: string; position: THREE.Vector3 }>) => void) | undefined;
   let combatantProvider: (() => unknown[]) | undefined;
+  let modeChangedCallback: ((mode: string, config: unknown) => void) | undefined;
   const explosionEffectsPool = { id: 'explosion-pool' };
   const combatants = [{ id: 'c1' }, { id: 'c2' }];
   const listener = { id: 'listener' };
@@ -40,6 +41,9 @@ function createRefs() {
     },
     gameModeManager: {
       setWarSimulator: vi.fn(),
+      onModeChanged: vi.fn((callback: typeof modeChangedCallback) => {
+        modeChangedCallback = callback;
+      }),
     },
     fixedWingModel: {
       setTerrainManager: vi.fn(),
@@ -72,6 +76,10 @@ function createRefs() {
     },
     hudSystem: {},
     influenceMapSystem: {},
+    m2hbEmplacementSystem: {
+      setCombatantSystem: vi.fn(),
+      setAudioManager: vi.fn(),
+    },
     minimapSystem: {
       setHelipadMarkers: vi.fn(),
       setWarSimulator: vi.fn(),
@@ -94,9 +102,13 @@ function createRefs() {
       setHUDSystem: vi.fn(),
       setWarSimulator: vi.fn(),
     },
-    terrainSystem: {},
+    terrainSystem: {
+      getHeightAt: vi.fn((_x: number, _z: number) => 12),
+    },
     ticketSystem: {},
-    vehicleManager: {},
+    vehicleManager: {
+      spawnScenarioM2HBEmplacements: vi.fn(() => ['m2hb_scenario_id']),
+    },
     warSimulator: {
       setCombatantSystem: vi.fn(),
       setInfluenceMap: vi.fn(),
@@ -115,6 +127,7 @@ function createRefs() {
     refs,
     getHelipadCallback: () => helipadCallback,
     getCombatantProvider: () => combatantProvider,
+    getModeChangedCallback: () => modeChangedCallback,
     combatants,
     explosionEffectsPool,
     listener,
@@ -125,7 +138,7 @@ describe('OperationalRuntimeComposer', () => {
   it('wires strategy runtime across war sim, feedback, and map systems', () => {
     const { refs } = createRefs();
 
-    wireOperationalRuntime(createOperationalRuntimeGroups(refs));
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
 
     expect(refs.warSimulator.setCombatantSystem).toHaveBeenCalledWith(refs.combatantSystem);
     expect(refs.warSimulator.setZoneManager).toHaveBeenCalledWith(refs.zoneManager);
@@ -149,7 +162,7 @@ describe('OperationalRuntimeComposer', () => {
       listener,
     } = createRefs();
 
-    wireOperationalRuntime(createOperationalRuntimeGroups(refs));
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
 
     expect(refs.helipadSystem.setTerrainManager).toHaveBeenCalledWith(refs.terrainSystem);
     expect(refs.helipadSystem.setVegetationSystem).toHaveBeenCalledWith(refs.globalBillboardSystem);
@@ -192,5 +205,61 @@ describe('OperationalRuntimeComposer', () => {
     expect(refs.aaEmplacementSystem.setAudioManager).toHaveBeenCalledWith(refs.audioManager);
     expect(refs.aaEmplacementSystem.setTerrainSystem).toHaveBeenCalledWith(refs.terrainSystem);
     expect(refs.aaEmplacementSystem.setExplosionEffectsPool).toHaveBeenCalledWith(explosionEffectsPool);
+  });
+
+  it('injects combat + audio dependencies into the M2HB emplacement system', () => {
+    const { refs } = createRefs();
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    expect(refs.m2hbEmplacementSystem.setCombatantSystem).toHaveBeenCalledWith(refs.combatantSystem);
+    expect(refs.m2hbEmplacementSystem.setAudioManager).toHaveBeenCalledWith(refs.audioManager);
+  });
+
+  it('spawns M2HB emplacements once per supported scenario when the game mode changes', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    const scene = new THREE.Scene();
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene });
+    const onChange = getModeChangedCallback();
+    expect(onChange).toBeDefined();
+
+    onChange?.('open_frontier', {});
+    onChange?.('a_shau_valley', {});
+    // Unsupported modes never trigger a spawn.
+    onChange?.('tdm', {});
+    // Re-entering the same mode is idempotent - no second spawn.
+    onChange?.('open_frontier', {});
+
+    // The composer defers spawn via setTimeout(0); flush the macrotask queue.
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const calls = refs.vehicleManager.spawnScenarioM2HBEmplacements.mock.calls as Array<[{ modes: string[] }]>;
+    const modeArgs = calls.map(([arg]) => arg.modes[0]);
+    expect(modeArgs.sort()).toEqual(['a_shau_valley', 'open_frontier']);
+    // Both invocations route through the shared scene + m2hbSystem.
+    for (const [arg] of calls) {
+      expect((arg as { scene: THREE.Scene }).scene).toBe(scene);
+      expect((arg as { m2hbSystem: unknown }).m2hbSystem).toBe(refs.m2hbEmplacementSystem);
+    }
+  });
+
+  it('resolvePosition snaps spawn position to the terrain height query', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    refs.terrainSystem.getHeightAt = vi.fn(() => 42);
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    getModeChangedCallback()?.('open_frontier', {});
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const [[arg]] = refs.vehicleManager.spawnScenarioM2HBEmplacements.mock.calls as Array<[{
+      resolvePosition?: (m: string, base: THREE.Vector3) => THREE.Vector3;
+    }]>;
+    const base = new THREE.Vector3(10, 0, 20);
+    const snapped = arg.resolvePosition?.('open_frontier', base);
+    expect(snapped?.x).toBe(10);
+    expect(snapped?.y).toBe(42);
+    expect(snapped?.z).toBe(20);
   });
 });

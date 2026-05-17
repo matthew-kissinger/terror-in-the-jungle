@@ -333,6 +333,9 @@ export class SystemManager {
   get vehicleManager(): import('../systems/vehicle/VehicleManager').VehicleManager {
     return this.registry.require('vehicleManager');
   }
+  get m2hbEmplacementSystem(): import('../systems/combat/weapons/M2HBEmplacement').M2HBEmplacementSystem {
+    return this.registry.require('m2hbEmplacementSystem');
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {

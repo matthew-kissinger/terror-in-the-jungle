@@ -1,4 +1,8 @@
+import * as THREE from 'three';
 import type { SystemKeyToType } from './SystemRegistry';
+import { GameMode } from '../config/gameModeTypes';
+import { Logger } from '../utils/Logger';
+import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacementSpawn';
 
 type OperationalRuntimeRefs = Pick<
   SystemKeyToType,
@@ -15,6 +19,7 @@ type OperationalRuntimeRefs = Pick<
   | 'helipadSystem'
   | 'hudSystem'
   | 'influenceMapSystem'
+  | 'm2hbEmplacementSystem'
   | 'minimapSystem'
   | 'npcVehicleController'
   | 'playerController'
@@ -54,6 +59,7 @@ interface OperationalRuntimeGroups {
     | 'helicopterModel'
     | 'helipadSystem'
     | 'hudSystem'
+    | 'm2hbEmplacementSystem'
     | 'minimapSystem'
     | 'npcVehicleController'
     | 'playerController'
@@ -103,6 +109,7 @@ export function createOperationalRuntimeGroups(
       helicopterModel: refs.helicopterModel,
       helipadSystem: refs.helipadSystem,
       hudSystem: refs.hudSystem,
+      m2hbEmplacementSystem: refs.m2hbEmplacementSystem,
       minimapSystem: refs.minimapSystem,
       npcVehicleController: refs.npcVehicleController,
       playerController: refs.playerController,
@@ -124,11 +131,16 @@ export function createOperationalRuntimeGroups(
   };
 }
 
+export interface OperationalRuntimeOptions {
+  scene: THREE.Scene;
+}
+
 export function wireOperationalRuntime(
-  groups: OperationalRuntimeGroups
+  groups: OperationalRuntimeGroups,
+  options: OperationalRuntimeOptions = { scene: undefined as unknown as THREE.Scene }
 ): void {
   wireStrategyRuntime(groups.strategyRuntime);
-  wireVehicleRuntime(groups.vehicleRuntime);
+  wireVehicleRuntime(groups.vehicleRuntime, options);
   wireAirSupportRuntime(groups.airSupportRuntime);
 }
 
@@ -147,7 +159,10 @@ function wireStrategyRuntime(runtime: OperationalRuntimeGroups['strategyRuntime'
   runtime.fullMapSystem.setWarSimulator(runtime.warSimulator);
 }
 
-function wireVehicleRuntime(runtime: OperationalRuntimeGroups['vehicleRuntime']): void {
+function wireVehicleRuntime(
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+  options: OperationalRuntimeOptions
+): void {
   if (typeof runtime.helipadSystem.configureDependencies === 'function') {
     runtime.helipadSystem.configureDependencies({
       terrainManager: runtime.terrainSystem,
@@ -222,6 +237,74 @@ function wireVehicleRuntime(runtime: OperationalRuntimeGroups['vehicleRuntime'])
 
   runtime.npcVehicleController.setVehicleManager(runtime.vehicleManager);
   runtime.npcVehicleController.setCombatantProvider(() => runtime.combatantSystem.combatants);
+
+  wireM2HBEmplacementRuntime(runtime, options);
+}
+
+// Maps GameMode -> the scenario-spawn key understood by
+// `spawnScenarioM2HBEmplacements`. Modes absent from this table get no
+// M2HB spawn (TDM, Zone Control, AI sandbox).
+const M2HB_MODES_BY_GAMEMODE: Partial<Record<GameMode, M2HBScenarioMode>> = {
+  [GameMode.OPEN_FRONTIER]: 'open_frontier',
+  [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
+};
+
+function wireM2HBEmplacementRuntime(
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+  options: OperationalRuntimeOptions
+): void {
+  const m2hb = runtime.m2hbEmplacementSystem;
+  if (!m2hb) return;
+  const scene = options.scene;
+
+  // Inject runtime dependencies for fire-path execution (raycast + audio).
+  m2hb.setCombatantSystem(runtime.combatantSystem);
+  m2hb.setAudioManager(runtime.audioManager);
+
+  if (!scene) return;
+
+  const spawnedModes = new Set<M2HBScenarioMode>();
+  runtime.gameModeManager.onModeChanged((mode) => {
+    const scenarioKey = M2HB_MODES_BY_GAMEMODE[mode];
+    if (!scenarioKey) return;
+    if (spawnedModes.has(scenarioKey)) return;
+    // Reserve synchronously so a re-entrant mode-change in the same tick
+    // (test harness scenario) does not queue a second deferred spawn.
+    spawnedModes.add(scenarioKey);
+    // Defer one frame so the per-mode terrain provider is hot before
+    // resolvePosition runs `getHeightAt`. `prepareModeStartup` sets the
+    // height provider before `setGameMode`, but tile-bound queries can
+    // still be racing; the setTimeout(0) gives the chunk loader a tick.
+    setTimeout(() => {
+      try {
+        const ids = runtime.vehicleManager.spawnScenarioM2HBEmplacements({
+          scene,
+          m2hbSystem: m2hb,
+          modes: [scenarioKey],
+          resolvePosition: (_m, base) => snapM2HBToTerrain(base, runtime.terrainSystem),
+        });
+        Logger.info('combat', `M2HB scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
+      } catch (error) {
+        // Roll back the reservation so a manual re-trigger can retry.
+        spawnedModes.delete(scenarioKey);
+        Logger.warn('combat', `M2HB scenario spawn failed for ${scenarioKey}`, error);
+      }
+    }, 0);
+  });
+}
+
+const _m2hbScratch = new THREE.Vector3();
+
+function snapM2HBToTerrain(
+  base: THREE.Vector3,
+  terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
+): THREE.Vector3 {
+  _m2hbScratch.copy(base);
+  if (typeof terrainSystem.getHeightAt === 'function') {
+    const y = terrainSystem.getHeightAt(base.x, base.z);
+    if (Number.isFinite(y)) _m2hbScratch.y = y;
+  }
+  return _m2hbScratch.clone();
 }
 
 function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRuntime']): void {

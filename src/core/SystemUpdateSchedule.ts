@@ -43,6 +43,7 @@ export const SYSTEM_UPDATE_SCHEDULE: readonly SystemUpdatePhaseDefinition[] = [
     budgetMs: 5.0,
     systems: [
       { key: 'combatantSystem', mode: 'direct-update' },
+      { key: 'm2hbEmplacementSystem', mode: 'direct-update' },
     ],
   },
   {
