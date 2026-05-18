@@ -11,7 +11,7 @@
  * constants.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { PBR, PBR_HULL_DIMENSIONS, type PBRMount } from './PBR';
 import { Emplacement } from './Emplacement';
@@ -394,6 +394,155 @@ describe('PBR procedural hull mesh', () => {
     // vertically but does not exceed the hull length / beam.
     expect(size.z).toBeGreaterThanOrEqual(PBR_HULL_DIMENSIONS.length * 0.99);
     expect(size.x).toBeGreaterThanOrEqual(PBR_HULL_DIMENSIONS.beam * 0.99);
+  });
+});
+
+// ---------- Mount aim in world space (B1) ----------
+
+describe('PBR mount world-space aim composition', () => {
+  /**
+   * Player-fire path through M2HBEmplacementSystem.update derives the
+   * barrel forward from yaw/pitch + the emplacement's world quaternion.
+   * For a PBR mount parented under a (potentially rotated) hull, the
+   * world-space direction must reflect both the hull's pose and the
+   * mount's local tripod rotation. We observe behavior by intercepting
+   * the combatant raycast and reading the ray direction the system
+   * actually fires.
+   */
+  function makeRayCaptureCombatantSystem(): { cs: any; lastDirection: () => THREE.Vector3 | null } {
+    let captured: THREE.Vector3 | null = null;
+    const cs = {
+      handlePlayerShot: vi.fn((ray: THREE.Ray) => {
+        captured = ray.direction.clone();
+        return { hit: false, point: new THREE.Vector3(), killed: false, headshot: false, damageDealt: 0 };
+      }),
+      impactEffectsPool: { spawn: vi.fn() },
+    };
+    return { cs, lastDirection: () => captured };
+  }
+
+  function makeFiringAdapter(vehicleId: string) {
+    return {
+      getActiveEmplacementId: () => vehicleId,
+      consumeFireRequest: () => true,
+    } as any;
+  }
+
+  it('forward mount on a yaw=0 hull fires along world -Z (the hull bow)', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleManager();
+    const m2hb = new M2HBEmplacementSystem(scene);
+    const { cs, lastDirection } = makeRayCaptureCombatantSystem();
+    m2hb.setCombatantSystem(cs);
+
+    const { mounts } = createPBR(scene, vm, m2hb, {
+      vehicleId: 'pbr_aim_fwd',
+      position: new THREE.Vector3(0, 0, 0),
+      faction: Faction.US,
+    });
+    scene.updateMatrixWorld(true);
+
+    const fwd = mounts.find(m => m.index === 0)!;
+    m2hb.attachPlayerAdapter(fwd.vehicleId, makeFiringAdapter(fwd.vehicleId));
+    m2hb.update(1 / 60);
+
+    const dir = lastDirection();
+    expect(dir).not.toBeNull();
+    // The forward mount keeps the tripod's native -Z forward, so on a
+    // yaw=0 hull the world-space fire direction is essentially -Z.
+    expect(dir!.z).toBeLessThan(-0.95);
+    expect(Math.abs(dir!.x)).toBeLessThan(0.05);
+  });
+
+  it('aft mount (rotated 180° on the hull) fires off the stern, not the bow', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleManager();
+    const m2hb = new M2HBEmplacementSystem(scene);
+    const { cs, lastDirection } = makeRayCaptureCombatantSystem();
+    m2hb.setCombatantSystem(cs);
+
+    const { mounts } = createPBR(scene, vm, m2hb, {
+      vehicleId: 'pbr_aim_aft',
+      position: new THREE.Vector3(0, 0, 0),
+      faction: Faction.US,
+    });
+    scene.updateMatrixWorld(true);
+
+    const aft = mounts.find(m => m.index === 1)!;
+    m2hb.attachPlayerAdapter(aft.vehicleId, makeFiringAdapter(aft.vehicleId));
+    m2hb.update(1 / 60);
+
+    const dir = lastDirection();
+    expect(dir).not.toBeNull();
+    // The aft tripod has a local 180° yaw, so its barrel-forward
+    // (local -Z) maps to world +Z (off the stern of a yaw=0 hull).
+    expect(dir!.z).toBeGreaterThan(0.95);
+    expect(Math.abs(dir!.x)).toBeLessThan(0.05);
+  });
+
+  it('forward mount on a hull yawed 90° fires along world +X (or -X), not world Z', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleManager();
+    const m2hb = new M2HBEmplacementSystem(scene);
+    const { cs, lastDirection } = makeRayCaptureCombatantSystem();
+    m2hb.setCombatantSystem(cs);
+
+    const { mounts } = createPBR(scene, vm, m2hb, {
+      vehicleId: 'pbr_aim_yawed',
+      position: new THREE.Vector3(0, 0, 0),
+      faction: Faction.US,
+      initialYaw: Math.PI / 2,
+    });
+    scene.updateMatrixWorld(true);
+
+    const fwd = mounts.find(m => m.index === 0)!;
+    m2hb.attachPlayerAdapter(fwd.vehicleId, makeFiringAdapter(fwd.vehicleId));
+    m2hb.update(1 / 60);
+
+    const dir = lastDirection();
+    expect(dir).not.toBeNull();
+    // After a 90° hull yaw, the forward mount's local -Z projects onto
+    // world ±X. The defining behavior: the dominant axis is X, not Z.
+    expect(Math.abs(dir!.x)).toBeGreaterThan(0.95);
+    expect(Math.abs(dir!.z)).toBeLessThan(0.05);
+  });
+});
+
+// ---------- Mount slew double-step regression (B2) ----------
+
+describe('PBR mount slew step cadence', () => {
+  it('VehicleManager fan-out plus PBR.update advances mount yaw once per frame, not twice', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleManager();
+    const m2hb = new M2HBEmplacementSystem(scene);
+
+    const { mounts } = createPBR(scene, vm, m2hb, {
+      vehicleId: 'pbr_slew',
+      position: new THREE.Vector3(0, 0, 0),
+      faction: Faction.US,
+    });
+
+    const fwd = mounts.find(m => m.index === 0)!;
+    const { yaw: yawSlewRate } = fwd.emplacement.getSlewRates();
+
+    // Aim the mount somewhere far enough that one second of slew will
+    // not reach the target — the advance is then bounded by the rate.
+    fwd.emplacement.setAim(Math.PI * 0.9, 0);
+    expect(fwd.emplacement.getYaw()).toBeCloseTo(0, 6);
+
+    // Step the VehicleManager (PBR + 2 mounts) for one whole second of
+    // fixed-step updates. If PBR.update double-stepped the mounts, the
+    // observed yaw advance would be ~2 * yawSlewRate * 1.0 radians.
+    const DT = 1 / 60;
+    for (let i = 0; i < 60; i++) {
+      vm.update(DT);
+    }
+
+    const advanced = fwd.emplacement.getYaw();
+    // One second of slew at yawSlewRate. Allow a tiny tolerance for
+    // floating-point accumulation.
+    expect(advanced).toBeGreaterThan(yawSlewRate * 0.95);
+    expect(advanced).toBeLessThan(yawSlewRate * 1.1);
   });
 });
 

@@ -369,17 +369,18 @@ export class PBR implements IVehicle {
   // ---------- Per-frame integration ----------
 
   /**
-   * Step the hull simulation, write the integrated pose to the chassis
-   * Object3D, then step each mount's slew. The mounts are children of
-   * the chassis Object3D, so writing chassis pose first guarantees the
-   * mount world transforms compose correctly off the new hull matrix
-   * (same pattern Tank uses for its TankTurret child).
+   * Step the hull simulation and write the integrated pose to the
+   * chassis Object3D. The mounts are children of the chassis Object3D,
+   * so writing chassis pose first guarantees the mount world transforms
+   * compose correctly off the new hull matrix (same pattern Tank uses
+   * for its TankTurret child).
    *
-   * The M2HBEmplacementSystem owns the weapon-fire path; we only step
-   * the slew here. Calling update on each mount's Emplacement is also
-   * safe when the M2HBEmplacementSystem itself calls into the same
-   * Emplacement again later in the frame (slew is idempotent: it
-   * walks current angles toward a target, no double-step issue).
+   * Mount slew is NOT stepped here. Each mount Emplacement is registered
+   * separately with the VehicleManager (in `PBRSpawn.createPBR`) so
+   * `VehicleManager.update()` fans out a single `update(dt)` per mount
+   * per frame at the same cadence as a ground-fixed emplacement. The
+   * M2HBEmplacementSystem owns the weapon-fire path independently of
+   * this update.
    */
   update(dt: number): void {
     if (this.destroyed || dt <= 0) return;
@@ -389,10 +390,6 @@ export class PBR implements IVehicle {
     this.object.position.copy(state.position);
     this.object.quaternion.copy(state.quaternion);
     this.velocity.copy(state.velocity);
-
-    for (const mount of this.mounts) {
-      mount.emplacement.update(dt);
-    }
   }
 
   dispose(): void {
