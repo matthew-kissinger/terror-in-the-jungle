@@ -669,6 +669,199 @@ describe('CombatantMovement', () => {
     });
   });
 
+  // ── Terrain-solver stall-loop reroute (terrain-solver-stall-fix, R2 DEFEKT-4) ──
+  describe('terrain-solver stall-loop reroute', () => {
+    /**
+     * Terrain factory: a steep wall sitting in the middle of the NPC's
+     * planned navmesh path. Without the reroute fix, the solver's contour
+     * branch fires every tick around the lip and the cached path is never
+     * invalidated.
+     */
+    function lipTerrain(xWall: number, grade: number) {
+      return vi.fn((x: number, _z: number) => (x > xWall ? (x - xWall) * grade : 0));
+    }
+
+    type StallHook = (
+      combatant: ReturnType<typeof createTestCombatant>,
+      contourActivated: boolean,
+      lowProgress: boolean,
+      deltaTime: number,
+    ) => boolean;
+
+    function callReroute(
+      m: CombatantMovement,
+      c: ReturnType<typeof createTestCombatant>,
+      contourActivated: boolean,
+      lowProgress: boolean,
+      deltaTime: number,
+    ) {
+      return (m as unknown as { evaluateTerrainStallReroute: StallHook })
+        .evaluateTerrainStallReroute(c, contourActivated, lowProgress, deltaTime);
+    }
+
+    it('invalidates a cached navmesh path when contour-stall sustains past the reroute window', () => {
+      // Wall directly ahead of the start position. Navmesh hands the NPC a
+      // path straight through it; the solver activates contour every tick.
+      // After NPC_CONTOUR_STALL_REROUTE_MS of low-progress contour, the
+      // cached path should be invalidated so the next tick re-queries.
+      // Start the NPC already near the lip so contour engages from tick 0.
+      terrain.getHeightAt = lipTerrain(2, 5);
+
+      const adapter = mockNavmeshAdapter();
+      const navSystem = mockNavmeshSystem(adapter);
+      const start = new THREE.Vector3(0, 0, 0);
+      const midBlocked = new THREE.Vector3(40, 0, 0); // sits past the wall
+      const destination = new THREE.Vector3(120, 0, 0);
+      navSystem.queryPath.mockReturnValue([start, midBlocked, destination]);
+      movement.setNavmeshSystem(navSystem as any);
+
+      const c = createTestCombatant({
+        id: 'npc-stall-reroute',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: destination.clone(),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      // Drive contour-stall ticks. The fix only fires when contourActivated
+      // + lowProgress is sustained. With the lip-terrain in place, the
+      // solver naturally produces those signals; we drive ticks via the
+      // public updateMovement surface to keep the test behavioral.
+      // Cap at 30 × 100ms = 3s of sim time. NPC_CONTOUR_STALL_REROUTE_MS is
+      // 1200ms; PATH_MAX_AGE_MS is 10_000ms. A second queryPath inside the
+      // 3s window is only possible if the reroute fired — natural cache
+      // expiry would take ~10s.
+      for (let i = 0; i < 30; i++) {
+        movement.resetPathQueryBudget();
+        vi.spyOn(performance, 'now').mockReturnValue(i * 100);
+        movement.updateMovement(c, 0.1, new Map(), new Map(), {
+          disableSpacing: true,
+          disableTerrainSample: true,
+        });
+        if (navSystem.queryPath.mock.calls.length >= 2) break;
+      }
+
+      // The cached path must have been re-queried at least once after the
+      // initial cache fill. Without the reroute the cache stays valid for
+      // PATH_MAX_AGE_MS (10s) regardless of progress.
+      expect(navSystem.queryPath.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('does not reroute when contour is not active', () => {
+      // Flat terrain: no contour, no stall, no reroute regardless of how
+      // long the tick stream runs.
+      const c = createTestCombatant({
+        id: 'npc-no-stall-no-reroute',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      // Drive the helper directly with the exact preconditions we want to
+      // assert against — keep the unit isolated from solver internals.
+      for (let i = 0; i < 50; i++) {
+        const triggered = callReroute(movement, c, /*contour*/ false, /*lowProgress*/ false, 0.1);
+        expect(triggered).toBe(false);
+      }
+      expect(c.movementContourStallMs ?? 0).toBe(0);
+    });
+
+    it('does not reroute when contour fires but the NPC is making forward progress', () => {
+      const c = createTestCombatant({
+        id: 'npc-contour-progressing',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      // Contour active every tick, but lowProgress is false because the NPC
+      // is making meaningful XZ progress along the contour. No reroute.
+      for (let i = 0; i < 50; i++) {
+        const triggered = callReroute(movement, c, /*contour*/ true, /*lowProgress*/ false, 0.1);
+        expect(triggered).toBe(false);
+      }
+      expect(c.movementContourStallMs ?? 0).toBe(0);
+    });
+
+    it('resets the stall accumulator on the first non-stalling tick', () => {
+      const c = createTestCombatant({
+        id: 'npc-stall-reset',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      // Accumulate partway toward the threshold (1200ms): 5 ticks × 100ms = 500ms.
+      for (let i = 0; i < 5; i++) {
+        callReroute(movement, c, true, true, 0.1);
+      }
+      expect(c.movementContourStallMs).toBeGreaterThan(0);
+      expect(c.movementContourStallMs).toBeLessThan(1200);
+
+      // One non-stalling tick clears the accumulator.
+      callReroute(movement, c, false, true, 0.1);
+      expect(c.movementContourStallMs).toBe(0);
+    });
+
+    it('only operates on high-LOD combatants', () => {
+      // Low-LOD NPCs use a lighter path and don't oscillate the same way;
+      // the brief constrains the fix to high-LOD only.
+      const c = createTestCombatant({
+        id: 'npc-low-lane',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+        simLane: 'low',
+        renderLane: 'culled',
+      });
+
+      // Even 100 ticks of perfect stall conditions on a low-LOD NPC must
+      // never trigger the reroute.
+      for (let i = 0; i < 100; i++) {
+        const triggered = callReroute(movement, c, true, true, 0.1);
+        expect(triggered).toBe(false);
+      }
+      expect(c.movementContourStallMs ?? 0).toBe(0);
+    });
+
+    it('does not interfere when a backtrack point is already active', () => {
+      // If the StuckDetector has already kicked us into backtrack, leave
+      // recovery to the existing path — don't fight it from the solver.
+      const adapter = mockNavmeshAdapter();
+      const navSystem = mockNavmeshSystem(adapter);
+      navSystem.queryPath.mockReturnValue([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(80, 0, 0),
+      ]);
+      movement.setNavmeshSystem(navSystem as any);
+
+      const c = createTestCombatant({
+        id: 'npc-backtrack-no-reroute',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+        movementBacktrackPoint: new THREE.Vector3(-10, NPC_Y_OFFSET, 0),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      // Even with stall preconditions met, an active backtrack point must
+      // suppress the reroute and zero the accumulator.
+      for (let i = 0; i < 50; i++) {
+        const triggered = callReroute(movement, c, true, true, 0.1);
+        expect(triggered).toBe(false);
+      }
+      expect(c.movementContourStallMs ?? 0).toBe(0);
+    });
+  });
+
   // ── Wade / route-around water (npc-wade-behavior, R1 of VODA-2) ─────────
   describe('wade behavior + deep-water route-around', () => {
     /**
