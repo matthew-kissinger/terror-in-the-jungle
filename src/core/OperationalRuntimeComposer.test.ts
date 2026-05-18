@@ -109,6 +109,7 @@ function createRefs() {
     vehicleManager: {
       spawnScenarioM2HBEmplacements: vi.fn(() => ['m2hb_scenario_id']),
       spawnScenarioM48Tanks: vi.fn(() => ['m48_scenario_id']),
+      spawnScenarioSampans: vi.fn(() => ['sampan_scenario_id']),
     },
     warSimulator: {
       setCombatantSystem: vi.fn(),

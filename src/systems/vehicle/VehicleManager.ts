@@ -15,6 +15,11 @@ import {
   type M48ScenarioMode,
 } from './M48TankSpawn';
 import { Tank } from './Tank';
+import {
+  spawnScenarioSampans,
+  type SampanScenarioMode,
+} from './SampanSpawn';
+import { Sampan } from './Sampan';
 
 // Scratch vector for distance calculations
 const _diff = new THREE.Vector3();
@@ -188,6 +193,49 @@ export class VehicleManager implements GameSystem {
     if (!v || v.category !== 'ground') return null;
     // `instanceof` keeps the wheeled M151 out of the tank-adapter path.
     return v instanceof Tank ? v : null;
+  }
+
+  /**
+   * Scenario-time spawn entry for the Sampan watercraft (Open Frontier
+   * river + A Shau valley river) per `cycle-voda-3-watercraft`.
+   * Each spawn registers a `Sampan` with this manager; the caller is
+   * responsible for binding the runtime water sampler via
+   * `Sampan.setWaterSampler` (and optionally the terrain provider via
+   * `Sampan.setTerrain` for beach-grounding queries) post-spawn,
+   * mirroring the M48 path that wires terrain after the fact.
+   *
+   * `resolvePosition` mirrors the M48 spawn callback — typically a
+   * water-surface or terrain snap closure.
+   *
+   * Returns the registered vehicle ids so the composer / scenario
+   * runtime can tear them down on mode switch.
+   */
+  spawnScenarioSampans(args: {
+    scene: THREE.Scene;
+    modes: SampanScenarioMode[];
+    resolvePosition?: (mode: SampanScenarioMode, base: THREE.Vector3) => THREE.Vector3;
+  }): string[] {
+    const spawned = spawnScenarioSampans({
+      modes: args.modes,
+      scene: args.scene,
+      vehicleManager: this,
+      resolvePosition: args.resolvePosition,
+    });
+    return spawned.map(s => s.vehicleId);
+  }
+
+  /**
+   * Convenience lookup for the `WatercraftPlayerAdapter`: resolve a
+   * sampan by the seated occupant id, returning null when the
+   * occupant is not seated in a sampan. Sibling of
+   * `getTankByOccupant`; the PBR sibling task adds its own
+   * `getPBRByOccupant` resolver against the same `category ===
+   * 'watercraft'` filter + a `PBR` instanceof narrowing.
+   */
+  getSampanByOccupant(occupantId: string): Sampan | null {
+    const v = this.getVehicleByOccupant(occupantId);
+    if (!v || v.category !== 'watercraft') return null;
+    return v instanceof Sampan ? v : null;
   }
 
   getAllVehicles(): IVehicle[] {
