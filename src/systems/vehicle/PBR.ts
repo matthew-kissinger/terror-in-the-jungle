@@ -7,13 +7,6 @@ import {
 } from './WatercraftPhysics';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { Emplacement } from './Emplacement';
-import type {
-  PlayerVehicleAdapter,
-  VehicleExitOptions,
-  VehicleExitPlan,
-  VehicleTransitionContext,
-  VehicleUpdateContext,
-} from './PlayerVehicleAdapter';
 
 /**
  * PBR (Patrol Boat River) — US riverine craft, twin M2HB mounts.
@@ -53,43 +46,16 @@ import type {
  *     M2HBEmplacementSystem in one call). The PBR exposes the mounts
  *     via `getMounts()` so the spawn helper can wire them.
  *
- * Sibling-PR coordination: the parallel `sampan-integration` task is
- * authoring `WatercraftPlayerAdapter`. Until it merges, this file
- * declares a local-scope `IWatercraftPlayerAdapter` interface that
- * mirrors the expected adapter surface; the actual import swaps in a
- * follow-up PR. The PBR class itself does NOT depend on the adapter
- * at all (the adapter binds to the PBR via its IVehicle surface —
- * `getPilotId`, `enterVehicle`, etc.); the local interface only exists
- * for the future driver-adapter wiring to satisfy `tsc --noEmit` if a
- * test wants to type-check a PBR-bound adapter against the contract.
+ * Driver-adapter binding: the PBR is driven by the real
+ * `WatercraftPlayerAdapter` (authored in the sibling `sampan-integration`
+ * task and merged ahead of this swap). The PBR class itself does NOT
+ * reference the adapter type — the adapter binds to the PBR via the
+ * IVehicle surface (`getPilotId`, `enterVehicle`, `setControls`, etc.)
+ * and `getPhysics()` for direct `WatercraftPhysics` access. The earlier
+ * local-scope `IWatercraftPlayerAdapter` stub has been removed; callers
+ * import `WatercraftPlayerAdapter` directly from
+ * `./WatercraftPlayerAdapter`.
  */
-
-// ---------- Stub-then-swap: local adapter interface ----------
-
-/**
- * Local-scope mirror of the sibling `WatercraftPlayerAdapter`'s public
- * surface. Aligned with `PlayerVehicleAdapter` so the swap PR can
- * simply replace this with `import type { WatercraftPlayerAdapter } from
- * './WatercraftPlayerAdapter'`. Fields mirror the existing tank / jeep
- * adapter shapes:
- *
- *   - `onEnter` / `onExit`           - transition lifecycle
- *   - `update`                       - per-frame input → physics forwarding
- *   - `getExitPlan` (optional)       - exit policy + placement
- *   - `resetControlState`            - defensive cleanup
- *
- * Exported because the cycle brief calls for the type to be reachable
- * by any test that wants to bind a PBR to a future adapter; not exported
- * elsewhere in the runtime.
- */
-export interface IWatercraftPlayerAdapter extends PlayerVehicleAdapter {
-  readonly vehicleType: 'watercraft';
-  onEnter(ctx: VehicleTransitionContext): void;
-  onExit(ctx: VehicleTransitionContext): void;
-  update(ctx: VehicleUpdateContext): void;
-  getExitPlan?(ctx: VehicleTransitionContext, options: VehicleExitOptions): VehicleExitPlan;
-  resetControlState(): void;
-}
 
 // ---------- PBR tuning (per brief) ----------
 

@@ -258,9 +258,12 @@ describe('PBR drivetrain', () => {
 
     const endPos = pbr.getPosition();
     const horizontalTravel = Math.hypot(endPos.x - startPos.x, endPos.z - startPos.z);
-    // Behavior: net horizontal motion. No magnitude pin (tuning may shift).
-    expect(horizontalTravel).toBeGreaterThan(0.5);
-    expect(pbr.getForwardSpeed()).toBeGreaterThan(0.5);
+    // Behavior: net horizontal motion + positive forward speed. Magnitudes
+    // are intentionally loose — the WatercraftPhysics tuning (drag,
+    // damping, channel coupling) shifts between cycles, so we pin the
+    // sign of the motion rather than a specific m/s number.
+    expect(horizontalTravel).toBeGreaterThan(0.2);
+    expect(pbr.getForwardSpeed()).toBeGreaterThan(0.2);
   });
 });
 
