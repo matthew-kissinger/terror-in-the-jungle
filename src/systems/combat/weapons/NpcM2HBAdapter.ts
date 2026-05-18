@@ -27,7 +27,10 @@ import {
  *   - The field-of-fire cone is derived from the live barrel pose
  *     (`Emplacement.getYaw()` / `getPitch()` / `getPosition()`) so an
  *     NPC won't try to mount a tripod whose barrel can't reach the
- *     threat.
+ *     threat. The local-frame yaw+pitch forward is composed with the
+ *     emplacement's `getQuaternion()` so PBR-mounted (or otherwise
+ *     parented) tripods report world-correct aim — same composition as
+ *     `M2HBEmplacement.computeBarrelForward` (B1 fix, 48406eb0).
  *
  * Production wiring:
  *   const adapter = createNpcM2HBAdapter(vehicleManager, m2hbSystem);
@@ -43,6 +46,14 @@ import {
 
 const _muzzleScratch = new THREE.Vector3();
 const _forwardScratch = new THREE.Vector3();
+/**
+ * Scratch quaternion for composing the emplacement's world rotation
+ * onto the locally-derived barrel forward. Required for tripods that
+ * live under a rotated parent (e.g. the PBR's aft mount on a hull at
+ * 180° local rotation). Mirrors the `_scratchWorldQuat` slot in
+ * `M2HBEmplacement.computeBarrelForward` (B1 fix in 48406eb0).
+ */
+const _worldQuatScratch = new THREE.Quaternion();
 /** M2HB barrel cone half-angle. Matches the helper's default fallback. */
 const M2HB_CONE_HALF_ANGLE_RAD = DEFAULT_FOV_HALF_ANGLE_RAD;
 /** Muzzle elevation above the tripod base, metres. Matches M2HBEmplacement.computeMuzzleOrigin. */
@@ -86,6 +97,16 @@ export function createNpcM2HBAdapter(
    * `computeBarrelForward` so the cone the AI consults matches the
    * direction live rounds will travel. Writes into the supplied scratch
    * vectors and returns whether the lookup succeeded.
+   *
+   * The local-frame forward derived from yaw + pitch is composed with
+   * the emplacement's world quaternion so a tripod that lives under a
+   * rotated parent (e.g. the PBR's aft M2HB mount on a hull rotated
+   * 180°) reports its barrel in the correct world direction. Mirrors
+   * the B1 fix to `M2HBEmplacement.computeBarrelForward` and
+   * `EmplacementPlayerAdapter.computeBarrelCamera` (commit 48406eb0).
+   * For an identity world quaternion (ground tripod at yaw=0) the
+   * composition is a no-op, so cycle-#6 emplacement behaviour is
+   * preserved.
    */
   function readBarrelPose(
     vehicleId: string,
@@ -101,6 +122,10 @@ export function createNpcM2HBAdapter(
     const cy = Math.cos(yaw);
     const sy = Math.sin(yaw);
     forwardOut.set(-sy * cp, sp, -cy * cp);
+    // `getQuaternion()` allocates a fresh quaternion; copy into the
+    // scratch slot to keep the per-call allocation count bounded.
+    _worldQuatScratch.copy(emp.getQuaternion());
+    forwardOut.applyQuaternion(_worldQuatScratch);
     muzzleOut.copy(emp.getPosition());
     muzzleOut.y += MUZZLE_HEIGHT_M;
     muzzleOut.addScaledVector(forwardOut, MUZZLE_FORWARD_M);
