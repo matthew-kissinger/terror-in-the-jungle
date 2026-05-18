@@ -4,6 +4,7 @@ import { GameMode } from '../config/gameModeTypes';
 import { Logger } from '../utils/Logger';
 import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacementSpawn';
 import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
+import type { SampanScenarioMode } from '../systems/vehicle/SampanSpawn';
 
 type OperationalRuntimeRefs = Pick<
   SystemKeyToType,
@@ -241,6 +242,7 @@ function wireVehicleRuntime(
 
   wireM2HBEmplacementRuntime(runtime, options);
   wireM48TankRuntime(runtime, options);
+  wireSampanRuntime(runtime, options);
 }
 
 // Maps GameMode -> the scenario-spawn key understood by
@@ -362,6 +364,67 @@ function snapM48ToTerrain(
     if (Number.isFinite(y)) _m48Scratch.y = y;
   }
   return _m48Scratch.clone();
+}
+
+// Maps GameMode -> the Sampan scenario-spawn key. Same shape + same
+// scenarios as the M48 wiring above (the sampans ride alongside the
+// land vehicles on Open Frontier river + A Shau valley river).
+const SAMPAN_MODES_BY_GAMEMODE: Partial<Record<GameMode, SampanScenarioMode>> = {
+  [GameMode.OPEN_FRONTIER]: 'open_frontier',
+  [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
+};
+
+function wireSampanRuntime(
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+  options: OperationalRuntimeOptions
+): void {
+  const scene = options.scene;
+  if (!scene) return;
+
+  const spawnedModes = new Set<SampanScenarioMode>();
+  runtime.gameModeManager.onModeChanged((mode) => {
+    const scenarioKey = SAMPAN_MODES_BY_GAMEMODE[mode];
+    if (!scenarioKey) return;
+    if (spawnedModes.has(scenarioKey)) return;
+    spawnedModes.add(scenarioKey);
+    // Defer one frame so the per-mode terrain provider is hot before
+    // resolvePosition runs `getHeightAt` — mirrors the M48 + M2HB
+    // wiring deferral above.
+    setTimeout(() => {
+      try {
+        const ids = runtime.vehicleManager.spawnScenarioSampans({
+          scene,
+          modes: [scenarioKey],
+          resolvePosition: (_m, base) => snapSampanToTerrain(base, runtime.terrainSystem),
+        });
+        Logger.info('vehicle', `Sampan scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
+      } catch (error) {
+        // Roll back the reservation so a manual re-trigger can retry.
+        spawnedModes.delete(scenarioKey);
+        Logger.warn('vehicle', `Sampan scenario spawn failed for ${scenarioKey}`, error);
+      }
+    }, 0);
+  });
+}
+
+const _sampanScratch = new THREE.Vector3();
+
+function snapSampanToTerrain(
+  base: THREE.Vector3,
+  terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
+): THREE.Vector3 {
+  // For the MVP we snap the hull to terrain height; the global water
+  // sampler is wired by the WaterSystem injection path post-spawn
+  // (Sampan.setWaterSampler). The hull then settles to its equilibrium
+  // waterline under buoyancy regardless of this initial Y. Snap is
+  // still useful so a freshly-spawned sampan does not start above the
+  // valley ridgeline or below the seabed.
+  _sampanScratch.copy(base);
+  if (typeof terrainSystem.getHeightAt === 'function') {
+    const y = terrainSystem.getHeightAt(base.x, base.z);
+    if (Number.isFinite(y)) _sampanScratch.y = y;
+  }
+  return _sampanScratch.clone();
 }
 
 function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRuntime']): void {
