@@ -4,6 +4,7 @@ import { GameMode } from '../config/gameModeTypes';
 import { Logger } from '../utils/Logger';
 import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacementSpawn';
 import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
+import type { PBRScenarioMode } from '../systems/vehicle/PBRSpawn';
 import type { SampanScenarioMode } from '../systems/vehicle/SampanSpawn';
 
 type OperationalRuntimeRefs = Pick<
@@ -243,6 +244,7 @@ function wireVehicleRuntime(
   wireM2HBEmplacementRuntime(runtime, options);
   wireM48TankRuntime(runtime, options);
   wireSampanRuntime(runtime, options);
+  wirePBRRuntime(runtime, options);
 }
 
 // Maps GameMode -> the scenario-spawn key understood by
@@ -425,6 +427,70 @@ function snapSampanToTerrain(
     if (Number.isFinite(y)) _sampanScratch.y = y;
   }
   return _sampanScratch.clone();
+}
+
+// Maps GameMode -> the PBR scenario-spawn key. Same shape as the M2HB
+// + M48 wiring (PBR spawns alongside on Open Frontier US riverbank +
+// A Shau US river outpost). Cycle-voda-3-watercraft pbr-integration.
+const PBR_MODES_BY_GAMEMODE: Partial<Record<GameMode, PBRScenarioMode>> = {
+  [GameMode.OPEN_FRONTIER]: 'open_frontier',
+  [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
+};
+
+function wirePBRRuntime(
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+  options: OperationalRuntimeOptions
+): void {
+  const m2hb = runtime.m2hbEmplacementSystem;
+  // The PBR depends on the M2HB system to bind the mount weapons; if
+  // the M2HB system is not available there is nothing useful to wire.
+  if (!m2hb) return;
+  const scene = options.scene;
+  if (!scene) return;
+
+  const spawnedModes = new Set<PBRScenarioMode>();
+  runtime.gameModeManager.onModeChanged((mode) => {
+    const scenarioKey = PBR_MODES_BY_GAMEMODE[mode];
+    if (!scenarioKey) return;
+    if (spawnedModes.has(scenarioKey)) return;
+    spawnedModes.add(scenarioKey);
+    // Defer one frame so the per-mode terrain provider is hot before
+    // resolvePosition runs `getHeightAt` — mirrors the M2HB / M48
+    // wiring's setTimeout(0) deferral above. The PBR will eventually
+    // snap to the water surface; until the river-height query is
+    // wired, terrain height is a safe fallback (boat lands on dry
+    // ground but the WatercraftPhysics buoyancy contract handles the
+    // rest once the WaterSystem sampler is attached).
+    setTimeout(() => {
+      try {
+        const ids = runtime.vehicleManager.spawnScenarioPBRs({
+          scene,
+          m2hbSystem: m2hb,
+          modes: [scenarioKey],
+          resolvePosition: (_m, base) => snapPBRToTerrain(base, runtime.terrainSystem),
+        });
+        Logger.info('vehicle', `PBR scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
+      } catch (error) {
+        // Roll back the reservation so a manual re-trigger can retry.
+        spawnedModes.delete(scenarioKey);
+        Logger.warn('vehicle', `PBR scenario spawn failed for ${scenarioKey}`, error);
+      }
+    }, 0);
+  });
+}
+
+const _pbrScratch = new THREE.Vector3();
+
+function snapPBRToTerrain(
+  base: THREE.Vector3,
+  terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
+): THREE.Vector3 {
+  _pbrScratch.copy(base);
+  if (typeof terrainSystem.getHeightAt === 'function') {
+    const y = terrainSystem.getHeightAt(base.x, base.z);
+    if (Number.isFinite(y)) _pbrScratch.y = y;
+  }
+  return _pbrScratch.clone();
 }
 
 function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRuntime']): void {
