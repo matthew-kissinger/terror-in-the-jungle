@@ -21,7 +21,14 @@ describe('HosekWilkieSkyBackend (via AtmosphereSystem)', () => {
     system.attachScene(scene);
     const skyMesh = scene.children.find((c) => c.name === 'HosekWilkieSkyDome');
     expect(skyMesh).toBeDefined();
-    expect((skyMesh as THREE.Mesh).material).toBeInstanceOf(THREE.MeshBasicMaterial);
+    // Behavior contract: the dome mesh has a sky material attached. The
+    // concrete material class shifted from `MeshBasicMaterial` (LUT-bake
+    // dome) to `MeshBasicNodeMaterial` (TSL per-fragment Preetham, default
+    // mode after cycle `tsl-preetham-fragment-port`); both render the
+    // dome, and the test cares that ONE is present, not which.
+    const mat = (skyMesh as THREE.Mesh).material as THREE.Material;
+    expect(mat).toBeDefined();
+    expect(mat.side).toBe(THREE.BackSide);
   });
 
   it('reapplies the same preset cleanly without duplicating the dome', () => {
