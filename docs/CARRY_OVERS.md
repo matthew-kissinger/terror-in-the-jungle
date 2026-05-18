@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-17 (post `cycle-vekhikl-4-tank-turret-and-cannon` close)
+Last verified: 2026-05-18 (post `cycle-voda-3-watercraft` close)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -24,14 +24,14 @@ started, the cycle is `INCOMPLETE` per the rule in
 
 | ID | Title | Opened | Cycles open | Owning subsystem | Blocking? | Notes |
 |----|-------|--------|------------:|------------------|-----------|-------|
-| DEFEKT-4 | NPC route-follow quality not signed off (slope-stuck, navmesh crowd disabled, terrain solver stalls) | cycle-2026-04-17-drift-correction-run | 9 | navigation | no | Phase 3 R5 (NavmeshSystem split) creates the seam; runtime acceptance after that. |
-| STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 8 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. |
-| AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 7 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
-| KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 5 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
-| KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 1 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
-| cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 3 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
-| weapons-cluster-zonemanager-migration | Finish the IZoneQuery migration for the 5 remaining concrete `ZoneManager` imports in the weapons cluster: `FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`, `PlayerHealthSystem` | cycle-2026-05-10-zone-manager-decoupling | 3 | weapons | no | Out-of-scope for Phase 2 R2 batches A/B/C; aspirational ≤5 ZoneManager-import target missed. Phase 3+ can finish; cycle-2026-05-10's ≤20 success criterion was met (achieved 17 read / 5 concrete). |
-| konveyer-large-file-splits | HosekWilkieSkyBackend.ts (807 LOC, slated for the TSL fragment-shader sky port) — water half closed in cycle-voda-1-water-shader-and-acceptance | exp→master merge prep 2026-05-12 | 3 | environment | no | Split-debt tracking. WaterSystem.ts split landed (1125 → 300 LOC orchestrator + 4 modules ≤300 each) and grandfather entry removed in PR #232. Sky half still grandfathered. **Cycle #13 `cycle-sun-and-atmosphere-overhaul` (queued 2026-05-17) absorbs the HosekWilkieSkyBackend half** — the TSL fragment-shader sky port per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md` candidate F retires the 256×128 LUT for visuals, keeps a 32×8 CPU LUT for fog/hemisphere readers, and ports `evaluateAnalytic` to a TSL node graph; closes fully when cycle #13 lands. |
+| DEFEKT-4 | NPC route-follow quality not signed off (slope-stuck, navmesh crowd disabled, terrain solver stalls) | cycle-2026-04-17-drift-correction-run | 10 | navigation | no | Phase 3 R5 (NavmeshSystem split) creates the seam; runtime acceptance after that. **Closes at cycle #11 `cycle-defekt-4-npc-route-quality` (now active).** |
+| STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 9 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. **Cycle #10 perf-analyst noted CI runs at measurement_trust=warn (GPU runner starvation; WebGL CONTEXT_LOST + WebGPU→WebGL2 fallback mid-capture); absolute p99 numbers untrustworthy until refresh. Expedite cycle #13.** |
+| AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 8 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
+| KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 6 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
+| KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 2 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
+| cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 4 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
+| weapons-cluster-zonemanager-migration | Finish the IZoneQuery migration for the 5 remaining concrete `ZoneManager` imports in the weapons cluster: `FirstPersonWeapon`, `WeaponAmmo`, `AmmoManager`, `AmmoSupplySystem`, `PlayerHealthSystem` | cycle-2026-05-10-zone-manager-decoupling | 4 | weapons | no | Out-of-scope for Phase 2 R2 batches A/B/C; aspirational ≤5 ZoneManager-import target missed. Phase 3+ can finish; cycle-2026-05-10's ≤20 success criterion was met (achieved 17 read / 5 concrete). |
+| konveyer-large-file-splits | HosekWilkieSkyBackend.ts (807 LOC, slated for the TSL fragment-shader sky port) — water half closed in cycle-voda-1-water-shader-and-acceptance | exp→master merge prep 2026-05-12 | 4 | environment | no | Split-debt tracking. WaterSystem.ts split landed (1125 → 300 LOC orchestrator + 4 modules ≤300 each) and grandfather entry removed in PR #232. Sky half still grandfathered. **Cycle #12 `cycle-sun-and-atmosphere-overhaul` (queued 2026-05-17) absorbs the HosekWilkieSkyBackend half** — the TSL fragment-shader sky port per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md` candidate F retires the 256×128 LUT for visuals, keeps a 32×8 CPU LUT for fog/hemisphere readers, and ports `evaluateAnalytic` to a TSL node graph; closes fully when cycle #12 lands. |
 
 ## Parked
 
@@ -257,6 +257,15 @@ History log:
   as KEEP-INCONCLUSIVE (1.79x speedup, 8.92 KB gz — under both gates so kept per brief
   rule). Kill-attribution gap from prior cycle closed via shared CombatantSystemDamage
   handler routing.
+- 2026-05-18 — `cycle-voda-3-watercraft` close (autonomous-loop posture):
+  6 PRs shipped (#259 #260 #261 #262 #263 #264). VODA-3 closed in docs/DIRECTIVES.md.
+  Net active-list delta 0 (carry-overs unchanged at 8). Owner walk-through deferred
+  to docs/PLAYTEST_PENDING.md. Sampan + PBR watercraft both drivable; PBR M2HB twin
+  mounts fire with world-space-correct aim (fixed a latent local-only-forward bug
+  in M2HBEmplacement + EmplacementPlayerAdapter + NpcM2HBAdapter — cycle-#6
+  ground-fixed emplacements unchanged via identity-quaternion no-op). Water sampler
+  wiring deferred to a follow-up. Perf CI measurement_trust=warn (GPU runner
+  starvation) — not a regression; cycle #13 baselines-refresh expedited.
 
 ## Closed
 

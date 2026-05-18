@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-17 (autonomous chain advanced past cycle #9; cycles #1-#9 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a / cycle #7 close-commit / cycle #8 close-commit / cycle #9 close-commit; current cycle = cycle-voda-3-watercraft)
+Last verified: 2026-05-18 (autonomous chain advanced past cycle #10; cycles #1-#10 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a / cycle #7 close-commit / cycle #8 close-commit / cycle #9 close-commit / cycle #10 close-commit; current cycle = cycle-defekt-4-npc-route-quality)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,110 +154,94 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-voda-3-watercraft
+## Current cycle: cycle-defekt-4-npc-route-quality
 
-**Cycle ID:** `cycle-voda-3-watercraft`
-**Brief:** [docs/tasks/cycle-voda-3-watercraft.md](tasks/cycle-voda-3-watercraft.md)
-**Skip-confirm:** no (owner playtest required per the brief; auto-deferred
-to PLAYTEST_PENDING.md under autonomous-loop posture)
-**Concurrency cap:** 4
+**Cycle ID:** `cycle-defekt-4-npc-route-quality`
+**Brief:** [docs/tasks/cycle-defekt-4-npc-route-quality.md](tasks/cycle-defekt-4-npc-route-quality.md)
+**Skip-confirm:** yes (campaign auto-advance)
+**Concurrency cap:** 3
 
-User-observable gap closed: VODA-3 watercraft. Ship two watercraft —
-the Sampan (light Vietnamese river boat) and the PBR (Patrol Boat
-River, US riverine craft with twin M2HB mounts) — both drivable and
-mountable. Both float on the buoyancy contract from VODA-2 and mount
-via the seat/adapter surface from VEKHIKL-1. Plus: river crossings,
-bridge interactions, and beach/bank docking. Blocked on cycle #4
-(VEKHIKL-1 seat/adapter pattern) and cycle #7 (VODA-2 buoyancy
-contract) — both `done` in the queue.
+User-observable gap closed: DEFEKT-4 NPC route-follow quality. Close
+the three threads behind DEFEKT-4: (1) slope-stuck — NPCs get pinned
+on inclines past the slope-stall threshold and can't recover;
+(2) navmesh crowd disabled — the Recast crowd surface is wired but
+disabled because of a prior regression; this cycle re-enables and
+validates; (3) terrain-aware solver stall loops — the slope-aware
+movement solver has stall-loop modes that cause perceptible
+stop-and-go on rough terrain. Active carry-over since cycle-2026-04-17.
 
 ### Round schedule
 
-| Round | Tasks (parallel) | Cap |
-|-------|------------------|-----|
-| 1 | `watercraft-physics-core`, `watercraft-physics-tests` | 2 |
-| 2 | `sampan-integration`, `pbr-integration`, `voda-3-playtest-evidence` | 3 |
+| Round | Tasks (parallel) | Cap | Notes |
+|-------|------------------|-----|-------|
+| 1 | `npc-slope-stuck-recovery`, `navmesh-crowd-reenable` | 2 | Independent. |
+| 2 | `terrain-solver-stall-fix` | 1 | After R1 — needs the re-enabled crowd to validate against. |
 
 ### Dependencies
 
-- R1: watercraft-physics-core (~450 LOC new
-  `src/systems/vehicle/WatercraftPhysics.ts` — generalizes
-  `GroundVehiclePhysics` chassis-conform with water-surface conform
-  via the buoyancy contract; state = position/velocity/angular
-  velocity/quaternion/enginePower + hull-sample-points; per-hull-sample
-  buoyancy via `BuoyancyForce.applyAtPoint`; throttle drives forward
-  force; rudder drives yaw; quadratic drag; river current force from
-  VODA-2 flow contract; wave heave + pitch from per-sample y-variance;
-  beach/bank docking via `ITerrainRuntime.getHeightAt` grounded-state
-  transition), watercraft-physics-tests (7 L2 behavior tests: neutral
-  buoyancy float, throttle forward, rudder yaw, current drift on
-  stationary hull, beach grounded transition, bridge clearance,
-  wave heave oscillation).
-- R2: sampan-integration (~250 LOC new
-  `src/systems/vehicle/Sampan.ts` — 6m × 2m, low power, single
-  seat; `WatercraftPlayerAdapter` with W/S throttle, A/D rudder, F
-  enter/exit; third-person follow camera; one spawn on A Shau
-  riverbank), pbr-integration (~300 LOC new
-  `src/systems/vehicle/PBR.ts` — 9.4m, twin water-jet drive, two
-  M2HB twin mounts forward + aft, driver + two gunners + one
-  passenger; reuses WatercraftPlayerAdapter for driver seat; M2HB
-  twins via cycle #6 emplacement pattern parented to PBR hull; one
-  spawn at US river outpost on A Shau), voda-3-playtest-evidence
-  (owner playtest; auto-deferred under autonomous-loop).
+- R1: `npc-slope-stuck-recovery` (NPC speed below epsilon for > 1.5 s
+  on a slope > stall threshold triggers a recovery state; yields to
+  gravity slide downhill until on walkable slope, then re-acquires
+  pathing target; behavior test on steep slope verifying recovery
+  transition within budget), `navmesh-crowd-reenable` (re-enable
+  Recast crowd surface; validate against the prior regression that
+  disabled it; scenario test catches regression if disable is
+  re-applied; perf budget ≤2 ms additional per nav step on
+  `combat120`).
+- R2: `terrain-solver-stall-fix` (identify stall-loop pattern in
+  the slope-aware solver via A Shau valley movement-replay; fix the
+  loop via `lastProgressPosition` re-route trigger or different
+  ordering of slope vs distance checks; behavior test verifies NPC
+  traverses A Shau valley without stop-and-go).
 
 ### Reviewer policy
 
-- `combat-reviewer` pre-merge gate for `pbr-integration` (M2HB
-  twin-mount wiring through combat-system path).
-- Orchestrator reviews other PRs (watercraft-physics-core,
-  watercraft-physics-tests, sampan-integration,
-  voda-3-playtest-evidence).
+- `terrain-nav-reviewer` pre-merge gate for all tasks (every touched
+  file is under `src/systems/navigation/**`).
 
 ### Hard stops (cycle-specific)
 
-- Cycles #4 OR #7 not closed → halt at dispatch (both verified
-  `done` at this dispatch).
-- Any new external physics library → halt (hand-rolled buoyancy
-  from VODA-2 carries to watercraft).
-- Owner playtest rejects twice → halt (deferred under
-  autonomous-loop; orchestrator proceeds, owner sweeps later).
+- `navmesh-crowd-reenable` reproduces the prior regression → halt.
+- Perf regression > 5% p99 on `combat120` from any task → halt
+  (deferred to cycle #13 baseline refresh until that lands;
+  measurement_trust=warn until then, but absolute deltas still
+  tracked).
+- Determinism regression → halt.
 - Standard: fence change, worktree isolation failure,
   twice-rejected reviewer.
-- Campaign-wide: perf regression > 5% p99 on `combat120` (deferred
-  to cycle #13 baseline refresh until that lands).
 
 ### Success criteria
 
-See [docs/tasks/cycle-voda-3-watercraft.md](tasks/cycle-voda-3-watercraft.md)
+See [docs/tasks/cycle-defekt-4-npc-route-quality.md](tasks/cycle-defekt-4-npc-route-quality.md)
 "Acceptance Criteria (cycle close)":
 - All R1 + R2 task PRs merged.
-- Sampan + PBR drivable on A Shau river.
-- M2HB twin on PBR firable + gunnable from passenger seat.
-- Owner playtest sign-off (deferred under autonomous-loop).
+- DEFEKT-4 visibly closed: NPCs no longer pin on slopes, navmesh
+  crowd re-enabled and validated, no stall loops on A Shau
+  traversal.
 - No fence change.
-- No external physics library.
 - No perf regression > 5% p99 on `combat120`.
-- `VODA-3` directive in `docs/DIRECTIVES.md` moves to Closed.
+- `DEFEKT-4` row in `docs/CARRY_OVERS.md` moves from Active to
+  Closed.
 
 ### Out of scope
 
-Other watercraft (Junk Force boats, etc.) — future cycles.
-Watercraft damage states beyond destroyed/intact — future. Submerged
-operation / submarines — far future. Multiplayer boat sharing —
-out of scope across campaign. Touching `src/systems/terrain/**`,
-`src/systems/navigation/**`. Fenced-interface touches.
+Major navmesh refactor (NavmeshSystem split / Phase 3 R5) —
+separate cycle if needed. AI behavior changes beyond movement
+(target selection, etc.). Touching `src/systems/combat/**` (only
+the movement consumer surface, gated by reviewer). Fenced-interface
+touches.
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #10** in the 13-cycle queue at
+This cycle is **position #11** in the 13-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 `Auto-advance: yes` + `posture: autonomous-loop` are set there. When
 this cycle closes:
 
-1. Mark cycle #10 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-defekt-4-npc-route-quality`).
+1. Mark cycle #11 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-sun-and-atmosphere-overhaul`).
 3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-defekt-4-npc-route-quality`.
+4. Commit with `docs(campaign): advance to cycle-sun-and-atmosphere-overhaul`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
@@ -265,38 +249,46 @@ mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-vekhikl-4-tank-turret-and-cannon` closed on 2026-05-17 at the
-cycle close-commit (last R3 merge at `0791d73e` swapping the
-TankAIGunnerRoute stub for the real TankBallisticSolver). **8 PRs
-across R1/R2/R3**. R1: [#252](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/252)
-`2026-05-17T17:24:26Z` TankTurret rig (capped yaw 30°/s + pitch
-8°/s + envelope [-10°, +20°]), [#253](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/253)
-`18:15:46Z` TankCannonProjectile (400 m/s muzzle + 20m arming +
-AP/HEAT/HE resolver + 9m blast radius + gravity-only arc per
-MortarBallistics template), [#251](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/251)
-`18:28:27Z` TankGunnerAdapter (post-merge stub→real swap on top).
-R2: [#254](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/254)
-`20:04:21Z` tank-ballistic-solver-wasm-pilot —
-**KEEP-INCONCLUSIVE** (1.79x speedup vs ≥3x bar AND 8.92 KB gz vs
-600 KB ceiling — under both gates so kept per brief rule; first
-pilot data, not codebase commitment), [#256](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/256)
-`20:04:32Z` Tank HP bands + substates (100/66/33/0% bands +
-tracks-blown / turret-jammed / engine-killed substates +
-damage-type-biased weight table), [#257](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/257)
-`21:47:09Z` NPC tank gunner with lead prediction + kill-attribution
-refactor (closes #253 reviewer kill-attribution gap via shared
-`CombatantSystemDamage.applyExplosionDamage` handler;
-CHANGES-REQUESTED → APPROVE iteration), [#255](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/255)
-`21:49:42Z` vekhikl-4-playtest-evidence (deferred under
-autonomous-loop). R3: [#258](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/258)
-`22:28:22Z` tank-ai-gunner-route-swap-real-solver (post-merge
-stub→real `TankBallisticSolver` swap once #254 + #257 both on
-master). VEKHIKL-3 + VEKHIKL-4 in DIRECTIVES.md moved Open →
-Closed (full M48 combat platform). combat120 p99 intra-cycle +1.4%
-(49.00 → 49.70 ms across cycle's PRs) — well under 5% gate. No
-fence change. No external physics library added. Owner walk-through
-deferred under autonomous-loop posture. No carry-over delta
-(VEKHIKL-3 + VEKHIKL-4 live in DIRECTIVES.md, not CARRY_OVERS
+`cycle-voda-3-watercraft` closed on 2026-05-18 at the cycle
+close-commit. **6 PRs across R1/R2**. R1:
+[#260](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/260)
+`2026-05-17T23:52:59Z` WatercraftPhysics hand-rolled hull (620 LOC
+under ≤700 ceiling per acceptance; generalizes `GroundVehiclePhysics`
+chassis-conform with water-surface conform via the VODA-2 buoyancy
+contract; throttle + rudder + quadratic drag + river-current force +
+wave-heave/pitch + beach/bank docking),
+[#259](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/259)
+`2026-05-18T00:23:14Z` WatercraftPhysics behavior tests + stub→real
+swap at merge. R2:
+[#261](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/261)
+`2026-05-18T09:59:09Z` watercraft-physics-damping-fix (vertical drag
++ convergent flow coupling — closed 2 real defects flagged by R1 swap
+reviewer),
+[#262](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/262)
+`2026-05-18T09:59:43Z` sampan-integration (Sampan IVehicle +
+WatercraftPlayerAdapter + SampanSpawn + composer wire; 6m × 2m hull,
+single seat, W/S throttle + A/D rudder + F enter/exit; third-person
+follow camera),
+[#264](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/264)
+`2026-05-18T13:10:05Z` pbr-integration (PBR + twin M2HB mounts +
+B1/B2/B3 fixes + NpcM2HB world-space aim closure — first
+CHANGES-REQUESTED → APPROVE after fix + post-rebase verification on
+`pbr-verify` worktree; the world-space aim composition closes a
+latent local-only-forward bug in `M2HBEmplacement` +
+`EmplacementPlayerAdapter` + `NpcM2HBAdapter`; cycle-#6 ground-fixed
+emplacements unaffected via identity-quaternion no-op),
+[#263](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/263)
+`2026-05-18T13:29:26Z` voda-3-playtest-evidence (deferred under
+autonomous-loop). VODA-3 in DIRECTIVES.md moved Open → Closed. Water
+sampler wiring for Sampan + PBR deferred as a follow-up (boats land
+on dry terrain until `OperationalRuntimeComposer.wireSampanRuntime`
++ `wirePBRRuntime` get `setWaterSampler(waterSystem)` calls).
+combat120 p99 CI measurement_trust=warn across all cycle PR runs
+(GPU runner starvation; PR #260 test-only baseline shows same
+numbers — not a real regression; cycle #13 baselines-refresh
+expedited). No fence change. No external physics library added.
+Owner walk-through deferred under autonomous-loop posture. No
+carry-over delta (VODA-3 lives in DIRECTIVES.md, not CARRY_OVERS
 Active). Carry-over count: 8 → 8.
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
