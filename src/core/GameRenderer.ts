@@ -32,6 +32,16 @@ import {
 export const INITIAL_FOG_COLOR = 0x7a8f88;
 
 /**
+ * Default tonemap applied at renderer init. AGX (Three.js r184) replaced
+ * ACES Filmic in `cycle-sun-and-atmosphere-overhaul` because the per-fragment
+ * Preetham sky R1 port needs AGX's softer rolloff to preserve horizon-zenith
+ * variety + HDR sun-disc contrast. Exported for tests so the policy stays
+ * locked against a silent revert. The WorldBuilder dev console exposes a
+ * runtime A/B toggle back to ACES (`toneMapping = 'aces'`) for playtest.
+ */
+export const DEFAULT_TONE_MAPPING: THREE.ToneMapping = THREE.AgXToneMapping;
+
+/**
  * Determine whether the WebGLRenderer should preserve its drawing buffer.
  *
  * Required by PlaytestCaptureManager (F9) for `renderer.domElement.toBlob()`
@@ -142,7 +152,12 @@ export class GameRenderer {
     renderer.shadowMap.enabled = shouldEnableShadows();
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // See `DEFAULT_TONE_MAPPING` for the AGX rationale. The WorldBuilder
+    // dev console exposes a runtime A/B toggle back to ACES for owner
+    // playtest; per-scenario `preset.exposure` recalibration is the R2
+    // task `per-scenario-exposure-recalibration`, so the default
+    // `toneMappingExposure` stays at 1.0.
+    renderer.toneMapping = DEFAULT_TONE_MAPPING;
     renderer.toneMappingExposure = 1.0;
   }
 
