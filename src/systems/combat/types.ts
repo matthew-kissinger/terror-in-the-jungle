@@ -206,6 +206,15 @@ export interface Combatant extends ITargetable {
   movementLastGoodPosition?: THREE.Vector3;
   movementBacktrackPoint?: THREE.Vector3;
   movementContourSign?: -1 | 1;
+  /**
+   * Accumulated ms of contour-stall (contour-activated + low-progress).
+   * Used by the terrain solver to detect oscillation around a navmesh
+   * waypoint that points across un-traversable terrain. When the accumulator
+   * crosses {@code CONTOUR_STALL_REROUTE_MS}, the cached navmesh path is
+   * invalidated so the next tick fetches a route that accounts for the
+   * obstacle. Reset to 0 on meaningful progress or when contour disengages.
+   */
+  movementContourStallMs?: number;
   vehicleId?: string;
   vehicleSeatIndex?: number;
 }

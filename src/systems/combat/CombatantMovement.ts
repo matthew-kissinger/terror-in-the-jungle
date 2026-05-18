@@ -53,6 +53,18 @@ const NPC_CONTOUR_FORWARD_BLEND = 0.42;
 const NPC_BACKTRACK_ARRIVAL_RADIUS_SQ = 2.25;
 const NPC_PROGRESS_EPSILON_SQ = 0.5;
 const NPC_LOW_PROGRESS_DELTA_SQ = 0.02;
+/**
+ * Wall-clock ms of contour-activated + low-progress accumulation that
+ * counts as a terrain-solver stall loop. When the navmesh-followed
+ * waypoint points across un-traversable terrain (e.g. a steep ridge the
+ * navmesh did not classify), contour deflects ~90° each tick and the NPC
+ * oscillates around the waypoint with no net forward progress. After this
+ * window, the cached navmesh path is invalidated so the next tick fetches
+ * a fresh route that goes around the obstacle. Long enough that the local
+ * contour blend gets a real chance to clear the lip before we re-query,
+ * short enough that the stop-and-go is not perceptible on screen.
+ */
+const NPC_CONTOUR_STALL_REROUTE_MS = 1200;
 const NPC_RECOVERY_BASE_RADIUS = 2.5;
 const NPC_RECOVERY_RADIUS_STEP = 1.25;
 const NPC_RECOVERY_MAX_RADIUS = 6.5;
@@ -327,6 +339,20 @@ export class CombatantMovement {
 
     const progress = this.updateProgressTracking(combatant, steering.anchorDistanceBeforeSq, now);
 
+    // Terrain-solver stall-loop guard: if contour is active and the NPC isn't
+    // making forward progress, the navmesh waypoint likely points across
+    // terrain the solver can't traverse (slope past walkable cutoff that the
+    // navmesh didn't classify). Drop the cached path so the next tick gets a
+    // fresh route that accounts for the obstacle. High-LOD only — low/culled
+    // run the terrain solver less aggressively and don't oscillate the same
+    // way. See `NPC_CONTOUR_STALL_REROUTE_MS` for the timing rationale.
+    this.evaluateTerrainStallReroute(
+      combatant,
+      steering.contourActivated,
+      progress.lowProgress,
+      deltaTime,
+    );
+
     // Pass the *goal* anchor (destination/cover/target) separately so the
     // stuck detector's escalation counter does not reset every time the
     // transient movement anchor flips between a backtrack point and the goal.
@@ -435,6 +461,63 @@ export class CombatantMovement {
       combatant.movementIntent = 'backtrack';
     }
     return action;
+  }
+
+  /**
+   * Detect terrain-solver stall loops (contour fires every tick but the NPC
+   * makes no forward progress) and invalidate the cached navmesh path when
+   * the stall has been sustained past {@link NPC_CONTOUR_STALL_REROUTE_MS}.
+   *
+   * The stall pattern: an NPC carrying a navmesh waypoint that points across
+   * a slope the navmesh did not classify hits `isForwardBlocked` each tick;
+   * `chooseContourDirection` deflects ~90° toward a contour-line and blends
+   * partially back toward the anchor; the next tick the slope is still
+   * ahead, so contour fires again. `movementContourSign` adds only a +0.25
+   * hysteresis bonus, so the side can flip — net XZ progress oscillates
+   * around the waypoint without crossing it.
+   *
+   * Dropping the cached path here lets the next tick re-query a route that
+   * already accounts for the obstacle, breaking the loop. High-LOD only:
+   * low/culled lanes don't oscillate the same way (fewer evaluations per
+   * second, navmesh-amortized) and the cost of re-querying isn't worth it.
+   *
+   * Returns true when a re-route was triggered (for telemetry / tests).
+   */
+  private evaluateTerrainStallReroute(
+    combatant: Combatant,
+    contourActivated: boolean,
+    lowProgress: boolean,
+    deltaTime: number,
+  ): boolean {
+    // High-LOD only. Backtrack engaged means the StuckDetector has already
+    // taken over recovery; don't fight it.
+    if (combatant.simLane !== 'high' || combatant.movementBacktrackPoint) {
+      combatant.movementContourStallMs = 0;
+      return false;
+    }
+
+    if (!contourActivated || !lowProgress) {
+      combatant.movementContourStallMs = 0;
+      return false;
+    }
+
+    const deltaMs = Math.max(0, deltaTime * 1000);
+    const accumulated = (combatant.movementContourStallMs ?? 0) + deltaMs;
+    combatant.movementContourStallMs = accumulated;
+
+    if (accumulated < NPC_CONTOUR_STALL_REROUTE_MS) {
+      return false;
+    }
+
+    // Stall window crossed: drop the cached path and reset the contour sign
+    // so the fresh route is not biased by the previous deflection side.
+    // Reset the accumulator so we don't fire again on the very next tick if
+    // the new path also crosses the obstacle; the StuckDetector remains the
+    // backstop if re-routing repeatedly fails.
+    const had = this.navPaths.delete(combatant.id);
+    combatant.movementContourSign = undefined;
+    combatant.movementContourStallMs = 0;
+    return had;
   }
 
   /**
