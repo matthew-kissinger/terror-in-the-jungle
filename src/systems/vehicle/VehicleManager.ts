@@ -14,6 +14,10 @@ import {
   spawnScenarioM48Tanks,
   type M48ScenarioMode,
 } from './M48TankSpawn';
+import {
+  spawnScenarioPBRs,
+  type PBRScenarioMode,
+} from './PBRSpawn';
 import { Tank } from './Tank';
 import {
   spawnScenarioSampans,
@@ -175,6 +179,36 @@ export class VehicleManager implements GameSystem {
       modes: args.modes,
       scene: args.scene,
       vehicleManager: this,
+      resolvePosition: args.resolvePosition,
+    });
+    return spawned.map(s => s.vehicleId);
+  }
+
+  /**
+   * Scenario-time spawn entry for the PBR (Patrol Boat River) per
+   * `cycle-voda-3-watercraft` R2 `pbr-integration`. Each spawn
+   * registers the PBR plus its two child M2HB emplacements with this
+   * manager, and registers the emplacements with `m2hbSystem` so they
+   * participate in the existing weapon-fire path.
+   *
+   * `resolvePosition` mirrors the M2HB / M48 spawn callbacks. Typically
+   * a water-surface or terrain-snap closure so the hull lands at the
+   * river height rather than 0.
+   *
+   * Returns the spawned PBR vehicle ids (not the mount ids — those
+   * are addressable via `pbr.getMounts()` after the spawn completes).
+   */
+  spawnScenarioPBRs(args: {
+    scene: THREE.Scene;
+    m2hbSystem: M2HBEmplacementSystem;
+    modes: PBRScenarioMode[];
+    resolvePosition?: (mode: PBRScenarioMode, base: THREE.Vector3) => THREE.Vector3;
+  }): string[] {
+    const spawned = spawnScenarioPBRs({
+      modes: args.modes,
+      scene: args.scene,
+      vehicleManager: this,
+      m2hbSystem: args.m2hbSystem,
       resolvePosition: args.resolvePosition,
     });
     return spawned.map(s => s.vehicleId);
