@@ -268,10 +268,18 @@ export class SystemInitializer {
     onProgress('world', 0.5);
 
     // Defer non-critical systems so first interactive frame is not blocked.
+    // `waterSystem` (river geometry compile) and `globalBillboardSystem`
+    // (vegetation atlas decode + per-type material construction) are deferred
+    // since neither is visible on the main menu — their update() paths are
+    // no-ops before init() runs (empty vegetation map, no water surface).
+    // Their init resumes in the background as soon as the menu renders, and
+    // is awaited again before mode startup via `ensureGameplaySystemsReady`.
     const deferredSystems = new Set<GameSystem>([
       refs.helipadSystem,
       refs.helicopterModel,
       refs.fixedWingModel,
+      refs.waterSystem,
+      refs.globalBillboardSystem,
     ]);
 
     const systems: GameSystem[] = allSystems.filter(system => !deferredSystems.has(system));

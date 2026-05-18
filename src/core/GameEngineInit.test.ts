@@ -68,6 +68,8 @@ function createEngineStub() {
     },
     systemManager: {
       initializeSystems: vi.fn().mockResolvedValue(undefined),
+      startDeferredInitialization: vi.fn(),
+      ensureGameplaySystemsReady: vi.fn().mockResolvedValue(undefined),
       assetLoader: { getTexture: vi.fn().mockReturnValue(undefined) },
       globalBillboardSystem: { configure: vi.fn() },
       hudSystem: { setPlayAgainCallback: vi.fn() },

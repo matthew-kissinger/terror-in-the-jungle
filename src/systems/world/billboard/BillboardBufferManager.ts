@@ -230,6 +230,7 @@ export class GPUBillboardVegetation {
     time: number,
     fog?: THREE.FogExp2 | null,
     lighting?: BillboardLighting | null,
+    playerWorldPosition?: THREE.Vector3 | null,
   ): void {
     // Apply batched buffer updates
     if (this.pendingPositionUpdate) {
@@ -247,6 +248,9 @@ export class GPUBillboardVegetation {
 
     this.material.uniforms.cameraPosition.value.copy(camera.position);
     this.material.uniforms.time.value = time;
+    if (playerWorldPosition) {
+      this.material.uniforms.playerWorldPosition.value.copy(playerWorldPosition);
+    }
     if (camera instanceof THREE.PerspectiveCamera) {
       this.material.uniforms.viewMatrix.value.copy(camera.matrixWorldInverse);
     }

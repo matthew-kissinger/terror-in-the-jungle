@@ -82,6 +82,12 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
 
     engine.startupFlow.showMenu();
     engine.loadingScreen.showMainMenu();
+
+    // Kick off deferred gameplay-system init (water, vegetation, vehicles) in
+    // the background as soon as the menu is visible. By the time the player
+    // picks a mode the init is usually done; `startGameWithMode` awaits the
+    // same promise as a safety gate.
+    engine.systemManager.startDeferredInitialization();
   } catch (error) {
     Logger.error('engine-init', 'Failed to initialize engine:', error);
     const errorMessage = error instanceof Error
@@ -132,6 +138,11 @@ export async function startGameWithMode(
     markStartup(`engine-init.start-game.${mode}.begin`);
     Logger.info('engine-init', `Starting game with mode: ${mode}`);
     engine.loadingScreen.beginGameLaunch(launchSelection);
+
+    // Make sure deferred gameplay systems (water, vegetation, vehicles) are
+    // ready before mode startup tries to use them. The kickoff happens at
+    // menu-show time; this await is a safety gate for impatient players.
+    await engine.systemManager.ensureGameplaySystemsReady();
 
     const preparedMode = await startGamePipeline.prepareModeStartup(engine, launchSelection);
     const initialDeployPosition = await startGamePipeline.prepareInitialDeploy(

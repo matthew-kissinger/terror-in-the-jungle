@@ -84,8 +84,9 @@ export class GlobalBillboardSystem implements GameSystem {
     deltaTime: number,
     fog?: THREE.FogExp2 | null,
     lighting?: BillboardLighting | null,
+    playerWorldPosition?: THREE.Vector3 | null,
   ): void {
-    this.gpuSystem.update(this.camera, deltaTime, fog, lighting);
+    this.gpuSystem.update(this.camera, deltaTime, fog, lighting, playerWorldPosition);
   }
 
   dispose(): void {

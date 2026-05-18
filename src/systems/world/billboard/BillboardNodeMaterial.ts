@@ -40,6 +40,14 @@ const clampValue = (value: number, min: number, max: number): number => (
   Math.min(max, Math.max(min, value))
 );
 
+const DEFAULT_WIND_DIRECTION: { x: number; y: number; z: number } = (() => {
+  const x = 1;
+  const y = 0;
+  const z = 0.3;
+  const len = Math.hypot(x, y, z) || 1;
+  return { x: x / len, y: y / len, z: z / len };
+})();
+
 const resolveWindStrength = (height: number, profile: VegetationAtlasProfile): number => {
   const profileMultiplier = profile === 'ground-compact'
     ? 0.55
@@ -81,6 +89,10 @@ interface BillboardMaterialUniforms {
   windStrength: BillboardMaterialUniform<number>;
   windSpeed: BillboardMaterialUniform<number>;
   windSpatialScale: BillboardMaterialUniform<number>;
+  windDirection: BillboardMaterialUniform<THREE.Vector3>;
+  playerWorldPosition: BillboardMaterialUniform<THREE.Vector3>;
+  playerImprintRadius: BillboardMaterialUniform<number>;
+  playerImprintStrength: BillboardMaterialUniform<number>;
   fogColor: BillboardMaterialUniform<THREE.Color>;
   fogDensity: BillboardMaterialUniform<number>;
   fogHeightFalloff: BillboardMaterialUniform<number>;
@@ -154,6 +166,12 @@ export function createBillboardNodeMaterial(
     windStrength: { value: resolveWindStrength(config.height, config.atlasProfile) },
     windSpeed: { value: 1.15 },
     windSpatialScale: { value: 0.055 },
+    windDirection: {
+      value: new THREE.Vector3(DEFAULT_WIND_DIRECTION.x, DEFAULT_WIND_DIRECTION.y, DEFAULT_WIND_DIRECTION.z),
+    },
+    playerWorldPosition: { value: new THREE.Vector3(0, 1000, 0) },
+    playerImprintRadius: { value: 2.2 },
+    playerImprintStrength: { value: 0.8 },
     fogColor: { value: new THREE.Color(0x5a7a6a) },
     fogDensity: { value: DEFAULT_BILLBOARD_FOG_DENSITY },
     fogHeightFalloff: { value: 0.03 },
@@ -188,9 +206,16 @@ export function createBillboardNodeMaterial(
   const instanceRotation = tslInstancedBufferAttribute(rotationAttribute, 'float');
   const toCamera = cameraPosition.sub(instancePosition);
   const toCameraXZ = tslVec3(toCamera.x, 0, toCamera.z);
-  const xzLength = tslMax(length(toCameraXZ), tslFloat(0.001));
-  const forward = toCameraXZ.div(xzLength);
-  const right = tslVec3(forward.z, 0, forward.x.negate());
+  const xzLength = length(toCameraXZ);
+  // Smooth-blend to a world-X fallback right-axis when looking nearly vertical at a
+  // tuft. Avoids the snap the previous max(length, 0.001) clamp caused.
+  const forwardBlend = smoothstep(tslFloat(0.05), tslFloat(0.3), xzLength);
+  const safeForward = tslMix(
+    tslVec3(1, 0, 0),
+    toCameraXZ.div(tslMax(xzLength, tslFloat(0.001))),
+    forwardBlend,
+  );
+  const right = tslVec3(safeForward.z, 0, safeForward.x.negate());
   const up = tslVec3(0, 1, 0);
   const scaledX = positionGeometry.x.mul(instanceScale.x);
   const scaledY = positionGeometry.y.mul(instanceScale.y);
@@ -198,6 +223,10 @@ export function createBillboardNodeMaterial(
   const windStrength = tslReference('float', uniforms.windStrength);
   const windSpeed = tslReference('float', uniforms.windSpeed);
   const windSpatialScale = tslReference('float', uniforms.windSpatialScale);
+  const windDirection = tslReference('vec3', uniforms.windDirection);
+  const playerPos = tslReference('vec3', uniforms.playerWorldPosition);
+  const imprintRadius = tslReference('float', uniforms.playerImprintRadius);
+  const imprintStrength = tslReference('float', uniforms.playerImprintStrength);
   const lodDistances = tslReference('vec2', uniforms.lodDistances);
   const maxDistance = tslReference('float', uniforms.maxDistance);
   const fadeDistance = tslReference('float', uniforms.fadeDistance);
@@ -216,9 +245,31 @@ export function createBillboardNodeMaterial(
   const sway = primarySway.add(gustSway.mul(0.35)).mul(windStrength).mul(lodWindScale);
   const swayWeight = uv().y.mul(uv().y);
 
+  // World-direction wind: all blades lean the same way during a gust.
+  const swayOffset = windDirection.mul(sway.mul(swayWeight));
+
+  // Player-presence imprint: radial push-away with quadratic falloff. Linear uv.y
+  // weight so the base shifts too — gives a visible parted path through the grass,
+  // not tip-only tilt.
+  const toPlayerX = playerPos.x.sub(instancePosition.x);
+  const toPlayerZ = playerPos.z.sub(instancePosition.z);
+  const distToPlayer = length(tslVec2(toPlayerX, toPlayerZ));
+  const safePlayerDist = tslMax(distToPlayer, tslFloat(0.001));
+  const pushX = toPlayerX.div(safePlayerDist).negate();
+  const pushZ = toPlayerZ.div(safePlayerDist).negate();
+  const falloff = tslClamp(
+    tslFloat(1).sub(distToPlayer.div(imprintRadius)),
+    tslFloat(0),
+    tslFloat(1),
+  );
+  const imprintMag = falloff.mul(falloff).mul(imprintStrength).mul(uv().y);
+  const imprintOffset = tslVec3(pushX.mul(imprintMag), tslFloat(0), pushZ.mul(imprintMag));
+
   material.positionNode = instancePosition
-    .add(right.mul(scaledX.add(sway.mul(swayWeight))))
-    .add(up.mul(scaledY));
+    .add(right.mul(scaledX))
+    .add(up.mul(scaledY))
+    .add(swayOffset)
+    .add(imprintOffset);
 
   const atlas = createBillboardAtlasNodes(config.texture, config.normalTexture ?? config.texture, uniforms, instancePosition);
   const texColor = atlas.color as TslNode;

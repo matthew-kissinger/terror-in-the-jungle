@@ -119,7 +119,8 @@ export class SystemUpdater {
           );
           lighting = this.billboardLighting;
         }
-        refs.globalBillboardSystem.update(deltaTime, fog, lighting);
+        const playerPos = refs.playerController?.getPosition();
+        refs.globalBillboardSystem.update(deltaTime, fog, lighting, playerPos);
       }
       performanceTelemetry.endSystem('Billboards');
     });

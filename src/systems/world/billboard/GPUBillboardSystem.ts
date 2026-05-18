@@ -121,10 +121,11 @@ export class GPUBillboardSystem {
     _deltaTime: number,
     fog?: THREE.FogExp2 | null,
     lighting?: BillboardLighting | null,
+    playerWorldPosition?: THREE.Vector3 | null,
   ): void {
     const time = performance.now() * 0.001;
     this.vegetationTypes.forEach(vegetation => {
-      vegetation.update(camera, time, fog, lighting);
+      vegetation.update(camera, time, fog, lighting, playerWorldPosition);
     });
   }
 

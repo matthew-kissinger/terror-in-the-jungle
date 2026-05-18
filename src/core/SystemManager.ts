@@ -55,6 +55,7 @@ export class SystemManager {
   private systems: GameSystem[] = [];
   private deferredSystems: GameSystem[] = [];
   private deferredInitStarted = false;
+  private deferredInitPromise?: Promise<void>;
   private scene?: THREE.Scene;
   
   private initializer = new SystemInitializer();
@@ -94,12 +95,27 @@ export class SystemManager {
   }
 
   startDeferredInitialization(): void {
-    if (this.deferredInitStarted || this.deferredSystems.length === 0) {
-      return;
-    }
+    void this.ensureGameplaySystemsReady();
+  }
 
+  /**
+   * Returns a promise that resolves when all deferred gameplay systems
+   * (vegetation, water, vehicles) have finished initializing. Idempotent —
+   * multiple callers share the same underlying promise. Called from
+   * `GameEngineInit` right after `showMainMenu` (background kickoff) and
+   * again before mode startup (await gate).
+   */
+  ensureGameplaySystemsReady(): Promise<void> {
+    if (this.deferredInitPromise) {
+      return this.deferredInitPromise;
+    }
+    if (this.deferredSystems.length === 0) {
+      this.deferredInitPromise = Promise.resolve();
+      return this.deferredInitPromise;
+    }
     this.deferredInitStarted = true;
-    void this.initializeDeferredSystems();
+    this.deferredInitPromise = this.initializeDeferredSystems();
+    return this.deferredInitPromise;
   }
 
   private async initializeDeferredSystems(): Promise<void> {
