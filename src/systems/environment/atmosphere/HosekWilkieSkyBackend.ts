@@ -2,12 +2,24 @@ import * as THREE from 'three';
 import type { ISkyBackend } from './ISkyBackend';
 import type { AtmospherePreset } from './ScenarioAtmospherePresets';
 import { sunDirectionFromPreset } from './ScenarioAtmospherePresets';
+import {
+  createHosekWilkieTslMaterial,
+  type HosekWilkieTslMaterial,
+} from './HosekWilkieTslNode';
 
 const DOME_RADIUS = 500;
 const DOME_WIDTH_SEGMENTS = 64;
 const DOME_HEIGHT_SEGMENTS = 32;
-const SKY_TEXTURE_WIDTH = 256;
-const SKY_TEXTURE_HEIGHT = 128;
+// Cycle `tsl-preetham-fragment-port` (2026-05-17): the visual dome is now
+// per-fragment-shaded via TSL. The 32x8 backing texture is the only
+// remaining CPU-baked LUT — it serves `sample()` / `getZenith()` /
+// `getHorizon()` for fog + hemisphere readers, NOT the dome itself.
+// Mode `'lut-bake'` (back-out) keeps a `MeshBasicMaterial` reading the
+// 32x8 texture as a fallback for browsers / mobile GPUs where the TSL
+// dome regresses. Per the spike Section 4 acceptance: net memory is a
+// small reduction (256x128 half-float ⇒ 32x8 half-float).
+const SKY_TEXTURE_WIDTH = 32;
+const SKY_TEXTURE_HEIGHT = 8;
 
 const LUT_AZIMUTH_BINS = 32;
 const LUT_ELEVATION_BINS = 8;
@@ -185,9 +197,36 @@ function fbm(x: number, y: number): number {
  * every frame, but the LUT is only re-baked when the sun direction
  * changes — in v1 that's once per scenario boot.
  */
+/**
+ * Visual dome implementation mode.
+ *
+ * - `'tsl'` (default): the dome paints with a per-fragment TSL Preetham
+ *   shader (`HosekWilkieTslNode`). The 32×8 CPU LUT only serves
+ *   `sample()` / `getZenith()` / `getHorizon()` for fog + hemisphere
+ *   readers; the visual dome is fragment-resolution.
+ * - `'lut-bake'`: legacy bake-and-stretch path that paints the same 32×8
+ *   CPU LUT onto a `MeshBasicMaterial`. Back-out for browsers where the
+ *   TSL graph regresses visually or on perf. The bake-and-stretch path
+ *   loses the in-shader HDR sun-disc; callers can pair this with the
+ *   additive `SunDiscMesh` sprite from cycle-sky-visual-restore for the
+ *   pre-merge sun look.
+ */
+export type SkyBackendMode = 'tsl' | 'lut-bake';
+
+export interface HosekWilkieSkyBackendOptions {
+  /**
+   * Visual dome mode. Default `'tsl'`. Mobile callers can override to
+   * `'lut-bake'` if the per-fragment TSL dome regresses on the WebGL2
+   * fallback. See `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md`
+   * Section 4 back-out path.
+   */
+  mode?: SkyBackendMode;
+}
+
 export class HosekWilkieSkyBackend implements ISkyBackend {
+  private readonly mode: SkyBackendMode;
   private readonly mesh: THREE.Mesh;
-  private readonly material: THREE.MeshBasicMaterial;
+  private readonly material: THREE.MeshBasicMaterial | HosekWilkieTslMaterial;
   private readonly geometry: THREE.SphereGeometry;
   private readonly skyTexture: THREE.Texture;
   private readonly skyData: Uint16Array;
@@ -242,28 +281,47 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   // clouds, no anchor motion) while still firing on real visible change.
   private skyContentChanged = true;
 
-  constructor() {
+  constructor(options: HosekWilkieSkyBackendOptions = {}) {
+    this.mode = options.mode ?? 'tsl';
     this.lut = new Float32Array(LUT_AZIMUTH_BINS * LUT_ELEVATION_BINS * 3);
     const skyTexture = createSkyTexture();
     this.skyTexture = skyTexture.texture;
     this.skyData = skyTexture.data;
 
-    this.material = new THREE.MeshBasicMaterial({
-      name: 'HosekWilkieSky',
-      map: this.skyTexture,
-      side: THREE.BackSide,
-      depthWrite: false,
-      depthTest: false,
-      fog: false,
-      // Bypass the renderer's ACESFilmicToneMapping for the dome. The
-      // pre-merge Preetham GLSL deliberately bypassed tonemapping; routing
-      // the baked LUT through ACES desaturates and pulls to middle grey.
-      // See docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md.
-      toneMapped: false,
-    });
+    if (this.mode === 'tsl') {
+      // Per-fragment TSL Preetham dome. The 32×8 backing texture is built
+      // alongside but ONLY feeds `sample()` / `getZenith()` / `getHorizon()`
+      // for fog + hemisphere readers. The dome itself paints from the
+      // fragment shader. See `HosekWilkieTslNode.ts` for the graph.
+      this.material = createHosekWilkieTslMaterial({
+        sunDirection: this.sunDirection,
+        turbidity: this.turbidity,
+        rayleigh: this.rayleigh,
+        mieCoefficient: this.mieCoefficient,
+        mieDirectionalG: this.mieDirectionalG,
+        groundAlbedo: this.groundAlbedo,
+        exposure: this.exposure,
+      });
+    } else {
+      // Back-out path: bake-and-stretch dome. Paints the 32×8 CPU LUT onto
+      // a standard `MeshBasicMaterial`. See spike Section 4 back-out path.
+      this.material = new THREE.MeshBasicMaterial({
+        name: 'HosekWilkieSky',
+        map: this.skyTexture,
+        side: THREE.BackSide,
+        depthWrite: false,
+        depthTest: false,
+        fog: false,
+        // Bypass the renderer's ACESFilmicToneMapping for the dome. The
+        // pre-merge Preetham GLSL deliberately bypassed tonemapping; routing
+        // the baked LUT through ACES desaturates and pulls to middle grey.
+        // See docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md.
+        toneMapped: false,
+      });
+    }
 
     this.geometry = new THREE.SphereGeometry(DOME_RADIUS, DOME_WIDTH_SEGMENTS, DOME_HEIGHT_SEGMENTS);
-    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh = new THREE.Mesh(this.geometry, this.material as THREE.Material);
     this.mesh.renderOrder = -1;
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = true;
@@ -271,6 +329,11 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     this.bakeLUT();
     this.lutDirty = false;
     this.refreshSkyTexture();
+  }
+
+  /** Visual dome mode (test/debug visibility). */
+  getMode(): SkyBackendMode {
+    return this.mode;
   }
 
   /** Apply a scenario preset: sun direction, turbidity, albedo, exposure. */
@@ -281,8 +344,27 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     this.groundAlbedo.copy(preset.groundAlbedo);
     this.exposure = preset.exposure;
 
+    this.syncTslMaterialUniforms();
     this.lutDirty = true;
     this.markSkyTextureDirty();
+  }
+
+  /**
+   * Mirror the backend's preset state into the TSL material uniforms when
+   * the dome is running in `'tsl'` mode. Cheap (10 scalar/vec writes); the
+   * TSL graph picks the new values up on the next render without a recompile.
+   */
+  private syncTslMaterialUniforms(): void {
+    if (this.mode !== 'tsl') return;
+    const tslMaterial = this.material as HosekWilkieTslMaterial;
+    if (!tslMaterial.uniforms) return;
+    tslMaterial.uniforms.sunDirection.value.copy(this.sunDirection);
+    tslMaterial.uniforms.turbidity.value = this.turbidity;
+    tslMaterial.uniforms.rayleigh.value = this.rayleigh;
+    tslMaterial.uniforms.mieCoefficient.value = this.mieCoefficient;
+    tslMaterial.uniforms.mieDirectionalG.value = this.mieDirectionalG;
+    tslMaterial.uniforms.groundAlbedo.value.copy(this.groundAlbedo);
+    tslMaterial.uniforms.exposure.value = this.exposure;
   }
 
   /** Returns the dome mesh so `AtmosphereSystem` can attach it to the scene. */
@@ -304,6 +386,16 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       this.lastSunDir.x * nx + this.lastSunDir.y * ny + this.lastSunDir.z * nz;
 
     this.sunDirection.set(nx, ny, nz);
+    // Sun direction is the per-frame uniform driving the TSL fragment
+    // shader's sky gradient + disc position. Push every frame so the
+    // dome tracks animated TOD presets smoothly (LUT rebake is gated on
+    // the 0.5° threshold below; the shader uniform is not).
+    if (this.mode === 'tsl') {
+      const tslMaterial = this.material as HosekWilkieTslMaterial;
+      if (tslMaterial.uniforms) {
+        tslMaterial.uniforms.sunDirection.value.set(nx, ny, nz);
+      }
+    }
 
     // LUT rebake stays at the 0.5° threshold — it's cheap (256 directions)
     // and consumers of `sample()` / `getZenith()` / `getHorizon()` need
