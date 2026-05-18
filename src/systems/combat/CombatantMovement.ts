@@ -19,13 +19,18 @@ import { NPC_MAX_SPEED, NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { NavmeshMovementAdapter } from '../navigation/NavmeshMovementAdapter';
 import { StuckDetector, type StuckRecoveryAction } from './StuckDetector';
+import { SlopeStuckDetector } from './SlopeStuckDetector';
 import { Logger } from '../../utils/Logger';
 import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 import {
   computeSlopeValueFromNormal,
   computeSmoothedSupportNormal,
 } from '../terrain/GameplaySurfaceSampling';
-import { isWalkableSlope } from '../terrain/SlopePhysics';
+import {
+  computeSlopeSlideVelocity,
+  isWalkableSlope,
+  SLOPE_SLIDE_STRENGTH,
+} from '../terrain/SlopePhysics';
 
 // ── Terrain sample intervals by LOD (ms) ──
 const TERRAIN_SAMPLE_INTERVAL_HIGH = 80;
@@ -154,6 +159,7 @@ export class CombatantMovement {
   private wadeSplashEmitter?: NpcWadeSplashEmitter;
   private readonly _spacingForce = new THREE.Vector3();
   private readonly stuckDetector = new StuckDetector();
+  private readonly slopeStuckDetector = new SlopeStuckDetector();
   private readonly navPaths = new Map<string, CachedNavPath>();
   private pathQueriesThisFrame = 0;
   private nextStuckRecoveryWarnAtMs = 0;
@@ -193,6 +199,7 @@ export class CombatantMovement {
         this.navmeshAdapter.unregisterAgent(combatant.id);
       }
       this.stuckDetector.remove(combatant.id);
+      this.slopeStuckDetector.remove(combatant.id);
       this.navPaths.delete(combatant.id);
       performanceTelemetry.removeNPCMovementTracker(combatant.id);
       return;
@@ -204,6 +211,7 @@ export class CombatantMovement {
       if (this.navmeshAdapter?.hasAgent(combatant.id)) {
         this.navmeshAdapter.unregisterAgent(combatant.id);
       }
+      this.slopeStuckDetector.remove(combatant.id);
       this.navPaths.delete(combatant.id);
       performanceTelemetry.removeNPCMovementTracker(combatant.id);
       return;
@@ -267,6 +275,19 @@ export class CombatantMovement {
 
     const steering = this.applyTerrainAwareVelocity(combatant, now, navmeshWaypoint);
     this.clampHorizontalVelocity(combatant, NPC_MAX_SPEED);
+
+    // Slope-stuck recovery: if the terrain-aware solver leaves the NPC pinned
+    // on an unwalkable slope with intended-but-stalled movement for longer
+    // than SLOPE_STALL_TIME_MS, override velocity with a downhill slide until
+    // the NPC reaches a walkable slope. On recovery we drop the cached
+    // navmesh path so the next tick re-acquires the goal anchor from scratch.
+    // See `SlopeStuckDetector` for the threshold rationale.
+    const slopeAction = this.evaluateSlopeStuckRecovery(combatant, now);
+    if (slopeAction === 'recovered') {
+      this.navPaths.delete(combatant.id);
+      combatant.movementBacktrackPoint = undefined;
+      combatant.movementContourSign = undefined;
+    }
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
     combatant.position.addScaledVector(combatant.velocity, deltaTime);
@@ -346,6 +367,56 @@ export class CombatantMovement {
     const scale = max / Math.sqrt(speedSq);
     combatant.velocity.x *= scale;
     combatant.velocity.z *= scale;
+  }
+
+  /**
+   * Drive the slope-stuck recovery state machine for one tick.
+   *
+   * Sampled against the support normal at the combatant's current position
+   * (same primitive the terrain-aware solver uses, so the slope classifier
+   * agrees with `isWalkableSlope` from SlopePhysics). When recovery is
+   * active, the frame's velocity is overwritten with a downhill slide along
+   * the negative XZ projection of the support normal at
+   * {@link SLOPE_SLIDE_STRENGTH} m/s. Recovery exits the moment the
+   * combatant's support normal classifies as walkable.
+   *
+   * The 'slide' action also sets `movementIntent = 'backtrack'` so the
+   * recovery is observable through existing telemetry channels without
+   * widening the intent enum.
+   */
+  private evaluateSlopeStuckRecovery(combatant: Combatant, now: number): 'none' | 'slide' | 'recovered' {
+    const supportNormal = this.sampleSupportNormal(
+      combatant.position.x,
+      combatant.position.z,
+      combatant.velocity.x,
+      combatant.velocity.z,
+      _supportNormal,
+    );
+    const slopeValue = computeSlopeValueFromNormal(supportNormal);
+    const onUnwalkableSlope = !isWalkableSlope(slopeValue);
+
+    // "Wants movement" mirrors the StuckDetector definition — the AI has
+    // pushed a non-trivial velocity even if the solver has since clamped it.
+    // We approximate via the resolved movement intent: a 'hold' NPC has no
+    // forward intent at all, so its stall is not a slope-stuck failure.
+    const wantsMovement = (combatant.movementIntent ?? 'hold') !== 'hold';
+    const currentSpeed = Math.hypot(combatant.velocity.x, combatant.velocity.z);
+
+    const action = this.slopeStuckDetector.checkAndUpdate(
+      combatant,
+      now,
+      onUnwalkableSlope,
+      wantsMovement,
+      currentSpeed,
+    );
+
+    if (action === 'slide') {
+      const slide = computeSlopeSlideVelocity(supportNormal.x, supportNormal.z, SLOPE_SLIDE_STRENGTH);
+      combatant.velocity.x = slide.x;
+      combatant.velocity.z = slide.z;
+      combatant.movementIntent = 'backtrack';
+    }
+    return action;
   }
 
   updateRotation(combatant: Combatant, _deltaTime: number): void {
@@ -1227,6 +1298,7 @@ export class CombatantMovement {
       this.navmeshAdapter.unregisterAgent(id);
     }
     this.stuckDetector.remove(id);
+    this.slopeStuckDetector.remove(id);
     this.wadeSplashEmitter?.forgetEmitter(id);
     performanceTelemetry.removeNPCMovementTracker(id);
   }
@@ -1234,6 +1306,7 @@ export class CombatantMovement {
   /** Reset stuck detection state (call on round/mode transitions). */
   resetStuckDetector(): void {
     this.stuckDetector.clear();
+    this.slopeStuckDetector.clear();
     this.nextStuckRecoveryWarnAtMs = 0;
     this.suppressedStuckRecoveryWarns = 0;
   }
