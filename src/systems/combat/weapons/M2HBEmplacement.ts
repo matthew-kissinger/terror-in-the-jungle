@@ -49,6 +49,7 @@ const _scratchMuzzle = new THREE.Vector3();
 const _scratchForward = new THREE.Vector3();
 const _scratchTracerEnd = new THREE.Vector3();
 const _scratchOrigin = new THREE.Vector3();
+const _scratchWorldQuat = new THREE.Quaternion();
 
 export class M2HBEmplacementSystem implements GameSystem {
   private readonly scene: THREE.Scene;
@@ -203,7 +204,13 @@ export class M2HBEmplacementSystem implements GameSystem {
 
   private computeBarrelForward(emp: Emplacement, out: THREE.Vector3): void {
     // Same convention as the player adapter's `computeBarrelCamera`:
-    // yaw=0,pitch=0 → world -Z. Yaw rotates around Y, pitch around local X.
+    // yaw=0,pitch=0 → local -Z. Yaw rotates around Y, pitch around local X.
+    // Compose the emplacement's world quaternion onto the locally-derived
+    // forward so a tripod that lives under a rotated parent (e.g. the
+    // PBR's hull, or a ground-fixed emplacement spawned with an
+    // initialYaw) aims in the correct world direction. For an identity
+    // world quaternion (true for a ground tripod placed at yaw=0) the
+    // composition is a no-op.
     const yaw = emp.getYaw();
     const pitch = emp.getPitch();
     const cp = Math.cos(pitch);
@@ -211,6 +218,10 @@ export class M2HBEmplacementSystem implements GameSystem {
     const cy = Math.cos(yaw);
     const sy = Math.sin(yaw);
     out.set(-sy * cp, sp, -cy * cp);
+    // `getQuaternion()` allocates a fresh quaternion; we copy into the
+    // scratch slot to keep the per-shot allocation count bounded.
+    _scratchWorldQuat.copy(emp.getQuaternion());
+    out.applyQuaternion(_scratchWorldQuat);
   }
 
   private computeMuzzleOrigin(binding: M2HBBinding, out: THREE.Vector3): void {

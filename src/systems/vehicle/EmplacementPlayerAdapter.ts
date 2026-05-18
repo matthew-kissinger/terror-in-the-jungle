@@ -41,6 +41,7 @@ function createEmplacementUIContext(): VehicleUIContext {
 
 const _scratchMount = new THREE.Vector3();
 const _scratchForward = new THREE.Vector3();
+const _scratchWorldQuat = new THREE.Quaternion();
 
 /**
  * Emplacement (stationary heavy-weapon) player adapter — M2HB tripod MVP.
@@ -209,7 +210,12 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     _scratchMount.copy(this.model.getPosition());
 
     // Derive forward from yaw + pitch. Y-up, yaw around Y, pitch around
-    // local X. Forward when yaw=0, pitch=0 is world -Z (Three.js convention).
+    // local X. Forward when yaw=0, pitch=0 is local -Z (Three.js
+    // convention). Compose with the emplacement's world quaternion so
+    // the camera looks the right way when the tripod is parented under
+    // a rotated hull (PBR mounts, vehicle-mounted M2HB) or spawned at
+    // a non-zero initialYaw on the ground. For an identity world
+    // quaternion the composition is a no-op.
     const yaw = this.model.getYaw();
     const pitch = this.model.getPitch();
     const cp = Math.cos(pitch);
@@ -217,6 +223,8 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     const cy = Math.cos(yaw);
     const sy = Math.sin(yaw);
     _scratchForward.set(-sy * cp, sp, -cy * cp);
+    _scratchWorldQuat.copy(this.model.getQuaternion());
+    _scratchForward.applyQuaternion(_scratchWorldQuat);
 
     // Sit the eye at the mount, lifted slightly to the sights line, and
     // nudged a hair forward so the player's view doesn't clip the
