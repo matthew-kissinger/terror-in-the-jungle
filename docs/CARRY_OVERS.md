@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-18 (post `cycle-voda-3-watercraft` close)
+Last verified: 2026-05-18 (post `cycle-defekt-4-npc-route-quality` close)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -24,7 +24,6 @@ started, the cycle is `INCOMPLETE` per the rule in
 
 | ID | Title | Opened | Cycles open | Owning subsystem | Blocking? | Notes |
 |----|-------|--------|------------:|------------------|-----------|-------|
-| DEFEKT-4 | NPC route-follow quality not signed off (slope-stuck, navmesh crowd disabled, terrain solver stalls) | cycle-2026-04-17-drift-correction-run | 10 | navigation | no | Phase 3 R5 (NavmeshSystem split) creates the seam; runtime acceptance after that. **Closes at cycle #11 `cycle-defekt-4-npc-route-quality` (now active).** |
 | STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 9 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. **Cycle #10 perf-analyst noted CI runs at measurement_trust=warn (GPU runner starvation; WebGL CONTEXT_LOST + WebGPU→WebGL2 fallback mid-capture); absolute p99 numbers untrustworthy until refresh. Expedite cycle #13.** |
 | AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 8 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
 | KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 6 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
@@ -266,6 +265,33 @@ History log:
   ground-fixed emplacements unchanged via identity-quaternion no-op). Water sampler
   wiring deferred to a follow-up. Perf CI measurement_trust=warn (GPU runner
   starvation) — not a regression; cycle #13 baselines-refresh expedited.
+- 2026-05-18 — `cycle-defekt-4-npc-route-quality` close (autonomous-loop posture):
+  shipped DEFEKT-4 closure as 3 PRs across R1/R2. R1:
+  [#265](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/265)
+  `df84a870` npc-slope-stuck-recovery (new `SlopeStuckDetector.ts` +
+  `evaluateSlopeStuckRecovery` helper in `CombatantMovement.ts`;
+  `SLOPE_STALL_TIME_MS=1500` triggers a recovery state that yields to
+  gravity slide downhill via `SLOPE_SLIDE_STRENGTH=8.0` until on
+  walkable slope, then re-acquires pathing; behavior tests cover
+  steep-slope transition within budget),
+  [#266](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/266)
+  `aac0e519` navmesh-crowd-reenable (re-enabled Recast crowd surface
+  as layered direction-only consumer via `applyAgentSteeredDirection`;
+  `MAX_CROWD_AGENTS=64`; high-LOD gated; original disable was a
+  structural unregister-every-tick at commit `7487b693`, not a flag;
+  scenario test catches regression if disable is re-applied; perf
+  inside the ≤2 ms additional per nav step budget). R2:
+  [#267](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/267)
+  `4f505661` terrain-solver-stall-fix (wall-clock accumulator on
+  `(contourActivated && lowProgress)` crossing
+  `NPC_CONTOUR_STALL_REROUTE_MS=1200`; high-LOD only; backtrack-
+  suppressed via `movementBacktrackPoint` (not intent); drops cached
+  navmesh path so next tick re-queries; helper
+  `evaluateTerrainStallReroute` in `CombatantMovement.ts`; new
+  optional field `Combatant.movementContourStallMs`; behavior test
+  verifies A Shau valley traversal without stop-and-go). All three
+  PRs received `terrain-nav-reviewer` APPROVE pre-merge. DEFEKT-4
+  moved Active → Closed. Active count: 8 → 7.
 
 ## Closed
 
@@ -284,6 +310,7 @@ History log:
 - KB-MOBILE-WEBGPU | Mobile is unplayable post-WebGPU-merge; was playable on WebGL pre-merge | closed in cycle-2026-05-16-mobile-webgpu-and-sky-recovery (investigation) + fix shipped in cycle-mobile-webgl2-fallback-fix | Investigation pinned root cause to TSL-fragment-cost regression on WebGPURenderer's WebGL2 backend. **Fix landed via 9 PRs across 3 rounds in `cycle-mobile-webgl2-fallback-fix`**: R1 [#213](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/213) `6e7a8879` terrain-tsl-biome-early-out + [#211](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/211) `9e1ccab5` terrain-tsl-triplanar-gate + [#212](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/212) `0b3b749d` render-bucket-telemetry-fix; R2 [#215](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/215) `99044966` mobile-pixel-ratio-cap + [#214](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/214) `ca725369` mobile-skip-npc-prewarm + [#216](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/216) `706ad344` mobile-sky-cadence-gate + [#217](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/217) `83fb9fb0` asset-audio-defer; R3 [#218](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/218) `ff87e635` tsl-shader-cost-probe + [#219](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/219) `a81d8cda` real-device-validation-harness. Plus the out-of-band CI fix [`47c42216`](https://github.com/matthew-kissinger/terror-in-the-jungle/commit/47c42216) matrix-fan-out mobile-ui job (root-cause-fixed the 30-min timeout flake; wall time 30+ min → 3-10 min per device parallel). Asset-audio-defer measured `modeClickToPlayableMs` 19,341ms → 11,349ms (−7,992ms). Real-device walk-through deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) under autonomous-loop posture; harness script `scripts/real-device-validation.ts` ready for owner-attach run; close-validation memo at [docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/cycle-close-validation.md](rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/cycle-close-validation.md). Alignment memo: [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
 - KB-SKY-BLAND | Sky / clouds look bland on master post-WebGPU-merge | closed in cycle-2026-05-16-mobile-webgpu-and-sky-recovery (investigation) + fix shipped in cycle-sky-visual-restore | Investigation complete; root cause is visual-fidelity loss (not perf): 128×64 CPU-baked `DataTexture` replaced per-fragment Preetham `ShaderMaterial`, HDR clamped to [0,1] at bake time, missing `toneMapped: false` routes dome through ACES, sun-disc normalised to peak 1.0 kills HDR pearl. **Fix landed via three R1 PRs in `cycle-sky-visual-restore`**: [#208](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/208) `2118177f` (toneMapped:false + 256×128 LUT), [#210](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/210) `3455fa96` (HalfFloatType HDR LUT + drop [0,1] clamp + ceiling 8→64), [#209](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/209) `9e1ce7c7` (additive HDR sun-disc sprite). Owner walk-through deferred under autonomous-loop posture; Playwright smoke screenshots under `artifacts/cycle-sky-visual-restore/playtest-evidence/` (5 PNGs: dome-noon, hdr-{webgpu,webgl}, sun-disc-{noon,nadir}); deferral tracked in [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md). Alignment memo: [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
 - DEFEKT-3 | Combat AI p99 — synchronous cover search in `AIStateEngage.initiateSquadSuppression` | closed in cycle-konveyer-11-spatial-grid-compute | **R1 spatial grid landed via 3 PRs**: [#220](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/220) `9a02714a` (CoverSpatialGrid 282 LOC + 277 LOC tests, 8m cells, deterministic order, queryNearest + queryWithLOS), [#221](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/221) `a5b5bcd6` (AIStateEngage routes flank-cover scan through structural `CoverGridQuery` interface; preserves 2-search cap + reuse; adds `engage.suppression.initiate.coverGridQuery` Phase F sub-marker + `suppressionFlankCoverGridHits/Misses` telemetry), [#222](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/222) `8d12ede5` (L3 integration test `src/integration/combat/cover-grid-suppression.test.ts`, perf budget p99 ≤ 5ms with ~190x margin vs ~954ms baseline). Post-merge `combat120` capture at `8d12ede5`: avg_frame 15.54ms (PASS), peak_p99 34.40ms (+3.0% vs baseline 33.4ms, under 5% hard-stop), **combat_budget_dominance 0% (Combat never topped 16.67ms vs pre-R1 954ms peak)**, **hitch_100ms_percent 0% in 5939 frames (vs documented 954ms baseline)**. R2 GPU-compute prototype skipped per brief's skip condition — R1 wins meet ≥3x avg drop + ≥10x peak drop bars. Artifact: `artifacts/perf/2026-05-16T19-32-35-293Z/`.
+- DEFEKT-4 | NPC route-follow quality not signed off (slope-stuck, navmesh crowd disabled, terrain solver stalls) | closed in cycle-defekt-4-npc-route-quality | **3 PRs across R1/R2, all `terrain-nav-reviewer` APPROVE pre-merge**: R1 [#265](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/265) `df84a870` npc-slope-stuck-recovery (new `SlopeStuckDetector.ts` + `evaluateSlopeStuckRecovery` in `CombatantMovement.ts`; `SLOPE_STALL_TIME_MS=1500` triggers recovery via `SLOPE_SLIDE_STRENGTH=8.0` gravity slide downhill until on walkable slope, then re-acquires pathing target; behavior test verifies steep-slope recovery transition within budget), [#266](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/266) `aac0e519` navmesh-crowd-reenable (re-enabled Recast crowd as layered direction-only consumer via `applyAgentSteeredDirection`; `MAX_CROWD_AGENTS=64`; high-LOD gated; original disable was structural unregister-every-tick at commit `7487b693`, not a flag; perf inside ≤2 ms additional per nav step budget). R2 [#267](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/267) `4f505661` terrain-solver-stall-fix (wall-clock accumulator on `(contourActivated && lowProgress)` crossing `NPC_CONTOUR_STALL_REROUTE_MS=1200`; high-LOD only; backtrack-suppressed via `movementBacktrackPoint` not intent; drops cached navmesh path so next tick re-queries; helper `evaluateTerrainStallReroute` in `CombatantMovement.ts`; new optional `Combatant.movementContourStallMs` field; A Shau valley traversal without stop-and-go verified by behavior test). Active count: 8 → 7. No fence change.
 
 ## Reading the table
 

@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-18 (autonomous chain advanced past cycle #10; cycles #1-#10 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a / cycle #7 close-commit / cycle #8 close-commit / cycle #9 close-commit / cycle #10 close-commit; current cycle = cycle-defekt-4-npc-route-quality)
+Last verified: 2026-05-18 (autonomous chain advanced past cycle #11; cycles #1-#11 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a / cycle #7 close-commit / cycle #8 close-commit / cycle #9 close-commit / cycle #10 close-commit / cycle #11 close-commit; current cycle = cycle-sun-and-atmosphere-overhaul)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,94 +154,97 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-defekt-4-npc-route-quality
+## Current cycle: cycle-sun-and-atmosphere-overhaul
 
-**Cycle ID:** `cycle-defekt-4-npc-route-quality`
-**Brief:** [docs/tasks/cycle-defekt-4-npc-route-quality.md](tasks/cycle-defekt-4-npc-route-quality.md)
-**Skip-confirm:** yes (campaign auto-advance)
-**Concurrency cap:** 3
+**Cycle ID:** `cycle-sun-and-atmosphere-overhaul`
+**Brief:** [docs/tasks/cycle-sun-and-atmosphere-overhaul.md](tasks/cycle-sun-and-atmosphere-overhaul.md)
+**Skip-confirm:** no (owner playtest required across 5 scenarios × 4 TOD; deferred under autonomous-loop posture)
+**Concurrency cap:** 4
 
-User-observable gap closed: DEFEKT-4 NPC route-follow quality. Close
-the three threads behind DEFEKT-4: (1) slope-stuck — NPCs get pinned
-on inclines past the slope-stall threshold and can't recover;
-(2) navmesh crowd disabled — the Recast crowd surface is wired but
-disabled because of a prior regression; this cycle re-enables and
-validates; (3) terrain-aware solver stall loops — the slope-aware
-movement solver has stall-loop modes that cause perceptible
-stop-and-go on rough terrain. Active carry-over since cycle-2026-04-17.
+User-observable gap closed: KB-SKY-DEEP (new visual-quality follow-up
+to cycle #1's KB-SKY-BLAND) + HosekWilkieSkyBackend half of
+`konveyer-large-file-splits`. Port
+`HosekWilkieSkyBackend.evaluateAnalytic` (CPU JS Preetham math
+sampled per-fragment from a 256×128 LUT) into a **TSL fragment
+node** wired to the dome via `MeshBasicNodeMaterial.colorNode`;
+restore the per-fragment Preetham gradient + in-shader HDR sun-disc
+the pre-merge GLSL had; retire the 256×128 visual LUT and keep only
+a 32×8 CPU LUT for fog / hemisphere readers; swap renderer tonemap
+from `THREE.ACESFilmicToneMapping` to `THREE.AgXToneMapping`
+(`THREE.NeutralToneMapping` fallback on r184 if AGX unavailable);
+fix the night-red bug via an elevation-keyed sun↔moon color blend at
+the one-line cause in `HosekWilkieSkyBackend.bakeLUT()`;
+recalibrate per-scenario `preset.exposure` for the AGX rolloff. No
+new `WebGLRenderTarget` (preserves the cycle-voda-1 mobile no-RT
+win). Source authority:
+[docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md).
 
 ### Round schedule
 
 | Round | Tasks (parallel) | Cap | Notes |
 |-------|------------------|-----|-------|
-| 1 | `npc-slope-stuck-recovery`, `navmesh-crowd-reenable` | 2 | Independent. |
-| 2 | `terrain-solver-stall-fix` | 1 | After R1 — needs the re-enabled crowd to validate against. |
+| 1 | `night-red-fix`, `agx-tonemap-swap`, `tsl-preetham-fragment-port` | 3 | Three independent landings. Night-red is ~10 LOC + tests; AGX is a ~5 LOC renderer change + dev-flag wiring; TSL port is the large one (~400-600 LOC TSL + parity test against CPU `evaluateAnalytic`). |
+| 2 | `sun-disc-and-aureole-tuning`, `per-scenario-exposure-recalibration`, `sun-and-atmosphere-playtest-evidence` | 3 | Disc tuning composes with the in-shader HDR pin-point from R1; exposure tuning depends on AGX landing; playtest captures use the WorldBuilder force-TOD flow (5 scenarios × 4 TOD = 20 shots + WebGPU/WebGL2 parity + night-red regression). |
 
 ### Dependencies
 
-- R1: `npc-slope-stuck-recovery` (NPC speed below epsilon for > 1.5 s
-  on a slope > stall threshold triggers a recovery state; yields to
-  gravity slide downhill until on walkable slope, then re-acquires
-  pathing target; behavior test on steep slope verifying recovery
-  transition within budget), `navmesh-crowd-reenable` (re-enable
-  Recast crowd surface; validate against the prior regression that
-  disabled it; scenario test catches regression if disable is
-  re-applied; perf budget ≤2 ms additional per nav step on
-  `combat120`).
-- R2: `terrain-solver-stall-fix` (identify stall-loop pattern in
-  the slope-aware solver via A Shau valley movement-replay; fix the
-  loop via `lastProgressPosition` re-route trigger or different
-  ordering of slope vs distance checks; behavior test verifies NPC
-  traverses A Shau valley without stop-and-go).
+- R1: `night-red-fix` (elevation-keyed `Color.lerpColors(sunColor, MOON_COLOR, smoothstep(−2°, −8°))` replaces peak-normalisation + luma-floor in `HosekWilkieSkyBackend.bakeLUT()`; isolated to lines 711-729),
+  `agx-tonemap-swap` (`THREE.AgXToneMapping` at `GameRenderer.ts:145-146` with `THREE.NeutralToneMapping` r184 fallback; ACES remains runtime-toggleable via WorldBuilder for A/B),
+  `tsl-preetham-fragment-port` (port `evaluateAnalytic` 761-874 to TSL `Fn` node graph; new `HosekWilkieTslNode.ts`; dome swaps to `MeshBasicNodeMaterial(colorNode: tslPreethamNode, toneMapped: false)`; CPU LUT shrinks to 32×8 for fog readers only; dev-flag back-out via `WorldBuilder.skyBackendMode = 'tsl' | 'lut-bake'`; TSL/CPU parity test < 0.05 per-channel delta at 64 sampled directions).
+- R2: `sun-disc-and-aureole-tuning` (in-shader HDR pin-point defaults: 3-5° apparent diameter at noon, 6-10° aureole stretching to 15-30° mie band at low sun; additive `SunDiscMesh` sprite gated behind `WorldBuilder.useAdditiveSunSprite` flag default `false`),
+  `per-scenario-exposure-recalibration` (sweep `forceTimeOfDay` across `[0.0, 0.25, 0.5, 0.75]` on each of the five scenarios; tune per-scenario `preset.exposure` to land within spike Section 4 HSL targets; bump `SKY_LIGHT_MAX_COMPONENT` / `SKY_FOG_MAX_COMPONENT` only if AGX range clips visibly),
+  `sun-and-atmosphere-playtest-evidence` (5 scenarios × 4 TOD = 20 captures + WebGPU/WebGL2 parity pair + 5 night-red regression assertions on `moonLight.color` at midnight; `scripts/capture-sun-and-atmosphere-shots.ts` extends existing hosek-wilkie capture script; deferral row in PLAYTEST_PENDING).
 
 ### Reviewer policy
 
-- `terrain-nav-reviewer` pre-merge gate for all tasks (every touched
-  file is under `src/systems/navigation/**`).
+- **No mandatory `combat-reviewer`** — no `src/systems/combat/**` touches expected.
+- **No mandatory `terrain-nav-reviewer`** — no `src/systems/terrain/**` or `src/systems/navigation/**` touches expected.
+- Orchestrator reviews all PRs for: surface integrity (no fence leak), perf budget compliance, WebGPU/WebGL2 visual parity merge gate, mobile-ui CI matrix green.
+- **Optional `perf-analyst` pre-merge gate** for `tsl-preetham-fragment-port` — given the per-fragment cost claim, compare `combat120` + `openfrontier:short` against baseline post-port before merge.
 
 ### Hard stops (cycle-specific)
 
-- `navmesh-crowd-reenable` reproduces the prior regression → halt.
-- Perf regression > 5% p99 on `combat120` from any task → halt
-  (deferred to cycle #13 baseline refresh until that lands;
-  measurement_trust=warn until then, but absolute deltas still
-  tracked).
-- Determinism regression → halt.
-- Standard: fence change, worktree isolation failure,
-  twice-rejected reviewer.
+- Any new `WebGLRenderTarget` introduced anywhere in the diff → halt (cycle-voda-1 mobile no-RT win is load-bearing).
+- TSL → WebGL2 translation produces a fragment shader > 2× the hand-port op count → ship back-out path A (parallel `ShaderMaterial` GLSL gated on `!renderer.isWebGPURenderer`); do NOT halt unless the back-out also overshoots budget.
+- Per-fragment dome adds > 1.0 ms p99 on `combat120` after R1 → halt; reassess with mobile-gated dev-flag fallback to the bake-and-stretch path.
+- Visual parity WebGPU vs WebGL2 fails (> 5% per-channel delta at sampled key points: zenith, horizon-mid, sun-disc-center, anti-sun-horizon) at merge time → halt; iterate parallel GLSL until parity holds.
+- Mobile-emulation perf probes (Pixel 5 23.68 avgFps, iPhone 12 28.30 avgFps from cycle #2) regress > 10% → halt; mobile-gate per-fragment dome behind `skyBackendMode='lut-bake'` default.
+- Owner playtest rejects R2 twice → halt (deferred under autonomous-loop; orchestrator proceeds, owner sweeps later).
+- Standard: fence change, worktree isolation failure, twice-rejected reviewer, carry-over count growth.
 
 ### Success criteria
 
-See [docs/tasks/cycle-defekt-4-npc-route-quality.md](tasks/cycle-defekt-4-npc-route-quality.md)
+See [docs/tasks/cycle-sun-and-atmosphere-overhaul.md](tasks/cycle-sun-and-atmosphere-overhaul.md)
 "Acceptance Criteria (cycle close)":
 - All R1 + R2 task PRs merged.
-- DEFEKT-4 visibly closed: NPCs no longer pin on slopes, navmesh
-  crowd re-enabled and validated, no stall loops on A Shau
-  traversal.
-- No fence change.
-- No perf regression > 5% p99 on `combat120`.
-- `DEFEKT-4` row in `docs/CARRY_OVERS.md` moves from Active to
-  Closed.
+- `renderer.toneMapping === THREE.AgXToneMapping` (or `THREE.NeutralToneMapping` fallback) by default; ACES via WorldBuilder.
+- Visual targets per time-of-day across all five scenarios hit spike Section 4 HSL ranges (noon cobalt zenith, golden-hour warm-cool stratification, dusk vermillion horizon, twilight "keeper red" vibe band with cool combat lighting, deep navy night with no red bleed, dawn mirror of dusk cooler-shifted).
+- Night-red regression: `r < 0.5 * max(g, b)` on `moonLight.color` at midnight, all 5 scenarios.
+- TSL/CPU parity test: < 0.05 per-channel delta at 64 sampled directions.
+- WebGPU/WebGL2 parity: < 5% per-channel delta at sampled key points.
+- `combat120` p99 ≤ 34.4 ms (current 33.4 ms + 1.0 ms budget).
+- `openfrontier:short` p99 ≤ 33.7 ms (current 32.7 ms + 1.0 ms budget).
+- 0 MB net new memory (32×8 LUT replaces 256×128 LUT).
+- Mobile sky-refresh cadence unchanged at 8 s.
+- No fence change. No new `WebGLRenderTarget`.
+- `KB-SKY-DEEP` opens and closes within this cycle (zero-cycle visual-quality follow-up to KB-SKY-BLAND; history-log entry only).
+- `konveyer-large-file-splits` HosekWilkieSkyBackend half moves Active → Closed (TSL port retires the 807-LOC grandfather entry; new modules each stay ≤ 700 LOC per Phase 0 file-size rule).
 
 ### Out of scope
 
-Major navmesh refactor (NavmeshSystem split / Phase 3 R5) —
-separate cycle if needed. AI behavior changes beyond movement
-(target selection, etc.). Touching `src/systems/combat/**` (only
-the movement consumer surface, gated by reviewer). Fenced-interface
-touches.
+Behind-cloud sun occlusion (cloud-fidelity carries to a later cycle). ADS-toward-sun glare gameplay feature (queue as follow-up). Sun-aware rim light / specular pass cross-cutting every material (queue as cycle #14 or later). Bruneton precomputed atmospheric scattering (rejected per cycle hard-stop on no-RT). HDR cubemap rotation (rejected per ~120 MB asset budget). Cloud representation / cloud-deck art direction (separate cycle). Touching `src/systems/combat/**`, `src/systems/terrain/**`, `src/systems/navigation/**`. Fenced-interface touches. Refactoring `HosekWilkieSkyBackend.ts` beyond what the TSL port + 32×8 LUT shrink necessitates (out-of-scope cleanup is a drift-correction signal).
 
 ### Campaign auto-advance protocol
 
-This cycle is **position #11** in the 13-cycle queue at
+This cycle is **position #12** in the 13-cycle queue at
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 `Auto-advance: yes` + `posture: autonomous-loop` are set there. When
 this cycle closes:
 
-1. Mark cycle #11 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-sun-and-atmosphere-overhaul`).
+1. Mark cycle #12 row `done` in the campaign queue table with close-commit SHA.
+2. Read the next not-done row (`cycle-stabilizat-1-baselines-refresh`).
 3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-sun-and-atmosphere-overhaul`.
+4. Commit with `docs(campaign): advance to cycle-stabilizat-1-baselines-refresh`.
 5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
@@ -249,53 +252,42 @@ mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-voda-3-watercraft` closed on 2026-05-18 at the cycle
-close-commit. **6 PRs across R1/R2**. R1:
-[#260](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/260)
-`2026-05-17T23:52:59Z` WatercraftPhysics hand-rolled hull (620 LOC
-under ≤700 ceiling per acceptance; generalizes `GroundVehiclePhysics`
-chassis-conform with water-surface conform via the VODA-2 buoyancy
-contract; throttle + rudder + quadratic drag + river-current force +
-wave-heave/pitch + beach/bank docking),
-[#259](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/259)
-`2026-05-18T00:23:14Z` WatercraftPhysics behavior tests + stub→real
-swap at merge. R2:
-[#261](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/261)
-`2026-05-18T09:59:09Z` watercraft-physics-damping-fix (vertical drag
-+ convergent flow coupling — closed 2 real defects flagged by R1 swap
-reviewer),
-[#262](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/262)
-`2026-05-18T09:59:43Z` sampan-integration (Sampan IVehicle +
-WatercraftPlayerAdapter + SampanSpawn + composer wire; 6m × 2m hull,
-single seat, W/S throttle + A/D rudder + F enter/exit; third-person
-follow camera),
-[#264](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/264)
-`2026-05-18T13:10:05Z` pbr-integration (PBR + twin M2HB mounts +
-B1/B2/B3 fixes + NpcM2HB world-space aim closure — first
-CHANGES-REQUESTED → APPROVE after fix + post-rebase verification on
-`pbr-verify` worktree; the world-space aim composition closes a
-latent local-only-forward bug in `M2HBEmplacement` +
-`EmplacementPlayerAdapter` + `NpcM2HBAdapter`; cycle-#6 ground-fixed
-emplacements unaffected via identity-quaternion no-op),
-[#263](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/263)
-`2026-05-18T13:29:26Z` voda-3-playtest-evidence (deferred under
-autonomous-loop). VODA-3 in DIRECTIVES.md moved Open → Closed. Water
-sampler wiring for Sampan + PBR deferred as a follow-up (boats land
-on dry terrain until `OperationalRuntimeComposer.wireSampanRuntime`
-+ `wirePBRRuntime` get `setWaterSampler(waterSystem)` calls).
-combat120 p99 CI measurement_trust=warn across all cycle PR runs
-(GPU runner starvation; PR #260 test-only baseline shows same
-numbers — not a real regression; cycle #13 baselines-refresh
-expedited). No fence change. No external physics library added.
-Owner walk-through deferred under autonomous-loop posture. No
-carry-over delta (VODA-3 lives in DIRECTIVES.md, not CARRY_OVERS
-Active). Carry-over count: 8 → 8.
+`cycle-defekt-4-npc-route-quality` closed on 2026-05-18 at the cycle
+close-commit. **3 PRs across R1/R2**; all three received
+`terrain-nav-reviewer` APPROVE pre-merge. R1:
+[#265](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/265)
+`df84a870` npc-slope-stuck-recovery (new
+`src/systems/navigation/SlopeStuckDetector.ts` +
+`evaluateSlopeStuckRecovery` helper in `CombatantMovement.ts`;
+`SLOPE_STALL_TIME_MS=1500` triggers a recovery state that yields to
+gravity slide downhill via `SLOPE_SLIDE_STRENGTH=8.0` until on
+walkable slope, then re-acquires pathing target; behavior tests
+cover steep-slope transition within budget),
+[#266](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/266)
+`aac0e519` navmesh-crowd-reenable (Recast crowd surface re-enabled
+as layered direction-only consumer via
+`applyAgentSteeredDirection`; `MAX_CROWD_AGENTS=64`; high-LOD gated;
+the prior disable was a structural unregister-every-tick at commit
+`7487b693`, not a flag; scenario test catches regression if disable
+is re-applied; perf inside the ≤2 ms additional per nav step
+budget). R2:
+[#267](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/267)
+`4f505661` terrain-solver-stall-fix (wall-clock accumulator on
+`(contourActivated && lowProgress)` crossing
+`NPC_CONTOUR_STALL_REROUTE_MS=1200`; high-LOD only;
+backtrack-suppressed via `movementBacktrackPoint` (not intent);
+drops cached navmesh path so next tick re-queries; helper
+`evaluateTerrainStallReroute` in `CombatantMovement.ts`; new
+optional `Combatant.movementContourStallMs` field; behavior test
+verifies A Shau valley traversal without stop-and-go). DEFEKT-4 in
+`docs/CARRY_OVERS.md` moved Active → Closed. Carry-over count: 8 →
+7. No fence change. No perf regression > 5% p99 on `combat120`.
 
-Concurrent branch on the side: `task/mode-startup-terrain-spike` remains
-parked at 1 commit (no PR). The cycle #2 mode-startup work absorbed
-some of the synchronous-bake path concerns via the asset-audio-defer
-+ mobile-skip-npc-prewarm tasks; the spike's terrain-bake-in-worker
-hardening criteria still live in
+Concurrent branch on the side: `task/mode-startup-terrain-spike`
+remains parked at 1 commit (no PR). The cycle #2 mode-startup work
+absorbed some of the synchronous-bake path concerns via the
+asset-audio-defer + mobile-skip-npc-prewarm tasks; the spike's
+terrain-bake-in-worker hardening criteria still live in
 [docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 
 ## Dispatch protocol

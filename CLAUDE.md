@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-18 (post `cycle-voda-3-watercraft` close; VODA-3 closed; campaign pointer advanced to cycle #11 `cycle-defekt-4-npc-route-quality`)
+Last verified: 2026-05-18 (post `cycle-defekt-4-npc-route-quality` close; DEFEKT-4 closed; campaign pointer advanced to cycle #12 `cycle-sun-and-atmosphere-overhaul`)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,8 +46,8 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active cycle (2026-05-18):** `cycle-defekt-4-npc-route-quality`
-is position #11 in a **13-cycle autonomous-chain campaign** (expanded
+**Active cycle (2026-05-18):** `cycle-sun-and-atmosphere-overhaul`
+is position #12 in a **13-cycle autonomous-chain campaign** (expanded
 from 12 on 2026-05-17 via insertion of `cycle-sun-and-atmosphere-overhaul`
 at position #12). Owner originally launched the campaign on 2026-05-16
 with `auto-advance: yes` in
@@ -58,7 +58,7 @@ VODA, VEKHIKL, and DEFEKT directives plus the two post-WebGPU
 investigation fix cycles (mobile + sky) plus the sun-and-atmosphere
 overhaul (new TSL fragment-shader sky + AGX tonemap + night-red fix).
 
-The queue (cycles #1-#10 closed; #11 active):
+The queue (cycles #1-#11 closed; #12 active):
 1. `cycle-sky-visual-restore` → KB-SKY-BLAND fix. **DONE** (`fd646aeb`).
 2. `cycle-mobile-webgl2-fallback-fix` → KB-MOBILE-WEBGPU fix (real-device validation = merge gate). **DONE** (`7931d179`).
 3. `cycle-konveyer-11-spatial-grid-compute` → DEFEKT-3 (cover spatial grid). **DONE** (`b86cf027`).
@@ -69,8 +69,8 @@ The queue (cycles #1-#10 closed; #11 active):
 8. `cycle-vekhikl-3-tank-chassis` → M48 skid-steer chassis. **DONE** (cycle close-commit; 5 PRs #246-#250; VEKHIKL-3 chassis half code-complete, owner playtest deferred; turret + cannon awaits cycle #9).
 9. `cycle-vekhikl-4-tank-turret-and-cannon` → turret + cannon + Rust→WASM ballistic-solver pilot. **DONE** (cycle close-commit; 8 PRs #251-#258; VEKHIKL-3+4 code-complete, owner playtest deferred).
 10. `cycle-voda-3-watercraft` → Sampan + PBR. **DONE** (cycle close-commit; 6 PRs #259-#264; VODA-3 code-complete, owner playtest deferred).
-11. `cycle-defekt-4-npc-route-quality` → slope-stuck + crowd + solver fixes. **ACTIVE**.
-12. `cycle-sun-and-atmosphere-overhaul` → TSL fragment-shader Preetham + AGX tonemap + night-red fix + sun-disc tuning (NEW 2026-05-17 per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md`; closes HosekWilkieSkyBackend half of `konveyer-large-file-splits`).
+11. `cycle-defekt-4-npc-route-quality` → slope-stuck + crowd + solver fixes. **DONE** (cycle close-commit; 3 PRs #265-#267 across R1/R2; all three `terrain-nav-reviewer` APPROVE pre-merge; DEFEKT-4 Active → Closed; Active count 8 → 7).
+12. `cycle-sun-and-atmosphere-overhaul` → TSL fragment-shader Preetham + AGX tonemap + night-red fix + sun-disc tuning (NEW 2026-05-17 per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md`; closes HosekWilkieSkyBackend half of `konveyer-large-file-splits`). **ACTIVE**.
 13. `cycle-stabilizat-1-baselines-refresh` → perf baseline refresh (now runs last so it captures cycle #12's +0.3-1.0ms p99 sky cost as the new normal).
 
 Every cycle has a pre-authored brief at `docs/tasks/<slug>.md`. The
@@ -113,11 +113,12 @@ Cloudflare account-level audit:
 `artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored).
 
 Single source of truth for unresolved items:
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is **8** after
-the 2026-05-17 cycle #8 close (cycles #1-#3 closed DEFEKT-3 +
-KB-MOBILE-WEBGPU + KB-SKY-BLAND; net cycle delta from #4-#8 was 0
-because VEKHIKL-1, VODA-1, VEKHIKL-2, VODA-2, and VEKHIKL-3 live in
-DIRECTIVES.md not CARRY_OVERS Active). Active items: DEFEKT-4 (closes at cycle #11),
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is **7** after
+the 2026-05-18 cycle #11 close (cycles #1-#3 closed DEFEKT-3 +
+KB-MOBILE-WEBGPU + KB-SKY-BLAND; net cycle delta from #4-#10 was 0
+because VEKHIKL-1, VODA-1, VEKHIKL-2, VODA-2, VEKHIKL-3, VEKHIKL-4,
+and VODA-3 live in DIRECTIVES.md not CARRY_OVERS Active; cycle #11
+closed DEFEKT-4 bringing 8 → 7). Active items:
 STABILIZAT-1 (closes at cycle #13 — renumbered after sun-and-atmosphere
 insertion), AVIATSIYA-1 / DEFEKT-5 (visual review pending), KB-LOAD
 residual, KB-STARTUP-1 (held; cycle #2 mobile work absorbed parts),
