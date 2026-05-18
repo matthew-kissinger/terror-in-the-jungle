@@ -130,6 +130,42 @@ export class NavmeshMovementAdapter {
     }
   }
 
+  /**
+   * Apply only the crowd's steered DIRECTION to the combatant's XZ velocity,
+   * preserving the caller's intended speed (`velocity.length()` before this call).
+   *
+   * Why this exists: the original disable (2026-03-17) was driven by a regression
+   * where the crowd's full-velocity override slowed agents on slopes — crowd
+   * steering fought the terrain-aware solver's speed assignment. Separating
+   * direction (crowd) from speed (caller / terrain solver) keeps local-avoidance
+   * benefits while letting the terrain-aware solver remain the authority for
+   * slope-aware speed. Caller is expected to call `applyTerrainAwareVelocity`
+   * after this so the surface projection has the last word.
+   *
+   * No-op when:
+   *   - the agent isn't registered,
+   *   - the crowd's XZ velocity is below the zero threshold (no steering signal),
+   *   - or the caller's XZ velocity is below the zero threshold (no movement intent).
+   */
+  applyAgentSteeredDirection(combatant: Combatant): void {
+    const agent = this.agentMap.get(combatant.id);
+    if (!agent) return;
+
+    const vel = agent.velocity();
+    const crowdMagSq = vel.x * vel.x + vel.z * vel.z;
+    if (crowdMagSq < ZERO_VELOCITY_THRESHOLD_SQ) return;
+
+    const vx = combatant.velocity.x;
+    const vz = combatant.velocity.z;
+    const callerSpeedSq = vx * vx + vz * vz;
+    if (callerSpeedSq < ZERO_VELOCITY_THRESHOLD_SQ) return;
+
+    const callerSpeed = Math.sqrt(callerSpeedSq);
+    const invCrowdMag = 1 / Math.sqrt(crowdMagSq);
+    combatant.velocity.x = vel.x * invCrowdMag * callerSpeed;
+    combatant.velocity.z = vel.z * invCrowdMag * callerSpeed;
+  }
+
   /** Check if a crowd agent appears to be moving toward its target. */
   private checkAgentMoving(id: string, _agent: CrowdAgent): boolean {
     const frames = this.zeroVelocityFrames.get(id) ?? 0;

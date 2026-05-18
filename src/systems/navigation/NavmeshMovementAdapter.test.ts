@@ -156,6 +156,60 @@ describe('NavmeshMovementAdapter', () => {
     });
   });
 
+  // Regression guard: the original 2026-03-17 disable was triggered because the
+  // crowd's full-velocity override slowed agents on slopes (the crowd's steered
+  // magnitude often dropped below the AI's intended speed). applyAgentSteeredDirection
+  // preserves caller speed, so the regression cannot reproduce by construction.
+  describe('applyAgentSteeredDirection', () => {
+    it('rotates XZ to the crowd direction while preserving caller-intended speed', () => {
+      const c = makeCombatant({ velocity: new THREE.Vector3(6, 0, 0) }); // caller wants 6 m/s in +X
+      adapter.registerAgent(c);
+      // Mock crowd velocity is (1, 0, 2) per makeMockAgent — magnitude sqrt(5).
+      adapter.applyAgentSteeredDirection(c);
+      // Direction should match crowd's (normalized 1,2), magnitude should be 6.
+      const magnitude = Math.sqrt(c.velocity.x * c.velocity.x + c.velocity.z * c.velocity.z);
+      expect(magnitude).toBeCloseTo(6);
+      const ratio = c.velocity.z / c.velocity.x;
+      expect(ratio).toBeCloseTo(2);
+    });
+
+    it('does not introduce motion when the caller is stationary', () => {
+      // Regression: caller intent is "hold", crowd still steered some direction.
+      // We must not invent forward motion from a zero baseline.
+      const c = makeCombatant({ velocity: new THREE.Vector3(0, 0, 0) });
+      adapter.registerAgent(c);
+      adapter.applyAgentSteeredDirection(c);
+      expect(c.velocity.x).toBe(0);
+      expect(c.velocity.z).toBe(0);
+    });
+
+    it('does not slow the agent when the crowd is idle (zero steering signal)', () => {
+      // The pre-2026-03-17 regression: a near-zero crowd velocity (e.g. on a
+      // slope where the local avoidance heuristic dropped speed) would
+      // override the AI's intended speed. Verify the inverse here.
+      const idleAgent = {
+        requestMoveTarget: vi.fn(),
+        velocity: vi.fn().mockReturnValue({ x: 0, y: 0, z: 0 }),
+      } as unknown as CrowdAgent;
+      const { crowd: idleCrowd } = makeMockCrowd();
+      (idleCrowd.addAgent as ReturnType<typeof vi.fn>).mockReturnValueOnce(idleAgent);
+      const idleAdapter = new NavmeshMovementAdapter(idleCrowd);
+
+      const c = makeCombatant({ velocity: new THREE.Vector3(8, 0, 0) });
+      idleAdapter.registerAgent(c);
+      idleAdapter.applyAgentSteeredDirection(c);
+      expect(c.velocity.x).toBe(8);
+      expect(c.velocity.z).toBe(0);
+    });
+
+    it('leaves velocity unchanged for an unregistered combatant', () => {
+      const c = makeCombatant({ velocity: new THREE.Vector3(5, 0, 5) });
+      adapter.applyAgentSteeredDirection(c);
+      expect(c.velocity.x).toBe(5);
+      expect(c.velocity.z).toBe(5);
+    });
+  });
+
   describe('dispose', () => {
     it('removes all registered agents', () => {
       adapter.registerAgent(makeCombatant({ id: 'a' }));

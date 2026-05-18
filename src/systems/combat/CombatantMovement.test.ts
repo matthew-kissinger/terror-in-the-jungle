@@ -9,10 +9,14 @@ import { Logger } from '../../utils/Logger';
 function mockNavmeshAdapter(agentIds: Set<string> = new Set()) {
   return {
     hasAgent: vi.fn((id: string) => agentIds.has(id)),
-    registerAgent: vi.fn(() => true),
+    registerAgent: vi.fn((c: { id: string }) => {
+      agentIds.add(c.id);
+      return true;
+    }),
     unregisterAgent: vi.fn((id: string) => agentIds.delete(id)),
     updateAgentTarget: vi.fn(),
     applyAgentVelocity: vi.fn(),
+    applyAgentSteeredDirection: vi.fn(),
     getAgentCount: vi.fn(() => agentIds.size),
     dispose: vi.fn(),
   };
@@ -47,8 +51,8 @@ describe('CombatantMovement', () => {
     vi.restoreAllMocks();
   });
 
-  it('unregisters legacy navmesh crowd agents and uses the terrain-aware mover', () => {
-    const adapter = mockNavmeshAdapter(new Set(['npc1']));
+  it('registers high-LOD combatants with the navmesh crowd for local avoidance', () => {
+    const adapter = mockNavmeshAdapter();
     const navSystem = mockNavmeshSystem(adapter);
     movement.setNavmeshSystem(navSystem as any);
 
@@ -67,8 +71,38 @@ describe('CombatantMovement', () => {
       disableTerrainSample: true,
     });
 
-    expect(adapter.unregisterAgent).toHaveBeenCalledWith('npc1');
+    // Re-enabled per navmesh-crowd-reenable: high-LOD active NPCs join the crowd,
+    // get their target pushed, and have crowd-steered direction applied. The
+    // terrain-aware solver still runs after and remains the slope authority.
+    expect(adapter.registerAgent).toHaveBeenCalled();
+    expect(adapter.updateAgentTarget).toHaveBeenCalled();
+    expect(adapter.applyAgentSteeredDirection).toHaveBeenCalled();
     expect(c.velocity.lengthSq()).toBeGreaterThan(0);
+  });
+
+  it('releases the crowd slot when a combatant drops out of high-LOD eligibility', () => {
+    const adapter = mockNavmeshAdapter(new Set(['npc1']));
+    const navSystem = mockNavmeshSystem(adapter);
+    movement.setNavmeshSystem(navSystem as any);
+
+    const c = createTestCombatant({
+      id: 'npc1',
+      state: CombatantState.PATROLLING,
+      squadRole: 'leader' as const,
+      position: new THREE.Vector3(0, 0, 0),
+      destinationPoint: new THREE.Vector3(20, 0, 0),
+      // Low simLane is ineligible for crowd steering.
+      simLane: 'low',
+      renderLane: 'culled',
+    });
+
+    movement.updateMovement(c, 0.016, new Map(), new Map(), {
+      disableSpacing: true,
+      disableTerrainSample: true,
+    });
+
+    expect(adapter.unregisterAgent).toHaveBeenCalledWith('npc1');
+    expect(adapter.registerAgent).not.toHaveBeenCalled();
   });
 
   it('steers long-range movement toward the current navmesh waypoint through the terrain-aware solver', () => {
