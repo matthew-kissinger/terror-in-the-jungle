@@ -245,11 +245,6 @@ export class CombatantMovement {
       this.clampHorizontalVelocity(combatant, NPC_MAX_SPEED);
     }
 
-    // Unregister from crowd (crowd steering disabled; path queries used instead).
-    if (this.navmeshAdapter?.hasAgent(combatant.id)) {
-      this.navmeshAdapter.unregisterAgent(combatant.id);
-    }
-
     const now = performance.now();
 
     const goalAnchorForStuck = this.resolvePrimaryGoalAnchor(combatant);
@@ -271,6 +266,29 @@ export class CombatantMovement {
         combatant.velocity.x = _navWaypointDirection.x * speed;
         combatant.velocity.z = _navWaypointDirection.z * speed;
       }
+    }
+
+    // Recast crowd local-avoidance layer (re-enabled 2026-05-18 per
+    // navmesh-crowd-reenable). The 2026-03-17 disable was driven by a regression
+    // where crowd-as-primary-mover fought the terrain-aware solver's slope speeds.
+    // Here we use the crowd only for steered DIRECTION (separation/avoidance) and
+    // keep the caller's speed via `applyAgentSteeredDirection`; the terrain-aware
+    // solver still runs after this block and remains the authority for surface
+    // projection and slope-aware speed scaling. High-LOD only — low/culled stay
+    // on terrain-solver-only path-follow to keep the crowd capacity headroom.
+    if (this.navmeshAdapter && this.shouldUseCrowdSteering(combatant)) {
+      let agentReady = this.navmeshAdapter.hasAgent(combatant.id);
+      if (!agentReady) {
+        agentReady = this.navmeshAdapter.registerAgent(combatant);
+      }
+      if (agentReady) {
+        this.navmeshAdapter.updateAgentTarget(combatant);
+        this.navmeshAdapter.applyAgentSteeredDirection(combatant);
+      }
+    } else if (this.navmeshAdapter?.hasAgent(combatant.id)) {
+      // Ineligible this tick (e.g. dropped to lower LOD, backtrack engaged):
+      // release the crowd slot so others can use it.
+      this.navmeshAdapter.unregisterAgent(combatant.id);
     }
 
     const steering = this.applyTerrainAwareVelocity(combatant, now, navmeshWaypoint);
@@ -417,6 +435,22 @@ export class CombatantMovement {
       combatant.movementIntent = 'backtrack';
     }
     return action;
+  }
+
+  /**
+   * Crowd-steering eligibility: high simLane, has a real destination, not on a
+   * backtrack, has measurable speed, and not in a dead/in-vehicle terminal
+   * state (those are already early-returned). Restricting to `high` keeps the
+   * crowd inside its `MAX_CROWD_AGENTS=64` capacity for active close-combat.
+   */
+  private shouldUseCrowdSteering(combatant: Combatant): boolean {
+    if (combatant.simLane !== 'high') return false;
+    if (!combatant.destinationPoint) return false;
+    if (combatant.movementBacktrackPoint) return false;
+    const vx = combatant.velocity.x;
+    const vz = combatant.velocity.z;
+    if (vx * vx + vz * vz < 0.0001) return false;
+    return true;
   }
 
   updateRotation(combatant: Combatant, _deltaTime: number): void {
