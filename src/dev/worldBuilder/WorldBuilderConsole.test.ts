@@ -5,12 +5,14 @@
  * observable runtime effects of toggles — not Tweakpane DOM layout, button
  * label strings, or internal state-key spellings.
  */
+import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   WorldBuilderConsole,
   WORLDBUILDER_GLOBAL_KEY,
   getWorldBuilderState,
   isWorldBuilderFlagActive,
+  toneMappingConstant,
   type WorldBuilderState,
 } from './WorldBuilderConsole';
 import { DebugHudRegistry } from '../../ui/debug/DebugHudRegistry';
@@ -20,6 +22,7 @@ interface FakeShadowMap {
 }
 interface FakeRenderer {
   shadowMap: FakeShadowMap;
+  toneMapping: THREE.ToneMapping;
 }
 interface FakeGameRenderer {
   renderer: FakeRenderer;
@@ -40,7 +43,12 @@ function makeMockEngine(): {
   resumeSpy: ReturnType<typeof vi.fn>;
   stepSpy: ReturnType<typeof vi.fn>;
 } {
-  const three: FakeRenderer = { shadowMap: { enabled: true } };
+  // Pre-seed the mock renderer with AGX so the "applyEffectiveToggles flips
+  // the WebGLRenderer tonemap" test starts from the realistic init state.
+  const three: FakeRenderer = {
+    shadowMap: { enabled: true },
+    toneMapping: THREE.AgXToneMapping,
+  };
   const gameRenderer: FakeGameRenderer = { renderer: three };
 
   const pauseSpy = vi.fn();
@@ -209,6 +217,27 @@ describe('WorldBuilderConsole effective toggles', () => {
     panel.dispose();
   });
 
+  it('toneMapping defaults to AGX and the toggle flips renderer.toneMapping to ACES and back', async () => {
+    const { engine, three } = makeMockEngine();
+    const panel = new WorldBuilderConsole(engine as never);
+    await panel.register(registry);
+
+    // Init publishes default state ('agx') — applyEffectiveToggles ran once
+    // during register(), so the renderer's tonemap is AGX.
+    expect(panel.getState().toneMapping).toBe('agx');
+    expect(three.toneMapping).toBe(THREE.AgXToneMapping);
+
+    // Flip to ACES at runtime via the dev console.
+    panel.applyState({ toneMapping: 'aces' });
+    expect(three.toneMapping).toBe(THREE.ACESFilmicToneMapping);
+
+    // Flip back to AGX.
+    panel.applyState({ toneMapping: 'agx' });
+    expect(three.toneMapping).toBe(THREE.AgXToneMapping);
+
+    panel.dispose();
+  });
+
   it('hudVisible=false hides elements with [data-hud-root]', async () => {
     const hud = document.createElement('div');
     hud.setAttribute('data-hud-root', '');
@@ -226,6 +255,13 @@ describe('WorldBuilderConsole effective toggles', () => {
     expect(hud.style.display).toBe('');
 
     panel.dispose();
+  });
+});
+
+describe('toneMappingConstant resolver', () => {
+  it('maps the tonemap tokens to their THREE constants', () => {
+    expect(toneMappingConstant('agx')).toBe(THREE.AgXToneMapping);
+    expect(toneMappingConstant('aces')).toBe(THREE.ACESFilmicToneMapping);
   });
 });
 
@@ -254,6 +290,33 @@ describe('WorldBuilderConsole persistence', () => {
     expect(panel.getState().invulnerable).toBe(true);
     expect(panel.getState().shadowsEnabled).toBe(false);
     expect(three.shadowMap.enabled).toBe(false);
+    panel.dispose();
+  });
+
+  it('rejects an unknown tonemap token from localStorage and keeps the default', async () => {
+    localStorage.setItem(
+      'worldBuilder.state.v1',
+      JSON.stringify({ toneMapping: 'krypton-glow' }),
+    );
+    const { engine, three } = makeMockEngine();
+    const panel = new WorldBuilderConsole(engine as never);
+    await panel.register(registry);
+    // Garbage value must NOT poison renderer.toneMapping at boot.
+    expect(panel.getState().toneMapping).toBe('agx');
+    expect(three.toneMapping).toBe(THREE.AgXToneMapping);
+    panel.dispose();
+  });
+
+  it('hydrates a valid tonemap token from localStorage and applies it on boot', async () => {
+    localStorage.setItem(
+      'worldBuilder.state.v1',
+      JSON.stringify({ toneMapping: 'aces' }),
+    );
+    const { engine, three } = makeMockEngine();
+    const panel = new WorldBuilderConsole(engine as never);
+    await panel.register(registry);
+    expect(panel.getState().toneMapping).toBe('aces');
+    expect(three.toneMapping).toBe(THREE.ACESFilmicToneMapping);
     panel.dispose();
   });
 

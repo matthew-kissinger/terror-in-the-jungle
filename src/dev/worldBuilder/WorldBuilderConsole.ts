@@ -26,9 +26,17 @@
  * reloads during a debugging session.
  */
 
+import * as THREE from 'three';
 import type { GameEngine } from '../../core/GameEngine';
 import type { DebugHudRegistry, DebugPanel } from '../../ui/debug/DebugHudRegistry';
 import { Logger } from '../../utils/Logger';
+
+/**
+ * Renderer tonemap modes exposed to the WorldBuilder console. Default is
+ * `'agx'`; `'aces'` is retained as a runtime A/B back-out for owner playtest
+ * per `cycle-sun-and-atmosphere-overhaul` task `agx-tonemap-swap`.
+ */
+export type ToneMappingMode = 'agx' | 'aces';
 
 /** Minimal Tweakpane shape we use. Mirrors the LiveTuningPanel approach. */
 interface PaneLike {
@@ -64,6 +72,9 @@ export interface WorldBuilderState {
   npcTickPaused: boolean;
   forceTimeOfDay: number; // 0..1, -1 = follow live atmosphere
 
+  // Renderer A/B
+  toneMapping: ToneMappingMode;
+
   // Identification — useful for logging that WorldBuilder is active.
   active: boolean;
 }
@@ -79,8 +90,17 @@ const DEFAULT_STATE: WorldBuilderState = {
   ambientAudioEnabled: true,
   npcTickPaused: false,
   forceTimeOfDay: -1,
+  toneMapping: 'agx',
   active: true,
 };
+
+/**
+ * Resolve a {@link ToneMappingMode} to the matching Three.js constant.
+ * Exported for unit tests; runtime call site is {@link WorldBuilderConsole}.
+ */
+export function toneMappingConstant(mode: ToneMappingMode): THREE.ToneMapping {
+  return mode === 'aces' ? THREE.ACESFilmicToneMapping : THREE.AgXToneMapping;
+}
 
 export const WORLDBUILDER_GLOBAL_KEY = '__worldBuilder';
 
@@ -244,6 +264,10 @@ export class WorldBuilderConsole implements DebugPanel {
     sys.addBinding(this.state, 'postProcessEnabled').on('change', () => onChange());
     sys.addBinding(this.state, 'hudVisible').on('change', () => onChange());
     sys.addBinding(this.state, 'ambientAudioEnabled').on('change', () => onChange());
+    // Tonemap A/B: default 'agx', flip to 'aces' for playtest comparison.
+    sys.addBinding(this.state, 'toneMapping', {
+      options: { AGX: 'agx', ACES: 'aces' },
+    }).on('change', () => onChange());
 
     // ---- Debug Viz (re-routes to existing overlays) ----
     const viz = this.pane.addFolder({ title: 'Debug Viz', expanded: false });
@@ -289,11 +313,19 @@ export class WorldBuilderConsole implements DebugPanel {
   }
 
   private applyEffectiveToggles(): void {
-    // 1. Renderer shadows — flips the WebGLRenderer flag.
+    // 1. Renderer shadows + tonemap — flips the WebGLRenderer flags.
     try {
-      const three = (this.engine.renderer as unknown as { renderer?: { shadowMap?: { enabled: boolean } } }).renderer;
+      const three = (this.engine.renderer as unknown as {
+        renderer?: {
+          shadowMap?: { enabled: boolean };
+          toneMapping?: THREE.ToneMapping;
+        };
+      }).renderer;
       if (three?.shadowMap) {
         three.shadowMap.enabled = this.state.shadowsEnabled && this.originalShadowMapEnabled;
+      }
+      if (three && 'toneMapping' in three) {
+        three.toneMapping = toneMappingConstant(this.state.toneMapping);
       }
     } catch { /* tolerate. */ }
 
@@ -338,9 +370,11 @@ export class WorldBuilderConsole implements DebugPanel {
       const parsed = JSON.parse(raw) as Partial<WorldBuilderState>;
       for (const key of Object.keys(this.state) as Array<keyof WorldBuilderState>) {
         const v = parsed[key];
-        if (v !== undefined && typeof v === typeof this.state[key]) {
-          (this.state as unknown as Record<string, unknown>)[key] = v;
-        }
+        if (v === undefined || typeof v !== typeof this.state[key]) continue;
+        // Reject unknown tonemap tokens so a corrupted localStorage entry
+        // never silently leaves the renderer on an undefined enum value.
+        if (key === 'toneMapping' && v !== 'agx' && v !== 'aces') continue;
+        (this.state as unknown as Record<string, unknown>)[key] = v;
       }
     } catch { /* bad JSON. */ }
   }

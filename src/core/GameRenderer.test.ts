@@ -12,8 +12,9 @@
  * the single policy point deciding whether we pay that cost.
  */
 
+import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { INITIAL_FOG_COLOR, shouldPreserveDrawingBuffer } from './GameRenderer';
+import { DEFAULT_TONE_MAPPING, INITIAL_FOG_COLOR, shouldPreserveDrawingBuffer } from './GameRenderer';
 
 const originalHref = window.location.href;
 
@@ -61,6 +62,22 @@ describe('shouldPreserveDrawingBuffer', () => {
 // constant only matters for the pre-atmosphere first frame and any
 // chunk-boundary slivers that bleed through the dome — but those are the
 // exact cases that read as white when the constant ever drifts.
+// Tonemap policy guardrail (agx-tonemap-swap): AGX must be the renderer
+// init default. The per-fragment Preetham sky port relies on AGX's softer
+// rolloff; a silent revert to ACES would crush horizon-zenith variety and
+// flatten the HDR sun-disc back to a white blob. The WorldBuilder dev
+// console exposes a runtime A/B toggle to ACES for owner playtest, but
+// the renderer's *startup* tonemap is locked to AGX here.
+describe('DEFAULT_TONE_MAPPING', () => {
+  it('is AGX (the AGX vs ACES swap from cycle-sun-and-atmosphere-overhaul)', () => {
+    expect(DEFAULT_TONE_MAPPING).toBe(THREE.AgXToneMapping);
+  });
+
+  it('is not the old ACES Filmic default', () => {
+    expect(DEFAULT_TONE_MAPPING).not.toBe(THREE.ACESFilmicToneMapping);
+  });
+});
+
 describe('INITIAL_FOG_COLOR', () => {
   it('is not pure white (would amplify CDLOD seam cracks)', () => {
     expect(INITIAL_FOG_COLOR).not.toBe(0xffffff);
