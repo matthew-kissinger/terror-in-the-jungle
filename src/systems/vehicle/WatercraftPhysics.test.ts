@@ -196,39 +196,38 @@ function defaultConfig(overrides: Partial<WatercraftPhysicsConfig> = {}): Waterc
 describe('WatercraftPhysics', () => {
   const DT = 1 / 60;
 
-  it('neutral buoyancy keeps hull in a bounded vertical envelope', () => {
+  it('neutral buoyancy settles hull to a stable waterline', () => {
     // No throttle, no current, deep terrain. Released from y=3, gravity +
-    // per-sample buoyancy form a conservative spring → the hull oscillates
-    // around its equilibrium waterline. Pure behavioral assertion: hull does
-    // NOT sink past saturation (terrain is 200m down) and does NOT fly off
-    // upward. We sample over a full settle window so a sticky test-time
-    // phase does not pick a momentary spike.
-    //
-    // TODO(watercraft-physics-core follow-up): the real impl applies
-    // `dragCoefficient` only to horizontal velocity (see
-    // `integrateControls`); vertical velocity is undamped. With water drag
-    // wired into `integrateLinear` the hull would settle to a stable
-    // waterline and a tighter assertion (|y - equilibrium| < hull-thickness)
-    // would be appropriate. Flagged to orchestrator 2026-05-17.
+    // per-sample buoyancy form a damped spring → the hull converges to its
+    // equilibrium waterline within a few seconds. Behavioral assertions:
+    // (a) hull does NOT sink past saturation and does NOT fly off upward,
+    // (b) by t=4s the per-second Y envelope is tight (hull settled, not
+    // oscillating forever).
     const sampler = makeFlatWater(0);
     const physics = createPhysicsUnderTest(defaultConfig({
       initialPosition: new THREE.Vector3(0, 3, 0), // released above water
     }), sampler);
 
     const terrain = makeDeepTerrain();
-    // Run 10s to bleed start transients, then sample 2s of envelope.
-    for (let i = 0; i < 600; i += 1) physics.update(DT, terrain);
+    // Bleed transients for 4s so the damped spring has settled.
+    for (let i = 0; i < 240; i += 1) physics.update(DT, terrain);
 
     const ys: number[] = [];
-    for (let i = 0; i < 120; i += 1) {
+    for (let i = 0; i < 60; i += 1) {
       physics.update(DT, terrain);
       ys.push(physics.getState().position.y);
     }
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    // Envelope bounded — no runaway sink, no runaway lift.
-    expect(minY).toBeGreaterThan(-10);
-    expect(maxY).toBeLessThan(10);
+    const range = maxY - minY;
+    // Envelope bounded — no runaway sink, no runaway lift. With the damping
+    // term in `integrateLinear` the equilibrium for this fixture sits near
+    // y = -0.6 m (half-submerged, displacement balances weight).
+    expect(minY).toBeGreaterThan(-2);
+    expect(maxY).toBeLessThan(2);
+    // Hull has settled — residual oscillation across 1s is small relative to
+    // hull height (HULL_HEIGHT_FOR_IMMERSION = 1.2m).
+    expect(range).toBeLessThan(0.1);
     // Velocity finite (no NaN-leak under sustained forcing).
     expect(Number.isFinite(physics.getState().velocity.y)).toBe(true);
   });
@@ -288,20 +287,11 @@ describe('WatercraftPhysics', () => {
     expect(Math.abs(physics.getState().angularVelocity)).toBeGreaterThan(0.005);
   });
 
-  it('river current adds drift to stationary hull', () => {
+  it('river current drifts hull toward a bounded fraction of flow speed', () => {
     // Flow of (1, 0, 0) m/s. No throttle. The hull is pushed downstream by
-    // the channel current: velocity.x and position.x both rise.
-    //
-    // TODO(watercraft-physics-core follow-up): the real impl's
-    // `applyFlowCoupling` adds `flow * dt * FLOW_COUPLING` per step
-    // *additively* — it does not converge to flow speed the way
-    // `BuoyancyForce.applyBuoyancyForce` does (a `velocity = velocity *
-    // decay + flow * (1 - decay)` blend). The header comment claims
-    // "convergence toward a fraction of the channel speed" but the actual
-    // math accumulates without bound under sustained current. We can still
-    // assert directional drift, but the upper bound (`velocity.x <=
-    // flow.x`) belongs in a follow-up cycle once the integrator is changed
-    // to a proper exponential blend. Flagged to orchestrator 2026-05-17.
+    // the channel current via convergent half-coupling: velocity.x rises
+    // toward `flow.x * FLOW_COUPLING` (~0.5 m/s) and stays bounded under
+    // sustained current.
     const flow = new THREE.Vector3(1, 0, 0);
     const sampler = makeFlatWater(0, flow);
     const physics = createPhysicsUnderTest(defaultConfig({
@@ -319,8 +309,10 @@ describe('WatercraftPhysics', () => {
     const state = physics.getState();
     // Hull drifted downstream (+X).
     expect(state.position.x - xBefore).toBeGreaterThan(0.1);
-    // Horizontal velocity has a positive x-component.
-    expect(state.velocity.x).toBeGreaterThan(0.05);
+    // Horizontal velocity converges toward half-flow (0.5 m/s) — directional,
+    // and bounded well below the full channel speed (no unbounded accumulation).
+    expect(state.velocity.x).toBeGreaterThan(0.2);
+    expect(state.velocity.x).toBeLessThan(0.9);
     // Velocity is finite (no NaN-leak under sustained forcing).
     expect(Number.isFinite(state.velocity.x)).toBe(true);
   });

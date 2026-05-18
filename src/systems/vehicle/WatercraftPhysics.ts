@@ -383,8 +383,10 @@ export class WatercraftPhysics {
     // Sum buoyant force (vertical only — Archimedes ~ straight up). Per
     // brief: F_buoy_i = g * rho * sampleVolume * immersion_i.
     let totalBuoyN = 0;
+    let immersionSum = 0;
     for (let i = 0; i < this.sampleCount; i += 1) {
       const im = this.state.hullSamples[i].immersion;
+      immersionSum += im;
       if (im > 0) {
         totalBuoyN += this.cfg.gravity * this.cfg.waterDensity
           * this.perSampleVolume * im;
@@ -394,6 +396,25 @@ export class WatercraftPhysics {
     // v_y += a_y * dt where a_y = (F_gravity + F_buoy) / m.
     const accelY = (gWeight + totalBuoyN) / m;
     this.state.velocity.y += accelY * dt;
+
+    // Vertical hydrodynamic damping. Gravity + per-sample buoyancy form a
+    // conservative spring on Y; without damping the hull oscillates around
+    // its equilibrium waterline forever. Mirror `BuoyancyForce.applyBuoyancyForce`
+    // (exponential decay scaled by immersion) so a fully airborne hull falls
+    // freely while a partially submerged hull bleeds vertical energy in
+    // proportion to how much of it is wetted. The 5.0 multiplier is tuned so
+    // a typical fixture hull (mass 250kg, displacement 0.5 m^3, drag 1.4)
+    // settles to its equilibrium waterline within ~3s of physical time —
+    // empirically the per-second envelope drops below 0.1 m by t=3s and is
+    // sub-mm by t=5s. Wave heave responsiveness is preserved because the
+    // damping rate is small per fixed-step (dt = 1/60s) and only activates
+    // when samples are actually wetted.
+    const meanImmersion = immersionSum / this.sampleCount;
+    if (meanImmersion > 0 && this.cfg.dragCoefficient > 0) {
+      const verticalDampingRate = this.cfg.dragCoefficient * 5.0;
+      const dampFactor = Math.exp(-verticalDampingRate * meanImmersion * dt);
+      this.state.velocity.y *= dampFactor;
+    }
 
     // Integrate Y position (X and Z are integrated together in integratePose
     // after thrust + drag + flow accumulation so we apply pose update once).
@@ -474,11 +495,17 @@ export class WatercraftPhysics {
     _flowAccum.x /= weight;
     _flowAccum.z /= weight;
 
-    // Half-coupled push: a real hull does not perfectly track surface flow;
-    // here we add a fraction of flow each step so velocity converges toward
-    // a fraction of the channel speed when uncontested by throttle / drag.
-    this.state.velocity.x += _flowAccum.x * dt * FLOW_COUPLING;
-    this.state.velocity.z += _flowAccum.z * dt * FLOW_COUPLING;
+    // Convergent half-coupling: a real hull does not perfectly track surface
+    // flow. Mirror `BuoyancyForce.applyBuoyancyForce`'s exponential blend so
+    // horizontal velocity converges toward `flow * FLOW_COUPLING` rather than
+    // accumulating unbounded under sustained current. `rate=1.0` puts the
+    // half-way convergence at ~0.7s; the half-coupling cap (0.5) keeps the
+    // steady-state at half-channel speed so a free-drifting hull doesn't
+    // out-run the surface current.
+    const rate = 1.0;
+    const blend = 1 - Math.exp(-rate * dt);
+    this.state.velocity.x += blend * (_flowAccum.x * FLOW_COUPLING - this.state.velocity.x);
+    this.state.velocity.z += blend * (_flowAccum.z * FLOW_COUPLING - this.state.velocity.z);
   }
 
   // ---------- Step (5): beach / bank docking ----------
