@@ -11,6 +11,19 @@ const SKY_TEXTURE_HEIGHT = 128;
 
 const LUT_AZIMUTH_BINS = 32;
 const LUT_ELEVATION_BINS = 8;
+
+// Elevation-keyed sun↔moon blend for the bakeLUT sun-color path.
+// At -2° elevation (sun just below the horizon, the "vibe band" of civil
+// twilight) the warm Fex transmittance is preserved; at -8° and below the
+// sun color reads cool moonlight rather than the long-path-amplified deep
+// red the raw Fex extinction produces. Owner-default civil-twilight band
+// per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md` Section 6
+// question 2 recommendation (b). MOON_COLOR is the cool-moonlight target
+// from spike Section 2 vision + Section 4 night target.
+const MOON_COLOR = new THREE.Color(0.18, 0.20, 0.30);
+const TWILIGHT_UPPER_RAD = Math.PI / 180 * -2; // sun warm above this
+const TWILIGHT_LOWER_RAD = Math.PI / 180 * -8; // pure moon below this
+
 const DEFAULT_CLOUD_NOISE_SCALE = 1 / 900;
 const DEFAULT_CLOUD_WIND_DIR_X = 0.7;
 const DEFAULT_CLOUD_WIND_DIR_Z = 0.7;
@@ -712,13 +725,26 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     // radiance toward the sun direction, which would saturate to white).
     // At noon Fex is near 1 across all wavelengths -> near-white sun.
     // At dawn the longer path attenuates blue -> warm amber/red sun.
+    // Below the horizon the Fex math blows up red (the long optical path
+    // attenuates green and blue to ~0 while red survives), which used to
+    // bleed a bright red key-light into the deep-night scene. Blend
+    // toward cool moonlight across the civil-twilight band so the night
+    // hemisphere reads as moonlit, not blood-red. The blend runs BEFORE
+    // peak-normalisation + luma-floor so the floor catches the blended
+    // moon-cool color, not the raw Fex output.
     this.scratchDir.copy(this.sunDirection);
     this.scratchDir.normalize();
     this.computeTransmittance(this.scratchDir, this.sunColor);
+    const sunElevationRad = Math.asin(Math.max(-1, Math.min(1, this.scratchDir.y)));
+    // smoothstep(x, min, max) returns 0 at x<=min, 1 at x>=max. We want
+    // t=0 in the vibe band (-2° and above) and t=1 in deep night
+    // (-8° and below), so invert the raw smoothstep.
+    const t = 1 - THREE.MathUtils.smoothstep(sunElevationRad, TWILIGHT_LOWER_RAD, TWILIGHT_UPPER_RAD);
+    this.sunColor.lerp(MOON_COLOR, t);
     const peak = Math.max(this.sunColor.r, this.sunColor.g, this.sunColor.b, 1e-4);
     this.sunColor.setRGB(this.sunColor.r / peak, this.sunColor.g / peak, this.sunColor.b / peak);
-    // Floor brightness so sub-horizon sun still registers as a dim warm
-    // color rather than true black.
+    // Floor brightness so sub-horizon sun still registers as a dim cool
+    // (moonlit) color rather than true black.
     const luma = 0.2126 * this.sunColor.r + 0.7152 * this.sunColor.g + 0.0722 * this.sunColor.b;
     if (luma < 0.1) {
       this.sunColor.setRGB(

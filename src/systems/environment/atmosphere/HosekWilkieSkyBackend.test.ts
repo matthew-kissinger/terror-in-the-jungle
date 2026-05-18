@@ -305,6 +305,81 @@ describe('HosekWilkieSkyBackend (LUT rebake threshold)', () => {
   });
 });
 
+/**
+ * Behavior contract for the elevation-keyed sun↔moon color blend
+ * (`night-red-fix`). Before this fix, sub-horizon sun directions produced
+ * a pure-red `sunColor` because the long-optical-path Fex transmittance
+ * annihilates green and blue while red survives — the peak-normalisation
+ * then locked that to (1, 0, 0). The fix blends toward cool moonlight
+ * across a civil-twilight band so the night hemisphere reads moonlit
+ * rather than blood-red. See
+ * `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md` Section 1
+ * observation 2 + Section 3 last paragraph.
+ */
+describe('HosekWilkieSkyBackend (night-red elevation blend)', () => {
+  function bakeAt(elevationDeg: number): THREE.Color {
+    const backend = new HosekWilkieSkyBackend();
+    // Use a sane mid-turbidity preset so the Fex math runs normally
+    // through `computeTransmittance`. Sub-horizon `sunDirection` is the
+    // load-bearing input — we drive it through `update()` directly so
+    // the LUT bakes against the requested elevation rather than the
+    // preset's stored elevation.
+    backend.applyPreset(SCENARIO_ATMOSPHERE_PRESETS.openfrontier);
+    const elevationRad = (elevationDeg * Math.PI) / 180;
+    const sun = new THREE.Vector3(Math.cos(elevationRad), Math.sin(elevationRad), 0).normalize();
+    backend.update(0.016, sun);
+    return backend.getSun(new THREE.Color());
+  }
+
+  it('deep-night sun direction (-10°) bakes a cool moonlight color, not red bleed', () => {
+    // Pre-fix: peak-normalised Fex returned roughly (1, ~0, ~0) — pure
+    // red. Post-fix: at -10° the elevation-keyed blend pulls the color
+    // fully to MOON_COLOR so the result reads cool (blue dominant, no
+    // red dominance). The spike memo line 151 specifies MOON_COLOR
+    // ≈ (0.18, 0.20, 0.30) and line 175 expresses the regression
+    // criterion as "NOT red-dominant"; we assert that observable
+    // outcome (r is the smallest channel) rather than a tighter
+    // fractional bound that would constrain the exact MOON_COLOR
+    // chromaticity at the constant level.
+    const sun = bakeAt(-10);
+    expect(sun.r).toBeLessThan(sun.g);
+    expect(sun.r).toBeLessThan(sun.b);
+    // And specifically: the blue channel dominates a cool moonlight
+    // result, so b > g > r is the expected ordering.
+    expect(sun.b).toBeGreaterThan(sun.g);
+  });
+
+  it('vibe-band sun direction (-5°) is warmer than deep night (-10°)', () => {
+    // The civil-twilight band (-2° to -8°) is the "vibe" zone where
+    // sub-horizon Fex warmth still bleeds through partially. The blend
+    // is smooth across the band, so a vibe-band sample must be measurably
+    // warmer (more red-shifted relative to blue) than a deep-night
+    // sample where the blend is fully moon-cool. We assert the relative
+    // warmth-gradient rather than an absolute "r > g > b" ordering
+    // because the Fex extinction at -5° is heavy enough that even a
+    // partial moon-blend can flip the ordering of the residual green
+    // and blue channels — what matters for the player-visible result
+    // is the smooth warmth gradient across the band, not the exact
+    // channel ordering of a single sample.
+    const vibe = bakeAt(-5);
+    const night = bakeAt(-10);
+    const vibeWarmth = vibe.r - vibe.b;
+    const nightWarmth = night.r - night.b;
+    expect(vibeWarmth).toBeGreaterThan(nightWarmth);
+    expect(vibe.r).toBeGreaterThan(0.3);
+  });
+
+  it('above-horizon sun directions are unchanged by the moon blend (preserves daytime behaviour)', () => {
+    // The blend is gated on civil-twilight elevations only. At any
+    // elevation above -2°, t = 0 so the sun color is the raw
+    // peak-normalised Fex (the existing daytime behaviour). We assert
+    // the existing "low-sun warmer than noon" contract still holds.
+    const noon = bakeAt(60);
+    const dawn = bakeAt(5);
+    expect(dawn.r - dawn.b).toBeGreaterThan(noon.r - noon.b);
+  });
+});
+
 describe('HosekWilkieSkyBackend (sky-integrated cloud coverage)', () => {
   it('clamps cloud coverage for the sky-dome cloud pass', () => {
     const backend = new HosekWilkieSkyBackend();
