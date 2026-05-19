@@ -1,0 +1,4070 @@
+{
+  "support": {
+    "longtask": true,
+    "longAnimationFrame": true,
+    "measure": true,
+    "webglTextureUpload": true
+  },
+  "totals": {
+    "longTaskCount": 73,
+    "longTaskTotalDurationMs": 16606,
+    "longTaskMaxDurationMs": 4774,
+    "longAnimationFrameCount": 79,
+    "longAnimationFrameTotalDurationMs": 66153.9999999404,
+    "longAnimationFrameMaxDurationMs": 4842,
+    "longAnimationFrameBlockingDurationMs": 25779.465000047687,
+    "webglTextureUploadCount": 764,
+    "webglTextureUploadTotalDurationMs": 760.2999997735023,
+    "webglTextureUploadMaxDurationMs": 105.5,
+    "webglTextureUploadByOperation": {
+      "texImage2D": {
+        "count": 7,
+        "totalDurationMs": 0.30000001192092896,
+        "maxDurationMs": 0.30000001192092896
+      },
+      "texStorage2D": {
+        "count": 48,
+        "totalDurationMs": 0.19999998807907104,
+        "maxDurationMs": 0.19999998807907104
+      },
+      "texSubImage2D": {
+        "count": 693,
+        "totalDurationMs": 759.6999998092651,
+        "maxDurationMs": 105.5
+      },
+      "generateMipmap": {
+        "count": 16,
+        "totalDurationMs": 0.09999996423721313,
+        "maxDurationMs": 0.09999996423721313
+      }
+    },
+    "userTimingByName": {
+      "SystemUpdater.Combat": {
+        "count": 67,
+        "totalDurationMs": 1199.4000002145767,
+        "maxDurationMs": 88.70000004768372
+      },
+      "CombatAI.frame.total": {
+        "count": 67,
+        "totalDurationMs": 445.09999990463257,
+        "maxDurationMs": 33.09999996423721
+      },
+      "SystemUpdater.Terrain": {
+        "count": 67,
+        "totalDurationMs": 107.30000013113022,
+        "maxDurationMs": 9.100000023841858
+      },
+      "SystemUpdater.Navigation": {
+        "count": 67,
+        "totalDurationMs": 10.300000071525574,
+        "maxDurationMs": 5.300000011920929
+      },
+      "SystemUpdater.Billboards": {
+        "count": 67,
+        "totalDurationMs": 9.900000035762787,
+        "maxDurationMs": 1.199999988079071
+      },
+      "SystemUpdater.Vehicles": {
+        "count": 67,
+        "totalDurationMs": 114.09999960660934,
+        "maxDurationMs": 8.399999976158142
+      },
+      "SystemUpdater.Player": {
+        "count": 67,
+        "totalDurationMs": 190.20000004768372,
+        "maxDurationMs": 16.100000023841858
+      },
+      "SystemUpdater.Weapons": {
+        "count": 67,
+        "totalDurationMs": 30.200000166893005,
+        "maxDurationMs": 10.300000011920929
+      },
+      "SystemUpdater.HUD": {
+        "count": 67,
+        "totalDurationMs": 34.10000026226044,
+        "maxDurationMs": 7.899999976158142
+      },
+      "SystemUpdater.TacticalUI": {
+        "count": 67,
+        "totalDurationMs": 183.799999833107,
+        "maxDurationMs": 14.400000035762787
+      },
+      "SystemUpdater.WarSim": {
+        "count": 67,
+        "totalDurationMs": 4.400000095367432,
+        "maxDurationMs": 1.199999988079071
+      },
+      "SystemUpdater.AirSupport": {
+        "count": 67,
+        "totalDurationMs": 7,
+        "maxDurationMs": 1.800000011920929
+      },
+      "SystemUpdater.ModeRuntime": {
+        "count": 67,
+        "totalDurationMs": 1.2000000476837158,
+        "maxDurationMs": 0.19999998807907104
+      },
+      "SystemUpdater.World": {
+        "count": 67,
+        "totalDurationMs": 147.89999967813492,
+        "maxDurationMs": 12.599999964237213
+      },
+      "SystemUpdater.World.Zone": {
+        "count": 58,
+        "totalDurationMs": 43.799999833106995,
+        "maxDurationMs": 4.899999976158142
+      },
+      "SystemUpdater.World.Tickets": {
+        "count": 58,
+        "totalDurationMs": 8.699999988079071,
+        "maxDurationMs": 4
+      },
+      "SystemUpdater.World.Weather": {
+        "count": 58,
+        "totalDurationMs": 9.099999904632568,
+        "maxDurationMs": 1.199999988079071
+      },
+      "SystemUpdater.World.Atmosphere": {
+        "count": 58,
+        "totalDurationMs": 30.20000022649765,
+        "maxDurationMs": 5.100000023841858
+      },
+      "SystemUpdater.World.Water": {
+        "count": 58,
+        "totalDurationMs": 8.199999868869781,
+        "maxDurationMs": 1.399999976158142
+      },
+      "SystemUpdater.Other": {
+        "count": 67,
+        "totalDurationMs": 142.3000002503395,
+        "maxDurationMs": 30.5
+      },
+      "GameEngineLoop.RenderMain.collectGPUTime": {
+        "count": 67,
+        "totalDurationMs": 2.299999952316284,
+        "maxDurationMs": 0.6000000238418579
+      },
+      "GameEngineLoop.RenderMain.beginFrameStats": {
+        "count": 67,
+        "totalDurationMs": 1.4999999403953552,
+        "maxDurationMs": 0.30000001192092896
+      },
+      "GameEngineLoop.RenderMain.renderer.render": {
+        "count": 67,
+        "totalDurationMs": 10874.300000011921,
+        "maxDurationMs": 4556.899999976158
+      },
+      "GameEngineLoop.RenderMain.endGPUTimer": {
+        "count": 67,
+        "totalDurationMs": 1.1999999284744263,
+        "maxDurationMs": 0.3999999761581421
+      },
+      "GameEngineLoop.RenderOverlay.weapon": {
+        "count": 67,
+        "totalDurationMs": 367.1999999284744,
+        "maxDurationMs": 38.200000047683716
+      },
+      "GameEngineLoop.RenderOverlay.grenade": {
+        "count": 67,
+        "totalDurationMs": 104.59999984502792,
+        "maxDurationMs": 41.59999996423721
+      },
+      "CombatAI.slowest.patrolling.high": {
+        "count": 26,
+        "totalDurationMs": 19.599999964237213,
+        "maxDurationMs": 3.199999988079071
+      },
+      "CombatAI.method.state.patrolling": {
+        "count": 34,
+        "totalDurationMs": 23.600000083446503,
+        "maxDurationMs": 3.5999999046325684
+      },
+      "CombatAI.method.patrol.findNearestEnemy": {
+        "count": 24,
+        "totalDurationMs": 13.400000095367432,
+        "maxDurationMs": 2.899999976158142
+      },
+      "CombatAI.method.squadCommandOverride": {
+        "count": 3,
+        "totalDurationMs": 1.100000023841858,
+        "maxDurationMs": 0.40000003576278687
+      },
+      "CombatAI.method.suppressionDecay": {
+        "count": 3,
+        "totalDurationMs": 1.399999976158142,
+        "maxDurationMs": 0.6000000238418579
+      }
+    }
+  },
+  "recent": {
+    "longTasks": {
+      "count": 32,
+      "totalDurationMs": 2863,
+      "maxDurationMs": 192,
+      "entries": [
+        {
+          "name": "self",
+          "startTime": 60294.39999997616,
+          "duration": 76,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 62862.5,
+          "duration": 71,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 65427.80000001192,
+          "duration": 104,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 66116.19999998808,
+          "duration": 124,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 66711.30000001192,
+          "duration": 102,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 69207.60000002384,
+          "duration": 55,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 69282.5,
+          "duration": 80,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 70559.89999997616,
+          "duration": 103,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 71860.19999998808,
+          "duration": 77,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 74362.39999997616,
+          "duration": 51,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 74432.30000001192,
+          "duration": 79,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 75712.10000002384,
+          "duration": 91,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 75804.69999998808,
+          "duration": 54,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 76937.80000001192,
+          "duration": 65,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 77008.39999997616,
+          "duration": 80,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 78333.10000002384,
+          "duration": 88,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 79609.39999997616,
+          "duration": 80,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 80891.89999997616,
+          "duration": 192,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 82141.19999998808,
+          "duration": 52,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 83421.5,
+          "duration": 65,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 84670,
+          "duration": 71,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 85951.10000002384,
+          "duration": 114,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 87246.69999998808,
+          "duration": 102,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 87721.5,
+          "duration": 174,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 89740.10000002384,
+          "duration": 58,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 89814,
+          "duration": 126,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 96176.5,
+          "duration": 54,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 96254.39999997616,
+          "duration": 70,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 97557.89999997616,
+          "duration": 106,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 98848.10000002384,
+          "duration": 89,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 101399.80000001192,
+          "duration": 84,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        },
+        {
+          "name": "self",
+          "startTime": 102686.69999998808,
+          "duration": 126,
+          "attribution": [
+            {
+              "name": "unknown",
+              "entryType": "taskattribution",
+              "startTime": 0,
+              "duration": 0,
+              "containerType": "window",
+              "containerSrc": "",
+              "containerId": "",
+              "containerName": ""
+            }
+          ]
+        }
+      ]
+    },
+    "longAnimationFrames": {
+      "count": 32,
+      "totalDurationMs": 34583.69999986887,
+      "maxDurationMs": 2573.800000011921,
+      "blockingDurationMs": 9516.325000035762,
+      "entries": [
+        {
+          "startTime": 65532,
+          "duration": 708.6999999880791,
+          "blockingDuration": 75.661,
+          "renderStart": 66116.19999998808,
+          "styleAndLayoutStart": 66240.10000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 66116.39999997616,
+              "duration": 123,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 66241.10000002384,
+          "duration": 570.3999999761581,
+          "blockingDuration": 50.252,
+          "renderStart": 66711.80000001192,
+          "styleAndLayoutStart": 66811,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 66713.60000002384,
+              "duration": 97,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 66814,
+          "duration": 1211.199999988079,
+          "blockingDuration": 1161.199999988079,
+          "renderStart": 67988.69999998808,
+          "styleAndLayoutStart": 68025.10000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 67989.5,
+              "duration": 35,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 68025.60000002384,
+          "duration": 1236,
+          "blockingDuration": 4.784,
+          "renderStart": 69207.80000001192,
+          "styleAndLayoutStart": 69261.19999998808,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 69208,
+              "duration": 53,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 69262.60000002384,
+          "duration": 99.69999998807907,
+          "blockingDuration": 29.846,
+          "renderStart": 69282.69999998808,
+          "styleAndLayoutStart": 69362.10000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 69282.89999997616,
+              "duration": 79,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 69362.60000002384,
+          "duration": 1299.2999999523163,
+          "blockingDuration": 52.12,
+          "renderStart": 70560,
+          "styleAndLayoutStart": 70658.39999997616,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 70560.30000001192,
+              "duration": 98,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 70663.60000002384,
+          "duration": 1273.5999999642372,
+          "blockingDuration": 31.857,
+          "renderStart": 71860.19999998808,
+          "styleAndLayoutStart": 71937.10000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 71860.30000001192,
+              "duration": 76,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 71938.10000002384,
+          "duration": 2474.899999976158,
+          "blockingDuration": 0.709,
+          "renderStart": 74362.60000002384,
+          "styleAndLayoutStart": 74412.69999998808,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 74362.80000001192,
+              "duration": 49,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 74414,
+          "duration": 96.10000002384186,
+          "blockingDuration": 28.381,
+          "renderStart": 74432.30000001192,
+          "styleAndLayoutStart": 74509.60000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 74432.39999997616,
+              "duration": 77,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 74511.69999998808,
+          "duration": 1291.1000000238419,
+          "blockingDuration": 41.286,
+          "renderStart": 75712.10000002384,
+          "styleAndLayoutStart": 75802.5,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 75712.89999997616,
+              "duration": 89,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 75803.10000002384,
+          "duration": 53.5,
+          "blockingDuration": 1.979,
+          "renderStart": 75804.69999998808,
+          "styleAndLayoutStart": 75855.60000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 75804.80000001192,
+              "duration": 50,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 75858.80000001192,
+          "duration": 1143.0999999642372,
+          "blockingDuration": 14.784,
+          "renderStart": 76937.89999997616,
+          "styleAndLayoutStart": 77000,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 76938.10000002384,
+              "duration": 61,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 77003.10000002384,
+          "duration": 85.29999995231628,
+          "blockingDuration": 30.065,
+          "renderStart": 77008.39999997616,
+          "styleAndLayoutStart": 77088.39999997616,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 77008.60000002384,
+              "duration": 79,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 1
+            }
+          ]
+        },
+        {
+          "startTime": 77088.69999998808,
+          "duration": 1243.6000000238419,
+          "blockingDuration": 1193.6000000238419,
+          "renderStart": 78301.69999998808,
+          "styleAndLayoutStart": 78332.19999998808,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 78302.39999997616,
+              "duration": 29,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 78332.69999998808,
+          "duration": 88.5,
+          "blockingDuration": 38.154,
+          "renderStart": 78333.19999998808,
+          "styleAndLayoutStart": 78421.10000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 78333.19999998808,
+              "duration": 87,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 78421.69999998808,
+          "duration": 1267.4000000357628,
+          "blockingDuration": 30.19,
+          "renderStart": 79609.39999997616,
+          "styleAndLayoutStart": 79689,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 79609.89999997616,
+              "duration": 78,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 79689.60000002384,
+          "duration": 1380,
+          "blockingDuration": 127.829,
+          "renderStart": 80892,
+          "styleAndLayoutStart": 81023.5,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 80892.39999997616,
+              "duration": 130,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 81084.19999998808,
+          "duration": 1109,
+          "blockingDuration": 3.651,
+          "renderStart": 82141.30000001192,
+          "styleAndLayoutStart": 82193.10000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 82141.5,
+              "duration": 51,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 82193.5,
+          "duration": 1293,
+          "blockingDuration": 21.112,
+          "renderStart": 83421.60000002384,
+          "styleAndLayoutStart": 83486.30000001192,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "TimerHandler:setInterval",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/ui-BIvTakrm.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 92929,
+              "windowAttribution": "self",
+              "executionStart": 82969.89999997616,
+              "duration": 5,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            },
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 83421.69999998808,
+              "duration": 64,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 83486.89999997616,
+          "duration": 1254.300000011921,
+          "blockingDuration": 21.292,
+          "renderStart": 84670,
+          "styleAndLayoutStart": 84741.19999998808,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 84670.30000001192,
+              "duration": 70,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 84741.5,
+          "duration": 1323.300000011921,
+          "blockingDuration": 63.869,
+          "renderStart": 85951.19999998808,
+          "styleAndLayoutStart": 86064.80000001192,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 85953.30000001192,
+              "duration": 111,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 86065.10000002384,
+          "duration": 1281.7999999523163,
+          "blockingDuration": 50.297,
+          "renderStart": 87246.69999998808,
+          "styleAndLayoutStart": 87345.19999998808,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 87246.89999997616,
+              "duration": 97,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 87349.39999997616,
+          "duration": 544.8000000119209,
+          "blockingDuration": 123.022,
+          "renderStart": 87721.5,
+          "styleAndLayoutStart": 87893.60000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 87721.89999997616,
+              "duration": 171,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 1
+            }
+          ]
+        },
+        {
+          "startTime": 87895.80000001192,
+          "duration": 1901.3999999761581,
+          "blockingDuration": 7.636,
+          "renderStart": 89740.19999998808,
+          "styleAndLayoutStart": 89795.39999997616,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 89740.60000002384,
+              "duration": 54,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 89798.69999998808,
+          "duration": 136.30000001192093,
+          "blockingDuration": 71.287,
+          "renderStart": 89814.10000002384,
+          "styleAndLayoutStart": 89933.80000001192,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 89814.69999998808,
+              "duration": 118,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 2
+            }
+          ]
+        },
+        {
+          "startTime": 89940.69999998808,
+          "duration": 2475,
+          "blockingDuration": 2425,
+          "renderStart": 92388.19999998808,
+          "styleAndLayoutStart": 92415.5,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 92388.30000001192,
+              "duration": 27,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 92416.5,
+          "duration": 2573.800000011921,
+          "blockingDuration": 2523.800000011921,
+          "renderStart": 94954.19999998808,
+          "styleAndLayoutStart": 94990.19999998808,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 94954.30000001192,
+              "duration": 35,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 94990.80000001192,
+          "duration": 1238.3999999761581,
+          "blockingDuration": 2.748,
+          "renderStart": 96176.80000001192,
+          "styleAndLayoutStart": 96228.60000002384,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 96176.89999997616,
+              "duration": 51,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 96230.5,
+          "duration": 93.69999998807907,
+          "blockingDuration": 20.311,
+          "renderStart": 96254.39999997616,
+          "styleAndLayoutStart": 96323.89999997616,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 96254.5,
+              "duration": 69,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        },
+        {
+          "startTime": 96324.5,
+          "duration": 1336.300000011921,
+          "blockingDuration": 52.955,
+          "renderStart": 97558,
+          "styleAndLayoutStart": 97658.5,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 97558,
+              "duration": 100,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 1
+            }
+          ]
+        },
+        {
+          "startTime": 97664.39999997616,
+          "duration": 1272.9000000357628,
+          "blockingDuration": 39.348,
+          "renderStart": 98848.10000002384,
+          "styleAndLayoutStart": 98937.19999998808,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 98848.30000001192,
+              "duration": 88,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 1
+            }
+          ]
+        },
+        {
+          "startTime": 98937.69999998808,
+          "duration": 1227.300000011921,
+          "blockingDuration": 1177.300000011921,
+          "renderStart": 100126.5,
+          "styleAndLayoutStart": 100164.89999997616,
+          "firstUIEventTimestamp": 0,
+          "scripts": [
+            {
+              "name": "script",
+              "invoker": "FrameRequestCallback",
+              "invokerType": "user-callback",
+              "sourceURL": "http://127.0.0.1:4275/build-assets/index-CO0Kc7ul.js",
+              "sourceFunctionName": "",
+              "sourceCharPosition": 1088633,
+              "windowAttribution": "self",
+              "executionStart": 100127,
+              "duration": 37,
+              "pauseDuration": 0,
+              "forcedStyleAndLayoutDuration": 0
+            }
+          ]
+        }
+      ]
+    },
+    "webglTextureUploads": [
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89895.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89896.60000002384,
+        "duration": 1.2999999523162842,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89900.60000002384,
+        "duration": 0.5999999642372131,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89902.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89902.5,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89902.89999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89903.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89906.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.5,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.89999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92410.89999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 92411.10000002384,
+        "duration": 0.09999996423721313,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94986.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94986.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94986.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94986.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94986.89999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94986.89999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94987,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94987,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94987,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94987,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94987,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 94988.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96216,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96216.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96216.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96216.5,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96216.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96216.89999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96217.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96217.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96217.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96217.5,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96217.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96223.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96303.30000001192,
+        "duration": 0.09999996423721313,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96303.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96304.10000002384,
+        "duration": 0.09999996423721313,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96304.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96304.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96304.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96305.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96306,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96306.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96307,
+        "duration": 0.19999998807907104,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96307.30000001192,
+        "duration": 0.30000001192092896,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 96309.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97640.19999998808,
+        "duration": 0.19999998807907104,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97641,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97641.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97642.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97642.5,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97643,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97643.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97644.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97644.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97644.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97644.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 97647.5,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98910.89999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98911.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98911.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98911.60000002384,
+        "duration": 0.09999996423721313,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98911.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98912,
+        "duration": 0.19999998807907104,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98912.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98912.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98912.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98913,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98913,
+        "duration": 0.19999998807907104,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 98917.5,
+        "duration": 0.19999998807907104,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100162.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100177.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 100183.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101466.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101466.69999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101466.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101466.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101466.80000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101467.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101467.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101467.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101467.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101467.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101467.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 101468.5,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102772.30000001192,
+        "duration": 0.19999998807907104,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102772.69999998808,
+        "duration": 0.19999998807907104,
+        "target": "TEXTURE_2D",
+        "textureId": 33,
+        "width": 6,
+        "height": 6,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 144,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102773.30000001192,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102773.5,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102773.80000001192,
+        "duration": 0.09999996423721313,
+        "target": "TEXTURE_2D",
+        "textureId": 39,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102774.10000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102774.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102775.19999998808,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102775.19999998808,
+        "duration": 0.10000002384185791,
+        "target": "TEXTURE_2D",
+        "textureId": 47,
+        "width": 3,
+        "height": 3,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 36,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102775.39999997616,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102775.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 102778.60000002384,
+        "duration": 0,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      }
+    ],
+    "webglTextureUploadTop": [
+      {
+        "operation": "texSubImage2D",
+        "startTime": 40544.10000002384,
+        "duration": 105.5,
+        "target": "TEXTURE_2D",
+        "textureId": 17,
+        "width": 2048,
+        "height": 2048,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/bambooGrove/bamboo-google-2/imposter.png",
+        "sourceWidth": 2048,
+        "sourceHeight": 2048,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 41489.39999997616,
+        "duration": 90.90000003576279,
+        "target": "TEXTURE_2D",
+        "textureId": 22,
+        "width": 2048,
+        "height": 2048,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/fanPalm/lady-palm-google-1/imposter.png",
+        "sourceWidth": 2048,
+        "sourceHeight": 2048,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 41580.89999997616,
+        "duration": 77.70000004768372,
+        "target": "TEXTURE_2D",
+        "textureId": 23,
+        "width": 2048,
+        "height": 2048,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/fanPalm/lady-palm-google-1/imposter.normal.png",
+        "sourceWidth": 2048,
+        "sourceHeight": 2048,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 40650.89999997616,
+        "duration": 73.70000004768372,
+        "target": "TEXTURE_2D",
+        "textureId": 18,
+        "width": 2048,
+        "height": 2048,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/bambooGrove/bamboo-google-2/imposter.normal.png",
+        "sourceWidth": 2048,
+        "sourceHeight": 2048,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 41959.69999998808,
+        "duration": 71.60000002384186,
+        "target": "TEXTURE_2D",
+        "textureId": 25,
+        "width": 2048,
+        "height": 2048,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/coconut/coconut-palm-google/imposter.png",
+        "sourceWidth": 2048,
+        "sourceHeight": 2048,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 42271.80000001192,
+        "duration": 70,
+        "target": "TEXTURE_2D",
+        "textureId": 28,
+        "width": 2688,
+        "height": 1344,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/npcs/usArmy/patrol_walk/animated-albedo-packed.png",
+        "sourceWidth": 2688,
+        "sourceHeight": 1344,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 41247.69999998808,
+        "duration": 67.30000001192093,
+        "target": "TEXTURE_2D",
+        "textureId": 21,
+        "width": 2048,
+        "height": 2048,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/bananaPlant/banana-tree-sean-tarrant/imposter.normal.png",
+        "sourceWidth": 2048,
+        "sourceHeight": 2048,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 42032,
+        "duration": 62.39999997615814,
+        "target": "TEXTURE_2D",
+        "textureId": 26,
+        "width": 2048,
+        "height": 2048,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/coconut/coconut-palm-google/imposter.normal.png",
+        "sourceWidth": 2048,
+        "sourceHeight": 2048,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 41190.30000001192,
+        "duration": 56.5,
+        "target": "TEXTURE_2D",
+        "textureId": 20,
+        "width": 2048,
+        "height": 2048,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/bananaPlant/banana-tree-sean-tarrant/imposter.png",
+        "sourceWidth": 2048,
+        "sourceHeight": 2048,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 39498.60000002384,
+        "duration": 12.699999988079071,
+        "target": "TEXTURE_2D",
+        "textureId": 12,
+        "width": 512,
+        "height": 512,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/tall-grass.webp",
+        "sourceWidth": 512,
+        "sourceHeight": 512,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 39487.5,
+        "duration": 9.699999988079071,
+        "target": "TEXTURE_2D",
+        "textureId": 11,
+        "width": 512,
+        "height": 512,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/jungle-floor.webp",
+        "sourceWidth": 512,
+        "sourceHeight": 512,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 39521.69999998808,
+        "duration": 8.800000011920929,
+        "target": "TEXTURE_2D",
+        "textureId": 14,
+        "width": 512,
+        "height": 512,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/rocky-highland.webp",
+        "sourceWidth": 512,
+        "sourceHeight": 512,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 39512.30000001192,
+        "duration": 8.5,
+        "target": "TEXTURE_2D",
+        "textureId": 13,
+        "width": 512,
+        "height": 512,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/river-bank.webp",
+        "sourceWidth": 512,
+        "sourceHeight": 512,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 39477.39999997616,
+        "duration": 7.200000047683716,
+        "target": "TEXTURE_2D",
+        "textureId": 9,
+        "width": 1024,
+        "height": 1024,
+        "sourceType": "Uint8Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 4194304,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 41798.39999997616,
+        "duration": 7.200000047683716,
+        "target": "TEXTURE_2D",
+        "textureId": 24,
+        "width": 1024,
+        "height": 512,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/elephantEar/big-leaf-plant-reyshapes/imposter.png",
+        "sourceWidth": 1024,
+        "sourceHeight": 512,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 41007.80000001192,
+        "duration": 6.899999976158142,
+        "target": "TEXTURE_2D",
+        "textureId": 19,
+        "width": 1024,
+        "height": 512,
+        "sourceType": "HTMLImageElement",
+        "sourceUrl": "http://127.0.0.1:4275/assets/pixel-forge/vegetation/fern/fern-danni-bittman/imposter.png",
+        "sourceWidth": 1024,
+        "sourceHeight": 512,
+        "byteLength": 0,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 71927.19999998808,
+        "duration": 1.4000000357627869,
+        "target": "TEXTURE_2D",
+        "textureId": 45,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 39531.30000001192,
+        "duration": 1.300000011920929,
+        "target": "TEXTURE_2D",
+        "textureId": 15,
+        "width": 1024,
+        "height": 1024,
+        "sourceType": "Float32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 4194304,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89896.60000002384,
+        "duration": 1.2999999523162842,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 81005.30000001192,
+        "duration": 1,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 59053.60000002384,
+        "duration": 0.8999999761581421,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 59071.39999997616,
+        "duration": 0.7000000476837158,
+        "target": "TEXTURE_2D",
+        "textureId": 51,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 70635.69999998808,
+        "duration": 0.6000000238418579,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 39485.80000001192,
+        "duration": 0.5999999642372131,
+        "target": "TEXTURE_2D",
+        "textureId": 10,
+        "width": 257,
+        "height": 257,
+        "sourceType": "Uint8Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 264196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 89900.60000002384,
+        "duration": 0.5999999642372131,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 66777.5,
+        "duration": 0.3999999761581421,
+        "target": "TEXTURE_2D",
+        "textureId": 41,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texImage2D",
+        "startTime": 3727.699999988079,
+        "duration": 0.30000001192092896,
+        "target": "TEXTURE_2D",
+        "textureId": 1,
+        "width": 1,
+        "height": 1,
+        "sourceType": "Uint8Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 4,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 44927.19999998808,
+        "duration": 0.30000001192092896,
+        "target": "TEXTURE_2D",
+        "textureId": 31,
+        "width": 7,
+        "height": 7,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 196,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 52610.30000001192,
+        "duration": 0.30000001192092896,
+        "target": "TEXTURE_2D",
+        "textureId": 49,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 66766.69999998808,
+        "duration": 0.30000001192092896,
+        "target": "TEXTURE_2D",
+        "textureId": 35,
+        "width": 5,
+        "height": 5,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 100,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 70640.5,
+        "duration": 0.30000001192092896,
+        "target": "TEXTURE_2D",
+        "textureId": 43,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      },
+      {
+        "operation": "texSubImage2D",
+        "startTime": 74489.19999998808,
+        "duration": 0.30000001192092896,
+        "target": "TEXTURE_2D",
+        "textureId": 37,
+        "width": 2,
+        "height": 2,
+        "sourceType": "Uint32Array",
+        "sourceUrl": "",
+        "sourceWidth": 0,
+        "sourceHeight": 0,
+        "byteLength": 16,
+        "argsLength": 9
+      }
+    ],
+    "userTimingByName": {
+      "SystemUpdater.Combat": {
+        "count": 67,
+        "totalDurationMs": 1199.4000002145767,
+        "maxDurationMs": 88.70000004768372
+      },
+      "CombatAI.frame.total": {
+        "count": 67,
+        "totalDurationMs": 445.09999990463257,
+        "maxDurationMs": 33.09999996423721
+      },
+      "SystemUpdater.Terrain": {
+        "count": 67,
+        "totalDurationMs": 107.30000013113022,
+        "maxDurationMs": 9.100000023841858
+      },
+      "SystemUpdater.Navigation": {
+        "count": 67,
+        "totalDurationMs": 10.300000071525574,
+        "maxDurationMs": 5.300000011920929
+      },
+      "SystemUpdater.Billboards": {
+        "count": 67,
+        "totalDurationMs": 9.900000035762787,
+        "maxDurationMs": 1.199999988079071
+      },
+      "SystemUpdater.Vehicles": {
+        "count": 67,
+        "totalDurationMs": 114.09999960660934,
+        "maxDurationMs": 8.399999976158142
+      },
+      "SystemUpdater.Player": {
+        "count": 67,
+        "totalDurationMs": 190.20000004768372,
+        "maxDurationMs": 16.100000023841858
+      },
+      "SystemUpdater.Weapons": {
+        "count": 67,
+        "totalDurationMs": 30.200000166893005,
+        "maxDurationMs": 10.300000011920929
+      },
+      "SystemUpdater.HUD": {
+        "count": 67,
+        "totalDurationMs": 34.10000026226044,
+        "maxDurationMs": 7.899999976158142
+      },
+      "SystemUpdater.TacticalUI": {
+        "count": 67,
+        "totalDurationMs": 183.799999833107,
+        "maxDurationMs": 14.400000035762787
+      },
+      "SystemUpdater.WarSim": {
+        "count": 67,
+        "totalDurationMs": 4.400000095367432,
+        "maxDurationMs": 1.199999988079071
+      },
+      "SystemUpdater.AirSupport": {
+        "count": 67,
+        "totalDurationMs": 7,
+        "maxDurationMs": 1.800000011920929
+      },
+      "SystemUpdater.ModeRuntime": {
+        "count": 67,
+        "totalDurationMs": 1.2000000476837158,
+        "maxDurationMs": 0.19999998807907104
+      },
+      "SystemUpdater.World": {
+        "count": 67,
+        "totalDurationMs": 147.89999967813492,
+        "maxDurationMs": 12.599999964237213
+      },
+      "SystemUpdater.World.Zone": {
+        "count": 58,
+        "totalDurationMs": 43.799999833106995,
+        "maxDurationMs": 4.899999976158142
+      },
+      "SystemUpdater.World.Tickets": {
+        "count": 58,
+        "totalDurationMs": 8.699999988079071,
+        "maxDurationMs": 4
+      },
+      "SystemUpdater.World.Weather": {
+        "count": 58,
+        "totalDurationMs": 9.099999904632568,
+        "maxDurationMs": 1.199999988079071
+      },
+      "SystemUpdater.World.Atmosphere": {
+        "count": 58,
+        "totalDurationMs": 30.20000022649765,
+        "maxDurationMs": 5.100000023841858
+      },
+      "SystemUpdater.World.Water": {
+        "count": 58,
+        "totalDurationMs": 8.199999868869781,
+        "maxDurationMs": 1.399999976158142
+      },
+      "SystemUpdater.Other": {
+        "count": 67,
+        "totalDurationMs": 142.3000002503395,
+        "maxDurationMs": 30.5
+      },
+      "GameEngineLoop.RenderMain.collectGPUTime": {
+        "count": 67,
+        "totalDurationMs": 2.299999952316284,
+        "maxDurationMs": 0.6000000238418579
+      },
+      "GameEngineLoop.RenderMain.beginFrameStats": {
+        "count": 67,
+        "totalDurationMs": 1.4999999403953552,
+        "maxDurationMs": 0.30000001192092896
+      },
+      "GameEngineLoop.RenderMain.renderer.render": {
+        "count": 67,
+        "totalDurationMs": 10874.300000011921,
+        "maxDurationMs": 4556.899999976158
+      },
+      "GameEngineLoop.RenderMain.endGPUTimer": {
+        "count": 67,
+        "totalDurationMs": 1.1999999284744263,
+        "maxDurationMs": 0.3999999761581421
+      },
+      "GameEngineLoop.RenderOverlay.weapon": {
+        "count": 67,
+        "totalDurationMs": 367.1999999284744,
+        "maxDurationMs": 38.200000047683716
+      },
+      "GameEngineLoop.RenderOverlay.grenade": {
+        "count": 67,
+        "totalDurationMs": 104.59999984502792,
+        "maxDurationMs": 41.59999996423721
+      },
+      "CombatAI.slowest.patrolling.high": {
+        "count": 26,
+        "totalDurationMs": 19.599999964237213,
+        "maxDurationMs": 3.199999988079071
+      },
+      "CombatAI.method.state.patrolling": {
+        "count": 34,
+        "totalDurationMs": 23.600000083446503,
+        "maxDurationMs": 3.5999999046325684
+      },
+      "CombatAI.method.patrol.findNearestEnemy": {
+        "count": 24,
+        "totalDurationMs": 13.400000095367432,
+        "maxDurationMs": 2.899999976158142
+      },
+      "CombatAI.method.squadCommandOverride": {
+        "count": 3,
+        "totalDurationMs": 1.100000023841858,
+        "maxDurationMs": 0.40000003576278687
+      },
+      "CombatAI.method.suppressionDecay": {
+        "count": 3,
+        "totalDurationMs": 1.399999976158142,
+        "maxDurationMs": 0.6000000238418579
+      }
+    }
+  }
+}
