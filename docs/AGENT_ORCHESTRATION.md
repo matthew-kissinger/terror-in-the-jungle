@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-18 (autonomous chain advanced past cycle #11; cycles #1-#11 closed at fd646aeb / 7931d179 / b86cf027 / 73e777cb / f14400d2 / 78c9c55a / cycle #7 close-commit / cycle #8 close-commit / cycle #9 close-commit / cycle #10 close-commit / cycle #11 close-commit; current cycle = cycle-sun-and-atmosphere-overhaul)
+Last verified: 2026-05-18 (CAMPAIGN CUT at cycle #12 per owner direction; cycles #1-#12 closed; cycle #13 `cycle-stabilizat-1-baselines-refresh` removed from scope; no active cycle — orchestrator idle until owner queues next work)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,98 +154,30 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: cycle-sun-and-atmosphere-overhaul
+## Current cycle: NONE (campaign closed)
 
-**Cycle ID:** `cycle-sun-and-atmosphere-overhaul`
-**Brief:** [docs/tasks/cycle-sun-and-atmosphere-overhaul.md](tasks/cycle-sun-and-atmosphere-overhaul.md)
-**Skip-confirm:** no (owner playtest required across 5 scenarios × 4 TOD; deferred under autonomous-loop posture)
-**Concurrency cap:** 4
+**Status:** No active cycle. The 13-cycle post-WebGPU campaign was
+**cut at cycle #12** per owner direction on 2026-05-18. Cycle #13
+`cycle-stabilizat-1-baselines-refresh` was removed from scope and
+may be re-queued later as a standalone cycle.
 
-User-observable gap closed: KB-SKY-DEEP (new visual-quality follow-up
-to cycle #1's KB-SKY-BLAND) + HosekWilkieSkyBackend half of
-`konveyer-large-file-splits`. Port
-`HosekWilkieSkyBackend.evaluateAnalytic` (CPU JS Preetham math
-sampled per-fragment from a 256×128 LUT) into a **TSL fragment
-node** wired to the dome via `MeshBasicNodeMaterial.colorNode`;
-restore the per-fragment Preetham gradient + in-shader HDR sun-disc
-the pre-merge GLSL had; retire the 256×128 visual LUT and keep only
-a 32×8 CPU LUT for fog / hemisphere readers; swap renderer tonemap
-from `THREE.ACESFilmicToneMapping` to `THREE.AgXToneMapping`
-(`THREE.NeutralToneMapping` fallback on r184 if AGX unavailable);
-fix the night-red bug via an elevation-keyed sun↔moon color blend at
-the one-line cause in `HosekWilkieSkyBackend.bakeLUT()`;
-recalibrate per-scenario `preset.exposure` for the AGX rolloff. No
-new `WebGLRenderTarget` (preserves the cycle-voda-1 mobile no-RT
-win). Source authority:
-[docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md).
+**Last cycle closed:** `cycle-sun-and-atmosphere-overhaul` (cycle
+#12) — 6 PRs (#269-#274). Closes: KB-SKY-DEEP (opened+closed
+in-cycle), HosekWilkieSkyBackend half of `konveyer-large-file-splits`.
+Two follow-up notes carried in
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md):
+(a) spike memo's strict `r < 0.5 * max(g, b)` night-red assertion
+is over-tight (fails its own MOON_COLOR target); soft sense
+`r ≤ max(g, b)` is canonical. (b) Per-preset
+`computeSunDirectionAtTime` elevation envelope sanity check —
+confirm natural-time path reaches sub-(-8°) elevation in each
+preset; the playtest capture script bypassed via
+`backend.update()` direct call to verify the fix structurally.
 
-### Round schedule
+**Resume:** when the owner queues new work, the orchestrator
+re-mirrors the next cycle's brief into this section per the cycle
+lifecycle ritual above and re-enters dispatch.
 
-| Round | Tasks (parallel) | Cap | Notes |
-|-------|------------------|-----|-------|
-| 1 | `night-red-fix`, `agx-tonemap-swap`, `tsl-preetham-fragment-port` | 3 | Three independent landings. Night-red is ~10 LOC + tests; AGX is a ~5 LOC renderer change + dev-flag wiring; TSL port is the large one (~400-600 LOC TSL + parity test against CPU `evaluateAnalytic`). |
-| 2 | `sun-disc-and-aureole-tuning`, `per-scenario-exposure-recalibration`, `sun-and-atmosphere-playtest-evidence` | 3 | Disc tuning composes with the in-shader HDR pin-point from R1; exposure tuning depends on AGX landing; playtest captures use the WorldBuilder force-TOD flow (5 scenarios × 4 TOD = 20 shots + WebGPU/WebGL2 parity + night-red regression). |
-
-### Dependencies
-
-- R1: `night-red-fix` (elevation-keyed `Color.lerpColors(sunColor, MOON_COLOR, smoothstep(−2°, −8°))` replaces peak-normalisation + luma-floor in `HosekWilkieSkyBackend.bakeLUT()`; isolated to lines 711-729),
-  `agx-tonemap-swap` (`THREE.AgXToneMapping` at `GameRenderer.ts:145-146` with `THREE.NeutralToneMapping` r184 fallback; ACES remains runtime-toggleable via WorldBuilder for A/B),
-  `tsl-preetham-fragment-port` (port `evaluateAnalytic` 761-874 to TSL `Fn` node graph; new `HosekWilkieTslNode.ts`; dome swaps to `MeshBasicNodeMaterial(colorNode: tslPreethamNode, toneMapped: false)`; CPU LUT shrinks to 32×8 for fog readers only; dev-flag back-out via `WorldBuilder.skyBackendMode = 'tsl' | 'lut-bake'`; TSL/CPU parity test < 0.05 per-channel delta at 64 sampled directions).
-- R2: `sun-disc-and-aureole-tuning` (in-shader HDR pin-point defaults: 3-5° apparent diameter at noon, 6-10° aureole stretching to 15-30° mie band at low sun; additive `SunDiscMesh` sprite gated behind `WorldBuilder.useAdditiveSunSprite` flag default `false`),
-  `per-scenario-exposure-recalibration` (sweep `forceTimeOfDay` across `[0.0, 0.25, 0.5, 0.75]` on each of the five scenarios; tune per-scenario `preset.exposure` to land within spike Section 4 HSL targets; bump `SKY_LIGHT_MAX_COMPONENT` / `SKY_FOG_MAX_COMPONENT` only if AGX range clips visibly),
-  `sun-and-atmosphere-playtest-evidence` (5 scenarios × 4 TOD = 20 captures + WebGPU/WebGL2 parity pair + 5 night-red regression assertions on `moonLight.color` at midnight; `scripts/capture-sun-and-atmosphere-shots.ts` extends existing hosek-wilkie capture script; deferral row in PLAYTEST_PENDING).
-
-### Reviewer policy
-
-- **No mandatory `combat-reviewer`** — no `src/systems/combat/**` touches expected.
-- **No mandatory `terrain-nav-reviewer`** — no `src/systems/terrain/**` or `src/systems/navigation/**` touches expected.
-- Orchestrator reviews all PRs for: surface integrity (no fence leak), perf budget compliance, WebGPU/WebGL2 visual parity merge gate, mobile-ui CI matrix green.
-- **Optional `perf-analyst` pre-merge gate** for `tsl-preetham-fragment-port` — given the per-fragment cost claim, compare `combat120` + `openfrontier:short` against baseline post-port before merge.
-
-### Hard stops (cycle-specific)
-
-- Any new `WebGLRenderTarget` introduced anywhere in the diff → halt (cycle-voda-1 mobile no-RT win is load-bearing).
-- TSL → WebGL2 translation produces a fragment shader > 2× the hand-port op count → ship back-out path A (parallel `ShaderMaterial` GLSL gated on `!renderer.isWebGPURenderer`); do NOT halt unless the back-out also overshoots budget.
-- Per-fragment dome adds > 1.0 ms p99 on `combat120` after R1 → halt; reassess with mobile-gated dev-flag fallback to the bake-and-stretch path.
-- Visual parity WebGPU vs WebGL2 fails (> 5% per-channel delta at sampled key points: zenith, horizon-mid, sun-disc-center, anti-sun-horizon) at merge time → halt; iterate parallel GLSL until parity holds.
-- Mobile-emulation perf probes (Pixel 5 23.68 avgFps, iPhone 12 28.30 avgFps from cycle #2) regress > 10% → halt; mobile-gate per-fragment dome behind `skyBackendMode='lut-bake'` default.
-- Owner playtest rejects R2 twice → halt (deferred under autonomous-loop; orchestrator proceeds, owner sweeps later).
-- Standard: fence change, worktree isolation failure, twice-rejected reviewer, carry-over count growth.
-
-### Success criteria
-
-See [docs/tasks/cycle-sun-and-atmosphere-overhaul.md](tasks/cycle-sun-and-atmosphere-overhaul.md)
-"Acceptance Criteria (cycle close)":
-- All R1 + R2 task PRs merged.
-- `renderer.toneMapping === THREE.AgXToneMapping` (or `THREE.NeutralToneMapping` fallback) by default; ACES via WorldBuilder.
-- Visual targets per time-of-day across all five scenarios hit spike Section 4 HSL ranges (noon cobalt zenith, golden-hour warm-cool stratification, dusk vermillion horizon, twilight "keeper red" vibe band with cool combat lighting, deep navy night with no red bleed, dawn mirror of dusk cooler-shifted).
-- Night-red regression: `r < 0.5 * max(g, b)` on `moonLight.color` at midnight, all 5 scenarios.
-- TSL/CPU parity test: < 0.05 per-channel delta at 64 sampled directions.
-- WebGPU/WebGL2 parity: < 5% per-channel delta at sampled key points.
-- `combat120` p99 ≤ 34.4 ms (current 33.4 ms + 1.0 ms budget).
-- `openfrontier:short` p99 ≤ 33.7 ms (current 32.7 ms + 1.0 ms budget).
-- 0 MB net new memory (32×8 LUT replaces 256×128 LUT).
-- Mobile sky-refresh cadence unchanged at 8 s.
-- No fence change. No new `WebGLRenderTarget`.
-- `KB-SKY-DEEP` opens and closes within this cycle (zero-cycle visual-quality follow-up to KB-SKY-BLAND; history-log entry only).
-- `konveyer-large-file-splits` HosekWilkieSkyBackend half moves Active → Closed (TSL port retires the 807-LOC grandfather entry; new modules each stay ≤ 700 LOC per Phase 0 file-size rule).
-
-### Out of scope
-
-Behind-cloud sun occlusion (cloud-fidelity carries to a later cycle). ADS-toward-sun glare gameplay feature (queue as follow-up). Sun-aware rim light / specular pass cross-cutting every material (queue as cycle #14 or later). Bruneton precomputed atmospheric scattering (rejected per cycle hard-stop on no-RT). HDR cubemap rotation (rejected per ~120 MB asset budget). Cloud representation / cloud-deck art direction (separate cycle). Touching `src/systems/combat/**`, `src/systems/terrain/**`, `src/systems/navigation/**`. Fenced-interface touches. Refactoring `HosekWilkieSkyBackend.ts` beyond what the TSL port + 32×8 LUT shrink necessitates (out-of-scope cleanup is a drift-correction signal).
-
-### Campaign auto-advance protocol
-
-This cycle is **position #12** in the 13-cycle queue at
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
-`Auto-advance: yes` + `posture: autonomous-loop` are set there. When
-this cycle closes:
-
-1. Mark cycle #12 row `done` in the campaign queue table with close-commit SHA.
-2. Read the next not-done row (`cycle-stabilizat-1-baselines-refresh`).
-3. Mirror that cycle's brief content into this "Current cycle" section.
-4. Commit with `docs(campaign): advance to cycle-stabilizat-1-baselines-refresh`.
-5. Re-enter dispatch loop. Do NOT prompt the human.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
 mark the failing cycle's row `BLOCKED`, and halt.

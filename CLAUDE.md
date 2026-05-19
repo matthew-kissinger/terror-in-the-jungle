@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-18 (post `cycle-defekt-4-npc-route-quality` close; DEFEKT-4 closed; campaign pointer advanced to cycle #12 `cycle-sun-and-atmosphere-overhaul`)
+Last verified: 2026-05-18 (post `cycle-sun-and-atmosphere-overhaul` close; CAMPAIGN CUT at cycle #12 per owner direction; cycle #13 `cycle-stabilizat-1-baselines-refresh` removed from scope; no active cycle)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,19 +46,13 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active cycle (2026-05-18):** `cycle-sun-and-atmosphere-overhaul`
-is position #12 in a **13-cycle autonomous-chain campaign** (expanded
-from 12 on 2026-05-17 via insertion of `cycle-sun-and-atmosphere-overhaul`
-at position #12). Owner originally launched the campaign on 2026-05-16
-with `auto-advance: yes` in
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md);
-fresh agent invocations of `/orchestrate` chain through all 13 cycles
-without intervention until a hard-stop fires. The chain covers all
-VODA, VEKHIKL, and DEFEKT directives plus the two post-WebGPU
-investigation fix cycles (mobile + sky) plus the sun-and-atmosphere
-overhaul (new TSL fragment-shader sky + AGX tonemap + night-red fix).
+**Active cycle (2026-05-18):** NONE. The 13-cycle post-WebGPU
+campaign was **cut at cycle #12** per owner direction on 2026-05-18.
+Cycle #13 `cycle-stabilizat-1-baselines-refresh` was removed from
+scope and may be re-queued later as a standalone cycle. Cycles #1
+through #12 all closed; 66 PRs merged across the campaign.
 
-The queue (cycles #1-#11 closed; #12 active):
+The queue (cycles #1-#12 closed; #13 SKIPPED out-of-scope):
 1. `cycle-sky-visual-restore` → KB-SKY-BLAND fix. **DONE** (`fd646aeb`).
 2. `cycle-mobile-webgl2-fallback-fix` → KB-MOBILE-WEBGPU fix (real-device validation = merge gate). **DONE** (`7931d179`).
 3. `cycle-konveyer-11-spatial-grid-compute` → DEFEKT-3 (cover spatial grid). **DONE** (`b86cf027`).
@@ -70,8 +64,8 @@ The queue (cycles #1-#11 closed; #12 active):
 9. `cycle-vekhikl-4-tank-turret-and-cannon` → turret + cannon + Rust→WASM ballistic-solver pilot. **DONE** (cycle close-commit; 8 PRs #251-#258; VEKHIKL-3+4 code-complete, owner playtest deferred).
 10. `cycle-voda-3-watercraft` → Sampan + PBR. **DONE** (cycle close-commit; 6 PRs #259-#264; VODA-3 code-complete, owner playtest deferred).
 11. `cycle-defekt-4-npc-route-quality` → slope-stuck + crowd + solver fixes. **DONE** (cycle close-commit; 3 PRs #265-#267 across R1/R2; all three `terrain-nav-reviewer` APPROVE pre-merge; DEFEKT-4 Active → Closed; Active count 8 → 7).
-12. `cycle-sun-and-atmosphere-overhaul` → TSL fragment-shader Preetham + AGX tonemap + night-red fix + sun-disc tuning (NEW 2026-05-17 per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md`; closes HosekWilkieSkyBackend half of `konveyer-large-file-splits`). **ACTIVE**.
-13. `cycle-stabilizat-1-baselines-refresh` → perf baseline refresh (now runs last so it captures cycle #12's +0.3-1.0ms p99 sky cost as the new normal).
+12. `cycle-sun-and-atmosphere-overhaul` → TSL fragment-shader Preetham + AGX tonemap + night-red fix + sun-disc tuning. **DONE** (6 PRs #269-#274 across R1/R2; KB-SKY-DEEP opened+closed in-cycle; HosekWilkieSkyBackend half of `konveyer-large-file-splits` closed; per-scenario exposure recalibrated for AGX; mobile probes Pixel 5 29.02 / iPhone 12 28.88 avgFps inside 10% gate; night-red regression PASS soft sense on all 5 scenarios; WebGPU/WebGL2 parity 1.18% max delta; owner playtest deferred to PLAYTEST_PENDING).
+13. `cycle-stabilizat-1-baselines-refresh` → **SKIPPED** (out of scope per owner direction 2026-05-18). May be re-queued as a standalone cycle later. STABILIZAT-1 stays active; combat120 baselines remain at measurement_trust=warn.
 
 Every cycle has a pre-authored brief at `docs/tasks/<slug>.md`. The
 orchestrator chains via the protocol in
@@ -101,11 +95,10 @@ discipline, parallel R&D protocol, and reporting standard.
 
 Phases 0/1/2/2.4/2.5 done. Phases 3–9 queued (refactor campaign,
 deprioritized behind the WebGPU + ground-vehicle vision directions).
-**Auto-advance is now `yes`** as of the 2026-05-16 12-cycle campaign
-launch. To pause chaining mid-campaign: flip `Auto-advance: yes` to
-`Auto-advance: PAUSED` in
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
-The orchestrator finishes the in-flight cycle and stops.
+**Campaign closed 2026-05-18 at cycle #12.** Auto-advance is
+stopped. To launch new work, queue a fresh cycle in
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+or open a new campaign manifest.
 
 For full context (audit findings, Phases 0–2 outcomes, Phase 3+ scope):
 [docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md).
@@ -113,18 +106,16 @@ Cloudflare account-level audit:
 `artifacts/live-audit-2026-05-09/CLOUDFLARE_ACCOUNT_AUDIT.md` (gitignored).
 
 Single source of truth for unresolved items:
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is **7** after
-the 2026-05-18 cycle #11 close (cycles #1-#3 closed DEFEKT-3 +
-KB-MOBILE-WEBGPU + KB-SKY-BLAND; net cycle delta from #4-#10 was 0
-because VEKHIKL-1, VODA-1, VEKHIKL-2, VODA-2, VEKHIKL-3, VEKHIKL-4,
-and VODA-3 live in DIRECTIVES.md not CARRY_OVERS Active; cycle #11
-closed DEFEKT-4 bringing 8 → 7). Active items:
-STABILIZAT-1 (closes at cycle #13 — renumbered after sun-and-atmosphere
-insertion), AVIATSIYA-1 / DEFEKT-5 (visual review pending), KB-LOAD
-residual, KB-STARTUP-1 (held; cycle #2 mobile work absorbed parts),
-cloudflare-stabilization followups, weapons-cluster-zonemanager-migration,
-konveyer-large-file-splits (WaterSystem half closed at cycle #5;
-HosekWilkieSkyBackend half closes at cycle #12 `cycle-sun-and-atmosphere-overhaul`).
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Active count is **6** after
+the 2026-05-18 cycle #12 close (cycle #11 closed DEFEKT-4 bringing
+8 → 7; cycle #12 closed `konveyer-large-file-splits`
+HosekWilkieSkyBackend half bringing 7 → 6; KB-SKY-DEEP was opened
+and closed in cycle #12 with no net effect). Active items:
+STABILIZAT-1 (cycle #13 was supposed to close — now SKIPPED;
+combat120 baselines remain at measurement_trust=warn),
+AVIATSIYA-1 / DEFEKT-5 (visual review pending), KB-LOAD residual,
+KB-STARTUP-1 (held; cycle #2 mobile work absorbed parts),
+cloudflare-stabilization followups, weapons-cluster-zonemanager-migration.
 
 4 cycle-retro nits from cycle 2.4 captured in BACKLOG retro (NOT new
 carry-overs to respect ≤12 limit; bundle into next cycle that touches
@@ -133,10 +124,7 @@ flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
 Campaign manifest:
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
-(13-cycle autonomous chain; `auto-advance: yes`; expanded from 12 on
-2026-05-17 via insertion of `cycle-sun-and-atmosphere-overhaul` at
-position #12 per
-[docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md](docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)).
+(CLOSED 2026-05-18 at cycle #12; cycle #13 SKIPPED out-of-scope; 66 PRs merged across cycles #1-#12).
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle
