@@ -201,7 +201,13 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     turbidity: 5.5,
     rayleigh: 2.4,
     groundAlbedo: new THREE.Color(0x2a3a22), // deep jungle green
-    exposure: 0.18,
+    // AGX has a softer rolloff than ACES (especially in mids/highs).
+    // cycle-sun-and-atmosphere-overhaul bumped this from 0.18 → 0.234
+    // (+30%, mid of the 20-50% range called out in the spike) so the
+    // dawn-patrol sky retains its perceived brightness post-tonemap-swap
+    // without over-driving the warm haze band into clipped white. See
+    // docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md Section 4.
+    exposure: 0.234,
     fogDensity: 0.0003,
     // Start at dawn (6am); 10-minute real-time cycle so playtests see the
     // sun sweep across the sky without waiting forever.
@@ -220,7 +226,14 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     turbidity: 3.5,
     rayleigh: 2.0,
     groundAlbedo: new THREE.Color(0x3b4c2e),
-    exposure: 0.22,
+    // AGX vs ACES rolloff: openfrontier was already at the high end of
+    // the pre-AGX range (0.22). cycle-sun-and-atmosphere-overhaul bumped
+    // this 0.22 → 0.264 (+20%, low end of the 20-50% range) — noon with
+    // a high sun and turbidity 3.5 is the easiest scene to over-expose
+    // under AGX's softer shoulder, so a conservative bump preserves the
+    // cobalt-saturated zenith target (HSL ~210°,70%,50%) without washing
+    // the horizon ring to white. See SUN_AND_ATMOSPHERE_VISION Section 4.
+    exposure: 0.264,
     fogDensity: 0.00055,
     todCycle: { dayLengthSeconds: 600, startHour: 12 },
     // Scattered fair-weather cumulus over the frontier. Coverage stays below
@@ -239,7 +252,14 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     turbidity: 7.0,
     rayleigh: 2.6,
     groundAlbedo: new THREE.Color(0x2e2a22),
-    exposure: 0.16,
+    // AGX vs ACES rolloff: tdm sat at the low end of the pre-AGX range
+    // (0.16) because dusk's heavy turbidity already cranks the warm band
+    // hot. cycle-sun-and-atmosphere-overhaul bumped this 0.16 → 0.208
+    // (+30%, mid of 20-50%) so the blood-orange / vermillion horizon
+    // target (HSL ~15-25°,75%,50%) reads cleanly under AGX without the
+    // distant ridges silhouetting against an under-exposed muddy band.
+    // See SUN_AND_ATMOSPHERE_VISION Section 4 dusk acceptance.
+    exposure: 0.208,
     fogDensity: 0.0012,
     todCycle: { dayLengthSeconds: 600, startHour: 18 },
     // Overcast dusk, broken layers. Rebalanced up slightly from 0.6 to 0.7
@@ -255,7 +275,14 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     turbidity: 4.5,
     rayleigh: 2.2,
     groundAlbedo: new THREE.Color(0x34402a),
-    exposure: 0.18,
+    // AGX vs ACES rolloff: zone control's golden-hour preset matched
+    // ashau's pre-AGX 0.18. cycle-sun-and-atmosphere-overhaul bumped
+    // this 0.18 → 0.234 (+30%, mid of 20-50%) so the warm-cool
+    // stratification target (orange/amber band 15-30° above horizon,
+    // teal at zenith) retains the brightness needed for backlit rim
+    // light to read on combatants/vegetation toward the low-oblique sun.
+    // See SUN_AND_ATMOSPHERE_VISION Section 4 golden-hour acceptance.
+    exposure: 0.234,
     fogDensity: 0.0009,
     todCycle: { dayLengthSeconds: 600, startHour: 16 },
     // Broken golden-hour clouds. Rebalanced up from 0.3 to 0.55 so the
@@ -272,7 +299,14 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     turbidity: 3.0,
     rayleigh: 2.0,
     groundAlbedo: new THREE.Color(0x3b4c2e),
-    exposure: 0.22,
+    // AGX vs ACES rolloff: combat120 mirrors openfrontier's noon framing
+    // for perf-baseline interpretability. cycle-sun-and-atmosphere-overhaul
+    // bumped this 0.22 → 0.264 (+20%, low end of 20-50%) in lock-step with
+    // openfrontier so the combat120 baseline PNG diff stays meaningful
+    // post-tonemap-swap (drifting this exposure independently would
+    // invalidate the historical combat120-2026-04-19.png comparison).
+    // See SUN_AND_ATMOSPHERE_VISION Section 4 noon acceptance.
+    exposure: 0.264,
     fogDensity: 0.00055,
     // Light scattered — perf-lean baseline, but rebalanced from 0.2 to 0.48
     // so combat120 actually reads as "noon with some clouds" instead of
