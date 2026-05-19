@@ -51,6 +51,12 @@ describe('HosekWilkieTslNode factory', () => {
     expect(material.uniforms.groundAlbedo.value).toBeInstanceOf(THREE.Color);
     expect(material.uniforms.sunDiscInner.value).toBe(HOSEK_WILKIE_TSL_DEFAULTS.sunDiscInner);
     expect(material.uniforms.sunDiscOuter.value).toBe(HOSEK_WILKIE_TSL_DEFAULTS.sunDiscOuter);
+    expect(material.uniforms.sunAureoleOuterNoon.value).toBe(
+      HOSEK_WILKIE_TSL_DEFAULTS.sunAureoleOuterNoon,
+    );
+    expect(material.uniforms.sunAureoleOuterLowSun.value).toBe(
+      HOSEK_WILKIE_TSL_DEFAULTS.sunAureoleOuterLowSun,
+    );
     expect(material.colorNode).toBeDefined();
     expect(material.toneMapped).toBe(false);
     expect(material.side).toBe(THREE.BackSide);
@@ -188,6 +194,93 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
     expect(Number.isFinite(out.b)).toBe(true);
   });
 
+  /**
+   * Build a direction at a precise angular offset `angleDeg` from `sun`,
+   * keeping the perturbation in the plane of `sun` and `axisHint`. Used by
+   * the aureole tests so the offsets are honest angles, not ad-hoc tilts.
+   */
+  function offsetFromSun(
+    sun: THREE.Vector3,
+    angleDeg: number,
+    axisHint: THREE.Vector3,
+  ): THREE.Vector3 {
+    const perp = axisHint.clone().sub(sun.clone().multiplyScalar(sun.dot(axisHint)));
+    if (perp.lengthSq() < 1e-8) perp.set(0, 1, 0).sub(sun.clone().multiplyScalar(sun.y));
+    perp.normalize();
+    const angleRad = (angleDeg * Math.PI) / 180;
+    return sun
+      .clone()
+      .multiplyScalar(Math.cos(angleRad))
+      .add(perp.multiplyScalar(Math.sin(angleRad)))
+      .normalize();
+  }
+
+  it('aureole halo adds radiance just outside the visible disc (gameplay-readable glare)', () => {
+    // Direction ~5° from the sun: outside the disc-outer cone (cos(2.5°))
+    // but well inside the noon aureole cone (cos(8°)). At a high-sun
+    // state the halo additive contribution lifts radiance above the
+    // equivalent direction outside the aureole cone (cos(15°)).
+    const highSunState: PreethamCpuMirrorState = {
+      ...baseState,
+      sunDirection: new THREE.Vector3(0.2, 0.95, 0.2).normalize(),
+    };
+    const axisHint = new THREE.Vector3(0, 1, 0);
+    const halo = offsetFromSun(highSunState.sunDirection, 5, axisHint);
+    const outside = offsetFromSun(highSunState.sunDirection, 15, axisHint);
+
+    const haloOut = new THREE.Color();
+    const outsideOut = new THREE.Color();
+    evaluatePreethamWithDiscCpu(highSunState, halo, haloOut);
+    evaluatePreethamWithDiscCpu(highSunState, outside, outsideOut);
+
+    const haloLuma = 0.2126 * haloOut.r + 0.7152 * haloOut.g + 0.0722 * haloOut.b;
+    const outsideLuma = 0.2126 * outsideOut.r + 0.7152 * outsideOut.g + 0.0722 * outsideOut.b;
+    expect(haloLuma).toBeGreaterThan(outsideLuma);
+  });
+
+  it('aureole halo stretches into the mie band at low sun (wider noticeable glare than at noon)', () => {
+    // Same angular offset from the sun (~12°). At noon (sun.y≈0.95) this
+    // direction is OUTSIDE the aureole cone (~8°), so the halo doesn't
+    // contribute. At low sun (sun.y≈0.15) the aureole stretches into the
+    // mie band (~21° outer), so the halo contribution is non-zero. We
+    // assert each state's "12° offset from sun" reads brighter than the
+    // same state's "30° offset from sun" — the relative comparison
+    // controls for the per-state base-sky luminance and isolates the
+    // aureole contribution.
+    const noonState: PreethamCpuMirrorState = {
+      ...baseState,
+      sunDirection: new THREE.Vector3(0.2, 0.95, 0.2).normalize(),
+    };
+    const lowSunState: PreethamCpuMirrorState = {
+      ...baseState,
+      sunDirection: new THREE.Vector3(0.7, 0.15, 0.7).normalize(),
+    };
+    const axisHint = new THREE.Vector3(0, 1, 0);
+    const noon12 = offsetFromSun(noonState.sunDirection, 12, axisHint);
+    const noon30 = offsetFromSun(noonState.sunDirection, 30, axisHint);
+    const lowSun12 = offsetFromSun(lowSunState.sunDirection, 12, axisHint);
+    const lowSun30 = offsetFromSun(lowSunState.sunDirection, 30, axisHint);
+
+    const noon12Out = new THREE.Color();
+    const noon30Out = new THREE.Color();
+    const lowSun12Out = new THREE.Color();
+    const lowSun30Out = new THREE.Color();
+    evaluatePreethamWithDiscCpu(noonState, noon12, noon12Out);
+    evaluatePreethamWithDiscCpu(noonState, noon30, noon30Out);
+    evaluatePreethamWithDiscCpu(lowSunState, lowSun12, lowSun12Out);
+    evaluatePreethamWithDiscCpu(lowSunState, lowSun30, lowSun30Out);
+
+    const luma = (c: THREE.Color): number =>
+      0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    const noonHaloDelta = luma(noon12Out) - luma(noon30Out);
+    const lowSunHaloDelta = luma(lowSun12Out) - luma(lowSun30Out);
+    // At noon the 12° offset is OUTSIDE the aureole, so the delta is
+    // governed by the sky gradient only and should be small. At low sun
+    // the 12° offset is INSIDE the stretched aureole — the halo adds a
+    // strong additive contribution and the delta is much larger.
+    expect(lowSunHaloDelta).toBeGreaterThan(noonHaloDelta);
+  });
+
   it('exposure scales the dome radiance roughly linearly (before disc + clamp)', () => {
     // Sample at a non-sun direction so the disc contribution drops to 0.
     const dir = new THREE.Vector3(-1, 0.2, 0.3).normalize();
@@ -257,13 +350,14 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
     let directionsChecked = 0;
     // The backend LUT is 32 azimuth × 8 elevation = 256 directions. Sample
     // upper-hemisphere bin centers (rows 4-7) at every other azimuth bin
-    // for 16 candidates, then drop directions within 12° of the sun so the
-    // disc contribution drops to zero in the mirror. We keep `>= 12`
-    // directions in the comparison after the cull.
+    // for 16 candidates, then drop directions within the disc+aureole cone
+    // so the additive disc + halo contribution drops to zero in the mirror.
+    // High-sun aureole outer is ~cos(8°); 15° cull adds margin so the
+    // smoothstep tail is below comparison noise.
     for (let row = 4; row < 8; row++) {
       for (let col = 0; col < 32; col += 2) {
         const dir = lutBinCenter(row, col, 8, 32);
-        if (dir.dot(sunDir) > Math.cos((12 * Math.PI) / 180)) continue;
+        if (dir.dot(sunDir) > Math.cos((15 * Math.PI) / 180)) continue;
         backend.sample(dir, backendOut);
         evaluatePreethamWithDiscCpu(mirrorState, dir, mirrorOut);
         const dr = Math.abs(backendOut.r - mirrorOut.r);
@@ -300,10 +394,12 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
     const mirrorOut = new THREE.Color();
     let maxDelta = 0;
     let directionsChecked = 0;
+    // Low-sun aureole stretches into the mie band (~18° outer at sunY=0.25);
+    // cull at 25° adds margin so the additive halo is below comparison noise.
     for (let row = 4; row < 8; row++) {
       for (let col = 0; col < 32; col += 2) {
         const dir = lutBinCenter(row, col, 8, 32);
-        if (dir.dot(sunDir) > Math.cos((12 * Math.PI) / 180)) continue;
+        if (dir.dot(sunDir) > Math.cos((25 * Math.PI) / 180)) continue;
         backend.sample(dir, backendOut);
         evaluatePreethamWithDiscCpu(mirrorState, dir, mirrorOut);
         const dr = Math.abs(backendOut.r - mirrorOut.r);

@@ -15,8 +15,14 @@ import { SunDiscMesh } from './SunDiscMesh';
 describe('SunDiscMesh', () => {
   const DOME_RADIUS = 500;
 
+  // Cycle #12 R2 `sun-disc-and-aureole-tuning`: the additive sprite is
+  // disabled by default to avoid a double-sun read against the in-shader
+  // HDR sun-disc. Tests that exercise the horizon-gated visibility path
+  // explicitly opt in via `{ enabled: true }`. The new disabled-by-default
+  // path is exercised by its own behavior tests at the end of this file.
+
   it('hides the sprite when the sun is below the horizon', () => {
-    const disc = new SunDiscMesh(DOME_RADIUS);
+    const disc = new SunDiscMesh(DOME_RADIUS, { enabled: true });
     const camera = new THREE.Vector3(0, 0, 0);
     const subHorizonSun = new THREE.Vector3(0.7, -0.4, 0.5).normalize();
     const sunColor = new THREE.Color(1, 0.9, 0.7);
@@ -26,8 +32,8 @@ describe('SunDiscMesh', () => {
     expect(disc.getMesh().visible).toBe(false);
   });
 
-  it('shows the sprite when the sun is above the horizon', () => {
-    const disc = new SunDiscMesh(DOME_RADIUS);
+  it('shows the sprite when the sun is above the horizon (enabled path)', () => {
+    const disc = new SunDiscMesh(DOME_RADIUS, { enabled: true });
     const camera = new THREE.Vector3(0, 0, 0);
     const noonSun = new THREE.Vector3(0.3, 0.9, 0.3).normalize();
     const sunColor = new THREE.Color(1, 1, 1);
@@ -38,7 +44,7 @@ describe('SunDiscMesh', () => {
   });
 
   it('positions the sprite at sunDirection x dome-radius x (just inside the dome), anchored to the camera', () => {
-    const disc = new SunDiscMesh(DOME_RADIUS);
+    const disc = new SunDiscMesh(DOME_RADIUS, { enabled: true });
     const camera = new THREE.Vector3(123, 50, -77);
     const sunDir = new THREE.Vector3(0.4, 0.8, 0.45).normalize();
     const sunColor = new THREE.Color(1, 1, 1);
@@ -101,5 +107,40 @@ describe('SunDiscMesh', () => {
     // No throw is the smoke check; calling twice would over-dispose so
     // we only assert that a fresh dispose call is safe.
     expect(() => disc.dispose()).not.toThrow();
+  });
+
+  // ---------- enabled-flag gating (cycle #12 R2 sun-disc-and-aureole-tuning) ----------
+
+  it('defaults to disabled — sprite stays hidden even when sun is above horizon', () => {
+    const disc = new SunDiscMesh(DOME_RADIUS);
+    const camera = new THREE.Vector3(0, 0, 0);
+    const noonSun = new THREE.Vector3(0.3, 0.9, 0.3).normalize();
+    const sunColor = new THREE.Color(1, 1, 1);
+
+    disc.update(camera, noonSun, sunColor);
+
+    expect(disc.isEnabled()).toBe(false);
+    expect(disc.getMesh().visible).toBe(false);
+  });
+
+  it('setEnabled(true) re-enables the horizon-gated path; setEnabled(false) hides the sprite immediately', () => {
+    const disc = new SunDiscMesh(DOME_RADIUS);
+    const camera = new THREE.Vector3(0, 0, 0);
+    const noonSun = new THREE.Vector3(0.3, 0.9, 0.3).normalize();
+    const sunColor = new THREE.Color(1, 1, 1);
+
+    // Disabled by default — even after update() the sprite stays hidden.
+    disc.update(camera, noonSun, sunColor);
+    expect(disc.getMesh().visible).toBe(false);
+
+    // Enable → next update shows the sprite for an above-horizon sun.
+    disc.setEnabled(true);
+    expect(disc.isEnabled()).toBe(true);
+    disc.update(camera, noonSun, sunColor);
+    expect(disc.getMesh().visible).toBe(true);
+
+    // Disable mid-frame → sprite hides immediately (no one-frame leak).
+    disc.setEnabled(false);
+    expect(disc.getMesh().visible).toBe(false);
   });
 });

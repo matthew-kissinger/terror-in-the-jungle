@@ -75,6 +75,15 @@ export interface WorldBuilderState {
   // Renderer A/B
   toneMapping: ToneMappingMode;
 
+  /**
+   * Cycle #12 R2 `sun-disc-and-aureole-tuning`: with the in-shader HDR
+   * sun-disc landed in `HosekWilkieTslNode`, the additive `SunDiscMesh`
+   * sprite is OFF by default to avoid a double-sun read. Flip this to
+   * `true` at runtime to re-enable the sprite as a back-out / A-B
+   * comparison against the in-shader pin-point.
+   */
+  useAdditiveSunSprite: boolean;
+
   // Identification — useful for logging that WorldBuilder is active.
   active: boolean;
 }
@@ -91,6 +100,7 @@ const DEFAULT_STATE: WorldBuilderState = {
   npcTickPaused: false,
   forceTimeOfDay: -1,
   toneMapping: 'agx',
+  useAdditiveSunSprite: false,
   active: true,
 };
 
@@ -268,6 +278,9 @@ export class WorldBuilderConsole implements DebugPanel {
     sys.addBinding(this.state, 'toneMapping', {
       options: { AGX: 'agx', ACES: 'aces' },
     }).on('change', () => onChange());
+    // Sun-disc sprite A/B: default off (in-shader pin-point is the
+    // primary), flip on for back-out comparison.
+    sys.addBinding(this.state, 'useAdditiveSunSprite').on('change', () => onChange());
 
     // ---- Debug Viz (re-routes to existing overlays) ----
     const viz = this.pane.addFolder({ title: 'Debug Viz', expanded: false });

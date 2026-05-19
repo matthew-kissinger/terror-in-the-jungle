@@ -258,6 +258,46 @@ describe('WorldBuilderConsole effective toggles', () => {
   });
 });
 
+describe('WorldBuilderConsole useAdditiveSunSprite flag', () => {
+  it('defaults to false (in-shader sun-disc is the primary path)', async () => {
+    const { engine } = makeMockEngine();
+    const panel = new WorldBuilderConsole(engine as never);
+    await panel.register(registry);
+    expect(panel.getState().useAdditiveSunSprite).toBe(false);
+    // Published to window so AtmosphereSystem can read it per-frame.
+    expect(getWorldBuilderState()?.useAdditiveSunSprite).toBe(false);
+    panel.dispose();
+  });
+
+  it('applyState flips the flag and republishes it on window.__worldBuilder', async () => {
+    const { engine } = makeMockEngine();
+    const panel = new WorldBuilderConsole(engine as never);
+    await panel.register(registry);
+
+    panel.applyState({ useAdditiveSunSprite: true });
+    expect(panel.getState().useAdditiveSunSprite).toBe(true);
+    expect(getWorldBuilderState()?.useAdditiveSunSprite).toBe(true);
+
+    panel.applyState({ useAdditiveSunSprite: false });
+    expect(panel.getState().useAdditiveSunSprite).toBe(false);
+    expect(getWorldBuilderState()?.useAdditiveSunSprite).toBe(false);
+
+    panel.dispose();
+  });
+
+  it('hydrates a saved useAdditiveSunSprite=true from localStorage', async () => {
+    localStorage.setItem(
+      'worldBuilder.state.v1',
+      JSON.stringify({ useAdditiveSunSprite: true }),
+    );
+    const { engine } = makeMockEngine();
+    const panel = new WorldBuilderConsole(engine as never);
+    await panel.register(registry);
+    expect(panel.getState().useAdditiveSunSprite).toBe(true);
+    panel.dispose();
+  });
+});
+
 describe('toneMappingConstant resolver', () => {
   it('maps the tonemap tokens to their THREE constants', () => {
     expect(toneMappingConstant('agx')).toBe(THREE.AgXToneMapping);

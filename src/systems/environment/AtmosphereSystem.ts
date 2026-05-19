@@ -505,6 +505,14 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
    * fog/light path stays usable without a sun-disc scene attachment.
    */
   private updateSunDisc(): void {
+    // Cycle #12 R2 `sun-disc-and-aureole-tuning`: the in-shader HDR
+    // sun-disc in `HosekWilkieTslNode` is the primary path; the additive
+    // sprite is OFF by default to avoid a double-sun read. Owner re-enables
+    // it via WorldBuilder.useAdditiveSunSprite at runtime for A/B
+    // comparison. Outside of the dev console (e.g. retail build), the
+    // flag is never published, so the sprite stays disabled.
+    const wb = getWorldBuilderState();
+    this.sunDisc.setEnabled(Boolean(wb?.useAdditiveSunSprite));
     this.backend.getSun(this.scratchSunColor);
     this.sunDisc.update(this.cameraPosition, this.sunDirection, this.scratchSunColor);
   }

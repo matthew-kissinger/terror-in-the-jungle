@@ -83,10 +83,21 @@ export class SunDiscMesh {
   private readonly mesh: THREE.Mesh;
   private readonly domeRadius: number;
   private readonly scratchColor = new THREE.Color();
+  /**
+   * Cycle #12 R2 `sun-disc-and-aureole-tuning`: with the in-shader HDR
+   * sun-disc landed (`HosekWilkieTslNode`), this additive sprite is OFF
+   * by default to avoid a double-sun read. The owner re-enables it at
+   * runtime via the WorldBuilder `useAdditiveSunSprite` flag for A/B
+   * comparison. When disabled, `update()` keeps the mesh hidden
+   * regardless of sun elevation; flipping `enabled` back to `true`
+   * restores the original horizon-gated visibility logic.
+   */
+  private enabled = false;
 
-  constructor(domeRadius: number, options?: { discSize?: number }) {
+  constructor(domeRadius: number, options?: { discSize?: number; enabled?: boolean }) {
     this.domeRadius = domeRadius;
     const size = options?.discSize ?? DEFAULT_DISC_SIZE;
+    if (options?.enabled !== undefined) this.enabled = options.enabled;
 
     const { material, uniforms } = createSunDiscMaterial();
     this.material = material;
@@ -100,6 +111,23 @@ export class SunDiscMesh {
     this.mesh.renderOrder = 0;
     this.mesh.matrixAutoUpdate = true;
     this.mesh.visible = false;
+  }
+
+  /**
+   * Toggle whether the sprite participates in rendering. When `false`,
+   * `update()` keeps the mesh hidden regardless of sun elevation; when
+   * `true`, the original horizon-gated visibility resumes on the next
+   * `update()` tick. Hides the mesh immediately on `false` so a flag
+   * flip mid-frame does not leave a sprite drawn for one extra frame.
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+    if (!enabled) this.mesh.visible = false;
+  }
+
+  /** Whether the sprite is currently allowed to render when above horizon. */
+  isEnabled(): boolean {
+    return this.enabled;
   }
 
   /** Returns the disc mesh so `AtmosphereSystem` can attach it to the scene. */
@@ -118,7 +146,7 @@ export class SunDiscMesh {
     sunDirection: THREE.Vector3,
     sunColor: THREE.Color,
   ): void {
-    if (sunDirection.y < 0) {
+    if (!this.enabled || sunDirection.y < 0) {
       this.mesh.visible = false;
       return;
     }
