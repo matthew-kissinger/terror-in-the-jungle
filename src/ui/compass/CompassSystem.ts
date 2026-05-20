@@ -4,10 +4,17 @@ import { GameSystem } from '../../types';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { createCompassDOM } from './CompassDOMBuilder';
 import { updateZoneMarkers, type ZoneMarkerState } from './CompassZoneMarkers';
+import {
+  updateVehicleMarkers,
+  createVehicleMarkerState,
+  type VehicleMarkerState,
+  type IVehicleMarkerQuery
+} from './CompassVehicleMarkers';
 
 export class CompassSystem implements GameSystem {
   private camera: THREE.Camera;
   private zoneQuery?: IZoneQuery;
+  private vehicleQuery?: IVehicleMarkerQuery;
 
   private compassContainer!: HTMLDivElement;
   private compassRose!: HTMLDivElement;
@@ -26,6 +33,8 @@ export class CompassSystem implements GameSystem {
     zoneMarkers: new Map<string, HTMLDivElement>(),
     seenZones: new Set<string>()
   };
+
+  private readonly vehicleMarkerState: VehicleMarkerState = createVehicleMarkerState();
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -70,6 +79,31 @@ export class CompassSystem implements GameSystem {
           playerHeadingDegrees: headingDegrees,
           state: this.zoneMarkerState
         });
+        // Vehicle markers ride the same 100ms cadence as zones so the
+        // compass refresh stays one bounded chunk of DOM work per tick.
+        if (this.vehicleQuery) {
+          updateVehicleMarkers({
+            camera: this.camera,
+            vehicleQuery: this.vehicleQuery,
+            markersContainer: this.markersContainer,
+            playerHeadingDegrees: headingDegrees,
+            state: this.vehicleMarkerState
+          });
+        }
+        this.zoneUpdateTimer = 0;
+      }
+    } else if (this.vehicleQuery) {
+      // Vehicle-only refresh path for scenarios that wire vehicles but
+      // not zones (e.g. free-roam playtests). Same cadence as zones.
+      this.zoneUpdateTimer += deltaTime * 1000;
+      if (this.zoneUpdateTimer >= CompassSystem.ZONE_UPDATE_INTERVAL) {
+        updateVehicleMarkers({
+          camera: this.camera,
+          vehicleQuery: this.vehicleQuery,
+          markersContainer: this.markersContainer,
+          playerHeadingDegrees: headingDegrees,
+          state: this.vehicleMarkerState
+        });
         this.zoneUpdateTimer = 0;
       }
     }
@@ -87,6 +121,10 @@ export class CompassSystem implements GameSystem {
     this.zoneQuery = query;
   }
 
+  setVehicleQuery(query: IVehicleMarkerQuery): void {
+    this.vehicleQuery = query;
+  }
+
   dispose(): void {
     if (this.compassContainer.parentNode) {
       this.compassContainer.parentNode.removeChild(this.compassContainer);
@@ -94,6 +132,8 @@ export class CompassSystem implements GameSystem {
 
     this.zoneMarkerState.zoneMarkers.clear();
     this.zoneMarkerState.seenZones.clear();
+    this.vehicleMarkerState.markers.clear();
+    this.vehicleMarkerState.seenCategories.clear();
 
     if (this.styleSheet && this.styleSheet.parentNode) {
       this.styleSheet.parentNode.removeChild(this.styleSheet);

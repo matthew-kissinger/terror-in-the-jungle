@@ -154,6 +154,32 @@ export const COMPASS_STYLES = `
       color: rgba(212, 163, 68, 0.9);
     }
 
+    .compass-marker-vehicle {
+      border-radius: 3px;
+      width: 18px;
+      height: 14px;
+      font-size: 8px;
+      flex-direction: column;
+      line-height: 1;
+    }
+
+    .compass-marker-vehicle-watercraft {
+      border-radius: 8px 8px 3px 3px;
+    }
+
+    .compass-marker-vehicle-emplacement {
+      border-radius: 0;
+    }
+
+    .compass-marker-distance {
+      font-family: var(--font-primary, 'Rajdhani', sans-serif);
+      font-size: 7px;
+      font-weight: 600;
+      margin-top: 1px;
+      opacity: 0.85;
+      letter-spacing: 0.2px;
+    }
+
     @keyframes compassBlink {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
