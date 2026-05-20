@@ -27,6 +27,13 @@ export interface InputCallbacks {
   onToggleMortarCamera?: () => void;
   onDeployMortar?: () => void;
   onMortarFire?: () => void;
+  /**
+   * Context-aware F-key / X-button boarding handler.
+   * Return `true` when the action consumed the input (e.g. a nearby vehicle
+   * was boarded), so the downstream mortar-fire / enter-exit fallback is
+   * skipped. Return `false` (or leave unset) to let the fallback run.
+   */
+  onBoardNearestVehicle?: () => boolean;
   onMortarAdjustPitch?: (delta: number) => void;
   onMortarAdjustYaw?: (delta: number) => void;
   onWeaponSlotChange?: (slot: WeaponSlot) => void;
@@ -153,7 +160,14 @@ export class PlayerInput {
       this.gamepadManager.setCallbacks({
         onJump: () => callbacks.onJump?.(),
         onReload: () => callbacks.onReload?.(),
-        onInteract: () => (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.(),
+        onInteract: () => {
+          // Mirror F-key priority: try boarding nearest vehicle first; fall
+          // back to the existing enter/exit handler when not consumed.
+          const consumed = callbacks.onBoardNearestVehicle?.() ?? false;
+          if (!consumed) {
+            (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.();
+          }
+        },
         onWeaponSwitch: () => {
           // Cycle through weapons: primary -> secondary -> throwable
           const next = ((this.currentWeaponMode + 1) % 3) as WeaponSlot;
@@ -522,9 +536,13 @@ export class PlayerInput {
       this.callbacks.onDeployMortar?.();
     }
 
-    // Mortar fire with F key (when not in a flight vehicle)
+    // F key — board nearest vehicle first; fall back to mortar fire when not consumed.
+    // (Skipped entirely while seated in a flight vehicle.)
     if (!this.isInFlightVehicle() && event.code === 'KeyF') {
-      this.callbacks.onMortarFire?.();
+      const consumed = this.callbacks.onBoardNearestVehicle?.() ?? false;
+      if (!consumed) {
+        this.callbacks.onMortarFire?.();
+      }
     }
 
     // Mortar aiming with arrow keys (when not in a flight vehicle)
