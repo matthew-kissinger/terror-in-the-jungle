@@ -75,6 +75,18 @@ the count grew, the cycle is **INCOMPLETE**; the cycle ID is reused with a
 `-2` suffix until the count holds or shrinks. Carry-overs open ≥5 cycles are
 red-flagged and must be named in the next cycle's plan.
 
+**No zero-cycle carry-overs (2026-05-20, framework recovery Pass 2 R2.2).**
+Carry-overs track only items spanning ≥2 cycles. A gap opened and closed
+inside a single cycle goes in the PR description as a user-observable gap
+line, NOT as a CARRY_OVERS entry. The carry-over registry is a
+shrinking-progress audit trail for multi-cycle work, not a bookkeeping
+ledger for in-cycle gaps that the PR description already names. Enforced
+by `scripts/cycle-validate.ts <slug> --close`, which diffs the CARRY_OVERS
+"Closed" section against a cycle-start snapshot and FAILs on any newly
+closed ID that was not in the Active list at cycle start. Existing
+zero-cycle entries already in `Closed` are historical record and are NOT
+retroactively flagged; the check applies only to new entries.
+
 ### Campaign auto-advance (Phase 0 + realignment plan, 2026-05-09)
 
 A **campaign** is an ordered sequence of cycles queued in

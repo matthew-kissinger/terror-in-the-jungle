@@ -19,6 +19,14 @@ started, the cycle is `INCOMPLETE` per the rule in
 4. **Cycles-open count auto-increments at cycle close.** A carry-over open
    ≥3 cycles is a yellow flag; ≥5 is a red flag and must surface in the next
    cycle's plan.
+5. **Carry-overs track only items spanning ≥2 cycles** (framework recovery
+   Pass 2 R2.2, 2026-05-20). A gap opened and closed inside a single cycle
+   goes in the PR description as a user-observable gap line, NOT as a
+   CARRY_OVERS entry. Enforced by `scripts/cycle-validate.ts <slug> --close`.
+   Existing zero-cycle entries already in `Closed` (KB-SKY-LUT-BANDING,
+   KB-DEM-EDGE-TAPER, VEKHIKL-UX-1, VEKHIKL-UX-2, VODA-OF-1,
+   VEKHIKL-LAYOUT-1) are historical record and are NOT retroactively
+   flagged; the rule applies only to new entries.
 
 ## Active
 
