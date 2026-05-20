@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-19 (new parallel campaign queued [docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md); 3 cycles dispatched concurrently; previous post-WebGPU campaign was cut at cycle #12 on 2026-05-18)
+Last verified: 2026-05-20 (campaign 2026-05-19-visual-and-wayfinding CLOSED — 3 parallel cycles, 11 PRs merged, zero net carry-over delta; previous post-WebGPU campaign was cut at cycle #12 on 2026-05-18)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,40 +46,31 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active campaign (2026-05-19): visual-and-wayfinding (parallel).**
-Three independent cycles dispatched concurrently per
-[docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md).
-Disjoint subsystems → no DAG → run side-by-side. Concurrency cap **9**
-(sum of R1 task counts: 2 + 3 + 4). Posture: `auto-advance: yes` +
-`posture: autonomous-loop`. Each cycle closes independently per its
-own brief; the campaign closes when all three close.
+**Active campaign: NONE.** The 2026-05-19 visual-and-wayfinding
+campaign closed 2026-05-20 at master commit `4dd2c054`. Close memo
+at [docs/BACKLOG.md](docs/BACKLOG.md) `## Recently Completed
+(campaign-2026-05-19-visual-and-wayfinding)`. 11 PRs merged across
+3 parallel cycles (sky LUT bump; A Shau DEM edge taper + slope-aware
+route stamping + water enable; vehicle proximity HUD prompt +
+minimap/fullmap/compass markers). Zero net carry-over delta; three
+zero-cycle IDs (KB-SKY-LUT-BANDING, KB-DEM-EDGE-TAPER, VEKHIKL-UX-1)
+opened and closed in-cycle; Stage D3 of cycle-2026-05-09-cdlod-edge-morph
+closed by cycle 2.
 
-1. `cycle-skylut-resolution-bump` — fix Open Frontier midday "dark
-   spots" + horizon-banding by bumping the sky LUT from 32×8 to
-   32×32. Single file (`HosekWilkieSkyBackend.ts`). No mandatory
-   reviewer. [brief](docs/tasks/cycle-skylut-resolution-bump.md)
-2. `cycle-ashau-edge-and-flow-tuning` — three R1 landings:
-   **Stage D3 DEM edge taper** in `DEMHeightProvider.ts` (closes
-   the deferred D3 of `cycle-2026-05-09-cdlod-edge-morph`; fixes
-   the tall vertical "fins" at A Shau map edge); **slope-aware
-   route stamping** in `TerrainFlowCompiler.ts` +
-   `AShauValleyConfig.ts` (drapes route corridors instead of
-   flattening on steep hillsides — kills visible "trenches"); and
-   **A Shau `waterEnabled` flip** so the hydrology river surface
-   renders (sampan stops sitting on dry dirt). `terrain-nav-reviewer`
-   mandatory on all three R1 PRs.
-   [brief](docs/tasks/cycle-ashau-edge-and-flow-tuning.md)
-3. `cycle-vehicle-wayfinding-and-prompts` — four R1 landings (one
-   stretch): **"Press F to board" HUD prompt** via
-   `InteractionPromptPanel` + new `GroundVehicleProximityChecker`;
-   **minimap markers** for M151 / M48 / Sampan / PBR / M2HB (reuses
-   helipad-marker pipeline); **full-map markers** (same pipeline at
-   the M-key world-map layer); **compass bearing markers** (stretch
-   — drops if R1 budget tight). Lists
-   `cycle-vekhikl-5-fleet-expansion` (M113 APC + M35 truck + T-54
-   tank, optional ZU-23-2 AA + LCM-8) in the campaign hold list as
-   a follow-up gated on owner playtest sign-off.
-   [brief](docs/tasks/cycle-vehicle-wayfinding-and-prompts.md)
+**Hold list (owner-gated, NOT auto-promoted):**
+- `cycle-vekhikl-5-fleet-expansion` — M113 APC + M35 truck + T-54
+  tank (+ optional ZU-23-2 AA + LCM-8). Trigger: owner signs off on
+  cycle-vehicle-wayfinding-and-prompts playtest evidence (deferred
+  to [docs/PLAYTEST_PENDING.md](docs/PLAYTEST_PENDING.md) under
+  autonomous-loop).
+- `cycle-sky-screen-space-quad` — Hillaire-style screen-space sky
+  rework. Trigger: cycle #1 LUT bump ships but owner playtest still
+  shows visible artifacts, OR cycle #2 ships but A Shau valley
+  flight still shows banding beyond what the LUT bump explains.
+- `cycle-stabilizat-1-baselines-refresh` — STABILIZAT-1 / combat120
+  baseline refresh on a quiet machine. Removed from post-WebGPU
+  campaign on 2026-05-18 per owner direction; may be re-queued as a
+  standalone cycle later.
 
 **Previous campaign (closed 2026-05-18):** the 13-cycle post-WebGPU
 campaign was cut at cycle #12 per owner direction. Cycles #1–#12

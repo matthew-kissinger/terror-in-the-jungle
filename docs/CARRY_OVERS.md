@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-18 (post `cycle-sun-and-atmosphere-overhaul` close; campaign cut at cycle #12 per owner direction; cycle #13 `cycle-stabilizat-1-baselines-refresh` removed from scope)
+Last verified: 2026-05-20 (post `campaign-2026-05-19-visual-and-wayfinding` close — 3 parallel cycles, 11 PRs; zero net carry-over delta — KB-SKY-LUT-BANDING + KB-DEM-EDGE-TAPER + VEKHIKL-UX-1 all opened and closed in-cycle; Stage D3 of cycle-2026-05-09-cdlod-edge-morph closed)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -291,6 +291,23 @@ History log:
   verifies A Shau valley traversal without stop-and-go). All three
   PRs received `terrain-nav-reviewer` APPROVE pre-merge. DEFEKT-4
   moved Active → Closed. Active count: 8 → 7.
+- 2026-05-20 — `campaign-2026-05-19-visual-and-wayfinding` close
+  (autonomous-loop posture, parallel campaign): three parallel
+  cycles closed in one campaign-close commit. 11 PRs merged. Three
+  zero-cycle carry-overs opened+closed in-cycle (KB-SKY-LUT-BANDING
+  by cycle-skylut-resolution-bump; KB-DEM-EDGE-TAPER by
+  cycle-ashau-edge-and-flow-tuning; VEKHIKL-UX-1 by
+  cycle-vehicle-wayfinding-and-prompts). Cycle 2 also closed Stage
+  D3 of cycle-2026-05-09-cdlod-edge-morph (the deferred DEM edge
+  taper). All `terrain-nav-reviewer` passes APPROVE or
+  APPROVE-WITH-NOTES (one CHANGES-REQUESTED on PR #275's first pass
+  for missing worker-side parity, re-dispatch APPROVE). Net active
+  count delta: 0 (active list unchanged at 6). Owner playtests
+  deferred across all three cycles per posture rule, rows appended
+  to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md). Hold-list
+  promotion (`cycle-vekhikl-5-fleet-expansion`,
+  `cycle-sky-screen-space-quad`) remains owner-gated on the
+  deferred playtests; not auto-promoted at this close.
 
 ## Closed
 

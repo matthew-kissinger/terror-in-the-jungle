@@ -59,6 +59,66 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (campaign-2026-05-19-visual-and-wayfinding)
+
+Three parallel cycles in
+[docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
+(autonomous-loop posture). 11 PRs merged across the three cycles
+without inter-cycle dispatch dependency. Closes the three
+2026-05-19 owner-playtest issues (Open Frontier midday dark spots,
+A Shau CDLOD edge fins + nav-lane trenches + sampan on dry dirt,
+no vehicle wayfinding HUD / minimap / map markers).
+
+### Cycle #1 — `cycle-skylut-resolution-bump`
+
+Closes `KB-SKY-LUT-BANDING` (zero-cycle carry-over). Single-file
+LUT dimension bump (32×8 → 32×32) in `HosekWilkieSkyBackend.ts`
+for fog/hemisphere reader smoothness. No mandatory reviewer.
+
+- [#276](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/276) `51763218` `skylut-resolution-bump` — Bumped `SKY_TEXTURE_HEIGHT` 8→32 (kept `SKY_TEXTURE_WIDTH=32`); `LUT_ELEVATION_BINS` bumped in tandem (executor caught both constants feed the fog/hemisphere reader). Parity-test delta inside 0.05 ceiling. +48 / −23 LOC.
+- [#284](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/284) `4dd2c054` `skylut-playtest-evidence` — Extended `scripts/capture-sun-and-atmosphere-shots.ts` with `--lut-bump-check`; capture pair (Open Frontier noon + A Shau midday) committable post-merge. Playtest memo + PLAYTEST_PENDING row landed. Required two rebases (PLAYTEST_PENDING.md collisions with sibling cycle R2s).
+
+Carry-over delta: 0 (KB-SKY-LUT-BANDING opened+closed).
+
+### Cycle #2 — `cycle-ashau-edge-and-flow-tuning`
+
+Closes `KB-DEM-EDGE-TAPER` (zero-cycle) AND Stage D3 of
+`cycle-2026-05-09-cdlod-edge-morph` (carry-over from 2026-05-09).
+Three R1 production landings + one R2 evidence PR.
+`terrain-nav-reviewer` MANDATORY on all three R1 PRs.
+
+- [#275](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/275) `f0359e80` + `a98c1f28` `dem-edge-taper` — Replaced boundary clamp in `DEMHeightProvider.sampleBilinear` with smoothstep taper to `DEM_EDGE_BASELINE_M=0` over `DEM_EDGE_TAPER_RADIUS_M=1500`. First reviewer pass returned CHANGES-REQUESTED on missing worker-side parity (`src/workers/terrain.worker.ts` had a duplicate `sampleDEM` that still clamped — taper was a no-op at the rendering path). Re-dispatch landed `src/systems/terrain/DEMSampling.ts` as a shared canonical sampler; both call sites delegate. Latent coord-system mismatch (worker treated origin as DEM corner vs. provider's center) fixed in lockstep. A Shau not in `prebake-navmesh.ts` MODES list so no prebake regen needed. Reviewer 2nd pass: **APPROVE**. +262 / −8 LOC + worker fix.
+- [#277](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/277) `d0adbd9c` `ashau-water-enable` — Flipped `waterEnabled: true` at `AShauValleyConfig.ts:147`; added `globalWaterPlaneEnabled` field (default = `waterEnabled`) to decouple the sea-level plane from the hydrology river surface; relocated Sampan spawn from `(60, 0, 80)` to `(-6895, 0, 4835)` on the largest hydrology channel midpoint. Executor finding: the spawn relocation was the actual fix — the flag flip alone would not have fixed sampan-on-dirt (the old spawn was 1.8–2.3 km from any wet cell). Reviewer: **APPROVE-WITH-NOTES** (5 INFOs, including: spawn coord brittle to future hydrology bake regen, follow-up to use `resolvePosition` for runtime resolution; back-compat semantics for `globalWaterPlaneEnabled` cross-check). +69 / −10 LOC.
+- [#282](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/282) `78eb7230` `route-stamp-slope-guard` — Added slope-aware drape blend to `TerrainFlowCompiler.appendRouteFlow` (4-tap differential at stamp center; `slopeGuardDegrees=15`, `routeBlendOnSteepSlope=0.0` for A Shau; 30° for Open Frontier). Trenches stop appearing on hillsides. Auto-regenerated `open_frontier-42` prebake artifacts (heightmap + navmesh + bake-manifest; +21KB navmesh delta from fewer flattened cells, intended effect). Reviewer: **APPROVE-WITH-NOTES** (4 INFOs: test asserts on stamp radii vs heightmap delta — acceptable; `samplingRadius` not scaled by `flattenStrength` — one-line comment recommended; 4-tap slope sample directionally biased toward zero at DEM edges — campaign-retro item; stray pre-existing prebake artifacts not regressed). +253 / −9 LOC.
+- [#283](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/283) `0ae68009` `ashau-edge-and-flow-playtest-evidence` — New `scripts/capture-ashau-edge-and-flow-shots.ts` (3 capture pairs: north-edge flyover, valley road, sampan close-up). Playtest memo + PLAYTEST_PENDING row landed. R1 reviewer follow-up items captured in memo's "Cycle retro items" section.
+
+Carry-over delta: 0 (KB-DEM-EDGE-TAPER opened+closed; Stage D3 of cycle-2026-05-09-cdlod-edge-morph closed; net active count unchanged).
+
+### Cycle #3 — `cycle-vehicle-wayfinding-and-prompts`
+
+Closes `VEKHIKL-UX-1` (zero-cycle). Four R1 production landings
+(including the stretch compass markers) + one R2 evidence PR
+that also folded in the deferred compass runtime wiring. No
+mandatory reviewer.
+
+- [#279](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/279) `44ddf347` `vehicle-proximity-prompt` — New `src/systems/vehicle/GroundVehicleProximityChecker.ts` mirroring `FixedWingInteraction.ts` (10 Hz, 6 m radius). Per-vehicle copy: "Press F to board M151 Jeep" / "M48 Patton tank" / "Sampan" / "PBR gunboat" / "Press F to crew M2HB emplacement". Added non-fenced `PlayerController.isInAnyVehicle()` helper (impl class, not interface — `IPlayerController` untouched). Executor disclosure: actual M151 ids are feature-derived (`motor_pool_small_m151`) not the brief's `m151_*` prefix — label resolver tolerates both. +486 / −0 LOC.
+- [#280](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/280) `9977c335` `minimap-vehicle-markers` — Extended `MinimapSystem.ts` + `MinimapRenderer.ts` using helipad-marker pattern. `VehicleMarker` type lives in `MinimapRenderer.ts` (matches existing `HelipadMarker` export pattern so the sibling fullmap task imports cleanly). Composer wiring at `OperationalRuntimeComposer.ts`. Faction colors (US blue, OPFOR red). +555 / −7 LOC.
+- [#281](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/281) `6cc01c69` `fullmap-vehicle-markers` — Mirrored minimap markers onto `FullMapSystem.ts` using the north-up flipped-axis transform. +205 / −2 LOC.
+- [#278](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/278) `3fc34f1f` `compass-vehicle-markers` (stretch) — New `CompassVehicleMarkers.ts` modeled on `CompassZoneMarkers.ts`. Bearing chevrons + distance labels for the nearest vehicle of each drivable category. Stretch landed (not dropped). Runtime wiring (`compassSystem.setVehicleQuery()` in the startup composer) was outside the brief's `src/ui/compass/**` fence and deferred; landed in PR #285 commit 1. +547 / −0 LOC.
+- [#285](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/285) `d78df6e5` + `f6439494` `vehicle-wayfinding-playtest-evidence` (+ compass wiring) — Commit 1 wired `compassSystem.setVehicleQuery()` in `StartupPlayerRuntimeComposer.ts` with a `vehicleManager.getAllVehicles()`-backed adapter and sibling test. Commit 2 landed `scripts/capture-vehicle-wayfinding-shots.ts` (22-shot matrix across 5 vehicle types × 4 surfaces + negative cases), playtest memo, PLAYTEST_PENDING row.
+
+Carry-over delta: 0 (VEKHIKL-UX-1 opened+closed).
+
+### Campaign-level summary
+
+- 11 PRs merged across the three cycles (cycle #1: 2; cycle #2: 4; cycle #3: 5).
+- R1 round dispatched all 8 production tasks in parallel under a 9-cap (1 stretch dropped → no, landed; actual = 8 R1 + 3 R2 = 11).
+- One reviewer-driven re-dispatch on PR #275 (worker-side parity miss); zero fence changes; zero hard-stops.
+- `combat120` perf: PASS by CI-gate inference. All 8 R1 PRs landed `perf` CI green; per-cycle p99 deltas inferred below the 5% campaign-level soft gate. STABILIZAT-1 baselines remain warn-stamped per the un-run cycle #13.
+- Carry-over count: 6 → 6 (zero net change; three zero-cycle IDs opened+closed in-cycle; Stage D3 of cycle-2026-05-09-cdlod-edge-morph closed; no new active items opened).
+- Hold list intact: `cycle-vekhikl-5-fleet-expansion` and `cycle-sky-screen-space-quad` remain owner-gated on the autonomous-loop-deferred playtest evidence; `cycle-stabilizat-1-baselines-refresh` remains parked per 2026-05-18 owner direction.
+- Owner playtests deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) across all three cycles (per `posture: autonomous-loop`).
+
 ## Recently Completed (cycle-mobile-webgl2-fallback-fix)
 
 Campaign position #2 of 12 in

@@ -1,6 +1,6 @@
 # Campaign: 2026-05-19 Visual Polish & Wayfinding (parallel cycles)
 
-Last verified: 2026-05-19 (queued; pre-dispatch)
+Last verified: 2026-05-20 (CLOSED — all three cycles closed; 11 PRs merged at master commit `4dd2c054`; campaign close memo at [docs/BACKLOG.md](BACKLOG.md) `## Recently Completed (campaign-2026-05-19-visual-and-wayfinding)`)
 
 Campaign manifest. Trigger: owner 2026-05-19 playtest of live build
 (SHA `fc398f12` at `terror-in-the-jungle.pages.dev`). Three issues
@@ -15,7 +15,12 @@ captured in screenshots:
 
 ## Status
 
-**Auto-advance: yes.** Posture: **autonomous-loop**.
+**CLOSED 2026-05-20.** All three cycles closed per their own
+acceptance criteria. 11 PRs merged. Campaign close memo lives at
+[docs/BACKLOG.md](BACKLOG.md) `## Recently Completed
+(campaign-2026-05-19-visual-and-wayfinding)`.
+
+Original posture: **Auto-advance: yes.** Posture: **autonomous-loop**.
 
 Three cycles. **All three run in parallel** because they touch
 disjoint subsystems:
@@ -73,9 +78,9 @@ Three independent cycles. No DAG. Dispatch order does not matter.
 
 | # | Slug | Status | Closes | Brief | Notes |
 |---|------|--------|--------|-------|-------|
-| 1 | `cycle-skylut-resolution-bump` | pending | KB-SKY-LUT-BANDING (opens+closes in-cycle) | [brief](tasks/cycle-skylut-resolution-bump.md) | One-file LUT dimension bump in `HosekWilkieSkyBackend.ts` from 32×8 to 32×32. Fixes Open Frontier midday dark spots + horizon banding. Tiny scope, single R1 production PR + playtest PR. No mandatory reviewer. |
-| 2 | `cycle-ashau-edge-and-flow-tuning` | pending | KB-DEM-EDGE-TAPER (opens+closes in-cycle) + Stage D3 of cycle-2026-05-09-cdlod-edge-morph | [brief](tasks/cycle-ashau-edge-and-flow-tuning.md) | Three R1 landings: DEM edge taper (closes deferred Stage D3), slope-aware route stamping (kills trenches on hillsides), A Shau `waterEnabled` flip (sampan stops sitting on dirt). `terrain-nav-reviewer` mandatory on all three. |
-| 3 | `cycle-vehicle-wayfinding-and-prompts` | pending | VEKHIKL-UX-1 (opens+closes in-cycle) | [brief](tasks/cycle-vehicle-wayfinding-and-prompts.md) | Four R1 landings (one stretch): "Press F to board" HUD prompt, minimap vehicle markers, full-map vehicle markers, optional compass bearing markers. Reuses existing `InteractionPromptPanel` + helipad-marker patterns. Lists `cycle-vekhikl-5-fleet-expansion` as the follow-up cycle for new vehicle types. |
+| 1 | `cycle-skylut-resolution-bump` | **done** | KB-SKY-LUT-BANDING (opens+closes in-cycle) | [brief](tasks/archive/campaign-2026-05-19-visual-and-wayfinding/cycle-skylut-resolution-bump.md) | Closed 2026-05-20. 2 PRs (#276, #284). |
+| 2 | `cycle-ashau-edge-and-flow-tuning` | **done** | KB-DEM-EDGE-TAPER (opens+closes in-cycle) + Stage D3 of cycle-2026-05-09-cdlod-edge-morph | [brief](tasks/archive/campaign-2026-05-19-visual-and-wayfinding/cycle-ashau-edge-and-flow-tuning.md) | Closed 2026-05-20. 4 PRs (#275, #277, #282, #283). All three `terrain-nav-reviewer` APPROVE or APPROVE-WITH-NOTES (one CHANGES-REQUESTED on PR #275 first pass; re-dispatch APPROVE). |
+| 3 | `cycle-vehicle-wayfinding-and-prompts` | **done** | VEKHIKL-UX-1 (opens+closes in-cycle) | [brief](tasks/archive/campaign-2026-05-19-visual-and-wayfinding/cycle-vehicle-wayfinding-and-prompts.md) | Closed 2026-05-20. 5 PRs (#278, #279, #280, #281, #285). Stretch compass markers landed (not dropped). Compass runtime wiring folded into PR #285 commit 1. |
 
 ## Hold list
 

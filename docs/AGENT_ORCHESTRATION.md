@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-19 (new parallel campaign queued: [docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md) — three independent cycles dispatched in parallel; concurrency cap 9; previous post-WebGPU campaign cut at cycle #12 on 2026-05-18)
+Last verified: 2026-05-20 (campaign 2026-05-19-visual-and-wayfinding CLOSED — all three parallel cycles closed per their own acceptance criteria; 11 PRs merged; previous post-WebGPU campaign cut at cycle #12 on 2026-05-18)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,53 +154,37 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: PARALLEL (campaign 2026-05-19 visual-and-wayfinding — 3 cycles concurrent)
+## Current cycle: NONE (campaign 2026-05-19-visual-and-wayfinding closed 2026-05-20)
 
-**Status:** Active parallel campaign. Three independent cycles
-dispatch concurrently under
-[docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md).
-The campaign explicitly exists to run cycles in parallel because
-their target subsystems are disjoint (sky / terrain / UI+vehicle).
+The orchestrator has no active cycle. The 2026-05-19 visual-and-wayfinding
+campaign closed at master commit `4dd2c054` on 2026-05-20 after all three
+parallel cycles closed per their own acceptance criteria (11 PRs merged
+total). Close memo lives at the top of
+[docs/BACKLOG.md](BACKLOG.md) `## Recently Completed
+(campaign-2026-05-19-visual-and-wayfinding)`.
 
-**Posture:** `auto-advance: yes` + `posture: autonomous-loop`.
+To start a new cycle: append a new campaign manifest (or new cycle row to
+an existing manifest), author the cycle brief at `docs/tasks/<slug>.md`,
+and replace this section with the cycle-specific pointer (slug, tasks,
+DAG, concurrency cap, reviewer policy, posture, hard-stops).
 
-**Concurrency cap:** 9 across the campaign (2 + 3 + 4 across R1 of
-the three cycles). Per-cycle cap declared in each cycle's brief.
+**Hold list (owner-gated, do NOT auto-promote):**
+- `cycle-vekhikl-5-fleet-expansion` — M113 APC + M35 truck + T-54 tank
+  (optional ZU-23-2 AA + LCM-8). Trigger: owner signs off on
+  cycle-vehicle-wayfinding-and-prompts playtest evidence (deferred to
+  PLAYTEST_PENDING under autonomous-loop posture).
+- `cycle-sky-screen-space-quad` — Hillaire-style screen-space sky rework.
+  Trigger: cycle #1 LUT bump ships but owner playtest still shows visible
+  artifacts, OR cycle #2 ships but A Shau valley flight still shows
+  banding beyond what the LUT bump explains.
+- `cycle-stabilizat-1-baselines-refresh` — STABILIZAT-1 / combat120
+  baseline refresh on a quiet machine. Removed from the post-WebGPU
+  campaign on 2026-05-18 per owner direction; may be re-queued as a
+  standalone cycle later.
 
-**Cycles in flight:**
-
-| # | Slug | R1 tasks | Reviewer | Brief |
-|---|------|----------|----------|-------|
-| 1 | `cycle-skylut-resolution-bump` | `skylut-resolution-bump`, `skylut-playtest-evidence` | none mandatory (optional perf-analyst) | [brief](tasks/cycle-skylut-resolution-bump.md) |
-| 2 | `cycle-ashau-edge-and-flow-tuning` | `dem-edge-taper`, `route-stamp-slope-guard`, `ashau-water-enable` | `terrain-nav-reviewer` mandatory on all three | [brief](tasks/cycle-ashau-edge-and-flow-tuning.md) |
-| 3 | `cycle-vehicle-wayfinding-and-prompts` | `vehicle-proximity-prompt`, `minimap-vehicle-markers`, `fullmap-vehicle-markers`, `compass-vehicle-markers` (stretch) | none mandatory | [brief](tasks/cycle-vehicle-wayfinding-and-prompts.md) |
-
-Each cycle has its own R2 (playtest-evidence) round. The campaign
-closes when all three cycles close.
-
-**Dependencies (DAG):** none. Disjoint subsystems.
-
-**Hard-stops (campaign-level, in addition to per-cycle):**
-- ≥ 2 of 3 cycles hit a hard-stop in the same dispatch round →
-  flip auto-advance to `PAUSED`.
-- Carry-over count grows across the campaign (sum > 0) → halt.
-- Fence-change proposal in any executor report → halt.
-- `combat120` p99 regresses > 5% vs cycle #12 close baseline (soft
-  gate; baselines warn-stamped per STABILIZAT-1).
-
-**Last cycle closed before this campaign:**
-`cycle-sun-and-atmosphere-overhaul` (post-WebGPU campaign cycle
-#12) — 6 PRs (#269-#274). Two follow-up notes carry forward,
-recorded in
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md):
-(a) strict `r < 0.5 * max(g, b)` night-red assertion is over-tight;
-soft sense `r ≤ max(g, b)` is canonical. (b) Per-preset
-`computeSunDirectionAtTime` elevation envelope sanity check —
-captured in cycle #1's playtest evidence of this campaign as an
-observation (not fixed here).
-
-**Resume:** orchestrator may re-enter dispatch on any incomplete
-cycle by reading this section + the cycle's brief.
+**Resume:** orchestrator stops after a campaign close. Restart via
+`/orchestrate` once a new campaign manifest or single-cycle brief is
+queued.
 
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
