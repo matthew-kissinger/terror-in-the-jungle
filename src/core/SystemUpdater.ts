@@ -8,6 +8,7 @@ import { isPerfUserTimingEnabled } from './PerfDiagnostics';
 import { GameEventBus } from './GameEventBus';
 import { SimulationScheduler } from './SimulationScheduler';
 import { collectTrackedSystems, SYSTEM_UPDATE_BUDGET_MS } from './SystemUpdateSchedule';
+import { GroundVehicleProximityChecker } from '../systems/vehicle/GroundVehicleProximityChecker';
 
 interface SystemTimingEntry {
   name: string;
@@ -36,6 +37,13 @@ export class SystemUpdater {
   private readonly scheduler = new SimulationScheduler();
   private readonly perfUserTimingEnabled =
     (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfUserTimingEnabled();
+
+  // Lazily-instantiated proximity checker for the "Press F to board"
+  // ground-vehicle / watercraft / emplacement HUD prompt. Created on the
+  // first Vehicles-phase tick where vehicleManager + playerController +
+  // hudSystem are all present. Owns its own 10 Hz cadence internally so
+  // we can call update() every frame here without measurable cost.
+  private groundVehicleProximityChecker: GroundVehicleProximityChecker | null = null;
 
   // Reused per-frame color buffers for forwarding AtmosphereSystem output
   // into the billboard lighting snapshot. Allocating once here avoids
@@ -130,6 +138,8 @@ export class SystemUpdater {
       if (refs.helicopterModel) refs.helicopterModel.update(deltaTime);
       if (refs.fixedWingModel) refs.fixedWingModel.update(deltaTime);
       if (refs.vehicleManager) refs.vehicleManager.update(deltaTime);
+      this.ensureGroundVehicleProximityChecker(refs);
+      this.groundVehicleProximityChecker?.update(deltaTime);
       performanceTelemetry.endSystem('Vehicles');
     });
 
@@ -273,6 +283,38 @@ export class SystemUpdater {
 
     // End frame telemetry
     performanceTelemetry.endFrame();
+  }
+
+  /**
+   * Lazily construct the ground-vehicle proximity checker once both the
+   * VehicleManager and PlayerController are registered. The checker only
+   * needs read-only refs (player position, in-vehicle flag, HUD signaller)
+   * so we capture them by closure rather than threading them through every
+   * subsequent tick. Returns silently when prerequisites are missing — the
+   * Vehicles phase can run before the runtime composer wires the HUD.
+   */
+  private ensureGroundVehicleProximityChecker(refs: SystemKeyToType): void {
+    if (this.groundVehicleProximityChecker) return;
+    const vehicleManager = refs.vehicleManager;
+    const playerController = refs.playerController;
+    const hudSystem = refs.hudSystem;
+    if (!vehicleManager || !playerController || !hudSystem) return;
+
+    // `isInAnyVehicle()` covers helicopter, fixed-wing, ground vehicles
+    // (jeep/tank), watercraft (sampan/PBR), and emplacements — all five
+    // session states the prompt must suppress against. We fall back to
+    // the fenced predicates when the concrete method is absent (e.g. a
+    // test double providing only `IPlayerController` surface).
+    const isInVehicle = typeof (playerController as { isInAnyVehicle?: () => boolean }).isInAnyVehicle === 'function'
+      ? () => (playerController as { isInAnyVehicle: () => boolean }).isInAnyVehicle()
+      : () => playerController.isInHelicopter() || playerController.isInFixedWing();
+
+    this.groundVehicleProximityChecker = new GroundVehicleProximityChecker(
+      vehicleManager,
+      () => playerController.getPosition(),
+      isInVehicle,
+    );
+    this.groundVehicleProximityChecker.setHUDSystem(hudSystem);
   }
 
   private trackInstrumentedSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {
