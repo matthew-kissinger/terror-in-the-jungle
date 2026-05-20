@@ -344,6 +344,8 @@ Next cycle recommendation:
 - Current backlog: `docs/BACKLOG.md`
 - Past-cycle briefs: `docs/tasks/archive/<cycle-id>/`
 - E-track spike memos (still referenced by Phase F candidates in the
-  backlog): `origin/spike/E2-rendering-at-scale`,
-  `spike/E3-combat-ai-paradigm`, `spike/E4-agent-player-api`,
-  `spike/E5-deterministic-sim`, `spike/E6-vehicle-physics-rebuild`
+  backlog): preserved as immutable tags `spike-E1-archive` through
+  `spike-E6-archive` (commits previously lived on `spike/E*` branches,
+  pruned 2026-05-20). Index: [docs/archive/E_TRACK_SPIKE_MEMO_INDEX_2026-05-07.md](../docs/archive/E_TRACK_SPIKE_MEMO_INDEX_2026-05-07.md).
+  Resolve with `git checkout spike-E2-archive` (etc.) or browse
+  `https://github.com/matthew-kissinger/terror-in-the-jungle/tree/spike-E2-archive`.
