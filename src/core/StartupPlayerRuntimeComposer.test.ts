@@ -43,6 +43,7 @@ function createRefs() {
     compassSystem: {
       mountTo: vi.fn(),
       setZoneQuery: vi.fn(),
+      setVehicleQuery: vi.fn(),
     },
     firstPersonWeapon: {
       setAudioManager: vi.fn(),
@@ -145,6 +146,9 @@ function createRefs() {
     sandbagSystem: {},
     terrainSystem: {},
     ticketSystem: {},
+    vehicleManager: {
+      getAllVehicles: vi.fn(() => []),
+    },
     warSimulator: {},
     zoneManager: {
       setPlayerAlliance: vi.fn(),
@@ -186,6 +190,46 @@ describe('StartupPlayerRuntimeComposer', () => {
     expect(refs.playerController.setPlayerFaction).toHaveBeenCalledWith(Faction.US);
     expect(refs.zoneManager.setPlayerAlliance).toHaveBeenCalledWith(Alliance.BLUFOR);
     expect(refs.commandInputManager.mountTo).toHaveBeenCalledWith(layout);
+  });
+
+  it('wires a compass vehicle query adapter that filters out destroyed vehicles and aircraft', () => {
+    const { refs } = createRefs();
+    const drivableJeep = {
+      vehicleId: 'm151_a',
+      category: 'ground',
+      faction: Faction.US,
+      getPosition: () => new THREE.Vector3(10, 0, 20),
+      isDestroyed: () => false,
+    };
+    const destroyedTank = {
+      vehicleId: 'm48_dead',
+      category: 'ground',
+      faction: Faction.US,
+      getPosition: () => new THREE.Vector3(0, 0, 0),
+      isDestroyed: () => true,
+    };
+    const heli = {
+      vehicleId: 'huey_alpha',
+      category: 'helicopter',
+      faction: Faction.US,
+      getPosition: () => new THREE.Vector3(100, 100, 0),
+      isDestroyed: () => false,
+    };
+    refs.vehicleManager.getAllVehicles = vi.fn(() => [drivableJeep, destroyedTank, heli]);
+
+    wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), {
+      camera: new THREE.PerspectiveCamera(),
+    });
+
+    expect(refs.compassSystem.setVehicleQuery).toHaveBeenCalledTimes(1);
+    const query = refs.compassSystem.setVehicleQuery.mock.calls[0][0] as {
+      getVehicleMarkers: () => Array<{ vehicleId: string; category: string }>;
+    };
+    expect(query).toBeDefined();
+    const markers = query.getVehicleMarkers();
+    // Aircraft + destroyed entries are dropped; only the live ground vehicle survives.
+    expect(markers.map(m => m.vehicleId)).toEqual(['m151_a']);
+    expect(markers[0].category).toBe('ground');
   });
 
   it('builds spectator candidates from the live loadout context instead of a startup snapshot', () => {
