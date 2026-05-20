@@ -55,6 +55,13 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
       maxSlopeDeg: 16,
     },
   },
+  // Renders hydrology river surface AND global sea-level plane. The seed-42
+  // noise terrain centers near y=0 so the global plane is visible on shore
+  // terrain, and the procedural-river ribbon overlays it in the river channel.
+  // `globalWaterPlaneEnabled` is intentionally left unset so it inherits from
+  // `waterEnabled` (true) via the SystemManager resolver
+  // (`config.globalWaterPlaneEnabled ?? waterEnabled`).
+  waterEnabled: true,
   weather: {
     enabled: true,
     initialState: WeatherState.CLEAR,
