@@ -126,6 +126,12 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
     homeBaseShoulderTargetHeightMode: 'max',
     connectObjectivePairs: false,
     maxRoutesPerAnchor: 2,
+    // Slope-aware drape: real-DEM hillsides are too steep to cut a flat trail
+    // through without visible trenches. Above 15 deg the stamp blends toward
+    // full drape (0 flatten). 5 deg softness gives a smooth 10-20 deg blend.
+    slopeGuardDegrees: 15,
+    slopeGuardSoftnessDegrees: 5,
+    routeBlendOnSteepSlope: 0.0,
   },
   hydrology: {
     preload: true,

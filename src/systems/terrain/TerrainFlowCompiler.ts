@@ -25,6 +25,12 @@ const DEFAULT_MAX_ROUTES_PER_ANCHOR = 3;
 const OBJECTIVE_NEIGHBOR_LINKS = 2;
 const OBJECTIVE_ROUTE_ENDPOINT_RADIUS_SCALE = 0.88;
 
+// Slope-guard defaults. When `slopeGuardDegrees` is unset in policy, the guard
+// is treated as fully-off (effectively +Infinity) so that the legacy single-
+// path behavior is preserved byte-identical for any config that hasn't opted
+// in. Slope sample step is fixed for deterministic 4-tap differentials.
+const SLOPE_SAMPLE_STEP_M = 4;
+
 interface TerrainFlowCompileResult {
   stamps: TerrainStampConfig[];
   surfacePatches: TerrainSurfacePatch[];
@@ -72,7 +78,7 @@ export function compileTerrainFlow(
       pair.to.id,
     );
 
-    appendRouteFlow(result, pair, route, policy);
+    appendRouteFlow(result, pair, route, policy, getTerrainHeight);
   }
 
   return result;
@@ -176,6 +182,7 @@ function appendRouteFlow(
   pair: RoutePair,
   route: Array<{ x: number; z: number }>,
   policy: TerrainFlowPolicyConfig,
+  getTerrainHeight: (x: number, z: number) => number,
 ): void {
   const points = sanitizeRoutePoints(pair.from, pair.to, route, policy);
   if (points.length < 2) {
@@ -236,15 +243,22 @@ function appendRouteFlow(
     for (let capsuleIndex = 0; capsuleIndex < capsuleCount; capsuleIndex++) {
       const startT = capsuleIndex / capsuleCount;
       const endT = (capsuleIndex + 1) / capsuleCount;
+      const capsuleStartX = lerp(start.x, end.x, startT);
+      const capsuleStartZ = lerp(start.z, end.z, startT);
+      const capsuleEndX = lerp(start.x, end.x, endT);
+      const capsuleEndZ = lerp(start.z, end.z, endT);
+      const midX = (capsuleStartX + capsuleEndX) * 0.5;
+      const midZ = (capsuleStartZ + capsuleEndZ) * 0.5;
+      const flattenStrength = computeFlattenStrength(policy, getTerrainHeight, midX, midZ);
       result.stamps.push({
         kind: 'flatten_capsule',
-        startX: lerp(start.x, end.x, startT),
-        startZ: lerp(start.z, end.z, startT),
-        endX: lerp(start.x, end.x, endT),
-        endZ: lerp(start.z, end.z, endT),
-        innerRadius,
-        outerRadius,
-        gradeRadius,
+        startX: capsuleStartX,
+        startZ: capsuleStartZ,
+        endX: capsuleEndX,
+        endZ: capsuleEndZ,
+        innerRadius: innerRadius * flattenStrength,
+        outerRadius: outerRadius * flattenStrength,
+        gradeRadius: gradeRadius * flattenStrength,
         gradeStrength: routeGradeStrength,
         samplingRadius: innerRadius,
         targetHeightMode: routeTargetHeightMode,
@@ -253,6 +267,62 @@ function appendRouteFlow(
       });
     }
   }
+}
+
+// Slope-aware drape blend.
+//
+// Below `slopeGuardDegrees - softness/2`, returns 1.0 (full original flatten;
+// byte-identical to legacy behavior). Above `slopeGuardDegrees + softness/2`,
+// returns `routeBlendOnSteepSlope` (typically 0 = full drape). In the soft
+// band, smoothstep gives a C1-continuous interpolation.
+//
+// When `slopeGuardDegrees` is unset in policy, returns 1.0 unconditionally
+// (no guard, no extra sampling).
+//
+// Slope sample uses a deterministic 4-tap central difference at `(x, z)`.
+function computeFlattenStrength(
+  policy: TerrainFlowPolicyConfig,
+  getTerrainHeight: (x: number, z: number) => number,
+  x: number,
+  z: number,
+): number {
+  const guardDeg = policy.slopeGuardDegrees;
+  if (guardDeg === undefined || guardDeg <= 0) {
+    return 1;
+  }
+  const softness = Math.max(0, policy.slopeGuardSoftnessDegrees ?? 0);
+  const blendTarget = clamp(policy.routeBlendOnSteepSlope ?? 0, 0, 1);
+  const slopeDeg = sampleSlopeDegrees(getTerrainHeight, x, z);
+  const halfBand = softness * 0.5;
+  const lowEdge = guardDeg - halfBand;
+  const highEdge = guardDeg + halfBand;
+  const t = smoothstep(lowEdge, highEdge, slopeDeg);
+  return lerp(1, blendTarget, t);
+}
+
+// 4-tap central difference around (x, z). Deterministic; no allocation.
+function sampleSlopeDegrees(
+  getTerrainHeight: (x: number, z: number) => number,
+  x: number,
+  z: number,
+): number {
+  const s = SLOPE_SAMPLE_STEP_M;
+  const hPosX = getTerrainHeight(x + s, z);
+  const hNegX = getTerrainHeight(x - s, z);
+  const hPosZ = getTerrainHeight(x, z + s);
+  const hNegZ = getTerrainHeight(x, z - s);
+  const dHdX = (hPosX - hNegX) / (2 * s);
+  const dHdZ = (hPosZ - hNegZ) / (2 * s);
+  const slopeMag = Math.hypot(dHdX, dHdZ);
+  return Math.atan(slopeMag) * (180 / Math.PI);
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  if (edge0 >= edge1) {
+    return value < edge0 ? 0 : 1;
+  }
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
 }
 
 function sanitizeRoutePoints(
