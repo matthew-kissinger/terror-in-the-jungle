@@ -40,6 +40,10 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
     homeBaseShoulderTargetHeightMode: 'max',
     connectObjectivePairs: true,
     maxRoutesPerAnchor: 4,
+    // Gentle slope guard for the noise-terrain map; trips only on rare ridges.
+    slopeGuardDegrees: 30,
+    slopeGuardSoftnessDegrees: 5,
+    routeBlendOnSteepSlope: 0.0,
   },
   hydrology: {
     preload: true,

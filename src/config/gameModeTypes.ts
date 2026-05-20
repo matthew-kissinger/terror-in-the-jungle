@@ -209,6 +209,14 @@ export interface TerrainFlowPolicyConfig {
   homeBaseShoulderTargetHeightMode?: 'center' | 'average' | 'max';
   connectObjectivePairs?: boolean;
   maxRoutesPerAnchor?: number;
+  // Slope-aware drape blend. When the terrain at a stamp center exceeds
+  // `slopeGuardDegrees`, the stamp's contributed flatten effect blends toward
+  // `routeBlendOnSteepSlope` (drape). `slopeGuardSoftnessDegrees` widens the
+  // transition band on either side of the threshold for a C1-continuous blend.
+  // Below the threshold (gentle ground), stamps are byte-identical to today.
+  slopeGuardDegrees?: number;
+  slopeGuardSoftnessDegrees?: number;
+  routeBlendOnSteepSlope?: number;
 }
 
 interface TerrainFeatureGameplayPolicy {
