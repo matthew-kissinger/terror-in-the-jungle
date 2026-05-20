@@ -92,12 +92,15 @@ export function createSampan(
  *   - `open_frontier`: hydrology channel cuts diagonally across the
  *     16x16 km map. (-200, 0, 100) lies in a typical channel mid-segment
  *     on the seeded layout; the resolver snap handles the rest.
- *   - `a_shau_valley`: the M48 spawn at (40, 0, 60) anchors a valley
- *     road; (60, 0, 80) places the sampan ~30 m off-road in the
- *     low-lying area where the hydrology bake reports wet cells
- *     (verified manually against `a_shau_valley-hydrology.json`).
- *     The valley floor here is around 580 m elevation — the resolver
- *     snap (when supplied) handles the actual water-surface Y.
+ *   - `a_shau_valley`: (-6895, 0, 4835) lies on the largest hydrology
+ *     channel in the A Shau bake (accumulation 32944 cells; channel
+ *     length 21.6 km). The point is deterministic, NVA-friendly
+ *     (~7.6 km from Base Area 611, ~7.4 km from US LZ Goodman) and
+ *     guaranteed wet against `a_shau_valley-hydrology.json`. The
+ *     previous (60, 0, 80) coords were ~1.8 km away from the nearest
+ *     channel, so the boat sat on dry dirt. The resolver snap (when
+ *     supplied) handles the actual water-surface Y from the bake
+ *     (channel elevation ~501 m at this point).
  */
 export const SAMPAN_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', {
   vehicleId: string;
@@ -113,7 +116,7 @@ export const SAMPAN_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', {
   },
   a_shau_valley: {
     vehicleId: 'sampan_ashau_valley_river',
-    position: new THREE.Vector3(60, 0, 80),
+    position: new THREE.Vector3(-6895, 0, 4835),
     faction: Faction.NVA,
     initialYaw: Math.PI * 0.25,
   },
