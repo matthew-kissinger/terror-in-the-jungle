@@ -144,7 +144,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
   // system pushes the preset density onto `renderer.fog.density`.
   cameraFar: 4000,
   shadowFar: 500,
-  waterEnabled: false, // No global water plane - area has streams, not lakes
+  waterEnabled: true, // Renders the hydrology river surface so the sampan sits on water, not dirt.
+  globalWaterPlaneEnabled: false, // Valley floor ~580m makes a sea-level plane invisible and wasted.
 
   // Campaign tickets - high count for extended persistent play
   maxTickets: 5000,

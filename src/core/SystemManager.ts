@@ -201,7 +201,12 @@ export class SystemManager {
     const config = getGameModeConfig(mode);
     if (this.waterSystem) {
       const waterEnabled = config.waterEnabled !== false;
-      this.waterSystem.setEnabled(waterEnabled);
+      // Decouple the global 2000m plane from `waterEnabled`. Default to
+      // `waterEnabled` for back-compat; A Shau opts out via explicit
+      // `globalWaterPlaneEnabled: false` so hydrology river surfaces still
+      // render while the sea-level plane stays hidden (valley floor ~580m).
+      const globalWaterPlaneEnabled = config.globalWaterPlaneEnabled ?? waterEnabled;
+      this.waterSystem.setEnabled(globalWaterPlaneEnabled);
       if (waterEnabled && typeof this.waterSystem.setWorldSize === 'function') {
         this.waterSystem.setWorldSize(config.worldSize);
       }
