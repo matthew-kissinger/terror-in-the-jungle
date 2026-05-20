@@ -17,11 +17,20 @@ The `/orchestrate` slash command tells the main session to read this file and
 2. `git fetch origin && git status`. If behind master, fast-forward pull.
 3. Read `docs/AGENT_ORCHESTRATION.md` in full. It names the current cycle,
    tasks, round schedule, concurrency cap, playtest policy, and failure
-   handling.
+   handling. The "Current cycle" section is authoritative:
+   - **Small campaign (≤3 cycles, typically parallel):** the cycles are
+     listed inline under an `## Active cycles` block. No separate
+     campaign manifest file exists; do not look for one.
+   - **Large campaign (≥4 sequenced cycles):** "Current cycle" points at
+     a `docs/CAMPAIGN_<date>-<slug>.md` manifest. Read that manifest
+     next.
+   - **Single cycle / no campaign:** "Current cycle" points directly at
+     one task brief.
 4. Skim `docs/TESTING.md` and `docs/INTERFACE_FENCE.md`. You must enforce
    these from an orchestrator seat.
-5. Use `TaskCreate` to register every task in the current cycle. Encode
-   dependencies with `addBlockedBy` per the cycle's DAG.
+5. Use `TaskCreate` to register every task in the current cycle (or each
+   active cycle for a small parallel campaign). Encode dependencies
+   with `addBlockedBy` per the DAG.
 6. Print the round schedule in a plain-text message to the user before any
    dispatch. Wait for "go" or a redirect unless the cycle explicitly says
    skip-confirm.
@@ -129,23 +138,35 @@ diffs yourself unless you are deciding a borderline merge.
 - Do not read every PR diff. Trust executor reports; reviewers and CI catch
   real issues.
 
-## Campaign auto-advance (2026-05-09 realignment)
+## Campaign auto-advance (2026-05-09 realignment; trimmed 2026-05-20)
 
-If the campaign manifest at `docs/archive/CAMPAIGN_2026-05-09.md` (or any
-`docs/CAMPAIGN_*.md` named in `docs/AGENT_ORCHESTRATION.md` "Current
-campaign") declares `auto-advance: yes` and the current cycle did NOT hit
-a hard-stop, after running the end-of-cycle ritual:
+Campaign shape determines the playbook:
 
-1. Read the campaign manifest. Find the next cycle in the queue not yet
-   marked `done`.
-2. Update `docs/AGENT_ORCHESTRATION.md` "Current cycle" to point at the
-   next cycle's brief.
-3. Mark the just-closed cycle `done` in the campaign manifest.
-4. Commit with `docs(campaign): advance to <next-cycle-slug>`.
-5. Re-enter the dispatch loop for the next cycle. Do NOT prompt the
-   human. Do NOT spawn a new orchestrator session.
+- **Small campaign (≤3 cycles, parallel):** Cycles are listed inline
+  under `## Active cycles` in `docs/AGENT_ORCHESTRATION.md`. No
+  separate manifest file. Dispatch all R1 tasks across all listed
+  cycles in parallel (concurrency cap respected); no `next-cycle`
+  chaining is needed because the cycles are concurrent. At end-of-run
+  ritual, append a `## Recently Completed (<campaign-id>)` section to
+  `docs/BACKLOG.md` and reset the "Current cycle" stub. No
+  `docs(campaign): advance` commits are needed.
+- **Large campaign (≥4 sequenced cycles):** A campaign manifest exists
+  at `docs/CAMPAIGN_<date>-<slug>.md` (or, for archived campaigns,
+  under `docs/archive/`). When the manifest declares `auto-advance:
+  yes` and the current cycle did NOT hit a hard-stop, after running
+  the end-of-cycle ritual:
 
-Hard-stops always halt the campaign and surface to the human. Stops:
+  1. Read the campaign manifest. Find the next cycle in the queue not
+     yet marked `done`.
+  2. Update `docs/AGENT_ORCHESTRATION.md` "Current cycle" to point at
+     the next cycle's brief.
+  3. Mark the just-closed cycle `done` in the campaign manifest.
+  4. Commit with `docs(campaign): advance to <next-cycle-slug>`.
+  5. Re-enter the dispatch loop for the next cycle. Do NOT prompt the
+     human. Do NOT spawn a new orchestrator session.
+
+Hard-stops always halt the campaign and surface to the human, regardless
+of shape. Stops:
 - Fence change proposed
 - >2 CI red / blocked in a single round
 - Perf regression >5% p99 on combat120
@@ -153,10 +174,16 @@ Hard-stops always halt the campaign and surface to the human. Stops:
 - isolation=worktree failure
 - Reviewer returns CHANGES-REQUESTED twice on the same task
 
-When a hard-stop fires: stop the campaign, set the failed cycle's status
-in the campaign manifest to `BLOCKED` with a one-line cause, leave
-"Current cycle" pointing at the failed cycle so a human resume picks up
-where you left off, and print a clear summary.
+When a hard-stop fires on a large campaign: stop the campaign, set the
+failed cycle's status in the campaign manifest to `BLOCKED` with a
+one-line cause, leave "Current cycle" pointing at the failed cycle so a
+human resume picks up where you left off, and print a clear summary. For
+small campaigns: mark the failing cycle in the inline `## Active cycles`
+block as `BLOCKED`, leave the rest as-is, and print the summary.
+
+Owner-gated / hold-list cycles live in `docs/BACKLOG.md` under
+"Owner-gated cycles" (not inside campaign manifests). Do not auto-promote
+hold-list entries.
 
 ## Autonomous-loop posture (2026-05-16, `/goal`-aligned runs)
 

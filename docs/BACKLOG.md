@@ -14,6 +14,19 @@ record, not current state.
 
 See [docs/DIRECTIVES.md](DIRECTIVES.md).
 
+## Owner-gated cycles
+
+Cycles queued but explicitly **not** auto-promoted. Each waits on the named
+owner-gate before re-queuing. Live source-of-truth (was previously
+duplicated inside campaign manifests; the manifests are archived).
+
+| slug | gate | scope |
+|---|---|---|
+| `cycle-vekhikl-seat-swaps` | owner signs off on `cycle-vekhikl-player-boarding-wire` playtest evidence (deferred row in `docs/PLAYTEST_PENDING.md`) | pilot↔gunner seat swap on M48 + PBR |
+| `cycle-vekhikl-5-fleet-expansion` | owner signs off on both `cycle-vehicle-wayfinding-and-prompts` and `cycle-vekhikl-player-boarding-wire` playtest evidence | M113 APC + M35 truck + T-54 tank (+ optional ZU-23-2 AA + LCM-8) |
+| `cycle-sky-screen-space-quad` | `cycle-skylut-resolution-bump` shipped but owner playtest still shows visible artifacts | Hillaire-style screen-space sky rework |
+| `cycle-stabilizat-1-baselines-refresh` | owner re-queues (removed from post-WebGPU campaign 2026-05-18) | STABILIZAT-1 / combat120 baseline refresh on a quiet machine |
+
 ## Active Branch (task/mode-startup-terrain-spike)
 
 Opened 2026-05-13 for the user-reported "click a game mode and it takes

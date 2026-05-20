@@ -86,32 +86,47 @@ closed ID that was not in the Active list at cycle start. Existing
 zero-cycle entries already in `Closed` are historical record and are NOT
 retroactively flagged; the check applies only to new entries.
 
-### Campaign auto-advance (Phase 0 + realignment plan, 2026-05-09)
+### Campaign auto-advance (Phase 0 + realignment plan, 2026-05-09; trimmed 2026-05-20)
 
-A **campaign** is an ordered sequence of cycles queued in
-[docs/archive/CAMPAIGN_2026-05-09.md](archive/CAMPAIGN_2026-05-09.md). When the active
-campaign declares `auto-advance: yes`, the orchestrator chains cycles
-without human input:
+A **campaign** is a coordinated batch of cycles. There are two shapes:
 
-1. Run the current cycle's dispatch loop normally.
-2. At end-of-cycle, run the ritual (move briefs, append BACKLOG, refresh
-   `docs/CARRY_OVERS.md` via `npm run check:cycle -- <slug> --close`).
-3. Read the campaign manifest. If a `next-cycle` is queued and not
-   gated by a hard-stop, update this file's "Current cycle" section to
-   point at the next cycle's brief and **continue without prompting**.
-4. Hard-stops still surface and halt the campaign:
-   - Fence-change proposal in any executor report
-   - >2 CI red or blocked tasks in a single round
-   - Perf regression >5% p99 on `combat120` after any round
-   - Carry-over count grew during a cycle (cycle becomes INCOMPLETE; campaign halts)
-   - Any executor reports `isolation=worktree` failure
-5. Hard-stops surface as: print the failure summary, set "Current cycle"
-   in this file to the **failed** cycle (with status `INCOMPLETE` /
-   `BLOCKED`), and halt. The human resumes the campaign manually.
+- **Small (≤3 cycles, typically parallel):** No separate manifest file.
+  List the active cycles inline in this file's `## Active cycles` block
+  (under "Current cycle"). The orchestrator dispatches all R1 tasks
+  across the listed cycles in parallel; no `next-cycle` chaining is
+  needed because the cycles are concurrent. Hold-list / owner-gated
+  cycles live in `docs/BACKLOG.md` "Owner-gated cycles" section.
+- **Large (≥4 sequenced cycles):** Use a campaign manifest at
+  `docs/CAMPAIGN_<date>-<slug>.md` with the queue, `auto-advance`
+  flag, and posture declarations. The orchestrator chains the
+  sequenced cycles per the manifest:
+  1. Run the current cycle's dispatch loop normally.
+  2. At end-of-cycle, run the ritual (move briefs, append BACKLOG,
+     refresh `docs/CARRY_OVERS.md` via
+     `npm run check:cycle -- <slug> --close`).
+  3. Read the campaign manifest. If a `next-cycle` is queued and not
+     gated by a hard-stop, update this file's "Current cycle" section
+     to point at the next cycle's brief and **continue without
+     prompting**.
+  4. Hard-stops still surface and halt the campaign:
+     - Fence-change proposal in any executor report
+     - >2 CI red or blocked tasks in a single round
+     - Perf regression >5% p99 on `combat120` after any round
+     - Carry-over count grew during a cycle (cycle becomes INCOMPLETE; campaign halts)
+     - Any executor reports `isolation=worktree` failure
+  5. Hard-stops surface as: print the failure summary, set "Current
+     cycle" in this file to the **failed** cycle (with status
+     `INCOMPLETE` / `BLOCKED`), and halt. The human resumes the
+     campaign manually.
 
-Without `auto-advance: yes`, the orchestrator stops after each cycle close
-and waits for the next `/orchestrate` invocation. That's the legacy
-single-cycle pattern.
+Without `auto-advance: yes` (or for small campaigns where no manifest
+exists), the orchestrator stops after each cycle close and waits for
+the next `/orchestrate` invocation. That's the legacy single-cycle
+pattern.
+
+Archived campaign manifests stay where they are
+(`docs/archive/CAMPAIGN_*.md`) as historical record; do not delete or
+backfill them.
 
 ### Autonomous-loop posture (2026-05-16, `/goal`-aligned runs)
 
@@ -164,6 +179,22 @@ standalone bookkeeping pass):
 4. Commit with message `docs: close <cycle-id>`.
 
 The stub template under "Current cycle" is what the next cycle fills in.
+
+**"Current cycle" template shape (small campaigns, ≤3 cycles).** When
+running a small campaign, fill in an `## Active cycles` block under
+"Current state" instead of authoring a separate campaign manifest:
+
+```
+## Active cycles
+- cycle-<slug-a> — <one-line scope> — <ID-list>
+- cycle-<slug-b> — <one-line scope> — <ID-list>
+- cycle-<slug-c> — <one-line scope> — <ID-list>
+
+(Optional: posture/auto-advance flags, hard-stops, owner-gated triggers)
+```
+
+For larger campaigns (≥4 sequenced cycles) point "Current state" at the
+manifest file as usual.
 
 ## Current state
 
