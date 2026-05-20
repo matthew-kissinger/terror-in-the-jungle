@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-18 (CAMPAIGN CUT at cycle #12 per owner direction; cycles #1-#12 closed; cycle #13 `cycle-stabilizat-1-baselines-refresh` removed from scope; no active cycle — orchestrator idle until owner queues next work)
+Last verified: 2026-05-19 (new parallel campaign queued: [docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md) — three independent cycles dispatched in parallel; concurrency cap 9; previous post-WebGPU campaign cut at cycle #12 on 2026-05-18)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,29 +154,53 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: NONE (campaign closed)
+## Current cycle: PARALLEL (campaign 2026-05-19 visual-and-wayfinding — 3 cycles concurrent)
 
-**Status:** No active cycle. The 13-cycle post-WebGPU campaign was
-**cut at cycle #12** per owner direction on 2026-05-18. Cycle #13
-`cycle-stabilizat-1-baselines-refresh` was removed from scope and
-may be re-queued later as a standalone cycle.
+**Status:** Active parallel campaign. Three independent cycles
+dispatch concurrently under
+[docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md).
+The campaign explicitly exists to run cycles in parallel because
+their target subsystems are disjoint (sky / terrain / UI+vehicle).
 
-**Last cycle closed:** `cycle-sun-and-atmosphere-overhaul` (cycle
-#12) — 6 PRs (#269-#274). Closes: KB-SKY-DEEP (opened+closed
-in-cycle), HosekWilkieSkyBackend half of `konveyer-large-file-splits`.
-Two follow-up notes carried in
+**Posture:** `auto-advance: yes` + `posture: autonomous-loop`.
+
+**Concurrency cap:** 9 across the campaign (2 + 3 + 4 across R1 of
+the three cycles). Per-cycle cap declared in each cycle's brief.
+
+**Cycles in flight:**
+
+| # | Slug | R1 tasks | Reviewer | Brief |
+|---|------|----------|----------|-------|
+| 1 | `cycle-skylut-resolution-bump` | `skylut-resolution-bump`, `skylut-playtest-evidence` | none mandatory (optional perf-analyst) | [brief](tasks/cycle-skylut-resolution-bump.md) |
+| 2 | `cycle-ashau-edge-and-flow-tuning` | `dem-edge-taper`, `route-stamp-slope-guard`, `ashau-water-enable` | `terrain-nav-reviewer` mandatory on all three | [brief](tasks/cycle-ashau-edge-and-flow-tuning.md) |
+| 3 | `cycle-vehicle-wayfinding-and-prompts` | `vehicle-proximity-prompt`, `minimap-vehicle-markers`, `fullmap-vehicle-markers`, `compass-vehicle-markers` (stretch) | none mandatory | [brief](tasks/cycle-vehicle-wayfinding-and-prompts.md) |
+
+Each cycle has its own R2 (playtest-evidence) round. The campaign
+closes when all three cycles close.
+
+**Dependencies (DAG):** none. Disjoint subsystems.
+
+**Hard-stops (campaign-level, in addition to per-cycle):**
+- ≥ 2 of 3 cycles hit a hard-stop in the same dispatch round →
+  flip auto-advance to `PAUSED`.
+- Carry-over count grows across the campaign (sum > 0) → halt.
+- Fence-change proposal in any executor report → halt.
+- `combat120` p99 regresses > 5% vs cycle #12 close baseline (soft
+  gate; baselines warn-stamped per STABILIZAT-1).
+
+**Last cycle closed before this campaign:**
+`cycle-sun-and-atmosphere-overhaul` (post-WebGPU campaign cycle
+#12) — 6 PRs (#269-#274). Two follow-up notes carry forward,
+recorded in
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md):
-(a) spike memo's strict `r < 0.5 * max(g, b)` night-red assertion
-is over-tight (fails its own MOON_COLOR target); soft sense
-`r ≤ max(g, b)` is canonical. (b) Per-preset
+(a) strict `r < 0.5 * max(g, b)` night-red assertion is over-tight;
+soft sense `r ≤ max(g, b)` is canonical. (b) Per-preset
 `computeSunDirectionAtTime` elevation envelope sanity check —
-confirm natural-time path reaches sub-(-8°) elevation in each
-preset; the playtest capture script bypassed via
-`backend.update()` direct call to verify the fix structurally.
+captured in cycle #1's playtest evidence of this campaign as an
+observation (not fixed here).
 
-**Resume:** when the owner queues new work, the orchestrator
-re-mirrors the next cycle's brief into this section per the cycle
-lifecycle ritual above and re-enters dispatch.
+**Resume:** orchestrator may re-enter dispatch on any incomplete
+cycle by reading this section + the cycle's brief.
 
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,

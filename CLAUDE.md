@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-18 (post `cycle-sun-and-atmosphere-overhaul` close; CAMPAIGN CUT at cycle #12 per owner direction; cycle #13 `cycle-stabilizat-1-baselines-refresh` removed from scope; no active cycle)
+Last verified: 2026-05-19 (new parallel campaign queued [docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md); 3 cycles dispatched concurrently; previous post-WebGPU campaign was cut at cycle #12 on 2026-05-18)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,13 +46,47 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active cycle (2026-05-18):** NONE. The 13-cycle post-WebGPU
-campaign was **cut at cycle #12** per owner direction on 2026-05-18.
-Cycle #13 `cycle-stabilizat-1-baselines-refresh` was removed from
-scope and may be re-queued later as a standalone cycle. Cycles #1
-through #12 all closed; 66 PRs merged across the campaign.
+**Active campaign (2026-05-19): visual-and-wayfinding (parallel).**
+Three independent cycles dispatched concurrently per
+[docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md).
+Disjoint subsystems → no DAG → run side-by-side. Concurrency cap **9**
+(sum of R1 task counts: 2 + 3 + 4). Posture: `auto-advance: yes` +
+`posture: autonomous-loop`. Each cycle closes independently per its
+own brief; the campaign closes when all three close.
 
-The queue (cycles #1-#12 closed; #13 SKIPPED out-of-scope):
+1. `cycle-skylut-resolution-bump` — fix Open Frontier midday "dark
+   spots" + horizon-banding by bumping the sky LUT from 32×8 to
+   32×32. Single file (`HosekWilkieSkyBackend.ts`). No mandatory
+   reviewer. [brief](docs/tasks/cycle-skylut-resolution-bump.md)
+2. `cycle-ashau-edge-and-flow-tuning` — three R1 landings:
+   **Stage D3 DEM edge taper** in `DEMHeightProvider.ts` (closes
+   the deferred D3 of `cycle-2026-05-09-cdlod-edge-morph`; fixes
+   the tall vertical "fins" at A Shau map edge); **slope-aware
+   route stamping** in `TerrainFlowCompiler.ts` +
+   `AShauValleyConfig.ts` (drapes route corridors instead of
+   flattening on steep hillsides — kills visible "trenches"); and
+   **A Shau `waterEnabled` flip** so the hydrology river surface
+   renders (sampan stops sitting on dry dirt). `terrain-nav-reviewer`
+   mandatory on all three R1 PRs.
+   [brief](docs/tasks/cycle-ashau-edge-and-flow-tuning.md)
+3. `cycle-vehicle-wayfinding-and-prompts` — four R1 landings (one
+   stretch): **"Press F to board" HUD prompt** via
+   `InteractionPromptPanel` + new `GroundVehicleProximityChecker`;
+   **minimap markers** for M151 / M48 / Sampan / PBR / M2HB (reuses
+   helipad-marker pipeline); **full-map markers** (same pipeline at
+   the M-key world-map layer); **compass bearing markers** (stretch
+   — drops if R1 budget tight). Lists
+   `cycle-vekhikl-5-fleet-expansion` (M113 APC + M35 truck + T-54
+   tank, optional ZU-23-2 AA + LCM-8) in the campaign hold list as
+   a follow-up gated on owner playtest sign-off.
+   [brief](docs/tasks/cycle-vehicle-wayfinding-and-prompts.md)
+
+**Previous campaign (closed 2026-05-18):** the 13-cycle post-WebGPU
+campaign was cut at cycle #12 per owner direction. Cycles #1–#12
+closed; 66 PRs merged.  Cycle #13
+`cycle-stabilizat-1-baselines-refresh` was removed from scope; may
+be re-queued as a standalone cycle later. The queue (cycles #1-#12
+closed; #13 SKIPPED out-of-scope):
 1. `cycle-sky-visual-restore` → KB-SKY-BLAND fix. **DONE** (`fd646aeb`).
 2. `cycle-mobile-webgl2-fallback-fix` → KB-MOBILE-WEBGPU fix (real-device validation = merge gate). **DONE** (`7931d179`).
 3. `cycle-konveyer-11-spatial-grid-compute` → DEFEKT-3 (cover spatial grid). **DONE** (`b86cf027`).
@@ -95,10 +129,10 @@ discipline, parallel R&D protocol, and reporting standard.
 
 Phases 0/1/2/2.4/2.5 done. Phases 3–9 queued (refactor campaign,
 deprioritized behind the WebGPU + ground-vehicle vision directions).
-**Campaign closed 2026-05-18 at cycle #12.** Auto-advance is
-stopped. To launch new work, queue a fresh cycle in
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
-or open a new campaign manifest.
+Post-WebGPU campaign closed 2026-05-18 at cycle #12; the
+2026-05-19 visual-and-wayfinding campaign now runs (above). To
+queue additional work, append to that manifest or open a fresh
+campaign manifest.
 
 For full context (audit findings, Phases 0–2 outcomes, Phase 3+ scope):
 [docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md).
@@ -122,9 +156,12 @@ carry-overs to respect ≤12 limit; bundle into next cycle that touches
 relevant area): A Shau test claim softening; perf ceiling 1.0→2.0ms if
 flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
-Campaign manifest:
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
-(CLOSED 2026-05-18 at cycle #12; cycle #13 SKIPPED out-of-scope; 66 PRs merged across cycles #1-#12).
+Campaign manifests:
+- [docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
+  — **active**, 3 parallel cycles.
+- [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+  — closed 2026-05-18 at cycle #12; cycle #13 SKIPPED out-of-scope;
+  66 PRs merged across cycles #1-#12.
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle
