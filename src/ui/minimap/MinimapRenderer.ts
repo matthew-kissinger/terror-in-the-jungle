@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { isBlufor } from '../../systems/combat/types';
+import { Faction, isBlufor } from '../../systems/combat/types';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
@@ -29,6 +29,21 @@ export type HelipadMarker = {
   position: THREE.Vector3;
 };
 
+/**
+ * Minimap marker for a drivable / boardable vehicle or stationary
+ * emplacement. Sibling of `HelipadMarker`. Populated per-frame by
+ * `MinimapSystem` from `VehicleManager.getVehiclesByCategory(...)` so
+ * positions follow moving vehicles. Shared with `FullMapSystem` (which
+ * imports this type from `MinimapRenderer`) so the minimap and full map
+ * agree on category + faction coding.
+ */
+export type VehicleMarker = {
+  worldPos: THREE.Vector3;
+  category: 'ground' | 'watercraft' | 'emplacement';
+  faction: Faction;
+  vehicleType: string;
+};
+
 type MinimapRenderState = {
   ctx: CanvasRenderingContext2D;
   size: number;
@@ -42,6 +57,7 @@ type MinimapRenderState = {
   playerSquadId?: string;
   commandPosition?: THREE.Vector3;
   helipadMarkers?: HelipadMarker[];
+  vehicleMarkers?: VehicleMarker[];
   mapIntelPolicy?: MapIntelPolicyConfig;
   terrainFlowPaths?: TerrainFlowPath[];
 };
@@ -69,6 +85,7 @@ export function renderMinimap(state: MinimapRenderState): void {
   drawCombatantIndicators(ctx, state, renderScale);
   drawStrategicAgents(ctx, state, renderScale);
   drawHelipadMarkers(ctx, state, renderScale);
+  drawVehicleMarkers(ctx, state, renderScale);
 
   if (state.commandPosition) {
     drawCommandMarker(ctx, state, renderScale);
@@ -432,6 +449,98 @@ function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderS
       ctx.fillText('H', x, y);
     }
   }
+}
+
+/**
+ * Per-category glyph drawn at the marker's projected position. Pure
+ * canvas primitives so the minimap signposts work without pulling in
+ * additional PNG assets; matches the helipad fallback path (the "H"
+ * letter) in spirit. Glyphs are intentionally small so they stay
+ * legible at every minimap zoom level.
+ *
+ * - ground (jeep / tank): rounded rectangle (vehicle silhouette).
+ * - watercraft (sampan / PBR): pointed boat outline.
+ * - emplacement (M2HB): X-cross to read as "fixed gun pickup".
+ */
+function drawVehicleGlyph(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  category: VehicleMarker['category'],
+  radius: number,
+): void {
+  switch (category) {
+    case 'ground': {
+      // Vehicle body silhouette: rounded rect.
+      const w = radius * 2;
+      const h = radius * 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x - w / 2, y - h / 2);
+      ctx.lineTo(x + w / 2, y - h / 2);
+      ctx.lineTo(x + w / 2, y + h / 2);
+      ctx.lineTo(x - w / 2, y + h / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'watercraft': {
+      // Boat silhouette: pointed at one end, square at the other.
+      ctx.beginPath();
+      ctx.moveTo(x - radius, y - radius * 0.5);
+      ctx.lineTo(x + radius * 0.6, y - radius * 0.5);
+      ctx.lineTo(x + radius, y);
+      ctx.lineTo(x + radius * 0.6, y + radius * 0.5);
+      ctx.lineTo(x - radius, y + radius * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'emplacement': {
+      // X-cross: stationary fixed weapon.
+      const r = radius * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(x - r, y - r);
+      ctx.lineTo(x + r, y + r);
+      ctx.moveTo(x + r, y - r);
+      ctx.lineTo(x - r, y + r);
+      ctx.stroke();
+      break;
+    }
+  }
+}
+
+function drawVehicleMarkers(
+  ctx: CanvasRenderingContext2D,
+  state: MinimapRenderState,
+  renderScale: number,
+): void {
+  if (!state.vehicleMarkers || state.vehicleMarkers.length === 0) return;
+
+  const scale = state.size / state.worldSize;
+  const baseRadius = 4 * renderScale;
+
+  ctx.save();
+  ctx.lineWidth = 1.25 * renderScale;
+
+  for (const marker of state.vehicleMarkers) {
+    const { x, y } = worldToMinimap(marker.worldPos, state, scale);
+    if (x < -baseRadius || x > state.size + baseRadius || y < -baseRadius || y > state.size + baseRadius) continue;
+
+    // Faction palette: matches the combatant-dot palette so player can
+    // visually tie a vehicle to "the blue side" / "the red side" at a
+    // glance. US blue (rgba 91,140,201) / OPFOR red (rgba 201,86,74).
+    const friendly = isBlufor(marker.faction);
+    const fillColor = friendly ? 'rgba(91, 140, 201, 0.85)' : 'rgba(201, 86, 74, 0.85)';
+    const strokeColor = friendly ? 'rgba(220, 230, 245, 0.95)' : 'rgba(245, 220, 220, 0.95)';
+
+    ctx.fillStyle = fillColor;
+    ctx.strokeStyle = strokeColor;
+    drawVehicleGlyph(ctx, x, y, marker.category, baseRadius);
+  }
+
+  ctx.restore();
 }
 
 function worldToMinimap(

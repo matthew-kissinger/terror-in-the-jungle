@@ -183,6 +183,13 @@ function wireVehicleRuntime(
     runtime.fullMapSystem.setHelipadMarkers(markers);
   });
 
+  // Inject the vehicle manager so the minimap can pull drivable /
+  // boardable vehicle positions per-frame. Guarded so older test
+  // doubles without `setVehicleManager` keep working.
+  if (typeof runtime.minimapSystem.setVehicleManager === 'function') {
+    runtime.minimapSystem.setVehicleManager(runtime.vehicleManager);
+  }
+
   if (typeof runtime.helicopterModel.configureDependencies === 'function') {
     runtime.helicopterModel.configureDependencies({
       terrainManager: runtime.terrainSystem,

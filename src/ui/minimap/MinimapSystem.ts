@@ -5,7 +5,8 @@ import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { createMinimapDOM } from './MinimapDOMBuilder';
 import { DEFAULT_WORLD_SIZE, MINIMAP_SIZE } from './MinimapStyles';
-import { renderMinimap, HelipadMarker } from './MinimapRenderer';
+import { renderMinimap, HelipadMarker, VehicleMarker } from './MinimapRenderer';
+import type { IVehicle } from '../../systems/vehicle/IVehicle';
 import { isMobileViewport } from '../../utils/DeviceDetector';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
@@ -13,6 +14,24 @@ import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes'
 
 // Reusable scratch vectors to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
+
+/**
+ * Minimal contract MinimapSystem needs from VehicleManager. Kept
+ * structural so the minimap can be tested without standing up the full
+ * vehicle subsystem, and so the composer wire stays a single line.
+ */
+export interface MinimapVehicleSource {
+  getVehiclesByCategory(category: 'ground' | 'watercraft' | 'emplacement'): readonly IVehicle[];
+}
+
+// Categories of drivable / boardable vehicles surfaced on the minimap.
+// Helicopters and fixed-wing are intentionally excluded -- the existing
+// helipad markers already provide aircraft signposting.
+const VEHICLE_MARKER_CATEGORIES: ReadonlyArray<'ground' | 'watercraft' | 'emplacement'> = [
+  'ground',
+  'watercraft',
+  'emplacement',
+];
 
 export class MinimapSystem implements GameSystem {
   private camera: THREE.Camera;
@@ -22,6 +41,8 @@ export class MinimapSystem implements GameSystem {
   private playerSquadId?: string;
   private commandPosition?: THREE.Vector3;
   private helipadMarkers: HelipadMarker[] = [];
+  private vehicleMarkers: VehicleMarker[] = [];
+  private vehicleSource?: MinimapVehicleSource;
   private terrainFlowPaths: TerrainFlowPath[] = [];
   private mapIntelPolicy: MapIntelPolicyConfig = {
     tacticalRangeOverride: null,
@@ -125,8 +146,31 @@ export class MinimapSystem implements GameSystem {
     this.camera.getWorldDirection(_v1);
     this.playerRotation = Math.atan2(_v1.x, -_v1.z);
 
+    // Refresh vehicle markers from the source each tick so moving
+    // jeeps, tanks, sampans, and PBRs follow the world. Emplacements
+    // are stationary but pulled by the same loop -- they're free.
+    if (this.vehicleSource) {
+      this.refreshVehicleMarkers(this.vehicleSource);
+    }
+
     // Throttling is handled by SystemUpdater's tacticalUiAccumulator (20Hz).
     this.renderMinimap();
+  }
+
+  private refreshVehicleMarkers(source: MinimapVehicleSource): void {
+    this.vehicleMarkers.length = 0;
+    for (const category of VEHICLE_MARKER_CATEGORIES) {
+      const vehicles = source.getVehiclesByCategory(category);
+      for (const vehicle of vehicles) {
+        if (vehicle.isDestroyed()) continue;
+        this.vehicleMarkers.push({
+          worldPos: vehicle.getPosition().clone(),
+          category,
+          faction: vehicle.faction,
+          vehicleType: vehicle.vehicleId,
+        });
+      }
+    }
   }
 
   /** Re-parent minimap into a grid slot (called after init). */
@@ -182,6 +226,29 @@ export class MinimapSystem implements GameSystem {
     this.helipadMarkers = markers;
   }
 
+  /**
+   * Inject the vehicle data source. The minimap pulls markers from it
+   * every tick so player-drivable vehicles (jeep / tank / sampan / PBR)
+   * and stationary emplacements (M2HB) stay on the minimap as players
+   * drive them around. Pass `undefined` to suspend vehicle markers
+   * (e.g. game-mode teardown).
+   */
+  setVehicleManager(source: MinimapVehicleSource | undefined): void {
+    this.vehicleSource = source;
+    if (!source) {
+      this.vehicleMarkers.length = 0;
+    }
+  }
+
+  /**
+   * Direct setter -- bypasses the per-frame pull for tests and any
+   * caller that wants to drive vehicle markers explicitly (e.g. a
+   * replay viewer).
+   */
+  setVehicleMarkers(markers: VehicleMarker[]): void {
+    this.vehicleMarkers = markers.slice();
+  }
+
   setTerrainFlowPaths(paths: TerrainFlowPath[]): void {
     this.terrainFlowPaths = paths.slice();
   }
@@ -191,6 +258,12 @@ export class MinimapSystem implements GameSystem {
   }
 
   private renderMinimap(): void {
+    // jsdom-style environments without the `canvas` package return a
+    // null 2D context. Skip rendering in that case so per-frame logic
+    // (e.g. the vehicle-marker refresh) stays testable without
+    // standing up a real WebGL canvas.
+    if (!this.minimapContext) return;
+
     renderMinimap({
       ctx: this.minimapContext,
       size: this.MINIMAP_SIZE,
@@ -204,6 +277,7 @@ export class MinimapSystem implements GameSystem {
       playerSquadId: this.playerSquadId,
       commandPosition: this.commandPosition,
       helipadMarkers: this.helipadMarkers,
+      vehicleMarkers: this.vehicleMarkers,
       mapIntelPolicy: this.mapIntelPolicy,
       terrainFlowPaths: this.terrainFlowPaths,
     });

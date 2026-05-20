@@ -82,6 +82,7 @@ function createRefs() {
     },
     minimapSystem: {
       setHelipadMarkers: vi.fn(),
+      setVehicleManager: vi.fn(),
       setWarSimulator: vi.fn(),
     },
     npcVehicleController: {
@@ -107,6 +108,7 @@ function createRefs() {
     },
     ticketSystem: {},
     vehicleManager: {
+      getVehiclesByCategory: vi.fn(() => []),
       spawnScenarioM2HBEmplacements: vi.fn(() => ['m2hb_scenario_id']),
       spawnScenarioM48Tanks: vi.fn(() => ['m48_scenario_id']),
       spawnScenarioPBRs: vi.fn(() => ['pbr_scenario_id']),
@@ -198,6 +200,7 @@ describe('OperationalRuntimeComposer', () => {
     expect(refs.fullMapSystem.setHelipadMarkers).toHaveBeenCalledWith([
       { id: 'hp-alpha', position: new THREE.Vector3(10, 2, 20) },
     ]);
+    expect(refs.minimapSystem.setVehicleManager).toHaveBeenCalledWith(refs.vehicleManager);
 
     const combatantProvider = getCombatantProvider();
     expect(combatantProvider).toBeDefined();
