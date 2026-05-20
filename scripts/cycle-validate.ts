@@ -29,6 +29,7 @@
  *   2  invocation error
  */
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -166,6 +167,182 @@ interface CarryRow {
   cycleOpenIdx: number; // index into split cells; -1 if not a data row
 }
 
+/**
+ * Extract every carry-over ID listed in the Active table of a
+ * `docs/CARRY_OVERS.md` body. Active rows are pipe-delimited markdown
+ * table rows under a `## Active` heading; the ID is the first non-empty
+ * cell after the leading pipe.
+ */
+export function extractActiveCarryOverIds(body: string): Set<string> {
+  return extractIdsFromSection(body, /^##\s+Active\s*$/i, /^##\s+/);
+}
+
+/**
+ * Extract every carry-over ID listed in the Closed section of a
+ * `docs/CARRY_OVERS.md` body. Closed entries are bullet rows like
+ * `- <ID> | <title> | closed in <cycle-id> | resolution`; the ID is the
+ * leading token before the first ` | ` separator.
+ */
+export function extractClosedCarryOverIds(body: string): Set<string> {
+  const ids = new Set<string>();
+  const lines = body.split(/\r?\n/);
+  let inClosed = false;
+  for (const line of lines) {
+    if (/^##\s+Closed\s*$/i.test(line)) {
+      inClosed = true;
+      continue;
+    }
+    if (inClosed && /^##\s+/.test(line)) {
+      inClosed = false;
+      continue;
+    }
+    if (!inClosed) continue;
+
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('- ')) continue;
+    // Format: "- <ID> | <title> | closed in <cycle-id> | resolution"
+    const rest = trimmed.slice(2);
+    const pipeIdx = rest.indexOf('|');
+    if (pipeIdx < 0) continue;
+    const id = rest.slice(0, pipeIdx).trim();
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+function extractIdsFromSection(
+  body: string,
+  startRe: RegExp,
+  stopRe: RegExp,
+): Set<string> {
+  const ids = new Set<string>();
+  const lines = body.split(/\r?\n/);
+  let inSection = false;
+  let headerSeen = false;
+  for (const line of lines) {
+    if (startRe.test(line)) {
+      inSection = true;
+      headerSeen = false;
+      continue;
+    }
+    if (inSection && stopRe.test(line)) {
+      inSection = false;
+      continue;
+    }
+    if (!inSection) continue;
+    const trimmed = line.trim();
+    if (trimmed.startsWith('| ID ') || trimmed.startsWith('| Title ')) {
+      headerSeen = true;
+      continue;
+    }
+    if (/^\|[\s:|-]+\|$/.test(trimmed)) continue;
+    if (!headerSeen) continue;
+    if (!trimmed.startsWith('|')) continue;
+    const cells = trimmed.split('|');
+    if (cells.length < 3) continue;
+    const id = cells[1]?.trim();
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+
+/**
+ * Find every carry-over ID that was opened AND closed inside a single
+ * cycle. A zero-cycle entry is one that appears in `endBody`'s Closed
+ * section but did NOT exist in `startBody` (neither in `startBody`'s
+ * Active list nor in `startBody`'s Closed list). Existing zero-cycle
+ * entries already present in `startBody`'s Closed are historical record
+ * and never flagged.
+ *
+ * Pure: no I/O. Caller supplies both bodies.
+ */
+export function findZeroCycleCarryOvers(
+  startBody: string,
+  endBody: string,
+): string[] {
+  const startActive = extractActiveCarryOverIds(startBody);
+  const startClosed = extractClosedCarryOverIds(startBody);
+  const endClosed = extractClosedCarryOverIds(endBody);
+
+  const offenders: string[] = [];
+  for (const id of endClosed) {
+    if (startClosed.has(id)) continue; // already historical
+    if (startActive.has(id)) continue; // legitimate close of a ≥2-cycle entry
+    offenders.push(id);
+  }
+  return offenders;
+}
+
+/**
+ * Read the cycle-start CARRY_OVERS.md body from git. The cycle-start ref
+ * is the merge-base of the current HEAD with `origin/master` — that's the
+ * commit the cycle branched from. Returns `null` when git isn't available
+ * or the file didn't exist at the merge-base (e.g. fresh repo).
+ */
+function readCycleStartCarryOversBody(): string | null {
+  let mergeBase: string;
+  try {
+    mergeBase = execFileSync('git', ['merge-base', 'HEAD', 'origin/master'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    try {
+      mergeBase = execFileSync('git', ['merge-base', 'HEAD', 'master'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+    } catch {
+      return null;
+    }
+  }
+  if (!mergeBase) return null;
+  try {
+    return execFileSync(
+      'git',
+      ['show', `${mergeBase}:docs/CARRY_OVERS.md`],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cycle-close gate (framework recovery Pass 2 R2.2, 2026-05-20).
+ * Diffs the current CARRY_OVERS.md against the cycle-start snapshot.
+ * Prints FAIL and returns false when any new ID was opened+closed in the
+ * same cycle. Returns true on clean (or when no snapshot is available —
+ * the gate is best-effort, not a hard block on environments without git).
+ */
+function runZeroCycleCarryOverCheck(slug: string): boolean {
+  let endBody: string;
+  try {
+    endBody = readFileSync(CARRY_PATH, 'utf8');
+  } catch {
+    return true; // no file, no check
+  }
+  const startBody = readCycleStartCarryOversBody();
+  if (startBody === null) {
+    console.log(
+      `[cycle-validate] zero-cycle check skipped — could not resolve cycle-start CARRY_OVERS.md from git.`,
+    );
+    return true;
+  }
+  const offenders = findZeroCycleCarryOvers(startBody, endBody);
+  if (offenders.length === 0) {
+    console.log(`[cycle-validate] OK — zero-cycle carry-over check passed.`);
+    return true;
+  }
+  for (const id of offenders) {
+    console.error(
+      `[cycle-validate] FAIL: zero-cycle carry-over ${id} detected in cycle ${slug}. ` +
+        `Move to PR description user-observable gap line.`,
+    );
+  }
+  return false;
+}
+
 function incrementCarryovers(): { changed: boolean; activeCount: number } {
   let content: string;
   try {
@@ -276,6 +453,10 @@ function main(): void {
   }
 
   if (closeMode) {
+    const zeroCycleOk = runZeroCycleCarryOverCheck(slug);
+    if (!zeroCycleOk) {
+      process.exit(1);
+    }
     const { changed, activeCount } = incrementCarryovers();
     console.log(
       `[cycle-validate] carry-overs: ${activeCount} active, ${changed ? 'incremented' : 'unchanged'}.`,
