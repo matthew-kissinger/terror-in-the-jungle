@@ -44,6 +44,41 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-framework-recovery-pass-2)
+
+Pass 2 of the framework recovery plan
+([docs/archive/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](archive/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md);
+self-archived by R2.3 per the plan's own instruction). Closes the
+governance debt named in the plan's signal-vs-noise table: status
+mirrored across 6 docs, 500-line cycle briefs killing executors,
+campaign-manifest abstraction for ≤3-cycle parallel runs adding a third
+nesting level for no payoff, zero-cycle carry-over bookkeeping, and the
+unreliable sandbox push from agent worktrees. **6 PRs merged across R1
++ R2; R1.3 (CI shared-setup job) deferred** because the cache plumbing
+broke on cross-workspace paths and the wall-clock win is incremental on
+top of Pass 1's path-filter doctor PR.
+
+### R1 (4 dispatched, 3 merged, 1 deferred)
+
+- [#307](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/307) `677fe2a4` `directives-slim-refactor` — `docs/DIRECTIVES.md` 303 → 76 LOC (table-row-per-directive); 13 per-id memo files under `docs/directives/<id>.md`; new sibling test `docs/DIRECTIVES.test.ts` (4 cases, structure parsing) + one-line addition of `docs/**/*.test.ts` to `vitest.config.ts`.
+- [#306](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/306) `7d94a0ec` `brief-template-slim` — new `docs/tasks/_TEMPLATE.md` (≤80 LOC); `scripts/cycle-validate.ts` LOC warn at 100+ / 150+; `scripts/cycle-validate.test.ts` extension. The cycle-framework-recovery-pass-2 brief itself trips the new WARN at 113 LOC (surfaced as expected validator behavior).
+- [#305](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/305) `50170d5a` `sandbox-push-fix-or-document` — DOCUMENT route taken: `.claude/settings.local.json` keeps `Bash(git push:*)` under `ask` and is intentionally untracked, so the orchestrator-push protocol is codified in `docs/AGENT_ORCHESTRATION.md` §"Dispatch protocol" step 4 + `.claude/agents/executor.md` ground rule + report format. Executors that hit sandbox-block report `pr_url: blocked-by-sandbox` and the orchestrator pushes from the main session.
+- [#304](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/304) `ci-shared-setup-job` — **CLOSED DEFERRED**. The `setup` job ran green but `actions/cache/save@v4` failed to save `../game-field-kits` (path outside `GITHUB_WORKSPACE`), so all 6 downstream jobs failed with `fail-on-cache-miss: true`. Fix-forward path: drop game-field-kits from the cache; each downstream job re-checkouts it (~10-30 s). Wall-clock win is incremental on top of the Pass 1 doctor PR's path-filter wins, so not load-bearing. Can be re-attempted in a future targeted CI cycle.
+
+### R2 (3 dispatched, 3 merged)
+
+- [#310](https://github.com/matthew-kissinger/terref-in-the-jungle/pull/310) `ecba36ee` `status-mirror-consolidation` — 78 files changed, +31 / -468 lines. CLAUDE.md 220 → 34; AGENT_ORCHESTRATION.md 402 → 306; BACKLOG.md 599 → 570; README.md 320 → 305. Bulk strip of `Last verified:` / `Last updated:` headers across 74 doc files (kept only on DIRECTIVES.md per the canonical-status-source design). Current-state sections collapsed to `See [docs/DIRECTIVES.md](docs/DIRECTIVES.md).` one-liners.
+- [#308](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/308) `f5511c53` `carryovers-zero-cycle-ban` — new rule in AGENT_ORCHESTRATION.md §"Carry-over discipline" (and matching CARRY_OVERS.md header): "Carry-overs track only items spanning ≥2 cycles." Validator check in `scripts/cycle-validate.ts <slug> --close` diffs CARRY_OVERS Closed against a `git merge-base HEAD origin/master` cycle-start snapshot and FAILs on a newly closed ID that wasn't Active at cycle start. Best-effort design (logs "skipped" if no merge-base available, not hard-fails on infrastructure issues).
+- [#309](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/309) `6c02d1bf` `campaign-layer-delete-or-shrink` — Campaign-manifest abstraction now reserved for ≥4 sequenced cycles. ≤3-cycle parallel runs use a `## Active cycles` inline block in AGENT_ORCHESTRATION.md under "Current state" instead of a separate manifest file. Hold-list moved to BACKLOG.md "Owner-gated cycles" table (live source-of-truth; the archived campaign manifests stay untouched). Plan file self-archived: `docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md` → `docs/archive/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md` per the plan's lines 207-209 instruction.
+
+### Cycle-level summary
+
+- **6 PRs merged** (R1: 3 of 4; R2: 3 of 3). R1.3 closed deferred — not load-bearing, can re-attempt later.
+- One mid-merge conflict on `docs/AGENT_ORCHESTRATION.md` (R2.1 + R2.3 both touched the file). Resolved by orchestrator rebase, kept both R2.2's "No zero-cycle carry-overs" rule and R2.3's "Active cycles template shape" guidance; R2.1's "Current state" pointer became the new section name.
+- Zero fence changes. Zero perf hard-stops. Zero source-code touches (`src/**` untouched per the brief's non-goals).
+- **Validator self-test**: the new 100+ LOC brief warning correctly fires on the cycle-framework-recovery-pass-2 brief itself at 113 LOC. Next cycle that uses the new `docs/tasks/_TEMPLATE.md` should land ≤80 LOC.
+- **Expected impact** (per the plan, to be measured on next non-Pass-2 cycle): orchestrator prose per cycle drops from ~1,750 → ~250 lines; cycle wall-clock for similar 3-parallel scope ~day → 1-2 hours; executor token-budget deaths near zero; doc-state edits per cycle close 6 → 1.
+
 ## Recently Completed (campaign-2026-05-20-vehicle-boarding-and-water)
 
 Three parallel cycles in
