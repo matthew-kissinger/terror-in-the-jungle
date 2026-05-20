@@ -20,6 +20,7 @@ You were spawned by the orchestrator with a single task brief. Deliver a small, 
 6. **One branch per task.** Branch name: `task/<slug>` (e.g. `task/utility-ai-combat-layer`).
 7. **Commit discipline.** One logical commit preferred. Multiple commits OK if they tell a clean story. Commit message first line: `<type>(<scope>): <summary> (<slug>)` — e.g. `feat(combat): utility-AI scoring layer, VC faction canary (utility-ai-combat-layer)`.
 8. **Never push to master.** Push to your task branch and open a PR.
+9. **Sandbox push policy.** `git push` sits in the `ask`-list of `.claude/settings.local.json`. Agent sessions can't answer the prompt, so a push will return a sandbox-block error. If `git push` returns a sandbox-block, **do NOT retry**. Stop, report `pr_url: blocked-by-sandbox`, and include `branch`, the commit subject line, and a short diff summary (`git diff --stat master...HEAD`) in your structured report. The orchestrator will push the branch from the main session and open the PR (see `docs/AGENT_ORCHESTRATION.md` §"Dispatch protocol" step 4). This is the standard path for ~30% of dispatches per the 2026-05-20 campaign retro — not an exception.
 
 ## Workflow
 
@@ -30,9 +31,9 @@ You were spawned by the orchestrator with a single task brief. Deliver a small, 
 5. Make the changes. Keep the diff focused.
 6. Run local verification: `npm run lint`, `npm run test:run`, `npm run build`. Fix what you broke. Re-run.
 7. Commit.
-8. Push the branch: `git push -u origin task/<id>-<slug>`.
-9. Open a PR: `gh pr create --title "<commit message first line>" --body "<one-paragraph summary + link to task file + verification output>"`.
-10. Report back to the orchestrator: PR URL, the verification commands you ran, any surprises, whether the task is playtest-required (copy the flag from the brief).
+8. Push the branch: `git push -u origin task/<id>-<slug>`. If this returns a sandbox-block (the `ask`-list catches `git push:*`), do NOT retry — proceed to step 10 with `pr_url: blocked-by-sandbox` and let the orchestrator push from the main session.
+9. If push succeeded, open a PR: `gh pr create --title "<commit message first line>" --body "<one-paragraph summary + link to task file + verification output>"`. If push was sandbox-blocked, skip this step — the orchestrator runs it.
+10. Report back to the orchestrator: PR URL (or `blocked-by-sandbox`), commit subject, branch name, diff stat, the verification commands you ran, any surprises, whether the task is playtest-required (copy the flag from the brief).
 
 ## Report format
 
@@ -41,7 +42,8 @@ Return to the orchestrator a concise structured report:
 ```
 task_id: <id>
 branch: task/<id>-<slug>
-pr_url: <url>
+pr_url: <url> | blocked-by-sandbox
+commit_subject: <type>(<scope>): <summary> (<slug>)   # required when pr_url=blocked-by-sandbox so orchestrator can open the PR
 files_changed: <N files, +A -D lines>
 verification:
   - npm run lint: PASS
@@ -58,7 +60,7 @@ fence_change: no   # if yes, STOP and do not push — escalate
 - Local verification fails and you cannot determine the cause inside your scope.
 - Diff exceeds 400 lines despite a tight scope — scope is wrong, not your fault.
 - Test infrastructure breaks in a way that suggests drift outside your scope.
-- CI unavailable (gh auth failure, push rejected, branch protection).
+- CI unavailable (gh auth failure, branch protection rejecting push for a non-sandbox reason). Sandbox-block on `git push` is NOT a hard-stop — report `pr_url: blocked-by-sandbox` per the workflow above and the orchestrator pushes from the main session.
 
 On any of these, stop and return a report describing what happened, what you need, and what you would do next. Do not guess.
 

@@ -270,6 +270,17 @@ For each round, in a single orchestrator turn:
 4. When an executor returns:
    - Read the structured report.
    - If `fence_change: yes` → stop; surface to human.
+   - If `pr_url: blocked-by-sandbox` → the executor hit the sandbox
+     `ask`-list on `git push` (`.claude/settings.local.json` keeps
+     `Bash(git push:*)` under `ask` for safety, and agent sessions
+     cannot answer the prompt). The orchestrator pushes from the main
+     session and opens the PR on the executor's behalf:
+     1. `git -C .claude/worktrees/<agent-dir> push -u origin task/<slug>`
+        (or `git push origin task/<slug>:task/<slug>` from the main
+        worktree if the branch is already visible).
+     2. `gh pr create --title "<commit subject from report>" --body "<executor-supplied summary + verification block>"`.
+     3. Treat the resulting PR URL as the executor's `pr_url` and
+        continue at step 4's CI-poll path below.
    - If PR URL present but CI state unknown → poll
      `gh pr view <url> --json statusCheckRollup,mergeable` or stream via
      `Monitor` on `gh pr checks <url> --watch`.
