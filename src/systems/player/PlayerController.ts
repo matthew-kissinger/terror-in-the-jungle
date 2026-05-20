@@ -734,6 +734,19 @@ export class PlayerController implements GameSystem {
   isInFixedWing(): boolean { return this.playerState.isInFixedWing; }
   getFixedWingId(): string | null { return this.playerState.fixedWingId; }
 
+  /**
+   * True when the player is seated in any vehicle category — helicopter,
+   * fixed-wing, ground (jeep/tank), watercraft (sampan/PBR), or emplacement.
+   * Consumed by `GroundVehicleProximityChecker` so the "Press F to board"
+   * HUD prompt suppresses itself while the player is already in a vehicle.
+   *
+   * Not on `IPlayerController` (fenced); use the helicopter/fixed-wing
+   * predicates directly when the caller already knows the category.
+   */
+  isInAnyVehicle(): boolean {
+    return this.vehicleStateManager.isInVehicle();
+  }
+
   requestVehicleExit(options: VehicleExitOptions = {}): VehicleExitResult {
     const vehicleId = this.vehicleStateManager.getVehicleId() ?? '';
     const result = this.vehicleStateManager.exitVehicle(
