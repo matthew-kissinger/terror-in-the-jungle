@@ -65,7 +65,7 @@ History log:
   [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
   Fix work tracked under `cycle-sky-visual-restore` (KB-SKY-BLAND) and
   `cycle-mobile-webgl2-fallback-fix` (KB-MOBILE-WEBGPU); both queued in
-  [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+  [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
   Active count: 11 → 9 (back to cycle-start level; net cycle delta 0).
 - 2026-05-13 — mode-startup spike: KB-STARTUP-1 opened from the user-reported
   "mode selection takes forever" issue. `task/mode-startup-terrain-spike`
@@ -132,7 +132,7 @@ History log:
   8 → 8.
 
   Cycle #13 `cycle-sun-and-atmosphere-overhaul` queued in
-  [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+  [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
   at position #12 (inserted between cycle #11 defekt-4 and the renumbered
   cycle #13 baselines-refresh) per
   [docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md](rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md)

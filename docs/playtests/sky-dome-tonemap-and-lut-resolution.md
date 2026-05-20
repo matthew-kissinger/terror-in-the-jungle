@@ -5,7 +5,7 @@ Last updated: 2026-05-16
 ## Cycle
 
 `cycle-sky-visual-restore` (campaign position #1 of 12,
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md)).
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)).
 Closes carry-over `KB-SKY-BLAND` jointly with sibling tasks
 `sky-hdr-bake-restore` and `sky-sun-disc-restore`.
 

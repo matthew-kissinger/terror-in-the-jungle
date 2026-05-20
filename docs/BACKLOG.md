@@ -6,7 +6,7 @@ This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
 realignment, 2026-05-09). Active directives live in
 [docs/DIRECTIVES.md](DIRECTIVES.md). Current verified state lives in
-`docs/STATE_OF_REPO.md` (also targeted for Phase 1 split into `docs/state/`).
+[docs/state/CURRENT.md](state/CURRENT.md) (split from the retired `docs/STATE_OF_REPO.md` on 2026-05-11; pre-split file archived at `docs/archive/STATE_OF_REPO.md`).
 Historical cycle records live under `docs/cycles/<cycle-id>/RESULT.md`.
 
 Keep this file at or below 200 measured lines. Do not place long cycle
@@ -62,7 +62,7 @@ persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 ## Recently Completed (campaign-2026-05-19-visual-and-wayfinding)
 
 Three parallel cycles in
-[docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
+[docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](archive/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
 (autonomous-loop posture). 11 PRs merged across the three cycles
 without inter-cycle dispatch dependency. Closes the three
 2026-05-19 owner-playtest issues (Open Frontier midday dark spots,
@@ -122,7 +122,7 @@ Carry-over delta: 0 (VEKHIKL-UX-1 opened+closed).
 ## Recently Completed (cycle-mobile-webgl2-fallback-fix)
 
 Campaign position #2 of 12 in
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
 (autonomous-loop posture). Three-round cycle, 9 PRs merged. Closes
 the shipped fix for `KB-MOBILE-WEBGPU` (the post-WebGPU-merge
 WebGL2-fallback mobile-unplayable regression).
@@ -187,7 +187,7 @@ Follow-ups for the next cycle (#3, `cycle-konveyer-11-spatial-grid-compute`):
 ## Recently Completed (cycle-sky-visual-restore)
 
 Campaign position #1 of 12 in
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
 (autonomous-loop posture). Single-round cycle, three parallel R1 tasks all
 touching `src/systems/environment/atmosphere/**`. Closes the shipped fix for
 `KB-SKY-BLAND` (the post-WebGPU-merge sky-bland visual regression).

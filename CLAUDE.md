@@ -147,12 +147,14 @@ carry-overs to respect ≤12 limit; bundle into next cycle that touches
 relevant area): A Shau test claim softening; perf ceiling 1.0→2.0ms if
 flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
-Campaign manifests:
-- [docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
-  — **active**, 3 parallel cycles.
-- [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+Campaign manifests (all closed; archive-only):
+- [docs/archive/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/archive/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
+  — closed 2026-05-20; 3 parallel cycles, 11 PRs merged.
+- [docs/archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
   — closed 2026-05-18 at cycle #12; cycle #13 SKIPPED out-of-scope;
   66 PRs merged across cycles #1-#12.
+- [docs/archive/CAMPAIGN_2026-05-09.md](docs/archive/CAMPAIGN_2026-05-09.md)
+  — closed 2026-05-09 (earliest archived).
 
 Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use
 descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle

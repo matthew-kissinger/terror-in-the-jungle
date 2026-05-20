@@ -90,7 +90,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 
 ## Current-state discipline
 
-- Read [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) before making current
+- Read [docs/state/CURRENT.md](docs/state/CURRENT.md) before making current
   claims. Roadmap, backlog, comments, archived docs, and tests are sensors, not
   truth.
 - A Shau Valley is a required scenario, not optional coverage. If work touches
@@ -124,11 +124,11 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | Doc | Purpose |
 |-----|---------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System overview, tick graph, coupling heatmap, key patterns |
-| [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) | Current verified repo state, known drift, and immediate priorities |
+| [docs/state/CURRENT.md](docs/state/CURRENT.md) | Current verified repo state, known drift, and immediate priorities (split from the retired `docs/STATE_OF_REPO.md` on 2026-05-11) |
 | [docs/DIRECTIVES.md](docs/DIRECTIVES.md) | Active directive list: status, owning subsystem, success criteria, evidence link |
 | [docs/CARRY_OVERS.md](docs/CARRY_OVERS.md) | Single source of truth for unresolved carry-overs |
 | [docs/ASSET_ACCEPTANCE_STANDARD.md](docs/ASSET_ACCEPTANCE_STANDARD.md) | Pixel Forge and runtime asset acceptance policy |
-| [docs/ARCHITECTURE_RECOVERY.md](docs/ARCHITECTURE_RECOVERY.md) | Architecture recovery cycles, gates, current findings, and residual risks |
+| [docs/archive/ARCHITECTURE_RECOVERY.md](docs/archive/ARCHITECTURE_RECOVERY.md) | Architecture recovery cycles, gates, findings, residual risks (historical control board; archived 2026-05-20 — current state in `docs/state/CURRENT.md`) |
 | [docs/COMBAT.md](docs/COMBAT.md) | Combat subsystem architecture (new, D1 2026-04-17) |
 | [docs/TESTING.md](docs/TESTING.md) | Four-layer test contract. Read before writing tests. |
 | [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced interfaces in `src/types/SystemInterfaces.ts` |
@@ -194,7 +194,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 
 ## Game-feel requires human playtest
 
-Tests, lint, and build catch many correctness regressions. The fixed-wing runtime probe is intended to cover browser-level aircraft validation too; check [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) and run `npm run probe:fixed-wing` before treating aircraft changes as validated. None of these checks catch feel regressions. An aircraft that passes every other test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.
+Tests, lint, and build catch many correctness regressions. The fixed-wing runtime probe is intended to cover browser-level aircraft validation too; check [docs/state/CURRENT.md](docs/state/CURRENT.md) and run `npm run probe:fixed-wing` before treating aircraft changes as validated. None of these checks catch feel regressions. An aircraft that passes every other test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.
 
 Any change to flight, driving, combat rhythm, or UI responsiveness must be validated by a human running `docs/PLAYTEST_CHECKLIST.md`. Passing automated checks is necessary, not sufficient. If you can't get a human through the checklist, say so explicitly in the PR description rather than claiming the change is done.
 

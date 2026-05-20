@@ -5,7 +5,7 @@ Last updated: 2026-05-16
 ## Cycle
 
 `cycle-mobile-webgl2-fallback-fix` (campaign position #2 of 12,
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md)).
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)).
 Closes carry-over `KB-MOBILE-WEBGPU` jointly with the rest of the
 cycle's R1 + R2 + R3 tasks. R3's `real-device-validation-harness` is
 the cycle-wide merge gate; this memo captures the per-task evidence

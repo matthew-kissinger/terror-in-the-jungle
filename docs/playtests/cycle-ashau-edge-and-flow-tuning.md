@@ -19,7 +19,7 @@ delta on active count: 0). No new carry-overs opened.
 ## Autonomous-loop deferral notice
 
 Under the
-[campaign manifest's](../CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
+[campaign manifest's](../archive/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
 declared `posture: autonomous-loop`, the cycle's playtest-required
 gate is **deferred** to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md)
 per the orchestrator's autonomous-loop override (per

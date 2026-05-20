@@ -3,7 +3,7 @@
 Last verified: 2026-05-13
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
-> For the current verified repo state, see [STATE_OF_REPO.md](STATE_OF_REPO.md).
+> For the current verified repo state, see [STATE_OF_REPO.md](state/CURRENT.md).
 
 ## Vision
 
@@ -100,7 +100,7 @@ Carry these findings into the next Projekt revamp:
 | 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. Fixed-wing feel/interpolation sign-off, NPC transport, ground vehicles, and aircraft combat integration remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
 | 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water has a legacy global plane plus hydrology channel surfaces and query/interaction samples; shader/intersection acceptance and watercraft-grade physics are not started. |
-| 6: Ground Vehicles | IN PROGRESS | M151 jeep physics MVP (VEKHIKL-1) queued via [docs/tasks/vekhikl-1-jeep-spike.md](tasks/vekhikl-1-jeep-spike.md); architecture rearch memos in flight at `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` (wheeled physics, Ackermann steering, ground-normal conform) and `docs/rearch/TANK_SYSTEMS_2026-05-13.md` (skid-steer, independent turret, gunner seat, ballistic cannon, damage states). Cars first, tanks second. GLBs exist (jeep, APC, truck, tank, PT-76); `IVehicle` already accepts `'ground'` and `src/systems/vehicle/GroundVehicle.ts` holds the M151 stub. |
+| 6: Ground Vehicles | IN PROGRESS | M151 jeep physics MVP (VEKHIKL-1) queued via [docs/tasks/vekhikl-1-jeep-spike.md](tasks/archive/cycle-vekhikl-1-jeep-drivable/vekhikl-1-jeep-spike.md); architecture rearch memos in flight at `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` (wheeled physics, Ackermann steering, ground-normal conform) and `docs/rearch/TANK_SYSTEMS_2026-05-13.md` (skid-steer, independent turret, gunner seat, ballistic cannon, damage states). Cars first, tanks second. GLBs exist (jeep, APC, truck, tank, PT-76); `IVehicle` already accepts `'ground'` and `src/systems/vehicle/GroundVehicle.ts` holds the M151 stub. |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
 | 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
 | 9: Faction Expansion | PARTIAL | 4 factions in loadout context (US, ARVN, NVA, VC). AI doctrine per faction not started. |

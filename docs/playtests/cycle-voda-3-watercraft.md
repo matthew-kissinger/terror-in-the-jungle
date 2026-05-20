@@ -13,7 +13,7 @@ PBR with twin M2HB) once the owner walks the deferred punch list below.
 ## Autonomous-loop deferral notice
 
 Under the
-[campaign manifest's](../CAMPAIGN_2026-05-13-POST-WEBGPU.md) declared
+[campaign manifest's](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md) declared
 `posture: autonomous-loop`, the cycle's playtest-required gate is
 **deferred** to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md) per
 the orchestrator's autonomous-loop override (per

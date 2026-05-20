@@ -4,7 +4,7 @@ Last verified: 2026-05-20 (post all three 2026-05-19-visual-and-wayfinding cycle
 
 Single-source sink for cycles that closed under
 `posture: autonomous-loop` (per
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md))
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md))
 and merged on CI green + reviewer APPROVE without the owner-playtest
 gate firing.
 
@@ -71,7 +71,7 @@ NOT reverted automatically.
   §"Autonomous-loop posture" — defines what triggers an append here.
 - [docs/AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md)
   §"Autonomous-loop posture" — cross-tool view of the same rules.
-- [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+- [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
   — current campaign manifest declaring `posture: autonomous-loop`.
 - [GOAL_DIRECTIVE.md](../GOAL_DIRECTIVE.md) — the `/goal` directive
   string for invoking the autonomous loop.
