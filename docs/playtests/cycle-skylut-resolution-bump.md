@@ -1,7 +1,5 @@
 # Playtest: cycle-skylut-resolution-bump
 
-Last verified: 2026-05-19
-
 Cycle: `cycle-skylut-resolution-bump` (campaign position #1 of
 `docs/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md`)
 Task slug: `skylut-playtest-evidence` (R1, merge gate)

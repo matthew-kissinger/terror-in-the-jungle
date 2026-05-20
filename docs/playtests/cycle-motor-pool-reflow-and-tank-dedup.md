@@ -1,7 +1,5 @@
 # Playtest: cycle-motor-pool-reflow-and-tank-dedup
 
-Last verified: 2026-05-20
-
 Cycle: `cycle-motor-pool-reflow-and-tank-dedup` (campaign position #3
 of 3, 2026-05-20 vehicle-boarding-and-water parallel campaign)
 Task slug: `motor-pool-and-tank-dedup-playtest-evidence`

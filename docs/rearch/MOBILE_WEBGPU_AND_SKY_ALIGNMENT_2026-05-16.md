@@ -1,7 +1,5 @@
 # Mobile WebGPU + Sky Recovery — Alignment Memo
 
-Last verified: 2026-05-16
-
 R2 deliverable for
 [`cycle-2026-05-16-mobile-webgpu-and-sky-recovery`](../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
 Orchestrator-authored synthesis of the five R1 investigation memos under

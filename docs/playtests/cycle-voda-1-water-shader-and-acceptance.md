@@ -1,7 +1,5 @@
 # Playtest: cycle-voda-1-water-shader-and-acceptance
 
-Last verified: 2026-05-16
-
 Cycle: `cycle-voda-1-water-shader-and-acceptance` (campaign position #5 of 12)
 Task slug: `voda-1-playtest-evidence`
 Branch: `task/voda-1-playtest-evidence`

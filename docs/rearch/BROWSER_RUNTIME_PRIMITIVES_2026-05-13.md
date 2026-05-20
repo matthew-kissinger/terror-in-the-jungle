@@ -1,7 +1,5 @@
 # Browser-runtime primitives inventory
 
-Last verified: 2026-05-13
-
 Authored on `exp/konveyer-webgpu-migration`; merged to `master` 2026-05-13 via PR #192 (commit `1df141ca`). Companion to
 [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
 ("keep the stack" + the 2026-05-13 ground-vehicle addendum naming

@@ -1,7 +1,5 @@
 # Tank systems architecture
 
-Last verified: 2026-05-13
-
 Branch: `exp/konveyer-webgpu-migration`. Sibling to
 [GROUND_VEHICLE_PHYSICS_2026-05-13.md](GROUND_VEHICLE_PHYSICS_2026-05-13.md)
 (the wheeled-chassis foundation) and to

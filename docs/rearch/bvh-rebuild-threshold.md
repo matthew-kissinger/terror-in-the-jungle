@@ -1,7 +1,5 @@
 # BVH Rebuild Threshold Review
 
-Last verified: 2026-05-10
-
 ## Scope
 
 Optimization stream memo for terrain near-field BVH rebuild threshold tuning.

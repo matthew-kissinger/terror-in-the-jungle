@@ -1,7 +1,5 @@
 # Perf Regression Playbook
 
-Last verified: 2026-05-09
-
 How to investigate a perf regression. Distilled from the DEFEKT-3 /
 STABILIZAT-1 chain captured in `docs/archive/PERFORMANCE.md`. Read
 [scenarios.md](scenarios.md) and [baselines.md](baselines.md) before starting.

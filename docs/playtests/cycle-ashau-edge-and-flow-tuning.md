@@ -1,7 +1,5 @@
 # Playtest: cycle-ashau-edge-and-flow-tuning
 
-Last verified: 2026-05-20
-
 Cycle: `cycle-ashau-edge-and-flow-tuning` (campaign position #2 of 3,
 2026-05-19 visual-and-wayfinding parallel campaign)
 Task slug: `ashau-edge-and-flow-playtest-evidence`

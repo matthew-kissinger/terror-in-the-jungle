@@ -1,7 +1,5 @@
 # Playtest: cycle-vekhikl-4-tank-turret-and-cannon
 
-Last verified: 2026-05-17
-
 Cycle: `cycle-vekhikl-4-tank-turret-and-cannon` (campaign position #9 of 13)
 Task slug: `vekhikl-4-playtest-evidence`
 Branch: `task/vekhikl-4-playtest-evidence`

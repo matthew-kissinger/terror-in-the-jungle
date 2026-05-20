@@ -1,7 +1,5 @@
 # Playtest Pending
 
-Last verified: 2026-05-20 (post 2026-05-20-vehicle-boarding-and-water cycle #1 R2: vekhikl-board-integration-test-and-playtest-evidence)
-
 Single-source sink for cycles that closed under
 `posture: autonomous-loop` (per
 [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md))

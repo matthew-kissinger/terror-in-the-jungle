@@ -1,7 +1,5 @@
 # Perf Baselines
 
-Last verified: 2026-05-09
-
 Tracked baselines, refresh rules, and current scenario health. Comparison data
 lives in `perf-baselines.json` at repo root; this doc explains policy and
 status.

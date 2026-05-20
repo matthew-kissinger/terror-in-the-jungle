@@ -1,6 +1,5 @@
 # HEAP_RECOVERY_COMBAT120_TRIAGE — the combat120 heap regression does not reproduce
 
-Last updated: 2026-04-22
 Cycle: `cycle-2026-04-22-heap-and-polish`
 Task: `docs/tasks/heap-recovery-combat120-triage.md`
 Round: 1

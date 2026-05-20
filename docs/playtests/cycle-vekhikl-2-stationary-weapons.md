@@ -1,7 +1,5 @@
 # Playtest: cycle-vekhikl-2-stationary-weapons
 
-Last verified: 2026-05-16
-
 Cycle: `cycle-vekhikl-2-stationary-weapons` (campaign position #6 of 12)
 Task slug: `vekhikl-2-playtest-evidence`
 Branch: `task/vekhikl-2-playtest-evidence`

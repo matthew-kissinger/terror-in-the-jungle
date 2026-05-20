@@ -1,7 +1,5 @@
 # Playtest Checklist
 
-Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge)
-
 Agents can run tests and probes. They cannot feel the game. Any PR that touches flight, driving, combat rhythm, or UI responsiveness must be validated against this checklist by a human pressing keys and watching the screen. Tests green + build green != feel green.
 
 Check each item. Unchecked items are failures. Add notes for anything that borders on "fine but off."

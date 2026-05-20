@@ -1,7 +1,5 @@
 # Cover Query Precompute First Slice
 
-Last verified: 2026-05-10
-
 ## Scope
 
 Perf stream first slice for DEFEKT-3. This pass did not implement the full

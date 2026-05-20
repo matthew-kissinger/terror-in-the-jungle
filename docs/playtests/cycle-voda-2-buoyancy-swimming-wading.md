@@ -1,7 +1,5 @@
 # Playtest: cycle-voda-2-buoyancy-swimming-wading
 
-Last verified: 2026-05-17
-
 Cycle: `cycle-voda-2-buoyancy-swimming-wading` (campaign position #7 of 13)
 Task slug: `voda-2-playtest-evidence`
 Branch: `task/voda-2-playtest-evidence`

@@ -1,7 +1,5 @@
 # Mode Startup Terrain Bake Spike
 
-Last verified: 2026-05-13
-
 Branch: `task/mode-startup-terrain-spike`
 
 ## Summary

@@ -1,7 +1,5 @@
 # Combat Subsystem
 
-Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge; Phase F R1 — combat sub-attribution + lane rename — landed)
-
 This document is the authoritative architecture reference for the combat
 subsystem (`src/systems/combat/`). Combat is the hot loop: AI decisions,
 targeting, damage resolution, cover/suppression, kill attribution, squad

@@ -2,8 +2,6 @@
 
 > **Status note (2026-05-12).** E2 (rendering paradigm at scale) LANDED on master 2026-05-12 via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192) (commit `1df141ca`). WebGPU + TSL is now the production renderer; WebGL2 fallback automatic for unsupported environments. E1 (ECS), E3 (AI paradigm), and the remaining E-track questions remain open. See [docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md](rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md) for current state.
 
-Last updated: 2026-04-16
-
 This document names the architectural decisions that surgical cleanup work (Batches A-D) deliberately does **not** settle. Without explicit framing, those decisions get made by default — the "current shape" becomes "the correct shape" without anyone having argued for it.
 
 This file lists the five open questions, why each matters, and what a decision on each requires. Task briefs for each live under `docs/tasks/E*.md` and run as R&D spikes in parallel with surgical work.

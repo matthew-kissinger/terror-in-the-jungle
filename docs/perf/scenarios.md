@@ -1,7 +1,5 @@
 # Perf Scenarios
 
-Last verified: 2026-05-09
-
 Scenario definitions for `perf:capture:*`. Each scenario combines a game mode,
 duration, NPC count, and behavior flags so captures are repeatable. Tracked
 baselines live in `perf-baselines.json`; refresh policy is in

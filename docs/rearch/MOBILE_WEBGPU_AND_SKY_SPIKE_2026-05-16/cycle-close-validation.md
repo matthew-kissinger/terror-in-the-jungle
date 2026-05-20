@@ -1,7 +1,5 @@
 # Cycle Close Validation — `cycle-mobile-webgl2-fallback-fix`
 
-Last verified: 2026-05-16
-
 R3 deliverable for the `real-device-validation-harness` task, closing
 `cycle-mobile-webgl2-fallback-fix` under **autonomous-loop posture** per
 [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../CAMPAIGN_2026-05-13-POST-WEBGPU.md)

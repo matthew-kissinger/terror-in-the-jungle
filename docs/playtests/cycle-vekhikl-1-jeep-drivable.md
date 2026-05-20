@@ -1,7 +1,5 @@
 # Playtest: cycle-vekhikl-1-jeep-drivable
 
-Last verified: 2026-05-16
-
 Cycle: `cycle-vekhikl-1-jeep-drivable` (campaign position #4 of 12)
 Task slug: `m151-jeep-playtest-evidence`
 Branch: `task/m151-jeep-playtest-evidence`

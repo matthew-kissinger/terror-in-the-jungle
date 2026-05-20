@@ -1,7 +1,5 @@
 # Perf Measurement-Chain Trust Status
 
-Last verified: 2026-05-10
-
 Current trust state of the combat120 perf baseline and the chain of evidence
 behind STABILIZAT-1 (combat120 baseline refresh blocked) and DEFEKT-3
 (combat AI p99 — synchronous cover search in

@@ -1,7 +1,5 @@
 # Playtest memo: `terrain-tsl-biome-early-out`
 
-Last updated: 2026-05-16
-
 ## Cycle
 
 `cycle-mobile-webgl2-fallback-fix` (campaign position #2 of 12,

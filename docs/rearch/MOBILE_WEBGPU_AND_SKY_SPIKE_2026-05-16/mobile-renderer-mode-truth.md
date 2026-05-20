@@ -1,7 +1,5 @@
 # mobile-renderer-mode-truth
 
-Last verified: 2026-05-16
-
 Cycle: `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` (R1, memo-only).
 Carry-over: KB-MOBILE-WEBGPU (investigation; promoted to a named fix
 cycle by the R2 alignment memo).

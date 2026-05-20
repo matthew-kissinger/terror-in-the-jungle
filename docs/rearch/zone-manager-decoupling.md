@@ -1,7 +1,5 @@
 # ZoneManager Decoupling — Design Memo
 
-Last verified: 2026-05-09
-
 Cycle: `cycle-2026-05-10-zone-manager-decoupling` (Phase 2, Round 1).
 
 This memo is the design artifact the upcoming `izone-query-fence` PR cites

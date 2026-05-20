@@ -1,7 +1,5 @@
 # Performance and Profiling
 
-Last verified: 2026-05-13
-
 Index for the perf-harness docs. The original 2,332-LOC `docs/PERFORMANCE.md`
 was split into focused topics on `cycle-2026-05-09-doc-decomposition-and-wiring`.
 Pre-split full-history copy lives at `docs/archive/PERFORMANCE.md`.

@@ -1,7 +1,5 @@
 # Roadmap
 
-Last verified: 2026-05-13
-
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 > For the current verified repo state, see [STATE_OF_REPO.md](state/CURRENT.md).
 

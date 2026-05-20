@@ -1,7 +1,5 @@
 # Playtest: cycle-sun-and-atmosphere-overhaul
 
-Last verified: 2026-05-18
-
 Cycle: `cycle-sun-and-atmosphere-overhaul` (campaign position #12 of 13)
 Task slug: `sun-and-atmosphere-playtest-evidence`
 Branch: `task/sun-and-atmosphere-playtest-evidence`

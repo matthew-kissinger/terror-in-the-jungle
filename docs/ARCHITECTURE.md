@@ -1,7 +1,5 @@
 # Architecture
 
-Last verified: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge; mode-start terrain-bake spike)
-
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
 ## Entry Points

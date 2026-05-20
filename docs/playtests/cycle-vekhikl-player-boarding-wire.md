@@ -1,7 +1,5 @@
 # Playtest: cycle-vekhikl-player-boarding-wire
 
-Last verified: 2026-05-20
-
 Cycle: `cycle-vekhikl-player-boarding-wire` (campaign
 [2026-05-20-vehicle-boarding-and-water](../CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
 cycle #1)

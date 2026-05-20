@@ -1,7 +1,5 @@
 # TSL shader cost audit (R1 — `cycle-2026-05-16-mobile-webgpu-and-sky-recovery`)
 
-Last verified: 2026-05-16
-
 User-observable gap surfaced: **KB-MOBILE-WEBGPU** — mobile playability tanked post-KONVEYER-merge. The two surface candidates this memo addresses are (a) per-fragment TSL cost on the WebGL2 fallback path that mobile lands on and (b) anything new on the WebGL2 path that the pre-merge WebGL renderer never had to pay.
 
 ## TL;DR

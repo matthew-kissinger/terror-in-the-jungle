@@ -1,7 +1,5 @@
 # KONVEYER Full Autonomous WebGPU Migration
 
-Last verified: 2026-05-11
-
 This memo defines the autonomous experimental-branch objective for the
 KONVEYER renderer campaign: migrate Terror in the Jungle from the current
 `WebGLRenderer` production runtime toward production-ready strict

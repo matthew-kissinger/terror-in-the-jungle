@@ -1,7 +1,5 @@
 # Playtest: cycle-voda-3-watercraft
 
-Last verified: 2026-05-17
-
 Cycle: `cycle-voda-3-watercraft` (campaign position #10 of 13)
 Task slug: `voda-3-playtest-evidence`
 Branch: `task/voda-3-playtest-evidence`

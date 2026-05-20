@@ -79,25 +79,11 @@ repository, believe the repository and update the doc.
 
 ## Current Alignment
 
-WebGPU + TSL is the shipped baseline (PR #192, merged 2026-05-13). Automatic
-WebGL2 fallback runs on browsers without WebGPU; strict WebGPU mode is the
-renderer-acceptance proof path. Three campaigns closed since the merge:
-post-WebGPU (66 PRs across 12 cycles), visual-and-wayfinding (11 PRs across
-3 parallel cycles), and vehicle-boarding-and-water (15 PRs across 3 parallel
-cycles, closed 2026-05-20 with production deploy fired).
-
-Active state and open directives route through
-[docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Current carry-over count: 6
-(STABILIZAT-1, AVIATSIYA-1/DEFEKT-5, KB-LOAD residual, KB-STARTUP-1,
-cloudflare-stabilization followups, weapons-cluster-zonemanager-migration).
-
-The next work batch is the framework recovery plan at
-[docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md)
-— CI trim, framework trim, doc-drift align. Hold-list cycles
-(`cycle-vekhikl-seat-swaps`, `cycle-vekhikl-5-fleet-expansion`,
-`cycle-sky-screen-space-quad`, `cycle-stabilizat-1-baselines-refresh`) remain
-owner-gated.
+WebGPU + TSL is the shipped baseline (PR #192, merged 2026-05-13) with
+automatic WebGL2 fallback on browsers without WebGPU; strict WebGPU mode is
+the renderer-acceptance proof path. Current directive state, open work, and
+carry-overs route through [docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md).
 
 ## Controls
 

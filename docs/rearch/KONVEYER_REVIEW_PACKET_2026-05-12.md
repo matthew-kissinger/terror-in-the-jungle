@@ -1,7 +1,5 @@
 # KONVEYER Review Packet
 
-Last verified: 2026-05-12
-
 Branch: `exp/konveyer-webgpu-migration`. Source-of-truth pickup point:
 `origin/exp/konveyer-webgpu-migration` HEAD, not any frozen SHA in this doc.
 

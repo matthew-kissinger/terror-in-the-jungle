@@ -1,7 +1,5 @@
 # Post-KONVEYER migration milestone
 
-Last verified: 2026-05-13
-
 Branch context: `master` (post-merge). This memo replaces the
 "do-not-merge" gate that governed
 `docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md` while the migration

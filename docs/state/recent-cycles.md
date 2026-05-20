@@ -1,7 +1,5 @@
 # Recent Cycle Outcomes
 
-Last verified: 2026-05-13
-
 Last 3 cycles, summarized. Companion docs:
 
 - [docs/state/CURRENT.md](CURRENT.md) — current truth
