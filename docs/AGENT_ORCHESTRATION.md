@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-20 (campaign 2026-05-20-vehicle-boarding-and-water QUEUED — three parallel cycles pending dispatch covering the F-key boarding glue, Open Frontier river surface, and motor pool reflow + OF M48 dedup; previous 2026-05-19-visual-and-wayfinding campaign closed 2026-05-20 at master commit `4dd2c054`)
+Last verified: 2026-05-20 (campaign 2026-05-20-vehicle-boarding-and-water CLOSED — 3 parallel cycles, 15 PRs merged; production deploy gate fired; carry-over count unchanged at 6; next campaign not yet queued — see `docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md` for the post-campaign framework work)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,107 +154,96 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: campaign-2026-05-20-vehicle-boarding-and-water (parallel, queued, pre-dispatch)
+## Current cycle: (none — campaign-2026-05-20 closed; framework recovery plan pending owner review)
 
-Active campaign: [docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md).
-Posture **autonomous-loop**, **auto-advance: yes**. Three independent
-cycles dispatched in parallel under a shared concurrency cap of 10
-(cycle #1: 5 R1 tasks; cycle #2: 3 R1 tasks; cycle #3: 2 R1 tasks).
+No active cycle. Last campaign (campaign-2026-05-20-vehicle-boarding-and-water)
+closed on 2026-05-20 with the production deploy gate fired against master
+tip `e99be58e`. Manifest archived at
+[docs/archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md).
 
-**Cycle #1 — `cycle-vekhikl-player-boarding-wire`** (5 R1 + 1 R2;
-opens+closes VEKHIKL-UX-2). Wires the missing F-key → ground / tank /
-watercraft / emplacement boarding glue. Closes a critical bug: the
-2026-05-19 wayfinding cycle shipped a "Press F to board" HUD prompt
-but never wired the F-key handler or constructed the four per-category
-player adapters. Mortar fire stays on F via a fallback router. Pilot
-seat only — M48 + PBR gunner swaps deferred to `cycle-vekhikl-seat-swaps`
-on the hold list. Brief:
-[docs/tasks/cycle-vekhikl-player-boarding-wire.md](tasks/cycle-vekhikl-player-boarding-wire.md).
-R1 tasks: `vekhikl-board-input-router`,
-`vekhikl-board-controller-factory`, `vekhikl-board-ground-adapter-wire`,
-`vekhikl-board-tank-adapter-wire`,
-`vekhikl-board-watercraft-and-emplacement-wire`. R2:
-`vekhikl-board-integration-test-and-playtest-evidence`.
-
-**Cycle #2 — `cycle-of-river-surface-enable`** (3 R1 + 1 R2;
-opens+closes VODA-OF-1). Flips `waterEnabled: true` on
-`OpenFrontierConfig`, snaps OF Sampan + PBR to the water-surface Y at
-spawn, captures pre/post Playwright pair. Keeps the global sea-level
-plane enabled (OF terrain centers near y=0; unlike A Shau which
-disabled the global plane because its valley floor sits at +580 m).
-Brief:
-[docs/tasks/cycle-of-river-surface-enable.md](tasks/cycle-of-river-surface-enable.md).
-R1 tasks: `of-water-config-flip`, `of-water-spawn-snap-resolver`,
-`of-water-capture-pair`. R2: `of-water-playtest-evidence`. Mandatory
-`terrain-nav-reviewer` on the config flip PR.
-
-**Cycle #3 — `cycle-motor-pool-reflow-and-tank-dedup`** (2 R1 + 1 R2;
-opens+closes VEKHIKL-LAYOUT-1). Reflows `motor_pool_heavy` for ≥1.5 m
-clearance + ≥60° yaw spread, removes the dressing M48 from the OF
-motor pool prefab, and relocates the OF scenario M48 spawn anchor to
-the motor pool bay so OF has exactly one boardable tank. A Shau motor
-pool must not regress (split the prefab if needed). Brief:
-[docs/tasks/cycle-motor-pool-reflow-and-tank-dedup.md](tasks/cycle-motor-pool-reflow-and-tank-dedup.md).
-R1 tasks: `motor-pool-heavy-reflow`, `of-tank-relocate-to-motor-pool`.
-R2: `motor-pool-and-tank-dedup-playtest-evidence`.
-
-**Campaign-close hard gate**: after all three cycles close on master,
-orchestrator runs `gh workflow run deploy.yml --ref master`, polls
-until deploy success, and records the deployed SHA in the close memo
-in `docs/BACKLOG.md`. This is the explicit fulfillment of the
-"make sure water is proper in production" owner ask.
+The next work batch is the **framework recovery plan** at
+[docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](FRAMEWORK_RECOVERY_PLAN_2026-05-20.md)
+(landed 2026-05-20 as commit `45d77250`). Owner reads it post-compact
+with fresh eyes, answers the 5 decision questions, and gates the
+3-pass execution:
+- Pass 1 (CI trim) + Pass 3 (README + tags align) ship as a single
+  low-risk doctor PR.
+- Pass 2 (framework trim — touches governance) spawns its own focused
+  cycle once the doctor PR lands.
 
 **Hold list (owner-gated, do NOT auto-promote):**
 - `cycle-vekhikl-seat-swaps` — pilot↔gunner swap on M48 + PBR.
-  Trigger: owner signs off on cycle #1 playtest evidence.
+  Trigger: owner signs off on `cycle-vekhikl-player-boarding-wire`
+  playtest evidence (deferred row in
+  [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md)).
 - `cycle-vekhikl-5-fleet-expansion` — M113 APC + M35 truck + T-54
-  tank (+ optional ZU-23-2 AA + LCM-8). Trigger: owner signs off on
-  both cycle-vehicle-wayfinding-and-prompts AND cycle #1 of this
-  campaign.
+  tank (+ optional ZU-23-2 AA + LCM-8). Trigger: owner signs off
+  on both `cycle-vehicle-wayfinding-and-prompts` and
+  `cycle-vekhikl-player-boarding-wire`.
 - `cycle-sky-screen-space-quad` — Hillaire-style screen-space sky
   rework. Carried over from the 2026-05-19 campaign hold list.
 - `cycle-stabilizat-1-baselines-refresh` — STABILIZAT-1 / combat120
   baseline refresh. Carried over from the post-WebGPU campaign close.
 
-**Resume:** orchestrator runs the campaign dispatch protocol when
-`/orchestrate` fires. All three cycles launch in parallel.
-
+**Resume:** once owner approves the framework recovery plan, the next
+`/orchestrate` invocation dispatches Pass 1 + Pass 3 as a single
+doctor PR (no cycle wrapper needed; touches CI yaml + README +
+package.json tags). Pass 2 (framework governance trim) gets its own
+cycle brief at that point.
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,
 mark the failing cycle's row `BLOCKED`, and halt.
 
 ### Last closed cycle
 
-`cycle-defekt-4-npc-route-quality` closed on 2026-05-18 at the cycle
-close-commit. **3 PRs across R1/R2**; all three received
-`terrain-nav-reviewer` APPROVE pre-merge. R1:
-[#265](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/265)
-`df84a870` npc-slope-stuck-recovery (new
-`src/systems/navigation/SlopeStuckDetector.ts` +
-`evaluateSlopeStuckRecovery` helper in `CombatantMovement.ts`;
-`SLOPE_STALL_TIME_MS=1500` triggers a recovery state that yields to
-gravity slide downhill via `SLOPE_SLIDE_STRENGTH=8.0` until on
-walkable slope, then re-acquires pathing target; behavior tests
-cover steep-slope transition within budget),
-[#266](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/266)
-`aac0e519` navmesh-crowd-reenable (Recast crowd surface re-enabled
-as layered direction-only consumer via
-`applyAgentSteeredDirection`; `MAX_CROWD_AGENTS=64`; high-LOD gated;
-the prior disable was a structural unregister-every-tick at commit
-`7487b693`, not a flag; scenario test catches regression if disable
-is re-applied; perf inside the ≤2 ms additional per nav step
-budget). R2:
-[#267](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/267)
-`4f505661` terrain-solver-stall-fix (wall-clock accumulator on
-`(contourActivated && lowProgress)` crossing
-`NPC_CONTOUR_STALL_REROUTE_MS=1200`; high-LOD only;
-backtrack-suppressed via `movementBacktrackPoint` (not intent);
-drops cached navmesh path so next tick re-queries; helper
-`evaluateTerrainStallReroute` in `CombatantMovement.ts`; new
-optional `Combatant.movementContourStallMs` field; behavior test
-verifies A Shau valley traversal without stop-and-go). DEFEKT-4 in
-`docs/CARRY_OVERS.md` moved Active → Closed. Carry-over count: 8 →
-7. No fence change. No perf regression > 5% p99 on `combat120`.
+`campaign-2026-05-20-vehicle-boarding-and-water` closed on 2026-05-20.
+Three parallel cycles, **15 PRs merged**, zero fence changes, zero
+hard-stops at cycle close. One mid-campaign hard-stop in cycle #1 R1
+(3 of 5 executors terminated mid-thought at ≥90k tokens) handled via
+re-dispatch with tighter inline prompts; the largest task was split
+into a factory module + a handler/composer wire to fit the executor
+context budget. The intermittent sandbox blocked git commit/push from
+3 worktrees; orchestrator-side push from the main session unblocked
+each.
+
+- **Cycle #1 — `cycle-vekhikl-player-boarding-wire`** (opens+closes
+  `VEKHIKL-UX-2`). 8 PRs: [#288](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/288)
+  ground-adapter wire, [#289](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/289)
+  tank-adapter wire, [#293](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/293)
+  input-router (retry), [#296](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/296)
+  watercraft + emplacement wire, [#297](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/297)
+  factory-module-only (split A retry), [#298](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/298)
+  handler + composer wire (split B retry), [#299](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/299)
+  SystemUpdater wire, [#300](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/300)
+  L3 integration test + playtest evidence. Closes the critical
+  user-reported gap: the 2026-05-19 wayfinding cycle shipped the
+  "Press F to board" HUD prompt but the F-key handler was never wired,
+  so all five drivable vehicles were unenterable. Mortar fire stays
+  on F via the fallback router.
+- **Cycle #2 — `cycle-of-river-surface-enable`** (opens+closes
+  `VODA-OF-1`). 4 PRs: [#286](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/286)
+  `of-water-config-flip` (mandatory `terrain-nav-reviewer` APPROVE),
+  [#291](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/291)
+  `of-water-spawn-snap-resolver`, [#292](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/292)
+  `of-water-capture-pair`, [#294](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/294)
+  `of-water-playtest-evidence`. PR #292 post-captures stale at write
+  time (captured before #286/#291 merged); cycle-close gate noted
+  regeneration as deferred-playtest follow-up.
+- **Cycle #3 — `cycle-motor-pool-reflow-and-tank-dedup`**
+  (opens+closes `VEKHIKL-LAYOUT-1`). 3 PRs: [#287](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/287)
+  `of-tank-relocate-to-motor-pool`, [#290](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/290)
+  `motor-pool-heavy-reflow` (user-approved scope expansion: prefab
+  split into `_of` + `_ashau` halves to preserve the A Shau motor
+  pool footprint), [#295](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/295)
+  `motor-pool-and-tank-dedup-playtest-evidence`.
+
+Carry-over delta: 0 (3 zero-cycle IDs opened+closed in-campaign;
+active list unchanged at 6). Production deploy gate fired against
+master tip `e99be58e` via `gh workflow run deploy.yml --ref master`
+(deploy run `26182116715`). No perf regression > 5% p99 on `combat120`.
+Owner playtests deferred under autonomous-loop posture; deferred
+rows already present in [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md)
+for all three cycles.
 
 Concurrent branch on the side: `task/mode-startup-terrain-spike`
 remains parked at 1 commit (no PR). The cycle #2 mode-startup work

@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-20 (campaign 2026-05-20-vehicle-boarding-and-water QUEUED — 3 parallel cycles pre-dispatch: F-key boarding glue, Open Frontier river surface, motor pool reflow + OF M48 dedup; closes with a production deploy gate; previous 2026-05-19-visual-and-wayfinding campaign CLOSED 2026-05-20)
+Last verified: 2026-05-20 (campaign 2026-05-20-vehicle-boarding-and-water CLOSED — 3 parallel cycles, 15 PRs merged, production deploy fired against master tip `e99be58e`; framework recovery plan landed in commit `45d77250` for post-compact owner review)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,35 +46,37 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active campaign: `campaign-2026-05-20-vehicle-boarding-and-water`**
-([docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)),
-queued and ready for `/orchestrate`. Three parallel cycles (posture
-autonomous-loop, auto-advance yes). Closes a critical bug the
-2026-05-19 wayfinding cycle missed: the "Press F to board" HUD prompt
-shipped without the F-key handler, so all five drivable vehicles
-(M151, M48, Sampan, PBR, M2HB) are unenterable today. NPC boarding
-paths still work.
+**Most recent campaign closed: `campaign-2026-05-20-vehicle-boarding-and-water`**
+([docs/archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](docs/archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)),
+closed 2026-05-20. Three parallel cycles, 15 PRs merged, zero fence
+changes. Closed the critical user-reported gap (F-key boarding never
+wired despite the 2026-05-19 wayfinding cycle shipping the HUD
+prompt — all five drivable vehicles now enterable, mortar fallback
+preserved on no-vehicle-in-6m). Open Frontier river surface
+enabled + Sampan/PBR snapped to water at spawn; OF motor pool
+reflowed + OF M48 deduped into the motor pool bay (prefab split
+into `_of` + `_ashau` halves to preserve A Shau footprint).
+Production deploy gate fired against master tip `e99be58e` via
+`gh workflow run deploy.yml --ref master` (deploy run `26182116715`,
+success).
 
-Queued cycles:
-1. `cycle-vekhikl-player-boarding-wire` — F-key router (mortar
-   fallback) + per-category adapter factory + 4 adapter wires +
-   integration test. Opens+closes `VEKHIKL-UX-2`. Pilot seat only;
-   gunner swaps deferred. 5 R1 tasks.
-2. `cycle-of-river-surface-enable` — flip OF `waterEnabled: true`,
-   wire water-surface spawn snap for Sampan + PBR, capture pre/post
-   pair. Opens+closes `VODA-OF-1`. Mandatory `terrain-nav-reviewer`
-   on the config flip PR. 3 R1 tasks.
-3. `cycle-motor-pool-reflow-and-tank-dedup` — reflow
-   `motor_pool_heavy` for ≥1.5 m clearance + ≥60° yaw spread; remove
-   dressing M48 from prefab; relocate OF M48 scenario spawn into the
-   motor pool bay. A Shau motor pool must not regress (split prefab
-   if needed). Opens+closes `VEKHIKL-LAYOUT-1`. 2 R1 tasks.
-
-**Campaign closes with a production deploy gate** —
-`gh workflow run deploy.yml --ref master` after all three cycles
-close. This is the explicit fulfillment of the "make sure water is
-proper in production" owner ask. Deployed SHA recorded in the close
-memo.
+**Next work (queued, owner-gated): framework recovery plan**
+([docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md),
+landed 2026-05-20 as commit `45d77250`). The 6-week accretion of
+campaign harness layers has made each cycle balloon from ~30 min to
+~1 day, with CI mobile-ui shards dominating critical path and 5
+separate jobs each doing `npm ci` + game-field-kits checkout (~20
+cumulative compute min/PR wasted). Plan documents a 3-pass recovery:
+Pass 1 (CI trim — shared install job, mobile-ui matrix consolidation,
+remove per-job game-field-kits checkout duplication) + Pass 3
+(README + tags align — drift fixes including the missing
+`docs/STATE_OF_REPO.md` reference, stale active-campaign claim,
+test-count drift, archive path) ship as a single low-risk doctor PR.
+Pass 2 (framework trim — touches governance: AGENT_ORCHESTRATION,
+TESTING, INTERFACE_FENCE, executor brief structure) spawns its own
+focused cycle once the doctor PR lands. Plan opens with 5 owner
+decision questions; do not start Pass 1/2/3 implementation until
+the owner reviews the plan post-compact and answers.
 
 **Hold list (owner-gated, NOT auto-promoted):**
 - `cycle-vekhikl-seat-swaps` — pilot↔gunner swap on M48 + PBR.
@@ -142,8 +144,8 @@ deprioritized behind the WebGPU + ground-vehicle vision directions).
 Post-WebGPU campaign closed 2026-05-18 at cycle #12. The
 2026-05-19 visual-and-wayfinding campaign closed 2026-05-20 with 11
 PRs across 3 parallel cycles. The 2026-05-20 vehicle-boarding-and-water
-campaign now runs (queued above). To queue additional work, append to
-that manifest or open a fresh campaign manifest.
+campaign closed 2026-05-20 with 15 PRs across 3 parallel cycles. The
+next batch is the framework recovery plan (above) — owner-gated.
 
 For full context (audit findings, Phases 0–2 outcomes, Phase 3+ scope):
 [docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md).
@@ -168,9 +170,12 @@ relevant area): A Shau test claim softening; perf ceiling 1.0→2.0ms if
 flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
 Campaign manifests:
-- **Active**:
-  [docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
-  — queued 2026-05-20; 3 parallel cycles pre-dispatch.
+- **No active campaign.** Next batch is the framework recovery plan at
+  [docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md)
+  (owner-gated; not yet decomposed into cycle manifest).
+- [docs/archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](docs/archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
+  — closed 2026-05-20; 3 parallel cycles, 15 PRs merged, production
+  deploy fired.
 - [docs/archive/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/archive/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
   — closed 2026-05-20; 3 parallel cycles, 11 PRs merged.
 - [docs/archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)

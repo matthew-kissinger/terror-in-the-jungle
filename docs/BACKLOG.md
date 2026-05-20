@@ -1,6 +1,6 @@
 # Backlog
 
-Last verified: 2026-05-16 (post `cycle-mobile-webgl2-fallback-fix` close)
+Last verified: 2026-05-20 (post `campaign-2026-05-20-vehicle-boarding-and-water` close)
 
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
@@ -58,6 +58,80 @@ Spike memo and evidence:
 Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
+
+## Recently Completed (campaign-2026-05-20-vehicle-boarding-and-water)
+
+Three parallel cycles in
+[docs/archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
+(autonomous-loop posture). **15 PRs merged across the three cycles**
+without inter-cycle dispatch dependency. Closes the three 2026-05-20
+owner-walk + audit-surfaced gaps (player F-key boarding never wired
+despite shipped HUD prompt, OF river surface not rendered, OF motor
+pool clutter + duplicate M48). Campaign closed with the production
+deploy gate firing against master tip `e99be58e` via
+`gh workflow run deploy.yml --ref master` (deploy run `26182116715`,
+success) — explicit fulfillment of the owner ask "make sure water is
+proper in production as well."
+
+### Cycle #1 — `cycle-vekhikl-player-boarding-wire`
+
+Closes `VEKHIKL-UX-2` (zero-cycle carry-over). 5 R1 + 1 R2 in the
+brief; landed as 8 PRs after a mid-cycle hard-stop (3 of 5 executors
+terminated mid-thought at ≥90k tokens) was handled via re-dispatch
+with tighter inline prompts + a split of the largest R1 task into a
+factory module + handler/composer wire. Pilot seat only — M48 + PBR
+gunner swaps deferred to `cycle-vekhikl-seat-swaps` on the hold list.
+
+- [#288](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/288) `02fcf31c` `vekhikl-board-ground-adapter-wire` — Wired M151 jeep boarding end-to-end (`GroundVehiclePlayerAdapter` construction + `VehicleSessionController.enterVehicle('ground', _, _)` call site).
+- [#289](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/289) `4b25e45b` `vekhikl-board-tank-adapter-wire` — Wired M48 Patton pilot boarding (`TankPlayerAdapter` construction; W/S throttle + A/D skid-steer + F enter/exit).
+- [#293](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/293) `b23e882f` `vekhikl-board-input-router` (retry) — F-key router with mortar fallback ("no-vehicle-in-6m → onMortarFire" path is the load-bearing regression sentinel; F-while-seated triggers exit, not mortar fire). Original R1 task #3 executor terminated at ≥90k tokens; retry succeeded with a tighter inline prompt.
+- [#296](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/296) `5582a127` `vekhikl-board-watercraft-and-emplacement-wire` — Wired Sampan + PBR + M2HB boarding (`WatercraftPlayerAdapter` + `EmplacementPlayerAdapter` construction; PBR/WatercraftIVehicle structural shape gap bridged via local helper in this PR; centralized in #297).
+- [#297](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/297) `d455078c` `vekhikl-board-factory-module` (split A retry) — Per-category player adapter factory module (`createGroundVehiclePlayerAdapter` / `Tank` / `Watercraft` / `Emplacement` returning the right adapter for the right IVehicle category). Split out of the original `vekhikl-board-controller-factory` task to fit executor context budget after the original terminated mid-thought.
+- [#298](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/298) `8560a280` `vekhikl-board-handler-and-composer-wire` (split B retry) — `PlayerController` boarding handler + composer wire. Constructs the factory once at startup and routes the F-key router's "board nearest" intent through it.
+- [#299](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/299) `a6cfef34` `vekhikl-board-system-updater-wire` — Wired `GroundVehicleProximityChecker` (and the four sibling category checkers) through `SystemUpdater` so the proximity radius latches the prompted vehicle id under the live game loop (without this, the HUD prompt fires but the F-key router has no vehicle id to forward to `enterVehicle`).
+- [#300](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/300) `e99be58e` `vekhikl-board-integration-test-and-playtest-evidence` — L3 cross-category integration test at `src/integration/vehicle/board-five-types.test.ts` (7/7 assertions; real factory + proximity checker + session controller against all five categories, zero stubs at unit-under-test layer); 15-shot capture script `scripts/capture-vekhikl-player-boarding-shots.ts` (5 vehicles × 3 frames each: pre-press, post-press, post-exit; PNG run deferred to owner walk-through per R2 budget-discipline note); playtest memo + PLAYTEST_PENDING row.
+
+Carry-over delta: 0 (VEKHIKL-UX-2 opened+closed). Cycle retro item:
+the executor context-budget hard-stop pattern is captured in
+[docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](FRAMEWORK_RECOVERY_PLAN_2026-05-20.md)
+Pass 2 (framework trim).
+
+### Cycle #2 — `cycle-of-river-surface-enable`
+
+Closes `VODA-OF-1` (zero-cycle carry-over). 3 R1 + 1 R2; landed as
+4 PRs. Mandatory `terrain-nav-reviewer` APPROVE on the config flip PR.
+
+- [#286](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/286) `3312d0f6` `of-water-config-flip` — Flipped `waterEnabled: true` on `OpenFrontierConfig.ts`; kept the global sea-level plane enabled (`globalWaterPlaneEnabled: true` by inheritance, intentional because OF terrain centers near y=0, unlike A Shau which disabled it at +580 m valley floor). `terrain-nav-reviewer` APPROVE.
+- [#291](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/291) `0b28d689` `of-water-spawn-snap-resolver` — Snapped OF Sampan (`-200, 0, 100`) and PBR (`-880, 0, -760`) spawns to the water-surface Y at scenario load so the hulls start on the river surface, not 0 m above it. Watercraft physics expects the hull-on-surface initial state.
+- [#292](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/292) `b78276cc` `of-water-capture-pair` — Playwright pre/post capture pair via new `scripts/capture-of-river-surface-shots.ts`. **Post captures stale at write time** (executor ran the post step before #286 + #291 merged, so committed `summary-of-water-post.json` records `riverSurface.visible: false` across all three records). Regeneration flagged as the load-bearing close gate in the playtest memo retro section.
+- [#294](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/294) `f418443f` `of-water-playtest-evidence` — Playtest memo + PLAYTEST_PENDING row landed with the stale-post-capture regen gate explicitly called out.
+
+Carry-over delta: 0 (VODA-OF-1 opened+closed).
+
+### Cycle #3 — `cycle-motor-pool-reflow-and-tank-dedup`
+
+Closes `VEKHIKL-LAYOUT-1` (zero-cycle carry-over). 2 R1 + 1 R2;
+landed as 3 PRs. User-approved scope expansion in PR #290 (prefab
+split) flagged at mid-cycle.
+
+- [#287](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/287) `71a8d2f0` `of-tank-relocate-to-motor-pool` — Relocated the real M48 Tank IVehicle scenario spawn from West FOB `(-1025, 0, -760)` to the motor pool bay `(183, 0, -1173)`; removed the dressing M48 mesh from the OF prefab so OF has exactly one M48 silhouette.
+- [#290](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/290) `d74abb36` `motor-pool-heavy-reflow` — Reflowed `motor_pool_heavy` into staggered bays (z ∈ [8, 18], yaw 72° spread π × 0.3 → 0.7, ≥1.5 m bounding-box clearance per pair); flanked AMMO/SUPPLY/FUEL crates around the comms tower at x=-24 (no longer behind vehicles). **User-approved scope expansion**: the OF reflow's M48 bay sat outside A Shau's 34 m footprint, so the shared prefab was split into `motor_pool_heavy_of` + `motor_pool_heavy_ashau` with side-effects in `gameModeTypes.ts` + `scripts/check-terrain-visual.ts` for the new prefab IDs (A Shau half preserves the cycle-vekhikl-3-shipped layout byte-for-byte).
+- [#295](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/295) `34d202c5` `motor-pool-and-tank-dedup-playtest-evidence` — 5-shot capture script (`of-motor-pool-pre/post`, `ashau-motor-pool-pre/post`, `of-fob-no-tank` single-state); optional `of-motor-pool-tank-prompt.png` flag-gated on cycle #1 boarding wire landing first. PNG run deferred to owner walk-through per R2 budget-discipline note.
+
+Carry-over delta: 0 (VEKHIKL-LAYOUT-1 opened+closed). Cycle-retro
+item: prefab-ID additions ripple to `gameModeTypes.ts` +
+`scripts/check-terrain-visual.ts` in any future prefab-split cycle.
+
+### Campaign-level summary
+
+- **15 PRs merged across the three cycles** (cycle #1 boarding: 8 PRs; cycle #2 OF water: 4 PRs; cycle #3 motor pool: 3 PRs).
+- One mid-cycle hard-stop in cycle #1 R1 (executor context-budget overflow on 3 of 5 tasks) handled via tighter-prompt re-dispatch + task split into a factory module + handler/composer wire. Zero fence changes; zero perf hard-stops; zero CI red after retries.
+- Intermittent sandbox blocked git commit/push from 3 worktrees (#291, #298, #299) at ~30% incidence — orchestrator-side push from the main session unblocked each. Flagged in [docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](FRAMEWORK_RECOVERY_PLAN_2026-05-20.md).
+- Production deploy gate fired against master tip `e99be58e` via `gh workflow run deploy.yml --ref master` (deploy run `26182116715` → success). Explicit fulfillment of the owner ask "make sure water is proper in production as well."
+- Carry-over count: 6 → 6 (zero net change; three zero-cycle IDs opened+closed in-campaign).
+- Hold list intact: `cycle-vekhikl-seat-swaps`, `cycle-vekhikl-5-fleet-expansion`, `cycle-sky-screen-space-quad`, `cycle-stabilizat-1-baselines-refresh` remain owner-gated on the autonomous-loop-deferred playtest evidence.
+- Owner playtests deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) across all three cycles. Two known stale-post-capture regen gates (PR #292 OF water, PR #295 motor pool PNG run) called out in the respective playtest memos as load-bearing close gates for the deferred owner walks.
+- Next work batch: framework recovery plan at [docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](FRAMEWORK_RECOVERY_PLAN_2026-05-20.md) (landed in-campaign as commit `45d77250`; owner-gated post-compact review).
 
 ## Recently Completed (campaign-2026-05-19-visual-and-wayfinding)
 
