@@ -36,69 +36,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
+  setup:
+    # Shared install + build runs once. Downstream jobs restore the cache
+    # instead of re-running `npm ci` + game-field-kits checkout + build five
+    # separate times (~20 cumulative compute min per PR pre-this-job).
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    outputs:
+      cache-key: ${{ steps.cache-key.outputs.key }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Checkout game field kits
-        env:
-          GAME_FIELD_KITS_DEPLOY_KEY: ${{ secrets.GAME_FIELD_KITS_DEPLOY_KEY }}
-        run: bash .github/scripts/checkout-game-field-kits.sh
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: Build game field kits packages
-        run: bash .github/scripts/build-game-field-kits.sh
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Checkout game field kits
-        env:
-          GAME_FIELD_KITS_DEPLOY_KEY: ${{ secrets.GAME_FIELD_KITS_DEPLOY_KEY }}
-        run: bash .github/scripts/checkout-game-field-kits.sh
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: Build game field kits packages
-        run: bash .github/scripts/build-game-field-kits.sh
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Unit and integration tests
-        run: npm run test:run
-
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Compute setup cache key
+        id: cache-key
+        run: |
+          key="${{ runner.os }}-setup-${{ hashFiles('package-lock.json', '.github/scripts/checkout-game-field-kits.sh', '.github/scripts/build-game-field-kits.sh') }}"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
 
       - name: Checkout game field kits
         env:
@@ -120,19 +75,23 @@ jobs:
       - name: Build
         run: npm run build
 
-  smoke:
+      - name: Save setup cache
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.cache-key.outputs.key }}
+          path: |
+            node_modules
+            dist
+            ../game-field-kits
+
+  lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [lint, test]
+    timeout-minutes: 10
+    needs: [setup]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Checkout game field kits
-        env:
-          GAME_FIELD_KITS_DEPLOY_KEY: ${{ secrets.GAME_FIELD_KITS_DEPLOY_KEY }}
-        run: bash .github/scripts/checkout-game-field-kits.sh
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -140,11 +99,99 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Build game field kits packages
-        run: bash .github/scripts/build-game-field-kits.sh
+      - name: Restore setup cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ needs.setup.outputs.cache-key }}
+          path: |
+            node_modules
+            dist
+            ../game-field-kits
+          fail-on-cache-miss: true
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Lint
+        run: npm run lint
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [setup]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Restore setup cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ needs.setup.outputs.cache-key }}
+          path: |
+            node_modules
+            dist
+            ../game-field-kits
+          fail-on-cache-miss: true
+
+      - name: Unit and integration tests
+        run: npm run test:run
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [setup]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Restore setup cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ needs.setup.outputs.cache-key }}
+          path: |
+            node_modules
+            dist
+            ../game-field-kits
+          fail-on-cache-miss: true
+
+      - name: Build
+        run: npm run build
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [setup, lint, test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Restore setup cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ needs.setup.outputs.cache-key }}
+          path: |
+            node_modules
+            dist
+            ../game-field-kits
+          fail-on-cache-miss: true
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
@@ -197,7 +244,7 @@ jobs:
     # fan out to the full 4-device matrix. Original 4-device matrix sat on
     # an 18-min ceiling per device; this default cuts wall-clock by ~3/4.
     timeout-minutes: 18
-    needs: [lint, test, mobile-ui-changes]
+    needs: [setup, lint, test, mobile-ui-changes]
     if: needs.mobile-ui-changes.outputs.hit == 'true' || needs.mobile-ui-changes.outputs.full == 'true'
     strategy:
       # Don't kill sibling devices when one fails — full coverage when the
@@ -210,22 +257,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Checkout game field kits
-        env:
-          GAME_FIELD_KITS_DEPLOY_KEY: ${{ secrets.GAME_FIELD_KITS_DEPLOY_KEY }}
-        run: bash .github/scripts/checkout-game-field-kits.sh
-
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Build game field kits packages
-        run: bash .github/scripts/build-game-field-kits.sh
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Restore setup cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ needs.setup.outputs.cache-key }}
+          path: |
+            node_modules
+            dist
+            ../game-field-kits
+          fail-on-cache-miss: true
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
@@ -282,17 +328,12 @@ jobs:
   perf:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [perf-changes]
+    needs: [setup, perf-changes]
     if: needs.perf-changes.outputs.hit == 'true' || needs.perf-changes.outputs.full == 'true'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Checkout game field kits
-        env:
-          GAME_FIELD_KITS_DEPLOY_KEY: ${{ secrets.GAME_FIELD_KITS_DEPLOY_KEY }}
-        run: bash .github/scripts/checkout-game-field-kits.sh
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -300,11 +341,15 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Build game field kits packages
-        run: bash .github/scripts/build-game-field-kits.sh
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Restore setup cache
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ needs.setup.outputs.cache-key }}
+          path: |
+            node_modules
+            dist
+            ../game-field-kits
+          fail-on-cache-miss: true
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
