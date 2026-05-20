@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last verified: 2026-05-20 (campaign 2026-05-19-visual-and-wayfinding CLOSED — 3 parallel cycles, 11 PRs merged, zero net carry-over delta; previous post-WebGPU campaign was cut at cycle #12 on 2026-05-18)
+Last verified: 2026-05-20 (campaign 2026-05-20-vehicle-boarding-and-water QUEUED — 3 parallel cycles pre-dispatch: F-key boarding glue, Open Frontier river surface, motor pool reflow + OF M48 dedup; closes with a production deploy gate; previous 2026-05-19-visual-and-wayfinding campaign CLOSED 2026-05-20)
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -46,27 +46,46 @@ strategic sim, budget arbiter v2) are queued as follow-up cycles on master.
 `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum, plus the
 KONVEYER review packet bundle.
 
-**Active campaign: NONE.** The 2026-05-19 visual-and-wayfinding
-campaign closed 2026-05-20 at master commit `4dd2c054`. Close memo
-at [docs/BACKLOG.md](docs/BACKLOG.md) `## Recently Completed
-(campaign-2026-05-19-visual-and-wayfinding)`. 11 PRs merged across
-3 parallel cycles (sky LUT bump; A Shau DEM edge taper + slope-aware
-route stamping + water enable; vehicle proximity HUD prompt +
-minimap/fullmap/compass markers). Zero net carry-over delta; three
-zero-cycle IDs (KB-SKY-LUT-BANDING, KB-DEM-EDGE-TAPER, VEKHIKL-UX-1)
-opened and closed in-cycle; Stage D3 of cycle-2026-05-09-cdlod-edge-morph
-closed by cycle 2.
+**Active campaign: `campaign-2026-05-20-vehicle-boarding-and-water`**
+([docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)),
+queued and ready for `/orchestrate`. Three parallel cycles (posture
+autonomous-loop, auto-advance yes). Closes a critical bug the
+2026-05-19 wayfinding cycle missed: the "Press F to board" HUD prompt
+shipped without the F-key handler, so all five drivable vehicles
+(M151, M48, Sampan, PBR, M2HB) are unenterable today. NPC boarding
+paths still work.
+
+Queued cycles:
+1. `cycle-vekhikl-player-boarding-wire` — F-key router (mortar
+   fallback) + per-category adapter factory + 4 adapter wires +
+   integration test. Opens+closes `VEKHIKL-UX-2`. Pilot seat only;
+   gunner swaps deferred. 5 R1 tasks.
+2. `cycle-of-river-surface-enable` — flip OF `waterEnabled: true`,
+   wire water-surface spawn snap for Sampan + PBR, capture pre/post
+   pair. Opens+closes `VODA-OF-1`. Mandatory `terrain-nav-reviewer`
+   on the config flip PR. 3 R1 tasks.
+3. `cycle-motor-pool-reflow-and-tank-dedup` — reflow
+   `motor_pool_heavy` for ≥1.5 m clearance + ≥60° yaw spread; remove
+   dressing M48 from prefab; relocate OF M48 scenario spawn into the
+   motor pool bay. A Shau motor pool must not regress (split prefab
+   if needed). Opens+closes `VEKHIKL-LAYOUT-1`. 2 R1 tasks.
+
+**Campaign closes with a production deploy gate** —
+`gh workflow run deploy.yml --ref master` after all three cycles
+close. This is the explicit fulfillment of the "make sure water is
+proper in production" owner ask. Deployed SHA recorded in the close
+memo.
 
 **Hold list (owner-gated, NOT auto-promoted):**
+- `cycle-vekhikl-seat-swaps` — pilot↔gunner swap on M48 + PBR.
+  Trigger: owner signs off on cycle #1 playtest evidence.
 - `cycle-vekhikl-5-fleet-expansion` — M113 APC + M35 truck + T-54
   tank (+ optional ZU-23-2 AA + LCM-8). Trigger: owner signs off on
-  cycle-vehicle-wayfinding-and-prompts playtest evidence (deferred
-  to [docs/PLAYTEST_PENDING.md](docs/PLAYTEST_PENDING.md) under
-  autonomous-loop).
+  both cycle-vehicle-wayfinding-and-prompts AND cycle #1 of this
+  campaign.
 - `cycle-sky-screen-space-quad` — Hillaire-style screen-space sky
-  rework. Trigger: cycle #1 LUT bump ships but owner playtest still
-  shows visible artifacts, OR cycle #2 ships but A Shau valley
-  flight still shows banding beyond what the LUT bump explains.
+  rework. Trigger: cycle #1 of 2026-05-19 LUT bump shipped but
+  owner playtest still shows visible artifacts.
 - `cycle-stabilizat-1-baselines-refresh` — STABILIZAT-1 / combat120
   baseline refresh on a quiet machine. Removed from post-WebGPU
   campaign on 2026-05-18 per owner direction; may be re-queued as a
@@ -120,10 +139,11 @@ discipline, parallel R&D protocol, and reporting standard.
 
 Phases 0/1/2/2.4/2.5 done. Phases 3–9 queued (refactor campaign,
 deprioritized behind the WebGPU + ground-vehicle vision directions).
-Post-WebGPU campaign closed 2026-05-18 at cycle #12; the
-2026-05-19 visual-and-wayfinding campaign now runs (above). To
-queue additional work, append to that manifest or open a fresh
-campaign manifest.
+Post-WebGPU campaign closed 2026-05-18 at cycle #12. The
+2026-05-19 visual-and-wayfinding campaign closed 2026-05-20 with 11
+PRs across 3 parallel cycles. The 2026-05-20 vehicle-boarding-and-water
+campaign now runs (queued above). To queue additional work, append to
+that manifest or open a fresh campaign manifest.
 
 For full context (audit findings, Phases 0–2 outcomes, Phase 3+ scope):
 [docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md](docs/archive/STABILIZATION_CHECKPOINT_2026-05-09.md).
@@ -147,7 +167,10 @@ carry-overs to respect ≤12 limit; bundle into next cycle that touches
 relevant area): A Shau test claim softening; perf ceiling 1.0→2.0ms if
 flaky; tileKey() guard comment; mobile-ui CI timeout 25→30 min headroom.
 
-Campaign manifests (all closed; archive-only):
+Campaign manifests:
+- **Active**:
+  [docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
+  — queued 2026-05-20; 3 parallel cycles pre-dispatch.
 - [docs/archive/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md](docs/archive/CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING.md)
   — closed 2026-05-20; 3 parallel cycles, 11 PRs merged.
 - [docs/archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)

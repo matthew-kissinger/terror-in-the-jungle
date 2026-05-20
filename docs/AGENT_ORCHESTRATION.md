@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last verified: 2026-05-20 (campaign 2026-05-19-visual-and-wayfinding CLOSED — all three parallel cycles closed per their own acceptance criteria; 11 PRs merged; previous post-WebGPU campaign cut at cycle #12 on 2026-05-18)
+Last verified: 2026-05-20 (campaign 2026-05-20-vehicle-boarding-and-water QUEUED — three parallel cycles pending dispatch covering the F-key boarding glue, Open Frontier river surface, and motor pool reflow + OF M48 dedup; previous 2026-05-19-visual-and-wayfinding campaign closed 2026-05-20 at master commit `4dd2c054`)
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -154,37 +154,70 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: NONE (campaign 2026-05-19-visual-and-wayfinding closed 2026-05-20)
+## Current cycle: campaign-2026-05-20-vehicle-boarding-and-water (parallel, queued, pre-dispatch)
 
-The orchestrator has no active cycle. The 2026-05-19 visual-and-wayfinding
-campaign closed at master commit `4dd2c054` on 2026-05-20 after all three
-parallel cycles closed per their own acceptance criteria (11 PRs merged
-total). Close memo lives at the top of
-[docs/BACKLOG.md](BACKLOG.md) `## Recently Completed
-(campaign-2026-05-19-visual-and-wayfinding)`.
+Active campaign: [docs/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md](CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md).
+Posture **autonomous-loop**, **auto-advance: yes**. Three independent
+cycles dispatched in parallel under a shared concurrency cap of 10
+(cycle #1: 5 R1 tasks; cycle #2: 3 R1 tasks; cycle #3: 2 R1 tasks).
 
-To start a new cycle: append a new campaign manifest (or new cycle row to
-an existing manifest), author the cycle brief at `docs/tasks/<slug>.md`,
-and replace this section with the cycle-specific pointer (slug, tasks,
-DAG, concurrency cap, reviewer policy, posture, hard-stops).
+**Cycle #1 — `cycle-vekhikl-player-boarding-wire`** (5 R1 + 1 R2;
+opens+closes VEKHIKL-UX-2). Wires the missing F-key → ground / tank /
+watercraft / emplacement boarding glue. Closes a critical bug: the
+2026-05-19 wayfinding cycle shipped a "Press F to board" HUD prompt
+but never wired the F-key handler or constructed the four per-category
+player adapters. Mortar fire stays on F via a fallback router. Pilot
+seat only — M48 + PBR gunner swaps deferred to `cycle-vekhikl-seat-swaps`
+on the hold list. Brief:
+[docs/tasks/cycle-vekhikl-player-boarding-wire.md](tasks/cycle-vekhikl-player-boarding-wire.md).
+R1 tasks: `vekhikl-board-input-router`,
+`vekhikl-board-controller-factory`, `vekhikl-board-ground-adapter-wire`,
+`vekhikl-board-tank-adapter-wire`,
+`vekhikl-board-watercraft-and-emplacement-wire`. R2:
+`vekhikl-board-integration-test-and-playtest-evidence`.
+
+**Cycle #2 — `cycle-of-river-surface-enable`** (3 R1 + 1 R2;
+opens+closes VODA-OF-1). Flips `waterEnabled: true` on
+`OpenFrontierConfig`, snaps OF Sampan + PBR to the water-surface Y at
+spawn, captures pre/post Playwright pair. Keeps the global sea-level
+plane enabled (OF terrain centers near y=0; unlike A Shau which
+disabled the global plane because its valley floor sits at +580 m).
+Brief:
+[docs/tasks/cycle-of-river-surface-enable.md](tasks/cycle-of-river-surface-enable.md).
+R1 tasks: `of-water-config-flip`, `of-water-spawn-snap-resolver`,
+`of-water-capture-pair`. R2: `of-water-playtest-evidence`. Mandatory
+`terrain-nav-reviewer` on the config flip PR.
+
+**Cycle #3 — `cycle-motor-pool-reflow-and-tank-dedup`** (2 R1 + 1 R2;
+opens+closes VEKHIKL-LAYOUT-1). Reflows `motor_pool_heavy` for ≥1.5 m
+clearance + ≥60° yaw spread, removes the dressing M48 from the OF
+motor pool prefab, and relocates the OF scenario M48 spawn anchor to
+the motor pool bay so OF has exactly one boardable tank. A Shau motor
+pool must not regress (split the prefab if needed). Brief:
+[docs/tasks/cycle-motor-pool-reflow-and-tank-dedup.md](tasks/cycle-motor-pool-reflow-and-tank-dedup.md).
+R1 tasks: `motor-pool-heavy-reflow`, `of-tank-relocate-to-motor-pool`.
+R2: `motor-pool-and-tank-dedup-playtest-evidence`.
+
+**Campaign-close hard gate**: after all three cycles close on master,
+orchestrator runs `gh workflow run deploy.yml --ref master`, polls
+until deploy success, and records the deployed SHA in the close memo
+in `docs/BACKLOG.md`. This is the explicit fulfillment of the
+"make sure water is proper in production" owner ask.
 
 **Hold list (owner-gated, do NOT auto-promote):**
-- `cycle-vekhikl-5-fleet-expansion` — M113 APC + M35 truck + T-54 tank
-  (optional ZU-23-2 AA + LCM-8). Trigger: owner signs off on
-  cycle-vehicle-wayfinding-and-prompts playtest evidence (deferred to
-  PLAYTEST_PENDING under autonomous-loop posture).
-- `cycle-sky-screen-space-quad` — Hillaire-style screen-space sky rework.
-  Trigger: cycle #1 LUT bump ships but owner playtest still shows visible
-  artifacts, OR cycle #2 ships but A Shau valley flight still shows
-  banding beyond what the LUT bump explains.
+- `cycle-vekhikl-seat-swaps` — pilot↔gunner swap on M48 + PBR.
+  Trigger: owner signs off on cycle #1 playtest evidence.
+- `cycle-vekhikl-5-fleet-expansion` — M113 APC + M35 truck + T-54
+  tank (+ optional ZU-23-2 AA + LCM-8). Trigger: owner signs off on
+  both cycle-vehicle-wayfinding-and-prompts AND cycle #1 of this
+  campaign.
+- `cycle-sky-screen-space-quad` — Hillaire-style screen-space sky
+  rework. Carried over from the 2026-05-19 campaign hold list.
 - `cycle-stabilizat-1-baselines-refresh` — STABILIZAT-1 / combat120
-  baseline refresh on a quiet machine. Removed from the post-WebGPU
-  campaign on 2026-05-18 per owner direction; may be re-queued as a
-  standalone cycle later.
+  baseline refresh. Carried over from the post-WebGPU campaign close.
 
-**Resume:** orchestrator stops after a campaign close. Restart via
-`/orchestrate` once a new campaign manifest or single-cycle brief is
-queued.
+**Resume:** orchestrator runs the campaign dispatch protocol when
+`/orchestrate` fires. All three cycles launch in parallel.
 
 
 Hard-stops flip `Auto-advance: yes` → `PAUSED` in the campaign manifest,

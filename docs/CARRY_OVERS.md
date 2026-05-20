@@ -1,6 +1,6 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-20 (post `campaign-2026-05-19-visual-and-wayfinding` close — 3 parallel cycles, 11 PRs; zero net carry-over delta — KB-SKY-LUT-BANDING + KB-DEM-EDGE-TAPER + VEKHIKL-UX-1 all opened and closed in-cycle; Stage D3 of cycle-2026-05-09-cdlod-edge-morph closed)
+Last verified: 2026-05-20 (post `campaign-2026-05-19-visual-and-wayfinding` close + queue of `campaign-2026-05-20-vehicle-boarding-and-water` — 3 parallel cycles queued: VEKHIKL-UX-2 (player boarding never wired — F press does nothing), VODA-OF-1 (Open Frontier river surface not rendered), VEKHIKL-LAYOUT-1 (motor pool clutter + OF M48 duplicate); each is a zero-cycle ID that opens at cycle launch and closes at cycle close, so projected net delta at campaign close is 0)
 
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
@@ -308,6 +308,31 @@ History log:
   promotion (`cycle-vekhikl-5-fleet-expansion`,
   `cycle-sky-screen-space-quad`) remains owner-gated on the
   deferred playtests; not auto-promoted at this close.
+- 2026-05-20 — `campaign-2026-05-20-vehicle-boarding-and-water` queue
+  (autonomous-loop posture, parallel campaign, pre-dispatch). Three
+  parallel cycles queued from a 2026-05-20 owner walk + codebase
+  audit. None of the per-category player adapters
+  (`GroundVehiclePlayerAdapter`, `TankPlayerAdapter`,
+  `WatercraftPlayerAdapter`, `EmplacementPlayerAdapter`) are
+  constructed by production code, and no
+  `VehicleSessionController.enterVehicle('ground' | 'tank' |
+  'watercraft' | 'emplacement', _, _)` call exists — only the
+  helicopter + fixed_wing categories have working boarding glue,
+  even though five drivable vehicle types ship in master. Cycle #1
+  `cycle-vekhikl-player-boarding-wire` wires the missing glue
+  (opens+closes VEKHIKL-UX-2). Cycle #2
+  `cycle-of-river-surface-enable` flips OF `waterEnabled: true` +
+  adds water-surface spawn snap for Sampan + PBR
+  (opens+closes VODA-OF-1). Cycle #3
+  `cycle-motor-pool-reflow-and-tank-dedup` reflows
+  `motor_pool_heavy` placements and relocates the OF M48 scenario
+  spawn into the motor pool while removing the duplicate dressing
+  M48 (opens+closes VEKHIKL-LAYOUT-1). Each ID is zero-cycle. Net
+  projected delta at campaign close: 0 (active list stays at 6).
+  Hold-list additions: `cycle-vekhikl-seat-swaps` (M48 + PBR pilot↔
+  gunner swap; gated on the boarding cycle's playtest evidence).
+  Campaign closes only after production deploy completes — explicit
+  owner ask "make sure water is proper in production as well".
 
 ## Closed
 
