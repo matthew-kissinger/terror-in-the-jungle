@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { SystemKeyToType } from './SystemRegistry';
 import { GameMode } from '../config/gameModeTypes';
+import type { GameModeConfig } from '../config/gameModeTypes';
 import { Logger } from '../utils/Logger';
 import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacementSpawn';
 import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
@@ -31,6 +32,7 @@ type OperationalRuntimeRefs = Pick<
   | 'ticketSystem'
   | 'vehicleManager'
   | 'warSimulator'
+  | 'waterSystem'
   | 'worldFeatureSystem'
   | 'zoneManager'
 >;
@@ -68,6 +70,7 @@ interface OperationalRuntimeGroups {
     | 'playerController'
     | 'terrainSystem'
     | 'vehicleManager'
+    | 'waterSystem'
     | 'worldFeatureSystem'
   >;
   airSupportRuntime: Pick<
@@ -118,6 +121,7 @@ export function createOperationalRuntimeGroups(
       playerController: refs.playerController,
       terrainSystem: refs.terrainSystem,
       vehicleManager: refs.vehicleManager,
+      waterSystem: refs.waterSystem,
       worldFeatureSystem: refs.worldFeatureSystem,
     },
     airSupportRuntime: {
@@ -383,6 +387,13 @@ const SAMPAN_MODES_BY_GAMEMODE: Partial<Record<GameMode, SampanScenarioMode>> = 
   [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
 };
 
+// Per-craft initial freeboard offsets applied above the water surface
+// at spawn so the hull starts straddling the waterline rather than
+// fully submerged. Buoyancy still equilibrates within the first second
+// of physics; this is purely for visual continuity at spawn.
+const SAMPAN_SPAWN_FREEBOARD_METERS = 0.35;
+const PBR_SPAWN_FREEBOARD_METERS = 0.30;
+
 function wireSampanRuntime(
   runtime: OperationalRuntimeGroups['vehicleRuntime'],
   options: OperationalRuntimeOptions
@@ -391,7 +402,7 @@ function wireSampanRuntime(
   if (!scene) return;
 
   const spawnedModes = new Set<SampanScenarioMode>();
-  runtime.gameModeManager.onModeChanged((mode) => {
+  runtime.gameModeManager.onModeChanged((mode, config) => {
     const scenarioKey = SAMPAN_MODES_BY_GAMEMODE[mode];
     if (!scenarioKey) return;
     if (spawnedModes.has(scenarioKey)) return;
@@ -404,7 +415,13 @@ function wireSampanRuntime(
         const ids = runtime.vehicleManager.spawnScenarioSampans({
           scene,
           modes: [scenarioKey],
-          resolvePosition: (_m, base) => snapSampanToTerrain(base, runtime.terrainSystem),
+          resolvePosition: (_m, base) => snapWatercraftToSurface(
+            base,
+            runtime.terrainSystem,
+            runtime.waterSystem,
+            config as GameModeConfig | undefined,
+            SAMPAN_SPAWN_FREEBOARD_METERS,
+          ),
         });
         Logger.info('vehicle', `Sampan scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
       } catch (error) {
@@ -414,26 +431,6 @@ function wireSampanRuntime(
       }
     }, 0);
   });
-}
-
-const _sampanScratch = new THREE.Vector3();
-
-function snapSampanToTerrain(
-  base: THREE.Vector3,
-  terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
-): THREE.Vector3 {
-  // For the MVP we snap the hull to terrain height; the global water
-  // sampler is wired by the WaterSystem injection path post-spawn
-  // (Sampan.setWaterSampler). The hull then settles to its equilibrium
-  // waterline under buoyancy regardless of this initial Y. Snap is
-  // still useful so a freshly-spawned sampan does not start above the
-  // valley ridgeline or below the seabed.
-  _sampanScratch.copy(base);
-  if (typeof terrainSystem.getHeightAt === 'function') {
-    const y = terrainSystem.getHeightAt(base.x, base.z);
-    if (Number.isFinite(y)) _sampanScratch.y = y;
-  }
-  return _sampanScratch.clone();
 }
 
 // Maps GameMode -> the PBR scenario-spawn key. Same shape as the M2HB
@@ -456,25 +453,30 @@ function wirePBRRuntime(
   if (!scene) return;
 
   const spawnedModes = new Set<PBRScenarioMode>();
-  runtime.gameModeManager.onModeChanged((mode) => {
+  runtime.gameModeManager.onModeChanged((mode, config) => {
     const scenarioKey = PBR_MODES_BY_GAMEMODE[mode];
     if (!scenarioKey) return;
     if (spawnedModes.has(scenarioKey)) return;
     spawnedModes.add(scenarioKey);
     // Defer one frame so the per-mode terrain provider is hot before
     // resolvePosition runs `getHeightAt` — mirrors the M2HB / M48
-    // wiring's setTimeout(0) deferral above. The PBR will eventually
-    // snap to the water surface; until the river-height query is
-    // wired, terrain height is a safe fallback (boat lands on dry
-    // ground but the WatercraftPhysics buoyancy contract handles the
-    // rest once the WaterSystem sampler is attached).
+    // wiring's setTimeout(0) deferral above. When the scenario has
+    // `waterEnabled` set, the snap consults WaterSurfaceSampler first
+    // (hydrology river surface or global plane); when no water covers
+    // the spawn point, terrain height is the fallback.
     setTimeout(() => {
       try {
         const ids = runtime.vehicleManager.spawnScenarioPBRs({
           scene,
           m2hbSystem: m2hb,
           modes: [scenarioKey],
-          resolvePosition: (_m, base) => snapPBRToTerrain(base, runtime.terrainSystem),
+          resolvePosition: (_m, base) => snapWatercraftToSurface(
+            base,
+            runtime.terrainSystem,
+            runtime.waterSystem,
+            config as GameModeConfig | undefined,
+            PBR_SPAWN_FREEBOARD_METERS,
+          ),
         });
         Logger.info('vehicle', `PBR scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
       } catch (error) {
@@ -486,18 +488,41 @@ function wirePBRRuntime(
   });
 }
 
-const _pbrScratch = new THREE.Vector3();
+const _watercraftScratch = new THREE.Vector3();
 
-function snapPBRToTerrain(
+/**
+ * Shared spawn snap for watercraft. When the active scenario has water
+ * enabled (`waterEnabled !== false`) and the WaterSystem reports a
+ * water surface at the spawn XZ (hydrology river or global plane), the
+ * hull is snapped to `waterY + freeboard` so it starts straddling the
+ * waterline. Otherwise the snap falls back to terrain height (mirrors
+ * the prior land-snap behavior so the hull does not spawn above the
+ * ridgeline or below the seabed). Returns a fresh Vector3 each call;
+ * scratch is internal.
+ */
+function snapWatercraftToSurface(
   base: THREE.Vector3,
   terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
+  waterSystem: OperationalRuntimeGroups['vehicleRuntime']['waterSystem'] | undefined,
+  config: GameModeConfig | undefined,
+  freeboard: number,
 ): THREE.Vector3 {
-  _pbrScratch.copy(base);
+  _watercraftScratch.copy(base);
+
+  const waterEnabled = config ? config.waterEnabled !== false : false;
+  if (waterEnabled && waterSystem && typeof waterSystem.getWaterSurfaceY === 'function') {
+    const waterY = waterSystem.getWaterSurfaceY(base);
+    if (typeof waterY === 'number' && Number.isFinite(waterY)) {
+      _watercraftScratch.y = waterY + freeboard;
+      return _watercraftScratch.clone();
+    }
+  }
+
   if (typeof terrainSystem.getHeightAt === 'function') {
     const y = terrainSystem.getHeightAt(base.x, base.z);
-    if (Number.isFinite(y)) _pbrScratch.y = y;
+    if (Number.isFinite(y)) _watercraftScratch.y = y;
   }
-  return _pbrScratch.clone();
+  return _watercraftScratch.clone();
 }
 
 function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRuntime']): void {

@@ -107,6 +107,11 @@ function createRefs() {
       getHeightAt: vi.fn((_x: number, _z: number) => 12),
     },
     ticketSystem: {},
+    waterSystem: {
+      // Default: dry. Individual tests override this to simulate water
+      // covering the spawn XZ.
+      getWaterSurfaceY: vi.fn((_position: THREE.Vector3) => null),
+    },
     vehicleManager: {
       getVehiclesByCategory: vi.fn(() => []),
       spawnScenarioM2HBEmplacements: vi.fn(() => ['m2hb_scenario_id']),
@@ -275,5 +280,76 @@ describe('OperationalRuntimeComposer', () => {
     expect(snapped?.x).toBe(10);
     expect(snapped?.y).toBe(42);
     expect(snapped?.z).toBe(20);
+  });
+
+  it('snaps Sampan + PBR spawn Y above the water surface when the scenario has water enabled and a surface covers the spawn XZ', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    refs.terrainSystem.getHeightAt = vi.fn(() => -5); // would be underwater seabed
+    refs.waterSystem.getWaterSurfaceY = vi.fn(() => 12);
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    getModeChangedCallback()?.('open_frontier', { waterEnabled: true });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const sampanCall = (refs.vehicleManager.spawnScenarioSampans.mock.calls as Array<[{
+      resolvePosition?: (m: string, base: THREE.Vector3) => THREE.Vector3;
+    }]>)[0]?.[0];
+    const sampanSnapped = sampanCall?.resolvePosition?.('open_frontier', new THREE.Vector3(-200, 0, 100));
+    expect(sampanSnapped?.x).toBe(-200);
+    expect(sampanSnapped?.z).toBe(100);
+    // Y lands above the water surface (sampler-reported Y plus per-craft freeboard).
+    expect(sampanSnapped?.y).toBeGreaterThan(12);
+    expect(sampanSnapped?.y).toBeLessThan(13);
+
+    const pbrCall = (refs.vehicleManager.spawnScenarioPBRs.mock.calls as Array<[{
+      resolvePosition?: (m: string, base: THREE.Vector3) => THREE.Vector3;
+    }]>)[0]?.[0];
+    const pbrSnapped = pbrCall?.resolvePosition?.('open_frontier', new THREE.Vector3(-880, 0, -760));
+    expect(pbrSnapped?.x).toBe(-880);
+    expect(pbrSnapped?.z).toBe(-760);
+    expect(pbrSnapped?.y).toBeGreaterThan(12);
+    expect(pbrSnapped?.y).toBeLessThan(13);
+  });
+
+  it('falls back to terrain height when no water surface covers the watercraft spawn XZ', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    refs.terrainSystem.getHeightAt = vi.fn(() => 17);
+    refs.waterSystem.getWaterSurfaceY = vi.fn(() => null); // hasWater = false
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    getModeChangedCallback()?.('open_frontier', { waterEnabled: true });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const sampanCall = (refs.vehicleManager.spawnScenarioSampans.mock.calls as Array<[{
+      resolvePosition?: (m: string, base: THREE.Vector3) => THREE.Vector3;
+    }]>)[0]?.[0];
+    const sampanSnapped = sampanCall?.resolvePosition?.('open_frontier', new THREE.Vector3(50, 0, 60));
+    expect(sampanSnapped?.y).toBe(17);
+
+    const pbrCall = (refs.vehicleManager.spawnScenarioPBRs.mock.calls as Array<[{
+      resolvePosition?: (m: string, base: THREE.Vector3) => THREE.Vector3;
+    }]>)[0]?.[0];
+    const pbrSnapped = pbrCall?.resolvePosition?.('open_frontier', new THREE.Vector3(50, 0, 60));
+    expect(pbrSnapped?.y).toBe(17);
+  });
+
+  it('skips the water sampler entirely when the scenario explicitly disables water', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    refs.terrainSystem.getHeightAt = vi.fn(() => 9);
+    refs.waterSystem.getWaterSurfaceY = vi.fn(() => 100); // would be tall water if consulted
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    getModeChangedCallback()?.('open_frontier', { waterEnabled: false });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const sampanCall = (refs.vehicleManager.spawnScenarioSampans.mock.calls as Array<[{
+      resolvePosition?: (m: string, base: THREE.Vector3) => THREE.Vector3;
+    }]>)[0]?.[0];
+    const sampanSnapped = sampanCall?.resolvePosition?.('open_frontier', new THREE.Vector3(0, 0, 0));
+    expect(sampanSnapped?.y).toBe(9);
+    expect(refs.waterSystem.getWaterSurfaceY).not.toHaveBeenCalled();
   });
 });
