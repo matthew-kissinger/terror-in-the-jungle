@@ -345,7 +345,7 @@ function mainAirfieldFeature(config: GameModeConfig): MapFeatureDefinition | nul
 
 function supportFoundationFeature(config: GameModeConfig): MapFeatureDefinition | null {
   const features = config.features ?? [];
-  return features.find((feature) => feature.prefabId === 'motor_pool_heavy')
+  return features.find((feature) => feature.prefabId?.startsWith('motor_pool_heavy'))
     ?? features.find((feature) => feature.prefabId === 'airfield_support_compound_small')
     ?? features.find((feature) => feature.id.includes('motor_pool'))
     ?? features.find((feature) => feature.kind === 'firebase' && feature.prefabId?.includes('firebase'))
