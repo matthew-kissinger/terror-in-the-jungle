@@ -43,8 +43,15 @@ export const M48_HULL_DIMENSIONS = {
  * same pattern `M2HBEmplacementSpawn` uses.
  */
 export const M48_SPAWN_OFFSETS = {
-  /** Open Frontier: US base — ~30 m east of the FOB centre at (-1025, 0, -760). */
-  open_frontier: { x: -995, z: -760, yaw: 0 },
+  /**
+   * Open Frontier: airfield Main Motor Pool bay — anchor `(155, 0, -1195)`
+   * (`OpenFrontierConfig.ts` `airfield_motor_pool`) plus the M48 bay
+   * slot `(28, 0, 22)` from the reflowed `motor_pool_heavy` prefab.
+   * The dressing M48 prop is removed from the prefab in the sibling
+   * `motor-pool-heavy-reflow` task, leaving this real Tank IVehicle as
+   * the only M48 visible in OF.
+   */
+  open_frontier: { x: 183, z: -1173, yaw: Math.PI * 0.55 },
   /** A Shau Valley: valley-road anchor near the south road bend. */
   a_shau_valley: { x: 40, z: 60, yaw: Math.PI * 0.25 },
 } as const;
