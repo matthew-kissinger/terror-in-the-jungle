@@ -1,303 +1,76 @@
 # Directives
 
-Last verified: 2026-05-18 (post `cycle-voda-3-watercraft` close; VODA-3 closed)
+Last verified: 2026-05-20 (slim refactor under `directives-slim-refactor`; full evidence prose now lives in per-id memo files under [`docs/directives/`](directives/)).
 
-Active directive list. Each entry has binary `open` / `done` status, owning
-subsystem, opening cycle, latest evidence link, and plain-English success
-criteria. Closed items stay as evidence trail. Carry-over discipline:
-[docs/CARRY_OVERS.md](CARRY_OVERS.md). Historical ledger prose:
-[docs/archive/PROJEKT_OBJEKT_143/](archive/PROJEKT_OBJEKT_143/).
+Active directive list. Each row is binary `open` / `code-complete` / `done` / `closed`, owning subsystem, latest evidence (one link or short pointer), and the most load-bearing success criterion. Verbose evidence has moved to per-id memo files; carry-over discipline remains [docs/CARRY_OVERS.md](CARRY_OVERS.md); historical ledger prose at [docs/archive/PROJEKT_OBJEKT_143/](archive/PROJEKT_OBJEKT_143/).
 
-## KB-STARTUP-1 - Mode-start terrain surface bake
-Status: open / candidate branch (`task/mode-startup-terrain-spike`). Owning subsystem: terrain / engine init / perf harness. Opened: 2026-05-13 mode-startup spike.
-Latest evidence: baseline `artifacts/perf/2026-05-13T03-49-44-385Z/startup-ui-zone-control` measured Zone Control at `modeClickToDeployVisible=27765ms` and `modeClickToPlayable=32473ms`; Open Frontier timed out past 120s in the same diagnostic pass. The spike evidence after worker offload is `artifacts/perf/2026-05-13T04-30-36-660Z/startup-ui-zone-control` (`modeClickToDeployVisible=1156ms`, worker bake 523.4ms), `artifacts/perf/2026-05-13T04-31-26-223Z/startup-ui-open-frontier` (`3387ms`, worker bake 2374.7ms), and `artifacts/perf/2026-05-13T04-34-04-814Z/startup-ui-tdm` (`1185ms`, worker bake 236.8ms). Design memo: `docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md`.
-Cache finding: Recast WASM, Vite build assets, and prebaked navmesh delivery were already on the correct immutable/header path. The blocker was synchronous terrain surface CPU work after mode select, not a missing WASM/navmesh cache push.
-Success criteria:
-- Mode-click deploy UI appears quickly in production-shaped startup probes for Zone Control, Open Frontier, and TDM, without returning terrain baking to the main-thread click path.
-- Worker terrain baking uses transferable typed arrays and serialized provider configs; no fenced-interface change.
-- Open Frontier and A Shau visual review accepts the source-backed visual-margin approximation before merge. If not accepted, replace it with persistent/prebaked visual-surface artifacts or IndexedDB/OPFS cache, not a synchronous fallback.
-- `npm run typecheck`, `npm run lint`, `npm run lint:budget`, `npm run test:quick`, `npm run build`, and the three `perf-startup-ui` probes are linked in the PR. The existing CDLOD micro-timing flake must be called out if `validate:fast` fails only there.
+## Open
 
-## KONVEYER-10 - Scene parity and frame-budget attribution
-Status: closed 2026-05-13 (via PR #192 master merge, commit `1df141ca`). Owning subsystem: renderer / environment / world / perf-harness. Opened: cycle-2026-05-11-konveyer-scene-parity. See `docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md` for closure summary.
-Latest evidence: master HEAD (post-2026-05-13 merge of `exp/konveyer-webgpu-migration` via PR #192, commit `1df141ca`); `artifacts/perf/2026-05-11T02-10-59-661Z/konveyer-completion-audit/completion-audit.json` marks KONVEYER-0 through KONVEYER-9 branch-review complete, while `artifacts/perf/2026-05-11T02-00-18-828Z/projekt-143-terrain-visual-review/visual-review.json` accepts strict-WebGPU terrain ground tone only. The 2026-05-11 KONVEYER-10 pass adds strict WebGPU renderer matrix proof at `artifacts/perf/2026-05-11T18-17-20-942Z/konveyer-renderer-matrix/matrix.json`. Scene probes passed for Open Frontier + Zone Control at `artifacts/perf/2026-05-11T18-30-56-546Z/konveyer-scene-parity/scene-parity.json` and Team Deathmatch + combat120 + A Shau at `artifacts/perf/2026-05-11T18-31-39-756Z/konveyer-scene-parity/scene-parity.json`; the 2026-05-12 Open Frontier checkpoint at `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json` adds strict close-GLB/materialization, bounded spawn-residency reserve, and startup feature-compile proof. Multi-mode reserve verification at `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json` resolves strict WebGPU across Open Frontier (cap 8, 12 candidates, 4 `total-cap`), Zone Control (cap 9, 12 candidates, 3 `total-cap`), Team Deathmatch (cap 12, 16 candidates, 4 `total-cap`), `ai_sandbox`/combat120 (cap 12, 32 candidates, 18 `total-cap` + 2 `pool-empty`), and A Shau (0 live combatants at probe time) with zero console/page errors per mode. Phase F slice 1 (2026-05-12) generalized the close-model reserve from `spawnResidency*` naming to `hardNearReserve*` semantics (real-time cluster density, not a spawn-time snapshot) and bumped `hardNearReserveExtraCap` 4→6, lifting per-faction pool from 12 to 14. Post-slice multi-mode strict-WebGPU proof at `artifacts/perf/2026-05-12T02-24-10-594Z/konveyer-asset-crop-probe/asset-crop-probe.json` resolves Open Frontier (cap 10, 10 candidates, 0 fallbacks), Zone Control (cap 11, 11 candidates, 0 review-pose fallbacks), Team Deathmatch (cap 14, 15 candidates, 1 `total-cap` review), `ai_sandbox`/combat120 (cap 14, 25 candidates, 5 `total-cap` + 6 `pool-empty` review), and A Shau (0 candidates) with zero console/page errors per mode. Combat120 retains `pool-empty` because the US pool exhausts at 14 while NVA keeps 4 slack — faction-asymmetric pool sizing is the next slice (budget arbiter v1), not a steady-cap question. Follow-up close-model churn pre-release shipped 2026-05-12 (`CombatantRenderer.updateCloseModels` pre-releases active close models that fall outside the top-`effectiveActiveCap` prospective set). Post-fix multi-mode strict WebGPU proof: `artifacts/perf/2026-05-12T03-06-33-332Z/konveyer-asset-crop-probe/asset-crop-probe.json`. Combat120 review fallback profile is now `total-cap:22 + pool-empty:0` (was `total-cap:5 + pool-empty:6`); the larger total-cap is candidate-set growth (36 vs 25 candidates this run), not regression. All five modes still resolve strict WebGPU with zero console/page errors. A Shau directed-warp evidence shipped 2026-05-12 (probe-only, `scripts/konveyer-asset-crop-probe.ts` warps player to Hill 937 contested zone before close-NPC review). Five-mode proof at `artifacts/perf/2026-05-12T03-33-59-816Z/konveyer-asset-crop-probe/asset-crop-probe.json`: A Shau materialized 0→4 live combatants 5865ms after warp (WarSimulator strategic-spawn cadence) and review pose then captured 60 candidates in close radius with 14 rendered (cap=14, `total-cap:46`). Zero pool-empty / zero pool-loading across all five modes; every fallback is at the cap boundary (designed materialization tier). MaterializationProfile v2 shipped 2026-05-12: `CombatantMaterializationRow` adds `reason` (parseable render-lane reason) and `inActiveCombat` (firefight participation flag); surfaced through `window.npcMaterializationProfile()` and the crop probe's `nearest[]` projection. Multi-mode proof at `artifacts/perf/2026-05-12T04-48-59-955Z/konveyer-asset-crop-probe/asset-crop-probe.json`. First diagnostic finding: A Shau review-pose has `inActiveCombat=true` actors stuck on `impostor:total-cap` (combatant_40 at 7.9 m), the Phase F memo's named target case for the budget arbiter slice. Budget arbiter v1 shipped 2026-05-12 (`PixelForgeNpcDistanceConfig.inActiveCombatWeight=8` added to the close-model candidate priority score; ENGAGING/SUPPRESSING/ADVANCING actors are now prioritized at the cap edge). Multi-mode proof at `artifacts/perf/2026-05-12T09-45-53-698Z/konveyer-asset-crop-probe/asset-crop-probe.json`. combat120 close-GLB slots now include 7 in-combat actors (was 0 measured under slice 4); the arbiter composes correctly — in-combat is a strong signal but not absolute, so on-screen non-combat actors closer in still outrank off-screen in-combat actors by design. Tier-transition events shipped 2026-05-12 (Phase F memo slice 6): `CombatantRenderer.updateBillboards` now emits `materialization_tier_changed` on `GameEventBus` whenever a combatant's render mode changes between frames, with `{ combatantId, fromRender, toRender, reason, distanceMeters }`. Multi-mode regression proof at `artifacts/perf/2026-05-12T12-55-00-499Z/konveyer-asset-crop-probe/asset-crop-probe.json` — no close-NPC materialization regressions vs slice 5. Reviewer packet at `docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md` synthesizes the six shipped slices, names blocked items (A Shau finite-edge, sky/cloud representation, vegetation+NPC asset acceptance, water shader/art, terrain/fire authority, startup heightmap rebake), proposes the next architectural slices (sim-strategic lane, render-silhouette lane, render-cluster lane, lane-naming refactor, budget arbiter v2, 3000-unit perf gate), and gives a qualified "yes" to WebGPU/TSL as the right renderer architecture. Tier-event capture (probe-side, shipped 2026-05-12): `bootstrap.ts` exposes `window.__materializationTierEvents()` under `?diag=1`; crop probe records the materialization flow per mode. Evidence at `artifacts/perf/2026-05-12T13-59-07-487Z/konveyer-asset-crop-probe/asset-crop-probe.json`. A Shau records 199 transition events in one window (94 first→impostor, 60 impostor→close-glb, 41 close-glb→impostor, 4 first→close-glb), quantifying cap-boundary churn during the WarSimulator's Hill 937 materialization spike. combat120 shows same pattern in miniature (43 events).
-Design posture: WebGL is the previous implementation attempt for the game vision, not a pixel-perfect target. KONVEYER-10 should prefer WebGPU-native scene decisions that better serve jungle density, combatant readability, flight-scale sky/weather, finite-map presentation, and long-term materialization-tier performance.
-Closure posture: completing the initial migration/parity target should trigger a principles-first rearchitecture review against the vision, using the WebGPU/TSL branch as the new baseline rather than preserving WebGL-era compromises.
-Asset posture: vegetation/NPC/cloud defects may be source-asset or bake-contract problems, not only shader problems. Pixel Forge regeneration, impostor rebakes, texture edits, LOD/source cleanup, and color-space corrections are valid outcomes when WebGPU exposes bad WebGL-era asset assumptions.
-Water posture: before the principles-first rearchitecture review, run a hydrology/water pass that connects visible hydrology, water shader/material behavior, water/terrain intersections, interaction, buoyancy/swimming, and eventual watercraft into the scene-architecture decision loop.
-Research posture: `docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md` is the current spike memo for WebGPU/TSL, terrain/CDLOD, clouds, Pixel Forge asset acceptance, hydrology/water, and ECS/materialization direction. It treats ECSY as an outside reference clone only, not a dependency target.
-Success criteria:
-- Strict WebGPU remains the proof path; WebGL is named diagnostic comparison only.
-- Vegetation and NPC impostors have strict-WebGPU parity evidence that separates raw atlas/crop, material lighting, fog contribution, and final output.
-- `World` timing is decomposed into actionable sub-timings for atmosphere sky texture, atmosphere light/fog, weather, water, and zone/ticket work.
-- Skyward high-triangle reports are captured with scene/pass attribution before CDLOD, shadow, or vegetation tuning.
-- Sky/cloud behavior has a measured anchoring decision so flight no longer makes the sky or cloud field feel attached to the player; current implementation direction is camera-followed dome for clipping safety plus a world/altitude-projected cloud deck for weather stability.
-- Cloud representation has a follow-up decision for straight-line cutoffs, hard bands, visible alignment seams, and low-resolution/blocky sky texture artifacts; do not treat the current dome-texture pass as final if it keeps producing obviously improper cloud geometry.
-- Zone Control and other finite maps have a selected edge-presentation strategy: terrain apron, low-res far ring, edge fade, flight clamp, or documented equivalent.
-- Strict-WebGPU Open Frontier, Zone Control, Team Deathmatch, combat120, and A Shau short captures are linked before any renewed default-on or production-rollout claim.
+| id | title | status | owner | latest evidence | success criteria |
+|---|---|---|---|---|---|
+| KB-STARTUP-1 | Mode-start terrain surface bake | open (spike) | terrain / engine init | spike branch `task/mode-startup-terrain-spike` + memo `MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md` | Mode-click deploy UI appears quickly in startup probes without returning bake to main thread — see [memo](directives/kb-startup-1.md) |
+| KONVEYER-12 | Finite map edge strategy | open | terrain / renderer / atmosphere | `2026-05-11T22-11-28-128Z/konveyer-scene-parity` (post cloud-deck + A Shau collar reject) | Pick one finite-edge model per map type and prove in strict WebGPU from all pose classes — see [memo](directives/konveyer-12.md) |
+| VODA-1 | Visible water surface + query API | code-complete (playtest deferred) | environment / water | cycle-voda-1 5 PRs (#228-#232) | Water surface visible across OF + A Shau with foam + flow + sampler API — see [memo](directives/voda-1.md) |
+| VODA-2 | Flow, buoyancy, swimming | code-complete (playtest deferred) | environment / water | cycle-voda-2 7 PRs (#239-#245) | Buoyancy + player swim/breath + NPC wade + foot-splash + river-current force — see [memo](directives/voda-2.md) |
+| VEKHIKL-1 | M151 jeep ground vehicle | code-complete (playtest deferred) | vehicle (ground) | cycle-vekhikl-1 5 PRs (#223-#227) | M151 spawn + drive + per-wheel terrain conform in OF + A Shau — see [memo](directives/vekhikl-1.md) |
+| VEKHIKL-2 | Stationary M2 .50 cal emplacements | code-complete (playtest deferred) | vehicle / weapons | cycle-vekhikl-2 6 PRs (#233-#238) | M2HB mount + fire + NPC gunner via orderBoard — see [memo](directives/vekhikl-2.md) |
+| AVIATSIYA-2 | AC-47 low-pitch takeoff single-bounce | open | vehicle (fixed-wing) / airframe | (none) | AC-47 low-pitch takeoff no longer single-bounces on airfield |
+| AVIATSIYA-4 | Helicopter combat surfaces | open | helicopter / weapons | (none) | Door-gunner + chin minigun + rocket-pod fire on Huey / UH-1C / Cobra with period loadout |
+| AVIATSIYA-5 | Fixed-wing combat surfaces | open | vehicle (fixed-wing) / weapons | (none) | A-1 / F-4 / AC-47 each carry period weapons with lead/sway/station-keep |
+| AVIATSIYA-6 | Combat maneuvers | open | vehicle / helicopter / AI | (none) | AC-47 pylon-turn / A-1 dive / F-4 strafe / Cobra rocket / Huey strafe routes callable by NPC + assist players |
+| AVIATSIYA-7 | AH-1 Cobra import + integration | open | helicopter | `pixel-forge/war-assets/vehicles/aircraft/ah1-cobra.glb` | Cobra spawnable + flyable + weapon-armed alongside Huey and UH-1C |
+| SVYAZ-3 | Air-support call-in radio | open | combat / UI / aviation | first slice `665b0c5` (radio shell + asset list) | Radio menu + target marking + asset selection + per-asset cooldown + NPC-pilot fulfillment |
+| SVYAZ-4 | RTS-flavored command discipline | open | combat / UI | (none) | Squad + air-support commands compose so the sim reads as hybrid FPS/RTS |
+| UX-2 | Map spawn / respawn flow | open | UI / player | (none) | Map shows spawn options; tap- and click-to-spawn; mobile touch targets sized correctly |
+| UX-3 | Loadout selection | open | UI / player | (none) | Loadout categories + ammo loads + faction availability + PC/mobile parity |
+| UX-4 | Deploy flow polish | open | UI / player | (none) | Menu-to-first-frame is fast + clear; immediate danger readable in first frame |
+| STABILIZAT-1 | Refresh combat120 perf baseline | open | perf-harness | `2026-05-10T10-45-07-263Z` (3 fail) | `perf:capture:combat120` from quiet machine produces avg ≤17ms, p99 ≤35ms; refreshed baseline committed |
+| DEFEKT-1 | Stale baseline audit | open | perf-harness | `2026-05-07T22-04-54-994Z/projekt-143-stale-baseline-audit` | `perf-baselines.json` current for all tracked scenarios; stale-baseline gate passes |
+| DEFEKT-2 | Doc / code / artifact drift | open | doc-harness | `2026-05-08T01-26-06.909Z/projekt-143-doc-drift` | `check:doc-drift` passes + 14 consecutive days no drift after release |
+| DEFEKT-3 | Combat AI p99 anchor | open | combat | `docs/rearch/cover-query-precompute.md` | Sync cover search in `AIStateEngage.initiateSquadSuppression` no longer dominates p99; combat120 p99 ≤35ms PASS |
+| DEFEKT-6 | Terrain occlusion and fire authority | open | combat / terrain / navigation / materialization | `2026-05-11T19-14-54-162Z/konveyer-terrain-fire-authority` | Reproduce/disprove fire-through-terrain with browser evidence and identify authoritative LOS query — see [memo](directives/defekt-6.md) |
+| DIZAYN-3 | Liberty of proposal | open | design | (none) | Visual/feel proposals can land on any directive; engineering reject requires written rationale |
 
-Current KONVEYER-10 findings:
-- Skyward triangle attribution is terrain-dominated. K11 measured the pre-edge-change terrain submission spike; K12 source-backed visual extent now records Open Frontier at 1,336,320 terrain triangles, Zone Control at 399,360, actual Team Deathmatch at 307,200, combat120 at 215,040, and A Shau at 1,536,000, all still across 2 main + 1 shadow terrain submissions.
-- Finite-map strategy has moved from a rejected standalone ring/skirt toward source-backed visual terrain extent separated from playable/gameplay extents. Open Frontier, Zone Control, actual Team Deathmatch, and combat120 look materially better from finite-edge views, but A Shau still exposes a flat DEM boundary and cloud/horizon cut lines remain unresolved. The bright-lime `tall-grass.webp` source tile was corrected to a dark humid olive palette; this is an asset-level fix, not closure for broader terrain lighting/material direction.
-- Vegetation/NPC material probes now have an actionable asset audit at `artifacts/perf/2026-05-11T22-24-56-014Z/konveyer-asset-material-audit/asset-material-audit.json`. It warns that NPC impostor atlases are very dark and lifted heavily by material uniforms, NPC normal maps are absent in the active probe, and vegetation impostors combine sparse alpha with a bright green tint bias. Treat this as Pixel Forge/source-vs-runtime decision evidence, not as visual acceptance.
-- First final-frame crop proof is `artifacts/perf/2026-05-11T22-41-07-556Z/konveyer-asset-crop-probe/asset-crop-probe.json`. It resolves strict WebGPU, captures Open Frontier and A Shau vegetation/NPC crop attempts, and stays WARN: vegetation crops remain green/saturated, Open Frontier's NPC crop is background-dominant rather than a clean soldier crop, A Shau has no cropable NPC instance, and no visible close-GLB comparison is present. Follow-up close-model telemetry in `artifacts/perf/2026-05-11T23-18-06-820Z/konveyer-asset-crop-probe/asset-crop-probe.json` proves the bounded startup prewarm now runs before reveal and activates 8 Open Frontier close GLBs under strict WebGPU, with startup marks `npc-close-model-prewarm.*`. The public-profile proof at `artifacts/perf/2026-05-11T23-56-05-104Z/konveyer-asset-crop-probe/asset-crop-probe.json` confirms the probe now sources nearest rows from `window.npcMaterializationProfile()`; after the hard-near anti-pop priority, `pool-loading` clears to zero and nearest review rows are close GLBs with weapons. It also includes the first fern source-atlas palette edit toward darker humid olive; the final vegetation crop is visibly less mint, but the simple green-dominance metric still warns, so treat the remaining vegetation finding as probe/segmentation plus Pixel Forge asset-review work rather than shader-threshold tuning. The 2026-05-12 strict Open Frontier close-GLB materialization proof at `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json` records a bounded spawn-residency reserve: 11 visible nearby close GLBs, effective close cap 11, no close fallback records, all nearest startup/review rows as `close-glb` with weapons, public materialization profile telemetry, geometry-derived body bounds, and an isolated crop that shows the soldier/weapon under strict WebGPU. The follow-up multi-mode reserve packet at `artifacts/perf/2026-05-12T01-50-30-290Z/konveyer-asset-crop-probe/asset-crop-probe.json` covers Open Frontier, Zone Control, Team Deathmatch, `ai_sandbox`/combat120, and A Shau under strict WebGPU with zero console/page errors per mode. It confirms the +4 reserve activates only when actors are inside the 64m spawn-residency bubble (Zone Control +1, TDM +4, combat120 +4; Open Frontier 0 at the steady review pose; A Shau 0 because the strategic simulation does not place live combatants near the review pose). combat120 surfaces 32 candidates against the 12-slot cap with 18 `total-cap` plus 2 `pool-empty` fallbacks and an asymmetric faction pool (`US` target 12 exhausts while `NVA` keeps 4 available). Next architecture decision is Phase F materialization-tier policy: scale `PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP` / `spawnResidencyExtraCap` by mode density and faction balance, accept impostor LOD past the cap as a designed materialization tier, or move some of the close-radius work onto the impostor path with stronger crop/lighting evidence. Not a steady-state-cap tuning question and not a startup total-cap regression.
-- Startup UI "Compiling features" is now attributed below the label. `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json` records Open Frontier terrain feature compile marks: feature list compile about 5.2ms for 1,363 stamps, 67 surface patches, 8 exclusion zones, and 36 flow paths; stamped-provider creation about 2.1ms; 1024-grid heightmap rebake about 48.5ms; total terrain-feature compile about 55.9ms. The first optimization candidate is prebaking or chunking the stamped heightmap rebake, not WebGPU shader compilation.
-- Cloud anchor model improved to camera-followed dome plus world/altitude-projected cloud-deck sampling in `HosekWilkieSkyBackend`, replacing texture-UV cloud noise. Current strict WebGPU proof at `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json` records `cloud model=camera-followed-dome-world-altitude-clouds` across Open Frontier, Zone Control, actual Team Deathmatch, combat120, and A Shau with zero console/page errors. This is an anchoring slice, not final cloud/weather acceptance.
-- Water/hydrology pass started as a VODA bridge, not a closure claim. `npm run check:hydrology-bakes` passes, `artifacts/perf/2026-05-11T21-33-05-844Z/projekt-143-water-system-audit/water-system-audit.json` records current source wiring as WARN, and `artifacts/perf/2026-05-11T21-33-31-662Z/projekt-143-water-runtime-proof/water-runtime-proof.json` proves hydrology river meshes, channel queries, and the new interaction sample in Open Frontier and A Shau. Screenshots still require visual acceptance.
-- Strict WebGPU scene probes passed across the requested modes. The earlier `perf-capture` target-closed blocker at `artifacts/perf/2026-05-11T18-37-33-773Z/summary.json` is now separated from the attribution-overhead issue by K11 evidence; use the K11 summary-attribution command shape before treating strict runtime captures as blocked.
+## Recently closed (last 10)
 
-## KONVEYER-11 - Strict proof chain and terrain budget
-Status: done. Owning subsystem: renderer / terrain / perf-harness / combat. Opened: cycle-2026-05-11-konveyer-k11-proof-terrain-budget.
-Latest evidence: `artifacts/perf/2026-05-11T18-56-10-018Z/measurement-trust.json` passes measurement trust with strict WebGPU, render-submission summary attribution, and every-fourth-sample attribution cadence. `artifacts/perf/2026-05-11T18-52-12-160Z/measurement-trust.json` shows full every-sample attribution is too heavy and fails measurement trust. CDLOD node/ring strict proofs are `artifacts/perf/2026-05-11T19-27-26-995Z/konveyer-scene-parity/scene-parity.json` for Open Frontier + A Shau and `artifacts/perf/2026-05-11T19-29-34-958Z/konveyer-scene-parity/scene-parity.json` for Zone Control + combat120; later K12 probe repair found that the earlier `team_deathmatch` probe label was not starting runtime enum `tdm`, so use `artifacts/perf/2026-05-11T20-21-57-694Z/konveyer-scene-parity/scene-parity.json` for actual Team Deathmatch terrain attribution. Player terrain-fire fallback test evidence is `artifacts/perf/2026-05-11T19-05-00-000Z/konveyer-terrain-fire-authority/vitest-combatant-combat.json`; strict WebGPU browser proof is `artifacts/perf/2026-05-11T19-14-54-162Z/konveyer-terrain-fire-authority/terrain-fire-authority.json`. Cycle brief: `docs/tasks/cycle-2026-05-11-konveyer-k11-proof-terrain-budget.md`.
-Success criteria:
-- Strict WebGPU `perf-capture` attribution has a trusted command shape that preserves scene/category/pass ownership without full-dump sample overhead.
-- Terrain/CDLOD runtime cost is attributed by main pass and shadow pass before terrain LOD, shadow, or culling policy changes.
-- Active CDLOD node/ring evidence exists for ground, elevated, and skyward cameras.
-- Fire-through-terrain reports are audited as a combat/terrain/nav/materialization contract risk, not as an isolated weapon tuning issue.
+| id | title | status | owner | latest evidence | success criteria |
+|---|---|---|---|---|---|
+| DEFEKT-4 | NPC navmesh route quality | closed 2026-05-18 | navigation | 3 PRs #265-#267 (all `terrain-nav-reviewer` APPROVE) | A Shau + OF route-quality captures pass measurement trust — see [memo](directives/defekt-4.md) |
+| VODA-3 | Watercraft and integration | closed 2026-05-18 | environment / water | cycle-voda-3 6 PRs (#259-#264) | Sampan + PBR rigged with enter/exit + M2HB twin mounts world-space-correct — see [memo](directives/voda-3.md) |
+| VEKHIKL-3 | M48 Patton tank (chassis half) | closed 2026-05-17 | vehicle (ground / tracked) | cycle-vekhikl-3 5 PRs (#246-#250) | Skid-steer chassis + four-corner conform + tracks-blown — see [memo](directives/vekhikl-3.md) |
+| VEKHIKL-4 | M48 turret + cannon + AI gunner + WASM solver pilot | closed 2026-05-17 | vehicle (ground / tracked) / combat | cycle-vekhikl-4 8 PRs (#251-#258) | Turret + cannon + HP bands + NPC gunner + Rust→WASM pilot recorded KEEP-INCONCLUSIVE — see [memo](directives/vekhikl-4.md) |
+| KONVEYER-11 | Strict proof chain and terrain budget | done | renderer / terrain / perf-harness / combat | `2026-05-11T18-56-10-018Z/measurement-trust.json` | Trusted strict-WebGPU attribution + terrain main/shadow split + CDLOD node/ring evidence + fire-through-terrain audit — see [memo](directives/konveyer-11.md) |
+| KONVEYER-10 | Scene parity and frame-budget attribution | closed 2026-05-13 | renderer / environment / world / perf-harness | master HEAD `1df141ca` + `docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md` | Strict WebGPU as proof path + sub-timing decomposition + sky/cloud/finite-edge decisions — see [memo](directives/konveyer-10.md) |
+| STABILIZAT-3 | Live release verification | done | deploy | `npm run check:live-release` PASS after 2026-05-10 deploy | Production SHA remains live `/asset-manifest.json` truth |
+| AVIATSIYA-1 | Helicopter rotor visual parity | done | helicopter | `2026-05-08T01-23-26-506Z/projekt-143-visual-integrity-audit` | Huey + UH-1C + AH-1 Cobra rotor directionality + naming pass live review; regressions reopen DEFEKT-5 |
+| DEFEKT-5 | Visual fallback and directionality audit | done | combat / helicopter / FX | `2026-05-08T01-23-26-506Z/projekt-143-visual-integrity-audit` | Visual integrity audit clean |
+| SVYAZ-2 | Squad pings: go, patrol, attack, fall back | done | combat / UI | `2026-05-07T21-41-01-140Z/projekt-143-svyaz-ping-command-browser-proof` | Ping commands land in browser proof |
 
-## KONVEYER-12 - Finite map edge strategy
-Status: open. Owning subsystem: terrain / renderer / atmosphere / mode boundaries. Opened: cycle-2026-05-11-konveyer-edge-strategy.
-Latest evidence: K10/K11 strict scene probes show the old render-only apron was measurable but not visually accepted. A cheap render-only horizon-ring prototype passed strict WebGPU numeric checks at `artifacts/perf/2026-05-11T19-44-30-183Z/konveyer-scene-parity/scene-parity.json`, but visual review rejected it as slab/wall presentation with hard cloud/terrain cut lines, so it is not active branch strategy. The active first slice is source-backed visual terrain extent, proved in strict WebGPU at `artifacts/perf/2026-05-11T20-21-57-694Z/konveyer-scene-parity/scene-parity.json`; that run also fixes the Team Deathmatch probe alias and confirms actual `tdm` config (`playable=400`, `visualMargin=1200`). After visual review flagged the bright-lime `tall-grass.webp` source tile, candidate palette artifacts were written to `artifacts/perf/2026-05-11T20-30-tall-grass-palette/`, the live tile was corrected, and force-built strict WebGPU proof passed at `artifacts/perf/2026-05-11T20-58-48-929Z/konveyer-scene-parity/scene-parity.json`. The current full-mode strict WebGPU proof after the cloud-deck anchoring and A Shau collar rejection is `artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`. Open Frontier, Zone Control, actual Team Deathmatch, and combat120 no longer read as a cheap wall/slab from finite-edge screenshots. A Shau remains blocked because its DEM has no real outer source data and still reads as a flat edge. A later A Shau-only 1600m collar experiment with DEM edge-slope extrapolation and visual-edge tint proved strict WebGPU at `artifacts/perf/2026-05-11T21-58-04-137Z/konveyer-scene-parity/scene-parity.json`, but visual review rejected the tan/gold synthetic band; keep that as evidence against further probe tuning, not as active acceptance.
-Success criteria:
-- Pick one finite-edge model for small maps and A Shau: source-backed visual terrain extent, low-detail far ring, horizon skirt, terrain fade, flight/weapon boundary, or an explicit hybrid.
-- Prove the model in strict WebGPU from ground, elevated, skyward, and finite-edge poses without hiding the edge behind fog alone.
-- Preserve gameplay boundaries separately from visual terrain coverage.
-- Record triangle/pass impact before changing terrain LOD ranges or shadow policy.
+## Older closes (memo only, not in tables)
 
-## VODA-1 — Visible water surface and query API
-Status: code-complete (owner playtest deferred). Owning subsystem: environment / water. Opened: cycle-2026-05-04. Code-complete: cycle-voda-1-water-shader-and-acceptance 2026-05-16.
-Latest evidence: 5 PRs landed under `cycle-voda-1-water-shader-and-acceptance` — R1: #228 `dfee8d64` terrain-water-intersection-mask (terrain-side wet-sand soft-blend 1.5m + water-side foam line 0.8m, opt-in default-off binding so pre-VODA-1 visuals byte-identical when unbound), #229 `62db21c2` water-surface-shader (production `MeshStandardMaterial` + `onBeforeCompile` patch chosen over TSL node material to preserve `?renderer=webgl` escape hatch and avoid mobile node-material cost regression; composed with #228's foam patch into single `installWaterMaterialPatches()` callback at rebase time so both inject); R2: #231 `ca679273` hydrology-river-flow-visuals (per-vertex `aFlowDir`/`aFoamMask` attributes baked at geometry-build + `installHydrologyRiverFlowPatch` shader patch with UV-scrolled normal sampling), #232 `f14400d2` water-system-file-split (WaterSystem.ts 1125 LOC → 300 LOC orchestrator + 5 modules ≤300 LOC each: HydrologyRiverSurface 144, HydrologyRiverGeometry 222, HydrologyRiverFlowPatch 178, WaterSurfaceBinding 299, WaterSurfaceSampler 146; grandfather entry removed from `scripts/lint-source-budget.ts`; 11 existing WaterSystem.test.ts pass byte-identical + 17 new sibling tests across the new modules), #230 voda-1-playtest-evidence (`docs/playtests/cycle-voda-1-water-shader-and-acceptance.md` + `scripts/capture-voda-1-water-shots.ts` + PLAYTEST_PENDING.md row). **No `WebGLRenderTarget` reflection pass added anywhere** (mobile no-RT win documented in `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md` item 8 preserved). Owner walk-through deferred under autonomous-loop posture; full `done` promotion blocks on owner walk + `evidence:atmosphere` re-run + `terrain_water_exposure_review` resolution confirmation per PLAYTEST_PENDING row.
-Success criteria:
-- [x] `WaterSystem` renders a visible water surface across Open Frontier and A Shau, lit by `AtmosphereSystem`, with no clipping artifacts at terrain intersections (foam-line + terrain-side soft-blend land in #228; surface shader in #229).
-- [x] Hydrology channels drive water-surface placement (already shipped pre-cycle; visible flow added in #231).
-- [x] Public query API present: `isUnderwater(pos)`, `getWaterDepth(pos)`, `getWaterSurfaceY(pos)`, and `sampleWaterInteraction(pos)` for future physics/gameplay consumers (preserved through #232 split — `WaterSurfaceSampler.ts` owns the impl; `WaterSystem` orchestrator delegates).
-- [ ] `evidence:atmosphere` regenerates with water visible and zero browser errors (owner-sweep verification deferred to PLAYTEST_PENDING).
-- [ ] Open Frontier `terrain_water_exposure_review` overexposure flags resolved (owner-sweep verification deferred to PLAYTEST_PENDING).
+These are still closed and still tracked; their original short evidence prose lives only in this commit's git history. Re-add a row to the closed table only if a regression reopens them.
 
-## VODA-2 — Flow, buoyancy, swimming
-Status: code-complete (owner playtest deferred). Owning subsystem: environment / water. Opened: cycle-2026-05-04. Code-complete: cycle-voda-2-buoyancy-swimming-wading 2026-05-17.
-Latest evidence: 7 PRs landed under `cycle-voda-2-buoyancy-swimming-wading` — R1: [#239](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/239) `89365f4c` buoyancy-physics (new `src/systems/environment/water/BuoyancyForce.ts` + sibling test consuming `sampleWaterInteraction`; behavior tests cover neutral float, sink, surface, dampened oscillation), [#240](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/240) `98ffeabc` npc-wade-behavior (CombatantMovement speed scales with `1 - immersion01 × 0.6` in shallow water; nav cost up-weight; combat-reviewer APPROVE), [#241](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/241) `83415458` player-swim-and-breath (PlayerMovement branches on `submerged` → swim mode with WASD + Space up + Ctrl down + depth-proportional drag; PlayerHealthSystem breath timer with gasp + damage past 45 s; new PlayerSwimState module; HUD breath gauge); R2: [#242](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/242) `2496b4e1` water-sampler-composer-wiring (activates dormant R1 consumers via system composer), [#245](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/245) `163ecb73` river-flow-gameplay-current (BuoyancyForce extended with horizontal flow force from hydrology channel direction × magnitude × body drag), [#244](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/244) `0b24a19f` wade-foot-splash-visuals (new `src/systems/effects/WadeSplashEffect.ts` triggered on footstep when `immersion01 ∈ [0.1, 0.5]`; reuses existing impact-effects pool), [#243](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/243) `47e394c2` voda-2-playtest-evidence (`docs/playtests/cycle-voda-2-buoyancy-swimming-wading.md` + capture script + PLAYTEST_PENDING row, deferred under autonomous-loop posture). No fence change (`sampleWaterInteraction` contract consumed, not modified). Owner walk-through deferred under autonomous-loop posture; full `done` promotion blocks on owner walk per [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) row.
-Success criteria:
-- [x] Rivers from hydrology channels carry visible flow (#245 `river-flow-gameplay-current`; visual flow already shipped in VODA-1 #231).
-- [x] Buoyancy physics for floating bodies (#239 `buoyancy-physics`; consumes `sampleWaterInteraction`).
-- [x] Player swimming with animation, stamina, breath, and surfacing (#241 `player-swim-and-breath`).
-- [x] Wading and foot-splash visuals at the bank (#244 `wade-foot-splash-visuals` + #240 `npc-wade-behavior`).
-- [ ] Owner playtest walk (wade ford, swim river, breath-hold gasp, surfacing, NPC route around deep water) — deferred to PLAYTEST_PENDING.
+- SVYAZ-1 — Squad command stand-down (done; `2026-05-07T18-59-28-353Z/projekt-143-svyaz-standdown-browser-proof`)
+- UX-1 — Respawn screen redesign PC + mobile (done; `2026-05-07T20-35-21-453Z/projekt-143-ux-respawn-browser-proof`)
+- STABILIZAT-2 — Land vehicle-visuals + airfield + helicopter rotor fix (done; master `babae19a76e5ff622976a632e10f7055315d2698`)
+- AVIATSIYA-3 — Helicopter parity audit (done; `docs/rearch/helicopter-parity-audit.md`)
+- DIZAYN-1 — Vision charter (done; charter at `docs/archive/dizayn/vision-charter.md`)
+- DIZAYN-2 — Art-direction review gate (done; gate at `docs/archive/dizayn/art-direction-gate.md`)
 
-## VODA-3 — Watercraft and integration
-Status: closed (cycle-voda-3-watercraft close-commit 2026-05-18). Owning subsystem: environment / water. Opened: cycle-2026-05-04. Code-complete: cycle-voda-3-watercraft 2026-05-18 (owner playtest deferred under autonomous-loop).
-Latest evidence: 6 PRs landed under `cycle-voda-3-watercraft` across R1/R2. R1: [#260](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/260) `2026-05-17T23:52:59Z` watercraft-physics-core (new `src/systems/vehicle/WatercraftPhysics.ts`, 620 LOC under ≤700 ceiling; generalizes `GroundVehiclePhysics` chassis-conform with water-surface conform via the VODA-2 buoyancy contract; state = position/velocity/angularVelocity/quaternion/enginePower + hull-sample-points; per-hull-sample buoyancy via `BuoyancyForce.applyAtPoint`; throttle drives forward force; rudder drives yaw; quadratic drag; river current force from VODA-2 flow contract; wave heave + pitch from per-sample y-variance; beach/bank docking via `ITerrainRuntime.getHeightAt` grounded-state transition), [#259](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/259) `2026-05-18T00:23:14Z` watercraft-physics-tests (behavior tests + stub→real swap at merge). R2: [#261](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/261) `2026-05-18T09:59:09Z` watercraft-physics-damping-fix (vertical drag + convergent flow coupling — closed 2 real defects flagged by R1 swap reviewer), [#262](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/262) `2026-05-18T09:59:43Z` sampan-integration (new `src/systems/vehicle/Sampan.ts` IVehicle impl + `WatercraftPlayerAdapter` + `SampanSpawn` + `OperationalRuntimeComposer.wireSampanRuntime` wire; 6m × 2m hull, low power, single seat, W/S throttle + A/D rudder + F enter/exit, third-person follow camera), [#264](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/264) `2026-05-18T13:10:05Z` pbr-integration (new `src/systems/vehicle/PBR.ts` IVehicle impl + PBR composer wire; 9.4m hull with twin water-jet drive, two M2HB twin mounts forward + aft, driver + two gunners + one passenger; reuses `WatercraftPlayerAdapter` for driver seat; M2HB twins via cycle #6 emplacement pattern parented to PBR hull; B1/B2/B3 fixes — world-space aim composition closes a latent local-only-forward bug in `M2HBEmplacement` + `EmplacementPlayerAdapter` + `NpcM2HBAdapter`; cycle-#6 ground-fixed emplacements unaffected via identity-quaternion no-op; first combat-reviewer CHANGES-REQUESTED → APPROVE after fix + post-rebase verification on `pbr-verify` worktree), [#263](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/263) `2026-05-18T13:29:26Z` voda-3-playtest-evidence (`docs/playtests/cycle-voda-3-watercraft.md` + capture script + PLAYTEST_PENDING row; deferred under autonomous-loop posture). Water sampler wiring for Sampan + PBR deferred as a follow-up (both currently land on dry terrain until `OperationalRuntimeComposer.wireSampanRuntime` + `wirePBRRuntime` get `setWaterSampler(waterSystem)` calls; requires plumbing waterSystem reference through the vehicle composer surface). combat120 p99 CI measurement_trust=warn across all cycle PR runs (GPU runner starvation; not a real regression — PR #260 test-only baseline shows the same numbers; cycle #13 baselines-refresh expedited). No fence change. No external physics library added. Owner walk-through deferred under autonomous-loop posture; full owner playtest sign-off blocks on [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) row.
-Success criteria:
-- [x] Sampan and PBR (river patrol boat) rigged with player enter/exit (#262 + #264).
-- [x] PBR M2HB twin mounts firable + gunnable from world-space-correct aim direction (#264 + B1/B2/B3 fixes).
-- [x] Beach/bank docking via grounded-state transition (#260 — visible when boats sit on hull-bottom-on-terrain state).
-- [ ] Bridge interactions verified in playtest (deferred to PLAYTEST_PENDING; A Shau may not have a bridge in driveable range).
-- [ ] Owner playtest walk (mount Sampan, navigate A Shau river up + down, exit at bank; mount PBR, drive upstream against current, fire M2HB at riverbank target, swap seats; observe wave heave + rocking at idle) — deferred to PLAYTEST_PENDING.
+## Per-directive memo files
 
-## VEKHIKL-1 — M151 jeep ground vehicle
-Status: code-complete (owner playtest deferred). Owning subsystem: vehicle (ground). Opened: cycle-2026-05-04. Code-complete: cycle-vekhikl-1-jeep-drivable 2026-05-16.
-Latest evidence: 5 PRs landed under `cycle-vekhikl-1-jeep-drivable` — R1: #223 `6309558a` GroundVehiclePhysics (581 LOC, fixed-step rigid-body sim per `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md`), #224 `e687e70a` GroundVehiclePhysics.test (305 LOC, 7 behavior tests post stub→real swap); R2: #226 `…` GroundVehiclePlayerAdapter (W/S throttle, A/D steer, Space brake, F enter/exit, third-person follow) + VehicleManager.getGroundVehicleByOccupant helper, #227 `901ae017` M151 integration (GroundVehicle.update wired to GroundVehiclePhysics; VehicleManager.update fan-out; M151 spawns confirmed on Open Frontier airfield_motor_pool + A Shau tabat_motor_pool via existing world-feature prefabs; Playwright smoke verified jeep visible at expected coords on both modes), #225 `…` playtest evidence (`docs/playtests/cycle-vekhikl-1-jeep-drivable.md` + `scripts/capture-m151-jeep-playtest-shots.ts` + PLAYTEST_PENDING row). Owner walk-through deferred under autonomous-loop posture; PLAYTEST_PENDING.md row tracks the owner sweep. Promotion to fully `done` blocks on owner sign-off.
-Success criteria:
-- [x] M151 spawnable in Open Frontier; player enters/exits via `VehicleSessionController` (verified by adapter+integration PRs + smoke).
-- [x] Basic driving (forward, back, turn) over terrain (verified by GroundVehiclePhysics tests: gravity, conform-flat, conform-slope, Ackermann yaw scaling, brake-to-stop, slope-stall).
-- [x] Collides with terrain (per-wheel terrain conform via `ITerrainRuntime.getHeightAt/getNormalAt/getSlopeAt`; no per-frame reflection RT). Static-obstacle collision deferred to future cycle.
+Verbose evidence for directives with >2 lines of original prose lives here:
 
-## VEKHIKL-2 — Stationary M2 .50 cal emplacements
-Status: code-complete (owner playtest deferred). Owning subsystem: vehicle / weapons. Opened: cycle-2026-05-04. Code-complete: cycle-vekhikl-2-stationary-weapons 2026-05-17.
-Latest evidence: 6 PRs landed under `cycle-vekhikl-2-stationary-weapons` — R1: [#233](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/233) `0096d825` Emplacement IVehicle surface (`VehicleCategory` extended with `'emplacement'` inside the IVehicle module, no fence touch), [#234](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/234) `917d83df` EmplacementPlayerAdapter (mouse yaw/pitch within cone, first-person camera behind spade grips, F mount/dismount). R2: [#235](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/235) `c9725b76` vekhikl-2-playtest-evidence (`docs/playtests/cycle-vekhikl-2-stationary-weapons.md` + `scripts/capture-vekhikl-2-emplacement-shots.ts` + PLAYTEST_PENDING row; deferred under autonomous-loop posture), [#237](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/237) `0732beaa` M2HB weapon integration (575 RPM, 250-round belt, tracer every 5th, reload-on-dismount), [#236](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/236) `afa90775` emplacement-npc-gunner (NPC mount via orderBoard + cached emplacement scan; reviewer CHANGES-REQUESTED → APPROVE iteration). R3: [#238](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/238) `78c9c55a` system bootstrap wiring (M2HBEmplacementSystem registered; scenario spawns at Open Frontier US base + A Shau NVA bunker overlook). Owner walk-through deferred under autonomous-loop posture; full `done` promotion blocks on owner walk per [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) row.
-Success criteria:
-- [x] M2HB emplacements spawnable on Open Frontier US base + A Shau NVA bunker overlook (#238 system wiring).
-- [x] Player mounts via IVehicle seat-occupant surface and PlayerVehicleAdapter pattern (#233 + #234); mouse drives barrel yaw/pitch within cone limits.
-- [x] LMB fires at ~575 RPM with tracer every 5th round; 250-round belt; reload triggers on dismount (#237).
-- [x] NPC squad-AI gunners mount unoccupied friendly-faction emplacements and engage enemies inside the field-of-fire cone via the orderBoard scan (#236).
-- [ ] Owner playtest walk (mount, aim, fire, reload, NPC-gunner observation) — deferred to PLAYTEST_PENDING.
-
-## VEKHIKL-3 — M48 Patton tank (skid-steer chassis + turret + cannon)
-Status: closed (cycle-vekhikl-4-tank-turret-and-cannon close-commit 2026-05-17). Owning subsystem: vehicle (ground / tracked). Opened: cycle-2026-05-04. Chassis half code-complete: cycle-vekhikl-3-tank-chassis 2026-05-17. Closed: cycle-vekhikl-4-tank-turret-and-cannon 2026-05-17 (turret + cannon + AI gunner + damage states + WASM pilot half landed; full M48 combat platform).
-Latest evidence: 5 PRs landed under `cycle-vekhikl-3-tank-chassis` — R1: [#246](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/246) `6ab6ade5` tracked-vehicle-physics-core (new `src/systems/vehicle/TrackedVehiclePhysics.ts` per `docs/rearch/TANK_SYSTEMS_2026-05-13.md`; skid-steer kinematics with W/S throttle + A/D turn → independent L/R track speeds via `smoothControlInputs` lerp; four-corner ground conform through `ITerrainRuntime`; tracks-blown state zeroes forward velocity contribution; fixed 1/60 s step via `FixedStepRunner`; reuses `GroundVehiclePhysics` integration loop shape with skid-steer substituted for Ackermann), [#247](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/247) `23410433` tracked-vehicle-physics-tests (7 L2 behavior tests: pure forward throttle → forward motion + zero yaw, pure turn axis → in-place pivot, throttle+turn combined, chassis tilt on slope per-corner ground sample, tracks-blown immobilization, slope-stall scaling, input smoothing → no instantaneous jump). R2: [#249](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/249) `bc4ec779` vekhikl-3-playtest-evidence (`docs/playtests/cycle-vekhikl-3-tank-chassis.md` + capture script + PLAYTEST_PENDING row; deferred under autonomous-loop posture), [#250](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/250) `a08b878a` m48-tank-integration (new `src/systems/vehicle/Tank.ts` IVehicle impl + M48 chassis config; `VehicleManager` registration; M48 spawns on Open Frontier US base + A Shau valley road; `update(dt)` delegates to `TrackedVehiclePhysics.step()`), [#248](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/248) `a11c1ddf` tank-player-adapter (new `src/systems/vehicle/TankPlayerAdapter.ts` mirroring `GroundVehiclePlayerAdapter` with skid-steer input model: W/S throttle, A/D turn — NOT steer angle; F enter/exit; player seat = `'pilot'`; external orbit-tank third-person camera for the chassis-only slice; turret first-person comes in cycle #9; stub swapped to real Tank instance at merge commit `a11c1ddf`). No fence change (`VehicleCategory` / `SeatRole` reused per INTERFACE_FENCE.md). No external physics library added (per ENGINE_TRAJECTORY addendum + TANK_SYSTEMS §"Decision"). Owner walk-through deferred under autonomous-loop posture; full `done` promotion blocks on cycle #9 close (turret + cannon + AI gunner + damage states + WASM pilot).
-Success criteria:
-- [x] Tanks built as a sibling of the wheeled chassis (not a subclass) per TANK_SYSTEMS memo (chassis lives in `TrackedVehiclePhysics`, reusing the `GroundVehiclePhysics` integration loop shape).
-- [x] M48 chassis drivable on Open Frontier US base + A Shau valley road via skid-steer (W/S throttle, A/D track-differential turn) with four-corner terrain conform and ground-conform chassis tilt (#246 + #248 + #250).
-- [x] Tracks-blown immobilization state implemented (#246 forward-velocity contribution zeroed when `tracksBlown` set; verified by #247 behavior test).
-- [x] No external physics library added; fixed-1/60 s integration step via `FixedStepRunner` (#246).
-- [x] Turret + cannon mount + barrel pitch slew + ballistic projectile (cycle #9 PR #252 TankTurret rig + PR #253 TankCannonProjectile + PR #251 TankGunnerAdapter).
-- [x] HP bands + visual transitions + turret-jammed / engine-killed substates (cycle #9 PR #256 tank-damage-states).
-- [x] NPC AI gunner with lead-prediction via Rust→WASM solver pilot (cycle #9 PR #257 tank-ai-gunner-route + PR #254 tank-ballistic-solver-wasm-pilot KEEP-INCONCLUSIVE outcome + PR #258 post-merge stub→real swap).
-- [ ] Owner playtest walk (mount, drive forward + reverse + in-place pivot, slope crest, tracks-blown trigger, turret aim, cannon arc, HP transitions, substate triggers, NPC gunner observation) — deferred to PLAYTEST_PENDING.
-
-## VEKHIKL-4 — M48 turret, cannon, AI gunner, damage states, Rust→WASM ballistic-solver pilot
-Status: closed (cycle-vekhikl-4-tank-turret-and-cannon close-commit 2026-05-17). Owning subsystem: vehicle (ground / tracked) / combat. Opened: cycle-2026-05-13 (named in `docs/rearch/TANK_SYSTEMS_2026-05-13.md` + `docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`). Closed: cycle-vekhikl-4-tank-turret-and-cannon 2026-05-17.
-Latest evidence: 8 PRs landed under `cycle-vekhikl-4-tank-turret-and-cannon` across R1/R2/R3. R1: [#252](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/252) `2026-05-17T17:24:26Z` TankTurret rig (capped yaw 30°/s + pitch 8°/s + envelope [-10°, +20°]; parent-child mount onto Tank.ts chassis), [#253](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/253) `18:15:46Z` TankCannonProjectile (400 m/s muzzle velocity + 20m arming distance + AP/HEAT/HE damage-type resolver + 9m blast radius + gravity-only arc per `MortarBallistics.ts:22` template; reuses `ExplosionEffectsPool`), [#251](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/251) `18:28:27Z` TankGunnerAdapter (post-merge stub→real swap on top; `IVehicle.enterVehicle(_, 'gunner')`; mouse drives yaw + pitch; LMB fires cannon; first-person gunner sight; pilot↔gunner seat swap). R2: [#254](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/254) `20:04:21Z` tank-ballistic-solver-wasm-pilot — **KEEP-INCONCLUSIVE outcome** (1.79x speedup vs ≥3x bar; 8.92 KB gz vs 600 KB ceiling — under both gates so kept per brief rule; Rust crate `rust/tank-ballistic-solver/` exposes `solveTrajectory`; TS wrapper at `src/systems/combat/projectiles/TankBallisticSolver.ts`; not a default for codebase Rust→WASM adoption — first pilot result is data not commitment), [#256](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/256) `20:04:32Z` Tank HP bands + substates (100/66/33/0% bands with smoke wisps → plume → on-fire → wreck visual ladder; tracks-blown/turret-jammed/engine-killed substates triggered at <33% HP via damage-type-biased weight table; combinations possible), [#257](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/257) `21:47:09Z` NPC tank gunner with lead prediction + kill-attribution refactor (extends `CombatantAI.acquireTarget` with tank-mounted state branch; NPC computes lead via solver, slews turret to lead position, fires when within cone tolerance; MVP gunner-only on parked tanks; closed #253 reviewer kill-attribution gap via shared `CombatantSystemDamage.applyExplosionDamage` handler routing; CHANGES-REQUESTED → APPROVE iteration), [#255](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/255) `21:49:42Z` vekhikl-4-playtest-evidence (`docs/playtests/cycle-vekhikl-4-tank-turret-and-cannon.md` + capture script + PLAYTEST_PENDING row; deferred under autonomous-loop posture). R3: [#258](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/258) `22:28:22Z` tank-ai-gunner-route-swap-real-solver (post-merge stub→real `TankBallisticSolver` swap once R2 #254 + #257 both on master). combat120 p99 intra-cycle +1.4% (49.00 → 49.70 ms across cycle's PRs) — well under 5% gate. No fence change. No external physics library added. Owner walk-through deferred under autonomous-loop posture; full closure recorded once owner sweeps deferred items in [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md).
-Success criteria:
-- [x] Turret rig with capped yaw + barrel pitch slew (#252).
-- [x] Player gunner seat with cannon fire (#251 + #253).
-- [x] Ballistic main-cannon projectile with gravity-only arc + arming + damage-type resolver (#253).
-- [x] HP bands with three visual transitions + tracks-blown / turret-jammed / engine-killed substates (#256).
-- [x] NPC gunner with lead-prediction routing through the ballistic solver (#257 + #258).
-- [x] Rust→WASM ballistic-solver pilot conclusion recorded (#254 KEEP-INCONCLUSIVE: 1.79x speedup vs 3x bar, 8.92 KB gz vs 600 KB ceiling — both gates fail high so kept; first-pilot data does not commit codebase to broader Rust→WASM adoption).
-- [ ] Owner playtest walk (turret aim, cannon arc, HP transitions, substate triggers, NPC gunner observation) — deferred to PLAYTEST_PENDING.
-
-## AVIATSIYA-1 — Helicopter rotor visual parity
-Status: done. Owning subsystem: helicopter. Opened: cycle-2026-04-23.
-Latest evidence: `artifacts/perf/2026-05-08T01-23-26-506Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`
-Success criteria:
-- Huey, UH-1C Gunship, and AH-1 Cobra rotor directionality and naming pass live in-production review.
-- Future rotor regressions reopen DEFEKT-5.
-
-## AVIATSIYA-2 — AC-47 low-pitch takeoff single-bounce
-Status: open. Owning subsystem: vehicle (fixed-wing) / airframe. Opened: cycle-2026-04-21.
-Success criteria:
-- AC-47 takeoff at low pitch no longer single-bounces on the airfield.
-- `Airframe` ground-rolling model has tests covering the regression.
-
-## AVIATSIYA-3 — Helicopter parity audit
-Status: done. Owning subsystem: helicopter. Opened: cycle-2026-04-22.
-Latest evidence: `docs/rearch/helicopter-parity-audit.md`
-Success criteria:
-- Audit memo names the state-authority gaps between `HelicopterVehicleAdapter` and `HelicopterPlayerAdapter`, and proposes consolidation.
-
-## AVIATSIYA-4 — Helicopter combat surfaces
-Status: open. Owning subsystem: helicopter / weapons. Opened: cycle-2026-05-04.
-Success criteria:
-- Door-gunner controls and reload behavior on Huey.
-- Chin minigun on UH-1C Gunship and AH-1 Cobra.
-- Rocket-pod fire from stub-wing pylons (Gunship, Cobra).
-- Recoil, tracer behavior, and ammo loadout match the period.
-
-## AVIATSIYA-5 — Fixed-wing combat surfaces
-Status: open. Owning subsystem: vehicle (fixed-wing) / weapons. Opened: cycle-2026-05-04.
-Success criteria:
-- A-1 Skyraider carries bombs, rockets, napalm canisters, 20mm cannon.
-- F-4 Phantom carries Sidewinder missiles and bombs.
-- AC-47 Spooky side-firing minigun pattern present and authentic.
-- Target lead, weapon sway, and station-keeping during attack runs.
-
-## AVIATSIYA-6 — Combat maneuvers
-Status: open. Owning subsystem: vehicle / helicopter / AI. Opened: cycle-2026-05-04.
-Success criteria:
-- AC-47 left-circle pylon-turn gunship orbit complete.
-- A-1 dive-bomb attack profile.
-- F-4 strafing run; Cobra rocket run; Huey gunship rocket strafe.
-- Maneuvers callable by NPC pilots and assist-flying players.
-
-## AVIATSIYA-7 — AH-1 Cobra import and integration
-Status: open. Owning subsystem: helicopter. Opened: cycle-2026-05-04.
-Latest evidence: GLB at `pixel-forge/war-assets/vehicles/aircraft/ah1-cobra.glb`.
-Success criteria:
-- Cobra spawnable, flyable, and weapon-armed alongside Huey and UH-1C.
-
-## SVYAZ-1 — Squad command stand-down
-Status: done. Owning subsystem: combat / UI. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-07T18-59-28-353Z/projekt-143-svyaz-standdown-browser-proof/standdown-browser-proof.json`
-
-## SVYAZ-2 — Squad pings: go, patrol, attack, fall back
-Status: done. Owning subsystem: combat / UI. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-07T21-41-01-140Z/projekt-143-svyaz-ping-command-browser-proof/ping-command-browser-proof.json`
-
-## SVYAZ-3 — Air-support call-in radio
-Status: open. Owning subsystem: combat / UI / aviation. Opened: cycle-2026-05-04.
-Latest evidence: radio UI shell, asset list, target-mode selector, and cooldown HUD first slice merged in `665b0c5`.
-Success criteria:
-- Radio menu reachable from squad UI or hotkey.
-- Target marking by smoke, willie pete, or position-only.
-- Asset selection across the aviation roster (A-1 napalm, A-1 rockets, F-4 bombs, AC-47 orbit, Cobra rocket run, Huey gunship strafe).
-- Per-asset cooldown system.
-- NPC-piloted aircraft fulfill the call-in.
-
-## SVYAZ-4 — RTS-flavored command discipline
-Status: open. Owning subsystem: combat / UI. Opened: cycle-2026-05-04.
-Success criteria: squad and air-support commands compose so the simulation reads as a hybrid FPS/RTS while the player is embedded as an infantryman or pilot.
-
-## UX-1 — Respawn screen redesign (PC + mobile)
-Status: done. Owning subsystem: UI / player. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-07T20-35-21-453Z/projekt-143-ux-respawn-browser-proof/ux-respawn-browser-proof.json`
-
-## UX-2 — Map spawn / respawn flow
-Status: open. Owning subsystem: UI / player. Opened: cycle-2026-05-04.
-Success criteria:
-- Map view shows spawn options unambiguously.
-- Tap-to-spawn and click-to-spawn both work.
-- Zone, helipad, and tactical-insertion priority is visible.
-- Mobile touch interactions are large enough to hit accurately.
-
-## UX-3 — Loadout selection
-Status: open. Owning subsystem: UI / player. Opened: cycle-2026-05-04.
-Success criteria:
-- Loadout categories clear (rifleman, RTO, machine gunner, etc.).
-- Weapon and ammunition loads visible.
-- Per-faction loadout availability respected.
-- PC and mobile information parity.
-
-## UX-4 — Deploy flow polish
-Status: open. Owning subsystem: UI / player. Opened: cycle-2026-05-04.
-Success criteria:
-- Deploy from menu through first frame of gameplay is fast and clear.
-- Orientation and immediate danger are readable in the first frame.
-
-## STABILIZAT-1 — Refresh combat120 perf baseline
-Status: open. Owning subsystem: perf-harness. Opened: cycle-2026-04-21.
-Latest evidence: `artifacts/perf/2026-05-10T10-45-07-263Z` (`perf:compare`: 5 pass, 0 warn, 3 fail; avg 20.15ms FAIL, p99 47.10ms FAIL, max 100ms FAIL).
-Success criteria:
-- `npm run perf:capture:combat120` from a quiet machine produces avg ≤17ms, p99 ≤35ms, heap_recovery ≥0.5, heap_end_growth ≤+10MB.
-- Refreshed baseline committed to `perf-baselines.json`.
-
-## STABILIZAT-2 — Land vehicle-visuals + airfield + helicopter rotor fix
-Status: done. Owning subsystem: cross-cutting. Opened: cycle-2026-05-04.
-Latest evidence: master at `babae19a76e5ff622976a632e10f7055315d2698`.
-
-## STABILIZAT-3 — Live release verification
-Status: done. Owning subsystem: deploy. Opened: cycle-2026-05-04.
-Latest evidence: `npm run check:live-release` PASS after the 2026-05-10 release-stewardship deploy; production SHA remains live `/asset-manifest.json` truth.
-
-## DEFEKT-1 — Stale baseline audit
-Status: open. Owning subsystem: perf-harness. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-07T22-04-54-994Z/projekt-143-stale-baseline-audit/stale-baseline-audit.json`
-Success criteria:
-- `perf-baselines.json` carries current entries for all tracked scenarios (combat120, openfrontier:short, ashau:short, frontier30m).
-- Stale-baseline gate passes without WARN.
-
-## DEFEKT-2 — Doc / code / artifact drift
-Status: open. Owning subsystem: doc-harness. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-08T01-26-06.909Z/projekt-143-doc-drift/doc-drift.json`
-Success criteria:
-- `check:doc-drift` passes with zero future-date, missing-artifact, or missing-script findings.
-- 14 consecutive days with no doc / code / live drift after a release.
-
-## DEFEKT-3 — Combat AI p99 anchor
-Status: open. Owning subsystem: combat. Opened: cycle-2026-04-17.
-Latest evidence: TTL cache first slice and failed combat120 compare documented at `docs/rearch/cover-query-precompute.md`.
-Success criteria:
-- Synchronous cover search in `AIStateEngage.initiateSquadSuppression` no longer dominates p99.
-- `combat120` p99 ≤35ms with measurement trust PASS.
-
-## DEFEKT-4 — NPC navmesh route quality
-Status: closed (cycle-defekt-4-npc-route-quality close-commit e6e02711 2026-05-18). Owning subsystem: navigation. Opened: cycle-2026-04-17. Shipped as 3 PRs: #265 npc-slope-stuck-recovery (`df84a870`), #266 navmesh-crowd-reenable (`aac0e519`), #267 terrain-solver-stall-fix (`4f505661`). All three `terrain-nav-reviewer` APPROVE pre-merge.
-Latest evidence: `artifacts/perf/2026-05-07T22-42-23-479Z/projekt-143-defekt-route-quality-audit/route-quality-audit.json`
-Success criteria:
-- A Shau and Open Frontier active-driver route-quality captures pass measurement trust.
-- Route/stuck telemetry within explicit closure bounds for max stuck seconds, route no-progress resets, waypoint replan failures, and terrain-stall warning rate.
-
-## DEFEKT-5 — Visual fallback and directionality audit
-Status: done. Owning subsystem: combat / helicopter / FX. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-08T01-23-26-506Z/projekt-143-visual-integrity-audit/visual-integrity-audit.json`
-
-## DEFEKT-6 — Terrain occlusion and fire authority
-Status: open. Owning subsystem: combat / terrain / navigation / materialization. Opened: cycle-2026-05-11.
-Latest evidence: player report during KONVEYER follow-up that enemies can still be shot through terrain; K11 brief records this as an architecture risk in `docs/tasks/cycle-2026-05-11-konveyer-k11-proof-terrain-budget.md`. The 2026-05-11 follow-up note says this may indicate larger wiring, dependency, authority, and optimization issues rather than one bad weapon branch. First code slice found and patched a player-fire gap where close-range shots under 200m bypassed the CPU height-profile fallback when the terrain BVH missed. Targeted unit proof lives at `artifacts/perf/2026-05-11T19-05-00-000Z/konveyer-terrain-fire-authority/vitest-combatant-combat.json`; strict WebGPU browser proof lives at `artifacts/perf/2026-05-11T19-14-54-162Z/konveyer-terrain-fire-authority/terrain-fire-authority.json` and records a real 181.7m Open Frontier line where BVH returned no hit but effective-height profile blocked before damage. Do not close this directive from that first slice.
-Success criteria:
-- Reproduce or disprove fire-through-terrain with browser evidence that records shooter, target, terrain height/effective height, weapon ray, LOS result, and hit outcome.
-- Identify the authoritative terrain occlusion query for player fire, NPC fire, AI LOS, cover, and active-driver shot validation.
-- Verify combat raycasts are not bypassing render terrain, effective collision terrain, hydrology/cover blockers, navmesh placement, or materialization state through stale caches or partial shortcuts.
-- Record perf impact and cache ownership before changing LOS cadence, ray count, or terrain-query implementation.
-
-## DIZAYN-1 — Vision charter
-Status: done. Owning subsystem: design. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-07T17-49-40.255Z/projekt-143-dizayn-vision-charter-audit/vision-charter-audit.json` (charter at `docs/archive/dizayn/vision-charter.md`).
-
-## DIZAYN-2 — Art-direction review gate
-Status: done. Owning subsystem: design. Opened: cycle-2026-05-04.
-Latest evidence: `artifacts/perf/2026-05-07T17-55-41.245Z/projekt-143-dizayn-art-direction-gate-audit/art-direction-gate-audit.json` (gate at `docs/archive/dizayn/art-direction-gate.md`).
-
-## DIZAYN-3 — Liberty of proposal
-Status: open. Owning subsystem: design. Opened: cycle-2026-05-04.
-Success criteria: visual / feel proposals from the design lane can land on any directive; engineering rejection requires a written rationale.
+- [KB-STARTUP-1](directives/kb-startup-1.md)
+- [KONVEYER-10](directives/konveyer-10.md)
+- [KONVEYER-11](directives/konveyer-11.md)
+- [KONVEYER-12](directives/konveyer-12.md)
+- [VODA-1](directives/voda-1.md)
+- [VODA-2](directives/voda-2.md)
+- [VODA-3](directives/voda-3.md)
+- [VEKHIKL-1](directives/vekhikl-1.md)
+- [VEKHIKL-2](directives/vekhikl-2.md)
+- [VEKHIKL-3](directives/vekhikl-3.md)
+- [VEKHIKL-4](directives/vekhikl-4.md)
+- [DEFEKT-4](directives/defekt-4.md)
+- [DEFEKT-6](directives/defekt-6.md)
