@@ -101,6 +101,18 @@ export class GroundVehicleProximityChecker {
   }
 
   /**
+   * Read the id of the vehicle the prompt is currently advertising, or
+   * `null` if no prompt is showing. The boarding factory consumes this
+   * to dispatch the F-key intent to the right vehicle without re-running
+   * the proximity scan. Stays in sync with `showInteractionPrompt` /
+   * `hideInteractionPrompt` calls — when the prompt hides, this reads
+   * back as `null`.
+   */
+  getLastShownVehicleId(): string | null {
+    return this.lastShownVehicleId;
+  }
+
+  /**
    * Per-frame entry point. Accumulates time and dispatches a single
    * proximity check per `CHECK_INTERVAL_S`. Tests prefer
    * `checkPlayerProximity()` directly to avoid simulating the cadence.

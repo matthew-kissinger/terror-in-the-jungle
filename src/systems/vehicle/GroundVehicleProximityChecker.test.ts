@@ -232,6 +232,32 @@ describe('GroundVehicleProximityChecker', () => {
     // capture, so a silent retune here would invalidate the playtest set.
     expect(PROMPT_RADIUS_M).toBe(6);
   });
+
+  it('exposes the currently prompted vehicle id (or null) for the boarding factory', () => {
+    const jeep = new FakeVehicle('motor_pool_small_m151', 'ground', new THREE.Vector3(3, 0, 0));
+    const manager = makeVehicleManager([jeep]);
+    const hud = makeHud();
+    const playerPos = new THREE.Vector3(0, 0, 0);
+
+    const checker = new GroundVehicleProximityChecker(
+      manager as never,
+      () => playerPos,
+      () => false,
+    );
+    checker.setHUDSystem(hud);
+
+    // No prompt yet → null
+    expect(checker.getLastShownVehicleId()).toBeNull();
+
+    // Prompt shown → returns the prompted id
+    checker.checkPlayerProximity();
+    expect(checker.getLastShownVehicleId()).toBe('motor_pool_small_m151');
+
+    // Walk out of range → prompt hides, id goes back to null
+    playerPos.set(20, 0, 0);
+    checker.checkPlayerProximity();
+    expect(checker.getLastShownVehicleId()).toBeNull();
+  });
 });
 
 describe('resolveVehiclePromptCopy', () => {
