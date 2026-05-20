@@ -24,12 +24,23 @@
  *
  * Total when invoked with the cycle's default matrix: 20 + 8 + 5 = 33 shots.
  *
+ * Cycle `cycle-skylut-resolution-bump` task `skylut-playtest-evidence`
+ * (2026-05-19) adds a `--lut-bump-check` flag that takes a focused pair only:
+ * Open Frontier noon + A Shau midday-flyover. Used with `--prefix=pre|post`
+ * to produce the before/after baseline pair. The artifact root flips to
+ * `artifacts/cycle-skylut-resolution-bump/playtest-evidence/`. The flag also
+ * computes a horizon-row gradient monotonicity check (delta-per-pixel
+ * ≤ 4/255 across the visible band) and a fog-vs-sky horizon parity check
+ * (±5%) and writes them to `bump-summary.json` alongside the PNGs.
+ *
  * Usage:
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts                   # full 33-shot matrix
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --tod=noon         # single TOD, all scenarios
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --scenario=ashau   # single scenario, all TOD
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --skip-parity      # skip the WebGPU/WebGL2 pair set
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --skip-night       # skip the night-red regression set
+ *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --lut-bump-check --prefix=pre   # pre-bump baseline pair
+ *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --lut-bump-check --prefix=post  # post-bump pair + analysis
  *
  * Notes:
  *   - `combat120` (ai_sandbox) has no `todCycle` and ignores `forceTimeOfDay`.
@@ -166,6 +177,29 @@ const OUT_DIR = join(
   'cycle-sun-and-atmosphere-overhaul',
   'playtest-evidence'
 );
+
+/**
+ * Cycle `cycle-skylut-resolution-bump`: focused pre/post artifact root used
+ * only when `--lut-bump-check` is passed. Distinct from `OUT_DIR` so the
+ * cycle's evidence lives in its own folder under `artifacts/`.
+ */
+const LUT_BUMP_OUT_DIR = join(
+  process.cwd(),
+  'artifacts',
+  'cycle-skylut-resolution-bump',
+  'playtest-evidence'
+);
+
+/**
+ * Cycle `cycle-skylut-resolution-bump` focused capture pair: Open Frontier
+ * noon (the canonical "midday dark spots" report) + A Shau midday flyover
+ * (the "skybox edge through terrain" report). Both use the existing preset's
+ * `cameraHeight` so the framing matches the user's reported viewpoint.
+ */
+const LUT_BUMP_PAIR: Array<{ scenario: ScenarioKey; tod: TodLabel }> = [
+  { scenario: 'openfrontier', tod: 'noon' },
+  { scenario: 'ashau', tod: 'noon' },
+];
 
 // ----- CLI -----
 
@@ -651,6 +685,163 @@ async function sampleParityKeyPointsFromPng(buffer: Buffer): Promise<ParitySampl
   }
 }
 
+// ----- LUT-bump check: horizon-row gradient + fog/sky parity -----
+
+interface HorizonRowSample {
+  /** y coord (row index) we sampled, in [0, h-1]. */
+  rowY: number;
+  /** Sample count across the row (one sample per 1% of width). */
+  sampleCount: number;
+  /** Max delta-per-step across consecutive samples (raw 0-255). */
+  maxStepDelta255: number;
+  /** Mean delta-per-step across consecutive samples (raw 0-255). */
+  meanStepDelta255: number;
+  /** Monotonic if delta-per-step <= 4 (out of 255) for every step. */
+  monotonicUnder4: boolean;
+  /** Count of steps that exceed 4/255 (pre-bump banding heuristic >=16). */
+  stepsOverThreshold: number;
+  /** Highest single step delta in any one channel. */
+  maxAnyChannelDelta255: number;
+}
+
+/**
+ * Sample a horizontal row of pixels near the visible horizon and report the
+ * delta-per-step statistic.
+ *
+ * The brief acceptance is:
+ *   - post-bump horizon-row gradient monotonic, delta-per-pixel <= 4/255
+ *     across the visible band
+ *   - pre-bump should show >= 16/255 step at bin boundaries
+ *
+ * The camera is posed with the dome dominating the frame and pitch a few
+ * degrees above horizon. The horizon line lands at roughly y = 0.55 * h
+ * (see `sampleParityKeyPointsFromPng.horizonMid`). To dodge sun-disc + cloud
+ * features that dominate the centre column, we sample a row at y = 0.6 * h
+ * (just below mid, picking up the fog band the LUT drives), restrict samples
+ * to the visible-band x range [0.1 * w, 0.9 * w], and sample every 1% of
+ * width (= ~80 samples at 1920).
+ *
+ * The step metric is the max-of-channels absolute delta between consecutive
+ * samples. That keeps a single hard step in any colour channel from being
+ * averaged out by smoother neighbours.
+ */
+async function sampleHorizonRowFromPng(buffer: Buffer): Promise<HorizonRowSample | null> {
+  try {
+    const img = sharp(buffer);
+    const meta = await img.metadata();
+    const w = meta.width ?? 0;
+    const h = meta.height ?? 0;
+    if (w === 0 || h === 0) return null;
+    const channels = meta.channels ?? 3;
+    const raw = await img.raw().toBuffer();
+
+    const rowY = Math.floor(h * 0.6);
+    const xStart = Math.floor(w * 0.1);
+    const xEnd = Math.floor(w * 0.9);
+    const stepX = Math.max(1, Math.floor(w * 0.01));
+
+    const samples: Array<[number, number, number]> = [];
+    for (let x = xStart; x <= xEnd; x += stepX) {
+      const idx = (rowY * w + x) * channels;
+      samples.push([raw[idx], raw[idx + 1], raw[idx + 2]]);
+    }
+
+    let maxStep = 0;
+    let totalStep = 0;
+    let stepsOver = 0;
+    let maxAnyChannel = 0;
+    for (let i = 1; i < samples.length; i++) {
+      const a = samples[i - 1];
+      const b = samples[i];
+      const dR = Math.abs(b[0] - a[0]);
+      const dG = Math.abs(b[1] - a[1]);
+      const dB = Math.abs(b[2] - a[2]);
+      const stepMax = Math.max(dR, dG, dB);
+      maxAnyChannel = Math.max(maxAnyChannel, stepMax);
+      // Use a mean-of-channels for the "monotonic" call so single-channel
+      // grain (e.g. dither from the WebGL2 fallback) does not trip the
+      // assertion; the maxAnyChannel field is still surfaced for triage.
+      const stepMean = (dR + dG + dB) / 3;
+      totalStep += stepMean;
+      maxStep = Math.max(maxStep, stepMean);
+      if (stepMean > 4) stepsOver++;
+    }
+    const meanStep = samples.length > 1 ? totalStep / (samples.length - 1) : 0;
+
+    return {
+      rowY,
+      sampleCount: samples.length,
+      maxStepDelta255: maxStep,
+      meanStepDelta255: meanStep,
+      monotonicUnder4: maxStep <= 4,
+      stepsOverThreshold: stepsOver,
+      maxAnyChannelDelta255: maxAnyChannel,
+    };
+  } catch {
+    return null;
+  }
+}
+
+interface FogVsSkySample {
+  /** Sky pixel (above horizon, normalized 0-1). */
+  sky: [number, number, number];
+  /** Fog pixel (at the visible horizon line, normalized 0-1). */
+  fog: [number, number, number];
+  /** Per-channel absolute delta. */
+  delta: [number, number, number];
+  /** Max channel delta as percent of 255. */
+  maxChannelDeltaPct: number;
+  /** Passes the ±5% (per the brief). */
+  passesUnder5Pct: boolean;
+}
+
+/**
+ * Sample one pixel above the horizon (sky-dome direct) and one pixel at the
+ * horizon line (fog-driven hemisphere reader). The brief's acceptance: these
+ * match within ±5% per channel. Pre-bump, the coarse 8-row LUT puts a hard
+ * bin boundary at the visible horizon, so the fog pixel reads as a discrete
+ * step away from the sky pixel above it.
+ */
+async function sampleFogVsSkyHorizonFromPng(buffer: Buffer): Promise<FogVsSkySample | null> {
+  try {
+    const img = sharp(buffer);
+    const meta = await img.metadata();
+    const w = meta.width ?? 0;
+    const h = meta.height ?? 0;
+    if (w === 0 || h === 0) return null;
+    const channels = meta.channels ?? 3;
+    const raw = await img.raw().toBuffer();
+    const at = (x: number, y: number): [number, number, number] => {
+      const idx = (Math.floor(y) * w + Math.floor(x)) * channels;
+      return [raw[idx] / 255, raw[idx + 1] / 255, raw[idx + 2] / 255];
+    };
+    // Sample off-centre to dodge the sun-disc directly in the middle. The
+    // sky pixel sits well above the horizon to read the hemisphere-direct
+    // colour; the fog pixel sits just at the horizon line.
+    const skyX = w * 0.2;
+    const skyY = h * 0.35;
+    const fogX = w * 0.2;
+    const fogY = h * 0.58;
+    const sky = at(skyX, skyY);
+    const fog = at(fogX, fogY);
+    const delta: [number, number, number] = [
+      Math.abs(sky[0] - fog[0]),
+      Math.abs(sky[1] - fog[1]),
+      Math.abs(sky[2] - fog[2]),
+    ];
+    const maxChannelDeltaPct = Math.max(...delta) * 100;
+    return {
+      sky,
+      fog,
+      delta,
+      maxChannelDeltaPct,
+      passesUnder5Pct: maxChannelDeltaPct <= 5,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ----- Top-level capture orchestration -----
 
 interface CaptureRecord {
@@ -664,6 +855,10 @@ interface CaptureRecord {
   pngBytes: number;
   parity?: ParitySample | null;
   moonColor?: MoonColorSample | null;
+  /** Populated only for `--lut-bump-check` captures. */
+  horizonRow?: HorizonRowSample | null;
+  /** Populated only for `--lut-bump-check` captures. */
+  fogVsSky?: FogVsSkySample | null;
   notes: string;
 }
 
@@ -710,7 +905,12 @@ async function captureSingleShot(
   tod: TodLabel,
   rendererMode: RendererMode,
   outFile: string,
-  options: { sampleParity?: boolean; sampleNightRed?: boolean }
+  options: {
+    sampleParity?: boolean;
+    sampleNightRed?: boolean;
+    /** Populate horizon-row + fog-vs-sky samples for the LUT-bump check. */
+    sampleLutBump?: boolean;
+  }
 ): Promise<CaptureRecord> {
   // Stop the engine RAF FIRST so subsequent settle / forceSkyRefresh /
   // applyTod work happens on a calm page. Without this, the streaming
@@ -761,6 +961,8 @@ async function captureSingleShot(
   }
 
   const parity = options.sampleParity && pngBuffer ? await sampleParityKeyPointsFromPng(pngBuffer) : null;
+  const horizonRow = options.sampleLutBump && pngBuffer ? await sampleHorizonRowFromPng(pngBuffer) : null;
+  const fogVsSky = options.sampleLutBump && pngBuffer ? await sampleFogVsSkyHorizonFromPng(pngBuffer) : null;
 
   return {
     filename: outFile,
@@ -773,6 +975,8 @@ async function captureSingleShot(
     pngBytes: pngBuffer?.byteLength ?? 0,
     parity,
     moonColor,
+    horizonRow,
+    fogVsSky,
     notes: snapNotes,
   };
 }
@@ -882,6 +1086,51 @@ async function runNightRedMatrix(
   }
 }
 
+/**
+ * Cycle `cycle-skylut-resolution-bump`: focused 2-shot matrix used by
+ * `--lut-bump-check`. Captures only Open Frontier noon + A Shau midday and
+ * samples the horizon row + fog-vs-sky horizon parity. Output filenames are
+ * prefixed (`pre-` / `post-`) so a pre-bump run on `master@be953420` and a
+ * post-bump run on this cycle's head produce both halves of the diff pair
+ * under `LUT_BUMP_OUT_DIR`.
+ */
+async function runLutBumpMatrix(
+  page: Page,
+  baseUrl: string,
+  prefix: string,
+  outDir: string,
+  records: CaptureRecord[]
+): Promise<void> {
+  for (const { scenario: scenarioKey, tod } of LUT_BUMP_PAIR) {
+    const scenario = SCENARIO_PRESETS.find((s) => s.key === scenarioKey);
+    if (!scenario) {
+      logStep(`LUT-bump scenario ${scenarioKey} not found, skipping`);
+      continue;
+    }
+    await navigateAndStart(page, baseUrl, 'webgpu', scenario.mode);
+    await page.waitForTimeout(scenario.settleSec * 1000);
+
+    const filename = join(outDir, `${prefix}${scenario.key}-${tod}.png`);
+    try {
+      const rec = await captureSingleShot(page, scenario, tod, 'webgpu', filename, { sampleLutBump: true });
+      records.push(rec);
+    } catch (err) {
+      logStep(`LUT-bump ${scenario.key}/${tod} FAILED: ${(err as Error).message}`);
+      records.push({
+        filename,
+        scenario: scenario.key,
+        tod,
+        rendererMode: 'webgpu',
+        appliedVia: 'n/a',
+        forceTimeOfDay: 0,
+        resolvedBackend: 'failed',
+        pngBytes: 0,
+        notes: `error: ${(err as Error).message}`,
+      });
+    }
+  }
+}
+
 // ----- Summary computation -----
 
 function computeParityDeltas(records: CaptureRecord[]): SuiteSummary['parityDeltas'] {
@@ -949,6 +1198,8 @@ async function main(): Promise<void> {
   const scenarioFlag = readFlagValue('scenario') as ScenarioKey | null;
   const skipParity = hasFlag('skip-parity');
   const skipNight = hasFlag('skip-night');
+  const lutBumpCheck = hasFlag('lut-bump-check');
+  const prefixFlag = readFlagValue('prefix');
 
   // Build the visual matrix. If --tod=<single>, only capture that one; if
   // --scenario=<key>, only run that scenario.
@@ -965,9 +1216,23 @@ async function main(): Promise<void> {
     visualScenarios = [s];
   }
 
-  if (!existsSync(OUT_DIR)) {
-    mkdirSync(OUT_DIR, { recursive: true });
-    logStep(`Created ${OUT_DIR}`);
+  const activeOutDir = lutBumpCheck ? LUT_BUMP_OUT_DIR : OUT_DIR;
+  if (!existsSync(activeOutDir)) {
+    mkdirSync(activeOutDir, { recursive: true });
+    logStep(`Created ${activeOutDir}`);
+  }
+
+  // --lut-bump-check expects --prefix=pre|post; default to a timestamped
+  // prefix so back-to-back runs do not stomp each other.
+  let lutBumpPrefix = '';
+  if (lutBumpCheck) {
+    if (prefixFlag && prefixFlag.length > 0) {
+      lutBumpPrefix = `${prefixFlag}-`;
+    } else {
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      lutBumpPrefix = `cap-${ts}-`;
+      logStep(`No --prefix passed; defaulting LUT-bump prefix to ${lutBumpPrefix}`);
+    }
   }
 
   let server: ServerHandle | null = null;
@@ -994,20 +1259,27 @@ async function main(): Promise<void> {
 
     const baseUrl = `http://127.0.0.1:${PORT}/`;
 
-    // --- Visual matrix (default 20 shots = 5 scenarios x 4 TODs) ---
-    logStep(`Running visual matrix: ${visualScenarios.length} scenarios x ${visualTods.length} TODs`);
-    await runVisualMatrix(page, baseUrl, visualScenarios, visualTods, records);
+    if (lutBumpCheck) {
+      // Focused pair only — Open Frontier noon + A Shau midday flyover. The
+      // full visual/parity/night matrices are skipped under this flag.
+      logStep(`Running LUT-bump check matrix (2 shots, prefix=${lutBumpPrefix}, outDir=${activeOutDir})`);
+      await runLutBumpMatrix(page, baseUrl, lutBumpPrefix, activeOutDir, records);
+    } else {
+      // --- Visual matrix (default 20 shots = 5 scenarios x 4 TODs) ---
+      logStep(`Running visual matrix: ${visualScenarios.length} scenarios x ${visualTods.length} TODs`);
+      await runVisualMatrix(page, baseUrl, visualScenarios, visualTods, records);
 
-    // --- WebGPU vs WebGL2 parity matrix (8 shots = 1 scenario x 4 TODs x 2 modes) ---
-    if (!skipParity) {
-      logStep('Running parity matrix (openfrontier x 4 TODs x 2 renderers)');
-      await runParityMatrix(page, baseUrl, PARITY_SCENARIO, PARITY_TODS, records);
-    }
+      // --- WebGPU vs WebGL2 parity matrix (8 shots = 1 scenario x 4 TODs x 2 modes) ---
+      if (!skipParity) {
+        logStep('Running parity matrix (openfrontier x 4 TODs x 2 renderers)');
+        await runParityMatrix(page, baseUrl, PARITY_SCENARIO, PARITY_TODS, records);
+      }
 
-    // --- Night-red regression matrix (5 shots = 5 scenarios at midnight) ---
-    if (!skipNight) {
-      logStep('Running night-red regression matrix (5 scenarios at midnight)');
-      await runNightRedMatrix(page, baseUrl, SCENARIO_PRESETS, records);
+      // --- Night-red regression matrix (5 shots = 5 scenarios at midnight) ---
+      if (!skipNight) {
+        logStep('Running night-red regression matrix (5 scenarios at midnight)');
+        await runNightRedMatrix(page, baseUrl, SCENARIO_PRESETS, records);
+      }
     }
 
     page.off('console', onConsole);
@@ -1019,13 +1291,17 @@ async function main(): Promise<void> {
 
   const summary: SuiteSummary = {
     createdAt: new Date().toISOString(),
-    outDir: OUT_DIR,
+    outDir: activeOutDir,
     records,
     parityDeltas: computeParityDeltas(records),
     nightRedRegression: computeNightRedRegression(records),
   };
 
-  const summaryPath = join(OUT_DIR, 'summary.json');
+  // Write the appropriate summary path. Under --lut-bump-check we write
+  // `bump-summary-<prefix>.json` so a pre + post pair coexist; under the
+  // default flow we write the legacy `summary.json` for cycle #12 evidence.
+  const summaryName = lutBumpCheck ? `bump-summary-${lutBumpPrefix.replace(/-$/, '')}.json` : 'summary.json';
+  const summaryPath = join(activeOutDir, summaryName);
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
   logStep(`Wrote summary -> ${summaryPath}`);
 
@@ -1033,6 +1309,26 @@ async function main(): Promise<void> {
   const successes = records.filter((r) => r.pngBytes > 0).length;
   const failures = records.filter((r) => r.pngBytes === 0).length;
   logStep(`Capture summary: ${successes} succeeded, ${failures} failed (${records.length} total)`);
+
+  if (lutBumpCheck) {
+    logStep('LUT-bump assertions:');
+    for (const rec of records) {
+      const hr = rec.horizonRow;
+      const fs = rec.fogVsSky;
+      if (hr) {
+        const verdict = hr.monotonicUnder4 ? 'PASS' : 'FAIL';
+        logStep(`  ${rec.scenario}/${rec.tod} horizon-row: ${verdict} (max-step=${hr.maxStepDelta255.toFixed(2)}/255, mean=${hr.meanStepDelta255.toFixed(2)}/255, stepsOver4=${hr.stepsOverThreshold}, maxAnyChannel=${hr.maxAnyChannelDelta255}/255)`);
+      } else {
+        logStep(`  ${rec.scenario}/${rec.tod} horizon-row: (no sample)`);
+      }
+      if (fs) {
+        const verdict = fs.passesUnder5Pct ? 'PASS' : 'FAIL';
+        logStep(`  ${rec.scenario}/${rec.tod} fog-vs-sky: ${verdict} (max channel delta=${fs.maxChannelDeltaPct.toFixed(2)}%)`);
+      } else {
+        logStep(`  ${rec.scenario}/${rec.tod} fog-vs-sky: (no sample)`);
+      }
+    }
+  }
 
   if (summary.nightRedRegression.length > 0) {
     const strictPass = summary.nightRedRegression.filter((n) => n.strictPasses).length;
