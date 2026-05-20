@@ -1,7 +1,5 @@
 # Playtest: cycle-vekhikl-3-tank-chassis
 
-Last verified: 2026-05-17
-
 Cycle: `cycle-vekhikl-3-tank-chassis` (campaign position #8 of 13)
 Task slug: `vekhikl-3-playtest-evidence`
 Branch: `task/vekhikl-3-playtest-evidence`

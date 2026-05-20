@@ -1,7 +1,5 @@
 # Asset Acceptance Standard
 
-Last updated: 2026-05-03
-
 This is the Phase 2 / Cycle 1 acceptance standard for Pixel Forge and other
 runtime assets in Terror in the Jungle. It is a stabilization gate, not an art
 direction memo: an asset can look good and still be rejected if it cannot prove

@@ -1,7 +1,5 @@
 # Interface Fence
 
-Last verified: 2026-05-09
-
 This file defines the rules for changing contract interfaces. **Interfaces inside `src/types/SystemInterfaces.ts` are fenced.** Everything else is free to refactor.
 
 ## Why this exists

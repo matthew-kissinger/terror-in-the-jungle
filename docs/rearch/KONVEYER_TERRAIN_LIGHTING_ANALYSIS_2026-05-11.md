@@ -1,7 +1,5 @@
 # KONVEYER Terrain, Lighting, And Scene-Parity Analysis
 
-Last verified: 2026-05-11
-
 ## Decision
 
 The migration branch has already pivoted from "WebGPU with WebGL fallback" to

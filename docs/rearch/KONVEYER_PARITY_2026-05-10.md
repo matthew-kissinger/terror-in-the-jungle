@@ -1,7 +1,5 @@
 # KONVEYER Parity And Migration Ledger
 
-Last verified: 2026-05-11
-
 Branch: `exp/konveyer-webgpu-migration`
 
 ## KONVEYER-0 Summary

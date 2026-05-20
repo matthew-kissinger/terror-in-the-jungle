@@ -1,6 +1,5 @@
 # Environment Polish Plan — 2026-05-18
 
-Last verified: 2026-05-18 (post `cycle-voda-3-watercraft` close; cycle #11 `cycle-defekt-4-npc-route-quality` active)
 Status: planning memo, owner-requested interrupt outside the 13-cycle campaign chain.
 
 ## TL;DR

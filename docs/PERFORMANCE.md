@@ -1,7 +1,5 @@
 # Performance
 
-Last verified: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge)
-
 This file split into `docs/perf/` on cycle-2026-05-09-doc-decomposition-and-wiring.
 
 - [docs/perf/README.md](perf/README.md) — index, profiling commands, build targets

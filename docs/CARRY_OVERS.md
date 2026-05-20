@@ -1,7 +1,5 @@
 # Carry-Overs Registry
 
-Last verified: 2026-05-20 (post `campaign-2026-05-20-vehicle-boarding-and-water` close — 3 parallel cycles closed, 15 PRs merged, production deploy fired against master tip `e99be58e`; VEKHIKL-UX-2 + VODA-OF-1 + VEKHIKL-LAYOUT-1 each opened+closed in-campaign as zero-cycle IDs; active count unchanged at 6)
-
 Single source of truth for "what's still hanging." Every cycle must close at
 least one carry-over OR ship a user-observable feature; the carry-over count
 strictly decreases or holds. If a cycle ends with a higher count than it

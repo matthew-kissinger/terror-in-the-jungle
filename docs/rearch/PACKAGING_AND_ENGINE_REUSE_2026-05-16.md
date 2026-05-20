@@ -1,7 +1,5 @@
 # Packaging, engine reuse, and frontier primitives
 
-Last verified: 2026-05-16 (cycle-sky-visual-restore close; cycle-mobile-webgl2-fallback-fix R1 in flight)
-
 Forward-looking synthesis on how the post-WebGPU engine can be packaged for
 distribution surfaces beyond Cloudflare Pages, extracted as a reusable
 engine for adjacent 3D games, and pushed with browser primitives that

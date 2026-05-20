@@ -1,6 +1,5 @@
 # UI Icon Manifest
 
-Last updated: 2026-04-01
 Status: **38** PNGs in `public/assets/ui/icons/`; URLs via `src/ui/icons/IconRegistry.ts`
 
 ## Architecture

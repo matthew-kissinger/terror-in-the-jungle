@@ -1,7 +1,5 @@
 # Mobile Startup and Frame Budget
 
-Last verified: 2026-05-16
-
 Cycle: `cycle-2026-05-16-mobile-webgpu-and-sky-recovery` (R1 investigation).
 Task slug: `mobile-startup-and-frame-budget`. Closes against
 `KB-MOBILE-WEBGPU` in `docs/CARRY_OVERS.md`.

@@ -1,7 +1,5 @@
 # Agent Instructions
 
-Last updated: 2026-05-13
-
 This is the authoritative, agent-agnostic operating guide for this repo. Every agent (Claude Code, Codex, Cursor, Gemini, humans) should read this file first. `CLAUDE.md` is a thin wrapper that adds Claude-Code-specific context on top of what's here.
 
 ## Project

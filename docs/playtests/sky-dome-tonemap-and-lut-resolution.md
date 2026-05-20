@@ -1,7 +1,5 @@
 # Playtest memo: `sky-dome-tonemap-and-lut-resolution`
 
-Last updated: 2026-05-16
-
 ## Cycle
 
 `cycle-sky-visual-restore` (campaign position #1 of 12,

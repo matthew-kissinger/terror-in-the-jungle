@@ -1,7 +1,5 @@
 # KONVEYER Primitive Research Spike — Expensive Systems
 
-Last verified: 2026-05-12
-
 Branch: `exp/konveyer-webgpu-migration`. Companion to
 [KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md](KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md),
 [KONVEYER_REVIEW_PACKET_2026-05-12.md](KONVEYER_REVIEW_PACKET_2026-05-12.md),

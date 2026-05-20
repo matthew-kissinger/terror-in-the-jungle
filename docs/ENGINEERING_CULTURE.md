@@ -1,7 +1,5 @@
 # Engineering Culture
 
-Last verified: 2026-05-10
-
 This file is the single-read culture + working-rules synthesis for any agent
 or human doing work on this repo, especially **unattended multi-stream R&D
 runs** (overnight Codex / Claude / Cursor passes that touch stabilization,

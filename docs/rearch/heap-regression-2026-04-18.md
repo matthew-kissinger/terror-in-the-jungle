@@ -1,6 +1,5 @@
 # heap-regression-2026-04-18 — utility-AI per-tick allocation storm
 
-Last updated: 2026-04-18
 Cycle: `cycle-2026-04-18-harness-flight-combat`
 Task: `docs/tasks/heap-regression-investigation.md`
 

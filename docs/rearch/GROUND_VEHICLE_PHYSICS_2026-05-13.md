@@ -1,7 +1,5 @@
 # Ground-vehicle physics architecture
 
-Last verified: 2026-05-13
-
 Branch: `exp/konveyer-webgpu-migration`. Companion to
 [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
 (addendum 2026-05-13 extends its "no external physics lib" stance to

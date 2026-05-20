@@ -1,7 +1,5 @@
 # Playtest: cycle-of-river-surface-enable
 
-Last verified: 2026-05-20
-
 Cycle: `cycle-of-river-surface-enable` (campaign position #2 of 3,
 2026-05-20 vehicle-boarding-and-water parallel campaign)
 Task slug: `of-water-playtest-evidence` (R2, merge gate)

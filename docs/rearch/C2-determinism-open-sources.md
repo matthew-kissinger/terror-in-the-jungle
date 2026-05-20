@@ -1,6 +1,5 @@
 # C2 — Determinism: remaining open non-determinism sources
 
-Last updated: 2026-04-18
 Depends on: `docs/rearch/E5-deterministic-sim.md`, `docs/rearch/E5-nondeterminism-audit.md`.
 
 C2 landed the seam (`SeededRandom` ambient session + `ReplayRecorder` +

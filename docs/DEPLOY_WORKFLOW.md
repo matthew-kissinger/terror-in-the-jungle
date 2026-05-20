@@ -1,7 +1,5 @@
 # Deploy Workflow
 
-Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge; deploy path unchanged)
-
 Production: https://terror-in-the-jungle.pages.dev/
 
 This document captures how a commit becomes a live Cloudflare Pages deploy, how browser freshness is preserved for repeat players, and how to verify prod headers when users report stale assets or load failures.

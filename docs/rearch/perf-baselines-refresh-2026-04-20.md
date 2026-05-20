@@ -1,6 +1,5 @@
 # perf-baselines-refresh 2026-04-20 — post-cycle-2026-04-21 baseline capture
 
-Last updated: 2026-04-20
 Cycle: `cycle-2026-04-21-atmosphere-polish-and-fixes`
 Task: `docs/tasks/perf-baseline-refresh.md`
 

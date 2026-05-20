@@ -1,7 +1,5 @@
 # Current State
 
-Last verified: 2026-05-13 (KONVEYER campaign closed by `master` merge of `exp/konveyer-webgpu-migration` via PR #192 / commit `1df141ca`; master is now the WebGPU + TSL renderer branch with automatic WebGL2 fallback for unsupported environments; active spike branch is `task/mode-startup-terrain-spike`)
-
 Top-level current-truth snapshot for the repo. Companion docs:
 
 - [docs/CARRY_OVERS.md](../CARRY_OVERS.md) — active carry-over registry (single source of truth for unresolved items)

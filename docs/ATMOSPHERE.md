@@ -1,7 +1,5 @@
 # Atmosphere System
 
-Last updated: 2026-05-10
-
 This document describes the current sky / sun / fog / cloud / ambient stack and
 the remaining atmosphere roadmap. The v1 atmosphere foundation and polish cycles
 landed across `cycle-2026-04-20-atmosphere-foundation` and

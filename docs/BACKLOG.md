@@ -1,46 +1,18 @@
 # Backlog
 
-Last verified: 2026-05-20 (post `campaign-2026-05-20-vehicle-boarding-and-water` close)
-
 This file is the compact Strategic Reserve index. **Active carry-overs and
 unresolved items live in [docs/CARRY_OVERS.md](CARRY_OVERS.md)** (Phase 0
-realignment, 2026-05-09). Active directives live in
-[docs/DIRECTIVES.md](DIRECTIVES.md). Current verified state lives in
-[docs/state/CURRENT.md](state/CURRENT.md) (split from the retired `docs/STATE_OF_REPO.md` on 2026-05-11; pre-split file archived at `docs/archive/STATE_OF_REPO.md`).
-Historical cycle records live under `docs/cycles/<cycle-id>/RESULT.md`.
+realignment, 2026-05-09). Active directives + current state live in
+[docs/DIRECTIVES.md](DIRECTIVES.md). Historical cycle records live under
+`docs/cycles/<cycle-id>/RESULT.md`.
 
-Keep this file at or below 200 measured lines. Do not place long cycle
-retrospectives, PR logs, or active directive status here.
+Keep this file at or below 200 measured lines of evergreen index. Long cycle
+retrospectives (the "Recently Completed" sections below) are historical
+record, not current state.
 
-## Current Release Routing
+## Current state
 
-1. Post-WebGPU master is the release posture: WebGPU + TSL default, automatic
-   WebGL2 fallback, strict WebGPU evidence for renderer claims.
-2. Runtime claims require an entry in `docs/DIRECTIVES.md` plus artifact paths.
-3. Live release claims require `check:live-release` evidence after manual
-   deploy.
-4. Performance baseline refresh remains blocked until STABILIZAT-1 passes from
-   a trusted combat120 chain.
-5. Mode-startup claims must separate cache delivery from runtime CPU bake.
-   `KB-STARTUP-1` owns the active terrain-bake hardening branch.
-6. Human playtest remains required for flight, driving, combat rhythm, and UI
-   responsiveness.
-
-## Active Directive Routing
-
-Use [docs/DIRECTIVES.md](DIRECTIVES.md) instead of duplicating active work here.
-
-| Work area | Directive |
-|---|---|
-| Water surface, hydrology placement, water query/interaction API | VODA-1 |
-| Ground vehicles and stationary weapons | VEKHIKL-1 / VEKHIKL-2 |
-| Helicopter parity, aircraft weapons, maneuvers, Cobra import | AVIATSIYA-3 through AVIATSIYA-7 |
-| Squad commands, pings, air-support radio | SVYAZ-1 through SVYAZ-4 |
-| Respawn, map spawn, loadout, deploy flow | UX-1 through UX-4 |
-| Combat120 baseline and live release | STABILIZAT-1 through STABILIZAT-3 |
-| Baseline drift, doc/code drift, combat p99 (`DEFEKT-3`), route quality | DEFEKT-1 through DEFEKT-4 |
-| WebGPU scene parity and rollout gating | KONVEYER-10 (closed; follow-ups through post-WebGPU campaign) |
-| Mode-start terrain surface bake and startup UI delay | KB-STARTUP-1 |
+See [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Active Branch (task/mode-startup-terrain-spike)
 

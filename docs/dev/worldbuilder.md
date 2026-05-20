@@ -1,7 +1,5 @@
 # WorldBuilder Console
 
-Last verified: 2026-05-09
-
 The WorldBuilder is a dev-only browser console for testing the running game in
 isolation. It consolidates god-mode, system on/off toggles, debug-viz routing,
 and scenario-isolation controls into one Tweakpane panel that sits next to the

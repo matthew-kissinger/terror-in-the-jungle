@@ -1,7 +1,5 @@
 # Testing Contract
 
-Last updated: 2026-04-16
-
 This file is the authoritative test-layer policy. **Every agent and human touching tests must read this first.** The point is to prevent implementation-mirror tests that enshrine today's code shape and block tomorrow's refactor.
 
 ## Why this exists

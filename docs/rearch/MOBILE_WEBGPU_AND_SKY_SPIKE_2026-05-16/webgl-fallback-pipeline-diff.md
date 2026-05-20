@@ -1,6 +1,5 @@
 # WebGL Fallback Pipeline Diff (Pre- vs Post-KONVEYER Merge)
 
-Last verified: 2026-05-16
 Cycle: `cycle-2026-05-16-mobile-webgpu-and-sky-recovery`
 Task: `webgl-fallback-pipeline-diff` (R1)
 Status: Memo only. No product code touched.

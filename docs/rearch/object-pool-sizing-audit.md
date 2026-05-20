@@ -1,7 +1,5 @@
 # Object Pool Sizing Audit
 
-Last verified: 2026-05-10
-
 ## Scope
 
 Optimization stream memo for `TracerPool`, `ImpactEffectsPool`, and

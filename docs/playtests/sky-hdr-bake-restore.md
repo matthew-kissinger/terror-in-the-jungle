@@ -1,7 +1,5 @@
 # Playtest: sky-hdr-bake-restore
 
-Last verified: 2026-05-16
-
 Cycle: `cycle-sky-visual-restore` (campaign position #1 of 12).
 Task brief: [docs/tasks/cycle-sky-visual-restore.md](../tasks/cycle-sky-visual-restore.md) (R1 task `sky-hdr-bake-restore`).
 Closes: `KB-SKY-BLAND` (one of three coordinated R1 tasks).

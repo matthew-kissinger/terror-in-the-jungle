@@ -1,7 +1,5 @@
 # Development Guide
 
-Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge)
-
 ## Prerequisites
 
 - Node 24 (pinned in `.nvmrc`)

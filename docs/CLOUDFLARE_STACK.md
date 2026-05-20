@@ -1,7 +1,5 @@
 # Cloudflare Stack
 
-Last updated: 2026-05-13 (post-PR-#192 WebGPU/TSL master merge; cache config unchanged)
-
 Production today: `https://terror-in-the-jungle.pages.dev/`
 
 This document is the deployment/storage target for the game. `docs/DEPLOY_WORKFLOW.md` remains the command-level deploy runbook; this file explains the Cloudflare architecture we should move toward before adding more terrain/model payloads or live user interaction.

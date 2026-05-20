@@ -1,7 +1,5 @@
 # KONVEYER Materialization Tier Architecture (Draft)
 
-Last verified: 2026-05-12
-
 Status: draft memo, not a contract. Branch: `exp/konveyer-webgpu-migration`.
 Purpose: capture the current implicit tier model and the proposed Phase F
 hot/cold/render-residency model toward the canonical vision sentence

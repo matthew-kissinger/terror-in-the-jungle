@@ -1,7 +1,5 @@
 # KONVEYER WebGPU Stack Research Spikes
 
-Last verified: 2026-05-11
-
 ## Purpose
 
 This memo records the research spike requested during KONVEYER-10. It is not a

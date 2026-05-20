@@ -1,6 +1,5 @@
 # Sun & Atmosphere Vision Spike — 2026-05-16
 
-Last verified: 2026-05-16 (post `cycle-sky-visual-restore` merge; pre cycle #6 dispatch)
 Status: research + vision memo. **No code modified.**
 
 ## TL;DR

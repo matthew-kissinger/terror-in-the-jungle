@@ -1,7 +1,5 @@
 # Asset Manifest
 
-Last updated: 2026-05-03
-
 ## 3D Models (159 GLBs)
 
 Shipped path: `public/models/**` (Vite static assets).

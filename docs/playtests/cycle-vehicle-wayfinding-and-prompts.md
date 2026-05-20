@@ -1,7 +1,5 @@
 # Playtest: cycle-vehicle-wayfinding-and-prompts
 
-Last verified: 2026-05-20
-
 Cycle: `cycle-vehicle-wayfinding-and-prompts`
 (campaign `CAMPAIGN_2026-05-19-VISUAL-AND-WAYFINDING` position #3 of 3)
 Task slug: `vehicle-wayfinding-playtest-evidence`
