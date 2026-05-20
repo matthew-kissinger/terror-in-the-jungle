@@ -4,7 +4,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['src/**/*.{test,spec}.ts', 'scripts/perf-harness/**/*.{test,spec}.{js,ts}'],
+    include: [
+      'src/**/*.{test,spec}.ts',
+      'scripts/*.{test,spec}.ts',
+      'scripts/perf-harness/**/*.{test,spec}.{js,ts}',
+    ],
     passWithNoTests: true,
     typecheck: {
       enabled: true,

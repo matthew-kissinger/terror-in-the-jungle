@@ -29,10 +29,19 @@
  *   2  invocation error
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const CARRY_PATH = join(process.cwd(), 'docs', 'CARRY_OVERS.md');
+
+// Brief LOC thresholds (framework recovery Pass 2 R1.2). The template caps at
+// 80 lines; warn at 100; recommend a split at 150. WARN, never FAIL — owners
+// can knowingly ship a longer brief, but executor token-budget deaths in the
+// 2026-05-20 vehicle-boarding cycle (350-510 LOC briefs) are the reason this
+// gate exists.
+const BRIEF_WARN_LOC = 100;
+const BRIEF_SPLIT_LOC = 150;
+const TASKS_DIR = join(process.cwd(), 'docs', 'tasks');
 
 const BANNED_KEYWORDS = [
   'polish',
@@ -58,6 +67,75 @@ function todayISO(): string {
     String(d.getUTCMonth() + 1).padStart(2, '0'),
     String(d.getUTCDate()).padStart(2, '0'),
   ].join('-');
+}
+
+export interface BriefLocCheck {
+  path: string;
+  lineCount: number;
+  level: 'ok' | 'warn' | 'split';
+  message: string;
+}
+
+/**
+ * Count meaningful lines in a brief and classify against the LOC thresholds.
+ * Pure: no I/O. Caller supplies the file body (so tests can synthesize one
+ * without touching the filesystem).
+ */
+export function classifyBriefLoc(path: string, body: string): BriefLocCheck {
+  // Split on either CRLF or LF. A trailing newline produces one empty cell;
+  // drop it so a 100-line file with a trailing newline counts as 100, not 101.
+  const parts = body.split(/\r?\n/);
+  if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
+  const lineCount = parts.length;
+
+  if (lineCount > BRIEF_SPLIT_LOC) {
+    return {
+      path,
+      lineCount,
+      level: 'split',
+      message:
+        `Brief "${path}" is ${lineCount} LOC (>${BRIEF_SPLIT_LOC}). ` +
+        `Strongly consider splitting into Round 1 + Round 2 task files. ` +
+        `Long briefs starve executor token budgets — see ` +
+        `docs/tasks/_TEMPLATE.md (80 LOC cap).`,
+    };
+  }
+  if (lineCount > BRIEF_WARN_LOC) {
+    return {
+      path,
+      lineCount,
+      level: 'warn',
+      message:
+        `Brief "${path}" is ${lineCount} LOC (>${BRIEF_WARN_LOC}). ` +
+        `Target is ≤80 LOC per docs/tasks/_TEMPLATE.md. Trim Non-goals / ` +
+        `Acceptance prose or split into Round 2.`,
+    };
+  }
+  return {
+    path,
+    lineCount,
+    level: 'ok',
+    message: `Brief "${path}" is ${lineCount} LOC (within target).`,
+  };
+}
+
+/**
+ * Resolve a slug to its brief path and run the LOC check. Returns null when
+ * no brief file is found — the slug-name discipline gate is separate, so a
+ * missing brief is not a validator failure here.
+ */
+function checkBriefLocForSlug(slug: string): BriefLocCheck | null {
+  const cleanSlug = slug.startsWith('cycle-') ? slug : slug;
+  const candidates = [
+    join(TASKS_DIR, `${cleanSlug}.md`),
+    join(TASKS_DIR, `${slug}.md`),
+  ];
+  for (const path of candidates) {
+    if (existsSync(path)) {
+      return classifyBriefLoc(path, readFileSync(path, 'utf8'));
+    }
+  }
+  return null;
 }
 
 function validateSlug(slug: string): { ok: boolean; reason?: string } {
@@ -190,6 +268,13 @@ function main(): void {
   }
   console.log(`[cycle-validate] OK — slug "${slug}" passes the cycle-name discipline gate.`);
 
+  const briefCheck = checkBriefLocForSlug(slug);
+  if (briefCheck && briefCheck.level !== 'ok') {
+    console.warn(`[cycle-validate] WARN — ${briefCheck.message}`);
+  } else if (briefCheck) {
+    console.log(`[cycle-validate] OK — ${briefCheck.message}`);
+  }
+
   if (closeMode) {
     const { changed, activeCount } = incrementCarryovers();
     console.log(
@@ -198,4 +283,14 @@ function main(): void {
   }
 }
 
-main();
+// Run CLI behavior only when invoked directly, not when imported by tests.
+// `process.argv[1]` is the script path under tsx; compare normalized basenames.
+const invokedDirectly =
+  typeof process !== 'undefined' &&
+  Array.isArray(process.argv) &&
+  typeof process.argv[1] === 'string' &&
+  /cycle-validate\.ts$/.test(process.argv[1].replace(/\\/g, '/'));
+
+if (invokedDirectly) {
+  main();
+}
