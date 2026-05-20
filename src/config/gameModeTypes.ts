@@ -90,7 +90,8 @@ type MapFeaturePrefabId =
   | 'bridge_checkpoint_small'
   | 'crossing_outpost_small'
   | 'motor_pool_small'
-  | 'motor_pool_heavy'
+  | 'motor_pool_heavy_of'
+  | 'motor_pool_heavy_ashau'
   | 'trail_checkpoint_small'
   | 'airstrip_rough_small'
   | 'airfield_support_compound_small';

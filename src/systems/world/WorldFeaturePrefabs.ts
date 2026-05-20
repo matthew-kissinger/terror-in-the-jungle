@@ -161,7 +161,37 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(-5, 0, 8.75), yaw: 0 },
     ],
   },
-  motor_pool_heavy: {
+  // Open Frontier motor pool — reflowed for ≥ 1.5 m bounding-box clearance
+  // and ≥ 60° yaw spread across the four ground vehicles. M48 dressing prop
+  // is intentionally removed; the real Tank IVehicle spawns at the same
+  // bay anchor via M48_SPAWN_OFFSETS.open_frontier (sibling task
+  // of-tank-relocate-to-motor-pool). Crate row pushed off the parking
+  // strip to flank the comms tower instead. All placements sit within the
+  // 36 m footprint radius declared by airfield_motor_pool in
+  // OpenFrontierConfig.ts.
+  motor_pool_heavy_of: {
+    placements: [
+      { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -14), yaw: Math.PI, registerCollision: true },
+      { modelPath: StructureModels.COMMS_TOWER, offset: new THREE.Vector3(-20, 0, -4), yaw: 0, registerCollision: true },
+      { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(20, 0, -4), yaw: Math.PI * 0.5, registerCollision: true },
+      // Vehicle bays: staggered Z (8 → 22), yaw spread 72° (π*0.3 → π*0.7).
+      { modelPath: GroundVehicleModels.M151_JEEP, offset: new THREE.Vector3(-2, 0, 8), yaw: Math.PI * 0.3, registerCollision: true },
+      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-16, 0, 14), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(10, 0, 18), yaw: Math.PI * 0.7, registerCollision: true },
+      // M48 bay anchor: real Tank IVehicle is spawned here by M48TankSpawn
+      // (see of-tank-relocate-to-motor-pool). Distance from prefab center:
+      // sqrt(28^2 + 22^2) ≈ 35.6 m, inside the 36 m OF footprint.
+      // Crate row east of warehouse, flanking the comms tower.
+      { modelPath: StructureModels.AMMO_CRATE, offset: new THREE.Vector3(-24, 0, 0), yaw: 0 },
+      { modelPath: StructureModels.SUPPLY_CRATE, offset: new THREE.Vector3(-24, 0, 4), yaw: 0 },
+      { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(-24, 0, -4), yaw: 0 },
+    ],
+  },
+  // A Shau motor pool — preserves the owner-accepted layout that shipped
+  // with cycle-vekhikl-3. Kept as a separate prefab so the OF reflow does
+  // not regress A Shau visuals. Footprint radius at A Shau is 34 m
+  // (Ta Bat Armored Yard); all placements sit inside it.
+  motor_pool_heavy_ashau: {
     placements: [
       { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -14), yaw: Math.PI, registerCollision: true },
       { modelPath: StructureModels.COMMS_TOWER, offset: new THREE.Vector3(-20, 0, -4), yaw: 0, registerCollision: true },

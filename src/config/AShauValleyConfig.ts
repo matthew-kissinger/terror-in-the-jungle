@@ -365,7 +365,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
         innerRadius: 22,
         outerRadius: 30,
       },
-      prefabId: 'motor_pool_heavy',
+      prefabId: 'motor_pool_heavy_ashau',
     },
     // Firebase Ripcord - US hilltop firebase (eastern ridgeline)
     {

@@ -219,7 +219,7 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
         innerRadius: 24,
         outerRadius: 34,
       },
-      prefabId: 'motor_pool_heavy',
+      prefabId: 'motor_pool_heavy_of',
     },
     {
       id: 'village_cluster_main',

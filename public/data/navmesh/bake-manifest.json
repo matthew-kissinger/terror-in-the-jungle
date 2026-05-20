@@ -5,7 +5,7 @@
     {
       "modeId": "open_frontier",
       "seed": 42,
-      "signature": "navmesh-bake-v1-00948fe8a9db99",
+      "signature": "navmesh-bake-v1-18e73a939aa094",
       "navmeshAsset": "/data/navmesh/open_frontier-42.bin",
       "heightmapAsset": "/data/heightmaps/open_frontier-42.f32",
       "worldSize": 3200,
