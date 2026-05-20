@@ -366,6 +366,65 @@ describe('PlayerInput', () => {
       expect(callbacks.onToggleMortarCamera).toHaveBeenCalled();
     });
 
+    describe('F-key boarding router', () => {
+      it('skips mortar fire when boarding consumes the F key', () => {
+        const onBoardNearestVehicle = vi.fn(() => true);
+        const onMortarFire = vi.fn();
+        playerInput.setCallbacks({ onBoardNearestVehicle, onMortarFire });
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' }));
+
+        expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
+        expect(onMortarFire).not.toHaveBeenCalled();
+      });
+
+      it('falls back to mortar fire when boarding declines the F key', () => {
+        const onBoardNearestVehicle = vi.fn(() => false);
+        const onMortarFire = vi.fn();
+        playerInput.setCallbacks({ onBoardNearestVehicle, onMortarFire });
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' }));
+
+        expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
+        expect(onMortarFire).toHaveBeenCalledTimes(1);
+      });
+
+      it('fires mortar when no boarding callback is registered (back-compat)', () => {
+        const onMortarFire = vi.fn();
+        playerInput.setCallbacks({ onMortarFire });
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' }));
+
+        expect(onMortarFire).toHaveBeenCalledTimes(1);
+      });
+
+      it('mirrors the boarding priority on gamepad interact (X) — board consumes', () => {
+        const onBoardNearestVehicle = vi.fn(() => true);
+        const onEnterExitVehicle = vi.fn();
+        const onEnterExitHelicopter = vi.fn();
+        playerInput.setCallbacks({ onBoardNearestVehicle, onEnterExitVehicle, onEnterExitHelicopter });
+        const gamepadCallbacks = gamepadManagerInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+        gamepadCallbacks.onInteract();
+
+        expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
+        expect(onEnterExitVehicle).not.toHaveBeenCalled();
+        expect(onEnterExitHelicopter).not.toHaveBeenCalled();
+      });
+
+      it('mirrors the boarding priority on gamepad interact (X) — boarding declines falls back to enter/exit', () => {
+        const onBoardNearestVehicle = vi.fn(() => false);
+        const onEnterExitVehicle = vi.fn();
+        playerInput.setCallbacks({ onBoardNearestVehicle, onEnterExitVehicle });
+        const gamepadCallbacks = gamepadManagerInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+        gamepadCallbacks.onInteract();
+
+        expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
+        expect(onEnterExitVehicle).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('should trigger onMouseDown/onMouseUp when pointer is locked', () => {
       // Mock lock
       Object.defineProperty(document, 'pointerLockElement', { value: document.body, configurable: true });
