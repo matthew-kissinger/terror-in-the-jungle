@@ -9,6 +9,7 @@
  */
 
 import { bakePreparedVisualGrid, generateNormalData } from './terrainPreparedVisualBake';
+import { sampleDEMBilinearWithTaper } from '../systems/terrain/DEMSampling';
 
 // ── Height provider reconstruction ──
 // We can't import the real classes because workers get a separate module graph.
@@ -178,28 +179,28 @@ function calculateNoiseHeight(worldX: number, worldZ: number, noise: WorkerNoise
 }
 
 // ── DEM bilinear sampling ──
+// Delegates to the canonical helper in src/systems/terrain/DEMSampling.ts so
+// the worker-thread bake path (which visits chunks past the playable bounds
+// via the visual margin) shares the outside-DEM taper with the main-thread
+// DEMHeightProvider. Pre-2026-05-19 this duplicated a clamp-to-edge bilinear
+// and produced vertical fins at the A Shau map edge.
 
 function sampleDEM(
   worldX: number, worldZ: number,
   data: Float32Array, width: number, height: number,
   metersPerPixel: number, originX: number, originZ: number,
 ): number {
-  const gx = (worldX - originX) / metersPerPixel;
-  const gz = (worldZ - originZ) / metersPerPixel;
-
-  const x0 = Math.max(0, Math.min(width - 2, Math.floor(gx)));
-  const z0 = Math.max(0, Math.min(height - 2, Math.floor(gz)));
-  const fx = gx - x0;
-  const fz = gz - z0;
-
-  const h00 = data[z0 * width + x0];
-  const h10 = data[z0 * width + x0 + 1];
-  const h01 = data[(z0 + 1) * width + x0];
-  const h11 = data[(z0 + 1) * width + x0 + 1];
-
-  const h0 = h00 * (1 - fx) + h10 * fx;
-  const h1 = h01 * (1 - fx) + h11 * fx;
-  return h0 * (1 - fz) + h1 * fz;
+  // The main-thread DEMHeightProvider treats (originX, originZ) as the
+  // CENTER of the DEM box; the shared helper expects the same convention,
+  // plus the precomputed halfWidth/halfHeight in world meters.
+  const halfWidthMeters = (width * metersPerPixel) / 2;
+  const halfHeightMeters = (height * metersPerPixel) / 2;
+  return sampleDEMBilinearWithTaper(
+    data, width, height,
+    metersPerPixel, originX, originZ,
+    halfWidthMeters, halfHeightMeters,
+    worldX, worldZ,
+  );
 }
 
 // ── Worker state ──
