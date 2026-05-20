@@ -9,7 +9,7 @@
 
 **A browser-based combined-arms FPS / RTS sandbox set in the Vietnam theater, late 1960s.**
 
-[▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Directives](docs/DIRECTIVES.md) · [Current state](docs/STATE_OF_REPO.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
+[▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Directives](docs/DIRECTIVES.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
 
 > **Engine architected for 3,000 combatants via materialization tiers; live-fire
 > combat verified at 120 NPCs while the ECS hot path is built out (Phase F).**
@@ -36,11 +36,12 @@ repository, believe the repository and update the doc.
 - **WebGPU-first renderer.** `master` defaults to Three.js r184
   `WebGPURenderer` / TSL after PR #192, with a production WebGL2 fallback and
   strict WebGPU mode retained for renderer evidence.
-- **Mode startup architecture.** The active `task/mode-startup-terrain-spike`
-  branch moves mode-start terrain surface baking into module workers with
-  transferable height/normal grids. Zone Control and TDM now show deploy UI in
-  about 1.2s from mode click in the spike evidence; Open Frontier is about
-  3.4s, down from a timeout-class baseline.
+- **Mode startup architecture.** Mode-start terrain surface baking moves to
+  module workers with transferable height/normal grids. Zone Control and TDM
+  show deploy UI in about 1.2 s from mode click; Open Frontier in about 3.4 s,
+  down from a timeout-class baseline. Spike branch parked at
+  `task/mode-startup-terrain-spike`; production-hardening criteria recorded in
+  [docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 - **Large-scale combat.** A Shau is architected as a ~3,000-unit strategic
   simulation through materialization tiers; the verified live-fire combat
   frontier is currently 120 NPCs while the ECS hot path is built out
@@ -78,24 +79,25 @@ repository, believe the repository and update the doc.
 
 ## Current Alignment
 
-As of 2026-05-13, PR #192 merged `exp/konveyer-webgpu-migration` into
-`master`. The shipped baseline is now WebGPU + TSL first, automatic WebGL2
-fallback second, and strict WebGPU proof mode for renderer acceptance. The
-active campaign is
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+WebGPU + TSL is the shipped baseline (PR #192, merged 2026-05-13). Automatic
+WebGL2 fallback runs on browsers without WebGPU; strict WebGPU mode is the
+renderer-acceptance proof path. Three campaigns closed since the merge:
+post-WebGPU (66 PRs across 12 cycles), visual-and-wayfinding (11 PRs across
+3 parallel cycles), and vehicle-boarding-and-water (15 PRs across 3 parallel
+cycles, closed 2026-05-20 with production deploy fired).
 
-The current task branch is `task/mode-startup-terrain-spike`. It addresses the
-user-visible delay after clicking a game mode. Research and live-header checks
-showed Recast WASM/build-asset caching was already correct; the measured
-blocker was synchronous terrain surface baking in the mode-start path. The
-branch moves that work into the terrain worker pool and records the decision in
-[docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
+Active state and open directives route through
+[docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
+[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). Current carry-over count: 6
+(STABILIZAT-1, AVIATSIYA-1/DEFEKT-5, KB-LOAD residual, KB-STARTUP-1,
+cloudflare-stabilization followups, weapons-cluster-zonemanager-migration).
 
-Active areas now route through [docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md): Phase F materialization/scaling,
-DEFEKT-3 combat p99, DEFEKT-4 route quality, STABILIZAT-1 baseline refresh,
-VODA water work, VEKHIKL driveable land vehicles, and the mode-startup terrain
-surface hardening opened by this branch.
+The next work batch is the framework recovery plan at
+[docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md)
+— CI trim, framework trim, doc-drift align. Hold-list cycles
+(`cycle-vekhikl-seat-swaps`, `cycle-vekhikl-5-fleet-expansion`,
+`cycle-sky-screen-space-quad`, `cycle-stabilizat-1-baselines-refresh`) remain
+owner-gated.
 
 ## Controls
 
@@ -135,7 +137,7 @@ surface hardening opened by this branch.
 
 Pointer-lock support depends on the browser. Chrome/Edge/Firefox are the
 primary FPS validation path; in-app embedded browsers may need the unlocked
-mouse-look fallback documented in [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md).
+mouse-look fallback.
 
 ## Run Locally
 
@@ -200,7 +202,7 @@ ergonomics, or UI feel is good.
 - [Three.js](https://threejs.org/) 0.184
 - TypeScript 6.0
 - Vite 8
-- Vitest 4 (~4,100 tests across ~265 files)
+- Vitest 4 (~4,700 tests across ~330 files)
 - Playwright 1.59
 - [Recast Navigation](https://github.com/isaac-mason/recast-navigation-js)
 - Tweakpane 4 (dev-only live tuning)
@@ -228,7 +230,8 @@ fenced-interface boundary at `src/types/SystemInterfaces.ts`.
 | [src/ui](src/ui) | HUD, controls, screens, icons, loading, deploy / respawn UI, command overlays, tactical map. |
 | [scripts](scripts) | Probes, perf capture, deployment helpers, evidence generation, 12 retained plain-named `check:*` audit scripts. Archived one-off audits live in [scripts/audit-archive](scripts/audit-archive). |
 | [docs](docs) | Directives, architecture, testing, deployment, cycles, archives. |
-| [docs/cycles/](docs/cycles) | Per-cycle retrospectives (`<cycle-id>/RESULT.md`). |
+| [docs/tasks/archive/](docs/tasks/archive) | Closed cycle briefs (`<cycle-id>/<slug>.md`). |
+| [docs/archive/](docs/archive) | Closed campaign manifests and pre-Phase-0 state snapshots. |
 
 ## Documentation
 
@@ -239,7 +242,6 @@ Start here:
 | [docs/DIRECTIVES.md](docs/DIRECTIVES.md) | Active directive list with status, owning subsystem, success criteria, and latest evidence link. |
 | [AGENTS.md](AGENTS.md) | Daily loop, commands, conventions, hard rules. Agent-agnostic. |
 | [CLAUDE.md](CLAUDE.md) | Claude-Code-specific harness pieces (slash commands, subagents). |
-| [docs/STATE_OF_REPO.md](docs/STATE_OF_REPO.md) | Verified current state, post-cycle. |
 | [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md) | Master dispatch + merge protocol, cycle lifecycle. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System overview, tick graph, coupling heatmap. |
 | [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced-interface change rules. |

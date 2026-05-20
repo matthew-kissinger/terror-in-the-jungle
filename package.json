@@ -1,5 +1,24 @@
 {
   "name": "terror-in-the-jungle",
+  "description": "Browser-based combined-arms Vietnam-theater FPS/RTS sandbox built on Three.js + WebGPU/TSL, with materialization-tiered combat architected for ~3,000 NPCs.",
+  "keywords": [
+    "threejs",
+    "webgpu",
+    "tsl",
+    "vietnam",
+    "fps",
+    "rts",
+    "combined-arms",
+    "browser-game",
+    "real-terrain",
+    "recast-navigation"
+  ],
+  "homepage": "https://terror-in-the-jungle.pages.dev/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matthew-kissinger/terror-in-the-jungle.git"
+  },
+  "license": "MIT",
   "private": true,
   "version": "0.0.0",
   "knip": {
