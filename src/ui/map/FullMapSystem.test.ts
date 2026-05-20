@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { FullMapSystem } from './FullMapSystem';
+import { FullMapSystem, type VehicleMarker } from './FullMapSystem';
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { GameModeManager } from '../../systems/world/GameModeManager';
@@ -58,6 +58,7 @@ function createCanvasContextStub() {
     fillRect: vi.fn(),
     strokeRect: vi.fn(),
     clearRect: vi.fn(),
+    rect: vi.fn(),
     beginPath: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
@@ -256,6 +257,106 @@ describe('FullMapSystem', () => {
         createTestCombatant({ squadId: 'squad-player' }),
       ]);
       expect(() => (system as any).render()).not.toThrow();
+    });
+  });
+
+  describe('vehicle markers', () => {
+    beforeEach(() => {
+      system.setZoneQuery(mockZoneManager);
+      system.setCombatantSystem(mockCombatantSystem);
+      system.setGameModeManager(mockGameModeManager);
+      // Pin world size so we can reason about the flipped-axis projection.
+      mockGameModeManager.getWorldSize = vi.fn(() => 400);
+      system.update(0.016);
+    });
+
+    it('rendering with an empty marker list does not throw', () => {
+      system.setVehicleMarkers([]);
+      expect(() => (system as any).render()).not.toThrow();
+    });
+
+    it('rendering markers for every category does not throw', () => {
+      const markers: VehicleMarker[] = [
+        {
+          worldPos: new THREE.Vector3(50, 0, 50),
+          category: 'ground',
+          faction: Faction.US,
+          vehicleType: 'm151_test',
+        },
+        {
+          worldPos: new THREE.Vector3(-50, 0, -50),
+          category: 'watercraft',
+          faction: Faction.US,
+          vehicleType: 'pbr_test',
+        },
+        {
+          worldPos: new THREE.Vector3(0, 0, 80),
+          category: 'emplacement',
+          faction: Faction.NVA,
+          vehicleType: 'm2hb_test',
+        },
+      ];
+      system.setVehicleMarkers(markers);
+      expect(() => (system as any).render()).not.toThrow();
+    });
+
+    it('projects markers via the same flipped-axis transform as zones', () => {
+      // The full map uses a north-up flipped-axis projection:
+      //   screenX = (worldSize/2 - worldX) * scale
+      //   screenY = (worldSize/2 - worldZ) * scale
+      // With worldSize=400 and MAP_SIZE=800 the scale is 2.
+      // A marker at world (+100, _, +100) should land at screen (400, 400).
+      // A zone placed at the same world position must land on the same point.
+      const ctxStub = (system as any).mapContext as ReturnType<typeof createCanvasContextStub>;
+
+      const sharedWorld = new THREE.Vector3(100, 0, 100);
+      mockZoneManager.getAllZones = vi.fn(() => [
+        createTestZone({ id: 'shared', position: sharedWorld.clone() }),
+      ]);
+      system.setVehicleMarkers([
+        {
+          worldPos: sharedWorld.clone(),
+          category: 'ground',
+          faction: Faction.US,
+          vehicleType: 'm151_shared',
+        },
+      ]);
+
+      (system as any).render();
+
+      // The vehicle 'ground' icon is a square — drawn via rect(x - half, y - half, w, h).
+      // The zone icon at the same position is drawn via arc(x, y, radius, ...).
+      // The centre of both should agree on (x, y) at the projected location.
+      const arcCalls = ctxStub.arc.mock.calls as Array<[number, number, number, number, number]>;
+      const rectCalls = ctxStub.rect.mock.calls as Array<[number, number, number, number]>;
+      expect(rectCalls.length).toBeGreaterThan(0);
+
+      const [rx, ry, rw, rh] = rectCalls[rectCalls.length - 1];
+      const vehicleCx = rx + rw / 2;
+      const vehicleCy = ry + rh / 2;
+
+      // Find a zone arc near the same projected center. We don't pin the
+      // exact pixel — the projection contract is what matters.
+      const zoneNearby = arcCalls.some(([ax, ay]) =>
+        Math.abs(ax - vehicleCx) < 0.5 && Math.abs(ay - vehicleCy) < 0.5,
+      );
+      expect(zoneNearby).toBe(true);
+    });
+
+    it('renders without errors when no game-mode manager is wired', () => {
+      // Defensive: caller order shouldn't matter — markers should still draw
+      // even if setGameModeManager hasn't been called yet.
+      const fresh = new FullMapSystem(mockCamera);
+      fresh.setVehicleMarkers([
+        {
+          worldPos: new THREE.Vector3(10, 0, 10),
+          category: 'ground',
+          faction: Faction.US,
+          vehicleType: 'm151_fresh',
+        },
+      ]);
+      expect(() => (fresh as any).render()).not.toThrow();
+      fresh.dispose();
     });
   });
 });
