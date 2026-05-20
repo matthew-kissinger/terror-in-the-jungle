@@ -1,0 +1,37 @@
+docs: close campaign-2026-05-20-vehicle-boarding-and-water (3 cycles, 15 PRs, deploy fired)
+
+Three parallel cycles closed in one campaign-close commit. Production
+deploy gate fired against master tip e99be58e via
+`gh workflow run deploy.yml --ref master` (deploy run 26182116715,
+success) — explicit fulfillment of the owner ask "make sure water is
+proper in production as well."
+
+Cycle results (carry-over delta: 0 net):
+- cycle-vekhikl-player-boarding-wire — opens+closes VEKHIKL-UX-2. 8 PRs.
+  Wires the missing F-key → ground/tank/watercraft/emplacement boarding
+  glue across all five drivable vehicles. Mortar fallback preserved
+  on no-vehicle-in-6m. Mid-cycle hard-stop (3 of 5 R1 executors
+  context-budget overflow) handled via tighter-prompt re-dispatch +
+  factory/handler task split.
+- cycle-of-river-surface-enable — opens+closes VODA-OF-1. 4 PRs.
+  OF waterEnabled flipped (terrain-nav-reviewer APPROVE), Sampan + PBR
+  snapped to water-surface Y at spawn. Stale post-captures in PR #292
+  flagged for owner-walk regen.
+- cycle-motor-pool-reflow-and-tank-dedup — opens+closes
+  VEKHIKL-LAYOUT-1. 3 PRs. OF motor pool reflowed; real M48 relocated
+  to motor pool bay; dressing M48 removed. User-approved prefab split
+  (_of + _ashau halves) to preserve A Shau footprint.
+
+Ritual:
+- Cycle briefs moved to docs/tasks/archive/campaign-2026-05-20-vehicle-boarding-and-water/
+- Campaign manifest moved to docs/archive/
+- CARRY_OVERS.md updated (3 zero-cycle IDs in Closed; history log entry)
+- CLAUDE.md "Current focus" reflects closed state + framework recovery plan as next
+- AGENT_ORCHESTRATION.md "Current cycle" stub + "Last closed cycle" entry
+- BACKLOG.md "Recently Completed" section appended
+
+Next work batch is the framework recovery plan landed in-campaign as
+commit 45d77250 (docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md) —
+owner-gated post-compact review before any Pass 1/2/3 execution.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
