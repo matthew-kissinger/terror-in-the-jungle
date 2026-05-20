@@ -32,6 +32,8 @@ import { VehicleSessionController } from '../vehicle/VehicleSessionController';
 import { HelicopterPlayerAdapter } from '../vehicle/HelicopterPlayerAdapter';
 import { FixedWingPlayerAdapter } from '../vehicle/FixedWingPlayerAdapter';
 import type { VehicleExitOptions, VehicleExitResult, VehicleTransitionContext } from '../vehicle/PlayerVehicleAdapter';
+import type { PlayerVehicleAdapterFactory } from '../vehicle/PlayerVehicleAdapterFactory';
+import type { GroundVehicleProximityChecker } from '../vehicle/GroundVehicleProximityChecker';
 import type { FullMapSystem } from '../../ui/map/FullMapSystem';
 
 interface SettingsModalController {
@@ -100,6 +102,19 @@ export class PlayerController implements GameSystem {
   private vehicleStateManager = new VehicleSessionController();
   private helicopterAdapter?: HelicopterPlayerAdapter;
   private fixedWingAdapter?: FixedWingPlayerAdapter;
+  /**
+   * Factory + dispatcher for the M151 / M48 / Sampan / PBR / M2HB
+   * boarding flows (split B of vekhikl-board-controller-factory). The
+   * composer wires this; without it, `handleBoardNearestVehicle()`
+   * returns `false` so the F-key falls through to the mortar handler.
+   */
+  private playerVehicleAdapterFactory?: PlayerVehicleAdapterFactory;
+  /**
+   * Proximity-prompt source for the boarding factory. SystemUpdater
+   * creates and ticks this checker; the composer reads it back through
+   * `getBoardingProximityChecker()` when building the factory.
+   */
+  private boardingProximityChecker?: GroundVehicleProximityChecker;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -211,6 +226,7 @@ export class PlayerController implements GameSystem {
         if (this.commandInputManager?.handleSecondarySelect()) return;
         this.handleEnterExitHelicopter();
       },
+      onBoardNearestVehicle: () => this.handleBoardNearestVehicle(),
       onToggleFlightAssist: () => {
         if (this.vehicleStateManager.getVehicleType() === 'fixed_wing') {
           this.fixedWingAdapter?.toggleFlightAssist();
@@ -410,6 +426,46 @@ export class PlayerController implements GameSystem {
 
   private handleEnterExitHelicopter(): void {
     this.vehicleController.handleEnterExitHelicopter(this.playerState);
+  }
+
+  /**
+   * F-key context dispatcher for ground vehicles, watercraft, tanks,
+   * and emplacements (helicopters + fixed-wing stay on the `E` /
+   * helicopter handler path). Returns `true` if the input was
+   * consumed so `PlayerInput`'s F-router skips the mortar-fire
+   * fallback.
+   *
+   * When seated in a non-flight vehicle, F exits via the same
+   * factory's `tryExit()` (mirror of the helicopter E-press toggle).
+   * When unseated, F attempts to board the prompted vehicle. Returns
+   * `false` if the factory hasn't been wired yet (no composer hook)
+   * or if the factory itself refused (no proximity, no free seat,
+   * etc.) — in that case the mortar-fire fallback still runs.
+   */
+  handleBoardNearestVehicle(): boolean {
+    const factory = this.playerVehicleAdapterFactory;
+    if (!factory) return false;
+    // Helicopter + fixed-wing have their own enter/exit path; the
+    // boarding factory only owns the five ground/water/emplacement
+    // session states. Defer to the existing helicopter handler when
+    // the player is already in a flight vehicle.
+    if (this.playerState.isInHelicopter || this.playerState.isInFixedWing) {
+      return false;
+    }
+    if (this.vehicleStateManager.isInVehicle()) {
+      return factory.tryExit();
+    }
+    return factory.tryBoardNearest();
+  }
+
+  /**
+   * Explicit exit for the boarding factory. Used by callers that
+   * already know the player is seated and want to dismount without
+   * routing through the F-key context check. Returns `true` if the
+   * session controller ran the adapter's exit hook.
+   */
+  handleExitVehicle(): boolean {
+    return this.playerVehicleAdapterFactory?.tryExit() ?? false;
   }
 
   private handleSquadDeploy(): void {
@@ -970,6 +1026,55 @@ export class PlayerController implements GameSystem {
     this.syncLoadoutHud();
   }
   setRenderer(renderer: IGameRenderer): void { this.gameRenderer = renderer; }
+
+  /**
+   * Composer-side wire for the per-category boarding factory. Without
+   * this hookup, `handleBoardNearestVehicle()` returns `false` so the
+   * F-router falls through to mortar-fire — matching pre-VEKHIKL-UX-2
+   * behavior.
+   */
+  setPlayerVehicleAdapterFactory(factory: PlayerVehicleAdapterFactory): void {
+    this.playerVehicleAdapterFactory = factory;
+  }
+
+  /**
+   * Inject the proximity checker the boarding factory queries for
+   * `getLastShownVehicleId()`. SystemUpdater owns the checker's
+   * per-frame `.update()` cadence; this getter/setter pair just
+   * exposes the reference so the composer can capture it inside the
+   * factory's deps without duplicating the checker.
+   */
+  setBoardingProximityChecker(checker: GroundVehicleProximityChecker): void {
+    this.boardingProximityChecker = checker;
+  }
+
+  getBoardingProximityChecker(): GroundVehicleProximityChecker | undefined {
+    return this.boardingProximityChecker;
+  }
+
+  /**
+   * Read-only accessors the composer uses to build the boarding
+   * factory's `PlayerVehicleAdapterFactoryDeps` without exposing
+   * mutable internals. Returns the live references the factory
+   * captures — the player's transform mutates through `setPosition()`
+   * which the composer wires explicitly.
+   */
+  getBoardingFactoryInternals(): {
+    vehicleSessionController: VehicleSessionController;
+    playerState: PlayerState;
+    input: InputManager;
+    cameraController: PlayerCamera;
+    setPosition: (position: THREE.Vector3, reason: string) => void;
+  } {
+    return {
+      vehicleSessionController: this.vehicleStateManager,
+      playerState: this.playerState,
+      input: this.input,
+      cameraController: this.cameraController,
+      setPosition: (pos, reason) => this.setPosition(pos, reason),
+    };
+  }
+
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;
     inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));

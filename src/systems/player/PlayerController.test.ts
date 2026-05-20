@@ -692,6 +692,97 @@ describe('PlayerController', () => {
     });
   });
 
+  /**
+   * Ground vehicle / watercraft / tank / emplacement boarding wire
+   * (VEKHIKL-UX-2, split B of `vekhikl-board-controller-factory`).
+   * Behavior tests only — the factory itself has unit coverage; here
+   * we check that the F-key reaches the handler, the handler
+   * routes to board vs. exit based on session state, and the
+   * boolean return value matches the factory's verdict so the
+   * F-router's mortar fallback runs when the input wasn't consumed.
+   */
+  describe('Vehicle Boarding (handleBoardNearestVehicle)', () => {
+    let mockFactory: { tryBoardNearest: ReturnType<typeof vi.fn>; tryExit: ReturnType<typeof vi.fn> };
+
+    beforeEach(() => {
+      mockFactory = {
+        tryBoardNearest: vi.fn().mockReturnValue(true),
+        tryExit: vi.fn().mockReturnValue(true),
+      };
+    });
+
+    it('routes the F-key input callback to handleBoardNearestVehicle', () => {
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+
+      const callbacks = (playerController['input'].setCallbacks as any).mock.calls[0][0];
+      expect(typeof callbacks.onBoardNearestVehicle).toBe('function');
+
+      const consumed = callbacks.onBoardNearestVehicle();
+
+      expect(consumed).toBe(true);
+      expect(mockFactory.tryBoardNearest).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns true when the factory successfully boards a vehicle', () => {
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      mockFactory.tryBoardNearest.mockReturnValue(true);
+
+      expect(playerController.handleBoardNearestVehicle()).toBe(true);
+    });
+
+    it('returns false when the factory cannot board (no proximity, seat full, etc.)', () => {
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      mockFactory.tryBoardNearest.mockReturnValue(false);
+
+      // Falsey return lets PlayerInput's F-router fall through to mortar fire.
+      expect(playerController.handleBoardNearestVehicle()).toBe(false);
+    });
+
+    it('returns false when no factory has been wired (legacy/test paths)', () => {
+      // Pre-composer or test-double scenario — the F-key must not crash;
+      // it just falls through to mortar fire.
+      expect(playerController.handleBoardNearestVehicle()).toBe(false);
+    });
+
+    it('routes to factory.tryExit when the player is already seated in a vehicle', () => {
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      // Simulate a non-flight vehicle session — the boarding factory owns
+      // ground/water/emplacement seats. We poke the internal session
+      // controller's `isInVehicle` directly since the public seat API
+      // belongs to the factory we're stubbing out.
+      const session = playerController['vehicleStateManager'];
+      const isInVehicleSpy = vi.spyOn(session, 'isInVehicle').mockReturnValue(true);
+
+      const consumed = playerController.handleBoardNearestVehicle();
+
+      expect(isInVehicleSpy).toHaveBeenCalled();
+      expect(mockFactory.tryExit).toHaveBeenCalledTimes(1);
+      expect(mockFactory.tryBoardNearest).not.toHaveBeenCalled();
+      expect(consumed).toBe(true);
+    });
+
+    it('skips the boarding factory while the player is in a flight vehicle (helicopter / fixed-wing keep their own handler)', () => {
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      playerController['playerState'].isInHelicopter = true;
+
+      const consumed = playerController.handleBoardNearestVehicle();
+
+      // No tryBoardNearest, no tryExit — the flight-vehicle E/F handler
+      // owns this path, so F falls through to the mortar fallback.
+      expect(mockFactory.tryBoardNearest).not.toHaveBeenCalled();
+      expect(mockFactory.tryExit).not.toHaveBeenCalled();
+      expect(consumed).toBe(false);
+    });
+
+    it('handleExitVehicle delegates to the factory tryExit and returns its verdict', () => {
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      mockFactory.tryExit.mockReturnValue(false);
+
+      expect(playerController.handleExitVehicle()).toBe(false);
+      expect(mockFactory.tryExit).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('Controls', () => {
     it('should disable controls', () => {
       playerController['playerState'].velocity.set(5, 5, 5);
