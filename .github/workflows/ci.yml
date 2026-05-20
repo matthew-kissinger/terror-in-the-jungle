@@ -155,24 +155,56 @@ jobs:
       - name: Production smoke
         run: npm run smoke:prod
 
+  mobile-ui-changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      hit: ${{ steps.filter.outputs.hit }}
+      full: ${{ steps.label.outputs.full }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - name: Path filter
+        id: filter
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.sha }}"
+          if [ -z "$base" ]; then base="$head^"; fi
+          changed=$(git diff --name-only "$base" "$head" 2>/dev/null || git diff --name-only HEAD^ HEAD)
+          echo "Changed files:"; echo "$changed"
+          if echo "$changed" | grep -qE '^(src/ui/|src/systems/player/PlayerInput|index\.html|scripts/mobile-ui-check\.ts|\.github/workflows/ci\.yml)'; then
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Detect mobile-full label
+        id: label
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels) }}
+        run: |
+          if echo "$LABELS" | grep -q '"name": "mobile-full"'; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+          fi
+
   mobile-ui:
     runs-on: ubuntu-latest
-    # Each device case observed taking ~12 min on the post-WebGPU mode-startup
-    # path (KB-STARTUP-1 mobile-emulation bake stall). 18 min per device gives
-    # 50% headroom; matrix fans the 4 devices out in parallel so the wall-time
-    # gate is max-of-devices, not sum. Pre-fan-out, the single sequential job
-    # took ~48 min and could never fit in any reasonable timeout.
+    # Default to 1 device for fast feedback. PRs that touch UI / player input /
+    # index.html trigger the path filter; PRs with the `mobile-full` label
+    # fan out to the full 4-device matrix. Original 4-device matrix sat on
+    # an 18-min ceiling per device; this default cuts wall-clock by ~3/4.
     timeout-minutes: 18
-    needs: [lint, test]
+    needs: [lint, test, mobile-ui-changes]
+    if: needs.mobile-ui-changes.outputs.hit == 'true' || needs.mobile-ui-changes.outputs.full == 'true'
     strategy:
-      # Don't kill sibling devices when one fails — we want full coverage per push.
+      # Don't kill sibling devices when one fails — full coverage when the
+      # matrix fans out.
       fail-fast: false
       matrix:
-        device:
-          - android-390x844
-          - android-844x390
-          - android-740x360
-          - phone-667x375
+        device: ${{ needs.mobile-ui-changes.outputs.full == 'true' && fromJSON('["android-390x844","android-844x390","android-740x360","phone-667x375"]') || fromJSON('["android-390x844"]') }}
 
     steps:
       - name: Checkout
@@ -212,9 +244,46 @@ jobs:
           path: artifacts/mobile-ui/**
           retention-days: 7
 
+  perf-changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      hit: ${{ steps.filter.outputs.hit }}
+      full: ${{ steps.label.outputs.full }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - name: Path filter
+        id: filter
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.sha }}"
+          if [ -z "$base" ]; then base="$head^"; fi
+          changed=$(git diff --name-only "$base" "$head" 2>/dev/null || git diff --name-only HEAD^ HEAD)
+          echo "Changed files:"; echo "$changed"
+          if echo "$changed" | grep -qE '^(src/systems/combat/|src/core/|src/systems/terrain/|scripts/perf-|\.github/workflows/ci\.yml|perf-baselines\.json)'; then
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Detect perf-full label
+        id: label
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels) }}
+        run: |
+          if echo "$LABELS" | grep -q '"name": "perf-full"'; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+          fi
+
   perf:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: [perf-changes]
+    if: needs.perf-changes.outputs.hit == 'true' || needs.perf-changes.outputs.full == 'true'
 
     steps:
       - name: Checkout
