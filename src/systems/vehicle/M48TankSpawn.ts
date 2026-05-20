@@ -14,8 +14,8 @@ import type { VehicleManager } from './VehicleManager';
  *     allows a procedural fallback — taking the fallback path keeps
  *     this PR synchronous and isolates the integration from the loader
  *     contract.
- *   - Static spawn table per scenario (Open Frontier US base + A Shau
- *     valley road).
+ *   - Static spawn table per scenario (Open Frontier airfield Main
+ *     Motor Pool bay + A Shau valley road).
  *   - `resolvePosition` callback so the caller can snap the spawn
  *     anchor to terrain through the runtime terrain provider.
  *
@@ -102,10 +102,17 @@ export function createM48Tank(
 }
 
 /**
- * Default scenario spawn table for the two cycle-VEKHIKL-3 M48
- * placements. Coordinates come from `M48_SPAWN_OFFSETS`; Y is left at
- * 0 and the spawn caller should snap-to-terrain via the runtime
- * terrain provider before handing off to `createM48Tank`.
+ * Default scenario spawn table for the two M48 placements. Coordinates
+ * come from `M48_SPAWN_OFFSETS`; Y is left at 0 and the spawn caller
+ * should snap-to-terrain via the runtime terrain provider before
+ * handing off to `createM48Tank`.
+ *
+ * The Open Frontier entry now lands inside the airfield Main Motor
+ * Pool bay (per cycle-motor-pool-reflow-and-tank-dedup), not the
+ * West FOB anchor used by the cycle-VEKHIKL-3 initial drop. The
+ * sibling `motor-pool-heavy-reflow` task removes the dressing M48
+ * prop from the prefab, so this Tank IVehicle is the only M48
+ * rendered in OF.
  */
 export const M48_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', {
   vehicleId: string;

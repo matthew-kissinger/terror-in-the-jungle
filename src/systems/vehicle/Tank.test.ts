@@ -224,6 +224,29 @@ describe('M48 scenario spawn', () => {
     expect(M48_SCENARIO_SPAWNS.a_shau_valley.faction).toBe(Faction.US);
   });
 
+  it('Open Frontier M48 anchor lands inside the airfield Main Motor Pool footprint (cycle-motor-pool-reflow-and-tank-dedup)', () => {
+    // OpenFrontierConfig.ts `airfield_motor_pool` anchor + 36 m footprint
+    // radius. The relocated OF M48 must spawn inside that footprint so
+    // the player sees a single, real, boardable Tank IVehicle at the
+    // motor pool (replacing the prefab dressing M48 the sibling reflow
+    // task removes).
+    const motorPoolAnchor = { x: 155, z: -1195 };
+    const motorPoolRadius = 36;
+    const of = M48_SCENARIO_SPAWNS.open_frontier;
+    const dx = of.position.x - motorPoolAnchor.x;
+    const dz = of.position.z - motorPoolAnchor.z;
+    const distance = Math.sqrt(dx * dx + dz * dz);
+    expect(distance).toBeLessThanOrEqual(motorPoolRadius);
+  });
+
+  it('A Shau M48 anchor is unchanged by the OF relocation', () => {
+    // Cycle-motor-pool-reflow-and-tank-dedup is OF-only; the A Shau
+    // M48 must continue to spawn at its valley-road anchor.
+    const ashau = M48_SCENARIO_SPAWNS.a_shau_valley;
+    expect(ashau.position.x).toBeCloseTo(40, 2);
+    expect(ashau.position.z).toBeCloseTo(60, 2);
+  });
+
   it('spawnScenarioM48Tanks registers both modes when both are requested', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleManager();
