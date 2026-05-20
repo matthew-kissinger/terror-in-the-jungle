@@ -315,6 +315,13 @@ export class SystemUpdater {
       isInVehicle,
     );
     this.groundVehicleProximityChecker.setHUDSystem(hudSystem);
+
+    // Inject the checker into the PlayerController so the boarding-adapter
+    // factory's `tryBoardNearest()` can read `getLastShownVehicleId()` when
+    // the player presses F. Without this wire the F-router falls through to
+    // the mortar fallback and no vehicle is ever boardable.
+    (playerController as { setBoardingProximityChecker?: (checker: GroundVehicleProximityChecker) => void })
+      .setBoardingProximityChecker?.(this.groundVehicleProximityChecker);
   }
 
   private trackInstrumentedSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {

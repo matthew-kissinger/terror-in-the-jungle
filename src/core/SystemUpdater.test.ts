@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { SystemUpdater } from './SystemUpdater';
 import { SYSTEM_UPDATE_SCHEDULE, TRACKED_SYSTEM_KEYS } from './SystemUpdateSchedule';
 import type { SystemKeyToType } from './SystemRegistry';
+import { GroundVehicleProximityChecker } from '../systems/vehicle/GroundVehicleProximityChecker';
 
 function createRefs(overrides: Partial<SystemKeyToType> = {}): SystemKeyToType {
   return {
@@ -140,6 +141,36 @@ describe('SystemUpdater', () => {
     expect(npcVehicleController.update).toHaveBeenCalledTimes(1);
     expect(gameModeManager.updateRuntime).not.toHaveBeenCalled();
     expect(gameModeManager.update).not.toHaveBeenCalled();
+  });
+
+  it('injects the ground-vehicle proximity checker into the player controller once vehicleManager + hudSystem are present', () => {
+    const updater = new SystemUpdater();
+    const setBoardingProximityChecker = vi.fn();
+    const vehicleManager = {
+      update: vi.fn(),
+      getAllVehicles: vi.fn(() => []),
+    };
+    const refs = createRefs({
+      vehicleManager,
+      playerController: {
+        getPosition: vi.fn(() => new THREE.Vector3(0, 2, 0)),
+        setPosition: vi.fn(),
+        update: vi.fn(),
+        isInHelicopter: vi.fn(() => false),
+        isInFixedWing: vi.fn(() => false),
+        isInAnyVehicle: vi.fn(() => false),
+        setBoardingProximityChecker,
+      },
+    } as unknown as Partial<SystemKeyToType>);
+
+    updater.updateSystems(refs, [], undefined, 0.016, true);
+
+    expect(setBoardingProximityChecker).toHaveBeenCalledTimes(1);
+    expect(setBoardingProximityChecker).toHaveBeenCalledWith(expect.any(GroundVehicleProximityChecker));
+
+    // Subsequent ticks must not re-inject (the checker is lazily built once).
+    updater.updateSystems(refs, [], undefined, 0.016, true);
+    expect(setBoardingProximityChecker).toHaveBeenCalledTimes(1);
   });
 
   it('fallback-updates systems that are not declared in the explicit schedule', () => {
