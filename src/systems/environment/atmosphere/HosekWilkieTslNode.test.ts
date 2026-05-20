@@ -348,15 +348,21 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
     const mirrorOut = new THREE.Color();
     let maxDelta = 0;
     let directionsChecked = 0;
-    // The backend LUT is 32 azimuth × 8 elevation = 256 directions. Sample
-    // upper-hemisphere bin centers (rows 4-7) at every other azimuth bin
-    // for 16 candidates, then drop directions within the disc+aureole cone
-    // so the additive disc + halo contribution drops to zero in the mirror.
-    // High-sun aureole outer is ~cos(8°); 15° cull adds margin so the
-    // smoothstep tail is below comparison noise.
-    for (let row = 4; row < 8; row++) {
+    // The backend LUT is 32 azimuth × 32 elevation = 1024 directions
+    // after cycle `skylut-resolution-bump`. Sample upper-hemisphere bin
+    // centers (rows 16-31, every 4th row for coverage symmetry with the
+    // pre-bump 4-row sweep) at every other azimuth bin, then drop
+    // directions within the disc+aureole cone so the additive disc +
+    // halo contribution drops to zero in the mirror. High-sun aureole
+    // outer is ~cos(8°); 15° cull adds margin so the smoothstep tail is
+    // below comparison noise. Measured max delta at the new dimensions:
+    // ~0 per channel at bin centers (the LUT was baked from the same
+    // `evaluateAnalytic` the mirror mirrors). Pre-bump deltas were
+    // ~0.02 because the 8-row LUT snapped intermediate elevations onto
+    // the nearest of 8 bin centers, producing quantisation residual.
+    for (let row = 16; row < 32; row += 4) {
       for (let col = 0; col < 32; col += 2) {
-        const dir = lutBinCenter(row, col, 8, 32);
+        const dir = lutBinCenter(row, col, 32, 32);
         if (dir.dot(sunDir) > Math.cos((15 * Math.PI) / 180)) continue;
         backend.sample(dir, backendOut);
         evaluatePreethamWithDiscCpu(mirrorState, dir, mirrorOut);
@@ -395,10 +401,15 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
     let maxDelta = 0;
     let directionsChecked = 0;
     // Low-sun aureole stretches into the mie band (~18° outer at sunY=0.25);
-    // cull at 25° adds margin so the additive halo is below comparison noise.
-    for (let row = 4; row < 8; row++) {
+    // cull at 25° adds margin so the additive halo is below comparison
+    // noise. Upper-hemisphere rows 16-31 (every 4th) of the new 32-row LUT
+    // give comparable coverage to the pre-bump 4 row × 16 azimuth sweep.
+    // Measured max delta at the new dimensions for the ashau dawn preset:
+    // ~0 per channel at bin centers (vs ~0.02 pre-bump from 8-row
+    // elevation quantisation).
+    for (let row = 16; row < 32; row += 4) {
       for (let col = 0; col < 32; col += 2) {
-        const dir = lutBinCenter(row, col, 8, 32);
+        const dir = lutBinCenter(row, col, 32, 32);
         if (dir.dot(sunDir) > Math.cos((25 * Math.PI) / 180)) continue;
         backend.sample(dir, backendOut);
         evaluatePreethamWithDiscCpu(mirrorState, dir, mirrorOut);

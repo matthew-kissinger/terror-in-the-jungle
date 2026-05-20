@@ -11,18 +11,29 @@ const DOME_RADIUS = 500;
 const DOME_WIDTH_SEGMENTS = 64;
 const DOME_HEIGHT_SEGMENTS = 32;
 // Cycle `tsl-preetham-fragment-port` (2026-05-17): the visual dome is now
-// per-fragment-shaded via TSL. The 32x8 backing texture is the only
+// per-fragment-shaded via TSL. The 32x32 backing texture is the only
 // remaining CPU-baked LUT — it serves `sample()` / `getZenith()` /
 // `getHorizon()` for fog + hemisphere readers, NOT the dome itself.
 // Mode `'lut-bake'` (back-out) keeps a `MeshBasicMaterial` reading the
-// 32x8 texture as a fallback for browsers / mobile GPUs where the TSL
+// 32x32 texture as a fallback for browsers / mobile GPUs where the TSL
 // dome regresses. Per the spike Section 4 acceptance: net memory is a
-// small reduction (256x128 half-float ⇒ 32x8 half-float).
+// small reduction vs the pre-port baseline (256x128 half-float ⇒ 32x32
+// half-float).
+//
+// Cycle `skylut-resolution-bump` (2026-05-19): elevation rows bumped
+// 8 → 32 to eliminate banded fog/hemisphere reads under the post-AGX
+// exposure range. The 8-row quantisation produced discrete radiance
+// bins at Open Frontier midday ("random dark spots" on terrain) and
+// hard fog-color steps at low elevation that read as a visible
+// "skybox edge through terrain" on A Shau flyovers. Memory delta:
+// +3 KB (256 → 1024 half-float texels for the GPU fallback texture)
+// + 2.25 KB (768 → 3072 floats for the CPU LUT). Bake cost: ~4x a
+// sub-millisecond op, well inside the 2 s / 8 s refresh cadence.
 const SKY_TEXTURE_WIDTH = 32;
-const SKY_TEXTURE_HEIGHT = 8;
+const SKY_TEXTURE_HEIGHT = 32;
 
 const LUT_AZIMUTH_BINS = 32;
-const LUT_ELEVATION_BINS = 8;
+const LUT_ELEVATION_BINS = 32;
 
 // Elevation-keyed sun↔moon blend for the bakeLUT sun-color path.
 // At -2° elevation (sun just below the horizon, the "vibe band" of civil
@@ -201,10 +212,10 @@ function fbm(x: number, y: number): number {
  * Visual dome implementation mode.
  *
  * - `'tsl'` (default): the dome paints with a per-fragment TSL Preetham
- *   shader (`HosekWilkieTslNode`). The 32×8 CPU LUT only serves
+ *   shader (`HosekWilkieTslNode`). The 32×32 CPU LUT only serves
  *   `sample()` / `getZenith()` / `getHorizon()` for fog + hemisphere
  *   readers; the visual dome is fragment-resolution.
- * - `'lut-bake'`: legacy bake-and-stretch path that paints the same 32×8
+ * - `'lut-bake'`: legacy bake-and-stretch path that paints the same 32×32
  *   CPU LUT onto a `MeshBasicMaterial`. Back-out for browsers where the
  *   TSL graph regresses visually or on perf. The bake-and-stretch path
  *   loses the in-shader HDR sun-disc; callers can pair this with the
@@ -289,7 +300,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     this.skyData = skyTexture.data;
 
     if (this.mode === 'tsl') {
-      // Per-fragment TSL Preetham dome. The 32×8 backing texture is built
+      // Per-fragment TSL Preetham dome. The 32×32 backing texture is built
       // alongside but ONLY feeds `sample()` / `getZenith()` / `getHorizon()`
       // for fog + hemisphere readers. The dome itself paints from the
       // fragment shader. See `HosekWilkieTslNode.ts` for the graph.
@@ -303,7 +314,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
         exposure: this.exposure,
       });
     } else {
-      // Back-out path: bake-and-stretch dome. Paints the 32×8 CPU LUT onto
+      // Back-out path: bake-and-stretch dome. Paints the 32×32 CPU LUT onto
       // a standard `MeshBasicMaterial`. See spike Section 4 back-out path.
       this.material = new THREE.MeshBasicMaterial({
         name: 'HosekWilkieSky',
@@ -614,7 +625,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     // discourse 50288 / 66535).
     //
     // Slice 12 retained: per-pixel base color comes from a bilinear LUT
-    // sample over the same 32x8 LUT the CPU `sample()` accessor reads.
+    // sample over the same 32x32 LUT the CPU `sample()` accessor reads.
     // Sun disc and cloud deck stay composited per-pixel — they cannot be
     // collapsed into the LUT because they depend on view direction
     // relative to the sun and on world-anchored cloud noise.
@@ -770,9 +781,12 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
 
   /**
    * Bake the CPU-side sample LUT + cache zenith/horizon/sun color from the
-   * same analytic radiance formula the shader runs. Cheap (32*8 = 256
+   * same analytic radiance formula the shader runs. Cheap (32*32 = 1024
    * directions) and only re-runs when sun direction changes — once per
-   * scenario boot in v1.
+   * scenario boot in v1. Cycle `skylut-resolution-bump` raised the
+   * elevation rows from 8 to 32 so the fog/hemisphere readers no longer
+   * quantise into visible radiance bins under the post-AGX exposure
+   * range.
    */
   private bakeLUT(): void {
     // Per-bin: pick a representative direction, evaluate radiance, store.
