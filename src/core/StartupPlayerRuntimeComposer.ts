@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { IGameRenderer } from '../types/SystemInterfaces';
 import type { SystemKeyToType } from './SystemRegistry';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
+import { PlayerVehicleAdapterFactory } from '../systems/vehicle/PlayerVehicleAdapterFactory';
+import type { GroundVehicleProximityChecker } from '../systems/vehicle/GroundVehicleProximityChecker';
 import type {
   IVehicleMarkerQuery,
   VehicleMarkerCategory,
@@ -65,6 +67,7 @@ interface StartupPlayerRuntimeGroups {
     | 'sandbagSystem'
     | 'terrainSystem'
     | 'ticketSystem'
+    | 'vehicleManager'
     | 'zoneManager'
   >;
   hudRuntime: Pick<
@@ -135,6 +138,7 @@ export function createStartupPlayerRuntimeGroups(
       sandbagSystem: refs.sandbagSystem,
       terrainSystem: refs.terrainSystem,
       ticketSystem: refs.ticketSystem,
+      vehicleManager: refs.vehicleManager,
       zoneManager: refs.zoneManager,
     },
     hudRuntime: {
@@ -208,6 +212,7 @@ function wirePlayerRuntime(
     sandbagSystem,
     terrainSystem,
     ticketSystem,
+    vehicleManager,
     zoneManager,
   } = runtime;
 
@@ -229,6 +234,27 @@ function wirePlayerRuntime(
     playerSquadController,
     commandInputManager,
   });
+
+  // Boarding factory wire (VEKHIKL-UX-2, split B). Closes the
+  // F-key gap shipped by the 2026-05-19 wayfinding cycle: the
+  // "Press F to board" prompt rendered but no handler dispatched
+  // the input to the per-category adapters. Guarded so test
+  // doubles without the new setter / vehicleManager mock keep
+  // working unchanged.
+  if (
+    typeof playerController.setPlayerVehicleAdapterFactory === 'function'
+    && vehicleManager
+  ) {
+    const factory = createPlayerVehicleAdapterFactory({
+      playerController,
+      vehicleManager,
+      hudSystem,
+      gameRenderer: options.renderer,
+    });
+    if (factory) {
+      playerController.setPlayerVehicleAdapterFactory(factory);
+    }
+  }
 
   playerHealthSystem.setZoneManager(zoneManager);
   playerHealthSystem.setTicketSystem(ticketSystem);
@@ -415,4 +441,80 @@ function createCompassVehicleQuery(source: CompassVehicleSource): IVehicleMarker
       return out;
     },
   };
+}
+
+/**
+ * Minimal `PlayerController` surface the boarding-factory composer
+ * needs. Structural typing so the composer test doesn't have to
+ * stand up a real `PlayerController`; the production
+ * `PlayerController` already implements all four methods.
+ */
+interface BoardingFactoryHost {
+  setPlayerVehicleAdapterFactory?: (factory: PlayerVehicleAdapterFactory) => void;
+  getBoardingProximityChecker?: () => unknown;
+  getBoardingFactoryInternals?: () => {
+    vehicleSessionController: ConstructorParameters<typeof PlayerVehicleAdapterFactory>[0]['vehicleSessionController'];
+    playerState: ConstructorParameters<typeof PlayerVehicleAdapterFactory>[0]['playerState'];
+    input: ConstructorParameters<typeof PlayerVehicleAdapterFactory>[0]['input'];
+    cameraController: ConstructorParameters<typeof PlayerVehicleAdapterFactory>[0]['cameraController'];
+    setPosition: (position: THREE.Vector3, reason: string) => void;
+  };
+}
+
+/**
+ * Build the per-category boarding factory and bind it to the
+ * `PlayerController`. The factory captures live references to the
+ * controller's session controller, player state, input, camera, and
+ * canonical `setPosition()` — so streaming hooks fire when the
+ * player teleports onto a vehicle's seat anchor.
+ *
+ * Returns `null` when the controller doesn't expose the wire seams
+ * (legacy test double) — the caller drops the factory wire in that
+ * case so the F-router falls back to mortar fire.
+ *
+ * The proximity checker is read lazily through
+ * `playerController.getBoardingProximityChecker()`: the checker is
+ * owned by `SystemUpdater`, which creates it on the first Vehicles
+ * tick. Until the checker is pushed onto the controller, the
+ * factory's `tryBoardNearest()` will see `null` and return `false`
+ * — same outcome as no proximity prompt.
+ */
+function createPlayerVehicleAdapterFactory(args: {
+  playerController: BoardingFactoryHost;
+  vehicleManager: ConstructorParameters<typeof PlayerVehicleAdapterFactory>[0]['vehicleManager'];
+  hudSystem?: ConstructorParameters<typeof PlayerVehicleAdapterFactory>[0]['hudSystem'];
+  gameRenderer?: IGameRenderer;
+}): PlayerVehicleAdapterFactory | null {
+  const internals = args.playerController.getBoardingFactoryInternals?.();
+  if (!internals) return null;
+
+  // Lazy proximity-checker proxy: the real checker is created
+  // inside SystemUpdater's Vehicles tick and pushed onto the
+  // controller via `setBoardingProximityChecker()`. The factory
+  // reads through this proxy each time `tryBoardNearest()` runs,
+  // so the wire activates as soon as the checker lands without
+  // requiring a re-construction of the factory. The factory's
+  // deps type wants the concrete `GroundVehicleProximityChecker`,
+  // but it only calls `getLastShownVehicleId()` — the structural
+  // cast is sound and stays narrow.
+  const proximityProxy = {
+    getLastShownVehicleId(): string | null {
+      const checker = args.playerController.getBoardingProximityChecker?.() as
+        | { getLastShownVehicleId?: () => string | null }
+        | undefined;
+      return checker?.getLastShownVehicleId?.() ?? null;
+    },
+  } as unknown as GroundVehicleProximityChecker;
+
+  return new PlayerVehicleAdapterFactory({
+    vehicleManager: args.vehicleManager,
+    vehicleSessionController: internals.vehicleSessionController,
+    proximityChecker: proximityProxy,
+    playerState: internals.playerState,
+    input: internals.input,
+    cameraController: internals.cameraController,
+    hudSystem: args.hudSystem,
+    gameRenderer: args.gameRenderer,
+    setPosition: internals.setPosition,
+  });
 }

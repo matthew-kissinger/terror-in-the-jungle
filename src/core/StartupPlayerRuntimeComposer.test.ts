@@ -111,6 +111,18 @@ function createRefs() {
       }),
       setTerrainSystem: vi.fn(),
       setTicketSystem: vi.fn(),
+      // Boarding-factory wire (VEKHIKL-UX-2 split B). The composer
+      // captures internals through `getBoardingFactoryInternals()` and
+      // wires a factory back via `setPlayerVehicleAdapterFactory()`.
+      getBoardingFactoryInternals: vi.fn(() => ({
+        vehicleSessionController: { registerAdapter: vi.fn(), enterVehicle: vi.fn(), isInVehicle: vi.fn(() => false), getVehicleId: vi.fn(() => null) },
+        playerState: { position: new THREE.Vector3() },
+        input: {},
+        cameraController: {},
+        setPosition: vi.fn(),
+      })),
+      getBoardingProximityChecker: vi.fn(() => undefined),
+      setPlayerVehicleAdapterFactory: vi.fn(),
     },
     playerHealthSystem: {
       mountUI: vi.fn(),
@@ -230,6 +242,37 @@ describe('StartupPlayerRuntimeComposer', () => {
     // Aircraft + destroyed entries are dropped; only the live ground vehicle survives.
     expect(markers.map(m => m.vehicleId)).toEqual(['m151_a']);
     expect(markers[0].category).toBe('ground');
+  });
+
+  it('wires the boarding-factory back into the player controller when the seam exists (VEKHIKL-UX-2)', () => {
+    const { refs } = createRefs();
+
+    wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), {
+      camera: new THREE.PerspectiveCamera(),
+    });
+
+    expect(refs.playerController.getBoardingFactoryInternals).toHaveBeenCalled();
+    expect(refs.playerController.setPlayerVehicleAdapterFactory).toHaveBeenCalledTimes(1);
+    const factory = refs.playerController.setPlayerVehicleAdapterFactory.mock.calls[0][0];
+    expect(factory).toBeDefined();
+    // Factory exposes the surface PlayerController will call through it.
+    expect(typeof factory.tryBoardNearest).toBe('function');
+    expect(typeof factory.tryExit).toBe('function');
+  });
+
+  it('skips the boarding-factory wire on legacy controllers that lack the seam', () => {
+    const { refs } = createRefs();
+    // Strip the boarding-factory seam to model a pre-split-B controller
+    // (or a test double that doesn't know about it). The composer must
+    // tolerate this without exploding.
+    delete (refs.playerController as any).getBoardingFactoryInternals;
+    delete (refs.playerController as any).setPlayerVehicleAdapterFactory;
+
+    expect(() =>
+      wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), {
+        camera: new THREE.PerspectiveCamera(),
+      }),
+    ).not.toThrow();
   });
 
   it('builds spectator candidates from the live loadout context instead of a startup snapshot', () => {
