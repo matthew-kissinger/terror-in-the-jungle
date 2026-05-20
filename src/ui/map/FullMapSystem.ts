@@ -4,7 +4,7 @@ import { GameSystem } from '../../types';
 import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { isBlufor } from '../../systems/combat/types';
+import { Faction, isBlufor } from '../../systems/combat/types';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 import { FullMapInput } from './FullMapInput';
 import {
@@ -28,6 +28,19 @@ import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes'
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
 
+/**
+ * Drivable vehicle marker rendered on both the minimap and the full
+ * map. Defined locally here for now; the sibling minimap task may
+ * land its own copy. If both land independently a small follow-up
+ * will move this to a shared module.
+ */
+export type VehicleMarker = {
+  worldPos: THREE.Vector3;
+  category: 'ground' | 'watercraft' | 'emplacement';
+  faction: Faction;
+  vehicleType: string;
+};
+
 export class FullMapSystem implements GameSystem {
   private camera: THREE.Camera;
   private zoneQuery?: IZoneQuery;
@@ -36,6 +49,7 @@ export class FullMapSystem implements GameSystem {
   private warSimulator?: WarSimulator;
   private terrainRuntime?: ITerrainRuntime;
   private helipadMarkers: HelipadMarker[] = [];
+  private vehicleMarkers: VehicleMarker[] = [];
   private terrainFlowPaths: TerrainFlowPath[] = [];
   private terrainBackdrop: HTMLCanvasElement | null = null;
   private terrainBackdropWorldSize = 0;
@@ -300,6 +314,9 @@ export class FullMapSystem implements GameSystem {
 
     // Draw helipad markers
     this.drawHelipadMarkers(ctx);
+
+    // Draw drivable vehicle markers (above combatant dots, below player marker)
+    this.drawVehicleMarkers(ctx);
 
     // Draw combatants (materialized, full brightness)
     if (this.combatantSystem) {
@@ -637,6 +654,10 @@ export class FullMapSystem implements GameSystem {
     this.helipadMarkers = markers;
   }
 
+  setVehicleMarkers(markers: VehicleMarker[]): void {
+    this.vehicleMarkers = markers;
+  }
+
   private drawCommandMarker(ctx: CanvasRenderingContext2D): void {
     if (!this.commandPosition) return;
 
@@ -707,6 +728,87 @@ export class FullMapSystem implements GameSystem {
       ctx.textBaseline = 'middle';
       ctx.fillText('H', x, y);
     }
+  }
+
+  private drawVehicleMarkers(ctx: CanvasRenderingContext2D): void {
+    if (this.vehicleMarkers.length === 0) return;
+
+    const scale = MAP_SIZE / this.worldSize;
+    const zoomLevel = this.inputHandler.getZoomLevel();
+    const iconSize = Math.max(8, 10 / zoomLevel);
+    const strokeWidth = Math.max(1.25, 0.9 / zoomLevel);
+
+    for (const marker of this.vehicleMarkers) {
+      // Same flipped-axis coordinate system as zones/combatants/helipads
+      const x = (this.worldSize / 2 - marker.worldPos.x) * scale;
+      const y = (this.worldSize / 2 - marker.worldPos.z) * scale;
+
+      const factionFill = isBlufor(marker.faction)
+        ? 'rgba(91, 140, 201, 0.45)'
+        : 'rgba(201, 86, 74, 0.45)';
+      const factionStroke = isBlufor(marker.faction)
+        ? 'rgba(91, 140, 201, 0.95)'
+        : 'rgba(201, 86, 74, 0.95)';
+
+      ctx.fillStyle = factionFill;
+      ctx.strokeStyle = factionStroke;
+      ctx.lineWidth = strokeWidth;
+
+      this.drawVehicleCategoryIcon(ctx, marker.category, x, y, iconSize);
+    }
+  }
+
+  /**
+   * Category icon palette:
+   *   ground       — filled square (jeep / tank silhouette stand-in)
+   *   watercraft   — filled diamond (boat hull stand-in)
+   *   emplacement  — X cross (matches the "static gun" mental model)
+   *
+   * Stroke + fill are pre-set by the caller (faction-aware coloring).
+   */
+  private drawVehicleCategoryIcon(
+    ctx: CanvasRenderingContext2D,
+    category: 'ground' | 'watercraft' | 'emplacement',
+    x: number,
+    y: number,
+    iconSize: number,
+  ): void {
+    if (category === 'ground') {
+      const half = iconSize;
+      ctx.beginPath();
+      ctx.rect(x - half, y - half, half * 2, half * 2);
+      ctx.fill();
+      ctx.stroke();
+      return;
+    }
+
+    if (category === 'watercraft') {
+      const half = iconSize * 1.15;
+      ctx.beginPath();
+      ctx.moveTo(x, y - half);
+      ctx.lineTo(x + half, y);
+      ctx.lineTo(x, y + half);
+      ctx.lineTo(x - half, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      return;
+    }
+
+    // emplacement → X cross with a small filled centre disc so it stays
+    // legible against busy terrain backdrops.
+    const arm = iconSize;
+    ctx.beginPath();
+    ctx.arc(x, y, arm * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x - arm, y - arm);
+    ctx.lineTo(x + arm, y + arm);
+    ctx.moveTo(x + arm, y - arm);
+    ctx.lineTo(x - arm, y + arm);
+    ctx.stroke();
   }
 
   dispose(): void {
