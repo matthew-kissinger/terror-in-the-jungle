@@ -7,8 +7,28 @@ import type { IHeightProvider, HeightProviderConfig } from './IHeightProvider';
  * World coordinate mapping:
  * - The DEM grid is centered at (originX, originZ) in world space.
  * - Each pixel covers metersPerPixel x metersPerPixel meters.
- * - Out-of-bounds queries clamp to edge values.
+ * - Inside the DEM box, bilinear interpolation of the four nearest pixels.
+ * - Outside the DEM box, the boundary value tapers smoothly toward
+ *   DEM_EDGE_BASELINE_M over DEM_EDGE_TAPER_RADIUS_M, eliminating the
+ *   vertical "fin" artifacts that the pre-2026-05-19 boundary clamp
+ *   produced at the visible quadtree margin (closes Stage D3 of
+ *   cycle-2026-05-09-cdlod-edge-morph).
  */
+
+/**
+ * Distance (in world meters) over which the outside-DEM heightmap ramps
+ * from the boundary sample to {@link DEM_EDGE_BASELINE_M}. Sized to
+ * cover A Shau's visible margin (cameraFar ~4000 m); samples past this
+ * radius saturate at the baseline.
+ */
+export const DEM_EDGE_TAPER_RADIUS_M = 1500;
+
+/**
+ * Floor elevation the outside-DEM taper ramps toward. Default 0 m sea
+ * level — visually clean for A Shau (long downhill into distance) and
+ * the player can't navigate there, so no gameplay impact.
+ */
+export const DEM_EDGE_BASELINE_M = 0;
 export class DEMHeightProvider implements IHeightProvider {
   private readonly data: Float32Array;
   private readonly width: number;
@@ -88,6 +108,13 @@ export class DEMHeightProvider implements IHeightProvider {
 
   /**
    * Static bilinear sampling - used both by the class and by inline worker code.
+   *
+   * For samples inside the DEM box this returns the bilinear interpolation
+   * of the four nearest pixels (byte-identical to the pre-2026-05-19 clamp
+   * path). For samples outside the box the boundary value tapers smoothly
+   * toward {@link DEM_EDGE_BASELINE_M} over {@link DEM_EDGE_TAPER_RADIUS_M}
+   * using a smoothstep, providing C1-continuous heightmap behavior past
+   * the DEM boundary instead of an extruded boundary value.
    */
   static sampleBilinear(
     data: Float32Array,
@@ -109,7 +136,8 @@ export class DEMHeightProvider implements IHeightProvider {
     const gxf = relX / metersPerPixel;
     const gzf = relZ / metersPerPixel;
 
-    // Clamp to grid bounds
+    // Clamp to grid bounds. The 1.001 epsilon keeps x1 = x0 + 1 a valid
+    // sample for the bilinear taps; this is the existing in-DEM path.
     const gx = Math.max(0, Math.min(gridWidth - 1.001, gxf));
     const gz = Math.max(0, Math.min(gridHeight - 1.001, gzf));
 
@@ -130,7 +158,32 @@ export class DEMHeightProvider implements IHeightProvider {
     // Bilinear interpolation
     const h0 = h00 * (1 - fx) + h10 * fx;
     const h1 = h01 * (1 - fx) + h11 * fx;
+    const boundarySample = h0 * (1 - fz) + h1 * fz;
 
-    return h0 * (1 - fz) + h1 * fz;
+    // Outside-DEM taper. The DEM box covers world coords [-halfW, +halfW]
+    // x [-halfH, +halfH], which maps to gxf in [0, gridWidth] and gzf in
+    // [0, gridHeight] — note the box edge is at gridWidth, not gridWidth-1
+    // (that bound only constrains the bilinear taps). The "outside
+    // distance" is the world-meter separation between the query and the
+    // DEM bounding box; it is exactly 0 for any sample inside the box,
+    // so the in-DEM path returns boundarySample unmodified and remains
+    // byte-identical to the pre-taper sampler.
+    const outsideGx = gxf < 0 ? -gxf : gxf > gridWidth ? gxf - gridWidth : 0;
+    const outsideGz = gzf < 0 ? -gzf : gzf > gridHeight ? gzf - gridHeight : 0;
+    if (outsideGx === 0 && outsideGz === 0) {
+      return boundarySample;
+    }
+
+    const outsideX = outsideGx * metersPerPixel;
+    const outsideZ = outsideGz * metersPerPixel;
+    const outsideDist = Math.hypot(outsideX, outsideZ);
+    const t = outsideDist >= DEM_EDGE_TAPER_RADIUS_M
+      ? 1
+      : outsideDist / DEM_EDGE_TAPER_RADIUS_M;
+    // smoothstep(0, 1, t) = t*t*(3 - 2t) — C1-continuous; derivative is 0
+    // at both endpoints so the taper joins the boundary value without a
+    // kink and saturates cleanly at the baseline past the radius.
+    const s = t * t * (3 - 2 * t);
+    return boundarySample + (DEM_EDGE_BASELINE_M - boundarySample) * s;
   }
 }

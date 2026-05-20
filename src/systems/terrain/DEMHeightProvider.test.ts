@@ -38,10 +38,12 @@ describe('DEMHeightProvider', () => {
     expect(dem.getHeightAt(-15, -20)).toBeCloseTo(150, 2);
   });
 
-  it('clamps out-of-bounds queries to the edge sample', () => {
+  it('tapers out-of-bounds queries toward the edge baseline past the taper radius', () => {
     const dem = create4x4DEM();
-    // Far beyond top-left: clamps to (0,0)
-    expect(dem.getHeightAt(-1000, -1000)).toBeCloseTo(100, 2);
+    // Far beyond top-left (well past DEM_EDGE_TAPER_RADIUS_M = 1500 m):
+    // the smoothstep taper has fully saturated, so the query reads the
+    // baseline elevation rather than the extruded boundary value.
+    expect(dem.getHeightAt(-2000, -2000)).toBeCloseTo(0, 2);
   });
 
   it('offsets by the configured origin when interpreting world coordinates', () => {
@@ -91,11 +93,15 @@ describe('DEMHeightProvider', () => {
     }
   });
 
-  it('handles degenerate 1x1 DEM by returning the single elevation everywhere', () => {
+  it('handles degenerate 1x1 DEM by returning the single elevation inside the box', () => {
     const data = new Float32Array([500]);
     const dem = new DEMHeightProvider(data, 1, 1, 10);
+    // Inside the box (world bounds [-5, 5]): the single pixel value.
     expect(dem.getHeightAt(0, 0)).toBeCloseTo(500, 2);
-    expect(dem.getHeightAt(100, 100)).toBeCloseTo(500, 2);
+    // Outside the box (95 m past +X), well past the taper radius: the
+    // taper has saturated at the baseline, so the boundary value no
+    // longer extrudes outward as a vertical wall.
+    expect(dem.getHeightAt(2000, 2000)).toBeCloseTo(0, 2);
   });
 
   it('returns constant value for a uniform elevation grid', () => {
