@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { IGameRenderer } from '../types/SystemInterfaces';
 import type { SystemKeyToType } from './SystemRegistry';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
+import type {
+  IVehicleMarkerQuery,
+  VehicleMarkerCategory,
+  VehicleMarkerEntry,
+} from '../ui/compass/CompassVehicleMarkers';
 
 type StartupPlayerRuntimeRefs = Pick<
   SystemKeyToType,
@@ -30,6 +35,7 @@ type StartupPlayerRuntimeRefs = Pick<
   | 'sandbagSystem'
   | 'terrainSystem'
   | 'ticketSystem'
+  | 'vehicleManager'
   | 'warSimulator'
   | 'zoneManager'
 >;
@@ -77,6 +83,7 @@ interface StartupPlayerRuntimeGroups {
     | 'grenadeSystem'
     | 'mortarSystem'
     | 'ticketSystem'
+    | 'vehicleManager'
     | 'zoneManager'
   >;
   deployRuntime: Pick<
@@ -145,6 +152,7 @@ export function createStartupPlayerRuntimeGroups(
       grenadeSystem: refs.grenadeSystem,
       mortarSystem: refs.mortarSystem,
       ticketSystem: refs.ticketSystem,
+      vehicleManager: refs.vehicleManager,
       zoneManager: refs.zoneManager,
     },
     deployRuntime: {
@@ -281,6 +289,7 @@ function wireHUDRuntime(runtime: StartupPlayerRuntimeGroups['hudRuntime']): void
     grenadeSystem,
     mortarSystem,
     ticketSystem,
+    vehicleManager,
     zoneManager,
   } = runtime;
 
@@ -315,6 +324,13 @@ function wireHUDRuntime(runtime: StartupPlayerRuntimeGroups['hudRuntime']): void
   commandInputManager.mountTo(layout);
 
   compassSystem.setZoneQuery(zoneManager);
+  // Compass vehicle-marker layer landed in `compass-vehicle-markers`
+  // (PR #278) but the runtime wiring was deferred. Without this adapter
+  // the chevrons stay dark. Guarded so older test doubles without
+  // `setVehicleQuery` keep working.
+  if (typeof compassSystem.setVehicleQuery === 'function' && vehicleManager) {
+    compassSystem.setVehicleQuery(createCompassVehicleQuery(vehicleManager));
+  }
   minimapSystem.setZoneQuery(zoneManager);
   minimapSystem.setCombatantSystem(combatantSystem);
   fullMapSystem.setZoneQuery(zoneManager);
@@ -356,4 +372,47 @@ function wireDeployRuntime(runtime: StartupPlayerRuntimeGroups['deployRuntime'])
   runtime.playerRespawnManager.setWarSimulator(runtime.warSimulator);
   runtime.playerRespawnManager.setTerrainSystem(runtime.terrainSystem);
   runtime.playerRespawnManager.setHelipadSystem(runtime.helipadSystem);
+}
+
+/**
+ * Minimal surface the compass-vehicle-marker adapter needs from the
+ * vehicle manager. Structural typing keeps the composer test happy with
+ * a plain mock and lets us avoid pulling the full `VehicleManager`
+ * import path through the type-check seam.
+ */
+interface CompassVehicleSource {
+  getAllVehicles(): ReadonlyArray<{
+    vehicleId: string;
+    category: string;
+    faction: import('../systems/combat/types').Faction;
+    getPosition(): THREE.Vector3;
+    isDestroyed(): boolean;
+  }>;
+}
+
+const COMPASS_DRIVABLE_CATEGORIES = new Set<string>(['ground', 'watercraft', 'emplacement']);
+
+/**
+ * Build an `IVehicleMarkerQuery` adapter over `VehicleManager`. The
+ * compass calls `getVehicleMarkers()` at its existing 100 ms cadence;
+ * the adapter does an O(N) scan that filters out destroyed vehicles
+ * and non-drivable categories (aircraft have their own HUD).
+ */
+function createCompassVehicleQuery(source: CompassVehicleSource): IVehicleMarkerQuery {
+  return {
+    getVehicleMarkers(): readonly VehicleMarkerEntry[] {
+      const out: VehicleMarkerEntry[] = [];
+      for (const vehicle of source.getAllVehicles()) {
+        if (!COMPASS_DRIVABLE_CATEGORIES.has(vehicle.category)) continue;
+        if (vehicle.isDestroyed()) continue;
+        out.push({
+          vehicleId: vehicle.vehicleId,
+          category: vehicle.category as VehicleMarkerCategory,
+          faction: vehicle.faction,
+          position: vehicle.getPosition(),
+        });
+      }
+      return out;
+    },
+  };
 }
