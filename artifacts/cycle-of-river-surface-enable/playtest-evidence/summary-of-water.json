@@ -1,0 +1,87 @@
+{
+  "createdAt": "2026-05-20T16:52:32.632Z",
+  "pairTag": "post",
+  "scenario": "openfrontier",
+  "outDir": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a20ccc1441d3f3e97\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence",
+  "records": [
+    {
+      "name": "of-sampan-spawn",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a20ccc1441d3f3e97\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-sampan-spawn-post.png",
+      "pairTag": "post",
+      "pose": {
+        "position": [
+          -215,
+          6,
+          100
+        ],
+        "yawDeg": 90,
+        "pitchDeg": -12
+      },
+      "pngBytes": 283339,
+      "riverSurface": {
+        "query": [
+          -200,
+          0,
+          100
+        ],
+        "surfaceY": null,
+        "visible": false,
+        "source": "none"
+      },
+      "notes": ""
+    },
+    {
+      "name": "of-pbr-spawn",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a20ccc1441d3f3e97\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-pbr-spawn-post.png",
+      "pairTag": "post",
+      "pose": {
+        "position": [
+          -900,
+          8,
+          -760
+        ],
+        "yawDeg": 90,
+        "pitchDeg": -12
+      },
+      "pngBytes": 241081,
+      "riverSurface": {
+        "query": [
+          -880,
+          0,
+          -760
+        ],
+        "surfaceY": null,
+        "visible": false,
+        "source": "none"
+      },
+      "notes": ""
+    },
+    {
+      "name": "of-river-segment",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a20ccc1441d3f3e97\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-river-segment-post.png",
+      "pairTag": "post",
+      "pose": {
+        "position": [
+          -540,
+          120,
+          -100
+        ],
+        "yawDeg": 200,
+        "pitchDeg": -30
+      },
+      "pngBytes": 1265194,
+      "riverSurface": {
+        "query": [
+          -540,
+          0,
+          -330
+        ],
+        "surfaceY": null,
+        "visible": false,
+        "source": "none"
+      },
+      "notes": ""
+    }
+  ],
+  "notes": []
+}
