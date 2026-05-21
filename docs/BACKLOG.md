@@ -44,6 +44,32 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (water-hydrology-polish, doctor pass 2026-05-21)
+
+Doctor pass on top of the 2026-05-20 vehicle-boarding-and-water campaign
+after owner playtest showed the OF river-surface visibility shipped via
+`cycle-of-river-surface-enable` was leaning on the wrong abstraction
+(global sea-level plane co-existing with hydrology channels). The polish
+pass made hydrology river surfaces the accepted OF / A Shau water path,
+made the global sea-level plane opt-in only, snapped Sampan + PBR onto
+the hydrology surface from frame 0, and exposed the hydrology channels
+on the minimap + full map so owner playtest has a discoverability
+surface. Slug contains `polish` and is therefore a **doctor pass, not a
+formal cycle** (cycle-validate stoplist); shipped as 3 sequential PRs
+off master with no orchestrator dispatch.
+
+- [#313](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/313) `f69e119c` `water-polish-ui` — Minimap + Full Map gain optional `setHydrologyChannels(channels | null)` so the cyan river ribbon paints scaled by accumulation; Full Map gains `setVehicleManager` so ground / watercraft / emplacement markers refresh per-frame; Full Map `worldSize > 5000` `autoFitView` switched from player-centered ~13× to overview 1.0× (A Shau was unusable as a strategic surface); legend gains Water + Boat rows; `GPUBillboardSystem.clearInstancesInZones` batches per-chunk culling across all exclusion zones in one pass. 312 LOC added across 8 files, pure UI / pure-perf — safe as a no-op until the core wire lands.
+- [#314](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/314) `f375aa02` `water-polish-core` — Hydrology-driven river surface + terrain features + watercraft spawn snap. `OpenFrontierConfig.globalWaterPlaneEnabled: false` (explicit); `SystemManager` + `gameModeTypes` resolution tightened to `=== true` (the old `!== false` defaulting was silently flipping plumbing on); new `HydrologyTerrainFeatures` compiles river-bake artifacts into terrain stamps + vegetation exclusion zones; new `HydrologyRiverPath` + `HydrologyRiverMetrics` extracted modules; `HydrologyRiverGeometry` / `HydrologyRiverSurface` / `HydrologyRiverFlowPatch` / `WaterSurfaceBinding` rebuilt around the new metrics with `TerrainSystem`-bound Y sampling; `OperationalRuntimeComposer.bindSpawnedWatercraftRuntime` injects water + terrain samplers into Sampan + PBR on spawn; `ModeStartupPreparer` pipes hydrology channel polylines to minimap + full map. PR-size exception (GOST-TIJ-001): 26 files, +1597 / -260 — tightly cross-coupled hydrology cluster.
+- [#315](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/315) `30d8b9f0` `water-polish-docs` — Regenerated `cycle-of-river-surface-enable` playtest evidence (previous post-captures were stale from a worktree before #286 / #291 merged; new captures show `riverSurface.visible: true, source: "hydrology"` for Sampan + PBR + river-segment), rolled CARRY_OVERS + state/CURRENT + ROADMAP + BACKLOG + PLAYTEST_PENDING forward to reflect the merged work, amended `rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md` with a water-surface-on-hydrology pointer. Closes the `VODA-OF-1` deferred-playtest follow-up gate from `cycle-of-river-surface-enable`. **`package.json` description + keywords aligned for aircraft**: description now mentions helicopters (UH-1 Huey, AH-1 Cobra) and fixed-wing (A-1 Skyraider, F-4 Phantom, AC-47 Spooky), matching the README Highlights line that has always called this out as combined-arms; keywords gain `aviation`, `helicopters`, `fixed-wing`, `vehicles`.
+
+### Doctor-pass summary
+
+- 3 PRs merged in order (UI no-op → core wire → docs + npm metadata). UI shipped first so the core's unconditional `setHydrologyChannels(...)` calls had landing pads.
+- ~2,024 LOC net delta across `src/` (+1,909 / -282) plus regenerated playtest evidence and metadata alignment.
+- Closes the `VODA-OF-1` deferred-playtest follow-up gate; updates the `cycle-of-river-surface-enable` PLAYTEST_PENDING row to direct the owner walk at hydrology-first criteria instead of the now-wrong global-plane assumption.
+- Housekeeping bundled with the pass: pruned 9 stale perf captures (493.2 MB), pruned 3 merged feature branches locally + remote.
+- VODA-1 and VODA-2 stay `code-complete (playtest deferred)` — the polish pass does not unilaterally promote them.
+
 ## Recently Completed (cycle-framework-recovery-pass-2)
 
 Pass 2 of the framework recovery plan

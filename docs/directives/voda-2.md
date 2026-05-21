@@ -16,3 +16,7 @@ Code-complete: cycle-voda-2-buoyancy-swimming-wading 2026-05-17
 - [x] Player swimming with animation, stamina, breath, and surfacing (#241 `player-swim-and-breath`).
 - [x] Wading and foot-splash visuals at the bank (#244 `wade-foot-splash-visuals` + #240 `npc-wade-behavior`).
 - [ ] Owner playtest walk (wade ford, swim river, breath-hold gasp, surfacing, NPC route around deep water) — deferred to PLAYTEST_PENDING.
+
+## 2026-05-21 polish-pass amendment
+
+The `water-hydrology-polish` doctor pass (PRs [#313](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/313) / [#314](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/314) / [#315](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/315), merged 2026-05-21) corrected the underlying water surface VODA-2 consumes: Open Frontier now uses hydrology river surfaces with the global plane disabled, and the water sampler is bound to watercraft from spawn (`bindSpawnedWatercraftRuntime` in `OperationalRuntimeComposer`). `sampleWaterInteraction` contract is unchanged, so the VODA-2 buoyancy / swim / wade consumers (`BuoyancyForce`, `PlayerSwimState`, `WadeSplashEffect`, NPC wade speed scaling) keep reading the same shape they were built against. This directive **stays `code-complete (playtest deferred)`** — the owner walk for wade ford / swim river / breath-hold / NPC route remains the gate for `done`.
