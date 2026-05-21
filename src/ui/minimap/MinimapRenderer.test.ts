@@ -252,3 +252,34 @@ describe('MinimapRenderer vehicle markers', () => {
     expect(emptyFills).toBe(baselineFills);
   });
 });
+
+describe('MinimapRenderer hydrology channels', () => {
+  it('draws hydrology channels with a water-colored stroke', () => {
+    const { ctx, strokeStyles } = createMockCtx();
+
+    renderMinimap({
+      ctx,
+      size: 200,
+      worldSize: 400,
+      playerPosition: new THREE.Vector3(0, 2, 0),
+      playerRotation: 0,
+      camera: createMockCamera(),
+      hydrologyChannels: [
+        {
+          headCell: 1,
+          outletCell: 2,
+          lengthCells: 2,
+          lengthMeters: 80,
+          maxAccumulationCells: 100,
+          points: [
+            { cell: 1, x: -30, z: -20, elevationMeters: 0, accumulationCells: 50 },
+            { cell: 2, x: 35, z: 25, elevationMeters: -1, accumulationCells: 100 },
+          ],
+        },
+      ],
+    });
+
+    expect((ctx.lineTo as any).mock.calls.length).toBeGreaterThan(0);
+    expect(strokeStyles.some(s => s.includes('36, 208, 223'))).toBe(true);
+  });
+});

@@ -32,6 +32,14 @@ export function createLegend(): HTMLDivElement {
       <div class="legend-icon" style="background: rgba(91, 140, 201, 0.5); border-radius: 50%; font-size: 8px; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">H</div>
       <span>Helipad</span>
     </div>
+    <div class="legend-item">
+      <div class="legend-icon" style="background: rgba(36, 208, 223, 0.95); height: 4px; border-radius: 2px; box-shadow: 0 0 0 2px rgba(2, 65, 96, 0.75);"></div>
+      <span>Water</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-icon" style="background: rgba(91, 140, 201, 0.55); transform: rotate(45deg); border: 1px solid rgba(91, 140, 201, 0.95);"></div>
+      <span>Boat</span>
+    </div>
   `;
   return legend;
 }
