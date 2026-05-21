@@ -38,7 +38,7 @@ export const EMPTY_HYDROLOGY_RIVER_STATS: HydrologyRiverMeshStats = {
   maxAccumulationCells: 0,
 };
 
-export const HYDROLOGY_RIVER_MATERIAL_PROFILE = 'natural_channel_gradient';
+export const HYDROLOGY_RIVER_MATERIAL_PROFILE = 'legible_hydrology_river';
 
 /**
  * Optional hook fired once when a fresh river material is created, before
@@ -96,25 +96,26 @@ export class HydrologyRiverSurface {
     const material = new THREE.MeshStandardMaterial({
       name: 'hydrology-river-surface-material',
       color: 0xffffff,
-      emissive: 0x000000,
-      emissiveIntensity: 0.02,
-      roughness: 0.54,
+      emissive: 0x021a24,
+      emissiveIntensity: 0.04,
+      roughness: 0.08,
       metalness: 0,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.96,
       depthWrite: false,
       vertexColors: true,
       polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -2,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -8,
       side: THREE.DoubleSide,
     });
+    material.envMapIntensity = 0.56;
     this.onMaterialReady?.(material);
 
     const mesh = new THREE.Mesh(geo.geometry, material);
     mesh.name = 'hydrology-river-surface-mesh';
     mesh.frustumCulled = true;
-    mesh.renderOrder = 2;
+    mesh.renderOrder = 6;
 
     const group = new THREE.Group();
     group.name = 'hydrology-river-surfaces';

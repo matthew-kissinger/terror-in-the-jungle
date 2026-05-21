@@ -6,7 +6,7 @@
  * Sibling R1 tasks in the cycle:
  *   - `of-water-config-flip` — adds `waterEnabled: true` to
  *     `src/config/OpenFrontierConfig.ts` so the WaterSystem dispatches
- *     the hydrology river surface AND the global sea-level plane.
+ *     hydrology river surfaces without the legacy global sea-level plane.
  *   - `of-water-spawn-snap-resolver` — extends
  *     `OperationalRuntimeComposer` so the OF Sampan + PBR spawn snap to
  *     the actual water-surface Y (via `WaterSurfaceSampler`) rather than
@@ -16,12 +16,12 @@
  * surface renders and that both boats sit on water:
  *
  *   - of-sampan-spawn-{pre,post}.png   — close-up of the Sampan spawn at
- *                                        OF coord (-200, 0, 100), framed
+ *                                        OF coord (-324, 0, 384), framed
  *                                        from a behind/overhead angle so
  *                                        the water-line under the hull
  *                                        reads clearly.
  *   - of-pbr-spawn-{pre,post}.png      — close-up of the PBR spawn at
- *                                        OF coord (-880, 0, -760), same
+ *                                        OF coord (396, 0, 876), same
  *                                        framing convention.
  *   - of-river-segment-{pre,post}.png  — wide shot of a river channel
  *                                        segment between the two boats,
@@ -363,7 +363,7 @@ async function probeRiverSurfaceAt(
 // ----- Pose presets -----
 
 /**
- * OF Sampan spawn coord: (-200, 0, 100) (see
+ * OF Sampan spawn coord: (-324, 0, 384) (see
  * `src/systems/vehicle/SampanSpawn.ts:111-116`). Camera placed slightly
  * behind + above the boat looking along the channel forward direction,
  * so the post-shot frames the hull on the river ribbon with shoreline
@@ -371,40 +371,38 @@ async function probeRiverSurfaceAt(
  * points along +X; the camera sits at -X relative to the boat.
  */
 const POSE_SAMPAN_SPAWN: Pose = {
-  position: [-215, 6, 100],
+  position: [-344, 8, 384],
   yawDeg: 90,   // look toward +X (boat forward)
   pitchDeg: -12,
 };
-const QUERY_SAMPAN: [number, number, number] = [-200, 0, 100];
+const QUERY_SAMPAN: [number, number, number] = [-324, 0, 384];
 
 /**
- * OF PBR spawn coord: (-880, 0, -760) (see
+ * OF PBR spawn coord: (396, 0, 876) (see
  * `src/systems/vehicle/PBRSpawn.ts:167-172`). PBR yaw is `π/2`
  * (forward = +X). Camera offset back along -X + a few meters of
  * altitude so the boat reads in frame with channel context.
  */
 const POSE_PBR_SPAWN: Pose = {
-  position: [-900, 8, -760],
+  position: [376, 10, 876],
   yawDeg: 90,   // look toward +X (boat forward)
   pitchDeg: -12,
 };
-const QUERY_PBR: [number, number, number] = [-880, 0, -760];
+const QUERY_PBR: [number, number, number] = [396, 0, 876];
 
 /**
  * OF river-segment overlook framing a stretch of the procedural-river
  * channel between the two boat spawns. The midpoint between Sampan
- * (-200, 100) and PBR (-880, -760) is roughly (-540, -330). We sit
- * above + offset so the channel ribbon dominates the frame and the
- * shoreline seam (where the procedural-river meets the global plane)
- * is visible. If post-bump shows z-fight here, the cycle hard-stop
- * triggers.
+ * (-324, 384) and PBR (396, 876) is roughly (36, 630). We sit above
+ * the hydrology ribbon so the channel dominates the frame and the
+ * shoreline seam is visible.
  */
 const POSE_RIVER_SEGMENT: Pose = {
-  position: [-540, 120, -100],
-  yawDeg: 200,
+  position: [36, 120, 400],
+  yawDeg: 0,
   pitchDeg: -30,
 };
-const QUERY_RIVER_SEGMENT: [number, number, number] = [-540, 0, -330];
+const QUERY_RIVER_SEGMENT: [number, number, number] = [36, 0, 630];
 
 // ----- Captures -----
 

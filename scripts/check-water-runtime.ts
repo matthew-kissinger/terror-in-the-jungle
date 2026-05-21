@@ -214,23 +214,35 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
       }
       : null;
     let focusPoint = center;
-    if (positionAttr?.count && positionAttr.getX && positionAttr.getY && positionAttr.getZ) {
+    const waterSystem = engine?.systemManager?.waterSystem;
+    if (
+      positionAttr?.count
+      && positionAttr.getX
+      && positionAttr.getY
+      && positionAttr.getZ
+      && typeof waterSystem?.getWaterSurfaceY === 'function'
+    ) {
       let bestScore = Number.POSITIVE_INFINITY;
-      for (let index = 0; index + 5 < positionAttr.count; index += 6) {
+      for (let index = 0; index < positionAttr.count; index++) {
         const sample = {
-          x: (positionAttr.getX(index + 1) + positionAttr.getX(index + 4)) * 0.5,
-          y: (positionAttr.getY(index + 1) + positionAttr.getY(index + 4)) * 0.5,
-          z: (positionAttr.getZ(index + 1) + positionAttr.getZ(index + 4)) * 0.5,
+          x: positionAttr.getX(index),
+          y: positionAttr.getY(index),
+          z: positionAttr.getZ(index),
         };
         if (!Number.isFinite(sample.x) || !Number.isFinite(sample.y) || !Number.isFinite(sample.z)) {
           continue;
         }
-        const score = center
+        const surfaceY = waterSystem.getWaterSurfaceY(sample);
+        if (!Number.isFinite(surfaceY)) continue;
+        const alpha = colorAttr?.getW ? colorAttr.getW(index) : 1;
+        const centerDistance = center
           ? Math.hypot(sample.x - center.x, sample.z - center.z)
           : index;
+        const centerlineBonus = Math.max(0, 1 - alpha) * 2_000;
+        const score = centerDistance + centerlineBonus;
         if (score < bestScore) {
           bestScore = score;
-          focusPoint = sample;
+          focusPoint = { ...sample, y: surfaceY };
         }
       }
     }
@@ -251,7 +263,6 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
       engine.renderer.setOverrideCamera(camera);
     }
 
-    const waterSystem = engine?.systemManager?.waterSystem;
     let queryProbe = null;
     if (
       focusPoint
@@ -307,7 +318,7 @@ function resultPassed(result: RuntimeProofResult): boolean {
     && result.proof.groupPresent
     && result.proof.meshPresent
     && result.proof.waterInfo?.hydrologyRiverVisible === true
-    && result.proof.waterInfo?.hydrologyRiverMaterialProfile === 'natural_channel_gradient'
+    && result.proof.waterInfo?.hydrologyRiverMaterialProfile === 'legible_hydrology_river'
     && result.proof.colorAttributePresent
     && result.proof.colorAttributeItemSize === 4
     && (result.proof.waterInfo?.hydrologySegmentCount ?? 0) > 0

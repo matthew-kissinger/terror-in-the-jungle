@@ -165,7 +165,7 @@ describe('WaterSystem sun direction from atmosphere', () => {
 
     const info = system.getDebugInfo();
     expect(info.enabled).toBe(false);
-    expect(info.hydrologyRiverMaterialProfile).toBe('natural_channel_gradient');
+    expect(info.hydrologyRiverMaterialProfile).toBe('legible_hydrology_river');
     expect(info.hydrologyRiverVisible).toBe(true);
     expect(info.hydrologyChannelCount).toBe(1);
     expect(info.hydrologySegmentCount).toBe(1);
@@ -183,20 +183,20 @@ describe('WaterSystem sun direction from atmosphere', () => {
     system.setHydrologyChannels(makeHydrologyArtifact());
 
     expect(fakeWater.visible).toBe(false);
-    expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 0))).toBeCloseTo(1.85, 5);
-    expect(system.getWaterDepth(new THREE.Vector3(5, 1, 0))).toBeCloseTo(0.85, 5);
+    expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 0))).toBeCloseTo(2.35, 5);
+    expect(system.getWaterDepth(new THREE.Vector3(5, 1, 0))).toBeCloseTo(1.35, 5);
     expect(system.isUnderwater(new THREE.Vector3(5, 1, 0))).toBe(true);
     const sample = system.sampleWaterInteraction(new THREE.Vector3(5, 1, 0), {
       immersionDepthMeters: 2,
     });
     expect(sample.source).toBe('hydrology');
-    expect(sample.surfaceY).toBeCloseTo(1.85, 5);
-    expect(sample.depth).toBeCloseTo(0.85, 5);
-    expect(sample.immersion01).toBeCloseTo(0.425, 5);
-    expect(sample.buoyancyScalar).toBeCloseTo(0.425, 5);
-    expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 10))).toBeNull();
-    expect(system.getWaterDepth(new THREE.Vector3(5, 1, 10))).toBe(0);
-    expect(system.sampleWaterInteraction(new THREE.Vector3(5, 1, 10)).source).toBe('none');
+    expect(sample.surfaceY).toBeCloseTo(2.35, 5);
+    expect(sample.depth).toBeCloseTo(1.35, 5);
+    expect(sample.immersion01).toBeCloseTo(0.675, 5);
+    expect(sample.buoyancyScalar).toBeCloseTo(0.675, 5);
+    expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 80))).toBeNull();
+    expect(system.getWaterDepth(new THREE.Vector3(5, 1, 80))).toBe(0);
+    expect(system.sampleWaterInteraction(new THREE.Vector3(5, 1, 80)).source).toBe('none');
 
     system.setHydrologyChannels(null);
     expect(fakeWater.visible).toBe(true);
@@ -223,7 +223,7 @@ describe('WaterSystem sun direction from atmosphere', () => {
     expect(material.normalScale.y).toBeCloseTo(0.18, 5);
   });
 
-  it('builds hydrology river surfaces with bank-to-channel vertex color coverage', () => {
+  it('builds hydrology river surfaces with visible bank-to-channel depth coverage', () => {
     const { scene, system } = makeSystemWithScene();
 
     system.setHydrologyChannels(makeHydrologyArtifact());
@@ -236,12 +236,15 @@ describe('WaterSystem sun direction from atmosphere', () => {
     const color = mesh.geometry.getAttribute('color');
     const index = mesh.geometry.getIndex();
 
-    expect(position.count).toBe(6);
+    expect(position.count).toBe(14);
     expect(color.count).toBe(position.count);
     expect(color.itemSize).toBe(4);
-    expect(index?.count).toBe(12);
+    expect(index?.count).toBe(36);
     expect(mesh.material.vertexColors).toBe(true);
-    expect(mesh.material.emissiveIntensity).toBeLessThan(0.05);
+    expect(mesh.material.opacity).toBeGreaterThan(0.8);
+    expect(color.getZ(3)).toBeGreaterThan(color.getX(3));
+    expect(color.getW(0)).toBeLessThan(color.getW(3));
+    expect(color.getW(3)).toBeGreaterThan(0.9);
   });
 
   it('clears hydrology river surfaces when the next mode has no hydrology bake', () => {

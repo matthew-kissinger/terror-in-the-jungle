@@ -2,28 +2,29 @@ import * as THREE from 'three';
 
 // Flow visuals for `hydrology-river-flow-visuals` (VODA-1 R2).
 //
-//   - HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S: 0.45 m/s — the normal-map scrolls
+//   - HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S: 0.72 m/s — the normal-map scrolls
 //     this far per second along the segment's flow direction. Tuned against
-//     A Shau valley: at 0.45 the river reads as a slow jungle current rather
+//     A Shau valley: at 0.72 the river reads as a slow jungle current rather
 //     than a torrent (anything >1.0 looked like a flash flood), while still
 //     producing visible motion at the riverside POV the playtest evidence
 //     calls out. The normal scale (`HYDROLOGY_RIVER_NORMAL_SCALE`) is small
 //     enough that the ripple does not destabilise the bank → shallow → deep
 //     vertex-color gradient the R1 work landed.
-//   - HYDROLOGY_RIVER_NORMAL_REPEAT_M: 6 m wave-period along flow / 3 m
+//   - HYDROLOGY_RIVER_NORMAL_REPEAT_M: 5 m wave-period along flow / 2.6 m
 //     across. Each `repeat` distance is one full tile of the shared
 //     `waternormals.jpg`; periods chosen so the river reads as small chop
 //     rather than ocean swell.
-//   - HYDROLOGY_RIVER_FOAM_INTENSITY: 0.45 — brightness of the foam
+//   - HYDROLOGY_RIVER_FOAM_INTENSITY: 0.56 — brightness of the foam
 //     contribution above the bank → shallow → deep gradient. The
 //     terrain-water-edge foam (R1) uses 0.55; the river-flow foam is a
 //     hair softer so the two read as distinct effects.
-export const HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S = 0.45;
-export const HYDROLOGY_RIVER_NORMAL_REPEAT_ALONG_M = 6;
-export const HYDROLOGY_RIVER_NORMAL_REPEAT_ACROSS_M = 3;
-export const HYDROLOGY_RIVER_NORMAL_SCALE = 0.32;
-export const HYDROLOGY_RIVER_FOAM_INTENSITY = 0.45;
+export const HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S = 0.72;
+export const HYDROLOGY_RIVER_NORMAL_REPEAT_ALONG_M = 5;
+export const HYDROLOGY_RIVER_NORMAL_REPEAT_ACROSS_M = 2.6;
+export const HYDROLOGY_RIVER_NORMAL_SCALE = 0.42;
+export const HYDROLOGY_RIVER_FOAM_INTENSITY = 0.56;
 export const HYDROLOGY_RIVER_FOAM_COLOR = new THREE.Color(0xe9efe8);
+export const HYDROLOGY_RIVER_EDGE_ALPHA_MIN = 0.36;
 
 /**
  * Uniforms captured at compile time on the hydrology river material's
@@ -62,7 +63,7 @@ export interface HydrologyRiverShaderRefs {
  *
  * Mobile floor: no `WebGLRenderTarget`, no depth texture. The patch is a
  * straight ALU + 1 normal-map fetch per fragment — within budget for the
- * tiny rendered surface (river mesh caps at 24 channels × 2048 segments).
+ * tiny rendered surface (river mesh caps at 4096 total segments).
  *
  * Returns the captured uniform refs so the caller can tick `uTime` per
  * frame and late-bind the normal texture if it loads after install.
@@ -96,8 +97,12 @@ export function installHydrologyRiverFlowPatch(
         `#include <common>
 attribute vec2 aFlowDir;
 attribute float aFoamMask;
+#ifndef USE_UV
+attribute vec2 uv;
+#endif
 varying vec2 vFlowDir;
 varying float vFoamMask;
+varying vec2 vRiverUv;
 varying vec3 vRiverWorldPos;`,
       )
       .replace(
@@ -105,6 +110,7 @@ varying vec3 vRiverWorldPos;`,
         `#include <worldpos_vertex>
 vFlowDir = aFlowDir;
 vFoamMask = aFoamMask;
+vRiverUv = uv;
 vRiverWorldPos = worldPosition.xyz;`,
       );
 
@@ -122,6 +128,7 @@ uniform float uNormalRepeatAlong;
 uniform float uNormalRepeatAcross;
 varying vec2 vFlowDir;
 varying float vFoamMask;
+varying vec2 vRiverUv;
 varying vec3 vRiverWorldPos;`,
       )
       // Layer a flow-aligned normal sample on top of the standard normal
@@ -162,12 +169,16 @@ varying vec3 vRiverWorldPos;`,
       // narrowness + slope factor; modulate by a slow time-varying
       // jitter so the cap doesn't read as a static decal. Layered on
       // outgoingLight before <opaque_fragment> writes gl_FragColor.
-      .replace(
+.replace(
         '#include <opaque_fragment>',
         `{
+  float _edgeFade = smoothstep(0.0, 0.22, vRiverUv.x) * smoothstep(0.0, 0.22, 1.0 - vRiverUv.x);
+  diffuseColor.a *= mix(${HYDROLOGY_RIVER_EDGE_ALPHA_MIN.toFixed(2)}, 1.0, _edgeFade);
   float _foamJitter = 0.7 + 0.3 * sin(uTime * 1.7 + vRiverWorldPos.x * 0.35 + vRiverWorldPos.z * 0.27);
   float _foam = clamp(vFoamMask, 0.0, 1.0) * _foamJitter * uFoamIntensity;
   outgoingLight = mix(outgoingLight, uFoamColor, _foam);
+  float _sparkle = pow(max(dot(normal, normalize(vec3(0.35, 0.82, 0.28))), 0.0), 28.0);
+  outgoingLight += _sparkle * vec3(0.42, 0.68, 0.72);
   diffuseColor.a = clamp(diffuseColor.a + _foam * 0.35, 0.0, 1.0);
 }
 #include <opaque_fragment>`,

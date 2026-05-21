@@ -60,7 +60,7 @@ describe('HydrologyRiverSurface', () => {
     expect(scene.getObjectByName('hydrology-river-surfaces')).toBeDefined();
     expect(surface.isActive()).toBe(true);
     expect(surface.isVisible()).toBe(true);
-    expect(surface.getMaterialProfile()).toBe('natural_channel_gradient');
+    expect(surface.getMaterialProfile()).toBe('legible_hydrology_river');
     expect(surface.getQuerySegments().length).toBeGreaterThan(0);
     const stats = surface.getStats();
     expect(stats.channelCount).toBe(1);
@@ -112,6 +112,21 @@ describe('HydrologyRiverSurface', () => {
     }
   });
 
+  it('smooths multi-point hydrology channels into a denser river ribbon', () => {
+    const scene = new THREE.Scene();
+    const artifact = makeArtifact();
+    artifact.channelPolylines[0]!.points = [
+      { cell: 0, x: 0, z: 0, elevationMeters: 4, accumulationCells: 8 },
+      { cell: 1, x: 40, z: 0, elevationMeters: 3, accumulationCells: 12 },
+      { cell: 2, x: 40, z: 40, elevationMeters: 2, accumulationCells: 16 },
+    ];
+    const surface = new HydrologyRiverSurface(scene);
+
+    surface.setArtifact(artifact);
+
+    expect(surface.getStats().segmentCount).toBeGreaterThan(8);
+  });
+
   it('bakes per-vertex flow-direction and foam-mask attributes for the river-flow shader patch', () => {
     const scene = new THREE.Scene();
     const surface = new HydrologyRiverSurface(scene);
@@ -156,5 +171,7 @@ describe('HydrologyRiverSurface', () => {
       THREE.MeshStandardMaterial
     >;
     expect(mesh.material).toBe(seen[0]);
+    expect(mesh.material.opacity).toBeGreaterThan(0.8);
+    expect(mesh.renderOrder).toBeGreaterThan(2);
   });
 });

@@ -302,11 +302,10 @@ export interface GameModeConfig {
   cameraFar?: number;
   fogDensity?: number;
   shadowFar?: number;
-  waterEnabled?: boolean; // Default true; high-level "water exists in this scenario" flag (controls global plane unless `globalWaterPlaneEnabled` overrides).
+  waterEnabled?: boolean; // Explicit hydrology/gameplay water flag. Omitted means no accepted water feature for the mode.
   // Optional explicit decouple for the 2000m flat global water plane.
-  // Defaults to `waterEnabled` for back-compat. Set `false` to suppress the
-  // global plane while still rendering hydrology river surfaces (e.g. A Shau
-  // valley floor is at ~580m so a sea-level plane is invisible and wasted).
+  // Defaults off. Set true only for debug or ocean/lake-specific work; current
+  // river modes should render hydrology surfaces instead of the legacy plane.
   globalWaterPlaneEnabled?: boolean;
 
   // Optional feature-gated hydrology cache preload. This loads public

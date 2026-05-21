@@ -200,12 +200,11 @@ export class SystemManager {
     // Set weather config for mode
     const config = getGameModeConfig(mode);
     if (this.waterSystem) {
-      const waterEnabled = config.waterEnabled !== false;
-      // Decouple the global 2000m plane from `waterEnabled`. Default to
-      // `waterEnabled` for back-compat; A Shau opts out via explicit
-      // `globalWaterPlaneEnabled: false` so hydrology river surfaces still
-      // render while the sea-level plane stays hidden (valley floor ~580m).
-      const globalWaterPlaneEnabled = config.globalWaterPlaneEnabled ?? waterEnabled;
+      const waterEnabled = config.waterEnabled === true;
+      // Keep the legacy camera-following sea-level plane opt-in only. Current
+      // river gameplay is hydrology-backed and should not inherit a global
+      // sheet just because a scenario has water.
+      const globalWaterPlaneEnabled = config.globalWaterPlaneEnabled === true;
       this.waterSystem.setEnabled(globalWaterPlaneEnabled);
       if (waterEnabled && typeof this.waterSystem.setWorldSize === 'function') {
         this.waterSystem.setWorldSize(config.worldSize);

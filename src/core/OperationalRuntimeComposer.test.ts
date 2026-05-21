@@ -4,6 +4,8 @@ import {
   createOperationalRuntimeGroups,
   wireOperationalRuntime,
 } from './OperationalRuntimeComposer';
+import { PBR } from '../systems/vehicle/PBR';
+import { Sampan } from '../systems/vehicle/Sampan';
 
 function createRefs() {
   let helipadCallback: ((helipads: Array<{ id: string; position: THREE.Vector3 }>) => void) | undefined;
@@ -37,6 +39,7 @@ function createRefs() {
     },
     fullMapSystem: {
       setHelipadMarkers: vi.fn(),
+      setVehicleManager: vi.fn(),
       setWarSimulator: vi.fn(),
     },
     gameModeManager: {
@@ -113,6 +116,7 @@ function createRefs() {
       getWaterSurfaceY: vi.fn((_position: THREE.Vector3) => null),
     },
     vehicleManager: {
+      getVehicle: vi.fn(() => null),
       getVehiclesByCategory: vi.fn(() => []),
       spawnScenarioM2HBEmplacements: vi.fn(() => ['m2hb_scenario_id']),
       spawnScenarioM48Tanks: vi.fn(() => ['m48_scenario_id']),
@@ -206,6 +210,7 @@ describe('OperationalRuntimeComposer', () => {
       { id: 'hp-alpha', position: new THREE.Vector3(10, 2, 20) },
     ]);
     expect(refs.minimapSystem.setVehicleManager).toHaveBeenCalledWith(refs.vehicleManager);
+    expect(refs.fullMapSystem.setVehicleManager).toHaveBeenCalledWith(refs.vehicleManager);
 
     const combatantProvider = getCombatantProvider();
     expect(combatantProvider).toBeDefined();
@@ -295,9 +300,9 @@ describe('OperationalRuntimeComposer', () => {
     const sampanCall = (refs.vehicleManager.spawnScenarioSampans.mock.calls as Array<[{
       resolvePosition?: (m: string, base: THREE.Vector3) => THREE.Vector3;
     }]>)[0]?.[0];
-    const sampanSnapped = sampanCall?.resolvePosition?.('open_frontier', new THREE.Vector3(-200, 0, 100));
-    expect(sampanSnapped?.x).toBe(-200);
-    expect(sampanSnapped?.z).toBe(100);
+    const sampanSnapped = sampanCall?.resolvePosition?.('open_frontier', new THREE.Vector3(-324, 0, 384));
+    expect(sampanSnapped?.x).toBe(-324);
+    expect(sampanSnapped?.z).toBe(384);
     // Y lands above the water surface (sampler-reported Y plus per-craft freeboard).
     expect(sampanSnapped?.y).toBeGreaterThan(12);
     expect(sampanSnapped?.y).toBeLessThan(13);
@@ -305,9 +310,9 @@ describe('OperationalRuntimeComposer', () => {
     const pbrCall = (refs.vehicleManager.spawnScenarioPBRs.mock.calls as Array<[{
       resolvePosition?: (m: string, base: THREE.Vector3) => THREE.Vector3;
     }]>)[0]?.[0];
-    const pbrSnapped = pbrCall?.resolvePosition?.('open_frontier', new THREE.Vector3(-880, 0, -760));
-    expect(pbrSnapped?.x).toBe(-880);
-    expect(pbrSnapped?.z).toBe(-760);
+    const pbrSnapped = pbrCall?.resolvePosition?.('open_frontier', new THREE.Vector3(396, 0, 876));
+    expect(pbrSnapped?.x).toBe(396);
+    expect(pbrSnapped?.z).toBe(876);
     expect(pbrSnapped?.y).toBeGreaterThan(12);
     expect(pbrSnapped?.y).toBeLessThan(13);
   });
@@ -333,6 +338,31 @@ describe('OperationalRuntimeComposer', () => {
     }]>)[0]?.[0];
     const pbrSnapped = pbrCall?.resolvePosition?.('open_frontier', new THREE.Vector3(50, 0, 60));
     expect(pbrSnapped?.y).toBe(17);
+  });
+
+  it('binds runtime water and terrain providers to spawned watercraft', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    const sampan = new Sampan('sampan_scenario_id', new THREE.Group());
+    const pbr = new PBR('pbr_scenario_id', new THREE.Group());
+    const sampanWater = vi.spyOn(sampan, 'setWaterSampler');
+    const sampanTerrain = vi.spyOn(sampan, 'setTerrain');
+    const pbrWater = vi.spyOn(pbr, 'setWaterSampler');
+    const pbrTerrain = vi.spyOn(pbr, 'setTerrain');
+    refs.vehicleManager.getVehicle = vi.fn((id: string) => {
+      if (id === 'sampan_scenario_id') return sampan;
+      if (id === 'pbr_scenario_id') return pbr;
+      return null;
+    });
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    getModeChangedCallback()?.('open_frontier', { waterEnabled: true });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(sampanWater).toHaveBeenCalledWith(refs.waterSystem);
+    expect(sampanTerrain).toHaveBeenCalledWith(refs.terrainSystem);
+    expect(pbrWater).toHaveBeenCalledWith(refs.waterSystem);
+    expect(pbrTerrain).toHaveBeenCalledWith(refs.terrainSystem);
   });
 
   it('skips the water sampler entirely when the scenario explicitly disables water', async () => {
