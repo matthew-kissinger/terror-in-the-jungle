@@ -399,6 +399,25 @@ Recommended next water spike:
   material plus terrain-intersection proof, followed by one gameplay consumer
   of the interaction sample.
 
+2026-05-21 correction:
+
+- Current river-bearing modes no longer use the legacy global sea-level plane
+  as an accepted water path. Open Frontier and A Shau disable it and render
+  hydrology river surfaces only.
+- Hydrology river geometry now derives width from accumulation, uses a
+  smoothed multi-band cross-section, publishes flow-speed query segments, and
+  contributes riverbed terrain stamps plus vegetation exclusion zones at mode
+  startup. A downstream elevation profile is applied before the water ribbon
+  and terrain stamps consume the path, so noisy terrain samples no longer
+  render as stepped river plates.
+- `npm run check:water-runtime -- --headless` passes against
+  `artifacts/perf/2026-05-21T00-27-21-410Z/projekt-143-water-runtime-proof/`.
+  Visual evidence under
+  `artifacts/water-hydrology-polish/2026-05-21T00-18-53-086Z/loaded-terrain-visual/`
+  shows loaded-terrain player, oblique, and map passes for Open Frontier and A
+  Shau, while human game-feel acceptance, shoreline fine art, and a WebGPU/TSL
+  premium water material remain open.
+
 ## What This Opens
 
 - Compute-assisted culling and visibility work, once evidence proves the CPU

@@ -1,80 +1,80 @@
 {
-  "createdAt": "2026-05-20T16:52:32.632Z",
+  "createdAt": "2026-05-20T20:48:09.214Z",
   "pairTag": "post",
   "scenario": "openfrontier",
-  "outDir": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a20ccc1441d3f3e97\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence",
+  "outDir": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence",
   "records": [
     {
       "name": "of-sampan-spawn",
-      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a20ccc1441d3f3e97\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-sampan-spawn-post.png",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-sampan-spawn-post.png",
       "pairTag": "post",
       "pose": {
         "position": [
-          -215,
-          6,
-          100
+          -344,
+          8,
+          384
         ],
         "yawDeg": 90,
         "pitchDeg": -12
       },
-      "pngBytes": 283339,
+      "pngBytes": 174879,
       "riverSurface": {
         "query": [
-          -200,
+          -324,
           0,
-          100
+          384
         ],
-        "surfaceY": null,
-        "visible": false,
-        "source": "none"
+        "surfaceY": 11.084675979614257,
+        "visible": true,
+        "source": "hydrology"
       },
       "notes": ""
     },
     {
       "name": "of-pbr-spawn",
-      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a20ccc1441d3f3e97\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-pbr-spawn-post.png",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-pbr-spawn-post.png",
       "pairTag": "post",
       "pose": {
         "position": [
-          -900,
-          8,
-          -760
+          376,
+          10,
+          876
         ],
         "yawDeg": 90,
         "pitchDeg": -12
       },
-      "pngBytes": 241081,
+      "pngBytes": 118305,
       "riverSurface": {
         "query": [
-          -880,
+          396,
           0,
-          -760
+          876
         ],
-        "surfaceY": null,
-        "visible": false,
-        "source": "none"
+        "surfaceY": 0.9356321960687639,
+        "visible": true,
+        "source": "hydrology"
       },
       "notes": ""
     },
     {
       "name": "of-river-segment",
-      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a20ccc1441d3f3e97\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-river-segment-post.png",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\artifacts\\cycle-of-river-surface-enable\\playtest-evidence\\of-river-segment-post.png",
       "pairTag": "post",
       "pose": {
         "position": [
-          -540,
+          36,
           120,
-          -100
+          400
         ],
-        "yawDeg": 200,
+        "yawDeg": 0,
         "pitchDeg": -30
       },
-      "pngBytes": 1265194,
+      "pngBytes": 230348,
       "riverSurface": {
         "query": [
-          -540,
+          36,
           0,
-          -330
+          630
         ],
         "surfaceY": null,
         "visible": false,

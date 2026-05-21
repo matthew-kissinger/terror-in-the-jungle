@@ -57,10 +57,12 @@ another pre-release scope expansion.
 
 Carry these findings into the next Projekt revamp:
 
-- Water and hydrology: keep the hydrology corridor/bake work and the
-  `WaterSystem` query/interaction contract, but treat natural river/lake
-  rendering, crossings, shader/intersection work, swimming/buoyancy consumers,
-  and watercraft-grade physics as future terrain-engine work.
+- Water and hydrology: keep the hydrology corridor/bake work, hydrology river
+  surfaces, riverbed terrain stamps, map/boat discoverability, and the
+  `WaterSystem` query/interaction contract. The legacy global water plane is
+  only an opt-in fallback; natural WebGPU/TSL river rendering, crossings,
+  shoreline polish, and watercraft-grade physics remain future terrain-engine
+  work.
 - Vegetation ecology: use the short-palm retirement, bamboo/ground-cover
   distribution audits, and Pixel Forge candidate proofs as starting evidence
   for clustered jungle, hydrology-aware palms/understory, trail edges, and grass
@@ -97,7 +99,7 @@ Carry these findings into the next Projekt revamp:
 | 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), animals (6/6), structures integrated. Fixed-wing runtime is live; ground vehicles remain static only. |
 | 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. Fixed-wing feel/interpolation sign-off, NPC transport, ground vehicles, and aircraft combat integration remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
-| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water has a legacy global plane plus hydrology channel surfaces and query/interaction samples; shader/intersection acceptance and watercraft-grade physics are not started. |
+| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water now uses hydrology river surfaces with terrain riverbed stamps, query/interaction samples, and map/boat discoverability; the legacy global plane is opt-in fallback only. Final WebGPU/TSL water material, shoreline polish, and watercraft-grade physics remain open. |
 | 6: Ground Vehicles | IN PROGRESS | M151 jeep physics MVP (VEKHIKL-1) queued via [docs/tasks/vekhikl-1-jeep-spike.md](tasks/archive/cycle-vekhikl-1-jeep-drivable/vekhikl-1-jeep-spike.md); architecture rearch memos in flight at `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` (wheeled physics, Ackermann steering, ground-normal conform) and `docs/rearch/TANK_SYSTEMS_2026-05-13.md` (skid-steer, independent turret, gunner seat, ballistic cannon, damage states). Cars first, tanks second. GLBs exist (jeep, APC, truck, tank, PT-76); `IVehicle` already accepts `'ground'` and `src/systems/vehicle/GroundVehicle.ts` holds the M151 stub. |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
 | 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
@@ -112,7 +114,8 @@ Carry these findings into the next Projekt revamp:
 - Ground vehicle physics (terrain-following, speed by surface type)
 - M151 Jeep, M113 APC, M35 Truck as first drivable ground vehicles
 - NPC helicopter transport (takeoff, fly to LZ, deploy squad, RTB)
-- Watercraft (sampan, PBR) blocked on water engine
+- Watercraft (sampan, PBR) have boarding/spawn integration; watercraft-grade
+  hydrodynamics and seat-swap combat polish remain open.
 
 ### Command & RTS
 - Command scaling: squad (8-16) -> platoon (30-60) -> company (100-200) -> battalion (500+)
