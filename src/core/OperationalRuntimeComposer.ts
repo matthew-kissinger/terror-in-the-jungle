@@ -7,6 +7,8 @@ import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacement
 import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
 import type { PBRScenarioMode } from '../systems/vehicle/PBRSpawn';
 import type { SampanScenarioMode } from '../systems/vehicle/SampanSpawn';
+import { PBR } from '../systems/vehicle/PBR';
+import { Sampan } from '../systems/vehicle/Sampan';
 
 type OperationalRuntimeRefs = Pick<
   SystemKeyToType,
@@ -187,11 +189,14 @@ function wireVehicleRuntime(
     runtime.fullMapSystem.setHelipadMarkers(markers);
   });
 
-  // Inject the vehicle manager so the minimap can pull drivable /
+  // Inject the vehicle manager so map surfaces can pull drivable /
   // boardable vehicle positions per-frame. Guarded so older test
   // doubles without `setVehicleManager` keep working.
   if (typeof runtime.minimapSystem.setVehicleManager === 'function') {
     runtime.minimapSystem.setVehicleManager(runtime.vehicleManager);
+  }
+  if (typeof runtime.fullMapSystem.setVehicleManager === 'function') {
+    runtime.fullMapSystem.setVehicleManager(runtime.vehicleManager);
   }
 
   if (typeof runtime.helicopterModel.configureDependencies === 'function') {
@@ -423,6 +428,7 @@ function wireSampanRuntime(
             SAMPAN_SPAWN_FREEBOARD_METERS,
           ),
         });
+        bindSpawnedWatercraftRuntime(ids, runtime);
         Logger.info('vehicle', `Sampan scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
       } catch (error) {
         // Roll back the reservation so a manual re-trigger can retry.
@@ -478,6 +484,7 @@ function wirePBRRuntime(
             PBR_SPAWN_FREEBOARD_METERS,
           ),
         });
+        bindSpawnedWatercraftRuntime(ids, runtime);
         Logger.info('vehicle', `PBR scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
       } catch (error) {
         // Roll back the reservation so a manual re-trigger can retry.
@@ -490,9 +497,21 @@ function wirePBRRuntime(
 
 const _watercraftScratch = new THREE.Vector3();
 
+function bindSpawnedWatercraftRuntime(
+  ids: readonly string[],
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+): void {
+  for (const id of ids) {
+    const vehicle = runtime.vehicleManager.getVehicle(id);
+    if (!(vehicle instanceof Sampan) && !(vehicle instanceof PBR)) continue;
+    vehicle.setWaterSampler(runtime.waterSystem ?? null);
+    vehicle.setTerrain(runtime.terrainSystem ?? null);
+  }
+}
+
 /**
  * Shared spawn snap for watercraft. When the active scenario has water
- * enabled (`waterEnabled !== false`) and the WaterSystem reports a
+ * enabled (`waterEnabled === true`) and the WaterSystem reports a
  * water surface at the spawn XZ (hydrology river or global plane), the
  * hull is snapped to `waterY + freeboard` so it starts straddling the
  * waterline. Otherwise the snap falls back to terrain height (mirrors
@@ -509,7 +528,7 @@ function snapWatercraftToSurface(
 ): THREE.Vector3 {
   _watercraftScratch.copy(base);
 
-  const waterEnabled = config ? config.waterEnabled !== false : false;
+  const waterEnabled = config ? config.waterEnabled === true : false;
   if (waterEnabled && waterSystem && typeof waterSystem.getWaterSurfaceY === 'function') {
     const waterY = waterSystem.getWaterSurfaceY(base);
     if (typeof waterY === 'number' && Number.isFinite(waterY)) {

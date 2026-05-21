@@ -148,15 +148,12 @@ export function createPBR(
  *
  * Scenarios shipped this cycle:
  *
- *   - `a_shau_valley`: the US river outpost on the south side of A
- *     Shau. Coordinates picked to land on a flat river stretch ~50 m
- *     north of the southern road bend (avoids the steep ravine that
- *     blocks watercraft north of the road). yaw=0 points the bow
- *     downstream (+Z toward the contested map).
- *   - `open_frontier`: a forward US spawn ~150 m east of the FOB,
- *     intended to land on the procedural-river segment that runs
- *     through the contested band of Open Frontier. yaw=Math.PI/2
- *     points the bow east toward the contested zone.
+ *   - `a_shau_valley`: (1188.9, 0, 1743.72) lands on a confirmed
+ *     tributary sample in the A Shau hydrology bake. The old (80, 0,
+ *     110) anchor was ~1.7 km from water.
+ *   - `open_frontier`: (396, 0, 876) lands on the lower section of the
+ *     highest-accumulation seeded hydrology channel, keeping the PBR
+ *     near the same visible water route as the sampan.
  */
 export const PBR_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', {
   vehicleId: string;
@@ -166,13 +163,13 @@ export const PBR_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', {
 }> = {
   open_frontier: {
     vehicleId: 'pbr_us_open_frontier',
-    position: new THREE.Vector3(-880, 0, -760),
+    position: new THREE.Vector3(396, 0, 876),
     faction: Faction.US,
     initialYaw: Math.PI * 0.5,
   },
   a_shau_valley: {
     vehicleId: 'pbr_us_ashau_river',
-    position: new THREE.Vector3(80, 0, 110),
+    position: new THREE.Vector3(1188.9, 0, 1743.72),
     faction: Faction.US,
     initialYaw: 0,
   },

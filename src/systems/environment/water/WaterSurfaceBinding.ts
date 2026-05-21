@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import {
+  HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S,
+  HYDROLOGY_RIVER_NORMAL_REPEAT_ALONG_M,
+  HYDROLOGY_RIVER_NORMAL_SCALE,
   installHydrologyRiverFlowPatch,
   type HydrologyRiverShaderRefs,
 } from './HydrologyRiverFlowPatch';
@@ -130,6 +133,7 @@ export class WaterSurfaceBinding {
   private shaderRefs?: GlobalWaterShaderRefs;
   private terrainHeightBinding: WaterTerrainHeightSamplerBinding | null = null;
   private hydrologyRiverRefs?: HydrologyRiverShaderRefs;
+  private hydrologyRiverMaterial?: THREE.MeshStandardMaterial;
   private readonly waterEdgeFoamUniforms: WaterEdgeFoamUniforms = {
     terrainHeightmap: { value: null },
     terrainHeightWorldSize: { value: 1 },
@@ -187,6 +191,12 @@ export class WaterSurfaceBinding {
    * loads. Replaces any prior install (river surface rebuilds material).
    */
   installRiverFlowPatch(material: THREE.MeshStandardMaterial, initialNormalMap: THREE.Texture | null): HydrologyRiverShaderRefs {
+    this.hydrologyRiverMaterial = material;
+    if (initialNormalMap) {
+      material.normalMap = initialNormalMap;
+      material.normalScale.set(HYDROLOGY_RIVER_NORMAL_SCALE, HYDROLOGY_RIVER_NORMAL_SCALE);
+      material.needsUpdate = true;
+    }
     const refs = installHydrologyRiverFlowPatch(material, initialNormalMap);
     this.hydrologyRiverRefs = refs;
     return refs;
@@ -198,12 +208,28 @@ export class WaterSurfaceBinding {
     this.hydrologyRiverRefs.uTime.value += deltaTime;
     if (normalMap && this.hydrologyRiverRefs.uRiverNormalMap.value !== normalMap) {
       this.hydrologyRiverRefs.uRiverNormalMap.value = normalMap;
+      if (this.hydrologyRiverMaterial) {
+        this.hydrologyRiverMaterial.normalMap = normalMap;
+        this.hydrologyRiverMaterial.normalScale.set(HYDROLOGY_RIVER_NORMAL_SCALE, HYDROLOGY_RIVER_NORMAL_SCALE);
+        this.hydrologyRiverMaterial.needsUpdate = true;
+      }
+    }
+    // WebGPU does not reliably honor the classic onBeforeCompile flow patch
+    // path yet, but MeshStandardMaterial still uses the bound normalMap.
+    // Scroll the shared river UVs along their local flow axis so the surface
+    // keeps moving in both WebGPU and WebGL renderers.
+    if (normalMap) {
+      normalMap.offset.y -= deltaTime
+        * HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S
+        / Math.max(0.001, HYDROLOGY_RIVER_NORMAL_REPEAT_ALONG_M);
+      normalMap.offset.x += deltaTime * 0.006;
     }
   }
 
   /** Drop the captured river refs when the river surface is torn down. */
   clearRiverFlowPatch(): void {
     this.hydrologyRiverRefs = undefined;
+    this.hydrologyRiverMaterial = undefined;
   }
 
   /**

@@ -89,9 +89,11 @@ export function createSampan(
  * M48 spawn snaps to terrain height.
  *
  * Coordinate rationale:
- *   - `open_frontier`: hydrology channel cuts diagonally across the
- *     16x16 km map. (-200, 0, 100) lies in a typical channel mid-segment
- *     on the seeded layout; the resolver snap handles the rest.
+ *   - `open_frontier`: (-324, 0, 384) is the midpoint sample on the
+ *     highest-accumulation seeded hydrology channel in
+ *     `open_frontier-42-hydrology.json`. The old (-200, 0, 100) anchor
+ *     was hundreds of meters off the actual ribbon, so the hull could
+ *     silently fall back to terrain.
  *   - `a_shau_valley`: (-6895, 0, 4835) lies on the largest hydrology
  *     channel in the A Shau bake (accumulation 32944 cells; channel
  *     length 21.6 km). The point is deterministic, NVA-friendly
@@ -110,7 +112,7 @@ export const SAMPAN_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', {
 }> = {
   open_frontier: {
     vehicleId: 'sampan_open_frontier_river',
-    position: new THREE.Vector3(-200, 0, 100),
+    position: new THREE.Vector3(-324, 0, 384),
     faction: Faction.VC,
     initialYaw: Math.PI * 0.5,
   },

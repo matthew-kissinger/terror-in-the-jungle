@@ -30,16 +30,15 @@ describe('large-map hydrology runtime configuration', () => {
 });
 
 describe('global water plane decouple flag', () => {
-  // The SystemManager routes `globalWaterPlaneEnabled ?? waterEnabled` into
+  // The SystemManager routes `globalWaterPlaneEnabled === true` into
   // `WaterSystem.setEnabled()`. These tests document the resolution intent at
-  // the config level so a future agent can't accidentally re-couple the
+  // the config level so a future agent can't accidentally re-couple the old
   // global sea-level plane to the high-level "water exists in scenario" flag.
   function resolveGlobalPlaneEnabled(config: {
     waterEnabled?: boolean;
     globalWaterPlaneEnabled?: boolean;
   }): boolean {
-    const waterEnabled = config.waterEnabled !== false;
-    return config.globalWaterPlaneEnabled ?? waterEnabled;
+    return config.globalWaterPlaneEnabled === true;
   }
 
   it('A Shau renders water without the sea-level global plane', () => {
@@ -51,20 +50,19 @@ describe('global water plane decouple flag', () => {
     expect(resolveGlobalPlaneEnabled(A_SHAU_VALLEY_CONFIG)).toBe(false);
   });
 
-  it('Open Frontier keeps the legacy default (global plane on by default)', () => {
-    // OF did not set either flag prior to this cycle; it should keep both
-    // the global plane and the hydrology river rendering as today.
-    expect(OPEN_FRONTIER_CONFIG.globalWaterPlaneEnabled).toBeUndefined();
-    expect(resolveGlobalPlaneEnabled(OPEN_FRONTIER_CONFIG)).toBe(true);
+  it('Open Frontier renders hydrology water without the legacy global plane', () => {
+    expect(OPEN_FRONTIER_CONFIG.waterEnabled).toBe(true);
+    expect(OPEN_FRONTIER_CONFIG.globalWaterPlaneEnabled).toBe(false);
+    expect(resolveGlobalPlaneEnabled(OPEN_FRONTIER_CONFIG)).toBe(false);
   });
 
-  it('defaults global plane to the waterEnabled value when only waterEnabled is set', () => {
+  it('keeps the global plane off unless explicitly requested', () => {
     expect(resolveGlobalPlaneEnabled({ waterEnabled: false })).toBe(false);
-    expect(resolveGlobalPlaneEnabled({ waterEnabled: true })).toBe(true);
-    expect(resolveGlobalPlaneEnabled({})).toBe(true);
+    expect(resolveGlobalPlaneEnabled({ waterEnabled: true })).toBe(false);
+    expect(resolveGlobalPlaneEnabled({})).toBe(false);
   });
 
-  it('lets globalWaterPlaneEnabled override the waterEnabled default', () => {
+  it('allows an explicit legacy override for debug or ocean-specific work', () => {
     expect(
       resolveGlobalPlaneEnabled({ waterEnabled: true, globalWaterPlaneEnabled: false }),
     ).toBe(false);

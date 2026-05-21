@@ -18,7 +18,7 @@ interface WaterSystemAuditReport {
     worldSizeScaledPlane: boolean;
     modeWaterToggle: boolean;
     aShauGlobalWaterDisabled: boolean;
-    openFrontierUsesDefaultGlobalWater: boolean;
+    openFrontierGlobalWaterDisabled: boolean;
     openFrontierNoiseCarvesWaterAreas: boolean;
     aShauRiverPolylineAssetPresent: boolean;
     aShauRiverPolylineCount: number | null;
@@ -34,7 +34,7 @@ interface WaterSystemAuditReport {
     hydrologyRiverMeshConsumerPresent: boolean;
     hydrologyRiverMeshStartupWiringPresent: boolean;
     globalWaterPlaneSuppressedByHydrology: boolean;
-    hydrologyRiverNaturalMaterialProfilePresent: boolean;
+    hydrologyRiverLegibleMaterialProfilePresent: boolean;
     hydrologyRiverVertexColorGradientPresent: boolean;
     publicWaterQueryApiPresent: boolean;
     hydrologyWaterQuerySurfacePresent: boolean;
@@ -64,6 +64,9 @@ const SOURCE_PATHS = {
   hydrologyRuntimePreload: join(process.cwd(), 'src', 'core', 'ModeStartupPreparer.ts'),
   terrainMaterial: join(process.cwd(), 'src', 'systems', 'terrain', 'TerrainMaterial.ts'),
   terrainSurfaceRuntime: join(process.cwd(), 'src', 'systems', 'terrain', 'TerrainSurfaceRuntime.ts'),
+  hydrologyRiverSurface: join(process.cwd(), 'src', 'systems', 'environment', 'water', 'HydrologyRiverSurface.ts'),
+  hydrologyRiverGeometry: join(process.cwd(), 'src', 'systems', 'environment', 'water', 'HydrologyRiverGeometry.ts'),
+  waterSurfaceSampler: join(process.cwd(), 'src', 'systems', 'environment', 'water', 'WaterSurfaceSampler.ts'),
 };
 
 function timestampSlug(): string {
@@ -102,6 +105,9 @@ function main(): void {
   const hydrologyRuntimePreload = readText(SOURCE_PATHS.hydrologyRuntimePreload);
   const terrainMaterial = readText(SOURCE_PATHS.terrainMaterial);
   const terrainSurfaceRuntime = readText(SOURCE_PATHS.terrainSurfaceRuntime);
+  const hydrologyRiverSurface = readText(SOURCE_PATHS.hydrologyRiverSurface);
+  const hydrologyRiverGeometry = readText(SOURCE_PATHS.hydrologyRiverGeometry);
+  const waterSurfaceSampler = readText(SOURCE_PATHS.waterSurfaceSampler);
   const aShauRivers = readJson<{ rivers?: unknown[] }>(SOURCE_PATHS.aShauRivers);
   const hydrologyBakeManifest = readJson<{ entries?: unknown[] }>(SOURCE_PATHS.hydrologyBakeManifest);
 
@@ -112,10 +118,10 @@ function main(): void {
     cameraFollower: waterSystem.includes('this.water.position.x = this.camera.position.x')
       && waterSystem.includes('this.water.position.z = this.camera.position.z'),
     worldSizeScaledPlane: waterSystem.includes('safeWorld * 1.8'),
-    modeWaterToggle: systemManager.includes('config.waterEnabled !== false')
+    modeWaterToggle: systemManager.includes('config.waterEnabled === true')
       && gameModeTypes.includes('waterEnabled?: boolean'),
-    aShauGlobalWaterDisabled: aShauConfig.includes('waterEnabled: false'),
-    openFrontierUsesDefaultGlobalWater: !openFrontierConfig.includes('waterEnabled: false'),
+    aShauGlobalWaterDisabled: aShauConfig.includes('globalWaterPlaneEnabled: false'),
+    openFrontierGlobalWaterDisabled: openFrontierConfig.includes('globalWaterPlaneEnabled: false'),
     openFrontierNoiseCarvesWaterAreas: noiseHeightProvider.includes('waterNoise')
       && noiseHeightProvider.includes('riverNoise')
       && noiseHeightProvider.includes('height = -3'),
@@ -140,40 +146,41 @@ function main(): void {
       && terrainSurfaceRuntime.includes('THREE.LinearFilter')
       && terrainMaterial.includes('hydrologyMask.wetStrength ?? 0.08')
       && terrainMaterial.includes('hydrologyMask.channelStrength ?? 0.14')
-      && terrainMaterial.includes('secondaryBlend = clamp(1.0 - hydrologyWeight'),
+      && terrainMaterial.includes('secondaryBlend: tslMix(secondaryBlend, tslClamp(tslFloat(1).sub(hydrologyWeight)'),
     hydrologyRiverMeshConsumerPresent: waterSystem.includes('setHydrologyChannels')
-      && waterSystem.includes('buildHydrologyRiverGeometry')
-      && waterSystem.includes('hydrology-river-surfaces'),
+      && hydrologyRiverSurface.includes('buildHydrologyRiverGeometry')
+      && hydrologyRiverSurface.includes('hydrology-river-surfaces'),
     hydrologyRiverMeshStartupWiringPresent: hydrologyRuntimePreload.includes('waterSystem.setHydrologyChannels')
       && hydrologyRuntimePreload.includes('hydrologyBake?.artifact'),
     globalWaterPlaneSuppressedByHydrology: waterSystem.includes('isGlobalWaterPlaneActive()')
-      && waterSystem.includes('!this.hydrologyRiverGroup')
+      && waterSystem.includes('!this.riverSurface.isActive()')
       && waterSystem.includes('updateGlobalWaterVisibility()'),
-    hydrologyRiverNaturalMaterialProfilePresent: waterSystem.includes('HYDROLOGY_RIVER_MATERIAL_PROFILE')
-      && waterSystem.includes("'natural_channel_gradient'")
-      && waterSystem.includes('emissiveIntensity: 0.02')
-      && waterSystem.includes('opacity: 0.55'),
-    hydrologyRiverVertexColorGradientPresent: waterSystem.includes("geometry.setAttribute('color'")
-      && waterSystem.includes('pushHydrologyRiverColor(colors, centerColor, HYDROLOGY_RIVER_CENTER_ALPHA)')
-      && waterSystem.includes('HYDROLOGY_RIVER_CENTER_ALPHA')
-      && waterSystem.includes('vertexColors: true'),
+    hydrologyRiverLegibleMaterialProfilePresent: hydrologyRiverSurface.includes('HYDROLOGY_RIVER_MATERIAL_PROFILE')
+      && hydrologyRiverSurface.includes("'legible_hydrology_river'")
+      && hydrologyRiverSurface.includes('emissive: 0x021a24')
+      && hydrologyRiverSurface.includes('roughness: 0.08')
+      && hydrologyRiverSurface.includes('opacity: 0.96'),
+    hydrologyRiverVertexColorGradientPresent: hydrologyRiverGeometry.includes("geometry.setAttribute('color'")
+      && hydrologyRiverGeometry.includes('HYDROLOGY_RIVER_CROSS_SECTION')
+      && hydrologyRiverGeometry.includes('resolveCrossSectionColor')
+      && hydrologyRiverGeometry.includes('HYDROLOGY_RIVER_CENTER_ALPHA')
+      && hydrologyRiverSurface.includes('vertexColors: true'),
     publicWaterQueryApiPresent: waterSystem.includes('isUnderwater(position: THREE.Vector3)')
       && waterSystem.includes('getWaterSurfaceY(position: THREE.Vector3): number | null')
       && waterSystem.includes('getWaterDepth(position: THREE.Vector3): number'),
-    hydrologyWaterQuerySurfacePresent: waterSystem.includes('hydrologyWaterQuerySegments')
-      && waterSystem.includes('getHydrologyWaterSurfaceY')
-      && waterSystem.includes('startSurfaceY')
-      && waterSystem.includes('halfWidth'),
+    hydrologyWaterQuerySurfacePresent: waterSurfaceSampler.includes('sampleHydrology')
+      && waterSurfaceSampler.includes('startSurfaceY')
+      && waterSurfaceSampler.includes('halfWidth'),
     waterQueryTestCoveragePresent: waterSystemTest.includes('reports global water surface and depth while the global plane is active')
       && waterSystemTest.includes('getWaterSurfaceY(new THREE.Vector3(5, 1, 0))')
       && waterSystemTest.includes('getWaterDepth(new THREE.Vector3(5, 1, 0))'),
     waterInteractionSampleApiPresent: waterSystem.includes('sampleWaterInteraction(')
-      && waterSystem.includes('WaterInteractionSample')
-      && waterSystem.includes('buoyancyScalar')
-      && waterSystem.includes("source: WaterSurfaceSource"),
+      && waterSurfaceSampler.includes('WaterInteractionSample')
+      && waterSurfaceSampler.includes('buoyancyScalar')
+      && waterSurfaceSampler.includes("source: WaterSurfaceSource"),
     waterInteractionSampleTestCoveragePresent: waterSystemTest.includes('sampleWaterInteraction(new THREE.Vector3(45, -0.5, -20)')
       && waterSystemTest.includes("expect(sample.source).toBe('hydrology')")
-      && waterSystemTest.includes('expect(sample.buoyancyScalar).toBeCloseTo(0.425, 5)'),
+      && waterSystemTest.includes('expect(sample.buoyancyScalar).toBeCloseTo(0.675, 5)'),
   };
 
   const missingCore = [
@@ -192,13 +199,13 @@ function main(): void {
     currentContract,
     findings: [
       currentContract.globalWaterPlane && currentContract.cameraFollower
-        ? 'Current runtime water is a camera-following global plane at sea level, not a map-space river or stream network.'
+        ? 'The legacy camera-following global plane still exists as an opt-in fallback, but current accepted river modes disable it and use hydrology river surfaces.'
         : 'Current runtime water contract could not be fully identified from source.',
       currentContract.aShauGlobalWaterDisabled
         ? 'A Shau correctly disables the global water plane because the map needs streams, not a sea-level sheet through the DEM.'
         : 'A Shau global-water disable was not found.',
-      currentContract.openFrontierUsesDefaultGlobalWater && currentContract.openFrontierNoiseCarvesWaterAreas
-        ? 'Open Frontier currently combines procedural negative-height water areas with the default global water plane; it does not own a stable river graph.'
+      currentContract.openFrontierGlobalWaterDisabled && currentContract.openFrontierNoiseCarvesWaterAreas
+        ? 'Open Frontier no longer inherits the global sea-level plane; accepted water is the hydrology river surface, while old procedural carved areas remain terrain until explicitly covered by hydrology.'
         : 'Open Frontier water assumptions need review before hydrology-backed rendering.',
       currentContract.aShauRiverPolylineAssetPresent
         ? currentContract.hydrologyRiverMeshConsumerPresent
@@ -209,12 +216,12 @@ function main(): void {
         ? currentContract.hydrologyDefaultModePreloadPresent
           ? currentContract.hydrologyDefaultModeBiomeClassificationPresent && currentContract.hydrologyTerrainMaterialMaskPresent
             ? currentContract.hydrologyRiverMeshConsumerPresent && currentContract.hydrologyRiverMeshStartupWiringPresent
-              ? currentContract.hydrologyRiverNaturalMaterialProfilePresent
+              ? currentContract.hydrologyRiverLegibleMaterialProfilePresent
                 && currentContract.hydrologyRiverVertexColorGradientPresent
                 && currentContract.hydrologyTerrainMaterialFeatheredMaskPresent
                 && currentContract.globalWaterPlaneSuppressedByHydrology
-                ? 'The hydrology bake manifest, typed loader, default large-map vegetation classifier, feathered terrain material mask, bank-to-channel river material consumer, and global-water suppression on hydrology maps are wired; final stream visuals still need browser proof and human acceptance.'
-                : 'The hydrology bake manifest, typed loader, default large-map vegetation classifier, terrain material mask, and provisional river-strip water consumer are wired; final stream visuals still need browser proof and human acceptance.'
+                ? 'The hydrology bake manifest, typed loader, default large-map vegetation classifier, feathered terrain material mask, bank-to-channel river material consumer, and global-water suppression on hydrology maps are wired; current river visuals have browser proof, while human game-feel acceptance and final WebGPU water art remain release-signoff work.'
+                : 'The hydrology bake manifest, typed loader, default large-map vegetation classifier, terrain material mask, and basic river-strip water consumer are wired; current visuals still need the full material/shoreline profile before art acceptance.'
               : 'The hydrology bake manifest, typed loader, default large-map vegetation classifier, and terrain material mask consumer are wired; runtime water remains the global-plane/fallback contract.'
             : 'The hydrology bake manifest and typed loader are wired by default for large maps, but vegetation/material consumers need review.'
           : currentContract.hydrologyFeatureGatedPreloadPresent
@@ -231,12 +238,12 @@ function main(): void {
     ],
     nextBranchRequirements: [
       'Keep WaterSystem as the global ocean/lake fallback; hydrology river surfaces must remain a separate map-space consumer, not a clipped/scaled global plane.',
-      'Treat hydrology river strips as provisional until matched Open Frontier/A Shau browser screenshots and perf captures pass.',
+      'Keep matched Open Frontier/A Shau screenshot packets and runtime proof paired with any river visual change; rerun the water polish capture and check:water-runtime when this contract changes.',
       'Refine river mesh strips from accepted channel polylines instead of scaling or clipping the global water plane.',
       'Feed bank/wetness masks into route/trail crossings and water queries before final ecology acceptance.',
       'Route future gameplay consumers through WaterSystem queries instead of reintroducing simple y<0 water-contact assumptions.',
       'Route first buoyancy, swimming, wading, and watercraft prototypes through WaterSystem.sampleWaterInteraction before adding force/application code.',
-      'Require matched Open Frontier/A Shau screenshots and clean perf captures before accepting runtime river visuals.',
+      'Require human playtest acceptance plus perf coverage before promoting the current playable river surface to release-final water art.',
     ],
     nonClaims: [
       currentContract.publicWaterQueryApiPresent && currentContract.hydrologyWaterQuerySurfacePresent

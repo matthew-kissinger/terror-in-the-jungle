@@ -15,6 +15,7 @@ import type { PreparedHeightmapGrid, PreparedTerrainSource } from '../systems/te
 import { loadHydrologyBakeForMode } from '../systems/terrain/hydrology/HydrologyBakeManifest';
 import type { LoadedHydrologyBake } from '../systems/terrain/hydrology/HydrologyBakeManifest';
 import type { HydrologyBiomePolicy } from '../systems/terrain/hydrology/HydrologyBiomeClassifier';
+import { compileHydrologyTerrainFeatures } from '../systems/terrain/hydrology/HydrologyTerrainFeatures';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
 import { resolveGameAssetUrl } from './GameAssetManifest';
@@ -127,11 +128,19 @@ export function compileStartupTerrainFeatures(
     config,
     (x, z) => heightCache.getHeightAt(x, z),
   );
+  const hydrologyFeatures = compileHydrologyTerrainFeatures(
+    preparedTerrainSource.hydrologyBake?.artifact ?? null,
+  );
+  compiledFeatures.stamps.push(...hydrologyFeatures.stamps);
+  compiledFeatures.vegetationExclusionZones.push(...hydrologyFeatures.vegetationExclusionZones);
+  compiledFeatures.stamps.sort((a, b) => a.priority - b.priority);
   markStartup(`${telemetryPrefix}.features.end`);
   markStartup(`${telemetryPrefix}.stats.stamps-${compiledFeatures.stamps.length}`);
   markStartup(`${telemetryPrefix}.stats.surface-patches-${compiledFeatures.surfacePatches.length}`);
   markStartup(`${telemetryPrefix}.stats.exclusion-zones-${compiledFeatures.vegetationExclusionZones.length}`);
   markStartup(`${telemetryPrefix}.stats.flow-paths-${compiledFeatures.flowPaths.length}`);
+  markStartup(`${telemetryPrefix}.stats.hydrology-stamps-${hydrologyFeatures.stamps.length}`);
+  markStartup(`${telemetryPrefix}.stats.hydrology-exclusion-zones-${hydrologyFeatures.vegetationExclusionZones.length}`);
 
   if (compiledFeatures.stamps.length > 0) {
     markStartup(`${telemetryPrefix}.stamped-provider.begin`);
@@ -395,6 +404,8 @@ async function configureTerrainAndNavigation(
   terrainSystem.setHydrologyBake(hydrologyBake);
   terrainSystem.setHydrologyBiomePolicy(resolveHydrologyBiomePolicy(config));
   engine.systemManager.waterSystem.setHydrologyChannels(hydrologyBake?.artifact ?? null);
+  engine.systemManager.minimapSystem.setHydrologyChannels(hydrologyBake?.artifact.channelPolylines ?? null);
+  engine.systemManager.fullMapSystem.setHydrologyChannels(hydrologyBake?.artifact.channelPolylines ?? null);
 
   // VODA-2 swim/breath: wire the WaterSystem into the player so head
   // submersion flips PlayerMovement into swim mode + drives the breath
