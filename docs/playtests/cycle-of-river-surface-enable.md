@@ -1,5 +1,21 @@
 # Playtest: cycle-of-river-surface-enable
 
+> **Superseded by the 2026-05-21 `water-hydrology-polish` doctor pass**
+> (PRs [#313](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/313)
+> / [#314](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/314)
+> / [#315](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/315)).
+> The polish pass disabled the global sea-level plane for Open Frontier
+> (`globalWaterPlaneEnabled: false`), made hydrology river surfaces the
+> accepted OF / A Shau water path, and regenerated the post-capture
+> evidence at `summary-of-water-post.json` with
+> `riverSurface.visible: true, source: "hydrology"`. The body below
+> still reads against the pre-supersede plan, which assumed both the
+> global plane AND the hydrology ribbon would render. The current
+> acceptance criteria live in
+> [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md) (search for
+> `cycle-of-river-surface-enable`) and are hydrology-first. Treat the
+> sections below as historical context, not active acceptance.
+
 Cycle: `cycle-of-river-surface-enable` (campaign position #2 of 3,
 2026-05-20 vehicle-boarding-and-water parallel campaign)
 Task slug: `of-water-playtest-evidence` (R2, merge gate)
