@@ -1,6 +1,6 @@
 {
   "name": "terror-in-the-jungle",
-  "description": "Browser-based combined-arms Vietnam-theater FPS/RTS sandbox built on Three.js + WebGPU/TSL, with materialization-tiered combat architected for ~3,000 NPCs.",
+  "description": "Browser-based combined-arms Vietnam-theater FPS/RTS sandbox built on Three.js + WebGPU/TSL — infantry, ground vehicles, helicopters (UH-1 Huey, AH-1 Cobra), and fixed-wing aircraft (A-1 Skyraider, F-4 Phantom, AC-47 Spooky) in a single runtime, with materialization-tiered combat architected for ~3,000 NPCs.",
   "keywords": [
     "threejs",
     "webgpu",
@@ -9,6 +9,10 @@
     "fps",
     "rts",
     "combined-arms",
+    "aviation",
+    "helicopters",
+    "fixed-wing",
+    "vehicles",
     "browser-game",
     "real-terrain",
     "recast-navigation"

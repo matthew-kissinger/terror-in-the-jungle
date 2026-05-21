@@ -385,17 +385,26 @@ flat terrain/data boundaries, and cloud texture resolution, blocky puffs,
 weather layering, cloud shadows/occlusion, and possible Pixel Forge or authored
 weather assets remain open for the next atmosphere pass.
 
-The KONVEYER water/hydrology review has begun as a bridge into VODA rather
-than as a closure claim. `npm run check:hydrology-bakes` passes. Source audit
-`artifacts/perf/2026-05-11T21-33-05-844Z/projekt-143-water-system-audit/water-system-audit.json`
-records current wiring as WARN because the shader/art/consumer work is still
-unfinished. Runtime proof
-`artifacts/perf/2026-05-11T21-33-31-662Z/projekt-143-water-runtime-proof/water-runtime-proof.json`
+The water/hydrology contract was corrected on 2026-05-21 after visual review
+showed that "visible strips" and the old global sea-level plane were misleading
+acceptance targets. Current river-bearing modes use hydrology river surfaces;
+the legacy global plane is opt-in only and disabled in Open Frontier and A
+Shau. Runtime terrain startup now adds hydrology riverbed flatten stamps and
+vegetation exclusion zones so water sits in a carved bed instead of over
+unchanged jungle ground. The shared river path now profiles noisy terrain
+samples into a continuous downstream grade before both terrain stamps and the
+water ribbon consume it, removing the Open Frontier stepped-water artifact
+found in the first visual pass. `npm run check:hydrology-bakes` passes, and
+runtime proof
+`artifacts/perf/2026-05-21T00-27-21-410Z/projekt-143-water-runtime-proof/water-runtime-proof.json`
 passes in Open Frontier and A Shau: hydrology river meshes are present,
 channel queries resolve, and `WaterSystem.sampleWaterInteraction` reports
-hydrology-backed `depth`, `immersion01`, and `buoyancyScalar` samples. Visual
-acceptance is still open; the proof screenshots show Open Frontier washed out
-around isolated river strips and A Shau still very dark/matte.
+hydrology-backed samples. Visual acceptance is improved but not final art:
+the browser proof and
+`artifacts/water-hydrology-polish/2026-05-21T00-18-53-086Z/loaded-terrain-visual/`
+show river-scale channels, loaded-terrain camera placement, map water overlays,
+and boat discoverability, while human game-feel acceptance, shoreline fine art,
+and a future WebGPU/TSL water material remain next polish work.
 
 Visual review also identified the `tall-grass.webp` source tile as too bright
 and saturated for the Vietnam jungle palette. Candidate local palette artifacts
