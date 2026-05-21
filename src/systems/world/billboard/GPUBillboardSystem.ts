@@ -195,6 +195,75 @@ export class GPUBillboardSystem {
     Logger.info('vegetation', `Cleared ${totalCleared} vegetation instances`);
   }
 
+  clearInstancesInZones(zones: ReadonlyArray<{ x: number; z: number; radius: number }>): void {
+    if (zones.length === 0) return;
+
+    let totalCleared = 0;
+    const zoneCenters = zones.map(zone => ({
+      x: zone.x,
+      z: zone.z,
+      radius: zone.radius,
+      radiusSq: zone.radius * zone.radius,
+      center: new THREE.Vector2(zone.x, zone.z),
+    }));
+
+    this.chunkBounds.forEach((bounds, chunkKey) => {
+      const candidateZones = zoneCenters.filter(zone =>
+        bounds.distanceToPoint(zone.center) ** 2 <= zone.radiusSq
+      );
+      if (candidateZones.length === 0) return;
+
+      const chunkData = this.chunkInstances.get(chunkKey);
+      if (!chunkData) return;
+
+      chunkData.forEach((indices, type) => {
+        const vegetation = this.vegetationTypes.get(type);
+        if (!vegetation) return;
+
+        const positions = vegetation.getInstancePositions();
+        const indicesToRemove: number[] = [];
+        const remainingIndices: number[] = [];
+
+        for (const index of indices) {
+          const i3 = index * 3;
+          const x = positions[i3];
+          const z = positions[i3 + 2];
+          let inZone = false;
+          for (const zone of candidateZones) {
+            const dx = x - zone.x;
+            const dz = z - zone.z;
+            if (dx * dx + dz * dz <= zone.radiusSq) {
+              inZone = true;
+              break;
+            }
+          }
+          if (inZone) {
+            indicesToRemove.push(index);
+          } else {
+            remainingIndices.push(index);
+          }
+        }
+
+        if (indicesToRemove.length > 0) {
+          vegetation.removeInstances(indicesToRemove);
+          totalCleared += indicesToRemove.length;
+          if (remainingIndices.length === 0) {
+            chunkData.delete(type);
+          } else {
+            chunkData.set(type, remainingIndices);
+          }
+        }
+      });
+
+      if (chunkData.size === 0) {
+        this.chunkInstances.delete(chunkKey);
+        this.chunkBounds.delete(chunkKey);
+      }
+    });
+
+    Logger.info('vegetation', `Cleared ${totalCleared} vegetation instances across ${zones.length} exclusion zones`);
+  }
+
   dispose(): void {
     this.vegetationTypes.forEach(vegetation => vegetation.dispose());
     this.vegetationTypes.clear();

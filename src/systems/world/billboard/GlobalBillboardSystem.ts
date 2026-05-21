@@ -134,9 +134,7 @@ export class GlobalBillboardSystem implements GameSystem {
 
   setExclusionZones(zones: TerrainExclusionZone[]): void {
     this.exclusionZones = zones.map((zone) => ({ x: zone.x, z: zone.z, radius: zone.radius }));
-    for (const zone of this.exclusionZones) {
-      this.clearVegetationInArea(zone.x, zone.z, zone.radius);
-    }
+    this.gpuSystem.clearInstancesInZones(this.exclusionZones);
   }
 
   private clearVegetationInArea(x: number, z: number, radius: number): void {

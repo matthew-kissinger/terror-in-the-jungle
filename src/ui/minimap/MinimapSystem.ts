@@ -11,6 +11,7 @@ import { isMobileViewport } from '../../utils/DeviceDetector';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
+import type { HydrologyChannelPolyline } from '../../systems/terrain/hydrology/HydrologyBake';
 
 // Reusable scratch vectors to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -44,6 +45,7 @@ export class MinimapSystem implements GameSystem {
   private vehicleMarkers: VehicleMarker[] = [];
   private vehicleSource?: MinimapVehicleSource;
   private terrainFlowPaths: TerrainFlowPath[] = [];
+  private hydrologyChannels: HydrologyChannelPolyline[] = [];
   private mapIntelPolicy: MapIntelPolicyConfig = {
     tacticalRangeOverride: null,
     showStrategicAgentsOnMinimap: false,
@@ -253,6 +255,10 @@ export class MinimapSystem implements GameSystem {
     this.terrainFlowPaths = paths.slice();
   }
 
+  setHydrologyChannels(channels: readonly HydrologyChannelPolyline[] | null): void {
+    this.hydrologyChannels = channels ? channels.slice() : [];
+  }
+
   setMapIntelPolicy(policy: MapIntelPolicyConfig): void {
     this.mapIntelPolicy = { ...policy };
   }
@@ -280,6 +286,7 @@ export class MinimapSystem implements GameSystem {
       vehicleMarkers: this.vehicleMarkers,
       mapIntelPolicy: this.mapIntelPolicy,
       terrainFlowPaths: this.terrainFlowPaths,
+      hydrologyChannels: this.hydrologyChannels,
     });
   }
 

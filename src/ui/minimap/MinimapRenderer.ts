@@ -6,6 +6,7 @@ import { Faction, isBlufor } from '../../systems/combat/types';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
+import type { HydrologyChannelPolyline } from '../../systems/terrain/hydrology/HydrologyBake';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -60,6 +61,7 @@ type MinimapRenderState = {
   vehicleMarkers?: VehicleMarker[];
   mapIntelPolicy?: MapIntelPolicyConfig;
   terrainFlowPaths?: TerrainFlowPath[];
+  hydrologyChannels?: HydrologyChannelPolyline[];
 };
 
 type MinimapPosition = {
@@ -76,6 +78,7 @@ export function renderMinimap(state: MinimapRenderState): void {
 
   drawGrid(ctx, size, renderScale);
   drawTerrainFlowPaths(ctx, state, renderScale);
+  drawHydrologyChannels(ctx, state, renderScale);
 
   if (state.zoneQuery) {
     const zones = state.zoneQuery.getAllZones();
@@ -93,6 +96,63 @@ export function renderMinimap(state: MinimapRenderState): void {
 
   drawPlayer(ctx, size, renderScale);
   drawViewCone(ctx, state.camera, size, renderScale);
+}
+
+function drawHydrologyChannels(
+  ctx: CanvasRenderingContext2D,
+  state: MinimapRenderState,
+  renderScale: number,
+): void {
+  if (!state.hydrologyChannels || state.hydrologyChannels.length === 0) return;
+
+  const scale = state.size / state.worldSize;
+  const maxAccumulation = Math.max(
+    1,
+    ...state.hydrologyChannels.map(channel => channel.maxAccumulationCells),
+  );
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (const channel of state.hydrologyChannels) {
+    if (channel.points.length < 2) continue;
+    const t = Math.min(1, Math.max(0, channel.maxAccumulationCells / maxAccumulation));
+    const width = Math.max(1.4 * renderScale, 1.8 * renderScale + 2.6 * renderScale * t);
+
+    ctx.strokeStyle = 'rgba(2, 65, 96, 0.78)';
+    ctx.lineWidth = width + 1.5 * renderScale;
+    strokeHydrologyChannel(ctx, state, scale, channel);
+
+    ctx.strokeStyle = 'rgba(36, 208, 223, 0.95)';
+    ctx.lineWidth = width;
+    strokeHydrologyChannel(ctx, state, scale, channel);
+  }
+
+  ctx.restore();
+}
+
+function strokeHydrologyChannel(
+  ctx: CanvasRenderingContext2D,
+  state: MinimapRenderState,
+  scale: number,
+  channel: HydrologyChannelPolyline,
+): void {
+  let started = false;
+  for (const point of channel.points) {
+    _flowPoint.set(point.x, 0, point.z);
+    const { x, y } = worldToMinimap(_flowPoint, state, scale);
+    if (!started) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      started = true;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  if (started) {
+    ctx.stroke();
+  }
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, size: number, renderScale: number): void {

@@ -24,6 +24,8 @@ import type { HelipadMarker } from '../minimap/MinimapRenderer';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
+import type { HydrologyChannelPolyline } from '../../systems/terrain/hydrology/HydrologyBake';
+import type { IVehicle } from '../../systems/vehicle/IVehicle';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -41,6 +43,16 @@ export type VehicleMarker = {
   vehicleType: string;
 };
 
+export interface FullMapVehicleSource {
+  getVehiclesByCategory(category: 'ground' | 'watercraft' | 'emplacement'): readonly IVehicle[];
+}
+
+const VEHICLE_MARKER_CATEGORIES: ReadonlyArray<'ground' | 'watercraft' | 'emplacement'> = [
+  'ground',
+  'watercraft',
+  'emplacement',
+];
+
 export class FullMapSystem implements GameSystem {
   private camera: THREE.Camera;
   private zoneQuery?: IZoneQuery;
@@ -50,7 +62,9 @@ export class FullMapSystem implements GameSystem {
   private terrainRuntime?: ITerrainRuntime;
   private helipadMarkers: HelipadMarker[] = [];
   private vehicleMarkers: VehicleMarker[] = [];
+  private vehicleSource?: FullMapVehicleSource;
   private terrainFlowPaths: TerrainFlowPath[] = [];
+  private hydrologyChannels: HydrologyChannelPolyline[] = [];
   private terrainBackdrop: HTMLCanvasElement | null = null;
   private terrainBackdropWorldSize = 0;
 
@@ -199,6 +213,10 @@ export class FullMapSystem implements GameSystem {
       }
     }
 
+    if (this.vehicleSource) {
+      this.refreshVehicleMarkers(this.vehicleSource);
+    }
+
     // Render map when visible
     if (this.isVisible) {
       this.render();
@@ -239,27 +257,15 @@ export class FullMapSystem implements GameSystem {
   }
 
   private autoFitView(): void {
-    // Calculate the optimal zoom to show all zones at readable size.
-    // Base rendering scale is MAP_SIZE / worldSize pixels per unit.
-    // We want ~1 px/unit minimum so zone radii (50-100 units) are visible.
-
-    const baseScale = MAP_SIZE / this.worldSize; // e.g. 0.038 for 21km
-
     if (this.worldSize > 5000) {
-      // Very large worlds: zoom so 1 world-unit ~ 0.5 px (shows ~1600m across canvas)
-      const targetPxPerUnit = 0.5;
-      const zoomLevel = Math.max(1.0, targetPxPerUnit / baseScale);
-      this.inputHandler.setZoomLevel(zoomLevel);
-
-      // Center pan on player position
-      const scale = MAP_SIZE / this.worldSize;
-      const px = (this.worldSize / 2 - this.playerPosition.x) * scale;
-      const py = (this.worldSize / 2 - this.playerPosition.z) * scale;
-      const panX = (MAP_SIZE / 2 - px) * zoomLevel;
-      const panY = (MAP_SIZE / 2 - py) * zoomLevel;
-      this.inputHandler.setPanOffset(panX, panY);
+      // Very large worlds must open as an overview. The previous player-
+      // centered auto-zoom made A Shau open at ~13x, hiding rivers, boats,
+      // and strategic context and making zoom-out painful on PC/mobile.
+      this.inputHandler.setZoomLevel(1.0);
+      this.inputHandler.resetPan();
     } else if (this.worldSize > BASE_WORLD_SIZE) {
       // Medium worlds (Open Frontier): fit entire world
+      const baseScale = MAP_SIZE / this.worldSize;
       const targetViewSize = MAP_SIZE * 0.8;
       const requiredScale = targetViewSize / this.worldSize;
       const zoomLevel = requiredScale / baseScale;
@@ -299,9 +305,9 @@ export class FullMapSystem implements GameSystem {
     ctx.translate(-size / 2, -size / 2);
 
     this.drawTerrainBackdrop(ctx);
-    // Draw grid
     this.drawGrid(ctx);
     this.drawTerrainFlowPaths(ctx);
+    this.drawHydrologyChannels(ctx);
 
     // Draw zones
     if (this.zoneQuery) {
@@ -461,6 +467,57 @@ export class FullMapSystem implements GameSystem {
     }
 
     ctx.restore();
+  }
+
+  private drawHydrologyChannels(ctx: CanvasRenderingContext2D): void {
+    if (this.hydrologyChannels.length === 0) {
+      return;
+    }
+
+    const scale = MAP_SIZE / this.worldSize;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const maxAccumulation = Math.max(
+      1,
+      ...this.hydrologyChannels.map(channel => channel.maxAccumulationCells),
+    );
+
+    for (const channel of this.hydrologyChannels) {
+      if (channel.points.length < 2) continue;
+      const t = Math.min(1, Math.max(0, channel.maxAccumulationCells / maxAccumulation));
+      const width = Math.max(2.5, (8 + 18 * t) * scale);
+
+      ctx.strokeStyle = 'rgba(2, 65, 96, 0.82)';
+      ctx.lineWidth = width + Math.max(2, 1.2 / this.inputHandler.getZoomLevel());
+      this.strokeHydrologyChannel(ctx, channel);
+
+      ctx.strokeStyle = 'rgba(36, 208, 223, 0.96)';
+      ctx.lineWidth = Math.max(1.25, width * 0.55);
+      this.strokeHydrologyChannel(ctx, channel);
+    }
+
+    ctx.restore();
+  }
+
+  private strokeHydrologyChannel(
+    ctx: CanvasRenderingContext2D,
+    channel: HydrologyChannelPolyline,
+  ): void {
+    const scale = MAP_SIZE / this.worldSize;
+    ctx.beginPath();
+    for (let i = 0; i < channel.points.length; i++) {
+      const point = channel.points[i];
+      const x = (this.worldSize / 2 - point.x) * scale;
+      const y = (this.worldSize / 2 - point.z) * scale;
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
   }
 
   private drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone): void {
@@ -650,12 +707,39 @@ export class FullMapSystem implements GameSystem {
     this.terrainFlowPaths = paths.slice();
   }
 
+  setHydrologyChannels(channels: readonly HydrologyChannelPolyline[] | null): void {
+    this.hydrologyChannels = channels ? channels.slice() : [];
+  }
+
   setHelipadMarkers(markers: HelipadMarker[]): void {
     this.helipadMarkers = markers;
   }
 
   setVehicleMarkers(markers: VehicleMarker[]): void {
     this.vehicleMarkers = markers;
+  }
+
+  setVehicleManager(source: FullMapVehicleSource | undefined): void {
+    this.vehicleSource = source;
+    if (!source) {
+      this.vehicleMarkers.length = 0;
+    }
+  }
+
+  private refreshVehicleMarkers(source: FullMapVehicleSource): void {
+    this.vehicleMarkers.length = 0;
+    for (const category of VEHICLE_MARKER_CATEGORIES) {
+      const vehicles = source.getVehiclesByCategory(category);
+      for (const vehicle of vehicles) {
+        if (vehicle.isDestroyed()) continue;
+        this.vehicleMarkers.push({
+          worldPos: vehicle.getPosition().clone(),
+          category,
+          faction: vehicle.faction,
+          vehicleType: vehicle.vehicleId,
+        });
+      }
+    }
   }
 
   private drawCommandMarker(ctx: CanvasRenderingContext2D): void {
