@@ -16,6 +16,7 @@ import type { LoadedHydrologyBake } from '../systems/terrain/hydrology/Hydrology
 import type { HydrologyBiomePolicy } from '../systems/terrain/hydrology/HydrologyBiomeClassifier';
 import { compileHydrologyTerrainFeatures } from '../systems/terrain/hydrology/HydrologyTerrainFeatures';
 import { composeTerrain } from '../systems/terrain/compositor/TerrainCompositor';
+import { setLastTerrainCompositorOutput } from '../systems/terrain/compositor/LastCompositorOutput';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
 import { resolveGameAssetUrl } from './GameAssetManifest';
@@ -138,6 +139,12 @@ export function compileStartupTerrainFeatures(
     hydrology: hydrologyFeatures,
     hydrologyArtifact: preparedTerrainSource.hydrologyBake?.artifact ?? null,
   });
+  // Surface the latest output to the dev-only Shift+\ → S compositor overlay
+  // (cycle-terrain-compositor R2.3). Production builds register the overlay
+  // factory under `import.meta.env.DEV` only, but the cache itself stays in a
+  // tiny standalone module so this static set does not pull mode-startup into
+  // every chunk that wants to read the result.
+  setLastTerrainCompositorOutput(composed);
 
   // Reassemble the full CompiledTerrainFeatureSet so downstream consumers
   // (TerrainSystem.setTerrainFeaturesAsync, minimap/fullmap flow paths)
