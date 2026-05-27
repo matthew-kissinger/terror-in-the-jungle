@@ -139,12 +139,14 @@ export function compileStartupTerrainFeatures(
     hydrology: hydrologyFeatures,
     hydrologyArtifact: preparedTerrainSource.hydrologyBake?.artifact ?? null,
   });
-  // Surface the latest output to the dev-only Shift+\ → S compositor overlay
-  // (cycle-terrain-compositor R2.3). Production builds register the overlay
-  // factory under `import.meta.env.DEV` only, but the cache itself stays in a
-  // tiny standalone module so this static set does not pull mode-startup into
-  // every chunk that wants to read the result.
-  setLastTerrainCompositorOutput(composed);
+  // Surface the latest output to the dev-only Shift+\ → J compositor overlay
+  // (cycle-terrain-compositor R2.3). Gated on `import.meta.env.DEV` so the
+  // production bundle does not hold a reference to the composed output via the
+  // module-level cache slot in `LastCompositorOutput.ts`. Vite tree-shakes the
+  // import along with the call site when `import.meta.env.DEV` is false.
+  if (import.meta.env.DEV) {
+    setLastTerrainCompositorOutput(composed);
+  }
 
   // Reassemble the full CompiledTerrainFeatureSet so downstream consumers
   // (TerrainSystem.setTerrainFeaturesAsync, minimap/fullmap flow paths)

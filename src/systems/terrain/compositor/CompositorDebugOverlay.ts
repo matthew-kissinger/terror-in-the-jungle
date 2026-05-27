@@ -2,7 +2,12 @@ import * as THREE from 'three';
 import type { WorldOverlay } from '../../../ui/debug/WorldOverlayRegistry';
 import type { TerrainStampConfig } from '../TerrainFeatureTypes';
 import type { IHeightProvider } from '../IHeightProvider';
-import { stampAABB, type AABB2D } from './TerrainStampConflictDetector';
+import {
+  ENVELOPE_RAMP_THRESHOLD_METERS,
+  stampAABB,
+  type AABB2D,
+} from './TerrainStampConflictDetector';
+import { HYDROLOGY_TERRAIN_PRIORITY } from '../hydrology/HydrologyTerrainFeatures';
 
 /**
  * R2.3 of cycle-terrain-compositor (memo:
@@ -19,12 +24,15 @@ import { stampAABB, type AABB2D } from './TerrainStampConflictDetector';
  *
  * Stamps from the compositor do not yet carry a domain "kind" annotation
  * (R1.3's annotations cover policy, not origin), so the overlay classifies by
- * the priority band each compiler ships:
- *   - hydrology priority is `40`              → blue
- *   - airfield rects + envelope (50…99)        → white
- *   - helipads + motor pools at priority 100   → orange
- *   - roads / flow routes (>= 110)             → green
- * Anything outside those bands falls back to white.
+ * shape + the same envelope-ramp heuristic the detector uses to compute AABBs:
+ *   - flatten_capsule with `gradeRadius - outerRadius >= 30`   → white (airfield envelope)
+ *   - flatten_capsule at the hydrology priority (40)           → blue (hydrology channel)
+ *   - other flatten_capsule                                    → green (route / flow stamp)
+ *   - flatten_circle                                           → orange (firebase / helipad / village anchor)
+ *
+ * This mirrors {@link stampAABB}'s `ENVELOPE_RAMP_THRESHOLD_METERS` check at
+ * TerrainStampConflictDetector.ts so the overlay and the detector always agree
+ * on which capsule is an airfield envelope.
  */
 
 const COLOR_AIRFIELD = 0xffffff;
@@ -37,7 +45,7 @@ const AABB_TOP_OFFSET_M = 50;
 const CONFLICT_LIFT_M = 0.5;
 const OVERLAY_ID = 'compositor-stamps';
 const OVERLAY_LABEL = 'Compositor Stamps';
-const OVERLAY_HOTKEY = 'S';
+const OVERLAY_HOTKEY = 'J';
 
 /**
  * Minimal shape the overlay needs from each conflict record. We accept the
@@ -128,12 +136,24 @@ export function createCompositorDebugOverlay(
   };
 }
 
-/** Test-only entry point that mirrors the overlay's classification logic. */
+/**
+ * Classify a stamp by (kind, envelope-ramp-width) so the overlay agrees with
+ * {@link stampAABB} on what counts as an airfield-envelope-class capsule. This
+ * replaces an earlier priority-band classifier that mis-labelled the airfield
+ * envelope (priority 30, below the hydrology band) and motor-pool / route
+ * stamps (priorities 56-60, both in the "airfield" band).
+ *
+ * Exported so the test suite can pin the classification rule.
+ */
 export function classifyStampColor(stamp: TerrainStampConfig): number {
-  if (stamp.priority < 50) return COLOR_HYDROLOGY;
-  if (stamp.priority < 100) return COLOR_AIRFIELD;
-  if (stamp.priority < 110) return COLOR_MOTORPOOL;
-  return COLOR_ROUTE;
+  if (stamp.kind === 'flatten_capsule') {
+    const rampWidth = stamp.gradeRadius - stamp.outerRadius;
+    if (rampWidth >= ENVELOPE_RAMP_THRESHOLD_METERS) return COLOR_AIRFIELD;
+    if (stamp.priority === HYDROLOGY_TERRAIN_PRIORITY) return COLOR_HYDROLOGY;
+    return COLOR_ROUTE;
+  }
+  // flatten_circle: firebase / helipad / motor-pool / village anchor.
+  return COLOR_MOTORPOOL;
 }
 
 function stampCenter(stamp: TerrainStampConfig): { x: number; z: number } {

@@ -7,11 +7,13 @@ import type {
 } from '../TerrainFeatureTypes';
 import type { IHeightProvider } from '../IHeightProvider';
 import {
+  classifyStampColor,
   createCompositorDebugOverlay,
   type CompositorDebugOverlaySource,
   type CompositorOverlayConflict,
 } from './CompositorDebugOverlay';
 import { stampAABB } from './TerrainStampConflictDetector';
+import { HYDROLOGY_TERRAIN_PRIORITY } from '../hydrology/HydrologyTerrainFeatures';
 
 function stubProvider(): IHeightProvider {
   return {
@@ -171,6 +173,49 @@ describe('CompositorDebugOverlay', () => {
     expect(conflictMatDisposed).toBe(true);
     expect(group.children).not.toContain(stampLines);
     expect(group.children).not.toContain(conflictLines);
+  });
+
+  describe('classifyStampColor', () => {
+    // The classifier must agree with the detector's envelope heuristic so the
+    // overlay's airfield-envelope wireframe matches the AABB the detector and
+    // resolver act on. Pin all four branches: envelope, hydrology, other
+    // capsule (route / flow), and circle (facility).
+    it('classifies envelope-class capsules distinctly from narrow capsules and circles', () => {
+      const envelope = capsule({ outerRadius: 8, gradeRadius: 60 });  // ramp 52, envelope-class
+      const hydrology = capsule({ outerRadius: 8, gradeRadius: 10, priority: HYDROLOGY_TERRAIN_PRIORITY });
+      const route = capsule({ outerRadius: 8, gradeRadius: 10, priority: 56 });
+      const facility = circle({ priority: 60 });
+
+      const envelopeColor = classifyStampColor(envelope);
+      const hydrologyColor = classifyStampColor(hydrology);
+      const routeColor = classifyStampColor(route);
+      const facilityColor = classifyStampColor(facility);
+
+      // All four categories must produce distinct colours so reviewers can
+      // tell airfield envelopes apart from hydrology channels in the wireframe.
+      const colors = new Set([envelopeColor, hydrologyColor, routeColor, facilityColor]);
+      expect(colors.size).toBe(4);
+    });
+
+    it('treats an OF airfield envelope-style capsule (low priority) as envelope, not hydrology', () => {
+      // Regression: airfield envelope stamps ship priority ~30 (basePriority -
+      // 20), below the old hydrology priority band. The old priority-band
+      // classifier coloured them as hydrology; the new heuristic uses ramp
+      // width and classifies them correctly.
+      const envelopeAtLowPriority = capsule({
+        outerRadius: 30,
+        gradeRadius: 78,  // ramp 48 m, matches AIRFIELD_ENVELOPE_GRADE_RAMP_M
+        priority: 30,
+      });
+      const hydrologyAtSamePriorityBand = capsule({
+        outerRadius: 8,
+        gradeRadius: 10,
+        priority: HYDROLOGY_TERRAIN_PRIORITY,
+      });
+      expect(classifyStampColor(envelopeAtLowPriority)).not.toBe(
+        classifyStampColor(hydrologyAtSamePriorityBand),
+      );
+    });
   });
 
   it('builds an empty stamp batch and no conflict batch when output is null', () => {

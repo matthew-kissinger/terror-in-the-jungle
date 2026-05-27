@@ -19,7 +19,8 @@
 //     and the padding-gap symptom (memo §Evidence) lives at the ramp edge.
 //     We classify by ramp width: gradeRadius - outerRadius >= 30 m is well
 //     past any hydrology channel's grade ramp (~8 m at typical river widths)
-//     and matches the airfield envelope's 90 m grade ramp.
+//     and matches the airfield envelope's 48 m grade ramp
+//     (TerrainFeatureCompiler.AIRFIELD_ENVELOPE_GRADE_RAMP_M).
 
 import type { TerrainStampConfig } from '../TerrainFeatureTypes';
 
@@ -44,9 +45,13 @@ export interface TerrainStampConflict {
 // Heuristic: a flatten_capsule whose grade ramp (gradeRadius - outerRadius)
 // is >= this many meters is treated as an airfield-envelope-class stamp and
 // has its AABB inflated by gradeRadius instead of outerRadius. The airfield
-// envelope ships a 90 m grade ramp; the widest hydrology grade ramp at
+// envelope ships a 48 m grade ramp (TerrainFeatureCompiler.ts
+// AIRFIELD_ENVELOPE_GRADE_RAMP_M); the widest hydrology grade ramp at
 // realistic river widths is < 15 m, so a 30 m threshold is unambiguous.
-const ENVELOPE_RAMP_THRESHOLD_METERS = 30;
+//
+// Exported for the dev-only compositor debug overlay (R2.3) so its colour
+// classifier can agree with the detector on what "envelope-class" means.
+export const ENVELOPE_RAMP_THRESHOLD_METERS = 30;
 
 export function stampAABB(stamp: TerrainStampConfig): AABB2D {
   if (stamp.kind === 'flatten_circle') {
