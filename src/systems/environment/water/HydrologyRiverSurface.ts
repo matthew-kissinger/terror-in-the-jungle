@@ -68,6 +68,16 @@ export interface HydrologyRiverSurfaceOptions {
  * `./HydrologyRiverGeometry`. The material is created here so the
  * `onMaterialReady` hook (provided by `WaterSystem` → `WaterSurfaceBinding`)
  * can install the `onBeforeCompile` patch before the mesh enters the scene.
+ *
+ * R2.2 of cycle-terrain-compositor: the artifact fed in via `setArtifact()`
+ * is the `waterSurfaceArtifact` from `TerrainCompositorOutput` — the Pass C
+ * re-anchored copy (river polyline elevations re-sampled against the
+ * composed provider). The river-Y bake at
+ * `point.elevationMeters + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS` inside
+ * `HydrologyRiverGeometry` is unchanged; the elevations being fed in are
+ * the fixed bit, so the mesh now sits on the actual composed ground over
+ * airfield/motor-pool overlaps. Navmesh + heightmap-bake consumers keep
+ * reading the original artifact via `TerrainSystem.setHydrologyBake()`.
  */
 export class HydrologyRiverSurface {
   private scene: THREE.Scene;

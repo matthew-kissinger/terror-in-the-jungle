@@ -68,10 +68,13 @@ export function compileHydrologyTerrainFeatures(
         priority: HYDROLOGY_TERRAIN_PRIORITY,
         // Hydrology bed cedes its target height to a higher-priority overlapping
         // stamp (airfield envelope, motor-pool flatten) when present; otherwise
-        // the baked `bedHeight` wins. R2.2 flips this to `sample_post_compose`
-        // once the hydrology feedback loop ships.
+        // the baked `bedHeight` wins. R2.2 flips the strategy to
+        // `sample_post_compose` so the compositor's Pass C feedback loop
+        // re-anchors river-surface elevations against the composed provider
+        // (memo §"Why this fixes both bugs"); navmesh + heightmap-bake
+        // consumers still see the original bedHeight in the input artifact.
         obstructionPolicy: 'consult',
-        targetHeightStrategy: 'baked',
+        targetHeightStrategy: 'sample_post_compose',
       });
 
       appendVegetationExclusionChain(
