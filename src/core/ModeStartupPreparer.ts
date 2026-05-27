@@ -15,6 +15,7 @@ import { loadHydrologyBakeForMode } from '../systems/terrain/hydrology/Hydrology
 import type { LoadedHydrologyBake } from '../systems/terrain/hydrology/HydrologyBakeManifest';
 import type { HydrologyBiomePolicy } from '../systems/terrain/hydrology/HydrologyBiomeClassifier';
 import { compileHydrologyTerrainFeatures } from '../systems/terrain/hydrology/HydrologyTerrainFeatures';
+import type { HydrologyBakeArtifact } from '../systems/terrain/hydrology/HydrologyBake';
 import { composeTerrain } from '../systems/terrain/compositor/TerrainCompositor';
 import { setLastTerrainCompositorOutput } from '../systems/terrain/compositor/LastCompositorOutput';
 import { Logger } from '../utils/Logger';
@@ -49,6 +50,16 @@ const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
 interface CompiledStartupTerrainFeatures {
   compiledFeatures: CompiledTerrainFeatureSet;
   preparedTerrainSource: PreparedTerrainSource;
+  /**
+   * Hydrology artifact for the water-surface mesh. After R2.2 this is the
+   * Pass C re-anchored copy (river polyline elevations re-sampled against
+   * the composed provider) when hydrology + recomposeHydrology are both
+   * on; otherwise it matches `preparedTerrainSource.hydrologyBake.artifact`
+   * (the original). Navmesh + heightmap bake consumers must continue to
+   * read the ORIGINAL artifact via `preparedTerrainSource.hydrologyBake`
+   * (memo §Risks "Navmesh desync").
+   */
+  waterSurfaceArtifact: HydrologyBakeArtifact | null;
 }
 
 function hydrologyPreloadEnabled(config: ReturnType<typeof getGameModeConfig>): boolean {
@@ -133,11 +144,18 @@ export function compileStartupTerrainFeatures(
     preparedTerrainSource.hydrologyBake?.artifact ?? null,
   );
 
+  // R2.2: enable Pass C (hydrology feedback) so the water-surface mesh
+  // rides on the composed terrain over airfield/motor-pool overlaps.
+  // The original hydrology artifact stays available via
+  // `preparedTerrainSource.hydrologyBake.artifact` for navmesh + heightmap
+  // bake consumers; only the water-surface consumer (HydrologyRiverSurface)
+  // reads `composed.waterSurfaceArtifact`.
   const composed = composeTerrain({
     baseProvider,
     features: featureCompile,
     hydrology: hydrologyFeatures,
     hydrologyArtifact: preparedTerrainSource.hydrologyBake?.artifact ?? null,
+    options: { recomposeHydrology: true },
   });
   // Surface the latest output to the dev-only Shift+\ → J compositor overlay
   // (cycle-terrain-compositor R2.3). Gated on `import.meta.env.DEV` so the
@@ -192,7 +210,11 @@ export function compileStartupTerrainFeatures(
     markStartup(`${telemetryPrefix}.stamps.none`);
   }
 
-  return { compiledFeatures, preparedTerrainSource };
+  return {
+    compiledFeatures,
+    preparedTerrainSource,
+    waterSurfaceArtifact: composed.waterSurfaceArtifact,
+  };
 }
 
 async function applyCompiledTerrainFeatures(
@@ -409,6 +431,7 @@ async function configureTerrainAndNavigation(
   engine: GameEngine,
   config: ReturnType<typeof getGameModeConfig>,
   preparedTerrainSource: PreparedTerrainSource,
+  waterSurfaceArtifact: HydrologyBakeArtifact | null,
 ): Promise<void> {
   markStartup(`engine-init.start-game.${config.id}.terrain-config.begin`);
   if (!engine.systemManager.navmeshSystem.isReady()) {
@@ -426,9 +449,18 @@ async function configureTerrainAndNavigation(
 
   const terrainSystem = engine.systemManager.terrainSystem;
   const hydrologyBake = preparedTerrainSource.hydrologyBake ?? null;
+  // Terrain, minimap, fullmap all consume the ORIGINAL artifact — they
+  // either back the navmesh / heightmap bake graph (where re-anchoring
+  // would corrupt navigation) or render schematic 2D channels where the
+  // base elevation is the right reference.
   terrainSystem.setHydrologyBake(hydrologyBake);
   terrainSystem.setHydrologyBiomePolicy(resolveHydrologyBiomePolicy(config));
-  engine.systemManager.waterSystem.setHydrologyChannels(hydrologyBake?.artifact ?? null);
+  // WaterSystem consumes the RECOMPOSED artifact so the river-surface mesh
+  // sits on the actual composed ground (memo §"Why this fixes both bugs":
+  // closes the OF water-on-walls bug at airfield + motor-pool overlaps).
+  // When recompose is disabled or no hydrology bake is present, this is
+  // identical to the original artifact.
+  engine.systemManager.waterSystem.setHydrologyChannels(waterSurfaceArtifact ?? hydrologyBake?.artifact ?? null);
   engine.systemManager.minimapSystem.setHydrologyChannels(hydrologyBake?.artifact.channelPolylines ?? null);
   engine.systemManager.fullMapSystem.setHydrologyChannels(hydrologyBake?.artifact.channelPolylines ?? null);
 
@@ -598,7 +630,12 @@ export async function prepareModeStartup(
 
   emitProgress('world', 0, 'Preparing world...');
   emitProgress('navmesh', 0, 'Loading navigation...');
-  await configureTerrainAndNavigation(engine, config, startupTerrain.preparedTerrainSource);
+  await configureTerrainAndNavigation(
+    engine,
+    config,
+    startupTerrain.preparedTerrainSource,
+    startupTerrain.waterSurfaceArtifact,
+  );
   emitProgress('world', 1, 'World ready');
   emitProgress('navmesh', 1, 'Navigation ready');
   await yieldToRenderer();
