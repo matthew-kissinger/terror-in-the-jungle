@@ -5,32 +5,35 @@ import type {
   TerrainStampConfig,
 } from '../TerrainFeatureTypes';
 import type { HydrologyBakeArtifact } from '../hydrology/HydrologyBake';
+import type { TerrainStampConflict } from './TerrainStampConflictDetector';
+
+// Re-export the real conflict type so downstream consumers (Mode startup,
+// telemetry, R2.3 debug overlay) import it from a single location.
+export type { TerrainStampConflict } from './TerrainStampConflictDetector';
+export type { TerrainStampPolicyResolution } from './TerrainStampPolicyResolver';
 
 /**
- * Input contract for {@link composeTerrain}. R1.1 is the foundation pass:
- * we accept the already-compiled outputs of the existing
+ * Input contract for {@link composeTerrain}.
+ *
+ * The compositor accepts the already-compiled outputs of the existing
  * {@link compileTerrainFeatures} (which itself folds in
  * {@link compileTerrainFlow}) and {@link compileHydrologyTerrainFeatures}
- * paths, then concat-and-sort byte-identically with the legacy logic in
- * {@link ../core/ModeStartupPreparer.compileStartupTerrainFeatures}.
- *
- * Later phases extend each {@link TerrainCompositorStampGroup} with
- * `obstructionPolicy` / `targetHeightStrategy` annotations (R1.3),
- * AABB conflict graphs (R1.2 / R2.1), and hydrology recomposition
- * (R2.2). The shape of this contract is stable from R1.1 forward.
+ * paths, then concat-and-sorts them in priority order. R2.1 wires a policy
+ * resolver that rewrites `fixedTargetHeight` on stamps whose
+ * `obstructionPolicy` / `targetHeightStrategy` annotations demand it.
  *
  * Design memo: docs/rearch/TERRAIN_COMPOSITOR_SPIKE_2026-05-27.md
  */
 export interface TerrainCompositorInput {
-  /** Base terrain provider — procedural noise (OF) or DEM (A Shau). */
+  /** Base terrain provider - procedural noise (OF) or DEM (A Shau). */
   baseProvider: IHeightProvider;
   /** Compiled feature set (airfields, motor pools, helipads, flow stamps, surface patches, flow paths). */
   features: CompiledTerrainFeatureSet;
   /** Compiled hydrology stamps + vegetation exclusions (or null when hydrology disabled). */
   hydrology: TerrainCompositorHydrologyInput | null;
-  /** Hydrology bake artifact (for the eventual Pass C feedback loop; passed through unchanged in R1.1). */
+  /** Hydrology bake artifact (for the eventual Pass C feedback loop; passed through unchanged until R2.2). */
   hydrologyArtifact: HydrologyBakeArtifact | null;
-  /** Behavior switches reserved for R2.x phases. R1.1 ignores all fields. */
+  /** Behavior switches. `strict` is reserved for downstream logging; the resolver behaves identically with or without it. */
   options?: TerrainCompositorOptions;
 }
 
@@ -40,21 +43,30 @@ export interface TerrainCompositorHydrologyInput {
 }
 
 export interface TerrainCompositorOptions {
-  /** R2.x: enable strict conflict resolution (fail on configuration errors). Ignored in R1.1. */
+  /**
+   * Reserved for downstream warn-level logging of configuration-error
+   * conflicts (e.g. a `never_above` motor-pool sitting inside a river bed).
+   * The resolver itself behaves identically regardless of strict mode.
+   */
   strict?: boolean;
-  /** R2.2: re-anchor hydrology elevations against the composed provider. Ignored in R1.1. */
+  /** R2.2: re-anchor hydrology elevations against the composed provider. Not consumed yet. */
   recomposeHydrology?: boolean;
 }
 
 /**
- * Output of {@link composeTerrain}. In R1.1 this is byte-identical to the
- * legacy concat-sort + {@link StampedHeightProvider} construction:
+ * Output of {@link composeTerrain}.
  *
- * - `stamps`: features.stamps ∪ hydrology.stamps, sorted ascending by priority.
- * - `vegetationExclusionZones`: features.vegetationExclusionZones ∪ hydrology.vegetationExclusionZones.
+ * - `stamps`: features.stamps union hydrology.stamps, sorted ascending by
+ *   priority, with `fixedTargetHeight` updated when the R2.1 resolver applied
+ *   a policy (`consult` / `never_above` / `never_below` / `override`).
+ * - `vegetationExclusionZones`: features.vegetationExclusionZones union
+ *   hydrology.vegetationExclusionZones.
  * - `composedProvider`: new StampedHeightProvider(base, stamps).
- * - `conflicts`: always empty (R1.2 owns AABB detection).
- * - `waterSurfaceArtifact`: input hydrologyArtifact passed through unchanged (R2.2 owns Pass C).
+ * - `conflicts`: every AABB overlap detected, each annotated with the
+ *   resolution the policy resolver chose (`unchanged` / `clamped` /
+ *   `resampled` / `overridden`).
+ * - `waterSurfaceArtifact`: input hydrologyArtifact passed through unchanged
+ *   in R2.1 (R2.2 owns Pass C - re-anchored river elevations).
  */
 export interface TerrainCompositorOutput {
   composedProvider: IHeightProvider;
@@ -63,9 +75,3 @@ export interface TerrainCompositorOutput {
   conflicts: TerrainStampConflict[];
   waterSurfaceArtifact: HydrologyBakeArtifact | null;
 }
-
-/**
- * Reserved for R1.2 (logging-only) and R2.1 (policy resolution). Empty in R1.1.
- * Fields will land in R1.2 — keep the type alias so consumers can import it now.
- */
-export type TerrainStampConflict = Record<string, never>;
