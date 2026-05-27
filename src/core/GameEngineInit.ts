@@ -12,6 +12,9 @@ import { createLosRayOverlay } from '../ui/debug/worldOverlays/losRayOverlay';
 import { createSquadInfluenceOverlay } from '../ui/debug/worldOverlays/squadInfluenceOverlay';
 import { createTerrainChunkOverlay } from '../ui/debug/worldOverlays/terrainChunkOverlay';
 import { createTerrainSeamOverlay } from '../ui/debug/worldOverlays/terrainSeamOverlay';
+import { createCompositorDebugOverlay } from '../systems/terrain/compositor/CompositorDebugOverlay';
+import { getLastTerrainCompositorOutput } from '../systems/terrain/compositor/LastCompositorOutput';
+import { detectStampConflicts } from '../systems/terrain/compositor/TerrainStampConflictDetector';
 import { WorldOverlayControlPanel } from '../ui/debug/WorldOverlayControlPanel';
 
 type StartGamePipeline = {
@@ -310,6 +313,29 @@ function wireWorldOverlays(engine: GameEngine): void {
     getActiveTiles: () => terrainSystem.getActiveTilesForDebug?.() ?? [],
     getHeightAt: (x, z) => (typeof terrainSystem.getHeightAt === 'function' ? terrainSystem.getHeightAt(x, z) : 0),
   }));
+
+  // R2.3 of cycle-terrain-compositor: dev-only overlay for stamp AABBs +
+  // conflict edges. Gated on `import.meta.env.DEV` so Vite tree-shakes the
+  // factory + its Three.js geometry helpers out of production bundles. Falls
+  // back to the R1.2 detector while the R2.1 resolver is still landing —
+  // either way the overlay reads a non-empty conflicts list from the latest
+  // compositor output.
+  if (import.meta.env.DEV) {
+    overlays.register(createCompositorDebugOverlay({
+      getOutput: () => {
+        const out = getLastTerrainCompositorOutput();
+        if (!out) return null;
+        const conflicts = out.conflicts.length > 0
+          ? (out.conflicts as unknown as ReturnType<typeof detectStampConflicts>)
+          : detectStampConflicts(out.stamps);
+        return {
+          stamps: out.stamps,
+          conflicts,
+          composedProvider: out.composedProvider,
+        };
+      },
+    }));
+  }
 
   engine.worldOverlayControlPanel = new WorldOverlayControlPanel(overlays);
   engine.debugHud.register(engine.worldOverlayControlPanel);
