@@ -66,6 +66,12 @@ export function compileHydrologyTerrainFeatures(
         fixedTargetHeight: bedHeight,
         heightOffset: 0,
         priority: HYDROLOGY_TERRAIN_PRIORITY,
+        // Hydrology bed cedes its target height to a higher-priority overlapping
+        // stamp (airfield envelope, motor-pool flatten) when present; otherwise
+        // the baked `bedHeight` wins. R2.2 flips this to `sample_post_compose`
+        // once the hydrology feedback loop ships.
+        obstructionPolicy: 'consult',
+        targetHeightStrategy: 'baked',
       });
 
       appendVegetationExclusionChain(

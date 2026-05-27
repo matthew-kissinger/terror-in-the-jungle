@@ -124,6 +124,11 @@ function appendZoneShoulders(
         : (policy.zoneShoulderTargetHeightMode ?? DEFAULT_ZONE_SHOULDER_TARGET_HEIGHT_MODE),
       heightOffset: 0,
       priority: shoulderPriority,
+      // Zone shoulders own the pad they grade; R2.1's resolver treats them as
+      // hard-override against overlapping hydrology / route stamps so the
+      // capture circle stays on its authored datum.
+      obstructionPolicy: 'override',
+      targetHeightStrategy: 'baked',
     });
   }
 }
@@ -264,6 +269,11 @@ function appendRouteFlow(
         targetHeightMode: routeTargetHeightMode,
         heightOffset: 0,
         priority: routePriority,
+        // Route corridors carve their own driving surface; the resolver lets
+        // their baked centerline target win over overlapping low-priority
+        // stamps (zone shoulders inside the inset, hydrology beds adjacent).
+        obstructionPolicy: 'override',
+        targetHeightStrategy: 'baked',
       });
     }
   }

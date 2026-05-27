@@ -12,7 +12,9 @@ import type {
   CompiledTerrainFeatureSet,
   TerrainExclusionZone,
   TerrainStampConfig,
+  TerrainStampObstructionPolicy,
   TerrainStampTargetHeightMode,
+  TerrainStampTargetHeightStrategy,
   TerrainSurfaceKind,
   TerrainSurfacePatch,
 } from './TerrainFeatureTypes';
@@ -123,6 +125,8 @@ function compileTerrainStamps(
   const gradeStrength = resolveGradeStrength(feature, terrain.gradeStrength, gradeRadius, outerRadius);
   const samplingRadius = terrain.samplingRadius ?? innerRadius;
 
+  const { obstructionPolicy, targetHeightStrategy } = resolveCircleStampPolicy(feature);
+
   return [{
     kind: 'flatten_circle',
     centerX: feature.position.x,
@@ -135,7 +139,27 @@ function compileTerrainStamps(
     targetHeightMode: terrain.targetHeightMode ?? 'max',
     heightOffset: terrain.heightOffset ?? 0,
     priority: terrain.priority ?? defaultPriorityForFeature(feature),
+    obstructionPolicy,
+    targetHeightStrategy,
   }];
+}
+
+/**
+ * Compositor (cycle-terrain-compositor R2.1) policy defaults for the generic
+ * single-circle flatten emitted by `compileTerrainStamps`. Helipad rates as a
+ * hard-override pad (vehicles need the exact landing surface). Firebase /
+ * village / road / motor-pool prefab flattens never raise terrain above their
+ * datum, matching the existing `targetHeightMode: 'max'` semantics — the field
+ * is metadata only until R2.1 reads it.
+ */
+function resolveCircleStampPolicy(feature: MapFeatureDefinition): {
+  obstructionPolicy: TerrainStampObstructionPolicy;
+  targetHeightStrategy: TerrainStampTargetHeightStrategy;
+} {
+  if (feature.kind === 'helipad') {
+    return { obstructionPolicy: 'override', targetHeightStrategy: 'baked' };
+  }
+  return { obstructionPolicy: 'never_above', targetHeightStrategy: 'baked' };
 }
 
 function compileSurfacePatch(feature: MapFeatureDefinition): TerrainSurfacePatch | null {
@@ -330,6 +354,11 @@ function compileGeneratedTerrainStamps(
       fixedTargetHeight: airfieldDatumHeight,
       heightOffset,
       priority: priority + resolveAirfieldStampPriorityOffset(kind) + index,
+      // Runway / apron / taxiway / filler rects own their footprint: their
+      // baked `airfieldDatumHeight` wins over any overlapping stamp. R2.1's
+      // resolver consumes these annotations; behavior unchanged today.
+      obstructionPolicy: 'override',
+      targetHeightStrategy: 'baked',
     };
   });
 
@@ -447,6 +476,13 @@ function buildAirfieldEnvelopeStamp(
     // envelope applies first and every authored rect overrides within its own
     // inner radius.
     priority: basePriority - 20,
+    // The envelope is the airfield's draped shoulder: it consults overlapping
+    // higher-priority stamps for its datum and (under R2.2) re-samples the
+    // composed provider after lower-priority context lands, so the envelope
+    // sits on the right ground even where adjacent hydrology or motor-pool
+    // stamps have cut into the base noise.
+    obstructionPolicy: 'consult',
+    targetHeightStrategy: 'sample_post_compose',
   };
 }
 
