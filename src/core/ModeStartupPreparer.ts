@@ -8,7 +8,6 @@ import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../systems/terrain/NoiseHeightProvider';
 import { compileTerrainFeatures } from '../systems/terrain/TerrainFeatureCompiler';
-import { StampedHeightProvider } from '../systems/terrain/StampedHeightProvider';
 import { bakeStampedHeightmapGrid } from '../systems/terrain/TerrainStampGridBaker';
 import type { CompiledTerrainFeatureSet } from '../systems/terrain/TerrainFeatureTypes';
 import type { PreparedHeightmapGrid, PreparedTerrainSource } from '../systems/terrain/PreparedTerrainSource';
@@ -16,6 +15,7 @@ import { loadHydrologyBakeForMode } from '../systems/terrain/hydrology/Hydrology
 import type { LoadedHydrologyBake } from '../systems/terrain/hydrology/HydrologyBakeManifest';
 import type { HydrologyBiomePolicy } from '../systems/terrain/hydrology/HydrologyBiomeClassifier';
 import { compileHydrologyTerrainFeatures } from '../systems/terrain/hydrology/HydrologyTerrainFeatures';
+import { composeTerrain } from '../systems/terrain/compositor/TerrainCompositor';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
 import { resolveGameAssetUrl } from './GameAssetManifest';
@@ -124,16 +124,32 @@ export function compileStartupTerrainFeatures(
   const baseProvider = heightCache.getProvider();
 
   markStartup(`${telemetryPrefix}.features.begin`);
-  const compiledFeatures = compileTerrainFeatures(
+  const featureCompile = compileTerrainFeatures(
     config,
     (x, z) => heightCache.getHeightAt(x, z),
   );
   const hydrologyFeatures = compileHydrologyTerrainFeatures(
     preparedTerrainSource.hydrologyBake?.artifact ?? null,
   );
-  compiledFeatures.stamps.push(...hydrologyFeatures.stamps);
-  compiledFeatures.vegetationExclusionZones.push(...hydrologyFeatures.vegetationExclusionZones);
-  compiledFeatures.stamps.sort((a, b) => a.priority - b.priority);
+
+  const composed = composeTerrain({
+    baseProvider,
+    features: featureCompile,
+    hydrology: hydrologyFeatures,
+    hydrologyArtifact: preparedTerrainSource.hydrologyBake?.artifact ?? null,
+  });
+
+  // Reassemble the full CompiledTerrainFeatureSet so downstream consumers
+  // (TerrainSystem.setTerrainFeaturesAsync, minimap/fullmap flow paths)
+  // receive the same shape they did pre-compositor. R1.1 is NO-OP: stamps
+  // and vegetationExclusionZones come straight from the compositor;
+  // surfacePatches and flowPaths come straight from the feature compile.
+  const compiledFeatures: CompiledTerrainFeatureSet = {
+    stamps: composed.stamps,
+    surfacePatches: featureCompile.surfacePatches,
+    vegetationExclusionZones: composed.vegetationExclusionZones,
+    flowPaths: featureCompile.flowPaths,
+  };
   markStartup(`${telemetryPrefix}.features.end`);
   markStartup(`${telemetryPrefix}.stats.stamps-${compiledFeatures.stamps.length}`);
   markStartup(`${telemetryPrefix}.stats.surface-patches-${compiledFeatures.surfacePatches.length}`);
@@ -144,7 +160,7 @@ export function compileStartupTerrainFeatures(
 
   if (compiledFeatures.stamps.length > 0) {
     markStartup(`${telemetryPrefix}.stamped-provider.begin`);
-    heightCache.setProvider(new StampedHeightProvider(baseProvider, compiledFeatures.stamps));
+    heightCache.setProvider(composed.composedProvider);
     markStartup(`${telemetryPrefix}.stamped-provider.end`);
     if (preparedTerrainSource.preparedHeightmap) {
       markStartup(`${telemetryPrefix}.heightmap-rebake.begin`);
