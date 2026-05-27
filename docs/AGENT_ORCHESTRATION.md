@@ -200,6 +200,30 @@ manifest file as usual.
 
 See [docs/DIRECTIVES.md](DIRECTIVES.md).
 
+## Current cycle
+
+- **Cycle:** `cycle-terrain-compositor`
+- **Brief:** [docs/tasks/cycle-terrain-compositor.md](tasks/cycle-terrain-compositor.md)
+- **Memo:** [docs/rearch/TERRAIN_COMPOSITOR_SPIKE_2026-05-27.md](rearch/TERRAIN_COMPOSITOR_SPIKE_2026-05-27.md)
+- **Closes:** OF water-on-walls + OF airfield random-mountain/padding bugs (user-observable; not in CARRY_OVERS Active).
+- **Posture:** attended (default). Concurrency cap: 5. Single cycle, no campaign.
+- **Hard stops:** standard playbook list (fence change, >2 CI red, perf regression >5% p99, carry-over growth, worktree failure, twice-rejected reviewer).
+- **Mandatory reviewer:** `terrain-nav-reviewer` on R2.2 (hydrology feedback). Nice-to-have on every R1 + R2.1.
+
+### Tasks (DAG)
+
+- **R1 (parallel, ≤3):**
+  - `terrain-compositor-skeleton` ([brief](tasks/terrain-compositor-skeleton.md)) — NO-OP wrapper + behavior-identical tests.
+  - `compositor-conflict-detection` ([brief](tasks/compositor-conflict-detection.md)) — standalone AABB conflict detector, logging-only.
+  - `compositor-stamp-policy-annotations` ([brief](tasks/compositor-stamp-policy-annotations.md)) — extend `TerrainStampConfig` + annotate three compilers.
+- **R2 (parallel, ≤3; depends on all of R1):**
+  - `compositor-stamp-policy-resolver` — consult / never_above / never_below / override resolution. Brief authored at end of R1.
+  - `compositor-hydrology-feedback` — Pass C: re-sample river elevations against composed provider. `terrain-nav-reviewer` mandatory. Brief authored at end of R1.
+  - `compositor-debug-overlay` — dev-only overlay through diagnostic surface. Brief authored at end of R1.
+- **R3 (sequential, depends on R2):**
+  - `compositor-of-acceptance-captures` — capture script proves OF water + airfield acceptance.
+  - `compositor-playtest-evidence` — PLAYTEST_PENDING row for owner walk.
+
 ## Dispatch protocol
 
 For each round, in a single orchestrator turn:
