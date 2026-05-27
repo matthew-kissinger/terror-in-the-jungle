@@ -11,7 +11,7 @@ interface HydrologyTerrainFeatureResult {
   vegetationExclusionZones: TerrainExclusionZone[];
 }
 
-const HYDROLOGY_TERRAIN_PRIORITY = 40;
+export const HYDROLOGY_TERRAIN_PRIORITY = 40;
 const HYDROLOGY_STAMP_SEGMENT_STEP = 4;
 const HYDROLOGY_MIN_STAMP_LENGTH_METERS = 4;
 const HYDROLOGY_CHANNEL_DEPTH_WIDTH_SCALE = 0.025;

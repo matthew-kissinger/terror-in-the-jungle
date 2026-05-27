@@ -143,15 +143,15 @@ export function disposeEventListeners(): void {
 }
 
 /**
- * Dispatch an N/L/I/T/C/X/Y/S keypress to the matching world overlay. Only
+ * Dispatch an N/L/I/T/C/X/Y/J keypress to the matching world overlay. Only
  * fires when the overlay master is already visible (opted-in via Shift+\)
  * so the keys do not shadow gameplay bindings during normal play.
  *
- * S is dev-only (cycle-terrain-compositor R2.3): it toggles the compositor
+ * J is dev-only (cycle-terrain-compositor R2.3): it toggles the compositor
  * stamp overlay, which is registered through `wireWorldOverlays` only when
- * `import.meta.env.DEV` is true. In production builds the overlay id is not
- * registered and the toggle is a NO-OP, so the gameplay S binding stays
- * unaffected even if a release build is somehow handed this branch.
+ * `import.meta.env.DEV` is true. We use J (not S) because S is consumed by
+ * `applyFreeFlyKeyState` as back-strafe before reaching this dispatcher, and
+ * free-fly is the primary diagnostic mode for inspecting stamps from altitude.
  */
 function handleWorldOverlayHotkey(engine: GameEngine, event: KeyboardEvent): boolean {
   const overlays = engine.renderer.worldOverlays;
@@ -166,7 +166,7 @@ function handleWorldOverlayHotkey(engine: GameEngine, event: KeyboardEvent): boo
     c: 'aircraft-contact',
     x: 'terrain-chunks',
     y: 'terrain-seams',
-    s: 'compositor-stamps',
+    j: 'compositor-stamps',
   };
   const id = map[k];
   if (!id) return false;
