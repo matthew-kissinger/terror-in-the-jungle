@@ -44,6 +44,60 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-terrain-compositor)
+
+Closes the Open Frontier **water-on-walls** bug (rivers appearing to run on
+elevated terrain near airfields) and the **airfield random-mountain /
+padding-gap** bug — both rooted in the same gap: three independent stamp
+compilers (`TerrainFeatureCompiler`, `TerrainFlowCompiler`,
+`HydrologyTerrainFeatures`) producing stamps in isolation, getting
+concat-and-sort merged at startup with no spatial conflict detection and no
+feedback loop letting downstream stamps influence upstream target heights.
+A Shau Valley unaffected (DEM provides real river valleys and airfields
+ship `validateTerrain: false`) — used as the cycle's regression sentinel.
+
+Introduces `TerrainCompositor` as the canonical owner of stamp composition
++ spatial conflict detection + hydrology feedback. Three passes:
+**Pass A** (existing compilers emit annotated stamps), **Pass B** (AABB
+overlap detector + policy resolver: `consult` / `never_above` /
+`never_below` / `override`), **Pass C** (re-sample river elevations
+against the composed provider; navmesh sees the original artifact, water
+surface mesh sees the recomposed copy). Ships an IndexedDB → OPFS →
+in-memory LRU recompose cache wired into the startup path for sub-5ms
+second-compose. Dev-only `Shift+\ → J` overlay visualizes stamp AABBs +
+conflict edges.
+
+8 PRs merged in DAG order (R1 parallel; R2 parallel after merge-conflict
+rebase; R3 sequential). All R2 PRs gated by `terrain-nav-reviewer`
+APPROVE-WITH-NOTES; mandatory R2.2 reviewer pass cleared the load-bearing
+Pass C navmesh-desync invariant.
+
+- [#317](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/317) `ce68a39a` `terrain-compositor-skeleton` (R1.1) — NO-OP wrapper module + contract types + behavior-identical tests (snapshot of stamps + 64-coord height sample on OF seed 42 + A Shau, worker-parity sanity at 16 coords). Routes `compileStartupTerrainFeatures` through `composeTerrain`.
+- [#318](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/318) `b49edc28` `compositor-conflict-detection` (R1.2) — Standalone AABB conflict detector with `flatten_circle` / `flatten_capsule` / airfield-envelope-class heuristic (`gradeRadius - outerRadius >= 30 m`). 5 unit tests. Logging-only — R2.1 wires it.
+- [#319](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/319) `0f2f59a2` `compositor-stamp-policy-annotations` (R1.3) — Extends `TerrainStampConfig` with optional `obstructionPolicy` + `targetHeightStrategy` fields. Three compilers annotate emissions with behavior-preserving defaults (airfield envelope → `consult` + `sample_post_compose`; airfield rect → `override` + `baked`; route + zone-shoulder → `override` + `baked`; hydrology bed → `consult` + `baked`).
+- [#320](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/320) `58f95c34` `compositor-debug-overlay` (R2.3, two-pass) — Dev-only `Shift+\ → J` overlay; renders stamp AABBs (envelope white, hydrology blue, route green, facility orange) + red conflict edges via batched `THREE.LineSegments`. Reviewer first pass returned CHANGES-REQUESTED (hotkey `S` collided with free-fly back-strafe; priority-band classifier mis-labelled envelope as hydrology; `setLastTerrainCompositorOutput` writer ungated). Fix commit landed all three plus a focused regression test ("envelope at priority 30 ≠ hydrology at priority 40") — reviewer APPROVED.
+- [#321](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/321) `be4c958b` `compositor-stamp-policy-resolver` (R2.1) — Wires R1.2 detector into compositor; implements four resolution rules; deletes R1.1 `TerrainStampConflict` placeholder; F1 fixes stale "90m" comment to 48m; F2 reconciles AABB with `TerrainStampGridBaker` by returning dual inner/outer bbox via `stampAABBs`. OF airfield-interior-flatness sentinel asserts `max-min < 0.5 m` across a 20m grid centered at (365, 0, -1335). 8 resolver tests pin behavior. Reviewer APPROVE-WITH-NOTES.
+- [#322](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/322) `e50a63d7` `compositor-hydrology-feedback` (R2.2, two-pass) — **Pass C** + IndexedDB/OPFS/in-memory LRU cache wired end-to-end. Reviewer first pass: APPROVE-WITH-NOTES but flagged cache as dead code (library + unit-tested but no caller). Cycle owner explicit decision to ship the cache → re-dispatched with wire-up scope. Follow-up commit `769e3d00` adds `ModeStartupPreparer` plumbing + canonical stamp fingerprint + integration test pinning second-compose <5ms via reference-equality. Mandatory reviewer pass APPROVED; navmesh desync invariant verified (original artifact → bake/navmesh path; recomposed copy → `WaterSystem.setHydrologyChannels` only).
+- [#323](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/323) `062947b8` `compositor-of-acceptance-captures` (R3.1) — Playwright capture script asserting (a) zero water-on-walls violations (`|TerrainSystem.getHeightAt + 0.85 - WaterSystem.getWaterSurfaceY| ≤ 0.5 m` at known overlap points) and (b) airfield interior flatness (20m grid at OF main airfield, `max - min ≤ 0.5 m`). Three OF locations: airfield interior, south envelope edge, hydrology∩airfield overlap. Outputs JSON summary + 3 PNGs into `artifacts/cycle-terrain-compositor/playtest-evidence/`.
+- [#324](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/324) `935e8dc2` `compositor-playtest-evidence` (R3.2) — Owner-walk memo at `docs/playtests/cycle-terrain-compositor.md` (5-item OF walk-list + A Shau regression check + `Shift+\ → J` overlay verification) + PLAYTEST_PENDING row.
+
+### Cycle-retro follow-ups (captured from reviewer APPROVE-WITH-NOTES)
+
+- **A Shau sentinel strengthening** (R2.1 Note 1): `TerrainCompositor.test.ts` A Shau test should add `expect(composed.conflicts).toHaveLength(0)` so "no overlap → no rewrites → byte-identical" becomes proven, not presupposed. The current test allows `sample_post_compose` rewrites to silently slip past.
+- **R2.1 in-code clarifications** (R2.1 Notes 2-4): comment for `sample_post_compose` higher-index invariant in resolver Pass 1; comment for `consult` global rewrite (envelope-of-airfield) in resolver Pass 2; `annotateResolutionsForStamp` first-conflict-only is documented and downstream R2.3 telemetry doesn't depend on per-conflict counts.
+- **Cache fingerprint completeness** (R2.2 Note 1): `fingerprintStamps` in `ModeStartupPreparer` projects positions + radii + priority + `fixedTargetHeight` + `heightOffset` + `obstructionPolicy` + `targetHeightStrategy`, but omits `gradeStrength`, `samplingRadius`, `targetHeightMode`. Stable today (those fields derive deterministically from feature compilation) but a tweakpane knob that ever varies them at runtime introduces a silent stale-cache risk.
+- **Integration test budget tight** (R2.2 Note 2): 5ms cache-hit assertion; reference-equality is the load-bearing claim. Consider relaxing to 20ms if flake materializes.
+- **OPFS/IDB end-to-end coverage** (R2.2 Note 3): cache persistence layer exercised only by unit test with in-process IDB shim. End-to-end roundtrip not gated in CI.
+- **CI infrastructure: Playwright browser install timing out** (cross-cycle): Both `perf` (25min) and `smoke` (15min) jobs cancelled on multiple PRs during this cycle's `Install Playwright browsers --with-deps` step. Independent of code; needs a CI workflow fix (pin/cache the Playwright browser bundle, or move the install ahead of CI matrix split). Filed as a follow-up task for next cycle's R1.
+- **Brief mismatch** (R2.3 retro): brief referenced `src/ui/debug/DiagnosticChordHandler.ts` which does not exist; actual seams are `WorldOverlayRegistry` + `GameEngineInit.wireWorldOverlays` + `GameEngineInput.handleWorldOverlayHotkey`. Next time we author a brief for a chord-registered overlay, point at those.
+
+### Cycle summary
+
+- **8 PRs merged** in DAG order (R1.1/1.2/1.3 parallel; R2.1/2.2/2.3 parallel after rebase; R3.1/3.2 sequential).
+- **Two reviewer two-pass loops**: R2.3 (hotkey + classifier + dev-gate) and R2.2 (cache wire-up). Both APPROVED on the second pass.
+- **One CI infrastructure halt averted**: master has no branch protection; Playwright install timeouts on perf + smoke gates were bypassed per "broken CI gate, not code regression" with explicit owner sign-off.
+- **Acceptance**: R3.1 capture script reports zero water-on-walls violations + airfield interior flatness `max - min < 0.5 m` at OF main airfield post-merge. Owner walk-through deferred to PLAYTEST_PENDING.
+
 ## Recently Completed (water-hydrology-polish, doctor pass 2026-05-21)
 
 Doctor pass on top of the 2026-05-20 vehicle-boarding-and-water campaign
