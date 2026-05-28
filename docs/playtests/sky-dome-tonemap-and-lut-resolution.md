@@ -1,5 +1,7 @@
 # Playtest memo: `sky-dome-tonemap-and-lut-resolution`
 
+Last verified: 2026-05-28 (drift-correction link fix under `doc-consolidation-and-refs`; cycle brief moved to `docs/tasks/archive/`)
+
 ## Cycle
 
 `cycle-sky-visual-restore` (campaign position #1 of 12,
@@ -87,7 +89,7 @@ description.
 
 ## References
 
-- Cycle brief: [`docs/tasks/cycle-sky-visual-restore.md`](../tasks/cycle-sky-visual-restore.md)
+- Cycle brief: [`docs/tasks/cycle-sky-visual-restore.md`](../tasks/archive/cycle-sky-visual-restore/cycle-sky-visual-restore.md)
 - R2 alignment: [`docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md`](../rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md)
 - Visual diff (R1): [`docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/sky-visual-and-cost-regression.md`](../rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/sky-visual-and-cost-regression.md)
 - Pre-fix baseline: [`docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/img/openfrontier-noon-post-merge.png`](../rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/img/openfrontier-noon-post-merge.png)

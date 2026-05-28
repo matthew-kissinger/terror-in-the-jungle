@@ -1,5 +1,7 @@
 # Playtest: cycle-terrain-compositor
 
+Last verified: 2026-05-28 (drift-correction link fix under `doc-consolidation-and-refs`; cycle brief moved to `docs/tasks/archive/`)
+
 Cycle: `cycle-terrain-compositor` (single-cycle dispatch, 2026-05-27).
 Task slug: `compositor-playtest-evidence` (R3.2, owner-walk evidence).
 Branch: `task/compositor-playtest-evidence`.
@@ -8,7 +10,7 @@ Capture script (R3.1):
 Design memo:
 [docs/rearch/TERRAIN_COMPOSITOR_SPIKE_2026-05-27.md](../rearch/TERRAIN_COMPOSITOR_SPIKE_2026-05-27.md).
 Cycle brief:
-[docs/tasks/cycle-terrain-compositor.md](../tasks/cycle-terrain-compositor.md).
+[docs/tasks/cycle-terrain-compositor.md](../tasks/archive/cycle-terrain-compositor/cycle-terrain-compositor.md).
 
 ## Posture note (read this first)
 

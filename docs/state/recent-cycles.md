@@ -1,6 +1,8 @@
 # Recent Cycle Outcomes
 
-Last 3 cycles, summarized. Companion docs:
+Last verified: 2026-05-28 (drift-correction link fixes under `doc-consolidation-and-refs`; cycle prose unchanged. For cycles after 2026-05-13 see the closed campaign manifests under [docs/archive/](../archive/) and [docs/DIRECTIVES.md](../DIRECTIVES.md).)
+
+Recent cycles, summarized. Companion docs:
 
 - [docs/state/CURRENT.md](CURRENT.md) — current truth
 - [docs/CARRY_OVERS.md](../CARRY_OVERS.md) — active carry-over registry
@@ -52,7 +54,7 @@ component commits; the master-merge PR #192 carried them in.
 **Rescoped:** R2-R4 (cover-spatial-grid, render-silhouette/cluster lanes,
 squad-aggregated strategic sim, budget arbiter v2, multi-mode strict-WebGPU
 proof v2) queued on master as
-[`cycle-phase-f-r2-r4-on-master`](../tasks/cycle-phase-f-r2-r4-on-master.md).
+[`cycle-phase-f-r2-r4-on-master`](../tasks/archive/cycle-phase-f-r2-r4-on-master-DEFERRED/cycle-phase-f-r2-r4-on-master.md).
 Milestone memo:
 [docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).
 
@@ -86,10 +88,10 @@ touched.
 - New `docs/state/CURRENT.md` 2026-05-13 entry, milestone memo
   [POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md),
   and active campaign manifest
-  [CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+  [CAMPAIGN_2026-05-13-POST-WEBGPU.md](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
   (PR #194; bundle 2).
 - Task-brief archive + R2-R4 rescope on master via
-  [`cycle-phase-f-r2-r4-on-master`](../tasks/cycle-phase-f-r2-r4-on-master.md)
+  [`cycle-phase-f-r2-r4-on-master`](../tasks/archive/cycle-phase-f-r2-r4-on-master-DEFERRED/cycle-phase-f-r2-r4-on-master.md)
   (PR #195; bundle 3).
 
 ---

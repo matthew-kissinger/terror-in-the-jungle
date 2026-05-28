@@ -1,5 +1,7 @@
 # Post-KONVEYER migration milestone
 
+Last verified: 2026-05-28 (drift-correction link fixes under `doc-consolidation-and-refs`; campaign manifest moved to `docs/archive/`. Content is the 2026-05-13 milestone snapshot.)
+
 Branch context: `master` (post-merge). This memo replaces the
 "do-not-merge" gate that governed
 `docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md` while the migration
@@ -206,7 +208,7 @@ verbatim from the rearch memo.
 ### Other backlog directives
 
 These are listed in `docs/BACKLOG.md` and the new campaign manifest
-[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md);
+[docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md);
 queued, not scheduled, pending owner direction:
 
 - **VODA-1 / VODA-2 / VODA-3** — water shader, intersections,
@@ -307,6 +309,6 @@ follow-up cycles need a directional read on:
   — "keep the stack" stance with the 2026-05-13 ground-vehicle addendum.
 - [docs/state/CURRENT.md](../state/CURRENT.md) — top-level current-truth
   snapshot; 2026-05-13 entry caps the KONVEYER campaign.
-- [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+- [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
   — active campaign manifest replacing the historical 2026-05-09
   manifest.

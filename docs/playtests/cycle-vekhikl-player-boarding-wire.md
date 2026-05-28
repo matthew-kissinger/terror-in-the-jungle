@@ -1,7 +1,9 @@
 # Playtest: cycle-vekhikl-player-boarding-wire
 
+Last verified: 2026-05-28 (drift-correction link fix under `doc-consolidation-and-refs`; campaign manifest moved to `docs/archive/`)
+
 Cycle: `cycle-vekhikl-player-boarding-wire` (campaign
-[2026-05-20-vehicle-boarding-and-water](../CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
+[2026-05-20-vehicle-boarding-and-water](../archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
 cycle #1)
 Task slug: `vekhikl-board-integration-test-and-playtest-evidence` (R2, merge gate)
 Branch: `task/vekhikl-board-integration-test-and-playtest-evidence`
@@ -15,7 +17,7 @@ below.
 ## Autonomous-loop deferral notice
 
 Under the
-[campaign manifest's](../CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
+[campaign manifest's](../archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
 declared `posture: autonomous-loop`, the cycle's playtest-required gate
 is **deferred** to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md)
 per the orchestrator's autonomous-loop override (per

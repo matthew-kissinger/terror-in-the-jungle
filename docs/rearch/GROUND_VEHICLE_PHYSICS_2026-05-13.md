@@ -1,10 +1,12 @@
 # Ground-vehicle physics architecture
 
+Last verified: 2026-05-28 (drift-correction link fixes under `doc-consolidation-and-refs`; the `vekhikl-1-jeep-spike` brief moved to `docs/tasks/archive/`. Content is the 2026-05-13 architecture snapshot.)
+
 Branch: `exp/konveyer-webgpu-migration`. Companion to
 [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
 (addendum 2026-05-13 extends its "no external physics lib" stance to
 ground vehicles) and to the queued
-[docs/tasks/vekhikl-1-jeep-spike.md](../tasks/vekhikl-1-jeep-spike.md)
+[docs/tasks/vekhikl-1-jeep-spike.md](../tasks/archive/cycle-vekhikl-1-jeep-drivable/vekhikl-1-jeep-spike.md)
 task brief (this memo unblocks it). Parallel
 `docs/rearch/TANK_SYSTEMS_2026-05-13.md` covers tracked vehicles.
 
@@ -484,7 +486,7 @@ Related docs:
   — house-style reference.
 - [docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md](KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md)
   — house-style reference.
-- [docs/tasks/vekhikl-1-jeep-spike.md](../tasks/vekhikl-1-jeep-spike.md)
+- [docs/tasks/vekhikl-1-jeep-spike.md](../tasks/archive/cycle-vekhikl-1-jeep-drivable/vekhikl-1-jeep-spike.md)
   — task brief unblocked by this memo.
 - `docs/rearch/TANK_SYSTEMS_2026-05-13.md` — parallel sibling memo
   for tracked vehicles.
