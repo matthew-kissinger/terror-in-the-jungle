@@ -45,8 +45,8 @@ describe('ModeStartupPreparer telemetry', () => {
     startupMarks.length = 0;
   });
 
-  it('attributes terrain feature compilation even when no stamps are present', () => {
-    const result = compileStartupTerrainFeatures(baseConfig(), { kind: 'procedural' });
+  it('attributes terrain feature compilation even when no stamps are present', async () => {
+    const result = await compileStartupTerrainFeatures(baseConfig(), { kind: 'procedural' });
 
     expect(result.compiledFeatures.stamps).toHaveLength(0);
     expect(startupMarks).toEqual(expect.arrayContaining([
@@ -60,7 +60,7 @@ describe('ModeStartupPreparer telemetry', () => {
     ]));
   });
 
-  it('attributes stamped-provider install and prepared-heightmap rebake', () => {
+  it('attributes stamped-provider install and prepared-heightmap rebake', async () => {
     const prepared: PreparedTerrainSource = {
       kind: 'procedural',
       preparedHeightmap: {
@@ -70,7 +70,7 @@ describe('ModeStartupPreparer telemetry', () => {
       },
     };
 
-    const result = compileStartupTerrainFeatures(
+    const result = await compileStartupTerrainFeatures(
       baseConfig({
         features: [{
           id: 'helipad_main',

@@ -17,7 +17,13 @@ import type { HydrologyBiomePolicy } from '../systems/terrain/hydrology/Hydrolog
 import { compileHydrologyTerrainFeatures } from '../systems/terrain/hydrology/HydrologyTerrainFeatures';
 import type { HydrologyBakeArtifact } from '../systems/terrain/hydrology/HydrologyBake';
 import { composeTerrain } from '../systems/terrain/compositor/TerrainCompositor';
+import {
+  HydrologyArtifactCache,
+  computeHydrologyArtifactCacheKey,
+} from '../systems/terrain/compositor/HydrologyArtifactCache';
 import { setLastTerrainCompositorOutput } from '../systems/terrain/compositor/LastCompositorOutput';
+import type { TerrainStampConfig } from '../systems/terrain/TerrainFeatureTypes';
+import type { HeightProviderConfig } from '../systems/terrain/IHeightProvider';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
 import { resolveGameAssetUrl } from './GameAssetManifest';
@@ -127,10 +133,130 @@ function resolveHydrologyBiomePolicy(config: ReturnType<typeof getGameModeConfig
   };
 }
 
-export function compileStartupTerrainFeatures(
+/**
+ * Module-scoped cache for Pass C (hydrology recompose) artifacts. Constructed
+ * lazily on first use so test envs that never call `compileStartupTerrainFeatures`
+ * don't allocate one. Shared across mode startups so repeated launches of the
+ * same map (mode-switch, post-victory restart) hit the in-memory LRU; cold
+ * starts hit the IDB / OPFS persistent layer. Both are safe to miss — Pass C
+ * is pure and will recompute on a miss.
+ */
+let cachedHydrologyArtifactCache: HydrologyArtifactCache | null = null;
+function getHydrologyArtifactCache(): HydrologyArtifactCache {
+  if (!cachedHydrologyArtifactCache) {
+    cachedHydrologyArtifactCache = new HydrologyArtifactCache();
+  }
+  return cachedHydrologyArtifactCache;
+}
+
+/**
+ * Test-only escape hatch — reset the module-scoped cache so each test gets a
+ * clean LRU. Not exported from the package surface.
+ */
+export function __resetHydrologyArtifactCacheForTests(): void {
+  cachedHydrologyArtifactCache = null;
+}
+
+/**
+ * Project stamps to a normalized, order-independent fingerprint suitable for
+ * the cache key. Sort by (priority, kind, primary-coord) and project to a
+ * fixed key order so two callers producing the same stamp set in different
+ * insertion orders compute the same cache key.
+ *
+ * Reviewer Note 2 (R2.2): the cache key relies on caller-supplied canonical
+ * serialization. Doing it here keeps that responsibility at the call site.
+ */
+function fingerprintStamps(stamps: TerrainStampConfig[]): Array<Record<string, unknown>> {
+  const projected = stamps.map(stampToFingerprint);
+  projected.sort(compareStampFingerprints);
+  return projected;
+}
+
+function stampToFingerprint(stamp: TerrainStampConfig): Record<string, unknown> {
+  if (stamp.kind === 'flatten_circle') {
+    return {
+      kind: stamp.kind,
+      priority: stamp.priority,
+      x: stamp.centerX,
+      z: stamp.centerZ,
+      innerRadius: stamp.innerRadius,
+      outerRadius: stamp.outerRadius,
+      gradeRadius: stamp.gradeRadius,
+      fixedTargetHeight: stamp.fixedTargetHeight ?? null,
+      heightOffset: stamp.heightOffset,
+      obstructionPolicy: stamp.obstructionPolicy ?? null,
+      targetHeightStrategy: stamp.targetHeightStrategy ?? null,
+    };
+  }
+  return {
+    kind: stamp.kind,
+    priority: stamp.priority,
+    x: stamp.startX,
+    z: stamp.startZ,
+    endX: stamp.endX,
+    endZ: stamp.endZ,
+    innerRadius: stamp.innerRadius,
+    outerRadius: stamp.outerRadius,
+    gradeRadius: stamp.gradeRadius,
+    fixedTargetHeight: stamp.fixedTargetHeight ?? null,
+    heightOffset: stamp.heightOffset,
+    obstructionPolicy: stamp.obstructionPolicy ?? null,
+    targetHeightStrategy: stamp.targetHeightStrategy ?? null,
+  };
+}
+
+function compareStampFingerprints(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): number {
+  if (a.priority !== b.priority) return (a.priority as number) - (b.priority as number);
+  if (a.kind !== b.kind) return (a.kind as string).localeCompare(b.kind as string);
+  if (a.x !== b.x) return (a.x as number) - (b.x as number);
+  if (a.z !== b.z) return (a.z as number) - (b.z as number);
+  return 0;
+}
+
+/**
+ * Cheap, deterministic identity for a height provider. Strips heavy buffers
+ * (DEM payloads) and keeps only the shape that drives the height function.
+ * The cache invalidates whenever this identity changes — switching DEMs,
+ * re-seeding noise, swapping in a stamped wrapper.
+ */
+function heightProviderIdentity(config: HeightProviderConfig): unknown {
+  if (config.type === 'dem') {
+    return {
+      type: 'dem',
+      width: config.width,
+      height: config.height,
+      metersPerPixel: config.metersPerPixel,
+      originX: config.originX,
+      originZ: config.originZ,
+      byteLength: config.buffer.byteLength,
+    };
+  }
+  if (config.type === 'stamped') {
+    return {
+      type: 'stamped',
+      base: heightProviderIdentity(config.base),
+      stampCount: config.stamps.length,
+    };
+  }
+  if (config.type === 'visualExtent') {
+    return {
+      type: 'visualExtent',
+      base: heightProviderIdentity(config.base),
+      source: heightProviderIdentity(config.source),
+      playableWorldSize: config.playableWorldSize,
+      visualMargin: config.visualMargin,
+    };
+  }
+  return { type: config.type, seed: config.seed };
+}
+
+export async function compileStartupTerrainFeatures(
   config: ReturnType<typeof getGameModeConfig>,
   preparedTerrainSource: PreparedTerrainSource,
-): CompiledStartupTerrainFeatures {
+): Promise<CompiledStartupTerrainFeatures> {
   const telemetryPrefix = `engine-init.start-game.${config.id}.terrain-features.compile`;
   const heightCache = getHeightQueryCache();
   const baseProvider = heightCache.getProvider();
@@ -144,19 +270,50 @@ export function compileStartupTerrainFeatures(
     preparedTerrainSource.hydrologyBake?.artifact ?? null,
   );
 
+  // R2.2 (wire-up): when a hydrology artifact is present, compute the cache
+  // key from the inputs to compose (sorted stamp fingerprint + artifact
+  // schema + base provider identity) and warm the in-memory LRU from
+  // persistent storage. The synchronous compose path then reads the warmed
+  // cache via `getInMemory`. Misses recompute and write back through
+  // `cache.set`. Cache is module-scoped so repeated launches of the same
+  // map share warm state.
+  const hydrologyArtifact = preparedTerrainSource.hydrologyBake?.artifact ?? null;
+  const passCEnabled = hydrologyArtifact !== null;
+  let hydrologyCache: HydrologyArtifactCache | undefined;
+  let hydrologyCacheKey: string | undefined;
+  if (passCEnabled) {
+    hydrologyCache = getHydrologyArtifactCache();
+    const stampsFingerprint = fingerprintStamps([
+      ...featureCompile.stamps,
+      ...hydrologyFeatures.stamps,
+    ]);
+    hydrologyCacheKey = await computeHydrologyArtifactCacheKey(
+      stampsFingerprint,
+      hydrologyArtifact,
+      heightProviderIdentity(baseProvider.getWorkerConfig()),
+    );
+    // `warm` resolves false when neither persistent backend has the entry;
+    // that's fine — the compose path falls through to the synchronous
+    // recompute branch. Errors are swallowed inside warm().
+    await hydrologyCache.warm(hydrologyCacheKey);
+  }
+
   // R2.2: enable Pass C (hydrology feedback) so the water-surface mesh
   // rides on the composed terrain over airfield/motor-pool overlaps.
   // The original hydrology artifact stays available via
   // `preparedTerrainSource.hydrologyBake.artifact` for navmesh + heightmap
   // bake consumers; only the water-surface consumer (HydrologyRiverSurface)
   // reads `composed.waterSurfaceArtifact`.
-  const composed = composeTerrain({
-    baseProvider,
-    features: featureCompile,
-    hydrology: hydrologyFeatures,
-    hydrologyArtifact: preparedTerrainSource.hydrologyBake?.artifact ?? null,
-    options: { recomposeHydrology: true },
-  });
+  const composed = composeTerrain(
+    {
+      baseProvider,
+      features: featureCompile,
+      hydrology: hydrologyFeatures,
+      hydrologyArtifact,
+      options: { recomposeHydrology: passCEnabled },
+    },
+    { hydrologyCache, hydrologyCacheKey },
+  );
   // Surface the latest output to the dev-only Shift+\ → J compositor overlay
   // (cycle-terrain-compositor R2.3). Gated on `import.meta.env.DEV` so the
   // production bundle does not hold a reference to the composed output via the
@@ -623,7 +780,7 @@ export async function prepareModeStartup(
 
   emitProgress('features', 0, 'Compiling features...');
   markStartup(`engine-init.start-game.${mode}.terrain-features.compile.begin`);
-  const startupTerrain = compileStartupTerrainFeatures(config, preparedTerrainSource);
+  const startupTerrain = await compileStartupTerrainFeatures(config, preparedTerrainSource);
   markStartup(`engine-init.start-game.${mode}.terrain-features.compile.end`);
   emitProgress('features', 1, 'Features compiled');
   await yieldToRenderer();
