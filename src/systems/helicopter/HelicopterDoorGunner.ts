@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { AircraftWeaponMount } from './AircraftConfigs';
 import type { CombatantSystem } from '../combat/CombatantSystem';
+import { Faction, isAlly } from '../combat/types';
 import type { IAudioManager } from '../../types/SystemInterfaces';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem, MuzzleFlashVariant } from '../effects/MuzzleFlashSystem';
@@ -21,6 +22,7 @@ const _up = new THREE.Vector3();
 
 interface GunnerState {
   config: AircraftWeaponMount;
+  faction: Faction;
   ammo: number;
   cooldownRemaining: number;
   targetId: string | null;
@@ -50,12 +52,13 @@ export class HelicopterDoorGunner {
   setCombatantSystem(cs: CombatantSystem): void { this.combatantSystem = cs; }
   setAudioManager(am: IAudioManager): void { this.audioManager = am; }
 
-  initGunners(heliId: string, mounts: AircraftWeaponMount[]): void {
+  initGunners(heliId: string, mounts: AircraftWeaponMount[], faction: Faction): void {
     const crewWeapons = mounts.filter(m => m.firingMode === 'crew');
     if (crewWeapons.length === 0) return;
 
     this.gunners.set(heliId, crewWeapons.map(config => ({
       config,
+      faction,
       ammo: config.ammoCapacity,
       cooldownRemaining: 0,
       targetId: null,
@@ -84,7 +87,7 @@ export class HelicopterDoorGunner {
       // Periodically scan for targets
       if (gunner.acquireAccumulator >= GUNNER_ACQUIRE_INTERVAL) {
         gunner.acquireAccumulator = 0;
-        gunner.targetId = this.findTarget(position);
+        gunner.targetId = this.findTarget(position, gunner.faction);
       }
 
       // Fire at target
@@ -100,20 +103,21 @@ export class HelicopterDoorGunner {
     this.muzzleFlashAccumulator += dt;
   }
 
-  private findTarget(heliPos: THREE.Vector3): string | null {
+  private findTarget(heliPos: THREE.Vector3, faction: Faction): string | null {
     if (!this.combatantSystem) return null;
 
     const nearbyIds = this.combatantSystem.querySpatialRadius(heliPos, GUNNER_MAX_RANGE);
+    const combatants = this.combatantSystem.getAllCombatants();
     let bestId: string | null = null;
     let bestDist = Infinity;
 
     for (const id of nearbyIds) {
-      const combatants = this.combatantSystem.getAllCombatants();
       const c = combatants.find(c => c.id === id);
       if (!c || c.health <= 0 || c.isDying) continue;
 
-      // Only shoot enemies (OPFOR from gunship's perspective = US heli vs OPFOR NPCs)
-      // Simple heuristic: shoot any enemy faction
+      // Only shoot enemies — never allies of the gunship's faction.
+      if (isAlly(faction, c.faction)) continue;
+
       const dist = c.position.distanceTo(heliPos);
       if (dist < GUNNER_MIN_RANGE) continue;
       if (dist < bestDist) {
@@ -153,7 +157,7 @@ export class HelicopterDoorGunner {
     // Raycast
     const ray = new THREE.Ray(_mountWorld.clone(), _toTarget.clone());
     const dmg = gunner.config.damage;
-    const result = this.combatantSystem.handlePlayerShot(ray, () => dmg);
+    const result = this.combatantSystem.handlePlayerShot(ray, () => dmg, 'rifle', gunner.faction);
 
     // Tracer every 4th round
     if (gunner.roundsSinceTracer >= 4) {

@@ -19,6 +19,7 @@ import type { FullMapSystem } from '../../ui/map/FullMapSystem';
 
 export interface PlayerCombatControllerDependencies {
   helicopterModel?: HelicopterModel;
+  fixedWingModel?: FixedWingModel;
   firstPersonWeapon?: FirstPersonWeapon;
   hudSystem?: HUDSystem;
   inventoryManager?: InventoryManager;

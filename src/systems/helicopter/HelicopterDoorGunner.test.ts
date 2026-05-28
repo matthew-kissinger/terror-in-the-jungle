@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import type { AircraftWeaponMount } from './AircraftConfigs';
 import type { CombatantSystem } from '../combat/CombatantSystem';
+import { Faction } from '../combat/types';
 
 vi.mock('../effects/TracerPool', () => ({
   TracerPool: class {
@@ -51,8 +52,8 @@ function makeAudioManager() {
   return { play: vi.fn() } as any;
 }
 
-function makeTarget(id: string, pos: THREE.Vector3, health = 100, isDying = false) {
-  return { id, position: pos, health, isDying };
+function makeTarget(id: string, pos: THREE.Vector3, health = 100, isDying = false, faction: Faction = Faction.NVA) {
+  return { id, position: pos, health, isDying, faction };
 }
 
 describe('HelicopterDoorGunner', () => {
@@ -73,7 +74,7 @@ describe('HelicopterDoorGunner', () => {
   // ── initGunners ──
 
   it('creates gunners only for crew weapons', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN, PILOT_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN, PILOT_GUN], Faction.US);
     // Should fire with crew gun but not pilot gun - verify by updating
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -86,7 +87,7 @@ describe('HelicopterDoorGunner', () => {
   });
 
   it('creates nothing for pilot-only mounts', () => {
-    gunner.initGunners(HELI_ID, [PILOT_GUN]);
+    gunner.initGunners(HELI_ID, [PILOT_GUN], Faction.US);
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
     (cs.getAllCombatants as any).mockReturnValue([target]);
@@ -98,7 +99,7 @@ describe('HelicopterDoorGunner', () => {
   // ── Grounded ──
 
   it('does not fire when grounded', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
     (cs.getAllCombatants as any).mockReturnValue([target]);
@@ -120,7 +121,7 @@ describe('HelicopterDoorGunner', () => {
   // ── Target acquisition ──
 
   it('scans for targets at 0.5s interval', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     gunner.update(0.3, HELI_ID, heliPos, heliQuat, false);
     expect(cs.querySpatialRadius).not.toHaveBeenCalled();
@@ -131,7 +132,7 @@ describe('HelicopterDoorGunner', () => {
   });
 
   it('selects the closest enemy in range', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const far = makeTarget('far', new THREE.Vector3(0, 50, 150));
     const close = makeTarget('close', new THREE.Vector3(0, 50, 50));
@@ -148,7 +149,7 @@ describe('HelicopterDoorGunner', () => {
   });
 
   it('ignores dead combatants during target acquisition', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const dead = makeTarget('dead', new THREE.Vector3(0, 50, 50), 0);
     (cs.querySpatialRadius as any).mockReturnValue(['dead']);
@@ -159,7 +160,7 @@ describe('HelicopterDoorGunner', () => {
   });
 
   it('ignores dying combatants during target acquisition', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const dying = makeTarget('dying', new THREE.Vector3(0, 50, 50), 50, true);
     (cs.querySpatialRadius as any).mockReturnValue(['dying']);
@@ -170,7 +171,7 @@ describe('HelicopterDoorGunner', () => {
   });
 
   it('ignores targets below minimum range (10m)', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const tooClose = makeTarget('close', new THREE.Vector3(0, 50, 5)); // 5m away
     (cs.querySpatialRadius as any).mockReturnValue(['close']);
@@ -180,10 +181,40 @@ describe('HelicopterDoorGunner', () => {
     expect(cs.handlePlayerShot).not.toHaveBeenCalled();
   });
 
+  // ── Friendly fire (IFF) ──
+
+  it('does not fire at combatants allied with the gunship faction', () => {
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
+
+    const ally = makeTarget('ally', new THREE.Vector3(0, 50, 50), 100, false, Faction.ARVN);
+    (cs.querySpatialRadius as any).mockReturnValue(['ally']);
+    (cs.getAllCombatants as any).mockReturnValue([ally]);
+
+    gunner.update(0.6, HELI_ID, heliPos, heliQuat, false);
+    expect(cs.handlePlayerShot).not.toHaveBeenCalled();
+  });
+
+  it('skips a closer ally and engages the enemy, passing shooterFaction through', () => {
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
+
+    const ally = makeTarget('ally', new THREE.Vector3(0, 50, 30), 100, false, Faction.US);
+    const enemy = makeTarget('enemy', new THREE.Vector3(0, 50, 80), 100, false, Faction.NVA);
+    (cs.querySpatialRadius as any).mockReturnValue(['ally', 'enemy']);
+    (cs.getAllCombatants as any).mockReturnValue([ally, enemy]);
+
+    gunner.update(0.6, HELI_ID, heliPos, heliQuat, false);
+
+    // Ally is nearer but must be skipped; the NVA target is engaged.
+    expect(cs.handlePlayerShot).toHaveBeenCalledTimes(1);
+    const [, , weaponType, shooterFaction] = (cs.handlePlayerShot as any).mock.calls[0];
+    expect(weaponType).toBe('rifle');
+    expect(shooterFaction).toBe(Faction.US);
+  });
+
   // ── Firing ──
 
   it('fires when target acquired and cooldown expired', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -195,7 +226,7 @@ describe('HelicopterDoorGunner', () => {
 
   it('consumes ammo on fire', () => {
     const lowAmmoGun = { ...CREW_GUN, ammoCapacity: 3 };
-    gunner.initGunners(HELI_ID, [lowAmmoGun]);
+    gunner.initGunners(HELI_ID, [lowAmmoGun], Faction.US);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -217,7 +248,7 @@ describe('HelicopterDoorGunner', () => {
   });
 
   it('respects cooldown (1/fireRate)', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -237,7 +268,7 @@ describe('HelicopterDoorGunner', () => {
   });
 
   it('clears target if target is dead when firing', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -258,7 +289,7 @@ describe('HelicopterDoorGunner', () => {
   // ── Tracer ──
 
   it('spawns tracer every 4th round', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -282,7 +313,7 @@ describe('HelicopterDoorGunner', () => {
   it('plays audio at tracer round intervals', () => {
     const audio = makeAudioManager();
     gunner.setAudioManager(audio);
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -303,7 +334,7 @@ describe('HelicopterDoorGunner', () => {
   // ── Dispose ──
 
   it('dispose() removes gunner state for a helicopter', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
     gunner.dispose(HELI_ID);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
@@ -315,8 +346,8 @@ describe('HelicopterDoorGunner', () => {
   });
 
   it('disposeAll() clears everything and disposes effect pools', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
-    gunner.initGunners('heli-2', [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
+    gunner.initGunners('heli-2', [CREW_GUN], Faction.US);
     gunner.disposeAll();
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
@@ -338,7 +369,7 @@ describe('HelicopterDoorGunner', () => {
   it('supports multiple crew gunners per helicopter', () => {
     const leftGun = { ...CREW_GUN, name: 'Left M60', localPosition: [-1.5, 0.3, -0.5] as [number, number, number] };
     const rightGun = { ...CREW_GUN, name: 'Right M60', localPosition: [1.5, 0.3, -0.5] as [number, number, number] };
-    gunner.initGunners(HELI_ID, [leftGun, rightGun]);
+    gunner.initGunners(HELI_ID, [leftGun, rightGun], Faction.US);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -353,7 +384,7 @@ describe('HelicopterDoorGunner', () => {
 
   it('does not fire with 0 ammo', () => {
     const emptyGun = { ...CREW_GUN, ammoCapacity: 0 };
-    gunner.initGunners(HELI_ID, [emptyGun]);
+    gunner.initGunners(HELI_ID, [emptyGun], Faction.US);
 
     const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
     (cs.querySpatialRadius as any).mockReturnValue(['e1']);
@@ -378,7 +409,7 @@ describe('HelicopterDoorGunner', () => {
   // ── No targets ──
 
   it('does nothing when no targets found', () => {
-    gunner.initGunners(HELI_ID, [CREW_GUN]);
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
     (cs.querySpatialRadius as any).mockReturnValue([]);
 
     gunner.update(0.6, HELI_ID, heliPos, heliQuat, false);

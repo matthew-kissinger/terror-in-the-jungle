@@ -289,7 +289,7 @@ export class HelicopterModel implements GameSystem {
 
     this.weaponSystem.initWeapons(helicopterId, aircraftConfig.weapons);
     this.healthSystem.initHealth(helicopterId, aircraftConfig.role);
-    this.doorGunner.initGunners(helicopterId, aircraftConfig.weapons);
+    this.doorGunner.initGunners(helicopterId, aircraftConfig.weapons, Faction.US);
     this.animation.initialize(helicopterId, helicopter);
     this.audio.initialize(helicopterId, helicopter);
 

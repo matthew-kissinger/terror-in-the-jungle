@@ -20,6 +20,11 @@ export class PlayerCombatController {
       return;
     }
 
+    if (playerState.isInFixedWing && this.deps.fixedWingModel && playerState.fixedWingId) {
+      this.deps.fixedWingModel.startFiring(playerState.fixedWingId);
+      return;
+    }
+
     switch (currentWeaponMode) {
       case WeaponSlot.GRENADE: {
         const equipmentAction = this.deps.inventoryManager?.getEquipmentActionForSlot(WeaponSlot.GRENADE);
@@ -45,6 +50,11 @@ export class PlayerCombatController {
   endFire(playerState: PlayerState, currentWeaponMode: WeaponSlot): void {
     if (playerState.isInHelicopter && this.deps.helicopterModel && playerState.helicopterId) {
       this.deps.helicopterModel.stopFiring(playerState.helicopterId);
+      return;
+    }
+
+    if (playerState.isInFixedWing && this.deps.fixedWingModel && playerState.fixedWingId) {
+      this.deps.fixedWingModel.stopFiring(playerState.fixedWingId);
       return;
     }
 
