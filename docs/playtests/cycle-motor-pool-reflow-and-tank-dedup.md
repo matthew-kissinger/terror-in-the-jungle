@@ -1,5 +1,7 @@
 # Playtest: cycle-motor-pool-reflow-and-tank-dedup
 
+Last verified: 2026-05-28 (drift-correction link fix under `doc-consolidation-and-refs`; campaign manifest moved to `docs/archive/`)
+
 Cycle: `cycle-motor-pool-reflow-and-tank-dedup` (campaign position #3
 of 3, 2026-05-20 vehicle-boarding-and-water parallel campaign)
 Task slug: `motor-pool-and-tank-dedup-playtest-evidence`
@@ -13,7 +15,7 @@ active carry-over count: 0). No new carry-overs opened.
 ## Autonomous-loop deferral notice
 
 Under the
-[campaign manifest's](../CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
+[campaign manifest's](../archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
 declared `posture: autonomous-loop`, the cycle's playtest-required
 gate is **deferred** to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md)
 per the orchestrator's autonomous-loop override (per

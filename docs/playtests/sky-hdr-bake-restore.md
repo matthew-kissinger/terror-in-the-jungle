@@ -1,7 +1,9 @@
 # Playtest: sky-hdr-bake-restore
 
+Last verified: 2026-05-28 (drift-correction link fix under `doc-consolidation-and-refs`; cycle brief moved to `docs/tasks/archive/`)
+
 Cycle: `cycle-sky-visual-restore` (campaign position #1 of 12).
-Task brief: [docs/tasks/cycle-sky-visual-restore.md](../tasks/cycle-sky-visual-restore.md) (R1 task `sky-hdr-bake-restore`).
+Task brief: [docs/tasks/cycle-sky-visual-restore.md](../tasks/archive/cycle-sky-visual-restore/cycle-sky-visual-restore.md) (R1 task `sky-hdr-bake-restore`).
 Closes: `KB-SKY-BLAND` (one of three coordinated R1 tasks).
 Posture: autonomous-loop. Owner walk-through pending; CI green + smoke
 evidence is sufficient to merge under the active campaign manifest.

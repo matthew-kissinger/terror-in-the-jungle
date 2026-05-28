@@ -1,5 +1,7 @@
 # Playtest memo: `terrain-tsl-biome-early-out`
 
+Last verified: 2026-05-28 (drift-correction link fix under `doc-consolidation-and-refs`; cycle brief moved to `docs/tasks/archive/`)
+
 ## Cycle
 
 `cycle-mobile-webgl2-fallback-fix` (campaign position #2 of 12,
@@ -134,7 +136,7 @@ real-device validation step and Critical Process Note #1):
 
 ## References
 
-- Cycle brief: [docs/tasks/cycle-mobile-webgl2-fallback-fix.md](../tasks/cycle-mobile-webgl2-fallback-fix.md)
+- Cycle brief: [docs/tasks/cycle-mobile-webgl2-fallback-fix.md](../tasks/archive/cycle-mobile-webgl2-fallback-fix/cycle-mobile-webgl2-fallback-fix.md)
 - Alignment memo: [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](../rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md)
 - TSL shader-cost audit: [docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/tsl-shader-cost-audit.md](../rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/tsl-shader-cost-audit.md)
 - TSL `If/ElseIf` reference: [.claude/skills/webgpu-threejs-tsl/docs/core-concepts.md](../../.claude/skills/webgpu-threejs-tsl/docs/core-concepts.md)

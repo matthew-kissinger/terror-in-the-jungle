@@ -1,5 +1,7 @@
 # Playtest: cycle-of-river-surface-enable
 
+Last verified: 2026-05-28 (drift-correction link fix under `doc-consolidation-and-refs`; campaign manifest moved to `docs/archive/`)
+
 > **Superseded by the 2026-05-21 `water-hydrology-polish` doctor pass**
 > (PRs [#313](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/313)
 > / [#314](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/314)
@@ -29,7 +31,7 @@ deferred punch list below. Net delta on the active carry-over count: 0.
 ## Autonomous-loop deferral notice
 
 Under the
-[campaign manifest's](../CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
+[campaign manifest's](../archive/CAMPAIGN_2026-05-20-VEHICLE-BOARDING-AND-WATER.md)
 declared `posture: autonomous-loop`, the cycle's playtest-required gate
 is **deferred** to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md)
 per the orchestrator's autonomous-loop override (per
