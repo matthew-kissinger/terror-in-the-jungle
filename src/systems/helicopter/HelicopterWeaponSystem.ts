@@ -3,6 +3,7 @@ import type { AircraftWeaponMount } from './AircraftConfigs';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { IAudioManager, IHUDSystem } from '../../types/SystemInterfaces';
+import { Faction } from '../combat/types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem, MuzzleFlashVariant } from '../effects/MuzzleFlashSystem';
 import { Logger } from '../../utils/Logger';
@@ -15,12 +16,21 @@ interface WeaponInstance {
   cooldownRemaining: number;
   roundsSinceTracer: number;
   lastPodSide: boolean; // alternating left/right for rocket pods
+  /** Crew-served weapons (door guns) only fire when the seat is manned. */
+  crewServed: boolean;
 }
 
 interface HelicopterWeaponState {
+  /** Pilot-operated weapons cycled by the active index. */
   weapons: WeaponInstance[];
+  /** Crew-served weapons (door guns) fired independently when manned. */
+  crewWeapons: WeaponInstance[];
   activeIndex: number;
   isFiring: boolean;
+  /** True when a player gunner or AI crew occupies the door-gun seat(s). */
+  crewManned: boolean;
+  /** Owning faction; aircraft guns only damage enemies of this faction. */
+  faction: Faction;
 }
 
 // ── Rearm rates ──
@@ -70,24 +80,40 @@ export class HelicopterWeaponSystem {
 
   // ── Lifecycle ──
 
-  initWeapons(heliId: string, mounts: AircraftWeaponMount[]): void {
-    // Only pilot-operated weapons for now
-    const pilotWeapons = mounts.filter(m => m.firingMode === 'pilot');
-    if (pilotWeapons.length === 0) return;
-
-    const weapons: WeaponInstance[] = pilotWeapons.map(config => ({
+  initWeapons(heliId: string, mounts: AircraftWeaponMount[], faction: Faction = Faction.US): void {
+    const makeInstance = (config: AircraftWeaponMount): WeaponInstance => ({
       config,
       ammo: config.ammoCapacity,
       cooldownRemaining: 0,
       roundsSinceTracer: 0,
       lastPodSide: false,
-    }));
+      crewServed: config.firingMode === 'crew',
+    });
+
+    const weapons = mounts.filter(m => m.firingMode === 'pilot').map(makeInstance);
+    const crewWeapons = mounts.filter(m => m.firingMode === 'crew').map(makeInstance);
+
+    // Nothing to track if the airframe has no armament at all.
+    if (weapons.length === 0 && crewWeapons.length === 0) return;
 
     this.states.set(heliId, {
       weapons,
+      crewWeapons,
       activeIndex: 0,
       isFiring: false,
+      crewManned: false,
+      faction,
     });
+  }
+
+  /**
+   * Mark whether the door-gun seat(s) are occupied. Crew-served weapons stay
+   * inert until manned (player gunner or AI crew), then fire automatically at
+   * enemies via the door-gunner update path.
+   */
+  setCrewManned(heliId: string, manned: boolean): void {
+    const state = this.states.get(heliId);
+    if (state) state.crewManned = manned;
   }
 
   startFiring(heliId: string): void {
@@ -129,32 +155,43 @@ export class HelicopterWeaponSystem {
     const state = this.states.get(heliId);
     if (!state) return;
 
-    const active = state.weapons[state.activeIndex];
-    if (!active) return;
-
     // Rearm when grounded near helipad
     if (isGrounded && nearHelipad) {
       this.rearm(state, dt);
     }
 
-    // Decrement cooldown
-    if (active.cooldownRemaining > 0) {
-      active.cooldownRemaining -= dt;
-    }
-
-    // Fire if holding trigger
-    if (state.isFiring && active.ammo > 0 && active.cooldownRemaining <= 0) {
-      const isProjectile = (active.config.projectileSpeed ?? 0) > 0;
-      if (isProjectile) {
-        this.fireProjectile(active, position, quaternion);
-      } else {
-        this.fireHitscan(active, position, quaternion, dt);
+    // Crew-served door guns: fire when manned and airborne, independent of the
+    // pilot trigger. They stay inert when unmanned or grounded.
+    if (state.crewManned && !isGrounded) {
+      for (const crew of state.crewWeapons) {
+        if (crew.cooldownRemaining > 0) crew.cooldownRemaining -= dt;
+        if (crew.ammo > 0 && crew.cooldownRemaining <= 0) {
+          this.fireHitscan(crew, position, quaternion, dt, state.faction);
+        }
       }
     }
 
-    // Push HUD status
-    if (this.hudSystem) {
-      this.hudSystem.setHelicopterWeaponStatus(active.config.name, active.ammo);
+    const active = state.weapons[state.activeIndex];
+    if (active) {
+      // Decrement cooldown
+      if (active.cooldownRemaining > 0) {
+        active.cooldownRemaining -= dt;
+      }
+
+      // Fire if holding trigger
+      if (state.isFiring && active.ammo > 0 && active.cooldownRemaining <= 0) {
+        const isProjectile = (active.config.projectileSpeed ?? 0) > 0;
+        if (isProjectile) {
+          this.fireProjectile(active, position, quaternion);
+        } else {
+          this.fireHitscan(active, position, quaternion, dt, state.faction);
+        }
+      }
+
+      // Push HUD status
+      if (this.hudSystem) {
+        this.hudSystem.setHelicopterWeaponStatus(active.config.name, active.ammo);
+      }
     }
   }
 
@@ -177,6 +214,18 @@ export class HelicopterWeaponSystem {
     return this.states.get(heliId)?.weapons.length ?? 0;
   }
 
+  /** Number of crew-served weapons (door guns) registered for this aircraft. */
+  getCrewWeaponCount(heliId: string): number {
+    return this.states.get(heliId)?.crewWeapons.length ?? 0;
+  }
+
+  /** Aggregate crew-served ammo remaining (door guns). */
+  getCrewAmmo(heliId: string): number {
+    const state = this.states.get(heliId);
+    if (!state) return 0;
+    return state.crewWeapons.reduce((sum, w) => sum + w.ammo, 0);
+  }
+
   // ── Hitscan (minigun) ──
 
   private fireHitscan(
@@ -184,6 +233,7 @@ export class HelicopterWeaponSystem {
     position: THREE.Vector3,
     quaternion: THREE.Quaternion,
     dt: number,
+    faction: Faction,
   ): void {
     const interval = 1 / weapon.config.fireRate;
 
@@ -211,7 +261,8 @@ export class HelicopterWeaponSystem {
       const ray = new THREE.Ray(_mountWorld.clone(), _forward.clone());
       if (this.combatantSystem) {
         const dmg = weapon.config.damage;
-        const result = this.combatantSystem.handlePlayerShot(ray, () => dmg);
+        // Pass the owning faction so friend-or-foe filtering only damages enemies.
+        const result = this.combatantSystem.handlePlayerShot(ray, () => dmg, 'helicopter_minigun', faction);
 
         if (result.hit) {
           // Impact effect
@@ -303,7 +354,12 @@ export class HelicopterWeaponSystem {
   // ── Rearm ──
 
   private rearm(state: HelicopterWeaponState, dt: number): void {
-    for (const w of state.weapons) {
+    this.rearmWeapons(state.weapons, dt);
+    this.rearmWeapons(state.crewWeapons, dt);
+  }
+
+  private rearmWeapons(weapons: WeaponInstance[], dt: number): void {
+    for (const w of weapons) {
       if (w.ammo >= w.config.ammoCapacity) continue;
 
       const isProjectile = (w.config.projectileSpeed ?? 0) > 0;

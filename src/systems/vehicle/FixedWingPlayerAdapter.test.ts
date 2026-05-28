@@ -54,6 +54,9 @@ function createMockFixedWingModel(options?: {
     })),
     exitAircraft: vi.fn(),
     tryEnterAircraft: vi.fn(),
+    getWeaponCount: vi.fn(() => 1),
+    startFiring: vi.fn(),
+    stopFiring: vi.fn(),
   };
 }
 
@@ -200,6 +203,45 @@ describe('FixedWingPlayerAdapter', () => {
         reason: 'input',
       });
       expect(result).toBe(plannedExit);
+    });
+  });
+
+  describe('armament wiring', () => {
+    it('advertises the forward cannon as a firable weapon on entry', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'fw_abc');
+      adapter.onEnter(ctx);
+
+      const vehicleContext = (ctx.hudSystem!.setVehicleContext as any).mock.calls.at(-1)?.[0];
+      expect(vehicleContext.weaponCount).toBeGreaterThan(0);
+      expect(vehicleContext.capabilities.canFirePrimary).toBe(true);
+    });
+
+    it('routes the fire trigger to the model only while seated', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'fw_abc');
+
+      // No-op before boarding.
+      adapter.startFiring();
+      expect(fwModel.startFiring).not.toHaveBeenCalled();
+
+      adapter.onEnter(ctx);
+      adapter.startFiring();
+      expect(fwModel.startFiring).toHaveBeenCalledWith('fw_abc');
+
+      adapter.stopFiring();
+      expect(fwModel.stopFiring).toHaveBeenCalledWith('fw_abc');
+    });
+
+    it('releases the trigger when the player leaves the cockpit', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'fw_abc');
+      adapter.onEnter(ctx);
+      adapter.startFiring();
+      (fwModel.stopFiring as any).mockClear();
+
+      adapter.onExit(ctx);
+      expect(fwModel.stopFiring).toHaveBeenCalledWith('fw_abc');
     });
   });
 

@@ -5,6 +5,7 @@ import type { AircraftWeaponMount } from './AircraftConfigs';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { IAudioManager, IHUDSystem } from '../../types/SystemInterfaces';
+import { Faction } from '../combat/types';
 
 // Mock effect systems to avoid WebGL in tests
 vi.mock('../effects/TracerPool', () => ({
@@ -370,6 +371,64 @@ describe('HelicopterWeaponSystem', () => {
       // Rearm 1 second at 1 rocket/sec
       ws.update(1.0, HELI_ID, pos, quat, true, true);
       expect(ws.getWeaponStatus(HELI_ID)!.ammo).toBe(14);
+    });
+  });
+
+  describe('crew-served door guns', () => {
+    it('registers crew weapons so a manned door gun can fire', () => {
+      ws.initWeapons(HELI_ID, [MINIGUN, ROCKET, CREW_GUN]);
+      // Pilot weapon count is unchanged (crew guns are a separate channel)...
+      expect(ws.getWeaponCount(HELI_ID)).toBe(2);
+      // ...but the crew door gun is now tracked with ammo, not dropped.
+      expect(ws.getCrewWeaponCount(HELI_ID)).toBe(1);
+      expect(ws.getCrewAmmo(HELI_ID)).toBe(CREW_GUN.ammoCapacity);
+    });
+
+    it('stays inert while the door-gun seat is unmanned', () => {
+      ws.initWeapons(HELI_ID, [MINIGUN, CREW_GUN]);
+      // Airborne, trigger not pulled, seat unmanned: only the manned crew path
+      // would fire, and it must not.
+      ws.update(0.5, HELI_ID, pos, quat, false, false);
+      expect(cs.handlePlayerShot).not.toHaveBeenCalled();
+    });
+
+    it('fires the door gun once the seat is manned and the heli is airborne', () => {
+      ws.initWeapons(HELI_ID, [CREW_GUN]);
+      ws.setCrewManned(HELI_ID, true);
+      ws.update(0.5, HELI_ID, pos, quat, false, false);
+      expect(cs.handlePlayerShot).toHaveBeenCalled();
+      // Door gun should have drawn down its own ammo pool.
+      expect(ws.getCrewAmmo(HELI_ID)).toBeLessThan(CREW_GUN.ammoCapacity);
+    });
+
+    it('holds fire when manned but still on the ground', () => {
+      ws.initWeapons(HELI_ID, [CREW_GUN]);
+      ws.setCrewManned(HELI_ID, true);
+      ws.update(0.5, HELI_ID, pos, quat, true, false); // grounded
+      expect(cs.handlePlayerShot).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('friend-or-foe filtering', () => {
+    it('shoots through the shared combatant fire path with the owning faction', () => {
+      // OPFOR gunship: its guns must resolve hits as an OPFOR shooter so the
+      // shared IFF filter spares OPFOR combatants.
+      ws.initWeapons(HELI_ID, [MINIGUN], Faction.NVA);
+      ws.startFiring(HELI_ID);
+      ws.update(0.05, HELI_ID, pos, quat, false, false);
+
+      expect(cs.handlePlayerShot).toHaveBeenCalled();
+      const faction = (cs.handlePlayerShot as any).mock.calls[0][3];
+      expect(faction).toBe(Faction.NVA);
+    });
+
+    it('defaults to the US faction for the player gunship', () => {
+      ws.initWeapons(HELI_ID, [MINIGUN]);
+      ws.startFiring(HELI_ID);
+      ws.update(0.05, HELI_ID, pos, quat, false, false);
+
+      const faction = (cs.handlePlayerShot as any).mock.calls[0][3];
+      expect(faction).toBe(Faction.US);
     });
   });
 

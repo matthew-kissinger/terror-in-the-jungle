@@ -478,8 +478,12 @@ export class CombatantSystem implements GameSystem {
     ray: THREE.Ray,
     damageCalculator: (distance: number, isHeadshot: boolean) => number,
     weaponType = 'rifle',
+    // Shooter faction for friend-or-foe filtering. Defaults to the player's
+    // faction (US). Aircraft weapons pass their owning faction so friendly
+    // combatants are never hit.
+    shooterFaction: Faction = Faction.US,
   ): CombatHitResult {
-    return this.combatantCombat.handlePlayerShot(ray, damageCalculator, this.combatants, weaponType);
+    return this.combatantCombat.handlePlayerShot(ray, damageCalculator, this.combatants, weaponType, shooterFaction);
   }
 
   resolvePlayerAimPoint(ray: THREE.Ray): CombatHitResult {
