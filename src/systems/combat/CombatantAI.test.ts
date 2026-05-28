@@ -66,6 +66,7 @@ vi.mock('./ai/AIStateEngage', () => ({
     setSquads = vi.fn()
     setUtilityScorer = vi.fn()
     setCoverBearingProbe = vi.fn()
+    setCoverGridQuery = vi.fn()
   },
 }))
 
@@ -107,6 +108,7 @@ vi.mock('./ai/AICoverSystem', () => ({
     cleanupOccupation = vi.fn()
     setTerrainSystem = vi.fn()
     setSandbagSystem = vi.fn()
+    collectCoverCandidates = vi.fn(() => [])
   },
 }))
 
