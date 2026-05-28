@@ -149,6 +149,66 @@ export class AICoverSystem {
   }
 
   /**
+   * Collect the unscored cover candidates the synchronous `findBestCover`
+   * scan would consider near `origin` (cached terrain ridge/depression
+   * spots plus dynamically-placed sandbags), without running the
+   * `evaluateCoverQuality` scoring pass.
+   *
+   * Used by `CombatCoverGridProvider` to populate the O(1) spatial grid
+   * with the SAME candidate set the legacy scan draws from — so routing
+   * flank cover-selection through the grid changes which candidate wins
+   * (nearest LOS-valid vs. best-scored), not which positions are in play.
+   * This keeps cover-choice sane: the grid never invents cover the scan
+   * couldn't also have found.
+   *
+   * `threatPosition` only affects sandbag candidate placement (the cover
+   * point is offset to sit behind the sandbag relative to the threat),
+   * matching `findBestCover`. Returned `CoverSpot.position` vectors are
+   * freshly-cloned and owned by the caller — sandbag positions are copied
+   * out of the object pool so the caller can retain them safely.
+   */
+  collectCoverCandidates(
+    origin: THREE.Vector3,
+    threatPosition: THREE.Vector3,
+    maxSearchRadius: number = 30
+  ): CoverSpot[] {
+    const candidates: CoverSpot[] = []
+
+    const chunkKeys = this.getChunksInRadius(origin, maxSearchRadius)
+    for (const chunkKey of chunkKeys) {
+      const cachedSpots = this.getCachedCoverSpots(chunkKey, origin)
+      for (const spot of cachedSpots) {
+        if (origin.distanceTo(spot.position) > maxSearchRadius) continue
+        // Clone so the caller (grid) owns a stable position independent of
+        // the per-chunk cache, which is rebuilt on its own TTL.
+        candidates.push({ ...spot, position: spot.position.clone() })
+      }
+    }
+
+    if (this.sandbagSystem) {
+      const sandbagSpots = evaluateSandbagCover(
+        this.sandbagSystem,
+        origin,
+        threatPosition,
+        maxSearchRadius
+      )
+      for (const spot of sandbagSpots) {
+        if (origin.distanceTo(spot.position) <= maxSearchRadius) {
+          // evaluateSandbagCover hands back pooled Vector3s; copy out and
+          // release so the pool stays balanced and the caller owns a clone.
+          const pooled = spot.position
+          candidates.push({ ...spot, position: new THREE.Vector3().copy(pooled) })
+          objectPool.releaseVector3(pooled)
+        } else {
+          objectPool.releaseVector3(spot.position)
+        }
+      }
+    }
+
+    return candidates
+  }
+
+  /**
    * Reset per-frame budgets. Call once per frame before AI updates.
    */
   beginFrame(): void {

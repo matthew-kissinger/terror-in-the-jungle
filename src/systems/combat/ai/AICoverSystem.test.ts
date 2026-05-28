@@ -701,4 +701,70 @@ describe('AICoverSystem', () => {
       expect(keys.length).toBeGreaterThan(1);
     });
   });
+
+  describe('collectCoverCandidates', () => {
+    it('returns the same terrain cover positions findBestCover draws from', () => {
+      // The ridge at x=10 is the terrain cover findBestCover finds; the
+      // candidate collector should surface it too (unscored).
+      mockHeightQueryCache.getHeightAt = vi.fn((x: number, _z: number) => {
+        if (x >= 8 && x <= 12) return 5;
+        return 0;
+      });
+      const origin = new THREE.Vector3(0, 0, 0);
+      const threat = new THREE.Vector3(30, 0, 0);
+
+      const candidates = coverSystem.collectCoverCandidates(origin, threat, 30);
+
+      expect(candidates.length).toBeGreaterThan(0);
+      // Every candidate is within the search radius of the origin.
+      for (const c of candidates) {
+        expect(origin.distanceTo(c.position)).toBeLessThanOrEqual(30);
+      }
+      // The ridge cover (a position findBestCover would also return) is present.
+      const findBest = coverSystem.findBestCover(
+        createMockCombatant('seeker', Faction.US, origin),
+        threat,
+        new Map(),
+        30
+      );
+      expect(findBest).not.toBeNull();
+      const matchesBest = candidates.some(
+        c => c.position.distanceTo(findBest!.position) < 0.001
+      );
+      expect(matchesBest).toBe(true);
+    });
+
+    it('returns no candidates beyond the search radius', () => {
+      mockHeightQueryCache.getHeightAt = vi.fn((x: number, _z: number) => {
+        if (x >= 8 && x <= 12) return 5;
+        return 0;
+      });
+      const origin = new THREE.Vector3(0, 0, 0);
+      const threat = new THREE.Vector3(100, 0, 0);
+
+      // Radius too small to reach the ridge at x=10.
+      const candidates = coverSystem.collectCoverCandidates(origin, threat, 5);
+
+      expect(candidates.length).toBe(0);
+    });
+
+    it('hands back cloned positions the caller can retain safely', () => {
+      mockHeightQueryCache.getHeightAt = vi.fn((x: number, _z: number) => {
+        if (x >= 8 && x <= 12) return 5;
+        return 0;
+      });
+      const origin = new THREE.Vector3(0, 0, 0);
+      const threat = new THREE.Vector3(30, 0, 0);
+
+      const candidates = coverSystem.collectCoverCandidates(origin, threat, 30);
+      expect(candidates.length).toBeGreaterThan(0);
+
+      // Mutating a returned position must not corrupt subsequent collections.
+      const before = candidates[0].position.clone();
+      candidates[0].position.set(999, 999, 999);
+      const again = coverSystem.collectCoverCandidates(origin, threat, 30);
+      const stillThere = again.some(c => c.position.distanceTo(before) < 0.001);
+      expect(stillThere).toBe(true);
+    });
+  });
 });

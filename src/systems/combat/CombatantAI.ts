@@ -15,6 +15,7 @@ import { AITargeting } from './ai/AITargeting'
 import type { TargetAcquisitionTelemetry } from './ai/AITargetAcquisition'
 import { AICoverSystem } from './ai/AICoverSystem'
 import { AIFlankingSystem } from './ai/AIFlankingSystem'
+import { CombatCoverGridProvider } from './ai/CombatCoverGridProvider'
 import { UtilityScorer, DEFAULT_UTILITY_ACTIONS } from './ai/utility'
 import {
   TankAIGunnerRoute,
@@ -93,6 +94,12 @@ export class CombatantAI {
   // Tactical systems
   private coverSystem: AICoverSystem
   private flankingSystem: AIFlankingSystem
+  // O(1) cover spatial-grid bridge. Owns a CoverSpatialGrid populated from
+  // the same terrain + sandbag candidates the synchronous scan uses, and is
+  // injected into the engage handler so engaged-state flank cover selection
+  // queries the grid first (falling back to the synchronous scan only when
+  // the grid yields no LOS-valid candidate). DEFEKT-3 chip.
+  private coverGridProvider: CombatCoverGridProvider
   private ticketSystem?: TicketSystem
   private flankingUpdatedSquadsThisFrame: Set<string> = new Set()
   private losCallsiteTelemetry: LosCallsiteTelemetry = createLosCallsiteTelemetry()
@@ -175,6 +182,7 @@ export class CombatantAI {
     this.targeting = new AITargeting()
     this.coverSystem = new AICoverSystem()
     this.flankingSystem = new AIFlankingSystem()
+    this.coverGridProvider = new CombatCoverGridProvider(this.coverSystem)
 
     this.targeting.setMethodTimer((name, fn) => this.withAiMethodTiming(name, fn))
 
@@ -182,6 +190,11 @@ export class CombatantAI {
     this.engageHandler.setCoverSystem(this.coverSystem)
     this.engageHandler.setFlankingSystem(this.flankingSystem)
     this.engageHandler.setMethodTimer((name, fn) => this.withAiMethodTiming(name, fn))
+    // Route engaged-state flank cover selection through the O(1) grid. The
+    // grid needs a terrain runtime to LOS-gate candidates; until
+    // setTerrainSystem() wires one, queryWithLOS() returns null and the
+    // engage handler uses its synchronous-scan fallback unchanged.
+    this.engageHandler.setCoverGridQuery(this.coverGridProvider)
 
     // Wire C1 utility-AI prototype. Factions opt in via
     // FACTION_COMBAT_TUNING[faction].useUtilityAI — currently only VC.
@@ -788,6 +801,9 @@ export class CombatantAI {
     this.targeting.setTerrainSystem(terrainSystem)
     this.coverSystem.setTerrainSystem(terrainSystem)
     this.flankingSystem.setTerrainSystem(terrainSystem)
+    // Activates the cover-grid LOS gate; without it the grid query no-ops
+    // and the engage handler stays on the synchronous-scan fallback.
+    this.coverGridProvider.setTerrainRuntime(terrainSystem)
   }
 
   setEngagementRange(range: number): void {
