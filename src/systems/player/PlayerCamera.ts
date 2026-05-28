@@ -15,6 +15,22 @@ const _lookTarget = new THREE.Vector3();
 const _fwPosition = new THREE.Vector3();
 const _fwQuaternion = new THREE.Quaternion();
 const _fwForward = new THREE.Vector3();
+const _followPosition = new THREE.Vector3();
+const _followLookTarget = new THREE.Vector3();
+
+/**
+ * Minimal contract a ground/tank/surface adapter implements so the camera
+ * can drive a third-person follow pose for it without knowing the vehicle's
+ * concrete type. The adapter registers itself via
+ * `PlayerCamera.setVehicleFollowCamera` on enter and clears it on exit.
+ *
+ * Returns true and writes the desired camera position + look target into the
+ * provided vectors; returns false when the vehicle pose is unavailable, in
+ * which case the camera falls back to first-person for that frame.
+ */
+export interface VehicleFollowCamera {
+  computeThirdPersonCamera(outPosition: THREE.Vector3, outLookTarget: THREE.Vector3): boolean;
+}
 
 const FIXED_WING_CAMERA_FOLLOW_RATE = 9.5;
 const FIXED_WING_CAMERA_LOOK_RATE = 12;
@@ -26,6 +42,9 @@ export class PlayerCamera {
   private cameraShakeSystem?: CameraShakeSystem;
   private helicopterModel?: IHelicopterModel;
   private fixedWingModel?: FixedWingModel;
+  // Active ground/tank/surface follow-cam provider, set by the vehicle
+  // adapter on enter and cleared on exit. Null means infantry (first-person).
+  private vehicleFollowCamera: VehicleFollowCamera | null = null;
 
   // Camera settings
   private pitch = 0;
@@ -64,6 +83,16 @@ export class PlayerCamera {
     this.fixedWingModel = fixedWingModel;
   }
 
+  /**
+   * Register (or clear with `null`) the ground/tank follow-cam provider.
+   * While set, `updateCamera` drives a third-person follow pose instead of
+   * the infantry first-person camera. Adapters call this in `onEnter` and
+   * clear it in `onExit` so exit re-attaches first-person automatically.
+   */
+  setVehicleFollowCamera(provider: VehicleFollowCamera | null): void {
+    this.vehicleFollowCamera = provider;
+  }
+
   setFlightMouseControlEnabled(enabled: boolean): void {
     this.flightMouseControlEnabled = enabled;
   }
@@ -96,10 +125,37 @@ export class PlayerCamera {
       this.updateHelicopterCamera(input);
     } else if (this.playerState.isInFixedWing) {
       this.updateFixedWingCamera(input, deltaTime);
+    } else if (this.vehicleFollowCamera) {
+      this.resetFixedWingCameraState();
+      this.updateVehicleFollowCamera(input);
     } else {
       this.resetFixedWingCameraState();
       this.updateFirstPersonCamera(input);
     }
+  }
+
+  /**
+   * Third-person follow camera for ground vehicles and tanks. Pose math
+   * lives on the adapter (`computeThirdPersonCamera`) so each vehicle type
+   * tunes its own distance/height; the camera just applies the result. If
+   * the adapter cannot resolve the chassis pose this frame (e.g. mid-spawn),
+   * fall back to first-person so the view never freezes under the chassis.
+   */
+  private updateVehicleFollowCamera(input: PlayerInput): void {
+    const provider = this.vehicleFollowCamera;
+    if (!provider || !provider.computeThirdPersonCamera(_followPosition, _followLookTarget)) {
+      this.updateFirstPersonCamera(input);
+      return;
+    }
+
+    // Consume any pending mouse movement so it doesn't accumulate and snap
+    // the view the instant the player exits back to infantry control.
+    if (input.getIsPointerLocked()) {
+      input.clearMouseMovement();
+    }
+
+    this.camera.position.copy(_followPosition);
+    this.camera.lookAt(_followLookTarget);
   }
 
   private updateFirstPersonCamera(input: PlayerInput): void {
