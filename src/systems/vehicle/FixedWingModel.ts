@@ -46,7 +46,40 @@ import type { VehicleExitOptions, VehicleExitPlan, VehicleExitResult } from './P
 import { ModelLoader } from '../assets/ModelLoader';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { Faction } from '../combat/types';
+import type { CombatantSystem } from '../combat/CombatantSystem';
+import { TracerPool } from '../effects/TracerPool';
 import { Logger } from '../../utils/Logger';
+
+/**
+ * Forward fixed-wing armament. A single nose-mounted hitscan cannon firing
+ * straight ahead along the airframe forward axis. Reuses the same combatant
+ * fire path (handlePlayerShot) as the helicopter weapons so friend-or-foe
+ * filtering and damage resolution are shared — no bespoke targeting.
+ */
+const FIXED_WING_FORWARD_GUN = {
+  name: 'Nose Cannon',
+  ammoCapacity: 600,
+  fireRate: 18,        // rounds per second
+  damage: 22,          // per hit
+  spreadDeg: 0.8,
+  tracerInterval: 2,
+  // Muzzle offset forward of the airframe origin so the ray clears the nose.
+  muzzleForward: 4.0,
+} as const;
+
+const FIXED_WING_GUN_TRACER_RANGE = 500;
+
+interface FixedWingWeaponState {
+  ammo: number;
+  cooldownRemaining: number;
+  roundsSinceTracer: number;
+  isFiring: boolean;
+  faction: Faction;
+}
+
+const _gunMuzzle = new THREE.Vector3();
+const _gunForward = new THREE.Vector3();
+const _gunTracerEnd = new THREE.Vector3();
 
 interface AircraftRuntime {
   airframe: Airframe;
@@ -147,7 +180,7 @@ function sanitizeCommand(command: Partial<FixedWingCommand>, base: FixedWingComm
 
 /**
  * Orchestrates all fixed-wing aircraft instances.
- * Parallel to HelicopterModel but simpler (no weapons, no door gunners).
+ * Parallel to HelicopterModel; carries a forward nose cannon (no door gunners).
  */
 export class FixedWingModel implements GameSystem {
   private static readonly IDLE_SIMULATION_SPEED = 0.5;
@@ -181,6 +214,11 @@ export class FixedWingModel implements GameSystem {
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
   private vehicleManager?: VehicleManager;
+  private combatantSystem?: CombatantSystem;
+
+  // Forward armament: per-aircraft weapon state + a small shared tracer pool.
+  private weapons = new Map<string, FixedWingWeaponState>();
+  private tracerPool?: TracerPool;
 
   // Controls from player input
   private currentPilotIntent: FixedWingPilotIntent = createIdleFixedWingPilotIntent();
@@ -212,6 +250,10 @@ export class FixedWingModel implements GameSystem {
 
   setVehicleManager(vehicleManager: VehicleManager): void {
     this.vehicleManager = vehicleManager;
+  }
+
+  setCombatantSystem(combatantSystem: CombatantSystem): void {
+    this.combatantSystem = combatantSystem;
   }
 
   // -- GameSystem lifecycle --
@@ -346,6 +388,18 @@ export class FixedWingModel implements GameSystem {
 
       const currentSnapshot = shouldSimulate ? this.buildSnapshot(runtime) : snapshot;
       const currentFlightState = fixedWingFlightStateFromSnapshot(currentSnapshot);
+
+      // Forward cannon: only the player-piloted aircraft can pull the trigger.
+      // Gated to airborne flight so a parked aircraft can't strafe the apron.
+      if (isPiloted) {
+        this.updateForwardGun(
+          aircraftId,
+          group,
+          currentFlightState !== 'grounded',
+          deltaTime,
+        );
+      }
+
       const shouldRender = shouldRenderAirVehicle({
         camera,
         scene: this.scene,
@@ -377,6 +431,9 @@ export class FixedWingModel implements GameSystem {
         this.playerController.updatePlayerPosition(group.position);
       }
     }
+
+    // Sweep expired tracers (no-op until the cannon has actually fired).
+    this.tracerPool?.update();
   }
 
   dispose(): void {
@@ -408,6 +465,9 @@ export class FixedWingModel implements GameSystem {
     this.spawnMetadata.clear();
     this.lineupAircraft.clear();
     this.simulating.clear();
+    this.weapons.clear();
+    this.tracerPool?.dispose();
+    this.tracerPool = undefined;
     for (const pilot of this.npcPilots.values()) pilot.clearMission();
     this.npcPilots.clear();
   }
@@ -504,6 +564,17 @@ export class FixedWingModel implements GameSystem {
         airframe,
         command: createIdleCommand(),
         worldHalfExtent,
+      });
+
+      // Forward armament: every fixed-wing carries the nose cannon. US-owned
+      // (matches the VehicleManager adapter faction below) so friend-or-foe
+      // filtering only damages enemies.
+      this.weapons.set(id, {
+        ammo: FIXED_WING_FORWARD_GUN.ammoCapacity,
+        cooldownRemaining: 0,
+        roundsSinceTracer: 0,
+        isFiring: false,
+        faction: Faction.US,
       });
 
       // Wire animation on the inner model (where propeller nodes live)
@@ -724,6 +795,133 @@ export class FixedWingModel implements GameSystem {
   setFixedWingPilotIntent(intent: FixedWingPilotIntent): void {
     this.currentPilotIntent = { ...intent };
     this.pilotIntentActive = true;
+  }
+
+  // -- Forward armament --
+
+  /**
+   * Begin firing the nose cannon for the given aircraft. Held trigger: the
+   * cannon keeps firing each update while `isFiring` is set and ammo remains.
+   */
+  startFiring(aircraftId: string): void {
+    const weapon = this.weapons.get(aircraftId);
+    if (weapon) weapon.isFiring = true;
+  }
+
+  stopFiring(aircraftId: string): void {
+    const weapon = this.weapons.get(aircraftId);
+    if (weapon) weapon.isFiring = false;
+  }
+
+  /** Number of forward weapons mounted on this aircraft (currently the nose cannon). */
+  getWeaponCount(aircraftId: string): number {
+    return this.weapons.has(aircraftId) ? 1 : 0;
+  }
+
+  /** Forward cannon ammo remaining. */
+  getWeaponAmmo(aircraftId: string): number {
+    return this.weapons.get(aircraftId)?.ammo ?? 0;
+  }
+
+  /**
+   * Advance the forward cannon for one frame. Fires as many rounds as the
+   * fire-rate budget allows while the trigger is held, routing each shot
+   * through the shared combatant fire path so friend-or-foe filtering and
+   * damage resolution match the helicopter and player weapons. Only fires
+   * for airborne / moving aircraft (no ground strafing of the parking apron).
+   */
+  private updateForwardGun(
+    aircraftId: string,
+    group: THREE.Group,
+    isAirborne: boolean,
+    deltaTime: number,
+  ): void {
+    const weapon = this.weapons.get(aircraftId);
+    if (!weapon) return;
+
+    if (weapon.cooldownRemaining > 0) {
+      weapon.cooldownRemaining -= deltaTime;
+    }
+
+    if (!weapon.isFiring || !isAirborne || weapon.ammo <= 0) {
+      return;
+    }
+    if (!this.combatantSystem) {
+      return;
+    }
+
+    const interval = 1 / FIXED_WING_FORWARD_GUN.fireRate;
+    let rounds = 0;
+    // Fire as many rounds as the dt budget allows, capped to avoid a runaway
+    // loop on a very large frame delta.
+    while (weapon.cooldownRemaining <= 0 && weapon.ammo > 0 && rounds < 32) {
+      weapon.cooldownRemaining += interval;
+      weapon.ammo--;
+      weapon.roundsSinceTracer++;
+      rounds++;
+
+      // Physics forward is -Z; muzzle sits ahead of the nose so the ray clears
+      // the airframe geometry.
+      _gunForward.set(0, 0, -1).applyQuaternion(group.quaternion).normalize();
+      _gunMuzzle
+        .copy(_gunForward)
+        .multiplyScalar(FIXED_WING_FORWARD_GUN.muzzleForward)
+        .add(group.position);
+
+      this.applyGunSpread(_gunForward, FIXED_WING_FORWARD_GUN.spreadDeg);
+
+      const ray = new THREE.Ray(_gunMuzzle.clone(), _gunForward.clone());
+      const result = this.combatantSystem.handlePlayerShot(
+        ray,
+        () => FIXED_WING_FORWARD_GUN.damage,
+        'fixedwing_gun',
+        weapon.faction,
+      );
+
+      if (result.hit) {
+        this.combatantSystem.impactEffectsPool?.spawn(result.point, _gunForward);
+      }
+
+      if (weapon.roundsSinceTracer >= FIXED_WING_FORWARD_GUN.tracerInterval) {
+        weapon.roundsSinceTracer = 0;
+        _gunTracerEnd.copy(
+          result.hit
+            ? result.point
+            : _gunMuzzle.clone().addScaledVector(_gunForward, FIXED_WING_GUN_TRACER_RANGE),
+        );
+        this.ensureTracerPool().spawn(_gunMuzzle.clone(), _gunTracerEnd.clone(), 120);
+      }
+    }
+  }
+
+  /** Lazily create the shared tracer pool (only when something actually fires). */
+  private ensureTracerPool(): TracerPool {
+    if (!this.tracerPool) {
+      this.tracerPool = new TracerPool(this.scene, 24);
+    }
+    return this.tracerPool;
+  }
+
+  /** Apply a random cone spread to a normalized forward direction in place. */
+  private applyGunSpread(direction: THREE.Vector3, spreadDeg: number): void {
+    if (spreadDeg <= 0) return;
+    const spreadRad = (spreadDeg * Math.PI) / 180;
+    const angle = Math.random() * spreadRad;
+    const rotation = Math.random() * Math.PI * 2;
+
+    const up = _gunTracerEnd.set(0, 1, 0);
+    const right = new THREE.Vector3().crossVectors(direction, up);
+    if (right.lengthSq() < 0.001) {
+      up.set(1, 0, 0);
+      right.crossVectors(direction, up);
+    }
+    right.normalize();
+    up.crossVectors(right, direction).normalize();
+
+    direction
+      .addScaledVector(right, Math.sin(angle) * Math.cos(rotation))
+      .addScaledVector(up, Math.sin(angle) * Math.sin(rotation))
+      .normalize();
   }
 
   // -- NPC pilot hooks --

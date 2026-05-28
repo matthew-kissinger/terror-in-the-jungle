@@ -321,7 +321,11 @@ export class CombatantCombat {
     ray: THREE.Ray,
     damageCalculator: (distance: number, isHeadshot: boolean) => number,
     allCombatants: Map<string, Combatant>,
-    weaponType: string = 'rifle'
+    weaponType: string = 'rifle',
+    // Faction of the shooter. Defaults to the player's faction (US). Aircraft
+    // weapons pass their owning faction so friend-or-foe filtering inside
+    // raycastCombatants (isAlly) excludes the shooter's own allies.
+    shooterFaction: Faction = Faction.US
   ): CombatHitResult {
     if (this.sandbagSystem) {
       const hitSandbag = this.sandbagSystem.checkRayIntersection(ray);
@@ -334,7 +338,7 @@ export class CombatantCombat {
       }
     }
 
-    const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants, { positionMode: 'visual' });
+    const hit = this.hitDetection.raycastCombatants(ray, shooterFaction, allCombatants, { positionMode: 'visual' });
     const terrainHit = this.terrainSystem
       ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
       : { hit: false as const };
@@ -376,7 +380,7 @@ export class CombatantCombat {
         const victimName = `${hit.combatant.faction}-${hit.combatant.id.slice(-4)}`;
         this.hudSystem.addKillToFeed(
           'PLAYER',
-          Faction.US,
+          shooterFaction,
           victimName,
           hit.combatant.faction,
           hit.headshot,

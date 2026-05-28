@@ -2,7 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { FixedWingModel } from './FixedWingModel';
 import { AircraftModels } from '../assets/modelPaths';
+import { Faction } from '../combat/types';
+import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { FixedWingSpawnMetadata } from './FixedWingOperations';
+
+// Mock the tracer pool to avoid WebGL line geometry in the test environment.
+vi.mock('../effects/TracerPool', () => ({
+  TracerPool: class {
+    spawn = vi.fn();
+    update = vi.fn();
+    dispose = vi.fn();
+  },
+}));
 
 // Mock ModelLoader
 vi.mock('../assets/ModelLoader', () => ({
@@ -356,6 +367,102 @@ describe('FixedWingModel', () => {
       expect(fedPos.x).toBeCloseTo(groupPos.x, 5);
       expect(fedPos.y).toBeCloseTo(groupPos.y, 5);
       expect(fedPos.z).toBeCloseTo(groupPos.z, 5);
+    });
+  });
+
+  describe('forward armament', () => {
+    function makeCombatantSystem() {
+      return {
+        handlePlayerShot: vi.fn().mockReturnValue({ hit: false, point: new THREE.Vector3() }),
+        impactEffectsPool: { spawn: vi.fn() },
+      } as unknown as CombatantSystem;
+    }
+
+    function makeAirbornePlayerController() {
+      const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+      camera.position.set(0, 500, 0);
+      return {
+        isInHelicopter: () => false,
+        isInFixedWing: () => true,
+        getFixedWingId: () => 'fw1',
+        exitFixedWing: vi.fn(),
+        updatePlayerPosition: vi.fn(),
+        getCamera: () => camera,
+      };
+    }
+
+    it('mounts a forward weapon so the aircraft has armament', async () => {
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(0, 10, 0), 0);
+      expect(model.getWeaponCount('fw1')).toBeGreaterThan(0);
+      expect(model.getWeaponCount('nonexistent')).toBe(0);
+    });
+
+    it('fires the forward gun through the shared combatant fire path while airborne', async () => {
+      const cs = makeCombatantSystem();
+      const metadata = createSpawnMetadata();
+      model.setCombatantSystem(cs);
+      model.setPlayerController(makeAirbornePlayerController() as any);
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+      model.setPilotedAircraft('fw1');
+      model.positionAircraftOnApproach('fw1'); // airborne
+
+      const ammoBeforeFiring = model.getWeaponAmmo('fw1');
+      model.startFiring('fw1');
+      model.update(0.2);
+
+      expect(cs.handlePlayerShot).toHaveBeenCalled();
+      // Firing draws down the cannon's ammo pool.
+      expect(model.getWeaponAmmo('fw1')).toBeLessThan(ammoBeforeFiring);
+    });
+
+    it('passes the owning faction to the fire path so friendlies are spared', async () => {
+      const cs = makeCombatantSystem();
+      const metadata = createSpawnMetadata();
+      model.setCombatantSystem(cs);
+      model.setPlayerController(makeAirbornePlayerController() as any);
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+      model.setPilotedAircraft('fw1');
+      model.positionAircraftOnApproach('fw1');
+
+      model.startFiring('fw1');
+      model.update(0.2);
+
+      // The player aircraft fires as US; the shared IFF filter spares US/ARVN.
+      const faction = (cs.handlePlayerShot as any).mock.calls[0][3];
+      expect(faction).toBe(Faction.US);
+    });
+
+    it('does not strafe while parked on the ground', async () => {
+      const cs = makeCombatantSystem();
+      model.setCombatantSystem(cs);
+      model.setPlayerController(makeAirbornePlayerController() as any);
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0);
+      model.setPilotedAircraft('fw1'); // grounded at parking spot
+
+      model.startFiring('fw1');
+      model.update(0.2);
+
+      expect(cs.handlePlayerShot).not.toHaveBeenCalled();
+    });
+
+    it('stops firing when the trigger is released', async () => {
+      const cs = makeCombatantSystem();
+      const metadata = createSpawnMetadata();
+      model.setCombatantSystem(cs);
+      model.setPlayerController(makeAirbornePlayerController() as any);
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+      model.setPilotedAircraft('fw1');
+      model.positionAircraftOnApproach('fw1');
+
+      model.startFiring('fw1');
+      model.stopFiring('fw1');
+      model.update(0.2);
+
+      expect(cs.handlePlayerShot).not.toHaveBeenCalled();
     });
   });
 

@@ -26,15 +26,17 @@ const FW_ASSIST_MOUSE_RECENTER_RATE = 3.2;
 const FW_ORBIT_HOLD_ALTITUDE_HYSTERESIS_M = 60;
 const FW_ORBIT_HOLD_MIN_DROPOUT_ALTITUDE_M = 20;
 
-function createFixedWingUIContext(role: string): VehicleUIContext {
+function createFixedWingUIContext(role: string, weaponCount: number): VehicleUIContext {
   return {
     kind: 'plane',
     role,
     hudVariant: 'flight',
-    weaponCount: 0,
+    weaponCount,
     capabilities: {
       canExit: true,
-      canFirePrimary: false,
+      // Forward nose cannon: the pilot can fire when at least one weapon is
+      // mounted. No weapon cycling (single fixed forward gun).
+      canFirePrimary: weaponCount > 0,
       canCycleWeapons: false,
       canFreeLook: true,
       canStabilize: true,
@@ -104,7 +106,10 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.showFixedWingInstruments?.();
     hudSystem?.showFixedWingMouseIndicator?.();
     hudSystem?.updateFixedWingMouseMode?.(this.getFlightMouseControlEnabled(ctx.cameraController));
-    hudSystem?.setVehicleContext?.(createFixedWingUIContext(config?.role ?? 'pilot'));
+    hudSystem?.setVehicleContext?.(createFixedWingUIContext(
+      config?.role ?? 'pilot',
+      this.fixedWingModel.getWeaponCount(ctx.vehicleId),
+    ));
 
     // Set stall speed for HUD display
     const fd = this.fixedWingModel.getFlightData(ctx.vehicleId);
@@ -144,6 +149,11 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.hideFixedWingMouseIndicator?.();
     hudSystem?.setVehicleContext?.(null);
 
+    // Release the trigger before tearing down so the cannon can't latch firing
+    // across an exit.
+    if (this.activeAircraftId) {
+      this.fixedWingModel.stopFiring(this.activeAircraftId);
+    }
     this.fixedWingModel.setPilotedAircraft(null);
     this.activeAircraftId = null;
     this.activeConfigKey = null;
@@ -194,6 +204,24 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.fixedWingOrbitCenterZ = 0;
     this.fixedWingPilotMode = 'assisted';
     this.lastMouseControlEnabled = false;
+  }
+
+  // ── Fire control ──
+
+  /**
+   * Begin firing the forward nose cannon. Routed from the player fire input
+   * while piloting (mirrors the helicopter fire wiring). No-op if not seated.
+   */
+  startFiring(): void {
+    if (this.activeAircraftId) {
+      this.fixedWingModel.startFiring(this.activeAircraftId);
+    }
+  }
+
+  stopFiring(): void {
+    if (this.activeAircraftId) {
+      this.fixedWingModel.stopFiring(this.activeAircraftId);
+    }
   }
 
   // ── Public accessors ──
