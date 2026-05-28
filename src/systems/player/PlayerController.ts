@@ -920,6 +920,7 @@ export class PlayerController implements GameSystem {
     this.configureCombatController({
       firstPersonWeapon: dependencies.firstPersonWeapon,
       helicopterModel: dependencies.helicopterModel,
+      fixedWingModel: dependencies.fixedWingModel,
       hudSystem: dependencies.hudSystem,
       inventoryManager: dependencies.inventoryManager,
       grenadeSystem: dependencies.grenadeSystem,
@@ -1140,6 +1141,7 @@ export class PlayerController implements GameSystem {
   setFixedWingModel(fixedWingModel: FixedWingModel): void {
     this.fixedWingModel = fixedWingModel;
     this.cameraController.setFixedWingModel(fixedWingModel);
+    this.configureCombatController({ fixedWingModel });
     this.configureVehicleController({ fixedWingModel });
     this.fixedWingAdapter = new FixedWingPlayerAdapter(fixedWingModel);
     this.vehicleStateManager.registerAdapter(this.fixedWingAdapter);
