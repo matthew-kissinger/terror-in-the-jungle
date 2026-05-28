@@ -112,7 +112,7 @@ describe('HelicopterDoorGunner', () => {
 
   it('does not fire without combatantSystem set', () => {
     const bareGunner = new HelicopterDoorGunner(scene);
-    bareGunner.initGunners(HELI_ID, [CREW_GUN]);
+    bareGunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
     // No setCombatantSystem call
     bareGunner.update(0.6, HELI_ID, heliPos, heliQuat, false);
     expect(cs.handlePlayerShot).not.toHaveBeenCalled();
