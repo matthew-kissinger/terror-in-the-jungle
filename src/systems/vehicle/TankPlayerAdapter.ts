@@ -128,6 +128,10 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     // Save infantry look angles so the camera restores cleanly on exit.
     ctx.cameraController.saveInfantryAngles();
 
+    // Drive the third-person orbit-tank follow-cam from this frame onward.
+    // Cleared in onExit so the camera re-attaches to first-person infantry.
+    ctx.cameraController.setVehicleFollowCamera?.(this);
+
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(createTankUIContext());
 
@@ -152,6 +156,9 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     if ('setInputContext' in ctx.input) {
       (ctx.input as any).setInputContext('gameplay');
     }
+    // Re-attach first-person before restoring infantry angles so the next
+    // updateCamera frame uses the infantry path, not the stale follow-cam.
+    ctx.cameraController?.setVehicleFollowCamera?.(null);
     ctx.cameraController?.restoreInfantryAngles();
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;

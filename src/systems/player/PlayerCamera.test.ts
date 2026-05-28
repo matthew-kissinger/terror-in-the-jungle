@@ -747,4 +747,107 @@ describe('PlayerCamera', () => {
       expect(camera.position.equals(playerState.position)).toBe(true);
     });
   });
+
+  describe('Ground-vehicle / tank follow camera', () => {
+    // A follow-cam provider that reports a fixed chassis pose well away from
+    // the infantry boarding point (playerState.position is at 0,5,0). Stands
+    // in for GroundVehiclePlayerAdapter / TankPlayerAdapter, which implement
+    // the same computeThirdPersonCamera contract.
+    const chassisCamPos = new THREE.Vector3(40, 12, -25);
+    const chassisLookAt = new THREE.Vector3(35, 4, -20);
+
+    function makeFollowProvider(resolves = true) {
+      return {
+        computeThirdPersonCamera: vi.fn(
+          (outPos: THREE.Vector3, outLook: THREE.Vector3) => {
+            if (!resolves) return false;
+            outPos.copy(chassisCamPos);
+            outLook.copy(chassisLookAt);
+            return true;
+          },
+        ),
+      };
+    }
+
+    it('drives the third-person follow path instead of sitting at the boarding point', () => {
+      const provider = makeFollowProvider();
+      playerCamera.setVehicleFollowCamera(provider);
+
+      playerCamera.updateCamera(mockInput);
+
+      // Camera tracks the chassis pose the adapter reported...
+      expect(provider.computeThirdPersonCamera).toHaveBeenCalled();
+      expect(camera.position.equals(chassisCamPos)).toBe(true);
+      // ...and is NOT stuck under the chassis at the ground-origin boarding
+      // point (the camera-under-vehicle bug this fixes).
+      expect(camera.position.equals(playerState.position)).toBe(false);
+    });
+
+    it('orients the camera toward the chassis it is following', () => {
+      const provider = makeFollowProvider();
+      playerCamera.setVehicleFollowCamera(provider);
+
+      playerCamera.updateCamera(mockInput);
+
+      // The camera should be looking from the follow position toward the
+      // chassis look target (behind/above the chassis, facing it).
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const toTarget = chassisLookAt.clone().sub(camera.position).normalize();
+      expect(forward.dot(toTarget)).toBeGreaterThan(0.99);
+    });
+
+    it('tracks the chassis as it moves between frames', () => {
+      const provider = makeFollowProvider();
+      playerCamera.setVehicleFollowCamera(provider);
+
+      playerCamera.updateCamera(mockInput);
+      const firstPos = camera.position.clone();
+
+      // Chassis drives forward: provider now reports a new pose.
+      chassisCamPos.set(60, 12, -80);
+      playerCamera.updateCamera(mockInput);
+
+      expect(camera.position.equals(firstPos)).toBe(false);
+      expect(camera.position.equals(chassisCamPos)).toBe(true);
+    });
+
+    it('falls back to first-person when the chassis pose is unavailable', () => {
+      const provider = makeFollowProvider(false);
+      playerCamera.setVehicleFollowCamera(provider);
+
+      playerCamera.updateCamera(mockInput);
+
+      // No pose this frame -> infantry view at the player position, never
+      // a frozen 3rd-person camera.
+      expect(camera.position.equals(playerState.position)).toBe(true);
+    });
+
+    it('re-attaches to first-person after the follow provider is cleared on exit', () => {
+      const provider = makeFollowProvider();
+      playerCamera.setVehicleFollowCamera(provider);
+      playerCamera.updateCamera(mockInput);
+      expect(camera.position.equals(playerState.position)).toBe(false);
+
+      // Exit the vehicle: adapter clears the provider.
+      playerCamera.setVehicleFollowCamera(null);
+      playerCamera.updateCamera(mockInput);
+
+      expect(camera.position.equals(playerState.position)).toBe(true);
+    });
+
+    it('yields to the helicopter camera when both are somehow active', () => {
+      // Flight occupancy takes priority over a ground follow-cam; this guards
+      // against a stale provider hijacking the aircraft view.
+      const provider = makeFollowProvider();
+      playerCamera.setVehicleFollowCamera(provider);
+      playerState.isInHelicopter = true;
+      playerState.helicopterId = 'heli-1';
+      playerCamera.setHelicopterModel(mockHelicopterModel);
+
+      playerCamera.updateCamera(mockInput);
+
+      expect(mockHelicopterModel.getHelicopterPositionTo).toHaveBeenCalled();
+      expect(provider.computeThirdPersonCamera).not.toHaveBeenCalled();
+    });
+  });
 });
