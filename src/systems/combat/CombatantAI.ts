@@ -811,8 +811,9 @@ export class CombatantAI {
   // Drops grid entries tied to the previous map. Region entries are
   // TTL-refreshed but never evicted, so without this a mode switch leaves the
   // old map's cover cells in the grid (and they accumulate across switches).
-  // Called from CombatantSystem.clearCombatantsForExternalPopulation, the hook
-  // that actually fires on every mode switch/restart.
+  // Called from both CombatantSystem mode-switch repopulation paths:
+  // reseedForcesForMode (OF/ZC/TDM) and clearCombatantsForExternalPopulation
+  // (WarSimulator / A Shau).
   resetCoverGrid(): void {
     this.coverGridProvider.reset()
   }
