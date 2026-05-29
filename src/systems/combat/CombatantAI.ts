@@ -801,6 +801,11 @@ export class CombatantAI {
     this.targeting.setTerrainSystem(terrainSystem)
     this.coverSystem.setTerrainSystem(terrainSystem)
     this.flankingSystem.setTerrainSystem(terrainSystem)
+    // Drop grid entries tied to the previous terrain before pointing at the
+    // new runtime. Region entries are TTL-refreshed but never evicted, so
+    // without this a mode-switch leaves the old map's cover cells in the grid
+    // (and they accumulate across switches). reset() is otherwise never called.
+    this.coverGridProvider.reset()
     // Activates the cover-grid LOS gate; without it the grid query no-ops
     // and the engage handler stays on the synchronous-scan fallback.
     this.coverGridProvider.setTerrainRuntime(terrainSystem)

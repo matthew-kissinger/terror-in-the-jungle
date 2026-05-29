@@ -152,8 +152,9 @@ export class AIStateEngage {
   private utilityScorer?: UtilityScorer
   // Optional cover spatial-grid query. When wired, squad-suppression flank
   // cover-search consults the grid first (O(1) average cell lookup with LOS
-  // gate) and falls back to the synchronous `findNearestCover` scan only
-  // when the grid returns no candidate. The grid is authored by the sibling
+  // gate). On a miss it re-scans the SAME candidate source the grid is
+  // populated from -- `coverSystem.findBestCover` (AICoverSystem) -- so the
+  // hit and miss paths agree. The grid is authored by the sibling
   // `cover-spatial-grid-cpu` R1 task; this consumer accepts any object
   // implementing the `CoverGridQuery` structural shape.
   private coverGridQuery?: CoverGridQuery
@@ -250,10 +251,12 @@ export class AIStateEngage {
 
   /**
    * Opt-in cover spatial-grid query. When set, squad-suppression flank cover
-   * search consults the grid first; the synchronous `findNearestCover` scan
-   * is only used as a fallback when the grid returns no candidate. Leaving
-   * this unset preserves the legacy synchronous path verbatim (used by every
-   * existing test in this file).
+   * search consults the grid first; on a miss it falls back to
+   * `coverSystem.findBestCover` (the same AICoverSystem source the grid is
+   * populated from) when a cover system is wired, or the synchronous
+   * `findNearestCover` scan otherwise. Leaving this unset preserves the
+   * legacy synchronous path verbatim (used by every existing test in this
+   * file).
    *
    * Pass `undefined` to disable the grid path again (used by tests and the
    * mobile WebGL2 fallback that disables advanced AI knobs).
@@ -917,11 +920,12 @@ export class AIStateEngage {
           this.telemetry.suppressionFlankCoverSearchCapSkips++
         } else {
           // Cover-spatial-grid fast path (DEFEKT-3 fix). The grid lookup is
-          // O(1) average on an 8 m uniform cell index and replaces the
-          // synchronous sandbag + vegetation + terrain raycast scan that
-          // peaked at ~954 ms on combat120. The cap still applies because
-          // even O(1) cell scans accumulate across a squad and the legacy
-          // fallback can still fire when the grid is empty in a region.
+          // O(1) average on an 8 m uniform cell index. It is populated from
+          // AICoverSystem candidates (CombatCoverGridProvider ->
+          // coverSystem.collectCoverCandidates), the SAME source the fallback
+          // below re-scans, so a grid hit and a grid miss select from one
+          // candidate universe. The cap still applies because even O(1) cell
+          // scans accumulate across a squad.
           if (this.coverGridQuery) {
             coverNearFlank = this.measureEngageMethod('engage.suppression.initiate.coverGridQuery', () =>
               this.coverGridQuery!.queryWithLOS(flankDestination, targetPos)
@@ -933,14 +937,24 @@ export class AIStateEngage {
               this.telemetry.suppressionFlankCoverGridMisses++
             }
           }
-          // Fallback to the legacy synchronous scan if the grid wasn't
-          // wired or returned no candidate. The cap is consulted again to
-          // honor the grid-served increment above.
+          // Fallback when the grid wasn't wired or returned no candidate.
+          // Draw from the SAME source the grid indexes -- AICoverSystem
+          // (firing-position terrain ridges + sandbags) -- so the grid-hit
+          // and grid-miss paths agree on the candidate universe. The legacy
+          // findNearestCover scan (AICoverFinding's occlusion + vegetation +
+          // raycast hide-model) is kept only as the no-coverSystem edge
+          // fallback used by the mobile WebGL2 path and the legacy-path
+          // tests. The cap is consulted again to honor the grid-served
+          // increment above.
           if (!coverNearFlank && flankCoverSearches < this.MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION) {
             coverNearFlank = this.measureEngageMethod('engage.suppression.initiate.coverSearch', () => {
               flankCoverProbe.position.copy(flankDestination)
               flankCoverSearches++
               this.telemetry.suppressionFlankCoverSearches++
+              if (this.coverSystem) {
+                const coverSpot = this.coverSystem.findBestCover(flankCoverProbe, targetPos, allCombatants)
+                return coverSpot ? coverSpot.position.clone() : null
+              }
               return findNearestCover(flankCoverProbe, targetPos)
             })
           } else if (!coverNearFlank) {

@@ -799,6 +799,34 @@ describe('AIStateEngage', () => {
         });
       });
 
+      it('routes the grid-miss fallback through the unified AICoverSystem source when wired', () => {
+        const { leader, members } = buildSquad(3);
+        const queryWithLOS = vi.fn().mockReturnValue(null);
+        aiStateEngage.setCoverGridQuery({ queryWithLOS });
+        // Wire the same cover system the grid is populated from. On a grid
+        // miss the fallback must re-scan THIS source (findBestCover), not the
+        // legacy findNearestCover hide-model scan, so hit and miss agree.
+        const coverSpot = { position: new THREE.Vector3(44, 6, 6) };
+        mockCoverSystem.findBestCover.mockReturnValue(coverSpot);
+        aiStateEngage.setCoverSystem(mockCoverSystem);
+
+        aiStateEngage.initiateSquadSuppression(leader, new THREE.Vector3(50, 0, 0), allCombatants, findNearestCover);
+
+        expect(queryWithLOS).toHaveBeenCalledTimes(1);
+        // Grid miss -> unified source (AICoverSystem.findBestCover), NOT the
+        // legacy findNearestCover scan.
+        expect(mockCoverSystem.findBestCover).toHaveBeenCalledTimes(1);
+        expect(findNearestCover).not.toHaveBeenCalled();
+        const flanker = members[2];
+        expect(flanker.destinationPoint).toBeDefined();
+        expect(flanker.destinationPoint!.distanceTo(coverSpot.position)).toBeLessThan(0.001);
+        expect(aiStateEngage.getCloseEngagementTelemetry()).toMatchObject({
+          suppressionFlankCoverGridHits: 0,
+          suppressionFlankCoverGridMisses: 1,
+          suppressionFlankCoverSearches: 1,
+        });
+      });
+
       it('honors the per-suppression cap across mixed grid and legacy candidates', () => {
         // Larger squad: 5 flankers (members 3..6 plus the index===1 suppressor)
         // would otherwise want 4 cover searches; the cap caps it at 2 total.
