@@ -873,4 +873,33 @@ describe('CombatantAI', () => {
       expect(evaluate).not.toHaveBeenCalled()
     })
   })
+
+  describe('cover-grid lifecycle', () => {
+    // Regression guard for the mode-switch cover-grid leak: the grid's reset()
+    // must be its own hook (resetCoverGrid), NOT tied to setTerrainSystem.
+    // setTerrainSystem runs once at engine boot; terrain is regenerated in
+    // place on mode switch and never re-wires the runtime, so a reset hung off
+    // setTerrainSystem would never fire on a switch and stale cross-map cover
+    // cells would accumulate (region entries are TTL-refreshed but never
+    // evicted).
+    it('wires the terrain runtime but does NOT reset the grid on setTerrainSystem (boot-only path)', () => {
+      const provider = (ai as any).coverGridProvider
+      const resetSpy = vi.spyOn(provider, 'reset')
+      const runtimeSpy = vi.spyOn(provider, 'setTerrainRuntime')
+
+      ai.setTerrainSystem({} as any)
+
+      expect(runtimeSpy).toHaveBeenCalledTimes(1)
+      expect(resetSpy).not.toHaveBeenCalled()
+    })
+
+    it('resets the cover grid when resetCoverGrid() is invoked (mode-switch hook)', () => {
+      const provider = (ai as any).coverGridProvider
+      const resetSpy = vi.spyOn(provider, 'reset')
+
+      ai.resetCoverGrid()
+
+      expect(resetSpy).toHaveBeenCalledTimes(1)
+    })
+  })
 })

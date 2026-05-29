@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { GameScenario } from '../harness/GameScenario';
 import { AIStateEngage } from '../../systems/combat/ai/AIStateEngage';
+import { AICoverSystem } from '../../systems/combat/ai/AICoverSystem';
 import { CombatantState, Faction } from '../../systems/combat/types';
 import { FrameTimingTracker } from '../../systems/debug/FrameTimingTracker';
 import { SeededRandom } from '../../core/SeededRandom';
@@ -304,5 +305,86 @@ describe('Cover Grid Squad-Suppression (KONVEYER-11 R1 regression guard)', () =>
       telemetry.suppressionFlankCoverSearchCapSkips;
     const flankerCount = members.filter(m => m.state === CombatantState.ADVANCING).length;
     expect(skips).toBeGreaterThanOrEqual(Math.max(0, flankerCount - 2));
+  });
+
+  // ---------------------------------------------------------------------------
+  // Production wiring (combat-reviewer follow-up): the cases above run with no
+  // cover-grid query and no cover system wired, so they only exercise the
+  // legacy findNearestCover edge. These two assert the production branches the
+  // runtime actually takes once CombatantAI wires the grid + AICoverSystem:
+  //   - grid hit  -> flanker uses the grid-served cover, no synchronous scan;
+  //   - grid miss -> fallback re-scans the SAME source (AICoverSystem.
+  //     findBestCover), NOT the legacy findNearestCover hide-model scan, so the
+  //     hit and miss paths agree on one candidate universe.
+  // ---------------------------------------------------------------------------
+
+  it('uses a grid-served cover candidate for flankers and skips the synchronous scan (grid-hit branch)', () => {
+    const { members, targetPos } = spawnSuppressionScenario();
+    const coverCalls: Array<{ from: THREE.Vector3; threat: THREE.Vector3 }> = [];
+    const findNearestCover = makeFindNearestCover(coverCalls);
+    const leader = members.find(m => m.squadRole === 'leader')!;
+
+    const gridSpot = new THREE.Vector3(46, 0, 6);
+    const queryWithLOS = vi.fn().mockReturnValue(gridSpot);
+    aiStateEngage.setCoverGridQuery({ queryWithLOS });
+
+    aiStateEngage.initiateSquadSuppression(leader, targetPos, scenario.combatants, findNearestCover);
+
+    // Grid was consulted and the legacy synchronous scan was not.
+    expect(queryWithLOS).toHaveBeenCalled();
+    expect(coverCalls.length).toBe(0);
+
+    // At least one flanker accepted the grid-served cover position.
+    const flankers = members.filter(m => m.state === CombatantState.ADVANCING);
+    const usedGrid = flankers.some(
+      f => f.destinationPoint != null && f.destinationPoint.distanceTo(gridSpot) < 0.001,
+    );
+    expect(usedGrid).toBe(true);
+
+    const telemetry = aiStateEngage.getCloseEngagementTelemetry();
+    expect(telemetry.suppressionFlankCoverGridHits).toBeGreaterThan(0);
+    expect(telemetry.suppressionFlankCoverSearches).toBe(0);
+  });
+
+  it('routes grid-miss flanker cover through AICoverSystem.findBestCover, not the legacy scan (grid-miss branch)', () => {
+    const { members, targetPos } = spawnSuppressionScenario();
+    const coverCalls: Array<{ from: THREE.Vector3; threat: THREE.Vector3 }> = [];
+    const findNearestCover = makeFindNearestCover(coverCalls);
+    const leader = members.find(m => m.squadRole === 'leader')!;
+
+    // Grid wired but returns no candidate -> exercises the miss fallback.
+    const queryWithLOS = vi.fn().mockReturnValue(null);
+    aiStateEngage.setCoverGridQuery({ queryWithLOS });
+
+    // Real AICoverSystem is the unified fallback source. Spy so we can both
+    // control the returned spot and assert it (not the legacy findNearestCover
+    // param) is the path a grid miss takes.
+    const coverSystem = new AICoverSystem();
+    const coverSpot = new THREE.Vector3(48, 0, 4);
+    const findBestCoverSpy = vi.spyOn(coverSystem, 'findBestCover').mockReturnValue({
+      position: coverSpot,
+      score: 1,
+      coverType: 'terrain',
+      height: 1,
+      lastEvaluatedTime: 0,
+    });
+    aiStateEngage.setCoverSystem(coverSystem);
+
+    aiStateEngage.initiateSquadSuppression(leader, targetPos, scenario.combatants, findNearestCover);
+
+    expect(queryWithLOS).toHaveBeenCalled();
+    // Grid miss routes to the unified AICoverSystem source, not the legacy scan.
+    expect(findBestCoverSpy).toHaveBeenCalled();
+    expect(coverCalls.length).toBe(0);
+
+    const flankers = members.filter(m => m.state === CombatantState.ADVANCING);
+    const usedFindBest = flankers.some(
+      f => f.destinationPoint != null && f.destinationPoint.distanceTo(coverSpot) < 0.001,
+    );
+    expect(usedFindBest).toBe(true);
+
+    const telemetry = aiStateEngage.getCloseEngagementTelemetry();
+    expect(telemetry.suppressionFlankCoverGridMisses).toBeGreaterThan(0);
+    expect(telemetry.suppressionFlankCoverSearches).toBeGreaterThan(0);
   });
 });
