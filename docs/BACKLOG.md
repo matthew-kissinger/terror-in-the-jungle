@@ -26,6 +26,7 @@ duplicated inside campaign manifests; the manifests are archived).
 | `cycle-vekhikl-5-fleet-expansion` | owner signs off on both `cycle-vehicle-wayfinding-and-prompts` and `cycle-vekhikl-player-boarding-wire` playtest evidence | M113 APC + M35 truck + T-54 tank (+ optional ZU-23-2 AA + LCM-8) |
 | `cycle-sky-screen-space-quad` | `cycle-skylut-resolution-bump` shipped but owner playtest still shows visible artifacts | Hillaire-style screen-space sky rework |
 | `cycle-stabilizat-1-baselines-refresh` | owner re-queues (removed from post-WebGPU campaign 2026-05-18) | STABILIZAT-1 / combat120 baseline refresh on a quiet machine |
+| `cycle-hydrology-river-surface-fix` | owner provides a concrete observed hydrology river-surface defect + repro pose (the Wave-0 characterization the brief requires) | fix the observed OF/A Shau hydrology river-surface defect + implement `WatercraftPhysics.isUnderBridge` (stayed Wave-0-pending in `cycle-2026-05-28-vehicles-aircraft-operable`; brief retained at `docs/tasks/hydrology-river-surface-fix.md`) |
 
 ## Active Branch (task/mode-startup-terrain-spike)
 
@@ -43,6 +44,60 @@ Spike memo and evidence:
 Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
+
+## Recently Completed (cycle-2026-05-28-vehicles-aircraft-operable)
+
+Closes the owner-reported **"vehicles and aircraft are not actually operable"**
+gap. Boarding a ground vehicle/tank welded the camera under the chassis at the
+ground-origin boarding point (`PlayerCamera` had no ground/tank branch though
+the correct third-person follow-cam already existed but was never called);
+tanks had no usable crew/cannon and no spawn discoverability; aircraft weapons
+were broken end-to-end (Huey M60 door guns filtered out of `initWeapons`,
+fixed-wing `weaponCount:0`, and pilot guns hit friendlies — no friend-or-foe
+check). Bundled repo-alignment ran in parallel (dead `CoverSpatialGrid` O(1)
+path, drifted docs, unreferenced scripts).
+
+**7 of 8 task PRs merged** across R1 (5 parallel) + R2 (2 of 3, after the
+keystone). The 8th task (`hydrology-river-surface-fix`) was never dispatched —
+it stayed **Wave-0-pending** (the brief forbids dispatch until the orchestrator
+names a concrete observed hydrology defect + repro pose, which needs a headed
+GPU walk on this box) and is deferred to the owner-gated queue above as
+`cycle-hydrology-river-surface-fix`.
+
+- [#325](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/325) `7366bc73`+`8ffb0b1e` `vehicle-occupancy-camera` (R1 keystone) — `VehicleFollowCamera` provider slot on `PlayerCamera` + third-person branch in `updateCamera`; ground/tank adapters register in `onEnter`, clear in `onExit`; pose-unavailable frame falls back to first-person. L2 `PlayerCamera.test.ts` is the merge gate; live-loop smoke deferred (existing capture script bypasses the prod follow-cam path). Memo `docs/playtests/vehicle-occupancy-camera.md`.
+- [#326](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/326) `db157965`+`3b0b3fb2`+`129f2f11` `aircraft-armament` (R1) — Huey M60 door guns registered + fire only when manned AND airborne; fixed-wing nose cannon (`weaponCount>0`, real muzzle, fire through adapter trigger); aircraft hitscan threads owning `Faction` through `handlePlayerShot`→`raycastCombatants` so US/ARVN take ZERO damage from player aircraft fire. `combat-reviewer` APPROVE. Deterministic IFF unit tests stand in for the smoke. Memo `docs/playtests/aircraft-armament.md`. Seam noted: the live `beginFire/endFire` `isInFixedWing` route lands with the keystone.
+- [#327](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/327) `3dc351a6` `doc-consolidation-and-refs` (R1) — refreshed `CURRENT.md` + fixed drifted cross-references. Gate: lint:docs.
+- [#328](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/328) `123d7295`+`c111ac69`+`fe8c1cc8`+`ff68d7c6` `cover-grid-wiring` (R1) — wired the O(1) `CoverSpatialGrid` into prod engage cover selection; unified the flank cover-search source; **cover-grid reset on BOTH mode-switch repopulation paths** (`reseedForcesForMode` for OF/ZC/TDM AND `clearCombatantsForExternalPopulation` for WarSimulator/A Shau) — the original fix only wired the WarSimulator branch, so the common path still leaked stale cross-map cover cells. `combat-reviewer` APPROVE (two-pass; lifecycle-leak follow-up landed as commits 2-3).
+- [#329](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/329) `353cd9cf` `script-inventory-archival` (R1) — archived 9 unreferenced top-level one-off scripts. Gate: validate.
+- [#330](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/330) `a158a4e1` `tank-crew-cannon-turret` (R2) — operable M48 crew + cannon + real turret (seat swap pilot↔gunner, cannon fire, turret slew). addBlockedBy `vehicle-occupancy-camera`. `combat-reviewer` APPROVE. CI test failure was the known pre-existing hydrology-compositor sub-5ms timing flake (`compositor-hydrology-cache-cycle.integration.test.ts`), unrelated to tank code → merged real-checks-green.
+- [#331](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/331) `3245ee15` `tank-deploy-loadout-ux` (R2) — tank deploy/loadout option + OF respawn-map vehicle markers + controls hint. UI-only. orchestrator + smoke.
+
+### Perf harness fix (folded in)
+
+The headed-Playwright `perf:capture:combat120` gate was hitting `net::ERR_FAILED`
+at boot: `startServer` only rebuilt `dist-perf` when `index.html` was missing
+(no staleness detection), so a stale bundle made Vite preview's SPA fallback
+serve `index.html` (text/html, 200) for a since-renamed dynamic-import/worker
+chunk, which the browser refuses to execute as a module. Fixed in
+`scripts/perf-capture.ts` by forcing a fresh perf build per capture by default
+(`forceServerBuild`, matching the sibling capture scripts), with a `--no-build`
+opt-out for fast local iteration and `dev` mode unaffected. Validated via
+`npm run build:perf` (exit 0). The combat120 **regression gate itself remains
+deferred** under the existing `STABILIZAT-1` carry-over ("refresh on a quiet
+machine") — the harness is now correct, but the run was not taken on a busy box.
+`cover-grid-wiring` + the `combat-reviewer` pass cleared the merged combat code
+of p99 risk (the O(1) grid is expected to hold or improve combat120).
+
+### Cycle status
+
+- **Carry-overs: 6 active, unchanged (6 → 6).** No new carry-over opened; the
+  deferred hydrology work lives in the owner-gated queue, not CARRY_OVERS
+  Active. Per-entry "Cycles open" counter incremented by 1 (normal close).
+- **Partial close**: 7/8 task PRs merged; `hydrology-river-surface-fix` deferred
+  owner-gated (Wave-0-pending). Close commit carries `(playtest-deferred)`.
+- **Playtests deferred** under autonomous-loop posture; PLAYTEST_PENDING rows
+  appended for the four user-observable tasks (occupancy-camera, aircraft-
+  armament, tank crew/cannon, tank deploy/UX).
 
 ## Recently Completed (cycle-terrain-compositor)
 
