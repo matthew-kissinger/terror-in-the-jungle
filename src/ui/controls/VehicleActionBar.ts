@@ -15,6 +15,7 @@ import { UIComponent } from '../engine/UIComponent';
 import styles from './TouchControls.module.css';
 import type { VehicleUIContext } from '../layout/types';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
+import { TANK_CONTROLS_HINT } from '../loadout/LoadoutTypes';
 
 interface VehicleActionCallbacks {
   onExitVehicle?: () => void;
@@ -31,6 +32,7 @@ interface VehicleActionCallbacks {
 
 export class VehicleActionBar extends UIComponent {
   private callbacks: VehicleActionCallbacks = {};
+  private controlsHint!: HTMLDivElement;
   private exitBtn!: HTMLDivElement;
   private fireBtn!: HTMLDivElement;
   private wpnBtn!: HTMLDivElement;
@@ -48,6 +50,11 @@ export class VehicleActionBar extends UIComponent {
     this.root.className = styles.vehicleActionBar;
     this.root.id = 'vehicle-action-bar';
     this.root.style.display = 'none';
+
+    // Brief "how to use" line shown when crewing a ground vehicle (tank):
+    // enter/exit, seat-swap, and fire keys. Hidden for other vehicle kinds.
+    this.controlsHint = this.createControlsHint();
+    this.controlsHint.style.display = 'none';
 
     this.exitBtn = this.createButton('EXIT', styles.vehicleExitBtn);
     this.fireBtn = this.createButton('FIRE', styles.vehicleFireBtn);
@@ -68,6 +75,7 @@ export class VehicleActionBar extends UIComponent {
     this.hoverBtn.dataset.action = 'hover';
     this.lookBtn.dataset.action = 'look';
 
+    this.root.appendChild(this.controlsHint);
     this.root.appendChild(this.exitBtn);
     this.root.appendChild(this.fireBtn);
     this.root.appendChild(this.wpnBtn);
@@ -166,6 +174,8 @@ export class VehicleActionBar extends UIComponent {
     this.fireBtn.classList.remove(styles.pressed);
 
     const capabilities = context?.capabilities;
+    // Brief controls hint only while crewing a ground vehicle (tank).
+    this.controlsHint.style.display = context?.hudVariant === 'groundVehicle' ? 'block' : 'none';
     this.exitBtn.style.display = capabilities?.canExit ? 'flex' : 'none';
     this.fireBtn.style.display = capabilities?.canFirePrimary ? 'flex' : 'none';
     this.wpnBtn.style.display = capabilities?.canCycleWeapons ? 'flex' : 'none';
@@ -233,6 +243,15 @@ export class VehicleActionBar extends UIComponent {
     btn.style.pointerEvents = 'auto';
     btn.style.userSelect = 'none';
     return btn;
+  }
+
+  private createControlsHint(): HTMLDivElement {
+    const hint = document.createElement('div');
+    hint.className = styles.vehicleControlsHint;
+    hint.dataset.role = 'controls-hint';
+    hint.setAttribute('aria-label', 'vehicle controls hint');
+    hint.textContent = TANK_CONTROLS_HINT;
+    return hint;
   }
 
   private applyStabilizerLabel(context: VehicleUIContext | null): void {

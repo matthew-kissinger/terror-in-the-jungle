@@ -1,4 +1,5 @@
 import { Faction, GrenadeType } from '../../systems/combat/types';
+import { M48_SPAWN_OFFSETS } from '../../config/vehicles/m48-config';
 
 export enum LoadoutWeapon {
   RIFLE = 'rifle',
@@ -319,4 +320,77 @@ export function getLoadoutPoolForFaction(faction: Faction): LoadoutOptionPool {
 
 export function getDefaultLoadoutForFaction(faction: Faction): PlayerLoadout {
   return clonePlayerLoadout(getLoadoutPoolForFaction(faction).presetTemplates[0]?.loadout ?? DEFAULT_PLAYER_LOADOUT);
+}
+
+/**
+ * A crewable vehicle the player can choose to deploy into/near, surfaced
+ * alongside the infantry spawn points in the deploy screen. This is a
+ * UI-layer description only -- it carries the world spawn anchor and the
+ * controls hint so the deploy screen can render a "crew a tank" choice and
+ * the vehicle action bar can show a how-to-use line. Crewing/gunnery
+ * behaviour itself is owned by the vehicle systems, not this module.
+ */
+export interface VehicleDeployOption {
+  /** Stable id used for selection wiring (matches the spawned IVehicle id where applicable). */
+  id: string;
+  /** Display name, e.g. "M48 Patton". */
+  name: string;
+  /** Short class label shown in the deploy list, e.g. "ARMOR". */
+  classLabel: string;
+  /** One-line description of the vehicle role. */
+  description: string;
+  /** World-space spawn anchor (x/z); the deploy flow snaps Y to terrain. */
+  position: { x: number; z: number };
+  /** Owning faction so the UI can color the choice. */
+  faction: Faction;
+  /** Brief controls hint shown when near/in the vehicle (enter / seat-swap / fire). */
+  controlsHint: string;
+}
+
+/**
+ * Default controls hint for a crewed ground vehicle (tank). Referenced by
+ * both the deploy screen choice and the vehicle action bar. The seat-swap
+ * and fire keys are documented here for discoverability; the gunnery
+ * behaviour is wired by the tank-crew systems, not this module.
+ */
+export const TANK_CONTROLS_HINT = 'E enter / exit  -  F swap seat  -  LMB fire';
+
+/**
+ * Built-in crewable vehicle deploy options keyed by game-mode id. The M48
+ * Patton anchors mirror `M48_SCENARIO_SPAWNS` (config-sourced) so the
+ * deploy choice points at the same place the tank actually spawns.
+ */
+const VEHICLE_DEPLOY_OPTIONS_BY_MODE: Record<string, VehicleDeployOption[]> = {
+  open_frontier: [
+    {
+      id: 'm48_tank_of_us_fob',
+      name: 'M48 Patton',
+      classLabel: 'ARMOR',
+      description: 'Crew the M48 at the airfield motor pool.',
+      position: { x: M48_SPAWN_OFFSETS.open_frontier.x, z: M48_SPAWN_OFFSETS.open_frontier.z },
+      faction: Faction.US,
+      controlsHint: TANK_CONTROLS_HINT,
+    },
+  ],
+  a_shau_valley: [
+    {
+      id: 'm48_tank_ashau_valley_road',
+      name: 'M48 Patton',
+      classLabel: 'ARMOR',
+      description: 'Crew the M48 on the valley road.',
+      position: { x: M48_SPAWN_OFFSETS.a_shau_valley.x, z: M48_SPAWN_OFFSETS.a_shau_valley.z },
+      faction: Faction.US,
+      controlsHint: TANK_CONTROLS_HINT,
+    },
+  ],
+};
+
+/**
+ * Returns the crewable vehicle deploy options available for a game mode.
+ * Modes without a tank placement return an empty list so the deploy screen
+ * simply omits the vehicles section.
+ */
+export function getVehicleDeployOptionsForMode(mode: string): VehicleDeployOption[] {
+  const options = VEHICLE_DEPLOY_OPTIONS_BY_MODE[mode] ?? [];
+  return options.map(option => ({ ...option, position: { ...option.position } }));
 }
