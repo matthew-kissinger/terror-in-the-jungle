@@ -22,12 +22,16 @@ import type { VehicleManager } from './VehicleManager';
  * Hierarchy built by `buildM48ChassisMesh`:
  *   chassisRoot (positioned in world)
  *   ├── hull box (the main armored body)
- *   ├── turret cylinder (cosmetic stand-in; cycle #9 replaces it)
- *   └── barrel cylinder (cosmetic stand-in; cycle #9 replaces it)
+ *   ├── track L / track R boxes
+ *
+ * The turret + barrel meshes are NOT part of the chassis mesh. They are
+ * mounted onto the `TankTurret` rig nodes (yaw + pitch) by
+ * `mountM48TurretMeshes` after the `Tank` (and its turret) is constructed,
+ * so the turret traverses and the barrel elevates with crew aim instead of
+ * being a static cosmetic stand-in.
  *
  * The mesh has no physics meaning — `TrackedVehiclePhysics` owns the
- * simulation; the mesh is just a visible proxy for the chassis-slice
- * playtest.
+ * simulation; the mesh is just a visible proxy.
  */
 
 export function buildM48ChassisMesh(): THREE.Group {
@@ -44,6 +48,7 @@ export function buildM48ChassisMesh(): THREE.Group {
   const hullMat = new THREE.MeshStandardMaterial({ color: 0x3d4631, flatShading: true });
   const hull = new THREE.Mesh(hullGeom, hullMat);
   hull.position.y = height * 0.275 + 0.45;
+  hull.name = 'm48_hull';
   root.add(hull);
 
   // Tracks: two long boxes flanking the hull, darker.
@@ -56,22 +61,89 @@ export function buildM48ChassisMesh(): THREE.Group {
   trackR.position.set(+width * 0.42, 0.325, 0);
   root.add(trackR);
 
-  // Turret: cosmetic stand-in. Cycle #9 will swap for a proper rig.
-  const turretGeom = new THREE.CylinderGeometry(1.4, 1.55, 0.85, 12);
-  const turret = new THREE.Mesh(turretGeom, hullMat);
-  turret.position.y = height * 0.55 + 0.45 + 0.45;
-  turret.name = 'm48_turret_placeholder';
-  root.add(turret);
-
-  // Barrel: cosmetic stand-in along -Z (chassis-forward).
-  const barrelGeom = new THREE.CylinderGeometry(0.09, 0.11, 5.0, 10);
-  const barrel = new THREE.Mesh(barrelGeom, trackMat);
-  barrel.rotation.x = Math.PI * 0.5;
-  barrel.position.set(0, turret.position.y, -2.5);
-  barrel.name = 'm48_barrel_placeholder';
-  root.add(barrel);
-
   return root;
+}
+
+/**
+ * Mount the rotating turret + barrel geometry onto a Tank's `TankTurret`
+ * rig. The turret bulk parents under the yaw node (traverses with yaw) and
+ * the barrel + mantlet parent under the pitch node (elevates with the
+ * barrel). The TankTurret's `barrelTipLocalOffset` points -5 m along
+ * pitchNode-local -Z, so the barrel mesh is centred at -2.5 m to put its
+ * muzzle at that tip — keeping the rendered barrel aligned with the
+ * cannon's fire origin + aim direction.
+ *
+ * Idempotent enough for spawn use: it adds named meshes once per Tank. The
+ * meshes follow the rig on `dispose()` because the turret detaches its
+ * nodes (which carry these children) from the chassis.
+ */
+export function mountM48TurretMeshes(tank: Tank): void {
+  const turretRig = tank.getTurret();
+  const yawNode = turretRig.getYawNode();
+  const pitchNode = turretRig.getPitchNode();
+
+  const turretMat = new THREE.MeshStandardMaterial({ color: 0x3d4631, flatShading: true });
+  const steelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a18, flatShading: true });
+
+  // Turret bulk: a rounded cast-steel body. A flattened sphere reads as the
+  // M48's distinctive elliptical turret far better than a plain cylinder,
+  // and a low cylindrical ring under it seats it on the turret ring.
+  const turretBody = new THREE.Mesh(
+    new THREE.SphereGeometry(1.55, 14, 10),
+    turretMat,
+  );
+  turretBody.scale.set(1.0, 0.55, 1.25); // squashed + elongated fore-aft
+  turretBody.position.set(0, 0.35, -0.1);
+  turretBody.name = 'm48_turret';
+  yawNode.add(turretBody);
+
+  const turretRing = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.45, 1.6, 0.4, 16),
+    turretMat,
+  );
+  turretRing.position.set(0, 0.05, 0);
+  turretRing.name = 'm48_turret_ring';
+  yawNode.add(turretRing);
+
+  // Commander cupola on the turret roof (cosmetic detail, traverses w/ turret).
+  const cupola = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.5, 0.45, 10),
+    turretMat,
+  );
+  cupola.position.set(0.5, 0.85, 0.45);
+  cupola.name = 'm48_cupola';
+  yawNode.add(cupola);
+
+  // Mantlet: the gun shield where the barrel exits the turret face. Parents
+  // under the pitch node so it tilts with the barrel.
+  const mantlet = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.7, 0.5),
+    steelMat,
+  );
+  mantlet.position.set(0, 0, -0.9);
+  mantlet.name = 'm48_mantlet';
+  pitchNode.add(mantlet);
+
+  // Barrel: 90mm M41 main gun. Centred at -2.5 m along pitch-local -Z so
+  // the muzzle lands at the turret's -5 m barrel-tip offset.
+  const barrel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.11, 0.13, 5.0, 12),
+    steelMat,
+  );
+  barrel.rotation.x = Math.PI * 0.5; // cylinder +Y -> local -Z
+  barrel.position.set(0, 0, -2.5);
+  barrel.name = 'm48_barrel';
+  pitchNode.add(barrel);
+
+  // Muzzle brake: short fatter sleeve at the barrel tip.
+  const muzzleBrake = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.18, 0.5, 12),
+    steelMat,
+  );
+  muzzleBrake.rotation.x = Math.PI * 0.5;
+  muzzleBrake.position.set(0, 0, -4.85);
+  muzzleBrake.name = 'm48_muzzle_brake';
+  pitchNode.add(muzzleBrake);
 }
 
 export interface CreateM48TankOptions {
@@ -97,6 +169,9 @@ export function createM48Tank(
   scene.add(root);
 
   const tank = new Tank(options.vehicleId, root, options.faction, undefined, M48_PHYSICS_CONFIG);
+  // Mount the rotating turret + barrel onto the Tank's turret rig so the
+  // gunner's aim visibly traverses + elevates the cannon.
+  mountM48TurretMeshes(tank);
   vehicleManager.register(tank);
   return { tank, root };
 }
