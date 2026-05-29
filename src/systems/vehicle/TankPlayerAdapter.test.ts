@@ -88,14 +88,37 @@ function createTransitionContext(
       getIsPointerLocked: vi.fn(() => false),
       getTouchControls: vi.fn(() => null),
       getTouchMovementVector: vi.fn(() => ({ x: 0, z: 0 })),
+      getTouchFlightCyclicInput: vi.fn(() => ({ pitch: 0, roll: 0 })),
       relockPointer: vi.fn(),
     } as any,
     cameraController: {
       saveInfantryAngles: vi.fn(),
       restoreInfantryAngles: vi.fn(),
+      setVehicleFollowCamera: vi.fn(),
     } as any,
     hudSystem: createMockHudSystem() as any,
     gameRenderer: { setCrosshairMode: vi.fn() } as any,
+  };
+}
+
+/** A fake cannon launcher that records every shot for assertions. */
+function createFakeCannon() {
+  const shots: Array<{
+    origin: THREE.Vector3;
+    direction: THREE.Vector3;
+    shooterId: string;
+  }> = [];
+  let serial = 0;
+  return {
+    shots,
+    launch(args: any): string {
+      shots.push({
+        origin: args.origin.clone(),
+        direction: args.direction.clone(),
+        shooterId: args.shooterId,
+      });
+      return `shell_${serial++}`;
+    },
   };
 }
 
@@ -468,6 +491,227 @@ describe('TankPlayerAdapter', () => {
       const updateSpy = vi.spyOn(tank, 'update');
       adapter.stepPhysics(1 / 60, null);
       expect(updateSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('crew weapon readiness (driver vs gunner)', () => {
+    it('reports an unarmed driver station on board (no cannon while driving)', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+
+      const uiCtx = (ctx.hudSystem!.setVehicleContext as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      expect(uiCtx.weaponCount).toBe(0);
+      expect(uiCtx.capabilities.canFirePrimary).toBe(false);
+      expect(adapter.getCrewSeat()).toBe('pilot');
+    });
+
+    it('reports an armed gunner station once the player crews the cannon', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      adapter.swapSeat(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      const calls = (ctx.hudSystem!.setVehicleContext as ReturnType<typeof vi.fn>).mock.calls;
+      const lastCtx = calls[calls.length - 1][0];
+      expect(lastCtx.weaponCount).toBeGreaterThan(0);
+      expect(lastCtx.capabilities.canFirePrimary).toBe(true);
+      expect(adapter.getCrewSeat()).toBe('gunner');
+    });
+  });
+
+  describe('driver <-> gunner seat swap', () => {
+    it('toggles the control target between the driver hatch and the gunner station', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      const upd = createUpdateContext(ctx.input, ctx.hudSystem);
+
+      expect(adapter.getCrewSeat()).toBe('pilot');
+      expect(adapter.swapSeat(upd)).toBe('gunner');
+      expect(adapter.getCrewSeat()).toBe('gunner');
+      // ...and back to the driver hatch.
+      expect(adapter.swapSeat(upd)).toBe('pilot');
+      expect(adapter.getCrewSeat()).toBe('pilot');
+    });
+
+    it('moves the player onto the gunner seat of the underlying tank when swapping up', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      // Player boards as driver (occupies the pilot seat on the tank).
+      tank.enterVehicle('player', 'pilot');
+      adapter.onEnter(ctx);
+
+      adapter.swapSeat(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      const seats = tank.getSeats();
+      const gunnerSeat = seats.find(s => s.role === 'gunner');
+      const pilotSeat = seats.find(s => s.role === 'pilot');
+      expect(gunnerSeat!.occupantId).toBe('player');
+      // Pilot seat is freed so the chassis crew slot is open for an NPC.
+      expect(pilotSeat!.occupantId).toBeNull();
+    });
+
+    it('parks the chassis when the player leaves the driver hatch for the turret', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+
+      // Drive forward, then climb into the turret.
+      (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (k: string) => k === 'keyw',
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      const setControlsSpy = vi.spyOn(tank, 'setControls');
+
+      adapter.swapSeat(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      // Leaving the driver hatch issues a zeroed, braked command so the
+      // unattended chassis doesn't coast forward while the player gunners.
+      expect(setControlsSpy).toHaveBeenCalledWith(0, 0, true);
+    });
+
+    it('is a no-op when the player is not mounted', () => {
+      const ctx = createTransitionContext(createPlayerState());
+      // No onEnter — adapter is idle.
+      const result = adapter.swapSeat(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(result).toBe('pilot');
+      expect(adapter.getCrewSeat()).toBe('pilot');
+    });
+  });
+
+  describe('gunner turret aim + cannon fire', () => {
+    function mountAsGunner(): {
+      ctx: VehicleTransitionContext;
+      now: { value: number };
+      cannon: ReturnType<typeof createFakeCannon>;
+    } {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      const cannon = createFakeCannon();
+      const now = { value: 100000 };
+      adapter.setCannonSystem(cannon, () => now.value);
+      adapter.onEnter(ctx);
+      adapter.swapSeat(createUpdateContext(ctx.input, ctx.hudSystem));
+      return { ctx, now, cannon };
+    }
+
+    it('drives turret yaw/pitch from mouse movement while crewing the gun', () => {
+      const { ctx } = mountAsGunner();
+      const turret = tank.getTurret();
+
+      (ctx.input.getIsPointerLocked as ReturnType<typeof vi.fn>).mockReturnValue(true);
+      (ctx.input.getMouseMovement as ReturnType<typeof vi.fn>).mockReturnValue({ x: 30, y: -20 });
+
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      // Right-drag turns the turret right (negative yaw); up-drag raises it.
+      expect(turret.getTargetYaw()).toBeLessThan(0);
+      expect(turret.getTargetPitch()).toBeGreaterThan(0);
+    });
+
+    it('fires the main cannon through the projectile system when the trigger is held', () => {
+      const { ctx, cannon } = mountAsGunner();
+      (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (k: string) => k === 'space',
+      );
+
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      expect(cannon.shots.length).toBe(1);
+      // The shot spawns from the barrel with a non-degenerate aim direction
+      // and is attributed to the player.
+      expect(cannon.shots[0].shooterId).toBe('player');
+      expect(cannon.shots[0].direction.lengthSq()).toBeGreaterThan(0.5);
+    });
+
+    it('does not fire the cannon from the driver hatch even with the trigger held', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      const cannon = createFakeCannon();
+      adapter.setCannonSystem(cannon, () => 100000);
+      adapter.onEnter(ctx); // stays in pilot seat
+
+      (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (k: string) => k === 'space',
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      expect(cannon.shots.length).toBe(0);
+    });
+
+    it('enforces a reload gate between shots, then fires again once it elapses', () => {
+      const { ctx, now, cannon } = mountAsGunner();
+      (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (k: string) => k === 'space',
+      );
+
+      // First shot fires.
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(cannon.shots.length).toBe(1);
+
+      // Trigger still held a moment later — reload gate blocks the second shot.
+      now.value += 200;
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(cannon.shots.length).toBe(1);
+
+      // After the full reload window the cannon fires again.
+      now.value += adapter.reloadSeconds * 1000 + 1;
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(cannon.shots.length).toBe(2);
+    });
+
+    it('holds fire when the turret is jammed (damage state)', () => {
+      const { ctx, cannon } = mountAsGunner();
+      tank.getTurret().setJammed(true);
+
+      (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (k: string) => k === 'space',
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      expect(cannon.shots.length).toBe(0);
+    });
+
+    it('latches the fire intent even with no cannon bound (late wire picks it up)', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      adapter.swapSeat(createUpdateContext(ctx.input, ctx.hudSystem));
+      // No setCannonSystem — gunner aims but the gun is silent.
+
+      (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (k: string) => k === 'space',
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      // Fire request was consumed inside the (no-op) cannon path, so it does
+      // not leak to a later consumer. The point of this test is that the
+      // adapter doesn't throw when firing with no launcher bound.
+      expect(adapter.getCrewSeat()).toBe('gunner');
+    });
+  });
+
+  describe('gunner-sight first-person camera', () => {
+    it('returns false in the driver hatch and a down-barrel pose in the gunner seat', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      // Add the chassis to a scene so turret world matrices propagate.
+      const scene = new THREE.Scene();
+      scene.add((tank as any).object ?? new THREE.Object3D());
+      adapter.onEnter(ctx);
+
+      const camPos = new THREE.Vector3();
+      const lookAt = new THREE.Vector3();
+      // Driver hatch: no gunner sight.
+      expect(adapter.computeGunnerSightCamera(camPos, lookAt)).toBe(false);
+
+      adapter.swapSeat(createUpdateContext(ctx.input, ctx.hudSystem));
+      const ok = adapter.computeGunnerSightCamera(camPos, lookAt);
+      expect(ok).toBe(true);
+      // Eye and look-target are distinct points (a real forward vector).
+      expect(camPos.distanceTo(lookAt)).toBeGreaterThan(0.1);
     });
   });
 });

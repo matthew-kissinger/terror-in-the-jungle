@@ -260,7 +260,7 @@ export class PlayerVehicleAdapterFactory {
     }
 
     this.deps.vehicleSessionController.registerAdapter(adapter);
-    const ctx = this.buildTransitionContext(vehicle.getPosition().clone());
+    const ctx = this.buildTransitionContext(vehicle.getPosition().clone(), vehicle.vehicleId);
     const entered = this.deps.vehicleSessionController.enterVehicle(
       adapter.vehicleType,
       vehicle.vehicleId,
@@ -288,7 +288,10 @@ export class PlayerVehicleAdapterFactory {
       ? this.deps.vehicleManager.getVehicle(vehicleId)
       : null;
 
-    const ctx = this.buildTransitionContext(this.deps.playerState.position.clone());
+    const ctx = this.buildTransitionContext(
+      this.deps.playerState.position.clone(),
+      vehicleId ?? undefined,
+    );
     const result = this.deps.vehicleSessionController.exitVehicle(ctx, {
       reason: 'input',
     });
@@ -343,16 +346,29 @@ export class PlayerVehicleAdapterFactory {
     }
   }
 
-  private buildTransitionContext(position: THREE.Vector3): VehicleTransitionContext {
+  private buildTransitionContext(
+    position: THREE.Vector3,
+    vehicleId?: string,
+  ): VehicleTransitionContext {
     const explicitSetter = this.deps.setPosition;
     const setPosition = explicitSetter
       ? explicitSetter
       : (p: THREE.Vector3, _reason: string): void => {
           this.deps.playerState.position.copy(p);
         };
+    // Resolve the vehicle id from the caller (the vehicle being boarded /
+    // exited) and fall back to the session's current id. The old code only
+    // read the session id, which is null on the *first* board (the session
+    // has not entered yet), so the adapter's `onEnter` ctx carried an empty
+    // `vehicleId`. The session controller re-spread the real id over the ctx
+    // on enter/exit, which papered over the bug — but adapters that read the
+    // ctx id directly (gunner-station snap reasons, future weapon wiring)
+    // would see ''. Threading the resolved id through fixes it at the source.
+    const resolvedId =
+      vehicleId ?? this.deps.vehicleSessionController.getVehicleId() ?? '';
     return {
       playerState: this.deps.playerState,
-      vehicleId: this.deps.vehicleSessionController.getVehicleId() ?? '',
+      vehicleId: resolvedId,
       position,
       setPosition,
       input: this.deps.input,
