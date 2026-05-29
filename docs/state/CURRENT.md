@@ -34,16 +34,17 @@ campaign merged via [PR #192](https://github.com/matthew-kissinger/terror-in-the
 support fall back to the WebGL2 path automatically, and strict mode
 (`?renderer=webgpu-strict`) is the acceptance bar for renderer-parity evidence.
 
-The active cycle is
-[`cycle-2026-05-28-vehicles-aircraft-operable`](../tasks/cycle-2026-05-28-vehicles-aircraft-operable.md):
-making ground vehicles, tanks, and aircraft actually operable end-to-end
+The most recently closed cycle is
+[`cycle-2026-05-28-vehicles-aircraft-operable`](../tasks/archive/cycle-2026-05-28-vehicles-aircraft-operable/cycle-2026-05-28-vehicles-aircraft-operable.md):
+making ground vehicles, tanks, and aircraft operable end-to-end
 (third-person follow-cam on boarding, tank crew + cannon + spawn
-discoverability, aircraft armament with friend-or-foe), with bundled
-repo-alignment tasks — wire the dead `CoverSpatialGrid` O(1) cover path into
-prod combat (DEFEKT-3), consolidate drifted docs (this task), and archive
-unreferenced scripts. Posture is autonomous-loop: per-cycle playtests become
-Playwright smoke + screenshots, deferred to
-[docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
+discoverability, aircraft armament with friend-or-foe), plus bundled
+repo-alignment tasks — wiring the O(1) `CoverSpatialGrid` cover path into
+prod combat (DEFEKT-3), consolidating drifted docs, and archiving
+unreferenced scripts. 7 of 8 tasks shipped; the hydrology river-surface fix
+is owner-gated in [docs/BACKLOG.md](../BACKLOG.md). Posture was
+autonomous-loop: per-cycle playtests became Playwright smoke + screenshots,
+deferred to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
 
 Several preceding campaigns are now closed and historical: the post-WebGPU
 feature-pivot campaign (VODA water, VEKHIKL ground vehicles, DEFEKT fixes) was
@@ -63,8 +64,9 @@ as of this refresh:
   deferred to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
 - **DEFEKT-3** (combat AI p99 — synchronous cover search in
   `AIStateEngage.initiateSquadSuppression`) — open. The `cover-grid-wiring`
-  task in the active cycle injects the existing O(1) `CoverSpatialGrid`; see
-  [docs/state/perf-trust.md](perf-trust.md) for the measurement chain.
+  task wired the existing O(1) `CoverSpatialGrid` into prod combat; the
+  combat120 p99 PASS remains gated on the STABILIZAT-1 baseline refresh —
+  see [docs/state/perf-trust.md](perf-trust.md) for the measurement chain.
 - **KONVEYER-10/11** — closed; full slice-by-slice evidence in
   [docs/directives/konveyer-10.md](../directives/konveyer-10.md) and
   [docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).

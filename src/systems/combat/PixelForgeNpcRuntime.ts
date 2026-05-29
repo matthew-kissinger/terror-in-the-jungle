@@ -126,32 +126,15 @@ export function getPixelForgeNpcCloseModelDistanceSq(): number {
   return meters * meters;
 }
 
-/**
- * @deprecated Read `getPixelForgeNpcCloseModelDistanceMeters()` so tuning-panel
- * edits take effect at runtime. Retained for callers that snapshot at startup.
- */
-export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS =
-  PixelForgeNpcDistanceConfig.closeModelDistanceMeters;
-/**
- * @deprecated Read `getPixelForgeNpcCloseModelDistanceSq()` so tuning-panel
- * edits take effect at runtime.
- */
-export const PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_SQ =
-  PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS * PIXEL_FORGE_NPC_CLOSE_MODEL_DISTANCE_METERS;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP = 8;
 /**
  * Maximum extra close-model slots above `PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP`
  * granted when the hard-near cluster around the player overflows the steady
  * cap. The effective cap therefore ranges from `TOTAL_CAP` up to
- * `TOTAL_CAP + HARD_NEAR_RESERVE_EXTRA_CAP`. This replaces the former
- * `*_SPAWN_RESIDENCY_EXTRA_CAP` constant (kept as a deprecated alias for
- * one cycle) and serves any dense close-range cluster, not only the first
- * reveal.
+ * `TOTAL_CAP + HARD_NEAR_RESERVE_EXTRA_CAP`, serving any dense close-range
+ * cluster, not only the first reveal.
  */
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP = 6;
-/** @deprecated Use `PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP`. */
-export const PIXEL_FORGE_NPC_CLOSE_MODEL_SPAWN_RESIDENCY_EXTRA_CAP =
-  PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION =
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION = 4;

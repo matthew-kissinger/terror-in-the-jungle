@@ -28,8 +28,10 @@ repository, believe the repository and update the doc.
 
 - **Combined arms in a browser.** Infantry, squads, helicopters (UH-1 Huey,
   UH-1C Gunship, AH-1 Cobra), fixed-wing (A-1 Skyraider, F-4 Phantom, AC-47
-  Spooky), airfields, objectives, tickets, suppression, grenades, and vehicle
-  enter/exit/eject — all part of the same runtime, all shipped to production.
+  Spooky), armor (M48 Patton), ground transport (M151 jeep), watercraft
+  (Sampan, PBR gunboat), crew-served emplacements, airfields, objectives,
+  tickets, suppression, grenades, and vehicle enter/exit/eject — all part of
+  the same runtime, all shipped to production.
 - **Real terrain target.** A Shau Valley uses real elevation data through a
   Cloudflare R2 manifest path with an explicit terrain/nav startup gate. No
   silent TileCache fallback; if the asset isn't loadable, the mode tells you.
@@ -95,7 +97,8 @@ carry-overs route through [docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
 | Mouse | Look / aim |
 | `Space` | Jump |
 | `Shift` | Sprint |
-| `E` | Enter / exit / eject vehicle |
+| `F` | Board / exit ground & water vehicles (jeep, tank, sampan, PBR, emplacements) |
+| `E` | Enter / exit aircraft (helicopter, fixed-wing) |
 | `R` | Reload |
 | `G` | Grenade |
 | `M` | Map / squad command |
@@ -188,7 +191,7 @@ ergonomics, or UI feel is good.
 - [Three.js](https://threejs.org/) 0.184
 - TypeScript 6.0
 - Vite 8
-- Vitest 4 (~4,700 tests across ~330 files)
+- Vitest 4 (~4,800 tests across ~345 files)
 - Playwright 1.59
 - [Recast Navigation](https://github.com/isaac-mason/recast-navigation-js)
 - Tweakpane 4 (dev-only live tuning)

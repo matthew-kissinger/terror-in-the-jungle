@@ -27,7 +27,7 @@ Active directive list. Each row is binary `open` / `code-complete` / `done` / `c
 | STABILIZAT-1 | Refresh combat120 perf baseline | open | perf-harness | `2026-05-10T10-45-07-263Z` (3 fail) | `perf:capture:combat120` from quiet machine produces avg ≤17ms, p99 ≤35ms; refreshed baseline committed |
 | DEFEKT-1 | Stale baseline audit | open | perf-harness | `2026-05-07T22-04-54-994Z/projekt-143-stale-baseline-audit` | `perf-baselines.json` current for all tracked scenarios; stale-baseline gate passes |
 | DEFEKT-2 | Doc / code / artifact drift | open | doc-harness | `2026-05-08T01-26-06.909Z/projekt-143-doc-drift` | `check:doc-drift` passes + 14 consecutive days no drift after release |
-| DEFEKT-3 | Combat AI p99 anchor | open | combat | `docs/rearch/cover-query-precompute.md` | Sync cover search in `AIStateEngage.initiateSquadSuppression` no longer dominates p99; combat120 p99 ≤35ms PASS |
+| DEFEKT-3 | Combat AI p99 anchor | open (O(1) path wired; perf unproven) | combat | `cover-grid-wiring` (cycle-2026-05-28) wired O(1) `CoverSpatialGrid` into prod combat; combat120 p99 PASS still gated on STABILIZAT-1 baseline refresh — [perf-trust.md](state/perf-trust.md) | Sync cover search in `AIStateEngage.initiateSquadSuppression` no longer dominates p99; combat120 p99 ≤35ms PASS |
 | DEFEKT-6 | Terrain occlusion and fire authority | open | combat / terrain / navigation / materialization | `2026-05-11T19-14-54-162Z/konveyer-terrain-fire-authority` | Reproduce/disprove fire-through-terrain with browser evidence and identify authoritative LOS query — see [memo](directives/defekt-6.md) |
 | DIZAYN-3 | Liberty of proposal | open | design | (none) | Visual/feel proposals can land on any directive; engineering reject requires written rationale |
 

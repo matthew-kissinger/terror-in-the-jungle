@@ -1,6 +1,3 @@
-// Note: THREE and TerrainType imports removed as they were unused
-// These may be needed for future features
-
 /**
  * Interface for a function that starts a synthesized sound
  * @returns duration of the sound in seconds

@@ -59,9 +59,13 @@ interface DocDriftReport {
   };
 }
 
+// Current release-facing docs (post doc-consolidation). The original
+// Projekt-143 targets (`docs/PROJEKT_OBJEKT_143.md`, `docs/STATE_OF_REPO.md`)
+// were archived under `docs/archive/`; the live current-truth surface is now
+// the directive registry + the CURRENT.md snapshot.
 const DEFAULT_DOCS = [
-  'docs/PROJEKT_OBJEKT_143.md',
-  'docs/STATE_OF_REPO.md',
+  'docs/DIRECTIVES.md',
+  'docs/state/CURRENT.md',
   'docs/PERFORMANCE.md',
 ];
 const OUTPUT_NAME = 'projekt-143-doc-drift';
@@ -203,7 +207,7 @@ function scanDocs(docPaths: string[], currentDate: string, scripts: Record<strin
         const command = match[1] ?? '';
         packageCommandRefs.push({ command, file: docPath, line: lineNumber });
         if (!scripts[command]) {
-          const severity: Severity = docPath === 'docs/PROJEKT_OBJEKT_143.md' ? 'error' : 'warning';
+          const severity: Severity = docPath === 'docs/DIRECTIVES.md' ? 'error' : 'warning';
           findings.push({
             id: `missing-package-script:${docPath}:${lineNumber}:${command}`,
             severity,

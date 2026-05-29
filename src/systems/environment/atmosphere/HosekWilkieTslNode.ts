@@ -18,7 +18,6 @@ import {
   pow as tslPowBase,
   reference,
   smoothstep as tslSmoothstepBase,
-  sub,
   vec3,
 } from 'three/tsl';
 
@@ -665,9 +664,3 @@ export const HOSEK_WILKIE_TSL_DEFAULTS = {
   moonColor: { r: MOON_COLOR_R, g: MOON_COLOR_G, b: MOON_COLOR_B },
   sunDiscHdrGain: SUN_DISC_HDR_GAIN,
 } as const;
-
-// Silence noise from unused imports during TS6-strict compile. `sub` is
-// referenced in some TSL examples but we use `.negate()` and `.sub()` chain
-// methods above; keep the import for future graph extensions.
-const _unused = { sub };
-void _unused;
