@@ -401,13 +401,20 @@ export class CombatantSystem implements GameSystem {
     return value.replace(/[^a-zA-Z0-9_.:-]/g, '_');
   }
 
-  // Reseed forces when switching game modes to honor new HQ layouts and caps
+  // Reseed forces when switching game modes to honor new HQ layouts and caps.
+  // This is the standard (non-WarSimulator) mode-switch repopulation path used
+  // by OF/ZC/TDM; the WarSimulator path (A Shau) uses
+  // clearCombatantsForExternalPopulation instead.
   public reseedForcesForMode(): void {
     const createdPlayerSquadId = this.spawnManager.reseedForcesForMode(this.shouldCreatePlayerSquad, this.playerSquadId);
     if (createdPlayerSquadId) {
       this.playerSquadId = createdPlayerSquadId;
     }
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
+    // Repopulating on a regenerated map; clear the cover grid so stale cross-map
+    // cover cells don't accumulate across switches (mirrors the WarSimulator
+    // path in clearCombatantsForExternalPopulation).
+    this.combatantAI.resetCoverGrid();
   }
 
   // -- Materialization bridge (used by WarSimulator) --
@@ -684,8 +691,9 @@ export class CombatantSystem implements GameSystem {
     this.playerSquadId = undefined;
     this.spawnManager.resetRuntimeStateForExternalPopulation();
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
-    // Mode switch repopulates combatants on a regenerated map; clear the cover
-    // grid so stale cross-map cover cells don't accumulate across switches.
+    // WarSimulator (A Shau) mode-switch repopulation path; clear the cover grid
+    // so stale cross-map cover cells don't accumulate across switches (mirrors
+    // reseedForcesForMode, the OF/ZC/TDM path).
     this.combatantAI.resetCoverGrid();
   }
 

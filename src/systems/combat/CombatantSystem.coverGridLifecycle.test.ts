@@ -3,19 +3,44 @@ import { CombatantSystem } from './CombatantSystem';
 
 // Mode-switch lifecycle guard for the cover-grid leak (combat-reviewer
 // follow-up on cover-grid-wiring). On every mode switch/restart, GameModeManager
-// repopulates combatants via CombatantSystem.clearCombatantsForExternalPopulation
-// (GameModeManager.ts:318). That hook must clear the cover grid so stale
-// cross-map cover cells don't accumulate -- the grid's region entries are
-// TTL-refreshed but never evicted, so without an explicit reset they leak
-// across switches.
+// repopulates combatants on the regenerated map via ONE OF TWO CombatantSystem
+// paths, forked on config.warSimulator?.enabled (GameModeManager.ts:313-319):
+//   - reseedForcesForMode()                -> OF / ZC / TDM (the common path)
+//   - clearCombatantsForExternalPopulation -> WarSimulator / A Shau Valley
+// BOTH must clear the cover grid, otherwise stale cross-map cover cells leak
+// (the grid's region entries are TTL-refreshed but never evicted). The original
+// fix only wired the WarSimulator branch, so the common OF/ZC/TDM path still
+// leaked -- these tests guard both branches.
 //
 // CombatantSystem's constructor instantiates GPU-bound effect pools and the
-// renderer, so we exercise the *real* method body against a structural `this`
+// renderer, so we exercise the *real* method bodies against a structural `this`
 // double rather than constructing the whole system. The assertion is the wiring
-// contract: clearing combatants for external population resets the cover grid.
+// contract: each repopulation path resets the cover grid.
 
-describe('CombatantSystem.clearCombatantsForExternalPopulation cover-grid reset', () => {
-  it('invokes combatantAI.resetCoverGrid on the mode-switch repopulation hook', () => {
+describe('CombatantSystem cover-grid mode-switch reset', () => {
+  it('resets the cover grid on the common reseedForcesForMode path (OF/ZC/TDM)', () => {
+    const resetCoverGrid = vi.fn();
+    const setSquads = vi.fn();
+    const reseed = vi.fn(() => undefined);
+    const stub = {
+      spawnManager: { reseedForcesForMode: reseed },
+      squadManager: { getAllSquads: vi.fn(() => new Map()) },
+      combatantAI: { setSquads, resetCoverGrid },
+      shouldCreatePlayerSquad: false,
+      playerSquadId: undefined as string | undefined,
+    };
+
+    CombatantSystem.prototype.reseedForcesForMode.call(stub);
+
+    expect(reseed).toHaveBeenCalledTimes(1);
+    expect(resetCoverGrid).toHaveBeenCalledTimes(1);
+    // Reset runs after squads are re-synced.
+    expect(setSquads.mock.invocationCallOrder[0]).toBeLessThan(
+      resetCoverGrid.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('resets the cover grid on the WarSimulator clearCombatantsForExternalPopulation path (A Shau)', () => {
     const resetCoverGrid = vi.fn();
     const setSquads = vi.fn();
     const stub = {
