@@ -684,6 +684,9 @@ export class CombatantSystem implements GameSystem {
     this.playerSquadId = undefined;
     this.spawnManager.resetRuntimeStateForExternalPopulation();
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
+    // Mode switch repopulates combatants on a regenerated map; clear the cover
+    // grid so stale cross-map cover cells don't accumulate across switches.
+    this.combatantAI.resetCoverGrid();
   }
 
   setSpatialBounds(size: number): void {
