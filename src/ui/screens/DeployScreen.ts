@@ -17,7 +17,9 @@ import {
   getWeaponLabel,
   type LoadoutFieldKey,
   type PlayerLoadout,
+  type VehicleDeployOption,
 } from '../loadout/LoadoutTypes';
+import { isBlufor } from '../../systems/combat/types';
 import styles from './DeployScreen.module.css';
 
 interface LoadoutFieldControl {
@@ -49,6 +51,8 @@ export class DeployScreen extends UIComponent {
   private sequenceSteps?: HTMLDivElement;
   private spawnOptionsPanel?: HTMLDivElement;
   private spawnOptionsList?: HTMLDivElement;
+  private vehicleOptionsPanel?: HTMLDivElement;
+  private vehicleOptionsList?: HTMLDivElement;
   private timerDisplay?: HTMLDivElement;
   private respawnButton?: HTMLButtonElement;
   private secondaryActionButton?: HTMLButtonElement;
@@ -63,6 +67,7 @@ export class DeployScreen extends UIComponent {
   private onRespawnClick?: () => void;
   private onCancelClick?: () => void;
   private onSpawnOptionSelected?: (spawnPointId: string, spawnPointName: string) => void;
+  private onVehicleDeployOptionSelected?: (vehicleId: string, vehicleName: string) => void;
   private onLoadoutChange?: (field: LoadoutFieldKey, direction: 1 | -1) => void;
   private onPresetCycle?: (direction: 1 | -1) => void;
   private onPresetSave?: () => void;
@@ -132,6 +137,7 @@ export class DeployScreen extends UIComponent {
     sidePanel.appendChild(this.createSelectedPanel());
     const sideScroll = this.createDiv(styles.sideScroll, 'respawn-side-scroll');
     sideScroll.appendChild(this.createSpawnOptionsPanel());
+    sideScroll.appendChild(this.createVehicleOptionsPanel());
     sideScroll.appendChild(this.createSequencePanel());
     sideScroll.appendChild(this.createLoadoutPanel());
     sideScroll.appendChild(this.createLegendPanel());
@@ -299,6 +305,25 @@ export class DeployScreen extends UIComponent {
     this.onSpawnOptionSelected = callback;
   }
 
+  setVehicleDeployOptionCallback(callback: (vehicleId: string, vehicleName: string) => void): void {
+    this.onVehicleDeployOptionSelected = callback;
+  }
+
+  updateVehicleDeployOptions(options: VehicleDeployOption[], selectedVehicleId?: string): void {
+    if (!this.vehicleOptionsList || !this.vehicleOptionsPanel) return;
+    this.vehicleOptionsList.innerHTML = '';
+
+    // Hide the whole section when no crewable vehicles exist for the mode.
+    this.vehicleOptionsPanel.style.display = options.length === 0 ? 'none' : '';
+    if (options.length === 0) return;
+
+    for (const option of options) {
+      this.vehicleOptionsList.appendChild(
+        this.makeVehicleOptionButton(option, option.id === selectedVehicleId)
+      );
+    }
+  }
+
   updateAlliance(alliance: string, faction?: string): void {
     const allianceLabel = String(alliance).split('_').join(' ').toUpperCase();
     const factionLabel = faction ? String(faction).split('_').join(' ').toUpperCase() : '';
@@ -387,6 +412,16 @@ export class DeployScreen extends UIComponent {
     panel.appendChild(this.createHeading('h3', undefined, styles.panelTitle, 'AVAILABLE SPAWNS'));
     this.spawnOptionsList = this.createDiv(styles.spawnOptionsList, 'respawn-spawn-options');
     panel.appendChild(this.spawnOptionsList);
+    return panel;
+  }
+
+  private createVehicleOptionsPanel(): HTMLDivElement {
+    const panel = this.createDiv(styles.spawnOptionsPanel, 'respawn-vehicle-options-panel');
+    this.vehicleOptionsPanel = panel;
+    panel.style.display = 'none';
+    panel.appendChild(this.createHeading('h3', undefined, styles.panelTitle, 'CREW A VEHICLE'));
+    this.vehicleOptionsList = this.createDiv(styles.spawnOptionsList, 'respawn-vehicle-options');
+    panel.appendChild(this.vehicleOptionsList);
     return panel;
   }
 
@@ -633,6 +668,32 @@ export class DeployScreen extends UIComponent {
     const meta = this.createDiv(styles.spawnOptionMeta);
     const safety = spawnPoint.safe ? 'CLEAR' : 'HOT';
     meta.textContent = `${this.getSpawnKindLabel(spawnPoint)} / ${safety} / ${Math.round(spawnPoint.position.x)}, ${Math.round(spawnPoint.position.z)}`;
+    button.appendChild(label);
+    button.appendChild(meta);
+    return button;
+  }
+
+  private makeVehicleOptionButton(option: VehicleDeployOption, selected: boolean): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = selected
+      ? `${styles.spawnOption} ${styles.spawnOptionSelected}`
+      : styles.spawnOption;
+    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    button.setAttribute('aria-label', `${option.classLabel} ${option.name}`);
+    if (button.dataset) {
+      button.dataset.vehicleId = option.id;
+      button.dataset.vehicleClass = option.classLabel;
+      button.dataset.faction = isBlufor(option.faction) ? 'BLUFOR' : 'OPFOR';
+    }
+    button.addEventListener('pointerdown', () => {
+      this.onVehicleDeployOptionSelected?.(option.id, option.name);
+    });
+
+    const label = this.createDiv(styles.spawnOptionLabel);
+    label.textContent = option.name;
+    const meta = this.createDiv(styles.spawnOptionMeta);
+    meta.textContent = `${option.classLabel} / ${option.controlsHint}`;
     button.appendChild(label);
     button.appendChild(meta);
     return button;

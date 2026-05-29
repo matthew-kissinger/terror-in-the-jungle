@@ -9,6 +9,8 @@ import {
   zoneHasSpawnPoint
 } from './OpenFrontierRespawnMapUtils';
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
+import type { VehicleMarker } from '../minimap/MinimapRenderer';
+import { isBlufor } from '../../systems/combat/types';
 
 interface RenderState {
   zoomLevel: number;
@@ -27,7 +29,8 @@ export class OpenFrontierRespawnMapRenderer {
     ctx: CanvasRenderingContext2D,
     state: RenderState,
     zoneQuery?: IZoneQuery,
-    spawnPoints: RespawnSpawnPoint[] = []
+    spawnPoints: RespawnSpawnPoint[] = [],
+    vehicleMarkers: VehicleMarker[] = []
   ): void {
     const size = MAP_SIZE;
 
@@ -63,6 +66,8 @@ export class OpenFrontierRespawnMapRenderer {
     }
 
     spawnPoints.forEach(spawnPoint => this.drawSpawnPoint(ctx, spawnPoint, state.zoomLevel));
+
+    vehicleMarkers.forEach(marker => this.drawVehicleMarker(ctx, marker, state.zoomLevel));
 
     // Draw selected spawn highlight
     if (state.selectedSpawnPointId) {
@@ -259,6 +264,64 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = color;
     ctx.fillText(textLabel, placement.x, placement.y);
+  }
+
+  /**
+   * Draws a crewable-vehicle marker (tank / jeep / sampan) so the player
+   * can see where vehicles sit before deploying. Ground vehicles read as a
+   * faction-colored armored box with a "TANK" tag; watercraft as a diamond;
+   * emplacements as an X cross. Mirrors the glyph language used on the
+   * minimap / full map.
+   */
+  private static drawVehicleMarker(
+    ctx: CanvasRenderingContext2D,
+    marker: VehicleMarker,
+    zoomLevel: number
+  ): void {
+    const { x, y } = worldToMap(marker.worldPos.x, marker.worldPos.z);
+    const size = Math.max(7, 11 / Math.sqrt(Math.max(zoomLevel, 0.75)));
+    const friendly = isBlufor(marker.faction);
+    const fill = friendly ? 'rgba(91, 140, 201, 0.6)' : 'rgba(201, 86, 74, 0.6)';
+    const stroke = friendly ? 'rgba(220, 230, 245, 0.95)' : 'rgba(245, 220, 220, 0.95)';
+
+    ctx.save();
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1.5;
+
+    if (marker.category === 'ground') {
+      ctx.beginPath();
+      ctx.rect(x - size, y - size * 0.7, size * 2, size * 1.4);
+      ctx.fill();
+      ctx.stroke();
+    } else if (marker.category === 'watercraft') {
+      ctx.beginPath();
+      ctx.moveTo(x, y - size);
+      ctx.lineTo(x + size, y);
+      ctx.lineTo(x, y + size);
+      ctx.lineTo(x - size, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(x - size, y - size);
+      ctx.lineTo(x + size, y + size);
+      ctx.moveTo(x + size, y - size);
+      ctx.lineTo(x - size, y + size);
+      ctx.stroke();
+    }
+
+    const tag = marker.category === 'ground'
+      ? 'TANK'
+      : marker.category === 'watercraft' ? 'BOAT' : 'GUN';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = stroke;
+    ctx.fillText(tag, x, y + size + 2);
+
+    ctx.restore();
   }
 
   private static getSpawnPointLabelPlacement(

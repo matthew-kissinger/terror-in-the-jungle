@@ -270,6 +270,52 @@ describe('VehicleActionBar', () => {
     expect(onUp).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the controls hint when crewing a ground vehicle', () => {
+    bar.setVehicleContext({
+      kind: 'car',
+      role: 'pilot',
+      hudVariant: 'groundVehicle',
+      weaponCount: 1,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: true,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: false,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+
+    const hint = document.querySelector('[aria-label="vehicle controls hint"]') as HTMLDivElement;
+    expect(hint).toBeTruthy();
+    expect(hint.style.display).not.toBe('none');
+    expect(hint.textContent).toContain('enter');
+  });
+
+  it('hides the controls hint for flight contexts', () => {
+    bar.setVehicleContext({
+      kind: 'helicopter',
+      role: 'transport',
+      hudVariant: 'flight',
+      weaponCount: 0,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: false,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: true,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+
+    const hint = document.querySelector('[aria-label="vehicle controls hint"]') as HTMLDivElement;
+    expect(hint.style.display).toBe('none');
+  });
+
   it('dispose removes the component', () => {
     bar.dispose();
     expect(document.getElementById('vehicle-action-bar')).toBeNull();

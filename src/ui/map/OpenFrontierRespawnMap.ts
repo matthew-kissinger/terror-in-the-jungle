@@ -9,6 +9,7 @@ import {
   worldToMap
 } from './OpenFrontierRespawnMapUtils';
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
+import type { VehicleMarker } from '../minimap/MinimapRenderer';
 
 const DEFAULT_ZOOM = 1;
 const VIEW_PADDING = 96;
@@ -28,6 +29,11 @@ export class OpenFrontierRespawnMap {
 
   // Spawn zones
   private spawnPoints: RespawnSpawnPoint[] = [];
+
+  // Crewable-vehicle markers (tank / jeep / sampan) so the player can see
+  // where vehicles are before deploying. Shares the VehicleMarker shape
+  // used by the minimap and full map.
+  private vehicleMarkers: VehicleMarker[] = [];
 
   // Zoom and pan state
   private zoomLevel = 1;
@@ -260,7 +266,8 @@ export class OpenFrontierRespawnMap {
         selectedSpawnPointId: this.selectedZoneId
       },
       this.zoneQuery,
-      this.spawnPoints
+      this.spawnPoints,
+      this.vehicleMarkers
     );
   }
 
@@ -293,6 +300,14 @@ export class OpenFrontierRespawnMap {
     if (this.selectedZoneId && !this.spawnPoints.some(spawnPoint => spawnPoint.id === this.selectedZoneId)) {
       this.selectedZoneId = undefined;
     }
+    this.render();
+  }
+
+  setVehicleMarkers(markers: VehicleMarker[]): void {
+    this.vehicleMarkers = markers.map(marker => ({
+      ...marker,
+      worldPos: marker.worldPos.clone()
+    }));
     this.render();
   }
 
