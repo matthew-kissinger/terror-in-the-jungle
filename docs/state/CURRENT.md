@@ -4,7 +4,8 @@ Last verified: 2026-05-28 (drift-correction refresh under `doc-consolidation-and
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
-tracker. Keep it under ~250 LOC (see Drift watch).
+tracker. ~250 LOC is the editorial target (the enforced caps are soft 800 /
+hard 1500 — see Drift watch).
 
 - [docs/DIRECTIVES.md](../DIRECTIVES.md) — binary directive registry (open / closed)
 - [docs/CARRY_OVERS.md](../CARRY_OVERS.md) — active carry-over registry (single source of truth for unresolved items)
@@ -19,7 +20,7 @@ Historical full-fat snapshot (pre-Phase-1) lives at `docs/archive/STATE_OF_REPO.
 ## Vision
 
 > Engine architected for 3,000 combatants via materialization tiers; live-fire
-> combat verified at 120 NPCs while the ECS hot path is built out (Phase F).
+> combat verified at 120 NPCs while an ECS hot path is evaluated (Phase F).
 
 That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
@@ -139,6 +140,7 @@ Per the realignment plan, the doc-discipline lint
 - Top-level docs claiming an NPC count must include the canonical
   qualifier or link to ROADMAP
 
-If this doc starts growing past ~250 LOC, that is the signal to file
-another split task — do not let it return to the audit-JSON-as-prose
-shape that motivated the original split.
+The lint only enforces the soft 800 / hard 1500 caps above; ~250 LOC is a
+softer editorial target, not a lint threshold. If this doc starts growing
+past ~250 LOC, that is the signal to file another split task — do not let it
+return to the audit-JSON-as-prose shape that motivated the original split.

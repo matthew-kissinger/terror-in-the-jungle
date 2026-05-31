@@ -44,7 +44,7 @@ consult them. **All 6 named flags wired in Phase 1** ([PR #172](https://github.c
 | Invulnerable | yes | `PlayerHealthSystem.takeDamage()` early-returns when active |
 | Infinite ammo | yes | `AmmoManager.consumeRound()` returns true without decrement when active |
 | No-clip | yes | `PlayerMovement` skips terrain collision + gravity + boundary clamps when active |
-| One-shot kills | not wired | open carry-over `worldbuilder-oneshotkills-wiring` (out-of-scope for Phase 1 brief) |
+| One-shot kills | yes | wired in `CombatantCombat.ts` + `CombatantSystemDamage.ts` (player hits/explosions become lethal when active); closed in `release-stewardship-2026-05-10` |
 | **Heal & Refill** (button) | best-effort | calls `playerHealth.reset/revive`, `ammoManager.refillAll/setReserveFull`, `firstPersonWeapon.reload` if those methods exist on the system surfaces today |
 
 ### 2. System Toggles
@@ -52,7 +52,7 @@ consult them. **All 6 named flags wired in Phase 1** ([PR #172](https://github.c
 | Toggle | Effective today? | How |
 |---|---|---|
 | Shadows | yes | `engine.renderer.renderer.shadowMap.enabled` |
-| Post-process | yes | `PostProcessingManager.beginFrame/endFrame` consults `getWorldBuilderState()` (wired Phase 1) |
+| Post-process | stubbed | `PostProcessingManager` is a no-op since the WebGPU post-process rewrite — `beginFrame/endFrame` are empty, so the flag has no visible effect |
 | HUD visible | yes | toggles `[data-hud-root]` elements via DOM `display` |
 | Ambient audio | yes | `AudioManager.update` scales ambient gain to 0/1 on flag flip (wired Phase 1) |
 
@@ -92,7 +92,7 @@ DCE confirmed).
 | `invulnerable` | `src/systems/player/PlayerHealthSystem.ts` | `takeDamage()` |
 | `infiniteAmmo` | `src/systems/weapons/AmmoManager.ts` | `consumeRound()` |
 | `noClip` | `src/systems/player/PlayerMovement.ts` | `simulateMovementStep()` |
-| `postProcessEnabled` | `src/systems/effects/PostProcessingManager.ts` | `beginFrame/endFrame` |
+| `postProcessEnabled` | `src/systems/effects/PostProcessingManager.ts` | stubbed (no-op since the WebGPU post-process rewrite) |
 | `forceTimeOfDay` | `src/systems/environment/AtmosphereSystem.ts` | `update()` |
 | `ambientAudioEnabled` | `src/systems/audio/AudioManager.ts` | `update()` |
 
@@ -170,6 +170,6 @@ All 6 carry-overs from the `worldbuilder-wiring` family closed in
 `-noclip-wiring`, `-postprocess-wiring`, `-tod-wiring`,
 `-ambient-audio-wiring`. Combat-reviewer APPROVE-WITH-NOTES.
 
-One open follow-up carry-over: `worldbuilder-oneshotkills-wiring` — the
-7th flag is still published but unwired (out-of-scope for the Phase 1
-brief which named only 6). See [docs/CARRY_OVERS.md](../CARRY_OVERS.md).
+The 7th flag, `oneShotKills`, was subsequently wired in
+`CombatantCombat.ts` + `CombatantSystemDamage.ts` and closed in
+`release-stewardship-2026-05-10`. See [docs/CARRY_OVERS.md](../CARRY_OVERS.md).

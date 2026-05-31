@@ -957,7 +957,7 @@ enforces. Pre-dates this session; flag in next docs-touch cycle.
   Rust→WASM ballistic-solver pilot brief.
 - [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md) —
   "keep the stack" stance + ground-vehicle addendum.
-- [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+- [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
   — active 12-cycle queue.
 - [docs/INTERFACE_FENCE.md](../INTERFACE_FENCE.md) — fence rules
   underpinning the engine-extraction proposal.

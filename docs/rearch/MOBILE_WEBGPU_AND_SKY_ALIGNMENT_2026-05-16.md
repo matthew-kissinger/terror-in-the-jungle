@@ -288,7 +288,7 @@ Item 10 is the merge gate.
 
 **Sequencing call for the mobile fix cycle:** the
 `cycle-konveyer-11-spatial-grid-compute` already queued in
-[`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+[`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
 closes `DEFEKT-3` (the `Combat.AI` 46.86 ms / 954 ms peak on mobile).
 The owner can choose to sequence `cycle-konveyer-11-spatial-grid-compute`
 ahead of `cycle-mobile-webgl2-fallback-fix` (closes the steady-state #1
@@ -298,7 +298,7 @@ disjoint code paths.
 ## Named fix cycles (queued in campaign manifest)
 
 Both queued at the top of
-[`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+[`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
 ahead of `cycle-vekhikl-1-jeep-drivable`. Owner picks ordering at
 next `/orchestrate` dispatch.
 
@@ -405,7 +405,7 @@ with the resolution:
 > `cycle-sky-visual-restore` (KB-SKY-BLAND) and
 > `cycle-mobile-webgl2-fallback-fix` (KB-MOBILE-WEBGPU). Both queued
 > at the top of
-> [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+> [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 > Alignment memo:
 > [`docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md`](MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md).
 > Five R1 investigation memos under
@@ -447,7 +447,7 @@ cycle delta: 0. Cycle exits clean, no INCOMPLETE flag.
   - [`sky-visual-and-cost-regression.md`](MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/sky-visual-and-cost-regression.md)
   - [`mobile-startup-and-frame-budget.md`](MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/mobile-startup-and-frame-budget.md)
 - Campaign manifest:
-  [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+  [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 - Carry-over registry:
   [`docs/CARRY_OVERS.md`](../CARRY_OVERS.md).
 - Post-KONVEYER milestone:

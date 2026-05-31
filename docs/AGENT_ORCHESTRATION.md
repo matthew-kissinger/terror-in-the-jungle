@@ -215,6 +215,8 @@ For each round, in a single orchestrator turn:
 
 1. Select the next batch per the round schedule (≤ concurrency cap).
 2. Send one message with N parallel `Agent` calls:
+   (`Agent(...)` here denotes the Task/subagent dispatch the main session
+   drives via the `/orchestrate` skill — not a literally-named `Agent` tool.)
    ```
    Agent(
      subagent_type="executor",
@@ -288,13 +290,14 @@ Every task brief ends up in an executor prompt along with these:
 2. Read `docs/INTERFACE_FENCE.md` before touching
    `src/types/SystemInterfaces.ts`. Any proposed fence change → stop and
    surface.
-3. Small diffs. If you pass ~500 lines net and you are not deleting retired
-   code (B1 is the one task that can go larger), stop and reassess.
+3. Small diffs. If you pass ~400 lines net and you are not deleting retired
+   code (a task whose brief is explicitly flagged as a large retired-code
+   deletion is the one kind that can go larger), stop and reassess.
 4. Do not modify files outside the task's `Files touched` scope.
 5. Verify locally before pushing: `npm run lint`, `npm run test:run`,
    `npm run build`. New rules as of Phase 0 (2026-05-09):
    - Files ≤700 LOC and ≤50 public methods (grandfathered exceptions
-     listed in `eslint.config.js`).
+     listed in `scripts/lint-source-budget.ts`; run `npm run lint:budget`).
    - New `src/systems/**/*.ts` requires a sibling `*.test.ts`.
    - PR description names a closed carry-over by ID (from
      `docs/CARRY_OVERS.md`) OR the user-observable gap shipped.
@@ -355,6 +358,6 @@ Next cycle recommendation:
 - E-track spike memos (still referenced by Phase F candidates in the
   backlog): preserved as immutable tags `spike-E1-archive` through
   `spike-E6-archive` (commits previously lived on `spike/E*` branches,
-  pruned 2026-05-20). Index: [docs/archive/E_TRACK_SPIKE_MEMO_INDEX_2026-05-07.md](../docs/archive/E_TRACK_SPIKE_MEMO_INDEX_2026-05-07.md).
+  pruned 2026-05-20). Index: [docs/archive/E_TRACK_SPIKE_MEMO_INDEX_2026-05-07.md](archive/E_TRACK_SPIKE_MEMO_INDEX_2026-05-07.md).
   Resolve with `git checkout spike-E2-archive` (etc.) or browse
   `https://github.com/matthew-kissinger/terror-in-the-jungle/tree/spike-E2-archive`.

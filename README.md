@@ -12,12 +12,13 @@
 [▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Directives](docs/DIRECTIVES.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
 
 > **Engine architected for 3,000 combatants via materialization tiers; live-fire
-> combat verified at 120 NPCs while the ECS hot path is built out (Phase F).**
+> combat verified at 120 NPCs while an ECS hot path is evaluated (Phase F).**
 > The production renderer is WebGPU + TSL by default, with automatic WebGL2
 > fallback for browsers without WebGPU support. A Shau Valley uses real DEM
 > elevation on a 21 km map, side-mounted helicopter rotors over a Huey at low
 > altitude, and A-1 Skyraiders coming in for the napalm pass. See
-> [docs/ROADMAP.md](docs/ROADMAP.md) for the canonical phase status.
+> [docs/ROADMAP.md](docs/ROADMAP.md) for the aspirational vision; verified state lives in
+> [docs/state/CURRENT.md](docs/state/CURRENT.md) and live work in [docs/DIRECTIVES.md](docs/DIRECTIVES.md).
 
 Active directives, success criteria, and evidence links live in
 [docs/DIRECTIVES.md](docs/DIRECTIVES.md). Carry-overs live in
@@ -46,7 +47,7 @@ repository, believe the repository and update the doc.
   [docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
 - **Large-scale combat.** A Shau is architected as a ~3,000-unit strategic
   simulation through materialization tiers; the verified live-fire combat
-  frontier is currently 120 NPCs while the ECS hot path is built out
+  frontier is currently 120 NPCs while an ECS hot path is evaluated
   ([Phase F](docs/ROADMAP.md)).
 - **Squad command surface.** RTS-style direct orders with Vietnam-era prose:
   Hold, Patrol, Attack Here, Fall Back, Stand Down — issued from minimap

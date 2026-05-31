@@ -3,7 +3,7 @@
 Status: **automated smoke deferred; owner walk-through pending.**
 
 Cycle: `cycle-2026-05-28-vehicles-aircraft-operable`
-Task brief: [`docs/tasks/vehicle-occupancy-camera.md`](../tasks/vehicle-occupancy-camera.md)
+Task brief: [`docs/tasks/archive/cycle-2026-05-28-vehicles-aircraft-operable/vehicle-occupancy-camera.md`](../tasks/archive/cycle-2026-05-28-vehicles-aircraft-operable/vehicle-occupancy-camera.md)
 
 ## What the fix does
 

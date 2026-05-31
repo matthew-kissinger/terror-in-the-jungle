@@ -92,6 +92,8 @@ Runtime composers (extracted from SystemConnector):
 
 See [docs/COMBAT.md](COMBAT.md) for the authoritative combat subsystem architecture (carved out in D1, 2026-04-17). Per-faction combat tuning lives in `src/config/FactionCombatTuning.ts` and is consumed through the `FACTION_COMBAT_TUNING[faction]` lookup pattern (D2, 2026-04-17).
 
+Combatants are stored in a `Map<string, Combatant>` (`CombatantSystem.ts`); there is no ECS — bitECS is not a dependency and the E1 evaluation recommends DEFER.
+
 ## Tick Graph
 
 From `SystemUpdater.updateSystems()`:
@@ -281,7 +283,7 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
 
 | Mode | Config File | World Size | Combatants |
 |------|------------|---:|---:|
-| Zone Control | `ZoneControlConfig.ts` | 500m | 20 |
+| Zone Control | `ZoneControlConfig.ts` | 800m | 20 |
 | Team Deathmatch | `TeamDeathmatchConfig.ts` | 400m | 30 |
 | Open Frontier | `OpenFrontierConfig.ts` | 3200m | 120 |
 | A Shau Valley | `AShauValleyConfig.ts` | 21km | 60 materialized / 3000 strategic |

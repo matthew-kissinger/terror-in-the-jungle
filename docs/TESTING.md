@@ -1,10 +1,12 @@
 # Testing Contract
 
+Last verified: 2026-05-31
+
 This file is the authoritative test-layer policy. **Every agent and human touching tests must read this first.** The point is to prevent implementation-mirror tests that enshrine today's code shape and block tomorrow's refactor.
 
 ## Why this exists
 
-The repo has grown ~3,700 tests across ~180 files. A large fraction assert *implementation details* (specific phase-state names, envelope constant values, exact command magnitudes) rather than *behavior*. When the implementation changes — even correctly — those tests fail and have to be rewritten. The net effect: tests block refactors that would make the game better.
+The repo has grown to several thousand behavior tests across 347 test files. A large fraction assert *implementation details* (specific phase-state names, envelope constant values, exact command magnitudes) rather than *behavior*. When the implementation changes — even correctly — those tests fail and have to be rewritten. The net effect: tests block refactors that would make the game better.
 
 This document tells you which kind of test to write and which to prune.
 
@@ -19,6 +21,8 @@ This document tells you which kind of test to write and which to prune.
 
 Target totals across all four layers: **under 10 minutes for CI, under 30 s for local `test:quick`.**
 
+> **L4 is not a vitest layer.** L1-L3 run under vitest (`npm run test:run` / `test:quick`). L4 (full-engine / browser / perf) is the `scripts/` Playwright + perf-capture tooling — `npm run perf:*` and `npm run probe:*` against a live Vite preview — and is *not* exercised by `test:run` or `test:quick`.
+
 ## Behavior tests vs implementation tests
 
 A **behavior test** asserts what the system *does* from a caller's perspective. It survives refactors.
@@ -27,7 +31,15 @@ A **implementation test** asserts how the system does it internally. It dies in 
 
 ### Good (behavior):
 
+Fixed-wing liftoff/stall is an L4 concern, exercised by the real runtime probe
+`npm run probe:fixed-wing` (`scripts/fixed-wing-runtime-probe.ts`) against a live
+Vite preview — not a vitest assertion. The illustrative pseudocode below shows the
+*shape* of a behavior check (assert the observable outcome — does it lift off, does
+it stall — not the internal command/phase that produced it):
+
 ```ts
+// ILLUSTRATIVE PSEUDOCODE — there is no flyScenario() helper.
+// The real check is `npm run probe:fixed-wing` (scripts/fixed-wing-runtime-probe.ts).
 it('AC-47 lifts off within 10 seconds at full throttle + elevator', async () => {
   const result = await flyScenario({ aircraft: 'AC47_SPOOKY', throttle: 1, elevator: 1, durationSec: 12 });
   expect(result.liftoffTimeSec).toBeLessThan(10);
@@ -63,6 +75,8 @@ it('applyDamage bumps suppressionLevel by exactly 0.3', () => {
 ```
 
 ## Rules
+
+> These rules are **review-enforced conventions, not lint-enforced** — eslint has no rule for them. They are upheld in code review.
 
 1. **Test through public interfaces.** If the interface is in `src/types/SystemInterfaces.ts`, you can test against it. If it's a private method, you probably shouldn't be testing it directly.
 2. **Don't assert on tuning constants.** Numbers like `0.3`, `0.6`, `18`, phase names like `'rotation'` — these will change. Assert on observable outcomes.
@@ -108,6 +122,8 @@ When you are asked to triage tests in a directory:
 Target: **drop test count by 30-50% without losing behavior coverage.** If you can't, the directory didn't have much drift — report as low-yield and move on.
 
 ## Forbidden patterns
+
+> These are **review-enforced conventions, not lint-enforced** — eslint has no rule for them. Reviewers reject PRs that introduce them.
 
 - `vi.spyOn(obj, 'privateMethod')` on private methods (prefix `_`). Test through the public interface.
 - `expect(someConstantExport).toBe(0.3)`. Don't assert on tuning constants.

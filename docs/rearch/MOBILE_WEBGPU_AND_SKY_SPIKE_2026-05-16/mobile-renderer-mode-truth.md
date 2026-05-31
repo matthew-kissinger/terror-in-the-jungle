@@ -376,7 +376,7 @@ re-run the probe.
 - Cycle brief:
   [`docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md`](../../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
 - Parent campaign manifest:
-  [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../CAMPAIGN_2026-05-13-POST-WEBGPU.md).
+  [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 - POST-KONVEYER milestone memo:
   [`docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md`](../POST_KONVEYER_MIGRATION_2026-05-13.md)
   — "What still needs proof on production hardware variety"

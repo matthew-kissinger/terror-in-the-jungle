@@ -202,7 +202,7 @@ top of Pass 1's path-filter doctor PR.
 
 ### R2 (3 dispatched, 3 merged)
 
-- [#310](https://github.com/matthew-kissinger/terref-in-the-jungle/pull/310) `ecba36ee` `status-mirror-consolidation` — 78 files changed, +31 / -468 lines. CLAUDE.md 220 → 34; AGENT_ORCHESTRATION.md 402 → 306; BACKLOG.md 599 → 570; README.md 320 → 305. Bulk strip of `Last verified:` / `Last updated:` headers across 74 doc files (kept only on DIRECTIVES.md per the canonical-status-source design). Current-state sections collapsed to `See [docs/DIRECTIVES.md](docs/DIRECTIVES.md).` one-liners.
+- [#310](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/310) `ecba36ee` `status-mirror-consolidation` — 78 files changed, +31 / -468 lines. CLAUDE.md 220 → 34; AGENT_ORCHESTRATION.md 402 → 306; BACKLOG.md 599 → 570; README.md 320 → 305. Bulk strip of `Last verified:` / `Last updated:` headers across 74 doc files (kept only on DIRECTIVES.md per the canonical-status-source design). Current-state sections collapsed to `See [docs/DIRECTIVES.md](docs/DIRECTIVES.md).` one-liners.
 - [#308](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/308) `f5511c53` `carryovers-zero-cycle-ban` — new rule in AGENT_ORCHESTRATION.md §"Carry-over discipline" (and matching CARRY_OVERS.md header): "Carry-overs track only items spanning ≥2 cycles." Validator check in `scripts/cycle-validate.ts <slug> --close` diffs CARRY_OVERS Closed against a `git merge-base HEAD origin/master` cycle-start snapshot and FAILs on a newly closed ID that wasn't Active at cycle start. Best-effort design (logs "skipped" if no merge-base available, not hard-fails on infrastructure issues).
 - [#309](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/309) `6c02d1bf` `campaign-layer-delete-or-shrink` — Campaign-manifest abstraction now reserved for ≥4 sequenced cycles. ≤3-cycle parallel runs use a `## Active cycles` inline block in AGENT_ORCHESTRATION.md under "Current state" instead of a separate manifest file. Hold-list moved to BACKLOG.md "Owner-gated cycles" table (live source-of-truth; the archived campaign manifests stay untouched). Plan file self-archived: `docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md` → `docs/archive/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md` per the plan's lines 207-209 instruction.
 
@@ -248,7 +248,7 @@ gunner swaps deferred to `cycle-vekhikl-seat-swaps` on the hold list.
 
 Carry-over delta: 0 (VEKHIKL-UX-2 opened+closed). Cycle retro item:
 the executor context-budget hard-stop pattern is captured in
-[docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](FRAMEWORK_RECOVERY_PLAN_2026-05-20.md)
+[docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](archive/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md)
 Pass 2 (framework trim).
 
 ### Cycle #2 — `cycle-of-river-surface-enable`
@@ -281,12 +281,12 @@ item: prefab-ID additions ripple to `gameModeTypes.ts` +
 
 - **15 PRs merged across the three cycles** (cycle #1 boarding: 8 PRs; cycle #2 OF water: 4 PRs; cycle #3 motor pool: 3 PRs).
 - One mid-cycle hard-stop in cycle #1 R1 (executor context-budget overflow on 3 of 5 tasks) handled via tighter-prompt re-dispatch + task split into a factory module + handler/composer wire. Zero fence changes; zero perf hard-stops; zero CI red after retries.
-- Intermittent sandbox blocked git commit/push from 3 worktrees (#291, #298, #299) at ~30% incidence — orchestrator-side push from the main session unblocked each. Flagged in [docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](FRAMEWORK_RECOVERY_PLAN_2026-05-20.md).
+- Intermittent sandbox blocked git commit/push from 3 worktrees (#291, #298, #299) at ~30% incidence — orchestrator-side push from the main session unblocked each. Flagged in [docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](archive/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md).
 - Production deploy gate fired against master tip `e99be58e` via `gh workflow run deploy.yml --ref master` (deploy run `26182116715` → success). Explicit fulfillment of the owner ask "make sure water is proper in production as well."
 - Carry-over count: 6 → 6 (zero net change; three zero-cycle IDs opened+closed in-campaign).
 - Hold list intact: `cycle-vekhikl-seat-swaps`, `cycle-vekhikl-5-fleet-expansion`, `cycle-sky-screen-space-quad`, `cycle-stabilizat-1-baselines-refresh` remain owner-gated on the autonomous-loop-deferred playtest evidence.
 - Owner playtests deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) across all three cycles. Two known stale-post-capture regen gates (PR #292 OF water, PR #295 motor pool PNG run) called out in the respective playtest memos as load-bearing close gates for the deferred owner walks.
-- Next work batch: framework recovery plan at [docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](FRAMEWORK_RECOVERY_PLAN_2026-05-20.md) (landed in-campaign as commit `45d77250`; owner-gated post-compact review).
+- Next work batch: framework recovery plan at [docs/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md](archive/FRAMEWORK_RECOVERY_PLAN_2026-05-20.md) (landed in-campaign as commit `45d77250`; owner-gated post-compact review).
 
 ## Recently Completed (campaign-2026-05-19-visual-and-wayfinding)
 

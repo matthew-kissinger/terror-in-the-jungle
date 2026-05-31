@@ -26,7 +26,7 @@ tested / do not work end-to-end" gap, in three parts:
 ## Autonomous-loop deferral notice
 
 Under the cycle brief's declared `posture: autonomous-loop`
-(`docs/tasks/cycle-2026-05-28-vehicles-aircraft-operable.md`), the
+(`docs/tasks/archive/cycle-2026-05-28-vehicles-aircraft-operable/cycle-2026-05-28-vehicles-aircraft-operable.md`), the
 playtest-required gate for this task is **deferred** to
 [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md) per the orchestrator's
 autonomous-loop override (see

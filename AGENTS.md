@@ -6,7 +6,7 @@ This is the authoritative, agent-agnostic operating guide for this repo. Every a
 
 Terror in the Jungle - a browser-based 3D combat game set in the Vietnam War. Three.js 0.184, TypeScript 6.0, Vite 8, Vitest 4, Node 24.
 
-Vision: **engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** WebGPU + TSL (Three.js 0.184, `WebGPURenderer` default on master since 2026-05-13 via PR #192, with automatic WebGL2 fallback for browsers without WebGPU support) and driveable land vehicles (M151 jeep first, then tanks with skid-steer + independent turret + ballistic cannon) are parallel first-class directions alongside the 3,000-combatant scale commitment. Stable frame-time tails under load, real-terrain scenarios (A Shau Valley 21km DEM). Ships to Cloudflare Pages at https://terror-in-the-jungle.pages.dev/. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md); do not restate it elsewhere.
+Vision: **engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while an ECS hot path is evaluated (Phase F).** WebGPU + TSL (Three.js 0.184, `WebGPURenderer` default on master since 2026-05-13 via PR #192, with automatic WebGL2 fallback for browsers without WebGPU support) and driveable land vehicles (M151 jeep first, then tanks with skid-steer + independent turret + ballistic cannon) are parallel first-class directions alongside the 3,000-combatant scale commitment. Stable frame-time tails under load, real-terrain scenarios (A Shau Valley 21km DEM). Ships to Cloudflare Pages at https://terror-in-the-jungle.pages.dev/. The 3,000-combatant vision + scale sentence live in [docs/ROADMAP.md](docs/ROADMAP.md) (aspirational); verified current state lives in [docs/state/CURRENT.md](docs/state/CURRENT.md) and live work in [docs/DIRECTIVES.md](docs/DIRECTIVES.md).
 
 ## Commands
 
@@ -140,8 +140,8 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Vision and phase plan |
 | [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md) | Multi-agent DAG (active when orchestrating) |
 | [docs/REARCHITECTURE.md](docs/REARCHITECTURE.md) | Phase E paradigm questions |
-| `docs/rearch/E[1-6]*.md` | Phase E evaluation memos (on `spike/E*` branches only; not merged) |
-| [docs/ASSET_MANIFEST.md](docs/ASSET_MANIFEST.md) | 75 GLBs, integration status |
+| `docs/rearch/E[1-6]*.md` | Phase E evaluation memos (E1 evaluation is on master; E2-E6 explorations live on `spike/E*` branches) |
+| [docs/ASSET_MANIFEST.md](docs/ASSET_MANIFEST.md) | 159 GLBs, integration status |
 | [docs/UI_ICON_MANIFEST.md](docs/UI_ICON_MANIFEST.md) | Pixel-art UI icons |
 
 ## Agent skills and rules
@@ -196,9 +196,7 @@ Tests, lint, and build catch many correctness regressions. The fixed-wing runtim
 
 Any change to flight, driving, combat rhythm, or UI responsiveness must be validated by a human running `docs/PLAYTEST_CHECKLIST.md`. Passing automated checks is necessary, not sufficient. If you can't get a human through the checklist, say so explicitly in the PR description rather than claiming the change is done.
 
-Cycle 2 explicitly owns fixed-wing feel/interpolation work. Do not add more
-vehicle types until the stiff response, altitude bounce/porpoise, and high-speed
-camera/render shake questions have an evidence-backed decision.
+Live vehicle and aircraft directive status is tracked in [docs/DIRECTIVES.md](docs/DIRECTIVES.md) (VEKHIKL-*, AVIATSIYA-*). Fixed-wing feel/interpolation remains an open quality question but does not gate new vehicle work.
 
 ## Known gotchas for agents
 
@@ -223,7 +221,7 @@ camera/render shake questions have an evidence-backed decision.
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.
 - **Mode-startup stalls are not automatically cache bugs.** The 2026-05-13 spike showed Recast WASM/build/navmesh cache headers can be correct while synchronous terrain surface baking still blocks mode selection. For startup work, run `scripts/perf-startup-ui.ts` and check `startup-marks.json` before changing Cloudflare cache policy. Current memo: `docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md`.
-- **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:culling-proof` (renamed from `check:projekt-143-culling-proof` in Phase 1); the cycle2-proof bundle is archived under `scripts/audit-archive/cycle2-proof.ts`. The proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
+- **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:culling-proof` (renamed from `check:projekt-143-culling-proof` in Phase 1); the cycle2-proof bundle is archived under `scripts/audit-archive/cycle2-proof-suite.ts`. The proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
 - **Cycle 3 KB-CULL owner baseline.** Before changing culling, HLOD, static
   features, vehicle visibility, or pool residency, run
   `npm run check:culling-baseline`. It selects a representative

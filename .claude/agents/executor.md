@@ -31,7 +31,7 @@ You were spawned by the orchestrator with a single task brief. Deliver a small, 
 5. Make the changes. Keep the diff focused.
 6. Run local verification: `npm run lint`, `npm run test:run`, `npm run build`. Fix what you broke. Re-run.
 7. Commit.
-8. Push the branch: `git push -u origin task/<id>-<slug>`. If this returns a sandbox-block (the `ask`-list catches `git push:*`), do NOT retry — proceed to step 10 with `pr_url: blocked-by-sandbox` and let the orchestrator push from the main session.
+8. Push the branch: `git push -u origin task/<slug>`. If this returns a sandbox-block (the `ask`-list catches `git push:*`), do NOT retry — proceed to step 10 with `pr_url: blocked-by-sandbox` and let the orchestrator push from the main session.
 9. If push succeeded, open a PR: `gh pr create --title "<commit message first line>" --body "<one-paragraph summary + link to task file + verification output>"`. If push was sandbox-blocked, skip this step — the orchestrator runs it.
 10. Report back to the orchestrator: PR URL (or `blocked-by-sandbox`), commit subject, branch name, diff stat, the verification commands you ran, any surprises, whether the task is playtest-required (copy the flag from the brief).
 
@@ -41,7 +41,7 @@ Return to the orchestrator a concise structured report:
 
 ```
 task_id: <id>
-branch: task/<id>-<slug>
+branch: task/<slug>
 pr_url: <url> | blocked-by-sandbox
 commit_subject: <type>(<scope>): <summary> (<slug>)   # required when pr_url=blocked-by-sandbox so orchestrator can open the PR
 files_changed: <N files, +A -D lines>

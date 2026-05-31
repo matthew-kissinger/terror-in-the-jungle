@@ -1,7 +1,7 @@
 # Roadmap
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
-> For the current verified repo state, see [STATE_OF_REPO.md](state/CURRENT.md).
+> For the current verified repo state, see [Current State](state/CURRENT.md).
 
 ## Vision
 
@@ -13,7 +13,7 @@ Vietnam War is the first theater. Architecture generalizes to any war with diffe
 
 Current production renderer is **`WebGPURenderer`** (Three.js r184,
 `three/webgpu` import) with automatic WebGL2 fallback for browsers without
-WebGPU support. This landed on master on 2026-05-12 via
+WebGPU support. This landed on master on 2026-05-13 via
 [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
 (merge commit `1df141ca`), folding in KONVEYER-0 through KONVEYER-10 plus the
 Phase F R1 materialization rearch slices. The WebGL2 fallback path is gated on
@@ -43,9 +43,11 @@ before merge. See
 
 **Canonical vision sentence (copy verbatim into other docs that need to state it):**
 
-> Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F, ~weeks 7–12 of the 2026-05-09 realignment plan).
+> Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while an ECS hot path is evaluated (Phase F, ~weeks 7–12 of the 2026-05-09 realignment plan).
 
-Phase F is the work that makes the 3,000 line true: bitECS port of combatants, async / precomputed cover-search to close DEFEKT-3, a 1,000-NPC perf gate, and a determinism pilot. Until Phase F lands, all public-facing claims about scale must include the qualifier above.
+Phase F is the work that makes the 3,000 line true: a contingent bitECS port of combatants (only if the current approach stops scaling), async / precomputed cover-search to close DEFEKT-3, a 1,000-NPC perf gate, and a determinism pilot. Until Phase F lands, all public-facing claims about scale must include the qualifier above.
+
+Current reality: combatants live in a Map<string,Combatant> (CombatantSystem.ts); bitECS is not yet a dependency and the E1 evaluation (docs/rearch/E1-ecs-evaluation.md) recommends DEFER — ECS is a contingent Phase-F evaluation, not in progress.
 
 ## Projekt Objekt-143 Follow-Up
 
@@ -112,7 +114,7 @@ Carry these findings into the next Projekt revamp:
 - Fixed-wing feel/interpolation sign-off before adding more vehicle types
 - Unified `IVehicle` interface for helicopters, ground vehicles, watercraft
 - Ground vehicle physics (terrain-following, speed by surface type)
-- M151 Jeep, M113 APC, M35 Truck as first drivable ground vehicles
+- M113 APC, M35 Truck as next drivable ground vehicles
 - NPC helicopter transport (takeoff, fly to LZ, deploy squad, RTB)
 - Watercraft (sampan, PBR) have boarding/spawn integration; watercraft-grade
   hydrodynamics and seat-swap combat polish remain open.
@@ -153,7 +155,7 @@ Carry these findings into the next Projekt revamp:
 
 ## Performance Budget
 
-- Near-term gate: keep 120-NPC materialized scenarios under a stable 60 FPS class budget and continue driving down p95/p99 tails through capture-and-compare work
+- Near-term gate: drive toward a 60 FPS-class budget for 120-NPC materialized scenarios and continue driving down p95/p99 tails through capture-and-compare work (current combat120: ~16ms avg, p99 ~34ms, max-frame FAIL, measurement-trust WARN — see [docs/state/perf-trust.md](state/perf-trust.md))
 - Long-term scale-frontier target before widening materialized counts: <8ms average, <16ms p99
 - Memory: <512MB heap for standard modes
 - Every phase: perf captures before/after, reject regressions

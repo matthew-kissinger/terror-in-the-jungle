@@ -31,7 +31,7 @@ Tracked baselines: `combat120`, `openfrontier:short`, `ashau:short`,
 
 These overrides are gated to dev/perf-harness builds and do not ship in retail.
 
-`combat120` defaults to AI Sandbox seed `42` for deterministic spawn layout.
+`combat120` defaults to AI Sandbox seed `2718` for deterministic spawn layout.
 
 `openfrontier:short` and other Open Frontier captures may pin a pre-baked
 terrain seed via `?seed=<n>`. `npm run probe:fixed-wing` uses Open Frontier

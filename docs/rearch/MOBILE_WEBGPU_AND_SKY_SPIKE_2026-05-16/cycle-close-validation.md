@@ -2,7 +2,7 @@
 
 R3 deliverable for the `real-device-validation-harness` task, closing
 `cycle-mobile-webgl2-fallback-fix` under **autonomous-loop posture** per
-[`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+[`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
 and [`.claude/agents/orchestrator.md`](../../../.claude/agents/orchestrator.md)
 §"Autonomous-loop posture".
 
@@ -252,7 +252,7 @@ Per `cycle-mobile-webgl2-fallback-fix.md` "Acceptance Criteria (cycle close)":
 
 - Cycle brief: [`docs/tasks/cycle-mobile-webgl2-fallback-fix.md`](../../tasks/cycle-mobile-webgl2-fallback-fix.md)
 - R2 alignment memo: [`MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md`](../MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md)
-- Campaign manifest: [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../CAMPAIGN_2026-05-13-POST-WEBGPU.md)
+- Campaign manifest: [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
 - Playtest deferral sink: [`docs/PLAYTEST_PENDING.md`](../../PLAYTEST_PENDING.md)
 - Orchestrator autonomous-loop rules: [`.claude/agents/orchestrator.md`](../../../.claude/agents/orchestrator.md) §"Autonomous-loop posture"
 - Harness script: [`scripts/real-device-validation.ts`](../../../scripts/real-device-validation.ts)

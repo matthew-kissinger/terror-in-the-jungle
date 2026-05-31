@@ -1,5 +1,11 @@
 # Perf Measurement-Chain Trust Status
 
+> **Update 2026-05-31:** the synchronous cover search described below is
+> REMEDIATED — the O(1) `CoverSpatialGrid` is wired into prod combat
+> (`CombatantAI.ts:185,197`; `AIStateEngage` threads `spatialGrid` through
+> suppression). DEFEKT-3's combat120 p99 PASS is pending the STABILIZAT-1
+> baseline refresh, not further cover-search work.
+
 Current trust state of the combat120 perf baseline and the chain of evidence
 behind STABILIZAT-1 (combat120 baseline refresh blocked) and DEFEKT-3
 (combat AI p99 — synchronous cover search in

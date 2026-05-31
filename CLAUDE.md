@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while the ECS hot path is built out (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. Canonical phase status lives in [docs/ROADMAP.md](docs/ROADMAP.md).
+Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). **Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while an ECS hot path is evaluated (Phase F).** Real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages. The vision + scale sentence live in [docs/ROADMAP.md](docs/ROADMAP.md) (aspirational); verified current state lives in [docs/state/CURRENT.md](docs/state/CURRENT.md) and live work in [docs/DIRECTIVES.md](docs/DIRECTIVES.md).
 
 ## Read First
 

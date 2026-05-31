@@ -160,7 +160,7 @@ Symptoms: harness `blockedByTerrain` count rises, `avgActualSpeed` drops,
 `StuckDetector` console signals grow; combat may continue but movement
 visibly bounces.
 
-Investigation: see also `docs/MOVEMENT_NAV_CHECKIN.md`. Check
+Investigation: see also `docs/archive/MOVEMENT_NAV_CHECKIN.md`. Check
 `movement-artifacts.json` and `movement-viewer.html`. The 2026-05-06
 `CombatantMovement` patch rejects zero-distance navmesh backtrack snaps and
 prefers last-good navmesh progress before scored terrain fallback;
