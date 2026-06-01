@@ -590,8 +590,11 @@ async function navDiagnostics(page: Page): Promise<unknown> {
     });
 
     const snappedPoints = repRows
-      .map((row) => row.snapped)
-      .filter((point): point is { x: number; y: number; z: number } => point !== null);
+      .map((row: { snapped: { x: number; y: number; z: number } | null }) => row.snapped)
+      .filter(
+        (point: { x: number; y: number; z: number } | null): point is { x: number; y: number; z: number } =>
+          point !== null,
+      );
     const connectivity = typeof nav.validateConnectivity === 'function' && snappedPoints.length >= 2
       ? nav.validateConnectivity(snappedPoints)
       : null;

@@ -21,6 +21,14 @@
 
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
+
+import {
+  evaluateStaleness,
+  DEFAULT_MAX_AGE_DAYS,
+  type BaselineProvenance,
+  type StalenessResult,
+} from './perf-baseline-staleness';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,6 +90,10 @@ type ScenarioBaseline = {
   lastMeasured?: {
     date: string;
     artifactDir: string;
+    /** Git commit SHA that was HEAD when this baseline was captured (optional for legacy entries). */
+    capturedAtSha?: string;
+    /** ISO-8601 capture timestamp (optional for legacy entries). */
+    capturedAt?: string;
     [key: string]: unknown;
   };
 };
@@ -170,6 +182,69 @@ function loadBaselines(): BaselineFile | null {
 
 function saveBaselines(baselines: BaselineFile): void {
   writeFileSync(BASELINE_PATH, JSON.stringify(baselines, null, 2) + '\n', 'utf-8');
+}
+
+// ---------------------------------------------------------------------------
+// Git provenance helpers (impure; isolated so the staleness decision can stay pure)
+// ---------------------------------------------------------------------------
+
+/** Current HEAD commit SHA, or null when git is unavailable / not a repo. */
+function gitHeadSha(): string | null {
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve `git merge-base --is-ancestor <sha> HEAD`.
+ *   true  -> sha is an ancestor of (or equal to) HEAD
+ *   false -> sha is reachable/known but NOT an ancestor (exit code 1)
+ *   null  -> indeterminate (no sha, git missing, or sha unknown to this clone)
+ */
+function shaIsAncestorOfHead(sha: string | undefined): boolean | null {
+  if (!sha) return null;
+  try {
+    // exit 0 = ancestor. Throws on non-zero.
+    execSync(`git merge-base --is-ancestor ${sha} HEAD`, { stdio: ['ignore', 'ignore', 'ignore'] });
+    return true;
+  } catch (err) {
+    // Exit code 1 = definitively not an ancestor. Other codes (128 = bad/unknown
+    // object, git missing) are indeterminate and must not read as "stale".
+    const status = (err as { status?: number }).status;
+    if (status === 1) return false;
+    return null;
+  }
+}
+
+/**
+ * Run the staleness guard for the scenario being compared and print its
+ * verdict. Returns the result so the caller can fold a strict `fail` into the
+ * process exit code. Comparison behavior is unchanged when the result is `ok`.
+ */
+function checkBaselineStaleness(scenario: ScenarioBaseline, strict: boolean): StalenessResult {
+  const provenance: BaselineProvenance = {
+    capturedAtSha: scenario.lastMeasured?.capturedAtSha,
+    capturedAt: scenario.lastMeasured?.capturedAt,
+  };
+
+  const result = evaluateStaleness({
+    provenance,
+    shaIsAncestorOfHead: shaIsAncestorOfHead(provenance.capturedAtSha),
+    now: new Date(),
+    config: { maxAgeDays: DEFAULT_MAX_AGE_DAYS, strict },
+  });
+
+  if (result.level === 'fail') {
+    console.log(`\nBaseline staleness: FAIL - ${result.message}`);
+  } else if (result.level === 'warn') {
+    console.log(`\nBaseline staleness: WARN - ${result.message}`);
+  } else {
+    console.log(`\nBaseline staleness: OK - ${result.message}`);
+  }
+
+  return result;
 }
 
 function normalizeScenarioName(name?: string | null): string | undefined {
@@ -395,9 +470,16 @@ function updateBaseline(
     process.exit(2);
   }
 
+  const capturedAt = new Date().toISOString();
+  const capturedAtSha = gitHeadSha();
+
   baselines.scenarios[scenarioName].lastMeasured = {
-    date: new Date().toISOString().slice(0, 10),
+    date: capturedAt.slice(0, 10),
     artifactDir: artifactDirName,
+    // Provenance for the staleness guard. capturedAtSha is omitted (not null)
+    // when git is unavailable so the on-disk shape stays clean.
+    ...(capturedAtSha ? { capturedAtSha } : {}),
+    capturedAt,
     avgFrameMs: Number(metrics.avgFrameMs.toFixed(2)),
     p95FrameMs: Number(metrics.p95FrameMs.toFixed(2)),
     p99FrameMs: Number(metrics.p99FrameMs.toFixed(2)),
@@ -549,6 +631,12 @@ function main(): void {
   const scenario = baselines.scenarios[scenarioName];
   console.log(`Scenario: ${scenarioName} - ${scenario.description}\n`);
 
+  // Staleness guard (additive): the comparison below is only trustworthy if the
+  // baseline was captured against a commit still in history and within the age
+  // budget. Strict mode (--fail-on-warn / perf:compare:strict) escalates a
+  // definitively stale baseline to a hard fail; otherwise it is advisory.
+  const staleness = checkBaselineStaleness(scenario, opts.failOnWarn);
+
   // Compare against thresholds
   const rows = buildComparison(metrics, scenario);
   printTable(rows);
@@ -566,6 +654,12 @@ function main(): void {
 
   if (hasFail) {
     console.log('\nFAIL - one or more metrics exceeded fail threshold');
+    process.exit(2);
+  } else if (staleness.level === 'fail') {
+    // Metrics passed/warned, but the baseline itself is stale under strict mode.
+    // A "pass" here would assert a comparison against code the baseline never
+    // measured, so this is a hard fail. (Metric FAIL above already dominates.)
+    console.log('\nFAIL - baseline is stale and --fail-on-warn was set; refusing to trust the comparison.');
     process.exit(2);
   } else if (hasWarn) {
     if (opts.failOnWarn) {

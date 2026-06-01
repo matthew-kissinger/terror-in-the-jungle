@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import tsEslint from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import importPlugin from "eslint-plugin-import";
+import globals from "globals";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -59,6 +60,26 @@ export default [
       "**/*worker*.{ts,tsx}",
       "src/workers/**/*.{ts,tsx}",
     ],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
+    // Repo automation/probe scripts run under Node (tsx), not in the browser.
+    // They legitimately use console + process and live in their own TS project
+    // (tsconfig.scripts.json) so the type-aware parser can resolve them.
+    files: ["scripts/**/*.ts"],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: ["./tsconfig.scripts.json"],
+        tsconfigRootDir: __dirname,
+        sourceType: "module",
+      },
+      globals: {
+        ...globals.node,
+      },
+    },
     rules: {
       "no-console": "off",
     },

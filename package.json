@@ -28,7 +28,9 @@
   "knip": {
     "entry": [
       "index.html",
+      "src/main.ts",
       "public/sw.js",
+      "scripts/**/*.{test,spec}.ts",
       "scripts/hud-state-probe.ts",
       "scripts/perf-active-driver.cjs",
       "scripts/perf-browser-observers.js",
@@ -42,7 +44,8 @@
       "wrangler"
     ],
     "ignoreFiles": [
-      "docs/cycles/**/evidence/**/probe.mts"
+      "docs/cycles/**/evidence/**/probe.mts",
+      ".claude/skills/**/templates/**"
     ],
     "ignore": [
       "scripts/capture-*-shots.ts",
@@ -62,6 +65,7 @@
     "build": "tsc && vite build && npm run cloudflare:assets:manifest",
     "build:perf": "cross-env VITE_PERF_HARNESS=1 tsc && cross-env VITE_PERF_HARNESS=1 vite build --outDir dist-perf && npm run cloudflare:assets:manifest -- --out=dist-perf/asset-manifest.json",
     "typecheck": "tsc --noEmit",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json --noEmit",
     "doctor": "npx tsx scripts/doctor.ts",
     "validate:fast": "npm run check:pixel-forge-cutover && npm run check:pixel-forge-npc-crops && npm run typecheck && npm run lint && npm run lint:budget && npm run lint:docs && npm run test:quick",
     "navmesh:generate": "npx tsx scripts/prebake-navmesh.ts --force",
@@ -73,6 +77,8 @@
     "deploy:prod": "npx tsx scripts/github-workflow-run.ts deploy.yml --ref master --watch",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
+    "lint:scripts": "eslint scripts/",
+    "lint:scripts:fix": "eslint scripts/ --fix",
     "lint:budget": "npx tsx scripts/lint-source-budget.ts",
     "lint:docs": "npx tsx scripts/lint-docs.ts",
     "check:fence": "npx tsx scripts/check-fence.ts",
@@ -178,6 +184,7 @@
     "eslint": "^9.39.4",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
+    "globals": "^14.0.0",
     "jsdom": "^29.0.1",
     "knip": "^6.4.1",
     "playwright": "^1.59.1",

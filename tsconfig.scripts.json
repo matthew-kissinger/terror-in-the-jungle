@@ -1,0 +1,19 @@
+{
+  // Typecheck project for the repo automation/probe scripts under scripts/.
+  // Extends the base app tsconfig so script <-> src cross-imports resolve, and
+  // pulls in Node typings (these run under tsx/node, not the DOM bundle). Test
+  // globals are included so this project is also the ESLint type-aware project
+  // for scripts/**/*.ts uniformly (mirrors how src test files are linted).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vitest/globals"],
+    // Scripts run on Node 24 (.nvmrc) via tsx, not in the browser bundle, so
+    // they can rely on newer ECMAScript built-ins (String.replaceAll, Array.at,
+    // structuredClone, etc.). The app target stays ES2020 for browser breadth;
+    // this override only widens the lib for the scripts typecheck project.
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": ["scripts", "src"]
+}
