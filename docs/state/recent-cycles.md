@@ -1,6 +1,6 @@
 # Recent Cycle Outcomes
 
-Last verified: 2026-05-28 (drift-correction link fixes under `doc-consolidation-and-refs`; cycle prose unchanged. For cycles after 2026-05-13 see the closed campaign manifests under [docs/archive/](../archive/) and [docs/DIRECTIVES.md](../DIRECTIVES.md).)
+Last verified: 2026-06-01 (added the optimal-development arc entry; prior refresh 2026-05-28 under `doc-consolidation-and-refs`. For cycles after 2026-05-13 see the closed campaign manifests under [docs/archive/](../archive/) and [docs/DIRECTIVES.md](../DIRECTIVES.md).)
 
 Recent cycles, summarized. Companion docs:
 
@@ -10,6 +10,37 @@ Recent cycles, summarized. Companion docs:
 
 For older cycle outcomes, browse `docs/cycles/` or
 `docs/tasks/archive/<cycle-id>/`.
+
+---
+
+## optimal-development arc (2026-06-01, autonomous-loop, workflow-orchestrated)
+
+Eight workflow-driven phases shipped to `master` and deployed live (tip
+`17adc18a`), each gated green (typecheck + lint + test:run + build) before merge:
+
+- **Phase 0 — doc grounding:** 24 onboarding docs realigned to code reality
+  (ECS framing corrected to "evaluated", status-home pointer, ~24 broken
+  links/paths + stale facts).
+- **Phase 1 — trust the instruments:** perf-baseline staleness guard in
+  `perf-compare.ts`; `scripts/` brought under lint + a `tsconfig.scripts.json`
+  typecheck; knip config fixed (unused-files 462 → 87).
+- **Phase 2 — prove & protect:** per-frame allocation hardening (combat/
+  terrain/billboard); +142 behavior tests for zero-coverage modules; broadened
+  `check:doc-drift` from 3 → all 405 docs and wired it into CI.
+- **Phase 3 — bug hunt:** adversarial refute-by-default sweep — 6 confirmed
+  bugs fixed (each red→green), ~17 suspected refuted by empirical probe.
+- **Phase 4 — scale:** god-file budget burndown (4 hard FAILs → 0 via
+  facade-preserving splits); bitECS scoping spike benchmarked 1.0–1.09× vs OOP
+  → **DEFER** ([docs/rearch/ECS_SPIKE_2026-05-31.md](../rearch/ECS_SPIKE_2026-05-31.md)).
+- **Phase 5 — features:** aviation/UX scoped against current code (most already
+  built); DIRECTIVES AVIATSIYA rows realigned; one bounded UX wiring landed;
+  design-heavy gaps deferred with plans
+  ([docs/rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md](../rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md)).
+
+Suite 5249 green; `lint:budget` clean; `check:live-release` PASS (7/7). The CI
+Playwright-browser jobs (smoke/mobile-ui/perf) were made advisory due to a
+runner-side `playwright install` hang (infra, not code) — restore once fixed.
+Feel-walks tracked in [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
 
 ---
 

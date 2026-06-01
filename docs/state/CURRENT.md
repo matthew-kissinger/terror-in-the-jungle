@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-05-28 (drift-correction refresh under `doc-consolidation-and-refs`; historical KONVEYER slice-by-slice evidence consolidated into [docs/directives/konveyer-10.md](../directives/konveyer-10.md) and [docs/archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md))
+Last verified: 2026-06-01 (post optimal-development arc — see Current focus; prior refresh 2026-05-28 under `doc-consolidation-and-refs`)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -26,7 +26,7 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-05-28)
+## Current focus (2026-06-01)
 
 `master` is the WebGPU + TSL renderer branch and has been since the KONVEYER
 campaign merged via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
@@ -35,17 +35,29 @@ campaign merged via [PR #192](https://github.com/matthew-kissinger/terror-in-the
 support fall back to the WebGL2 path automatically, and strict mode
 (`?renderer=webgpu-strict`) is the acceptance bar for renderer-parity evidence.
 
-The most recently closed cycle is
-[`cycle-2026-05-28-vehicles-aircraft-operable`](../tasks/archive/cycle-2026-05-28-vehicles-aircraft-operable/cycle-2026-05-28-vehicles-aircraft-operable.md):
-making ground vehicles, tanks, and aircraft operable end-to-end
-(third-person follow-cam on boarding, tank crew + cannon + spawn
-discoverability, aircraft armament with friend-or-foe), plus bundled
-repo-alignment tasks — wiring the O(1) `CoverSpatialGrid` cover path into
-prod combat (DEFEKT-3), consolidating drifted docs, and archiving
-unreferenced scripts. 7 of 8 tasks shipped; the hydrology river-surface fix
-is owner-gated in [docs/BACKLOG.md](../BACKLOG.md). Posture was
-autonomous-loop: per-cycle playtests became Playwright smoke + screenshots,
-deferred to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
+The most recent work is the **2026-06-01 optimal-development arc** — eight
+workflow-orchestrated phases shipped to `master` and deployed live (tip
+`17adc18a`): (0) doc grounding to code reality; (1) instrument-trust (perf
+baseline staleness guard, `scripts/` brought under lint+typecheck, knip config
+fixed 462→87); (2) per-frame alloc hardening + a +142-test behavior backfill +
+the `check:doc-drift` gate broadened to the full doc tree and wired into CI;
+(3) an adversarial bug hunt (6 confirmed fixes, all red→green; ~17 refuted by
+probe); (4) god-file budget burndown (4 hard FAILs → 0 via facade splits) and a
+bitECS scoping spike that benchmarked 1.0–1.09× vs OOP → **DEFER**
+(corroborates the E1 memo; [docs/rearch/ECS_SPIKE_2026-05-31.md](../rearch/ECS_SPIKE_2026-05-31.md));
+(5) aviation/UX scoped against current code (most already built) with DIRECTIVES
+realigned ([docs/rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md](../rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md)).
+Suite 5249 green; `lint:budget` clean; `check:doc-drift` clean. Posture
+autonomous-loop; feel-walks deferred to
+[docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
+
+The preceding cycle,
+[`cycle-2026-05-28-vehicles-aircraft-operable`](../tasks/archive/cycle-2026-05-28-vehicles-aircraft-operable/cycle-2026-05-28-vehicles-aircraft-operable.md),
+made ground vehicles, tanks, and aircraft operable end-to-end (boarding
+follow-cam, tank crew + cannon + spawn discoverability, aircraft armament with
+friend-or-foe) and wired the O(1) `CoverSpatialGrid` cover path into prod
+combat (DEFEKT-3). The hydrology river-surface fix remains owner-gated in
+[docs/BACKLOG.md](../BACKLOG.md).
 
 Several preceding campaigns are now closed and historical: the post-WebGPU
 feature-pivot campaign (VODA water, VEKHIKL ground vehicles, DEFEKT fixes) was
@@ -71,19 +83,34 @@ as of this refresh:
 - **KONVEYER-10/11** — closed; full slice-by-slice evidence in
   [docs/directives/konveyer-10.md](../directives/konveyer-10.md) and
   [docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).
-- **KB-STARTUP-1, KONVEYER-12, DEFEKT-1/2/6, STABILIZAT-1, AVIATSIYA-*,
-  SVYAZ-*, UX-*, DIZAYN-3** — open; see DIRECTIVES rows and the per-id memos
+- **AVIATSIYA-4, AVIATSIYA-7** — code-complete (playtest deferred) per the
+  2026-06-01 scope pass; **AVIATSIYA-5, AVIATSIYA-6** — open (partial): nose
+  cannon + live-fire + station-keep + NPC maneuver state machine done;
+  per-aircraft period weapons, lead/sway aids, and named maneuver routes
+  deferred.
+- **ECS hot path (Phase F)** — evaluation recorded **DEFER** (bitECS spike
+  1.0–1.09× vs OOP, off the prod path); combatants stay in `Map<string,Combatant>`.
+- **KB-STARTUP-1, KONVEYER-12, DEFEKT-1/2/6, STABILIZAT-1, SVYAZ-*, UX-*,
+  DIZAYN-3** — open; see DIRECTIVES rows and the per-id memos
   under [docs/directives/](../directives/).
 
 ## What is real today
 
-- Repo builds, lints, smoke-tests, and runs the mobile UI gate. CI perf
-  capture/compare is advisory; baseline refresh remains blocked per
-  [docs/state/perf-trust.md](perf-trust.md).
+- Repo builds, lints, and tests green in CI (the blocking gates). The
+  Playwright-browser jobs (smoke, mobile-ui, perf) are currently advisory
+  (`continue-on-error`) due to a persistent GitHub-runner `playwright install`
+  hang (Chromium downloads 100% then stalls post-download) — `prod-smoke` stays
+  enforced locally via `npm run validate` and post-deploy via
+  `check:live-release`; restore those jobs to blocking once the install hang is
+  fixed (Playwright bump / browser cache). Perf baseline refresh remains
+  blocked per [docs/state/perf-trust.md](perf-trust.md).
 - Playable combined-arms browser game, not just an engine shell.
 - Helicopters and three flyable fixed-wing aircraft (A-1, F-4, AC-47) are
-  live in runtime with HUD/control law. Operability gaps (boarding camera,
-  aircraft armament, tank crew/cannon) are the active cycle's scope.
+  live with HUD/control law, weapons (helicopter door-gun + chin minigun +
+  rocket pods; fixed-wing nose cannon with friend-or-foe), and operable
+  boarding/crew/cannon. Remaining aviation work is design-heavy (per-aircraft
+  period weapons, lead/sway aiming, named maneuver routes), deferred per
+  [docs/rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md](../rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md).
 - WebGPU `WebGPURenderer` + TSL node materials across terrain, vegetation
   impostors, NPC impostors, and the LUT-driven Hosek-Wilkie atmosphere
   surface, with automatic WebGL2 fallback for non-WebGPU environments.
@@ -121,9 +148,10 @@ culling cannot expose bright terrain cracks.
 
 ## Live deploy verification
 
-Live release is gated on blocking CI (lint + test + build + smoke +
-mobile-ui), review of the advisory perf artifact, and manual Cloudflare Pages
-deploy via `deploy.yml`. Production deploy SHA is the live
+Live release is gated on the blocking CI jobs (lint + test + build); the
+Playwright-browser jobs (smoke, mobile-ui, perf) are currently advisory (see
+"What is real today"), with manual Cloudflare Pages deploy via `deploy.yml`.
+Production deploy SHA is the live
 `/asset-manifest.json` source of truth — do not freeze it into this doc.
 
 To verify the current production state, fetch
