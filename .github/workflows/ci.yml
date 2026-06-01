@@ -127,6 +127,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [lint, test]
+    # TEMPORARY-ADVISORY: GitHub-runner Playwright chromium install hangs post-download
+    # (binary reaches 100% in ~1s, then the install stalls to the job timeout; bounded by
+    # the retry+timeout in "Install Playwright browsers"). Code gates (build/test/lint) stay
+    # authoritative; prod-smoke is still enforced locally via `npm run validate` and
+    # post-deploy via `npm run check:live-release`. Restore to blocking once the install
+    # hang is fixed (Playwright version bump / cache the browser). See commit 386bd4cd.
+    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -210,6 +217,9 @@ jobs:
     timeout-minutes: 18
     needs: [lint, test, mobile-ui-changes]
     if: needs.mobile-ui-changes.outputs.hit == 'true' || needs.mobile-ui-changes.outputs.full == 'true'
+    # TEMPORARY-ADVISORY: same GitHub-runner Playwright install hang as the smoke job
+    # (see its comment). Restore to blocking once the install hang is fixed.
+    continue-on-error: true
     strategy:
       # Don't kill sibling devices when one fails — full coverage when the
       # matrix fans out.
