@@ -19,23 +19,27 @@ export class TerrainBudgetMetrics {
     pendingUnits: number
   ): TerrainStreamMetric {
     const previous = this.metrics.get(name);
-    const metric: TerrainStreamMetric = previous
-      ? {
-          ...previous,
-          budgetMs,
-          lastMs: durationMs,
-          emaMs: previous.emaMs * (1 - this.emaAlpha) + durationMs * this.emaAlpha,
-          workUnits,
-          pendingUnits,
-        }
-      : {
-          name,
-          budgetMs,
-          lastMs: durationMs,
-          emaMs: durationMs,
-          workUnits,
-          pendingUnits,
-        };
+    if (previous) {
+      // Reuse the stored object to avoid a per-frame allocation. Field values
+      // are byte-identical to the prior spread; only object identity is reused.
+      // EMA is computed from the OLD emaMs before any field is reassigned.
+      previous.emaMs = previous.emaMs * (1 - this.emaAlpha) + durationMs * this.emaAlpha;
+      previous.budgetMs = budgetMs;
+      previous.lastMs = durationMs;
+      previous.workUnits = workUnits;
+      previous.pendingUnits = pendingUnits;
+      this.metrics.set(name, previous);
+      return previous;
+    }
+
+    const metric: TerrainStreamMetric = {
+      name,
+      budgetMs,
+      lastMs: durationMs,
+      emaMs: durationMs,
+      workUnits,
+      pendingUnits,
+    };
 
     this.metrics.set(name, metric);
     return metric;

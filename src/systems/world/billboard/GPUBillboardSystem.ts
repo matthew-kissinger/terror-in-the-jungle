@@ -124,9 +124,9 @@ export class GPUBillboardSystem {
     playerWorldPosition?: THREE.Vector3 | null,
   ): void {
     const time = performance.now() * 0.001;
-    this.vegetationTypes.forEach(vegetation => {
+    for (const vegetation of this.vegetationTypes.values()) {
       vegetation.update(camera, time, fog, lighting, playerWorldPosition);
-    });
+    }
   }
 
   getDebugInfo(): { [key: string]: number } {

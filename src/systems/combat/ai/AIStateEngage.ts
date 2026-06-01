@@ -145,6 +145,13 @@ function createCloseEngagementTelemetry(): CloseEngagementTelemetry {
 export class AIStateEngage {
   private readonly MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION = 2
   private readonly FLANK_DESTINATION_REUSE_RADIUS_SQ = 12 * 12
+  // Scratch proxy-combatant reused across initiateSquadSuppression() calls for
+  // the flank cover-search probe. Its `.position` is overwritten (via copy)
+  // before each findBestCover/findNearestCover call, those consumers read it
+  // synchronously and never retain it, and the returned cover positions are
+  // cloned — so a single shared instance is safe and behavior-identical to the
+  // former per-call allocation. The method is synchronous and non-re-entrant.
+  private readonly flankCoverProbe = { position: new THREE.Vector3() } as Combatant
   private squads: Map<string, Squad> = new Map()
   private squadSuppressionCooldown: Map<string, number> = new Map()
   private coverSystem?: AICoverSystem
@@ -867,7 +874,7 @@ export class AIStateEngage {
     const now = Date.now()
     this.squadSuppressionCooldown.set(combatant.squadId, now)
 
-    const flankCoverProbe = { position: new THREE.Vector3() } as Combatant
+    const flankCoverProbe = this.flankCoverProbe
     let flankCoverSearches = 0
 
     squad.members.forEach((memberId, index) => {
