@@ -69,4 +69,24 @@ export const NpcLodConfig = {
   squadFollowStaleMs: 4000,
   /** Distant culled-bucket simulation interval (ms). Lower = more frequent but more cost. */
   culledDistantSimIntervalMs: 8000,
+  /**
+   * When a high-LOD NPC escalates to the terminal "hold" recovery (repeated
+   * backtracks against an unreachable goal) inside a dense friendly crowd,
+   * send it to a dispersed point away from the local crowd centroid and delay
+   * its next objective re-evaluation, instead of re-targeting the same
+   * contested point and rejoining the crush. Reduces the convergence-time
+   * terrain-stall storm. Default on; gated so it can be A/B'd in a playtest.
+   * See docs/MOVEMENT_NAV_CHECKIN.md (convergence stall fix).
+   */
+  stallDispersalEnabled: true,
+  /**
+   * Opt-in: stagger the full terrain-aware movement solve for high-LOD NPCs
+   * that are contour-stalled AND packed in a friendly crowd, coasting on the
+   * off-ticks (skipping the spacing grid query + terrain-aware contour solve).
+   * Bounds the worst-case per-frame movement cost at point-blank convergence.
+   * Default OFF pending a feel playtest — staggering clustered NPCs can read as
+   * micro-stutter if the crowd is sparse, and the contour re-score cache
+   * already removes most of the per-tick cost this targets.
+   */
+  crowdStallStaggerEnabled: false,
 };
