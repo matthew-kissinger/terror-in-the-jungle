@@ -378,6 +378,50 @@ describe('AbstractCombatResolver event emission', () => {
     expect(wipedSquadIds.has('op_sq')).toBe(true);
   });
 
+  it('emits squad_engaged on first contact between two newly-engaged squads', () => {
+    // Regression: combatActive used to be set true before the first-contact
+    // guard ran, so squad_engaged never fired. The guard must key off the
+    // PRIOR-tick combat state, not the freshly-written flag.
+    const { agents, squads } = buildScenario({
+      usPos: { x: 0, z: 0 },
+      opforPos: { x: 30, z: 0 },
+      size: 4,
+    });
+    const events = new WarEventEmitter();
+    const seen = collectEvents(events);
+    const resolver = new AbstractCombatResolver(agents, squads, makeConfig(), events);
+    resolver.setPlayerPosition(99999, 99999);
+
+    resolver.update(5);
+    events.flush();
+
+    const engaged = seen.filter((e) => e.type === 'squad_engaged');
+    expect(engaged.length).toBeGreaterThan(0);
+    const e = engaged[0] as Extract<WarEvent, { type: 'squad_engaged' }>;
+    expect([e.squadId, e.enemySquadId].sort()).toEqual(['op_sq', 'us_sq']);
+  });
+
+  it('does not re-emit squad_engaged while the same engagement persists', () => {
+    // Throttle: once both squads are already combat-active, a subsequent tick
+    // of the SAME engagement must not fire a fresh squad_engaged.
+    const { agents, squads } = buildScenario({
+      usPos: { x: 0, z: 0 },
+      opforPos: { x: 30, z: 0 },
+      size: 4,
+    });
+    const events = new WarEventEmitter();
+    const seen = collectEvents(events);
+    const resolver = new AbstractCombatResolver(agents, squads, makeConfig(), events);
+    resolver.setPlayerPosition(99999, 99999);
+
+    resolver.update(5);  // first contact -> should emit
+    resolver.update(10); // still engaged -> should NOT emit again
+
+    events.flush();
+    const engaged = seen.filter((e) => e.type === 'squad_engaged');
+    expect(engaged.length).toBe(1);
+  });
+
   it('does not emit combat events when there are no engagements', () => {
     const { agents, squads } = buildScenario({
       usPos: { x: 0, z: 0 },

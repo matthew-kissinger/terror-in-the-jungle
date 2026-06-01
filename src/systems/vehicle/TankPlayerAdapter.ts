@@ -336,7 +336,11 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     this.crewSeat = target;
     this.playerSeat = target;
     this.resetControlState();
-    this.lastShotMs = Number.NEGATIVE_INFINITY;
+    // Deliberately do NOT reset `lastShotMs` here: the reload gate models the
+    // physical cannon's reload, which is a property of the gun and persists
+    // across seat swaps on the same chassis. Re-arming on a driver<->gunner
+    // toggle would let a player defeat the rate limit by swapping out-and-back
+    // between shots.
 
     this.applyHudContext(ctx.hudSystem);
     return this.crewSeat;

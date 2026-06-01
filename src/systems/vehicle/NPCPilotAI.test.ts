@@ -130,6 +130,23 @@ describe('NPCPilotAI', () => {
       expect(later.autoHover).toBe(false);
     });
 
+    it('produces finite controls when orbitRadius is zero (no divide-by-zero)', () => {
+      // `orbitRadius ?? default` only guards an *omitted* radius; an explicit
+      // 0 must not divide-by-zero into the angular-speed term and spill NaN
+      // through the heading/yaw controls.
+      ai.setMission(makeMission({
+        waypoints: [],
+        orbitPoint: new THREE.Vector3(0, 0, 0),
+        orbitRadius: 0,
+        cruiseSpeed: 50,
+      }));
+      ai.update(DT, new THREE.Vector3(0, 29, 0), ZERO_VEL, IDENTITY_QUAT, 0); // takeoff -> orbit
+      const controls = ai.update(DT, new THREE.Vector3(100, 100, 0), ZERO_VEL, IDENTITY_QUAT, 0);
+      expect(Number.isFinite(controls.collective!)).toBe(true);
+      expect(Number.isFinite(controls.yaw!)).toBe(true);
+      expect(Number.isFinite(controls.cyclicPitch!)).toBe(true);
+    });
+
     it('does not crash when orbitRadius is omitted (uses default)', () => {
       ai.setMission(makeMission({
         waypoints: [],

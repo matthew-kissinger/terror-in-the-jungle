@@ -99,6 +99,13 @@ export class AbstractCombatResolver {
       }
     }
 
+    // Snapshot which squads were already in combat BEFORE we overwrite the
+    // flags below, so the per-engagement loop can detect first contact.
+    const wasCombatActive = new Set<string>();
+    for (const squad of this.squads.values()) {
+      if (squad.combatActive) wasCombatActive.add(squad.id);
+    }
+
     // Reset combat flags
     for (const squad of this.squads.values()) {
       squad.combatActive = engagedSquads.has(squad.id);
@@ -112,7 +119,7 @@ export class AbstractCombatResolver {
     // Resolve each engagement
     for (const [usSquad, opforSquad] of engagements) {
       // Emit squad engaged event (throttled - only on first contact)
-      if (!usSquad.combatActive || !opforSquad.combatActive) {
+      if (!wasCombatActive.has(usSquad.id) || !wasCombatActive.has(opforSquad.id)) {
         this.events.emit({
           type: 'squad_engaged',
           squadId: usSquad.id,

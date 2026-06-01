@@ -662,6 +662,39 @@ describe('TankPlayerAdapter', () => {
       expect(cannon.shots.length).toBe(2);
     });
 
+    it('does not let a driver<->gunner seat toggle re-arm the cannon inside the reload window', () => {
+      // The reload gate models the physical 90mm cannon's reload, which is a
+      // property of the gun — not of which seat the player is sitting in.
+      // Toggling to the driver hatch and back is not a reload event, so a
+      // player must not be able to fire, swap out-and-back, and fire again
+      // well inside the reload window (a rate-limit defeat via normal input).
+      const { ctx, now, cannon } = mountAsGunner();
+      const upd = createUpdateContext(ctx.input, ctx.hudSystem);
+      (ctx.input.isKeyPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (k: string) => k === 'space',
+      );
+
+      // First shot fires.
+      adapter.update(upd);
+      expect(cannon.shots.length).toBe(1);
+
+      // A moment later (well inside the 3.5s reload) the player toggles down
+      // to the driver hatch and straight back up to the gunner station.
+      now.value += 500;
+      adapter.swapSeat(upd); // gunner -> pilot
+      adapter.swapSeat(upd); // pilot -> gunner
+
+      // Trigger still held: the cannon has NOT physically reloaded, so the
+      // shot must be rejected. (Pre-fix this fires a second round.)
+      adapter.update(upd);
+      expect(cannon.shots.length).toBe(1);
+
+      // Once the real reload window has elapsed, the cannon fires again.
+      now.value += adapter.reloadSeconds * 1000 + 1;
+      adapter.update(upd);
+      expect(cannon.shots.length).toBe(2);
+    });
+
     it('holds fire when the turret is jammed (damage state)', () => {
       const { ctx, cannon } = mountAsGunner();
       tank.getTurret().setJammed(true);

@@ -107,13 +107,20 @@ export class SpectatorCamera {
   update(dt: number, candidates: SpectatorCandidate[]): void {
     if (!this.active) return;
 
+    // Capture where the current target sat in the *previous* ordering before
+    // the list is rebuilt, so a dead target can hand off to the survivor that
+    // shifts into its slot (the next target in viewing order).
+    const previousIndex = this.currentTargetId
+      ? this.candidateIds.indexOf(this.currentTargetId)
+      : -1;
+
     // Rebuild candidate list each frame
     this.candidateIds = candidates.map(c => c.id);
 
     // If current target is gone (died), auto-advance
     const currentTarget = candidates.find(c => c.id === this.currentTargetId);
     if (!currentTarget) {
-      this.autoAdvance(candidates);
+      this.autoAdvance(candidates, previousIndex);
     }
 
     const target = candidates.find(c => c.id === this.currentTargetId);
@@ -165,20 +172,18 @@ export class SpectatorCamera {
     Logger.info('player', `Spectator camera now watching ${this.currentTargetId}`);
   }
 
-  private autoAdvance(candidates: SpectatorCandidate[]): void {
+  private autoAdvance(candidates: SpectatorCandidate[], previousIndex: number): void {
     if (candidates.length === 0) {
       this.currentTargetId = null;
       return;
     }
 
-    // Try to pick the next candidate in order after the old one
-    const oldIndex = this.currentTargetId
-      ? this.candidateIds.indexOf(this.currentTargetId)
-      : -1;
-
-    // candidateIds was already rebuilt, so pick index 0 as fallback
-    const nextIndex = oldIndex >= 0 && oldIndex < candidates.length
-      ? Math.min(oldIndex, candidates.length - 1)
+    // The dead target occupied `previousIndex` in the prior ordering. After it
+    // is removed, the survivor that shifts into that slot is the next target in
+    // viewing order, so reuse the same index (clamped). Fall back to the first
+    // candidate when there was no prior target.
+    const nextIndex = previousIndex >= 0
+      ? Math.min(previousIndex, candidates.length - 1)
       : 0;
 
     this.currentTargetId = candidates[nextIndex].id;

@@ -164,7 +164,7 @@ export class HelicopterWeaponSystem {
     // pilot trigger. They stay inert when unmanned or grounded.
     if (state.crewManned && !isGrounded) {
       for (const crew of state.crewWeapons) {
-        if (crew.cooldownRemaining > 0) crew.cooldownRemaining -= dt;
+        this.advanceCooldown(crew, dt);
         if (crew.ammo > 0 && crew.cooldownRemaining <= 0) {
           this.fireHitscan(crew, position, quaternion, dt, state.faction);
         }
@@ -173,10 +173,9 @@ export class HelicopterWeaponSystem {
 
     const active = state.weapons[state.activeIndex];
     if (active) {
-      // Decrement cooldown
-      if (active.cooldownRemaining > 0) {
-        active.cooldownRemaining -= dt;
-      }
+      // Advance the firing clock by this frame's dt so the round budget passed
+      // into the accumulator reflects how much time actually elapsed.
+      this.advanceCooldown(active, dt);
 
       // Fire if holding trigger
       if (state.isFiring && active.ammo > 0 && active.cooldownRemaining <= 0) {
@@ -226,6 +225,23 @@ export class HelicopterWeaponSystem {
     return state.crewWeapons.reduce((sum, w) => sum + w.ammo, 0);
   }
 
+  // ── Cooldown clock ──
+
+  /**
+   * Advance a weapon's firing clock by one frame. The clock counts down by
+   * `dt` every frame (whether or not the trigger is held) and is floored at
+   * `-dt` so an idle or stalled frame can never bank more than a single
+   * frame's worth of catch-up. When the trigger is held the resulting
+   * non-positive deficit is what the hitscan accumulator spends to emit a
+   * dt-accurate number of rounds.
+   */
+  private advanceCooldown(weapon: WeaponInstance, dt: number): void {
+    weapon.cooldownRemaining -= dt;
+    if (weapon.cooldownRemaining < -dt) {
+      weapon.cooldownRemaining = -dt;
+    }
+  }
+
   // ── Hitscan (minigun) ──
 
   private fireHitscan(
@@ -237,8 +253,12 @@ export class HelicopterWeaponSystem {
   ): void {
     const interval = 1 / weapon.config.fireRate;
 
-    // Accumulator: fire as many rounds as the dt budget allows
-    // (weapon.cooldownRemaining is already <= 0 when we enter)
+    // Accumulator: fire every round whose interval fits in the dt budget. The
+    // caller (advanceCooldown) has already debited this frame's dt and floored
+    // the deficit at -dt, so cooldownRemaining is in [-dt, 0] on entry. Each
+    // round adds `interval`; the loop terminates once the deficit is repaid,
+    // so a larger dt fires proportionally more rounds (dt-accurate fire rate)
+    // while a single frame can never emit more than one frame's worth.
     while (weapon.cooldownRemaining <= 0 && weapon.ammo > 0) {
       weapon.cooldownRemaining += interval;
       weapon.ammo--;
@@ -302,9 +322,6 @@ export class HelicopterWeaponSystem {
       if (this.audioManager && weapon.roundsSinceTracer === 0) {
         this.audioManager.play('minigunBurst', _mountWorld.clone());
       }
-
-      // Cap iterations to avoid infinite loop on very large dt
-      if (weapon.cooldownRemaining > -dt) break;
     }
   }
 

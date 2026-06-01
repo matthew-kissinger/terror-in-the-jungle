@@ -250,12 +250,14 @@ export class PlayerMovement {
 
     // Swim/wade/walk state branch. Sample at head position (eye height) so
     // wading in shoulder-deep water still counts as walk; only true head
-    // submersion flips into the swim path.
+    // submersion flips into the swim path. `playerState.position.y` already
+    // holds the eye world Y (PlayerCamera copies it straight into the camera)
+    // for both standing and crouching, so the head sample is taken there
+    // directly. Applying a stance offset here would double-count the crouch
+    // and drop the sample below the eyes, flipping a crouched-but-dry player
+    // into swim mode.
     if (this.waterSampler) {
-      const eyeHeight = this.playerState.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
-      this.headPositionScratch
-        .copy(this.playerState.position)
-        .setY(this.playerState.position.y + (eyeHeight - PLAYER_EYE_HEIGHT));
+      this.headPositionScratch.copy(this.playerState.position);
       this.swimInputScratch.forward =
         (input.isKeyPressed('keyw') ? 1 : 0) - (input.isKeyPressed('keys') ? 1 : 0);
       this.swimInputScratch.strafe =

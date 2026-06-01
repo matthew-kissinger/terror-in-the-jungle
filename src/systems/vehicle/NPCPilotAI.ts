@@ -145,7 +145,11 @@ export class NPCPilotAI {
   ): PilotControls {
     const mission = this.mission!;
     const center = mission.orbitPoint!;
-    const radius = mission.orbitRadius ?? 150;
+    // Floor the radius to a positive value: `?? 150` only substitutes for an
+    // omitted radius, so an explicit `0` (or negative) would otherwise reach
+    // the `speed / radius` divide below and spill Infinity → NaN into the
+    // orbit angle and every downstream control output.
+    const radius = Math.max(mission.orbitRadius ?? 150, 1);
     const speed = mission.cruiseSpeed;
 
     // Advance orbit angle
