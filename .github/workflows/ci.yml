@@ -150,7 +150,15 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium
+        run: |
+          for attempt in 1 2 3; do
+            echo "Playwright chromium install attempt $attempt"
+            timeout 240 npx playwright install chromium && exit 0
+            echo "attempt $attempt timed out/failed after 240s; retrying" >&2
+            sleep 5
+          done
+          echo "Playwright chromium install failed after 3 attempts (runner-side download/extract hang)" >&2
+          exit 1
 
       - name: Build
         run: npm run build
@@ -231,7 +239,15 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium
+        run: |
+          for attempt in 1 2 3; do
+            echo "Playwright chromium install attempt $attempt"
+            timeout 240 npx playwright install chromium && exit 0
+            echo "attempt $attempt timed out/failed after 240s; retrying" >&2
+            sleep 5
+          done
+          echo "Playwright chromium install failed after 3 attempts (runner-side download/extract hang)" >&2
+          exit 1
 
       - name: Build
         run: npm run build
@@ -310,7 +326,15 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium
+        run: |
+          for attempt in 1 2 3; do
+            echo "Playwright chromium install attempt $attempt"
+            timeout 240 npx playwright install chromium && exit 0
+            echo "attempt $attempt timed out/failed after 240s; retrying" >&2
+            sleep 5
+          done
+          echo "Playwright chromium install failed after 3 attempts (runner-side download/extract hang)" >&2
+          exit 1
 
       - name: Build perf-harness bundle
         run: npm run build:perf
