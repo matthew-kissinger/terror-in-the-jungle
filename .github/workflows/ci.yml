@@ -313,6 +313,11 @@ jobs:
     timeout-minutes: 25
     needs: [perf-changes]
     if: needs.perf-changes.outputs.hit == 'true' || needs.perf-changes.outputs.full == 'true'
+    # ADVISORY: perf is advisory by design (its capture/compare steps are already
+    # continue-on-error + it emits perf-advisory-report). Job-level continue-on-error so the
+    # Playwright-install runner hang (see the smoke job comment) cannot fail the run. perf
+    # was never a blocking gate; restore alongside smoke/mobile-ui when the install is fixed.
+    continue-on-error: true
 
     steps:
       - name: Checkout
