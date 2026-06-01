@@ -14,6 +14,7 @@ on:
       - 'tsconfig*.json'
       - 'eslint.config.js'
       - '.github/workflows/ci.yml'
+      - '.github/scripts/**'
   pull_request:
     branches: [master]
     paths:
@@ -26,6 +27,7 @@ on:
       - 'tsconfig*.json'
       - 'eslint.config.js'
       - '.github/workflows/ci.yml'
+      - '.github/scripts/**'
   workflow_dispatch:
 
 permissions:
