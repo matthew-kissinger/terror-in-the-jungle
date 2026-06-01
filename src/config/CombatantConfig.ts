@@ -76,7 +76,7 @@ export const NpcLodConfig = {
    * its next objective re-evaluation, instead of re-targeting the same
    * contested point and rejoining the crush. Reduces the convergence-time
    * terrain-stall storm. Default on; gated so it can be A/B'd in a playtest.
-   * See docs/MOVEMENT_NAV_CHECKIN.md (convergence stall fix).
+   * See docs/state/perf-trust.md (2026-06-01 convergence-stall fix).
    */
   stallDispersalEnabled: true,
   /**
