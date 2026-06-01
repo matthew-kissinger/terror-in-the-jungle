@@ -196,6 +196,8 @@ describe('PlayerRespawnManager', () => {
       setRespawnClickCallback: vi.fn(),
       setCancelClickCallback: vi.fn(),
       setSpawnOptionClickCallback: vi.fn(),
+      setVehicleDeployOptionCallback: vi.fn(),
+      updateVehicleDeployOptions: vi.fn(),
       updateAlliance: vi.fn(),
       updateSpawnOptions: vi.fn(),
       recordDecisionTime: vi.fn(),
@@ -212,6 +214,7 @@ describe('PlayerRespawnManager', () => {
       setZoneManager: vi.fn(),
       setGameModeManager: vi.fn(),
       setSpawnPoints: vi.fn(),
+      setVehicleMarkers: vi.fn(),
       showMap: vi.fn(),
       clearSelection: vi.fn(),
       stopMapUpdateInterval: vi.fn(),
@@ -1294,6 +1297,62 @@ describe('PlayerRespawnManager', () => {
       expect(mockDeployScreen.hide).toHaveBeenCalled();
       expect(mockMapController.clearSelection).toHaveBeenCalled();
       expect(mockMapController.stopMapUpdateInterval).toHaveBeenCalled();
+    });
+  });
+
+  describe('crewable-vehicle deploy options', () => {
+    beforeEach(() => {
+      respawnManager.setZoneManager(mockZoneManager);
+      respawnManager.setGameModeManager(mockGameModeManager);
+      respawnManager.setPlayerController(mockPlayerController);
+      respawnManager.setFirstPersonWeapon(mockFirstPersonWeapon);
+    });
+
+    it('surfaces the Open Frontier M48 option and a matching deploy-map marker on deploy', () => {
+      vi.mocked(mockGameModeManager.getCurrentMode).mockReturnValue(GameMode.OPEN_FRONTIER);
+
+      respawnManager.onPlayerDeath();
+
+      expect((mockDeployScreen as any).updateVehicleDeployOptions).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'm48_tank_of_us_fob', classLabel: 'ARMOR', faction: Faction.US }),
+        ])
+      );
+      const vehicleOptions = vi.mocked((mockDeployScreen as any).updateVehicleDeployOptions).mock.calls.at(-1)![0];
+      expect(vehicleOptions).toHaveLength(1);
+
+      // The same option also drops a 'ground' marker on the deploy map.
+      const markers = vi.mocked((mockMapController as any).setVehicleMarkers).mock.calls.at(-1)![0];
+      expect(markers).toHaveLength(1);
+      expect(markers[0]).toEqual(expect.objectContaining({
+        category: 'ground',
+        faction: Faction.US,
+        vehicleType: 'm48_tank_of_us_fob',
+      }));
+      expect(markers[0].worldPos).toBeInstanceOf(THREE.Vector3);
+    });
+
+    it('publishes an empty vehicle list for modes without a crewable vehicle (panel stays hidden)', () => {
+      vi.mocked(mockGameModeManager.getCurrentMode).mockReturnValue(GameMode.TEAM_DEATHMATCH);
+
+      respawnManager.onPlayerDeath();
+
+      expect((mockDeployScreen as any).updateVehicleDeployOptions).toHaveBeenLastCalledWith([]);
+      const markers = vi.mocked((mockMapController as any).setVehicleMarkers).mock.calls.at(-1)![0];
+      expect(markers).toEqual([]);
+    });
+
+    it('routes a vehicle-option selection through an informational handler without teleporting the player', async () => {
+      await respawnManager.init();
+      vi.mocked(mockGameModeManager.getCurrentMode).mockReturnValue(GameMode.OPEN_FRONTIER);
+      respawnManager.onPlayerDeath();
+
+      const callback = vi.mocked((mockDeployScreen as any).setVehicleDeployOptionCallback).mock.calls[0][0];
+      callback('m48_tank_of_us_fob', 'M48 Patton');
+
+      // Informational only: no spawn selection set, no player reposition.
+      expect(respawnManager['selectedSpawnPoint']).toBeUndefined();
+      expect(mockPlayerController.setPosition).not.toHaveBeenCalled();
     });
   });
 

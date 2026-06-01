@@ -19,7 +19,9 @@ import {
 } from '../world/runtime/DeployFlowSession';
 import { getGameModeDefinition } from '../../config/gameModeDefinitions';
 import { GameMode } from '../../config/gameModeTypes';
-import type { LoadoutFieldKey, PlayerLoadout } from '../../ui/loadout/LoadoutTypes';
+import type { LoadoutFieldKey, PlayerLoadout, VehicleDeployOption } from '../../ui/loadout/LoadoutTypes';
+import { getVehicleDeployOptionsForMode } from '../../ui/loadout/LoadoutTypes';
+import type { VehicleMarker } from '../../ui/minimap/MinimapRenderer';
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import { InputContextManager } from '../input/InputContextManager';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
@@ -61,6 +63,7 @@ export class PlayerRespawnManager implements GameSystem {
   private isRespawnUIVisible = false;
   private respawnTimer = 0;
   private availableSpawnPoints: RespawnSpawnPoint[] = [];
+  private availableVehicleOptions: VehicleDeployOption[] = [];
   private lastTimerDisplaySecond: number = -1;
   private lastTimerDisplayHasSelection = false;
   private deathCount = 0;
@@ -115,6 +118,9 @@ export class PlayerRespawnManager implements GameSystem {
     });
     this.respawnUI.setSpawnOptionClickCallback((spawnPointId, spawnPointName) => {
       this.selectSpawnPointOnMap(spawnPointId, spawnPointName);
+    });
+    this.respawnUI.setVehicleDeployOptionCallback((vehicleId, vehicleName) => {
+      this.selectVehicleDeployOption(vehicleId, vehicleName);
     });
     this.respawnUI.setLoadoutChangeCallback((field, direction) => {
       this.handleLoadoutChange(field, direction);
@@ -360,6 +366,43 @@ export class PlayerRespawnManager implements GameSystem {
     );
   }
 
+  /**
+   * Refresh the crewable-vehicle deploy options for the active mode and push
+   * them to both the deploy-screen panel and the deploy-map markers. Modes
+   * without a tank placement yield an empty list, which hides the panel and
+   * clears the markers (so the deploy screen looks unchanged for those modes).
+   */
+  private updateVehicleDeployOptions(): void {
+    const mode = this.gameModeManager?.getCurrentMode() ?? GameMode.ZONE_CONTROL;
+    this.availableVehicleOptions = getVehicleDeployOptionsForMode(mode);
+    this.respawnUI.updateVehicleDeployOptions(this.availableVehicleOptions);
+    this.mapController.setVehicleMarkers(this.buildVehicleMarkers(this.availableVehicleOptions));
+  }
+
+  /** Map static vehicle deploy options to deploy-map markers (informational). */
+  private buildVehicleMarkers(options: VehicleDeployOption[]): VehicleMarker[] {
+    return options.map(option => ({
+      worldPos: new THREE.Vector3(option.position.x, 0, option.position.z),
+      category: 'ground',
+      faction: option.faction,
+      vehicleType: option.id,
+    }));
+  }
+
+  /**
+   * Informational selection of a crewable-vehicle deploy option. The player is
+   * NOT teleported into the vehicle here (crewing/gunnery is owned by the
+   * vehicle systems); this surfaces where the vehicle is and how to crew it.
+   */
+  private selectVehicleDeployOption(vehicleId: string, vehicleName: string): void {
+    const option = this.availableVehicleOptions.find(entry => entry.id === vehicleId);
+    if (!option) return;
+    Logger.info(
+      'player',
+      ` Vehicle deploy option focused: ${vehicleName} at ${Math.round(option.position.x)}, ${Math.round(option.position.z)} (${option.controlsHint})`
+    );
+  }
+
   private respawn(position: THREE.Vector3): void {
     // Ensure spawn position is at correct terrain height
     if (!this.terrainSystem) {
@@ -417,6 +460,12 @@ export class PlayerRespawnManager implements GameSystem {
     this.updateAvailableSpawnPoints();
     this.mapController.setSpawnPoints(this.availableSpawnPoints);
     this.respawnUI.updateSpawnOptions(this.availableSpawnPoints, this.selectedSpawnPoint);
+
+    // Surface crewable-vehicle deploy options (e.g. the M48) for the active
+    // mode. This is purely informational/discoverability: it shows where the
+    // tank is plus its controls hint, and drops a marker on the deploy map.
+    // It does not crew the player into the vehicle.
+    this.updateVehicleDeployOptions();
 
     // Release pointer lock and set menu context so the cursor is free
     InputContextManager.getInstance().setContext('menu');

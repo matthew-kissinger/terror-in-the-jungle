@@ -4,6 +4,7 @@ import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
+import type { VehicleMarker } from '../../ui/minimap/MinimapRenderer';
 
 /**
  * Coordinates between the main game and the respawn map view.
@@ -36,6 +37,15 @@ export class RespawnMapController {
 
   setSpawnPoints(spawnPoints: RespawnSpawnPoint[]): void {
     this.openFrontierRespawnMap.setSpawnPoints(spawnPoints);
+  }
+
+  /**
+   * Pass crewable-vehicle markers (tank / boat / emplacement) through to the
+   * deploy map so the player can see where vehicles are before deploying.
+   * Informational only -- selection does not crew the vehicle.
+   */
+  setVehicleMarkers(markers: VehicleMarker[]): void {
+    this.openFrontierRespawnMap.setVehicleMarkers(markers);
   }
 
   setZoneSelectedCallback(callback: (zoneId: string, zoneName: string) => void): void {
