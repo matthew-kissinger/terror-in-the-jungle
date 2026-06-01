@@ -902,6 +902,12 @@ export class CombatantMovement {
       // of falling back to a blocked direct-push while the per-frame query
       // budget is exhausted. This removes the convergence-time
       // drop -> throttled-null -> ram-the-slope thrash.
+      //
+      // Note: PATH_MAX_AGE_MS is intentionally NOT re-checked on this branch —
+      // a >10s-old route is still served when the budget is saturated. That is
+      // safe: a non-advancing NPC hits the 3s WAYPOINT_STALL_TIMEOUT_MS hard
+      // delete in resolveNavmeshWaypoint first, and an advancing one is reaching
+      // its waypoints, so the age ceiling never bites in practice.
       if (this.pathQueriesThisFrame >= PATH_QUERIES_PER_FRAME) {
         return cached;
       }

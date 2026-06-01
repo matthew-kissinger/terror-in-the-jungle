@@ -76,7 +76,13 @@ export const NpcLodConfig = {
    * its next objective re-evaluation, instead of re-targeting the same
    * contested point and rejoining the crush. Reduces the convergence-time
    * terrain-stall storm. Default on; gated so it can be A/B'd in a playtest.
-   * See docs/state/perf-trust.md (2026-06-01 convergence-stall fix).
+   *
+   * Known limitation: a squad *follower* with a live leader is re-pointed at the
+   * leader's destination by updatePatrolMovement on the next tick (before the
+   * delayed re-eval gate), so dispersal sticks for leaders + leaderless
+   * followers but is a no-op for led followers. The leader's dispersal still
+   * pulls its squad out of the crush. A follower-hold refinement is deferred to
+   * the playtest follow-up. See docs/state/perf-trust.md (2026-06-01 fix).
    */
   stallDispersalEnabled: true,
   /**
