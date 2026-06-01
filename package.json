@@ -32,6 +32,7 @@
       "public/sw.js",
       "scripts/**/*.{test,spec}.ts",
       "scripts/hud-state-probe.ts",
+      "scripts/ecs-spike-bench.ts",
       "scripts/perf-active-driver.cjs",
       "scripts/perf-browser-observers.js",
       "scripts/probe-alpha-protection.ts",
