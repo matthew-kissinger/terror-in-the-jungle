@@ -19,8 +19,20 @@ import {
   type PlayerLoadout,
   type VehicleDeployOption,
 } from '../loadout/LoadoutTypes';
-import { isBlufor } from '../../systems/combat/types';
 import styles from './DeployScreen.module.css';
+import {
+  createDiv,
+  createHeading,
+  createMetaRow,
+  makeActionButton,
+  makeSmallButton,
+} from './deploy/DeployDomFactory';
+import {
+  groupSpawnPoints,
+  makeSpawnOptionButton,
+  makeVehicleOptionButton,
+  type DeploySpawnListContext,
+} from './deploy/DeploySpawnList';
 
 interface LoadoutFieldControl {
   value: HTMLDivElement;
@@ -317,9 +329,10 @@ export class DeployScreen extends UIComponent {
     this.vehicleOptionsPanel.style.display = options.length === 0 ? 'none' : '';
     if (options.length === 0) return;
 
+    const ctx = this.spawnListContext();
     for (const option of options) {
       this.vehicleOptionsList.appendChild(
-        this.makeVehicleOptionButton(option, option.id === selectedVehicleId)
+        makeVehicleOptionButton(ctx, option, option.id === selectedVehicleId)
       );
     }
   }
@@ -348,14 +361,15 @@ export class DeployScreen extends UIComponent {
       return;
     }
 
-    for (const group of this.groupSpawnPoints(spawnPoints)) {
+    const ctx = this.spawnListContext();
+    for (const group of groupSpawnPoints(spawnPoints)) {
       const groupEl = this.createDiv(styles.spawnOptionGroup);
       const heading = this.createDiv(styles.spawnOptionGroupTitle);
       heading.textContent = group.label;
       groupEl.appendChild(heading);
 
       for (const spawnPoint of group.points) {
-        const option = this.makeSpawnOptionButton(spawnPoint, spawnPoint.id === selectedSpawnPointId);
+        const option = makeSpawnOptionButton(ctx, spawnPoint, spawnPoint.id === selectedSpawnPointId);
         groupEl.appendChild(option);
       }
 
@@ -551,55 +565,28 @@ export class DeployScreen extends UIComponent {
 
   // --- Private helpers ---
 
+  // DOM-factory wrappers preserve the original call sites while the actual
+  // element construction lives in deploy/DeployDomFactory.ts.
   private makeButton(id: string | undefined, label: string, onPress: () => void): HTMLButtonElement {
-    const button = document.createElement('button');
-    if (id) button.id = id;
-    button.type = 'button';
-    button.className = styles.smallButton;
-    button.textContent = label;
-    button.addEventListener('pointerdown', () => {
-      if (!button.disabled) onPress();
-    });
-    return button;
+    return makeSmallButton(id, styles.smallButton, label, onPress);
   }
 
   private makeActionButton(id: string, className: string, onPress: () => void): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.id = id;
-    button.type = 'button';
-    button.className = className;
-    button.addEventListener('pointerdown', () => {
-      if (!button.disabled) onPress();
-    });
-    return button;
+    return makeActionButton(id, className, onPress);
   }
 
   private createDiv(className?: string, id?: string): HTMLDivElement {
-    const el = document.createElement('div');
-    if (id) el.id = id;
-    if (className) el.className = className;
-    return el;
+    return createDiv(className, id);
   }
 
   private createMetaRow(label: string, value: string): { row: HTMLDivElement; value: HTMLDivElement } {
-    const row = this.createDiv(styles.metaRow);
-    const term = this.createDiv(styles.metaLabel);
-    term.textContent = label;
-    const valueEl = this.createDiv(styles.metaValue);
-    valueEl.textContent = value;
-    row.appendChild(term);
-    row.appendChild(valueEl);
-    return { row, value: valueEl };
+    return createMetaRow(styles.metaRow, styles.metaLabel, styles.metaValue, label, value);
   }
 
   private createHeading<K extends 'h1' | 'h2' | 'h3' | 'h4'>(
     tag: K, id: string | undefined, className: string | undefined, text: string,
   ): HTMLHeadingElement {
-    const el = document.createElement(tag) as HTMLHeadingElement;
-    if (id) el.id = id;
-    if (className) el.className = className;
-    el.textContent = text;
-    return el;
+    return createHeading(tag, id, className, text);
   }
 
   private updateFieldValue(field: LoadoutFieldKey, value: string): void {
@@ -645,91 +632,15 @@ export class DeployScreen extends UIComponent {
     this.loadoutStatus.textContent = 'Two weapon slots and one equipment slot. Adjust before deploying.';
   }
 
-  private makeSpawnOptionButton(spawnPoint: RespawnSpawnPoint, selected: boolean): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = selected
-      ? `${styles.spawnOption} ${styles.spawnOptionSelected}`
-      : styles.spawnOption;
-    button.textContent = '';
-    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    button.setAttribute('aria-label', `${this.getSpawnKindLabel(spawnPoint)} ${spawnPoint.name}`);
-    if (button.dataset) {
-      button.dataset.spawnId = spawnPoint.id;
-      button.dataset.spawnKind = spawnPoint.kind;
-      button.dataset.selectionClass = spawnPoint.selectionClass;
-    }
-    button.addEventListener('pointerdown', () => {
-      this.onSpawnOptionSelected?.(spawnPoint.id, spawnPoint.name);
-    });
-
-    const label = this.createDiv(styles.spawnOptionLabel);
-    label.textContent = spawnPoint.name;
-    const meta = this.createDiv(styles.spawnOptionMeta);
-    const safety = spawnPoint.safe ? 'CLEAR' : 'HOT';
-    meta.textContent = `${this.getSpawnKindLabel(spawnPoint)} / ${safety} / ${Math.round(spawnPoint.position.x)}, ${Math.round(spawnPoint.position.z)}`;
-    button.appendChild(label);
-    button.appendChild(meta);
-    return button;
-  }
-
-  private makeVehicleOptionButton(option: VehicleDeployOption, selected: boolean): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = selected
-      ? `${styles.spawnOption} ${styles.spawnOptionSelected}`
-      : styles.spawnOption;
-    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    button.setAttribute('aria-label', `${option.classLabel} ${option.name}`);
-    if (button.dataset) {
-      button.dataset.vehicleId = option.id;
-      button.dataset.vehicleClass = option.classLabel;
-      button.dataset.faction = isBlufor(option.faction) ? 'BLUFOR' : 'OPFOR';
-    }
-    button.addEventListener('pointerdown', () => {
-      this.onVehicleDeployOptionSelected?.(option.id, option.name);
-    });
-
-    const label = this.createDiv(styles.spawnOptionLabel);
-    label.textContent = option.name;
-    const meta = this.createDiv(styles.spawnOptionMeta);
-    meta.textContent = `${option.classLabel} / ${option.controlsHint}`;
-    button.appendChild(label);
-    button.appendChild(meta);
-    return button;
-  }
-
-  private groupSpawnPoints(spawnPoints: RespawnSpawnPoint[]): Array<{ label: string; points: RespawnSpawnPoint[] }> {
-    const groups: Array<{ kind: RespawnSpawnPoint['kind']; label: string; points: RespawnSpawnPoint[] }> = [
-      { kind: 'home_base', label: 'ALLIANCE BASES', points: [] },
-      { kind: 'zone', label: 'CONTROLLED ZONES', points: [] },
-      { kind: 'helipad', label: 'HELIPADS', points: [] },
-      { kind: 'insertion', label: 'INSERTION POINTS', points: [] },
-      { kind: 'default', label: 'DEFAULT', points: [] },
-    ];
-
-    for (const spawnPoint of spawnPoints) {
-      const group = groups.find((entry) => entry.kind === spawnPoint.kind) ?? groups[groups.length - 1];
-      group.points.push(spawnPoint);
-    }
-
-    return groups.filter((group) => group.points.length > 0);
-  }
-
-  private getSpawnKindLabel(spawnPoint: RespawnSpawnPoint): string {
-    switch (spawnPoint.kind) {
-      case 'home_base':
-        return 'BASE';
-      case 'zone':
-        return 'ZONE';
-      case 'helipad':
-        return 'HELIPAD';
-      case 'insertion':
-        return 'INSERTION';
-      case 'default':
-      default:
-        return 'DEFAULT';
-    }
+  // Snapshot of the dependencies the spawn/vehicle option builders need. The
+  // builder bodies live in deploy/DeploySpawnList.ts; callbacks are read live
+  // so late `set*Callback` calls still take effect.
+  private spawnListContext(): DeploySpawnListContext {
+    return {
+      styles,
+      onSpawnOptionSelected: this.onSpawnOptionSelected,
+      onVehicleDeployOptionSelected: this.onVehicleDeployOptionSelected,
+    };
   }
 
   private updateDecisionMetric(elapsedMs: number): void {

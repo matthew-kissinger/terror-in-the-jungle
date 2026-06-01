@@ -17,13 +17,17 @@ import { movementStatsTracker } from './MovementStatsTracker';
 import {
   computeForwardGrade,
   computeSlopeValueFromNormal,
-  computeSmoothedSupportNormal,
 } from '../terrain/GameplaySurfaceSampling';
 import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 import {
   enforceWorldBoundary,
   resolveMovementIntent,
 } from './movement/MovementKinematics';
+import { applySteepTerrainFlow } from './movement/SteepTerrainFlow';
+import {
+  sampleSupportNormal as sampleSupportNormalFootprint,
+  PLAYER_SUPPORT_LOOKAHEAD,
+} from './movement/SupportNormalSampler';
 import {
   PlayerSwimState,
   type LocomotionMode,
@@ -39,11 +43,6 @@ const _horizontalVelocity = new THREE.Vector3();
 const _upVector = new THREE.Vector3(0, 1, 0);
 const _terrainNormal = new THREE.Vector3(0, 1, 0);
 const _previousTerrainNormal = new THREE.Vector3(0, 1, 0);
-const _terrainFlowDirection = new THREE.Vector3();
-const _terrainFlowTargetVelocity = new THREE.Vector3();
-const _uphillDirection = new THREE.Vector3();
-const _contourA = new THREE.Vector3();
-const _contourB = new THREE.Vector3();
 
 const MOVEMENT_ACCELERATION = 5;
 const FRICTION_RATE = 8;
@@ -58,13 +57,10 @@ const CROUCH_SPEED_MULTIPLIER = 0.5;
 const PLAYER_COLLISION_RADIUS = 0.5;
 const LANDING_SOUND_THRESHOLD = -5;
 const BOUNDARY_BOUNCE_FACTOR = 0.5;
-const PLAYER_SUPPORT_SAMPLE_DISTANCE = 1.35;
-const PLAYER_SUPPORT_FOOTPRINT_RADIUS = 0.8;
-const PLAYER_SUPPORT_LOOKAHEAD = 0.95;
-const PLAYER_SUPPORT_NORMAL_SMOOTHING = 0.35;
-const PLAYER_STEEP_FLOW_SPEED_FACTOR = 0.82;
-const PLAYER_STEEP_FLOW_MIN_SPEED = 1.4;
-const PLAYER_STEEP_FLOW_LERP = 0.58;
+// Support-sampling + steep-flow tuning now lives with the extracted helpers
+// (movement/SupportNormalSampler, movement/SteepTerrainFlow).
+// PLAYER_SUPPORT_LOOKAHEAD is re-imported above because the forward-grade
+// sample below also keys off it.
 const PLAYER_TERRAIN_LIP_RISE = 0.45;
 // Bound one-frame grounded rises from collision boxes, cliff seams, or stamped lips.
 const PLAYER_MAX_GROUND_RISE_PER_STEP = 0.75;
@@ -636,60 +632,14 @@ export class PlayerMovement {
     requestedMoveZ: number,
     deltaTime: number,
   ): boolean {
-    const downhillLength = Math.hypot(targetSupportNormal.x, targetSupportNormal.z);
-    if (downhillLength <= 0.001) {
-      return false;
-    }
-
-    _uphillDirection.set(
-      -targetSupportNormal.x / downhillLength,
-      0,
-      -targetSupportNormal.z / downhillLength,
-    );
-
-    const desiredDirection = _terrainFlowDirection.set(
-      requestedMoveX !== 0 || requestedMoveZ !== 0 ? requestedMoveX : this.playerState.velocity.x,
-      0,
-      requestedMoveX !== 0 || requestedMoveZ !== 0 ? requestedMoveZ : this.playerState.velocity.z,
-    );
-    if (desiredDirection.lengthSq() <= 0.0001) {
-      return false;
-    }
-
-    desiredDirection.projectOnPlane(targetSupportNormal);
-    desiredDirection.y = 0;
-
-    const uphillDot = downhillLength > 0.001 ? desiredDirection.dot(_uphillDirection) : 0;
-    if (uphillDot > 0) {
-      desiredDirection.addScaledVector(_uphillDirection, -uphillDot);
-    }
-
-    if (desiredDirection.lengthSq() <= 0.0001) {
-      _contourA.set(-_uphillDirection.z, 0, _uphillDirection.x);
-      _contourB.set(_uphillDirection.z, 0, -_uphillDirection.x);
-      const contourAAlignment = _contourA.dot(_horizontalVelocity.set(this.playerState.velocity.x, 0, this.playerState.velocity.z));
-      const contourBAlignment = _contourB.dot(_horizontalVelocity);
-      desiredDirection.copy(contourAAlignment >= contourBAlignment ? _contourA : _contourB);
-    }
-
-    desiredDirection.normalize();
-
-    const currentSpeed = Math.hypot(this.playerState.velocity.x, this.playerState.velocity.z);
-    const flowedSpeed = Math.max(PLAYER_STEEP_FLOW_MIN_SPEED, currentSpeed * PLAYER_STEEP_FLOW_SPEED_FACTOR);
-    const targetVelocity = _terrainFlowTargetVelocity.copy(desiredDirection).multiplyScalar(flowedSpeed);
-    this.playerState.velocity.x = THREE.MathUtils.lerp(
-      this.playerState.velocity.x,
-      targetVelocity.x,
-      PLAYER_STEEP_FLOW_LERP,
-    );
-    this.playerState.velocity.z = THREE.MathUtils.lerp(
-      this.playerState.velocity.z,
-      targetVelocity.z,
-      PLAYER_STEEP_FLOW_LERP,
-    );
-    newPosition.x = this.playerState.position.x + this.playerState.velocity.x * deltaTime;
-    newPosition.z = this.playerState.position.z + this.playerState.velocity.z * deltaTime;
-    return true;
+    return applySteepTerrainFlow({
+      playerState: this.playerState,
+      newPosition,
+      targetSupportNormal,
+      requestedMoveX,
+      requestedMoveZ,
+      deltaTime,
+    });
   }
 
   private sampleSupportNormal(
@@ -700,31 +650,17 @@ export class PlayerMovement {
     target: THREE.Vector3,
     smooth: boolean,
   ): THREE.Vector3 {
-    computeSmoothedSupportNormal(
-      this.sampleTerrainHeight.bind(this),
+    return sampleSupportNormalFootprint({
+      sampleHeight: this.sampleTerrainHeight.bind(this),
       x,
       z,
-      this.sampledSupportNormal,
-      {
-        sampleDistance: PLAYER_SUPPORT_SAMPLE_DISTANCE,
-        footprintRadius: PLAYER_SUPPORT_FOOTPRINT_RADIUS,
-        lookaheadDistance: PLAYER_SUPPORT_LOOKAHEAD,
-        moveX,
-        moveZ,
-      },
-    );
-
-    if (!this.playerState.isGrounded) {
-      return target.copy(this.sampledSupportNormal);
-    }
-
-    if (!smooth) {
-      return target.copy(this.sampledSupportNormal);
-    }
-
-    return target
-      .lerp(this.sampledSupportNormal, PLAYER_SUPPORT_NORMAL_SMOOTHING)
-      .normalize();
+      moveX,
+      moveZ,
+      target,
+      sampledScratch: this.sampledSupportNormal,
+      grounded: this.playerState.isGrounded,
+      smooth,
+    });
   }
 
   private sampleTerrainHeight(x: number, z: number): number {

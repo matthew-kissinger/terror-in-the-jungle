@@ -14,8 +14,6 @@ import { MatchTimer } from './MatchTimer';
 import { GameStatusPanel } from './GameStatusPanel';
 import { KillCounter } from './KillCounter';
 import { AmmoDisplay } from './AmmoDisplay';
-import { HelicopterHUD } from './HelicopterHUD';
-import { FixedWingHUD } from './FixedWingHUD';
 import { InteractionPromptPanel } from './InteractionPromptPanel';
 import { GrenadeMeter } from './GrenadeMeter';
 import { BreathGauge } from './BreathGauge';
@@ -26,8 +24,9 @@ import { ViewportManager } from '../design/responsive';
 import type { HUDLayout } from '../layout/HUDLayout';
 import * as THREE from 'three';
 import type { InventorySlotDefinition } from '../../systems/player/InventoryManager';
+import { HUDVehicleHud } from './HUDVehicleHud';
 
-export class HUDElements {
+export class HUDElements extends HUDVehicleHud {
   // Main containers
   public hudContainer: HTMLDivElement;
 
@@ -48,10 +47,6 @@ export class HUDElements {
   public breathGauge: BreathGauge;
   public mortarPanel: MortarPanel;
 
-  // UIComponent-based elements (Phase 4)
-  public helicopterHUD: HelicopterHUD;
-  public fixedWingHUD: FixedWingHUD;
-
   // Feedback systems
   public killFeed: KillFeed;
   public damageNumbers?: DamageNumberSystem;
@@ -67,6 +62,11 @@ export class HUDElements {
   private objectiveDisplay: ObjectiveDisplay;
 
   constructor(camera?: THREE.Camera) {
+    // Base constructor instantiates the helicopter + fixed-wing HUD overlays
+    // (this.helicopterHUD / this.fixedWingHUD). They are detached DOM until
+    // mounted below — construction order has no observable side effect.
+    super();
+
     this.hudContainer = this.createHUDContainer();
 
     // Initialize UIComponent-based modules
@@ -82,9 +82,8 @@ export class HUDElements {
     this.breathGauge = new BreathGauge();
     this.mortarPanel = new MortarPanel();
 
-    // Initialize Phase 4 UIComponent modules
-    this.helicopterHUD = new HelicopterHUD();
-    this.fixedWingHUD = new FixedWingHUD();
+    // Phase 4 UIComponent modules (helicopterHUD / fixedWingHUD) are
+    // constructed by super() above.
 
     // Initialize legacy modules (not yet migrated)
     this.objectiveDisplay = new ObjectiveDisplay();
@@ -213,106 +212,8 @@ export class HUDElements {
     this.interactionPromptPanel.hide();
   }
 
-  updateElevation(elevation: number): void {
-    this.helicopterHUD.setElevation(elevation);
-  }
-
-  // Helicopter mouse control indicator methods
-  showHelicopterMouseIndicator(): void {
-    this.helicopterHUD.showMouseIndicator();
-  }
-
-  hideHelicopterMouseIndicator(): void {
-    this.helicopterHUD.hideMouseIndicator();
-  }
-
-  updateHelicopterMouseMode(controlMode: boolean): void {
-    this.helicopterHUD.setMouseMode(controlMode);
-  }
-
-  // Helicopter instruments methods (only visible in helicopter)
-  showHelicopterInstruments(): void {
-    this.helicopterHUD.show();
-    this.helicopterHUD.showInstruments();
-  }
-
-  hideHelicopterInstruments(): void {
-    this.helicopterHUD.hide();
-    this.helicopterHUD.hideInstruments();
-  }
-
-  updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
-    this.helicopterHUD.setInstruments(collective, rpm, autoHover, engineBoost);
-  }
-
-  updateHelicopterFlightData(airspeed: number, heading: number, verticalSpeed: number): void {
-    this.helicopterHUD.setFlightData(airspeed, heading, verticalSpeed);
-  }
-
-  setHelicopterAircraftRole(role: import('../../systems/helicopter/AircraftConfigs').AircraftRole): void {
-    this.helicopterHUD.setAircraftRole(role);
-  }
-
-  setHelicopterWeaponStatus(name: string, ammo: number): void {
-    this.helicopterHUD.setWeaponStatus(name, ammo);
-  }
-
-  setHelicopterDamage(healthPercent: number): void {
-    this.helicopterHUD.setDamage(healthPercent);
-  }
-
-  // Fixed-wing HUD methods
-  showFixedWingInstruments(): void {
-    this.fixedWingHUD.show();
-  }
-
-  hideFixedWingInstruments(): void {
-    this.fixedWingHUD.hide();
-  }
-
-  updateFixedWingFlightData(airspeed: number, heading: number, verticalSpeed: number): void {
-    this.fixedWingHUD.setFlightData(airspeed, heading, verticalSpeed);
-  }
-
-  updateFixedWingThrottle(throttle: number): void {
-    this.fixedWingHUD.setThrottle(throttle);
-  }
-
-  setFixedWingStallWarning(stalled: boolean): void {
-    this.fixedWingHUD.setStallWarning(stalled);
-  }
-
-  setFixedWingStallSpeed(speed: number): void {
-    this.fixedWingHUD.setStallSpeed(speed);
-  }
-
-  setFixedWingAutoLevel(active: boolean): void {
-    this.fixedWingHUD.setAutoLevel(active);
-  }
-
-  setFixedWingFlightAssist(active: boolean): void {
-    this.fixedWingHUD.setFlightAssist(active);
-  }
-
-  setFixedWingPhase(phase: import('../../systems/vehicle/FixedWingControlLaw').FixedWingControlPhase): void {
-    this.fixedWingHUD.setPhase(phase);
-  }
-
-  setFixedWingOperationState(state: import('../../systems/vehicle/FixedWingOperations').FixedWingOperationState): void {
-    this.fixedWingHUD.setOperationState(state);
-  }
-
-  showFixedWingMouseIndicator(): void {
-    this.fixedWingHUD.showMouseIndicator();
-  }
-
-  hideFixedWingMouseIndicator(): void {
-    this.fixedWingHUD.hideMouseIndicator();
-  }
-
-  updateFixedWingMouseMode(controlMode: boolean): void {
-    this.fixedWingHUD.setMouseMode(controlMode);
-  }
+  // Vehicle instrument HUD methods (helicopter + fixed-wing) are inherited
+  // from HUDVehicleHud, which owns this.helicopterHUD / this.fixedWingHUD.
 
   // Mortar indicator methods
   showMortarIndicator(): void {
