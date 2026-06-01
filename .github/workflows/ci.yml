@@ -14,6 +14,7 @@ on:
       - 'tsconfig*.json'
       - 'eslint.config.js'
       - '.github/workflows/ci.yml'
+      - '.github/scripts/**'
   pull_request:
     branches: [master]
     paths:
@@ -26,6 +27,7 @@ on:
       - 'tsconfig*.json'
       - 'eslint.config.js'
       - '.github/workflows/ci.yml'
+      - '.github/scripts/**'
   workflow_dispatch:
 
 permissions:
@@ -123,21 +125,31 @@ jobs:
       - name: Build
         run: npm run build
 
+  # ── Playwright browser jobs ──────────────────────────────────────────────
+  # smoke / mobile-ui / perf run inside the official Playwright image, which
+  # ships the matching Chromium PRE-EXTRACTED. This sidesteps the GitHub-runner
+  # `playwright install` hang where the chromium zip downloaded to 100% then the
+  # post-download unzip stalled to the job timeout (3/3 retries; see commit
+  # 386bd4cd and docs/state/perf-trust.md). No `playwright install` step is
+  # needed in-container.
+  # IMPORTANT: the image tag MUST track the `playwright` version in the lockfile
+  # (currently 1.59.1). A playwright bump must bump `v1.59.1-noble` in lockstep,
+  # or the npm package and the baked browser revision diverge and the download
+  # (and the hang) returns. The image bundles Node 22; setup-node pins Node 24
+  # per .nvmrc over it. openssh-client is ensured for the deploy-key checkout.
+
   smoke:
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.59.1-noble
     timeout-minutes: 15
     needs: [lint, test]
-    # TEMPORARY-ADVISORY: GitHub-runner Playwright chromium install hangs post-download
-    # (binary reaches 100% in ~1s, then the install stalls to the job timeout; bounded by
-    # the retry+timeout in "Install Playwright browsers"). Code gates (build/test/lint) stay
-    # authoritative; prod-smoke is still enforced locally via `npm run validate` and
-    # post-deploy via `npm run check:live-release`. Restore to blocking once the install
-    # hang is fixed (Playwright version bump / cache the browser). See commit 386bd4cd.
-    continue-on-error: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Ensure SSH client present (container)
+        run: command -v ssh-keyscan >/dev/null 2>&1 || { apt-get update && apt-get install -y --no-install-recommends openssh-client; }
 
       - name: Checkout game field kits
         env:
@@ -155,17 +167,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Playwright browsers
-        run: |
-          for attempt in 1 2 3; do
-            echo "Playwright chromium install attempt $attempt"
-            timeout 240 npx playwright install chromium && exit 0
-            echo "attempt $attempt timed out/failed after 240s; retrying" >&2
-            sleep 5
-          done
-          echo "Playwright chromium install failed after 3 attempts (runner-side download/extract hang)" >&2
-          exit 1
 
       - name: Build
         run: npm run build
@@ -210,6 +211,7 @@ jobs:
 
   mobile-ui:
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.59.1-noble
     # Default to 1 device for fast feedback. PRs that touch UI / player input /
     # index.html trigger the path filter; PRs with the `mobile-full` label
     # fan out to the full 4-device matrix. Original 4-device matrix sat on
@@ -217,9 +219,6 @@ jobs:
     timeout-minutes: 18
     needs: [lint, test, mobile-ui-changes]
     if: needs.mobile-ui-changes.outputs.hit == 'true' || needs.mobile-ui-changes.outputs.full == 'true'
-    # TEMPORARY-ADVISORY: same GitHub-runner Playwright install hang as the smoke job
-    # (see its comment). Restore to blocking once the install hang is fixed.
-    continue-on-error: true
     strategy:
       # Don't kill sibling devices when one fails — full coverage when the
       # matrix fans out.
@@ -230,6 +229,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Ensure SSH client present (container)
+        run: command -v ssh-keyscan >/dev/null 2>&1 || { apt-get update && apt-get install -y --no-install-recommends openssh-client; }
 
       - name: Checkout game field kits
         env:
@@ -247,17 +249,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Playwright browsers
-        run: |
-          for attempt in 1 2 3; do
-            echo "Playwright chromium install attempt $attempt"
-            timeout 240 npx playwright install chromium && exit 0
-            echo "attempt $attempt timed out/failed after 240s; retrying" >&2
-            sleep 5
-          done
-          echo "Playwright chromium install failed after 3 attempts (runner-side download/extract hang)" >&2
-          exit 1
 
       - name: Build
         run: npm run build
@@ -310,18 +301,23 @@ jobs:
 
   perf:
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.59.1-noble
     timeout-minutes: 25
     needs: [perf-changes]
     if: needs.perf-changes.outputs.hit == 'true' || needs.perf-changes.outputs.full == 'true'
-    # ADVISORY: perf is advisory by design (its capture/compare steps are already
-    # continue-on-error + it emits perf-advisory-report). Job-level continue-on-error so the
-    # Playwright-install runner hang (see the smoke job comment) cannot fail the run. perf
-    # was never a blocking gate; restore alongside smoke/mobile-ui when the install is fixed.
+    # ADVISORY BY DESIGN: GPU-less CI cannot produce a trustworthy perf capture
+    # (CI captures hard-timeout / finalFrameCount 0 — see docs/state/perf-trust.md),
+    # so the job stays continue-on-error and emits a perf-advisory-report. The
+    # container fixes the prior `playwright install` extract-hang so the advisory
+    # capture can actually run; this is no longer about the install hang.
     continue-on-error: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Ensure SSH client present (container)
+        run: command -v ssh-keyscan >/dev/null 2>&1 || { apt-get update && apt-get install -y --no-install-recommends openssh-client; }
 
       - name: Checkout game field kits
         env:
@@ -339,17 +335,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Playwright browsers
-        run: |
-          for attempt in 1 2 3; do
-            echo "Playwright chromium install attempt $attempt"
-            timeout 240 npx playwright install chromium && exit 0
-            echo "attempt $attempt timed out/failed after 240s; retrying" >&2
-            sleep 5
-          done
-          echo "Playwright chromium install failed after 3 attempts (runner-side download/extract hang)" >&2
-          exit 1
 
       - name: Build perf-harness bundle
         run: npm run build:perf
