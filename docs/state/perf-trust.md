@@ -5,6 +5,19 @@
 > (`CombatantAI.ts:185,197`; `AIStateEngage` threads `spatialGrid` through
 > suppression). DEFEKT-3's combat120 p99 PASS is pending the STABILIZAT-1
 > baseline refresh, not further cover-search work.
+>
+> **Update 2026-06-01:** a fresh **measurement-trust PASS** combat120 capture
+> (`artifacts/perf/2026-06-01T17-13-43-711Z`, RTX 3070 / WebGPU, 5447 frames)
+> reports `perf:compare` **6 pass / 1 warn / 1 fail**: p95 33.10 ms PASS, max
+> 49.50 ms PASS, heap −0.05 MB PASS, avg 16.60 ms WARN, **p99 45.60 ms FAIL**.
+> The p99 fail is a *late-run tail*, not steady state: p99 held ~31–34 ms for
+> ~85 of 90 s, then a respawn + an NPC terrain-stall storm + a point-blank
+> frontline collapse spiked the global p99. **The combat120 tail now traces to
+> NPC terrain-stalls (the stuck-on-slopes movement carry-over), not the cover
+> search** — which the spatial-grid wiring did relieve in steady state. Baseline
+> was **not** refreshed (a FAILing capture cannot reset the gate); STABILIZAT-1
+> stays blocked pending a quiet-machine pass that clears the gates. Capture done
+> on a non-isolated workstation, so treat as directional evidence.
 
 Current trust state of the combat120 perf baseline and the chain of evidence
 behind STABILIZAT-1 (combat120 baseline refresh blocked) and DEFEKT-3
