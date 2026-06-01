@@ -11,3 +11,4 @@
  *   }));
  */
 export { createTestCombatant, mockTerrainRuntime } from './mocks';
+export { makeHydrologyArtifact, makeChannelPolyline, makePolylinePoint } from './hydrology';

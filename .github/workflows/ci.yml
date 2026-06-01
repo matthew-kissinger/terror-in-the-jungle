@@ -64,6 +64,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Doc-drift gate
+        run: npm run check:doc-drift
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
