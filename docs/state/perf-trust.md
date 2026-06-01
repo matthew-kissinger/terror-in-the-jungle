@@ -1,5 +1,31 @@
 # Perf Measurement-Chain Trust Status
 
+Last updated: 2026-06-01
+
+> **Update 2026-06-01 (convergence-stall fix landed):** the combat120 p99 tail
+> root cause was traced and the **combat-side lever shipped** in
+> `fix(combat): cut NPC convergence terrain-stall cost + oscillation`
+> (`task/combat-convergence-stall-fix`). The earlier "tail traces to NPC
+> terrain-stalls" framing holds but was sharpened: differencing the
+> `2026-06-01T17-13-43-711Z` runtime samples shows the late-run spike is a
+> **superposition** — `SystemUpdater.Combat` per-frame +2.0 ms (movement/AI; the
+> stall storm) *and* uninstrumented render/"Other" +2.9 ms — not Combat alone
+> (`combat_budget_dominance` = 0). Movement cost is misattributed to Combat, not
+> Navigation (≈0.01 ms). DEFEKT-4's recovery mechanisms fire en masse at the
+> crush but **oscillate** (contour ↔ backtrack) rather than resolving. The fix:
+> (1) cache the contour side ~200 ms so a stalled NPC stops re-sampling the
+> support normal twice/tick (the dominant uncached `getHeightAt` cost), (2) serve
+> the stale nav route when the per-frame query budget is exhausted instead of
+> dropping to a blocked direct-push, (3) disperse a held-and-crowded NPC away
+> from the crush (default on, playtest-pending), (4) opt-in crowd-stall movement
+> stagger (default off). Full test suite green (5260). **Frame-time certification
+> is deferred to the STABILIZAT-1 quiet-machine refresh** — local re-captures ran
+> on a contended workstation (probe round-trip 19.7→23.6 ms, +20%; sim trajectory
+> diverged to a denser convergence), so avg/max are dominated by machine
+> contention. Across three captures p99 was directionally comparable-or-better
+> (45.6 → 44.0 → 39.0 ms); the per-tick sampling reduction is proven by the
+> contour-cache unit test, not by these noisy aggregates.
+
 > **Update 2026-05-31:** the synchronous cover search described below is
 > REMEDIATED — the O(1) `CoverSpatialGrid` is wired into prod combat
 > (`CombatantAI.ts:185,197`; `AIStateEngage` threads `spatialGrid` through

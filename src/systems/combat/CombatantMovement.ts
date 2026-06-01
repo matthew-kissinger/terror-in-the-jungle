@@ -15,7 +15,7 @@ import {
   updateRetreatingMovement,
   updateSuppressingMovement
 } from './CombatantMovementStates';
-import { NPC_MAX_SPEED, NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import { NPC_MAX_SPEED, NPC_Y_OFFSET, NpcLodConfig } from '../../config/CombatantConfig';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { NavmeshMovementAdapter } from '../navigation/NavmeshMovementAdapter';
 import { StuckDetector, type StuckRecoveryAction } from './StuckDetector';
@@ -65,6 +65,31 @@ const NPC_LOW_PROGRESS_DELTA_SQ = 0.02;
  * short enough that the stop-and-go is not perceptible on screen.
  */
 const NPC_CONTOUR_STALL_REROUTE_MS = 1200;
+/**
+ * Window (ms) the chosen contour side ({@link Combatant.movementContourSign})
+ * is reused before re-scoring the left/right candidates. Re-scoring samples the
+ * support normal twice per tick — the dominant terrain-sampling cost for a
+ * contour-stalled NPC at convergence. While the NPC stays blocked the chosen
+ * side is stable (and committing to it longer also dampens the side-flip
+ * oscillation the reroute guard was added to fight), so the score is cached for
+ * this window and the contour vector is rebuilt from the freshly sampled normal.
+ */
+const NPC_CONTOUR_RESCORE_INTERVAL_MS = 200;
+/**
+ * Convergence dispersal (NpcLodConfig.stallDispersalEnabled): distance (m) a
+ * held-and-crowded NPC is sent away from the local crowd centroid. Kept above
+ * the patrol DESTINATION_ARRIVAL_RADIUS (15m) so a leader does not immediately
+ * count the dispersal point as "reached" and re-pick the contested zone.
+ */
+const NPC_STALL_DISPERSAL_DISTANCE = 18;
+/**
+ * Minimum squared magnitude of the friendly spacing force for an NPC to count
+ * as "in a crowd" worth dispersing from. The spacing force is non-zero only
+ * when same-faction NPCs sit within the spacing radius, so any meaningful
+ * magnitude means the NPC is packed; below this it is an isolated stall and the
+ * default immediate-unfreeze applies instead.
+ */
+const NPC_STALL_DISPERSAL_MIN_FORCE_SQ = 1e-4;
 const NPC_RECOVERY_BASE_RADIUS = 2.5;
 const NPC_RECOVERY_RADIUS_STEP = 1.25;
 const NPC_RECOVERY_MAX_RADIUS = 6.5;
@@ -110,6 +135,14 @@ interface CachedNavPath {
   queryTime: number;
   /** Time when current waypoint index was set (for stall detection). */
   waypointStartTime: number;
+  /**
+   * Set by the terrain-solver stall guard to request a fresh route on the next
+   * affordable query. The stale path keeps being served (the NPC follows its
+   * last route) until the per-frame query budget allows a re-query, instead of
+   * being hard-dropped — which would leave the NPC direct-pushing into the
+   * obstacle during the throttle gap and re-feed the stall loop.
+   */
+  needsRequery?: boolean;
 }
 
 /**
@@ -229,6 +262,29 @@ export class CombatantMovement {
       return;
     }
 
+    // Crowd-stall movement stagger (opt-in, NpcLodConfig.crowdStallStaggerEnabled,
+    // default off). A high-LOD NPC that was contour-stalled inside a friendly
+    // crowd last full tick coasts this tick: advance the existing velocity and
+    // re-ground, skipping the spacing grid query and the terrain-aware contour
+    // solve (the two dominant per-tick costs at point-blank convergence). The
+    // next tick runs the full solve, giving a 50% cadence. Recovery detectors
+    // work on >=600ms windows, so one coasted frame does not perturb their
+    // escalation. The flag is only ever armed when the knob is on.
+    if (combatant.movementStaggerSkipNext) {
+      combatant.movementStaggerSkipNext = false;
+      if (NpcLodConfig.crowdStallStaggerEnabled && combatant.simLane === 'high') {
+        combatant.position.addScaledVector(combatant.velocity, deltaTime);
+        if (this.wadeSplashEmitter) {
+          const moving = combatant.velocity.lengthSq() > 0.01;
+          this.wadeSplashEmitter.tryEmitForCombatant(combatant.id, combatant.position, moving);
+        }
+        if (!options?.disableTerrainSample) {
+          this.syncTerrainHeight(combatant);
+        }
+        return;
+      }
+    }
+
     // Movement based on state
     if (combatant.state === CombatantState.PATROLLING) {
       updatePatrolMovement(combatant, deltaTime, squads, combatants, {
@@ -251,8 +307,10 @@ export class CombatantMovement {
 
     // Apply friendly spacing force to prevent bunching
     // This gently pushes NPCs apart when they get too close to friendlies
-    if (!options?.disableSpacing && this.spatialGridManager) {
-      clusterManager.calculateSpacingForce(combatant, combatants, this.spatialGridManager, this._spacingForce);
+    const spatialGrid = options?.disableSpacing ? undefined : this.spatialGridManager;
+    const spacingApplied = !!spatialGrid;
+    if (spatialGrid) {
+      clusterManager.calculateSpacingForce(combatant, combatants, spatialGrid, this._spacingForce);
       combatant.velocity.add(this._spacingForce);
       this.clampHorizontalVelocity(combatant, NPC_MAX_SPEED);
     }
@@ -375,12 +433,25 @@ export class CombatantMovement {
       // sequence, NPCs with unreachable goals freeze visibly. See
       // docs/tasks/npc-unfreeze-and-stuck.md.
       combatant.movementBacktrackPoint = undefined;
-      combatant.destinationPoint = undefined;
       combatant.target = null;
       combatant.state = CombatantState.PATROLLING;
-      combatant.lastZoneEvalTime = 0;
       combatant.movementIntent = 'hold';
       combatant.velocity.set(0, 0, 0);
+
+      // Convergence dispersal: an NPC that escalated to 'hold' while packed in a
+      // friendly crowd re-targets the same contested point and rejoins the
+      // crush, sustaining the terrain-stall storm. Instead, send it away from
+      // the crowd centroid and delay its objective re-evaluation so it walks
+      // clear before re-engaging. Falls back to the immediate-unfreeze (clear
+      // destination + force re-eval) when the NPC isn't actually crowded.
+      const dispersed =
+        NpcLodConfig.stallDispersalEnabled &&
+        spacingApplied &&
+        this.tryAssignCrowdDispersal(combatant, now);
+      if (!dispersed) {
+        combatant.destinationPoint = undefined;
+        combatant.lastZoneEvalTime = 0;
+      }
       this.warnStuckRecovery(combatant.id, 'hold', now);
     }
 
@@ -401,6 +472,19 @@ export class CombatantMovement {
       combatant.position.z,
       telemetryIntent !== 'hold' && combatant.velocity.lengthSq() > 0.01,
     );
+
+    // Arm a coast tick next frame when this NPC is contour-stalled inside a
+    // crowd (opt-in; the flag stays unset in the default config because the
+    // knob is off, so production behavior is unchanged). Backtracking NPCs are
+    // excluded — they are already on the StuckDetector recovery path.
+    combatant.movementStaggerSkipNext =
+      NpcLodConfig.crowdStallStaggerEnabled &&
+      combatant.simLane === 'high' &&
+      !backtrackActivated &&
+      steering.contourActivated &&
+      progress.lowProgress &&
+      spacingApplied &&
+      this._spacingForce.lengthSq() >= NPC_STALL_DISPERSAL_MIN_FORCE_SQ;
   }
 
   private clampHorizontalVelocity(combatant: Combatant, maxSpeed: number): void {
@@ -509,15 +593,21 @@ export class CombatantMovement {
       return false;
     }
 
-    // Stall window crossed: drop the cached path and reset the contour sign
-    // so the fresh route is not biased by the previous deflection side.
-    // Reset the accumulator so we don't fire again on the very next tick if
-    // the new path also crosses the obstacle; the StuckDetector remains the
-    // backstop if re-routing repeatedly fails.
-    const had = this.navPaths.delete(combatant.id);
+    // Stall window crossed: flag the cached path for re-query and reset the
+    // contour sign so the fresh route is not biased by the previous deflection
+    // side. The path is flagged rather than deleted so the NPC keeps following
+    // its current route until a fresh one is affordable (see getOrQueryPath),
+    // instead of direct-pushing into the obstacle during the query-budget gap.
+    // Reset the accumulator so we don't fire again on the very next tick if the
+    // new path also crosses the obstacle; the StuckDetector remains the backstop
+    // if re-routing repeatedly fails.
+    const cached = this.navPaths.get(combatant.id);
+    if (cached) {
+      cached.needsRequery = true;
+    }
     combatant.movementContourSign = undefined;
     combatant.movementContourStallMs = 0;
-    return had;
+    return !!cached;
   }
 
   /**
@@ -620,6 +710,7 @@ export class CombatantMovement {
         finalDirection,
         anchorDirection,
         supportNormal,
+        now,
       );
       if (contourDirection.lengthSq() > 0.0001) {
         finalDirection = contourDirection;
@@ -799,15 +890,33 @@ export class CombatantMovement {
       // Check if destination changed significantly or path is stale
       const destChangedSq = cached.destination.distanceToSquared(anchor);
       const age = now - cached.queryTime;
-      if (destChangedSq < PATH_DESTINATION_CHANGE_SQ && age < PATH_MAX_AGE_MS) {
+      const fresh = !cached.needsRequery
+        && destChangedSq < PATH_DESTINATION_CHANGE_SQ
+        && age < PATH_MAX_AGE_MS;
+      if (fresh) {
         return cached;
       }
-      // Invalidate stale/mismatched path
+      // Stale, destination-changed, or flagged for re-route. Only drop the
+      // cached path when we can afford a fresh query this frame; otherwise keep
+      // serving the stale route so the NPC follows its last waypoints instead
+      // of falling back to a blocked direct-push while the per-frame query
+      // budget is exhausted. This removes the convergence-time
+      // drop -> throttled-null -> ram-the-slope thrash.
+      //
+      // Note: PATH_MAX_AGE_MS is intentionally NOT re-checked on this branch —
+      // a >10s-old route is still served when the budget is saturated. That is
+      // safe: a non-advancing NPC hits the 3s WAYPOINT_STALL_TIMEOUT_MS hard
+      // delete in resolveNavmeshWaypoint first, and an advancing one is reaching
+      // its waypoints, so the age ceiling never bites in practice.
+      if (this.pathQueriesThisFrame >= PATH_QUERIES_PER_FRAME) {
+        return cached;
+      }
       this.navPaths.delete(combatant.id);
+    } else if (this.pathQueriesThisFrame >= PATH_QUERIES_PER_FRAME) {
+      // No cached path and no query budget left this frame.
+      return null;
     }
 
-    // Amortize queries across frame
-    if (this.pathQueriesThisFrame >= PATH_QUERIES_PER_FRAME) return null;
     this.pathQueriesThisFrame++;
 
     // Query navmesh for path at terrain level (subtract NPC_Y_OFFSET)
@@ -933,6 +1042,7 @@ export class CombatantMovement {
     desiredDirection: THREE.Vector3,
     anchorDirection: THREE.Vector3,
     supportNormal: THREE.Vector3,
+    now: number,
   ): THREE.Vector3 {
     const downhillLength = Math.hypot(supportNormal.x, supportNormal.z);
     let uphillX = 0;
@@ -946,14 +1056,31 @@ export class CombatantMovement {
       uphillZ = desiredDirection.z;
     }
 
+    // Contour candidates are rebuilt from the current (freshly sampled) support
+    // normal every tick — that part is cheap. The expensive part is scoring
+    // both sides, which samples the support normal twice more. While the NPC
+    // stays contour-blocked the winning side is stable, so reuse the cached
+    // sign for NPC_CONTOUR_RESCORE_INTERVAL_MS instead of re-scoring each tick.
     _contourLeft.set(-uphillZ, 0, uphillX).normalize();
     _contourRight.set(uphillZ, 0, -uphillX).normalize();
 
-    const leftScore = this.scoreContourDirection(combatant, _contourLeft, anchorDirection, -1);
-    const rightScore = this.scoreContourDirection(combatant, _contourRight, anchorDirection, 1);
-    const useLeft = leftScore >= rightScore;
-    const chosenSign: -1 | 1 = useLeft ? -1 : 1;
-    const chosenDirection = useLeft ? _contourLeft : _contourRight;
+    const cachedSign = combatant.movementContourSign;
+    const cacheValid = (cachedSign === -1 || cachedSign === 1)
+      && now < (combatant.movementContourRescoreAtMs ?? 0);
+
+    let chosenSign: -1 | 1;
+    let chosenDirection: THREE.Vector3;
+    if (cacheValid) {
+      chosenSign = cachedSign as -1 | 1;
+      chosenDirection = chosenSign === -1 ? _contourLeft : _contourRight;
+    } else {
+      const leftScore = this.scoreContourDirection(combatant, _contourLeft, anchorDirection, -1);
+      const rightScore = this.scoreContourDirection(combatant, _contourRight, anchorDirection, 1);
+      const useLeft = leftScore >= rightScore;
+      chosenSign = useLeft ? -1 : 1;
+      chosenDirection = useLeft ? _contourLeft : _contourRight;
+      combatant.movementContourRescoreAtMs = now + NPC_CONTOUR_RESCORE_INTERVAL_MS;
+    }
 
     combatant.movementContourSign = chosenSign;
     _blendedDirection.copy(chosenDirection)
@@ -961,6 +1088,9 @@ export class CombatantMovement {
       .addScaledVector(anchorDirection, NPC_CONTOUR_FORWARD_BLEND);
     if (_blendedDirection.lengthSq() > 0.0001) {
       _blendedDirection.normalize();
+      // Keep the blended forward-block decision identical whether or not the
+      // score was cached, so the cache only removes the two left/right scoring
+      // samples and never changes the chosen heading for a given side.
       if (!this.isForwardBlocked(combatant.position, _blendedDirection)) {
         chosenDirection.copy(_blendedDirection);
       }
@@ -1135,6 +1265,36 @@ export class CombatantMovement {
     this.navPaths.delete(combatant.id);
     combatant.movementIntent = 'backtrack';
     combatant.movementContourSign = undefined;
+  }
+
+  /**
+   * Send a held-and-crowded combatant to a dispersed point away from the local
+   * crowd centroid and delay its objective re-evaluation. Reuses the friendly
+   * spacing force computed earlier this tick as the away-from-crowd direction
+   * (caller guarantees spacing ran). Returns false when the NPC is not actually
+   * crowded (spacing force ~0), so the caller keeps the default immediate
+   * unfreeze. See NpcLodConfig.stallDispersalEnabled.
+   */
+  private tryAssignCrowdDispersal(combatant: Combatant, now: number): boolean {
+    const awayX = this._spacingForce.x;
+    const awayZ = this._spacingForce.z;
+    const awayLenSq = awayX * awayX + awayZ * awayZ;
+    if (awayLenSq < NPC_STALL_DISPERSAL_MIN_FORCE_SQ) {
+      return false;
+    }
+    const inv = NPC_STALL_DISPERSAL_DISTANCE / Math.sqrt(awayLenSq);
+    const targetX = combatant.position.x + awayX * inv;
+    const targetZ = combatant.position.z + awayZ * inv;
+    if (combatant.destinationPoint) {
+      combatant.destinationPoint.set(targetX, combatant.position.y, targetZ);
+    } else {
+      combatant.destinationPoint = new THREE.Vector3(targetX, combatant.position.y, targetZ);
+    }
+    // Delay objective re-evaluation (now, not 0) so patrol's driveTowardDestination
+    // carries the NPC toward the dispersal point for a beat before zone targeting
+    // can overwrite it with the contested objective again.
+    combatant.lastZoneEvalTime = now;
+    return true;
   }
 
   private warnStuckRecovery(combatantId: string, action: 'backtrack' | 'hold', now: number): void {

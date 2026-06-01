@@ -215,6 +215,24 @@ export interface Combatant extends ITargetable {
    * obstacle. Reset to 0 on meaningful progress or when contour disengages.
    */
   movementContourStallMs?: number;
+  /**
+   * Wall-clock timestamp (performance.now()) until which the cached
+   * {@code movementContourSign} may be reused without re-scoring left/right
+   * contour candidates. Contour re-scoring is the dominant per-tick terrain
+   * sampling cost for a stalled NPC; while an NPC stays contour-blocked the
+   * chosen side is stable, so the score is cached for a short window and the
+   * contour direction is rebuilt from the (freshly sampled) support normal.
+   * See {@code NPC_CONTOUR_RESCORE_INTERVAL_MS}.
+   */
+  movementContourRescoreAtMs?: number;
+  /**
+   * Set by the terrain solver when this high-LOD NPC was contour-stalled inside
+   * a friendly crowd, requesting that the next movement tick coast (skip the
+   * spacing query + terrain-aware solve) to halve its worst-case per-frame
+   * cost. Only consulted when {@code NpcLodConfig.crowdStallStaggerEnabled} is
+   * on (default off). Cleared after the skipped tick.
+   */
+  movementStaggerSkipNext?: boolean;
   vehicleId?: string;
   vehicleSeatIndex?: number;
 }

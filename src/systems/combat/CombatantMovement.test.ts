@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantState } from './types';
 import { createTestCombatant, mockTerrainRuntime } from '../../test-utils';
-import { NPC_MAX_SPEED, NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import { NPC_MAX_SPEED, NPC_Y_OFFSET, NpcLodConfig } from '../../config/CombatantConfig';
 import { Logger } from '../../utils/Logger';
 
 function mockNavmeshAdapter(agentIds: Set<string> = new Set()) {
@@ -1026,6 +1026,241 @@ describe('CombatantMovement', () => {
         disableTerrainSample: true,
       });
       expect(dryNpc.velocity.x).toBeGreaterThan(4);
+    });
+  });
+
+  describe('convergence stall fixes', () => {
+    // A "pocket": flat at the origin, steep walls in every direction past a
+    // small radius. An NPC inside it has its forward probe (and both contour
+    // probes) blocked every tick, so the terrain-aware solver activates contour
+    // and the NPC makes no progress — the canonical convergence-stall trigger,
+    // without the lateral-slide escape a single flat wall would allow.
+    function pocketTerrain(radius = 1.6) {
+      return vi.fn((x: number, z: number) => (Math.hypot(x, z) > radius ? 12 : 0));
+    }
+
+    describe('contour re-score caching (#2)', () => {
+      it('samples terrain less on a cached contour tick than on a re-scoring tick', () => {
+        let samples = 0;
+        const pocket = pocketTerrain();
+        const t = mockTerrainRuntime({
+          getHeightAt: vi.fn((x: number, z: number) => {
+            samples++;
+            return pocket(x, z);
+          }),
+        });
+        const m = new CombatantMovement(t);
+        const c = createTestCombatant({
+          id: 'npc-contour-cache',
+          state: CombatantState.ADVANCING,
+          position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+          destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+          simLane: 'high',
+          renderLane: 'culled',
+        });
+        const tick = (nowMs: number) => {
+          vi.spyOn(performance, 'now').mockReturnValue(nowMs);
+          samples = 0;
+          m.updateMovement(c, 0.016, new Map(), new Map(), {
+            disableSpacing: true,
+            disableTerrainSample: true,
+          });
+          return samples;
+        };
+
+        tick(0); // first contour tick scores both sides + fills the cache
+        const cachedTickSamples = tick(16); // inside the window -> reuse the side
+        const rescoreTickSamples = tick(16 + 1000); // past the window -> re-score
+
+        expect(cachedTickSamples).toBeLessThan(rescoreTickSamples);
+      });
+    });
+
+    describe('throttled path query keeps the cached route (#3)', () => {
+      it('serves the stale route instead of stranding the NPC when the query budget is exhausted', () => {
+        const adapter = mockNavmeshAdapter();
+        const navSystem = mockNavmeshSystem(adapter);
+        // Route bends sharply along +z before the +x destination, so following
+        // the cached waypoint (z-dominant velocity) is distinguishable from a
+        // fallback direct-push toward the destination (x-dominant velocity).
+        const routeWaypoint = new THREE.Vector3(0, 0, 80);
+        const destination = new THREE.Vector3(120, 0, 0);
+        navSystem.queryPath.mockReturnValue([
+          new THREE.Vector3(0, 0, 0),
+          routeWaypoint,
+          destination,
+        ]);
+        movement.setNavmeshSystem(navSystem as any);
+
+        const c = createTestCombatant({
+          id: 'npc-stale-route',
+          state: CombatantState.ADVANCING,
+          position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+          destinationPoint: destination.clone(),
+          simLane: 'high',
+          renderLane: 'culled',
+        });
+
+        // Frame 1: establish the cached route.
+        vi.spyOn(performance, 'now').mockReturnValue(0);
+        movement.resetPathQueryBudget();
+        movement.updateMovement(c, 0.016, new Map(), new Map(), {
+          disableSpacing: true,
+          disableTerrainSample: true,
+        });
+
+        // Frame 2 (same instant, so the waypoint-stall timeout does not fire):
+        // the destination jumped >5m, so the cached path is no longer "fresh".
+        c.destinationPoint = new THREE.Vector3(140, 0, 0);
+        movement.resetPathQueryBudget();
+        // Exhaust the per-frame query budget with throwaway NPCs first.
+        for (let i = 0; i < 6; i++) {
+          const filler = createTestCombatant({
+            id: `filler-${i}`,
+            state: CombatantState.ADVANCING,
+            position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+            destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 10 + i),
+            simLane: 'high',
+            renderLane: 'culled',
+          });
+          movement.updateMovement(filler, 0.016, new Map(), new Map(), {
+            disableSpacing: true,
+            disableTerrainSample: true,
+          });
+        }
+
+        // The NPC's path can't be re-queried this frame (budget gone), but it
+        // should keep steering along the cached waypoint (+z) instead of
+        // snapping to a direct push at the destination (+x).
+        c.velocity.set(0, 0, 0);
+        movement.updateMovement(c, 0.016, new Map(), new Map(), {
+          disableSpacing: true,
+          disableTerrainSample: true,
+        });
+
+        expect(Math.abs(c.velocity.z)).toBeGreaterThan(Math.abs(c.velocity.x));
+      });
+    });
+
+    describe('crowd dispersal on terminal hold (#1)', () => {
+      // The terminal 'hold' escalation is rare by design (every recovery layer
+      // tries to break a stall first), so the dispersal decision is exercised
+      // directly through its helper — the same cast-based seam the reroute tests
+      // use. It reads the friendly spacing force computed earlier in the tick;
+      // we seed that force to stand in for "a crowd on the +z side".
+      type DispersalHook = (
+        combatant: ReturnType<typeof createTestCombatant>,
+        now: number,
+      ) => boolean;
+      function callDispersal(
+        m: CombatantMovement,
+        c: ReturnType<typeof createTestCombatant>,
+        now: number,
+        spacingForce: THREE.Vector3,
+      ): boolean {
+        (m as unknown as { _spacingForce: THREE.Vector3 })._spacingForce.copy(spacingForce);
+        return (m as unknown as { tryAssignCrowdDispersal: DispersalHook }).tryAssignCrowdDispersal(c, now);
+      }
+
+      it('sends a crowded held NPC to a point away from the crowd and delays re-evaluation', () => {
+        const m = new CombatantMovement(mockTerrainRuntime());
+        const c = createTestCombatant({
+          id: 'npc-hold-disperse',
+          position: new THREE.Vector3(5, NPC_Y_OFFSET, 5),
+          destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+          lastZoneEvalTime: 0,
+          simLane: 'high',
+          renderLane: 'culled',
+        });
+        // Crowd on the +z side -> spacing force points -z (away from it).
+        const dispersed = callDispersal(m, c, 4242, new THREE.Vector3(0, 0, -1));
+
+        expect(dispersed).toBe(true);
+        expect(c.destinationPoint).toBeDefined();
+        const toDest = new THREE.Vector3()
+          .subVectors(c.destinationPoint as THREE.Vector3, c.position)
+          .setY(0);
+        // Dispersal heads in the away (-z) direction, beyond the patrol arrival
+        // radius (15m) so a leader does not immediately re-pick the contested zone.
+        expect(toDest.z).toBeLessThan(0);
+        expect(Math.abs(toDest.x)).toBeLessThan(1e-6);
+        expect(toDest.length()).toBeGreaterThan(15);
+        // Re-evaluation is delayed (stamped to now, not reset to 0).
+        expect(c.lastZoneEvalTime).toBe(4242);
+      });
+
+      it('does not disperse an isolated NPC (preserving the immediate unfreeze)', () => {
+        const m = new CombatantMovement(mockTerrainRuntime());
+        const c = createTestCombatant({
+          id: 'npc-hold-isolated',
+          position: new THREE.Vector3(5, NPC_Y_OFFSET, 5),
+          destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+          simLane: 'high',
+          renderLane: 'culled',
+        });
+        // No crowd -> spacing force ~0 -> nothing to disperse from.
+        const dispersed = callDispersal(m, c, 4242, new THREE.Vector3(0, 0, 0));
+        expect(dispersed).toBe(false);
+      });
+    });
+
+    describe('crowd-stall movement stagger (#4, opt-in)', () => {
+      function crowdStallTick() {
+        const m = new CombatantMovement(mockTerrainRuntime({ getHeightAt: pocketTerrain() }));
+        const c = createTestCombatant({
+          id: 'npc-stagger',
+          state: CombatantState.ADVANCING,
+          position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+          destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+          simLane: 'high',
+          renderLane: 'culled',
+        });
+        const neighbor = createTestCombatant({
+          id: 'npc-stagger-neighbor',
+          position: new THREE.Vector3(0, NPC_Y_OFFSET, 0.6),
+        });
+        const combatants = new Map([[c.id, c], [neighbor.id, neighbor]]);
+        const queryRadius = vi.fn(() => [c.id, neighbor.id]);
+        m.setSpatialGridManager({ queryRadius } as any);
+        return { m, c, combatants, queryRadius };
+      }
+
+      it('runs the full solve every tick when disabled (default)', () => {
+        const original = NpcLodConfig.crowdStallStaggerEnabled;
+        NpcLodConfig.crowdStallStaggerEnabled = false;
+        try {
+          const { m, c, combatants, queryRadius } = crowdStallTick();
+          vi.spyOn(performance, 'now').mockReturnValue(0);
+          m.updateMovement(c, 0.016, new Map(), combatants, {});
+          vi.spyOn(performance, 'now').mockReturnValue(16);
+          m.updateMovement(c, 0.016, new Map(), combatants, {});
+          // Spacing (a full-solve step) ran on both ticks.
+          expect(queryRadius.mock.calls.length).toBe(2);
+          expect(c.movementStaggerSkipNext).toBeFalsy();
+        } finally {
+          NpcLodConfig.crowdStallStaggerEnabled = original;
+        }
+      });
+
+      it('coasts the next tick for a crowd-stalled NPC when enabled', () => {
+        const original = NpcLodConfig.crowdStallStaggerEnabled;
+        NpcLodConfig.crowdStallStaggerEnabled = true;
+        try {
+          const { m, c, combatants, queryRadius } = crowdStallTick();
+          vi.spyOn(performance, 'now').mockReturnValue(0);
+          m.updateMovement(c, 0.016, new Map(), combatants, {});
+          // The full solve armed a coast tick for the contour-stalled crowd NPC.
+          expect(c.movementStaggerSkipNext).toBe(true);
+          const callsAfterFull = queryRadius.mock.calls.length;
+          vi.spyOn(performance, 'now').mockReturnValue(16);
+          m.updateMovement(c, 0.016, new Map(), combatants, {});
+          // Coast tick skipped the spacing grid query (and the terrain solve).
+          expect(queryRadius.mock.calls.length).toBe(callsAfterFull);
+          expect(c.movementStaggerSkipNext).toBe(false);
+        } finally {
+          NpcLodConfig.crowdStallStaggerEnabled = original;
+        }
+      });
     });
   });
 });
