@@ -203,7 +203,7 @@ See [docs/DIRECTIVES.md](DIRECTIVES.md).
 ## Current cycle
 
 - **Cycle:** (none — closed `cycle-2026-05-28-vehicles-aircraft-operable` on 2026-05-28; 7/8 tasks shipped, `hydrology-river-surface-fix` deferred owner-gated)
-- **Next:** see `docs/BACKLOG.md` for strategic-reserve candidates + the owner-gated queue; cycles are seeded via `/orchestrate` against a new brief.
+- **Next:** **Field Journal frontend wiring campaign is prepped (PAUSED).** See [`docs/CAMPAIGN_2026-06-03-field-journal-frontend.md`](CAMPAIGN_2026-06-03-field-journal-frontend.md) (design language: [`docs/FIELD_JOURNAL_UI.md`](FIELD_JOURNAL_UI.md)); dispatch Cycle 1 (`cycle-field-journal-foundation`) on go-ahead. Other candidates: `docs/BACKLOG.md` strategic-reserve + owner-gated queue; cycles are seeded via `/orchestrate` against a new brief.
 
 ### Tasks (DAG)
 

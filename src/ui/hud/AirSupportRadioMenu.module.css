@@ -67,7 +67,7 @@
 .summaryKey,
 .buttonMeta,
 .assetMeta {
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--font-primary);
   text-transform: uppercase;
   letter-spacing: 0;
   color: rgba(205, 196, 171, 0.64);
@@ -82,7 +82,7 @@
 
 .title {
   margin: 0;
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--font-primary);
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 0;
@@ -97,7 +97,7 @@
   border-radius: 6px;
   background: rgba(29, 32, 34, 0.86);
   color: rgba(240, 239, 235, 0.9);
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
@@ -124,7 +124,7 @@
 .summaryValue {
   overflow: hidden;
   color: rgba(243, 241, 233, 0.95);
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--font-primary);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0;
@@ -146,7 +146,7 @@
   border-radius: 6px;
   background: rgba(33, 38, 35, 0.76);
   color: rgba(243, 241, 233, 0.92);
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--font-primary);
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -195,7 +195,7 @@
 .assetLabel {
   overflow-wrap: anywhere;
   color: rgba(243, 241, 233, 0.96);
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--font-primary);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0;
@@ -204,7 +204,7 @@
 
 .assetStatus {
   color: rgba(92, 184, 92, 0.92);
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
@@ -238,7 +238,7 @@
 
 .statusText {
   color: rgba(243, 241, 233, 0.88);
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0;

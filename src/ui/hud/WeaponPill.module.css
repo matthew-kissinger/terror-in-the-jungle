@@ -1,20 +1,17 @@
 /**
- * WeaponPill - Compact mobile weapon indicator
+ * WeaponPill - Compact mobile weapon indicator (Field Journal).
  *
- * Replaces the 6-slot weapon bar with a minimal pill:
  *   [◂] AR 30/90 [▸]
  *
- * Modern 2026 aesthetic: solid dark fill, no borders, subtle glow.
+ * Ink chip with paper-light type, stamp-red switch highlight.
  */
 
 .pill {
   display: flex;
   align-items: center;
   gap: 0;
-  background:
-    linear-gradient(180deg, rgba(251, 191, 36, 0.08), transparent 70%),
-    rgba(15, 21, 14, 0.9);
-  border: 1px solid var(--ops-line);
+  background: rgba(43, 38, 32, 0.85);
+  border: 1px solid rgba(231, 217, 186, 0.4);
   border-radius: var(--radius-pill, 50px);
   padding: 3px 2px;
   pointer-events: auto;
@@ -23,7 +20,7 @@
   -webkit-user-select: none;
   min-width: 120px;
   height: 38px;
-  box-shadow: var(--ops-shadow);
+  box-shadow: 0 2px 6px rgba(43, 38, 32, 0.35);
 }
 
 .chevron {
@@ -35,7 +32,7 @@
   border-radius: 50%;
   background: transparent;
   border: none;
-  color: var(--ops-data);
+  color: rgba(231, 217, 186, 0.6);
   font-size: 20px;
   font-weight: bold;
   padding: 0;
@@ -47,8 +44,8 @@
 }
 
 .chevron:active {
-  background: rgba(251, 191, 36, 0.12);
-  color: var(--ops-accent-bright);
+  background: rgba(79, 107, 58, 0.25);
+  color: var(--paper-lt);
 }
 
 .info {
@@ -63,45 +60,42 @@
 }
 
 .weaponName {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ops-accent-bright);
+  font-size: 15px;
+  color: var(--paper-lt);
   letter-spacing: 0.5px;
-  text-shadow: var(--shadow-text);
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--type-stamp);
   line-height: 1;
 }
 
 .ammo {
   font-size: 12px;
   font-weight: 600;
-  color: var(--ops-data);
+  color: rgba(201, 183, 138, 0.9);
   font-variant-numeric: tabular-nums;
-  text-shadow: var(--shadow-text);
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--type);
   line-height: 1;
   transition: color var(--duration-fast, 150ms) ease;
 }
 
 .ammoSep {
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(231, 217, 186, 0.3);
   margin: 0 1px;
   font-weight: 400;
 }
 
 /* Ammo states */
-.low .ammo { color: var(--accent, #d97706); }
-.low .weaponName { color: rgba(255, 255, 255, 0.85); }
+.low .ammo { color: var(--warn); }
+.low .weaponName { color: var(--paper-lt); }
 
-.empty .ammo { color: var(--danger, #ef4444); }
-.empty .weaponName { color: rgba(255, 255, 255, 0.7); }
+.empty .ammo { color: var(--hot); }
+.empty .weaponName { color: rgba(231, 217, 186, 0.7); }
 
-.noAmmo .ammo { color: var(--critical, #dc2626); }
-.noAmmo .weaponName { color: rgba(255, 255, 255, 0.45); }
+.noAmmo .ammo { color: var(--hot); }
+.noAmmo .weaponName { color: rgba(231, 217, 186, 0.45); }
 
 /* On weapon cycle, brief highlight */
 .pill.switching {
-  box-shadow: var(--ops-glow);
+  box-shadow: 0 0 12px rgba(158, 59, 46, 0.4), 0 2px 6px rgba(43, 38, 32, 0.35);
 }
 
 /* Desktop: hidden (UnifiedWeaponBar handles desktop) */
@@ -109,7 +103,7 @@
   display: none;
 }
 
-/* Touch: passive ammo display only (under joystick zone at z-1000, not tappable).
+/* Touch: passive ammo display only (under joystick zone, not tappable).
  * Cycling is handled by the weapon cycler in TouchActionButtons. */
 :global([data-device="touch"]) .pill {
   pointer-events: none;
@@ -138,6 +132,6 @@
     font-size: 16px;
   }
 
-  .weaponName { font-size: 12px; }
+  .weaponName { font-size: 13px; }
   .ammo { font-size: 10px; }
 }

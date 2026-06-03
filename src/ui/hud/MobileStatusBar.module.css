@@ -1,7 +1,7 @@
 /**
- * MobileStatusBar - Compact merged status line for touch devices.
+ * MobileStatusBar - Compact merged status line for touch devices (Field Journal).
  *
- * Shows timer + tickets + K/D in a single horizontal pill at the top.
+ * Shows timer + tickets + K/D in a single horizontal ink chip at the top.
  * Hidden on desktop where separate components handle this info.
  */
 
@@ -9,45 +9,42 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background:
-    linear-gradient(180deg, rgba(251, 191, 36, 0.08), transparent 70%),
-    rgba(15, 21, 14, 0.88);
-  border: 1px solid var(--ops-line);
+  background: rgba(43, 38, 32, 0.85);
+  border: 1px solid rgba(231, 217, 186, 0.4);
   border-radius: var(--radius-pill, 50px);
   padding: 4px 12px;
   pointer-events: none;
   user-select: none;
-  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  font-family: var(--type);
   white-space: nowrap;
   overflow: hidden;
   max-width: calc(100vw - 32px);
   height: 28px;
-  box-shadow: var(--ops-shadow);
+  box-shadow: 0 2px 6px rgba(43, 38, 32, 0.35);
   justify-content: center;
 }
 
 .timer {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
-  color: var(--ops-accent-bright);
-  text-shadow: var(--shadow-text);
+  color: var(--paper-lt);
   letter-spacing: 0.5px;
   line-height: 1;
 }
 
 .timerWarning {
-  color: var(--accent, #d97706);
+  color: var(--warn);
 }
 
 .timerCritical {
-  color: var(--danger, #ef4444);
+  color: var(--hot);
   animation: statusPulse 1s ease-in-out infinite;
 }
 
 .dot {
   font-size: 6px;
-  color: var(--ops-line);
+  color: rgba(231, 217, 186, 0.4);
   line-height: 1;
 }
 
@@ -58,26 +55,24 @@
 }
 
 .us {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
-  color: var(--faction-us, #60a5fa);
-  text-shadow: var(--shadow-text);
+  color: #7d9a5a;
   line-height: 1;
 }
 
 .sep {
   font-size: 9px;
-  color: var(--ops-line);
+  color: rgba(231, 217, 186, 0.4);
   line-height: 1;
 }
 
 .opfor {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
-  color: var(--faction-opfor, #ef4444);
-  text-shadow: var(--shadow-text);
+  color: #cf6a52;
   line-height: 1;
 }
 
@@ -100,6 +95,6 @@
   }
 
   .timer, .us, .opfor {
-    font-size: 10px;
+    font-size: 11px;
   }
 }

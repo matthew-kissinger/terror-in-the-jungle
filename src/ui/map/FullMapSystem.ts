@@ -560,7 +560,7 @@ export class FullMapSystem implements GameSystem {
     // Zone name - adjust font size for readability
     const fontSize = Math.max(10, 12 / Math.sqrt(zoomLevel));
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = `bold ${fontSize}px Rajdhani`;
+    ctx.font = `bold ${fontSize}px "Courier Prime", monospace`;
     ctx.textAlign = 'center';
     ctx.fillText(zone.name, x, y - radius - 8);
   }
@@ -777,7 +777,7 @@ export class FullMapSystem implements GameSystem {
 
     const distanceMeters = Math.round(this.playerPosition.distanceTo(this.commandPosition));
     ctx.fillStyle = 'rgba(216, 236, 198, 0.92)';
-    ctx.font = `bold ${Math.max(10, 12 / Math.sqrt(this.inputHandler.getZoomLevel()))}px Rajdhani`;
+    ctx.font = `bold ${Math.max(10, 12 / Math.sqrt(this.inputHandler.getZoomLevel()))}px "Courier Prime", monospace`;
     ctx.textAlign = 'left';
     ctx.fillText(`${distanceMeters}m`, x + 14, y - 12);
   }
@@ -807,7 +807,7 @@ export class FullMapSystem implements GameSystem {
       // H letter
       const fontSize = Math.max(10, 12 / Math.sqrt(zoomLevel));
       ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.font = `bold ${fontSize}px Rajdhani`;
+      ctx.font = `bold ${fontSize}px "Courier Prime", monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('H', x, y);

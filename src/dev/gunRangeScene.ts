@@ -482,7 +482,7 @@ export class GunRangeScene {
       padding: '10px 12px',
       background: 'rgba(7, 9, 10, 0.72)',
       color: '#e7ffe0',
-      fontFamily: '"JetBrains Mono", Consolas, monospace',
+      fontFamily: '"Courier Prime", Consolas, monospace',
       fontSize: '12px',
       lineHeight: '1.45',
       whiteSpace: 'pre',

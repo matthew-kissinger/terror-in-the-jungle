@@ -34,31 +34,33 @@ export class ZoneCaptureNotification {
     }
 
     const notification = document.createElement('div');
-    const color = isCaptured ? 'rgba(92, 184, 92, 0.9)' : 'rgba(201, 86, 74, 0.9)';
-    const borderColor = isCaptured ? 'rgba(92, 184, 92, 0.4)' : 'rgba(201, 86, 74, 0.4)';
+    // Field-green = secured, stamp-red = lost. Lifted variants for legibility on the dark ink chip.
+    const color = isCaptured ? '#8aa86a' : '#cf6a55';
+    const borderColor = isCaptured ? 'rgba(79, 107, 58, 0.6)' : 'rgba(158, 59, 46, 0.6)';
     const text = isCaptured ? 'CAPTURED' : 'LOST';
 
     notification.style.cssText = `
       padding: 16px 36px;
-      background: rgba(8, 12, 18, 0.8);
+      background: rgba(43, 38, 32, 0.82);
       border: 1px solid ${borderColor};
-      border-radius: 4px;
+      border-radius: 3px;
       text-align: center;
       animation: zoneNotifyFadeIn 0.3s ease-out;
       backdrop-filter: blur(8px);
-      font-family: var(--font-primary, 'Rajdhani', sans-serif);
+      font-family: var(--type);
     `;
 
     notification.innerHTML = `
       <div style="
-        font-family: var(--font-heading, 'Teko', sans-serif);
+        font-family: var(--type-stamp);
         font-size: 28px;
         font-weight: 500;
-        color: ${color};
+        color: var(--paper-lt);
         margin-bottom: 6px;
         letter-spacing: 2px;
       ">ZONE ${zoneName}</div>
       <div style="
+        font-family: var(--type-stamp);
         font-size: 16px;
         font-weight: 700;
         color: ${color};

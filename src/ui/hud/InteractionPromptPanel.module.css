@@ -7,6 +7,7 @@
 
 .container {
   padding: var(--space-2-5) var(--space-5);
+  font-family: var(--type-stamp);
   font-size: var(--font-size-sm);
   font-weight: var(--weight-bold);
   color: var(--text-primary);
@@ -15,7 +16,7 @@
   letter-spacing: 0.5px;
   background: var(--surface-panel);
   border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   backdrop-filter: blur(6px);
   pointer-events: none;
   display: none;

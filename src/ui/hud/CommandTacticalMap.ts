@@ -352,7 +352,7 @@ export class CommandTacticalMap {
       }
 
       .command-tactical-map__title {
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--font-primary);
         font-size: 14px;
         font-weight: 700;
         letter-spacing: 0.08em;
@@ -361,7 +361,7 @@ export class CommandTacticalMap {
       }
 
       .command-tactical-map__detail {
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--font-primary);
         font-size: 12px;
         letter-spacing: 0.08em;
         text-transform: uppercase;

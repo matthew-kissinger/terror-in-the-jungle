@@ -314,7 +314,7 @@ export class FlightTestScene {
     panel.style.cssText =
       `position: fixed; ${positionCss} padding: 10px 14px;` +
       ' background: rgba(0,0,0,0.55);' +
-      ' font-family: JetBrains Mono, Consolas, monospace;' +
+      ' font-family: "Courier Prime", Consolas, monospace;' +
       ' line-height: 1.45; white-space: pre;' +
       ' pointer-events: none; z-index: 9998;';
     document.body.appendChild(panel);

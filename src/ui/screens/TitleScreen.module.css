@@ -1,5 +1,6 @@
 /**
- * TitleScreen - centered title + loading + buttons.
+ * TitleScreen — Field Journal menu sheet: manila panel, typewriter title,
+ * stamp + margin note, green-hatch loading bar. See docs/FIELD_JOURNAL_UI.md.
  */
 
 .screen {
@@ -24,37 +25,68 @@
 
 .heroPanel {
   position: relative;
-  overflow: hidden;
-  border: 1px solid var(--ops-line);
-  background: linear-gradient(180deg, rgba(19, 26, 18, 0.96), rgba(8, 12, 9, 0.92));
-  box-shadow: var(--ops-shadow);
-  padding: clamp(24px, 4vw, 48px);
-  max-width: 720px;
+  overflow: visible;
+  border: 1px solid var(--paper-edge);
+  background: linear-gradient(180deg, var(--paper-lt), var(--paper));
+  box-shadow: 0 12px 30px rgba(60, 48, 28, 0.28), 0 2px 0 rgba(255, 255, 255, 0.4) inset;
+  border-radius: var(--r);
+  padding: clamp(28px, 4vw, 48px);
+  max-width: 640px;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  transform: rotate(-0.5deg);
+}
+
+.eyebrow {
+  margin: 0 0 18px;
+  color: var(--ink-faint);
+  font-family: var(--type);
+  font-size: 12px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
 }
 
 .title {
   margin: 0;
-  color: #f6f0dd;
-  font-family: var(--font-heading);
-  font-size: clamp(3.2rem, 9vw, 7rem);
-  font-weight: 500;
-  line-height: 0.88;
-  letter-spacing: 0.06em;
+  color: var(--ink);
+  font-family: var(--type-stamp);
+  font-size: clamp(2.8rem, 9vw, 6rem);
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  text-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.3);
   animation: ui-fadeInUp 0.8s ease-out;
+}
+
+.tagline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 16px 0 4px;
+}
+
+.taglineText {
+  font-family: var(--type-stamp);
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+}
+
+.year {
+  color: var(--red);
 }
 
 .loadingSection {
   width: 100%;
   margin-top: var(--space-6);
   padding-top: var(--space-4);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px dashed var(--ink-faint);
 }
 
 .loadingHeader {
@@ -66,36 +98,36 @@
 }
 
 .loadingLabel {
-  color: var(--ops-accent-bright);
+  color: var(--red);
+  font-family: var(--type-stamp);
   font-size: var(--font-size-xs);
-  font-weight: var(--weight-semibold);
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .progressBar {
   width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
+  height: 16px;
+  background: rgba(43, 38, 32, 0.12);
+  border: 1.5px solid var(--ink);
+  border-radius: 8px;
   overflow: hidden;
   margin-bottom: var(--space-3);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, var(--ops-accent-dim), var(--ops-accent));
+  background: repeating-linear-gradient(45deg, var(--green) 0 8px, var(--green-dk) 8px 16px);
   transition: width 0.15s linear;
-  border-radius: 999px;
-  box-shadow: 0 0 18px rgba(245, 158, 11, 0.4);
+  border-radius: 8px;
 }
 
 .phaseText {
   min-height: 18px;
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
+  font-family: var(--type);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   opacity: 0.88;
@@ -118,6 +150,7 @@
 .startButton {
   composes: primaryButton from './ScreenPrimitives.module.css';
   min-width: 240px;
+  font-size: var(--font-size-lg);
 }
 
 .settingsLink {
@@ -139,14 +172,25 @@
 .preparingText {
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  background: rgba(245, 158, 11, 0.08);
-  color: #f8edd1;
+  border: 1px dashed var(--ink-faint);
+  background: rgba(231, 217, 186, 0.6);
+  color: var(--ink-soft);
   font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
+  font-family: var(--type);
   letter-spacing: 0.04em;
   line-height: 1.6;
   text-transform: uppercase;
+  border-radius: var(--r-sm);
+}
+
+.marginNote {
+  margin: 18px 0 0;
+  font-family: var(--hand);
+  color: var(--red-dk);
+  font-size: 22px;
+  line-height: 1.05;
+  transform: rotate(-2deg);
+  opacity: 0.9;
 }
 
 .errorPanel {
@@ -154,27 +198,28 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: linear-gradient(180deg, rgba(20, 10, 9, 0.98), rgba(10, 7, 7, 0.95));
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  background: linear-gradient(180deg, var(--paper-lt), var(--paper));
+  border: 2px solid var(--red);
+  box-shadow: 0 20px 40px rgba(60, 48, 28, 0.4);
   padding: var(--space-6) var(--space-8);
   max-width: 460px;
   width: 90%;
   z-index: var(--z-modal-overlay);
   animation: ui-scaleIn 0.3s ease-out;
+  border-radius: var(--r);
 }
 
 .errorTitle {
-  color: #fca5a5;
+  color: var(--red);
+  font-family: var(--type-stamp);
   font-size: var(--font-size-lg);
-  font-weight: var(--weight-semibold);
   margin-bottom: var(--space-3);
   text-transform: uppercase;
   text-align: center;
 }
 
 .errorMessage {
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--font-size-sm);
   line-height: 1.6;
   margin-bottom: var(--space-5);
@@ -194,26 +239,27 @@
 }
 
 .errorButtonPrimary {
-  border-color: rgba(248, 113, 113, 0.35);
-  color: #fca5a5;
+  border-color: var(--red);
+  border-bottom-style: solid;
+  color: var(--red);
 }
 
 .fullscreenPrompt {
   position: fixed;
   bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) rotate(-1deg);
   padding: var(--space-3) var(--space-5);
-  background: rgba(13, 19, 14, 0.95);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  border-radius: 8px;
-  color: #fde68a;
+  background: rgba(231, 217, 186, 0.92);
+  border: 1px dashed var(--red);
+  border-radius: var(--r-sm);
+  color: var(--red);
   cursor: pointer;
   touch-action: manipulation;
   pointer-events: auto;
   z-index: 10;
+  font-family: var(--type-stamp);
   font-size: 0.82rem;
-  font-weight: var(--weight-semibold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   transition: opacity 0.3s;
@@ -233,7 +279,7 @@
   }
 
   .title {
-    font-size: clamp(2.6rem, 15vw, 4.6rem);
+    font-size: clamp(2.4rem, 14vw, 4.4rem);
   }
 }
 
@@ -277,5 +323,9 @@
 
   .menuSection {
     margin-top: var(--space-3);
+  }
+
+  .marginNote {
+    display: none;
   }
 }

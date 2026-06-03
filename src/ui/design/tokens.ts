@@ -3,49 +3,56 @@
  * Import from here instead of hardcoding colors, z-indexes, sizes.
  */
 
+/**
+ * Field Journal palette (see docs/FIELD_JOURNAL_UI.md). Keys are stable — many
+ * JS-driven HUD components import them — only the values changed from the old
+ * amber/blue scheme. In-game HUD reads as pencil/ink on dark manila CHIPS, so
+ * the text tokens here are LIGHT (paper) and the glass tokens are dark ink: that
+ * keeps HUD modules legible over a bright battlefield (FJ pencil-on-acetate).
+ */
 export const colors = {
-  // Faction colors - muted military tones
-  us: '#5b8cc9',
-  usLight: '#7ba8dd',
-  usDark: '#3d6a9e',
-  opfor: '#c9564a',
-  opforLight: '#d97a70',
-  opforDark: '#a03a30',
+  // Faction colors — ALLIED = field green, HOSTILE = stamp red
+  us: '#4f6b3a',
+  usLight: '#6f8a52',
+  usDark: '#3a4f2a',
+  opfor: '#9e3b2e',
+  opforLight: '#b5472f',
+  opforDark: '#7c2c22',
 
   // UI chrome (loading screen / menus)
-  primary: '#7fb4d9',
-  secondary: '#5a8fb5',
-  accent: '#9fcfeb',
+  primary: '#2b2620',
+  secondary: '#5a5145',
+  accent: '#9e3b2e',
 
-  // Feedback - muted, not neon
-  success: '#5cb85c',
-  warning: '#d4a344',
-  danger: '#c9564a',
-  critical: '#b83a5e',
-  headshot: '#d4a344',
-  heal: '#6ab87a',
+  // Feedback
+  success: '#4f6b3a',
+  warning: '#a8742a',
+  danger: '#9e3b2e',
+  critical: '#7c2c22',
+  headshot: '#a8742a',
+  heal: '#4f6b3a',
 
-  // Text
-  textPrimary: '#d8dfe3',
-  textSecondary: '#9aa8b2',
-  textMuted: '#6b7780',
+  // Text — LIGHT, for HUD modules drawn on dark ink chips over the battlefield
+  textPrimary: '#e7d9ba',
+  textSecondary: '#c9b78a',
+  textMuted: '#8a7e6b',
 
-  // Glass backgrounds
-  glassBg: 'rgba(20, 35, 50, 0.4)',
-  glassBgDense: 'rgba(20, 35, 50, 0.9)',
-  glassBorder: 'rgba(127, 180, 217, 0.2)',
-  glassBorderBright: 'rgba(127, 180, 217, 0.3)',
+  // Chip backgrounds — dark ink so light HUD text reads over any backdrop
+  glassBg: 'rgba(43, 38, 32, 0.78)',
+  glassBgDense: 'rgba(43, 38, 32, 0.92)',
+  glassBorder: 'rgba(231, 217, 186, 0.4)',
+  glassBorderBright: 'rgba(231, 217, 186, 0.6)',
 
-  // HUD glass - slightly more visible for readability
-  hudGlass: 'rgba(8, 12, 18, 0.55)',
-  hudBorder: 'rgba(255, 255, 255, 0.08)',
+  // HUD chip
+  hudGlass: 'rgba(43, 38, 32, 0.78)',
+  hudBorder: 'rgba(231, 217, 186, 0.4)',
 
   // Buttons
-  buttonBg: 'rgba(90, 143, 181, 0.3)',
-  buttonHover: 'rgba(90, 143, 181, 0.5)',
+  buttonBg: 'rgba(158, 59, 46, 0.18)',
+  buttonHover: 'rgba(158, 59, 46, 0.32)',
 
   // TDM accent
-  tdmAccent: '#c9564a',
+  tdmAccent: '#9e3b2e',
 } as const;
 
 export const zIndex = {
@@ -104,7 +111,11 @@ export const breakpoints = {
 } as const;
 
 export const fontStack = {
-  ui: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif",
-  hud: "var(--font-primary, 'Rajdhani', sans-serif)",
-  mono: "var(--font-mono, 'JetBrains Mono', monospace)",
+  ui: "'Courier Prime', 'Courier New', monospace",
+  hud: "var(--type, 'Courier Prime', monospace)",
+  mono: "var(--type, 'Courier Prime', monospace)",
+  /** Special Elite — stamp/heading/big-numeral voice */
+  stamp: "var(--type-stamp, 'Special Elite', monospace)",
+  /** Caveat — handwritten margin notes / distances */
+  hand: "var(--hand, 'Caveat', cursive)",
 } as const;

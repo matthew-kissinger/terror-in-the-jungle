@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Field Journal — Terror in the Jungle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Special+Elite&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<!-- Paper grain / topo / vignette layers applied to <body> via CSS -->
+<div class="paper-grain" aria-hidden="true"></div>
+<div class="topo-lines" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<!-- BAKE-OFF corner link -->
+<a class="bakeoff-link" href="../index.html">&larr; BAKE-OFF</a>
+
+<!-- ============ PERSISTENT NAV (manila folder tabs) ============ -->
+<nav class="folder-tabs" aria-label="Screen switcher">
+  <button class="tab" data-screen="menu" aria-current="true">MENU</button>
+  <button class="tab" data-screen="modes">MODES</button>
+  <button class="tab" data-screen="deploy">DEPLOY</button>
+  <button class="tab" data-screen="combat">COMBAT</button>
+  <button class="tab" data-screen="loading">LOADING</button>
+</nav>
+
+<main class="screens">
+
+  <!-- ===================== SCREEN 1: MENU ===================== -->
+  <section class="screen screen--menu is-active" id="screen-menu" aria-label="Main menu">
+    <div class="menu-canvas-wrap" aria-hidden="true">
+      <!-- CSS/SVG ambient jungle ridge backdrop -->
+      <svg class="ridge-svg" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="skyFade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#e6d6b0" />
+            <stop offset="55%" stop-color="#d9c7a3" />
+            <stop offset="100%" stop-color="#cbb78d" />
+          </linearGradient>
+        </defs>
+        <rect width="1200" height="700" fill="url(#skyFade)" />
+        <path class="ridge ridge--far"  d="M0,360 L120,330 L260,372 L420,318 L560,366 L720,320 L880,372 L1040,330 L1200,366 L1200,700 L0,700 Z" />
+        <path class="ridge ridge--mid"  d="M0,440 L150,400 L320,452 L470,398 L640,456 L820,404 L980,458 L1120,410 L1200,448 L1200,700 L0,700 Z" />
+        <path class="ridge ridge--near" d="M0,540 L180,500 L360,548 L540,496 L720,556 L900,502 L1080,552 L1200,512 L1200,700 L0,700 Z" />
+      </svg>
+      <!-- hand-drawn palm silhouettes -->
+      <div class="palm palm--l"></div>
+      <div class="palm palm--r"></div>
+      <div class="menu-fog"></div>
+    </div>
+
+    <div class="menu-content">
+      <div class="paperclip" aria-hidden="true"></div>
+      <p class="menu-eyebrow">RECON FIELD BOOK · No. 4</p>
+      <h1 class="menu-title">Terror<span class="amp"> in the </span>Jungle</h1>
+      <div class="menu-tagline">
+        <span class="stamp stamp--classified" aria-hidden="true">CLASSIFIED</span>
+        <span class="tagline-text">A SHAU VALLEY <span class="ink-year">1968</span></span>
+      </div>
+
+      <div class="menu-actions">
+        <button class="btn btn--deploy" data-goto="deploy">
+          <span class="btn-stamp-ring" aria-hidden="true"></span>
+          DEPLOY
+        </button>
+        <button class="btn btn--ghost" data-goto="modes">SETTINGS</button>
+        <div class="menu-tertiary">
+          <button class="link-btn" data-goto="loading">CREDITS</button>
+          <span class="version-mark">v0.9</span>
+        </div>
+      </div>
+
+      <p class="margin-note margin-note--menu">"keep your head down &amp;<br/>your map dry." &mdash; R.</p>
+    </div>
+  </section>
+
+  <!-- ===================== SCREEN 2: MODES ===================== -->
+  <section class="screen screen--modes" id="screen-modes" aria-label="Select operation">
+    <header class="sheet-header">
+      <span class="tape tape--tl" aria-hidden="true"></span>
+      <h2 class="sheet-title">Select Operation</h2>
+      <p class="sheet-sub">OPERATIONS LOG &mdash; choose your tasking</p>
+    </header>
+
+    <div class="modes-grid">
+      <article class="op-card is-selected" tabindex="0">
+        <span class="op-clip" aria-hidden="true"></span>
+        <header class="op-head">
+          <h3 class="op-name">Zone Control</h3>
+          <span class="op-check" aria-hidden="true">SELECTED</span>
+        </header>
+        <p class="op-tag">Frontline capture, rapid redeploy</p>
+        <dl class="op-stats">
+          <div><dt>Tempo</dt><dd>Fast</dd></div>
+          <div><dt>Forces</dt><dd>60</dd></div>
+          <div><dt>Duration</dt><dd>3:00</dd></div>
+          <div><dt>Theater</dt><dd>Frontline</dd></div>
+        </dl>
+      </article>
+
+      <article class="op-card" tabindex="0">
+        <span class="op-clip" aria-hidden="true"></span>
+        <header class="op-head">
+          <h3 class="op-name">Open Frontier</h3>
+          <span class="op-check" aria-hidden="true">SELECT</span>
+        </header>
+        <p class="op-tag">Open-map pressure on contested ground</p>
+        <dl class="op-stats">
+          <div><dt>Tempo</dt><dd>Medium</dd></div>
+          <div><dt>Forces</dt><dd>120</dd></div>
+          <div><dt>Duration</dt><dd>15:00</dd></div>
+          <div><dt>Theater</dt><dd>Open map</dd></div>
+        </dl>
+      </article>
+
+      <article class="op-card" tabindex="0">
+        <span class="op-clip" aria-hidden="true"></span>
+        <header class="op-head">
+          <h3 class="op-name">Team Deathmatch</h3>
+          <span class="op-check" aria-hidden="true">SELECT</span>
+        </header>
+        <p class="op-tag">Close-quarters combat loop</p>
+        <dl class="op-stats">
+          <div><dt>Tempo</dt><dd>Very fast</dd></div>
+          <div><dt>Forces</dt><dd>30</dd></div>
+          <div><dt>Duration</dt><dd>5:00</dd></div>
+          <div><dt>Theater</dt><dd>Close quarters</dd></div>
+        </dl>
+      </article>
+
+      <article class="op-card op-card--campaign" tabindex="0">
+        <span class="op-clip" aria-hidden="true"></span>
+        <span class="stamp stamp--campaign" aria-hidden="true">CAMPAIGN</span>
+        <header class="op-head">
+          <h3 class="op-name">A Shau Valley</h3>
+          <span class="op-check" aria-hidden="true">SELECT</span>
+        </header>
+        <p class="op-tag">Warfront-scale campaign</p>
+        <dl class="op-stats">
+          <div><dt>Tempo</dt><dd>Escalating</dd></div>
+          <div><dt>Forces</dt><dd>3000</dd></div>
+          <div><dt>Duration</dt><dd>60:00</dd></div>
+          <div><dt>Theater</dt><dd>Valley campaign</dd></div>
+        </dl>
+      </article>
+    </div>
+
+    <div class="sheet-foot">
+      <button class="btn btn--ghost" data-goto="menu">BACK</button>
+      <button class="btn btn--deploy btn--sm" data-goto="deploy">
+        <span class="btn-stamp-ring" aria-hidden="true"></span>
+        CONFIRM TASKING
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================== SCREEN 3: DEPLOY (HERO) ===================== -->
+  <section class="screen screen--deploy" id="screen-deploy" aria-label="Deploy: map, spawn and loadout">
+    <div class="deploy-grid">
+
+      <!-- MAP COLUMN -->
+      <div class="deploy-map-col">
+        <header class="deploy-col-head">
+          <h2 class="col-title">Insertion Map</h2>
+          <span class="col-note">grid ref 48Q YD 09</span>
+        </header>
+
+        <div class="topo-map" role="group" aria-label="Spawn point map">
+          <!-- topo background -->
+          <svg class="topo-map-svg" viewBox="0 0 400 320" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <pattern id="mapGraph" width="20" height="20" patternUnits="userSpaceOnUse">
+                <path d="M20 0 L0 0 0 20" fill="none" stroke="#9c8a64" stroke-width="0.5" opacity="0.45"/>
+              </pattern>
+            </defs>
+            <rect width="400" height="320" fill="url(#mapGraph)" />
+            <!-- contour rings -->
+            <g class="contours" fill="none" stroke="#4f6b3a" stroke-width="1.1" opacity="0.5">
+              <path d="M70,120 C120,70 230,70 280,130 C320,180 250,250 170,240 C100,232 40,180 70,120 Z"/>
+              <path d="M95,135 C135,100 220,100 255,140 C285,180 235,225 170,218 C115,212 70,180 95,135 Z"/>
+              <path d="M120,150 C150,128 210,128 232,152 C255,180 220,205 172,200 C135,196 105,180 120,150 Z"/>
+            </g>
+            <!-- river -->
+            <path class="map-river" d="M-10,60 C90,90 140,40 220,90 C300,140 320,260 420,250" fill="none" stroke="#6b86a8" stroke-width="6" opacity="0.55" stroke-linecap="round"/>
+            <!-- hand route dashes -->
+            <path class="map-route" d="M60,270 C140,240 180,200 240,170 C290,145 320,110 350,70" fill="none" stroke="#9e3b2e" stroke-width="2" stroke-dasharray="3 7" stroke-linecap="round"/>
+          </svg>
+          <span class="coffee-ring" aria-hidden="true"></span>
+
+          <!-- spawn markers, positioned % -->
+          <button class="spawn is-selected" data-spawn="FIREBASE ALPHA" style="left:18%; top:78%;" data-status="secure">
+            <span class="spawn-dot"></span>
+            <span class="spawn-circle" aria-hidden="true"></span>
+            <span class="spawn-call">FIREBASE ALPHA</span>
+            <span class="spawn-hand">120m</span>
+          </button>
+          <button class="spawn" data-spawn="LZ BRAVO" style="left:62%; top:30%;" data-status="secure">
+            <span class="spawn-dot"></span>
+            <span class="spawn-circle" aria-hidden="true"></span>
+            <span class="spawn-call">LZ BRAVO</span>
+            <span class="spawn-hand">240m</span>
+          </button>
+          <button class="spawn" data-spawn="RIDGE OUTPOST" style="left:30%; top:24%;" data-status="contested">
+            <span class="spawn-dot"></span>
+            <span class="spawn-circle" aria-hidden="true"></span>
+            <span class="spawn-call">RIDGE OUTPOST</span>
+            <span class="spawn-hand">310m</span>
+          </button>
+          <button class="spawn" data-spawn="RIVER CROSSING" style="left:78%; top:62%;" data-status="contested">
+            <span class="spawn-dot"></span>
+            <span class="spawn-circle" aria-hidden="true"></span>
+            <span class="spawn-call">RIVER CROSSING</span>
+            <span class="spawn-hand">180m</span>
+          </button>
+          <button class="spawn spawn--hot" data-spawn="HILL 937" style="left:50%; top:52%;" data-status="hot">
+            <span class="spawn-dot"></span>
+            <span class="spawn-circle" aria-hidden="true"></span>
+            <span class="spawn-call">HILL 937</span>
+            <span class="spawn-hand">60m</span>
+          </button>
+        </div>
+
+        <!-- spawn list (legend) -->
+        <ul class="spawn-list" aria-label="Spawn points">
+          <li class="spawn-row is-selected" data-spawn-row="FIREBASE ALPHA">
+            <span class="sr-name">Firebase Alpha</span>
+            <span class="sr-status status--secure">Secure</span>
+            <span class="sr-dist">120m</span>
+          </li>
+          <li class="spawn-row" data-spawn-row="LZ BRAVO">
+            <span class="sr-name">LZ Bravo</span>
+            <span class="sr-status status--secure">Secure</span>
+            <span class="sr-dist">240m</span>
+          </li>
+          <li class="spawn-row" data-spawn-row="RIDGE OUTPOST">
+            <span class="sr-name">Ridge Outpost</span>
+            <span class="sr-status status--contested">Contested</span>
+            <span class="sr-dist">310m</span>
+          </li>
+          <li class="spawn-row" data-spawn-row="RIVER CROSSING">
+            <span class="sr-name">River Crossing</span>
+            <span class="sr-status status--contested">Contested</span>
+            <span class="sr-dist">180m</span>
+          </li>
+          <li class="spawn-row" data-spawn-row="HILL 937">
+            <span class="sr-name">Hill 937</span>
+            <span class="sr-status status--hot">Hot</span>
+            <span class="sr-dist">60m</span>
+          </li>
+        </ul>
+
+        <!-- vehicles -->
+        <div class="vehicles">
+          <span class="vehicles-label">Insert by</span>
+          <div class="vehicle-chips" role="group" aria-label="Deployment vehicle">
+            <button class="veh is-selected" data-veh="UH-1 HUEY">
+              <svg viewBox="0 0 32 18" class="veh-ico" aria-hidden="true"><path d="M2 9h22M6 5l4 4M24 9l4-3M14 9v-4h6M16 13v3h6" stroke="#2b2620" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>
+              UH-1 HUEY
+            </button>
+            <button class="veh" data-veh="F-4 PHANTOM">
+              <svg viewBox="0 0 32 18" class="veh-ico" aria-hidden="true"><path d="M2 9h26M12 9l-5-5M12 9l-5 5M20 9l4-3M20 9l4 3" stroke="#2b2620" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>
+              F-4 PHANTOM
+            </button>
+            <button class="veh" data-veh="M151 JEEP">
+              <svg viewBox="0 0 32 18" class="veh-ico" aria-hidden="true"><path d="M4 12h22M7 12V7h12l5 5M9 14a2 2 0 1 0 .1 0M22 14a2 2 0 1 0 .1 0" stroke="#2b2620" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>
+              M151 JEEP
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOADOUT COLUMN -->
+      <div class="deploy-load-col">
+        <header class="deploy-col-head">
+          <h2 class="col-title">Loadout Sheet</h2>
+          <span class="col-note">sign &amp; carry</span>
+        </header>
+
+        <div class="loadout">
+          <div class="slot" data-slot="primary">
+            <div class="slot-meta">
+              <span class="slot-label">Primary</span>
+              <span class="slot-pick">M16 Rifle</span>
+            </div>
+            <div class="slot-alts">
+              <span class="alt-lead">swap:</span>
+              <span class="alt">M14</span><span class="alt">M60 LMG</span><span class="alt">Shotgun</span><span class="alt">M79 Launcher</span>
+            </div>
+          </div>
+
+          <div class="slot" data-slot="secondary">
+            <div class="slot-meta">
+              <span class="slot-label">Secondary</span>
+              <span class="slot-pick">M1911 Pistol</span>
+            </div>
+            <div class="slot-alts">
+              <span class="alt-lead">swap:</span>
+              <span class="alt">Sawn-off</span><span class="alt">Flare gun</span>
+            </div>
+          </div>
+
+          <div class="slot" data-slot="equipment">
+            <div class="slot-meta">
+              <span class="slot-label">Equipment</span>
+              <span class="slot-pick">Medkit</span>
+            </div>
+            <div class="slot-alts">
+              <span class="alt-lead">swap:</span>
+              <span class="alt">Sandbags</span><span class="alt">Mortar</span><span class="alt">Radio</span>
+            </div>
+          </div>
+
+          <div class="slot" data-slot="explosive">
+            <div class="slot-meta">
+              <span class="slot-label">Explosive</span>
+              <span class="slot-pick">M67 Grenade <em>&times;3</em></span>
+            </div>
+            <div class="slot-alts">
+              <span class="alt-lead">swap:</span>
+              <span class="alt">Smoke</span><span class="alt">C4</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="deploy-action">
+          <div class="deploy-countdown">
+            <span class="cd-label">DEPLOY IN</span>
+            <span class="cd-time" id="deploy-countdown">0:08</span>
+          </div>
+          <button class="btn btn--deploy btn--big" data-goto="combat">
+            <span class="btn-stamp-ring" aria-hidden="true"></span>
+            DEPLOY
+          </button>
+          <button class="btn btn--ghost" data-goto="modes">BACK</button>
+        </div>
+        <p class="margin-note margin-note--deploy">Hill 937 is "hot" &mdash;<br/>go in low, fast.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SCREEN 4: COMBAT ===================== -->
+  <section class="screen screen--combat" id="screen-combat" aria-label="Combat HUD">
+    <div class="battlefield" aria-hidden="true">
+      <svg class="battle-svg" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="battleSky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ccba8e" />
+            <stop offset="60%" stop-color="#bda87c" />
+            <stop offset="100%" stop-color="#8f7d54" />
+          </linearGradient>
+        </defs>
+        <rect width="1200" height="700" fill="url(#battleSky)" />
+        <path d="M0,420 L200,380 L420,430 L640,378 L860,432 L1080,384 L1200,424 L1200,700 L0,700 Z" fill="#5d6b46" opacity="0.55"/>
+        <path d="M0,520 L240,480 L520,532 L760,484 L1020,536 L1200,496 L1200,700 L0,700 Z" fill="#42512f" opacity="0.7"/>
+        <g stroke="#2f3a22" stroke-width="4" opacity="0.5" stroke-linecap="round">
+          <path d="M180,700 L160,470"/><path d="M420,700 L450,500"/><path d="M820,700 L800,480"/><path d="M1010,700 L1040,500"/>
+        </g>
+      </svg>
+      <div class="battle-haze"></div>
+    </div>
+
+    <!-- pencil-on-acetate HUD overlay -->
+    <div class="hud">
+      <!-- top strip -->
+      <div class="hud-top">
+        <div class="hud-objective">
+          <span class="obj-label">OBJECTIVE</span>
+          <span class="obj-text">CAPTURE HILL 937</span>
+          <div class="obj-bar"><span class="obj-fill" style="width:64%"></span><span class="obj-pct">64%</span></div>
+        </div>
+        <div class="hud-timer">
+          <span class="timer-val">12:47</span>
+          <div class="tickets">
+            <span class="tk tk--allied">ALLIED <b>412</b></span>
+            <span class="tk tk--hostile">HOSTILE <b>388</b></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- kill feed -->
+      <ul class="killfeed">
+        <li><span class="kf-act">RECON-1</span> <span class="kf-wpn">M16</span> <span class="kf-vic">NVA REGULAR</span></li>
+        <li><span class="kf-act">DOC-3</span> <span class="kf-wpn">M60</span> <span class="kf-vic">NVA SAPPER</span></li>
+        <li><span class="kf-act">RECON-1</span> <span class="kf-wpn">M67</span> <span class="kf-vic">VC SCOUT</span></li>
+      </ul>
+
+      <!-- minimap + compass -->
+      <div class="hud-minimap">
+        <div class="compass"><span class="compass-needle"></span><span class="compass-head">047</span></div>
+        <svg class="mini-svg" viewBox="0 0 120 120" aria-hidden="true">
+          <rect width="120" height="120" fill="none"/>
+          <g stroke="#2b2620" stroke-width="0.6" opacity="0.4">
+            <path d="M0 30 H120 M0 60 H120 M0 90 H120 M30 0 V120 M60 0 V120 M90 0 V120"/>
+          </g>
+          <circle cx="60" cy="68" r="6" fill="#9e3b2e"/>
+          <circle cx="38" cy="44" r="3" fill="#4f6b3a"/>
+          <circle cx="82" cy="52" r="3" fill="#4f6b3a"/>
+          <circle cx="74" cy="86" r="3" fill="#2b2620"/>
+          <path d="M60 68 L60 50" stroke="#2b2620" stroke-width="1.4"/>
+        </svg>
+        <span class="mini-label">SECTOR 7</span>
+      </div>
+
+      <!-- center crosshair + hit marker -->
+      <div class="crosshair" aria-hidden="true">
+        <span class="ch ch--t"></span><span class="ch ch--b"></span>
+        <span class="ch ch--l"></span><span class="ch ch--r"></span>
+        <span class="hit-marker"></span>
+      </div>
+
+      <!-- bottom: vitals -->
+      <div class="hud-bottom">
+        <div class="vital vital--health">
+          <span class="vital-label">HEALTH</span>
+          <div class="vital-bar"><span class="vital-fill vf--health" style="width:78%"></span></div>
+          <span class="vital-num">78<span class="vital-max">/100</span></span>
+        </div>
+        <div class="vital vital--ammo">
+          <span class="vital-label">M16 · AMMO</span>
+          <span class="vital-num vital-num--ammo">24<span class="vital-max">/120</span></span>
+          <span class="vital-gren">GRENADE &times;3</span>
+        </div>
+      </div>
+
+      <!-- MOBILE touch controls (shown at phone bp or via toggle) -->
+      <div class="touch-controls" id="touch-controls">
+        <div class="joystick" aria-hidden="true"><span class="joy-knob"></span></div>
+        <div class="fire-cluster" aria-hidden="true">
+          <button class="tbtn tbtn--ads">ADS</button>
+          <button class="tbtn tbtn--reload">RLD</button>
+          <button class="tbtn tbtn--gren">GRN</button>
+          <button class="tbtn tbtn--fire">FIRE</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="mobile-toggle" id="mobile-toggle" aria-pressed="false">MOBILE</button>
+  </section>
+
+  <!-- ===================== SCREEN 5: LOADING ===================== -->
+  <section class="screen screen--loading" id="screen-loading" aria-label="Loading">
+    <div class="load-sheet">
+      <span class="tape tape--load" aria-hidden="true"></span>
+      <span class="stamp stamp--deploying" aria-hidden="true">DEPLOYING</span>
+      <h2 class="load-title">Mobilizing</h2>
+      <p class="load-sub">Standby for insertion &mdash; preparing the valley</p>
+
+      <div class="load-bar-wrap">
+        <div class="load-bar"><span class="load-fill" id="load-fill" style="width:62%"></span></div>
+        <span class="load-pct" id="load-pct">62%</span>
+      </div>
+
+      <ul class="phase-list">
+        <li class="phase is-done"><span class="ph-tick">&#10003;</span> Initializing</li>
+        <li class="phase is-done"><span class="ph-tick">&#10003;</span> Terrain</li>
+        <li class="phase is-done"><span class="ph-tick">&#10003;</span> Shaders</li>
+        <li class="phase is-current"><span class="ph-tick">&#9656;</span> Models</li>
+        <li class="phase"><span class="ph-tick">&middot;</span> Audio</li>
+        <li class="phase"><span class="ph-tick">&middot;</span> Ready</li>
+      </ul>
+
+      <p class="load-tip"><span class="tip-key">FIELD NOTE</span> <span id="load-tip-text">Suppressing fire pins the enemy in place.</span></p>
+    </div>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

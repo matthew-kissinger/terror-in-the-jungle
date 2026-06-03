@@ -1,80 +1,45 @@
 /**
- * Layer 1: Primitive Design Tokens
+ * Layer 1: Primitive Design Tokens — FIELD JOURNAL
  * Raw palette values named by what they ARE, not what they mean.
- * Never reference these directly in components - use theme.css semantic tokens.
+ * Never reference these directly in components — use theme.css semantic tokens.
+ *
+ * Field Journal: a recon scout's hand-kept field book. Manila paper, typewriter
+ * ink, faded rubber-stamp red, topo green. See docs/FIELD_JOURNAL_UI.md.
  */
 
 :root {
-  /* --- Jungle darks --- */
-  --color-jungle-950: #0a0f08;
-  --color-jungle-900: #151d10;
-  --color-jungle-800: #1e2a16;
-  --color-jungle-700: #2d3d22;
-  --color-jungle-600: #3f5530;
+  /* --- Paper (manila surfaces) --- */
+  --paper: #d9c7a3;
+  --paper-lt: #e7d9ba;
+  --paper-dk: #c4b186;
+  --paper-edge: #b09a6b;
 
-  /* --- Olive --- */
-  --color-olive-700: #4a6332;
-  --color-olive-600: #5a7a3e;
-  --color-olive-500: #6b904a;
-  --color-olive-400: #8aad5e;
-  --color-olive-300: #a8c87a;
+  /* --- Ink (typewriter text) --- */
+  --ink: #2b2620;
+  --ink-soft: #5a5145;
+  --ink-faint: #8a7e6b;
 
-  /* --- Steel (blue-grey) --- */
-  --color-steel-900: #1a1f2e;
-  --color-steel-800: #252d3e;
-  --color-steel-700: #333d50;
-  --color-steel-600: #4a5568;
-  --color-steel-500: #64748b;
-  --color-steel-400: #94a3b8;
-  --color-steel-300: #cbd5e1;
-  --color-steel-200: #e2e8f0;
+  /* --- Stamp red (accent / danger / hostile) --- */
+  --red: #9e3b2e;
+  --red-dk: #7c2c22;
 
-  /* --- Amber --- */
-  --color-amber-700: #92400e;
-  --color-amber-600: #b45309;
-  --color-amber-500: #d97706;
-  --color-amber-400: #f59e0b;
-  --color-amber-300: #fbbf24;
-  --color-amber-200: #fde68a;
+  /* --- Field green (secure / success / allied) --- */
+  --green: #4f6b3a;
+  --green-dk: #3a4f2a;
 
-  /* --- Crimson --- */
-  --color-crimson-800: #7f1d1d;
-  --color-crimson-700: #991b1b;
-  --color-crimson-600: #dc2626;
-  --color-crimson-500: #ef4444;
-  --color-crimson-400: #f87171;
-  --color-crimson-300: #fca5a5;
+  /* --- Status extremes --- */
+  --hot: #b5472f;
+  --warn: #a8742a;
 
-  /* --- Cerulean (blue) --- */
-  --color-cerulean-800: #1e3a5f;
-  --color-cerulean-700: #1d4ed8;
-  --color-cerulean-600: #3b82f6;
-  --color-cerulean-500: #60a5fa;
-  --color-cerulean-400: #93c5fd;
-  --color-cerulean-300: #bfdbfe;
+  /* --- Material --- */
+  --tape: rgba(225, 214, 180, 0.62);
+  --shadow: rgba(43, 38, 32, 0.3);
 
-  /* --- Green (success/squad) --- */
-  --color-green-600: #16a34a;
-  --color-green-500: #22c55e;
-  --color-green-400: #4ade80;
-  --color-green-300: #86efac;
-
-  /* --- Neutral --- */
-  --color-neutral-950: #0a0a0a;
-  --color-neutral-900: #171717;
-  --color-neutral-800: #262626;
-  --color-neutral-700: #404040;
-  --color-neutral-600: #525252;
-  --color-neutral-500: #737373;
-  --color-neutral-400: #a3a3a3;
-  --color-neutral-300: #d4d4d4;
-  --color-neutral-200: #e5e5e5;
-  --color-neutral-100: #f5f5f5;
-  --color-neutral-50: #fafafa;
-
-  /* --- White / Black --- */
-  --color-white: #ffffff;
-  --color-black: #000000;
+  /* --- Field Journal radii + layout --- */
+  --r-sm: 2px;
+  --r: 3px;
+  --tab-h: 46px;
+  --maxw: 1280px;
 
   /* --- Typography scale (fluid) --- */
   --font-size-2xs: clamp(0.5625rem, 1vw, 0.625rem);
@@ -102,12 +67,12 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
-  /* --- Border radius --- */
+  /* --- Border radius (legacy scale; FJ surfaces use --r / --r-sm) --- */
   --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  --radius-2xl: 20px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+  --radius-2xl: 6px;
   --radius-pill: 50px;
   --radius-full: 50%;
 

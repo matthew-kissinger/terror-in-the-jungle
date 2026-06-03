@@ -68,28 +68,28 @@ export class WeaponSwitchFeedback {
         font-size: 20px;
         font-weight: 700;
         margin-bottom: 4px;
-        color: rgba(220, 225, 230, 0.7);
+        color: rgba(231, 217, 186, 0.7);
       }
 
       .weapon-switch-name {
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--type-stamp);
         font-size: 18px;
         font-weight: 700;
-        color: rgba(220, 225, 230, 0.9);
+        color: rgba(231, 217, 186, 0.95);
         text-transform: uppercase;
         letter-spacing: 1.5px;
-        background: rgba(8, 12, 18, 0.6);
+        background: rgba(43, 38, 32, 0.78);
         padding: 6px 18px;
-        border-radius: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        border: 1px solid rgba(231, 217, 186, 0.4);
         backdrop-filter: blur(6px);
       }
 
       .weapon-switch-ammo {
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--type);
         font-size: 13px;
         font-weight: 600;
-        color: rgba(220, 225, 230, 0.55);
+        color: rgba(231, 217, 186, 0.6);
         margin-top: 4px;
       }
 

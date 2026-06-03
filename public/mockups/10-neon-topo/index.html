@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Terror in the Jungle — Neon Topo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-screen="menu">
+
+  <!-- ============ AMBIENT TOPO BACKDROP (global, behind everything) ============ -->
+  <div class="topo-field" aria-hidden="true">
+    <svg class="topo-svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="glowCyan" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#36E0C8" stop-opacity="0.55" />
+          <stop offset="100%" stop-color="#36E0C8" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="glowMag" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#FF4D9D" stop-opacity="0.45" />
+          <stop offset="100%" stop-color="#FF4D9D" stop-opacity="0" />
+        </radialGradient>
+      </defs>
+      <g class="contour-stack" stroke="#36E0C8" fill="none">
+        <path d="M-50 220 Q 360 120 720 230 T 1490 200" />
+        <path d="M-50 300 Q 360 200 720 310 T 1490 280" />
+        <path d="M-50 380 Q 360 280 720 390 T 1490 360" />
+        <path d="M-50 470 Q 360 360 720 480 T 1490 450" />
+        <path d="M-50 560 Q 360 450 720 570 T 1490 540" />
+        <path d="M-50 650 Q 360 540 720 660 T 1490 630" />
+        <path d="M-50 740 Q 360 630 720 750 T 1490 720" />
+      </g>
+      <g class="contour-stack contour-stack--mag" stroke="#FF4D9D" fill="none">
+        <path d="M-50 180 Q 420 320 820 180 T 1490 240" />
+        <path d="M-50 420 Q 420 560 820 420 T 1490 480" />
+        <path d="M-50 680 Q 420 820 820 680 T 1490 740" />
+      </g>
+      <circle class="blob blob--cyan" cx="280" cy="640" r="320" fill="url(#glowCyan)" />
+      <circle class="blob blob--mag" cx="1120" cy="240" r="300" fill="url(#glowMag)" />
+    </svg>
+    <div class="scanlines"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <!-- ============ TOP NAV / SCREEN SWITCHER ============ -->
+  <header class="nav" role="navigation" aria-label="Screen switcher">
+    <div class="nav__brand">
+      <span class="nav__glyph" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22"><path d="M2 22 Q 9 6 16 16 T 30 12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2 28 Q 9 14 16 22 T 30 20" fill="none" stroke="currentColor" stroke-width="2" opacity="0.5"/></svg>
+      </span>
+      <span class="nav__brandtext">NEON&nbsp;TOPO</span>
+    </div>
+    <nav class="seg" id="seg">
+      <button class="seg__btn is-active" data-go="menu"><span>01</span>MENU</button>
+      <button class="seg__btn" data-go="modes"><span>02</span>MODES</button>
+      <button class="seg__btn" data-go="deploy"><span>03</span>DEPLOY</button>
+      <button class="seg__btn" data-go="combat"><span>04</span>COMBAT</button>
+      <button class="seg__btn" data-go="loading"><span>05</span>LOADING</button>
+      <span class="seg__ink" id="segInk"></span>
+    </nav>
+    <a class="nav__bakeoff" href="../index.html">&larr; BAKE-OFF</a>
+  </header>
+
+  <main class="stage">
+
+    <!-- ============================================================ SCREEN 1: MENU -->
+    <section class="screen screen--menu is-active" id="screen-menu" aria-label="Main menu">
+      <div class="menu">
+        <div class="menu__eyebrow">
+          <span class="dot"></span> OPS-PLANNING TERMINAL &middot; ONLINE
+        </div>
+        <h1 class="menu__title">
+          <span class="menu__line">TERROR</span>
+          <span class="menu__line menu__line--mid">IN THE</span>
+          <span class="menu__line menu__line--accent">JUNGLE</span>
+        </h1>
+        <p class="menu__tagline"><span class="tick"></span> A SHAU VALLEY &mdash; 1968</p>
+
+        <div class="menu__actions">
+          <button class="btn btn--primary" data-go="modes">
+            <span class="btn__label">DEPLOY</span>
+            <span class="btn__sub">ENTER OPERATION</span>
+            <span class="btn__chev" aria-hidden="true">&rsaquo;</span>
+          </button>
+          <button class="btn btn--ghost" data-go="loading">
+            <span class="btn__label">SETTINGS</span>
+          </button>
+        </div>
+
+        <div class="menu__foot">
+          <button class="link link--credits" data-go="loading">CREDITS</button>
+          <span class="menu__ver">BUILD&nbsp;<b>v0.9</b></span>
+        </div>
+      </div>
+
+      <aside class="menu__panel" aria-hidden="true">
+        <div class="hud-card hud-card--readout">
+          <div class="hud-card__head"><span>SECTOR SCAN</span><span class="mono">21.0 KM</span></div>
+          <svg class="radar" viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="92" class="radar__ring"/>
+            <circle cx="100" cy="100" r="62" class="radar__ring"/>
+            <circle cx="100" cy="100" r="32" class="radar__ring"/>
+            <line x1="100" y1="8" x2="100" y2="192" class="radar__cross"/>
+            <line x1="8" y1="100" x2="192" y2="100" class="radar__cross"/>
+            <g class="radar__sweep"><path d="M100 100 L100 8 A92 92 0 0 1 168 50 Z"/></g>
+            <circle cx="138" cy="74" r="3.5" class="radar__blip radar__blip--allied"/>
+            <circle cx="72" cy="132" r="3.5" class="radar__blip radar__blip--hostile"/>
+            <circle cx="120" cy="146" r="3.5" class="radar__blip radar__blip--hostile"/>
+          </svg>
+          <div class="hud-card__rows mono">
+            <div><span>ALLIED</span><b class="c-allied">412</b></div>
+            <div><span>HOSTILE</span><b class="c-hostile">388</b></div>
+            <div><span>WEATHER</span><b>HUMID</b></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ============================================================ SCREEN 2: MODES -->
+    <section class="screen screen--modes" id="screen-modes" aria-label="Operation select">
+      <div class="screen__head">
+        <h2 class="screen__title">SELECT&nbsp;OPERATION</h2>
+        <p class="screen__hint mono">// CHOOSE ENGAGEMENT PROFILE</p>
+      </div>
+
+      <div class="modes__grid" id="modesGrid">
+        <!-- card 1 selected -->
+        <button class="mode is-selected" data-mode="0">
+          <div class="mode__bg" aria-hidden="true"></div>
+          <div class="mode__top">
+            <span class="mode__idx mono">OP&middot;01</span>
+            <span class="mode__sel">SELECTED</span>
+          </div>
+          <h3 class="mode__name">ZONE CONTROL</h3>
+          <p class="mode__tag">Frontline capture, rapid redeploy</p>
+          <div class="mode__stats">
+            <div><span>TEMPO</span><b>Fast</b></div>
+            <div><span>FORCES</span><b>60</b></div>
+            <div><span>DURATION</span><b>3:00</b></div>
+            <div><span>THEATER</span><b>Frontline</b></div>
+          </div>
+        </button>
+
+        <button class="mode" data-mode="1">
+          <div class="mode__bg" aria-hidden="true"></div>
+          <div class="mode__top">
+            <span class="mode__idx mono">OP&middot;02</span>
+            <span class="mode__sel">SELECT</span>
+          </div>
+          <h3 class="mode__name">OPEN FRONTIER</h3>
+          <p class="mode__tag">Open-map pressure on contested ground</p>
+          <div class="mode__stats">
+            <div><span>TEMPO</span><b>Medium</b></div>
+            <div><span>FORCES</span><b>120</b></div>
+            <div><span>DURATION</span><b>15:00</b></div>
+            <div><span>THEATER</span><b>Open map</b></div>
+          </div>
+        </button>
+
+        <button class="mode" data-mode="2">
+          <div class="mode__bg" aria-hidden="true"></div>
+          <div class="mode__top">
+            <span class="mode__idx mono">OP&middot;03</span>
+            <span class="mode__sel">SELECT</span>
+          </div>
+          <h3 class="mode__name">TEAM DEATHMATCH</h3>
+          <p class="mode__tag">Close-quarters combat loop</p>
+          <div class="mode__stats">
+            <div><span>TEMPO</span><b>Very fast</b></div>
+            <div><span>FORCES</span><b>30</b></div>
+            <div><span>DURATION</span><b>5:00</b></div>
+            <div><span>THEATER</span><b>Close quarters</b></div>
+          </div>
+        </button>
+
+        <button class="mode mode--campaign" data-mode="3">
+          <div class="mode__bg" aria-hidden="true"></div>
+          <div class="mode__top">
+            <span class="mode__idx mono">OP&middot;04</span>
+            <span class="mode__sel">SELECT</span>
+          </div>
+          <h3 class="mode__name">A SHAU VALLEY</h3>
+          <p class="mode__tag">Warfront-scale campaign</p>
+          <div class="mode__stats">
+            <div><span>TEMPO</span><b>Escalating</b></div>
+            <div><span>FORCES</span><b>3000</b></div>
+            <div><span>DURATION</span><b>60:00</b></div>
+            <div><span>THEATER</span><b>Valley campaign</b></div>
+          </div>
+          <span class="mode__flag">CAMPAIGN</span>
+        </button>
+      </div>
+
+      <div class="screen__cta">
+        <button class="btn btn--ghost" data-go="menu"><span class="btn__label">&lsaquo; BACK</span></button>
+        <button class="btn btn--primary" data-go="deploy">
+          <span class="btn__label">CONFIRM OP</span>
+          <span class="btn__chev" aria-hidden="true">&rsaquo;</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ============================================================ SCREEN 3: DEPLOY (HERO) -->
+    <section class="screen screen--deploy" id="screen-deploy" aria-label="Deployment planning">
+      <div class="screen__head screen__head--deploy">
+        <div>
+          <h2 class="screen__title">DEPLOYMENT</h2>
+          <p class="screen__hint mono">// ZONE CONTROL &middot; A SHAU VALLEY</p>
+        </div>
+        <div class="deploy__count">
+          <span class="deploy__countlabel mono">DEPLOY IN</span>
+          <span class="deploy__counttime" id="countdown">0:08</span>
+        </div>
+      </div>
+
+      <div class="deploy__grid">
+
+        <!-- MAP -->
+        <div class="panel panel--map">
+          <div class="panel__bar">
+            <span class="panel__title">TACTICAL MAP</span>
+            <span class="panel__meta mono">GRID 4&times;4 &middot; 5 LZ</span>
+          </div>
+          <div class="map" id="map">
+            <svg class="map__svg" viewBox="0 0 400 320" preserveAspectRatio="xMidYMid slice">
+              <g class="map__contours" fill="none" stroke="#36E0C8">
+                <path d="M-20 60 Q 120 10 220 70 T 420 50"/>
+                <path d="M-20 110 Q 120 60 220 120 T 420 100"/>
+                <path d="M-20 165 Q 120 115 220 175 T 420 155"/>
+                <path d="M-20 220 Q 120 170 220 230 T 420 210"/>
+                <path d="M-20 275 Q 120 225 220 285 T 420 265"/>
+              </g>
+              <path class="map__river" d="M40 -10 Q 120 90 90 180 T 160 330" fill="none"/>
+              <!-- capturable zones -->
+              <circle class="zone zone--allied" cx="92" cy="120" r="26"/>
+              <circle class="zone zone--contested" cx="250" cy="92" r="30"/>
+              <circle class="zone zone--hostile" cx="320" cy="232" r="34"/>
+              <g class="map__sweep"><path d="M200 160 L200 -40 A200 200 0 0 1 360 40 Z"/></g>
+            </svg>
+
+            <!-- spawn markers (positioned via CSS %) -->
+            <button class="spawn is-selected" data-spawn="0" style="--x:23%;--y:38%" data-status="secure">
+              <span class="spawn__pin"></span>
+              <span class="spawn__tip"><b>FIREBASE ALPHA</b><i>Secure &middot; 120m</i></span>
+            </button>
+            <button class="spawn" data-spawn="1" style="--x:62%;--y:29%" data-status="secure">
+              <span class="spawn__pin"></span>
+              <span class="spawn__tip"><b>LZ BRAVO</b><i>Secure &middot; 240m</i></span>
+            </button>
+            <button class="spawn" data-spawn="2" style="--x:80%;--y:73%" data-status="contested">
+              <span class="spawn__pin"></span>
+              <span class="spawn__tip"><b>RIDGE OUTPOST</b><i>Contested &middot; 310m</i></span>
+            </button>
+            <button class="spawn" data-spawn="3" style="--x:30%;--y:62%" data-status="contested">
+              <span class="spawn__pin"></span>
+              <span class="spawn__tip"><b>RIVER CROSSING</b><i>Contested &middot; 180m</i></span>
+            </button>
+            <button class="spawn" data-spawn="4" style="--x:52%;--y:84%" data-status="hot">
+              <span class="spawn__pin"></span>
+              <span class="spawn__tip"><b>HILL 937</b><i>Hot &middot; 60m</i></span>
+            </button>
+
+            <div class="map__legend mono">
+              <span><i class="lg lg--secure"></i>SECURE</span>
+              <span><i class="lg lg--contested"></i>CONTESTED</span>
+              <span><i class="lg lg--hot"></i>HOT</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SPAWN LIST -->
+        <div class="panel panel--spawns">
+          <div class="panel__bar">
+            <span class="panel__title">SPAWN POINT</span>
+            <span class="panel__meta mono" id="spawnMeta">FIREBASE ALPHA</span>
+          </div>
+          <ul class="spawnlist" id="spawnlist">
+            <li class="srow is-selected" data-spawn="0" data-status="secure">
+              <span class="srow__name">FIREBASE ALPHA</span>
+              <span class="srow__status">SECURE</span>
+              <span class="srow__dist mono">120m</span>
+            </li>
+            <li class="srow" data-spawn="1" data-status="secure">
+              <span class="srow__name">LZ BRAVO</span>
+              <span class="srow__status">SECURE</span>
+              <span class="srow__dist mono">240m</span>
+            </li>
+            <li class="srow" data-spawn="2" data-status="contested">
+              <span class="srow__name">RIDGE OUTPOST</span>
+              <span class="srow__status">CONTESTED</span>
+              <span class="srow__dist mono">310m</span>
+            </li>
+            <li class="srow" data-spawn="3" data-status="contested">
+              <span class="srow__name">RIVER CROSSING</span>
+              <span class="srow__status">CONTESTED</span>
+              <span class="srow__dist mono">180m</span>
+            </li>
+            <li class="srow" data-spawn="4" data-status="hot">
+              <span class="srow__name">HILL 937</span>
+              <span class="srow__status">HOT</span>
+              <span class="srow__dist mono">60m</span>
+            </li>
+          </ul>
+
+          <div class="panel__bar panel__bar--sub">
+            <span class="panel__title">INSERTION VEHICLE</span>
+          </div>
+          <div class="vehicles" id="vehicles">
+            <button class="veh is-selected" data-veh="0">
+              <span class="veh__ico" aria-hidden="true">
+                <svg viewBox="0 0 40 40"><path d="M4 20h26m-6-6 12 6-12 6M14 12v16" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="14" cy="20" r="6" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>
+              </span>
+              <span class="veh__txt"><b>UH-1 HUEY</b><i>Transport</i></span>
+            </button>
+            <button class="veh" data-veh="1">
+              <span class="veh__ico" aria-hidden="true">
+                <svg viewBox="0 0 40 40"><path d="M6 22 22 14l12 2-4 6-22 4z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M16 22v8M24 22v6" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>
+              </span>
+              <span class="veh__txt"><b>F-4 PHANTOM</b><i>Close air</i></span>
+            </button>
+            <button class="veh" data-veh="2">
+              <span class="veh__ico" aria-hidden="true">
+                <svg viewBox="0 0 40 40"><path d="M4 24h32l-4-8H10z" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="28" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="28" cy="28" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>
+              </span>
+              <span class="veh__txt"><b>M151 JEEP</b><i>Ground</i></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- LOADOUT -->
+        <div class="panel panel--loadout">
+          <div class="panel__bar">
+            <span class="panel__title">HOLO-KIT &middot; LOADOUT</span>
+            <span class="panel__meta mono">TAP TO SWAP</span>
+          </div>
+          <div class="kit" id="kit">
+
+            <div class="slot is-active" data-slot="primary">
+              <div class="slot__head">
+                <span class="slot__role mono">PRIMARY</span>
+                <span class="slot__swap">SWAP</span>
+              </div>
+              <div class="slot__pick">
+                <span class="slot__glyph" aria-hidden="true">
+                  <svg viewBox="0 0 64 24"><path d="M2 12h40l4-4h12v4h-6l-2 4H30l-4 4h-6v-4H2z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                </span>
+                <span class="slot__name">M16 RIFLE</span>
+              </div>
+              <div class="slot__alts mono">M14 &middot; M60 LMG &middot; SHOTGUN &middot; M79</div>
+            </div>
+
+            <div class="slot" data-slot="secondary">
+              <div class="slot__head">
+                <span class="slot__role mono">SECONDARY</span>
+                <span class="slot__swap">SWAP</span>
+              </div>
+              <div class="slot__pick">
+                <span class="slot__glyph" aria-hidden="true">
+                  <svg viewBox="0 0 64 24"><path d="M10 8h30v6h-6l-2 6h-6l2-6H10z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                </span>
+                <span class="slot__name">M1911 PISTOL</span>
+              </div>
+              <div class="slot__alts mono">SAWN-OFF &middot; FLARE GUN</div>
+            </div>
+
+            <div class="slot" data-slot="equipment">
+              <div class="slot__head">
+                <span class="slot__role mono">EQUIPMENT</span>
+                <span class="slot__swap">SWAP</span>
+              </div>
+              <div class="slot__pick">
+                <span class="slot__glyph" aria-hidden="true">
+                  <svg viewBox="0 0 32 24"><rect x="6" y="6" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16 9v8M12 13h8" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                </span>
+                <span class="slot__name">MEDKIT</span>
+              </div>
+              <div class="slot__alts mono">SANDBAGS &middot; MORTAR &middot; RADIO</div>
+            </div>
+
+            <div class="slot" data-slot="explosive">
+              <div class="slot__head">
+                <span class="slot__role mono">EXPLOSIVE</span>
+                <span class="slot__swap">SWAP</span>
+              </div>
+              <div class="slot__pick">
+                <span class="slot__glyph" aria-hidden="true">
+                  <svg viewBox="0 0 32 24"><circle cx="15" cy="15" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19 8l4-3M19 8l3 1" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+                </span>
+                <span class="slot__name">M67 GRENADE <em class="slot__qty">&times;3</em></span>
+              </div>
+              <div class="slot__alts mono">SMOKE &middot; C4</div>
+            </div>
+
+          </div>
+
+          <div class="deploy__action">
+            <button class="btn btn--ghost btn--back" data-go="modes"><span class="btn__label">&lsaquo; BACK</span></button>
+            <button class="btn btn--primary btn--deploy" data-go="combat">
+              <span class="btn__label">DEPLOY</span>
+              <span class="btn__sub" id="deploySub">FIREBASE ALPHA &middot; UH-1 HUEY</span>
+              <span class="btn__pulse" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================ SCREEN 4: COMBAT -->
+    <section class="screen screen--combat" id="screen-combat" aria-label="Combat HUD">
+      <div class="battle" aria-hidden="true">
+        <svg class="battle__svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+          <g class="battle__contours" fill="none" stroke="#36E0C8">
+            <path d="M-50 540 Q 360 440 720 560 T 1490 520"/>
+            <path d="M-50 620 Q 360 520 720 640 T 1490 600"/>
+            <path d="M-50 710 Q 360 610 720 730 T 1490 690"/>
+            <path d="M-50 800 Q 360 700 720 820 T 1490 780"/>
+          </g>
+        </svg>
+        <div class="battle__horizon"></div>
+        <div class="battle__haze"></div>
+      </div>
+
+      <!-- top bar -->
+      <div class="hud hud--top">
+        <div class="tickets">
+          <div class="tk tk--allied"><span class="mono">ALLIED</span><b>412</b></div>
+          <div class="tk__timer">
+            <span class="mono">MATCH</span><b id="matchTimer">12:47</b>
+          </div>
+          <div class="tk tk--hostile"><b>388</b><span class="mono">HOSTILE</span></div>
+        </div>
+      </div>
+
+      <!-- objective -->
+      <div class="hud hud--objective">
+        <div class="obj">
+          <div class="obj__row">
+            <span class="obj__tag mono">OBJECTIVE</span>
+            <span class="obj__name">CAPTURE HILL 937</span>
+            <span class="obj__pct mono">64%</span>
+          </div>
+          <div class="obj__bar"><span style="width:64%"></span></div>
+        </div>
+      </div>
+
+      <!-- compass -->
+      <div class="hud hud--compass">
+        <div class="compass">
+          <div class="compass__strip" id="compassStrip">
+            <span>N</span><span>03</span><span>06</span><span class="lit">E</span><span>12</span><span>15</span><span>S</span><span>21</span><span>24</span><span>W</span><span>30</span><span>33</span><span>N</span>
+          </div>
+          <div class="compass__needle"></div>
+          <div class="compass__read mono">047</div>
+        </div>
+      </div>
+
+      <!-- kill feed -->
+      <div class="hud hud--feed">
+        <div class="feed">
+          <div class="feed__row"><span class="feed__a">RECON-1</span><i class="feed__w mono">M16</i><span class="feed__b">NVA REGULAR</span></div>
+          <div class="feed__row"><span class="feed__a">DELTA-3</span><i class="feed__w mono">M60</i><span class="feed__b">NVA SAPPER</span></div>
+          <div class="feed__row"><span class="feed__a">YOU</span><i class="feed__w mono">M67</i><span class="feed__b">VC SCOUT</span></div>
+        </div>
+      </div>
+
+      <!-- minimap -->
+      <div class="hud hud--minimap">
+        <div class="minimap">
+          <svg viewBox="0 0 120 120">
+            <g fill="none" stroke="#36E0C8" opacity="0.5">
+              <path d="M-10 30 Q 40 10 70 36 T 130 28"/>
+              <path d="M-10 60 Q 40 40 70 66 T 130 58"/>
+              <path d="M-10 90 Q 40 70 70 96 T 130 88"/>
+            </g>
+            <circle cx="84" cy="40" r="10" class="mm-zone mm-zone--hostile"/>
+            <circle cx="40" cy="78" r="9" class="mm-zone mm-zone--allied"/>
+            <g class="mm-sweep"><path d="M60 60 L60 -10 A70 70 0 0 1 116 18 Z"/></g>
+            <polygon points="60,52 66,68 60,63 54,68" class="mm-player"/>
+          </svg>
+          <span class="minimap__label mono">937</span>
+        </div>
+      </div>
+
+      <!-- center crosshair + hitmarker -->
+      <div class="hud hud--reticle">
+        <div class="reticle">
+          <span class="reticle__l reticle__l--t"></span>
+          <span class="reticle__l reticle__l--r"></span>
+          <span class="reticle__l reticle__l--b"></span>
+          <span class="reticle__l reticle__l--l"></span>
+          <span class="reticle__dot"></span>
+          <span class="reticle__hit" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <!-- bottom-left vitals -->
+      <div class="hud hud--vitals">
+        <div class="vital vital--hp">
+          <div class="vital__ring">
+            <svg viewBox="0 0 64 64">
+              <circle cx="32" cy="32" r="27" class="vring__bg"/>
+              <circle cx="32" cy="32" r="27" class="vring__fg" style="--p:78"/>
+            </svg>
+            <span class="vital__num">78</span>
+          </div>
+          <span class="vital__lbl mono">HEALTH</span>
+        </div>
+      </div>
+
+      <!-- bottom-right ammo -->
+      <div class="hud hud--ammo">
+        <div class="ammo">
+          <span class="ammo__wpn mono">M16</span>
+          <div class="ammo__big"><b>24</b><span class="mono">/120</span></div>
+          <div class="ammo__gren mono">GRENADE <b>&times;3</b></div>
+        </div>
+      </div>
+
+      <!-- MOBILE CONTROLS (shown at phone breakpoint, or via toggle) -->
+      <div class="touch" id="touchLayer" aria-hidden="true">
+        <div class="joy">
+          <span class="joy__ring"></span>
+          <span class="joy__nub"></span>
+        </div>
+        <div class="tbtns">
+          <button class="tbtn tbtn--ads">ADS</button>
+          <button class="tbtn tbtn--reload">RLD</button>
+          <button class="tbtn tbtn--gren">NADE</button>
+          <button class="tbtn tbtn--fire">FIRE</button>
+        </div>
+      </div>
+
+      <button class="mobtoggle" id="mobToggle" title="Toggle mobile controls">
+        <span class="mono">MOBILE</span><span class="mobtoggle__state" id="mobState">OFF</span>
+      </button>
+    </section>
+
+    <!-- ============================================================ SCREEN 5: LOADING -->
+    <section class="screen screen--loading" id="screen-loading" aria-label="Loading">
+      <div class="loading">
+        <div class="loading__brand">
+          <span class="loading__glyph" aria-hidden="true">
+            <svg viewBox="0 0 60 60"><path d="M4 40 Q 16 10 30 28 T 56 22" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M4 50 Q 16 20 30 38 T 56 32" fill="none" stroke="currentColor" stroke-width="2.4" opacity="0.5"/></svg>
+          </span>
+          <div>
+            <h2 class="loading__title">PREPARING THEATER</h2>
+            <p class="loading__sub mono">A SHAU VALLEY &middot; ZONE CONTROL</p>
+          </div>
+        </div>
+
+        <div class="loading__barwrap">
+          <div class="loading__barmeta mono">
+            <span>LOADING &middot; <b id="loadPhase">MODELS</b></span>
+            <span id="loadPct">62%</span>
+          </div>
+          <div class="loading__bar">
+            <span class="loading__fill" id="loadFill" style="width:62%"></span>
+            <span class="loading__shine"></span>
+          </div>
+        </div>
+
+        <ol class="phases" id="phases">
+          <li class="phase is-done"><span class="phase__mk"></span>INITIALIZING</li>
+          <li class="phase is-done"><span class="phase__mk"></span>TERRAIN</li>
+          <li class="phase is-done"><span class="phase__mk"></span>SHADERS</li>
+          <li class="phase is-current"><span class="phase__mk"></span>MODELS</li>
+          <li class="phase"><span class="phase__mk"></span>AUDIO</li>
+          <li class="phase"><span class="phase__mk"></span>READY</li>
+        </ol>
+
+        <div class="loading__tip">
+          <span class="loading__tiptag mono">FIELD INTEL</span>
+          <p id="tipText">Suppressing fire pins the enemy in place.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -32,11 +32,9 @@
 /* --- Shared panel base --- */
 .panel {
   width: 60px;
-  background:
-    linear-gradient(180deg, rgba(120, 180, 255, 0.08), transparent 70%),
-    rgba(15, 21, 14, 0.92);
-  border: 1px solid var(--ops-line);
-  border-radius: var(--radius-md);
+  background: rgba(43, 38, 32, 0.85);
+  border: 1px solid rgba(231, 217, 186, 0.4);
+  border-radius: var(--r);
   box-shadow: var(--ops-shadow);
   display: flex;
   flex-direction: column;
@@ -54,11 +52,12 @@
 .elevationValue {
   font-size: var(--font-size-sm);
   font-weight: var(--weight-bold);
-  color: var(--text-primary);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
   text-align: center;
-  background: rgba(120, 180, 255, 0.08);
+  background: rgba(43, 38, 32, 0.78);
   padding: var(--space-1) var(--space-1-5);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   min-width: 40px;
   font-variant-numeric: tabular-nums;
 }
@@ -66,7 +65,8 @@
 .dataLabel {
   font-size: var(--font-size-3xs);
   font-weight: var(--weight-semibold);
-  color: var(--ops-data);
+  color: rgba(231, 217, 186, 0.5);
+  font-family: var(--type-stamp);
   text-align: center;
   margin-top: var(--space-1);
   text-transform: uppercase;
@@ -80,22 +80,23 @@
 .airspeedValue {
   font-size: var(--font-size-sm);
   font-weight: var(--weight-bold);
-  color: var(--text-primary);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
   text-align: center;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(43, 38, 32, 0.78);
   padding: var(--space-1) var(--space-1-5);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   min-width: 40px;
   font-variant-numeric: tabular-nums;
 }
 
 .airspeedStall {
-  color: var(--danger);
-  background: rgba(201, 120, 74, 0.15);
+  color: var(--hot);
+  background: rgba(181, 71, 47, 0.25);
 }
 
 .airspeedWarning {
-  color: var(--accent);
+  color: var(--warn);
 }
 
 /* --- Heading section --- */
@@ -107,14 +108,16 @@
 .headingLabel {
   font-size: var(--font-size-sm);
   font-weight: var(--weight-bold);
-  color: var(--text-primary);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
   min-width: 18px;
   text-align: center;
 }
 
 .headingDegrees {
   font-size: var(--font-size-3xs);
-  color: var(--ops-data);
+  color: rgba(201, 183, 138, 0.9);
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
 }
 
@@ -148,7 +151,8 @@
 .vsiValue {
   font-size: var(--font-size-2xs);
   font-weight: var(--weight-bold);
-  color: var(--text-primary);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
   min-width: 24px;
   text-align: center;
@@ -172,7 +176,8 @@
 
 .instrumentLabel {
   font-size: 8px;
-  color: var(--ops-data);
+  color: rgba(231, 217, 186, 0.5);
+  font-family: var(--type-stamp);
   text-align: center;
   margin-bottom: 2px;
   text-transform: uppercase;
@@ -185,10 +190,10 @@
 .thrustBar {
   width: 12px;
   height: 30px;
-  border: 1px solid var(--ops-line);
+  border: 1px solid rgba(231, 217, 186, 0.4);
   position: relative;
   border-radius: 2px;
-  background: rgba(7, 10, 8, 0.7);
+  background: rgba(43, 38, 32, 0.6);
 }
 
 .touchMode .thrustBar {
@@ -206,15 +211,15 @@
 }
 
 .thrustNormal {
-  background: linear-gradient(to top, var(--success), rgba(106, 184, 122, 0.85));
+  background: repeating-linear-gradient(45deg, var(--green) 0 6px, var(--green-dk) 6px 12px);
 }
 
 .thrustMedium {
-  background: linear-gradient(to top, var(--accent), rgba(212, 180, 68, 0.85));
+  background: repeating-linear-gradient(45deg, var(--warn) 0 6px, #8a5f22 6px 12px);
 }
 
 .thrustHigh {
-  background: linear-gradient(to top, var(--danger), rgba(201, 120, 74, 0.85));
+  background: repeating-linear-gradient(45deg, var(--hot) 0 6px, var(--red-dk) 6px 12px);
 }
 
 /* Status indicators (Auto-level) */
@@ -228,15 +233,16 @@
 .statusBox {
   width: 24px;
   height: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(231, 217, 186, 0.3);
   border-radius: 2px;
-  background: rgba(100, 100, 100, 0.2);
+  background: rgba(43, 38, 32, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 7px;
   font-weight: var(--weight-bold);
   color: var(--text-muted);
+  font-family: var(--type-stamp);
   text-transform: uppercase;
   transition: background var(--duration-fast) var(--ease-out),
               border-color var(--duration-fast) var(--ease-out),
@@ -244,16 +250,16 @@
 }
 
 .statusBoxActive {
-  color: var(--text-primary);
-  background: rgba(92, 184, 92, 0.35);
-  border-color: var(--success);
+  color: var(--paper-lt);
+  background: rgba(79, 107, 58, 0.45);
+  border-color: var(--green);
 }
 
 /* --- Stall warning --- */
 .stallWarning {
   display: none;
-  background: rgba(201, 60, 40, 0.25);
-  border-color: var(--danger);
+  background: rgba(181, 71, 47, 0.3);
+  border-color: var(--hot);
 }
 
 .stallWarningVisible {
@@ -261,14 +267,15 @@
 }
 
 .phaseCueVisible {
-  background: rgba(212, 180, 68, 0.18);
-  border-color: var(--accent);
+  background: rgba(168, 116, 42, 0.22);
+  border-color: var(--warn);
 }
 
 .stallText {
   font-size: var(--font-size-xs);
   font-weight: var(--weight-bold);
-  color: var(--danger);
+  color: var(--hot);
+  font-family: var(--type-stamp);
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -276,11 +283,12 @@
 }
 
 .stallTextCritical {
-  color: var(--danger);
+  color: var(--hot);
 }
 
 .stallTextCue {
-  color: var(--accent);
+  color: var(--warn);
+  font-family: var(--type-stamp);
   letter-spacing: 0.6px;
   animation: none;
 }
@@ -307,18 +315,18 @@
 .mouseIcon {
   width: 20px;
   height: 26px;
-  border: 2px solid var(--ops-data);
+  border: 2px solid rgba(231, 217, 186, 0.5);
   border-radius: 8px 8px 12px 12px;
   position: relative;
   margin-bottom: var(--space-1);
-  background: rgba(120, 180, 255, 0.05);
+  background: rgba(43, 38, 32, 0.4);
   transition: border-color var(--duration-fast) var(--ease-out),
               background var(--duration-fast) var(--ease-out);
 }
 
 .mouseIconFreeLook {
   border-color: var(--ops-accent);
-  background: rgba(120, 180, 255, 0.12);
+  background: rgba(158, 59, 46, 0.2);
 }
 
 .mouseWheel {
@@ -328,14 +336,15 @@
   transform: translateX(-50%);
   width: 2px;
   height: 6px;
-  background: var(--ops-data);
+  background: rgba(231, 217, 186, 0.7);
   border-radius: 1px;
 }
 
 .mouseStatus {
   font-size: var(--font-size-3xs);
   font-weight: var(--weight-bold);
-  color: var(--text-primary);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
   text-align: center;
   text-transform: uppercase;
   line-height: 1.2;
@@ -364,8 +373,8 @@
 .damageBarOuter {
   flex: 1;
   height: 6px;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(43, 38, 32, 0.6);
+  border: 1px solid rgba(231, 217, 186, 0.25);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -376,14 +385,15 @@
   transition: width 0.2s ease, background 0.3s ease;
 }
 
-.damageGreen { background: var(--success); }
-.damageAmber { background: var(--accent); }
-.damageRed { background: var(--danger); }
+.damageGreen { background: repeating-linear-gradient(45deg, var(--green) 0 6px, var(--green-dk) 6px 12px); }
+.damageAmber { background: repeating-linear-gradient(45deg, var(--warn) 0 6px, #8a5f22 6px 12px); }
+.damageRed { background: repeating-linear-gradient(45deg, var(--hot) 0 6px, var(--red-dk) 6px 12px); }
 
 .damageValue {
   font-size: var(--font-size-3xs);
   font-weight: var(--weight-bold);
-  color: var(--text-primary);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
   min-width: 24px;
   text-align: right;

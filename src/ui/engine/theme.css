@@ -1,119 +1,136 @@
 /**
- * Layer 2: Semantic Design Tokens
+ * Layer 2: Semantic Design Tokens — FIELD JOURNAL
  * Contextual meaning referencing primitives.
  * Components reference THESE tokens, never Layer 1 directly.
+ *
+ * The signature palette: manila paper surfaces, typewriter ink text, faded
+ * stamp-red accent, field-green secure/allied. See docs/FIELD_JOURNAL_UI.md.
  */
 
 @import './primitives.css';
 
 :root {
-  /* === Fonts === */
-  --font-heading: 'Teko', 'Rajdhani', sans-serif;
-  --font-primary: 'Rajdhani', -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'Courier New', monospace;
+  /* === Fonts (Field Journal: typewriter + margin hand) === */
+  --type: 'Courier Prime', 'Courier New', monospace;
+  --type-stamp: 'Special Elite', 'Courier New', monospace;
+  --hand: 'Caveat', 'Comic Sans MS', cursive;
+  /* Semantic font-role aliases → FJ faces. Components reference these
+     (--font-heading / --font-primary / --font-mono) rather than the raw faces. */
+  --font-heading: var(--type-stamp);
+  --font-primary: var(--type);
+  --font-mono: var(--type);
 
-  /* === Surfaces === */
-  --surface-void: var(--color-jungle-950);
-  --surface-base: var(--color-neutral-950);
-  --surface-panel: rgba(10, 15, 8, 0.75);
-  --surface-panel-hover: rgba(10, 15, 8, 0.85);
-  --surface-glass: rgba(10, 15, 8, 0.6);
+  /* === Surfaces (manila paper) === */
+  --surface-void: var(--paper-dk);
+  --surface-base: var(--paper);
+  --surface-panel: var(--paper-lt);
+  --surface-panel-hover: #f0e4c6;
+  --surface-glass: var(--paper-lt);
   --surface-hud: transparent;
-  --surface-overlay: rgba(0, 0, 0, 0.85);
+  --surface-overlay: rgba(43, 38, 32, 0.82);
 
-  /* === Text === */
-  --text-primary: var(--color-steel-200);
-  --text-secondary: var(--color-steel-400);
-  --text-muted: rgba(255, 255, 255, 0.4);
-  --text-inverse: var(--color-neutral-950);
+  /* === Text (ink on paper) === */
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-soft);
+  --text-muted: var(--ink-faint);
+  --text-inverse: var(--paper-lt);
 
-  /* === Faction colors === */
-  --faction-us: var(--color-cerulean-500);
-  --faction-us-dim: var(--color-cerulean-600);
-  --faction-us-bg: rgba(59, 130, 246, 0.15);
-  --faction-opfor: var(--color-crimson-500);
-  --faction-opfor-dim: var(--color-crimson-600);
-  --faction-opfor-bg: rgba(239, 68, 68, 0.15);
-  --faction-squad: var(--color-green-400);
-  --faction-neutral: var(--color-neutral-300);
+  /* === Faction colors: ALLIED = field green, HOSTILE = stamp red === */
+  --faction-us: var(--green);
+  --faction-us-dim: var(--green-dk);
+  --faction-us-bg: rgba(79, 107, 58, 0.16);
+  --faction-opfor: var(--red);
+  --faction-opfor-dim: var(--red-dk);
+  --faction-opfor-bg: rgba(158, 59, 46, 0.14);
+  --faction-squad: var(--green);
+  --faction-neutral: var(--ink-soft);
 
   /* === Game state === */
-  --health-full: var(--color-green-400);
-  --health-mid: var(--color-amber-300);
-  --health-low: var(--color-crimson-500);
-  --health-critical: var(--color-crimson-600);
+  --health-full: var(--green);
+  --health-mid: var(--warn);
+  --health-low: var(--red);
+  --health-critical: var(--red-dk);
 
-  --ammo-normal: var(--text-primary);
-  --ammo-low: var(--color-amber-300);
-  --ammo-empty: var(--color-crimson-500);
+  --ammo-normal: var(--ink);
+  --ammo-low: var(--warn);
+  --ammo-empty: var(--red);
 
   /* === Feedback === */
-  --feedback-success: var(--color-green-400);
-  --feedback-warning: var(--color-amber-300);
-  --feedback-danger: var(--color-crimson-500);
-  --feedback-critical: var(--color-crimson-600);
-  --feedback-headshot: var(--color-amber-300);
+  --feedback-success: var(--green);
+  --feedback-warning: var(--warn);
+  --feedback-danger: var(--red);
+  --feedback-critical: var(--red-dk);
+  --feedback-headshot: var(--warn);
 
-  /* === Accent (amber - objectives, active states, UI highlights) === */
-  --accent: var(--color-amber-500);
-  --accent-bright: var(--color-amber-400);
-  --accent-dim: var(--color-amber-600);
-  --accent-bg: rgba(217, 119, 6, 0.15);
+  /* Bare semantic aliases — referenced directly by several HUD components
+     (AmmoDisplay, GrenadeMeter, StatsPanel, vehicle HUDs, …). Previously
+     undefined, so those states silently inherited; define them to FJ. */
+  --danger: var(--red);
+  --success: var(--green);
+  --warning: var(--warn);
+  --critical: var(--red-dk);
+  --heal: var(--green);
 
-  /* === Borders === */
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-default: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.2);
-  --border-accent: var(--accent);
+  /* === Accent (the signature stamp red) === */
+  --accent: var(--red);
+  --accent-bright: var(--hot);
+  --accent-dim: var(--red-dk);
+  --accent-bg: rgba(158, 59, 46, 0.12);
 
-  /* === Shadows === */
-  --shadow-text: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.5);
-  --shadow-panel: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-glow-accent: 0 0 12px rgba(217, 119, 6, 0.3);
-  --shadow-glow-danger: 0 0 12px rgba(239, 68, 68, 0.3);
+  /* === Borders (paper edges, ink rules) === */
+  --border-subtle: var(--paper-edge);
+  --border-default: var(--paper-edge);
+  --border-strong: var(--ink-faint);
+  --border-accent: var(--red);
 
-  /* === Glass effects === */
-  --glass-blur: blur(8px);
-  --glass-saturate: saturate(120%);
+  /* === Shadows (paper lift + emboss; hard stamp offsets) === */
+  --shadow-text: 0 1px 0 rgba(255, 255, 255, 0.35);
+  --shadow-panel: 0 2px 8px var(--shadow);
+  --shadow-glow-accent: 2px 2px 0 rgba(124, 44, 34, 0.35);
+  --shadow-glow-danger: 2px 2px 0 rgba(124, 44, 34, 0.4);
+
+  /* === "Glass" effects — paper is opaque; blur is a near-noop === */
+  --glass-blur: blur(0px);
+  --glass-saturate: saturate(100%);
 
   /* === Buttons === */
-  --button-bg: rgba(217, 119, 6, 0.2);
-  --button-bg-hover: rgba(217, 119, 6, 0.35);
-  --button-bg-active: rgba(217, 119, 6, 0.5);
-  --button-secondary-bg: rgba(255, 255, 255, 0.05);
-  --button-secondary-bg-hover: rgba(255, 255, 255, 0.1);
+  --button-bg: var(--paper-lt);
+  --button-bg-hover: #f0e4c6;
+  --button-bg-active: var(--paper-dk);
+  --button-secondary-bg: rgba(231, 217, 186, 0.5);
+  --button-secondary-bg-hover: rgba(240, 228, 198, 0.8);
 
-  /* === Screen / Menu chrome (amber/military) === */
-  --screen-accent: #c9952e;
-  --screen-accent-dim: #a07828;
-  --screen-accent-bright: #e8c46a;
-  --screen-glass: rgba(10, 14, 12, 0.55);
-  --screen-glass-dense: rgba(10, 14, 12, 0.95);
-  --screen-glass-border: rgba(200, 170, 80, 0.12);
-  --screen-glass-border-bright: rgba(200, 170, 80, 0.3);
-  --screen-danger: #d97a70;
-  --screen-tdm-accent: #c9564a;
+  /* === Screen / Menu chrome === */
+  --screen-accent: var(--red);
+  --screen-accent-dim: var(--red-dk);
+  --screen-accent-bright: var(--hot);
+  --screen-glass: rgba(231, 217, 186, 0.86);
+  --screen-glass-dense: var(--paper-lt);
+  --screen-glass-border: var(--paper-edge);
+  --screen-glass-border-bright: var(--ink-faint);
+  --screen-danger: var(--red);
+  --screen-tdm-accent: var(--red);
 
   /* === Operations table screen language === */
-  --ops-accent: var(--color-amber-400);
-  --ops-accent-bright: var(--color-amber-200);
-  --ops-accent-dim: var(--color-amber-600);
-  --ops-olive: var(--color-olive-300);
-  --ops-data: var(--color-steel-300);
-  --ops-line: rgba(168, 200, 122, 0.18);
-  --ops-line-strong: rgba(251, 191, 36, 0.34);
-  --ops-panel: rgba(15, 21, 14, 0.92);
-  --ops-panel-strong: rgba(18, 25, 17, 0.96);
-  --ops-panel-muted: rgba(10, 14, 10, 0.84);
-  --ops-map-surface: rgba(9, 13, 10, 0.96);
-  --ops-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
-  --ops-glow: 0 10px 28px rgba(245, 158, 11, 0.18);
-  --ops-warning: var(--color-amber-300);
-  --ops-danger: var(--color-crimson-400);
+  --ops-accent: var(--red);
+  --ops-accent-bright: var(--hot);
+  --ops-accent-dim: var(--red-dk);
+  --ops-olive: var(--green);
+  --ops-data: var(--ink);
+  --ops-line: rgba(138, 126, 107, 0.4);
+  --ops-line-strong: rgba(158, 59, 46, 0.4);
+  --ops-panel: var(--paper-lt);
+  --ops-panel-strong: var(--paper);
+  --ops-panel-muted: rgba(231, 217, 186, 0.7);
+  --ops-map-surface: var(--paper-dk);
+  --ops-shadow: 0 2px 8px var(--shadow);
+  --ops-glow: 2px 3px 8px var(--shadow);
+  --ops-warning: var(--warn);
+  --ops-danger: var(--red);
 
-  /* === Victory / Defeat === */
-  --victory-bg: rgba(8, 18, 12, 0.9);
-  --defeat-bg: rgba(18, 8, 8, 0.9);
+  /* === Victory / Defeat washes === */
+  --victory-bg: rgba(79, 107, 58, 0.9);
+  --defeat-bg: rgba(158, 59, 46, 0.9);
 
   /* === Touch controls === */
   --tc-fire-size: 80px;
@@ -206,11 +223,11 @@
 
 @keyframes ui-pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 5px rgba(158, 59, 46, 0.4);
     opacity: 1;
   }
   50% {
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+    box-shadow: 0 0 15px rgba(158, 59, 46, 0.7);
     opacity: 0.9;
   }
 }
@@ -240,6 +257,19 @@
 }
 
 #game-hud-root {
+  /* In-game HUD is pencil-on-acetate: modules sit on dark chips over the live
+     battlefield, so the text tokens INVERT to light within the HUD root. This
+     keeps every HUD module legible over any backdrop without editing each
+     component; menus (outside this root) keep ink-on-paper. See
+     docs/FIELD_JOURNAL_UI.md "In-game HUD treatment". */
+  --text-primary: var(--paper-lt);
+  --text-secondary: #d8c6a0;
+  --text-muted: #b6a487;
+  --text-inverse: var(--ink);
+  --surface-panel: rgba(43, 38, 32, 0.78);
+  --surface-panel-hover: rgba(43, 38, 32, 0.88);
+  --border-subtle: rgba(231, 217, 186, 0.25);
+  --border-default: rgba(231, 217, 186, 0.4);
   font-family: var(--font-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;

@@ -16,10 +16,10 @@
   padding: var(--space-1) var(--space-4);
   user-select: none;
   pointer-events: none;
-  background: rgba(10, 15, 8, 0.45);
+  background: rgba(43, 38, 32, 0.78);
   backdrop-filter: blur(4px);
-  border-radius: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r);
+  border: 1px solid rgba(231, 217, 186, 0.4);
 }
 
 .faction {
@@ -40,9 +40,8 @@
 
 .count {
   font-size: var(--font-size-xl);
-  font-weight: var(--weight-bold);
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
-  text-shadow: var(--shadow-text);
   transition: color var(--duration-fast) var(--ease-out);
   line-height: 1;
 }

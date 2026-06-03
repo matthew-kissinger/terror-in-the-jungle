@@ -215,14 +215,14 @@ describe('DeployScreen', () => {
       ui.updateTimerDisplay(5, false);
       const timer = elementMap.get('respawn-timer');
       expect(timer?.textContent).toContain('5s');
-      expect(timer?.style.color).toBe('rgba(212, 163, 68, 0.9)');
+      expect(timer?.style.color).toBe('rgba(168, 116, 42, 0.95)');
     });
 
     it('should show ready message when timer is 0', () => {
       ui.updateTimerDisplay(0, false);
       const timer = elementMap.get('respawn-timer');
       expect(timer?.textContent).toBe('Ready for deployment');
-      expect(timer?.style.color).toBe('rgba(92, 184, 92, 0.9)');
+      expect(timer?.style.color).toBe('rgba(58, 79, 42, 0.95)');
     });
   });
 

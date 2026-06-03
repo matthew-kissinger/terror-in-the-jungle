@@ -34,7 +34,7 @@
   padding: 22px 24px;
   text-align: center;
   color: rgba(220, 210, 170, 0.88);
-  font-family: var(--font-primary, 'Rajdhani', 'Segoe UI', sans-serif);
+  font-family: var(--font-primary);
 }
 
 .spawn-loading-ring {
