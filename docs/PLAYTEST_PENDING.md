@@ -80,5 +80,3 @@ NOT reverted automatically.
   §"Autonomous-loop posture" — cross-tool view of the same rules.
 - [docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md](archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
   — current campaign manifest declaring `posture: autonomous-loop`.
-- [GOAL_DIRECTIVE.md](../GOAL_DIRECTIVE.md) — the `/goal` directive
-  string for invoking the autonomous loop.
