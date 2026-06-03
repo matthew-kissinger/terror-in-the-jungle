@@ -1,10 +1,10 @@
 # Campaign: Field Journal Frontend Wiring
 
 > **Date:** 2026-06-03
-> **Posture:** **IN PROGRESS.** Cycle 1 (foundation) landed + verified (lint/typecheck/5260 tests/build green); working through the surface cycles.
+> **Posture:** **COMPLETE — all 8 cycles landed, merged to `master`** (merge `a2aae2fa`, branch `task/ui-redesign-bakeoff`). Remaining: one human PC + real-device playtest of the in-game surfaces, and follow-up task #9 (deploy map-canvas markers).
 > **Auto-advance:** no (each cycle is reviewed + playtested before the next opens).
 >
-> **Progress:** ✅ 1 foundation · ✅ 2 shell · ✅ 3 deploy* · ✅ 4 hud-combat · ✅ 5 hud-mobile · ✅ 6 overlays · ✅ 7 vehicles · 🔶 8 sweep
+> **Progress:** ✅ 1 foundation · ✅ 2 shell · ✅ 3 deploy* · ✅ 4 hud-combat · ✅ 5 hud-mobile · ✅ 6 overlays · ✅ 7 vehicles · ✅ 8 sweep
 > *(deploy screen chrome + layout + fit-to-viewport done & verified; in-canvas map markers + real-device playtest are follow-ups)*
 >
 > **Status:** cycles 1–7 landed + auto-verified (lint/typecheck/**5260 tests**/build; check:mobile-ui; check:fence). check:hud is environmentally broken locally (headless WebGPU-fallback boot) — validates in CI. Visually confirmed: title, mode-select, deploy (PC+phone), in-game HUD, settings modal. The in-game HUD (4), touch controls (5), and vehicle HUDs (7) render only in live gameplay → final visual + overlap/placement is the one human PC + real-device playtest pass (Principle 5).
