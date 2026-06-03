@@ -3,14 +3,20 @@ import { GameSystem } from '../../types';
 import type { InputManager } from '../input/InputManager';
 import type { HUDLayout } from '../../ui/layout/HUDLayout';
 import type { AirSupportRadioCooldowns } from '../airsupport/AirSupportRadioCatalog';
+import {
+  AIR_SUPPORT_RADIO_ASSETS,
+  getAirSupportRadioAsset,
+  radioAssetToSupportType,
+} from '../airsupport/AirSupportRadioCatalog';
+import type { AirSupportManager } from '../airsupport/AirSupportManager';
 import { CommandModeOverlay } from '../../ui/hud/CommandModeOverlay';
 import { AirSupportRadioMenu, type AirSupportRadioSelection } from '../../ui/hud/AirSupportRadioMenu';
 import type { InputMode } from '../input/InputManager';
 import type { SquadCommandState } from './PlayerSquadController';
 import { PlayerSquadController } from './PlayerSquadController';
-import { SquadCommand } from './types';
+import { SquadCommand, Faction } from './types';
 import { getQuickCommandOption, requiresCommandTarget } from './SquadCommandPresentation';
-import type { IZoneQuery } from '../../types/SystemInterfaces';
+import type { IZoneQuery, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { CombatantSystem } from './CombatantSystem';
 import type { GameModeManager } from '../world/GameModeManager';
 import type { PlayerController } from '../player/PlayerController';
@@ -27,6 +33,8 @@ export class CommandInputManager implements GameSystem {
   private combatantSystem?: CombatantSystem;
   private gameModeManager?: GameModeManager;
   private playerController?: PlayerController;
+  private airSupportManager?: AirSupportManager;
+  private terrainSystem?: ITerrainRuntime;
   private inputMode: InputMode = 'keyboardMouse';
   private latestSquadState: SquadCommandState = {
     hasSquad: false,
@@ -41,6 +49,12 @@ export class CommandInputManager implements GameSystem {
   private mapUpdateAccumulator = 0;
   private readonly mapDirection = new THREE.Vector3();
   private readonly mapPlayerPosition = new THREE.Vector3();
+  private readonly radioOrigin = new THREE.Vector3();
+  private readonly radioDir = new THREE.Vector3();
+  private readonly radioTarget = new THREE.Vector3();
+  private readonly radioApproach = new THREE.Vector3();
+  private radioTargetValid = false;
+  private radioCooldownAccumulator = 0;
   private unsubscribeCommandState?: () => void;
   private unsubscribeInputMode?: () => void;
   private visibilityListeners = new Set<(visible: boolean) => void>();
@@ -77,6 +91,14 @@ export class CommandInputManager implements GameSystem {
   }
 
   update(deltaTime: number): void {
+    if (this.radioVisible) {
+      this.radioCooldownAccumulator += deltaTime;
+      if (this.radioCooldownAccumulator >= 0.1) {
+        this.radioCooldownAccumulator = 0;
+        this.feedRadioCooldowns();
+      }
+    }
+
     if (!this.overlayVisible || !this.playerController) return;
 
     if (this.inputMode === 'gamepad') {
@@ -163,6 +185,14 @@ export class CommandInputManager implements GameSystem {
 
   setPlayerController(playerController: PlayerController): void {
     this.playerController = playerController;
+  }
+
+  setAirSupportManager(airSupportManager: AirSupportManager): void {
+    this.airSupportManager = airSupportManager;
+  }
+
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   onVisibilityChange(listener: (visible: boolean) => void): () => void {
@@ -272,10 +302,15 @@ export class CommandInputManager implements GameSystem {
       this.closeOverlay(false);
     }
     this.radioVisible = true;
+    this.radioCooldownAccumulator = 0;
+    // Snapshot the call-in target (where the player is looking) and current
+    // asset cooldowns the instant the radio opens.
+    this.resolveRadioTarget();
+    this.feedRadioCooldowns();
     this.inputManager?.unlockPointer?.();
     this.openOverlayTouchPassThrough();
     this.airSupportRadioMenu.setVisible(true);
-    this.airSupportRadioMenu.setState({ statusText: 'Select aircraft and target mark' });
+    this.airSupportRadioMenu.setState({ statusText: this.describeRadioTarget() });
     this.emitVisibility();
   }
 
@@ -358,12 +393,108 @@ export class CommandInputManager implements GameSystem {
   }
 
   private handleRadioSelection(selection: AirSupportRadioSelection): void {
-    const marking = selection.targetMarking.replace(/_/g, ' ').toUpperCase();
-    this.airSupportRadioMenu.setState({
-      selectedAssetId: selection.assetId,
-      selectedMarking: selection.targetMarking,
-      statusText: `${marking} target mark selected`,
+    const asset = getAirSupportRadioAsset(selection.assetId);
+    const supportType = radioAssetToSupportType[selection.assetId];
+
+    // Unwired (no air-support manager or no resolved target): keep the shell's
+    // prior status-echo behaviour so the radio still reads as a UI surface.
+    if (!this.airSupportManager || !supportType || !this.radioTargetValid) {
+      const marking = selection.targetMarking.replace(/_/g, ' ').toUpperCase();
+      this.airSupportRadioMenu.setState({
+        selectedAssetId: selection.assetId,
+        selectedMarking: selection.targetMarking,
+        statusText: `${marking} target mark selected`,
+      });
+      return;
+    }
+
+    // Run the sortie in along the player's line of sight.
+    this.radioApproach.set(
+      this.radioTarget.x - this.radioOrigin.x,
+      0,
+      this.radioTarget.z - this.radioOrigin.z,
+    );
+    if (this.radioApproach.lengthSq() < 1) {
+      this.radioApproach.set(0, 0, 1);
+    }
+    this.radioApproach.normalize();
+
+    const accepted = this.airSupportManager.requestSupport({
+      type: supportType,
+      targetPosition: this.radioTarget.clone(),
+      approachDirection: this.radioApproach.clone(),
+      requesterFaction: Faction.US,
     });
+
+    if (accepted) {
+      this.airSupportRadioMenu.setState({
+        selectedAssetId: selection.assetId,
+        selectedMarking: selection.targetMarking,
+        statusText: `${asset.label} inbound - ${asset.aircraft}`,
+      });
+      this.feedRadioCooldowns();
+      this.closeRadioMenu();
+    } else {
+      const remaining = Math.ceil(this.airSupportManager.getCooldownRemaining(supportType));
+      this.airSupportRadioMenu.setState({
+        selectedAssetId: selection.assetId,
+        selectedMarking: selection.targetMarking,
+        statusText: `${asset.label} unavailable (${remaining}s)`,
+      });
+      this.feedRadioCooldowns();
+    }
+  }
+
+  /**
+   * Snapshot the call-in target by marching the player's view ray to the
+   * terrain surface. Falls back to a fixed distance ahead when the player is
+   * looking above the horizon. No-op (target invalid) without a player camera.
+   */
+  private resolveRadioTarget(): void {
+    this.radioTargetValid = false;
+    if (!this.playerController) return;
+
+    const camera = this.playerController.getCamera();
+    camera.getWorldPosition(this.radioOrigin);
+    camera.getWorldDirection(this.radioDir);
+
+    const sampleHeight = (x: number, z: number): number =>
+      this.terrainSystem?.getHeightAt(x, z) ?? 0;
+
+    const STEP = 8;
+    const MAX_RANGE = 2000;
+    for (let d = STEP; d <= MAX_RANGE; d += STEP) {
+      const x = this.radioOrigin.x + this.radioDir.x * d;
+      const y = this.radioOrigin.y + this.radioDir.y * d;
+      const z = this.radioOrigin.z + this.radioDir.z * d;
+      const groundY = sampleHeight(x, z);
+      if (y <= groundY) {
+        this.radioTarget.set(x, groundY, z);
+        this.radioTargetValid = true;
+        return;
+      }
+    }
+
+    const horiz = Math.hypot(this.radioDir.x, this.radioDir.z) || 1;
+    const fx = this.radioOrigin.x + (this.radioDir.x / horiz) * 200;
+    const fz = this.radioOrigin.z + (this.radioDir.z / horiz) * 200;
+    this.radioTarget.set(fx, sampleHeight(fx, fz), fz);
+    this.radioTargetValid = true;
+  }
+
+  private describeRadioTarget(): string {
+    if (!this.radioTargetValid) return 'Select aircraft and target mark';
+    return `Target ${Math.round(this.radioTarget.x)}, ${Math.round(this.radioTarget.z)} - select aircraft`;
+  }
+
+  private feedRadioCooldowns(): void {
+    if (!this.airSupportManager) return;
+    const cooldowns: AirSupportRadioCooldowns = {};
+    for (const asset of AIR_SUPPORT_RADIO_ASSETS) {
+      const type = radioAssetToSupportType[asset.id];
+      cooldowns[asset.id] = type ? this.airSupportManager.getCooldownRemaining(type) : 0;
+    }
+    this.setRadioCooldowns(cooldowns);
   }
 
   private getDefaultPlacementCommand(): SquadCommand | null {

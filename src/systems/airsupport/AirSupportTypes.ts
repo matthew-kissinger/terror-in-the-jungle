@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Faction } from '../combat/types';
 
 export type AirSupportType = 'spooky' | 'napalm' | 'rocket_run' | 'recon';
 
@@ -6,6 +7,11 @@ export interface AirSupportRequest {
   type: AirSupportType;
   targetPosition: THREE.Vector3;
   approachDirection?: THREE.Vector3;
+  /**
+   * Faction that called the strike. Threaded into mission damage so friendly
+   * combatants are never hit. Defaults to the player faction (US) when omitted.
+   */
+  requesterFaction?: Faction;
 }
 
 export interface AirSupportMission {
@@ -17,6 +23,8 @@ export interface AirSupportMission {
   duration: number;
   targetPosition: THREE.Vector3;
   approachDirection: THREE.Vector3;
+  /** Faction that called the strike (for friend-or-foe damage filtering). */
+  requesterFaction?: Faction;
   /** Mission-specific state (orbit angle, rockets fired, etc.) */
   missionData: Record<string, number>;
 }

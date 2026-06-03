@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { initSpooky, updateSpooky } from './SpookyMission';
+import { Faction } from '../combat/types';
 import { createAirSupportMission, flatTerrainHeight } from '../../test-utils/airSupportMission';
 
 /**
@@ -165,5 +166,22 @@ describe('SpookyMission', () => {
         updateSpooky(mission, 0.1, undefined, undefined, undefined, flatTerrainHeight());
       }
     }).not.toThrow();
+  });
+
+  it('threads the requester faction into its minigun damage (friend-or-foe)', () => {
+    const mission = createAirSupportMission('spooky', { x: 300, z: 300 });
+    initSpooky(mission);
+    const cs = makeCombatantSystem();
+    const dt = 0.1;
+    for (let i = 0; i < 80; i++) {
+      mission.elapsed += dt;
+      updateSpooky(mission, dt, cs, makeAudio(), makeTracerPool(), flatTerrainHeight(), false, Faction.US);
+    }
+    const calls = cs.applyExplosionDamage.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // The 6th argument is the shooter faction used to spare friendlies.
+    for (const call of calls) {
+      expect(call[5]).toBe(Faction.US);
+    }
   });
 });

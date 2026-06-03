@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { HUDLayout } from '../../ui/layout/HUDLayout';
-import { SquadCommand } from './types';
+import { SquadCommand, Faction } from './types';
 import { CommandInputManager } from './CommandInputManager';
 import { getQuickCommandOption } from './SquadCommandPresentation';
 import { ViewportManager } from '../../ui/design/responsive';
@@ -202,6 +202,49 @@ describe('CommandInputManager', () => {
     expect(document.body.textContent).toContain('POSITION ONLY target mark selected');
     expect(controller.issueQuickCommand).not.toHaveBeenCalled();
     expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('dispatches a radio call-in to the air support manager with the player faction', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+
+    const requestSupport = vi.fn(() => true);
+    manager.setAirSupportManager({
+      requestSupport,
+      getCooldownRemaining: vi.fn(() => 0),
+    } as any);
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+    manager.setPlayerController({
+      getCamera: () => ({
+        getWorldPosition: (v: THREE.Vector3) => v.set(0, 10, 0),
+        getWorldDirection: (v: THREE.Vector3) => v.set(0, -0.5, 1).normalize(),
+      }),
+      getPosition: (v: THREE.Vector3) => v.set(0, 0, 0),
+    } as any);
+
+    manager.toggleRadioMenu();
+    document.body.querySelector<HTMLButtonElement>('[data-radio-asset="ac47_orbit"]')?.click();
+
+    expect(requestSupport).toHaveBeenCalledTimes(1);
+    const request = requestSupport.mock.calls[0][0];
+    expect(request.type).toBe('spooky'); // ac47_orbit fulfils via the spooky sortie
+    expect(request.requesterFaction).toBe(Faction.US); // called strikes spare friendlies
+    expect(request.targetPosition).toBeInstanceOf(THREE.Vector3);
+    // Radio closes after a successful call-in.
+    expect(document.body.querySelector<HTMLElement>('[role="dialog"]')?.dataset.visible).toBe('false');
 
     manager.dispose();
     layout.dispose();

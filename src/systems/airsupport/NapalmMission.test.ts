@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { initNapalm, updateNapalm } from './NapalmMission';
+import { Faction } from '../combat/types';
 import { createAirSupportMission, flatTerrainHeight } from '../../test-utils/airSupportMission';
 
 /**
@@ -144,6 +145,23 @@ describe('NapalmMission', () => {
 
   it('does not crash and does no damage when no combatant system is provided', () => {
     expect(() => flyPass({ combatantSystem: undefined })).not.toThrow();
+  });
+
+  it('threads the requester faction into every explosion-damage call (friend-or-foe)', () => {
+    const mission = createAirSupportMission('napalm', { x: 0, z: 0 });
+    initNapalm(mission);
+    const dt = 0.1;
+    for (let i = 0; i < 600; i++) {
+      mission.elapsed += dt;
+      updateNapalm(mission, dt, combatantSystem, undefined, undefined, flatTerrainHeight(), Faction.US);
+      if (mission.state === 'outbound') break;
+    }
+    const calls = combatantSystem.applyExplosionDamage.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // The 6th argument is the shooter faction used to spare friendlies.
+    for (const call of calls) {
+      expect(call[5]).toBe(Faction.US);
+    }
   });
 });
 

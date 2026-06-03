@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { AirSupportMission } from './AirSupportTypes';
 import type { CombatantSystem } from '../combat/CombatantSystem';
+import type { Faction } from '../combat/types';
 import type { IAudioManager } from '../../types/SystemInterfaces';
 import type { TracerPool } from '../effects/TracerPool';
 
@@ -36,6 +37,7 @@ export function updateSpooky(
   tracerPool: TracerPool | undefined,
   getTerrainHeight: (x: number, z: number) => number,
   physicsControlled = false,
+  shooterFaction?: Faction,
 ): void {
   const { aircraft, targetPosition } = mission;
 
@@ -103,6 +105,7 @@ export function updateSpooky(
           DAMAGE_PER_ROUND,
           undefined,
           'spooky_minigun',
+          shooterFaction,
         );
       }
     }

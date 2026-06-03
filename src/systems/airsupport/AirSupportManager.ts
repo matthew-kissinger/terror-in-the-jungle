@@ -255,6 +255,7 @@ export class AirSupportManager implements GameSystem {
       duration: config.duration,
       targetPosition: request.targetPosition.clone(),
       approachDirection: approachDir,
+      requesterFaction: request.requesterFaction,
       missionData: {},
     };
 
@@ -338,7 +339,7 @@ export class AirSupportManager implements GameSystem {
 
     switch (mission.type) {
       case 'spooky':
-        updateSpooky(mission, dt, this.combatantSystem, this.audioManager, this.tracerPool, getHeight, this.flightControllers.has(mission.id));
+        updateSpooky(mission, dt, this.combatantSystem, this.audioManager, this.tracerPool, getHeight, this.flightControllers.has(mission.id), mission.requesterFaction);
         // Spooky auto-transitions to outbound when duration expires
         if (mission.elapsed >= mission.duration) {
           mission.state = 'outbound';
@@ -346,7 +347,7 @@ export class AirSupportManager implements GameSystem {
         break;
 
       case 'napalm':
-        updateNapalm(mission, dt, this.combatantSystem, this.audioManager, explosionSpawn, getHeight);
+        updateNapalm(mission, dt, this.combatantSystem, this.audioManager, explosionSpawn, getHeight, mission.requesterFaction);
         break;
 
       case 'rocket_run':

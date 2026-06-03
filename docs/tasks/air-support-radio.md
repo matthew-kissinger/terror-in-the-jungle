@@ -43,6 +43,12 @@ Spike (read it — file:line for every seam): `docs/rearch/AIR_SUPPORT_RADIO_SPI
   no named maneuvers. Map radio assets only onto sortie types whose mission files
   already fire.
 - New world-marker via `IGameRenderer` (FENCED) — reuse minimap/tactical-map markers.
+- **`rocket_run` IFF (follow-up):** napalm + spooky use direct `applyExplosionDamage`
+  and are faction-threaded now. `rocket_run` (a1_rockets, cobra_rocket_run) fires
+  through `GrenadeSystem.spawnProjectile` → `GrenadeEffects.explodeFrag`, the SHARED
+  player-grenade explosion path (`attackerId:'PLAYER'`, no faction). Threading a
+  per-projectile `shooterFaction` there also touches player grenades, so it is a
+  separate focused follow-up — out of scope here to keep the grenade core stable.
 
 ## Acceptance
 

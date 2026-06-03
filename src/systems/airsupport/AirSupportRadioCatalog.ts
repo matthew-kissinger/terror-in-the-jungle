@@ -1,3 +1,5 @@
+import type { AirSupportType } from './AirSupportTypes';
+
 export type AirSupportRadioAssetId =
   | 'a1_napalm'
   | 'a1_rockets'
@@ -38,7 +40,7 @@ export const AIR_SUPPORT_RADIO_ASSETS: AirSupportRadioAsset[] = [
     aircraft: 'A-1 Skyraider',
     payload: 'Napalm',
     mission: 'Low strike',
-    cooldownSeconds: 120,
+    cooldownSeconds: 90,
   },
   {
     id: 'a1_rockets',
@@ -46,7 +48,7 @@ export const AIR_SUPPORT_RADIO_ASSETS: AirSupportRadioAsset[] = [
     aircraft: 'A-1 Skyraider',
     payload: 'Rocket pods',
     mission: 'Dive attack',
-    cooldownSeconds: 90,
+    cooldownSeconds: 60,
   },
   {
     id: 'f4_bombs',
@@ -54,7 +56,7 @@ export const AIR_SUPPORT_RADIO_ASSETS: AirSupportRadioAsset[] = [
     aircraft: 'F-4 Phantom',
     payload: 'Bombs',
     mission: 'Fast strike',
-    cooldownSeconds: 150,
+    cooldownSeconds: 90,
   },
   {
     id: 'ac47_orbit',
@@ -70,7 +72,7 @@ export const AIR_SUPPORT_RADIO_ASSETS: AirSupportRadioAsset[] = [
     aircraft: 'AH-1 Cobra',
     payload: 'Rockets',
     mission: 'Gunship run',
-    cooldownSeconds: 75,
+    cooldownSeconds: 60,
   },
   {
     id: 'huey_gunship_strafe',
@@ -78,9 +80,24 @@ export const AIR_SUPPORT_RADIO_ASSETS: AirSupportRadioAsset[] = [
     aircraft: 'UH-1C Gunship',
     payload: 'Minigun strafe',
     mission: 'Close support',
-    cooldownSeconds: 60,
+    cooldownSeconds: 180,
   },
 ];
+
+/**
+ * Maps each radio asset onto the runtime sortie type that fulfils it
+ * (`AirSupportManager.requestSupport`). Several radio assets share a runtime
+ * type — they share that type's cooldown, which is the single cooldown
+ * authority (the catalog `cooldownSeconds` are aligned to it for the HUD bar).
+ */
+export const radioAssetToSupportType: Record<AirSupportRadioAssetId, AirSupportType> = {
+  a1_napalm: 'napalm',
+  a1_rockets: 'rocket_run',
+  f4_bombs: 'napalm',
+  ac47_orbit: 'spooky',
+  cobra_rocket_run: 'rocket_run',
+  huey_gunship_strafe: 'spooky',
+};
 
 export function getAirSupportRadioAsset(assetId: AirSupportRadioAssetId): AirSupportRadioAsset {
   const asset = AIR_SUPPORT_RADIO_ASSETS.find((entry) => entry.id === assetId);

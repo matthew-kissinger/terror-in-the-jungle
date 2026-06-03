@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { AirSupportMission } from './AirSupportTypes';
 import type { CombatantSystem } from '../combat/CombatantSystem';
+import type { Faction } from '../combat/types';
 import type { IAudioManager } from '../../types/SystemInterfaces';
 
 // Napalm parameters
@@ -30,6 +31,7 @@ export function updateNapalm(
   audioManager: IAudioManager | undefined,
   explosionSpawn: ((position: THREE.Vector3) => void) | undefined,
   getTerrainHeight: (x: number, z: number) => number,
+  shooterFaction?: Faction,
 ): void {
   const { aircraft, targetPosition, approachDirection } = mission;
   const speed = 120;
@@ -88,6 +90,7 @@ export function updateNapalm(
         FIRE_ZONE_MAX_DAMAGE,
         undefined,
         'napalm',
+        shooterFaction,
       );
     }
 
@@ -115,6 +118,7 @@ export function updateNapalm(
             30,
             undefined,
             'napalm',
+            shooterFaction,
           );
         }
       }

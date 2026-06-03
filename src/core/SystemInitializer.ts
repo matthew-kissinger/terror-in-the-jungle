@@ -187,6 +187,12 @@ export class SystemInitializer {
       terrainHeightAt: (x, z) => refs.terrainSystem?.getHeightAt(x, z) ?? 0,
     });
     refs.commandInputManager = new CommandInputManager(refs.playerSquadController);
+    // Air-support radio call-in: the command UI dispatches sorties through the
+    // existing AirSupportManager and needs terrain to resolve the marked point.
+    refs.commandInputManager.setAirSupportManager(refs.airSupportManager);
+    if (refs.terrainSystem) {
+      refs.commandInputManager.setTerrainSystem(refs.terrainSystem);
+    }
     refs.inventoryManager = new InventoryManager();
     refs.inventoryManager.setSuppressUI(true); // UnifiedWeaponBar replaces built-in hotbar
     refs.grenadeSystem = new GrenadeSystem(scene, camera, refs.terrainSystem);
