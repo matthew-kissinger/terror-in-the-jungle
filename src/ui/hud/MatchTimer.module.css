@@ -7,31 +7,30 @@
  */
 
 .container {
-  padding: var(--space-0-5) var(--space-3);
+  padding: var(--space-1) var(--space-3);
   pointer-events: none;
   user-select: none;
-  background: rgba(10, 15, 8, 0.75);
-  border-radius: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(43, 38, 32, 0.78);
+  border-radius: var(--r);
+  border: 1px solid rgba(231, 217, 186, 0.4);
   display: inline-flex;
   align-items: center;
 }
 
 .display {
-  font-size: var(--font-size-xl);
-  font-weight: var(--weight-bold);
+  font-size: var(--font-size-2xl);
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   text-align: left;
   letter-spacing: 1px;
-  text-shadow: var(--shadow-text);
   transition: color var(--duration-normal) var(--ease-out);
   line-height: 1;
 }
 
 /* Warning state: <=60s remaining */
 .warning .display {
-  color: var(--accent);
+  color: var(--warn);
 }
 
 /* Critical state: <=30s remaining */

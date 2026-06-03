@@ -77,7 +77,7 @@ export class TerrainSandboxScene {
     Object.assign(this.paneContainer.style, {
       position: 'fixed', top: '16px', right: '16px', width: '340px',
       maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', pointerEvents: 'auto',
-      zIndex: '9999', fontFamily: '"JetBrains Mono", Consolas, monospace', fontSize: '11px',
+      zIndex: '9999', fontFamily: '"Courier Prime", Consolas, monospace', fontSize: '11px',
     } as CSSStyleDeclaration);
     document.body.appendChild(this.paneContainer);
 
@@ -85,7 +85,7 @@ export class TerrainSandboxScene {
     Object.assign(this.overlay.style, {
       position: 'fixed', top: '12px', left: '12px', padding: '10px 14px',
       background: 'rgba(0,0,0,0.55)', color: '#e7ffe0',
-      fontFamily: '"JetBrains Mono", Consolas, monospace', fontSize: '12px',
+      fontFamily: '"Courier Prime", Consolas, monospace', fontSize: '12px',
       lineHeight: '1.45', whiteSpace: 'pre', pointerEvents: 'none', zIndex: '9998',
     } as CSSStyleDeclaration);
     document.body.appendChild(this.overlay);

@@ -55,7 +55,7 @@ export class ScorePopupSystem {
     element.className = 'score-popup';
     element.style.cssText = `
       position: fixed;
-      font-family: var(--font-primary, 'Rajdhani', sans-serif);
+      font-family: var(--font-primary);
       font-size: 24px;
       font-weight: bold;
       text-shadow:

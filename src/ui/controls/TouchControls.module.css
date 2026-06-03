@@ -53,26 +53,27 @@
   width: var(--tc-fire-size);
   height: var(--tc-fire-size);
   background: radial-gradient(circle at 38% 38%,
-    rgba(255, 100, 80, 0.85),
-    rgba(210, 45, 30, 0.75));
-  border: none;
+    rgba(181, 71, 47, 0.92),
+    rgba(124, 44, 34, 0.85));
+  border: 2px solid rgba(231, 217, 186, 0.5);
   box-shadow:
-    0 0 24px rgba(255, 60, 40, 0.3),
-    inset 0 1px 3px rgba(255, 200, 180, 0.2);
+    0 2px 6px rgba(43, 38, 32, 0.4),
+    inset 0 1px 3px rgba(231, 217, 186, 0.2);
   z-index: var(--tc-z-controls);
   font-size: var(--tc-font-size);
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.95);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  font-family: var(--type-stamp);
+  color: var(--paper-lt);
+  text-shadow: 0 1px 2px rgba(43, 38, 32, 0.6);
 }
 
 .fireBtn.pressed {
   background: radial-gradient(circle at 38% 38%,
-    rgba(255, 120, 100, 0.95),
-    rgba(230, 60, 40, 0.9));
+    rgba(200, 86, 60, 0.98),
+    rgba(140, 50, 38, 0.95));
   box-shadow:
-    0 0 32px rgba(255, 60, 40, 0.5),
-    inset 0 1px 3px rgba(255, 200, 180, 0.3);
+    0 2px 10px rgba(124, 44, 34, 0.5),
+    inset 0 1px 3px rgba(231, 217, 186, 0.3);
   transform: scale(0.93);
 }
 
@@ -94,19 +95,21 @@
   bottom: 36%;
   width: var(--tc-ads-size);
   height: var(--tc-ads-size);
-  background: rgba(60, 130, 200, 0.35);
-  border: none;
+  background: rgba(43, 38, 32, 0.6);
+  border: 1.5px solid rgba(231, 217, 186, 0.4);
   box-shadow: none;
   z-index: var(--tc-z-controls);
   font-size: var(--tc-font-size-sm);
-  color: rgba(255, 255, 255, 0.7);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  font-family: var(--type-stamp);
+  color: rgba(231, 217, 186, 0.8);
+  text-shadow: 0 1px 2px rgba(43, 38, 32, 0.5);
 }
 
 .adsActive {
-  background: rgba(80, 160, 255, 0.65);
-  box-shadow: 0 0 16px rgba(80, 160, 255, 0.3);
-  color: rgba(255, 255, 255, 1);
+  background: rgba(79, 107, 58, 0.7);
+  border-color: rgba(120, 150, 90, 0.7);
+  box-shadow: 0 0 12px rgba(79, 107, 58, 0.4);
+  color: var(--paper-lt);
 }
 
 /* Portrait: match fire button offset */
@@ -145,16 +148,17 @@
   composes: btn;
   width: var(--tc-action-size);
   height: var(--tc-action-size);
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
+  background: rgba(43, 38, 32, 0.6);
+  border: 1px solid rgba(231, 217, 186, 0.35);
   box-shadow: none;
   font-size: var(--tc-font-size-sm);
-  color: rgba(255, 255, 255, 0.55);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-family: var(--type-stamp);
+  color: rgba(231, 217, 186, 0.7);
+  text-shadow: 0 1px 2px rgba(43, 38, 32, 0.4);
 }
 
 .actionBtn.pressed {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(79, 107, 58, 0.55);
   transform: scale(0.9);
 }
 
@@ -170,12 +174,12 @@
   gap: 0;
   height: var(--tc-action-size);
   min-width: calc(var(--tc-action-size) * 1.7);
-  border-radius: calc(var(--tc-action-size) / 2);
-  background: rgba(0, 0, 0, 0.45);
+  border-radius: var(--r);
+  background: rgba(43, 38, 32, 0.78);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  border: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(231, 217, 186, 0.35);
+  box-shadow: 0 2px 8px rgba(43, 38, 32, 0.3);
   touch-action: none;
   pointer-events: auto;
   user-select: none;
@@ -204,23 +208,22 @@
 
 .weaponCyclerLabel {
   font-size: var(--tc-font-size-sm);
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--paper-lt);
   text-align: center;
   min-width: 20px;
   letter-spacing: 0.3px;
   pointer-events: none;
-  font-family: var(--font-primary);
+  font-family: var(--type-stamp);
   line-height: 1;
 }
 
 .weaponCyclerAmmo {
   font-size: 10px;
   font-weight: 600;
-  color: var(--ops-data, rgba(168, 200, 122, 0.8));
+  color: rgba(201, 183, 138, 0.9);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
-  font-family: var(--font-primary);
+  font-family: var(--type);
   line-height: 1;
   margin-left: 2px;
 }
@@ -239,12 +242,10 @@
   right: max(12px, env(safe-area-inset-right, 0px));
   width: 48px;
   height: 48px;
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(251, 191, 36, 0.08), transparent 70%),
-    rgba(15, 21, 14, 0.9);
-  border: 1px solid var(--ops-line);
-  box-shadow: var(--ops-shadow);
+  border-radius: var(--r);
+  background: rgba(43, 38, 32, 0.85);
+  border: 1px solid rgba(231, 217, 186, 0.4);
+  box-shadow: 0 2px 6px rgba(43, 38, 32, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -272,20 +273,16 @@
   height: 68px;
   flex-direction: column;
   gap: 4px;
-  background:
-    linear-gradient(180deg, rgba(251, 191, 36, 0.15), transparent 65%),
-    rgba(14, 22, 18, 0.94);
-  border: 1px solid var(--ops-line-strong);
-  box-shadow: var(--ops-glow);
+  background: rgba(43, 38, 32, 0.9);
+  border: 1.5px solid var(--green);
+  box-shadow: 0 2px 8px rgba(43, 38, 32, 0.45);
   z-index: var(--tc-z-controls);
   font-size: 28px;
   letter-spacing: 1px;
 }
 
 .interactBtn.pressed {
-  background:
-    linear-gradient(180deg, rgba(251, 191, 36, 0.22), transparent 65%),
-    rgba(18, 28, 20, 0.98);
+  background: rgba(58, 79, 42, 0.95);
 }
 
 .interactIconWrap {
@@ -301,7 +298,7 @@
   font-size: 18px;
   line-height: 1;
   letter-spacing: 0.12em;
-  color: var(--ops-accent-bright);
+  color: var(--paper-lt);
 }
 
 /* ==========================================================================
@@ -748,20 +745,16 @@
   composes: btn;
   width: var(--tc-action-size);
   height: var(--tc-action-size);
-  background:
-    linear-gradient(180deg, rgba(251, 191, 36, 0.08), transparent 75%),
-    rgba(15, 21, 14, 0.9);
-  border: 1px solid var(--ops-line);
+  background: rgba(43, 38, 32, 0.85);
+  border: 1px solid rgba(231, 217, 186, 0.4);
   font-size: var(--tc-font-size-sm);
-  color: var(--ops-accent-bright);
+  color: var(--paper-lt);
   text-shadow: var(--shadow-text);
   box-shadow: var(--ops-shadow);
 }
 
 .vehicleBtn.pressed {
-  background:
-    linear-gradient(180deg, rgba(251, 191, 36, 0.12), transparent 75%),
-    rgba(20, 29, 20, 0.96);
+  background: rgba(43, 38, 32, 0.95);
   transform: scale(0.9);
 }
 
@@ -775,17 +768,17 @@
   width: var(--tc-action-size);
   height: var(--tc-action-size);
   background:
-    linear-gradient(180deg, rgba(220, 38, 38, 0.18), transparent 75%),
-    rgba(27, 14, 14, 0.94);
-  border: 1px solid rgba(248, 113, 113, 0.45);
+    linear-gradient(180deg, rgba(158, 59, 46, 0.32), transparent 75%),
+    rgba(43, 38, 32, 0.9);
+  border: 1px solid rgba(207, 106, 82, 0.55);
   font-size: var(--tc-font-size-sm);
-  color: rgba(254, 226, 226, 0.98);
+  color: var(--paper-lt);
   text-shadow: var(--shadow-text);
   box-shadow: var(--shadow-glow-danger);
 }
 
 .vehicleExitBtn.pressed {
-  background: rgba(220, 60, 40, 0.7);
+  background: rgba(158, 59, 46, 0.8);
   transform: scale(0.9);
 }
 
@@ -794,17 +787,17 @@
   width: var(--tc-action-size);
   height: var(--tc-action-size);
   background:
-    linear-gradient(180deg, rgba(245, 158, 11, 0.18), transparent 75%),
-    rgba(28, 16, 12, 0.95);
-  border: 1px solid rgba(251, 191, 36, 0.4);
+    linear-gradient(180deg, rgba(181, 71, 47, 0.34), transparent 75%),
+    rgba(43, 38, 32, 0.9);
+  border: 1px solid rgba(207, 106, 82, 0.5);
   font-size: var(--tc-font-size-sm);
-  color: rgba(253, 230, 138, 0.96);
+  color: var(--paper-lt);
   text-shadow: var(--shadow-text);
   box-shadow: var(--ops-shadow);
 }
 
 .vehicleFireBtn.pressed {
-  background: rgba(230, 60, 40, 0.7);
+  background: rgba(181, 71, 47, 0.8);
   transform: scale(0.9);
 }
 
@@ -814,14 +807,15 @@
   max-width: 180px;
   padding: 4px 8px;
   border-radius: 8px;
-  background: rgba(15, 21, 14, 0.9);
-  border: 1px solid var(--ops-line);
+  background: rgba(43, 38, 32, 0.85);
+  border: 1px solid rgba(231, 217, 186, 0.4);
   font-size: 9px;
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: 0.3px;
   text-align: center;
-  color: var(--ops-accent-bright);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
   text-shadow: var(--shadow-text);
   box-shadow: var(--ops-shadow);
   pointer-events: none;

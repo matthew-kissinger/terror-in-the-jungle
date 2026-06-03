@@ -1,5 +1,8 @@
 /**
- * DeployScreen - operations-table deploy and respawn surface.
+ * DeployScreen — Field Journal "Insertion Map + Loadout Sheet".
+ * Manila panels, topo map frame, stamp-red deploy. Fits the viewport: the
+ * spawn list is the only bounded inner-scroll; the DEPLOY control is pinned.
+ * See docs/FIELD_JOURNAL_UI.md.
  */
 
 .root {
@@ -11,7 +14,7 @@
 
 /* Fully opaque on respawn so the game canvas doesn't bleed through */
 .root[data-deploy-kind="respawn"] {
-  background: rgba(4, 8, 5, 1);
+  background: var(--paper);
 }
 
 .visible {
@@ -50,18 +53,18 @@
 
 .headerTitle {
   margin: 0;
-  color: #f4f0e2;
-  font-family: var(--font-heading);
+  color: var(--ink);
+  font-family: var(--type-stamp);
   font-size: clamp(2rem, 5vw, 3.4rem);
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
   line-height: 0.94;
   text-transform: uppercase;
 }
 
 .headerStatus {
   margin-top: var(--space-3);
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--font-size-base);
   line-height: 1.6;
 }
@@ -99,38 +102,41 @@
 
 .mapTitle {
   margin: 0 0 var(--space-2);
-  color: #f4f0e2;
-  font-family: var(--font-heading);
+  color: var(--ink);
+  font-family: var(--type-stamp);
   font-size: clamp(1.45rem, 3vw, 2rem);
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .mapHelper {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
+  color: var(--ink-soft);
+  font-family: var(--hand);
+  font-size: clamp(1rem, 2.2vw, 1.2rem);
+  line-height: 1.3;
 }
 
+/* topo map surface — manila with graph grid + contour tints */
 .map {
   flex: 1;
   min-height: 360px;
-  border: 1px solid var(--ops-line);
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--r);
   background:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    radial-gradient(circle at 15% 12%, rgba(168, 200, 122, 0.08), transparent 24%),
-    radial-gradient(circle at 80% 70%, rgba(245, 158, 11, 0.08), transparent 24%),
-    var(--ops-map-surface);
-  background-size: 140px 140px, 140px 140px, 100% 100%, 100% 100%, 100% 100%;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    linear-gradient(rgba(156, 138, 100, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(156, 138, 100, 0.4) 1px, transparent 1px),
+    radial-gradient(circle at 30% 35%, rgba(79, 107, 58, 0.12), transparent 30%),
+    radial-gradient(circle at 75% 70%, rgba(79, 107, 58, 0.1), transparent 28%),
+    linear-gradient(180deg, #ddcaa0, #cdba8e);
+  background-size: 22px 22px, 22px 22px, 100% 100%, 100% 100%, 100% 100%;
+  box-shadow: inset 0 0 40px rgba(90, 70, 40, 0.18);
   overflow: hidden;
 }
 
 .sidePanel {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--space-3);
   min-height: 0;
 }
@@ -155,25 +161,25 @@
 
 .selectedName {
   margin-bottom: var(--space-2);
-  color: #fff7e2;
-  font-family: var(--font-heading);
+  color: var(--ink);
+  font-family: var(--type-stamp);
   font-size: clamp(1.4rem, 3vw, 2rem);
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
   line-height: 0.95;
   text-transform: uppercase;
 }
 
 .statusText {
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--font-size-sm);
   line-height: 1.6;
 }
 
 .decisionMetric {
   margin-top: var(--space-2);
-  color: rgba(212, 163, 68, 0.88);
-  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  font-family: var(--type);
   font-size: var(--font-size-xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -181,7 +187,7 @@
 
 .spawnOptionsPanel {
   composes: briefPanel from './ScreenPrimitives.module.css';
-  background: #0a0d0a;
+  background: rgba(231, 217, 186, 0.5);
 }
 
 .spawnOptionsList {
@@ -197,8 +203,8 @@
 }
 
 .spawnOptionGroupTitle {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  font-family: var(--type);
   font-size: var(--font-size-2xs);
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -207,35 +213,41 @@
 .spawnOption,
 .spawnOptionEmpty {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(8, 12, 9, 0.74);
-  color: #fff7e2;
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--r);
+  background: var(--paper-lt);
+  color: var(--ink);
   text-align: left;
 }
 
 .spawnOption {
   min-height: 52px;
   padding: var(--space-2-5) var(--space-3);
+  border-left: 4px solid var(--green);
   cursor: pointer;
+  transition: transform .1s, border-left-color .12s, background .12s;
 }
 
 .spawnOption:hover,
 .spawnOption:focus-visible {
-  border-color: var(--ops-line-strong);
-  background: rgba(25, 34, 22, 0.84);
+  border-left-color: var(--red);
+  background: #f0e4c6;
+  transform: translateX(2px);
 }
 
 .spawnOptionSelected {
-  border-color: rgba(212, 163, 68, 0.78);
-  background: rgba(44, 35, 14, 0.72);
+  border-color: var(--red);
+  border-left-color: var(--red);
+  background: rgba(158, 59, 46, 0.1);
+  box-shadow: inset 3px 0 0 var(--red);
 }
 
 .spawnOptionLabel {
   overflow: hidden;
-  color: #fff7e2;
-  font-family: var(--font-heading);
+  color: var(--ink);
+  font-family: var(--type-stamp);
   font-size: var(--font-size-base);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -243,8 +255,8 @@
 
 .spawnOptionMeta,
 .spawnOptionEmpty {
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
+  color: var(--ink-soft);
+  font-family: var(--type);
   font-size: var(--font-size-2xs);
   letter-spacing: 0.08em;
   line-height: 1.5;
@@ -274,31 +286,31 @@
   height: 22px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--ops-line-strong);
+  border: 1.5px solid var(--green);
   border-radius: 999px;
-  color: #fde68a;
+  color: var(--green-dk);
+  background: rgba(79, 107, 58, 0.12);
   font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-  font-weight: var(--weight-bold);
+  font-family: var(--type-stamp);
 }
 
 .sequenceBody {
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--font-size-sm);
   line-height: 1.6;
 }
 
 .controlPanel {
   composes: briefPanel from './ScreenPrimitives.module.css';
-  border-color: var(--ops-line-strong);
+  border-color: var(--red);
   position: relative;
 }
 
 .timer {
   margin-bottom: var(--space-4);
-  color: rgba(212, 163, 68, 0.9);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  color: var(--red);
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-base);
   letter-spacing: 0.08em;
   text-align: center;
   text-transform: uppercase;
@@ -327,9 +339,10 @@
 }
 
 .loadoutStatus {
-  color: var(--text-secondary);
-  font-size: var(--font-size-xs);
-  line-height: 1.6;
+  color: var(--ink-soft);
+  font-family: var(--hand);
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+  line-height: 1.3;
   margin-bottom: var(--space-3);
 }
 
@@ -350,22 +363,24 @@
 
 .presetName {
   overflow: hidden;
-  color: #fff7e2;
+  color: var(--ink);
+  font-family: var(--type-stamp);
   font-size: var(--font-size-lg);
-  font-weight: var(--weight-bold);
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .presetDescription {
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--font-size-xs);
   line-height: 1.5;
 }
 
 .factionPill {
   composes: statusChip from './ScreenPrimitives.module.css';
-  color: #fff7e2;
+  color: var(--green-dk);
+  border-color: var(--green);
 }
 
 .presetButtons,
@@ -388,28 +403,34 @@
   transform: none;
 }
 
+/* loadout slot — green-ruled form line, like the mockup loadout sheet */
 .loadoutRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: center;
-  padding-top: var(--space-3);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: var(--space-3);
+  padding: var(--space-2-5) var(--space-3);
+  border: 1px solid var(--paper-edge);
+  border-left: 4px solid var(--green);
+  border-radius: var(--r);
+  background: rgba(231, 217, 186, 0.5);
 }
 
 .loadoutLabel {
-  color: var(--text-muted);
+  color: var(--ink-faint);
   font-size: var(--font-size-2xs);
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
 .loadoutValue {
   min-height: 20px;
   overflow: hidden;
-  color: #fff7e2;
+  color: var(--ink);
+  font-family: var(--type-stamp);
   font-size: var(--font-size-base);
-  font-weight: var(--weight-bold);
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -428,11 +449,12 @@
 .legendSwatch {
   width: 16px;
   height: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--ink-faint);
+  border-radius: var(--r-sm);
 }
 
 .legendLabel {
-  color: var(--text-secondary);
+  color: var(--ink-soft);
   font-size: var(--font-size-xs);
 }
 
@@ -458,12 +480,13 @@
 
   .map {
     flex: none;
-    min-height: 280px;
+    min-height: 150px;
+    height: clamp(150px, 22dvh, 240px);
   }
 
   .sidePanel {
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
   }
 
@@ -667,7 +690,7 @@
 
   .sidePanel {
     display: grid;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
   }
 

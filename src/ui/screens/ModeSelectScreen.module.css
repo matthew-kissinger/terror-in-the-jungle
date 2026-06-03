@@ -32,9 +32,10 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  border: 1px solid var(--ops-line);
-  background: linear-gradient(180deg, rgba(19, 26, 18, 0.96), rgba(8, 12, 9, 0.92));
-  box-shadow: var(--ops-shadow);
+  border: 1px solid var(--paper-edge);
+  background: linear-gradient(180deg, var(--paper-lt), var(--paper));
+  box-shadow: 2px 3px 10px var(--shadow);
+  border-radius: var(--r);
   padding: clamp(12px, 2vw, 24px) clamp(16px, 2vw, 24px);
 }
 
@@ -47,11 +48,11 @@
 
 .heading {
   margin: 0;
-  color: #f4f0e2;
-  font-family: var(--font-heading);
+  color: var(--ink);
+  font-family: var(--type-stamp);
   font-size: clamp(1.2rem, 4vw, 3.4rem);
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 400;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   line-height: 1.1;
 }
@@ -109,12 +110,38 @@
   composes: metricValue from './ScreenPrimitives.module.css';
 }
 
+/* imperfect file-card tilt */
+.card:nth-child(1) { transform: rotate(-0.6deg); }
+.card:nth-child(2) { transform: rotate(0.5deg); }
+.card:nth-child(3) { transform: rotate(-0.4deg); }
+.card:nth-child(4) { transform: rotate(0.7deg); }
+.card:hover { transform: translateY(-3px) rotate(0deg); }
+
 .cardTdm:hover {
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(248, 113, 113, 0.22);
+  box-shadow: 4px 6px 14px var(--shadow), 0 0 0 2px rgba(158, 59, 46, 0.25);
 }
 
 .cardTdm .metricValue:last-child {
-  color: #fca5a5;
+  color: var(--red);
+}
+
+/* A Shau campaign gets a green rubber stamp */
+.card[data-mode="a_shau_valley"]::after {
+  content: "CAMPAIGN";
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  transform: rotate(8deg);
+  font-family: var(--type-stamp);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--green);
+  border: 2.5px solid var(--green);
+  padding: 3px 8px;
+  border-radius: var(--r-sm);
+  opacity: 0.82;
+  mix-blend-mode: multiply;
+  pointer-events: none;
 }
 
 .backButton {

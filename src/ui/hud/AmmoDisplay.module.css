@@ -13,10 +13,10 @@
   pointer-events: none;
   user-select: none;
   gap: var(--space-0-5);
-  background: rgba(10, 15, 8, 0.75);
-  border-radius: 8px;
+  background: rgba(43, 38, 32, 0.78);
+  border-radius: var(--r);
   padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(231, 217, 186, 0.4);
 }
 
 :global([data-device="touch"]) .container {
@@ -33,11 +33,10 @@
 }
 
 .magazine {
-  font-size: var(--font-size-xl);
-  font-weight: var(--weight-bold);
+  font-size: var(--font-size-2xl);
+  font-family: var(--type-stamp);
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
-  text-shadow: var(--shadow-text);
   transition: color var(--duration-fast) var(--ease-out);
   line-height: 1;
 }
@@ -75,11 +74,11 @@
 
 /* Ammo states */
 .low .magazine {
-  color: var(--accent);
+  color: var(--warn);
 }
 
 .low .status {
-  color: var(--accent);
+  color: var(--warn);
 }
 
 .empty .magazine {

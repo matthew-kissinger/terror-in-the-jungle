@@ -201,9 +201,9 @@
     "postcss": "^8.5.10"
   },
   "dependencies": {
-    "@fontsource-variable/jetbrains-mono": "^5.2.8",
-    "@fontsource/rajdhani": "^5.2.7",
-    "@fontsource/teko": "^5.2.7",
+    "@fontsource/caveat": "^5.2.8",
+    "@fontsource/courier-prime": "^5.2.8",
+    "@fontsource/special-elite": "^5.2.8",
     "@game-field-kits/event-bus": "file:../game-field-kits/packages/event-bus",
     "@game-field-kits/frame-scheduler": "file:../game-field-kits/packages/frame-scheduler",
     "@game-field-kits/three-effect-pool": "file:../game-field-kits/packages/three-effect-pool",

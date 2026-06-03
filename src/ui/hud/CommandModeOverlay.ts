@@ -487,7 +487,7 @@ export class CommandModeOverlay implements LayoutComponent {
       .command-mode-overlay__summary-key,
       .command-mode-overlay__button-hint,
       .command-mode-overlay__hint {
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--font-primary);
         text-transform: uppercase;
         letter-spacing: 0.12em;
         color: rgba(205, 196, 171, 0.62);
@@ -501,7 +501,7 @@ export class CommandModeOverlay implements LayoutComponent {
 
       .command-mode-overlay__title {
         margin: 0;
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--font-primary);
         font-size: 28px;
         font-weight: 700;
         letter-spacing: 0.06em;
@@ -516,7 +516,7 @@ export class CommandModeOverlay implements LayoutComponent {
         border-radius: 10px;
         background: rgba(29, 32, 34, 0.86);
         color: rgba(240, 239, 235, 0.9);
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--font-primary);
         font-size: 12px;
         font-weight: 700;
         letter-spacing: 0.12em;
@@ -578,7 +578,7 @@ export class CommandModeOverlay implements LayoutComponent {
       .command-mode-overlay__summary-value,
       .command-mode-overlay__button-label,
       .command-mode-overlay__note {
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--font-primary);
         color: rgba(243, 241, 233, 0.95);
       }
 

@@ -21,7 +21,7 @@ export class DeathCamOverlay {
 
     this.overlayElement = document.createElement('div');
     this.overlayElement.id = 'death-cam-overlay';
-    this.overlayElement.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9000; display: none; font-family: "Rajdhani", "Segoe UI", sans-serif;';
+    this.overlayElement.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9000; display: none; font-family: "Courier Prime", "Courier New", monospace;';
 
     const vignette = document.createElement('div');
     vignette.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.7) 100%); pointer-events: none;';

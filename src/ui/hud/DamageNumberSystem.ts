@@ -64,7 +64,7 @@ export class DamageNumberSystem {
     element.className = 'damage-number';
     element.style.cssText = `
       position: absolute;
-      font-family: var(--font-primary, 'Rajdhani', sans-serif);
+      font-family: var(--font-primary);
       font-size: 18px;
       font-weight: bold;
       text-shadow:

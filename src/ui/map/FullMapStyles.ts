@@ -50,7 +50,7 @@ export const MAP_STYLES = `
     color: rgba(255, 255, 255, 0.9);
     font-size: 24px;
     font-weight: bold;
-    font-family: var(--font-primary, 'Rajdhani', sans-serif);
+    font-family: var(--font-primary);
     text-transform: uppercase;
     letter-spacing: 4px;
   }
@@ -64,7 +64,7 @@ export const MAP_STYLES = `
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.8);
-    font-family: var(--font-primary, 'Rajdhani', sans-serif);
+    font-family: var(--font-primary);
     font-size: 12px;
   }
 
@@ -98,7 +98,7 @@ export const MAP_STYLES = `
     border-radius: 8px;
     color: rgba(255, 255, 255, 0.8);
     font-size: 20px;
-    font-family: var(--font-primary, 'Rajdhani', sans-serif);
+    font-family: var(--font-primary);
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -113,7 +113,7 @@ export const MAP_STYLES = `
     bottom: 20px;
     left: 20px;
     color: rgba(255, 255, 255, 0.5);
-    font-family: var(--font-primary, 'Rajdhani', sans-serif);
+    font-family: var(--font-primary);
     font-size: 12px;
   }
 
@@ -128,7 +128,7 @@ export const MAP_STYLES = `
   .compass-direction {
     position: absolute;
     color: rgba(255, 255, 255, 0.8);
-    font-family: var(--font-primary, 'Rajdhani', sans-serif);
+    font-family: var(--font-primary);
     font-weight: bold;
     font-size: 16px;
   }
@@ -152,7 +152,7 @@ export const MAP_STYLES = `
     border: 2px solid rgba(255, 255, 255, 0.3);
     color: rgba(255, 255, 255, 0.9);
     font-size: 20px;
-    font-family: var(--font-primary, 'Rajdhani', sans-serif);
+    font-family: var(--font-primary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -181,7 +181,7 @@ export const MAP_STYLES = `
     border: 1px solid rgba(255, 80, 80, 0.5);
     color: rgba(255, 255, 255, 0.9);
     font-size: 20px;
-    font-family: var(--font-primary, 'Rajdhani', sans-serif);
+    font-family: var(--font-primary);
     display: flex;
     align-items: center;
     justify-content: center;

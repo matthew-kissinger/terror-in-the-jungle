@@ -267,7 +267,7 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   }
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.font = `${Math.round(10 * renderScale)}px Rajdhani, sans-serif`;
+  ctx.font = `${Math.round(10 * renderScale)}px "Courier Prime", monospace`;
   ctx.textAlign = 'center';
   ctx.fillText(zone.name, x, y + zoneRadius + 12 * renderScale);
 
@@ -503,7 +503,7 @@ function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderS
       ctx.restore();
     } else {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.font = `bold ${Math.round(10 * renderScale)}px Rajdhani, sans-serif`;
+      ctx.font = `bold ${Math.round(10 * renderScale)}px "Courier Prime", monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('H', x, y);

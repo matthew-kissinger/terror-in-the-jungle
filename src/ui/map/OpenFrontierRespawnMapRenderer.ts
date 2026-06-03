@@ -158,7 +158,7 @@ export class OpenFrontierRespawnMapRenderer {
       ctx.fillRect(x - iconSize/2, y - iconSize/2, iconSize, iconSize);
 
       ctx.fillStyle = '#000';
-      ctx.font = 'bold 12px Rajdhani, sans-serif';
+      ctx.font = 'bold 12px "Courier Prime", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('HQ', x, y);
@@ -172,7 +172,7 @@ export class OpenFrontierRespawnMapRenderer {
     // Spawn indicator for spawnable zones
     if (isSpawnable) {
       ctx.fillStyle = 'rgba(92, 184, 92, 0.9)';
-      ctx.font = 'bold 16px Rajdhani, sans-serif';
+      ctx.font = 'bold 16px "Courier Prime", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillText('⬇', x, y + radius + 3);
@@ -190,7 +190,7 @@ export class OpenFrontierRespawnMapRenderer {
 
     // Zone name with background for better readability
     const name = zone.name.toUpperCase();
-    ctx.font = isSpawnable ? 'bold 11px Rajdhani, sans-serif' : '10px Rajdhani, sans-serif';
+    ctx.font = isSpawnable ? 'bold 11px "Courier Prime", monospace' : '10px "Courier Prime", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
 
@@ -483,7 +483,7 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.fillRect(10, MAP_SIZE - 60, 200, 50);
 
     ctx.fillStyle = 'rgba(220, 225, 230, 0.6)';
-    ctx.font = '11px Rajdhani, sans-serif';
+    ctx.font = '11px "Courier Prime", monospace';
     ctx.textAlign = 'left';
     ctx.fillText('Scroll: Zoom', 15, MAP_SIZE - 45);
     ctx.fillText('Drag: Pan', 15, MAP_SIZE - 30);

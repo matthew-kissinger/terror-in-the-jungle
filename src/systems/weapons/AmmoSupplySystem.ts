@@ -308,7 +308,7 @@ export class AmmoSupplySystem implements GameSystem {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-family: var(--font-primary, 'Rajdhani', sans-serif);
+      font-family: var(--font-primary);
       font-size: 32px;
       font-weight: bold;
       color: rgba(92, 184, 92, 0.95);

@@ -149,7 +149,7 @@ export class PlayerSquadController implements GameSystem {
       padding: 20px 40px;
       border-radius: 6px;
       color: rgba(92, 184, 92, 0.9);
-      font-family: var(--font-primary, 'Rajdhani', sans-serif);
+      font-family: var(--font-primary);
       font-size: 24px;
       font-weight: bold;
       z-index: 10000;
@@ -216,7 +216,7 @@ export class PlayerSquadController implements GameSystem {
       pointer-events: none;
       user-select: none;
       color: rgba(220, 225, 230, 0.55);
-      font-family: var(--font-primary, 'Rajdhani', sans-serif);
+      font-family: var(--font-primary);
       font-size: 9px;
       font-weight: bold;
       letter-spacing: 0.5px;

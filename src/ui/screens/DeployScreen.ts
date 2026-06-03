@@ -275,10 +275,10 @@ export class DeployScreen extends UIComponent {
       if (respawnTimer > 0) {
         const label = this.deploySession?.countdownLabel ?? 'Deployment available in';
         this.timerDisplay.textContent = `${label} ${Math.ceil(respawnTimer)}s`;
-        this.timerDisplay.style.color = 'rgba(212, 163, 68, 0.9)';
+        this.timerDisplay.style.color = 'rgba(168, 116, 42, 0.95)';
       } else {
         this.timerDisplay.textContent = this.deploySession?.readyLabel ?? 'Ready for deployment';
-        this.timerDisplay.style.color = 'rgba(92, 184, 92, 0.9)';
+        this.timerDisplay.style.color = 'rgba(58, 79, 42, 0.95)';
       }
     }
 
@@ -544,10 +544,10 @@ export class DeployScreen extends UIComponent {
     const panel = this.createDiv(styles.legend);
     panel.appendChild(this.createHeading('h4', undefined, styles.panelTitle, 'MAP LEGEND'));
     const items = [
-      { color: 'rgba(91, 140, 201, 0.9)', label: 'HQ / Main Base' },
-      { color: 'rgba(92, 184, 92, 0.85)', label: 'Controlled Zone' },
-      { color: 'rgba(212, 163, 68, 0.85)', label: 'Contested Zone' },
-      { color: 'rgba(201, 86, 74, 0.85)', label: 'Enemy Zone' },
+      { color: 'var(--green-dk)', label: 'HQ / Main Base' },
+      { color: 'var(--green)', label: 'Controlled Zone' },
+      { color: 'var(--warn)', label: 'Contested Zone' },
+      { color: 'var(--red)', label: 'Enemy Zone' },
     ];
 
     for (const item of items) {

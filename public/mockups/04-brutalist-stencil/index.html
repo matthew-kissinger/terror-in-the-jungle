@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>TERROR IN THE JUNGLE // BRUTALIST STENCIL</title>
+<meta name="theme-color" content="#0A0A0A" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Stardos+Stencil:wght@400;700&family=Black+Ops+One&family=Archivo+Black&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body data-screen="menu">
+
+  <!-- ============ HAZARD-STRIPE TICKER / TOP MARGIN ============ -->
+  <div class="hazard-edge hazard-edge--top" aria-hidden="true"></div>
+
+  <!-- ============ NAV / SCREEN SWITCHER ============ -->
+  <nav class="switcher" aria-label="Screen switcher">
+    <div class="switcher__brand">
+      <span class="switcher__stencil">T·I·T·J</span>
+      <span class="switcher__sub">FIELD&nbsp;CONSOLE</span>
+    </div>
+    <div class="switcher__seg" role="tablist" aria-label="Screens">
+      <button class="seg" role="tab" data-go="menu"    aria-selected="true">MENU</button>
+      <button class="seg" role="tab" data-go="modes"    aria-selected="false">MODES</button>
+      <button class="seg" role="tab" data-go="deploy"   aria-selected="false">DEPLOY</button>
+      <button class="seg" role="tab" data-go="combat"   aria-selected="false">COMBAT</button>
+      <button class="seg" role="tab" data-go="loading"  aria-selected="false">LOADING</button>
+    </div>
+    <a class="switcher__bakeoff" href="../index.html">&larr;&nbsp;BAKE-OFF</a>
+  </nav>
+
+  <main class="stage">
+
+    <!-- ==================================================== -->
+    <!-- SCREEN 1 :: MENU                                     -->
+    <!-- ==================================================== -->
+    <section class="screen screen--menu is-active" id="screen-menu" data-screen="menu" aria-label="Main menu">
+      <div class="menu-bg" aria-hidden="true">
+        <div class="menu-bg__sky"></div>
+        <svg class="menu-bg__ridge" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+          <polygon class="ridge ridge--far"  points="0,520 140,470 300,500 470,440 640,490 820,430 1010,485 1180,440 1280,470 1280,720 0,720" />
+          <polygon class="ridge ridge--mid"  points="0,580 180,540 360,575 540,520 720,565 900,515 1090,560 1280,520 1280,720 0,720" />
+          <polygon class="ridge ridge--near" points="0,650 220,615 430,648 640,600 860,645 1080,605 1280,648 1280,720 0,720" />
+        </svg>
+        <div class="menu-bg__palms" aria-hidden="true">
+          <span class="palm palm--1"></span>
+          <span class="palm palm--2"></span>
+          <span class="palm palm--3"></span>
+        </div>
+        <div class="menu-bg__scan"></div>
+      </div>
+
+      <div class="menu-grid">
+        <header class="menu-mast">
+          <p class="menu-kicker"><span class="tick">▮</span> MIL-SPEC // FIELD OPERATIONS TERMINAL</p>
+          <h1 class="menu-title">
+            <span class="menu-title__line">TERROR</span>
+            <span class="menu-title__line menu-title__line--inset">IN&nbsp;THE</span>
+            <span class="menu-title__line">JUNGLE</span>
+          </h1>
+          <div class="menu-tagbar">
+            <span class="stamp stamp--orange">A SHAU VALLEY</span>
+            <span class="stamp stamp--olive">1968</span>
+            <span class="menu-tag-rule" aria-hidden="true"></span>
+          </div>
+        </header>
+
+        <div class="menu-actions">
+          <button class="btn btn--primary" data-go="deploy">
+            <span class="btn__index">01</span>
+            <span class="btn__label">DEPLOY</span>
+            <span class="btn__chev" aria-hidden="true">&#9654;</span>
+          </button>
+          <button class="btn btn--secondary" data-go="modes">
+            <span class="btn__index">02</span>
+            <span class="btn__label">SETTINGS</span>
+          </button>
+          <div class="menu-actions__foot">
+            <button class="link-stencil" data-go="loading">CREDITS</button>
+            <span class="ver-stamp">v0.9</span>
+          </div>
+        </div>
+
+        <aside class="menu-placard" aria-hidden="true">
+          <div class="placard__row"><span>UNIT</span><b>RECON-1</b></div>
+          <div class="placard__row"><span>SECTOR</span><b>A-SHAU</b></div>
+          <div class="placard__row"><span>STATUS</span><b class="ok">READY</b></div>
+          <div class="placard__barcode"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- SCREEN 2 :: MODES                                    -->
+    <!-- ==================================================== -->
+    <section class="screen screen--modes" id="screen-modes" data-screen="modes" aria-label="Select operation" hidden>
+      <header class="sect-head">
+        <h2 class="sect-head__title">SELECT OPERATION</h2>
+        <p class="sect-head__meta"><span class="tick">▮</span> 04 PROFILES LOADED</p>
+      </header>
+
+      <div class="modes-grid">
+
+        <article class="opcard is-selected" tabindex="0" data-mode>
+          <div class="opcard__bar"><span class="opcard__no">01</span><span class="opcard__sel">SELECTED</span></div>
+          <h3 class="opcard__name">ZONE CONTROL</h3>
+          <p class="opcard__tag">Frontline capture, rapid redeploy</p>
+          <dl class="opcard__stats">
+            <div><dt>TEMPO</dt><dd>FAST</dd></div>
+            <div><dt>FORCES</dt><dd class="num">60</dd></div>
+            <div><dt>DURATION</dt><dd class="num">3:00</dd></div>
+            <div><dt>THEATER</dt><dd>FRONTLINE</dd></div>
+          </dl>
+        </article>
+
+        <article class="opcard" tabindex="0" data-mode>
+          <div class="opcard__bar"><span class="opcard__no">02</span><span class="opcard__sel">—</span></div>
+          <h3 class="opcard__name">OPEN FRONTIER</h3>
+          <p class="opcard__tag">Open-map pressure on contested ground</p>
+          <dl class="opcard__stats">
+            <div><dt>TEMPO</dt><dd>MEDIUM</dd></div>
+            <div><dt>FORCES</dt><dd class="num">120</dd></div>
+            <div><dt>DURATION</dt><dd class="num">15:00</dd></div>
+            <div><dt>THEATER</dt><dd>OPEN MAP</dd></div>
+          </dl>
+        </article>
+
+        <article class="opcard" tabindex="0" data-mode>
+          <div class="opcard__bar"><span class="opcard__no">03</span><span class="opcard__sel">—</span></div>
+          <h3 class="opcard__name">TEAM DEATHMATCH</h3>
+          <p class="opcard__tag">Close-quarters combat loop</p>
+          <dl class="opcard__stats">
+            <div><dt>TEMPO</dt><dd>VERY FAST</dd></div>
+            <div><dt>FORCES</dt><dd class="num">30</dd></div>
+            <div><dt>DURATION</dt><dd class="num">5:00</dd></div>
+            <div><dt>THEATER</dt><dd>CLOSE QTRS</dd></div>
+          </dl>
+        </article>
+
+        <article class="opcard opcard--campaign" tabindex="0" data-mode>
+          <div class="opcard__bar"><span class="opcard__no">04</span><span class="opcard__sel opcard__sel--flag">CAMPAIGN</span></div>
+          <h3 class="opcard__name">A SHAU VALLEY</h3>
+          <p class="opcard__tag">Warfront-scale campaign</p>
+          <dl class="opcard__stats">
+            <div><dt>TEMPO</dt><dd>ESCALATING</dd></div>
+            <div><dt>FORCES</dt><dd class="num">3000</dd></div>
+            <div><dt>DURATION</dt><dd class="num">60:00</dd></div>
+            <div><dt>THEATER</dt><dd>VALLEY</dd></div>
+          </dl>
+        </article>
+
+      </div>
+
+      <div class="modes-foot">
+        <button class="btn btn--ghost" data-go="menu"><span class="btn__chev" aria-hidden="true">&#9664;</span><span class="btn__label">BACK</span></button>
+        <button class="btn btn--primary" data-go="deploy"><span class="btn__label">CONFIRM OPERATION</span><span class="btn__chev" aria-hidden="true">&#9654;</span></button>
+      </div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- SCREEN 3 :: DEPLOY (HERO)                            -->
+    <!-- ==================================================== -->
+    <section class="screen screen--deploy" id="screen-deploy" data-screen="deploy" aria-label="Deployment" hidden>
+      <header class="sect-head sect-head--deploy">
+        <h2 class="sect-head__title">DEPLOYMENT // ZONE CONTROL</h2>
+        <div class="sect-head__right">
+          <span class="countdown">DEPLOY IN <b id="dpl-count">0:08</b></span>
+        </div>
+      </header>
+
+      <div class="deploy-layout">
+
+        <!-- COLUMN A : MAP + SPAWN TILES -->
+        <div class="deploy-col deploy-col--map">
+          <div class="panel">
+            <div class="panel__head"><span class="panel__tag">01</span><h3 class="panel__title">SECTOR MAP // SPAWN GRID</h3></div>
+            <div class="panel__body">
+              <div class="tacmap" aria-hidden="true">
+                <svg class="tacmap__svg" viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <pattern id="bsgrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                      <path d="M20 0H0V20" fill="none" stroke="#3B4029" stroke-width="1"/>
+                    </pattern>
+                  </defs>
+                  <rect width="400" height="260" fill="url(#bsgrid)"/>
+                  <polyline points="0,150 90,120 150,150 230,110 320,150 400,120" fill="none" stroke="#3B4029" stroke-width="6"/>
+                  <polygon points="150,260 200,150 250,260" fill="#16170f"/>
+                  <circle class="objective-ping" cx="300" cy="70" r="10" fill="none" stroke="#FF5A1F" stroke-width="3"/>
+                  <circle cx="300" cy="70" r="3" fill="#FF5A1F"/>
+                </svg>
+                <span class="tacmap__obj">OBJ&nbsp;// HILL&nbsp;937</span>
+              </div>
+
+              <ul class="spawn-list" role="listbox" aria-label="Spawn points">
+                <li class="spawn is-selected" role="option" aria-selected="true" tabindex="0" data-spawn>
+                  <span class="spawn__pip" aria-hidden="true"></span>
+                  <span class="spawn__name">FIREBASE ALPHA</span>
+                  <span class="spawn__status s-secure">SECURE</span>
+                  <span class="spawn__dist num">120m</span>
+                </li>
+                <li class="spawn" role="option" aria-selected="false" tabindex="0" data-spawn>
+                  <span class="spawn__pip" aria-hidden="true"></span>
+                  <span class="spawn__name">LZ BRAVO</span>
+                  <span class="spawn__status s-secure">SECURE</span>
+                  <span class="spawn__dist num">240m</span>
+                </li>
+                <li class="spawn" role="option" aria-selected="false" tabindex="0" data-spawn>
+                  <span class="spawn__pip" aria-hidden="true"></span>
+                  <span class="spawn__name">RIDGE OUTPOST</span>
+                  <span class="spawn__status s-contested">CONTESTED</span>
+                  <span class="spawn__dist num">310m</span>
+                </li>
+                <li class="spawn" role="option" aria-selected="false" tabindex="0" data-spawn>
+                  <span class="spawn__pip" aria-hidden="true"></span>
+                  <span class="spawn__name">RIVER CROSSING</span>
+                  <span class="spawn__status s-contested">CONTESTED</span>
+                  <span class="spawn__dist num">180m</span>
+                </li>
+                <li class="spawn" role="option" aria-selected="false" tabindex="0" data-spawn>
+                  <span class="spawn__pip" aria-hidden="true"></span>
+                  <span class="spawn__name">HILL 937</span>
+                  <span class="spawn__status s-hot">HOT</span>
+                  <span class="spawn__dist num">60m</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- COLUMN B : VEHICLES + LOADOUT -->
+        <div class="deploy-col deploy-col--kit">
+
+          <div class="panel">
+            <div class="panel__head"><span class="panel__tag">02</span><h3 class="panel__title">INSERTION VEHICLE</h3></div>
+            <div class="panel__body">
+              <div class="veh-row" role="radiogroup" aria-label="Vehicle">
+                <button class="veh is-selected" role="radio" aria-checked="true" data-veh>
+                  <span class="veh__icon" aria-hidden="true">
+                    <svg viewBox="0 0 40 24"><rect x="2" y="2" width="36" height="2"/><rect x="10" y="6" width="18" height="8"/><rect x="14" y="14" width="4" height="6"/><rect x="22" y="14" width="4" height="6"/><rect x="28" y="9" width="10" height="2"/></svg>
+                  </span>
+                  <span class="veh__name">UH-1 HUEY</span>
+                  <span class="veh__role">TRANSPORT</span>
+                </button>
+                <button class="veh" role="radio" aria-checked="false" data-veh>
+                  <span class="veh__icon" aria-hidden="true">
+                    <svg viewBox="0 0 40 24"><polygon points="2,12 26,9 38,11 38,13 26,15 2,12"/><polygon points="14,6 20,11 14,11"/><polygon points="14,18 20,13 14,13"/></svg>
+                  </span>
+                  <span class="veh__name">F-4 PHANTOM</span>
+                  <span class="veh__role">CLOSE AIR</span>
+                </button>
+                <button class="veh" role="radio" aria-checked="false" data-veh>
+                  <span class="veh__icon" aria-hidden="true">
+                    <svg viewBox="0 0 40 24"><rect x="6" y="8" width="24" height="7"/><rect x="2" y="11" width="6" height="4"/><circle cx="13" cy="18" r="3"/><circle cx="27" cy="18" r="3"/></svg>
+                  </span>
+                  <span class="veh__name">M151 JEEP</span>
+                  <span class="veh__role">GROUND</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel panel--loadout">
+            <div class="panel__head"><span class="panel__tag">03</span><h3 class="panel__title">COMBAT LOADOUT</h3><span class="panel__hint">TAP&nbsp;TO&nbsp;SWAP</span></div>
+            <div class="panel__body">
+              <ul class="loadout">
+
+                <li class="slot" tabindex="0" data-slot>
+                  <div class="slot__top"><span class="slot__role">PRIMARY</span><span class="slot__swap">SWAP&nbsp;⇄</span></div>
+                  <div class="slot__pick"><span class="slot__glyph" aria-hidden="true">▮▬▬</span><span class="slot__name">M16 RIFLE</span></div>
+                  <div class="slot__alts">M14 · M60 LMG · SHOTGUN · M79</div>
+                </li>
+
+                <li class="slot" tabindex="0" data-slot>
+                  <div class="slot__top"><span class="slot__role">SECONDARY</span><span class="slot__swap">SWAP&nbsp;⇄</span></div>
+                  <div class="slot__pick"><span class="slot__glyph" aria-hidden="true">▮▪</span><span class="slot__name">M1911 PISTOL</span></div>
+                  <div class="slot__alts">SAWN-OFF · FLARE GUN</div>
+                </li>
+
+                <li class="slot" tabindex="0" data-slot>
+                  <div class="slot__top"><span class="slot__role">EQUIPMENT</span><span class="slot__swap">SWAP&nbsp;⇄</span></div>
+                  <div class="slot__pick"><span class="slot__glyph slot__glyph--med" aria-hidden="true">+</span><span class="slot__name">MEDKIT</span></div>
+                  <div class="slot__alts">SANDBAGS · MORTAR · RADIO</div>
+                </li>
+
+                <li class="slot" tabindex="0" data-slot>
+                  <div class="slot__top"><span class="slot__role">EXPLOSIVE</span><span class="slot__swap">SWAP&nbsp;⇄</span></div>
+                  <div class="slot__pick"><span class="slot__glyph" aria-hidden="true">◆</span><span class="slot__name">M67 GRENADE</span><span class="slot__qty">x3</span></div>
+                  <div class="slot__alts">SMOKE · C4</div>
+                </li>
+
+              </ul>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="deploy-foot">
+        <button class="btn btn--ghost" data-go="modes"><span class="btn__chev" aria-hidden="true">&#9664;</span><span class="btn__label">BACK</span></button>
+        <button class="btn btn--primary btn--deploy" data-go="combat">
+          <span class="btn__label">DEPLOY</span>
+          <span class="btn__count">IN <b id="dpl-count-2">0:08</b></span>
+          <span class="btn__chev" aria-hidden="true">&#9654;</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- SCREEN 4 :: COMBAT HUD                               -->
+    <!-- ==================================================== -->
+    <section class="screen screen--combat" id="screen-combat" data-screen="combat" aria-label="Combat HUD" hidden>
+      <div class="combat-bg" aria-hidden="true">
+        <div class="combat-bg__sky"></div>
+        <svg class="combat-bg__ridge" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMax slice">
+          <polygon points="0,560 200,520 420,555 660,500 900,550 1140,505 1280,545 1280,720 0,720" fill="#171a0f"/>
+          <polygon points="0,640 260,605 520,640 780,595 1040,635 1280,600 1280,720 0,720" fill="#0d0f08"/>
+        </svg>
+        <div class="combat-bg__canopy"></div>
+        <div class="combat-bg__haze"></div>
+      </div>
+
+      <div class="hud" data-mobile="off">
+
+        <!-- top-left : objective + tickets -->
+        <div class="hud-block hud-objective">
+          <div class="hud-objective__head"><span class="tick">▮</span> OBJECTIVE</div>
+          <div class="hud-objective__name">CAPTURE HILL 937</div>
+          <div class="hud-meter"><span class="hud-meter__fill" style="width:64%"></span><span class="hud-meter__num num">64%</span></div>
+          <div class="tickets">
+            <div class="ticket ticket--allied"><span>ALLIED</span><b class="num">412</b></div>
+            <div class="ticket ticket--hostile"><span>HOSTILE</span><b class="num">388</b></div>
+          </div>
+        </div>
+
+        <!-- top-center : timer -->
+        <div class="hud-block hud-timer">
+          <span class="hud-timer__lbl">MATCH</span>
+          <span class="hud-timer__val num">12:47</span>
+        </div>
+
+        <!-- top-right : compass + minimap -->
+        <div class="hud-block hud-topright">
+          <div class="compass"><span class="compass__hdg num">047</span><span class="compass__lbl">HDG</span></div>
+          <div class="minimap" aria-hidden="true">
+            <svg viewBox="0 0 100 100">
+              <rect width="100" height="100" fill="#0d0f08"/>
+              <path d="M0 40 L40 30 L70 45 L100 35" fill="none" stroke="#3B4029" stroke-width="3"/>
+              <polyline points="20,100 50,55 80,100" fill="none" stroke="#3B4029" stroke-width="2"/>
+              <circle cx="72" cy="34" r="6" fill="none" stroke="#FF5A1F" stroke-width="2"/>
+              <rect x="46" y="62" width="8" height="8" fill="#FF5A1F"/>
+              <rect x="30" y="40" width="5" height="5" fill="#C7C5BE"/>
+              <rect x="64" y="70" width="5" height="5" fill="#C7C5BE"/>
+            </svg>
+            <span class="minimap__tag">MAP</span>
+          </div>
+        </div>
+
+        <!-- kill feed -->
+        <ul class="killfeed" aria-label="Kill feed">
+          <li class="kf"><span class="kf__a">RECON-1</span><span class="kf__w">M16</span><span class="kf__b">NVA REGULAR</span></li>
+          <li class="kf"><span class="kf__a">DELTA-3</span><span class="kf__w">M79</span><span class="kf__b">VC SAPPER</span></li>
+          <li class="kf"><span class="kf__a">RECON-1</span><span class="kf__w">M1911</span><span class="kf__b">NVA SCOUT</span></li>
+        </ul>
+
+        <!-- center reticle + hitmarker -->
+        <div class="reticle" aria-hidden="true">
+          <span class="reticle__bar reticle__bar--t"></span>
+          <span class="reticle__bar reticle__bar--b"></span>
+          <span class="reticle__bar reticle__bar--l"></span>
+          <span class="reticle__bar reticle__bar--r"></span>
+          <span class="reticle__dot"></span>
+          <span class="hitmarker"><i></i><i></i><i></i><i></i></span>
+        </div>
+
+        <!-- bottom-left : health -->
+        <div class="hud-block hud-health">
+          <div class="hud-stat__lbl">HEALTH</div>
+          <div class="hud-stat__big"><span class="num" id="hp-val">78</span><span class="hud-stat__max">/100</span></div>
+          <div class="hud-meter hud-meter--hp"><span class="hud-meter__fill" style="width:78%"></span></div>
+        </div>
+
+        <!-- bottom-right : ammo + grenades -->
+        <div class="hud-block hud-ammo">
+          <div class="hud-ammo__weapon">M16</div>
+          <div class="hud-stat__big hud-stat__big--right"><span class="num">24</span><span class="hud-stat__max">/120</span></div>
+          <div class="hud-gren"><span>GRENADES</span><b class="num">x3</b></div>
+        </div>
+
+        <!-- ====== MOBILE CONTROLS ====== -->
+        <div class="mctrl mctrl--left" aria-hidden="true">
+          <div class="joystick"><span class="joystick__base"></span><span class="joystick__nub"></span></div>
+          <span class="mctrl__cap">MOVE</span>
+        </div>
+        <div class="mctrl mctrl--right" aria-hidden="true">
+          <button class="mbtn mbtn--ads">ADS</button>
+          <button class="mbtn mbtn--rel">REL</button>
+          <button class="mbtn mbtn--gren">◆</button>
+          <button class="mbtn mbtn--fire">FIRE</button>
+        </div>
+      </div>
+
+      <button class="mobile-toggle" id="mobileToggle" aria-pressed="false">MOBILE&nbsp;HUD: <b>OFF</b></button>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- SCREEN 5 :: LOADING                                  -->
+    <!-- ==================================================== -->
+    <section class="screen screen--loading" id="screen-loading" data-screen="loading" aria-label="Loading" hidden>
+      <div class="loading-wrap">
+        <header class="loading-head">
+          <p class="menu-kicker"><span class="tick">▮</span> INSERTING INTO THEATER</p>
+          <h2 class="loading-title">A SHAU VALLEY</h2>
+          <span class="loading-sub">1968 // ZONE CONTROL</span>
+        </header>
+
+        <div class="loadbar">
+          <div class="loadbar__track"><span class="loadbar__fill" style="width:62%"></span></div>
+          <div class="loadbar__meta">
+            <span class="loadbar__phase">PHASE: <b>MODELS</b></span>
+            <span class="loadbar__pct num">62%</span>
+          </div>
+        </div>
+
+        <ol class="phases">
+          <li class="ph ph--done"><span class="ph__box">✓</span><span class="ph__name">INITIALIZING</span></li>
+          <li class="ph ph--done"><span class="ph__box">✓</span><span class="ph__name">TERRAIN</span></li>
+          <li class="ph ph--done"><span class="ph__box">✓</span><span class="ph__name">SHADERS</span></li>
+          <li class="ph ph--active"><span class="ph__box">▮</span><span class="ph__name">MODELS</span></li>
+          <li class="ph"><span class="ph__box">·</span><span class="ph__name">AUDIO</span></li>
+          <li class="ph"><span class="ph__box">·</span><span class="ph__name">READY</span></li>
+        </ol>
+
+        <div class="tipbox">
+          <span class="tipbox__lbl">FIELD TIP</span>
+          <p class="tipbox__txt" id="tipText">Suppressing fire pins the enemy in place.</p>
+        </div>
+      </div>
+      <div class="loading-stripes" aria-hidden="true"></div>
+    </section>
+
+  </main>
+
+  <div class="hazard-edge hazard-edge--bottom" aria-hidden="true"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

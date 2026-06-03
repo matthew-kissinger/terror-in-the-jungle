@@ -30,6 +30,7 @@ Active directive list. Each row is binary `open` / `code-complete` / `done` / `c
 | DEFEKT-3 | Combat AI p99 anchor | open (O(1) path wired; perf unproven) | combat | `cover-grid-wiring` (cycle-2026-05-28) wired O(1) `CoverSpatialGrid` into prod combat; combat120 p99 PASS unproven — no baseline is tracked (`perf-baselines.json` removed) so `perf:compare` is non-gating; see [perf-trust.md](state/perf-trust.md) | Sync cover search in `AIStateEngage.initiateSquadSuppression` no longer dominates p99; combat120 p99 ≤35ms PASS |
 | DEFEKT-6 | Terrain occlusion and fire authority | open | combat / terrain / navigation / materialization | `2026-05-11T19-14-54-162Z/konveyer-terrain-fire-authority` | Reproduce/disprove fire-through-terrain with browser evidence and identify authoritative LOS query — see [memo](directives/defekt-6.md) |
 | DIZAYN-3 | Liberty of proposal | open | design | (none) | Visual/feel proposals can land on any directive; engineering reject requires written rationale |
+| DIZAYN-4 | Field Journal UI direction + frontend wiring | open (campaign prepped, paused) | design / UI | bake-off won 2026-06-03; plan [CAMPAIGN_2026-06-03-field-journal-frontend](CAMPAIGN_2026-06-03-field-journal-frontend.md) + spec [FIELD_JOURNAL_UI](FIELD_JOURNAL_UI.md); 10 mockups in `public/mockups/` | Field Journal wired across every frontend surface; all old styling removed; no fallbacks; HUD layout re-solved on PC + mobile with nothing off-canvas / no scroll-to-see. Umbrella advancing UX-2 / UX-3 / UX-4 |
 
 ## Recently closed (last 10)
 

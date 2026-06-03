@@ -246,7 +246,7 @@ export class UnifiedWeaponBar {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        font-family: var(--font-primary);
         transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
         backdrop-filter: blur(6px);
         gap: 2px;

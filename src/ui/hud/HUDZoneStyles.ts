@@ -18,14 +18,14 @@ export const HUDZoneStyles = `
   }
 
   .objectives-title {
-    font-size: 10px;
-    font-weight: 700;
+    font-size: 11px;
+    font-family: ${fontStack.stamp};
     margin-bottom: 6px;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    border-bottom: 1px solid ${colors.hudBorder};
+    border-bottom: 1px dashed ${colors.hudBorder};
     padding-bottom: 4px;
-    color: ${colors.textMuted};
+    color: ${colors.textSecondary};
   }
 
   .zone-item {

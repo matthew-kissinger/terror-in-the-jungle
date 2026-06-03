@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>TERROR IN THE JUNGLE — Combat Film / 16mm</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%231A1712'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23C8442A'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ====================== GLOBAL FILM OVERLAYS ====================== -->
+<!-- These sit above everything, below the chrome, to sell the "footage frame" -->
+<div class="film-stack" aria-hidden="true">
+  <div class="fs-vignette"></div>
+  <div class="fs-grain"></div>
+  <div class="fs-scratches"></div>
+  <div class="fs-leak fs-leak--a"></div>
+  <div class="fs-leak fs-leak--b"></div>
+  <div class="fs-flicker"></div>
+</div>
+
+<!-- The whole app jitters very subtly = gate weave -->
+<div class="gate" id="gate">
+
+  <!-- ====================== SCREEN: MENU ====================== -->
+  <section class="screen screen--menu is-active" id="screen-menu" data-screen="menu">
+    <div class="frame-marks" aria-hidden="true">
+      <span class="mark tl"></span><span class="mark tr"></span>
+      <span class="mark bl"></span><span class="mark br"></span>
+    </div>
+
+    <!-- ambient backdrop: CSS jungle ridgeline + fog + sun haze -->
+    <div class="menu-bg" aria-hidden="true">
+      <div class="mb-sky"></div>
+      <div class="mb-sun"></div>
+      <div class="mb-fog mb-fog--far"></div>
+      <svg class="mb-ridge mb-ridge--far" viewBox="0 0 1440 400" preserveAspectRatio="none">
+        <path d="M0,260 L120,210 L260,250 L380,190 L520,240 L660,170 L820,235 L980,180 L1140,245 L1300,195 L1440,240 L1440,400 L0,400 Z"/>
+      </svg>
+      <div class="mb-fog mb-fog--mid"></div>
+      <svg class="mb-ridge mb-ridge--mid" viewBox="0 0 1440 400" preserveAspectRatio="none">
+        <path d="M0,300 L100,250 L230,300 L360,240 L500,300 L640,250 L780,310 L940,250 L1100,310 L1280,255 L1440,300 L1440,400 L0,400 Z"/>
+      </svg>
+      <div class="mb-trees" aria-hidden="true"></div>
+      <div class="mb-fog mb-fog--near"></div>
+    </div>
+
+    <div class="rec-stamp">
+      <span class="rec-dot"></span><span class="rec-text">REC</span>
+    </div>
+    <div class="date-stamp">A SHAU VALLEY&nbsp;&nbsp;03&nbsp;1968</div>
+
+    <div class="menu-inner">
+      <p class="menu-slate">REEL 01 — CARTRIDGE LOADED</p>
+      <h1 class="menu-title">
+        <span class="mt-line">TERROR</span>
+        <span class="mt-line mt-line--in">IN THE</span>
+        <span class="mt-line">JUNGLE</span>
+      </h1>
+      <p class="menu-tagline"><span class="tag-tick">▮</span> A SHAU VALLEY 1968</p>
+
+      <div class="menu-actions">
+        <button class="btn btn--primary" data-go="deploy">
+          <span class="btn-label">DEPLOY</span>
+          <span class="btn-sub">ROLL CAMERA</span>
+        </button>
+        <button class="btn btn--ghost" data-go="modes">SETTINGS</button>
+      </div>
+
+      <div class="menu-foot">
+        <button class="link-tertiary" data-go="loading">CREDITS</button>
+        <span class="foot-sep">·</span>
+        <span class="version">v0.9 · 16MM REVERSAL STOCK</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== SCREEN: MODES ====================== -->
+  <section class="screen screen--modes" id="screen-modes" data-screen="modes">
+    <div class="frame-marks" aria-hidden="true">
+      <span class="mark tl"></span><span class="mark tr"></span>
+      <span class="mark bl"></span><span class="mark br"></span>
+    </div>
+    <div class="rec-stamp"><span class="rec-dot"></span><span class="rec-text">REC</span></div>
+    <div class="date-stamp">A SHAU VALLEY&nbsp;&nbsp;03&nbsp;1968</div>
+
+    <header class="sec-head">
+      <p class="sec-kicker">FOOTAGE LOG / OPERATIONS</p>
+      <h2 class="sec-title">SELECT OPERATION</h2>
+      <p class="sec-note">Four reels recovered. Choose theater of record.</p>
+    </header>
+
+    <div class="modes-grid">
+      <!-- ZONE CONTROL -->
+      <button class="op-card is-selected" data-op="zone">
+        <span class="op-clip">CLIP 04-A</span>
+        <span class="op-sel-tag">● ROLLING</span>
+        <h3 class="op-name">ZONE CONTROL</h3>
+        <p class="op-tag">Frontline capture, rapid redeploy</p>
+        <dl class="op-stats">
+          <div><dt>TEMPO</dt><dd>Fast</dd></div>
+          <div><dt>FORCES</dt><dd>60</dd></div>
+          <div><dt>DURATION</dt><dd>3:00</dd></div>
+          <div><dt>THEATER</dt><dd>Frontline</dd></div>
+        </dl>
+      </button>
+
+      <!-- OPEN FRONTIER -->
+      <button class="op-card" data-op="frontier">
+        <span class="op-clip">CLIP 04-B</span>
+        <h3 class="op-name">OPEN FRONTIER</h3>
+        <p class="op-tag">Open-map pressure on contested ground</p>
+        <dl class="op-stats">
+          <div><dt>TEMPO</dt><dd>Medium</dd></div>
+          <div><dt>FORCES</dt><dd>120</dd></div>
+          <div><dt>DURATION</dt><dd>15:00</dd></div>
+          <div><dt>THEATER</dt><dd>Open map</dd></div>
+        </dl>
+      </button>
+
+      <!-- TEAM DEATHMATCH -->
+      <button class="op-card" data-op="tdm">
+        <span class="op-clip">CLIP 04-C</span>
+        <h3 class="op-name">TEAM DEATHMATCH</h3>
+        <p class="op-tag">Close-quarters combat loop</p>
+        <dl class="op-stats">
+          <div><dt>TEMPO</dt><dd>Very fast</dd></div>
+          <div><dt>FORCES</dt><dd>30</dd></div>
+          <div><dt>DURATION</dt><dd>5:00</dd></div>
+          <div><dt>THEATER</dt><dd>Close quarters</dd></div>
+        </dl>
+      </button>
+
+      <!-- A SHAU VALLEY -->
+      <button class="op-card op-card--feature" data-op="ashau">
+        <span class="op-clip">CLIP 04-D</span>
+        <span class="op-reel-badge">FEATURE REEL</span>
+        <h3 class="op-name">A SHAU VALLEY</h3>
+        <p class="op-tag">Warfront-scale campaign</p>
+        <dl class="op-stats">
+          <div><dt>TEMPO</dt><dd>Escalating</dd></div>
+          <div><dt>FORCES</dt><dd>3000</dd></div>
+          <div><dt>DURATION</dt><dd>60:00</dd></div>
+          <div><dt>THEATER</dt><dd>Valley campaign</dd></div>
+        </dl>
+      </button>
+    </div>
+
+    <div class="modes-foot">
+      <button class="btn btn--ghost btn--sm" data-go="menu">BACK</button>
+      <button class="btn btn--primary btn--sm" data-go="deploy"><span class="btn-label">CONFIRM REEL</span></button>
+    </div>
+  </section>
+
+  <!-- ====================== SCREEN: DEPLOY (HERO) ====================== -->
+  <section class="screen screen--deploy" id="screen-deploy" data-screen="deploy">
+    <div class="frame-marks" aria-hidden="true">
+      <span class="mark tl"></span><span class="mark tr"></span>
+      <span class="mark bl"></span><span class="mark br"></span>
+    </div>
+    <div class="rec-stamp"><span class="rec-dot"></span><span class="rec-text">REC</span></div>
+    <div class="date-stamp">A SHAU VALLEY&nbsp;&nbsp;03&nbsp;1968</div>
+
+    <header class="sec-head sec-head--deploy">
+      <p class="sec-kicker">RECON PRINT / GREASE-PENCIL BRIEF</p>
+      <h2 class="sec-title">DEPLOYMENT</h2>
+    </header>
+
+    <div class="deploy-layout">
+
+      <!-- MAP: grainy aerial recon photo -->
+      <div class="dp-map-wrap panel">
+        <div class="panel-tab">AERIAL RECON 1:25k</div>
+        <div class="dp-map" id="deployMap">
+          <svg class="recon-art" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <defs>
+              <radialGradient id="reconWash" cx="42%" cy="36%" r="80%">
+                <stop offset="0%" stop-color="#5b5a3c"/>
+                <stop offset="55%" stop-color="#3a3a26"/>
+                <stop offset="100%" stop-color="#1f2014"/>
+              </radialGradient>
+            </defs>
+            <rect width="600" height="600" fill="url(#reconWash)"/>
+            <!-- river -->
+            <path class="rc-river" d="M-20,150 C120,200 180,300 320,330 C440,356 500,470 640,520" />
+            <!-- tributary -->
+            <path class="rc-river rc-river--thin" d="M320,330 C300,400 360,440 380,560" />
+            <!-- ridges / contour scribbles -->
+            <path class="rc-contour" d="M80,90 C200,60 360,120 520,80"/>
+            <path class="rc-contour" d="M60,140 C200,120 380,170 540,130"/>
+            <path class="rc-contour" d="M120,420 C240,400 360,440 500,410"/>
+            <path class="rc-contour rc-contour--faint" d="M40,300 C180,280 360,320 560,300"/>
+            <!-- treeline stipple -->
+            <g class="rc-trees">
+              <circle cx="150" cy="470" r="9"/><circle cx="172" cy="486" r="11"/><circle cx="196" cy="468" r="8"/>
+              <circle cx="120" cy="490" r="10"/><circle cx="220" cy="490" r="9"/><circle cx="250" cy="475" r="7"/>
+              <circle cx="430" cy="200" r="9"/><circle cx="455" cy="216" r="11"/><circle cx="480" cy="198" r="8"/>
+              <circle cx="410" cy="220" r="7"/><circle cx="500" cy="214" r="9"/>
+            </g>
+            <!-- grease-pencil grid -->
+            <g class="rc-grid">
+              <line x1="0" y1="120" x2="600" y2="120"/><line x1="0" y1="280" x2="600" y2="280"/>
+              <line x1="0" y1="440" x2="600" y2="440"/>
+              <line x1="160" y1="0" x2="160" y2="600"/><line x1="320" y1="0" x2="320" y2="600"/>
+              <line x1="480" y1="0" x2="480" y2="600"/>
+            </g>
+          </svg>
+
+          <!-- objective marker -->
+          <div class="map-obj" style="left:60%;top:28%">
+            <span class="mo-ring"></span>
+            <span class="mo-x"></span>
+            <span class="mo-label">OBJ · HILL 937</span>
+          </div>
+
+          <!-- spawn pins (positions in %) -->
+          <button class="map-pin" data-spawn="alpha"  style="left:23%;top:70%"><span class="pin-dot"></span><span class="pin-tag">A</span></button>
+          <button class="map-pin" data-spawn="bravo"  style="left:40%;top:54%"><span class="pin-dot"></span><span class="pin-tag">B</span></button>
+          <button class="map-pin" data-spawn="ridge"  style="left:74%;top:62%"><span class="pin-dot"></span><span class="pin-tag">R</span></button>
+          <button class="map-pin" data-spawn="river"  style="left:52%;top:78%"><span class="pin-dot"></span><span class="pin-tag">X</span></button>
+          <button class="map-pin is-hot is-selected" data-spawn="hill" style="left:62%;top:33%"><span class="pin-dot"></span><span class="pin-tag">937</span></button>
+
+          <div class="map-stampcorner">FRAME 1138 · f/5.6 · 1/250</div>
+        </div>
+      </div>
+
+      <!-- SPAWN LIST -->
+      <div class="dp-spawn panel">
+        <div class="panel-tab">INSERTION POINTS</div>
+        <ul class="spawn-list" id="spawnList">
+          <li><button class="spawn-row" data-spawn="alpha">
+            <span class="sr-name">FIREBASE ALPHA</span>
+            <span class="sr-meta"><span class="status status--secure">SECURE</span><span class="sr-dist">120m</span></span>
+          </button></li>
+          <li><button class="spawn-row" data-spawn="bravo">
+            <span class="sr-name">LZ BRAVO</span>
+            <span class="sr-meta"><span class="status status--secure">SECURE</span><span class="sr-dist">240m</span></span>
+          </button></li>
+          <li><button class="spawn-row" data-spawn="ridge">
+            <span class="sr-name">RIDGE OUTPOST</span>
+            <span class="sr-meta"><span class="status status--contested">CONTESTED</span><span class="sr-dist">310m</span></span>
+          </button></li>
+          <li><button class="spawn-row" data-spawn="river">
+            <span class="sr-name">RIVER CROSSING</span>
+            <span class="sr-meta"><span class="status status--contested">CONTESTED</span><span class="sr-dist">180m</span></span>
+          </button></li>
+          <li><button class="spawn-row is-selected" data-spawn="hill">
+            <span class="sr-name">HILL 937</span>
+            <span class="sr-meta"><span class="status status--hot">HOT</span><span class="sr-dist">60m</span></span>
+          </button></li>
+        </ul>
+
+        <div class="dp-vehicles">
+          <p class="dp-sub">DEPLOY VEHICLE</p>
+          <div class="veh-row">
+            <button class="veh is-selected" data-veh="huey">
+              <svg viewBox="0 0 48 24" class="veh-ico" aria-hidden="true"><path d="M6 14h26l8-4-2 6H10z M2 8h20 M16 6v4 M30 14v4 M22 18h12"/></svg>
+              <span class="veh-name">UH-1 HUEY</span><span class="veh-role">TRANSPORT</span>
+            </button>
+            <button class="veh" data-veh="phantom">
+              <svg viewBox="0 0 48 24" class="veh-ico" aria-hidden="true"><path d="M2 12h30l12-3-4 3 4 3-12-3 M14 12l-6-6 M14 12l-6 6 M32 9l4-4 M32 15l4 4"/></svg>
+              <span class="veh-name">F-4 PHANTOM</span><span class="veh-role">CLOSE AIR</span>
+            </button>
+            <button class="veh" data-veh="jeep">
+              <svg viewBox="0 0 48 24" class="veh-ico" aria-hidden="true"><path d="M4 16h40 M8 16v-5h26v5 M14 11V7h12v4 M12 16a3 3 0 106 0 M30 16a3 3 0 106 0"/></svg>
+              <span class="veh-name">M151 JEEP</span><span class="veh-role">GROUND</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOADOUT -->
+      <div class="dp-loadout panel">
+        <div class="panel-tab">LOADOUT MANIFEST</div>
+
+        <div class="lo-slots" id="loadoutSlots">
+          <!-- PRIMARY -->
+          <div class="lo-slot" data-slot="primary">
+            <div class="lo-head"><span class="lo-kind">PRIMARY</span><span class="lo-swap">SWAP ▸</span></div>
+            <div class="lo-pick">
+              <svg viewBox="0 0 64 18" class="lo-ico" aria-hidden="true"><path d="M2 8h44 M46 8l14-2-2 6-12-1 M10 8v4 M20 8v3 M6 6h10v2H6z"/></svg>
+              <span class="lo-name">M16 RIFLE</span>
+            </div>
+            <div class="lo-alts">
+              <span class="alt is-current">M16</span><span class="alt">M14</span><span class="alt">M60 LMG</span><span class="alt">Shotgun</span><span class="alt">M79 Launcher</span>
+            </div>
+          </div>
+          <!-- SECONDARY -->
+          <div class="lo-slot" data-slot="secondary">
+            <div class="lo-head"><span class="lo-kind">SECONDARY</span><span class="lo-swap">SWAP ▸</span></div>
+            <div class="lo-pick">
+              <svg viewBox="0 0 64 18" class="lo-ico" aria-hidden="true"><path d="M14 6h22v5H20l-2 4-3-4h-1z M16 11v4 M36 6l8 1v3l-8 0"/></svg>
+              <span class="lo-name">M1911 PISTOL</span>
+            </div>
+            <div class="lo-alts">
+              <span class="alt is-current">M1911</span><span class="alt">Sawn-off</span><span class="alt">Flare gun</span>
+            </div>
+          </div>
+          <!-- EQUIPMENT -->
+          <div class="lo-slot" data-slot="equipment">
+            <div class="lo-head"><span class="lo-kind">EQUIPMENT</span><span class="lo-swap">SWAP ▸</span></div>
+            <div class="lo-pick">
+              <svg viewBox="0 0 64 18" class="lo-ico" aria-hidden="true"><rect x="20" y="3" width="24" height="13" rx="2"/><path d="M32 6v7 M28.5 9.5h7"/></svg>
+              <span class="lo-name">MEDKIT</span>
+            </div>
+            <div class="lo-alts">
+              <span class="alt is-current">Medkit</span><span class="alt">Sandbags</span><span class="alt">Mortar</span><span class="alt">Radio</span>
+            </div>
+          </div>
+          <!-- EXPLOSIVE -->
+          <div class="lo-slot" data-slot="explosive">
+            <div class="lo-head"><span class="lo-kind">EXPLOSIVE</span><span class="lo-swap">SWAP ▸</span></div>
+            <div class="lo-pick">
+              <svg viewBox="0 0 64 18" class="lo-ico" aria-hidden="true"><circle cx="30" cy="11" r="5"/><path d="M30 6V3 M30 3h4 M27 8l-2-2"/></svg>
+              <span class="lo-name">M67 GRENADE</span><span class="lo-qty">×3</span>
+            </div>
+            <div class="lo-alts">
+              <span class="alt is-current">M67 ×3</span><span class="alt">Smoke</span><span class="alt">C4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DEPLOY BAR -->
+      <div class="dp-bar panel">
+        <button class="btn btn--ghost btn--sm dp-back" data-go="modes">◂ BACK</button>
+        <div class="dp-countdown">
+          <span class="dc-label">DEPLOY IN</span>
+          <span class="dc-time" id="deployCount">0:08</span>
+        </div>
+        <button class="btn btn--primary btn--deploy" data-go="combat">
+          <span class="btn-label">DEPLOY</span>
+          <span class="btn-sub">CUE INSERTION</span>
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ====================== SCREEN: COMBAT (HUD) ====================== -->
+  <section class="screen screen--combat" id="screen-combat" data-screen="combat">
+
+    <!-- battlefield backdrop -->
+    <div class="combat-bg" aria-hidden="true">
+      <div class="cb-sky"></div>
+      <div class="cb-haze"></div>
+      <svg class="cb-ridge" viewBox="0 0 1440 500" preserveAspectRatio="none">
+        <path d="M0,300 L160,250 L320,300 L460,240 L620,300 L780,250 L940,310 L1120,250 L1280,300 L1440,255 L1440,500 L0,500 Z"/>
+      </svg>
+      <div class="cb-smoke cb-smoke--a"></div>
+      <div class="cb-smoke cb-smoke--b"></div>
+      <div class="cb-foliage cb-foliage--l"></div>
+      <div class="cb-foliage cb-foliage--r"></div>
+      <div class="cb-tracer"></div>
+    </div>
+
+    <!-- viewfinder framelines -->
+    <div class="vf" aria-hidden="true">
+      <span class="vf-corner vf-tl"></span><span class="vf-corner vf-tr"></span>
+      <span class="vf-corner vf-bl"></span><span class="vf-corner vf-br"></span>
+      <span class="vf-tick vf-tick-l"></span><span class="vf-tick vf-tick-r"></span>
+    </div>
+
+    <!-- top viewfinder bar: REC + battery + timer -->
+    <div class="vf-top">
+      <div class="vf-rec"><span class="rec-dot"></span> REC <span class="vf-tc" id="combatTimer">12:47</span></div>
+      <div class="vf-exposure">
+        <span class="ev-label">EV</span>
+        <span class="ev-tick"></span><span class="ev-tick"></span><span class="ev-tick on"></span><span class="ev-tick on"></span><span class="ev-tick on"></span><span class="ev-tick"></span><span class="ev-tick"></span>
+      </div>
+      <div class="vf-batt"><span class="batt-shell"><span class="batt-fill"></span></span><span class="batt-pct">74%</span></div>
+    </div>
+
+    <!-- tickets strip -->
+    <div class="hud-tickets">
+      <div class="tk tk--allied"><span class="tk-side">ALLIED</span><span class="tk-num">412</span></div>
+      <div class="tk-vs">VS</div>
+      <div class="tk tk--hostile"><span class="tk-side">HOSTILE</span><span class="tk-num">388</span></div>
+    </div>
+
+    <!-- objective -->
+    <div class="hud-obj">
+      <p class="obj-label">CAPTURE HILL 937</p>
+      <div class="obj-bar"><span class="obj-fill" style="width:64%"></span></div>
+      <p class="obj-pct">64%</p>
+    </div>
+
+    <!-- kill feed -->
+    <ul class="hud-feed">
+      <li><span class="kf-actor">RECON-1</span><span class="kf-wpn">M16</span><span class="kf-victim">NVA REGULAR</span></li>
+      <li><span class="kf-actor">DOC-3</span><span class="kf-wpn">M1911</span><span class="kf-victim">NVA SAPPER</span></li>
+      <li><span class="kf-actor allied-down">HOSTILE</span><span class="kf-wpn">RPG</span><span class="kf-victim">BRAVO-2</span></li>
+    </ul>
+
+    <!-- compass -->
+    <div class="hud-compass">
+      <div class="cmp-strip">
+        <span>N</span><span>·</span><span>03</span><span>·</span><span>06</span><span>E</span><span>·</span><span>12</span><span>·</span><span>S</span>
+      </div>
+      <span class="cmp-needle"></span>
+      <span class="cmp-read">047</span>
+    </div>
+
+    <!-- minimap -->
+    <div class="hud-minimap">
+      <div class="mm-frame">
+        <svg viewBox="0 0 120 120" class="mm-art" aria-hidden="true">
+          <rect width="120" height="120" fill="#23241a"/>
+          <path class="mm-river" d="M-5,40 C30,55 50,80 120,90"/>
+          <line class="mm-grid" x1="40" y1="0" x2="40" y2="120"/><line class="mm-grid" x1="80" y1="0" x2="80" y2="120"/>
+          <line class="mm-grid" x1="0" y1="40" x2="120" y2="40"/><line class="mm-grid" x1="0" y1="80" x2="120" y2="80"/>
+        </svg>
+        <span class="mm-obj"></span>
+        <span class="mm-self"></span>
+        <span class="mm-dotA" style="left:30%;top:60%"></span>
+        <span class="mm-dotA" style="left:55%;top:48%"></span>
+        <span class="mm-dotH" style="left:70%;top:35%"></span>
+      </div>
+      <span class="mm-label">SECTOR 04</span>
+    </div>
+
+    <!-- crosshair + hitmarker -->
+    <div class="hud-cross" aria-hidden="true">
+      <span class="cross-l"></span><span class="cross-r"></span><span class="cross-t"></span><span class="cross-b"></span>
+      <span class="cross-dot"></span>
+      <span class="hitmarker"></span>
+    </div>
+
+    <!-- bottom-left: health -->
+    <div class="hud-health">
+      <span class="hl-label">VITALS</span>
+      <div class="hl-bar"><span class="hl-fill" style="width:78%"></span></div>
+      <span class="hl-num">78<small>/100</small></span>
+    </div>
+
+    <!-- bottom-right: ammo -->
+    <div class="hud-ammo">
+      <span class="am-wpn">M16</span>
+      <span class="am-count"><b id="ammoMag">24</b><small>/120</small></span>
+      <span class="am-gren">GRENADE ×3</span>
+    </div>
+
+    <!-- MOBILE controls (visible on phone breakpoint OR when toggled) -->
+    <div class="mobile-controls" id="mobileControls">
+      <div class="mc-joy" aria-hidden="true"><span class="mc-knob"></span></div>
+      <div class="mc-right">
+        <div class="mc-ammo"><span class="mca-wpn">M16</span><span class="mca-count">24<small>/120</small></span><span class="mca-gren">NADE ×3</span></div>
+        <div class="mc-actions">
+          <button class="mc-btn mc-ads">ADS</button>
+          <button class="mc-btn mc-reload">RELOAD</button>
+          <button class="mc-btn mc-gren">NADE</button>
+          <button class="mc-btn mc-fire">FIRE</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="combat-mobiletoggle" id="mobileToggle" title="Toggle mobile controls">▣ MOBILE</button>
+  </section>
+
+  <!-- ====================== SCREEN: LOADING ====================== -->
+  <section class="screen screen--loading" id="screen-loading" data-screen="loading">
+    <div class="frame-marks" aria-hidden="true">
+      <span class="mark tl"></span><span class="mark tr"></span>
+      <span class="mark bl"></span><span class="mark br"></span>
+    </div>
+    <div class="rec-stamp"><span class="rec-dot"></span><span class="rec-text">REC</span></div>
+    <div class="date-stamp">A SHAU VALLEY&nbsp;&nbsp;03&nbsp;1968</div>
+
+    <!-- countdown leader -->
+    <div class="leader" aria-hidden="true">
+      <span class="leader-ring"></span>
+      <span class="leader-cross-v"></span>
+      <span class="leader-cross-h"></span>
+      <span class="leader-num">3</span>
+    </div>
+
+    <div class="load-inner">
+      <p class="load-kicker">PROCESSING REEL — DO NOT EJECT</p>
+      <h2 class="load-title">DEVELOPING FOOTAGE</h2>
+
+      <div class="load-barwrap">
+        <div class="load-bar"><span class="load-fill" id="loadFill" style="width:62%"></span></div>
+        <div class="load-readout"><span class="load-phase" id="loadPhase">MODELS</span><span class="load-pct" id="loadPct">62%</span></div>
+      </div>
+
+      <ol class="load-phases" id="loadPhases">
+        <li class="lp done"><span class="lp-dot"></span>INITIALIZING</li>
+        <li class="lp done"><span class="lp-dot"></span>TERRAIN</li>
+        <li class="lp done"><span class="lp-dot"></span>SHADERS</li>
+        <li class="lp active"><span class="lp-dot"></span>MODELS</li>
+        <li class="lp"><span class="lp-dot"></span>AUDIO</li>
+        <li class="lp"><span class="lp-dot"></span>READY</li>
+      </ol>
+
+      <p class="load-tip"><span class="tip-key">FIELD NOTE</span> Suppressing fire pins the enemy in place.</p>
+    </div>
+  </section>
+
+</div><!-- /.gate -->
+
+<!-- ====================== NAV / SCREEN SWITCHER ====================== -->
+<nav class="navbar" aria-label="Screen switcher">
+  <span class="nav-brand">REEL&nbsp;01</span>
+  <div class="nav-segs">
+    <button class="nav-seg is-active" data-go="menu">MENU</button>
+    <button class="nav-seg" data-go="modes">MODES</button>
+    <button class="nav-seg" data-go="deploy">DEPLOY</button>
+    <button class="nav-seg" data-go="combat">COMBAT</button>
+    <button class="nav-seg" data-go="loading">LOADING</button>
+  </div>
+  <a class="nav-bakeoff" href="../index.html">◂ BAKE-OFF</a>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
