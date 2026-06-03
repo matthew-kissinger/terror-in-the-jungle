@@ -63,7 +63,7 @@ Dependencies are noted. Grouping/count is flexible — Cycles 4/5 could merge, 6
 - Acceptance: `check:mobile-ui` green; human playtest on a real phone; no overlaps at 390px / notch / landscape.
 
 **6. `cycle-field-journal-overlays`** — modals + secondary screens. Depends on 1.
-- Reskin `SettingsModal`, `MissionBriefing`, `ScoreboardPanel`, `StatsPanel`, `MatchEndScreen`, the loading UI (`LoadingProgress`, `src/core/LoadingUI`), interaction prompts, zone-capture/weapon-switch notifications.
+- Reskin `SettingsModal`, `MissionBriefing`, `ScoreboardPanel`, `StatsPanel`, `MatchEndScreen`, the loading UI (`LoadingProgress`, `src/core/LoadingUI.ts`), interaction prompts, zone-capture/weapon-switch notifications.
 - Files: `src/ui/loading/*`, `src/ui/hud/{ScoreboardPanel,StatsPanel,MatchEndScreen,InteractionPromptPanel,ZoneCaptureNotification,...}.*`, `src/core/LoadingUI.*`.
 
 **7. `cycle-field-journal-vehicles`** — vehicle HUDs. Depends on 1 (+ 4 for shared HUD primitives).

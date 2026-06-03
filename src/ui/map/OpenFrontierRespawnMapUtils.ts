@@ -25,28 +25,29 @@ export function zoneHasSpawnPoint(zone: CaptureZone, spawnPoints: RespawnSpawnPo
  * Returns the color for a zone based on its state and owner
  */
 export function getZoneColor(zone: CaptureZone, alpha: number, isSpawnable: boolean): string {
+  // Field Journal: ALLIED = field green, HOSTILE = stamp red, CONTESTED = warn.
   if (!isSpawnable && !(zone.owner !== null && isOpfor(zone.owner))) {
-    // Dim non-spawnable friendly zones
-    return `rgba(100, 100, 100, ${alpha * 0.5})`;
+    // Dim non-spawnable friendly zones (ink-faint)
+    return `rgba(138, 126, 107, ${alpha * 0.5})`;
   }
 
   if (zone.isHomeBase) {
     if (zone.owner === Faction.US) {
-      return `rgba(91, 140, 201, ${alpha})`;
+      return `rgba(79, 107, 58, ${alpha})`;
     } else {
-      return `rgba(201, 86, 74, ${alpha})`;
+      return `rgba(158, 59, 46, ${alpha})`;
     }
   }
 
   switch (zone.state) {
     case ZoneState.BLUFOR_CONTROLLED:
-      return `rgba(92, 184, 92, ${alpha})`;
+      return `rgba(79, 107, 58, ${alpha})`;
     case ZoneState.OPFOR_CONTROLLED:
-      return `rgba(201, 86, 74, ${alpha})`;
+      return `rgba(158, 59, 46, ${alpha})`;
     case ZoneState.CONTESTED:
-      return `rgba(212, 163, 68, ${alpha})`;
+      return `rgba(168, 116, 42, ${alpha})`;
     default:
-      return `rgba(107, 119, 128, ${alpha})`;
+      return `rgba(138, 126, 107, ${alpha})`;
   }
 }
 

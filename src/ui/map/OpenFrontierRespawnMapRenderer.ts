@@ -34,8 +34,8 @@ export class OpenFrontierRespawnMapRenderer {
   ): void {
     const size = MAP_SIZE;
 
-    // Clear canvas with dark background
-    ctx.fillStyle = '#0a0f0a';
+    // Clear canvas with manila topo background (Field Journal)
+    ctx.fillStyle = '#cdba8e';
     ctx.fillRect(0, 0, size, size);
 
     // Save state for transformations
@@ -88,7 +88,7 @@ export class OpenFrontierRespawnMapRenderer {
 
   private static drawGrid(ctx: CanvasRenderingContext2D): void {
     const gridSize = 100;
-    ctx.strokeStyle = 'rgba(220, 225, 230, 0.025)';
+    ctx.strokeStyle = 'rgba(90, 70, 40, 0.12)';
     ctx.lineWidth = 1;
 
     for (let i = 0; i <= MAP_SIZE; i += gridSize) {
@@ -104,7 +104,7 @@ export class OpenFrontierRespawnMapRenderer {
     }
 
     // Draw major grid lines
-    ctx.strokeStyle = 'rgba(220, 225, 230, 0.06)';
+    ctx.strokeStyle = 'rgba(90, 70, 40, 0.28)';
     ctx.lineWidth = 2;
 
     // Center crosshair
@@ -171,7 +171,7 @@ export class OpenFrontierRespawnMapRenderer {
 
     // Spawn indicator for spawnable zones
     if (isSpawnable) {
-      ctx.fillStyle = 'rgba(92, 184, 92, 0.9)';
+      ctx.fillStyle = 'rgba(79, 107, 58, 0.95)';
       ctx.font = 'bold 16px "Courier Prime", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
@@ -197,7 +197,7 @@ export class OpenFrontierRespawnMapRenderer {
     // Text background
     const metrics = ctx.measureText(name);
     const padding = 4;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(231, 217, 186, 0.85)';
     ctx.fillRect(
       x - metrics.width / 2 - padding,
       y - radius - 20 - padding,
@@ -206,7 +206,7 @@ export class OpenFrontierRespawnMapRenderer {
     );
 
     // Text
-    ctx.fillStyle = isSpawnable ? 'rgba(92, 184, 92, 0.9)' : 'rgba(255, 255, 255, 0.7)';
+    ctx.fillStyle = isSpawnable ? 'rgba(58, 79, 42, 0.95)' : 'rgba(43, 38, 32, 0.8)';
     ctx.fillText(name, x, y - radius - 8);
   }
 
@@ -217,14 +217,14 @@ export class OpenFrontierRespawnMapRenderer {
   ): void {
     const { x, y } = worldToMap(spawnPoint.position.x, spawnPoint.position.z);
     const color = spawnPoint.selectionClass === 'direct_insertion'
-      ? 'rgba(255, 214, 102, 0.95)'
+      ? 'rgba(158, 59, 46, 0.95)'
       : spawnPoint.kind === 'helipad'
-        ? 'rgba(111, 196, 255, 0.95)'
-        : 'rgba(92, 184, 92, 0.95)';
+        ? 'rgba(58, 79, 42, 0.95)'
+        : 'rgba(79, 107, 58, 0.95)';
     const outerRadius = Math.max(11, 16 / Math.sqrt(Math.max(zoomLevel, 0.75)));
     const innerRadius = Math.max(7, 11 / Math.sqrt(Math.max(zoomLevel, 0.75)));
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillStyle = 'rgba(43, 38, 32, 0.5)';
     ctx.beginPath();
     ctx.arc(x, y, outerRadius, 0, Math.PI * 2);
     ctx.fill();
@@ -235,7 +235,7 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.fill();
 
     const textLabel = `${this.getSpawnPointKindLabel(spawnPoint)} ${spawnPoint.name}`;
-    ctx.font = 'bold 11px monospace';
+    ctx.font = 'bold 11px "Courier Prime", monospace';
     const metrics = ctx.measureText(textLabel);
     const padding = 5;
     const height = 15;
@@ -253,7 +253,7 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.lineTo(placement.x, placement.y);
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(4, 8, 5, 0.84)';
+    ctx.fillStyle = 'rgba(231, 217, 186, 0.85)';
     ctx.fillRect(
       backgroundX,
       placement.y - 11,
@@ -281,8 +281,8 @@ export class OpenFrontierRespawnMapRenderer {
     const { x, y } = worldToMap(marker.worldPos.x, marker.worldPos.z);
     const size = Math.max(7, 11 / Math.sqrt(Math.max(zoomLevel, 0.75)));
     const friendly = isBlufor(marker.faction);
-    const fill = friendly ? 'rgba(91, 140, 201, 0.6)' : 'rgba(201, 86, 74, 0.6)';
-    const stroke = friendly ? 'rgba(220, 230, 245, 0.95)' : 'rgba(245, 220, 220, 0.95)';
+    const fill = friendly ? 'rgba(79, 107, 58, 0.6)' : 'rgba(158, 59, 46, 0.6)';
+    const stroke = 'rgba(43, 38, 32, 0.85)';
 
     ctx.save();
     ctx.fillStyle = fill;
@@ -315,7 +315,7 @@ export class OpenFrontierRespawnMapRenderer {
     const tag = marker.category === 'ground'
       ? 'TANK'
       : marker.category === 'watercraft' ? 'BOAT' : 'GUN';
-    ctx.font = 'bold 9px monospace';
+    ctx.font = 'bold 9px "Courier Prime", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillStyle = stroke;
@@ -410,7 +410,7 @@ export class OpenFrontierRespawnMapRenderer {
     const time = Date.now() / 1000;
     const pulse = Math.sin(time * 3) * 0.2 + 0.8;
 
-    ctx.strokeStyle = `rgba(92, 184, 92, ${pulse})`;
+    ctx.strokeStyle = `rgba(158, 59, 46, ${pulse})`;
     ctx.lineWidth = 4;
     ctx.setLineDash([5, 5]);
     ctx.lineDashOffset = time * 10;
@@ -434,9 +434,9 @@ export class OpenFrontierRespawnMapRenderer {
     const y = margin;
 
     // Background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(43, 38, 32, 0.78)';
     ctx.fillRect(x, y, minimapSize, minimapSize);
-    ctx.strokeStyle = 'rgba(220, 225, 230, 0.3)';
+    ctx.strokeStyle = 'rgba(231, 217, 186, 0.4)';
     ctx.strokeRect(x, y, minimapSize, minimapSize);
 
     // Draw zones on minimap
@@ -459,8 +459,8 @@ export class OpenFrontierRespawnMapRenderer {
       const zx = x + (WORLD_SIZE / 2 - spawnPoint.position.x) * scale;
       const zy = y + (WORLD_SIZE / 2 - spawnPoint.position.z) * scale;
       ctx.fillStyle = spawnPoint.selectionClass === 'direct_insertion'
-        ? 'rgba(255, 214, 102, 0.95)'
-        : 'rgba(92, 184, 92, 0.95)';
+        ? 'rgba(181, 71, 47, 0.95)'
+        : 'rgba(125, 154, 90, 0.95)';
       ctx.beginPath();
       ctx.arc(zx, zy, 2.5, 0, Math.PI * 2);
       ctx.fill();
@@ -473,16 +473,16 @@ export class OpenFrontierRespawnMapRenderer {
     const viewX = x + minimapSize / 2 - viewWidth / 2 - state.panOffset.x * viewScale;
     const viewY = y + minimapSize / 2 - viewHeight / 2 - state.panOffset.y * viewScale;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.strokeStyle = 'rgba(231, 217, 186, 0.6)';
     ctx.lineWidth = 1;
     ctx.strokeRect(viewX, viewY, viewWidth, viewHeight);
   }
 
   private static drawControlsHint(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillStyle = 'rgba(43, 38, 32, 0.78)';
     ctx.fillRect(10, MAP_SIZE - 60, 200, 50);
 
-    ctx.fillStyle = 'rgba(220, 225, 230, 0.6)';
+    ctx.fillStyle = 'rgba(231, 217, 186, 0.7)';
     ctx.font = '11px "Courier Prime", monospace';
     ctx.textAlign = 'left';
     ctx.fillText('Scroll: Zoom', 15, MAP_SIZE - 45);
