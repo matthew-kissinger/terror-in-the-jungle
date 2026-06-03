@@ -45,7 +45,6 @@
       "wrangler"
     ],
     "ignoreFiles": [
-      "docs/cycles/**/evidence/**/probe.mts",
       ".claude/skills/**/templates/**"
     ],
     "ignore": [
