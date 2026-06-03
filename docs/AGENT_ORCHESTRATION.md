@@ -202,12 +202,23 @@ See [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** (none — closed `cycle-2026-05-28-vehicles-aircraft-operable` on 2026-05-28; 7/8 tasks shipped, `hydrology-river-surface-fix` deferred owner-gated)
-- **Next:** **Field Journal frontend wiring campaign is prepped (PAUSED).** See [`docs/CAMPAIGN_2026-06-03-field-journal-frontend.md`](CAMPAIGN_2026-06-03-field-journal-frontend.md) (design language: [`docs/FIELD_JOURNAL_UI.md`](FIELD_JOURNAL_UI.md)); dispatch Cycle 1 (`cycle-field-journal-foundation`) on go-ahead. Other candidates: `docs/BACKLOG.md` strategic-reserve + owner-gated queue; cycles are seeded via `/orchestrate` against a new brief.
+- **Cycle:** **Big cycle — 3 parallel streams, opened 2026-06-03.** Spike-first per owner direction; 3 spike memos under `docs/rearch/*_SPIKE_2026-06-03.md`. Prior cycle DIZAYN-4 (Field Journal frontend) is code-complete + playtest-deferred (see DIRECTIVES + PLAYTEST_PENDING).
+
+## Active cycles
+
+- `cycle-deploy-loadout-flow` — UX-2/3/4 deploy/spawn/loadout FUNCTION (FJ visual layer already shipped); selectable ammo is fence-gated — brief `docs/tasks/deploy-loadout-flow.md`, spike `docs/rearch/DEPLOY_LOADOUT_FLOW_SPIKE_2026-06-03.md`
+- `cycle-air-support-radio` — SVYAZ-3 radio call-in wiring + IFF fix — brief `docs/tasks/air-support-radio.md`, spike `docs/rearch/AIR_SUPPORT_RADIO_SPIKE_2026-06-03.md`
+- `cycle-combat-p99-attribution` — DEFEKT-3 p99 tail attribution + stagger-enable — brief `docs/tasks/combat-p99-attribution.md`, spike `docs/rearch/COMBAT_AI_P99_SPIKE_2026-06-03.md`
+
+Owner scope calls (2026-06-03): UX-3 ammo SELECTABLE (fence-gate `IAmmoManager` → `[interface-change]` if needed); SVYAZ-3 friendly-fire FIXED (thread requester Faction + IFF test); DEFEKT-3 `crowdStallStaggerEnabled` default ON (movement-feel playtest before close).
 
 ### Tasks (DAG)
 
-(Empty stub — populate when the next cycle opens.)
+**cycle-deploy-loadout-flow** — R1: `map-spawn-tap-target-sizing`, `deploy-spawn-affordance-copy`, `loadout-faction-availability-readout`, `loadout-mobile-touch-parity`, `loadout-selectable-ammo` (fence-gated). R2: `deploy-spawn-threat-readout` (dep: affordance-copy), `deploy-first-frame-continuity` (dep: threat-readout).
+
+**cycle-air-support-radio** — R1: `radio-asset-type-mapping`, `radio-target-marking`, `air-support-cooldown-feed`. R2: `radio-call-in-dispatch` (dep: mapping+marking), `air-support-iff-faction`, `air-support-npc-fulfillment-test`, `retire-legacy-air-support-call` (optional).
+
+**cycle-combat-p99-attribution** — R1: `combat-p99-tail-attribution`, `cover-search-cost-microbench`, `contour-height-sample-dedupe`. R2: `crowd-stall-stagger-enable` (dep: attribution), `combat120-quiet-certification`.
 
 ## Dispatch protocol
 
