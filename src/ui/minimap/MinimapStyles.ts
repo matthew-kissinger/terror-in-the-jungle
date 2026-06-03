@@ -52,7 +52,7 @@ export const MINIMAP_STYLES = `
     position: absolute;
     bottom: 4px;
     left: 4px;
-    color: rgba(220, 225, 230, 0.45);
+    color: rgba(231, 217, 186, 0.45);
     font-size: 8px;
     font-family: var(--font-primary);
     font-weight: 600;

@@ -66,6 +66,7 @@ function createCanvasContextStub() {
     fill: vi.fn(),
     arc: vi.fn(),
     fillText: vi.fn(),
+    measureText: vi.fn(() => ({ width: 40 })),
     save: vi.fn(),
     restore: vi.fn(),
     translate: vi.fn(),

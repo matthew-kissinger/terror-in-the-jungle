@@ -311,7 +311,7 @@ export class AmmoSupplySystem implements GameSystem {
       font-family: var(--font-primary);
       font-size: 32px;
       font-weight: bold;
-      color: rgba(92, 184, 92, 0.95);
+      color: rgba(79, 107, 58, 0.95);
       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
       pointer-events: none;
       z-index: 500;

@@ -294,8 +294,8 @@ export class FullMapSystem implements GameSystem {
     const zoomLevel = this.inputHandler.getZoomLevel();
     const pan = this.inputHandler.getPanOffset();
 
-    // Clear canvas
-    ctx.fillStyle = 'rgba(10, 10, 15, 0.95)';
+    // Clear canvas with manila topo background (Field Journal)
+    ctx.fillStyle = '#cdba8e';
     ctx.fillRect(0, 0, size, size);
 
     // Apply zoom + pan transformation
@@ -417,17 +417,19 @@ export class FullMapSystem implements GameSystem {
         const south = heights[Math.min(row + 1, resolution)][col];
         const slope = Math.min(1, Math.hypot(east - height, south - height) / 18);
         const normalized = (height - minHeight) / heightRange;
-        const red = Math.round(24 + normalized * 38 + slope * 10);
-        const green = Math.round(34 + normalized * 54 - slope * 4);
-        const blue = Math.round(24 + normalized * 18);
-        ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, 0.78)`;
+        // Sepia shaded relief on parchment: low ground = light, high ground +
+        // steep ridges = darker bistre. Keeps the map within the manila family.
+        const red = Math.round(206 - normalized * 60 - slope * 34);
+        const green = Math.round(186 - normalized * 70 - slope * 30);
+        const blue = Math.round(140 - normalized * 66 - slope * 24);
+        ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, 0.85)`;
         ctx.fillRect(col * cellSize, row * cellSize, cellSize + 1, cellSize + 1);
 
         const contourBand = Math.floor(height / contourStep);
         const eastBand = Math.floor(east / contourStep);
         const southBand = Math.floor(south / contourStep);
         if (contourBand !== eastBand || contourBand !== southBand) {
-          ctx.fillStyle = 'rgba(220, 224, 196, 0.12)';
+          ctx.fillStyle = 'rgba(74, 56, 30, 0.22)';
           ctx.fillRect(col * cellSize, row * cellSize, cellSize + 0.5, Math.max(1, cellSize * 0.15));
         }
       }
@@ -489,11 +491,11 @@ export class FullMapSystem implements GameSystem {
       const t = Math.min(1, Math.max(0, channel.maxAccumulationCells / maxAccumulation));
       const width = Math.max(2.5, (8 + 18 * t) * scale);
 
-      ctx.strokeStyle = 'rgba(2, 65, 96, 0.82)';
+      ctx.strokeStyle = 'rgba(38, 60, 74, 0.85)';
       ctx.lineWidth = width + Math.max(2, 1.2 / this.inputHandler.getZoomLevel());
       this.strokeHydrologyChannel(ctx, channel);
 
-      ctx.strokeStyle = 'rgba(36, 208, 223, 0.96)';
+      ctx.strokeStyle = 'rgba(82, 120, 140, 0.95)';
       ctx.lineWidth = Math.max(1.25, width * 0.55);
       this.strokeHydrologyChannel(ctx, channel);
     }
@@ -557,12 +559,23 @@ export class FullMapSystem implements GameSystem {
       ctx.fill();
     }
 
-    // Zone name - adjust font size for readability
+    // Zone name on a small parchment chip so it stays legible over the sepia
+    // shaded-relief backdrop.
     const fontSize = Math.max(10, 12 / Math.sqrt(zoomLevel));
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.font = `bold ${fontSize}px "Courier Prime", monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(zone.name, x, y - radius - 8);
+    const label = zone.name;
+    const labelWidth = ctx.measureText(label).width;
+    const labelPad = 4;
+    ctx.fillStyle = 'rgba(231, 217, 186, 0.85)';
+    ctx.fillRect(
+      x - labelWidth / 2 - labelPad,
+      y - radius - 8 - fontSize,
+      labelWidth + labelPad * 2,
+      fontSize + 4,
+    );
+    ctx.fillStyle = 'rgba(43, 38, 32, 0.92)';
+    ctx.fillText(label, x, y - radius - 8);
   }
 
   private getZoneColor(state: ZoneState, alpha: number): string {
@@ -600,7 +613,7 @@ export class FullMapSystem implements GameSystem {
 
       const isPlayerSquad = combatant.squadId === this.playerSquadId;
       ctx.fillStyle = isPlayerSquad
-        ? 'rgba(92, 184, 92, 0.92)'
+        ? 'rgba(125, 154, 90, 0.95)'
         : (isBlufor(combatant.faction) ? COMBATANT_COLORS.US : COMBATANT_COLORS.OPFOR);
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
@@ -630,8 +643,8 @@ export class FullMapSystem implements GameSystem {
 
       const alpha = tier === 1 ? 0.4 : 0.2;
       ctx.fillStyle = faction === 0
-        ? `rgba(91, 140, 201, ${alpha})`
-        : `rgba(201, 86, 74, ${alpha})`;
+        ? `rgba(79, 107, 58, ${alpha})`
+        : `rgba(158, 59, 46, ${alpha})`;
       ctx.beginPath();
       ctx.arc(x, y, 2, 0, Math.PI * 2);
       ctx.fill();
@@ -751,14 +764,14 @@ export class FullMapSystem implements GameSystem {
     const x = (this.worldSize / 2 - this.commandPosition.x) * scale;
     const y = (this.worldSize / 2 - this.commandPosition.z) * scale;
 
-    ctx.strokeStyle = 'rgba(92, 184, 92, 0.34)';
+    ctx.strokeStyle = 'rgba(125, 154, 90, 0.4)';
     ctx.lineWidth = Math.max(1.5, 0.8 / this.inputHandler.getZoomLevel());
     ctx.beginPath();
     ctx.moveTo(playerX, playerY);
     ctx.lineTo(x, y);
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(92, 184, 92, 0.92)';
+    ctx.strokeStyle = 'rgba(125, 154, 90, 0.95)';
     ctx.lineWidth = Math.max(2, 1 / this.inputHandler.getZoomLevel());
 
     ctx.beginPath();
@@ -776,7 +789,7 @@ export class FullMapSystem implements GameSystem {
     ctx.stroke();
 
     const distanceMeters = Math.round(this.playerPosition.distanceTo(this.commandPosition));
-    ctx.fillStyle = 'rgba(216, 236, 198, 0.92)';
+    ctx.fillStyle = 'rgba(58, 79, 42, 0.95)';
     ctx.font = `bold ${Math.max(10, 12 / Math.sqrt(this.inputHandler.getZoomLevel()))}px "Courier Prime", monospace`;
     ctx.textAlign = 'left';
     ctx.fillText(`${distanceMeters}m`, x + 14, y - 12);
@@ -795,18 +808,18 @@ export class FullMapSystem implements GameSystem {
       const y = (this.worldSize / 2 - marker.position.z) * scale;
 
       // Circle background
-      ctx.fillStyle = 'rgba(91, 140, 201, 0.4)';
+      ctx.fillStyle = 'rgba(79, 107, 58, 0.4)';
       ctx.beginPath();
       ctx.arc(x, y, iconSize, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = 'rgba(91, 140, 201, 0.9)';
+      ctx.strokeStyle = 'rgba(79, 107, 58, 0.9)';
       ctx.lineWidth = Math.max(1.5, 1 / zoomLevel);
       ctx.stroke();
 
       // H letter
       const fontSize = Math.max(10, 12 / Math.sqrt(zoomLevel));
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillStyle = 'rgba(43, 38, 32, 0.9)';
       ctx.font = `bold ${fontSize}px "Courier Prime", monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -828,11 +841,9 @@ export class FullMapSystem implements GameSystem {
       const y = (this.worldSize / 2 - marker.worldPos.z) * scale;
 
       const factionFill = isBlufor(marker.faction)
-        ? 'rgba(91, 140, 201, 0.45)'
-        : 'rgba(201, 86, 74, 0.45)';
-      const factionStroke = isBlufor(marker.faction)
-        ? 'rgba(91, 140, 201, 0.95)'
-        : 'rgba(201, 86, 74, 0.95)';
+        ? 'rgba(79, 107, 58, 0.5)'
+        : 'rgba(158, 59, 46, 0.5)';
+      const factionStroke = 'rgba(43, 38, 32, 0.85)';
 
       ctx.fillStyle = factionFill;
       ctx.strokeStyle = factionStroke;

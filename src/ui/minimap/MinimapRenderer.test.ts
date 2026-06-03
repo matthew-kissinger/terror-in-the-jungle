@@ -165,7 +165,7 @@ describe('MinimapRenderer vehicle markers', () => {
     // Stroke + fill calls grew, and the friendly blue fill landed in
     // the style history (matches the combatant friendly palette).
     expect((ctx.fill as any).mock.calls.length).toBeGreaterThan(0);
-    expect(fillStyles.some(s => s.includes('91, 140, 201'))).toBe(true);
+    expect(fillStyles.some(s => s.includes('79, 107, 58'))).toBe(true);
   });
 
   it('colors an enemy ground vehicle with the OPFOR palette', () => {
@@ -182,8 +182,8 @@ describe('MinimapRenderer vehicle markers', () => {
 
     renderMinimap({ ctx, ...baseState(markers) });
 
-    expect(fillStyles.some(s => s.includes('201, 86, 74'))).toBe(true);
-    expect(fillStyles.some(s => s.includes('91, 140, 201'))).toBe(false);
+    expect(fillStyles.some(s => s.includes('158, 59, 46'))).toBe(true);
+    expect(fillStyles.some(s => s.includes('79, 107, 58'))).toBe(false);
   });
 
   it('skips vehicles outside the minimap window', () => {
@@ -280,6 +280,6 @@ describe('MinimapRenderer hydrology channels', () => {
     });
 
     expect((ctx.lineTo as any).mock.calls.length).toBeGreaterThan(0);
-    expect(strokeStyles.some(s => s.includes('36, 208, 223'))).toBe(true);
+    expect(strokeStyles.some(s => s.includes('82, 120, 140'))).toBe(true);
   });
 });

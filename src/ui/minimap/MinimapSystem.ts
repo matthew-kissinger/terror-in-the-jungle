@@ -93,7 +93,11 @@ export class MinimapSystem implements GameSystem {
   async init(parent?: HTMLElement): Promise<void> {
     Logger.info('minimap', ' Initializing Minimap System...');
 
-    // Add to DOM (grid slot or body)
+    // Add to DOM (grid slot or body). When no grid slot is supplied yet we
+    // park it on <body>; keep it hidden until mountTo() places it in its HUD
+    // grid slot, otherwise it flashes as a loose box in the top-left corner
+    // for the few frames before the grid is built.
+    if (!parent) this.minimapContainer.style.display = 'none';
     (parent ?? document.body).appendChild(this.minimapContainer);
 
     // Prevent browser gestures on the minimap container
@@ -181,6 +185,9 @@ export class MinimapSystem implements GameSystem {
       this.minimapContainer.parentNode.removeChild(this.minimapContainer);
     }
     parent.appendChild(this.minimapContainer);
+    // Reveal now that it sits in its grid slot (init() hid it while parked
+    // on <body>). Visibility past this point is the HUD grid's concern.
+    this.minimapContainer.style.display = '';
   }
 
   // System connections

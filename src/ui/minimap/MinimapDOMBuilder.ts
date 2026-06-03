@@ -22,15 +22,15 @@ export function createMinimapDOM(minimapSize: number): MinimapDOMRefs {
   legend.className = 'minimap-legend';
   legend.innerHTML = `
     <div style="display: flex; align-items: center; gap: 3px;">
-      <div style="width: 8px; height: 8px; background: rgba(92, 184, 92, 0.8); border-radius: 50%;"></div>
+      <div style="width: 8px; height: 8px; background: rgba(125, 154, 90, 0.8); border-radius: 50%;"></div>
       <span>SQUAD</span>
     </div>
     <div style="display: flex; align-items: center; gap: 3px;">
-      <div style="width: 8px; height: 8px; background: rgba(91, 140, 201, 0.8); border-radius: 50%;"></div>
+      <div style="width: 8px; height: 8px; background: rgba(79, 107, 58, 0.8); border-radius: 50%;"></div>
       <span>US</span>
     </div>
     <div style="display: flex; align-items: center; gap: 3px;">
-      <div style="width: 8px; height: 8px; background: rgba(201, 86, 74, 0.8); border-radius: 50%;"></div>
+      <div style="width: 8px; height: 8px; background: rgba(158, 59, 46, 0.8); border-radius: 50%;"></div>
       <span>OPFOR</span>
     </div>
   `;

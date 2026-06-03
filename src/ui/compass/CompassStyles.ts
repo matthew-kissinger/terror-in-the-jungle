@@ -10,8 +10,8 @@ export const COMPASS_STYLES = `
       position: relative;
       width: 160px;
       height: 42px;
-      background: rgba(8, 12, 18, 0.45);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(43, 38, 32, 0.45);
+      border: 1px solid rgba(231, 217, 186, 0.06);
       border-radius: 4px;
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
@@ -39,21 +39,21 @@ export const COMPASS_STYLES = `
 
     .compass-cardinal {
       position: absolute;
-      color: rgba(220, 225, 230, 0.7);
+      color: rgba(231, 217, 186, 0.7);
       font-family: var(--font-primary);
       font-weight: 700;
       font-size: 15px;
       letter-spacing: 0.5px;
     }
 
-    .compass-cardinal.north { color: rgba(201, 86, 74, 0.85); }
-    .compass-cardinal.east { color: rgba(220, 225, 230, 0.5); }
-    .compass-cardinal.south { color: rgba(220, 225, 230, 0.5); }
-    .compass-cardinal.west { color: rgba(220, 225, 230, 0.5); }
+    .compass-cardinal.north { color: rgba(158, 59, 46, 0.85); }
+    .compass-cardinal.east { color: rgba(231, 217, 186, 0.5); }
+    .compass-cardinal.south { color: rgba(231, 217, 186, 0.5); }
+    .compass-cardinal.west { color: rgba(231, 217, 186, 0.5); }
 
     .compass-degree {
       position: absolute;
-      color: rgba(220, 225, 230, 0.25);
+      color: rgba(231, 217, 186, 0.25);
       font-family: var(--font-primary);
       font-size: 9px;
       font-weight: 600;
@@ -68,12 +68,12 @@ export const COMPASS_STYLES = `
       width: 1px;
       height: 100%;
       background: linear-gradient(to bottom,
-        rgba(220, 225, 230, 0.5) 0%,
-        rgba(220, 225, 230, 0.3) 20%,
+        rgba(231, 217, 186, 0.5) 0%,
+        rgba(231, 217, 186, 0.3) 20%,
         transparent 40%,
         transparent 60%,
-        rgba(220, 225, 230, 0.3) 80%,
-        rgba(220, 225, 230, 0.5) 100%
+        rgba(231, 217, 186, 0.3) 80%,
+        rgba(231, 217, 186, 0.5) 100%
       );
       transform: translateX(-50%);
       z-index: 10;
@@ -85,12 +85,12 @@ export const COMPASS_STYLES = `
       bottom: 0;
       left: 50%;
       transform: translateX(-50%);
-      color: rgba(220, 225, 230, 0.65);
+      color: rgba(231, 217, 186, 0.65);
       font-family: var(--font-primary);
       font-size: 12px;
       font-weight: 700;
       padding: 1px 6px;
-      background: rgba(8, 12, 18, 0.4);
+      background: rgba(43, 38, 32, 0.4);
       border-radius: 3px;
       letter-spacing: 1px;
     }
@@ -99,7 +99,7 @@ export const COMPASS_STYLES = `
       position: absolute;
       width: 1px;
       height: 8px;
-      background: rgba(220, 225, 230, 0.15);
+      background: rgba(231, 217, 186, 0.15);
       top: 50%;
       transform: translateY(-50%);
     }
@@ -130,28 +130,28 @@ export const COMPASS_STYLES = `
     }
 
     .compass-marker.friendly {
-      background: rgba(91, 140, 201, 0.25);
-      border-color: rgba(91, 140, 201, 0.6);
-      color: rgba(91, 140, 201, 0.9);
+      background: rgba(79, 107, 58, 0.25);
+      border-color: rgba(79, 107, 58, 0.6);
+      color: rgba(79, 107, 58, 0.9);
     }
 
     .compass-marker.enemy {
-      background: rgba(201, 86, 74, 0.25);
-      border-color: rgba(201, 86, 74, 0.6);
-      color: rgba(201, 86, 74, 0.9);
+      background: rgba(158, 59, 46, 0.25);
+      border-color: rgba(158, 59, 46, 0.6);
+      color: rgba(158, 59, 46, 0.9);
     }
 
     .compass-marker.neutral {
-      background: rgba(220, 225, 230, 0.1);
-      border-color: rgba(220, 225, 230, 0.35);
-      color: rgba(220, 225, 230, 0.7);
+      background: rgba(231, 217, 186, 0.1);
+      border-color: rgba(231, 217, 186, 0.35);
+      color: rgba(231, 217, 186, 0.7);
     }
 
     .compass-marker.contested {
       animation: compassBlink 0.8s infinite;
-      background: rgba(212, 163, 68, 0.2);
-      border-color: rgba(212, 163, 68, 0.6);
-      color: rgba(212, 163, 68, 0.9);
+      background: rgba(168, 116, 42, 0.2);
+      border-color: rgba(168, 116, 42, 0.6);
+      color: rgba(168, 116, 42, 0.9);
     }
 
     .compass-marker-vehicle {

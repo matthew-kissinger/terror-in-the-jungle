@@ -6,13 +6,13 @@ export class PlayerHealthUI {
 
   private readonly UI_STYLES = `
     .health-display {
-      background: rgba(0, 0, 0, 0.55);
+      background: rgba(43, 38, 32, 0.78);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       padding: 4px 12px;
       border: none;
       border-radius: 50px;
-      color: rgba(220, 225, 230, 0.9);
+      color: rgba(231, 217, 186, 0.9);
       font-family: var(--font-primary);
       font-size: 14px;
       font-weight: 700;
@@ -35,14 +35,14 @@ export class PlayerHealthUI {
     .health-bar {
       width: clamp(60px, 12vw, 100px);
       height: 4px;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(231, 217, 186, 0.14);
       border-radius: 2px;
       overflow: hidden;
     }
 
     .health-fill {
       height: 100%;
-      background: rgba(92, 184, 92, 0.85);
+      background: rgba(79, 107, 58, 0.9);
       transition: width 0.3s ease, background-color 0.3s ease;
       border-radius: 2px;
     }
@@ -52,8 +52,8 @@ export class PlayerHealthUI {
     }
 
     @keyframes redPulse {
-      0%, 100% { box-shadow: 0 0 0 rgba(201, 86, 74, 0); }
-      50% { box-shadow: 0 0 12px rgba(201, 86, 74, 0.4); }
+      0%, 100% { box-shadow: 0 0 0 rgba(158, 59, 46, 0); }
+      50% { box-shadow: 0 0 12px rgba(158, 59, 46, 0.4); }
     }
 
     .spawn-protection {
@@ -133,14 +133,14 @@ export class PlayerHealthUI {
 
       // Dynamic color based on health percentage
       if (healthPercent > 60) {
-        healthFill.style.background = 'rgba(92, 184, 92, 0.85)';
-        healthPct.style.color = 'rgba(220, 225, 230, 0.9)';
+        healthFill.style.background = 'rgba(79, 107, 58, 0.9)';
+        healthPct.style.color = 'rgba(231, 217, 186, 0.9)';
       } else if (healthPercent > 30) {
-        healthFill.style.background = 'rgba(212, 163, 68, 0.85)';
-        healthPct.style.color = 'rgba(212, 163, 68, 0.95)';
+        healthFill.style.background = 'rgba(168, 116, 42, 0.9)';
+        healthPct.style.color = 'rgba(168, 116, 42, 0.95)';
       } else {
-        healthFill.style.background = 'rgba(201, 86, 74, 0.85)';
-        healthPct.style.color = 'rgba(201, 86, 74, 0.95)';
+        healthFill.style.background = 'rgba(158, 59, 46, 0.9)';
+        healthPct.style.color = 'rgba(158, 59, 46, 0.95)';
       }
     }
   }

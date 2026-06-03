@@ -26,10 +26,10 @@
   justify-content: flex-end;
   gap: 5px;
   padding: 3px 6px;
-  background: rgba(8, 12, 18, 0.45);
+  background: rgba(43, 38, 32, 0.45);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  border-left: 2px solid rgba(220, 225, 230, 0.1);
+  border-left: 2px solid rgba(231, 217, 186, 0.1);
   border-radius: 0 2px 2px 0;
   transition: opacity 0.3s ease;
   animation: slideIn 0.15s ease-out;
@@ -38,7 +38,7 @@
 }
 
 .entryExplosive {
-  border-left-color: rgba(212, 163, 68, 0.4);
+  border-left-color: rgba(168, 116, 42, 0.4);
 }
 
 .entrySlideOut {
@@ -46,7 +46,7 @@
 }
 
 .entryStreak {
-  border-left: 2px solid rgba(212, 163, 68, 0.8);
+  border-left: 2px solid rgba(168, 116, 42, 0.8);
   animation: slideIn 0.15s ease-out, streakGlow 0.6s ease-out;
 }
 
@@ -76,13 +76,13 @@
 }
 
 .weaponIconHeadshot {
-  color: rgba(212, 163, 68, 0.9);
+  color: rgba(168, 116, 42, 0.9);
 }
 
 .headshotTag {
   display: inline-flex;
   align-items: center;
-  color: rgba(255, 200, 120, 0.9);
+  color: rgba(196, 150, 70, 0.9);
   font-size: 9px;
   font-weight: 700;
   font-family: var(--font-primary);
@@ -117,10 +117,10 @@
 
 @keyframes streakGlow {
   0% {
-    box-shadow: 0 0 8px rgba(212, 163, 68, 0.6);
+    box-shadow: 0 0 8px rgba(168, 116, 42, 0.6);
   }
   100% {
-    box-shadow: 0 0 0 rgba(212, 163, 68, 0);
+    box-shadow: 0 0 0 rgba(168, 116, 42, 0);
   }
 }
 

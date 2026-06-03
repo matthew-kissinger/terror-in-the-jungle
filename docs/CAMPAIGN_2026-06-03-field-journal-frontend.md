@@ -1,11 +1,11 @@
 # Campaign: Field Journal Frontend Wiring
 
 > **Date:** 2026-06-03
-> **Posture:** **COMPLETE — all 8 cycles landed, merged to `master`** (merge `a2aae2fa`, branch `task/ui-redesign-bakeoff`). Remaining: one human PC + real-device playtest of the in-game surfaces, and follow-up task #9 (deploy map-canvas markers).
+> **Posture:** **COMPLETE — all 8 cycles + every post-merge follow-up landed.** Deploy map markers (#9), the in-game minimap + full tactical map, and the remaining HUD-feedback / player-health / death-cam / command-mode / air-support / squad-indicator faction colors are all FJ-ified; the boot "small box" flash (minimap + compass briefly parking on `<body>` before the HUD grid built) is fixed. Only the dev debug panels intentionally keep their diagnostic colors. Remaining: one human PC + real-device playtest of the in-game surfaces.
 > **Auto-advance:** no (each cycle is reviewed + playtested before the next opens).
 >
-> **Progress:** ✅ 1 foundation · ✅ 2 shell · ✅ 3 deploy* · ✅ 4 hud-combat · ✅ 5 hud-mobile · ✅ 6 overlays · ✅ 7 vehicles · ✅ 8 sweep
-> *(deploy screen chrome + layout + fit-to-viewport done & verified; in-canvas map markers + real-device playtest are follow-ups)*
+> **Progress:** ✅ 1 foundation · ✅ 2 shell · ✅ 3 deploy · ✅ 4 hud-combat · ✅ 5 hud-mobile · ✅ 6 overlays · ✅ 7 vehicles · ✅ 8 sweep · ✅ follow-ups (deploy map #9, in-game maps #10, boot-flash fix)
+> *(full tactical map is now a manila paper sheet with sepia shaded-relief terrain + FJ zones/markers; in-game minimap is a dark ink chip with FJ factions — both verified in a live match via the browser preview)*
 >
 > **Status:** cycles 1–7 landed + auto-verified (lint/typecheck/**5260 tests**/build; check:mobile-ui; check:fence). check:hud is environmentally broken locally (headless WebGPU-fallback boot) — validates in CI. Visually confirmed: title, mode-select, deploy (PC+phone), in-game HUD, settings modal. The in-game HUD (4), touch controls (5), and vehicle HUDs (7) render only in live gameplay → final visual + overlap/placement is the one human PC + real-device playtest pass (Principle 5).
 >

@@ -455,11 +455,11 @@ export class CommandModeOverlay implements LayoutComponent {
         flex-direction: column;
         gap: 14px;
         padding: 20px;
-        border: 1px solid rgba(214, 165, 89, 0.25);
+        border: 1px solid rgba(168, 116, 42, 0.25);
         border-radius: 18px;
         background:
           linear-gradient(180deg, rgba(15, 18, 14, 0.95), rgba(8, 10, 11, 0.92)),
-          radial-gradient(circle at top, rgba(92, 184, 92, 0.1), transparent 60%);
+          radial-gradient(circle at top, rgba(79, 107, 58, 0.1), transparent 60%);
         box-shadow: 0 24px 40px rgba(0, 0, 0, 0.34);
         pointer-events: auto;
       }
@@ -525,7 +525,7 @@ export class CommandModeOverlay implements LayoutComponent {
       }
 
       .command-mode-overlay__radio {
-        border-color: rgba(92, 184, 92, 0.24);
+        border-color: rgba(79, 107, 58, 0.24);
         color: rgba(178, 234, 178, 0.9);
         letter-spacing: 0;
       }
@@ -612,7 +612,7 @@ export class CommandModeOverlay implements LayoutComponent {
 
       .command-mode-overlay__button:hover:not(:disabled) {
         transform: translateY(-1px);
-        border-color: rgba(214, 165, 89, 0.35);
+        border-color: rgba(168, 116, 42, 0.35);
         background: rgba(48, 56, 50, 0.9);
       }
 
@@ -622,7 +622,7 @@ export class CommandModeOverlay implements LayoutComponent {
       }
 
       .command-mode-overlay__button--active {
-        border-color: rgba(92, 184, 92, 0.46);
+        border-color: rgba(79, 107, 58, 0.46);
         background:
           linear-gradient(180deg, rgba(32, 58, 39, 0.95), rgba(20, 37, 24, 0.88));
       }

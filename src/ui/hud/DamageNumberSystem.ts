@@ -102,23 +102,23 @@ export class DamageNumberSystem {
       }
 
       .damage-number.normal {
-        color: rgba(220, 225, 230, 0.95);
+        color: rgba(231, 217, 186, 0.95);
       }
 
       .damage-number.headshot {
-        color: rgba(212, 163, 68, 0.95);
+        color: rgba(168, 116, 42, 0.95);
         font-size: 20px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 4px rgba(212, 163, 68, 0.3);
+          0 0 4px rgba(168, 116, 42, 0.3);
       }
 
       .damage-number.kill {
-        color: rgba(201, 86, 74, 0.95);
+        color: rgba(158, 59, 46, 0.95);
         font-size: 22px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 5px rgba(201, 86, 74, 0.4);
+          0 0 5px rgba(158, 59, 46, 0.4);
       }
     `;
     document.head.appendChild(style);

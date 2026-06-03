@@ -100,50 +100,50 @@ export class ScorePopupSystem {
       }
 
       .score-popup.capture {
-        color: rgba(91, 140, 201, 0.95);
+        color: rgba(79, 107, 58, 0.95);
         font-size: 28px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 6px rgba(91, 140, 201, 0.4);
+          0 0 6px rgba(79, 107, 58, 0.4);
       }
 
       .score-popup.defend {
-        color: rgba(212, 163, 68, 0.95);
+        color: rgba(168, 116, 42, 0.95);
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 4px rgba(212, 163, 68, 0.3);
+          0 0 4px rgba(168, 116, 42, 0.3);
       }
 
       .score-popup.secured {
-        color: rgba(92, 184, 92, 0.95);
+        color: rgba(125, 154, 90, 0.95);
         font-size: 32px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 6px rgba(92, 184, 92, 0.4);
+          0 0 6px rgba(125, 154, 90, 0.4);
       }
 
       .score-popup.kill {
-        color: rgba(220, 225, 230, 0.95);
+        color: rgba(231, 217, 186, 0.95);
         font-size: 26px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 5px rgba(220, 225, 230, 0.3);
+          0 0 5px rgba(231, 217, 186, 0.3);
       }
 
       .score-popup.headshot {
-        color: rgba(212, 163, 68, 0.95);
+        color: rgba(168, 116, 42, 0.95);
         font-size: 24px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 5px rgba(212, 163, 68, 0.4);
+          0 0 5px rgba(168, 116, 42, 0.4);
       }
 
       .score-popup.assist {
-        color: rgba(154, 168, 178, 0.95);
+        color: rgba(200, 188, 160, 0.95);
         font-size: 20px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 3px rgba(154, 168, 178, 0.3);
+          0 0 3px rgba(200, 188, 160, 0.3);
       }
     `;
     document.head.appendChild(style);

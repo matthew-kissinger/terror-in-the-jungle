@@ -315,8 +315,8 @@ export class CommandTacticalMap {
     const cursorY = this.size / 2 + rotatedZ * scale;
 
     this.context.strokeStyle = this.placementArmed
-      ? 'rgba(214, 165, 89, 0.92)'
-      : 'rgba(92, 184, 92, 0.92)';
+      ? 'rgba(168, 116, 42, 0.92)'
+      : 'rgba(79, 107, 58, 0.92)';
     this.context.lineWidth = 2;
     this.context.beginPath();
     this.context.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
@@ -370,7 +370,7 @@ export class CommandTacticalMap {
 
       .command-tactical-map__frame {
         position: relative;
-        border: 1px solid rgba(214, 165, 89, 0.25);
+        border: 1px solid rgba(168, 116, 42, 0.25);
         border-radius: 16px;
         overflow: hidden;
         background: rgba(12, 14, 16, 0.92);

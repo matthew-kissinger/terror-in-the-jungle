@@ -36,7 +36,7 @@ export class HitMarkerFeedback {
       pointer-events: none;
       opacity: 0;
       z-index: ${zIndex.hudOverlay};
-      background: radial-gradient(circle at center, transparent 0%, rgba(255, 0, 0, 0.3) 100%);
+      background: radial-gradient(circle at center, transparent 0%, rgba(158, 59, 46, 0.3) 100%);
     `;
 
     this.injectStyles();
@@ -66,7 +66,7 @@ export class HitMarkerFeedback {
       .hit-marker-cross::after {
         content: '';
         position: absolute;
-        background: white;
+        background: rgba(231, 217, 186, 0.95);
         box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
       }
 
@@ -110,7 +110,7 @@ export class HitMarkerFeedback {
 
       .hit-marker-hit::before,
       .hit-marker-hit::after {
-        background: rgba(255, 255, 255, 0.9);
+        background: rgba(231, 217, 186, 0.9);
       }
 
       /* Headshot marker - gold */
@@ -135,9 +135,9 @@ export class HitMarkerFeedback {
 
       .hit-marker-headshot::before,
       .hit-marker-headshot::after {
-        background: rgba(212, 163, 68, 0.95);
+        background: rgba(168, 116, 42, 0.95);
         box-shadow:
-          0 0 4px rgba(212, 163, 68, 0.5),
+          0 0 4px rgba(168, 116, 42, 0.5),
           0 0 2px rgba(0, 0, 0, 0.9);
       }
 
@@ -163,9 +163,9 @@ export class HitMarkerFeedback {
 
       .hit-marker-kill::before,
       .hit-marker-kill::after {
-        background: rgba(201, 86, 74, 0.95);
+        background: rgba(158, 59, 46, 0.95);
         box-shadow:
-          0 0 5px rgba(201, 86, 74, 0.6),
+          0 0 5px rgba(158, 59, 46, 0.6),
           0 0 3px rgba(0, 0, 0, 0.9);
       }
 
@@ -203,12 +203,12 @@ export class HitMarkerFeedback {
       }
 
       .vignette-kill {
-        background: radial-gradient(circle at center, transparent 0%, rgba(201, 86, 74, 0.25) 100%);
+        background: radial-gradient(circle at center, transparent 0%, rgba(158, 59, 46, 0.25) 100%);
         animation: killVignettePulse 400ms ease-out forwards;
       }
 
       .vignette-headshot {
-        background: radial-gradient(circle at center, transparent 0%, rgba(212, 163, 68, 0.15) 100%);
+        background: radial-gradient(circle at center, transparent 0%, rgba(168, 116, 42, 0.15) 100%);
         animation: headshotVignettePulse 350ms ease-out forwards;
       }
     `;

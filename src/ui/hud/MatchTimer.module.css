@@ -44,10 +44,10 @@
 
 @keyframes timerCriticalPulse {
   0%, 100% {
-    filter: drop-shadow(0 0 4px rgba(201, 86, 74, 0.2));
+    filter: drop-shadow(0 0 4px rgba(158, 59, 46, 0.2));
   }
   50% {
-    filter: drop-shadow(0 0 10px rgba(201, 86, 74, 0.5));
+    filter: drop-shadow(0 0 10px rgba(158, 59, 46, 0.5));
   }
 }
 

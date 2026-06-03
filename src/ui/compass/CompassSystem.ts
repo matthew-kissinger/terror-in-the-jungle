@@ -49,6 +49,10 @@ export class CompassSystem implements GameSystem {
 
   async init(parent?: HTMLElement): Promise<void> {
     Logger.info('compass', 'Initializing Compass System...');
+    // Park on <body> when no grid slot is supplied yet; stay hidden until
+    // mountTo() reparents into the HUD grid, otherwise the compass flashes as
+    // a loose box in the corner for the few frames before the grid is built.
+    if (!parent) this.compassContainer.style.display = 'none';
     (parent ?? document.body).appendChild(this.compassContainer);
     Logger.info('compass', 'Compass System initialized');
   }
@@ -115,6 +119,9 @@ export class CompassSystem implements GameSystem {
       this.compassContainer.parentNode.removeChild(this.compassContainer);
     }
     parent.appendChild(this.compassContainer);
+    // Reveal now that it sits in its grid slot (init() hid it while parked
+    // on <body>). Visibility past this point is the HUD grid's concern.
+    this.compassContainer.style.display = '';
   }
 
   setZoneQuery(query: IZoneQuery): void {

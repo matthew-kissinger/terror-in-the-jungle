@@ -36,11 +36,11 @@
   gap: 14px;
   padding: 18px;
   overflow: auto;
-  border: 1px solid rgba(214, 165, 89, 0.28);
+  border: 1px solid rgba(168, 116, 42, 0.28);
   border-radius: 8px;
   background:
     linear-gradient(180deg, rgba(15, 18, 14, 0.96), rgba(8, 10, 11, 0.94)),
-    radial-gradient(circle at top right, rgba(92, 184, 92, 0.09), transparent 58%);
+    radial-gradient(circle at top right, rgba(79, 107, 58, 0.09), transparent 58%);
   box-shadow: 0 24px 40px rgba(0, 0, 0, 0.34);
   pointer-events: auto;
 }
@@ -154,7 +154,7 @@
 }
 
 .markingButton[aria-pressed="true"] {
-  border-color: rgba(92, 184, 92, 0.48);
+  border-color: rgba(79, 107, 58, 0.48);
   background: rgba(32, 58, 39, 0.92);
 }
 
@@ -178,7 +178,7 @@
 }
 
 .assetButton:hover:not(:disabled) {
-  border-color: rgba(214, 165, 89, 0.38);
+  border-color: rgba(168, 116, 42, 0.38);
   background: rgba(48, 56, 50, 0.9);
 }
 
@@ -188,7 +188,7 @@
 }
 
 .assetButton[aria-pressed="true"] {
-  border-color: rgba(92, 184, 92, 0.52);
+  border-color: rgba(79, 107, 58, 0.52);
   background: rgba(32, 58, 39, 0.92);
 }
 
@@ -203,7 +203,7 @@
 }
 
 .assetStatus {
-  color: rgba(92, 184, 92, 0.92);
+  color: rgba(79, 107, 58, 0.92);
   font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 700;
@@ -213,7 +213,7 @@
 }
 
 .assetButton:disabled .assetStatus {
-  color: rgba(214, 165, 89, 0.9);
+  color: rgba(168, 116, 42, 0.9);
 }
 
 .cooldownTrack {
@@ -228,7 +228,7 @@
   height: 100%;
   width: 0%;
   border-radius: 2px;
-  background: rgba(214, 165, 89, 0.72);
+  background: rgba(168, 116, 42, 0.72);
   transition: width 120ms ease;
 }
 

@@ -29,21 +29,21 @@ export class DeathCamOverlay {
 
     const infoPanel = document.createElement('div');
     infoPanel.id = 'death-info-panel';
-    infoPanel.style.cssText = 'position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(8, 12, 18, 0.9); border: 1px solid rgba(201, 86, 74, 0.5); border-radius: 4px; padding: 20px 40px; text-align: center; animation: fadeSlideIn 0.5s ease-out; backdrop-filter: blur(8px);';
+    infoPanel.style.cssText = 'position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(43, 38, 32, 0.92); border: 1px solid rgba(158, 59, 46, 0.5); border-radius: 4px; padding: 20px 40px; text-align: center; animation: fadeSlideIn 0.5s ease-out; backdrop-filter: blur(8px);';
 
     this.killerNameEl = document.createElement('div');
     this.killerNameEl.id = 'killer-name';
-    this.killerNameEl.style.cssText = 'color: rgba(201, 86, 74, 0.95); font-size: 32px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-shadow: 0 0 8px rgba(201, 86, 74, 0.3);';
+    this.killerNameEl.style.cssText = 'color: rgba(158, 59, 46, 0.95); font-size: 32px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-shadow: 0 0 8px rgba(158, 59, 46, 0.3);';
     infoPanel.appendChild(this.killerNameEl);
 
     this.killDetailsEl = document.createElement('div');
     this.killDetailsEl.id = 'kill-details';
-    this.killDetailsEl.style.cssText = 'color: rgba(220, 225, 230, 0.8); font-size: 16px; margin-top: 10px;';
+    this.killDetailsEl.style.cssText = 'color: rgba(231, 217, 186, 0.8); font-size: 16px; margin-top: 10px;';
     infoPanel.appendChild(this.killDetailsEl);
 
     this.headshotEl = document.createElement('div');
     this.headshotEl.id = 'headshot-indicator';
-    this.headshotEl.style.cssText = 'color: rgba(212, 163, 68, 0.9); font-size: 18px; font-weight: bold; margin-top: 10px; text-transform: uppercase; display: none;';
+    this.headshotEl.style.cssText = 'color: rgba(168, 116, 42, 0.9); font-size: 18px; font-weight: bold; margin-top: 10px; text-transform: uppercase; display: none;';
     this.headshotEl.textContent = ' HEADSHOT ';
     infoPanel.appendChild(this.headshotEl);
 
@@ -51,7 +51,7 @@ export class DeathCamOverlay {
 
     this.timerEl = document.createElement('div');
     this.timerEl.id = 'death-respawn-timer';
-    this.timerEl.style.cssText = 'position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%); color: rgba(220, 225, 230, 0.45); font-size: 16px; text-transform: uppercase; letter-spacing: 2px;';
+    this.timerEl.style.cssText = 'position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%); color: rgba(231, 217, 186, 0.5); font-size: 16px; text-transform: uppercase; letter-spacing: 2px;';
     this.overlayElement.appendChild(this.timerEl);
 
     const style = document.createElement('style');

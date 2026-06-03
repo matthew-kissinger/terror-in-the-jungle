@@ -73,7 +73,7 @@ export function renderMinimap(state: MinimapRenderState): void {
   const { ctx, size } = state;
   const renderScale = size / 200;
 
-  ctx.fillStyle = 'rgba(20, 20, 30, 0.9)';
+  ctx.fillStyle = 'rgba(43, 38, 32, 0.9)';
   ctx.fillRect(0, 0, size, size);
 
   drawGrid(ctx, size, renderScale);
@@ -120,11 +120,11 @@ function drawHydrologyChannels(
     const t = Math.min(1, Math.max(0, channel.maxAccumulationCells / maxAccumulation));
     const width = Math.max(1.4 * renderScale, 1.8 * renderScale + 2.6 * renderScale * t);
 
-    ctx.strokeStyle = 'rgba(2, 65, 96, 0.78)';
+    ctx.strokeStyle = 'rgba(38, 60, 74, 0.78)';
     ctx.lineWidth = width + 1.5 * renderScale;
     strokeHydrologyChannel(ctx, state, scale, channel);
 
-    ctx.strokeStyle = 'rgba(36, 208, 223, 0.95)';
+    ctx.strokeStyle = 'rgba(82, 120, 140, 0.95)';
     ctx.lineWidth = width;
     strokeHydrologyChannel(ctx, state, scale, channel);
   }
@@ -156,7 +156,7 @@ function strokeHydrologyChannel(
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, size: number, renderScale: number): void {
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.strokeStyle = 'rgba(231, 217, 186, 0.1)';
   ctx.lineWidth = 1 * renderScale;
   const gridSize = 20 * renderScale;
   for (let i = 0; i <= size; i += gridSize) {
@@ -220,20 +220,20 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
 
   switch (zone.state) {
     case ZoneState.BLUFOR_CONTROLLED:
-      ctx.fillStyle = 'rgba(91, 140, 201, 0.3)';
-      ctx.strokeStyle = 'rgba(91, 140, 201, 0.8)';
+      ctx.fillStyle = 'rgba(79, 107, 58, 0.3)';
+      ctx.strokeStyle = 'rgba(79, 107, 58, 0.8)';
       break;
     case ZoneState.OPFOR_CONTROLLED:
-      ctx.fillStyle = 'rgba(201, 86, 74, 0.3)';
-      ctx.strokeStyle = 'rgba(201, 86, 74, 0.8)';
+      ctx.fillStyle = 'rgba(158, 59, 46, 0.3)';
+      ctx.strokeStyle = 'rgba(158, 59, 46, 0.8)';
       break;
     case ZoneState.CONTESTED:
-      ctx.fillStyle = 'rgba(212, 163, 68, 0.3)';
-      ctx.strokeStyle = 'rgba(212, 163, 68, 0.8)';
+      ctx.fillStyle = 'rgba(168, 116, 42, 0.3)';
+      ctx.strokeStyle = 'rgba(168, 116, 42, 0.8)';
       break;
     default:
-      ctx.fillStyle = 'rgba(107, 119, 128, 0.3)';
-      ctx.strokeStyle = 'rgba(107, 119, 128, 0.8)';
+      ctx.fillStyle = 'rgba(138, 126, 107, 0.3)';
+      ctx.strokeStyle = 'rgba(138, 126, 107, 0.8)';
   }
 
   ctx.beginPath();
@@ -254,7 +254,7 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
     ctx.drawImage(markerIcon, x - markerSize / 2, y - markerSize / 2, markerSize, markerSize);
     ctx.restore();
   } else if (zone.isHomeBase) {
-    ctx.fillStyle = zone.state === ZoneState.BLUFOR_CONTROLLED ? 'rgba(91, 140, 201, 0.9)' : 'rgba(201, 86, 74, 0.9)';
+    ctx.fillStyle = zone.state === ZoneState.BLUFOR_CONTROLLED ? 'rgba(79, 107, 58, 0.9)' : 'rgba(158, 59, 46, 0.9)';
     ctx.fillRect(x - markerSize / 2, y - markerSize / 2, markerSize, markerSize);
   } else {
     ctx.beginPath();
@@ -266,15 +266,15 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
     ctx.fill();
   }
 
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.fillStyle = 'rgba(231, 217, 186, 0.8)';
   ctx.font = `${Math.round(10 * renderScale)}px "Courier Prime", monospace`;
   ctx.textAlign = 'center';
   ctx.fillText(zone.name, x, y + zoneRadius + 12 * renderScale);
 
   if (zone.state === ZoneState.CONTESTED) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.fillStyle = 'rgba(231, 217, 186, 0.6)';
     ctx.fillRect(x - 15 * renderScale, y + zoneRadius + 15 * renderScale, 30 * renderScale, 3 * renderScale);
-    ctx.fillStyle = 'rgba(212, 163, 68, 0.9)';
+    ctx.fillStyle = 'rgba(168, 116, 42, 0.9)';
     ctx.fillRect(x - 15 * renderScale, y + zoneRadius + 15 * renderScale, 30 * renderScale * (zone.captureProgress / 100), 3 * renderScale);
   }
 }
@@ -313,13 +313,13 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
         ctx.drawImage(squadIcon, x - sqIconSize / 2, y - sqIconSize / 2, sqIconSize, sqIconSize);
         ctx.restore();
       } else {
-        ctx.fillStyle = 'rgba(92, 184, 92, 0.8)';
+        ctx.fillStyle = 'rgba(125, 154, 90, 0.8)';
         ctx.beginPath();
         ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
         ctx.fill();
       }
     } else {
-      ctx.fillStyle = isBlufor(combatant.faction) ? 'rgba(91, 140, 201, 0.6)' : 'rgba(201, 86, 74, 0.6)';
+      ctx.fillStyle = isBlufor(combatant.faction) ? 'rgba(79, 107, 58, 0.6)' : 'rgba(158, 59, 46, 0.6)';
       ctx.beginPath();
       ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
       ctx.fill();
@@ -366,8 +366,8 @@ function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRender
     // Dimmer for strategic tier, slightly brighter for simulated
     const alpha = tier === 1 ? 0.35 : 0.2;
     ctx.fillStyle = faction === 0
-      ? `rgba(91, 140, 201, ${alpha})`
-      : `rgba(201, 86, 74, ${alpha})`;
+      ? `rgba(79, 107, 58, ${alpha})`
+      : `rgba(158, 59, 46, ${alpha})`;
 
     ctx.beginPath();
     ctx.arc(mx, my, dotSize, 0, Math.PI * 2);
@@ -389,11 +389,11 @@ function drawPlayer(ctx: CanvasRenderingContext2D, size: number, renderScale: nu
     ctx.restore();
   } else {
     // Fallback: circle
-    ctx.fillStyle = 'rgba(220, 225, 230, 0.95)';
+    ctx.fillStyle = 'rgba(231, 217, 186, 0.95)';
     ctx.beginPath();
     ctx.arc(centerX, centerY, 4 * renderScale, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(220, 225, 230, 0.95)';
+    ctx.strokeStyle = 'rgba(231, 217, 186, 0.95)';
     ctx.lineWidth = 2 * renderScale;
     ctx.stroke();
   }
@@ -407,7 +407,7 @@ function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size:
 
   const angle = 0;
 
-  ctx.strokeStyle = 'rgba(220, 225, 230, 0.6)';
+  ctx.strokeStyle = 'rgba(231, 217, 186, 0.6)';
   ctx.lineWidth = 3 * renderScale;
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
@@ -428,7 +428,7 @@ function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size:
   const rightX = centerX + Math.sin(rightAngle) * coneLength;
   const rightY = centerY - Math.cos(rightAngle) * coneLength;
 
-  ctx.fillStyle = 'rgba(220, 225, 230, 0.08)';
+  ctx.fillStyle = 'rgba(231, 217, 186, 0.08)';
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(leftX, leftY);
@@ -447,14 +447,14 @@ function drawCommandMarker(ctx: CanvasRenderingContext2D, state: MinimapRenderSt
 
   const centerX = state.size / 2;
   const centerY = state.size / 2;
-  ctx.strokeStyle = 'rgba(92, 184, 92, 0.35)';
+  ctx.strokeStyle = 'rgba(125, 154, 90, 0.35)';
   ctx.lineWidth = 1.5 * renderScale;
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(x, y);
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(92, 184, 92, 0.8)';
+  ctx.strokeStyle = 'rgba(125, 154, 90, 0.8)';
   ctx.lineWidth = 2 * renderScale;
 
   ctx.beginPath();
@@ -483,12 +483,12 @@ function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderS
     if (x < -iconSize || x > state.size + iconSize || y < -iconSize || y > state.size + iconSize) continue;
 
     // Circle background
-    ctx.fillStyle = 'rgba(91, 140, 201, 0.4)';
+    ctx.fillStyle = 'rgba(79, 107, 58, 0.4)';
     ctx.beginPath();
     ctx.arc(x, y, iconSize, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(91, 140, 201, 0.9)';
+    ctx.strokeStyle = 'rgba(79, 107, 58, 0.9)';
     ctx.lineWidth = 1.5 * renderScale;
     ctx.stroke();
 
@@ -502,7 +502,7 @@ function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderS
       ctx.drawImage(icon, x - imgSize / 2, y - imgSize / 2, imgSize, imgSize);
       ctx.restore();
     } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillStyle = 'rgba(231, 217, 186, 0.9)';
       ctx.font = `bold ${Math.round(10 * renderScale)}px "Courier Prime", monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -589,11 +589,11 @@ function drawVehicleMarkers(
     if (x < -baseRadius || x > state.size + baseRadius || y < -baseRadius || y > state.size + baseRadius) continue;
 
     // Faction palette: matches the combatant-dot palette so player can
-    // visually tie a vehicle to "the blue side" / "the red side" at a
-    // glance. US blue (rgba 91,140,201) / OPFOR red (rgba 201,86,74).
+    // visually tie a vehicle to the allied / hostile side at a glance.
+    // US field-green (rgba 79,107,58) / OPFOR stamp-red (rgba 158,59,46).
     const friendly = isBlufor(marker.faction);
-    const fillColor = friendly ? 'rgba(91, 140, 201, 0.85)' : 'rgba(201, 86, 74, 0.85)';
-    const strokeColor = friendly ? 'rgba(220, 230, 245, 0.95)' : 'rgba(245, 220, 220, 0.95)';
+    const fillColor = friendly ? 'rgba(79, 107, 58, 0.85)' : 'rgba(158, 59, 46, 0.85)';
+    const strokeColor = friendly ? 'rgba(231, 217, 186, 0.95)' : 'rgba(231, 217, 186, 0.95)';
 
     ctx.fillStyle = fillColor;
     ctx.strokeStyle = strokeColor;

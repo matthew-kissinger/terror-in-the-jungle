@@ -144,11 +144,11 @@ export class PlayerSquadController implements GameSystem {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(92, 184, 92, 0.15);
-      border: 1px solid rgba(92, 184, 92, 0.5);
+      background: rgba(79, 107, 58, 0.15);
+      border: 1px solid rgba(79, 107, 58, 0.5);
       padding: 20px 40px;
       border-radius: 6px;
-      color: rgba(92, 184, 92, 0.9);
+      color: rgba(79, 107, 58, 0.9);
       font-family: var(--font-primary);
       font-size: 24px;
       font-weight: bold;
@@ -215,7 +215,7 @@ export class PlayerSquadController implements GameSystem {
       gap: 5px;
       pointer-events: none;
       user-select: none;
-      color: rgba(220, 225, 230, 0.55);
+      color: rgba(231, 217, 186, 0.55);
       font-family: var(--font-primary);
       font-size: 9px;
       font-weight: bold;
@@ -254,7 +254,7 @@ export class PlayerSquadController implements GameSystem {
     commandText.textContent = getSquadCommandLabel(this.currentCommand, 'short');
 
     const isActiveCommand = this.currentCommand !== SquadCommand.NONE && this.currentCommand !== SquadCommand.FREE_ROAM;
-    commandText.style.color = isActiveCommand ? 'rgba(92, 184, 92, 0.9)' : 'rgba(220, 225, 230, 0.55)';
+    commandText.style.color = isActiveCommand ? 'rgba(79, 107, 58, 0.9)' : 'rgba(231, 217, 186, 0.55)';
   }
 
   getCommandPosition(): THREE.Vector3 | undefined {
