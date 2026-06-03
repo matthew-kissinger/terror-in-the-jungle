@@ -21,7 +21,7 @@ Hosek-Wilkie sky, and water. Backend selection lives in
 `src/core/RendererBackend.ts` (`resolveRendererBackendMode()` reads
 `?renderer=` / env), and `src/core/GameRenderer.ts` drives the swap from a
 WebGL bootstrap renderer to the WebGPU surface (`initializeRendererBackend()`,
-lines 233-310). Modes:
+lines 248-329). Modes:
 
 - `'webgpu'` (default) — production path. Falls back to Three.js's automatic
   WebGL2 backend when `navigator.gpu` is unavailable or the WebGPU adapter

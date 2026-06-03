@@ -18,9 +18,11 @@ Pre-split full-history copy lives at `docs/archive/PERFORMANCE.md`.
 Perf captures land in `artifacts/perf/<timestamp>/`. The `artifacts/` tree is
 gitignored, so retention is enforced by [`scripts/artifact-prune.ts`](../../scripts/artifact-prune.ts):
 captures older than 30 days are deleted unless they are cited by name in any
-`docs/**/*.md` file or pinned in `perf-baselines.json`. Long-term reference
-captures should be linked from a cycle doc or carry-over, not assumed to live
-forever in `artifacts/perf/`.
+`docs/**/*.md` file or pinned in `perf-baselines.json`. The baseline-pin path is
+inert while no `perf-baselines.json` exists (the prune script returns an empty
+pin set when the file is absent), so retention currently rests entirely on doc
+citations. Long-term reference captures should be linked from a cycle doc or
+carry-over, not assumed to live forever in `artifacts/perf/`.
 
 The [`artifact-prune` GitHub Actions workflow](../../.github/workflows/artifact-prune.yml)
 runs every Sunday at 04:00 UTC (and on `workflow_dispatch`). To inspect runs:
@@ -100,9 +102,9 @@ npm run perf:quick                      # Smoke; not a baseline
 
 # Analysis and comparison:
 npm run perf:analyze:latest             # Print latest artifact summary
-npm run perf:compare                    # Compare latest vs tracked baselines
-npm run perf:compare:strict             # Same compare, fail on warnings too
-npm run perf:update-baseline            # Refresh baselines from latest capture (use sparingly)
+npm run perf:compare                    # Compare latest vs baseline; prints raw metrics when no baseline is tracked
+npm run perf:compare:strict             # Same compare, fail on warnings too (no-op gating without a baseline)
+npm run perf:update-baseline            # (Re)create perf-baselines.json from latest capture (use sparingly)
 ```
 
 `perf:capture` accepts `--scenario`, `--server-mode`, `--headless`,

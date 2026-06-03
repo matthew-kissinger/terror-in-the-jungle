@@ -1,12 +1,12 @@
 # Testing Contract
 
-Last verified: 2026-05-31
+Last verified: 2026-06-02
 
 This file is the authoritative test-layer policy. **Every agent and human touching tests must read this first.** The point is to prevent implementation-mirror tests that enshrine today's code shape and block tomorrow's refactor.
 
 ## Why this exists
 
-The repo has grown to several thousand behavior tests across 347 test files. A large fraction assert *implementation details* (specific phase-state names, envelope constant values, exact command magnitudes) rather than *behavior*. When the implementation changes — even correctly — those tests fail and have to be rewritten. The net effect: tests block refactors that would make the game better.
+The repo has grown to several thousand behavior tests across 370 test files. A large fraction assert *implementation details* (specific phase-state names, envelope constant values, exact command magnitudes) rather than *behavior*. When the implementation changes — even correctly — those tests fail and have to be rewritten. The net effect: tests block refactors that would make the game better.
 
 This document tells you which kind of test to write and which to prune.
 

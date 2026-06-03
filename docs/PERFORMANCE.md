@@ -31,7 +31,12 @@ Pre-Phase-1 content archived at `docs/archive/PERFORMANCE.md`.
   R2-R4 (cover-spatial-grid, render-silhouette lane, squad-aggregated
   strategic sim, budget arbiter v2, render-cluster lane) will address the
   remaining combat cost.
-- **STABILIZAT-1 remains open.** `perf-baselines.json` is still pinned to
-  the 2026-04-20 capture; the WebGPU + Phase F R1 baseline refresh is queued
-  as its own cycle so the new master baseline becomes the falsifiable bar
-  future PRs measure against. See `docs/CARRY_OVERS.md`.
+- **STABILIZAT-1 remains open.** As of this 2026-05-13 snapshot,
+  `perf-baselines.json` was still pinned to the 2026-04-20 capture, with the
+  WebGPU + Phase F R1 baseline refresh queued as its own cycle.
+  **Update 2026-06-02:** `perf-baselines.json` has since been removed entirely,
+  so there is currently no tracked baseline at all — `perf:compare` prints raw
+  latest-capture metrics and does not gate. The STABILIZAT-1 "refresh the
+  pinned baseline" framing is therefore superseded: re-establishing a baseline
+  now means creating the file fresh via `npm run perf:update-baseline`. See
+  [docs/perf/baselines.md](perf/baselines.md) and `docs/CARRY_OVERS.md`.

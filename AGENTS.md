@@ -36,8 +36,9 @@ npm run check:states             # State coverage probe
 npm run check:hud                # HUD layout validator
 npm run check:memory             # Memory growth tracker
 # Phase 1 `script-triage` (2026-05-09) renamed the 12 retained audit scripts
-# from `check:projekt-143-*` to plain `check:*` names. 80 one-off cycle-specific
-# audits moved to `scripts/audit-archive/` and dropped from package.json.
+# from `check:projekt-143-*` to plain `check:*` names. One-off cycle-specific
+# audits were dropped from package.json and parked in `scripts/audit-archive/`;
+# the 2026-06-02 prune deleted the orphaned ones, leaving ~18 still cited by docs/perf/*.
 npm run check:culling-proof      # Headed deterministic renderer/category proof
 npm run check:culling-baseline   # Culling owner-path before packet
 npm run check:terrain-baseline   # Elevated terrain horizon before proof
@@ -61,9 +62,9 @@ npm run perf:capture:ashau:short
 npm run perf:capture:frontier30m    # 30min soak
 npm run perf:startup:openfrontier   # Retail startup benchmark (mode select -> deploy -> playable)
 npm run perf:quick                  # Smoke capture (not a baseline)
-npm run perf:compare                # Compare latest vs tracked baselines
-npm run perf:compare:strict         # Same, but fail on warnings too
-npm run perf:update-baseline        # Overwrite baselines from latest
+npm run perf:compare                # Print latest-capture metrics; no baseline is currently tracked
+npm run perf:compare:strict         # Same, but fail on warnings too (only gates when a baseline exists)
+npm run perf:update-baseline        # (Re)establish a tracked baseline from the latest capture
 npm run evidence:atmosphere         # All-mode ground/sky/aircraft atmosphere + terrain visibility evidence
 
 # Asset import and validation
@@ -141,7 +142,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md) | Multi-agent DAG (active when orchestrating) |
 | [docs/REARCHITECTURE.md](docs/REARCHITECTURE.md) | Phase E paradigm questions |
 | `docs/rearch/E[1-6]*.md` | Phase E evaluation memos (E1 evaluation is on master; E2-E6 explorations live on `spike/E*` branches) |
-| [docs/ASSET_MANIFEST.md](docs/ASSET_MANIFEST.md) | 159 GLBs, integration status |
+| [docs/ASSET_MANIFEST.md](docs/ASSET_MANIFEST.md) | 153 GLBs, integration status |
 | [docs/UI_ICON_MANIFEST.md](docs/UI_ICON_MANIFEST.md) | Pixel-art UI icons |
 
 ## Agent skills and rules
@@ -221,7 +222,7 @@ Live vehicle and aircraft directive status is tracked in [docs/DIRECTIVES.md](do
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.
 - **Mode-startup stalls are not automatically cache bugs.** The 2026-05-13 spike showed Recast WASM/build/navmesh cache headers can be correct while synchronous terrain surface baking still blocks mode selection. For startup work, run `scripts/perf-startup-ui.ts` and check `startup-marks.json` before changing Cloudflare cache policy. Current memo: `docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md`.
-- **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:culling-proof` (renamed from `check:projekt-143-culling-proof` in Phase 1); the cycle2-proof bundle is archived under `scripts/audit-archive/cycle2-proof-suite.ts`. The proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
+- **Cycle 2 KB-CULL proof.** Do not certify close-NPC/NPC-imposter culling from combat-heavy AI Sandbox captures when `measurement_trust` fails. The 2026-05-03 60/120 NPC diagnostic captures exposed the renderer categories but failed harness trust. Use `npm run check:culling-proof` (renamed from `check:projekt-143-culling-proof` in Phase 1). The proof is headed by default because headless Chromium produced a lost WebGL context and zero renderer counters on this machine.
 - **Cycle 3 KB-CULL owner baseline.** Before changing culling, HLOD, static
   features, vehicle visibility, or pool residency, run
   `npm run check:culling-baseline`. It selects a representative

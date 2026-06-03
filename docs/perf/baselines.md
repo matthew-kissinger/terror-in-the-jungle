@@ -1,24 +1,34 @@
 # Perf Baselines
 
-Tracked baselines, refresh rules, and current scenario health. Comparison data
-lives in `perf-baselines.json` at repo root; this doc explains policy and
-status.
+Baseline policy, refresh rules, and current scenario health.
 
-## Tracked baselines
+> **Status (2026-06-02): no baseline is currently tracked.** `perf-baselines.json`
+> was removed from the repo. With no baseline file present, `perf:compare` does
+> **not** gate pass/fail — it prints the latest capture's raw metrics and exits
+> 0 (see [`perf:compare` details](#perfcompare-details) below). Re-establishing a
+> baseline means running `npm run perf:update-baseline`, which (re)creates
+> `perf-baselines.json` from the latest capture. The procedure for doing that
+> deliberately is in [Refresh procedure](#refresh-procedure). Everything below
+> describes how a tracked baseline behaves *once one exists*; treat it as the
+> contract to restore, not the current runtime state.
 
-`perf-baselines.json` tracks: `combat120`, `openfrontier:short`,
-`ashau:short`, `frontier30m`. Other scenarios are diagnostic only and do not
-gate `perf:compare`.
+## Scenarios a baseline would gate
 
-The current tracked baselines were refreshed on **2026-04-20** after the
-atmosphere/airfield/harness cycle. The DEFEKT-1 audit at
-`scripts/audit-archive/stale-baseline-audit.ts` classifies all four scenarios as
-stale-by-age but currently `0/4` as refresh-eligible because every recent
-capture either fails validation or fails measurement trust.
+When `perf-baselines.json` exists it gates these scenarios: `combat120`,
+`openfrontier:short`, `ashau:short`, `frontier30m`. Other scenarios are
+diagnostic only and do not gate `perf:compare`.
+
+The last tracked baselines (before the file was removed) were captured on
+**2026-04-20** after the atmosphere/airfield/harness cycle. The DEFEKT-1
+stale-baseline audit at `scripts/audit-archive/stale-baseline-audit.ts`
+classified those four scenarios as stale-by-age with `0/4` refresh-eligible
+because every recent capture either failed validation or failed measurement
+trust. That audit now throws `perf-baselines.json is missing` until a baseline
+is re-established.
 
 `frontier30m` script semantics were corrected in Cycle 2 to use
-`--match-duration 3600 --disable-victory true`, but the tracked baseline is
-still the older capture from before that fix. Refresh it only from a
+`--match-duration 3600 --disable-victory true`; that fix postdated the last
+tracked baseline. When a baseline is restored, capture `frontier30m` only from a
 quiet-machine perf session after the audit reports strict eligibility.
 
 ## Pre-drift-correction reference
@@ -30,8 +40,12 @@ Use this when judging whether a candidate refresh is regression vs progress.
 
 ## Current scenario health
 
-Status as of 2026-05-09. Source: latest `perf:compare` selection on each
-scenario, plus the DEFEKT-1 stale-baseline audit.
+Last recorded gate status: **2026-05-09**, when `perf-baselines.json` was still
+tracked. Source at the time: latest `perf:compare` selection on each scenario,
+plus the DEFEKT-1 stale-baseline audit. These rows are retained as the
+last-known gated status; with no baseline currently tracked, `perf:compare` no
+longer produces PASS/WARN/FAIL rows (it prints raw metrics). Re-gating these
+scenarios requires restoring a baseline per [Refresh procedure](#refresh-procedure).
 
 | Scenario | Status | Avg | p99 | Notes |
 |----------|--------|----:|----:|-------|
@@ -52,6 +66,13 @@ pre-split full diagnostic chain is preserved in
 
 ## Refresh procedure
 
+This procedure (re-)establishes `perf-baselines.json`, which is currently
+absent. On the very first run there is no baseline yet, so the compare/audit
+gates in steps 5-6 have nothing to measure against — run them only once a prior
+baseline exists, or to confirm a freshly written one. The non-negotiable bar in
+every case is steps 1-4 (quiet machine, fresh bundle, `status: ok` +
+measurement-trust `pass`) plus the manual heap/frame criteria below.
+
 1. Verify the machine is quiet (no other browser games, no overnight repo
    agents, no asset bakes). See [scenarios.md](scenarios.md) "Capture
    environment discipline".
@@ -61,16 +82,22 @@ pre-split full diagnostic chain is preserved in
 4. Verify `summary.json` has `status: "ok"` and
    `measurementTrust.status: "pass"`. If either fails, the capture is
    diagnostic only — do not promote.
-5. Run `npm run perf:compare -- --scenario <scenario>`. All gates must be
-   `pass` (or `warn` if you intend to widen the baseline window).
-6. Run `npx tsx scripts/audit-archive/stale-baseline-audit.ts --as-of <today>`.
-   The scenario must classify as `eligible`, not `stale_by_age` or
-   `blocked_by_validation`.
-7. Capture twice more for repeatability. All three captures must pass the
-   compare gate.
-8. `npm run perf:update-baseline -- --scenario <scenario> --artifact <dir>`
-   updates `perf-baselines.json` from the latest capture only after every
-   gate above is green.
+5. (Only if a baseline already exists.) Run
+   `npm run perf:compare -- --scenario <scenario>`. All gates must be `pass`
+   (or `warn` if you intend to widen the baseline window). With no baseline
+   present, `perf:compare` prints raw metrics and cannot gate — judge the
+   capture against the manual criteria below.
+6. (Only if a baseline already exists.) Run
+   `npx tsx scripts/audit-archive/stale-baseline-audit.ts --as-of <today>`. The
+   scenario must classify as `eligible`, not `stale_by_age` or
+   `blocked_by_validation`. This audit throws `perf-baselines.json is missing`
+   when no baseline file is present.
+7. Capture twice more for repeatability. All three captures must clear the
+   manual criteria (and the compare gate, once a baseline exists).
+8. `npm run perf:update-baseline -- --scenario <scenario> --dir <timestamp>`
+   writes `perf-baselines.json` from the selected capture (creating the file if
+   it does not exist) only after every check above is satisfied. Omit `--dir` to
+   use the latest capture.
 9. Commit `perf-baselines.json` with a message referencing the carry-over the
    refresh closes (typically STABILIZAT-1 for `combat120`).
 
@@ -88,17 +115,23 @@ exception note in `docs/CARRY_OVERS.md`.
 
 ## perf:compare details
 
-`perf:compare` always prints PASS/WARN/FAIL rows. `FAIL` is locally blocking
-when invoked through `validate:full`; hosted CI keeps the artifacts and
-reports the failure without blocking deploy. `WARN` is reported but
-non-blocking by default so recovered-but-not-yet-rebaselined scenarios still
-surface in logs. Use `perf:compare:strict` or `--fail-on-warn` to make
-warnings block locally.
+**With no `perf-baselines.json` present (current state), `perf:compare` prints
+the latest capture's raw metrics and exits 0** — there is nothing to gate
+against, so it never emits PASS/WARN/FAIL rows or a non-zero exit. The behavior
+below applies once a baseline file exists.
+
+When a baseline exists, `perf:compare` prints PASS/WARN/FAIL rows per metric.
+`FAIL` is locally blocking when invoked through `validate:full`; hosted CI keeps
+the artifacts and reports the failure without blocking deploy. `WARN` is
+reported but non-blocking by default so recovered-but-not-yet-rebaselined
+scenarios still surface in logs. Use `perf:compare:strict` or `--fail-on-warn`
+to make warnings block locally. Note that the CI perf job's `perf:compare` step
+is `continue-on-error` (advisory) regardless.
 
 `peak_max_frame_ms` classification: pass `< 120`, warn `120-299`,
 fail `>= 300`.
 
 `perf:compare` auto-selects the latest capture for the scenario and skips
 non-capture artifact directories (audits, decision packets, etc.). Failed
-diagnostic captures are excluded from auto-selection. Pass `--artifact <dir>`
+diagnostic captures are excluded from auto-selection. Pass `--dir <timestamp>`
 to compare a specific capture.

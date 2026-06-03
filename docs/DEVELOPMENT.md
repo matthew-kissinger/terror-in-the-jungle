@@ -107,11 +107,17 @@ npm run preview:perf             # Preview dist-perf/ (harness-ready)
 npm run perf:startup:openfrontier # Production-shaped mode selection -> deploy -> playable timing
 npm run perf:capture:combat120   # Primary regression capture
 npm run perf:capture:openfrontier:short
-npm run perf:compare             # Compare against baselines
+npm run perf:compare             # Print latest-capture metrics (no baseline tracked; see below)
 npm run perf:compare -- --scenario openfrontier:short
-npm run perf:compare:strict      # Treat warnings as failures too
-npm run validate:full            # test + build + combat120 + compare
+npm run perf:compare:strict      # Treat warnings as failures too (only when a baseline is tracked)
+npm run validate:full            # test + build + combat120 + perf:compare
 ```
+
+No baseline is currently tracked: `perf-baselines.json` is absent, so
+`perf:compare` prints the raw latest-capture metrics and exits 0 without
+pass/fail gating (and `perf:compare:strict` cannot fail on a missing baseline).
+Run `npm run perf:update-baseline` to (re)establish one. The CI `perf` job's
+`perf:compare` step is advisory (continue-on-error) regardless.
 
 See [perf/README.md](perf/README.md) for full profiling docs (build targets, capture commands, artifacts), [perf/baselines.md](perf/baselines.md) for tracked baselines and refresh procedure, [perf/scenarios.md](perf/scenarios.md) for scenario definitions, and [perf/playbook.md](perf/playbook.md) for the regression investigation playbook.
 
@@ -219,7 +225,7 @@ npm run deadcode         # review output; advisory hygiene gate
 
 For performance-sensitive changes, also run:
 ```bash
-npm run validate:full    # adds combat120 capture + baseline comparison
+npm run validate:full    # adds combat120 capture + perf:compare (raw metrics until a baseline is tracked)
 ```
 
 For world/vehicle/aircraft/terrain work, also run:
@@ -304,7 +310,7 @@ src/
   test-utils/     Test helpers and mocks
 scripts/          Perf capture, analysis, comparison, prebake
 public/
-  models/         75 GLB files (weapons, vehicles, structures, etc.)
+  models/         153 GLB files (weapons, vehicles, structures, etc.)
   assets/         Textures, sprites, audio, icons
 ```
 

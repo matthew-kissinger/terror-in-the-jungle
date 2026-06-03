@@ -224,7 +224,7 @@ tuning as a substitute for re-enabling validated navmesh route following.
 ## Internal Layers
 
 Combat has five internal layers. The layer boundaries are logical, not
-folder-based — the folder is intentionally flat (~60 files) because
+folder-based — the folder is intentionally flat (~80 files) because
 moving files would churn 75+ consumer imports without reducing actual
 coupling. The `ai/` subfolder is the only current split.
 
@@ -396,8 +396,8 @@ here so future work can pick them up cleanly.
 
 ## Testing Guidance
 
-Combat has ~35 test files under `src/systems/combat/**` after the A2
-pruning pass. Follow the layering in `docs/TESTING.md`:
+Combat has ~56 test files under `src/systems/combat/**`. Follow the
+layering in `docs/TESTING.md`:
 
 - **L1 (pure functions):** target-filter helpers, `isPlayerTarget`,
   `isTargetAlive`, alliance predicates, `KillAssistTracker` damage
@@ -431,7 +431,7 @@ After mapping imports:
 
 - There are no circular imports between files within combat.
 - `ai/` already isolates per-state handlers and per-frame budgets.
-- The remaining flat layout has ~60 files but each file has a clear
+- The remaining flat layout has ~80 files but each file has a clear
   role — the mental model in this doc corresponds 1:1 to files.
 - Moving files (e.g. `combat/damage/`, `combat/targeting/`,
   `combat/suppression/`) would churn imports in 75+ consumer files

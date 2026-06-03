@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-01 (post optimal-development arc — see Current focus; prior refresh 2026-05-28 under `doc-consolidation-and-refs`)
+Last verified: 2026-06-02 (perf-baselines.json removal: corrected the baseline-refresh framing to "no baseline tracked; perf:compare is non-gating"; prior refresh 2026-06-01 post optimal-development arc)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -78,8 +78,11 @@ as of this refresh:
 - **DEFEKT-3** (combat AI p99 — synchronous cover search in
   `AIStateEngage.initiateSquadSuppression`) — open. The `cover-grid-wiring`
   task wired the existing O(1) `CoverSpatialGrid` into prod combat; the
-  combat120 p99 PASS remains gated on the STABILIZAT-1 baseline refresh —
-  see [docs/state/perf-trust.md](perf-trust.md) for the measurement chain.
+  combat120 p99 PASS is unverified. No perf baseline is currently tracked —
+  `perf-baselines.json` was removed, so `perf:compare` prints raw
+  latest-capture metrics without pass/fail gating; STABILIZAT-1 (open) would
+  re-establish a baseline via `perf:update-baseline`. See
+  [docs/state/perf-trust.md](perf-trust.md) for the measurement chain.
 - **KONVEYER-10/11** — closed; full slice-by-slice evidence in
   [docs/directives/konveyer-10.md](../directives/konveyer-10.md) and
   [docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).
@@ -102,8 +105,11 @@ as of this refresh:
   hang (Chromium downloads 100% then stalls post-download) — `prod-smoke` stays
   enforced locally via `npm run validate` and post-deploy via
   `check:live-release`; restore those jobs to blocking once the install hang is
-  fixed (Playwright bump / browser cache). Perf baseline refresh remains
-  blocked per [docs/state/perf-trust.md](perf-trust.md).
+  fixed (Playwright bump / browser cache). No perf baseline is currently
+  tracked (`perf-baselines.json` was removed); `perf:compare` prints raw
+  latest-capture metrics with no pass/fail gating, and the CI perf job is
+  advisory (`continue-on-error`). See [docs/state/perf-trust.md](perf-trust.md)
+  for the measurement chain.
 - Playable combined-arms browser game, not just an engine shell.
 - Helicopters and three flyable fixed-wing aircraft (A-1, F-4, AC-47) are
   live with HUD/control law, weapons (helicopter door-gun + chin minigun +

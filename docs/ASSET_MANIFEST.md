@@ -1,6 +1,6 @@
 # Asset Manifest
 
-## 3D Models (159 GLBs)
+## 3D Models (153 GLBs)
 
 Shipped path: `public/models/**` (Vite static assets).
 
@@ -12,7 +12,6 @@ Shipped path: `public/models/**` (Vite static assets).
 | Watercraft | 2 | Sampan, PBR |
 | Structures | 34 | Sandbag wall/bunker, guard tower, helipad, TOC bunker, tunnel entrance, AA emplacements |
 | Buildings | 12 | Shophouse, French villa, pagoda, church, farmhouse, warehouse |
-| Animals | 6 | Water buffalo, tiger, macaque, king cobra, egret, wild boar |
 | Legacy props | 1 | Wooden barrel |
 | Pixel Forge NPC bodies | 4 | US Army, ARVN, NVA, VC combined skinned GLBs |
 | Pixel Forge props | 80 | Barrels, boxes, bottles, fences, fish, camp, fortification, and clutter GLBs |
@@ -27,8 +26,7 @@ All models: low-poly stylized (PS2-era fidelity), GLB (binary glTF 2.0), PBR mat
 | Helicopters | 3/3 integrated | UH-1 Huey, UH-1C Gunship, AH-1 Cobra via ModelLoader. Runtime aircraft GLBs now come from the Pixel Forge aircraft import and preserve embedded rotor pivot animation metadata. |
 | Fixed-wing | 3/3 integrated | F-4 Phantom, AC-47 Spooky, A-1 Skyraider flyable at airfields via FixedWingModel. Runtime aircraft GLBs now come from the Pixel Forge aircraft import; propeller spin axes are inferred from embedded GLB animation tracks. |
 | Ground vehicles | 5/5 static | Staged in motor pools. No driving/interaction. |
-| Watercraft | Not wired | Blocked on water engine. |
-| Animals | 6/6 integrated | All types via AnimalSystem. |
+| Watercraft | Boarding/spawn wired | Sampan + PBR board and spawn via OperationalRuntimeComposer; watercraft-grade hydrodynamics remain open. |
 | Structures | Integrated | Procedural firebase/airfield generators, WorldFeatureSystem. |
 | Pixel Forge NPCs | Integrated first pass | Close actors use combined skinned GLBs with M16A1/AK-47 attachments. Mid/far actors use Pixel Forge animated impostor atlases through instanced buckets. No old NPC sprite assets are allowed by the cutover validator. |
 | Pixel Forge props | Cataloged | `PixelForgePropCatalog` exposes the 80 curated GLBs for placement profiles. These props are not substitutes for vegetation or NPC gaps. |

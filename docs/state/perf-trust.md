@@ -1,6 +1,19 @@
 # Perf Measurement-Chain Trust Status
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
+
+> **Update 2026-06-02 (baseline file removed):** `perf-baselines.json` has been
+> deleted from the repo and is intended to stay gone. The historical narrative
+> below repeatedly says a capture "cannot refresh `perf-baselines.json`" or that
+> "baseline refresh remains blocked" — that framing assumed a tracked baseline
+> existed but was gated. There is now **no tracked baseline at all**: with the
+> file absent, `npm run perf:compare` prints the latest capture's raw metrics
+> and exits 0 (no PASS/WARN/FAIL gating), and the CI perf job's `perf:compare`
+> step is `continue-on-error` (advisory). Re-establishing a baseline means
+> *creating* the file via `npm run perf:update-baseline`, not "refreshing" an
+> existing pin. Read every "refresh blocked" / "cannot refresh baseline"
+> statement below as historical context for the now-superseded STABILIZAT-1
+> refresh premise. See [docs/perf/baselines.md](../perf/baselines.md).
 
 > **Update 2026-06-01 (convergence-stall fix landed):** the combat120 p99 tail
 > root cause was traced and the **combat-side lever shipped** in

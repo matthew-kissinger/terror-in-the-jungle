@@ -21,7 +21,7 @@ A single overnight pass can touch all five. Each mode has a distinct
 | **Stabilization** | Closes a carry-over from `docs/CARRY_OVERS.md` Active table. Every change references the carry-over ID in the PR description. | `stab/<carry-over-id>` | PR opened, draft if owner review needed; merge gated. |
 | **Code-golf** | Net LOC reduction or split of a grandfathered file in `scripts/lint-source-budget.ts`. Behavior unchanged. | `golf/<scope>` | PR opened, lint-budget delta in description. |
 | **Optimization** | Algorithmic improvement (allocation reduction, worker offload, pool sizing, BVH rebuild thresholds). Verified with a measurement, not vibes. | `opt/<scope>` | PR opened with before/after numbers. |
-| **Perf** | Measured frame-time / p99 / heap improvement on a tracked scenario (combat120, ashau:short, openfrontier:short, frontier30m). Baseline updated only with owner approval. | `perf/<scope>` | PR opened with `npm run perf:compare` output attached. |
+| **Perf** | Measured frame-time / p99 / heap improvement on a tracked scenario (combat120, ashau:short, openfrontier:short, frontier30m). No baseline is currently tracked; re-establishing one needs owner approval. | `perf/<scope>` | PR opened with `npm run perf:compare` output (raw latest-capture metrics) attached. |
 | **Features** | Closes a directive from `docs/DIRECTIVES.md` or a well-bounded slice of one. References directive ID (VODA-1, VEKHIKL-1, SVYAZ-3, etc.). | `feat/<directive-or-slug>` | PR opened. May ship a "first slice" that unblocks the rest of the directive. |
 
 **Spike** is a sixth mode, distinct: research / prototype that may NEVER
@@ -154,9 +154,11 @@ through the cycle process. It is governed by this section.
 3. **Never close a carry-over without owner approval.** Stabilization
    PRs may PROPOSE the close (move to Closed table in the PR diff) but
    the orchestrator owns the actual transition during cycle close.
-4. **Never change baselines.** `perf-baselines.json` updates only via
-   `npm run perf:update-baseline` with owner approval. Perf PRs attach
-   measurements; they don't rewrite the baseline themselves.
+4. **Never (re)establish a baseline without owner approval.** No baseline
+   is currently tracked: `npm run perf:compare` prints the latest capture's
+   raw metrics (no pass/fail gating). `npm run perf:update-baseline` would
+   write a `perf-baselines.json` to gate against — do not run it without
+   owner approval. Perf PRs attach measurements; they don't create a baseline.
 5. **Validate before push.** `npm run lint`, `npm run test:run`,
    `npm run build` — all green per branch. For perf-track PRs add
    `npm run perf:capture:combat120` + `npm run perf:compare`.
@@ -186,7 +188,7 @@ through the cycle process. It is governed by this section.
 - `src/types/SystemInterfaces.ts` (fenced).
 - Active cycle's `Files touched` list (check
   `docs/tasks/cycle-*.md` "Current cycle").
-- `perf-baselines.json` (owner approval required).
+- Re-establishing a perf baseline (no baseline tracked; see hard rule #4).
 - `master` branch directly.
 - Orchestration metadata (see hard rule #1).
 - Any file in `dist/`, `dist-perf/`, or `node_modules/`.

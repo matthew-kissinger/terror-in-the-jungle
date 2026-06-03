@@ -3,90 +3,66 @@
 [![CI](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/ci.yml)
 [![Deploy](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/deploy.yml/badge.svg?branch=master)](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Three.js](https://img.shields.io/badge/three.js-0.184-black)](https://threejs.org/)
+[![Three.js](https://img.shields.io/badge/three.js-r184-black)](https://threejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-8-646cff)](https://vitejs.dev/)
+[![WebGPU](https://img.shields.io/badge/WebGPU-TSL-005a9c)](https://www.w3.org/TR/webgpu/)
 
-**A browser-based combined-arms FPS / RTS sandbox set in the Vietnam theater, late 1960s.**
+**A combined-arms Vietnam War sandbox that runs in your browser — where you hold a rifle and a radio at the same time.**
 
-[▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Directives](docs/DIRECTIVES.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
+[▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Vision](docs/ROADMAP.md) · [Current state](docs/state/CURRENT.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
 
-> **Engine architected for 3,000 combatants via materialization tiers; live-fire
-> combat verified at 120 NPCs while an ECS hot path is evaluated (Phase F).**
-> The production renderer is WebGPU + TSL by default, with automatic WebGL2
-> fallback for browsers without WebGPU support. A Shau Valley uses real DEM
-> elevation on a 21 km map, side-mounted helicopter rotors over a Huey at low
-> altitude, and A-1 Skyraiders coming in for the napalm pass. See
-> [docs/ROADMAP.md](docs/ROADMAP.md) for the aspirational vision; verified state lives in
-> [docs/state/CURRENT.md](docs/state/CURRENT.md) and live work in [docs/DIRECTIVES.md](docs/DIRECTIVES.md).
+---
 
-Active directives, success criteria, and evidence links live in
-[docs/DIRECTIVES.md](docs/DIRECTIVES.md). Carry-overs live in
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md). When a doc disagrees with the
-repository, believe the repository and update the doc.
+## The idea
 
-## Highlights
+Most shooters make you choose: be the soldier, or be the commander. This is built on the bet that you shouldn't have to.
 
-- **Combined arms in a browser.** Infantry, squads, helicopters (UH-1 Huey,
-  UH-1C Gunship, AH-1 Cobra), fixed-wing (A-1 Skyraider, F-4 Phantom, AC-47
-  Spooky), armor (M48 Patton), ground transport (M151 jeep), watercraft
-  (Sampan, PBR gunboat), crew-served emplacements, airfields, objectives,
-  tickets, suppression, grenades, and vehicle enter/exit/eject — all part of
-  the same runtime, all shipped to production.
-- **Real terrain target.** A Shau Valley uses real elevation data through a
-  Cloudflare R2 manifest path with an explicit terrain/nav startup gate. No
-  silent TileCache fallback; if the asset isn't loadable, the mode tells you.
-- **WebGPU-first renderer.** `master` defaults to Three.js r184
-  `WebGPURenderer` / TSL after PR #192, with a production WebGL2 fallback and
-  strict WebGPU mode retained for renderer evidence.
-- **Mode startup architecture.** Mode-start terrain surface baking moves to
-  module workers with transferable height/normal grids. Zone Control and TDM
-  show deploy UI in about 1.2 s from mode click; Open Frontier in about 3.4 s,
-  down from a timeout-class baseline. Spike branch parked at
-  `task/mode-startup-terrain-spike`; production-hardening criteria recorded in
-  [docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md](docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md).
-- **Large-scale combat.** A Shau is architected as a ~3,000-unit strategic
-  simulation through materialization tiers; the verified live-fire combat
-  frontier is currently 120 NPCs while an ECS hot path is evaluated
-  ([Phase F](docs/ROADMAP.md)).
-- **Squad command surface.** RTS-style direct orders with Vietnam-era prose:
-  Hold, Patrol, Attack Here, Fall Back, Stand Down — issued from minimap
-  taps or keyboard, dispatched to AI states with terrain-height-aware world
-  markers.
-- **Diagnostic toolkit.** Backtick-toggled debug HUD registry, Shift+\
-  six-overlay debugger, V/B free-fly + entity inspector, Backspace pause /
-  `.` step / `,` slow / `;` fast, F9 playtest capture, ` ` (single backslash)
-  Tweakpane live-tuning panel (dev-only), `?mode=terrain-sandbox` URL gate.
-- **Game-feel instrumentation.** Fixed-wing probes, perf captures (sparse and
-  full combat120), HUD validators, mobile-UI gates, atmosphere evidence, doc
-  drift gate, 12 retained plain-named `check:*` audit scripts (after Phase 1
-  `script-triage` archived 80 one-off cycle-specific audits to
-  `scripts/audit-archive/`). Tests are sensors, not truth.
-- **Mobile is not an afterthought.** Touch controls, tactical map command
-  dispatch, and HUD layout are covered by dedicated validation scripts.
-- **Agent-resistant architecture.** Fenced interfaces in
-  [src/types/SystemInterfaces.ts](src/types/SystemInterfaces.ts), explicit
-  ownership docs, the [DIRECTIVES.md](docs/DIRECTIVES.md) directive registry,
-  and a doc-drift gate so multiple humans and coding agents can collaborate
-  without inventing duplicate authorities.
+You drop into first-person infantry combat in the A Shau Valley, late 1960s. Then you pull up the tactical map — **in real time, no pause, no slowdown** — issue orders to your squad, and snap back to your iron sights while the fight keeps moving around you. Hold, Patrol, Attack Here, Fall Back. All of it under fire.
 
-## Playable Modes
+Underneath the game is the real ambition: a **war-simulation engine**, not a single level. The same systems that run an 8-versus-8 skirmish are architected to drive theater-scale combined arms. Vietnam is the first theater; the architecture generalizes to any war with its own factions, terrain, vehicles, and doctrine.
+
+> **Honest scale claim:** the engine is architected for 3,000 combatants via
+> materialization tiers; live-fire combat is verified at 120 NPCs while an ECS
+> hot path is evaluated (Phase F). A Shau runs as a ~3,000-unit *strategic*
+> simulation with selective materialization — not 3,000 simultaneous live
+> combatants. The aspirational vision lives in [docs/ROADMAP.md](docs/ROADMAP.md);
+> the verified, current truth lives in [docs/state/CURRENT.md](docs/state/CURRENT.md).
+
+## What's in the box
+
+- **Combined arms, one runtime.** Infantry, squads, and crew-served emplacements
+  fight alongside helicopters (UH-1 Huey, UH-1C Gunship, AH-1 Cobra), fixed-wing
+  aircraft (A-1 Skyraider, F-4 Phantom, AC-47 Spooky), armor (M48 Patton),
+  ground transport (M151 jeep), and watercraft (Sampan, PBR gunboat) — with
+  boarding, crews, enter/exit/eject, objectives, tickets, suppression, and
+  grenades. All of it ships to production.
+- **Command under fire.** RTS-style direct orders — Hold, Patrol, Attack Here,
+  Fall Back, Stand Down — issued from minimap taps or the keyboard and
+  dispatched to terrain-aware AI states. No time-stop; the war doesn't wait.
+- **Real terrain.** A Shau Valley is built on real DEM elevation across a 21 km
+  map, delivered through a Cloudflare R2 manifest with an explicit terrain/nav
+  startup gate. If the data can't load, the mode says so — no silent fallback.
+- **WebGPU-first rendering.** `master` ships Three.js r184 `WebGPURenderer` with
+  TSL node materials across terrain, vegetation and NPC impostors, and a
+  LUT-driven Hosek-Wilkie sky — with automatic WebGL2 fallback for browsers
+  without WebGPU, and a strict WebGPU mode kept as the renderer-acceptance proof.
+- **Atmosphere that holds its budget.** Day/night-capable sky, fog, clouds, and
+  hydrology-driven river surfaces, with total atmosphere CPU cost held under
+  ~1 ms across all five modes.
+- **Built to resist drift.** Fenced interfaces, a directive registry, and a
+  CI doc-drift gate let one human and a fleet of coding agents collaborate
+  without inventing duplicate authorities. Tests and docs are sensors, not truth
+  — when a doc disagrees with the code, the code wins and the doc gets fixed.
+
+## Playable modes
 
 | Mode | Shape | Purpose |
 | --- | --- | --- |
-| **Zone Control** | Small objective battle | Capture zones and drain enemy tickets. |
-| **Team Deathmatch** | Small combat loop | Fast infantry and vehicle combat smoke. |
+| **Zone Control** | Objective battle | Capture zones, drain enemy tickets. |
+| **Team Deathmatch** | Fast combat loop | Infantry + vehicle combat smoke. |
 | **Open Frontier** | Larger sandbox | Airfields, vehicles, helicopters, armor staging, 120-NPC perf checks. |
-| **A Shau Valley** | Real-terrain strategic mode | Architected for ~3,000-unit strategic layer via materialization tiers; live combat verified at 120, on DEM-backed terrain. |
+| **A Shau Valley** | Real-terrain strategic mode | ~3,000-unit strategic layer via materialization tiers on DEM-backed terrain; live combat verified at 120. |
 | **AI Sandbox** | Configurable simulation | Observation, tuning, perf capture, combat diagnostics. |
-
-## Current Alignment
-
-WebGPU + TSL is the shipped baseline (PR #192, merged 2026-05-13) with
-automatic WebGL2 fallback on browsers without WebGPU; strict WebGPU mode is
-the renderer-acceptance proof path. Current directive state, open work, and
-carry-overs route through [docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
-[docs/CARRY_OVERS.md](docs/CARRY_OVERS.md).
 
 ## Controls
 
@@ -104,14 +80,13 @@ carry-overs route through [docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
 | `G` | Grenade |
 | `M` | Map / squad command |
 
-### Desktop — diagnostics and debug
+### Desktop — diagnostics & debug
 
 | Input | Action |
 | --- | --- |
 | `` ` `` (backtick) | Toggle debug HUD registry |
 | `Shift+\` | Six-overlay world debugger |
-| `V` | Toggle free-fly camera |
-| `B` | Toggle entity inspector |
+| `V` / `B` | Free-fly camera / entity inspector |
 | `Backspace` | Pause / resume |
 | `.` | Step one frame |
 | `,` / `;` | Slow / fast time scale |
@@ -120,31 +95,24 @@ carry-overs route through [docs/DIRECTIVES.md](docs/DIRECTIVES.md) and
 
 ### Mobile
 
-- Virtual movement stick
-- Touch look
-- Tactical map command dispatch (squad orders)
-- Touch fire and action buttons
+Virtual movement stick, touch look, touch fire/action buttons, and tactical-map
+command dispatch — the squad-order surface is first-class on touch, not an
+afterthought. Pointer-lock depends on the browser; Chrome/Edge/Firefox are the
+primary FPS path, and embedded browsers fall back to unlocked mouse-look.
 
-Pointer-lock support depends on the browser. Chrome/Edge/Firefox are the
-primary FPS validation path; in-app embedded browsers may need the unlocked
-mouse-look fallback.
-
-## Run Locally
+## Run locally
 
 ```bash
 npm install
-npm run doctor   # environment sanity
+npm run doctor   # environment sanity (Node, deps, Playwright browsers)
 npm run dev      # vite dev server
 ```
 
 Requirements:
 
-- Node 24, pinned in [.nvmrc](.nvmrc)
-- A WebGPU-capable browser recommended (Chrome 113+ / Firefox 147+ /
-  Safari 26+); WebGL2 fallback is automatic on older browsers. Master ships
-  WebGPU + TSL by default after the 2026-05-13
-  [`exp/konveyer-webgpu-migration`](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
-  merge.
+- **Node 24**, pinned in [.nvmrc](.nvmrc)
+- A **WebGPU-capable browser** recommended (Chrome 113+ / Firefox 147+ /
+  Safari 26+); WebGL2 fallback is automatic on older browsers
 - Playwright browsers for validation scripts (`npx playwright install`)
 
 Production-shaped local path:
@@ -159,10 +127,10 @@ npm run preview
 Routine gate before any commit:
 
 ```bash
-npm run validate:fast
+npm run validate:fast        # typecheck + lint + doc-drift + quick tests
 ```
 
-Release gate (adds `perf:capture:combat120`):
+Release gate (adds the combat120 perf capture):
 
 ```bash
 npm run validate:full
@@ -171,57 +139,50 @@ npm run validate:full
 Domain-specific gates:
 
 ```bash
-npm run probe:fixed-wing             # A-1 / F-4 / AC-47 entry, climb, approach, bailout
-npm run evidence:atmosphere          # all-mode sky / fog / cloud
-npm run check:mobile-ui              # actionability + scroll on mobile viewports
-npm run check:hud                    # HUD layout
-npm run perf:capture:combat120       # 90s combat sim, 120 NPCs, seed 2718
-npm run perf:compare                 # latest capture vs perf-baselines.json
-npm run perf:startup:openfrontier    # production-shaped mode-start UI timing
-npm run check:doc-drift              # docs / state / performance ↔ artifact paths
-npm run check:cycle-close            # current-completion audit (renamed from check:projekt-143-completion-audit in Phase 1)
+npm run probe:fixed-wing     # A-1 / F-4 / AC-47 entry, climb, approach, bailout
+npm run evidence:atmosphere  # all-mode sky / fog / cloud
+npm run check:mobile-ui      # actionability + scroll on mobile viewports
+npm run check:hud            # HUD layout
+npm run perf:capture:combat120   # 90s combat sim, 120 NPCs, seed 2718
+npm run check:doc-drift      # live docs ↔ real files / scripts / npm targets
+npm run check:live-release   # 7-gate production-freshness proof
 ```
 
-Game-feel changes still require a human pass through
+Game-feel changes still need a human pass through
 [docs/PLAYTEST_CHECKLIST.md](docs/PLAYTEST_CHECKLIST.md). Automated probes are
-necessary — they do not prove that flight, infantry pacing, squad command
-ergonomics, or UI feel is good.
+necessary, not sufficient — they don't prove flight, infantry pacing, squad
+command ergonomics, or UI feel is *good*.
 
-## Tech Stack
+## Tech stack
 
-- [Three.js](https://threejs.org/) 0.184
-- TypeScript 6.0
-- Vite 8
-- Vitest 4 (~4,800 tests across ~345 files)
-- Playwright 1.59
-- [Recast Navigation](https://github.com/isaac-mason/recast-navigation-js)
+- [Three.js](https://threejs.org/) r184 — `WebGPURenderer` + TSL, WebGL2 fallback
+- TypeScript 6.0 · Vite 8 · Vitest 4 (5,260+ tests across 370+ files)
+- Playwright 1.59 for browser-level probes
+- [Recast Navigation](https://github.com/isaac-mason/recast-navigation-js) (WASM) for navmesh
 - Tweakpane 4 (dev-only live tuning)
-- Cloudflare Pages for the app shell
-- Cloudflare R2 for large immutable runtime assets (DEM, navmesh, heightmap)
+- **Cloudflare Pages** for the app shell · **Cloudflare R2** for large immutable
+  runtime assets (DEM, navmesh, heightmaps)
 
-Runtime features include CDLOD terrain, atmosphere / sky / fog / cloud
-rendering, hydrology-driven water surfaces, service-worker freshness control,
-debug overlays, queue-and-flush eventing, object pools for hot paths,
-seed-keyed prebaked navmesh / heightmap assets, and an explicit
-fenced-interface boundary at `src/types/SystemInterfaces.ts`.
+Runtime architecture leans on CDLOD terrain, queue-and-flush eventing, object
+pools for hot paths, seed-keyed prebaked navmesh/heightmap assets,
+service-worker freshness control, and an explicit fenced-interface boundary at
+[src/types/SystemInterfaces.ts](src/types/SystemInterfaces.ts).
 
-## Repository Map
+## Repository map
 
 | Path | Owns |
 | --- | --- |
-| [src/core](src/core) | Engine loop, system initialization, scheduler, runtime composition, time scale, runtime metrics. |
-| [src/systems/combat](src/systems/combat) | NPC state, AI, LOS, cover finding, suppression, target acquisition, movement, LOD, damage, rendering. |
+| [src/core](src/core) | Engine loop, system init, scheduler, runtime composition, time scale, metrics. |
+| [src/systems/combat](src/systems/combat) | NPC state, AI, LOS, cover search, suppression, targeting, movement, LOD, damage, rendering. |
 | [src/systems/navigation](src/systems/navigation) | Recast navmesh loading, static-tiled generation, path queries. |
 | [src/systems/terrain](src/systems/terrain) | CDLOD terrain runtime, streamed height queries, terrain evidence. |
-| [src/systems/vehicle](src/systems/vehicle) | Vehicle session authority, fixed-wing models, adapters, airframe. |
+| [src/systems/vehicle](src/systems/vehicle) | Vehicle session authority, fixed-wing + ground models, adapters, airframe. |
 | [src/systems/helicopter](src/systems/helicopter) | Helicopter models, physics, rotors, deployment. |
 | [src/systems/environment](src/systems/environment) | Atmosphere, sky, clouds, weather, water, hydrology. |
-| [src/systems/player](src/systems/player) | Player respawn manager, controller, deploy flow. |
-| [src/ui](src/ui) | HUD, controls, screens, icons, loading, deploy / respawn UI, command overlays, tactical map. |
-| [scripts](scripts) | Probes, perf capture, deployment helpers, evidence generation, 12 retained plain-named `check:*` audit scripts. Archived one-off audits live in [scripts/audit-archive](scripts/audit-archive). |
-| [docs](docs) | Directives, architecture, testing, deployment, cycles, archives. |
-| [docs/tasks/archive/](docs/tasks/archive) | Closed cycle briefs (`<cycle-id>/<slug>.md`). |
-| [docs/archive/](docs/archive) | Closed campaign manifests and pre-Phase-0 state snapshots. |
+| [src/systems/player](src/systems/player) | Player controller, respawn manager, deploy flow, swim state. |
+| [src/ui](src/ui) | HUD, controls, screens, icons, loading, deploy/respawn UI, tactical map. |
+| [scripts](scripts) | Probes, perf capture, deploy helpers, evidence generation, `check:*` audit gates. |
+| [docs](docs) | Vision, current state, directives, architecture, testing, deployment. |
 
 ## Documentation
 
@@ -229,80 +190,55 @@ Start here:
 
 | Doc | Use it for |
 | --- | --- |
-| [docs/DIRECTIVES.md](docs/DIRECTIVES.md) | Active directive list with status, owning subsystem, success criteria, and latest evidence link. |
+| [docs/state/CURRENT.md](docs/state/CURRENT.md) | Verified current truth — read before making "what's real" claims. |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | The vision, phase plan, and canonical scale sentence. |
+| [docs/DIRECTIVES.md](docs/DIRECTIVES.md) | Active directive registry: status, owner, success criteria, evidence. |
 | [AGENTS.md](AGENTS.md) | Daily loop, commands, conventions, hard rules. Agent-agnostic. |
-| [CLAUDE.md](CLAUDE.md) | Claude-Code-specific harness pieces (slash commands, subagents). |
-| [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md) | Master dispatch + merge protocol, cycle lifecycle. |
+| [CLAUDE.md](CLAUDE.md) | Claude-Code-specific harness (slash commands, subagents). |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System overview, tick graph, coupling heatmap. |
-| [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced-interface change rules. |
 | [docs/COMBAT.md](docs/COMBAT.md) | Combat ownership, AI, movement, LOD, scale rules. |
-| [docs/TESTING.md](docs/TESTING.md) | Four-layer testing contract. Read before adding tests. |
+| [docs/TESTING.md](docs/TESTING.md) | Four-layer testing contract — read before adding tests. |
 | [docs/perf/](docs/perf/) | Perf scenarios, capture workflow, baseline policy, regression playbook. |
 | [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) | Cloudflare Pages / R2 deploy and cache verification. |
-| [docs/PLAYTEST_CHECKLIST.md](docs/PLAYTEST_CHECKLIST.md) | Human playtest form for feel-sensitive changes. |
-| [docs/BACKLOG.md](docs/BACKLOG.md) | Strategic Reserve index. Active work routes through `docs/DIRECTIVES.md`. |
 
 ## Contributing
 
-This is a live game repo. Keep changes narrow and evidence-backed.
+This is a live game repo built by one developer working alongside a fleet of
+coding agents, so the rules optimize for **narrow, evidence-backed changes** that
+many contributors can make in parallel without stepping on each other.
 
 ```bash
-npm run validate:fast            # before any commit
+npm run validate:fast        # before any commit
 ```
 
-Before pushing larger or perf-sensitive work, also run the domain-specific
-probe that matches the subsystem you touched. Hard rules:
+Before larger or perf-sensitive work, also run the domain probe for the
+subsystem you touched. Hard rules:
 
-- Do not modify [src/types/SystemInterfaces.ts](src/types/SystemInterfaces.ts)
-  without explicit approval. Cross-fence accessor changes are limited to ≤20
-  LOC per file and require `[interface-change]` in the PR title.
-- PR size: ≤500 LOC preferred (GOST-TIJ-001). Larger PRs require a stated
-  rationale; tightly cross-coupled clusters get an explicit exception in the
-  PR description.
-- No implementation-mirror tests. Assert behavior, not internal state names
-  or tuning constants.
-- Don't push directly to `master`. Open a PR; rebase-merge via `gh pr merge --rebase`.
-- Don't use `--no-verify` to bypass hooks.
-- Don't refresh `perf-baselines.json` without project-owner authorization.
-
-Branch naming:
-
-```text
-task/<descriptive-slug>
-```
-
-Commit first line:
-
-```text
-<type>(<scope>): <summary> (<slug>)
-```
-
-This repo is used by multiple coding agents and humans. If a doc disagrees
-with current code or runtime evidence, believe the evidence and update the doc.
+- Don't modify [src/types/SystemInterfaces.ts](src/types/SystemInterfaces.ts)
+  without explicit approval — it's the fence boundary. Cross-fence accessor
+  changes are ≤20 LOC/file and need `[interface-change]` in the PR title.
+- PRs ≤500 LOC preferred; larger needs a stated rationale.
+- No implementation-mirror tests — assert behavior, not internal names or tuning
+  constants.
+- Branch as `task/<descriptive-slug>`; first commit line
+  `<type>(<scope>): <summary> (<slug>)`.
+- If a doc disagrees with the code or runtime evidence, believe the evidence and
+  fix the doc.
 
 ## Deployment
 
-Production:
+Live: **<https://terror-in-the-jungle.pages.dev/>**
 
-> [https://terror-in-the-jungle.pages.dev/](https://terror-in-the-jungle.pages.dev/)
-
-Deploys are **manual** via GitHub Actions:
-
-```bash
-npm run deploy:prod              # = gh workflow run deploy.yml --ref master --watch
-```
-
-Pushing to `master` is **not** proof of production freshness — CI runs but
-deploy does not. Live release verification:
+Deploys are **manual** via GitHub Actions — pushing `master` runs CI but does
+*not* ship:
 
 ```bash
-npm run check:live-release
+npm run deploy:prod          # gh workflow run deploy.yml --ref master --watch
+npm run check:live-release   # 7-gate proof: head pushed, CI green, deploy green,
+                             # live asset-manifest SHA, Pages headers, R2 DEM, browser smoke
 ```
 
-Verifies seven gates: local-head-pushed, ci-success-for-head, deploy-success-for-head,
-live `/asset-manifest.json` SHA matches HEAD, Pages headers (cache-control + COOP +
-COEP), R2 DEM accessibility (immutable + CORS), and live browser smoke. See
-[docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) for the full path.
+See [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) for the full path.
 
 ## License
 

@@ -1,6 +1,6 @@
 # Directives
 
-Last verified: 2026-05-20 (slim refactor under `directives-slim-refactor`; full evidence prose now lives in per-id memo files under [`docs/directives/`](directives/)).
+Last verified: 2026-06-02 (DEFEKT-3 evidence corrected for `perf-baselines.json` removal — no tracked baseline, `perf:compare` non-gating; statuses unchanged. Slim refactor under `directives-slim-refactor`; full evidence prose lives in per-id memo files under [`docs/directives/`](directives/)).
 
 Active directive list. Each row is binary `open` / `code-complete` / `done` / `closed`, owning subsystem, latest evidence (one link or short pointer), and the most load-bearing success criterion. Verbose evidence has moved to per-id memo files; carry-over discipline remains [docs/CARRY_OVERS.md](CARRY_OVERS.md); historical ledger prose at [docs/archive/PROJEKT_OBJEKT_143/](archive/PROJEKT_OBJEKT_143/).
 
@@ -27,7 +27,7 @@ Active directive list. Each row is binary `open` / `code-complete` / `done` / `c
 | STABILIZAT-1 | Refresh combat120 perf baseline | open | perf-harness | `2026-05-10T10-45-07-263Z` (3 fail) | `perf:capture:combat120` from quiet machine produces avg ≤17ms, p99 ≤35ms; refreshed baseline committed |
 | DEFEKT-1 | Stale baseline audit | open | perf-harness | `2026-05-07T22-04-54-994Z/projekt-143-stale-baseline-audit` | `perf-baselines.json` current for all tracked scenarios; stale-baseline gate passes |
 | DEFEKT-2 | Doc / code / artifact drift | open | doc-harness | `2026-05-08T01-26-06.909Z/projekt-143-doc-drift` | `check:doc-drift` passes + 14 consecutive days no drift after release (note: check:doc-drift currently scans only docs/DIRECTIVES.md, docs/state/CURRENT.md, docs/PERFORMANCE.md; broadening coverage to the full docs/ tree is remaining work) |
-| DEFEKT-3 | Combat AI p99 anchor | open (O(1) path wired; perf unproven) | combat | `cover-grid-wiring` (cycle-2026-05-28) wired O(1) `CoverSpatialGrid` into prod combat; combat120 p99 PASS still gated on STABILIZAT-1 baseline refresh — [perf-trust.md](state/perf-trust.md) | Sync cover search in `AIStateEngage.initiateSquadSuppression` no longer dominates p99; combat120 p99 ≤35ms PASS |
+| DEFEKT-3 | Combat AI p99 anchor | open (O(1) path wired; perf unproven) | combat | `cover-grid-wiring` (cycle-2026-05-28) wired O(1) `CoverSpatialGrid` into prod combat; combat120 p99 PASS unproven — no baseline is tracked (`perf-baselines.json` removed) so `perf:compare` is non-gating; see [perf-trust.md](state/perf-trust.md) | Sync cover search in `AIStateEngage.initiateSquadSuppression` no longer dominates p99; combat120 p99 ≤35ms PASS |
 | DEFEKT-6 | Terrain occlusion and fire authority | open | combat / terrain / navigation / materialization | `2026-05-11T19-14-54-162Z/konveyer-terrain-fire-authority` | Reproduce/disprove fire-through-terrain with browser evidence and identify authoritative LOS query — see [memo](directives/defekt-6.md) |
 | DIZAYN-3 | Liberty of proposal | open | design | (none) | Visual/feel proposals can land on any directive; engineering reject requires written rationale |
 

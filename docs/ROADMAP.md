@@ -98,7 +98,7 @@ Carry these findings into the next Projekt revamp:
 |-------|--------|---------|
 | 0: Asset Manifest | DONE | 75 asset specs generated via PixelForge Kiln. |
 | 1: Asset Generation | DONE | 75 GLBs shipped. Vegetation remakes pending. |
-| 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), animals (6/6), structures integrated. Fixed-wing runtime is live; ground vehicles remain static only. |
+| 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), structures integrated. Fixed-wing runtime is live; ground vehicles remain static only. |
 | 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. Fixed-wing feel/interpolation sign-off, NPC transport, ground vehicles, and aircraft combat integration remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
 | 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water now uses hydrology river surfaces with terrain riverbed stamps, query/interaction samples, and map/boat discoverability; the legacy global plane is opt-in fallback only. Final WebGPU/TSL water material, shoreline polish, and watercraft-grade physics remain open. |

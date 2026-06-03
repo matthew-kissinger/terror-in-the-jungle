@@ -181,19 +181,14 @@ draw-call and renderer telemetry.
 
 ## Bundle Certification
 
-Cycle 1 benchmark bundles are certified with:
+Cycle 1 benchmark bundles were certified by a dedicated bundle-certifier script
+that consumed the startup-UI, combat120, open-frontier-short, ashau-short, and
+grenade-spike artifact directories. That one-off script has since been removed;
+its already-emitted outputs remain the certification record. For a new bundle,
+gather the same artifacts and re-record the metadata fields below by hand or in
+a replacement script.
 
-```bash
-npx tsx scripts/audit-archive/cycle1-benchmark-bundle.ts -- \
-  --startup-open <startup-ui-open-frontier-dir> \
-  --startup-zone <startup-ui-zone-control-dir> \
-  --combat120 <combat120-artifact-dir> \
-  --openfrontier-short <open-frontier-short-artifact-dir> \
-  --ashau-short <ashau-short-artifact-dir> \
-  --grenade <grenade-spike-artifact-dir>
-```
-
-The certifier writes a bundle summary and a
+The certifier wrote a bundle summary and a
 `projekt-143-cycle1-metadata.json` sidecar into each source artifact directory.
 Those sidecars record commit SHA, mode, timing windows, warmup policy,
 browser/runtime metadata, instrumentation flags, renderer/scene evidence, and

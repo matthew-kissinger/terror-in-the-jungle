@@ -35,10 +35,13 @@ Reference-graph pass found these top-level scripts unreferenced by
 `package.json`, CI, `src/`, `docs/`, `rust/`, or any other live script. Moved
 to `scripts/archive/`:
 
+(`capture-water-hydrology-polish.ts` and `m151-jeep-integration-smoke.ts`
+were archived here on 2026-05-28 and then deleted in the 2026-06-02 prune —
+see "Pruned 2026-06-02" below. The rows that follow are still present under
+`scripts/archive/`.)
+
 | File | Why archived |
 |------|--------------|
-| `capture-water-hydrology-polish.ts` | One-off water-hydrology capture; not wired to any `package.json`/CI gate or open brief. Superseded by the live `capture-of-*-shots.ts` chain. |
-| `m151-jeep-integration-smoke.ts` | Cycle-specific smoke for the closed `cycle-vekhikl-1-jeep-drivable` task; not referenced by any current gate. |
 | `compress_audio.py` | Legacy WAV->OGG audio pipeline one-off; not in any gate. |
 | `compress_audio_simple.py` | Legacy audio pipeline variant; pairs with `compress_audio.py`. |
 | `smart_optimize_clean.py` | Legacy image-optimization one-off; superseded by `scripts/optimize-assets.ts` (`npm run assets:optimize`). |
@@ -50,3 +53,22 @@ to `scripts/archive/`:
 No `package.json` script entry pointed at any moved file, so no `package.json`
 change was needed. `npm run validate` (lint + test + build + smoke) confirms no
 CI / package.json script broke.
+
+## Pruned 2026-06-02 (repo-junk-audit)
+
+The 2026-06-02 cleanup pass (commit `146ea64d`) departed from the
+"never hard-delete" archival convention above for genuinely orphaned
+one-offs and removed them outright (history still recovers the bodies):
+
+- **`scripts/audit-archive/`**: 63 of the ~80 parked audit one-offs were
+  deleted. ~18 remain — the ones cited by `docs/perf/*` prose (heap /
+  attribution / suppression-cost diagnostics). Any older claim of "80
+  archived audits" now overstates what is on disk.
+- **`scripts/archive/`**: `capture-water-hydrology-polish.ts` and
+  `m151-jeep-integration-smoke.ts` (archived 2026-05-28, above) were
+  deleted. The 7 legacy Python/`.bat` asset one-offs listed above remain.
+- **Top-level**: `benchmark-ballistic-solver.ts`,
+  `capture-sky-dome-tonemap-and-lut-resolution-shot.ts`, and
+  `capture-sky-sun-disc-restore.ts` were deleted as unreferenced.
+
+No `package.json`/CI gate pointed at any deleted file.

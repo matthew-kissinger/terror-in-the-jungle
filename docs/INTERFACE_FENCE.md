@@ -26,6 +26,8 @@ Every exported interface in `src/types/SystemInterfaces.ts`, specifically:
 - `IAudioManager`
 - `IAmmoManager`
 - `IFlashbangScreenEffect`
+- `ISkyRuntime`
+- `ICloudRuntime`
 - `IZoneQuery`
 - `IGameRenderer`
 
