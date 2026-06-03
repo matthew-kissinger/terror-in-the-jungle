@@ -42,6 +42,7 @@
   --maxw: 1280px;
 
   /* --- Typography scale (fluid) --- */
+  --font-size-3xs: 0.5rem;
   --font-size-2xs: clamp(0.5625rem, 1vw, 0.625rem);
   --font-size-xs: clamp(0.625rem, 1.2vw, 0.75rem);
   --font-size-sm: clamp(0.75rem, 1.4vw, 0.875rem);

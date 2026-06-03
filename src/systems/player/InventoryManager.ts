@@ -506,8 +506,8 @@ export class InventoryManager implements GameSystem {
         position: relative;
         width: 48px;
         height: 52px;
-        background: rgba(10, 10, 14, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(43, 38, 32, 0.78);
+        border: 1px solid rgba(231, 217, 186, 0.2);
         border-radius: 4px;
         display: flex;
         flex-direction: column;
@@ -520,8 +520,8 @@ export class InventoryManager implements GameSystem {
       }
 
       .hotbar-slot.active {
-        border-color: rgba(200, 230, 255, 0.6);
-        background: rgba(200, 230, 255, 0.12);
+        border-color: rgba(158, 59, 46, 0.6);
+        background: rgba(158, 59, 46, 0.16);
       }
 
       .hotbar-slot.inactive {
@@ -533,7 +533,7 @@ export class InventoryManager implements GameSystem {
         top: 2px;
         left: 4px;
         font-size: 9px;
-        color: rgba(255, 255, 255, 0.35);
+        color: rgba(231, 217, 186, 0.35);
         font-weight: 600;
         font-family: var(--font-primary);
       }
@@ -541,18 +541,18 @@ export class InventoryManager implements GameSystem {
       .slot-icon {
         font-size: 15px;
         font-weight: 700;
-        color: rgba(255, 255, 255, 0.85);
+        color: rgba(231, 217, 186, 0.85);
         letter-spacing: -0.5px;
         margin-top: 4px;
       }
 
       .hotbar-slot.active .slot-icon {
-        color: rgba(220, 240, 255, 1);
+        color: rgba(231, 217, 186, 1);
       }
 
       .slot-label {
         font-size: 7px;
-        color: rgba(255, 255, 255, 0.45);
+        color: rgba(231, 217, 186, 0.45);
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.3px;
@@ -563,7 +563,7 @@ export class InventoryManager implements GameSystem {
         bottom: 2px;
         right: 4px;
         font-size: 10px;
-        color: rgba(255, 255, 255, 0.7);
+        color: rgba(231, 217, 186, 0.7);
         font-weight: 700;
       }
     `;

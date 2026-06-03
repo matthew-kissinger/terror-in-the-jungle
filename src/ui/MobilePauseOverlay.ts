@@ -55,7 +55,7 @@ export class MobilePauseOverlay {
         text-transform: uppercase;
         letter-spacing: 0.1em;
         padding: 1rem 2rem;
-        border: 2px solid rgba(127, 180, 217, 0.5);
+        border: 2px solid rgba(231, 217, 186, 0.4);
         border-radius: 12px;
         min-height: 44px;
         display: flex;

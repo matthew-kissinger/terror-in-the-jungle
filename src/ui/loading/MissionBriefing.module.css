@@ -24,7 +24,7 @@
   background: linear-gradient(180deg, var(--paper-lt), var(--paper));
   border: 1px solid var(--paper-edge);
   border-radius: var(--r);
-  padding: var(--space-8) var(--space-10, 3rem);
+  padding: var(--space-8) var(--space-10);
   max-width: 620px;
   width: 100%;
   text-align: center;
@@ -32,7 +32,7 @@
 }
 
 .classification {
-  font-size: var(--font-size-xs, 0.75rem);
+  font-size: var(--font-size-xs);
   font-family: var(--type-stamp);
   text-transform: uppercase;
   letter-spacing: 0.3em;
@@ -108,7 +108,7 @@
   border: 2.5px solid var(--red);
   box-shadow: 2px 2px 0 rgba(124, 44, 34, 0.35);
   color: var(--red);
-  padding: var(--space-4) var(--space-10, 3rem);
+  padding: var(--space-4) var(--space-10);
   font-size: var(--font-size-base);
   font-family: var(--type-stamp);
   text-transform: uppercase;

@@ -458,7 +458,7 @@ export class CommandModeOverlay implements LayoutComponent {
         border: 1px solid rgba(168, 116, 42, 0.25);
         border-radius: 18px;
         background:
-          linear-gradient(180deg, rgba(15, 18, 14, 0.95), rgba(8, 10, 11, 0.92)),
+          linear-gradient(180deg, rgba(43, 38, 32, 0.95), rgba(43, 38, 32, 0.92)),
           radial-gradient(circle at top, rgba(79, 107, 58, 0.1), transparent 60%);
         box-shadow: 0 24px 40px rgba(0, 0, 0, 0.34);
         pointer-events: auto;
@@ -490,7 +490,7 @@ export class CommandModeOverlay implements LayoutComponent {
         font-family: var(--font-primary);
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: rgba(205, 196, 171, 0.62);
+        color: rgba(182, 164, 135, 0.7);
       }
 
       .command-mode-overlay__eyebrow,
@@ -506,16 +506,16 @@ export class CommandModeOverlay implements LayoutComponent {
         font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: rgba(244, 242, 236, 0.96);
+        color: rgba(231, 217, 186, 0.96);
       }
 
       .command-mode-overlay__close,
       .command-mode-overlay__radio {
         padding: 8px 10px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(231, 217, 186, 0.25);
         border-radius: 10px;
-        background: rgba(29, 32, 34, 0.86);
-        color: rgba(240, 239, 235, 0.9);
+        background: rgba(43, 38, 32, 0.86);
+        color: rgba(231, 217, 186, 0.9);
         font-family: var(--font-primary);
         font-size: 12px;
         font-weight: 700;
@@ -526,7 +526,7 @@ export class CommandModeOverlay implements LayoutComponent {
 
       .command-mode-overlay__radio {
         border-color: rgba(79, 107, 58, 0.24);
-        color: rgba(178, 234, 178, 0.9);
+        color: rgba(125, 154, 90, 0.95);
         letter-spacing: 0;
       }
 
@@ -554,9 +554,9 @@ export class CommandModeOverlay implements LayoutComponent {
         flex-direction: column;
         gap: 4px;
         padding: 10px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(231, 217, 186, 0.18);
         border-radius: 12px;
-        background: rgba(26, 30, 28, 0.66);
+        background: rgba(43, 38, 32, 0.66);
       }
 
       .command-mode-overlay__detail-panel {
@@ -570,16 +570,16 @@ export class CommandModeOverlay implements LayoutComponent {
         flex-direction: column;
         gap: 4px;
         padding: 10px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(231, 217, 186, 0.18);
         border-radius: 12px;
-        background: rgba(26, 30, 28, 0.66);
+        background: rgba(43, 38, 32, 0.66);
       }
 
       .command-mode-overlay__summary-value,
       .command-mode-overlay__button-label,
       .command-mode-overlay__note {
         font-family: var(--font-primary);
-        color: rgba(243, 241, 233, 0.95);
+        color: rgba(231, 217, 186, 0.95);
       }
 
       .command-mode-overlay__summary-value {
@@ -602,9 +602,9 @@ export class CommandModeOverlay implements LayoutComponent {
         gap: 6px;
         min-height: 88px;
         padding: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(231, 217, 186, 0.2);
         border-radius: 14px;
-        background: rgba(33, 38, 35, 0.76);
+        background: rgba(43, 38, 32, 0.76);
         text-align: left;
         cursor: pointer;
         transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
@@ -613,7 +613,7 @@ export class CommandModeOverlay implements LayoutComponent {
       .command-mode-overlay__button:hover:not(:disabled) {
         transform: translateY(-1px);
         border-color: rgba(168, 116, 42, 0.35);
-        background: rgba(48, 56, 50, 0.9);
+        background: rgba(43, 38, 32, 0.88);
       }
 
       .command-mode-overlay__button:disabled {
@@ -624,7 +624,7 @@ export class CommandModeOverlay implements LayoutComponent {
       .command-mode-overlay__button--active {
         border-color: rgba(79, 107, 58, 0.46);
         background:
-          linear-gradient(180deg, rgba(32, 58, 39, 0.95), rgba(20, 37, 24, 0.88));
+          linear-gradient(180deg, rgba(58, 79, 42, 0.92), rgba(58, 79, 42, 0.85));
       }
 
       .command-mode-overlay__button-label {
@@ -648,7 +648,7 @@ export class CommandModeOverlay implements LayoutComponent {
         max-width: 260px;
         font-size: 13px;
         line-height: 1.35;
-        color: rgba(217, 214, 205, 0.74);
+        color: rgba(182, 164, 135, 0.8);
         text-align: right;
       }
 

@@ -83,7 +83,7 @@
 
 /* Bleed indicator - shows which side is losing tickets */
 .bleed {
-  font-size: var(--font-size-3xs, 8px);
+  font-size: var(--font-size-3xs);
   color: var(--feedback-danger);
   letter-spacing: -1px;
   height: 10px;

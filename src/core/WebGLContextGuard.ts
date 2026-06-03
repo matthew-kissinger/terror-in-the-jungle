@@ -50,13 +50,13 @@ export class WebGLContextGuard {
 
     const message = document.createElement('div');
     message.style.cssText = `
-      color: #7fb4d9;
+      color: #e7d9ba;
       font-size: 1.4rem;
       text-align: center;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       padding: 1.5rem 2.5rem;
-      border: 2px solid rgba(127, 180, 217, 0.5);
+      border: 2px solid rgba(231, 217, 186, 0.4);
       border-radius: 12px;
     `;
     message.textContent = 'Recovering graphics…';
@@ -66,8 +66,8 @@ export class WebGLContextGuard {
       width: 24px;
       height: 24px;
       margin: 1rem auto 0;
-      border: 3px solid rgba(127, 180, 217, 0.3);
-      border-top-color: #7fb4d9;
+      border: 3px solid rgba(231, 217, 186, 0.3);
+      border-top-color: #9e3b2e;
       border-radius: 50%;
       animation: webgl-recovery-spin 0.8s linear infinite;
     `;

@@ -9,10 +9,10 @@
   pointer-events: none;
   user-select: none;
   padding: 4px 10px;
-  background: rgba(10, 15, 8, 0.35);
+  background: rgba(43, 38, 32, 0.5);
   backdrop-filter: blur(4px);
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(231, 217, 186, 0.2);
 }
 
 .stat {

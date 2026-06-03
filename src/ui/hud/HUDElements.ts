@@ -144,7 +144,7 @@ export class HUDElements extends HUDVehicleHud {
       top: 0; left: 0; right: 0; bottom: 0;
       pointer-events: none;
       font-family: ${fontStack.hud};
-      color: rgba(220, 225, 230, 0.95);
+      color: rgba(231, 217, 186, 0.95);
       z-index: ${zIndex.hudBase};
       letter-spacing: 0.2px;
     `;
@@ -183,7 +183,7 @@ export class HUDElements extends HUDVehicleHud {
       left: 50%;
       transform: translate(-50%, -50%);
       background: rgba(0, 0, 0, 0.8);
-      color: white;
+      color: #e7d9ba;
       padding: 20px;
       font-size: 24px;
       border-radius: 5px;

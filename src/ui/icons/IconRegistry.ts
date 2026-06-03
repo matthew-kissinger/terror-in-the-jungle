@@ -141,7 +141,7 @@ export function getWeaponIconElement(weaponType: string, size = 14): HTMLElement
 
   const span = document.createElement('span');
   span.textContent = data.label;
-  span.style.cssText = 'color:rgba(255,255,255,0.4);font-size:10px;';
+  span.style.cssText = 'color:rgba(231,217,186,0.4);font-size:10px;';
   return span;
 }
 

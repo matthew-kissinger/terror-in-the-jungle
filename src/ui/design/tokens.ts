@@ -112,10 +112,10 @@ export const breakpoints = {
 
 export const fontStack = {
   ui: "'Courier Prime', 'Courier New', monospace",
-  hud: "var(--type, 'Courier Prime', monospace)",
-  mono: "var(--type, 'Courier Prime', monospace)",
+  hud: "var(--type)",
+  mono: "var(--type)",
   /** Special Elite — stamp/heading/big-numeral voice */
-  stamp: "var(--type-stamp, 'Special Elite', monospace)",
+  stamp: "var(--type-stamp)",
   /** Caveat — handwritten margin notes / distances */
-  hand: "var(--hand, 'Caveat', cursive)",
+  hand: "var(--hand)",
 } as const;

@@ -104,13 +104,13 @@ export class WeaponPickupSystem implements GameSystem {
       left: 50%;
       transform: translate(-50%, -50%) translateY(80px);
       background: rgba(0, 0, 0, 0.8);
-      color: #fff;
+      color: #e7d9ba;
       padding: 12px 24px;
       border-radius: 8px;
       font-family: var(--font-primary);
       font-size: 16px;
       font-weight: bold;
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      border: 2px solid rgba(231, 217, 186, 0.4);
       z-index: 1000;
       pointer-events: none;
       display: none;

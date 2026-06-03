@@ -239,8 +239,8 @@ export class UnifiedWeaponBar {
         position: relative;
         width: 48px;
         height: 52px;
-        background: rgba(10, 15, 8, 0.55);
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(43, 38, 32, 0.78);
+        border: 1px solid rgba(231, 217, 186, 0.2);
         border-radius: 6px;
         display: flex;
         flex-direction: column;
@@ -257,9 +257,9 @@ export class UnifiedWeaponBar {
       }
 
       .uwb-slot--active {
-        border-color: rgba(217, 119, 6, 0.5);
-        background: rgba(217, 119, 6, 0.12);
-        box-shadow: 0 0 8px rgba(217, 119, 6, 0.15);
+        border-color: rgba(158, 59, 46, 0.6);
+        background: rgba(158, 59, 46, 0.16);
+        box-shadow: 0 0 8px rgba(158, 59, 46, 0.22);
       }
 
       .uwb-slot--pressed {
@@ -273,12 +273,12 @@ export class UnifiedWeaponBar {
       .uwb-key {
         font-size: 9px;
         font-weight: 600;
-        color: rgba(255, 255, 255, 0.3);
+        color: rgba(231, 217, 186, 0.35);
         line-height: 1;
       }
 
       .uwb-slot--active .uwb-key {
-        color: rgba(217, 160, 80, 0.7);
+        color: rgba(231, 217, 186, 0.85);
       }
 
       .uwb-icon {
@@ -287,7 +287,7 @@ export class UnifiedWeaponBar {
         justify-content: center;
         font-size: 11px;
         font-weight: 700;
-        color: rgba(255, 255, 255, 0.55);
+        color: rgba(231, 217, 186, 0.6);
         line-height: 1;
       }
 
@@ -302,12 +302,12 @@ export class UnifiedWeaponBar {
       }
 
       .uwb-slot--active .uwb-icon {
-        color: rgba(255, 255, 255, 0.95);
+        color: rgba(231, 217, 186, 0.95);
       }
 
       .uwb-slot--active .uwb-icon img {
         opacity: 1;
-        filter: drop-shadow(0 0 4px rgba(217, 119, 6, 0.4)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+        filter: drop-shadow(0 0 4px rgba(158, 59, 46, 0.5)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
       }
 
       /* Hide entire weapon bar on touch - WeaponPill replaces it */

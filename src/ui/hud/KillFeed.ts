@@ -250,13 +250,13 @@ export class KillFeed {
       case Faction.US:
         return colors.us;
       case Faction.ARVN:
-        return '#5ab8b8';
+        return '#6f8a52';
       case Faction.NVA:
         return colors.opfor;
       case Faction.VC:
-        return '#d4943c';
+        return '#9e3b2e';
       default:
-        return '#ffffff';
+        return '#e7d9ba';
     }
   }
 

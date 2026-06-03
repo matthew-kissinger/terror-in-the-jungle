@@ -25,8 +25,8 @@ function showFatalError(message: string) {
   overlay.style.left = '0';
   overlay.style.width = '100%';
   overlay.style.height = '100%';
-  overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
-  overlay.style.color = '#fff';
+  overlay.style.backgroundColor = 'rgba(43, 38, 32, 0.92)';
+  overlay.style.color = '#e7d9ba';
   overlay.style.display = 'flex';
   overlay.style.flexDirection = 'column';
   overlay.style.justifyContent = 'center';
@@ -42,7 +42,7 @@ function showFatalError(message: string) {
   const err = document.createElement('div');
   err.textContent = String(message);
   err.style.fontSize = '14px';
-  err.style.color = '#ff5555';
+  err.style.color = '#9e3b2e';
   err.style.marginBottom = '20px';
 
   const button = document.createElement('button');

@@ -357,7 +357,7 @@ export class CommandTacticalMap {
         font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: rgba(244, 241, 231, 0.94);
+        color: rgba(231, 217, 186, 0.94);
       }
 
       .command-tactical-map__detail {
@@ -365,7 +365,7 @@ export class CommandTacticalMap {
         font-size: 12px;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: rgba(203, 197, 181, 0.68);
+        color: rgba(182, 164, 135, 0.75);
       }
 
       .command-tactical-map__frame {
@@ -373,7 +373,7 @@ export class CommandTacticalMap {
         border: 1px solid rgba(168, 116, 42, 0.25);
         border-radius: 16px;
         overflow: hidden;
-        background: rgba(12, 14, 16, 0.92);
+        background: rgba(43, 38, 32, 0.92);
       }
 
       .command-tactical-map__frame::after {
