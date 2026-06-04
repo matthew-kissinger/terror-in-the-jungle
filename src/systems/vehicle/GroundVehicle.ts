@@ -80,6 +80,19 @@ export class GroundVehicle implements IVehicle {
         this.physics.setWorldHalfExtent(worldSize * 0.5);
       }
     }
+
+    // Rest the chassis on the surface the moment terrain is available. Placement
+    // seeds the vehicle's world Y before terrain is wired, which can leave the
+    // jeep clipped under the DEM and `isGrounded === false` — in that state the
+    // drive force is gated to zero. Conforming here makes the vehicle grounded
+    // (and drivable) from the first frame, and writes the rested pose back to
+    // the scene object so `getPosition()` reports the surface height right away.
+    if (terrain) {
+      this.physics.conformToTerrain(terrain);
+      const state = this.physics.getInterpolatedState();
+      this.object.position.copy(state.position);
+      this.object.quaternion.copy(state.quaternion);
+    }
   }
 
   // ---------- Physics access (for adapters / NPC drivers) ----------

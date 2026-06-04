@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { PlayerState } from '../../types';
 import type { IGameRenderer, IHUDSystem } from '../../types/SystemInterfaces';
 import type { PlayerCamera } from '../player/PlayerCamera';
@@ -263,7 +263,14 @@ export class PlayerVehicleAdapterFactory {
     }
 
     this.deps.vehicleSessionController.registerAdapter(adapter);
-    const ctx = this.buildTransitionContext(vehicle.getPosition().clone(), vehicle.vehicleId);
+    // Snap the player onto the locked SEAT, not the chassis center. The seat's
+    // `localOffset` is in the vehicle's body frame; rotate it by the vehicle
+    // orientation and add the chassis position to get the world seat pose.
+    // Passing the chassis center here (the prior behavior) put the player at
+    // the geometric middle of the vehicle, which read as "mounted behind /
+    // inside" for the M151 (driver seat is forward-of-center).
+    const seatWorld = this.computeSeatWorldPosition(vehicle, seatIndex);
+    const ctx = this.buildTransitionContext(seatWorld, vehicle.vehicleId);
     const entered = this.deps.vehicleSessionController.enterVehicle(
       adapter.vehicleType,
       vehicle.vehicleId,
@@ -306,6 +313,27 @@ export class PlayerVehicleAdapterFactory {
   }
 
   // ── Internals ──────────────────────────────────────────────────────────────
+
+  /**
+   * World-space position of a vehicle seat, given its local body-frame
+   * offset. Mirrors the seat math NPC mounting uses: rotate the seat's
+   * `localOffset` by the chassis orientation, then translate by the chassis
+   * world position. Falls back to the chassis center if the seat index does
+   * not resolve (defensive — `seatIndex` always comes from a successful
+   * `enterVehicle`, so the seat exists in practice).
+   */
+  private computeSeatWorldPosition(
+    vehicle: IVehicle,
+    seatIndex: number,
+  ): THREE.Vector3 {
+    const chassis = vehicle.getPosition().clone();
+    const seat = vehicle.getSeats()[seatIndex];
+    if (!seat) return chassis;
+    return seat.localOffset
+      .clone()
+      .applyQuaternion(vehicle.getQuaternion())
+      .add(chassis);
+  }
 
   private getOrBuildAdapter(
     vehicle: IVehicle,

@@ -198,6 +198,53 @@ export class GroundVehiclePhysics {
     this.worldHalfExtent = halfExtent;
   }
 
+  /**
+   * Terrain-clamp the chassis to rest on the surface at the current X/Z so the
+   * vehicle is grounded from frame 0 instead of waiting for the first
+   * `simulateStep` to conform it. Without this, a vehicle constructed before
+   * terrain is wired (its initial world Y is whatever the placement pass
+   * picked — often below the DEM surface) stays `isGrounded === false` and the
+   * drive force is gated to zero, so throttle produces no motion and the
+   * chassis appears clipped under the ground.
+   *
+   * Snaps Y to `terrainHeight + axleOffset`, zeroes vertical velocity, marks
+   * the state grounded, and seeds `groundHeight` + the wheel samples so the
+   * very next interpolated pose is correct. Safe to call repeatedly; a no-op
+   * when `terrain` is null or the chassis is outside the playable extent.
+   */
+  conformToTerrain(terrain: ITerrainRuntime | null): void {
+    // Guard against not-yet-ready or partial terrain stand-ins (the world
+    // placement path may hand us a terrain before its query methods are
+    // wired). Mirrors the `typeof` guard `setTerrain` already uses for the
+    // boundary extent.
+    if (!terrain || typeof terrain.getHeightAt !== 'function') return;
+
+    const x = this.state.position.x;
+    const z = this.state.position.z;
+    if (typeof terrain.getPlayableWorldSize === 'function') {
+      const worldSize = terrain.getPlayableWorldSize();
+      if (Number.isFinite(worldSize) && worldSize > 0) {
+        const halfWorld = worldSize * 0.5;
+        if (Math.abs(x) > halfWorld || Math.abs(z) > halfWorld) return;
+      }
+    }
+
+    const groundHeight = terrain.getHeightAt(x, z);
+    if (!Number.isFinite(groundHeight)) return;
+
+    this.state.position.y = groundHeight + this.cfg.axleOffset;
+    if (this.state.velocity.y < 0) this.state.velocity.y = 0;
+    this.state.groundHeight = groundHeight;
+    this.state.isGrounded = true;
+    for (let i = 0; i < WHEEL_COUNT; i += 1) {
+      this.state.wheelSamples[i].terrainHeight = groundHeight;
+      this.state.wheelSamples[i].inBounds = true;
+    }
+    // Keep the interpolation buffer in lockstep so the first rendered pose
+    // does not lerp up from a stale below-surface previous state.
+    this.snapshotPrevious();
+  }
+
   getState(): Readonly<GroundVehicleState> {
     return this.state;
   }
