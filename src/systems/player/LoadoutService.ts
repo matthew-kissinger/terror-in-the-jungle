@@ -6,8 +6,11 @@ import type { IFirstPersonWeapon } from '../../types/SystemInterfaces';
 import type { InventoryManager } from './InventoryManager';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import {
+  AmmoLoad,
+  AMMO_LOAD_OPTIONS,
   clonePlayerLoadout,
   DEFAULT_PLAYER_LOADOUT,
+  getAmmoLoadReserveFactor,
   getDefaultLoadoutForFaction,
   getGrenadeTypeForEquipment,
   getLoadoutPoolForFaction,
@@ -21,7 +24,11 @@ import {
 
 interface LoadoutRuntimeTargets {
   inventoryManager?: InventoryManager;
-  firstPersonWeapon?: IFirstPersonWeapon;
+  // `setReserveAmmoFactor` is a concrete-class capability (FirstPersonWeapon),
+  // intentionally NOT part of the fenced IFirstPersonWeapon surface. Declared
+  // here as an optional method so applyToRuntime can call it fence-safely; test
+  // doubles and the interface alone remain valid.
+  firstPersonWeapon?: IFirstPersonWeapon & { setReserveAmmoFactor?: (factor: number) => void };
   grenadeSystem?: GrenadeSystem;
 }
 
@@ -124,7 +131,8 @@ function clonePresetSlot(slot: LoadoutPresetSlot): LoadoutPresetSlot {
 function loadoutsEqual(a: PlayerLoadout, b: PlayerLoadout): boolean {
   return a.primaryWeapon === b.primaryWeapon
     && a.secondaryWeapon === b.secondaryWeapon
-    && a.equipment === b.equipment;
+    && a.equipment === b.equipment
+    && (a.ammoLoad ?? AmmoLoad.STANDARD) === (b.ammoLoad ?? AmmoLoad.STANDARD);
 }
 
 function migrateLegacyEquipment(candidate: {
@@ -193,11 +201,20 @@ function sanitizeLoadoutForPool(value: unknown, pool: LoadoutOptionPool): Player
     ? candidate.equipment as LoadoutEquipment
     : migrateLegacyEquipment(candidate, pool);
 
-  return {
+  const sanitized: PlayerLoadout = {
     primaryWeapon,
     secondaryWeapon,
     equipment,
   };
+
+  // Ammo load is universal (not faction-filtered) and optional: only carry a
+  // recognised value through; absent/invalid is left undefined (treated as
+  // STANDARD everywhere it is read).
+  if (AMMO_LOAD_OPTIONS.some(option => option.value === candidate.ammoLoad)) {
+    sanitized.ammoLoad = candidate.ammoLoad as AmmoLoad;
+  }
+
+  return sanitized;
 }
 
 function createDefaultPresetSlots(pool: LoadoutOptionPool): LoadoutPresetSlot[] {
@@ -388,6 +405,8 @@ export class LoadoutService {
         );
       case 'equipment':
         return this.setEquipment(this.cycleEquipment(direction));
+      case 'ammoLoad':
+        return this.setAmmoLoad(this.cycleAmmoLoad(direction));
       default:
         return this.getCurrentLoadout();
     }
@@ -473,6 +492,17 @@ export class LoadoutService {
     });
   }
 
+  setAmmoLoad(ammoLoad: AmmoLoad): PlayerLoadout {
+    if (!AMMO_LOAD_OPTIONS.some(option => option.value === ammoLoad)) {
+      return this.getCurrentLoadout();
+    }
+
+    return this.setLoadout({
+      ...this.currentState.currentLoadout,
+      ammoLoad,
+    });
+  }
+
   setLoadout(loadout: PlayerLoadout): PlayerLoadout {
     this.currentState.currentLoadout = sanitizeLoadoutForPool(loadout, this.currentPool);
     this.persistCurrentContext();
@@ -487,6 +517,12 @@ export class LoadoutService {
     targets.inventoryManager?.reset();
     targets.firstPersonWeapon?.setPlayerFaction?.(this.currentContext.faction);
     targets.firstPersonWeapon?.setPrimaryWeapon(loadout.primaryWeapon as RuntimeWeaponType);
+    // Selectable ammo load scales the player's spawn RESERVE ammo. Optional-call
+    // so runtime test doubles without the concrete method stay valid (it lives
+    // on the concrete FirstPersonWeapon, not the fenced IFirstPersonWeapon).
+    targets.firstPersonWeapon?.setReserveAmmoFactor?.(
+      getAmmoLoadReserveFactor(loadout.ammoLoad ?? AmmoLoad.STANDARD)
+    );
     if (grenadeType) {
       targets.grenadeSystem?.setGrenadeType(grenadeType);
     }
@@ -522,6 +558,15 @@ export class LoadoutService {
     if (index < 0) index = 0;
     index = (index + direction + pool.length) % pool.length;
     return pool[index];
+  }
+
+  private cycleAmmoLoad(direction: 1 | -1): AmmoLoad {
+    const values = AMMO_LOAD_OPTIONS.map(option => option.value);
+    const current = this.currentState.currentLoadout.ammoLoad ?? AmmoLoad.STANDARD;
+    let index = values.indexOf(current);
+    if (index < 0) index = 0;
+    index = (index + direction + values.length) % values.length;
+    return values[index];
   }
 
   private emitChange(): void {

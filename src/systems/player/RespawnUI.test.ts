@@ -20,6 +20,22 @@ class MockHTMLElement {
   parentElement: MockHTMLElement | null = null;
   disabled: boolean = false;
   dataset: Record<string, string> = {};
+  // Minimal classList so components that toggle classes (e.g. the loadout
+  // availability chips) work against the mock. Tolerates undefined tokens.
+  private classes: Set<string> = new Set();
+  classList = {
+    add: (...tokens: Array<string | undefined>) => {
+      for (const token of tokens) if (token) this.classes.add(token);
+    },
+    remove: (...tokens: Array<string | undefined>) => {
+      for (const token of tokens) if (token) this.classes.delete(token);
+    },
+    contains: (token: string) => this.classes.has(token),
+    toggle: (token: string) => {
+      if (this.classes.has(token)) { this.classes.delete(token); return false; }
+      this.classes.add(token); return true;
+    },
+  };
   private attributes: Map<string, string> = new Map();
   
   // Event handlers

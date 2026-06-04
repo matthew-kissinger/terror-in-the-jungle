@@ -134,6 +134,20 @@ export class WeaponAmmo {
     this.launcherAmmo.reset()
   }
 
+  /**
+   * Apply the selectable ammo-load reserve factor to every weapon. Each manager
+   * scales its reserve relative to its own BASE capacity and re-provisions, so
+   * the spawn reserve reflects the choice and it persists across switches.
+   */
+  setReserveAmmoFactor(factor: number): void {
+    this.rifleAmmo.setReserveFactor(factor)
+    this.shotgunAmmo.setReserveFactor(factor)
+    this.smgAmmo.setReserveFactor(factor)
+    this.pistolAmmo.setReserveFactor(factor)
+    this.lmgAmmo.setReserveFactor(factor)
+    this.launcherAmmo.setReserveFactor(factor)
+  }
+
   getAmmoState(): any {
     return this.currentAmmoManager.getState()
   }

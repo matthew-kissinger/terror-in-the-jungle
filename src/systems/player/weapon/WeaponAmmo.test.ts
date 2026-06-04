@@ -167,4 +167,77 @@ describe('WeaponAmmo', () => {
       }
     })
   })
+
+  describe('setReserveAmmoFactor (selectable ammo load)', () => {
+    it('scales every weapon\'s reserve relative to its base and re-provisions it', () => {
+      // Capture each weapon's baseline reserve before scaling.
+      const managers = [
+        weaponAmmo.getRifleAmmo(),
+        weaponAmmo.getShotgunAmmo(),
+        weaponAmmo.getSMGAmmo(),
+        weaponAmmo.getPistolAmmo(),
+        weaponAmmo.getLMGAmmo(),
+        weaponAmmo.getLauncherAmmo(),
+      ]
+      const baseReserves = managers.map(m => m.getState().maxReserve)
+
+      weaponAmmo.setReserveAmmoFactor(1.5)
+
+      managers.forEach((mgr, i) => {
+        const state = mgr.getState()
+        const expected = Math.round(baseReserves[i] * 1.5)
+        expect(state.maxReserve).toBe(expected)
+        // Re-provisioned: the spawn reserve reflects the new capacity.
+        expect(state.reserveAmmo).toBe(expected)
+      })
+
+      // The rifle's documented 90 base becomes 135 at x1.5.
+      expect(weaponAmmo.getRifleAmmo().getState().maxReserve).toBe(135)
+    })
+
+    it('does not change the magazine size', () => {
+      const rifle = weaponAmmo.getRifleAmmo()
+      const baseMag = rifle.getState().maxMagazine
+
+      weaponAmmo.setReserveAmmoFactor(2.0)
+
+      expect(rifle.getState().maxMagazine).toBe(baseMag)
+      expect(rifle.getState().currentMagazine).toBe(baseMag)
+    })
+
+    it('computes from the base so repeated factor changes do not compound', () => {
+      const rifle = weaponAmmo.getRifleAmmo()
+      const base = rifle.getState().maxReserve // 90
+
+      weaponAmmo.setReserveAmmoFactor(1.5)
+      weaponAmmo.setReserveAmmoFactor(2.0)
+
+      // Always relative to the base (90 -> 180), never to the previous scaled value.
+      expect(rifle.getState().maxReserve).toBe(Math.round(base * 2.0))
+      expect(rifle.getState().maxReserve).toBe(180)
+    })
+
+    it('keeps the scaled reserve after a resetAll (survives respawn provisioning)', () => {
+      weaponAmmo.setReserveAmmoFactor(2.0)
+      weaponAmmo.getRifleAmmo().consumeRound()
+
+      weaponAmmo.resetAll()
+
+      const state = weaponAmmo.getRifleAmmo().getState()
+      expect(state.maxReserve).toBe(180)
+      expect(state.reserveAmmo).toBe(180)
+    })
+
+    it('preserves the factored reserve across a weapon switch', () => {
+      weaponAmmo.setReserveAmmoFactor(1.5)
+
+      // A weapon switch in the runtime is `setCurrentAmmoManager`; it must not
+      // disturb the already-scaled reserve of the newly-active weapon.
+      weaponAmmo.setCurrentAmmoManager(weaponAmmo.getSMGAmmo())
+
+      const smgState = weaponAmmo.getAmmoState()
+      expect(smgState.maxReserve).toBe(Math.round(128 * 1.5))
+      expect(smgState.reserveAmmo).toBe(Math.round(128 * 1.5))
+    })
+  })
 })

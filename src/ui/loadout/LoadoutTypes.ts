@@ -18,10 +18,26 @@ export enum LoadoutEquipment {
   MORTAR_KIT = 'mortar_kit'
 }
 
+/**
+ * Selectable ammo load for a loadout. Universal (not faction-filtered): scales
+ * the player's spawn RESERVE ammo only (magazine size is unchanged). STANDARD is
+ * the implicit default everywhere `ammoLoad` is absent.
+ */
+export enum AmmoLoad {
+  STANDARD = 'standard',
+  EXTENDED = 'extended',
+  HEAVY = 'heavy'
+}
+
 export interface PlayerLoadout {
   primaryWeapon: LoadoutWeapon;
   secondaryWeapon: LoadoutWeapon;
   equipment: LoadoutEquipment;
+  /**
+   * Optional selectable ammo load. Absent is treated as `AmmoLoad.STANDARD`
+   * everywhere it is read, so existing presets/tests/persisted data stay valid.
+   */
+  ammoLoad?: AmmoLoad;
 }
 
 export interface LoadoutPresetTemplate {
@@ -47,7 +63,8 @@ interface LoadoutFieldOption<TValue extends string> {
 export type LoadoutFieldKey =
   | 'primaryWeapon'
   | 'secondaryWeapon'
-  | 'equipment';
+  | 'equipment'
+  | 'ammoLoad';
 
 const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWeapon>> = [
   { value: LoadoutWeapon.RIFLE, label: 'Rifle', shortLabel: 'AR' },
@@ -64,6 +81,17 @@ const LOADOUT_EQUIPMENT_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutEquipme
   { value: LoadoutEquipment.FLASHBANG, label: 'Flashbang', shortLabel: 'FLS' },
   { value: LoadoutEquipment.SANDBAG_KIT, label: 'Sandbag Kit', shortLabel: 'SB' },
   { value: LoadoutEquipment.MORTAR_KIT, label: 'Mortar Kit', shortLabel: 'MTR' },
+];
+
+/**
+ * Ammo load options, universal across factions (NOT filtered by the faction
+ * pool). Mirrors the weapon/equipment option arrays so the deploy screen can
+ * cycle and label them uniformly.
+ */
+export const AMMO_LOAD_OPTIONS: ReadonlyArray<LoadoutFieldOption<AmmoLoad>> = [
+  { value: AmmoLoad.STANDARD, label: 'Standard', shortLabel: 'STD' },
+  { value: AmmoLoad.EXTENDED, label: 'Extended', shortLabel: 'EXT' },
+  { value: AmmoLoad.HEAVY, label: 'Heavy', shortLabel: 'HVY' },
 ];
 
 export const DEFAULT_PLAYER_LOADOUT: PlayerLoadout = {
@@ -277,6 +305,31 @@ export function getEquipmentShortLabel(equipment: LoadoutEquipment): string {
   return LOADOUT_EQUIPMENT_OPTIONS.find(option => option.value === equipment)?.shortLabel ?? 'EQP';
 }
 
+export function getAmmoLoadLabel(load: AmmoLoad): string {
+  return AMMO_LOAD_OPTIONS.find(option => option.value === load)?.label ?? 'Standard';
+}
+
+export function getAmmoLoadShortLabel(load: AmmoLoad): string {
+  return AMMO_LOAD_OPTIONS.find(option => option.value === load)?.shortLabel ?? 'STD';
+}
+
+/**
+ * Reserve-ammo multiplier for an ammo load. STANDARD is the baseline (1.0);
+ * EXTENDED and HEAVY scale the player's spawn reserve up. Magazine size is
+ * never affected by this factor.
+ */
+export function getAmmoLoadReserveFactor(load: AmmoLoad): number {
+  switch (load) {
+    case AmmoLoad.EXTENDED:
+      return 1.5;
+    case AmmoLoad.HEAVY:
+      return 2.0;
+    case AmmoLoad.STANDARD:
+    default:
+      return 1.0;
+  }
+}
+
 export function isGrenadeEquipment(equipment: LoadoutEquipment): boolean {
   return equipment === LoadoutEquipment.FRAG_GRENADE
     || equipment === LoadoutEquipment.SMOKE_GRENADE
@@ -297,11 +350,15 @@ export function getGrenadeTypeForEquipment(equipment: LoadoutEquipment): Grenade
 }
 
 export function clonePlayerLoadout(loadout: PlayerLoadout): PlayerLoadout {
-  return {
+  const cloned: PlayerLoadout = {
     primaryWeapon: loadout.primaryWeapon,
     secondaryWeapon: loadout.secondaryWeapon,
     equipment: loadout.equipment,
   };
+  if (loadout.ammoLoad !== undefined) {
+    cloned.ammoLoad = loadout.ammoLoad;
+  }
+  return cloned;
 }
 
 export function getLoadoutPoolForFaction(faction: Faction): LoadoutOptionPool {

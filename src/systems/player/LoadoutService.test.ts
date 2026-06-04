@@ -3,6 +3,7 @@ import { GameMode } from '../../config/gameModeTypes';
 import { Alliance, Faction, GrenadeType } from '../combat/types';
 import { LoadoutService } from './LoadoutService';
 import {
+  AmmoLoad,
   DEFAULT_PLAYER_LOADOUT,
   LoadoutEquipment,
   LoadoutWeapon
@@ -189,5 +190,80 @@ describe('LoadoutService', () => {
     expect(firstPersonWeapon.setPlayerFaction).toHaveBeenCalledWith(Faction.US);
     expect(firstPersonWeapon.setPrimaryWeapon).toHaveBeenCalledWith('smg');
     expect(grenadeSystem.setGrenadeType).toHaveBeenCalledWith(GrenadeType.SMOKE);
+  });
+
+  describe('selectable ammo load', () => {
+    it('cycles the ammo load forward through the universal pool', () => {
+      const service = new LoadoutService();
+
+      // Absent ammo load is treated as STANDARD, so the first forward step is EXTENDED.
+      expect(service.getCurrentLoadout().ammoLoad).toBeUndefined();
+      expect(service.cycleField('ammoLoad', 1).ammoLoad).toBe(AmmoLoad.EXTENDED);
+      expect(service.cycleField('ammoLoad', 1).ammoLoad).toBe(AmmoLoad.HEAVY);
+      // Wraps back to STANDARD.
+      expect(service.cycleField('ammoLoad', 1).ammoLoad).toBe(AmmoLoad.STANDARD);
+    });
+
+    it('cycles the ammo load backward through the universal pool', () => {
+      const service = new LoadoutService();
+
+      // Stepping back from the implicit STANDARD wraps to HEAVY.
+      expect(service.cycleField('ammoLoad', -1).ammoLoad).toBe(AmmoLoad.HEAVY);
+      expect(service.cycleField('ammoLoad', -1).ammoLoad).toBe(AmmoLoad.EXTENDED);
+      expect(service.cycleField('ammoLoad', -1).ammoLoad).toBe(AmmoLoad.STANDARD);
+    });
+
+    it('applies the standard reserve factor (1.0) when no ammo load is selected', () => {
+      const service = new LoadoutService();
+      const firstPersonWeapon = {
+        setPlayerFaction: vi.fn(),
+        setPrimaryWeapon: vi.fn(),
+        setReserveAmmoFactor: vi.fn(),
+      };
+
+      service.applyToRuntime({ firstPersonWeapon: firstPersonWeapon as any });
+
+      expect(firstPersonWeapon.setReserveAmmoFactor).toHaveBeenCalledWith(1.0);
+    });
+
+    it('applies the matching reserve factor for the selected ammo load', () => {
+      const service = new LoadoutService();
+      const firstPersonWeapon = {
+        setPlayerFaction: vi.fn(),
+        setPrimaryWeapon: vi.fn(),
+        setReserveAmmoFactor: vi.fn(),
+      };
+
+      service.setAmmoLoad(AmmoLoad.HEAVY);
+      service.applyToRuntime({ firstPersonWeapon: firstPersonWeapon as any });
+
+      // HEAVY maps to a x2.0 reserve multiplier.
+      expect(firstPersonWeapon.setReserveAmmoFactor).toHaveBeenCalledWith(2.0);
+    });
+
+    it('does not break applyToRuntime when the weapon double lacks setReserveAmmoFactor', () => {
+      const service = new LoadoutService();
+      const firstPersonWeapon = {
+        setPlayerFaction: vi.fn(),
+        setPrimaryWeapon: vi.fn(),
+      };
+
+      service.setAmmoLoad(AmmoLoad.EXTENDED);
+
+      // The optional-call must tolerate a runtime double without the method.
+      expect(() =>
+        service.applyToRuntime({ firstPersonWeapon: firstPersonWeapon as any })
+      ).not.toThrow();
+      expect(firstPersonWeapon.setPrimaryWeapon).toHaveBeenCalled();
+    });
+
+    it('persists the selected ammo load across a reload from storage', () => {
+      const service = new LoadoutService();
+      service.setAmmoLoad(AmmoLoad.EXTENDED);
+      service.saveCurrentToActivePreset();
+
+      const reloaded = new LoadoutService();
+      expect(reloaded.getCurrentLoadout().ammoLoad).toBe(AmmoLoad.EXTENDED);
+    });
   });
 });

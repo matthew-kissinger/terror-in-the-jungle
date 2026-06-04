@@ -45,6 +45,7 @@ describe('WeaponSwitching', () => {
       getLMGAmmo: vi.fn(() => lmgMgr),
       getLauncherAmmo: vi.fn(() => launcherMgr),
       setCurrentAmmoManager: vi.fn(),
+      setReserveAmmoFactor: vi.fn(),
       // Report a stable state object so we can check it is forwarded.
       getAmmoState: vi.fn(() => ({ currentMagazine: 7, reserveAmmo: 21 })),
     }
@@ -90,6 +91,23 @@ describe('WeaponSwitching', () => {
       const callArgs = rigManager.startWeaponSwitch.mock.calls[0]
       expect(callArgs[0]).toBe('smg')
       expect(callArgs[callArgs.length - 1]).toBe(smgMgr)
+    })
+  })
+
+  describe('reserve ammo factor seam (selectable ammo load)', () => {
+    it('routes the reserve factor through to the per-weapon ammo subsystem', () => {
+      switching.setReserveAmmoFactor(1.5)
+
+      expect(ammo.setReserveAmmoFactor).toHaveBeenCalledWith(1.5)
+    })
+
+    it('does not re-scale the reserve as a side effect of switching weapons', () => {
+      // Switching must not touch the reserve factor: a load chosen at deploy
+      // persists no matter how many times the player changes weapons.
+      switching.switchWeapon('smg', vi.fn())
+      switching.switchWeapon('pistol', vi.fn())
+
+      expect(ammo.setReserveAmmoFactor).not.toHaveBeenCalled()
     })
   })
 
