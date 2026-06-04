@@ -151,6 +151,7 @@
     "check:terrain-fire-authority": "npx tsx scripts/konveyer-terrain-fire-authority-probe.ts --renderer webgpu-strict --headed",
     "audit:konveyer-completion": "npx tsx scripts/konveyer-completion-audit.ts",
     "check:doc-drift": "npx tsx scripts/doc-drift.ts",
+    "check:doc-drift:full": "npx tsx scripts/doc-drift.ts --full",
     "check:hydrology-bakes": "npx tsx scripts/prebake-hydrology.ts --check",
     "check:cycle-close": "npx tsx scripts/check-cycle-close.ts",
     "check:live-release": "npx tsx scripts/check-live-release.ts",

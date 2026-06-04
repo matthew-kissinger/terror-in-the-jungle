@@ -40,8 +40,19 @@
  * are carried over from the original Projekt-143 checker so existing evidence
  * chains keep working.
  *
+ * ADVISORY FULL-TREE MODE (`--full`, npm script `check:doc-drift:full`):
+ *   The default gate is GREEN by design — it suppresses pre-existing drift via
+ *   the GRANDFATHER set (live docs) and the low-severity prefix list (archive /
+ *   cycles / tasks-archive). That suppression hides the repo's pre-existing
+ *   broken-reference backlog. `--full` re-runs the SAME scan over the whole
+ *   `docs/**` tree but counts EVERY broken reference — grandfathered and
+ *   low-severity included — and prints a repo-wide summary. It is advisory: it
+ *   ALWAYS exits 0 and is intentionally NOT wired into the CI gate. Use it to
+ *   measure (not gate) the backlog; full-tree gating is a deliberate follow-up.
+ *
  * Usage:
- *   npx tsx scripts/doc-drift.ts                 # full tree, exit 1 on new drift
+ *   npx tsx scripts/doc-drift.ts                 # full tree, exit 1 on new drift (GATE)
+ *   npx tsx scripts/doc-drift.ts --full          # advisory: count ALL broken refs, exit 0
  *   npx tsx scripts/doc-drift.ts --print-grandfather   # emit current failures as a grandfather block
  *   npx tsx scripts/doc-drift.ts --doc docs/DIRECTIVES.md  # scan an explicit subset
  */
@@ -54,7 +65,7 @@ type Status = 'pass' | 'warn' | 'fail';
 type Severity = 'warning' | 'error';
 type Kind = 'missing_markdown_link' | 'missing_code_path' | 'missing_package_script';
 
-interface Finding {
+export interface Finding {
   id: string;
   severity: Severity;
   grandfathered: boolean;
@@ -408,6 +419,54 @@ function statusFromFindings(findings: Finding[]): Status {
   return 'pass';
 }
 
+export interface FullTreeDriftSummary {
+  /** Distinct docs that produced at least one broken-reference finding. */
+  docsWithDrift: number;
+  /** Total broken references across the whole tree (no suppression). */
+  totalBrokenRefs: number;
+  brokenByKind: Record<Kind, number>;
+  /** Of the total, how many are hidden from the gate (grandfathered + low-severity). */
+  suppressedFromGate: number;
+}
+
+/**
+ * Pure roll-up of a full-tree scan for the advisory `--full` mode. Unlike the
+ * gate (which only surfaces NEW, live-doc, error-severity drift), this counts
+ * EVERY broken reference the scan produced — grandfathered live-doc refs and
+ * low-severity archive refs included — so the repo-wide broken-reference
+ * backlog is visible as a single number. It does not exit or mutate anything;
+ * `--full` always exits 0.
+ *
+ * Every `Finding` the scanner emits represents a broken reference (the scanner
+ * only pushes a finding when a target is missing on disk / in package.json), so
+ * the full-tree broken-ref count is simply the finding count rolled up by kind.
+ */
+export function summarizeFullTreeDrift(findings: Finding[]): FullTreeDriftSummary {
+  const brokenByKind: Record<Kind, number> = {
+    missing_markdown_link: 0,
+    missing_code_path: 0,
+    missing_package_script: 0,
+  };
+  const docsWithDrift = new Set<string>();
+  let suppressedFromGate = 0;
+
+  for (const f of findings) {
+    brokenByKind[f.kind] += 1;
+    docsWithDrift.add(f.file);
+    // A finding is invisible to the gate when it is not an error: either it was
+    // grandfathered (downgraded to 'warning') or it lives under a low-severity
+    // (archive/cycles/tasks-archive) prefix.
+    if (f.severity !== 'error') suppressedFromGate += 1;
+  }
+
+  return {
+    docsWithDrift: docsWithDrift.size,
+    totalBrokenRefs: findings.length,
+    brokenByKind,
+    suppressedFromGate,
+  };
+}
+
 function buildReport(outDir: string): { report: DocDriftReport; findings: Finding[] } {
   const docsRoot = resolve('docs');
   const explicit = explicitDocs();
@@ -528,6 +587,29 @@ function main(): void {
     return;
   }
 
+  // Advisory full-tree mode: report the repo-wide broken-reference backlog and
+  // ALWAYS exit 0. This never touches the gate's pass/fail logic below.
+  if (process.argv.includes('--full')) {
+    const full = summarizeFullTreeDrift(findings);
+    console.log(`doc-drift FULL (advisory): ${report.files.summary}`);
+    console.log(
+      `docs=${report.summary.docsScanned} (live=${report.summary.liveDocsScanned}) ` +
+      `mdLinks=${report.summary.markdownLinksChecked} codePaths=${report.summary.codePathsChecked} ` +
+      `npmRefs=${report.summary.packageScriptRefsChecked}`,
+    );
+    console.log(
+      `brokenRefs=${full.totalBrokenRefs} across ${full.docsWithDrift} docs ` +
+      `(missing_markdown_link=${full.brokenByKind.missing_markdown_link} ` +
+      `missing_code_path=${full.brokenByKind.missing_code_path} ` +
+      `missing_package_script=${full.brokenByKind.missing_package_script})`,
+    );
+    console.log(
+      `suppressedFromGate=${full.suppressedFromGate} ` +
+      `(grandfathered + low-severity archive/cycles/tasks-archive) — advisory, gate unaffected`,
+    );
+    return;
+  }
+
   console.log(`doc-drift ${report.status.toUpperCase()}: ${report.files.summary}`);
   console.log(
     `docs=${report.summary.docsScanned} (live=${report.summary.liveDocsScanned}) ` +
@@ -548,9 +630,19 @@ function main(): void {
   }
 }
 
-try {
-  main();
-} catch (error) {
-  console.error('doc-drift-gate failed:', error instanceof Error ? error.message : String(error));
-  process.exit(1);
+// Run CLI behavior only when invoked directly, not when imported by tests.
+// `process.argv[1]` is the script path under tsx; compare normalized paths.
+const invokedDirectly =
+  typeof process !== 'undefined' &&
+  Array.isArray(process.argv) &&
+  typeof process.argv[1] === 'string' &&
+  /doc-drift\.ts$/.test(process.argv[1].replace(/\\/g, '/'));
+
+if (invokedDirectly) {
+  try {
+    main();
+  } catch (error) {
+    console.error('doc-drift-gate failed:', error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }
