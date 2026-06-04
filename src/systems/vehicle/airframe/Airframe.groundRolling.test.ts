@@ -28,6 +28,8 @@ import { airframeConfigFromLegacy } from '../FixedWingTypes';
 const FIXED_DT = 1 / 60;
 const SKYRAIDER = FIXED_WING_CONFIGS.A1_SKYRAIDER.physics;
 const SKYRAIDER_AF = airframeConfigFromLegacy(SKYRAIDER);
+const AC47 = FIXED_WING_CONFIGS.AC47_SPOOKY.physics;
+const AC47_AF = airframeConfigFromLegacy(AC47);
 
 function flatProbe(height: number): AirframeTerrainProbe {
   const normal = new THREE.Vector3(0, 1, 0);
@@ -208,5 +210,97 @@ describe('Airframe — continuous wheel-load rolling model', () => {
     // single-tick delta; require < 2 m/s per tick as the smoothness bound.
     expect(maxDelta).toBeLessThan(2);
     expect(liftoffTick).toBeGreaterThan(0);
+  });
+});
+
+describe('Airframe — AC-47 low-pitch takeoff (AVIATSIYA-2 single-bounce)', () => {
+  /**
+   * Drive a full ground roll to liftoff and return the per-tick vertical
+   * position / velocity trace for the seconds spanning the grounded→airborne
+   * transition. The AC-47 is a heavy, marginal-lift gunship: it commits to
+   * liftoff near (or below) its own stall speed, so the wing cannot
+   * immediately sustain a climb. A bad liftoff impulse pops it up, the wing
+   * can't carry it, vy reverses, and it sinks back to the runway — the
+   * single-bounce vertical pop the carry-over describes.
+   */
+  function takeoffTrace(pitch: number) {
+    const af = new Airframe(
+      new THREE.Vector3(0, AC47_AF.ground.gearClearanceM, 0),
+      AC47_AF,
+    );
+    const probe = flatProbe(0);
+    const cmd = intent({ throttle: 1, pitch, tier: 'raw' });
+
+    let liftoffTick = -1;
+    const ys: number[] = [];
+    const vys: number[] = [];
+    const totalTicks = Math.round(20 / FIXED_DT);
+    // The single-bounce is a ground-contact-transition artifact: it plays out
+    // in the first couple of seconds after the wheels leave the runway, while
+    // the marginal-lift gunship is still near AGL 0. A healthy sustained
+    // climb-out comes later and legitimately carries large positive vy, so we
+    // scope the trace to the transition window — capturing the whole flight
+    // would conflate the (legitimate) later climb with the (illegitimate)
+    // liftoff pop.
+    const transitionWindowTicks = Math.round(2 / FIXED_DT);
+    for (let i = 0; i < totalTicks; i++) {
+      af.step(cmd, probe, FIXED_DT);
+      const s = af.getState();
+      if (liftoffTick < 0 && !s.weightOnWheels) {
+        liftoffTick = i;
+      }
+      if (liftoffTick >= 0 && i < liftoffTick + transitionWindowTicks) {
+        ys.push(s.position.y);
+        vys.push(s.verticalSpeedMs);
+      }
+    }
+    return { liftoffTick, ys, vys };
+  }
+
+  it('low-pitch liftoff does not pop up then sink back to the runway', () => {
+    // A low-pitch rotation (just above the rotation input threshold) is the
+    // reported bounce case: the pilot eases the nose up for a gentle takeoff.
+    const { liftoffTick, ys, vys } = takeoffTrace(0.15);
+    expect(liftoffTick).toBeGreaterThan(0);
+
+    // Observable bounce signature #1: a single-frame upward pop. The aircraft
+    // must never gain altitude faster than a sustainable climb at the marginal
+    // liftoff speed. The old fixed impulse injected ~4.5 m/s on the liftoff
+    // frame; a smooth ground-clearing roll stays an order of magnitude below.
+    const peakVy = Math.max(...vys);
+    expect(peakVy).toBeLessThan(2);
+
+    // Observable bounce signature #2: rise-then-fall. Find the highest point
+    // reached after liftoff; if the aircraft then descends substantially below
+    // that peak (a "settle back toward the runway"), that is the bounce. A
+    // smooth takeoff is monotone-or-rising — it never gives back the altitude
+    // it just gained.
+    const peakY = Math.max(...ys);
+    const peakIdx = ys.indexOf(peakY);
+    let maxDropAfterPeak = 0;
+    for (let i = peakIdx; i < ys.length; i++) {
+      maxDropAfterPeak = Math.max(maxDropAfterPeak, peakY - ys[i]);
+    }
+    // Allow a hair of numerical settle (gear clearance is 0.5 m). A real
+    // bounce gave back ~1 m of the ~1.08 m it gained.
+    expect(maxDropAfterPeak).toBeLessThan(AC47_AF.ground.gearClearanceM);
+  });
+
+  it('still climbs away once it has the speed to fly', () => {
+    // The fix must not pin the gunship to the runway forever — once forward
+    // speed builds past the marginal-lift threshold, it must climb out. After
+    // 20 s of full-throttle low-pitch takeoff the AC-47 should be well clear
+    // of the ground.
+    const af = new Airframe(
+      new THREE.Vector3(0, AC47_AF.ground.gearClearanceM, 0),
+      AC47_AF,
+    );
+    const probe = flatProbe(0);
+    const cmd = intent({ throttle: 1, pitch: 0.3, tier: 'raw' });
+    for (let i = 0; i < Math.round(20 / FIXED_DT); i++) {
+      af.step(cmd, probe, FIXED_DT);
+    }
+    expect(af.getState().altitudeAGL).toBeGreaterThan(20);
+    expect(af.getState().weightOnWheels).toBe(false);
   });
 });

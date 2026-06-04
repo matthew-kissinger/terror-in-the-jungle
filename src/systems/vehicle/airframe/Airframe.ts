@@ -45,6 +45,19 @@ const LIFTOFF_AIR_AUTHORITY_PITCH_ACCEL_MS2 = 6.0;
 // early roll behaving like taxi. 0.35 × Vr is well below 0.85 × Vr (the old
 // `rotationReady` gate) but above taxi-speed stick twitches.
 const LIFTOFF_MIN_SPEED_RATIO = 0.35;
+// Ground-clearing liftoff impulse (m/s vertical), replacing the old fixed
+// `Math.max(4.5, newFwd*0.12)` floor that caused the AVIATSIYA-2 single-bounce
+// on marginal-lift aircraft (AC-47). The impulse is scaled by commanded
+// rotation and by the wing's lift margin over residual wheel load, then capped:
+//   MIN  — a small nudge so the gear clears the runway even on a bare-minimum
+//          rotation (sized below the gear clearance so it never out-runs aero);
+//   MARGIN_GAIN — extra impulse the wing has genuinely earned (liftRatio above
+//          wheelLoad), so a strong, well-above-Vr rotation still feels snappy;
+//   MAX  — hard ceiling so the commit can never inject a ballistic pop the
+//          aerodynamics can't sustain (the old 4.5 m/s value sat here).
+const LIFTOFF_CLEARING_IMPULSE_MIN = 1.2;
+const LIFTOFF_CLEARING_IMPULSE_MARGIN_GAIN = 4.5;
+const LIFTOFF_CLEARING_IMPULSE_MAX = 3.0;
 const GROUND_STABILIZATION_TICKS = 3;
 const AIRBORNE_RECOVERY_ALTITUDE = 0.4;
 // Airborne *downward* touchdown fallback requires the guards (low AGL + vy<=0)
@@ -515,9 +528,33 @@ export class Airframe {
     ) {
       this.weightOnWheels = false;
       this.phase = 'rotation';
+      // Ground-clearing liftoff impulse. The OLD `Math.max(4.5, newFwd*0.12)`
+      // floor injected a fixed ~4.5 m/s vertical pop on every liftoff,
+      // regardless of how marginal the commit was. For a marginal-lift
+      // airframe rotating at low pitch (AC-47: heavy, low cl0, commits below
+      // its own stall speed via the lift-meets-wheel-load branch), the wing
+      // cannot sustain that climb rate — the plane pops to ~1 m, vy reverses,
+      // and it sinks back to the runway. That spike-then-reverse IS the
+      // AVIATSIYA-2 single-bounce.
+      //
+      // The impulse only needs to lift the gear clear of the runway at the
+      // instant of rotation; the aero model then carries (or doesn't carry)
+      // the climb. Scale it by BOTH commanded rotation and the lift margin
+      // the wing actually has over the residual wheel load, and cap it well
+      // below the sustainable climb so it can never out-run the aerodynamics.
+      // A low-pitch / marginal-lift liftoff now gets a gentle, monotone
+      // ground-clearing nudge instead of a ballistic pop.
+      const rotationFraction = THREE.MathUtils.clamp(cmd.elevator, 0, 1);
+      const liftMargin = THREE.MathUtils.clamp(liftRatio - wheelLoad, 0, 1);
+      const clearingImpulse = THREE.MathUtils.clamp(
+        LIFTOFF_CLEARING_IMPULSE_MIN +
+          liftMargin * LIFTOFF_CLEARING_IMPULSE_MARGIN_GAIN,
+        LIFTOFF_CLEARING_IMPULSE_MIN,
+        LIFTOFF_CLEARING_IMPULSE_MAX,
+      ) * rotationFraction;
       this.velocity.addScaledVector(
         _up.set(0, 1, 0).applyQuaternion(this.quaternion),
-        Math.max(4.5, newFwd * 0.12),
+        clearingImpulse,
       );
       this.pitchRate = Math.max(this.pitchRate, cmd.elevator * 0.5);
       // Suppress immediate *downward* retouchdown for ~1s. Keeps the plane
