@@ -3,6 +3,7 @@
 
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
+import { SeededRandom } from '../../core/SeededRandom';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 // Validation knobs for post-placement nudge (A Shau pilot). Conservative defaults.
@@ -10,8 +11,12 @@ const ZONE_VALIDATE_MAX_SLOPE = 0.25;
 const ZONE_VALIDATE_DITCH_THRESHOLD_M = 4;
 const ZONE_VALIDATE_RING_RADIUS_M = 25;
 const ZONE_VALIDATE_RING_SAMPLES = 8;
-const ZONE_VALIDATE_NUDGE_DISTANCES_M = [15, 30, 45];
-const ZONE_VALIDATE_NUDGE_DIRECTIONS = 12;
+// Denser, wider search so the validator can climb out of a steep-walled ditch:
+// the near rings can land on the rim wall (still steep / still below the plateau),
+// so we keep probing out to 70 m at ~6 m steps and 16 directions to reach the
+// surrounding flat plateau. Stamp-less capture zones rely on this escape path.
+const ZONE_VALIDATE_NUDGE_DISTANCES_M = [12, 18, 24, 30, 36, 45, 55, 70];
+const ZONE_VALIDATE_NUDGE_DIRECTIONS = 16;
 const ZONE_VALIDATE_HEIGHT_FUDGE_M = 1;
 
 export interface ValidateAndNudgeOptions {
@@ -54,7 +59,9 @@ export class ZoneTerrainAdapter {
     // Search in a spiral pattern for flatter terrain
     for (let i = 0; i < sampleCount; i++) {
       const angle = (i / sampleCount) * Math.PI * 2;
-      const distance = searchRadius * (0.5 + Math.random() * 0.5);
+      // SeededRandom.random() falls back to Math.random() off the replay/test
+      // path, so production placement is unchanged but L3 tests are deterministic.
+      const distance = searchRadius * (0.5 + SeededRandom.random() * 0.5);
       const testX = desiredPosition.x + Math.cos(angle) * distance;
       const testZ = desiredPosition.z + Math.sin(angle) * distance;
 
@@ -90,6 +97,19 @@ export class ZoneTerrainAdapter {
     const label = options.zoneLabel ?? 'zone';
     const centerX = desiredPosition.x;
     const centerZ = desiredPosition.z;
+
+    // Readiness guard (mirrors SpawnPositionCalculator.canUseTerrainAt): never
+    // nudge against unready/unstamped terrain. If the height field is not yet
+    // resolved here, the ditch/slope heuristics would read transient base-DEM
+    // values and drag the zone OFF a flatten pad that has not landed yet. Bail
+    // and leave the authored position untouched (do NOT even snap Y, since the
+    // height read would be stale). Stub terrains without the optional readiness
+    // methods are treated as ready so unit tests stay simple.
+    if (!this.isTerrainReadyAt(terrainSystem, centerX, centerZ)) {
+      Logger.info('world', `Zone "${label}" validation skipped: terrain not ready at (${centerX.toFixed(1)}, ${centerZ.toFixed(1)})`);
+      return desiredPosition.clone();
+    }
+
     const centerHeight = terrainSystem.getHeightAt(centerX, centerZ);
     const centerSlope = this.calculateTerrainSlope(centerX, centerZ);
     const ringMean = this.sampleRingMeanHeight(centerX, centerZ, ZONE_VALIDATE_RING_RADIUS_M, ZONE_VALIDATE_RING_SAMPLES);
@@ -138,6 +158,24 @@ export class ZoneTerrainAdapter {
 
     Logger.warn('world', `Zone "${label}" failed validation [${reason}], no flatter candidate within ${ZONE_VALIDATE_NUDGE_DISTANCES_M[ZONE_VALIDATE_NUDGE_DISTANCES_M.length - 1]} m`);
     return new THREE.Vector3(centerX, centerHeight, centerZ);
+  }
+
+  /**
+   * Whether terrain (including stamps) is resolved at this point. Mirrors
+   * SpawnPositionCalculator.canUseTerrainAt. Optional methods absent on bare
+   * test stubs are treated as "ready" so L2 unit tests need only `getHeightAt`.
+   */
+  private isTerrainReadyAt(terrainSystem: ITerrainRuntime, x: number, z: number): boolean {
+    if (typeof terrainSystem.isTerrainReady === 'function' && !terrainSystem.isTerrainReady()) {
+      return false;
+    }
+    if (typeof terrainSystem.isAreaReadyAt === 'function' && !terrainSystem.isAreaReadyAt(x, z)) {
+      return false;
+    }
+    if (typeof terrainSystem.hasTerrainAt === 'function' && !terrainSystem.hasTerrainAt(x, z)) {
+      return false;
+    }
+    return true;
   }
 
   private scoreCandidate(slope: number, height: number, centerHeight: number, inDitch: boolean): number {

@@ -224,7 +224,10 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   ],
 
   zones: [
-    // US Base - pushed back further
+    // US Base - pushed back further. Shares (-50, -180) with the `firebase_us`
+    // flatten pad (targetHeightMode:'max'), so its ground is already guaranteed
+    // flat. validateTerrain:false stops the post-placement nudge from dragging
+    // the base OFF its own pad and into the base-DEM ditch beside it.
     {
       id: 'us_base',
       name: 'US Base',
@@ -232,9 +235,11 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       radius: 36,
       isHomeBase: true,
       owner: Faction.US,
-      ticketBleedRate: 0
+      ticketBleedRate: 0,
+      validateTerrain: false
     },
-    // OPFOR Base - pushed back further
+    // OPFOR Base - pushed back further. Shares (-30, 330) with the `nva_bunkers`
+    // flatten pad (targetHeightMode:'max'); same rationale as us_base.
     {
       id: 'opfor_base',
       name: 'OPFOR Base',
@@ -242,7 +247,8 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       radius: 36,
       isHomeBase: true,
       owner: Faction.VC,
-      ticketBleedRate: 0
+      ticketBleedRate: 0,
+      validateTerrain: false
     },
     // Capture Zones - staggered layout, wider apart
     {

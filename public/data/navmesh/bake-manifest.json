@@ -18,7 +18,7 @@
     {
       "modeId": "zone_control",
       "seed": 42,
-      "signature": "navmesh-bake-v1-1077c5a14f3ef7",
+      "signature": "navmesh-bake-v1-169dc826b03949",
       "navmeshAsset": "/data/navmesh/zone_control-42.bin",
       "heightmapAsset": "/data/heightmaps/zone_control-42.f32",
       "worldSize": 800,
@@ -30,7 +30,7 @@
     {
       "modeId": "zone_control",
       "seed": 137,
-      "signature": "navmesh-bake-v1-0b3e8d985bb000",
+      "signature": "navmesh-bake-v1-076cb033ded222",
       "navmeshAsset": "/data/navmesh/zone_control-137.bin",
       "heightmapAsset": "/data/heightmaps/zone_control-137.f32",
       "worldSize": 800,
@@ -42,7 +42,7 @@
     {
       "modeId": "zone_control",
       "seed": 2718,
-      "signature": "navmesh-bake-v1-0af3b5288085b0",
+      "signature": "navmesh-bake-v1-14d95c3c874077",
       "navmeshAsset": "/data/navmesh/zone_control-2718.bin",
       "heightmapAsset": "/data/heightmaps/zone_control-2718.f32",
       "worldSize": 800,
