@@ -23,4 +23,9 @@ export interface RespawnSpawnPoint {
   selectionClass: RespawnSpawnSelectionClass;
   sourceZoneId?: string;
   priority?: number;
+  /**
+   * Nearby-enemy count snapshot at deploy time, for the deploy list's threat
+   * readout. 0 when the strategic WarSimulator is disabled (e.g. ZC / TDM).
+   */
+  threat?: number;
 }

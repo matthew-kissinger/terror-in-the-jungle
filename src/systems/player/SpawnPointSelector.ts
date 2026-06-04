@@ -203,6 +203,16 @@ export class SpawnPointSelector {
       }];
     }
 
+    // Annotate each spawn with a read-only nearby-enemy count so the deploy
+    // list can show how hot the insertion is. Snapshot at deploy time; this
+    // reads the strategic WarSimulator only (0 when it is disabled) and never
+    // mutates sim state. UX-4: immediate danger readable before deploying.
+    const SPAWN_THREAT_RADIUS = 120; // metres
+    const enemyAlliance = getEnemyAlliance(playerAlliance);
+    for (const point of sorted) {
+      point.threat = this.countNearbyAgents(point.position, SPAWN_THREAT_RADIUS, enemyAlliance);
+    }
+
     return sorted;
   }
 

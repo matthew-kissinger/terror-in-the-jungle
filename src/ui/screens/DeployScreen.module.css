@@ -428,6 +428,20 @@
   font-weight: 700;
 }
 
+/* Spawn threat readout (UX-4): banded colour on the deploy list meta. */
+.spawnThreat[data-threat="clear"] {
+  color: var(--green);
+}
+
+.spawnThreat[data-threat="warm"] {
+  color: var(--warn);
+}
+
+.spawnThreat[data-threat="hot"] {
+  color: var(--red);
+  font-weight: 700;
+}
+
 /* loadout slot — green-ruled form line, like the mockup loadout sheet */
 .loadoutRow {
   display: grid;

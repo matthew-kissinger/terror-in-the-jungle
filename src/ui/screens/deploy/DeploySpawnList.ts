@@ -38,6 +38,22 @@ export function getSpawnKindLabel(spawnPoint: RespawnSpawnPoint): string {
   }
 }
 
+/**
+ * Classify a spawn's deploy-time threat into a banded label + kind for the
+ * list meta (UX-4). Driven by the nearby-enemy snapshot; falls back to the
+ * `safe` flag so a forward insertion still reads as exposed when no strategic
+ * agents are nearby (e.g. WarSimulator off).
+ */
+export function classifySpawnThreat(
+  spawnPoint: RespawnSpawnPoint,
+): { label: string; kind: 'clear' | 'warm' | 'hot' } {
+  const threat = spawnPoint.threat ?? 0;
+  if (threat >= 4) return { label: 'HOT', kind: 'hot' };
+  if (threat >= 1) return { label: 'WARM', kind: 'warm' };
+  if (!spawnPoint.safe) return { label: 'EXPOSED', kind: 'warm' };
+  return { label: 'CLEAR', kind: 'clear' };
+}
+
 export function groupSpawnPoints(
   spawnPoints: RespawnSpawnPoint[],
 ): Array<{ label: string; points: RespawnSpawnPoint[] }> {
@@ -83,8 +99,18 @@ export function makeSpawnOptionButton(
   const label = createDiv(styles.spawnOptionLabel);
   label.textContent = spawnPoint.name;
   const meta = createDiv(styles.spawnOptionMeta);
-  const safety = spawnPoint.safe ? 'CLEAR' : 'HOT';
-  meta.textContent = `${getSpawnKindLabel(spawnPoint)} / ${safety} / ${Math.round(spawnPoint.position.x)}, ${Math.round(spawnPoint.position.z)}`;
+  const threat = classifySpawnThreat(spawnPoint);
+  const kindEl = document.createElement('span');
+  kindEl.textContent = `${getSpawnKindLabel(spawnPoint)} / `;
+  const threatEl = document.createElement('span');
+  threatEl.className = styles.spawnThreat;
+  if (threatEl.dataset) threatEl.dataset.threat = threat.kind;
+  threatEl.textContent = threat.label;
+  const coordsEl = document.createElement('span');
+  coordsEl.textContent = ` / ${Math.round(spawnPoint.position.x)}, ${Math.round(spawnPoint.position.z)}`;
+  meta.appendChild(kindEl);
+  meta.appendChild(threatEl);
+  meta.appendChild(coordsEl);
   button.appendChild(label);
   button.appendChild(meta);
   return button;
