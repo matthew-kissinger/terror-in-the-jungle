@@ -39,12 +39,6 @@ const DATE_RE = /^Last (verified|updated):\s*\d{4}-\d{2}-\d{2}/m;
  * Phase 1 of the realignment plan moves / splits / dates them; new doc
  * authors cannot add to this list without orchestrator note.
  */
-const GRANDFATHER_DATE: Set<string> = new Set([
-  'docs/rearch/E1-ecs-evaluation.md',
-  'docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md',
-  'docs/rearch/helicopter-parity-audit.md',
-]);
-
 const GRANDFATHER_LOC: Set<string> = new Set([
   // docs/PERFORMANCE.md split into docs/perf/ in cycle-2026-05-09-doc-decomposition-and-wiring (Phase 1).
   // docs/STATE_OF_REPO.md split into docs/state/ in cycle-2026-05-09-doc-decomposition-and-wiring (Phase 1).
@@ -89,14 +83,18 @@ function walk(dir: string): string[] {
 }
 
 function checkDateHeader(file: string, content: string): void {
+  // After the 2026-05-10 status-mirror consolidation, only the canonical status
+  // source (docs/DIRECTIVES.md) carries a `Last verified:` header — it was
+  // intentionally stripped from every other doc. Enforce the header only there.
+  const rel = relative(docsRoot, file).replace(/\\/g, '/');
+  if (rel !== 'DIRECTIVES.md') return;
   const head = content.split(/\r?\n/).slice(0, 10).join('\n');
   if (!DATE_RE.test(head)) {
-    const grandfathered = GRANDFATHER_DATE.has(relPosix(file));
     findings.push({
       file,
-      level: grandfathered ? 'warn' : 'fail',
-      rule: grandfathered ? 'date-header [grandfathered]' : 'date-header',
-      message: 'Missing `Last verified: YYYY-MM-DD` or `Last updated: YYYY-MM-DD` in first 10 lines.',
+      level: 'fail',
+      rule: 'date-header',
+      message: 'docs/DIRECTIVES.md must carry `Last verified: YYYY-MM-DD` (canonical status source).',
     });
   }
 }
