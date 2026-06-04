@@ -3,7 +3,7 @@
 
 import * as THREE from 'three'
 import { Combatant, CombatantState, Faction, ITargetable, Squad, SquadCommand } from './types'
-import { resolveFallbackRally } from './SquadOrderPosture'
+import { resolveFallbackRally, isRecentlyHit } from './SquadOrderPosture'
 import { SquadCommandConfig } from '../../config/SquadCommandConfig'
 import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 import { SandbagSystem } from '../weapons/SandbagSystem'
@@ -649,9 +649,28 @@ export class CombatantAI {
 
     switch (command) {
       case SquadCommand.FOLLOW_ME:
-      case SquadCommand.RETREAT:
-        // These commands interrupt active combat - pull the combatant out
-        if (isInCombat) {
+      case SquadCommand.RETREAT: {
+        // FALL BACK "fire only if pinned" (SVYAZ-4 Stage 4): a RETREAT unit that
+        // was hit inside the panic window is pinned and must be allowed to fight
+        // back. The perception scans already let a pinned unit re-acquire
+        // (isFallbackAcquisitionSuppressed), promoting it PATROLLING -> ALERT ->
+        // ENGAGING. But this per-tick override runs FIRST and, left unguarded,
+        // interrupts ANY combat state (incl. ALERT) back to PATROLLING every
+        // tick — yanking the pinned unit out before handleAlert can promote it,
+        // so it never fires. So: only interrupt combat for RETREAT when NOT
+        // pinned. FOLLOW_ME always interrupts (it has no fire-back posture).
+        const pinned =
+          command === SquadCommand.RETREAT &&
+          isRecentlyHit(
+            combatant.lastHitTime,
+            Date.now(),
+            SquadCommandConfig.fallBackPinnedWindowSeconds * 1000,
+          )
+
+        // These commands interrupt active combat - pull the combatant out.
+        // A pinned RETREAT unit is exempt: it keeps its ALERT/ENGAGING so it can
+        // shoot back rather than be cut down while fleeing.
+        if (isInCombat && !pinned) {
           combatant.state = CombatantState.PATROLLING
           combatant.target = null
           combatant.inCover = false
@@ -660,8 +679,9 @@ export class CombatantAI {
           combatant.suppressionTarget = undefined
           combatant.suppressionEndTime = undefined
         }
-        // Also pull out of DEFENDING (e.g. from a prior HOLD_POSITION)
-        if (combatant.state === CombatantState.DEFENDING) {
+        // Also pull out of DEFENDING (e.g. from a prior HOLD_POSITION). A pinned
+        // RETREAT unit holds its ground here too — defending IS firing back.
+        if (combatant.state === CombatantState.DEFENDING && !pinned) {
           combatant.state = CombatantState.PATROLLING
           combatant.defensePosition = undefined
           combatant.defendingZoneId = undefined
@@ -669,17 +689,17 @@ export class CombatantAI {
         // FALL BACK posture (SVYAZ-4 Stage 3): break contact and run to rally.
         // The combat interrupt above already dropped the target; here we point
         // the destination at the rally (the marked point if set, else the live
-        // player when fallBackRallyToPlayer is on). Acquisition stays suppressed
-        // unless the unit is pinned — that gate lives in the perception scans
-        // (isFallbackAcquisitionSuppressed), so a target re-acquired there is
-        // intentional (fire-only-if-pinned) and we must not stomp it.
-        if (command === SquadCommand.RETREAT) {
+        // player when fallBackRallyToPlayer is on). A pinned unit is NOT redirected
+        // to rally — it stays put and fights until the pin ages out, after which a
+        // later tick (no longer pinned) interrupts and resumes the fall-back.
+        if (command === SquadCommand.RETREAT && !pinned) {
           const rally = resolveFallbackRally(squad, playerPosition)
           if (rally) {
             combatant.destinationPoint = rally
           }
         }
         break
+      }
 
       case SquadCommand.HOLD_POSITION:
         // Does NOT interrupt active combat - only redirect non-combat states

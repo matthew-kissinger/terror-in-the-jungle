@@ -77,6 +77,72 @@ describe('PlayerSquadController', () => {
     expect(marker?.position.z).toBe(16);
   });
 
+  it('snaps a HOLD anchor to the nearest reachable navmesh point (Stage 4)', () => {
+    const squad = createSquad();
+    // Snapper relocates the marked point to a reachable spot (e.g. off a cliff).
+    const reachable = new THREE.Vector3(38, 2, -15);
+    const snapToNavmesh = vi.fn(() => reachable);
+    const controller = new PlayerSquadController(createSquadManagerStub(squad) as any, {
+      snapToNavmesh,
+    });
+    controller.assignPlayerSquad(squad.id);
+
+    const marked = new THREE.Vector3(40, 0, -18);
+    controller.issueCommandAtPosition(SquadCommand.HOLD_POSITION, marked);
+
+    expect(snapToNavmesh).toHaveBeenCalledTimes(1);
+    // Stored anchor is the snapped point, not the raw marked point.
+    expect(squad.commandPosition).toEqual(reachable);
+    // Stored as a clone — mutating the squad's anchor must not feed back.
+    expect(squad.commandPosition).not.toBe(reachable);
+  });
+
+  it('stores the raw marked point when the navmesh snap fails (fail-open)', () => {
+    const squad = createSquad();
+    // Navmesh not ready / nothing reachable within radius -> null.
+    const snapToNavmesh = vi.fn(() => null);
+    const controller = new PlayerSquadController(createSquadManagerStub(squad) as any, {
+      snapToNavmesh,
+    });
+    controller.assignPlayerSquad(squad.id);
+
+    const marked = new THREE.Vector3(60, 0, 12);
+    controller.issueCommandAtPosition(SquadCommand.ATTACK_HERE, marked);
+
+    expect(snapToNavmesh).toHaveBeenCalledTimes(1);
+    // Command is NOT dropped — the raw point is kept rather than losing the order.
+    expect(squad.currentCommand).toBe(SquadCommand.ATTACK_HERE);
+    expect(squad.commandPosition).toEqual(marked);
+  });
+
+  it('does not snap non-leashed FALL BACK to navmesh (rally is a posture, not an anchor)', () => {
+    const squad = createSquad();
+    const snapToNavmesh = vi.fn(() => new THREE.Vector3(999, 0, 999));
+    const controller = new PlayerSquadController(createSquadManagerStub(squad) as any, {
+      snapToNavmesh,
+    });
+    controller.assignPlayerSquad(squad.id);
+
+    const marked = new THREE.Vector3(7, 0, -3);
+    controller.issueCommandAtPosition(SquadCommand.RETREAT, marked);
+
+    // FALL BACK carries no leash anchor -> snapper untouched, raw point honored.
+    expect(snapToNavmesh).not.toHaveBeenCalled();
+    expect(squad.commandPosition).toEqual(marked);
+  });
+
+  it('leaves anchors untouched when no snapper is wired (byte-identical off-path)', () => {
+    const squad = createSquad();
+    const controller = new PlayerSquadController(createSquadManagerStub(squad) as any);
+    controller.assignPlayerSquad(squad.id);
+
+    const marked = new THREE.Vector3(40, 0, -18);
+    controller.issueCommandAtPosition(SquadCommand.HOLD_POSITION, marked);
+
+    expect(squad.commandPosition).toEqual(marked);
+    expect(squad.commandPosition).not.toBe(marked);
+  });
+
   it('issues stand down without retaining the prior command point or changing formation', () => {
     const squad = createSquad();
     const scene = new THREE.Scene();

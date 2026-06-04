@@ -49,9 +49,34 @@ function resolveCommandLeashRadius(command: SquadCommand): number | undefined {
   }
 }
 
+/**
+ * Leashed standing orders (HOLD/ATTACK/PATROL) anchor an acquisition leash on
+ * their `commandPosition`. A leashed anchor that lands off the navmesh / inside
+ * geometry / on an unwalkable slope makes the commanded NPC path toward an
+ * unreachable point — StuckDetector escalates and clears the destination, and
+ * the unit loops forever (SVYAZ-4 Stage 4 watch-item). Only these orders need
+ * the navmesh snap; FREE_ROAM / STAND DOWN / FALL BACK carry no leash anchor.
+ */
+function isLeashedAnchorCommand(command: SquadCommand): boolean {
+  return (
+    command === SquadCommand.HOLD_POSITION ||
+    command === SquadCommand.ATTACK_HERE ||
+    command === SquadCommand.PATROL_HERE
+  );
+}
+
 interface PlayerSquadControllerOptions {
   scene?: THREE.Scene;
   terrainHeightAt?: (x: number, z: number) => number;
+  /**
+   * Project a marked world point onto the nearest REACHABLE navmesh point
+   * (SVYAZ-4 Stage 4 unreachable-anchor snap). Returns null when the navmesh is
+   * not ready / nothing reachable within the snap radius — the caller then
+   * stores the RAW point (fail-open: better an approximate anchor than a dropped
+   * command). Wired from the NavmeshSystem at startup; left undefined off the
+   * commanded path (tests, headless) so behavior is byte-identical there.
+   */
+  snapToNavmesh?: (point: THREE.Vector3) => THREE.Vector3 | null;
 }
 
 export class PlayerSquadController implements GameSystem {
@@ -62,9 +87,11 @@ export class PlayerSquadController implements GameSystem {
   private commandIndicatorElement?: HTMLElement;
   private readonly commandWorldMarker?: SquadCommandWorldMarker;
   private readonly commandStateListeners = new Set<SquadCommandStateListener>();
+  private readonly snapToNavmesh?: (point: THREE.Vector3) => THREE.Vector3 | null;
 
   constructor(squadManager: SquadManager, options: PlayerSquadControllerOptions = {}) {
     this.squadManager = squadManager;
+    this.snapToNavmesh = options.snapToNavmesh;
     if (options.scene) {
       this.commandWorldMarker = new SquadCommandWorldMarker(options.scene, {
         terrainHeightAt: options.terrainHeightAt,
@@ -159,7 +186,9 @@ export class PlayerSquadController implements GameSystem {
     }
 
     squad.currentCommand = command;
-    squad.commandPosition = explicitPosition ? explicitPosition.clone() : undefined;
+    squad.commandPosition = explicitPosition
+      ? this.resolveAnchorPosition(command, explicitPosition)
+      : undefined;
     squad.commandLeashRadius = resolveCommandLeashRadius(command);
     this.currentCommand = command;
     const commandLabel = getSquadCommandLabel(command, 'full');
@@ -167,6 +196,28 @@ export class PlayerSquadController implements GameSystem {
     this.showCommandFeedback(commandLabel);
     this.updateCommandIndicator();
     this.emitCommandState();
+  }
+
+  /**
+   * Resolve the stored anchor for a marked command (SVYAZ-4 Stage 4
+   * unreachable-anchor navmesh snap). For a leashed standing order
+   * (HOLD/ATTACK/PATROL) the marked point is projected onto the nearest
+   * REACHABLE navmesh point so the commanded NPC paths toward a walkable goal
+   * rather than an unreachable point that StuckDetector escalates + clears
+   * (the loop-forever watch-item). Fail-open: when no snapper is wired or the
+   * navmesh yields nothing reachable, the RAW marked point is stored (current
+   * behavior) — never drop the command. Non-leashed orders are never snapped;
+   * off the commanded path (no snapper) every order stores the raw clone, so
+   * behavior is byte-identical there.
+   */
+  private resolveAnchorPosition(command: SquadCommand, marked: THREE.Vector3): THREE.Vector3 {
+    if (this.snapToNavmesh && isLeashedAnchorCommand(command)) {
+      const snapped = this.snapToNavmesh(marked);
+      if (snapped) {
+        return snapped.clone();
+      }
+    }
+    return marked.clone();
   }
 
   private showCommandFeedback(commandName: string): void {

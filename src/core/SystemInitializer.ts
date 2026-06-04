@@ -185,9 +185,16 @@ export class SystemInitializer {
 
     // Initialize new squad/inventory/grenade systems
     const squadManager = (refs.combatantSystem as any).squadManager;
+    const navmeshSystem = refs.navmeshSystem;
     refs.playerSquadController = new PlayerSquadController(squadManager, {
       scene,
       terrainHeightAt: (x, z) => refs.terrainSystem?.getHeightAt(x, z) ?? 0,
+      // SVYAZ-4 Stage 4: snap a leashed order's marked point to the nearest
+      // REACHABLE navmesh point so HOLD/ATTACK/PATROL anchors don't land off the
+      // navmesh and loop the commanded NPC against StuckDetector. findNearestPoint
+      // returns null when the navmesh isn't ready / nothing's reachable, which the
+      // controller treats as fail-open (store the raw point).
+      snapToNavmesh: (point) => navmeshSystem?.findNearestPoint(point) ?? null,
     });
     refs.commandInputManager = new CommandInputManager(refs.playerSquadController);
     // Air-support radio call-in: the command UI dispatches sorties through the
