@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import { chromium, type Browser, type CDPSession, type Page } from 'playwright';
 
 export type ConsoleEntry = { ts: string; type: string; text: string };

@@ -5,6 +5,10 @@
  * read-only classifier — these tests assert the allowed URL triggers it
  * and unrelated URLs do not. (See docs/TESTING.md.)
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { isTerrainSandboxMode } from './terrainSandboxMode';

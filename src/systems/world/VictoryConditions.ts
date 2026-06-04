@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import { Faction } from '../combat/types';
 import { ZoneState } from './ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';

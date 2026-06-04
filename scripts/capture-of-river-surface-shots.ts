@@ -1,4 +1,7 @@
 #!/usr/bin/env tsx
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Capture Playwright pre/post screenshots for cycle
  * `cycle-of-river-surface-enable` task `of-water-capture-pair` (R1).

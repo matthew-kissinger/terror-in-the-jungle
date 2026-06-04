@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Per-state behavior tests. These hit the pure state functions directly via
  * `stepState`, bypassing the PlayerBot shell. The goal is to pin the decision

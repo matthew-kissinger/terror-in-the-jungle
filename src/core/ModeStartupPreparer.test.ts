@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Alliance, Faction } from '../systems/combat/types';
 import { GameMode } from '../config/gameModeTypes';

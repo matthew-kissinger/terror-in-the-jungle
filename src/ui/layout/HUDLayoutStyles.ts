@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * CSS Grid layout styles for the HUD system.
  * Three responsive templates: desktop, mobile-landscape, mobile-portrait.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * NPC fixed-wing pilot. State-machine pilot that produces
  * `FixedWingPilotIntent` each tick from the airframe's `AirframeState`.

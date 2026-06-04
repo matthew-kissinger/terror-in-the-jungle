@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import * as THREE from 'three';
 import { Combatant, Faction, Squad, SquadCommand } from './types';
 import { ZoneState } from '../world/ZoneManager';

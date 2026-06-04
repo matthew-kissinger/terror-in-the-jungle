@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Action buttons for mobile: Jump, Reload, and Weapon Cycler.
  * Positioned in a column above the fire button on the right side.

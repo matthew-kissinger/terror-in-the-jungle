@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Behavior tests for `AmmoManager` focused on the WorldBuilder
  * `infiniteAmmo` wiring (cycle-2026-05-09-doc-decomposition-and-wiring,

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 declare module 'three/addons/tsl/WebGLNodesHandler.js' {
   import type { Camera, Material, Object3D, Scene, WebGLRenderer } from 'three';
 

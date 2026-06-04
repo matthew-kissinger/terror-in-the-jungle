@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 // R2.1 of cycle-terrain-compositor (memo:
 // docs/rearch/TERRAIN_COMPOSITOR_SPIKE_2026-05-27.md §"Pass order").
 //

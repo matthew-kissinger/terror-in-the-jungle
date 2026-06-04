@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import type { HydrologyPolylinePoint } from './HydrologyBake';
 
 const HYDROLOGY_RIVER_PATH_SMOOTHING_PASSES = 2;

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Types for the NPC fixed-wing pilot state machine. `Mission` is the
  * declarative, FlightGear-inspired input the pilot consumes; `PilotState`

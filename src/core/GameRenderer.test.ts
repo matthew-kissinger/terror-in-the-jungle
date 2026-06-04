@@ -11,6 +11,10 @@
  * back-buffer that cost ~13 MB heap residual in retail R3. The helper is
  * the single policy point deciding whether we pay that cost.
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

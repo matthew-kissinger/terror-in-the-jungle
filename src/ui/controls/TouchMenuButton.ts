@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Touch menu button (hamburger icon) for mobile pause/settings access.
  * The button only launches the shared gameplay pause/settings surface.

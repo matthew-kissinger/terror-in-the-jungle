@@ -1,6 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { HelicopterHUD } from './HelicopterHUD';
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import { GameMode, type GameModeDefinition } from '../../config/gameModeTypes';
 import { resolveLaunchSelection } from '../../config/gameModeDefinitions';
 import { Alliance, Faction } from '../combat/types';

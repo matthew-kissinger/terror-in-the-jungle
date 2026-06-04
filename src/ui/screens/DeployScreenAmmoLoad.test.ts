@@ -12,6 +12,10 @@
  *  - Cycling the slot's PREV/NEXT fires the loadout-change callback with the
  *    'ammoLoad' field key so it flows to LoadoutService.cycleField.
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { DeployScreen } from './DeployScreen';
 import { Alliance, Faction } from '../../systems/combat/types';

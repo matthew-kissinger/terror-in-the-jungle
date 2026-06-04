@@ -1,0 +1,43 @@
+Terror in the Jungle — Original Asset License
+Copyright (c) 2025-2026 Matthew Kissinger
+
+All ORIGINAL, non-code creative assets authored by Matthew Kissinger for this
+project are licensed under the Creative Commons Attribution-ShareAlike 4.0
+International License (CC BY-SA 4.0).
+
+  Full legal text: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+  Human-readable:  https://creativecommons.org/licenses/by-sa/4.0/
+  SPDX-License-Identifier: CC-BY-SA-4.0
+
+This covers (non-exhaustive) the original assets under public/, src/, and
+deploy-3d-assets/:
+
+  - 3D models (.glb / .gltf), including every model produced by the project's
+    own "Pixel Forge" procedural-generation pipeline (a FIRST-PARTY tool at
+    ~/X/games-3d/pixel-forge — NOT a third-party asset source);
+  - textures and images (.png / .webp / .jpg);
+  - audio (.wav / .ogg) authored for this project;
+  - original UI art, icons, and screen art.
+
+Plain-language summary (not a substitute for the full license): you are free
+to SHARE (copy and redistribute) and ADAPT (remix, transform, build upon)
+these assets for any purpose, even commercially, provided that:
+
+  - ATTRIBUTION — you give appropriate credit to "Matthew Kissinger / Terror in
+    the Jungle", link to this license, and indicate if changes were made; and
+  - SHARE-ALIKE — if you remix or build upon these assets, you distribute your
+    contributions under this same CC BY-SA 4.0 license.
+
+WHAT THIS LICENSE DOES NOT COVER:
+
+  - The project's SOURCE CODE, which is licensed under AGPL-3.0-or-later
+    (see LICENSE).
+  - Third-party or public-domain inputs, which retain their own status and are
+    NOT relicensed here — in particular real-world DEM / terrain elevation data
+    (e.g. USGS 3DEP, US-government public domain), bundled fonts, and any
+    third-party model, texture, or sound. See THIRD-PARTY-ASSETS.md.
+
+Suggested attribution:
+
+  "Terror in the Jungle assets by Matthew Kissinger, licensed CC BY-SA 4.0
+   (https://github.com/matthew-kissinger/terror-in-the-jungle)."

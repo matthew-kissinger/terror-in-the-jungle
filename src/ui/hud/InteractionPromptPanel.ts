@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * InteractionPromptPanel - Shows contextual interaction text (e.g. "Press E to pick up").
  *

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import { StructureModels, GroundVehicleModels } from '../assets/modelPaths';
 
 export type FirebaseZone = 'perimeter' | 'interior' | 'entrance' | 'corner';

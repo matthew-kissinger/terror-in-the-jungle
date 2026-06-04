@@ -22,9 +22,9 @@
     "type": "git",
     "url": "https://github.com/matthew-kissinger/terror-in-the-jungle.git"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "knip": {
     "entry": [
       "index.html",

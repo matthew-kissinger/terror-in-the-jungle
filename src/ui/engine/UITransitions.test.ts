@@ -1,6 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const originalDocument = globalThis.document;

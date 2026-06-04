@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Mobile-only overlay: when the user switches apps or the tab is hidden,
  * we show "Tap to resume" and mute audio. Tapping resumes.

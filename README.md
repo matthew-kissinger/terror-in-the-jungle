@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/ci.yml)
 [![Deploy](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/deploy.yml/badge.svg?branch=master)](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/deploy.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Assets: CC BY-SA 4.0](https://img.shields.io/badge/assets-CC%20BY--SA%204.0-lightgrey.svg)](LICENSE-ASSETS)
 [![Three.js](https://img.shields.io/badge/three.js-r184-black)](https://threejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue)](https://www.typescriptlang.org/)
 [![WebGPU](https://img.shields.io/badge/WebGPU-TSL-005a9c)](https://www.w3.org/TR/webgpu/)
@@ -224,6 +225,10 @@ subsystem you touched. Hard rules:
   `<type>(<scope>): <summary> (<slug>)`.
 - If a doc disagrees with the code or runtime evidence, believe the evidence and
   fix the doc.
+- **Licensing of contributions:** by submitting a contribution you agree to
+  license your code under **AGPL-3.0-or-later** and any original assets under
+  **CC BY-SA 4.0**, and you certify you have the right to do so. See
+  [LICENSING.md](LICENSING.md).
 
 ## Deployment
 
@@ -242,4 +247,23 @@ See [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) for the full path.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+- **Source code** — [GNU AGPL-3.0-or-later](LICENSE). Because this game is served
+  over a network, network use counts as distribution: if you run a modified
+  version as a network service, its users are entitled to the corresponding
+  source.
+- **Original assets** (Matthew Kissinger's models, textures, audio, and UI art,
+  including everything produced by the first-party "Pixel Forge" pipeline) —
+  [CC BY-SA 4.0](LICENSE-ASSETS).
+- **Third-party / public-domain inputs** — real-world USGS 3DEP DEM terrain data
+  (public domain), bundled fonts (SIL OFL), and npm dependencies — retain their
+  own licenses. See [THIRD-PARTY-ASSETS.md](THIRD-PARTY-ASSETS.md).
+
+The running game shows an in-app notice naming the copyright holder and the AGPL
+source URL (on the startup / deploy screen and in the in-game Credits panel).
+**Modified versions must preserve these notices in reasonably visible
+locations.**
+
+Every commit prior to the relicense commit was published under the MIT License
+and remains MIT; this change is forward-only. See [LICENSING.md](LICENSING.md).
+
+Copyright (c) 2025-2026 Matthew Kissinger.

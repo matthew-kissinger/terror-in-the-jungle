@@ -1,4 +1,7 @@
 #!/usr/bin/env tsx
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Capture paired strict-WebGPU desktop screenshots for the
  * terrain-tsl-triplanar-gate task in cycle-mobile-webgl2-fallback-fix.

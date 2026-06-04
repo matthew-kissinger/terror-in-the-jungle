@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import type { AssetLoader } from '../systems/assets/AssetLoader';
 import type { PlayerController } from '../systems/player/PlayerController';
 import type { CombatantSystem } from '../systems/combat/CombatantSystem';

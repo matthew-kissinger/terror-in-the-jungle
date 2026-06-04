@@ -4,6 +4,9 @@
  * Behavior tests for the gun-range URL guard. The scene is a dev-only hitbox
  * validation route, so the guard should only accept its explicit mode value.
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { isGunRangeMode } from './gunRangeMode';

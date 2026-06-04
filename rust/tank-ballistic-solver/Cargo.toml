@@ -3,7 +3,7 @@ name = "tank-ballistic-solver"
 version = "0.1.0"
 edition = "2021"
 description = "Rust->WASM pilot for the M48 tank ballistic trajectory solver. First Rust pilot crate; deliberately tiny and dependency-light."
-license = "MIT"
+license = "AGPL-3.0-or-later"
 publish = false
 
 [lib]

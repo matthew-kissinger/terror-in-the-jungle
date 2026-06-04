@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Source-file budget linter.
  *
@@ -61,6 +64,11 @@ const GRANDFATHER: Record<string, { round: string; reason: string }> = {
   'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: '823 LOC → split alongside HUDSystem in R3' },
   'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: '742 LOC → split alongside HUDSystem in R3' },
   'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '763 LOC, 0 tests → split into terrain config + biome config + spawn data' },
+  // Pre-existing budget debt surfaced by validate:fast (CI runs `lint` but not
+  // `lint:budget`): grew to ~713 LOC during the 2026-06-03 deploy-loadout cycle
+  // (UX-3 faction-availability chips + the selectable-ammo 4th loadout slot).
+  // Not relicense-related; queued for a presentation/loadout-panel split.
+  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: '~713 LOC after the deploy-loadout cycle (faction chips + selectable-ammo slot) → split the loadout panel out of the screen facade' },
   'src/core/SystemManager.ts': { round: 'P2-P3', reason: '60 methods → decompose system wiring + lifecycle into helpers' },
   // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
   // HosekWilkieSkyBackend grew through the KONVEYER campaign and is tracked as
@@ -144,8 +152,20 @@ function countMethodsInFirstClass(source: string): number {
 
 function locOf(source: string): number {
   const lines = source.split(/\r?\n/);
-  while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
-  return lines.length;
+  // Exclude the leading SPDX / copyright license header (added repo-wide by the
+  // AGPL-3.0 relicense) so license boilerplate is not counted against each
+  // file's code budget.
+  let start = 0;
+  while (
+    start < lines.length &&
+    /^\s*\/\/\s*(SPDX-License-Identifier:|Copyright \(c\))/.test(lines[start])
+  ) {
+    start += 1;
+  }
+  if (start > 0 && start < lines.length && lines[start].trim() === '') start += 1;
+  const body = lines.slice(start);
+  while (body.length > 0 && body[body.length - 1].trim() === '') body.pop();
+  return body.length;
 }
 
 function classify(rel: string, loc: number, methods: number): Finding[] {

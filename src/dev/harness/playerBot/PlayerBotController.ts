@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Controller that translates `PlayerBotIntent` into the existing
  * PlayerController surface — movement intent, view angles, fire trigger,

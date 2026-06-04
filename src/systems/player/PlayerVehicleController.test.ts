@@ -5,6 +5,10 @@
  * - HelicopterPlayerAdapter.test.ts
  * - FixedWingPlayerAdapter.test.ts
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 import { describe, expect, it, vi } from 'vitest';
 import { PlayerVehicleController } from './PlayerVehicleController';
 import type { PlayerState } from '../../types';

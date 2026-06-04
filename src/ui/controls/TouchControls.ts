@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Orchestrator for all mobile touch controls.
  * Creates and wires up VirtualJoystick, TouchLook, TouchFireButton, and TouchActionButtons.

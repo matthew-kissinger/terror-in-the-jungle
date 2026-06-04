@@ -12,6 +12,10 @@
  * mode that has no crewable vehicle (Team Deathmatch). This guards the
  * discoverability seam that was shipped UI-only and previously never fed.
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 import { beforeEach, describe, it, expect } from 'vitest';
 import { DeployScreen } from './DeployScreen';
 import { GameMode } from '../../config/gameModeTypes';

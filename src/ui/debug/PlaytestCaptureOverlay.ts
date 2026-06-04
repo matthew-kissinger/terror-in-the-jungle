@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * F9 capture modal. Shows a PNG thumbnail, collects an annotation, resolves
  * with { annotation } on Submit or null on Cancel/Escape.

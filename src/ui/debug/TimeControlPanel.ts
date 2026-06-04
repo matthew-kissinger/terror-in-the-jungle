@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import { zIndex } from '../design/tokens';
 import type { DebugPanel } from './DebugHudRegistry';
 import type { TimeScale } from '../../core/TimeScale';

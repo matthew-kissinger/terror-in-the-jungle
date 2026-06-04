@@ -1,4 +1,7 @@
 #!/usr/bin/env tsx
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 
 /**
  * Real-device validation harness for `cycle-mobile-webgl2-fallback-fix`.

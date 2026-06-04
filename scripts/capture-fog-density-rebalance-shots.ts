@@ -1,4 +1,7 @@
 #!/usr/bin/env tsx
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Capture the 5 screenshot-gate PNGs for the `fog-density-rebalance` PR.
  * See `docs/tasks/fog-density-rebalance.md` ("Screenshot evidence") for

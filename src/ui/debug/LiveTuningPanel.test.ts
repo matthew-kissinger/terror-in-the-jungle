@@ -5,6 +5,10 @@
  * observable runtime effects of knob changes — not Tweakpane DOM layout,
  * specific knob labels, or internal state-key strings.
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveTuningPanel, type TuningState } from './LiveTuningPanel';
 import { DebugHudRegistry } from './DebugHudRegistry';

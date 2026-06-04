@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * TitleScreen - Minimal title + loading bar + START GAME.
  *
@@ -11,6 +14,7 @@ import { LoadingProgress } from '../loading/LoadingProgress';
 import { LOADING_PHASES } from '../../config/loading';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import { requestFullscreenCompat } from '../../utils/Orientation';
+import { showCreditsPanel } from '../AttributionNotice';
 import styles from './TitleScreen.module.css';
 
 export class TitleScreen extends UIComponent {
@@ -53,6 +57,7 @@ export class TitleScreen extends UIComponent {
           <div class="${styles.menuSection}" data-ref="menu">
             <button class="${styles.startButton}" data-ref="start" type="button">START GAME</button>
             <button class="${styles.settingsLink}" data-ref="settings" type="button">SETTINGS</button>
+            <button class="${styles.settingsLink}" data-ref="about" type="button">ABOUT</button>
           </div>
 
           <div class="${styles.preparingText}" data-ref="preparingText" style="display:none"></div>
@@ -103,6 +108,11 @@ export class TitleScreen extends UIComponent {
     const settingsBtn = this.$('[data-ref="settings"]');
     if (settingsBtn) {
       this.listen(settingsBtn, 'click', () => this.deferAction(() => this.onSettingsCallback?.()));
+    }
+
+    const aboutBtn = this.$('[data-ref="about"]');
+    if (aboutBtn) {
+      this.listen(aboutBtn, 'click', () => showCreditsPanel());
     }
 
     this.listen(window, 'keydown', (e) => {

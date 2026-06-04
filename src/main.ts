@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 // Fonts - self-hosted via fontsource (woff2, latin subset only)
 // Field Journal faces: Special Elite (stamp), Courier Prime (body), Caveat (hand).
 import '@fontsource/special-elite/latin-400.css';
@@ -12,6 +15,7 @@ import '@fontsource/caveat/latin-700.css';
 import './ui/engine/theme.css';
 
 import { bootstrapGame } from './core/bootstrap';
+import { mountPersistentAttribution } from './ui/AttributionNotice';
 import { Logger } from './utils/Logger';
 
 function registerServiceWorker(): void {
@@ -25,6 +29,11 @@ function registerServiceWorker(): void {
 }
 
 registerServiceWorker();
+
+// Persistent AGPL source-availability notice (see LICENSING.md): a small,
+// always-visible corner credit shown across the title, deploy, and in-game
+// screens. The full Credits / About panel opens from the title ABOUT button.
+mountPersistentAttribution();
 
 bootstrapGame().catch((err) => {
   Logger.error('bootstrap', 'Bootstrap entry failed', err);

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 const SOURCE_DELTA_EPSILON_METERS = 0.01;
 const MIN_EDGE_SLOPE_SAMPLE_METERS = 8;
 const MAX_EDGE_SLOPE_SAMPLE_METERS = 64;

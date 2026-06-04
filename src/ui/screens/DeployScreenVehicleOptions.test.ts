@@ -11,6 +11,10 @@
  *  - The choice surfaces the controls hint so a first-time player learns
  *    how to crew the tank without leaving the deploy screen.
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { DeployScreen } from './DeployScreen';
 import { Faction } from '../../systems/combat/types';

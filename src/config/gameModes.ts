@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 import { getSandboxConfig, isSandboxMode } from '../core/SandboxModeDetector';
 import { GameMode, GameModeConfig } from './gameModeTypes';
 import { ZONE_CONTROL_CONFIG } from './ZoneControlConfig';

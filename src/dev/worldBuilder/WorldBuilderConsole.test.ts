@@ -5,6 +5,10 @@
  * observable runtime effects of toggles — not Tweakpane DOM layout, button
  * label strings, or internal state-key spellings.
  */
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
+
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {

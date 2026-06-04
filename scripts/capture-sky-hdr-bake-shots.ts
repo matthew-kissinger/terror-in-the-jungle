@@ -1,4 +1,7 @@
 #!/usr/bin/env tsx
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Capture noon sky shots in three renderer modes for the
  * sky-hdr-bake-restore task. Drives the perf-harness bundle

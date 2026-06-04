@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * PD controllers for the NPC fixed-wing pilot. Pure functions that take the
  * current observation and return clamped scalar inputs in the Airframe

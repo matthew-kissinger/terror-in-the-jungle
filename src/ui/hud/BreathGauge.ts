@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * BreathGauge - Breath remaining bar shown while the player's head is
  * submerged. Signal-driven: caller sets remaining + capacity, color/width/

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * ViewportManager - singleton that tracks viewport dimensions and emits
  * responsive info to subscribers. Uses ResizeObserver + rAF debounce.

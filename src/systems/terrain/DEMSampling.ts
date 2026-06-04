@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Canonical DEM bilinear sampling math, including the outside-DEM edge
  * taper introduced 2026-05-19 (cycle-ashau-edge-and-flow-tuning Stage D3).

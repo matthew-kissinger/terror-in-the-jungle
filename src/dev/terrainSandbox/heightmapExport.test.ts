@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (c) 2025-2026 Matthew Kissinger
+
 /**
  * Behavior tests for the terrain-sandbox export helpers. Focus: shape of the
  * MapSeedRegistry entry, JSON round-trip, raw .f32 byte count matching the
