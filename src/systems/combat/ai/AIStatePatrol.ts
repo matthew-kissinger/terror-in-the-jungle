@@ -8,6 +8,7 @@ import { Logger } from '../../../utils/Logger'
 import { ISpatialQuery } from '../SpatialOctree'
 import { clusterManager } from '../ClusterManager'
 import { NpcLodConfig } from '../../../config/CombatantConfig'
+import { resolveOrderIntent, isWithinLeash } from '../SquadOrderPosture'
 
 const _toTarget = new THREE.Vector3()
 const _offset = new THREE.Vector3()
@@ -97,6 +98,16 @@ export class AIStatePatrol {
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy) {
       const targetPos = isPlayerTarget(enemy) ? playerPosition : enemy.position;
+
+      // Persistence leash (SVYAZ-4 Stage 2): a player-commanded squad on a
+      // standing HOLD/ATTACK/PATROL order engages threats near its anchor but
+      // does not get baited into chasing one past the leash. Off the commanded
+      // path (non-player squad / no active order) this is a no-op and the scan
+      // proceeds byte-identically.
+      if (!this.isEnemyWithinCommandLeash(combatant, squad, targetPos)) {
+        return;
+      }
+
       const distance = combatant.position.distanceTo(targetPos);
       const toTarget = _toTarget.subVectors(targetPos, combatant.position).normalize();
       combatant.rotation = Math.atan2(toTarget.z, toTarget.x);
@@ -130,6 +141,22 @@ export class AIStatePatrol {
         }
       }
     }
+  }
+
+  /**
+   * Acquisition leash gate (SVYAZ-4 Stage 2). Returns true (acquire) unless the
+   * combatant is in a player-commanded squad with an active leashed order AND
+   * the enemy sits beyond (leashRadius + engageBandPastLeash) of the anchor.
+   * Guarded so non-player / no-order combatants are byte-identical.
+   */
+  private isEnemyWithinCommandLeash(
+    combatant: Combatant,
+    squad: Squad | undefined,
+    enemyPosition: THREE.Vector3
+  ): boolean {
+    const intent = resolveOrderIntent(combatant, squad);
+    if (!intent.hasActiveOrder) return true;
+    return isWithinLeash(intent, enemyPosition);
   }
 
   private handleSquadCommand(

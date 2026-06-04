@@ -14,6 +14,7 @@ import {
   type SquadQuickCommandOption
 } from './SquadCommandPresentation';
 import { SquadCommandWorldMarker } from './SquadCommandWorldMarker';
+import { SquadCommandConfig } from '../../config/SquadCommandConfig';
 
 export interface SquadCommandState {
   hasSquad: boolean;
@@ -28,6 +29,25 @@ export interface SquadCommandState {
 }
 
 type SquadCommandStateListener = (state: SquadCommandState) => void;
+
+/**
+ * Resolve the persistence-leash radius for a command at issue time from
+ * SquadCommandConfig (SVYAZ-4 Stage 2). Only the leashed standing orders
+ * (HOLD/ATTACK/PATROL) get a radius; non-leashed orders leave it undefined so
+ * the acquisition gate stays inert off the commanded path.
+ */
+function resolveCommandLeashRadius(command: SquadCommand): number | undefined {
+  switch (command) {
+    case SquadCommand.HOLD_POSITION:
+      return SquadCommandConfig.holdLeashRadius;
+    case SquadCommand.ATTACK_HERE:
+      return SquadCommandConfig.attackLeashRadius;
+    case SquadCommand.PATROL_HERE:
+      return SquadCommandConfig.patrolRoamRadius;
+    default:
+      return undefined;
+  }
+}
 
 interface PlayerSquadControllerOptions {
   scene?: THREE.Scene;
@@ -140,6 +160,7 @@ export class PlayerSquadController implements GameSystem {
 
     squad.currentCommand = command;
     squad.commandPosition = explicitPosition ? explicitPosition.clone() : undefined;
+    squad.commandLeashRadius = resolveCommandLeashRadius(command);
     this.currentCommand = command;
     const commandLabel = getSquadCommandLabel(command, 'full');
     Logger.info('squad', ` Squad Command Issued: ${commandLabel}`);

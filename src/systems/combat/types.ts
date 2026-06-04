@@ -261,6 +261,16 @@ export interface Squad {
   currentCommand?: SquadCommand;
   commandPosition?: THREE.Vector3;
   /**
+   * Persistence-leash radius (metres) resolved at command-issue time from
+   * `SquadCommandConfig` per order type (HOLD/ATTACK/PATROL). Used by the
+   * acquisition leash gate (SVYAZ-4 Stage 2) so a standing order survives
+   * contact: the squad engages threats near `commandPosition` but will not
+   * chase a bait enemy past `leashRadius + engageBandPastLeash`. Undefined for
+   * non-leashed orders (FOLLOW / FALL BACK / STAND DOWN / none); the gate then
+   * falls back to the live config value for the order type.
+   */
+  commandLeashRadius?: number;
+  /**
    * Wall-clock timestamp (performance.now()) when the leader was first
    * observed idle. Cleared when the leader starts moving again. Followers
    * use this to escape leader-idle deadlock after NpcLodConfig.squadFollowStaleMs.

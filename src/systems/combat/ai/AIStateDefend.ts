@@ -2,10 +2,11 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { Combatant, CombatantState, ITargetable, isPlayerTarget } from '../types';
+import { Combatant, CombatantState, ITargetable, Squad, isPlayerTarget } from '../types';
 import { ISpatialQuery } from '../SpatialOctree';
 import type { IZoneQuery } from '../../../types/SystemInterfaces';
 import { clusterManager } from '../ClusterManager';
+import { resolveOrderIntent, isWithinLeash } from '../SquadOrderPosture';
 
 const _toTarget = new THREE.Vector3();
 const _toDefensePos = new THREE.Vector3();
@@ -16,9 +17,14 @@ const _toZone = new THREE.Vector3();
  */
 export class AIStateDefend {
   private zoneQuery?: IZoneQuery;
+  private squads: Map<string, Squad> = new Map();
 
   setZoneManager(zoneQuery: IZoneQuery): void {
     this.zoneQuery = zoneQuery;
+  }
+
+  setSquads(squads: Map<string, Squad>): void {
+    this.squads = squads;
   }
 
   handleDefending(
@@ -46,7 +52,7 @@ export class AIStateDefend {
   ): void {
     // Check for nearby enemies - defenders engage if threatened
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
-    if (enemy) {
+    if (enemy && this.isEnemyWithinCommandLeash(combatant, isPlayerTarget(enemy) ? playerPosition : enemy.position)) {
       const targetPos = isPlayerTarget(enemy) ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
 
@@ -112,6 +118,19 @@ export class AIStateDefend {
         }
       }
     }
+  }
+
+  /**
+   * Acquisition leash gate (SVYAZ-4 Stage 2). Returns true (acquire) unless the
+   * combatant is in a player-commanded squad with an active leashed order AND
+   * the enemy sits beyond (leashRadius + engageBandPastLeash) of the anchor.
+   * Guarded so non-player / no-order combatants are byte-identical.
+   */
+  private isEnemyWithinCommandLeash(combatant: Combatant, enemyPosition: THREE.Vector3): boolean {
+    const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
+    const intent = resolveOrderIntent(combatant, squad);
+    if (!intent.hasActiveOrder) return true;
+    return isWithinLeash(intent, enemyPosition);
   }
 
   private getClusterDensity(

@@ -2,9 +2,10 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three'
-import { Combatant, CombatantState, ITargetable, isPlayerTarget } from '../types'
+import { Combatant, CombatantState, ITargetable, Squad, isPlayerTarget } from '../types'
 import { ISpatialQuery } from '../SpatialOctree'
 import { Logger } from '../../../utils/Logger'
+import { resolveOrderIntent, isWithinLeash } from '../SquadOrderPosture'
 const _toDestination = new THREE.Vector3()
 const _toTarget = new THREE.Vector3()
 const _toCover = new THREE.Vector3()
@@ -21,6 +22,11 @@ interface SeekingCoverVisibilitySample {
  */
 export class AIStateMovement {
   private seekingCoverVisibilityByCombatant = new WeakMap<Combatant, SeekingCoverVisibilitySample>()
+  private squads: Map<string, Squad> = new Map()
+
+  setSquads(squads: Map<string, Squad>): void {
+    this.squads = squads
+  }
 
   handleAdvancing(
     combatant: Combatant,
@@ -56,7 +62,7 @@ export class AIStateMovement {
     combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
 
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
-    if (enemy) {
+    if (enemy && this.isEnemyWithinCommandLeash(combatant, isPlayerTarget(enemy) ? playerPosition : enemy.position)) {
       const targetPos = isPlayerTarget(enemy) ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
 
@@ -118,6 +124,19 @@ export class AIStateMovement {
       combatant.destinationPoint = undefined;
       combatant.inCover = false;
     }
+  }
+
+  /**
+   * Acquisition leash gate (SVYAZ-4 Stage 2). Returns true (acquire) unless the
+   * combatant is in a player-commanded squad with an active leashed order AND
+   * the enemy sits beyond (leashRadius + engageBandPastLeash) of the anchor.
+   * Guarded so non-player / no-order combatants are byte-identical.
+   */
+  private isEnemyWithinCommandLeash(combatant: Combatant, enemyPosition: THREE.Vector3): boolean {
+    const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined
+    const intent = resolveOrderIntent(combatant, squad)
+    if (!intent.hasActiveOrder) return true
+    return isWithinLeash(intent, enemyPosition)
   }
 
   private hasSeekingCoverLineOfSight(

@@ -77,6 +77,7 @@ vi.mock('./ai/AIStateMovement', () => ({
   AIStateMovement: class {
     handleAdvancing = vi.fn()
     handleSeekingCover = vi.fn()
+    setSquads = vi.fn()
   },
 }))
 
@@ -84,6 +85,7 @@ vi.mock('./ai/AIStateDefend', () => ({
   AIStateDefend: class {
     handleDefending = vi.fn()
     setZoneManager = vi.fn()
+    setSquads = vi.fn()
   },
 }))
 

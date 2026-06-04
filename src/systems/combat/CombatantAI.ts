@@ -227,6 +227,10 @@ export class CombatantAI {
     this.squads = squads
     this.patrolHandler.setSquads(squads)
     this.engageHandler.setSquads(squads)
+    // SVYAZ-4 Stage 2: defend + advancing acquisition scans consult the same
+    // live squad map for the persistence-leash gate.
+    this.defendHandler.setSquads(squads)
+    this.movementHandler.setSquads(squads)
   }
 
   setTicketSystem(ticketSystem: TicketSystem): void {
