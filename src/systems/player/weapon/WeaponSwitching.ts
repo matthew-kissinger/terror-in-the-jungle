@@ -58,6 +58,16 @@ export class WeaponSwitching {
   }
 
   /**
+   * Apply the selectable ammo-load reserve factor across every weapon's
+   * magazine. Routed through the switching seam because WeaponSwitching owns
+   * the per-weapon ammo subsystem; scaling each manager's reserve here means
+   * the choice persists no matter which weapon the player switches to.
+   */
+  setReserveAmmoFactor(factor: number): void {
+    this.ammo.setReserveAmmoFactor(factor)
+  }
+
+  /**
    * Switch to the specified weapon type
    * @param weaponType - 'rifle', 'shotgun', 'smg', 'pistol', 'lmg', or 'launcher'
    * @param onAmmoChange - Callback to update HUD with new ammo state

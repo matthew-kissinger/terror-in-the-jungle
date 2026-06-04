@@ -353,6 +353,21 @@ export class FirstPersonWeapon implements GameSystem {
     this.switching.switchWeapon(weaponType, (state) => this.onAmmoChange(state))
   }
 
+  /**
+   * Apply the selectable ammo-load reserve factor (from the deploy loadout) to
+   * every weapon's spawn reserve. Scales each weapon's reserve relative to its
+   * BASE capacity (so repeated changes don't compound) and re-provisions, and
+   * the factor persists across weapon switches. Magazine size is unchanged.
+   *
+   * Concrete-class capability only -- intentionally NOT on the fenced
+   * IFirstPersonWeapon interface; LoadoutService calls it via an optional-call.
+   */
+  setReserveAmmoFactor(factor: number): void {
+    this.switching.setReserveAmmoFactor(factor)
+    // Reflect the new reserve on the HUD for the active weapon immediately.
+    this.onAmmoChange(this.ammo.getAmmoState())
+  }
+
   private startReload(): void {
     // Auto-exit ADS if aiming to allow reload
     if (this.animations.getADS()) {

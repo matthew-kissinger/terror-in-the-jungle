@@ -13,6 +13,10 @@ import type { DeploySessionModel } from '../../systems/world/runtime/DeployFlowS
 import type { LoadoutPresentationModel } from '../../systems/player/LoadoutService';
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 import {
+  AmmoLoad,
+  AMMO_LOAD_OPTIONS,
+  getAmmoLoadLabel,
+  getAmmoLoadShortLabel,
   getEquipmentLabel,
   getEquipmentShortLabel,
   getWeaponLabel,
@@ -47,6 +51,7 @@ const LOADOUT_FIELD_ORDER: Array<{ key: LoadoutFieldKey; label: string }> = [
   { key: 'primaryWeapon', label: 'Primary' },
   { key: 'secondaryWeapon', label: 'Secondary' },
   { key: 'equipment', label: 'Equipment' },
+  { key: 'ammoLoad', label: 'Ammo Load' },
 ];
 
 export class DeployScreen extends UIComponent {
@@ -249,6 +254,7 @@ export class DeployScreen extends UIComponent {
     this.updateFieldValue('primaryWeapon', getWeaponLabel(loadout.primaryWeapon));
     this.updateFieldValue('secondaryWeapon', getWeaponLabel(loadout.secondaryWeapon));
     this.updateFieldValue('equipment', getEquipmentLabel(loadout.equipment));
+    this.updateFieldValue('ammoLoad', getAmmoLoadLabel(loadout.ammoLoad ?? AmmoLoad.STANDARD));
     this.refreshAvailabilityChips();
   }
 
@@ -610,9 +616,19 @@ export class DeployScreen extends UIComponent {
    * fewer options). Read-only from the presentation model — no service change.
    */
   private refreshAvailabilityChips(): void {
+    const current = this.currentLoadout;
+    // Ammo loads are universal (NOT faction-filtered), so their chip strip is
+    // driven by the global AMMO_LOAD_OPTIONS pool and rendered regardless of
+    // whether a faction presentation model is present yet.
+    this.renderAvailabilityStrip(
+      'ammoLoad',
+      AMMO_LOAD_OPTIONS.map(option => option.value),
+      current?.ammoLoad ?? AmmoLoad.STANDARD,
+      getAmmoLoadShortLabel,
+    );
+
     const model = this.loadoutPresentation;
     if (!model) return;
-    const current = this.currentLoadout;
     this.renderAvailabilityStrip('primaryWeapon', model.availableWeapons, current?.primaryWeapon, getWeaponShortLabel);
     this.renderAvailabilityStrip('secondaryWeapon', model.availableWeapons, current?.secondaryWeapon, getWeaponShortLabel);
     this.renderAvailabilityStrip('equipment', model.availableEquipment, current?.equipment, getEquipmentShortLabel);

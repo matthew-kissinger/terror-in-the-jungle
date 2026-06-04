@@ -26,8 +26,13 @@ export class AmmoManager {
   private zoneManager?: ZoneManager;
   private isResupplying = false;
   private lastResupplyZone: CaptureZone | null = null;
+  /** Unscaled reserve capacity captured at construction; the selectable ammo
+   * load factor is always applied relative to this so repeated changes don't
+   * compound. */
+  private readonly baseMaxReserve: number;
 
   constructor(magazineSize: number = 30, maxReserve: number = 90) {
+    this.baseMaxReserve = maxReserve;
     this.state = {
       currentMagazine: magazineSize,
       reserveAmmo: maxReserve,
@@ -38,6 +43,20 @@ export class AmmoManager {
       needsReload: false,
       lastResupplyTime: 0
     };
+  }
+
+  /**
+   * Scale the reserve capacity by `factor` relative to the BASE reserve and
+   * re-provision so the spawn reserve reflects the choice. Magazine size is
+   * untouched. Always computed from the base (never the current scaled value)
+   * so repeated factor changes do not compound; the new `maxReserve` persists
+   * across weapon switches because switching never re-resets the manager.
+   */
+  setReserveFactor(factor: number): void {
+    const scaledReserve = Math.max(0, Math.round(this.baseMaxReserve * factor));
+    this.state.maxReserve = scaledReserve;
+    this.state.reserveAmmo = scaledReserve;
+    this.onAmmoChange?.(this.state);
   }
 
   setZoneManager(zoneManager: ZoneManager): void {
