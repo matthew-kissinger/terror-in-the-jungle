@@ -35,8 +35,14 @@ export class AILineOfSight {
   private sandbagSystem?: SandbagSystem;
   private smokeCloudSystem?: SmokeCloudSystem;
 
-  // LOS result cache: avoids redundant raycasts for the same combatant pair
-  private losCache: Map<string, LOSCacheEntry> = new Map();
+  // LOS result cache: avoids redundant raycasts for the same combatant pair.
+  // Nested map keyed by attacker id -> target id so that cache lookups never
+  // allocate a concatenated string key on the hot path (including cache hits).
+  private losCache: Map<string, Map<string, LOSCacheEntry>> = new Map();
+  // Running total of cached entries across the nested maps, kept in sync on
+  // set/delete so clearCache() can make its "is the cache large?" decision
+  // without iterating every bucket.
+  private losCacheSize = 0;
 
   // Profiling counters
   static cacheHits = 0;
@@ -68,13 +74,44 @@ export class AILineOfSight {
   clearCache(): void {
     const now = performance.now();
     // Only do full sweep if cache is getting large
-    if (this.losCache.size > 200) {
-      this.losCache.forEach((entry, key) => {
-        if (now - entry.timestamp > LOS_CACHE_TTL_MS) {
-          this.losCache.delete(key);
+    if (this.losCacheSize > 200) {
+      this.losCache.forEach((targets, attackerId) => {
+        targets.forEach((entry, targetId) => {
+          if (now - entry.timestamp > LOS_CACHE_TTL_MS) {
+            targets.delete(targetId);
+            this.losCacheSize--;
+          }
+        });
+        if (targets.size === 0) {
+          this.losCache.delete(attackerId);
         }
       });
     }
+  }
+
+  /**
+   * Look up a cached LOS entry without allocating a composite key.
+   * Returns undefined when no entry exists for the pair.
+   */
+  private getCacheEntry(attackerId: string, targetId: string): LOSCacheEntry | undefined {
+    const targets = this.losCache.get(attackerId);
+    return targets ? targets.get(targetId) : undefined;
+  }
+
+  /**
+   * Store (or overwrite) a cached LOS entry for the pair, keeping the running
+   * entry count in sync so clearCache() can stay allocation-free on the hot path.
+   */
+  private setCacheEntry(attackerId: string, targetId: string, entry: LOSCacheEntry): void {
+    let targets = this.losCache.get(attackerId);
+    if (!targets) {
+      targets = new Map();
+      this.losCache.set(attackerId, targets);
+    }
+    if (!targets.has(targetId)) {
+      this.losCacheSize++;
+    }
+    targets.set(targetId, entry);
   }
 
   /**
@@ -156,9 +193,12 @@ export class AILineOfSight {
     }
 
     // --- LOS Cache check (for the expensive raycast portion) ---
-    const cacheKey = `${combatant.id}_${target.id}`;
+    // Nested-map lookup avoids allocating a `${id}_${id}` key per check,
+    // so cache hits do zero string allocation on the hottest combat path.
+    const attackerId = combatant.id;
+    const targetId = target.id;
     const now = performance.now();
-    const cached = this.losCache.get(cacheKey);
+    const cached = this.getCacheEntry(attackerId, targetId);
 
     if (cached && (now - cached.timestamp) < LOS_CACHE_TTL_MS) {
       AILineOfSight.cacheHits++;
@@ -173,7 +213,7 @@ export class AILineOfSight {
       const blocked = this.isBlockedByHeightfield(combatant, targetPos, distance);
       if (blocked) {
         AILineOfSight.prefilterRejects++;
-        this.losCache.set(cacheKey, { result: false, timestamp: now });
+        this.setCacheEntry(attackerId, targetId, { result: false, timestamp: now });
         return false;
       }
       AILineOfSight.prefilterPasses++;
@@ -206,7 +246,7 @@ export class AILineOfSight {
     }
 
     // Store in cache
-    this.losCache.set(cacheKey, { result, timestamp: now });
+    this.setCacheEntry(attackerId, targetId, { result, timestamp: now });
 
     return result;
   }

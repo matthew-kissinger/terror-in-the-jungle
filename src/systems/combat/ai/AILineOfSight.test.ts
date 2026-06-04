@@ -73,6 +73,57 @@ describe('AILineOfSight heightfield prefilter', () => {
     expect(stats.fullEvaluationClear).toBe(1);
   });
 
+  it('serves a repeated check from cache without re-running the full evaluation', () => {
+    (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
+    const los = new AILineOfSight();
+    const terrainSystem = {
+      getEffectiveHeightAt: vi.fn(() => -2),
+      raycastTerrain: vi.fn(() => ({ hit: false }))
+    } as any;
+    los.setTerrainSystem(terrainSystem);
+
+    const source = makeCombatant('a', 0, 0);
+    const target = makeCombatant('b', 80, 0);
+
+    const first = los.canSeeTarget(source, target, new THREE.Vector3());
+    const second = los.canSeeTarget(source, target, new THREE.Vector3());
+
+    // Same observable result both times...
+    expect(first).toBe(true);
+    expect(second).toBe(true);
+    // ...but the expensive raycast ran only once - the second check hit the cache.
+    expect(terrainSystem.raycastTerrain).toHaveBeenCalledTimes(1);
+    const stats = AILineOfSight.getCacheStats();
+    expect(stats.hits).toBe(1);
+    expect(stats.misses).toBe(1);
+  });
+
+  it('caches each combatant pair independently', () => {
+    (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
+    const los = new AILineOfSight();
+    const terrainSystem = {
+      getEffectiveHeightAt: vi.fn(() => -2),
+      raycastTerrain: vi.fn(() => ({ hit: false }))
+    } as any;
+    los.setTerrainSystem(terrainSystem);
+
+    const source = makeCombatant('a', 0, 0);
+    const targetB = makeCombatant('b', 80, 0);
+    const targetC = makeCombatant('c', 0, 80);
+
+    // Two distinct targets for the same attacker => two distinct cache entries.
+    los.canSeeTarget(source, targetB, new THREE.Vector3());
+    los.canSeeTarget(source, targetC, new THREE.Vector3());
+    // Repeats of each pair are served from cache.
+    los.canSeeTarget(source, targetB, new THREE.Vector3());
+    los.canSeeTarget(source, targetC, new THREE.Vector3());
+
+    expect(terrainSystem.raycastTerrain).toHaveBeenCalledTimes(2);
+    const stats = AILineOfSight.getCacheStats();
+    expect(stats.hits).toBe(2);
+    expect(stats.misses).toBe(2);
+  });
+
   it('does not double-raise player eye position for full LOS terrain raycasts', () => {
     (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
     const los = new AILineOfSight();
