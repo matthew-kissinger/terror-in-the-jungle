@@ -322,13 +322,31 @@ export class WeaponRigManager {
   }
 
   startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher', _hudSystem?: IHUDSystem, _audioManager?: IAudioManager, _ammoManager?: IAmmoManager): boolean {
-    // Don't switch if already the current weapon
-    if (weaponType === this.currentWeaponType) {
-      return false
+    // A switch already in flight to a DIFFERENT target must be superseded, not
+    // dropped. Dropping it desynced the equipped weapon from the selected
+    // loadout at spawn: the deploy-apply path issues several switch requests in
+    // a row (inventory slot reset + setPrimaryWeapon), and the stale first
+    // request used to win while the authoritative primary request was rejected.
+    // Re-pointing the pending switch makes the call idempotent: the last
+    // requested weapon always wins. (loadout-deploy-equip-match)
+    if (this.isSwitchingWeapon) {
+      // The in-flight destination is `pendingWeaponSwitch` (which may already
+      // have been applied to `currentWeaponType` past the animation midpoint).
+      // Only a request for that same destination is a no-op; any other target,
+      // including one matching the PRE-switch `currentWeaponType`, re-points the
+      // switch. Comparing to `currentWeaponType` alone is unsafe here because it
+      // has not yet caught up to the in-flight destination.
+      const destination = this.pendingWeaponSwitch ?? this.currentWeaponType
+      if (weaponType === destination) {
+        return false
+      }
+      Logger.info('player', ` Re-targeting in-flight switch to ${weaponType}`)
+      this.pendingWeaponSwitch = weaponType
+      return true
     }
 
-    // Can't switch while already switching
-    if (this.isSwitchingWeapon) {
+    // Don't switch if already the current weapon
+    if (weaponType === this.currentWeaponType) {
       return false
     }
 
@@ -384,6 +402,12 @@ export class WeaponRigManager {
   }
 
   private performWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher', hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
+    // The LOGICAL equipped weapon is authoritative regardless of whether the
+    // rendered GLB rigs have loaded yet. Track it before the rig-null guard so
+    // the equipped weapon always matches the requested one (the visible model
+    // swap below is best-effort and resolves once rigs exist).
+    this.currentWeaponType = weaponType
+
     // Actually switch the visible weapon models
     if (!this.m16RifleRig || !this.akRifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig || !this.m60Rig || !this.m79Rig) return
 
@@ -393,7 +417,6 @@ export class WeaponRigManager {
     this.pistolRig.visible = false
     this.m60Rig.visible = false
     this.m79Rig.visible = false
-    this.currentWeaponType = weaponType
 
     switch (weaponType) {
       case 'rifle':
@@ -473,6 +496,11 @@ export class WeaponRigManager {
 
   isSwitching(): boolean {
     return this.isSwitchingWeapon
+  }
+
+  /** The logical weapon currently equipped (independent of switch animation). */
+  getCurrentWeaponType(): 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' {
+    return this.currentWeaponType
   }
 
   setRifleFaction(faction: Faction): void {

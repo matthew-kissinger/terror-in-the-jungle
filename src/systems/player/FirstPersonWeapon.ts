@@ -357,6 +357,14 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   /**
+   * The weapon currently equipped in-hand. Used to verify that the deployed
+   * weapon matches the selected loadout primary at spawn.
+   */
+  getEquippedWeaponType(): 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' {
+    return this.rigManager.getCurrentWeaponType()
+  }
+
+  /**
    * Apply the selectable ammo-load reserve factor (from the deploy loadout) to
    * every weapon's spawn reserve. Scales each weapon's reserve relative to its
    * BASE capacity (so repeated changes don't compound) and re-provisions, and

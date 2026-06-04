@@ -270,10 +270,27 @@ describe('WeaponRigManager', () => {
       expect(result).toBe(false)
     })
 
-    it('returns false if already mid-switch', () => {
+    it('ignores a repeat request for the weapon already being switched to', () => {
+      manager.startWeaponSwitch('shotgun')
+      const result = manager.startWeaponSwitch('shotgun')
+      expect(result).toBe(false)
+    })
+
+    it('re-targets an in-flight switch so the last requested weapon wins', () => {
+      // A new switch request mid-animation must supersede the in-flight one, so
+      // the weapon the player ends up holding is the LAST one requested. This is
+      // the deploy-equip guarantee (loadout-deploy-equip-match): the spawn-apply
+      // path fires several switch requests in a row and the final (primary) one
+      // must be the one equipped.
       manager.startWeaponSwitch('shotgun')
       const result = manager.startWeaponSwitch('smg')
-      expect(result).toBe(false)
+      expect(result).toBe(true)
+
+      // Drive the switch to completion and confirm SMG is what we land on.
+      for (let i = 0; i < 8 && manager.isSwitching(); i++) {
+        manager.updateSwitchAnimation(0.1)
+      }
+      expect(manager.getCurrentWeaponType()).toBe('smg')
     })
 
     it('returns true and starts switch for valid weapon type', () => {
