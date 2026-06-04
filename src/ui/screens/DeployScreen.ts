@@ -14,7 +14,9 @@ import type { LoadoutPresentationModel } from '../../systems/player/LoadoutServi
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 import {
   getEquipmentLabel,
+  getEquipmentShortLabel,
   getWeaponLabel,
+  getWeaponShortLabel,
   type LoadoutFieldKey,
   type PlayerLoadout,
   type VehicleDeployOption,
@@ -38,6 +40,7 @@ interface LoadoutFieldControl {
   value: HTMLDivElement;
   previousButton: HTMLButtonElement;
   nextButton: HTMLButtonElement;
+  availability: HTMLDivElement;
 }
 
 const LOADOUT_FIELD_ORDER: Array<{ key: LoadoutFieldKey; label: string }> = [
@@ -85,6 +88,7 @@ export class DeployScreen extends UIComponent {
   private onPresetSave?: () => void;
   private deploySession?: DeploySessionModel;
   private loadoutPresentation?: LoadoutPresentationModel;
+  private currentLoadout?: PlayerLoadout;
   private decisionStartedAtMs: number | null = null;
   private decisionElapsedMs: number | null = null;
   private readonly loadoutControls = new Map<LoadoutFieldKey, LoadoutFieldControl>();
@@ -137,7 +141,7 @@ export class DeployScreen extends UIComponent {
     this.mapTitle = this.createDiv(styles.mapTitle, 'respawn-map-title');
     this.mapTitle.textContent = 'SELECT SPAWN POINT';
     const mapHelper = this.createDiv(styles.mapHelper);
-    mapHelper.textContent = 'Click a zone on the map to select your deployment point.';
+    mapHelper.textContent = 'Tap or click a sector to select your insertion point — or pick from the spawn list below.';
     this.mapContainer = this.createDiv(styles.map, 'respawn-map');
     mapHeader.appendChild(this.mapTitle);
     mapHeader.appendChild(mapHelper);
@@ -241,9 +245,11 @@ export class DeployScreen extends UIComponent {
   }
 
   updateLoadout(loadout: PlayerLoadout): void {
+    this.currentLoadout = loadout;
     this.updateFieldValue('primaryWeapon', getWeaponLabel(loadout.primaryWeapon));
     this.updateFieldValue('secondaryWeapon', getWeaponLabel(loadout.secondaryWeapon));
     this.updateFieldValue('equipment', getEquipmentLabel(loadout.equipment));
+    this.refreshAvailabilityChips();
   }
 
   updateLoadoutPresentation(model: LoadoutPresentationModel): void {
@@ -256,6 +262,7 @@ export class DeployScreen extends UIComponent {
     if (this.loadoutPresetDescription) {
       this.loadoutPresetDescription.textContent = model.presetDescription;
     }
+    this.refreshAvailabilityChips();
     this.refreshLoadoutState(this.deploySession?.allowLoadoutEditing === true);
   }
 
@@ -500,6 +507,8 @@ export class DeployScreen extends UIComponent {
     valueEl.textContent = '--';
     valueBlock.appendChild(labelEl);
     valueBlock.appendChild(valueEl);
+    const availability = this.createDiv(styles.availabilityStrip);
+    valueBlock.appendChild(availability);
 
     const buttons = this.createDiv(styles.loadoutButtons);
     const prev = this.makeButton(undefined, 'PREV', () => this.onLoadoutChange?.(field, -1));
@@ -509,7 +518,7 @@ export class DeployScreen extends UIComponent {
 
     row.appendChild(valueBlock);
     row.appendChild(buttons);
-    this.loadoutControls.set(field, { value: valueEl, previousButton: prev, nextButton: next });
+    this.loadoutControls.set(field, { value: valueEl, previousButton: prev, nextButton: next, availability });
     return row;
   }
 
@@ -592,6 +601,39 @@ export class DeployScreen extends UIComponent {
   private updateFieldValue(field: LoadoutFieldKey, value: string): void {
     const control = this.loadoutControls.get(field);
     if (control) control.value.textContent = value;
+  }
+
+  /**
+   * Surface the faction's available pool per loadout slot (UX-3): render each
+   * option as a short-label chip with the active selection highlighted, so the
+   * player can see what their faction can field (and why reduced factions have
+   * fewer options). Read-only from the presentation model — no service change.
+   */
+  private refreshAvailabilityChips(): void {
+    const model = this.loadoutPresentation;
+    if (!model) return;
+    const current = this.currentLoadout;
+    this.renderAvailabilityStrip('primaryWeapon', model.availableWeapons, current?.primaryWeapon, getWeaponShortLabel);
+    this.renderAvailabilityStrip('secondaryWeapon', model.availableWeapons, current?.secondaryWeapon, getWeaponShortLabel);
+    this.renderAvailabilityStrip('equipment', model.availableEquipment, current?.equipment, getEquipmentShortLabel);
+  }
+
+  private renderAvailabilityStrip<T extends string>(
+    field: LoadoutFieldKey,
+    pool: readonly T[],
+    active: T | undefined,
+    shortLabel: (value: T) => string,
+  ): void {
+    const control = this.loadoutControls.get(field);
+    if (!control) return;
+    const strip = control.availability;
+    strip.innerHTML = '';
+    for (const value of pool) {
+      const chip = this.createDiv(styles.availabilityChip);
+      chip.textContent = shortLabel(value);
+      if (value === active) chip.classList.add(styles.availabilityChipActive);
+      strip.appendChild(chip);
+    }
   }
 
   private renderSequenceSteps(steps: string[]): void {

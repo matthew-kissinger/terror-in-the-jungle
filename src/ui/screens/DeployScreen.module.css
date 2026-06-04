@@ -403,6 +403,31 @@
   transform: none;
 }
 
+/* Faction availability (UX-3): per-slot short-label chips, active one highlighted. */
+.availabilityStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1-5);
+}
+
+.availabilityChip {
+  padding: 1px var(--space-1-5);
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--radius-pill);
+  color: var(--ink-faint);
+  font-size: var(--font-size-3xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.availabilityChipActive {
+  border-color: var(--green);
+  background: rgba(79, 107, 58, 0.18);
+  color: var(--ink);
+  font-weight: 700;
+}
+
 /* loadout slot — green-ruled form line, like the mockup loadout sheet */
 .loadoutRow {
   display: grid;
@@ -610,6 +635,15 @@
   .smallButton {
     min-height: 30px;
     padding: var(--space-1-5) var(--space-2);
+  }
+}
+
+/* Touch targets (UX-3): coarse pointers get a 44px minimum on the small
+   loadout/preset buttons — overrides the narrow-width 30/34px rules above by
+   source order so fingers always hit a 44px target. */
+@media (pointer: coarse) {
+  .smallButton {
+    min-height: 44px;
   }
 }
 
