@@ -202,12 +202,35 @@ See [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** (none — **closed the big cycle of 3 parallel streams on 2026-06-03.** All shipped code-complete / playtest-deferred to master: `cycle-air-support-radio` (SVYAZ-3, `fa273ebd`); `cycle-combat-p99-attribution` (DEFEKT-3, merge `8f09d471` — cover-search clause proven met, residual tail split to new directive `combat-movement-stall-tail`); `cycle-deploy-loadout-flow` (UX-2/3/4 — faction-availability `4733463a`, map-tap `3b7e2e14`, selectable-ammo `d3567243`, threat-readout `fbbf82e3`, merge `86ee640d`). Owner playtests in [PLAYTEST_PENDING](PLAYTEST_PENDING.md). Two flagged follow-ups: `rocket_run` IFF (spawned task) + `combat-movement-stall-tail`.)
-- **Next:** owner playtest sweep + the deferred backlog ([BACKLOG.md](BACKLOG.md) owner-gated queue) + `combat-movement-stall-tail`.
+- **Cycle:** `cycle-2026-06-04-deploy-zone-vehicle` — three owner-reported gameplay
+  defects in the deploy → spawn → mount chain, opened 2026-06-04 from a triage pass.
+  Each brief carries file:line diagnosis. All three streams touch disjoint systems
+  (player/loadout, world/zone+terrain, vehicle) → dispatch in parallel, no
+  inter-task deps. Slug passes `cycle-validate`.
+- **Previous:** big cycle of 3 parallel streams closed 2026-06-03 (SVYAZ-3 air-support
+  `fa273ebd`, DEFEKT-3 combat-p99 `8f09d471`, UX-2/3/4 deploy-loadout `86ee640d`);
+  follow-ups `rocket_run` IFF + `combat-movement-stall-tail`.
+- **Next:** owner playtest sweep of the three fixes + deferred backlog +
+  `combat-movement-stall-tail`.
 
 ### Tasks (DAG)
 
-(Empty — populate when the next cycle opens.)
+All Round 1, no inter-task dependencies (3 tasks ≤ concurrency cap 5):
+
+- `loadout-deploy-equip-match` (UX-5) — deployed weapon must equal the selected (or
+  default) loadout on initial deploy + every respawn.
+  Brief: `docs/tasks/loadout-deploy-equip-match.md`. Reviewer: none path-gated.
+- `zone-base-ditch-placement` (DEFEKT-7) — ZC home bases + enemy spawn off the ditch
+  floor onto flat ground.
+  Brief: `docs/tasks/zone-base-ditch-placement.md`. Reviewer: **`terrain-nav-reviewer`**
+  (terrain height logic, even though the files live under `src/systems/world/`).
+- `vehicle-board-drive-e2e` (VEKHIKL-5) — jeep boards into the driver seat, rests on
+  the ground, drives; ships a real e2e test.
+  Brief: `docs/tasks/vehicle-board-drive-e2e.md`. Reviewer: none path-gated.
+
+Hard-stops (halt + surface to owner): any fence-change proposal; >2 CI red/blocked
+in a round; perf >5% p99 regression on `combat120`; carry-over growth; worktree
+failure; reviewer twice-rejected.
 
 ## Dispatch protocol
 
