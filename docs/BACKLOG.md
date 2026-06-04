@@ -45,6 +45,36 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-04-deploy-zone-vehicle)
+
+Closes three owner-reported deploy/spawn/mount defects, triaged to file:line then
+fixed in parallel (disjoint systems). All three shipped to master CI-green, each
+with a repro-first L3 behavior test; all playtest-deferred to
+[PLAYTEST_PENDING](PLAYTEST_PENDING.md).
+
+- **UX-5** `loadout-deploy-equip-match` — PR #335 (`e0144444`). "Deployed weapon
+  not the one I had on me." Root cause was `WeaponRigManager.startWeaponSwitch`
+  dropping an in-flight weapon switch, so a stale switch won when the player died
+  mid-swap; fix is last-requested-wins. L3 `LoadoutDeployEquip.test.ts`.
+- **DEFEKT-7** `zone-base-ditch-placement` — PR #336 (`fb371129`,
+  terrain-nav-reviewer APPROVE-WITH-NOTES). "Enemy spawn + closest base always in
+  a ditch." `ZoneTerrainAdapter.validateAndNudge` had no terrain-readiness guard
+  and dragged the flatten-stamped home bases off their own pad; fix adds the guard,
+  sets `validateTerrain:false` on the home bases, and widens the nudge search so
+  stamp-less capture zones escape steep-walled ditches. L3 `ZoneDitchPlacement.test.ts`.
+- **VEKHIKL-5** `vehicle-board-drive-e2e` — PR #334 (`f63b0da5`). Jeep "mounts
+  behind, spawns stuck in terrain, won't drive." Mount-behind = the locked
+  `seatIndex` was fetched then unused (chassis-center passed to boarding); spawn
+  clip left the jeep ungrounded so drive force (gated on `isGrounded`) stayed zero.
+  Fix = seat-world-offset board + `conformToTerrain` on spawn. L3
+  `VehicleBoardDriveE2E.test.ts` (jeep + M48).
+
+Follow-ups (not carry-overs — in-cycle gaps named per the carry-over discipline):
+- `MOVEMENT_NAV_CHECKIN`: add the same readiness guard to the unconditional spiral
+  pre-pass in `ZoneInitializer.findSuitableZonePosition` (harmless today).
+- Vehicle: M48 `TrackedVehiclePhysics` did not get the spawn rest-height conform
+  this cycle (only `GroundVehiclePhysics` did); revisit if the tank ever spawns clipped.
+
 ## Recently Completed (cycle-2026-05-28-vehicles-aircraft-operable)
 
 Closes the owner-reported **"vehicles and aircraft are not actually operable"**
