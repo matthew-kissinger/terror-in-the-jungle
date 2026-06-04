@@ -4,7 +4,8 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { ZoneManager, CaptureZone } from '../world/ZoneManager';
+import { CaptureZone } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { InventoryManager } from '../player/InventoryManager';
 import { FirstPersonWeapon } from '../player/FirstPersonWeapon';
 import { Faction } from '../combat/types';
@@ -23,7 +24,7 @@ export class AmmoSupplySystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
   private crates: Map<string, AmmoCrate> = new Map();
-  private zoneManager?: ZoneManager;
+  private zoneManager?: IZoneQuery;
   private inventoryManager?: InventoryManager;
   private firstPersonWeapon?: FirstPersonWeapon;
 
@@ -97,7 +98,7 @@ export class AmmoSupplySystem implements GameSystem {
     Logger.info('weapons', 'Ammo Supply System disposed');
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
+  setZoneManager(zoneManager: IZoneQuery): void {
     this.zoneManager = zoneManager;
   }
 

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { Faction } from '../combat/types';
-import { ZoneManager } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { TicketSystem } from '../world/TicketSystem';
 import { PlayerHealthUI } from './PlayerHealthUI';
 import { PlayerHealthEffects } from './PlayerHealthEffects';
@@ -273,7 +273,7 @@ export class PlayerHealthSystem implements GameSystem {
 
   // System connections
 
-  setZoneManager(manager: ZoneManager): void {
+  setZoneManager(manager: IZoneQuery): void {
     if (this.respawnManager) {
       this.respawnManager.setZoneManager(manager);
     }

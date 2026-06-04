@@ -3,7 +3,8 @@
 
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
-import { ZoneManager, CaptureZone } from '../world/ZoneManager';
+import { CaptureZone } from '../world/ZoneManager';
+import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { Faction } from '../combat/types';
 import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 
@@ -26,7 +27,7 @@ export class AmmoManager {
   private reloadStartTime = 0;
   private onReloadComplete?: () => void;
   private onAmmoChange?: (state: AmmoState) => void;
-  private zoneManager?: ZoneManager;
+  private zoneManager?: IZoneQuery;
   private isResupplying = false;
   private lastResupplyZone: CaptureZone | null = null;
   /** Unscaled reserve capacity captured at construction; the selectable ammo
@@ -62,7 +63,7 @@ export class AmmoManager {
     this.onAmmoChange?.(this.state);
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
+  setZoneManager(zoneManager: IZoneQuery): void {
     this.zoneManager = zoneManager;
   }
 
@@ -151,7 +152,7 @@ export class AmmoManager {
   }
 
   private checkResupplyZone(playerPosition: THREE.Vector3, deltaTime: number): void {
-    const currentZone = this.zoneManager!.getZoneAtPosition(playerPosition);
+    const currentZone = this.zoneManager!.getZoneAt(playerPosition);
 
     // Check if we're in a friendly zone (HQ or captured)
     const canResupply = currentZone && (

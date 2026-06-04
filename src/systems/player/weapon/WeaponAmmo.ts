@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import { AmmoManager } from '../../weapons/AmmoManager'
-import { ZoneManager } from '../../world/ZoneManager'
+import type { IZoneQuery } from '../../../types/SystemInterfaces'
 
 /**
  * Manages per-weapon ammo state: rifle, shotgun, SMG
@@ -118,7 +118,7 @@ export class WeaponAmmo {
     this.currentAmmoManager = manager
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
+  setZoneManager(zoneManager: IZoneQuery): void {
     // Set zone manager for all ammo managers (for resupply)
     this.rifleAmmo.setZoneManager(zoneManager)
     this.shotgunAmmo.setZoneManager(zoneManager)

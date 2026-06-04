@@ -10,7 +10,7 @@ import { CombatantSystem } from '../combat/CombatantSystem'
 import { AssetLoader } from '../assets/AssetLoader'
 import { PlayerController } from './PlayerController'
 import { AudioManager } from '../audio/AudioManager'
-import { ZoneManager } from '../world/ZoneManager'
+import type { IZoneQuery } from '../../types/SystemInterfaces'
 import { TicketSystem } from '../world/TicketSystem'
 import { InventoryManager } from './InventoryManager'
 import { PlayerStatsTracker } from './PlayerStatsTracker'
@@ -65,7 +65,7 @@ export class FirstPersonWeapon implements GameSystem {
   private ticketSystem?: TicketSystem
   private hudSystem?: HUDSystem
   private audioManager?: AudioManager
-  private zoneManager?: ZoneManager;
+  private zoneManager?: IZoneQuery;
   private inventoryManager?: InventoryManager;
   private statsTracker?: PlayerStatsTracker;
   private playerFaction: Faction = Faction.US;
@@ -314,7 +314,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.firing.setGrenadeSystem(grenadeSystem)
   }
 
-  setZoneManager(zoneManager: ZoneManager): void {
+  setZoneManager(zoneManager: IZoneQuery): void {
     this.zoneManager = zoneManager
     this.ammo.setZoneManager(zoneManager)
   }
