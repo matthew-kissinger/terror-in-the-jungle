@@ -30,6 +30,21 @@ describe('PlayerSquadController', () => {
     expect(squad.commandPosition).toEqual(holdPosition);
   });
 
+  it('drops a target command issued without a marked point (no player-feet anchor)', () => {
+    const squad = createSquad();
+    const controller = new PlayerSquadController(createSquadManagerStub(squad) as any);
+    controller.assignPlayerSquad(squad.id);
+    // Player standing somewhere non-trivial — the old bug anchored HOLD here.
+    controller.updatePlayerPosition(new THREE.Vector3(5, 0, 5));
+
+    // Hotkey path with no resolved point (slot 2 = HOLD_POSITION).
+    controller.issueQuickCommand(2);
+
+    // Dropped, not silently anchored on the player's feet.
+    expect(squad.currentCommand).not.toBe(SquadCommand.HOLD_POSITION);
+    expect(squad.commandPosition).toBeUndefined();
+  });
+
   it('stores attack-here as a directed command point', () => {
     const squad = createSquad();
     const controller = new PlayerSquadController(createSquadManagerStub(squad) as any);

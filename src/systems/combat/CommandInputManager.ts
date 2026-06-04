@@ -218,10 +218,17 @@ export class CommandInputManager implements GameSystem {
       this.handleOverlayCommandSelection(slot);
       return;
     }
-    this.playerSquadController.issueQuickCommand(slot);
-    if (this.overlayVisible) {
-      this.closeOverlay();
+    const option = getQuickCommandOption(slot);
+    if (option && requiresCommandTarget(option.command)) {
+      // Look-to-mark: a target-requiring command fired from the hotkey (no map
+      // open) pings where the player is looking — never the player's own feet.
+      // Reuses the air-support camera->ground pick; no camera => silently ignored.
+      if (this.resolveCameraGroundPick(this.radioTarget)) {
+        this.playerSquadController.issueCommandAtPosition(option.command, this.radioTarget);
+      }
+      return;
     }
+    this.playerSquadController.issueQuickCommand(slot);
   }
 
   handleCancel(): boolean {
@@ -454,8 +461,17 @@ export class CommandInputManager implements GameSystem {
    * looking above the horizon. No-op (target invalid) without a player camera.
    */
   private resolveRadioTarget(): void {
-    this.radioTargetValid = false;
-    if (!this.playerController) return;
+    this.radioTargetValid = this.resolveCameraGroundPick(this.radioTarget);
+  }
+
+  /**
+   * March the player's view ray to the terrain surface and write the hit into
+   * `out`. Returns false only when there is no player camera; falls back to a
+   * fixed distance ahead (still returns true) when the player looks above the
+   * horizon. Shared by the air-support call-in and squad look-to-mark commands.
+   */
+  private resolveCameraGroundPick(out: THREE.Vector3): boolean {
+    if (!this.playerController) return false;
 
     const camera = this.playerController.getCamera();
     camera.getWorldPosition(this.radioOrigin);
@@ -472,17 +488,16 @@ export class CommandInputManager implements GameSystem {
       const z = this.radioOrigin.z + this.radioDir.z * d;
       const groundY = sampleHeight(x, z);
       if (y <= groundY) {
-        this.radioTarget.set(x, groundY, z);
-        this.radioTargetValid = true;
-        return;
+        out.set(x, groundY, z);
+        return true;
       }
     }
 
     const horiz = Math.hypot(this.radioDir.x, this.radioDir.z) || 1;
     const fx = this.radioOrigin.x + (this.radioDir.x / horiz) * 200;
     const fz = this.radioOrigin.z + (this.radioDir.z / horiz) * 200;
-    this.radioTarget.set(fx, sampleHeight(fx, fz), fz);
-    this.radioTargetValid = true;
+    out.set(fx, sampleHeight(fx, fz), fz);
+    return true;
   }
 
   private describeRadioTarget(): string {

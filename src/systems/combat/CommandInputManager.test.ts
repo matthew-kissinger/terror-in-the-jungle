@@ -281,6 +281,79 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
+  // ── Look-to-mark squad commands (SVYAZ-4 Stage 1) ──────────────────────────
+  const makeLookController = (origin: THREE.Vector3, dir: THREE.Vector3) => {
+    const camera = {
+      getWorldPosition: vi.fn((t: THREE.Vector3) => t.copy(origin)),
+      getWorldDirection: vi.fn((t: THREE.Vector3) => t.copy(dir).normalize()),
+    };
+    return {
+      getCamera: vi.fn(() => camera),
+      getPosition: vi.fn((t?: THREE.Vector3) => (t ?? new THREE.Vector3()).copy(origin)),
+    };
+  };
+
+  it('pings a target command at the looked-at ground point, not the player feet', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    // Camera 20 m up over the origin, looking forward + down toward +z.
+    manager.setPlayerController(
+      makeLookController(new THREE.Vector3(0, 20, 0), new THREE.Vector3(0, -0.7, 0.7)) as any
+    );
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+
+    // Overlay CLOSED: a hotkey HOLD must look-to-mark, never anchor on the player.
+    manager.issueQuickCommand(2);
+
+    expect(controller.issueQuickCommand).not.toHaveBeenCalled();
+    expect(controller.issueCommandAtPosition).toHaveBeenCalledTimes(1);
+    const [cmd, pos] = controller.issueCommandAtPosition.mock.calls[0];
+    expect(cmd).toBe(SquadCommand.HOLD_POSITION);
+    // Marked well ahead of the player (origin), never on their feet.
+    expect(pos.z).toBeGreaterThan(15);
+    expect(Math.hypot(pos.x, pos.z)).toBeGreaterThan(15);
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('reaches ATTACK on slot 6 via look-to-mark', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.setPlayerController(
+      makeLookController(new THREE.Vector3(0, 20, 0), new THREE.Vector3(0, -0.7, 0.7)) as any
+    );
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+
+    manager.issueQuickCommand(6);
+
+    expect(controller.issueCommandAtPosition).toHaveBeenCalledTimes(1);
+    expect(controller.issueCommandAtPosition.mock.calls[0][0]).toBe(SquadCommand.ATTACK_HERE);
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('routes non-target commands (FOLLOW) straight through with no target point', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.setPlayerController(
+      makeLookController(new THREE.Vector3(0, 20, 0), new THREE.Vector3(0, -0.7, 0.7)) as any
+    );
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+
+    manager.issueQuickCommand(1);
+
+    expect(controller.issueQuickCommand).toHaveBeenCalledWith(1);
+    expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
+
+    manager.dispose();
+    layout.dispose();
+  });
+
   it('arms placement orders in the overlay and dispatches them after a map click', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);

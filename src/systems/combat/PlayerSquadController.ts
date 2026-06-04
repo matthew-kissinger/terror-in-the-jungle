@@ -9,6 +9,7 @@ import { Logger } from '../../utils/Logger';
 import {
   getQuickCommandOption,
   getSquadCommandLabel,
+  requiresCommandTarget,
   SQUAD_QUICK_COMMAND_OPTIONS,
   type SquadQuickCommandOption
 } from './SquadCommandPresentation';
@@ -128,10 +129,17 @@ export class PlayerSquadController implements GameSystem {
     const squad = this.squadManager.getSquad(this.playerSquadId);
     if (!squad) return;
 
+    if (requiresCommandTarget(command) && !explicitPosition) {
+      // A target-requiring order (hold/patrol/attack/fall-back) must carry an
+      // explicit marked point. Without one — e.g. a bare hotkey before the
+      // look-to-mark pick resolved — drop it rather than silently anchoring on
+      // the player's own feet (the old default that made these commands feel
+      // broken). The look-to-mark / map-click point is resolved upstream.
+      return;
+    }
+
     squad.currentCommand = command;
-    squad.commandPosition = command === SquadCommand.FREE_ROAM || command === SquadCommand.NONE
-      ? undefined
-      : explicitPosition?.clone() ?? this.playerPosition.clone();
+    squad.commandPosition = explicitPosition ? explicitPosition.clone() : undefined;
     this.currentCommand = command;
     const commandLabel = getSquadCommandLabel(command, 'full');
     Logger.info('squad', ` Squad Command Issued: ${commandLabel}`);

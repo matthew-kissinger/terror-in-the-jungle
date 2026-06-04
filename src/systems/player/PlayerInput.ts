@@ -566,7 +566,7 @@ export class PlayerInput {
       this.callbacks.onSquadCommand?.();
     }
 
-    // Squad quick commands (Shift+1..5; helicopter digital weapons use plain 1/2 above)
+    // Squad quick commands (Shift+1..6; helicopter digital weapons use plain 1/2 above)
     if (event.shiftKey) {
       if (event.code === 'Digit1') {
         this.callbacks.onSquadQuickCommand?.(1);
@@ -578,6 +578,8 @@ export class PlayerInput {
         this.callbacks.onSquadQuickCommand?.(4);
       } else if (event.code === 'Digit5') {
         this.callbacks.onSquadQuickCommand?.(5);
+      } else if (event.code === 'Digit6') {
+        this.callbacks.onSquadQuickCommand?.(6);
       }
     }
   }
