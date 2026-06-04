@@ -19,6 +19,7 @@ import {
   type MovementArtifactReportForViewer,
   type MovementTerrainOverlayArtifact,
 } from './perfMovementViewerTemplate';
+import { computeTailAttribution, type TailAttribution } from './perf-tail-attribution';
 import {
   PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE,
   PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_RESET_SOURCE,
@@ -528,6 +529,12 @@ type CaptureSummary = {
   // the active driver's stop() call. Optional: only present when the
   // active player scenario was enabled and the stop call returned data.
   harnessDriverFinal?: HarnessDriverFinal;
+  // combat-p99-tail-attribution (DEFEKT-3): per-method attribution of the
+  // single worst-p99 sample window, computed from the existing combatBreakdown
+  // timers. Baseline-free — answers "where is the tail frame's time?" from one
+  // capture. Undefined when no sample carried a combatBreakdown. Type +
+  // implementation live in ./perf-tail-attribution.
+  tailAttribution?: TailAttribution;
 };
 
 type MovementViewerPayload = {
@@ -1036,6 +1043,10 @@ function computeMaxFrameStallSeconds(samples: RuntimeSample[]): number {
   if (tailMs > maxStall) maxStall = tailMs;
   return maxStall / 1000;
 }
+
+// combat-p99-tail-attribution (DEFEKT-3, L1): `computeTailAttribution` +
+// `TailAttribution` live in ./perf-tail-attribution so they are unit-testable
+// without importing this script (which runs a real capture on import).
 
 function average(values: number[]): number {
   if (values.length === 0) return 0;
@@ -3915,9 +3926,13 @@ async function runCapture(): Promise<void> {
         },
         matchEndedAtMs: matchEndedAtRelMs,
         matchOutcome: matchOutcome,
-        harnessDriverFinal: harnessDriverFinal ?? undefined
+        harnessDriverFinal: harnessDriverFinal ?? undefined,
+        tailAttribution: computeTailAttribution(runtimeSamples)
       };
       writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
+      if (summary.tailAttribution) {
+        console.log(`\n[tail-attribution] ${summary.tailAttribution.conclusion}`);
+      }
       console.log(`\nArtifacts: ${artifactDir}`);
     } catch {
       // best effort only

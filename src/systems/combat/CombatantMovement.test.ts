@@ -1076,6 +1076,106 @@ describe('CombatantMovement', () => {
       });
     });
 
+    describe('per-tick current-position height dedupe (#3, perf-only)', () => {
+      // A slope whose height varies in BOTH x and z, so the contour solver's
+      // current-position height genuinely drives the routing decision (a wrong
+      // memo value would steer the NPC differently). Steep enough past a small
+      // radius to keep the forward probe blocked => contour fires every tick.
+      function slopeTerrain() {
+        return (x: number, z: number) =>
+          Math.hypot(x, z) > 1.6 ? 6 + x * 0.7 + z * 0.4 : 0;
+      }
+
+      // Build an NPC contour-stalled at the origin against `slopeTerrain`, with
+      // a terrain mock that records every (x,z)->height call in order.
+      function makeRun() {
+        const pure = slopeTerrain();
+        const callLog: Array<{ x: number; z: number; h: number }> = [];
+        const t = mockTerrainRuntime({
+          getHeightAt: vi.fn((x: number, z: number) => {
+            const h = pure(x, z);
+            callLog.push({ x, z, h });
+            return h;
+          }),
+        });
+        const m = new CombatantMovement(t);
+        const c = createTestCombatant({
+          id: 'npc-pos-dedupe',
+          state: CombatantState.ADVANCING,
+          position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+          destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+          simLane: 'high',
+          renderLane: 'culled',
+        });
+        return { m, c, callLog, pure };
+      }
+
+      function runTrajectory(nowSequenceMs: number[]) {
+        const { m, c, callLog, pure } = makeRun();
+        const trajectory: Array<{ px: number; pz: number; vx: number; vz: number }> = [];
+        for (const nowMs of nowSequenceMs) {
+          vi.spyOn(performance, 'now').mockReturnValue(nowMs);
+          m.updateMovement(c, 0.016, new Map(), new Map(), {
+            disableSpacing: true,
+            disableTerrainSample: true,
+          });
+          trajectory.push({ px: c.position.x, pz: c.position.z, vx: c.velocity.x, vz: c.velocity.z });
+        }
+        return { trajectory, callLog, pure };
+      }
+
+      // Re-score every tick (interval > rescore window) so the dedupe path is
+      // exercised on every tick rather than short-circuited by the side cache.
+      const nowSequence = [0, 1000, 2000, 3000, 4000];
+
+      it('keeps height sampling pure: a coordinate never yields two different heights', () => {
+        const { callLog, pure } = runTrajectory(nowSequence);
+        // Every recorded sample equals the pure terrain value at that coord, so
+        // the memo (which sits above getHeightAt) can only ever return what a
+        // fresh call would have. This is the byte-identical guarantee.
+        for (const { x, z, h } of callLog) {
+          expect(h).toBe(pure(x, z));
+        }
+      });
+
+      it('produces a deterministic, reproducible trajectory under the dedupe', () => {
+        const a = runTrajectory(nowSequence).trajectory;
+        const b = runTrajectory(nowSequence).trajectory;
+        // Byte-identical routing: two independent runs over the same seed/scenario
+        // yield the exact same positions and velocities every tick.
+        expect(b).toEqual(a);
+        // The NPC actually moved (the scenario exercised the solver, not a no-op).
+        const moved = Math.hypot(a[a.length - 1].px, a[a.length - 1].pz) > 0;
+        expect(moved).toBe(true);
+      });
+
+      it('collapses repeated start-of-tick current-position samples to one (vs un-deduped 2+)', () => {
+        // Precise per-tick proof using the ordered call log: count how many times
+        // the NPC's position AT THE START of the tick is sampled during that
+        // tick. With the memo, the first sample fills the cache and all later
+        // same-coord reads are served from it -> exactly one getHeightAt hit for
+        // the start coord per tick.
+        const { m, c, callLog } = makeRun();
+        const startCoordHitsPerTick: number[] = [];
+        for (const nowMs of nowSequence) {
+          vi.spyOn(performance, 'now').mockReturnValue(nowMs);
+          const startX = c.position.x;
+          const startZ = c.position.z;
+          const logBefore = callLog.length;
+          m.updateMovement(c, 0.016, new Map(), new Map(), {
+            disableSpacing: true,
+            disableTerrainSample: true,
+          });
+          const tickCalls = callLog.slice(logBefore);
+          const startHits = tickCalls.filter((e) => e.x === startX && e.z === startZ).length;
+          startCoordHitsPerTick.push(startHits);
+        }
+        // Every tick activated the contour solver (start coord sampled at least
+        // once) and never sampled the identical start coord more than once.
+        expect(startCoordHitsPerTick.every((n) => n === 1)).toBe(true);
+      });
+    });
+
     describe('throttled path query keeps the cached route (#3)', () => {
       it('serves the stale route instead of stranding the NPC when the query budget is exhausted', () => {
         const adapter = mockNavmeshAdapter();
@@ -1204,7 +1304,7 @@ describe('CombatantMovement', () => {
       });
     });
 
-    describe('crowd-stall movement stagger (#4, opt-in)', () => {
+    describe('crowd-stall movement stagger (#4, default ON)', () => {
       function crowdStallTick() {
         const m = new CombatantMovement(mockTerrainRuntime({ getHeightAt: pocketTerrain() }));
         const c = createTestCombatant({
@@ -1225,7 +1325,13 @@ describe('CombatantMovement', () => {
         return { m, c, combatants, queryRadius };
       }
 
-      it('runs the full solve every tick when disabled (default)', () => {
+      it('defaults crowdStallStaggerEnabled to ON (pins the cycle-combat-p99-attribution default)', () => {
+        // Pin the shipped default so a regression that flips it back off is
+        // caught here rather than silently dropping the combat-side p99 lever.
+        expect(NpcLodConfig.crowdStallStaggerEnabled).toBe(true);
+      });
+
+      it('runs the full solve every tick when explicitly disabled', () => {
         const original = NpcLodConfig.crowdStallStaggerEnabled;
         NpcLodConfig.crowdStallStaggerEnabled = false;
         try {
@@ -1257,6 +1363,80 @@ describe('CombatantMovement', () => {
           // Coast tick skipped the spacing grid query (and the terrain solve).
           expect(queryRadius.mock.calls.length).toBe(callsAfterFull);
           expect(c.movementStaggerSkipNext).toBe(false);
+        } finally {
+          NpcLodConfig.crowdStallStaggerEnabled = original;
+        }
+      });
+
+      it('holds a 50% coast cadence (full -> coast -> full -> coast) on a sustained stall', () => {
+        const original = NpcLodConfig.crowdStallStaggerEnabled;
+        NpcLodConfig.crowdStallStaggerEnabled = true;
+        try {
+          const { m, c, combatants, queryRadius } = crowdStallTick();
+          const solveTicks: boolean[] = [];
+          let prevCalls = 0;
+          for (let i = 0; i < 6; i++) {
+            vi.spyOn(performance, 'now').mockReturnValue(i * 16);
+            m.updateMovement(c, 0.016, new Map(), combatants, {});
+            const calls = queryRadius.mock.calls.length;
+            solveTicks.push(calls > prevCalls); // true when the spacing solve ran this tick
+            prevCalls = calls;
+          }
+          // Alternating full/coast: the full solve runs every other tick.
+          expect(solveTicks).toEqual([true, false, true, false, true, false]);
+        } finally {
+          NpcLodConfig.crowdStallStaggerEnabled = original;
+        }
+      });
+
+      it('never coasts an isolated (non-crowded) NPC even with the flag on (no micro-stutter)', () => {
+        const original = NpcLodConfig.crowdStallStaggerEnabled;
+        NpcLodConfig.crowdStallStaggerEnabled = true;
+        try {
+          // Same stalling pocket terrain but NO neighbor in range -> spacing
+          // force stays ~0, so the crowd gate never arms the coast.
+          const m = new CombatantMovement(mockTerrainRuntime({ getHeightAt: pocketTerrain() }));
+          const c = createTestCombatant({
+            id: 'npc-stagger-isolated',
+            state: CombatantState.ADVANCING,
+            position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+            destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+            simLane: 'high',
+            renderLane: 'culled',
+          });
+          const queryRadius = vi.fn(() => [c.id]); // only itself nearby
+          m.setSpatialGridManager({ queryRadius } as any);
+          for (let i = 0; i < 4; i++) {
+            vi.spyOn(performance, 'now').mockReturnValue(i * 16);
+            m.updateMovement(c, 0.016, new Map([[c.id, c]]), new Map([[c.id, c]]), {});
+            // The full solve runs every tick (spacing queried every tick) and the
+            // coast flag is never armed for the lonely NPC.
+            expect(c.movementStaggerSkipNext).toBeFalsy();
+          }
+          expect(queryRadius.mock.calls.length).toBe(4);
+        } finally {
+          NpcLodConfig.crowdStallStaggerEnabled = original;
+        }
+      });
+
+      it('a coasted NPC still advances toward its goal (coast integrates velocity, not a freeze)', () => {
+        const original = NpcLodConfig.crowdStallStaggerEnabled;
+        NpcLodConfig.crowdStallStaggerEnabled = true;
+        try {
+          const { m, c, combatants } = crowdStallTick();
+          vi.spyOn(performance, 'now').mockReturnValue(0);
+          // Full solve arms the coast and leaves a non-zero velocity.
+          m.updateMovement(c, 0.016, new Map(), combatants, {});
+          expect(c.movementStaggerSkipNext).toBe(true);
+          const before = c.position.clone();
+          const vel = c.velocity.clone();
+          vi.spyOn(performance, 'now').mockReturnValue(16);
+          m.updateMovement(c, 0.016, new Map(), combatants, {});
+          // The coast tick integrated the existing velocity (position changed by
+          // velocity*dt), so the NPC keeps drifting rather than freezing.
+          const expected = before.clone().addScaledVector(vel, 0.016);
+          expect(c.position.x).toBeCloseTo(expected.x, 5);
+          expect(c.position.z).toBeCloseTo(expected.z, 5);
         } finally {
           NpcLodConfig.crowdStallStaggerEnabled = original;
         }

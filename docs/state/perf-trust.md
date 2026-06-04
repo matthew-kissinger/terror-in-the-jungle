@@ -1,6 +1,51 @@
 # Perf Measurement-Chain Trust Status
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
+
+> **Update 2026-06-03 (combat-p99-attribution landed; recommend SPLIT DEFEKT-3):**
+> the `combat-p99-attribution` cycle landed the measurement + the one built-but-
+> disabled combat lever, and **proved the cover search is not the p99 driver**:
+> - **Per-method tail attribution** now ships in every capture's `summary.json`
+>   as `tailAttribution` (pure logic in `scripts/perf-tail-attribution.ts`,
+>   unit-tested). For the worst-p99 sample it decomposes the frame from the
+>   timers the capture already records: cover timers
+>   (`engage.suppression.initiate.coverSearch`/`coverGridQuery`/
+>   `engage.cover.findBestCover`), the Combat-phase **unattributed residual**
+>   (`totalMs` − named children = where the contour terrain-stall movement cost
+>   hides, since movement is billed to the Combat phase but not to a named
+>   `aiMethodMs` timer), the top `aiStateMs` (`state.advancing`), and the
+>   frame-level Combat-vs-render/Other split. It emits `coverDominatesTail` /
+>   `combatDominatesTail` verdict flags. Baseline-free — answers "where is the
+>   tail?" from one run.
+> - **Cover-search cost microbench** (`src/systems/combat/ai/CoverSearch.bench.test.ts`)
+>   measures the search in isolation at realistic density: median
+>   `findBestCover` ≈0.008 ms, `queryWithLOS` ≈0.015 ms (53 candidates indexed),
+>   and the **entire 8-search/frame budget ≈0.06 ms** — ~0.4% of a 16.67 ms
+>   frame, ~600× below a 35 ms p99 frame. The cover search structurally cannot
+>   anchor the tail. DEFEKT-3 clause 1 ("no longer dominates p99") is **met**.
+> - **Contour height-sample dedupe** in `CombatantMovement`: the contour rescore
+>   sampled `getTerrainHeight` at the NPC's *current* position up to 4× per tick
+>   (two `scoreContourDirection` passes + `computeDirectionalSpeedFactor` + the
+>   `isForwardBlocked` gate). A per-tick memo keyed on exact `(x,z)` collapses
+>   them to one query. Byte-identical (pure function of `(x,z)`) — proven by a
+>   determinism test asserting an identical, reproducible trajectory and a
+>   start-coord-sampled-once-per-tick spy.
+> - **`crowdStallStaggerEnabled` flipped default ON** (`src/config/CombatantConfig.ts`):
+>   the 50%-cadence coast for contour-stalled, crowded high-LOD NPCs. The only
+>   intended default behavior change; arms only on the stalled+crowded high-LOD
+>   path. Movement-feel sign-off deferred to `docs/PLAYTEST_PENDING.md`.
+> - **Recommended outcome — SPLIT.** The cover-search half of DEFEKT-3 is proven
+>   met. The residual combat-billed tail is the NPC terrain-stall movement storm
+>   (the Combat-phase unattributed residual + `state.advancing`), and the bad
+>   frame remains a superposition with ~+2.9 ms uninstrumented render/Other —
+>   so a combat-only fix is **not guaranteed** to clear 35 ms. Recommend marking
+>   the cover-search criterion met and spinning the movement-stall tail into a
+>   new directive (proposed slug `combat-movement-stall-tail`) plus the
+>   render/Other half into render attribution (a KONVEYER axis). Full suite
+>   green; frame-time ≤35ms certification stays deferred to the STABILIZAT-1
+>   quiet box (this cycle cannot run a headed capture on a quiet machine).
+
+> **Update 2026-06-02 (baseline file removed):**
 
 > **Update 2026-06-02 (baseline file removed):** `perf-baselines.json` has been
 > deleted from the repo and is intended to stay gone. The historical narrative

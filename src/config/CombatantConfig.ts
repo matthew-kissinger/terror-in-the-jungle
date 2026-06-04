@@ -86,13 +86,21 @@ export const NpcLodConfig = {
    */
   stallDispersalEnabled: true,
   /**
-   * Opt-in: stagger the full terrain-aware movement solve for high-LOD NPCs
-   * that are contour-stalled AND packed in a friendly crowd, coasting on the
-   * off-ticks (skipping the spacing grid query + terrain-aware contour solve).
-   * Bounds the worst-case per-frame movement cost at point-blank convergence.
-   * Default OFF pending a feel playtest — staggering clustered NPCs can read as
-   * micro-stutter if the crowd is sparse, and the contour re-score cache
-   * already removes most of the per-tick cost this targets.
+   * Stagger the full terrain-aware movement solve for high-LOD NPCs that are
+   * contour-stalled AND packed in a friendly crowd, coasting on the off-ticks
+   * (skipping the spacing grid query + terrain-aware contour solve). Bounds the
+   * worst-case per-frame movement cost at point-blank convergence — the combat-
+   * side p99 lever for DEFEKT-3 (the bad frame's Combat term is the convergence
+   * terrain-stall storm, per docs/rearch/COMBAT_AI_P99_SPIKE_2026-06-03.md).
+   *
+   * Default ON as of cycle-combat-p99-attribution (2026-06-03). It only ever
+   * arms for an NPC that is BOTH contour-stalled AND in a measurable friendly
+   * crowd (spacing force above NPC_STALL_DISPERSAL_MIN_FORCE_SQ), so an isolated
+   * or freely-moving NPC never coasts and cannot micro-stutter; the staggered
+   * NPC still integrates its existing velocity + re-grounds on the coast tick.
+   * A coast happens at most every other tick (50% cadence) and recovery
+   * detectors work on >=600ms windows, so escalation is unaffected. Movement-
+   * feel sign-off is tracked in docs/PLAYTEST_PENDING.md; set false to revert.
    */
-  crowdStallStaggerEnabled: false,
+  crowdStallStaggerEnabled: true,
 };
