@@ -485,8 +485,8 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.fillStyle = 'rgba(231, 217, 186, 0.7)';
     ctx.font = '11px "Courier Prime", monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('Scroll: Zoom', 15, MAP_SIZE - 45);
+    ctx.fillText('Scroll / Pinch: Zoom', 15, MAP_SIZE - 45);
     ctx.fillText('Drag: Pan', 15, MAP_SIZE - 30);
-    ctx.fillText('Click: Select spawn', 15, MAP_SIZE - 15);
+    ctx.fillText('Tap / Click: Select', 15, MAP_SIZE - 15);
   }
 }

@@ -6,6 +6,8 @@ import {
   setMapWorldSize,
   getMaxZoom,
   transformCanvasToMapSpace,
+  computeHitRadiusMapUnits,
+  pickNearestSpawnWithinRadius,
   worldToMap
 } from './OpenFrontierRespawnMapUtils';
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
@@ -409,16 +411,8 @@ export class OpenFrontierRespawnMap {
 
   private getSpawnPointAtPosition(canvasX: number, canvasY: number): RespawnSpawnPoint | undefined {
     const adjusted = transformCanvasToMapSpace(canvasX, canvasY, this.zoomLevel, this.panOffset);
-
-    for (const spawnPoint of this.spawnPoints) {
-      const { x, y } = worldToMap(spawnPoint.position.x, spawnPoint.position.z);
-      const dx = adjusted.x - x;
-      const dy = adjusted.y - y;
-      if ((dx * dx + dy * dy) <= (20 * 20)) {
-        return spawnPoint;
-      }
-    }
-
-    return undefined;
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const hitRadius = computeHitRadiusMapUnits(this.zoomLevel, rect.width);
+    return pickNearestSpawnWithinRadius(adjusted.x, adjusted.y, this.spawnPoints, hitRadius);
   }
 }

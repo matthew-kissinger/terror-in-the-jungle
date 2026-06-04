@@ -86,3 +86,52 @@ export function transformCanvasToMapSpace(
     y: (canvasY - centerY - panOffset.y) / zoomLevel + centerY
   };
 }
+
+// Spawn-pick tap target (UX-2). The hit test runs in unzoomed map space, but a
+// fixed map-unit radius collapses to a few CSS pixels on a shrunk/zoomed-out
+// mobile canvas. These translate a consistent on-screen finger target into
+// map-units, clamped so very zoomed-in pins stay pickable and very zoomed-out
+// taps never merge adjacent spawns.
+const TAP_TARGET_CSS_RADIUS_PX = 22; // ~44px diameter finger target
+const MIN_HIT_MAP_UNITS = 14;        // never smaller than the pin glyph
+const MAX_HIT_MAP_UNITS = 90;        // never so large adjacent spawns merge
+
+/**
+ * Unzoomed-map-unit radius that corresponds to a ~22px on-screen tap target at
+ * the current zoom and displayed canvas width. Falls back to the canvas-native
+ * width when the live rect is unavailable (headless / pre-layout).
+ */
+export function computeHitRadiusMapUnits(zoomLevel: number, displayWidthPx: number): number {
+  const zoom = zoomLevel > 0 ? zoomLevel : 1;
+  const width = displayWidthPx > 0 ? displayWidthPx : MAP_SIZE;
+  const mapUnitsPerCssPx = MAP_SIZE / (width * zoom);
+  const radius = TAP_TARGET_CSS_RADIUS_PX * mapUnitsPerCssPx;
+  return Math.max(MIN_HIT_MAP_UNITS, Math.min(MAX_HIT_MAP_UNITS, radius));
+}
+
+/**
+ * Nearest spawn point within the hit radius of an unzoomed-map-space point, or
+ * undefined when none is in range. Nearest-on-miss makes coarse taps reliable
+ * and disambiguates adjacent spawns (closest wins, not first-found).
+ */
+export function pickNearestSpawnWithinRadius(
+  adjustedX: number,
+  adjustedY: number,
+  spawnPoints: RespawnSpawnPoint[],
+  hitRadiusMapUnits: number,
+): RespawnSpawnPoint | undefined {
+  const radiusSq = hitRadiusMapUnits * hitRadiusMapUnits;
+  let best: RespawnSpawnPoint | undefined;
+  let bestDistSq = Infinity;
+  for (const spawnPoint of spawnPoints) {
+    const { x, y } = worldToMap(spawnPoint.position.x, spawnPoint.position.z);
+    const dx = adjustedX - x;
+    const dy = adjustedY - y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq <= radiusSq && distSq < bestDistSq) {
+      best = spawnPoint;
+      bestDistSq = distSq;
+    }
+  }
+  return best;
+}
