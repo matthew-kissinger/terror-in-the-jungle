@@ -106,4 +106,19 @@ export const NpcLodConfig = {
    * feel sign-off is tracked in docs/PLAYTEST_PENDING.md; set false to revert.
    */
   crowdStallStaggerEnabled: true,
+  /**
+   * Sticky contour hysteresis (opt-in, default OFF). Strengthens the
+   * same-side bonus applied when a contour-stalled NPC re-scores its
+   * left/right go-around direction, so it commits to one side instead of
+   * flip-flopping at the navmesh/terrain seam. Fewer side-flips = fewer ticks
+   * trapped in the expensive contour solve, shortening the combat120 p99
+   * terrain-stall tail (combat-movement-stall-tail). The 1200ms reroute guard
+   * (NPC_CONTOUR_STALL_REROUTE_MS) remains the backstop against committing to a
+   * genuinely worse side, so this never permanently locks an NPC.
+   *
+   * Behavior-changing (movement feel) → ships OFF pending an owner playtest
+   * sign-off tracked in docs/PLAYTEST_PENDING.md, mirroring how
+   * crowdStallStaggerEnabled was rolled out. Set true to A/B.
+   */
+  contourStickyHysteresisEnabled: false,
 };

@@ -865,6 +865,82 @@ describe('CombatantMovement', () => {
     });
   });
 
+  // ── Sticky contour hysteresis (F2, combat-movement-stall-tail) ──────────
+  describe('sticky contour hysteresis', () => {
+    /**
+     * Asymmetric ridge: a wall ahead (x > 2) plus a constant z-tilt so the
+     * left/right go-around scores are genuinely contested. Under the baseline
+     * +0.25 same-side bonus the chosen contour side flip-flops every few
+     * hundred ms and the NPC oscillates in front of the lip; this is the shape
+     * that most reproduces the convergence-time stall oscillation.
+     */
+    function ridgeTerrain() {
+      return (x: number, z: number) => (x > 2 ? (x - 2) * 5 : 0) + z * 0.6;
+    }
+
+    afterEach(() => {
+      NpcLodConfig.contourStickyHysteresisEnabled = false;
+    });
+
+    function driveStall(): { flips: number; finalX: number } {
+      const t = mockTerrainRuntime();
+      t.getHeightAt = ridgeTerrain();
+      const m = new CombatantMovement(t);
+      const adapter = mockNavmeshAdapter();
+      const navSystem = mockNavmeshSystem(adapter);
+      navSystem.queryPath.mockReturnValue([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(40, 0, 0),
+        new THREE.Vector3(120, 0, 0),
+      ]);
+      m.setNavmeshSystem(navSystem as any);
+
+      const c = createTestCombatant({
+        id: 'npc-sticky-contour',
+        state: CombatantState.ADVANCING,
+        position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+        destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+
+      let flips = 0;
+      let prev: -1 | 1 | undefined;
+      for (let i = 0; i < 50; i++) {
+        m.resetPathQueryBudget();
+        vi.spyOn(performance, 'now').mockReturnValue(i * 100);
+        m.updateMovement(c, 0.1, new Map(), new Map(), {
+          disableSpacing: true,
+          disableTerrainSample: true,
+        });
+        const s = c.movementContourSign;
+        if (prev !== undefined && s !== undefined && s !== prev) flips++;
+        if (s !== undefined) prev = s;
+      }
+      return { flips, finalX: c.position.x };
+    }
+
+    it('ships OFF by default (no behavior change until owner playtest sign-off)', () => {
+      expect(NpcLodConfig.contourStickyHysteresisEnabled).toBe(false);
+    });
+
+    it('cuts contour side-flips and lets the NPC clear the lip when enabled', () => {
+      NpcLodConfig.contourStickyHysteresisEnabled = false;
+      const off = driveStall();
+      NpcLodConfig.contourStickyHysteresisEnabled = true;
+      const on = driveStall();
+
+      // Baseline must actually oscillate, else the comparison is vacuous.
+      expect(off.flips).toBeGreaterThanOrEqual(4);
+      // Sticky hysteresis at least halves the side-flipping...
+      expect(on.flips).toBeLessThanOrEqual(Math.floor(off.flips / 2));
+      // ...and committing to one go-around lets the NPC traverse past the lip
+      // (x > 2) instead of oscillating in front of it.
+      expect(on.finalX).toBeGreaterThan(off.finalX);
+      expect(on.finalX).toBeGreaterThan(2);
+    });
+  });
+
   // ── Wade / route-around water (npc-wade-behavior, R1 of VODA-2) ─────────
   describe('wade behavior + deep-water route-around', () => {
     /**

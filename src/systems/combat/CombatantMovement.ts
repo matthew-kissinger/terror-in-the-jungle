@@ -79,6 +79,18 @@ const NPC_CONTOUR_STALL_REROUTE_MS = 1200;
  */
 const NPC_CONTOUR_RESCORE_INTERVAL_MS = 200;
 /**
+ * Score bonus the previously-chosen contour side keeps on re-score, the
+ * hysteresis that resists side-flipping at the navmesh/terrain seam. The
+ * baseline ({@link NPC_CONTOUR_SAME_SIDE_BONUS}) is light; the sticky variant
+ * ({@link NPC_CONTOUR_SAME_SIDE_BONUS_STICKY}, opt-in via
+ * NpcLodConfig.contourStickyHysteresisEnabled) dominates the typical inter-side
+ * score gap so the NPC commits to one go-around. Sized below the ~1.5-2.0 score
+ * term scale so a clearly-better opposite side can still win; the 1200ms reroute
+ * guard is the final backstop.
+ */
+const NPC_CONTOUR_SAME_SIDE_BONUS = 0.25;
+const NPC_CONTOUR_SAME_SIDE_BONUS_STICKY = 1.0;
+/**
  * Convergence dispersal (NpcLodConfig.stallDispersalEnabled): distance (m) a
  * held-and-crowded NPC is sent away from the local crowd centroid. Kept above
  * the patrol DESTINATION_ARRIVAL_RADIUS (15m) so a leader does not immediately
@@ -1152,7 +1164,9 @@ export class CombatantMovement {
     }
     score -= Math.max(0, aheadHeight - currentHeight - NPC_TERRAIN_LIP_RISE) * 0.35;
     if (combatant.movementContourSign === sign) {
-      score += 0.25;
+      score += NpcLodConfig.contourStickyHysteresisEnabled
+        ? NPC_CONTOUR_SAME_SIDE_BONUS_STICKY
+        : NPC_CONTOUR_SAME_SIDE_BONUS;
     }
     return score;
   }
