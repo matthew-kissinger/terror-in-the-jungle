@@ -210,6 +210,23 @@ export class CombatantMovement {
   private nextStuckRecoveryWarnAtMs = 0;
   private suppressedStuckRecoveryWarns = 0;
 
+  // ── Per-tick current-position terrain-height memo ──
+  // A single NPC's contour solve samples getTerrainHeight at its *current*
+  // position (combatant.position) up to four times in one updateMovement call:
+  // chooseContourDirection -> scoreContourDirection (left + right) each sample
+  // the current height, and computeDirectionalSpeedFactor (called from both
+  // scoring passes AND once more for the chosen direction) re-samples it. The
+  // position is fixed for the whole steering computation (it only advances after
+  // the solver returns), so the repeated samples return the identical float.
+  // This memo collapses them to one terrain query. It is keyed on the EXACT
+  // (x, z) floats and getHeightAt is a pure function of (x, z), so a cache hit
+  // returns a byte-identical value — routing output (contour decisions, routes)
+  // is unchanged; only the redundant terrain queries are removed.
+  private posHeightCacheValid = false;
+  private posHeightCacheX = 0;
+  private posHeightCacheZ = 0;
+  private posHeightCacheValue = 0;
+
   constructor(terrainSystem?: ITerrainRuntime, zoneQuery?: IZoneQuery) {
     this.terrainSystem = terrainSystem;
     this.zoneQuery = zoneQuery;
@@ -230,6 +247,11 @@ export class CombatantMovement {
     combatants: Map<string, Combatant>,
     options?: { disableSpacing?: boolean; disableTerrainSample?: boolean }
   ): void {
+    // Fresh per-tick current-position height memo for this combatant. Must be
+    // reset before any contour terrain sampling so a height is never reused
+    // across NPCs or across ticks.
+    this.resetPositionHeightCache();
+
     // Stop movement if game is not active
     if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
       combatant.velocity.set(0, 0, 0);
@@ -998,7 +1020,10 @@ export class CombatantMovement {
   }
 
   private isForwardBlocked(position: THREE.Vector3, direction: THREE.Vector3): boolean {
-    const currentHeight = this.getTerrainHeight(position.x, position.z);
+    // Memoized when `position` is the combatant's current position (the hot-path
+    // callers); a different position falls through to a fresh sample. Keyed on
+    // exact (x, z), so the value is byte-identical to getTerrainHeight either way.
+    const currentHeight = this.getCurrentPositionHeight(position.x, position.z);
     const aheadX = position.x + direction.x * NPC_FORWARD_PROBE_DISTANCE;
     const aheadZ = position.z + direction.z * NPC_FORWARD_PROBE_DISTANCE;
     const aheadHeight = this.getTerrainHeight(aheadX, aheadZ);
@@ -1105,7 +1130,7 @@ export class CombatantMovement {
     anchorDirection: THREE.Vector3,
     sign: -1 | 1,
   ): number {
-    const currentHeight = this.getTerrainHeight(combatant.position.x, combatant.position.z);
+    const currentHeight = this.getCurrentPositionHeight(combatant.position.x, combatant.position.z);
     const aheadX = combatant.position.x + direction.x * NPC_FORWARD_PROBE_DISTANCE;
     const aheadZ = combatant.position.z + direction.z * NPC_FORWARD_PROBE_DISTANCE;
     const aheadHeight = this.getTerrainHeight(aheadX, aheadZ);
@@ -1134,7 +1159,7 @@ export class CombatantMovement {
     direction: THREE.Vector3,
     intent: CombatantMovementIntent = combatant.movementIntent ?? this.resolveMovementIntent(combatant),
   ): number {
-    const currentHeight = this.getTerrainHeight(combatant.position.x, combatant.position.z);
+    const currentHeight = this.getCurrentPositionHeight(combatant.position.x, combatant.position.z);
     const aheadHeight = this.getTerrainHeight(
       combatant.position.x + direction.x * NPC_FORWARD_PROBE_DISTANCE,
       combatant.position.z + direction.z * NPC_FORWARD_PROBE_DISTANCE,
@@ -1458,6 +1483,35 @@ export class CombatantMovement {
       throw new Error('CombatantMovement requires terrainSystem before terrain height queries');
     }
     return this.terrainSystem.getHeightAt(x, z);
+  }
+
+  /**
+   * Reset the per-tick current-position height memo. Called once at the top of
+   * each {@link updateMovement} so the memo never carries a height across NPCs
+   * or across ticks (where the position has moved).
+   */
+  private resetPositionHeightCache(): void {
+    this.posHeightCacheValid = false;
+  }
+
+  /**
+   * Memoized terrain height for the combatant's *current* position within a
+   * single tick. Keyed on the exact (x, z) floats: a hit only occurs when the
+   * caller asks for the identical coordinates already sampled this tick, and
+   * `getHeightAt` is a pure function of (x, z), so the returned value is
+   * byte-identical to a fresh {@link getTerrainHeight} call. Any other position
+   * (forward probes, contour neighbours) falls through to a fresh sample.
+   */
+  private getCurrentPositionHeight(x: number, z: number): number {
+    if (this.posHeightCacheValid && this.posHeightCacheX === x && this.posHeightCacheZ === z) {
+      return this.posHeightCacheValue;
+    }
+    const height = this.getTerrainHeight(x, z);
+    this.posHeightCacheValid = true;
+    this.posHeightCacheX = x;
+    this.posHeightCacheZ = z;
+    this.posHeightCacheValue = height;
+    return height;
   }
 
   /**
