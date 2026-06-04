@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { Combatant, CombatantState, ITargetable, Squad, isPlayerTarget } from '../types'
 import { ISpatialQuery } from '../SpatialOctree'
 import { Logger } from '../../../utils/Logger'
-import { resolveOrderIntent, isWithinLeash } from '../SquadOrderPosture'
+import { resolveOrderIntent, isWithinLeash, isFallbackAcquisitionSuppressed } from '../SquadOrderPosture'
 const _toDestination = new THREE.Vector3()
 const _toTarget = new THREE.Vector3()
 const _toCover = new THREE.Vector3()
@@ -127,15 +127,26 @@ export class AIStateMovement {
   }
 
   /**
-   * Acquisition leash gate (SVYAZ-4 Stage 2). Returns true (acquire) unless the
-   * combatant is in a player-commanded squad with an active leashed order AND
-   * the enemy sits beyond (leashRadius + engageBandPastLeash) of the anchor.
+   * Acquisition gate for the ADVANCING (push) state (SVYAZ-4 Stage 2 leash +
+   * Stage 3 ATTACK/FALL BACK). Returns true (acquire) unless a FALL BACK posture
+   * is active and the unit is not pinned, or a non-ATTACK leashed order is active
+   * and the enemy is past (leashRadius + engageBandPastLeash) of the anchor.
+   *
+   * ATTACK is the exception: a unit ADVANCING onto an attack objective ENGAGES EN
+   * ROUTE (the spike's "engage en route" contract). The destination-anchored leash
+   * would otherwise reject enemies near the advancing unit but far from the anchor,
+   * so for an ATTACK posture this state does not gate by anchor distance — the
+   * existing <30m close-range react logic in handleAdvancing bounds engagement.
    * Guarded so non-player / no-order combatants are byte-identical.
    */
   private isEnemyWithinCommandLeash(combatant: Combatant, enemyPosition: THREE.Vector3): boolean {
     const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined
     const intent = resolveOrderIntent(combatant, squad)
+    if (isFallbackAcquisitionSuppressed(intent, combatant.lastHitTime, Date.now())) {
+      return false
+    }
     if (!intent.hasActiveOrder) return true
+    if (intent.mode === 'attack') return true
     return isWithinLeash(intent, enemyPosition)
   }
 

@@ -6,7 +6,7 @@ import { Combatant, CombatantState, ITargetable, Squad, isPlayerTarget } from '.
 import { ISpatialQuery } from '../SpatialOctree';
 import type { IZoneQuery } from '../../../types/SystemInterfaces';
 import { clusterManager } from '../ClusterManager';
-import { resolveOrderIntent, isWithinLeash } from '../SquadOrderPosture';
+import { resolveOrderIntent, isWithinLeash, isFallbackAcquisitionSuppressed } from '../SquadOrderPosture';
 
 const _toTarget = new THREE.Vector3();
 const _toDefensePos = new THREE.Vector3();
@@ -121,14 +121,18 @@ export class AIStateDefend {
   }
 
   /**
-   * Acquisition leash gate (SVYAZ-4 Stage 2). Returns true (acquire) unless the
-   * combatant is in a player-commanded squad with an active leashed order AND
-   * the enemy sits beyond (leashRadius + engageBandPastLeash) of the anchor.
-   * Guarded so non-player / no-order combatants are byte-identical.
+   * Acquisition gate for player-commanded squads (SVYAZ-4 Stage 2 leash + Stage 3
+   * FALL BACK). Returns true (acquire) unless a leashed order is active and the
+   * enemy is past (leashRadius + engageBandPastLeash) of the anchor, or a FALL
+   * BACK posture is active and the unit is not pinned (not hit within the panic
+   * window). Guarded so non-player / no-order combatants are byte-identical.
    */
   private isEnemyWithinCommandLeash(combatant: Combatant, enemyPosition: THREE.Vector3): boolean {
     const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
     const intent = resolveOrderIntent(combatant, squad);
+    if (isFallbackAcquisitionSuppressed(intent, combatant.lastHitTime, Date.now())) {
+      return false;
+    }
     if (!intent.hasActiveOrder) return true;
     return isWithinLeash(intent, enemyPosition);
   }

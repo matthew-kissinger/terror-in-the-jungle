@@ -32,6 +32,12 @@ vi.mock('three', () => ({
       this.z = a.z - b.z
       return this
     })
+    this.distanceTo = vi.fn(function (this: any, v: any) {
+      const dx = this.x - v.x
+      const dy = this.y - v.y
+      const dz = this.z - v.z
+      return Math.sqrt(dx * dx + dy * dy + dz * dz)
+    })
     this.length = vi.fn(function (this: any) {
       return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z)
     })
@@ -463,6 +469,19 @@ describe('CombatantAI', () => {
 
         expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
       })
+
+      it('redirects to the marked rally point when one is set (SVYAZ-4 Stage 3)', () => {
+        mockCombatant.state = CombatantState.ENGAGING
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        // FALL BACK breaks contact and heads to the marked rally point (-100,-100),
+        // not the old retreat-away-from-player vector.
+        expect(mockCombatant.destinationPoint).toBeDefined()
+        expect(mockCombatant.destinationPoint!.x).toBe(-100)
+        expect(mockCombatant.destinationPoint!.z).toBe(-100)
+      })
     })
 
     describe('HOLD_POSITION command', () => {
@@ -575,15 +594,32 @@ describe('CombatantAI', () => {
         squad.commandPosition = new THREE.Vector3(50, 0, 50)
       })
 
-      it('should transition DEFENDING combatant to PATROLLING', () => {
+      it('pushes a far DEFENDING combatant onto the anchor via ADVANCING (SVYAZ-4 Stage 3)', () => {
         const THREE = require('three')
+        // Combatant at origin, anchor at (50,50) -> well past the arrive radius.
+        mockCombatant.position = new THREE.Vector3(0, 0, 0)
         mockCombatant.state = CombatantState.DEFENDING
         mockCombatant.defensePosition = new THREE.Vector3(50, 0, 50)
 
         ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
 
-        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        // ATTACK is a push objective: the unit advances onto the point (engaging
+        // en route) rather than sitting on patrol.
+        expect(mockCombatant.state).toBe(CombatantState.ADVANCING)
+        expect(mockCombatant.destinationPoint).toBeDefined()
         expect(mockCombatant.defensePosition).toBeUndefined()
+      })
+
+      it('does not re-push a unit already on the objective footprint', () => {
+        const THREE = require('three')
+        // Combatant standing on the anchor -> inside the arrive radius.
+        mockCombatant.position = new THREE.Vector3(50, 0, 50)
+        mockCombatant.state = CombatantState.PATROLLING
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        // Arrived -> stays in a non-advancing hold posture (take + hold).
+        expect(mockCombatant.state).not.toBe(CombatantState.ADVANCING)
       })
 
       it('should NOT interrupt ENGAGING state', () => {
@@ -637,14 +673,32 @@ describe('CombatantAI', () => {
     })
 
     describe('faction and squad filtering', () => {
-      it('should NOT affect OPFOR faction combatants', () => {
+      it('makes a player-controlled OPFOR squad follow commands (gate is player-control, not faction)', () => {
+        // SVYAZ-4 Stage 3 fix: commanding as OPFOR must work. The override is
+        // gated on the squad being player-controlled, not on isBlufor — a
+        // player-commanded OPFOR squad pulls out of combat on FOLLOW_ME just like
+        // a BLUFOR one would.
+        squad.faction = Faction.NVA
+        mockCombatant.faction = Faction.NVA
+        mockCombatant.state = CombatantState.ENGAGING
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.US })
+        squad.currentCommand = SquadCommand.FOLLOW_ME
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.target).toBeNull()
+      })
+
+      it('leaves an OPFOR combatant in a NON-player squad byte-identical (no override)', () => {
+        squad.isPlayerControlled = false
         mockCombatant.faction = Faction.NVA
         mockCombatant.state = CombatantState.ENGAGING
         squad.currentCommand = SquadCommand.FOLLOW_ME
 
         ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
 
-        // OPFOR should be unaffected - engageHandler should be called normally
+        // No player control -> override is inert -> normal engage runs.
         const engageHandler = (ai as any).engageHandler
         expect(engageHandler.handleEngaging).toHaveBeenCalled()
       })

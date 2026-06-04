@@ -8,11 +8,11 @@ import { Logger } from '../../../utils/Logger'
 import { ISpatialQuery } from '../SpatialOctree'
 import { clusterManager } from '../ClusterManager'
 import { NpcLodConfig } from '../../../config/CombatantConfig'
-import { resolveOrderIntent, isWithinLeash } from '../SquadOrderPosture'
+import { resolveOrderIntent, isWithinLeash, isFallbackAcquisitionSuppressed, resolveFallbackRally } from '../SquadOrderPosture'
+import { SquadCommandConfig } from '../../../config/SquadCommandConfig'
 
 const _toTarget = new THREE.Vector3()
 const _offset = new THREE.Vector3()
-const _awayDir = new THREE.Vector3()
 const PATROL_VISIBILITY_RECHECK_MS = 250
 
 interface PatrolVisibilitySample {
@@ -144,9 +144,12 @@ export class AIStatePatrol {
   }
 
   /**
-   * Acquisition leash gate (SVYAZ-4 Stage 2). Returns true (acquire) unless the
-   * combatant is in a player-commanded squad with an active leashed order AND
-   * the enemy sits beyond (leashRadius + engageBandPastLeash) of the anchor.
+   * Acquisition gate for player-commanded squads (SVYAZ-4 Stage 2 leash + Stage 3
+   * FALL BACK). Returns true (acquire) unless:
+   * - a leashed order (HOLD/ATTACK/PATROL) is active AND the enemy sits beyond
+   *   (leashRadius + engageBandPastLeash) of the anchor, or
+   * - a FALL BACK posture is active AND the unit is not pinned (not hit within the
+   *   panic window) — it runs to rally rather than turning to fight.
    * Guarded so non-player / no-order combatants are byte-identical.
    */
   private isEnemyWithinCommandLeash(
@@ -155,6 +158,9 @@ export class AIStatePatrol {
     enemyPosition: THREE.Vector3
   ): boolean {
     const intent = resolveOrderIntent(combatant, squad);
+    if (isFallbackAcquisitionSuppressed(intent, combatant.lastHitTime, Date.now())) {
+      return false;
+    }
     if (!intent.hasActiveOrder) return true;
     return isWithinLeash(intent, enemyPosition);
   }
@@ -197,14 +203,19 @@ export class AIStatePatrol {
 
       case SquadCommand.PATROL_HERE:
         if (squad.commandPosition) {
-          const patrolRadius = 20;
+          // Roam radius from config so the wander destination and the Stage 2
+          // acquisition leash agree on the area the squad is responsible for. The
+          // RNG wander lives here (the non-pure AI side), not in SquadOrderPosture.
+          const patrolRadius = SquadCommandConfig.patrolRoamRadius;
           const basePos = squad.commandPosition;
 
           if (!combatant.destinationPoint ||
               combatant.position.distanceTo(combatant.destinationPoint) < 5) {
             const angle = Math.random() * Math.PI * 2;
-            const distance = Math.random() * patrolRadius;
-            
+            // Math.sqrt keeps the wander point inside the radius with uniform area
+            // coverage; either way |offset| <= patrolRadius so roam stays leashed.
+            const distance = Math.sqrt(Math.random()) * patrolRadius;
+
             _offset.set(
               basePos.x + Math.cos(angle) * distance,
               basePos.y,
@@ -216,7 +227,12 @@ export class AIStatePatrol {
         break;
 
       case SquadCommand.ATTACK_HERE:
-        if (squad.commandPosition && combatant.position.distanceTo(squad.commandPosition) > 5) {
+        // ATTACK pushes onto the anchor through the ADVANCING state (set by
+        // applySquadCommandOverride). If the unit is still PATROLLING here (e.g.
+        // it just arrived and ADVANCING self-terminated), keep it heading to the
+        // anchor until it is on the objective footprint.
+        if (squad.commandPosition &&
+            combatant.position.distanceTo(squad.commandPosition) > SquadCommandConfig.attackArriveRadius) {
           combatant.destinationPoint = squad.commandPosition.clone();
         } else {
           combatant.destinationPoint = undefined;
@@ -224,13 +240,15 @@ export class AIStatePatrol {
         break;
 
       case SquadCommand.RETREAT:
-        if (squad.commandPosition) {
-          const retreatDistance = 50;
-          _awayDir
-            .subVectors(combatant.position, playerPosition)
-            .normalize()
-            .multiplyScalar(retreatDistance);
-          combatant.destinationPoint = squad.commandPosition.clone().add(_awayDir);
+        // FALL BACK rally: head to the marked point if set, else the live player
+        // (when fallBackRallyToPlayer). Shared with applySquadCommandOverride so
+        // both agree — no more retreat-away-from-player vector that fought the
+        // marked rally point.
+        {
+          const rally = resolveFallbackRally(squad, playerPosition);
+          if (rally) {
+            combatant.destinationPoint = rally;
+          }
         }
         break;
 

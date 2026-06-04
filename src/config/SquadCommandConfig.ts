@@ -42,6 +42,15 @@ export const SquadCommandConfig = {
   patrolRoamRadius: 20,
 
   /**
+   * Distance (metres) from an ATTACK anchor within which a unit is treated as
+   * "arrived" and no longer routed through ADVANCING (SVYAZ-4 Stage 3). Above
+   * this, a not-yet-arrived non-combat unit pushes onto the anchor via the
+   * existing ADVANCING state; ADVANCING itself self-terminates at its own ~3m
+   * arrival, so this only governs whether the push is (re)issued.
+   */
+  attackArriveRadius: 5,
+
+  /**
    * Extra band (metres) added past the leash radius before an enemy is
    * considered "out of reach". An NPC engages anything within
    * (leashRadius + engageBandPastLeash) of the anchor but will not acquire or
@@ -57,4 +66,14 @@ export const SquadCommandConfig = {
    * one live-tunable switch.)
    */
   fallBackRallyToPlayer: true,
+
+  /**
+   * Panic window (seconds) within which a FALL BACK NPC may still re-acquire and
+   * fire on a threat (SVYAZ-4 Stage 3, "fire only if pinned"). FALL BACK breaks
+   * contact and runs to rally with acquisition suppressed; this window is the one
+   * exception — a unit that was hit (its `lastHitTime`) inside this many seconds
+   * is pinned and may shoot back rather than be cut down while fleeing. Matched to
+   * the engage-state panic window so a pinned NPC behaves consistently.
+   */
+  fallBackPinnedWindowSeconds: 3,
 };

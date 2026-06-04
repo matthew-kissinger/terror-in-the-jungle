@@ -3,7 +3,13 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { resolveOrderIntent, isWithinLeash } from './SquadOrderPosture';
+import {
+  resolveOrderIntent,
+  isWithinLeash,
+  resolveFallbackRally,
+  isFallbackAcquisitionSuppressed,
+  isRecentlyHit,
+} from './SquadOrderPosture';
 import { Combatant, Faction, Squad, SquadCommand } from './types';
 import { SquadCommandConfig } from '../../config/SquadCommandConfig';
 
@@ -180,5 +186,108 @@ describe('SquadOrderPosture.isWithinLeash', () => {
     const intent = resolveOrderIntent(makeCombatant(), undefined);
     const faraway = new THREE.Vector3(10_000, 0, 10_000);
     expect(isWithinLeash(intent, faraway)).toBe(true);
+  });
+});
+
+describe('SquadOrderPosture FALL BACK posture (SVYAZ-4 Stage 3)', () => {
+  function fallBackSquad(overrides: Partial<Squad> = {}): Squad {
+    return makeSquad({
+      isPlayerControlled: true,
+      currentCommand: SquadCommand.RETREAT,
+      ...overrides,
+    });
+  }
+
+  it('resolves a fallback posture without engaging the leash band', () => {
+    // FALL BACK is a posture, not a leash: it must not gate acquisition by
+    // distance from an anchor (that is what makes a unit "fire only if pinned"
+    // rather than "engage within the leash").
+    const intent = resolveOrderIntent(makeCombatant(), fallBackSquad());
+    expect(intent.mode).toBe('fallback');
+    expect(intent.hasActiveOrder).toBe(false);
+    // An enemy a kilometre away is still "within leash" because there is no leash.
+    expect(isWithinLeash(intent, new THREE.Vector3(1000, 0, 1000))).toBe(true);
+  });
+
+  it('rallies to the marked point when FALL BACK carries one', () => {
+    const mark = new THREE.Vector3(7, 0, -3);
+    const squad = fallBackSquad({ commandPosition: mark });
+    const rally = resolveFallbackRally(squad, new THREE.Vector3(100, 0, 100));
+    expect(rally).not.toBeNull();
+    expect(rally!.x).toBe(7);
+    expect(rally!.z).toBe(-3);
+  });
+
+  it('rallies to the live player when FALL BACK has no marked point', () => {
+    const squad = fallBackSquad({ commandPosition: undefined });
+    const player = new THREE.Vector3(42, 0, 9);
+    const rally = resolveFallbackRally(squad, player);
+    expect(rally).not.toBeNull();
+    expect(rally!.x).toBe(42);
+    expect(rally!.z).toBe(9);
+  });
+
+  it('does not mutate the marked point or player position it returns', () => {
+    const mark = new THREE.Vector3(1, 0, 1);
+    const squad = fallBackSquad({ commandPosition: mark });
+    const rally = resolveFallbackRally(squad, new THREE.Vector3())!;
+    rally.set(999, 999, 999);
+    // The order board's marked point is untouched (rally is a clone).
+    expect(mark.x).toBe(1);
+    expect(mark.z).toBe(1);
+  });
+
+  it('suppresses acquisition for an un-pinned FALL BACK unit', () => {
+    const intent = resolveOrderIntent(makeCombatant(), fallBackSquad());
+    // Never hit (lastHitTime 0) -> suppressed (runs to rally, does not fight).
+    expect(isFallbackAcquisitionSuppressed(intent, 0, 10_000)).toBe(true);
+  });
+
+  it('lets a pinned FALL BACK unit re-acquire (hit inside the panic window)', () => {
+    const intent = resolveOrderIntent(makeCombatant(), fallBackSquad());
+    const now = 100_000;
+    const windowMs = SquadCommandConfig.fallBackPinnedWindowSeconds * 1000;
+    // Hit half a window ago -> pinned -> not suppressed -> may fire back.
+    const recentHit = now - windowMs / 2;
+    expect(isFallbackAcquisitionSuppressed(intent, recentHit, now)).toBe(false);
+  });
+
+  it('re-suppresses once the pin (last hit) ages out of the panic window', () => {
+    const intent = resolveOrderIntent(makeCombatant(), fallBackSquad());
+    const now = 100_000;
+    const windowMs = SquadCommandConfig.fallBackPinnedWindowSeconds * 1000;
+    const oldHit = now - windowMs * 2;
+    expect(isFallbackAcquisitionSuppressed(intent, oldHit, now)).toBe(true);
+  });
+
+  it('never suppresses acquisition for a non-fallback posture', () => {
+    // A HOLD intent is leashed, not fallback — suppression must be inert there so
+    // the leash band stays the sole gate.
+    const hold = resolveOrderIntent(
+      makeCombatant(),
+      makeSquad({
+        isPlayerControlled: true,
+        currentCommand: SquadCommand.HOLD_POSITION,
+        commandPosition: new THREE.Vector3(),
+      }),
+    );
+    expect(isFallbackAcquisitionSuppressed(hold, 0, 10_000)).toBe(false);
+  });
+});
+
+describe('SquadOrderPosture.isRecentlyHit', () => {
+  it('treats a never-hit unit (lastHitTime 0) as not recent', () => {
+    expect(isRecentlyHit(0, 10_000, 3000)).toBe(false);
+  });
+
+  it('is true inside the window and false outside it', () => {
+    expect(isRecentlyHit(9000, 10_000, 3000)).toBe(true);
+    expect(isRecentlyHit(6000, 10_000, 3000)).toBe(false);
+  });
+
+  it('is deterministic given an explicit clock (no wall-clock read)', () => {
+    const a = isRecentlyHit(8000, 10_000, 3000);
+    const b = isRecentlyHit(8000, 10_000, 3000);
+    expect(a).toBe(b);
   });
 });

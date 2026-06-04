@@ -23,11 +23,24 @@ export interface SquadOrderIntent {
   acquisitionAllowed: boolean;
   /** Whether an active HOLD / ATTACK / PATROL order is in force for this squad. */
   hasActiveOrder: boolean;
-  /** Standing posture derived from the squad command. */
-  mode: 'none' | 'hold' | 'attack' | 'patrol';
-  /** Leash radius (metres) for the active order, or 0 when no leashed order. */
+  /**
+   * Standing posture derived from the squad command.
+   * - `hold` / `attack` / `patrol`: leashed standing orders (acquisition gated by
+   *   `isWithinLeash`).
+   * - `fallback`: break contact and run to rally (FALL BACK / RETREAT). Not a
+   *   leashed order — `hasActiveOrder` is false — but a distinct posture the
+   *   acquisition scans use to suppress fire unless the unit is pinned
+   *   (`isFallbackAcquisitionSuppressed`).
+   * - `none`: behave autonomously (off the commanded path).
+   */
+  mode: 'none' | 'hold' | 'attack' | 'patrol' | 'fallback';
+  /** Leash radius (metres) for the active leashed order, or 0 otherwise. */
   leashRadius: number;
-  /** Order anchor (the squad's commandPosition), or null when none is set. */
+  /**
+   * Order anchor. For HOLD/ATTACK/PATROL this is the squad's `commandPosition`.
+   * For `fallback` it is the explicit marked rally point, or null when the squad
+   * means "rally to the live player" (resolved by `resolveFallbackRally`).
+   */
   anchor: THREE.Vector3 | null;
 }
 
@@ -47,6 +60,8 @@ function modeForCommand(command: SquadCommand | undefined): SquadOrderIntent['mo
       return 'attack';
     case SquadCommand.PATROL_HERE:
       return 'patrol';
+    case SquadCommand.RETREAT:
+      return 'fallback';
     default:
       return 'none';
   }
@@ -92,6 +107,22 @@ export function resolveOrderIntent(_combatant: Combatant, squad: Squad | undefin
     return NONE_INTENT;
   }
 
+  if (mode === 'fallback') {
+    // FALL BACK is a posture, not a leash: the unit breaks contact and runs to
+    // rally. `hasActiveOrder` stays false so the leash band (`isWithinLeash`)
+    // never gates it; acquisition is instead suppressed unless the unit is
+    // pinned (`isFallbackAcquisitionSuppressed`). A null anchor means "rally to
+    // the live player" (resolved by `resolveFallbackRally`) — that is a valid
+    // fallback, unlike a leashed order with no marked point.
+    return {
+      acquisitionAllowed: false,
+      hasActiveOrder: false,
+      mode,
+      leashRadius: 0,
+      anchor: squad.commandPosition ?? null,
+    };
+  }
+
   const anchor = squad.commandPosition ?? null;
   if (!anchor) {
     // A leashed order with no marked point cannot anchor a leash — leave the NPC
@@ -123,4 +154,58 @@ export function isWithinLeash(intent: SquadOrderIntent, enemyPosition: THREE.Vec
   const dx = enemyPosition.x - intent.anchor.x;
   const dz = enemyPosition.z - intent.anchor.z;
   return dx * dx + dz * dz <= reach * reach;
+}
+
+/**
+ * Resolve the FALL BACK rally destination for a player-commanded squad (SVYAZ-4
+ * Stage 3). Honors an explicit marked point (`commandPosition`) when one is set;
+ * otherwise rallies to the live player position when
+ * `SquadCommandConfig.fallBackRallyToPlayer` is on. Returns null only when there
+ * is no marked point and rally-to-player is disabled — the caller then leaves the
+ * existing destination alone.
+ *
+ * Pure: clones inputs, reads no clock / RNG. The caller supplies `playerPosition`
+ * so the squad order board never has to embed the (mutable) player reference.
+ */
+export function resolveFallbackRally(
+  squad: Squad | undefined,
+  playerPosition: THREE.Vector3,
+): THREE.Vector3 | null {
+  if (squad?.commandPosition) {
+    return squad.commandPosition.clone();
+  }
+  if (SquadCommandConfig.fallBackRallyToPlayer) {
+    return playerPosition.clone();
+  }
+  return null;
+}
+
+/**
+ * "Fire only if pinned" gate for a FALL BACK unit (SVYAZ-4 Stage 3). A retreating
+ * unit suppresses acquisition — it runs to rally rather than turning to fight —
+ * UNLESS it was hit within `SquadCommandConfig.fallBackPinnedWindowSeconds`, in
+ * which case it is pinned and may shoot back. Returns true when acquisition
+ * should be suppressed.
+ *
+ * Pure: the clock read stays in the caller (which passes `nowMs`), so this helper
+ * is deterministic and reproducible under test.
+ */
+export function isFallbackAcquisitionSuppressed(
+  intent: SquadOrderIntent,
+  lastHitTimeMs: number,
+  nowMs: number,
+): boolean {
+  if (intent.mode !== 'fallback') return false;
+  const pinned = isRecentlyHit(lastHitTimeMs, nowMs, SquadCommandConfig.fallBackPinnedWindowSeconds * 1000);
+  return !pinned;
+}
+
+/**
+ * Pure recency test: was `lastHitTimeMs` within `windowMs` before `nowMs`?
+ * A `lastHitTimeMs` of 0 (never hit) is treated as not-recent. Extracted so the
+ * "pinned" decision is unit-testable without a clock.
+ */
+export function isRecentlyHit(lastHitTimeMs: number, nowMs: number, windowMs: number): boolean {
+  if (!lastHitTimeMs) return false;
+  return nowMs - lastHitTimeMs < windowMs;
 }

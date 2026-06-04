@@ -293,20 +293,37 @@ describe('AIStatePatrol', () => {
       expect(combatant.destinationPoint?.clone()).toEqual(attackPos);
     });
 
-    it('should handle RETREAT command', () => {
+    it('rallies a RETREAT (FALL BACK) command to the marked point (SVYAZ-4 Stage 3)', () => {
       squad.currentCommand = SquadCommand.RETREAT;
-      squad.commandPosition = new THREE.Vector3(-100, 0, -100);
+      const rally = new THREE.Vector3(-100, 0, -100);
+      squad.commandPosition = rally;
       combatant.position.set(10, 0, 10);
-      // player is at 0,0,0. awayDir from player is (10, 0, 10) normalized * 50 = (35.35, 0, 35.35)
-      // destination = commandPosition + awayDir = (-100 + 35.35, 0, -100 + 35.35) = (-64.65, 0, -64.65)
 
       aiStatePatrol.handlePatrolling(
         combatant, 0.016, playerPosition, allCombatants, undefined,
         findNearestEnemy, canSeeTarget, shouldEngage
       );
 
+      // FALL BACK heads to the marked rally point, not an away-from-player vector.
       expect(combatant.destinationPoint).toBeDefined();
-      expect(combatant.destinationPoint?.x).toBeLessThan(-60);
+      expect(combatant.destinationPoint?.x).toBe(-100);
+      expect(combatant.destinationPoint?.z).toBe(-100);
+    });
+
+    it('rallies a RETREAT with no marked point to the live player', () => {
+      squad.currentCommand = SquadCommand.RETREAT;
+      squad.commandPosition = undefined;
+      combatant.position.set(10, 0, 10);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      // No marked point -> rally to the live player (fallBackRallyToPlayer default).
+      expect(combatant.destinationPoint).toBeDefined();
+      expect(combatant.destinationPoint?.x).toBe(playerPosition.x);
+      expect(combatant.destinationPoint?.z).toBe(playerPosition.z);
     });
   });
 

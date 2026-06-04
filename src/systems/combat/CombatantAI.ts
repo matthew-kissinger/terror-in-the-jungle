@@ -2,7 +2,9 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction, ITargetable, Squad, SquadCommand, isBlufor } from './types'
+import { Combatant, CombatantState, Faction, ITargetable, Squad, SquadCommand } from './types'
+import { resolveFallbackRally } from './SquadOrderPosture'
+import { SquadCommandConfig } from '../../config/SquadCommandConfig'
 import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
@@ -607,15 +609,18 @@ export class CombatantAI {
 
   /**
    * Check if a player-controlled squad's currentCommand should override the combatant's
-   * current AI state. Only affects US faction combatants in player squads.
+   * current AI state. Gated on the squad being PLAYER-CONTROLLED, not on faction
+   * (SVYAZ-4 Stage 3 fix): a player-commanded squad of EITHER alliance must follow
+   * orders. Previously gated on `isBlufor`, which silently no-op'd OPFOR command.
    *
    * - FOLLOW_ME / RETREAT: interrupt combat states (ENGAGING, SUPPRESSING, ALERT, SEEKING_COVER)
+   * - RETREAT (FALL BACK): also redirect to the rally point (marked point, else player)
    * - HOLD_POSITION: transition non-combat states to DEFENDING (does NOT override active combat)
-   * - PATROL_HERE / ATTACK_HERE: ensure non-combat states stay in PATROLLING (does NOT override active combat)
+   * - ATTACK_HERE: push not-yet-arrived non-combat units onto the anchor via ADVANCING
+   * - PATROL_HERE: ensure non-combat states stay in PATROLLING (does NOT override active combat)
    * - FREE_ROAM / NONE: clear command-driven overrides, return to normal AI
    */
-  private applySquadCommandOverride(combatant: Combatant, _playerPosition: THREE.Vector3): void {
-    if (!isBlufor(combatant.faction)) return
+  private applySquadCommandOverride(combatant: Combatant, playerPosition: THREE.Vector3): void {
     if (!combatant.squadId) return
 
     const squad = this.squads.get(combatant.squadId)
@@ -661,6 +666,19 @@ export class CombatantAI {
           combatant.defensePosition = undefined
           combatant.defendingZoneId = undefined
         }
+        // FALL BACK posture (SVYAZ-4 Stage 3): break contact and run to rally.
+        // The combat interrupt above already dropped the target; here we point
+        // the destination at the rally (the marked point if set, else the live
+        // player when fallBackRallyToPlayer is on). Acquisition stays suppressed
+        // unless the unit is pinned — that gate lives in the perception scans
+        // (isFallbackAcquisitionSuppressed), so a target re-acquired there is
+        // intentional (fire-only-if-pinned) and we must not stomp it.
+        if (command === SquadCommand.RETREAT) {
+          const rally = resolveFallbackRally(squad, playerPosition)
+          if (rally) {
+            combatant.destinationPoint = rally
+          }
+        }
         break
 
       case SquadCommand.HOLD_POSITION:
@@ -674,8 +692,31 @@ export class CombatantAI {
         }
         break
 
-      case SquadCommand.PATROL_HERE:
       case SquadCommand.ATTACK_HERE:
+        // Does NOT interrupt active combat. For a not-yet-arrived non-combat unit,
+        // push it onto the anchor through the EXISTING ADVANCING state (engages en
+        // route, drops to ENGAGING on contact, arrives + holds). Reuses the
+        // movement machinery — no new mover. ADVANCING reads destinationPoint and
+        // self-terminates on arrival (<3m -> ENGAGING), so once the unit is on the
+        // objective it leaves ADVANCING naturally.
+        if (!isInCombat) {
+          if (combatant.state === CombatantState.DEFENDING) {
+            combatant.defensePosition = undefined
+            combatant.defendingZoneId = undefined
+          }
+          const anchor = squad.commandPosition
+          if (anchor && combatant.position.distanceTo(anchor) > SquadCommandConfig.attackArriveRadius) {
+            combatant.state = CombatantState.ADVANCING
+            combatant.destinationPoint = anchor.clone()
+            combatant.isFlankingMove = false
+          } else if (combatant.state === CombatantState.DEFENDING) {
+            // Arrived (or no anchor) -> fall back to plain patrol/hold behaviour.
+            combatant.state = CombatantState.PATROLLING
+          }
+        }
+        break
+
+      case SquadCommand.PATROL_HERE:
         // Does NOT interrupt active combat - ensure non-combat states are PATROLLING
         if (!isInCombat && combatant.state === CombatantState.DEFENDING) {
           combatant.state = CombatantState.PATROLLING
