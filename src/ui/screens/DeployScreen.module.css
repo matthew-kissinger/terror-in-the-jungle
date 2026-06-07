@@ -967,6 +967,9 @@
   }
 
   .controlPanel {
+    position: sticky;
+    z-index: 3;
+    bottom: max(var(--space-2), env(safe-area-inset-bottom, 0px));
     padding: var(--space-3);
   }
 
