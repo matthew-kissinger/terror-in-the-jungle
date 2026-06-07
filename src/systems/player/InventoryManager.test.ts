@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
+import { LoadoutEquipment, LoadoutWeapon } from '../../ui/loadout/LoadoutTypes';
 
 // Mock Logger to avoid console output during tests
 vi.mock('../../utils/Logger', () => ({
@@ -179,22 +180,38 @@ describe('InventoryManager', () => {
       expect(slotChangeCallback).not.toHaveBeenCalled();
     });
 
-    it('should cycle weapon on KeyQ', () => {
+    it('should cycle weapon slots on KeyQ without selecting equipment', () => {
       const slotChangeCallback = vi.fn();
       inventoryManager.onSlotChange(slotChangeCallback);
 
       // Start at PRIMARY (2)
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ' }));
-      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.SANDBAG); // 3
+      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.SMG);
 
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ' }));
-      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.SMG); // 4
+      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.PISTOL);
 
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ' }));
-      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.PISTOL); // 5
+      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.SHOTGUN);
 
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ' }));
-      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.SHOTGUN); // 0 (wrapped)
+      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.PRIMARY);
+    });
+
+    it('cycles only the selected loadout weapon slots on KeyQ', () => {
+      inventoryManager.setLoadout({
+        primaryWeapon: LoadoutWeapon.LMG,
+        secondaryWeapon: LoadoutWeapon.PISTOL,
+        equipment: LoadoutEquipment.MORTAR_KIT,
+      });
+
+      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.PRIMARY);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ' }));
+      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.SHOTGUN);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyQ' }));
+      expect(inventoryManager.getCurrentSlot()).toBe(WeaponSlot.PRIMARY);
     });
 
     it('should notify multiple callbacks on slot change', () => {

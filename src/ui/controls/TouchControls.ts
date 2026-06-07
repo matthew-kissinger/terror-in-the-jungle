@@ -334,6 +334,10 @@ export class TouchControls {
     this.adsButton.resetADS();
   }
 
+  setWeaponSlotConfig(labels: readonly string[], weaponCycleSlots: readonly number[]): void {
+    this.actionButtons.setSlotConfig(labels, weaponCycleSlots);
+  }
+
   isVisible(): boolean {
     return this.visible;
   }

@@ -24,11 +24,15 @@ import {
   getEquipmentShortLabel,
   getWeaponLabel,
   getWeaponShortLabel,
+  LoadoutEquipment,
+  LoadoutWeapon,
   type LoadoutFieldKey,
   type PlayerLoadout,
   type VehicleDeployOption,
 } from '../loadout/LoadoutTypes';
+import { icon } from '../icons/IconRegistry';
 import styles from './DeployScreen.module.css';
+import { ArmoryCharacterPreview } from './deploy/ArmoryCharacterPreview';
 import {
   createDiv,
   createHeading,
@@ -48,6 +52,19 @@ interface LoadoutFieldControl {
   previousButton: HTMLButtonElement;
   nextButton: HTMLButtonElement;
   availability: HTMLDivElement;
+  optionButtons: HTMLButtonElement[];
+}
+
+type DeployScreenView = 'insertion' | 'armory';
+type ArmoryPreviewSlot = 'primary' | 'secondary' | 'equipment' | 'ammo';
+type LoadoutSelectionValue = LoadoutWeapon | LoadoutEquipment | AmmoLoad;
+
+interface ArmoryPreviewControl {
+  visual: HTMLDivElement;
+  icon: HTMLImageElement;
+  fallback: HTMLSpanElement;
+  value: HTMLDivElement;
+  meta: HTMLDivElement;
 }
 
 const LOADOUT_FIELD_ORDER: Array<{ key: LoadoutFieldKey; label: string }> = [
@@ -58,6 +75,15 @@ const LOADOUT_FIELD_ORDER: Array<{ key: LoadoutFieldKey; label: string }> = [
 ];
 
 export class DeployScreen extends UIComponent {
+  private mapPanel?: HTMLDivElement;
+  private armoryPreviewPanel?: HTMLDivElement;
+  private armoryCharacterPreview?: ArmoryCharacterPreview;
+  private insertionSideView?: HTMLDivElement;
+  private armorySideView?: HTMLDivElement;
+  private insertionViewButton?: HTMLButtonElement;
+  private armoryViewButton?: HTMLButtonElement;
+  private activeView: DeployScreenView = 'insertion';
+  private loadoutEditingEnabled = false;
   private mapContainer?: HTMLDivElement;
   private headerTitle?: HTMLHeadingElement;
   private headerStatus?: HTMLDivElement;
@@ -66,6 +92,7 @@ export class DeployScreen extends UIComponent {
   private headerLoadoutValue?: HTMLDivElement;
   private headerAllianceValue?: HTMLDivElement;
   private mapTitle?: HTMLDivElement;
+  private selectedPanel?: HTMLDivElement;
   private selectedName?: HTMLDivElement;
   private selectedStatus?: HTMLDivElement;
   private selectedTitle?: HTMLHeadingElement;
@@ -92,6 +119,7 @@ export class DeployScreen extends UIComponent {
   private onSpawnOptionSelected?: (spawnPointId: string, spawnPointName: string) => void;
   private onVehicleDeployOptionSelected?: (vehicleId: string, vehicleName: string) => void;
   private onLoadoutChange?: (field: LoadoutFieldKey, direction: 1 | -1) => void;
+  private onLoadoutSelect?: (field: LoadoutFieldKey, value: LoadoutSelectionValue) => void;
   private onPresetCycle?: (direction: 1 | -1) => void;
   private onPresetSave?: () => void;
   private deploySession?: DeploySessionModel;
@@ -99,7 +127,9 @@ export class DeployScreen extends UIComponent {
   private currentLoadout?: PlayerLoadout;
   private decisionStartedAtMs: number | null = null;
   private decisionElapsedMs: number | null = null;
+  private armoryFocusWeapon?: LoadoutWeapon;
   private readonly loadoutControls = new Map<LoadoutFieldKey, LoadoutFieldControl>();
+  private readonly armoryPreviewControls = new Map<ArmoryPreviewSlot, ArmoryPreviewControl>();
 
   constructor() {
     super();
@@ -143,8 +173,17 @@ export class DeployScreen extends UIComponent {
     header.appendChild(headerCopy);
     header.appendChild(headerMeta);
 
+    const viewTabs = this.createDiv(styles.viewTabs, 'respawn-view-tabs');
+    this.insertionViewButton = this.makeButton('respawn-view-insertion', 'Insertion', () => this.setActiveView('insertion'));
+    this.armoryViewButton = this.makeButton('respawn-view-armory', 'Armory', () => this.setActiveView('armory'));
+    this.insertionViewButton.classList.add(styles.viewTab);
+    this.armoryViewButton.classList.add(styles.viewTab);
+    viewTabs.appendChild(this.insertionViewButton);
+    viewTabs.appendChild(this.armoryViewButton);
+
     // Map panel (hero)
     const mapPanel = this.createDiv(styles.mapPanel);
+    this.mapPanel = mapPanel;
     const mapHeader = this.createDiv(styles.mapHeader);
     this.mapTitle = this.createDiv(styles.mapTitle, 'respawn-map-title');
     this.mapTitle.textContent = 'SELECT SPAWN POINT';
@@ -156,25 +195,35 @@ export class DeployScreen extends UIComponent {
     mapPanel.appendChild(mapHeader);
     mapPanel.appendChild(this.mapContainer);
 
+    const primaryColumn = this.createDiv(styles.primaryColumn);
+    primaryColumn.appendChild(mapPanel);
+    primaryColumn.appendChild(this.createArmoryPreviewPanel());
+
     // Side panel
     const sidePanel = this.createDiv(styles.sidePanel);
     sidePanel.appendChild(this.createSelectedPanel());
     const sideScroll = this.createDiv(styles.sideScroll, 'respawn-side-scroll');
-    sideScroll.appendChild(this.createSpawnOptionsPanel());
-    sideScroll.appendChild(this.createVehicleOptionsPanel());
-    sideScroll.appendChild(this.createSequencePanel());
-    sideScroll.appendChild(this.createLoadoutPanel());
-    sideScroll.appendChild(this.createLegendPanel());
+    this.insertionSideView = this.createDiv(styles.sideView, 'respawn-insertion-view');
+    this.insertionSideView.appendChild(this.createSpawnOptionsPanel());
+    this.insertionSideView.appendChild(this.createVehicleOptionsPanel());
+    this.insertionSideView.appendChild(this.createSequencePanel());
+    this.insertionSideView.appendChild(this.createLegendPanel());
+    this.armorySideView = this.createDiv(styles.sideView, 'respawn-armory-view');
+    this.armorySideView.appendChild(this.createLoadoutPanel());
+    sideScroll.appendChild(this.insertionSideView);
+    sideScroll.appendChild(this.armorySideView);
     sidePanel.appendChild(sideScroll);
     sidePanel.appendChild(this.createControlsPanel());
 
-    layout.appendChild(mapPanel);
+    layout.appendChild(primaryColumn);
     layout.appendChild(sidePanel);
 
     stage.appendChild(header);
+    stage.appendChild(viewTabs);
     stage.appendChild(layout);
 
     this.root.appendChild(stage);
+    this.setActiveView('insertion');
   }
 
   // --- Public API (same as old RespawnUI) ---
@@ -209,6 +258,7 @@ export class DeployScreen extends UIComponent {
       this.secondaryActionButton.style.display = session.secondaryActionLabel ? 'block' : 'none';
     }
     this.setLoadoutEditingEnabled(session.allowLoadoutEditing);
+    this.setActiveView('insertion');
     if (!this.selectedName || this.selectedName.textContent === 'NONE') {
       this.resetSelectedSpawn();
     }
@@ -224,6 +274,10 @@ export class DeployScreen extends UIComponent {
     this.onLoadoutChange = callback;
   }
 
+  setLoadoutSelectCallback(callback: (field: LoadoutFieldKey, value: LoadoutSelectionValue) => void): void {
+    this.onLoadoutSelect = callback;
+  }
+
   setPresetCycleCallback(callback: (direction: 1 | -1) => void): void {
     this.onPresetCycle = callback;
   }
@@ -233,6 +287,7 @@ export class DeployScreen extends UIComponent {
   }
 
   setLoadoutEditingEnabled(enabled: boolean): void {
+    this.loadoutEditingEnabled = enabled;
     if (this.loadoutPanel) {
       this.loadoutPanel.style.opacity = enabled ? '1' : '0.55';
     }
@@ -243,11 +298,16 @@ export class DeployScreen extends UIComponent {
       this.applyButtonState(control.previousButton, enabled);
       this.applyButtonState(control.nextButton, enabled);
     }
+    this.setLoadoutOptionButtonsEnabled(enabled);
     if (this.presetPreviousButton) this.applyButtonState(this.presetPreviousButton, enabled);
     if (this.presetNextButton) this.applyButtonState(this.presetNextButton, enabled);
     if (this.presetSaveButton) {
       const saveEnabled = enabled && (this.loadoutPresentation?.presetDirty ?? true);
       this.applyButtonState(this.presetSaveButton, saveEnabled);
+    }
+    if (this.armoryViewButton) this.applyButtonState(this.armoryViewButton, enabled);
+    if (!enabled && this.activeView === 'armory') {
+      this.setActiveView('insertion');
     }
     this.refreshLoadoutState(enabled);
   }
@@ -258,6 +318,7 @@ export class DeployScreen extends UIComponent {
     this.updateFieldValue('secondaryWeapon', getWeaponLabel(loadout.secondaryWeapon));
     this.updateFieldValue('equipment', getEquipmentLabel(loadout.equipment));
     this.updateFieldValue('ammoLoad', getAmmoLoadLabel(loadout.ammoLoad ?? AmmoLoad.STANDARD));
+    this.updateArmoryPreview(loadout);
     this.refreshAvailabilityChips();
   }
 
@@ -273,14 +334,17 @@ export class DeployScreen extends UIComponent {
     }
     this.refreshAvailabilityChips();
     this.refreshLoadoutState(this.deploySession?.allowLoadoutEditing === true);
+    this.updateArmoryCharacterPreview();
   }
 
   show(): void {
     this.root.style.display = 'flex';
+    this.armoryCharacterPreview?.setVisible(this.activeView === 'armory');
     this.setDecisionTimerStarted();
   }
 
   hide(): void {
+    this.armoryCharacterPreview?.setVisible(false);
     this.root.style.display = 'none';
     this.decisionStartedAtMs = null;
     this.decisionElapsedMs = null;
@@ -415,6 +479,8 @@ export class DeployScreen extends UIComponent {
   }
 
   override dispose(): void {
+    this.armoryCharacterPreview?.dispose();
+    this.armoryCharacterPreview = undefined;
     super.dispose();
   }
 
@@ -422,6 +488,7 @@ export class DeployScreen extends UIComponent {
 
   private createSelectedPanel(): HTMLDivElement {
     const panel = this.createDiv(styles.panel, 'respawn-selected-panel');
+    this.selectedPanel = panel;
     this.selectedTitle = this.createHeading('h3', undefined, styles.panelTitle, 'SPAWN POINT');
     this.selectedName = this.createDiv(styles.selectedName, 'selected-spawn-name');
     this.selectedName.textContent = 'NONE';
@@ -467,16 +534,78 @@ export class DeployScreen extends UIComponent {
   private createLoadoutPanel(): HTMLDivElement {
     const panel = this.createDiv(styles.loadoutPanel, 'respawn-loadout-panel');
     this.loadoutPanel = panel;
-    panel.appendChild(this.createHeading('h3', undefined, styles.panelTitle, 'LOADOUT'));
+    panel.appendChild(this.createHeading('h3', undefined, styles.panelTitle, 'ARMORY OPTIONS'));
     this.loadoutStatus = this.createDiv(styles.loadoutStatus, 'respawn-loadout-status');
-    this.loadoutStatus.textContent = 'Two weapon slots and one equipment slot. Adjust before deploying.';
+    this.loadoutStatus.textContent = 'Preset kit and ammo load.';
     panel.appendChild(this.loadoutStatus);
     panel.appendChild(this.createPresetPanel());
 
+    const grid = this.createDiv(styles.loadoutGrid, 'respawn-loadout-grid');
     for (const field of LOADOUT_FIELD_ORDER) {
-      panel.appendChild(this.createLoadoutRow(field.key, field.label));
+      grid.appendChild(this.createLoadoutRow(field.key, field.label));
     }
+    panel.appendChild(grid);
     return panel;
+  }
+
+  private createArmoryPreviewPanel(): HTMLDivElement {
+    const panel = this.createDiv(styles.armoryPreviewPanel, 'respawn-armory-preview-panel');
+    this.armoryPreviewPanel = panel;
+
+    const header = this.createDiv(styles.armoryPreviewHeader);
+    header.appendChild(this.createHeading('h2', undefined, styles.mapTitle, 'ARMORY'));
+    const meta = this.createDiv(styles.armoryPreviewMeta);
+    meta.textContent = 'DEPLOYMENT KIT';
+    header.appendChild(meta);
+
+    const board = this.createDiv(styles.armoryBoard);
+    const figure = this.createDiv(styles.armoryModelStage, 'respawn-armory-model-stage');
+    const canvas = document.createElement('canvas');
+    canvas.id = 'respawn-armory-character-canvas';
+    canvas.className = styles.armoryModelCanvas;
+    canvas.setAttribute('aria-label', 'Equipped soldier preview');
+    const status = this.createDiv(styles.armoryModelStatus, 'respawn-armory-model-status');
+    const animationControls = this.createDiv(styles.armoryAnimationControls, 'respawn-armory-animation-controls');
+    figure.appendChild(canvas);
+    figure.appendChild(animationControls);
+    figure.appendChild(status);
+    this.armoryCharacterPreview = new ArmoryCharacterPreview(figure, canvas, status, animationControls);
+
+    const kit = this.createDiv(styles.armoryKit);
+    kit.appendChild(this.createArmoryPreviewItem('primary', 'Primary'));
+    kit.appendChild(this.createArmoryPreviewItem('secondary', 'Secondary'));
+    kit.appendChild(this.createArmoryPreviewItem('equipment', 'Equipment'));
+    kit.appendChild(this.createArmoryPreviewItem('ammo', 'Ammo Load'));
+
+    board.appendChild(figure);
+    board.appendChild(kit);
+    panel.appendChild(header);
+    panel.appendChild(board);
+    return panel;
+  }
+
+  private createArmoryPreviewItem(slot: ArmoryPreviewSlot, label: string): HTMLDivElement {
+    const item = this.createDiv(styles.armoryPreviewItem, `respawn-armory-${slot}`);
+    const visual = this.createDiv(styles.armoryPreviewIcon);
+    const iconEl = document.createElement('img');
+    iconEl.alt = '';
+    iconEl.draggable = false;
+    const fallback = document.createElement('span');
+    visual.appendChild(iconEl);
+    visual.appendChild(fallback);
+
+    const copy = this.createDiv(styles.armoryPreviewCopy);
+    const meta = this.createDiv(styles.armoryPreviewSlot);
+    meta.textContent = label;
+    const value = this.createDiv(styles.armoryPreviewValue);
+    value.textContent = '--';
+    copy.appendChild(meta);
+    copy.appendChild(value);
+
+    item.appendChild(visual);
+    item.appendChild(copy);
+    this.armoryPreviewControls.set(slot, { visual, icon: iconEl, fallback, value, meta });
+    return item;
   }
 
   private createPresetPanel(): HTMLDivElement {
@@ -508,16 +637,15 @@ export class DeployScreen extends UIComponent {
   }
 
   private createLoadoutRow(field: LoadoutFieldKey, label: string): HTMLDivElement {
-    const row = this.createDiv(styles.loadoutRow);
-    const valueBlock = this.createDiv();
+    const row = this.createDiv(styles.loadoutSection, `respawn-loadout-${field}-section`);
+    const header = this.createDiv(styles.loadoutSectionHeader);
+    const valueBlock = this.createDiv(styles.loadoutCurrent);
     const labelEl = this.createDiv(styles.loadoutLabel);
     labelEl.textContent = label;
     const valueEl = this.createDiv(styles.loadoutValue, `loadout-${field}-value`);
     valueEl.textContent = '--';
     valueBlock.appendChild(labelEl);
     valueBlock.appendChild(valueEl);
-    const availability = this.createDiv(styles.availabilityStrip);
-    valueBlock.appendChild(availability);
 
     const buttons = this.createDiv(styles.loadoutButtons);
     const prev = this.makeButton(undefined, 'PREV', () => this.onLoadoutChange?.(field, -1));
@@ -525,9 +653,12 @@ export class DeployScreen extends UIComponent {
     buttons.appendChild(prev);
     buttons.appendChild(next);
 
-    row.appendChild(valueBlock);
-    row.appendChild(buttons);
-    this.loadoutControls.set(field, { value: valueEl, previousButton: prev, nextButton: next, availability });
+    header.appendChild(valueBlock);
+    header.appendChild(buttons);
+    const availability = this.createDiv(styles.loadoutOptionGrid, `respawn-loadout-${field}-options`);
+    row.appendChild(header);
+    row.appendChild(availability);
+    this.loadoutControls.set(field, { value: valueEl, previousButton: prev, nextButton: next, availability, optionButtons: [] });
     return row;
   }
 
@@ -612,6 +743,112 @@ export class DeployScreen extends UIComponent {
     if (control) control.value.textContent = value;
   }
 
+  private setActiveView(view: DeployScreenView): void {
+    if (view === 'armory' && this.armoryViewButton?.disabled) {
+      view = 'insertion';
+    }
+    this.activeView = view;
+    const insertionActive = view === 'insertion';
+    if (this.mapPanel) this.mapPanel.style.display = insertionActive ? '' : 'none';
+    if (this.armoryPreviewPanel) this.armoryPreviewPanel.style.display = insertionActive ? 'none' : '';
+    if (this.selectedPanel) this.selectedPanel.style.display = insertionActive ? '' : 'none';
+    if (this.insertionSideView) this.insertionSideView.style.display = insertionActive ? 'flex' : 'none';
+    if (this.armorySideView) this.armorySideView.style.display = insertionActive ? 'none' : 'flex';
+    this.setViewButtonActive(this.insertionViewButton, insertionActive);
+    this.setViewButtonActive(this.armoryViewButton, !insertionActive);
+    this.insertionViewButton?.setAttribute('aria-pressed', String(insertionActive));
+    this.armoryViewButton?.setAttribute('aria-pressed', String(!insertionActive));
+    if (this.root.dataset) this.root.dataset.deployView = view;
+    const rootVisible = this.root.style.display !== 'none';
+    this.armoryCharacterPreview?.setVisible(!insertionActive && rootVisible);
+  }
+
+  private setViewButtonActive(button: HTMLButtonElement | undefined, active: boolean): void {
+    if (!button) return;
+    if (active) {
+      button.classList.add(styles.viewTabActive);
+    } else {
+      button.classList.remove(styles.viewTabActive);
+    }
+  }
+
+  private updateArmoryPreview(loadout: PlayerLoadout): void {
+    this.updateArmoryPreviewItem(
+      'primary',
+      getWeaponLabel(loadout.primaryWeapon),
+      getWeaponShortLabel(loadout.primaryWeapon),
+      this.getWeaponIcon(loadout.primaryWeapon)
+    );
+    this.updateArmoryPreviewItem(
+      'secondary',
+      getWeaponLabel(loadout.secondaryWeapon),
+      getWeaponShortLabel(loadout.secondaryWeapon),
+      this.getWeaponIcon(loadout.secondaryWeapon)
+    );
+    this.updateArmoryPreviewItem(
+      'equipment',
+      getEquipmentLabel(loadout.equipment),
+      getEquipmentShortLabel(loadout.equipment),
+      this.getEquipmentIcon(loadout.equipment)
+    );
+    const ammoLoad = loadout.ammoLoad ?? AmmoLoad.STANDARD;
+    this.updateArmoryPreviewItem('ammo', getAmmoLoadLabel(ammoLoad), getAmmoLoadShortLabel(ammoLoad));
+    this.updateArmoryCharacterPreview();
+  }
+
+  private updateArmoryPreviewItem(
+    slot: ArmoryPreviewSlot,
+    value: string,
+    shortLabel: string,
+    iconName?: string,
+  ): void {
+    const control = this.armoryPreviewControls.get(slot);
+    if (!control) return;
+    control.value.textContent = value;
+    if (iconName) {
+      control.icon.src = icon(iconName);
+      control.icon.style.display = 'block';
+      control.fallback.textContent = '';
+      control.visual.dataset.fallback = 'false';
+    } else {
+      control.icon.style.display = 'none';
+      control.fallback.textContent = shortLabel;
+      control.visual.dataset.fallback = 'true';
+    }
+  }
+
+  private getWeaponIcon(weapon: LoadoutWeapon): string {
+    switch (weapon) {
+      case LoadoutWeapon.SHOTGUN:
+        return 'icon-shotgun';
+      case LoadoutWeapon.SMG:
+        return 'icon-smg';
+      case LoadoutWeapon.PISTOL:
+        return 'icon-pistol';
+      case LoadoutWeapon.LMG:
+        return 'icon-lmg';
+      case LoadoutWeapon.LAUNCHER:
+        return 'icon-launcher';
+      case LoadoutWeapon.RIFLE:
+      default:
+        return 'icon-rifle';
+    }
+  }
+
+  private getEquipmentIcon(equipment: LoadoutEquipment): string {
+    switch (equipment) {
+      case LoadoutEquipment.SANDBAG_KIT:
+        return 'icon-sandbag';
+      case LoadoutEquipment.MORTAR_KIT:
+        return 'icon-mortar';
+      case LoadoutEquipment.FRAG_GRENADE:
+      case LoadoutEquipment.SMOKE_GRENADE:
+      case LoadoutEquipment.FLASHBANG:
+      default:
+        return 'icon-grenade';
+    }
+  }
+
   /**
    * Surface the faction's available pool per loadout slot (UX-3): render each
    * option as a short-label chip with the active selection highlighted, so the
@@ -628,13 +865,35 @@ export class DeployScreen extends UIComponent {
       AMMO_LOAD_OPTIONS.map(option => option.value),
       current?.ammoLoad ?? AmmoLoad.STANDARD,
       getAmmoLoadShortLabel,
+      getAmmoLoadLabel,
     );
 
     const model = this.loadoutPresentation;
     if (!model) return;
-    this.renderAvailabilityStrip('primaryWeapon', model.availableWeapons, current?.primaryWeapon, getWeaponShortLabel);
-    this.renderAvailabilityStrip('secondaryWeapon', model.availableWeapons, current?.secondaryWeapon, getWeaponShortLabel);
-    this.renderAvailabilityStrip('equipment', model.availableEquipment, current?.equipment, getEquipmentShortLabel);
+    this.renderAvailabilityStrip(
+      'primaryWeapon',
+      model.availableWeapons,
+      current?.primaryWeapon,
+      getWeaponShortLabel,
+      getWeaponLabel,
+      value => this.getWeaponIcon(value as LoadoutWeapon),
+    );
+    this.renderAvailabilityStrip(
+      'secondaryWeapon',
+      model.availableWeapons,
+      current?.secondaryWeapon,
+      getWeaponShortLabel,
+      getWeaponLabel,
+      value => this.getWeaponIcon(value as LoadoutWeapon),
+    );
+    this.renderAvailabilityStrip(
+      'equipment',
+      model.availableEquipment,
+      current?.equipment,
+      getEquipmentShortLabel,
+      getEquipmentLabel,
+      value => this.getEquipmentIcon(value as LoadoutEquipment),
+    );
   }
 
   private renderAvailabilityStrip<T extends string>(
@@ -642,17 +901,83 @@ export class DeployScreen extends UIComponent {
     pool: readonly T[],
     active: T | undefined,
     shortLabel: (value: T) => string,
+    fullLabel: (value: T) => string,
+    iconName?: (value: T) => string | undefined,
   ): void {
     const control = this.loadoutControls.get(field);
     if (!control) return;
     const strip = control.availability;
     strip.innerHTML = '';
+    control.optionButtons = [];
     for (const value of pool) {
-      const chip = this.createDiv(styles.availabilityChip);
-      chip.textContent = shortLabel(value);
-      if (value === active) chip.classList.add(styles.availabilityChipActive);
-      strip.appendChild(chip);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = styles.loadoutOptionCard;
+      button.dataset.loadoutField = field;
+      button.dataset.loadoutOption = String(value);
+      button.setAttribute('aria-pressed', String(value === active));
+      button.disabled = !this.loadoutEditingEnabled;
+      if (value === active) button.classList.add(styles.loadoutOptionCardActive);
+      const visual = this.createDiv(styles.loadoutOptionVisual);
+      const iconNameForValue = iconName?.(value);
+      if (iconNameForValue) {
+        const iconEl = document.createElement('img');
+        iconEl.alt = '';
+        iconEl.draggable = false;
+        iconEl.src = icon(iconNameForValue);
+        visual.appendChild(iconEl);
+      } else {
+        visual.textContent = shortLabel(value);
+      }
+      const copy = this.createDiv(styles.loadoutOptionCopy);
+      const name = this.createDiv(styles.loadoutOptionName);
+      name.textContent = fullLabel(value);
+      const meta = this.createDiv(styles.loadoutOptionMeta);
+      meta.textContent = shortLabel(value);
+      copy.appendChild(name);
+      copy.appendChild(meta);
+      button.appendChild(visual);
+      button.appendChild(copy);
+      button.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        this.selectLoadoutOption(field, value as LoadoutSelectionValue);
+      });
+      control.optionButtons.push(button);
+      strip.appendChild(button);
     }
+  }
+
+  private selectLoadoutOption(field: LoadoutFieldKey, value: LoadoutSelectionValue): void {
+    if (!this.loadoutEditingEnabled) return;
+    if (field === 'primaryWeapon' || field === 'secondaryWeapon') {
+      this.armoryFocusWeapon = value as LoadoutWeapon;
+      if (this.currentLoadout) {
+        this.armoryCharacterPreview?.setLoadout(
+          this.currentLoadout,
+          this.loadoutPresentation?.context.faction,
+          this.armoryFocusWeapon,
+        );
+      }
+    }
+    this.onLoadoutSelect?.(field, value);
+  }
+
+  private setLoadoutOptionButtonsEnabled(enabled: boolean): void {
+    for (const control of this.loadoutControls.values()) {
+      control.optionButtons.forEach((button) => {
+        button.disabled = !enabled;
+      });
+    }
+  }
+
+  private updateArmoryCharacterPreview(): void {
+    if (!this.currentLoadout) return;
+    const focusWeapon = this.armoryFocusWeapon ?? this.currentLoadout.primaryWeapon;
+    this.armoryCharacterPreview?.setLoadout(
+      this.currentLoadout,
+      this.loadoutPresentation?.context.faction,
+      focusWeapon,
+    );
   }
 
   private renderSequenceSteps(steps: string[]): void {

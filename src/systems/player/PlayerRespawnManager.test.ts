@@ -17,6 +17,7 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { getGameModeDefinition } from '../../config/gameModeDefinitions';
 import { resolveInitialSpawnPosition } from '../world/runtime/ModeSpawnResolver';
 import {
+  AmmoLoad,
   DEFAULT_PLAYER_LOADOUT,
   LoadoutEquipment,
   LoadoutWeapon
@@ -194,6 +195,7 @@ describe('PlayerRespawnManager', () => {
       setMapInteractionEnabled: vi.fn(),
       setLoadoutEditingEnabled: vi.fn(),
       setLoadoutChangeCallback: vi.fn(),
+      setLoadoutSelectCallback: vi.fn(),
       setPresetCycleCallback: vi.fn(),
       setPresetSaveCallback: vi.fn(),
       setRespawnClickCallback: vi.fn(),
@@ -359,6 +361,22 @@ describe('PlayerRespawnManager', () => {
         secondaryWeapon: LoadoutWeapon.PISTOL,
         equipment: LoadoutEquipment.SMOKE_GRENADE,
       })),
+      setPrimaryWeapon: vi.fn((weapon: LoadoutWeapon) => ({
+        ...DEFAULT_PLAYER_LOADOUT,
+        primaryWeapon: weapon,
+      })),
+      setSecondaryWeapon: vi.fn((weapon: LoadoutWeapon) => ({
+        ...DEFAULT_PLAYER_LOADOUT,
+        secondaryWeapon: weapon,
+      })),
+      setEquipment: vi.fn((equipment: LoadoutEquipment) => ({
+        ...DEFAULT_PLAYER_LOADOUT,
+        equipment,
+      })),
+      setAmmoLoad: vi.fn((ammoLoad: AmmoLoad) => ({
+        ...DEFAULT_PLAYER_LOADOUT,
+        ammoLoad,
+      })),
       saveCurrentToActivePreset: vi.fn(() => ({
         id: 'recon',
         name: 'Recon',
@@ -408,6 +426,7 @@ describe('PlayerRespawnManager', () => {
       expect((mockDeployScreen as any).setPresetSaveCallback).toHaveBeenCalled();
       expect(mockMapController.setZoneSelectedCallback).toHaveBeenCalled();
       expect(mockDeployScreen.setLoadoutChangeCallback).toHaveBeenCalled();
+      expect((mockDeployScreen as any).setLoadoutSelectCallback).toHaveBeenCalled();
     });
   });
 
@@ -1220,6 +1239,24 @@ describe('PlayerRespawnManager', () => {
       }));
       expect((mockDeployScreen as any).updateLoadout).toHaveBeenLastCalledWith(expect.objectContaining({
         equipment: LoadoutEquipment.MORTAR_KIT,
+      }));
+      expect((mockDeployScreen as any).updateLoadoutPresentation).toHaveBeenCalled();
+    });
+
+    it('routes direct deploy loadout selections through the loadout service', async () => {
+      await respawnManager.init();
+      respawnManager.setInventoryManager(mockInventoryManager);
+      respawnManager.onPlayerDeath();
+
+      const callback = vi.mocked((mockDeployScreen as any).setLoadoutSelectCallback).mock.calls[0][0];
+      callback('primaryWeapon', LoadoutWeapon.SMG);
+
+      expect((mockLoadoutService as any).setPrimaryWeapon).toHaveBeenCalledWith(LoadoutWeapon.SMG);
+      expect((mockInventoryManager as any).setLoadout).toHaveBeenCalledWith(expect.objectContaining({
+        primaryWeapon: LoadoutWeapon.SMG,
+      }));
+      expect((mockDeployScreen as any).updateLoadout).toHaveBeenLastCalledWith(expect.objectContaining({
+        primaryWeapon: LoadoutWeapon.SMG,
       }));
       expect((mockDeployScreen as any).updateLoadoutPresentation).toHaveBeenCalled();
     });

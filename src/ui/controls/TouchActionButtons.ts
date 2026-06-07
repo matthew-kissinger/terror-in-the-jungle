@@ -22,12 +22,11 @@ import { UIComponent } from '../engine/UIComponent';
 import { icon } from '../icons/IconRegistry';
 import styles from './TouchControls.module.css';
 
-const SLOT_LABELS = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
+const DEFAULT_SLOT_LABELS = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
 const SLOT_COUNT = 6;
 const GRENADE_SLOT = 1;
 
-/** All inventory slot indices for cycling (weapons + equipment) */
-const ALL_SLOTS = [0, 1, 2, 3, 4, 5]; // SG, GRN, AR, SB, SMG, PST
+const DEFAULT_WEAPON_CYCLE_SLOTS = [2, 0, 4, 5]; // AR, SG, SMG, PST
 
 const SWIPE_THRESHOLD = 40; // px
 const DOUBLE_TAP_WINDOW = 300; // ms
@@ -44,6 +43,8 @@ export class TouchActionButtons extends UIComponent {
   private activeActionPresses = new Map<HTMLElement, number>();
   private activeIndex = 2; // Default: AR (slot 2)
   private previousIndex = 0; // Last weapon for quick-switch
+  private slotLabels = [...DEFAULT_SLOT_LABELS];
+  private weaponCycleSlots = [...DEFAULT_WEAPON_CYCLE_SLOTS];
   private weaponLabelEl?: HTMLElement;
   private weaponAmmoEl?: HTMLElement;
   private weaponCyclerEl?: HTMLElement;
@@ -248,10 +249,26 @@ export class TouchActionButtons extends UIComponent {
   setActiveSlot(index: number): void {
     if (index >= 0 && index < SLOT_COUNT) {
       if (this.activeIndex !== index) {
-        this.previousIndex = this.activeIndex;
+        if (this.isWeaponCycleSlot(this.activeIndex)) {
+          this.previousIndex = this.activeIndex;
+        }
       }
       this.activeIndex = index;
       this.updateWeaponLabel();
+    }
+  }
+
+  setSlotConfig(labels: readonly string[], weaponCycleSlots: readonly number[]): void {
+    this.slotLabels = Array.from({ length: SLOT_COUNT }, (_, index) => labels[index] ?? DEFAULT_SLOT_LABELS[index] ?? '--');
+    this.setWeaponCycleSlots(weaponCycleSlots);
+    this.updateWeaponLabel();
+  }
+
+  setWeaponCycleSlots(slots: readonly number[]): void {
+    const sanitized = this.sanitizeWeaponCycleSlots(slots);
+    this.weaponCycleSlots = sanitized.length > 0 ? sanitized : [...DEFAULT_WEAPON_CYCLE_SLOTS];
+    if (!this.isWeaponCycleSlot(this.previousIndex)) {
+      this.previousIndex = this.weaponCycleSlots[0] ?? this.activeIndex;
     }
   }
 
@@ -292,7 +309,7 @@ export class TouchActionButtons extends UIComponent {
 
     const label = document.createElement('div');
     label.className = styles.weaponCyclerLabel;
-    label.textContent = SLOT_LABELS[this.activeIndex];
+    label.textContent = this.slotLabels[this.activeIndex];
 
     const ammo = document.createElement('div');
     ammo.className = styles.weaponCyclerAmmo;
@@ -315,42 +332,58 @@ export class TouchActionButtons extends UIComponent {
   }
 
   private cycleNext(): void {
-    const currentGunIdx = ALL_SLOTS.indexOf(this.activeIndex);
-    const nextGunIdx = (currentGunIdx + 1) % ALL_SLOTS.length;
-    const next = ALL_SLOTS[nextGunIdx >= 0 ? nextGunIdx : 0];
-    this.previousIndex = this.activeIndex;
-    this.activeIndex = next;
-    this.updateWeaponLabel();
-    this.onWeaponSelect?.(next);
-    this.flashSwitch();
+    this.selectWeaponCycleSlot(this.getAdjacentWeaponSlot(1));
   }
 
   private cyclePrev(): void {
-    const currentGunIdx = ALL_SLOTS.indexOf(this.activeIndex);
-    const prevGunIdx = (currentGunIdx - 1 + ALL_SLOTS.length) % ALL_SLOTS.length;
-    const prev = ALL_SLOTS[prevGunIdx >= 0 ? prevGunIdx : 0];
-    this.previousIndex = this.activeIndex;
-    this.activeIndex = prev;
-    this.updateWeaponLabel();
-    this.onWeaponSelect?.(prev);
-    this.flashSwitch();
+    this.selectWeaponCycleSlot(this.getAdjacentWeaponSlot(-1));
   }
 
   /** Double-tap quick-switch to the previous weapon. */
   private quickSwitchToLast(): void {
-    if (this.previousIndex === this.activeIndex) return;
+    if (this.previousIndex === this.activeIndex || !this.isWeaponCycleSlot(this.previousIndex)) return;
     const target = this.previousIndex;
-    this.previousIndex = this.activeIndex;
-    this.activeIndex = target;
-    this.updateWeaponLabel();
-    this.onWeaponSelect?.(target);
-    this.flashSwitch();
+    this.selectWeaponCycleSlot(target);
   }
 
   private updateWeaponLabel(): void {
     if (this.weaponLabelEl) {
-      this.weaponLabelEl.textContent = SLOT_LABELS[this.activeIndex];
+      this.weaponLabelEl.textContent = this.slotLabels[this.activeIndex] ?? '--';
     }
+  }
+
+  private getAdjacentWeaponSlot(direction: 1 | -1): number {
+    const slots = this.weaponCycleSlots;
+    const currentIndex = slots.indexOf(this.activeIndex);
+    if (currentIndex < 0) return slots[0] ?? this.activeIndex;
+    return slots[(currentIndex + direction + slots.length) % slots.length];
+  }
+
+  private selectWeaponCycleSlot(slot: number): void {
+    if (slot < 0 || slot >= SLOT_COUNT) return;
+    const previous = this.activeIndex;
+    if (previous !== slot && this.isWeaponCycleSlot(previous)) {
+      this.previousIndex = previous;
+    }
+    this.activeIndex = slot;
+    this.updateWeaponLabel();
+    this.onWeaponSelect?.(slot);
+    this.flashSwitch();
+  }
+
+  private isWeaponCycleSlot(slot: number): boolean {
+    return this.weaponCycleSlots.includes(slot);
+  }
+
+  private sanitizeWeaponCycleSlots(slots: readonly number[]): number[] {
+    const sanitized: number[] = [];
+    for (const slot of slots) {
+      if (!Number.isInteger(slot) || slot < 0 || slot >= SLOT_COUNT || sanitized.includes(slot)) {
+        continue;
+      }
+      sanitized.push(slot);
+    }
+    return sanitized;
   }
 
   private flashSwitch(): void {

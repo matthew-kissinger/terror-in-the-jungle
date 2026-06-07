@@ -23,7 +23,12 @@ import {
 import { getGameModeDefinition } from '../../config/gameModeDefinitions';
 import { GameMode } from '../../config/gameModeTypes';
 import type { LoadoutFieldKey, PlayerLoadout, VehicleDeployOption } from '../../ui/loadout/LoadoutTypes';
-import { getVehicleDeployOptionsForMode } from '../../ui/loadout/LoadoutTypes';
+import {
+  AmmoLoad,
+  getVehicleDeployOptionsForMode,
+  LoadoutEquipment,
+  LoadoutWeapon,
+} from '../../ui/loadout/LoadoutTypes';
 import type { VehicleMarker } from '../../ui/minimap/MinimapRenderer';
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import { InputContextManager } from '../input/InputContextManager';
@@ -48,6 +53,8 @@ interface PlayerRespawnManagerDependencies {
   terrainSystem: ITerrainRuntime;
   helipadSystem: HelipadSystem;
 }
+
+type LoadoutSelectionValue = LoadoutWeapon | LoadoutEquipment | AmmoLoad;
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -127,6 +134,9 @@ export class PlayerRespawnManager implements GameSystem {
     });
     this.respawnUI.setLoadoutChangeCallback((field, direction) => {
       this.handleLoadoutChange(field, direction);
+    });
+    this.respawnUI.setLoadoutSelectCallback((field, value) => {
+      this.handleLoadoutSelect(field, value);
     });
     this.respawnUI.setPresetCycleCallback((direction) => {
       this.handlePresetCycle(direction);
@@ -572,6 +582,17 @@ export class PlayerRespawnManager implements GameSystem {
     this.syncLoadoutPresentation();
   }
 
+  private handleLoadoutSelect(field: LoadoutFieldKey, value: LoadoutSelectionValue): void {
+    if (!this.deploySession?.allowLoadoutEditing || !this.loadoutService) {
+      return;
+    }
+
+    const updatedLoadout = this.updateLoadoutSelection(field, value);
+    this.inventoryManager?.setLoadout(updatedLoadout);
+    this.respawnUI.updateLoadout(updatedLoadout);
+    this.syncLoadoutPresentation();
+  }
+
   private handlePresetCycle(direction: 1 | -1): void {
     if (!this.deploySession?.allowLoadoutEditing || !this.loadoutService) {
       return;
@@ -642,6 +663,25 @@ export class PlayerRespawnManager implements GameSystem {
       throw new Error('Loadout service is required before editing deploy loadouts');
     }
     return this.loadoutService.cycleField(field, direction);
+  }
+
+  private updateLoadoutSelection(field: LoadoutFieldKey, value: LoadoutSelectionValue): PlayerLoadout {
+    if (!this.loadoutService) {
+      throw new Error('Loadout service is required before editing deploy loadouts');
+    }
+
+    switch (field) {
+      case 'primaryWeapon':
+        return this.loadoutService.setPrimaryWeapon(value as LoadoutWeapon);
+      case 'secondaryWeapon':
+        return this.loadoutService.setSecondaryWeapon(value as LoadoutWeapon);
+      case 'equipment':
+        return this.loadoutService.setEquipment(value as LoadoutEquipment);
+      case 'ammoLoad':
+        return this.loadoutService.setAmmoLoad(value as AmmoLoad);
+      default:
+        return this.loadoutService.getCurrentLoadout();
+    }
   }
 
   private applyActiveLoadout(): void {

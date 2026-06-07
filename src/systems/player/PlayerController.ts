@@ -1192,7 +1192,16 @@ export class PlayerController implements GameSystem {
     if (!this.hudSystem || !this.inventoryManager) {
       return;
     }
-    this.hudSystem.setWeaponBarLayout(this.inventoryManager.getSlotDefinitions(), this.inventoryManager.getWeaponCycleSlots());
+    const slotDefinitions = this.inventoryManager.getSlotDefinitions();
+    const weaponCycleSlots = this.inventoryManager.getWeaponCycleSlots();
+    this.hudSystem.setWeaponBarLayout(slotDefinitions, weaponCycleSlots);
+    if (typeof this.input.setWeaponCycleSlots === 'function') {
+      this.input.setWeaponCycleSlots(weaponCycleSlots);
+    }
+    this.input.getTouchControls()?.setWeaponSlotConfig?.(
+      slotDefinitions.map(def => def.shortLabel),
+      weaponCycleSlots
+    );
     this.hudSystem.setActiveWeaponSlot(this.inventoryManager.getCurrentSlot());
   }
 }

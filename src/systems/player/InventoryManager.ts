@@ -377,12 +377,12 @@ export class InventoryManager implements GameSystem {
   }
 
   private cycleWeapon(): void {
-    const enabledSlots = this.getEnabledSlots();
-    if (enabledSlots.length === 0) return;
+    const weaponSlots = this.getWeaponCycleSlots();
+    if (weaponSlots.length === 0) return;
 
-    const currentIndex = enabledSlots.indexOf(this.currentSlot);
-    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
-    const nextSlot = enabledSlots[(safeIndex + 1) % enabledSlots.length];
+    const currentIndex = weaponSlots.indexOf(this.currentSlot);
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % weaponSlots.length : 0;
+    const nextSlot = weaponSlots[nextIndex];
     this.switchToSlot(nextSlot);
   }
 

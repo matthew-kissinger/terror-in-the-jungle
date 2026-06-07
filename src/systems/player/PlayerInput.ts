@@ -74,6 +74,12 @@ export class PlayerInput {
   private isControlsEnabled = true;
   private flightVehicleMode: FlightVehicleMode = 'none';
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
+  private weaponCycleSlots: WeaponSlot[] = [
+    WeaponSlot.PRIMARY,
+    WeaponSlot.SHOTGUN,
+    WeaponSlot.SMG,
+    WeaponSlot.PISTOL,
+  ];
   private pointerLockFallbackActive = false;
 
   /** Touch controls - only created on touch-capable devices */
@@ -172,9 +178,7 @@ export class PlayerInput {
           }
         },
         onWeaponSwitch: () => {
-          // Cycle through weapons: primary -> secondary -> throwable
-          const next = ((this.currentWeaponMode + 1) % 3) as WeaponSlot;
-          callbacks.onWeaponSlotChange?.(next);
+          callbacks.onWeaponSlotChange?.(this.getNextWeaponCycleSlot());
         },
         onGrenade: () => callbacks.onGrenadeSwitch?.(),
         onSprintStart: () => callbacks.onRunStart?.(),
@@ -254,6 +258,18 @@ export class PlayerInput {
     this.currentWeaponMode = mode;
   }
 
+  setWeaponCycleSlots(slots: readonly WeaponSlot[]): void {
+    const nextSlots: WeaponSlot[] = [];
+    for (const slot of slots) {
+      if (!Number.isInteger(slot) || slot < 0 || slot > 5 || nextSlots.includes(slot)) {
+        continue;
+      }
+      nextSlots.push(slot);
+    }
+
+    this.weaponCycleSlots = nextSlots.length > 0 ? nextSlots : [WeaponSlot.PRIMARY];
+  }
+
   isKeyPressed(key: string): boolean {
     return this.keys.has(key.toLowerCase());
   }
@@ -331,6 +347,12 @@ export class PlayerInput {
   /** Touch controls instance (null on desktop) */
   getTouchControls(): TouchControls | null {
     return this.touchControls;
+  }
+
+  private getNextWeaponCycleSlot(): WeaponSlot {
+    const currentIndex = this.weaponCycleSlots.indexOf(this.currentWeaponMode);
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % this.weaponCycleSlots.length : 0;
+    return this.weaponCycleSlots[nextIndex] ?? WeaponSlot.PRIMARY;
   }
 
   /**

@@ -253,7 +253,8 @@ describe('PlayerInput', () => {
         onRallyPointPlace: vi.fn(),
         onToggleMortarCamera: vi.fn(),
         onMouseDown: vi.fn(),
-        onMouseUp: vi.fn()
+        onMouseUp: vi.fn(),
+        onWeaponSlotChange: vi.fn()
       };
       playerInput.setCallbacks(callbacks);
     });
@@ -336,6 +337,26 @@ describe('PlayerInput', () => {
 
       expect(onEnterExitVehicle).toHaveBeenCalledTimes(1);
       expect(onEnterExitHelicopter).not.toHaveBeenCalled();
+    });
+
+    it('cycles gamepad weapon switch through configured weapon slots', () => {
+      playerInput.setWeaponCycleSlots([WeaponSlot.PRIMARY, WeaponSlot.SHOTGUN]);
+      playerInput.setCurrentWeaponMode(WeaponSlot.PRIMARY);
+      const gamepadCallbacks = gamepadManagerInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+      gamepadCallbacks.onWeaponSwitch();
+
+      expect(callbacks.onWeaponSlotChange).toHaveBeenCalledWith(WeaponSlot.SHOTGUN);
+    });
+
+    it('returns to the first configured weapon slot when gamepad switch starts from equipment', () => {
+      playerInput.setWeaponCycleSlots([WeaponSlot.PRIMARY, WeaponSlot.SHOTGUN]);
+      playerInput.setCurrentWeaponMode(WeaponSlot.GRENADE);
+      const gamepadCallbacks = gamepadManagerInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+      gamepadCallbacks.onWeaponSwitch();
+
+      expect(callbacks.onWeaponSlotChange).toHaveBeenCalledWith(WeaponSlot.PRIMARY);
     });
 
     it('should trigger onToggleMouseControl when Right Ctrl is pressed (in helicopter)', () => {

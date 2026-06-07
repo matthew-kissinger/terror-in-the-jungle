@@ -170,15 +170,16 @@ export class UnifiedWeaponBar {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      if (!this.slotConfig[index]?.enabled) {
+        return;
+      }
       if (typeof slot.setPointerCapture === 'function') {
         slot.setPointerCapture(e.pointerId);
       }
       slot.classList.add('uwb-slot--pressed');
       this.activeIndex = index;
       this.updateHighlight();
-      if (this.slotConfig[index]?.enabled) {
-        this.onWeaponSelect?.(index);
-      }
+      this.onWeaponSelect?.(index);
     };
 
     const onPointerUp = (e: PointerEvent): void => {

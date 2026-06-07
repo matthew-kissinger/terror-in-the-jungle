@@ -104,6 +104,32 @@ describe('TouchActionButtons', () => {
       // A single tap should not fire weapon select (needs double-tap for quick-switch)
       expect(onWeaponSelect).not.toHaveBeenCalled();
     });
+
+    it('cycles through configured loadout weapon slots and labels', () => {
+      const onWeaponSelect = vi.fn();
+      actions.setOnWeaponSelect(onWeaponSelect);
+      actions.setSlotConfig(['PST', 'FRG', 'MG', '--', '--', '--'], [2, 0]);
+      actions.setActiveSlot(2);
+
+      const nextChevron = weaponCycler().children[3] as HTMLElement;
+      nextChevron.dispatchEvent(pointerDownEvent());
+
+      expect(onWeaponSelect).toHaveBeenCalledWith(0);
+      expect((weaponCycler().children[1] as HTMLElement).textContent).toBe('PST');
+    });
+
+    it('starts configured cycling from the first weapon when the active slot is equipment', () => {
+      const onWeaponSelect = vi.fn();
+      actions.setOnWeaponSelect(onWeaponSelect);
+      actions.setSlotConfig(['PST', 'FRG', 'MG', '--', '--', '--'], [2, 0]);
+      actions.setActiveSlot(1);
+
+      const nextChevron = weaponCycler().children[3] as HTMLElement;
+      nextChevron.dispatchEvent(pointerDownEvent());
+
+      expect(onWeaponSelect).toHaveBeenCalledWith(2);
+      expect((weaponCycler().children[1] as HTMLElement).textContent).toBe('MG');
+    });
   });
 
   describe('double-tap quick-switch', () => {
