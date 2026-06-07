@@ -10,8 +10,10 @@ import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacement
 import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
 import type { PBRScenarioMode } from '../systems/vehicle/PBRSpawn';
 import type { SampanScenarioMode } from '../systems/vehicle/SampanSpawn';
+import { resolveGroundPlacement, resolveWatercraftPlacement } from '../systems/terrain/TerrainPlacementAuthority';
 import { PBR } from '../systems/vehicle/PBR';
 import { Sampan } from '../systems/vehicle/Sampan';
+import { Tank } from '../systems/vehicle/Tank';
 
 type OperationalRuntimeRefs = Pick<
   SystemKeyToType,
@@ -201,6 +203,9 @@ function wireVehicleRuntime(
   if (typeof runtime.fullMapSystem.setVehicleManager === 'function') {
     runtime.fullMapSystem.setVehicleManager(runtime.vehicleManager);
   }
+  if (typeof runtime.combatantSystem.setVehicleManager === 'function') {
+    runtime.combatantSystem.setVehicleManager(runtime.vehicleManager);
+  }
 
   if (typeof runtime.helicopterModel.configureDependencies === 'function') {
     runtime.helicopterModel.configureDependencies({
@@ -306,7 +311,7 @@ function wireM2HBEmplacementRuntime(
           scene,
           m2hbSystem: m2hb,
           modes: [scenarioKey],
-          resolvePosition: (_m, base) => snapM2HBToTerrain(base, runtime.terrainSystem),
+          resolvePosition: (_m, base) => resolveGroundPlacement(base, runtime.terrainSystem).position,
         });
         Logger.info('combat', `M2HB scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
       } catch (error) {
@@ -316,20 +321,6 @@ function wireM2HBEmplacementRuntime(
       }
     }, 0);
   });
-}
-
-const _m2hbScratch = new THREE.Vector3();
-
-function snapM2HBToTerrain(
-  base: THREE.Vector3,
-  terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
-): THREE.Vector3 {
-  _m2hbScratch.copy(base);
-  if (typeof terrainSystem.getHeightAt === 'function') {
-    const y = terrainSystem.getHeightAt(base.x, base.z);
-    if (Number.isFinite(y)) _m2hbScratch.y = y;
-  }
-  return _m2hbScratch.clone();
 }
 
 // Maps GameMode -> the M48 scenario-spawn key. Same shape + same
@@ -361,8 +352,9 @@ function wireM48TankRuntime(
         const ids = runtime.vehicleManager.spawnScenarioM48Tanks({
           scene,
           modes: [scenarioKey],
-          resolvePosition: (_m, base) => snapM48ToTerrain(base, runtime.terrainSystem),
+          resolvePosition: (_m, base) => resolveGroundPlacement(base, runtime.terrainSystem).position,
         });
+        bindSpawnedM48TankRuntime(ids, runtime);
         Logger.info('vehicle', `M48 tank scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
       } catch (error) {
         // Roll back the reservation so a manual re-trigger can retry.
@@ -373,18 +365,15 @@ function wireM48TankRuntime(
   });
 }
 
-const _m48Scratch = new THREE.Vector3();
-
-function snapM48ToTerrain(
-  base: THREE.Vector3,
-  terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
-): THREE.Vector3 {
-  _m48Scratch.copy(base);
-  if (typeof terrainSystem.getHeightAt === 'function') {
-    const y = terrainSystem.getHeightAt(base.x, base.z);
-    if (Number.isFinite(y)) _m48Scratch.y = y;
+function bindSpawnedM48TankRuntime(
+  ids: readonly string[],
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+): void {
+  for (const id of ids) {
+    const vehicle = runtime.vehicleManager.getVehicle(id);
+    if (!(vehicle instanceof Tank)) continue;
+    vehicle.setTerrain(runtime.terrainSystem ?? null);
   }
-  return _m48Scratch.clone();
 }
 
 // Maps GameMode -> the Sampan scenario-spawn key. Same shape + same
@@ -427,7 +416,7 @@ function wireSampanRuntime(
             base,
             runtime.terrainSystem,
             runtime.waterSystem,
-            config as GameModeConfig | undefined,
+            config,
             SAMPAN_SPAWN_FREEBOARD_METERS,
           ),
         });
@@ -471,7 +460,8 @@ function wirePBRRuntime(
     // resolvePosition runs `getHeightAt` — mirrors the M2HB / M48
     // wiring's setTimeout(0) deferral above. When the scenario has
     // `waterEnabled` set, the snap consults WaterSurfaceSampler first
-    // (hydrology river surface or global plane); when no water covers
+    // (authored water body, hydrology river surface, or global plane);
+    // when no water covers
     // the spawn point, terrain height is the fallback.
     setTimeout(() => {
       try {
@@ -483,7 +473,7 @@ function wirePBRRuntime(
             base,
             runtime.terrainSystem,
             runtime.waterSystem,
-            config as GameModeConfig | undefined,
+            config,
             PBR_SPAWN_FREEBOARD_METERS,
           ),
         });
@@ -497,8 +487,6 @@ function wirePBRRuntime(
     }, 0);
   });
 }
-
-const _watercraftScratch = new THREE.Vector3();
 
 function bindSpawnedWatercraftRuntime(
   ids: readonly string[],
@@ -515,7 +503,8 @@ function bindSpawnedWatercraftRuntime(
 /**
  * Shared spawn snap for watercraft. When the active scenario has water
  * enabled (`waterEnabled === true`) and the WaterSystem reports a
- * water surface at the spawn XZ (hydrology river or global plane), the
+ * water surface at the spawn XZ (authored water body, hydrology river, or
+ * global plane), the
  * hull is snapped to `waterY + freeboard` so it starts straddling the
  * waterline. Otherwise the snap falls back to terrain height (mirrors
  * the prior land-snap behavior so the hull does not spawn above the
@@ -529,22 +518,12 @@ function snapWatercraftToSurface(
   config: GameModeConfig | undefined,
   freeboard: number,
 ): THREE.Vector3 {
-  _watercraftScratch.copy(base);
-
-  const waterEnabled = config ? config.waterEnabled === true : false;
-  if (waterEnabled && waterSystem && typeof waterSystem.getWaterSurfaceY === 'function') {
-    const waterY = waterSystem.getWaterSurfaceY(base);
-    if (typeof waterY === 'number' && Number.isFinite(waterY)) {
-      _watercraftScratch.y = waterY + freeboard;
-      return _watercraftScratch.clone();
-    }
-  }
-
-  if (typeof terrainSystem.getHeightAt === 'function') {
-    const y = terrainSystem.getHeightAt(base.x, base.z);
-    if (Number.isFinite(y)) _watercraftScratch.y = y;
-  }
-  return _watercraftScratch.clone();
+  return resolveWatercraftPlacement(base, {
+    terrainSystem,
+    waterSystem,
+    waterEnabled: config?.waterEnabled === true,
+    freeboardMeters: freeboard,
+  }).position;
 }
 
 function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRuntime']): void {

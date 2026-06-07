@@ -22,6 +22,7 @@
  *   setTracksBlown(blown): void;
  *   dispose(): void;
  *   setWorldHalfExtent(halfExtent): void;
+ *   conformToTerrain(terrain): void;
  *   getInterpolationAlpha(): number;
  *   getCornerSamples(): readonly CornerSample[];
  *   getForwardSpeed(): number;
@@ -122,6 +123,18 @@ function worldForward(q: THREE.Quaternion): THREE.Vector3 {
 
 describe('TrackedVehiclePhysics', () => {
   const DT = 0.02;
+
+  it('rests on the terrain immediately when terrain is wired after construction', () => {
+    const terrain = makeFlatTerrain(51);
+    const physics = new TrackedVehiclePhysics(new THREE.Vector3(10, -20, 15));
+
+    physics.conformToTerrain(terrain);
+
+    const state = physics.getState();
+    expect(state.position.y).toBeGreaterThan(51);
+    expect(state.position.y).toBeLessThan(52);
+    expect(state.isGrounded).toBe(true);
+  });
 
   describe('Pure forward throttle', () => {
     it('drives forward with no yaw when only throttle is applied', () => {

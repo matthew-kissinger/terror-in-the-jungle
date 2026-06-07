@@ -32,14 +32,13 @@ import type { HydrologyArtifactCache } from './HydrologyArtifactCache';
  *   compositor returns both the resolved stamps and a resolution-annotated
  *   conflict list.
  *
- * Pass C (Hydrology feedback, R2.2) — when `options.recomposeHydrology`
- * is true AND a hydrology artifact is present, the artifact is cloned
- * and each polyline point whose `(x, z)` falls inside the AABB of an
- * overlapping non-hydrology stamp is re-sampled against the composed
- * provider. The cloned artifact is returned via
+ * Pass C (Hydrology feedback, R2.2/R3 reset) — when
+ * `options.recomposeHydrology` is true AND a hydrology artifact is present,
+ * the artifact is cloned and each polyline point is re-sampled against the
+ * composed provider. The cloned artifact is returned via
  * {@link TerrainCompositorOutput.waterSurfaceArtifact} for
- * `HydrologyRiverSurface` (so the water mesh sits on the actual ground
- * over airfield-flattened terrain). Navmesh + heightmap bake consumers
+ * `HydrologyRiverSurface` (so the water mesh follows the actual composed
+ * hydrology bed). Navmesh + heightmap bake consumers
  * keep reading the original `input.hydrologyArtifact` (memo §Risks
  * "Navmesh desync").
  *
@@ -153,6 +152,7 @@ function runHydrologyFeedbackPass(
     hydrologyArtifact,
     composedProvider,
     relevantAABBs,
+    { resampleAllPoints: true },
   );
 
   if (cache && key) cache.set(key, recomposed);
@@ -161,10 +161,9 @@ function runHydrologyFeedbackPass(
 
 /**
  * Enumerate AABBs of non-hydrology stamps that overlap at least one
- * hydrology stamp. Pass C only re-samples polyline points whose `(x, z)`
- * lies inside one of these AABBs — most of the river footprint sits in
- * clean terrain and does not shift between the base and composed
- * providers.
+ * hydrology stamp. Older Pass C used this list as a targeted optimization.
+ * The foundation reset now re-samples the full channel path, but the AABB
+ * list remains useful for cache-key continuity and future diagnostics.
  *
  * Uses {@link detectStampConflicts} on the resolved (post-policy) stamp
  * list, then keeps only conflict pairs where exactly one side is

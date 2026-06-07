@@ -37,7 +37,7 @@ import { InfluenceMapSystem } from './InfluenceMapSystem';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { CombatantLODManager } from './CombatantLODManager';
 import { CombatantProfiler } from './CombatantProfiler';
-import { CombatantSystemDamage } from './CombatantSystemDamage';
+import { CombatantSystemDamage, type VehicleExplosionDamageQuery } from './CombatantSystemDamage';
 import { CombatantSystemUpdate } from './CombatantSystemUpdate';
 import { AILineOfSight } from './ai/AILineOfSight';
 import { clusterManager } from './ClusterManager';
@@ -614,6 +614,10 @@ export class CombatantSystem implements GameSystem {
     this.hudSystem = hudSystem;
     this.damageHandler.setHUDSystem(hudSystem);
     this.combatantCombat.setHUDSystem(hudSystem);
+  }
+
+  setVehicleManager(vehicleManager: VehicleExplosionDamageQuery): void {
+    this.damageHandler.setVehicleDamageQuery(vehicleManager);
   }
 
   setGameModeManager(gameModeManager: GameModeManager): void {

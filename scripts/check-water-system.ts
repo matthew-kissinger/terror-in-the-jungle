@@ -39,6 +39,11 @@ interface WaterSystemAuditReport {
     globalWaterPlaneSuppressedByHydrology: boolean;
     hydrologyRiverLegibleMaterialProfilePresent: boolean;
     hydrologyRiverVertexColorGradientPresent: boolean;
+    waterBodyConfigPresent: boolean;
+    waterBodyAuthorityPresent: boolean;
+    waterBodyRuntimeWiringPresent: boolean;
+    waterBodyMeshConsumerPresent: boolean;
+    waterBodyQueryPrecedencePresent: boolean;
     publicWaterQueryApiPresent: boolean;
     hydrologyWaterQuerySurfacePresent: boolean;
     waterQueryTestCoveragePresent: boolean;
@@ -69,7 +74,11 @@ const SOURCE_PATHS = {
   terrainSurfaceRuntime: join(process.cwd(), 'src', 'systems', 'terrain', 'TerrainSurfaceRuntime.ts'),
   hydrologyRiverSurface: join(process.cwd(), 'src', 'systems', 'environment', 'water', 'HydrologyRiverSurface.ts'),
   hydrologyRiverGeometry: join(process.cwd(), 'src', 'systems', 'environment', 'water', 'HydrologyRiverGeometry.ts'),
+  waterBodyAuthority: join(process.cwd(), 'src', 'systems', 'environment', 'water', 'WaterBodyAuthority.ts'),
+  waterBodySurface: join(process.cwd(), 'src', 'systems', 'environment', 'water', 'WaterBodySurface.ts'),
   waterSurfaceSampler: join(process.cwd(), 'src', 'systems', 'environment', 'water', 'WaterSurfaceSampler.ts'),
+  terrainFeatureCompileStage: join(process.cwd(), 'src', 'core', 'modeStartup', 'TerrainFeatureCompileStage.ts'),
+  terrainNavigationStage: join(process.cwd(), 'src', 'core', 'modeStartup', 'TerrainNavigationStage.ts'),
 };
 
 function timestampSlug(): string {
@@ -110,7 +119,11 @@ function main(): void {
   const terrainSurfaceRuntime = readText(SOURCE_PATHS.terrainSurfaceRuntime);
   const hydrologyRiverSurface = readText(SOURCE_PATHS.hydrologyRiverSurface);
   const hydrologyRiverGeometry = readText(SOURCE_PATHS.hydrologyRiverGeometry);
+  const waterBodyAuthority = readText(SOURCE_PATHS.waterBodyAuthority);
+  const waterBodySurface = readText(SOURCE_PATHS.waterBodySurface);
   const waterSurfaceSampler = readText(SOURCE_PATHS.waterSurfaceSampler);
+  const terrainFeatureCompileStage = readText(SOURCE_PATHS.terrainFeatureCompileStage);
+  const terrainNavigationStage = readText(SOURCE_PATHS.terrainNavigationStage);
   const aShauRivers = readJson<{ rivers?: unknown[] }>(SOURCE_PATHS.aShauRivers);
   const hydrologyBakeManifest = readJson<{ entries?: unknown[] }>(SOURCE_PATHS.hydrologyBakeManifest);
 
@@ -168,6 +181,21 @@ function main(): void {
       && hydrologyRiverGeometry.includes('resolveCrossSectionColor')
       && hydrologyRiverGeometry.includes('HYDROLOGY_RIVER_CENTER_ALPHA')
       && hydrologyRiverSurface.includes('vertexColors: true'),
+    waterBodyConfigPresent: gameModeTypes.includes('waterBodies?: WaterBodyConfig[]')
+      && openFrontierConfig.includes('waterBodies:')
+      && aShauConfig.includes('waterBodies:'),
+    waterBodyAuthorityPresent: waterBodyAuthority.includes('class WaterBodyAuthority')
+      && waterBodyAuthority.includes('compileWaterBodyTerrainFeatures')
+      && waterBodyAuthority.includes('compileWaterBodyQuerySegments'),
+    waterBodyRuntimeWiringPresent: terrainFeatureCompileStage.includes('compileWaterBodyTerrainFeatures')
+      && terrainNavigationStage.includes('setWaterBodies')
+      && terrainNavigationStage.includes('hasAuthoredWaterBodies'),
+    waterBodyMeshConsumerPresent: waterSystem.includes('setWaterBodies')
+      && waterBodySurface.includes('level-depth-water-bodies')
+      && waterBodySurface.includes('level-depth-water-body-surface-mesh'),
+    waterBodyQueryPrecedencePresent: waterSurfaceSampler.includes("source: 'water_body'")
+      && waterSurfaceSampler.indexOf('sampleWaterBody') >= 0
+      && waterSurfaceSampler.indexOf('sampleWaterBody') < waterSurfaceSampler.indexOf('sampleHydrology'),
     publicWaterQueryApiPresent: waterSystem.includes('isUnderwater(position: THREE.Vector3)')
       && waterSystem.includes('getWaterSurfaceY(position: THREE.Vector3): number | null')
       && waterSystem.includes('getWaterDepth(position: THREE.Vector3): number'),
@@ -201,22 +229,26 @@ function main(): void {
     inputs: Object.fromEntries(Object.entries(SOURCE_PATHS).map(([key, path]) => [key, existsSync(path) ? rel(path) : null])),
     currentContract,
     findings: [
-      currentContract.globalWaterPlane && currentContract.cameraFollower
-        ? 'The legacy camera-following global plane still exists as an opt-in fallback, but current accepted river modes disable it and use hydrology river surfaces.'
+      currentContract.waterBodyConfigPresent && currentContract.waterBodyAuthorityPresent && currentContract.waterBodyRuntimeWiringPresent
+        ? 'Open Frontier and A Shau now declare authored level/depth water bodies; the authority compiles bathymetry stamps and owns runtime water-body queries.'
+        : currentContract.globalWaterPlane && currentContract.cameraFollower
+        ? 'The legacy camera-following global plane still exists as an opt-in fallback.'
         : 'Current runtime water contract could not be fully identified from source.',
       currentContract.aShauGlobalWaterDisabled
         ? 'A Shau correctly disables the global water plane because the map needs streams, not a sea-level sheet through the DEM.'
         : 'A Shau global-water disable was not found.',
-      currentContract.openFrontierGlobalWaterDisabled && currentContract.openFrontierNoiseCarvesWaterAreas
-        ? 'Open Frontier no longer inherits the global sea-level plane; accepted water is the hydrology river surface, while old procedural carved areas remain terrain until explicitly covered by hydrology.'
-        : 'Open Frontier water assumptions need review before hydrology-backed rendering.',
+      currentContract.openFrontierGlobalWaterDisabled && currentContract.waterBodyConfigPresent
+        ? 'Open Frontier no longer inherits the global sea-level plane; accepted playable water is authored level/depth water bodies, while hydrology remains drainage/material input.'
+        : 'Open Frontier water assumptions need review before rendering acceptance.',
       currentContract.aShauRiverPolylineAssetPresent
         ? currentContract.hydrologyRiverMeshConsumerPresent
           ? 'A Shau still has a separate legacy river-polyline data asset; the runtime river visual path now consumes hydrology-bake channel polylines instead.'
           : 'A Shau already has a river-polyline data asset, but the current hydrology cache and water renderer do not consume it yet.'
         : 'A Shau river-polyline data was not found.',
       currentContract.hydrologyBakeManifestPresent && currentContract.hydrologyLoaderPresent
-        ? currentContract.hydrologyDefaultModePreloadPresent
+        ? currentContract.waterBodyRuntimeWiringPresent
+          ? 'The hydrology bake manifest, typed loader, default large-map vegetation classifier, and terrain material mask remain wired as drainage/material inputs; authored level/depth water bodies supersede hydrology river surfaces as accepted playable water in Open Frontier and A Shau.'
+        : currentContract.hydrologyDefaultModePreloadPresent
           ? currentContract.hydrologyDefaultModeBiomeClassificationPresent && currentContract.hydrologyTerrainMaterialMaskPresent
             ? currentContract.hydrologyRiverMeshConsumerPresent && currentContract.hydrologyRiverMeshStartupWiringPresent
               ? currentContract.hydrologyRiverLegibleMaterialProfilePresent

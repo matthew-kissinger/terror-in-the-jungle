@@ -222,6 +222,23 @@ describe('Sampan IVehicle', () => {
   // ----------------------------- Lifecycle --------------------------------
 
   describe('Lifecycle', () => {
+    it('applies damage without removing the hull object', () => {
+      const scene = new THREE.Scene();
+      const object = new THREE.Object3D();
+      scene.add(object);
+      const sampan = new Sampan('s_damage', object, Faction.NVA);
+
+      sampan.applyDamage(45, new THREE.Vector3());
+      expect(sampan.getHealthPercent()).toBeCloseTo(0.5, 5);
+      expect(sampan.isDestroyed()).toBe(false);
+      expect(scene.children).toHaveLength(1);
+
+      sampan.applyDamage(100, new THREE.Vector3());
+      expect(sampan.getHealthPercent()).toBe(0);
+      expect(sampan.isDestroyed()).toBe(true);
+      expect(scene.children).toHaveLength(1);
+    });
+
     it('disposes by removing the scene object and marking destroyed', () => {
       const scene = new THREE.Scene();
       const object = new THREE.Object3D();

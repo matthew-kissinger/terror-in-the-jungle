@@ -7,6 +7,7 @@ import { GameSystem } from '../../types';
 import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import { AssetLoader } from '../assets/AssetLoader';
 import { getAssetPath } from '../../config/paths';
+import type { WaterBodyConfig } from '../../config/gameModeTypes';
 import { WeatherSystem } from './WeatherSystem';
 import { playElementAnimation } from '../../ui/engine/playElementAnimation';
 import type { HydrologyBakeArtifact } from '../terrain/hydrology/HydrologyBake';
@@ -14,11 +15,19 @@ import {
   HydrologyRiverSurface,
   type HydrologyWaterQuerySegment,
 } from './water/HydrologyRiverSurface';
+import type { HydrologyRiverTerrainHeightSampler } from './water/HydrologyRiverGeometry';
 import {
   WaterSurfaceSampler,
   type WaterInteractionOptions,
   type WaterInteractionSample,
 } from './water/WaterSurfaceSampler';
+import {
+  WaterBodyAuthority,
+  type WaterBodyQuerySegment,
+} from './water/WaterBodyAuthority';
+import {
+  WaterBodySurface,
+} from './water/WaterBodySurface';
 import {
   WaterSurfaceBinding,
   type GlobalWaterShaderRefs,
@@ -43,6 +52,15 @@ interface WaterDebugInfo {
   hydrologyVertexCount: number;
   hydrologyTotalLengthMeters: number;
   hydrologyMaxAccumulationCells: number;
+  waterBodyMaterialProfile: string;
+  waterBodyVisible: boolean;
+  waterBodyCount: number;
+  waterBodySegmentCount: number;
+  waterBodyTotalLengthMeters: number;
+  waterBodyMinSurfaceY: number | null;
+  waterBodyMaxSurfaceY: number | null;
+  waterBodyMinDepthMeters: number | null;
+  waterBodyMaxDepthMeters: number | null;
 }
 
 const GLOBAL_WATER_COLOR = 0x17362f;
@@ -80,6 +98,8 @@ export class WaterSystem implements GameSystem {
   private enabled = true;
 
   private readonly riverSurface: HydrologyRiverSurface;
+  private readonly waterBodyAuthority: WaterBodyAuthority;
+  private readonly waterBodySurface: WaterBodySurface;
   private readonly sampler: WaterSurfaceSampler;
   private readonly binding: WaterSurfaceBinding;
 
@@ -94,9 +114,12 @@ export class WaterSystem implements GameSystem {
     this.riverSurface = new HydrologyRiverSurface(scene, {
       onMaterialReady: (m) => this.binding.installRiverFlowPatch(m, this.waterNormalTexture ?? null),
     });
+    this.waterBodyAuthority = new WaterBodyAuthority();
+    this.waterBodySurface = new WaterBodySurface(scene);
     this.sampler = new WaterSurfaceSampler({
       globalWaterLevel: this.WATER_LEVEL,
       isGlobalPlaneActive: () => this.isGlobalWaterPlaneActive(),
+      getWaterBodyQuerySegments: (): readonly WaterBodyQuerySegment[] => this.waterBodyAuthority.getQuerySegments(),
       getHydrologyQuerySegments: (): readonly HydrologyWaterQuerySegment[] => this.riverSurface.getQuerySegments(),
     });
   }
@@ -196,6 +219,8 @@ export class WaterSystem implements GameSystem {
   }
 
   dispose(): void {
+    this.waterBodySurface.clear();
+    this.waterBodyAuthority.clear();
     this.riverSurface.clear();
     if (this.water) {
       this.scene.remove(this.water);
@@ -241,6 +266,7 @@ export class WaterSystem implements GameSystem {
 
   getDebugInfo(): WaterDebugInfo {
     const stats = this.riverSurface.getStats();
+    const waterBodyStats = this.waterBodyAuthority.getStats();
     return {
       enabled: this.enabled,
       waterLevel: this.WATER_LEVEL,
@@ -254,7 +280,24 @@ export class WaterSystem implements GameSystem {
       hydrologyVertexCount: stats.vertexCount,
       hydrologyTotalLengthMeters: stats.totalLengthMeters,
       hydrologyMaxAccumulationCells: stats.maxAccumulationCells,
+      waterBodyMaterialProfile: this.waterBodySurface.getMaterialProfile(),
+      waterBodyVisible: this.waterBodySurface.isVisible(),
+      waterBodyCount: waterBodyStats.bodyCount,
+      waterBodySegmentCount: waterBodyStats.segmentCount,
+      waterBodyTotalLengthMeters: waterBodyStats.totalLengthMeters,
+      waterBodyMinSurfaceY: waterBodyStats.minSurfaceY,
+      waterBodyMaxSurfaceY: waterBodyStats.maxSurfaceY,
+      waterBodyMinDepthMeters: waterBodyStats.minDepthMeters,
+      waterBodyMaxDepthMeters: waterBodyStats.maxDepthMeters,
     };
+  }
+
+  getHydrologyQuerySegmentsForDebug(): readonly HydrologyWaterQuerySegment[] {
+    return this.riverSurface.getQuerySegments();
+  }
+
+  getWaterBodyQuerySegmentsForDebug(): readonly WaterBodyQuerySegment[] {
+    return this.waterBodyAuthority.getQuerySegments();
   }
 
   /** Publish water-edge config for terrain-side consumers. */
@@ -273,9 +316,29 @@ export class WaterSystem implements GameSystem {
    * while still drawing DEM-following water. On null, drop binding-layer
    * river-flow refs so `tickRiverFlow` becomes a no-op.
    */
-  setHydrologyChannels(artifact: HydrologyBakeArtifact | null): void {
+  setHydrologyChannels(
+    artifact: HydrologyBakeArtifact | null,
+    terrainHeightAt: HydrologyRiverTerrainHeightSampler | null = null,
+  ): void {
     if (!artifact) this.binding.clearRiverFlowPatch();
-    this.riverSurface.setArtifact(artifact);
+    this.riverSurface.setArtifact(artifact, { terrainHeightAt });
+    this.updateGlobalWaterVisibility();
+  }
+
+  /**
+   * Replace authored level/depth gameplay water. These bodies own runtime
+   * sampling and visible water for modes that define them; hydrology remains
+   * available as terrain/vegetation input but should not be the gameplay
+   * surface in those modes.
+   */
+  setWaterBodies(configs: readonly WaterBodyConfig[] | null | undefined): void {
+    this.waterBodyAuthority.setBodies(configs);
+    const segments = this.waterBodyAuthority.getQuerySegments();
+    if (segments.length > 0) {
+      this.waterBodySurface.setSegments(segments, this.waterBodyAuthority.getStats());
+    } else {
+      this.waterBodySurface.clear();
+    }
     this.updateGlobalWaterVisibility();
   }
 
@@ -295,7 +358,9 @@ export class WaterSystem implements GameSystem {
     this.water.scale.set(s, 1, s);
   }
 
-  private isGlobalWaterPlaneActive(): boolean { return this.enabled && !this.riverSurface.isActive(); }
+  private isGlobalWaterPlaneActive(): boolean {
+    return this.enabled && !this.riverSurface.isActive() && !this.waterBodyAuthority.isActive();
+  }
 
   private updateGlobalWaterVisibility(): void {
     if (this.water) this.water.visible = this.isGlobalWaterPlaneActive();

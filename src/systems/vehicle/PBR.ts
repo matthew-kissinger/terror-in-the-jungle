@@ -10,6 +10,7 @@ import {
 } from './WatercraftPhysics';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { Emplacement } from './Emplacement';
+import { VehicleDamageState, type VehicleDamageResult } from './VehicleDamage';
 
 /**
  * PBR (Patrol Boat River) — US riverine craft, twin M2HB mounts.
@@ -148,6 +149,7 @@ const DEFAULT_PBR_SEATS: VehicleSeat[] = [
 
 const _scratchPos = new THREE.Vector3();
 const _scratchQuat = new THREE.Quaternion();
+const PBR_MAX_HP = 350;
 
 /**
  * Public surface description for the per-mount sub-vehicles. The
@@ -176,7 +178,7 @@ export class PBR implements IVehicle {
   private readonly physics: WatercraftPhysics;
   private readonly mounts: PBRMount[];
   private terrain: ITerrainRuntime | null = null;
-  private destroyed = false;
+  private readonly damage = new VehicleDamageState(PBR_MAX_HP);
   private readonly velocity = new THREE.Vector3();
 
   constructor(
@@ -328,11 +330,22 @@ export class PBR implements IVehicle {
   }
 
   isDestroyed(): boolean {
-    return this.destroyed;
+    return this.damage.isDestroyed();
   }
 
   getHealthPercent(): number {
-    return this.destroyed ? 0 : 1;
+    return this.damage.getHealthPercent();
+  }
+
+  applyDamage(amount: number, hitPoint: THREE.Vector3): VehicleDamageResult {
+    const result = this.damage.applyDamage(amount);
+    if (result.destroyed) {
+      this.setControls(0, 0);
+      for (const mount of this.mounts) {
+        mount.emplacement.applyDamage(Number.POSITIVE_INFINITY, hitPoint);
+      }
+    }
+    return result;
   }
 
   // ---------- Per-frame integration ----------
@@ -352,7 +365,7 @@ export class PBR implements IVehicle {
    * this update.
    */
   update(dt: number): void {
-    if (this.destroyed || dt <= 0) return;
+    if (this.isDestroyed() || dt <= 0) return;
     this.physics.update(dt, this.terrain ?? undefined);
 
     const state = this.physics.getState();
@@ -362,7 +375,7 @@ export class PBR implements IVehicle {
   }
 
   dispose(): void {
-    this.destroyed = true;
+    this.damage.destroy();
     this.physics.dispose();
     for (const mount of this.mounts) {
       mount.emplacement.dispose();

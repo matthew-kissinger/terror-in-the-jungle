@@ -11,7 +11,6 @@ retrospectives (the "Recently Completed" sections below) are historical
 record, not current state.
 
 ## Current state
-
 See [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Owner-gated cycles
@@ -26,7 +25,7 @@ duplicated inside campaign manifests; the manifests are archived).
 | `cycle-vekhikl-5-fleet-expansion` | owner signs off on both `cycle-vehicle-wayfinding-and-prompts` and `cycle-vekhikl-player-boarding-wire` playtest evidence | M113 APC + M35 truck + T-54 tank (+ optional ZU-23-2 AA + LCM-8) |
 | `cycle-sky-screen-space-quad` | `cycle-skylut-resolution-bump` shipped but owner playtest still shows visible artifacts | Hillaire-style screen-space sky rework |
 | `cycle-stabilizat-1-baselines-refresh` | owner re-queues (removed from post-WebGPU campaign 2026-05-18) | STABILIZAT-1 / combat120 baseline refresh on a quiet machine |
-| `cycle-hydrology-river-surface-fix` | owner provides a concrete observed hydrology river-surface defect + repro pose (the Wave-0 characterization the brief requires) | fix the observed OF/A Shau hydrology river-surface defect + implement `WatercraftPhysics.isUnderBridge` (stayed Wave-0-pending in `cycle-2026-05-28-vehicles-aircraft-operable`; brief retained at `docs/tasks/hydrology-river-surface-fix.md`) |
+| `cycle-hydrology-river-surface-fix` | superseded by the foundation reset unless split back out as a narrow child | old Wave-0 brief retained at `docs/tasks/hydrology-river-surface-fix.md`; concrete owner defects now exist, but the issue is broader than surface-height polish |
 
 ## Active Branch (task/mode-startup-terrain-spike)
 
@@ -44,6 +43,20 @@ Spike memo and evidence:
 Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
+
+## Recently Completed (cycle-terrain-vehicle-water-foundation-reset)
+
+Closes the owner-requeued foundation reset locally after rejecting vehicle,
+tank, hydrology, and Zone Control playability. The reset makes terrain placement
+authoritative for vehicles/zones, fields US/NVA M48s in Open Frontier and
+A Shau, routes tank and non-tank vehicle explosion damage, and replaces accepted
+gameplay water with authored level/depth water bodies instead of hydrology
+ribbons. Local headed proof:
+`artifacts/playtests/terrain-vehicle-water-foundation-reset/terrain-foundation-proof.json`.
+
+Owner playtest remains pending in [PLAYTEST_PENDING](PLAYTEST_PENDING.md) for
+subjective terrain/water/vehicle feel; production parity requires the normal
+`deploy:prod` + `check:live-release` chain for the pushed master tip.
 
 ## Recently Completed (cycle-2026-06-04-deploy-zone-vehicle)
 
@@ -72,8 +85,11 @@ with a repro-first L3 behavior test; all playtest-deferred to
 Follow-ups (not carry-overs — in-cycle gaps named per the carry-over discipline):
 - `MOVEMENT_NAV_CHECKIN`: add the same readiness guard to the unconditional spiral
   pre-pass in `ZoneInitializer.findSuitableZonePosition` (harmless today).
-- Vehicle: M48 `TrackedVehiclePhysics` did not get the spawn rest-height conform
-  this cycle (only `GroundVehiclePhysics` did); revisit if the tank ever spawns clipped.
+- Vehicle: M48 spawn rest-height conform closed in
+  `cycle-terrain-vehicle-water-foundation-reset` R1 local proof; shared
+  non-tank vehicle explosion damage and authored water-body bounds are covered
+  by the same proof script once rerun.
+  Remaining vehicle work is tank combat balance/feel and owner playtest.
 
 ## Recently Completed (cycle-2026-05-28-vehicles-aircraft-operable)
 

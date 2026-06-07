@@ -103,6 +103,94 @@ describe('buildHydrologyRiverGeometry', () => {
     expect(build.stats.maxAccumulationCells).toBeGreaterThan(0);
   });
 
+  it('uses the runtime terrain sampler for visible and query river elevations when supplied', () => {
+    const channel = makeChannelPolyline({
+      points: [
+        makePolylinePoint({ cell: 0, x: 0, z: 0, elevationMeters: 3, accumulationCells: 8 }),
+        makePolylinePoint({ cell: 1, x: 30, z: 0, elevationMeters: 3, accumulationCells: 16 }),
+      ],
+    });
+    const artifact = makeHydrologyArtifact({ channelPolylines: [channel] });
+
+    const baked = buildHydrologyRiverGeometry(artifact)!;
+    const runtime = buildHydrologyRiverGeometry(artifact, { terrainHeightAt: () => 22 })!;
+
+    expect(runtime.querySegments.length).toBe(baked.querySegments.length);
+    for (let i = 0; i < runtime.querySegments.length; i++) {
+      const bakedSegment = baked.querySegments[i]!;
+      const runtimeSegment = runtime.querySegments[i]!;
+      expect(runtimeSegment.startSurfaceY).toBeGreaterThan(bakedSegment.startSurfaceY + 10);
+      expect(runtimeSegment.endSurfaceY).toBeGreaterThan(bakedSegment.endSurfaceY + 10);
+      expect(runtimeSegment.startSurfaceY).toBeCloseTo(runtimeSegment.endSurfaceY, 5);
+    }
+
+    const bakedY = baked.geometry.getAttribute('position').getY(0);
+    const runtimeY = runtime.geometry.getAttribute('position').getY(0);
+    expect(runtimeY).toBeGreaterThan(bakedY + 10);
+  });
+
+  it('blends runtime river bank vertices toward terrain while preserving query waterline', () => {
+    const channel = makeChannelPolyline({
+      points: [
+        makePolylinePoint({ cell: 0, x: 0, z: 0, elevationMeters: 3, accumulationCells: 8 }),
+        makePolylinePoint({ cell: 1, x: 30, z: 0, elevationMeters: 3, accumulationCells: 16 }),
+      ],
+    });
+    const artifact = makeHydrologyArtifact({ channelPolylines: [channel] });
+
+    const build = buildHydrologyRiverGeometry(artifact, { terrainHeightAt: () => 22 })!;
+    const positions = build.geometry.getAttribute('position');
+    const edgeY = positions.getY(0);
+    const centerY = positions.getY(3);
+    const queryY = build.querySegments[0]!.startSurfaceY;
+
+    expect(edgeY).toBeLessThan(centerY);
+    expect(centerY - edgeY).toBeGreaterThan(0.5);
+    expect(queryY).toBeCloseTo(centerY, 5);
+  });
+
+  it('falls back to baked elevation when the runtime terrain sampler is non-finite', () => {
+    const artifact = makeHydrologyArtifact();
+
+    const baked = buildHydrologyRiverGeometry(artifact)!;
+    const runtime = buildHydrologyRiverGeometry(artifact, { terrainHeightAt: () => Number.NaN })!;
+
+    expect(runtime.querySegments).toEqual(baked.querySegments);
+    expect(Array.from(runtime.geometry.getAttribute('position').array)).toEqual(
+      Array.from(baked.geometry.getAttribute('position').array),
+    );
+  });
+
+  it('does not publish runtime river segments that are buried under steep terrain', () => {
+    const channel = makeChannelPolyline({
+      points: [
+        makePolylinePoint({ cell: 0, x: 0, z: 0, elevationMeters: 3, accumulationCells: 8 }),
+        makePolylinePoint({ cell: 1, x: 30, z: 0, elevationMeters: 3, accumulationCells: 16 }),
+      ],
+    });
+    const artifact = makeHydrologyArtifact({ channelPolylines: [channel] });
+
+    const build = buildHydrologyRiverGeometry(artifact, { terrainHeightAt: (x) => (x === 15 ? 12 : 3) });
+
+    expect(build).toBeNull();
+  });
+
+  it('does not publish runtime river segments with wall-like inner banks', () => {
+    const channel = makeChannelPolyline({
+      points: [
+        makePolylinePoint({ cell: 0, x: 0, z: 0, elevationMeters: 3, accumulationCells: 8 }),
+        makePolylinePoint({ cell: 1, x: 30, z: 0, elevationMeters: 3, accumulationCells: 16 }),
+      ],
+    });
+    const artifact = makeHydrologyArtifact({ channelPolylines: [channel] });
+
+    const build = buildHydrologyRiverGeometry(artifact, {
+      terrainHeightAt: (_x, z) => (Math.abs(z) > 1 ? 6.4 : 3),
+    });
+
+    expect(build).toBeNull();
+  });
+
   it('publishes query segments that form a forward-connected polyline with positive width', () => {
     // A longer multi-point channel exercises segment chaining.
     const channel = makeChannelPolyline({

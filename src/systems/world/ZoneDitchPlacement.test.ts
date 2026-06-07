@@ -182,11 +182,8 @@ describe('Zone Control placement keeps bases and zones out of ditches (DEFEKT-7)
       [opforBase, 'opfor_base'],
     ] as const) {
       const cfg = ZONE_CONTROL_CONFIG.zones.find(z => z.id === cfgId)!;
-      const drift = Math.hypot(
-        base.position.x - cfg.position.x,
-        base.position.z - cfg.position.z
-      );
-      expect(drift).toBeLessThanOrEqual(cfg.radius);
+      expect(base.position.x).toBeCloseTo(cfg.position.x, 6);
+      expect(base.position.z).toBeCloseTo(cfg.position.z, 6);
     }
   });
 

@@ -89,6 +89,22 @@ function makeSyntheticHydrologyArtifact(): HydrologyBakeArtifact {
   };
 }
 
+function makeFlatHeightProvider(height: number): IHeightProvider {
+  return {
+    getHeightAt: () => height,
+    getWorkerConfig: () => ({ type: 'noise', seed: 0 }),
+  };
+}
+
+function makeEmptyFeatures(): CompiledTerrainFeatureSet {
+  return {
+    stamps: [],
+    surfacePatches: [],
+    vegetationExclusionZones: [],
+    flowPaths: [],
+  };
+}
+
 function buildScenario(
   config: GameModeConfig,
   hydrologyArtifact: HydrologyBakeArtifact | null,
@@ -315,6 +331,36 @@ describe('composeTerrain (R2.1 - resolver wired in)', () => {
         const worker = workerSideProvider.getHeightAt(x, z);
         expect(worker).toBe(main);
       }
+    });
+  });
+
+  describe('hydrology water-surface feedback', () => {
+    it('re-anchors the full channel path against the composed hydrology bed', () => {
+      const baseProvider = makeFlatHeightProvider(20);
+      const hydrologyArtifact = makeSyntheticHydrologyArtifact();
+      const hydrologyResult = compileHydrologyTerrainFeatures(hydrologyArtifact);
+
+      const composed = composeTerrain({
+        baseProvider,
+        features: makeEmptyFeatures(),
+        hydrology: hydrologyResult,
+        hydrologyArtifact,
+        options: { recomposeHydrology: true },
+      });
+
+      const waterPoints = composed.waterSurfaceArtifact?.channelPolylines[0]?.points ?? [];
+      const originalPoints = hydrologyArtifact.channelPolylines[0]?.points ?? [];
+      expect(waterPoints.length).toBe(originalPoints.length);
+
+      let sawReanchoredPoint = false;
+      for (let i = 0; i < waterPoints.length; i++) {
+        const point = waterPoints[i]!;
+        const original = originalPoints[i]!;
+        const composedHeight = composed.composedProvider.getHeightAt(point.x, point.z);
+        expect(point.elevationMeters).toBe(composedHeight);
+        if (point.elevationMeters !== original.elevationMeters) sawReanchoredPoint = true;
+      }
+      expect(sawReanchoredPoint).toBe(true);
     });
   });
 

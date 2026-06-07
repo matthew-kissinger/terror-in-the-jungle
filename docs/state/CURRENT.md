@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-02 (perf-baselines.json removal: corrected the baseline-refresh framing to "no baseline tracked; perf:compare is non-gating"; prior refresh 2026-06-01 post optimal-development arc)
+Last verified: 2026-06-07 (terrain-vehicle-water foundation reset R1/R2 local proof: shared terrain/water spawn resolver, both-faction M48 terrain/damage routing, Zone Control no-drift browser evidence, and authored level/depth water-body proof; production proof uses `deploy:prod` + `check:live-release`; owner playtest still open)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -27,6 +27,27 @@ Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
 ## Current focus (2026-06-01)
+
+2026-06-07 correction: the next long-horizon objective is
+`terrain-vehicle-water-foundation-reset`. Treat VODA / VEKHIKL / DEFEKT-7
+code-complete rows as engineering history until new owner-visible proof shows
+vehicles spawn and drive on flat terrain, tanks exist for both teams and take
+damage, authored level/depth water reads as integrated water instead of
+ribbons/stamps, and Zone Control objectives sit on playable pads.
+R1 local proof now covers the shared M2HB/M48/watercraft terrain-water spawn
+resolver, US/NVA M48 registration/rest-height and tank explosion-damage routing
+in Open Frontier and A Shau, shared non-tank vehicle explosion damage, and Zone
+Control home-base no-drift/flat-core browser evidence. Latest local headed
+proof is `PASS`:
+`artifacts/playtests/terrain-vehicle-water-foundation-reset/terrain-foundation-proof.json`.
+The earlier hydrology checks are diagnostic only: screenshots showed the old
+water path could read as a narrow terrain-following surface. R2 replaces the
+accepted gameplay-water surface with authored Open Frontier and A Shau
+level/depth reaches: they carve bathymetry, render `level-depth-water-bodies`,
+and return `water_body` samples while hydrology remains a drainage/material
+sensor. The headed local foundation proof passes; this release still requires
+the normal live Cloudflare Pages proof before any production-parity claim, and
+owner playtest remains open for subjective terrain/water/vehicle feel.
 
 `master` is the WebGPU + TSL renderer branch and has been since the KONVEYER
 campaign merged via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
@@ -128,10 +149,11 @@ as of this refresh:
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.
-- River-bearing modes use hydrology river surfaces; the legacy global
-  sea-level plane is opt-in only and disabled in Open Frontier and A Shau.
-  `npm run check:hydrology-bakes` passes. Water game-feel and a future
-  WebGPU/TSL water material remain polish work.
+- Open Frontier and A Shau now use authored level/depth water bodies for
+  playable water instead of hydrology river surfaces; the legacy global
+  sea-level plane is opt-in only and disabled in both modes. Hydrology remains
+  useful for drainage/material masks. Water game-feel and a future WebGPU/TSL
+  water material remain polish work.
 - Pixel Forge NPC/vegetation runtime art is the production truth; old
   sprites/source-soldier PNGs are guarded by
   `npm run check:pixel-forge-cutover`.

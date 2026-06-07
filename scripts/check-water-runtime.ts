@@ -25,6 +25,13 @@ interface WaterDebugInfo {
   hydrologySegmentCount?: number;
   hydrologyVertexCount?: number;
   hydrologyTotalLengthMeters?: number;
+  waterBodyVisible?: boolean;
+  waterBodyMaterialProfile?: string;
+  waterBodyCount?: number;
+  waterBodySegmentCount?: number;
+  waterBodyTotalLengthMeters?: number;
+  waterBodyMinDepthMeters?: number | null;
+  waterBodyMaxDepthMeters?: number | null;
 }
 
 interface RuntimeProofResult {
@@ -124,6 +131,7 @@ interface HarnessObject {
       getX?: (index: number) => number;
       getY?: (index: number) => number;
       getZ?: (index: number) => number;
+      getW?: (index: number) => number;
     } | undefined;
     computeBoundingBox?: () => void;
     boundingBox?: {
@@ -202,8 +210,8 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
     const engine = (window as HarnessWindow).__engine;
     const scene = engine?.renderer?.scene;
     const waterInfo = engine?.systemManager?.waterSystem?.getDebugInfo?.() ?? null;
-    const group = scene?.getObjectByName?.('hydrology-river-surfaces') ?? null;
-    const mesh = scene?.getObjectByName?.('hydrology-river-surface-mesh') ?? null;
+    const group = scene?.getObjectByName?.('level-depth-water-bodies') ?? null;
+    const mesh = scene?.getObjectByName?.('level-depth-water-body-surface-mesh') ?? null;
     const geometry = mesh?.geometry ?? null;
     const positionAttr = geometry?.getAttribute?.('position') ?? null;
     const colorAttr = geometry?.getAttribute?.('color') ?? null;
@@ -311,7 +319,7 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
   });
 
   await page.waitForTimeout(500);
-  const screenshot = join(artifactDir, `${mode}-river-proof.png`);
+  const screenshot = join(artifactDir, `${mode}-water-body-proof.png`);
   await page.screenshot({ path: screenshot, fullPage: false });
   return { mode, screenshot: rel(screenshot), errors, proof };
 }
@@ -320,15 +328,15 @@ function resultPassed(result: RuntimeProofResult): boolean {
   return result.errors.length === 0
     && result.proof.groupPresent
     && result.proof.meshPresent
-    && result.proof.waterInfo?.hydrologyRiverVisible === true
-    && result.proof.waterInfo?.hydrologyRiverMaterialProfile === 'legible_hydrology_river'
+    && result.proof.waterInfo?.waterBodyVisible === true
+    && result.proof.waterInfo?.waterBodyMaterialProfile === 'level_depth_water_body'
     && result.proof.colorAttributePresent
     && result.proof.colorAttributeItemSize === 4
-    && (result.proof.waterInfo?.hydrologySegmentCount ?? 0) > 0
+    && (result.proof.waterInfo?.waterBodySegmentCount ?? 0) > 0
     && Number.isFinite(result.proof.queryProbe?.surfaceY ?? NaN)
     && (result.proof.queryProbe?.depthOneMeterBelowSurface ?? 0) > 0.9
     && result.proof.queryProbe?.underwaterOneMeterBelowSurface === true
-    && result.proof.queryProbe?.interactionSampleOneMeterBelowSurface?.source === 'hydrology'
+    && result.proof.queryProbe?.interactionSampleOneMeterBelowSurface?.source === 'water_body'
     && result.proof.queryProbe.interactionSampleOneMeterBelowSurface.submerged === true
     && result.proof.queryProbe.interactionSampleOneMeterBelowSurface.buoyancyScalar >= 0.49;
 }
@@ -350,14 +358,14 @@ function toMarkdown(report: RuntimeProofReport): string {
       `- Errors: ${result.errors.length}`,
       `- Global water enabled: ${String(result.proof.waterInfo?.enabled ?? null)}`,
       `- Global water visible: ${String(result.proof.waterInfo?.waterVisible ?? null)}`,
-      `- Hydrology river visible: ${String(result.proof.waterInfo?.hydrologyRiverVisible ?? null)}`,
-      `- Hydrology material profile: ${String(result.proof.waterInfo?.hydrologyRiverMaterialProfile ?? null)}`,
-      `- Hydrology color attribute present: ${String(result.proof.colorAttributePresent)}`,
-      `- Hydrology color attribute item size: ${String(result.proof.colorAttributeItemSize)}`,
-      `- Hydrology focus point: ${JSON.stringify(result.proof.focusPoint)}`,
+      `- Water body visible: ${String(result.proof.waterInfo?.waterBodyVisible ?? null)}`,
+      `- Water body material profile: ${String(result.proof.waterInfo?.waterBodyMaterialProfile ?? null)}`,
+      `- Water body color attribute present: ${String(result.proof.colorAttributePresent)}`,
+      `- Water body color attribute item size: ${String(result.proof.colorAttributeItemSize)}`,
+      `- Water body focus point: ${JSON.stringify(result.proof.focusPoint)}`,
       `- Query probe: ${JSON.stringify(result.proof.queryProbe)}`,
-      `- Hydrology channels: ${String(result.proof.waterInfo?.hydrologyChannelCount ?? null)}`,
-      `- Hydrology segments: ${String(result.proof.waterInfo?.hydrologySegmentCount ?? null)}`,
+      `- Water bodies: ${String(result.proof.waterInfo?.waterBodyCount ?? null)}`,
+      `- Water body segments: ${String(result.proof.waterInfo?.waterBodySegmentCount ?? null)}`,
       '',
     ].join('\n')),
     '## Non-Claims',
@@ -428,9 +436,9 @@ async function main(): Promise<void> {
   console.log(`Projekt 143 water runtime proof ${report.status.toUpperCase()}: ${rel(jsonPath)}`);
   for (const result of report.results) {
     console.log(
-      `${result.mode}: segments=${result.proof.waterInfo?.hydrologySegmentCount ?? 'n/a'} `
-      + `channels=${result.proof.waterInfo?.hydrologyChannelCount ?? 'n/a'} `
-      + `profile=${result.proof.waterInfo?.hydrologyRiverMaterialProfile ?? 'n/a'} `
+      `${result.mode}: waterBodySegments=${result.proof.waterInfo?.waterBodySegmentCount ?? 'n/a'} `
+      + `waterBodies=${result.proof.waterInfo?.waterBodyCount ?? 'n/a'} `
+      + `profile=${result.proof.waterInfo?.waterBodyMaterialProfile ?? 'n/a'} `
       + `globalEnabled=${result.proof.waterInfo?.enabled ?? 'n/a'} `
       + `errors=${result.errors.length} screenshot=${result.screenshot}`,
     );

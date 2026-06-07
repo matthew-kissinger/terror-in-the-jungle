@@ -4,7 +4,10 @@
 import * as THREE from 'three';
 import { Logger } from '../../../utils/Logger';
 import type { HydrologyBakeArtifact } from '../../terrain/hydrology/HydrologyBake';
-import { buildHydrologyRiverGeometry } from './HydrologyRiverGeometry';
+import {
+  buildHydrologyRiverGeometry,
+  type HydrologyRiverGeometryOptions,
+} from './HydrologyRiverGeometry';
 
 export interface HydrologyRiverMeshStats {
   channelCount: number;
@@ -72,15 +75,12 @@ export interface HydrologyRiverSurfaceOptions {
  * `onMaterialReady` hook (provided by `WaterSystem` → `WaterSurfaceBinding`)
  * can install the `onBeforeCompile` patch before the mesh enters the scene.
  *
- * R2.2 of cycle-terrain-compositor: the artifact fed in via `setArtifact()`
- * is the `waterSurfaceArtifact` from `TerrainCompositorOutput` — the Pass C
- * re-anchored copy (river polyline elevations re-sampled against the
- * composed provider). The river-Y bake at
- * `point.elevationMeters + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS` inside
- * `HydrologyRiverGeometry` is unchanged; the elevations being fed in are
- * the fixed bit, so the mesh now sits on the actual composed ground over
- * airfield/motor-pool overlaps. Navmesh + heightmap-bake consumers keep
- * reading the original artifact via `TerrainSystem.setHydrologyBake()`.
+ * R2.2/R3 of cycle-terrain-compositor: the artifact fed in via `setArtifact()`
+ * is the `waterSurfaceArtifact` from `TerrainCompositorOutput`, and callers
+ * may also pass the runtime terrain-height sampler. Navmesh + heightmap-bake
+ * consumers keep reading the original artifact via
+ * `TerrainSystem.setHydrologyBake()`; water rendering/query uses the runtime
+ * surface so watercraft and the visible river mesh share the same authority.
  */
 export class HydrologyRiverSurface {
   private scene: THREE.Scene;
@@ -99,11 +99,14 @@ export class HydrologyRiverSurface {
    * Replace the active hydrology surface. `null` clears; an artifact with
    * no polylines is a no-op after the clear. Returns true on attach.
    */
-  setArtifact(artifact: HydrologyBakeArtifact | null): boolean {
+  setArtifact(
+    artifact: HydrologyBakeArtifact | null,
+    options: HydrologyRiverGeometryOptions = {},
+  ): boolean {
     this.clear();
     if (!artifact || artifact.channelPolylines.length === 0) return false;
 
-    const geo = buildHydrologyRiverGeometry(artifact);
+    const geo = buildHydrologyRiverGeometry(artifact, options);
     if (!geo) return false;
 
     const material = new THREE.MeshStandardMaterial({

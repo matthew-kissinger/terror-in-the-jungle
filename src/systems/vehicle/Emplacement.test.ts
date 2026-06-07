@@ -234,6 +234,21 @@ describe('Emplacement', () => {
   });
 
   describe('lifecycle', () => {
+    it('applies damage without removing the tripod object', () => {
+      const { scene, tripod } = makeRig();
+      const emp = new Emplacement('m2hb_damage', tripod);
+
+      emp.applyDamage(80, new THREE.Vector3());
+      expect(emp.getHealthPercent()).toBeCloseTo(0.5, 5);
+      expect(emp.isDestroyed()).toBe(false);
+      expect(scene.children).toHaveLength(1);
+
+      emp.applyDamage(200, new THREE.Vector3());
+      expect(emp.getHealthPercent()).toBe(0);
+      expect(emp.isDestroyed()).toBe(true);
+      expect(scene.children).toHaveLength(1);
+    });
+
     it('removes the tripod from the scene on dispose and reports destroyed', () => {
       const { scene, tripod } = makeRig();
       const emp = new Emplacement('m2hb_dispose', tripod);

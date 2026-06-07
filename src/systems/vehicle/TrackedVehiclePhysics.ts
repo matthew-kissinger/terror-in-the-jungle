@@ -293,6 +293,48 @@ export class TrackedVehiclePhysics {
     this.worldHalfExtent = halfExtent;
   }
 
+  /**
+   * Terrain-clamp the chassis to rest on the surface at the current X/Z so a
+   * tank spawned before terrain is wired starts grounded and driveable from
+   * frame 0. Mirrors GroundVehiclePhysics.conformToTerrain for tracked
+   * vehicles without sharing the wheeled-vehicle implementation.
+   */
+  conformToTerrain(terrain: ITerrainRuntime | null): void {
+    if (!terrain || typeof terrain.getHeightAt !== 'function') return;
+
+    const x = this.state.position.x;
+    const z = this.state.position.z;
+    if (typeof terrain.getPlayableWorldSize === 'function') {
+      const worldSize = terrain.getPlayableWorldSize();
+      if (Number.isFinite(worldSize) && worldSize > 0) {
+        const halfWorld = worldSize * 0.5;
+        if (Math.abs(x) > halfWorld || Math.abs(z) > halfWorld) return;
+      }
+    }
+
+    const groundHeight = terrain.getHeightAt(x, z);
+    if (!Number.isFinite(groundHeight)) return;
+
+    this.state.position.y = groundHeight + this.cfg.axleOffset;
+    if (this.state.velocity.y < 0) this.state.velocity.y = 0;
+    this.state.groundHeight = groundHeight;
+    this.state.isGrounded = true;
+    for (let i = 0; i < CORNER_COUNT; i += 1) {
+      this.state.cornerSamples[i].position.copy(this.state.position);
+      this.state.cornerSamples[i].terrainHeight = groundHeight;
+      this.state.cornerSamples[i].inBounds = true;
+    }
+
+    if (typeof terrain.getNormalAt === 'function') {
+      terrain.getNormalAt(x, z, _normal);
+      if (_normal.lengthSq() < 1e-6) _normal.copy(_worldUp);
+      else _normal.normalize();
+    } else {
+      _normal.copy(_worldUp);
+    }
+    this.conformToGround(_normal);
+  }
+
   getInterpolationAlpha(): number {
     return this.stepper.getInterpolationAlpha();
   }

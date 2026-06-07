@@ -61,6 +61,12 @@ describe('compileHydrologyTerrainFeatures', () => {
     expect(first.innerRadius).toBeGreaterThan(0);
     expect(first.outerRadius).toBeGreaterThan(first.innerRadius);
     expect(first.gradeRadius).toBeGreaterThan(first.outerRadius);
+    expect(first.gradeRadius).toBeGreaterThan(first.outerRadius * 2);
+    expect(first.innerRadius).toBeLessThan(first.gradeRadius * 0.35);
+    expect(first.gradeStrength).toBeLessThan(0.6);
+    expect(first.fixedTargetHeight).toBeGreaterThan(6.5);
+    expect(first.obstructionPolicy).toBe('consult');
+    expect(first.targetHeightStrategy).toBe('baked');
 
     const exclusion = result.vegetationExclusionZones[0];
     expect(exclusion?.sourceId).toBe('hydrology-river-0');

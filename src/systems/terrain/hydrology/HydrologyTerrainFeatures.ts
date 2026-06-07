@@ -15,12 +15,12 @@ interface HydrologyTerrainFeatureResult {
 }
 
 export const HYDROLOGY_TERRAIN_PRIORITY = 40;
-const HYDROLOGY_STAMP_SEGMENT_STEP = 4;
+const HYDROLOGY_STAMP_SEGMENT_STEP = 1;
 const HYDROLOGY_MIN_STAMP_LENGTH_METERS = 4;
-const HYDROLOGY_CHANNEL_DEPTH_WIDTH_SCALE = 0.025;
-const HYDROLOGY_CHANNEL_INNER_RADIUS_SCALE = 0.5;
-const HYDROLOGY_CHANNEL_OUTER_RADIUS_SCALE = 0.68;
-const HYDROLOGY_CHANNEL_GRADE_RADIUS_SCALE = 1.08;
+const HYDROLOGY_CHANNEL_DEPTH_WIDTH_SCALE = 0.012;
+const HYDROLOGY_CHANNEL_INNER_RADIUS_SCALE = 0.34;
+const HYDROLOGY_CHANNEL_OUTER_RADIUS_SCALE = 0.52;
+const HYDROLOGY_CHANNEL_GRADE_RADIUS_SCALE = 1.45;
 const HYDROLOGY_VEGETATION_CLEAR_RADIUS_SCALE = 1.12;
 const HYDROLOGY_VEGETATION_CLEAR_OVERHANG_PADDING_METERS = 14;
 const HYDROLOGY_VEGETATION_CLEAR_MIN_RADIUS_METERS = 24;
@@ -52,7 +52,7 @@ export function compileHydrologyTerrainFeatures(
       if (length < HYDROLOGY_MIN_STAMP_LENGTH_METERS) continue;
 
       const width = resolveAverageWidth(start, end, artifact, peakAccumulationCells);
-      const bedDepth = clamp(width * HYDROLOGY_CHANNEL_DEPTH_WIDTH_SCALE, 0.75, 2.4);
+      const bedDepth = clamp(width * HYDROLOGY_CHANNEL_DEPTH_WIDTH_SCALE, 0.95, 1.7);
       const bedHeight = ((start.elevationMeters + end.elevationMeters) * 0.5) - bedDepth;
       stamps.push({
         kind: 'flatten_capsule',
@@ -63,21 +63,20 @@ export function compileHydrologyTerrainFeatures(
         innerRadius: width * HYDROLOGY_CHANNEL_INNER_RADIUS_SCALE,
         outerRadius: width * HYDROLOGY_CHANNEL_OUTER_RADIUS_SCALE,
         gradeRadius: width * HYDROLOGY_CHANNEL_GRADE_RADIUS_SCALE,
-        gradeStrength: 0.78,
+        gradeStrength: 0.42,
         samplingRadius: width * 0.42,
         targetHeightMode: 'center',
         fixedTargetHeight: bedHeight,
         heightOffset: 0,
         priority: HYDROLOGY_TERRAIN_PRIORITY,
-        // Hydrology bed cedes its target height to a higher-priority overlapping
-        // stamp (airfield envelope, motor-pool flatten) when present; otherwise
-        // the baked `bedHeight` wins. R2.2 flips the strategy to
-        // `sample_post_compose` so the compositor's Pass C feedback loop
-        // re-anchors river-surface elevations against the composed provider
-        // (memo §"Why this fixes both bugs"); navmesh + heightmap-bake
-        // consumers still see the original bedHeight in the input artifact.
+        // Hydrology bed keeps its own carved datum. `consult` still lets
+        // higher-priority authored pads override the bed where they overlap,
+        // while the compositor's Pass C samples the resulting composed provider
+        // for the water-surface artifact. Using `sample_post_compose` here
+        // would re-sample every hydrology stamp against terrain without itself
+        // and erase the bed, leaving ribbon water on steep ground.
         obstructionPolicy: 'consult',
-        targetHeightStrategy: 'sample_post_compose',
+        targetHeightStrategy: 'baked',
       });
 
       appendVegetationExclusionChain(

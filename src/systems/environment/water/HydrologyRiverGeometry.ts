@@ -22,6 +22,9 @@ const MAX_HYDROLOGY_RIVER_CHANNELS = 24;
 const MAX_HYDROLOGY_RIVER_SEGMENTS = 4096;
 const HYDROLOGY_RIVER_SURFACE_OFFSET_METERS = 0.85;
 const HYDROLOGY_RIVER_MIN_SEGMENT_LENGTH_METERS = 0.5;
+const HYDROLOGY_RIVER_MIN_DEPTH_OVER_TERRAIN_METERS = 0.05;
+const HYDROLOGY_RIVER_MAX_DEPTH_OVER_TERRAIN_METERS = 3.5;
+const HYDROLOGY_RIVER_MAX_INNER_TERRAIN_ABOVE_WATER_METERS = 1.8;
 const HYDROLOGY_RIVER_BANK_COLOR = new THREE.Color(0x4a5c4f);
 const HYDROLOGY_RIVER_SHALLOW_COLOR = new THREE.Color(0x0a7082);
 const HYDROLOGY_RIVER_DEEP_COLOR = new THREE.Color(0x032640);
@@ -52,6 +55,9 @@ const HYDROLOGY_RIVER_FOAM_BANK_FLOOR_FRACTION = 0.32;
 // light watercraft downstream.
 const HYDROLOGY_RIVER_GAMEPLAY_FLOW_MIN_M_PER_S = 0.25;
 const HYDROLOGY_RIVER_GAMEPLAY_FLOW_MAX_M_PER_S = 1.15;
+const HYDROLOGY_RIVER_BANK_TERRAIN_CLEARANCE_METERS = 0.08;
+const HYDROLOGY_RIVER_BANK_VISUAL_DROP_MAX_METERS = 0.72;
+const HYDROLOGY_RIVER_BANK_VISUAL_RISE_MAX_METERS = 0.38;
 
 type RiverCrossSectionBand = 'edge' | 'bank' | 'shallow' | 'deep';
 
@@ -66,6 +72,7 @@ interface RiverRenderPoint extends HydrologyPolylinePoint {
   distanceMeters: number;
   widthMeters: number;
   flowFactor: number;
+  surfaceBaseY: number;
   leftBankScale: number;
   rightBankScale: number;
 }
@@ -86,6 +93,12 @@ export interface HydrologyRiverGeometryBuild {
   querySegments: HydrologyWaterQuerySegment[];
 }
 
+export type HydrologyRiverTerrainHeightSampler = (x: number, z: number) => number;
+
+export interface HydrologyRiverGeometryOptions {
+  terrainHeightAt?: HydrologyRiverTerrainHeightSampler | null;
+}
+
 /**
  * Pure geometry builder for hydrology river surfaces. Consumes a baked
  * hydrology artifact and emits a triangulated channel mesh with:
@@ -99,6 +112,7 @@ export interface HydrologyRiverGeometryBuild {
  */
 export function buildHydrologyRiverGeometry(
   artifact: HydrologyBakeArtifact,
+  options: HydrologyRiverGeometryOptions = {},
 ): HydrologyRiverGeometryBuild | null {
   const sortedChannels = [...artifact.channelPolylines]
     .sort((a, b) => b.maxAccumulationCells - a.maxAccumulationCells || b.lengthMeters - a.lengthMeters)
@@ -118,7 +132,7 @@ export function buildHydrologyRiverGeometry(
   let renderedChannelCount = 0;
 
   for (const channel of sortedChannels) {
-    const points = buildRiverRenderPoints(channel, artifact, peakAccumulationCells);
+    const points = buildRiverRenderPoints(channel, artifact, peakAccumulationCells, options.terrainHeightAt ?? null);
     if (points.length < 2) continue;
     maxAccumulationCells = Math.max(maxAccumulationCells, channel.maxAccumulationCells);
 
@@ -128,7 +142,7 @@ export function buildHydrologyRiverGeometry(
       if (!point) continue;
 
       const frame = resolveSectionFrame(points, index);
-      const pointY = point.elevationMeters + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS;
+      const pointY = point.surfaceBaseY + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS;
       const vertexBase = positions.length / 3;
       sectionVertexBases.push(vertexBase);
 
@@ -143,10 +157,12 @@ export function buildHydrologyRiverGeometry(
         const lateral = sample.across * halfWidth * (1 + (sideScale - 1) * edgeWeight);
         const color = resolveCrossSectionColor(sample.band, point.flowFactor);
 
+        const vertexX = point.x + frame.normalX * lateral;
+        const vertexZ = point.z + frame.normalZ * lateral;
         positions.push(
-          point.x + frame.normalX * lateral,
-          pointY,
-          point.z + frame.normalZ * lateral,
+          vertexX,
+          resolveCrossSectionY(vertexX, vertexZ, pointY, sample, options.terrainHeightAt ?? null),
+          vertexZ,
         );
         normals.push(0, 1, 0);
         uvs.push((sample.across + 1) * 0.5, point.distanceMeters / HYDROLOGY_RIVER_UV_FLOW_REPEAT_METERS);
@@ -171,8 +187,12 @@ export function buildHydrologyRiverGeometry(
 
       const flowX = dx / length;
       const flowZ = dz / length;
-      const startY = start.elevationMeters + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS;
-      const endY = end.elevationMeters + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS;
+      const startY = start.surfaceBaseY + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS;
+      const endY = end.surfaceBaseY + HYDROLOGY_RIVER_SURFACE_OFFSET_METERS;
+      const halfWidth = Math.max(start.widthMeters, end.widthMeters) * 0.5;
+      if (isRuntimeUnsupportedRiverSegment(start, end, startY, endY, halfWidth, options.terrainHeightAt ?? null)) {
+        continue;
+      }
       const flowFactor = (start.flowFactor + end.flowFactor) * 0.5;
 
       const narrownessFoam = clamp(
@@ -212,7 +232,7 @@ export function buildHydrologyRiverGeometry(
         startX: start.x, startZ: start.z,
         endX: end.x, endZ: end.z,
         startSurfaceY: startY, endSurfaceY: endY,
-        halfWidth: Math.max(start.widthMeters, end.widthMeters) * 0.5,
+        halfWidth,
         flowX,
         flowZ,
         flowSpeedMetersPerSecond,
@@ -256,6 +276,7 @@ function buildRiverRenderPoints(
   channel: HydrologyChannelPolyline,
   artifact: HydrologyBakeArtifact,
   peakAccumulationCells: number,
+  terrainHeightAt: HydrologyRiverTerrainHeightSampler | null,
 ): RiverRenderPoint[] {
   const source = smoothHydrologyRiverPath(channel.points);
   const points: RiverRenderPoint[] = [];
@@ -280,11 +301,63 @@ function buildRiverRenderPoints(
       distanceMeters,
       widthMeters,
       flowFactor,
+      surfaceBaseY: resolveSurfaceBaseY(point, terrainHeightAt),
       leftBankScale: resolveBankScale(point, channel.headCell, -1),
       rightBankScale: resolveBankScale(point, channel.outletCell, 1),
     });
   }
   return points;
+}
+
+function resolveSurfaceBaseY(
+  point: HydrologyPolylinePoint,
+  terrainHeightAt: HydrologyRiverTerrainHeightSampler | null,
+): number {
+  if (!terrainHeightAt) return point.elevationMeters;
+  const terrainY = terrainHeightAt(point.x, point.z);
+  return Number.isFinite(terrainY) ? terrainY : point.elevationMeters;
+}
+
+function isRuntimeUnsupportedRiverSegment(
+  start: RiverRenderPoint,
+  end: RiverRenderPoint,
+  startY: number,
+  endY: number,
+  halfWidth: number,
+  terrainHeightAt: HydrologyRiverTerrainHeightSampler | null,
+): boolean {
+  if (!terrainHeightAt) return false;
+
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const length = Math.hypot(dx, dz);
+  if (length < HYDROLOGY_RIVER_MIN_SEGMENT_LENGTH_METERS) return true;
+
+  const midX = (start.x + end.x) * 0.5;
+  const midZ = (start.z + end.z) * 0.5;
+  const surfaceY = (startY + endY) * 0.5;
+  const centerTerrainY = terrainHeightAt(midX, midZ);
+  if (!Number.isFinite(centerTerrainY)) return false;
+
+  const depthOverTerrain = surfaceY - centerTerrainY;
+  if (
+    depthOverTerrain < HYDROLOGY_RIVER_MIN_DEPTH_OVER_TERRAIN_METERS
+    || depthOverTerrain > HYDROLOGY_RIVER_MAX_DEPTH_OVER_TERRAIN_METERS
+  ) {
+    return true;
+  }
+
+  const normalX = -dz / length;
+  const normalZ = dx / length;
+  const innerOffset = Math.max(1, halfWidth * 0.35);
+  const leftInnerTerrainY = terrainHeightAt(midX + normalX * innerOffset, midZ + normalZ * innerOffset);
+  const rightInnerTerrainY = terrainHeightAt(midX - normalX * innerOffset, midZ - normalZ * innerOffset);
+  if (!Number.isFinite(leftInnerTerrainY) || !Number.isFinite(rightInnerTerrainY)) return false;
+
+  const innerTerrainAboveWaterMax = Math.max(leftInnerTerrainY - surfaceY, rightInnerTerrainY - surfaceY);
+  const innerDepthOverTerrainMax = Math.max(surfaceY - leftInnerTerrainY, surfaceY - rightInnerTerrainY);
+  return innerTerrainAboveWaterMax > HYDROLOGY_RIVER_MAX_INNER_TERRAIN_ABOVE_WATER_METERS
+    || innerDepthOverTerrainMax > HYDROLOGY_RIVER_MAX_DEPTH_OVER_TERRAIN_METERS;
 }
 
 function resolveSectionFrame(points: readonly RiverRenderPoint[], index: number): {
@@ -333,6 +406,27 @@ function resolveCrossSectionColor(band: RiverCrossSectionBand, flowFactor: numbe
   }
 }
 
+function resolveCrossSectionY(
+  x: number,
+  z: number,
+  waterY: number,
+  sample: RiverCrossSectionSample,
+  terrainHeightAt: HydrologyRiverTerrainHeightSampler | null,
+): number {
+  if (!terrainHeightAt) return waterY;
+  const bankWeight = Math.pow(Math.abs(sample.across), 1.45);
+  if (bankWeight < 0.001) return waterY;
+  const terrainY = terrainHeightAt(x, z);
+  if (!Number.isFinite(terrainY)) return waterY;
+
+  const shoreY = clamp(
+    terrainY + HYDROLOGY_RIVER_BANK_TERRAIN_CLEARANCE_METERS,
+    waterY - HYDROLOGY_RIVER_BANK_VISUAL_DROP_MAX_METERS,
+    waterY + HYDROLOGY_RIVER_BANK_VISUAL_RISE_MAX_METERS,
+  );
+  return lerp(waterY, shoreY, bankWeight);
+}
+
 function resolveBankScale(point: HydrologyPolylinePoint, salt: number, side: -1 | 1): number {
   const phase = salt * 0.017 + side * 1.913;
   const broad = Math.sin(point.x * 0.021 + point.z * 0.014 + phase);
@@ -343,6 +437,10 @@ function resolveBankScale(point: HydrologyPolylinePoint, salt: number, side: -1 
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function lerp(start: number, end: number, t: number): number {
+  return start + (end - start) * t;
 }
 
 function pushColor(colors: number[], color: THREE.Color, alpha: number): void {

@@ -11,9 +11,19 @@ import { KillAssistTracker } from './KillAssistTracker';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 import { GameEventBus } from '../../core/GameEventBus';
+import type { IVehicle } from '../vehicle/IVehicle';
+import { Tank, type TankDamageType } from '../vehicle/Tank';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
+
+export interface VehicleExplosionDamageQuery {
+  getVehiclesInRadius(center: THREE.Vector3, radius: number): readonly IVehicle[];
+}
+
+interface GenericVehicleDamageTarget extends IVehicle {
+  applyDamage(amount: number, hitPoint: THREE.Vector3): unknown;
+}
 
 /**
  * Handles explosion damage application to combatants
@@ -22,6 +32,7 @@ const _deathDir = new THREE.Vector3();
 export class CombatantSystemDamage {
   private ticketSystem?: TicketSystem;
   private hudSystem?: IHUDSystem;
+  private vehicleDamageQuery?: VehicleExplosionDamageQuery;
 
   constructor(
     private combatants: Map<string, Combatant>,
@@ -40,6 +51,10 @@ export class CombatantSystemDamage {
 
   setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
+  }
+
+  setVehicleDamageQuery(query: VehicleExplosionDamageQuery | null): void {
+    this.vehicleDamageQuery = query ?? undefined;
   }
 
   /**
@@ -204,5 +219,52 @@ export class CombatantSystemDamage {
     if (hitCount > 0) {
       Logger.debug('Combat', `Explosion hit ${hitCount} combatants`);
     }
+
+    this.applyExplosionDamageToVehicles(center, radius, maxDamage, weaponType, shooterFaction);
   }
+
+  private applyExplosionDamageToVehicles(
+    center: THREE.Vector3,
+    radius: number,
+    maxDamage: number,
+    weaponType: string,
+    shooterFaction?: Faction,
+  ): void {
+    if (!this.vehicleDamageQuery || radius <= 0 || maxDamage <= 0) return;
+
+    const damageType = tankDamageTypeForWeapon(weaponType);
+    let hitCount = 0;
+    for (const vehicle of this.vehicleDamageQuery.getVehiclesInRadius(center, radius)) {
+      if (vehicle.isDestroyed()) continue;
+      if (shooterFaction !== undefined && isAlly(vehicle.faction, shooterFaction)) continue;
+
+      const distance = vehicle.getPosition().distanceTo(center);
+      if (distance > radius) continue;
+      const damage = maxDamage * (1.0 - distance / radius);
+      if (damage <= 0) continue;
+
+      if (vehicle instanceof Tank) {
+        vehicle.applyDamage(damage, center, damageType);
+      } else if (isGenericVehicleDamageTarget(vehicle)) {
+        vehicle.applyDamage(damage, center);
+      } else {
+        continue;
+      }
+      hitCount++;
+    }
+
+    if (hitCount > 0) {
+      Logger.debug('Combat', `Explosion hit ${hitCount} vehicles`);
+    }
+  }
+}
+
+function isGenericVehicleDamageTarget(vehicle: IVehicle): vehicle is GenericVehicleDamageTarget {
+  return typeof (vehicle as { applyDamage?: unknown }).applyDamage === 'function';
+}
+
+function tankDamageTypeForWeapon(weaponType: string): TankDamageType {
+  if (weaponType === 'tank_cannon') return 'AP';
+  if (weaponType.includes('rocket') || weaponType.includes('heat')) return 'HEAT';
+  return 'HE';
 }

@@ -52,7 +52,7 @@ export interface TerrainCompositorOptions {
    * The resolver itself behaves identically regardless of strict mode.
    */
   strict?: boolean;
-  /** R2.2: re-anchor hydrology elevations against the composed provider. Not consumed yet. */
+  /** Re-anchor hydrology water-surface elevations against the composed provider. */
   recomposeHydrology?: boolean;
 }
 
@@ -68,8 +68,8 @@ export interface TerrainCompositorOptions {
  * - `conflicts`: every AABB overlap detected, each annotated with the
  *   resolution the policy resolver chose (`unchanged` / `clamped` /
  *   `resampled` / `overridden`).
- * - `waterSurfaceArtifact`: input hydrologyArtifact passed through unchanged
- *   in R2.1 (R2.2 owns Pass C - re-anchored river elevations).
+ * - `waterSurfaceArtifact`: hydrologyArtifact cloned with river elevations
+ *   re-anchored against the composed provider when Pass C is enabled.
  */
 export interface TerrainCompositorOutput {
   composedProvider: IHeightProvider;

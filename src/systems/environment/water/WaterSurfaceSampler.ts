@@ -3,8 +3,9 @@
 
 import * as THREE from 'three';
 import type { HydrologyWaterQuerySegment } from './HydrologyRiverSurface';
+import type { WaterBodyQuerySegment } from './WaterBodyAuthority';
 
-export type WaterSurfaceSource = 'none' | 'global' | 'hydrology';
+export type WaterSurfaceSource = 'none' | 'global' | 'hydrology' | 'water_body';
 
 export interface WaterInteractionSample {
   source: WaterSurfaceSource;
@@ -42,6 +43,7 @@ export const DEFAULT_WATER_IMMERSION_DEPTH_METERS = 1.6;
 export interface WaterSurfaceSamplerBindings {
   globalWaterLevel: number;
   isGlobalPlaneActive(): boolean;
+  getWaterBodyQuerySegments(): readonly WaterBodyQuerySegment[];
   getHydrologyQuerySegments(): readonly HydrologyWaterQuerySegment[];
 }
 
@@ -125,17 +127,22 @@ export class WaterSurfaceSampler {
   }
 
   /**
-   * Resolve which water source (hydrology, global plane, or none) covers
-   * the given XZ. Hydrology takes priority so per-river surfaces override
-   * the global plane in the overlap. When a hydrology segment matches,
+   * Resolve which water source (authored water body, hydrology, global plane,
+   * or none) covers the given XZ. Authored level/depth water bodies take
+   * priority over old terrain-following hydrology ribbons; hydrology still
+   * overrides the global plane. When a segment matches,
    * its reference is returned so the sampler can derive flow velocity
    * from the same segment without a second walk.
    */
   private resolveWaterSurface(position: THREE.Vector3): {
     source: WaterSurfaceSource;
     surfaceY: number | null;
-    flowSegment: HydrologyWaterQuerySegment | null;
+    flowSegment: WaterFlowSegment | null;
   } {
+    const waterBody = this.sampleWaterBody(position.x, position.z);
+    if (waterBody !== null) {
+      return { source: 'water_body', surfaceY: waterBody.surfaceY, flowSegment: waterBody.segment };
+    }
     const hydrology = this.sampleHydrology(position.x, position.z);
     if (hydrology !== null) {
       return { source: 'hydrology', surfaceY: hydrology.surfaceY, flowSegment: hydrology.segment };
@@ -175,6 +182,41 @@ export class WaterSurfaceSampler {
     }
     return nearest === null ? null : { surfaceY: nearest.surfaceY, segment: nearest.segment };
   }
+
+  /**
+   * Walk authored level/depth water-body reaches and return the constant
+   * surface Y of the nearest covered segment. The segment also carries flow
+   * and bed-depth metadata for gameplay diagnostics.
+   */
+  private sampleWaterBody(
+    x: number,
+    z: number,
+  ): { surfaceY: number; segment: WaterBodyQuerySegment } | null {
+    const segments = this.bindings.getWaterBodyQuerySegments();
+    let nearest: { distanceSq: number; surfaceY: number; segment: WaterBodyQuerySegment } | null = null;
+    for (const segment of segments) {
+      const dx = segment.endX - segment.startX;
+      const dz = segment.endZ - segment.startZ;
+      const lengthSq = dx * dx + dz * dz;
+      if (lengthSq <= 0) continue;
+      const t = clamp(((x - segment.startX) * dx + (z - segment.startZ) * dz) / lengthSq, 0, 1);
+      const sampleX = segment.startX + dx * t;
+      const sampleZ = segment.startZ + dz * t;
+      const distanceSq = (x - sampleX) ** 2 + (z - sampleZ) ** 2;
+      if (distanceSq > segment.halfWidth ** 2) continue;
+      const surfaceY = segment.startSurfaceY + (segment.endSurfaceY - segment.startSurfaceY) * t;
+      if (!nearest || distanceSq < nearest.distanceSq) {
+        nearest = { distanceSq, surfaceY, segment };
+      }
+    }
+    return nearest === null ? null : { surfaceY: nearest.surfaceY, segment: nearest.segment };
+  }
+}
+
+interface WaterFlowSegment {
+  flowX: number;
+  flowZ: number;
+  flowSpeedMetersPerSecond: number;
 }
 
 function clamp(value: number, min: number, max: number): number {

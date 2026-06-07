@@ -233,6 +233,25 @@ describe('GameModeManager', () => {
     ]);
   });
 
+  it('notifies every registered mode-change listener on mode switch', () => {
+    const manager = new GameModeManager();
+    const first = vi.fn();
+    const second = vi.fn();
+
+    manager.onModeChanged(first);
+    manager.onModeChanged(second);
+    manager.setGameMode(GameMode.OPEN_FRONTIER);
+
+    expect(first).toHaveBeenCalledWith(
+      GameMode.OPEN_FRONTIER,
+      expect.objectContaining({ id: GameMode.OPEN_FRONTIER })
+    );
+    expect(second).toHaveBeenCalledWith(
+      GameMode.OPEN_FRONTIER,
+      expect.objectContaining({ id: GameMode.OPEN_FRONTIER })
+    );
+  });
+
   it('passes scheduled runtime updates through the active mode runtime', () => {
     const events: string[] = [];
     const manager = new GameModeManager(getGameModeDefinition, definition => ({

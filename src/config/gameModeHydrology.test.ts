@@ -44,18 +44,20 @@ describe('global water plane decouple flag', () => {
     return config.globalWaterPlaneEnabled === true;
   }
 
-  it('A Shau renders water without the sea-level global plane', () => {
-    // The Sampan needs the hydrology river to render, but the 2000m flat
-    // plane at Y=0 would sit ~580m below the valley floor — invisible and
-    // wasted. The explicit decouple makes this legible.
+  it('A Shau renders authored water bodies without the sea-level global plane', () => {
+    // The 2000m flat plane at Y=0 would sit hundreds of meters below the DEM
+    // valley floor — invisible and wasted. Playable water now comes from
+    // authored level/depth reaches.
     expect(A_SHAU_VALLEY_CONFIG.waterEnabled).toBe(true);
     expect(A_SHAU_VALLEY_CONFIG.globalWaterPlaneEnabled).toBe(false);
+    expect(A_SHAU_VALLEY_CONFIG.waterBodies?.length).toBeGreaterThanOrEqual(2);
     expect(resolveGlobalPlaneEnabled(A_SHAU_VALLEY_CONFIG)).toBe(false);
   });
 
-  it('Open Frontier renders hydrology water without the legacy global plane', () => {
+  it('Open Frontier renders authored water bodies without the legacy global plane', () => {
     expect(OPEN_FRONTIER_CONFIG.waterEnabled).toBe(true);
     expect(OPEN_FRONTIER_CONFIG.globalWaterPlaneEnabled).toBe(false);
+    expect(OPEN_FRONTIER_CONFIG.waterBodies?.length).toBeGreaterThanOrEqual(2);
     expect(resolveGlobalPlaneEnabled(OPEN_FRONTIER_CONFIG)).toBe(false);
   });
 

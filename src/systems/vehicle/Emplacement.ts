@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { Faction } from '../combat/types';
 import type { IVehicle, SeatRole, VehicleSeat } from './IVehicle';
+import { VehicleDamageState, type VehicleDamageResult } from './VehicleDamage';
 
 /**
  * Fixed weapon emplacement (e.g. M2HB on tripod or sandbag platform).
@@ -75,6 +76,7 @@ const DEFAULT_SEATS: VehicleSeat[] = [
   // Ammo handler: to the gunner's left, lower (kneeling at the ready-box).
   { index: 1, role: 'passenger', occupantId: null, localOffset: new THREE.Vector3(-0.7, 0.5, -0.4), exitOffset: new THREE.Vector3(-1.8, 0, -0.4) },
 ];
+const EMPLACEMENT_MAX_HP = 160;
 
 function clampAngle(value: number, limits: { min: number; max: number } | null): number {
   if (!limits) return value;
@@ -107,7 +109,7 @@ export class Emplacement implements IVehicle {
   private readonly yawNode: THREE.Object3D | null;
   private readonly pitchNode: THREE.Object3D | null;
 
-  private destroyed = false;
+  private readonly damage = new VehicleDamageState(EMPLACEMENT_MAX_HP);
   private readonly zeroVelocity = new THREE.Vector3();
 
   constructor(
@@ -238,11 +240,15 @@ export class Emplacement implements IVehicle {
   }
 
   isDestroyed(): boolean {
-    return this.destroyed;
+    return this.damage.isDestroyed();
   }
 
   getHealthPercent(): number {
-    return this.destroyed ? 0 : 1;
+    return this.damage.getHealthPercent();
+  }
+
+  applyDamage(amount: number, _hitPoint: THREE.Vector3): VehicleDamageResult {
+    return this.damage.applyDamage(amount);
   }
 
   // ---------- Per-frame slew ----------
@@ -252,7 +258,7 @@ export class Emplacement implements IVehicle {
    * rates. There is no chassis integration; the tripod itself never moves.
    */
   update(dt: number): void {
-    if (this.destroyed || dt <= 0) return;
+    if (this.isDestroyed() || dt <= 0) return;
 
     const maxYawStep = this.config.yawSlewRate * dt;
     const maxPitchStep = this.config.pitchSlewRate * dt;
@@ -266,7 +272,7 @@ export class Emplacement implements IVehicle {
   }
 
   dispose(): void {
-    this.destroyed = true;
+    this.damage.destroy();
     this.object.removeFromParent();
   }
 }

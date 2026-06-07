@@ -273,6 +273,27 @@ describe('PBR drivetrain', () => {
 // ---------- Lifecycle ----------
 
 describe('PBR lifecycle', () => {
+  it('applies damage to the hull and disables mounts when wrecked', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleManager();
+    const m2hb = new M2HBEmplacementSystem(scene);
+    const { pbr, mounts } = createPBR(scene, vm, m2hb, {
+      vehicleId: 'pbr_damage',
+      position: new THREE.Vector3(0, 0, 0),
+      faction: Faction.US,
+    });
+
+    pbr.applyDamage(175, new THREE.Vector3());
+    expect(pbr.getHealthPercent()).toBeCloseTo(0.5, 5);
+    expect(pbr.isDestroyed()).toBe(false);
+    expect(mounts.every(m => !m.emplacement.isDestroyed())).toBe(true);
+
+    pbr.applyDamage(400, new THREE.Vector3());
+    expect(pbr.getHealthPercent()).toBe(0);
+    expect(pbr.isDestroyed()).toBe(true);
+    expect(mounts.every(m => m.emplacement.isDestroyed())).toBe(true);
+  });
+
   it('dispose removes the hull from the scene and tears down both mounts', () => {
     const scene = new THREE.Scene();
     const vm = new VehicleManager();

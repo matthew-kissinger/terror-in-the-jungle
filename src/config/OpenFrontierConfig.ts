@@ -58,11 +58,46 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
       maxSlopeDeg: 16,
     },
   },
-  // Renders hydrology river surfaces only. The old camera-following sea-level
-  // plane made carved terrain look like water acceptance; current water must
-  // come from the hydrology graph.
+  // Authored level/depth reaches own playable water. Hydrology still seeds
+  // terrain material masks, but the old terrain-following river ribbon is no
+  // longer accepted as a gameplay water surface.
   waterEnabled: true,
   globalWaterPlaneEnabled: false,
+  waterBodies: [
+    {
+      id: 'of_sampan_level_reach',
+      kind: 'reach',
+      surfaceY: 7,
+      widthMeters: 74,
+      depthMinMeters: 2.2,
+      depthMaxMeters: 3.6,
+      bankGradeMeters: 42,
+      flowSpeedMetersPerSecond: 0.18,
+      points: [
+        { x: -780, z: 76, depthMeters: 2.1 },
+        { x: -520, z: 250, depthMeters: 2.2 },
+        { x: -324, z: 384, depthMeters: 3.6 },
+        { x: -115, z: 520, depthMeters: 2.8 },
+      ],
+    },
+    {
+      id: 'of_pbr_level_reach',
+      kind: 'reach',
+      surfaceY: 26,
+      widthMeters: 86,
+      depthMinMeters: 2.8,
+      depthMaxMeters: 4.4,
+      bankGradeMeters: 48,
+      flowSpeedMetersPerSecond: 0.24,
+      points: [
+        { x: -75, z: 470, depthMeters: 2.7 },
+        { x: 150, z: 665, depthMeters: 2.8 },
+        { x: 396, z: 876, depthMeters: 4.4 },
+        { x: 585, z: 1035, depthMeters: 3.2 },
+        { x: 790, z: 1205, depthMeters: 3.0 },
+      ],
+    },
+  ],
   weather: {
     enabled: true,
     initialState: WeatherState.CLEAR,

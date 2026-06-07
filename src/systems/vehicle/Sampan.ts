@@ -10,6 +10,7 @@ import {
 } from './WatercraftPhysics';
 import type { BuoyancySamplerLike } from '../environment/water/BuoyancyForce';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import { VehicleDamageState, type VehicleDamageResult } from './VehicleDamage';
 
 /**
  * Sampan: light unarmed Vietnamese river boat. First IVehicle to ride
@@ -83,13 +84,14 @@ export const SAMPAN_HULL_DIMENSIONS = {
 
 const _scratchPos = new THREE.Vector3();
 const _scratchQuat = new THREE.Quaternion();
+const SAMPAN_MAX_HP = 90;
 
 export class Sampan implements IVehicle {
   readonly category = 'watercraft' as const;
   readonly faction: Faction;
   private readonly seats: VehicleSeat[];
   private readonly velocity = new THREE.Vector3();
-  private destroyed = false;
+  private readonly damage = new VehicleDamageState(SAMPAN_MAX_HP);
   private readonly physics: WatercraftPhysics;
   private terrain: ITerrainRuntime | null = null;
 
@@ -244,11 +246,19 @@ export class Sampan implements IVehicle {
   }
 
   isDestroyed(): boolean {
-    return this.destroyed;
+    return this.damage.isDestroyed();
   }
 
   getHealthPercent(): number {
-    return this.destroyed ? 0 : 1;
+    return this.damage.getHealthPercent();
+  }
+
+  applyDamage(amount: number, _hitPoint: THREE.Vector3): VehicleDamageResult {
+    const result = this.damage.applyDamage(amount);
+    if (result.destroyed) {
+      this.setControls(0, 0);
+    }
+    return result;
   }
 
   // ---------- Per-frame integration ----------
@@ -260,7 +270,7 @@ export class Sampan implements IVehicle {
    * for the open-water sailing path).
    */
   update(dt: number): void {
-    if (this.destroyed || dt <= 0) return;
+    if (this.isDestroyed() || dt <= 0) return;
     this.physics.update(dt, this.terrain ?? undefined);
 
     const state = this.physics.getState();
@@ -270,7 +280,7 @@ export class Sampan implements IVehicle {
   }
 
   dispose(): void {
-    this.destroyed = true;
+    this.damage.destroy();
     this.physics.dispose();
     this.object.removeFromParent();
   }

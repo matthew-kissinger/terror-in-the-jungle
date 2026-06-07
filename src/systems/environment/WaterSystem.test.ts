@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { WaterSystem } from './WaterSystem';
+import type { WaterBodyConfig } from '../../config/gameModeTypes';
 import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import type { AssetLoader } from '../assets/AssetLoader';
 import type { HydrologyBakeArtifact } from '../terrain/hydrology/HydrologyBake';
@@ -81,6 +82,20 @@ function makeHydrologyArtifact(): HydrologyBakeArtifact {
           { cell: 1, x: 15, z: 0, elevationMeters: 1, accumulationCells: 16 },
         ],
       },
+    ],
+  };
+}
+
+function makeWaterBody(): WaterBodyConfig {
+  return {
+    id: 'test_level_reach',
+    kind: 'reach',
+    surfaceY: 8,
+    widthMeters: 40,
+    depthMeters: 3,
+    points: [
+      { x: 0, z: 0, depthMeters: 2 },
+      { x: 20, z: 0, depthMeters: 4 },
     ],
   };
 }
@@ -203,6 +218,66 @@ describe('WaterSystem sun direction from atmosphere', () => {
 
     system.setHydrologyChannels(null);
     expect(fakeWater.visible).toBe(true);
+  });
+
+  it('samples hydrology river surfaces from the supplied runtime terrain height', () => {
+    const { system } = makeSystemWithScene();
+
+    system.setHydrologyChannels(makeHydrologyArtifact(), () => 12);
+
+    expect(system.getWaterSurfaceY(new THREE.Vector3(5, 1, 0))).toBeCloseTo(12.85, 5);
+    expect(system.getWaterDepth(new THREE.Vector3(5, 1, 0))).toBeCloseTo(11.85, 5);
+    expect(system.sampleWaterInteraction(new THREE.Vector3(5, 1, 0)).source).toBe('hydrology');
+  });
+
+  it('samples authored level/depth water bodies independently of the global plane', () => {
+    const { scene, system } = makeSystemWithScene();
+    const fakeWater = { visible: false };
+    (system as unknown as { water: { visible: boolean } }).water = fakeWater;
+
+    system.setEnabled(false);
+    system.setWaterBodies([makeWaterBody()]);
+
+    const info = system.getDebugInfo();
+    expect(fakeWater.visible).toBe(false);
+    expect(info.waterBodyVisible).toBe(true);
+    expect(info.waterBodyCount).toBe(1);
+    expect(info.waterBodySegmentCount).toBe(1);
+    expect(info.waterBodyMinDepthMeters).toBe(2);
+    expect(info.waterBodyMaxDepthMeters).toBe(4);
+    expect(scene.getObjectByName('level-depth-water-bodies')).toBeDefined();
+
+    const sample = system.sampleWaterInteraction(new THREE.Vector3(10, 6, 0), {
+      immersionDepthMeters: 4,
+    });
+    expect(sample.source).toBe('water_body');
+    expect(sample.surfaceY).toBe(8);
+    expect(sample.depth).toBe(2);
+    expect(sample.immersion01).toBeCloseTo(0.5, 5);
+  });
+
+  it('clears authored water bodies when the next mode has none', () => {
+    const { scene, system } = makeSystemWithScene();
+
+    system.setWaterBodies([makeWaterBody()]);
+    system.setWaterBodies(null);
+
+    const info = system.getDebugInfo();
+    expect(info.waterBodyVisible).toBe(false);
+    expect(info.waterBodyCount).toBe(0);
+    expect(info.waterBodySegmentCount).toBe(0);
+    expect(scene.getObjectByName('level-depth-water-bodies')).toBeUndefined();
+    expect(system.sampleWaterInteraction(new THREE.Vector3(10, 6, 0)).source).toBe('global');
+  });
+
+  it('exposes runtime hydrology query segments for proof harness diagnostics', () => {
+    const { system } = makeSystemWithScene();
+
+    system.setHydrologyChannels(makeHydrologyArtifact(), () => 12);
+
+    const segments = system.getHydrologyQuerySegmentsForDebug();
+    expect(segments.length).toBeGreaterThan(0);
+    expect(segments[0]?.startSurfaceY).toBeCloseTo(12.85, 5);
   });
 
   it('applies global water color to the standard material', () => {

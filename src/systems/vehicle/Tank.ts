@@ -225,6 +225,12 @@ export class Tank implements IVehicle {
         this.physics.setWorldHalfExtent(worldSize * 0.5);
       }
     }
+    if (terrain) {
+      this.physics.conformToTerrain(terrain);
+      const state = this.physics.getState();
+      this.object.position.copy(state.position);
+      this.object.quaternion.copy(state.quaternion);
+    }
   }
 
   // ---------- Physics access (for adapters / NPC drivers) ----------

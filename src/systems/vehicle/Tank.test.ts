@@ -18,7 +18,12 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { Tank } from './Tank';
 import { VehicleManager } from './VehicleManager';
-import { createM48Tank, spawnScenarioM48Tanks, M48_SCENARIO_SPAWNS } from './M48TankSpawn';
+import {
+  createM48Tank,
+  spawnScenarioM48Tanks,
+  M48_SCENARIO_SPAWN_GROUPS,
+  M48_SCENARIO_SPAWNS,
+} from './M48TankSpawn';
 import { Faction } from '../combat/types';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
@@ -225,6 +230,18 @@ describe('M48 scenario spawn', () => {
       .not.toBe(M48_SCENARIO_SPAWNS.a_shau_valley.vehicleId);
     expect(M48_SCENARIO_SPAWNS.open_frontier.faction).toBe(Faction.US);
     expect(M48_SCENARIO_SPAWNS.a_shau_valley.faction).toBe(Faction.US);
+    const allIds = Object.values(M48_SCENARIO_SPAWN_GROUPS)
+      .flat()
+      .map(def => def.vehicleId);
+    expect(new Set(allIds).size).toBe(allIds.length);
+  });
+
+  it('fields US and NVA M48s in each large scenario mode', () => {
+    for (const defs of Object.values(M48_SCENARIO_SPAWN_GROUPS)) {
+      expect(defs.map(def => def.faction)).toEqual(
+        expect.arrayContaining([Faction.US, Faction.NVA])
+      );
+    }
   });
 
   it('Open Frontier M48 anchor lands inside the airfield Main Motor Pool footprint (cycle-motor-pool-reflow-and-tank-dedup)', () => {
@@ -260,10 +277,10 @@ describe('M48 scenario spawn', () => {
       vehicleManager: vm,
     });
 
-    expect(spawned).toHaveLength(2);
-    // Both should be registered ground-category vehicles.
+    expect(spawned).toHaveLength(4);
+    // Every scenario tank should be registered as a ground-category vehicle.
     const ground = vm.getVehiclesByCategory('ground');
-    expect(ground).toHaveLength(2);
+    expect(ground).toHaveLength(4);
   });
 
   it('spawns at the table positions when no resolver is supplied', () => {
@@ -282,6 +299,10 @@ describe('M48 scenario spawn', () => {
     expect(ofTank.getPosition().z).toBeCloseTo(M48_SCENARIO_SPAWNS.open_frontier.position.z, 2);
     expect(ashauTank.getPosition().x).toBeCloseTo(M48_SCENARIO_SPAWNS.a_shau_valley.position.x, 2);
     expect(ashauTank.getPosition().z).toBeCloseTo(M48_SCENARIO_SPAWNS.a_shau_valley.position.z, 2);
+    const ofOpforTank = vm.getVehicle('m48_tank_of_nva_main_hq')!;
+    const ashauOpforTank = vm.getVehicle('m48_tank_ashau_nva_dongso')!;
+    expect(ofOpforTank.faction).toBe(Faction.NVA);
+    expect(ashauOpforTank.faction).toBe(Faction.NVA);
   });
 
   it('honours an optional resolvePosition (terrain-snap callback)', () => {
@@ -595,7 +616,7 @@ describe('VehicleManager.spawnScenarioM48Tanks surface', () => {
       modes: ['open_frontier', 'a_shau_valley'],
     });
 
-    expect(ids).toHaveLength(2);
+    expect(ids).toHaveLength(4);
     for (const id of ids) {
       expect(vm.getVehicle(id)?.category).toBe('ground');
     }

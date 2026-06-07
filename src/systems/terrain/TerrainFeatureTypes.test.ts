@@ -236,7 +236,7 @@ describe('compositor stamp policy annotations', () => {
     expect(result.stamps.every((s) => s.targetHeightStrategy === 'baked')).toBe(true);
   });
 
-  it('annotates hydrology channel-bed stamps with consult + sample_post_compose', () => {
+  it('annotates hydrology channel-bed stamps with consult + baked', () => {
     const artifact: HydrologyBakeArtifact = {
       schemaVersion: 1,
       width: 4,
@@ -272,6 +272,6 @@ describe('compositor stamp policy annotations', () => {
 
     assertStampPoliciesAnnotated(result.stamps, 'hydrology');
     expect(result.stamps.every((s) => s.obstructionPolicy === 'consult')).toBe(true);
-    expect(result.stamps.every((s) => s.targetHeightStrategy === 'sample_post_compose')).toBe(true);
+    expect(result.stamps.every((s) => s.targetHeightStrategy === 'baked')).toBe(true);
   });
 });

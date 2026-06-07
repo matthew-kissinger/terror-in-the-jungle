@@ -131,21 +131,42 @@ describe('recomposeHydrologyArtifact', () => {
     expect(stats.maxAbsoluteDeltaMeters).toBe(10);
   });
 
-  it('leaves every point unchanged when no relevant AABBs overlap the river', () => {
+  it('re-samples every point when no AABB filter is supplied', () => {
     const provider = makeFlatProvider(99);
     const artifact = makeSyntheticArtifact([[0, 0], [100, 0]], 12);
 
-    // Empty AABB list — skip the optimization, no work to do.
-    const { artifact: noWork, stats: noStats } = recomposeHydrologyArtifact(artifact, provider, []);
-    expect(noWork.channelPolylines[0].points.every((p) => p.elevationMeters === 12)).toBe(true);
-    expect(noStats.pointsResampled).toBe(0);
+    const { artifact: recomposed, stats } = recomposeHydrologyArtifact(artifact, provider, []);
+    expect(recomposed.channelPolylines[0].points.every((p) => p.elevationMeters === 99)).toBe(true);
+    expect(stats.pointsResampled).toBe(2);
+    expect(stats.pointsScanned).toBe(2);
+  });
 
-    // AABB exists but doesn't contain any polyline point.
+  it('leaves points outside the AABB filter unchanged in targeted mode', () => {
+    const provider = makeFlatProvider(99);
+    const artifact = makeSyntheticArtifact([[0, 0], [100, 0]], 12);
+
     const farAABB: AABB2D = { minX: 1000, minZ: 1000, maxX: 1100, maxZ: 1100 };
     const { artifact: stillUnchanged, stats: farStats } = recomposeHydrologyArtifact(artifact, provider, [farAABB]);
     expect(stillUnchanged.channelPolylines[0].points.every((p) => p.elevationMeters === 12)).toBe(true);
     expect(farStats.pointsResampled).toBe(0);
     expect(farStats.pointsScanned).toBe(2);
+  });
+
+  it('can force full-channel re-anchoring even when an AABB filter is present', () => {
+    const provider = makeFlatProvider(21);
+    const artifact = makeSyntheticArtifact([[-200, 0], [0, 0], [200, 0]], 5);
+    const middleOnly: AABB2D = { minX: -10, minZ: -10, maxX: 10, maxZ: 10 };
+
+    const { artifact: result, stats } = recomposeHydrologyArtifact(
+      artifact,
+      provider,
+      [middleOnly],
+      { resampleAllPoints: true },
+    );
+
+    expect(result.channelPolylines[0].points.every((p) => p.elevationMeters === 21)).toBe(true);
+    expect(stats.pointsResampled).toBe(3);
+    expect(stats.pointsScanned).toBe(3);
   });
 
   it('handles the empty-artifact and no-channels edge cases gracefully', () => {

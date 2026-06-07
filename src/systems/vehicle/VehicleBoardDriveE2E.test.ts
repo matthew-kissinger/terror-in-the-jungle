@@ -318,10 +318,12 @@ describe('M48 tank board → driver seat → dismount (e2e)', () => {
     const terrain = makeFlatTerrain(8);
     const tank = new Tank(
       'm48_tank_of_us_fob',
-      makeObject(new THREE.Vector3(60, 8, 60)),
+      makeObject(new THREE.Vector3(60, -20, 60)),
       Faction.US,
     );
     tank.setTerrain(terrain);
+    expect(tank.getPosition().y).toBeGreaterThan(8);
+    expect(tank.getPosition().y).toBeLessThan(9);
 
     const h = await buildHarness(tank);
 

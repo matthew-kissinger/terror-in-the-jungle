@@ -7,8 +7,10 @@ import {
   createOperationalRuntimeGroups,
   wireOperationalRuntime,
 } from './OperationalRuntimeComposer';
+import { Faction } from '../systems/combat/types';
 import { PBR } from '../systems/vehicle/PBR';
 import { Sampan } from '../systems/vehicle/Sampan';
+import { Tank } from '../systems/vehicle/Tank';
 
 function createRefs() {
   let helipadCallback: ((helipads: Array<{ id: string; position: THREE.Vector3 }>) => void) | undefined;
@@ -39,6 +41,7 @@ function createRefs() {
     combatantSystem: {
       combatants,
       explosionEffectsPool,
+      setVehicleManager: vi.fn(),
     },
     fullMapSystem: {
       setHelipadMarkers: vi.fn(),
@@ -142,8 +145,8 @@ function createRefs() {
 
   // Fan out a single mode-change invocation across every registered
   // listener so wiring functions registered later (e.g. the M48 tank
-  // wire) still observe the event even though the mock's `onModeChanged`
-  // collects all callbacks rather than only the last one.
+  // wire) still observe the event, matching GameModeManager's real
+  // multi-listener contract.
   const fanout = (mode: string, config: unknown) => {
     for (const cb of modeChangedCallbacks) cb(mode, config);
   };
@@ -214,6 +217,7 @@ describe('OperationalRuntimeComposer', () => {
     ]);
     expect(refs.minimapSystem.setVehicleManager).toHaveBeenCalledWith(refs.vehicleManager);
     expect(refs.fullMapSystem.setVehicleManager).toHaveBeenCalledWith(refs.vehicleManager);
+    expect(refs.combatantSystem.setVehicleManager).toHaveBeenCalledWith(refs.vehicleManager);
 
     const combatantProvider = getCombatantProvider();
     expect(combatantProvider).toBeDefined();
@@ -288,6 +292,26 @@ describe('OperationalRuntimeComposer', () => {
     expect(snapped?.x).toBe(10);
     expect(snapped?.y).toBe(42);
     expect(snapped?.z).toBe(20);
+  });
+
+  it('binds spawned M48 tanks to the runtime terrain provider immediately after spawn', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    refs.terrainSystem.getHeightAt = vi.fn(() => 12);
+    const tank = new Tank('m48_scenario_id', new THREE.Group(), Faction.US);
+    const setTerrain = vi.spyOn(tank, 'setTerrain');
+    refs.vehicleManager.getVehicle = vi.fn((id: string) => {
+      if (id === 'm48_scenario_id') return tank;
+      return null;
+    });
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    getModeChangedCallback()?.('open_frontier', {});
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(setTerrain).toHaveBeenCalledWith(refs.terrainSystem);
+    expect(tank.getPosition().y).toBeGreaterThan(12);
+    expect(tank.getPosition().y).toBeLessThan(13);
   });
 
   it('snaps Sampan + PBR spawn Y above the water surface when the scenario has water enabled and a surface covers the spawn XZ', async () => {

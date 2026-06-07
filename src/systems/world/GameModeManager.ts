@@ -37,6 +37,7 @@ import {
 
 type GameModeDefinitionResolver = (mode: GameMode) => GameModeDefinition;
 type GameModeRuntimeFactory = (definition: GameModeDefinition) => GameModeRuntime;
+type GameModeChangeListener = (mode: GameMode, config: GameModeConfig) => void;
 
 interface GameModeManagerDependencies {
   zoneManager: ZoneManager;
@@ -129,7 +130,7 @@ export class GameModeManager implements GameSystem {
   private playerRespawnManager?: PlayerRespawnManager;
 
   // Callbacks
-  private onModeChange?: (mode: GameMode, config: GameModeConfig) => void;
+  private readonly modeChangeListeners = new Set<GameModeChangeListener>();
 
   constructor(
     private readonly definitionResolver: GameModeDefinitionResolver = getGameModeDefinition,
@@ -150,7 +151,7 @@ export class GameModeManager implements GameSystem {
   }
 
   dispose(): void {
-    // Cleanup if needed
+    this.modeChangeListeners.clear();
   }
 
   // Set connected systems
@@ -287,8 +288,8 @@ export class GameModeManager implements GameSystem {
     );
 
     // Notify listeners
-    if (this.onModeChange) {
-      this.onModeChange(mode, this.currentConfig);
+    for (const listener of this.modeChangeListeners) {
+      listener(mode, this.currentConfig);
     }
   }
 
@@ -418,8 +419,8 @@ export class GameModeManager implements GameSystem {
   }
 
   // Register mode change callback
-  public onModeChanged(callback: (mode: GameMode, config: GameModeConfig) => void): void {
-    this.onModeChange = callback;
+  public onModeChanged(callback: GameModeChangeListener): void {
+    this.modeChangeListeners.add(callback);
   }
 
   // Helper to check if player spawning at zones is allowed

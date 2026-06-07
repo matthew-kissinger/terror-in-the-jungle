@@ -1,12 +1,23 @@
 <!-- 80 LOC cap per framework recovery Pass 2 R1.2. Briefs over 100 LOC trigger cycle-validate warning. -->
 # hydrology-river-surface-fix
 
-Closes the owner-reported "there are still issues with hydrology." The
-terrain-compositor cycle closed 2026-05-27 claiming to fix OF "water on walls";
-the owner still sees a hydrology defect. SCOPE IS WAVE-0-PENDING: the
-orchestrator drives the build, characterizes the exact defect (compositor fix
-fell short vs a different bug), and fills Scope item 1 below before dispatch.
-Also implements the `WatercraftPhysics.isUnderBridge` stub.
+Superseded for planning by
+`docs/tasks/terrain-vehicle-water-foundation-reset.md`. The owner provided
+concrete defects on 2026-06-07: rivers cut off by terrain, stamp-created
+trenches/high walls, and water reading as a raised ribbon. Treat that as a
+foundation reset, not a one-off surface-height polish pass.
+
+Originally closed the owner-reported "there are still issues with hydrology."
+The terrain-compositor cycle closed 2026-05-27 claiming to fix OF "water on
+walls"; the owner has now rejected the abstraction itself. Keep this brief only
+as a narrow child if the reset still needs `WatercraftPhysics.isUnderBridge`.
+
+2026-06-07 R1/R2 note: local runtime proof briefly improved hydrology
+mesh/query diagnostics, but owner feedback rejected the terrain-following
+surface model. Open Frontier and A Shau now move accepted gameplay water to
+authored level/depth reaches (`water_body` samples, carved bathymetry stamps,
+`level-depth-water-bodies` mesh). Keep hydrology as drainage/material input or
+as a narrow child for bridge-clearance work, not as the close criterion.
 
 ## Files touched (provisional - confirm at Wave 0)
 
@@ -17,9 +28,8 @@ Also implements the `WatercraftPhysics.isUnderBridge` stub.
 
 ## Scope
 
-1. (WAVE-0-PENDING) Fix the specific hydrology defect the orchestrator observes;
-   written here after the Wave 0 walk. DO NOT DISPATCH until this bullet names a
-   concrete, observed defect + a repro pose.
+1. Characterize the concrete 2026-06-07 defects with repro poses: terrain
+   cutoffs, trench/wall banks, and ribbon water.
 2. Implement `WatercraftPhysics.isUnderBridge` (currently a stub) so watercraft
    clearance under bridges is correct.
 
@@ -27,7 +37,7 @@ Also implements the `WatercraftPhysics.isUnderBridge` stub.
 
 - Re-running the full terrain-compositor design (only fix the observed defect).
 - CDLOD / skirts / edge-morph rework.
-- A Shau changes (regression sentinel; must stay NO-OP).
+- Replacing the new level/depth water-body authority.
 
 ## Acceptance
 

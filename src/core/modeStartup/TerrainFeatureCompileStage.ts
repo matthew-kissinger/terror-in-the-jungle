@@ -7,6 +7,7 @@ import { compileTerrainFeatures } from '../../systems/terrain/TerrainFeatureComp
 import { bakeStampedHeightmapGrid } from '../../systems/terrain/TerrainStampGridBaker';
 import type { CompiledTerrainFeatureSet } from '../../systems/terrain/TerrainFeatureTypes';
 import type { PreparedHeightmapGrid, PreparedTerrainSource } from '../../systems/terrain/PreparedTerrainSource';
+import { compileWaterBodyTerrainFeatures } from '../../systems/environment/water/WaterBodyAuthority';
 import { compileHydrologyTerrainFeatures } from '../../systems/terrain/hydrology/HydrologyTerrainFeatures';
 import type { HydrologyBakeArtifact } from '../../systems/terrain/hydrology/HydrologyBake';
 import { composeTerrain } from '../../systems/terrain/compositor/TerrainCompositor';
@@ -57,8 +58,14 @@ export async function compileStartupTerrainFeatures(
     config,
     (x, z) => heightCache.getHeightAt(x, z),
   );
-  const hydrologyFeatures = compileHydrologyTerrainFeatures(
-    preparedTerrainSource.hydrologyBake?.artifact ?? null,
+  const waterBodyFeatures = compileWaterBodyTerrainFeatures(config.waterBodies ?? null);
+  mergeCompiledTerrainFeatures(featureCompile, waterBodyFeatures);
+
+  const hasAuthoredWaterBodies = waterBodyFeatures.stamps.length > 0;
+  const hydrologyFeatures = hasAuthoredWaterBodies
+    ? emptyCompiledTerrainFeatures()
+    : compileHydrologyTerrainFeatures(
+      preparedTerrainSource.hydrologyBake?.artifact ?? null,
   );
 
   // R2.2 (wire-up): when a hydrology artifact is present, compute the cache
@@ -68,7 +75,7 @@ export async function compileStartupTerrainFeatures(
   // cache via `getInMemory`. Misses recompute and write back through
   // `cache.set`. Cache is module-scoped so repeated launches of the same
   // map share warm state.
-  const hydrologyArtifact = preparedTerrainSource.hydrologyBake?.artifact ?? null;
+  const hydrologyArtifact = hasAuthoredWaterBodies ? null : preparedTerrainSource.hydrologyBake?.artifact ?? null;
   const passCEnabled = hydrologyArtifact !== null;
   let hydrologyCache: HydrologyArtifactCache | undefined;
   let hydrologyCacheKey: string | undefined;
@@ -130,6 +137,8 @@ export async function compileStartupTerrainFeatures(
   markStartup(`${telemetryPrefix}.stats.surface-patches-${compiledFeatures.surfacePatches.length}`);
   markStartup(`${telemetryPrefix}.stats.exclusion-zones-${compiledFeatures.vegetationExclusionZones.length}`);
   markStartup(`${telemetryPrefix}.stats.flow-paths-${compiledFeatures.flowPaths.length}`);
+  markStartup(`${telemetryPrefix}.stats.water-body-stamps-${waterBodyFeatures.stamps.length}`);
+  markStartup(`${telemetryPrefix}.stats.water-body-exclusion-zones-${waterBodyFeatures.vegetationExclusionZones.length}`);
   markStartup(`${telemetryPrefix}.stats.hydrology-stamps-${hydrologyFeatures.stamps.length}`);
   markStartup(`${telemetryPrefix}.stats.hydrology-exclusion-zones-${hydrologyFeatures.vegetationExclusionZones.length}`);
 
@@ -163,6 +172,27 @@ export async function compileStartupTerrainFeatures(
     preparedTerrainSource,
     waterSurfaceArtifact: composed.waterSurfaceArtifact,
   };
+}
+
+function emptyCompiledTerrainFeatures(): CompiledTerrainFeatureSet {
+  return {
+    stamps: [],
+    surfacePatches: [],
+    vegetationExclusionZones: [],
+    flowPaths: [],
+  };
+}
+
+function mergeCompiledTerrainFeatures(
+  target: CompiledTerrainFeatureSet,
+  source: CompiledTerrainFeatureSet,
+): void {
+  target.stamps.push(...source.stamps);
+  target.surfacePatches.push(...source.surfacePatches);
+  target.vegetationExclusionZones.push(...source.vegetationExclusionZones);
+  target.flowPaths.push(...source.flowPaths);
+  target.stamps.sort((a, b) => a.priority - b.priority);
+  target.surfacePatches.sort((a, b) => a.priority - b.priority);
 }
 
 function bakeStampedPreparedHeightmap(

@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { WaterSurfaceSampler } from './WaterSurfaceSampler';
 import type { HydrologyWaterQuerySegment } from './HydrologyRiverSurface';
+import type { WaterBodyQuerySegment } from './WaterBodyAuthority';
 
 /**
  * Behavior tests for the runtime water-surface sampler. These exercise the
@@ -20,10 +21,12 @@ function makeBindings(opts: {
   globalActive?: boolean;
   globalY?: number;
   segments?: readonly HydrologyWaterQuerySegment[];
+  waterBodies?: readonly WaterBodyQuerySegment[];
 }) {
   return {
     globalWaterLevel: opts.globalY ?? 0,
     isGlobalPlaneActive: () => opts.globalActive ?? false,
+    getWaterBodyQuerySegments: () => opts.waterBodies ?? [],
     getHydrologyQuerySegments: () => opts.segments ?? [],
   };
 }
@@ -45,6 +48,27 @@ function makeFlowingSegment(overrides: Partial<HydrologyWaterQuerySegment> = {})
     flowX: 1,
     flowZ: 0,
     flowSpeedMetersPerSecond: 0.5,
+    ...overrides,
+  };
+}
+
+function makeWaterBodySegment(overrides: Partial<WaterBodyQuerySegment> = {}): WaterBodyQuerySegment {
+  return {
+    waterBodyId: 'test_reach',
+    startX: 0,
+    startZ: 0,
+    endX: 10,
+    endZ: 0,
+    startSurfaceY: 8,
+    endSurfaceY: 8,
+    startDepthMeters: 2,
+    endDepthMeters: 4,
+    startBedY: 6,
+    endBedY: 4,
+    halfWidth: 3,
+    flowX: 1,
+    flowZ: 0,
+    flowSpeedMetersPerSecond: 0.25,
     ...overrides,
   };
 }
@@ -104,6 +128,24 @@ describe('WaterSurfaceSampler', () => {
     expect(sample.source).toBe('hydrology');
     expect(sample.surfaceY).toBeCloseTo(5, 5);
     expect(sample.depth).toBeCloseTo(4, 5);
+  });
+
+  it('prefers authored water bodies over hydrology and the global plane', () => {
+    const sampler = new WaterSurfaceSampler(
+      makeBindings({
+        globalActive: true,
+        globalY: 0,
+        segments: [makeFlowingSegment({ startSurfaceY: 4, endSurfaceY: 6, halfWidth: 5 })],
+        waterBodies: [makeWaterBodySegment()],
+      }),
+    );
+
+    const sample = sampler.sample(new THREE.Vector3(5, 1, 0));
+
+    expect(sample.source).toBe('water_body');
+    expect(sample.surfaceY).toBe(8);
+    expect(sample.depth).toBeCloseTo(7, 5);
+    expect(sample.flowVelocity.length()).toBeCloseTo(0.25, 5);
   });
 
   it('falls back to global plane outside the channel half-width', () => {

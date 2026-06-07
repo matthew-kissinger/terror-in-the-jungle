@@ -162,10 +162,9 @@ export class VehicleManager implements GameSystem {
   /**
    * Scenario-time spawn entry for the M48 Patton tanks (Open Frontier
    * US base + A Shau valley road) per `cycle-vekhikl-3-tank-chassis`.
-   * Each spawn registers a `Tank` with this manager; the caller is
-   * responsible for wiring the runtime terrain provider via
-   * `Tank.setTerrain` if terrain conform is wanted (mirrors the M151
-   * jeep path through `WorldFeatureSystem.registerGroundVehiclePlacement`).
+   * Each spawn registers a `Tank` with this manager; the operational
+   * runtime composer wires the runtime terrain provider immediately after
+   * spawn so the chassis rests on terrain from frame 0.
    *
    * `resolvePosition` mirrors the M2HB spawn callback — typically a
    * terrain-snap closure.

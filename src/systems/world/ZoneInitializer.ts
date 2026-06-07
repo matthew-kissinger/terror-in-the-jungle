@@ -165,10 +165,12 @@ export class ZoneInitializer {
     Logger.info('world', `Creating zones for game mode: ${this.gameModeConfig.name}`);
 
     for (const zoneConfig of this.gameModeConfig.zones) {
-      const position = this.terrainAdapter.findSuitableZonePosition(
-        zoneConfig.position,
-        zoneConfig.radius
-      );
+      const position = zoneConfig.validateTerrain === false
+        ? zoneConfig.position.clone()
+        : this.terrainAdapter.findSuitableZonePosition(
+          zoneConfig.position,
+          zoneConfig.radius
+        );
 
       this.createZone(
         {

@@ -11,6 +11,8 @@ import { Logger } from '../../utils/Logger';
 import type { GameEngine } from '../GameEngine';
 import { markStartup } from '../StartupTelemetry';
 import { computeNavmeshBakeSignature } from '../../systems/navigation/NavmeshBakeSignature';
+import { getHeightQueryCache } from '../../systems/terrain/HeightQueryCache';
+import { recomposeHydrologyArtifact } from '../../systems/terrain/compositor/HydrologyArtifactRecomposer';
 import { resolveHydrologyBiomePolicy } from './HydrologyArtifactCacheStage';
 import { yieldToRenderer } from './StartupYield';
 
@@ -49,12 +51,6 @@ export async function configureTerrainAndNavigation(
   // base elevation is the right reference.
   terrainSystem.setHydrologyBake(hydrologyBake);
   terrainSystem.setHydrologyBiomePolicy(resolveHydrologyBiomePolicy(config));
-  // WaterSystem consumes the RECOMPOSED artifact so the river-surface mesh
-  // sits on the actual composed ground (memo §"Why this fixes both bugs":
-  // closes the OF water-on-walls bug at airfield + motor-pool overlaps).
-  // When recompose is disabled or no hydrology bake is present, this is
-  // identical to the original artifact.
-  engine.systemManager.waterSystem.setHydrologyChannels(waterSurfaceArtifact ?? hydrologyBake?.artifact ?? null);
   engine.systemManager.minimapSystem.setHydrologyChannels(hydrologyBake?.artifact.channelPolylines ?? null);
   engine.systemManager.fullMapSystem.setHydrologyChannels(hydrologyBake?.artifact.channelPolylines ?? null);
 
@@ -83,6 +79,20 @@ export async function configureTerrainAndNavigation(
   });
   terrainSystem.setFarCanopyTint(config.terrain?.farCanopyTint);
   markStartup(`engine-init.start-game.${config.id}.terrain-config.end`);
+
+  // WaterSystem consumes the RECOMPOSED artifact so the river-surface mesh
+  // sits on the actual composed ground. Bind it after configureModeSurface():
+  // that call can re-bake GPU heights and swap HeightQueryCache to a
+  // BakedHeightProvider, so this final pass aligns water with the same runtime
+  // terrain surface used by vehicles, collision, and proof sampling.
+  const hasAuthoredWaterBodies = (config.waterBodies?.length ?? 0) > 0;
+  engine.systemManager.waterSystem.setWaterBodies(config.waterBodies ?? null);
+  engine.systemManager.waterSystem.setHydrologyChannels(
+    hasAuthoredWaterBodies
+      ? null
+      : reanchorWaterSurfaceArtifactToRuntimeTerrain(waterSurfaceArtifact ?? hydrologyBake?.artifact ?? null),
+    (x, z) => terrainSystem.getHeightAt(x, z),
+  );
 
   if (engine.systemManager.navmeshSystem.isWasmReady()) {
     const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
@@ -148,6 +158,18 @@ export async function configureTerrainAndNavigation(
       }
     }
   }
+}
+
+function reanchorWaterSurfaceArtifactToRuntimeTerrain(
+  artifact: HydrologyBakeArtifact | null,
+): HydrologyBakeArtifact | null {
+  if (!artifact) return null;
+  return recomposeHydrologyArtifact(
+    artifact,
+    getHeightQueryCache().getProvider(),
+    [],
+    { resampleAllPoints: true },
+  ).artifact;
 }
 
 export async function applyCompiledTerrainFeatures(

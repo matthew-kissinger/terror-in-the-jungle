@@ -205,8 +205,9 @@ export class SystemManager {
     if (this.waterSystem) {
       const waterEnabled = config.waterEnabled === true;
       // Keep the legacy camera-following sea-level plane opt-in only. Current
-      // river gameplay is hydrology-backed and should not inherit a global
-      // sheet just because a scenario has water.
+      // playable river water is owned by authored level/depth bodies or
+      // hydrology, and should not inherit a global sheet just because a
+      // scenario has water.
       const globalWaterPlaneEnabled = config.globalWaterPlaneEnabled === true;
       this.waterSystem.setEnabled(globalWaterPlaneEnabled);
       if (waterEnabled && typeof this.waterSystem.setWorldSize === 'function') {

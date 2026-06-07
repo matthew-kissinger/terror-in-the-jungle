@@ -153,8 +153,44 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
   // system pushes the preset density onto `renderer.fog.density`.
   cameraFar: 4000,
   shadowFar: 500,
-  waterEnabled: true, // Renders the hydrology river surface so the sampan sits on water, not dirt.
+  waterEnabled: true, // Authored level/depth reaches own playable watercraft water.
   globalWaterPlaneEnabled: false, // Valley floor ~580m makes a sea-level plane invisible and wasted.
+  waterBodies: [
+    {
+      id: 'ashau_sampan_level_reach',
+      kind: 'reach',
+      surfaceY: 493,
+      widthMeters: 112,
+      depthMinMeters: 2.8,
+      depthMaxMeters: 5.2,
+      bankGradeMeters: 64,
+      flowSpeedMetersPerSecond: 0.28,
+      points: [
+        { x: -7600, z: 4585, depthMeters: 3.0 },
+        { x: -7240, z: 4710, depthMeters: 3.1 },
+        { x: -6895, z: 4835, depthMeters: 5.2 },
+        { x: -6480, z: 5055, depthMeters: 3.4 },
+        { x: -6110, z: 5245, depthMeters: 3.2 },
+      ],
+    },
+    {
+      id: 'ashau_pbr_level_reach',
+      kind: 'reach',
+      surfaceY: 539,
+      widthMeters: 104,
+      depthMinMeters: 3.2,
+      depthMaxMeters: 5.8,
+      bankGradeMeters: 62,
+      flowSpeedMetersPerSecond: 0.32,
+      points: [
+        { x: 760, z: 1405, depthMeters: 3.3 },
+        { x: 1020, z: 1610, depthMeters: 3.4 },
+        { x: 1188.9, z: 1743.72, depthMeters: 5.8 },
+        { x: 1410, z: 1905, depthMeters: 3.7 },
+        { x: 1715, z: 2120, depthMeters: 3.5 },
+      ],
+    },
+  ],
 
   // Campaign tickets - high count for extended persistent play
   maxTickets: 5000,

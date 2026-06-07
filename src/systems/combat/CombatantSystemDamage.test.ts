@@ -11,6 +11,8 @@ import type { SquadManager } from './SquadManager';
 import type { CombatantSpawnManager } from './CombatantSpawnManager';
 import type { TicketSystem } from '../world/TicketSystem';
 import { GameEventBus } from '../../core/GameEventBus';
+import { Tank } from '../vehicle/Tank';
+import { GroundVehicle } from '../vehicle/GroundVehicle';
 
 vi.mock('./KillAssistTracker', () => ({
   KillAssistTracker: {
@@ -214,6 +216,82 @@ describe('CombatantSystemDamage', () => {
       }
     });
   });
+
+  describe('vehicle damage routing', () => {
+    it('applies radial explosion damage to enemy tanks through the injected vehicle query', () => {
+      const enemyTank = new Tank('nva_tank', positionedObject(new THREE.Vector3(0, 0, 0)), Faction.NVA);
+      damage.setVehicleDamageQuery({
+        getVehiclesInRadius: vi.fn(() => [enemyTank]),
+      });
+
+      damage.applyExplosionDamage(
+        new THREE.Vector3(0, 0, 0),
+        9,
+        200,
+        'shooter-vehicle',
+        'tank_cannon',
+        Faction.US,
+      );
+
+      expect(enemyTank.getHealthPercent()).toBeCloseTo(0.8, 5);
+      expect(enemyTank.getHpBand()).toBe('healthy');
+    });
+
+    it('skips allied tanks when shooter faction is supplied', () => {
+      const friendlyTank = new Tank('us_tank', positionedObject(new THREE.Vector3(0, 0, 0)), Faction.US);
+      damage.setVehicleDamageQuery({
+        getVehiclesInRadius: vi.fn(() => [friendlyTank]),
+      });
+
+      damage.applyExplosionDamage(
+        new THREE.Vector3(0, 0, 0),
+        9,
+        200,
+        'shooter-vehicle',
+        'tank_cannon',
+        Faction.US,
+      );
+
+      expect(friendlyTank.getHealthPercent()).toBe(1);
+    });
+
+    it('applies radial explosion damage to enemy M151 vehicles through the same route', () => {
+      const jeep = new GroundVehicle('nva_m151', positionedObject(new THREE.Vector3(0, 0, 0)), Faction.NVA);
+      damage.setVehicleDamageQuery({
+        getVehiclesInRadius: vi.fn(() => [jeep]),
+      });
+
+      damage.applyExplosionDamage(
+        new THREE.Vector3(0, 0, 0),
+        9,
+        125,
+        'shooter-vehicle',
+        'tank_cannon',
+        Faction.US,
+      );
+
+      expect(jeep.getHealthPercent()).toBeCloseTo(0.5, 5);
+      expect(jeep.isDestroyed()).toBe(false);
+    });
+
+    it('skips allied non-tank vehicles when shooter faction is supplied', () => {
+      const friendlyJeep = new GroundVehicle('us_m151', positionedObject(new THREE.Vector3(0, 0, 0)), Faction.US);
+      damage.setVehicleDamageQuery({
+        getVehiclesInRadius: vi.fn(() => [friendlyJeep]),
+      });
+
+      damage.applyExplosionDamage(
+        new THREE.Vector3(0, 0, 0),
+        9,
+        125,
+        'shooter-vehicle',
+        'tank_cannon',
+        Faction.US,
+      );
+
+      expect(friendlyJeep.getHealthPercent()).toBe(1);
+    });
+  });
 });
 
 type WorldBuilderTestWindow = { __worldBuilder?: unknown };
@@ -239,4 +317,10 @@ function publishWorldBuilderState(oneShotKills: boolean): void {
     forceTimeOfDay: -1,
     active: true,
   };
+}
+
+function positionedObject(position: THREE.Vector3): THREE.Object3D {
+  const object = new THREE.Object3D();
+  object.position.copy(position);
+  return object;
 }

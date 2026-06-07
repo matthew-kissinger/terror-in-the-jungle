@@ -180,24 +180,26 @@ export function createM48Tank(
 }
 
 /**
- * Default scenario spawn table for the two M48 placements. Coordinates
- * come from `M48_SPAWN_OFFSETS`; Y is left at 0 and the spawn caller
- * should snap-to-terrain via the runtime terrain provider before
- * handing off to `createM48Tank`.
+ * Primary M48 scenario spawn table. Coordinates come from
+ * `M48_SPAWN_OFFSETS`; Y is left at 0 and the spawn caller should
+ * snap-to-terrain via the runtime terrain provider before handing off
+ * to `createM48Tank`.
  *
  * The Open Frontier entry now lands inside the airfield Main Motor
  * Pool bay (per cycle-motor-pool-reflow-and-tank-dedup), not the
  * West FOB anchor used by the cycle-VEKHIKL-3 initial drop. The
  * sibling `motor-pool-heavy-reflow` task removes the dressing M48
  * prop from the prefab, so this Tank IVehicle is the only M48
- * rendered in OF.
+ * rendered in the US motor pool.
  */
-export const M48_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', {
+export interface M48ScenarioSpawnDefinition {
   vehicleId: string;
   position: THREE.Vector3;
   faction: Faction;
   initialYaw: number;
-}> = {
+}
+
+export const M48_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', M48ScenarioSpawnDefinition> = {
   open_frontier: {
     vehicleId: 'm48_tank_of_us_fob',
     position: new THREE.Vector3(M48_SPAWN_OFFSETS.open_frontier.x, 0, M48_SPAWN_OFFSETS.open_frontier.z),
@@ -214,6 +216,39 @@ export const M48_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', {
 
 export type M48ScenarioMode = keyof typeof M48_SCENARIO_SPAWNS;
 
+/**
+ * Full per-mode tank fleet. Keeps `M48_SCENARIO_SPAWNS` as the legacy
+ * primary-US lookup while the scenario spawn path fields both factions.
+ */
+export const M48_SCENARIO_SPAWN_GROUPS: Record<M48ScenarioMode, readonly M48ScenarioSpawnDefinition[]> = {
+  open_frontier: [
+    M48_SCENARIO_SPAWNS.open_frontier,
+    {
+      vehicleId: 'm48_tank_of_nva_main_hq',
+      position: new THREE.Vector3(
+        M48_SPAWN_OFFSETS.open_frontier_opfor.x,
+        0,
+        M48_SPAWN_OFFSETS.open_frontier_opfor.z,
+      ),
+      faction: Faction.NVA,
+      initialYaw: M48_SPAWN_OFFSETS.open_frontier_opfor.yaw,
+    },
+  ],
+  a_shau_valley: [
+    M48_SCENARIO_SPAWNS.a_shau_valley,
+    {
+      vehicleId: 'm48_tank_ashau_nva_dongso',
+      position: new THREE.Vector3(
+        M48_SPAWN_OFFSETS.a_shau_valley_opfor.x,
+        0,
+        M48_SPAWN_OFFSETS.a_shau_valley_opfor.z,
+      ),
+      faction: Faction.NVA,
+      initialYaw: M48_SPAWN_OFFSETS.a_shau_valley_opfor.yaw,
+    },
+  ],
+};
+
 export function spawnScenarioM48Tanks(args: {
   modes: M48ScenarioMode[];
   scene: THREE.Scene;
@@ -227,15 +262,16 @@ export function spawnScenarioM48Tanks(args: {
 }): Array<{ vehicleId: string; tank: Tank; root: THREE.Group }> {
   const spawned: Array<{ vehicleId: string; tank: Tank; root: THREE.Group }> = [];
   for (const mode of args.modes) {
-    const def = M48_SCENARIO_SPAWNS[mode];
-    const position = args.resolvePosition ? args.resolvePosition(mode, def.position) : def.position;
-    const parts = createM48Tank(args.scene, args.vehicleManager, {
-      vehicleId: def.vehicleId,
-      position,
-      faction: def.faction,
-      initialYaw: def.initialYaw,
-    });
-    spawned.push({ vehicleId: def.vehicleId, ...parts });
+    for (const def of M48_SCENARIO_SPAWN_GROUPS[mode]) {
+      const position = args.resolvePosition ? args.resolvePosition(mode, def.position) : def.position;
+      const parts = createM48Tank(args.scene, args.vehicleManager, {
+        vehicleId: def.vehicleId,
+        position,
+        faction: def.faction,
+        initialYaw: def.initialYaw,
+      });
+      spawned.push({ vehicleId: def.vehicleId, ...parts });
+    }
   }
   return spawned;
 }

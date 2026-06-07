@@ -11,6 +11,7 @@ import {
   type GroundVehicleControls,
 } from './GroundVehiclePhysics';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import { VehicleDamageState, type VehicleDamageResult } from './VehicleDamage';
 
 const DEFAULT_M151_SEATS: VehicleSeat[] = [
   { index: 0, role: 'pilot', occupantId: null, localOffset: new THREE.Vector3(-0.35, 0.8, 0.35), exitOffset: new THREE.Vector3(-2, 0, 0) },
@@ -40,13 +41,14 @@ export function isM151ModelPath(modelPath: string): boolean {
 }
 
 const _scratchPos = new THREE.Vector3();
+const M151_MAX_HP = 250;
 
 export class GroundVehicle implements IVehicle {
   readonly category = 'ground' as const;
   readonly faction: Faction;
   private readonly seats: VehicleSeat[];
   private readonly velocity = new THREE.Vector3();
-  private destroyed = false;
+  private readonly damage = new VehicleDamageState(M151_MAX_HP);
   private readonly physics: GroundVehiclePhysics;
   private terrain: ITerrainRuntime | null = null;
 
@@ -159,11 +161,27 @@ export class GroundVehicle implements IVehicle {
   }
 
   isDestroyed(): boolean {
-    return this.destroyed;
+    return this.damage.isDestroyed();
   }
 
   getHealthPercent(): number {
-    return this.destroyed ? 0 : 1;
+    return this.damage.getHealthPercent();
+  }
+
+  getHp(): number {
+    return this.damage.getHp();
+  }
+
+  getMaxHp(): number {
+    return this.damage.getMaxHp();
+  }
+
+  applyDamage(amount: number, _hitPoint: THREE.Vector3): VehicleDamageResult {
+    const result = this.damage.applyDamage(amount);
+    if (result.destroyed) {
+      this.physics.setEngineActive(false);
+    }
+    return result;
   }
 
   // ---------- Per-frame integration ----------
@@ -174,7 +192,7 @@ export class GroundVehicle implements IVehicle {
    * the surface as flat-and-infinite until `setTerrain` is called).
    */
   update(dt: number): void {
-    if (this.destroyed || dt <= 0) return;
+    if (this.isDestroyed() || dt <= 0) return;
     this.physics.update(dt, this.terrain);
 
     const interpolated = this.physics.getInterpolatedState();
@@ -184,7 +202,7 @@ export class GroundVehicle implements IVehicle {
   }
 
   dispose(): void {
-    this.destroyed = true;
+    this.damage.destroy();
     this.object.removeFromParent();
   }
 }

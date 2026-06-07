@@ -10,8 +10,8 @@ import { OPEN_FRONTIER_CONFIG } from './OpenFrontierConfig';
  *   globalWaterPlaneEnabled = config.globalWaterPlaneEnabled === true
  *
  * Both values are dispatched into `WaterSystem.setEnabled(...)` and used to
- * decide whether to render the global sea-level plane and the hydrology
- * river ribbon. Tests in this file assert behavior at that dispatch boundary
+ * decide whether to render the global sea-level plane. Tests in this file
+ * assert behavior at that dispatch boundary
  * so a future config edit cannot silently re-enable the old global sea-level
  * plane on Open Frontier.
  */
@@ -25,17 +25,17 @@ function resolveWaterDispatch(config: {
 }
 
 describe('OpenFrontierConfig water dispatch', () => {
-  it('declares waterEnabled explicitly so the hydrology river surface renders', () => {
-    // Explicit so a future agent cannot accidentally disable the OF river
-    // render by toggling a project-wide default.
+  it('declares waterEnabled explicitly for authored level/depth reaches', () => {
     expect(OPEN_FRONTIER_CONFIG.waterEnabled).toBe(true);
+    expect(OPEN_FRONTIER_CONFIG.waterBodies?.length).toBeGreaterThanOrEqual(2);
+    expect(OPEN_FRONTIER_CONFIG.waterBodies?.every((body) => body.kind === 'reach')).toBe(true);
   });
 
   it('explicitly disables the legacy global sea-level plane', () => {
     expect(OPEN_FRONTIER_CONFIG.globalWaterPlaneEnabled).toBe(false);
   });
 
-  it('dispatches hydrology water without the global sea-level plane', () => {
+  it('dispatches playable water without the global sea-level plane', () => {
     const dispatch = resolveWaterDispatch(OPEN_FRONTIER_CONFIG);
     expect(dispatch.waterEnabled).toBe(true);
     expect(dispatch.globalWaterPlaneEnabled).toBe(false);
