@@ -54,7 +54,11 @@ reference contract:
 - Night terrain diagnostics pass red/white/cyan bounds across all five
   scenarios. The older strict night-red sampler remains intentionally
   over-tight and logs strict failures, while the active red-not-dominant
-  terrain diagnostic passes 5/5.
+  terrain diagnostic passes 5/5. The capture script now also emits advisory
+  `localMax(...)` hotspot ratios for night terrain so narrow red, white, cyan,
+  or bright material streaks are visible in the proof log instead of being
+  averaged away by whole-region sampling; these are triage evidence because
+  in-scene markers and props can legitimately create localized colored pixels.
 - Live production proof is a per-deploy gate. Future deploys must rerun
   `npm run check:live-release` and use the live `/asset-manifest.json`
   `gitSha` as production truth.

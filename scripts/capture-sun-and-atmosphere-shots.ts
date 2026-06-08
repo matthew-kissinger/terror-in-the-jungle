@@ -1400,6 +1400,10 @@ interface VisualQualitySample {
   cyanBrightRatio: number;
   warmTerrainRatio: number;
   brightRatio: number;
+  maxLocalRedDominantRatio: number | null;
+  maxLocalWhiteHotRatio: number | null;
+  maxLocalCyanBrightRatio: number | null;
+  maxLocalBrightRatio: number | null;
   sunCoreRatio: number | null;
   sunCoreMaxSpanRatio: number | null;
   sunVisibility: 'visible-core' | 'terrain-occluded' | 'missing-unoccluded' | null;
@@ -1408,6 +1412,9 @@ interface VisualQualitySample {
   passesRidgeWarmthCandidate: boolean | null;
   passesSunScaleCandidate: boolean | null;
 }
+
+const NIGHT_HOTSPOT_TILE_SIZE_PX = 48;
+const NIGHT_HOTSPOT_MIN_TILE_COVERAGE = 0.2;
 
 function visualQualityRegionFor(view: CaptureView, tod: TodLabel): { kind: VisualQualityKind; region: VisualQualityRegion } | null {
   if (view === 'ridge') {
@@ -1573,6 +1580,50 @@ async function sampleVisualQualityFromPng(
     const cyanBrightRatio = cyanBrightCount / pixelCount;
     const warmTerrainRatio = warmTerrainCount / pixelCount;
     const brightRatio = brightCount / pixelCount;
+    let maxLocalRedDominantRatio: number | null = null;
+    let maxLocalWhiteHotRatio: number | null = null;
+    let maxLocalCyanBrightRatio: number | null = null;
+    let maxLocalBrightRatio: number | null = null;
+    if (kind === 'night-terrain') {
+      maxLocalRedDominantRatio = 0;
+      maxLocalWhiteHotRatio = 0;
+      maxLocalCyanBrightRatio = 0;
+      maxLocalBrightRatio = 0;
+      for (let tileY = y0; tileY < y1; tileY += NIGHT_HOTSPOT_TILE_SIZE_PX) {
+        for (let tileX = x0; tileX < x1; tileX += NIGHT_HOTSPOT_TILE_SIZE_PX) {
+          const tileX1 = Math.min(x1, tileX + NIGHT_HOTSPOT_TILE_SIZE_PX);
+          const tileY1 = Math.min(y1, tileY + NIGHT_HOTSPOT_TILE_SIZE_PX);
+          const tileArea = Math.max(1, (tileX1 - tileX) * (tileY1 - tileY));
+          let tilePixels = 0;
+          let tileRed = 0;
+          let tileWhite = 0;
+          let tileCyan = 0;
+          let tileBright = 0;
+
+          for (let y = tileY; y < tileY1; y++) {
+            for (let x = tileX; x < tileX1; x++) {
+              const idx = (y * w + x) * channels;
+              const r = raw[idx] / 255;
+              const g = raw[idx + 1] / 255;
+              const b = raw[idx + 2] / 255;
+              const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+              if (luma < 0.025) continue;
+              tilePixels++;
+              if (luma > 0.75) tileWhite++;
+              if (luma > 0.22 && r > g * 1.18 && r > b * 1.35) tileRed++;
+              if (luma > 0.30 && g > r * 1.18 && b > r * 1.35) tileCyan++;
+              if (luma > 0.28) tileBright++;
+            }
+          }
+
+          if (tilePixels < tileArea * NIGHT_HOTSPOT_MIN_TILE_COVERAGE) continue;
+          maxLocalRedDominantRatio = Math.max(maxLocalRedDominantRatio, tileRed / tilePixels);
+          maxLocalWhiteHotRatio = Math.max(maxLocalWhiteHotRatio, tileWhite / tilePixels);
+          maxLocalCyanBrightRatio = Math.max(maxLocalCyanBrightRatio, tileCyan / tilePixels);
+          maxLocalBrightRatio = Math.max(maxLocalBrightRatio, tileBright / tilePixels);
+        }
+      }
+    }
     const sunCoreRatio = shouldMeasureSun ? sunCoreCount / (w * h) : null;
     const sunCoreMaxSpanRatio = shouldMeasureSun && sunCoreCount > 0
       ? Math.max((sunMaxX - sunMinX + 1) / w, (sunMaxY - sunMinY + 1) / h)
@@ -1602,6 +1653,10 @@ async function sampleVisualQualityFromPng(
       cyanBrightRatio,
       warmTerrainRatio,
       brightRatio,
+      maxLocalRedDominantRatio,
+      maxLocalWhiteHotRatio,
+      maxLocalCyanBrightRatio,
+      maxLocalBrightRatio,
       sunCoreRatio,
       sunCoreMaxSpanRatio,
       sunVisibility,
@@ -2270,11 +2325,15 @@ async function main(): Promise<void> {
       const sunVerdict = q.passesSunScaleCandidate === null
         ? 'n/a'
         : q.passesSunScaleCandidate ? 'PASS' : 'FAIL';
+      const localHotspots = q.maxLocalRedDominantRatio === null
+        ? ''
+        : `localMax(red=${(q.maxLocalRedDominantRatio * 100).toFixed(1)}% white=${((q.maxLocalWhiteHotRatio ?? 0) * 100).toFixed(1)}% cyan=${((q.maxLocalCyanBrightRatio ?? 0) * 100).toFixed(1)}% bright=${((q.maxLocalBrightRatio ?? 0) * 100).toFixed(1)}%) `;
       logStep(
         `  ${entry.scenario}/${entry.tod}/${entry.rendererMode}/${q.kind}: ` +
         `mean=(${q.meanRgb.map((v) => v.toFixed(3)).join(',')}) luma=${q.meanLuma.toFixed(3)} ` +
         `red=${(q.redDominantRatio * 100).toFixed(2)}% white=${(q.whiteHotRatio * 100).toFixed(2)}% ` +
         `cyan=${(q.cyanBrightRatio * 100).toFixed(2)}% warm=${(q.warmTerrainRatio * 100).toFixed(2)}% ` +
+        `${localHotspots}` +
         `sunCore=${q.sunCoreRatio === null ? 'n/a' : `${(q.sunCoreRatio * 100).toFixed(3)}%`} ` +
         `sunSpan=${q.sunCoreMaxSpanRatio === null ? 'n/a' : `${(q.sunCoreMaxSpanRatio * 100).toFixed(2)}%`} ` +
         `sunVisibility=${q.sunVisibility ?? 'n/a'} ` +
