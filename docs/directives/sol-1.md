@@ -84,7 +84,8 @@ not redesign the sky again unless owner review rejects it. It should:
 - run owner visual review on the SDS-style sun body, noon/golden glare,
   night terrain/water, WebGPU/WebGL2 parity crops, and the A Shau
   terrain-occluded ridge proof;
-- use the full matrix, ridge proof, and live proof above as the acceptance
+- use the full matrix, ridge proof, live proof, and
+  [SOL-1 acceptance packet](sol-1-acceptance-packet.md) as the acceptance
   packet;
 - compare any owner-rejected frame against the current automated matrix before
   redesigning atmosphere, terrain, water, or shadows again;
