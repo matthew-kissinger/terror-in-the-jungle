@@ -43,17 +43,17 @@ export const SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y = 0.90;
 // SDS-style sky solar mass. The depth-tested SunDiscMesh owns the hot core;
 // this tight sky term warms the immediate surrounding mass so the visible sun
 // reads as fire rather than a dull grey-white plate.
-export const SUN_SKY_MASS_START = 0.986;
+export const SUN_SKY_MASS_START = 0.990;
 export const SUN_SKY_MASS_END = 0.9992;
-export const SUN_SKY_MASS_POWER = 2.8;
-export const SUN_SKY_MASS_PAINT_STRENGTH = 0.28;
-export const SUN_SKY_MASS_STRENGTH = 0.17;
+export const SUN_SKY_MASS_POWER = 3.2;
+export const SUN_SKY_MASS_PAINT_STRENGTH = 0.38;
+export const SUN_SKY_MASS_STRENGTH = 0.19;
 export const SUN_SKY_MASS_PAINT_R = 1.0;
-export const SUN_SKY_MASS_PAINT_G = 0.47;
-export const SUN_SKY_MASS_PAINT_B = 0.10;
-export const SUN_SKY_MASS_R = 1.65;
-export const SUN_SKY_MASS_G = 0.92;
-export const SUN_SKY_MASS_B = 0.28;
+export const SUN_SKY_MASS_PAINT_G = 0.54;
+export const SUN_SKY_MASS_PAINT_B = 0.12;
+export const SUN_SKY_MASS_R = 1.95;
+export const SUN_SKY_MASS_G = 1.12;
+export const SUN_SKY_MASS_B = 0.30;
 
 export const MOON_COLOR_R = 0.18;
 export const MOON_COLOR_G = 0.20;

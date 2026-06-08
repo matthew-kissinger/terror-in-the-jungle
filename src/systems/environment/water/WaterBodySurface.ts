@@ -7,11 +7,22 @@ import type { WaterBodyQuerySegment, WaterBodyStats } from './WaterBodyAuthority
 
 export const WATER_BODY_MATERIAL_PROFILE = 'level_depth_water_body';
 const WATER_BODY_DAY_COLOR = new THREE.Color(0xffffff);
-const WATER_BODY_NIGHT_COLOR = new THREE.Color(0x152230);
+const WATER_BODY_NIGHT_COLOR = new THREE.Color(0x16546b);
+const WATER_BODY_NIGHT_RENDER_COLOR = new THREE.Color(0x16546b);
 const WATER_BODY_DAY_EMISSIVE_INTENSITY = 0.06;
-const WATER_BODY_NIGHT_EMISSIVE_INTENSITY = 0.008;
+const WATER_BODY_NIGHT_EMISSIVE_INTENSITY = 0.032;
 const WATER_BODY_DAY_ENV_INTENSITY = 0.5;
 const WATER_BODY_NIGHT_ENV_INTENSITY = 0.06;
+const WATER_BODY_DAY_OPACITY = 0.92;
+const WATER_BODY_NIGHT_OPACITY = 0.98;
+const WATER_BODY_NIGHT_ALPHA_FLOOR = 0.88;
+const WATER_BODY_SOLID_NIGHT_THRESHOLD = 0.08;
+
+interface WaterBodyAlphaRefs {
+  waterBodyNightBlend: { value: number };
+  waterBodyNightAlphaFloor: { value: number };
+  waterBodyNightRenderColor: { value: THREE.Color };
+}
 
 /**
  * Scene-owned mesh for authored level/depth water bodies. Gameplay sampling
@@ -21,7 +32,10 @@ const WATER_BODY_NIGHT_ENV_INTENSITY = 0.06;
 export class WaterBodySurface {
   private readonly scene: THREE.Scene;
   private group?: THREE.Group;
-  private mesh?: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+  private mesh?: THREE.Mesh<THREE.BufferGeometry, THREE.Material>;
+  private dayMaterial?: THREE.MeshStandardMaterial;
+  private nightMaterial?: THREE.MeshBasicMaterial;
+  private alphaRefs?: WaterBodyAlphaRefs;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -32,24 +46,9 @@ export class WaterBodySurface {
     if (segments.length === 0) return false;
 
     const geometry = buildWaterBodyGeometry(segments);
-    const material = new THREE.MeshStandardMaterial({
-      name: 'level-depth-water-body-material',
-      color: WATER_BODY_DAY_COLOR,
-      emissive: 0x021621,
-      emissiveIntensity: WATER_BODY_DAY_EMISSIVE_INTENSITY,
-      roughness: 0.12,
-      metalness: 0,
-      transparent: true,
-      opacity: 0.92,
-      depthWrite: false,
-      vertexColors: true,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -8,
-      side: THREE.DoubleSide,
-    });
-    material.envMapIntensity = WATER_BODY_DAY_ENV_INTENSITY;
-    installWaterBodyAlphaPatch(material);
+    const material = createWaterBodyDayMaterial();
+    const nightMaterial = createWaterBodyNightMaterial();
+    this.alphaRefs = installWaterBodyAlphaPatch(material);
 
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = 'level-depth-water-body-surface-mesh';
@@ -63,6 +62,8 @@ export class WaterBodySurface {
 
     this.group = group;
     this.mesh = mesh;
+    this.dayMaterial = material;
+    this.nightMaterial = nightMaterial;
     Logger.info(
       'environment',
       `Level/depth water bodies loaded: ${stats.bodyCount} bodies, ${stats.segmentCount} segments`,
@@ -74,10 +75,14 @@ export class WaterBodySurface {
     if (this.group) this.scene.remove(this.group);
     if (this.mesh) {
       this.mesh.geometry.dispose();
-      this.mesh.material.dispose();
     }
+    this.dayMaterial?.dispose();
+    this.nightMaterial?.dispose();
     this.group = undefined;
     this.mesh = undefined;
+    this.dayMaterial = undefined;
+    this.nightMaterial = undefined;
+    this.alphaRefs = undefined;
   }
 
   isActive(): boolean { return !!this.group; }
@@ -85,9 +90,11 @@ export class WaterBodySurface {
   getMaterialProfile(): string { return this.mesh ? WATER_BODY_MATERIAL_PROFILE : 'none'; }
 
   setLightingFactor(daylight: number): void {
-    if (!this.mesh) return;
+    if (!this.mesh || !this.dayMaterial || !this.nightMaterial) return;
     const t = Math.min(1, Math.max(0, Number.isFinite(daylight) ? daylight : 1));
-    const material = this.mesh.material;
+    const solidNight = t <= WATER_BODY_SOLID_NIGHT_THRESHOLD;
+    this.mesh.material = solidNight ? this.nightMaterial : this.dayMaterial;
+    const material = this.dayMaterial;
     material.color.copy(WATER_BODY_NIGHT_COLOR).lerp(WATER_BODY_DAY_COLOR, t);
     material.emissiveIntensity =
       WATER_BODY_NIGHT_EMISSIVE_INTENSITY
@@ -95,7 +102,53 @@ export class WaterBodySurface {
     material.envMapIntensity =
       WATER_BODY_NIGHT_ENV_INTENSITY
       + (WATER_BODY_DAY_ENV_INTENSITY - WATER_BODY_NIGHT_ENV_INTENSITY) * t;
+    material.opacity =
+      WATER_BODY_NIGHT_OPACITY
+      + (WATER_BODY_DAY_OPACITY - WATER_BODY_NIGHT_OPACITY) * t;
+    if (this.alphaRefs) {
+      this.alphaRefs.waterBodyNightBlend.value = 1 - t;
+      this.alphaRefs.waterBodyNightRenderColor.value.copy(WATER_BODY_NIGHT_RENDER_COLOR);
+    }
+    material.userData.waterBodyNightBlend = 1 - t;
+    material.userData.waterBodyNightAlphaFloor = WATER_BODY_NIGHT_ALPHA_FLOOR;
   }
+}
+
+function createWaterBodyDayMaterial(): THREE.MeshStandardMaterial {
+  const material = new THREE.MeshStandardMaterial({
+    name: 'level-depth-water-body-material',
+    color: WATER_BODY_DAY_COLOR,
+    emissive: 0x021621,
+    emissiveIntensity: WATER_BODY_DAY_EMISSIVE_INTENSITY,
+    roughness: 0.12,
+    metalness: 0,
+    transparent: true,
+    opacity: WATER_BODY_DAY_OPACITY,
+    depthWrite: false,
+    vertexColors: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -8,
+    side: THREE.DoubleSide,
+  });
+  material.envMapIntensity = WATER_BODY_DAY_ENV_INTENSITY;
+  return material;
+}
+
+function createWaterBodyNightMaterial(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    name: 'level-depth-water-body-night-material',
+    color: WATER_BODY_NIGHT_RENDER_COLOR,
+    transparent: false,
+    opacity: 1,
+    depthWrite: true,
+    depthTest: true,
+    fog: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -8,
+    side: THREE.DoubleSide,
+  });
 }
 
 function buildWaterBodyGeometry(segments: readonly WaterBodyQuerySegment[]): THREE.BufferGeometry {
@@ -164,7 +217,7 @@ function buildWaterBodyGeometry(segments: readonly WaterBodyQuerySegment[]): THR
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setAttribute('waterAlpha', new THREE.Float32BufferAttribute(alphas, 1));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
@@ -236,7 +289,7 @@ function pushVertex(
   alpha: number,
 ): void {
   positions.push(x, y + 0.08, z);
-  colors.push(color[0], color[1], color[2], alpha);
+  colors.push(color[0], color[1], color[2]);
   alphas.push(alpha);
 }
 
@@ -244,13 +297,30 @@ function resolveAlphaForDepth(depthMeters: number): number {
   return Math.min(0.96, Math.max(0.68, 0.68 + depthMeters * 0.08));
 }
 
-function installWaterBodyAlphaPatch(material: THREE.MeshStandardMaterial): void {
+function installWaterBodyAlphaPatch(material: THREE.MeshStandardMaterial): WaterBodyAlphaRefs {
+  const refs: WaterBodyAlphaRefs = {
+    waterBodyNightBlend: { value: 0 },
+    waterBodyNightAlphaFloor: { value: WATER_BODY_NIGHT_ALPHA_FLOOR },
+    waterBodyNightRenderColor: { value: WATER_BODY_NIGHT_RENDER_COLOR.clone() },
+  };
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.waterBodyNightBlend = refs.waterBodyNightBlend;
+    shader.uniforms.waterBodyNightAlphaFloor = refs.waterBodyNightAlphaFloor;
+    shader.uniforms.waterBodyNightRenderColor = refs.waterBodyNightRenderColor;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float waterAlpha;\nvarying float vWaterAlpha;')
       .replace('#include <color_vertex>', '#include <color_vertex>\nvWaterAlpha = waterAlpha;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vWaterAlpha;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= vWaterAlpha;');
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform float waterBodyNightBlend;\nuniform float waterBodyNightAlphaFloor;\nuniform vec3 waterBodyNightRenderColor;\nvarying float vWaterAlpha;',
+      )
+      .replace(
+        '#include <color_fragment>',
+        '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, waterBodyNightRenderColor, waterBodyNightBlend * 0.92);\nfloat waterBodyAlpha = mix(vWaterAlpha, max(vWaterAlpha, waterBodyNightAlphaFloor), waterBodyNightBlend);\ndiffuseColor.a *= waterBodyAlpha;',
+      );
   };
+  material.userData.waterBodyNightBlend = refs.waterBodyNightBlend.value;
+  material.userData.waterBodyNightAlphaFloor = refs.waterBodyNightAlphaFloor.value;
+  return refs;
 }

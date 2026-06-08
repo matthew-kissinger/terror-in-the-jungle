@@ -75,6 +75,18 @@ describe('SunDiscMesh', () => {
     expect(material.depthTest).toBe(true);
   });
 
+  it('keeps the explicit WebGL fallback on the bounded hot-body path', () => {
+    const disc = new SunDiscMesh(DOME_RADIUS);
+
+    disc.setRendererBackend('webgl');
+    const material = disc.getMaterial();
+
+    expect(material.name).toBe('SunDiscWebGL');
+    expect(material.blending).toBe(THREE.NormalBlending);
+    expect(material.toneMapped).toBe(false);
+    expect(material.depthTest).toBe(true);
+  });
+
   it('records that the mesh owns only the hot body while the dome owns atmospheric glow', () => {
     const disc = new SunDiscMesh(DOME_RADIUS);
     const material = disc.getMaterial() as THREE.Material & {

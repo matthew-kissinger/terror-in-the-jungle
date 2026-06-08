@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (SOL-1 SDS-style candidate: `SunDiscMesh` owns the depth-tested hot body with mottled internal heat, the TSL dome adds bounded glow plus tighter warm sky solar mass, full local visual matrix and A Shau ridge proof pass; owner visual acceptance remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
+Last verified: 2026-06-08 (SOL-1 SDS-style retune: `SunDiscMesh` owns the depth-tested hot body with mottled internal heat, the TSL dome adds bounded glow plus tighter warm sky solar mass, full local visual matrix and A Shau night-water proof pass; owner visual acceptance remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -151,9 +151,10 @@ as of this refresh:
   night terrain reads, lighting-angle coherence, terrain/water material
   response, and hill/ridge light bleed need a full proof and likely authority
   cleanup before final visual acceptance.
-- Active SOL-1 mitigation on master shrinks the sun body, uses cool
-  moonlight below the horizon, tints low-sun ambient fill, dims water
-  specular/emissive/foam response at night, and adds an
+- Active SOL-1 mitigation on master retunes the sun body against the Sheep Dog
+  Simulator WebGPU reference, uses cool moonlight below the horizon, tints
+  low-sun ambient fill, dims water specular/emissive/foam response at night,
+  and adds an
   `AtmosphereLightingSnapshot` consumed by renderer lights, billboard
   vegetation, water, terrain night fill, and a bounded low-sun terrain
   heightmap/relief response. The renderer-facing low-sun directional light is
@@ -170,13 +171,15 @@ as of this refresh:
   positioning in `syncDomePosition()`, retunes the depth-tested body with a
   broader warm-white center, mottled internal heat, and ember rim, and adds a
   tighter SDS-style warm sky solar mass so the surrounding area no longer reads
-  as a damp grey sphere. The
-  full local matrix now passes across all five scenarios and time-of-day
-  captures. Representative Open Frontier golden proof records WebGPU
-  `sunCore=0.045%`, `sunSpan=3.33%` and explicit WebGL2 `sunCore=0.042%`,
-  `sunSpan=3.24%`, with WebGPU/WebGL2 parity max channel delta `4.31%`.
-  Matrix-wide WebGPU sun core is `0.044-0.048%`, sun span is `3.33-3.43%`, and all
-  sun-scale checks pass. Midnight rendered-terrain
+  as a damp grey sphere. The true WebGPU path keeps the SDS-style additive TSL
+  body, while the explicit WebGL renderer fallback uses bounded alpha blending
+  so its center does not clip to flat white. The full local matrix now passes
+  `33/33` captures across all five scenarios, time-of-day slots, parity pairs,
+  and midnight probes. Representative Open Frontier golden proof records WebGPU
+  `sunCore=0.088%`, `sunSpan=4.81%` and explicit WebGL2 `sunCore=0.061%`,
+  `sunSpan=3.70%`, with WebGPU/WebGL2 parity max channel delta `3.92%`.
+  Matrix-wide daylight WebGPU sun core is `0.087-0.093%`, sun span is
+  `4.81-5.00%`, and all sun-scale checks pass. Midnight rendered-terrain
   checks pass red/white/cyan bounds across all five scenarios; the older strict
   night-red sampler remains intentionally over-tight and logs strict failures,
   while the active red-not-dominant terrain diagnostic passes 5/5. A Shau dusk
@@ -184,7 +187,10 @@ as of this refresh:
   the production `webgpu-force-webgl` fallback both record
   `sunVisibility=terrain-occluded`, `sunOcclusion=55m`, `sunCore=0`,
   `sunSpan=0`, ridge warmth PASS, sun-scale PASS, and parity max channel delta
-  `0.00%`.
+  `0.00%`. A Shau midnight now proves the authored level/depth water body on a
+  cool opaque night material with
+  `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`, replacing the previous
+  red water-body slab.
   Production parity is proven by rerunning `npm run check:live-release` after
   each deployment. SOL-1 is still not visually accepted: the next goal is
   SOL-1R7 owner visual acceptance.
@@ -194,8 +200,9 @@ as of this refresh:
 - Open Frontier and A Shau now use authored level/depth water bodies for
   playable water instead of hydrology river surfaces; the legacy global
   sea-level plane is opt-in only and disabled in both modes. Hydrology remains
-  useful for drainage/material masks. Water game-feel and a future WebGPU/TSL
-  water material remain polish work.
+  useful for drainage/material masks. The current renderer uses a daytime
+  standard-material bridge plus a cool opaque night material; water game-feel
+  and a future natural WebGPU/TSL water material remain polish work.
 - Pixel Forge NPC/vegetation runtime art is the production truth; old
   sprites/source-soldier PNGs are guarded by
   `npm run check:pixel-forge-cutover`.

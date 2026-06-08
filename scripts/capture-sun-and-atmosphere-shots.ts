@@ -1415,6 +1415,9 @@ interface VisualQualitySample {
 
 const NIGHT_HOTSPOT_TILE_SIZE_PX = 48;
 const NIGHT_HOTSPOT_MIN_TILE_COVERAGE = 0.2;
+const NIGHT_LOCAL_RED_MIN_LUMA = 0.045;
+const NIGHT_LOCAL_RED_OVER_GREEN = 1.12;
+const NIGHT_LOCAL_RED_OVER_BLUE = 1.25;
 
 function visualQualityRegionFor(view: CaptureView, tod: TodLabel): { kind: VisualQualityKind; region: VisualQualityRegion } | null {
   if (view === 'ridge') {
@@ -1429,10 +1432,10 @@ function visualQualityRegionFor(view: CaptureView, tod: TodLabel): { kind: Visua
   if (tod === 'twilight' || tod === 'midnight') {
     return {
       kind: 'night-terrain',
-      // Lower half where terrain/water are visible in the forced-TOD visual
-      // shots. The diagnostic intentionally samples broadly so cyan water
-      // bands and red/white terrain patches both show up.
-      region: { x0: 0, x1: 1, y0: 0.45, y1: 1 },
+      // Terrain and authored water can sit high in A Shau's sun-facing
+      // forced-TOD frame. Sample from the upper terrain band down so narrow
+      // river/body streaks do not hide above the old lower-half crop.
+      region: { x0: 0, x1: 1, y0: 0.30, y1: 1 },
     };
   }
   if (tod !== 'midnight') {
@@ -1610,7 +1613,11 @@ async function sampleVisualQualityFromPng(
               if (luma < 0.025) continue;
               tilePixels++;
               if (luma > 0.75) tileWhite++;
-              if (luma > 0.22 && r > g * 1.18 && r > b * 1.35) tileRed++;
+              if (
+                luma > NIGHT_LOCAL_RED_MIN_LUMA
+                && r > g * NIGHT_LOCAL_RED_OVER_GREEN
+                && r > b * NIGHT_LOCAL_RED_OVER_BLUE
+              ) tileRed++;
               if (luma > 0.30 && g > r * 1.18 && b > r * 1.35) tileCyan++;
               if (luma > 0.28) tileBright++;
             }

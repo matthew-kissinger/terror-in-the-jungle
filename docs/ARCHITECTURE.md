@@ -19,8 +19,9 @@ index.html -> src/main.ts -> src/core/bootstrap.ts -> new GameEngine()
 Production renderer is the Three.js r184 `WebGPURenderer` from `three/webgpu`,
 with TSL node materials covering terrain CDLOD, vegetation/NPC impostors, and
 the Hosek-Wilkie sky. Authored water bodies currently render through
-`WaterBodySurface` with a standard material plus shader patching; a final
-WebGPU/TSL water material is still future work. Backend selection lives in
+`WaterBodySurface` with a daytime standard-material bridge plus an explicit
+cool opaque night material; a final natural WebGPU/TSL water material is still
+future work. Backend selection lives in
 `src/core/RendererBackend.ts` (`resolveRendererBackendMode()` reads
 `?renderer=` / env), and `src/core/GameRenderer.ts` drives the swap from a
 WebGL bootstrap renderer to the WebGPU surface (`initializeRendererBackend()`,
@@ -304,9 +305,11 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    horizon scatter plus a tighter warm sky solar mass. Full local matrix proof
    passes across all five scenarios and time-of-day captures after fixing stale
    camera-relative sun-body sync and adding mottled internal heat to the body.
-   Representative Open Frontier golden proof records WebGPU `sunCore=0.045%`,
-   `sunSpan=3.33%` and explicit WebGL2 `sunCore=0.042%`, `sunSpan=3.24%`, with
-   parity max channel delta `4.31%`.
+   Representative Open Frontier golden proof records WebGPU `sunCore=0.088%`,
+   `sunSpan=4.81%` and explicit WebGL2 `sunCore=0.061%`, `sunSpan=3.70%`, with
+   parity max channel delta `3.92%`. A Shau midnight proves the authored
+   level/depth water body on its cool opaque night material with
+   `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`.
    A Shau dusk ridge proof passes strict WebGPU and production
    `webgpu-force-webgl` fallback terrain occlusion, sun-scale, and parity
    (`0.00%` max channel delta). Production
@@ -322,9 +325,10 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    current blockers are route/NPC movement quality, airfield datum consistency,
    vehicle usability, and outer-boundary strategy, not missing DEM delivery.
 6. **Water rendering/material future** - authored level/depth water bodies are
-   the gameplay-water authority, but the renderer is still a standard-material
-   bridge. Natural WebGPU/TSL water, shoreline polish, bridge clearance, and a
-   wider authored river network remain terrain-engine work.
+   the gameplay-water authority, with a daytime standard-material bridge and a
+   cool opaque night material to avoid emissive red/white slabs. Natural
+   WebGPU/TSL water, shoreline polish, bridge clearance, and a wider authored
+   river network remain terrain-engine work.
 7. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
 8. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
 

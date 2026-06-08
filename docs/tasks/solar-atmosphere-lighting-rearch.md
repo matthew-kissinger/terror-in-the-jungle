@@ -14,6 +14,8 @@ vegetation, and terrain night fill consume that effective lighting state. The
 TSL dome and CPU LUT share a cool sub-horizon sky floor. Water is night-aware.
 Shadows preserve A Shau camera altitude. Terrain has a bounded low-sun
 heightmap/relief approximation for ridge-light cases.
+Authored level/depth water bodies use a cool opaque night material for true
+night instead of trying to express depth/alpha through the lit daytime bridge.
 
 The visible sun path now follows the SDS WebGPU lesson: `SunDiscMesh` owns the
 depth-tested hot body, while the TSL sky dome owns bounded atmosphere plus a
@@ -28,9 +30,9 @@ occlude the hard body.
 - The Open Frontier golden parity crops show a broader warm-white center with
   mottled internal heat, a warmer irregular rim, and tighter SDS-style sky
   solar mass instead of the rejected tiny pearl / smooth damp sphere.
-  Representative values: WebGPU `sunCore=0.045%`, `sunSpan=3.33%`; explicit
-  WebGL2 `sunCore=0.042%`, `sunSpan=3.24%`; WebGPU/WebGL2 max channel delta
-  `4.31%`.
+  Representative values: WebGPU `sunCore=0.088%`, `sunSpan=4.81%`; explicit
+  WebGL2 `sunCore=0.061%`, `sunSpan=3.70%`; WebGPU/WebGL2 max channel delta
+  `3.92%`.
 - The Open Frontier golden missing-body frame was not terrain occlusion; it was
   stale camera-relative `SunDiscMesh` positioning after the capture camera
   moved. `syncDomePosition()` now refreshes the sun body, and the capture gate
@@ -45,6 +47,8 @@ occlude the hard body.
   scenarios. The older strict night-red sampler remains intentionally
   over-tight and logs strict failures, while the active red-not-dominant
   terrain diagnostic passes 5/5.
+- A Shau midnight proves the level/depth water-body night material: rendered
+  night-terrain `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`.
 - Live production proof is the per-deploy gate; rerun
   `npm run check:live-release` after each production deploy.
 

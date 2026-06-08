@@ -69,11 +69,13 @@ Carry these findings into the next Projekt revamp:
 - Water and hydrology: accepted gameplay water now comes from authored
   level/depth water bodies in Open Frontier and A Shau. These reaches carve
   bathymetry, return `water_body` samples, and render as real volumes instead
-  of narrow terrain-following ribbons. Hydrology remains useful as a
-  drainage/material sensor, not as the player-facing water surface. The legacy
-  global water plane is only an opt-in fallback; natural WebGPU/TSL river
-  rendering, wider authored river networks, crossings, shoreline polish, bridge
-  clearance, and watercraft-grade physics remain future terrain-engine work.
+  of narrow terrain-following ribbons. They use a cool opaque night material
+  to avoid red/white emissive slabs in true night captures. Hydrology remains
+  useful as a drainage/material sensor, not as the player-facing water surface.
+  The legacy global water plane is only an opt-in fallback; natural WebGPU/TSL
+  river rendering, wider authored river networks, crossings, shoreline polish,
+  bridge clearance, and watercraft-grade physics remain future terrain-engine
+  work.
 - Vegetation ecology: use the short-palm retirement, bamboo/ground-cover
   distribution audits, and Pixel Forge candidate proofs as starting evidence
   for clustered jungle, hydrology-aware palms/understory, trail edges, and grass
@@ -126,11 +128,13 @@ Carry these findings into the next Projekt revamp:
   `SunDiscMesh` owns a depth-tested hot sun body and the TSL sky dome owns
   bounded atmospheric glow/scatter plus a tight warm sky solar mass. Full local
   matrix proof now passes across all five scenarios and time-of-day captures;
-  representative Open Frontier golden proof records WebGPU `sunCore=0.045%`,
-  `sunSpan=3.33%` and explicit WebGL2 `sunCore=0.042%`, `sunSpan=3.24%`, with
-  parity max channel delta `4.31%`. A Shau dusk ridge proof passes strict WebGPU
+  representative Open Frontier golden proof records WebGPU `sunCore=0.088%`,
+  `sunSpan=4.81%` and explicit WebGL2 `sunCore=0.061%`, `sunSpan=3.70%`, with
+  parity max channel delta `3.92%`. A Shau dusk ridge proof passes strict WebGPU
   and production `webgpu-force-webgl` fallback terrain occlusion, sun-scale, and
-  parity. Production parity remains the per-deploy
+  parity, while A Shau midnight verifies the authored water body no longer
+  creates a local red/white/cyan/bright slab. Production parity remains the
+  per-deploy
   `check:live-release` gate; owner visual acceptance remains the SOL-1 closeout
   gate.
 - STABILIZAT-1: re-establish quiet-machine perf baselines, certify combat120

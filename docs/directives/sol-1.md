@@ -34,14 +34,17 @@ reference contract:
 - The sprite and sky mass were retuned from the rejected tiny white pearl /
   damp sphere into a visible hot object: broader warm-white center, mottled
   internal heat, irregular ember rim, and tighter warm surrounding solar mass.
+  The true WebGPU path stays on the SDS-style additive TSL material; the
+  explicit `?renderer=webgl` fallback uses bounded alpha blending so its hot
+  center does not clip to flat white during parity captures.
   Representative focused crops are
   `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/crop-parity-openfrontier-golden-webgpu.png`
   and `crop-close-parity-openfrontier-golden-webgpu.png`.
 - Full local matrix proof now passes the sun-scale detector across all five
   scenarios and time-of-day captures. Representative Open Frontier golden
-  proof records WebGPU `sunCore=0.045%`, `sunSpan=3.33%`; explicit WebGL2
-  records `sunCore=0.042%`, `sunSpan=3.24%`. WebGPU/WebGL2 color parity stays
-  under cap with max channel delta `4.31%`.
+  proof records WebGPU `sunCore=0.088%`, `sunSpan=4.81%`; explicit WebGL2
+  records `sunCore=0.061%`, `sunSpan=3.70%`. WebGPU/WebGL2 color parity stays
+  under cap with max channel delta `3.92%`.
 - Open Frontier golden previously looked like a terrain-occluded body, but the
   new terrain ray probe showed it was `missing-unoccluded`; the root cause was
   stale camera-relative `SunDiscMesh` positioning after capture camera moves.
@@ -59,6 +62,10 @@ reference contract:
   or bright material streaks are visible in the proof log instead of being
   averaged away by whole-region sampling; these are triage evidence because
   in-scene markers and props can legitimately create localized colored pixels.
+- A Shau midnight now proves the level/depth water body on the cool opaque
+  night material path: the rendered night-terrain region records
+  `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`, replacing the previous
+  red water-body slab.
 - Live production proof is a per-deploy gate. Future deploys must rerun
   `npm run check:live-release` and use the live `/asset-manifest.json`
   `gitSha` as production truth.

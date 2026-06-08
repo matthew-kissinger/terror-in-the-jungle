@@ -678,6 +678,27 @@ function applyFeatureSurfaceColor(color: TslNode, worldPos: TslNode, uniforms: T
   return result;
 }
 
+function applyNightTerrainColorStabilizer(color: TslNode, uniforms: TerrainUniforms): TslNode {
+  const daylight = tslClamp(tslReference('float', uniforms.atmosphereDaylightFactor), tslFloat(0), tslFloat(1));
+  const nightStrength = tslFloat(1).sub(smoothstep(tslFloat(0.08), tslFloat(0.42), daylight));
+  const luma = color.r.mul(0.2126).add(color.g.mul(0.7152)).add(color.b.mul(0.0722));
+  const coolLuma = tslVec3(luma.mul(0.72), luma.mul(0.84), luma.mul(1.08));
+  const redExcess = tslClamp(
+    color.r.sub(tslMax(color.g.mul(1.05), color.b.mul(1.12))),
+    tslFloat(0),
+    tslFloat(1),
+  );
+  const warmExcess = tslClamp(color.r.sub(color.b.mul(1.08)), tslFloat(0), tslFloat(1));
+  const redMask = smoothstep(tslFloat(0.012), tslFloat(0.075), redExcess);
+  const warmMask = smoothstep(tslFloat(0.025), tslFloat(0.12), warmExcess);
+  const stabilizer = tslClamp(
+    nightStrength.mul(tslMax(redMask.mul(0.92), warmMask.mul(0.48))),
+    tslFloat(0),
+    tslFloat(0.92),
+  );
+  return tslMix(color, coolLuma, stabilizer);
+}
+
 function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   const worldPos = tslPositionWorld;
   const terrainNormal = createTerrainNormalNode(uniforms, worldPos);
@@ -747,6 +768,7 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
   const lowSunOcclusion = terrainLowSunOcclusionMask(terrainNormal, worldPos, uniforms);
   finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.28, 0.36, 0.44)), lowSunOcclusion);
+  finalColor = applyNightTerrainColorStabilizer(finalColor, uniforms);
 
   const tileParams0 = tslAttribute('tileParams0', 'vec4');
   const tileParams1 = tslAttribute('tileParams1', 'vec4');

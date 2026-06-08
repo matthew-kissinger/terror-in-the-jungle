@@ -108,10 +108,15 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   instead of a flat clipped core. Full local matrix proof now passes across all
   five scenarios and time-of-day captures after fixing stale camera-relative
   sun-body sync. Representative Open Frontier golden proof records WebGPU
-  `sunCore=0.045%`, `sunSpan=3.33%` and explicit WebGL2 `sunCore=0.042%`,
-  `sunSpan=3.24%`, with parity max channel delta `4.31%`. A Shau dusk ridge
-  proof passes terrain-occluded sun-body, terrain warmth, sun-scale, and
-  production fallback parity. Rerun `npm run check:live-release` after each
+  `sunCore=0.088%`, `sunSpan=4.81%` and explicit WebGL2 `sunCore=0.061%`,
+  `sunSpan=3.70%`, with parity max channel delta `3.92%`. The WebGPU path keeps
+  the SDS-style additive TSL body; the explicit WebGL renderer path uses a
+  bounded fallback material so the center stays warm instead of clipping to
+  white. A Shau dusk ridge proof passes terrain-occluded sun-body, terrain
+  warmth, sun-scale, and production fallback parity. A Shau midnight also
+  proves the authored level/depth water body on a cool opaque night material
+  path with `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)` in the
+  rendered night-terrain region. Rerun `npm run check:live-release` after each
   production deploy.
 - The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
   readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,
