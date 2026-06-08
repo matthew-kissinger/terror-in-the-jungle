@@ -46,10 +46,10 @@ const DOME_INSET = 0.99;
 const HDR_PEAK_MULTIPLIER = 4.5;
 /** Floor so a near-horizon sun still reads as a warm disc. */
 const HDR_FLOOR_MULTIPLIER = 1.25;
-const BODY_RADIUS = 0.21;
-const BODY_FEATHER = 0.31;
-const HOT_CORE_RADIUS = BODY_RADIUS * 0.78;
-const HOT_CORE_FEATHER = BODY_RADIUS * 1.08;
+const BODY_RADIUS = 0.19;
+const BODY_FEATHER = 0.285;
+const HOT_CORE_RADIUS = BODY_RADIUS * 0.98;
+const HOT_CORE_FEATHER = BODY_RADIUS * 1.24;
 const FALLBACK_TEXTURE_SIZE = 128;
 
 interface SunDiscUniforms {
@@ -87,13 +87,20 @@ const WEBGL_SUN_FRAGMENT = /* glsl */ `
     float r = length(d) * 2.0;
     float plasma = sin(d.x * 142.0 + d.y * 86.0) * sin(d.x * -118.0 + d.y * 178.0);
     plasma = plasma * 0.5 + 0.5;
+    float filament = sin(d.x * 231.0 + d.y * -73.0) * sin(d.x * 47.0 + d.y * 211.0);
+    filament = filament * 0.5 + 0.5;
     float bodyR = r + (plasma - 0.5) * 0.07;
     float coreR = r + (plasma - 0.5) * 0.022;
     float body = 1.0 - sunSmoothstep(${BODY_RADIUS.toFixed(6)}, ${BODY_FEATHER.toFixed(6)}, bodyR);
     float hotCore = 1.0 - sunSmoothstep(${HOT_CORE_RADIUS.toFixed(6)}, ${HOT_CORE_FEATHER.toFixed(6)}, coreR);
-    float edgeFire = clamp(body - hotCore * 0.18, 0.0, 1.0) * (0.84 + plasma * 0.28);
-    float alpha = clamp(max(edgeFire * 0.64, hotCore * 0.96), 0.0, 1.0);
-    vec3 rgb = mix(uBodyColor, uCoreColor, hotCore);
+    float innerHeat = 1.0 - sunSmoothstep(${(BODY_RADIUS * 0.5).toFixed(6)}, ${HOT_CORE_FEATHER.toFixed(6)}, coreR);
+    float edgeFire = clamp(body - hotCore * 0.08, 0.0, 1.0) * (0.74 + plasma * 0.38 + filament * 0.18);
+    float amberMass = clamp(edgeFire * 0.74 + body * 0.16, 0.0, 1.0);
+    float alpha = clamp(max(amberMass * 0.78, hotCore * 0.98), 0.0, 1.0);
+    vec3 emberColor = mix(vec3(1.0, 0.24, 0.015), uBodyColor, 0.28 + filament * 0.24);
+    float coreMix = max(hotCore, innerHeat * 0.46);
+    vec3 rgb = mix(emberColor * amberMass, uCoreColor, coreMix);
+    rgb += emberColor * amberMass * 0.12;
     gl_FragColor = vec4(rgb, alpha);
   }
 `;
@@ -118,15 +125,18 @@ function createFallbackSunTexture(): THREE.DataTexture {
       const coreR = r + (plasma - 0.5) * 0.022;
       const body = 1 - smoothstepCpu(BODY_RADIUS, BODY_FEATHER, bodyR);
       const hotCore = 1 - smoothstepCpu(HOT_CORE_RADIUS, HOT_CORE_FEATHER, coreR);
-      const edgeFire = Math.max(0, Math.min(1, body - hotCore * 0.2)) * (0.78 + plasma * 0.34);
-      const alpha = Math.max(edgeFire * 0.34, hotCore * 0.38);
+      const filament = Math.sin(nx * 115.5 + ny * -36.5) * Math.sin(nx * 23.5 + ny * 105.5) * 0.5 + 0.5;
+      const innerHeat = 1 - smoothstepCpu(BODY_RADIUS * 0.5, HOT_CORE_FEATHER, coreR);
+      const edgeFire = Math.max(0, Math.min(1, body - hotCore * 0.1)) * (0.74 + plasma * 0.38 + filament * 0.18);
+      const amberMass = Math.max(0, Math.min(1, edgeFire * 0.74 + body * 0.16));
+      const alpha = Math.max(amberMass * 0.36, hotCore * 0.42, innerHeat * 0.22);
       const heat = Math.max(0, Math.min(1, hotCore));
       const amberR = 255;
-      const amberG = 126 + plasma * 36;
-      const amberB = 12 + plasma * 22;
+      const amberG = 78 + plasma * 62 + filament * 28;
+      const amberB = 3 + plasma * 18;
       const hotR = 255;
-      const hotG = 230;
-      const hotB = 184;
+      const hotG = 242;
+      const hotB = 204;
       const i = (y * FALLBACK_TEXTURE_SIZE + x) * 4;
       data[i] = Math.round(amberR + (hotR - amberR) * heat);
       data[i + 1] = Math.round(amberG + (hotG - amberG) * heat);
@@ -174,21 +184,34 @@ function createSunDiscMaterial(): { material: MeshBasicNodeMaterial; uniforms: S
   const body = (float(1.0) as any).sub(smoothstep(float(BODY_RADIUS), float(BODY_FEATHER), warpedBodyR) as any);
   const hotCore = (float(1.0) as any).sub(smoothstep(float(HOT_CORE_RADIUS), float(HOT_CORE_FEATHER), warpedCoreR) as any);
   const sunColorNode = reference('value', 'color', uniforms.sunColor as any) as any;
+  const waveC = ((centered as any).x.mul(float(115.5)).add((centered as any).y.mul(float(-36.5))) as any).sin();
+  const waveD = ((centered as any).x.mul(float(23.5)).add((centered as any).y.mul(float(105.5))) as any).sin();
+  const filament = (waveC.mul(waveD) as any).mul(float(0.5)).add(float(0.5));
+  const innerHeat = (float(1.0) as any).sub(
+    smoothstep(float(BODY_RADIUS * 0.5), float(HOT_CORE_FEATHER), warpedCoreR) as any,
+  );
   const rimHeat = clamp(
     body
-      .sub(hotCore.mul(float(0.2)) as any)
-      .mul(plasma.mul(float(0.45)).add(float(0.92))) as any,
+      .sub(hotCore.mul(float(0.08)) as any)
+      .mul(plasma.mul(float(0.48)).add(filament.mul(float(0.24)) as any).add(float(0.74))) as any,
     0.0,
     1.0,
   ) as any;
-  const emberMass = clamp(rimHeat.add(body.mul(float(0.55)) as any) as any, 0.0, 1.0) as any;
-  const amberBody = mix(
-    vec3(7.0, 2.2, 0.0) as any,
-    sunColorNode.mul(vec3(1.55, 0.72, 0.18)).mul(float(1.35)) as any,
-    float(0.06),
+  const emberMass = clamp(rimHeat.mul(float(0.74)).add(body.mul(float(0.16)) as any) as any, 0.0, 1.0) as any;
+  const emberTint = mix(
+    vec3(5.8, 0.88, 0.02) as any,
+    vec3(8.4, 2.05, 0.10) as any,
+    plasma.mul(float(0.58)).add(filament.mul(float(0.26)) as any) as any,
   ) as any;
-  const hotWhite = vec3(2.85, 2.25, 1.28).mul(float(2.1)) as any;
-  const rgb = amberBody.mul(emberMass).add(hotWhite.mul(hotCore)) as any;
+  const amberBody = mix(
+    emberTint,
+    sunColorNode.mul(vec3(1.55, 0.72, 0.18)).mul(float(1.45)) as any,
+    float(0.04),
+  ) as any;
+  const hotWhite = vec3(3.05, 2.56, 1.55).mul(float(2.12)) as any;
+  const rgb = amberBody
+    .mul(emberMass)
+    .add(hotWhite.mul(max(hotCore, innerHeat.mul(float(0.42)) as any) as any)) as any;
   const opacity = clamp(max(emberMass, hotCore.mul(float(0.98)) as any), 0.0, 1.0) as any;
   (material as any).colorNode = rgb;
   (material as any).opacityNode = opacity;
@@ -212,7 +235,7 @@ function createWebGlSunDiscMaterial(): {
 } {
   const uniforms: SunDiscWebGlUniforms = {
     uBodyColor: { value: new THREE.Color(1.0, 0.55, 0.12) },
-    uCoreColor: { value: new THREE.Color(1.0, 0.972, 0.942) },
+    uCoreColor: { value: new THREE.Color(1.0, 0.925, 0.936) },
   };
   const material = new THREE.ShaderMaterial({
     name: 'SunDiscWebGL',
@@ -343,7 +366,7 @@ export class SunDiscMesh {
     this.webGlBodyColor.r = Math.min(1, this.webGlBodyColor.r);
     this.webGlBodyColor.g = Math.min(0.72, this.webGlBodyColor.g);
     this.webGlBodyColor.b = Math.min(0.24, this.webGlBodyColor.b);
-    this.webGlCoreColor.setRGB(1.0, 0.972, 0.942);
+    this.webGlCoreColor.setRGB(1.0, 0.925, 0.936);
     this.webGlUniforms.uBodyColor.value.copy(this.webGlBodyColor);
     this.webGlUniforms.uCoreColor.value.copy(this.webGlCoreColor);
   }

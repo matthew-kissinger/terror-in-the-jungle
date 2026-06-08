@@ -48,6 +48,17 @@ import {
   SUN_BASE_GLARE_HIGH_SUN_CAP_G,
   SUN_BASE_GLARE_HIGH_SUN_CAP_R,
   SUN_DISC_OUTER_DEFAULT,
+  SUN_SKY_MASS_B,
+  SUN_SKY_MASS_END,
+  SUN_SKY_MASS_G,
+  SUN_SKY_MASS_PAINT_B,
+  SUN_SKY_MASS_PAINT_G,
+  SUN_SKY_MASS_PAINT_R,
+  SUN_SKY_MASS_PAINT_STRENGTH,
+  SUN_SKY_MASS_POWER,
+  SUN_SKY_MASS_R,
+  SUN_SKY_MASS_START,
+  SUN_SKY_MASS_STRENGTH,
   TOTAL_RAYLEIGH,
 } from './HosekWilkieTslConstants';
 
@@ -369,8 +380,38 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
       exposedOverGlareCap.mul(tslFloat(SUN_BASE_GLARE_OVER_CAP_RETENTION)),
     );
     const exposedNearSunShaped = tslMix(exposed, exposedNearSunCapped, baseGlareMask);
-
-    const final = exposedNearSunShaped;
+    const skySolarMassShape = tslSmoothstep(
+      tslFloat(SUN_SKY_MASS_START),
+      tslFloat(SUN_SKY_MASS_END),
+      cosTheta,
+    );
+    const skySolarMassDayT = tslSmoothstep(tslFloat(-0.02), tslFloat(0.08), sunY);
+    const skySolarMassPaint = tslClamp(
+      skySolarMassShape
+        .mul(skySolarMassDayT)
+        .mul(tslFloat(SUN_SKY_MASS_PAINT_STRENGTH)),
+      tslFloat(0),
+      tslFloat(1),
+    );
+    const skySolarMassColor = tslVec3(
+      tslFloat(SUN_SKY_MASS_PAINT_R),
+      tslFloat(SUN_SKY_MASS_PAINT_G),
+      tslFloat(SUN_SKY_MASS_PAINT_B),
+    );
+    const skySolarMassRadiance = tslVec3(
+      tslFloat(SUN_SKY_MASS_R),
+      tslFloat(SUN_SKY_MASS_G),
+      tslFloat(SUN_SKY_MASS_B),
+    );
+    const skySolarMass = tslPow(
+      skySolarMassShape,
+      tslFloat(SUN_SKY_MASS_POWER),
+    ).mul(skySolarMassDayT).mul(tslFloat(SUN_SKY_MASS_STRENGTH));
+    const final = tslMix(
+      exposedNearSunShaped,
+      skySolarMassColor,
+      skySolarMassPaint,
+    ).add(skySolarMassRadiance.mul(skySolarMass));
 
     // Cycle sky-visual-restore: clamp linear radiance to fp16's safe range
     // (CPU port also clamps to [0, 64]); the dome material is

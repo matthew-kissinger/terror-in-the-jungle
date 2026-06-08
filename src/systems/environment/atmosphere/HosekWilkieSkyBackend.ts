@@ -27,6 +27,17 @@ import {
   SUN_BASE_GLARE_HIGH_SUN_CAP_G,
   SUN_BASE_GLARE_HIGH_SUN_CAP_R,
   SUN_DISC_OUTER_DEFAULT,
+  SUN_SKY_MASS_B,
+  SUN_SKY_MASS_END,
+  SUN_SKY_MASS_G,
+  SUN_SKY_MASS_PAINT_B,
+  SUN_SKY_MASS_PAINT_G,
+  SUN_SKY_MASS_PAINT_R,
+  SUN_SKY_MASS_PAINT_STRENGTH,
+  SUN_SKY_MASS_POWER,
+  SUN_SKY_MASS_R,
+  SUN_SKY_MASS_START,
+  SUN_SKY_MASS_STRENGTH,
 } from './HosekWilkieTslConstants';
 
 const DOME_RADIUS = 500;
@@ -1034,6 +1045,18 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     r += (compressedR - r) * baseGlareMask;
     g2c += (compressedG - g2c) * baseGlareMask;
     b += (compressedB - b) * baseGlareMask;
+
+    const skySolarMassShape = smoothstep(SUN_SKY_MASS_START, SUN_SKY_MASS_END, cosTheta);
+    const skySolarMassDayT = smoothstep(-0.02, 0.08, sunY);
+    const skySolarMassPaint = Math.max(
+      0,
+      Math.min(1, skySolarMassShape * skySolarMassDayT * SUN_SKY_MASS_PAINT_STRENGTH),
+    );
+    const skySolarMass =
+      Math.pow(skySolarMassShape, SUN_SKY_MASS_POWER) * skySolarMassDayT * SUN_SKY_MASS_STRENGTH;
+    r += (SUN_SKY_MASS_PAINT_R - r) * skySolarMassPaint + SUN_SKY_MASS_R * skySolarMass;
+    g2c += (SUN_SKY_MASS_PAINT_G - g2c) * skySolarMassPaint + SUN_SKY_MASS_G * skySolarMass;
+    b += (SUN_SKY_MASS_PAINT_B - b) * skySolarMassPaint + SUN_SKY_MASS_B * skySolarMass;
 
     // Keep the sky-only glare range wide enough for fog and hemisphere
     // readers without reintroducing a hard sun body into the dome path.

@@ -29,6 +29,17 @@ import {
   SUN_BASE_GLARE_HIGH_SUN_CAP_G,
   SUN_BASE_GLARE_HIGH_SUN_CAP_R,
   SUN_DISC_OUTER_DEFAULT,
+  SUN_SKY_MASS_B,
+  SUN_SKY_MASS_END,
+  SUN_SKY_MASS_G,
+  SUN_SKY_MASS_PAINT_B,
+  SUN_SKY_MASS_PAINT_G,
+  SUN_SKY_MASS_PAINT_R,
+  SUN_SKY_MASS_PAINT_STRENGTH,
+  SUN_SKY_MASS_POWER,
+  SUN_SKY_MASS_R,
+  SUN_SKY_MASS_START,
+  SUN_SKY_MASS_STRENGTH,
   TOTAL_RAYLEIGH,
 } from './HosekWilkieTslConstants';
 
@@ -211,6 +222,18 @@ export function evaluatePreethamSkyCpu(
   g2c += (compressedG - g2c) * baseGlareMask;
   b += (compressedB - b) * baseGlareMask;
 
+  const skySolarMassShape = smoothstepCpu(SUN_SKY_MASS_START, SUN_SKY_MASS_END, cosTheta);
+  const skySolarMassDayT = smoothstepCpu(-0.02, 0.08, sunYClamped);
+  const skySolarMassPaint = Math.max(
+    0,
+    Math.min(1, skySolarMassShape * skySolarMassDayT * SUN_SKY_MASS_PAINT_STRENGTH),
+  );
+  const skySolarMass =
+    (skySolarMassShape ** SUN_SKY_MASS_POWER) * skySolarMassDayT * SUN_SKY_MASS_STRENGTH;
+  r += (SUN_SKY_MASS_PAINT_R - r) * skySolarMassPaint + SUN_SKY_MASS_R * skySolarMass;
+  g2c += (SUN_SKY_MASS_PAINT_G - g2c) * skySolarMassPaint + SUN_SKY_MASS_G * skySolarMass;
+  b += (SUN_SKY_MASS_PAINT_B - b) * skySolarMassPaint + SUN_SKY_MASS_B * skySolarMass;
+
   out.setRGB(
     Math.max(0, Math.min(64, r)),
     Math.max(0, Math.min(64, g2c)),
@@ -238,5 +261,11 @@ export const HOSEK_WILKIE_TSL_DEFAULTS = {
     r: SUN_BASE_GLARE_CAP_R,
     g: SUN_BASE_GLARE_CAP_G,
     b: SUN_BASE_GLARE_CAP_B,
+  },
+  sunSkyMass: {
+    start: SUN_SKY_MASS_START,
+    end: SUN_SKY_MASS_END,
+    paintStrength: SUN_SKY_MASS_PAINT_STRENGTH,
+    strength: SUN_SKY_MASS_STRENGTH,
   },
 } as const;

@@ -298,15 +298,16 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    heightmap/relief response, altitude-preserving shadow recentering for A Shau,
    renderer-facing low-sun directional-light bounds, and a ridge-occlusion
    capture path for the A Shau terrain-warmth metric. The visible sun path now
-   uses the SDS-style ownership split: `SunDiscMesh` is the default,
-   depth-tested hot-body owner and the TSL dome owns only atmospheric glow /
-   horizon scatter. Full local matrix proof passes across all five scenarios
-   and time-of-day captures after fixing stale camera-relative sun-body sync.
-   Representative Open Frontier golden proof records WebGPU
-   `sunCore=0.053%`, `sunSpan=3.52%` and explicit WebGL2
-   `sunCore=0.035%`, `sunSpan=2.78%`, with parity max channel delta `0.78%`.
-   A Shau dusk ridge proof passes strict WebGPU / explicit WebGL2 terrain
-   warmth, sun-scale, and parity (`0.39%` max channel delta). Production
+   uses the SDS-style ownership model: `SunDiscMesh` is the default,
+   depth-tested hot-body owner and the TSL dome owns bounded atmospheric glow /
+   horizon scatter plus a tight warm sky solar mass. Full local matrix proof
+   passes across all five scenarios and time-of-day captures after fixing stale
+   camera-relative sun-body sync. Representative Open Frontier golden proof
+   records WebGPU `sunCore=0.053%`, `sunSpan=3.52%` and explicit WebGL2
+   `sunCore=0.044%`, `sunSpan=3.33%`, with parity max channel delta `1.57%`.
+   A Shau dusk ridge proof passes strict WebGPU and production
+   `webgpu-force-webgl` fallback terrain occlusion, sun-scale, and parity
+   (`0.00%` max channel delta). Production
    parity is proven by the per-deploy live-release gate; owner visual
    acceptance remains open.
 5. **A Shau required-asset / navigation gate** - startup now fails

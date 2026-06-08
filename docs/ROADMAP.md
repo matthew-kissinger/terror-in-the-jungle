@@ -122,14 +122,15 @@ Carry these findings into the next Projekt revamp:
 - Owner playtest sign-off for the terrain/vehicle/water foundation reset and the
   playtest-deferred VODA, VEKHIKL, AVIATSIYA, SVYAZ, UX, and DIZAYN surfaces.
 - SOL-1 solar/atmosphere/terrain lighting rearch: the active source candidate
-  now follows the Sheep Dog Simulator-style ownership split where
-  `SunDiscMesh` owns a depth-tested hot sun body and the TSL sky dome owns only
-  atmospheric glow/scatter. Full local matrix proof now passes across all five
-  scenarios and time-of-day captures; representative Open Frontier golden proof
-  records WebGPU `sunCore=0.053%`, `sunSpan=3.52%` and explicit WebGL2
-  `sunCore=0.035%`, `sunSpan=2.78%`, with parity max channel delta `0.78%`.
-  A Shau dusk ridge proof passes strict WebGPU / explicit WebGL2 terrain warmth,
-  sun-scale, and parity. Production parity remains the per-deploy
+  now follows the Sheep Dog Simulator-style ownership model where
+  `SunDiscMesh` owns a depth-tested hot sun body and the TSL sky dome owns
+  bounded atmospheric glow/scatter plus a tight warm sky solar mass. Full local
+  matrix proof now passes across all five scenarios and time-of-day captures;
+  representative Open Frontier golden proof records WebGPU `sunCore=0.053%`,
+  `sunSpan=3.52%` and explicit WebGL2 `sunCore=0.044%`, `sunSpan=3.33%`, with
+  parity max channel delta `1.57%`. A Shau dusk ridge proof passes strict WebGPU
+  and production `webgpu-force-webgl` fallback terrain occlusion, sun-scale, and
+  parity. Production parity remains the per-deploy
   `check:live-release` gate; owner visual acceptance remains the SOL-1 closeout
   gate.
 - STABILIZAT-1: re-establish quiet-machine perf baselines, certify combat120

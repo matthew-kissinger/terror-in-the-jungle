@@ -45,7 +45,7 @@
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --lut-bump-check --prefix=pre   # pre-bump baseline pair
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --lut-bump-check --prefix=post  # post-bump pair + analysis
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --ridge-occlusion-check --scenario=ashau --tod=dusk
- *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --ridge-occlusion-check --scenario=ashau --tod=dusk --renderer-modes=webgpu-strict,webgl --angle=d3d11
+ *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --ridge-occlusion-check --scenario=ashau --tod=dusk --renderer-modes=webgpu-strict,webgpu-force-webgl --angle=d3d11
  *
  * Notes:
  *   - `combat120` (ai_sandbox) has no `todCycle` and ignores `forceTimeOfDay`.
@@ -70,7 +70,7 @@ type ScenarioKey = 'ashau' | 'openfrontier' | 'tdm' | 'zc' | 'combat120';
 
 type TodLabel = 'noon' | 'golden' | 'dusk' | 'twilight' | 'dawn' | 'midnight';
 
-type RendererMode = 'webgpu' | 'webgpu-strict' | 'webgl';
+type RendererMode = 'webgpu' | 'webgpu-strict' | 'webgpu-force-webgl' | 'webgl';
 type CaptureView = 'sun' | 'ridge';
 type BrowserAngleBackend = 'swiftshader' | 'd3d11' | 'vulkan' | 'default';
 
@@ -253,10 +253,10 @@ function parseRendererModes(defaultModes: RendererMode[]): RendererMode[] {
     .split(',')
     .map((part) => part.trim())
     .filter(Boolean);
-  const allowed = new Set<RendererMode>(['webgpu', 'webgpu-strict', 'webgl']);
+  const allowed = new Set<RendererMode>(['webgpu', 'webgpu-strict', 'webgpu-force-webgl', 'webgl']);
   const modes = parsed.map((mode) => {
     if (!allowed.has(mode as RendererMode)) {
-      throw new Error(`Invalid --renderer-modes entry "${mode}". Expected webgpu, webgpu-strict, or webgl.`);
+      throw new Error(`Invalid --renderer-modes entry "${mode}". Expected webgpu, webgpu-strict, webgpu-force-webgl, or webgl.`);
     }
     return mode as RendererMode;
   });
@@ -678,7 +678,7 @@ async function buildRidgeOcclusionPose(page: Page, preset: ScenarioPreset): Prom
         }
         | undefined;
       const atmosphere = engine?.systemManager?.atmosphereSystem as
-        | { sunDirection?: { x: number; z: number } }
+        | { sunDirection?: { x: number; y: number; z: number } }
         | undefined;
 
       if (!terrain?.getHeightAt) {
@@ -702,15 +702,21 @@ async function buildRidgeOcclusionPose(page: Page, preset: ScenarioPreset): Prom
       }
 
       let sx = atmosphere?.sunDirection?.x ?? fallback[0];
+      let sy = atmosphere?.sunDirection?.y ?? 0.1;
       let sz = atmosphere?.sunDirection?.z ?? fallback[1];
-      const sunLen = Math.hypot(sx, sz);
-      if (sunLen > 0.001) {
-        sx /= sunLen;
-        sz /= sunLen;
+      const sunLen3d = Math.hypot(sx, sy, sz);
+      if (sunLen3d > 0.001) {
+        sx /= sunLen3d;
+        sy /= sunLen3d;
+        sz /= sunLen3d;
       } else {
         sx = fallback[0];
+        sy = 0.1;
         sz = fallback[1];
       }
+      const sunHorizontalLen = Math.hypot(sx, sz) || 1;
+      const hx = sx / sunHorizontalLen;
+      const hz = sz / sunHorizontalLen;
 
       const isAshaU = scenarioKey === 'ashau';
       const extent = isAshaU ? 1800 : 720;
@@ -721,9 +727,9 @@ async function buildRidgeOcclusionPose(page: Page, preset: ScenarioPreset): Prom
         x: 0,
         z: 0,
         y: terrain.getHeightAt(0, 0),
-        cameraX: -sx * distances[0],
-        cameraZ: -sz * distances[0],
-        cameraGroundY: terrain.getHeightAt(-sx * distances[0], -sz * distances[0]),
+        cameraX: -hx * distances[0],
+        cameraZ: -hz * distances[0],
+        cameraGroundY: terrain.getHeightAt(-hx * distances[0], -hz * distances[0]),
         rise: 0,
         score: Number.NEGATIVE_INFINITY,
       };
@@ -734,8 +740,8 @@ async function buildRidgeOcclusionPose(page: Page, preset: ScenarioPreset): Prom
           if (!Number.isFinite(y)) continue;
           for (const distance of distances) {
             samplesChecked++;
-            const cameraX = x - sx * distance;
-            const cameraZ = z - sz * distance;
+            const cameraX = x - hx * distance;
+            const cameraZ = z - hz * distance;
             const cameraGroundY = terrain.getHeightAt(cameraX, cameraZ);
             if (!Number.isFinite(cameraGroundY)) continue;
 
@@ -756,17 +762,22 @@ async function buildRidgeOcclusionPose(page: Page, preset: ScenarioPreset): Prom
           x: 0,
           z: 0,
           y,
-          cameraX: -sx * distance,
-          cameraZ: -sz * distance,
-          cameraGroundY: terrain.getHeightAt(-sx * distance, -sz * distance),
+          cameraX: -hx * distance,
+          cameraZ: -hz * distance,
+          cameraGroundY: terrain.getHeightAt(-hx * distance, -hz * distance),
           rise: 0,
           score: 0,
         };
       }
 
-      const target: [number, number, number] = [best.x, best.y + 7, best.z];
+      const cameraClearance = 18;
+      const cameraY = best.cameraGroundY + cameraClearance;
+      const target: [number, number, number] = [
+        best.cameraX + sx * 1000,
+        cameraY + sy * 1000,
+        best.cameraZ + sz * 1000,
+      ];
       const cameraGround: [number, number, number] = [best.cameraX, best.cameraGroundY, best.cameraZ];
-      const cameraY = Math.max(best.cameraGroundY + 18, best.y + 10);
       const yawDeg = (Math.atan2(sx, -sz) * 180) / Math.PI;
       const pose: Pose = {
         position: [best.cameraX, cameraY, best.cameraZ],
@@ -1998,16 +2009,17 @@ async function runLutBumpMatrix(
 function computeParityDeltas(records: CaptureRecord[]): SuiteSummary['parityDeltas'] {
   const out: SuiteSummary['parityDeltas'] = [];
   // Group parity captures by scenario+TOD and compute per-channel deltas
-  // between the best WebGPU-family capture and the explicit WebGL pair.
-  // Prefer strict WebGPU when both default and strict rows exist.
+  // between the best WebGPU-family capture and the WebGL2 pair. Prefer the
+  // production `WebGPURenderer` forced-WebGL2 fallback when it is present;
+  // explicit `webgl` is retained as the plain-WebGLRenderer diagnostic path.
   const parityKey = (r: CaptureRecord): string => `${r.view ?? 'sun'}|${r.scenario}|${r.tod}`;
   const pairs = new Map<string, { webgpu?: CaptureRecord; webgl?: CaptureRecord }>();
   for (const r of records) {
     if (!r.parity) continue;
     const k = parityKey(r);
     const entry = pairs.get(k) ?? {};
-    if (r.rendererMode === 'webgl') {
-      entry.webgl = r;
+    if (r.rendererMode === 'webgl' || r.rendererMode === 'webgpu-force-webgl') {
+      if (r.rendererMode === 'webgpu-force-webgl' || !entry.webgl) entry.webgl = r;
     } else if (r.rendererMode === 'webgpu-strict' || !entry.webgpu) {
       entry.webgpu = r;
     }

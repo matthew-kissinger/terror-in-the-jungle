@@ -100,15 +100,16 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   one effective lighting snapshot, and applies a bounded low-sun terrain
   heightmap/relief response. The shadow recenter path preserves A Shau altitude,
   and renderer-facing low-sun directional light is bounded separately from the
-  analytic sky color. The visible sun path now follows the SDS WebGPU split:
+  analytic sky color. The visible sun path now follows the SDS WebGPU lesson:
   `SunDiscMesh` is ON by default and owns the depth-tested hot body, while the
-  TSL dome owns atmospheric glow / horizon scatter only. Full local matrix
-  proof now passes across all five scenarios and time-of-day captures after
-  fixing stale camera-relative sun-body sync. Representative Open Frontier
-  golden proof records WebGPU `sunCore=0.053%`, `sunSpan=3.52%` and explicit
-  WebGL2 `sunCore=0.035%`, `sunSpan=2.78%`, with parity max channel delta
-  `0.78%`. A Shau dusk ridge proof passes terrain warmth, sun-scale, and
-  renderer parity. Production parity must be proven with
+  TSL dome owns bounded atmospheric glow / horizon scatter plus a tight warm
+  sky solar mass around the body. Full local matrix proof now passes across all
+  five scenarios and time-of-day captures after fixing stale camera-relative
+  sun-body sync. Representative Open Frontier golden proof records WebGPU
+  `sunCore=0.053%`, `sunSpan=3.52%` and explicit WebGL2 `sunCore=0.044%`,
+  `sunSpan=3.33%`, with parity max channel delta `1.57%`. A Shau dusk ridge
+  proof passes terrain-occluded sun-body, terrain warmth, sun-scale, and
+  production fallback parity. Production parity must be proven with
   `npm run check:live-release` after each deploy.
 - The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
   readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,

@@ -28,29 +28,31 @@ TSL dome and CPU LUT share a cool sub-horizon sky floor. Water is night-aware.
 Shadows preserve A Shau camera altitude. Terrain has a bounded low-sun
 heightmap/relief approximation for ridge-light cases.
 
-The visible sun path now follows the SDS WebGPU split: `SunDiscMesh` owns the
-only hot body and is depth-tested; the TSL sky dome owns atmospheric glow and
-horizon scatter only. This removes the duplicate grey dome-sun path and gives
-terrain a chance to occlude the hard body.
+The visible sun path now follows the SDS WebGPU lesson: `SunDiscMesh` owns the
+depth-tested hot body, while the TSL sky dome owns bounded atmosphere plus a
+tight warm solar mass around that body. This removes the duplicate grey
+dome-sun path, avoids the rejected damp sphere, and gives terrain a chance to
+occlude the hard body.
 
 ## Evidence
 
 - Full local matrix proof now passes the current sun-body / atmosphere
   diagnostic across all five scenarios and time-of-day captures.
-- The Open Frontier golden parity crops show the current broader white-hot
-  center with a warmer irregular heat rim instead of the rejected tiny pearl /
-  smooth damp sphere. Representative values: WebGPU `sunCore=0.053%`,
-  `sunSpan=3.52%`; explicit WebGL2 `sunCore=0.035%`, `sunSpan=2.78%`;
-  WebGPU/WebGL2 max channel delta `0.78%`.
+- The Open Frontier golden parity crops show the current broader warm-white
+  center with a warmer irregular heat rim and SDS-style sky solar mass instead
+  of the rejected tiny pearl / smooth damp sphere. Representative values:
+  WebGPU `sunCore=0.053%`, `sunSpan=3.52%`; explicit WebGL2
+  `sunCore=0.044%`, `sunSpan=3.33%`; WebGPU/WebGL2 max channel delta `1.57%`.
 - The Open Frontier golden missing-body frame was not terrain occlusion; it was
   stale camera-relative `SunDiscMesh` positioning after the capture camera
   moved. `syncDomePosition()` now refreshes the sun body, and the capture gate
   records `sunVisibility` / terrain ray occlusion so missing-unoccluded bodies
   fail explicitly.
-- A Shau dusk ridge proof now passes strict WebGPU and explicit WebGL2 terrain
-  warmth, sun-scale, and parity diagnostics. Representative values:
-  WebGPU-strict `sunCore=0.053%`, `sunSpan=3.52%`; WebGL2 `sunCore=0.036%`,
-  `sunSpan=2.87%`; parity max channel delta `0.39%`.
+- A Shau dusk ridge proof now uses a true terrain-occluded sun-body pose.
+  Strict WebGPU and the production `webgpu-force-webgl` fallback both record
+  `sunVisibility=terrain-occluded`, `sunOcclusion=55m`, `sunCore=0`,
+  `sunSpan=0`, ridge warmth PASS, sun-scale PASS, and parity max channel delta
+  `0.00%`.
 - Night terrain diagnostics pass red/white/cyan bounds across all five
   scenarios. The older strict night-red sampler remains intentionally
   over-tight and logs strict failures, while the active red-not-dominant
@@ -68,8 +70,8 @@ terrain a chance to occlude the hard body.
 
 - [x] Full visual matrix rerun proves the SDS-style sun body / occlusion
       contract and no red/white/cyan night terrain across all modes.
-- [x] A Shau strict-WebGPU ridge proof rerun passes the new sun-body /
-      terrain-warmth contract and WebGL2 parity.
+- [x] A Shau strict-WebGPU ridge proof rerun passes the new terrain-occluded
+      sun-body / terrain-warmth contract and production WebGL2 fallback parity.
 - [x] Focused unit tests cover sun body/glare bounds and sub-horizon light
       behavior.
 - [x] Master CI, deploy, and live-release proof remain required for production
