@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (SOL-1 engineering closeout: `SunDiscMesh` owns the depth-tested hot body with a broader warm core and fractured amber shell, the TSL dome keeps only tight warm solar mass, full 33-shot matrix and A Shau ridge proof pass, production live proof passes for `53e50190`; owner visual acceptance remains open)
+Last verified: 2026-06-08 (SOL-1 engineering closeout: `SunDiscMesh` owns the depth-tested hot body with a broader warm core and fractured amber shell, the TSL dome keeps only tight warm solar mass, full 33-shot matrix and A Shau ridge proof pass, production live proof passes through `npm run check:live-release`; owner visual acceptance remains open)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -189,11 +189,11 @@ as of this refresh:
   `0.00%`. A Shau midnight proves the authored level/depth water body on a cool
   opaque night material with
   `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`, replacing the previous
-  red water-body slab. Production proof passes at
-  `artifacts/perf/2026-06-08T15-56-30-243Z/projekt-143-live-release-proof/release-proof.json`:
-  CI `27148343601`, deploy `27149940462`, live manifest SHA
-  `53e501903ebad9e5b51c339555c178ffc72845e6`, Pages/R2/SW headers PASS, and
-  live browser smoke PASS. The next SOL-1 goal is owner visual acceptance.
+  red water-body slab. Production proof is the live-release verifier:
+  `npm run check:live-release` must pass against the current deployed `master`
+  SHA, including CI/deploy success, live manifest SHA parity, Pages/R2/SW
+  headers, and live browser smoke. The next SOL-1 goal is owner visual
+  acceptance.
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.

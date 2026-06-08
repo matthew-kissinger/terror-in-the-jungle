@@ -48,10 +48,9 @@ occlude the hard body.
   scenarios.
 - A Shau midnight proves the level/depth water-body night material: rendered
   night-terrain `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`.
-- Live production proof passes for `53e50190`: CI `27148343601`, deploy
-  `27149940462`, live manifest SHA, Pages/R2/SW headers, and live browser smoke
-  all PASS in
-  `artifacts/perf/2026-06-08T15-56-30-243Z/projekt-143-live-release-proof/release-proof.json`.
+- Live production proof is `npm run check:live-release`: CI, deploy, live
+  manifest SHA parity, Pages/R2/SW headers, and live browser smoke all PASS for
+  the current deployed `master` SHA.
 
 ## Non-goals
 

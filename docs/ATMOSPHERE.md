@@ -118,10 +118,9 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   and production fallback. A Shau midnight also
   proves the authored level/depth water body on a cool opaque night material
   path with `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)` in the
-  rendered night-terrain region. Production proof passes for `53e50190` via
-  CI `27148343601`, deploy `27149940462`, and
-  `artifacts/perf/2026-06-08T15-56-30-243Z/projekt-143-live-release-proof/release-proof.json`.
-  Owner visual acceptance remains the closeout gate.
+  rendered night-terrain region. Production proof is `npm run check:live-release`
+  against the current deployed `master` SHA. Owner visual acceptance remains the
+  closeout gate.
 - The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
   readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,
   not physically exhaustive sky rendering or horizon-scale terrain occlusion.

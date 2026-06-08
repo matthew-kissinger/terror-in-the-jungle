@@ -313,8 +313,8 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`.
    A Shau dusk ridge proof passes strict WebGPU and production fallback terrain
    occlusion, terrain warmth, sun-scale, and `0.00%` parity delta. Production
-   parity is proven for `53e50190` by `check:live-release`; owner visual
-   acceptance remains open.
+   parity is proven by `check:live-release` against the current deployed
+   `master` SHA; owner visual acceptance remains open.
 5. **A Shau required-asset / navigation gate** - startup now fails
    A Shau when the required DEM/manifest path is missing or returns HTML, and
    preview builds now emit the manifest. The old TileCache fallback path has

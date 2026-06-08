@@ -133,8 +133,8 @@ Carry these findings into the next Projekt revamp:
   dusk ridge proof passes strict WebGPU and production fallback terrain
   occlusion, terrain warmth, sun-scale, and `0.00%` parity delta, while A Shau
   midnight verifies the authored water body no longer creates a local
-  red/white/cyan/bright slab. Production parity passes for `53e50190`; owner
-  visual acceptance remains the SOL-1 closeout gate.
+  red/white/cyan/bright slab. Production parity is proven by
+  `check:live-release`; owner visual acceptance remains the SOL-1 closeout gate.
 - STABILIZAT-1: re-establish quiet-machine perf baselines, certify combat120
   frame tails, and separate NPC movement-stall work from render/Other cost.
 - KB-STARTUP-1: harden worker-backed terrain surface baking and mode-start

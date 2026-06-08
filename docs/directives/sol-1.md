@@ -67,11 +67,9 @@ reference contract:
   night material path: the rendered night-terrain region records
   `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`, replacing the previous
   red water-body slab.
-- Production proof passes at
-  `artifacts/perf/2026-06-08T15-56-30-243Z/projekt-143-live-release-proof/release-proof.json`:
-  CI `27148343601`, deploy `27149940462`, live `/asset-manifest.json` SHA
-  `53e501903ebad9e5b51c339555c178ffc72845e6`, Pages/R2/SW headers, and live
-  browser smoke all PASS.
+- Production proof is `npm run check:live-release`: the current deployed
+  `master` SHA must match `/asset-manifest.json`, and CI, deploy, Pages/R2/SW
+  headers, and live browser smoke must all PASS.
 
 These are automated diagnostics, not owner visual acceptance. SOL-1 stays open
 until a human visual review accepts the current candidate.
