@@ -40,6 +40,7 @@ const _euler = new THREE.Euler();
 const ENGINE_IDLE_RPM = 0.18;
 const WHEEL_COUNT = 4;
 const WHEEL_LABELS = ['FL', 'FR', 'RL', 'RR'] as const;
+const MAX_ACCUMULATED_STEP_SECONDS = 0.75;
 
 export interface GroundVehicleControls {
   /** Bidirectional throttle; -1 reverse, 0 idle, +1 forward. */
@@ -120,7 +121,10 @@ export class GroundVehiclePhysics {
   static readonly FIXED_STEP_SECONDS = 1 / 60;
   private readonly GRAVITY = -9.81;
   private readonly cfg: GroundVehiclePhysicsConfig;
-  private readonly stepper = new FixedStepRunner(GroundVehiclePhysics.FIXED_STEP_SECONDS);
+  private readonly stepper = new FixedStepRunner(
+    GroundVehiclePhysics.FIXED_STEP_SECONDS,
+    MAX_ACCUMULATED_STEP_SECONDS,
+  );
 
   private state: GroundVehicleState;
   private previousState: GroundVehicleState;

@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (basin-water rearch local proof: Open Frontier and A Shau use authored level/depth basin footprints instead of reach ribbons; `npm run check:water-runtime -- --headless` passes with `water_body` samples, fresh screenshots, and a 481-vertices-per-body mesh budget; prior SOL-1 live proof remains recorded separately; owner visual acceptance remains open)
+Last verified: 2026-06-08 (land-vehicle proof refresh: Open Frontier and A Shau M151/M48 board, drive, use elevated third-person camera, exit cleanly, and suppress first-person weapon overlay with zero renderable weapon meshes while seated; basin-water proof remains current; prior SOL-1 live proof remains recorded separately; owner visual acceptance remains open)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -48,6 +48,16 @@ footprints, and return `water_body` samples while hydrology remains a
 drainage/material sensor. The fresh local runtime proof passes and records the
 current mesh cost at 962 total vertices / 481 vertices per basin body:
 `artifacts/perf/2026-06-08T18-04-38-049Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
+The latest land-vehicle owner-acceptance proof covers live M151 and M48 targets
+in Open Frontier and A Shau using the current board/drive/exit path:
+`artifacts/playtests/land-vehicle-runtime-proof/open_frontier-m151-proof.json`,
+`open_frontier-m48-proof.json`, `a_shau_valley-m151-proof.json`, and
+`a_shau_valley-m48-proof.json`. These runs prove W-drive displacement, elevated
+third-person camera framing, clean exit, and infantry-weapon suppression through
+the vehicle-session/equipment state. The proof now fails if any first-person
+weapon overlay root or mesh remains renderable while seated; this replaces the
+older current-rig-only diagnostic that could miss stale rifle overlays in
+screenshots.
 The previous live Cloudflare Pages proof passes for `df97e707`:
 `artifacts/perf/2026-06-07T21-16-21-306Z/projekt-143-live-release-proof/release-proof.json`.
 Owner playtest remains open for subjective terrain/water/vehicle feel.
@@ -142,6 +152,14 @@ as of this refresh:
   boarding/crew/cannon. Remaining aviation work is design-heavy (per-aircraft
   period weapons, lead/sway aiming, named maneuver routes), deferred per
   [docs/rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md](../rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md).
+- M151 and M48 owner-acceptance automation now covers Open Frontier and A Shau:
+  scenario-spawned M151s are real `IVehicle`s instead of static dressing, Open
+  Frontier/A Shau M48s remain boardable and drivable, ground/tank follow cameras
+  use elevated third-person framing, and `FirstPersonWeapon` is suppressed at
+  the equipment layer while any vehicle/craft session is active. Screenshots in
+  `artifacts/playtests/land-vehicle-runtime-proof/` are the current visual proof
+  for "no rifle visible while seated"; older screenshots that show a
+  lower-right rifle are stale/rejected evidence.
 - WebGPU `WebGPURenderer` + TSL node materials across terrain, vegetation
   impostors, NPC impostors, and the TSL atmosphere dome, with automatic WebGL2
   fallback for non-WebGPU environments.

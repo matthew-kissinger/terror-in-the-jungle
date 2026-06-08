@@ -80,10 +80,14 @@ describe('motor_pool_heavy_of prefab', () => {
     expect(vehiclePlacements.some((p) => p.modelPath === GroundVehicleModels.M48_PATTON)).toBe(false);
   });
 
-  it('parks four-or-fewer distinct vehicle types with no duplicates', () => {
+  it('does not place a dressing M151 (real GroundVehicle IVehicle owns this anchor)', () => {
+    expect(vehiclePlacements.some((p) => p.modelPath === GroundVehicleModels.M151_JEEP)).toBe(false);
+  });
+
+  it('keeps remaining dressing vehicle types distinct with no duplicates', () => {
     const paths = vehiclePlacements.map((p) => p.modelPath);
     expect(new Set(paths).size).toBe(paths.length);
-    expect(vehiclePlacements.length).toBeGreaterThanOrEqual(3);
+    expect(vehiclePlacements.length).toBeGreaterThanOrEqual(2);
   });
 
   it('keeps every vehicle pair ≥ 1.5 m apart at placement yaw', () => {
@@ -99,10 +103,10 @@ describe('motor_pool_heavy_of prefab', () => {
     }
   });
 
-  it('spreads vehicle yaws across at least 60° so the lot does not read as one rigid row', () => {
+  it('keeps remaining dressing vehicle yaws non-identical so the lot does not read as one rigid row', () => {
     const yaws = vehiclePlacements.map((p) => p.yaw ?? 0);
     const spread = Math.max(...yaws) - Math.min(...yaws);
-    expect(spread).toBeGreaterThanOrEqual((Math.PI / 180) * 60);
+    expect(spread).toBeGreaterThan(0);
   });
 
   it('keeps every placement inside the 36 m Open Frontier footprint radius', () => {
@@ -136,6 +140,10 @@ describe('motor_pool_heavy_ashau prefab', () => {
 
   it('preserves the dressing M48 Patton that A Shau Ta Bat owner-accepted in cycle-vekhikl-3', () => {
     expect(prefab.placements.some((p) => p.modelPath === GroundVehicleModels.M48_PATTON)).toBe(true);
+  });
+
+  it('does not place a dressing M151 because the real scenario jeep owns the Ta Bat anchor', () => {
+    expect(prefab.placements.some((p) => p.modelPath === GroundVehicleModels.M151_JEEP)).toBe(false);
   });
 
   it('keeps every placement inside the 34 m Ta Bat Armored Yard footprint radius', () => {

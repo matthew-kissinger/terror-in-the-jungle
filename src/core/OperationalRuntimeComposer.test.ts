@@ -8,6 +8,7 @@ import {
   wireOperationalRuntime,
 } from './OperationalRuntimeComposer';
 import { Faction } from '../systems/combat/types';
+import { GroundVehicle } from '../systems/vehicle/GroundVehicle';
 import { PBR } from '../systems/vehicle/PBR';
 import { Sampan } from '../systems/vehicle/Sampan';
 import { Tank } from '../systems/vehicle/Tank';
@@ -125,6 +126,7 @@ function createRefs() {
       getVehicle: vi.fn(() => null),
       getVehiclesByCategory: vi.fn(() => []),
       spawnScenarioM2HBEmplacements: vi.fn(() => ['m2hb_scenario_id']),
+      spawnScenarioM151Jeeps: vi.fn(() => ['m151_scenario_id']),
       spawnScenarioM48Tanks: vi.fn(() => ['m48_scenario_id']),
       spawnScenarioPBRs: vi.fn(() => ['pbr_scenario_id']),
       spawnScenarioSampans: vi.fn(() => ['sampan_scenario_id']),
@@ -312,6 +314,29 @@ describe('OperationalRuntimeComposer', () => {
     expect(setTerrain).toHaveBeenCalledWith(refs.terrainSystem);
     expect(tank.getPosition().y).toBeGreaterThan(12);
     expect(tank.getPosition().y).toBeLessThan(13);
+  });
+
+  it('binds spawned M151 jeeps to the runtime terrain provider immediately after spawn', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    refs.terrainSystem.getHeightAt = vi.fn(() => 8);
+    const jeep = new GroundVehicle('m151_scenario_id', new THREE.Group(), Faction.US);
+    const setTerrain = vi.spyOn(jeep, 'setTerrain');
+    refs.vehicleManager.getVehicle = vi.fn((id: string) => {
+      if (id === 'm151_scenario_id') return jeep;
+      return null;
+    });
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    getModeChangedCallback()?.('open_frontier', {});
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(refs.vehicleManager.spawnScenarioM151Jeeps).toHaveBeenCalledWith(expect.objectContaining({
+      modes: ['open_frontier'],
+    }));
+    expect(setTerrain).toHaveBeenCalledWith(refs.terrainSystem);
+    expect(jeep.getPosition().y).toBeGreaterThan(8);
+    expect(jeep.getPosition().y).toBeLessThan(9);
   });
 
   it('snaps Sampan + PBR spawn Y above the water surface when the scenario has water enabled and a surface covers the spawn XZ', async () => {

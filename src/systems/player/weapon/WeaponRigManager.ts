@@ -526,6 +526,28 @@ export class WeaponRigManager {
     }
   }
 
+  setAllWeaponVisibility(visible: boolean): void {
+    if (visible) {
+      this.setWeaponVisibility(true)
+      return
+    }
+
+    const rigs = [
+      this.m16RifleRig,
+      this.akRifleRig,
+      this.shotgunRig,
+      this.smgRig,
+      this.pistolRig,
+      this.m60Rig,
+      this.m79Rig,
+    ]
+    for (const rig of rigs) {
+      if (rig) {
+        rig.visible = false
+      }
+    }
+  }
+
   private getActiveRifleRig(): THREE.Group | undefined {
     return isBlufor(this.activeRifleFaction)
       ? this.m16RifleRig

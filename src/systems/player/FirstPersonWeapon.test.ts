@@ -157,6 +157,7 @@ describe('FirstPersonWeapon', () => {
       isSwitching: vi.fn(() => false),
       updateSwitchAnimation: vi.fn(),
       setWeaponVisibility: vi.fn(),
+      setAllWeaponVisibility: vi.fn(),
     };
 
     mockAnimations = {
@@ -629,7 +630,7 @@ describe('FirstPersonWeapon', () => {
       expect(mockInput.setEnabled).toHaveBeenCalledWith(false);
       expect(mockAnimations.setADS).toHaveBeenCalledWith(false);
       expect(mockAnimations.reset).toHaveBeenCalled();
-      expect(mockRigManager.setWeaponVisibility).toHaveBeenCalledWith(false);
+      expect(mockRigManager.setAllWeaponVisibility).toHaveBeenCalledWith(false);
     });
 
     it('should enable weapon and reset ammo', () => {
@@ -638,6 +639,39 @@ describe('FirstPersonWeapon', () => {
       expect(mockInput.setEnabled).toHaveBeenCalledWith(true);
       expect(mockRigManager.setWeaponVisibility).toHaveBeenCalledWith(true);
       expect(mockAmmo.resetAll).toHaveBeenCalled();
+    });
+
+    it('suppresses all weapon rigs and rendering while seated in a vehicle', () => {
+      weapon.setVehicleEquipmentSuppressed(true);
+
+      expect(mockInput.setEnabled).toHaveBeenCalledWith(false);
+      expect(mockInput.setFiringActive).toHaveBeenCalledWith(false);
+      expect(mockAnimations.setADS).toHaveBeenCalledWith(false);
+      expect(mockRigManager.setAllWeaponVisibility).toHaveBeenCalledWith(false);
+      expect(weapon.canRenderWeapon()).toBe(false);
+    });
+
+    it('keeps vehicle suppression authoritative when a slot tries to show the weapon', () => {
+      weapon.setVehicleEquipmentSuppressed(true);
+      vi.clearAllMocks();
+
+      weapon.setWeaponVisibility(true);
+      weapon.renderWeapon({} as THREE.WebGLRenderer);
+
+      expect(mockRigManager.setAllWeaponVisibility).toHaveBeenCalledWith(false);
+      expect(mockRigManager.setWeaponVisibility).not.toHaveBeenCalledWith(true);
+      expect(mockModel.render).not.toHaveBeenCalled();
+    });
+
+    it('restores requested weapon visibility after vehicle suppression clears', () => {
+      weapon.setVehicleEquipmentSuppressed(true);
+      vi.clearAllMocks();
+
+      weapon.setVehicleEquipmentSuppressed(false);
+
+      expect(mockInput.setEnabled).toHaveBeenCalledWith(true);
+      expect(mockRigManager.setWeaponVisibility).toHaveBeenCalledWith(true);
+      expect(weapon.canRenderWeapon()).toBe(true);
     });
 
     it('should update HUD on enable', () => {

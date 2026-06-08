@@ -8,12 +8,14 @@ import type { GameModeConfig } from '../config/gameModeTypes';
 import { Logger } from '../utils/Logger';
 import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacementSpawn';
 import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
+import type { M151ScenarioMode } from '../systems/vehicle/M151JeepSpawn';
 import type { PBRScenarioMode } from '../systems/vehicle/PBRSpawn';
 import type { SampanScenarioMode } from '../systems/vehicle/SampanSpawn';
 import { resolveGroundPlacement, resolveWatercraftPlacement } from '../systems/terrain/TerrainPlacementAuthority';
 import { PBR } from '../systems/vehicle/PBR';
 import { Sampan } from '../systems/vehicle/Sampan';
 import { Tank } from '../systems/vehicle/Tank';
+import { GroundVehicle } from '../systems/vehicle/GroundVehicle';
 
 type OperationalRuntimeRefs = Pick<
   SystemKeyToType,
@@ -266,6 +268,7 @@ function wireVehicleRuntime(
   runtime.npcVehicleController.setCombatantProvider(() => runtime.combatantSystem.combatants);
 
   wireM2HBEmplacementRuntime(runtime, options);
+  wireM151JeepRuntime(runtime, options);
   wireM48TankRuntime(runtime, options);
   wireSampanRuntime(runtime, options);
   wirePBRRuntime(runtime, options);
@@ -330,6 +333,55 @@ const M48_MODES_BY_GAMEMODE: Partial<Record<GameMode, M48ScenarioMode>> = {
   [GameMode.OPEN_FRONTIER]: 'open_frontier',
   [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
 };
+
+// Maps GameMode -> the M151 scenario-spawn key. This gives the owner
+// acceptance path a stable, synchronous jeep instead of relying on a
+// world-feature dressing GLB that can load after the proof window.
+const M151_MODES_BY_GAMEMODE: Partial<Record<GameMode, M151ScenarioMode>> = {
+  [GameMode.OPEN_FRONTIER]: 'open_frontier',
+  [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
+};
+
+function wireM151JeepRuntime(
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+  options: OperationalRuntimeOptions
+): void {
+  const scene = options.scene;
+  if (!scene) return;
+
+  const spawnedModes = new Set<M151ScenarioMode>();
+  runtime.gameModeManager.onModeChanged((mode) => {
+    const scenarioKey = M151_MODES_BY_GAMEMODE[mode];
+    if (!scenarioKey) return;
+    if (spawnedModes.has(scenarioKey)) return;
+    spawnedModes.add(scenarioKey);
+    setTimeout(() => {
+      try {
+        const ids = runtime.vehicleManager.spawnScenarioM151Jeeps({
+          scene,
+          modes: [scenarioKey],
+          resolvePosition: (_m, base) => resolveGroundPlacement(base, runtime.terrainSystem).position,
+        });
+        bindSpawnedM151JeepRuntime(ids, runtime);
+        Logger.info('vehicle', `M151 jeep scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
+      } catch (error) {
+        spawnedModes.delete(scenarioKey);
+        Logger.warn('vehicle', `M151 jeep scenario spawn failed for ${scenarioKey}`, error);
+      }
+    }, 0);
+  });
+}
+
+function bindSpawnedM151JeepRuntime(
+  ids: readonly string[],
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+): void {
+  for (const id of ids) {
+    const vehicle = runtime.vehicleManager.getVehicle(id);
+    if (!(vehicle instanceof GroundVehicle)) continue;
+    vehicle.setTerrain(runtime.terrainSystem ?? null);
+  }
+}
 
 function wireM48TankRuntime(
   runtime: OperationalRuntimeGroups['vehicleRuntime'],

@@ -18,6 +18,10 @@ import {
   type M48ScenarioMode,
 } from './M48TankSpawn';
 import {
+  spawnScenarioM151Jeeps,
+  type M151ScenarioMode,
+} from './M151JeepSpawn';
+import {
   spawnScenarioPBRs,
   type PBRScenarioMode,
 } from './PBRSpawn';
@@ -178,6 +182,25 @@ export class VehicleManager implements GameSystem {
     resolvePosition?: (mode: M48ScenarioMode, base: THREE.Vector3) => THREE.Vector3;
   }): string[] {
     const spawned = spawnScenarioM48Tanks({
+      modes: args.modes,
+      scene: args.scene,
+      vehicleManager: this,
+      resolvePosition: args.resolvePosition,
+    });
+    return spawned.map(s => s.vehicleId);
+  }
+
+  /**
+   * Scenario-time spawn entry for the M151 jeep. World-feature M151 GLBs can
+   * load late as scenery; this path gives owner acceptance a stable, live,
+   * boardable vehicle id as soon as supported scenarios start.
+   */
+  spawnScenarioM151Jeeps(args: {
+    scene: THREE.Scene;
+    modes: M151ScenarioMode[];
+    resolvePosition?: (mode: M151ScenarioMode, base: THREE.Vector3) => THREE.Vector3;
+  }): string[] {
+    const spawned = spawnScenarioM151Jeeps({
       modes: args.modes,
       scene: args.scene,
       vehicleManager: this,

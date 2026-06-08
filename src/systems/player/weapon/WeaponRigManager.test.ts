@@ -631,6 +631,33 @@ describe('WeaponRigManager', () => {
       // Should not throw
       expect(newManager.getCurrentRig()).toBeUndefined()
     })
+
+    it('can hide every weapon rig for vehicle equipment suppression', () => {
+      manager.startWeaponSwitch('shotgun')
+      manager.updateSwitchAnimation(0.21)
+
+      manager.setAllWeaponVisibility(false)
+
+      const rigs = [
+        (manager as any).m16RifleRig,
+        (manager as any).akRifleRig,
+        (manager as any).shotgunRig,
+        (manager as any).smgRig,
+        (manager as any).pistolRig,
+        (manager as any).m60Rig,
+        (manager as any).m79Rig,
+      ]
+      expect(rigs.filter(Boolean).length).toBeGreaterThan(1)
+      expect(rigs.filter(Boolean).every((rig: THREE.Group) => rig.visible === false)).toBe(true)
+    })
+
+    it('restores only the active weapon through setAllWeaponVisibility(true)', () => {
+      manager.setAllWeaponVisibility(false)
+
+      manager.setAllWeaponVisibility(true)
+
+      expect(manager.getCurrentRig()?.visible).toBe(true)
+    })
   })
 
   describe('setRifleFaction', () => {

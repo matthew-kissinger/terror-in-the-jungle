@@ -164,12 +164,11 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(-5, 0, 8.75), yaw: 0 },
     ],
   },
-  // Open Frontier motor pool — reflowed for ≥ 1.5 m bounding-box clearance
-  // and ≥ 60° yaw spread across the four ground vehicles. M48 dressing prop
-  // is intentionally removed; the real Tank IVehicle spawns at the same
-  // bay anchor via M48_SPAWN_OFFSETS.open_frontier (sibling task
-  // of-tank-relocate-to-motor-pool). Crate row pushed off the parking
-  // strip to flank the comms tower instead. All placements sit within the
+  // Open Frontier motor pool — reflowed for ≥ 1.5 m bounding-box clearance.
+  // M151 and M48 dressing props are intentionally removed; real scenario
+  // IVehicles spawn at the same motor-pool area via M151JeepSpawn and
+  // M48TankSpawn. Crate row pushed off the parking strip to flank the
+  // comms tower instead. All placements sit within the
   // 36 m footprint radius declared by airfield_motor_pool in
   // OpenFrontierConfig.ts.
   motor_pool_heavy_of: {
@@ -177,10 +176,11 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -14), yaw: Math.PI, registerCollision: true },
       { modelPath: StructureModels.COMMS_TOWER, offset: new THREE.Vector3(-20, 0, -4), yaw: 0, registerCollision: true },
       { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(20, 0, -4), yaw: Math.PI * 0.5, registerCollision: true },
-      // Vehicle bays: staggered Z (8 → 22), yaw spread 72° (π*0.3 → π*0.7).
-      { modelPath: GroundVehicleModels.M151_JEEP, offset: new THREE.Vector3(-2, 0, 8), yaw: Math.PI * 0.3, registerCollision: true },
       { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-16, 0, 14), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(10, 0, 18), yaw: Math.PI * 0.7, registerCollision: true },
+      // M151 bay anchor: real GroundVehicle IVehicle spawns here by
+      // M151JeepSpawn. Distance from prefab center:
+      // sqrt(21^2 + 7^2) ≈ 22.1 m, inside the 36 m OF footprint.
       // M48 bay anchor: real Tank IVehicle is spawned here by M48TankSpawn
       // (see of-tank-relocate-to-motor-pool). Distance from prefab center:
       // sqrt(28^2 + 22^2) ≈ 35.6 m, inside the 36 m OF footprint.
@@ -200,7 +200,6 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.COMMS_TOWER, offset: new THREE.Vector3(-20, 0, -4), yaw: 0, registerCollision: true },
       { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(20, 0, -4), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-18, 0, 12), yaw: Math.PI * 0.5, registerCollision: true },
-      { modelPath: GroundVehicleModels.M151_JEEP, offset: new THREE.Vector3(-4, 0, 13), yaw: Math.PI * 0.45, registerCollision: true },
       { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(12, 0, 10), yaw: Math.PI * 0.58, registerCollision: true },
       { modelPath: GroundVehicleModels.M48_PATTON, offset: new THREE.Vector3(24, 0, 14), yaw: Math.PI * 0.6, registerCollision: true },
       { modelPath: StructureModels.AMMO_CRATE, offset: new THREE.Vector3(-10, 0, 20), yaw: 0 },

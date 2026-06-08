@@ -54,6 +54,11 @@ boundaries instead of retuning isolated materials.
 - Do not carry an old full-matrix claim across a post-feedback retune. If the
   source changes after a matrix run, downgrade the docs to focused evidence
   until the full matrix is rerun.
+- Do not accept state-only diagnostics when the defect is visible in a
+  screenshot. The 2026-06-08 vehicle proof initially checked only the current
+  weapon rig and missed a stale lower-right rifle overlay. Runtime visual gates
+  now need to inspect the actual render roots/meshes, then pair that with
+  screenshot review before claiming a visual regression is fixed.
 
 ## Evidence Matrix
 
@@ -80,3 +85,7 @@ changed authority chain:
 - Update `docs/state/CURRENT.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`,
   and `docs/CARRY_OVERS.md` only from verified repo truth. Archive old claims
   instead of letting stale hydrology or sky assumptions remain in current docs.
+- When a proof script exposes a stronger invariant, write it into the workflow.
+  Vehicle/craft acceptance now requires infantry weapons to be suppressed by the
+  vehicle-session equipment state, with zero renderable first-person weapon
+  overlay roots/meshes while seated; a hidden current rig alone is not proof.

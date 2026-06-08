@@ -195,6 +195,7 @@ describe('PlayerController', () => {
       showWeapon: vi.fn(),
       hideWeapon: vi.fn(),
       setWeaponVisibility: vi.fn(),
+      setVehicleEquipmentSuppressed: vi.fn(),
       setPlayerFaction: vi.fn(),
       setFiringEnabled: vi.fn(),
       setPrimaryWeapon: vi.fn(),
@@ -549,6 +550,7 @@ describe('PlayerController', () => {
     it('should equip weapon', () => {
       playerController.equipWeapon();
 
+      expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).toHaveBeenCalledWith(false);
       expect(mockFirstPersonWeapon.showWeapon).toHaveBeenCalled();
       expect(mockFirstPersonWeapon.setFiringEnabled).toHaveBeenCalledWith(true);
       expect(mockRenderer.showCrosshair).toHaveBeenCalled();
@@ -600,6 +602,20 @@ describe('PlayerController', () => {
       expect(mockFirstPersonWeapon.setWeaponVisibility).toHaveBeenCalledWith(false);
       expect(mockGrenadeSystem.showGrenadeInHand).toHaveBeenCalledWith(false);
     });
+
+    it('does not re-show infantry equipment when the selected slot changes while seated in a vehicle', () => {
+      playerController.setFirstPersonWeapon(mockFirstPersonWeapon);
+      const session = playerController['vehicleStateManager'];
+      vi.spyOn(session, 'isInVehicle').mockReturnValue(true);
+      const slotChangeCallback = (mockInventoryManager.onSlotChange as any).mock.calls[0][0];
+      vi.clearAllMocks();
+
+      slotChangeCallback(WeaponSlot.PRIMARY);
+
+      expect(mockFirstPersonWeapon.setWeaponVisibility).toHaveBeenCalledWith(false);
+      expect(mockFirstPersonWeapon.setWeaponVisibility).not.toHaveBeenCalledWith(true);
+      expect(mockFirstPersonWeapon.setPrimaryWeapon).not.toHaveBeenCalled();
+    });
   });
 
   describe('Helicopter Mode', () => {
@@ -629,13 +645,12 @@ describe('PlayerController', () => {
       expect(position.z).toBe(200);
     });
 
-    it('should unequip weapon on enter', () => {
+    it('should suppress infantry equipment on enter', () => {
       const helicopterPos = new THREE.Vector3(200, 50, 200);
 
       playerController.enterHelicopter('heli-1', helicopterPos);
 
-      expect(mockFirstPersonWeapon.hideWeapon).toHaveBeenCalled();
-      expect(mockFirstPersonWeapon.setFiringEnabled).toHaveBeenCalledWith(false);
+      expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).toHaveBeenCalledWith(true);
     });
 
     it('should show helicopter HUD on enter', () => {
@@ -671,7 +686,7 @@ describe('PlayerController', () => {
       expect(position.z).toBe(200);
     });
 
-    it('should equip weapon on exit', () => {
+    it('should unsuppress infantry equipment on exit', () => {
       const helicopterPos = new THREE.Vector3(200, 50, 200);
       const exitPos = new THREE.Vector3(195, 2, 200);
 
@@ -679,8 +694,8 @@ describe('PlayerController', () => {
       vi.clearAllMocks();
       playerController.exitHelicopter(exitPos);
 
-      expect(mockFirstPersonWeapon.showWeapon).toHaveBeenCalled();
-      expect(mockFirstPersonWeapon.setFiringEnabled).toHaveBeenCalledWith(true);
+      expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).toHaveBeenCalledWith(false);
+      expect(mockFirstPersonWeapon.setWeaponVisibility).toHaveBeenCalledWith(true);
     });
 
     it('should hide helicopter HUD on exit', () => {
@@ -733,12 +748,36 @@ describe('PlayerController', () => {
       expect(playerController.handleBoardNearestVehicle()).toBe(true);
     });
 
+    it('suppresses infantry equipment when factory boarding succeeds', () => {
+      playerController.setFirstPersonWeapon(mockFirstPersonWeapon);
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      const session = playerController['vehicleStateManager'];
+      let seated = false;
+      vi.spyOn(session, 'isInVehicle').mockImplementation(() => seated);
+      mockFactory.tryBoardNearest.mockImplementation(() => {
+        seated = true;
+        return true;
+      });
+
+      expect(playerController.handleBoardNearestVehicle()).toBe(true);
+      expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).toHaveBeenCalledWith(true);
+    });
+
     it('returns false when the factory cannot board (no proximity, seat full, etc.)', () => {
       playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
       mockFactory.tryBoardNearest.mockReturnValue(false);
 
       // Falsey return lets PlayerInput's F-router fall through to mortar fire.
       expect(playerController.handleBoardNearestVehicle()).toBe(false);
+    });
+
+    it('keeps the infantry weapon equipped when factory boarding fails', () => {
+      playerController.setFirstPersonWeapon(mockFirstPersonWeapon);
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      mockFactory.tryBoardNearest.mockReturnValue(false);
+
+      expect(playerController.handleBoardNearestVehicle()).toBe(false);
+      expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).not.toHaveBeenCalledWith(true);
     });
 
     it('returns false when no factory has been wired (legacy/test paths)', () => {
@@ -764,6 +803,25 @@ describe('PlayerController', () => {
       expect(consumed).toBe(true);
     });
 
+    it('unsuppresses infantry equipment when factory exit succeeds', () => {
+      playerController.setFirstPersonWeapon(mockFirstPersonWeapon);
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      const session = playerController['vehicleStateManager'];
+      let seated = true;
+      vi.spyOn(session, 'isInVehicle').mockImplementation(() => seated);
+      playerController['infantryEquipmentSuppressedByVehicle'] = true;
+      mockFactory.tryExit.mockImplementation(() => {
+        seated = false;
+        return true;
+      });
+
+      const consumed = playerController.handleBoardNearestVehicle();
+
+      expect(consumed).toBe(true);
+      expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).toHaveBeenCalledWith(false);
+      expect(mockFirstPersonWeapon.setWeaponVisibility).toHaveBeenCalledWith(true);
+    });
+
     it('skips the boarding factory while the player is in a flight vehicle (helicopter / fixed-wing keep their own handler)', () => {
       playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
       playerController['playerState'].isInHelicopter = true;
@@ -783,6 +841,23 @@ describe('PlayerController', () => {
 
       expect(playerController.handleExitVehicle()).toBe(false);
       expect(mockFactory.tryExit).toHaveBeenCalledTimes(1);
+    });
+
+    it('handleExitVehicle unsuppresses infantry equipment when exit succeeds', () => {
+      playerController.setFirstPersonWeapon(mockFirstPersonWeapon);
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      const session = playerController['vehicleStateManager'];
+      let seated = true;
+      vi.spyOn(session, 'isInVehicle').mockImplementation(() => seated);
+      playerController['infantryEquipmentSuppressedByVehicle'] = true;
+      mockFactory.tryExit.mockImplementation(() => {
+        seated = false;
+        return true;
+      });
+
+      expect(playerController.handleExitVehicle()).toBe(true);
+      expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).toHaveBeenCalledWith(false);
+      expect(mockFirstPersonWeapon.setWeaponVisibility).toHaveBeenCalledWith(true);
     });
   });
 

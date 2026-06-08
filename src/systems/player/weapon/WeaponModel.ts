@@ -102,7 +102,8 @@ export class WeaponModel {
    * Render weapon overlay on top of main scene
    */
   render(renderer: THREE.WebGLRenderer, rigManager: WeaponRigManager): void {
-    if (!rigManager.getCurrentRig()) return
+    const currentRig = rigManager.getCurrentRig()
+    if (!currentRig || currentRig.visible === false) return
 
     // Save current renderer state
     const currentAutoClear = renderer.autoClear

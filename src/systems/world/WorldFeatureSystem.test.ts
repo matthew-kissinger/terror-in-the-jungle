@@ -302,15 +302,21 @@ describe('WorldFeatureSystem', () => {
     expect(vehicle.vehicleId).toBe('test_motor_pool_m151');
     expect(vehicle.category).toBe('ground');
     expect(vehicle.hasFreeSeats('pilot')).toBe(true);
-    expect(vehicle.getPosition().y).toBeCloseTo(5);
+    expect(vehicle.getPosition().y).toBeCloseTo(5.45);
+    expect(terrainManager.registerCollisionObject).not.toHaveBeenCalled();
 
     let meshCount = 0;
-    scene.children[0].traverse((child) => {
+    let frozenMeshCount = 0;
+    scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         meshCount++;
+        if (!child.matrixAutoUpdate || !child.matrixWorldAutoUpdate) {
+          frozenMeshCount++;
+        }
       }
     });
     expect(meshCount).toBe(2);
+    expect(frozenMeshCount).toBe(0);
 
     currentConfig = {
       id: GameMode.TEAM_DEATHMATCH,

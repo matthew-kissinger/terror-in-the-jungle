@@ -88,6 +88,7 @@ export class PlayerController implements GameSystem {
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private playerFaction: Faction = Faction.US;
   private playerState: PlayerState;
+  private infantryEquipmentSuppressedByVehicle = false;
   private spawnStabilizationUntilMs = 0;
   private gameStarted = false;
 
@@ -187,6 +188,7 @@ export class PlayerController implements GameSystem {
       this.movement.updateMovement(deltaTime, this.input, this.camera);
     }
     this.cameraController.updateCamera(this.input, deltaTime);
+    this.syncInfantryEquipmentForVehicleState();
     this.updateHUD();
     this.updateWeaponSystems();
     if (this.terrainSystem) this.terrainSystem.updatePlayerPosition(this.playerState.position);
@@ -339,26 +341,31 @@ export class PlayerController implements GameSystem {
 
   /** Start firing - routes to weapon system based on current weapon mode */
   private actionFireStart(): void {
+    if (this.shouldSuppressInfantryActions()) return;
     this.combatController.beginFire(this.playerState, this.currentWeaponMode, this.camera);
   }
 
   /** Stop firing - routes to weapon system based on current weapon mode */
   private actionFireStop(): void {
+    if (this.shouldSuppressInfantryActions()) return;
     this.combatController.endFire(this.playerState, this.currentWeaponMode);
   }
 
   /** Start ADS - delegates to WeaponInput */
   private actionADSStart(): void {
+    if (this.isInfantryEquipmentSuppressedForVehicle()) return;
     this.combatController.startADS();
   }
 
   /** Stop ADS - delegates to WeaponInput */
   private actionADSStop(): void {
+    if (this.isInfantryEquipmentSuppressedForVehicle()) return;
     this.combatController.stopADS();
   }
 
   /** Reload - delegates to WeaponInput */
   private actionReload(): void {
+    if (this.isInfantryEquipmentSuppressedForVehicle()) return;
     this.combatController.reload();
   }
 
@@ -456,9 +463,17 @@ export class PlayerController implements GameSystem {
       return false;
     }
     if (this.vehicleStateManager.isInVehicle()) {
-      return factory.tryExit();
+      const exited = factory.tryExit();
+      if (exited) {
+        this.syncInfantryEquipmentForVehicleState();
+      }
+      return exited;
     }
-    return factory.tryBoardNearest();
+    const boarded = factory.tryBoardNearest();
+    if (boarded) {
+      this.syncInfantryEquipmentForVehicleState();
+    }
+    return boarded;
   }
 
   /**
@@ -468,7 +483,11 @@ export class PlayerController implements GameSystem {
    * session controller ran the adapter's exit hook.
    */
   handleExitVehicle(): boolean {
-    return this.playerVehicleAdapterFactory?.tryExit() ?? false;
+    const exited = this.playerVehicleAdapterFactory?.tryExit() ?? false;
+    if (exited) {
+      this.syncInfantryEquipmentForVehicleState();
+    }
+    return exited;
   }
 
   private handleSquadDeploy(): void {
@@ -548,7 +567,44 @@ export class PlayerController implements GameSystem {
   }
 
   private updateWeaponSystems(): void {
+    if (this.isInfantryEquipmentSuppressedForVehicle()) return;
     this.combatController.updateSupportSystems(this.currentWeaponMode, this.camera, this.input);
+  }
+
+  private isInfantryEquipmentSuppressedForVehicle(): boolean {
+    return this.infantryEquipmentSuppressedByVehicle || this.vehicleStateManager.isInVehicle();
+  }
+
+  private shouldSuppressInfantryActions(): boolean {
+    return this.isInfantryEquipmentSuppressedForVehicle()
+      && !this.playerState.isInHelicopter
+      && !this.playerState.isInFixedWing;
+  }
+
+  private syncInfantryEquipmentForVehicleState(): void {
+    const shouldSuppress = this.vehicleStateManager.isInVehicle();
+    this.firstPersonWeapon?.setVehicleEquipmentSuppressed(shouldSuppress);
+
+    if (shouldSuppress) {
+      this.infantryEquipmentSuppressedByVehicle = true;
+      this.grenadeSystem?.showGrenadeInHand(false);
+      this.sandbagSystem?.showPlacementPreview(false);
+      this.hudSystem?.hideGrenadePowerMeter();
+      return;
+    }
+
+    if (!this.infantryEquipmentSuppressedByVehicle) {
+      return;
+    }
+
+    this.infantryEquipmentSuppressedByVehicle = false;
+    if (!this.inventoryManager) {
+      this.firstPersonWeapon?.setWeaponVisibility(true);
+      this.gameRenderer?.showCrosshair();
+      return;
+    }
+    this.handleWeaponSlotChange(this.currentWeaponMode);
+    this.gameRenderer?.showCrosshair();
   }
 
   private handleWeaponSlotChange(slot: WeaponSlot): void {
@@ -564,12 +620,13 @@ export class PlayerController implements GameSystem {
 
     const equippedWeapon = this.inventoryManager?.getWeaponTypeForSlot(slot) ?? null;
     const equipmentAction = this.inventoryManager?.getEquipmentActionForSlot(slot) ?? null;
-    if (equippedWeapon && this.firstPersonWeapon) {
+    const suppressInfantryEquipment = this.isInfantryEquipmentSuppressedForVehicle();
+    if (!suppressInfantryEquipment && equippedWeapon && this.firstPersonWeapon) {
       this.firstPersonWeapon.setWeaponVisibility(true);
       this.firstPersonWeapon.setPrimaryWeapon(equippedWeapon);
-    } else if (equipmentAction === 'grenade') {
+    } else if (!suppressInfantryEquipment && equipmentAction === 'grenade') {
       this.grenadeSystem?.showGrenadeInHand(true);
-    } else if (equipmentAction === 'sandbag' || (slot === WeaponSlot.SANDBAG && this.inventoryManager?.hasSandbagKit())) {
+    } else if (!suppressInfantryEquipment && (equipmentAction === 'sandbag' || (slot === WeaponSlot.SANDBAG && this.inventoryManager?.hasSandbagKit()))) {
       this.sandbagSystem?.showPlacementPreview(true);
     }
 
@@ -586,7 +643,7 @@ export class PlayerController implements GameSystem {
       touchControls.setActiveWeaponSlot(slot as number);
 
       // Show/hide sandbag rotation buttons
-      if (equipmentAction === 'sandbag' || slot === WeaponSlot.SANDBAG) {
+      if (!suppressInfantryEquipment && (equipmentAction === 'sandbag' || slot === WeaponSlot.SANDBAG)) {
         touchControls.sandbagButtons.showButton();
       } else {
         touchControls.sandbagButtons.hideButton();
@@ -744,7 +801,12 @@ export class PlayerController implements GameSystem {
   setViewAngles(yaw: number, pitch = 0): void { this.cameraController.setInfantryViewAngles(yaw, pitch); }
 
   equipWeapon(): void {
+    if (this.vehicleStateManager.isInVehicle()) {
+      this.syncInfantryEquipmentForVehicleState();
+      return;
+    }
     if (this.firstPersonWeapon) {
+      this.firstPersonWeapon.setVehicleEquipmentSuppressed(false);
       this.firstPersonWeapon.showWeapon();
       this.firstPersonWeapon.setFiringEnabled(true);
     }
@@ -763,7 +825,7 @@ export class PlayerController implements GameSystem {
   enterHelicopter(helicopterId: string, helicopterPosition: THREE.Vector3): void {
     Logger.info('player', `  ENTERING HELICOPTER: ${helicopterId}`);
     this.vehicleStateManager.enterVehicle('helicopter', helicopterId, this.buildTransitionContext(helicopterId, helicopterPosition));
-    this.unequipWeapon();
+    this.syncInfantryEquipmentForVehicleState();
     Logger.info('player', `  CAMERA MODE: Switched to helicopter camera (flight sim style)`);
   }
 
@@ -771,7 +833,7 @@ export class PlayerController implements GameSystem {
     const helicopterId = this.playerState.helicopterId;
     Logger.info('player', `  EXITING HELICOPTER: ${helicopterId}`);
     this.vehicleStateManager.exitVehicle(this.buildTransitionContext(helicopterId ?? '', exitPosition));
-    this.equipWeapon();
+    this.syncInfantryEquipmentForVehicleState();
     Logger.info('player', `  CAMERA MODE: Switched to first-person camera`);
   }
 
@@ -781,13 +843,13 @@ export class PlayerController implements GameSystem {
   enterFixedWing(aircraftId: string, aircraftPosition: THREE.Vector3): void {
     Logger.info('player', `ENTERING FIXED-WING: ${aircraftId}`);
     this.vehicleStateManager.enterVehicle('fixed_wing', aircraftId, this.buildTransitionContext(aircraftId, aircraftPosition));
-    this.unequipWeapon();
+    this.syncInfantryEquipmentForVehicleState();
   }
 
   exitFixedWing(exitPosition: THREE.Vector3): void {
     Logger.info('player', `EXITING FIXED-WING: ${this.playerState.fixedWingId}`);
     this.vehicleStateManager.exitVehicle(this.buildTransitionContext(this.playerState.fixedWingId ?? '', exitPosition));
-    this.equipWeapon();
+    this.syncInfantryEquipmentForVehicleState();
   }
 
   isInFixedWing(): boolean { return this.playerState.isInFixedWing; }
@@ -813,7 +875,7 @@ export class PlayerController implements GameSystem {
       options,
     );
     if (result.exited) {
-      this.equipWeapon();
+      this.syncInfantryEquipmentForVehicleState();
     }
     return result;
   }

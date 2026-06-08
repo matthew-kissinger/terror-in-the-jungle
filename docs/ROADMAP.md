@@ -114,7 +114,7 @@ Carry these findings into the next Projekt revamp:
 | 3: Vehicle Controls | PARTIAL | 3 flyable helicopters, 3 flyable fixed-wing aircraft, drivable M151, operable M48 tanks, and boardable watercraft surfaces are live. Fixed-wing feel/interpolation sign-off, vehicle seat swaps, NPC transport, aircraft period weapons/routes, and broader combined-arms feel remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
 | 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water now uses authored level/depth basin bodies with carved bathymetry and `water_body` samples in Open Frontier and A Shau; hydrology is diagnostic/material input. Final WebGPU/TSL water material, broader authored basin/river networks, shoreline art polish, bridge clearance, and watercraft-grade physics remain open. |
-| 6: Ground Vehicles | MOSTLY DONE | M151 jeep (VEKHIKL-1) drivable with per-wheel terrain conform; M48 Patton chassis (VEKHIKL-3) + turret/cannon/AI gunner (VEKHIKL-4) shipped; cycle-2026-05-28 added tank crew + cannon + turret and deploy/loadout discoverability. All code-complete; playtests deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md). Architecture memos: `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` (wheeled physics, Ackermann steering, ground-normal conform) and `docs/rearch/TANK_SYSTEMS_2026-05-13.md` (skid-steer, independent turret, gunner seat, ballistic cannon, damage states). |
+| 6: Ground Vehicles | MOSTLY DONE | M151 jeep (VEKHIKL-1) drivable with per-wheel terrain conform; M48 Patton chassis (VEKHIKL-3) + turret/cannon/AI gunner (VEKHIKL-4) shipped; 2026-06-08 proof refresh verifies real M151/M48 `IVehicle` targets in Open Frontier and A Shau board, drive, use elevated third-person camera, exit cleanly, and suppress first-person infantry weapons while seated. All code-complete; playtests deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md). Architecture memos: `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` (wheeled physics, Ackermann steering, ground-normal conform) and `docs/rearch/TANK_SYSTEMS_2026-05-13.md` (skid-steer, independent turret, gunner seat, ballistic cannon, damage states). |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Weapon pickup and M2HB emplacement surfaces exist but remain playtest-polish items; faction doctrines and broader content loops remain open. |
 | 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
 | 9: Faction Expansion | PARTIAL | 4 factions in loadout context (US, ARVN, NVA, VC). AI doctrine per faction not started. |
@@ -143,8 +143,9 @@ Carry these findings into the next Projekt revamp:
 - KONVEYER-12: choose a finite-map edge strategy for procedural maps and a real
   A Shau outer-boundary strategy instead of synthetic collar tuning.
 - A Shau play-path validation: route/NPC movement quality, airfield usability,
-  vehicle spawn/driving proof, basin-water readability, and terrain-source
-  boundaries.
+  basin-water readability, visual-system readability in rain/night, and
+  terrain-source boundaries. M151/M48 board/drive/camera/exit proof is now
+  covered locally; owner feel remains pending.
 - Aviation follow-through: fixed-wing feel, period-specific weapons, lead/sway
   aids, named maneuver routes, and broader air-combat loops.
 - Ground and water vehicle follow-through: seat swaps, M113/M35/T-54 fleet

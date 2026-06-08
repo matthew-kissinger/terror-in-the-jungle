@@ -49,6 +49,7 @@ const _gravityVec = new THREE.Vector3();
 
 const CORNER_COUNT = 4;
 const CORNER_LABELS = ['FL', 'FR', 'RL', 'RR'] as const;
+const MAX_ACCUMULATED_STEP_SECONDS = 0.75;
 
 export interface TrackedVehicleControls {
   /** Forward/back throttle axis: W - S, range [-1, +1]. */
@@ -143,7 +144,10 @@ export class TrackedVehiclePhysics {
   static readonly FIXED_STEP_SECONDS = 1 / 60;
   private readonly GRAVITY = -9.81;
   private readonly cfg: TrackedVehiclePhysicsConfig;
-  private readonly stepper = new FixedStepRunner(TrackedVehiclePhysics.FIXED_STEP_SECONDS);
+  private readonly stepper = new FixedStepRunner(
+    TrackedVehiclePhysics.FIXED_STEP_SECONDS,
+    MAX_ACCUMULATED_STEP_SECONDS,
+  );
 
   private state: InternalState;
   private rawControls: TrackedVehicleControls;

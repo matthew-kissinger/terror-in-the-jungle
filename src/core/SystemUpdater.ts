@@ -136,6 +136,13 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('Billboards');
     });
 
+    this.trackSystemUpdate('Player', SYSTEM_UPDATE_BUDGET_MS.Player, () => {
+      performanceTelemetry.beginSystem('Player');
+      if (refs.playerController) refs.playerController.update(deltaTime);
+      if (refs.firstPersonWeapon) refs.firstPersonWeapon.update(deltaTime);
+      performanceTelemetry.endSystem('Player');
+    });
+
     this.trackSystemUpdate('Vehicles', SYSTEM_UPDATE_BUDGET_MS.Vehicles, () => {
       performanceTelemetry.beginSystem('Vehicles');
       if (refs.helicopterModel) refs.helicopterModel.update(deltaTime);
@@ -144,13 +151,6 @@ export class SystemUpdater {
       this.ensureGroundVehicleProximityChecker(refs);
       this.groundVehicleProximityChecker?.update(deltaTime);
       performanceTelemetry.endSystem('Vehicles');
-    });
-
-    this.trackSystemUpdate('Player', SYSTEM_UPDATE_BUDGET_MS.Player, () => {
-      performanceTelemetry.beginSystem('Player');
-      if (refs.playerController) refs.playerController.update(deltaTime);
-      if (refs.firstPersonWeapon) refs.firstPersonWeapon.update(deltaTime);
-      performanceTelemetry.endSystem('Player');
     });
 
     this.trackSystemUpdate('Weapons', SYSTEM_UPDATE_BUDGET_MS.Weapons, () => {

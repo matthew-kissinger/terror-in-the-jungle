@@ -244,6 +244,24 @@ describe('GroundVehiclePhysics', () => {
     });
   });
 
+  describe('Low-cadence catch-up', () => {
+    it('continues to accelerate through a delayed frame instead of time-dilating to a stop', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      physics.setEngineActive(true);
+
+      for (let i = 0; i < 30; i++) physics.update(DT, flat);
+      physics.setControls({ throttle: 1.0, steerAngle: 0 });
+
+      const start = physics.getState().position.clone();
+      physics.update(1.0, flat);
+
+      const travel = physics.getState().position.distanceTo(start);
+      expect(travel).toBeGreaterThan(0.25);
+      expect(physics.getForwardSpeed()).toBeGreaterThan(1.0);
+    });
+  });
+
   describe('Slope-stall', () => {
     it('forward drive force scales down on slopes above threshold', () => {
       // Compare achieved chassis-forward speed after a fixed throttle window

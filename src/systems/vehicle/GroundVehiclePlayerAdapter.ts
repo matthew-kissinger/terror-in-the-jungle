@@ -85,9 +85,9 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
   readonly inputContext: InputContext = 'gameplay';
 
   // Third-person follow tuning (jeep-sized; tank/truck adapters may override).
-  cameraDistance = 7;
-  cameraHeight = 3.2;
-  cameraLookHeight = 1.2;
+  cameraDistance = 8.5;
+  cameraHeight = 5.6;
+  cameraLookHeight = 1.4;
 
   private controls: GroundVehicleControls = {
     throttle: 0,

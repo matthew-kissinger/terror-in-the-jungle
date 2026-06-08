@@ -140,8 +140,8 @@ TRACKED (budgeted, EMA-monitored):
   Terrain     2.0ms  terrainSystem
   Navigation  2.0ms  navmeshSystem
   Billboards  2.0ms  globalBillboardSystem
-  Vehicles    1.0ms  helicopterModel + fixedWingModel + vehicleManager
   Player      1.0ms  playerController + firstPersonWeapon
+  Vehicles    1.0ms  helicopterModel + fixedWingModel + vehicleManager
   Weapons     1.0ms  grenade + mortar + sandbag + ammoSupply
   HUD         1.0ms  hudSystem
   TacticalUI  0.5ms  minimap + compass (scheduled cadence)
@@ -183,6 +183,13 @@ Key behavior:
 - `WeaponFiring.resolveBarrelAlignedCommand()` redirects the ray from barrel position toward the camera aim point for tracer alignment. ADS uses camera center; hip-fire uses a right/down offset.
 - `WeaponAnimations` handles ADS transition, recoil spring, idle bob, and pump action.
 - `ShotCommand` pattern: all validation (canFire, ammo) happens before command creation. Executor trusts the command.
+- Vehicle/craft occupancy suppresses infantry weapons at the equipment layer,
+  not as a render-loop patch. `PlayerController` syncs the
+  `VehicleSessionController` state into `FirstPersonWeapon` through
+  `setVehicleEquipmentSuppressed()`. `FirstPersonWeapon` then disables firing,
+  clears ADS/firing input, hides every overlay rig root through
+  `WeaponRigManager.setAllWeaponVisibility(false)`, and makes
+  `renderWeapon()` a no-op until the session returns to infantry.
 
 ## Air Vehicle Systems
 
@@ -220,6 +227,11 @@ Vehicle state management (`src/systems/vehicle/`):
 - Exit planning is typed as normal, blocked, emergency-eject, or force-cleanup. Fixed-wing unsafe airborne exit blocks normal model-owned exit, but the active player input path can request an emergency eject through the session controller.
 - `HelicopterPlayerAdapter` owns helicopter control state (collective, cyclic, yaw, altitudeLock). `FixedWingPlayerAdapter` owns fixed-wing control state (throttle, mouse pitch/roll, stabilityAssist).
 - `PlayerState` flags (`isInHelicopter`, `isInFixedWing`) are derived cache synced via `syncPlayerState()`. Adding a new vehicle type requires one new adapter file.
+- Player updates run before vehicle simulation so active adapters can publish
+  throttle/steer/brake intent before the vehicle physics tick consumes it.
+  First-person infantry equipment is also synced from session state in the
+  player tick, before weapon/support-system updates can re-show a rifle while
+  seated.
 
 ## Coupling Heatmap
 

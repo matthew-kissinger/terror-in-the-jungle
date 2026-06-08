@@ -306,6 +306,8 @@ describe('GroundVehiclePlayerAdapter', () => {
       // With identity quaternion the chassis 'back' direction is world +Z.
       expect(camPos.z).toBeGreaterThan(0);
       expect(camPos.y).toBeGreaterThan(0); // lifted above the chassis
+      const downAngleDeg = THREE.MathUtils.radToDeg(Math.atan2(camPos.y, Math.hypot(camPos.x, camPos.z)));
+      expect(downAngleDeg).toBeGreaterThan(31);
       expect(lookAt.x).toBe(0);
       expect(lookAt.z).toBe(0);
     });

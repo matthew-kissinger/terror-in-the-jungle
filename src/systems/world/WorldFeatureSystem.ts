@@ -334,15 +334,27 @@ export class WorldFeatureSystem implements GameSystem {
           child.receiveShadow = true;
         }
       });
-      parent.add(object);
-      freezeTransform(object);
       const objectId = `${feature.id}_${placement.id ?? i}`;
-      const collisionRegistered = placement.registerCollision === true && profile.collisionMode === 'bounds';
+      const isDynamicGroundVehicle = isM151ModelPath(placement.modelPath) && Boolean(this.vehicleManager);
+      // M151 prefabs become live GroundVehicle instances. Keeping them inside
+      // the frozen/static feature tree leaves their matrices stale after the
+      // physics state changes, so the player sees a boardable but immobile jeep.
+      // Dynamic vehicles also must not leave static collision/LOS bounds behind
+      // at their spawn point after they drive away.
+      if (isDynamicGroundVehicle) {
+        this.scene.add(object);
+      } else {
+        parent.add(object);
+        freezeTransform(object);
+      }
+      const collisionRegistered = !isDynamicGroundVehicle &&
+        placement.registerCollision === true &&
+        profile.collisionMode === 'bounds';
       if (collisionRegistered) {
         this.terrainManager.registerCollisionObject(objectId, object);
       }
 
-      const losObstacleIds = this.registerPlacementWithLOS(objectId, object);
+      const losObstacleIds = isDynamicGroundVehicle ? [] : this.registerPlacementWithLOS(objectId, object);
       const vehicleId = this.registerGroundVehiclePlacement(objectId, placement, object);
 
       this.spawnedObjects.push({

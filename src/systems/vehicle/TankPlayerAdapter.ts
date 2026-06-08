@@ -149,9 +149,9 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
 
   // Third-person follow tuning — wider/higher than the jeep to clear the
   // turret silhouette.
-  cameraDistance = 12;
-  cameraHeight = 5.5;
-  cameraLookHeight = 2.0;
+  cameraDistance = 13.5;
+  cameraHeight = 8.8;
+  cameraLookHeight = 2.6;
 
   // Gunner aim sensitivity + sight offsets (mutable so settings can retune).
   mouseSensitivity = MOUSE_AIM_SENSITIVITY;

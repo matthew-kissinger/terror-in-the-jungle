@@ -175,6 +175,24 @@ describe('TrackedVehiclePhysics', () => {
       );
       expect(horizontalTravel).toBeGreaterThan(0.5);
     });
+
+    it('continues to advance through a delayed frame instead of simulating only a tiny slice', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      settle(physics, flat, 30, DT);
+
+      const posBefore = physics.getState().position.clone();
+      physics.setControls(1.0, 0, false);
+      physics.update(1.0, flat);
+
+      const state = physics.getState();
+      const horizontalTravel = Math.hypot(
+        state.position.x - posBefore.x,
+        state.position.z - posBefore.z,
+      );
+      expect(horizontalTravel).toBeGreaterThan(1.0);
+      expect(physics.getForwardSpeed()).toBeGreaterThan(2.0);
+    });
   });
 
   describe('Pure turn axis', () => {

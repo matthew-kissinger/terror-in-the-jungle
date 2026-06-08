@@ -44,6 +44,8 @@ export class FirstPersonWeapon implements GameSystem {
   private assetLoader: AssetLoader
   private playerController?: PlayerController
   private isEnabled = true
+  private requestedWeaponVisible = true
+  private vehicleEquipmentSuppressed = false
 
   // Focused modules
   private rigManager: WeaponRigManager
@@ -130,6 +132,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.firing.setGunCore(this.rigManager.getCurrentCore())
 
     Logger.info('weapon', ' First Person Weapon initialized (rifle + shotgun + SMG)')
+    this.applyWeaponPresentationState()
 
     // Trigger initial ammo display
     this.onAmmoChange(this.ammo.getAmmoState())
@@ -137,7 +140,10 @@ export class FirstPersonWeapon implements GameSystem {
 
   update(deltaTime: number): void {
     const weaponRig = this.rigManager.getCurrentRig()
-    if (!weaponRig || !this.isEnabled) return
+    if (!weaponRig || !this.isEnabled || this.vehicleEquipmentSuppressed) {
+      this.applyWeaponPresentationState()
+      return
+    }
 
     // Update ammo manager with player position for zone resupply
     const playerPos = this.playerController?.getPosition()
@@ -160,6 +166,7 @@ export class FirstPersonWeapon implements GameSystem {
       if (!this.rigManager.isSwitching()) {
         this.updateWeaponReferences()
       }
+      this.applyWeaponPresentationState()
     }
 
     // Apply weapon transform
@@ -197,6 +204,7 @@ export class FirstPersonWeapon implements GameSystem {
   setPlayerFaction(faction: Faction): void {
     this.playerFaction = faction
     this.rigManager.setRifleFaction(faction)
+    this.applyWeaponPresentationState()
   }
 
   setCombatantSystem(combatantSystem: CombatantSystem): void {
@@ -221,6 +229,7 @@ export class FirstPersonWeapon implements GameSystem {
 
   // Called by main game loop to render weapon overlay
   renderWeapon(renderer: THREE.WebGLRenderer): void {
+    if (!this.canRenderWeapon()) return
     this.model.render(renderer, this.rigManager)
   }
 
@@ -325,14 +334,15 @@ export class FirstPersonWeapon implements GameSystem {
     this.input.setEnabled(false)
     this.animations.setADS(false)
     this.animations.reset()
-    this.rigManager.setWeaponVisibility(false)
+    this.applyWeaponPresentationState()
   }
 
   // Enable weapon (for respawn)
   enable(): void {
     this.isEnabled = true
-    this.input.setEnabled(true)
-    this.rigManager.setWeaponVisibility(true)
+    this.requestedWeaponVisible = true
+    this.input.setEnabled(!this.vehicleEquipmentSuppressed)
+    this.applyWeaponPresentationState()
     // Reset all ammo on respawn
     this.ammo.resetAll()
     // Update HUD with current weapon's ammo
@@ -340,7 +350,51 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   setWeaponVisibility(visible: boolean): void {
-    this.rigManager.setWeaponVisibility(visible)
+    this.requestedWeaponVisible = visible
+    this.applyWeaponPresentationState()
+  }
+
+  setVehicleEquipmentSuppressed(suppressed: boolean): void {
+    if (this.vehicleEquipmentSuppressed === suppressed) {
+      this.applyWeaponPresentationState()
+      return
+    }
+
+    this.vehicleEquipmentSuppressed = suppressed
+    this.input.setEnabled(this.isEnabled && !suppressed)
+    if (suppressed) {
+      this.input.setFiringActive(false)
+      this.animations.setADS(false)
+    }
+    this.applyWeaponPresentationState()
+  }
+
+  isVehicleEquipmentSuppressed(): boolean {
+    return this.vehicleEquipmentSuppressed
+  }
+
+  canRenderWeapon(): boolean {
+    const currentRig = this.rigManager.getCurrentRig()
+    return this.isEnabled
+      && this.requestedWeaponVisible
+      && !this.vehicleEquipmentSuppressed
+      && currentRig !== undefined
+      && currentRig.visible !== false
+  }
+
+  getWeaponPresentationState(): {
+    requestedVisible: boolean
+    vehicleSuppressed: boolean
+    canRender: boolean
+    currentRigVisible: boolean | null
+  } {
+    const currentRig = this.rigManager.getCurrentRig()
+    return {
+      requestedVisible: this.requestedWeaponVisible,
+      vehicleSuppressed: this.vehicleEquipmentSuppressed,
+      canRender: this.canRenderWeapon(),
+      currentRigVisible: currentRig ? currentRig.visible !== false : null,
+    }
   }
 
   // Set game started state
@@ -354,6 +408,7 @@ export class FirstPersonWeapon implements GameSystem {
    */
   setPrimaryWeapon(weaponType: LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'): void {
     this.switching.switchWeapon(weaponType, (state) => this.onAmmoChange(state))
+    this.applyWeaponPresentationState()
   }
 
   /**
@@ -424,29 +479,39 @@ export class FirstPersonWeapon implements GameSystem {
 
   // Helicopter integration methods
   hideWeapon(): void {
-    this.rigManager.setWeaponVisibility(false)
-    Logger.info('weapon', 'Weapon hidden (in helicopter)')
+    this.setWeaponVisibility(false)
+    Logger.info('weapon', 'Weapon hidden')
   }
 
   showWeapon(): void {
-    this.rigManager.setWeaponVisibility(true)
-    Logger.info('weapon', 'Weapon shown (exited helicopter)')
+    this.setWeaponVisibility(true)
+    Logger.info('weapon', 'Weapon shown')
   }
 
   setFiringEnabled(enabled: boolean): void {
     this.isEnabled = enabled
-    this.input.setEnabled(enabled)
+    this.input.setEnabled(enabled && !this.vehicleEquipmentSuppressed)
     if (!enabled) {
       // Stop any current firing
       this.input.setFiringActive(false)
-      Logger.info('weapon', 'Firing disabled (in helicopter)')
+      Logger.info('weapon', 'Firing disabled')
     } else {
-      Logger.info('weapon', 'Firing enabled (exited helicopter)')
+      Logger.info('weapon', 'Firing enabled')
     }
+    this.applyWeaponPresentationState()
   }
 
   /** Expose WeaponInput for touch control wiring */
   getWeaponInput(): WeaponInput {
     return this.input
+  }
+
+  private applyWeaponPresentationState(): void {
+    const visible = this.isEnabled && this.requestedWeaponVisible && !this.vehicleEquipmentSuppressed
+    if (visible) {
+      this.rigManager.setWeaponVisibility(true)
+    } else {
+      this.rigManager.setAllWeaponVisibility(false)
+    }
   }
 }
