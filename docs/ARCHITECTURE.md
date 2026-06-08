@@ -291,7 +291,8 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    emitting `asset-manifest.json`; the shader now uses a seamless cloud-deck
    projection instead of azimuth-wrapped UVs. Open Frontier and combat120 are
    lighter scattered-cloud presets and still need art review. SOL-1 now owns
-   the broader solar/atmosphere/terrain-lighting rearch. The active worktree has
+   the broader solar/atmosphere/terrain-lighting rearch. The active master
+   candidate has
    an `AtmosphereLightingSnapshot` feeding renderer lights, billboard
    vegetation, and water, plus a shared cool sub-horizon sky floor for the TSL
    dome and CPU LUT, a terrain night-fill uniform, a bounded low-sun terrain

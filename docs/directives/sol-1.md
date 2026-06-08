@@ -13,7 +13,7 @@ The source audit found a cross-system problem, not a single material bug:
 sky, renderer lights, terrain, water, billboard vegetation, fog, and shadow
 recentering all consumed different pieces of atmosphere state.
 
-The active worktree now adds an explicit `AtmosphereLightingSnapshot` for
+The active master candidate now adds an explicit `AtmosphereLightingSnapshot` for
 effective direct light, sky fill, ground bounce, ambient fill, fog color, and
 daylight factor. Renderer lights, water, billboard vegetation, and terrain
 night-fill consume the same snapshot. The TSL dome and CPU LUT share a cool
@@ -54,9 +54,11 @@ reference contract:
   scenarios. The older strict night-red sampler remains intentionally
   over-tight and logs strict failures, while the active red-not-dominant
   terrain diagnostic passes 5/5.
-- Live production proof is a per-deploy gate: after this source candidate is
-  pushed and deployed, rerun `npm run check:live-release` and use the live
-  `/asset-manifest.json` `gitSha` as production truth.
+- Live production proof passed for deployed commit `d8f7985d` with
+  `artifacts/perf/2026-06-08T11-27-23-796Z/projekt-143-live-release-proof/release-proof.json`
+  after deploy run `27134232367` and CI run `27134316468`. Future deploys must
+  rerun `npm run check:live-release` and use the live `/asset-manifest.json`
+  `gitSha` as production truth.
 
 These are automated diagnostics, not owner visual acceptance. SOL-1 stays open
 until a human visual review accepts the current candidate.

@@ -6,22 +6,9 @@ feedback rejected the prior sun scale and terrain lighting. The fix must keep
 sun scale, night color, terrain/water highlights, shadow direction, and
 hill/ridge light-bleed coherent in all shipping modes.
 
-## Files touched
-
-- `src/systems/environment/AtmosphereSystem.ts`
-- `src/systems/environment/atmosphere/HosekWilkieTslNode.ts`
-- `src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts`
-- `src/systems/environment/WaterSystem.ts`
-- `src/systems/terrain/TerrainMaterial.ts`
-- `src/systems/environment/water/WaterSurfaceBinding.ts`
-- `src/systems/environment/water/WaterBodySurface.ts`
-- `src/systems/environment/water/HydrologyRiverSurface.ts`
-- `scripts/capture-sun-and-atmosphere-shots.ts`
-- `docs/ATMOSPHERE.md`
-
 ## Current State
 
-The active worktree is the candidate SOL-1 authority. `AtmosphereSystem`
+The active master candidate is the SOL-1 authority. `AtmosphereSystem`
 publishes `AtmosphereLightingSnapshot`; renderer lights, water, billboard
 vegetation, and terrain night fill consume that effective lighting state. The
 TSL dome and CPU LUT share a cool sub-horizon sky floor. Water is night-aware.
@@ -57,6 +44,8 @@ occlude the hard body.
   scenarios. The older strict night-red sampler remains intentionally
   over-tight and logs strict failures, while the active red-not-dominant
   terrain diagnostic passes 5/5.
+- Live production proof passed on deployed commit `d8f7985d`:
+  `artifacts/perf/2026-06-08T11-27-23-796Z/projekt-143-live-release-proof/release-proof.json`.
 
 ## Non-goals
 
@@ -74,8 +63,8 @@ occlude the hard body.
       sun-body / terrain-warmth contract and production WebGL2 fallback parity.
 - [x] Focused unit tests cover sun body/glare bounds and sub-horizon light
       behavior.
-- [x] Master CI, deploy, and live-release proof remain required for production
-      releases.
+- [x] Master CI, deploy, and live-release proof passed for deployed commit
+      `d8f7985d`; rerun them for later production releases.
 - [ ] Owner visual review accepts sun scale, terrain/water lighting, and the
       ridge light-bleed approximation.
 - [x] Perf impact is covered by the 2026-06-08 master CI perf job until

@@ -94,7 +94,8 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   nav connectivity as passing, but route/NPC movement quality and airfield use
   still need play-path validation. The run also proves the A Shau work did not
   prevent Open Frontier, TDM, Zone Control, or combat120 from entering live mode.
-- SOL-1 remains open for owner visual acceptance and live proof after deploy.
+- SOL-1 remains open for owner visual acceptance; live production proof passed
+  on deployed commit `d8f7985d`.
   The current mitigation removes cyan/white night-water and sub-horizon light
   defaults, keeps renderer, water, billboard lighting, and terrain night fill on
   one effective lighting snapshot, and applies a bounded low-sun terrain
@@ -109,8 +110,10 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   `sunCore=0.053%`, `sunSpan=3.52%` and explicit WebGL2 `sunCore=0.044%`,
   `sunSpan=3.33%`, with parity max channel delta `1.57%`. A Shau dusk ridge
   proof passes terrain-occluded sun-body, terrain warmth, sun-scale, and
-  production fallback parity. Production parity must be proven with
-  `npm run check:live-release` after each deploy.
+  production fallback parity. Production parity passed with
+  `artifacts/perf/2026-06-08T11-27-23-796Z/projekt-143-live-release-proof/release-proof.json`
+  after deploy run `27134232367` and CI run `27134316468`; rerun
+  `npm run check:live-release` after each later deploy.
 - The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
   readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,
   not physically exhaustive sky rendering or horizon-scale terrain occlusion.

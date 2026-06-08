@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (SOL-1 SDS-style source candidate: `SunDiscMesh` owns the depth-tested hot body, the TSL dome adds bounded glow plus warm sky solar mass, full local visual matrix and A Shau ridge proof pass; live proof and owner visual acceptance remain open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
+Last verified: 2026-06-08 (SOL-1 SDS-style candidate is live on `d8f7985d`: `SunDiscMesh` owns the depth-tested hot body, the TSL dome adds bounded glow plus warm sky solar mass, full local visual matrix and A Shau ridge proof pass, and `check:live-release` passed; owner visual acceptance remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -151,7 +151,7 @@ as of this refresh:
   night terrain reads, lighting-angle coherence, terrain/water material
   response, and hill/ridge light bleed need a full proof and likely authority
   cleanup before final visual acceptance.
-- Active SOL-1 mitigation in the worktree shrinks the sun body, uses cool
+- Active SOL-1 mitigation on master shrinks the sun body, uses cool
   moonlight below the horizon, tints low-sun ambient fill, dims water
   specular/emissive/foam response at night, and adds an
   `AtmosphereLightingSnapshot` consumed by renderer lights, billboard
@@ -184,9 +184,11 @@ as of this refresh:
   `sunVisibility=terrain-occluded`, `sunOcclusion=55m`, `sunCore=0`,
   `sunSpan=0`, ridge warmth PASS, sun-scale PASS, and parity max channel delta
   `0.00%`.
-  Production parity must be proven with `npm run check:live-release` after each
-  deployment. SOL-1 is still not visually accepted: the next goal is SOL-1R7
-  owner visual acceptance.
+  Production parity passed on deployed commit `d8f7985d` with
+  `artifacts/perf/2026-06-08T11-27-23-796Z/projekt-143-live-release-proof/release-proof.json`
+  after deploy run `27134232367` and CI run `27134316468`; rerun
+  `npm run check:live-release` after each later deployment. SOL-1 is still not
+  visually accepted: the next goal is SOL-1R7 owner visual acceptance.
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.
