@@ -25,14 +25,15 @@ occlude the hard body.
 
 ## Evidence
 
-- Full local matrix proof passed the prior candidate, but the latest post-owner
-  retune has focused proof only until the matrix is rerun.
+- Full local matrix proof passes the latest post-owner retune: `33/33` captures
+  succeeded in
+  `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/summary.json`.
 - The Open Frontier golden parity crops show a broader warm-white center with
   mottled internal heat, a warmer irregular rim, and tighter SDS-style sky
   solar mass instead of the rejected tiny pearl / smooth damp sphere.
-  Representative focused values: WebGPU noon/golden/dusk
-  `sunCore=0.112/0.105/0.105%`, `sunSpan=5.37/5.19/5.19%`; explicit WebGL2
-  golden `sunCore=0.085%`, `sunSpan=4.44%`; WebGPU/WebGL2 max channel delta
+  Representative values: daylight WebGPU `sunCore=0.105-0.113%`,
+  `sunSpan=5.19-5.46%`; explicit WebGL2 Open Frontier
+  `sunCore=0.085-0.086%`, `sunSpan=4.44%`; WebGPU/WebGL2 max channel delta
   `0.39%`.
 - The Open Frontier golden missing-body frame was not terrain occlusion; it was
   stale camera-relative `SunDiscMesh` positioning after the capture camera
@@ -40,14 +41,17 @@ occlude the hard body.
   records `sunVisibility` / terrain ray occlusion so missing-unoccluded bodies
   fail explicitly.
 - A Shau dusk ridge proof now uses a true terrain-occluded sun-body pose.
-  Strict WebGPU and the bundled-Chromium production fallback both record
+  Strict WebGPU and production fallback both record
   `sunVisibility=terrain-occluded`, `sunOcclusion=55m`, `sunCore=0`,
-  `sunSpan=0`, ridge warmth PASS, and sun-scale PASS.
-- The latest focused A Shau midnight diagnostic passes red/white/cyan bounds.
+  `sunSpan=0`, ridge warmth PASS, sun-scale PASS, and `0.00%` parity delta.
+- Full matrix night diagnostics pass red/white/cyan bounds across all five
+  scenarios.
 - A Shau midnight proves the level/depth water-body night material: rendered
   night-terrain `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`.
-- Live production proof is the per-deploy gate; rerun
-  `npm run check:live-release` after each production deploy.
+- Live production proof passes for `53e50190`: CI `27148343601`, deploy
+  `27149940462`, live manifest SHA, Pages/R2/SW headers, and live browser smoke
+  all PASS in
+  `artifacts/perf/2026-06-08T15-56-30-243Z/projekt-143-live-release-proof/release-proof.json`.
 
 ## Non-goals
 
@@ -59,7 +63,7 @@ occlude the hard body.
 
 ## Acceptance
 
-- [ ] Full visual matrix rerun proves the SDS-style sun body / occlusion
+- [x] Full visual matrix rerun proves the SDS-style sun body / occlusion
       contract and no red/white/cyan night terrain across all modes.
 - [x] A Shau strict-WebGPU ridge proof rerun passes the new terrain-occluded
       sun-body / terrain-warmth contract and production fallback coverage.

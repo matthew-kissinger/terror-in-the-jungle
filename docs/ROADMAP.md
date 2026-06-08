@@ -126,16 +126,15 @@ Carry these findings into the next Projekt revamp:
 - SOL-1 solar/atmosphere/terrain lighting rearch: the active source candidate
   now follows the Sheep Dog Simulator-style ownership model where
   `SunDiscMesh` owns a depth-tested hot sun body and the TSL sky dome owns
-  bounded atmospheric glow/scatter plus a tight warm sky solar mass. The latest
-  focused proof records Open Frontier WebGPU noon/golden/dusk
-  `sunCore=0.112/0.105/0.105%`, `sunSpan=5.37/5.19/5.19%`, explicit WebGL2
-  golden `sunCore=0.085%`, `sunSpan=4.44%`, and focused parity max channel
-  delta `0.39%`. A Shau dusk ridge proof passes strict WebGPU and production
-  fallback terrain occlusion, terrain warmth, and sun-scale, while A Shau
+  bounded atmospheric glow/scatter plus a tight warm sky solar mass. The
+  post-feedback full matrix passes `33/33` captures with daylight WebGPU
+  `sunCore=0.105-0.113%`, `sunSpan=5.19-5.46%`, explicit WebGL2 Open Frontier
+  `sunCore=0.085-0.086%`, `sunSpan=4.44%`, and max parity delta `0.39%`. A Shau
+  dusk ridge proof passes strict WebGPU and production fallback terrain
+  occlusion, terrain warmth, sun-scale, and `0.00%` parity delta, while A Shau
   midnight verifies the authored water body no longer creates a local
-  red/white/cyan/bright slab. The full visual matrix must be rerun before SOL-1
-  closeout; production parity remains the per-deploy `check:live-release` gate;
-  owner visual acceptance remains the SOL-1 closeout gate.
+  red/white/cyan/bright slab. Production parity passes for `53e50190`; owner
+  visual acceptance remains the SOL-1 closeout gate.
 - STABILIZAT-1: re-establish quiet-machine perf baselines, certify combat120
   frame tails, and separate NPC movement-stall work from render/Other cost.
 - KB-STARTUP-1: harden worker-backed terrain surface baking and mode-start

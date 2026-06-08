@@ -1,6 +1,6 @@
 # SOL-1 - Solar, atmosphere, and terrain lighting rearch
 
-Status: open (owner acceptance pending)
+Status: code-complete (deployed; owner acceptance pending)
 Owning subsystem: renderer / atmosphere / terrain / water / shadows
 Opened: 2026-06-07 owner visual rejection
 
@@ -41,39 +41,44 @@ reference contract:
   Representative focused crops are
   `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/crop-parity-openfrontier-golden-webgpu.png`
   and `crop-close-parity-openfrontier-golden-webgpu.png`.
-- The latest focused Open Frontier proof records WebGPU noon/golden/dusk
-  `sunCore=0.112/0.105/0.105%`, `sunSpan=5.37/5.19/5.19%`; explicit WebGL2
-  golden records `sunCore=0.085%`, `sunSpan=4.44%`. WebGPU/WebGL2 color parity
-  stays under cap with max channel delta `0.39%`.
+- The post-feedback full local matrix passes `33/33` captures in
+  `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/summary.json`.
+  Daylight WebGPU records `sunCore=0.105-0.113%`, `sunSpan=5.19-5.46%`;
+  explicit WebGL2 Open Frontier records `sunCore=0.085-0.086%`,
+  `sunSpan=4.44%`. WebGPU/WebGL2 color parity stays under cap with max channel
+  delta `0.39%`.
 - Open Frontier golden previously looked like a terrain-occluded body, but the
   new terrain ray probe showed it was `missing-unoccluded`; the root cause was
   stale camera-relative `SunDiscMesh` positioning after capture camera moves.
   `syncDomePosition()` now refreshes the sun body.
-- A Shau dusk ridge proof now exercises an actual terrain-occluded sun-body
-  case. Strict WebGPU and the bundled-Chromium production fallback both record
+- A Shau dusk ridge proof now exercises an actual terrain-occluded sun-body case
+  in `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/ridge-summary.json`.
+  Strict WebGPU and production fallback both record
   `sunVisibility=terrain-occluded`, `sunOcclusion=55m`, `sunCore=0`,
-  `sunSpan=0`, ridge warmth PASS, and sun-scale PASS.
-- The latest focused A Shau midnight diagnostic passes rendered night-terrain
-  red/white/cyan bounds. The capture script also emits advisory `localMax(...)`
-  hotspot ratios for night terrain so narrow red, white, cyan, or bright
-  material streaks are visible in the proof log instead of being averaged away
-  by whole-region sampling; these are triage evidence because in-scene markers
-  and props can legitimately create localized colored pixels.
+  `sunSpan=0`, ridge warmth PASS, sun-scale PASS, and WebGPU/WebGL2 parity max
+  channel delta `0.00%`.
+- The full matrix night diagnostics pass rendered night-terrain red/white/cyan
+  bounds across all five scenarios. The capture script also emits advisory
+  `localMax(...)` hotspot ratios for night terrain so narrow red, white, cyan,
+  or bright material streaks are visible in the proof log instead of being
+  averaged away by whole-region sampling; these are triage evidence because
+  in-scene markers and props can legitimately create localized colored pixels.
 - A Shau midnight now proves the level/depth water body on the cool opaque
   night material path: the rendered night-terrain region records
   `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`, replacing the previous
   red water-body slab.
-- Full local matrix proof was valid for the prior candidate but must be rerun
-  after this retune before SOL-1 closeout. Live production proof is a per-deploy
-  gate. Future deploys must rerun `npm run check:live-release` and use the live
-  `/asset-manifest.json` `gitSha` as production truth.
+- Production proof passes at
+  `artifacts/perf/2026-06-08T15-56-30-243Z/projekt-143-live-release-proof/release-proof.json`:
+  CI `27148343601`, deploy `27149940462`, live `/asset-manifest.json` SHA
+  `53e501903ebad9e5b51c339555c178ffc72845e6`, Pages/R2/SW headers, and live
+  browser smoke all PASS.
 
 These are automated diagnostics, not owner visual acceptance. SOL-1 stays open
 until a human visual review accepts the current candidate.
 
 ## Recommended Next Goal
 
-**SOL-1R7 - owner visual acceptance.**
+**SOL-1R8 - owner visual acceptance.**
 
 Use the current renderer state as the candidate authority. The next pass should
 not redesign the sky again unless owner review rejects it. It should:
@@ -81,8 +86,8 @@ not redesign the sky again unless owner review rejects it. It should:
 - run owner visual review on the SDS-style sun body, noon/golden glare,
   night terrain/water, WebGPU/WebGL2 parity crops, and the A Shau
   terrain-occluded ridge proof;
-- rerun the full visual matrix before promoting the directive from focused
-  candidate proof to closeout proof;
+- use the full matrix, ridge proof, and live proof above as the acceptance
+  packet;
 - compare any owner-rejected frame against the current automated matrix before
   redesigning atmosphere, terrain, water, or shadows again;
 - update this directive to `closed` only after owner acceptance.

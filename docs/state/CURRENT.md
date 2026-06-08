@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (SOL-1 SDS-style retune refresh: `SunDiscMesh` owns the depth-tested hot body with a broader warm core and fractured amber shell, the TSL dome keeps only tight warm solar mass, focused Open Frontier/A Shau proofs pass; owner visual acceptance and full-matrix/live proof remain open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
+Last verified: 2026-06-08 (SOL-1 engineering closeout: `SunDiscMesh` owns the depth-tested hot body with a broader warm core and fractured amber shell, the TSL dome keeps only tight warm solar mass, full 33-shot matrix and A Shau ridge proof pass, production live proof passes for `53e50190`; owner visual acceptance remains open)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -147,10 +147,11 @@ as of this refresh:
   KONVEYER and sun-atmosphere work moved the visual dome off the old large
   LUT-bake path; the small CPU LUT remains for fog/hemisphere readers. Evidence:
   [docs/directives/konveyer-10.md](../directives/konveyer-10.md).
-- SOL-1 is now open for the current visual rejection: sun scale, red/white
-  night terrain reads, lighting-angle coherence, terrain/water material
-  response, and hill/ridge light bleed need a full proof and likely authority
-  cleanup before final visual acceptance.
+- SOL-1 is engineering-complete and deployed for the current visual rejection:
+  sun scale, red/white night terrain reads, lighting-angle coherence,
+  terrain/water material response, and hill/ridge light bleed have full local
+  matrix, focused ridge, and live-production proof. Owner visual acceptance is
+  still the remaining closeout gate.
 - Active SOL-1 mitigation on master retunes the sun body against the Sheep Dog
   Simulator WebGPU reference, uses cool moonlight below the horizon, tints
   low-sun ambient fill, dims water specular/emissive/foam response at night,
@@ -173,22 +174,26 @@ as of this refresh:
   tighter SDS-style warm sky solar mass so the surrounding area no longer reads
   as a damp grey sphere. The true WebGPU path keeps the SDS-style additive TSL
   body, while the explicit WebGL renderer fallback caps its hot center to warm
-  white instead of clipped pure white. The latest post-feedback retune has
-  focused, not full-matrix, proof: Open Frontier noon/golden/dusk WebGPU records
-  `sunCore=0.112/0.105/0.105%` and `sunSpan=5.37/5.19/5.19%`; explicit WebGL2
-  golden records `sunCore=0.085%`, `sunSpan=4.44%`; the focused
-  WebGPU/WebGL2 parity max channel delta is `0.39%`. A Shau dusk ridge proof
-  uses a true terrain-occluded sun-body pose: strict WebGPU records
+  white instead of clipped pure white. Post-feedback full matrix proof passes
+  `33/33` captures in
+  `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/summary.json`:
+  daylight WebGPU `sunCore=0.105-0.113%`, `sunSpan=5.19-5.46%`, explicit WebGL2
+  Open Frontier `sunCore=0.085-0.086%`, `sunSpan=4.44%`, WebGPU/WebGL2 parity
+  max channel delta `0.39%`, all sun-scale checks PASS, and all active
+  night-terrain diagnostics PASS. A Shau dusk ridge proof uses a true
+  terrain-occluded sun-body pose in
+  `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/ridge-summary.json`:
+  strict WebGPU and production fallback both record
   `sunVisibility=terrain-occluded`, `sunOcclusion=55m`, `sunCore=0`,
-  `sunSpan=0`, ridge warmth PASS, and sun-scale PASS; bundled Chromium
-  production-fallback proof records the same occlusion metrics when resolved as
-  `webgpu-webgl-fallback`. A Shau midnight now proves the authored level/depth
-  water body on a cool opaque night material with
+  `sunSpan=0`, ridge warmth PASS, sun-scale PASS, and parity max channel delta
+  `0.00%`. A Shau midnight proves the authored level/depth water body on a cool
+  opaque night material with
   `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`, replacing the previous
-  red water-body slab.
-  Before SOL-1 closeout or deploy claims, rerun the full visual matrix and
-  `npm run check:live-release` against production. SOL-1 is still not visually
-  accepted: the next goal is SOL-1R7 owner visual acceptance.
+  red water-body slab. Production proof passes at
+  `artifacts/perf/2026-06-08T15-56-30-243Z/projekt-143-live-release-proof/release-proof.json`:
+  CI `27148343601`, deploy `27149940462`, live manifest SHA
+  `53e501903ebad9e5b51c339555c178ffc72845e6`, Pages/R2/SW headers PASS, and
+  live browser smoke PASS. The next SOL-1 goal is owner visual acceptance.
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.
