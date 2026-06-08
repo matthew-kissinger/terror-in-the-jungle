@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   acos,
-  asin,
   cameraPosition,
   clamp as tslClampBase,
   cos as tslCosBase,
@@ -37,44 +36,34 @@ import {
   MOON_COLOR_G,
   MOON_COLOR_R,
   STEEPNESS,
-  SUN_AUREOLE_OUTER_LOWSUN_DEFAULT,
-  SUN_AUREOLE_OUTER_NOON_DEFAULT,
-  SUN_AUREOLE_RELATIVE_GAIN,
   SUN_BASE_GLARE_CAP_B,
   SUN_BASE_GLARE_CAP_G,
   SUN_BASE_GLARE_CAP_R,
   SUN_BASE_GLARE_COMPRESS_OUTER_DEFAULT,
+  SUN_BASE_GLARE_COMPRESS_SHAPE_POWER,
+  SUN_BASE_GLARE_OVER_CAP_RETENTION,
   SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y,
   SUN_BASE_GLARE_HIGH_SUN_BLEND_START_Y,
   SUN_BASE_GLARE_HIGH_SUN_CAP_B,
   SUN_BASE_GLARE_HIGH_SUN_CAP_G,
   SUN_BASE_GLARE_HIGH_SUN_CAP_R,
-  SUN_DISC_HDR_GAIN,
-  SUN_DISC_INNER_DEFAULT,
   SUN_DISC_OUTER_DEFAULT,
   TOTAL_RAYLEIGH,
-  TWILIGHT_LOWER_RAD,
-  TWILIGHT_UPPER_RAD,
 } from './HosekWilkieTslConstants';
 
 /**
- * TSL per-fragment Preetham sky node + in-shader HDR sun-disc.
+ * TSL per-fragment Preetham sky node.
  *
  * Cycle 2026-05-17 (`tsl-preetham-fragment-port`): the CPU `evaluateAnalytic`
  * (HosekWilkieSkyBackend.ts:761-874) is mirrored here as a TSL `Fn` graph
- * so the dome paints with fragment-resolution gradient + HDR sun-disc
- * pin-point instead of a bake-and-stretch LUT. The CPU LUT stays for fog +
- * hemisphere readers (`sample()`, `getZenith()`, `getHorizon()`) but at
- * 32x8 instead of 256x128.
+ * so the dome paints with fragment-resolution gradient instead of a
+ * bake-and-stretch LUT. The CPU LUT stays for fog + hemisphere readers
+ * (`sample()`, `getZenith()`, `getHorizon()`) but at 32x8 instead of
+ * 256x128.
  *
- * Per the spike memo Section 1 observation 1 + Section 3 candidate F:
- * the sun-disc pin-point uses the pre-merge `vSunE * 19000.0 * Fex * sundisc`
- * shape, smoothly mixed into the sky color inside the fragment shader so
- * no additive sprite is necessary by default.
- *
- * The night-red elevation-keyed sun-color blend (sibling `night-red-fix`
- * task) is mirrored here so the per-fragment dome doesn't reintroduce the
- * red-sky bleed when the sun drops below civil twilight.
+ * SOL-1 / SDS alignment: the dome owns atmospheric glow only. The separate
+ * depth-tested `SunDiscMesh` owns the visible hot body, which prevents a
+ * double hard sun and allows ridges to occlude the body.
  */
 
 type UniformSlot<T = unknown> = { value: T };
@@ -111,27 +100,11 @@ export interface HosekWilkieTslUniforms {
   groundAlbedo: UniformSlot<THREE.Color>;
   exposure: UniformSlot<number>;
   /**
-   * Cosine of the inner sun-disc half-angle. Pixels with
-   * `dot(viewDir, sunDir) >= sunDiscInner` get the full HDR pin-point.
-   */
-  sunDiscInner: UniformSlot<number>;
-  /**
-   * Cosine of the outer sun-disc half-angle. Pixels with
-   * `dot(viewDir, sunDir) <= sunDiscOuter` get zero disc contribution.
-   * Smoothstep between Outer and Inner gives the disc falloff.
+   * Cosine of the visible sun-body outer half-angle. The dome does not paint
+   * the body; this edge only bounds broad Mie glare so the separate
+   * depth-tested body remains readable.
    */
   sunDiscOuter: UniformSlot<number>;
-  /**
-   * Cosine of the aureole outer edge at noon (sun.y = 1). Adds a soft
-   * additive halo outside the visible disc. Default cos(1.5°).
-   */
-  sunAureoleOuterNoon: UniformSlot<number>;
-  /**
-   * Cosine of the aureole outer edge at low sun (sun.y = 0). The halo
-   * stretches modestly without becoming a second sun; default cos(3°).
-   * Per-fragment elevation interpolates between the two edges.
-   */
-  sunAureoleOuterLowSun: UniformSlot<number>;
 }
 
 export type HosekWilkieTslMaterial = MeshBasicNodeMaterial & {
@@ -172,10 +145,7 @@ export function createHosekWilkieTslMaterial(
     mieDirectionalG: { value: options.mieDirectionalG },
     groundAlbedo: { value: options.groundAlbedo.clone() },
     exposure: { value: options.exposure },
-    sunDiscInner: { value: SUN_DISC_INNER_DEFAULT },
     sunDiscOuter: { value: SUN_DISC_OUTER_DEFAULT },
-    sunAureoleOuterNoon: { value: SUN_AUREOLE_OUTER_NOON_DEFAULT },
-    sunAureoleOuterLowSun: { value: SUN_AUREOLE_OUTER_LOWSUN_DEFAULT },
   };
 
   const material = new MeshBasicNodeMaterial({
@@ -210,10 +180,7 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
   const mieDirectionalG = tslReference('float', uniforms.mieDirectionalG);
   const groundAlbedo = tslReference('color', uniforms.groundAlbedo);
   const exposure = tslReference('float', uniforms.exposure);
-  const sunDiscInner = tslReference('float', uniforms.sunDiscInner);
   const sunDiscOuter = tslReference('float', uniforms.sunDiscOuter);
-  const sunAureoleOuterNoon = tslReference('float', uniforms.sunAureoleOuterNoon);
-  const sunAureoleOuterLowSun = tslReference('float', uniforms.sunAureoleOuterLowSun);
 
   const totalRayleigh = tslVec3(
     tslFloat(TOTAL_RAYLEIGH[0]),
@@ -228,16 +195,6 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
   const cutoffAngle = tslFloat(CUTOFF_ANGLE);
   const steepness = tslFloat(STEEPNESS);
   const eeBase = tslFloat(EE_BASE);
-
-  const twilightUpper = tslFloat(TWILIGHT_UPPER_RAD);
-  const twilightLower = tslFloat(TWILIGHT_LOWER_RAD);
-  const moonColor = tslVec3(
-    tslFloat(MOON_COLOR_R),
-    tslFloat(MOON_COLOR_G),
-    tslFloat(MOON_COLOR_B),
-  );
-  const sunDiscGain = tslFloat(SUN_DISC_HDR_GAIN);
-  const sunAureoleRelativeGain = tslFloat(SUN_AUREOLE_RELATIVE_GAIN);
 
   // The fragment node body. Captured in a Fn so the TSL graph fuses into
   // a single function call in the translated WGSL/GLSL.
@@ -377,9 +334,8 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
     // Apply scenario exposure.
     const exposed = withBounce.mul(exposure);
 
-    // Compress broad base-sky glare near the sun before adding the explicit
-    // disc/aureole. This keeps the physical sun readable without allowing the
-    // Preetham Mie lobe to become a huge white second body.
+    // Compress broad base-sky glare near the sun. The sky keeps the ambient
+    // forward-scatter; SunDiscMesh owns the only visible hard body.
     const baseGlareMaskRaw = tslSmoothstep(
       tslFloat(SUN_BASE_GLARE_COMPRESS_OUTER_DEFAULT),
       sunDiscOuter,
@@ -390,8 +346,9 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
       tslFloat(SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y),
       sunY,
     );
-    const baseGlareMask = tslFloat(1).sub(
-      tslPow(tslFloat(1).sub(baseGlareMaskRaw), tslFloat(4)),
+    const baseGlareMask = tslPow(
+      baseGlareMaskRaw,
+      tslFloat(SUN_BASE_GLARE_COMPRESS_SHAPE_POWER),
     );
     const highSunBaseGlareCap = tslVec3(
       tslFloat(SUN_BASE_GLARE_HIGH_SUN_CAP_R),
@@ -404,48 +361,16 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
       tslFloat(SUN_BASE_GLARE_CAP_B),
     );
     const shapedBaseGlareCap = tslMix(baseGlareCap, highSunBaseGlareCap, highSunBaseGlareT);
-    const exposedNearSunCapped = tslMin(exposed, shapedBaseGlareCap);
+    const exposedOverGlareCap = tslMax(
+      exposed.sub(shapedBaseGlareCap),
+      tslVec3(tslFloat(0), tslFloat(0), tslFloat(0)),
+    );
+    const exposedNearSunCapped = tslMin(exposed, shapedBaseGlareCap).add(
+      exposedOverGlareCap.mul(tslFloat(SUN_BASE_GLARE_OVER_CAP_RETENTION)),
+    );
     const exposedNearSunShaped = tslMix(exposed, exposedNearSunCapped, baseGlareMask);
 
-    // ----- Sun-disc HDR pin-point -----
-    // Match pre-merge `vSunE * 19000.0 * Fex * sundisc` shape. The disc
-    // contribution is added on top of the sky color via a smoothstep
-    // falloff between SUN_DISC_OUTER and SUN_DISC_INNER (cosine-domain).
-    // The disc color applies the night-red elevation-keyed sun↔moon blend
-    // so deep-night skies do not paint a red disc when the sun is
-    // sub-horizon. Mirrors the CPU `bakeLUT()` sun-color path: peak-
-    // normalise Fex first so the warm branch reads as a visible color,
-    // then lerp toward the literal MOON_COLOR.
-    const sunElevationRad = asin(sunY);
-    const moonBlendT = tslSmoothstep(twilightLower, twilightUpper, sunElevationRad);
-    // moonBlendT = 1 above twilight upper (-2°) ⇒ peak-normalised Fex;
-    // moonBlendT = 0 below twilight lower (-8°) ⇒ pure MOON_COLOR.
-    const fexPeak = tslMax(tslMax(fex.x, fex.y), tslMax(fex.z, tslFloat(1e-4)));
-    const fexNormalised = fex.div(fexPeak);
-    const sunColorBlended = tslMix(moonColor, fexNormalised, moonBlendT);
-
-    const sundiscFalloff = tslSmoothstep(sunDiscOuter, sunDiscInner, cosTheta);
-    const discContribution = sunE
-      .mul(sunDiscGain)
-      .mul(sunColorBlended)
-      .mul(sundiscFalloff);
-
-    // Aureole: a softer additive halo outside the disc. The outer edge
-    // ramps from the noon target (~1.5°) toward the low-sun target
-    // (~3°) by `1 - sun.y`, so the halo stretches as the sun drops. The
-    // inner edge of the aureole is the disc-outer cone (so the halo
-    // blends seamlessly out of the pearl). Per spike Section 4 +
-    // cycle #12 R2 `sun-disc-and-aureole-tuning`.
-    const lowSunMix = tslClamp(tslFloat(1).sub(sunY), tslFloat(0), tslFloat(1));
-    const aureoleOuter = tslMix(sunAureoleOuterNoon, sunAureoleOuterLowSun, lowSunMix);
-    const aureoleFalloff = tslSmoothstep(aureoleOuter, sunDiscOuter, cosTheta);
-    const aureoleContribution = sunE
-      .mul(sunDiscGain)
-      .mul(sunAureoleRelativeGain)
-      .mul(sunColorBlended)
-      .mul(aureoleFalloff);
-
-    const final = exposedNearSunShaped.add(discContribution).add(aureoleContribution);
+    const final = exposedNearSunShaped;
 
     // Cycle sky-visual-restore: clamp linear radiance to fp16's safe range
     // (CPU port also clamps to [0, 64]); the dome material is

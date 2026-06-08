@@ -17,24 +17,19 @@ import {
   MOON_COLOR_G,
   MOON_COLOR_R,
   STEEPNESS,
-  SUN_AUREOLE_OUTER_LOWSUN_DEFAULT,
-  SUN_AUREOLE_OUTER_NOON_DEFAULT,
-  SUN_AUREOLE_RELATIVE_GAIN,
   SUN_BASE_GLARE_CAP_B,
   SUN_BASE_GLARE_CAP_G,
   SUN_BASE_GLARE_CAP_R,
   SUN_BASE_GLARE_COMPRESS_OUTER_DEFAULT,
+  SUN_BASE_GLARE_COMPRESS_SHAPE_POWER,
+  SUN_BASE_GLARE_OVER_CAP_RETENTION,
   SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y,
   SUN_BASE_GLARE_HIGH_SUN_BLEND_START_Y,
   SUN_BASE_GLARE_HIGH_SUN_CAP_B,
   SUN_BASE_GLARE_HIGH_SUN_CAP_G,
   SUN_BASE_GLARE_HIGH_SUN_CAP_R,
-  SUN_DISC_HDR_GAIN,
-  SUN_DISC_INNER_DEFAULT,
   SUN_DISC_OUTER_DEFAULT,
   TOTAL_RAYLEIGH,
-  TWILIGHT_LOWER_RAD,
-  TWILIGHT_UPPER_RAD,
 } from './HosekWilkieTslConstants';
 
 export interface PreethamCpuMirrorState {
@@ -45,23 +40,18 @@ export interface PreethamCpuMirrorState {
   mieDirectionalG: number;
   groundAlbedo: THREE.Color;
   exposure: number;
-  sunDiscInner?: number;
   sunDiscOuter?: number;
-  /** Cosine of the aureole outer edge at noon. Defaults to the shader default. */
-  sunAureoleOuterNoon?: number;
-  /** Cosine of the aureole outer edge at low sun. Defaults to the shader default. */
-  sunAureoleOuterLowSun?: number;
 }
 
 /**
  * Evaluate the per-fragment Preetham color at a view direction, using the
- * same math the TSL fragment node uses. Includes the sun-disc HDR
- * pin-point and the night-red elevation-keyed sun↔moon blend so the
- * parity test compares like-for-like.
+ * same sky-only math the TSL fragment node uses. The visible hot body is
+ * owned by SunDiscMesh; this mirror only shapes the atmospheric dome and
+ * broad forward-scatter around that body.
  *
  * Returns the linear-radiance RGB the dome would paint at this fragment.
  */
-export function evaluatePreethamWithDiscCpu(
+export function evaluatePreethamSkyCpu(
   state: PreethamCpuMirrorState,
   viewDirection: THREE.Vector3,
   out: THREE.Color,
@@ -207,49 +197,19 @@ export function evaluatePreethamWithDiscCpu(
     SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y,
     sunYClamped,
   );
-  const baseGlareMask = 1 - (1 - baseGlareMaskRaw) ** 4;
+  const baseGlareMask = baseGlareMaskRaw ** SUN_BASE_GLARE_COMPRESS_SHAPE_POWER;
   const capR = SUN_BASE_GLARE_CAP_R + (SUN_BASE_GLARE_HIGH_SUN_CAP_R - SUN_BASE_GLARE_CAP_R) * highSunGlareT;
   const capG = SUN_BASE_GLARE_CAP_G + (SUN_BASE_GLARE_HIGH_SUN_CAP_G - SUN_BASE_GLARE_CAP_G) * highSunGlareT;
   const capB = SUN_BASE_GLARE_CAP_B + (SUN_BASE_GLARE_HIGH_SUN_CAP_B - SUN_BASE_GLARE_CAP_B) * highSunGlareT;
-  r += (Math.min(r, capR) - r) * baseGlareMask;
-  g2c += (Math.min(g2c, capG) - g2c) * baseGlareMask;
-  b += (Math.min(b, capB) - b) * baseGlareMask;
-
-  const sunElevationRad = Math.asin(sunYClamped);
-  const moonBlendT = smoothstepCpu(
-    TWILIGHT_LOWER_RAD,
-    TWILIGHT_UPPER_RAD,
-    sunElevationRad,
-  );
-  const fexPeak = Math.max(fexR, fexG, fexB, 1e-4);
-  const fexNR = fexR / fexPeak;
-  const fexNG = fexG / fexPeak;
-  const fexNB = fexB / fexPeak;
-  const sunColorR = MOON_COLOR_R + (fexNR - MOON_COLOR_R) * moonBlendT;
-  const sunColorG = MOON_COLOR_G + (fexNG - MOON_COLOR_G) * moonBlendT;
-  const sunColorB = MOON_COLOR_B + (fexNB - MOON_COLOR_B) * moonBlendT;
-
-  const sunDiscInner = state.sunDiscInner ?? SUN_DISC_INNER_DEFAULT;
-  const sunDiscOuter = state.sunDiscOuter ?? SUN_DISC_OUTER_DEFAULT;
-  const sundiscFalloff = smoothstepCpu(sunDiscOuter, sunDiscInner, cosTheta);
-  const discScale = sunE * SUN_DISC_HDR_GAIN * sundiscFalloff;
-  r += discScale * sunColorR;
-  g2c += discScale * sunColorG;
-  b += discScale * sunColorB;
-
-  const aureoleOuterNoon =
-    state.sunAureoleOuterNoon ?? SUN_AUREOLE_OUTER_NOON_DEFAULT;
-  const aureoleOuterLowSun =
-    state.sunAureoleOuterLowSun ?? SUN_AUREOLE_OUTER_LOWSUN_DEFAULT;
-  const lowSunMix = Math.max(0, Math.min(1, 1 - sunYClamped));
-  const aureoleOuter =
-    aureoleOuterNoon + (aureoleOuterLowSun - aureoleOuterNoon) * lowSunMix;
-  const aureoleFalloff = smoothstepCpu(aureoleOuter, sunDiscOuter, cosTheta);
-  const aureoleScale =
-    sunE * SUN_DISC_HDR_GAIN * SUN_AUREOLE_RELATIVE_GAIN * aureoleFalloff;
-  r += aureoleScale * sunColorR;
-  g2c += aureoleScale * sunColorG;
-  b += aureoleScale * sunColorB;
+  const compressedR =
+    Math.min(r, capR) + Math.max(0, r - capR) * SUN_BASE_GLARE_OVER_CAP_RETENTION;
+  const compressedG =
+    Math.min(g2c, capG) + Math.max(0, g2c - capG) * SUN_BASE_GLARE_OVER_CAP_RETENTION;
+  const compressedB =
+    Math.min(b, capB) + Math.max(0, b - capB) * SUN_BASE_GLARE_OVER_CAP_RETENTION;
+  r += (compressedR - r) * baseGlareMask;
+  g2c += (compressedG - g2c) * baseGlareMask;
+  b += (compressedB - b) * baseGlareMask;
 
   out.setRGB(
     Math.max(0, Math.min(64, r)),
@@ -265,15 +225,8 @@ function smoothstepCpu(edge0: number, edge1: number, x: number): number {
 }
 
 export const HOSEK_WILKIE_TSL_DEFAULTS = {
-  sunDiscInner: SUN_DISC_INNER_DEFAULT,
   sunDiscOuter: SUN_DISC_OUTER_DEFAULT,
-  sunAureoleOuterNoon: SUN_AUREOLE_OUTER_NOON_DEFAULT,
-  sunAureoleOuterLowSun: SUN_AUREOLE_OUTER_LOWSUN_DEFAULT,
-  sunAureoleRelativeGain: SUN_AUREOLE_RELATIVE_GAIN,
-  twilightUpperRad: TWILIGHT_UPPER_RAD,
-  twilightLowerRad: TWILIGHT_LOWER_RAD,
   moonColor: { r: MOON_COLOR_R, g: MOON_COLOR_G, b: MOON_COLOR_B },
-  sunDiscHdrGain: SUN_DISC_HDR_GAIN,
   nightSkyFloorDayGain: NIGHT_SKY_FLOOR_DAY_GAIN,
   nightSkyFloorNightGain: NIGHT_SKY_FLOOR_NIGHT_GAIN,
   nightSkyFloorBlendStartY: NIGHT_SKY_FLOOR_BLEND_START_Y,

@@ -6,23 +6,13 @@ import * as THREE from 'three';
 import { SunDiscMesh } from './SunDiscMesh';
 
 /**
- * Behaviour contract for the additive HDR sun-disc sprite. We assert
- * what callers observe — visibility, world placement, tonemap-bypassed
- * additive material flags — not the internal radial-gradient pixel
- * values or the specific HDR peak constant. Implementation-mirror tests
- * against the multiplier would break the moment the sky bake path
- * changes (e.g. when `sky-hdr-bake-restore` lands the half-float upload
- * and the disc multiplier is retuned to match), which is the failure
- * mode `docs/TESTING.md` exists to prevent.
+ * Behaviour contract for the additive HDR sun-disc sprite. We assert what
+ * callers observe — visibility, world placement, tonemap-bypassed additive
+ * material flags, and SDS-style ownership metadata — not the internal radial
+ * shader expression or a specific HDR peak constant.
  */
 describe('SunDiscMesh', () => {
   const DOME_RADIUS = 500;
-
-  // Cycle #12 R2 `sun-disc-and-aureole-tuning`: the additive sprite is
-  // disabled by default to avoid a double-sun read against the in-shader
-  // HDR sun-disc. Tests that exercise the horizon-gated visibility path
-  // explicitly opt in via `{ enabled: true }`. The new disabled-by-default
-  // path is exercised by its own behavior tests at the end of this file.
 
   it('hides the sprite when the sun is below the horizon', () => {
     const disc = new SunDiscMesh(DOME_RADIUS, { enabled: true });
@@ -35,8 +25,8 @@ describe('SunDiscMesh', () => {
     expect(disc.getMesh().visible).toBe(false);
   });
 
-  it('shows the sprite when the sun is above the horizon (enabled path)', () => {
-    const disc = new SunDiscMesh(DOME_RADIUS, { enabled: true });
+  it('shows the sprite when the sun is above the horizon by default', () => {
+    const disc = new SunDiscMesh(DOME_RADIUS);
     const camera = new THREE.Vector3(0, 0, 0);
     const noonSun = new THREE.Vector3(0.3, 0.9, 0.3).normalize();
     const sunColor = new THREE.Color(1, 1, 1);
@@ -71,22 +61,44 @@ describe('SunDiscMesh', () => {
     expect(dz / distance).toBeCloseTo(sunDir.z, 3);
   });
 
-  it('uses tonemap-bypassed additive blending so the HDR pearl reads at full radiance', () => {
+  it('uses tonemap-bypassed additive blending and depth testing for ridge occlusion', () => {
     const disc = new SunDiscMesh(DOME_RADIUS);
     const material = disc.getMaterial();
 
-    // Tonemap bypass: the dome path uses MeshBasicMaterial with default
-    // toneMapped=true and that is the documented cause of the bland
-    // post-merge sun. The disc must opt out so ACES does not crush the
-    // HDR pearl back into LDR before it reaches the screen.
+    // Tonemap bypass keeps the hot body from collapsing into a dull LDR spot.
     expect(material.toneMapped).toBe(false);
     expect(material.transparent).toBe(true);
     expect(material.blending).toBe(THREE.AdditiveBlending);
-    // Depth flags: the disc must not write to the depth buffer (so it
-    // never occludes terrain that subsequently renders against it) and
-    // must not depth-test against the dome's `renderOrder = -1` paint.
+    // Depth flags: the body does not write depth, but it must depth-test so
+    // terrain can occlude it instead of letting light bleed through ridges.
     expect(material.depthWrite).toBe(false);
-    expect(material.depthTest).toBe(false);
+    expect(material.depthTest).toBe(true);
+  });
+
+  it('records that the mesh owns only the hot body while the dome owns atmospheric glow', () => {
+    const disc = new SunDiscMesh(DOME_RADIUS);
+    const material = disc.getMaterial() as THREE.Material & {
+      userData: {
+        sunDiscOwnership?: { owns?: string; skyOwns?: string };
+        sunDiscShape?: {
+          bodyRadius?: number;
+          bodyFeather?: number;
+          hotCoreRadius?: number;
+          hotCoreFeather?: number;
+        };
+      };
+    };
+
+    expect(material.userData.sunDiscOwnership?.owns).toBe('disc-body-only');
+    expect(material.userData.sunDiscOwnership?.skyOwns).toBe(
+      'atmospheric-glow-and-horizon-scatter',
+    );
+    expect(material.userData.sunDiscShape?.hotCoreRadius).toBeLessThan(
+      material.userData.sunDiscShape?.bodyRadius ?? 0,
+    );
+    expect(material.userData.sunDiscShape?.hotCoreFeather).toBeGreaterThan(
+      material.userData.sunDiscShape?.hotCoreRadius ?? 0,
+    );
   });
 
   it('returns the same mesh handle so AtmosphereSystem can attach it once', () => {
@@ -112,9 +124,7 @@ describe('SunDiscMesh', () => {
     expect(() => disc.dispose()).not.toThrow();
   });
 
-  // ---------- enabled-flag gating (cycle #12 R2 sun-disc-and-aureole-tuning) ----------
-
-  it('defaults to disabled — sprite stays hidden even when sun is above horizon', () => {
+  it('defaults to enabled — sprite shows for an above-horizon sun', () => {
     const disc = new SunDiscMesh(DOME_RADIUS);
     const camera = new THREE.Vector3(0, 0, 0);
     const noonSun = new THREE.Vector3(0.3, 0.9, 0.3).normalize();
@@ -122,17 +132,17 @@ describe('SunDiscMesh', () => {
 
     disc.update(camera, noonSun, sunColor);
 
-    expect(disc.isEnabled()).toBe(false);
-    expect(disc.getMesh().visible).toBe(false);
+    expect(disc.isEnabled()).toBe(true);
+    expect(disc.getMesh().visible).toBe(true);
   });
 
   it('setEnabled(true) re-enables the horizon-gated path; setEnabled(false) hides the sprite immediately', () => {
-    const disc = new SunDiscMesh(DOME_RADIUS);
+    const disc = new SunDiscMesh(DOME_RADIUS, { enabled: false });
     const camera = new THREE.Vector3(0, 0, 0);
     const noonSun = new THREE.Vector3(0.3, 0.9, 0.3).normalize();
     const sunColor = new THREE.Color(1, 1, 1);
 
-    // Disabled by default — even after update() the sprite stays hidden.
+    // Explicitly disabled — even after update() the sprite stays hidden.
     disc.update(camera, noonSun, sunColor);
     expect(disc.getMesh().visible).toBe(false);
 

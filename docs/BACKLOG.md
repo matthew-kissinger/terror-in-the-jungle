@@ -484,17 +484,19 @@ PRs merged in dispatch order:
   `Float16BufferAttribute` storage and WebGPU `RGBA16Float` upload). Texture
   `colorSpace` flips `SRGBColorSpace → LinearSRGBColorSpace` (correct for
   fp16 linear payload). Analytic ceiling lifts `Math.min(8, …)` → `Math.min(64, …)`
-  so the sun-disc spike survives bake without overflowing fp16's exponent.
-  `compressSkyRadianceForRenderer` deliberately untouched (cap correct for
-  downstream fog + hemisphere readers).
+  so the then-current near-sun sky peak survived bake without overflowing
+  fp16's exponent. `compressSkyRadianceForRenderer` deliberately untouched
+  (cap correct for downstream fog + hemisphere readers). SOL-1R7 later moved
+  hard-body ownership out of the dome path and into `SunDiscMesh`.
 - [#209](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/209)
   `9e1ce7c7` `sky-sun-disc-restore` — New `SunDiscMesh.ts` (196 LOC, under
   200 cap) + 7-test sibling `SunDiscMesh.test.ts`. Additive HDR sprite
   (`PlaneGeometry` + `MeshBasicMaterial` with `toneMapped: false`,
-  `AdditiveBlending`, `depthWrite/Test: false`) billboarded to the camera,
-  positioned at `sunDir * (domeRadius * 0.99)`. Hidden when sun
-  `.y < 0`. Existing dome `mixSunDisc` soft glow stays; sprite is the
-  bright pin-point on top.
+  `AdditiveBlending`, `depthWrite: false`, `depthTest: false` in that PR)
+  billboarded to the camera, positioned at `sunDir * (domeRadius * 0.99)`.
+  Hidden when sun `.y < 0`. SOL-1R7 later changed the current contract:
+  `SunDiscMesh` is depth-tested and owns the hot body while the dome keeps only
+  atmospheric glow/scatter.
 
 Carry-over delta: 0. KB-SKY-BLAND was already in Closed at cycle start;
 the Closed entry is updated with the three merge SHAs + Playwright

@@ -597,6 +597,28 @@ describe('AtmosphereSystem (ICloudRuntime contract)', () => {
     expect(system.getCoverage()).toBeCloseTo(baseline, 5);
   });
 
+  it('syncDomePosition keeps the visible sun body camera-relative', () => {
+    const system = new AtmosphereSystem();
+    const scene = new THREE.Scene();
+    system.attachScene(scene);
+    system.applyScenarioPreset('combat120');
+
+    const sunBody = scene.children.find((child) => child.name === 'SunDiscSprite');
+    expect(sunBody).toBeInstanceOf(THREE.Mesh);
+
+    const firstCamera = new THREE.Vector3(10, 20, 30);
+    const secondCamera = new THREE.Vector3(90, 35, -10);
+    system.syncDomePosition(firstCamera);
+    const firstSunPosition = sunBody!.position.clone();
+    system.syncDomePosition(secondCamera);
+    const secondSunPosition = sunBody!.position.clone();
+
+    expect(secondSunPosition.x - firstSunPosition.x).toBeCloseTo(secondCamera.x - firstCamera.x, 5);
+    expect(secondSunPosition.y - firstSunPosition.y).toBeCloseTo(secondCamera.y - firstCamera.y, 5);
+    expect(secondSunPosition.z - firstSunPosition.z).toBeCloseTo(secondCamera.z - firstCamera.z, 5);
+    expect(secondSunPosition.distanceTo(secondCamera)).toBeGreaterThan(400);
+  });
+
   /**
    * Cross-scenario coverage regression (`cloud-audit-and-polish`). The
    * pre-audit defaults left four of five scenarios invisibly-clouded

@@ -19,6 +19,8 @@ import {
   SUN_BASE_GLARE_CAP_G,
   SUN_BASE_GLARE_CAP_R,
   SUN_BASE_GLARE_COMPRESS_OUTER_DEFAULT,
+  SUN_BASE_GLARE_COMPRESS_SHAPE_POWER,
+  SUN_BASE_GLARE_OVER_CAP_RETENTION,
   SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y,
   SUN_BASE_GLARE_HIGH_SUN_BLEND_START_Y,
   SUN_BASE_GLARE_HIGH_SUN_CAP_B,
@@ -237,10 +239,8 @@ function fbm(x: number, y: number): number {
  *   readers; the visual dome is fragment-resolution.
  * - `'lut-bake'`: legacy bake-and-stretch path that paints the same 32×32
  *   CPU LUT onto a `MeshBasicMaterial`. Back-out for browsers where the
- *   TSL graph regresses visually or on perf. The bake-and-stretch path
- *   loses the in-shader HDR sun-disc; callers can pair this with the
- *   additive `SunDiscMesh` sprite from cycle-sky-visual-restore for the
- *   pre-merge sun look.
+ *   TSL graph regresses visually or on perf. The visible hot body remains
+ *   the separate depth-tested `SunDiscMesh` in both modes.
  */
 export type SkyBackendMode = 'tsl' | 'lut-bake';
 
@@ -694,7 +694,6 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
 
         this.scratchDir.set(dirX, sinElevation, dirZ);
         this.scratchColor.setRGB(r, g, b);
-        this.mixSunDisc(this.scratchDir, this.scratchColor);
         this.mixCloudDeck(this.scratchDir, this.scratchColor);
         r = this.scratchColor.r;
         g = this.scratchColor.g;
@@ -702,8 +701,8 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
 
         // Half-float HDR: write linear radiance directly. The prior
         // sqrt-gamma + clamp01 + *255 path was a workaround for 8-bit
-        // sRGB storage that crushed the sun-disc spike and capped noon
-        // saturation. With fp16 we keep linear values up to ~65k; the
+        // sRGB storage that crushed near-sun glare and capped noon
+        // saturation. With fp16 we keep linear sky values up to ~65k; the
         // dome material is `toneMapped: false` so the on-screen exposure
         // is controlled by the upstream `evaluateAnalytic` ceiling
         // (64.0) rather than this encode step.
@@ -741,16 +740,6 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     this.refreshFireCount = 0;
     this.refreshTotalMs = 0;
     this.refreshLastMs = 0;
-  }
-
-  private mixSunDisc(direction: THREE.Vector3, color: THREE.Color): void {
-    const sunDot =
-      direction.x * this.sunDirection.x +
-      direction.y * this.sunDirection.y +
-      direction.z * this.sunDirection.z;
-    if (sunDot <= 0.9992) return;
-    const strength = smoothstep(0.9992, 0.99992, sunDot);
-    color.lerp(this.sunColor, strength);
   }
 
   private mixCloudDeck(direction: THREE.Vector3, color: THREE.Color): void {
@@ -1032,17 +1021,22 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
       SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y,
       sunY,
     );
-    const baseGlareMask = 1 - Math.pow(1 - baseGlareMaskRaw, 4);
+    const baseGlareMask = Math.pow(baseGlareMaskRaw, SUN_BASE_GLARE_COMPRESS_SHAPE_POWER);
     const capR = SUN_BASE_GLARE_CAP_R + (SUN_BASE_GLARE_HIGH_SUN_CAP_R - SUN_BASE_GLARE_CAP_R) * highSunGlareT;
     const capG = SUN_BASE_GLARE_CAP_G + (SUN_BASE_GLARE_HIGH_SUN_CAP_G - SUN_BASE_GLARE_CAP_G) * highSunGlareT;
     const capB = SUN_BASE_GLARE_CAP_B + (SUN_BASE_GLARE_HIGH_SUN_CAP_B - SUN_BASE_GLARE_CAP_B) * highSunGlareT;
-    r += (Math.min(r, capR) - r) * baseGlareMask;
-    g2c += (Math.min(g2c, capG) - g2c) * baseGlareMask;
-    b += (Math.min(b, capB) - b) * baseGlareMask;
+    const compressedR =
+      Math.min(r, capR) + Math.max(0, r - capR) * SUN_BASE_GLARE_OVER_CAP_RETENTION;
+    const compressedG =
+      Math.min(g2c, capG) + Math.max(0, g2c - capG) * SUN_BASE_GLARE_OVER_CAP_RETENTION;
+    const compressedB =
+      Math.min(b, capB) + Math.max(0, b - capB) * SUN_BASE_GLARE_OVER_CAP_RETENTION;
+    r += (compressedR - r) * baseGlareMask;
+    g2c += (compressedG - g2c) * baseGlareMask;
+    b += (compressedB - b) * baseGlareMask;
 
-    // Cycle sky-visual-restore: lift the prior 8.0 ceiling to 64.0 so
-    // the sun-disc spike survives into the half-float LUT without
-    // bumping into fp16's exponent range (max representable ~65504).
+    // Keep the sky-only glare range wide enough for fog and hemisphere
+    // readers without reintroducing a hard sun body into the dome path.
     // Downstream consumers of `sample()` / `getZenith()` / `getHorizon()`
     // still pass through `compressSkyRadianceForRenderer` in
     // `AtmosphereSystem` for fog + hemisphere readers.

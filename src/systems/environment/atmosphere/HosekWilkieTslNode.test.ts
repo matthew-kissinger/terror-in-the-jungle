@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
-  evaluatePreethamWithDiscCpu,
+  evaluatePreethamSkyCpu,
   HOSEK_WILKIE_TSL_DEFAULTS,
   type PreethamCpuMirrorState,
 } from './HosekWilkieTslCpuMirror';
@@ -15,19 +15,19 @@ import { HosekWilkieSkyBackend } from './HosekWilkieSkyBackend';
 import { SCENARIO_ATMOSPHERE_PRESETS } from './ScenarioAtmospherePresets';
 
 /**
- * Behavior contract for the TSL per-fragment Preetham node + the CPU
- * mirror that drives the parity test.
+ * Behavior contract for the TSL per-fragment Preetham sky node + the CPU
+ * mirror that drives the parity test. The visible sun body is owned by
+ * SunDiscMesh; this file covers only the atmospheric dome.
  *
  * The TSL node is the shader graph attached to the dome. We assert:
  *  1. The factory returns a node material with the expected uniform table
  *     and a wired `colorNode` (no recompile is needed on uniform mutation).
- *  2. The CPU mirror reproduces the documented Preetham + sun-disc shape
- *     across representative directions (zenith vs horizon delta, sun-disc
- *     pin-point, night-red elevation-keyed sun↔moon blend).
+ *  2. The CPU mirror reproduces the documented Preetham sky shape across
+ *     representative directions (zenith vs horizon delta, night floor,
+ *     bounded forward-scatter).
  *  3. The CPU mirror parity proxy: for a fixed scenario state, the CPU
  *     mirror matches what the dome's CPU `evaluateAnalytic` produces in
- *     the directions where their math overlaps (sky compositing minus the
- *     sun-disc and night-red blend, which the dome handles separately).
+ *     the directions where their math overlaps.
  *
  * Implementation note: a true GPU readback parity test requires WebGPU,
  * which is not available in the vitest node environment. The CPU mirror
@@ -54,14 +54,7 @@ describe('HosekWilkieTslNode factory', () => {
     expect(material.uniforms.turbidity.value).toBe(4);
     expect(material.uniforms.rayleigh.value).toBe(2);
     expect(material.uniforms.groundAlbedo.value).toBeInstanceOf(THREE.Color);
-    expect(material.uniforms.sunDiscInner.value).toBe(HOSEK_WILKIE_TSL_DEFAULTS.sunDiscInner);
     expect(material.uniforms.sunDiscOuter.value).toBe(HOSEK_WILKIE_TSL_DEFAULTS.sunDiscOuter);
-    expect(material.uniforms.sunAureoleOuterNoon.value).toBe(
-      HOSEK_WILKIE_TSL_DEFAULTS.sunAureoleOuterNoon,
-    );
-    expect(material.uniforms.sunAureoleOuterLowSun.value).toBe(
-      HOSEK_WILKIE_TSL_DEFAULTS.sunAureoleOuterLowSun,
-    );
     expect(material.colorNode).toBeDefined();
     expect(material.toneMapped).toBe(false);
     expect(material.side).toBe(THREE.BackSide);
@@ -126,7 +119,7 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
       baseState.sunDirection.clone(), // sun direction
     ];
     for (const dir of dirs) {
-      evaluatePreethamWithDiscCpu(baseState, dir, out);
+      evaluatePreethamSkyCpu(baseState, dir, out);
       expect(Number.isFinite(out.r)).toBe(true);
       expect(Number.isFinite(out.g)).toBe(true);
       expect(Number.isFinite(out.b)).toBe(true);
@@ -136,52 +129,42 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
     }
   });
 
-  it('paints a brighter color in the sun direction than in the anti-sun direction', () => {
+  it('keeps the sky-only sun direction comparable to the anti-sun direction', () => {
     const sunOut = new THREE.Color();
     const antiOut = new THREE.Color();
     const antiSun = baseState.sunDirection.clone().multiplyScalar(-1);
     // The anti-sun direction can still be sub-horizon; nudge to horizon.
     antiSun.y = Math.max(antiSun.y, 0.1);
     antiSun.normalize();
-    evaluatePreethamWithDiscCpu(baseState, baseState.sunDirection, sunOut);
-    evaluatePreethamWithDiscCpu(baseState, antiSun, antiOut);
+    evaluatePreethamSkyCpu(baseState, baseState.sunDirection, sunOut);
+    evaluatePreethamSkyCpu(baseState, antiSun, antiOut);
     const sunLuma = 0.2126 * sunOut.r + 0.7152 * sunOut.g + 0.0722 * sunOut.b;
     const antiLuma = 0.2126 * antiOut.r + 0.7152 * antiOut.g + 0.0722 * antiOut.b;
-    expect(sunLuma).toBeGreaterThan(antiLuma);
+    expect(sunLuma).toBeGreaterThan(antiLuma * 0.8);
+    expect(Math.max(sunOut.r, sunOut.g, sunOut.b)).toBeLessThan(1.25);
   });
 
-  it('produces an HDR pin-point at the sun direction (disc contribution lifts radiance >>1)', () => {
+  it('keeps the sky-only sun direction bounded so it cannot become a hard body', () => {
     const sunOut = new THREE.Color();
-    evaluatePreethamWithDiscCpu(baseState, baseState.sunDirection, sunOut);
-    // The HDR disc gain (19000.0 * sunE * fex) drives radiance well above
-    // 1.0 at the sun-disc center. We assert the qualitative shape — pin-point
-    // is "much brighter" than the surrounding sky — without enshrining the
-    // exact 19000.0 constant (which the R2 task may tune).
+    evaluatePreethamSkyCpu(baseState, baseState.sunDirection, sunOut);
+    // The dome is allowed to glow near the sun, but the SDS-aligned contract
+    // puts the fiery body in SunDiscMesh. A sky-only sample at the sun
+    // direction must stay bounded instead of clipping into a second circle.
     const maxChannel = Math.max(sunOut.r, sunOut.g, sunOut.b);
-    expect(maxChannel).toBeGreaterThan(1.0);
+    expect(maxChannel).toBeLessThan(1.25);
   });
 
-  it('night-red blend: deep-night sun-disc contribution drops to zero (no red bleed from disc path)', () => {
-    // The night-red bug bled red into the sun-disc HDR pin-point when the
-    // sun dropped below the horizon. The fix gates the disc behind the
-    // elevation-keyed sun↔moon blend AND `sunE` collapses to zero at
-    // deep-night elevation (`acos(sunY) > cutoffAngle`). So the disc
-    // contribution at deep-night must be effectively zero — anything the
-    // mirror returns at the sun direction is sky-only (ground-bounce +
-    // night-floor), NOT a red pin-point.
+  it('deep-night sun direction stays sky-only without a red pin-point', () => {
     const out = new THREE.Color();
     const deepNightState: PreethamCpuMirrorState = {
       ...baseState,
       sunDirection: new THREE.Vector3(0.6, Math.sin((-15 * Math.PI) / 180), 0.5).normalize(),
     };
     const dir = deepNightState.sunDirection.clone();
-    evaluatePreethamWithDiscCpu(deepNightState, dir, out);
-    // The disc contribution is `sunE * 19000 * sunColor * falloff`; if it
-    // were active the radiance would exceed 1.0 at the disc center. At
-    // deep night `sunE` collapses to 0, so the radiance must be tiny —
-    // well below the HDR pin-point range and certainly below 0.5.
+    evaluatePreethamSkyCpu(deepNightState, dir, out);
     const maxChannel = Math.max(out.r, out.g, out.b);
-    expect(maxChannel).toBeLessThan(0.5);
+    expect(maxChannel).toBeLessThan(0.08);
+    expect(out.r).toBeLessThan(out.g);
   });
 
   it('deep-night sky floor stays cool and visibly above black away from the disc', () => {
@@ -190,7 +173,7 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
       ...baseState,
       sunDirection: new THREE.Vector3(0.6, Math.sin((-15 * Math.PI) / 180), 0.5).normalize(),
     };
-    evaluatePreethamWithDiscCpu(deepNightState, new THREE.Vector3(0, 1, 0), out);
+    evaluatePreethamSkyCpu(deepNightState, new THREE.Vector3(0, 1, 0), out);
 
     const luma = 0.2126 * out.r + 0.7152 * out.g + 0.0722 * out.b;
     expect(luma).toBeGreaterThan(0.005);
@@ -203,10 +186,9 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
       ...baseState,
       sunDirection: new THREE.Vector3(0.6, Math.sin((-5 * Math.PI) / 180), 0.5).normalize(),
     };
-    evaluatePreethamWithDiscCpu(twilightState, twilightState.sunDirection, out);
-    // At -5° elevation, moonBlendT ≈ 0.5; the sun-disc inherits some
-    // warmth from Fex. We assert finite + the qualitative direction
-    // (not pure-cool, not pure-warm) without enshrining the exact channels.
+    evaluatePreethamSkyCpu(twilightState, twilightState.sunDirection, out);
+    // The visual body is hidden below the horizon; the dome still needs a
+    // finite twilight band rather than a black sky or a red body artifact.
     expect(Number.isFinite(out.r)).toBe(true);
     expect(Number.isFinite(out.g)).toBe(true);
     expect(Number.isFinite(out.b)).toBe(true);
@@ -215,7 +197,7 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
   /**
    * Build a direction at a precise angular offset `angleDeg` from `sun`,
    * keeping the perturbation in the plane of `sun` and `axisHint`. Used by
-   * the aureole tests so the offsets are honest angles, not ad-hoc tilts.
+   * the sky-glare tests so the offsets are honest angles, not ad-hoc tilts.
    */
   function offsetFromSun(
     sun: THREE.Vector3,
@@ -233,37 +215,27 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
       .normalize();
   }
 
-  it('aureole halo adds radiance just outside the visible disc (gameplay-readable glare)', () => {
-    // Direction ~1.0° from the sun: outside the disc-outer cone (cos(0.65°))
-    // but inside the tightened noon aureole cone (cos(1.5°)). At a high-sun
-    // state the halo additive contribution lifts radiance above the
-    // equivalent direction outside the aureole cone.
+  it('sky forward-scatter remains bounded near the sun body footprint', () => {
     const highSunState: PreethamCpuMirrorState = {
       ...baseState,
       sunDirection: new THREE.Vector3(0.2, 0.95, 0.2).normalize(),
     };
     const axisHint = new THREE.Vector3(0, 1, 0);
-    const halo = offsetFromSun(highSunState.sunDirection, 1.0, axisHint);
-    const outside = offsetFromSun(highSunState.sunDirection, 3, axisHint);
+    const near = offsetFromSun(highSunState.sunDirection, 1.0, axisHint);
+    const outside = offsetFromSun(highSunState.sunDirection, 20, axisHint);
 
-    const haloOut = new THREE.Color();
+    const nearOut = new THREE.Color();
     const outsideOut = new THREE.Color();
-    evaluatePreethamWithDiscCpu(highSunState, halo, haloOut);
-    evaluatePreethamWithDiscCpu(highSunState, outside, outsideOut);
+    evaluatePreethamSkyCpu(highSunState, near, nearOut);
+    evaluatePreethamSkyCpu(highSunState, outside, outsideOut);
 
-    const haloLuma = 0.2126 * haloOut.r + 0.7152 * haloOut.g + 0.0722 * haloOut.b;
+    const nearLuma = 0.2126 * nearOut.r + 0.7152 * nearOut.g + 0.0722 * nearOut.b;
     const outsideLuma = 0.2126 * outsideOut.r + 0.7152 * outsideOut.g + 0.0722 * outsideOut.b;
-    expect(haloLuma).toBeGreaterThan(outsideLuma);
+    expect(nearLuma).toBeGreaterThan(outsideLuma * 0.85);
+    expect(Math.max(nearOut.r, nearOut.g, nearOut.b)).toBeLessThan(1.3);
   });
 
-  it('aureole halo stretches modestly at low sun without becoming a broad disc', () => {
-    // Same angular offset from the sun (~2°). At noon (sun.y≈0.95) this
-    // direction is outside the tightened aureole cone, so the halo doesn't
-    // contribute. At low sun (sun.y≈0.15) the aureole stretches enough that
-    // the contribution is non-zero, but it no longer saturates a huge white
-    // circle. The relative comparison
-    // controls for the per-state base-sky luminance and isolates the
-    // aureole contribution.
+  it('low-sun sky glow is warm and bounded without becoming a broad hard disc', () => {
     const noonState: PreethamCpuMirrorState = {
       ...baseState,
       sunDirection: new THREE.Vector3(0.2, 0.95, 0.2).normalize(),
@@ -282,50 +254,51 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
     const noon10Out = new THREE.Color();
     const lowSun2Out = new THREE.Color();
     const lowSun10Out = new THREE.Color();
-    evaluatePreethamWithDiscCpu(noonState, noon2, noon2Out);
-    evaluatePreethamWithDiscCpu(noonState, noon10, noon10Out);
-    evaluatePreethamWithDiscCpu(lowSunState, lowSun2, lowSun2Out);
-    evaluatePreethamWithDiscCpu(lowSunState, lowSun10, lowSun10Out);
+    evaluatePreethamSkyCpu(noonState, noon2, noon2Out);
+    evaluatePreethamSkyCpu(noonState, noon10, noon10Out);
+    evaluatePreethamSkyCpu(lowSunState, lowSun2, lowSun2Out);
+    evaluatePreethamSkyCpu(lowSunState, lowSun10, lowSun10Out);
 
-    const luma = (c: THREE.Color): number =>
-      0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-    const lowSunHaloDelta = luma(lowSun2Out) - luma(lowSun10Out);
-    // At low sun the 2° offset is inside the modest glare cone, while the
-    // 10° offset is outside. The halo can be subtler than high-noon glare,
-    // but it must remain visible without turning into the old huge white
-    // sun body.
-    expect(lowSunHaloDelta).toBeGreaterThan(0);
-    expect(Math.max(lowSun2Out.r, lowSun2Out.g, lowSun2Out.b)).toBeLessThan(2);
-    expect(Math.max(lowSun10Out.r, lowSun10Out.g, lowSun10Out.b)).toBeLessThan(8);
+    expect(Math.max(noon2Out.r, noon2Out.g, noon2Out.b)).toBeLessThan(1.3);
+    expect(Math.max(noon10Out.r, noon10Out.g, noon10Out.b)).toBeLessThan(2.2);
+    expect(Math.max(lowSun2Out.r, lowSun2Out.g, lowSun2Out.b)).toBeLessThan(1.3);
+    expect(lowSun2Out.r).toBeGreaterThan(lowSun2Out.b);
+    expect(Math.max(lowSun10Out.r, lowSun10Out.g, lowSun10Out.b)).toBeLessThan(1.3);
   });
 
-  it('compresses broad low-sun base glare so only the controlled disc can white out', () => {
+  it('compresses broad low-sun base glare so only SunDiscMesh can white out', () => {
     const lowSunState: PreethamCpuMirrorState = {
       ...baseState,
       sunDirection: new THREE.Vector3(0.7, 0.12, 0.7).normalize(),
     };
     const axisHint = new THREE.Vector3(0, 1, 0);
+    const nearGlow2 = offsetFromSun(lowSunState.sunDirection, 2, axisHint);
+    const midGlare10 = offsetFromSun(lowSunState.sunDirection, 10, axisHint);
     const broadGlare18 = offsetFromSun(lowSunState.sunDirection, 18, axisHint);
     const broadGlare20 = offsetFromSun(lowSunState.sunDirection, 20, axisHint);
+    const nearGlow2Out = new THREE.Color();
+    const midGlare10Out = new THREE.Color();
     const broadGlare18Out = new THREE.Color();
     const broadGlare20Out = new THREE.Color();
-    evaluatePreethamWithDiscCpu(lowSunState, broadGlare18, broadGlare18Out);
-    evaluatePreethamWithDiscCpu(lowSunState, broadGlare20, broadGlare20Out);
+    evaluatePreethamSkyCpu(lowSunState, nearGlow2, nearGlow2Out);
+    evaluatePreethamSkyCpu(lowSunState, midGlare10, midGlare10Out);
+    evaluatePreethamSkyCpu(lowSunState, broadGlare18, broadGlare18Out);
+    evaluatePreethamSkyCpu(lowSunState, broadGlare20, broadGlare20Out);
 
-    // This direction is well outside the physical disc and the tightened
-    // aureole. It may stay bright and warm, but it must not become the
+    // These directions may stay bright and warm, but they must not become the
     // display-white plate that reads as a second oversized sun body.
+    expect(Math.max(nearGlow2Out.r, nearGlow2Out.g, nearGlow2Out.b)).toBeLessThan(1.25);
+    expect(Math.max(midGlare10Out.r, midGlare10Out.g, midGlare10Out.b)).toBeLessThan(1.15);
     expect(Math.max(broadGlare18Out.r, broadGlare18Out.g, broadGlare18Out.b)).toBeLessThan(0.9);
     expect(Math.max(broadGlare20Out.r, broadGlare20Out.g, broadGlare20Out.b)).toBeLessThan(0.9);
   });
 
-  it('exposure scales the dome radiance roughly linearly (before disc + clamp)', () => {
-    // Sample at a non-sun direction so the disc contribution drops to 0.
+  it('exposure scales the dome radiance roughly linearly before clamp', () => {
     const dir = new THREE.Vector3(-1, 0.2, 0.3).normalize();
     const lowOut = new THREE.Color();
     const highOut = new THREE.Color();
-    evaluatePreethamWithDiscCpu({ ...baseState, exposure: 0.1 }, dir, lowOut);
-    evaluatePreethamWithDiscCpu({ ...baseState, exposure: 0.4 }, dir, highOut);
+    evaluatePreethamSkyCpu({ ...baseState, exposure: 0.1 }, dir, lowOut);
+    evaluatePreethamSkyCpu({ ...baseState, exposure: 0.4 }, dir, highOut);
     // Higher exposure must paint a brighter sky.
     const lowLuma = 0.2126 * lowOut.r + 0.7152 * lowOut.g + 0.0722 * lowOut.b;
     const highLuma = 0.2126 * highOut.r + 0.7152 * highOut.g + 0.0722 * highOut.b;
@@ -337,11 +310,10 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
   /**
    * The dome's `evaluateAnalytic` (private; we exercise it via the
    * `sample()` / `getZenith()` / `getHorizon()` public surface) shares
-   * the Preetham math with the TSL node's CPU mirror. The dome math does
-   * NOT include the sun-disc HDR pin-point or the night-red blend (those
-   * live only in the TSL fragment + on `sunColor` respectively), so the
-   * parity proxy must sample directions AWAY from the sun and at sun
-   * elevations above civil twilight.
+   * the Preetham math with the TSL node's CPU mirror. The proxy samples
+   * mostly away from the sun because the near-sun lobe is the most sensitive
+   * place for visual retuning, while the fog/hemisphere readers need broad
+   * sky agreement.
    *
    * This proxy stands in for the live-GPU readback parity test the cycle
    * brief asks for (Playwright captures the real GPU output; here we
@@ -368,7 +340,7 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
     backend.applyPreset(preset);
     const sunDir = new THREE.Vector3();
     // The backend bakes the LUT off the supplied sun direction. Use a noon
-    // sun so we are well above civil twilight (night-red branch off).
+    // sun so the sampled upper hemisphere has strong daylight coverage.
     sunDir.set(0, 0.95, 0.2).normalize();
     backend.update(0.016, sunDir);
 
@@ -390,10 +362,9 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
     // after cycle `skylut-resolution-bump`. Sample upper-hemisphere bin
     // centers (rows 16-31, every 4th row for coverage symmetry with the
     // pre-bump 4-row sweep) at every other azimuth bin, then drop
-    // directions within the disc+aureole cone so the additive disc +
-    // halo contribution drops to zero in the mirror. High-sun aureole
-    // outer is ~cos(8°); 15° cull adds margin so the smoothstep tail is
-    // below comparison noise. Measured max delta at the new dimensions:
+    // directions close to the body footprint; those are the most visually
+    // retuned part of the sky and not representative of fog / hemisphere
+    // readers. Measured max delta at the new dimensions:
     // ~0 per channel at bin centers (the LUT was baked from the same
     // `evaluateAnalytic` the mirror mirrors). Pre-bump deltas were
     // ~0.02 because the 8-row LUT snapped intermediate elevations onto
@@ -403,7 +374,7 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
         const dir = lutBinCenter(row, col, 32, 32);
         if (dir.dot(sunDir) > Math.cos((15 * Math.PI) / 180)) continue;
         backend.sample(dir, backendOut);
-        evaluatePreethamWithDiscCpu(mirrorState, dir, mirrorOut);
+        evaluatePreethamSkyCpu(mirrorState, dir, mirrorOut);
         const dr = Math.abs(backendOut.r - mirrorOut.r);
         const dg = Math.abs(backendOut.g - mirrorOut.g);
         const db = Math.abs(backendOut.b - mirrorOut.b);
@@ -438,9 +409,9 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
     const mirrorOut = new THREE.Color();
     let maxDelta = 0;
     let directionsChecked = 0;
-    // Low-sun aureole stretches into the mie band (~18° outer at sunY=0.25);
-    // cull at 25° adds margin so the additive halo is below comparison
-    // noise. Upper-hemisphere rows 16-31 (every 4th) of the new 32-row LUT
+    // Low-sun forward scatter stretches into the Mie band; cull at 25° to keep
+    // the proxy focused on broad sky agreement. Upper-hemisphere rows 16-31
+    // (every 4th) of the new 32-row LUT
     // give comparable coverage to the pre-bump 4 row × 16 azimuth sweep.
     // Measured max delta at the new dimensions for the ashau dawn preset:
     // ~0 per channel at bin centers (vs ~0.02 pre-bump from 8-row
@@ -450,7 +421,7 @@ describe('HosekWilkieTslNode CPU mirror — parity proxy vs dome CPU evaluation'
         const dir = lutBinCenter(row, col, 32, 32);
         if (dir.dot(sunDir) > Math.cos((25 * Math.PI) / 180)) continue;
         backend.sample(dir, backendOut);
-        evaluatePreethamWithDiscCpu(mirrorState, dir, mirrorOut);
+        evaluatePreethamSkyCpu(mirrorState, dir, mirrorOut);
         const dr = Math.abs(backendOut.r - mirrorOut.r);
         const dg = Math.abs(backendOut.g - mirrorOut.g);
         const db = Math.abs(backendOut.b - mirrorOut.b);

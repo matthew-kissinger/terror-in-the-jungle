@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (SOL-1 candidate shipped at `2db02400`: true-WebGPU all-mode sun-scale/night terrain checks pass, strict-WebGPU A Shau ridge proof passes with WebGL parity, CI/deploy/live-release proof pass, and owner visual acceptance remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
+Last verified: 2026-06-08 (SOL-1 SDS-style source candidate: `SunDiscMesh` owns the depth-tested hot body, the TSL dome is sky-glow-only, full local visual matrix and A Shau ridge proof pass; live proof and owner visual acceptance remain open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -166,14 +166,22 @@ as of this refresh:
   terrain from falling near-black. The 2026-06-08 proof refresh also fixed an A
   Shau sun-facing capture bug by using terrain-relative camera clearance, and
   tightened `sun-scale` so missing sun-body detection fails instead of passing.
-  The capture script emits SOL-1 `visualQuality` pixel metrics: the 2026-06-08
-  true-WebGPU all-mode matrix passes noon/golden/dusk sun-scale and
-  twilight/midnight red/white/cyan terrain checks, while the strict-WebGPU
-  A Shau dusk ridge proof passes terrain warmth and visible sun footprint.
-  All-mode WebGPU/WebGL2 parity is 0%; strict-WebGPU ridge parity against
-  explicit WebGL2 is 0.39%. CI `27119813037`, deploy `27120013716`, and live
-  release proof passed for commit `2db02400`. SOL-1 is still not visually
-  accepted: the next goal is SOL-1R7 owner visual acceptance.
+  The final focused source candidate fixes stale camera-relative `SunDiscMesh`
+  positioning in `syncDomePosition()` and suppresses the broad low-sun grey
+  glare plate found in owner-review contact-sheet frames. The full local matrix
+  now passes across all five scenarios and time-of-day captures. Representative
+  Open Frontier golden proof records WebGPU `sunCore=0.053%`, `sunSpan=3.52%`
+  and explicit WebGL2 `sunCore=0.035%`, `sunSpan=2.78%`, with
+  WebGPU/WebGL2 parity max channel delta `0.78%`. Midnight rendered-terrain
+  checks pass red/white/cyan bounds across all five scenarios; the older strict
+  night-red sampler remains intentionally over-tight and logs strict failures,
+  while the active red-not-dominant terrain diagnostic passes 5/5. A Shau dusk
+  ridge proof passes terrain warmth, WebGPU/WebGL2 parity, and sun-scale with
+  WebGPU-strict `sunCore=0.053%`, `sunSpan=3.52%`; explicit WebGL2
+  `sunCore=0.036%`, `sunSpan=2.87%`; ridge parity max channel delta `0.39%`.
+  Production parity must be proven with `npm run check:live-release` after each
+  deployment. SOL-1 is still not visually accepted: the next goal is SOL-1R7
+  owner visual acceptance.
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.

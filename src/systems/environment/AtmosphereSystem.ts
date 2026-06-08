@@ -106,6 +106,10 @@ export function createAtmosphereLightingSnapshot(): AtmosphereLightingSnapshot {
  */
 const MOBILE_SKY_REFRESH_SECONDS = 8;
 
+type RendererBackendProbe = {
+  getRendererBackendCapabilities?: () => { resolvedBackend?: string };
+};
+
 function compressSkyRadianceForRenderer(color: THREE.Color, maxComponent: number): THREE.Color {
   const peak = Math.max(color.r, color.g, color.b);
   if (peak > maxComponent && peak > 1e-6) {
@@ -129,40 +133,10 @@ function lowSunAmbientBlend(sunY: number): number {
  * for the design and roadmap (Hosek-Wilkie analytic, prebaked cubemap,
  * volumetric for fly-through).
  *
- * Cycle 2026-04-21 (`atmosphere-day-night-cycle`): preset-driven animated
- * sun direction. Presets carry an optional `todCycle` and, when present,
- * `update(dt)` advances `simulationTimeSeconds` and recomputes
- * `sunDirection` via `computeSunDirectionAtTime`. Presets without a
- * `todCycle` (e.g. `combat120`) stay static to preserve perf baselines.
- *
- * Cycle 2026-04-21 (`skybox-cutover-no-fallbacks`): single-authority
- * analytic dome. The `HosekWilkieSkyBackend` is instantiated in the
- * constructor and a sane bootstrap preset (`combat120` noon) is applied
- * immediately, so the very first rendered frame already shows a real sky.
- * `applyScenarioPreset(<scenario>)` at scenario boot then switches to the
- * per-scenario look. The legacy `Skybox` PNG dome and `NullSkyBackend`
- * fallback are gone.
- *
- * Cycle 2026-04-24 (`architecture-recovery-atmosphere-evidence`):
- * the analytic sky backend receives the effective cloud coverage. The old
- * planar cloud render was retired because playtest evidence showed a hard
- * flat horizontal divider.
- *
- * Prior cycles (kept here as history):
- * - Round 2 (`atmosphere-hosek-wilkie-sky`): introduced the analytic dome
- *   alongside the legacy `Skybox` PNG; switchover on `applyScenarioPreset`.
- * - Round 3 (`atmosphere-fog-tinted-by-sky`): owns `scene.fog.color`.
- *   `WeatherAtmosphere` forwards storm-darken + underwater-override intent
- *   here instead of writing `fog.color` directly, so the horizon seam
- *   disappears at every sun angle.
- * - Round 3 (`atmosphere-sun-hemisphere-coupling`): source of truth for
- *   directional sun light position + color, hemisphere sky/ground tint,
- *   and the water system's sun vector. Weather intensity multipliers
- *   layer on top in `WeatherAtmosphere`.
- *
- * Lives in the existing `World` tracked group in `SystemUpdater` (no new
- * budget group). `update()` forwards sun direction to the backend, then
- * pushes light + fog state onto the bound renderer.
+ * Presets can carry an optional `todCycle`; otherwise the sun remains static
+ * for stable perf baselines. The analytic backend owns fog, hemisphere, cloud,
+ * and sky-dome state, while `SunDiscMesh` owns the SOL-1 visible hot body.
+ * Lives in the existing `World` tracked group in `SystemUpdater`.
  */
 export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime {
   /** Bootstrap preset applied at construction so the first frame has a real sky. */
@@ -172,12 +146,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private hosekBackend: HosekWilkieSkyBackend;
   private scene?: THREE.Scene;
   private domeMesh: THREE.Mesh;
-  /**
-   * Additive HDR sun-disc sprite. Restores the pre-merge pearl-bright
-   * sun the dome's CPU-baked `DataTexture` cannot represent (radiance
-   * gets clamped to `[0,1]` at bake time). See `SunDiscMesh.ts` for the
-   * design rationale.
-   */
+  /** SOL-1 visible hot-body owner; the TSL dome keeps sky glow/scatter only. */
   private sunDisc: SunDiscMesh;
   private sunDiscMesh: THREE.Mesh;
   private currentScenario?: ScenarioAtmosphereKey;
@@ -391,6 +360,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.domeMesh.position.copy(cameraPosition);
     this.cameraPosition.copy(cameraPosition);
     this.hosekBackend.setCloudWorldAnchor(cameraPosition);
+    this.updateSunDisc();
   }
 
   /**
@@ -441,6 +411,17 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
    */
   setRenderer(renderer: IGameRenderer): void {
     this.renderer = renderer;
+    const resolvedBackend = (renderer as IGameRenderer & RendererBackendProbe)
+      .getRendererBackendCapabilities?.()
+      ?.resolvedBackend;
+    if (
+      resolvedBackend === 'webgpu'
+      || resolvedBackend === 'webgl'
+      || resolvedBackend === 'webgpu-webgl-fallback'
+      || resolvedBackend === 'unknown'
+    ) {
+      this.sunDisc.setRendererBackend(resolvedBackend);
+    }
     this.applyToRenderer();
   }
 
@@ -551,14 +532,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
    * fog/light path stays usable without a sun-disc scene attachment.
    */
   private updateSunDisc(): void {
-    // Cycle #12 R2 `sun-disc-and-aureole-tuning`: the in-shader HDR
-    // sun-disc in `HosekWilkieTslNode` is the primary path; the additive
-    // sprite is OFF by default to avoid a double-sun read. Owner re-enables
-    // it via WorldBuilder.useAdditiveSunSprite at runtime for A/B
-    // comparison. Outside of the dev console (e.g. retail build), the
-    // flag is never published, so the sprite stays disabled.
-    const wb = getWorldBuilderState();
-    this.sunDisc.setEnabled(Boolean(wb?.useAdditiveSunSprite));
+    // SOL-1 / SDS alignment: the additive sprite owns the visible hot body.
+    // The dome owns only atmospheric glow / horizon scatter so the scene does
+    // not render a double hard sun. WorldBuilder can still disable the sprite
+    // for explicit dev A/B comparison.
+    const wb = import.meta.env.DEV ? getWorldBuilderState() : undefined;
+    this.sunDisc.setEnabled(wb?.useAdditiveSunSprite !== false);
     this.backend.getSun(this.scratchSunColor);
     this.sunDisc.update(this.cameraPosition, this.sunDirection, this.scratchSunColor);
   }

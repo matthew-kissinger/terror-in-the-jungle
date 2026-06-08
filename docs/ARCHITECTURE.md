@@ -297,13 +297,18 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    dome and CPU LUT, a terrain night-fill uniform, a bounded low-sun terrain
    heightmap/relief response, altitude-preserving shadow recentering for A Shau,
    renderer-facing low-sun directional-light bounds, and a ridge-occlusion
-   capture path that passes the focused A Shau dusk terrain-warmth metric.
-   The visible sun/aureole footprint is now bounded in the all-mode matrix
-   (noon `sunSpan=2.41%`, golden/dusk `sunSpan=1.48%`), twilight/midnight
-   terrain passes red/white/cyan checks, and the 2026-06-08 strict-WebGPU
-   A Shau dusk ridge proof resolves true `webgpu` with explicit-WebGL2 parity
-   at 0.39% max channel delta. CI, deploy, and live-release proof passed for
-   shipped commit `2db02400`; owner visual acceptance remains open.
+   capture path for the A Shau terrain-warmth metric. The visible sun path now
+   uses the SDS-style ownership split: `SunDiscMesh` is the default,
+   depth-tested hot-body owner and the TSL dome owns only atmospheric glow /
+   horizon scatter. Full local matrix proof passes across all five scenarios
+   and time-of-day captures after fixing stale camera-relative sun-body sync.
+   Representative Open Frontier golden proof records WebGPU
+   `sunCore=0.053%`, `sunSpan=3.52%` and explicit WebGL2
+   `sunCore=0.035%`, `sunSpan=2.78%`, with parity max channel delta `0.78%`.
+   A Shau dusk ridge proof passes strict WebGPU / explicit WebGL2 terrain
+   warmth, sun-scale, and parity (`0.39%` max channel delta). Production
+   parity is proven by the per-deploy live-release gate; owner visual
+   acceptance remains open.
 5. **A Shau required-asset / navigation gate** - startup now fails
    A Shau when the required DEM/manifest path is missing or returns HTML, and
    preview builds now emit the manifest. The old TileCache fallback path has

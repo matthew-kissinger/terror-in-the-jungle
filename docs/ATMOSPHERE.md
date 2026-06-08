@@ -94,22 +94,22 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   nav connectivity as passing, but route/NPC movement quality and airfield use
   still need play-path validation. The run also proves the A Shau work did not
   prevent Open Frontier, TDM, Zone Control, or combat120 from entering live mode.
-- SOL-1 remains open for owner visual acceptance, not for missing local
-  automated or live-release proof. The current mitigation removes cyan/white night-water
-  and sub-horizon light defaults, keeps renderer, water, billboard lighting,
-  and terrain night fill on one effective lighting snapshot, and applies a
-  bounded low-sun terrain heightmap/relief response. The shadow recenter path
-  preserves A Shau altitude, and renderer-facing low-sun directional light is
-  bounded separately from the analytic sky color. The visible sun body now
-  separates a small HDR disc from a bounded aureole and an elevation-colored
-  base-glare cap, so the all-mode proof passes sun-scale (`sunSpan=2.41%` at
-  noon, `1.48%` at golden/dusk), twilight/midnight red/white/cyan terrain
-  checks pass, and strict-WebGPU A Shau dusk ridge proof resolves true
-  `webgpu` with explicit-WebGL2 parity at 0.39%. The legacy strict night-red
-  assertion still fails because it contradicts the documented cool moon target
-  `(0.18, 0.20, 0.30)`; the red-not-dominant check passes 5/5. The candidate
-  shipped at `2db02400` with passing CI, deploy, and live-release proof on
-  2026-06-08.
+- SOL-1 remains open for owner visual acceptance and live proof after deploy.
+  The current mitigation removes cyan/white night-water and sub-horizon light
+  defaults, keeps renderer, water, billboard lighting, and terrain night fill on
+  one effective lighting snapshot, and applies a bounded low-sun terrain
+  heightmap/relief response. The shadow recenter path preserves A Shau altitude,
+  and renderer-facing low-sun directional light is bounded separately from the
+  analytic sky color. The visible sun path now follows the SDS WebGPU split:
+  `SunDiscMesh` is ON by default and owns the depth-tested hot body, while the
+  TSL dome owns atmospheric glow / horizon scatter only. Full local matrix
+  proof now passes across all five scenarios and time-of-day captures after
+  fixing stale camera-relative sun-body sync. Representative Open Frontier
+  golden proof records WebGPU `sunCore=0.053%`, `sunSpan=3.52%` and explicit
+  WebGL2 `sunCore=0.035%`, `sunSpan=2.78%`, with parity max channel delta
+  `0.78%`. A Shau dusk ridge proof passes terrain warmth, sun-scale, and
+  renderer parity. Production parity must be proven with
+  `npm run check:live-release` after each deploy.
 - The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
   readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,
   not physically exhaustive sky rendering or horizon-scale terrain occlusion.

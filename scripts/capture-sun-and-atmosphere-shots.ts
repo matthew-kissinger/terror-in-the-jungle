@@ -102,6 +102,16 @@ interface RidgeOcclusionDiagnostics {
   samplesChecked: number;
 }
 
+interface SunOcclusionDiagnostics {
+  terrainOccluded: boolean;
+  terrainHitDistance: number | null;
+  terrainClearanceAtCamera: number | null;
+  samplesChecked: number;
+  cameraPosition: [number, number, number] | null;
+  sunDirection: [number, number, number] | null;
+  reason: string;
+}
+
 // ----- Configuration tables -----
 
 const SCENARIO_PRESETS: ScenarioPreset[] = [
@@ -896,6 +906,151 @@ async function poseAndRender(page: Page, pose: Pose): Promise<void> {
   );
 }
 
+async function sampleSunOcclusion(page: Page): Promise<SunOcclusionDiagnostics> {
+  try {
+    return await page.evaluate(() => {
+      const engine = (window as { __engine?: unknown }).__engine as
+        | {
+          renderer?: {
+            camera?: {
+              position?: {
+                x: number;
+                y: number;
+                z: number;
+                clone?: () => unknown;
+              };
+            };
+          };
+          systemManager?: {
+            atmosphereSystem?: {
+              sunDirection?: {
+                x: number;
+                y: number;
+                z: number;
+                clone?: () => unknown;
+              };
+            };
+            terrainSystem?: {
+              getHeightAt?: (x: number, z: number) => number;
+              raycastTerrain?: (origin: unknown, direction: unknown, maxDistance: number) => { hit: boolean; distance?: number };
+            };
+          };
+        }
+        | undefined;
+      const cameraPosition = engine?.renderer?.camera?.position;
+      const sun = engine?.systemManager?.atmosphereSystem?.sunDirection;
+      const terrain = engine?.systemManager?.terrainSystem;
+      if (!cameraPosition || !sun || !terrain?.getHeightAt) {
+        return {
+          terrainOccluded: false,
+          terrainHitDistance: null,
+          terrainClearanceAtCamera: null,
+          samplesChecked: 0,
+          cameraPosition: cameraPosition
+            ? [Number(cameraPosition.x), Number(cameraPosition.y), Number(cameraPosition.z)] as [number, number, number]
+            : null,
+          sunDirection: sun
+            ? [Number(sun.x), Number(sun.y), Number(sun.z)] as [number, number, number]
+            : null,
+          reason: 'camera, sunDirection, or terrain height unavailable',
+        };
+      }
+
+      const cx = Number(cameraPosition.x);
+      const cy = Number(cameraPosition.y);
+      const cz = Number(cameraPosition.z);
+      let sx = Number(sun.x);
+      let sy = Number(sun.y);
+      let sz = Number(sun.z);
+      const len = Math.hypot(sx, sy, sz);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(cz) || !Number.isFinite(len) || len < 1e-4) {
+        return {
+          terrainOccluded: false,
+          terrainHitDistance: null,
+          terrainClearanceAtCamera: null,
+          samplesChecked: 0,
+          cameraPosition: [cx, cy, cz] as [number, number, number],
+          sunDirection: [sx, sy, sz] as [number, number, number],
+          reason: 'invalid camera or sun vector',
+        };
+      }
+      sx /= len;
+      sy /= len;
+      sz /= len;
+
+      const terrainAtCamera = terrain.getHeightAt(cx, cz);
+      const terrainClearanceAtCamera = Number.isFinite(terrainAtCamera)
+        ? cy - Number(terrainAtCamera)
+        : null;
+      const maxDistance = 1500;
+
+      if (terrain.raycastTerrain && typeof cameraPosition.clone === 'function' && typeof sun.clone === 'function') {
+        try {
+          const origin = cameraPosition.clone();
+          const direction = sun.clone() as { normalize?: () => unknown };
+          direction.normalize?.();
+          const ray = terrain.raycastTerrain(origin, direction, maxDistance);
+          if (ray?.hit) {
+            return {
+              terrainOccluded: true,
+              terrainHitDistance: Number.isFinite(ray.distance) ? Number(ray.distance) : null,
+              terrainClearanceAtCamera,
+              samplesChecked: 0,
+              cameraPosition: [cx, cy, cz] as [number, number, number],
+              sunDirection: [sx, sy, sz] as [number, number, number],
+              reason: 'terrain.raycastTerrain hit sun ray',
+            };
+          }
+        } catch {
+          // Fall through to height sampling; the nearfield BVH can be stale
+          // during large-terrain capture settle.
+        }
+      }
+
+      let samplesChecked = 0;
+      for (let distance = 25; distance <= maxDistance; distance += 15) {
+        samplesChecked++;
+        const x = cx + sx * distance;
+        const y = cy + sy * distance;
+        const z = cz + sz * distance;
+        const terrainY = terrain.getHeightAt(x, z);
+        if (!Number.isFinite(terrainY)) continue;
+        if (Number(terrainY) >= y - 1.5) {
+          return {
+            terrainOccluded: true,
+            terrainHitDistance: distance,
+            terrainClearanceAtCamera,
+            samplesChecked,
+            cameraPosition: [cx, cy, cz] as [number, number, number],
+            sunDirection: [sx, sy, sz] as [number, number, number],
+            reason: 'sampled terrain height intersects sun ray',
+          };
+        }
+      }
+
+      return {
+        terrainOccluded: false,
+        terrainHitDistance: null,
+        terrainClearanceAtCamera,
+        samplesChecked,
+        cameraPosition: [cx, cy, cz] as [number, number, number],
+        sunDirection: [sx, sy, sz] as [number, number, number],
+        reason: 'sun ray clear over sampled terrain',
+      };
+    });
+  } catch (err) {
+    return {
+      terrainOccluded: false,
+      terrainHitDistance: null,
+      terrainClearanceAtCamera: null,
+      samplesChecked: 0,
+      cameraPosition: null,
+      sunDirection: null,
+      reason: `sun occlusion probe failed: ${(err as Error).message}`,
+    };
+  }
+}
+
 async function snap(page: Page, outFile: string): Promise<Buffer> {
   // Long timeout + animations=disabled — the engine RAF is stopped before this
   // point (see `poseAndRender`), so Playwright's default font-load wait can
@@ -1236,6 +1391,8 @@ interface VisualQualitySample {
   brightRatio: number;
   sunCoreRatio: number | null;
   sunCoreMaxSpanRatio: number | null;
+  sunVisibility: 'visible-core' | 'terrain-occluded' | 'missing-unoccluded' | null;
+  sunOcclusionDistance: number | null;
   passesNightRedWhiteCyan: boolean | null;
   passesRidgeWarmthCandidate: boolean | null;
   passesSunScaleCandidate: boolean | null;
@@ -1276,6 +1433,7 @@ async function sampleVisualQualityFromPng(
   buffer: Buffer,
   tod: TodLabel,
   view: CaptureView,
+  sunOcclusion: SunOcclusionDiagnostics | null,
 ): Promise<VisualQualitySample | null> {
   const qualityConfig = visualQualityRegionFor(view, tod);
   if (!qualityConfig) return null;
@@ -1336,6 +1494,7 @@ async function sampleVisualQualityFromPng(
     if (pixelCount === 0) return null;
     const shouldMeasureSun = kind === 'sun-scale' || kind === 'ridge-low-sun';
     if (shouldMeasureSun) {
+      const sunMask = new Uint8Array(w * h);
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const idx = (y * w + x) * channels;
@@ -1351,12 +1510,50 @@ async function sampleVisualQualityFromPng(
             && Math.abs(r - g) < 0.10
             && Math.abs(g - b) < 0.20
           ) {
-            sunCoreCount++;
-            sunMinX = Math.min(sunMinX, x);
-            sunMaxX = Math.max(sunMaxX, x);
-            sunMinY = Math.min(sunMinY, y);
-            sunMaxY = Math.max(sunMaxY, y);
+            sunMask[y * w + x] = 1;
           }
+        }
+      }
+
+      const stack: number[] = [];
+      for (let i = 0; i < sunMask.length; i++) {
+        if (sunMask[i] !== 1) continue;
+        let count = 0;
+        let minX = w;
+        let maxX = -1;
+        let minY = h;
+        let maxY = -1;
+        sunMask[i] = 2;
+        stack.push(i);
+        while (stack.length > 0) {
+          const current = stack.pop()!;
+          const cx = current % w;
+          const cy = Math.floor(current / w);
+          count++;
+          minX = Math.min(minX, cx);
+          maxX = Math.max(maxX, cx);
+          minY = Math.min(minY, cy);
+          maxY = Math.max(maxY, cy);
+          for (let oy = -1; oy <= 1; oy++) {
+            const ny = cy + oy;
+            if (ny < 0 || ny >= h) continue;
+            for (let ox = -1; ox <= 1; ox++) {
+              if (ox === 0 && oy === 0) continue;
+              const nx = cx + ox;
+              if (nx < 0 || nx >= w) continue;
+              const ni = ny * w + nx;
+              if (sunMask[ni] !== 1) continue;
+              sunMask[ni] = 2;
+              stack.push(ni);
+            }
+          }
+        }
+        if (count > sunCoreCount) {
+          sunCoreCount = count;
+          sunMinX = minX;
+          sunMaxX = maxX;
+          sunMinY = minY;
+          sunMaxY = maxY;
         }
       }
     }
@@ -1371,6 +1568,18 @@ async function sampleVisualQualityFromPng(
       : shouldMeasureSun
         ? 0
         : null;
+    const sunVisibility = shouldMeasureSun
+      ? sunCoreCount > 0
+        ? 'visible-core'
+        : sunOcclusion?.terrainOccluded
+          ? 'terrain-occluded'
+          : 'missing-unoccluded'
+      : null;
+    const sunScalePass = shouldMeasureSun
+      ? sunCoreCount > 0
+        ? sunCoreRatio <= 0.006 && sunCoreMaxSpanRatio <= 0.055
+        : Boolean(sunOcclusion?.terrainOccluded)
+      : null;
     return {
       kind,
       region,
@@ -1384,15 +1593,15 @@ async function sampleVisualQualityFromPng(
       brightRatio,
       sunCoreRatio,
       sunCoreMaxSpanRatio,
+      sunVisibility,
+      sunOcclusionDistance: shouldMeasureSun ? sunOcclusion?.terrainHitDistance ?? null : null,
       passesNightRedWhiteCyan: kind === 'night-terrain'
         ? redDominantRatio <= 0.01 && whiteHotRatio <= 0.005 && cyanBrightRatio <= 0.03
         : null,
       passesRidgeWarmthCandidate: kind === 'ridge-low-sun'
         ? warmTerrainRatio <= 0.45 && redDominantRatio <= 0.25 && whiteHotRatio <= 0.01
         : null,
-      passesSunScaleCandidate: shouldMeasureSun
-        ? sunCoreCount > 0 && sunCoreRatio <= 0.006 && sunCoreMaxSpanRatio <= 0.055
-        : null,
+      passesSunScaleCandidate: sunScalePass,
     };
   } catch {
     return null;
@@ -1419,6 +1628,8 @@ interface CaptureRecord {
   fogVsSky?: FogVsSkySample | null;
   /** Populated only for ridge-occlusion captures. */
   ridgeOcclusion?: RidgeOcclusionDiagnostics | null;
+  /** Runtime terrain check for whether the sun ray is blocked by terrain. */
+  sunOcclusion?: SunOcclusionDiagnostics | null;
   /** SOL-1 rendered-terrain / water visual diagnostics. */
   visualQuality?: VisualQualitySample | null;
   notes: string;
@@ -1525,6 +1736,7 @@ async function captureSingleShot(
     })
     : await buildSunPose(page, preset, pitchDeg);
   await poseAndRender(page, pose);
+  const sunOcclusion = await sampleSunOcclusion(page);
 
   const resolvedBackend = await getResolvedBackend(page);
   // Sample moonColor BEFORE the screenshot so we still get the night-red
@@ -1546,7 +1758,7 @@ async function captureSingleShot(
   const parity = options.sampleParity && pngBuffer ? await sampleParityKeyPointsFromPng(pngBuffer) : null;
   const horizonRow = options.sampleLutBump && pngBuffer ? await sampleHorizonRowFromPng(pngBuffer) : null;
   const fogVsSky = options.sampleLutBump && pngBuffer ? await sampleFogVsSkyHorizonFromPng(pngBuffer) : null;
-  const visualQuality = pngBuffer ? await sampleVisualQualityFromPng(pngBuffer, tod, view) : null;
+  const visualQuality = pngBuffer ? await sampleVisualQualityFromPng(pngBuffer, tod, view, sunOcclusion) : null;
 
   return {
     filename: outFile,
@@ -1563,6 +1775,7 @@ async function captureSingleShot(
     horizonRow,
     fogVsSky,
     ridgeOcclusion,
+    sunOcclusion,
     visualQuality,
     notes: snapNotes,
   };
@@ -2052,6 +2265,8 @@ async function main(): Promise<void> {
         `cyan=${(q.cyanBrightRatio * 100).toFixed(2)}% warm=${(q.warmTerrainRatio * 100).toFixed(2)}% ` +
         `sunCore=${q.sunCoreRatio === null ? 'n/a' : `${(q.sunCoreRatio * 100).toFixed(3)}%`} ` +
         `sunSpan=${q.sunCoreMaxSpanRatio === null ? 'n/a' : `${(q.sunCoreMaxSpanRatio * 100).toFixed(2)}%`} ` +
+        `sunVisibility=${q.sunVisibility ?? 'n/a'} ` +
+        `sunOcclusion=${q.sunOcclusionDistance === null ? 'n/a' : `${q.sunOcclusionDistance.toFixed(1)}m`} ` +
         `night=${nightVerdict} ridgeWarmth=${ridgeVerdict} sunScale=${sunVerdict}`
       );
     }

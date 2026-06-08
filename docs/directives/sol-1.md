@@ -22,38 +22,43 @@ at night. A Shau shadow recentering preserves follow-target altitude, and
 terrain has a bounded low-sun heightmap/relief response for the accepted
 short-range ridge approximation.
 
-Visible sun scale was fixed in two parts:
+Visible sun scale is being reworked against the Sheep Dog Simulator WebGPU
+reference contract:
 
-- The physical HDR disc stays small; the additive `SunDiscMesh` remains off by
-  default so it does not create a double sun.
-- Broad base-sky glare is capped before the explicit disc/aureole contribution.
-  The cap spans the measured white plate, blends to a blue-biased cap at high
-  sun, and uses a much lower aureole gain so glare no longer becomes a second
-  sun body.
-
-Fresh proof from 2026-06-08 on shipped commit `2db02400`:
-
-- `summary.json`: 33/33 captures succeeded. The default matrix resolved 29
-  records as true `webgpu` and 4 parity records as explicit `webgl`.
-- All sun-scale diagnostics pass: noon `sunSpan=2.41%`; golden and dusk
-  `sunSpan=1.48%`.
-- Twilight and midnight terrain red/white/cyan diagnostics pass in all modes,
-  including combat120 midnight.
-- WebGPU/WebGL2 all-mode parity max channel delta is 0%.
-- `ridge-summary.json`: A Shau dusk strict-WebGPU ridge proof resolves true
-  `webgpu`, finds a 274.6 m ridge-rise pose, and passes ridge warmth plus
-  sun-scale (`sunSpan=1.48%`). Explicit WebGL2 parity is 0.39%, under the 5%
-  target.
-- The legacy strict night-red assertion still fails 0/5 because it requires
-  `r < 0.5 * max(g,b)`, which contradicts the documented cool moon target
-  `(0.18, 0.20, 0.30)`. The red-not-dominant check passes 5/5.
-- CI `27119813037`, deploy `27120013716`, and live-release proof
-  `artifacts/perf/2026-06-08T06-29-37-017Z/projekt-143-live-release-proof/release-proof.json`
-  pass for the same commit. The live manifest serves
-  `2db02400ccb72350d89fc149f370f22ed3ea2922`.
+- `SunDiscMesh` is ON by default and owns the only visible hot body. It is
+  additive, tone-map bypassed, depth-tested, and records `disc-body-only`
+  ownership.
+- `HosekWilkieTslNode` is now sky-only for the hard body. It keeps bounded
+  atmospheric glow / horizon scatter and no longer paints a second HDR disc or
+  aureole body in the dome.
+- The sprite body was retuned from the rejected tiny white pearl into a
+  visible hot-body object: broader white-hot center, warmer irregular rim, and
+  no broad grey sphere. Representative focused crops are
+  `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/crop-parity-openfrontier-golden-webgpu.png`
+  and `crop-parity-openfrontier-golden-webgl.png`.
+- Full local matrix proof now passes the sun-scale detector across all five
+  scenarios and time-of-day captures. Representative Open Frontier golden
+  proof records WebGPU `sunCore=0.053%`, `sunSpan=3.52%`; explicit WebGL2
+  records `sunCore=0.035%`, `sunSpan=2.78%`. WebGPU/WebGL2 color parity stays
+  under cap with max channel delta `0.78%`.
+- Open Frontier golden previously looked like a terrain-occluded body, but the
+  new terrain ray probe showed it was `missing-unoccluded`; the root cause was
+  stale camera-relative `SunDiscMesh` positioning after capture camera moves.
+  `syncDomePosition()` now refreshes the sun body.
+- A Shau dusk ridge proof passes strict WebGPU and explicit WebGL2 terrain
+  warmth, sun-scale, and parity diagnostics. Representative proof records
+  WebGPU-strict `sunCore=0.053%`, `sunSpan=3.52%`; WebGL2 `sunCore=0.036%`,
+  `sunSpan=2.87%`; parity max channel delta `0.39%`.
+- Night terrain diagnostics pass red/white/cyan bounds across all five
+  scenarios. The older strict night-red sampler remains intentionally
+  over-tight and logs strict failures, while the active red-not-dominant
+  terrain diagnostic passes 5/5.
+- Live production proof is a per-deploy gate: after this source candidate is
+  pushed and deployed, rerun `npm run check:live-release` and use the live
+  `/asset-manifest.json` `gitSha` as production truth.
 
 These are automated diagnostics, not owner visual acceptance. SOL-1 stays open
-until a human visual review accepts the shipped candidate.
+until a human visual review accepts the current candidate.
 
 ## Recommended Next Goal
 
@@ -62,16 +67,17 @@ until a human visual review accepts the shipped candidate.
 Use the current renderer state as the candidate authority. The next pass should
 not redesign the sky again unless owner review rejects it. It should:
 
-- run owner visual review on sun scale, noon/golden glare, night terrain/water,
-  and the A Shau ridge light-bleed approximation;
+- run owner visual review on the SDS-style sun body, noon/golden glare,
+  night terrain/water, WebGPU/WebGL2 parity crops, and the A Shau ridge
+  light-bleed approximation;
 - compare any owner-rejected frame against the current automated matrix before
   redesigning atmosphere, terrain, water, or shadows again;
 - update this directive to `closed` only after owner acceptance.
 
 ## Success Criteria
 
-- Sun rendering separates physical body from glare/aureole. The body no longer
-  reads as a huge near object in noon, golden, or dusk captures.
+- Sun rendering separates physical body from sky glow. The body is readable as
+  a hot object, not a huge near object, tiny pearl, or smooth damp sphere.
 - True night terrain is not red-dominant, white-hot, or cyan-blown in all
   modes, including combat120.
 - Sun direction, directional light, water specular, terrain shading, billboard
@@ -80,7 +86,8 @@ not redesign the sky again unless owner review rejects it. It should:
 - Hill/ridge light bleed is either accepted as the current short-range
   heightmap approximation with documented limits, or replaced by a stronger
   occlusion model.
-- True WebGPU and explicit WebGL2 parity are proven from the same poses.
+- True WebGPU and explicit WebGL2 parity are proven from the same poses locally;
+  production parity is reproven by the live release gate after deployment.
 - Perf impact remains covered by the 2026-06-08 master CI perf job until
   STABILIZAT-1 refreshes baselines.
 

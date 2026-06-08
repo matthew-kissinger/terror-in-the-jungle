@@ -79,11 +79,9 @@ export interface WorldBuilderState {
   toneMapping: ToneMappingMode;
 
   /**
-   * Cycle #12 R2 `sun-disc-and-aureole-tuning`: with the in-shader HDR
-   * sun-disc landed in `HosekWilkieTslNode`, the additive `SunDiscMesh`
-   * sprite is OFF by default to avoid a double-sun read. Flip this to
-   * `true` at runtime to re-enable the sprite as a back-out / A-B
-   * comparison against the in-shader pin-point.
+   * SOL-1 / SDS alignment: `SunDiscMesh` owns the visible hot body and is ON
+   * by default. Flip this off only for dev A/B comparison against the
+   * sky-only dome.
    */
   useAdditiveSunSprite: boolean;
 
@@ -103,7 +101,7 @@ const DEFAULT_STATE: WorldBuilderState = {
   npcTickPaused: false,
   forceTimeOfDay: -1,
   toneMapping: 'agx',
-  useAdditiveSunSprite: false,
+  useAdditiveSunSprite: true,
   active: true,
 };
 

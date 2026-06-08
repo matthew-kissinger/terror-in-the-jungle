@@ -263,13 +263,13 @@ describe('WorldBuilderConsole effective toggles', () => {
 });
 
 describe('WorldBuilderConsole useAdditiveSunSprite flag', () => {
-  it('defaults to false (in-shader sun-disc is the primary path)', async () => {
+  it('defaults to true (SunDiscMesh is the primary body path)', async () => {
     const { engine } = makeMockEngine();
     const panel = new WorldBuilderConsole(engine as never);
     await panel.register(registry);
-    expect(panel.getState().useAdditiveSunSprite).toBe(false);
+    expect(panel.getState().useAdditiveSunSprite).toBe(true);
     // Published to window so AtmosphereSystem can read it per-frame.
-    expect(getWorldBuilderState()?.useAdditiveSunSprite).toBe(false);
+    expect(getWorldBuilderState()?.useAdditiveSunSprite).toBe(true);
     panel.dispose();
   });
 
