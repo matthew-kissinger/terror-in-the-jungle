@@ -62,9 +62,9 @@ integrated water bodies instead of stamped ribbons.
   `artifacts/playtests/terrain-vehicle-water-foundation-reset/terrain-foundation-proof.json`.
 - Hydrology diagnostics improved but do not close water acceptance.
 - R2 water rearch slice: Open Frontier and A Shau now declare authored
-  level/depth reaches; these compile carved bathymetry stamps, render
-  `level-depth-water-bodies`, and return `water_body` samples. Hydrology stays a
-  drainage/material sensor, not accepted gameplay water for those modes.
+  level/depth basin bodies; these compile carved bathymetry stamps, render
+  filled `level-depth-water-bodies`, and return `water_body` samples. Hydrology
+  stays a drainage/material sensor, not accepted gameplay water for those modes.
 - Latest headed proof passes with `water_body` samples and bounded bed/inner
   bank sections in `artifacts/playtests/terrain-vehicle-water-foundation-reset/terrain-foundation-proof.json`.
 - Gates: `doctor`, focused Vitest, `validate:fast`, `build`, `build:perf`,

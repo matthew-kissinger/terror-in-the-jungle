@@ -54,6 +54,7 @@ function makeFlowingSegment(overrides: Partial<HydrologyWaterQuerySegment> = {})
 
 function makeWaterBodySegment(overrides: Partial<WaterBodyQuerySegment> = {}): WaterBodyQuerySegment {
   return {
+    shape: 'reach',
     waterBodyId: 'test_reach',
     startX: 0,
     startZ: 0,
@@ -66,9 +67,38 @@ function makeWaterBodySegment(overrides: Partial<WaterBodyQuerySegment> = {}): W
     startBedY: 6,
     endBedY: 4,
     halfWidth: 3,
+    priority: 130,
     flowX: 1,
     flowZ: 0,
     flowSpeedMetersPerSecond: 0.25,
+    ...overrides,
+  };
+}
+
+function makeWaterBodyBasin(overrides: Partial<WaterBodyQuerySegment> = {}): WaterBodyQuerySegment {
+  return {
+    shape: 'basin',
+    waterBodyId: 'test_basin',
+    startX: -65,
+    startZ: 0,
+    endX: 65,
+    endZ: 0,
+    startSurfaceY: 12,
+    endSurfaceY: 12,
+    startDepthMeters: 1.4,
+    endDepthMeters: 5,
+    startBedY: 7,
+    endBedY: 7,
+    halfWidth: 35,
+    priority: 140,
+    flowX: 0,
+    flowZ: 1,
+    flowSpeedMetersPerSecond: 0.35,
+    centerX: 0,
+    centerZ: 0,
+    radiusXMeters: 100,
+    radiusZMeters: 35,
+    rotationRadians: 0,
     ...overrides,
   };
 }
@@ -146,6 +176,24 @@ describe('WaterSurfaceSampler', () => {
     expect(sample.surfaceY).toBe(8);
     expect(sample.depth).toBeCloseTo(7, 5);
     expect(sample.flowVelocity.length()).toBeCloseTo(0.25, 5);
+  });
+
+  it('samples authored basin water by basin footprint instead of a narrow reach band', () => {
+    const sampler = new WaterSurfaceSampler(
+      makeBindings({
+        globalActive: false,
+        waterBodies: [makeWaterBodyBasin()],
+      }),
+    );
+
+    const nearBank = sampler.sample(new THREE.Vector3(80, 11, 18));
+    const outsideBasin = sampler.sample(new THREE.Vector3(0, 0, 46));
+
+    expect(nearBank.source).toBe('water_body');
+    expect(nearBank.surfaceY).toBe(12);
+    expect(nearBank.depth).toBe(1);
+    expect(nearBank.flowVelocity.z).toBeCloseTo(0.35, 5);
+    expect(outsideBasin.source).toBe('none');
   });
 
   it('falls back to global plane outside the channel half-width', () => {

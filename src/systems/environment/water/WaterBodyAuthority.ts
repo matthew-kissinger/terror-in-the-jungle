@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import type { WaterBodyConfig, WaterBodyPointConfig } from '../../../config/gameModeTypes';
+import type {
+  WaterBodyBasinConfig,
+  WaterBodyConfig,
+  WaterBodyPointConfig,
+  WaterBodyReachConfig,
+} from '../../../config/gameModeTypes';
 import type {
   CompiledTerrainFeatureSet,
   TerrainExclusionZone,
@@ -9,6 +14,7 @@ import type {
 } from '../../terrain/TerrainFeatureTypes';
 
 export interface WaterBodyQuerySegment {
+  shape: 'reach' | 'basin';
   waterBodyId: string;
   startX: number;
   startZ: number;
@@ -21,9 +27,16 @@ export interface WaterBodyQuerySegment {
   startBedY: number;
   endBedY: number;
   halfWidth: number;
+  priority: number;
   flowX: number;
   flowZ: number;
   flowSpeedMetersPerSecond: number;
+  centerX?: number;
+  centerZ?: number;
+  radiusXMeters?: number;
+  radiusZMeters?: number;
+  rotationRadians?: number;
+  shorelineSeed?: number;
 }
 
 export interface WaterBodyStats {
@@ -97,31 +110,76 @@ export function compileWaterBodyTerrainFeatures(
   const stamps: TerrainStampConfig[] = [];
   const vegetationExclusionZones: TerrainExclusionZone[] = [];
   for (const segment of compileWaterBodyQuerySegments(configs)) {
-    const bankGrade = resolveBankGradeMeters(findBody(configs, segment.waterBodyId));
+    const body = findBody(configs, segment.waterBodyId);
+    const bankGrade = resolveBankGradeMeters(body);
     const halfWidth = segment.halfWidth;
-    stamps.push({
-      kind: 'flatten_capsule',
-      startX: segment.startX,
-      startZ: segment.startZ,
-      endX: segment.endX,
-      endZ: segment.endZ,
-      innerRadius: halfWidth,
-      outerRadius: halfWidth + WATER_BODY_OUTER_RADIUS_EXTRA_METERS,
-      gradeRadius: halfWidth + bankGrade,
-      gradeStrength: 0.7,
-      samplingRadius: halfWidth,
-      targetHeightMode: 'center',
-      fixedTargetHeight: (segment.startBedY + segment.endBedY) * 0.5,
-      heightOffset: 0,
-      priority: findBody(configs, segment.waterBodyId)?.priority ?? DEFAULT_WATER_BODY_PRIORITY,
-      obstructionPolicy: 'override',
-      targetHeightStrategy: 'baked',
-    });
+    const fixedTargetHeight = (segment.startBedY + segment.endBedY) * 0.5;
+    const priority = body?.priority ?? DEFAULT_WATER_BODY_PRIORITY;
+
+    if (segment.shape === 'basin') {
+      const length = Math.hypot(segment.endX - segment.startX, segment.endZ - segment.startZ);
+      if (length <= 1) {
+        stamps.push({
+          kind: 'flatten_circle',
+          centerX: segment.centerX ?? (segment.startX + segment.endX) * 0.5,
+          centerZ: segment.centerZ ?? (segment.startZ + segment.endZ) * 0.5,
+          innerRadius: halfWidth,
+          outerRadius: halfWidth + WATER_BODY_OUTER_RADIUS_EXTRA_METERS,
+          gradeRadius: halfWidth + bankGrade,
+          gradeStrength: 0.7,
+          samplingRadius: halfWidth,
+          targetHeightMode: 'center',
+          fixedTargetHeight,
+          heightOffset: 0,
+          priority,
+          obstructionPolicy: 'override',
+          targetHeightStrategy: 'baked',
+        });
+      } else {
+        stamps.push({
+          kind: 'flatten_capsule',
+          startX: segment.startX,
+          startZ: segment.startZ,
+          endX: segment.endX,
+          endZ: segment.endZ,
+          innerRadius: halfWidth,
+          outerRadius: halfWidth + WATER_BODY_OUTER_RADIUS_EXTRA_METERS,
+          gradeRadius: halfWidth + bankGrade,
+          gradeStrength: 0.7,
+          samplingRadius: halfWidth,
+          targetHeightMode: 'center',
+          fixedTargetHeight,
+          heightOffset: 0,
+          priority,
+          obstructionPolicy: 'override',
+          targetHeightStrategy: 'baked',
+        });
+      }
+    } else {
+      stamps.push({
+        kind: 'flatten_capsule',
+        startX: segment.startX,
+        startZ: segment.startZ,
+        endX: segment.endX,
+        endZ: segment.endZ,
+        innerRadius: halfWidth,
+        outerRadius: halfWidth + WATER_BODY_OUTER_RADIUS_EXTRA_METERS,
+        gradeRadius: halfWidth + bankGrade,
+        gradeStrength: 0.7,
+        samplingRadius: halfWidth,
+        targetHeightMode: 'center',
+        fixedTargetHeight,
+        heightOffset: 0,
+        priority,
+        obstructionPolicy: 'override',
+        targetHeightStrategy: 'baked',
+      });
+    }
 
     appendVegetationExclusions(
       vegetationExclusionZones,
       segment,
-      resolveVegetationClearRadiusMeters(findBody(configs, segment.waterBodyId), halfWidth, bankGrade),
+      resolveVegetationClearRadiusMeters(body, halfWidth, bankGrade),
     );
   }
 
@@ -140,7 +198,12 @@ export function compileWaterBodyQuerySegments(
 
   const segments: WaterBodyQuerySegment[] = [];
   for (const body of configs) {
-    if (body.kind !== 'reach' || body.points.length < 2) continue;
+    if (body.kind === 'basin') {
+      const basin = compileBasinQuerySegment(body);
+      if (basin) segments.push(basin);
+      continue;
+    }
+    if (body.points.length < 2) continue;
     const halfWidth = Math.max(1, body.widthMeters * 0.5);
     for (let index = 0; index < body.points.length - 1; index++) {
       const start = body.points[index];
@@ -154,6 +217,7 @@ export function compileWaterBodyQuerySegments(
       const startDepth = resolvePointDepth(body, start, index);
       const endDepth = resolvePointDepth(body, end, index + 1);
       segments.push({
+        shape: 'reach',
         waterBodyId: body.id,
         startX: start.x,
         startZ: start.z,
@@ -166,6 +230,7 @@ export function compileWaterBodyQuerySegments(
         startBedY: body.surfaceY - startDepth,
         endBedY: body.surfaceY - endDepth,
         halfWidth,
+        priority: body.priority ?? DEFAULT_WATER_BODY_PRIORITY,
         flowX: dx / length,
         flowZ: dz / length,
         flowSpeedMetersPerSecond: Math.max(
@@ -178,8 +243,56 @@ export function compileWaterBodyQuerySegments(
   return segments;
 }
 
+function compileBasinQuerySegment(body: WaterBodyBasinConfig): WaterBodyQuerySegment | null {
+  const radiusX = Math.max(1, body.radiusXMeters);
+  const radiusZ = Math.max(1, body.radiusZMeters);
+  const rotation = Number.isFinite(body.rotationRadians) ? body.rotationRadians ?? 0 : 0;
+  const majorRadius = Math.max(radiusX, radiusZ);
+  const minorRadius = Math.min(radiusX, radiusZ);
+  const majorAxisRotation = radiusX >= radiusZ ? rotation : rotation + Math.PI * 0.5;
+  const halfLine = Math.max(0, majorRadius - minorRadius);
+  const axisX = Math.cos(majorAxisRotation);
+  const axisZ = Math.sin(majorAxisRotation);
+  const depth = resolveBasinDepth(body);
+  const flowDirection = normalizeFlowDirection(
+    body.flowDirection?.x,
+    body.flowDirection?.z,
+    axisX,
+    axisZ,
+  );
+
+  return {
+    shape: 'basin',
+    waterBodyId: body.id,
+    startX: body.center.x - axisX * halfLine,
+    startZ: body.center.z - axisZ * halfLine,
+    endX: body.center.x + axisX * halfLine,
+    endZ: body.center.z + axisZ * halfLine,
+    startSurfaceY: body.surfaceY,
+    endSurfaceY: body.surfaceY,
+    startDepthMeters: resolveBasinMinDepth(body, depth),
+    endDepthMeters: depth,
+    startBedY: body.surfaceY - depth,
+    endBedY: body.surfaceY - depth,
+    halfWidth: minorRadius,
+    priority: body.priority ?? DEFAULT_WATER_BODY_PRIORITY,
+    flowX: flowDirection.x,
+    flowZ: flowDirection.z,
+    flowSpeedMetersPerSecond: Math.max(
+      0,
+      body.flowSpeedMetersPerSecond ?? DEFAULT_WATER_BODY_FLOW_SPEED_METERS_PER_SECOND,
+    ),
+    centerX: body.center.x,
+    centerZ: body.center.z,
+    radiusXMeters: radiusX,
+    radiusZMeters: radiusZ,
+    rotationRadians: rotation,
+    shorelineSeed: body.shorelineSeed,
+  };
+}
+
 function resolvePointDepth(
-  body: WaterBodyConfig,
+  body: WaterBodyReachConfig,
   point: WaterBodyPointConfig,
   pointIndex: number,
 ): number {
@@ -193,11 +306,25 @@ function resolvePointDepth(
   return Math.max(0.2, body.depthMeters ?? DEFAULT_WATER_BODY_DEPTH_METERS);
 }
 
+function resolveBasinDepth(body: WaterBodyBasinConfig): number {
+  if (Number.isFinite(body.depthMaxMeters)) {
+    return Math.max(0.2, body.depthMaxMeters ?? DEFAULT_WATER_BODY_DEPTH_METERS);
+  }
+  return Math.max(0.2, body.depthMeters ?? DEFAULT_WATER_BODY_DEPTH_METERS);
+}
+
+function resolveBasinMinDepth(body: WaterBodyBasinConfig, resolvedDepth: number): number {
+  if (Number.isFinite(body.depthMinMeters)) {
+    return Math.max(0.2, Math.min(resolvedDepth, body.depthMinMeters ?? resolvedDepth));
+  }
+  return Math.max(0.2, Math.min(resolvedDepth, resolvedDepth * 0.38));
+}
+
 function resolveBankGradeMeters(body: WaterBodyConfig | undefined): number {
   if (body && Number.isFinite(body.bankGradeMeters)) {
     return Math.max(WATER_BODY_OUTER_RADIUS_EXTRA_METERS, body.bankGradeMeters ?? WATER_BODY_MIN_BANK_GRADE_METERS);
   }
-  const width = body?.widthMeters ?? WATER_BODY_MIN_BANK_GRADE_METERS;
+  const width = resolveBodyFootprintWidthMeters(body);
   return clamp(width * 0.55, WATER_BODY_MIN_BANK_GRADE_METERS, WATER_BODY_MAX_BANK_GRADE_METERS);
 }
 
@@ -210,6 +337,31 @@ function resolveVegetationClearRadiusMeters(
     return Math.max(halfWidth, body.vegetationClearRadiusMeters ?? halfWidth);
   }
   return halfWidth + bankGrade + 8;
+}
+
+function resolveBodyFootprintWidthMeters(body: WaterBodyConfig | undefined): number {
+  if (!body) return WATER_BODY_MIN_BANK_GRADE_METERS;
+  if (body.kind === 'reach') return body.widthMeters;
+  return Math.min(body.radiusXMeters, body.radiusZMeters) * 2;
+}
+
+function normalizeFlowDirection(
+  x: number | undefined,
+  z: number | undefined,
+  fallbackX: number,
+  fallbackZ: number,
+): { x: number; z: number } {
+  const candidateX = Number.isFinite(x) ? x ?? 0 : 0;
+  const candidateZ = Number.isFinite(z) ? z ?? 0 : 0;
+  const candidateLength = Math.hypot(candidateX, candidateZ);
+  if (candidateLength > 0.0001) {
+    return { x: candidateX / candidateLength, z: candidateZ / candidateLength };
+  }
+  const fallbackLength = Math.hypot(fallbackX, fallbackZ);
+  if (fallbackLength > 0.0001) {
+    return { x: fallbackX / fallbackLength, z: fallbackZ / fallbackLength };
+  }
+  return { x: 1, z: 0 };
 }
 
 function appendVegetationExclusions(
@@ -246,7 +398,7 @@ function computeWaterBodyStats(
   let maxDepthMeters = -Infinity;
 
   for (const segment of segments) {
-    totalLengthMeters += Math.hypot(segment.endX - segment.startX, segment.endZ - segment.startZ);
+    totalLengthMeters += measureWaterBodyFootprintLength(segment);
     minSurfaceY = Math.min(minSurfaceY, segment.startSurfaceY, segment.endSurfaceY);
     maxSurfaceY = Math.max(maxSurfaceY, segment.startSurfaceY, segment.endSurfaceY);
     minDepthMeters = Math.min(minDepthMeters, segment.startDepthMeters, segment.endDepthMeters);
@@ -266,6 +418,21 @@ function computeWaterBodyStats(
 
 function findBody(configs: readonly WaterBodyConfig[], id: string): WaterBodyConfig | undefined {
   return configs.find((body) => body.id === id);
+}
+
+function measureWaterBodyFootprintLength(segment: WaterBodyQuerySegment): number {
+  if (
+    segment.shape === 'basin'
+    && Number.isFinite(segment.radiusXMeters)
+    && Number.isFinite(segment.radiusZMeters)
+  ) {
+    const a = Math.max(segment.radiusXMeters ?? 0, segment.radiusZMeters ?? 0);
+    const b = Math.min(segment.radiusXMeters ?? 0, segment.radiusZMeters ?? 0);
+    if (a <= 0 || b <= 0) return 0;
+    const h = ((a - b) ** 2) / ((a + b) ** 2);
+    return Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+  }
+  return Math.hypot(segment.endX - segment.startX, segment.endZ - segment.startZ);
 }
 
 function lerp(start: number, end: number, t: number): number {

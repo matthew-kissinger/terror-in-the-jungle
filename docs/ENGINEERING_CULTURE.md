@@ -138,9 +138,10 @@ sky, renderer lights, terrain response, vegetation, water, shadows, and fallback
 materials can all be partly correct while the composed frame is wrong.
 
 - Start by mapping ownership and evidence, not by retuning one shader constant.
-- Keep authored level/depth water bodies as gameplay water. Hydrology is
+- Keep authored level/depth basin water bodies as gameplay water. Hydrology is
   drainage/material/diagnostic input unless a future brief explicitly changes
-  that contract.
+  that contract. Do not reintroduce visible water as narrow hydrology/reach
+  bands that climb terrain.
 - Validate the matrix that matches the changed authority chain: A Shau plus the
   shared modes, day plus night when lighting/materials changed, and WebGPU plus
   explicit WebGL2/fallback when renderer behavior changed.

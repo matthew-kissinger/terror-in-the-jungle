@@ -106,8 +106,8 @@ letting each feature infer its own surface:
 - `TerrainPlacementAuthority` (`src/systems/terrain/TerrainPlacementAuthority.ts`)
   resolves ground and watercraft spawn heights for deploy/runtime placement.
 - `TerrainFeatureCompileStage` compiles authored `waterBodies` into terrain
-  stamps before mode terrain/nav prep, so reaches carve bathymetry instead of
-  riding on top of humps.
+  stamps before mode terrain/nav prep, so basin footprints carve bounded
+  bathymetry instead of riding on top of humps.
 - `TerrainNavigationStage` passes authored bodies into `WaterSystem` and clears
   hydrology river surfaces when authored gameplay water is present.
 - `WaterSystem` owns the legacy global plane, hydrology-derived river surfaces,
@@ -116,10 +116,11 @@ letting each feature infer its own surface:
   before global plane before dry land.
 
 Current accepted gameplay water in Open Frontier and A Shau is authored
-level/depth water bodies with carved beds and `water_body` samples. Hydrology is
-still useful for drainage/material classification, but it is not the
-player-facing water surface. The global plane remains an opt-in fallback for
-legacy/simple modes.
+level/depth basin water bodies with carved beds, filled render footprints,
+deterministic shoreline variation, depth-color/alpha rings, and `water_body`
+samples. Hydrology is still useful for drainage/material classification, but it
+is not the player-facing water surface. The global plane remains an opt-in
+fallback for legacy/simple modes.
 
 ## Tick Graph
 
@@ -324,11 +325,11 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    home-base terrain shoulders, and now includes authored water bodies. The
    current blockers are route/NPC movement quality, airfield datum consistency,
    vehicle usability, and outer-boundary strategy, not missing DEM delivery.
-6. **Water rendering/material future** - authored level/depth water bodies are
-   the gameplay-water authority, with a daytime standard-material bridge and a
-   cool opaque night material to avoid emissive red/white slabs. Natural
-   WebGPU/TSL water, shoreline polish, bridge clearance, and a wider authored
-   river network remain terrain-engine work.
+6. **Water rendering/material future** - authored level/depth basin water
+   bodies are the gameplay-water authority, with a daytime standard-material
+   bridge and a cool opaque night material to avoid emissive red/white slabs.
+   Natural WebGPU/TSL water, shoreline art polish, bridge clearance, and a
+   wider authored basin/river network remain terrain-engine work.
 7. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
 8. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
 

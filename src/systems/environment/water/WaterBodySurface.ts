@@ -27,7 +27,7 @@ interface WaterBodyAlphaRefs {
 /**
  * Scene-owned mesh for authored level/depth water bodies. Gameplay sampling
  * remains in `WaterBodyAuthority`; this class only translates the authority's
- * query segments into visible water ribbons at constant reach elevations.
+ * query footprints into visible level surfaces.
  */
 export class WaterBodySurface {
   private readonly scene: THREE.Scene;
@@ -165,6 +165,10 @@ function buildWaterBodyGeometry(segments: readonly WaterBodyQuerySegment[]): THR
   }
 
   for (const segment of segments) {
+    if (segment.shape === 'basin') {
+      appendBasinGeometry(positions, colors, alphas, indices, segment);
+      continue;
+    }
     const dx = segment.endX - segment.startX;
     const dz = segment.endZ - segment.startZ;
     const length = Math.hypot(dx, dz);
@@ -223,6 +227,89 @@ function buildWaterBodyGeometry(segments: readonly WaterBodyQuerySegment[]): THR
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+const WATER_BODY_BASIN_SEGMENTS = 96;
+const WATER_BODY_BASIN_RINGS = 5;
+
+function appendBasinGeometry(
+  positions: number[],
+  colors: number[],
+  alphas: number[],
+  indices: number[],
+  segment: WaterBodyQuerySegment,
+): void {
+  const centerX = segment.centerX;
+  const centerZ = segment.centerZ;
+  const radiusX = segment.radiusXMeters;
+  const radiusZ = segment.radiusZMeters;
+  if (
+    !Number.isFinite(centerX)
+    || !Number.isFinite(centerZ)
+    || !Number.isFinite(radiusX)
+    || !Number.isFinite(radiusZ)
+    || (radiusX ?? 0) <= 0
+    || (radiusZ ?? 0) <= 0
+  ) {
+    return;
+  }
+
+  const rotation = segment.rotationRadians ?? 0;
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const depth = Math.max(segment.startDepthMeters, segment.endDepthMeters);
+  const baseAlpha = resolveAlphaForDepth(depth);
+  const centerBase = positions.length / 3;
+  const seed = resolveShorelineSeed(segment);
+
+  pushVertex(
+    positions,
+    colors,
+    alphas,
+    centerX ?? 0,
+    segment.startSurfaceY,
+    centerZ ?? 0,
+    [0.035, 0.24, 0.34],
+    baseAlpha,
+  );
+
+  const firstRingBase = positions.length / 3;
+  for (let ring = 1; ring <= WATER_BODY_BASIN_RINGS; ring++) {
+    const ringT = ring / WATER_BODY_BASIN_RINGS;
+    for (let step = 0; step < WATER_BODY_BASIN_SEGMENTS; step++) {
+      const theta = (step / WATER_BODY_BASIN_SEGMENTS) * Math.PI * 2;
+      const variation = basinShorelineVariation(theta, seed) * Math.pow(ringT, 1.8);
+      const radiusScale = ringT * (1 + variation);
+      const localX = Math.cos(theta) * (radiusX ?? 1) * radiusScale;
+      const localZ = Math.sin(theta) * (radiusZ ?? 1) * radiusScale;
+      const x = (centerX ?? 0) + localX * cos - localZ * sin;
+      const z = (centerZ ?? 0) + localX * sin + localZ * cos;
+      const color = resolveBasinColor(ringT, variation);
+      const alpha = baseAlpha * resolveBasinAlphaScale(ringT, variation);
+      pushVertex(positions, colors, alphas, x, segment.startSurfaceY, z, color, alpha);
+    }
+  }
+
+  for (let step = 0; step < WATER_BODY_BASIN_SEGMENTS; step++) {
+    const next = (step + 1) % WATER_BODY_BASIN_SEGMENTS;
+    indices.push(centerBase, firstRingBase + next, firstRingBase + step);
+  }
+
+  for (let ring = 1; ring < WATER_BODY_BASIN_RINGS; ring++) {
+    const currentBase = firstRingBase + (ring - 1) * WATER_BODY_BASIN_SEGMENTS;
+    const nextBase = firstRingBase + ring * WATER_BODY_BASIN_SEGMENTS;
+    for (let step = 0; step < WATER_BODY_BASIN_SEGMENTS; step++) {
+      const next = (step + 1) % WATER_BODY_BASIN_SEGMENTS;
+      indices.push(
+        currentBase + step,
+        nextBase + step,
+        currentBase + next,
+        currentBase + next,
+        nextBase + step,
+        nextBase + next,
+      );
+    }
+  }
 }
 
 const WATER_BODY_CROSS_SECTION: Array<{
@@ -295,6 +382,58 @@ function pushVertex(
 
 function resolveAlphaForDepth(depthMeters: number): number {
   return Math.min(0.96, Math.max(0.68, 0.68 + depthMeters * 0.08));
+}
+
+function resolveShorelineSeed(segment: WaterBodyQuerySegment): number {
+  if (Number.isFinite(segment.shorelineSeed)) return segment.shorelineSeed ?? 0;
+  let hash = 2166136261;
+  for (let index = 0; index < segment.waterBodyId.length; index++) {
+    hash ^= segment.waterBodyId.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 0xffffffff;
+}
+
+function basinShorelineVariation(theta: number, seed: number): number {
+  const a = Math.sin(theta * 2.0 + seed * 17.13) * 0.045;
+  const b = Math.sin(theta * 3.0 + seed * 31.7) * 0.034;
+  const c = Math.cos(theta * 5.0 + seed * 11.4) * 0.026;
+  return clamp(a + b + c, -0.105, 0.105);
+}
+
+function resolveBasinColor(ringT: number, variation: number): [number, number, number] {
+  const shoreT = Math.pow(clamp(ringT, 0, 1), 1.55);
+  const shoal = clamp((variation + 0.105) / 0.21, 0, 1);
+  const deep: [number, number, number] = [0.035, 0.24, 0.34];
+  const mid: [number, number, number] = [0.055, 0.42, 0.5];
+  const shore: [number, number, number] = [0.04, 0.19, 0.14];
+  const mixed = mixColor(deep, mid, clamp(shoreT * 1.25, 0, 1));
+  const edge = mixColor(mixed, shore, clamp((shoreT - 0.72) / 0.28, 0, 1));
+  return mixColor(edge, [0.07, 0.34, 0.28], shoal * 0.16 * shoreT);
+}
+
+function resolveBasinAlphaScale(ringT: number, variation: number): number {
+  const edgeFade = clamp((1 - ringT) / 0.28, 0, 1);
+  const shorelineFade = 0.24 + edgeFade * 0.76;
+  const shoalFade = 1 - clamp((variation + 0.105) / 0.21, 0, 1) * 0.08 * ringT;
+  return clamp(shorelineFade * shoalFade, 0.2, 1);
+}
+
+function mixColor(
+  a: [number, number, number],
+  b: [number, number, number],
+  t: number,
+): [number, number, number] {
+  const clamped = clamp(t, 0, 1);
+  return [
+    a[0] + (b[0] - a[0]) * clamped,
+    a[1] + (b[1] - a[1]) * clamped,
+    a[2] + (b[2] - a[2]) * clamped,
+  ];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function installWaterBodyAlphaPatch(material: THREE.MeshStandardMaterial): WaterBodyAlphaRefs {

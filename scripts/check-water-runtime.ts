@@ -47,6 +47,8 @@ interface RuntimeProofResult {
     vertexCount: number;
     colorAttributePresent: boolean;
     colorAttributeItemSize: number;
+    waterAlphaAttributePresent: boolean;
+    waterAlphaAttributeItemSize: number;
     focusPoint: { x: number; y: number; z: number } | null;
     queryProbe: {
       surfaceY: number | null;
@@ -215,6 +217,7 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
     const geometry = mesh?.geometry ?? null;
     const positionAttr = geometry?.getAttribute?.('position') ?? null;
     const colorAttr = geometry?.getAttribute?.('color') ?? null;
+    const waterAlphaAttr = geometry?.getAttribute?.('waterAlpha') ?? null;
     geometry?.computeBoundingBox?.();
     const box = geometry?.boundingBox ?? null;
     const center = box
@@ -245,7 +248,7 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
         }
         const surfaceY = waterSystem.getWaterSurfaceY(sample);
         if (!Number.isFinite(surfaceY)) continue;
-        const alpha = colorAttr?.getW ? colorAttr.getW(index) : 1;
+        const alpha = waterAlphaAttr?.getX ? waterAlphaAttr.getX(index) : 1;
         const centerDistance = center
           ? Math.hypot(sample.x - center.x, sample.z - center.z)
           : index;
@@ -261,7 +264,7 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
     if (focusPoint && box && engine?.renderer?.camera && engine.renderer.setOverrideCamera) {
       const camera = engine.renderer.camera.clone();
       const span = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
-      const cameraDistance = span > 8_000 ? 180 : 95;
+      const cameraDistance = Math.min(520, Math.max(160, span * 0.42));
       camera.position.set(
         focusPoint.x + cameraDistance,
         Math.max(focusPoint.y + cameraDistance * 0.62, focusPoint.y + 45),
@@ -269,7 +272,7 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
       );
       camera.lookAt(focusPoint.x, focusPoint.y, focusPoint.z);
       camera.near = 0.1;
-      camera.far = Math.max(camera.far, 3_000);
+      camera.far = Math.max(camera.far, span * 3, 3_000);
       camera.updateProjectionMatrix();
       engine.renderer.setOverrideCamera(camera);
     }
@@ -306,6 +309,12 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
       vertexCount: positionAttr?.count ?? 0,
       colorAttributePresent: Boolean(colorAttr?.count && positionAttr?.count && colorAttr.count === positionAttr.count),
       colorAttributeItemSize: colorAttr?.itemSize ?? 0,
+      waterAlphaAttributePresent: Boolean(
+        waterAlphaAttr?.count
+        && positionAttr?.count
+        && waterAlphaAttr.count === positionAttr.count,
+      ),
+      waterAlphaAttributeItemSize: waterAlphaAttr?.itemSize ?? 0,
       focusPoint,
       queryProbe,
       boundingBox: box && center
@@ -331,7 +340,9 @@ function resultPassed(result: RuntimeProofResult): boolean {
     && result.proof.waterInfo?.waterBodyVisible === true
     && result.proof.waterInfo?.waterBodyMaterialProfile === 'level_depth_water_body'
     && result.proof.colorAttributePresent
-    && result.proof.colorAttributeItemSize === 4
+    && result.proof.colorAttributeItemSize === 3
+    && result.proof.waterAlphaAttributePresent
+    && result.proof.waterAlphaAttributeItemSize === 1
     && (result.proof.waterInfo?.waterBodySegmentCount ?? 0) > 0
     && Number.isFinite(result.proof.queryProbe?.surfaceY ?? NaN)
     && (result.proof.queryProbe?.depthOneMeterBelowSurface ?? 0) > 0.9
@@ -362,6 +373,8 @@ function toMarkdown(report: RuntimeProofReport): string {
       `- Water body material profile: ${String(result.proof.waterInfo?.waterBodyMaterialProfile ?? null)}`,
       `- Water body color attribute present: ${String(result.proof.colorAttributePresent)}`,
       `- Water body color attribute item size: ${String(result.proof.colorAttributeItemSize)}`,
+      `- Water body alpha attribute present: ${String(result.proof.waterAlphaAttributePresent)}`,
+      `- Water body alpha attribute item size: ${String(result.proof.waterAlphaAttributeItemSize)}`,
       `- Water body focus point: ${JSON.stringify(result.proof.focusPoint)}`,
       `- Query probe: ${JSON.stringify(result.proof.queryProbe)}`,
       `- Water bodies: ${String(result.proof.waterInfo?.waterBodyCount ?? null)}`,

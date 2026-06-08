@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (SOL-1 engineering closeout: `SunDiscMesh` owns the depth-tested hot body with a broader warm core and fractured amber shell, the TSL dome keeps only tight warm solar mass, full 33-shot matrix and A Shau ridge proof pass, production live proof passes through `npm run check:live-release`; owner visual acceptance remains open)
+Last verified: 2026-06-08 (basin-water rearch local proof: Open Frontier and A Shau use authored level/depth basin footprints instead of reach ribbons; `npm run check:water-runtime -- --headless` passes with `water_body` samples and fresh screenshots; prior SOL-1 live proof remains recorded separately; owner visual acceptance remains open)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -41,12 +41,13 @@ Control home-base no-drift/flat-core browser evidence. Latest local headed
 proof is `PASS`:
 `artifacts/playtests/terrain-vehicle-water-foundation-reset/terrain-foundation-proof.json`.
 The earlier hydrology checks are diagnostic only: screenshots showed the old
-water path could read as a narrow terrain-following surface. R2 replaces the
-accepted gameplay-water surface with authored Open Frontier and A Shau
-level/depth reaches: they carve bathymetry, render `level-depth-water-bodies`,
-and return `water_body` samples while hydrology remains a drainage/material
-sensor. The headed local foundation proof passes. The live Cloudflare Pages
-proof also passes for `df97e707`:
+water path could read as a narrow terrain-following surface. The accepted
+gameplay-water surface is now authored Open Frontier and A Shau level/depth
+basins: they carve bounded beds, render filled `level-depth-water-bodies`
+footprints, and return `water_body` samples while hydrology remains a
+drainage/material sensor. The fresh local runtime proof passes:
+`artifacts/perf/2026-06-08T17-31-57-587Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
+The previous live Cloudflare Pages proof passes for `df97e707`:
 `artifacts/perf/2026-06-07T21-16-21-306Z/projekt-143-live-release-proof/release-proof.json`.
 Owner playtest remains open for subjective terrain/water/vehicle feel.
 
@@ -197,12 +198,14 @@ as of this refresh:
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.
-- Open Frontier and A Shau now use authored level/depth water bodies for
+- Open Frontier and A Shau now use authored level/depth basin water bodies for
   playable water instead of hydrology river surfaces; the legacy global
   sea-level plane is opt-in only and disabled in both modes. Hydrology remains
-  useful for drainage/material masks. The current renderer uses a daytime
-  standard-material bridge plus a cool opaque night material; water game-feel
-  and a future natural WebGPU/TSL water material remain polish work.
+  useful for drainage/material masks. The current renderer draws filled basin
+  footprints with deterministic shoreline variation, depth-color/alpha rings,
+  a daytime standard-material bridge, and a cool opaque night material; owner
+  water game-feel acceptance, shoreline art polish, and a future natural
+  WebGPU/TSL water material remain polish work.
 - Pixel Forge NPC/vegetation runtime art is the production truth; old
   sprites/source-soldier PNGs are guarded by
   `npm run check:pixel-forge-cutover`.

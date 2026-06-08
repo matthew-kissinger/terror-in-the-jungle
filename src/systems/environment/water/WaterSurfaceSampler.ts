@@ -184,29 +184,33 @@ export class WaterSurfaceSampler {
   }
 
   /**
-   * Walk authored level/depth water-body reaches and return the constant
-   * surface Y of the nearest covered segment. The segment also carries flow
-   * and bed-depth metadata for gameplay diagnostics.
+   * Walk authored level/depth water bodies and return the constant surface Y
+   * of the nearest covered footprint. The query shape can be a legacy reach
+   * segment or a basin body; the segment also carries flow and bed-depth
+   * metadata for gameplay diagnostics.
    */
   private sampleWaterBody(
     x: number,
     z: number,
   ): { surfaceY: number; segment: WaterBodyQuerySegment } | null {
     const segments = this.bindings.getWaterBodyQuerySegments();
-    let nearest: { distanceSq: number; surfaceY: number; segment: WaterBodyQuerySegment } | null = null;
+    let nearest: { distanceSq: number; priority: number; surfaceY: number; segment: WaterBodyQuerySegment } | null = null;
     for (const segment of segments) {
-      const dx = segment.endX - segment.startX;
-      const dz = segment.endZ - segment.startZ;
-      const lengthSq = dx * dx + dz * dz;
-      if (lengthSq <= 0) continue;
-      const t = clamp(((x - segment.startX) * dx + (z - segment.startZ) * dz) / lengthSq, 0, 1);
-      const sampleX = segment.startX + dx * t;
-      const sampleZ = segment.startZ + dz * t;
-      const distanceSq = (x - sampleX) ** 2 + (z - sampleZ) ** 2;
-      if (distanceSq > segment.halfWidth ** 2) continue;
-      const surfaceY = segment.startSurfaceY + (segment.endSurfaceY - segment.startSurfaceY) * t;
-      if (!nearest || distanceSq < nearest.distanceSq) {
-        nearest = { distanceSq, surfaceY, segment };
+      const candidate = segment.shape === 'basin'
+        ? sampleBasinWaterBody(segment, x, z)
+        : sampleReachWaterBody(segment, x, z);
+      if (!candidate) continue;
+      if (
+        !nearest
+        || segment.priority > nearest.priority
+        || (segment.priority === nearest.priority && candidate.distanceSq < nearest.distanceSq)
+      ) {
+        nearest = {
+          distanceSq: candidate.distanceSq,
+          priority: segment.priority,
+          surfaceY: candidate.surfaceY,
+          segment,
+        };
       }
     }
     return nearest === null ? null : { surfaceY: nearest.surfaceY, segment: nearest.segment };
@@ -221,4 +225,59 @@ interface WaterFlowSegment {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function sampleReachWaterBody(
+  segment: WaterBodyQuerySegment,
+  x: number,
+  z: number,
+): { distanceSq: number; surfaceY: number } | null {
+  const dx = segment.endX - segment.startX;
+  const dz = segment.endZ - segment.startZ;
+  const lengthSq = dx * dx + dz * dz;
+  if (lengthSq <= 0) return null;
+  const t = clamp(((x - segment.startX) * dx + (z - segment.startZ) * dz) / lengthSq, 0, 1);
+  const sampleX = segment.startX + dx * t;
+  const sampleZ = segment.startZ + dz * t;
+  const distanceSq = (x - sampleX) ** 2 + (z - sampleZ) ** 2;
+  if (distanceSq > segment.halfWidth ** 2) return null;
+  return {
+    distanceSq,
+    surfaceY: segment.startSurfaceY + (segment.endSurfaceY - segment.startSurfaceY) * t,
+  };
+}
+
+function sampleBasinWaterBody(
+  segment: WaterBodyQuerySegment,
+  x: number,
+  z: number,
+): { distanceSq: number; surfaceY: number } | null {
+  const centerX = segment.centerX;
+  const centerZ = segment.centerZ;
+  const radiusX = segment.radiusXMeters;
+  const radiusZ = segment.radiusZMeters;
+  if (
+    !Number.isFinite(centerX)
+    || !Number.isFinite(centerZ)
+    || !Number.isFinite(radiusX)
+    || !Number.isFinite(radiusZ)
+    || (radiusX ?? 0) <= 0
+    || (radiusZ ?? 0) <= 0
+  ) {
+    return sampleReachWaterBody(segment, x, z);
+  }
+
+  const rotation = segment.rotationRadians ?? 0;
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const dx = x - (centerX ?? 0);
+  const dz = z - (centerZ ?? 0);
+  const localX = dx * cos + dz * sin;
+  const localZ = -dx * sin + dz * cos;
+  const normalizedDistanceSq = (localX / (radiusX ?? 1)) ** 2 + (localZ / (radiusZ ?? 1)) ** 2;
+  if (normalizedDistanceSq > 1) return null;
+  return {
+    distanceSq: normalizedDistanceSq,
+    surfaceY: segment.startSurfaceY,
+  };
 }

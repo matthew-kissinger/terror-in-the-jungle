@@ -253,7 +253,49 @@ export interface WaterBodyReachConfig {
   points: WaterBodyPointConfig[];
 }
 
-export type WaterBodyConfig = WaterBodyReachConfig;
+export interface WaterBodyCenterConfig {
+  x: number;
+  z: number;
+}
+
+export interface WaterBodyFlowDirectionConfig {
+  x: number;
+  z: number;
+}
+
+export interface WaterBodyBasinConfig {
+  id: string;
+  kind: 'basin';
+  /** Constant water surface height for this playable basin. */
+  surfaceY: number;
+  /** Ellipse center in world XZ. */
+  center: WaterBodyCenterConfig;
+  /** Ellipse radius along local X, before rotation. */
+  radiusXMeters: number;
+  /** Ellipse radius along local Z, before rotation. */
+  radiusZMeters: number;
+  /** Rotation in radians around world Y. */
+  rotationRadians?: number;
+  /** Default carved bed depth below `surfaceY`. */
+  depthMeters?: number;
+  /** Optional debug/visual depth range for shallow bank to deep-center reads. */
+  depthMinMeters?: number;
+  depthMaxMeters?: number;
+  /** Soft bank grading beyond the basin footprint. Defaults from footprint width. */
+  bankGradeMeters?: number;
+  /** Optional authored flow direction for watercraft/swimming samples. */
+  flowDirection?: WaterBodyFlowDirectionConfig;
+  /** Downstream/current speed for watercraft/swimming samples. */
+  flowSpeedMetersPerSecond?: number;
+  /** Terrain stamp priority. Defaults above authored terrain pads in its footprint. */
+  priority?: number;
+  /** Optional vegetation-clear radius. Defaults from footprint + bank grade. */
+  vegetationClearRadiusMeters?: number;
+  /** Deterministic shoreline variation seed for rendering only. */
+  shorelineSeed?: number;
+}
+
+export type WaterBodyConfig = WaterBodyReachConfig | WaterBodyBasinConfig;
 
 interface TerrainFeatureGameplayPolicy {
   linkedZoneId?: string;

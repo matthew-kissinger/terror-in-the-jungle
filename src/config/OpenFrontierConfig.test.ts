@@ -25,10 +25,10 @@ function resolveWaterDispatch(config: {
 }
 
 describe('OpenFrontierConfig water dispatch', () => {
-  it('declares waterEnabled explicitly for authored level/depth reaches', () => {
+  it('declares waterEnabled explicitly for authored level/depth basins', () => {
     expect(OPEN_FRONTIER_CONFIG.waterEnabled).toBe(true);
     expect(OPEN_FRONTIER_CONFIG.waterBodies?.length).toBeGreaterThanOrEqual(2);
-    expect(OPEN_FRONTIER_CONFIG.waterBodies?.every((body) => body.kind === 'reach')).toBe(true);
+    expect(OPEN_FRONTIER_CONFIG.waterBodies?.every((body) => body.kind === 'basin')).toBe(true);
   });
 
   it('explicitly disables the legacy global sea-level plane', () => {

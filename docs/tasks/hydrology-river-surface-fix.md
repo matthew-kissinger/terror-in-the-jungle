@@ -15,9 +15,10 @@ as a narrow child if the reset still needs `WatercraftPhysics.isUnderBridge`.
 2026-06-07 R1/R2 note: local runtime proof briefly improved hydrology
 mesh/query diagnostics, but owner feedback rejected the terrain-following
 surface model. Open Frontier and A Shau now move accepted gameplay water to
-authored level/depth reaches (`water_body` samples, carved bathymetry stamps,
-`level-depth-water-bodies` mesh). Keep hydrology as drainage/material input or
-as a narrow child for bridge-clearance work, not as the close criterion.
+authored level/depth basin bodies (`water_body` samples, carved bathymetry
+stamps, filled `level-depth-water-bodies` mesh). Keep hydrology as
+drainage/material input or as a narrow child for bridge-clearance work, not as
+the close criterion.
 
 ## Files touched (provisional - confirm at Wave 0)
 

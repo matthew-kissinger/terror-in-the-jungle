@@ -806,7 +806,7 @@ async function captureVehicleScenario(port: number, mode: ModeId): Promise<Scena
         distance: mode === 'a_shau_valley' ? 210 : 82,
         bearingDeg: mode === 'a_shau_valley' ? -38 : 118,
       });
-      screenshots.push(await screenshot(page, join(OUT_DIR, `${mode}-water-body-reach.png`)));
+      screenshots.push(await screenshot(page, join(OUT_DIR, `${mode}-water-body-basin.png`)));
     }
     const vehicleDamageProbes = [
       await probeVehicleExplosionDamage(page, mode, 'opfor_m48'),
@@ -870,7 +870,7 @@ function buildChecks(scenarios: ScenarioProof[]): CheckRow[] {
   const zcCaptureZones = (zc?.zones ?? []).filter((zone) => !zone.isHomeBase);
   const allErrors = scenarios.flatMap((scenario) => [...scenario.browserErrors, ...scenario.pageErrors]);
   const screenshots = scenarios.flatMap((scenario) => scenario.screenshots);
-  const waterBodyScreenshots = vehicleScenarios.map((scenario) => `${scenario.mode}-water-body-reach.png`);
+  const waterBodyScreenshots = vehicleScenarios.map((scenario) => `${scenario.mode}-water-body-basin.png`);
   const m48HeightDeltas = m48Rows.map((vehicle) => vehicle.heightDelta);
   const m48FactionCoverage = vehicleScenarios.map((scenario) => {
     const factions = scenario.vehicles
@@ -901,10 +901,10 @@ function buildChecks(scenarios: ScenarioProof[]): CheckRow[] {
 
   return [
     check('browser_errors_clear', allErrors.length === 0, allErrors, 'No browser console errors or page errors during proof capture.'),
-    check('screenshots_written', screenshots.length >= 7 && screenshots.every((shot) => existsSync(join(process.cwd(), shot))), screenshots, 'Expected M48, water-body reach, ZC base-pad, and ZC overview screenshots were written.'),
-    check('water_body_reach_screenshots_written', waterBodyScreenshots.every((filename) =>
+    check('screenshots_written', screenshots.length >= 7 && screenshots.every((shot) => existsSync(join(process.cwd(), shot))), screenshots, 'Expected M48, water-body basin, ZC base-pad, and ZC overview screenshots were written.'),
+    check('water_body_basin_screenshots_written', waterBodyScreenshots.every((filename) =>
       screenshots.some((shot) => shot.endsWith(filename) && existsSync(join(process.cwd(), shot))),
-    ), screenshots.filter((shot) => shot.includes('water-body-reach')), 'Open Frontier and A Shau include dedicated level/depth water-body screenshots for visual review.'),
+    ), screenshots.filter((shot) => shot.includes('water-body-basin')), 'Open Frontier and A Shau include dedicated level/depth basin water-body screenshots for visual review.'),
     check('m48_registered_in_large_modes', vehicleScenarios.every((scenario) =>
       scenario.vehicles.some((vehicle) => vehicle.id.toLowerCase().includes('m48')),
     ), m48Rows.map((vehicle) => vehicle.id), 'Open Frontier and A Shau each registered a live M48 IVehicle.'),
@@ -951,7 +951,7 @@ function buildChecks(scenarios: ScenarioProof[]): CheckRow[] {
         && sections.innerDepthOverTerrainMax !== null
         && sections.innerDepthOverTerrainMax <= 7;
     }), waterGroundSections,
-    'Runtime water-body centerlines and inner banks stay on finite bounded terrain rather than floating, burying, or carving sharp walls.'),
+    'Runtime water-body basin axes and inner banks stay on finite bounded terrain rather than floating, burying, or carving sharp walls.'),
     check('zone_control_home_bases_present', zcHomeBases.length === 2, zcHomeBases.map((zone) => zone.id), 'Zone Control exposes both home-base zones in the live browser runtime.'),
     check('zone_control_home_bases_no_authored_drift', zcHomeBases.length === 2 && homeDrifts.every((drift) =>
       drift !== null && drift <= 0.05,

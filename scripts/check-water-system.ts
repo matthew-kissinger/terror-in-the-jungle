@@ -230,7 +230,7 @@ function main(): void {
     currentContract,
     findings: [
       currentContract.waterBodyConfigPresent && currentContract.waterBodyAuthorityPresent && currentContract.waterBodyRuntimeWiringPresent
-        ? 'Open Frontier and A Shau now declare authored level/depth water bodies; the authority compiles bathymetry stamps and owns runtime water-body queries.'
+        ? 'Open Frontier and A Shau now declare authored level/depth basin water bodies; the authority compiles bathymetry stamps and owns runtime water-body queries.'
         : currentContract.globalWaterPlane && currentContract.cameraFollower
         ? 'The legacy camera-following global plane still exists as an opt-in fallback.'
         : 'Current runtime water contract could not be fully identified from source.',
@@ -238,7 +238,7 @@ function main(): void {
         ? 'A Shau correctly disables the global water plane because the map needs streams, not a sea-level sheet through the DEM.'
         : 'A Shau global-water disable was not found.',
       currentContract.openFrontierGlobalWaterDisabled && currentContract.waterBodyConfigPresent
-        ? 'Open Frontier no longer inherits the global sea-level plane; accepted playable water is authored level/depth water bodies, while hydrology remains drainage/material input.'
+        ? 'Open Frontier no longer inherits the global sea-level plane; accepted playable water is authored level/depth basin water bodies, while hydrology remains drainage/material input.'
         : 'Open Frontier water assumptions need review before rendering acceptance.',
       currentContract.aShauRiverPolylineAssetPresent
         ? currentContract.hydrologyRiverMeshConsumerPresent
@@ -247,7 +247,7 @@ function main(): void {
         : 'A Shau river-polyline data was not found.',
       currentContract.hydrologyBakeManifestPresent && currentContract.hydrologyLoaderPresent
         ? currentContract.waterBodyRuntimeWiringPresent
-          ? 'The hydrology bake manifest, typed loader, default large-map vegetation classifier, and terrain material mask remain wired as drainage/material inputs; authored level/depth water bodies supersede hydrology river surfaces as accepted playable water in Open Frontier and A Shau.'
+          ? 'The hydrology bake manifest, typed loader, default large-map vegetation classifier, and terrain material mask remain wired as drainage/material inputs; authored level/depth basin water bodies supersede hydrology river surfaces as accepted playable water in Open Frontier and A Shau.'
         : currentContract.hydrologyDefaultModePreloadPresent
           ? currentContract.hydrologyDefaultModeBiomeClassificationPresent && currentContract.hydrologyTerrainMaterialMaskPresent
             ? currentContract.hydrologyRiverMeshConsumerPresent && currentContract.hydrologyRiverMeshStartupWiringPresent

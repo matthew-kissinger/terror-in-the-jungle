@@ -26,16 +26,19 @@ boundaries instead of retuning isolated materials.
 
 ## Water Contract
 
-- Gameplay water is authored level/depth water bodies. Those bodies own carved
-  beds, spawn/query samples, render meshes, and accepted player-facing water.
+- Gameplay water is authored level/depth basin water bodies. Those bodies own
+  carved beds, spawn/query samples, filled render footprints, and accepted
+  player-facing water.
 - Hydrology is drainage, terrain-material, and diagnostic input. Do not revive
   hydrology as a narrow ribbon surface unless a new brief explicitly changes
   the water authority model.
 - The legacy global plane is an opt-in fallback only. It must not silently
   become the default Open Frontier or A Shau gameplay water surface.
 - A credible water fix needs both placement proof and visual proof: broad/deep
-  enough bodies, non-surface-only readability, sane night material response, and
-  `water_body` sampler precedence over hydrology.
+  enough basin bodies, non-surface-only readability, sane night material
+  response, and `water_body` sampler precedence over hydrology. Avoid returning
+  to visible reach bands unless a future brief explicitly narrows the scope to a
+  non-gameplay diagnostic overlay.
 
 ## Probe Before Tuning
 

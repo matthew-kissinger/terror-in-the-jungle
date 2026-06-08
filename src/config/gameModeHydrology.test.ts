@@ -47,7 +47,7 @@ describe('global water plane decouple flag', () => {
   it('A Shau renders authored water bodies without the sea-level global plane', () => {
     // The 2000m flat plane at Y=0 would sit hundreds of meters below the DEM
     // valley floor — invisible and wasted. Playable water now comes from
-    // authored level/depth reaches.
+    // authored level/depth basins.
     expect(A_SHAU_VALLEY_CONFIG.waterEnabled).toBe(true);
     expect(A_SHAU_VALLEY_CONFIG.globalWaterPlaneEnabled).toBe(false);
     expect(A_SHAU_VALLEY_CONFIG.waterBodies?.length).toBeGreaterThanOrEqual(2);

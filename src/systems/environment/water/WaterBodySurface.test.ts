@@ -8,6 +8,7 @@ import type { WaterBodyQuerySegment, WaterBodyStats } from './WaterBodyAuthority
 
 function makeSegment(): WaterBodyQuerySegment {
   return {
+    shape: 'reach',
     waterBodyId: 'test_reach',
     startX: 0,
     startZ: 0,
@@ -16,8 +17,41 @@ function makeSegment(): WaterBodyQuerySegment {
     startSurfaceY: 4,
     endSurfaceY: 4,
     halfWidth: 6,
+    priority: 130,
+    flowX: 1,
+    flowZ: 0,
+    flowSpeedMetersPerSecond: 0.2,
     startDepthMeters: 2,
     endDepthMeters: 3,
+    startBedY: 2,
+    endBedY: 1,
+  };
+}
+
+function makeBasinSegment(): WaterBodyQuerySegment {
+  return {
+    shape: 'basin',
+    waterBodyId: 'test_basin',
+    startX: -74,
+    startZ: 0,
+    endX: 74,
+    endZ: 0,
+    startSurfaceY: 4,
+    endSurfaceY: 4,
+    halfWidth: 36,
+    priority: 130,
+    flowX: 1,
+    flowZ: 0,
+    flowSpeedMetersPerSecond: 0.2,
+    startDepthMeters: 1.2,
+    endDepthMeters: 4.5,
+    startBedY: -0.5,
+    endBedY: -0.5,
+    centerX: 0,
+    centerZ: 0,
+    radiusXMeters: 110,
+    radiusZMeters: 36,
+    rotationRadians: 0.25,
   };
 }
 
@@ -108,6 +142,20 @@ describe('WaterBodySurface lighting', () => {
     surface.setSegments([makeSegment()], makeStats());
     const mesh = meshFrom(scene);
 
+    expect(mesh.geometry.getAttribute('color').itemSize).toBe(3);
+    expect(mesh.geometry.getAttribute('waterAlpha').itemSize).toBe(1);
+  });
+
+  it('draws basin water as a filled footprint instead of a cross-section ribbon', () => {
+    const scene = new THREE.Scene();
+    const surface = new WaterBodySurface(scene);
+    surface.setSegments([makeBasinSegment()], makeStats());
+    const mesh = meshFrom(scene);
+    const position = mesh.geometry.getAttribute('position');
+    const index = mesh.geometry.getIndex();
+
+    expect(position.count).toBeGreaterThan(400);
+    expect(index?.count).toBeGreaterThan(2_000);
     expect(mesh.geometry.getAttribute('color').itemSize).toBe(3);
     expect(mesh.geometry.getAttribute('waterAlpha').itemSize).toBe(1);
   });
