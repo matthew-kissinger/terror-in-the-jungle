@@ -154,6 +154,9 @@ gate. SOL-1-class changes require authority-chain evidence: scenario coverage,
 time-of-day coverage, and renderer parity that match the touched systems. If the
 change touches fallback materials or renderer-specific sky/water/terrain paths,
 include default WebGPU plus explicit WebGL2/fallback captures before pushing.
+Do not preserve a previous full-matrix claim after a retune unless that exact
+post-retune source was captured; document focused evidence separately from
+closeout evidence.
 
 ## Deployment
 

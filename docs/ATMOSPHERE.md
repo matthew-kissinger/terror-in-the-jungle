@@ -104,20 +104,21 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   analytic sky color. The visible sun path now follows the SDS WebGPU lesson:
   `SunDiscMesh` is ON by default and owns the depth-tested hot body, while the
   TSL dome owns bounded atmospheric glow / horizon scatter plus a tight warm
-  sky solar mass around the body. The current body has mottled internal heat
-  instead of a flat clipped core. Full local matrix proof now passes across all
-  five scenarios and time-of-day captures after fixing stale camera-relative
-  sun-body sync. Representative Open Frontier golden proof records WebGPU
-  `sunCore=0.088%`, `sunSpan=4.81%` and explicit WebGL2 `sunCore=0.061%`,
-  `sunSpan=3.70%`, with parity max channel delta `3.92%`. The WebGPU path keeps
-  the SDS-style additive TSL body; the explicit WebGL renderer path uses a
-  bounded fallback material so the center stays warm instead of clipping to
-  white. A Shau dusk ridge proof passes terrain-occluded sun-body, terrain
-  warmth, sun-scale, and production fallback parity. A Shau midnight also
+  sky solar mass around the body. The current body has a broader warm core,
+  fractured amber shell, and mottled internal heat instead of a tiny clipped
+  pearl inside a smooth surrounding lobe. Focused Open Frontier proof records
+  WebGPU noon/golden/dusk `sunCore=0.112/0.105/0.105%`,
+  `sunSpan=5.37/5.19/5.19%`, explicit WebGL2 golden `sunCore=0.085%`,
+  `sunSpan=4.44%`, and focused WebGPU/WebGL2 parity max channel delta `0.39%`.
+  The WebGPU path keeps the SDS-style additive TSL body; the explicit WebGL
+  renderer path caps the fallback material so the center stays warm instead of
+  clipping to pure white. A Shau dusk ridge proof passes terrain-occluded
+  sun-body, terrain warmth, and sun-scale in strict WebGPU and in bundled
+  Chromium production fallback. A Shau midnight also
   proves the authored level/depth water body on a cool opaque night material
   path with `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)` in the
-  rendered night-terrain region. Rerun `npm run check:live-release` after each
-  production deploy.
+  rendered night-terrain region. Rerun the full visual matrix before SOL-1
+  closeout, and rerun `npm run check:live-release` after each production deploy.
 - The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
   readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,
   not physically exhaustive sky rendering or horizon-scale terrain occlusion.

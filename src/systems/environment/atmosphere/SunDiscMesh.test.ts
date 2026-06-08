@@ -97,6 +97,7 @@ describe('SunDiscMesh', () => {
           bodyFeather?: number;
           hotCoreRadius?: number;
           hotCoreFeather?: number;
+          ownershipTuning?: string;
         };
       };
     };
@@ -111,6 +112,26 @@ describe('SunDiscMesh', () => {
     expect(material.userData.sunDiscShape?.hotCoreFeather).toBeGreaterThan(
       material.userData.sunDiscShape?.hotCoreRadius ?? 0,
     );
+  });
+
+  it('keeps the hot center broad enough to read as fire instead of a pin in a dull sphere', () => {
+    const disc = new SunDiscMesh(DOME_RADIUS);
+    const material = disc.getMaterial() as THREE.Material & {
+      userData: {
+        sunDiscShape?: {
+          bodyRadius?: number;
+          bodyFeather?: number;
+          hotCoreRadius?: number;
+          hotCoreFeather?: number;
+          ownershipTuning?: string;
+        };
+      };
+    };
+    const shape = material.userData.sunDiscShape;
+
+    expect(shape?.ownershipTuning).toBe('large-hot-core-fractured-amber-shell');
+    expect(shape?.hotCoreRadius ?? 0).toBeGreaterThan((shape?.bodyRadius ?? 1) * 0.85);
+    expect(shape?.bodyFeather ?? 1).toBeLessThan((shape?.bodyRadius ?? 0) * 1.35);
   });
 
   it('returns the same mesh handle so AtmosphereSystem can attach it once', () => {

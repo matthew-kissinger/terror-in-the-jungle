@@ -18,6 +18,11 @@ boundaries instead of retuning isolated materials.
 - Separate the visible sun body from atmospheric solar mass. `SunDiscMesh` owns
   the depth-tested hot body. The sky dome owns bounded glow, horizon scatter,
   and LUT-facing atmosphere. Do not make the sky glow carry the whole visual sun.
+- Treat sun-body shape as an ownership contract, not only a size constant. A
+  tiny hot core inside a smooth warm lobe reads like a dull sphere; a huge sky
+  lobe reads like a near object. Keep a readable hot center, irregular ember
+  shell, and tight atmospheric mass, then prove terrain occlusion against the
+  body separately from sky warmth.
 
 ## Water Contract
 
@@ -43,6 +48,9 @@ boundaries instead of retuning isolated materials.
 - Instrument visibility, occlusion, and fallback separately. A sun-size fix that
   only passes WebGPU can still fail the explicit WebGL2 path or production
   fallback.
+- Do not carry an old full-matrix claim across a post-feedback retune. If the
+  source changes after a matrix run, downgrade the docs to focused evidence
+  until the full matrix is rerun.
 
 ## Evidence Matrix
 

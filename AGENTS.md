@@ -103,6 +103,9 @@ For perf-sensitive work, add `npm run validate:full` before push.
   [docs/dev/visual-rearch-lessons.md](docs/dev/visual-rearch-lessons.md)
   before editing. SOL-1 showed those defects are usually authority-chain
   problems, not isolated material constants.
+- If a visual retune lands after a previous evidence matrix, update docs to say
+  focused proof until the full matrix is rerun. Do not inherit stale `33/33` or
+  parity numbers from an older candidate.
 - Local preview evidence is not live production evidence. After deployment,
   verify the live Pages app shell, `/asset-manifest.json`, R2 DEM URL, `/sw.js`,
   Recast WASM/build asset headers, and any service-worker cache behavior before
