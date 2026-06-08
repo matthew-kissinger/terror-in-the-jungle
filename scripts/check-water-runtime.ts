@@ -10,6 +10,9 @@ import { startServer, stopServer } from './preview-server';
 
 type ProofStatus = 'pass' | 'fail';
 
+const MAX_WATER_BODY_TOTAL_VERTICES = 4096;
+const MAX_WATER_BODY_VERTICES_PER_BODY = 512;
+
 interface WaterRuntimeProofOptions {
   modes: string[];
   port: number;
@@ -49,6 +52,14 @@ interface RuntimeProofResult {
     colorAttributeItemSize: number;
     waterAlphaAttributePresent: boolean;
     waterAlphaAttributeItemSize: number;
+    waterBodyVertexBudget: {
+      totalVertices: number;
+      waterBodyCount: number;
+      maxTotalVertices: number;
+      verticesPerBody: number;
+      maxVerticesPerBody: number;
+      pass: boolean;
+    };
     focusPoint: { x: number; y: number; z: number } | null;
     queryProbe: {
       surfaceY: number | null;
@@ -327,10 +338,33 @@ async function runModeProof(page: Page, mode: string, port: number, artifactDir:
     };
   });
 
+  const proofWithBudget = {
+    ...proof,
+    waterBodyVertexBudget: computeWaterBodyVertexBudget(proof),
+  };
+
   await page.waitForTimeout(500);
   const screenshot = join(artifactDir, `${mode}-water-body-proof.png`);
   await page.screenshot({ path: screenshot, fullPage: false });
-  return { mode, screenshot: rel(screenshot), errors, proof };
+  return { mode, screenshot: rel(screenshot), errors, proof: proofWithBudget };
+}
+
+function computeWaterBodyVertexBudget(
+  proof: { vertexCount: number; waterInfo: WaterDebugInfo | null },
+): RuntimeProofResult['proof']['waterBodyVertexBudget'] {
+  const totalVertices = proof.vertexCount;
+  const waterBodyCount = Math.max(0, proof.waterInfo?.waterBodyCount ?? 0);
+  const verticesPerBody = waterBodyCount > 0 ? totalVertices / waterBodyCount : totalVertices;
+  return {
+    totalVertices,
+    waterBodyCount,
+    maxTotalVertices: MAX_WATER_BODY_TOTAL_VERTICES,
+    verticesPerBody,
+    maxVerticesPerBody: MAX_WATER_BODY_VERTICES_PER_BODY,
+    pass: waterBodyCount > 0
+      && totalVertices <= MAX_WATER_BODY_TOTAL_VERTICES
+      && verticesPerBody <= MAX_WATER_BODY_VERTICES_PER_BODY,
+  };
 }
 
 function resultPassed(result: RuntimeProofResult): boolean {
@@ -343,6 +377,7 @@ function resultPassed(result: RuntimeProofResult): boolean {
     && result.proof.colorAttributeItemSize === 3
     && result.proof.waterAlphaAttributePresent
     && result.proof.waterAlphaAttributeItemSize === 1
+    && result.proof.waterBodyVertexBudget.pass
     && (result.proof.waterInfo?.waterBodySegmentCount ?? 0) > 0
     && Number.isFinite(result.proof.queryProbe?.surfaceY ?? NaN)
     && (result.proof.queryProbe?.depthOneMeterBelowSurface ?? 0) > 0.9
@@ -375,6 +410,7 @@ function toMarkdown(report: RuntimeProofReport): string {
       `- Water body color attribute item size: ${String(result.proof.colorAttributeItemSize)}`,
       `- Water body alpha attribute present: ${String(result.proof.waterAlphaAttributePresent)}`,
       `- Water body alpha attribute item size: ${String(result.proof.waterAlphaAttributeItemSize)}`,
+      `- Water body vertex budget: ${JSON.stringify(result.proof.waterBodyVertexBudget)}`,
       `- Water body focus point: ${JSON.stringify(result.proof.focusPoint)}`,
       `- Query probe: ${JSON.stringify(result.proof.queryProbe)}`,
       `- Water bodies: ${String(result.proof.waterInfo?.waterBodyCount ?? null)}`,
@@ -435,8 +471,8 @@ async function main(): Promise<void> {
     options,
     results,
     nonClaims: [
-      'This proof checks runtime mesh presence, public water query probes, and screenshot capture only.',
-      'This proof does not accept final river art, stream flow, crossings, consumer adoption of water interaction samples, physics, or perf.',
+      'This proof checks runtime mesh presence, public water query probes, screenshot capture, and the authored water-body mesh vertex budget.',
+      'This proof does not accept final river art, stream flow, crossings, consumer adoption of water interaction samples, physics, or full scenario frame-time perf.',
       'Human visual acceptance is still required before KB-TERRAIN water can close.',
     ],
   };
@@ -453,6 +489,8 @@ async function main(): Promise<void> {
       + `waterBodies=${result.proof.waterInfo?.waterBodyCount ?? 'n/a'} `
       + `profile=${result.proof.waterInfo?.waterBodyMaterialProfile ?? 'n/a'} `
       + `globalEnabled=${result.proof.waterInfo?.enabled ?? 'n/a'} `
+      + `vertices=${result.proof.waterBodyVertexBudget.totalVertices} `
+      + `verticesPerBody=${result.proof.waterBodyVertexBudget.verticesPerBody.toFixed(1)} `
       + `errors=${result.errors.length} screenshot=${result.screenshot}`,
     );
   }

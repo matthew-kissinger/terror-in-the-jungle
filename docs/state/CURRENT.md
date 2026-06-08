@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (basin-water rearch local proof: Open Frontier and A Shau use authored level/depth basin footprints instead of reach ribbons; `npm run check:water-runtime -- --headless` passes with `water_body` samples and fresh screenshots; prior SOL-1 live proof remains recorded separately; owner visual acceptance remains open)
+Last verified: 2026-06-08 (basin-water rearch local proof: Open Frontier and A Shau use authored level/depth basin footprints instead of reach ribbons; `npm run check:water-runtime -- --headless` passes with `water_body` samples, fresh screenshots, and a 481-vertices-per-body mesh budget; prior SOL-1 live proof remains recorded separately; owner visual acceptance remains open)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -45,8 +45,9 @@ water path could read as a narrow terrain-following surface. The accepted
 gameplay-water surface is now authored Open Frontier and A Shau level/depth
 basins: they carve bounded beds, render filled `level-depth-water-bodies`
 footprints, and return `water_body` samples while hydrology remains a
-drainage/material sensor. The fresh local runtime proof passes:
-`artifacts/perf/2026-06-08T17-31-57-587Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
+drainage/material sensor. The fresh local runtime proof passes and records the
+current mesh cost at 962 total vertices / 481 vertices per basin body:
+`artifacts/perf/2026-06-08T18-04-38-049Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
 The previous live Cloudflare Pages proof passes for `df97e707`:
 `artifacts/perf/2026-06-07T21-16-21-306Z/projekt-143-live-release-proof/release-proof.json`.
 Owner playtest remains open for subjective terrain/water/vehicle feel.

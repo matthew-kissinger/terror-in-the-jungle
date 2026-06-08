@@ -120,7 +120,10 @@ level/depth basin water bodies with carved beds, filled render footprints,
 deterministic shoreline variation, depth-color/alpha rings, and `water_body`
 samples. Hydrology is still useful for drainage/material classification, but it
 is not the player-facing water surface. The global plane remains an opt-in
-fallback for legacy/simple modes.
+fallback for legacy/simple modes. `npm run check:water-runtime -- --headless`
+now gates those bodies with runtime screenshots, public water-query probes, and
+a mesh-budget assertion; the current Open Frontier/A Shau bodies cost 962 total
+vertices / 481 vertices per basin body.
 
 ## Tick Graph
 
