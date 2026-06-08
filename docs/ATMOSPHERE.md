@@ -94,8 +94,8 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   nav connectivity as passing, but route/NPC movement quality and airfield use
   still need play-path validation. The run also proves the A Shau work did not
   prevent Open Frontier, TDM, Zone Control, or combat120 from entering live mode.
-- SOL-1 remains open for owner visual acceptance; live production proof passed
-  on deployed commit `d8f7985d`.
+- SOL-1 remains open for owner visual acceptance; live production proof is the
+  per-deploy `check:live-release` gate.
   The current mitigation removes cyan/white night-water and sub-horizon light
   defaults, keeps renderer, water, billboard lighting, and terrain night fill on
   one effective lighting snapshot, and applies a bounded low-sun terrain
@@ -104,16 +104,15 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   analytic sky color. The visible sun path now follows the SDS WebGPU lesson:
   `SunDiscMesh` is ON by default and owns the depth-tested hot body, while the
   TSL dome owns bounded atmospheric glow / horizon scatter plus a tight warm
-  sky solar mass around the body. Full local matrix proof now passes across all
+  sky solar mass around the body. The current body has mottled internal heat
+  instead of a flat clipped core. Full local matrix proof now passes across all
   five scenarios and time-of-day captures after fixing stale camera-relative
   sun-body sync. Representative Open Frontier golden proof records WebGPU
-  `sunCore=0.053%`, `sunSpan=3.52%` and explicit WebGL2 `sunCore=0.044%`,
-  `sunSpan=3.33%`, with parity max channel delta `1.57%`. A Shau dusk ridge
+  `sunCore=0.045%`, `sunSpan=3.33%` and explicit WebGL2 `sunCore=0.042%`,
+  `sunSpan=3.24%`, with parity max channel delta `4.31%`. A Shau dusk ridge
   proof passes terrain-occluded sun-body, terrain warmth, sun-scale, and
-  production fallback parity. Production parity passed with
-  `artifacts/perf/2026-06-08T11-27-23-796Z/projekt-143-live-release-proof/release-proof.json`
-  after deploy run `27134232367` and CI run `27134316468`; rerun
-  `npm run check:live-release` after each later deploy.
+  production fallback parity. Rerun `npm run check:live-release` after each
+  production deploy.
 - The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
   readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,
   not physically exhaustive sky rendering or horizon-scale terrain occlusion.

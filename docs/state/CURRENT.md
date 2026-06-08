@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (SOL-1 SDS-style candidate is live on `d8f7985d`: `SunDiscMesh` owns the depth-tested hot body, the TSL dome adds bounded glow plus warm sky solar mass, full local visual matrix and A Shau ridge proof pass, and `check:live-release` passed; owner visual acceptance remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
+Last verified: 2026-06-08 (SOL-1 SDS-style candidate: `SunDiscMesh` owns the depth-tested hot body with mottled internal heat, the TSL dome adds bounded glow plus tighter warm sky solar mass, full local visual matrix and A Shau ridge proof pass; owner visual acceptance remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -168,13 +168,14 @@ as of this refresh:
   tightened `sun-scale` so missing sun-body detection fails instead of passing.
   The final focused source candidate fixes stale camera-relative `SunDiscMesh`
   positioning in `syncDomePosition()`, retunes the depth-tested body with a
-  broader warm-white center and ember rim, and adds a tight SDS-style warm sky
-  solar mass so the surrounding area no longer reads as a damp grey sphere. The
+  broader warm-white center, mottled internal heat, and ember rim, and adds a
+  tighter SDS-style warm sky solar mass so the surrounding area no longer reads
+  as a damp grey sphere. The
   full local matrix now passes across all five scenarios and time-of-day
   captures. Representative Open Frontier golden proof records WebGPU
-  `sunCore=0.053%`, `sunSpan=3.52%` and explicit WebGL2 `sunCore=0.044%`,
-  `sunSpan=3.33%`, with WebGPU/WebGL2 parity max channel delta `1.57%`.
-  Matrix-wide sun core is `0.044-0.054%`, sun span is `3.33-3.52%`, and all
+  `sunCore=0.045%`, `sunSpan=3.33%` and explicit WebGL2 `sunCore=0.042%`,
+  `sunSpan=3.24%`, with WebGPU/WebGL2 parity max channel delta `4.31%`.
+  Matrix-wide WebGPU sun core is `0.044-0.048%`, sun span is `3.33-3.43%`, and all
   sun-scale checks pass. Midnight rendered-terrain
   checks pass red/white/cyan bounds across all five scenarios; the older strict
   night-red sampler remains intentionally over-tight and logs strict failures,
@@ -184,11 +185,9 @@ as of this refresh:
   `sunVisibility=terrain-occluded`, `sunOcclusion=55m`, `sunCore=0`,
   `sunSpan=0`, ridge warmth PASS, sun-scale PASS, and parity max channel delta
   `0.00%`.
-  Production parity passed on deployed commit `d8f7985d` with
-  `artifacts/perf/2026-06-08T11-27-23-796Z/projekt-143-live-release-proof/release-proof.json`
-  after deploy run `27134232367` and CI run `27134316468`; rerun
-  `npm run check:live-release` after each later deployment. SOL-1 is still not
-  visually accepted: the next goal is SOL-1R7 owner visual acceptance.
+  Production parity is proven by rerunning `npm run check:live-release` after
+  each deployment. SOL-1 is still not visually accepted: the next goal is
+  SOL-1R7 owner visual acceptance.
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.

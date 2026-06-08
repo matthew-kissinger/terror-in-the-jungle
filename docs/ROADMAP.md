@@ -126,9 +126,9 @@ Carry these findings into the next Projekt revamp:
   `SunDiscMesh` owns a depth-tested hot sun body and the TSL sky dome owns
   bounded atmospheric glow/scatter plus a tight warm sky solar mass. Full local
   matrix proof now passes across all five scenarios and time-of-day captures;
-  representative Open Frontier golden proof records WebGPU `sunCore=0.053%`,
-  `sunSpan=3.52%` and explicit WebGL2 `sunCore=0.044%`, `sunSpan=3.33%`, with
-  parity max channel delta `1.57%`. A Shau dusk ridge proof passes strict WebGPU
+  representative Open Frontier golden proof records WebGPU `sunCore=0.045%`,
+  `sunSpan=3.33%` and explicit WebGL2 `sunCore=0.042%`, `sunSpan=3.24%`, with
+  parity max channel delta `4.31%`. A Shau dusk ridge proof passes strict WebGPU
   and production `webgpu-force-webgl` fallback terrain occlusion, sun-scale, and
   parity. Production parity remains the per-deploy
   `check:live-release` gate; owner visual acceptance remains the SOL-1 closeout

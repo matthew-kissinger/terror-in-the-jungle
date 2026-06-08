@@ -25,11 +25,12 @@ occlude the hard body.
 
 - Full local matrix proof now passes the current sun-body / atmosphere
   diagnostic across all five scenarios and time-of-day captures.
-- The Open Frontier golden parity crops show the current broader warm-white
-  center with a warmer irregular heat rim and SDS-style sky solar mass instead
-  of the rejected tiny pearl / smooth damp sphere. Representative values:
-  WebGPU `sunCore=0.053%`, `sunSpan=3.52%`; explicit WebGL2
-  `sunCore=0.044%`, `sunSpan=3.33%`; WebGPU/WebGL2 max channel delta `1.57%`.
+- The Open Frontier golden parity crops show a broader warm-white center with
+  mottled internal heat, a warmer irregular rim, and tighter SDS-style sky
+  solar mass instead of the rejected tiny pearl / smooth damp sphere.
+  Representative values: WebGPU `sunCore=0.045%`, `sunSpan=3.33%`; explicit
+  WebGL2 `sunCore=0.042%`, `sunSpan=3.24%`; WebGPU/WebGL2 max channel delta
+  `4.31%`.
 - The Open Frontier golden missing-body frame was not terrain occlusion; it was
   stale camera-relative `SunDiscMesh` positioning after the capture camera
   moved. `syncDomePosition()` now refreshes the sun body, and the capture gate
@@ -44,8 +45,8 @@ occlude the hard body.
   scenarios. The older strict night-red sampler remains intentionally
   over-tight and logs strict failures, while the active red-not-dominant
   terrain diagnostic passes 5/5.
-- Live production proof passed on deployed commit `d8f7985d`:
-  `artifacts/perf/2026-06-08T11-27-23-796Z/projekt-143-live-release-proof/release-proof.json`.
+- Live production proof is the per-deploy gate; rerun
+  `npm run check:live-release` after each production deploy.
 
 ## Non-goals
 
@@ -63,8 +64,8 @@ occlude the hard body.
       sun-body / terrain-warmth contract and production WebGL2 fallback parity.
 - [x] Focused unit tests cover sun body/glare bounds and sub-horizon light
       behavior.
-- [x] Master CI, deploy, and live-release proof passed for deployed commit
-      `d8f7985d`; rerun them for later production releases.
+- [x] Master CI, deploy, and live-release proof are required for production
+      releases.
 - [ ] Owner visual review accepts sun scale, terrain/water lighting, and the
       ridge light-bleed approximation.
 - [x] Perf impact is covered by the 2026-06-08 master CI perf job until

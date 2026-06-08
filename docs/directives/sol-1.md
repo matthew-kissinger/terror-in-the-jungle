@@ -32,15 +32,16 @@ reference contract:
   replaces the rejected pale circular lobe without painting a second hard HDR
   disc into the dome.
 - The sprite and sky mass were retuned from the rejected tiny white pearl /
-  damp sphere into a visible hot object: broader warm-white center, irregular
-  ember rim, and warm surrounding solar mass. Representative focused crops are
+  damp sphere into a visible hot object: broader warm-white center, mottled
+  internal heat, irregular ember rim, and tighter warm surrounding solar mass.
+  Representative focused crops are
   `artifacts/cycle-sun-and-atmosphere-overhaul/playtest-evidence/crop-parity-openfrontier-golden-webgpu.png`
-  and `crop-parity-openfrontier-golden-webgl.png`.
+  and `crop-close-parity-openfrontier-golden-webgpu.png`.
 - Full local matrix proof now passes the sun-scale detector across all five
   scenarios and time-of-day captures. Representative Open Frontier golden
-  proof records WebGPU `sunCore=0.053%`, `sunSpan=3.52%`; explicit WebGL2
-  records `sunCore=0.044%`, `sunSpan=3.33%`. WebGPU/WebGL2 color parity stays
-  under cap with max channel delta `1.57%`.
+  proof records WebGPU `sunCore=0.045%`, `sunSpan=3.33%`; explicit WebGL2
+  records `sunCore=0.042%`, `sunSpan=3.24%`. WebGPU/WebGL2 color parity stays
+  under cap with max channel delta `4.31%`.
 - Open Frontier golden previously looked like a terrain-occluded body, but the
   new terrain ray probe showed it was `missing-unoccluded`; the root cause was
   stale camera-relative `SunDiscMesh` positioning after capture camera moves.
@@ -54,10 +55,8 @@ reference contract:
   scenarios. The older strict night-red sampler remains intentionally
   over-tight and logs strict failures, while the active red-not-dominant
   terrain diagnostic passes 5/5.
-- Live production proof passed for deployed commit `d8f7985d` with
-  `artifacts/perf/2026-06-08T11-27-23-796Z/projekt-143-live-release-proof/release-proof.json`
-  after deploy run `27134232367` and CI run `27134316468`. Future deploys must
-  rerun `npm run check:live-release` and use the live `/asset-manifest.json`
+- Live production proof is a per-deploy gate. Future deploys must rerun
+  `npm run check:live-release` and use the live `/asset-manifest.json`
   `gitSha` as production truth.
 
 These are automated diagnostics, not owner visual acceptance. SOL-1 stays open
