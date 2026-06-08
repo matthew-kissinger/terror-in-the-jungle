@@ -4,6 +4,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { WaterSystem } from './WaterSystem';
+import type { AtmosphereLightingSnapshot } from './AtmosphereSystem';
 import type { WaterBodyConfig } from '../../config/gameModeTypes';
 import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import type { AssetLoader } from '../assets/AssetLoader';
@@ -100,6 +101,29 @@ function makeWaterBody(): WaterBodyConfig {
   };
 }
 
+function makeAtmosphereWithLightingSnapshot(
+  rawSun: THREE.Vector3,
+  directLight: THREE.Vector3,
+  daylightFactor: number,
+): ISkyRuntime {
+  return {
+    ...makeAtmosphere(rawSun),
+    getLightingSnapshot: (out: AtmosphereLightingSnapshot) => {
+      out.sunDirection.copy(rawSun);
+      out.directLightDirection.copy(directLight);
+      out.directLightColor.setRGB(0.18, 0.2, 0.3);
+      out.skyColor.setRGB(0.08, 0.1, 0.16);
+      out.groundColor.setRGB(0.02, 0.025, 0.04);
+      out.ambientColor.setRGB(0.055, 0.07, 0.105);
+      out.fogColor.setRGB(0.04, 0.05, 0.08);
+      out.daylightFactor = daylightFactor;
+      out.nightBlend = 1 - daylightFactor;
+      out.sunAboveHorizon = rawSun.y >= 0;
+      return out;
+    },
+  } as ISkyRuntime;
+}
+
 describe('WaterSystem sun direction from atmosphere', () => {
   it('copies the atmosphere sun direction into its internal sun vector on bind', () => {
     const system = makeSystem();
@@ -123,6 +147,39 @@ describe('WaterSystem sun direction from atmosphere', () => {
 
     const sun = (system as unknown as { sun: THREE.Vector3 }).sun;
     expect(sun.length()).toBeCloseTo(1, 5);
+  });
+
+  it('uses the effective lighting direction from the atmosphere snapshot when available', () => {
+    const system = makeSystem();
+    const rawSubHorizonSun = new THREE.Vector3(0.1, -0.8, 0.1).normalize();
+    const directNightLight = new THREE.Vector3(-0.35, 0.55, 0.72).normalize();
+
+    system.setAtmosphereSystem(makeAtmosphereWithLightingSnapshot(rawSubHorizonSun, directNightLight, 0));
+
+    const sun = (system as unknown as { sun: THREE.Vector3 }).sun;
+    expect(sun.x).toBeCloseTo(directNightLight.x, 5);
+    expect(sun.y).toBeCloseTo(directNightLight.y, 5);
+    expect(sun.z).toBeCloseTo(directNightLight.z, 5);
+  });
+
+  it('dims global water material from the atmosphere snapshot daylight factor', () => {
+    const system = makeSystem();
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    (system as unknown as { water: { visible: boolean; material: THREE.MeshStandardMaterial; position: THREE.Vector3 } }).water = {
+      visible: false,
+      material,
+      position: new THREE.Vector3(),
+    };
+    system.setAtmosphereSystem(makeAtmosphereWithLightingSnapshot(
+      new THREE.Vector3(0, -1, 0),
+      new THREE.Vector3(0, 1, 0),
+      0,
+    ));
+
+    system.update(0.016);
+
+    expect(material.color.getHex()).toBe(0x061018);
+    expect(material.envMapIntensity).toBeCloseTo(0.04, 5);
   });
 
   it('disabled water does not report underwater positions', () => {

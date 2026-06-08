@@ -23,6 +23,39 @@ import {
   smoothstep as tslSmoothstepBase,
   vec3,
 } from 'three/tsl';
+import {
+  NIGHT_SKY_FLOOR_BLEND_FULL_Y,
+  NIGHT_SKY_FLOOR_BLEND_START_Y,
+  NIGHT_SKY_FLOOR_DAY_GAIN,
+  NIGHT_SKY_FLOOR_NIGHT_GAIN,
+} from './HosekWilkieNightSkyFloor';
+import {
+  CUTOFF_ANGLE,
+  EE_BASE,
+  MIE_CONST,
+  MOON_COLOR_B,
+  MOON_COLOR_G,
+  MOON_COLOR_R,
+  STEEPNESS,
+  SUN_AUREOLE_OUTER_LOWSUN_DEFAULT,
+  SUN_AUREOLE_OUTER_NOON_DEFAULT,
+  SUN_AUREOLE_RELATIVE_GAIN,
+  SUN_BASE_GLARE_CAP_B,
+  SUN_BASE_GLARE_CAP_G,
+  SUN_BASE_GLARE_CAP_R,
+  SUN_BASE_GLARE_COMPRESS_OUTER_DEFAULT,
+  SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y,
+  SUN_BASE_GLARE_HIGH_SUN_BLEND_START_Y,
+  SUN_BASE_GLARE_HIGH_SUN_CAP_B,
+  SUN_BASE_GLARE_HIGH_SUN_CAP_G,
+  SUN_BASE_GLARE_HIGH_SUN_CAP_R,
+  SUN_DISC_HDR_GAIN,
+  SUN_DISC_INNER_DEFAULT,
+  SUN_DISC_OUTER_DEFAULT,
+  TOTAL_RAYLEIGH,
+  TWILIGHT_LOWER_RAD,
+  TWILIGHT_UPPER_RAD,
+} from './HosekWilkieTslConstants';
 
 /**
  * TSL per-fragment Preetham sky node + in-shader HDR sun-disc.
@@ -43,62 +76,6 @@ import {
  * task) is mirrored here so the per-fragment dome doesn't reintroduce the
  * red-sky bleed when the sun drops below civil twilight.
  */
-
-// Preetham scattering constants (matches the CPU port for parity).
-const TOTAL_RAYLEIGH = [
-  5.804542996261093e-6,
-  1.3562911419845635e-5,
-  3.0265902468824876e-5,
-] as const;
-const MIE_CONST = [
-  1.8399918514433978e14,
-  2.7798023919660528e14,
-  4.0790479543861094e14,
-] as const;
-
-// Sun zenith-intensity tuning. Matches the CPU port's
-// (cutoffAngle, steepness, EE) constants in `evaluateAnalytic`.
-const CUTOFF_ANGLE = 1.6110731556870734;
-const STEEPNESS = 1.5;
-const EE_BASE = 1000.0;
-
-// Sun-disc default angular size (gameplay-readable per spike Section 6 q3 +
-// cycle #12 R2 `sun-disc-and-aureole-tuning`). The visible pearl spans
-// roughly 4° apparent diameter — Inner = cos(1.5°) (full HDR pin-point),
-// Outer = cos(2.5°) (smoothstep falloff to zero). Range: ~70-120 px in
-// 1080p 90°-hFOV per the spike Section 4 "Sun screen-space behavior" target.
-const SUN_DISC_INNER_DEFAULT = Math.cos((1.5 * Math.PI) / 180);
-const SUN_DISC_OUTER_DEFAULT = Math.cos((2.5 * Math.PI) / 180);
-
-// HDR aureole / glare halo around the visible disc. A second smoothstep
-// outside the disc-outer falloff adds a softer additive contribution
-// (cycle #12 R2 `sun-disc-and-aureole-tuning`, spike Section 4).
-//   Inner aureole edge = the disc-outer cone (so the halo blends seamlessly
-//     out of the pearl).
-//   Outer aureole edge at noon (sun.y = 1) = cos(8°) (mid of the 6-10°
-//     target band).
-//   Outer aureole edge at low sun (sun.y = 0) = cos(22°) (mid of the
-//     15-30° mie-band target stretch).
-// `mix(NOON_OUTER, LOWSUN_OUTER, 1 - sun.y)` ramps between the two by
-// elevation. The halo radiance is scaled to ~3% of the disc HDR gain so
-// the aureole reads as a glow, not a second disc.
-const SUN_AUREOLE_OUTER_NOON_DEFAULT = Math.cos((8 * Math.PI) / 180);
-const SUN_AUREOLE_OUTER_LOWSUN_DEFAULT = Math.cos((22 * Math.PI) / 180);
-const SUN_AUREOLE_RELATIVE_GAIN = 0.03;
-
-// Pre-merge HDR sun-disc intensity coefficient (`vSunE * 19000.0 * Fex`).
-const SUN_DISC_HDR_GAIN = 19000.0;
-
-// Civil-twilight elevation band for the night-red fix.
-// Sun↔moon blend interpolates over [-8°, -2°] elevation.
-const TWILIGHT_UPPER_RAD = (-2 * Math.PI) / 180;
-const TWILIGHT_LOWER_RAD = (-8 * Math.PI) / 180;
-
-// Cool moonlight color the sun-color path lerps toward below civil
-// twilight (mirrors `night-red-fix` task's `MOON_COLOR`).
-const MOON_COLOR_R = 0.18;
-const MOON_COLOR_G = 0.20;
-const MOON_COLOR_B = 0.30;
 
 type UniformSlot<T = unknown> = { value: T };
 type TslNode = any;
@@ -146,13 +123,12 @@ export interface HosekWilkieTslUniforms {
   sunDiscOuter: UniformSlot<number>;
   /**
    * Cosine of the aureole outer edge at noon (sun.y = 1). Adds a soft
-   * additive halo outside the visible disc. 6-10° target per spike
-   * Section 4; default cos(8°).
+   * additive halo outside the visible disc. Default cos(1.5°).
    */
   sunAureoleOuterNoon: UniformSlot<number>;
   /**
    * Cosine of the aureole outer edge at low sun (sun.y = 0). The halo
-   * stretches into the mie band (15-30° per spike); default cos(22°).
+   * stretches modestly without becoming a second sun; default cos(3°).
    * Per-fragment elevation interpolates between the two edges.
    */
   sunAureoleOuterLowSun: UniformSlot<number>;
@@ -366,8 +342,24 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
     const blend = oneVec.add(lowLow.sub(oneVec).mul(horizonMixClamped));
     const linBlended = linHigh.mul(blend);
 
-    // Night-sky floor (matches CPU lines 844-846: `0.1 * fex`).
-    const l0 = fex.mul(tslFloat(0.1));
+    // Night-sky floor. Daytime preserves the historical `0.1 * Fex`;
+    // sub-horizon sky crossfades to a stronger cool floor so night does
+    // not collapse to black or inherit red extinction.
+    const nightFloorT = tslFloat(1).sub(
+      tslSmoothstep(
+        tslFloat(NIGHT_SKY_FLOOR_BLEND_FULL_Y),
+        tslFloat(NIGHT_SKY_FLOOR_BLEND_START_Y),
+        sunY,
+      ),
+    );
+    const moonFloorColor = tslVec3(
+      tslFloat(MOON_COLOR_R),
+      tslFloat(MOON_COLOR_G),
+      tslFloat(MOON_COLOR_B),
+    );
+    const dayFloor = fex.mul(tslFloat(NIGHT_SKY_FLOOR_DAY_GAIN));
+    const nightFloor = moonFloorColor.mul(tslFloat(NIGHT_SKY_FLOOR_NIGHT_GAIN));
+    const l0 = tslMix(dayFloor, nightFloor, nightFloorT);
 
     // Compose the main sky radiance (matches CPU lines 848-850).
     const compose = linBlended.add(l0).mul(tslFloat(0.04));
@@ -384,6 +376,36 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
 
     // Apply scenario exposure.
     const exposed = withBounce.mul(exposure);
+
+    // Compress broad base-sky glare near the sun before adding the explicit
+    // disc/aureole. This keeps the physical sun readable without allowing the
+    // Preetham Mie lobe to become a huge white second body.
+    const baseGlareMaskRaw = tslSmoothstep(
+      tslFloat(SUN_BASE_GLARE_COMPRESS_OUTER_DEFAULT),
+      sunDiscOuter,
+      cosTheta,
+    );
+    const highSunBaseGlareT = tslSmoothstep(
+      tslFloat(SUN_BASE_GLARE_HIGH_SUN_BLEND_START_Y),
+      tslFloat(SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y),
+      sunY,
+    );
+    const baseGlareMask = tslFloat(1).sub(
+      tslPow(tslFloat(1).sub(baseGlareMaskRaw), tslFloat(4)),
+    );
+    const highSunBaseGlareCap = tslVec3(
+      tslFloat(SUN_BASE_GLARE_HIGH_SUN_CAP_R),
+      tslFloat(SUN_BASE_GLARE_HIGH_SUN_CAP_G),
+      tslFloat(SUN_BASE_GLARE_HIGH_SUN_CAP_B),
+    );
+    const baseGlareCap = tslVec3(
+      tslFloat(SUN_BASE_GLARE_CAP_R),
+      tslFloat(SUN_BASE_GLARE_CAP_G),
+      tslFloat(SUN_BASE_GLARE_CAP_B),
+    );
+    const shapedBaseGlareCap = tslMix(baseGlareCap, highSunBaseGlareCap, highSunBaseGlareT);
+    const exposedNearSunCapped = tslMin(exposed, shapedBaseGlareCap);
+    const exposedNearSunShaped = tslMix(exposed, exposedNearSunCapped, baseGlareMask);
 
     // ----- Sun-disc HDR pin-point -----
     // Match pre-merge `vSunE * 19000.0 * Fex * sundisc` shape. The disc
@@ -409,8 +431,8 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
       .mul(sundiscFalloff);
 
     // Aureole: a softer additive halo outside the disc. The outer edge
-    // ramps from the noon target (~8°) toward the low-sun mie-band target
-    // (~22°) by `1 - sun.y`, so the halo stretches as the sun drops. The
+    // ramps from the noon target (~1.5°) toward the low-sun target
+    // (~3°) by `1 - sun.y`, so the halo stretches as the sun drops. The
     // inner edge of the aureole is the disc-outer cone (so the halo
     // blends seamlessly out of the pearl). Per spike Section 4 +
     // cycle #12 R2 `sun-disc-and-aureole-tuning`.
@@ -423,7 +445,7 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
       .mul(sunColorBlended)
       .mul(aureoleFalloff);
 
-    const final = exposed.add(discContribution).add(aureoleContribution);
+    const final = exposedNearSunShaped.add(discContribution).add(aureoleContribution);
 
     // Cycle sky-visual-restore: clamp linear radiance to fp16's safe range
     // (CPU port also clamps to [0, 64]); the dome material is
@@ -433,237 +455,3 @@ function buildPreethamColorNode(uniforms: HosekWilkieTslUniforms): TslNode {
 
   return preethamFn();
 }
-
-/**
- * CPU-side mirror of the TSL fragment math. Used by the parity test to
- * compare TSL output (rendered offscreen and read back) against this
- * deterministic CPU evaluation, AND by the production CPU LUT bake to
- * keep `sample()`/`getZenith()`/`getHorizon()` aligned with the dome.
- *
- * Mirrors `HosekWilkieSkyBackend.evaluateAnalytic` line-for-line for
- * parity; mirrors the sun-disc + night-red blend that lives only in the
- * TSL fragment path (CPU `evaluateAnalytic` does the disc as a separate
- * LUT-composited pass via `mixSunDisc`).
- */
-export interface PreethamCpuMirrorState {
-  sunDirection: THREE.Vector3;
-  turbidity: number;
-  rayleigh: number;
-  mieCoefficient: number;
-  mieDirectionalG: number;
-  groundAlbedo: THREE.Color;
-  exposure: number;
-  sunDiscInner?: number;
-  sunDiscOuter?: number;
-  /** Cosine of the aureole outer edge at noon. Defaults to the shader default. */
-  sunAureoleOuterNoon?: number;
-  /** Cosine of the aureole outer edge at low sun. Defaults to the shader default. */
-  sunAureoleOuterLowSun?: number;
-}
-
-/**
- * Evaluate the per-fragment Preetham color at a view direction, using the
- * same math the TSL fragment node uses. Includes the sun-disc HDR
- * pin-point and the night-red elevation-keyed sun↔moon blend so the
- * parity test compares like-for-like.
- *
- * Returns the linear-radiance RGB the dome would paint at this fragment.
- */
-export function evaluatePreethamWithDiscCpu(
-  state: PreethamCpuMirrorState,
-  viewDirection: THREE.Vector3,
-  out: THREE.Color,
-): THREE.Color {
-  const sunLen =
-    Math.hypot(state.sunDirection.x, state.sunDirection.y, state.sunDirection.z) ||
-    1;
-  const sunX = state.sunDirection.x / sunLen;
-  const sunY = state.sunDirection.y / sunLen;
-  const sunZ = state.sunDirection.z / sunLen;
-  const sunYClamped = Math.max(-1, Math.min(1, sunY));
-
-  const viewLen =
-    Math.hypot(viewDirection.x, viewDirection.y, viewDirection.z) || 1;
-  const dx = viewDirection.x / viewLen;
-  const dy = viewDirection.y / viewLen;
-  const dz = viewDirection.z / viewLen;
-
-  // Sun zenith intensity.
-  const sunZenithAngle = Math.acos(sunYClamped);
-  const sunE =
-    EE_BASE *
-    Math.max(0, 1 - Math.exp(-((CUTOFF_ANGLE - sunZenithAngle) / STEEPNESS)));
-
-  const sunfade = 1 - Math.max(0, Math.min(1, 1 - Math.exp(sunYClamped)));
-  const rayleighCoeff = state.rayleigh - (1 - sunfade);
-
-  const betaR: [number, number, number] = [
-    TOTAL_RAYLEIGH[0] * rayleighCoeff,
-    TOTAL_RAYLEIGH[1] * rayleighCoeff,
-    TOTAL_RAYLEIGH[2] * rayleighCoeff,
-  ];
-  const totalMieScale = 0.434 * (0.2 * state.turbidity) * 1e-17;
-  const betaM: [number, number, number] = [
-    MIE_CONST[0] * totalMieScale * state.mieCoefficient,
-    MIE_CONST[1] * totalMieScale * state.mieCoefficient,
-    MIE_CONST[2] * totalMieScale * state.mieCoefficient,
-  ];
-
-  const upDot = Math.max(0, dy);
-  const zenithAngle = Math.acos(upDot);
-  const inverseDenom =
-    Math.cos(zenithAngle) +
-    0.15 * Math.pow(93.885 - (zenithAngle * 180) / Math.PI, -1.253);
-  const inverseLen = 1 / Math.max(1e-3, inverseDenom);
-  const sR = 8.4e3 * inverseLen;
-  const sM = 1.25e3 * inverseLen;
-
-  const fexR = Math.exp(-(betaR[0] * sR + betaM[0] * sM));
-  const fexG = Math.exp(-(betaR[1] * sR + betaM[1] * sM));
-  const fexB = Math.exp(-(betaR[2] * sR + betaM[2] * sM));
-
-  const cosTheta = dx * sunX + dy * sunY + dz * sunZ;
-  const rayleighPhase =
-    (3 / (16 * Math.PI)) * (1 + Math.pow(cosTheta * 0.5 + 0.5, 2));
-  const g = state.mieDirectionalG;
-  const g2 = g * g;
-  const hgDenom = Math.pow(
-    Math.max(1e-4, 1 - 2 * g * cosTheta + g2),
-    1.5,
-  );
-  const hgPhase = (1 / (4 * Math.PI)) * ((1 - g2) / hgDenom);
-
-  const betaRThetaR = betaR[0] * rayleighPhase;
-  const betaRThetaG = betaR[1] * rayleighPhase;
-  const betaRThetaB = betaR[2] * rayleighPhase;
-  const betaMThetaR = betaM[0] * hgPhase;
-  const betaMThetaG = betaM[1] * hgPhase;
-  const betaMThetaB = betaM[2] * hgPhase;
-
-  const sumR = Math.max(betaR[0] + betaM[0], 1e-9);
-  const sumG = Math.max(betaR[1] + betaM[1], 1e-9);
-  const sumB = Math.max(betaR[2] + betaM[2], 1e-9);
-
-  const linR = Math.pow(
-    Math.max(0, sunE * ((betaRThetaR + betaMThetaR) / sumR) * (1 - fexR)),
-    1.5,
-  );
-  const linG = Math.pow(
-    Math.max(0, sunE * ((betaRThetaG + betaMThetaG) / sumG) * (1 - fexG)),
-    1.5,
-  );
-  const linB = Math.pow(
-    Math.max(0, sunE * ((betaRThetaB + betaMThetaB) / sumB) * (1 - fexB)),
-    1.5,
-  );
-
-  const horizonMix = Math.min(
-    1,
-    Math.pow(Math.max(0, 1 - sunYClamped), 5),
-  );
-  const lowR = Math.pow(
-    Math.max(0, sunE * ((betaRThetaR + betaMThetaR) / sumR) * fexR),
-    0.5,
-  );
-  const lowG = Math.pow(
-    Math.max(0, sunE * ((betaRThetaG + betaMThetaG) / sumG) * fexG),
-    0.5,
-  );
-  const lowB = Math.pow(
-    Math.max(0, sunE * ((betaRThetaB + betaMThetaB) / sumB) * fexB),
-    0.5,
-  );
-  const blendR = 1 + (lowR - 1) * horizonMix;
-  const blendG = 1 + (lowG - 1) * horizonMix;
-  const blendB = 1 + (lowB - 1) * horizonMix;
-  const linRb = linR * blendR;
-  const linGb = linG * blendG;
-  const linBb = linB * blendB;
-
-  const l0R = 0.1 * fexR;
-  const l0G = 0.1 * fexG;
-  const l0B = 0.1 * fexB;
-
-  let r = (linRb + l0R) * 0.04;
-  let g2c = (linGb + l0G) * 0.04 + 0.0003;
-  let b = (linBb + l0B) * 0.04 + 0.00075;
-
-  const bounce = Math.max(0, -dy);
-  const bounceK = bounce * 0.35 * (0.5 + sunfade);
-  r += state.groundAlbedo.r * bounceK;
-  g2c += state.groundAlbedo.g * bounceK;
-  b += state.groundAlbedo.b * bounceK;
-
-  r *= state.exposure;
-  g2c *= state.exposure;
-  b *= state.exposure;
-
-  // Sun-disc HDR pin-point + night-red elevation-keyed sun↔moon blend.
-  // Peak-normalise Fex first so the warm-sun branch reads as a visible
-  // color; mirrors the CPU `bakeLUT()` sun-color path in
-  // HosekWilkieSkyBackend.
-  const sunElevationRad = Math.asin(sunYClamped);
-  const moonBlendT = smoothstepCpu(
-    TWILIGHT_LOWER_RAD,
-    TWILIGHT_UPPER_RAD,
-    sunElevationRad,
-  );
-  const fexPeak = Math.max(fexR, fexG, fexB, 1e-4);
-  const fexNR = fexR / fexPeak;
-  const fexNG = fexG / fexPeak;
-  const fexNB = fexB / fexPeak;
-  const sunColorR = MOON_COLOR_R + (fexNR - MOON_COLOR_R) * moonBlendT;
-  const sunColorG = MOON_COLOR_G + (fexNG - MOON_COLOR_G) * moonBlendT;
-  const sunColorB = MOON_COLOR_B + (fexNB - MOON_COLOR_B) * moonBlendT;
-
-  const sunDiscInner = state.sunDiscInner ?? SUN_DISC_INNER_DEFAULT;
-  const sunDiscOuter = state.sunDiscOuter ?? SUN_DISC_OUTER_DEFAULT;
-  const sundiscFalloff = smoothstepCpu(sunDiscOuter, sunDiscInner, cosTheta);
-  const discScale = sunE * SUN_DISC_HDR_GAIN * sundiscFalloff;
-  r += discScale * sunColorR;
-  g2c += discScale * sunColorG;
-  b += discScale * sunColorB;
-
-  // Aureole halo around the disc. Mirrors the TSL graph: linear blend
-  // between noon and low-sun outer edges by `1 - sunY`, smoothstep between
-  // disc-outer and aureole-outer (cosine domain), additive with relative
-  // gain (~3% of the disc HDR gain).
-  const aureoleOuterNoon = state.sunAureoleOuterNoon ?? SUN_AUREOLE_OUTER_NOON_DEFAULT;
-  const aureoleOuterLowSun = state.sunAureoleOuterLowSun ?? SUN_AUREOLE_OUTER_LOWSUN_DEFAULT;
-  const lowSunMix = Math.max(0, Math.min(1, 1 - sunYClamped));
-  const aureoleOuter = aureoleOuterNoon + (aureoleOuterLowSun - aureoleOuterNoon) * lowSunMix;
-  const aureoleFalloff = smoothstepCpu(aureoleOuter, sunDiscOuter, cosTheta);
-  const aureoleScale = sunE * SUN_DISC_HDR_GAIN * SUN_AUREOLE_RELATIVE_GAIN * aureoleFalloff;
-  r += aureoleScale * sunColorR;
-  g2c += aureoleScale * sunColorG;
-  b += aureoleScale * sunColorB;
-
-  out.setRGB(
-    Math.max(0, Math.min(64, r)),
-    Math.max(0, Math.min(64, g2c)),
-    Math.max(0, Math.min(64, b)),
-  );
-  return out;
-}
-
-function smoothstepCpu(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / Math.max(1e-9, edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
-/**
- * Test-visibility export of the constants used by the TSL graph + the CPU
- * mirror. Production code should not import these — they are tuning
- * defaults baked into the shader uniform initial values.
- */
-export const HOSEK_WILKIE_TSL_DEFAULTS = {
-  sunDiscInner: SUN_DISC_INNER_DEFAULT,
-  sunDiscOuter: SUN_DISC_OUTER_DEFAULT,
-  sunAureoleOuterNoon: SUN_AUREOLE_OUTER_NOON_DEFAULT,
-  sunAureoleOuterLowSun: SUN_AUREOLE_OUTER_LOWSUN_DEFAULT,
-  sunAureoleRelativeGain: SUN_AUREOLE_RELATIVE_GAIN,
-  twilightUpperRad: TWILIGHT_UPPER_RAD,
-  twilightLowerRad: TWILIGHT_LOWER_RAD,
-  moonColor: { r: MOON_COLOR_R, g: MOON_COLOR_G, b: MOON_COLOR_B },
-  sunDiscHdrGain: SUN_DISC_HDR_GAIN,
-} as const;

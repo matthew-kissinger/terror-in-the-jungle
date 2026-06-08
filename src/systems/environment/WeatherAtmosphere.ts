@@ -171,9 +171,8 @@ export function updateAtmosphere(
     }
     if (renderer.ambientLight) {
       renderer.ambientLight.intensity = ambientInt;
-      // AmbientLight is explicitly excluded from this task's scope
-      // (see `docs/tasks/atmosphere-sun-hemisphere-coupling.md` non-goals).
-      // Keep the legacy color so the flat-fill ambient reads the same.
+      // AtmosphereSystem reapplies the effective ambient color after weather
+      // updates each frame; weather owns only the intensity multiplier here.
       renderer.ambientLight.color.setHex(baseValues.ambientColor);
     }
     // moonLight.intensity is weather-multiplied here; moonLight.color +

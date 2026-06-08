@@ -45,6 +45,12 @@ export const EMPTY_HYDROLOGY_RIVER_STATS: HydrologyRiverMeshStats = {
 };
 
 export const HYDROLOGY_RIVER_MATERIAL_PROFILE = 'legible_hydrology_river';
+const HYDROLOGY_RIVER_DAY_COLOR = new THREE.Color(0xffffff);
+const HYDROLOGY_RIVER_NIGHT_COLOR = new THREE.Color(0x142432);
+const HYDROLOGY_RIVER_DAY_EMISSIVE_INTENSITY = 0.04;
+const HYDROLOGY_RIVER_NIGHT_EMISSIVE_INTENSITY = 0.006;
+const HYDROLOGY_RIVER_DAY_ENV_INTENSITY = 0.56;
+const HYDROLOGY_RIVER_NIGHT_ENV_INTENSITY = 0.06;
 
 /**
  * Optional hook fired once when a fresh river material is created, before
@@ -111,9 +117,9 @@ export class HydrologyRiverSurface {
 
     const material = new THREE.MeshStandardMaterial({
       name: 'hydrology-river-surface-material',
-      color: 0xffffff,
+      color: HYDROLOGY_RIVER_DAY_COLOR,
       emissive: 0x021a24,
-      emissiveIntensity: 0.04,
+      emissiveIntensity: HYDROLOGY_RIVER_DAY_EMISSIVE_INTENSITY,
       roughness: 0.08,
       metalness: 0,
       transparent: true,
@@ -125,7 +131,7 @@ export class HydrologyRiverSurface {
       polygonOffsetUnits: -8,
       side: THREE.DoubleSide,
     });
-    material.envMapIntensity = 0.56;
+    material.envMapIntensity = HYDROLOGY_RIVER_DAY_ENV_INTENSITY;
     this.onMaterialReady?.(material);
 
     const mesh = new THREE.Mesh(geo.geometry, material);
@@ -167,4 +173,17 @@ export class HydrologyRiverSurface {
   getMaterialProfile(): string { return this.mesh ? HYDROLOGY_RIVER_MATERIAL_PROFILE : 'none'; }
   getStats(): HydrologyRiverMeshStats { return this.stats; }
   getQuerySegments(): readonly HydrologyWaterQuerySegment[] { return this.querySegments; }
+
+  setLightingFactor(daylight: number): void {
+    if (!this.mesh) return;
+    const t = Math.min(1, Math.max(0, Number.isFinite(daylight) ? daylight : 1));
+    const material = this.mesh.material;
+    material.color.copy(HYDROLOGY_RIVER_NIGHT_COLOR).lerp(HYDROLOGY_RIVER_DAY_COLOR, t);
+    material.emissiveIntensity =
+      HYDROLOGY_RIVER_NIGHT_EMISSIVE_INTENSITY
+      + (HYDROLOGY_RIVER_DAY_EMISSIVE_INTENSITY - HYDROLOGY_RIVER_NIGHT_EMISSIVE_INTENSITY) * t;
+    material.envMapIntensity =
+      HYDROLOGY_RIVER_NIGHT_ENV_INTENSITY
+      + (HYDROLOGY_RIVER_DAY_ENV_INTENSITY - HYDROLOGY_RIVER_NIGHT_ENV_INTENSITY) * t;
+  }
 }

@@ -44,6 +44,8 @@
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --skip-night       # skip the night-red regression set
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --lut-bump-check --prefix=pre   # pre-bump baseline pair
  *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --lut-bump-check --prefix=post  # post-bump pair + analysis
+ *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --ridge-occlusion-check --scenario=ashau --tod=dusk
+ *   npx tsx scripts/capture-sun-and-atmosphere-shots.ts --ridge-occlusion-check --scenario=ashau --tod=dusk --renderer-modes=webgpu-strict,webgl --angle=d3d11
  *
  * Notes:
  *   - `combat120` (ai_sandbox) has no `todCycle` and ignores `forceTimeOfDay`.
@@ -68,7 +70,9 @@ type ScenarioKey = 'ashau' | 'openfrontier' | 'tdm' | 'zc' | 'combat120';
 
 type TodLabel = 'noon' | 'golden' | 'dusk' | 'twilight' | 'dawn' | 'midnight';
 
-type RendererMode = 'webgpu' | 'webgl';
+type RendererMode = 'webgpu' | 'webgpu-strict' | 'webgl';
+type CaptureView = 'sun' | 'ridge';
+type BrowserAngleBackend = 'swiftshader' | 'd3d11' | 'vulkan' | 'default';
 
 interface ScenarioPreset {
   key: ScenarioKey;
@@ -77,7 +81,7 @@ interface ScenarioPreset {
   hasTodCycle: boolean;
   sunAzimuthRad: number;
   sunElevationRad: number;
-  cameraHeight: number;          // sky-dominant framing height
+  cameraHeight: number;          // sky-dominant clearance above local terrain
   settleSec: number;
   label: string;
 }
@@ -86,6 +90,16 @@ interface Pose {
   position: [number, number, number];
   yawDeg: number;
   pitchDeg: number;
+  lookAt?: [number, number, number];
+}
+
+interface RidgeOcclusionDiagnostics {
+  target: [number, number, number];
+  cameraGround: [number, number, number];
+  sunHorizontal: [number, number];
+  ridgeRiseMeters: number;
+  score: number;
+  samplesChecked: number;
 }
 
 // ----- Configuration tables -----
@@ -222,6 +236,57 @@ function logStep(msg: string): void {
   console.log(`[${new Date().toISOString()}] ${msg}`);
 }
 
+function parseRendererModes(defaultModes: RendererMode[]): RendererMode[] {
+  const raw = readFlagValue('renderer-modes');
+  if (!raw) return defaultModes;
+  const parsed = raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const allowed = new Set<RendererMode>(['webgpu', 'webgpu-strict', 'webgl']);
+  const modes = parsed.map((mode) => {
+    if (!allowed.has(mode as RendererMode)) {
+      throw new Error(`Invalid --renderer-modes entry "${mode}". Expected webgpu, webgpu-strict, or webgl.`);
+    }
+    return mode as RendererMode;
+  });
+  return modes.length > 0 ? modes : defaultModes;
+}
+
+function parseBrowserAngle(): BrowserAngleBackend {
+  const raw = readFlagValue('angle') ?? 'swiftshader';
+  if (
+    raw !== 'swiftshader'
+    && raw !== 'd3d11'
+    && raw !== 'vulkan'
+    && raw !== 'default'
+  ) {
+    throw new Error(`Invalid --angle=${raw}. Expected swiftshader, d3d11, vulkan, or default.`);
+  }
+  return raw;
+}
+
+function buildBrowserLaunchOptions(): {
+  headless: boolean;
+  channel?: string;
+  args: string[];
+  angle: BrowserAngleBackend;
+} {
+  const angle = parseBrowserAngle();
+  const channel = readFlagValue('browser-channel') ?? undefined;
+  const args = [
+    ...(angle === 'default' ? [] : [`--use-angle=${angle}`]),
+    '--enable-webgl',
+    '--enable-unsafe-webgpu',
+  ];
+  return {
+    headless: !hasFlag('headed'),
+    channel,
+    args,
+    angle,
+  };
+}
+
 // ----- TOD math -----
 
 /**
@@ -245,11 +310,29 @@ function targetHourToForceTod(targetHour: number, startHour: number): number {
 // ----- Engine driving -----
 
 async function waitForEngine(page: Page): Promise<void> {
-  await page.waitForFunction(
-    () => Boolean((window as { __engine?: unknown }).__engine),
-    undefined,
-    { timeout: STARTUP_TIMEOUT_MS }
-  );
+  try {
+    await page.waitForFunction(
+      () => Boolean((window as { __engine?: unknown }).__engine),
+      undefined,
+      { timeout: STARTUP_TIMEOUT_MS }
+    );
+  } catch (error) {
+    const fatal = await readFatalOverlayText(page);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(fatal ? `${message}; fatalOverlay=${fatal}` : message);
+  }
+}
+
+async function readFatalOverlayText(page: Page): Promise<string | null> {
+  try {
+    return await page.evaluate(() => {
+      const text = document.body?.innerText?.trim() ?? '';
+      if (!text.includes('Failed to initialize')) return null;
+      return text.replace(/\s+/g, ' ').slice(0, 500);
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function startMode(page: Page, mode: string): Promise<void> {
@@ -440,7 +523,12 @@ async function forceSkyRefresh(
         update?: (dt: number) => void;
         sunDirection?: { set: (x: number, y: number, z: number) => unknown; x: number; y: number; z: number };
         applyToRenderer?: () => void;
+        getLightingSnapshot?: (out: unknown) => unknown;
+        lightingSnapshot?: unknown;
       };
+      const terrain = engine?.systemManager?.terrainSystem as unknown as
+        | { setAtmosphereLighting?: (lighting: unknown) => void }
+        | undefined;
       if (!atm) return;
       if (atm.hosekBackend) {
         atm.hosekBackend.skyTextureRefreshTimer = 9999;
@@ -462,6 +550,10 @@ async function forceSkyRefresh(
         if (typeof atm.applyToRenderer === 'function') {
           atm.applyToRenderer();
         }
+      }
+      if (atm.getLightingSnapshot && atm.lightingSnapshot && terrain?.setAtmosphereLighting) {
+        const lighting = atm.getLightingSnapshot(atm.lightingSnapshot);
+        terrain.setAtmosphereLighting(lighting);
       }
     },
     { tgt: targetSunDir }
@@ -485,6 +577,209 @@ function poseTowardSun(azimuthRad: number, height: number, pitchDeg: number): Po
   };
 }
 
+/**
+ * Build the sky-dominant sun pose using terrain-relative height. A Shau's DEM
+ * can sit hundreds of metres above world zero, so a fixed world-Y capture can
+ * end up below terrain and produce misleading sun/lighting evidence.
+ */
+async function buildSunPose(page: Page, preset: ScenarioPreset, pitchDeg: number): Promise<Pose> {
+  const basePose = poseTowardSun(preset.sunAzimuthRad, preset.cameraHeight, pitchDeg);
+  let sample: {
+    terrainY: number | null;
+    sunDirection: [number, number, number] | null;
+  } | null = null;
+  try {
+    sample = await page.evaluate(() => {
+      const engine = (window as { __engine?: { systemManager?: { atmosphereSystem?: unknown; terrainSystem?: unknown } } }).__engine;
+      const terrain = engine?.systemManager?.terrainSystem as
+        | { getHeightAt?: (x: number, z: number) => number }
+        | undefined;
+      const atmosphere = engine?.systemManager?.atmosphereSystem as
+        | { sunDirection?: { x: number; y: number; z: number } }
+        | undefined;
+      const y = terrain?.getHeightAt?.(0, 0);
+      const sun = atmosphere?.sunDirection;
+      return {
+        terrainY: Number.isFinite(y) ? Number(y) : null,
+        sunDirection: sun
+          && Number.isFinite(sun.x)
+          && Number.isFinite(sun.y)
+          && Number.isFinite(sun.z)
+          ? [Number(sun.x), Number(sun.y), Number(sun.z)] as [number, number, number]
+          : null,
+      };
+    });
+  } catch {
+    sample = null;
+  }
+
+  if (sample?.terrainY === null || sample === null) {
+    return basePose;
+  }
+
+  const position = [
+    basePose.position[0],
+    sample.terrainY + preset.cameraHeight,
+    basePose.position[2],
+  ] as [number, number, number];
+  const sun = sample.sunDirection;
+  if (sun) {
+    const len = Math.hypot(sun[0], sun[1], sun[2]) || 1;
+    const target = [
+      position[0] + (sun[0] / len) * 1000,
+      position[1] + (sun[1] / len) * 1000,
+      position[2] + (sun[2] / len) * 1000,
+    ] as [number, number, number];
+    return {
+      ...basePose,
+      position,
+      lookAt: target,
+    };
+  }
+
+  return {
+    ...basePose,
+    position,
+  };
+}
+
+/**
+ * Build a terrain-dominant "sun behind ridge" pose. The camera sits on the
+ * anti-sun side of the strongest sampled rise, then looks along the horizontal
+ * sun vector at the ridge. This shot class is what exposes hill/ridge light
+ * bleed; sky-dominant sun shots cannot prove that failure mode.
+ */
+async function buildRidgeOcclusionPose(page: Page, preset: ScenarioPreset): Promise<{
+  pose: Pose;
+  diagnostics: RidgeOcclusionDiagnostics;
+}> {
+  const fallbackSunHorizontal: [number, number] = [
+    Math.cos(preset.sunAzimuthRad),
+    Math.sin(preset.sunAzimuthRad),
+  ];
+
+  return await page.evaluate(
+    ({ fallback, scenarioKey }: { fallback: [number, number]; scenarioKey: ScenarioKey }) => {
+      const engine = (window as { __engine?: { systemManager?: { atmosphereSystem?: unknown; terrainSystem?: unknown } } }).__engine;
+      const terrain = engine?.systemManager?.terrainSystem as
+        | {
+          getHeightAt?: (x: number, z: number) => number;
+          getSlopeAt?: (x: number, z: number) => number;
+        }
+        | undefined;
+      const atmosphere = engine?.systemManager?.atmosphereSystem as
+        | { sunDirection?: { x: number; z: number } }
+        | undefined;
+
+      if (!terrain?.getHeightAt) {
+        const target: [number, number, number] = [0, 0, 0];
+        return {
+          pose: {
+            position: [-fallback[0] * 180, 34, -fallback[1] * 180] as [number, number, number],
+            yawDeg: (Math.atan2(fallback[0], -fallback[1]) * 180) / Math.PI,
+            pitchDeg: -4,
+            lookAt: target,
+          },
+          diagnostics: {
+            target,
+            cameraGround: [-fallback[0] * 180, 0, -fallback[1] * 180] as [number, number, number],
+            sunHorizontal: fallback,
+            ridgeRiseMeters: 0,
+            score: 0,
+            samplesChecked: 0,
+          },
+        };
+      }
+
+      let sx = atmosphere?.sunDirection?.x ?? fallback[0];
+      let sz = atmosphere?.sunDirection?.z ?? fallback[1];
+      const sunLen = Math.hypot(sx, sz);
+      if (sunLen > 0.001) {
+        sx /= sunLen;
+        sz /= sunLen;
+      } else {
+        sx = fallback[0];
+        sz = fallback[1];
+      }
+
+      const isAshaU = scenarioKey === 'ashau';
+      const extent = isAshaU ? 1800 : 720;
+      const step = isAshaU ? 150 : 60;
+      const distances = isAshaU ? [180, 300, 480, 660] : [90, 150, 240, 330];
+      let samplesChecked = 0;
+      let best = {
+        x: 0,
+        z: 0,
+        y: terrain.getHeightAt(0, 0),
+        cameraX: -sx * distances[0],
+        cameraZ: -sz * distances[0],
+        cameraGroundY: terrain.getHeightAt(-sx * distances[0], -sz * distances[0]),
+        rise: 0,
+        score: Number.NEGATIVE_INFINITY,
+      };
+
+      for (let x = -extent; x <= extent; x += step) {
+        for (let z = -extent; z <= extent; z += step) {
+          const y = terrain.getHeightAt(x, z);
+          if (!Number.isFinite(y)) continue;
+          for (const distance of distances) {
+            samplesChecked++;
+            const cameraX = x - sx * distance;
+            const cameraZ = z - sz * distance;
+            const cameraGroundY = terrain.getHeightAt(cameraX, cameraZ);
+            if (!Number.isFinite(cameraGroundY)) continue;
+
+            const rise = y - cameraGroundY;
+            const slope = terrain.getSlopeAt?.(x, z) ?? 0;
+            const score = rise * 1.8 + Math.max(0, y) * 0.04 + slope * 28 - distance * 0.015;
+            if (score > best.score && rise > (isAshaU ? 20 : 5)) {
+              best = { x, z, y, cameraX, cameraZ, cameraGroundY, rise, score };
+            }
+          }
+        }
+      }
+
+      if (!Number.isFinite(best.score)) {
+        const y = terrain.getHeightAt(0, 0);
+        const distance = distances[0];
+        best = {
+          x: 0,
+          z: 0,
+          y,
+          cameraX: -sx * distance,
+          cameraZ: -sz * distance,
+          cameraGroundY: terrain.getHeightAt(-sx * distance, -sz * distance),
+          rise: 0,
+          score: 0,
+        };
+      }
+
+      const target: [number, number, number] = [best.x, best.y + 7, best.z];
+      const cameraGround: [number, number, number] = [best.cameraX, best.cameraGroundY, best.cameraZ];
+      const cameraY = Math.max(best.cameraGroundY + 18, best.y + 10);
+      const yawDeg = (Math.atan2(sx, -sz) * 180) / Math.PI;
+      const pose: Pose = {
+        position: [best.cameraX, cameraY, best.cameraZ],
+        yawDeg,
+        pitchDeg: -5,
+        lookAt: target,
+      };
+      return {
+        pose,
+        diagnostics: {
+          target,
+          cameraGround,
+          sunHorizontal: [sx, sz] as [number, number],
+          ridgeRiseMeters: best.rise,
+          score: best.score,
+          samplesChecked,
+        },
+      };
+    },
+    { fallback: fallbackSunHorizontal, scenarioKey: preset.key }
+  );
+}
+
 async function poseAndRender(page: Page, pose: Pose): Promise<void> {
   await page.evaluate(
     ({ p, vp }: { p: Pose; vp: { width: number; height: number } }) => {
@@ -492,12 +787,41 @@ async function poseAndRender(page: Page, pose: Pose): Promise<void> {
         isLoopRunning?: boolean;
         animationFrameId?: number | null;
         renderer?: {
-          camera?: { position: { set: (x: number, y: number, z: number) => unknown }; rotation: { order: string; set: (x: number, y: number, z: number) => unknown }; updateMatrixWorld: (force: boolean) => void; aspect?: number; updateProjectionMatrix?: () => void };
-          renderer?: { setSize: (w: number, h: number, updateStyle?: boolean) => void; render: (scene: unknown, camera: unknown) => void };
+          camera?: {
+            position: { x: number; y: number; z: number; set: (x: number, y: number, z: number) => unknown };
+            rotation: { order: string; set: (x: number, y: number, z: number) => unknown };
+            lookAt?: (x: number, y: number, z: number) => unknown;
+            updateMatrixWorld: (force: boolean) => void;
+            aspect?: number;
+            updateProjectionMatrix?: () => void;
+          };
+          renderer?: {
+            setSize: (w: number, h: number, updateStyle?: boolean) => void;
+            render: (scene: unknown, camera: unknown) => void;
+            shadowMap?: { needsUpdate?: boolean };
+          };
           scene?: unknown;
+          setOverrideCamera?: (camera: unknown | null) => void;
           postProcessing?: { setSize?: (w: number, h: number) => void; beginFrame?: () => void; endFrame?: () => void };
         };
-        systemManager?: { atmosphereSystem?: { syncDomePosition?: (pos: unknown) => void; update?: (dt: number) => void }; skybox?: { updatePosition?: (pos: unknown) => void } };
+        systemManager?: {
+          atmosphereSystem?: {
+            syncDomePosition?: (pos: unknown) => void;
+            setTerrainYAtCamera?: (height: number) => void;
+            applyToRenderer?: () => void;
+            getLightingSnapshot?: (out: unknown) => unknown;
+            lightingSnapshot?: unknown;
+          };
+          skybox?: { updatePosition?: (pos: unknown) => void };
+          waterSystem?: { update?: (dt: number) => void };
+          terrainSystem?: {
+            getHeightAt?: (x: number, z: number) => number;
+            updatePlayerPosition?: (position: { x: number; y: number; z: number }) => void;
+            update?: (dt: number) => void;
+            setAtmosphereLighting?: (lighting: unknown) => void;
+            setRenderCameraOverride?: (camera: unknown | null) => void;
+          };
+        };
       };
       const renderer = engine?.renderer;
       const camera = renderer?.camera;
@@ -526,8 +850,26 @@ async function poseAndRender(page: Page, pose: Pose): Promise<void> {
       const yawRad = (p.yawDeg * Math.PI) / 180;
       const pitchRad = (p.pitchDeg * Math.PI) / 180;
       camera.rotation.order = 'YXZ';
-      camera.rotation.set(pitchRad, yawRad, 0);
+      if (p.lookAt && typeof camera.lookAt === 'function') {
+        camera.rotation.set(0, yawRad, 0);
+        camera.lookAt(p.lookAt[0], p.lookAt[1], p.lookAt[2]);
+      } else {
+        camera.rotation.set(pitchRad, yawRad, 0);
+      }
       camera.updateMatrixWorld(true);
+
+      const terrain = engine.systemManager?.terrainSystem;
+      const cameraGroundY = terrain?.getHeightAt?.(p.position[0], p.position[2]);
+      terrain?.updatePlayerPosition?.({
+        x: p.position[0],
+        y: Number.isFinite(cameraGroundY) ? Number(cameraGroundY) : p.position[1],
+        z: p.position[2],
+      });
+      renderer.setOverrideCamera?.(camera);
+      terrain?.setRenderCameraOverride?.(camera);
+      for (let i = 0; i < 10; i++) {
+        terrain?.update?.(1 / 30);
+      }
 
       // Glue both the legacy Skybox (if still mounted) and the analytic
       // dome to the new camera position.
@@ -535,10 +877,20 @@ async function poseAndRender(page: Page, pose: Pose): Promise<void> {
       if (skybox?.updatePosition) skybox.updatePosition(camera.position);
       const atm = engine.systemManager?.atmosphereSystem;
       if (atm?.syncDomePosition) atm.syncDomePosition(camera.position);
+      if (atm?.setTerrainYAtCamera && Number.isFinite(cameraGroundY)) atm.setTerrainYAtCamera(Number(cameraGroundY));
+      atm?.applyToRenderer?.();
+      if (atm?.getLightingSnapshot && atm.lightingSnapshot && terrain?.setAtmosphereLighting) {
+        const lighting = atm.getLightingSnapshot(atm.lightingSnapshot);
+        terrain.setAtmosphereLighting(lighting);
+      }
+      engine.systemManager?.waterSystem?.update?.(0.016);
 
-      pp?.beginFrame?.();
-      threeRenderer.render(scene, camera);
-      pp?.endFrame?.();
+      if (threeRenderer.shadowMap) threeRenderer.shadowMap.needsUpdate = true;
+      for (let i = 0; i < 2; i++) {
+        pp?.beginFrame?.();
+        threeRenderer.render(scene, camera);
+        pp?.endFrame?.();
+      }
     },
     { p: pose, vp: VIEWPORT }
   );
@@ -549,12 +901,27 @@ async function snap(page: Page, outFile: string): Promise<Buffer> {
   // point (see `poseAndRender`), so Playwright's default font-load wait can
   // still trip on a slow-rebake frame. Lift the timeout to match the longest
   // settle path; on success the screenshot completes well under that.
-  const buffer = await page.screenshot({
-    type: 'png',
-    fullPage: false,
-    timeout: 60_000,
-    animations: 'disabled',
-  });
+  let buffer: Buffer;
+  try {
+    buffer = await page.screenshot({
+      type: 'png',
+      fullPage: false,
+      timeout: 60_000,
+      animations: 'disabled',
+    });
+  } catch (err) {
+    logStep(`Playwright screenshot timed out; retrying ${outFile} through CDP capture (${(err as Error).message})`);
+    const session = await page.context().newCDPSession(page);
+    try {
+      const result = await session.send('Page.captureScreenshot', {
+        format: 'png',
+        fromSurface: true,
+      });
+      buffer = Buffer.from(result.data, 'base64');
+    } finally {
+      await session.detach();
+    }
+  }
   writeFileSync(outFile, buffer);
   logStep(`Wrote ${outFile} (${buffer.byteLength} bytes)`);
   return buffer;
@@ -845,6 +1212,193 @@ async function sampleFogVsSkyHorizonFromPng(buffer: Buffer): Promise<FogVsSkySam
   }
 }
 
+// ----- SOL-1 rendered-terrain visual quality diagnostics -----
+
+type VisualQualityKind = 'ridge-low-sun' | 'night-terrain' | 'sun-scale';
+
+interface VisualQualityRegion {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+interface VisualQualitySample {
+  kind: VisualQualityKind;
+  region: VisualQualityRegion;
+  pixelCount: number;
+  meanRgb: [number, number, number];
+  meanLuma: number;
+  redDominantRatio: number;
+  whiteHotRatio: number;
+  cyanBrightRatio: number;
+  warmTerrainRatio: number;
+  brightRatio: number;
+  sunCoreRatio: number | null;
+  sunCoreMaxSpanRatio: number | null;
+  passesNightRedWhiteCyan: boolean | null;
+  passesRidgeWarmthCandidate: boolean | null;
+  passesSunScaleCandidate: boolean | null;
+}
+
+function visualQualityRegionFor(view: CaptureView, tod: TodLabel): { kind: VisualQualityKind; region: VisualQualityRegion } | null {
+  if (view === 'ridge') {
+    return {
+      kind: 'ridge-low-sun',
+      // A Shau ridge proof pose: lower-middle terrain band where the owner
+      // observed warm surface lighting despite intervening relief. Excludes
+      // most sky and the near-black silhouette on the far left.
+      region: { x0: 0.32, x1: 0.72, y0: 0.50, y1: 0.92 },
+    };
+  }
+  if (tod === 'twilight' || tod === 'midnight') {
+    return {
+      kind: 'night-terrain',
+      // Lower half where terrain/water are visible in the forced-TOD visual
+      // shots. The diagnostic intentionally samples broadly so cyan water
+      // bands and red/white terrain patches both show up.
+      region: { x0: 0, x1: 1, y0: 0.45, y1: 1 },
+    };
+  }
+  if (tod !== 'midnight') {
+    return {
+      kind: 'sun-scale',
+      // Sun-facing captures place the sun near the frame center. Sample the
+      // whole screenshot so the metric can catch both an oversized sun body
+      // and an accidental broad white glare plate.
+      region: { x0: 0, x1: 1, y0: 0, y1: 1 },
+    };
+  }
+  return null;
+}
+
+async function sampleVisualQualityFromPng(
+  buffer: Buffer,
+  tod: TodLabel,
+  view: CaptureView,
+): Promise<VisualQualitySample | null> {
+  const qualityConfig = visualQualityRegionFor(view, tod);
+  if (!qualityConfig) return null;
+
+  try {
+    const img = sharp(buffer);
+    const meta = await img.metadata();
+    const w = meta.width ?? 0;
+    const h = meta.height ?? 0;
+    if (w === 0 || h === 0) return null;
+    const channels = meta.channels ?? 3;
+    const raw = await img.raw().toBuffer();
+    const { region, kind } = qualityConfig;
+    const x0 = Math.max(0, Math.min(w - 1, Math.floor(region.x0 * w)));
+    const x1 = Math.max(x0 + 1, Math.min(w, Math.floor(region.x1 * w)));
+    const y0 = Math.max(0, Math.min(h - 1, Math.floor(region.y0 * h)));
+    const y1 = Math.max(y0 + 1, Math.min(h, Math.floor(region.y1 * h)));
+
+    let pixelCount = 0;
+    let redDominantCount = 0;
+    let whiteHotCount = 0;
+    let cyanBrightCount = 0;
+    let warmTerrainCount = 0;
+    let brightCount = 0;
+    let sunCoreCount = 0;
+    let sunMinX = w;
+    let sunMaxX = -1;
+    let sunMinY = h;
+    let sunMaxY = -1;
+    let sumR = 0;
+    let sumG = 0;
+    let sumB = 0;
+    let sumLuma = 0;
+
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const idx = (y * w + x) * channels;
+        const r = raw[idx] / 255;
+        const g = raw[idx + 1] / 255;
+        const b = raw[idx + 2] / 255;
+        const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        // Ignore near-black silhouettes. They are useful artistically, but
+        // they drown out the actual red/white/cyan/warm terrain diagnostics.
+        if (luma < 0.025) continue;
+        pixelCount++;
+        sumR += r;
+        sumG += g;
+        sumB += b;
+        sumLuma += luma;
+        if (luma > 0.75) whiteHotCount++;
+        if (luma > 0.22 && r > g * 1.18 && r > b * 1.35) redDominantCount++;
+        if (luma > 0.30 && g > r * 1.18 && b > r * 1.35) cyanBrightCount++;
+        if (luma > 0.16 && r > g * 1.08 && r > b * 1.45) warmTerrainCount++;
+        if (luma > 0.28) brightCount++;
+      }
+    }
+
+    if (pixelCount === 0) return null;
+    const shouldMeasureSun = kind === 'sun-scale' || kind === 'ridge-low-sun';
+    if (shouldMeasureSun) {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const idx = (y * w + x) * channels;
+          const r = raw[idx] / 255;
+          const g = raw[idx + 1] / 255;
+          const b = raw[idx + 2] / 255;
+          const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          if (
+            luma > 0.94
+            && r > 0.90
+            && g > 0.90
+            && b > 0.84
+            && Math.abs(r - g) < 0.10
+            && Math.abs(g - b) < 0.20
+          ) {
+            sunCoreCount++;
+            sunMinX = Math.min(sunMinX, x);
+            sunMaxX = Math.max(sunMaxX, x);
+            sunMinY = Math.min(sunMinY, y);
+            sunMaxY = Math.max(sunMaxY, y);
+          }
+        }
+      }
+    }
+    const redDominantRatio = redDominantCount / pixelCount;
+    const whiteHotRatio = whiteHotCount / pixelCount;
+    const cyanBrightRatio = cyanBrightCount / pixelCount;
+    const warmTerrainRatio = warmTerrainCount / pixelCount;
+    const brightRatio = brightCount / pixelCount;
+    const sunCoreRatio = shouldMeasureSun ? sunCoreCount / (w * h) : null;
+    const sunCoreMaxSpanRatio = shouldMeasureSun && sunCoreCount > 0
+      ? Math.max((sunMaxX - sunMinX + 1) / w, (sunMaxY - sunMinY + 1) / h)
+      : shouldMeasureSun
+        ? 0
+        : null;
+    return {
+      kind,
+      region,
+      pixelCount,
+      meanRgb: [sumR / pixelCount, sumG / pixelCount, sumB / pixelCount],
+      meanLuma: sumLuma / pixelCount,
+      redDominantRatio,
+      whiteHotRatio,
+      cyanBrightRatio,
+      warmTerrainRatio,
+      brightRatio,
+      sunCoreRatio,
+      sunCoreMaxSpanRatio,
+      passesNightRedWhiteCyan: kind === 'night-terrain'
+        ? redDominantRatio <= 0.01 && whiteHotRatio <= 0.005 && cyanBrightRatio <= 0.03
+        : null,
+      passesRidgeWarmthCandidate: kind === 'ridge-low-sun'
+        ? warmTerrainRatio <= 0.45 && redDominantRatio <= 0.25 && whiteHotRatio <= 0.01
+        : null,
+      passesSunScaleCandidate: shouldMeasureSun
+        ? sunCoreCount > 0 && sunCoreRatio <= 0.006 && sunCoreMaxSpanRatio <= 0.055
+        : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ----- Top-level capture orchestration -----
 
 interface CaptureRecord {
@@ -852,6 +1406,7 @@ interface CaptureRecord {
   scenario: ScenarioKey;
   tod: TodLabel;
   rendererMode: RendererMode;
+  view?: CaptureView;
   appliedVia: 'worldBuilder' | 'directSunRotation' | 'n/a';
   forceTimeOfDay: number;
   resolvedBackend: string;
@@ -862,6 +1417,10 @@ interface CaptureRecord {
   horizonRow?: HorizonRowSample | null;
   /** Populated only for `--lut-bump-check` captures. */
   fogVsSky?: FogVsSkySample | null;
+  /** Populated only for ridge-occlusion captures. */
+  ridgeOcclusion?: RidgeOcclusionDiagnostics | null;
+  /** SOL-1 rendered-terrain / water visual diagnostics. */
+  visualQuality?: VisualQualitySample | null;
   notes: string;
 }
 
@@ -883,6 +1442,13 @@ interface SuiteSummary {
     strictPasses: boolean;
     softPasses: boolean;
   }>;
+  visualQuality: Array<{
+    scenario: ScenarioKey;
+    tod: TodLabel;
+    view: CaptureView;
+    rendererMode: RendererMode;
+    quality: VisualQualitySample;
+  }>;
 }
 
 async function navigateAndStart(
@@ -891,9 +1457,10 @@ async function navigateAndStart(
   rendererMode: RendererMode,
   modeKey: string
 ): Promise<void> {
-  const query = rendererMode === 'webgl'
-    ? '?perf=1&uiTransitions=0&renderer=webgl'
-    : '?perf=1&uiTransitions=0';
+  const rendererQuery = rendererMode === 'webgpu'
+    ? ''
+    : `&renderer=${encodeURIComponent(rendererMode)}`;
+  const query = `?perf=1&uiTransitions=0${rendererQuery}`;
   const url = `${baseUrl}${query}`;
   logStep(`Navigate -> ${url}`);
   await page.goto(url, { waitUntil: 'load', timeout: STARTUP_TIMEOUT_MS });
@@ -909,6 +1476,7 @@ async function captureSingleShot(
   rendererMode: RendererMode,
   outFile: string,
   options: {
+    view?: CaptureView;
     sampleParity?: boolean;
     sampleNightRed?: boolean;
     /** Populate horizon-row + fog-vs-sky samples for the LUT-bump check. */
@@ -943,7 +1511,19 @@ async function captureSingleShot(
   // Pitch a few degrees above horizon for non-midnight TODs; for midnight
   // tilt lower so the navy zenith reads against the near-black horizon.
   const pitchDeg = tod === 'midnight' ? 5 : tod === 'noon' ? 25 : tod === 'golden' ? 15 : 10;
-  const pose = poseTowardSun(preset.sunAzimuthRad, preset.cameraHeight, pitchDeg);
+  const view = options.view ?? 'sun';
+  let ridgeOcclusion: RidgeOcclusionDiagnostics | null = null;
+  const pose = view === 'ridge'
+    ? await buildRidgeOcclusionPose(page, preset).then((result) => {
+      ridgeOcclusion = result.diagnostics;
+      logStep(
+        `Ridge pose ${preset.key}/${tod}: rise=${result.diagnostics.ridgeRiseMeters.toFixed(1)}m ` +
+        `target=(${result.diagnostics.target.map((n) => n.toFixed(1)).join(', ')}) ` +
+        `cameraGround=(${result.diagnostics.cameraGround.map((n) => n.toFixed(1)).join(', ')})`
+      );
+      return result.pose;
+    })
+    : await buildSunPose(page, preset, pitchDeg);
   await poseAndRender(page, pose);
 
   const resolvedBackend = await getResolvedBackend(page);
@@ -966,12 +1546,14 @@ async function captureSingleShot(
   const parity = options.sampleParity && pngBuffer ? await sampleParityKeyPointsFromPng(pngBuffer) : null;
   const horizonRow = options.sampleLutBump && pngBuffer ? await sampleHorizonRowFromPng(pngBuffer) : null;
   const fogVsSky = options.sampleLutBump && pngBuffer ? await sampleFogVsSkyHorizonFromPng(pngBuffer) : null;
+  const visualQuality = pngBuffer ? await sampleVisualQualityFromPng(pngBuffer, tod, view) : null;
 
   return {
     filename: outFile,
     scenario: preset.key,
     tod,
     rendererMode,
+    view,
     appliedVia: todInfo.appliedVia,
     forceTimeOfDay: todInfo.forceTod,
     resolvedBackend,
@@ -980,6 +1562,8 @@ async function captureSingleShot(
     moonColor,
     horizonRow,
     fogVsSky,
+    ridgeOcclusion,
+    visualQuality,
     notes: snapNotes,
   };
 }
@@ -1089,6 +1673,68 @@ async function runNightRedMatrix(
   }
 }
 
+async function runRidgeOcclusionMatrix(
+  page: Page,
+  baseUrl: string,
+  scenarios: ScenarioPreset[],
+  tods: TodLabel[],
+  rendererModes: RendererMode[],
+  records: CaptureRecord[]
+): Promise<void> {
+  for (const mode of rendererModes) {
+    for (const scenario of scenarios) {
+      try {
+        await navigateAndStart(page, baseUrl, mode, scenario.mode);
+        await page.waitForTimeout(scenario.settleSec * 1000);
+      } catch (err) {
+        const note = `startup error: ${(err as Error).message}`;
+        logStep(`Ridge startup ${scenario.key}/${mode} FAILED: ${note}`);
+        for (const tod of tods) {
+          records.push({
+            filename: join(OUT_DIR, `ridge-${scenario.key}-${tod}-${mode}.png`),
+            scenario: scenario.key,
+            tod,
+            rendererMode: mode,
+            view: 'ridge',
+            appliedVia: 'n/a',
+            forceTimeOfDay: 0,
+            resolvedBackend: 'failed',
+            pngBytes: 0,
+            notes: note,
+          });
+        }
+        continue;
+      }
+
+      for (const tod of tods) {
+        const filename = join(OUT_DIR, `ridge-${scenario.key}-${tod}-${mode}.png`);
+        try {
+          const rec = await captureSingleShot(page, scenario, tod, mode, filename, {
+            view: 'ridge',
+            sampleParity: true,
+          });
+          records.push(rec);
+        } catch (err) {
+          logStep(`Ridge ${scenario.key}/${tod}/${mode} FAILED: ${(err as Error).message}`);
+          records.push({
+            filename,
+            scenario: scenario.key,
+            tod,
+            rendererMode: mode,
+            view: 'ridge',
+            appliedVia: 'n/a',
+            forceTimeOfDay: 0,
+            resolvedBackend: 'failed',
+            pngBytes: 0,
+            ridgeOcclusion: null,
+            notes: `error: ${(err as Error).message}`,
+          });
+        }
+      }
+    }
+  }
+}
+
 /**
  * Cycle `cycle-skylut-resolution-bump`: focused 2-shot matrix used by
  * `--lut-bump-check`. Captures only Open Frontier noon + A Shau midday and
@@ -1139,14 +1785,19 @@ async function runLutBumpMatrix(
 function computeParityDeltas(records: CaptureRecord[]): SuiteSummary['parityDeltas'] {
   const out: SuiteSummary['parityDeltas'] = [];
   // Group parity captures by scenario+TOD and compute per-channel deltas
-  // between webgpu and webgl pairs.
-  const parityKey = (r: CaptureRecord): string => `${r.scenario}|${r.tod}`;
+  // between the best WebGPU-family capture and the explicit WebGL pair.
+  // Prefer strict WebGPU when both default and strict rows exist.
+  const parityKey = (r: CaptureRecord): string => `${r.view ?? 'sun'}|${r.scenario}|${r.tod}`;
   const pairs = new Map<string, { webgpu?: CaptureRecord; webgl?: CaptureRecord }>();
   for (const r of records) {
     if (!r.parity) continue;
     const k = parityKey(r);
     const entry = pairs.get(k) ?? {};
-    entry[r.rendererMode] = r;
+    if (r.rendererMode === 'webgl') {
+      entry.webgl = r;
+    } else if (r.rendererMode === 'webgpu-strict' || !entry.webgpu) {
+      entry.webgpu = r;
+    }
     pairs.set(k, entry);
   }
 
@@ -1194,6 +1845,20 @@ function computeNightRedRegression(records: CaptureRecord[]): SuiteSummary['nigh
     }));
 }
 
+function computeVisualQualitySummary(records: CaptureRecord[]): SuiteSummary['visualQuality'] {
+  return records
+    .filter((r): r is CaptureRecord & { view: CaptureView; visualQuality: VisualQualitySample } => (
+      Boolean(r.visualQuality)
+    ))
+    .map((r) => ({
+      scenario: r.scenario,
+      tod: r.tod,
+      view: r.view ?? 'sun',
+      rendererMode: r.rendererMode,
+      quality: r.visualQuality,
+    }));
+}
+
 // ----- Main -----
 
 async function main(): Promise<void> {
@@ -1202,7 +1867,11 @@ async function main(): Promise<void> {
   const skipParity = hasFlag('skip-parity');
   const skipNight = hasFlag('skip-night');
   const lutBumpCheck = hasFlag('lut-bump-check');
+  const ridgeOcclusionCheck = hasFlag('ridge-occlusion-check');
   const prefixFlag = readFlagValue('prefix');
+  if (lutBumpCheck && ridgeOcclusionCheck) {
+    throw new Error('--lut-bump-check and --ridge-occlusion-check are separate focused matrices');
+  }
 
   // Build the visual matrix. If --tod=<single>, only capture that one; if
   // --scenario=<key>, only run that scenario.
@@ -1248,10 +1917,12 @@ async function main(): Promise<void> {
       log: logStep,
     });
 
-    const browser = await chromium.launch({
-      headless: true,
-      args: ['--use-angle=swiftshader', '--enable-webgl', '--enable-unsafe-webgpu'],
-    });
+    const launchOptions = buildBrowserLaunchOptions();
+    logStep(
+      `Launching Chromium for capture: channel=${launchOptions.channel ?? 'bundled'} ` +
+      `angle=${launchOptions.angle} headless=${launchOptions.headless}`
+    );
+    const browser = await chromium.launch(launchOptions);
     const context = await browser.newContext({ viewport: VIEWPORT });
     const page = await context.newPage();
 
@@ -1267,6 +1938,17 @@ async function main(): Promise<void> {
       // full visual/parity/night matrices are skipped under this flag.
       logStep(`Running LUT-bump check matrix (2 shots, prefix=${lutBumpPrefix}, outDir=${activeOutDir})`);
       await runLutBumpMatrix(page, baseUrl, lutBumpPrefix, activeOutDir, records);
+    } else if (ridgeOcclusionCheck) {
+      const ridgeScenarios = scenarioFlag
+        ? visualScenarios
+        : visualScenarios.filter((s) => s.key !== 'combat120');
+      const ridgeTods = todFlag ? visualTods : (['dusk', 'twilight'] as TodLabel[]);
+      const rendererModes = parseRendererModes(skipParity ? ['webgpu'] : ['webgpu', 'webgl']);
+      logStep(
+        `Running ridge-occlusion matrix: ${ridgeScenarios.length} scenarios x ` +
+        `${ridgeTods.length} TODs x ${rendererModes.length} renderers`
+      );
+      await runRidgeOcclusionMatrix(page, baseUrl, ridgeScenarios, ridgeTods, rendererModes, records);
     } else {
       // --- Visual matrix (default 20 shots = 5 scenarios x 4 TODs) ---
       logStep(`Running visual matrix: ${visualScenarios.length} scenarios x ${visualTods.length} TODs`);
@@ -1298,12 +1980,18 @@ async function main(): Promise<void> {
     records,
     parityDeltas: computeParityDeltas(records),
     nightRedRegression: computeNightRedRegression(records),
+    visualQuality: computeVisualQualitySummary(records),
   };
 
   // Write the appropriate summary path. Under --lut-bump-check we write
-  // `bump-summary-<prefix>.json` so a pre + post pair coexist; under the
-  // default flow we write the legacy `summary.json` for cycle #12 evidence.
-  const summaryName = lutBumpCheck ? `bump-summary-${lutBumpPrefix.replace(/-$/, '')}.json` : 'summary.json';
+  // `bump-summary-<prefix>.json` so a pre + post pair coexist; ridge checks
+  // get their own summary so later visual spot-checks do not overwrite the
+  // ridge-rise diagnostics; default flow keeps the legacy `summary.json`.
+  const summaryName = lutBumpCheck
+    ? `bump-summary-${lutBumpPrefix.replace(/-$/, '')}.json`
+    : ridgeOcclusionCheck
+      ? 'ridge-summary.json'
+      : 'summary.json';
   const summaryPath = join(activeOutDir, summaryName);
   writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
   logStep(`Wrote summary -> ${summaryPath}`);
@@ -1341,6 +2029,45 @@ async function main(): Promise<void> {
     for (const nr of summary.nightRedRegression) {
       const s = nr.sample;
       logStep(`  ${nr.scenario}: strict=${nr.strictPasses ? 'PASS' : 'FAIL'} soft=${nr.softPasses ? 'PASS' : 'FAIL'} r=${s?.r?.toFixed(3)} g=${s?.g?.toFixed(3)} b=${s?.b?.toFixed(3)}`);
+    }
+  }
+
+  if (summary.visualQuality.length > 0) {
+    logStep('SOL-1 visual quality diagnostics:');
+    for (const entry of summary.visualQuality) {
+      const q = entry.quality;
+      const nightVerdict = q.passesNightRedWhiteCyan === null
+        ? 'n/a'
+        : q.passesNightRedWhiteCyan ? 'PASS' : 'FAIL';
+      const ridgeVerdict = q.passesRidgeWarmthCandidate === null
+        ? 'n/a'
+        : q.passesRidgeWarmthCandidate ? 'PASS' : 'FAIL';
+      const sunVerdict = q.passesSunScaleCandidate === null
+        ? 'n/a'
+        : q.passesSunScaleCandidate ? 'PASS' : 'FAIL';
+      logStep(
+        `  ${entry.scenario}/${entry.tod}/${entry.rendererMode}/${q.kind}: ` +
+        `mean=(${q.meanRgb.map((v) => v.toFixed(3)).join(',')}) luma=${q.meanLuma.toFixed(3)} ` +
+        `red=${(q.redDominantRatio * 100).toFixed(2)}% white=${(q.whiteHotRatio * 100).toFixed(2)}% ` +
+        `cyan=${(q.cyanBrightRatio * 100).toFixed(2)}% warm=${(q.warmTerrainRatio * 100).toFixed(2)}% ` +
+        `sunCore=${q.sunCoreRatio === null ? 'n/a' : `${(q.sunCoreRatio * 100).toFixed(3)}%`} ` +
+        `sunSpan=${q.sunCoreMaxSpanRatio === null ? 'n/a' : `${(q.sunCoreMaxSpanRatio * 100).toFixed(2)}%`} ` +
+        `night=${nightVerdict} ridgeWarmth=${ridgeVerdict} sunScale=${sunVerdict}`
+      );
+    }
+  }
+
+  const ridgeRecords = records.filter((r) => r.ridgeOcclusion);
+  if (ridgeRecords.length > 0) {
+    logStep('Ridge-occlusion diagnostics:');
+    for (const rec of ridgeRecords) {
+      const ridge = rec.ridgeOcclusion;
+      if (!ridge) continue;
+      logStep(
+        `  ${rec.scenario}/${rec.tod}/${rec.rendererMode}: ` +
+        `rise=${ridge.ridgeRiseMeters.toFixed(1)}m score=${ridge.score.toFixed(1)} ` +
+        `samples=${ridge.samplesChecked} resolved=${rec.resolvedBackend}`
+      );
     }
   }
 

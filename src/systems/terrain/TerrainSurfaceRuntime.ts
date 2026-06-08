@@ -11,7 +11,9 @@ import { HeightmapGPU } from './HeightmapGPU';
 import {
   createTerrainMaterial,
   type TerrainMaterial,
+  type TerrainAtmosphereLightingMaterialConfig,
   type TerrainHydrologyMaskMaterialConfig,
+  updateTerrainMaterialAtmosphereLighting,
   updateTerrainMaterialFarCanopyTint,
   updateTerrainMaterialTextures,
   updateTerrainMaterialWetness,
@@ -61,6 +63,13 @@ export class TerrainSurfaceRuntime {
   private terrainMaterial: TerrainMaterial | null = null;
   private surfaceWetness = 0;
   private farCanopyTint: TerrainFarCanopyTintConfig = { enabled: false };
+  private atmosphereLighting: TerrainAtmosphereLightingMaterialConfig = {
+    nightFillColor: new THREE.Color(0, 0, 0),
+    nightFillStrength: 0,
+    directLightDirection: new THREE.Vector3(0, 1, 0),
+    daylightFactor: 1,
+    lowSunOcclusionStrength: 0,
+  };
   private hydrologyMaskMaterial: TerrainHydrologyMaskMaterialConfig | null = null;
   private hydrologyMaskTexture: THREE.DataTexture | null = null;
   private featureSurfacePatches: TerrainSurfacePatch[] = [];
@@ -107,6 +116,7 @@ export class TerrainSurfaceRuntime {
       biomeConfig: this.buildBiomeMaterialConfig(defaultBiomeId, biomeRules),
       hydrologyMask: this.hydrologyMaskMaterial,
       farCanopyTint: this.farCanopyTint,
+      atmosphereLighting: this.atmosphereLighting,
       surfaceWetness: this.surfaceWetness,
       tileGridResolution: this.tileGridResolution,
       surfacePatches: this.featureSurfacePatches,
@@ -156,6 +166,7 @@ export class TerrainSurfaceRuntime {
       biomeConfig: this.buildBiomeMaterialConfig(defaultBiomeId, biomeRules),
       hydrologyMask: this.hydrologyMaskMaterial,
       farCanopyTint: this.farCanopyTint,
+      atmosphereLighting: this.atmosphereLighting,
       surfaceWetness: this.surfaceWetness,
       tileGridResolution: this.tileGridResolution,
       surfacePatches: this.featureSurfacePatches,
@@ -220,6 +231,25 @@ export class TerrainSurfaceRuntime {
     this.farCanopyTint = farCanopyTint ?? { enabled: false };
     if (this.terrainMaterial) {
       updateTerrainMaterialFarCanopyTint(this.terrainMaterial, this.farCanopyTint);
+    }
+  }
+
+  setAtmosphereLighting(lighting: TerrainAtmosphereLightingMaterialConfig): void {
+    const directLightDirection = lighting.directLightDirection.clone();
+    if (directLightDirection.lengthSq() < 1e-8) {
+      directLightDirection.set(0, 1, 0);
+    } else {
+      directLightDirection.normalize();
+    }
+    this.atmosphereLighting = {
+      nightFillColor: lighting.nightFillColor.clone(),
+      nightFillStrength: THREE.MathUtils.clamp(lighting.nightFillStrength, 0, 0.5),
+      directLightDirection,
+      daylightFactor: THREE.MathUtils.clamp(lighting.daylightFactor, 0, 1),
+      lowSunOcclusionStrength: THREE.MathUtils.clamp(lighting.lowSunOcclusionStrength, 0, 1),
+    };
+    if (this.terrainMaterial) {
+      updateTerrainMaterialAtmosphereLighting(this.terrainMaterial, this.atmosphereLighting);
     }
   }
 
@@ -324,6 +354,7 @@ export class TerrainSurfaceRuntime {
     this.currentVisualMargin,
   );
     updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
+    updateTerrainMaterialAtmosphereLighting(this.terrainMaterial, this.atmosphereLighting);
   }
 
   private buildBiomeMaterialConfig(defaultBiomeId: string, biomeRules: BiomeClassificationRule[]) {

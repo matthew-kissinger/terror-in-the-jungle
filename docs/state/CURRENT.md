@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-07 (terrain-vehicle-water foundation reset R1/R2 local proof: shared terrain/water spawn resolver, both-faction M48 terrain/damage routing, Zone Control no-drift browser evidence, and authored level/depth water-body proof; production proof uses `deploy:prod` + `check:live-release`; owner playtest still open)
+Last verified: 2026-06-08 (SOL-1 local diagnostics refreshed: true-WebGPU all-mode sun-scale/night terrain checks pass, strict-WebGPU A Shau ridge proof passes with WebGL parity, and owner/perf/live-release proof remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -45,9 +45,10 @@ water path could read as a narrow terrain-following surface. R2 replaces the
 accepted gameplay-water surface with authored Open Frontier and A Shau
 level/depth reaches: they carve bathymetry, render `level-depth-water-bodies`,
 and return `water_body` samples while hydrology remains a drainage/material
-sensor. The headed local foundation proof passes; this release still requires
-the normal live Cloudflare Pages proof before any production-parity claim, and
-owner playtest remains open for subjective terrain/water/vehicle feel.
+sensor. The headed local foundation proof passes. The live Cloudflare Pages
+proof also passes for `df97e707`:
+`artifacts/perf/2026-06-07T21-16-21-306Z/projekt-143-live-release-proof/release-proof.json`.
+Owner playtest remains open for subjective terrain/water/vehicle feel.
 
 `master` is the WebGPU + TSL renderer branch and has been since the KONVEYER
 campaign merged via [PR #192](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/192)
@@ -77,7 +78,8 @@ The preceding cycle,
 made ground vehicles, tanks, and aircraft operable end-to-end (boarding
 follow-cam, tank crew + cannon + spawn discoverability, aircraft armament with
 friend-or-foe) and wired the O(1) `CoverSpatialGrid` cover path into prod
-combat (DEFEKT-3). The hydrology river-surface fix remains owner-gated in
+combat (DEFEKT-3). The old hydrology river-surface fix is superseded by the
+authored level/depth water-body foundation reset in
 [docs/BACKLOG.md](../BACKLOG.md).
 
 Several preceding campaigns are now closed and historical: the post-WebGPU
@@ -114,8 +116,8 @@ as of this refresh:
   deferred.
 - **ECS hot path (Phase F)** — evaluation recorded **DEFER** (bitECS spike
   1.0–1.09× vs OOP, off the prod path); combatants stay in `Map<string,Combatant>`.
-- **KB-STARTUP-1, KONVEYER-12, DEFEKT-1/2/6, STABILIZAT-1, SVYAZ-*, UX-*,
-  DIZAYN-3** — open; see DIRECTIVES rows and the per-id memos
+- **KB-STARTUP-1, KONVEYER-12, SOL-1, DEFEKT-1/2/6, STABILIZAT-1, SVYAZ-*,
+  UX-*, DIZAYN-3** — open; see DIRECTIVES rows and the per-id memos
   under [docs/directives/](../directives/).
 
 ## What is real today
@@ -139,13 +141,38 @@ as of this refresh:
   period weapons, lead/sway aiming, named maneuver routes), deferred per
   [docs/rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md](../rearch/PHASE5_FEATURE_SCOPE_2026-05-31.md).
 - WebGPU `WebGPURenderer` + TSL node materials across terrain, vegetation
-  impostors, NPC impostors, and the LUT-driven Hosek-Wilkie atmosphere
-  surface, with automatic WebGL2 fallback for non-WebGPU environments.
+  impostors, NPC impostors, and the TSL atmosphere dome, with automatic WebGL2
+  fallback for non-WebGPU environments.
 - Atmosphere CPU cost holds under ~1 ms total across all five modes after the
-  KONVEYER sky-refresh work (LUT-driven refresh + `DataTexture` upload +
-  idempotent `setCloudCoverage`); the worst-case A Shau SkyTexture EMA dropped
-  ~5.96 ms → 0.52 ms across that arc. Evidence:
+  KONVEYER and sun-atmosphere work moved the visual dome off the old large
+  LUT-bake path; the small CPU LUT remains for fog/hemisphere readers. Evidence:
   [docs/directives/konveyer-10.md](../directives/konveyer-10.md).
+- SOL-1 is now open for the current visual rejection: sun scale, red/white
+  night terrain reads, lighting-angle coherence, terrain/water material
+  response, and hill/ridge light bleed need a full proof and likely authority
+  cleanup before final visual acceptance.
+- Active SOL-1 mitigation in the worktree shrinks the sun body, uses cool
+  moonlight below the horizon, tints low-sun ambient fill, dims water
+  specular/emissive/foam response at night, and adds an
+  `AtmosphereLightingSnapshot` consumed by renderer lights, billboard
+  vegetation, water, terrain night fill, and a bounded low-sun terrain
+  heightmap/relief response. The renderer-facing low-sun directional light is
+  now bounded separately from the analytic sky color so terrain does not receive
+  an unbounded red sun value. The shadow-follow path preserves follow-target
+  altitude so A Shau low-sun lights do not target world Y=0 from below elevated
+  terrain. The TSL dome and CPU LUT also share a cool sub-horizon sky floor.
+  Focused Open Frontier midnight and TDM twilight captures removed cyan water,
+  lifted the near-black sky floor, reduced white fill, and stopped TDM twilight
+  terrain from falling near-black. The 2026-06-08 proof refresh also fixed an A
+  Shau sun-facing capture bug by using terrain-relative camera clearance, and
+  tightened `sun-scale` so missing sun-body detection fails instead of passing.
+  The capture script emits SOL-1 `visualQuality` pixel metrics: the 2026-06-08
+  true-WebGPU all-mode matrix passes noon/golden/dusk sun-scale and
+  twilight/midnight red/white/cyan terrain checks, while the strict-WebGPU
+  A Shau dusk ridge proof passes terrain warmth and visible sun footprint.
+  All-mode WebGPU/WebGL2 parity is 0%; strict-WebGPU ridge parity against
+  explicit WebGL2 is 0.39%. SOL-1 is still not visually accepted: the next goal
+  is SOL-1R7 owner/perf/release acceptance.
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.

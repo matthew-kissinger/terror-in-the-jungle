@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import {
+  HYDROLOGY_RIVER_FOAM_INTENSITY,
   HYDROLOGY_RIVER_FLOW_SPEED_M_PER_S,
   HYDROLOGY_RIVER_NORMAL_REPEAT_ALONG_M,
   HYDROLOGY_RIVER_NORMAL_SCALE,
@@ -17,6 +18,9 @@ export const GLOBAL_WATER_SHORELINE_FADE_METERS = 1.4;
 // to a single-pixel spike on phones.
 export const GLOBAL_WATER_SUN_SPEC_POWER = 64;
 export const GLOBAL_WATER_SUN_SPEC_GAIN = 0.85;
+const GLOBAL_WATER_NIGHT_SPEC_GAIN_SCALE = 0.04;
+const WATER_DAYLIGHT_START_Y = -0.04;
+const WATER_FULL_DAYLIGHT_Y = 0.14;
 // Underwater surface tint applied when the camera is submerged so the
 // underside reads as transmitted light, not as the topside dark teal.
 export const GLOBAL_WATER_UNDERWATER_TINT = new THREE.Color(0x2a5a6a);
@@ -29,6 +33,19 @@ export const GLOBAL_WATER_UNDERWATER_TINT = new THREE.Color(0x2a5a6a);
 export const WATER_EDGE_FOAM_WIDTH_METERS = 0.8;
 export const WATER_EDGE_FOAM_INTENSITY = 0.55;
 export const WATER_EDGE_SOFT_BLEND_DISTANCE_METERS = 1.5;
+
+export function waterDaylightFactor(sunY: number): number {
+  const raw = (sunY - WATER_DAYLIGHT_START_Y) / (WATER_FULL_DAYLIGHT_Y - WATER_DAYLIGHT_START_Y);
+  const t = Math.min(1, Math.max(0, Number.isFinite(raw) ? raw : 1));
+  return t * t * (3 - 2 * t);
+}
+
+function waterSunSpecGainForDaylight(daylightFactor: number): number {
+  const daylight = Math.min(1, Math.max(0, Number.isFinite(daylightFactor) ? daylightFactor : 1));
+  const scale = GLOBAL_WATER_NIGHT_SPEC_GAIN_SCALE
+    + (1 - GLOBAL_WATER_NIGHT_SPEC_GAIN_SCALE) * daylight;
+  return GLOBAL_WATER_SUN_SPEC_GAIN * scale;
+}
 
 export interface WaterTerrainHeightSamplerBinding {
   texture: THREE.Texture;
@@ -180,10 +197,16 @@ export class WaterSurfaceBinding {
   }
 
   /** Per-frame uniform refresh. Safe to call when the water is hidden. */
-  updateSurfaceUniforms(timeSeconds: number, sun: THREE.Vector3, cameraUnderwater: boolean): void {
+  updateSurfaceUniforms(
+    timeSeconds: number,
+    sun: THREE.Vector3,
+    cameraUnderwater: boolean,
+    daylightFactor = waterDaylightFactor(sun.y),
+  ): void {
     if (!this.shaderRefs) return;
     this.shaderRefs.uTime.value = timeSeconds;
     this.shaderRefs.uSunDirection.value.copy(sun);
+    this.shaderRefs.uSunSpecGain.value = waterSunSpecGainForDaylight(daylightFactor);
     this.shaderRefs.uCameraUnderwater.value = cameraUnderwater ? 1 : 0;
   }
 
@@ -206,9 +229,12 @@ export class WaterSurfaceBinding {
   }
 
   /** Advance river `uTime` + late-bind the normal map. No-op without install. */
-  tickRiverFlow(deltaTime: number, normalMap: THREE.Texture | undefined): void {
+  tickRiverFlow(deltaTime: number, normalMap: THREE.Texture | undefined, daylightFactor = 1): void {
     if (!this.hydrologyRiverRefs) return;
+    const daylight = Math.min(1, Math.max(0, Number.isFinite(daylightFactor) ? daylightFactor : 1));
     this.hydrologyRiverRefs.uTime.value += deltaTime;
+    this.hydrologyRiverRefs.uFoamIntensity.value = HYDROLOGY_RIVER_FOAM_INTENSITY * (0.12 + 0.88 * daylight);
+    this.hydrologyRiverRefs.uSparkleIntensity.value = daylight;
     if (normalMap && this.hydrologyRiverRefs.uRiverNormalMap.value !== normalMap) {
       this.hydrologyRiverRefs.uRiverNormalMap.value = normalMap;
       if (this.hydrologyRiverMaterial) {

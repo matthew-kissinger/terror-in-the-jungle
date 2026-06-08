@@ -1,6 +1,7 @@
 # Architecture
 
-Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
+Systems-based orchestration engine with registered `GameSystem` instances,
+tracked tick groups, scheduled cadence groups, and a small singleton set.
 
 ## Entry Points
 
@@ -16,8 +17,10 @@ index.html -> src/main.ts -> src/core/bootstrap.ts -> new GameEngine()
 ## Renderer Backend
 
 Production renderer is the Three.js r184 `WebGPURenderer` from `three/webgpu`,
-with TSL node materials covering terrain CDLOD, vegetation/NPC impostors, the
-Hosek-Wilkie sky, and water. Backend selection lives in
+with TSL node materials covering terrain CDLOD, vegetation/NPC impostors, and
+the Hosek-Wilkie sky. Authored water bodies currently render through
+`WaterBodySurface` with a standard material plus shader patching; a final
+WebGPU/TSL water material is still future work. Backend selection lives in
 `src/core/RendererBackend.ts` (`resolveRendererBackendMode()` reads
 `?renderer=` / env), and `src/core/GameRenderer.ts` drives the swap from a
 WebGL bootstrap renderer to the WebGPU surface (`initializeRendererBackend()`,
@@ -45,7 +48,7 @@ resolved backend.
 
 ```
 BOOT       main.ts -> bootstrap.ts -> new GameEngine()
-CONSTRUCT  SystemInitializer: 41 systems created in dependency order
+CONSTRUCT  SystemInitializer: registered systems created in dependency order
 WIRE       SystemConnector: setter calls via 3 runtime composers
 INIT       system.init() per non-deferred system
 MENU       GameUI state machine (TitleScreen -> ModeSelectScreen -> DeployScreen)
@@ -85,7 +88,7 @@ Runtime composers (extracted from SystemConnector):
 | Input | `src/systems/input/` | InputContextManager (singleton) | untracked |
 | Audio | `src/systems/audio/` | AudioManager, FootstepAudioSystem | untracked |
 | Effects | `src/systems/effects/` | ExplosionEffectsPool, ImpactEffectsPool, SmokeCloudSystem, TracerPool, PostProcessingManager, CameraShakeSystem | untracked |
-| Environment | `src/systems/environment/` | AtmosphereSystem, HosekWilkieSkyBackend, WeatherSystem, WaterSystem | untracked |
+| Environment | `src/systems/environment/` | AtmosphereSystem, HosekWilkieSkyBackend, WeatherSystem, WaterSystem, water/WaterBodyAuthority, water/WaterBodySurface, water/WaterSurfaceSampler | untracked |
 | Debug | `src/systems/debug/` | PerformanceTelemetry (singleton) | untracked |
 | UI | `src/ui/` | HUDSystem, GameUI, TouchControls, MinimapSystem, FullMapSystem | 1.5ms |
 | Config | `src/config/` | gameModeTypes, *Config, MapSeedRegistry, CombatantConfig, FactionCombatTuning | - |
@@ -93,6 +96,29 @@ Runtime composers (extracted from SystemConnector):
 See [docs/COMBAT.md](COMBAT.md) for the authoritative combat subsystem architecture (carved out in D1, 2026-04-17). Per-faction combat tuning lives in `src/config/FactionCombatTuning.ts` and is consumed through the `FACTION_COMBAT_TUNING[faction]` lookup pattern (D2, 2026-04-17).
 
 Combatants are stored in a `Map<string, Combatant>` (`CombatantSystem.ts`); there is no ECS — bitECS is not a dependency and the E1 evaluation recommends DEFER.
+
+## Terrain And Water Foundation
+
+Terrain and water placement now share explicit runtime authorities instead of
+letting each feature infer its own surface:
+
+- `TerrainPlacementAuthority` (`src/systems/terrain/TerrainPlacementAuthority.ts`)
+  resolves ground and watercraft spawn heights for deploy/runtime placement.
+- `TerrainFeatureCompileStage` compiles authored `waterBodies` into terrain
+  stamps before mode terrain/nav prep, so reaches carve bathymetry instead of
+  riding on top of humps.
+- `TerrainNavigationStage` passes authored bodies into `WaterSystem` and clears
+  hydrology river surfaces when authored gameplay water is present.
+- `WaterSystem` owns the legacy global plane, hydrology-derived river surfaces,
+  authored water-body authority, render mesh, and query sampler.
+- `WaterSurfaceSampler` source precedence is `water_body` before hydrology
+  before global plane before dry land.
+
+Current accepted gameplay water in Open Frontier and A Shau is authored
+level/depth water bodies with carved beds and `water_body` samples. Hydrology is
+still useful for drainage/material classification, but it is not the
+player-facing water surface. The global plane remains an opt-in fallback for
+legacy/simple modes.
 
 ## Tick Graph
 
@@ -239,7 +265,7 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
 
 ## Key Patterns
 
-- **GameSystem interface**: `init()`, `update(dt)`, `dispose()`. All 44 systems implement it.
+- **GameSystem interface**: `init()`, `update(dt)`, `dispose()`. Runtime systems are registered through `SystemInitializer`.
 - **Runtime composers**: Grouped dependency wiring replaces monolithic SystemConnector.
 - **SimulationScheduler**: Cadence-based update groups for non-critical systems.
 - **Diagnostics hooks**: in dev or perf-harness mode, `bootstrap.ts` exposes `window.advanceTime(ms)` and `window.render_game_to_text()` so Playwright probes can step the live game deterministically and capture compact state. Gated by `import.meta.env.DEV` + `?perf=1` at runtime OR by `import.meta.env.VITE_PERF_HARNESS === '1'` at build time (see `npm run build:perf`). Retail `npm run build` ships ZERO harness surface - hook branches are dead-code-eliminated by the build-time constant-fold.
@@ -264,18 +290,35 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    Current Cycle 9 evidence validates all five modes after preview builds began
    emitting `asset-manifest.json`; the shader now uses a seamless cloud-deck
    projection instead of azimuth-wrapped UVs. Open Frontier and combat120 are
-   lighter scattered-cloud presets and still need art review.
+   lighter scattered-cloud presets and still need art review. SOL-1 now owns
+   the broader solar/atmosphere/terrain-lighting rearch. The active worktree has
+   an `AtmosphereLightingSnapshot` feeding renderer lights, billboard
+   vegetation, and water, plus a shared cool sub-horizon sky floor for the TSL
+   dome and CPU LUT, a terrain night-fill uniform, a bounded low-sun terrain
+   heightmap/relief response, altitude-preserving shadow recentering for A Shau,
+   renderer-facing low-sun directional-light bounds, and a ridge-occlusion
+   capture path that passes the focused A Shau dusk terrain-warmth metric.
+   The visible sun/aureole footprint is now bounded in the all-mode matrix
+   (noon `sunSpan=2.41%`, golden/dusk `sunSpan=1.48%`), twilight/midnight
+   terrain passes red/white/cyan checks, and the 2026-06-08 strict-WebGPU
+   A Shau dusk ridge proof resolves true `webgpu` with explicit-WebGL2 parity
+   at 0.39% max channel delta. Owner acceptance, perf impact recording, and
+   release proof remain open.
 5. **A Shau required-asset / navigation gate** - startup now fails
    A Shau when the required DEM/manifest path is missing or returns HTML, and
    preview builds now emit the manifest. The old TileCache fallback path has
    been removed; large worlds use explicit static-tiled generation and A Shau
    startup stops if no generated or pre-baked navmesh exists. Later Cycle 10 work
-   anchors large-world generation bounds to scenario zones and stages A Shau
-   home-base terrain shoulders. The current artifact has representative-base
-   snap/connectivity/path success; the remaining blocker is route/NPC movement
-   quality and airfield usability, not missing DEM delivery.
-6. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
-7. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
+   anchors large-world generation bounds to scenario zones, stages A Shau
+   home-base terrain shoulders, and now includes authored water bodies. The
+   current blockers are route/NPC movement quality, airfield datum consistency,
+   vehicle usability, and outer-boundary strategy, not missing DEM delivery.
+6. **Water rendering/material future** - authored level/depth water bodies are
+   the gameplay-water authority, but the renderer is still a standard-material
+   bridge. Natural WebGPU/TSL water, shoreline polish, bridge clearance, and a
+   wider authored river network remain terrain-engine work.
+7. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
+8. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
 
 ## Game Modes
 

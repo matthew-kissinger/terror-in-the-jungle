@@ -45,7 +45,14 @@ before merge. See
 
 > Engine architected for 3,000 combatants via materialization tiers; live-fire combat verified at 120 NPCs while an ECS hot path is evaluated (Phase F, ~weeks 7–12 of the 2026-05-09 realignment plan).
 
-Phase F is the work that makes the 3,000 line true: a contingent bitECS port of combatants (only if the current approach stops scaling), async / precomputed cover-search to close DEFEKT-3, a 1,000-NPC perf gate, and a determinism pilot. Until Phase F lands, all public-facing claims about scale must include the qualifier above.
+Phase F is the work that keeps the 3,000 line honest: materialization tiers, a
+1,000-NPC perf gate, determinism and budget-arbiter pilots, and a contingent
+bitECS hot-path port only if the current approach stops scaling. Cover-search is
+no longer the known p99 blocker: the O(1) `CoverSpatialGrid` path is wired and
+proven cheap, while the remaining scale risk sits in residual NPC
+movement-stall tails, render/Other attribution, and the missing quiet-machine
+baseline. Until Phase F lands, all public-facing claims about scale must include
+the qualifier above.
 
 Current reality: combatants live in a Map<string,Combatant> (CombatantSystem.ts); bitECS is not yet a dependency and the E1 evaluation (docs/rearch/E1-ecs-evaluation.md) recommends DEFER — ECS is a contingent Phase-F evaluation, not in progress.
 
@@ -59,12 +66,14 @@ another pre-release scope expansion.
 
 Carry these findings into the next Projekt revamp:
 
-- Water and hydrology: keep the hydrology corridor/bake work, hydrology river
-  surfaces, riverbed terrain stamps, map/boat discoverability, and the
-  `WaterSystem` query/interaction contract. The legacy global water plane is
-  only an opt-in fallback; natural WebGPU/TSL river rendering, crossings,
-  shoreline polish, and watercraft-grade physics remain future terrain-engine
-  work.
+- Water and hydrology: accepted gameplay water now comes from authored
+  level/depth water bodies in Open Frontier and A Shau. These reaches carve
+  bathymetry, return `water_body` samples, and render as real volumes instead
+  of narrow terrain-following ribbons. Hydrology remains useful as a
+  drainage/material sensor, not as the player-facing water surface. The legacy
+  global water plane is only an opt-in fallback; natural WebGPU/TSL river
+  rendering, wider authored river networks, crossings, shoreline polish, bridge
+  clearance, and watercraft-grade physics remain future terrain-engine work.
 - Vegetation ecology: use the short-palm retirement, bamboo/ground-cover
   distribution audits, and Pixel Forge candidate proofs as starting evidence
   for clustered jungle, hydrology-aware palms/understory, trail edges, and grass
@@ -98,26 +107,54 @@ Carry these findings into the next Projekt revamp:
 |-------|--------|---------|
 | 0: Asset Manifest | DONE | 75 asset specs generated via PixelForge Kiln. |
 | 1: Asset Generation | DONE | 75 GLBs shipped. Vegetation remakes pending. |
-| 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), structures integrated. Fixed-wing runtime is live; ground vehicles remain static only. |
-| 3: Vehicle Controls | PARTIAL | 3 flyable helicopters plus 3 flyable fixed-wing aircraft with live HUD/control runtime. Fixed-wing feel/interpolation sign-off, NPC transport, ground vehicles, and aircraft combat integration remain. |
+| 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), structures, fixed-wing, M151/M48 vehicles, and watercraft boarding/spawn surfaces are integrated. Remaining asset work is visual polish, fleet expansion, and owner playtest acceptance. |
+| 3: Vehicle Controls | PARTIAL | 3 flyable helicopters, 3 flyable fixed-wing aircraft, drivable M151, operable M48 tanks, and boardable watercraft surfaces are live. Fixed-wing feel/interpolation sign-off, vehicle seat swaps, NPC transport, aircraft period weapons/routes, and broader combined-arms feel remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
-| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water now uses hydrology river surfaces with terrain riverbed stamps, query/interaction samples, and map/boat discoverability; the legacy global plane is opt-in fallback only. Final WebGPU/TSL water material, shoreline polish, and watercraft-grade physics remain open. |
+| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water now uses authored level/depth bodies with carved bathymetry and `water_body` samples in Open Frontier and A Shau; hydrology is diagnostic/material input. Final WebGPU/TSL water material, broader authored river networks, shoreline polish, bridge clearance, and watercraft-grade physics remain open. |
 | 6: Ground Vehicles | MOSTLY DONE | M151 jeep (VEKHIKL-1) drivable with per-wheel terrain conform; M48 Patton chassis (VEKHIKL-3) + turret/cannon/AI gunner (VEKHIKL-4) shipped; cycle-2026-05-28 added tank crew + cannon + turret and deploy/loadout discoverability. All code-complete; playtests deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md). Architecture memos: `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` (wheeled physics, Ackermann steering, ground-normal conform) and `docs/rearch/TANK_SYSTEMS_2026-05-13.md` (skid-steer, independent turret, gunner seat, ballistic cannon, damage states). |
-| 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
+| 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Weapon pickup and M2HB emplacement surfaces exist but remain playtest-polish items; faction doctrines and broader content loops remain open. |
 | 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
 | 9: Faction Expansion | PARTIAL | 4 factions in loadout context (US, ARVN, NVA, VC). AI doctrine per faction not started. |
-| 10: Scale Frontier | NOT STARTED | Gated on combat AI p99 closure. |
+| 10: Scale Frontier | NOT STARTED | Gated on STABILIZAT-1 quiet-machine baselines, residual combat movement-stall tail work, render/Other attribution, and Phase F materialization proof. |
+
+## Current Remaining Roadmap Work
+
+- Owner playtest sign-off for the terrain/vehicle/water foundation reset and the
+  playtest-deferred VODA, VEKHIKL, AVIATSIYA, SVYAZ, UX, and DIZAYN surfaces.
+- SOL-1 solar/atmosphere/terrain lighting rearch: the 2026-06-08 automated
+  proof now passes the true-WebGPU all-mode sun-scale/night-terrain matrix and
+  the strict-WebGPU A Shau ridge proof. Noon sun span is bounded to 2.41%,
+  golden/dusk to 1.48%, midnight/twilight terrain red/white/cyan checks pass,
+  and WebGPU/WebGL parity is 0% in the all-mode matrix / 0.39% in the ridge
+  matrix. The next repo goal is SOL-1R7 owner/perf/release acceptance: human
+  visual review of sun scale, terrain lighting, water highlights, and ridge
+  light-bleed approximation, followed by perf impact and live-release proof.
+- STABILIZAT-1: re-establish quiet-machine perf baselines, certify combat120
+  frame tails, and separate NPC movement-stall work from render/Other cost.
+- KB-STARTUP-1: harden worker-backed terrain surface baking and mode-start
+  batching so large maps stop blocking mode selection on the main thread.
+- KONVEYER-12: choose a finite-map edge strategy for procedural maps and a real
+  A Shau outer-boundary strategy instead of synthetic collar tuning.
+- A Shau play-path validation: route/NPC movement quality, airfield usability,
+  vehicle spawn/driving proof, water readability, and terrain-source boundaries.
+- Aviation follow-through: fixed-wing feel, period-specific weapons, lead/sway
+  aids, named maneuver routes, and broader air-combat loops.
+- Ground and water vehicle follow-through: seat swaps, M113/M35/T-54 fleet
+  expansion, bridge clearance, watercraft physics, and combined-arms feel.
+- Scale frontier: 1,000-NPC perf gate, materialization budget arbitration,
+  determinism proof, and an ECS hot-path decision only if OOP stops scaling.
 
 ## Phase Details (Future Work)
 
 ### Vehicles & Transport
-- Fixed-wing feel/interpolation sign-off before adding more vehicle types
-- Unified `IVehicle` interface for helicopters, ground vehicles, watercraft
-- Ground vehicle physics (terrain-following, speed by surface type)
-- M113 APC, M35 Truck as next drivable ground vehicles
+- Fixed-wing feel/interpolation sign-off before widening air-combat scope
+- Continue vehicle adapter/session consolidation across helicopters, fixed-wing,
+  ground vehicles, and watercraft
+- Seat swaps, active-gunner handoff, and combined-arms vehicle feel
+- M113 APC, M35 truck, and T-54 as next drivable ground-vehicle candidates
 - NPC helicopter transport (takeoff, fly to LZ, deploy squad, RTB)
 - Watercraft (sampan, PBR) have boarding/spawn integration; watercraft-grade
-  hydrodynamics and seat-swap combat polish remain open.
+  hydrodynamics, bridge clearance, and seat-swap combat polish remain open.
 
 ### Command & RTS
 - Command scaling: squad (8-16) -> platoon (30-60) -> company (100-200) -> battalion (500+)
@@ -125,12 +162,14 @@ Carry these findings into the next Projekt revamp:
 - Air support / artillery request interface
 
 ### Terrain & Environment
-- Water engine: river system, swimming, depth-based rendering, watercraft physics
+- Water engine: broader authored river network, WebGPU/TSL material pass,
+  shoreline polish, bridge clearance, swimming/wading feel, and watercraft
+  physics
 - Road network generation (splines, intersections, pathfinding between zones)
 - Biome transitions (blending at boundaries)
 
 ### Combat & Content
-- Stationary weapons (M2 .50 cal emplacements, NPC manning)
+- Stationary weapons polish (M2 .50 cal emplacements, NPC manning, owner feel)
 - Faction AI doctrines (VC guerrilla, NVA conventional, US combined arms)
 - Day/night cycle, music/soundtrack
 - Survival/roguelite game mode
@@ -147,7 +186,7 @@ Carry these findings into the next Projekt revamp:
 |----------|----------|
 | Loadout | Default presets + fully customizable. Changeable on respawn. |
 | Command mode | Fully real-time. No time slowdown. |
-| Water | Terrain engine module. Sandbox test first. |
+| Water | Authored level/depth bodies own gameplay water in Open Frontier and A Shau; hydrology remains drainage/material input; legacy global plane is opt-in fallback. |
 | NPC rendering | Pixel Forge impostors are production truth with limited close-GLB materialization; KONVEYER-10 owns WebGPU visual parity for impostors vs close GLBs. |
 | Campaign | Engine module. Linear, dynamic, and sandbox modes possible. Not near-term. |
 | Multiplayer | Don't block it, but not building now. Single-player AI focus. |
@@ -155,7 +194,11 @@ Carry these findings into the next Projekt revamp:
 
 ## Performance Budget
 
-- Near-term gate: drive toward a 60 FPS-class budget for 120-NPC materialized scenarios and continue driving down p95/p99 tails through capture-and-compare work (current combat120: ~16ms avg, p99 ~34ms, max-frame FAIL, measurement-trust WARN — see [docs/state/perf-trust.md](state/perf-trust.md))
+- Near-term gate: re-establish quiet-machine baselines through STABILIZAT-1,
+  then drive toward a 60 FPS-class budget for 120-NPC materialized scenarios.
+  `perf:compare` currently reports latest raw metrics without a tracked
+  baseline; cover-search is not the active p99 driver. See
+  [docs/state/perf-trust.md](state/perf-trust.md).
 - Long-term scale-frontier target before widening materialized counts: <8ms average, <16ms p99
 - Memory: <512MB heap for standard modes
 - Every phase: perf captures before/after, reject regressions

@@ -18,17 +18,33 @@ landed across `cycle-2026-04-20-atmosphere-foundation` and
   static so the primary perf regression target remains easier to compare.
 - `GameRenderer` fog is driven from atmosphere sky color instead of a hardcoded
   constant, removing the old horizon seam.
-- Hemisphere, directional, water, terrain, and vegetation lighting now read from
-  the same atmosphere snapshot.
-- `HosekWilkieSkyBackend` owns the visible sky-dome cloud pass. It receives
-  weather/scenario coverage from `AtmosphereSystem`, paints a generated sky
-  texture on a standard Three material, and avoids the old finite cloud-plane
-  horizon divider.
+- `AtmosphereSystem` publishes an `AtmosphereLightingSnapshot` with effective
+  direct light, sky fill, ground bounce, ambient fill, fog color, and daylight
+  factor. Renderer lights, water, and billboard vegetation use that contract;
+  terrain receives the same state through renderer lights and an atmosphere-
+  driven night-fill uniform plus a bounded low-sun heightmap/relief response in
+  the terrain material.
+- `AtmosphereSystem.setShadowFollowTarget` recenters the directional light and
+  target on the follow target's X/Y/Z. This preserves the sun angle on elevated
+  terrain such as A Shau instead of aiming the shadow frustum through world Y=0.
+- The active SOL-1 mitigation keeps daytime behavior largely intact while
+  correcting low-sun failures: sub-horizon sun vectors no longer become
+  above-ground terrain lights, ambient fill tints cool at dusk/night, and water
+  specular/emissive/foam/sparkle response attenuates when the sun is below the
+  horizon.
+- The TSL dome and CPU LUT share a cool sub-horizon sky floor. Daytime keeps
+  the historical Preetham floor, while night avoids near-black/red-extinction
+  sky samples that destabilize fog, hemisphere, water, and terrain reads.
+- `HosekWilkieSkyBackend` owns the visible sky-dome cloud pass. The active
+  visual dome is a TSL node material; the small CPU LUT remains for fog and
+  hemisphere readers. Weather/scenario coverage feeds the same backend, avoiding
+  the old finite cloud-plane horizon divider.
 - The old planar `CloudLayer` prototype has been removed from the active source
   tree. Do not reintroduce a finite cloud plane as WebGPU evidence; future
   cloud work should extend the sky-dome or an explicitly reviewed volume path.
-- `PostProcessingManager` applies ACES tone mapping before the 24-level quantize
-  and Bayer dither pass so warm dawn/dusk colors survive the retro post chain.
+- The active renderer draws straight to the backbuffer. `PostProcessingManager`
+  is a compatibility shim, and `GameRenderer` currently defaults to AGX tone
+  mapping after the sun-and-atmosphere overhaul.
 
 ## Runtime Contract
 
@@ -47,9 +63,14 @@ export interface ICloudRuntime {
 }
 ```
 
+`ISkyRuntime` remains the fenced read-only sky query surface. The concrete
+`AtmosphereSystem` additionally exposes `getLightingSnapshot(out)` so renderer,
+water, and billboard systems can consume the same effective day/night lighting
+without expanding the fenced interface.
+
 The important invariant is that fog, ambient lighting, water, terrain, and
-billboards all sample the same atmosphere state. Do not reintroduce independent
-hardcoded sky/fog/light colors for local fixes.
+billboards all sample the same atmosphere-derived lighting state. Do not
+reintroduce independent hardcoded sky/fog/light colors for local fixes.
 
 ## Current Limits
 
@@ -73,9 +94,23 @@ hardcoded sky/fog/light colors for local fixes.
   nav connectivity as passing, but route/NPC movement quality and airfield use
   still need play-path validation. The run also proves the A Shau work did not
   prevent Open Frontier, TDM, Zone Control, or combat120 from entering live mode.
-- The current backend uses a CPU LUT plus a generated sky texture from
-  simplified Hosek-Wilkie/Preetham-style math. It is designed for stable low
-  cost and WebGPU compatibility, not physically exhaustive sky rendering.
+- SOL-1 remains open for owner/perf/release acceptance, not for missing local
+  automated visual proof. The current mitigation removes cyan/white night-water
+  and sub-horizon light defaults, keeps renderer, water, billboard lighting,
+  and terrain night fill on one effective lighting snapshot, and applies a
+  bounded low-sun terrain heightmap/relief response. The shadow recenter path
+  preserves A Shau altitude, and renderer-facing low-sun directional light is
+  bounded separately from the analytic sky color. The visible sun body now
+  separates a small HDR disc from a bounded aureole and an elevation-colored
+  base-glare cap, so the all-mode proof passes sun-scale (`sunSpan=2.41%` at
+  noon, `1.48%` at golden/dusk), twilight/midnight red/white/cyan terrain
+  checks pass, and strict-WebGPU A Shau dusk ridge proof resolves true
+  `webgpu` with explicit-WebGL2 parity at 0.39%. The legacy strict night-red
+  assertion still fails because it contradicts the documented cool moon target
+  `(0.18, 0.20, 0.30)`; the red-not-dominant check passes 5/5.
+- The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
+  readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,
+  not physically exhaustive sky rendering or horizon-scale terrain occlusion.
 - Time-of-day is scenario-driven, not a gameplay system with mission scheduling,
   darkness adaptation, or AI visibility effects.
 - Human screenshot/playtest review is still required for visible atmosphere
@@ -103,6 +138,7 @@ hardcoded sky/fog/light colors for local fixes.
 
 - Cycle evidence: `docs/cycles/cycle-2026-04-20-atmosphere-foundation/` and
   `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/`.
+- Current rearch directive: [SOL-1](directives/sol-1.md).
 - Hosek & Wilkie, "An Analytic Model for Full Spectral Sky-Dome Radiance"
   (2012).
 - Hillaire 2020, "A Scalable and Production Ready Sky and Atmosphere Rendering

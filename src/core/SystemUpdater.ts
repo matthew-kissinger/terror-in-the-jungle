@@ -12,6 +12,7 @@ import { GameEventBus } from './GameEventBus';
 import { SimulationScheduler } from './SimulationScheduler';
 import { collectTrackedSystems, SYSTEM_UPDATE_BUDGET_MS } from './SystemUpdateSchedule';
 import { GroundVehicleProximityChecker } from '../systems/vehicle/GroundVehicleProximityChecker';
+import { createAtmosphereLightingSnapshot } from '../systems/environment/AtmosphereSystem';
 
 interface SystemTimingEntry {
   name: string;
@@ -59,10 +60,7 @@ export class SystemUpdater {
     skyColor: this.billboardSkyColor,
     groundColor: this.billboardGroundColor,
   };
-  // Matches HEMISPHERE_GROUND_DARKEN in AtmosphereSystem — keeps the billboard
-  // ground tint aligned with the hemisphere light's groundColor so terrain
-  // and vegetation darken by the same factor each frame.
-  private static readonly BILLBOARD_GROUND_DARKEN = 0.55;
+  private readonly billboardAtmosphereLighting = createAtmosphereLightingSnapshot();
 
   updateSystems(
     refs: SystemKeyToType,
@@ -112,22 +110,24 @@ export class SystemUpdater {
 
     this.trackSystemUpdate('Billboards', SYSTEM_UPDATE_BUDGET_MS.Billboards, () => {
       performanceTelemetry.beginSystem('Billboards');
+      let atmosphereLighting: typeof this.billboardAtmosphereLighting | undefined;
+      if (refs.atmosphereSystem) {
+        atmosphereLighting = refs.atmosphereSystem.getLightingSnapshot(
+          this.billboardAtmosphereLighting,
+        );
+        refs.terrainSystem?.setAtmosphereLighting(atmosphereLighting);
+      }
       if (refs.globalBillboardSystem) {
         const fog = scene?.fog as THREE.FogExp2 | undefined;
-        // Snapshot the atmosphere's current sun + hemisphere colors into the
-        // reusable billboard lighting struct. Terrain picks these up through
-        // MeshStandardMaterial + the renderer's moonLight/hemisphereLight;
-        // vegetation owns a custom billboard material, so we forward the same
-        // colors as uniforms to keep the two in parity
-        // across TOD, weather, and underwater transitions.
+        // Snapshot the atmosphere's current lighting authority into the
+        // reusable billboard struct. Terrain picks this up through renderer
+        // lights; vegetation owns a custom billboard material, so it receives
+        // the same effective direct/sky/ground colors as uniforms.
         let lighting: typeof this.billboardLighting | undefined;
-        if (refs.atmosphereSystem) {
-          refs.atmosphereSystem.getSunColor(this.billboardSunColor);
-          refs.atmosphereSystem.getZenithColor(this.billboardSkyColor);
-          refs.atmosphereSystem.getHorizonColor(this.billboardGroundColor);
-          this.billboardGroundColor.multiplyScalar(
-            SystemUpdater.BILLBOARD_GROUND_DARKEN,
-          );
+        if (atmosphereLighting) {
+          this.billboardSunColor.copy(atmosphereLighting.directLightColor);
+          this.billboardSkyColor.copy(atmosphereLighting.skyColor);
+          this.billboardGroundColor.copy(atmosphereLighting.groundColor);
           lighting = this.billboardLighting;
         }
         const playerPos = refs.playerController?.getPosition();

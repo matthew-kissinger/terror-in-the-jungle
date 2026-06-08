@@ -34,10 +34,19 @@ import {
   type WaterEdgeBinding,
   type WaterTerrainHeightSamplerBinding,
   WATER_EDGE_SOFT_BLEND_DISTANCE_METERS,
+  waterDaylightFactor,
 } from './water/WaterSurfaceBinding';
+import {
+  createAtmosphereLightingSnapshot,
+  type AtmosphereLightingSnapshot,
+} from './AtmosphereSystem';
 
 export type { WaterInteractionOptions, WaterInteractionSample, WaterSurfaceSource } from './water/WaterSurfaceSampler';
 export type { WaterEdgeBinding, WaterTerrainHeightSamplerBinding } from './water/WaterSurfaceBinding';
+
+type LightingSnapshotSkyRuntime = ISkyRuntime & {
+  getLightingSnapshot?: (out: AtmosphereLightingSnapshot) => AtmosphereLightingSnapshot;
+};
 
 interface WaterDebugInfo {
   enabled: boolean;
@@ -64,6 +73,9 @@ interface WaterDebugInfo {
 }
 
 const GLOBAL_WATER_COLOR = 0x17362f;
+const GLOBAL_WATER_NIGHT_COLOR = 0x061018;
+const GLOBAL_WATER_DAY_ENV_INTENSITY = 0.35;
+const GLOBAL_WATER_NIGHT_ENV_INTENSITY = 0.04;
 const GLOBAL_WATER_DISTORTION_SCALE = 2.35;
 const GLOBAL_WATER_ALPHA = 0.78;
 const GLOBAL_WATER_TIME_SCALE = 0.36;
@@ -85,7 +97,7 @@ export class WaterSystem implements GameSystem {
   private waterNormalTexture?: THREE.Texture;
   private assetLoader: AssetLoader;
   private weatherSystem?: WeatherSystem;
-  private atmosphereSystem?: ISkyRuntime;
+  private atmosphereSystem?: LightingSnapshotSkyRuntime;
 
   private readonly WATER_LEVEL = 0;
   private readonly BASE_WATER_SIZE = 2000;
@@ -93,6 +105,9 @@ export class WaterSystem implements GameSystem {
   private worldWaterSize = 2000;
 
   private sun: THREE.Vector3;
+  private readonly atmosphereLightingSnapshot = createAtmosphereLightingSnapshot();
+  private readonly globalWaterDayColor = new THREE.Color(GLOBAL_WATER_COLOR);
+  private readonly globalWaterNightColor = new THREE.Color(GLOBAL_WATER_NIGHT_COLOR);
   private wasUnderwater = false;
   private overlay?: HTMLDivElement;
   private enabled = true;
@@ -127,12 +142,22 @@ export class WaterSystem implements GameSystem {
   setWeatherSystem(w: WeatherSystem): void { this.weatherSystem = w; }
 
   /** Bind atmosphere so water reflections track real sun direction each frame. */
-  setAtmosphereSystem(s: ISkyRuntime): void { this.atmosphereSystem = s; this.syncSunFromAtmosphere(); }
+  setAtmosphereSystem(s: ISkyRuntime): void {
+    this.atmosphereSystem = s as LightingSnapshotSkyRuntime;
+    this.syncLightingFromAtmosphere();
+  }
 
-  private syncSunFromAtmosphere(): void {
-    if (!this.atmosphereSystem) return;
+  private syncLightingFromAtmosphere(): number {
+    if (!this.atmosphereSystem) return waterDaylightFactor(this.sun.y);
+    if (this.atmosphereSystem.getLightingSnapshot) {
+      const snapshot = this.atmosphereSystem.getLightingSnapshot(this.atmosphereLightingSnapshot);
+      this.sun.copy(snapshot.directLightDirection);
+      if (this.sun.lengthSq() > 0) this.sun.normalize();
+      return snapshot.daylightFactor;
+    }
     this.atmosphereSystem.getSunDirection(this.sun);
     if (this.sun.lengthSq() > 0) this.sun.normalize();
+    return waterDaylightFactor(this.sun.y);
   }
 
   async init(): Promise<void> {
@@ -155,7 +180,7 @@ export class WaterSystem implements GameSystem {
       normalMap: normals, normalScale: new THREE.Vector2(0.18, 0.18),
       depthWrite: false, side: THREE.DoubleSide,
     });
-    material.envMapIntensity = 0.35;
+    material.envMapIntensity = GLOBAL_WATER_DAY_ENV_INTENSITY;
     this.waterShaderRefs = this.binding.install(material, this.sun);
 
     this.water = new THREE.Mesh(geom, material);
@@ -194,12 +219,26 @@ export class WaterSystem implements GameSystem {
       this.water.position.x = this.camera.position.x;
       this.water.position.z = this.camera.position.z;
     }
-    this.syncSunFromAtmosphere();
+    const daylight = this.syncLightingFromAtmosphere();
+    this.updateWaterLighting(daylight);
     this.setUnderwaterState(this.isUnderwater(this.camera.position));
     this.waterTimeSeconds += deltaTime * GLOBAL_WATER_TIME_SCALE;
-    this.binding.updateSurfaceUniforms(this.waterTimeSeconds, this.sun, this.wasUnderwater);
+    this.binding.updateSurfaceUniforms(this.waterTimeSeconds, this.sun, this.wasUnderwater, daylight);
     // River flow on plain seconds (no GLOBAL_WATER_TIME_SCALE); no-op without hydrology.
-    this.binding.tickRiverFlow(deltaTime, this.waterNormalTexture);
+    this.binding.tickRiverFlow(deltaTime, this.waterNormalTexture, daylight);
+  }
+
+  private updateWaterLighting(daylight: number): void {
+    if (this.water) {
+      this.water.material.color
+        .copy(this.globalWaterNightColor)
+        .lerp(this.globalWaterDayColor, daylight);
+      this.water.material.envMapIntensity =
+        GLOBAL_WATER_NIGHT_ENV_INTENSITY
+        + (GLOBAL_WATER_DAY_ENV_INTENSITY - GLOBAL_WATER_NIGHT_ENV_INTENSITY) * daylight;
+    }
+    this.riverSurface.setLightingFactor(daylight);
+    this.waterBodySurface.setLightingFactor(daylight);
   }
 
   private setUnderwaterState(isUnderwater: boolean): void {

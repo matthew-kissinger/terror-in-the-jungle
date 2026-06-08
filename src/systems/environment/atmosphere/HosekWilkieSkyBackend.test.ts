@@ -140,6 +140,22 @@ describe('HosekWilkieSkyBackend (via AtmosphereSystem)', () => {
     }
   });
 
+  it('deep-night sampled sky stays cool and visibly above black', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.applyPreset(SCENARIO_ATMOSPHERE_PRESETS.openfrontier);
+    const elevationRad = (-15 * Math.PI) / 180;
+    const sun = new THREE.Vector3(Math.cos(elevationRad), Math.sin(elevationRad), 0).normalize();
+    backend.update(0.016, sun);
+
+    const zenith = backend.getZenith(new THREE.Color());
+    const horizon = backend.getHorizon(new THREE.Color());
+    for (const color of [zenith, horizon]) {
+      const luma = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+      expect(luma).toBeGreaterThan(0.005);
+      expect(color.b).toBeGreaterThan(color.r);
+    }
+  });
+
   it('syncDomePosition glues the dome to an arbitrary camera position', () => {
     const scene = new THREE.Scene();
     const system = new AtmosphereSystem();

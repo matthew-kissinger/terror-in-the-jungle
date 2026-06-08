@@ -43,6 +43,7 @@ const MAX_BIOME_RULES = 8;
 // uniform budgets and fail terrain material compilation, resulting in an
 // invisible-but-collidable terrain surface.
 const MAX_FEATURE_SURFACE_PATCHES = 8;
+const TERRAIN_HORIZON_SHADOW_SAMPLE_DISTANCES = [96, 192, 384, 768, 1536] as const;
 
 type UniformSlot<T = unknown> = { value: T };
 type TerrainUniforms = Record<string, UniformSlot>;
@@ -51,6 +52,7 @@ type TslNode = any;
 export type TerrainMaterial = MeshStandardNodeMaterial & {
   uniforms: TerrainUniforms;
   isKonveyerTerrainNodeMaterial: true;
+  emissiveNode?: TslNode;
 };
 
 const tslAttribute = (name: string, type: string): TslNode => attribute(name, type) as TslNode;
@@ -189,6 +191,15 @@ interface TerrainMaterialOptions {
   tileGridResolution?: number;
   surfacePatches?: TerrainSurfacePatch[];
   waterEdge?: TerrainWaterEdgeConfig;
+  atmosphereLighting?: TerrainAtmosphereLightingMaterialConfig;
+}
+
+export interface TerrainAtmosphereLightingMaterialConfig {
+  nightFillColor: THREE.Color;
+  nightFillStrength: number;
+  directLightDirection: THREE.Vector3;
+  daylightFactor: number;
+  lowSunOcclusionStrength: number;
 }
 
 /**
@@ -278,6 +289,33 @@ function createTerrainPositionNode(uniforms: TerrainUniforms): TslNode {
 function createTerrainNormalNode(uniforms: TerrainUniforms, worldPos: TslNode = tslPositionWorld): TslNode {
   const worldUv = createTerrainWorldUvNode(uniforms, worldPos);
   return normalize(tslTexture(uniformTexture(uniforms, 'terrainNormalMap'), worldUv).rgb.mul(2).sub(1)) as TslNode;
+}
+
+function sampleTerrainHeightAtWorldXz(worldXz: TslNode, uniforms: TerrainUniforms): TslNode {
+  const sampleWorldPos = tslVec3(worldXz.x, tslFloat(0), worldXz.y);
+  const worldUv = createTerrainWorldUvNode(uniforms, sampleWorldPos);
+  return tslTexture(uniformTexture(uniforms, 'terrainHeightmap'), worldUv).r;
+}
+
+function terrainHorizonBlockerSample(
+  worldPos: TslNode,
+  lightDirection: TslNode,
+  sunHorizontal: TslNode,
+  horizontalLength: TslNode,
+  distanceMeters: number,
+  uniforms: TerrainUniforms,
+): TslNode {
+  const distance = tslFloat(distanceMeters);
+  const sampleXz = worldPos.xz.add(sunHorizontal.mul(distance));
+  const sampledHeight = sampleTerrainHeightAtWorldXz(sampleXz, uniforms);
+  const rayHeight = worldPos.y
+    .add(lightDirection.y.div(horizontalLength).mul(distance))
+    .add(tslFloat(8 + distanceMeters * 0.018));
+  return smoothstep(
+    tslFloat(0),
+    tslFloat(30 + distanceMeters * 0.018),
+    sampledHeight.sub(rayHeight),
+  );
 }
 
 function hashUvNode(p: TslNode): TslNode {
@@ -707,6 +745,8 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   const farCanopyFogMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms)
     .mul(tslReference('float', uniforms.farCanopyTintFogStrength));
   finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
+  const lowSunOcclusion = terrainLowSunOcclusionMask(terrainNormal, worldPos, uniforms);
+  finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.28, 0.36, 0.44)), lowSunOcclusion);
 
   const tileParams0 = tslAttribute('tileParams0', 'vec4');
   const tileParams1 = tslAttribute('tileParams1', 'vec4');
@@ -751,6 +791,12 @@ function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
   roughnessSample = tslMix(roughnessSample, tslFloat(0.94), featureSurfaceWeight(3, worldPos, uniforms));
   roughnessSample = tslMix(roughnessSample, tslFloat(0.90), featureSurfaceWeight(4, worldPos, uniforms));
   roughnessSample = tslMix(roughnessSample, tslFloat(0.95), featureSurfaceWeight(5, worldPos, uniforms));
+  const lowSunOcclusion = terrainLowSunOcclusionMask(terrainNormal, worldPos, uniforms);
+  roughnessSample = tslMix(
+    roughnessSample,
+    tslMax(roughnessSample, tslFloat(0.97)),
+    lowSunOcclusion.mul(0.65),
+  );
   const farCanopyRoughnessMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms);
   const farCanopyAdjusted = tslMix(
     roughnessSample,
@@ -764,6 +810,41 @@ function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
   return tslMax(farCanopyAdjusted, tslFloat(0.88));
 }
 
+function createTerrainNightFillNode(uniforms: TerrainUniforms): TslNode {
+  return tslReference('color', uniforms.atmosphereNightFillColor)
+    .mul(tslReference('float', uniforms.atmosphereNightFillStrength));
+}
+
+function terrainLowSunOcclusionMask(terrainNormal: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
+  const strength = tslClamp(
+    tslReference('float', uniforms.atmosphereLowSunOcclusionStrength),
+    tslFloat(0),
+    tslFloat(1),
+  );
+  const lightDirection = normalize(tslReference('vec3', uniforms.atmosphereDirectLightDirection)) as TslNode;
+  const sunXz = tslVec2(lightDirection.x, lightDirection.z);
+  const horizontalLength = tslMax(tslLength(sunXz), tslFloat(0.001));
+  const sunHorizontal = sunXz.div(horizontalLength);
+  const nDotL = tslClamp(dot(terrainNormal, lightDirection), tslFloat(0), tslFloat(1));
+  const shadowFacing = tslFloat(1).sub(smoothstep(tslFloat(0.05), tslFloat(0.38), nDotL));
+  const slopeMask = tslFloat(1).sub(smoothstep(tslFloat(0.72), tslFloat(0.97), terrainNormal.y));
+  const ridgeElevationMask = smoothstep(tslFloat(80), tslFloat(620), worldPos.y);
+  let horizonBlocker = tslFloat(0);
+  for (const sampleDistance of TERRAIN_HORIZON_SHADOW_SAMPLE_DISTANCES) {
+    horizonBlocker = tslMax(
+      horizonBlocker,
+      terrainHorizonBlockerSample(worldPos, lightDirection, sunHorizontal, horizontalLength, sampleDistance, uniforms),
+    );
+  }
+  horizonBlocker = horizonBlocker.mul(tslFloat(1).sub(smoothstep(tslFloat(0.22), tslFloat(0.52), lightDirection.y)));
+  const reliefMask = tslClamp(
+    tslMax(slopeMask, ridgeElevationMask.mul(0.92)).mul(tslMix(tslFloat(0.62), tslFloat(1), shadowFacing)),
+    tslFloat(0),
+    tslFloat(1),
+  );
+  return strength.mul(tslClamp(tslMax(reliefMask, horizonBlocker), tslFloat(0), tslFloat(1)));
+}
+
 function configureTerrainNodeMaterial(material: TerrainMaterial, uniforms: TerrainUniforms): void {
   material.uniforms = uniforms;
   material.isKonveyerTerrainNodeMaterial = true;
@@ -775,6 +856,7 @@ function configureTerrainNodeMaterial(material: TerrainMaterial, uniforms: Terra
   material.colorNode = createTerrainColorNode(uniforms);
   material.roughnessNode = createTerrainRoughnessNode(uniforms);
   material.metalnessNode = tslFloat(0);
+  material.emissiveNode = createTerrainNightFillNode(uniforms);
 }
 
 export function createTerrainMaterial(options: TerrainMaterialOptions): TerrainMaterial {
@@ -820,6 +902,7 @@ export function updateTerrainMaterialTextures(
     surfaceWetness: readCurrentSurfaceWetness(material),
     surfacePatches,
     waterEdge: readCurrentWaterEdge(material) ?? undefined,
+    atmosphereLighting: readCurrentAtmosphereLighting(material),
   });
   material.needsUpdate = true;
 }
@@ -908,6 +991,27 @@ export function updateTerrainMaterialFarCanopyTint(
   );
 }
 
+export function updateTerrainMaterialAtmosphereLighting(
+  material: TerrainMaterial,
+  lighting: TerrainAtmosphereLightingMaterialConfig,
+): void {
+  const terrainUniforms = material.userData.terrainUniforms as TerrainUniforms | undefined;
+  if (!terrainUniforms) return;
+  const normalized = normalizeTerrainAtmosphereLighting(lighting);
+  (terrainUniforms.atmosphereNightFillColor.value as THREE.Color).copy(normalized.nightFillColor);
+  terrainUniforms.atmosphereNightFillStrength.value = normalized.nightFillStrength;
+  (terrainUniforms.atmosphereDirectLightDirection.value as THREE.Vector3).copy(normalized.directLightDirection);
+  terrainUniforms.atmosphereDaylightFactor.value = normalized.daylightFactor;
+  terrainUniforms.atmosphereLowSunOcclusionStrength.value = normalized.lowSunOcclusionStrength;
+  material.userData.terrainAtmosphereLighting = {
+    nightFillColor: normalized.nightFillColor.clone(),
+    nightFillStrength: normalized.nightFillStrength,
+    directLightDirection: normalized.directLightDirection.clone(),
+    daylightFactor: normalized.daylightFactor,
+    lowSunOcclusionStrength: normalized.lowSunOcclusionStrength,
+  };
+}
+
 function applyTerrainMaterialOptions(
   material: TerrainMaterial,
   options: TerrainMaterialOptions,
@@ -932,6 +1036,7 @@ function applyTerrainMaterialOptions(
     material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
     material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
     material.userData.terrainWaterEdge = normalizeWaterEdge(options.waterEdge);
+    material.userData.terrainAtmosphereLighting = normalizeTerrainAtmosphereLighting(options.atmosphereLighting);
     configureTerrainNodeMaterial(material, existingUniforms);
     material.needsUpdate = true;
     return;
@@ -941,6 +1046,7 @@ function applyTerrainMaterialOptions(
   material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
   material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
   material.userData.terrainWaterEdge = normalizeWaterEdge(options.waterEdge);
+  material.userData.terrainAtmosphereLighting = normalizeTerrainAtmosphereLighting(options.atmosphereLighting);
   material.customProgramCacheKey = () => 'KonveyerTerrainTSL_v1';
   configureTerrainNodeMaterial(material, shaderBindings.uniforms);
 }
@@ -1061,6 +1167,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
 
   const heightmapGridSize = heightTexture.image?.width ?? 512;
   const waterEdge = normalizeWaterEdge(options.waterEdge);
+  const atmosphereLighting = normalizeTerrainAtmosphereLighting(options.atmosphereLighting);
 
   const uniforms: Record<string, { value: unknown }> = {
     terrainHeightmap: { value: heightTexture },
@@ -1084,6 +1191,11 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
       farCanopyTint.color[1],
       farCanopyTint.color[2],
     ) },
+    atmosphereNightFillColor: { value: atmosphereLighting.nightFillColor.clone() },
+    atmosphereNightFillStrength: { value: atmosphereLighting.nightFillStrength },
+    atmosphereDirectLightDirection: { value: atmosphereLighting.directLightDirection.clone() },
+    atmosphereDaylightFactor: { value: atmosphereLighting.daylightFactor },
+    atmosphereLowSunOcclusionStrength: { value: atmosphereLighting.lowSunOcclusionStrength },
     hydrologyMaskTexture: { value: hydrologyMask.texture },
     hydrologyMaskEnabled: { value: hydrologyMask.enabled ? 1 : 0 },
     hydrologyMaskOrigin: { value: new THREE.Vector2(hydrologyMask.originX, hydrologyMask.originZ) },
@@ -1207,6 +1319,42 @@ function resolveHydrologyMaskMaterial(
 function readCurrentSurfaceWetness(material: TerrainMaterial): number {
   const currentWetness = material.userData.terrainSurfaceWetness;
   return typeof currentWetness === 'number' ? currentWetness : 0;
+}
+
+function normalizeTerrainAtmosphereLighting(
+  lighting?: TerrainAtmosphereLightingMaterialConfig,
+): TerrainAtmosphereLightingMaterialConfig {
+  const color = lighting?.nightFillColor instanceof THREE.Color
+    ? lighting.nightFillColor.clone()
+    : new THREE.Color(0, 0, 0);
+  const strength = THREE.MathUtils.clamp(lighting?.nightFillStrength ?? 0, 0, 0.5);
+  const directLightDirection = lighting?.directLightDirection instanceof THREE.Vector3
+    ? lighting.directLightDirection.clone()
+    : new THREE.Vector3(0, 1, 0);
+  if (directLightDirection.lengthSq() < 1e-8) {
+    directLightDirection.set(0, 1, 0);
+  } else {
+    directLightDirection.normalize();
+  }
+  const daylightFactor = THREE.MathUtils.clamp(lighting?.daylightFactor ?? 1, 0, 1);
+  const lowSunOcclusionStrength = THREE.MathUtils.clamp(lighting?.lowSunOcclusionStrength ?? 0, 0, 1);
+  return {
+    nightFillColor: color,
+    nightFillStrength: strength,
+    directLightDirection,
+    daylightFactor,
+    lowSunOcclusionStrength,
+  };
+}
+
+function readCurrentAtmosphereLighting(
+  material: TerrainMaterial,
+): TerrainAtmosphereLightingMaterialConfig | undefined {
+  const stashed = material.userData.terrainAtmosphereLighting as
+    | TerrainAtmosphereLightingMaterialConfig
+    | undefined;
+  if (!stashed) return undefined;
+  return normalizeTerrainAtmosphereLighting(stashed);
 }
 
 function readCurrentWaterEdge(material: TerrainMaterial): TerrainWaterEdgeConfig | null {

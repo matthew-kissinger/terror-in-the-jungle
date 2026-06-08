@@ -4,10 +4,12 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
-  createHosekWilkieTslMaterial,
   evaluatePreethamWithDiscCpu,
   HOSEK_WILKIE_TSL_DEFAULTS,
   type PreethamCpuMirrorState,
+} from './HosekWilkieTslCpuMirror';
+import {
+  createHosekWilkieTslMaterial,
 } from './HosekWilkieTslNode';
 import { HosekWilkieSkyBackend } from './HosekWilkieSkyBackend';
 import { SCENARIO_ATMOSPHERE_PRESETS } from './ScenarioAtmospherePresets';
@@ -182,6 +184,19 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
     expect(maxChannel).toBeLessThan(0.5);
   });
 
+  it('deep-night sky floor stays cool and visibly above black away from the disc', () => {
+    const out = new THREE.Color();
+    const deepNightState: PreethamCpuMirrorState = {
+      ...baseState,
+      sunDirection: new THREE.Vector3(0.6, Math.sin((-15 * Math.PI) / 180), 0.5).normalize(),
+    };
+    evaluatePreethamWithDiscCpu(deepNightState, new THREE.Vector3(0, 1, 0), out);
+
+    const luma = 0.2126 * out.r + 0.7152 * out.g + 0.0722 * out.b;
+    expect(luma).toBeGreaterThan(0.005);
+    expect(out.b).toBeGreaterThan(out.r);
+  });
+
   it('twilight band: sub-horizon civil-twilight sun keeps a warm Fex-derived blend', () => {
     const out = new THREE.Color();
     const twilightState: PreethamCpuMirrorState = {
@@ -219,17 +234,17 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
   }
 
   it('aureole halo adds radiance just outside the visible disc (gameplay-readable glare)', () => {
-    // Direction ~5° from the sun: outside the disc-outer cone (cos(2.5°))
-    // but well inside the noon aureole cone (cos(8°)). At a high-sun
+    // Direction ~1.0° from the sun: outside the disc-outer cone (cos(0.65°))
+    // but inside the tightened noon aureole cone (cos(1.5°)). At a high-sun
     // state the halo additive contribution lifts radiance above the
-    // equivalent direction outside the aureole cone (cos(15°)).
+    // equivalent direction outside the aureole cone.
     const highSunState: PreethamCpuMirrorState = {
       ...baseState,
       sunDirection: new THREE.Vector3(0.2, 0.95, 0.2).normalize(),
     };
     const axisHint = new THREE.Vector3(0, 1, 0);
-    const halo = offsetFromSun(highSunState.sunDirection, 5, axisHint);
-    const outside = offsetFromSun(highSunState.sunDirection, 15, axisHint);
+    const halo = offsetFromSun(highSunState.sunDirection, 1.0, axisHint);
+    const outside = offsetFromSun(highSunState.sunDirection, 3, axisHint);
 
     const haloOut = new THREE.Color();
     const outsideOut = new THREE.Color();
@@ -241,13 +256,12 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
     expect(haloLuma).toBeGreaterThan(outsideLuma);
   });
 
-  it('aureole halo stretches into the mie band at low sun (wider noticeable glare than at noon)', () => {
-    // Same angular offset from the sun (~12°). At noon (sun.y≈0.95) this
-    // direction is OUTSIDE the aureole cone (~8°), so the halo doesn't
-    // contribute. At low sun (sun.y≈0.15) the aureole stretches into the
-    // mie band (~21° outer), so the halo contribution is non-zero. We
-    // assert each state's "12° offset from sun" reads brighter than the
-    // same state's "30° offset from sun" — the relative comparison
+  it('aureole halo stretches modestly at low sun without becoming a broad disc', () => {
+    // Same angular offset from the sun (~2°). At noon (sun.y≈0.95) this
+    // direction is outside the tightened aureole cone, so the halo doesn't
+    // contribute. At low sun (sun.y≈0.15) the aureole stretches enough that
+    // the contribution is non-zero, but it no longer saturates a huge white
+    // circle. The relative comparison
     // controls for the per-state base-sky luminance and isolates the
     // aureole contribution.
     const noonState: PreethamCpuMirrorState = {
@@ -259,29 +273,50 @@ describe('HosekWilkieTslNode CPU mirror — Preetham shape', () => {
       sunDirection: new THREE.Vector3(0.7, 0.15, 0.7).normalize(),
     };
     const axisHint = new THREE.Vector3(0, 1, 0);
-    const noon12 = offsetFromSun(noonState.sunDirection, 12, axisHint);
-    const noon30 = offsetFromSun(noonState.sunDirection, 30, axisHint);
-    const lowSun12 = offsetFromSun(lowSunState.sunDirection, 12, axisHint);
-    const lowSun30 = offsetFromSun(lowSunState.sunDirection, 30, axisHint);
+    const noon2 = offsetFromSun(noonState.sunDirection, 2, axisHint);
+    const noon10 = offsetFromSun(noonState.sunDirection, 10, axisHint);
+    const lowSun2 = offsetFromSun(lowSunState.sunDirection, 2, axisHint);
+    const lowSun10 = offsetFromSun(lowSunState.sunDirection, 10, axisHint);
 
-    const noon12Out = new THREE.Color();
-    const noon30Out = new THREE.Color();
-    const lowSun12Out = new THREE.Color();
-    const lowSun30Out = new THREE.Color();
-    evaluatePreethamWithDiscCpu(noonState, noon12, noon12Out);
-    evaluatePreethamWithDiscCpu(noonState, noon30, noon30Out);
-    evaluatePreethamWithDiscCpu(lowSunState, lowSun12, lowSun12Out);
-    evaluatePreethamWithDiscCpu(lowSunState, lowSun30, lowSun30Out);
+    const noon2Out = new THREE.Color();
+    const noon10Out = new THREE.Color();
+    const lowSun2Out = new THREE.Color();
+    const lowSun10Out = new THREE.Color();
+    evaluatePreethamWithDiscCpu(noonState, noon2, noon2Out);
+    evaluatePreethamWithDiscCpu(noonState, noon10, noon10Out);
+    evaluatePreethamWithDiscCpu(lowSunState, lowSun2, lowSun2Out);
+    evaluatePreethamWithDiscCpu(lowSunState, lowSun10, lowSun10Out);
 
     const luma = (c: THREE.Color): number =>
       0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-    const noonHaloDelta = luma(noon12Out) - luma(noon30Out);
-    const lowSunHaloDelta = luma(lowSun12Out) - luma(lowSun30Out);
-    // At noon the 12° offset is OUTSIDE the aureole, so the delta is
-    // governed by the sky gradient only and should be small. At low sun
-    // the 12° offset is INSIDE the stretched aureole — the halo adds a
-    // strong additive contribution and the delta is much larger.
-    expect(lowSunHaloDelta).toBeGreaterThan(noonHaloDelta);
+    const lowSunHaloDelta = luma(lowSun2Out) - luma(lowSun10Out);
+    // At low sun the 2° offset is inside the modest glare cone, while the
+    // 10° offset is outside. The halo can be subtler than high-noon glare,
+    // but it must remain visible without turning into the old huge white
+    // sun body.
+    expect(lowSunHaloDelta).toBeGreaterThan(0);
+    expect(Math.max(lowSun2Out.r, lowSun2Out.g, lowSun2Out.b)).toBeLessThan(2);
+    expect(Math.max(lowSun10Out.r, lowSun10Out.g, lowSun10Out.b)).toBeLessThan(8);
+  });
+
+  it('compresses broad low-sun base glare so only the controlled disc can white out', () => {
+    const lowSunState: PreethamCpuMirrorState = {
+      ...baseState,
+      sunDirection: new THREE.Vector3(0.7, 0.12, 0.7).normalize(),
+    };
+    const axisHint = new THREE.Vector3(0, 1, 0);
+    const broadGlare18 = offsetFromSun(lowSunState.sunDirection, 18, axisHint);
+    const broadGlare20 = offsetFromSun(lowSunState.sunDirection, 20, axisHint);
+    const broadGlare18Out = new THREE.Color();
+    const broadGlare20Out = new THREE.Color();
+    evaluatePreethamWithDiscCpu(lowSunState, broadGlare18, broadGlare18Out);
+    evaluatePreethamWithDiscCpu(lowSunState, broadGlare20, broadGlare20Out);
+
+    // This direction is well outside the physical disc and the tightened
+    // aureole. It may stay bright and warm, but it must not become the
+    // display-white plate that reads as a second oversized sun body.
+    expect(Math.max(broadGlare18Out.r, broadGlare18Out.g, broadGlare18Out.b)).toBeLessThan(0.9);
+    expect(Math.max(broadGlare20Out.r, broadGlare20Out.g, broadGlare20Out.b)).toBeLessThan(0.9);
   });
 
   it('exposure scales the dome radiance roughly linearly (before disc + clamp)', () => {

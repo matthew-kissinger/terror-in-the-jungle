@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { WaterSurfaceBinding } from './WaterSurfaceBinding';
+import { GLOBAL_WATER_SUN_SPEC_GAIN, WaterSurfaceBinding } from './WaterSurfaceBinding';
 
 /**
  * Behavior tests for the water-surface shader binding. The point of this
@@ -43,6 +43,38 @@ describe('WaterSurfaceBinding', () => {
     expect(refs.uCameraUnderwater.value).toBe(0);
     expect(refs.uSunDirection.value.z).toBeCloseTo(-1, 5);
   });
+
+  it('attenuates analytic water sun specular when the sun is below the horizon', () => {
+    const binding = new WaterSurfaceBinding();
+    const material = new THREE.MeshStandardMaterial();
+    const refs = binding.install(material, new THREE.Vector3(0, 1, 0));
+
+    binding.updateSurfaceUniforms(1, new THREE.Vector3(0, 1, 0), false);
+    const daylightGain = refs.uSunSpecGain.value;
+
+    binding.updateSurfaceUniforms(2, new THREE.Vector3(0, -1, 0), false);
+    const nightGain = refs.uSunSpecGain.value;
+
+    expect(daylightGain).toBeCloseTo(GLOBAL_WATER_SUN_SPEC_GAIN, 5);
+    expect(nightGain).toBeGreaterThan(0);
+    expect(nightGain).toBeLessThan(daylightGain * 0.1);
+  });
+
+  it('uses explicit daylight for specular strength independent of light direction', () => {
+    const binding = new WaterSurfaceBinding();
+    const material = new THREE.MeshStandardMaterial();
+    const refs = binding.install(material, new THREE.Vector3(0, 1, 0));
+
+    binding.updateSurfaceUniforms(1, new THREE.Vector3(0, 1, 0), false, 1);
+    const daylightGain = refs.uSunSpecGain.value;
+
+    binding.updateSurfaceUniforms(2, new THREE.Vector3(0, 1, 0), false, 0);
+
+    expect(refs.uSunDirection.value.y).toBeCloseTo(1, 5);
+    expect(refs.uSunSpecGain.value).toBeGreaterThan(0);
+    expect(refs.uSunSpecGain.value).toBeLessThan(daylightGain * 0.1);
+  });
+
 
   it('updateSurfaceUniforms is safe when install has not been called', () => {
     const binding = new WaterSurfaceBinding();
@@ -93,6 +125,23 @@ describe('WaterSurfaceBinding', () => {
     // tickRiverFlow is a safe no-op when nothing is installed.
     const fresh = new WaterSurfaceBinding();
     expect(() => fresh.tickRiverFlow(1, normalMap)).not.toThrow();
+  });
+
+  it('dims hydrology river foam and sparkle at night', () => {
+    const binding = new WaterSurfaceBinding();
+    const riverMaterial = new THREE.MeshStandardMaterial();
+    const normalMap = new THREE.Texture();
+    const refs = binding.installRiverFlowPatch(riverMaterial, normalMap);
+
+    binding.tickRiverFlow(0.016, normalMap, 1);
+    const dayFoam = refs.uFoamIntensity.value;
+    const daySparkle = refs.uSparkleIntensity.value;
+
+    binding.tickRiverFlow(0.016, normalMap, 0);
+
+    expect(refs.uFoamIntensity.value).toBeLessThan(dayFoam * 0.2);
+    expect(refs.uSparkleIntensity.value).toBeLessThan(daySparkle);
+    expect(refs.uSparkleIntensity.value).toBe(0);
   });
 
   it('late-binds the river normal map when one becomes available after install', () => {

@@ -20,6 +20,7 @@ const {
   mockVegetationDebugInfo,
   mockVegetationReadyAround,
   mockUpdateFarCanopyTint,
+  mockUpdateAtmosphereLighting,
   mockBakeHeightmapSurface,
   mockBakePreparedVisualHeightmap,
 } = vi.hoisted(() => ({
@@ -55,6 +56,7 @@ const {
   }),
   mockVegetationReadyAround: vi.fn().mockReturnValue(true),
   mockUpdateFarCanopyTint: vi.fn(),
+  mockUpdateAtmosphereLighting: vi.fn(),
   mockBakeHeightmapSurface: vi.fn().mockResolvedValue({
     heightData: new Float32Array(16),
     normalData: new Uint8Array(64),
@@ -124,6 +126,7 @@ vi.mock('./TerrainMaterial', () => ({
     needsUpdate: false,
     dispose: vi.fn(),
   }),
+  updateTerrainMaterialAtmosphereLighting: mockUpdateAtmosphereLighting,
   updateTerrainMaterialFarCanopyTint: mockUpdateFarCanopyTint,
   updateTerrainMaterialTextures: vi.fn(),
   updateTerrainMaterialWetness: vi.fn(),
@@ -237,6 +240,7 @@ describe('TerrainSystem', () => {
     mockVegetationPendingCounts.mockClear();
     mockVegetationReadyAround.mockClear();
     mockUpdateFarCanopyTint.mockClear();
+    mockUpdateAtmosphereLighting.mockClear();
     mockBakeHeightmapSurface.mockClear();
     mockBakePreparedVisualHeightmap.mockClear();
     scene = makeMockScene();
@@ -289,6 +293,58 @@ describe('TerrainSystem', () => {
       expect(terrain.getChunkSize()).toBe(64);
       terrain.setChunkSize(128);
       expect(terrain.getChunkSize()).toBe(128);
+    });
+
+    it('forwards atmosphere lighting as a bounded cool terrain night fill', async () => {
+      await terrain.init();
+
+      terrain.setAtmosphereLighting({
+        skyColor: new THREE.Color(0.01, 0.012, 0.02),
+        groundColor: new THREE.Color(0.008, 0.01, 0.014),
+        ambientColor: new THREE.Color(0.055, 0.07, 0.105),
+        directLightDirection: new THREE.Vector3(1, 0.18, 0),
+        daylightFactor: 0.8,
+        nightBlend: 1,
+        sunAboveHorizon: true,
+      });
+
+      expect(mockUpdateAtmosphereLighting).toHaveBeenCalled();
+      const lighting = mockUpdateAtmosphereLighting.mock.calls.at(-1)?.[1];
+      expect(lighting.nightFillStrength).toBeGreaterThan(0.3);
+      expect(lighting.nightFillStrength).toBeLessThanOrEqual(0.38);
+      expect(lighting.nightFillColor.b).toBeGreaterThan(lighting.nightFillColor.r);
+      expect(lighting.directLightDirection.length()).toBeCloseTo(1);
+      expect(lighting.daylightFactor).toBeCloseTo(0.8);
+      expect(lighting.lowSunOcclusionStrength).toBeGreaterThan(0.45);
+      expect(lighting.lowSunOcclusionStrength).toBeLessThan(0.85);
+    });
+
+    it('does not apply low-sun terrain occlusion for high sun or sub-horizon light', async () => {
+      await terrain.init();
+
+      terrain.setAtmosphereLighting({
+        skyColor: new THREE.Color(0.4, 0.55, 0.75),
+        groundColor: new THREE.Color(0.14, 0.16, 0.12),
+        ambientColor: new THREE.Color(0.8, 0.82, 0.78),
+        directLightDirection: new THREE.Vector3(0.2, 0.95, 0.1),
+        daylightFactor: 1,
+        nightBlend: 0,
+        sunAboveHorizon: true,
+      });
+      let lighting = mockUpdateAtmosphereLighting.mock.calls.at(-1)?.[1];
+      expect(lighting.lowSunOcclusionStrength).toBe(0);
+
+      terrain.setAtmosphereLighting({
+        skyColor: new THREE.Color(0.01, 0.012, 0.02),
+        groundColor: new THREE.Color(0.008, 0.01, 0.014),
+        ambientColor: new THREE.Color(0.055, 0.07, 0.105),
+        directLightDirection: new THREE.Vector3(-0.18, 0.36, -0.92),
+        daylightFactor: 0,
+        nightBlend: 1,
+        sunAboveHorizon: false,
+      });
+      lighting = mockUpdateAtmosphereLighting.mock.calls.at(-1)?.[1];
+      expect(lighting.lowSunOcclusionStrength).toBe(0);
     });
 
     it('explicit setWorldSize is stable across chunk config changes', async () => {

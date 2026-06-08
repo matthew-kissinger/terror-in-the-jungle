@@ -28,6 +28,7 @@ export const HYDROLOGY_RIVER_NORMAL_SCALE = 0.42;
 export const HYDROLOGY_RIVER_FOAM_INTENSITY = 0.56;
 export const HYDROLOGY_RIVER_FOAM_COLOR = new THREE.Color(0xe9efe8);
 export const HYDROLOGY_RIVER_EDGE_ALPHA_MIN = 0.36;
+export const HYDROLOGY_RIVER_SPARKLE_INTENSITY = 1.0;
 
 /**
  * Uniforms captured at compile time on the hydrology river material's
@@ -44,6 +45,7 @@ export interface HydrologyRiverShaderRefs {
   uFoamColor: { value: THREE.Color };
   uRiverNormalMap: { value: THREE.Texture | null };
   uRiverNormalScale: { value: number };
+  uSparkleIntensity: { value: number };
 }
 
 /**
@@ -82,6 +84,7 @@ export function installHydrologyRiverFlowPatch(
     uFoamColor: { value: HYDROLOGY_RIVER_FOAM_COLOR.clone() },
     uRiverNormalMap: { value: initialNormalMap },
     uRiverNormalScale: { value: HYDROLOGY_RIVER_NORMAL_SCALE },
+    uSparkleIntensity: { value: HYDROLOGY_RIVER_SPARKLE_INTENSITY },
   };
 
   material.onBeforeCompile = (shader) => {
@@ -91,6 +94,7 @@ export function installHydrologyRiverFlowPatch(
     shader.uniforms.uFoamColor = refs.uFoamColor;
     shader.uniforms.uRiverNormalMap = refs.uRiverNormalMap;
     shader.uniforms.uRiverNormalScale = refs.uRiverNormalScale;
+    shader.uniforms.uSparkleIntensity = refs.uSparkleIntensity;
     shader.uniforms.uNormalRepeatAlong = { value: HYDROLOGY_RIVER_NORMAL_REPEAT_ALONG_M };
     shader.uniforms.uNormalRepeatAcross = { value: HYDROLOGY_RIVER_NORMAL_REPEAT_ACROSS_M };
 
@@ -127,6 +131,7 @@ uniform float uFoamIntensity;
 uniform vec3 uFoamColor;
 uniform sampler2D uRiverNormalMap;
 uniform float uRiverNormalScale;
+uniform float uSparkleIntensity;
 uniform float uNormalRepeatAlong;
 uniform float uNormalRepeatAcross;
 varying vec2 vFlowDir;
@@ -181,7 +186,7 @@ varying vec3 vRiverWorldPos;`,
   float _foam = clamp(vFoamMask, 0.0, 1.0) * _foamJitter * uFoamIntensity;
   outgoingLight = mix(outgoingLight, uFoamColor, _foam);
   float _sparkle = pow(max(dot(normal, normalize(vec3(0.35, 0.82, 0.28))), 0.0), 28.0);
-  outgoingLight += _sparkle * vec3(0.42, 0.68, 0.72);
+  outgoingLight += _sparkle * uSparkleIntensity * vec3(0.42, 0.68, 0.72);
   diffuseColor.a = clamp(diffuseColor.a + _foam * 0.35, 0.0, 1.0);
 }
 #include <opaque_fragment>`,

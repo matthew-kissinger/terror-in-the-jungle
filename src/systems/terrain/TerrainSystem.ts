@@ -55,6 +55,24 @@ interface TerrainModeSurfaceOptions {
   biomeRules?: BiomeClassificationRule[];
 }
 
+interface TerrainAtmosphereLightingInput {
+  skyColor: THREE.Color;
+  groundColor: THREE.Color;
+  ambientColor: THREE.Color;
+  directLightDirection: THREE.Vector3;
+  daylightFactor: number;
+  nightBlend: number;
+  sunAboveHorizon: boolean;
+}
+
+function smoothstep01(edge0: number, edge1: number, value: number): number {
+  if (edge0 === edge1) {
+    return value < edge0 ? 0 : 1;
+  }
+  const t = THREE.MathUtils.clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
 /**
  * Top-level terrain runtime facade. Implements GameSystem.
  *
@@ -80,6 +98,8 @@ export class TerrainSystem implements GameSystem {
   // State
   private playerPosition = new THREE.Vector3();
   private readinessProbe = new THREE.Vector3();
+  private atmosphereNightFillColor = new THREE.Color(0, 0, 0);
+  private atmosphereDirectLightDirection = new THREE.Vector3(0, 1, 0);
   private isInitialized = false;
   private vegetationAddThrottleFrame = false;
   private frameCounter = 0;
@@ -265,6 +285,31 @@ export class TerrainSystem implements GameSystem {
 
   setFarCanopyTint(farCanopyTint?: TerrainFarCanopyTintConfig): void {
     this.surfaceRuntime.setFarCanopyTint(farCanopyTint);
+  }
+
+  setAtmosphereLighting(lighting: TerrainAtmosphereLightingInput): void {
+    const nightBlend = THREE.MathUtils.clamp(lighting.nightBlend, 0, 1);
+    const daylightFactor = THREE.MathUtils.clamp(lighting.daylightFactor, 0, 1);
+    this.atmosphereDirectLightDirection.copy(lighting.directLightDirection);
+    if (this.atmosphereDirectLightDirection.lengthSq() < 1e-8) {
+      this.atmosphereDirectLightDirection.set(0, 1, 0);
+    } else {
+      this.atmosphereDirectLightDirection.normalize();
+    }
+    const lowSunOcclusionStrength = lighting.sunAboveHorizon
+      ? daylightFactor * (1 - smoothstep01(0.16, 0.5, this.atmosphereDirectLightDirection.y)) * 0.85
+      : 0;
+    this.atmosphereNightFillColor
+      .copy(lighting.ambientColor)
+      .lerp(lighting.skyColor, 0.18)
+      .lerp(lighting.groundColor, 0.08);
+    this.surfaceRuntime.setAtmosphereLighting({
+      nightFillColor: this.atmosphereNightFillColor,
+      nightFillStrength: nightBlend * 0.38,
+      directLightDirection: this.atmosphereDirectLightDirection,
+      daylightFactor,
+      lowSunOcclusionStrength,
+    });
   }
 
   setTerrainFeatures(features: CompiledTerrainFeatureSet): void {

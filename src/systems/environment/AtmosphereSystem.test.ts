@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { AtmosphereSystem } from './AtmosphereSystem';
+import { AtmosphereSystem, createAtmosphereLightingSnapshot } from './AtmosphereSystem';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import type { IGameRenderer } from '../../types/SystemInterfaces';
 import {
@@ -13,11 +13,13 @@ import {
 } from './atmosphere/ScenarioAtmospherePresets';
 
 function makeRendererStub(): IGameRenderer {
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
   const moonLight = new THREE.DirectionalLight(0xffffff, 1.0);
   const hemisphereLight = new THREE.HemisphereLight(0x000000, 0x000000, 0.5);
   // Three.js initializes DirectionalLight.target to a fresh Object3D with
   // matrixAutoUpdate=true, matching the live scene setup.
   return {
+    ambientLight,
     moonLight,
     hemisphereLight,
   } as unknown as IGameRenderer;
@@ -114,7 +116,7 @@ describe('AtmosphereSystem (ISkyRuntime contract)', () => {
 });
 
 describe('AtmosphereSystem (renderer coupling)', () => {
-  it('drives the moonLight color from the backend sun color when bound to a renderer', () => {
+  it('drives the moonLight color from a renderer-shaped backend sun color when bound to a renderer', () => {
     const system = new AtmosphereSystem();
     const backend: ISkyBackend = {
       update: () => {},
@@ -128,7 +130,33 @@ describe('AtmosphereSystem (renderer coupling)', () => {
 
     system.setRenderer(renderer);
 
-    expect(renderer.moonLight!.color.getHex()).toBe(0xff8844);
+    const color = renderer.moonLight!.color;
+    expect(Math.max(color.r, color.g, color.b)).toBeLessThanOrEqual(0.78);
+    expect(color.r).toBeGreaterThan(color.g);
+    expect(color.g).toBeGreaterThan(color.b);
+  });
+
+  it('desaturates low-sun renderer light before it reaches terrain materials', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('ashau');
+    const backend: ISkyBackend = {
+      update: () => {},
+      sample: (_dir, out) => out,
+      getSun: (out) => out.setRGB(2.0, 0.45, 0.06),
+      getZenith: (out) => out.setHex(0x335588),
+      getHorizon: (out) => out.setHex(0x889966),
+    };
+    system.setBackend(backend);
+    const renderer = makeRendererStub();
+
+    system.setRenderer(renderer);
+
+    const rawSun = system.getSunColor(new THREE.Color());
+    const shaped = renderer.moonLight!.color;
+    expect(rawSun.r).toBeGreaterThan(1);
+    expect(shaped.r).toBeLessThan(rawSun.r);
+    expect(shaped.b).toBeGreaterThan(rawSun.b);
+    expect(shaped.r / shaped.g).toBeLessThan(rawSun.r / rawSun.g);
   });
 
   it('positions the moonLight above the origin in the sun direction', () => {
@@ -142,20 +170,104 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     expect(renderer.moonLight!.position.lengthSq()).toBeGreaterThan(0);
   });
 
-  it('recenters the moonLight shadow follow target on the bound follow object', () => {
+  it('uses cool moonlight instead of a clamped sub-horizon sun for night terrain lighting', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('tdm');
+    const preset = system.getCurrentPreset()!;
+    const dayLen = preset.todCycle!.dayLengthSeconds;
+    let foundSubHorizon = false;
+
+    for (let i = 0; i < 48; i++) {
+      system.setSimulationTimeSeconds((dayLen * i) / 48);
+      if (system.getSunDirection(new THREE.Vector3()).y < 0) {
+        foundSubHorizon = true;
+        break;
+      }
+    }
+    expect(foundSubHorizon).toBe(true);
+
+    const renderer = makeRendererStub();
+    system.setRenderer(renderer);
+    system.update(0.016);
+
+    const lightDir = renderer.moonLight!.position.clone().normalize();
+    const lightColor = renderer.moonLight!.color;
+    expect(lightDir.y).toBeGreaterThan(0.4);
+    expect(lightColor.r).toBeLessThan(lightColor.b);
+    expect(lightColor.g).toBeGreaterThan(lightColor.r);
+  });
+
+  it('tints ambient fill cool at night instead of leaving a white terrain fill', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('tdm');
+    const preset = system.getCurrentPreset()!;
+    const dayLen = preset.todCycle!.dayLengthSeconds;
+    let foundNight = false;
+
+    for (let i = 0; i < 48; i++) {
+      system.setSimulationTimeSeconds((dayLen * i) / 48);
+      if (system.getSunDirection(new THREE.Vector3()).y < -0.05) {
+        foundNight = true;
+        break;
+      }
+    }
+    expect(foundNight).toBe(true);
+
+    const renderer = makeRendererStub();
+    system.setRenderer(renderer);
+    system.update(0.016);
+
+    const ambient = renderer.ambientLight!.color;
+    expect(ambient.r).toBeLessThan(0.2);
+    expect(ambient.g).toBeLessThan(0.2);
+    expect(ambient.b).toBeGreaterThan(ambient.r);
+  });
+
+  it('publishes the same effective night lighting snapshot that it applies to the renderer', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('tdm');
+    const preset = system.getCurrentPreset()!;
+    const dayLen = preset.todCycle!.dayLengthSeconds;
+    let foundNight = false;
+
+    for (let i = 0; i < 48; i++) {
+      system.setSimulationTimeSeconds((dayLen * i) / 48);
+      if (system.getSunDirection(new THREE.Vector3()).y < -0.05) {
+        foundNight = true;
+        break;
+      }
+    }
+    expect(foundNight).toBe(true);
+
+    const renderer = makeRendererStub();
+    system.setRenderer(renderer);
+    system.update(0.016);
+
+    const snapshot = system.getLightingSnapshot(createAtmosphereLightingSnapshot());
+    expect(snapshot.sunAboveHorizon).toBe(false);
+    expect(snapshot.directLightColor.r).toBeLessThan(snapshot.directLightColor.b);
+    expect(snapshot.directLightColor.getHex()).toBe(renderer.moonLight!.color.getHex());
+    expect(snapshot.skyColor.getHex()).toBe(renderer.hemisphereLight!.color.getHex());
+    expect(snapshot.groundColor.getHex()).toBe(renderer.hemisphereLight!.groundColor.getHex());
+    expect(snapshot.ambientColor.getHex()).toBe(renderer.ambientLight!.color.getHex());
+  });
+
+  it('recenters the moonLight shadow follow target on the bound follow object including altitude', () => {
     const system = new AtmosphereSystem();
     const renderer = makeRendererStub();
     system.setRenderer(renderer);
 
     const follow = new THREE.Object3D();
-    follow.position.set(120, 5, -40);
+    follow.position.set(120, 615, -40);
     system.setShadowFollowTarget(follow);
     // Trigger re-apply via update().
     system.update(0.016);
 
     const target = renderer.moonLight!.target.position;
     expect(target.x).toBeCloseTo(120, 3);
+    expect(target.y).toBeCloseTo(615, 3);
     expect(target.z).toBeCloseTo(-40, 3);
+    expect(renderer.moonLight!.position.y).toBeGreaterThan(target.y);
   });
 
   it('drives hemisphere sky color from the backend zenith sample without saturating HDR values', () => {

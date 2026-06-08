@@ -1,6 +1,6 @@
 # Directives
 
-Last verified: 2026-06-03 (big cycle CLOSED — all 3 streams code-complete / playtest-deferred: SVYAZ-3 air-support call-in, DEFEKT-3 combat-p99 (cover-search clause proven met → residual movement-stall tail split to new `combat-movement-stall-tail`), UX-2/3/4 deploy-loadout. DIZAYN-4 earlier closed. Spike memos under [`docs/rearch/`](rearch/); owner playtests in [PLAYTEST_PENDING](PLAYTEST_PENDING.md). Slim refactor under `directives-slim-refactor`; full evidence prose lives in per-id memo files under [`docs/directives/`](directives/)).
+Last verified: 2026-06-08 (SOL-1 automated visual proof refreshed: all-mode true-WebGPU matrix and strict-WebGPU A Shau ridge proof pass sun-scale/night/ridge diagnostics; owner visual review, perf, validation, and live-release proof remain before closeout).
 
 Active directive list. Each row is binary `open` / `code-complete` / `done` / `closed`, owning subsystem, latest evidence (one link or short pointer), and the most load-bearing success criterion. Verbose evidence has moved to per-id memo files; carry-over discipline remains [docs/CARRY_OVERS.md](CARRY_OVERS.md); historical ledger prose at [docs/archive/PROJEKT_OBJEKT_143/](archive/PROJEKT_OBJEKT_143/).
 
@@ -10,6 +10,7 @@ Active directive list. Each row is binary `open` / `code-complete` / `done` / `c
 |---|---|---|---|---|---|
 | KB-STARTUP-1 | Mode-start terrain surface bake | open (spike) | terrain / engine init | spike branch `task/mode-startup-terrain-spike` + memo `docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md` | Mode-click deploy UI appears quickly in startup probes without returning bake to main thread — see [memo](directives/kb-startup-1.md) |
 | KONVEYER-12 | Finite map edge strategy | open | terrain / renderer / atmosphere | `2026-05-11T22-11-28-128Z/konveyer-scene-parity` (post cloud-deck + A Shau collar reject) | Pick one finite-edge model per map type and prove in strict WebGPU from all pose classes — see [memo](directives/konveyer-12.md) |
+| SOL-1 | Solar / atmosphere / terrain lighting rearch | open (owner/perf pending) | renderer / atmosphere / terrain / water / shadows | 2026-06-08 local proof: true-WebGPU all-mode matrix `summary.json` passes noon/golden/dusk sun-scale, twilight/midnight terrain night checks, and WebGPU/WebGL parity (29 records resolved `webgpu`, 4 `webgl`, max parity delta 0%); strict-WebGPU A Shau dusk ridge `ridge-summary.json` resolves `webgpu`, passes ridge warmth + sun-scale (`sunSpan=1.48%`) with WebGL parity 0.39%; strict night-red legacy assertion still fails against the documented cool moon target while soft red-not-dominant passes 5/5 | Sun scale, terrain/night lighting, water highlights, shadow direction, and hill/ridge light-bleed are proven coherent across all modes — see [memo](directives/sol-1.md) |
 | VODA-1 | Visible water surface + query API | code-complete (playtest deferred) | environment / water | cycle-voda-1 5 PRs (#228-#232) | Water surface visible across OF + A Shau with foam + flow + sampler API — see [memo](directives/voda-1.md) |
 | VODA-2 | Flow, buoyancy, swimming | code-complete (playtest deferred) | environment / water | cycle-voda-2 7 PRs (#239-#245) | Buoyancy + player swim/breath + NPC wade + foot-splash + river-current force — see [memo](directives/voda-2.md) |
 | VEKHIKL-1 | M151 jeep ground vehicle | code-complete (playtest deferred) | vehicle (ground) | cycle-vekhikl-1 5 PRs (#223-#227) | M151 spawn + drive + per-wheel terrain conform in OF + A Shau — see [memo](directives/vekhikl-1.md) |
@@ -70,6 +71,7 @@ Verbose evidence for directives with >2 lines of original prose lives here:
 - [KONVEYER-10](directives/konveyer-10.md)
 - [KONVEYER-11](directives/konveyer-11.md)
 - [KONVEYER-12](directives/konveyer-12.md)
+- [SOL-1](directives/sol-1.md)
 - [VODA-1](directives/voda-1.md)
 - [VODA-2](directives/voda-2.md)
 - [VODA-3](directives/voda-3.md)

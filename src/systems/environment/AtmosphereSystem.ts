@@ -7,6 +7,7 @@ import type { ICloudRuntime, IGameRenderer, ISkyRuntime } from '../../types/Syst
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
 import { SunDiscMesh } from './atmosphere/SunDiscMesh';
+import { shapeDirectLightForRenderer } from './AtmosphereLightingColor';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
   computeSunDirectionAtTime,
@@ -36,6 +37,8 @@ const SUN_LIGHT_DISTANCE = 500;
  * on top of the dome's painted background.
  */
 const SKY_DOME_RADIUS = 500;
+/** Bootstrap fog fallback mirrored from GameRenderer before the live sky overwrites it. */
+const ATMOSPHERE_SNAPSHOT_BOOT_FOG_COLOR = 0x7a8f88;
 /**
  * The analytic sky backend stores HDR-ish radiance values. Those values are
  * fine for the baked sky texture, but fog and hemisphere lights need bounded
@@ -47,6 +50,48 @@ const SKY_FOG_MAX_COMPONENT = 0.74;
 const HEMISPHERE_GROUND_DARKEN = 0.55;
 /** Minimum Y for the sun light position — prevents degenerate shadow camera when sun is at/below horizon. */
 const MIN_SUN_Y = 20;
+/** Cool directional fill used once the authored sun has dropped below the horizon. */
+const NIGHT_DIRECTIONAL_LIGHT_COLOR = new THREE.Color(0.18, 0.20, 0.30);
+const NIGHT_DIRECTIONAL_LIGHT_DIRECTION = new THREE.Vector3(-0.35, 0.55, 0.72).normalize();
+const NIGHT_AMBIENT_LIGHT_COLOR = new THREE.Color(0.055, 0.070, 0.105);
+const LOW_SUN_AMBIENT_BLEND_START_Y = 0.14;
+const LOW_SUN_AMBIENT_BLEND_FULL_Y = -0.05;
+
+export interface AtmosphereLightingSnapshot {
+  /** Raw analytic sun direction. Used by the sky dome and visible sun disc. */
+  sunDirection: THREE.Vector3;
+  /** Direction used by scene lighting and shadow orientation. */
+  directLightDirection: THREE.Vector3;
+  /** Color used by the scene directional light and non-PBR impostor lighting. */
+  directLightColor: THREE.Color;
+  /** Compressed zenith color used by hemisphere/billboard sky fill. */
+  skyColor: THREE.Color;
+  /** Darkened horizon color used by hemisphere/billboard ground bounce. */
+  groundColor: THREE.Color;
+  /** Ambient fill color after low-sun/night tinting. */
+  ambientColor: THREE.Color;
+  /** Fog color after sky compression, weather darken, and underwater override. */
+  fogColor: THREE.Color;
+  /** Smooth day/night scalar for systems that need to dim authored highlights. */
+  daylightFactor: number;
+  nightBlend: number;
+  sunAboveHorizon: boolean;
+}
+
+export function createAtmosphereLightingSnapshot(): AtmosphereLightingSnapshot {
+  return {
+    sunDirection: new THREE.Vector3(0, 1, 0),
+    directLightDirection: new THREE.Vector3(0, 1, 0),
+    directLightColor: new THREE.Color(1, 1, 1),
+    skyColor: new THREE.Color(0.7, 0.8, 1.0),
+    groundColor: new THREE.Color(0.3, 0.3, 0.25),
+    ambientColor: new THREE.Color(1, 1, 1),
+    fogColor: new THREE.Color(ATMOSPHERE_SNAPSHOT_BOOT_FOG_COLOR),
+    daylightFactor: 1,
+    nightBlend: 0,
+    sunAboveHorizon: true,
+  };
+}
 
 /**
  * Mobile GPUs pay an outsized cost for the per-fire 8192-pixel sky LUT
@@ -70,6 +115,13 @@ function compressSkyRadianceForRenderer(color: THREE.Color, maxComponent: number
   color.g = Math.max(0, Math.min(maxComponent, color.g));
   color.b = Math.max(0, Math.min(maxComponent, color.b));
   return color;
+}
+
+function lowSunAmbientBlend(sunY: number): number {
+  const raw = (LOW_SUN_AMBIENT_BLEND_START_Y - sunY)
+    / (LOW_SUN_AMBIENT_BLEND_START_Y - LOW_SUN_AMBIENT_BLEND_FULL_Y);
+  const t = Math.max(0, Math.min(1, Number.isFinite(raw) ? raw : 0));
+  return t * t * (3 - 2 * t);
 }
 
 /**
@@ -163,10 +215,10 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
 
   // Scratch vectors/colors to avoid per-frame allocation.
   private readonly scratchSunColor = new THREE.Color();
-  private readonly scratchZenith = new THREE.Color();
-  private readonly scratchHorizon = new THREE.Color();
+  private readonly scratchAmbient = new THREE.Color();
   private readonly scratchSunPosition = new THREE.Vector3();
   private readonly cameraPosition = new THREE.Vector3();
+  private readonly lightingSnapshot = createAtmosphereLightingSnapshot();
 
   constructor() {
     this.hosekBackend = new HosekWilkieSkyBackend();
@@ -421,41 +473,44 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private applyToRenderer(): void {
     const renderer = this.renderer;
     if (!renderer) return;
+    const lighting = this.refreshLightingSnapshot();
 
-    // Sun direction + color drive the directional "moon" light.
+    // Sun direction + color drive the directional "moon" light while the
+    // sun is above the horizon. Below the horizon, use a separate cool
+    // moonlight direction/color instead of clamping the sub-horizon sun into
+    // an above-ground light that makes terrain read red or wrongly backlit.
     if (renderer.moonLight) {
       // Start with a sun-direction-scaled offset. Clamp Y so the light
       // stays above a minimum altitude even if the atmosphere model dips
       // the sun to/below the horizon — a degenerate near-horizontal
       // shadow frustum eats precision and can blank out shadows.
       this.scratchSunPosition
-        .copy(this.sunDirection)
+        .copy(lighting.directLightDirection)
         .multiplyScalar(SUN_LIGHT_DISTANCE);
-      if (this.scratchSunPosition.y < MIN_SUN_Y) {
+      if (lighting.sunAboveHorizon && this.scratchSunPosition.y < MIN_SUN_Y) {
         this.scratchSunPosition.y = MIN_SUN_Y;
       }
 
-      // Recenter the shadow frustum on the follow target's XZ so shadows
-      // stay sharp near the player regardless of sun angle. The frustum
-      // extents (±100m or ±70m per GPU tier) stay fixed; only the origin
-      // slides with the player. Target stays at terrain level so the
-      // camera still points generally downward.
+      // Recenter the shadow frustum on the follow target so shadows stay
+      // sharp near the player regardless of sun angle. Preserve the target's
+      // altitude too: A Shau terrain can sit hundreds of meters above world
+      // origin, and pinning the target to Y=0 makes low sun lights aim through
+      // the wrong elevation plane.
       if (this.followTarget) {
         const t = this.followTarget.position;
         renderer.moonLight.position.set(
           this.scratchSunPosition.x + t.x,
-          this.scratchSunPosition.y,
+          this.scratchSunPosition.y + t.y,
           this.scratchSunPosition.z + t.z
         );
-        renderer.moonLight.target.position.set(t.x, 0, t.z);
+        renderer.moonLight.target.position.set(t.x, t.y, t.z);
       } else {
         renderer.moonLight.position.copy(this.scratchSunPosition);
         renderer.moonLight.target.position.set(0, 0, 0);
       }
       renderer.moonLight.target.updateMatrixWorld();
 
-      this.backend.getSun(this.scratchSunColor);
-      renderer.moonLight.color.copy(this.scratchSunColor);
+      renderer.moonLight.color.copy(lighting.directLightColor);
 
       // Matrix world must be updated manually; setupLighting() no longer
       // freezeTransform()s this light but without an explicit update here
@@ -468,15 +523,13 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // ground color is a darkened horizon sample — the horizon is the
     // dominant contributor to terrain-bounced light in the jungle scene.
     if (renderer.hemisphereLight) {
-      this.backend.getZenith(this.scratchZenith);
-      this.backend.getHorizon(this.scratchHorizon);
-      compressSkyRadianceForRenderer(this.scratchZenith, SKY_LIGHT_MAX_COMPONENT);
-      compressSkyRadianceForRenderer(this.scratchHorizon, SKY_LIGHT_MAX_COMPONENT);
-      renderer.hemisphereLight.color.copy(this.scratchZenith);
-      renderer.hemisphereLight.groundColor
-        .copy(this.scratchHorizon)
-        .multiplyScalar(HEMISPHERE_GROUND_DARKEN);
+      renderer.hemisphereLight.color.copy(lighting.skyColor);
+      renderer.hemisphereLight.groundColor.copy(lighting.groundColor);
       renderer.hemisphereLight.updateMatrixWorld();
+    }
+
+    if (renderer.ambientLight) {
+      renderer.ambientLight.color.copy(lighting.ambientColor);
     }
   }
 
@@ -489,16 +542,6 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     }
   }
 
-  /**
-   * Push the current sky-derived fog color onto the renderer's
-   * `THREE.FogExp2` each frame. Kept separate from `applyToRenderer` so
-   * tests can drive the fog path without a renderer reference.
-   *
-   * The horizon-ring average is the match that kills the seam at every
-   * camera yaw: ground-level framings render fog at the same color the
-   * analytic dome paints along `view.y ≈ 0`, so the terrain edge no
-   * longer punches a hard line through the sky.
-   */
   /**
    * Per-frame sun-disc placement + intensity. The additive sprite sits
    * just inside the sky dome at the current sun direction and pulls its
@@ -523,20 +566,48 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private applyFogColor(): void {
     const fog = this.renderer?.fog;
     if (!fog) return;
+    fog.color.copy(this.refreshLightingSnapshot().fogColor);
+  }
 
-    if (this.fogUnderwaterOverride) {
-      fog.color.copy(this.underwaterFogColor);
-      return;
+  private refreshLightingSnapshot(): AtmosphereLightingSnapshot {
+    const snapshot = this.lightingSnapshot;
+    const sunAboveHorizon = this.sunDirection.y >= 0;
+    const nightBlend = lowSunAmbientBlend(this.sunDirection.y);
+
+    snapshot.sunDirection.copy(this.sunDirection);
+    snapshot.sunAboveHorizon = sunAboveHorizon;
+    snapshot.nightBlend = nightBlend;
+    snapshot.daylightFactor = 1 - nightBlend;
+    snapshot.directLightDirection.copy(
+      sunAboveHorizon ? this.sunDirection : NIGHT_DIRECTIONAL_LIGHT_DIRECTION,
+    );
+    if (sunAboveHorizon) {
+      this.backend.getSun(snapshot.directLightColor);
+      shapeDirectLightForRenderer(snapshot.directLightColor, this.sunDirection.y);
+    } else {
+      snapshot.directLightColor.copy(NIGHT_DIRECTIONAL_LIGHT_COLOR);
     }
 
-    this.backend.getHorizon(this.scratchHorizon);
-    compressSkyRadianceForRenderer(this.scratchHorizon, SKY_FOG_MAX_COMPONENT);
-    const f = this.fogDarkenFactor;
-    fog.color.setRGB(
-      this.scratchHorizon.r * f,
-      this.scratchHorizon.g * f,
-      this.scratchHorizon.b * f
-    );
+    this.backend.getZenith(snapshot.skyColor);
+    compressSkyRadianceForRenderer(snapshot.skyColor, SKY_LIGHT_MAX_COMPONENT);
+    this.backend.getHorizon(snapshot.groundColor);
+    compressSkyRadianceForRenderer(snapshot.groundColor, SKY_LIGHT_MAX_COMPONENT);
+    snapshot.groundColor.multiplyScalar(HEMISPHERE_GROUND_DARKEN);
+
+    this.scratchAmbient.setRGB(1, 1, 1);
+    snapshot.ambientColor
+      .copy(NIGHT_AMBIENT_LIGHT_COLOR)
+      .lerp(this.scratchAmbient, 1 - nightBlend);
+
+    if (this.fogUnderwaterOverride) {
+      snapshot.fogColor.copy(this.underwaterFogColor);
+    } else {
+      this.backend.getHorizon(snapshot.fogColor);
+      compressSkyRadianceForRenderer(snapshot.fogColor, SKY_FOG_MAX_COMPONENT);
+      snapshot.fogColor.multiplyScalar(this.fogDarkenFactor);
+    }
+
+    return snapshot;
   }
 
   // --- ISkyRuntime ---
@@ -562,6 +633,21 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   getHorizonColor(out: THREE.Color): THREE.Color {
     this.backend.getHorizon(out);
     return compressSkyRadianceForRenderer(out, SKY_LIGHT_MAX_COMPONENT);
+  }
+
+  getLightingSnapshot(out: AtmosphereLightingSnapshot): AtmosphereLightingSnapshot {
+    const snapshot = this.refreshLightingSnapshot();
+    out.sunDirection.copy(snapshot.sunDirection);
+    out.directLightDirection.copy(snapshot.directLightDirection);
+    out.directLightColor.copy(snapshot.directLightColor);
+    out.skyColor.copy(snapshot.skyColor);
+    out.groundColor.copy(snapshot.groundColor);
+    out.ambientColor.copy(snapshot.ambientColor);
+    out.fogColor.copy(snapshot.fogColor);
+    out.daylightFactor = snapshot.daylightFactor;
+    out.nightBlend = snapshot.nightBlend;
+    out.sunAboveHorizon = snapshot.sunAboveHorizon;
+    return out;
   }
 
   /**

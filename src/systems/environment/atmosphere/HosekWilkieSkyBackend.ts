@@ -9,6 +9,23 @@ import {
   createHosekWilkieTslMaterial,
   type HosekWilkieTslMaterial,
 } from './HosekWilkieTslNode';
+import {
+  NIGHT_SKY_FLOOR_DAY_GAIN,
+  NIGHT_SKY_FLOOR_NIGHT_GAIN,
+  nightSkyFloorBlendForSunY,
+} from './HosekWilkieNightSkyFloor';
+import {
+  SUN_BASE_GLARE_CAP_B,
+  SUN_BASE_GLARE_CAP_G,
+  SUN_BASE_GLARE_CAP_R,
+  SUN_BASE_GLARE_COMPRESS_OUTER_DEFAULT,
+  SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y,
+  SUN_BASE_GLARE_HIGH_SUN_BLEND_START_Y,
+  SUN_BASE_GLARE_HIGH_SUN_CAP_B,
+  SUN_BASE_GLARE_HIGH_SUN_CAP_G,
+  SUN_BASE_GLARE_HIGH_SUN_CAP_R,
+  SUN_DISC_OUTER_DEFAULT,
+} from './HosekWilkieTslConstants';
 
 const DOME_RADIUS = 500;
 const DOME_WIDTH_SEGMENTS = 64;
@@ -976,9 +993,19 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     const linBb = linB * blendB;
 
     // Night-sky floor (no sun disc on CPU side — disc is shader-only).
-    const l0R = 0.1 * fexR;
-    const l0G = 0.1 * fexG;
-    const l0B = 0.1 * fexB;
+    // Mirrors the TSL dome: daytime keeps the historical `0.1 * Fex`;
+    // sub-horizon sky crossfades to a stronger cool floor so night does
+    // not collapse to black or inherit red extinction.
+    const nightFloorT = nightSkyFloorBlendForSunY(sunY);
+    const dayFloorR = NIGHT_SKY_FLOOR_DAY_GAIN * fexR;
+    const dayFloorG = NIGHT_SKY_FLOOR_DAY_GAIN * fexG;
+    const dayFloorB = NIGHT_SKY_FLOOR_DAY_GAIN * fexB;
+    const nightFloorR = NIGHT_SKY_FLOOR_NIGHT_GAIN * MOON_COLOR.r;
+    const nightFloorG = NIGHT_SKY_FLOOR_NIGHT_GAIN * MOON_COLOR.g;
+    const nightFloorB = NIGHT_SKY_FLOOR_NIGHT_GAIN * MOON_COLOR.b;
+    const l0R = dayFloorR + (nightFloorR - dayFloorR) * nightFloorT;
+    const l0G = dayFloorG + (nightFloorG - dayFloorG) * nightFloorT;
+    const l0B = dayFloorB + (nightFloorB - dayFloorB) * nightFloorT;
 
     let r = (linRb + l0R) * 0.04;
     let g2c = (linGb + l0G) * 0.04 + 0.0003;
@@ -994,6 +1021,24 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     r *= this.exposure;
     g2c *= this.exposure;
     b *= this.exposure;
+
+    const baseGlareMaskRaw = smoothstep(
+      SUN_BASE_GLARE_COMPRESS_OUTER_DEFAULT,
+      SUN_DISC_OUTER_DEFAULT,
+      cosTheta,
+    );
+    const highSunGlareT = smoothstep(
+      SUN_BASE_GLARE_HIGH_SUN_BLEND_START_Y,
+      SUN_BASE_GLARE_HIGH_SUN_BLEND_FULL_Y,
+      sunY,
+    );
+    const baseGlareMask = 1 - Math.pow(1 - baseGlareMaskRaw, 4);
+    const capR = SUN_BASE_GLARE_CAP_R + (SUN_BASE_GLARE_HIGH_SUN_CAP_R - SUN_BASE_GLARE_CAP_R) * highSunGlareT;
+    const capG = SUN_BASE_GLARE_CAP_G + (SUN_BASE_GLARE_HIGH_SUN_CAP_G - SUN_BASE_GLARE_CAP_G) * highSunGlareT;
+    const capB = SUN_BASE_GLARE_CAP_B + (SUN_BASE_GLARE_HIGH_SUN_CAP_B - SUN_BASE_GLARE_CAP_B) * highSunGlareT;
+    r += (Math.min(r, capR) - r) * baseGlareMask;
+    g2c += (Math.min(g2c, capG) - g2c) * baseGlareMask;
+    b += (Math.min(b, capB) - b) * baseGlareMask;
 
     // Cycle sky-visual-restore: lift the prior 8.0 ceiling to 64.0 so
     // the sun-disc spike survives into the half-float LUT without

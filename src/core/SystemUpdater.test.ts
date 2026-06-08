@@ -7,6 +7,7 @@ import { SystemUpdater } from './SystemUpdater';
 import { SYSTEM_UPDATE_SCHEDULE, TRACKED_SYSTEM_KEYS } from './SystemUpdateSchedule';
 import type { SystemKeyToType } from './SystemRegistry';
 import { GroundVehicleProximityChecker } from '../systems/vehicle/GroundVehicleProximityChecker';
+import type { AtmosphereLightingSnapshot } from '../systems/environment/AtmosphereSystem';
 
 function createRefs(overrides: Partial<SystemKeyToType> = {}): SystemKeyToType {
   return {
@@ -174,6 +175,51 @@ describe('SystemUpdater', () => {
     // Subsequent ticks must not re-inject (the checker is lazily built once).
     updater.updateSystems(refs, [], undefined, 0.016, true);
     expect(setBoardingProximityChecker).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards the effective atmosphere lighting snapshot to billboard vegetation', () => {
+    const updater = new SystemUpdater();
+    const globalBillboardSystem = {
+      update: vi.fn(),
+    };
+    const terrainSystem = {
+      update: vi.fn(),
+      setAtmosphereLighting: vi.fn(),
+    };
+    const getSunColor = vi.fn((out: THREE.Color) => out.setRGB(1, 0.2, 0.1));
+    const atmosphereSystem = {
+      getSunColor,
+      getLightingSnapshot: vi.fn((out: AtmosphereLightingSnapshot) => {
+        out.directLightColor.setRGB(0.18, 0.2, 0.3);
+        out.skyColor.setRGB(0.08, 0.1, 0.16);
+        out.groundColor.setRGB(0.02, 0.025, 0.04);
+        out.ambientColor.setRGB(0.055, 0.07, 0.105);
+        out.fogColor.setRGB(0.04, 0.05, 0.08);
+        out.daylightFactor = 0;
+        out.nightBlend = 1;
+        out.sunAboveHorizon = false;
+        return out;
+      }),
+      update: vi.fn(),
+    };
+    const refs = createRefs({
+      globalBillboardSystem,
+      terrainSystem,
+      atmosphereSystem,
+    } as unknown as Partial<SystemKeyToType>);
+
+    updater.updateSystems(refs, [], new THREE.Scene(), 0.016, true);
+
+    expect(getSunColor).not.toHaveBeenCalled();
+    const lighting = globalBillboardSystem.update.mock.calls[0]?.[2];
+    expect(lighting.sunColor.r).toBeCloseTo(0.18);
+    expect(lighting.sunColor.b).toBeCloseTo(0.3);
+    expect(lighting.skyColor.b).toBeCloseTo(0.16);
+    expect(lighting.groundColor.b).toBeCloseTo(0.04);
+    expect(terrainSystem.setAtmosphereLighting).toHaveBeenCalledTimes(1);
+    const terrainLighting = terrainSystem.setAtmosphereLighting.mock.calls[0]?.[0];
+    expect(terrainLighting.nightBlend).toBe(1);
+    expect(terrainLighting.ambientColor.b).toBeCloseTo(0.105);
   });
 
   it('fallback-updates systems that are not declared in the explicit schedule', () => {

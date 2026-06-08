@@ -6,6 +6,12 @@ import { Logger } from '../../../utils/Logger';
 import type { WaterBodyQuerySegment, WaterBodyStats } from './WaterBodyAuthority';
 
 export const WATER_BODY_MATERIAL_PROFILE = 'level_depth_water_body';
+const WATER_BODY_DAY_COLOR = new THREE.Color(0xffffff);
+const WATER_BODY_NIGHT_COLOR = new THREE.Color(0x152230);
+const WATER_BODY_DAY_EMISSIVE_INTENSITY = 0.06;
+const WATER_BODY_NIGHT_EMISSIVE_INTENSITY = 0.008;
+const WATER_BODY_DAY_ENV_INTENSITY = 0.5;
+const WATER_BODY_NIGHT_ENV_INTENSITY = 0.06;
 
 /**
  * Scene-owned mesh for authored level/depth water bodies. Gameplay sampling
@@ -28,9 +34,9 @@ export class WaterBodySurface {
     const geometry = buildWaterBodyGeometry(segments);
     const material = new THREE.MeshStandardMaterial({
       name: 'level-depth-water-body-material',
-      color: 0xffffff,
+      color: WATER_BODY_DAY_COLOR,
       emissive: 0x021621,
-      emissiveIntensity: 0.06,
+      emissiveIntensity: WATER_BODY_DAY_EMISSIVE_INTENSITY,
       roughness: 0.12,
       metalness: 0,
       transparent: true,
@@ -42,7 +48,7 @@ export class WaterBodySurface {
       polygonOffsetUnits: -8,
       side: THREE.DoubleSide,
     });
-    material.envMapIntensity = 0.5;
+    material.envMapIntensity = WATER_BODY_DAY_ENV_INTENSITY;
     installWaterBodyAlphaPatch(material);
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -77,6 +83,19 @@ export class WaterBodySurface {
   isActive(): boolean { return !!this.group; }
   isVisible(): boolean { return Boolean(this.group?.visible); }
   getMaterialProfile(): string { return this.mesh ? WATER_BODY_MATERIAL_PROFILE : 'none'; }
+
+  setLightingFactor(daylight: number): void {
+    if (!this.mesh) return;
+    const t = Math.min(1, Math.max(0, Number.isFinite(daylight) ? daylight : 1));
+    const material = this.mesh.material;
+    material.color.copy(WATER_BODY_NIGHT_COLOR).lerp(WATER_BODY_DAY_COLOR, t);
+    material.emissiveIntensity =
+      WATER_BODY_NIGHT_EMISSIVE_INTENSITY
+      + (WATER_BODY_DAY_EMISSIVE_INTENSITY - WATER_BODY_NIGHT_EMISSIVE_INTENSITY) * t;
+    material.envMapIntensity =
+      WATER_BODY_NIGHT_ENV_INTENSITY
+      + (WATER_BODY_DAY_ENV_INTENSITY - WATER_BODY_NIGHT_ENV_INTENSITY) * t;
+  }
 }
 
 function buildWaterBodyGeometry(segments: readonly WaterBodyQuerySegment[]): THREE.BufferGeometry {
