@@ -46,6 +46,8 @@ export class FirstPersonWeapon implements GameSystem {
   private isEnabled = true
   private requestedWeaponVisible = true
   private vehicleEquipmentSuppressed = false
+  private effectiveVehicleEquipmentSuppressed = false
+  private lastInputEnabled: boolean | null = null
 
   // Focused modules
   private rigManager: WeaponRigManager
@@ -140,7 +142,8 @@ export class FirstPersonWeapon implements GameSystem {
 
   update(deltaTime: number): void {
     const weaponRig = this.rigManager.getCurrentRig()
-    if (!weaponRig || !this.isEnabled || this.vehicleEquipmentSuppressed) {
+    const vehicleSuppressed = this.syncVehicleSuppressionSideEffects()
+    if (!weaponRig || !this.isEnabled || vehicleSuppressed) {
       this.applyWeaponPresentationState()
       return
     }
@@ -238,7 +241,13 @@ export class FirstPersonWeapon implements GameSystem {
 
     const gunCore = this.rigManager.getCurrentCore()
     const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true
-    if (!this.combatantSystem || !gunCore.canFire() || !this.isEnabled || !isGameActive) return
+    if (
+      !this.combatantSystem
+      || !gunCore.canFire()
+      || !this.isEnabled
+      || !isGameActive
+      || this.isVehicleEquipmentSuppressedNow()
+    ) return
 
     const currentAmmo = this.ammo.getCurrentAmmoManager()
     
@@ -341,7 +350,7 @@ export class FirstPersonWeapon implements GameSystem {
   enable(): void {
     this.isEnabled = true
     this.requestedWeaponVisible = true
-    this.input.setEnabled(!this.vehicleEquipmentSuppressed)
+    this.syncVehicleSuppressionSideEffects()
     this.applyWeaponPresentationState()
     // Reset all ammo on respawn
     this.ammo.resetAll()
@@ -361,23 +370,19 @@ export class FirstPersonWeapon implements GameSystem {
     }
 
     this.vehicleEquipmentSuppressed = suppressed
-    this.input.setEnabled(this.isEnabled && !suppressed)
-    if (suppressed) {
-      this.input.setFiringActive(false)
-      this.animations.setADS(false)
-    }
+    this.syncVehicleSuppressionSideEffects()
     this.applyWeaponPresentationState()
   }
 
   isVehicleEquipmentSuppressed(): boolean {
-    return this.vehicleEquipmentSuppressed
+    return this.isVehicleEquipmentSuppressedNow()
   }
 
   canRenderWeapon(): boolean {
     const currentRig = this.rigManager.getCurrentRig()
     return this.isEnabled
       && this.requestedWeaponVisible
-      && !this.vehicleEquipmentSuppressed
+      && !this.isVehicleEquipmentSuppressedNow()
       && currentRig !== undefined
       && currentRig.visible !== false
   }
@@ -391,7 +396,7 @@ export class FirstPersonWeapon implements GameSystem {
     const currentRig = this.rigManager.getCurrentRig()
     return {
       requestedVisible: this.requestedWeaponVisible,
-      vehicleSuppressed: this.vehicleEquipmentSuppressed,
+      vehicleSuppressed: this.isVehicleEquipmentSuppressedNow(),
       canRender: this.canRenderWeapon(),
       currentRigVisible: currentRig ? currentRig.visible !== false : null,
     }
@@ -490,7 +495,7 @@ export class FirstPersonWeapon implements GameSystem {
 
   setFiringEnabled(enabled: boolean): void {
     this.isEnabled = enabled
-    this.input.setEnabled(enabled && !this.vehicleEquipmentSuppressed)
+    this.syncVehicleSuppressionSideEffects()
     if (!enabled) {
       // Stop any current firing
       this.input.setFiringActive(false)
@@ -507,11 +512,37 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private applyWeaponPresentationState(): void {
-    const visible = this.isEnabled && this.requestedWeaponVisible && !this.vehicleEquipmentSuppressed
+    const vehicleSuppressed = this.syncVehicleSuppressionSideEffects()
+    const visible = this.isEnabled && this.requestedWeaponVisible && !vehicleSuppressed
     if (visible) {
       this.rigManager.setWeaponVisibility(true)
     } else {
       this.rigManager.setAllWeaponVisibility(false)
     }
+  }
+
+  private isVehicleEquipmentSuppressedNow(): boolean {
+    return this.vehicleEquipmentSuppressed
+      || (typeof this.playerController?.isInAnyVehicle === 'function'
+        ? this.playerController.isInAnyVehicle()
+        : false)
+  }
+
+  private syncVehicleSuppressionSideEffects(): boolean {
+    const suppressed = this.isVehicleEquipmentSuppressedNow()
+    const inputEnabled = this.isEnabled && !suppressed
+
+    if (this.lastInputEnabled !== inputEnabled) {
+      this.input.setEnabled(inputEnabled)
+      this.lastInputEnabled = inputEnabled
+    }
+
+    if (suppressed) {
+      this.input.setFiringActive(false)
+      this.animations.setADS(false)
+    }
+
+    this.effectiveVehicleEquipmentSuppressed = suppressed
+    return this.effectiveVehicleEquipmentSuppressed
   }
 }

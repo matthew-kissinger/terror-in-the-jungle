@@ -444,7 +444,7 @@ describe('TankPlayerAdapter', () => {
       expect(camPos.z).toBeGreaterThan(0);
       expect(camPos.y).toBeGreaterThan(0); // lifted above the chassis
       const downAngleDeg = THREE.MathUtils.radToDeg(Math.atan2(camPos.y - tank.position.y, Math.hypot(camPos.x - tank.position.x, camPos.z - tank.position.z)));
-      expect(downAngleDeg).toBeGreaterThan(32);
+      expect(downAngleDeg).toBeGreaterThan(43);
       // Look-target sits on the chassis center, lifted by cameraLookHeight.
       expect(lookAt.x).toBe(0);
       expect(lookAt.z).toBe(0);

@@ -409,11 +409,9 @@ export interface VehicleDeployOption {
 
 /**
  * Default controls hint for a crewed ground vehicle (tank). Referenced by
- * both the deploy screen choice and the vehicle action bar. The seat-swap
- * and fire keys are documented here for discoverability; the gunnery
- * behaviour is wired by the tank-crew systems, not this module.
+ * both the deploy screen choice and the vehicle action bar.
  */
-export const TANK_CONTROLS_HINT = 'E enter / exit  -  F swap seat  -  LMB fire';
+export const TANK_CONTROLS_HINT = 'E enter / exit  -  F board / swap  -  W/S drive  -  A/D turn  -  LMB fire';
 
 /**
  * Built-in crewable vehicle deploy options keyed by game-mode id. The M48

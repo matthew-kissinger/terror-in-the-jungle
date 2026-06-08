@@ -15,12 +15,19 @@ type VehicleSessionState =
   | { status: 'infantry' }
   | { status: 'in_vehicle'; vehicleType: string; vehicleId: string; adapter: PlayerVehicleAdapter };
 
+type VehicleOccupancyChangeCallback = (inVehicle: boolean, state: Readonly<VehicleSessionState>) => void;
+
 export class VehicleSessionController {
   private state: VehicleSessionState = { status: 'infantry' };
   private readonly adapters = new Map<string, PlayerVehicleAdapter>();
+  private onOccupancyChange?: VehicleOccupancyChangeCallback;
 
   registerAdapter(adapter: PlayerVehicleAdapter): void {
     this.adapters.set(adapter.vehicleType, adapter);
+  }
+
+  setOccupancyChangeCallback(callback: VehicleOccupancyChangeCallback | undefined): void {
+    this.onOccupancyChange = callback;
   }
 
   getState(): Readonly<VehicleSessionState> {
@@ -61,6 +68,7 @@ export class VehicleSessionController {
     this.clearTransitionInput(ctx);
     adapter.onEnter({ ...ctx, vehicleId });
     this.syncPlayerState(ctx.playerState);
+    this.notifyOccupancyChange();
 
     Logger.info('VehicleSessionController', `Entered ${vehicleType}: ${vehicleId}`);
     return true;
@@ -95,6 +103,7 @@ export class VehicleSessionController {
 
     this.state = { status: 'infantry' };
     this.syncPlayerState(ctx.playerState);
+    this.notifyOccupancyChange();
 
     if (plan.message) {
       ctx.hudSystem?.showMessage?.(plan.message, 2000);
@@ -129,5 +138,9 @@ export class VehicleSessionController {
     if (typeof ctx.input.clearTransientInputState === 'function') {
       ctx.input.clearTransientInputState();
     }
+  }
+
+  private notifyOccupancyChange(): void {
+    this.onOccupancyChange?.(this.isInVehicle(), this.state);
   }
 }

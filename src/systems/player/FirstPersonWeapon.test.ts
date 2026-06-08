@@ -246,6 +246,7 @@ describe('FirstPersonWeapon', () => {
       getPosition: vi.fn(() => new THREE.Vector3()),
       isMoving: vi.fn(() => false),
       getVelocity: vi.fn(() => new THREE.Vector3()),
+      isInAnyVehicle: vi.fn(() => false),
       applyRecoil: vi.fn(),
       applyRecoilShake: vi.fn(),
     } as unknown as PlayerController;
@@ -649,6 +650,24 @@ describe('FirstPersonWeapon', () => {
       expect(mockAnimations.setADS).toHaveBeenCalledWith(false);
       expect(mockRigManager.setAllWeaponVisibility).toHaveBeenCalledWith(false);
       expect(weapon.canRenderWeapon()).toBe(false);
+    });
+
+    it('uses live vehicle occupancy as an authoritative render and input guard', () => {
+      weapon.setPlayerController(mockPlayerController);
+      vi.mocked((mockPlayerController as any).isInAnyVehicle).mockReturnValue(true);
+
+      weapon.update(0.016);
+      weapon.renderWeapon({} as THREE.WebGLRenderer);
+
+      expect(mockInput.setEnabled).toHaveBeenCalledWith(false);
+      expect(mockInput.setFiringActive).toHaveBeenCalledWith(false);
+      expect(mockAnimations.setADS).toHaveBeenCalledWith(false);
+      expect(mockRigManager.setAllWeaponVisibility).toHaveBeenCalledWith(false);
+      expect(mockModel.render).not.toHaveBeenCalled();
+      expect(weapon.getWeaponPresentationState()).toMatchObject({
+        vehicleSuppressed: true,
+        canRender: false,
+      });
     });
 
     it('keeps vehicle suppression authoritative when a slot tries to show the weapon', () => {

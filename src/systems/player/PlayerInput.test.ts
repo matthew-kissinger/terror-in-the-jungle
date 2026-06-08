@@ -391,6 +391,19 @@ describe('PlayerInput', () => {
     });
 
     describe('F-key boarding router', () => {
+      it('prioritizes vehicle seat swap before boarding or mortar fallback', () => {
+        const onVehicleSeatSwap = vi.fn(() => true);
+        const onBoardNearestVehicle = vi.fn(() => true);
+        const onMortarFire = vi.fn();
+        playerInput.setCallbacks({ onVehicleSeatSwap, onBoardNearestVehicle, onMortarFire });
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' }));
+
+        expect(onVehicleSeatSwap).toHaveBeenCalledTimes(1);
+        expect(onBoardNearestVehicle).not.toHaveBeenCalled();
+        expect(onMortarFire).not.toHaveBeenCalled();
+      });
+
       it('skips mortar fire when boarding consumes the F key', () => {
         const onBoardNearestVehicle = vi.fn(() => true);
         const onMortarFire = vi.fn();
@@ -434,6 +447,20 @@ describe('PlayerInput', () => {
         expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
         expect(onEnterExitVehicle).not.toHaveBeenCalled();
         expect(onEnterExitHelicopter).not.toHaveBeenCalled();
+      });
+
+      it('mirrors the seat-swap priority on gamepad interact (X)', () => {
+        const onVehicleSeatSwap = vi.fn(() => true);
+        const onBoardNearestVehicle = vi.fn(() => true);
+        const onEnterExitVehicle = vi.fn();
+        playerInput.setCallbacks({ onVehicleSeatSwap, onBoardNearestVehicle, onEnterExitVehicle });
+        const gamepadCallbacks = gamepadManagerInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+        gamepadCallbacks.onInteract();
+
+        expect(onVehicleSeatSwap).toHaveBeenCalledTimes(1);
+        expect(onBoardNearestVehicle).not.toHaveBeenCalled();
+        expect(onEnterExitVehicle).not.toHaveBeenCalled();
       });
 
       it('mirrors the boarding priority on gamepad interact (X) — boarding declines falls back to enter/exit', () => {

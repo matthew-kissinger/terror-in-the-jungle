@@ -192,8 +192,8 @@ const MIN_TRAVEL_METERS: Record<VehicleKind, number> = {
 };
 
 const MIN_CAMERA_DOWN_ANGLE_DEG: Record<VehicleKind, number> = {
-  m151: 31,
-  m48: 28,
+  m151: 45,
+  m48: 43,
 };
 
 function parseOptions(): Options {

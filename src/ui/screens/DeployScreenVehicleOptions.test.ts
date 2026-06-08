@@ -28,7 +28,7 @@ function tankOption(overrides: Partial<VehicleDeployOption> = {}): VehicleDeploy
     description: 'Crew the M48.',
     position: { x: 10, z: -20 },
     faction: Faction.US,
-    controlsHint: 'E enter / exit  -  F swap seat  -  LMB fire',
+    controlsHint: 'E enter / exit  -  F board / swap  -  W/S drive  -  A/D turn  -  LMB fire',
     ...overrides,
   };
 }
@@ -64,6 +64,17 @@ describe('DeployScreen crew-a-vehicle section', () => {
     expect(document.querySelector('[aria-label="ARMOR M48 Bravo"]')).toBeTruthy();
   });
 
+  it('places crewable vehicles before the spawn list for discoverability', () => {
+    screen.updateVehicleDeployOptions([tankOption()]);
+
+    const insertionView = document.getElementById('respawn-insertion-view')!;
+    const sectionIds = Array.from(insertionView.children).map((child) => child.id);
+
+    expect(sectionIds.indexOf('respawn-vehicle-options-panel')).toBeLessThan(
+      sectionIds.indexOf('respawn-spawn-options-panel'),
+    );
+  });
+
   it('fires the deploy callback with the chosen vehicle id', () => {
     const onSelect = vi.fn();
     screen.setVehicleDeployOptionCallback(onSelect);
@@ -77,12 +88,13 @@ describe('DeployScreen crew-a-vehicle section', () => {
 
   it('surfaces the controls hint on the choice', () => {
     screen.updateVehicleDeployOptions([
-      tankOption({ controlsHint: 'E enter / exit  -  F swap seat  -  LMB fire' }),
+      tankOption({ controlsHint: 'E enter / exit  -  F board / swap  -  W/S drive  -  A/D turn  -  LMB fire' }),
     ]);
 
     const choice = document.querySelector('[aria-label="ARMOR M48 Patton"]')!;
     expect(choice.textContent).toContain('E enter');
-    expect(choice.textContent).toContain('swap seat');
+    expect(choice.textContent).toContain('W/S drive');
+    expect(choice.textContent).toContain('board / swap');
   });
 
   it('marks the selected vehicle as pressed for accessibility', () => {

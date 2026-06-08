@@ -50,14 +50,13 @@ current mesh cost at 962 total vertices / 481 vertices per basin body:
 `artifacts/perf/2026-06-08T18-04-38-049Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.
 The latest land-vehicle owner-acceptance proof covers live M151 and M48 targets
 in Open Frontier and A Shau using the current board/drive/exit path:
-`artifacts/playtests/land-vehicle-runtime-proof/open_frontier-m151-proof.json`,
-`open_frontier-m48-proof.json`, `a_shau_valley-m151-proof.json`, and
-`a_shau_valley-m48-proof.json`. These runs prove W-drive displacement, elevated
-third-person camera framing, clean exit, and infantry-weapon suppression through
-the vehicle-session/equipment state. The proof now fails if any first-person
-weapon overlay root or mesh remains renderable while seated; this replaces the
-older current-rig-only diagnostic that could miss stale rifle overlays in
-screenshots.
+`artifacts/playtests/land-vehicle-runtime-proof/land-vehicle-runtime-proof.json`
+with matching after-board/after-drive screenshots. This run proves W-drive
+displacement, elevated third-person camera framing, clean exit, and
+infantry-weapon suppression through the vehicle-session/equipment state. The
+proof now fails if any first-person weapon overlay root or mesh remains
+renderable while seated; this replaces the older current-rig-only diagnostic
+that could miss stale rifle overlays in screenshots.
 The previous live Cloudflare Pages proof passes for `df97e707`:
 `artifacts/perf/2026-06-07T21-16-21-306Z/projekt-143-live-release-proof/release-proof.json`.
 Owner playtest remains open for subjective terrain/water/vehicle feel.

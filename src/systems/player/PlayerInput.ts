@@ -37,6 +37,7 @@ export interface InputCallbacks {
    * skipped. Return `false` (or leave unset) to let the fallback run.
    */
   onBoardNearestVehicle?: () => boolean;
+  onVehicleSeatSwap?: () => boolean;
   onMortarAdjustPitch?: (delta: number) => void;
   onMortarAdjustYaw?: (delta: number) => void;
   onWeaponSlotChange?: (slot: WeaponSlot) => void;
@@ -170,9 +171,10 @@ export class PlayerInput {
         onJump: () => callbacks.onJump?.(),
         onReload: () => callbacks.onReload?.(),
         onInteract: () => {
-          // Mirror F-key priority: try boarding nearest vehicle first; fall
-          // back to the existing enter/exit handler when not consumed.
-          const consumed = callbacks.onBoardNearestVehicle?.() ?? false;
+          // Mirror F-key priority: swap a swappable active vehicle first,
+          // then board/exit nearest, then fall back to the existing handler.
+          const consumed = (callbacks.onVehicleSeatSwap?.() ?? false)
+            || (callbacks.onBoardNearestVehicle?.() ?? false);
           if (!consumed) {
             (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.();
           }
@@ -561,10 +563,12 @@ export class PlayerInput {
       this.callbacks.onDeployMortar?.();
     }
 
-    // F key — board nearest vehicle first; fall back to mortar fire when not consumed.
+    // F key — when seated in a swappable vehicle, change seats first; otherwise
+    // board/exit the nearest vehicle and fall back to mortar fire when not consumed.
     // (Skipped entirely while seated in a flight vehicle.)
     if (!this.isInFlightVehicle() && event.code === 'KeyF') {
-      const consumed = this.callbacks.onBoardNearestVehicle?.() ?? false;
+      const consumed = (this.callbacks.onVehicleSeatSwap?.() ?? false)
+        || (this.callbacks.onBoardNearestVehicle?.() ?? false);
       if (!consumed) {
         this.callbacks.onMortarFire?.();
       }

@@ -344,6 +344,32 @@ describe('PlayerVehicleAdapterFactory.tryExit', () => {
   });
 });
 
+describe('PlayerVehicleAdapterFactory.trySwapSeat', () => {
+  it('swaps the active tank adapter between driver and gunner seats', async () => {
+    const tank = makeTank('m48_tank_of_us_fob', new THREE.Vector3(10, 0, 10));
+    const h = await buildHarness([{ vehicle: tank, position: tank.getPosition() }]);
+
+    primePrompt(h.proximityChecker, h.playerState.position, tank.getPosition());
+    expect(h.factory.tryBoardNearest()).toBe(true);
+    expect(tank.getPilotId()).toBe('player');
+
+    expect(h.factory.trySwapSeat()).toBe(true);
+
+    expect(tank.getPilotId()).toBeNull();
+    expect(tank.getSeats().find((seat) => seat.role === 'gunner')?.occupantId).toBe('player');
+  });
+
+  it('does not consume the input for a non-swappable active vehicle', async () => {
+    const jeep = makeJeep('motor_pool_small_m151', new THREE.Vector3(10, 0, 10));
+    const h = await buildHarness([{ vehicle: jeep, position: jeep.getPosition() }]);
+
+    primePrompt(h.proximityChecker, h.playerState.position, jeep.getPosition());
+    expect(h.factory.tryBoardNearest()).toBe(true);
+
+    expect(h.factory.trySwapSeat()).toBe(false);
+  });
+});
+
 describe('resolveAdapterFamily', () => {
   it('returns the correct family for each drivable category', async () => {
     const jeep = makeJeep('motor_pool_small_m151', new THREE.Vector3(0, 0, 0));

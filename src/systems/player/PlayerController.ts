@@ -149,6 +149,9 @@ export class PlayerController implements GameSystem {
 
     // Setup input callbacks
     this.setupInputCallbacks();
+    this.vehicleStateManager.setOccupancyChangeCallback(() => {
+      this.syncInfantryEquipmentForVehicleState();
+    });
     this.vehicleController.configure({
       requestVehicleExit: () => this.requestVehicleExit({ allowEject: true, reason: 'input' }).exited,
     });
@@ -232,6 +235,7 @@ export class PlayerController implements GameSystem {
         this.handleEnterExitHelicopter();
       },
       onBoardNearestVehicle: () => this.handleBoardNearestVehicle(),
+      onVehicleSeatSwap: () => this.handleVehicleSeatSwap(),
       onToggleFlightAssist: () => {
         if (this.vehicleStateManager.getVehicleType() === 'fixed_wing') {
           this.fixedWingAdapter?.toggleFlightAssist();
@@ -488,6 +492,13 @@ export class PlayerController implements GameSystem {
       this.syncInfantryEquipmentForVehicleState();
     }
     return exited;
+  }
+
+  handleVehicleSeatSwap(): boolean {
+    if (this.playerState.isInHelicopter || this.playerState.isInFixedWing) {
+      return false;
+    }
+    return this.playerVehicleAdapterFactory?.trySwapSeat?.() ?? false;
   }
 
   private handleSquadDeploy(): void {

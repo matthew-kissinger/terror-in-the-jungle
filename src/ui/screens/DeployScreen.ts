@@ -204,8 +204,8 @@ export class DeployScreen extends UIComponent {
     sidePanel.appendChild(this.createSelectedPanel());
     const sideScroll = this.createDiv(styles.sideScroll, 'respawn-side-scroll');
     this.insertionSideView = this.createDiv(styles.sideView, 'respawn-insertion-view');
-    this.insertionSideView.appendChild(this.createSpawnOptionsPanel());
     this.insertionSideView.appendChild(this.createVehicleOptionsPanel());
+    this.insertionSideView.appendChild(this.createSpawnOptionsPanel());
     this.insertionSideView.appendChild(this.createSequencePanel());
     this.insertionSideView.appendChild(this.createLegendPanel());
     this.armorySideView = this.createDiv(styles.sideView, 'respawn-armory-view');

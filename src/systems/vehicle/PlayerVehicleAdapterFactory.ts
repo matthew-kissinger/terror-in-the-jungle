@@ -21,6 +21,7 @@ import {
 import type {
   PlayerVehicleAdapter,
   VehicleTransitionContext,
+  VehicleUpdateContext,
 } from './PlayerVehicleAdapter';
 import { Tank } from './Tank';
 import { TankPlayerAdapter } from './TankPlayerAdapter';
@@ -310,6 +311,26 @@ export class PlayerVehicleAdapterFactory {
       vehicle.exitVehicle('player');
     }
     return result.exited;
+  }
+
+  trySwapSeat(): boolean {
+    if (!this.deps.vehicleSessionController.isInVehicle()) return false;
+
+    const adapter = this.deps.vehicleSessionController.getActiveAdapter() as (PlayerVehicleAdapter & {
+      swapSeat?: (ctx: VehicleUpdateContext) => unknown;
+      getCrewSeat?: () => string;
+    }) | null;
+    if (typeof adapter?.swapSeat !== 'function') return false;
+
+    const before = typeof adapter.getCrewSeat === 'function' ? adapter.getCrewSeat() : null;
+    const after = adapter.swapSeat({
+      deltaTime: 0,
+      input: this.deps.input,
+      cameraController: this.deps.cameraController,
+      hudSystem: this.deps.hudSystem,
+    });
+    const afterSeat = typeof adapter.getCrewSeat === 'function' ? adapter.getCrewSeat() : after;
+    return before === null || afterSeat !== before;
   }
 
   // ── Internals ──────────────────────────────────────────────────────────────

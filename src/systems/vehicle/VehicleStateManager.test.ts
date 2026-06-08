@@ -148,6 +148,26 @@ describe('VehicleStateManager', () => {
       expect(playerState.isInHelicopter).toBe(false);
       expect(playerState.isInFixedWing).toBe(true);
     });
+
+    it('notifies occupancy changes from the session transition itself', () => {
+      const onOccupancyChange = vi.fn();
+      manager.setOccupancyChangeCallback(onOccupancyChange);
+      const ctx = createTransitionContext(playerState, 'heli_1');
+
+      manager.enterVehicle('helicopter', 'heli_1', ctx);
+      manager.exitVehicle(ctx);
+
+      expect(onOccupancyChange).toHaveBeenNthCalledWith(
+        1,
+        true,
+        expect.objectContaining({ status: 'in_vehicle', vehicleType: 'helicopter', vehicleId: 'heli_1' }),
+      );
+      expect(onOccupancyChange).toHaveBeenNthCalledWith(
+        2,
+        false,
+        expect.objectContaining({ status: 'infantry' }),
+      );
+    });
   });
 
   describe('exiting a vehicle', () => {

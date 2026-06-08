@@ -720,12 +720,13 @@ describe('PlayerController', () => {
    * F-router's mortar fallback runs when the input wasn't consumed.
    */
   describe('Vehicle Boarding (handleBoardNearestVehicle)', () => {
-    let mockFactory: { tryBoardNearest: ReturnType<typeof vi.fn>; tryExit: ReturnType<typeof vi.fn> };
+    let mockFactory: { tryBoardNearest: ReturnType<typeof vi.fn>; tryExit: ReturnType<typeof vi.fn>; trySwapSeat: ReturnType<typeof vi.fn> };
 
     beforeEach(() => {
       mockFactory = {
         tryBoardNearest: vi.fn().mockReturnValue(true),
         tryExit: vi.fn().mockReturnValue(true),
+        trySwapSeat: vi.fn().mockReturnValue(true),
       };
     });
 
@@ -739,6 +740,18 @@ describe('PlayerController', () => {
 
       expect(consumed).toBe(true);
       expect(mockFactory.tryBoardNearest).toHaveBeenCalledTimes(1);
+    });
+
+    it('routes the F-key seat-swap callback to the active vehicle adapter factory', () => {
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+
+      const callbacks = (playerController['input'].setCallbacks as any).mock.calls[0][0];
+      expect(typeof callbacks.onVehicleSeatSwap).toBe('function');
+
+      const consumed = callbacks.onVehicleSeatSwap();
+
+      expect(consumed).toBe(true);
+      expect(mockFactory.trySwapSeat).toHaveBeenCalledTimes(1);
     });
 
     it('returns true when the factory successfully boards a vehicle', () => {
@@ -858,6 +871,14 @@ describe('PlayerController', () => {
       expect(playerController.handleExitVehicle()).toBe(true);
       expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).toHaveBeenCalledWith(false);
       expect(mockFirstPersonWeapon.setWeaponVisibility).toHaveBeenCalledWith(true);
+    });
+
+    it('handleVehicleSeatSwap returns false for flight vehicles', () => {
+      playerController.setPlayerVehicleAdapterFactory(mockFactory as any);
+      playerController['playerState'].isInFixedWing = true;
+
+      expect(playerController.handleVehicleSeatSwap()).toBe(false);
+      expect(mockFactory.trySwapSeat).not.toHaveBeenCalled();
     });
   });
 

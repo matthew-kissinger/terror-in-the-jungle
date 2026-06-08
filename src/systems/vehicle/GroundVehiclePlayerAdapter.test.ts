@@ -307,7 +307,7 @@ describe('GroundVehiclePlayerAdapter', () => {
       expect(camPos.z).toBeGreaterThan(0);
       expect(camPos.y).toBeGreaterThan(0); // lifted above the chassis
       const downAngleDeg = THREE.MathUtils.radToDeg(Math.atan2(camPos.y, Math.hypot(camPos.x, camPos.z)));
-      expect(downAngleDeg).toBeGreaterThan(31);
+      expect(downAngleDeg).toBeGreaterThan(45);
       expect(lookAt.x).toBe(0);
       expect(lookAt.z).toBe(0);
     });
