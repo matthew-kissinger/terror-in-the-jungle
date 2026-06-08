@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (SOL-1 local diagnostics refreshed: true-WebGPU all-mode sun-scale/night terrain checks pass, strict-WebGPU A Shau ridge proof passes with WebGL parity, and owner/perf/live-release proof remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
+Last verified: 2026-06-08 (SOL-1 candidate shipped at `2db02400`: true-WebGPU all-mode sun-scale/night terrain checks pass, strict-WebGPU A Shau ridge proof passes with WebGL parity, CI/deploy/live-release proof pass, and owner visual acceptance remains open; terrain-vehicle-water foundation reset live proof for `df97e707` remains prior production evidence)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -171,8 +171,9 @@ as of this refresh:
   twilight/midnight red/white/cyan terrain checks, while the strict-WebGPU
   A Shau dusk ridge proof passes terrain warmth and visible sun footprint.
   All-mode WebGPU/WebGL2 parity is 0%; strict-WebGPU ridge parity against
-  explicit WebGL2 is 0.39%. SOL-1 is still not visually accepted: the next goal
-  is SOL-1R7 owner/perf/release acceptance.
+  explicit WebGL2 is 0.39%. CI `27119813037`, deploy `27120013716`, and live
+  release proof passed for commit `2db02400`. SOL-1 is still not visually
+  accepted: the next goal is SOL-1R7 owner visual acceptance.
 - A Shau Valley is a 3,000-unit strategic simulation with selective
   materialization, not 3,000 simultaneous live combatants. DEM delivery is
   manifest-backed locally.

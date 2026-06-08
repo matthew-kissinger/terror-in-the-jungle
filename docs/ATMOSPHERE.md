@@ -94,8 +94,8 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   nav connectivity as passing, but route/NPC movement quality and airfield use
   still need play-path validation. The run also proves the A Shau work did not
   prevent Open Frontier, TDM, Zone Control, or combat120 from entering live mode.
-- SOL-1 remains open for owner/perf/release acceptance, not for missing local
-  automated visual proof. The current mitigation removes cyan/white night-water
+- SOL-1 remains open for owner visual acceptance, not for missing local
+  automated or live-release proof. The current mitigation removes cyan/white night-water
   and sub-horizon light defaults, keeps renderer, water, billboard lighting,
   and terrain night fill on one effective lighting snapshot, and applies a
   bounded low-sun terrain heightmap/relief response. The shadow recenter path
@@ -107,7 +107,9 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
   checks pass, and strict-WebGPU A Shau dusk ridge proof resolves true
   `webgpu` with explicit-WebGL2 parity at 0.39%. The legacy strict night-red
   assertion still fails because it contradicts the documented cool moon target
-  `(0.18, 0.20, 0.30)`; the red-not-dominant check passes 5/5.
+  `(0.18, 0.20, 0.30)`; the red-not-dominant check passes 5/5. The candidate
+  shipped at `2db02400` with passing CI, deploy, and live-release proof on
+  2026-06-08.
 - The current backend uses TSL Preetham-style sky math plus a small CPU LUT for
   readers. It is designed for stable low cost and WebGPU/WebGL2 compatibility,
   not physically exhaustive sky rendering or horizon-scale terrain occlusion.

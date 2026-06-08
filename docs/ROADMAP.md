@@ -126,9 +126,10 @@ Carry these findings into the next Projekt revamp:
   the strict-WebGPU A Shau ridge proof. Noon sun span is bounded to 2.41%,
   golden/dusk to 1.48%, midnight/twilight terrain red/white/cyan checks pass,
   and WebGPU/WebGL parity is 0% in the all-mode matrix / 0.39% in the ridge
-  matrix. The next repo goal is SOL-1R7 owner/perf/release acceptance: human
-  visual review of sun scale, terrain lighting, water highlights, and ridge
-  light-bleed approximation, followed by perf impact and live-release proof.
+  matrix. The shipped commit `2db02400` passed master CI, deploy, and live
+  release proof on 2026-06-08. The next repo goal is SOL-1R7 owner visual
+  acceptance: human review of sun scale, terrain lighting, water highlights,
+  and the ridge light-bleed approximation.
 - STABILIZAT-1: re-establish quiet-machine perf baselines, certify combat120
   frame tails, and separate NPC movement-stall work from render/Other cost.
 - KB-STARTUP-1: harden worker-backed terrain surface baking and mode-start

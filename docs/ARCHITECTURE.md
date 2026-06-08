@@ -302,8 +302,8 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    (noon `sunSpan=2.41%`, golden/dusk `sunSpan=1.48%`), twilight/midnight
    terrain passes red/white/cyan checks, and the 2026-06-08 strict-WebGPU
    A Shau dusk ridge proof resolves true `webgpu` with explicit-WebGL2 parity
-   at 0.39% max channel delta. Owner acceptance, perf impact recording, and
-   release proof remain open.
+   at 0.39% max channel delta. CI, deploy, and live-release proof passed for
+   shipped commit `2db02400`; owner visual acceptance remains open.
 5. **A Shau required-asset / navigation gate** - startup now fails
    A Shau when the required DEM/manifest path is missing or returns HTML, and
    preview builds now emit the manifest. The old TileCache fallback path has

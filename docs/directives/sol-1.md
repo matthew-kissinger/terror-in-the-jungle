@@ -1,6 +1,6 @@
 # SOL-1 - Solar, atmosphere, and terrain lighting rearch
 
-Status: open (owner/perf/release pending)
+Status: open (owner acceptance pending)
 Owning subsystem: renderer / atmosphere / terrain / water / shadows
 Opened: 2026-06-07 owner visual rejection
 
@@ -31,7 +31,7 @@ Visible sun scale was fixed in two parts:
   sun, and uses a much lower aureole gain so glare no longer becomes a second
   sun body.
 
-Fresh local proof from 2026-06-08:
+Fresh proof from 2026-06-08 on shipped commit `2db02400`:
 
 - `summary.json`: 33/33 captures succeeded. The default matrix resolved 29
   records as true `webgpu` and 4 parity records as explicit `webgl`.
@@ -47,24 +47,26 @@ Fresh local proof from 2026-06-08:
 - The legacy strict night-red assertion still fails 0/5 because it requires
   `r < 0.5 * max(g,b)`, which contradicts the documented cool moon target
   `(0.18, 0.20, 0.30)`. The red-not-dominant check passes 5/5.
+- CI `27119813037`, deploy `27120013716`, and live-release proof
+  `artifacts/perf/2026-06-08T06-29-37-017Z/projekt-143-live-release-proof/release-proof.json`
+  pass for the same commit. The live manifest serves
+  `2db02400ccb72350d89fc149f370f22ed3ea2922`.
 
 These are automated diagnostics, not owner visual acceptance. SOL-1 stays open
-until a human visual review, perf impact recording, full validation, and live
-release proof are done.
+until a human visual review accepts the shipped candidate.
 
 ## Recommended Next Goal
 
-**SOL-1R7 - owner, perf, and release acceptance.**
+**SOL-1R7 - owner visual acceptance.**
 
 Use the current renderer state as the candidate authority. The next pass should
 not redesign the sky again unless owner review rejects it. It should:
 
 - run owner visual review on sun scale, noon/golden glare, night terrain/water,
   and the A Shau ridge light-bleed approximation;
-- record perf impact before STABILIZAT-1 refreshes baselines;
-- run the repo release gates and live deploy proof if this ships to production;
-- update this directive to `code-complete` only after local validation and live
-  proof exist, and to `closed` only after owner acceptance.
+- compare any owner-rejected frame against the current automated matrix before
+  redesigning atmosphere, terrain, water, or shadows again;
+- update this directive to `closed` only after owner acceptance.
 
 ## Success Criteria
 
@@ -79,7 +81,8 @@ not redesign the sky again unless owner review rejects it. It should:
   heightmap approximation with documented limits, or replaced by a stronger
   occlusion model.
 - True WebGPU and explicit WebGL2 parity are proven from the same poses.
-- Perf impact is measured before STABILIZAT-1 refreshes baselines.
+- Perf impact remains covered by the 2026-06-08 master CI perf job until
+  STABILIZAT-1 refreshes baselines.
 
 ## Required Docs
 

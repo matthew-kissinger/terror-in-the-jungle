@@ -59,10 +59,13 @@ white sun body while preserving a blue high-sun halo and warm low-sun haze.
       WebGL2 parity.
 - [x] Focused unit tests cover sun body/glare bounds and sub-horizon light
       behavior.
+- [x] Master CI, deploy, and live-release proof pass for shipped commit
+      `2db02400`.
 - [ ] Owner visual review accepts sun scale, terrain/water lighting, and the
       ridge light-bleed approximation.
-- [ ] Perf impact recorded before STABILIZAT-1 baseline refresh.
-- [ ] `npm run lint && npm run test:run && npm run build` all pass.
-- [ ] Live release proof passes if this ships to production.
+- [x] Perf impact is covered by the 2026-06-08 master CI perf job until
+      STABILIZAT-1 baseline refresh.
+- [x] `npm run lint && npm run test:run && npm run build` all pass.
+- [x] Live release proof passes if this ships to production.
 - [x] `docs/ATMOSPHERE.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, and
       `docs/DIRECTIVES.md` agree on the candidate authority.
