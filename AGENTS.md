@@ -98,6 +98,11 @@ For perf-sensitive work, add `npm run validate:full` before push.
 - Do not let A Shau-focused work narrow the release gate. Before push/deploy in
   a recovery pass, rerun the all-mode evidence path so Open Frontier, TDM,
   Zone Control, and combat120 stay covered too.
+- If work touches sun, atmosphere, terrain lighting, shadows, fog, water, or
+  renderer fallback, read
+  [docs/dev/visual-rearch-lessons.md](docs/dev/visual-rearch-lessons.md)
+  before editing. SOL-1 showed those defects are usually authority-chain
+  problems, not isolated material constants.
 - Local preview evidence is not live production evidence. After deployment,
   verify the live Pages app shell, `/asset-manifest.json`, R2 DEM URL, `/sw.js`,
   Recast WASM/build asset headers, and any service-worker cache behavior before
@@ -132,6 +137,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | [docs/TESTING.md](docs/TESTING.md) | Four-layer test contract. Read before writing tests. |
 | [docs/INTERFACE_FENCE.md](docs/INTERFACE_FENCE.md) | Fenced interfaces in `src/types/SystemInterfaces.ts` |
 | [docs/ENGINEERING_CULTURE.md](docs/ENGINEERING_CULTURE.md) | Single-read culture + work-mode + parallel-R&D protocol. Required reading for unattended overnight agents. |
+| [docs/dev/visual-rearch-lessons.md](docs/dev/visual-rearch-lessons.md) | SOL-1/water lessons and proof matrix for visual rearchitecture work |
 | [docs/perf/](docs/perf/) | Profiling commands, scenarios, baselines, regression playbook (see `perf/README.md` for the index) |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Dev setup, validation, deployment, pre-push checklist |
 | [docs/DEPLOY_WORKFLOW.md](docs/DEPLOY_WORKFLOW.md) | Cloudflare Pages deploy + cache/service-worker strategy |

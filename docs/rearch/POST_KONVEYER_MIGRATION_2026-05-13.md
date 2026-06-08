@@ -103,7 +103,7 @@ across six PRs ahead of the master merge:
 - `fd5a2581` — `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` +
   `ENGINE_TRAJECTORY_2026-04-23.md` addendum.
 - `fb35f28f` — `docs/rearch/TANK_SYSTEMS_2026-05-13.md`.
-- `f5879ea8` — `docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`.
+- `f5879ea8` — archived `docs/archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`.
 
 ### Three new rearch memos + one amended memo
 
@@ -122,7 +122,7 @@ across six PRs ahead of the master merge:
   (`TankCannonProjectile`) with gravity-only arc, arming distance, and
   damage-type resolution. Damage as HP bands with three visual
   transitions plus a separate tracks-blown immobilization state.
-- **`BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`** — forward-looking
+- **`BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`** — archived forward-looking
   inventory of browser primitives the project could fold into the
   runtime. Leverage-ranked recommendation table with 18 rows; NOW
   items are all WebGPU-compute (covered by KONVEYER follow-ups), NEXT
@@ -303,7 +303,7 @@ follow-up cycles need a directional read on:
   — wheeled-chassis foundation; unblocks VEKHIKL-1.
 - [TANK_SYSTEMS_2026-05-13.md](TANK_SYSTEMS_2026-05-13.md) —
   tracked-vehicle sibling; unblocks VEKHIKL-3/4.
-- [BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md](BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md)
+- [BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md](../archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md)
   — forward-looking primitive inventory.
 - [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
   — "keep the stack" stance with the 2026-05-13 ground-vehicle addendum.

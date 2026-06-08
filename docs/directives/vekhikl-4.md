@@ -2,7 +2,7 @@
 
 Status: closed (cycle-vekhikl-4-tank-turret-and-cannon close-commit 2026-05-17)
 Owning subsystem: vehicle (ground / tracked) / combat
-Opened: cycle-2026-05-13 (named in `docs/rearch/TANK_SYSTEMS_2026-05-13.md` + `docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`)
+Opened: cycle-2026-05-13 (named in `docs/rearch/TANK_SYSTEMS_2026-05-13.md` + archived `docs/archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`)
 Closed: cycle-vekhikl-4-tank-turret-and-cannon 2026-05-17
 
 ## Latest evidence

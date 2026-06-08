@@ -160,7 +160,7 @@ KONVEYER follow-ups now living on master:
 Plus "best-fit classic primitives where they earn their keep" —
 AudioWorklet for vehicle engine sim, OPFS for prebake cache,
 SharedArrayBuffer-flavoured worker buffers, etc. (see
-`docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` for the
+archived `docs/archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` for the
 leverage-ranked inventory.)
 
 Rust → WASM is **spike-only as a first pass**, not a default. The
@@ -277,7 +277,7 @@ or in the hold list.
   — unblocks cycle #4 `cycle-vekhikl-1-jeep-drivable`.
 - [docs/rearch/TANK_SYSTEMS_2026-05-13.md](rearch/TANK_SYSTEMS_2026-05-13.md)
   — unblocks cycles #8 and #9.
-- [docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md](rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md)
+- [docs/archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md](BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md)
   — forward-looking primitive inventory; informs cycles #9, #11.
 - [docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md](rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md)
   — input to cycles #1 and #2.

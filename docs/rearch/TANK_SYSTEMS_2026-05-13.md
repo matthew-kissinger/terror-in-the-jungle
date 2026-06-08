@@ -6,7 +6,7 @@ Branch: `exp/konveyer-webgpu-migration`. Sibling to
 [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
 (addendum 2026-05-13 extends its "no external physics lib" stance to
 ground vehicles, which subsumes tanks). Parallel
-`docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` covers the
+archived `docs/archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` covers the
 AudioWorklet / Rust-WASM ballistic-solver candidates cross-referenced below.
 
 **TL;DR.** Tanks are a sibling of the wheeled-chassis MVP, not a
@@ -110,7 +110,7 @@ length, averaged the same way — smooths body pitch over rough terrain
 normals are articulated-track and out of scope.
 
 Cosmetic-only: track dust + scrape sounds and `AudioWorklet`-based
-engine-pitch modulation (parallel
+engine-pitch modulation (archived parallel
 `BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` memo) thread through
 `getEngineAudioParams()`. Not architectural.
 
@@ -462,7 +462,7 @@ open without these confirmed.
 ## Open questions / deferred
 
 - **Engine pitch / sound.** Out of scope for architecture. Reference
-  `AudioWorklet` as a candidate in the parallel
+  `AudioWorklet` as a candidate in the archived parallel
   `BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` memo. The
   `getEngineAudioParams()` hook on `TrackedVehiclePhysics` ships in
   v1 (free; values computed during integration); driving the audio
@@ -540,7 +540,8 @@ Related docs:
 - [KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md](KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md)
   — house-style; v2 track-mark-decal cross-ref gates on WebGPU
   rollout.
-- `BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md` (parallel; queued) —
+- [BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md](../archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md)
+  (archived parallel memo) —
   AudioWorklet engine-pitch + Rust-WASM ballistic-solver cross-refs.
 - [docs/TESTING.md](../TESTING.md) — behavior-test contract; L2
   budget; forbidden assertion patterns.

@@ -108,7 +108,7 @@ touched.
 - Three new rearch memos:
   `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md`,
   `docs/rearch/TANK_SYSTEMS_2026-05-13.md`,
-  `docs/rearch/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`, plus the
+  `docs/archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md`, plus the
   `docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md` 2026-05-13 addendum
   (PRs #189-#191).
 

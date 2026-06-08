@@ -148,6 +148,13 @@ That script captures A Shau, Open Frontier, TDM, Zone Control, and AI Sandbox
 from ground, sky, and aircraft views, and records terrain/water/nav diagnostics
 so local visual evidence cannot silently narrow to one mode.
 
+For visual rearchitecture work, read
+[dev/visual-rearch-lessons.md](dev/visual-rearch-lessons.md) before choosing the
+gate. SOL-1-class changes require authority-chain evidence: scenario coverage,
+time-of-day coverage, and renderer parity that match the touched systems. If the
+change touches fallback materials or renderer-specific sky/water/terrain paths,
+include default WebGPU plus explicit WebGL2/fallback captures before pushing.
+
 ## Deployment
 
 ### CI Pipeline

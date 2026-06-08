@@ -128,6 +128,26 @@ brief" from someone who actually owns the outcome.
   fenced. Any modification requires `[interface-change]` in the PR
   title and human approval. Try the non-fence solution first.
 
+## Visual/terrain rearchitecture discipline
+
+Read [docs/dev/visual-rearch-lessons.md](dev/visual-rearch-lessons.md)
+before touching sun, atmosphere, terrain lighting, fog, shadows, water, or
+renderer fallback. SOL-1 and the water foundation reset both showed that
+believability failures usually sit across an authority chain: time-of-day state,
+sky, renderer lights, terrain response, vegetation, water, shadows, and fallback
+materials can all be partly correct while the composed frame is wrong.
+
+- Start by mapping ownership and evidence, not by retuning one shader constant.
+- Keep authored level/depth water bodies as gameplay water. Hydrology is
+  drainage/material/diagnostic input unless a future brief explicitly changes
+  that contract.
+- Validate the matrix that matches the changed authority chain: A Shau plus the
+  shared modes, day plus night when lighting/materials changed, and WebGPU plus
+  explicit WebGL2/fallback when renderer behavior changed.
+- Separate automated proof from owner acceptance. Metrics can prove scale,
+  parity, and hotspot regressions; they do not prove that the sun, terrain mood,
+  or water depth feels final.
+
 ## Cycle work vs. parallel R&D
 
 The repo's primary delivery vehicle is the **cycle** — a

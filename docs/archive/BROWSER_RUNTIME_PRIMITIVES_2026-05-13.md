@@ -1,12 +1,12 @@
 # Browser-runtime primitives inventory
 
 Authored on `exp/konveyer-webgpu-migration`; merged to `master` 2026-05-13 via PR #192 (commit `1df141ca`). Companion to
-[ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
+[ENGINE_TRAJECTORY_2026-04-23.md](../rearch/ENGINE_TRAJECTORY_2026-04-23.md)
 ("keep the stack" + the 2026-05-13 ground-vehicle addendum naming
 Rapier-Rust→WASM as a gated, not-default, future evaluation) and to
-[GROUND_VEHICLE_PHYSICS_2026-05-13.md](GROUND_VEHICLE_PHYSICS_2026-05-13.md)
+[GROUND_VEHICLE_PHYSICS_2026-05-13.md](../rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md)
 (which names the four-gate clause on adopting `@dimforge/rapier3d-compat`).
-Sibling to [KONVEYER_AUTONOMOUS_RUN_2026-05-10.md](KONVEYER_AUTONOMOUS_RUN_2026-05-10.md)
+Sibling to [KONVEYER_AUTONOMOUS_RUN_2026-05-10.md](../rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md)
 (the WebGPU/TSL campaign map this branch is the home of). Owner-stated
 scope expansion 2026-05-12: "any primitive we can fold into code that
 runs in browser."
@@ -40,7 +40,7 @@ in current `src/` greps (2026-05-13).
 | Primitive | Status here | Citation |
 |---|---|---|
 | **WebGL2** (`WebGLRenderer`) | Production runtime. | `src/core/GameRenderer.ts:44` instantiates `THREE.WebGLRenderer`. Output color space pinned to `THREE.SRGBColorSpace` at `GameRenderer.ts:121` and `src/dev/gunRangeScene.ts:110`. |
-| **WebGPU + TSL** | Experimental on this branch. KONVEYER campaign tracks the migration. | [KONVEYER_AUTONOMOUS_RUN_2026-05-10.md](KONVEYER_AUTONOMOUS_RUN_2026-05-10.md). WebGPU+TSL is the default production renderer since PR #192 (`createWebGPURenderer` in `src/core/RendererBackend.ts`, called at `GameRenderer.ts:262`), with automatic WebGL2 fallback. |
+| **WebGPU + TSL** | Experimental on this branch. KONVEYER campaign tracks the migration. | [KONVEYER_AUTONOMOUS_RUN_2026-05-10.md](../rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md). WebGPU+TSL is the default production renderer since PR #192 (`createWebGPURenderer` in `src/core/RendererBackend.ts`, called at `GameRenderer.ts:262`), with automatic WebGL2 fallback. |
 | **Web Workers** (module-type) | Two active worker pools. | `src/systems/terrain/TerrainWorkerPool.ts:71` spawns up to `min(navigator.hardwareConcurrency - 1, 4)` instances of `src/workers/terrain.worker.ts` for heightmap bake + vegetation placement. `src/systems/navigation/NavmeshSystem.ts:177` spawns `src/workers/navmesh.worker.ts` for off-thread Recast tile build. Both via `new Worker(new URL(..., import.meta.url), { type: 'module' })` (Vite-bundled ES modules). |
 | **WASM (C++→WASM)** | Production. | `@recast-navigation/core` + `@recast-navigation/generators` + `@recast-navigation/three` (per `package.json:168-170`) provide WASM-backed Recast/Detour. `NavmeshSystem.ts:162` awaits `core.init()` then spawns the worker. Note the WASM module loads on both main thread and worker — see `NavmeshSystem.ts:160-168`. |
 | **SharedArrayBuffer / Atomics** | Not in use. | `grep` returns one comment-only match in `src/dev/terrainSandbox/heightmapExport.ts:102` ("SharedArrayBuffer-backed views would be rejected"). No live SAB. |
@@ -49,7 +49,7 @@ in current `src/` greps (2026-05-13).
 | **Gamepad API** | Production. | `src/ui/controls/GamepadManager.ts` is a dedicated wrapper with hot-plug, deadzone, and per-action mapping. Tested at `GamepadManager.test.ts`. |
 | **Web Audio + PannerNode (via Three.js)** | Production. | `src/systems/audio/AudioManager.ts:44-47` creates `THREE.AudioListener` (a `PannerNode` wrapper). `src/systems/audio/AudioPoolManager.ts` pools `THREE.PositionalAudio` (HRTF spatialization). Procedural footstep DSP at `src/systems/audio/FootstepSynthesis.ts` creates noise buffers on the main `BaseAudioContext`. |
 | **`crypto.subtle.digest`** | One use, advisory. | `src/systems/navigation/NavmeshCache.ts:42` hashes prebaked-navmesh inputs with SHA-256. Not on a hot path. |
-| **`Math.random()` + `Date.now()` + `performance.now()`** | Heavy use; partially gated through `SeededRandom`. | Top-20 LOGIC sites already routed through `src/core/SeededRandom.ts` per C2 (see [C2-determinism-open-sources.md](C2-determinism-open-sources.md)); ~80-90 LOGIC sites remain on `Math.random`, ~60 on `Date.now`, ~30 on `performance.now`. The 14 systems that bypass `TimeScale` are catalogued in `MEMORY.md`. |
+| **`Math.random()` + `Date.now()` + `performance.now()`** | Heavy use; partially gated through `SeededRandom`. | Top-20 LOGIC sites already routed through `src/core/SeededRandom.ts` per C2 (see [C2-determinism-open-sources.md](../rearch/C2-determinism-open-sources.md)); ~80-90 LOGIC sites remain on `Math.random`, ~60 on `Date.now`, ~30 on `performance.now`. The 14 systems that bypass `TimeScale` are catalogued in `MEMORY.md`. |
 | **`navigator.storage` / OPFS / IndexedDB** | Not used. | `grep` for `OPFS`, `navigator.storage`, `IndexedDB` returns zero matches. Settings/saves currently flow through `localStorage` (per `src/config/SettingsManager.ts`, `src/systems/strategy/PersistenceSystem.ts`, `src/systems/navigation/NavmeshCache.ts`). |
 | **BroadcastChannel / WebTransport / WebRTC / WebCodecs / WebHID / WebXR** | Not used. | `grep` returns zero matches. Game is single-player; no streaming media; no XR. |
 | **Compression Streams API** | Not used. | `grep` returns zero matches. |
@@ -86,7 +86,7 @@ workers (see §1).
   state machine has to tolerate a one-tick delay on the result. The R2
   cycle task brief slots here.
 - **Deterministic sim worker (post-`SimClock` seam).** When the
-  `SimClock` work in [C2-determinism-open-sources.md](C2-determinism-open-sources.md)
+  `SimClock` work in [C2-determinism-open-sources.md](../rearch/C2-determinism-open-sources.md)
   lands, the deterministic combat tick can run in a worker, fed from a
   command queue. Main thread renders an interpolated snapshot. This is
   the standard headless-server-in-a-worker pattern.
@@ -160,7 +160,7 @@ behind a tested wrapper. New WASM candidates:
   flight. Called once per shot. Small, hot, deterministic.
 - **Fixed-point deterministic math library.** If the `SimClock` +
   ReplayPlayer work extends to byte-identical cross-machine replay
-  (currently an explicit non-goal per [C2-determinism-open-sources.md](C2-determinism-open-sources.md)
+  (currently an explicit non-goal per [C2-determinism-open-sources.md](../rearch/C2-determinism-open-sources.md)
   §"Tolerance and scope"), `i32`/`i64` math in WASM is the cleanest
   path; TypeScript's IEEE-754 `number` cannot match across CPUs even
   with seeded RNG.
@@ -296,7 +296,7 @@ small pilot before committing to a build-system shift.
   `wasm32-unknown-unknown` + `+simd128` is a real 3-8× win in practice
   (industry consensus, not measured here; the E1 spike found that V8
   closes the OOP-vs-SoA gap inside JS — see
-  [E1-ecs-evaluation.md](E1-ecs-evaluation.md) §4 — but that finding is
+  [E1-ecs-evaluation.md](../rearch/E1-ecs-evaluation.md) §4 — but that finding is
   *within JS*, not vs WASM SIMD, where the SIMD intrinsics live below
   V8's reach).
 - **Deterministic fixed-point or integer math.** TypeScript's `number`
@@ -304,7 +304,7 @@ small pilot before committing to a build-system shift.
   microcodes, x87 vs SSE rounding modes, ARM-vs-x86 transcendental
   function precision) is fragile. Rust `i32`/`i64` ops compile to
   WASM `i32.add`/`i64.mul` that are bit-exact by the WASM spec, on
-  every conformant runtime. Relevant when [C2-determinism-open-sources.md](C2-determinism-open-sources.md)'s
+  every conformant runtime. Relevant when [C2-determinism-open-sources.md](../rearch/C2-determinism-open-sources.md)'s
   "cross-machine determinism is an explicit non-goal" assumption ever
   flips — e.g., for VODA-1 multiplayer or for byte-identical replay
   archives.
@@ -350,7 +350,7 @@ small pilot before committing to a build-system shift.
 |---|---|---|
 | Ballistic trajectory solver | Tank cannon shells (queued VEKHIKL-4) and existing mortar/grenade arcs | Small, hot, isolated. Easy to A/B against a TS reference. Drops cleanly into the tank-cannon flow. |
 | Cover-search spatial grid | DEFEKT-3 close | Tight numeric loop; SIMD-vectorizable. Alternative path if KONVEYER's WebGPU-compute spatial grid (named in the experimental-branch parity matrix) is blocked. |
-| Influence-map blur kernel | `InfluenceMapSystem` (per [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md) §2.3) | Separable Gaussian, contiguous Float32Array, 64×64. Clean SIMD candidate. |
+| Influence-map blur kernel | `InfluenceMapSystem` (per [ENGINE_TRAJECTORY_2026-04-23.md](../rearch/ENGINE_TRAJECTORY_2026-04-23.md) §2.3) | Separable Gaussian, contiguous Float32Array, 64×64. Clean SIMD candidate. |
 | Deterministic fixed-point math library | Future VODA-1 multiplayer or cross-machine replay | Bit-exact ops; reproducible across CPUs. Wraps `i32` saturating arithmetic with a thin TS-facing API. |
 | Rapier integration shim | Gated per `GROUND_VEHICLE_PHYSICS_2026-05-13.md` four-gate clause | Not a new Rust *crate* — this is "adopt the existing Rust→WASM crate behind a gate." Counts here only for tracking. |
 
@@ -554,7 +554,7 @@ plumbing.
 
 **Integration cost.** Medium. Color authoring + tone-mapper + Bayer
 quantize pass (`PostProcessingManager`) all assume SDR. The retro
-pixelation aesthetic per [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
+pixelation aesthetic per [ENGINE_TRAJECTORY_2026-04-23.md](../rearch/ENGINE_TRAJECTORY_2026-04-23.md)
 §2.5 may not benefit from HDR at all — HDR mostly wins on smooth
 highlight rolloff, and the project's look quantizes that on purpose.
 
@@ -711,7 +711,7 @@ Already in use. Stable.
 
 ## 8. Determinism primitives
 
-The C2 determinism work ([C2-determinism-open-sources.md](C2-determinism-open-sources.md))
+The C2 determinism work ([C2-determinism-open-sources.md](../rearch/C2-determinism-open-sources.md))
 already names the remaining LOGIC sites that need to thread through
 the deterministic seam. From the browser-primitive lens specifically:
 
@@ -739,7 +739,7 @@ cross-machine (currently an explicit non-goal per C2).
 
 `MEMORY.md` catalogues 14 systems that read `performance.now()`
 directly and bypass `TimeScale`. The `SimClock` seam named in
-[C2-determinism-open-sources.md](C2-determinism-open-sources.md)
+[C2-determinism-open-sources.md](../rearch/C2-determinism-open-sources.md)
 §"Recommended next pass" is the unified fix. Not a new browser
 primitive — it's a wrapper over existing ones.
 
@@ -915,7 +915,7 @@ Everything DEFERRED has a named gate. Everything PARKED has a named
   frames once — is texture decode actually on the main-thread
   critical path? If yes, row 14 is a NEXT, not a DEFERRED.
 - **HDR look target.** Does the retro-pixelated aesthetic per
-  [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
+  [ENGINE_TRAJECTORY_2026-04-23.md](../rearch/ENGINE_TRAJECTORY_2026-04-23.md)
   §2.5 want HDR at all? Probably no, but worth a one-paragraph
   decision before row 15 sits in DEFERRED indefinitely.
 
@@ -952,14 +952,14 @@ Repo files cited (paths relative to repo root):
 
 Rearch memos cited:
 
-- [KONVEYER_AUTONOMOUS_RUN_2026-05-10.md](KONVEYER_AUTONOMOUS_RUN_2026-05-10.md)
-- [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
+- [KONVEYER_AUTONOMOUS_RUN_2026-05-10.md](../rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md)
+- [ENGINE_TRAJECTORY_2026-04-23.md](../rearch/ENGINE_TRAJECTORY_2026-04-23.md)
   (including the 2026-05-13 addendum on ground vehicles)
-- [GROUND_VEHICLE_PHYSICS_2026-05-13.md](GROUND_VEHICLE_PHYSICS_2026-05-13.md)
+- [GROUND_VEHICLE_PHYSICS_2026-05-13.md](../rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md)
   (four-gate Rapier clause)
-- [E1-ecs-evaluation.md](E1-ecs-evaluation.md) (V8 closes the OOP-vs-SoA
+- [E1-ecs-evaluation.md](../rearch/E1-ecs-evaluation.md) (V8 closes the OOP-vs-SoA
   gap inside JS; bitECS spike result)
-- [C2-determinism-open-sources.md](C2-determinism-open-sources.md)
+- [C2-determinism-open-sources.md](../rearch/C2-determinism-open-sources.md)
   (remaining `Math.random` / `Date.now` / `performance.now` LOGIC
   sites; `SimClock` seam recommendation)
 
