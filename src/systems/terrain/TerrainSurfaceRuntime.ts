@@ -22,6 +22,21 @@ import { buildTerrainBiomeMaterialConfig } from './TerrainBiomeRuntimeConfig';
 const MIN_HEIGHTMAP_GRID_SIZE = 256;
 const MAX_HEIGHTMAP_GRID_SIZE = 1024;
 
+/**
+ * Gameplay (CPU) height/slope queries are decoupled from the GPU surface grid.
+ * The GPU surface grid is power-of-two-capped for cheap texture filtering, which
+ * on a ~21.5km A Shau world bottoms out at ~42m/sample — far coarser than the 9m
+ * DEM. That coarse grid C0-smooths sharp ridges, so the slope GRADIENT DIRECTION
+ * fed to the NPC contour solver flips relative to the true terrain (the
+ * combat-movement-stall-tail root). The gameplay-query grid below resolves the
+ * playable area at ~DEM scale so collision, BVH, AI slope, and vegetation read a
+ * faithful surface. It is a CPU-only Float32 grid — no GPU texture, no render
+ * regression. Native pixels are still the upper bound: there is no fidelity past
+ * the source DEM, so this never out-resolves the asset.
+ */
+const GAMEPLAY_QUERY_TARGET_METERS_PER_SAMPLE = 20;
+const MAX_GAMEPLAY_QUERY_GRID_SIZE = 1024;
+
 function roundUpToPowerOfTwo(value: number): number {
   let result = 1;
   while (result < value) {
@@ -43,6 +58,52 @@ export function computeTerrainSurfaceGridSize(worldSize: number): number {
     MIN_HEIGHTMAP_GRID_SIZE,
     Math.min(MAX_HEIGHTMAP_GRID_SIZE, roundUpToPowerOfTwo(requestedGridSize)),
   );
+}
+
+/**
+ * Grid size for the CPU gameplay-query heightmap over the PLAYABLE world extent.
+ *
+ * Targets ~{@link GAMEPLAY_QUERY_TARGET_METERS_PER_SAMPLE}m/sample, capped at
+ * {@link MAX_GAMEPLAY_QUERY_GRID_SIZE}, and never coarser than the GPU surface
+ * grid for the same extent (so small procedural worlds — whose surface grid is
+ * already fine — get no extra grid and no extra memory). For A Shau this lands at
+ * 1024 over ~21.1km ⇒ ~20.6m/sample, ~2x the GPU surface and ~9x fewer slope
+ * gradient-direction flips than the 512-grid (measured against the real DEM:
+ * steep-cell aspect flips 0.74% → 0.08%; mean |Δh| vs DEM 1.12m → 0.34m). Cost is
+ * a single 1024² Float32 (~4MB CPU), replacing the ~1MB coarse copy ⇒ ~+3MB CPU,
+ * zero GPU.
+ */
+export function computeGameplayQueryGridSize(playableWorldSize: number): number {
+  const requested = Math.ceil(playableWorldSize / GAMEPLAY_QUERY_TARGET_METERS_PER_SAMPLE) + 1;
+  const surfaceGrid = computeTerrainSurfaceGridSize(playableWorldSize);
+  return Math.max(
+    surfaceGrid,
+    Math.min(MAX_GAMEPLAY_QUERY_GRID_SIZE, requested),
+  );
+}
+
+/**
+ * Bake a CPU gameplay-query height grid from a source provider, sampled over
+ * `worldSize` centred on the origin. Mirrors {@link HeightmapGPU.bakeFromProvider}
+ * sample placement so a {@link BakedHeightProvider} wrapping this grid maps world
+ * coordinates identically to the GPU surface — but at a finer resolution and with
+ * no GPU texture allocation (CPU-only, gameplay-query path).
+ */
+export function bakeGameplayQueryGrid(
+  provider: IHeightProvider,
+  gridSize: number,
+  worldSize: number,
+): Float32Array {
+  const data = new Float32Array(gridSize * gridSize);
+  const halfWorld = worldSize / 2;
+  const step = worldSize / (gridSize - 1);
+  for (let z = 0; z < gridSize; z++) {
+    const worldZ = -halfWorld + z * step;
+    for (let x = 0; x < gridSize; x++) {
+      data[z * gridSize + x] = provider.getHeightAt(-halfWorld + x * step, worldZ);
+    }
+  }
+  return data;
 }
 
 /**
