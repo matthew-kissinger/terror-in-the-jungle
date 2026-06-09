@@ -224,6 +224,16 @@ export class PlayerVehicleAdapterFactory {
 
   constructor(deps: PlayerVehicleAdapterFactoryDeps) {
     this.deps = deps;
+    // Make the session controller the single seat-truth chokepoint. Wiring the
+    // VehicleManager here means *every* exit path that funnels through
+    // `session.exitVehicle` — including Escape / requestVehicleExit, which
+    // never touch `tryExit()` — releases the occupied IVehicle seat exactly
+    // once. The heli/fixed-wing entry paths share this same session controller,
+    // so they get the same seat-lifecycle guarantee for free. Guarded so test
+    // doubles of the session controller without the setter keep working.
+    if (typeof this.deps.vehicleSessionController.setSeatBinder === 'function') {
+      this.deps.vehicleSessionController.setSeatBinder(this.deps.vehicleManager);
+    }
   }
 
   /**
@@ -295,21 +305,18 @@ export class PlayerVehicleAdapterFactory {
     if (!this.deps.vehicleSessionController.isInVehicle()) return false;
 
     const vehicleId = this.deps.vehicleSessionController.getVehicleId();
-    const vehicle = vehicleId
-      ? this.deps.vehicleManager.getVehicle(vehicleId)
-      : null;
-
     const ctx = this.buildTransitionContext(
       this.deps.playerState.position.clone(),
       vehicleId ?? undefined,
     );
+    // The session controller now owns the IVehicle seat release (it is wired
+    // with the VehicleManager as its seat binder in this factory's
+    // constructor), so it frees the seat as part of `exitVehicle`. We no
+    // longer release it here — that would be a redundant double-call.
     const result = this.deps.vehicleSessionController.exitVehicle(ctx, {
       reason: 'input',
     });
 
-    if (result.exited && vehicle) {
-      vehicle.exitVehicle('player');
-    }
     return result.exited;
   }
 

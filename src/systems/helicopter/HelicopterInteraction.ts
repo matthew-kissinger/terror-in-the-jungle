@@ -6,14 +6,19 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { Logger } from '../../utils/Logger';
 import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
+import type { VehicleSeatBinder } from '../vehicle/VehicleSessionController';
 
 const POST_EXIT_INTERACTION_COOLDOWN_MS = 300;
+
+/** Occupant id the player holds on every IVehicle seat. */
+const PLAYER_OCCUPANT_ID = 'player';
 
 export class HelicopterInteraction {
   private helicopters: Map<string, THREE.Group>;
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
   private terrainManager?: ITerrainRuntime;
+  private seatBinder?: VehicleSeatBinder;
   private interactionRadius: number;
   private isPlayerNearHelicopter = false;
   private nearestHelicopterId: string | null = null;
@@ -39,6 +44,17 @@ export class HelicopterInteraction {
 
   setTerrainManager(terrainManager: ITerrainRuntime): void {
     this.terrainManager = terrainManager;
+  }
+
+  /**
+   * Inject the IVehicle resolver (the `VehicleManager`). The helicopter's
+   * seat truth lives on its `HelicopterVehicleAdapter`, registered with the
+   * manager. Boarding via this interaction must lock the pilot seat on that
+   * adapter so `getPilotId()` reflects the player while flying — otherwise
+   * NPC boarding and re-board checks see a free pilot seat (seat ghost).
+   */
+  setSeatBinder(binder: VehicleSeatBinder): void {
+    this.seatBinder = binder;
   }
 
   private findNearestHelicopter(playerPosition: THREE.Vector3): { id: string; group: THREE.Group; distance: number } | null {
@@ -136,6 +152,17 @@ export class HelicopterInteraction {
         ? `Too far from ${nearest.id} (${nearest.distance.toFixed(1)}m)`
         : 'No helicopters available');
       return;
+    }
+
+    // Lock the pilot seat on the helicopter's IVehicle adapter BEFORE handing
+    // off to the player controller. This is what makes `getPilotId()` report
+    // the player while flying instead of staying null (the seat-ghost bug).
+    // `VehicleSessionController.enterVehicle` also locks idempotently when its
+    // seat binder is wired, so a redundant lock there is a no-op — the player
+    // never ends up in two seats.
+    const heliVehicle = this.seatBinder?.getVehicle(nearest.id);
+    if (heliVehicle && heliVehicle.getPilotId() !== PLAYER_OCCUPANT_ID) {
+      heliVehicle.enterVehicle(PLAYER_OCCUPANT_ID, 'pilot');
     }
 
     Logger.debug('helicopter', `PLAYER ENTERING ${nearest.id}`);
