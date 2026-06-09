@@ -32,7 +32,7 @@ export class SystemConnector {
     camera: THREE.PerspectiveCamera,
     renderer?: IGameRenderer
   ): void {
-    wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), { camera, renderer });
+    wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), { camera, renderer, scene });
     wireGameplayRuntime(createGameplayRuntimeGroups(refs), { camera, renderer });
     wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene });
     this.wireNavigation(refs);
