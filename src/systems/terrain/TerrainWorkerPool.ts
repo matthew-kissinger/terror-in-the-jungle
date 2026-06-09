@@ -280,24 +280,6 @@ export class TerrainWorkerPool {
   }
 
   /**
-   * Generate terrain work units in worker space.
-   * This remains available while terrain generation tasks are still message-based.
-   */
-  async generateChunk(
-    chunkX: number, chunkZ: number,
-    size: number, segments: number, seed: number,
-  ): Promise<any> {
-    return this.enqueueTask({
-      type: 'generate',
-      chunkX,
-      chunkZ,
-      size,
-      segments,
-      seed,
-    });
-  }
-
-  /**
    * Enqueue a worker task. Dispatches immediately when a worker is free,
    * otherwise the task waits in the queue until a worker frees up (rather than
    * mis-dispatching onto an already-busy slot, which clobbered telemetry and

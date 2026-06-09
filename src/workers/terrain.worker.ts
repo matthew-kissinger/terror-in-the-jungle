@@ -8,7 +8,8 @@
  * Handles:
  * - setHeightProvider: configure noise or DEM provider
  * - bakeHeightmap: sample height provider into a Float32Array grid
- * - generateVegetation: 3-pass placement for a cell
+ * - bakePreparedVisualHeightmap: extend a prepared playable grid into the
+ *   visual margin and bake normals
  */
 
 import { bakePreparedVisualGrid, generateNormalData } from './terrainPreparedVisualBake';
@@ -220,10 +221,6 @@ function getNoise(seed: number): WorkerNoise {
     noiseCache.set(seed, noise);
   }
   return noise;
-}
-
-function getHeight(worldX: number, worldZ: number): number {
-  return sampleProviderHeight(activeProviderConfig, worldX, worldZ);
 }
 
 function bakeProviderGrid(providerConfig: HeightProviderConfig, gridSize: number, worldSize: number): Float32Array {
@@ -461,17 +458,7 @@ interface BakePreparedVisualHeightmapMsg {
   gridSize: number;
 }
 
-interface GenerateChunkMsg {
-  type: 'generate';
-  requestId: number;
-  chunkX: number;
-  chunkZ: number;
-  size: number;
-  segments: number;
-  seed: number;
-}
-
-type WorkerMessage = SetProviderMsg | BakeHeightmapMsg | BakePreparedVisualHeightmapMsg | GenerateChunkMsg;
+type WorkerMessage = SetProviderMsg | BakeHeightmapMsg | BakePreparedVisualHeightmapMsg;
 
 self.onmessage = function (event: MessageEvent<WorkerMessage>) {
   const msg = event.data;
@@ -516,91 +503,6 @@ self.onmessage = function (event: MessageEvent<WorkerMessage>) {
       (self as unknown as Worker).postMessage(
         { type: 'heightmapResult', requestId: msg.requestId, data, normalData, gridSize: msg.gridSize, worldSize },
         [data.buffer, normalData.buffer],
-      );
-      break;
-    }
-
-    case 'generate': {
-      // Terrain geometry generation path used by message-driven worker tasks.
-      const { chunkX, chunkZ, size, segments, seed, requestId } = msg;
-      if (activeProviderConfig.type === 'noise') {
-        activeProviderConfig = { type: 'noise', seed };
-      }
-
-      const baseX = chunkX * size;
-      const baseZ = chunkZ * size;
-      const segmentSize = size / segments;
-      const vertexCount = (segments + 1) * (segments + 1);
-      const indexCount = segments * segments * 6;
-
-      const positions = new Float32Array(vertexCount * 3);
-      const normals = new Float32Array(vertexCount * 3);
-      const uvs = new Float32Array(vertexCount * 2);
-      const indices = new Uint32Array(indexCount);
-      const heightData = new Float32Array(vertexCount);
-
-      let vertexIndex = 0;
-      for (let z = 0; z <= segments; z++) {
-        for (let x = 0; x <= segments; x++) {
-          const worldX = baseX + x * segmentSize;
-          const worldZ = baseZ + z * segmentSize;
-          const h = getHeight(worldX, worldZ);
-
-          const posIdx = vertexIndex * 3;
-          positions[posIdx] = x * segmentSize - size / 2;
-          positions[posIdx + 1] = h;
-          positions[posIdx + 2] = z * segmentSize - size / 2;
-
-          const uvIdx = vertexIndex * 2;
-          uvs[uvIdx] = x / segments;
-          uvs[uvIdx + 1] = z / segments;
-          heightData[vertexIndex] = h;
-          vertexIndex++;
-        }
-      }
-
-      let indexIndex = 0;
-      for (let z = 0; z < segments; z++) {
-        for (let x = 0; x < segments; x++) {
-          const tl = z * (segments + 1) + x;
-          const tr = tl + 1;
-          const bl = (z + 1) * (segments + 1) + x;
-          const br = bl + 1;
-          indices[indexIndex++] = tl;
-          indices[indexIndex++] = bl;
-          indices[indexIndex++] = tr;
-          indices[indexIndex++] = tr;
-          indices[indexIndex++] = bl;
-          indices[indexIndex++] = br;
-        }
-      }
-
-      // Compute normals
-      const normalAccum = new Float32Array(vertexCount * 3);
-      for (let i = 0; i < indexCount; i += 3) {
-        const i0 = indices[i] * 3;
-        const i1 = indices[i + 1] * 3;
-        const i2 = indices[i + 2] * 3;
-        const e1x = positions[i1] - positions[i0], e1y = positions[i1 + 1] - positions[i0 + 1], e1z = positions[i1 + 2] - positions[i0 + 2];
-        const e2x = positions[i2] - positions[i0], e2y = positions[i2 + 1] - positions[i0 + 1], e2z = positions[i2 + 2] - positions[i0 + 2];
-        const nx = e1y * e2z - e1z * e2y;
-        const ny = e1z * e2x - e1x * e2z;
-        const nz = e1x * e2y - e1y * e2x;
-        normalAccum[i0] += nx; normalAccum[i0 + 1] += ny; normalAccum[i0 + 2] += nz;
-        normalAccum[i1] += nx; normalAccum[i1 + 1] += ny; normalAccum[i1 + 2] += nz;
-        normalAccum[i2] += nx; normalAccum[i2 + 1] += ny; normalAccum[i2 + 2] += nz;
-      }
-      for (let i = 0; i < vertexCount; i++) {
-        const idx = i * 3;
-        const len = Math.sqrt(normalAccum[idx] ** 2 + normalAccum[idx + 1] ** 2 + normalAccum[idx + 2] ** 2) || 1;
-        normals[idx] = normalAccum[idx] / len;
-        normals[idx + 1] = normalAccum[idx + 1] / len;
-        normals[idx + 2] = normalAccum[idx + 2] / len;
-      }
-
-      (self as unknown as Worker).postMessage(
-        { type: 'result', requestId, chunkX, chunkZ, positions, normals, uvs, indices, heightData },
-        [positions.buffer, normals.buffer, uvs.buffer, indices.buffer, heightData.buffer],
       );
       break;
     }
