@@ -8,12 +8,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SettingsManager } from './SettingsManager';
 
+const LEGACY_STORAGE_KEY = 'pixelart-sandbox-settings';
+const STORAGE_KEY = 'terror-in-the-jungle-settings';
+
 describe('SettingsManager', () => {
   beforeEach(() => {
     // Reset singleton for clean tests
     (SettingsManager as any).instance = null;
-    // Clear localStorage
-    localStorage.removeItem('pixelart-sandbox-settings');
+    // Clear localStorage (both the current key and the legacy one)
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   });
 
   it('should return default values', () => {
@@ -117,5 +121,63 @@ describe('SettingsManager', () => {
     sm.set('controllerLookDeadZone', 12);
     expect(sm.getControllerMoveDeadZoneRaw()).toBeCloseTo(0.2);
     expect(sm.getControllerLookDeadZoneRaw()).toBeCloseTo(0.12);
+  });
+
+  describe('legacy storage-key migration', () => {
+    it('preserves a returning player\'s settings stored under the legacy key', () => {
+      // A returning player has settings written by an older build under the
+      // legacy project-name key, with no value under the current key yet.
+      localStorage.setItem(
+        LEGACY_STORAGE_KEY,
+        JSON.stringify({ masterVolume: 13, graphicsQuality: 'ultra', controllerInvertY: true }),
+      );
+
+      const sm = SettingsManager.getInstance();
+
+      // Their settings come through intact rather than resetting to defaults.
+      expect(sm.get('masterVolume')).toBe(13);
+      expect(sm.get('graphicsQuality')).toBe('ultra');
+      expect(sm.get('controllerInvertY')).toBe(true);
+    });
+
+    it('moves legacy settings onto the current key and clears the legacy key', () => {
+      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify({ masterVolume: 13 }));
+
+      SettingsManager.getInstance();
+
+      // After migration the value lives under the current key with the same data,
+      // and the legacy key no longer lingers.
+      const migrated = localStorage.getItem(STORAGE_KEY);
+      expect(migrated).not.toBeNull();
+      expect(JSON.parse(migrated as string).masterVolume).toBe(13);
+      expect(localStorage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
+    });
+
+    it('keeps the migrated value across a fresh load', () => {
+      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify({ masterVolume: 13 }));
+      SettingsManager.getInstance();
+
+      // A subsequent load (new instance) reads the current key, not the legacy one.
+      (SettingsManager as any).instance = null;
+      const reloaded = SettingsManager.getInstance();
+      expect(reloaded.get('masterVolume')).toBe(13);
+    });
+
+    it('prefers the current key when both keys are present', () => {
+      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify({ masterVolume: 13 }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ masterVolume: 88 }));
+
+      const sm = SettingsManager.getInstance();
+      expect(sm.get('masterVolume')).toBe(88);
+    });
+
+    it('fresh install writes only to the current key', () => {
+      const sm = SettingsManager.getInstance();
+      sm.set('masterVolume', 55);
+
+      expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+      expect(localStorage.getItem(LEGACY_STORAGE_KEY)).toBeNull();
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEY) as string).masterVolume).toBe(55);
+    });
   });
 });
