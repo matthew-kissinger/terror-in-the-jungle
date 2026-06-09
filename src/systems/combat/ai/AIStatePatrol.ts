@@ -89,7 +89,7 @@ export class AIStatePatrol {
 
     // Check if should transition to zone defense
     if (this.shouldAssignZoneDefense(combatant)) {
-      this.assignZoneDefense(combatant);
+      this.assignZoneDefense(combatant, allCombatants);
       if (combatant.state === CombatantState.DEFENDING) {
         return;
       }
@@ -313,7 +313,10 @@ export class AIStatePatrol {
     return true;
   }
 
-  private assignZoneDefense(combatant: Combatant): void {
+  private assignZoneDefense(
+    combatant: Combatant,
+    allCombatants: Map<string, Combatant>
+  ): void {
     if (!this.zoneQuery) return;
 
     combatant.lastDefenseReassignTime = Date.now();
@@ -338,6 +341,15 @@ export class AIStatePatrol {
     // Pick a zone that needs defenders
     for (const zone of nearbyOwnedZones) {
       const defenders = this.zoneDefenders.get(zone.id) || new Set();
+      // Shed stale ids before counting slots. zoneDefenders Sets only ever grow
+      // otherwise, so dead/despawned combatants permanently occupy slots and the
+      // zone "looks defended" while starving of fresh defenders late in a match.
+      // allCombatants is the per-tick liveness surface already threaded through
+      // handlePatrolling, so pruning here is the cheapest reliable signal — no
+      // new death-event pipeline needed (the unified death handler is a sibling
+      // task's domain). An id is stale if it's gone from the map (despawned) or
+      // present but DEAD.
+      this.pruneStaleDefenders(defenders, allCombatants);
       const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
       const squadSize = squad ? squad.members.length : 1;
 
@@ -356,6 +368,23 @@ export class AIStatePatrol {
 
         Logger.info('combat-ai', ` ${combatant.faction} defender assigned to zone ${zone.id} (${defenders.size}/${maxDefenders} defenders)`);
         return;
+      }
+    }
+  }
+
+  /**
+   * Remove ids from a zone's defender Set whose combatant is no longer a live
+   * defender — either despawned (absent from allCombatants) or DEAD. Keeps the
+   * slot accounting honest so freed slots can be reclaimed.
+   */
+  private pruneStaleDefenders(
+    defenders: Set<string>,
+    allCombatants: Map<string, Combatant>
+  ): void {
+    for (const id of defenders) {
+      const c = allCombatants.get(id);
+      if (!c || c.state === CombatantState.DEAD) {
+        defenders.delete(id);
       }
     }
   }
