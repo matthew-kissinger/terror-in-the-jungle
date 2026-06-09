@@ -382,7 +382,10 @@ describe('AIStatePatrol', () => {
       };
       mockZoneManager.getAllZones.mockReturnValue([zone]);
 
-      // Pre-fill defenders
+      // Pre-fill both slots with two LIVE defenders. Liveness matters: only
+      // present, non-dead combatants hold a slot (stale ids are pruned).
+      allCombatants.set('c2', createMockCombatant('c2', Faction.US));
+      allCombatants.set('c3', createMockCombatant('c3', Faction.US));
       const defenders = new Set(['c2', 'c3']);
       aiStatePatrol.getZoneDefenders().set('zone-1', defenders);
 
@@ -457,6 +460,82 @@ describe('AIStatePatrol', () => {
       expect(combatant.defendingZoneId).toBe('zone-near');
     });
 
+    it('lets a fresh combatant claim a defender slot after the prior defenders die', () => {
+      const zone = {
+        id: 'zone-1',
+        owner: Faction.US,
+        isHomeBase: false,
+        position: new THREE.Vector3(20, 0, 20),
+        radius: 10,
+      };
+      mockZoneManager.getAllZones.mockReturnValue([zone]);
+
+      // Fill both defender slots (maxDefenders = 2 for squad size 4) with two
+      // live combatants, then kill them. A match that runs long enough will
+      // cycle through defenders; if dead ids are never shed, the zone stays
+      // "fully defended" forever and starves of fresh defenders.
+      const deadDefenders: Combatant[] = [];
+      for (const id of ['d1', 'd2']) {
+        const defender = createMockCombatant(id, Faction.US, new THREE.Vector3(20, 0, 20));
+        allCombatants.set(id, defender);
+        deadDefenders.push(defender);
+        aiStatePatrol.handlePatrolling(
+          defender, 0.016, playerPosition, allCombatants, undefined,
+          findNearestEnemy, canSeeTarget, shouldEngage
+        );
+      }
+      expect(aiStatePatrol.getZoneDefenders().get('zone-1')?.size).toBe(2);
+
+      // Defenders die.
+      for (const defender of deadDefenders) {
+        defender.state = CombatantState.DEAD;
+      }
+
+      // A fresh, live combatant should now be able to claim a freed slot.
+      const replacement = createMockCombatant('c1', Faction.US, new THREE.Vector3(10, 0, 10));
+      allCombatants.set('c1', replacement);
+      aiStatePatrol.handlePatrolling(
+        replacement, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(replacement.state).toBe(CombatantState.DEFENDING);
+      expect(replacement.defendingZoneId).toBe('zone-1');
+      const defenders = aiStatePatrol.getZoneDefenders().get('zone-1');
+      expect(defenders?.has('c1')).toBe(true);
+      // Dead ids must not linger and keep the zone looking full.
+      expect(defenders?.has('d1')).toBe(false);
+      expect(defenders?.has('d2')).toBe(false);
+    });
+
+    it('frees a defender slot held by a despawned (removed) combatant', () => {
+      const zone = {
+        id: 'zone-1',
+        owner: Faction.US,
+        isHomeBase: false,
+        position: new THREE.Vector3(20, 0, 20),
+        radius: 10,
+      };
+      mockZoneManager.getAllZones.mockReturnValue([zone]);
+
+      // Pre-seed both slots with ids that are NOT present in allCombatants
+      // (simulating despawn/removal), without seeding the liveness map.
+      aiStatePatrol.getZoneDefenders().set('zone-1', new Set(['gone-1', 'gone-2']));
+
+      const replacement = createMockCombatant('c1', Faction.US, new THREE.Vector3(10, 0, 10));
+      allCombatants.set('c1', replacement);
+      aiStatePatrol.handlePatrolling(
+        replacement, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(replacement.state).toBe(CombatantState.DEFENDING);
+      const defenders = aiStatePatrol.getZoneDefenders().get('zone-1');
+      expect(defenders?.has('c1')).toBe(true);
+      expect(defenders?.has('gone-1')).toBe(false);
+      expect(defenders?.has('gone-2')).toBe(false);
+    });
+
     it('should assign different defense positions to different defenders', () => {
       const zone = {
         id: 'zone-1',
@@ -467,7 +546,9 @@ describe('AIStatePatrol', () => {
       };
       mockZoneManager.getAllZones.mockReturnValue([zone]);
 
-      // First defender
+      // First defender (must be live in the map so it keeps its slot when the
+      // second defender's assignment pass prunes stale ids).
+      allCombatants.set(combatant.id, combatant);
       aiStatePatrol.handlePatrolling(
         combatant, 0.016, playerPosition, allCombatants, undefined,
         findNearestEnemy, canSeeTarget, shouldEngage
@@ -476,6 +557,7 @@ describe('AIStatePatrol', () => {
 
       // Second defender
       const combatant2 = createMockCombatant('c2', Faction.US, new THREE.Vector3(10, 0, 10));
+      allCombatants.set(combatant2.id, combatant2);
       aiStatePatrol.handlePatrolling(
         combatant2, 0.016, playerPosition, allCombatants, undefined,
         findNearestEnemy, canSeeTarget, shouldEngage
