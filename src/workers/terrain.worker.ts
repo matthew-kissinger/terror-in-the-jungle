@@ -12,6 +12,7 @@
  */
 
 import { bakePreparedVisualGrid, generateNormalData } from './terrainPreparedVisualBake';
+import { DemBufferCache } from './demBufferCache';
 import { sampleDEMBilinearWithTaper } from '../systems/terrain/DEMSampling';
 
 // ── Height provider reconstruction ──
@@ -210,7 +211,7 @@ function sampleDEM(
 
 let activeProviderConfig: HeightProviderConfig = { type: 'noise', seed: 12345 };
 const noiseCache = new Map<number, WorkerNoise>();
-const demBufferCache = new Map<ArrayBuffer, Float32Array>();
+const demBufferCache = new DemBufferCache();
 
 function getNoise(seed: number): WorkerNoise {
   let noise = noiseCache.get(seed);
@@ -246,11 +247,7 @@ function sampleProviderHeight(config: HeightProviderConfig, worldX: number, worl
     case 'noise':
       return calculateNoiseHeight(worldX, worldZ, getNoise(config.seed));
     case 'dem': {
-      let demData = demBufferCache.get(config.buffer);
-      if (!demData) {
-        demData = new Float32Array(config.buffer);
-        demBufferCache.set(config.buffer, demData);
-      }
+      const demData = demBufferCache.getView(config.buffer);
       return sampleDEM(worldX, worldZ, demData, config.width, config.height, config.metersPerPixel, config.originX, config.originZ);
     }
     case 'stamped': {
@@ -482,6 +479,9 @@ self.onmessage = function (event: MessageEvent<WorkerMessage>) {
   switch (msg.type) {
     case 'setHeightProvider': {
       activeProviderConfig = msg.config;
+      // Release DEM views cached for the previous provider. A DEM buffer is
+      // ~21MB; without this, every mode switch leaks one per worker.
+      demBufferCache.clear();
       (self as unknown as Worker).postMessage({ type: 'providerReady' });
       break;
     }
