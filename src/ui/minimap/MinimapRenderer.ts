@@ -9,6 +9,7 @@ import { Faction, isBlufor } from '../../systems/combat/types';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
+import { worldToPlayerCenteredMap, factionMarkerFill } from '../map/MapProjection';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -283,9 +284,6 @@ function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRender
   const data = state.warSimulator.getAgentPositionsForMap();
   const scale = state.size / state.worldSize;
   const dotSize = 1.5 * renderScale;
-  const cos = Math.cos(state.playerRotation);
-  const sin = Math.sin(state.playerRotation);
-  const halfSize = state.size / 2;
 
   for (let i = 0; i < data.length; i += 4) {
     const faction = data[i];     // 0 = US, 1 = OPFOR
@@ -297,12 +295,15 @@ function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRender
     if (tier === 0) continue;
 
     // World to minimap (player-centered + rotated, same as worldToMinimap)
-    const dx = ax - state.playerPosition.x;
-    const dz = az - state.playerPosition.z;
-    const rotatedX = dx * cos + dz * sin;
-    const rotatedZ = -dx * sin + dz * cos;
-    const mx = halfSize + rotatedX * scale;
-    const my = halfSize + rotatedZ * scale;
+    const { x: mx, y: my } = worldToPlayerCenteredMap(
+      ax,
+      az,
+      state.playerPosition.x,
+      state.playerPosition.z,
+      state.playerRotation,
+      state.size,
+      scale,
+    );
 
     if (mx < 0 || mx > state.size || my < 0 || my > state.size) continue;
 
@@ -534,12 +535,8 @@ function drawVehicleMarkers(
     // Faction palette: matches the combatant-dot palette so player can
     // visually tie a vehicle to the allied / hostile side at a glance.
     // US field-green (rgba 79,107,58) / OPFOR stamp-red (rgba 158,59,46).
-    const friendly = isBlufor(marker.faction);
-    const fillColor = friendly ? 'rgba(79, 107, 58, 0.85)' : 'rgba(158, 59, 46, 0.85)';
-    const strokeColor = friendly ? 'rgba(231, 217, 186, 0.95)' : 'rgba(231, 217, 186, 0.95)';
-
-    ctx.fillStyle = fillColor;
-    ctx.strokeStyle = strokeColor;
+    ctx.fillStyle = factionMarkerFill(marker.faction, 0.85);
+    ctx.strokeStyle = 'rgba(231, 217, 186, 0.95)';
     drawVehicleGlyph(ctx, x, y, marker.category, baseRadius);
   }
 
@@ -551,15 +548,13 @@ function worldToMinimap(
   state: MinimapRenderState,
   scale: number
 ): MinimapPosition {
-  _v1.subVectors(worldPosition, state.playerPosition);
-
-  const cos = Math.cos(state.playerRotation);
-  const sin = Math.sin(state.playerRotation);
-  const rotatedX = _v1.x * cos + _v1.z * sin;
-  const rotatedZ = -_v1.x * sin + _v1.z * cos;
-
-  const x = state.size / 2 + rotatedX * scale;
-  const y = state.size / 2 + rotatedZ * scale;
-
-  return { x, y };
+  return worldToPlayerCenteredMap(
+    worldPosition.x,
+    worldPosition.z,
+    state.playerPosition.x,
+    state.playerPosition.z,
+    state.playerRotation,
+    state.size,
+    scale,
+  );
 }

@@ -28,6 +28,7 @@ import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
 import type { IVehicle } from '../../systems/vehicle/IVehicle';
+import { worldToNorthUpMap, factionMarkerFill } from './MapProjection';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -457,8 +458,7 @@ export class FullMapSystem implements GameSystem {
       ctx.beginPath();
       for (let i = 0; i < path.points.length; i++) {
         const point = path.points[i];
-        const x = (this.worldSize / 2 - point.x) * scale;
-        const y = (this.worldSize / 2 - point.z) * scale;
+        const { x, y } = this.worldToMap(point.x, point.z);
         if (i === 0) {
           ctx.moveTo(x, y);
         } else {
@@ -474,11 +474,7 @@ export class FullMapSystem implements GameSystem {
   private drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone): void {
     const scale = MAP_SIZE / this.worldSize;
     const zoomLevel = this.inputHandler.getZoomLevel();
-    // Fixed north-up map with flipped axes:
-    // Flip X axis: -X is right (west on right side)
-    // Flip Y axis: OPFOR (+Z) at top
-    const x = (this.worldSize / 2 - zone.position.x) * scale;
-    const y = (this.worldSize / 2 - zone.position.z) * scale;
+    const { x, y } = this.worldToMap(zone.position.x, zone.position.z);
 
     // Ensure minimum zone visibility with adaptive scaling
     const baseRadius = zone.radius * scale * 2;
@@ -548,17 +544,12 @@ export class FullMapSystem implements GameSystem {
   private drawCombatants(ctx: CanvasRenderingContext2D): void {
     if (!this.combatantSystem) return;
 
-    const scale = MAP_SIZE / this.worldSize;
     const combatants = this.combatantSystem.getAllCombatants();
 
     combatants.forEach(combatant => {
       if (combatant.state === 'dead') return;
 
-      // Fixed north-up map with flipped axes:
-      // Flip X axis: -X is right (west on right side)
-      // Flip Y axis: OPFOR (+Z) at top
-      const x = (this.worldSize / 2 - combatant.position.x) * scale;
-      const y = (this.worldSize / 2 - combatant.position.z) * scale;
+      const { x, y } = this.worldToMap(combatant.position.x, combatant.position.z);
 
       const isPlayerSquad = combatant.squadId === this.playerSquadId;
       ctx.fillStyle = isPlayerSquad
@@ -574,7 +565,6 @@ export class FullMapSystem implements GameSystem {
     if (this.mapIntelPolicy.showStrategicAgentsOnFullMap !== true) return;
     if (!this.warSimulator || !this.warSimulator.isEnabled()) return;
 
-    const scale = MAP_SIZE / this.worldSize;
     const data = this.warSimulator.getAgentPositionsForMap();
 
     for (let i = 0; i < data.length; i += 4) {
@@ -587,8 +577,7 @@ export class FullMapSystem implements GameSystem {
       if (tier === 0) continue;
 
       // Flipped axes matching drawCombatants
-      const x = (this.worldSize / 2 - ax) * scale;
-      const y = (this.worldSize / 2 - az) * scale;
+      const { x, y } = this.worldToMap(ax, az);
 
       const alpha = tier === 1 ? 0.4 : 0.2;
       ctx.fillStyle = faction === 0
@@ -601,12 +590,7 @@ export class FullMapSystem implements GameSystem {
   }
 
   private drawPlayer(ctx: CanvasRenderingContext2D): void {
-    const scale = MAP_SIZE / this.worldSize;
-    // Fixed north-up map with flipped axes:
-    // Flip X axis: -X is right (west on right side)
-    // Flip Y axis: OPFOR (+Z) at top
-    const x = (this.worldSize / 2 - this.playerPosition.x) * scale;
-    const y = (this.worldSize / 2 - this.playerPosition.z) * scale;
+    const { x, y } = this.worldToMap(this.playerPosition.x, this.playerPosition.z);
 
     // Player position
     ctx.fillStyle = COMBATANT_COLORS.PLAYER;
@@ -703,11 +687,8 @@ export class FullMapSystem implements GameSystem {
   private drawCommandMarker(ctx: CanvasRenderingContext2D): void {
     if (!this.commandPosition) return;
 
-    const scale = MAP_SIZE / this.worldSize;
-    const playerX = (this.worldSize / 2 - this.playerPosition.x) * scale;
-    const playerY = (this.worldSize / 2 - this.playerPosition.z) * scale;
-    const x = (this.worldSize / 2 - this.commandPosition.x) * scale;
-    const y = (this.worldSize / 2 - this.commandPosition.z) * scale;
+    const { x: playerX, y: playerY } = this.worldToMap(this.playerPosition.x, this.playerPosition.z);
+    const { x, y } = this.worldToMap(this.commandPosition.x, this.commandPosition.z);
 
     ctx.strokeStyle = 'rgba(125, 154, 90, 0.4)';
     ctx.lineWidth = Math.max(1.5, 0.8 / this.inputHandler.getZoomLevel());
@@ -743,14 +724,12 @@ export class FullMapSystem implements GameSystem {
   private drawHelipadMarkers(ctx: CanvasRenderingContext2D): void {
     if (this.helipadMarkers.length === 0) return;
 
-    const scale = MAP_SIZE / this.worldSize;
     const zoomLevel = this.inputHandler.getZoomLevel();
     const iconSize = Math.max(10, 12 / zoomLevel);
 
     for (const marker of this.helipadMarkers) {
       // Same flipped-axis coordinate system as zones/combatants
-      const x = (this.worldSize / 2 - marker.position.x) * scale;
-      const y = (this.worldSize / 2 - marker.position.z) * scale;
+      const { x, y } = this.worldToMap(marker.position.x, marker.position.z);
 
       // Circle background
       ctx.fillStyle = 'rgba(79, 107, 58, 0.4)';
@@ -775,19 +754,15 @@ export class FullMapSystem implements GameSystem {
   private drawVehicleMarkers(ctx: CanvasRenderingContext2D): void {
     if (this.vehicleMarkers.length === 0) return;
 
-    const scale = MAP_SIZE / this.worldSize;
     const zoomLevel = this.inputHandler.getZoomLevel();
     const iconSize = Math.max(8, 10 / zoomLevel);
     const strokeWidth = Math.max(1.25, 0.9 / zoomLevel);
 
     for (const marker of this.vehicleMarkers) {
       // Same flipped-axis coordinate system as zones/combatants/helipads
-      const x = (this.worldSize / 2 - marker.worldPos.x) * scale;
-      const y = (this.worldSize / 2 - marker.worldPos.z) * scale;
+      const { x, y } = this.worldToMap(marker.worldPos.x, marker.worldPos.z);
 
-      const factionFill = isBlufor(marker.faction)
-        ? 'rgba(79, 107, 58, 0.5)'
-        : 'rgba(158, 59, 46, 0.5)';
+      const factionFill = factionMarkerFill(marker.faction, 0.5);
       const factionStroke = 'rgba(43, 38, 32, 0.85)';
 
       ctx.fillStyle = factionFill;
@@ -865,6 +840,14 @@ export class FullMapSystem implements GameSystem {
   private invalidateTerrainBackdrop(): void {
     this.terrainBackdrop = null;
     this.terrainBackdropWorldSize = 0;
+  }
+
+  /**
+   * North-up flipped-axis projection shared with the deploy/respawn map.
+   * -X is screen-right, +Z is screen-up (OPFOR at top).
+   */
+  private worldToMap(worldX: number, worldZ: number): { x: number; y: number } {
+    return worldToNorthUpMap(worldX, worldZ, this.worldSize, MAP_SIZE);
   }
 
   private sampleWorldX(normalizedX: number): number {

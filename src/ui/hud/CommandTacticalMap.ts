@@ -6,6 +6,7 @@ import type { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { getAlliance } from '../../systems/combat/types';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { renderMinimap } from '../minimap/MinimapRenderer';
+import { worldToPlayerCenteredMap, playerCenteredMapToWorld } from '../map/MapProjection';
 import type { InputMode } from '../../systems/input/InputManager';
 
 export interface CommandTacticalMapRenderState {
@@ -216,17 +217,20 @@ export class CommandTacticalMap {
 
   private minimapToWorld(localX: number, localY: number): THREE.Vector3 {
     const scale = this.size / this.renderState.worldSize;
-    const rotatedX = (localX - this.size / 2) / scale;
-    const rotatedZ = (localY - this.size / 2) / scale;
-    const cos = Math.cos(this.renderState.playerRotation);
-    const sin = Math.sin(this.renderState.playerRotation);
-    const dx = rotatedX * cos - rotatedZ * sin;
-    const dz = rotatedX * sin + rotatedZ * cos;
+    const world = playerCenteredMapToWorld(
+      localX,
+      localY,
+      this.renderState.playerPosition.x,
+      this.renderState.playerPosition.z,
+      this.renderState.playerRotation,
+      this.size,
+      scale,
+    );
 
     return new THREE.Vector3(
-      this.renderState.playerPosition.x + dx,
+      world.x,
       this.renderState.playerPosition.y,
-      this.renderState.playerPosition.z + dz
+      world.z
     );
   }
 
@@ -308,14 +312,15 @@ export class CommandTacticalMap {
     if (!this.cursorWorldPosition) return;
 
     const scale = this.size / this.renderState.worldSize;
-    const dx = this.cursorWorldPosition.x - this.renderState.playerPosition.x;
-    const dz = this.cursorWorldPosition.z - this.renderState.playerPosition.z;
-    const cos = Math.cos(this.renderState.playerRotation);
-    const sin = Math.sin(this.renderState.playerRotation);
-    const rotatedX = dx * cos + dz * sin;
-    const rotatedZ = -dx * sin + dz * cos;
-    const cursorX = this.size / 2 + rotatedX * scale;
-    const cursorY = this.size / 2 + rotatedZ * scale;
+    const { x: cursorX, y: cursorY } = worldToPlayerCenteredMap(
+      this.cursorWorldPosition.x,
+      this.cursorWorldPosition.z,
+      this.renderState.playerPosition.x,
+      this.renderState.playerPosition.z,
+      this.renderState.playerRotation,
+      this.size,
+      scale,
+    );
 
     this.context.strokeStyle = this.placementArmed
       ? 'rgba(168, 116, 42, 0.92)'

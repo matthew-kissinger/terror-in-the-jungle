@@ -4,6 +4,7 @@
 import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import { Faction, isOpfor } from '../../systems/combat/types';
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
+import { worldToNorthUpMap } from './MapProjection';
 
 export const MAP_SIZE = 800;
 
@@ -55,14 +56,10 @@ export function getZoneColor(zone: CaptureZone, alpha: number, isSpawnable: bool
 }
 
 /**
- * Converts world coordinates to map canvas coordinates
+ * Converts world coordinates to map canvas coordinates (north-up flipped axes).
  */
 export function worldToMap(worldX: number, worldZ: number): { x: number; y: number } {
-  const scale = MAP_SIZE / WORLD_SIZE;
-  return {
-    x: (WORLD_SIZE / 2 - worldX) * scale,
-    y: (WORLD_SIZE / 2 - worldZ) * scale
-  };
+  return worldToNorthUpMap(worldX, worldZ, WORLD_SIZE, MAP_SIZE);
 }
 
 /**
