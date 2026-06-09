@@ -66,6 +66,7 @@ describe('GamepadManager', () => {
   let mgr: GamepadManager;
 
   beforeEach(() => {
+    localStorage.removeItem('terror-in-the-jungle-settings');
     localStorage.removeItem('pixelart-sandbox-settings');
     (SettingsManager as any).instance = null;
     gamepads = [null, null, null, null];

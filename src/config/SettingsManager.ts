@@ -26,7 +26,10 @@ interface GameSettings {
 type SettingsKey = keyof GameSettings;
 type SettingsListener = (key: SettingsKey, value: GameSettings[SettingsKey]) => void;
 
-const STORAGE_KEY = 'pixelart-sandbox-settings';
+const STORAGE_KEY = 'terror-in-the-jungle-settings';
+// Pre-rename project name. Read once on first load, then migrated to STORAGE_KEY
+// so returning players keep their settings. Never written to.
+const LEGACY_STORAGE_KEY = 'pixelart-sandbox-settings';
 
 const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 70,
@@ -118,6 +121,17 @@ export class SettingsManager {
         if (raw) {
           const parsed = JSON.parse(raw);
           return { ...DEFAULT_SETTINGS, ...parsed };
+        }
+
+        // No value under the current key: migrate from the pre-rename key if
+        // present, so returning players don't silently lose their settings.
+        const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacyRaw) {
+          const parsed = JSON.parse(legacyRaw);
+          const merged = { ...DEFAULT_SETTINGS, ...parsed };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+          return merged;
         }
       }
     } catch {
