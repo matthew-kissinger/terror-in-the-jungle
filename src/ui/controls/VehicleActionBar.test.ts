@@ -295,7 +295,7 @@ describe('VehicleActionBar', () => {
     const hint = document.querySelector('[aria-label="vehicle controls hint"]') as HTMLDivElement;
     expect(hint).toBeTruthy();
     expect(hint.style.display).not.toBe('none');
-    expect(hint.textContent).toContain('enter');
+    expect(hint.textContent).toContain('F board / exit / seat');
   });
 
   it('hides the controls hint for flight contexts', () => {

@@ -5,8 +5,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PlayerInput } from './PlayerInput';
 import { SettingsManager } from '../../config/SettingsManager';
 import { WeaponSlot } from './InventoryManager';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 
 const gamepadManagerInstances = vi.hoisted(() => [] as any[]);
+const touchControlsInstances = vi.hoisted(() => [] as any[]);
 
 // Mock browser globals for Node.js environment
 if (typeof document === 'undefined') {
@@ -80,9 +82,21 @@ vi.mock('../../utils/DeviceDetector', () => ({
 }));
 
 // Mock TouchControls to avoid DOM side effects
-vi.mock('../../ui/controls/TouchControls', () => ({
-  TouchControls: vi.fn()
-}));
+vi.mock('../../ui/controls/TouchControls', () => {
+  const MockTouchControls = vi.fn(function (this: any) {
+    this.setCallbacks = vi.fn();
+    this.look = { setSensitivity: vi.fn() };
+    this.rallyPointButton = { showButton: vi.fn() };
+    this.helicopterCyclic = { getCyclicInput: vi.fn().mockReturnValue({ pitch: 0, roll: 0 }) };
+    this.show = vi.fn();
+    this.hide = vi.fn();
+    this.consumeLookDelta = vi.fn().mockReturnValue({ x: 0, y: 0 });
+    this.getMovementVector = vi.fn().mockReturnValue({ x: 0, z: 0 });
+    this.dispose = vi.fn();
+    touchControlsInstances.push(this);
+  });
+  return { TouchControls: MockTouchControls };
+});
 
 // Mock GamepadManager to avoid window.addEventListener in non-jsdom environment
 vi.mock('../../ui/controls/GamepadManager', () => {
@@ -106,6 +120,7 @@ describe('PlayerInput', () => {
   let removeEventListenerSpy: any;
 
   beforeEach(() => {
+    vi.mocked(shouldUseTouchControls).mockReturnValue(false);
     addEventListenerSpy = vi.spyOn(document, 'addEventListener');
     removeEventListenerSpy = vi.spyOn(document, 'removeEventListener');
     playerInput = new PlayerInput();
@@ -115,6 +130,7 @@ describe('PlayerInput', () => {
     playerInput.dispose();
     vi.restoreAllMocks();
     gamepadManagerInstances.length = 0;
+    touchControlsInstances.length = 0;
   });
 
   describe('Initialization', () => {
@@ -473,6 +489,21 @@ describe('PlayerInput', () => {
 
         expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
         expect(onEnterExitVehicle).toHaveBeenCalledTimes(1);
+      });
+
+      it('mirrors the boarding priority on touch vehicle interaction', () => {
+        playerInput.dispose();
+        vi.mocked(shouldUseTouchControls).mockReturnValue(true);
+        playerInput = new PlayerInput();
+        const onBoardNearestVehicle = vi.fn(() => true);
+        const onEnterExitVehicle = vi.fn();
+        playerInput.setCallbacks({ onBoardNearestVehicle, onEnterExitVehicle });
+        const touchCallbacks = touchControlsInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+        touchCallbacks.onEnterExitVehicle();
+
+        expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
+        expect(onEnterExitVehicle).not.toHaveBeenCalled();
       });
     });
 

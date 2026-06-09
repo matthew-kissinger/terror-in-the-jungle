@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (land-vehicle proof refresh: Open Frontier and A Shau M151/M48 board, drive, use elevated third-person camera, exit cleanly, and suppress first-person weapon overlay with zero renderable weapon meshes while seated; basin-water proof remains current; prior SOL-1 live proof remains recorded separately; owner visual acceptance remains open)
+Last verified: 2026-06-08 (land-vehicle proof refresh: Open Frontier and A Shau M151/M48 board, drive, use elevated third-person camera, exit cleanly, and suppress first-person weapon overlay with zero renderable weapon meshes while seated; ground-vehicle input/UI hints now align on `F board / exit / seat`; basin-water proof remains current; live proof must be refreshed per deployed HEAD; owner visual acceptance remains open)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -57,8 +57,10 @@ infantry-weapon suppression through the vehicle-session/equipment state. The
 proof now fails if any first-person weapon overlay root or mesh remains
 renderable while seated; this replaces the older current-rig-only diagnostic
 that could miss stale rifle overlays in screenshots.
-The previous live Cloudflare Pages proof passes for `df97e707`:
-`artifacts/perf/2026-06-07T21-16-21-306Z/projekt-143-live-release-proof/release-proof.json`.
+Production proof is deploy-scoped, not inherited from older release artifacts:
+after every pushed `master` deploy, run `npm run check:live-release` and trust
+that gate's live manifest SHA, CI/deploy run, Pages/R2/SW headers, and browser
+smoke for the current deployed HEAD.
 Owner playtest remains open for subjective terrain/water/vehicle feel.
 
 `master` is the WebGPU + TSL renderer branch and has been since the KONVEYER
@@ -158,7 +160,9 @@ as of this refresh:
   the equipment layer while any vehicle/craft session is active. Screenshots in
   `artifacts/playtests/land-vehicle-runtime-proof/` are the current visual proof
   for "no rifle visible while seated"; older screenshots that show a
-  lower-right rifle are stale/rejected evidence.
+  lower-right rifle are stale/rejected evidence. Ground-vehicle controls are
+  now documented and surfaced as `F board / exit / seat`, `W/S drive`,
+  `A/D turn`, and `LMB fire` for armed vehicles.
 - WebGPU `WebGPURenderer` + TSL node materials across terrain, vegetation
   impostors, NPC impostors, and the TSL atmosphere dome, with automatic WebGL2
   fallback for non-WebGPU environments.

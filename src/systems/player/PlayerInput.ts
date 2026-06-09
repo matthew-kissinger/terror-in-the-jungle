@@ -151,7 +151,12 @@ export class PlayerInput {
           }
         },
         onScoreboardTap: () => callbacks.onScoreboardTap?.(),
-        onEnterExitVehicle: () => (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.(),
+        onEnterExitVehicle: () => {
+          const consumed = this.consumeVehicleBoardOrSeatSwap(callbacks);
+          if (!consumed) {
+            (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.();
+          }
+        },
         onSandbagRotateLeft: () => callbacks.onSandbagRotateLeft?.(),
         onSandbagRotateRight: () => callbacks.onSandbagRotateRight?.(),
         onRallyPointPlace: () => callbacks.onRallyPointPlace?.(),
@@ -173,8 +178,7 @@ export class PlayerInput {
         onInteract: () => {
           // Mirror F-key priority: swap a swappable active vehicle first,
           // then board/exit nearest, then fall back to the existing handler.
-          const consumed = (callbacks.onVehicleSeatSwap?.() ?? false)
-            || (callbacks.onBoardNearestVehicle?.() ?? false);
+          const consumed = this.consumeVehicleBoardOrSeatSwap(callbacks);
           if (!consumed) {
             (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.();
           }
@@ -355,6 +359,11 @@ export class PlayerInput {
     const currentIndex = this.weaponCycleSlots.indexOf(this.currentWeaponMode);
     const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % this.weaponCycleSlots.length : 0;
     return this.weaponCycleSlots[nextIndex] ?? WeaponSlot.PRIMARY;
+  }
+
+  private consumeVehicleBoardOrSeatSwap(callbacks: InputCallbacks = this.callbacks): boolean {
+    return (callbacks.onVehicleSeatSwap?.() ?? false)
+      || (callbacks.onBoardNearestVehicle?.() ?? false);
   }
 
   /**
@@ -567,8 +576,7 @@ export class PlayerInput {
     // board/exit the nearest vehicle and fall back to mortar fire when not consumed.
     // (Skipped entirely while seated in a flight vehicle.)
     if (!this.isInFlightVehicle() && event.code === 'KeyF') {
-      const consumed = (this.callbacks.onVehicleSeatSwap?.() ?? false)
-        || (this.callbacks.onBoardNearestVehicle?.() ?? false);
+      const consumed = this.consumeVehicleBoardOrSeatSwap();
       if (!consumed) {
         this.callbacks.onMortarFire?.();
       }
@@ -707,13 +715,13 @@ Right Ctrl - Toggle Flight Mouse Control
 W/S - Plane throttle while boarded
 A/D - Plane runway steering / rudder
 Arrow Keys - Plane pitch and bank intent
-E - Enter/Exit Vehicle
+E - Flight vehicle enter/exit
 M - Toggle Mortar Camera View (when mortar deployed)
 1-6 - Switch Weapons
 R - Reload
 G - Throw Grenade / Deploy Squad (in helicopter)
 B - Deploy/Undeploy Mortar
-F - Fire Mortar (when deployed)
+F - Board/exit/swap ground vehicles; fire mortar when not boarding
 Z - Squad Commands
 Shift+1..5 - Squad Quick Commands
 TAB - Scoreboard

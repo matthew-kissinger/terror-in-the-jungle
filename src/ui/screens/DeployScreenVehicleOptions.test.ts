@@ -18,7 +18,7 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { DeployScreen } from './DeployScreen';
 import { Faction } from '../../systems/combat/types';
-import type { VehicleDeployOption } from '../loadout/LoadoutTypes';
+import { TANK_CONTROLS_HINT, type VehicleDeployOption } from '../loadout/LoadoutTypes';
 
 function tankOption(overrides: Partial<VehicleDeployOption> = {}): VehicleDeployOption {
   return {
@@ -28,7 +28,7 @@ function tankOption(overrides: Partial<VehicleDeployOption> = {}): VehicleDeploy
     description: 'Crew the M48.',
     position: { x: 10, z: -20 },
     faction: Faction.US,
-    controlsHint: 'E enter / exit  -  F board / swap  -  W/S drive  -  A/D turn  -  LMB fire',
+    controlsHint: TANK_CONTROLS_HINT,
     ...overrides,
   };
 }
@@ -88,13 +88,13 @@ describe('DeployScreen crew-a-vehicle section', () => {
 
   it('surfaces the controls hint on the choice', () => {
     screen.updateVehicleDeployOptions([
-      tankOption({ controlsHint: 'E enter / exit  -  F board / swap  -  W/S drive  -  A/D turn  -  LMB fire' }),
+      tankOption({ controlsHint: TANK_CONTROLS_HINT }),
     ]);
 
     const choice = document.querySelector('[aria-label="ARMOR M48 Patton"]')!;
-    expect(choice.textContent).toContain('E enter');
+    expect(choice.textContent).toContain('F board / exit / seat');
     expect(choice.textContent).toContain('W/S drive');
-    expect(choice.textContent).toContain('board / swap');
+    expect(choice.textContent).toContain('LMB fire');
   });
 
   it('marks the selected vehicle as pressed for accessibility', () => {
