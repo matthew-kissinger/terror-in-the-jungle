@@ -86,7 +86,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // Additional offenders surfaced at Phase 0 install. Not in original god-module top-15
   // but already over the new limit. Each gets a queued split target.
   'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work', loc: 704, methods: 47 },
-  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 781, methods: 44 },
+  // Snapshot raised 781 → 810 (ci-gate-consolidation, 2026-06-09): the sibling
+  // Phase-1 task `real-mouse-input` (040337e7) added 29 LOC of real
+  // held-mouse-button state to PlayerInput AFTER the budget-ratchet snapshot
+  // (#339) was measured, so the gate was red on master before it could be made
+  // blocking. Growth is intentional and already merged; the file's R3 split
+  // target is unchanged. Within-cycle ratchet re-base, not a new carry-over.
+  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 810, methods: 44 },
   'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy', loc: 764, methods: 0 },
   'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling', loc: 1120, methods: 0 },
