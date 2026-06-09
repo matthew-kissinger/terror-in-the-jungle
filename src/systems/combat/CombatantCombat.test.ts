@@ -14,6 +14,10 @@ import { AudioManager } from '../audio/AudioManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { TerrainSystem } from '../terrain/TerrainSystem';
+import {
+  resetCombatFireRaycastBudget,
+  tryConsumeCombatFireRaycast,
+} from './ai/CombatFireRaycastBudget';
 
 const mockTracerPool: TracerPool = { spawn: vi.fn() } as any;
 const mockMuzzleFlashSystem: MuzzleFlashSystem = { spawnNPC: vi.fn() } as any;
@@ -179,6 +183,53 @@ describe('CombatantCombat', () => {
       combatantCombat.updateCombat(combatant, 0.016, new THREE.Vector3(0, 0, 0), new Map(), new Map());
 
       expect(combatant.gunCore.registerShot).not.toHaveBeenCalled();
+    });
+
+    // fire-gate-ordering: a shot the terrain gate aborts must not consume the
+    // fire-rate clock or accumulate bloom. registerShot() is the single mutation
+    // that advances both, so an aborted attempt must leave it uncalled and the
+    // next unblocked attempt must fire immediately.
+    it('a terrain-blocked attempt does not register a shot, and the next clear attempt fires', () => {
+      const shooter = createMockCombatant('shooter-1', Faction.NVA, 100, CombatantState.ENGAGING, new THREE.Vector3(0, 0, 0));
+      const target = createMockCombatant('target-1', Faction.US, 100, CombatantState.ENGAGING, new THREE.Vector3(40, 0, 0));
+      shooter.target = target;
+      // Keep the shooter at burst index 0 across both attempts so neither is
+      // gated by burst control.
+      shooter.skillProfile.burstLength = 10;
+
+      // First attempt: a ridge between shooter and target blocks the shot.
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValueOnce({ hit: true, distance: 5 });
+
+      combatantCombat.updateCombat(shooter, 0.016, new THREE.Vector3(0, 0, 0), new Map(), new Map());
+
+      // Blocked: no fire-rate / bloom mutation, no burst advance.
+      expect(shooter.gunCore.registerShot).not.toHaveBeenCalled();
+      expect(shooter.currentBurst).toBe(0);
+
+      // Second attempt: terrain is clear (default mock returns no hit).
+      combatantCombat.updateCombat(shooter, 0.016, new THREE.Vector3(0, 0, 0), new Map(), new Map());
+
+      expect(shooter.gunCore.registerShot).toHaveBeenCalledTimes(1);
+      expect(shooter.currentBurst).toBe(1);
+    });
+
+    it('an over-budget attempt does not register a shot (no cooldown/bloom theft)', () => {
+      const shooter = createMockCombatant('shooter-2', Faction.NVA, 100, CombatantState.ENGAGING, new THREE.Vector3(0, 0, 0));
+      const target = createMockCombatant('target-2', Faction.US, 100, CombatantState.ENGAGING, new THREE.Vector3(40, 0, 0));
+      shooter.target = target;
+      shooter.skillProfile.burstLength = 10;
+
+      // Exhaust the per-frame raycast budget so this combatant's terrain check is denied.
+      resetCombatFireRaycastBudget();
+      for (let i = 0; i < 64; i++) tryConsumeCombatFireRaycast();
+      try {
+        combatantCombat.updateCombat(shooter, 0.016, new THREE.Vector3(0, 0, 0), new Map(), new Map());
+
+        expect(shooter.gunCore.registerShot).not.toHaveBeenCalled();
+        expect(shooter.currentBurst).toBe(0);
+      } finally {
+        resetCombatFireRaycastBudget();
+      }
     });
 
     it('tolerates a dead combatant or missing target without throwing', () => {

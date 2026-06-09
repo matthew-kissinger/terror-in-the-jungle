@@ -187,7 +187,47 @@ export class CombatantCombat {
       return;
     }
 
-    // Fire shot
+    // Resolve the shot target up front so the gates below can run BEFORE any
+    // fire-rate / bloom state mutates. An aborted shot (terrain-blocked or over
+    // the raycast budget) must leave the fire-rate clock and bloom untouched —
+    // otherwise NPCs behind cover or over budget fire slower and less accurately
+    // than designed once the gates kick in.
+    const targetPos = isPlayerTarget(combatant.target) ? playerPosition : combatant.target?.position;
+
+    // Check terrain obstruction before firing - only for high/medium LOD combatants.
+    // This gate runs ahead of registerShot() so a blocked or over-budget shot
+    // does not consume cooldown or accumulate bloom.
+    if (targetPos && this.terrainSystem && combatant.simLane &&
+        (combatant.simLane === 'high' || combatant.simLane === 'medium')) {
+      const distance = combatant.position.distanceTo(targetPos);
+
+      // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
+      if (!tryConsumeCombatFireRaycast()) {
+        return;
+      }
+
+      // Use module-level scratch vectors instead of pool allocation
+      copyNpcMuzzlePosition(this._muzzlePos, combatant.position);
+
+      if (isPlayerTarget(combatant.target)) {
+        copyPlayerCenterMassPosition(this._targetFirePos, targetPos);
+      } else {
+        copyNpcCenterMassPosition(this._targetFirePos, targetPos);
+      }
+
+      this._fireDirection.subVectors(this._targetFirePos, this._muzzlePos).normalize();
+
+      const terrainHit = this.terrainSystem.raycastTerrain(this._muzzlePos, this._fireDirection, distance);
+
+      if (terrainHit.hit && terrainHit.distance! < distance - 0.5) {
+        // Terrain blocks shot, don't fire — no fire-rate or bloom mutation.
+        return;
+      }
+    }
+
+    // Gates passed: commit the shot. registerShot() advances the fire-rate clock
+    // and accumulates bloom, so it (and the burst / lastShotTime mutations) must
+    // run only once we know the shot actually happens.
     combatant.gunCore.registerShot();
     combatant.currentBurst++;
     combatant.lastShotTime = performance.now();
@@ -213,7 +253,6 @@ export class CombatantCombat {
     }
 
     // Add distance-based accuracy degradation
-    const targetPos = isPlayerTarget(combatant.target) ? playerPosition : combatant.target?.position;
     if (targetPos) {
       const distance = combatant.position.distanceTo(targetPos);
 
@@ -221,35 +260,6 @@ export class CombatantCombat {
       if (distance > 30) {
         const distancePenalty = Math.pow(1.5, (distance - 30) / 20); // Exponential growth
         accuracyMultiplier *= Math.min(distancePenalty, 8.0); // Cap at 8x inaccuracy
-      }
-
-      // Check terrain obstruction before firing - only for high/medium LOD combatants
-      if (this.terrainSystem && combatant.simLane &&
-          (combatant.simLane === 'high' || combatant.simLane === 'medium')) {
-        // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
-        if (!tryConsumeCombatFireRaycast()) {
-          combatant.currentBurst--; // Undo burst increment
-          return;
-        }
-
-        // Use module-level scratch vectors instead of pool allocation
-        copyNpcMuzzlePosition(this._muzzlePos, combatant.position);
-
-        if (isPlayerTarget(combatant.target)) {
-          copyPlayerCenterMassPosition(this._targetFirePos, targetPos);
-        } else {
-          copyNpcCenterMassPosition(this._targetFirePos, targetPos);
-        }
-
-        this._fireDirection.subVectors(this._targetFirePos, this._muzzlePos).normalize();
-
-        const terrainHit = this.terrainSystem.raycastTerrain(this._muzzlePos, this._fireDirection, distance);
-
-        if (terrainHit.hit && terrainHit.distance! < distance - 0.5) {
-          // Terrain blocks shot, don't fire
-          combatant.currentBurst--; // Undo burst increment
-          return;
-        }
       }
     }
 
