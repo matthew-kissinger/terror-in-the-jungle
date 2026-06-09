@@ -9,8 +9,16 @@
  *   2. Max public methods per class: 50.
  *
  * Existing god modules are explicitly grandfathered with a Phase 3 round
- * note. New files cannot be added to the grandfather list without an
- * orchestrator note in `docs/CARRY_OVERS.md`.
+ * note AND a measured snapshot. New files cannot be added to the
+ * grandfather list without an orchestrator note in `docs/CARRY_OVERS.md`.
+ *
+ * Ratchet rule (budget-ratchet, 2026-06-09): each grandfathered entry
+ * records the LOC / method-count snapshot at the moment it was admitted to
+ * the list. A grandfathered file may shrink freely, but if it grows PAST
+ * its snapshot the lint FAILs — the grandfather is a one-way ratchet, not a
+ * blank cheque. To lock in a shrink, re-run with `--print`, read the
+ * measured values, and lower the snapshot. The base 700 LOC / 50 method
+ * limits are unchanged for non-grandfathered files.
  *
  * Method counting is a deliberately simple regex — it's not a TS AST
  * walker. False positives are rare in this codebase (no method-shape
@@ -18,7 +26,7 @@
  * on `\bclass\b` first).
  *
  * Usage:
- *   npx tsx scripts/lint-source-budget.ts            # default mode (fail on hard breaches outside grandfather)
+ *   npx tsx scripts/lint-source-budget.ts            # default mode (fail on hard breaches + ratchet regressions)
  *   npx tsx scripts/lint-source-budget.ts --strict   # fail on warns too
  *   npx tsx scripts/lint-source-budget.ts --print    # print all offenders, no exit code change
  */
@@ -29,47 +37,69 @@ import { join, relative } from 'node:path';
 const repoRoot = process.cwd();
 const SRC_ROOT = join(repoRoot, 'src');
 
-const MAX_LOC = 700;
-const MAX_METHODS = 50;
+export const MAX_LOC = 700;
+export const MAX_METHODS = 50;
 
-// Grandfather list — current god modules. Each gets a Phase 3 round target.
+export interface GrandfatherEntry {
+  round: string;
+  reason: string;
+  /**
+   * Measured LOC snapshot. The ratchet ceiling for this file is
+   * `max(MAX_LOC, loc)`: a file already over budget may shrink below its
+   * snapshot freely but may not grow above it; a file under MAX_LOC simply
+   * stays bound by the normal MAX_LOC limit.
+   */
+  loc: number;
+  /** Measured first-class public-method snapshot — same `max(MAX_METHODS, methods)` rule. */
+  methods: number;
+}
+
+// Grandfather list — current god modules. Each gets a Phase 3 round target
+// plus a measured snapshot the ratchet enforces. Snapshots measured against
+// the current tree on 2026-06-09 (budget-ratchet): the old free-text `reason`
+// carried stale counts (e.g. CombatantRenderer "219 methods" when it now has
+// 78), which understated real progress and could not catch backsliding. The
+// `loc` / `methods` fields are the live snapshot — a grandfathered file may
+// drop below them but may not climb above them. (Values are the true measured
+// counts, not rounded; dimensions already under the base limit keep the base
+// limit as their effective ceiling.)
 // Format: posix-style relative path (forward slashes).
-const GRANDFATHER: Record<string, { round: string; reason: string }> = {
-  'src/systems/combat/CombatantRenderer.ts': { round: 'P3R1', reason: '1825 LOC, 219 methods → split into 5 files' },
-  'src/systems/combat/CombatantMovement.ts': { round: 'P3R2', reason: '1179 LOC, 158 methods → split into 4 files' },
-  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: '1014 LOC, 177 methods → split into 5 files' },
-  'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: '995 LOC → split into 4 files' },
-  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: '957 LOC → split into 4 files' },
-  'src/systems/vehicle/airframe/Airframe.ts': { round: 'P3R4', reason: '948 LOC, 0 tests → add tests + slim split' },
-  'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: '892 LOC → split into 3 files' },
-  'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: '802 LOC → split into 3 files' },
-  'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: '789 LOC → split into 3 files' },
-  'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: '788 LOC → split into 2 files' },
-  'src/systems/combat/ai/AIStateEngage.ts': { round: 'P3R2', reason: '758 LOC; cover-search extraction P4F2' },
-  'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: '757 LOC → split into 3 files' },
-  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: '740 LOC → split into 4 files' },
-  'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '665 LOC, 0 direct tests → split + tests' },
+const GRANDFATHER: Record<string, GrandfatherEntry> = {
+  'src/systems/combat/CombatantRenderer.ts': { round: 'P3R1', reason: 'split into 5 files', loc: 2191, methods: 78 },
+  'src/systems/combat/CombatantMovement.ts': { round: 'P3R2', reason: 'split into 4 files', loc: 1701, methods: 63 },
+  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1217, methods: 111 },
+  'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: 'split into 4 files', loc: 995, methods: 41 },
+  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files', loc: 1155, methods: 48 },
+  'src/systems/vehicle/airframe/Airframe.ts': { round: 'P3R4', reason: '0 tests → add tests + slim split', loc: 985, methods: 22 },
+  'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: 'split into 3 files', loc: 903, methods: 32 },
+  'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: 'split into 3 files', loc: 860, methods: 34 },
+  'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files', loc: 789, methods: 24 },
+  'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: 'split into 2 files', loc: 788, methods: 36 },
+  'src/systems/combat/ai/AIStateEngage.ts': { round: 'P3R2', reason: 'cover-search extraction P4F2', loc: 1005, methods: 30 },
+  'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'split into 3 files', loc: 935, methods: 44 },
+  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files', loc: 757, methods: 83 },
+  'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests', loc: 752, methods: 43 },
   // ZoneManager removed from grandfather list 2026-05-09 (Phase 2): fan-in
   // dropped from 52 → ≤20 via IZoneQuery seam (Batches A+B+C of
   // cycle-2026-05-10-zone-manager-decoupling). File is well under both LOC and
   // method limits; no further grandfathering needed.
   // Additional offenders surfaced at Phase 0 install. Not in original god-module top-15
   // but already over the new limit. Each gets a queued split target.
-  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: '704 LOC → split during AVIATSIYA-3 helicopter parity work' },
-  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: '727 LOC → split alongside PlayerController in R3' },
-  'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: '53 methods → use beginRejoiningSquad helper, see docs/CARRY_OVERS.md' },
-  'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: '728 LOC → split into placement / compile policy' },
-  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: '1039 LOC → split shader uniforms / atlas / impostor sampling' },
-  'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: '753 LOC, 60 methods → split into TerrainCore + TerrainStreamingFacade' },
-  'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: '823 LOC → split alongside HUDSystem in R3' },
-  'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: '742 LOC → split alongside HUDSystem in R3' },
-  'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '763 LOC, 0 tests → split into terrain config + biome config + spawn data' },
+  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work', loc: 704, methods: 47 },
+  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 781, methods: 44 },
+  'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
+  'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy', loc: 764, methods: 0 },
+  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling', loc: 1120, methods: 0 },
+  'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade', loc: 876, methods: 69 },
+  'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 861, methods: 24 },
+  'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 882, methods: 42 },
+  'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '0 tests → split into terrain config + biome config + spawn data', loc: 756, methods: 0 },
   // Pre-existing budget debt surfaced by validate:fast (CI runs `lint` but not
-  // `lint:budget`): grew to ~713 LOC during the 2026-06-03 deploy-loadout cycle
-  // (UX-3 faction-availability chips + the selectable-ammo 4th loadout slot).
+  // `lint:budget`): grew during the 2026-06-03 deploy-loadout cycle (UX-3
+  // faction-availability chips + the selectable-ammo 4th loadout slot).
   // Not relicense-related; queued for a presentation/loadout-panel split.
-  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: '~713 LOC after the deploy-loadout cycle (faction chips + selectable-ammo slot) → split the loadout panel out of the screen facade' },
-  'src/core/SystemManager.ts': { round: 'P2-P3', reason: '60 methods → decompose system wiring + lifecycle into helpers' },
+  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade', loc: 1038, methods: 68 },
+  'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers', loc: 355, methods: 61 },
   // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
   // HosekWilkieSkyBackend grew through the KONVEYER campaign and is tracked as
   // split-debt in docs/CARRY_OVERS.md (konveyer-large-file-splits). The
@@ -77,7 +107,7 @@ const GRANDFATHER: Record<string, { round: string; reason: string }> = {
   // (water-system-file-split, 2026-05-16): WaterSystem.ts is now an
   // orchestrator that delegates to water/HydrologyRiverSurface,
   // water/WaterSurfaceSampler, and water/WaterSurfaceBinding.
-  'src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts': { round: 'P4-KONVEYER-followup', reason: '807 LOC; grew through slices 13-15 (DataTexture, refresh-counter, idempotent setCloudCoverage) + sky-refresh-investigate fix → split atmosphere LUT + sun model + cloud composition during the TSL fragment-shader sky port' },
+  'src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts': { round: 'P4-KONVEYER-followup', reason: 'split atmosphere LUT + sun model + cloud composition during the TSL fragment-shader sky port', loc: 1069, methods: 0 },
 };
 
 const SKIP = (rel: string): boolean =>
@@ -89,13 +119,23 @@ const SKIP = (rel: string): boolean =>
   rel.includes('\\test-utils\\') ||
   rel.endsWith('.d.ts');
 
-interface Finding {
+export interface Finding {
   level: 'warn' | 'fail';
   rel: string;
   rule: 'loc' | 'methods';
   value: number;
+  /**
+   * The ceiling the value was compared against. For non-grandfathered files
+   * this is the base limit (MAX_LOC / MAX_METHODS). For grandfathered files
+   * it is the ratchet ceiling `max(base, snapshot)`.
+   */
   limit: number;
   grandfathered: boolean;
+  /**
+   * `true` when this finding is a ratchet regression — a grandfathered file
+   * grew past its recorded snapshot. These are FAILs, not WARNs.
+   */
+  ratchetRegression: boolean;
 }
 
 function walk(dir: string): string[] {
@@ -168,29 +208,53 @@ function locOf(source: string): number {
   return body.length;
 }
 
+/**
+ * Classify one measured dimension against the budget rules. Pure: takes the
+ * grandfather entry (or null) directly so it can be unit-tested without any
+ * filesystem access.
+ *
+ * Rules:
+ *   - Not grandfathered: FAIL when value > baseLimit (the original hard rule).
+ *   - Grandfathered, value > snapshot:     FAIL (ratchet regression — the file
+ *     grew past the floor it was admitted at).
+ *   - Grandfathered, baseLimit < value ≤ snapshot: WARN (known debt, no
+ *     regression — shrinking is encouraged).
+ *   - value ≤ baseLimit: no finding (a grandfathered file that has shrunk
+ *     under the base limit is simply healthy on this dimension).
+ */
+export function classifyDimension(
+  rel: string,
+  rule: 'loc' | 'methods',
+  value: number,
+  baseLimit: number,
+  entry: GrandfatherEntry | null,
+): Finding | null {
+  const grandfathered = entry !== null;
+  if (value <= baseLimit) {
+    // Within the base budget. No finding even if grandfathered — a grandfather
+    // entry whose dimension dropped under the limit no longer needs flagging.
+    return null;
+  }
+  if (!grandfathered) {
+    return { level: 'fail', rel, rule, value, limit: baseLimit, grandfathered: false, ratchetRegression: false };
+  }
+  const snapshot = rule === 'loc' ? entry.loc : entry.methods;
+  const ceiling = Math.max(baseLimit, snapshot);
+  if (value > ceiling) {
+    // Grew past the recorded snapshot — the ratchet only goes one way.
+    return { level: 'fail', rel, rule, value, limit: ceiling, grandfathered: true, ratchetRegression: true };
+  }
+  // Over base limit but at or under snapshot: known, accepted debt.
+  return { level: 'warn', rel, rule, value, limit: baseLimit, grandfathered: true, ratchetRegression: false };
+}
+
 function classify(rel: string, loc: number, methods: number): Finding[] {
   const findings: Finding[] = [];
-  const grandfathered = Boolean(GRANDFATHER[rel.replace(/\\/g, '/')]);
-  if (loc > MAX_LOC) {
-    findings.push({
-      level: grandfathered ? 'warn' : 'fail',
-      rel,
-      rule: 'loc',
-      value: loc,
-      limit: MAX_LOC,
-      grandfathered,
-    });
-  }
-  if (methods > MAX_METHODS) {
-    findings.push({
-      level: grandfathered ? 'warn' : 'fail',
-      rel,
-      rule: 'methods',
-      value: methods,
-      limit: MAX_METHODS,
-      grandfathered,
-    });
-  }
+  const entry = GRANDFATHER[rel.replace(/\\/g, '/')] ?? null;
+  const locFinding = classifyDimension(rel, 'loc', loc, MAX_LOC, entry);
+  if (locFinding) findings.push(locFinding);
+  const methodsFinding = classifyDimension(rel, 'methods', methods, MAX_METHODS, entry);
+  if (methodsFinding) findings.push(methodsFinding);
   return findings;
 }
 
@@ -218,10 +282,23 @@ function main(): void {
   if (printOnly || all.length > 0) {
     for (const f of all) {
       const tag = f.level.toUpperCase();
-      const gf = f.grandfathered ? ' [grandfathered]' : '';
+      const gf = f.ratchetRegression
+        ? ' [grandfathered: GREW PAST SNAPSHOT]'
+        : f.grandfathered
+          ? ' [grandfathered]'
+          : '';
       const ruleLabel = f.rule === 'loc' ? 'LOC' : 'methods';
       console.log(`[${tag}] ${f.rel} (${ruleLabel}): ${f.value} > ${f.limit}${gf}`);
     }
+  }
+
+  const ratchetRegressions = fails.filter((f) => f.ratchetRegression);
+  if (ratchetRegressions.length > 0) {
+    console.error(
+      `\n[lint-source-budget] ${ratchetRegressions.length} grandfathered file(s) grew past their snapshot. ` +
+        `Grandfather is a one-way ratchet: shrink the file, or — if the growth is intentional and approved — ` +
+        `raise its snapshot in scripts/lint-source-budget.ts with an orchestrator note in docs/CARRY_OVERS.md.`,
+    );
   }
 
   console.log(
@@ -234,4 +311,14 @@ function main(): void {
   if (strict && warns.length > 0) process.exit(1);
 }
 
-main();
+// Run CLI behavior only when invoked directly, not when imported by tests.
+// `process.argv[1]` is the script path under tsx; compare normalized basenames.
+const invokedDirectly =
+  typeof process !== 'undefined' &&
+  Array.isArray(process.argv) &&
+  typeof process.argv[1] === 'string' &&
+  /lint-source-budget\.ts$/.test(process.argv[1].replace(/\\/g, '/'));
+
+if (invokedDirectly) {
+  main();
+}
