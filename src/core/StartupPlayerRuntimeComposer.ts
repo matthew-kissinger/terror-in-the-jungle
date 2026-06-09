@@ -6,6 +6,14 @@ import { IGameRenderer } from '../types/SystemInterfaces';
 import type { SystemKeyToType } from './SystemRegistry';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import { PlayerVehicleAdapterFactory } from '../systems/vehicle/PlayerVehicleAdapterFactory';
+import type { PlayerVehicleAdapter } from '../systems/vehicle/PlayerVehicleAdapter';
+import { TankPlayerAdapter } from '../systems/vehicle/TankPlayerAdapter';
+import { EmplacementPlayerAdapter } from '../systems/vehicle/EmplacementPlayerAdapter';
+import { TankCannonProjectileSystem } from '../systems/combat/projectiles/TankCannonProjectile';
+import type { M2HBEmplacementSystem } from '../systems/combat/weapons/M2HBEmplacement';
+import type { CombatantSystem } from '../systems/combat/CombatantSystem';
+import type { ITerrainRuntime } from '../types/SystemInterfaces';
+import { Logger } from '../utils/Logger';
 import type { GroundVehicleProximityChecker } from '../systems/vehicle/GroundVehicleProximityChecker';
 import type {
   IVehicleMarkerQuery,
@@ -30,6 +38,7 @@ type StartupPlayerRuntimeRefs = Pick<
   | 'hudSystem'
   | 'inventoryManager'
   | 'loadoutService'
+  | 'm2hbEmplacementSystem'
   | 'minimapSystem'
   | 'mortarSystem'
   | 'playerController'
@@ -61,6 +70,7 @@ interface StartupPlayerRuntimeGroups {
     | 'hudSystem'
     | 'inventoryManager'
     | 'loadoutService'
+    | 'm2hbEmplacementSystem'
     | 'mortarSystem'
     | 'playerController'
     | 'playerHealthSystem'
@@ -112,6 +122,14 @@ interface StartupPlayerRuntimeGroups {
 interface StartupPlayerRuntimeOptions {
   camera: THREE.PerspectiveCamera;
   renderer?: IGameRenderer;
+  /**
+   * Live scene. Needed so the boarding factory can construct the shared
+   * `TankCannonProjectileSystem` (its pooled projectile meshes are added to
+   * the scene). Optional so older composer-test doubles that omit it keep
+   * working — the cannon wire is skipped when absent (same posture as the
+   * other guarded wires here).
+   */
+  scene?: THREE.Scene;
 }
 
 export function createStartupPlayerRuntimeGroups(
@@ -132,6 +150,7 @@ export function createStartupPlayerRuntimeGroups(
       hudSystem: refs.hudSystem,
       inventoryManager: refs.inventoryManager,
       loadoutService: refs.loadoutService,
+      m2hbEmplacementSystem: refs.m2hbEmplacementSystem,
       mortarSystem: refs.mortarSystem,
       playerController: refs.playerController,
       playerHealthSystem: refs.playerHealthSystem,
@@ -206,6 +225,7 @@ function wirePlayerRuntime(
     hudSystem,
     inventoryManager,
     loadoutService,
+    m2hbEmplacementSystem,
     mortarSystem,
     playerController,
     playerHealthSystem,
@@ -253,6 +273,15 @@ function wirePlayerRuntime(
       vehicleManager,
       hudSystem,
       gameRenderer: options.renderer,
+      // tank-cannon-wiring (Phase 2): the boarding factory is the real
+      // board-time hook, so the seated-weapon systems that live outside the
+      // adapter's construction surface get wired here. Without these the
+      // player tank cannon + M2HB emplacement never fire on LMB (zero prod
+      // callers of setCannonSystem / attachPlayerAdapter before this).
+      scene: options.scene,
+      combatantSystem,
+      terrainSystem,
+      m2hbEmplacementSystem,
     });
     if (factory) {
       playerController.setPlayerVehicleAdapterFactory(factory);
@@ -487,9 +516,15 @@ function createPlayerVehicleAdapterFactory(args: {
   vehicleManager: ConstructorParameters<typeof PlayerVehicleAdapterFactory>[0]['vehicleManager'];
   hudSystem?: ConstructorParameters<typeof PlayerVehicleAdapterFactory>[0]['hudSystem'];
   gameRenderer?: IGameRenderer;
+  scene?: THREE.Scene;
+  combatantSystem?: CombatantSystem;
+  terrainSystem?: ITerrainRuntime;
+  m2hbEmplacementSystem?: M2HBEmplacementSystem;
 }): PlayerVehicleAdapterFactory | null {
   const internals = args.playerController.getBoardingFactoryInternals?.();
   if (!internals) return null;
+
+  const { onSessionEnter, onSessionExit } = buildSeatedWeaponLifecycle(args);
 
   // Lazy proximity-checker proxy: the real checker is created
   // inside SystemUpdater's Vehicles tick and pushed onto the
@@ -519,5 +554,81 @@ function createPlayerVehicleAdapterFactory(args: {
     hudSystem: args.hudSystem,
     gameRenderer: args.gameRenderer,
     setPosition: internals.setPosition,
+    onSessionEnter,
+    onSessionExit,
   });
+}
+
+/**
+ * Build the board-time / dismount-time seated-weapon lifecycle hooks
+ * (tank-cannon-wiring, Phase 2). On board:
+ *   - a player M48 gunner gets the shared `TankCannonProjectileSystem` bound
+ *     via `setCannonSystem`, plus a per-frame stepper so launched rounds arc
+ *     and impact (the system needs `update(dt, terrainHeightAt)` ticked);
+ *   - a player M2HB gunner gets the `EmplacementPlayerAdapter` registered on
+ *     the M2HB system's binding via `attachPlayerAdapter`, so the already-
+ *     ticked `M2HBEmplacementSystem.update` polls its fire requests.
+ * On dismount both are detached so a stale binding can't keep firing.
+ *
+ * The cannon system is constructed once and shared across every player tank
+ * session (single-player, one crewed tank at a time). When `scene` /
+ * `combatantSystem` are absent (composer-test doubles), the cannon wire is a
+ * silent no-op; the M2HB wire still works since it needs neither.
+ */
+function buildSeatedWeaponLifecycle(args: {
+  scene?: THREE.Scene;
+  combatantSystem?: CombatantSystem;
+  terrainSystem?: ITerrainRuntime;
+  m2hbEmplacementSystem?: M2HBEmplacementSystem;
+}): {
+  onSessionEnter: (adapter: PlayerVehicleAdapter, vehicleId: string) => void;
+  onSessionExit: (adapter: PlayerVehicleAdapter, vehicleId: string) => void;
+} {
+  const { scene, combatantSystem, terrainSystem, m2hbEmplacementSystem } = args;
+
+  // Lazily construct the shared cannon system on first tank board so a session
+  // that never touches a tank pays nothing. Requires scene + combatantSystem
+  // (its explosion pool + radial-damage handler live there).
+  let cannon: TankCannonProjectileSystem | null = null;
+  const ensureCannon = (): TankCannonProjectileSystem | null => {
+    if (cannon) return cannon;
+    if (!scene || !combatantSystem) return null;
+    cannon = new TankCannonProjectileSystem(
+      scene,
+      combatantSystem.explosionEffectsPool,
+      combatantSystem,
+    );
+    Logger.info('vehicle', 'Player tank cannon system constructed (tank-cannon-wiring)');
+    return cannon;
+  };
+
+  const onSessionEnter = (adapter: PlayerVehicleAdapter, vehicleId: string): void => {
+    if (adapter instanceof TankPlayerAdapter) {
+      const system = ensureCannon();
+      if (!system) return;
+      adapter.setCannonSystem(system);
+      // Bake the terrain-height source into the stepper so the adapter can
+      // advance in-flight rounds without owning a terrain reference.
+      adapter.setCannonStepper((dt) => {
+        system.update(dt, (x, z) => terrainSystem?.getEffectiveHeightAt(x, z) ?? 0);
+      });
+      return;
+    }
+    if (adapter instanceof EmplacementPlayerAdapter && m2hbEmplacementSystem) {
+      m2hbEmplacementSystem.attachPlayerAdapter(vehicleId, adapter);
+    }
+  };
+
+  const onSessionExit = (adapter: PlayerVehicleAdapter, vehicleId: string): void => {
+    if (adapter instanceof TankPlayerAdapter) {
+      adapter.setCannonSystem(null);
+      adapter.setCannonStepper(null);
+      return;
+    }
+    if (adapter instanceof EmplacementPlayerAdapter && m2hbEmplacementSystem) {
+      m2hbEmplacementSystem.detachPlayerAdapter(vehicleId, adapter);
+    }
+  };
+
+  return { onSessionEnter, onSessionExit };
 }

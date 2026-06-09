@@ -54,6 +54,24 @@ export interface PlayerVehicleAdapterFactoryDeps {
    * setter. Split B wires this.
    */
   setPosition?: (position: THREE.Vector3, reason: string) => void;
+  /**
+   * Optional board-time hook fired after a successful `enterVehicle`, with
+   * the freshly-registered adapter + the boarded vehicle id. The composer
+   * uses this to attach weapon systems that live outside the adapter's
+   * construction surface — e.g. binding the player tank cannon
+   * (`TankPlayerAdapter.setCannonSystem`) or registering the player M2HB
+   * gunner adapter (`M2HBEmplacementSystem.attachPlayerAdapter`). Without it
+   * those weapon systems stay unwired and seated LMB fire is silent.
+   */
+  onSessionEnter?: (adapter: PlayerVehicleAdapter, vehicleId: string) => void;
+  /**
+   * Optional exit-time hook fired after a successful `exitVehicle`, with the
+   * adapter that was just torn down + the vehicle id it released. Mirror of
+   * `onSessionEnter`: the composer detaches the weapon system it attached on
+   * board so a dismounted tank/emplacement can't keep firing through a stale
+   * binding.
+   */
+  onSessionExit?: (adapter: PlayerVehicleAdapter, vehicleId: string) => void;
 }
 
 /**
@@ -291,6 +309,11 @@ export class PlayerVehicleAdapterFactory {
       vehicle.exitVehicle('player');
       return false;
     }
+    // Board-time composer hook: attach weapon systems that live outside the
+    // adapter's construction surface (player tank cannon, M2HB gunner
+    // adapter). Fires only on a fully-committed session so a refused entry
+    // never leaves a dangling weapon binding.
+    this.deps.onSessionEnter?.(adapter, vehicle.vehicleId);
     return true;
   }
 
@@ -305,6 +328,10 @@ export class PlayerVehicleAdapterFactory {
     if (!this.deps.vehicleSessionController.isInVehicle()) return false;
 
     const vehicleId = this.deps.vehicleSessionController.getVehicleId();
+    // Capture the active adapter BEFORE exitVehicle clears the session so the
+    // exit hook can detach whatever the enter hook attached to it.
+    const exitingAdapter = this.deps.vehicleSessionController.getActiveAdapter();
+
     const ctx = this.buildTransitionContext(
       this.deps.playerState.position.clone(),
       vehicleId ?? undefined,
@@ -317,6 +344,9 @@ export class PlayerVehicleAdapterFactory {
       reason: 'input',
     });
 
+    if (result.exited && exitingAdapter && vehicleId) {
+      this.deps.onSessionExit?.(exitingAdapter, vehicleId);
+    }
     return result.exited;
   }
 

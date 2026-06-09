@@ -108,6 +108,23 @@ export class M2HBEmplacementSystem implements GameSystem {
     binding.playerAdapter = adapter;
   }
 
+  /**
+   * Drop the player adapter from a binding on dismount. Symmetric with
+   * `attachPlayerAdapter` so the operational composer can detach the gunner
+   * adapter the moment the player leaves the seat — otherwise a stale
+   * adapter reference keeps the binding's fire path live after dismount.
+   * Only clears when the supplied adapter is the one currently bound, so an
+   * out-of-order detach (or an NPC re-occupying the seat) can't blow away a
+   * fresh binding. Idempotent: a no-op when the id is unknown or already
+   * detached.
+   */
+  detachPlayerAdapter(vehicleId: string, adapter?: EmplacementPlayerAdapter): void {
+    const binding = this.bindings.get(vehicleId);
+    if (!binding) return;
+    if (adapter && binding.playerAdapter !== adapter) return;
+    binding.playerAdapter = null;
+  }
+
   unregisterBinding(vehicleId: string): void { this.bindings.delete(vehicleId); }
 
   getBindingCount(): number { return this.bindings.size; }

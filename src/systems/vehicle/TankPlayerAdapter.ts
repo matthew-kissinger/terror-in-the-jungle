@@ -181,6 +181,12 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   private cannon: ITankCannonLauncher | null = null;
   private clock: () => number = () => performance.now();
   private lastShotMs = Number.NEGATIVE_INFINITY;
+  // Per-frame projectile stepper. The shared `TankCannonProjectileSystem`
+  // needs `update(dt, terrainHeightAt)` ticked so launched rounds arc + impact.
+  // The composer binds a closure with the terrain-height source baked in so
+  // the adapter advances in-flight shells each frame the player is crewing the
+  // tank (the normal fire → flight → impact window). Null = no stepper bound.
+  private cannonStep: ((deltaTime: number) => void) | null = null;
 
   constructor(model: Tank) {
     this.model = model;
@@ -196,6 +202,17 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   setCannonSystem(cannon: ITankCannonLauncher | null, clock?: () => number): void {
     this.cannon = cannon;
     if (clock) this.clock = clock;
+  }
+
+  /**
+   * Bind the per-frame stepper that advances the shared cannon system's
+   * in-flight projectiles (gravity arc + ground-impact detection). The
+   * composer wires a closure that calls `TankCannonProjectileSystem.update`
+   * with the live terrain-height source; the adapter calls it once per frame
+   * while mounted. Pass `null` to detach on dismount.
+   */
+  setCannonStepper(step: ((deltaTime: number) => void) | null): void {
+    this.cannonStep = step;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -274,6 +291,12 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
 
   update(ctx: VehicleUpdateContext): void {
     if (!this.mounted) return;
+
+    // Advance any in-flight cannon rounds first so a shell fired last frame
+    // arcs + impacts regardless of which station the player is crewing this
+    // frame (a gunner can swap to the driver hatch with a round still in
+    // flight).
+    this.cannonStep?.(ctx.deltaTime);
 
     if (this.crewSeat === 'gunner') {
       this.updateGunner(ctx);
