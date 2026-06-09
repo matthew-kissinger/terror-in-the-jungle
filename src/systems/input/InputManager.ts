@@ -54,6 +54,14 @@ export class InputManager extends PlayerInput {
     return super.isKeyPressed(key);
   }
 
+  override isMouseButtonPressed(button: number): boolean {
+    // Gate fire intent on gameplay context, same as held keys: a held mouse
+    // button must not register as fire while a map/menu/modal overlay owns
+    // input. Vehicle gunner adapters poll this while seated (gameplay context).
+    if (!this.contextManager.isGameplay()) return false;
+    return super.isMouseButtonPressed(button);
+  }
+
   setInputContext(context: InputContext): void {
     this.contextManager.setContext(context);
   }

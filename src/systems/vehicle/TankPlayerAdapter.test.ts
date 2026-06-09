@@ -86,6 +86,7 @@ function createTransitionContext(
       setFlightVehicleMode: vi.fn(),
       setInputContext: vi.fn(),
       isKeyPressed: vi.fn(() => false),
+      isMouseButtonPressed: vi.fn(() => false),
       getMouseMovement: vi.fn(() => ({ x: 0, y: 0 })),
       clearMouseMovement: vi.fn(),
       getIsPointerLocked: vi.fn(() => false),

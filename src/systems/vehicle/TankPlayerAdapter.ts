@@ -525,19 +525,10 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   }
 
   private readFireInput(input: PlayerInput): void {
-    let fire = false;
-    const anyInput = input as unknown as {
-      isMouseButtonPressed?: (b: number) => boolean;
-      getMouseButton?: (b: number) => boolean;
-    };
-    if (typeof anyInput.isMouseButtonPressed === 'function') {
-      fire = anyInput.isMouseButtonPressed(0) === true;
-    } else if (typeof anyInput.getMouseButton === 'function') {
-      fire = anyInput.getMouseButton(0) === true;
-    }
-    if (!fire && typeof input.isKeyPressed === 'function') {
-      fire = input.isKeyPressed('space');
-    }
+    // Left mouse button (held) fires the cannon; Space is the keyboard
+    // fallback. PlayerInput tracks real held-button state, so this latches
+    // a fire request for any frame the trigger is down.
+    const fire = input.isMouseButtonPressed(0) || input.isKeyPressed('space');
     if (fire) this.fireRequested = true;
   }
 
