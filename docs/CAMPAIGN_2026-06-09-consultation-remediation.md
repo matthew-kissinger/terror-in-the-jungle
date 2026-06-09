@@ -6,13 +6,16 @@
 > **Posture:** attended (NOT autonomous-loop — these cycles touch combat/terrain/vehicle
 > hot paths; owner wants eyes on perf deltas between phases)
 > **Concurrency cap:** 5
-> **Status:** Phase 4 open (`cycle-2026-06-09-terrain-fidelity-and-worker-safety`)
+> **Status:** Phase 5 open (`cycle-2026-06-09-deploy-weight-reduction`)
 >
 > **Progress:** ✅ 1 weapon-input-and-gate-hardening (4/4: #337 #338 #339 #340) ·
 > ✅ 2 vehicle-occupancy-truth (5/5: #341 #342 #343 #344 #345, live proof 11/11 PASS) ·
-> ✅ 3 combat-death-and-alliance (6/6: #346-#351 incl. R2 body-persistence split;
-> exit gate PASS — combat120 p99 50.6→~31ms vs Phase 2 close; closed 2026-06-09) ·
-> ▶ 4 terrain-fidelity-and-worker-safety · ⬜ 5 deploy-weight-reduction
+> ✅ 3 combat-death-and-alliance (6/6: #346-#351; exit gate PASS — combat120 p99
+> 50.6→~31ms vs Phase 2 close) ·
+> ✅ 4 terrain-fidelity-and-worker-safety (4/4: #352-#355; stall-tail premise
+> CONFIRMED + fixed — contour flips ~9x down, stall-warning storm gone at the
+> mid-phase checkpoint; closed 2026-06-09) ·
+> ▶ 5 deploy-weight-reduction (dist baseline at open: 110.2 MB)
 
 Source: 2026-06-09 full-codebase consultation review. Each phase is one cycle.
 **Phase barriers are hard:** a phase's exit gate (CI green + reviewer APPROVE on all

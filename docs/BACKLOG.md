@@ -103,6 +103,38 @@ a dedup guard (single-call contract — add comment or originalId dedup); watch
 raycast-budget denial rate in playtest (blocked NPCs now re-poll the terrain gate).
 Briefs: `docs/tasks/archive/cycle-2026-06-09-combat-death-and-alliance/`.
 
+## Recently Completed (cycle-2026-06-09-terrain-fidelity-and-worker-safety)
+
+Phase 4 of [CAMPAIGN_2026-06-09-consultation-remediation](CAMPAIGN_2026-06-09-consultation-remediation.md).
+4/4 merged, all terrain-nav APPROVE-WITH-NOTES, fence untouched:
+bvh-rebuild-double-buffer #352 (front/back MeshSlab; LOS reads a consistent
+snapshot, never hybrid rows; ~87KB), terrain-worker-safety #353 (dispose/onerror
+reject pendingTasks, 60s bake timeout, real task queue, demBufferCache evicted on
+provider swap — 21MB/worker leak), gameplay-heightmap-resolution #354 (**the
+stall-tail bet, premise CONFIRMED**: gameplay queries read the 512-wide GPU grid
+at ~42m/sample; now a 1024 CPU-only grid baked from the source DEM —
+steep-cell contour flips 0.74%→0.08% (~9x), mean |Δh| 1.12→0.34m, +3MB CPU,
+0 GPU; DEM_COVERAGE_METERS=21136 verified correct, "drift" was a red herring),
+navmesh-coverage-ashau #355 (full-map A Shau tiled prebake, 18.5MB
+`public/data/navmesh/a_shau_valley.bin`, worker-offloaded tiled gen; perimeter
+band beyond the old anchor window now paths instead of beelining).
+**Mid-phase checkpoint:** combat120 post-heightmap-fix — avg 24.0→20.9ms, max
+63.5→46.6ms, p99 flat (~32ms), and the terrain-stall warning storm is GONE
+(0 stall recoveries vs 28-suppressed at Phase 2 close; maxStuckSec 0.3, 0 route
+resets) → no further solver tuning dispatched; `combat-movement-stall-tail`
+retirement assessed at campaign close.
+Reviewer follow-ups (non-blocking): LOS near-field serves an N-frame-stale
+consistent snapshot during rebuild (~150-300ms during fast traverse — note in
+MOVEMENT_NAV_CHECKIN if rediscovered); future real-BVH wiring must
+computeBoundsTree on the back slab pre-swap; add an end-to-end dispose/mode-
+switch race test (primitives covered); a-shau navmesh .bin is immutable-cached
+under a fixed filename — re-bakes need a cache-bust; add an L2 test for the
+syncCpuHeightsToGpu round-trip; proposed split: lift the GPU surface grid to
+1024 for CPU↔render coherence (max 18m visual mismatch on sharp ridges,
+mean 0.86m — owner-walk item). NOTE: navmesh crowd was re-enabled 2026-05-18
+(steered direction) — older "crowd disabled" notes are stale.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-terrain-fidelity-and-worker-safety/`.
+
 ## Recently Completed Archive
 
 Detailed recently-completed cycle retrospectives moved to

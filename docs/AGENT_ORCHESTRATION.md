@@ -209,37 +209,40 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** `cycle-2026-06-09-terrain-fidelity-and-worker-safety` — Phase 4 of
-  the consultation-remediation campaign. The heightmap-resolution bet (A Shau
-  gameplay queries ~42m/sample off a 9m DEM → C0-discontinuous slope → the
-  combat-movement-stall-tail root), terrain worker lifecycle hazards, BVH
-  rebuild consistency, and A Shau tiled navmesh coverage. terrain-nav-reviewer
-  gates every PR. Mid-phase checkpoint after gameplay-heightmap-resolution
-  merges: re-run perf-capture combat120 + perf-analyst, re-evaluate whether
-  combat-movement-stall-tail is retired before any further solver tuning.
-- **Previous:** Phase 3 `cycle-2026-06-09-combat-death-and-alliance` closed
-  2026-06-09 — 6/6 merged (#346-#351), exit gate PASS (combat120 p99
-  50.6→~31ms vs Phase 2 close). See BACKLOG "Recently Completed".
-- **Next:** Phase 5 `cycle-2026-06-09-deploy-weight-reduction` per the campaign
-  manifest (auto-advance on Phase 4 exit gate).
+- **Cycle:** `cycle-2026-06-09-deploy-weight-reduction` — Phase 5 (final) of
+  the consultation-remediation campaign. Mostly deletion in disjoint areas:
+  prod mockup routes, unreachable water-era code, verified orphan modules,
+  the legacy localStorage settings key, and the adapter/map-renderer dedups
+  that waited for Phases 2/4 to stabilize their targets. Deletion tasks may
+  exceed the 400-net rule per the runbook's retired-code exception.
+- **Previous:** Phase 4 `cycle-2026-06-09-terrain-fidelity-and-worker-safety`
+  closed 2026-06-09 — 4/4 merged (#352-#355), stall-tail premise confirmed +
+  fixed, mid-phase checkpoint showed the stall-warning storm gone. See
+  BACKLOG "Recently Completed".
+- **Next:** campaign close — final summary, carry-over reconciliation,
+  combat-movement-stall-tail retirement assessment, owner playtest sweep
+  handoff (PLAYTEST_PENDING has one row per phase 2-5).
 
 ### Tasks (DAG)
 
 | slug | brief | deps | reviewer |
 |---|---|---|---|
-| gameplay-heightmap-resolution | [docs/tasks/gameplay-heightmap-resolution.md](tasks/gameplay-heightmap-resolution.md) | (root; size L, highest uncertainty) | terrain-nav |
-| terrain-worker-safety | [docs/tasks/terrain-worker-safety.md](tasks/terrain-worker-safety.md) | (root) | terrain-nav |
-| bvh-rebuild-double-buffer | [docs/tasks/bvh-rebuild-double-buffer.md](tasks/bvh-rebuild-double-buffer.md) | (root) | terrain-nav |
-| navmesh-coverage-ashau | [docs/tasks/navmesh-coverage-ashau.md](tasks/navmesh-coverage-ashau.md) | gameplay-heightmap-resolution | terrain-nav |
+| prune-prod-mockups | [docs/tasks/prune-prod-mockups.md](tasks/prune-prod-mockups.md) | (root; deletion) | — |
+| purge-water-remnants | [docs/tasks/purge-water-remnants.md](tasks/purge-water-remnants.md) | (root; deletion) | — |
+| delete-orphan-modules | [docs/tasks/delete-orphan-modules.md](tasks/delete-orphan-modules.md) | (root; deletion) | — |
+| settings-key-migration | [docs/tasks/settings-key-migration.md](tasks/settings-key-migration.md) | (root) | — |
+| dedup-map-renderers | [docs/tasks/dedup-map-renderers.md](tasks/dedup-map-renderers.md) | (root) | — |
+| dedup-vehicle-adapters | [docs/tasks/dedup-vehicle-adapters.md](tasks/dedup-vehicle-adapters.md) | delete-orphan-modules (surviving adapter set must be known) | — |
 
-Round 1: gameplay-heightmap-resolution, terrain-worker-safety,
-bvh-rebuild-double-buffer (3 parallel).
-Mid-phase checkpoint (orchestrator action) after heightmap merges.
-Round 2: navmesh-coverage-ashau.
+Round 1: prune-prod-mockups, purge-water-remnants, delete-orphan-modules,
+settings-key-migration, dedup-map-renderers (5 parallel — at cap).
+Round 2: dedup-vehicle-adapters (after delete-orphan-modules merges).
+Merge note: prune-prod-mockups and delete-orphan-modules both edit
+package.json knip.ignore — serialize their merges (second rebases).
 
-**Phase 4 exit gate:** NPC stuck-on-slope rate measurably down in a scripted
-A Shau scenario; no startup wedge under a dispose/mode-switch race;
-terrain-nav-reviewer APPROVE on all four.
+**Phase 5 exit gate:** dist/ size measurably down from the 110.2 MB open
+baseline; `knip:ci` clean with a smaller ignore list; no mockup routes in
+prod; user settings survive the key migration.
 
 ## Dispatch protocol
 
