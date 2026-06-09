@@ -49,7 +49,17 @@
     ],
     "ignore": [
       "scripts/capture-*-shots.ts",
-      "tools/generate-*.mjs"
+      "tools/generate-*.mjs",
+      "scripts/audit-archive/**",
+      "scripts/capture-terrain-foundation-proof.ts",
+      "scripts/check-land-vehicle-runtime.ts",
+      "scripts/mobile-renderer-probe.ts",
+      "scripts/perf-startup-mobile.ts",
+      "scripts/perf-tsl-shader-cost.ts",
+      "scripts/real-device-validation.ts",
+      "public/mockups/**",
+      "src/systems/assets/PixelForgePropCatalog.ts",
+      "src/systems/combat/weapons/NpcM2HBAdapter.ts"
     ],
     "ignoreBinaries": [
       "gh"
@@ -119,6 +129,7 @@
     "test:determinism": "vitest run src/core/SeededRandom.test.ts src/core/ReplayRecorder.test.ts src/core/ReplayPlayer.test.ts",
     "test:quick": "vitest run --reporter=dot",
     "deadcode": "knip",
+    "knip:ci": "knip --include files,dependencies,unlisted,binaries,unresolved --no-config-hints",
     "perf:quick": "npx tsx scripts/perf-capture.ts --headed --duration 30 --warmup 8 --npcs 60",
     "perf:compare": "npx tsx scripts/perf-compare.ts",
     "perf:compare:strict": "npx tsx scripts/perf-compare.ts --fail-on-warn",

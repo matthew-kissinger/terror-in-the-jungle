@@ -21,6 +21,7 @@ on:
       - 'src/**'
       - 'scripts/**'
       - 'public/**'
+      - 'index.html'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.js'
@@ -45,6 +46,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # Full history so the interface-fence gate can diff the whole PR
+          # range (base..HEAD) — not just the last commit — and so check:fence
+          # / lint:budget have origin/master to compare against.
+          fetch-depth: 0
 
       - name: Checkout game field kits
         env:
@@ -65,6 +71,43 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # ── Orchestration-framework enforcement gates (ci-gate-consolidation) ──
+      # These four checks were local-only until 2026-06-09, so the fence /
+      # source-budget / doc-link / dead-code rules the agent-orchestration
+      # framework depends on were unenforced on PRs. They are now BLOCKING:
+      # a PR that touches a fenced interface without `[interface-change]`, grows
+      # a grandfathered file past its snapshot, breaks a doc link, or adds an
+      # orphan module / unlisted dependency fails CI here.
+      - name: Interface-fence gate
+        # Diff the full PR range against origin/master and require the
+        # `[interface-change]` marker in the PR title when the fence file is
+        # touched. On push builds PR_TITLE is empty and the title check is
+        # skipped; the commit-subject marker is still enforced by the script.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [ -n "$PR_TITLE" ]; then
+            npm run check:fence -- --base origin/master --pr-title "$PR_TITLE"
+          else
+            npm run check:fence -- --base origin/master
+          fi
+
+      - name: Source-budget gate
+        run: npm run lint:budget
+
+      - name: Doc-link gate
+        run: npm run lint:docs
+
+      # knip:ci gates the high-signal dead-code categories (unused FILES,
+      # unlisted / unused / unresolved dependencies, missing binaries). The
+      # export-level unused-symbol backlog stays advisory via `npm run deadcode`
+      # (full knip) and shrinks as Phase 5 `delete-orphan-modules` lands; known
+      # orphan files are listed under `knip.ignore` in package.json with that
+      # deferral. Duplicate-export detection is excluded (one intentional
+      # NPC-height alias would false-fail it).
+      - name: Dead-code gate
+        run: npm run knip:ci
 
       - name: Doc-drift gate
         run: npm run check:doc-drift
@@ -277,13 +320,20 @@ jobs:
           fetch-depth: 2
       - name: Path filter
         id: filter
+        # NOTE: the perf job is ADVISORY (raw-metrics only, non-gating). There is
+        # no tracked baseline — perf-baselines.json was permanently removed
+        # 2026-06-02, so the old `perf-baselines\.json` trigger here was dead and
+        # is removed (ci-gate-consolidation). `perf:compare` prints raw
+        # latest-capture numbers and does not gate until STABILIZAT-1
+        # re-establishes a baseline on a quiet machine; see
+        # docs/state/perf-trust.md and docs/CARRY_OVERS.md (STABILIZAT-1).
         run: |
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.sha }}"
           if [ -z "$base" ]; then base="$head^"; fi
           changed=$(git diff --name-only "$base" "$head" 2>/dev/null || git diff --name-only HEAD^ HEAD)
           echo "Changed files:"; echo "$changed"
-          if echo "$changed" | grep -qE '^(src/systems/combat/|src/core/|src/systems/terrain/|scripts/perf-|\.github/workflows/ci\.yml|perf-baselines\.json)'; then
+          if echo "$changed" | grep -qE '^(src/systems/combat/|src/core/|src/systems/terrain/|scripts/perf-|\.github/workflows/ci\.yml)'; then
             echo "hit=true" >> "$GITHUB_OUTPUT"
           else
             echo "hit=false" >> "$GITHUB_OUTPUT"

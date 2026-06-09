@@ -1,6 +1,10 @@
 # Weekly artifact-prune job (Phase 0 retention policy, artifact-gc task).
-# Deletes perf-capture dirs older than 30 days that are not cited in docs and
-# not pinned in perf-baselines.json. See scripts/artifact-prune.ts for rules.
+# Deletes perf-capture dirs older than 30 days that are not cited in docs. See
+# scripts/artifact-prune.ts for rules. (There is no perf-baselines.json pin to
+# honor — that file was permanently removed 2026-06-02; the script's "pinned in
+# perf-baselines.json" clause is now an `if present` no-op. Perf is
+# raw-metrics / non-gating until STABILIZAT-1 re-establishes a baseline. —
+# ci-gate-consolidation 2026-06-09)
 # Manually inspect runs with: gh run list --workflow=artifact-prune.yml
 name: artifact-prune
 
