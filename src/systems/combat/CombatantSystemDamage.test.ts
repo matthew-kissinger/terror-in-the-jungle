@@ -13,11 +13,21 @@ import type { TicketSystem } from '../world/TicketSystem';
 import { GameEventBus } from '../../core/GameEventBus';
 import { Tank } from '../vehicle/Tank';
 import { GroundVehicle } from '../vehicle/GroundVehicle';
+import { spatialGridManager } from './SpatialGridManager';
 
 vi.mock('./KillAssistTracker', () => ({
   KillAssistTracker: {
     trackDamage: vi.fn(),
     processKillAssists: vi.fn(() => new Set<string>()),
+  },
+}));
+
+vi.mock('./SpatialGridManager', () => ({
+  spatialGridManager: {
+    getIsInitialized: vi.fn(() => true),
+    queryRadius: vi.fn(() => [] as string[]),
+    removeEntity: vi.fn(),
+    syncEntity: vi.fn(),
   },
 }));
 
@@ -34,10 +44,16 @@ describe('CombatantSystemDamage', () => {
     combatants = new Map();
     damage = new CombatantSystemDamage(
       combatants,
-      { getSquad: vi.fn(), removeSquadMember: vi.fn() } as unknown as SquadManager,
+      { getSquad: vi.fn(), getAllSquads: () => new Map(), removeSquadMember: vi.fn() } as unknown as SquadManager,
       { queueRespawn: vi.fn() } as unknown as CombatantSpawnManager,
     );
     vi.clearAllMocks();
+    // The explosion route now resolves candidates through the spatial grid.
+    // Return every live combatant id so the in-function distance test still
+    // performs the exact radius filtering these scenarios depend on.
+    (spatialGridManager.queryRadius as unknown as vi.Mock).mockImplementation(
+      () => Array.from(combatants.keys()),
+    );
   });
 
   afterEach(() => {

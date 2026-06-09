@@ -203,4 +203,43 @@ describe('CombatantDamage', () => {
       expect(() => bare.applyDamage(target, 20)).not.toThrow();
     });
   });
+
+  // combat-death-unification: rifle kills must produce the SAME squad state the
+  // explosion path already does — leader promotion + empty-squad deletion.
+  // These assert observable squad outcomes, not the mechanism that produces them.
+  describe('squad bookkeeping on death', () => {
+    it('promotes a surviving member to leader when the squad leader dies', () => {
+      const leader = createMockCombatant('leader-1', Faction.US, 10, CombatantState.IDLE, 'squad-A');
+      const squadA: Squad = {
+        id: 'squad-A',
+        faction: Faction.US,
+        members: ['leader-1', 'member-2', 'member-3'],
+        leaderId: 'leader-1',
+        formation: 'line',
+      };
+      const squads = new Map<string, Squad>([['squad-A', squadA]]);
+
+      combatantDamage.applyDamage(leader, 20, undefined, squads);
+
+      expect(squadA.members).not.toContain('leader-1');
+      expect(squadA.leaderId).not.toBe('leader-1');
+      expect(squadA.members).toContain(squadA.leaderId!);
+    });
+
+    it('deletes the squad when its last member dies', () => {
+      const last = createMockCombatant('last-1', Faction.US, 10, CombatantState.IDLE, 'squad-A');
+      const squadA: Squad = {
+        id: 'squad-A',
+        faction: Faction.US,
+        members: ['last-1'],
+        leaderId: 'last-1',
+        formation: 'line',
+      };
+      const squads = new Map<string, Squad>([['squad-A', squadA]]);
+
+      combatantDamage.applyDamage(last, 20, undefined, squads);
+
+      expect(squads.has('squad-A')).toBe(false);
+    });
+  });
 });

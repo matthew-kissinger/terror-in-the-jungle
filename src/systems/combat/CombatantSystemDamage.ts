@@ -11,6 +11,8 @@ import { KillAssistTracker } from './KillAssistTracker';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 import { GameEventBus } from '../../core/GameEventBus';
+import { handleCombatantDeath } from './CombatantDeathPipeline';
+import { spatialGridManager } from './SpatialGridManager';
 import type { IVehicle } from '../vehicle/IVehicle';
 import { Tank, type TankDamageType } from '../vehicle/Tank';
 
@@ -81,7 +83,14 @@ export class CombatantSystemDamage {
       && import.meta.env.DEV
       && isWorldBuilderFlagActive('oneShotKills');
 
-    this.combatants.forEach(combatant => {
+    // Query the spatial grid for combatants near the blast instead of an O(N)
+    // scan over every combatant. The octree returns a (possibly conservative)
+    // set of in-radius ids; the exact `distance <= radius` test below keeps the
+    // damage falloff identical to the old full scan. (combat-death-unification)
+    const candidateIds = spatialGridManager.queryRadius(center, radius);
+    candidateIds.forEach(id => {
+      const combatant = this.combatants.get(id);
+      if (!combatant) return;
       if (combatant.state === CombatantState.DEAD) return;
       // Friendly-fire exclusion when a shooter faction is provided.
       // Same-alliance combatants are immune to the radial wave.
@@ -139,15 +148,17 @@ export class CombatantSystemDamage {
             this.ticketSystem.onCombatantDeath(combatant.faction);
           }
 
-          // Queue respawn for player squad members
-          if (combatant.squadId) {
-            const squad = this.squadManager.getSquad(combatant.squadId);
-            if (squad?.isPlayerControlled) {
-              Logger.info('Combat', `Player squad member ${combatant.id} will respawn in 5 seconds...`);
-              this.spawnManager.queueRespawn(combatant.squadId, combatant.id);
-            }
-            this.squadManager.removeSquadMember(combatant.squadId, combatant.id);
-          }
+          // Squad bookkeeping (member removal, leader promotion, empty-squad
+          // deletion) + player-squad respawn queueing run through the unified
+          // death pipeline so explosion kills match rifle kills exactly.
+          // (combat-death-unification)
+          handleCombatantDeath(combatant, this.squadManager.getAllSquads(), 'explosion', {
+            isPlayerControlledSquad: (squadId) => !!this.squadManager.getSquad(squadId)?.isPlayerControlled,
+            queueRespawn: (squadId, memberId) => {
+              Logger.info('Combat', `Player squad member ${memberId} will respawn in 5 seconds...`);
+              this.spawnManager.queueRespawn(squadId, memberId);
+            },
+          });
 
           // Track killed combatants for kill feed
           if (wasAlive) {

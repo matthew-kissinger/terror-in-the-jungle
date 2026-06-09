@@ -14,6 +14,7 @@ import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { GameEventBus } from '../../core/GameEventBus';
+import { handleCombatantDeath } from './CombatantDeathPipeline';
 
 /**
  * Handles damage application and death processing for combatants.
@@ -236,16 +237,10 @@ export class CombatantDamage {
       });
     }
 
-    // Update squad
-    if (target.squadId && squads) {
-      const squad = squads.get(target.squadId);
-      if (squad) {
-        const index = squad.members.indexOf(target.id);
-        if (index > -1) {
-          squad.members.splice(index, 1);
-        }
-      }
-    }
+    // Update squad bookkeeping through the unified death pipeline so rifle
+    // kills produce the same squad state as explosion kills: member removal,
+    // leader promotion, and empty-squad deletion. (combat-death-unification)
+    handleCombatantDeath(target, squads, 'rifle');
   }
 
   /**
