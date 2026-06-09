@@ -718,31 +718,6 @@ describe('AtmosphereSystem (fog-tint plumbing)', () => {
     expect(fog.color.getHex()).toBe(0xddaa55);
   });
 
-  it('underwater override snaps fog color to teal regardless of sky state', () => {
-    const system = makeAtmosphereWithBackend(0xff0000);
-    const { renderer, fog } = makeFogStub();
-    system.setRenderer(renderer);
-
-    system.setFogUnderwaterOverride(true);
-    system.update(0.016);
-
-    expect(fog.color.getHex()).toBe(0x003344);
-  });
-
-  it('clearing the underwater override restores the sky-driven fog color', () => {
-    const system = makeAtmosphereWithBackend(0x4488aa);
-    const { renderer, fog } = makeFogStub();
-    system.setRenderer(renderer);
-
-    system.setFogUnderwaterOverride(true);
-    system.update(0.016);
-    expect(fog.color.getHex()).toBe(0x003344);
-
-    system.setFogUnderwaterOverride(false);
-    system.update(0.016);
-    expect(fog.color.getHex()).toBe(0x4488aa);
-  });
-
   it('darken factor dims the fog color without changing hue for grayscale samples', () => {
     const system = makeAtmosphereWithBackend(0x888888);
     const { renderer, fog } = makeFogStub();

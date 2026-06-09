@@ -12,9 +12,8 @@ import type { IGameRenderer } from '../../types/SystemInterfaces';
  * `WeatherAtmosphere.updateAtmosphere` after `atmosphere-fog-tinted-by-sky`.
  *
  * These tests assert the caller-visible contract: storm darkens, clear
- * does not, underwater snaps to override. They do NOT hard-code the
- * exact darken magnitudes (those are tuning constants — see
- * `docs/TESTING.md`).
+ * does not. They do NOT hard-code the exact darken magnitudes (those are
+ * tuning constants — see `docs/TESTING.md`).
  */
 
 function makeRendererStub(): IGameRenderer {
@@ -28,12 +27,10 @@ function makeRendererStub(): IGameRenderer {
 
 function makeFogIntentStub(): FogTintIntentReceiver & {
   setFogDarkenFactor: ReturnType<typeof vi.fn>;
-  setFogUnderwaterOverride: ReturnType<typeof vi.fn>;
   setCloudCoverageIntent: ReturnType<typeof vi.fn>;
 } {
   return {
     setFogDarkenFactor: vi.fn(),
-    setFogUnderwaterOverride: vi.fn(),
     setCloudCoverageIntent: vi.fn(),
   };
 }
@@ -48,29 +45,11 @@ const baseValues = {
 };
 
 describe('WeatherAtmosphere fog-tint forwarding', () => {
-  it('forwards underwater override to the atmosphere intent receiver', () => {
-    const renderer = makeRendererStub();
-    const intent = makeFogIntentStub();
-
-    updateAtmosphere(renderer, true, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
-
-    expect(intent.setFogUnderwaterOverride).toHaveBeenCalledWith(true);
-  });
-
-  it('clears the underwater override when returning to clear air', () => {
-    const renderer = makeRendererStub();
-    const intent = makeFogIntentStub();
-
-    updateAtmosphere(renderer, false, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
-
-    expect(intent.setFogUnderwaterOverride).toHaveBeenCalledWith(false);
-  });
-
   it('forwards a darker-than-clear fog factor during a storm', () => {
     const renderer = makeRendererStub();
     const intent = makeFogIntentStub();
 
-    updateAtmosphere(renderer, false, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, intent);
+    updateAtmosphere(renderer, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, intent);
 
     const darken = intent.setFogDarkenFactor.mock.calls.at(-1)?.[0] as number;
     expect(darken).toBeGreaterThan(0);
@@ -81,7 +60,7 @@ describe('WeatherAtmosphere fog-tint forwarding', () => {
     const renderer = makeRendererStub();
     const intent = makeFogIntentStub();
 
-    updateAtmosphere(renderer, false, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
+    updateAtmosphere(renderer, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
 
     const darken = intent.setFogDarkenFactor.mock.calls.at(-1)?.[0] as number;
     expect(darken).toBe(1.0);
@@ -91,8 +70,8 @@ describe('WeatherAtmosphere fog-tint forwarding', () => {
     const storm = makeFogIntentStub();
     const heavy = makeFogIntentStub();
 
-    updateAtmosphere(makeRendererStub(), false, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, storm);
-    updateAtmosphere(makeRendererStub(), false, WeatherState.HEAVY_RAIN, WeatherState.HEAVY_RAIN, 1, baseValues, false, heavy);
+    updateAtmosphere(makeRendererStub(), WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, storm);
+    updateAtmosphere(makeRendererStub(), WeatherState.HEAVY_RAIN, WeatherState.HEAVY_RAIN, 1, baseValues, false, heavy);
 
     const stormDarken = storm.setFogDarkenFactor.mock.calls.at(-1)?.[0] as number;
     const heavyDarken = heavy.setFogDarkenFactor.mock.calls.at(-1)?.[0] as number;
@@ -104,7 +83,7 @@ describe('WeatherAtmosphere fog-tint forwarding', () => {
     const intent = makeFogIntentStub();
     const initialColor = renderer.fog!.color.getHex();
 
-    updateAtmosphere(renderer, false, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
+    updateAtmosphere(renderer, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
 
     // Fog color unchanged — the atmosphere system will sample the sky
     // horizon instead. This is the seam-killing contract.
@@ -114,14 +93,8 @@ describe('WeatherAtmosphere fog-tint forwarding', () => {
   it('falls back to the legacy direct-write when no intent receiver is wired', () => {
     const renderer = makeRendererStub();
 
-    // Underwater path with no intent receiver: legacy direct-write
-    // stays in place for isolated unit tests and for safety in any
-    // call site we haven't wired yet.
-    updateAtmosphere(renderer, true, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false);
-    expect(renderer.fog!.color.getHex()).toBe(0x003344);
-
     // Clear path with no intent receiver: fog stamped with baseline.
-    updateAtmosphere(renderer, false, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false);
+    updateAtmosphere(renderer, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false);
     expect(renderer.fog!.color.getHex()).toBe(0x5a7a6a);
   });
 });
@@ -131,7 +104,7 @@ describe('WeatherAtmosphere cloud-coverage forwarding', () => {
     const renderer = makeRendererStub();
     const intent = makeFogIntentStub();
 
-    updateAtmosphere(renderer, false, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
+    updateAtmosphere(renderer, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
 
     const last = intent.setCloudCoverageIntent.mock.calls.at(-1);
     expect(last?.[0]).toBe(false);
@@ -141,7 +114,7 @@ describe('WeatherAtmosphere cloud-coverage forwarding', () => {
     const renderer = makeRendererStub();
     const intent = makeFogIntentStub();
 
-    updateAtmosphere(renderer, false, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, intent);
+    updateAtmosphere(renderer, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, intent);
 
     const last = intent.setCloudCoverageIntent.mock.calls.at(-1);
     expect(last?.[0]).toBe(true);
@@ -154,21 +127,11 @@ describe('WeatherAtmosphere cloud-coverage forwarding', () => {
     const storm = makeFogIntentStub();
     const heavy = makeFogIntentStub();
 
-    updateAtmosphere(makeRendererStub(), false, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, storm);
-    updateAtmosphere(makeRendererStub(), false, WeatherState.HEAVY_RAIN, WeatherState.HEAVY_RAIN, 1, baseValues, false, heavy);
+    updateAtmosphere(makeRendererStub(), WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, storm);
+    updateAtmosphere(makeRendererStub(), WeatherState.HEAVY_RAIN, WeatherState.HEAVY_RAIN, 1, baseValues, false, heavy);
 
     const stormTarget = storm.setCloudCoverageIntent.mock.calls.at(-1)?.[1] as number;
     const heavyTarget = heavy.setCloudCoverageIntent.mock.calls.at(-1)?.[1] as number;
     expect(stormTarget).toBeGreaterThan(heavyTarget);
-  });
-
-  it('releases the cloud intent while the camera is submerged', () => {
-    const renderer = makeRendererStub();
-    const intent = makeFogIntentStub();
-
-    updateAtmosphere(renderer, true, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, intent);
-
-    const last = intent.setCloudCoverageIntent.mock.calls.at(-1);
-    expect(last?.[0]).toBe(false);
   });
 });

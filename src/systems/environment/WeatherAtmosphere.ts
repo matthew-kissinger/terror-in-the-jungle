@@ -32,17 +32,13 @@ export interface AtmosphereBaseValues {
  *     NOT overwrite light colors.
  *   lightning flash → briefly boosts intensities and tints fog (handled in
  *     WeatherLightning.ts).
- *   underwater override → hard clamp; forwarded to AtmosphereSystem so it
- *     pins fog to teal regardless of sky.
  *
- * Preserving color mutations only on the underwater path keeps the
- * atmosphere-driven sun/hemisphere palette visible during clear/rain/storm
- * weather while still letting lightning and submersion do their visible
- * overrides.
+ * Keeping color mutations out of the per-state path lets the atmosphere-driven
+ * sun/hemisphere palette stay visible during clear/rain/storm weather while
+ * lightning still does its visible override.
  */
 export interface FogTintIntentReceiver {
   setFogDarkenFactor(factor: number): void;
-  setFogUnderwaterOverride(active: boolean): void;
   /**
    * Weather-driven cloud coverage intent. Mirrors fog darken: STORM /
    * HEAVY_RAIN raise coverage toward overcast, CLEAR releases back to the
@@ -90,7 +86,6 @@ function cloudCoverageForState(state: WeatherState): number {
 
 export function updateAtmosphere(
   renderer: IGameRenderer | undefined,
-  isUnderwater: boolean,
   currentState: WeatherState,
   targetState: WeatherState,
   transitionProgress: number,
@@ -99,35 +94,6 @@ export function updateAtmosphere(
   fogIntent?: FogTintIntentReceiver
 ): void {
   if (!renderer) return;
-
-  if (isUnderwater) {
-    if (renderer.fog) {
-      renderer.fog.density = 0.04;
-    }
-    // Forward the underwater override to the atmosphere system so it
-    // pins `fog.color` to `0x003344` every frame. When no intent
-    // receiver is wired (older call sites / unit tests), fall back to
-    // the legacy direct write so behavior stays unchanged.
-    if (fogIntent) {
-      fogIntent.setFogUnderwaterOverride(true);
-      // Clouds aren't visible under the water surface, so release the
-      // weather coverage override while submerged.
-      fogIntent.setCloudCoverageIntent?.(false, 0);
-    } else if (renderer.fog) {
-      renderer.fog.color.setHex(0x003344);
-    }
-    if (renderer.ambientLight) {
-      renderer.ambientLight.intensity = 0.5;
-      renderer.ambientLight.color.setHex(0x004455);
-    }
-    if (renderer.moonLight) {
-      renderer.moonLight.intensity = 0.0;
-    }
-    if (renderer.hemisphereLight) {
-      renderer.hemisphereLight.intensity = 0.1;
-    }
-    return;
-  }
 
   const currentParams = getWeatherParams(currentState, baseValues);
   const targetParams = getWeatherParams(targetState, baseValues);
@@ -147,7 +113,6 @@ export function updateAtmosphere(
   const cloudCoverage =
     cloudCoverageForState(currentState) * (1 - t) + cloudCoverageForState(targetState) * t;
   if (fogIntent) {
-    fogIntent.setFogUnderwaterOverride(false);
     fogIntent.setFogDarkenFactor(fogDarken);
     // A non-CLEAR state (now or the target) means weather is actively
     // tinting the sky; keep the intent active until we're fully back in

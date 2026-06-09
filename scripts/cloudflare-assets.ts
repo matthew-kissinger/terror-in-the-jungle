@@ -61,21 +61,6 @@ const ASSETS: AssetSource[] = [
       size: 21233664,
     },
   },
-  {
-    id: 'terrain.ashau.rivers',
-    sourcePath: 'public/data/vietnam/a-shau-rivers.json',
-    keyPrefix: 'terrain/a-shau',
-    outputName: 'a-shau-rivers',
-    extension: 'json',
-    contentType: 'application/json',
-    cacheControl: 'public, max-age=31536000, immutable',
-    required: true,
-    pinned: {
-      key: 'terrain/a-shau/a-shau-rivers.c8a5aea6b34f1ca667a17cbd371d785fae8b310cf7c670df55371a12ef108ab5.json',
-      sha256: 'c8a5aea6b34f1ca667a17cbd371d785fae8b310cf7c670df55371a12ef108ab5',
-      size: 25718,
-    },
-  },
 ];
 
 function argValue(name: string): string | undefined {
