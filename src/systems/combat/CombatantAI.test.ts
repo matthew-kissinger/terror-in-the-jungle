@@ -933,6 +933,94 @@ describe('CombatantAI', () => {
     })
   })
 
+  describe('perf-diagnostics gating', () => {
+    // ai-timing-gate: withAiMethodTiming + the per-update breakdown spread are
+    // diagnostic-only. Default OFF in prod: no timing wrapper bookkeeping runs
+    // and AI decisions are unchanged. Flipping the perf-diagnostics global ON
+    // (what the perf-capture harness does) must restore the full methodMs feed
+    // that scripts/perf-tail-attribution.ts consumes.
+    const flag = globalThis as { __ENABLE_PERF_DIAGNOSTICS__?: boolean }
+
+    afterEach(() => {
+      delete flag.__ENABLE_PERF_DIAGNOSTICS__
+    })
+
+    function makeAi(): CombatantAI {
+      const fresh = new CombatantAI()
+      fresh.beginFrame()
+      return fresh
+    }
+
+    it('does not populate method timing when diagnostics are OFF (default)', () => {
+      flag.__ENABLE_PERF_DIAGNOSTICS__ = false
+      const offAi = makeAi()
+      const c = createMockCombatant({ state: CombatantState.PATROLLING })
+
+      offAi.updateAI(c, 0.016, mockPlayerPosition, new Map([['c1', c]]), mockSpatialGrid)
+
+      // No timing wrapper executed: the per-method profile is empty and the
+      // last-update breakdown is absent on the prod path.
+      expect(offAi.getFrameMethodProfile()).toEqual({})
+      expect(offAi.getLastUpdateBreakdown()).toBeNull()
+      // The state profile keys are pre-seeded, but none accumulate time when OFF.
+      const stateProfile = offAi.getFrameStateProfile()
+      expect(Object.values(stateProfile).every(v => v === 0)).toBe(true)
+    })
+
+    it('populates method timing + breakdown when diagnostics are ON', () => {
+      flag.__ENABLE_PERF_DIAGNOSTICS__ = true
+      const onAi = makeAi()
+      const c = createMockCombatant({ state: CombatantState.PATROLLING })
+
+      onAi.updateAI(c, 0.016, mockPlayerPosition, new Map([['c1', c]]), mockSpatialGrid)
+
+      // methodMs still feeds the perf-capture harness when ON.
+      const methodProfile = onAi.getFrameMethodProfile()
+      expect(Object.keys(methodProfile).length).toBeGreaterThan(0)
+      // The patrol state wrapper is one of the timed sites.
+      expect(methodProfile).toHaveProperty('state.patrolling')
+
+      const breakdown = onAi.getLastUpdateBreakdown()
+      expect(breakdown).not.toBeNull()
+      expect(Object.keys(breakdown!.methodMs).length).toBeGreaterThan(0)
+    })
+
+    it('produces byte-identical AI decisions with diagnostics ON vs OFF', () => {
+      // A squad-command override (FOLLOW_ME interrupts ENGAGING -> PATROLLING)
+      // is a pure decision path. Gating timing must not change the outcome.
+      const buildSquad = (): Map<string, Squad> => new Map([['squad1', {
+        id: 'squad1',
+        faction: Faction.US,
+        members: ['c1'],
+        formation: 'wedge',
+        isPlayerControlled: true,
+        currentCommand: SquadCommand.FOLLOW_ME,
+      } as Squad]])
+
+      const runOnce = (enabled: boolean): { state: CombatantState; target: unknown } => {
+        flag.__ENABLE_PERF_DIAGNOSTICS__ = enabled
+        const runAi = makeAi()
+        runAi.setSquads(buildSquad())
+        const c = createMockCombatant({
+          state: CombatantState.ENGAGING,
+          squadId: 'squad1',
+          faction: Faction.US,
+          target: createMockCombatant({ id: 'enemy1', faction: Faction.NVA }),
+          inCover: true,
+          isFullAuto: true,
+        })
+        runAi.updateAI(c, 0.016, mockPlayerPosition, new Map([['c1', c]]), mockSpatialGrid)
+        return { state: c.state, target: c.target ?? null }
+      }
+
+      const off = runOnce(false)
+      const on = runOnce(true)
+
+      expect(off.state).toBe(CombatantState.PATROLLING)
+      expect(off).toEqual(on)
+    })
+  })
+
   describe('cover-grid lifecycle', () => {
     // Regression guard for the mode-switch cover-grid leak: the grid's reset()
     // must be its own hook (resetCoverGrid), NOT tied to setTerrainSystem.
