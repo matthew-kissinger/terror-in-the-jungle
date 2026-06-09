@@ -245,6 +245,17 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
     }
   }
 
+  /**
+   * Write the chassis world position into `out`. The session controller calls
+   * this each frame to keep `playerState.position` glued to the driven jeep so
+   * terrain streaming, AI targeting, zone presence, and the minimap track the
+   * vehicle rather than the boarding spot.
+   */
+  getChassisPosition(out: THREE.Vector3): boolean {
+    if (!this.activeVehicleId) return false;
+    return this.model.getVehiclePositionTo(this.activeVehicleId, out);
+  }
+
   resetControlState(): void {
     this.controls.throttle = 0;
     this.controls.steerAngle = 0;
