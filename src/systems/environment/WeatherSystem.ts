@@ -47,10 +47,7 @@ export class WeatherSystem implements GameSystem {
     flashTimer: 0,
     thunderDelay: 0
   };
-  
-  // Underwater state
-  private isUnderwater: boolean = false;
-  
+
   // Base atmosphere values (cached from renderer on init)
   // SALVAGE FIX: Updated defaults to match brighter GameRenderer values
   // Note: These are overwritten by actual renderer values in setRenderer()
@@ -95,9 +92,9 @@ export class WeatherSystem implements GameSystem {
 
   /**
    * Wire the atmosphere system as the fog-tint authority. Once set,
-   * weather forwards "storm darken" / "underwater override" intent here
-   * instead of writing `scene.fog.color` directly. Leaving this unset
-   * preserves the pre-atmosphere behavior for isolated tests.
+   * weather forwards "storm darken" intent here instead of writing
+   * `scene.fog.color` directly. Leaving this unset preserves the
+   * pre-atmosphere behavior for isolated tests.
    */
   setFogTintIntentReceiver(receiver: FogTintIntentReceiver): void {
     this.fogTintIntent = receiver;
@@ -136,14 +133,6 @@ export class WeatherSystem implements GameSystem {
     if (config) {
       this.setWeatherState(config.initialState, true);
       this.cycleTimer = this.getRandomCycleDuration();
-    }
-  }
-
-  setUnderwater(isUnderwater: boolean): void {
-    if (this.isUnderwater !== isUnderwater) {
-      this.isUnderwater = isUnderwater;
-      // Force immediate update to prevent lag in visual transition
-      this.updateAtmosphere();
     }
   }
 
@@ -357,7 +346,6 @@ export class WeatherSystem implements GameSystem {
 
     updateAtmosphere(
       this.renderer,
-      this.isUnderwater,
       this.currentState,
       this.targetState,
       this.transitionProgress,

@@ -22,13 +22,6 @@ import { isMobileGPU } from '../../utils/DeviceDetector';
 import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
 import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
-/**
- * Hard-override color for the submerged fog path. Matches the legacy
- * `WeatherAtmosphere.updateAtmosphere` underwater branch so surfacing
- * and submerging look identical before and after atmosphere-driven fog.
- */
-const UNDERWATER_FOG_COLOR = 0x003344;
-
 /** Distance from origin at which the directional "sun" light is placed. */
 const SUN_LIGHT_DISTANCE = 500;
 /**
@@ -70,7 +63,7 @@ export interface AtmosphereLightingSnapshot {
   groundColor: THREE.Color;
   /** Ambient fill color after low-sun/night tinting. */
   ambientColor: THREE.Color;
-  /** Fog color after sky compression, weather darken, and underwater override. */
+  /** Fog color after sky compression and weather darken. */
   fogColor: THREE.Color;
   /** Smooth day/night scalar for systems that need to dim authored highlights. */
   daylightFactor: number;
@@ -175,12 +168,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private followTarget?: THREE.Object3D;
 
   // Fog-tint plumbing (`atmosphere-fog-tinted-by-sky`). WeatherAtmosphere
-  // forwards storm-darken + underwater-override intent here; this system
-  // is the single authority that reconciles them with the sky-driven
-  // horizon tint each frame.
+  // forwards storm-darken intent here; this system is the single authority
+  // that reconciles it with the sky-driven horizon tint each frame.
   private fogDarkenFactor = 1.0;
-  private fogUnderwaterOverride = false;
-  private readonly underwaterFogColor = new THREE.Color(UNDERWATER_FOG_COLOR);
 
   // Scratch vectors/colors to avoid per-frame allocation.
   private readonly scratchSunColor = new THREE.Color();
@@ -293,7 +283,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.currentScenario = key;
     // Fog density tracks the preset alongside sky color
     // (`fog-density-rebalance`). Weather modulates this base per-frame
-    // (x1.5 rain, x3.5 storm); `WaterSystem` overrides to 0.04 underwater.
+    // (x1.5 rain, x3.5 storm).
     if (this.renderer?.fog) {
       this.renderer.fog.density = preset.fogDensity;
     }
@@ -405,9 +395,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
 
   /**
    * Cache the renderer so per-frame updates can drive `scene.fog.color`
-   * (sky-tint + storm darken + underwater override) AND sun + hemisphere
-   * light state directly. Applies once immediately so initial frames
-   * (pre-gameStarted) show correct sky-derived lighting.
+   * (sky-tint + storm darken) AND sun + hemisphere light state directly.
+   * Applies once immediately so initial frames (pre-gameStarted) show
+   * correct sky-derived lighting.
    */
   setRenderer(renderer: IGameRenderer): void {
     this.renderer = renderer;
@@ -440,15 +430,6 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
    */
   setFogDarkenFactor(factor: number): void {
     this.fogDarkenFactor = Math.max(0, Math.min(1, factor));
-  }
-
-  /**
-   * Forward the underwater override. When active, the atmosphere system
-   * snaps `scene.fog.color` to `UNDERWATER_FOG_COLOR` regardless of sky
-   * state (matches the legacy `0x003344` underwater branch).
-   */
-  setFogUnderwaterOverride(active: boolean): void {
-    this.fogUnderwaterOverride = active;
   }
 
   private applyToRenderer(): void {
@@ -578,13 +559,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       .copy(NIGHT_AMBIENT_LIGHT_COLOR)
       .lerp(this.scratchAmbient, 1 - nightBlend);
 
-    if (this.fogUnderwaterOverride) {
-      snapshot.fogColor.copy(this.underwaterFogColor);
-    } else {
-      this.backend.getHorizon(snapshot.fogColor);
-      compressSkyRadianceForRenderer(snapshot.fogColor, SKY_FOG_MAX_COMPONENT);
-      snapshot.fogColor.multiplyScalar(this.fogDarkenFactor);
-    }
+    this.backend.getHorizon(snapshot.fogColor);
+    compressSkyRadianceForRenderer(snapshot.fogColor, SKY_FOG_MAX_COMPONENT);
+    snapshot.fogColor.multiplyScalar(this.fogDarkenFactor);
 
     return snapshot;
   }

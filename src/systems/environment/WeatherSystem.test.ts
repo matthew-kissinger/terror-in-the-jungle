@@ -35,7 +35,6 @@ type WeatherSystemAny = WeatherSystem & {
   baseHemisphereIntensity: number;
   baseFogColor: number;
   baseAmbientColor: number;
-  isUnderwater: boolean;
   updateTransition: (deltaTime: number) => void;
   updateCycle: (deltaTime: number) => void;
   triggerRandomWeatherChange: () => void;
@@ -219,22 +218,6 @@ describe('WeatherSystem', () => {
       system.setWeatherConfig(config);
       const systemAny = system as WeatherSystemAny;
       expect(systemAny.cycleTimer).toBe(90);
-    });
-  });
-
-  describe('setUnderwater', () => {
-    it('triggers atmosphere update when toggled', () => {
-      const { system } = createSystem();
-      system.setUnderwater(true);
-      expect(updateAtmosphere).toHaveBeenCalledTimes(1);
-      const call = vi.mocked(updateAtmosphere).mock.calls[0];
-      expect(call[1]).toBe(true);
-    });
-
-    it('does not trigger atmosphere update when unchanged', () => {
-      const { system } = createSystem();
-      system.setUnderwater(false);
-      expect(updateAtmosphere).not.toHaveBeenCalled();
     });
   });
 

@@ -92,11 +92,9 @@ export class AssetLoader implements GameSystem {
       { file: 'mud-ground.webp', name: 'mud-ground', category: AssetCategory.GROUND },
       { file: 'rice-paddy.webp', name: 'rice-paddy', category: AssetCategory.GROUND },
       { file: 'river-bank.webp', name: 'river-bank', category: AssetCategory.GROUND },
-      { file: 'red-laterite.webp', name: 'red-laterite', category: AssetCategory.GROUND },
       { file: 'tall-grass.webp', name: 'tall-grass', category: AssetCategory.GROUND },
       { file: 'bamboo-floor.webp', name: 'bamboo-floor', category: AssetCategory.GROUND },
       { file: 'swamp.webp', name: 'swamp', category: AssetCategory.GROUND },
-      { file: 'sandy-beach.webp', name: 'sandy-beach', category: AssetCategory.GROUND },
       { file: 'defoliated-ground.webp', name: 'defoliated-ground', category: AssetCategory.GROUND },
       { file: 'firebase-ground.webp', name: 'firebase-ground', category: AssetCategory.GROUND },
       // UI/Player
