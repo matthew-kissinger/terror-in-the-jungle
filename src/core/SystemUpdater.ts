@@ -26,7 +26,6 @@ const WORLD_CHILD_BUDGET_MS = {
   Tickets: 0.08,
   Weather: 0.12,
   Atmosphere: 0.38,
-  Water: 0.30,
 } as const;
 
 /**
@@ -136,13 +135,17 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('Billboards');
     });
 
-    this.trackSystemUpdate('Player', SYSTEM_UPDATE_BUDGET_MS.Player, () => {
-      performanceTelemetry.beginSystem('Player');
-      if (refs.playerController) refs.playerController.update(deltaTime);
-      if (refs.firstPersonWeapon) refs.firstPersonWeapon.update(deltaTime);
-      performanceTelemetry.endSystem('Player');
-    });
-
+    // Vehicles MUST update before Player. Piloted-vehicle physics run on a
+    // fixed step and publish an INTERPOLATED visual pose (helicopter
+    // position/quaternion, fixed-wing, ground chassis) during this block.
+    // The chase cameras in PlayerCamera sample that pose by reference and
+    // hard-copy it (no follow lerp for heli/ground), so the camera must read
+    // it AFTER physics writes it, in the same frame. Running Player first
+    // makes the camera copy last frame's pose while the model renders at this
+    // frame's -> a one-frame desync that aliases the 60Hz fixed step against
+    // high-refresh (120/144Hz) displays and makes the model visibly
+    // shake/snap. Weapon suppression while seated is event-driven and does
+    // NOT depend on this order. Do not reorder these two blocks.
     this.trackSystemUpdate('Vehicles', SYSTEM_UPDATE_BUDGET_MS.Vehicles, () => {
       performanceTelemetry.beginSystem('Vehicles');
       if (refs.helicopterModel) refs.helicopterModel.update(deltaTime);
@@ -151,6 +154,13 @@ export class SystemUpdater {
       this.ensureGroundVehicleProximityChecker(refs);
       this.groundVehicleProximityChecker?.update(deltaTime);
       performanceTelemetry.endSystem('Vehicles');
+    });
+
+    this.trackSystemUpdate('Player', SYSTEM_UPDATE_BUDGET_MS.Player, () => {
+      performanceTelemetry.beginSystem('Player');
+      if (refs.playerController) refs.playerController.update(deltaTime);
+      if (refs.firstPersonWeapon) refs.firstPersonWeapon.update(deltaTime);
+      performanceTelemetry.endSystem('Player');
     });
 
     this.trackSystemUpdate('Weapons', SYSTEM_UPDATE_BUDGET_MS.Weapons, () => {
@@ -253,12 +263,6 @@ export class SystemUpdater {
         if (refs.atmosphereSystem) {
           this.trackInstrumentedSystemUpdate('World.Atmosphere', WORLD_CHILD_BUDGET_MS.Atmosphere, () => {
             refs.atmosphereSystem.update(worldDelta);
-          });
-        }
-
-        if (refs.waterSystem) {
-          this.trackInstrumentedSystemUpdate('World.Water', WORLD_CHILD_BUDGET_MS.Water, () => {
-            refs.waterSystem.update(worldDelta);
           });
         }
       }

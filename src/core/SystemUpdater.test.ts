@@ -39,9 +39,6 @@ function createRefs(overrides: Partial<SystemKeyToType> = {}): SystemKeyToType {
     weatherSystem: {
       update: vi.fn(),
     },
-    waterSystem: {
-      update: vi.fn(),
-    },
     playerController: {
       getPosition: vi.fn(() => new THREE.Vector3(0, 2, 0)),
       setPosition: vi.fn(),
@@ -94,7 +91,6 @@ describe('SystemUpdater', () => {
     expect(refs.zoneManager.update).toHaveBeenCalledWith(0.07);
     expect(refs.ticketSystem.update).toHaveBeenCalledWith(0.07);
     expect(refs.weatherSystem.update).toHaveBeenCalledWith(0.07);
-    expect(refs.waterSystem.update).toHaveBeenCalledWith(0.07);
   });
 
   it('does not contain A Shau contact-assist logic (removed from core)', () => {
@@ -239,5 +235,37 @@ describe('SystemUpdater', () => {
 
     expect(genericSystem.update).toHaveBeenCalledTimes(1);
     expect(genericSystem.update).toHaveBeenCalledWith(0.016);
+  });
+
+  it('updates Vehicles before Player so chase cameras read the post-physics pose (no heli model jitter)', () => {
+    // Regression guard: piloted-vehicle physics publish an interpolated visual
+    // pose during the Vehicles block, and PlayerCamera hard-copies that pose
+    // during the Player block. If Player runs first, the camera samples last
+    // frame's pose while the model renders at this frame's -> one-frame desync
+    // that makes the helicopter visibly shake on high-refresh displays.
+    const updater = new SystemUpdater();
+    const order: string[] = [];
+    const refs = createRefs({
+      helicopterModel: { update: vi.fn(() => { order.push('vehicles'); }) },
+      fixedWingModel: { update: vi.fn(() => { order.push('vehicles:fixedWing'); }) },
+      vehicleManager: {
+        update: vi.fn(() => { order.push('vehicles:manager'); }),
+        getAllVehicles: vi.fn(() => []),
+      },
+      firstPersonWeapon: { update: vi.fn(() => { order.push('player:weapon'); }) },
+      playerController: {
+        getPosition: vi.fn(() => new THREE.Vector3(0, 2, 0)),
+        setPosition: vi.fn(),
+        update: vi.fn(() => { order.push('player:controller'); }),
+      },
+    } as unknown as Partial<SystemKeyToType>);
+
+    updater.updateSystems(refs, [], undefined, 0.016, true);
+
+    const vehiclesIdx = order.indexOf('vehicles');
+    const playerIdx = order.indexOf('player:controller');
+    expect(vehiclesIdx).toBeGreaterThanOrEqual(0);
+    expect(playerIdx).toBeGreaterThanOrEqual(0);
+    expect(vehiclesIdx).toBeLessThan(playerIdx);
   });
 });
