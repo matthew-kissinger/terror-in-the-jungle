@@ -14,7 +14,18 @@ import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { GameEventBus } from '../../core/GameEventBus';
-import { handleCombatantDeath } from './CombatantDeathPipeline';
+import { handleCombatantDeath, DeathBookkeepingHooks } from './CombatantDeathPipeline';
+
+/**
+ * Death bookkeeping wiring for the rifle path. Supplies the live squad registry
+ * (so the player-rifle path, which calls applyDamage with squads: undefined,
+ * still reconciles the victim's squad) plus the player-squad respawn hooks the
+ * spawn manager owns. Set once by CombatantSystem; mirrors the hooks the
+ * explosion path already passes in CombatantSystemDamage.
+ */
+export interface DeathBookkeeping extends DeathBookkeepingHooks {
+  getSquads(): Map<string, Squad>;
+}
 
 /**
  * Handles damage application and death processing for combatants.
@@ -28,6 +39,7 @@ export class CombatantDamage {
   private combatantRenderer?: CombatantRenderer;
   private cameraShakeSystem?: CameraShakeSystem;
   private impactEffectsPool?: ImpactEffectsPool;
+  private deathBookkeeping?: DeathBookkeeping;
   private playerPosition: THREE.Vector3 = new THREE.Vector3();
   // Module-level scratch vectors (do not share with other modules)
   private readonly scratchDeathDir = new THREE.Vector3();
@@ -60,6 +72,17 @@ export class CombatantDamage {
 
   setImpactEffectsPool(pool: ImpactEffectsPool): void {
     this.impactEffectsPool = pool;
+  }
+
+  /**
+   * Wire the squad registry + player-squad respawn hooks the rifle death path
+   * uses for squad bookkeeping. Without this the player-rifle path (squads:
+   * undefined) silently skips reconciliation and player-squad rifle deaths never
+   * queue a respawn — both previously load-borne by the deleted spawn-manager
+   * sweep. (combat-death-body-persistence)
+   */
+  setDeathBookkeeping(bookkeeping: DeathBookkeeping): void {
+    this.deathBookkeeping = bookkeeping;
   }
 
   updatePlayerPosition(position: THREE.Vector3): void {
@@ -239,8 +262,22 @@ export class CombatantDamage {
 
     // Update squad bookkeeping through the unified death pipeline so rifle
     // kills produce the same squad state as explosion kills: member removal,
-    // leader promotion, and empty-squad deletion. (combat-death-unification)
-    handleCombatantDeath(target, squads, 'rifle');
+    // leader promotion, empty-squad deletion, and player-squad respawn queueing.
+    // (combat-death-unification + combat-death-body-persistence)
+    //
+    // The player-rifle path (CombatantCombat.handlePlayerShot) calls applyDamage
+    // with squads: undefined, so fall back to the wired squad registry — without
+    // it the victim's squad would never be reconciled (the deleted spawn-manager
+    // sweep used to). The respawn hooks queue player-squad replacements, which
+    // also previously load-bore on that sweep.
+    const resolvedSquads = squads ?? this.deathBookkeeping?.getSquads();
+    const hooks: DeathBookkeepingHooks | undefined = this.deathBookkeeping
+      ? {
+          isPlayerControlledSquad: (squadId) => this.deathBookkeeping!.isPlayerControlledSquad?.(squadId) ?? false,
+          queueRespawn: (squadId, memberId) => this.deathBookkeeping!.queueRespawn?.(squadId, memberId),
+        }
+      : undefined;
+    handleCombatantDeath(target, resolvedSquads, 'rifle', hooks);
   }
 
   /**

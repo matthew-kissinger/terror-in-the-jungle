@@ -195,6 +195,16 @@ export class CombatantSystem implements GameSystem {
 
     // Combat queries use the unified spatial grid manager.
     this.combatantCombat.setSpatialQueryProvider((center, radius) => this.spatialGridManager.queryRadius(center, radius));
+
+    // Wire rifle-death squad bookkeeping (combat-death-body-persistence): the
+    // player-rifle path passes squads: undefined, so supply the registry +
+    // player-squad respawn hooks here, mirroring the explosion path. Both
+    // previously load-bore on the now-deleted CombatantSpawnManager sweep.
+    this.combatantCombat.setDeathBookkeeping({
+      getSquads: () => this.squadManager.getAllSquads(),
+      isPlayerControlledSquad: (squadId) => !!this.squadManager.getSquad(squadId)?.isPlayerControlled,
+      queueRespawn: (squadId, memberId) => this.spawnManager.queueRespawn(squadId, memberId),
+    });
   }
 
   async init(): Promise<void> {

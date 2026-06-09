@@ -603,6 +603,13 @@ export class CombatantCombat {
     this.damage.setCombatantRenderer(renderer);
   }
 
+  // Forward the rifle-death squad bookkeeping wiring to the damage module so the
+  // player-rifle path reconciles squads and queues player-squad respawns through
+  // the unified death pipeline. (combat-death-body-persistence)
+  setDeathBookkeeping(bookkeeping: import('./CombatantDamage').DeathBookkeeping): void {
+    this.damage.setDeathBookkeeping(bookkeeping);
+  }
+
   setSpatialQueryProvider(provider: (center: THREE.Vector3, radius: number) => string[]): void {
     this.hitDetection.setQueryProvider(provider);
     this.suppression.setQueryProvider(provider);

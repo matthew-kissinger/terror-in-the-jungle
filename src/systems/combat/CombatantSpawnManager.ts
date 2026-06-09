@@ -321,16 +321,12 @@ export class CombatantSpawnManager {
     // Handle pending respawns for player squad members
     this.respawnManager.handlePendingRespawns(this.rallyPointSystem, this.zoneQuery, this.gameModeManager);
 
-    // Remove all dead combatants immediately - no body persistence
-    const toRemove: string[] = [];
-
-    this.combatants.forEach((combatant, id) => {
-      if (combatant.state === CombatantState.DEAD) {
-        toRemove.push(id);
-      }
-    });
-
-    toRemove.forEach(id => this.removeCombatant(id));
+    // Body despawn is owned solely by CombatantLODManager.updateDeathAnimations
+    // (combat-death-body-persistence). The old "remove all DEAD combatants" sweep
+    // lived here and raced the LOD manager — it could yank a body mid-animation
+    // and double-despawn. Its two load-bearing side effects were rehomed: rifle
+    // deaths queue player-squad respawns + reconcile squads via the unified
+    // death pipeline (CombatantDamage hooks wired in CombatantSystem), not here.
 
     // Maintain minimum force strength during COMBAT phase OR when combat is enabled
     const phase = ticketSystem?.getGameState().phase;
