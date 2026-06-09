@@ -112,6 +112,7 @@ function createTransitionContext(
     cameraController: {
       saveInfantryAngles: vi.fn(),
       restoreInfantryAngles: vi.fn(),
+      setVehicleFollowCamera: vi.fn(),
     } as any,
     hudSystem: createMockHudSystem() as any,
     gameRenderer: { setCrosshairMode: vi.fn() } as any,
@@ -471,6 +472,46 @@ describe('WatercraftPlayerAdapter', () => {
     it('returns false when no vehicle is active', () => {
       const ok = adapter.computeThirdPersonCamera(new THREE.Vector3(), new THREE.Vector3());
       expect(ok).toBe(false);
+    });
+
+    it('engages the vehicle follow camera on enter with a provider that yields the boat third-person pose', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+
+      // Boarding a boat must hand the camera a follow-cam provider so the
+      // player leaves the infantry (first-person) view. On master this never
+      // happens, so the player keeps the infantry camera while piloting.
+      const setFollow = ctx.cameraController.setVehicleFollowCamera as ReturnType<typeof vi.fn>;
+      expect(setFollow).toHaveBeenCalledTimes(1);
+      const provider = setFollow.mock.calls[0][0];
+      expect(provider).not.toBeNull();
+
+      // The engaged provider must produce the same third-person pose the
+      // adapter computes for the active hull (it is the watercraft's own
+      // follow cam, not some unrelated object).
+      const providerPos = new THREE.Vector3();
+      const providerLook = new THREE.Vector3();
+      const ok = provider.computeThirdPersonCamera(providerPos, providerLook);
+      expect(ok).toBe(true);
+
+      const expectedPos = new THREE.Vector3();
+      const expectedLook = new THREE.Vector3();
+      adapter.computeThirdPersonCamera(expectedPos, expectedLook);
+      expect(providerPos.distanceTo(expectedPos)).toBeCloseTo(0, 4);
+      expect(providerLook.distanceTo(expectedLook)).toBeCloseTo(0, 4);
+    });
+
+    it('restores the infantry camera on exit by clearing the follow-cam provider', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      adapter.onExit(ctx);
+
+      // Exit must detach the follow cam (pass null) so the next camera frame
+      // uses the infantry first-person path, not a stale boat follow cam.
+      const setFollow = ctx.cameraController.setVehicleFollowCamera as ReturnType<typeof vi.fn>;
+      expect(setFollow).toHaveBeenLastCalledWith(null);
     });
   });
 
