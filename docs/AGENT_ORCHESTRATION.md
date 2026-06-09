@@ -198,25 +198,43 @@ manifest file as usual.
 
 ## Current state
 
-See [docs/DIRECTIVES.md](DIRECTIVES.md).
+**Active campaign:** [CAMPAIGN_2026-06-09-consultation-remediation.md](CAMPAIGN_2026-06-09-consultation-remediation.md)
+— large (5 sequenced cycles), `auto-advance: yes`, `posture: attended`,
+concurrency cap 5. Phase barriers are hard: a phase's exit gate (CI green +
+reviewer APPROVE on all merged tasks + the named acceptance) must pass before
+the next cycle's R1 dispatch. Campaign hard-stops are listed in the manifest.
+Phases 2-5 briefs are authored at each phase's open, not up front.
+
+Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** (none — closed `cycle-2026-06-04-deploy-zone-vehicle` on 2026-06-04: three
-  owner-reported deploy/spawn/mount defects shipped to master, each with a repro-first
-  L3 test, all playtest-deferred — UX-5 loadout equip-match (PR #335, `e0144444`);
-  DEFEKT-7 zone/base ditch placement (PR #336, `fb371129`, terrain-nav APPROVE-WITH-NOTES);
-  VEKHIKL-5 jeep board/drive e2e (PR #334, `f63b0da5`). Owner playtests in
-  [PLAYTEST_PENDING](PLAYTEST_PENDING.md).)
-- **Previous:** big cycle of 3 parallel streams closed 2026-06-03 (SVYAZ-3 `fa273ebd`,
-  DEFEKT-3 `8f09d471`, UX-2/3/4 `86ee640d`); follow-ups `rocket_run` IFF +
-  `combat-movement-stall-tail`.
-- **Next:** owner playtest sweep of the three fixes + the deferred backlog
-  ([BACKLOG.md](BACKLOG.md) owner-gated queue) + `combat-movement-stall-tail`.
+- **Cycle:** `cycle-2026-06-09-weapon-input-and-gate-hardening` — Phase 1 of the
+  consultation-remediation campaign. Anchor: dead weapon bindings (tank cannon /
+  M2HB never fire on LMB — duck-typed input probes); plus the enforcement gates
+  (lint:budget ratchet, CI gate consolidation) that Phases 2-5 depend on, and a
+  frame-order guard test locking the load-bearing Vehicles-before-Player update
+  order (`8e99caac`).
+- **Previous:** closed `cycle-2026-06-04-deploy-zone-vehicle` on 2026-06-04
+  (UX-5 #335, DEFEKT-7 #336, VEKHIKL-5 #334 — all playtest-deferred); then the
+  2026-06-09 water-scorch + heli-jitter deploy (`8e99caac`, non-cycle).
+- **Next:** Phase 2 `cycle-2026-06-09-vehicle-occupancy-truth` per the campaign
+  manifest (auto-advance on Phase 1 exit gate).
 
 ### Tasks (DAG)
 
-(Empty — populate when the next cycle opens.)
+| slug | brief | deps | reviewer |
+|---|---|---|---|
+| real-mouse-input | [docs/tasks/real-mouse-input.md](tasks/real-mouse-input.md) | (root) — unblocks Phase 2 tank-cannon-wiring | — (FENCE WATCH: IPlayerController) |
+| frame-order-guard | [docs/tasks/frame-order-guard.md](tasks/frame-order-guard.md) | (root) | — |
+| budget-ratchet | [docs/tasks/budget-ratchet.md](tasks/budget-ratchet.md) | (root) | — |
+| ci-gate-consolidation | [docs/tasks/ci-gate-consolidation.md](tasks/ci-gate-consolidation.md) | budget-ratchet | — |
+
+Round 1: real-mouse-input, frame-order-guard, budget-ratchet (3 parallel).
+Round 2: ci-gate-consolidation (after budget-ratchet merges).
+
+**Phase 1 exit gate:** tank cannon + player M2HB fire on LMB in a smoke run; CI
+green with the four new gates active; frame-order-guard test passes.
 
 ## Dispatch protocol
 
