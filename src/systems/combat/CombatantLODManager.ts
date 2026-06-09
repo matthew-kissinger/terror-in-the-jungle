@@ -85,6 +85,18 @@ export class CombatantLODManager {
   private mediumLODRange = 400;
   private lowLODRange = 600;
 
+  // Cached dynamic-interval parameters. computeDynamicIntervalMs* is called
+  // per-combatant across the medium/low/culled loops; recomputing the
+  // world-size + GPU-tier branch on every call was redundant (worldSize only
+  // changes on mode switch; GPU tier/mobile are session-stable + module-memoized).
+  // Refreshed on setGameModeManager and once per updateCombatants frame.
+  private intervalStartScaleAt = 80;
+  private intervalMaxScaleAt = 1000;
+  private intervalStartScaleSq = 0;
+  private intervalMaxScaleSq = 0;
+  private intervalMinMs = 16;
+  private intervalMaxMs = 500;
+
   // LOD counts
   lodHighCount = 0;
   lodMediumCount = 0;
@@ -177,6 +189,37 @@ export class CombatantLODManager {
       this.maxHighFullUpdatesPerFrame = UPDATE_CAPS_DESKTOP.high;
       this.maxMediumFullUpdatesPerFrame = UPDATE_CAPS_DESKTOP.medium;
     }
+
+    this.refreshDynamicIntervalParams();
+  }
+
+  /**
+   * Recompute the world-size + GPU-tier dependent interval parameters and cache
+   * them. computeDynamicIntervalMs* then reads scalars instead of re-deriving
+   * worldSize / estimateGPUTier / isMobileGPU per call (per-combatant in the
+   * medium/low/culled loops). Called on scaling/mode changes and once per frame.
+   */
+  private refreshDynamicIntervalParams(): void {
+    const worldSize = this.gameModeManager?.getWorldSize() || 4000;
+    const isLargeWorld = worldSize > 1000;
+    const gpuTier = estimateGPUTier();
+    const isMobile = isMobileGPU();
+
+    const startScaleAt = isMobile ? 40 : (isLargeWorld ? 120 : 80);
+    const maxScaleAt = isMobile ? 300 : (isLargeWorld ? 600 : 1000);
+    this.intervalStartScaleAt = startScaleAt;
+    this.intervalMaxScaleAt = maxScaleAt;
+    this.intervalStartScaleSq = startScaleAt * startScaleAt;
+    this.intervalMaxScaleSq = maxScaleAt * maxScaleAt;
+
+    let minMs = isLargeWorld ? 33 : 16;
+    let maxMs = isLargeWorld ? 1000 : 500;
+    if (isMobile || gpuTier === 'low') {
+      minMs *= 2;
+      maxMs *= 1.5;
+    }
+    this.intervalMinMs = minMs;
+    this.intervalMaxMs = maxMs;
   }
 
   setLODRanges(high: number, medium: number, low: number): void {
@@ -226,21 +269,10 @@ export class CombatantLODManager {
    * Compute a smooth, distance-based update interval (milliseconds)
    */
   computeDynamicIntervalMs(distance: number): number {
-    const worldSize = this.gameModeManager?.getWorldSize() || 4000;
-    const isLargeWorld = worldSize > 1000;
-    const gpuTier = estimateGPUTier();
-    const isMobile = isMobileGPU();
-
-    const startScaleAt = isMobile ? 40 : (isLargeWorld ? 120 : 80);
-    const maxScaleAt = isMobile ? 300 : (isLargeWorld ? 600 : 1000);
-    
-    let minMs = isLargeWorld ? 33 : 16;
-    let maxMs = isLargeWorld ? 1000 : 500;
-
-    if (isMobile || gpuTier === 'low') {
-      minMs *= 2;
-      maxMs *= 1.5;
-    }
+    const startScaleAt = this.intervalStartScaleAt;
+    const maxScaleAt = this.intervalMaxScaleAt;
+    const minMs = this.intervalMinMs;
+    const maxMs = this.intervalMaxMs;
 
     const d = Math.max(0, distance - startScaleAt);
     const t = Math.min(1, d / Math.max(1, maxScaleAt - startScaleAt));
@@ -249,26 +281,15 @@ export class CombatantLODManager {
   }
 
   /**
-   * Squared-distance variant to avoid repeated sqrt in hot LOD loops.
+   * Squared-distance variant to avoid repeated sqrt in hot LOD loops. Reads the
+   * cached world-size + GPU-tier interval parameters (refreshDynamicIntervalParams)
+   * rather than re-deriving them per call.
    */
   computeDynamicIntervalMsFromDistanceSq(distanceSq: number): number {
-    const worldSize = this.gameModeManager?.getWorldSize() || 4000;
-    const isLargeWorld = worldSize > 1000;
-    const gpuTier = estimateGPUTier();
-    const isMobile = isMobileGPU();
-
-    const startScaleAt = isMobile ? 40 : (isLargeWorld ? 120 : 80);
-    const maxScaleAt = isMobile ? 300 : (isLargeWorld ? 600 : 1000);
-    const startScaleSq = startScaleAt * startScaleAt;
-    const maxScaleSq = maxScaleAt * maxScaleAt;
-
-    let minMs = isLargeWorld ? 33 : 16;
-    let maxMs = isLargeWorld ? 1000 : 500;
-
-    if (isMobile || gpuTier === 'low') {
-      minMs *= 2;
-      maxMs *= 1.5;
-    }
+    const startScaleSq = this.intervalStartScaleSq;
+    const maxScaleSq = this.intervalMaxScaleSq;
+    const minMs = this.intervalMinMs;
+    const maxMs = this.intervalMaxMs;
 
     if (distanceSq <= startScaleSq) {
       return minMs;
@@ -329,6 +350,10 @@ export class CombatantLODManager {
     const now = Date.now();
     const worldSize = this.gameModeManager?.getWorldSize() || 4000;
     const isLargeWorldMode = worldSize >= 1000;
+    // Refresh cached interval params once per frame so the per-combatant
+    // computeDynamicIntervalMs* calls below read scalars (worldSize only
+    // actually changes on a mode switch, but this stays correct if it drifts).
+    this.refreshDynamicIntervalParams();
 
     this.lodHighCount = 0;
     this.lodMediumCount = 0;

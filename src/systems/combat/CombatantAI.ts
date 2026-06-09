@@ -11,6 +11,7 @@ import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
 import { ISpatialQuery } from './SpatialOctree'
 import type { IZoneQuery } from '../../types/SystemInterfaces'
 import { TicketSystem } from '../world/TicketSystem'
+import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics'
 import { AIStatePatrol } from './ai/AIStatePatrol'
 import { AIStateEngage, type CloseEngagementTelemetry } from './ai/AIStateEngage'
 import { AIStateMovement } from './ai/AIStateMovement'
@@ -154,6 +155,55 @@ export class CombatantAI {
     playerPosition: THREE.Vector3
   ): boolean => this.canSeeTargetForCallsite('defendDetection', combatant, target, playerPosition)
 
+  // Hoisted per-state callbacks. Bound once at construction so the steady-state
+  // tick allocates no closures (the previous inline arrow functions + `.bind(this)`
+  // calls allocated on every updateAI tick). The patrol callbacks keep their
+  // `withAiMethodTiming` wrappers so diagnostics output is byte-identical when ON;
+  // the wrapper itself is the diagnostics gate (no-op fast path when OFF).
+  private readonly patrolFindNearestEnemy = (
+    unit: Combatant,
+    playerPos: THREE.Vector3,
+    combatants: Map<string, Combatant>,
+    grid?: ISpatialQuery
+  ): ITargetable | null =>
+    this.withAiMethodTiming('patrol.findNearestEnemy', () =>
+      this.findNearestEnemy(unit, playerPos, combatants, grid)
+    )
+
+  private readonly patrolCanSeeTarget = (
+    unit: Combatant,
+    target: ITargetable,
+    playerPos: THREE.Vector3
+  ): boolean =>
+    this.withAiMethodTiming('patrol.canSeeTarget', () =>
+      this.canSeeTargetForPatrolDetection(unit, target, playerPos)
+    )
+
+  private readonly patrolShouldEngage = (unit: Combatant, distance: number): boolean =>
+    this.withAiMethodTiming('patrol.shouldEngage', () => this.shouldEngage(unit, distance))
+
+  private readonly patrolGetClusterDensity = (
+    unit: Combatant,
+    combatants: Map<string, Combatant>,
+    grid?: ISpatialQuery
+  ): number =>
+    this.withAiMethodTiming('patrol.getClusterDensity', () =>
+      this.getClusterDensity(unit, combatants, grid)
+    )
+
+  private readonly boundFindNearestEnemy = this.findNearestEnemy.bind(this)
+  private readonly boundShouldSeekCover = this.shouldSeekCover.bind(this)
+  private readonly boundShouldSeekCoverMediumLOD = this.shouldSeekCoverMediumLOD.bind(this)
+  private readonly boundFindNearestCover = this.findNearestCover.bind(this)
+  private readonly boundCountNearbyEnemies = this.countNearbyEnemies.bind(this)
+  private readonly boundIsCoverFlanked = this.isCoverFlanked.bind(this)
+  private readonly boundGetClusterDensity = this.getClusterDensity.bind(this)
+
+  // Cached per-instance: perf diagnostics gate. Read once at construction and
+  // refreshed once per frame in beginFrame() so the hot updateAI path never
+  // re-parses window.location / globals per tick. OFF in prod by default.
+  private diagnosticsEnabled = isPerfDiagnosticsEnabled()
+
   private squads: Map<string, Squad> = new Map()
   private aiStateMs: Record<string, number> = {
     patrolling: 0,
@@ -267,10 +317,13 @@ export class CombatantAI {
       return
     }
 
-    const updateStart = performance.now()
+    const diagnostics = this.diagnosticsEnabled
+    const updateStart = diagnostics ? performance.now() : 0
     const stateAtStart = combatant.state
-    const methodMs: Record<string, number> = {}
-    const methodCounts: Record<string, number> = {}
+    // Per-update breakdown buffers only exist when diagnostics are ON. In prod
+    // (OFF) we allocate nothing here and the timing wrappers below are no-ops.
+    const methodMs: Record<string, number> | null = diagnostics ? {} : null
+    const methodCounts: Record<string, number> | null = diagnostics ? {} : null
     const previousActiveUpdateMethodMs = this.activeUpdateMethodMs
     const previousActiveUpdateMethodCounts = this.activeUpdateMethodCounts
     this.activeUpdateMethodMs = methodMs
@@ -306,7 +359,7 @@ export class CombatantAI {
       }
     }
 
-    const stateStart = performance.now()
+    const stateStart = diagnostics ? performance.now() : 0
     // Delegate to appropriate state handler
     switch (combatant.state) {
       case CombatantState.PATROLLING:
@@ -317,22 +370,10 @@ export class CombatantAI {
             playerPosition,
             allCombatants,
             spatialGrid,
-            (unit, playerPos, combatants, grid) =>
-              this.withAiMethodTiming('patrol.findNearestEnemy', () =>
-                this.findNearestEnemy(unit, playerPos, combatants, grid)
-              ),
-            (unit, target, playerPos) =>
-              this.withAiMethodTiming('patrol.canSeeTarget', () =>
-                this.canSeeTargetForPatrolDetection(unit, target, playerPos)
-              ),
-            (unit, distance) =>
-              this.withAiMethodTiming('patrol.shouldEngage', () =>
-                this.shouldEngage(unit, distance)
-              ),
-            (unit, combatants, grid) =>
-              this.withAiMethodTiming('patrol.getClusterDensity', () =>
-                this.getClusterDensity(unit, combatants, grid)
-              )
+            this.patrolFindNearestEnemy,
+            this.patrolCanSeeTarget,
+            this.patrolShouldEngage,
+            this.patrolGetClusterDensity
           )
         })
         break
@@ -359,8 +400,8 @@ export class CombatantAI {
               allCombatants,
               spatialGrid,
               this.canSeeTargetForEngageSuppressionCheck,
-              this.shouldSeekCoverMediumLOD.bind(this),
-              this.findNearestCover.bind(this),
+              this.boundShouldSeekCoverMediumLOD,
+              this.boundFindNearestCover,
               this.countNearbyEnemiesNoop,
               this.isCoverFlankedNoop
             )
@@ -374,10 +415,10 @@ export class CombatantAI {
               allCombatants,
               spatialGrid,
               this.canSeeTargetForEngageSuppressionCheck,
-              this.shouldSeekCover.bind(this),
-              this.findNearestCover.bind(this),
-              this.countNearbyEnemies.bind(this),
-              this.isCoverFlanked.bind(this)
+              this.boundShouldSeekCover,
+              this.boundFindNearestCover,
+              this.boundCountNearbyEnemies,
+              this.boundIsCoverFlanked
             )
           })
         }
@@ -397,7 +438,7 @@ export class CombatantAI {
             playerPosition,
             allCombatants,
             spatialGrid,
-            this.findNearestEnemy.bind(this),
+            this.boundFindNearestEnemy,
             this.canSeeTargetForAdvancingDetection
           )
         })
@@ -423,9 +464,9 @@ export class CombatantAI {
             playerPosition,
             allCombatants,
             spatialGrid,
-            this.findNearestEnemy.bind(this),
+            this.boundFindNearestEnemy,
             this.canSeeTargetForDefendDetection,
-            this.getClusterDensity.bind(this)
+            this.boundGetClusterDensity
           )
         })
         break
@@ -481,30 +522,39 @@ export class CombatantAI {
         break
       }
     }
-    const stateDuration = performance.now() - stateStart
-    const key = this.getStateTimingKey(stateAtStart)
-    this.aiStateMs[key] = (this.aiStateMs[key] || 0) + stateDuration
+    if (diagnostics) {
+      const stateDuration = performance.now() - stateStart
+      const key = this.getStateTimingKey(stateAtStart)
+      this.aiStateMs[key] = (this.aiStateMs[key] || 0) + stateDuration
+    }
     } finally {
-      const totalMs = performance.now() - updateStart
       this.activeUpdateMethodMs = previousActiveUpdateMethodMs
       this.activeUpdateMethodCounts = previousActiveUpdateMethodCounts
-      const breakdown: AiUpdateBreakdown = {
-        combatantId: combatant.id,
-        stateAtStart,
-        stateAtEnd: combatant.state,
-        simLane,
-        totalMs,
-        methodMs: { ...methodMs },
-        methodCounts: { ...methodCounts }
-      }
-      this.lastUpdateBreakdown = breakdown
-      if (!this.slowestUpdateBreakdown || totalMs > this.slowestUpdateBreakdown.totalMs) {
-        this.slowestUpdateBreakdown = breakdown
+      // Breakdown capture is diagnostics-only. In prod (OFF) we skip the
+      // performance.now() read and the two object spreads entirely.
+      if (diagnostics) {
+        const totalMs = performance.now() - updateStart
+        const breakdown: AiUpdateBreakdown = {
+          combatantId: combatant.id,
+          stateAtStart,
+          stateAtEnd: combatant.state,
+          simLane,
+          totalMs,
+          methodMs: { ...(methodMs ?? {}) },
+          methodCounts: { ...(methodCounts ?? {}) }
+        }
+        this.lastUpdateBreakdown = breakdown
+        if (!this.slowestUpdateBreakdown || totalMs > this.slowestUpdateBreakdown.totalMs) {
+          this.slowestUpdateBreakdown = breakdown
+        }
       }
     }
   }
 
   beginFrame(): void {
+    // Refresh the perf-diagnostics gate once per frame. Cheap relative to a
+    // frame; keeps updateAI's per-tick path free of window.location parsing.
+    this.diagnosticsEnabled = isPerfDiagnosticsEnabled()
     this.targeting.beginFrame()
     for (const key of Object.keys(this.aiStateMs)) {
       this.aiStateMs[key] = 0
@@ -590,6 +640,13 @@ export class CombatantAI {
   }
 
   private withAiMethodTiming<T>(name: string, fn: () => T): T {
+    // Prod fast path: no timing instrumentation when diagnostics are OFF. The
+    // wrapper collapses to a direct call — no performance.now(), no per-name
+    // bookkeeping, no per-update buffer writes. The perf-capture harness flips
+    // the gate ON (isPerfDiagnosticsEnabled) and gets the full breakdown below.
+    if (!this.diagnosticsEnabled) {
+      return fn()
+    }
     const start = performance.now()
     try {
       return fn()
