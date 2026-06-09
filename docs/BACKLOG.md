@@ -59,6 +59,25 @@ deletion tasks); live tank-cannon/M2HB LMB smoke re-verifies at Phase 2 close
 (composer wiring is Phase 2). Briefs:
 `docs/tasks/archive/cycle-2026-06-09-weapon-input-and-gate-hardening/`.
 
+## Recently Completed (cycle-2026-06-09-vehicle-occupancy-truth)
+
+Phase 2 of [CAMPAIGN_2026-06-09-consultation-remediation](CAMPAIGN_2026-06-09-consultation-remediation.md).
+5/5 merged, fence untouched: tank-interpolation #341 (M48 render-time interpolation —
+high-refresh jitter class), vehicle-seat-lifecycle #342 (all enter/exit through the
+IVehicle seat model via a VehicleSeatBinder on VehicleSessionController — kills seat
+ghosts), tank-cannon-wiring #343 (player tank cannon + M2HB live on LMB; true
+composition site is StartupPlayerRuntimeComposer, not OperationalRuntimeComposer;
+combat-reviewer APPROVE-WITH-NOTES), vehicle-player-position-sync #344
+(playerState.position tracks the chassis for ground/water/emplacement — streaming/AI/
+zones/minimap truth), watercraft-camera #345 (follow-cam wired; boats dormant).
+Live proof refreshed: land-vehicle-runtime-proof 11/11 PASS post-cycle. Owner walk
+row in PLAYTEST_PENDING. Follow-ups (reviewer notes): Escape-exit bypasses the
+factory detach hook (defended by mounted guards — candidate for Phase 5
+dedup-vehicle-adapters), M2HB one-frame latch ordering vs SystemUpdater Combat/Player
+blocks, in-flight cannon round freezes on dismount (stepper rides the adapter),
+NPC tank cannon (TankCannonProjectileSystem) still unconstructed in prod.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-vehicle-occupancy-truth/`.
+
 ## Recently Completed Archive
 
 Detailed recently-completed cycle retrospectives moved to

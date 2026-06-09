@@ -209,36 +209,35 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** `cycle-2026-06-09-vehicle-occupancy-truth` — Phase 2 of the
-  consultation-remediation campaign. Owner-visible vehicle correctness: seat
-  ghosts on Escape-exit / heli interaction, player position parked at the
-  boarding spot while driving (breaks streaming/AI/zones/minimap), dead tank
-  cannon + M2HB composer wiring, M48 fixed-step render jitter, unreachable
-  watercraft follow-cam.
-- **Previous:** Phase 1 `cycle-2026-06-09-weapon-input-and-gate-hardening`
-  closed 2026-06-09 — 4/4 merged (#337 #338 #339 #340), fence untouched, four
-  CI gates now blocking. See BACKLOG "Recently Completed".
-- **Next:** Phase 3 `cycle-2026-06-09-combat-death-and-alliance` per the
-  campaign manifest (auto-advance on Phase 2 exit gate).
+- **Cycle:** `cycle-2026-06-09-combat-death-and-alliance` — Phase 3 of the
+  consultation-remediation campaign. Combat correctness + the combat120 perf
+  lever: unify the three-way death-pipeline race (keystone), isAlly sweep,
+  zone-defender starvation, aborted-shot fire-rate theft, AI diagnostic
+  overhead gated out of prod ticks. Every task gates on combat-reviewer
+  pre-merge.
+- **Previous:** Phase 2 `cycle-2026-06-09-vehicle-occupancy-truth` closed
+  2026-06-09 — 5/5 merged (#341-#345), live land-vehicle proof 11/11 PASS,
+  owner walk row in PLAYTEST_PENDING. See BACKLOG "Recently Completed".
+- **Next:** Phase 4 `cycle-2026-06-09-terrain-fidelity-and-worker-safety` per
+  the campaign manifest (auto-advance on Phase 3 exit gate).
 
 ### Tasks (DAG)
 
 | slug | brief | deps | reviewer |
 |---|---|---|---|
-| vehicle-seat-lifecycle | [docs/tasks/vehicle-seat-lifecycle.md](tasks/vehicle-seat-lifecycle.md) | (root) | — |
-| tank-cannon-wiring | [docs/tasks/tank-cannon-wiring.md](tasks/tank-cannon-wiring.md) | real-mouse-input (merged) | combat (touches src/systems/combat/weapons/) |
-| tank-interpolation | [docs/tasks/tank-interpolation.md](tasks/tank-interpolation.md) | (root) | — |
-| vehicle-player-position-sync | [docs/tasks/vehicle-player-position-sync.md](tasks/vehicle-player-position-sync.md) | vehicle-seat-lifecycle | — |
-| watercraft-camera | [docs/tasks/watercraft-camera.md](tasks/watercraft-camera.md) | vehicle-player-position-sync | — |
+| combat-death-unification | [docs/tasks/combat-death-unification.md](tasks/combat-death-unification.md) | (root; keystone, size L) | combat |
+| faction-isally-sweep | [docs/tasks/faction-isally-sweep.md](tasks/faction-isally-sweep.md) | (root) | combat |
+| zone-defenders-prune | [docs/tasks/zone-defenders-prune.md](tasks/zone-defenders-prune.md) | (root) | combat |
+| fire-gate-ordering | [docs/tasks/fire-gate-ordering.md](tasks/fire-gate-ordering.md) | (root) | combat |
+| ai-timing-gate | [docs/tasks/ai-timing-gate.md](tasks/ai-timing-gate.md) | (root; merge serialized after combat-death-unification — shared CombatantLODManager) | combat |
 
-Round 1: vehicle-seat-lifecycle, tank-cannon-wiring, tank-interpolation (3 parallel).
-Round 2: vehicle-player-position-sync (after seat-lifecycle merges).
-Round 3: watercraft-camera (after position-sync merges).
+Round 1: all five in parallel (cap 5). Merge order: ai-timing-gate and
+combat-death-unification both touch CombatantLODManager — whichever is ready
+second rebases before merge.
 
-**Phase 2 exit gate:** drive a jeep 500m+ and confirm chunk streaming follows
-the player (not the boarding spot); board→exit→re-board lands in the same seat;
-M48 visually smooth at 120Hz (engineering proof + PLAYTEST_PENDING row for the
-owner 120Hz feel-walk); live tank-cannon/M2HB LMB smoke (carried from Phase 1).
+**Phase 3 exit gate:** combat120 perf-capture p95/p99 flat or improved vs the
+Phase 2 close reference capture (target: measurable improvement from
+ai-timing-gate); combat-reviewer APPROVE on all five.
 
 ## Dispatch protocol
 
