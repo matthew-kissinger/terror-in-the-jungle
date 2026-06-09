@@ -370,6 +370,85 @@ describe('PlayerVehicleAdapterFactory.trySwapSeat', () => {
   });
 });
 
+describe('seat lifecycle: exit paths that bypass factory.tryExit (Escape / requestVehicleExit)', () => {
+  /**
+   * Repro for the seat-ghost bug: `handleEscape` / `requestVehicleExit` end
+   * the player's session by calling `session.exitVehicle(...)` directly —
+   * they never route through `factory.tryExit()`. On master that path left
+   * the IVehicle seat locked to `'player'`, so `getPilotId()` lied (seat
+   * ghost) and re-boarding into the same seat failed.
+   *
+   * This exercises the production chokepoint (the shared session controller)
+   * rather than the factory wrapper, which is exactly the path the
+   * Escape / requestVehicleExit handlers take.
+   */
+  function buildTransitionCtx(h: Harness) {
+    return {
+      playerState: h.playerState,
+      vehicleId: h.session.getVehicleId() ?? '',
+      position: h.playerState.position.clone(),
+      setPosition: (p: THREE.Vector3) => h.playerState.position.copy(p),
+      input: createPlayerInput() as any,
+      cameraController: createCameraController() as any,
+      hudSystem: h.hud,
+    };
+  }
+
+  it('frees the seat when the session exits directly (Escape path), not just via factory.tryExit', async () => {
+    const jeep = makeJeep('motor_pool_small_m151', new THREE.Vector3(10, 0, 10));
+    const h = await buildHarness([{ vehicle: jeep, position: jeep.getPosition() }]);
+
+    primePrompt(h.proximityChecker, h.playerState.position, jeep.getPosition());
+    expect(h.factory.tryBoardNearest()).toBe(true);
+    expect(jeep.getPilotId()).toBe('player');
+
+    // Simulate handleEscape -> requestVehicleExit: ends the session WITHOUT
+    // calling factory.tryExit(). This is the path the bug lived on.
+    const result = h.session.exitVehicle(buildTransitionCtx(h), { reason: 'escape' });
+
+    expect(result.exited).toBe(true);
+    expect(h.session.isInVehicle()).toBe(false);
+    // The seat must be free — no ghost occupant blocking re-board / NPC mount.
+    expect(jeep.getPilotId()).toBeNull();
+    expect(jeep.getOccupant(0)).toBeNull();
+  });
+
+  it('re-board into the same seat succeeds after an Escape-style exit', async () => {
+    const jeep = makeJeep('motor_pool_small_m151', new THREE.Vector3(10, 0, 10));
+    const h = await buildHarness([{ vehicle: jeep, position: jeep.getPosition() }]);
+
+    primePrompt(h.proximityChecker, h.playerState.position, jeep.getPosition());
+    expect(h.factory.tryBoardNearest()).toBe(true);
+
+    h.session.exitVehicle(buildTransitionCtx(h), { reason: 'escape' });
+    expect(jeep.getPilotId()).toBeNull();
+
+    // Re-board: with a freed seat the player gets the pilot seat back.
+    primePrompt(h.proximityChecker, h.playerState.position, jeep.getPosition());
+    expect(h.factory.tryBoardNearest()).toBe(true);
+    expect(h.session.isInVehicle()).toBe(true);
+    expect(jeep.getPilotId()).toBe('player');
+  });
+
+  it('releases the occupied seat exactly once (an NPC passenger keeps its seat)', async () => {
+    const jeep = makeJeep('motor_pool_small_m151', new THREE.Vector3(10, 0, 10));
+    const h = await buildHarness([{ vehicle: jeep, position: jeep.getPosition() }]);
+
+    primePrompt(h.proximityChecker, h.playerState.position, jeep.getPosition());
+    expect(h.factory.tryBoardNearest()).toBe(true);
+
+    // An NPC mounts a passenger seat while the player drives.
+    jeep.enterVehicle('npc_grunt', 'passenger');
+
+    // Player exits via the Escape path (session-direct).
+    h.session.exitVehicle(buildTransitionCtx(h), { reason: 'escape' });
+
+    // Only the player's pilot seat is freed; the NPC keeps its seat.
+    expect(jeep.getPilotId()).toBeNull();
+    expect(jeep.getSeats().find((s) => s.occupantId === 'npc_grunt')).toBeTruthy();
+  });
+});
+
 describe('resolveAdapterFamily', () => {
   it('returns the correct family for each drivable category', async () => {
     const jeep = makeJeep('motor_pool_small_m151', new THREE.Vector3(0, 0, 0));

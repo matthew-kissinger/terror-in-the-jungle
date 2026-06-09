@@ -157,6 +157,9 @@ export class HelicopterModel implements GameSystem {
 
   setVehicleManager(vm: VehicleManager): void {
     this.vehicleManager = vm;
+    // VehicleManager is a VehicleSeatBinder: lets boarding via interaction
+    // lock the heli pilot seat so getPilotId() stays truthful while flying.
+    this.interaction.setSeatBinder(vm);
   }
 
   setSquadDeployTerrain(terrain: SquadDeployTerrainQuery): void {

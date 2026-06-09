@@ -4,10 +4,38 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { HelicopterInteraction } from './HelicopterInteraction';
+import { HelicopterVehicleAdapter } from '../vehicle/HelicopterVehicleAdapter';
+import { VehicleManager } from '../vehicle/VehicleManager';
+import { Faction } from '../combat/types';
 
 vi.mock('../../utils/DeviceDetector', () => ({
   shouldUseTouchControls: () => true,
 }));
+
+vi.mock('../../utils/Logger', () => ({
+  Logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+/**
+ * Stub HelicopterModel surface the HelicopterVehicleAdapter reads. The seat
+ * model itself lives on the adapter (pure occupancy bookkeeping), so the
+ * model only needs to answer the pose / health probes the adapter forwards.
+ */
+function makeHeliModelStub(position: THREE.Vector3) {
+  return {
+    getHelicopterPositionTo: (_id: string, target: THREE.Vector3) => {
+      target.copy(position);
+      return true;
+    },
+    getHelicopterQuaternionTo: (_id: string, target: THREE.Quaternion) => {
+      target.identity();
+      return true;
+    },
+    getFlightData: () => null,
+    isHelicopterDestroyed: () => false,
+    getHealthPercent: () => 1,
+  } as any;
+}
 
 describe('HelicopterInteraction', () => {
   it('uses effective terrain height when exiting a helicopter', () => {
@@ -160,5 +188,67 @@ describe('HelicopterInteraction', () => {
     interaction.tryEnterHelicopter();
 
     expect(playerController.enterHelicopter).toHaveBeenCalledWith('heli_test', expect.any(THREE.Vector3));
+  });
+});
+
+describe('HelicopterInteraction seat truth (vehicle-seat-lifecycle)', () => {
+  function buildHeliHarness() {
+    const heliPos = new THREE.Vector3(10, 5, 20);
+    const group = new THREE.Group();
+    group.position.copy(heliPos);
+
+    const vehicleManager = new VehicleManager();
+    const adapter = new HelicopterVehicleAdapter(
+      'heli_test',
+      'UH1_HUEY',
+      Faction.US,
+      makeHeliModelStub(heliPos),
+    );
+    vehicleManager.register(adapter);
+
+    const interaction = new HelicopterInteraction(new Map([['heli_test', group]]), 6);
+    interaction.setSeatBinder(vehicleManager);
+
+    const playerController = {
+      isInHelicopter: vi.fn(() => false),
+      isInFixedWing: vi.fn(() => false),
+      getPosition: vi.fn(() => new THREE.Vector3(11, 5, 20)),
+      enterHelicopter: vi.fn(),
+      exitHelicopter: vi.fn(),
+      getHelicopterId: vi.fn(() => 'heli_test'),
+    };
+    const hudSystem = { setInteractionContext: vi.fn() };
+    interaction.setPlayerController(playerController as any);
+    interaction.setHUDSystem(hudSystem as any);
+
+    return { interaction, adapter, playerController };
+  }
+
+  it('locks the pilot seat on the IVehicle adapter when boarding via interaction', () => {
+    const { interaction, adapter, playerController } = buildHeliHarness();
+
+    // Repro: before boarding the pilot seat is free (no ghost).
+    expect(adapter.getPilotId()).toBeNull();
+
+    interaction.tryEnterHelicopter();
+
+    // The player controller starts the flight session AND the IVehicle seat
+    // reflects the player as pilot — no getPilotId() === null desync while
+    // flying.
+    expect(playerController.enterHelicopter).toHaveBeenCalledWith('heli_test', expect.any(THREE.Vector3));
+    expect(adapter.getPilotId()).toBe('player');
+  });
+
+  it('does not double-occupy when boarding is attempted twice', () => {
+    const { interaction, adapter } = buildHeliHarness();
+
+    interaction.tryEnterHelicopter();
+    // Simulate a stray second board attempt (idempotency guard): the player
+    // must not end up locked into a second seat.
+    interaction.tryEnterHelicopter();
+
+    const playerSeats = adapter.getSeats().filter((s) => s.occupantId === 'player');
+    expect(playerSeats).toHaveLength(1);
+    expect(adapter.getPilotId()).toBe('player');
   });
 });

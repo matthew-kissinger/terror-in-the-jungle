@@ -85,7 +85,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // method limits; no further grandfathering needed.
   // Additional offenders surfaced at Phase 0 install. Not in original god-module top-15
   // but already over the new limit. Each gets a queued split target.
-  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work', loc: 704, methods: 47 },
+  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work; +3 LOC for vehicle-seat-lifecycle seat-binder forward (2026-06-09)', loc: 707, methods: 47 },
   // Snapshot raised 781 → 810 (ci-gate-consolidation, 2026-06-09): the sibling
   // Phase-1 task `real-mouse-input` (040337e7) added 29 LOC of real
   // held-mouse-button state to PlayerInput AFTER the budget-ratchet snapshot
