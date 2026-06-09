@@ -371,7 +371,11 @@ describe('CombatantSpawnManager', () => {
       expect(combatants.size).toBeLessThanOrEqual(10);
     });
 
-    it('removes dead combatants during the periodic spawn check', () => {
+    it('does not despawn dead bodies during the periodic spawn check (LOD manager owns despawn)', () => {
+      // combat-death-body-persistence: body despawn moved entirely to
+      // CombatantLODManager.updateDeathAnimations. The spawn manager must no
+      // longer remove DEAD combatants (the old racing sweep was deleted), so a
+      // body survives the periodic check and the LOD manager owns its lifetime.
       const deadCombatant = createMockCombatant('dead-1', Faction.US, new THREE.Vector3(0, 0, 0), CombatantState.DEAD, 0);
       combatants.set('dead-1', deadCombatant);
 
@@ -380,7 +384,7 @@ describe('CombatantSpawnManager', () => {
 
       spawnManager.update(4.0, true);
 
-      expect(combatants.has('dead-1')).toBe(false);
+      expect(combatants.has('dead-1')).toBe(true);
     });
   });
 

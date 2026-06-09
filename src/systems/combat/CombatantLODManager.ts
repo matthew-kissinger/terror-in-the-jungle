@@ -788,6 +788,9 @@ export class CombatantLODManager {
     this.combatantMovement.updateRotation(combatant, deltaTime);
   }
 
+  // Sole body-despawn owner (combat-death-body-persistence removed the racing
+  // CombatantSpawnManager sweep): despawns completed animations and terminal
+  // `DEAD && !isDying` stragglers exactly once.
   private updateDeathAnimations(deltaTime: number): void {
     const TOTAL_DEATH_TIME = DEATH_TOTAL_TIME;
 
@@ -805,6 +808,8 @@ export class CombatantLODManager {
           combatant.deathProgress = 1.0;
           toRemove.push(id);
         }
+      } else if (combatant.state === CombatantState.DEAD) {
+        toRemove.push(id);
       }
     });
 
