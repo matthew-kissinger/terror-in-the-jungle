@@ -44,6 +44,21 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-09-weapon-input-and-gate-hardening)
+
+Phase 1 of [CAMPAIGN_2026-06-09-consultation-remediation](CAMPAIGN_2026-06-09-consultation-remediation.md).
+4/4 merged, fence untouched: real-mouse-input #338 (real LMB state on PlayerInput;
+dead duck-probes deleted from tank/M2HB/gunner adapters), frame-order-guard #337
+(locks Vehicles-before-Player order + 'Other'-loop exclusion), budget-ratchet #339
+(grandfather list is now a no-growth ratchet with measured snapshots),
+ci-gate-consolidation #340 (lint:budget / check:fence / lint:docs / knip:ci now
+blocking on PRs; dead perf-baselines.json refs removed; index.html in PR paths
+filter). Follow-ups: knip:ci gates a documented subset (141-item export/type
+backlog excluded; orphan files in package.json knip.ignore await Phase 5
+deletion tasks); live tank-cannon/M2HB LMB smoke re-verifies at Phase 2 close
+(composer wiring is Phase 2). Briefs:
+`docs/tasks/archive/cycle-2026-06-09-weapon-input-and-gate-hardening/`.
+
 ## Recently Completed Archive
 
 Detailed recently-completed cycle retrospectives moved to

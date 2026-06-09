@@ -209,32 +209,36 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** `cycle-2026-06-09-weapon-input-and-gate-hardening` — Phase 1 of the
-  consultation-remediation campaign. Anchor: dead weapon bindings (tank cannon /
-  M2HB never fire on LMB — duck-typed input probes); plus the enforcement gates
-  (lint:budget ratchet, CI gate consolidation) that Phases 2-5 depend on, and a
-  frame-order guard test locking the load-bearing Vehicles-before-Player update
-  order (`8e99caac`).
-- **Previous:** closed `cycle-2026-06-04-deploy-zone-vehicle` on 2026-06-04
-  (UX-5 #335, DEFEKT-7 #336, VEKHIKL-5 #334 — all playtest-deferred); then the
-  2026-06-09 water-scorch + heli-jitter deploy (`8e99caac`, non-cycle).
-- **Next:** Phase 2 `cycle-2026-06-09-vehicle-occupancy-truth` per the campaign
-  manifest (auto-advance on Phase 1 exit gate).
+- **Cycle:** `cycle-2026-06-09-vehicle-occupancy-truth` — Phase 2 of the
+  consultation-remediation campaign. Owner-visible vehicle correctness: seat
+  ghosts on Escape-exit / heli interaction, player position parked at the
+  boarding spot while driving (breaks streaming/AI/zones/minimap), dead tank
+  cannon + M2HB composer wiring, M48 fixed-step render jitter, unreachable
+  watercraft follow-cam.
+- **Previous:** Phase 1 `cycle-2026-06-09-weapon-input-and-gate-hardening`
+  closed 2026-06-09 — 4/4 merged (#337 #338 #339 #340), fence untouched, four
+  CI gates now blocking. See BACKLOG "Recently Completed".
+- **Next:** Phase 3 `cycle-2026-06-09-combat-death-and-alliance` per the
+  campaign manifest (auto-advance on Phase 2 exit gate).
 
 ### Tasks (DAG)
 
 | slug | brief | deps | reviewer |
 |---|---|---|---|
-| real-mouse-input | [docs/tasks/real-mouse-input.md](tasks/real-mouse-input.md) | (root) — unblocks Phase 2 tank-cannon-wiring | — (FENCE WATCH: IPlayerController) |
-| frame-order-guard | [docs/tasks/frame-order-guard.md](tasks/frame-order-guard.md) | (root) | — |
-| budget-ratchet | [docs/tasks/budget-ratchet.md](tasks/budget-ratchet.md) | (root) | — |
-| ci-gate-consolidation | [docs/tasks/ci-gate-consolidation.md](tasks/ci-gate-consolidation.md) | budget-ratchet | — |
+| vehicle-seat-lifecycle | [docs/tasks/vehicle-seat-lifecycle.md](tasks/vehicle-seat-lifecycle.md) | (root) | — |
+| tank-cannon-wiring | [docs/tasks/tank-cannon-wiring.md](tasks/tank-cannon-wiring.md) | real-mouse-input (merged) | combat (touches src/systems/combat/weapons/) |
+| tank-interpolation | [docs/tasks/tank-interpolation.md](tasks/tank-interpolation.md) | (root) | — |
+| vehicle-player-position-sync | [docs/tasks/vehicle-player-position-sync.md](tasks/vehicle-player-position-sync.md) | vehicle-seat-lifecycle | — |
+| watercraft-camera | [docs/tasks/watercraft-camera.md](tasks/watercraft-camera.md) | vehicle-player-position-sync | — |
 
-Round 1: real-mouse-input, frame-order-guard, budget-ratchet (3 parallel).
-Round 2: ci-gate-consolidation (after budget-ratchet merges).
+Round 1: vehicle-seat-lifecycle, tank-cannon-wiring, tank-interpolation (3 parallel).
+Round 2: vehicle-player-position-sync (after seat-lifecycle merges).
+Round 3: watercraft-camera (after position-sync merges).
 
-**Phase 1 exit gate:** tank cannon + player M2HB fire on LMB in a smoke run; CI
-green with the four new gates active; frame-order-guard test passes.
+**Phase 2 exit gate:** drive a jeep 500m+ and confirm chunk streaming follows
+the player (not the boarding spot); board→exit→re-board lands in the same seat;
+M48 visually smooth at 120Hz (engineering proof + PLAYTEST_PENDING row for the
+owner 120Hz feel-walk); live tank-cannon/M2HB LMB smoke (carried from Phase 1).
 
 ## Dispatch protocol
 

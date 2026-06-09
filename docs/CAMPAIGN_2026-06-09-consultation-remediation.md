@@ -6,11 +6,11 @@
 > **Posture:** attended (NOT autonomous-loop — these cycles touch combat/terrain/vehicle
 > hot paths; owner wants eyes on perf deltas between phases)
 > **Concurrency cap:** 5
-> **Status:** Phase 1 open (`cycle-2026-06-09-weapon-input-and-gate-hardening`)
+> **Status:** Phase 2 open (`cycle-2026-06-09-vehicle-occupancy-truth`)
 >
-> **Progress:** ▶ 1 weapon-input-and-gate-hardening · ⬜ 2 vehicle-occupancy-truth ·
-> ⬜ 3 combat-death-and-alliance · ⬜ 4 terrain-fidelity-and-worker-safety ·
-> ⬜ 5 deploy-weight-reduction
+> **Progress:** ✅ 1 weapon-input-and-gate-hardening (4/4 merged: #337 #338 #339 #340,
+> closed 2026-06-09) · ▶ 2 vehicle-occupancy-truth · ⬜ 3 combat-death-and-alliance ·
+> ⬜ 4 terrain-fidelity-and-worker-safety · ⬜ 5 deploy-weight-reduction
 
 Source: 2026-06-09 full-codebase consultation review. Each phase is one cycle.
 **Phase barriers are hard:** a phase's exit gate (CI green + reviewer APPROVE on all
