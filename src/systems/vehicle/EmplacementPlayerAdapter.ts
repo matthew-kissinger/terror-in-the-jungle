@@ -287,22 +287,11 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
   }
 
   private readFireInput(input: PlayerInput): void {
-    // Left-click is exposed by PlayerInput via the same mouse-button
-    // surface used elsewhere; fall back to Space when mouse fire is
-    // unavailable (mirrors the existing infantry weapon binding).
-    let fire = false;
-    const anyInput = input as unknown as {
-      isMouseButtonPressed?: (b: number) => boolean;
-      getMouseButton?: (b: number) => boolean;
-    };
-    if (typeof anyInput.isMouseButtonPressed === 'function') {
-      fire = anyInput.isMouseButtonPressed(0) === true;
-    } else if (typeof anyInput.getMouseButton === 'function') {
-      fire = anyInput.getMouseButton(0) === true;
-    }
-    if (!fire && typeof input.isKeyPressed === 'function') {
-      fire = input.isKeyPressed('space');
-    }
+    // Left mouse button (held) fires the M2HB; Space is the keyboard
+    // fallback (mirrors the infantry weapon binding). PlayerInput tracks
+    // real held-button state, so this latches a fire request for any frame
+    // the trigger is down.
+    const fire = input.isMouseButtonPressed(0) || input.isKeyPressed('space');
     if (fire) this.fireRequested = true;
   }
 }

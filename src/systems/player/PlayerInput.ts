@@ -55,6 +55,16 @@ export interface InputCallbacks {
 
 export class PlayerInput {
   private keys: Set<string> = new Set();
+  /**
+   * Mouse buttons currently held down (DOM `MouseEvent.button` codes:
+   * 0 = left, 1 = middle, 2 = right). Populated on `mousedown` and cleared
+   * on `mouseup`, mirroring the held-key `keys` set. Vehicle gunner adapters
+   * (tank cannon, M2HB emplacement) poll this via `isMouseButtonPressed` for
+   * fire intent — gated the same way as held keys, so a window blur or a
+   * pointer-lock release drops the held button rather than latching a stuck
+   * shot.
+   */
+  private mouseButtons: Set<number> = new Set();
   private mouseMovement = { x: 0, y: 0 };
   private mouseResult = { x: 0, y: 0 }; // Cached return object to avoid per-frame allocation
   private isPointerLocked = false;
@@ -206,6 +216,7 @@ export class PlayerInput {
     this.isControlsEnabled = enabled;
     if (!enabled) {
       this.keys.clear();
+      this.mouseButtons.clear();
     }
   }
 
@@ -280,6 +291,18 @@ export class PlayerInput {
     return this.keys.has(key.toLowerCase());
   }
 
+  /**
+   * Whether a mouse button is currently held down. `button` uses DOM
+   * `MouseEvent.button` codes (0 = left, 1 = middle, 2 = right). Mirrors
+   * `isKeyPressed` for the pointer: the held-button set is populated on
+   * `mousedown` and cleared on `mouseup` (and on any transient-state clear),
+   * so the state tracks real input rather than latching. Vehicle gunner
+   * adapters poll this for fire intent.
+   */
+  isMouseButtonPressed(button: number): boolean {
+    return this.mouseButtons.has(button);
+  }
+
   /** Poll the gamepad once per frame. Must be called before reading movement/look. */
   pollGamepad(): void {
     if (this.gamepadManager) {
@@ -327,6 +350,7 @@ export class PlayerInput {
     const hadShift = this.keys.has('shiftleft') || this.keys.has('shiftright');
     const hadTab = this.keys.has('tab');
     this.keys.clear();
+    this.mouseButtons.clear();
     this.clearMouseMovement();
 
     if (hadShift) {
@@ -676,10 +700,15 @@ export class PlayerInput {
 
   private onMouseDown(event: MouseEvent): void {
     if (!this.getIsPointerLocked() || !this.isControlsEnabled) return;
+    this.mouseButtons.add(event.button);
     this.callbacks.onMouseDown?.(event.button);
   }
 
   private onMouseUp(event: MouseEvent): void {
+    // Always release the held-button state, even if controls are disabled or
+    // the pointer just unlocked — otherwise a button pressed-then-blocked
+    // would latch as stuck. The callback still honours the gate below.
+    this.mouseButtons.delete(event.button);
     if (!this.getIsPointerLocked() || !this.isControlsEnabled) return;
     this.callbacks.onMouseUp?.(event.button);
   }
