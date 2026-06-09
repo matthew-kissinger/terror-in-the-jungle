@@ -18,7 +18,7 @@ import type { PreparedHeightmapGrid } from './PreparedTerrainSource';
 
 import { TerrainRenderRuntime } from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
-import { computeTerrainSurfaceGridSize, TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
+import { bakeGameplayQueryGrid, computeGameplayQueryGridSize, computeTerrainSurfaceGridSize, TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
 import { TerrainQueries } from './TerrainQueries';
 import { VisualExtentHeightProvider } from './VisualExtentHeightProvider';
 import { VegetationScatterer, type VegetationScattererDebugInfo } from './VegetationScatterer';
@@ -824,22 +824,44 @@ export class TerrainSystem implements GameSystem {
   }
 
   /**
-   * After the GPU heightmap is baked, replace the HeightQueryCache provider
-   * with one that bilinear-interpolates the same baked grid. This ensures
-   * CPU height queries (collision, vegetation, BVH, AI) match the GPU surface.
+   * After the GPU heightmap is baked, replace the HeightQueryCache provider with
+   * one that bilinear-interpolates a baked grid, so CPU height queries (collision,
+   * vegetation, BVH, AI) read a stable, GPU-coherent surface.
+   *
+   * The GPU surface grid is power-of-two-capped and bottoms out at ~42m/sample on
+   * a ~21.5km A Shau world — far coarser than the 9m DEM. That coarse grid
+   * C0-smooths sharp ridges, flipping the slope gradient direction the NPC contour
+   * solver reads (the combat-movement-stall-tail root). So for DEM-scale worlds we
+   * bake a finer CPU-only gameplay-query grid from the live source provider (the
+   * full-resolution DEM at this point) over the same extent the GPU grid maps, and
+   * wrap THAT. The GPU surface texture is untouched (no render regression). For
+   * small procedural worlds the query grid size equals the surface grid, so we
+   * reuse the already-baked GPU grid and add no extra work or memory.
    */
   private syncCpuHeightsToGpu(): void {
     const baked = this.surfaceRuntime.getBakedHeightmap();
     if (!baked) return;
 
     const cache = getHeightQueryCache();
-    const bakedProvider = new BakedHeightProvider(
-      baked.data,
-      baked.gridSize,
-      baked.worldSize,
-      cache.getProvider().getWorkerConfig(),
+    // The worker config round-trips the ORIGINAL source identity (the DEM buffer
+    // for A Shau) even through a prior BakedHeightProvider swap, so re-baking the
+    // query grid always samples the full-resolution source — never a coarser
+    // intermediate grid from an earlier sync.
+    const workerConfig = cache.getProvider().getWorkerConfig();
+
+    const queryGridSize = computeGameplayQueryGridSize(this.config.worldSize);
+    if (queryGridSize > baked.gridSize) {
+      const sourceProvider = createHeightProviderFromConfig(workerConfig);
+      const queryData = bakeGameplayQueryGrid(sourceProvider, queryGridSize, baked.worldSize);
+      cache.setProvider(
+        new BakedHeightProvider(queryData, queryGridSize, baked.worldSize, workerConfig),
+      );
+      return;
+    }
+
+    cache.setProvider(
+      new BakedHeightProvider(baked.data, baked.gridSize, baked.worldSize, workerConfig),
     );
-    cache.setProvider(bakedProvider);
   }
 
   private applyVegetationConfig(): void {
