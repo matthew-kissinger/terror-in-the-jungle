@@ -1,7 +1,7 @@
 # delete-orphan-modules
 
 Known-orphaned modules ship in the repo (some in the bundle): the
-`src/rendering/` Konveyer compute spike (KonveyerComputeCarrier,
+Konveyer compute spike directory under src rendering (KonveyerComputeCarrier,
 KonveyerInstancedSlice + tests), `TerrainWorkerPool.generateChunk` + the
 worker 'generate' branch (zero prod callers, confirmed in #353's review),
 unwired probe scripts, and the knip.ignore ledger entries that exist only to
