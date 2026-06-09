@@ -45,7 +45,8 @@
       "wrangler"
     ],
     "ignoreFiles": [
-      ".claude/skills/**/templates/**"
+      ".claude/skills/**/templates/**",
+      "public/mockups/**"
     ],
     "ignore": [
       "scripts/capture-*-shots.ts",
@@ -57,7 +58,6 @@
       "scripts/perf-startup-mobile.ts",
       "scripts/perf-tsl-shader-cost.ts",
       "scripts/real-device-validation.ts",
-      "public/mockups/**",
       "src/systems/assets/PixelForgePropCatalog.ts",
       "src/systems/combat/weapons/NpcM2HBAdapter.ts"
     ],
