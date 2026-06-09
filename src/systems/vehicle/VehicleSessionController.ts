@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
+import * as THREE from 'three';
 import type { PlayerState } from '../../types';
 import { Logger } from '../../utils/Logger';
 import type { IVehicle, SeatRole } from './IVehicle';
@@ -29,9 +30,23 @@ export interface VehicleSeatBinder {
 
 type VehicleSessionState =
   | { status: 'infantry' }
-  | { status: 'in_vehicle'; vehicleType: string; vehicleId: string; adapter: PlayerVehicleAdapter };
+  | {
+      status: 'in_vehicle';
+      vehicleType: string;
+      vehicleId: string;
+      adapter: PlayerVehicleAdapter;
+      /**
+       * The live player state captured at enter time. Held so `update` can
+       * glue `playerState.position` to the chassis each frame for
+       * ground/water/emplacement sessions (the adapters that expose
+       * `getChassisPosition`). The reference is stable for the session.
+       */
+      playerState: PlayerState;
+    };
 
 type VehicleOccupancyChangeCallback = (inVehicle: boolean, state: Readonly<VehicleSessionState>) => void;
+
+const _chassisScratch = new THREE.Vector3();
 
 export class VehicleSessionController {
   private state: VehicleSessionState = { status: 'infantry' };
@@ -91,7 +106,7 @@ export class VehicleSessionController {
       }
     }
 
-    this.state = { status: 'in_vehicle', vehicleType, vehicleId, adapter };
+    this.state = { status: 'in_vehicle', vehicleType, vehicleId, adapter, playerState: ctx.playerState };
     this.lockSeat(vehicleType, vehicleId);
     this.clearTransitionInput(ctx);
     adapter.onEnter({ ...ctx, vehicleId });
@@ -152,6 +167,29 @@ export class VehicleSessionController {
       return;
     }
     this.state.adapter.update(ctx);
+    this.syncPlayerPositionToChassis();
+  }
+
+  /**
+   * Glue `playerState.position` to the active vehicle chassis each frame.
+   *
+   * Ground / water / emplacement adapters expose `getChassisPosition`; flight
+   * adapters (helicopter / fixed-wing) omit it because their own model update
+   * loops already drive the player position (`updatePlayerPosition`), so this
+   * is a no-op for them — no double-driving. World streaming, AI targeting,
+   * zone capture, and the minimap all read `playerState.position`, so without
+   * this the driven vehicle leaves every consumer stranded at the boarding
+   * spot. Mirrors the heli/fixed-wing per-frame sync; uses a direct position
+   * copy (not the guarded teleport `setPosition`) so a fast vehicle does not
+   * trip the spawn-stabilization jump guard.
+   */
+  private syncPlayerPositionToChassis(): void {
+    if (this.state.status !== 'in_vehicle') return;
+    const { adapter, playerState } = this.state;
+    if (!adapter.getChassisPosition) return;
+    if (adapter.getChassisPosition(_chassisScratch)) {
+      playerState.position.copy(_chassisScratch);
+    }
   }
 
   /**

@@ -91,6 +91,18 @@ export interface PlayerVehicleAdapter {
   update(ctx: VehicleUpdateContext): void;
 
   /**
+   * Optional: write the vehicle chassis world position into `out` and return
+   * true when the chassis pose is resolvable. Adapters whose vehicle moves the
+   * player around the world (ground / water / emplacement) implement this so
+   * the session controller can glue `playerState.position` to the chassis each
+   * frame — terrain streaming, AI targeting, zone capture, and the minimap all
+   * read that position. Flight adapters (helicopter / fixed-wing) omit it: they
+   * sync the player from their own model update loop, so leaving this undefined
+   * keeps the session controller from double-driving them.
+   */
+  getChassisPosition?(out: THREE.Vector3): boolean;
+
+  /**
    * Reset all control state owned by this adapter to defaults.
    * Called by onExit, but also available for forced cleanup.
    */

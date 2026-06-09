@@ -262,6 +262,18 @@ export class WatercraftPlayerAdapter implements PlayerVehicleAdapter {
     this.model.update(deltaTime);
   }
 
+  /**
+   * Write the hull world position into `out`. The session controller calls
+   * this each frame to keep `playerState.position` glued to the piloted hull so
+   * terrain streaming, AI targeting, zone presence, and the minimap track the
+   * watercraft rather than the boarding spot.
+   */
+  getChassisPosition(out: THREE.Vector3): boolean {
+    if (!this.mounted) return false;
+    out.copy(this.model.position);
+    return true;
+  }
+
   resetControlState(): void {
     this.controls.throttle = 0;
     this.controls.rudder = 0;

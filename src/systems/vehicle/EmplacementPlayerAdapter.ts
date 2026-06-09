@@ -176,6 +176,19 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     this.readFireInput(ctx.input);
   }
 
+  /**
+   * Write the emplacement mount world position into `out`. The session
+   * controller calls this each frame to keep `playerState.position` glued to
+   * the gun mount so AI targeting, zone presence, and the minimap see the
+   * gunner where the weapon is. A ground tripod is static, but a
+   * vehicle-mounted emplacement (PBR / vehicle M2HB) tracks the moving hull.
+   */
+  getChassisPosition(out: THREE.Vector3): boolean {
+    if (!this.mounted) return false;
+    out.copy(this.model.getPosition());
+    return true;
+  }
+
   resetControlState(): void {
     this.fireRequested = false;
   }
