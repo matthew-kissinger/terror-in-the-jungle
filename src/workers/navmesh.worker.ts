@@ -7,7 +7,7 @@
  */
 
 import { init, exportNavMesh } from '@recast-navigation/core';
-import { generateSoloNavMesh } from '@recast-navigation/generators';
+import { generateSoloNavMesh, generateTiledNavMesh } from '@recast-navigation/generators';
 
 interface GenerateMessage {
   type: 'generate';
@@ -54,7 +54,13 @@ self.onmessage = async function (event: MessageEvent<WorkerMessage>) {
     }
 
     try {
-      const result = generateSoloNavMesh(msg.positions, msg.indices, msg.config);
+      // A positive `tileSize` selects tiled generation (large worlds such as
+      // A Shau); otherwise solo. Both share the same transferable-buffer
+      // request shape, so the main thread offloads either kind identically.
+      const tiled = typeof msg.config.tileSize === 'number' && msg.config.tileSize > 0;
+      const result = tiled
+        ? generateTiledNavMesh(msg.positions, msg.indices, msg.config)
+        : generateSoloNavMesh(msg.positions, msg.indices, msg.config);
 
       if (!result.success || !result.navMesh) {
         (self as unknown as Worker).postMessage({

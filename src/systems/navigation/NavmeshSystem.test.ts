@@ -122,6 +122,50 @@ describe('NavmeshSystem graceful degradation', () => {
     expect(bounds.originZ).not.toBe(-896);
   });
 
+  it('offloads large-world tiled generation to the worker instead of stalling the main thread', async () => {
+    const tiled = vi.fn(() => ({ success: true, navMesh: { destroy: vi.fn() } }));
+    // Fake worker that answers a generate request synchronously, so tiled
+    // generation completes via the off-thread path (no main-thread build).
+    const fakeWorker = {
+      postMessage: vi.fn(),
+      terminate: vi.fn(),
+    };
+    const s = system as unknown as {
+      wasmReady: boolean;
+      workerReady: boolean;
+      navmeshWorker: typeof fakeWorker;
+      terrainSystem: { getHeightAt: (x: number, z: number) => number };
+      threeToTiledNavMeshFn: typeof tiled;
+      getPositionsAndIndicesFn: () => [Float32Array, Uint32Array];
+      importNavMeshFn: () => { navMesh: { destroy: () => void } };
+      pendingGeneration: { resolve: (d: Uint8Array) => void } | null;
+    };
+    s.wasmReady = true;
+    s.workerReady = true;
+    s.navmeshWorker = fakeWorker;
+    s.terrainSystem = { getHeightAt: () => 0 };
+    s.threeToTiledNavMeshFn = tiled;
+    s.getPositionsAndIndicesFn = () => [new Float32Array([0, 0, 0]), new Uint32Array([0])];
+    s.importNavMeshFn = () => ({ navMesh: { destroy: vi.fn() } });
+    // When the system posts a generate request, immediately resolve it with
+    // serialized navmesh data (what the real worker returns).
+    fakeWorker.postMessage.mockImplementation(() => {
+      s.pendingGeneration?.resolve(new Uint8Array([1, 2, 3, 4]));
+    });
+
+    // 21136 (A Shau) is above the tiled threshold → tiled generation path.
+    await expect(system.generateNavmesh(21136)).resolves.toBe(true);
+
+    expect(fakeWorker.postMessage).toHaveBeenCalledTimes(1);
+    // Tiled config offloaded to the worker carries a positive tileSize so the
+    // worker selects tiled (not solo) generation.
+    const sentConfig = fakeWorker.postMessage.mock.calls[0][0] as { config: { tileSize: number } };
+    expect(sentConfig.config.tileSize).toBeGreaterThan(0);
+    // The main-thread tiled build was NOT used — generation stayed off-thread.
+    expect(tiled).not.toHaveBeenCalled();
+    expect(system.isReady()).toBe(true);
+  });
+
   it('does not retry a failed solo build through a hidden large-world fallback', async () => {
     const solo = vi.fn(() => ({ success: false, error: 'synthetic solo failure' }));
     const tiled = vi.fn(() => ({ success: true, navMesh: { destroy: vi.fn() } }));
