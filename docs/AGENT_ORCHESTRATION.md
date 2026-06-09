@@ -209,35 +209,37 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** `cycle-2026-06-09-combat-death-and-alliance` — Phase 3 of the
-  consultation-remediation campaign. Combat correctness + the combat120 perf
-  lever: unify the three-way death-pipeline race (keystone), isAlly sweep,
-  zone-defender starvation, aborted-shot fire-rate theft, AI diagnostic
-  overhead gated out of prod ticks. Every task gates on combat-reviewer
-  pre-merge.
-- **Previous:** Phase 2 `cycle-2026-06-09-vehicle-occupancy-truth` closed
-  2026-06-09 — 5/5 merged (#341-#345), live land-vehicle proof 11/11 PASS,
-  owner walk row in PLAYTEST_PENDING. See BACKLOG "Recently Completed".
-- **Next:** Phase 4 `cycle-2026-06-09-terrain-fidelity-and-worker-safety` per
-  the campaign manifest (auto-advance on Phase 3 exit gate).
+- **Cycle:** `cycle-2026-06-09-terrain-fidelity-and-worker-safety` — Phase 4 of
+  the consultation-remediation campaign. The heightmap-resolution bet (A Shau
+  gameplay queries ~42m/sample off a 9m DEM → C0-discontinuous slope → the
+  combat-movement-stall-tail root), terrain worker lifecycle hazards, BVH
+  rebuild consistency, and A Shau tiled navmesh coverage. terrain-nav-reviewer
+  gates every PR. Mid-phase checkpoint after gameplay-heightmap-resolution
+  merges: re-run perf-capture combat120 + perf-analyst, re-evaluate whether
+  combat-movement-stall-tail is retired before any further solver tuning.
+- **Previous:** Phase 3 `cycle-2026-06-09-combat-death-and-alliance` closed
+  2026-06-09 — 6/6 merged (#346-#351), exit gate PASS (combat120 p99
+  50.6→~31ms vs Phase 2 close). See BACKLOG "Recently Completed".
+- **Next:** Phase 5 `cycle-2026-06-09-deploy-weight-reduction` per the campaign
+  manifest (auto-advance on Phase 4 exit gate).
 
 ### Tasks (DAG)
 
 | slug | brief | deps | reviewer |
 |---|---|---|---|
-| combat-death-unification | [docs/tasks/combat-death-unification.md](tasks/combat-death-unification.md) | (root; keystone, size L) | combat |
-| faction-isally-sweep | [docs/tasks/faction-isally-sweep.md](tasks/faction-isally-sweep.md) | (root) | combat |
-| zone-defenders-prune | [docs/tasks/zone-defenders-prune.md](tasks/zone-defenders-prune.md) | (root) | combat |
-| fire-gate-ordering | [docs/tasks/fire-gate-ordering.md](tasks/fire-gate-ordering.md) | (root) | combat |
-| ai-timing-gate | [docs/tasks/ai-timing-gate.md](tasks/ai-timing-gate.md) | (root; merge serialized after combat-death-unification — shared CombatantLODManager) | combat |
+| gameplay-heightmap-resolution | [docs/tasks/gameplay-heightmap-resolution.md](tasks/gameplay-heightmap-resolution.md) | (root; size L, highest uncertainty) | terrain-nav |
+| terrain-worker-safety | [docs/tasks/terrain-worker-safety.md](tasks/terrain-worker-safety.md) | (root) | terrain-nav |
+| bvh-rebuild-double-buffer | [docs/tasks/bvh-rebuild-double-buffer.md](tasks/bvh-rebuild-double-buffer.md) | (root) | terrain-nav |
+| navmesh-coverage-ashau | [docs/tasks/navmesh-coverage-ashau.md](tasks/navmesh-coverage-ashau.md) | gameplay-heightmap-resolution | terrain-nav |
 
-Round 1: all five in parallel (cap 5). Merge order: ai-timing-gate and
-combat-death-unification both touch CombatantLODManager — whichever is ready
-second rebases before merge.
+Round 1: gameplay-heightmap-resolution, terrain-worker-safety,
+bvh-rebuild-double-buffer (3 parallel).
+Mid-phase checkpoint (orchestrator action) after heightmap merges.
+Round 2: navmesh-coverage-ashau.
 
-**Phase 3 exit gate:** combat120 perf-capture p95/p99 flat or improved vs the
-Phase 2 close reference capture (target: measurable improvement from
-ai-timing-gate); combat-reviewer APPROVE on all five.
+**Phase 4 exit gate:** NPC stuck-on-slope rate measurably down in a scripted
+A Shau scenario; no startup wedge under a dispose/mode-switch race;
+terrain-nav-reviewer APPROVE on all four.
 
 ## Dispatch protocol
 

@@ -78,6 +78,31 @@ blocks, in-flight cannon round freezes on dismount (stepper rides the adapter),
 NPC tank cannon (TankCannonProjectileSystem) still unconstructed in prod.
 Briefs: `docs/tasks/archive/cycle-2026-06-09-vehicle-occupancy-truth/`.
 
+## Recently Completed (cycle-2026-06-09-combat-death-and-alliance)
+
+Phase 3 of [CAMPAIGN_2026-06-09-consultation-remediation](CAMPAIGN_2026-06-09-consultation-remediation.md).
+6/6 merged, all combat-reviewer gated (4 APPROVE, 2 APPROVE-WITH-NOTES), fence
+untouched: zone-defenders-prune #346, fire-gate-ordering #347 (aborted shots no
+longer eat fire-rate/bloom), faction-isally-sweep #348 (suppression/cluster/zone
+owner checks on canonical alliance helpers), combat-death-unification #349
+(CombatantDeathPipeline single owner; rifle-path promotion/empty-squad-delete was
+the real bug; explosion via spatialGridManager.queryRadius), ai-timing-gate #350
+(diagnostics behind isPerfDiagnosticsEnabled; per-tick allocs hoisted; LOD interval
+params cached), combat-death-body-persistence #351 (R2 split: LODManager sole
+body-despawn owner, racing SpawnManager sweep deleted, player-rifle squads + AI-
+killed player-squad respawns rehomed through the pipeline).
+**Exit gate PASS: combat120 p99 50.6→~31ms (-38%), avg 31→24ms vs Phase 2 close**
+(`artifacts/perf/2026-06-09T20-50-12-389Z` → `2026-06-09T21-57-12-684Z`; same
+non-quiet box, Combat-phase tail 13.2→9.8ms; p99 now under the 35ms STABILIZAT-1
+target, formal close still needs the quiet-box capture + committed baseline).
+Reviewer follow-ups (non-blocking): alive-but-no-longer-defending ids still hold
+zoneDefenders slots until death (#346 note); owner-display/resupply sites still
+raw `=== Faction.US` (ZoneRenderer, CompassZoneMarkers, OpenFrontierRespawnMapUtils,
+AmmoSupplySystem/AmmoManager — sweep candidate); RespawnManager.queueRespawn lacks
+a dedup guard (single-call contract — add comment or originalId dedup); watch
+raycast-budget denial rate in playtest (blocked NPCs now re-poll the terrain gate).
+Briefs: `docs/tasks/archive/cycle-2026-06-09-combat-death-and-alliance/`.
+
 ## Recently Completed Archive
 
 Detailed recently-completed cycle retrospectives moved to
