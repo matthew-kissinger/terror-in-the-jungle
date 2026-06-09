@@ -13,7 +13,7 @@ import {
 } from './OpenFrontierRespawnMapUtils';
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 import type { VehicleMarker } from '../minimap/MinimapRenderer';
-import { isBlufor } from '../../systems/combat/types';
+import { factionMarkerFill } from './MapProjection';
 
 interface RenderState {
   zoomLevel: number;
@@ -283,8 +283,7 @@ export class OpenFrontierRespawnMapRenderer {
   ): void {
     const { x, y } = worldToMap(marker.worldPos.x, marker.worldPos.z);
     const size = Math.max(7, 11 / Math.sqrt(Math.max(zoomLevel, 0.75)));
-    const friendly = isBlufor(marker.faction);
-    const fill = friendly ? 'rgba(79, 107, 58, 0.6)' : 'rgba(158, 59, 46, 0.6)';
+    const fill = factionMarkerFill(marker.faction, 0.6);
     const stroke = 'rgba(43, 38, 32, 0.85)';
 
     ctx.save();
