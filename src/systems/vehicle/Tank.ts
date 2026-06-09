@@ -227,7 +227,7 @@ export class Tank implements IVehicle {
     }
     if (terrain) {
       this.physics.conformToTerrain(terrain);
-      const state = this.physics.getState();
+      const state = this.physics.getInterpolatedState();
       this.object.position.copy(state.position);
       this.object.quaternion.copy(state.quaternion);
     }
@@ -522,7 +522,12 @@ export class Tank implements IVehicle {
     if (this.destroyed || dt <= 0) return;
     this.physics.update(dt, this.terrain);
 
-    const state = this.physics.getState();
+    // Render the interpolated pose, not the raw fixed-step pose. The physics
+    // ticks at a fixed 60 Hz; reading the raw step pose at a higher refresh
+    // makes the chassis snap to the latest completed step and jitter (same
+    // defect class as the helicopter chase-cam jitter fixed in 8e99caac). The
+    // simulation itself stays strictly fixed-step.
+    const state = this.physics.getInterpolatedState();
     this.object.position.copy(state.position);
     this.object.quaternion.copy(state.quaternion);
     this.velocity.copy(state.velocity);

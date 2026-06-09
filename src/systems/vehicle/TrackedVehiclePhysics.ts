@@ -150,13 +150,31 @@ export class TrackedVehiclePhysics {
   );
 
   private state: InternalState;
+  // Render-pose snapshot taken at the start of each fixed step (before the step
+  // mutates `state`). `getInterpolatedState()` blends it toward `state` by the
+  // accumulator fraction so the rendered M48 advances smoothly above the 60 Hz
+  // fixed step instead of snapping to the latest step (the jitter signature).
+  // Reuses InternalState for shape parity; only the pose fields are read.
+  private previousState: InternalState;
   private rawControls: TrackedVehicleControls;
   private worldHalfExtent = 0;
 
   constructor(initialPosition: THREE.Vector3, config?: Partial<TrackedVehiclePhysicsConfig>) {
     this.cfg = { ...DEFAULT_PHYSICS, ...(config ?? {}) };
     this.state = this.makeBlankState(initialPosition);
+    this.previousState = this.makeBlankState(initialPosition);
+    this.snapshotPrevious(); // seed the render buffer from the initial state
     this.rawControls = { throttleAxis: 0, turnAxis: 0, brake: 0 };
+  }
+
+  private snapshotPrevious(): void {
+    this.previousState.position.copy(this.state.position);
+    this.previousState.quaternion.copy(this.state.quaternion);
+    this.previousState.velocity.copy(this.state.velocity);
+    this.previousState.angularVelocity.copy(this.state.angularVelocity);
+    this.previousState.leftTrackSpeed = this.state.leftTrackSpeed;
+    this.previousState.rightTrackSpeed = this.state.rightTrackSpeed;
+    this.previousState.isGrounded = this.state.isGrounded;
   }
 
   private makeBlankState(initialPosition: THREE.Vector3): InternalState {
@@ -188,6 +206,7 @@ export class TrackedVehiclePhysics {
 
   update(deltaTime: number, terrain: ITerrainRuntime | null): void {
     this.stepper.step(deltaTime, (fixedDt) => {
+      this.snapshotPrevious();
       this.simulateStep(fixedDt, terrain);
     });
   }
@@ -231,11 +250,13 @@ export class TrackedVehiclePhysics {
       this.state.cornerSamples[i].terrainHeight = p.y - this.cfg.axleOffset;
       this.state.cornerSamples[i].inBounds = true;
     }
+    this.snapshotPrevious(); // keep render buffer in lockstep after a teleport
   }
 
   setQuaternion(q: THREE.Quaternion): void {
     this.state.quaternion.copy(q).normalize();
     this.state.angularVelocity.set(0, 0, 0);
+    this.snapshotPrevious();
   }
 
   setTracksBlown(blown: boolean): void {
@@ -337,10 +358,37 @@ export class TrackedVehiclePhysics {
       _normal.copy(_worldUp);
     }
     this.conformToGround(_normal);
+
+    // Lockstep the render buffer so the first rendered pose does not lerp up
+    // from the stale (often below-surface) pre-conform pose.
+    this.snapshotPrevious();
   }
 
   getInterpolationAlpha(): number {
     return this.stepper.getInterpolationAlpha();
+  }
+
+  /**
+   * Render-time interpolated pose: blends the previous fixed-step pose toward
+   * the current one by the accumulator fraction. Consume this for the rendered
+   * chassis transform — reading the raw `getState()` pose above 60 Hz snaps the
+   * M48 to the latest step and jitters (same defect as the heli chase-cam,
+   * 8e99caac). Track speeds are scaled to m/s to match `getState()`; the
+   * simulation itself stays strictly fixed-step.
+   */
+  getInterpolatedState(): TrackedVehicleStateSnapshot {
+    const alpha = this.stepper.getInterpolationAlpha();
+    return {
+      position: this.previousState.position.clone().lerp(this.state.position, alpha),
+      velocity: this.previousState.velocity.clone().lerp(this.state.velocity, alpha),
+      angularVelocity: this.previousState.angularVelocity.clone().lerp(this.state.angularVelocity, alpha),
+      quaternion: this.previousState.quaternion.clone().slerp(this.state.quaternion, alpha),
+      leftTrackSpeed: THREE.MathUtils.lerp(this.previousState.leftTrackSpeed, this.state.leftTrackSpeed, alpha) * this.cfg.maxTrackSpeed,
+      rightTrackSpeed: THREE.MathUtils.lerp(this.previousState.rightTrackSpeed, this.state.rightTrackSpeed, alpha) * this.cfg.maxTrackSpeed,
+      isGrounded: alpha < 1 ? this.previousState.isGrounded : this.state.isGrounded,
+      tracksBlown: this.state.tracksBlown,
+      engineKilled: this.state.engineKilled,
+    };
   }
 
   getCornerSamples(): readonly CornerSample[] {

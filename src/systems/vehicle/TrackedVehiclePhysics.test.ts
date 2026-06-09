@@ -487,4 +487,96 @@ describe('TrackedVehiclePhysics', () => {
       expect(Math.abs(fwd.lengthSq() - 1)).toBeLessThan(1e-3);
     });
   });
+
+  // Render-time interpolation. The chassis integrates at a fixed 60 Hz step but
+  // is rendered at the display refresh, which can be 120/144 Hz. Reading the raw
+  // fixed-step pose at a render frame that lands mid-step makes the chassis snap
+  // to the latest completed step and stall until the next one fires — the same
+  // jitter signature fixed for the helicopter chase-cam (8e99caac). The
+  // authoritative visual pose is `getInterpolatedState()`, which blends the
+  // previous and current fixed-step poses by the accumulator fraction.
+  describe('Render interpolation between fixed steps', () => {
+    const STEP = TrackedVehiclePhysics.FIXED_STEP_SECONDS;
+
+    it('exposes a rendered pose strictly between the previous and current physics steps mid-step', () => {
+      const flat = makeFlatTerrain(0);
+      // Drive with exactly-fixed-step deltas from a fresh (zero-accumulator)
+      // stepper so the render alpha is a known fraction at each assertion point.
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 90; i += 1) physics.update(STEP, flat);
+
+      // Standard fixed-step interpolation renders one step behind: at alpha == 0
+      // (accumulator empty, right after a step completes) the rendered pose is
+      // the *previous* completed step, and it advances toward the latest raw
+      // step as the render clock fills the accumulator. Capture both bracketing
+      // physics-step poses: alpha-0 rendered = previous step, raw state = latest.
+      const prevStepPose = physics.getInterpolatedState().position.clone();
+      const latestStepPose = physics.getState().position.clone();
+      const segment = prevStepPose.distanceTo(latestStepPose);
+      // The chassis is moving, so the two bracketing steps are distinct.
+      expect(segment).toBeGreaterThan(1e-4);
+
+      // Advance the render clock by HALF a fixed step. No new physics step fires
+      // (accumulator = 0.5 * STEP), so the raw physics pose is unchanged.
+      physics.update(STEP * 0.5, flat);
+      const rawPhysics = physics.getState().position.clone();
+      expect(rawPhysics.distanceTo(latestStepPose)).toBeLessThan(1e-6);
+
+      // The rendered pose at alpha ~ 0.5 must lie strictly BETWEEN the two
+      // bracketing physics steps — a genuine blend, not snapped to either
+      // endpoint. Raw-pose rendering would pin the rendered pose to
+      // `latestStepPose` (zero advance across the sub-step) and fail the
+      // "moved away from the latest step" assertion below — that is the jitter
+      // signature this test guards.
+      const rendered = physics.getInterpolatedState().position.clone();
+      expect(rendered.distanceTo(prevStepPose)).toBeGreaterThan(1e-4);
+      expect(rendered.distanceTo(latestStepPose)).toBeGreaterThan(1e-4);
+      expect(rendered.distanceTo(prevStepPose)).toBeLessThan(segment);
+      expect(rendered.distanceTo(latestStepPose)).toBeLessThan(segment);
+    });
+
+    it('rendered pose advances smoothly across render frames faster than the fixed step', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      settle(physics, flat, 30, STEP);
+
+      physics.setControls(1.0, 0, false);
+      // Warm up to a steady forward speed at the fixed cadence.
+      for (let i = 0; i < 60; i += 1) physics.update(STEP, flat);
+
+      // Render at 144 Hz while the sim ticks at 60 Hz. Reading the raw pose here
+      // would alias the fixed-step sawtooth: many render frames see ZERO advance
+      // (accumulator mid-step) punctuated by a big jump when a step fires. The
+      // interpolated pose must advance on essentially every render frame.
+      const RENDER_DT = 1 / 144;
+      let prev = physics.getInterpolatedState().position.clone();
+      let framesThatAdvanced = 0;
+      const TOTAL_FRAMES = 120;
+      for (let i = 0; i < TOTAL_FRAMES; i += 1) {
+        physics.update(RENDER_DT, flat);
+        const now = physics.getInterpolatedState().position.clone();
+        if (now.distanceTo(prev) > 1e-5) framesThatAdvanced += 1;
+        prev = now;
+      }
+
+      // With raw-pose rendering only ~ (60/144) of frames would advance (~42%).
+      // Interpolation should advance the vast majority of render frames.
+      expect(framesThatAdvanced).toBeGreaterThan(TOTAL_FRAMES * 0.85);
+    });
+
+    it('seeds the interpolation buffer on conformToTerrain so the first frame does not lerp from a stale pose', () => {
+      const terrain = makeFlatTerrain(40);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(10, -50, 15));
+
+      // Constructed well below the surface; conform clamps it onto the terrain.
+      physics.conformToTerrain(terrain);
+
+      // The very first interpolated pose must already report the conformed Y,
+      // not lerp up from the stale below-surface previous pose.
+      const rendered = physics.getInterpolatedState();
+      expect(rendered.position.y).toBeGreaterThan(40);
+      expect(rendered.position.y).toBeLessThan(41);
+    });
+  });
 });
