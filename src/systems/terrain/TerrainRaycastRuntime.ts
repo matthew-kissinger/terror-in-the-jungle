@@ -5,15 +5,35 @@ import * as THREE from 'three';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
 
 /**
+ * One side of the double-buffered near-field terrain mesh. The runtime keeps
+ * two of these: a `front` slab that queries raycast against (always a complete,
+ * self-consistent snapshot) and a `back` slab that an in-progress rebuild
+ * writes height rows into. The two are swapped atomically only once the back
+ * slab is fully rewritten, so a query issued mid-rebuild can never observe a
+ * hybrid of old and new triangles.
+ */
+interface MeshSlab {
+  mesh: THREE.Mesh;
+  positionBuffer: Float32Array;
+  gridWidth: number;
+}
+
+/**
  * Owns the near-field BVH terrain mesh used for terrain raycasts and LOS acceleration.
+ *
+ * The rebuild is incremental (a handful of grid rows per frame), so it spans
+ * multiple frames during which terrain LOS / fire-authority raycasts keep
+ * firing. To keep those queries consistent, rewrites land in a back slab and
+ * the registered (queried) front slab is only replaced once the rebuild
+ * completes. See `MeshSlab`.
  */
 export class TerrainRaycastRuntime {
   private readonly losAccelerator: LOSAccelerator;
-  private bvhMesh: THREE.Mesh | null = null;
+  // `frontSlab` is the snapshot queries read; `backSlab` receives the rebuild.
+  private frontSlab: MeshSlab | null = null;
+  private backSlab: MeshSlab | null = null;
   private readonly lastBvhCenter = new THREE.Vector3(NaN, NaN, NaN);
   private readonly targetBvhCenter = new THREE.Vector3(NaN, NaN, NaN);
-  private gridWidth = 0;
-  private positionBuffer: Float32Array | null = null;
   private halfSteps = 0;
   private rebuildStep = 6;
   private pendingRowIndex = 0;
@@ -63,16 +83,20 @@ export class TerrainRaycastRuntime {
   }
 
   dispose(): void {
-    if (this.bvhMesh) {
+    if (this.frontSlab) {
       this.losAccelerator.unregisterChunk('bvh_nearfield');
-      this.bvhMesh.geometry.dispose();
-      this.bvhMesh = null;
+      this.frontSlab.mesh.geometry.dispose();
+      this.frontSlab = null;
+    }
+    if (this.backSlab) {
+      this.backSlab.mesh.geometry.dispose();
+      this.backSlab = null;
     }
     this.losAccelerator.clear();
   }
 
   isReadyForPosition(center: THREE.Vector3, coverageRadius: number): boolean {
-    if (!this.bvhMesh || this.rebuildQueued) {
+    if (!this.frontSlab || this.rebuildQueued) {
       return false;
     }
     const dx = center.x - this.lastBvhCenter.x;
@@ -91,7 +115,7 @@ export class TerrainRaycastRuntime {
     this.rebuildStep = 6;
     this.halfSteps = Math.ceil(radius / this.rebuildStep);
     const gridW = this.halfSteps * 2 + 1;
-    this.ensureMeshBuffers(gridW);
+    this.ensureBackSlab(gridW);
     this.targetBvhCenter.copy(center);
     this.pendingRowIndex = 0;
     this.pendingRows = gridW;
@@ -102,14 +126,15 @@ export class TerrainRaycastRuntime {
     getHeightAt: (x: number, z: number) => number,
     maxRowsPerFrame: number,
   ): boolean {
-    if (!this.rebuildQueued || !this.bvhMesh || !this.positionBuffer) {
+    if (!this.rebuildQueued || !this.backSlab) {
       return false;
     }
 
-    const gridW = this.gridWidth;
-    const geometry = this.bvhMesh!.geometry as THREE.BufferGeometry;
+    const back = this.backSlab;
+    const gridW = back.gridWidth;
+    const geometry = back.mesh.geometry as THREE.BufferGeometry;
     const positionAttr = geometry.getAttribute('position') as THREE.BufferAttribute;
-    const positions = this.positionBuffer!;
+    const positions = back.positionBuffer;
     const rowsToProcess = Math.max(1, Math.min(maxRowsPerFrame, this.pendingRows));
     const startRow = this.pendingRowIndex;
     const endRow = Math.min(gridW, startRow + rowsToProcess);
@@ -130,9 +155,12 @@ export class TerrainRaycastRuntime {
     this.pendingRows = Math.max(0, gridW - endRow);
 
     if (this.pendingRows === 0) {
+      // Back slab is now a complete snapshot — finalize its bounds and swap it
+      // in front so queries pick it up atomically. Until this line runs, every
+      // raycast saw the previous, fully-consistent front slab.
       geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
-      this.losAccelerator.registerChunk('bvh_nearfield', this.bvhMesh!);
+      this.swapInBackSlab();
       this.lastBvhCenter.copy(this.targetBvhCenter);
       this.rebuildQueued = false;
     }
@@ -140,19 +168,44 @@ export class TerrainRaycastRuntime {
     return true;
   }
 
-  private ensureMeshBuffers(gridW: number): void {
-    if (this.bvhMesh && this.gridWidth === gridW && this.positionBuffer) {
+  /**
+   * Promote the freshly rebuilt back slab to front and register it for LOS.
+   * The old front slab (if any) becomes the back slab to be reused next
+   * rebuild, so steady-state allocates no new geometry. `registerChunk`
+   * replaces the `bvh_nearfield` cache entry by key, so the swap is atomic
+   * from a query's perspective: it reads either the old mesh or the new one,
+   * never a half-written buffer.
+   */
+  private swapInBackSlab(): void {
+    const newFront = this.backSlab!;
+    this.backSlab = this.frontSlab;
+    this.frontSlab = newFront;
+    this.losAccelerator.registerChunk('bvh_nearfield', newFront.mesh);
+  }
+
+  /**
+   * Ensure the back slab exists and matches the requested grid width. The back
+   * slab is the only buffer the rebuild writes into; the front slab is left
+   * untouched so in-flight queries stay consistent. When the grid width
+   * changes (rare — only when coverage radius changes) the back slab geometry
+   * is rebuilt from scratch.
+   */
+  private ensureBackSlab(gridW: number): void {
+    if (this.backSlab && this.backSlab.gridWidth === gridW) {
       return;
     }
 
-    if (this.bvhMesh) {
-      this.losAccelerator.unregisterChunk('bvh_nearfield');
-      this.bvhMesh.geometry.dispose();
+    if (this.backSlab) {
+      this.backSlab.mesh.geometry.dispose();
+      this.backSlab = null;
     }
 
-    this.gridWidth = gridW;
+    this.backSlab = this.createSlab(gridW);
+  }
+
+  private createSlab(gridW: number): MeshSlab {
     const vertexCount = gridW * gridW;
-    this.positionBuffer = new Float32Array(vertexCount * 3);
+    const positionBuffer = new Float32Array(vertexCount * 3);
     const indexCount = (gridW - 1) * (gridW - 1) * 6;
     const indices = vertexCount > 65535
       ? new Uint32Array(indexCount)
@@ -175,10 +228,12 @@ export class TerrainRaycastRuntime {
     }
 
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(this.positionBuffer, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(positionBuffer, 3));
     geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
-    this.bvhMesh = new THREE.Mesh(geometry);
-    this.bvhMesh.visible = false;
+    const mesh = new THREE.Mesh(geometry);
+    mesh.visible = false;
+
+    return { mesh, positionBuffer, gridWidth: gridW };
   }
 }
