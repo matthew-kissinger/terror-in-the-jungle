@@ -73,7 +73,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/vehicle/airframe/Airframe.ts': { round: 'P3R4', reason: '0 tests → add tests + slim split', loc: 985, methods: 22 },
   'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: 'ai-timing-gate; +5 LOC: sole body-despawn owner now reaps terminal DEAD stragglers (combat-death-body-persistence)', loc: 933, methods: 32 },
   'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: 'split into 3 files', loc: 860, methods: 34 },
-  'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files', loc: 789, methods: 24 },
+  'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files; +19 LOC: worker-offload tiled generation past the anchor window (navmesh-coverage-ashau)', loc: 808, methods: 24 },
   'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: 'split into 2 files', loc: 788, methods: 36 },
   'src/systems/combat/ai/AIStateEngage.ts': { round: 'P3R2', reason: 'cover-search extraction P4F2', loc: 1005, methods: 30 },
   'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path', loc: 992, methods: 44 },
@@ -99,7 +99,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade; +22 LOC cycle-2026-06-09 gameplay-heightmap-resolution (DEM-faithful CPU query grid in syncCpuHeightsToGpu + rationale)', loc: 898, methods: 69 },
   'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 861, methods: 24 },
   'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 882, methods: 42 },
-  'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '0 tests → split into terrain config + biome config + spawn data', loc: 756, methods: 0 },
+  'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '0 tests → split into terrain config + biome config + spawn data; +5 LOC: prebaked navmesh asset wiring (navmesh-coverage-ashau)', loc: 761, methods: 0 },
   // Pre-existing budget debt surfaced by validate:fast (CI runs `lint` but not
   // `lint:budget`): grew during the 2026-06-03 deploy-loadout cycle (UX-3
   // faction-availability chips + the selectable-ammo 4th loadout slot).

@@ -586,6 +586,25 @@ export class NavmeshSystem {
     );
     const obstacleMeshes = buildNavmeshFeatureObstacleMeshes(features, sampleHeight);
     const inputMeshes = [mesh, ...obstacleMeshes];
+
+    // Offload tiled generation to the worker when available (same transferable
+    // request path solo uses). The worker selects tiled vs solo from the
+    // positive `tileSize` in recastConfig, so coverage extends beyond the
+    // anchor window without stalling the main thread.
+    if (this.workerReady && this.getPositionsAndIndicesFn && this.importNavMeshFn) {
+      try {
+        const workerResult = await this.generateViaWorker(inputMeshes, recastConfig, null);
+        if (workerResult) this.generationMode = 'static-tiled';
+        geometry.dispose();
+        for (const obstacleMesh of obstacleMeshes) obstacleMesh.geometry.dispose();
+        return workerResult;
+      } catch (error) {
+        Logger.warn('Navigation', 'Worker tiled navmesh generation failed, falling back to main thread:', error);
+        this.pendingGeneration = null;
+        this.workerReady = false;
+      }
+    }
+
     const result = this.threeToTiledNavMeshFn(inputMeshes, recastConfig);
 
     if (!result.success || !result.navMesh) {

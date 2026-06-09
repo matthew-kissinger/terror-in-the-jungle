@@ -9,16 +9,18 @@
 
 import * as THREE from 'three';
 import { init, exportNavMesh, importNavMesh, NavMeshQuery } from '@recast-navigation/core';
-import { generateSoloNavMesh } from '@recast-navigation/generators';
+import { generateSoloNavMesh, generateTiledNavMesh } from '@recast-navigation/generators';
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
 import { OPEN_FRONTIER_CONFIG } from '../src/config/OpenFrontierConfig';
 import { ZONE_CONTROL_CONFIG } from '../src/config/ZoneControlConfig';
 import { TEAM_DEATHMATCH_CONFIG } from '../src/config/TeamDeathmatchConfig';
+import { A_SHAU_VALLEY_CONFIG } from '../src/config/AShauValleyConfig';
 import { getMapVariants } from '../src/config/MapSeedRegistry';
 import { GameMode } from '../src/config/gameModeTypes';
 import { NoiseHeightProvider } from '../src/systems/terrain/NoiseHeightProvider';
+import { DEMHeightProvider } from '../src/systems/terrain/DEMHeightProvider';
 import { StampedHeightProvider } from '../src/systems/terrain/StampedHeightProvider';
 import { compileTerrainFeatures } from '../src/systems/terrain/TerrainFeatureCompiler';
 import { buildHeightfieldMesh } from '../src/systems/navigation/NavmeshHeightfieldBuilder';
@@ -26,6 +28,17 @@ import { computeTerrainSurfaceGridSize } from '../src/systems/terrain/TerrainSur
 import { computeNavmeshBakeSignature } from '../src/systems/navigation/NavmeshBakeSignature';
 import { buildNavmeshFeatureObstacleMeshes } from '../src/systems/navigation/NavmeshFeatureObstacles';
 import type { GameModeConfig } from '../src/config/gameModeTypes';
+
+// ── A Shau (DEM-based, tiled) ────────────────────────────────────────
+// A Shau is not a seeded procedural mode: it ships a real DEM and a single
+// full-battlefield tiled navmesh. Recast tiled params mirror NavmeshSystem's
+// large-world tiled config (cs=3.0, ch=0.4, hfCellSize=12, tileSize=ceil(256/cs)).
+const ASHAU_NAVMESH_FILE = 'a_shau_valley.bin';
+const ASHAU_NAVMESH_ASSET = `/data/navmesh/${ASHAU_NAVMESH_FILE}`;
+const ASHAU_CS = 3.0;
+const ASHAU_CH = 0.4;
+const ASHAU_HF_CELL_SIZE = 12.0;
+const ASHAU_TILE_SIZE = Math.ceil(256 / ASHAU_CS);
 
 // ── Recast params (must match NavmeshSystem) ─────────────────────────
 
@@ -358,24 +371,190 @@ function validateConnectivity(
   return { connected: islands.length === 1, islands };
 }
 
+/**
+ * Validate A Shau connectivity. Same union-find as the seeded path, but with
+ * tall query half-extents (the valley spans 373m-1902m of relief, so the
+ * seeded 50m Y extent would miss high ridge polys), and a per-base search
+ * radius proportional to the home-base radius.
+ */
+function validateAShauConnectivity(
+  navMeshData: Uint8Array,
+  homeBases: Array<{ name: string; x: number; z: number; radius: number }>,
+  getHeight: (x: number, z: number) => number,
+): { connected: boolean; islands: string[][] } {
+  const imported = importNavMesh(navMeshData);
+  const query = new NavMeshQuery(imported.navMesh, { maxNodes: 4096 });
+  query.defaultQueryHalfExtents = { x: 30, y: 400, z: 30 };
+
+  const points = homeBases.map((b) => {
+    const raw = { x: b.x, y: getHeight(b.x, b.z), z: b.z };
+    const searchRadius = Math.max(b.radius + 40, 80);
+    const snapped = query.findClosestPoint(raw, {
+      halfExtents: { x: searchRadius, y: 400, z: searchRadius },
+    });
+    return {
+      name: b.name,
+      pos: snapped.success && snapped.polyRef !== 0 ? snapped.point : raw,
+    };
+  });
+
+  const parent = points.map((_, i) => i);
+  const find = (x: number): number => {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  };
+  const union = (a: number, b: number) => { parent[find(a)] = find(b); };
+
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      if (find(i) === find(j)) continue;
+      const result = query.computePath(points[i].pos, points[j].pos);
+      if (result.success && result.path.length > 0) {
+        union(i, j);
+      }
+    }
+  }
+
+  const groups = new Map<number, string[]>();
+  for (let i = 0; i < points.length; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(points[i].name);
+  }
+
+  const islands = [...groups.values()];
+  query.destroy();
+  imported.navMesh.destroy();
+  return { connected: islands.length === 1, islands };
+}
+
+/**
+ * Prebake the full-battlefield A Shau tiled navmesh from the real DEM.
+ * Skip-if-exists: leaves the committed `.bin` in place unless --force.
+ * Returns true on success (or skip), false if generation/connectivity failed.
+ */
+function bakeAShau(force: boolean): boolean {
+  const config = A_SHAU_VALLEY_CONFIG;
+  const outPath = resolve(NAVMESH_DIR, ASHAU_NAVMESH_FILE);
+
+  console.log(`\n${'#'.repeat(60)}`);
+  console.log(`Mode: a_shau_valley | worldSize=${config.worldSize} | DEM tiled (full battlefield)`);
+  console.log('#'.repeat(60));
+
+  if (existsSync(outPath) && !force) {
+    console.log(`  Skipping: ${ASHAU_NAVMESH_ASSET} already exists (use --force to regenerate).`);
+    return true;
+  }
+
+  // Read DEM from disk (gitignored; see data/vietnam/DATA_PIPELINE.md).
+  const hs = config.heightSource;
+  if (!hs || hs.type !== 'dem' || !hs.path) {
+    console.error('  ERROR: A Shau config is missing a DEM height source.');
+    return false;
+  }
+  const demPath = resolve(import.meta.dirname!, '..', 'public', hs.path.replace(/^\//, ''));
+  if (!existsSync(demPath)) {
+    console.error(
+      `  ERROR: A Shau DEM not found at ${demPath}. ` +
+      'The DEM is gitignored; place it locally before baking (data/vietnam/DATA_PIPELINE.md).',
+    );
+    return false;
+  }
+  const demBuf = readFileSync(demPath);
+  const demData = new Float32Array(demBuf.buffer, demBuf.byteOffset, demBuf.byteLength / 4);
+  const demProvider = new DEMHeightProvider(demData, hs.width!, hs.height!, hs.metersPerPixel!);
+
+  // Apply the same feature stamping the runtime terrain pipeline applies.
+  const compiled = compileTerrainFeatures(config, (x, z) => demProvider.getHeightAt(x, z));
+  const heightProvider = compiled.stamps.length > 0
+    ? new StampedHeightProvider(demProvider, compiled.stamps)
+    : demProvider;
+  const getHeight = (x: number, z: number) => heightProvider.getHeightAt(x, z);
+
+  // Build full-map input geometry (heightfield + structure obstacle walls).
+  console.log(`  Trying tiled cs=${ASHAU_CS} (hfCellSize=${ASHAU_HF_CELL_SIZE}m, tileSize=${ASHAU_TILE_SIZE})`);
+  const geoStart = performance.now();
+  const input = buildInputGeometry(config, getHeight, ASHAU_HF_CELL_SIZE);
+  const geoTime = performance.now() - geoStart;
+  console.log(`  Geometry: ${(input.positions.length / 3).toLocaleString()} verts, ${(input.indices.length / 3).toLocaleString()} tris (${(geoTime / 1000).toFixed(1)}s)`);
+
+  const recastConfig: Record<string, number> = {
+    cs: ASHAU_CS,
+    ch: ASHAU_CH,
+    walkableSlopeAngle: WALKABLE_SLOPE_ANGLE,
+    walkableHeight: Math.ceil(AGENT_HEIGHT / ASHAU_CH),
+    walkableClimb: Math.ceil(WALKABLE_CLIMB / ASHAU_CH),
+    walkableRadius: Math.ceil(AGENT_RADIUS / ASHAU_CS),
+    maxEdgeLen: 24,
+    maxSimplificationError: 1.3,
+    minRegionArea: 16,
+    mergeRegionArea: 40,
+    maxVertsPerPoly: 6,
+    detailSampleDist: 12,
+    detailSampleMaxError: 1,
+    tileSize: ASHAU_TILE_SIZE,
+  };
+
+  const genStart = performance.now();
+  const result = generateTiledNavMesh(input.positions, input.indices, recastConfig);
+  const genTime = performance.now() - genStart;
+  input.dispose();
+
+  if (!result.success || !result.navMesh) {
+    console.error(`  FAILED: tiled navmesh generation failed (${(genTime / 1000).toFixed(1)}s)`);
+    return false;
+  }
+
+  const navMeshData = exportNavMesh(result.navMesh);
+  result.navMesh.destroy();
+  console.log(`  Generated: ${(navMeshData.byteLength / 1024 / 1024).toFixed(2)}MB (${(genTime / 1000).toFixed(1)}s)`);
+
+  // Validate home-base connectivity (US LZs + NVA base areas).
+  const homeBases = (config.zones ?? [])
+    .filter(z => z.isHomeBase)
+    .map(z => ({ name: z.name, x: z.position.x, z: z.position.z, radius: z.radius }));
+  if (homeBases.length >= 2) {
+    const conn = validateAShauConnectivity(navMeshData, homeBases, getHeight);
+    if (!conn.connected) {
+      console.error(`  DISCONNECTED: ${conn.islands.length} islands:`);
+      for (const island of conn.islands) console.error(`    - [${island.join(', ')}]`);
+      return false;
+    }
+    console.log(`  Connectivity: PASS (${homeBases.length} home bases connected)`);
+  }
+
+  writeFileSync(outPath, navMeshData);
+  console.log(`  Written: public/data/navmesh/${ASHAU_NAVMESH_FILE} (${(navMeshData.byteLength / 1024 / 1024).toFixed(2)}MB)`);
+  return true;
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  const force = process.argv.includes('--force');
+  const ashauNavmeshExists = existsSync(resolve(NAVMESH_DIR, ASHAU_NAVMESH_FILE));
   const expectedEntries = buildExpectedBakeEntries();
   const manifestIssues = getBakeManifestIssues(expectedEntries);
-  if (expectedEntries.length > 0 && manifestIssues.length === 0) {
-    console.log(`All ${expectedEntries.length * 2} pre-baked assets match the navmesh bake manifest; skipping generation.`);
+  // The seeded modes only regenerate when their manifest is stale (or --force);
+  // a missing A Shau navmesh must not trigger a needless rewrite of the seeded
+  // `.bin` files (which would churn committed assets).
+  const seededNeedsBake = force || manifestIssues.length > 0;
+  if (expectedEntries.length > 0 && manifestIssues.length === 0 && ashauNavmeshExists) {
+    console.log(`All ${expectedEntries.length * 2} seeded pre-baked assets match the navmesh bake manifest; A Shau navmesh present; skipping generation.`);
     console.log('Run with --force to regenerate.');
-    if (!process.argv.includes('--force')) {
+    if (!force) {
       return;
     }
-  } else if (!process.argv.includes('--force')) {
+  } else if (!force) {
     console.log('Pre-baked assets need regeneration:');
     for (const issue of manifestIssues.slice(0, 12)) {
       console.log(`- ${issue}`);
     }
     if (manifestIssues.length > 12) {
       console.log(`- ... ${manifestIssues.length - 12} more`);
+    }
+    if (!ashauNavmeshExists) {
+      console.log(`- missing navmesh ${ASHAU_NAVMESH_ASSET}`);
     }
   }
 
@@ -393,7 +572,7 @@ async function main(): Promise<void> {
   let totalNavmeshes = 0;
   let totalHeightmaps = 0;
 
-  for (const mode of MODES) {
+  for (const mode of (seededNeedsBake ? MODES : [])) {
     const config = mode.config;
     const seeds = getModeSeeds(mode);
 
@@ -500,6 +679,13 @@ async function main(): Promise<void> {
         failures++;
       }
     }
+  }
+
+  // A Shau (DEM-based tiled, not part of the seeded manifest).
+  if (!bakeAShau(force)) {
+    failures++;
+  } else if (existsSync(resolve(NAVMESH_DIR, ASHAU_NAVMESH_FILE))) {
+    totalNavmeshes++;
   }
 
   console.log(`\n${'='.repeat(60)}`);

@@ -95,6 +95,11 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
     metersPerPixel: DEM_METERS_PER_PIXEL
   },
 
+  // Prebaked full-battlefield tiled navmesh (scripts/prebake-navmesh.ts).
+  // Replaces the runtime anchor-window-only tiled build that left the perimeter
+  // band uncovered, where NPCs beelined on steep DEM terrain.
+  navmeshAsset: '/data/navmesh/a_shau_valley.bin',
+
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [
