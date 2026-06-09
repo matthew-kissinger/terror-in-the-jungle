@@ -1,13 +1,20 @@
 # VODA-1 — Visible water surface and query API
 
-Status: code-complete (owner playtest deferred)
+> **SUPERSEDED — 2026-06-09 hydrology/water scorch.** Hydrology + all water
+> (rendering, query/physics, swimming, authored basins) stripped to first
+> principles on 2026-06-09; to be reworked in a future terrain/world-generator
+> cycle that re-introduces a water level + real-time debug visualization. The
+> code paths and capture scripts named below were removed in that strip; this
+> memo is retained as history.
+
+Status: superseded (was code-complete / owner playtest deferred)
 Owning subsystem: environment / water
 Opened: cycle-2026-05-04
 Code-complete: cycle-voda-1-water-shader-and-acceptance 2026-05-16
 
 ## Latest evidence
 
-5 PRs landed under `cycle-voda-1-water-shader-and-acceptance` — R1: #228 `dfee8d64` terrain-water-intersection-mask (terrain-side wet-sand soft-blend 1.5m + water-side foam line 0.8m, opt-in default-off binding so pre-VODA-1 visuals byte-identical when unbound), #229 `62db21c2` water-surface-shader (production `MeshStandardMaterial` + `onBeforeCompile` patch chosen over TSL node material to preserve `?renderer=webgl` escape hatch and avoid mobile node-material cost regression; composed with #228's foam patch into single `installWaterMaterialPatches()` callback at rebase time so both inject); R2: #231 `ca679273` hydrology-river-flow-visuals (per-vertex `aFlowDir`/`aFoamMask` attributes baked at geometry-build + `installHydrologyRiverFlowPatch` shader patch with UV-scrolled normal sampling), #232 `f14400d2` water-system-file-split (WaterSystem.ts 1125 LOC → 300 LOC orchestrator + 5 modules ≤300 LOC each: HydrologyRiverSurface 144, HydrologyRiverGeometry 222, HydrologyRiverFlowPatch 178, WaterSurfaceBinding 299, WaterSurfaceSampler 146; grandfather entry removed from `scripts/lint-source-budget.ts`; 11 existing WaterSystem.test.ts pass byte-identical + 17 new sibling tests across the new modules), #230 voda-1-playtest-evidence (`docs/playtests/cycle-voda-1-water-shader-and-acceptance.md` + `scripts/capture-voda-1-water-shots.ts` + PLAYTEST_PENDING.md row). **No `WebGLRenderTarget` reflection pass added anywhere** (mobile no-RT win documented in `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md` item 8 preserved). Owner walk-through deferred under autonomous-loop posture; full `done` promotion blocks on owner walk + `evidence:atmosphere` re-run + `terrain_water_exposure_review` resolution confirmation per PLAYTEST_PENDING row.
+5 PRs landed under `cycle-voda-1-water-shader-and-acceptance` — R1: #228 `dfee8d64` terrain-water-intersection-mask (terrain-side wet-sand soft-blend 1.5m + water-side foam line 0.8m, opt-in default-off binding so pre-VODA-1 visuals byte-identical when unbound), #229 `62db21c2` water-surface-shader (production `MeshStandardMaterial` + `onBeforeCompile` patch chosen over TSL node material to preserve `?renderer=webgl` escape hatch and avoid mobile node-material cost regression; composed with #228's foam patch into single `installWaterMaterialPatches()` callback at rebase time so both inject); R2: #231 `ca679273` hydrology-river-flow-visuals (per-vertex `aFlowDir`/`aFoamMask` attributes baked at geometry-build + `installHydrologyRiverFlowPatch` shader patch with UV-scrolled normal sampling), #232 `f14400d2` water-system-file-split (WaterSystem.ts 1125 LOC → 300 LOC orchestrator + 5 modules ≤300 LOC each: HydrologyRiverSurface 144, HydrologyRiverGeometry 222, HydrologyRiverFlowPatch 178, WaterSurfaceBinding 299, WaterSurfaceSampler 146; grandfather entry removed from `scripts/lint-source-budget.ts`; 11 existing WaterSystem.test.ts pass byte-identical + 17 new sibling tests across the new modules), #230 voda-1-playtest-evidence (`docs/playtests/cycle-voda-1-water-shader-and-acceptance.md` + a voda-1 water-shots capture script [removed in the 2026-06-09 strip] + PLAYTEST_PENDING.md row). **No `WebGLRenderTarget` reflection pass added anywhere** (mobile no-RT win documented in `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md` item 8 preserved). Owner walk-through deferred under autonomous-loop posture; full `done` promotion blocks on owner walk + `evidence:atmosphere` re-run + `terrain_water_exposure_review` resolution confirmation per PLAYTEST_PENDING row.
 
 ## Success criteria
 

@@ -27,11 +27,11 @@ import {
 } from './PBRSpawn';
 import { M2HBEmplacementSystem } from '../combat/weapons/M2HBEmplacement';
 import { Faction } from '../combat/types';
-import type { BuoyancySamplerLike } from '../environment/water/BuoyancyForce';
 import type {
+  BuoyancySamplerLike,
   WaterInteractionOptions,
   WaterInteractionSample,
-} from '../environment/water/WaterSurfaceSampler';
+} from './WatercraftBuoyancyTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 // ---------- Fakes ----------

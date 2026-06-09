@@ -1,6 +1,16 @@
 # VODA-3 — Watercraft and integration
 
-Status: closed (cycle-voda-3-watercraft close-commit 2026-05-18)
+> **SUPERSEDED — 2026-06-09 hydrology/water scorch.** Hydrology + all water
+> (rendering, query/physics, swimming, authored basins) stripped to first
+> principles on 2026-06-09; to be reworked in a future terrain/world-generator
+> cycle that re-introduces a water level + real-time debug visualization.
+> Watercraft code (Sampan, PBR, WatercraftPhysics, WatercraftPlayerAdapter) is
+> kept DORMANT — boats no longer spawn — and returns when water is rebuilt; the
+> buoyancy/sampler types were relocated to
+> `src/systems/vehicle/WatercraftBuoyancyTypes.ts`. This memo is retained as
+> history.
+
+Status: superseded (was closed; watercraft dormant after the 2026-06-09 water strip)
 Owning subsystem: environment / water
 Opened: cycle-2026-05-04
 Code-complete: cycle-voda-3-watercraft 2026-05-18 (owner playtest deferred under autonomous-loop)

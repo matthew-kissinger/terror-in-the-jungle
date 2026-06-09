@@ -14,11 +14,11 @@ import type {
   VehicleUpdateContext,
 } from '../../systems/vehicle/PlayerVehicleAdapter';
 import type { PlayerState } from '../../types';
-import type { BuoyancySamplerLike } from '../../systems/environment/water/BuoyancyForce';
 import type {
+  BuoyancySamplerLike,
   WaterInteractionOptions,
   WaterInteractionSample,
-} from '../../systems/environment/water/WaterSurfaceSampler';
+} from '../../systems/vehicle/WatercraftBuoyancyTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 vi.mock('../../utils/Logger', () => ({

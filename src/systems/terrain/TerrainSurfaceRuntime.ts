@@ -12,22 +12,15 @@ import {
   createTerrainMaterial,
   type TerrainMaterial,
   type TerrainAtmosphereLightingMaterialConfig,
-  type TerrainHydrologyMaskMaterialConfig,
   updateTerrainMaterialAtmosphereLighting,
   updateTerrainMaterialFarCanopyTint,
   updateTerrainMaterialTextures,
   updateTerrainMaterialWetness,
 } from './TerrainMaterial';
 import { buildTerrainBiomeMaterialConfig } from './TerrainBiomeRuntimeConfig';
-import { materializeHydrologyMasksFromArtifact } from './hydrology/HydrologyBake';
-import type { LoadedHydrologyBake } from './hydrology/HydrologyBakeManifest';
-import type { HydrologyBiomePolicy } from './hydrology/HydrologyBiomeClassifier';
 
 const MIN_HEIGHTMAP_GRID_SIZE = 256;
 const MAX_HEIGHTMAP_GRID_SIZE = 1024;
-const HYDROLOGY_MASK_FEATHER_RADIUS_CELLS = 1;
-const HYDROLOGY_WET_MATERIAL_STRENGTH = 0.08;
-const HYDROLOGY_CHANNEL_MATERIAL_STRENGTH = 0.14;
 
 function roundUpToPowerOfTwo(value: number): number {
   let result = 1;
@@ -70,8 +63,6 @@ export class TerrainSurfaceRuntime {
     daylightFactor: 1,
     lowSunOcclusionStrength: 0,
   };
-  private hydrologyMaskMaterial: TerrainHydrologyMaskMaterialConfig | null = null;
-  private hydrologyMaskTexture: THREE.DataTexture | null = null;
   private featureSurfacePatches: TerrainSurfacePatch[] = [];
   private currentWorldSize = 0;
   private currentPlayableWorldSize = 0;
@@ -114,7 +105,6 @@ export class TerrainSurfaceRuntime {
       visualMargin: this.currentVisualMargin,
       splatmap: this.splatmap,
       biomeConfig: this.buildBiomeMaterialConfig(defaultBiomeId, biomeRules),
-      hydrologyMask: this.hydrologyMaskMaterial,
       farCanopyTint: this.farCanopyTint,
       atmosphereLighting: this.atmosphereLighting,
       surfaceWetness: this.surfaceWetness,
@@ -164,7 +154,6 @@ export class TerrainSurfaceRuntime {
       visualMargin: 0,
       splatmap: this.splatmap,
       biomeConfig: this.buildBiomeMaterialConfig(defaultBiomeId, biomeRules),
-      hydrologyMask: this.hydrologyMaskMaterial,
       farCanopyTint: this.farCanopyTint,
       atmosphereLighting: this.atmosphereLighting,
       surfaceWetness: this.surfaceWetness,
@@ -253,35 +242,6 @@ export class TerrainSurfaceRuntime {
     }
   }
 
-  setHydrologyMaterialMask(
-    hydrologyBake: LoadedHydrologyBake | null,
-    policy: HydrologyBiomePolicy | null,
-  ): void {
-    this.disposeHydrologyMaskTexture();
-    this.hydrologyMaskMaterial = null;
-
-    if (hydrologyBake && policy) {
-      const texture = createHydrologyMaskTexture(hydrologyBake.artifact);
-      this.hydrologyMaskTexture = texture;
-      this.hydrologyMaskMaterial = {
-        texture,
-        width: hydrologyBake.artifact.width,
-        height: hydrologyBake.artifact.height,
-        originX: hydrologyBake.artifact.transform.originX,
-        originZ: hydrologyBake.artifact.transform.originZ,
-        cellSizeMeters: hydrologyBake.artifact.transform.cellSizeMeters,
-        wetBiomeId: policy.wetBiomeId,
-        channelBiomeId: policy.channelBiomeId,
-        wetStrength: HYDROLOGY_WET_MATERIAL_STRENGTH,
-        channelStrength: HYDROLOGY_CHANNEL_MATERIAL_STRENGTH,
-      };
-    }
-
-    if (this.terrainMaterial) {
-      this.updateMaterialArguments();
-    }
-  }
-
   setFeatureSurfacePatches(surfacePatches: TerrainSurfacePatch[]): void {
     this.featureSurfacePatches = surfacePatches.slice();
     if (this.terrainMaterial) {
@@ -303,7 +263,6 @@ export class TerrainSurfaceRuntime {
 
   dispose(): void {
     this.heightmapGPU.dispose();
-    this.disposeHydrologyMaskTexture();
     this.terrainMaterial?.dispose();
     this.terrainMaterial = null;
   }
@@ -349,7 +308,6 @@ export class TerrainSurfaceRuntime {
     this.splatmap,
     this.featureSurfacePatches,
     this.farCanopyTint,
-    this.hydrologyMaskMaterial,
     this.currentPlayableWorldSize,
     this.currentVisualMargin,
   );
@@ -362,89 +320,7 @@ export class TerrainSurfaceRuntime {
       this.assetLoader,
       defaultBiomeId,
       biomeRules,
-      this.getHydrologyMaterialBiomeIds(),
+      [],
     );
   }
-
-  private getHydrologyMaterialBiomeIds(): string[] {
-    if (!this.hydrologyMaskMaterial) return [];
-    return [
-      this.hydrologyMaskMaterial.wetBiomeId,
-      this.hydrologyMaskMaterial.channelBiomeId,
-    ];
-  }
-
-  private disposeHydrologyMaskTexture(): void {
-    this.hydrologyMaskTexture?.dispose();
-    this.hydrologyMaskTexture = null;
-  }
-}
-
-function createHydrologyMaskTexture(artifact: LoadedHydrologyBake['artifact']): THREE.DataTexture {
-  const masks = materializeHydrologyMasksFromArtifact(artifact);
-  const cellCount = artifact.width * artifact.height;
-  const data = new Uint8Array(cellCount * 4);
-  const wetWeights = featherHydrologyMask(
-    masks.wetCandidate,
-    artifact.width,
-    artifact.height,
-    HYDROLOGY_MASK_FEATHER_RADIUS_CELLS,
-  );
-  const channelWeights = featherHydrologyMask(
-    masks.channelCandidate,
-    artifact.width,
-    artifact.height,
-    HYDROLOGY_MASK_FEATHER_RADIUS_CELLS,
-  );
-
-  for (let index = 0; index < cellCount; index++) {
-    const offset = index * 4;
-    data[offset] = wetWeights[index] ?? 0;
-    data[offset + 1] = channelWeights[index] ?? 0;
-    data[offset + 2] = 0;
-    data[offset + 3] = 255;
-  }
-
-  const texture = new THREE.DataTexture(
-    data,
-    artifact.width,
-    artifact.height,
-    THREE.RGBAFormat,
-    THREE.UnsignedByteType,
-  );
-  texture.magFilter = THREE.LinearFilter;
-  texture.minFilter = THREE.LinearFilter;
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.generateMipmaps = false;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function featherHydrologyMask(mask: Uint8Array, width: number, height: number, radiusCells: number): Uint8Array {
-  const weights = new Uint8Array(mask.length);
-  const radius = Math.max(0, Math.floor(radiusCells));
-
-  for (let index = 0; index < mask.length; index++) {
-    if ((mask[index] ?? 0) <= 0) continue;
-
-    const centerX = index % width;
-    const centerY = Math.floor(index / width);
-    for (let dy = -radius; dy <= radius; dy++) {
-      const y = centerY + dy;
-      if (y < 0 || y >= height) continue;
-      for (let dx = -radius; dx <= radius; dx++) {
-        const x = centerX + dx;
-        if (x < 0 || x >= width) continue;
-        const distanceCells = Math.hypot(dx, dy);
-        if (distanceCells > radius + 0.001) continue;
-        const feather = 1 - distanceCells / (radius + 1);
-        const weight = Math.round(255 * feather);
-        const targetIndex = y * width + x;
-        weights[targetIndex] = Math.max(weights[targetIndex] ?? 0, weight);
-      }
-    }
-  }
-
-  return weights;
 }

@@ -30,8 +30,6 @@ import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSy
 import type { VegetationTypeConfig } from '../../config/vegetationTypes';
 import type { BiomeClassificationRule, BiomeVegetationEntry } from '../../config/biomes';
 import { ChunkVegetationGenerator } from './ChunkVegetationGenerator';
-import { createHydrologyBiomeClassifier } from './hydrology/HydrologyBiomeClassifier';
-import type { HydrologyBakeArtifact } from './hydrology/HydrologyBake';
 
 function makeMockBillboard(): GlobalBillboardSystem {
   return {
@@ -75,34 +73,6 @@ const testPalette: BiomeVegetationEntry[] = [
 const highlandPalette: BiomeVegetationEntry[] = [
   { typeId: 'fern', densityMultiplier: 0.25 },
 ];
-
-const riverbankPalette: BiomeVegetationEntry[] = [
-  { typeId: 'fern', densityMultiplier: 0.5 },
-];
-
-const HYDROLOGY_ARTIFACT: HydrologyBakeArtifact = {
-  schemaVersion: 1,
-  width: 3,
-  height: 3,
-  cellSizeMeters: 64,
-  depressionHandling: 'epsilon-fill',
-  transform: {
-    originX: -64,
-    originZ: -64,
-    cellSizeMeters: 64,
-  },
-  thresholds: {
-    accumulationP90Cells: 3,
-    accumulationP95Cells: 4,
-    accumulationP98Cells: 5,
-    accumulationP99Cells: 6,
-  },
-  masks: {
-    wetCandidateCells: [],
-    channelCandidateCells: [8],
-  },
-  channelPolylines: [],
-};
 
 describe('VegetationScatterer', () => {
   let scatterer: VegetationScatterer;
@@ -233,27 +203,5 @@ describe('VegetationScatterer', () => {
     const calls = vi.mocked(ChunkVegetationGenerator.generateVegetation).mock.calls;
     const classifiedPalette = calls[calls.length - 1][5];
     expect(classifiedPalette).toEqual(highlandPalette);
-  });
-
-  it('can classify vegetation cells from a feature-gated hydrology mask', () => {
-    scatterer.configure(
-      testTypes,
-      'denseJungle',
-      new Map([
-        ['denseJungle', testPalette],
-        ['riverbank', riverbankPalette],
-      ]),
-      [],
-      createHydrologyBiomeClassifier(HYDROLOGY_ARTIFACT, {
-        wetBiomeId: 'swamp',
-        channelBiomeId: 'riverbank',
-      }),
-    );
-
-    scatterer.update(new THREE.Vector3(0, 0, 0));
-
-    expect(ChunkVegetationGenerator.generateVegetation).toHaveBeenCalled();
-    const calls = vi.mocked(ChunkVegetationGenerator.generateVegetation).mock.calls;
-    expect(calls.map(call => call[5])).toContainEqual(riverbankPalette);
   });
 });

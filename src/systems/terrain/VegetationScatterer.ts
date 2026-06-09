@@ -9,7 +9,6 @@ import { classifyBiome, computeSlopeDeg } from './BiomeClassifier';
 import { ChunkVegetationGenerator } from './ChunkVegetationGenerator';
 import { getHeightQueryCache } from './HeightQueryCache';
 import type { TerrainExclusionZone } from './TerrainFeatureTypes';
-import { classifyHydrologyBiome, type HydrologyBiomeClassifier } from './hydrology/HydrologyBiomeClassifier';
 import type { BillboardInstance } from '../../types';
 
 export interface VegetationCellGenerationDebugInfo {
@@ -81,7 +80,6 @@ export class VegetationScatterer {
   private biomePalettes: Map<string, BiomeVegetationEntry[]> = new Map();
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
-  private hydrologyBiomeClassifier: HydrologyBiomeClassifier | null = null;
   private exclusionZones: TerrainExclusionZone[] = [];
 
   constructor(
@@ -111,13 +109,11 @@ export class VegetationScatterer {
     defaultBiomeId: string,
     biomePalettes: Map<string, BiomeVegetationEntry[]>,
     biomeRules: BiomeClassificationRule[] = [],
-    hydrologyBiomeClassifier: HydrologyBiomeClassifier | null = null,
   ): void {
     this.vegetationTypes = types;
     this.defaultBiomeId = defaultBiomeId;
     this.biomePalettes = new Map(biomePalettes);
     this.biomeRules = biomeRules.slice();
-    this.hydrologyBiomeClassifier = hydrologyBiomeClassifier;
   }
 
   setExclusionZones(zones: TerrainExclusionZone[]): void {
@@ -215,14 +211,7 @@ export class VegetationScatterer {
     }
     const centerHeight = this.getAlignedHeight(cache, centerX, centerZ);
     const centerSlopeDeg = computeSlopeDeg(centerX, centerZ, 4, (x, z) => this.getAlignedHeight(cache, x, z));
-    const biomeId = classifyHydrologyBiome(
-      classifyBiome(centerHeight, centerSlopeDeg, this.biomeRules, this.defaultBiomeId),
-      centerHeight,
-      centerSlopeDeg,
-      centerX,
-      centerZ,
-      this.hydrologyBiomeClassifier,
-    );
+    const biomeId = classifyBiome(centerHeight, centerSlopeDeg, this.biomeRules, this.defaultBiomeId);
     const biomePalette = this.biomePalettes.get(biomeId) ?? this.biomePalettes.get(this.defaultBiomeId);
     if (!biomePalette || biomePalette.length === 0) {
       return this.createCellGenerationDebugInfo(cellKey, biomeId, new Map(), 'empty-palette');

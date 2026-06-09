@@ -1,6 +1,14 @@
 <!-- 80 LOC cap. Source audit: 2026-06-07 owner feedback + repo trace. -->
 # terrain-vehicle-water-foundation-reset
 
+> **WATER HALF SUPERSEDED — 2026-06-09 hydrology/water scorch.** Hydrology +
+> all water (rendering, query/physics, swimming, authored basins) stripped to
+> first principles on 2026-06-09; to be reworked in a future terrain/world-
+> generator cycle that re-introduces a water level + real-time debug
+> visualization. The hydrology/basin code paths and the water-runtime checks
+> named below were removed in that strip. The terrain + vehicle + Zone Control
+> half of this brief still stands; only the water work is obsolete here.
+
 Re-aligns the next long-horizon cycle after owner playtest rejected the
 "code-complete / playtest deferred" surfaces for land vehicles, tanks,
 hydrology, and Zone Control placement. Objective: one terrain placement and

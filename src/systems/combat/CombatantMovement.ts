@@ -176,8 +176,9 @@ export interface NpcWaterSampler {
 
 /**
  * Splash-effect surface consumed for wade foot-puffs. Narrow shape so the
- * effect can be optional + stubbed in tests; production binding is the
- * `WadeSplashEffect` pool wired in `GameplayRuntimeComposer`.
+ * effect can be optional + stubbed in tests. Currently unwired: the wade /
+ * splash pool was stripped with the water rework (2026-06-09); this surface
+ * stays inert (no emitter is ever bound) until water is rebuilt.
  */
 export interface NpcWadeSplashEmitter {
   tryEmitForCombatant(combatantId: string, footPosition: THREE.Vector3, isGroundedAndMoving: boolean): boolean;

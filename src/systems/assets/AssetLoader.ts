@@ -101,8 +101,6 @@ export class AssetLoader implements GameSystem {
       { file: 'firebase-ground.webp', name: 'firebase-ground', category: AssetCategory.GROUND },
       // UI/Player
       { file: 'first-person.png', name: 'first-person', category: AssetCategory.UNKNOWN },
-      // Environment
-      { file: 'waternormals.jpg', name: 'waternormals', category: AssetCategory.UNKNOWN },
       ...PIXEL_FORGE_TEXTURE_ASSETS.map((asset) => ({
         file: asset.file,
         name: asset.name,
@@ -209,7 +207,7 @@ export class AssetLoader implements GameSystem {
     const lower = name.toLowerCase();
     if (name.startsWith('PixelForge.')) return null;
     let maxDim = 2048;
-    if (lower.includes('forestfloor') || lower.includes('waternormals')) maxDim = 1024;
+    if (lower.includes('forestfloor')) maxDim = 1024;
 
     if (w <= maxDim && h <= maxDim) return null;
 

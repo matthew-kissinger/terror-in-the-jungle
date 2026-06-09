@@ -8,7 +8,7 @@ import {
   WatercraftPhysics,
   type WatercraftPhysicsConfig,
 } from './WatercraftPhysics';
-import type { BuoyancySamplerLike } from '../environment/water/BuoyancyForce';
+import type { BuoyancySamplerLike } from './WatercraftBuoyancyTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { VehicleDamageState, type VehicleDamageResult } from './VehicleDamage';
 

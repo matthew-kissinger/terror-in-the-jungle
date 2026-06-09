@@ -223,48 +223,6 @@ describe('TerrainMaterial', () => {
     expect(mat.roughnessNode).toBeDefined();
   });
 
-  it('binds hydrology mask uniforms and node graph when a mask is available', () => {
-    const hydrologyBiomeConfig = {
-      layers: [
-        { biomeId: 'denseJungle', texture: makeMockTexture(), tileScale: 0.1, roughness: 0.85 },
-        { biomeId: 'swamp', texture: makeMockTexture(), tileScale: 0.12, roughness: 0.96 },
-        { biomeId: 'riverbank', texture: makeMockTexture(), tileScale: 0.11, roughness: 0.9 },
-      ],
-      rules: [],
-      cliffRockBiomeSlot: 0,
-    };
-
-    const mat = createTerrainMaterial({
-      heightTexture: makeMockTexture(),
-      normalTexture: makeMockTexture(),
-      worldSize: 3200,
-      splatmap: testSplatmap,
-      biomeConfig: hydrologyBiomeConfig,
-      hydrologyMask: {
-        texture: makeMockTexture(),
-        width: 257,
-        height: 257,
-        originX: -1520,
-        originZ: -1520,
-        cellSizeMeters: 12,
-        wetBiomeId: 'swamp',
-        channelBiomeId: 'riverbank',
-      },
-    });
-
-    const uniforms = terrainUniforms(mat);
-
-    expect(uniforms.hydrologyMaskEnabled.value).toBe(1);
-    expect(uniforms.hydrologyMaskTextureSize.value.x).toBe(257);
-    expect(uniforms.hydrologyMaskOrigin.value.x).toBe(-1520);
-    expect(uniforms.hydrologyWetBiomeSlot.value).toBe(1);
-    expect(uniforms.hydrologyChannelBiomeSlot.value).toBe(2);
-    expect(uniforms.hydrologyWetStrength.value).toBeCloseTo(0.08);
-    expect(uniforms.hydrologyChannelStrength.value).toBeCloseTo(0.14);
-    expect(mat.colorNode).toBeDefined();
-    expect(mat.roughnessNode).toBeDefined();
-  });
-
   it('updateTerrainMaterialTextures refreshes uniforms and node graph', () => {
     const mat = createTerrainMaterial({
       heightTexture: makeMockTexture(),

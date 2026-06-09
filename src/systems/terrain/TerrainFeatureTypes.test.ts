@@ -5,7 +5,7 @@
  * Compositor-policy annotation contract test.
  *
  * Part of cycle-terrain-compositor R1.3. Asserts that every stamp emitted by
- * the three compilers (feature, flow, hydrology) carries both
+ * the feature + flow compilers carries both
  * `obstructionPolicy` and `targetHeightStrategy`, set to one of the documented
  * literal-union values. The compositor (R2.1) reads these annotations to
  * resolve overlap conflicts; this test prevents a future stamp emission from
@@ -22,8 +22,6 @@ import * as THREE from 'three';
 import { GameMode } from '../../config/gameModeTypes';
 import { compileTerrainFeatures } from './TerrainFeatureCompiler';
 import { compileTerrainFlow } from './TerrainFlowCompiler';
-import { compileHydrologyTerrainFeatures } from './hydrology/HydrologyTerrainFeatures';
-import type { HydrologyBakeArtifact } from './hydrology/HydrologyBake';
 import type {
   TerrainStampConfig,
   TerrainStampObstructionPolicy,
@@ -233,45 +231,6 @@ describe('compositor stamp policy annotations', () => {
 
     assertStampPoliciesAnnotated(result.stamps, 'terrain-flow');
     expect(result.stamps.every((s) => s.obstructionPolicy === 'override')).toBe(true);
-    expect(result.stamps.every((s) => s.targetHeightStrategy === 'baked')).toBe(true);
-  });
-
-  it('annotates hydrology channel-bed stamps with consult + baked', () => {
-    const artifact: HydrologyBakeArtifact = {
-      schemaVersion: 1,
-      width: 4,
-      height: 4,
-      cellSizeMeters: 20,
-      depressionHandling: 'epsilon-fill',
-      transform: { originX: 0, originZ: 0, cellSizeMeters: 20 },
-      thresholds: {
-        accumulationP90Cells: 10,
-        accumulationP95Cells: 20,
-        accumulationP98Cells: 40,
-        accumulationP99Cells: 80,
-      },
-      masks: { wetCandidateCells: [1, 2], channelCandidateCells: [2] },
-      channelPolylines: [
-        {
-          headCell: 0,
-          outletCell: 3,
-          lengthCells: 4,
-          lengthMeters: 80,
-          maxAccumulationCells: 320,
-          points: [
-            { cell: 0, x: 0, z: 0, elevationMeters: 10, accumulationCells: 42 },
-            { cell: 1, x: 20, z: 0, elevationMeters: 9, accumulationCells: 80 },
-            { cell: 2, x: 40, z: 10, elevationMeters: 8, accumulationCells: 160 },
-            { cell: 3, x: 60, z: 10, elevationMeters: 7, accumulationCells: 320 },
-          ],
-        },
-      ],
-    };
-
-    const result = compileHydrologyTerrainFeatures(artifact);
-
-    assertStampPoliciesAnnotated(result.stamps, 'hydrology');
-    expect(result.stamps.every((s) => s.obstructionPolicy === 'consult')).toBe(true);
     expect(result.stamps.every((s) => s.targetHeightStrategy === 'baked')).toBe(true);
   });
 });

@@ -15,12 +15,6 @@ import { BakedHeightProvider } from './BakedHeightProvider';
 import type { IHeightProvider } from './IHeightProvider';
 import type { CompiledTerrainFeatureSet } from './TerrainFeatureTypes';
 import type { PreparedHeightmapGrid } from './PreparedTerrainSource';
-import type { LoadedHydrologyBake } from './hydrology/HydrologyBakeManifest';
-import {
-  createHydrologyBiomeClassifier,
-  type HydrologyBiomeClassifier,
-  type HydrologyBiomePolicy,
-} from './hydrology/HydrologyBiomeClassifier';
 
 import { TerrainRenderRuntime } from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
@@ -112,8 +106,6 @@ export class TerrainSystem implements GameSystem {
   private biomeRules: BiomeClassificationRule[] = [];
   private surfaceWetness = 0;
   private preparedHeightmap: PreparedHeightmapGrid | null = null;
-  private hydrologyBake: LoadedHydrologyBake | null = null;
-  private hydrologyBiomePolicy: HydrologyBiomePolicy | null = null;
   private terrainFeatures: CompiledTerrainFeatureSet = {
     stamps: [],
     surfacePatches: [],
@@ -547,52 +539,6 @@ export class TerrainSystem implements GameSystem {
     Logger.info('terrain', `Mode surface configured: ${this.config.worldSize}m world, visualMargin=${this.config.visualMargin}m, chunk=${this.chunkSize}, renderDist=${this.renderDistance}`);
   }
 
-  setHydrologyBake(hydrologyBake: LoadedHydrologyBake | null): void {
-    this.hydrologyBake = hydrologyBake;
-    this.surfaceRuntime.setHydrologyMaterialMask(this.hydrologyBake, this.hydrologyBiomePolicy);
-    if (this.hydrologyBiomePolicy) {
-      this.applyVegetationConfig();
-      if (this.isInitialized) {
-        this.vegetationScatterer.regenerateAll();
-      }
-    }
-  }
-
-  setHydrologyBiomePolicy(policy: HydrologyBiomePolicy | null): void {
-    this.hydrologyBiomePolicy = policy ? { ...policy } : null;
-    this.surfaceRuntime.setHydrologyMaterialMask(this.hydrologyBake, this.hydrologyBiomePolicy);
-    this.applyVegetationConfig();
-    if (this.isInitialized) {
-      this.vegetationScatterer.regenerateAll();
-    }
-  }
-
-  getHydrologyBakeDebugInfo(): {
-    loaded: boolean;
-    modeId: string | null;
-    signature: string | null;
-    wetCandidateCells: number | null;
-    channelCandidateCells: number | null;
-    channelPolylines: number | null;
-    biomePolicyEnabled: boolean;
-    materialMaskEnabled: boolean;
-    wetBiomeId: string | null;
-    channelBiomeId: string | null;
-  } {
-    return {
-      loaded: Boolean(this.hydrologyBake),
-      modeId: this.hydrologyBake?.entry.modeId ?? null,
-      signature: this.hydrologyBake?.entry.signature ?? null,
-      wetCandidateCells: this.hydrologyBake?.artifact.masks.wetCandidateCells.length ?? null,
-      channelCandidateCells: this.hydrologyBake?.artifact.masks.channelCandidateCells.length ?? null,
-      channelPolylines: this.hydrologyBake?.artifact.channelPolylines.length ?? null,
-      biomePolicyEnabled: Boolean(this.hydrologyBiomePolicy),
-      materialMaskEnabled: Boolean(this.hydrologyBake && this.hydrologyBiomePolicy),
-      wetBiomeId: this.hydrologyBiomePolicy?.wetBiomeId ?? null,
-      channelBiomeId: this.hydrologyBiomePolicy?.channelBiomeId ?? null,
-    };
-  }
-
   setWorldSize(worldSize: number): void {
     if (!Number.isFinite(worldSize) || worldSize <= 0) return;
     this.explicitWorldSize = worldSize;
@@ -897,13 +843,10 @@ export class TerrainSystem implements GameSystem {
   }
 
   private applyVegetationConfig(): void {
-    const hydrologyBiomeIds = this.hydrologyBiomePolicy
-      ? [this.hydrologyBiomePolicy.wetBiomeId, this.hydrologyBiomePolicy.channelBiomeId]
-      : [];
     const vegetationConfig = buildTerrainVegetationRuntimeConfig(
       this.defaultBiomeId,
       this.biomeRules,
-      hydrologyBiomeIds,
+      [],
     );
     const { biomeIds, biomePalettes } = vegetationConfig;
     this.billboardSystem.configure(biomeIds);
@@ -913,15 +856,9 @@ export class TerrainSystem implements GameSystem {
       this.defaultBiomeId,
       biomePalettes,
       this.biomeRules,
-      this.createHydrologyBiomeClassifier(),
     );
     this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
     this.vegetationScatterer.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
-  }
-
-  private createHydrologyBiomeClassifier(): HydrologyBiomeClassifier | null {
-    if (!this.hydrologyBake || !this.hydrologyBiomePolicy) return null;
-    return createHydrologyBiomeClassifier(this.hydrologyBake.artifact, this.hydrologyBiomePolicy);
   }
 
   private propagateTerrainSourceChanges(): void {

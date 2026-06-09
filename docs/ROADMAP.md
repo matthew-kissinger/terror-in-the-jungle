@@ -66,17 +66,17 @@ another pre-release scope expansion.
 
 Carry these findings into the next Projekt revamp:
 
-- Water and hydrology: accepted gameplay water now comes from authored
-  level/depth basin bodies in Open Frontier and A Shau. These basins carve
-  bounded bathymetry, return `water_body` samples, and render as filled
-  footprints with depth-color/alpha variation instead of narrow
-  terrain-following ribbons. They use a cool opaque night material to avoid
-  red/white emissive slabs in true night captures. Hydrology remains useful as
-  a drainage/material sensor, not as the player-facing water surface. The
-  legacy global water plane is only an opt-in fallback; natural WebGPU/TSL
-  water rendering, wider authored basin/river networks, crossings, shoreline
-  art polish, bridge clearance, and watercraft-grade physics remain future
-  terrain-engine work.
+- Water and hydrology: **stripped to first principles on 2026-06-09.** The
+  entire hydrology subsystem, the water layer (rendering, query/physics,
+  swimming/wading), and the authored OF/A Shau basin bodies were removed; the
+  terrain no longer has a water layer. This is a deliberate reset, to be
+  reworked in a future terrain/world-generator cycle that re-introduces a
+  simple water level plus real-time debug visualization. Watercraft code
+  (Sampan, PBR) is kept dormant — boats no longer spawn — and returns when
+  water is rebuilt. The long-term water vision below (natural WebGPU/TSL water
+  rendering, authored basin/river networks, crossings, shoreline art polish,
+  bridge clearance, and watercraft-grade physics) still stands as the target;
+  it just restarts from a clean slate.
 - Vegetation ecology: use the short-palm retirement, bamboo/ground-cover
   distribution audits, and Pixel Forge candidate proofs as starting evidence
   for clustered jungle, hydrology-aware palms/understory, trail edges, and grass
@@ -113,7 +113,7 @@ Carry these findings into the next Projekt revamp:
 | 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), structures, fixed-wing, M151/M48 vehicles, and watercraft boarding/spawn surfaces are integrated. Remaining asset work is visual polish, fleet expansion, and owner playtest acceptance. |
 | 3: Vehicle Controls | PARTIAL | 3 flyable helicopters, 3 flyable fixed-wing aircraft, drivable M151, operable M48 tanks, and boardable watercraft surfaces are live. Fixed-wing feel/interpolation sign-off, vehicle seat swaps, NPC transport, aircraft period weapons/routes, and broader combined-arms feel remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
-| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water now uses authored level/depth basin bodies with carved bathymetry and `water_body` samples in Open Frontier and A Shau; hydrology is diagnostic/material input. Final WebGPU/TSL water material, broader authored basin/river networks, shoreline art polish, bridge clearance, and watercraft-grade physics remain open. |
+| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. A Shau DEM delivery is manifest-backed locally; static-tiled nav and route/NPC quality still need play-path validation. Water: hydrology + all water (rendering, query/physics, swimming, authored basins) stripped to first principles on 2026-06-09; terrain currently has no water layer. To be reworked in a future terrain/world-generator cycle that re-introduces a water level + real-time debug visualization, then build back toward a WebGPU/TSL water material, authored basin/river networks, shoreline art polish, bridge clearance, and watercraft-grade physics. |
 | 6: Ground Vehicles | MOSTLY DONE | M151 jeep (VEKHIKL-1) drivable with per-wheel terrain conform; M48 Patton chassis (VEKHIKL-3) + turret/cannon/AI gunner (VEKHIKL-4) shipped; 2026-06-08 proof refresh verifies real M151/M48 `IVehicle` targets in Open Frontier and A Shau board, drive, use elevated third-person camera, exit cleanly, and suppress first-person infantry weapons while seated. All code-complete; playtests deferred to [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md). Architecture memos: `docs/rearch/GROUND_VEHICLE_PHYSICS_2026-05-13.md` (wheeled physics, Ackermann steering, ground-normal conform) and `docs/rearch/TANK_SYSTEMS_2026-05-13.md` (skid-steer, independent turret, gunner seat, ballistic cannon, damage states). |
 | 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Weapon pickup and M2HB emplacement surfaces exist but remain playtest-polish items; faction doctrines and broader content loops remain open. |
 | 8: Fixed-Wing Air War | PARTIAL | Fixed-wing runtime is live in Open Frontier with phase-aware control law, airfield stands/runway helpers, NPC pilot support, and browser probes for takeoff/climb/orbit/handoff/approach. Cycle 2 must still resolve high-speed feel, altitude bounce/porpoise, camera/render smoothness, weapons, and broader combat loops. |
@@ -122,8 +122,12 @@ Carry these findings into the next Projekt revamp:
 
 ## Current Remaining Roadmap Work
 
-- Owner playtest sign-off for the terrain/vehicle/water foundation reset and the
-  playtest-deferred VODA, VEKHIKL, AVIATSIYA, SVYAZ, UX, and DIZAYN surfaces.
+- Owner playtest sign-off for the terrain/vehicle foundation reset and the
+  playtest-deferred VEKHIKL, AVIATSIYA, SVYAZ, UX, and DIZAYN surfaces. (The
+  VODA water surfaces are no longer a playtest item — hydrology + all water were
+  stripped to first principles on 2026-06-09, pending a future
+  terrain/world-generator rework that re-introduces a water level + real-time
+  debug visualization.)
 - SOL-1 solar/atmosphere/terrain lighting rearch: the active source candidate
   now follows the Sheep Dog Simulator-style ownership model where
   `SunDiscMesh` owns a depth-tested hot sun body and the TSL sky dome owns
@@ -132,9 +136,11 @@ Carry these findings into the next Projekt revamp:
   `sunCore=0.105-0.113%`, `sunSpan=5.19-5.46%`, explicit WebGL2 Open Frontier
   `sunCore=0.085-0.086%`, `sunSpan=4.44%`, and max parity delta `0.39%`. A Shau
   dusk ridge proof passes strict WebGPU and production fallback terrain
-  occlusion, terrain warmth, sun-scale, and `0.00%` parity delta, while A Shau
-  midnight verifies the authored water body no longer creates a local
-  red/white/cyan/bright slab. Production parity is proven by
+  occlusion, terrain warmth, sun-scale, and `0.00%` parity delta. (The A Shau
+  midnight water-slab regression check is moot as of 2026-06-09: hydrology + all
+  water were stripped to first principles and the terrain has no water layer
+  until a future terrain/world-generator cycle re-introduces a water level +
+  real-time debug visualization.) Production parity is proven by
   `check:live-release`; owner visual acceptance remains the SOL-1 closeout gate.
 - STABILIZAT-1: re-establish quiet-machine perf baselines, certify combat120
   frame tails, and separate NPC movement-stall work from render/Other cost.
@@ -143,9 +149,10 @@ Carry these findings into the next Projekt revamp:
 - KONVEYER-12: choose a finite-map edge strategy for procedural maps and a real
   A Shau outer-boundary strategy instead of synthetic collar tuning.
 - A Shau play-path validation: route/NPC movement quality, airfield usability,
-  basin-water readability, visual-system readability in rain/night, and
-  terrain-source boundaries. M151/M48 board/drive/camera/exit proof is now
-  covered locally; owner feel remains pending.
+  visual-system readability in rain/night, and terrain-source boundaries.
+  (Water readability drops out until the post-2026-06-09 water rework lands.)
+  M151/M48 board/drive/camera/exit proof is now covered locally; owner feel
+  remains pending.
 - Aviation follow-through: fixed-wing feel, period-specific weapons, lead/sway
   aids, named maneuver routes, and broader air-combat loops.
 - Ground and water vehicle follow-through: seat swaps, M113/M35/T-54 fleet
@@ -162,8 +169,10 @@ Carry these findings into the next Projekt revamp:
 - Seat swaps, active-gunner handoff, and combined-arms vehicle feel
 - M113 APC, M35 truck, and T-54 as next drivable ground-vehicle candidates
 - NPC helicopter transport (takeoff, fly to LZ, deploy squad, RTB)
-- Watercraft (sampan, PBR) have boarding/spawn integration; watercraft-grade
-  hydrodynamics, bridge clearance, and seat-swap combat polish remain open.
+- Watercraft (sampan, PBR) code is kept dormant after the 2026-06-09 water
+  strip — boats no longer spawn and return once water is reworked. Boarding/spawn
+  integration, watercraft-grade hydrodynamics, bridge clearance, and seat-swap
+  combat polish all resume then.
 
 ### Command & RTS
 - Command scaling: squad (8-16) -> platoon (30-60) -> company (100-200) -> battalion (500+)
@@ -171,9 +180,11 @@ Carry these findings into the next Projekt revamp:
 - Air support / artillery request interface
 
 ### Terrain & Environment
-- Water engine: broader authored basin/river network, WebGPU/TSL material pass,
-  shoreline art polish, bridge clearance, swimming/wading feel, and watercraft
-  physics
+- Water engine: rebuild from first principles (hydrology + all water stripped
+  2026-06-09). Start with a simple water level + real-time debug visualization
+  inside the terrain/world generator, then build toward authored basin/river
+  networks, a WebGPU/TSL material pass, shoreline art polish, bridge clearance,
+  swimming/wading feel, and watercraft physics
 - Road network generation (splines, intersections, pathfinding between zones)
 - Biome transitions (blending at boundaries)
 
@@ -195,7 +206,7 @@ Carry these findings into the next Projekt revamp:
 |----------|----------|
 | Loadout | Default presets + fully customizable. Changeable on respawn. |
 | Command mode | Fully real-time. No time slowdown. |
-| Water | Authored level/depth basin bodies own gameplay water in Open Frontier and A Shau; hydrology remains drainage/material input; legacy global plane is opt-in fallback. |
+| Water | Hydrology + all water (rendering, query/physics, swimming, authored basins) stripped to first principles on 2026-06-09; terrain has no water layer. To be reworked in a future terrain/world-generator cycle that re-introduces a water level + real-time debug visualization. |
 | NPC rendering | Pixel Forge impostors are production truth with limited close-GLB materialization; KONVEYER-10 owns WebGPU visual parity for impostors vs close GLBs. |
 | Campaign | Engine module. Linear, dynamic, and sandbox modes possible. Not near-term. |
 | Multiplayer | Don't block it, but not building now. Single-player AI focus. |

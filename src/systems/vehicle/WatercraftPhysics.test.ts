@@ -22,11 +22,11 @@ import {
   WatercraftPhysics,
   type WatercraftPhysicsConfig,
 } from './WatercraftPhysics';
-import type { BuoyancySamplerLike } from '../environment/water/BuoyancyForce';
 import type {
+  BuoyancySamplerLike,
   WaterInteractionOptions,
   WaterInteractionSample,
-} from '../environment/water/WaterSurfaceSampler';
+} from './WatercraftBuoyancyTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 // =============================================================================

@@ -1,6 +1,13 @@
 <!-- 80 LOC cap per framework recovery Pass 2 R1.2. Briefs over 100 LOC trigger cycle-validate warning. -->
 # hydrology-river-surface-fix
 
+> **SUPERSEDED — 2026-06-09 hydrology/water scorch.** Hydrology + all water
+> (rendering, query/physics, swimming, authored basins) stripped to first
+> principles on 2026-06-09; to be reworked in a future terrain/world-generator
+> cycle that re-introduces a water level + real-time debug visualization. The
+> hydrology/water code paths named below were removed in that strip; this brief
+> is obsolete and retained only as history.
+
 Superseded for planning by
 `docs/tasks/terrain-vehicle-water-foundation-reset.md`. The owner provided
 concrete defects on 2026-06-07: rivers cut off by terrain, stamp-created
@@ -22,9 +29,9 @@ the close criterion.
 
 ## Files touched (provisional - confirm at Wave 0)
 
-- `src/systems/environment/water/HydrologyRiverSurface.ts`
+- HydrologyRiverSurface (was under src/systems/environment/water; removed in the 2026-06-09 strip)
 - `src/systems/terrain/compositor/**` (if the defect is compose-side)
-- `src/systems/vehicle/WatercraftPhysics.ts` (`isUnderBridge`)
+- `src/systems/vehicle/WatercraftPhysics.ts` (`isUnderBridge`; kept dormant)
 - sibling `*.test.ts`
 
 ## Scope

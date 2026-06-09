@@ -174,7 +174,8 @@ History log:
   carry-over notes column updated, sky still active).
 - 2026-05-17 — `cycle-voda-2-buoyancy-swimming-wading` close (autonomous-loop posture):
   shipped VODA-2 code-complete as 7 PRs across 2 rounds. R1: [#239](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/239)
-  `89365f4c` buoyancy-physics (new `src/systems/environment/water/BuoyancyForce.ts`
+  `89365f4c` buoyancy-physics (new BuoyancyForce module under
+  src/systems/environment/water [stripped 2026-06-09, rework pending]
   + sibling test; `applyBuoyancyForce(body, dt, waterSystem)` reads
   `sampleWaterInteraction(body.position)` and applies upward force
   proportional to `buoyancyScalar × volume × g` with denser-medium
@@ -195,7 +196,8 @@ History log:
   horizontal flow force from hydrology channel direction × magnitude ×
   body drag; visible swim-perpendicular drift in A Shau river per playtest
   capture), [#244](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/244)
-  `0b24a19f` wade-foot-splash-visuals (new `src/systems/effects/WadeSplashEffect.ts`
+  `0b24a19f` wade-foot-splash-visuals (new WadeSplashEffect module under
+  src/systems/effects [stripped 2026-06-09, rework pending]
   triggered on footstep when `immersion01 ∈ [0.1, 0.5]`; reuses existing
   impact-effects pool, no perf regression), [#243](https://github.com/matthew-kissinger/terror-in-the-jungle/pull/243)
   `47e394c2` voda-2-playtest-evidence (`docs/playtests/cycle-voda-2-buoyancy-swimming-wading.md`

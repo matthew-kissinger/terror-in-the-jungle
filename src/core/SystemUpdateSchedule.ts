@@ -150,7 +150,6 @@ export const SYSTEM_UPDATE_SCHEDULE: readonly SystemUpdatePhaseDefinition[] = [
       { key: 'ticketSystem', mode: 'cadenced-update' },
       { key: 'weatherSystem', mode: 'cadenced-update' },
       { key: 'atmosphereSystem', mode: 'cadenced-update' },
-      { key: 'waterSystem', mode: 'cadenced-update' },
     ],
   },
 ] as const;

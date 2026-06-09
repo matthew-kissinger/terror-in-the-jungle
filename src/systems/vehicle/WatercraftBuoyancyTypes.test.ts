@@ -10,11 +10,9 @@ import {
   DEFAULT_BUOYANCY_CONFIG,
   type BuoyantBody,
   type BuoyancySamplerLike,
-} from './BuoyancyForce';
-import type {
-  WaterInteractionOptions,
-  WaterInteractionSample,
-} from './WaterSurfaceSampler';
+  type WaterInteractionOptions,
+  type WaterInteractionSample,
+} from './WatercraftBuoyancyTypes';
 
 /**
  * Behavior tests for `applyBuoyancyForce`. We assert *what* the integrator
@@ -25,7 +23,7 @@ import type {
  * vectors, and exact magnitudes are not made.
  *
  * The sampler is a lightweight stub modelling a flat water plane at
- * y = 0. That keeps the test L1-pure: no `WaterSystem`, no DOM, no
+ * y = 0. That keeps the test L1-pure: no water system, no DOM, no
  * Three.js scene graph.
  */
 
@@ -33,10 +31,10 @@ const DEFAULT_IMMERSION_DEPTH_METERS = 1.6;
 
 /**
  * Stub sampler: water surface lives at `surfaceY`; immersion saturates over
- * `immersionDepthMeters` so the buoyancyScalar behaves the way the real
- * WaterSurfaceSampler does. No hydrology, no global-plane gating. The
- * `flow` option lets a river-flow test inject a horizontal flow vector
- * everywhere below the surface; default is no flow (still water).
+ * `immersionDepthMeters` so the buoyancyScalar behaves the way a real water
+ * sampler would. No hydrology, no global-plane gating. The `flow` option lets
+ * a river-flow test inject a horizontal flow vector everywhere below the
+ * surface; default is no flow (still water).
  */
 function makeFlatWater(
   surfaceY = 0,

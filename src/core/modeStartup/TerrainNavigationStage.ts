@@ -6,14 +6,10 @@ import { GameMode } from '../../config/gameModeTypes';
 import { getGameModeConfig } from '../../config/gameModes';
 import type { CompiledTerrainFeatureSet } from '../../systems/terrain/TerrainFeatureTypes';
 import type { PreparedTerrainSource } from '../../systems/terrain/PreparedTerrainSource';
-import type { HydrologyBakeArtifact } from '../../systems/terrain/hydrology/HydrologyBake';
 import { Logger } from '../../utils/Logger';
 import type { GameEngine } from '../GameEngine';
 import { markStartup } from '../StartupTelemetry';
 import { computeNavmeshBakeSignature } from '../../systems/navigation/NavmeshBakeSignature';
-import { getHeightQueryCache } from '../../systems/terrain/HeightQueryCache';
-import { recomposeHydrologyArtifact } from '../../systems/terrain/compositor/HydrologyArtifactRecomposer';
-import { resolveHydrologyBiomePolicy } from './HydrologyArtifactCacheStage';
 import { yieldToRenderer } from './StartupYield';
 
 /**
@@ -27,7 +23,6 @@ export async function configureTerrainAndNavigation(
   engine: GameEngine,
   config: ReturnType<typeof getGameModeConfig>,
   preparedTerrainSource: PreparedTerrainSource,
-  waterSurfaceArtifact: HydrologyBakeArtifact | null,
 ): Promise<void> {
   markStartup(`engine-init.start-game.${config.id}.terrain-config.begin`);
   if (!engine.systemManager.navmeshSystem.isReady()) {
@@ -44,24 +39,6 @@ export async function configureTerrainAndNavigation(
   }
 
   const terrainSystem = engine.systemManager.terrainSystem;
-  const hydrologyBake = preparedTerrainSource.hydrologyBake ?? null;
-  // Terrain, minimap, fullmap all consume the ORIGINAL artifact — they
-  // either back the navmesh / heightmap bake graph (where re-anchoring
-  // would corrupt navigation) or render schematic 2D channels where the
-  // base elevation is the right reference.
-  terrainSystem.setHydrologyBake(hydrologyBake);
-  terrainSystem.setHydrologyBiomePolicy(resolveHydrologyBiomePolicy(config));
-  engine.systemManager.minimapSystem.setHydrologyChannels(hydrologyBake?.artifact.channelPolylines ?? null);
-  engine.systemManager.fullMapSystem.setHydrologyChannels(hydrologyBake?.artifact.channelPolylines ?? null);
-
-  // VODA-2 swim/breath: wire the WaterSystem into the player so head
-  // submersion flips PlayerMovement into swim mode + drives the breath
-  // timer. Drowning damage routes through PlayerHealthSystem so spawn
-  // protection + death handling stay consistent with combat damage.
-  engine.systemManager.playerController.setWaterSystem(
-    engine.systemManager.waterSystem,
-    engine.systemManager.playerHealthSystem,
-  );
 
   if (config.worldSize) {
     engine.systemManager.playerController.setWorldSize(config.worldSize);
@@ -79,20 +56,6 @@ export async function configureTerrainAndNavigation(
   });
   terrainSystem.setFarCanopyTint(config.terrain?.farCanopyTint);
   markStartup(`engine-init.start-game.${config.id}.terrain-config.end`);
-
-  // WaterSystem consumes the RECOMPOSED artifact so the river-surface mesh
-  // sits on the actual composed ground. Bind it after configureModeSurface():
-  // that call can re-bake GPU heights and swap HeightQueryCache to a
-  // BakedHeightProvider, so this final pass aligns water with the same runtime
-  // terrain surface used by vehicles, collision, and proof sampling.
-  const hasAuthoredWaterBodies = (config.waterBodies?.length ?? 0) > 0;
-  engine.systemManager.waterSystem.setWaterBodies(config.waterBodies ?? null);
-  engine.systemManager.waterSystem.setHydrologyChannels(
-    hasAuthoredWaterBodies
-      ? null
-      : reanchorWaterSurfaceArtifactToRuntimeTerrain(waterSurfaceArtifact ?? hydrologyBake?.artifact ?? null),
-    (x, z) => terrainSystem.getHeightAt(x, z),
-  );
 
   if (engine.systemManager.navmeshSystem.isWasmReady()) {
     const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
@@ -158,18 +121,6 @@ export async function configureTerrainAndNavigation(
       }
     }
   }
-}
-
-function reanchorWaterSurfaceArtifactToRuntimeTerrain(
-  artifact: HydrologyBakeArtifact | null,
-): HydrologyBakeArtifact | null {
-  if (!artifact) return null;
-  return recomposeHydrologyArtifact(
-    artifact,
-    getHeightQueryCache().getProvider(),
-    [],
-    { resampleAllPoints: true },
-  ).artifact;
 }
 
 export async function applyCompiledTerrainFeatures(

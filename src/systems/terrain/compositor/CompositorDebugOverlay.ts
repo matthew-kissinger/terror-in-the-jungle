@@ -10,7 +10,6 @@ import {
   stampAABB,
   type AABB2D,
 } from './TerrainStampConflictDetector';
-import { HYDROLOGY_TERRAIN_PRIORITY } from '../hydrology/HydrologyTerrainFeatures';
 
 /**
  * R2.3 of cycle-terrain-compositor (memo:
@@ -39,7 +38,6 @@ import { HYDROLOGY_TERRAIN_PRIORITY } from '../hydrology/HydrologyTerrainFeature
  */
 
 const COLOR_AIRFIELD = 0xffffff;
-const COLOR_HYDROLOGY = 0x3399ff;
 const COLOR_MOTORPOOL = 0xff8800;
 const COLOR_ROUTE = 0x33dd55;
 const COLOR_CONFLICT = 0xff2233;
@@ -152,7 +150,6 @@ export function classifyStampColor(stamp: TerrainStampConfig): number {
   if (stamp.kind === 'flatten_capsule') {
     const rampWidth = stamp.gradeRadius - stamp.outerRadius;
     if (rampWidth >= ENVELOPE_RAMP_THRESHOLD_METERS) return COLOR_AIRFIELD;
-    if (stamp.priority === HYDROLOGY_TERRAIN_PRIORITY) return COLOR_HYDROLOGY;
     return COLOR_ROUTE;
   }
   // flatten_circle: firebase / helipad / motor-pool / village anchor.

@@ -25,11 +25,11 @@ import {
   SAMPAN_SCENARIO_SPAWNS,
 } from './SampanSpawn';
 import { Faction } from '../combat/types';
-import type { BuoyancySamplerLike } from '../environment/water/BuoyancyForce';
 import type {
+  BuoyancySamplerLike,
   WaterInteractionOptions,
   WaterInteractionSample,
-} from '../environment/water/WaterSurfaceSampler';
+} from './WatercraftBuoyancyTypes';
 
 // ---------------------------------------------------------------------------
 // Water sampler fakes (mirrors WatercraftPhysics.test.ts patterns)

@@ -31,12 +31,6 @@ import {
   sampleSupportNormal as sampleSupportNormalFootprint,
   PLAYER_SUPPORT_LOOKAHEAD,
 } from './movement/SupportNormalSampler';
-import {
-  PlayerSwimState,
-  type LocomotionMode,
-  type WaterSampler,
-} from './PlayerSwimState';
-import type { WadeSplashEffect } from '../effects/WadeSplashEffect';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -107,26 +101,6 @@ export class PlayerMovement {
   private lastDebugSnapshot: PlayerMovementDebugSnapshot | null = null;
   private agentMovementIntent: { forward: number; strafe: number } | null = null;
   private agentWorldMovementIntent: { x: number; z: number } | null = null;
-  private waterSampler: WaterSampler | null = null;
-  private readonly swimState = new PlayerSwimState();
-  private readonly headPositionScratch = new THREE.Vector3();
-  private readonly swimInputScratch = {
-    forward: 0,
-    strafe: 0,
-    ascend: false,
-    descend: false,
-  };
-  private readonly swimContextScratch = {
-    position: new THREE.Vector3(),
-    headPosition: new THREE.Vector3(),
-    camera: null as unknown as THREE.Camera,
-    baseSpeed: 0,
-    input: { forward: 0, strafe: 0, ascend: false, descend: false },
-    dt: 0,
-  };
-  private onDrowningDamage?: (damage: number) => void;
-  private onSurfaceGasp?: () => void;
-  private wadeSplashEffect: WadeSplashEffect | null = null;
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
@@ -156,51 +130,6 @@ export class PlayerMovement {
 
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void {
     this.footstepAudioSystem = footstepAudioSystem;
-  }
-
-  /**
-   * Bind the wade-splash particle pool. The effect spawns a small water
-   * puff on foot impact when the foot sample reports `immersion01 ∈
-   * [0.1, 0.5]` (shallow wade). Pass `null` to disable. The effect owns
-   * its own immersion sampler — `PlayerMovement` only tells it when a
-   * foot is grounded + moving so it can advance the stride accumulator.
-   */
-  setWadeSplashEffect(effect: WadeSplashEffect | null): void {
-    this.wadeSplashEffect = effect;
-  }
-
-  /**
-   * Bind the water sampler (typically the WaterSystem). When set, the player
-   * enters swim mode whenever the head sample reports `submerged === true`.
-   * Pass `null` to disable swim handling (e.g. during teardown or in modes
-   * that suppress water — keeps PlayerMovement decoupled from WaterSystem).
-   */
-  setWaterSampler(sampler: WaterSampler | null): void {
-    this.waterSampler = sampler;
-  }
-
-  /**
-   * Wire callbacks the swim state machine fires on resurface / drowning.
-   * `onSurfaceGasp` runs once when the gasp trigger has fired underwater and
-   * the player surfaces. `onDrowningDamage(amount)` runs each frame the
-   * player is still underwater past breath capacity.
-   */
-  setSwimCallbacks(callbacks: {
-    onDrowningDamage?: (damage: number) => void;
-    onSurfaceGasp?: () => void;
-  }): void {
-    this.onDrowningDamage = callbacks.onDrowningDamage;
-    this.onSurfaceGasp = callbacks.onSurfaceGasp;
-  }
-
-  /** Current locomotion mode for HUD / animation consumers. */
-  getLocomotionMode(): LocomotionMode {
-    return this.swimState.getMode();
-  }
-
-  /** Read-only handle to swim/breath/stamina state for HUD wiring. */
-  getSwimState(): PlayerSwimState {
-    return this.swimState;
   }
 
   setCrouching(crouching: boolean): void {
@@ -245,58 +174,6 @@ export class PlayerMovement {
     let baseSpeed = this.playerState.isRunning ? this.playerState.runSpeed : this.playerState.speed;
     if (this.playerState.isCrouching) {
       baseSpeed *= CROUCH_SPEED_MULTIPLIER;
-    }
-
-    // Swim/wade/walk state branch. Sample at head position (eye height) so
-    // wading in shoulder-deep water still counts as walk; only true head
-    // submersion flips into the swim path. `playerState.position.y` already
-    // holds the eye world Y (PlayerCamera copies it straight into the camera)
-    // for both standing and crouching, so the head sample is taken there
-    // directly. Applying a stance offset here would double-count the crouch
-    // and drop the sample below the eyes, flipping a crouched-but-dry player
-    // into swim mode.
-    if (this.waterSampler) {
-      this.headPositionScratch.copy(this.playerState.position);
-      this.swimInputScratch.forward =
-        (input.isKeyPressed('keyw') ? 1 : 0) - (input.isKeyPressed('keys') ? 1 : 0);
-      this.swimInputScratch.strafe =
-        (input.isKeyPressed('keyd') ? 1 : 0) - (input.isKeyPressed('keya') ? 1 : 0);
-      this.swimInputScratch.ascend = input.isKeyPressed('space');
-      this.swimInputScratch.descend =
-        input.isKeyPressed('controlleft') || input.isKeyPressed('controlright');
-      this.swimContextScratch.position = this.playerState.position;
-      this.swimContextScratch.headPosition = this.headPositionScratch;
-      this.swimContextScratch.camera = camera;
-      this.swimContextScratch.baseSpeed = baseSpeed;
-      this.swimContextScratch.dt = deltaTime;
-      this.swimContextScratch.input = this.swimInputScratch;
-
-      const swimResult = this.swimState.tick(this.waterSampler, this.swimContextScratch);
-
-      // Drowning damage tick + resurface gasp callback. The damage magnitude
-      // lives with the swim state machine; PlayerHealthSystem clamps + death.
-      if (this.swimState.isDrowning() && this.onDrowningDamage) {
-        this.onDrowningDamage(8 * deltaTime);
-      }
-      if (swimResult.surfacedThisStep && this.swimState.consumeGasp() && this.onSurfaceGasp) {
-        this.onSurfaceGasp();
-      }
-
-      if (swimResult.mode === 'swim') {
-        // 3D swim integration: no gravity, depth-scaled drag, transitions
-        // back through wade -> walk happen automatically once head clears.
-        const velocity = this.swimState.computeSwimVelocity(
-          this.swimContextScratch,
-          this.playerState.velocity,
-        );
-        this.playerState.velocity.copy(velocity);
-        this.playerState.position.addScaledVector(this.playerState.velocity, deltaTime);
-        // Treat the player as not grounded while swimming so jump + gravity
-        // resume cleanly on surface exit.
-        this.playerState.isGrounded = false;
-        this.playerState.isJumping = false;
-        return;
-      }
     }
 
     const {
@@ -613,17 +490,6 @@ export class PlayerMovement {
         this.playerState.isRunning,
         deltaTime,
         isMoving && this.playerState.isGrounded
-      );
-    }
-
-    // Wade splash: spawn a foot-impact puff while walking through shallow
-    // water. Mirrors the footstep audio guard so splashes do not fire while
-    // in a vehicle, mid-jump, or swimming (swim path returns earlier).
-    if (this.wadeSplashEffect && !this.playerState.isInHelicopter && !this.playerState.isInFixedWing) {
-      const isMoving = moveVector.length() > 0;
-      this.wadeSplashEffect.tryEmitForPlayer(
-        this.playerState.position,
-        isMoving && this.playerState.isGrounded,
       );
     }
   }

@@ -223,80 +223,6 @@ export interface TerrainFlowPolicyConfig {
   routeBlendOnSteepSlope?: number;
 }
 
-export interface WaterBodyPointConfig {
-  x: number;
-  z: number;
-  /** Optional point-specific depth below the level water surface. */
-  depthMeters?: number;
-}
-
-export interface WaterBodyReachConfig {
-  id: string;
-  kind: 'reach';
-  /** Constant water surface height for this playable reach. */
-  surfaceY: number;
-  /** Full visual/gameplay width of the water surface. */
-  widthMeters: number;
-  /** Default carved bed depth below `surfaceY` when points do not override it. */
-  depthMeters?: number;
-  /** Optional depth ramp used when point-specific depths are absent. */
-  depthMinMeters?: number;
-  depthMaxMeters?: number;
-  /** Soft bank grading beyond the flat bed. Defaults from width. */
-  bankGradeMeters?: number;
-  /** Downstream current for watercraft/swimming samples. */
-  flowSpeedMetersPerSecond?: number;
-  /** Terrain stamp priority. Defaults above authored terrain pads in its footprint. */
-  priority?: number;
-  /** Optional vegetation-clear radius. Defaults from width + bank grade. */
-  vegetationClearRadiusMeters?: number;
-  points: WaterBodyPointConfig[];
-}
-
-export interface WaterBodyCenterConfig {
-  x: number;
-  z: number;
-}
-
-export interface WaterBodyFlowDirectionConfig {
-  x: number;
-  z: number;
-}
-
-export interface WaterBodyBasinConfig {
-  id: string;
-  kind: 'basin';
-  /** Constant water surface height for this playable basin. */
-  surfaceY: number;
-  /** Ellipse center in world XZ. */
-  center: WaterBodyCenterConfig;
-  /** Ellipse radius along local X, before rotation. */
-  radiusXMeters: number;
-  /** Ellipse radius along local Z, before rotation. */
-  radiusZMeters: number;
-  /** Rotation in radians around world Y. */
-  rotationRadians?: number;
-  /** Default carved bed depth below `surfaceY`. */
-  depthMeters?: number;
-  /** Optional debug/visual depth range for shallow bank to deep-center reads. */
-  depthMinMeters?: number;
-  depthMaxMeters?: number;
-  /** Soft bank grading beyond the basin footprint. Defaults from footprint width. */
-  bankGradeMeters?: number;
-  /** Optional authored flow direction for watercraft/swimming samples. */
-  flowDirection?: WaterBodyFlowDirectionConfig;
-  /** Downstream/current speed for watercraft/swimming samples. */
-  flowSpeedMetersPerSecond?: number;
-  /** Terrain stamp priority. Defaults above authored terrain pads in its footprint. */
-  priority?: number;
-  /** Optional vegetation-clear radius. Defaults from footprint + bank grade. */
-  vegetationClearRadiusMeters?: number;
-  /** Deterministic shoreline variation seed for rendering only. */
-  shorelineSeed?: number;
-}
-
-export type WaterBodyConfig = WaterBodyReachConfig | WaterBodyBasinConfig;
-
 interface TerrainFeatureGameplayPolicy {
   linkedZoneId?: string;
   spawnIds?: string[];
@@ -379,32 +305,6 @@ export interface GameModeConfig {
   cameraFar?: number;
   fogDensity?: number;
   shadowFar?: number;
-  waterEnabled?: boolean; // Explicit hydrology/gameplay water flag. Omitted means no accepted water feature for the mode.
-  // Optional explicit decouple for the 2000m flat global water plane.
-  // Defaults off. Set true only for debug or ocean/lake-specific work; current
-  // river modes should render hydrology surfaces instead of the legacy plane.
-  globalWaterPlaneEnabled?: boolean;
-
-  // Authored level/depth gameplay water. Hydrology can still seed terrain
-  // material masks, but when waterBodies are present they own runtime water
-  // surface queries, visible water, and carved bathymetry.
-  waterBodies?: WaterBodyConfig[];
-
-  // Optional feature-gated hydrology cache preload. This loads public
-  // /data/hydrology cache artifacts for future terrain/material/water work but
-  // does not change mode visuals by itself.
-  hydrology?: {
-    preload?: boolean;
-    manifestUrl?: string;
-    allowSeededFallback?: boolean;
-    biomeClassification?: {
-      enabled?: boolean;
-      wetBiomeId?: string;
-      channelBiomeId?: string;
-      maxSlopeDeg?: number;
-    };
-  };
-
   // Match settings
   maxTickets: number;
   matchDuration: number; // seconds

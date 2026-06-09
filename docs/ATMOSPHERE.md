@@ -20,10 +20,14 @@ landed across `cycle-2026-04-20-atmosphere-foundation` and
   constant, removing the old horizon seam.
 - `AtmosphereSystem` publishes an `AtmosphereLightingSnapshot` with effective
   direct light, sky fill, ground bounce, ambient fill, fog color, and daylight
-  factor. Renderer lights, water, and billboard vegetation use that contract;
+  factor. Renderer lights and billboard vegetation use that contract;
   terrain receives the same state through renderer lights and an atmosphere-
   driven night-fill uniform plus a bounded low-sun heightmap/relief response in
-  the terrain material.
+  the terrain material. (Hydrology + all water were stripped to first principles
+  on 2026-06-09, so the water consumer of this snapshot and the water references
+  in the SOL-1 notes below no longer apply; water is to be reworked in a future
+  terrain/world-generator cycle that re-introduces a water level + real-time
+  debug visualization.)
 - `AtmosphereSystem.setShadowFollowTarget` recenters the directional light and
   target on the follow target's X/Y/Z. This preserves the sun angle on elevated
   terrain such as A Shau instead of aiming the shadow frustum through world Y=0.
@@ -141,7 +145,8 @@ reintroduce independent hardcoded sky/fog/light colors for local fixes.
 ## Perf Budget
 
 - `AtmosphereSystem` sits in the existing `World` tracked group with
-  `WeatherSystem` and `WaterSystem`.
+  `WeatherSystem`. (The `WaterSystem` was removed in the 2026-06-09 water strip;
+  hydrology + all water were stripped to first principles, rework pending.)
 - v1 target remains below roughly 0.3ms on mid-tier hardware for sky/fog/cloud
   updates.
 - Any future backend that exceeds this needs its own tracked group or an

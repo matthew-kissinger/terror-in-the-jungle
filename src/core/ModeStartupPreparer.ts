@@ -27,8 +27,6 @@ import {
  * `./modeStartup/` (split out 2026-05-31, cycle phase4-godfiles, mirroring the
  * WaterSystem -> water/ precedent):
  *
- *   - HydrologyArtifactCacheStage  — hydrology preload/biome policy + Pass C
- *                                    artifact cache + cache-key fingerprinting.
  *   - HeightSourceStage            — DEM / pre-baked / procedural height source.
  *   - TerrainFeatureCompileStage   — compile + compose terrain features.
  *   - TerrainNavigationStage       — terrain surface + navmesh wiring.
@@ -36,9 +34,8 @@ import {
  *   - StartupYield                 — repaint yield helper.
  *
  * The public surface (`prepareModeStartup`, `normalizeLaunchSelection`,
- * `configureHeightSource`, `compileStartupTerrainFeatures`, and the
- * `__resetHydrologyArtifactCacheForTests` test hook) is preserved exactly so
- * importers (`GameEngineInit`, tests) need no changes.
+ * `configureHeightSource`, `compileStartupTerrainFeatures`) is preserved
+ * exactly so importers (`GameEngineInit`, tests) need no changes.
  */
 
 // Re-export the public surface so existing importers keep resolving the same
@@ -47,7 +44,6 @@ export { compileStartupTerrainFeatures } from './modeStartup/TerrainFeatureCompi
 export type { CompiledStartupTerrainFeatures } from './modeStartup/TerrainFeatureCompileStage';
 export { configureHeightSource } from './modeStartup/HeightSourceStage';
 export { normalizeLaunchSelection } from './modeStartup/ScenarioWiringStage';
-export { __resetHydrologyArtifactCacheForTests } from './modeStartup/HydrologyArtifactCacheStage';
 
 interface PreparedModeStartup {
   mode: GameMode;
@@ -90,7 +86,6 @@ export async function prepareModeStartup(
     engine,
     config,
     startupTerrain.preparedTerrainSource,
-    startupTerrain.waterSurfaceArtifact,
   );
   emitProgress('world', 1, 'World ready');
   emitProgress('navmesh', 1, 'Navigation ready');

@@ -191,12 +191,10 @@ export class PlayerHealthSystem implements GameSystem {
   }
 
   /**
-   * Apply per-frame drowning damage. The breath timer + gasp trigger live
-   * in `PlayerSwimState` (consumed by `PlayerMovement`); this entry point
-   * exists so the drown damage channel is explicit at the health-system
-   * surface and easy to find from gameplay-tuning scans. Routes through
-   * `takeDamage` so spawn protection + invulnerability + death handling
-   * stay consistent with combat damage.
+   * Apply per-frame drowning damage, routed through `takeDamage` so spawn
+   * protection + invulnerability + death handling stay consistent with combat
+   * damage. Currently dormant: the swim / breath system was stripped with the
+   * water rework (2026-06-09) and nothing calls this until water returns.
    *
    * Caller should multiply the per-second drown rate by frame `dt` before
    * passing in. Returns `true` if the damage killed the player.

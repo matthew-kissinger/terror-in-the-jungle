@@ -2,17 +2,58 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import type * as THREE from 'three';
-import type { WaterInteractionOptions, WaterInteractionSample } from './WaterSurfaceSampler';
 
 /**
- * Per-body buoyancy force consumer for `WaterSystem.sampleWaterInteraction`.
+ * Dormant watercraft buoyancy + water-interaction contract.
+ *
+ * The hydrology/water system was stripped to first principles (2026-06-09).
+ * This file preserves the minimal, self-contained data + physics contract the
+ * dormant watercraft code (Sampan, PBR, WatercraftPhysics) compiles against so
+ * the boats return automatically when a water level is reintroduced. It depends
+ * on nothing but `THREE` (type-only) and a string union — there is no live
+ * water system, and boats are spawned with `setWaterSampler(null)`.
+ *
+ * Relocated from the deleted `environment/water/WaterSurfaceSampler` (the data
+ * contracts) and `environment/water/BuoyancyForce` (the physics helpers).
+ */
+
+// ---------- Water interaction contract ----------
+
+export type WaterSurfaceSource = 'none' | 'global' | 'hydrology' | 'water_body';
+
+export interface WaterInteractionSample {
+  source: WaterSurfaceSource;
+  surfaceY: number | null;
+  depth: number;
+  submerged: boolean;
+  immersion01: number;
+  buoyancyScalar: number;
+  /**
+   * Horizontal flow velocity in m/s (world XZ; `y` is always 0). Zero for the
+   * global plane and dry samples; populated from a matched channel segment
+   * when a future water source provides one. Freshly allocated per call so
+   * consumers may keep, copy, or mutate it without aliasing.
+   */
+  flowVelocity: THREE.Vector3;
+}
+
+export interface WaterInteractionOptions {
+  immersionDepthMeters?: number;
+}
+
+export const DEFAULT_WATER_IMMERSION_DEPTH_METERS = 1.6;
+
+// ---------- Buoyancy contract ----------
+
+/**
+ * Per-body buoyancy force consumer for a `sampleWaterInteraction` provider.
  * Hand-rolled physics — no external solver. Mirrors the GroundVehiclePhysics
  * pattern: explicit Euler step over the supplied dt with exponential damping
  * when the body is in water.
  *
  * The body contract is intentionally a structural duck-type so dropped
- * weapons, NPC ragdolls, future watercraft hulls, and tests can all satisfy
- * it without coupling to any concrete domain type.
+ * weapons, NPC ragdolls, watercraft hulls, and tests can all satisfy it
+ * without coupling to any concrete domain type.
  *
  * Force model (per call):
  *   F_buoy   = + g * ρ_water * V * buoyancyScalar        (up)
@@ -26,13 +67,10 @@ import type { WaterInteractionOptions, WaterInteractionSample } from './WaterSur
  * number of ALU ops. No allocations in the hot path.
  */
 
-// ---------- Public contract ----------
-
 /**
  * Anything floatable that buoyancy can act on. Structural duck-type — do
  * NOT import this from concrete NPC / weapon / vehicle modules and do NOT
- * narrow it. R2 wade-foot-splash and the future watercraft cycle satisfy
- * this contract independently.
+ * narrow it.
  */
 export interface BuoyantBody {
   /** World-space position. Read for sampling; the y component is updated by integration. */
@@ -48,9 +86,9 @@ export interface BuoyantBody {
 }
 
 /**
- * Minimal sampler surface required by `applyBuoyancyForce`. The real
- * `WaterSystem` satisfies this directly; tests pass a lightweight stub so
- * they do not pull in the renderer, asset loader, or DOM overlay.
+ * Minimal sampler surface required by `applyBuoyancyForce`. A future water
+ * system satisfies this directly; tests pass a lightweight stub so they do
+ * not pull in the renderer, asset loader, or DOM overlay.
  */
 export interface BuoyancySamplerLike {
   sampleWaterInteraction(position: THREE.Vector3, options?: WaterInteractionOptions): WaterInteractionSample;

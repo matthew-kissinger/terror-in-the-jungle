@@ -4,16 +4,11 @@
 import * as THREE from 'three';
 import type { SystemKeyToType } from './SystemRegistry';
 import { GameMode } from '../config/gameModeTypes';
-import type { GameModeConfig } from '../config/gameModeTypes';
 import { Logger } from '../utils/Logger';
 import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacementSpawn';
 import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
 import type { M151ScenarioMode } from '../systems/vehicle/M151JeepSpawn';
-import type { PBRScenarioMode } from '../systems/vehicle/PBRSpawn';
-import type { SampanScenarioMode } from '../systems/vehicle/SampanSpawn';
-import { resolveGroundPlacement, resolveWatercraftPlacement } from '../systems/terrain/TerrainPlacementAuthority';
-import { PBR } from '../systems/vehicle/PBR';
-import { Sampan } from '../systems/vehicle/Sampan';
+import { resolveGroundPlacement } from '../systems/terrain/TerrainPlacementAuthority';
 import { Tank } from '../systems/vehicle/Tank';
 import { GroundVehicle } from '../systems/vehicle/GroundVehicle';
 
@@ -41,7 +36,6 @@ type OperationalRuntimeRefs = Pick<
   | 'ticketSystem'
   | 'vehicleManager'
   | 'warSimulator'
-  | 'waterSystem'
   | 'worldFeatureSystem'
   | 'zoneManager'
 >;
@@ -79,7 +73,6 @@ interface OperationalRuntimeGroups {
     | 'playerController'
     | 'terrainSystem'
     | 'vehicleManager'
-    | 'waterSystem'
     | 'worldFeatureSystem'
   >;
   airSupportRuntime: Pick<
@@ -130,7 +123,6 @@ export function createOperationalRuntimeGroups(
       playerController: refs.playerController,
       terrainSystem: refs.terrainSystem,
       vehicleManager: refs.vehicleManager,
-      waterSystem: refs.waterSystem,
       worldFeatureSystem: refs.worldFeatureSystem,
     },
     airSupportRuntime: {
@@ -270,8 +262,6 @@ function wireVehicleRuntime(
   wireM2HBEmplacementRuntime(runtime, options);
   wireM151JeepRuntime(runtime, options);
   wireM48TankRuntime(runtime, options);
-  wireSampanRuntime(runtime, options);
-  wirePBRRuntime(runtime, options);
 }
 
 // Maps GameMode -> the scenario-spawn key understood by
@@ -426,156 +416,6 @@ function bindSpawnedM48TankRuntime(
     if (!(vehicle instanceof Tank)) continue;
     vehicle.setTerrain(runtime.terrainSystem ?? null);
   }
-}
-
-// Maps GameMode -> the Sampan scenario-spawn key. Same shape + same
-// scenarios as the M48 wiring above (the sampans ride alongside the
-// land vehicles on Open Frontier river + A Shau valley river).
-const SAMPAN_MODES_BY_GAMEMODE: Partial<Record<GameMode, SampanScenarioMode>> = {
-  [GameMode.OPEN_FRONTIER]: 'open_frontier',
-  [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
-};
-
-// Per-craft initial freeboard offsets applied above the water surface
-// at spawn so the hull starts straddling the waterline rather than
-// fully submerged. Buoyancy still equilibrates within the first second
-// of physics; this is purely for visual continuity at spawn.
-const SAMPAN_SPAWN_FREEBOARD_METERS = 0.35;
-const PBR_SPAWN_FREEBOARD_METERS = 0.30;
-
-function wireSampanRuntime(
-  runtime: OperationalRuntimeGroups['vehicleRuntime'],
-  options: OperationalRuntimeOptions
-): void {
-  const scene = options.scene;
-  if (!scene) return;
-
-  const spawnedModes = new Set<SampanScenarioMode>();
-  runtime.gameModeManager.onModeChanged((mode, config) => {
-    const scenarioKey = SAMPAN_MODES_BY_GAMEMODE[mode];
-    if (!scenarioKey) return;
-    if (spawnedModes.has(scenarioKey)) return;
-    spawnedModes.add(scenarioKey);
-    // Defer one frame so the per-mode terrain provider is hot before
-    // resolvePosition runs `getHeightAt` — mirrors the M48 + M2HB
-    // wiring deferral above.
-    setTimeout(() => {
-      try {
-        const ids = runtime.vehicleManager.spawnScenarioSampans({
-          scene,
-          modes: [scenarioKey],
-          resolvePosition: (_m, base) => snapWatercraftToSurface(
-            base,
-            runtime.terrainSystem,
-            runtime.waterSystem,
-            config,
-            SAMPAN_SPAWN_FREEBOARD_METERS,
-          ),
-        });
-        bindSpawnedWatercraftRuntime(ids, runtime);
-        Logger.info('vehicle', `Sampan scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
-      } catch (error) {
-        // Roll back the reservation so a manual re-trigger can retry.
-        spawnedModes.delete(scenarioKey);
-        Logger.warn('vehicle', `Sampan scenario spawn failed for ${scenarioKey}`, error);
-      }
-    }, 0);
-  });
-}
-
-// Maps GameMode -> the PBR scenario-spawn key. Same shape as the M2HB
-// + M48 wiring (PBR spawns alongside on Open Frontier US riverbank +
-// A Shau US river outpost). Cycle-voda-3-watercraft pbr-integration.
-const PBR_MODES_BY_GAMEMODE: Partial<Record<GameMode, PBRScenarioMode>> = {
-  [GameMode.OPEN_FRONTIER]: 'open_frontier',
-  [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
-};
-
-function wirePBRRuntime(
-  runtime: OperationalRuntimeGroups['vehicleRuntime'],
-  options: OperationalRuntimeOptions
-): void {
-  const m2hb = runtime.m2hbEmplacementSystem;
-  // The PBR depends on the M2HB system to bind the mount weapons; if
-  // the M2HB system is not available there is nothing useful to wire.
-  if (!m2hb) return;
-  const scene = options.scene;
-  if (!scene) return;
-
-  const spawnedModes = new Set<PBRScenarioMode>();
-  runtime.gameModeManager.onModeChanged((mode, config) => {
-    const scenarioKey = PBR_MODES_BY_GAMEMODE[mode];
-    if (!scenarioKey) return;
-    if (spawnedModes.has(scenarioKey)) return;
-    spawnedModes.add(scenarioKey);
-    // Defer one frame so the per-mode terrain provider is hot before
-    // resolvePosition runs `getHeightAt` — mirrors the M2HB / M48
-    // wiring's setTimeout(0) deferral above. When the scenario has
-    // `waterEnabled` set, the snap consults WaterSurfaceSampler first
-    // (authored water body, hydrology river surface, or global plane);
-    // when no water covers
-    // the spawn point, terrain height is the fallback.
-    setTimeout(() => {
-      try {
-        const ids = runtime.vehicleManager.spawnScenarioPBRs({
-          scene,
-          m2hbSystem: m2hb,
-          modes: [scenarioKey],
-          resolvePosition: (_m, base) => snapWatercraftToSurface(
-            base,
-            runtime.terrainSystem,
-            runtime.waterSystem,
-            config,
-            PBR_SPAWN_FREEBOARD_METERS,
-          ),
-        });
-        bindSpawnedWatercraftRuntime(ids, runtime);
-        Logger.info('vehicle', `PBR scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
-      } catch (error) {
-        // Roll back the reservation so a manual re-trigger can retry.
-        spawnedModes.delete(scenarioKey);
-        Logger.warn('vehicle', `PBR scenario spawn failed for ${scenarioKey}`, error);
-      }
-    }, 0);
-  });
-}
-
-function bindSpawnedWatercraftRuntime(
-  ids: readonly string[],
-  runtime: OperationalRuntimeGroups['vehicleRuntime'],
-): void {
-  for (const id of ids) {
-    const vehicle = runtime.vehicleManager.getVehicle(id);
-    if (!(vehicle instanceof Sampan) && !(vehicle instanceof PBR)) continue;
-    vehicle.setWaterSampler(runtime.waterSystem ?? null);
-    vehicle.setTerrain(runtime.terrainSystem ?? null);
-  }
-}
-
-/**
- * Shared spawn snap for watercraft. When the active scenario has water
- * enabled (`waterEnabled === true`) and the WaterSystem reports a
- * water surface at the spawn XZ (authored water body, hydrology river, or
- * global plane), the
- * hull is snapped to `waterY + freeboard` so it starts straddling the
- * waterline. Otherwise the snap falls back to terrain height (mirrors
- * the prior land-snap behavior so the hull does not spawn above the
- * ridgeline or below the seabed). Returns a fresh Vector3 each call;
- * scratch is internal.
- */
-function snapWatercraftToSurface(
-  base: THREE.Vector3,
-  terrainSystem: OperationalRuntimeGroups['vehicleRuntime']['terrainSystem'],
-  waterSystem: OperationalRuntimeGroups['vehicleRuntime']['waterSystem'] | undefined,
-  config: GameModeConfig | undefined,
-  freeboard: number,
-): THREE.Vector3 {
-  return resolveWatercraftPlacement(base, {
-    terrainSystem,
-    waterSystem,
-    waterEnabled: config?.waterEnabled === true,
-    freeboardMeters: freeboard,
-  }).position;
 }
 
 function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRuntime']): void {

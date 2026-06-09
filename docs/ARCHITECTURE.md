@@ -18,10 +18,10 @@ index.html -> src/main.ts -> src/core/bootstrap.ts -> new GameEngine()
 
 Production renderer is the Three.js r184 `WebGPURenderer` from `three/webgpu`,
 with TSL node materials covering terrain CDLOD, vegetation/NPC impostors, and
-the Hosek-Wilkie sky. Authored water bodies currently render through
-`WaterBodySurface` with a daytime standard-material bridge plus an explicit
-cool opaque night material; a final natural WebGPU/TSL water material is still
-future work. Backend selection lives in
+the Hosek-Wilkie sky. (Water rendering was stripped to first principles on
+2026-06-09; the terrain has no water layer until a future terrain/world-generator
+cycle re-introduces a water level + real-time debug visualization, after which a
+natural WebGPU/TSL water material is the target.) Backend selection lives in
 `src/core/RendererBackend.ts` (`resolveRendererBackendMode()` reads
 `?renderer=` / env), and `src/core/GameRenderer.ts` drives the swap from a
 WebGL bootstrap renderer to the WebGPU surface (`initializeRendererBackend()`,
@@ -89,7 +89,7 @@ Runtime composers (extracted from SystemConnector):
 | Input | `src/systems/input/` | InputContextManager (singleton) | untracked |
 | Audio | `src/systems/audio/` | AudioManager, FootstepAudioSystem | untracked |
 | Effects | `src/systems/effects/` | ExplosionEffectsPool, ImpactEffectsPool, SmokeCloudSystem, TracerPool, PostProcessingManager, CameraShakeSystem | untracked |
-| Environment | `src/systems/environment/` | AtmosphereSystem, HosekWilkieSkyBackend, WeatherSystem, WaterSystem, water/WaterBodyAuthority, water/WaterBodySurface, water/WaterSurfaceSampler | untracked |
+| Environment | `src/systems/environment/` | AtmosphereSystem, HosekWilkieSkyBackend, WeatherSystem (water layer stripped 2026-06-09; WaterSystem + water/ modules removed, rework pending) | untracked |
 | Debug | `src/systems/debug/` | PerformanceTelemetry (singleton) | untracked |
 | UI | `src/ui/` | HUDSystem, GameUI, TouchControls, MinimapSystem, FullMapSystem | 1.5ms |
 | Config | `src/config/` | gameModeTypes, *Config, MapSeedRegistry, CombatantConfig, FactionCombatTuning | - |
@@ -98,32 +98,24 @@ See [docs/COMBAT.md](COMBAT.md) for the authoritative combat subsystem architect
 
 Combatants are stored in a `Map<string, Combatant>` (`CombatantSystem.ts`); there is no ECS — bitECS is not a dependency and the E1 evaluation recommends DEFER.
 
-## Terrain And Water Foundation
+## Terrain Foundation
 
-Terrain and water placement now share explicit runtime authorities instead of
-letting each feature infer its own surface:
+Terrain placement shares an explicit runtime authority instead of letting each
+feature infer its own surface:
 
 - `TerrainPlacementAuthority` (`src/systems/terrain/TerrainPlacementAuthority.ts`)
-  resolves ground and watercraft spawn heights for deploy/runtime placement.
-- `TerrainFeatureCompileStage` compiles authored `waterBodies` into terrain
-  stamps before mode terrain/nav prep, so basin footprints carve bounded
-  bathymetry instead of riding on top of humps.
-- `TerrainNavigationStage` passes authored bodies into `WaterSystem` and clears
-  hydrology river surfaces when authored gameplay water is present.
-- `WaterSystem` owns the legacy global plane, hydrology-derived river surfaces,
-  authored water-body authority, render mesh, and query sampler.
-- `WaterSurfaceSampler` source precedence is `water_body` before hydrology
-  before global plane before dry land.
+  resolves ground spawn heights for deploy/runtime placement.
+- `TerrainFeatureCompileStage` compiles authored terrain stamps before mode
+  terrain/nav prep. Trails/roads (`terrainFlowPaths`) are compiled here.
+- `TerrainNavigationStage` prepares the navmesh after terrain features compile.
 
-Current accepted gameplay water in Open Frontier and A Shau is authored
-level/depth basin water bodies with carved beds, filled render footprints,
-deterministic shoreline variation, depth-color/alpha rings, and `water_body`
-samples. Hydrology is still useful for drainage/material classification, but it
-is not the player-facing water surface. The global plane remains an opt-in
-fallback for legacy/simple modes. `npm run check:water-runtime -- --headless`
-now gates those bodies with runtime screenshots, public water-query probes, and
-a mesh-budget assertion; the current Open Frontier/A Shau bodies cost 962 total
-vertices / 481 vertices per basin body.
+Hydrology + all water (rendering, query/physics, swimming, authored basins)
+stripped to first principles on 2026-06-09; to be reworked in a future
+terrain/world-generator cycle that re-introduces a water level + real-time debug
+visualization. The terrain no longer has a water layer: the hydrology subsystem,
+the `WaterSystem` + water query/physics modules, the authored `waterBodies`
+config, and the water-runtime checks were all removed. Watercraft code is kept
+dormant (boats no longer spawn) and returns when water is rebuilt.
 
 ## Tick Graph
 
@@ -148,7 +140,7 @@ TRACKED (budgeted, EMA-monitored):
   WarSim      2.0ms  warSimulator + strategicFeedback (scheduled)
   AirSupport  1.0ms  airSupport + aaEmplacement + npcVehicleController (scheduled)
   ModeRuntime 0.2ms  gameModeManager runtime hook (scheduled)
-  World       1.0ms  zoneManager + ticketSystem + weather + water (scheduled)
+  World       1.0ms  zoneManager + ticketSystem + weather (scheduled; water removed 2026-06-09)
 
 UNTRACKED (catch-all):
   assetLoader, audioManager, playerHealth, playerRespawn,
@@ -310,8 +302,9 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    lighter scattered-cloud presets and still need art review. SOL-1 now owns
    the broader solar/atmosphere/terrain-lighting rearch. The active master
    candidate has
-   an `AtmosphereLightingSnapshot` feeding renderer lights, billboard
-   vegetation, and water, plus a shared cool sub-horizon sky floor for the TSL
+   an `AtmosphereLightingSnapshot` feeding renderer lights and billboard
+   vegetation (the water consumer was removed in the 2026-06-09 water strip),
+   plus a shared cool sub-horizon sky floor for the TSL
    dome and CPU LUT, a terrain night-fill uniform, a bounded low-sun terrain
    heightmap/relief response, altitude-preserving shadow recentering for A Shau,
    renderer-facing low-sun directional-light bounds, and a ridge-occlusion
@@ -323,10 +316,10 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    amber shell, and WebGL fallback cap: daylight WebGPU
    `sunCore=0.105-0.113%`, `sunSpan=5.19-5.46%`, explicit WebGL2 Open Frontier
    `sunCore=0.085-0.086%`, `sunSpan=4.44%`, and max parity delta `0.39%`.
-   A Shau
-   midnight proves the authored
-   level/depth water body on its cool opaque night material with
-   `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`.
+   (The A Shau midnight authored-water night-material check is moot as of
+   2026-06-09: hydrology + all water were stripped to first principles and the
+   terrain has no water layer; it previously proved
+   `localMax(red=0.0% white=0.0% cyan=0.0% bright=0.0%)`.)
    A Shau dusk ridge proof passes strict WebGPU and production fallback terrain
    occlusion, terrain warmth, sun-scale, and `0.00%` parity delta. Production
    parity is proven by `check:live-release` against the current deployed
@@ -336,15 +329,16 @@ Mutual dependencies: PlayerController <-> FirstPersonWeapon, CombatantSystem <->
    preview builds now emit the manifest. The old TileCache fallback path has
    been removed; large worlds use explicit static-tiled generation and A Shau
    startup stops if no generated or pre-baked navmesh exists. Later Cycle 10 work
-   anchors large-world generation bounds to scenario zones, stages A Shau
-   home-base terrain shoulders, and now includes authored water bodies. The
+   anchors large-world generation bounds to scenario zones and stages A Shau
+   home-base terrain shoulders. The
    current blockers are route/NPC movement quality, airfield datum consistency,
    vehicle usability, and outer-boundary strategy, not missing DEM delivery.
-6. **Water rendering/material future** - authored level/depth basin water
-   bodies are the gameplay-water authority, with a daytime standard-material
-   bridge and a cool opaque night material to avoid emissive red/white slabs.
-   Natural WebGPU/TSL water, shoreline art polish, bridge clearance, and a
-   wider authored basin/river network remain terrain-engine work.
+6. **Water rendering/material future** - hydrology + all water (rendering,
+   query/physics, swimming, authored basins) stripped to first principles on
+   2026-06-09; the terrain has no water layer. To be reworked in a future
+   terrain/world-generator cycle that re-introduces a water level + real-time
+   debug visualization, then build toward a natural WebGPU/TSL water material,
+   shoreline art polish, bridge clearance, and an authored basin/river network.
 7. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
 8. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
 

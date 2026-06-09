@@ -8,7 +8,7 @@ import {
   DEFAULT_BUOYANCY_CONFIG,
   type BuoyancyConfig,
   type BuoyancySamplerLike,
-} from '../environment/water/BuoyancyForce';
+} from './WatercraftBuoyancyTypes';
 
 /**
  * Hand-rolled watercraft hull physics — fixed-step rigid-body sim that

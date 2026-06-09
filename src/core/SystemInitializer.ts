@@ -10,7 +10,6 @@ import { CombatantSystem } from '../systems/combat/CombatantSystem';
 import { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
-import { WaterSystem } from '../systems/environment/WaterSystem';
 import { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
 import { ZoneManager } from '../systems/world/ZoneManager';
 import { HUDSystem } from '../ui/hud/HUDSystem';
@@ -149,7 +148,6 @@ export class SystemInitializer {
     if (_renderer) {
       refs.atmosphereSystem.setRenderer(_renderer);
     }
-    refs.waterSystem = new WaterSystem(scene, camera, refs.assetLoader);
 
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.terrainSystem);
     refs.firstPersonWeapon = new FirstPersonWeapon(scene, camera, refs.assetLoader);
@@ -231,7 +229,6 @@ export class SystemInitializer {
       refs.globalBillboardSystem,
       refs.terrainSystem,
       // gpuTerrain disabled
-      refs.waterSystem,
       refs.weatherSystem,
       refs.atmosphereSystem,
       refs.playerController,
@@ -284,17 +281,15 @@ export class SystemInitializer {
     onProgress('world', 0.5);
 
     // Defer non-critical systems so first interactive frame is not blocked.
-    // `waterSystem` (river geometry compile) and `globalBillboardSystem`
-    // (vegetation atlas decode + per-type material construction) are deferred
-    // since neither is visible on the main menu — their update() paths are
-    // no-ops before init() runs (empty vegetation map, no water surface).
-    // Their init resumes in the background as soon as the menu renders, and
-    // is awaited again before mode startup via `ensureGameplaySystemsReady`.
+    // `globalBillboardSystem` (vegetation atlas decode + per-type material
+    // construction) is deferred since it is not visible on the main menu — its
+    // update() path is a no-op before init() runs (empty vegetation map). Its
+    // init resumes in the background as soon as the menu renders, and is
+    // awaited again before mode startup via `ensureGameplaySystemsReady`.
     const deferredSystems = new Set<GameSystem>([
       refs.helipadSystem,
       refs.helicopterModel,
       refs.fixedWingModel,
-      refs.waterSystem,
       refs.globalBillboardSystem,
     ]);
 

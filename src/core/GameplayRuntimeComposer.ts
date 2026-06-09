@@ -3,7 +3,6 @@
 
 import * as THREE from 'three';
 import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
-import { createNpcWaterSamplerAdapter } from '../systems/combat/npcWaterSamplerAdapter';
 import { IGameRenderer } from '../types/SystemInterfaces';
 import type { SystemKeyToType } from './SystemRegistry';
 
@@ -33,7 +32,6 @@ type GameplayRuntimeRefs = Pick<
   | 'terrainSystem'
   | 'ticketSystem'
   | 'weatherSystem'
-  | 'waterSystem'
   | 'zoneManager'
 >;
 
@@ -102,7 +100,6 @@ interface GameplayRuntimeGroups {
     | 'audioManager'
     | 'combatantSystem'
     | 'weatherSystem'
-    | 'waterSystem'
   >;
 }
 
@@ -174,7 +171,6 @@ export function createGameplayRuntimeGroups(
       audioManager: refs.audioManager,
       combatantSystem: refs.combatantSystem,
       weatherSystem: refs.weatherSystem,
-      waterSystem: refs.waterSystem,
     },
   };
 }
@@ -354,22 +350,4 @@ function wireEnvironmentRuntime(
     }
   }
 
-  if (runtime.waterSystem) {
-    runtime.waterSystem.setWeatherSystem(runtime.weatherSystem);
-    if (runtime.atmosphereSystem) {
-      runtime.waterSystem.setAtmosphereSystem(runtime.atmosphereSystem);
-    }
-
-    // VODA-2 wade behavior: bridge `WaterSystem.sampleWaterInteraction` into
-    // the `NpcWaterSampler` shape `CombatantMovement` consumes. The adapter
-    // owns a single shared Vector3 so per-tick NPC sampling does not
-    // allocate. Player swim is wired separately via
-    // `playerController.setWaterSystem` in `ModeStartupPreparer` because
-    // drowning damage needs the per-mode `PlayerHealthSystem` handle.
-    if (runtime.combatantSystem?.setWaterSampler) {
-      runtime.combatantSystem.setWaterSampler(
-        createNpcWaterSamplerAdapter(runtime.waterSystem),
-      );
-    }
-  }
 }

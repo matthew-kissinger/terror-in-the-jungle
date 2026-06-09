@@ -14,7 +14,6 @@ import { resolveGameAssetUrl } from '../GameAssetManifest';
 import type { GameEngine } from '../GameEngine';
 import { markStartup } from '../StartupTelemetry';
 import { computeNavmeshBakeSignature } from '../../systems/navigation/NavmeshBakeSignature';
-import { maybePreloadHydrologyBake } from './HydrologyArtifactCacheStage';
 
 /**
  * Height-source preparation stage extracted from the ModeStartupPreparer
@@ -96,7 +95,6 @@ export async function configureHeightSource(
     }
     return {
       kind: 'dem',
-      hydrologyBake: await maybePreloadHydrologyBake(mode, config),
       terrainFingerprint: computeNavmeshBakeSignature({
         heightSource: config.heightSource,
         resolvedPath,
@@ -134,7 +132,6 @@ export async function configureHeightSource(
         markStartup(`engine-init.start-game.${mode}.height-source.end`);
         return {
           kind: 'prebaked',
-          hydrologyBake: await maybePreloadHydrologyBake(mode, config),
           preparedHeightmap: {
             data: gridData,
             gridSize,
@@ -159,7 +156,6 @@ export async function configureHeightSource(
   markStartup(`engine-init.start-game.${mode}.height-source.end`);
   return {
     kind: 'procedural',
-    hydrologyBake: await maybePreloadHydrologyBake(mode, config),
     terrainFingerprint: seed,
   };
 }

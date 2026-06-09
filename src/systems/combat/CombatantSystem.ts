@@ -650,20 +650,6 @@ export class CombatantSystem implements GameSystem {
     this.lodManager.setNavmeshSystem(navmeshSystem);
   }
 
-  /**
-   * Bind the water sampler so NPCs wade-slow in shallow water and route
-   * around deep water at the navmesh layer. `WaterSystem` does not satisfy
-   * the `NpcWaterSampler` shape directly — its `sampleWaterInteraction`
-   * returns a struct, while `NpcWaterSampler` returns a scalar — so the
-   * runtime composer (`GameplayRuntimeComposer.wireEnvironmentRuntime`)
-   * builds the thin adapter via `createNpcWaterSamplerAdapter` and passes
-   * the result in. Pass `undefined` to detach (e.g. scenarios without
-   * water).
-   */
-  setWaterSampler(sampler: import('./CombatantMovement').NpcWaterSampler | undefined): void {
-    this.combatantMovement.setWaterSampler(sampler);
-  }
-
   // Game mode configuration methods
   setMaxCombatants(max: number): void {
     this.spawnManager.setMaxCombatants(max);

@@ -256,26 +256,6 @@ describe('FullMapSystem', () => {
       expect(() => (system as any).render()).not.toThrow();
     });
 
-    it('renders hydrology channels as map-visible water routes', () => {
-      system.setHydrologyChannels([
-        {
-          headCell: 1,
-          outletCell: 2,
-          lengthCells: 2,
-          lengthMeters: 120,
-          maxAccumulationCells: 100,
-          points: [
-            { cell: 1, x: -40, z: -40, elevationMeters: 2, accumulationCells: 50 },
-            { cell: 2, x: 60, z: 70, elevationMeters: 1, accumulationCells: 100 },
-          ],
-        },
-      ]);
-
-      expect(() => (system as any).render()).not.toThrow();
-      const ctxStub = (system as any).mapContext as ReturnType<typeof createCanvasContextStub>;
-      expect(ctxStub.lineTo).toHaveBeenCalled();
-    });
-
     it('renders when the player squad is highlighted', () => {
       system.setPlayerSquadId('squad-player');
       mockCombatantSystem.getAllCombatants = vi.fn(() => [

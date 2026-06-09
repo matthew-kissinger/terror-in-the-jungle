@@ -98,9 +98,8 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [
-      // Wet/channel vegetation is now owned by the baked hydrology mask below.
-      // Base rules stay dry-terrain only so low valley cells are not broadly
-      // mislabeled as swamp or riverbank outside accepted drainage corridors.
+      // Base rules stay dry-terrain only; wet/channel biomes are not assigned
+      // (the hydrology mask that drove them was removed in the water rework).
       { biomeId: 'tallGrass', elevationMax: 620, slopeMax: 8, elevationBlendWidth: 60, priority: 4 },
       { biomeId: 'bambooGrove', elevationMin: 680, elevationMax: 920, slopeMax: 10, elevationBlendWidth: 80, priority: 5 },
     ],
@@ -136,16 +135,6 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
     slopeGuardSoftnessDegrees: 5,
     routeBlendOnSteepSlope: 0.0,
   },
-  hydrology: {
-    preload: true,
-    biomeClassification: {
-      enabled: true,
-      wetBiomeId: 'swamp',
-      channelBiomeId: 'riverbank',
-      maxSlopeDeg: 16,
-    },
-  },
-
   // Renderer overrides for tall terrain. Fog density now lives alongside
   // the sky preset in `ScenarioAtmospherePresets.ts` (`fog-density-rebalance`)
   // so the dawn preset's warm horizon color and its density stay tuned
@@ -153,43 +142,6 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
   // system pushes the preset density onto `renderer.fog.density`.
   cameraFar: 4000,
   shadowFar: 500,
-  waterEnabled: true, // Authored level/depth basins own playable watercraft water.
-  globalWaterPlaneEnabled: false, // Valley floor ~580m makes a sea-level plane invisible and wasted.
-  waterBodies: [
-    {
-      id: 'ashau_north_valley_basin',
-      kind: 'basin',
-      surfaceY: 493,
-      center: { x: -6885, z: 4890 },
-      radiusXMeters: 890,
-      radiusZMeters: 265,
-      rotationRadians: 0.42,
-      depthMinMeters: 1.8,
-      depthMaxMeters: 5.8,
-      bankGradeMeters: 92,
-      flowDirection: { x: 0.91, z: 0.41 },
-      flowSpeedMetersPerSecond: 0.28,
-      vegetationClearRadiusMeters: 390,
-      shorelineSeed: 0.18,
-    },
-    {
-      id: 'ashau_south_valley_basin',
-      kind: 'basin',
-      surfaceY: 539,
-      center: { x: 1255, z: 1770 },
-      radiusXMeters: 680,
-      radiusZMeters: 230,
-      rotationRadians: 0.65,
-      depthMinMeters: 1.9,
-      depthMaxMeters: 6.2,
-      bankGradeMeters: 88,
-      flowDirection: { x: 0.79, z: 0.61 },
-      flowSpeedMetersPerSecond: 0.32,
-      vegetationClearRadiusMeters: 340,
-      shorelineSeed: 0.76,
-    },
-  ],
-
   // Campaign tickets - high count for extended persistent play
   maxTickets: 5000,
   matchDuration: 3600, // 60 minutes (save/resume makes this a session length, not match length)

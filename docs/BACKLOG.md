@@ -25,7 +25,7 @@ duplicated inside campaign manifests; the manifests are archived).
 | `cycle-vekhikl-5-fleet-expansion` | owner signs off on both `cycle-vehicle-wayfinding-and-prompts` and `cycle-vekhikl-player-boarding-wire` playtest evidence | M113 APC + M35 truck + T-54 tank (+ optional ZU-23-2 AA + LCM-8) |
 | `cycle-sky-screen-space-quad` | `cycle-skylut-resolution-bump` shipped but owner playtest still shows visible artifacts | Hillaire-style screen-space sky rework |
 | `cycle-stabilizat-1-baselines-refresh` | owner re-queues (removed from post-WebGPU campaign 2026-05-18) | STABILIZAT-1 / combat120 baseline refresh on a quiet machine |
-| `cycle-hydrology-river-surface-fix` | superseded by the foundation reset unless split back out as a narrow child | old Wave-0 brief retained at `docs/tasks/hydrology-river-surface-fix.md`; concrete owner defects now exist, but the issue is broader than surface-height polish |
+| `cycle-hydrology-river-surface-fix` | obsolete — hydrology + all water stripped to first principles 2026-06-09 | old Wave-0 brief retained at `docs/tasks/hydrology-river-surface-fix.md`; hydrology + all water (rendering, query/physics, swimming, authored basins) stripped to first principles on 2026-06-09; to be reworked in a future terrain/world-generator cycle that re-introduces a water level + real-time debug visualization, so this surface-height brief no longer applies |
 
 ## Active Branch (task/mode-startup-terrain-spike)
 

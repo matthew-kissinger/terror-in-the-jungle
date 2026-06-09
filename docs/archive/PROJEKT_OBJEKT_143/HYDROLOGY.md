@@ -1,5 +1,7 @@
 # Projekt Objekt-143 Hydrology Track
 
+> ARCHIVED / SUPERSEDED: the hydrology system this documents was removed on 2026-06-09 (water reworked from first principles).
+
 Last updated: 2026-05-07
 
 This note folds the owner request for reusable procedural hydrology into

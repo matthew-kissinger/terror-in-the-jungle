@@ -27,7 +27,6 @@ import type { HelipadMarker } from '../minimap/MinimapRenderer';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
-import type { HydrologyChannelPolyline } from '../../systems/terrain/hydrology/HydrologyBake';
 import type { IVehicle } from '../../systems/vehicle/IVehicle';
 
 // Reusable scratch vector to avoid per-frame allocations
@@ -67,7 +66,6 @@ export class FullMapSystem implements GameSystem {
   private vehicleMarkers: VehicleMarker[] = [];
   private vehicleSource?: FullMapVehicleSource;
   private terrainFlowPaths: TerrainFlowPath[] = [];
-  private hydrologyChannels: HydrologyChannelPolyline[] = [];
   private terrainBackdrop: HTMLCanvasElement | null = null;
   private terrainBackdropWorldSize = 0;
 
@@ -310,7 +308,6 @@ export class FullMapSystem implements GameSystem {
     this.drawTerrainBackdrop(ctx);
     this.drawGrid(ctx);
     this.drawTerrainFlowPaths(ctx);
-    this.drawHydrologyChannels(ctx);
 
     // Draw zones
     if (this.zoneQuery) {
@@ -472,57 +469,6 @@ export class FullMapSystem implements GameSystem {
     }
 
     ctx.restore();
-  }
-
-  private drawHydrologyChannels(ctx: CanvasRenderingContext2D): void {
-    if (this.hydrologyChannels.length === 0) {
-      return;
-    }
-
-    const scale = MAP_SIZE / this.worldSize;
-    ctx.save();
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    const maxAccumulation = Math.max(
-      1,
-      ...this.hydrologyChannels.map(channel => channel.maxAccumulationCells),
-    );
-
-    for (const channel of this.hydrologyChannels) {
-      if (channel.points.length < 2) continue;
-      const t = Math.min(1, Math.max(0, channel.maxAccumulationCells / maxAccumulation));
-      const width = Math.max(2.5, (8 + 18 * t) * scale);
-
-      ctx.strokeStyle = 'rgba(38, 60, 74, 0.85)';
-      ctx.lineWidth = width + Math.max(2, 1.2 / this.inputHandler.getZoomLevel());
-      this.strokeHydrologyChannel(ctx, channel);
-
-      ctx.strokeStyle = 'rgba(82, 120, 140, 0.95)';
-      ctx.lineWidth = Math.max(1.25, width * 0.55);
-      this.strokeHydrologyChannel(ctx, channel);
-    }
-
-    ctx.restore();
-  }
-
-  private strokeHydrologyChannel(
-    ctx: CanvasRenderingContext2D,
-    channel: HydrologyChannelPolyline,
-  ): void {
-    const scale = MAP_SIZE / this.worldSize;
-    ctx.beginPath();
-    for (let i = 0; i < channel.points.length; i++) {
-      const point = channel.points[i];
-      const x = (this.worldSize / 2 - point.x) * scale;
-      const y = (this.worldSize / 2 - point.z) * scale;
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-    ctx.stroke();
   }
 
   private drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone): void {
@@ -721,10 +667,6 @@ export class FullMapSystem implements GameSystem {
 
   setTerrainFlowPaths(paths: TerrainFlowPath[]): void {
     this.terrainFlowPaths = paths.slice();
-  }
-
-  setHydrologyChannels(channels: readonly HydrologyChannelPolyline[] | null): void {
-    this.hydrologyChannels = channels ? channels.slice() : [];
   }
 
   setHelipadMarkers(markers: HelipadMarker[]): void {

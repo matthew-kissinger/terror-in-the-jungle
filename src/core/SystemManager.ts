@@ -10,7 +10,6 @@ import { CombatantSystem } from '../systems/combat/CombatantSystem';
 import { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
-import { WaterSystem } from '../systems/environment/WaterSystem';
 
 import { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
 import { ZoneManager } from '../systems/world/ZoneManager';
@@ -202,18 +201,6 @@ export class SystemManager {
 
     // Set weather config for mode
     const config = getGameModeConfig(mode);
-    if (this.waterSystem) {
-      const waterEnabled = config.waterEnabled === true;
-      // Keep the legacy camera-following sea-level plane opt-in only. Current
-      // playable river water is owned by authored level/depth bodies or
-      // hydrology, and should not inherit a global sheet just because a
-      // scenario has water.
-      const globalWaterPlaneEnabled = config.globalWaterPlaneEnabled === true;
-      this.waterSystem.setEnabled(globalWaterPlaneEnabled);
-      if (waterEnabled && typeof this.waterSystem.setWorldSize === 'function') {
-        this.waterSystem.setWorldSize(config.worldSize);
-      }
-    }
     // Apply the per-scenario atmosphere preset (sun direction, turbidity,
     // ground albedo, fog density). Picks dawn for A Shau, noon for OF,
     // dusk for TDM, golden hour for ZC, noon for AI sandbox / combat120.
@@ -321,7 +308,6 @@ export class SystemManager {
   get playerController(): PlayerController { return this.registry.require('playerController'); }
   get combatantSystem(): CombatantSystem { return this.registry.require('combatantSystem'); }
   get atmosphereSystem(): AtmosphereSystem { return this.registry.require('atmosphereSystem'); }
-  get waterSystem(): WaterSystem { return this.registry.require('waterSystem'); }
   get weatherSystem(): WeatherSystem { return this.registry.require('weatherSystem'); }
   get firstPersonWeapon(): FirstPersonWeapon { return this.registry.require('firstPersonWeapon'); }
   get zoneManager(): ZoneManager { return this.registry.require('zoneManager'); }
