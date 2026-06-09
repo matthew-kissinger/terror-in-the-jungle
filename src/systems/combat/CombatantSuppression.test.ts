@@ -121,6 +121,50 @@ describe('CombatantSuppression', () => {
       expect(combatant.nearMissCount).toBe(0);
     });
 
+    it('does not suppress an allied combatant of a different faction', () => {
+      // ARVN shares the BLUFOR alliance with US. A US shooter's near miss must
+      // not suppress an allied ARVN soldier just because the faction enum differs.
+      const ally = createMockCombatant({
+        id: 'arvn-1',
+        faction: Faction.ARVN,
+        position: new THREE.Vector3(2, 0, 0),
+        suppressionLevel: 0,
+      });
+
+      const allCombatants = new Map([['arvn-1', ally]]);
+      const shotRay = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+      const hitPoint = new THREE.Vector3(0, 0, 0);
+
+      vi.mocked(spatialGridManager.queryRadius).mockReturnValue(['arvn-1']);
+
+      suppression.trackNearMisses(shotRay, hitPoint, Faction.US, allCombatants);
+
+      expect(ally.suppressionLevel).toBe(0);
+      expect(ally.nearMissCount).toBe(0);
+    });
+
+    it('suppresses an enemy from the opposing alliance regardless of exact faction', () => {
+      // VC and NVA share the OPFOR alliance; a US shooter must still suppress a
+      // VC soldier even though the canonical OPFOR faction is NVA.
+      const enemy = createMockCombatant({
+        id: 'vc-1',
+        faction: Faction.VC,
+        position: new THREE.Vector3(2, 0, 0),
+        suppressionLevel: 0,
+      });
+
+      const allCombatants = new Map([['vc-1', enemy]]);
+      const shotRay = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+      const hitPoint = new THREE.Vector3(0, 0, 0);
+
+      vi.mocked(spatialGridManager.queryRadius).mockReturnValue(['vc-1']);
+
+      suppression.trackNearMisses(shotRay, hitPoint, Faction.US, allCombatants);
+
+      expect(enemy.suppressionLevel).toBeGreaterThan(0);
+      expect(enemy.nearMissCount).toBe(1);
+    });
+
     it('calls player suppression system when player is near miss', () => {
       suppression.setPlayerSuppressionSystem(mockPlayerSuppressionSystem);
 

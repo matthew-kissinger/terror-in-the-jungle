@@ -130,6 +130,21 @@ describe('ClusterManager', () => {
       expect(force.z).toBe(0)
     })
 
+    it('should space apart from an allied combatant of a different faction', () => {
+      // US and ARVN share the BLUFOR alliance, so they are friendlies that must
+      // spread out from each other - not be skipped as a "different faction".
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
+      const ally = createMockCombatant('c2', Faction.ARVN, new THREE.Vector3(2, 0, 0))
+      allCombatants.set('c1', combatant)
+      allCombatants.set('c2', ally)
+      const spatialGrid = createMockSpatialGrid(['c1', 'c2'])
+
+      const force = clusterManager.calculateSpacingForce(combatant, allCombatants, spatialGrid)
+
+      // Repulsion away from the ally at +X means a negative-X push.
+      expect(force.x).toBeLessThan(0)
+    })
+
     it('should exclude self from spacing calculations', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
       allCombatants.set('c1', combatant)
@@ -283,6 +298,27 @@ describe('ClusterManager', () => {
 
       // All nearby combatants are enemies, should not cluster
       expect(result).toBe(false)
+    })
+
+    it('should cluster with allied combatants of a different faction', () => {
+      // ARVN soldiers share the BLUFOR alliance with the US combatant, so they
+      // are friendlies and must count toward the cluster threshold.
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
+      const ally1 = createMockCombatant('c2', Faction.ARVN, new THREE.Vector3(5, 0, 0))
+      const ally2 = createMockCombatant('c3', Faction.ARVN, new THREE.Vector3(0, 0, 5))
+      const ally3 = createMockCombatant('c4', Faction.ARVN, new THREE.Vector3(-5, 0, 0))
+      const ally4 = createMockCombatant('c5', Faction.ARVN, new THREE.Vector3(0, 0, -5))
+      allCombatants.set('c1', combatant)
+      allCombatants.set('c2', ally1)
+      allCombatants.set('c3', ally2)
+      allCombatants.set('c4', ally3)
+      allCombatants.set('c5', ally4)
+      const spatialGrid = createMockSpatialGrid(['c1', 'c2', 'c3', 'c4', 'c5'])
+
+      const result = clusterManager.isInCluster(combatant, allCombatants, spatialGrid)
+
+      // 4 allied friendlies = cluster, even though the faction enum differs.
+      expect(result).toBe(true)
     })
 
     it('should exclude self from cluster count', () => {

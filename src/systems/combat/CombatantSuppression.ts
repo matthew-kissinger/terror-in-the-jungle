@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, isOpfor } from './types';
+import { Combatant, CombatantState, Faction, isAlly, isOpfor } from './types';
 import { spatialGridManager } from './SpatialGridManager';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { AudioManager } from '../audio/AudioManager';
@@ -62,7 +62,7 @@ export class CombatantSuppression {
     if (!this.queryProvider && !spatialGridManager.getIsInitialized()) {
       // Fallback to old behavior if spatial grid not initialized (shouldn't happen)
       allCombatants.forEach(combatant => {
-        if (combatant.faction === shooterFaction) return;
+        if (isAlly(combatant.faction, shooterFaction)) return;
         if (combatant.state === CombatantState.DEAD) return;
 
         const distanceToHitSq = combatant.position.distanceToSquared(hitPoint);
@@ -83,7 +83,7 @@ export class CombatantSuppression {
     for (const id of nearbyCombatantIds) {
       const combatant = allCombatants.get(id);
       if (!combatant) continue;
-      if (combatant.faction === shooterFaction) continue;
+      if (isAlly(combatant.faction, shooterFaction)) continue;
       if (combatant.state === CombatantState.DEAD) continue;
 
       // Use squared distance for comparison (faster)

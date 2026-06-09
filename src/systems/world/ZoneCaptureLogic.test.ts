@@ -76,4 +76,50 @@ describe('ZoneCaptureLogic', () => {
     expect(zone.state).toBe(ZoneState.OPFOR_CONTROLLED);
     expect(zone.captureProgress).toBe(100);
   });
+
+  it('treats an ARVN-owned zone held by BLUFOR as friendly-controlled', () => {
+    // ARVN shares the BLUFOR alliance. An owner check that compares the owner
+    // against Faction.US alone misreads an ARVN-owned zone as neutral and lets
+    // its own BLUFOR holders re-capture it from scratch.
+    const logic = new ZoneCaptureLogic();
+    const zone = createZone();
+    zone.owner = Faction.ARVN;
+    zone.state = ZoneState.BLUFOR_CONTROLLED;
+    zone.captureProgress = 100;
+
+    for (let i = 0; i < 5; i++) {
+      logic.updateZoneCaptureState(zone, { us: 3, opfor: 0 }, 1.0);
+    }
+
+    // A BLUFOR-allied owner holding the zone with BLUFOR occupants stays
+    // BLUFOR-controlled at full progress - not flipped to neutral.
+    expect(zone.owner).toBe(Faction.ARVN);
+    expect(zone.state).toBe(ZoneState.BLUFOR_CONTROLLED);
+    expect(zone.captureProgress).toBe(100);
+  });
+
+  it('counts an ARVN-owned zone toward the BLUFOR ticket-bleed majority', () => {
+    // calculateTicketBleedRate must count BLUFOR-allied owners (US or ARVN) as
+    // a single side; an owner === Faction.US check drops ARVN zones and lets
+    // OPFOR appear to hold the majority.
+    const logic = new ZoneCaptureLogic();
+    const arvnZone = createZone();
+    arvnZone.id = 'arvn_zone';
+    arvnZone.owner = Faction.ARVN;
+
+    const opforZone = createZone();
+    opforZone.id = 'opfor_zone';
+    opforZone.owner = Faction.NVA;
+
+    const zones = new Map<string, CaptureZone>([
+      [arvnZone.id, arvnZone],
+      [opforZone.id, opforZone],
+    ]);
+
+    const bleed = logic.calculateTicketBleedRate(zones);
+
+    // One BLUFOR zone vs one OPFOR zone = parity, so neither side bleeds.
+    expect(bleed.us).toBe(0);
+    expect(bleed.opfor).toBe(0);
+  });
 });

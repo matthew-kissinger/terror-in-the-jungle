@@ -30,7 +30,8 @@ export class ZoneCaptureLogic {
     const bothPresent = us > 0 && opfor > 0;
 
     // Owned zone behavior: attackers reduce control based on net advantage.
-    if (zone.owner === Faction.US) {
+    // Owner is matched by alliance (US or ARVN are both BLUFOR), not raw faction.
+    if (zone.owner !== null && isBlufor(zone.owner)) {
       if (advantage >= 0) {
         zone.captureProgress = Math.min(100, zone.captureProgress + zone.captureSpeed * deltaTime * Math.max(0, advantage));
         zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.BLUFOR_CONTROLLED;
@@ -127,7 +128,7 @@ export class ZoneCaptureLogic {
     let opforBleed = 0;
 
     const capturedZones = Array.from(zones.values()).filter(z => !z.isHomeBase && z.owner !== null);
-    const usZones = capturedZones.filter(z => z.owner === Faction.US).length;
+    const usZones = capturedZones.filter(z => z.owner !== null && isBlufor(z.owner)).length;
     const opforZones = capturedZones.filter(z => z.owner !== null && isOpfor(z.owner)).length;
 
     // Majority holder causes ticket bleed for opponent

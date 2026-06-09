@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three'
-import { Combatant, CombatantState, ITargetable } from './types'
+import { Combatant, CombatantState, ITargetable, isAlly } from './types'
 import { SpatialGridManager } from './SpatialGridManager'
 
 export interface TargetDistributionTelemetry {
@@ -88,7 +88,7 @@ export class ClusterManager {
 
       const other = allCombatants.get(id)
       if (!other) continue
-      if (other.faction !== combatant.faction) continue
+      if (!isAlly(other.faction, combatant.faction)) continue
       if (other.state === CombatantState.DEAD) continue
 
       // Use distanceToSquared for comparison (faster than distanceTo)
@@ -138,7 +138,7 @@ export class ClusterManager {
 
       const other = allCombatants.get(id)
       if (!other) continue
-      if (other.faction !== combatant.faction) continue
+      if (!isAlly(other.faction, combatant.faction)) continue
       if (other.state === CombatantState.DEAD) continue
 
       // Use distanceToSquared for faster comparison
