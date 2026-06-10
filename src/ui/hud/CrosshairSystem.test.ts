@@ -104,6 +104,32 @@ describe('CrosshairSystem', () => {
       expect(tankGunner.style.display).toBe('none');
     });
 
+    it('should switch to fixed_wing and show only the reflector gunsight', () => {
+      crosshair.setMode('fixed_wing');
+      expect(crosshair.getMode()).toBe('fixed_wing');
+
+      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+      const pipper = crosshair.element.querySelector('[data-ref="pipper"]') as HTMLElement;
+      const tankGunner = crosshair.element.querySelector('[data-ref="tankGunner"]') as HTMLElement;
+      const emplacementMg = crosshair.element.querySelector('[data-ref="emplacementMg"]') as HTMLElement;
+      const fixedWing = crosshair.element.querySelector('[data-ref="fixedWing"]') as HTMLElement;
+      expect(fixedWing.style.display).toBe('');
+      expect(infantry.style.display).toBe('none');
+      expect(pipper.style.display).toBe('none');
+      expect(tankGunner.style.display).toBe('none');
+      expect(emplacementMg.style.display).toBe('none');
+    });
+
+    it('should restore the infantry crosshair when leaving fixed_wing', () => {
+      crosshair.setMode('fixed_wing');
+      crosshair.setMode('infantry');
+
+      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+      const fixedWing = crosshair.element.querySelector('[data-ref="fixedWing"]') as HTMLElement;
+      expect(infantry.style.display).toBe('');
+      expect(fixedWing.style.display).toBe('none');
+    });
+
     it('should swap cleanly between ground-gunnery modes and back to infantry', () => {
       const tankGunner = crosshair.element.querySelector('[data-ref="tankGunner"]') as HTMLElement;
       const emplacementMg = crosshair.element.querySelector('[data-ref="emplacementMg"]') as HTMLElement;

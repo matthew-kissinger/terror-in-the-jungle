@@ -399,6 +399,28 @@
   text-align: right;
 }
 
+/* --- Nose-gun ammo section --- */
+.ammoValue {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
+  text-align: center;
+  background: rgba(43, 38, 32, 0.78);
+  padding: var(--space-1) var(--space-1-5);
+  border-radius: var(--r-sm);
+  min-width: 40px;
+  font-variant-numeric: tabular-nums;
+  transition: color var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+}
+
+/* LOW: under 20% of the magazine — stamp-red call-out, the scout's "winchester". */
+.ammoLow {
+  color: var(--hot);
+  background: rgba(181, 71, 47, 0.25);
+}
+
 /* --- Responsive: mobile touch landscape --- */
 @media (pointer: coarse) and (orientation: landscape) {
   .container {

@@ -24,9 +24,20 @@ import {
   isTouchFlightMode,
   relockPointer,
   seatPlayer,
+  setCrosshairMode,
   setFlightVehicleInputState,
+  setInfantryCrosshair,
   setInputContext,
 } from './VehicleAdapterShared';
+
+/**
+ * Optional ammo-readout sink on the concrete HUD. `updateFixedWingAmmo` is not
+ * on the fenced `IHUDSystem` (it is HUD-internal), so the adapter widens the
+ * structural type here to push the nose-gun count without a fence change.
+ */
+type FixedWingAmmoHud = {
+  updateFixedWingAmmo?(rounds: number, capacity: number): void;
+};
 
 // ── Fixed-wing control tuning ──
 const FW_THROTTLE_RAMP_RATE = 0.8;
@@ -134,6 +145,11 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
       hudSystem?.setFixedWingAutoLevel?.(assistIndicator);
     }
 
+    // Boresighted reflector gunsight for the nose cannon (restored to infantry
+    // on exit). Seed the ammo readout from the aircraft's current magazine.
+    setCrosshairMode(ctx.gameRenderer, 'fixed_wing');
+    this.pushAmmo(hudSystem, ctx.vehicleId);
+
     // Tell FixedWingModel this aircraft is now piloted
     this.fixedWingModel.setPilotedAircraft(ctx.vehicleId);
 
@@ -151,6 +167,9 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.hideFixedWingInstruments?.();
     hudSystem?.hideFixedWingMouseIndicator?.();
     hudSystem?.setVehicleContext?.(null);
+
+    // Restore the infantry crosshair the player left on foot.
+    setInfantryCrosshair(ctx.gameRenderer);
 
     // Release the trigger before tearing down so the cannon can't latch firing
     // across an exit.
@@ -392,7 +411,21 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
         hudSystem.setFixedWingFlightAssist?.(assistIndicator);
         hudSystem.setFixedWingAutoLevel?.(assistIndicator);
       }
+      this.pushAmmo(hudSystem, this.activeAircraftId);
     }
+  }
+
+  /**
+   * Push the live nose-gun ammo count to the HUD. Reads the real fire-path
+   * count and capacity from the model so the readout decrements with each shot.
+   */
+  private pushAmmo(hudSystem: IHUDSystem | undefined, aircraftId: string): void {
+    const sink = hudSystem as (IHUDSystem & FixedWingAmmoHud) | undefined;
+    if (!sink?.updateFixedWingAmmo) return;
+    sink.updateFixedWingAmmo(
+      this.fixedWingModel.getWeaponAmmo(aircraftId),
+      this.fixedWingModel.getWeaponAmmoCapacity(aircraftId),
+    );
   }
 
   private addMouseControl(mouseMovement: { x: number; y: number }, sensitivity: number = FW_MOUSE_SENSITIVITY): void {

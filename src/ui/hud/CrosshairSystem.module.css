@@ -412,3 +412,79 @@
   background: #9e3b2e;
   box-shadow: 0 0 5px rgba(158, 59, 46, 0.85);
 }
+
+/* --- Fixed-wing reflector gunsight (R2 fixedwing-gunsight) ---
+   A static reflector sight boresighted to the nose-cannon convergence: an
+   outer ring, four short cross ticks just outside it (gap at the bore), and a
+   bright center pipper. No lead computation is drawn — purely a boresight. */
+.fixedWingReticle {
+  position: relative;
+  width: 88px;
+  height: 88px;
+}
+
+/* Reflector ring. */
+.fwRing {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid rgba(231, 217, 186, 0.7);
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(231, 217, 186, 0.3);
+}
+
+/* Short cross ticks — seated just outside the ring with a gap at the bore. */
+.fwTick {
+  position: absolute;
+  background: rgba(231, 217, 186, 0.85);
+  box-shadow: 0 0 2px rgba(231, 217, 186, 0.85);
+}
+
+.fwTickTop,
+.fwTickBottom {
+  width: 1.5px;
+  height: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.fwTickTop {
+  top: 6px;
+}
+
+.fwTickBottom {
+  bottom: 6px;
+}
+
+.fwTickLeft,
+.fwTickRight {
+  height: 1.5px;
+  width: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.fwTickLeft {
+  left: 6px;
+}
+
+.fwTickRight {
+  right: 6px;
+}
+
+/* Bright center pipper — the boresight aim point. */
+.fwPipper {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 4px;
+  background: rgba(231, 217, 186, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(231, 217, 186, 0.7);
+  z-index: 2;
+}
