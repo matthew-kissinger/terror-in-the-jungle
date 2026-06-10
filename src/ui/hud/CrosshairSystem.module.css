@@ -2,7 +2,10 @@
  * CrosshairSystem - Context-sensitive crosshair overlay.
  *
  * Modes: infantry (full tactical), helicopter_transport (hidden),
- * helicopter_gunship (hidden), helicopter_attack (pipper reticle).
+ * helicopter_gunship (hidden), helicopter_attack (pipper reticle),
+ * tank_gunner (center cross + stadia placeholder), emplacement_mg (open
+ * MG cross). The two ground-gunnery reticles are placeholder geometry; the
+ * R2 craft tasks refine the visuals.
  */
 
 .container {
@@ -178,4 +181,123 @@
   background: rgba(231, 217, 186, 0.9);
   border-radius: 50%;
   box-shadow: 0 0 4px rgba(231, 217, 186, 0.6);
+}
+
+/* --- Tank gunner sight (placeholder: center cross + stadia ticks) --- */
+/* R2 task `tank-gunner-sight` swaps this for a real rangefinder reticle. */
+.tankGunnerReticle {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.gunnerLine {
+  position: absolute;
+  background: rgba(231, 217, 186, 0.85);
+  box-shadow: 0 0 2px rgba(231, 217, 186, 0.85);
+}
+
+.gunnerLineV {
+  width: 1.5px;
+  height: 80px;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.gunnerLineH {
+  width: 80px;
+  height: 1.5px;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.gunnerDot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 4px;
+  border: 1px solid rgba(231, 217, 186, 0.9);
+  border-radius: 50%;
+  background: transparent;
+  z-index: 2;
+}
+
+/* Stadia rangefinder ticks along the vertical line (placeholder spacing). */
+.stadia {
+  position: absolute;
+  left: 50%;
+  width: 14px;
+  height: 1.5px;
+  transform: translateX(-50%);
+  background: rgba(231, 217, 186, 0.7);
+}
+
+.stadiaUp {
+  top: 22px;
+}
+
+.stadiaDown {
+  bottom: 22px;
+}
+
+/* --- Emplacement MG (open cross — gap at the centre) --- */
+/* R2 task `m2hb-gun-experience` refines this with belt/ammo state. */
+.mgReticle {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.mgLine {
+  position: absolute;
+  background: rgba(231, 217, 186, 0.85);
+  box-shadow: 0 0 2px rgba(231, 217, 186, 0.85);
+}
+
+.mgLineTop {
+  width: 2px;
+  height: 18px;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.mgLineBottom {
+  width: 2px;
+  height: 18px;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+}
+
+.mgLineLeft {
+  width: 18px;
+  height: 2px;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.mgLineRight {
+  width: 18px;
+  height: 2px;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.mgDot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 2px;
+  background: rgba(231, 217, 186, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 3px rgba(231, 217, 186, 0.85);
 }

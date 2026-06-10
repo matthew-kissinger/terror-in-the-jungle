@@ -20,6 +20,7 @@ import {
   clearFlightBookkeeping,
   relockPointer,
   seatPlayer,
+  setCrosshairMode,
   setInfantryCrosshair,
 } from './VehicleAdapterShared';
 
@@ -133,7 +134,9 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(createTankGunnerUIContext());
 
-    setInfantryCrosshair(ctx.gameRenderer);
+    // Gunner-sight reticle (center cross + stadia placeholder). The R2
+    // `tank-gunner-sight` task refines the geometry.
+    setCrosshairMode(ctx.gameRenderer, 'tank_gunner');
 
     // Re-acquire pointer lock so mouse-look (turret aim) keeps working.
     relockPointer(ctx.input);

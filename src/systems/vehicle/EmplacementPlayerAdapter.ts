@@ -17,6 +17,7 @@ import type { Emplacement } from './Emplacement';
 import {
   clearFlightBookkeeping,
   relockPointer,
+  setCrosshairMode,
   setInfantryCrosshair,
 } from './VehicleAdapterShared';
 
@@ -115,7 +116,9 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(createEmplacementUIContext());
 
-    setInfantryCrosshair(ctx.gameRenderer);
+    // Open MG cross reticle for the M2HB. The R2 `m2hb-gun-experience`
+    // task refines it with belt/ammo state.
+    setCrosshairMode(ctx.gameRenderer, 'emplacement_mg');
 
     relockPointer(ctx.input);
   }

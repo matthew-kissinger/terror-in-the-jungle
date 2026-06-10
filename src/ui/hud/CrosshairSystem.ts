@@ -9,13 +9,24 @@
  *   helicopter_transport - hidden (no pilot weapons)
  *   helicopter_gunship   - hidden (door guns are crew-operated)
  *   helicopter_attack    - forward pipper reticle (circle + center dot)
+ *   tank_gunner          - gunner sight: center cross + stadia placeholder
+ *   emplacement_mg       - open MG cross (M2HB tripod / vehicle mount)
+ *
+ * The two ground-gunnery reticles are placeholder geometry; the R2 craft
+ * tasks (tank-gunner-sight, m2hb-gun-experience) refine the visuals.
  */
 
 import { UIComponent } from '../engine/UIComponent';
 import { icon } from '../icons/IconRegistry';
 import styles from './CrosshairSystem.module.css';
 
-export type CrosshairMode = 'infantry' | 'helicopter_transport' | 'helicopter_gunship' | 'helicopter_attack';
+export type CrosshairMode =
+  | 'infantry'
+  | 'helicopter_transport'
+  | 'helicopter_gunship'
+  | 'helicopter_attack'
+  | 'tank_gunner'
+  | 'emplacement_mg';
 
 export class CrosshairSystem extends UIComponent {
   private mode = this.signal<CrosshairMode>('infantry');
@@ -43,6 +54,20 @@ export class CrosshairSystem extends UIComponent {
         <img data-ref="pipperRocket" data-icon="reticle-rocket" alt="Rocket reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;display:none;" draggable="false">
         <div class="${styles.pipperDot}"></div>
       </div>
+      <div data-ref="tankGunner" class="${styles.tankGunnerReticle}" style="display:none">
+        <div class="${styles.gunnerLine} ${styles.gunnerLineV}"></div>
+        <div class="${styles.gunnerLine} ${styles.gunnerLineH}"></div>
+        <div class="${styles.gunnerDot}"></div>
+        <div class="${styles.stadia} ${styles.stadiaUp}"></div>
+        <div class="${styles.stadia} ${styles.stadiaDown}"></div>
+      </div>
+      <div data-ref="emplacementMg" class="${styles.mgReticle}" style="display:none">
+        <div class="${styles.mgLine} ${styles.mgLineTop}"></div>
+        <div class="${styles.mgLine} ${styles.mgLineBottom}"></div>
+        <div class="${styles.mgLine} ${styles.mgLineLeft}"></div>
+        <div class="${styles.mgLine} ${styles.mgLineRight}"></div>
+        <div class="${styles.mgDot}"></div>
+      </div>
     `;
   }
 
@@ -54,7 +79,9 @@ export class CrosshairSystem extends UIComponent {
 
       const infantry = this.$('[data-ref="infantry"]');
       const pipper = this.$('[data-ref="pipper"]');
-      if (!infantry || !pipper) return;
+      const tankGunner = this.$('[data-ref="tankGunner"]');
+      const emplacementMg = this.$('[data-ref="emplacementMg"]');
+      if (!infantry || !pipper || !tankGunner || !emplacementMg) return;
 
       if (!visible) {
         this.root.classList.add(styles.hidden);
@@ -63,20 +90,30 @@ export class CrosshairSystem extends UIComponent {
 
       this.root.classList.remove(styles.hidden);
 
+      // Exactly one reticle is shown per mode (or none for the crew-only heli
+      // modes). Hide everything first, then reveal the active reticle.
+      infantry.style.display = 'none';
+      pipper.style.display = 'none';
+      tankGunner.style.display = 'none';
+      emplacementMg.style.display = 'none';
+
       switch (currentMode) {
         case 'infantry':
           infantry.style.display = '';
-          pipper.style.display = 'none';
           break;
         case 'helicopter_attack':
-          infantry.style.display = 'none';
           pipper.style.display = '';
           this.loadPipperIcons();
           break;
+        case 'tank_gunner':
+          tankGunner.style.display = '';
+          break;
+        case 'emplacement_mg':
+          emplacementMg.style.display = '';
+          break;
         case 'helicopter_transport':
         case 'helicopter_gunship':
-          infantry.style.display = 'none';
-          pipper.style.display = 'none';
+          // Crew-operated weapons — no pilot reticle.
           break;
       }
     });
