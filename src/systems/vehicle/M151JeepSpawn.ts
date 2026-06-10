@@ -4,13 +4,15 @@
 import * as THREE from 'three';
 import { Faction } from '../combat/types';
 import { GroundVehicle, M151_PHYSICS_CONFIG } from './GroundVehicle';
+import { applyM151JeepGlbVisual } from './VehicleGlbVisuals';
 import type { VehicleManager } from './VehicleManager';
 
 /**
- * Procedural M151 scenario spawn. The GLB jeep remains available as static
- * dressing, but owner acceptance needs a synchronous, stable-id IVehicle that
- * is present as soon as the scenario starts. This mirrors the M48 procedural
- * path and avoids proving a late-loading world-feature prop.
+ * M151 scenario spawn. The spawn itself stays synchronous (stable-id
+ * IVehicle present as soon as the scenario starts, procedural placeholder
+ * mesh); `applyM151JeepGlbVisual` then swaps in `m151-jeep.glb` when the
+ * model resolves, keeping the procedural mesh only as a load-failure
+ * fallback.
  */
 
 const M151_HULL = {
@@ -126,6 +128,8 @@ export function createM151Jeep(
 
   const jeep = new GroundVehicle(options.vehicleId, root, options.faction, undefined, M151_PHYSICS_CONFIG);
   vehicleManager.register(jeep);
+  // Fire-and-forget visual upgrade; the procedural mesh stays on failure.
+  void applyM151JeepGlbVisual(root);
   return { jeep, root };
 }
 

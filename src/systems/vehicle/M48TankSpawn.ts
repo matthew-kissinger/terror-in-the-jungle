@@ -5,18 +5,18 @@ import * as THREE from 'three';
 import { Faction } from '../combat/types';
 import { Tank } from './Tank';
 import { M48_HULL_DIMENSIONS, M48_PHYSICS_CONFIG, M48_SPAWN_OFFSETS } from '../../config/vehicles/m48-config';
+import { applyM48TankGlbVisual } from './VehicleGlbVisuals';
 import type { VehicleManager } from './VehicleManager';
 
 /**
- * Procedural M48 Patton chassis mesh + scenario-spawn glue. Mirrors the
- * shape of `M2HBEmplacementSpawn`:
+ * M48 Patton chassis mesh + scenario-spawn glue. Mirrors the shape of
+ * `M2HBEmplacementSpawn`:
  *
  *   - Procedural mesh shipped in source so the scenario spawn is not
- *     blocked on the GLB loader. `public/models/vehicles/ground/m48-patton.glb`
- *     does exist, but loading it is asynchronous and the cycle brief
- *     allows a procedural fallback — taking the fallback path keeps
- *     this PR synchronous and isolates the integration from the loader
- *     contract.
+ *     blocked on the GLB loader; `applyM48TankGlbVisual` then swaps in
+ *     `m48-patton.glb` asynchronously (hull on the chassis, Joint_Turret /
+ *     Joint_MainGun re-seated on the TankTurret rig), keeping the
+ *     procedural mesh only as a load-failure fallback.
  *   - Static spawn table per scenario (Open Frontier airfield Main
  *     Motor Pool bay + A Shau valley road).
  *   - `resolvePosition` callback so the caller can snap the spawn
@@ -176,6 +176,8 @@ export function createM48Tank(
   // gunner's aim visibly traverses + elevates the cannon.
   mountM48TurretMeshes(tank);
   vehicleManager.register(tank);
+  // Fire-and-forget visual upgrade; the procedural meshes stay on failure.
+  void applyM48TankGlbVisual(root, tank);
   return { tank, root };
 }
 
