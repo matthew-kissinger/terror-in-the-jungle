@@ -23,6 +23,13 @@ task — same dispatch round, small surface.) Spec:
 
 ## Scope
 
+0. **FIX THE INSTRUMENT FIRST** (finding from billboard-rig-migration PR
+   #376): the sweep's `foliage` and `npc` sample regions are fixed fallback
+   boxes that land on bare terrain — terrain-vs-terrain rows. In
+   `scripts/capture-tod-coherence-sweep.ts`, anchor both regions on actual
+   billboard/impostor pixels (project known world anchors to screen, the way
+   the `glb` row already does). Re-baseline after the fix; all band numbers
+   below are against the FIXED instrument.
 1. NPC impostors consume `lightingRigBindings` directly on the rig path with
    the SAME response (wrap/attenuation constants) the billboard migration
    tuned — no per-family re-tune; share constants via import, not copy.
@@ -31,9 +38,13 @@ task — same dispatch round, small surface.) Spec:
 3. Effects/prop sweep: enumerate remaining snapshot consumers; migrate any
    that visibly diverge under the rig (tracers/explosions are emissive —
    likely "documented unlit"); no speculative changes.
-4. A/B with `capture:tod-sweep` (`--label=p2b-off/p2b-on --rig-on`): NPC
-   corrVsTerrain ≥ 0.92 AND rangeRatio [0.6, 1.6] with the flag ON; foliage
-   numbers hold the billboard-migration result. Paste tables.
+4. A/B with the FIXED instrument (`--label=p2b-off/p2b-on --rig-on`):
+   foliage AND npc corrVsTerrain ≥ 0.92 with rangeRatio [0.6, 1.6] with the
+   flag ON — this is the first run where those rows measure real pixels, so
+   it also retroactively validates billboard-rig-migration's tuning; if the
+   foliage band fails on the fixed instrument, tune the SHARED constants
+   (billboard + NPC together) until it passes or report the structural
+   blocker. Paste tables.
 
 ## Non-goals
 
