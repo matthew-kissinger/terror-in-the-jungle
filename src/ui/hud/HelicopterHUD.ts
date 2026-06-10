@@ -10,7 +10,10 @@
  * 3. VSI (vertical speed indicator)
  * 4. Mouse mode indicator (CONTROL / FREE LOOK)
  * 5. Instruments panel (thrust bar, RPM, hover/boost indicators)
- * 6. Weapon status row (attack/gunship only)
+ * 6. Per-variant weapon-state panels: the attack airframe gets the pilot
+ *    weapon/ammo row; the gunship gets the door-gun crew panel (belt count);
+ *    the transport gets neither. Panel selection is descriptor-driven
+ *    (HELI_VARIANT_DESCRIPTORS) — the wrong-variant panel never mounts.
  * 7. Damage bar (health percentage)
  *
  * Replaces: ElevationSlider, HelicopterMouseIndicator, HelicopterInstrumentsPanel, HelicopterInstruments (wrapper)
@@ -27,6 +30,36 @@ const HEADING_LABELS: readonly string[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W',
 function headingToLabel(degrees: number): string {
   const index = Math.round(degrees / 45) % 8;
   return HEADING_LABELS[index];
+}
+
+/**
+ * Per-variant HUD panel descriptor: which weapon-state panels mount for a given
+ * airframe role. Replaces the old `role === 'attack' || role === 'gunship'`
+ * duck-typed check so each variant gets exactly its panels (the wrong-variant
+ * panel never mounts):
+ *   - transport: no weapon panels (unarmed UH-1 lift ship);
+ *   - gunship:   the door-gun crew panel (belt count) — the guns are
+ *                crew-operated, so the pilot sees the door-gun belt, not a
+ *                pilot weapon-select;
+ *   - attack:    the pilot weapon/ammo panel (AH-1 gun + rocket select, fed by
+ *                the gunship-reticle-upgrade weapon-status push).
+ */
+export interface HeliHudVariantDescriptor {
+  /** Pilot weapon/ammo panel (AH-1 attack sight: gun + rockets). */
+  readonly showWeaponPanel: boolean;
+  /** Door-gun crew panel (gunship: belt count). */
+  readonly showCrewPanel: boolean;
+}
+
+const HELI_VARIANT_DESCRIPTORS: Record<AircraftRole, HeliHudVariantDescriptor> = {
+  transport: { showWeaponPanel: false, showCrewPanel: false },
+  gunship: { showWeaponPanel: false, showCrewPanel: true },
+  attack: { showWeaponPanel: true, showCrewPanel: false },
+};
+
+/** Resolve the panel descriptor for an airframe role (single source of truth). */
+export function heliHudVariantDescriptor(role: AircraftRole): HeliHudVariantDescriptor {
+  return HELI_VARIANT_DESCRIPTORS[role];
 }
 
 export class HelicopterHUD extends UIComponent {
@@ -114,6 +147,10 @@ export class HelicopterHUD extends UIComponent {
       <div data-ref="weaponRow" class="${styles.panel} ${styles.weaponSection}">
         <div data-ref="weaponNameEl" class="${styles.weaponName}"></div>
         <div data-ref="weaponAmmoEl" class="${styles.weaponAmmo}">0</div>
+      </div>
+      <div data-ref="crewRow" class="${styles.panel} ${styles.crewSection}">
+        <div class="${styles.crewState}">DOOR</div>
+        <div data-ref="crewBeltEl" class="${styles.crewBelt}">0</div>
       </div>
       <div data-ref="damageBar" class="${styles.panel} ${styles.damageSection}">
         <div class="${styles.instrumentLabel}">${iconHtml('icon-engine-health', { width: 12, alt: 'HP', css: 'vertical-align:middle;' })}</div>
@@ -258,22 +295,26 @@ export class HelicopterHUD extends UIComponent {
       }
     });
 
-    // Effect: weapon row visibility (only for attack/gunship roles)
+    // Effect: per-variant weapon/crew panel visibility. The descriptor for the
+    // active airframe role decides which panel mounts — the attack airframe gets
+    // the pilot weapon panel, the gunship gets the door-gun crew panel, the
+    // transport gets neither. The wrong-variant panel is never shown.
     this.effect(() => {
-      const el = this.$('[data-ref="weaponRow"]');
-      if (!el) return;
-      const role = this.aircraftRole.value;
-      if (role === 'attack' || role === 'gunship') {
-        el.classList.add(styles.weaponSectionVisible);
-      } else {
-        el.classList.remove(styles.weaponSectionVisible);
-      }
+      const descriptor = heliHudVariantDescriptor(this.aircraftRole.value);
+      const weaponRow = this.$('[data-ref="weaponRow"]');
+      const crewRow = this.$('[data-ref="crewRow"]');
+      weaponRow?.classList.toggle(styles.weaponSectionVisible, descriptor.showWeaponPanel);
+      crewRow?.classList.toggle(styles.crewSectionVisible, descriptor.showCrewPanel);
     });
 
-    // Effect: weapon name + ammo
+    // Effect: pilot weapon name + ammo (attack panel) and the gunship door-gun
+    // belt (crew panel). The same weapon-status push feeds both — the attack
+    // panel reads it as the pilot weapon, the gunship panel reads the ammo as
+    // the door-gun belt count. Only the active variant's panel is visible.
     this.effect(() => {
       this.text('[data-ref="weaponNameEl"]', this.weaponName.value);
       this.text('[data-ref="weaponAmmoEl"]', String(this.weaponAmmo.value));
+      this.text('[data-ref="crewBeltEl"]', String(this.weaponAmmo.value));
     });
 
     // Effect: damage bar
@@ -347,10 +388,11 @@ export class HelicopterHUD extends UIComponent {
   }
 
   /**
-   * Show the selected pilot weapon name + remaining ammo in the attack/gunship
-   * weapon row. Display-only: the ammo is floored to whole rounds so the readout
-   * never shows a fractional count (rocket pods rearm in floating increments;
-   * the minigun belt is whole rounds).
+   * Show the selected pilot weapon name + remaining ammo in the weapon/crew
+   * panel. The attack panel reads it as the pilot weapon (gun/rockets); the
+   * gunship crew panel reads the ammo as the door-gun belt count. Display-only:
+   * the ammo is floored to whole rounds so the readout never shows a fractional
+   * count (rocket pods rearm in floating increments; belts are whole rounds).
    */
   setWeaponStatus(name: string, ammo: number): void {
     this.weaponName.value = name;

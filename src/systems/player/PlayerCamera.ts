@@ -30,6 +30,20 @@ const _followPosition = new THREE.Vector3();
 const _followLookTarget = new THREE.Vector3();
 // Out-param scratch for the optional weapon-sight FOV (degrees; 0 = unset).
 const _sightFovOut = { value: 0 };
+// Door-gun POV scratch: the gunner viewpoint (offset out the left door) and the
+// look target along the clamped gun aim. Module-level so the per-frame camera
+// solve never allocates.
+const _doorGunEye = new THREE.Vector3();
+const _doorGunLook = new THREE.Vector3();
+const _doorGunSide = new THREE.Vector3();
+
+// Door-gun gunner viewpoint, expressed in the airframe's local frame: the M60
+// sits in the left door, so the eye is offset out the left side (local -X),
+// slightly down (the gunner leans out over the skid). Tuning constants — the
+// view feel, not a contract.
+const DOOR_GUN_EYE_SIDE_M = 2.2;   // out the left door (local -X)
+const DOOR_GUN_EYE_DOWN_M = 0.4;   // gunner crouches below the rotor hub line
+const DOOR_GUN_LOOK_RANGE_M = 60;  // how far down the aim ray the camera looks
 
 /**
  * Minimal contract a ground/tank/surface adapter implements so the camera
@@ -93,6 +107,14 @@ export class PlayerCamera {
   // Set by the fixed-wing adapter; ignored by airframes without a broadside.
   private fixedWingBroadsideView = false;
 
+  // Door-gun gunner POV: while the player crews the UH-1 left-door gun, the
+  // camera leaves the chase pose and sits at the door-side gunner viewpoint,
+  // looking along the clamped gun aim the adapter pushes each frame. The aim is
+  // a world-space unit direction; the flag is force-reset on exit so the POV can
+  // never leak into the pilot view or the next aircraft.
+  private doorGunView = false;
+  private doorGunAim = new THREE.Vector3(-1, 0, 0);
+
   // Saved infantry angles for helicopter enter/exit transitions
   private savedInfantryYaw = Math.PI;
   private savedInfantryPitch = 0;
@@ -135,6 +157,26 @@ export class PlayerCamera {
 
   isFixedWingBroadsideView(): boolean {
     return this.fixedWingBroadsideView;
+  }
+
+  /**
+   * Enable (or disable) the helicopter door-gun gunner POV. The heli adapter
+   * pushes this each frame while the player crews the left-door gun, passing the
+   * clamped world-space gun aim so the camera looks where the gun points;
+   * disabling on swap-back to the pilot seat restores the chase cam on the next
+   * frame. `restoreInfantryAngles` force-resets the flag on dismount, so the POV
+   * can never leak into infantry or the next aircraft (mirrors the broadside
+   * view's leak guard).
+   */
+  setDoorGunView(active: boolean, aimDir?: THREE.Vector3): void {
+    this.doorGunView = active;
+    if (active && aimDir) {
+      this.doorGunAim.copy(aimDir).normalize();
+    }
+  }
+
+  isDoorGunView(): boolean {
+    return this.doorGunView;
   }
 
   /**
@@ -308,6 +350,16 @@ export class PlayerCamera {
       return;
     }
 
+    // Door-gun gunner POV wins over the chase/orbital pose while the player
+    // crews the left-door gun. The eye sits out the left door (a touch low) and
+    // looks along the clamped gun aim, so the gunner sees what the gun points
+    // at. Consuming any pending mouse movement keeps the aim slew from snapping
+    // the chase view the instant the player swaps back to the pilot seat.
+    if (this.doorGunView) {
+      this.updateDoorGunPovCamera(input);
+      return;
+    }
+
     const distanceBack = this.helicopterCameraDistance;
     const heightAbove = this.helicopterCameraHeight;
 
@@ -357,6 +409,33 @@ export class PlayerCamera {
       _lookTarget.y += 2;
       this.camera.lookAt(_lookTarget);
     }
+  }
+
+  /**
+   * Door-gun gunner POV: position the eye out the left door of the airframe (a
+   * touch low) and look along the clamped gun aim, so the player sees down the
+   * gun line while crewing it. `_helicopterPosition` / `_helicopterQuaternion`
+   * already hold the live airframe pose from `updateHelicopterCamera`. The aim
+   * is the world-space direction the adapter pushed via `setDoorGunView`. Any
+   * pending mouse movement is consumed here so the aim slew never bleeds into
+   * the chase view on swap-back.
+   */
+  private updateDoorGunPovCamera(input: PlayerInput): void {
+    if (input.getIsPointerLocked()) {
+      input.clearMouseMovement();
+    }
+
+    // Door-side eye offset in the airframe's local frame: out the left door
+    // (local -X), dropped slightly so the gunner is below the rotor-hub line.
+    _doorGunSide.set(-DOOR_GUN_EYE_SIDE_M, -DOOR_GUN_EYE_DOWN_M, 0)
+      .applyQuaternion(_helicopterQuaternion);
+    _doorGunEye.copy(_helicopterPosition).add(_doorGunSide);
+
+    // Look along the clamped world-space gun aim the adapter solved this frame.
+    _doorGunLook.copy(_doorGunEye).addScaledVector(this.doorGunAim, DOOR_GUN_LOOK_RANGE_M);
+
+    this.camera.position.copy(_doorGunEye);
+    this.camera.lookAt(_doorGunLook);
   }
 
   private updateFixedWingCamera(input: PlayerInput, deltaTime: number): void {
@@ -523,6 +602,9 @@ export class PlayerCamera {
     // Clear the AC-47 broadside view so it can never leak into infantry or the
     // next aircraft after a dismount.
     this.fixedWingBroadsideView = false;
+    // Same guarantee for the helicopter door-gun POV: a mid-gunner dismount must
+    // not leave the camera stuck at the door-side viewpoint.
+    this.doorGunView = false;
   }
 
   setInfantryViewAngles(yaw: number, pitch = 0): void {

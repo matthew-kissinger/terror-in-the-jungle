@@ -5,8 +5,19 @@ import * as THREE from 'three';
 import type { PlayerInput } from '../player/PlayerInput';
 import type { PlayerCamera } from '../player/PlayerCamera';
 import type { IGameRenderer } from '../../types/SystemInterfaces';
-import type { CrosshairMode } from '../../ui/hud/CrosshairSystem';
+import type { CrosshairMode, TraverseStopDir } from '../../ui/hud/CrosshairSystem';
 import type { VehicleTransitionContext } from './PlayerVehicleAdapter';
+
+/**
+ * Concrete crosshair-cue sink on `GameRenderer`. `setCrosshairTraverseStop` is
+ * NOT on the fenced `IGameRenderer` (it is crosshair-internal), so the gunner
+ * adapters widen the structural type here to push the arc-stop tick without a
+ * fence change — the same precedent as the attack-heli cue + fixed-wing ammo
+ * seams.
+ */
+type TraverseStopRenderer = IGameRenderer & {
+  setCrosshairTraverseStop?(stop: TraverseStopDir): void;
+};
 
 /**
  * Shared enter/exit/input plumbing for the player vehicle adapters.
@@ -106,6 +117,20 @@ export function setCrosshairMode(gameRenderer: IGameRenderer | undefined, mode: 
  */
 export function setInfantryCrosshair(gameRenderer: IGameRenderer | undefined): void {
   setCrosshairMode(gameRenderer, 'infantry');
+}
+
+/**
+ * Light the active gunsight's arc/traverse-stop edge tick (or clear it with
+ * `null`). Pushed through the concrete (non-fenced) GameRenderer cue seam so the
+ * emplacement-MG and helicopter door-gun reticles both show when their barrel
+ * runs out of travel. Guarded because the renderer is optional and the seam is
+ * duck-typed (test doubles routinely omit it).
+ */
+export function pushTraverseStop(
+  gameRenderer: IGameRenderer | undefined,
+  stop: TraverseStopDir,
+): void {
+  (gameRenderer as TraverseStopRenderer | undefined)?.setCrosshairTraverseStop?.(stop);
 }
 
 /**

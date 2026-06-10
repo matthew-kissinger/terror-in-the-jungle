@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { PostProcessingManager } from '../systems/effects/PostProcessingManager';
 import { CrosshairSystem } from '../ui/hud/CrosshairSystem';
-import type { CrosshairMode, HeliReticleWeapon } from '../ui/hud/CrosshairSystem';
+import type { CrosshairMode, HeliReticleWeapon, TraverseStopDir } from '../ui/hud/CrosshairSystem';
 import { LoadingUI } from './LoadingUI';
 import { Logger } from '../utils/Logger';
 import { freezeTransform } from '../utils/SceneUtils';
@@ -428,6 +428,18 @@ export class GameRenderer {
    */
   setCrosshairRocketCueOffset(offsetPx: number): void {
     this.crosshairSystem.setRocketCueOffset(offsetPx);
+  }
+
+  /**
+   * Light the active gunsight's edge tick for the arc/traverse stop the barrel
+   * is pinned against (or clear it with `null`). Concrete passthrough, not on the
+   * fenced `IGameRenderer` — the emplacement-MG and helicopter door-gun adapters
+   * duck-type it, mirroring the attack-heli cue seams. Only the visible reticle
+   * mode (emplacement_mg / door_gun) shows the tick, so the call is a harmless
+   * no-op in any other mode.
+   */
+  setCrosshairTraverseStop(stop: TraverseStopDir): void {
+    this.crosshairSystem.setTraverseStop(stop);
   }
 
   showSpawnLoadingIndicator(): void {

@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import type { IHUDSystem } from '../../types/SystemInterfaces';
+import type { IGameRenderer, IHUDSystem } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
 import type {
   PlayerVehicleAdapter,
@@ -18,6 +18,7 @@ import type { M2HBWeapon } from '../combat/weapons/M2HBWeapon';
 import { EmplacementGunPanel, type TraverseStop } from '../../ui/hud/EmplacementGunPanel';
 import {
   clearFlightBookkeeping,
+  pushTraverseStop,
   relockPointer,
   setCrosshairMode,
   setInfantryCrosshair,
@@ -120,6 +121,10 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
   // Current traverse stop the barrel is pinned against (null = has travel).
   private traverseStop: TraverseStop | null = null;
 
+  // Captured on enter so per-frame `update` (no transition ctx) can light the
+  // emplacement_mg reticle's arc-stop edge tick via the crosshair cue seam.
+  private gameRenderer: IGameRenderer | undefined;
+
   constructor(model: Emplacement) {
     this.model = model;
   }
@@ -156,6 +161,7 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
   onEnter(ctx: VehicleTransitionContext): void {
     this.resetControlState();
     this.mounted = true;
+    this.gameRenderer = ctx.gameRenderer;
 
     // Take the player off their feet and snap them onto the gunner seat.
     ctx.playerState.velocity.set(0, 0, 0);
@@ -194,11 +200,14 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.setVehicleContext?.(null);
 
     setInfantryCrosshair(ctx.gameRenderer);
+    // Clear any lit arc-stop tick so it never lingers under the infantry reticle.
+    pushTraverseStop(ctx.gameRenderer, null);
 
     // Tear down the gunner panel so it doesn't linger over the infantry HUD.
     this.traverseStop = null;
     this.unmountPanel();
 
+    this.gameRenderer = undefined;
     this.mounted = false;
     this.resetControlState();
   }
@@ -229,6 +238,8 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     this.readFireInput(ctx.input);
     this.refreshTraverseStop();
     this.refreshPanel();
+    // Light the emplacement_mg reticle's arc-stop edge tick from the live stop.
+    pushTraverseStop(this.gameRenderer, this.traverseStop);
   }
 
   /**

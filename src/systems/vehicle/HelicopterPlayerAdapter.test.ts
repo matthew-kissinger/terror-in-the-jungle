@@ -121,6 +121,8 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'heli_1')
       // Concrete (non-fenced) attack-sight cue seam (gunship-reticle-upgrade).
       setCrosshairHelicopterWeapon: vi.fn(),
       setCrosshairRocketCueOffset: vi.fn(),
+      // Concrete (non-fenced) arc-stop tick seam (heli-hud-consolidation).
+      setCrosshairTraverseStop: vi.fn(),
     } as any,
   };
 }
@@ -132,6 +134,7 @@ function createUpdateContext(opts: {
 } = {}) {
   const setCrosshairMode = vi.fn();
   const setHelicopterWeaponStatus = vi.fn();
+  const setDoorGunView = vi.fn();
   return {
     ctx: {
       deltaTime: 1 / 60,
@@ -140,12 +143,32 @@ function createUpdateContext(opts: {
         getMouseMovement: vi.fn(() => opts.mouse ?? { x: 0, y: 0 }),
         clearMouseMovement: vi.fn(),
         isMouseButtonPressed: vi.fn((b: number) => (b === 0 ? (opts.fire ?? false) : false)),
+        // The remaining accessors let a pilot-seat update run on the same ctx
+        // after a swap-back (the door-gun branch ignores them).
+        isKeyPressed: vi.fn(() => false),
+        getTouchControls: vi.fn(() => null),
+        getTouchMovementVector: vi.fn(() => ({ x: 0, z: 0 })),
+        getTouchCyclicInput: vi.fn(() => ({ pitch: 0, roll: 0 })),
+        getTouchFlightCyclicInput: vi.fn(() => ({ pitch: 0, roll: 0 })),
       } as any,
-      cameraController: {} as any,
-      hudSystem: { setHelicopterWeaponStatus } as any,
+      // The door-gun POV is pushed through the camera controller each frame.
+      // The flight-mouse accessors let the pilot-seat path run after a swap-back.
+      cameraController: {
+        setDoorGunView,
+        getFlightMouseControlEnabled: vi.fn(() => false),
+        getHelicopterMouseControlEnabled: vi.fn(() => false),
+      } as any,
+      // Belt readout + the flight-data/instrument sinks the pilot path uses
+      // after a swap-back run on the same ctx.
+      hudSystem: {
+        setHelicopterWeaponStatus,
+        updateHelicopterFlightData: vi.fn(),
+        updateHelicopterInstruments: vi.fn(),
+      } as any,
     },
     setCrosshairMode,
     setHelicopterWeaponStatus,
+    setDoorGunView,
   };
 }
 
@@ -190,6 +213,35 @@ describe('HelicopterPlayerAdapter', () => {
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
       expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenCalledWith('helicopter_transport');
+    });
+
+    it('carries the per-variant HUD panel descriptor on the vehicle context', () => {
+      // Transport: no weapon panels.
+      const transport = createMockHelicopterModel({ role: 'transport' });
+      adapter = new HelicopterPlayerAdapter(transport as any);
+      const transportCtx = createTransitionContext(createPlayerState(), 'huey');
+      adapter.onEnter(transportCtx);
+      const transportPanels = (transportCtx.hudSystem!.setVehicleContext as any)
+        .mock.calls.at(-1)![0].heliPanels;
+      expect(transportPanels).toEqual({ weaponPanel: false, crewPanel: false });
+
+      // Attack: pilot weapon panel only.
+      const attack = createMockHelicopterModel({ role: 'attack' });
+      adapter = new HelicopterPlayerAdapter(attack as any);
+      const attackCtx = createTransitionContext(createPlayerState(), 'cobra');
+      adapter.onEnter(attackCtx);
+      const attackPanels = (attackCtx.hudSystem!.setVehicleContext as any)
+        .mock.calls.at(-1)![0].heliPanels;
+      expect(attackPanels).toEqual({ weaponPanel: true, crewPanel: false });
+
+      // Gunship: door-gun crew panel only.
+      const gunship = createMockHelicopterModel({ role: 'gunship' });
+      adapter = new HelicopterPlayerAdapter(gunship as any);
+      const gunshipCtx = createTransitionContext(createPlayerState(), 'gun');
+      adapter.onEnter(gunshipCtx);
+      const gunshipPanels = (gunshipCtx.hudSystem!.setVehicleContext as any)
+        .mock.calls.at(-1)![0].heliPanels;
+      expect(gunshipPanels).toEqual({ weaponPanel: false, crewPanel: true });
     });
   });
 
@@ -355,6 +407,68 @@ describe('HelicopterPlayerAdapter', () => {
       expect(gunModel.setPlayerDoorGunCrewing).toHaveBeenLastCalledWith('heli_gun', false);
       expect((ctx.gameRenderer as any).setCrosshairMode).toHaveBeenLastCalledWith('infantry');
       expect(adapter.getCrewSeat()).toBe('pilot');
+    });
+
+    it('swings the camera to the door-gun POV while crewing and releases it on swap-back', () => {
+      boardGunship();
+      adapter.toggleDoorGunSeat();
+
+      // Crewing: the POV is engaged with a world-space aim direction.
+      const crewing = createUpdateContext();
+      adapter.update(crewing.ctx);
+      const enableCall = crewing.setDoorGunView.mock.calls.at(-1)!;
+      expect(enableCall[0]).toBe(true);
+      const aim = enableCall[1] as THREE.Vector3;
+      // Identity pose, centred gun → straight out the left door (local -X).
+      expect(aim.x).toBeLessThan(-0.9);
+
+      // Swap back to the pilot seat: the next pilot-seat update releases the POV.
+      adapter.toggleDoorGunSeat();
+      const piloting = createUpdateContext();
+      adapter.update(piloting.ctx);
+      expect(piloting.setDoorGunView).toHaveBeenCalledWith(false);
+    });
+
+    it('lights the door-gun arc-stop tick on the crosshair at the mount limit', () => {
+      const { ctx } = boardGunship();
+      const renderer = ctx.gameRenderer as any;
+      adapter.toggleDoorGunSeat();
+
+      // Drag hard into a yaw + elevation stop, then read the pushed tick.
+      for (let i = 0; i < 50; i++) {
+        adapter.update(createUpdateContext({ mouse: { x: 400, y: -400 } }).ctx);
+      }
+      // The crosshair was told to light an edge tick (a non-null stop direction),
+      // matching the gun's pinned arc limit.
+      const lastStop = renderer.setCrosshairTraverseStop.mock.calls.at(-1)![0];
+      expect(lastStop).not.toBeNull();
+      expect(lastStop).toBe(adapter.getDoorGunTraverseStop());
+    });
+
+    it('clears the door-gun arc-stop tick once the gun has travel again', () => {
+      const { ctx } = boardGunship();
+      const renderer = ctx.gameRenderer as any;
+      adapter.toggleDoorGunSeat();
+
+      // Pin the gun, then re-centre it (a seat re-toggle zeroes the aim).
+      for (let i = 0; i < 50; i++) {
+        adapter.update(createUpdateContext({ mouse: { x: 400, y: -400 } }).ctx);
+      }
+      adapter.toggleDoorGunSeat(); // off
+      adapter.toggleDoorGunSeat(); // on, aim re-centred to (0, 0)
+      adapter.update(createUpdateContext().ctx);
+
+      // Centred gun has travel in every direction → no edge tick lit.
+      expect(adapter.getDoorGunTraverseStop()).toBeNull();
+      expect(renderer.setCrosshairTraverseStop).toHaveBeenLastCalledWith(null);
+    });
+
+    it('clears the arc-stop tick on swap back to the pilot seat', () => {
+      const { ctx } = boardGunship();
+      const renderer = ctx.gameRenderer as any;
+      adapter.toggleDoorGunSeat();
+      adapter.toggleDoorGunSeat(); // back to pilot
+      expect(renderer.setCrosshairTraverseStop).toHaveBeenLastCalledWith(null);
     });
   });
 

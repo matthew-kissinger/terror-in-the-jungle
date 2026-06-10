@@ -85,7 +85,11 @@ function createTransitionContext(
       restoreInfantryAngles: vi.fn(),
     } as any,
     hudSystem: createMockHudSystem() as any,
-    gameRenderer: { setCrosshairMode: vi.fn() } as any,
+    gameRenderer: {
+      setCrosshairMode: vi.fn(),
+      // Concrete (non-fenced) arc-stop tick seam (heli-hud-consolidation).
+      setCrosshairTraverseStop: vi.fn(),
+    } as any,
   };
 }
 
@@ -246,6 +250,51 @@ describe('EmplacementPlayerAdapter', () => {
       const aim = model.getTargetAim();
       // Pitch should be clamped to the upper limit (we tried to elevate massively).
       expect(aim.pitch).toBeCloseTo(limits.max, 4);
+    });
+  });
+
+  describe('traverse-stop crosshair tick (heli-hud-consolidation)', () => {
+    it('lights the emplacement reticle edge tick when the barrel pins at a stop', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      const renderer = ctx.gameRenderer as any;
+
+      // Drive the barrel to its elevation stop, then run a frame.
+      model.setAim(0, model.getPitchLimits().max + 1); // clamps to the up stop
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      // The crosshair was told to light the matching edge tick.
+      expect(renderer.setCrosshairTraverseStop).toHaveBeenLastCalledWith('up');
+    });
+
+    it('clears the reticle edge tick when the barrel has travel again', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      const renderer = ctx.gameRenderer as any;
+
+      model.setAim(0, model.getPitchLimits().max + 1);
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(renderer.setCrosshairTraverseStop).toHaveBeenLastCalledWith('up');
+
+      // Aim back to centre: the barrel is off the stop, so the tick clears.
+      model.setAim(0, 0);
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(renderer.setCrosshairTraverseStop).toHaveBeenLastCalledWith(null);
+    });
+
+    it('clears the reticle edge tick on dismount', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      const renderer = ctx.gameRenderer as any;
+
+      model.setAim(0, model.getPitchLimits().max + 1);
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      adapter.onExit(ctx);
+      expect(renderer.setCrosshairTraverseStop).toHaveBeenLastCalledWith(null);
     });
   });
 

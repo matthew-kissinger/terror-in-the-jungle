@@ -69,6 +69,26 @@ export interface VehicleUIContext {
    * read it just ignore the zoom step.
    */
   sightMagnification?: number;
+  /**
+   * Optional per-variant HUD panel descriptor for helicopters: which
+   * weapon-state panels the airframe variant mounts (attack pilot weapon panel
+   * vs gunship door-gun crew panel vs transport none). Additive + optional so
+   * non-helicopter contexts are unaffected; the HelicopterHUD renders the right
+   * panels for the variant and the wrong-variant panel never mounts.
+   */
+  heliPanels?: HeliPanelDescriptor;
+}
+
+/**
+ * Which weapon-state panels a helicopter variant's HUD mounts. Drives the
+ * per-variant panel selection in HelicopterHUD so transport / gunship / attack
+ * each get exactly their panels rather than a shared superset.
+ */
+export interface HeliPanelDescriptor {
+  /** Attack pilot weapon/ammo panel (AH-1: gun + rockets). */
+  weaponPanel: boolean;
+  /** Gunship door-gun crew panel (belt count). */
+  crewPanel: boolean;
 }
 
 export interface InteractionContext {
