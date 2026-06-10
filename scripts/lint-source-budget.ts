@@ -76,7 +76,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files; +19 LOC: worker-offload tiled generation past the anchor window (navmesh-coverage-ashau)', loc: 808, methods: 24 },
   'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: 'split into 2 files', loc: 788, methods: 36 },
   'src/systems/combat/ai/AIStateEngage.ts': { round: 'P3R2', reason: 'cover-search extraction P4F2', loc: 1005, methods: 30 },
-  'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path', loc: 992, methods: 44 },
+  'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path; +10 LOC: per-frame stepper hook for the shared NPC tank cannon (npc-tank-cannon-wiring, 2026-06-09)', loc: 1002, methods: 44 },
   'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files', loc: 757, methods: 83 },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence)', loc: 762, methods: 43 },
   // ZoneManager removed from grandfather list 2026-05-09 (Phase 2): fan-in

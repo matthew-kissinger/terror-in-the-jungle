@@ -119,6 +119,9 @@ export class CombatantAI {
     | ((combatant: Combatant) => TankGunnerContext | null)
     | null = null
 
+  // Once-per-frame stepper (npc-tank-cannon-wiring): advances shared cannon flight from `beginFrame()`.
+  private frameStepper: (() => void) | null = null
+
   private readonly canSeeTargetForPatrolDetection = (
     combatant: Combatant,
     target: ITargetable,
@@ -302,6 +305,11 @@ export class CombatantAI {
   ): void {
     this.tankGunnerRoute = route
     this.tankGunnerContextProvider = contextProvider
+  }
+
+  /** Register / clear the once-per-frame stepper run at the top of `beginFrame()`. */
+  setFrameStepper(stepper: (() => void) | null): void {
+    this.frameStepper = stepper
   }
 
   updateAI(
@@ -555,6 +563,8 @@ export class CombatantAI {
     // Refresh the perf-diagnostics gate once per frame. Cheap relative to a
     // frame; keeps updateAI's per-tick path free of window.location parsing.
     this.diagnosticsEnabled = isPerfDiagnosticsEnabled()
+    // Advance the frame-synchronous stepper (NPC cannon flight) once per frame.
+    this.frameStepper?.()
     this.targeting.beginFrame()
     for (const key of Object.keys(this.aiStateMs)) {
       this.aiStateMs[key] = 0
