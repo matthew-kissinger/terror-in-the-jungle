@@ -44,6 +44,26 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-09-foliage-npc-lighting)
+
+Phase 2 of [CAMPAIGN_2026-06-09-lighting-rig](CAMPAIGN_2026-06-09-lighting-rig.md).
+2/2 merged: billboard-rig-migration #376 (foliage low-sun fade + hemi trim
+tuned against real rig radiance; billboard scene.fog.color authority folded;
+DISCOVERED the sweep's foliage/npc rows sampled bare terrain — fixed-box
+fallback, terrain-vs-terrain metrics), npc-impostor-and-effects-rig #378
+(combat-reviewer APPROVE-WITH-NOTES: sweep instrument fixed — regions now
+anchor on real rendered pixels; **foliage band MET on the fixed instrument:
+corr 1.000, rangeRatio 0.966** — the owner's "foliage maintains the same
+lighting" defect is solved and honestly measured on the rig path; NPC
+impostors consume the SAME shared constants by import with the scene-children
+scan bypassed [second authority gone on the rig path]; full lit-surface
+consumer sweep documented — effects are unlit-by-construction, GLB family
+already rig-driven). NPC row remains unmeasurable at the fixture (no NPC in
+frame) — Phase 4 `tod-coherence-gate` owns spawning one. Phase 4 checklist
+additions from review: re-validate per-faction PIXEL_FORGE parity tuning
+under the rig; NPC-in-frame visual check.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-foliage-npc-lighting/`.
+
 ## Recently Completed (cycle-2026-06-09-helicopter-craft)
 
 Phase 3 (final) of [CAMPAIGN_2026-06-09-craft-specialization](CAMPAIGN_2026-06-09-craft-specialization.md)
