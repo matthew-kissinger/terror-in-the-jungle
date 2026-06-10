@@ -271,6 +271,9 @@ function wirePlayerRuntime(
     options.scene && combatantSystem
       ? new TankCannonProjectileSystem(options.scene, combatantSystem.explosionEffectsPool, combatantSystem)
       : null;
+  // Single-owner stepping gate shared by the player session lifecycle and the
+  // NPC frame stepper (see CannonStepGate doc above buildSeatedWeaponLifecycle).
+  const cannonStepGate: CannonStepGate = { playerOwns: false };
 
   // Boarding factory wire (VEKHIKL-UX-2, split B). Closes the
   // F-key gap shipped by the 2026-05-19 wayfinding cycle: the
@@ -297,6 +300,7 @@ function wirePlayerRuntime(
       terrainSystem,
       m2hbEmplacementSystem,
       cannon: sharedCannon,
+      cannonStepGate,
     });
     if (factory) {
       playerController.setPlayerVehicleAdapterFactory(factory);
@@ -306,7 +310,7 @@ function wirePlayerRuntime(
   // NPC tank-gunner wire (npc-tank-cannon-wiring): nothing bound a cannon +
   // solver to CombatantAI's existing route in prod, so NPC M48s never fired.
   if (sharedCannon && combatantSystem && vehicleManager) {
-    wireNpcTankGunner({ combatantSystem, vehicleManager, terrainSystem, cannon: sharedCannon });
+    wireNpcTankGunner({ combatantSystem, vehicleManager, terrainSystem, cannon: sharedCannon, cannonStepGate });
   }
 
   playerHealthSystem.setZoneManager(zoneManager);
@@ -543,6 +547,8 @@ function createPlayerVehicleAdapterFactory(args: {
   m2hbEmplacementSystem?: M2HBEmplacementSystem;
   /** Shared cannon (npc-tank-cannon-wiring): the player path binds this so player + NPC share one pool. Null → lazy player-only build. */
   cannon?: TankCannonProjectileSystem | null;
+  /** Single-owner stepping gate shared with `wireNpcTankGunner` (see CannonStepGate). */
+  cannonStepGate?: CannonStepGate;
 }): PlayerVehicleAdapterFactory | null {
   const internals = args.playerController.getBoardingFactoryInternals?.();
   if (!internals) return null;
@@ -598,17 +604,30 @@ function createPlayerVehicleAdapterFactory(args: {
  * lazily built on first tank board from `scene` + `combatantSystem`; when
  * neither is available the cannon wire is a silent no-op (M2HB still works).
  */
+/**
+ * Single-owner gate for stepping the shared cannon pool (combat-reviewer fix,
+ * npc-tank-cannon-wiring). The pool must advance exactly once per frame:
+ * while a player tank session is active, `TankPlayerAdapter.update` owns the
+ * step (scaled `ctx.deltaTime`, runs even when combat AI is disabled); the
+ * NPC-side frame stepper yields. With no player seated, the NPC stepper owns
+ * it (scaled `beginFrame` dt).
+ */
+export interface CannonStepGate {
+  playerOwns: boolean;
+}
+
 function buildSeatedWeaponLifecycle(args: {
   scene?: THREE.Scene;
   combatantSystem?: CombatantSystem;
   terrainSystem?: ITerrainRuntime;
   m2hbEmplacementSystem?: M2HBEmplacementSystem;
   cannon?: TankCannonProjectileSystem | null;
+  cannonStepGate?: CannonStepGate;
 }): {
   onSessionEnter: (adapter: PlayerVehicleAdapter, vehicleId: string) => void;
   onSessionExit: (adapter: PlayerVehicleAdapter, vehicleId: string) => void;
 } {
-  const { scene, combatantSystem, terrainSystem, m2hbEmplacementSystem } = args;
+  const { scene, combatantSystem, terrainSystem, m2hbEmplacementSystem, cannonStepGate } = args;
 
   // Prefer the injected shared cannon (player + NPC share one pool); else lazy.
   let cannon: TankCannonProjectileSystem | null = args.cannon ?? null;
@@ -630,10 +649,14 @@ function buildSeatedWeaponLifecycle(args: {
       if (!system) return;
       adapter.setCannonSystem(system);
       // Bake the terrain-height source into the stepper so the adapter can
-      // advance in-flight rounds without owning a terrain reference.
+      // advance in-flight rounds without owning a terrain reference. The
+      // adapter becomes the pool's sole stepper for the session (the NPC
+      // frame stepper yields via the gate — double-stepping made shells
+      // integrate twice per frame and impact short).
       adapter.setCannonStepper((dt) => {
         system.update(dt, (x, z) => terrainSystem?.getEffectiveHeightAt(x, z) ?? 0);
       });
+      if (cannonStepGate) cannonStepGate.playerOwns = true;
       return;
     }
     if (adapter instanceof EmplacementPlayerAdapter && m2hbEmplacementSystem) {
@@ -654,6 +677,7 @@ function buildSeatedWeaponLifecycle(args: {
     if (adapter instanceof TankPlayerAdapter) {
       adapter.setCannonSystem(null);
       adapter.setCannonStepper(null);
+      if (cannonStepGate) cannonStepGate.playerOwns = false;
       return;
     }
     if (adapter instanceof EmplacementPlayerAdapter && m2hbEmplacementSystem) {
@@ -679,13 +703,14 @@ const NPC_CANNON_MAX_STEP_S = 1 / 30;
  * seat) and a per-frame cannon-flight stepper. Damage routes through the
  * cannon's existing `applyExplosionDamage` path — no new code.
  */
-function wireNpcTankGunner(args: {
+export function wireNpcTankGunner(args: {
   combatantSystem: CombatantSystem;
   vehicleManager: VehicleManager;
   terrainSystem?: ITerrainRuntime;
   cannon: TankCannonProjectileSystem;
+  cannonStepGate?: CannonStepGate;
 }): void {
-  const { combatantSystem, vehicleManager, terrainSystem, cannon } = args;
+  const { combatantSystem, vehicleManager, terrainSystem, cannon, cannonStepGate } = args;
 
   const solver = new TankBallisticSolver();
   void solver.init(); // optional WASM load; route uses the TS fallback meanwhile
@@ -702,13 +727,14 @@ function wireNpcTankGunner(args: {
 
   combatantSystem.combatantAI.setTankGunnerRoute(route, contextProvider);
 
-  // `beginFrame()` carries no dt; derive it from a wall-clock delta, clamped.
-  let lastStepMs = performance.now();
-  combatantSystem.combatantAI.setFrameStepper(() => {
-    const now = performance.now();
-    const dt = Math.min((now - lastStepMs) / 1000, NPC_CANNON_MAX_STEP_S);
-    lastStepMs = now;
-    if (dt <= 0) return;
+  // Advance cannon flight with the scaled frame dt handed through
+  // `beginFrame(deltaTime)` — TimeScale-respecting (dt=0 on pause freezes
+  // shells). Yields while a player tank session owns the step (gate), so the
+  // shared pool advances exactly once per frame.
+  combatantSystem.combatantAI.setFrameStepper((deltaTime) => {
+    if (cannonStepGate?.playerOwns) return;
+    if (deltaTime <= 0) return;
+    const dt = Math.min(deltaTime, NPC_CANNON_MAX_STEP_S);
     cannon.update(dt, (x, z) => terrainSystem?.getEffectiveHeightAt(x, z) ?? 0);
   });
 

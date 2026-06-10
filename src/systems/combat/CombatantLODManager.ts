@@ -334,7 +334,7 @@ export class CombatantLODManager {
 
       // Clear stale LOS cache entries
       this.combatantAI.clearLOSCache();
-      this.combatantAI.beginFrame?.();
+      this.combatantAI.beginFrame?.(deltaTime);
     }
 
     // Increment frame counter for AI staggering
