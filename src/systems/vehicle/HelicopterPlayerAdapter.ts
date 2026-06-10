@@ -16,11 +16,13 @@ import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 import type { IGameRenderer } from '../../types/SystemInterfaces';
 import type { HeliReticleWeapon, TraverseStopDir } from '../../ui/hud/CrosshairSystem';
+import { heliHudVariantDescriptor } from '../../ui/hud/HelicopterHUD';
 import { computeRocketCueDrop } from '../helicopter/HelicopterWeaponSystem';
 import {
   getFlightMouseControlEnabled,
   getTouchFlightCyclicInput,
   isTouchFlightMode,
+  pushTraverseStop,
   relockPointer,
   seatPlayer,
   setCrosshairMode,
@@ -89,11 +91,19 @@ function rocketCueAngleToPixels(angleRad: number): number {
 
 function createHelicopterUIContext(role: 'transport' | 'attack' | 'gunship'): VehicleUIContext {
   const armed = role === 'attack' || role === 'gunship';
+  const descriptor = heliHudVariantDescriptor(role);
   return {
     kind: 'helicopter',
     role,
     hudVariant: 'flight',
     weaponCount: armed ? 2 : 0,
+    // Per-variant HUD panel descriptor carried on the context so the HUD mounts
+    // exactly the right panels for this airframe variant (transport: none;
+    // gunship: door-gun crew panel; attack: pilot weapon panel).
+    heliPanels: {
+      weaponPanel: descriptor.showWeaponPanel,
+      crewPanel: descriptor.showCrewPanel,
+    },
     capabilities: {
       canExit: true,
       canFirePrimary: armed,
@@ -208,6 +218,8 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     if (ctx.gameRenderer) {
       ctx.gameRenderer.setCrosshairMode('infantry');
     }
+    // Clear any lit arc-stop tick so a mid-gunner dismount leaves none behind.
+    pushTraverseStop(ctx.gameRenderer, null);
 
     this.gameRenderer = undefined;
     this.activeHelicopterId = null;
@@ -235,6 +247,10 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
       this.updateDoorGun(ctx);
       return;
     }
+
+    // Pilot seat: make sure the door-gun gunner POV is released (a swap back to
+    // the pilot seat restores the chase cam on the next frame).
+    ctx.cameraController.setDoorGunView?.(false);
 
     let mouseMovement: { x: number; y: number } | undefined;
     const touchFlight = isTouchFlightMode(ctx.input);
@@ -314,6 +330,8 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
 
     this.setDoorGunCrewing(heliId, false);
     setCrosshairMode(this.gameRenderer, this.pilotCrosshairMode());
+    // Clear any lit arc-stop tick so it never lingers under the pilot reticle.
+    pushTraverseStop(this.gameRenderer, null);
     return 'pilot';
   }
 
@@ -397,6 +415,15 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
       && this.helicopterModel.getHelicopterQuaternionTo(heliId, _heliQuat);
     if (!hasPose) return;
     this.solveDoorGunAim(_heliQuat, _gunAim);
+
+    // Swing the camera to the door-side gunner POV looking along the clamped
+    // aim. Pushed every frame while crewing; the pilot-seat branch in `update`
+    // clears it on swap-back and the camera force-restores on dismount.
+    ctx.cameraController.setDoorGunView?.(true, _gunAim);
+
+    // Light the door-gun reticle's arc-stop edge tick from the live aim (the
+    // open-cross door_gun mode shares the emplacement traverse-stop signal).
+    pushTraverseStop(this.gameRenderer, this.getDoorGunTraverseStop());
 
     // Fire through the existing door-gun hitscan path (no new ballistics).
     const fire = input.isMouseButtonPressed?.(0) ?? false;

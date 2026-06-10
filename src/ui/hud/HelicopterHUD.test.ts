@@ -74,18 +74,52 @@ describe('HelicopterHUD', () => {
     expect(hud.element.querySelector('[data-ref="vsiValue"]')?.textContent).toBe('-1.5');
   });
 
-  it('shows the weapon row only for attack/gunship roles', () => {
-    const weaponRow = () =>
-      hud.element.querySelector('[data-ref="weaponRow"]') as HTMLElement;
+  describe('per-variant weapon-state panels (heli-hud-consolidation)', () => {
+    const weaponRow = () => hud.element.querySelector('[data-ref="weaponRow"]') as HTMLElement;
+    const crewRow = () => hud.element.querySelector('[data-ref="crewRow"]') as HTMLElement;
+    // The visibility classes are added/removed per variant; we read each panel's
+    // own "visible" marker class (the css mock returns class names verbatim).
+    const weaponShown = () => weaponRow().classList.contains('weaponSectionVisible');
+    const crewShown = () => crewRow().classList.contains('crewSectionVisible');
 
-    hud.setAircraftRole('attack');
-    const attackClass = weaponRow().className;
-    hud.setAircraftRole('transport');
-    const transportClass = weaponRow().className;
+    it('transport mounts no weapon-state panel (unarmed lift ship)', () => {
+      hud.setAircraftRole('transport');
+      expect(weaponShown()).toBe(false);
+      expect(crewShown()).toBe(false);
+    });
 
-    // The weapon row must render differently for an attack role vs transport;
-    // we don't pin to a specific class name.
-    expect(attackClass).not.toBe(transportClass);
+    it('attack mounts the pilot weapon panel but not the door-gun crew panel', () => {
+      hud.setAircraftRole('attack');
+      expect(weaponShown()).toBe(true);
+      expect(crewShown()).toBe(false);
+    });
+
+    it('gunship mounts the door-gun crew panel but not the pilot weapon panel', () => {
+      hud.setAircraftRole('gunship');
+      expect(crewShown()).toBe(true);
+      expect(weaponShown()).toBe(false);
+    });
+
+    it('swaps panels cleanly when the variant changes (wrong-variant panel never lingers)', () => {
+      hud.setAircraftRole('attack');
+      expect(weaponShown()).toBe(true);
+
+      hud.setAircraftRole('gunship');
+      // The attack weapon panel retracts, the gunship crew panel comes up.
+      expect(weaponShown()).toBe(false);
+      expect(crewShown()).toBe(true);
+
+      hud.setAircraftRole('transport');
+      // Both retract for the unarmed transport.
+      expect(weaponShown()).toBe(false);
+      expect(crewShown()).toBe(false);
+    });
+
+    it('shows the door-gun belt count in the gunship crew panel', () => {
+      hud.setAircraftRole('gunship');
+      hud.setWeaponStatus('M60 Door Gun', 480);
+      expect(hud.element.querySelector('[data-ref="crewBeltEl"]')?.textContent).toBe('480');
+    });
   });
 
   it('updates weapon name and ammo', () => {

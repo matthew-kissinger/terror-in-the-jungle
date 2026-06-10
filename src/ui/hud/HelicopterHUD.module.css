@@ -390,6 +390,36 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* --- Gunship door-gun crew section --- */
+.crewSection {
+  display: none;
+  flex-direction: row;
+  gap: 6px;
+  align-items: center;
+  min-width: 112px;
+}
+
+.crewSectionVisible {
+  display: flex;
+}
+
+.crewState {
+  font-size: var(--font-size-3xs);
+  font-weight: var(--weight-semibold);
+  color: rgba(231, 217, 186, 0.6);
+  font-family: var(--type-stamp);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.crewBelt {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--paper-lt);
+  font-family: var(--type-stamp);
+  font-variant-numeric: tabular-nums;
+}
+
 /* --- Damage section --- */
 .damageSection {
   flex-direction: row;

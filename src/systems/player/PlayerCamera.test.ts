@@ -668,6 +668,68 @@ describe('PlayerCamera', () => {
     });
   });
 
+  describe('Helicopter door-gun gunner POV (heli-hud-consolidation)', () => {
+    beforeEach(() => {
+      playerState.isInHelicopter = true;
+      playerState.helicopterId = 'heli-1';
+      // Airframe at a fixed point, identity heading so the door-side offset and
+      // aim are easy to reason about (local -X = world -X).
+      mockHelicopterModel.getHelicopterPositionTo = vi.fn((_id: string, target: THREE.Vector3) => {
+        target.set(0, 100, 0);
+        return true;
+      });
+      mockHelicopterModel.getHelicopterQuaternionTo = vi.fn((_id: string, target: THREE.Quaternion) => {
+        target.identity();
+        return true;
+      });
+      playerCamera.setHelicopterModel(mockHelicopterModel);
+      playerCamera.setHelicopterMouseControlEnabled(true); // chase mode otherwise
+    });
+
+    it('moves the eye out the left door and looks along the gun aim while crewing', () => {
+      // Gun pointed straight out the left door (world -X for the identity pose).
+      const aim = new THREE.Vector3(-1, 0, 0);
+      playerCamera.setDoorGunView(true, aim);
+      playerCamera.updateCamera(mockInput);
+      camera.updateMatrixWorld(true);
+
+      // The eye sits off the airframe on the left-door side (negative X), not at
+      // the chase pose behind the nose.
+      expect(camera.position.x).toBeLessThan(0);
+      // The camera looks roughly along the gun aim (down the -X axis).
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      expect(forward.x).toBeLessThan(-0.8);
+    });
+
+    it('restores the chase cam when the gunner swaps back to the pilot seat', () => {
+      playerCamera.setDoorGunView(true, new THREE.Vector3(-1, 0, 0));
+      playerCamera.updateCamera(mockInput);
+      const gunnerPos = camera.position.clone();
+
+      playerCamera.setDoorGunView(false);
+      playerCamera.updateCamera(mockInput);
+
+      // Back on the chase pose: a different viewpoint, behind the airframe.
+      expect(camera.position.equals(gunnerPos)).toBe(false);
+      expect(playerCamera.isDoorGunView()).toBe(false);
+    });
+
+    it('never leaks the door-gun POV into infantry after a mid-gunner dismount', () => {
+      playerCamera.setDoorGunView(true, new THREE.Vector3(-1, 0, 0));
+      playerCamera.updateCamera(mockInput);
+      expect(playerCamera.isDoorGunView()).toBe(true);
+
+      // Dismount restores infantry angles, which force-clears the POV flag.
+      playerCamera.restoreInfantryAngles();
+      playerState.isInHelicopter = false;
+      playerState.helicopterId = null;
+      playerCamera.updateCamera(mockInput);
+
+      expect(playerCamera.isDoorGunView()).toBe(false);
+      expect(camera.position.equals(playerState.position)).toBe(true);
+    });
+  });
+
   describe('applyRecoil', () => {
     it('should add pitch delta (clamped to maxPitch)', () => {
       playerCamera.applyRecoil(0.1, 0);
