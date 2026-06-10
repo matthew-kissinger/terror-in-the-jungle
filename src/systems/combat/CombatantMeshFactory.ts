@@ -16,6 +16,7 @@ import {
   mix,
   positionWorld,
   reference,
+  select,
   smoothstep,
   step,
   texture as tslTextureNode,
@@ -23,6 +24,14 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
+import { lightingRigBindings } from '../environment/LightingRig';
+import {
+  RIG_HEMI_UP_SKY_WEIGHT,
+  RIG_LOW_SUN_FADE_FLOOR,
+  RIG_LOW_SUN_FADE_HI,
+  RIG_LOW_SUN_FADE_LO,
+  RIG_WRAP,
+} from '../world/billboard/BillboardNodeMaterial';
 import { AssetLoader } from '../assets/AssetLoader';
 import { Combatant, Faction } from './types';
 import { Logger } from '../../utils/Logger';
@@ -104,6 +113,7 @@ const tslAttribute = (name: string, type: string): TslNode => attribute(name, ty
 const tslVec2 = (...args: TslNode[]): TslNode => (vec2 as (...values: TslNode[]) => TslNode)(...args);
 const tslVec3 = (...args: TslNode[]): TslNode => (vec3 as (...values: TslNode[]) => TslNode)(...args);
 const tslMix = (...args: TslNode[]): TslNode => (mix as (...values: TslNode[]) => TslNode)(...args);
+const tslSelect = (...args: TslNode[]): TslNode => (select as (...values: TslNode[]) => TslNode)(...args);
 const tslTexture = (source: THREE.Texture, sampleUv: TslNode): TslNode => tslTextureNode(source, sampleUv) as TslNode;
 const tslFloat = (value: number): TslNode => float(value) as TslNode;
 const tslReference = (type: string, uniform: { value: unknown }): TslNode => reference('value', type, uniform) as TslNode;
@@ -214,6 +224,11 @@ function createNpcImpostorColorNode(
   npcColor = tslMin(npcColor.add(tslVec3(0.045, 0.040, 0.030)), tslVec3(1, 1, 1));
   const readabilityLift = readabilityColor.mul(tslFloat(0.18).add(tslFloat(0.12).mul(combatState)));
   npcColor = tslMix(npcColor, tslMin(npcColor.add(readabilityLift), tslVec3(1, 1, 1)), readabilityStrength);
+  // Color-managed albedo BEFORE the legacy exposure/top-light/parity/atmosphere
+  // lighting — the rig path's analog of the billboard `colorManaged` term. The
+  // wrapped-Lambert rig lighting below multiplies this clean albedo so the NPC
+  // impostor tracks terrain the same way foliage does.
+  const rigAlbedo = npcColor;
   const topLight = smoothstep(tslFloat(0.12), tslFloat(1), baseUv.y).mul(npcTopLight);
   const npcLight = tslMax(minNpcLight, minNpcLight.add(topLight));
   npcColor = tslMin(npcColor.mul(npcExposure).mul(npcLight), tslVec3(1, 1, 1));
@@ -230,6 +245,39 @@ function createNpcImpostorColorNode(
     tslClamp(npcColor.mul(normalizedTint).mul(npcAtmosphereLightScale), tslVec3(0, 0, 0), tslVec3(1, 1, 1)),
     step(tslFloat(0.5), npcLightingEnabled),
   );
+
+  // --- Unified-rig branch (flag-gated, npc-impostor-and-effects-rig) ---------
+  // Wrapped-Lambert against the SAME uncompressed rig terms terrain + foliage
+  // consume, so the NPC impostor tracks them by construction. This is the
+  // billboard migration's response, shared by import (RIG_WRAP / RIG_HEMI_* /
+  // RIG_LOW_SUN_FADE_*) — no per-family re-tune. The impostor sprite is a
+  // camera-facing up-biased plane with no normal map, so its card normal is
+  // (0,1,0) — identical to the foliage card without a normal map — and it reads
+  // the identical hemisphere/low-sun trims. The legacy scene-scan tint above is
+  // bypassed on this path (single authority); legacy stays byte-identical when
+  // the flag is OFF. See docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §2c.
+  const rigEnabled = tslReference('float', lightingRigBindings.rigEnabled).greaterThan(tslFloat(0.5));
+  const rigSun = tslReference('color', lightingRigBindings.sunRadiance);
+  const rigSky = tslReference('color', lightingRigBindings.skyIrradiance);
+  const rigGround = tslReference('color', lightingRigBindings.groundIrradiance);
+  const rigAmbient = tslReference('color', lightingRigBindings.ambientRadiance);
+  const rigSunDir = tslReference('vec3', lightingRigBindings.sunDirection);
+  const rigExposure = tslReference('float', lightingRigBindings.exposure);
+  const rigSunElevationSin = tslReference('float', lightingRigBindings.sunElevationSin);
+  const rigCardNormal = tslVec3(0, 1, 0);
+  const rigWrap = tslFloat(RIG_WRAP);
+  const rigNl = tslMax(rigCardNormal.dot(rigSunDir), rigWrap.negate());
+  const rigDiff = rigNl.add(rigWrap).div(tslFloat(1).add(rigWrap));
+  const rigHemiWeight = tslFloat(0.5).add(rigCardNormal.y.mul(tslFloat(RIG_HEMI_UP_SKY_WEIGHT - 0.5)));
+  const rigHemi = tslMix(rigGround, rigSky, rigHemiWeight);
+  const rigLowSunFade = tslFloat(RIG_LOW_SUN_FADE_FLOOR).add(
+    tslFloat(1 - RIG_LOW_SUN_FADE_FLOOR).mul(
+      smoothstep(tslFloat(RIG_LOW_SUN_FADE_LO), tslFloat(RIG_LOW_SUN_FADE_HI), rigSunElevationSin),
+    ),
+  );
+  const rigDirectSun = rigSun.mul(rigDiff).mul(rigLowSunFade);
+  const rigLit = rigAlbedo.mul(rigHemi.add(rigDirectSun)).add(rigAmbient).mul(rigExposure);
+  npcColor = tslSelect(rigEnabled, rigLit, npcColor);
 
   const cameraDistance = tslCameraPosition.sub(tslPositionWorld).length();
   const expFog = tslFloat(1).sub(exp(npcFogDensity.negate().mul(tslMax(tslFloat(0), cameraDistance.sub(npcFogStartDistance)))));

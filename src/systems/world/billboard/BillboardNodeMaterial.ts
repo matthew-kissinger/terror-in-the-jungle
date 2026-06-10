@@ -33,8 +33,14 @@ import type { VegetationAlphaCrop, VegetationAtlasProfile } from '../../../confi
 import type { GPUVegetationConfig } from './BillboardTypes';
 import { lightingRigBindings } from '../../environment/LightingRig';
 
-/** Wrapped-Lambert terminator softening for foliage cards (memo §2c, wrap=0.5). */
-const RIG_WRAP = 0.5;
+/**
+ * Wrapped-Lambert terminator softening for the unlit families (memo §2c,
+ * wrap=0.5). Exported so the NPC impostor rig path consumes the SAME response
+ * the billboard migration tuned — shared by import, never copied (the
+ * npc-impostor-and-effects-rig brief: "no per-family re-tune; share constants
+ * via import, not copy").
+ */
+export const RIG_WRAP = 0.5;
 
 /**
  * Foliage low-sun direct-term attenuation (rig path, billboard-rig-migration).
@@ -65,9 +71,9 @@ const RIG_WRAP = 0.5;
  * mirroring terrain's documented occlusion band, rather than to an unobservable
  * sweep metric. See the PR body for the full evidence + tables.
  */
-const FOLIAGE_LOW_SUN_FADE_LO = 0.22;
-const FOLIAGE_LOW_SUN_FADE_HI = 0.52;
-const FOLIAGE_LOW_SUN_FADE_FLOOR = 0.35;
+export const RIG_LOW_SUN_FADE_LO = 0.22;
+export const RIG_LOW_SUN_FADE_HI = 0.52;
+export const RIG_LOW_SUN_FADE_FLOOR = 0.35;
 
 /**
  * Hemisphere-fill sky weight for the up-facing card. The wrapped-Lambert form
@@ -76,8 +82,10 @@ const FOLIAGE_LOW_SUN_FADE_FLOOR = 0.35;
  * integrates the whole hemisphere, not just the zenith, so this trims the
  * up-normal sky weight slightly below 1.0 — a documented artistic trim (memo
  * §2c: the clamp/blend constants survive only as trims, never as the mechanism).
+ * Exported (`RIG_HEMI_UP_SKY_WEIGHT`) so the NPC impostor card — also a
+ * camera-facing up-biased plane with no normal map — shares the identical trim.
  */
-const FOLIAGE_HEMI_UP_SKY_WEIGHT = 0.95;
+export const RIG_HEMI_UP_SKY_WEIGHT = 0.95;
 
 const DEFAULT_BILLBOARD_FOG_DENSITY = 0.00055;
 const BILLBOARD_ALPHA_TEST = 0.25;
@@ -539,7 +547,7 @@ function createBillboardLightingNode(
   // pure-zenith pick (a real tuft integrates the whole hemisphere). Weight goes
   // from 0.5 at a side-facing normal to FOLIAGE_HEMI_UP_SKY_WEIGHT straight up.
   const hemiWeight = tslFloat(0.5).add(
-    cardNormal.y.mul(tslFloat(FOLIAGE_HEMI_UP_SKY_WEIGHT - 0.5)),
+    cardNormal.y.mul(tslFloat(RIG_HEMI_UP_SKY_WEIGHT - 0.5)),
   );
   const hemi = tslMix(rigGround, rigSky, hemiWeight);
   // Low-sun direct-term fade, keyed on the SAME sun-height driver terrain's
@@ -547,12 +555,13 @@ function createBillboardLightingNode(
   // direct sun contribution toward a floor as the sun nears the horizon, so the
   // up-biased card normal no longer over-catches the low warm sun (the Phase 1
   // overshoot) while keeping a residual dusk contribution. Ambient + hemisphere
-  // fill are untouched. See FOLIAGE_LOW_SUN_FADE_* for the measured tuning.
-  const lowSunFade = tslFloat(FOLIAGE_LOW_SUN_FADE_FLOOR).add(
-    tslFloat(1 - FOLIAGE_LOW_SUN_FADE_FLOOR).mul(
+  // fill are untouched. See RIG_LOW_SUN_FADE_* for the measured tuning (exported,
+  // shared with the NPC impostor rig path — same response, no per-family re-tune).
+  const lowSunFade = tslFloat(RIG_LOW_SUN_FADE_FLOOR).add(
+    tslFloat(1 - RIG_LOW_SUN_FADE_FLOOR).mul(
       smoothstep(
-        tslFloat(FOLIAGE_LOW_SUN_FADE_LO),
-        tslFloat(FOLIAGE_LOW_SUN_FADE_HI),
+        tslFloat(RIG_LOW_SUN_FADE_LO),
+        tslFloat(RIG_LOW_SUN_FADE_HI),
         rigSunElevationSin,
       ),
     ),

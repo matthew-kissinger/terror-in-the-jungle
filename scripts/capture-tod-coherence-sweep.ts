@@ -38,17 +38,27 @@
  *   currentHour = startHour + (simulationTimeSeconds / dayLengthSeconds) * 24
  * and `simulationTimeSeconds = forceTimeOfDay * dayLengthSeconds`.
  *
- * --- Region fixture ---
+ * --- Region fixture (INSTRUMENT FIX, npc-impostor-and-effects-rig scope 0) ---
  * The fixed camera looks down-valley at a shallow pitch so terrain fills the
- * lower band and the densely-vegetated mid-ground fills the foliage band. The
- * four family regions are documented fixed fractional boxes
- * (`FAMILY_FALLBACK_REGIONS`). When the engine exposes a live world anchor for
- * a family (nearest NPC via `combatantSystem.getAllCombatants()`, nearest
- * GLB via `vehicleManager.getAllVehicles()`), that anchor is projected to
- * screen and a box of half-extent `ANCHOR_BOX_HALF_FRAC` is centred on it,
- * overriding the fallback so the sample tracks the actual entity. Terrain and
- * foliage always use the fixed bands (terrain is always ground; A Shau is
- * uniformly vegetated through the mid-ground).
+ * lower band. Terrain always uses its fixed ground band (`FAMILY_FALLBACK_REGIONS`).
+ *
+ * The `foliage` and `npc` families are ANCHORED ON ACTUAL PIXELS by scanning the
+ * live scene for the billboard / impostor instances that actually render, not by
+ * a fixed fallback box. The prior harness sampled `foliage` from a fixed
+ * mid-ground band and `npc` from a box around the nearest combatant's *feet* —
+ * both landed on bare down-valley terrain in the A Shau fixture, so the
+ * `corrVsTerrain` / `rangeRatio` rows for those families were terrain-vs-terrain
+ * and no shader change could move them (the billboard-rig-migration structural
+ * finding, PR #376). The fix:
+ *   - foliage: scan the scene for the billboard `MeshBasicNodeMaterial`
+ *     (`vegetationExposure` uniform), read its `instancePosition` buffer, and
+ *     anchor on the densest on-screen cluster of cards near the camera.
+ *   - npc: scan the scene for the impostor `MeshBasicNodeMaterial`
+ *     (`npcExposure` uniform), read its per-instance matrices, and anchor on the
+ *     nearest on-screen sprite *centre* (the sprite plane, not feet).
+ * A tight box (`ANCHOR_BOX_HALF_FRAC`) is centred on the projected anchor so the
+ * sample lands on the subject. The fixed fallback boxes are kept only for the
+ * degenerate case where no live instance projects on-screen (logged in `notes`).
  *
  * --- Headless posture ---
  * Best-effort per shot, matching the existing capture scripts: a scenario load
@@ -110,10 +120,10 @@ interface Region {
 
 /**
  * Fixed fractional region boxes per material family for the documented camera
- * fixture. Terrain owns the lowest ground band; foliage owns the vegetated
- * mid-ground band; NPC + GLB own placeholder boxes that are overridden at
- * runtime by projecting their live world anchors (see ANCHOR_BOX_HALF_FRAC).
- * These fallbacks are used when no live anchor is found.
+ * fixture. Terrain owns the lowest ground band and is never anchored. The
+ * foliage / npc / glb boxes are FALLBACKS only — used when no live instance of
+ * that family projects on-screen — because each is anchored on its actual
+ * rendered pixels at runtime (see `resolveAnchorRegions` + ANCHOR_BOX_HALF_FRAC).
  */
 const FAMILY_FALLBACK_REGIONS: Record<FamilyKey, Region> = {
   terrain: { x0: 0.30, x1: 0.70, y0: 0.82, y1: 0.98 },
@@ -122,12 +132,27 @@ const FAMILY_FALLBACK_REGIONS: Record<FamilyKey, Region> = {
   glb: { x0: 0.10, x1: 0.30, y0: 0.62, y1: 0.82 },
 };
 
-/** Half-extent (fraction of width / height) of the box centred on a projected anchor. */
-const ANCHOR_BOX_HALF_FRAC = 0.05;
+/**
+ * Half-extent (fraction of width / height) of the box centred on a projected
+ * anchor. Kept tight so the sample lands on the subject card/sprite rather than
+ * the terrain around it — the whole point of the instrument fix. The luminance
+ * sampler already skips near-black silhouette pixels, so a tight box that frames
+ * the lit subject reads the family, not the background.
+ */
+const ANCHOR_BOX_HALF_FRAC = 0.035;
 
-/** Families whose region is refined by projecting a live world anchor. */
-type AnchoredFamily = 'npc' | 'glb';
-const ANCHORED_FAMILIES: AnchoredFamily[] = ['npc', 'glb'];
+/** Families whose region is refined by projecting a live on-screen anchor. */
+type AnchoredFamily = 'foliage' | 'npc' | 'glb';
+const ANCHORED_FAMILIES: AnchoredFamily[] = ['foliage', 'npc', 'glb'];
+
+/**
+ * Per-mesh instance cap when scanning for anchor candidates. A Shau places tens
+ * of thousands of billboard cards; we only need the nearest on-screen one, and
+ * scanning every instance in a `page.evaluate` is wasteful. The mesh instance
+ * buffers are roughly camera-sorted by streaming order, so a generous cap still
+ * finds a near, on-screen subject. Matches the crop-probe's bounded scan.
+ */
+const ANCHOR_INSTANCE_SCAN_CAP = 4096;
 
 const PORT = 9184;
 const VIEWPORT = { width: 1920, height: 1080 };
@@ -470,22 +495,31 @@ async function snap(page: Page, outFile: string): Promise<Buffer | null> {
 // ----- World anchors -> screen regions -----
 
 /**
- * Project the nearest live NPC and GLB-vehicle world anchors to screen-space
- * fractional points. Terrain + foliage use their fixed fallback bands, so this
- * only resolves the two anchored families. Returns null entries for families
- * with no live anchor.
+ * Anchor the foliage / npc / glb families on the screen position of the actual
+ * instances that render, by scanning the live scene (INSTRUMENT FIX, scope 0).
+ *
+ * The scene scan mirrors `scripts/konveyer-asset-crop-probe.ts`: a billboard
+ * card carries a `vegetationExposure` uniform and stores world positions in an
+ * `instancePosition` buffer attribute; an NPC impostor carries an `npcExposure`
+ * uniform and is a `THREE.InstancedMesh` with per-instance matrices. For each
+ * anchored family we project every live instance to screen, keep the on-screen
+ * ones, and centre the anchor on the nearest cluster to the camera (the largest
+ * on-screen subject). GLB still anchors on the nearest vehicle's body centre.
+ * Returns null for families with no on-screen instance (the caller falls back to
+ * the fixed box and records `fallback` in the sample notes).
  */
 async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Record<FamilyKey, Region>>> {
   const projected = await page.evaluate(
-    ({ camPos }: { camPos: [number, number, number] }) => {
-      const engine = (window as { __engine?: { renderer?: { camera?: unknown }; systemManager?: { combatantSystem?: unknown; vehicleManager?: unknown } } }).__engine;
+    ({ camPos, instCap }: { camPos: [number, number, number]; instCap: number }) => {
+      const w = window as unknown as { __engine?: { renderer?: { camera?: unknown; scene?: unknown }; systemManager?: { vehicleManager?: unknown } } };
+      const engine = w.__engine;
       const camera = engine?.renderer?.camera as unknown as {
         position: { x: number; y: number; z: number };
         projectionMatrix?: { elements: number[] };
         matrixWorldInverse?: { elements: number[] };
-        updateMatrixWorld?: (force: boolean) => void;
       } | undefined;
-      if (!camera?.projectionMatrix || !camera.matrixWorldInverse) return { npc: null, glb: null };
+      const scene = engine?.renderer?.scene as unknown as { traverse?: (cb: (o: unknown) => void) => void } | undefined;
+      if (!camera?.projectionMatrix || !camera.matrixWorldInverse) return { foliage: null, npc: null, glb: null };
 
       // Multiply a world point by viewProjection (column-major 4x4 in `elements`)
       // to NDC, then map to screen fractions. y is flipped (NDC up -> screen up).
@@ -507,7 +541,9 @@ async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Rec
         return { x: (ndcX + 1) / 2, y: (1 - ndcY) / 2 };
       };
 
-      const nearest = (entries: Array<{ x: number; y: number; z: number }>): { x: number; y: number } | null => {
+      // Nearest on-screen world point to the camera -> its screen fraction. A
+      // tight box around this lands on the closest (largest) subject instance.
+      const nearestOnScreen = (entries: Array<{ x: number; y: number; z: number }>): { x: number; y: number } | null => {
         let best: { x: number; y: number } | null = null;
         let bestDist = Infinity;
         for (const e of entries) {
@@ -523,24 +559,107 @@ async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Rec
         return best;
       };
 
-      const sm = engine?.systemManager;
-      const combatantSystem = sm?.combatantSystem as { getAllCombatants?: () => Array<{ position?: { x: number; y: number; z: number }; isAlive?: boolean }> } | undefined;
-      const vehicleManager = sm?.vehicleManager as { getAllVehicles?: () => Array<{ getPosition?: () => { x: number; y: number; z: number } | undefined; position?: { x: number; y: number; z: number } }> } | undefined;
+      const hasUniform = (material: unknown, key: string): boolean => {
+        const uniforms = (material as { uniforms?: Record<string, unknown> } | undefined)?.uniforms;
+        return Boolean(uniforms && Object.prototype.hasOwnProperty.call(uniforms, key));
+      };
+      const materialArray = (material: unknown): unknown[] => (Array.isArray(material) ? material : material ? [material] : []);
 
+      // Scan the live scene for foliage cards + NPC impostor sprites and collect
+      // their world anchor points. Foliage: world positions live in the
+      // `instancePosition` buffer (camera-facing card centre is position + a
+      // half-height lift). NPC: per-instance matrices on a THREE.InstancedMesh
+      // (sprite centre is the matrix translation; the geometry is already
+      // centred on the sprite plane via NPC_SPRITE_RENDER_Y_OFFSET).
+      const foliagePoints: Array<{ x: number; y: number; z: number }> = [];
       const npcPoints: Array<{ x: number; y: number; z: number }> = [];
-      for (const c of combatantSystem?.getAllCombatants?.() ?? []) {
-        const p = c.position;
-        if (p && Number.isFinite(p.x)) npcPoints.push({ x: p.x, y: (p.y ?? 0) + 1.0, z: p.z });
-      }
+      scene?.traverse?.((object: unknown) => {
+        const obj = object as {
+          isMesh?: boolean;
+          isInstancedMesh?: boolean;
+          visible?: boolean;
+          count?: number;
+          material?: unknown;
+          matrixWorld?: { elements: number[] };
+          geometry?: { instanceCount?: number; attributes?: { instancePosition?: { count: number; getX: (i: number) => number; getY: (i: number) => number; getZ: (i: number) => number }; instanceScale?: { getY?: (i: number) => number } } };
+          getMatrixAt?: (i: number, m: { elements: number[] }) => void;
+        };
+        if (!obj?.isMesh || obj.visible === false) return;
+        for (const material of materialArray(obj.material)) {
+          const isFoliage = hasUniform(material, 'vegetationExposure');
+          const isNpc = hasUniform(material, 'npcExposure');
+          if (!isFoliage && !isNpc) continue;
+          if (isNpc && obj.isInstancedMesh && typeof obj.getMatrixAt === 'function') {
+            const count = Math.min(Number(obj.count ?? 0), instCap);
+            const m = { elements: new Array(16).fill(0) };
+            const owMatrix = obj.matrixWorld?.elements;
+            for (let i = 0; i < count; i++) {
+              obj.getMatrixAt(i, m);
+              // Translation column of the local instance matrix.
+              let tx = m.elements[12];
+              let ty = m.elements[13];
+              let tz = m.elements[14];
+              // Premultiply by mesh world matrix (translation part is enough for
+              // an axis-aligned instanced mesh; the meshes use identity world).
+              if (owMatrix) {
+                tx += owMatrix[12];
+                ty += owMatrix[13];
+                tz += owMatrix[14];
+              }
+              if (Number.isFinite(tx) && Number.isFinite(ty) && Number.isFinite(tz)) {
+                npcPoints.push({ x: tx, y: ty, z: tz });
+              }
+            }
+          } else {
+            const ip = obj.geometry?.attributes?.instancePosition;
+            const sc = obj.geometry?.attributes?.instanceScale;
+            if (isFoliage && ip) {
+              const count = Math.min(Number(obj.geometry?.instanceCount ?? ip.count ?? 0), instCap);
+              for (let i = 0; i < count; i++) {
+                const x = Number(ip.getX(i));
+                const y = Number(ip.getY(i));
+                const z = Number(ip.getZ(i));
+                if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+                // `instancePosition` is the centred card's vertical centre
+                // (PlaneGeometry origin; terrainHeight + yOffset*scale). Lift a
+                // modest quarter-height so the anchor sits on the lit card body
+                // above terrain rather than the base buried in the ground.
+                const lift = Math.min(3, Math.max(0.5, Number(sc?.getY?.(i) ?? 4) * 0.25));
+                foliagePoints.push({ x, y: y + lift, z });
+              }
+            }
+          }
+        }
+      });
+
+      const sm = engine?.systemManager as { vehicleManager?: unknown; combatantSystem?: unknown } | undefined;
+      const vehicleManager = sm?.vehicleManager as { getAllVehicles?: () => Array<{ getPosition?: () => { x: number; y: number; z: number } | undefined; position?: { x: number; y: number; z: number } }> } | undefined;
       const glbPoints: Array<{ x: number; y: number; z: number }> = [];
       for (const v of vehicleManager?.getAllVehicles?.() ?? []) {
         const p = v.getPosition?.() ?? v.position;
         if (p && Number.isFinite(p.x)) glbPoints.push({ x: p.x, y: (p.y ?? 0) + 1.0, z: p.z });
       }
 
-      return { npc: nearest(npcPoints), glb: nearest(glbPoints) };
+      // Secondary NPC anchor source: project live combatant positions (lifted to
+      // the sprite's vertical centre). The impostor InstancedMesh scan above
+      // misses NPCs rendered as close-GLB models or when a bucket's `count` is
+      // stale; the authoritative combatant list catches any on-screen subject so
+      // the npc row anchors on a real sprite whenever one is in frame.
+      const NPC_SPRITE_CENTRE_LIFT = 1.6;
+      const combatantSystem = sm?.combatantSystem as { getAllCombatants?: () => Array<{ position?: { x: number; y: number; z: number }; isAlive?: boolean; health?: number }> } | undefined;
+      for (const c of combatantSystem?.getAllCombatants?.() ?? []) {
+        const p = c.position;
+        const alive = c.isAlive !== false && (c.health === undefined || c.health > 0);
+        if (alive && p && Number.isFinite(p.x)) npcPoints.push({ x: p.x, y: (p.y ?? 0) + NPC_SPRITE_CENTRE_LIFT, z: p.z });
+      }
+
+      return {
+        foliage: nearestOnScreen(foliagePoints),
+        npc: nearestOnScreen(npcPoints),
+        glb: nearestOnScreen(glbPoints),
+      };
     },
-    { camPos: pose.position }
+    { camPos: pose.position, instCap: ANCHOR_INSTANCE_SCAN_CAP }
   );
 
   const out: Partial<Record<FamilyKey, Region>> = {};
@@ -676,7 +795,7 @@ async function captureTod(page: Page, hour: number, outDir: string): Promise<Tod
   const anchorRegions = await resolveAnchorRegions(page, pose);
   const regions: Record<FamilyKey, Region> = {
     terrain: FAMILY_FALLBACK_REGIONS.terrain,
-    foliage: FAMILY_FALLBACK_REGIONS.foliage,
+    foliage: anchorRegions.foliage ?? FAMILY_FALLBACK_REGIONS.foliage,
     npc: anchorRegions.npc ?? FAMILY_FALLBACK_REGIONS.npc,
     glb: anchorRegions.glb ?? FAMILY_FALLBACK_REGIONS.glb,
   };
