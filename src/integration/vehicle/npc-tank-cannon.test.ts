@@ -12,6 +12,7 @@ import { CombatantSystemDamage } from '../../systems/combat/CombatantSystemDamag
 import { Tank } from '../../systems/vehicle/Tank';
 import { VehicleManager } from '../../systems/vehicle/VehicleManager';
 import { Combatant, CombatantState, Faction } from '../../systems/combat/types';
+import { wireNpcTankGunner, type CannonStepGate } from '../../core/StartupPlayerRuntimeComposer';
 import { createTestCombatant } from '../../test-utils';
 import { spatialGridManager } from '../../systems/combat/SpatialGridManager';
 import type { SquadManager } from '../../systems/combat/SquadManager';
@@ -230,6 +231,55 @@ describe('NPC-crewed M48 cannon fires + applies damage (npc-tank-cannon-wiring)'
 
     expect(cannon.getActiveCount()).toBe(0);
     expect(enemy.health).toBe(100);
+  });
+
+  it('SINGLE-OWNER STEPPING: with a player tank session active the shared pool advances exactly once per frame', () => {
+    const sink = makeDamageSink(combatants);
+    cannon = new TankCannonProjectileSystem(
+      scene,
+      sink.explosionEffectsPool as any,
+      sink as any,
+      8,
+    );
+
+    // Wire through the REAL production wire (exported for this seam) with the
+    // single-owner gate the composer shares between the player session
+    // lifecycle and the NPC frame stepper.
+    const gate: CannonStepGate = { playerOwns: false };
+    wireNpcTankGunner({
+      combatantSystem: { combatantAI: ai } as any,
+      vehicleManager,
+      terrainSystem: { getEffectiveHeightAt: neverImpactGround } as any,
+      cannon,
+      cannonStepGate: gate,
+    });
+
+    const updateSpy = vi.spyOn(cannon, 'update');
+
+    // Player boards a tank → lifecycle marks the player session as the
+    // pool's sole stepper. Each frame: the adapter steps once (scaled
+    // ctx.deltaTime), then combat AI's beginFrame runs — the NPC stepper
+    // must yield, leaving exactly ONE pool advance per frame.
+    gate.playerOwns = true;
+    for (let frame = 0; frame < 5; frame++) {
+      updateSpy.mockClear();
+      cannon.update(1 / 60, neverImpactGround); // TankPlayerAdapter.cannonStep path
+      ai.beginFrame(1 / 60);                    // combat frame with scaled dt
+      expect(updateSpy).toHaveBeenCalledTimes(1);
+    }
+
+    // Player dismounts → the NPC stepper owns the step again (scaled dt).
+    gate.playerOwns = false;
+    updateSpy.mockClear();
+    ai.beginFrame(1 / 60);
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenLastCalledWith(1 / 60, expect.any(Function));
+
+    // Paused frame (TimeScale dt=0): shells must freeze, not advance at
+    // wall-clock — the stepper skips entirely.
+    updateSpy.mockClear();
+    ai.beginFrame(0);
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 
   it('LIVE AFTER WIRING: the NPC gunner launches a cannon round at the enemy', () => {

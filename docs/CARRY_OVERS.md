@@ -50,6 +50,12 @@ the cycle that re-opens it.
 
 History log:
 
+- 2026-06-09 — budget-grandfather note (orchestrator): `src/core/StartupPlayerRuntimeComposer.ts`
+  admitted to the lint-source-budget grandfather list at 739 LOC. The prod
+  composition point absorbed the seated-weapon lifecycle (tank cannon + M2HB),
+  the m2hb HUD panel host, and the NPC tank-gunner wire + single-owner
+  stepping gate inside the 2026-06-09 cycle window. Not a carry-over entry
+  (within-cycle growth); factor into a composition split when it next grows.
 - 2026-05-12 — vision-pivot park: AVIATSIYA-2 and AVIATSIYA-3 moved Active → Parked
   to free slots in the active-list budget for the WebGPU (KONVEYER-11 successor
   IDs) and driveable-land-vehicle (VEKHIKL-3 successor IDs) directions confirmed
