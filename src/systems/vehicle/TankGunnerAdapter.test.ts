@@ -152,6 +152,8 @@ describe('TankGunnerAdapter', () => {
       expect(ctx.hudSystem!.setVehicleContext).toHaveBeenCalledWith(
         expect.objectContaining({ kind: 'turret', role: 'gunner', hudVariant: 'turret' }),
       );
+      // Gunner seat shows the tank-gunner sight reticle, not the infantry one.
+      expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenLastCalledWith('tank_gunner');
     });
 
     it('records the active vehicle id for the session', () => {

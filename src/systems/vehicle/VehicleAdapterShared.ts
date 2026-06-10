@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { PlayerInput } from '../player/PlayerInput';
 import type { PlayerCamera } from '../player/PlayerCamera';
 import type { IGameRenderer } from '../../types/SystemInterfaces';
+import type { CrosshairMode } from '../../ui/hud/CrosshairSystem';
 import type { VehicleTransitionContext } from './PlayerVehicleAdapter';
 
 /**
@@ -88,13 +89,23 @@ export function relockPointer(input: PlayerInput): void {
 }
 
 /**
- * Restore the infantry crosshair. The ground-mode adapters set this on both
- * enter and exit; guarded because the game renderer is optional.
+ * Set the HUD crosshair mode for the seated craft. Guarded because the game
+ * renderer is optional (test doubles routinely omit it). Each ground-gunnery
+ * adapter sets its own reticle mode on enter and restores `'infantry'` on
+ * exit via `setInfantryCrosshair`.
+ */
+export function setCrosshairMode(gameRenderer: IGameRenderer | undefined, mode: CrosshairMode): void {
+  if (gameRenderer) {
+    gameRenderer.setCrosshairMode(mode);
+  }
+}
+
+/**
+ * Restore the infantry crosshair. The ground-mode adapters set this on exit;
+ * guarded because the game renderer is optional.
  */
 export function setInfantryCrosshair(gameRenderer: IGameRenderer | undefined): void {
-  if (gameRenderer) {
-    gameRenderer.setCrosshairMode('infantry');
-  }
+  setCrosshairMode(gameRenderer, 'infantry');
 }
 
 /**

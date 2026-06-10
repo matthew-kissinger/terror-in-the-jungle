@@ -140,6 +140,8 @@ describe('EmplacementPlayerAdapter', () => {
       expect(ctx.hudSystem!.setVehicleContext).toHaveBeenCalledWith(
         expect.objectContaining({ kind: 'turret', role: 'gunner', hudVariant: 'turret' }),
       );
+      // M2HB seat shows the open MG cross reticle, not the infantry one.
+      expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenLastCalledWith('emplacement_mg');
     });
 
     it('records the active emplacement id (from the bound model) for the session', () => {

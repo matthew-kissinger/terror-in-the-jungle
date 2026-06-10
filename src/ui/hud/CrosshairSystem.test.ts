@@ -75,6 +75,53 @@ describe('CrosshairSystem', () => {
       const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
       expect(infantry.style.display).toBe('');
     });
+
+    it('should switch to tank_gunner and show only the gunner-sight reticle', () => {
+      crosshair.setMode('tank_gunner');
+      expect(crosshair.getMode()).toBe('tank_gunner');
+
+      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+      const pipper = crosshair.element.querySelector('[data-ref="pipper"]') as HTMLElement;
+      const tankGunner = crosshair.element.querySelector('[data-ref="tankGunner"]') as HTMLElement;
+      const emplacementMg = crosshair.element.querySelector('[data-ref="emplacementMg"]') as HTMLElement;
+      expect(tankGunner.style.display).toBe('');
+      expect(infantry.style.display).toBe('none');
+      expect(pipper.style.display).toBe('none');
+      expect(emplacementMg.style.display).toBe('none');
+    });
+
+    it('should switch to emplacement_mg and show only the MG cross reticle', () => {
+      crosshair.setMode('emplacement_mg');
+      expect(crosshair.getMode()).toBe('emplacement_mg');
+
+      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+      const pipper = crosshair.element.querySelector('[data-ref="pipper"]') as HTMLElement;
+      const tankGunner = crosshair.element.querySelector('[data-ref="tankGunner"]') as HTMLElement;
+      const emplacementMg = crosshair.element.querySelector('[data-ref="emplacementMg"]') as HTMLElement;
+      expect(emplacementMg.style.display).toBe('');
+      expect(infantry.style.display).toBe('none');
+      expect(pipper.style.display).toBe('none');
+      expect(tankGunner.style.display).toBe('none');
+    });
+
+    it('should swap cleanly between ground-gunnery modes and back to infantry', () => {
+      const tankGunner = crosshair.element.querySelector('[data-ref="tankGunner"]') as HTMLElement;
+      const emplacementMg = crosshair.element.querySelector('[data-ref="emplacementMg"]') as HTMLElement;
+      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+
+      crosshair.setMode('tank_gunner');
+      expect(tankGunner.style.display).toBe('');
+      expect(emplacementMg.style.display).toBe('none');
+
+      crosshair.setMode('emplacement_mg');
+      expect(emplacementMg.style.display).toBe('');
+      expect(tankGunner.style.display).toBe('none');
+
+      crosshair.setMode('infantry');
+      expect(infantry.style.display).toBe('');
+      expect(tankGunner.style.display).toBe('none');
+      expect(emplacementMg.style.display).toBe('none');
+    });
   });
 
   describe('visibility', () => {
