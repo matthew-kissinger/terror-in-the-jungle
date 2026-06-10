@@ -124,6 +124,126 @@ export function getFixedWingWeaponConfig(configKey: string | null): FixedWingWea
 }
 
 /**
+ * Left-side broadside gunner view tuning for the AC-47 (fixedwing-camera-fit).
+ * The forward chase cam cannot aim guns that fire 90° to the left, so the AC-47
+ * gets a toggled gunner view that looks down the broadside fire axis. The camera
+ * sits OPPOSITE the fire axis (off the aircraft's right side) at `lateralOffset`
+ * and `heightOffset`, looking across the airframe toward the broadside
+ * convergence point with a slight down-angle for orbit fire. Other airframes
+ * have no broadside view (their guns fire forward).
+ */
+export interface FixedWingBroadsideView {
+  /** Camera offset along the airframe right axis (opposite the left fire axis), metres. */
+  readonly lateralOffset: number;
+  /** Camera height above the airframe, metres. */
+  readonly heightOffset: number;
+  /** Aft offset along the airframe so the gunner sits behind the battery, metres. */
+  readonly aftOffset: number;
+}
+
+/**
+ * Per-airframe chase / sight camera tuning (fixedwing-camera-fit). Data-driven
+ * so the camera consumes the table rather than hardcoding feel per airframe:
+ *
+ *  - A-1 Skyraider — closer, lower chase; agile prop attacker.
+ *  - F-4 Phantom — farther, higher chase + speed FOV widen; fast jet.
+ *  - AC-47 Spooky — wide, stately chase + the broadside gunner view.
+ *
+ * `sightConvergenceRange` is the reference range (metres) at which the reflector
+ * reticle is boresighted: the camera aims its screen centre at the gun
+ * convergence point this far down the fire axis, so the reticle predicts where
+ * the guns hit (forward for A-1/F-4, broadside-left for the AC-47).
+ */
+export interface FixedWingCameraFit {
+  readonly chaseDistance: number;
+  readonly chaseHeight: number;
+  readonly fovWidenEnabled: boolean;
+  readonly sightConvergenceRange: number;
+  /** Present only for airframes with a broadside battery (the AC-47). */
+  readonly broadside?: FixedWingBroadsideView;
+}
+
+const A1_CAMERA_FIT: FixedWingCameraFit = {
+  chaseDistance: 30,
+  chaseHeight: 8,
+  fovWidenEnabled: false,
+  sightConvergenceRange: 320,
+};
+
+const F4_CAMERA_FIT: FixedWingCameraFit = {
+  chaseDistance: 35,
+  chaseHeight: 8,
+  fovWidenEnabled: true,
+  sightConvergenceRange: 420,
+};
+
+const AC47_CAMERA_FIT: FixedWingCameraFit = {
+  chaseDistance: 40,
+  chaseHeight: 12,
+  fovWidenEnabled: false,
+  sightConvergenceRange: 360,
+  broadside: {
+    lateralOffset: 26,
+    heightOffset: 9,
+    aftOffset: 4,
+  },
+};
+
+const FIXED_WING_CAMERA_FITS: Record<string, FixedWingCameraFit> = {
+  A1_SKYRAIDER: A1_CAMERA_FIT,
+  F4_PHANTOM: F4_CAMERA_FIT,
+  AC47_SPOOKY: AC47_CAMERA_FIT,
+};
+
+const DEFAULT_FIXED_WING_CAMERA_FIT = F4_CAMERA_FIT;
+
+/** Resolve the camera-fit tuning for an aircraft config key (never null). */
+export function getFixedWingCameraFit(configKey: string | null): FixedWingCameraFit {
+  if (!configKey) return DEFAULT_FIXED_WING_CAMERA_FIT;
+  return FIXED_WING_CAMERA_FITS[configKey] ?? DEFAULT_FIXED_WING_CAMERA_FIT;
+}
+
+const _convAccum = new THREE.Vector3();
+const _convDir = new THREE.Vector3();
+
+/**
+ * Compute the world-space gun convergence point for an airframe — the point the
+ * reflector reticle is boresighted to. Averages the muzzle origins and projects
+ * `range` metres along the fire axis (forward for nose/wing guns, broadside-left
+ * for the AC-47), all rotated into world space by the aircraft quaternion. The
+ * reticle predicts gun hits when the camera aims its screen centre here. Written
+ * into `out` to avoid allocation.
+ */
+export function computeFixedWingConvergencePoint(
+  config: FixedWingWeaponConfig,
+  position: THREE.Vector3,
+  quaternion: THREE.Quaternion,
+  range: number,
+  out: THREE.Vector3,
+): THREE.Vector3 {
+  // Average the local muzzle offsets (paired wing cannons converge; the
+  // broadside battery centres on its middle barrel).
+  _convAccum.set(0, 0, 0);
+  for (const muzzle of config.muzzles) {
+    _convAccum.x += muzzle[0];
+    _convAccum.y += muzzle[1];
+    _convAccum.z += muzzle[2];
+  }
+  _convAccum.multiplyScalar(1 / config.muzzles.length);
+
+  _convDir
+    .set(config.fireAxis[0], config.fireAxis[1], config.fireAxis[2])
+    .normalize()
+    .multiplyScalar(range);
+
+  return out
+    .copy(_convAccum)
+    .add(_convDir)
+    .applyQuaternion(quaternion)
+    .add(position);
+}
+
+/**
  * Compute the world-space muzzle origin + fire direction for one round.
  *
  * `barrelIndex` selects which muzzle fires (round-robin across barrels). The

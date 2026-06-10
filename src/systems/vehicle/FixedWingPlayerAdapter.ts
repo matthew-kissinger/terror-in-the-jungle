@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { FixedWingModel } from './FixedWingModel';
 import { createIdleFixedWingPilotIntent } from './FixedWingControlLaw';
 import type { FixedWingPilotIntent, FixedWingPilotMode } from './FixedWingControlLaw';
+import { getFixedWingCameraFit } from './FixedWingArmament';
 import { FIXED_WING_CONFIGS } from './FixedWingConfigs';
 import { buildOrbitAnchorFromHeading } from './FixedWingOperations';
 import type { IHUDSystem } from '../../types/SystemInterfaces';
@@ -48,6 +49,9 @@ const FW_MOUSE_RECENTER_RATE = 1.8;
 const FW_ASSIST_MOUSE_RECENTER_RATE = 3.2;
 const FW_ORBIT_HOLD_ALTITUDE_HYSTERESIS_M = 60;
 const FW_ORBIT_HOLD_MIN_DROPOUT_ALTITUDE_M = 20;
+// DOM MouseEvent.button code for the right mouse button. RMB toggles the AC-47
+// broadside gunner view (rising edge), reusing the tank-sight RMB pattern.
+const FW_BROADSIDE_TOGGLE_BUTTON = 2;
 
 function createFixedWingUIContext(role: string, weaponCount: number): VehicleUIContext {
   return {
@@ -89,6 +93,12 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
   private fixedWingOrbitCenterZ = 0;
   private fixedWingPilotMode: FixedWingPilotMode = 'assisted';
   private lastMouseControlEnabled = false;
+
+  // AC-47 broadside gunner view: RMB rising-edge toggles it; only airframes with
+  // a broadside battery (per the camera-fit table) respond. Flight controls are
+  // unaffected — the toggle only repositions the camera.
+  private broadsideViewActive = false;
+  private prevBroadsideToggleDown = false;
 
   private fixedWingModel: FixedWingModel;
   private activeAircraftId: string | null = null;
@@ -154,6 +164,12 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     // Tell FixedWingModel this aircraft is now piloted
     this.fixedWingModel.setPilotedAircraft(ctx.vehicleId);
 
+    // Start every aircraft on the chase cam (broadside view off). Airframes
+    // without a broadside battery never enter it.
+    this.broadsideViewActive = false;
+    this.prevBroadsideToggleDown = false;
+    ctx.cameraController.setFixedWingBroadsideView(false);
+
     // Re-acquire pointer lock for mouse flight controls
     relockPointer(ctx.input);
   }
@@ -162,7 +178,12 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     ctx.setPosition(ctx.position, 'fixedwing.exit');
     setFlightVehicleInputState(ctx.input, 'none');
     setInputContext(ctx.input, 'gameplay');
+    // Drop the broadside gunner view before restoring infantry angles so it
+    // can never leak across the dismount.
+    ctx.cameraController?.setFixedWingBroadsideView(false);
     ctx.cameraController?.restoreInfantryAngles();
+    this.broadsideViewActive = false;
+    this.prevBroadsideToggleDown = false;
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.hideFixedWingInstruments?.();
@@ -193,6 +214,8 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
   update(ctx: VehicleUpdateContext): void {
     if (!this.activeAircraftId) return;
 
+    this.updateBroadsideView(ctx);
+
     let mouseMovement: { x: number; y: number } | undefined;
     const touchFlight = isTouchFlightMode(ctx.input);
     const mouseControlEnabled = getFlightMouseControlEnabled(ctx.cameraController);
@@ -217,6 +240,33 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     }
   }
 
+  /**
+   * RMB rising-edge toggles the AC-47 broadside gunner view (reuses the
+   * tank-sight RMB pattern). Only airframes that carry a broadside battery (per
+   * the camera-fit table) respond; for the A-1 / F-4 this is a no-op. The toggle
+   * only repositions the camera — flight controls are unchanged either way.
+   */
+  private updateBroadsideView(ctx: VehicleUpdateContext): void {
+    const hasBroadside = getFixedWingCameraFit(this.activeConfigKey).broadside !== undefined;
+    const down = typeof ctx.input.isMouseButtonPressed === 'function'
+      ? ctx.input.isMouseButtonPressed(FW_BROADSIDE_TOGGLE_BUTTON)
+      : false;
+
+    if (hasBroadside && down && !this.prevBroadsideToggleDown) {
+      this.broadsideViewActive = !this.broadsideViewActive;
+    }
+    this.prevBroadsideToggleDown = down;
+
+    // Force-off for airframes without a broadside so a stale toggle never sticks.
+    const desired = hasBroadside && this.broadsideViewActive;
+    ctx.cameraController.setFixedWingBroadsideView(desired);
+  }
+
+  /** True when the AC-47 broadside gunner view is engaged. */
+  isBroadsideViewActive(): boolean {
+    return this.broadsideViewActive;
+  }
+
   resetControlState(): void {
     this.fixedWingThrottle = 0;
     this.fixedWingMousePitch = 0;
@@ -227,6 +277,8 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.fixedWingOrbitCenterZ = 0;
     this.fixedWingPilotMode = 'assisted';
     this.lastMouseControlEnabled = false;
+    this.broadsideViewActive = false;
+    this.prevBroadsideToggleDown = false;
   }
 
   // ── Fire control ──

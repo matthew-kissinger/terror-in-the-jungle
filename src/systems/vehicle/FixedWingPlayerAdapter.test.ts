@@ -113,8 +113,13 @@ function createMockHudSystem() {
   };
 }
 
+// Mutable right-mouse-button state so the broadside-toggle test can press it.
+const RMB_BUTTON = 2;
+
 function createTransitionContext(playerState: PlayerState, vehicleId = 'fw_1'): VehicleTransitionContext {
   let flightMouseControlEnabled = false;
+  let broadsideView = false;
+  const mouseButtons = new Set<number>();
   return {
     playerState,
     vehicleId,
@@ -125,6 +130,11 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'fw_1'): 
       setFlightVehicleMode: vi.fn(),
       setInputContext: vi.fn(),
       isKeyPressed: vi.fn(() => false),
+      isMouseButtonPressed: vi.fn((button: number) => mouseButtons.has(button)),
+      setMouseButton: (button: number, down: boolean) => {
+        if (down) mouseButtons.add(button);
+        else mouseButtons.delete(button);
+      },
       getMouseMovement: vi.fn(() => ({ x: 0, y: 0 })),
       clearMouseMovement: vi.fn(),
       getIsPointerLocked: vi.fn(() => false),
@@ -142,6 +152,10 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'fw_1'): 
       }),
       getFlightMouseControlEnabled: vi.fn(() => flightMouseControlEnabled),
       getHelicopterMouseControlEnabled: vi.fn(() => flightMouseControlEnabled),
+      setFixedWingBroadsideView: vi.fn((enabled: boolean) => {
+        broadsideView = enabled;
+      }),
+      isFixedWingBroadsideView: vi.fn(() => broadsideView),
     } as any,
     hudSystem: createMockHudSystem() as any,
     gameRenderer: { setCrosshairMode: vi.fn() } as any,
@@ -422,6 +436,71 @@ describe('FixedWingPlayerAdapter', () => {
       adapter.update(updateCtx);
       intent = fwModel.setFixedWingPilotIntent.mock.calls.at(-1)?.[0];
       expect(intent.orbitHoldEnabled).toBe(false);
+    });
+  });
+
+  describe('AC-47 broadside gunner view (RMB toggle)', () => {
+    function ac47Context() {
+      fwModel = createMockFixedWingModel({ configKey: 'AC47_SPOOKY', displayName: 'AC-47 Spooky' });
+      adapter = new FixedWingPlayerAdapter(fwModel as any);
+      const ctx = createTransitionContext(createPlayerState(), 'ac47_1');
+      adapter.onEnter(ctx);
+      const updateCtx: VehicleUpdateContext = {
+        deltaTime: 0.016,
+        input: ctx.input,
+        cameraController: ctx.cameraController,
+        hudSystem: ctx.hudSystem,
+      };
+      return { ctx, updateCtx };
+    }
+
+    // Press + release RMB once (a rising edge the adapter consumes as a toggle).
+    function tapRmb(ctx: VehicleTransitionContext, updateCtx: VehicleUpdateContext) {
+      (ctx.input as any).setMouseButton(RMB_BUTTON, true);
+      adapter.update(updateCtx);
+      (ctx.input as any).setMouseButton(RMB_BUTTON, false);
+      adapter.update(updateCtx);
+    }
+
+    it('starts on the chase cam and toggles the broadside view on an RMB press', () => {
+      const { ctx, updateCtx } = ac47Context();
+      // Entry seeds the chase cam (broadside off).
+      expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(false);
+
+      tapRmb(ctx, updateCtx);
+      expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(true);
+      expect(adapter.isBroadsideViewActive()).toBe(true);
+
+      tapRmb(ctx, updateCtx);
+      expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(false);
+      expect(adapter.isBroadsideViewActive()).toBe(false);
+    });
+
+    it('clears the broadside view on exit so it cannot leak to infantry', () => {
+      const { ctx, updateCtx } = ac47Context();
+      tapRmb(ctx, updateCtx);
+      expect(adapter.isBroadsideViewActive()).toBe(true);
+
+      adapter.onExit(ctx);
+      expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(false);
+      expect(adapter.isBroadsideViewActive()).toBe(false);
+    });
+
+    it('ignores the broadside toggle on a forward-gun airframe (A-1)', () => {
+      // Default mock is the A-1 (forward guns, no broadside battery).
+      const ctx = createTransitionContext(createPlayerState(), 'fw_a1');
+      adapter.onEnter(ctx);
+      const updateCtx: VehicleUpdateContext = {
+        deltaTime: 0.016,
+        input: ctx.input,
+        cameraController: ctx.cameraController,
+        hudSystem: ctx.hudSystem,
+      };
+
+      tapRmb(ctx, updateCtx);
+      // The A-1 has no broadside view; RMB never engages it.
+      expect(adapter.isBroadsideViewActive()).toBe(false);
+      expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(false);
     });
   });
 });
