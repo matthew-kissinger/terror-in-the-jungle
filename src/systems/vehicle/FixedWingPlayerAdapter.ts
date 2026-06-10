@@ -33,10 +33,11 @@ import {
 /**
  * Optional ammo-readout sink on the concrete HUD. `updateFixedWingAmmo` is not
  * on the fenced `IHUDSystem` (it is HUD-internal), so the adapter widens the
- * structural type here to push the nose-gun count without a fence change.
+ * structural type here to push the per-airframe gun count + weapon name without
+ * a fence change.
  */
 type FixedWingAmmoHud = {
-  updateFixedWingAmmo?(rounds: number, capacity: number): void;
+  updateFixedWingAmmo?(rounds: number, capacity: number, weaponName?: string): void;
 };
 
 // ── Fixed-wing control tuning ──
@@ -416,8 +417,9 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
   }
 
   /**
-   * Push the live nose-gun ammo count to the HUD. Reads the real fire-path
-   * count and capacity from the model so the readout decrements with each shot.
+   * Push the live gun count + per-airframe weapon name to the HUD. Reads the
+   * real fire-path count, capacity, and weapon name from the model so the
+   * readout decrements with each shot and the label matches the airframe.
    */
   private pushAmmo(hudSystem: IHUDSystem | undefined, aircraftId: string): void {
     const sink = hudSystem as (IHUDSystem & FixedWingAmmoHud) | undefined;
@@ -425,6 +427,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     sink.updateFixedWingAmmo(
       this.fixedWingModel.getWeaponAmmo(aircraftId),
       this.fixedWingModel.getWeaponAmmoCapacity(aircraftId),
+      this.fixedWingModel.getWeaponName(aircraftId),
     );
   }
 

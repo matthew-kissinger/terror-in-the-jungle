@@ -52,36 +52,19 @@ import { Faction } from '../combat/types';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import { TracerPool } from '../effects/TracerPool';
 import { Logger } from '../../utils/Logger';
-
-/**
- * Per-airframe nose-cannon magazine size. Named field replacing the former
- * inline `600` magic number; identical across A-1 / F-4 / AC-47 for now (the
- * sibling per-aircraft-ordnance task differentiates them).
- */
-const NOSE_CANNON_AMMO_CAPACITY = 600;
-
-/**
- * Forward fixed-wing armament. A single nose-mounted hitscan cannon firing
- * straight ahead along the airframe forward axis. Reuses the same combatant
- * fire path (handlePlayerShot) as the helicopter weapons so friend-or-foe
- * filtering and damage resolution are shared — no bespoke targeting.
- */
-const FIXED_WING_FORWARD_GUN = {
-  name: 'Nose Cannon',
-  ammoCapacity: NOSE_CANNON_AMMO_CAPACITY,
-  fireRate: 18,        // rounds per second
-  damage: 22,          // per hit
-  spreadDeg: 0.8,
-  tracerInterval: 2,
-  muzzleForward: 4.0,  // forward offset so the ray clears the nose
-} as const;
+import { computeFixedWingShot, getFixedWingWeaponConfig } from './FixedWingArmament';
+import type { FixedWingWeaponConfig } from './FixedWingArmament';
 
 const FIXED_WING_GUN_TRACER_RANGE = 500;
 
 interface FixedWingWeaponState {
+  /** Per-airframe armament config (geometry, spread, cadence, magazine). */
+  config: FixedWingWeaponConfig;
   ammo: number;
   cooldownRemaining: number;
   roundsSinceTracer: number;
+  /** Round-robin barrel cursor (paired wing cannons / broadside battery). */
+  barrelIndex: number;
   isFiring: boolean;
   faction: Faction;
 }
@@ -184,7 +167,9 @@ function sanitizeCommand(command: Partial<FixedWingCommand>, base: FixedWingComm
 
 /**
  * Orchestrates all fixed-wing aircraft instances.
- * Parallel to HelicopterModel; carries a forward nose cannon (no door gunners).
+ * Parallel to HelicopterModel; each airframe carries its own gun from the
+ * armament table (A-1 wing cannons, F-4 nose rotary, AC-47 broadside; no door
+ * gunners).
  */
 export class FixedWingModel implements GameSystem {
   private static readonly IDLE_SIMULATION_SPEED = 0.5;
@@ -567,12 +552,17 @@ export class FixedWingModel implements GameSystem {
         worldHalfExtent,
       });
 
-      // Forward armament: every fixed-wing carries the nose cannon, US-owned
-      // (matching the adapter faction) so friend-or-foe filtering spares allies.
+      // Forward armament: each airframe pulls its own weapon config from the
+      // armament table (A-1 wing cannons, F-4 nose rotary, AC-47 broadside).
+      // US-owned (matching the adapter faction) so friend-or-foe filtering
+      // spares allies.
+      const weaponConfig = getFixedWingWeaponConfig(configKey);
       this.weapons.set(id, {
-        ammo: FIXED_WING_FORWARD_GUN.ammoCapacity,
+        config: weaponConfig,
+        ammo: weaponConfig.ammoCapacity,
         cooldownRemaining: 0,
         roundsSinceTracer: 0,
+        barrelIndex: 0,
         isFiring: false,
         faction: Faction.US,
       });
@@ -800,8 +790,8 @@ export class FixedWingModel implements GameSystem {
   // -- Forward armament --
 
   /**
-   * Begin firing the nose cannon for the given aircraft. Held trigger: the
-   * cannon keeps firing each update while `isFiring` is set and ammo remains.
+   * Begin firing the airframe's gun for the given aircraft. Held trigger: the
+   * gun keeps firing each update while `isFiring` is set and ammo remains.
    */
   startFiring(aircraftId: string): void {
     const weapon = this.weapons.get(aircraftId);
@@ -813,27 +803,39 @@ export class FixedWingModel implements GameSystem {
     if (weapon) weapon.isFiring = false;
   }
 
-  /** Number of forward weapons mounted on this aircraft (currently the nose cannon). */
+  /**
+   * Number of armament installations the player fires as a unit. The fleet
+   * fires its barrels as one trigger group (round-robin), so this is 1 when an
+   * aircraft is armed — the multi-barrel detail is the table's, not the count's.
+   */
   getWeaponCount(aircraftId: string): number {
     return this.weapons.has(aircraftId) ? 1 : 0;
   }
 
-  /** Forward cannon ammo remaining. */
+  /** Forward / broadside gun ammo remaining for this airframe. */
   getWeaponAmmo(aircraftId: string): number {
     return this.weapons.get(aircraftId)?.ammo ?? 0;
   }
 
-  /** Forward cannon magazine capacity (full load) for this airframe. */
-  getWeaponAmmoCapacity(_aircraftId: string): number {
-    return NOSE_CANNON_AMMO_CAPACITY;
+  /** Gun magazine capacity (full load) for this airframe's armament. */
+  getWeaponAmmoCapacity(aircraftId: string): number {
+    return this.weapons.get(aircraftId)?.config.ammoCapacity ?? 0;
+  }
+
+  /** HUD-facing weapon name for this airframe's armament. */
+  getWeaponName(aircraftId: string): string {
+    return this.weapons.get(aircraftId)?.config.name ?? '';
   }
 
   /**
-   * Advance the forward cannon for one frame. Fires as many rounds as the
+   * Advance the airframe's gun for one frame. Fires as many rounds as the
    * fire-rate budget allows while the trigger is held, routing each shot
    * through the shared combatant fire path so friend-or-foe filtering and
-   * damage resolution match the helicopter and player weapons. Only fires
-   * for airborne / moving aircraft (no ground strafing of the parking apron).
+   * damage resolution match the helicopter and player weapons. Fire geometry
+   * (origin / direction / spread / cadence / magazine) comes from the airframe
+   * armament table: A-1 and F-4 fire forward; the AC-47 fires its broadside
+   * battery 90° to the left of the nose. Only fires for airborne / moving
+   * aircraft (no ground strafing of the parking apron).
    */
   private updateForwardGun(
     aircraftId: string,
@@ -855,7 +857,8 @@ export class FixedWingModel implements GameSystem {
       return;
     }
 
-    const interval = 1 / FIXED_WING_FORWARD_GUN.fireRate;
+    const gun = weapon.config;
+    const interval = 1 / gun.fireRate;
     let rounds = 0;
     // Fire as many rounds as the dt budget allows, capped against a runaway loop.
     while (weapon.cooldownRemaining <= 0 && weapon.ammo > 0 && rounds < 32) {
@@ -864,19 +867,24 @@ export class FixedWingModel implements GameSystem {
       weapon.roundsSinceTracer++;
       rounds++;
 
-      // Physics forward is -Z; muzzle sits ahead of the nose to clear geometry.
-      _gunForward.set(0, 0, -1).applyQuaternion(group.quaternion).normalize();
-      _gunMuzzle
-        .copy(_gunForward)
-        .multiplyScalar(FIXED_WING_FORWARD_GUN.muzzleForward)
-        .add(group.position);
+      // Resolve muzzle origin + fire direction from the airframe armament table.
+      // Round-robins across the barrels (paired wing cannons / broadside trio).
+      computeFixedWingShot(
+        gun,
+        group.position,
+        group.quaternion,
+        weapon.barrelIndex,
+        _gunMuzzle,
+        _gunForward,
+      );
+      weapon.barrelIndex++;
 
-      this.applyGunSpread(_gunForward, FIXED_WING_FORWARD_GUN.spreadDeg);
+      this.applyGunSpread(_gunForward, gun.spreadDeg);
 
       const ray = new THREE.Ray(_gunMuzzle.clone(), _gunForward.clone());
       const result = this.combatantSystem.handlePlayerShot(
         ray,
-        () => FIXED_WING_FORWARD_GUN.damage,
+        () => gun.damage,
         'fixedwing_gun',
         weapon.faction,
       );
@@ -885,7 +893,7 @@ export class FixedWingModel implements GameSystem {
         this.combatantSystem.impactEffectsPool?.spawn(result.point, _gunForward);
       }
 
-      if (weapon.roundsSinceTracer >= FIXED_WING_FORWARD_GUN.tracerInterval) {
+      if (weapon.roundsSinceTracer >= gun.tracerInterval) {
         weapon.roundsSinceTracer = 0;
         _gunTracerEnd.copy(
           result.hit

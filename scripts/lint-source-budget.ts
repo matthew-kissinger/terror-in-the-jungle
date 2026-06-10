@@ -69,7 +69,14 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/combat/CombatantMovement.ts': { round: 'P3R2', reason: 'split into 4 files', loc: 1701, methods: 63 },
   'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1217, methods: 111 },
   'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: 'split into 4 files', loc: 995, methods: 41 },
-  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files', loc: 1155, methods: 48 },
+  // Snapshot raised 1155→1163 LOC / 48→51 methods (per-aircraft-ordnance,
+  // cycle-2026-06-09-fixed-wing-craft): per-airframe armament wiring + the new
+  // getWeaponName getter. The bulk weapon table was EXTRACTED to the sibling
+  // FixedWingArmament.ts (net new-module, not in-file growth); the +8 LOC here
+  // is the per-airframe config plumbing and the +3 method-regex matches are the
+  // getWeaponName getter plus two multi-line call-expression false positives.
+  // Within-cycle ratchet re-base; R4 split target unchanged. See docs/CARRY_OVERS.md.
+  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files', loc: 1163, methods: 51 },
   'src/systems/vehicle/airframe/Airframe.ts': { round: 'P3R4', reason: '0 tests → add tests + slim split', loc: 985, methods: 22 },
   'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: 'ai-timing-gate; +5 LOC: sole body-despawn owner now reaps terminal DEAD stragglers (combat-death-body-persistence)', loc: 933, methods: 32 },
   'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: 'split into 3 files', loc: 860, methods: 34 },

@@ -68,6 +68,7 @@ function createMockFixedWingModel(options?: {
     stopFiring: vi.fn(),
     getWeaponAmmo: vi.fn(() => gun.ammo),
     getWeaponAmmoCapacity: vi.fn(() => capacity),
+    getWeaponName: vi.fn(() => 'Nose Cannon'),
   };
 }
 
@@ -275,7 +276,9 @@ describe('FixedWingPlayerAdapter', () => {
       const ctx = createTransitionContext(ps, 'fw_abc');
 
       adapter.onEnter(ctx);
-      expect(ctx.hudSystem!.updateFixedWingAmmo).toHaveBeenCalledWith(600, 600);
+      // Rounds + capacity seed the readout; the per-airframe weapon name rides
+      // along as the third arg.
+      expect(ctx.hudSystem!.updateFixedWingAmmo).toHaveBeenCalledWith(600, 600, expect.any(String));
     });
 
     it('decrements the ammo readout as the trigger burns rounds (real fire path)', () => {
