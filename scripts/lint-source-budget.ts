@@ -84,7 +84,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // docs/CARRY_OVERS.md (Parked). Factor into a composition split when it
   // next grows.
   'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; +9 LOC: tank gunner-panel host (tank-sight-prod-wiring, same cycle window); split queued when it next grows', loc: 748, methods: 50 },
-  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files', loc: 757, methods: 83 },
+  // Snapshot raised 757 → 761 / 83 → 84 (fixedwing-gunsight, 2026-06-10): the
+  // fixed-wing reflector-gunsight task adds one HUD delegation method
+  // (`updateFixedWingAmmo`) so the nose-gun ammo count reaches FixedWingHUD —
+  // the mirror of the existing `setHelicopterWeaponStatus` delegation. Growth
+  // is intentional and minimal; the R3 split target is unchanged. In-cycle
+  // ratchet re-base, not a new carry-over (see docs/CARRY_OVERS.md).
+  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files', loc: 761, methods: 84 },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence)', loc: 762, methods: 43 },
   // ZoneManager removed from grandfather list 2026-05-09 (Phase 2): fan-in
   // dropped from 52 → ≤20 via IZoneQuery seam (Batches A+B+C of

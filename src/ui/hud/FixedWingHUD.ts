@@ -12,6 +12,7 @@
  * 5. Stall warning (flashing red)
  * 6. Mouse mode indicator (CONTROL / FREE LOOK)
  * 7. Damage bar (health percentage)
+ * 8. Nose-gun ammo counter (rounds remaining; LOW state under 20%)
  */
 
 import { UIComponent } from '../engine/UIComponent';
@@ -100,6 +101,10 @@ export class FixedWingHUD extends UIComponent {
   // Damage
   private healthPercent = this.signal(100);
 
+  // Nose-gun ammo
+  private ammo = this.signal(0);
+  private ammoCapacity = this.signal(0);
+
   private readonly isTouch = isTouchDevice();
 
   protected build(): void {
@@ -148,6 +153,10 @@ export class FixedWingHUD extends UIComponent {
           <div data-ref="damageFill" class="${styles.damageFill}"></div>
         </div>
         <div data-ref="damageValue" class="${styles.damageValue}">100%</div>
+      </div>
+      <div data-ref="ammoPanel" class="${styles.panel} ${styles.ammoSection}">
+        <div data-ref="ammoValue" class="${styles.ammoValue}">0</div>
+        <div class="${styles.dataLabel}">GUN</div>
       </div>
     `;
   }
@@ -302,6 +311,18 @@ export class FixedWingHUD extends UIComponent {
       }
       this.text('[data-ref="damageValue"]', `${Math.round(hp)}%`);
     });
+
+    // Effect: nose-gun ammo counter. LOW state lights when remaining rounds
+    // drop under 20% of the magazine (empty also reads LOW).
+    this.effect(() => {
+      const rounds = this.ammo.value;
+      const capacity = this.ammoCapacity.value;
+      const el = this.$('[data-ref="ammoValue"]');
+      if (!el) return;
+      el.textContent = String(Math.max(0, Math.round(rounds)));
+      const low = capacity > 0 && rounds <= capacity * 0.2;
+      el.classList.toggle(styles.ammoLow, low);
+    });
   }
 
   // --- Public API ---
@@ -331,4 +352,10 @@ export class FixedWingHUD extends UIComponent {
   setMouseMode(controlMode: boolean): void { this.controlMode.value = controlMode; }
 
   setDamage(healthPercent: number): void { this.healthPercent.value = healthPercent; }
+
+  /** Update the nose-gun ammo readout (rounds remaining + magazine capacity). */
+  setAmmo(rounds: number, capacity: number): void {
+    this.ammo.value = rounds;
+    this.ammoCapacity.value = capacity;
+  }
 }

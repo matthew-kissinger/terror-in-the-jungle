@@ -11,6 +11,11 @@
  *   helicopter_attack    - forward pipper reticle (circle + center dot)
  *   tank_gunner          - gunner sight: aim cross + horizontal stadia rangefinder + mil drop ticks
  *   emplacement_mg       - open MG cross (M2HB tripod / vehicle mount)
+ *   fixed_wing           - reflector gunsight: outer ring + center pipper + short cross ticks
+ *
+ * The fixed_wing reticle is a static reflector (gyro-less) sight boresighted to
+ * the nose-cannon convergence direction — outer ring, a bright center pipper,
+ * and four short cross ticks. No lead computation is drawn (R2 fixedwing-gunsight).
  *
  * The tank_gunner reticle is a real stadia sight (R2 tank-gunner-sight); the
  * emplacement_mg reticle is a real heavy-MG sight (R2 m2hb-gun-experience):
@@ -30,7 +35,8 @@ export type CrosshairMode =
   | 'helicopter_gunship'
   | 'helicopter_attack'
   | 'tank_gunner'
-  | 'emplacement_mg';
+  | 'emplacement_mg'
+  | 'fixed_wing';
 
 /**
  * Which mechanical traverse stop the emplacement barrel is pinned against, or
@@ -102,6 +108,17 @@ export class CrosshairSystem extends UIComponent {
         <div data-ref="mgStopLeft" class="${styles.mgStop} ${styles.mgStopLeft}"></div>
         <div data-ref="mgStopRight" class="${styles.mgStop} ${styles.mgStopRight}"></div>
       </div>
+      <div data-ref="fixedWing" class="${styles.fixedWingReticle}" style="display:none">
+        <!-- Reflector ring boresighted to the nose-cannon convergence. -->
+        <div class="${styles.fwRing}"></div>
+        <!-- Four short cross ticks just outside the ring (gap at the bore). -->
+        <div class="${styles.fwTick} ${styles.fwTickTop}"></div>
+        <div class="${styles.fwTick} ${styles.fwTickBottom}"></div>
+        <div class="${styles.fwTick} ${styles.fwTickLeft}"></div>
+        <div class="${styles.fwTick} ${styles.fwTickRight}"></div>
+        <!-- Bright center pipper. -->
+        <div class="${styles.fwPipper}"></div>
+      </div>
     `;
   }
 
@@ -115,7 +132,8 @@ export class CrosshairSystem extends UIComponent {
       const pipper = this.$('[data-ref="pipper"]');
       const tankGunner = this.$('[data-ref="tankGunner"]');
       const emplacementMg = this.$('[data-ref="emplacementMg"]');
-      if (!infantry || !pipper || !tankGunner || !emplacementMg) return;
+      const fixedWing = this.$('[data-ref="fixedWing"]');
+      if (!infantry || !pipper || !tankGunner || !emplacementMg || !fixedWing) return;
 
       if (!visible) {
         this.root.classList.add(styles.hidden);
@@ -130,6 +148,7 @@ export class CrosshairSystem extends UIComponent {
       pipper.style.display = 'none';
       tankGunner.style.display = 'none';
       emplacementMg.style.display = 'none';
+      fixedWing.style.display = 'none';
 
       switch (currentMode) {
         case 'infantry':
@@ -144,6 +163,9 @@ export class CrosshairSystem extends UIComponent {
           break;
         case 'emplacement_mg':
           emplacementMg.style.display = '';
+          break;
+        case 'fixed_wing':
+          fixedWing.style.display = '';
           break;
         case 'helicopter_transport':
         case 'helicopter_gunship':

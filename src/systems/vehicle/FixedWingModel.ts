@@ -54,6 +54,13 @@ import { TracerPool } from '../effects/TracerPool';
 import { Logger } from '../../utils/Logger';
 
 /**
+ * Per-airframe nose-cannon magazine size. Named field replacing the former
+ * inline `600` magic number; identical across A-1 / F-4 / AC-47 for now (the
+ * sibling per-aircraft-ordnance task differentiates them).
+ */
+const NOSE_CANNON_AMMO_CAPACITY = 600;
+
+/**
  * Forward fixed-wing armament. A single nose-mounted hitscan cannon firing
  * straight ahead along the airframe forward axis. Reuses the same combatant
  * fire path (handlePlayerShot) as the helicopter weapons so friend-or-foe
@@ -61,13 +68,12 @@ import { Logger } from '../../utils/Logger';
  */
 const FIXED_WING_FORWARD_GUN = {
   name: 'Nose Cannon',
-  ammoCapacity: 600,
+  ammoCapacity: NOSE_CANNON_AMMO_CAPACITY,
   fireRate: 18,        // rounds per second
   damage: 22,          // per hit
   spreadDeg: 0.8,
   tracerInterval: 2,
-  // Muzzle offset forward of the airframe origin so the ray clears the nose.
-  muzzleForward: 4.0,
+  muzzleForward: 4.0,  // forward offset so the ray clears the nose
 } as const;
 
 const FIXED_WING_GUN_TRACER_RANGE = 500;
@@ -134,15 +140,10 @@ function createIdleCommand(): FixedWingCommand {
 }
 
 /**
- * Translate a gameplay-side `FixedWingCommand` into an `AirframeIntent`. The
- * legacy shim used to do this internally. Two things to preserve:
- *
- * 1. `stabilityAssist` maps directly to `tier: 'assist' | 'raw'`. The Airframe
- *    command builder branches on tier, and the scales in the `feel` config
- *    are deliberately neutralized (see `airframeConfigFromLegacy`) so the
- *    legacy command values flow through unchanged.
- * 2. `brake` is only meaningful while weight-on-wheels; the Airframe command
- *    builder clamps it at ground-tier, so no extra gating is needed here.
+ * Translate a gameplay-side `FixedWingCommand` into an `AirframeIntent`.
+ * `stabilityAssist` maps to `tier: 'assist' | 'raw'` (the `feel` config scales
+ * are neutralized in `airframeConfigFromLegacy` so command values flow through
+ * unchanged); `brake` is clamped at ground-tier by the Airframe command builder.
  */
 function commandToAirframeIntent(cmd: FixedWingCommand): AirframeIntent {
   return {
@@ -425,12 +426,9 @@ export class FixedWingModel implements GameSystem {
       }
 
       if (isPiloted && this.playerController) {
-        // Feed the interpolated visual pose, not raw physics. The camera lerps
-        // from `group.position` (set to the interpolated state above when we
-        // simulated), so the PlayerController, HUD readouts (elevation), and
-        // any downstream consumer must share the same time base. Reading raw
-        // physics here aliased the fixed-step sawtooth against the render
-        // cadence and produced visible tick-back-and-forth at high refresh.
+        // Feed the interpolated visual pose (`group.position`), not raw physics,
+        // so the camera, HUD readouts, and downstream consumers share one time
+        // base — raw physics aliased the fixed-step sawtooth at high refresh.
         this.playerController.updatePlayerPosition(group.position);
       }
     }
@@ -569,9 +567,8 @@ export class FixedWingModel implements GameSystem {
         worldHalfExtent,
       });
 
-      // Forward armament: every fixed-wing carries the nose cannon. US-owned
-      // (matches the VehicleManager adapter faction below) so friend-or-foe
-      // filtering only damages enemies.
+      // Forward armament: every fixed-wing carries the nose cannon, US-owned
+      // (matching the adapter faction) so friend-or-foe filtering spares allies.
       this.weapons.set(id, {
         ammo: FIXED_WING_FORWARD_GUN.ammoCapacity,
         cooldownRemaining: 0,
@@ -826,6 +823,11 @@ export class FixedWingModel implements GameSystem {
     return this.weapons.get(aircraftId)?.ammo ?? 0;
   }
 
+  /** Forward cannon magazine capacity (full load) for this airframe. */
+  getWeaponAmmoCapacity(_aircraftId: string): number {
+    return NOSE_CANNON_AMMO_CAPACITY;
+  }
+
   /**
    * Advance the forward cannon for one frame. Fires as many rounds as the
    * fire-rate budget allows while the trigger is held, routing each shot
@@ -855,16 +857,14 @@ export class FixedWingModel implements GameSystem {
 
     const interval = 1 / FIXED_WING_FORWARD_GUN.fireRate;
     let rounds = 0;
-    // Fire as many rounds as the dt budget allows, capped to avoid a runaway
-    // loop on a very large frame delta.
+    // Fire as many rounds as the dt budget allows, capped against a runaway loop.
     while (weapon.cooldownRemaining <= 0 && weapon.ammo > 0 && rounds < 32) {
       weapon.cooldownRemaining += interval;
       weapon.ammo--;
       weapon.roundsSinceTracer++;
       rounds++;
 
-      // Physics forward is -Z; muzzle sits ahead of the nose so the ray clears
-      // the airframe geometry.
+      // Physics forward is -Z; muzzle sits ahead of the nose to clear geometry.
       _gunForward.set(0, 0, -1).applyQuaternion(group.quaternion).normalize();
       _gunMuzzle
         .copy(_gunForward)

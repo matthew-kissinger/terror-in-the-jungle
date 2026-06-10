@@ -17,6 +17,10 @@ function createMockFixedWingModel(options?: {
   flightData?: Record<string, unknown>;
 }) {
   const configKey = options?.configKey ?? 'A1_SKYRAIDER';
+  // Real magazine state so ammo behavior (decrement, capacity) is exercised
+  // end-to-end rather than asserted against a frozen literal.
+  const capacity = 600;
+  const gun = { ammo: capacity };
   return {
     getDisplayInfo: vi.fn(() => ({ autoLevelDefault: true, displayName: options?.displayName ?? 'A-1 Skyraider' })),
     getConfigKey: vi.fn(() => configKey),
@@ -58,8 +62,12 @@ function createMockFixedWingModel(options?: {
     exitAircraft: vi.fn(),
     tryEnterAircraft: vi.fn(),
     getWeaponCount: vi.fn(() => 1),
-    startFiring: vi.fn(),
+    // Firing burns a round each pull — stands in for the model's real fire path
+    // so the HUD readout decrements with the trigger.
+    startFiring: vi.fn(() => { gun.ammo = Math.max(0, gun.ammo - 60); }),
     stopFiring: vi.fn(),
+    getWeaponAmmo: vi.fn(() => gun.ammo),
+    getWeaponAmmoCapacity: vi.fn(() => capacity),
   };
 }
 
@@ -98,6 +106,7 @@ function createMockHudSystem() {
     setFixedWingOperationState: vi.fn(),
     setFixedWingFlightAssist: vi.fn(),
     setFixedWingAutoLevel: vi.fn(),
+    updateFixedWingAmmo: vi.fn(),
     updateElevation: vi.fn(),
     showMessage: vi.fn(),
   };
@@ -134,6 +143,7 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'fw_1'): 
       getHelicopterMouseControlEnabled: vi.fn(() => flightMouseControlEnabled),
     } as any,
     hudSystem: createMockHudSystem() as any,
+    gameRenderer: { setCrosshairMode: vi.fn() } as any,
   };
 }
 
@@ -245,6 +255,52 @@ describe('FixedWingPlayerAdapter', () => {
 
       adapter.onExit(ctx);
       expect(fwModel.stopFiring).toHaveBeenCalledWith('fw_abc');
+    });
+  });
+
+  describe('gunsight + ammo HUD', () => {
+    it('shows the reflector gunsight on entry and restores the infantry crosshair on exit', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'fw_abc');
+
+      adapter.onEnter(ctx);
+      expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenCalledWith('fixed_wing');
+
+      adapter.onExit(ctx);
+      expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenLastCalledWith('infantry');
+    });
+
+    it('seeds the ammo readout from the aircraft magazine on entry', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'fw_abc');
+
+      adapter.onEnter(ctx);
+      expect(ctx.hudSystem!.updateFixedWingAmmo).toHaveBeenCalledWith(600, 600);
+    });
+
+    it('decrements the ammo readout as the trigger burns rounds (real fire path)', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'fw_1');
+      adapter.onEnter(ctx);
+
+      const updateCtx: VehicleUpdateContext = {
+        deltaTime: 0.016,
+        input: ctx.input,
+        cameraController: ctx.cameraController,
+        hudSystem: ctx.hudSystem,
+      };
+
+      // Pull the trigger (burns rounds in the model), then tick the HUD.
+      adapter.startFiring();
+      adapter.update(updateCtx);
+      let lastAmmo = (ctx.hudSystem!.updateFixedWingAmmo as any).mock.calls.at(-1)?.[0];
+      expect(lastAmmo).toBeLessThan(600);
+
+      const afterFirst = lastAmmo;
+      adapter.startFiring();
+      adapter.update(updateCtx);
+      lastAmmo = (ctx.hudSystem!.updateFixedWingAmmo as any).mock.calls.at(-1)?.[0];
+      expect(lastAmmo).toBeLessThan(afterFirst);
     });
   });
 
