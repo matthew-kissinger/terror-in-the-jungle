@@ -130,6 +130,30 @@ describe('CrosshairSystem', () => {
       expect(fixedWing.style.display).toBe('none');
     });
 
+    it('should switch to door_gun and show only the door-gun open cross', () => {
+      crosshair.setMode('door_gun');
+      expect(crosshair.getMode()).toBe('door_gun');
+
+      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+      const emplacementMg = crosshair.element.querySelector('[data-ref="emplacementMg"]') as HTMLElement;
+      const doorGun = crosshair.element.querySelector('[data-ref="doorGun"]') as HTMLElement;
+      const fixedWing = crosshair.element.querySelector('[data-ref="fixedWing"]') as HTMLElement;
+      expect(doorGun.style.display).toBe('');
+      expect(infantry.style.display).toBe('none');
+      expect(emplacementMg.style.display).toBe('none');
+      expect(fixedWing.style.display).toBe('none');
+    });
+
+    it('should restore the infantry crosshair when leaving the door gun', () => {
+      crosshair.setMode('door_gun');
+      crosshair.setMode('infantry');
+
+      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+      const doorGun = crosshair.element.querySelector('[data-ref="doorGun"]') as HTMLElement;
+      expect(infantry.style.display).toBe('');
+      expect(doorGun.style.display).toBe('none');
+    });
+
     it('should swap cleanly between ground-gunnery modes and back to infantry', () => {
       const tankGunner = crosshair.element.querySelector('[data-ref="tankGunner"]') as HTMLElement;
       const emplacementMg = crosshair.element.querySelector('[data-ref="emplacementMg"]') as HTMLElement;
@@ -191,6 +215,31 @@ describe('CrosshairSystem', () => {
       crosshair.setTraverseStop(null);
       expect(litEdges()).toEqual([]);
       expect(crosshair.getTraverseStop()).toBeNull();
+    });
+  });
+
+  describe('door-gun arc-stop cue', () => {
+    // The door-gun reticle reuses the same traverse-stop signal as the
+    // emplacement MG, but with its own edge-tick elements (dgStop*).
+    function litDoorGunEdges(): string[] {
+      const refs = ['dgStopUp', 'dgStopDown', 'dgStopLeft', 'dgStopRight'];
+      return refs.filter((ref) => {
+        const el = crosshair.element.querySelector(`[data-ref="${ref}"]`) as HTMLElement;
+        return el.classList.contains('dgStopActive');
+      });
+    }
+
+    it('lights exactly the door-gun edge the gun is pinned against', () => {
+      crosshair.setMode('door_gun');
+
+      crosshair.setTraverseStop('left');
+      expect(litDoorGunEdges()).toEqual(['dgStopLeft']);
+
+      crosshair.setTraverseStop('down');
+      expect(litDoorGunEdges()).toEqual(['dgStopDown']);
+
+      crosshair.setTraverseStop(null);
+      expect(litDoorGunEdges()).toEqual([]);
     });
   });
 

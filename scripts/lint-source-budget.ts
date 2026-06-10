@@ -67,7 +67,11 @@ export interface GrandfatherEntry {
 const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/combat/CombatantRenderer.ts': { round: 'P3R1', reason: 'split into 5 files', loc: 2191, methods: 78 },
   'src/systems/combat/CombatantMovement.ts': { round: 'P3R2', reason: 'split into 4 files', loc: 1701, methods: 63 },
-  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1217, methods: 111 },
+  // Snapshot raised 1217 → 1222 (door-gun-seat, cycle-2026-06-09-helicopter-craft):
+  // +5 LOC for the `onHelicopterDoorGunToggle` input-callback wiring that routes
+  // the in-flight F key to the door-gun seat swap. Within-cycle ratchet re-base;
+  // R3 split target unchanged. See docs/CARRY_OVERS.md.
+  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1222, methods: 111 },
   'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: 'split into 4 files', loc: 995, methods: 41 },
   // Snapshot raised 1155→1163 LOC / 48→51 methods (per-aircraft-ordnance,
   // cycle-2026-06-09-fixed-wing-craft): per-airframe armament wiring + the new
@@ -105,14 +109,25 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // method limits; no further grandfathering needed.
   // Additional offenders surfaced at Phase 0 install. Not in original god-module top-15
   // but already over the new limit. Each gets a queued split target.
-  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work; +3 LOC for vehicle-seat-lifecycle seat-binder forward (2026-06-09)', loc: 707, methods: 47 },
+  // Snapshot raised 707 → 721 LOC / 47 → 51 methods (door-gun-seat,
+  // cycle-2026-06-09-helicopter-craft): +14 LOC / +4 thin pass-throughs
+  // (hasDoorGun, setPlayerDoorGunCrewing, getPlayerDoorGunStatus,
+  // firePlayerDoorGun) so the player heli adapter can crew the door gun without
+  // depending on HelicopterWeaponSystem directly (it only holds the fenced
+  // IHelicopterModel). Within-cycle ratchet re-base; R4 split target unchanged.
+  // See docs/CARRY_OVERS.md.
+  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work; +14 LOC for player door-gun seat pass-throughs (door-gun-seat, 2026-06-09)', loc: 721, methods: 51 },
   // Snapshot raised 781 → 810 (ci-gate-consolidation, 2026-06-09): the sibling
   // Phase-1 task `real-mouse-input` (040337e7) added 29 LOC of real
   // held-mouse-button state to PlayerInput AFTER the budget-ratchet snapshot
   // (#339) was measured, so the gate was red on master before it could be made
   // blocking. Growth is intentional and already merged; the file's R3 split
   // target is unchanged. Within-cycle ratchet re-base, not a new carry-over.
-  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 810, methods: 44 },
+  // Snapshot raised 810 → 819 (door-gun-seat, cycle-2026-06-09-helicopter-craft):
+  // +9 LOC for the helicopter-mode F-key door-gun seat-swap binding +
+  // `onHelicopterDoorGunToggle` callback decl. Within-cycle ratchet re-base; R3
+  // split target unchanged. See docs/CARRY_OVERS.md.
+  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 819, methods: 44 },
   'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy', loc: 764, methods: 0 },
   'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate)', loc: 1155, methods: 0 },

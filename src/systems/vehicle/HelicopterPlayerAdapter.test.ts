@@ -15,20 +15,27 @@ vi.mock('../../utils/DeviceDetector', () => ({
   shouldUseTouchControls: () => false,
 }));
 
-function createMockHelicopterModel() {
+function createMockHelicopterModel(opts: { hasDoorGun?: boolean; role?: 'transport' | 'gunship' | 'attack' } = {}) {
+  const hasDoorGun = opts.hasDoorGun ?? false;
   return {
     setHelicopterControls: vi.fn(),
     getHelicopterState: vi.fn(() => ({ engineRPM: 0.5 })),
     getFlightData: vi.fn(() => ({ airspeed: 30, heading: 90, verticalSpeed: 2 })),
-    getAircraftRole: vi.fn(() => 'transport' as const),
+    getAircraftRole: vi.fn(() => (opts.role ?? 'transport') as 'transport' | 'gunship' | 'attack'),
     exitHelicopter: vi.fn(),
     tryEnterHelicopter: vi.fn(),
     startFiring: vi.fn(),
     stopFiring: vi.fn(),
     switchHelicopterWeapon: vi.fn(),
     getWeaponStatus: vi.fn(),
-    getHelicopterPositionTo: vi.fn(),
-    getHelicopterQuaternionTo: vi.fn(),
+    // Pose: identity quaternion so the door-gun aim math is easy to reason about.
+    getHelicopterPositionTo: vi.fn((_id: string, out: THREE.Vector3) => { out.set(0, 50, 0); return true; }),
+    getHelicopterQuaternionTo: vi.fn((_id: string, out: THREE.Quaternion) => { out.identity(); return true; }),
+    // Door-gun seat surface (door-gun-seat).
+    hasDoorGun: vi.fn(() => hasDoorGun),
+    setPlayerDoorGunCrewing: vi.fn(),
+    firePlayerDoorGun: vi.fn(),
+    getPlayerDoorGunStatus: vi.fn(() => (hasDoorGun ? { name: 'M60 Door Gun', ammo: 500, maxAmmo: 500 } : null)),
     getPlayerExitPlan: vi.fn((_helicopterId: string) => ({
       canExit: true,
       mode: 'normal' as const,
@@ -110,6 +117,30 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'heli_1')
     } as any,
     hudSystem: createMockHudSystem() as any,
     gameRenderer: { setCrosshairMode: vi.fn() } as any,
+  };
+}
+
+/** Build a VehicleUpdateContext whose input lets a test drive the door gun. */
+function createUpdateContext(opts: {
+  mouse?: { x: number; y: number };
+  fire?: boolean;
+} = {}) {
+  const setCrosshairMode = vi.fn();
+  const setHelicopterWeaponStatus = vi.fn();
+  return {
+    ctx: {
+      deltaTime: 1 / 60,
+      input: {
+        getIsPointerLocked: vi.fn(() => true),
+        getMouseMovement: vi.fn(() => opts.mouse ?? { x: 0, y: 0 }),
+        clearMouseMovement: vi.fn(),
+        isMouseButtonPressed: vi.fn((b: number) => (b === 0 ? (opts.fire ?? false) : false)),
+      } as any,
+      cameraController: {} as any,
+      hudSystem: { setHelicopterWeaponStatus } as any,
+    },
+    setCrosshairMode,
+    setHelicopterWeaponStatus,
   };
 }
 
@@ -221,6 +252,104 @@ describe('HelicopterPlayerAdapter', () => {
       expect(adapter.getHelicopterControls().autoHover).toBe(false);
       adapter.toggleAutoHover();
       expect(adapter.getHelicopterControls().autoHover).toBe(true);
+    });
+  });
+
+  describe('door-gun seat (door-gun-seat)', () => {
+    function boardGunship(): {
+      gunModel: ReturnType<typeof createMockHelicopterModel>;
+      ctx: ReturnType<typeof createTransitionContext>;
+    } {
+      const gunModel = createMockHelicopterModel({ hasDoorGun: true, role: 'gunship' });
+      adapter = new HelicopterPlayerAdapter(gunModel as any);
+      const ctx = createTransitionContext(createPlayerState(), 'heli_gun');
+      adapter.onEnter(ctx);
+      return { gunModel, ctx };
+    }
+
+    it('boards into the pilot seat — the door gun is an explicit swap', () => {
+      boardGunship();
+      expect(adapter.getCrewSeat()).toBe('pilot');
+    });
+
+    it('swaps the player into the door-gun seat and back to the pilot seat', () => {
+      const { gunModel, ctx } = boardGunship();
+      const renderer = ctx.gameRenderer as any;
+
+      expect(adapter.toggleDoorGunSeat()).toBe('door_gun');
+      expect(adapter.getCrewSeat()).toBe('door_gun');
+      // Player is now crewing the door gun, and the reticle is the door-gun cross.
+      expect(gunModel.setPlayerDoorGunCrewing).toHaveBeenLastCalledWith('heli_gun', true);
+      expect(renderer.setCrosshairMode).toHaveBeenLastCalledWith('door_gun');
+
+      expect(adapter.toggleDoorGunSeat()).toBe('pilot');
+      expect(adapter.getCrewSeat()).toBe('pilot');
+      // Gun released back to the AI crew; pilot reticle restored (gunship variant).
+      expect(gunModel.setPlayerDoorGunCrewing).toHaveBeenLastCalledWith('heli_gun', false);
+      expect(renderer.setCrosshairMode).toHaveBeenLastCalledWith('helicopter_gunship');
+    });
+
+    it('is a no-op on an aircraft with no door gun', () => {
+      const noGunModel = createMockHelicopterModel({ hasDoorGun: false, role: 'transport' });
+      adapter = new HelicopterPlayerAdapter(noGunModel as any);
+      adapter.onEnter(createTransitionContext(createPlayerState(), 'heli_unarmed'));
+
+      expect(adapter.toggleDoorGunSeat()).toBe('pilot');
+      expect(adapter.getCrewSeat()).toBe('pilot');
+      expect(noGunModel.setPlayerDoorGunCrewing).not.toHaveBeenCalled();
+    });
+
+    it('clamps the door-gun aim to its mechanical arc stops', () => {
+      const { gunModel } = boardGunship();
+      adapter.toggleDoorGunSeat();
+
+      // A huge sustained right-drag must pin the gun at its yaw limit, not run away.
+      for (let i = 0; i < 50; i++) {
+        adapter.update(createUpdateContext({ mouse: { x: 400, y: -400 } }).ctx);
+      }
+      const aim = adapter.getDoorGunAim();
+      // Pinned against a yaw stop and an elevation stop (a real limit, not NaN/runaway).
+      expect(Math.abs(aim.yaw)).toBeLessThanOrEqual(1.21);
+      expect(Math.abs(aim.pitch)).toBeLessThanOrEqual(0.91);
+      expect(adapter.getDoorGunTraverseStop()).not.toBeNull();
+      expect(gunModel.firePlayerDoorGun).toHaveBeenCalled();
+    });
+
+    it('routes the held trigger to the existing door-gun fire path with the clamped aim', () => {
+      const { gunModel } = boardGunship();
+      adapter.toggleDoorGunSeat();
+
+      adapter.update(createUpdateContext({ fire: true }).ctx);
+
+      expect(gunModel.firePlayerDoorGun).toHaveBeenCalled();
+      const call = gunModel.firePlayerDoorGun.mock.calls.at(-1)!;
+      // (heliId, position, quaternion, aimDir, fire, dt)
+      expect(call[0]).toBe('heli_gun');
+      expect(call[4]).toBe(true); // trigger held
+      const aimDir = call[3] as THREE.Vector3;
+      // Centered aim points straight out the left door (local -X, identity pose).
+      expect(aimDir.x).toBeLessThan(-0.9);
+      expect(aimDir.length()).toBeCloseTo(1, 5);
+    });
+
+    it('surfaces the door-gun belt count to the HUD weapon-status slot while crewing', () => {
+      boardGunship();
+      adapter.toggleDoorGunSeat();
+      const built = createUpdateContext();
+      adapter.update(built.ctx);
+      expect(built.setHelicopterWeaponStatus).toHaveBeenCalledWith('M60 Door Gun', 500);
+    });
+
+    it('releases the door gun when the player dismounts straight from the gun seat', () => {
+      const { gunModel, ctx } = boardGunship();
+      adapter.toggleDoorGunSeat();
+      expect(adapter.getCrewSeat()).toBe('door_gun');
+
+      adapter.onExit(ctx);
+
+      expect(gunModel.setPlayerDoorGunCrewing).toHaveBeenLastCalledWith('heli_gun', false);
+      expect((ctx.gameRenderer as any).setCrosshairMode).toHaveBeenLastCalledWith('infantry');
+      expect(adapter.getCrewSeat()).toBe('pilot');
     });
   });
 });

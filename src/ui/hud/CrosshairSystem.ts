@@ -11,7 +11,14 @@
  *   helicopter_attack    - forward pipper reticle (circle + center dot)
  *   tank_gunner          - gunner sight: aim cross + horizontal stadia rangefinder + mil drop ticks
  *   emplacement_mg       - open MG cross (M2HB tripod / vehicle mount)
+ *   door_gun             - open MG cross for the helicopter door gun (M60); a
+ *                          lighter sibling of emplacement_mg with the same
+ *                          arc-stop edge ticks (the door mount has hard arc stops)
  *   fixed_wing           - reflector gunsight: outer ring + center pipper + short cross ticks
+ *
+ * The door_gun reticle reuses the emplacement_mg arc-stop signal (`setTraverseStop`)
+ * so the player sees the door gun running out of traverse/elevation travel, but
+ * draws a lighter open cross (M60 door gun, not a heavy .50-cal tripod sight).
  *
  * The fixed_wing reticle is a static reflector (gyro-less) sight boresighted to
  * the nose-cannon convergence direction — outer ring, a bright center pipper,
@@ -36,6 +43,7 @@ export type CrosshairMode =
   | 'helicopter_attack'
   | 'tank_gunner'
   | 'emplacement_mg'
+  | 'door_gun'
   | 'fixed_wing';
 
 /**
@@ -108,6 +116,19 @@ export class CrosshairSystem extends UIComponent {
         <div data-ref="mgStopLeft" class="${styles.mgStop} ${styles.mgStopLeft}"></div>
         <div data-ref="mgStopRight" class="${styles.mgStop} ${styles.mgStopRight}"></div>
       </div>
+      <div data-ref="doorGun" class="${styles.doorGunReticle}" style="display:none">
+        <!-- Lighter open cross for the M60 door gun (no heavy wings). -->
+        <div class="${styles.dgArm} ${styles.dgArmTop}"></div>
+        <div class="${styles.dgArm} ${styles.dgArmBottom}"></div>
+        <div class="${styles.dgArm} ${styles.dgArmLeft}"></div>
+        <div class="${styles.dgArm} ${styles.dgArmRight}"></div>
+        <div class="${styles.dgDot}"></div>
+        <!-- Arc-stop edge ticks: light when the door gun pins against a mount stop. -->
+        <div data-ref="dgStopUp" class="${styles.dgStop} ${styles.dgStopUp}"></div>
+        <div data-ref="dgStopDown" class="${styles.dgStop} ${styles.dgStopDown}"></div>
+        <div data-ref="dgStopLeft" class="${styles.dgStop} ${styles.dgStopLeft}"></div>
+        <div data-ref="dgStopRight" class="${styles.dgStop} ${styles.dgStopRight}"></div>
+      </div>
       <div data-ref="fixedWing" class="${styles.fixedWingReticle}" style="display:none">
         <!-- Reflector ring boresighted to the nose-cannon convergence. -->
         <div class="${styles.fwRing}"></div>
@@ -132,8 +153,9 @@ export class CrosshairSystem extends UIComponent {
       const pipper = this.$('[data-ref="pipper"]');
       const tankGunner = this.$('[data-ref="tankGunner"]');
       const emplacementMg = this.$('[data-ref="emplacementMg"]');
+      const doorGun = this.$('[data-ref="doorGun"]');
       const fixedWing = this.$('[data-ref="fixedWing"]');
-      if (!infantry || !pipper || !tankGunner || !emplacementMg || !fixedWing) return;
+      if (!infantry || !pipper || !tankGunner || !emplacementMg || !doorGun || !fixedWing) return;
 
       if (!visible) {
         this.root.classList.add(styles.hidden);
@@ -148,6 +170,7 @@ export class CrosshairSystem extends UIComponent {
       pipper.style.display = 'none';
       tankGunner.style.display = 'none';
       emplacementMg.style.display = 'none';
+      doorGun.style.display = 'none';
       fixedWing.style.display = 'none';
 
       switch (currentMode) {
@@ -163,6 +186,9 @@ export class CrosshairSystem extends UIComponent {
           break;
         case 'emplacement_mg':
           emplacementMg.style.display = '';
+          break;
+        case 'door_gun':
+          doorGun.style.display = '';
           break;
         case 'fixed_wing':
           fixedWing.style.display = '';
@@ -183,9 +209,10 @@ export class CrosshairSystem extends UIComponent {
       ring.style.height = `${diameter}px`;
     });
 
-    // Effect: emplacement traverse-stop edge ticks — exactly one edge lit (or
-    // none). Lighting the matching tick is the visual stop cue; the panel
-    // mirrors it with a label.
+    // Effect: emplacement + door-gun arc-stop edge ticks — exactly one edge lit
+    // (or none). Lighting the matching tick is the visual stop cue. The same
+    // `traverseStop` signal drives both reticles; only the active mode's
+    // element is visible, so a single source feeds both.
     this.effect(() => {
       const stop = this.traverseStop.value;
       const up = this.$('[data-ref="mgStopUp"]');
@@ -196,6 +223,15 @@ export class CrosshairSystem extends UIComponent {
       down?.classList.toggle(styles.mgStopActive, stop === 'down');
       left?.classList.toggle(styles.mgStopActive, stop === 'left');
       right?.classList.toggle(styles.mgStopActive, stop === 'right');
+
+      const dgUp = this.$('[data-ref="dgStopUp"]');
+      const dgDown = this.$('[data-ref="dgStopDown"]');
+      const dgLeft = this.$('[data-ref="dgStopLeft"]');
+      const dgRight = this.$('[data-ref="dgStopRight"]');
+      dgUp?.classList.toggle(styles.dgStopActive, stop === 'up');
+      dgDown?.classList.toggle(styles.dgStopActive, stop === 'down');
+      dgLeft?.classList.toggle(styles.dgStopActive, stop === 'left');
+      dgRight?.classList.toggle(styles.dgStopActive, stop === 'right');
     });
   }
 
@@ -230,10 +266,12 @@ export class CrosshairSystem extends UIComponent {
   }
 
   /**
-   * Light the emplacement_mg reticle's edge tick for the traverse stop the
-   * barrel is pinned against, or clear it with `null`. Only the emplacement_mg
-   * reticle shows these ticks; the call is a harmless no-op in other modes.
-   * Driven each frame by `EmplacementPlayerAdapter`.
+   * Light the active gunsight's edge tick for the arc/traverse stop the barrel
+   * is pinned against, or clear it with `null`. Drives both the emplacement_mg
+   * reticle (M2HB traverse stops, `EmplacementPlayerAdapter`) and the door_gun
+   * reticle (helicopter door-gun arc stops, `HelicopterPlayerAdapter`); only the
+   * visible mode's element shows the tick, so the call is a harmless no-op in
+   * any mode without arc-stop geometry.
    */
   setTraverseStop(stop: TraverseStopDir): void {
     this.traverseStop.value = stop;

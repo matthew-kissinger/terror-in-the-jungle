@@ -32,6 +32,12 @@ interface HelicopterWeaponState {
   isFiring: boolean;
   /** True when a player gunner or AI crew occupies the door-gun seat(s). */
   crewManned: boolean;
+  /**
+   * True while the PLAYER is crewing the door gun. The AI auto-fire path is
+   * suspended in this state — the player drives aim + trigger through
+   * `firePlayerDoorGun` instead — so the two never double-fire the same belt.
+   */
+  playerCrewing: boolean;
   /** Owning faction; aircraft guns only damage enemies of this faction. */
   faction: Faction;
 }
@@ -52,6 +58,7 @@ const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
 const _rocketVel = new THREE.Vector3();
 const _tracerEnd = new THREE.Vector3();
+const _aimDir = new THREE.Vector3();
 
 export class HelicopterWeaponSystem {
   private scene: THREE.Scene;
@@ -105,6 +112,7 @@ export class HelicopterWeaponSystem {
       activeIndex: 0,
       isFiring: false,
       crewManned: false,
+      playerCrewing: false,
       faction,
     });
   }
@@ -117,6 +125,61 @@ export class HelicopterWeaponSystem {
   setCrewManned(heliId: string, manned: boolean): void {
     const state = this.states.get(heliId);
     if (state) state.crewManned = manned;
+  }
+
+  /**
+   * Mark whether the PLAYER is crewing the door gun. While true the AI
+   * auto-fire path is suspended — the player drives aim + trigger through
+   * `firePlayerDoorGun` — so the door gun never double-fires. Setting it also
+   * keeps the seat marked manned so the gun is live.
+   */
+  setPlayerCrewing(heliId: string, crewing: boolean): void {
+    const state = this.states.get(heliId);
+    if (!state) return;
+    state.playerCrewing = crewing;
+    if (crewing) state.crewManned = true;
+  }
+
+  /**
+   * Fire the player-crewed door gun along an explicit world-space aim direction
+   * (the adapter clamps it to the mount arc). Reuses the exact crew-served
+   * hitscan damage/tracer/audio path the AI door gunner fires through — no new
+   * ballistics. The mount world position is derived from the door weapon's
+   * configured offset + the live airframe pose. A no-op when the aircraft has
+   * no door gun, is grounded, or the player is not crewing it.
+   *
+   * `fire` latches the held trigger: cooldown still advances every frame so the
+   * fire rate stays dt-accurate whether or not the trigger is down.
+   */
+  firePlayerDoorGun(
+    heliId: string,
+    position: THREE.Vector3,
+    quaternion: THREE.Quaternion,
+    aimDir: THREE.Vector3,
+    fire: boolean,
+    isGrounded: boolean,
+    dt: number,
+  ): void {
+    const state = this.states.get(heliId);
+    if (!state || !state.playerCrewing || isGrounded) return;
+
+    _aimDir.copy(aimDir).normalize();
+    for (const crew of state.crewWeapons) {
+      this.advanceCooldown(crew, dt);
+      if (fire && crew.ammo > 0 && crew.cooldownRemaining <= 0) {
+        this.fireHitscan(crew, position, quaternion, _aimDir, dt, state.faction);
+      }
+    }
+  }
+
+  /** Aggregate door-gun status for the player gunner HUD (name + ammo). */
+  getPlayerDoorGunStatus(heliId: string): { name: string; ammo: number; maxAmmo: number } | null {
+    const state = this.states.get(heliId);
+    if (!state || state.crewWeapons.length === 0) return null;
+    const first = state.crewWeapons[0];
+    const ammo = state.crewWeapons.reduce((sum, w) => sum + w.ammo, 0);
+    const maxAmmo = state.crewWeapons.reduce((sum, w) => sum + w.config.ammoCapacity, 0);
+    return { name: first.config.name, ammo: Math.floor(ammo), maxAmmo };
   }
 
   startFiring(heliId: string): void {
@@ -164,12 +227,16 @@ export class HelicopterWeaponSystem {
     }
 
     // Crew-served door guns: fire when manned and airborne, independent of the
-    // pilot trigger. They stay inert when unmanned or grounded.
-    if (state.crewManned && !isGrounded) {
+    // pilot trigger. They stay inert when unmanned or grounded. A PLAYER gunner
+    // drives the door gun on its own aim/fire path (`firePlayerDoorGun`), so the
+    // AI auto-fire here is suspended while the player crews it.
+    if (state.crewManned && !state.playerCrewing && !isGrounded) {
+      // AI crew fire along the airframe's forward axis.
+      _aimDir.set(0, 0, 1).applyQuaternion(quaternion).normalize();
       for (const crew of state.crewWeapons) {
         this.advanceCooldown(crew, dt);
         if (crew.ammo > 0 && crew.cooldownRemaining <= 0) {
-          this.fireHitscan(crew, position, quaternion, dt, state.faction);
+          this.fireHitscan(crew, position, quaternion, _aimDir, dt, state.faction);
         }
       }
     }
@@ -186,7 +253,9 @@ export class HelicopterWeaponSystem {
         if (isProjectile) {
           this.fireProjectile(active, position, quaternion);
         } else {
-          this.fireHitscan(active, position, quaternion, dt, state.faction);
+          // Pilot weapons fire along the airframe forward axis.
+          _aimDir.set(0, 0, 1).applyQuaternion(quaternion).normalize();
+          this.fireHitscan(active, position, quaternion, _aimDir, dt, state.faction);
         }
       }
 
@@ -251,6 +320,7 @@ export class HelicopterWeaponSystem {
     weapon: WeaponInstance,
     position: THREE.Vector3,
     quaternion: THREE.Quaternion,
+    aimDir: THREE.Vector3,
     dt: number,
     faction: Faction,
   ): void {
@@ -274,8 +344,9 @@ export class HelicopterWeaponSystem {
         weapon.config.localPosition[2],
       ).applyQuaternion(quaternion).add(position);
 
-      // Forward direction from helicopter quaternion
-      _forward.set(0, 0, 1).applyQuaternion(quaternion).normalize();
+      // Fire along the supplied aim direction (airframe-forward for the pilot /
+      // AI-crew paths; the player gunner's clamped door-gun aim when crewing).
+      _forward.copy(aimDir).normalize();
 
       // Apply random spread
       this.applySpread(_forward, weapon.config.spreadDeg ?? 0);

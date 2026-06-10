@@ -49,6 +49,8 @@ export interface InputCallbacks {
   onSquadCommand?: () => void;
   onSquadQuickCommand?: (slot: number) => void;
   onHelicopterWeaponSwitch?: (index: number) => void;
+  /** Swap the player between the pilot seat and the door gun (door-gun-seat). */
+  onHelicopterDoorGunToggle?: () => void;
   onAirSupportMenu?: () => void;
   onMenuOpen?: () => void;
 }
@@ -548,6 +550,13 @@ export class PlayerInput {
       // Altitude lock with H key
       if (event.code === 'KeyH') {
         this.callbacks.onToggleAltitudeLock?.();
+      }
+
+      // Swap between the pilot seat and the door gun with F (the ground-vehicle
+      // seat-swap key; the in-flight F handler above is gated off, so this is
+      // the heli door-gun route). A no-op on aircraft without a door gun.
+      if (event.code === 'KeyF') {
+        this.callbacks.onHelicopterDoorGunToggle?.();
       }
 
       // Weapon switching with 1/2 keys
