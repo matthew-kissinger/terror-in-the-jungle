@@ -346,9 +346,15 @@ export class HelicopterHUD extends UIComponent {
     this.aircraftRole.value = role;
   }
 
+  /**
+   * Show the selected pilot weapon name + remaining ammo in the attack/gunship
+   * weapon row. Display-only: the ammo is floored to whole rounds so the readout
+   * never shows a fractional count (rocket pods rearm in floating increments;
+   * the minigun belt is whole rounds).
+   */
   setWeaponStatus(name: string, ammo: number): void {
     this.weaponName.value = name;
-    this.weaponAmmo.value = ammo;
+    this.weaponAmmo.value = Math.max(0, Math.floor(ammo));
   }
 
   setDamage(healthPercent: number): void {

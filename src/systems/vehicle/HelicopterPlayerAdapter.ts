@@ -15,7 +15,8 @@ import type {
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 import type { IGameRenderer } from '../../types/SystemInterfaces';
-import type { TraverseStopDir } from '../../ui/hud/CrosshairSystem';
+import type { HeliReticleWeapon, TraverseStopDir } from '../../ui/hud/CrosshairSystem';
+import { computeRocketCueDrop } from '../helicopter/HelicopterWeaponSystem';
 import {
   getFlightMouseControlEnabled,
   getTouchFlightCyclicInput,
@@ -45,11 +46,46 @@ const DOOR_GUN_PITCH_MIN = -0.9; // rad, ~52° depression (firing down at the gr
 const DOOR_GUN_PITCH_MAX = 0.45; // rad, ~26° elevation
 const DOOR_GUN_STOP_EPS = 0.02;  // rad slack before a limit reads as "pinned"
 
+// ── Attack-sight rocket cue (gunship-reticle-upgrade) ──
+// The rocket pod on the AH-1 Cobra (the only `attack`-role airframe). Its name
+// matches `AircraftConfigs.AH1_COBRA` so the adapter can tell the active pilot
+// weapon apart from the gun via the fenced `getWeaponStatus().name`, and the
+// muzzle speed is the SAME value that config's rocket fire path launches at —
+// the cue only reads it, it does not re-define ballistics.
+const ROCKET_POD_NAME = 'Rocket Pod';
+const ROCKET_POD_MUZZLE_SPEED = 150; // m/s; matches AircraftConfigs.AH1_COBRA rocket pod
+// Vertical screen scale: pixels of cue drop per radian of below-bore rocket
+// fall, capped so the cue stays inside the pipper group's footprint.
+const ROCKET_CUE_PIXELS_PER_RAD = 90;
+const ROCKET_CUE_MAX_OFFSET_PX = 60;
+
 // Scratch vectors for the door-gun aim solve (module-level: no per-frame alloc).
 const _heliPos = new THREE.Vector3();
 const _heliQuat = new THREE.Quaternion();
 const _gunAim = new THREE.Vector3();
 const _gunEuler = new THREE.Euler();
+const _attitudeEuler = new THREE.Euler();
+
+/**
+ * Concrete crosshair-cue sink on `GameRenderer`. `setCrosshairHelicopterWeapon`
+ * + `setCrosshairRocketCueOffset` are NOT on the fenced `IGameRenderer` (they
+ * are crosshair-internal), so the adapter widens the structural type here to
+ * push the attack-sight state without a fence change — exactly the fixed-wing
+ * `updateFixedWingAmmo` precedent.
+ */
+type CrosshairCueRenderer = IGameRenderer & {
+  setCrosshairHelicopterWeapon?(weapon: HeliReticleWeapon): void;
+  setCrosshairRocketCueOffset?(offsetPx: number): void;
+};
+
+/**
+ * Map a rocket-fall lead angle (radians, ≥ 0) to the on-screen pixel drop of
+ * the CCIP cue below the boresight pipper. Deterministic + bounded.
+ */
+function rocketCueAngleToPixels(angleRad: number): number {
+  const px = Math.tan(Math.max(0, angleRad)) * ROCKET_CUE_PIXELS_PER_RAD;
+  return Math.min(ROCKET_CUE_MAX_OFFSET_PX, Math.max(0, px));
+}
 
 function createHelicopterUIContext(role: 'transport' | 'attack' | 'gunship'): VehicleUIContext {
   const armed = role === 'attack' || role === 'gunship';
@@ -214,6 +250,13 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
 
     if (mouseMovement) {
       ctx.input.clearMouseMovement();
+    }
+
+    // Attack-sight cue: pick the prominent reticle (gun pipper vs rocket cue)
+    // for the selected pilot weapon and, with rockets up, drop the CCIP cue by
+    // the live rocket-fall lead. Only the AH-1 (attack role) carries this sight.
+    if (this.aircraftRole === 'attack') {
+      this.updateAttackSight();
     }
   }
 
@@ -385,6 +428,52 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     // Compose with an Euler so a single rotation maps the door axis cleanly.
     _gunEuler.set(this.doorGunPitch, this.doorGunYaw, 0, 'YXZ');
     out.set(-1, 0, 0).applyEuler(_gunEuler).applyQuaternion(heliQuat).normalize();
+  }
+
+  // ── Attack-sight cue (gunship-reticle-upgrade) ──────────────────────────────
+
+  /**
+   * Refresh the AH-1 attack sight for one frame from existing flight + weapon
+   * state (all read through the fenced model surface — no new ballistics):
+   *   - read the selected pilot weapon (`getWeaponStatus().name`) to pick the
+   *     prominent reticle (gun pipper vs rocket cue);
+   *   - with rockets selected, solve the CCIP-lite rocket-fall lead from the
+   *     airframe airspeed + nose pitch + the rocket muzzle speed, and drop the
+   *     cue below the boresight by the converted pixel offset.
+   * The crosshair state is pushed through the concrete (non-fenced) GameRenderer
+   * cue seam — the fixed-wing ammo precedent — so the fence is untouched.
+   */
+  private updateAttackSight(): void {
+    const heliId = this.activeHelicopterId;
+    if (!heliId) return;
+    const renderer = this.gameRenderer as CrosshairCueRenderer | undefined;
+    if (!renderer?.setCrosshairHelicopterWeapon) return;
+
+    const status = this.helicopterModel.getWeaponStatus(heliId);
+    const rocketsSelected = status?.name === ROCKET_POD_NAME;
+    const weapon: HeliReticleWeapon = rocketsSelected ? 'rockets' : 'gun';
+    renderer.setCrosshairHelicopterWeapon(weapon);
+
+    if (!rocketsSelected) {
+      renderer.setCrosshairRocketCueOffset?.(0);
+      return;
+    }
+
+    // Airspeed + nose pitch drive the fall lead. Pitch comes from the live
+    // airframe pose (negative = nose-down dive → the cue converges to the pipper).
+    const airspeed = this.helicopterModel.getFlightData(heliId)?.airspeed ?? 0;
+    let pitch = 0;
+    if (this.helicopterModel.getHelicopterQuaternionTo(heliId, _heliQuat)) {
+      _attitudeEuler.setFromQuaternion(_heliQuat, 'YXZ');
+      pitch = _attitudeEuler.x;
+    }
+
+    const dropAngle = computeRocketCueDrop({
+      muzzleSpeed: ROCKET_POD_MUZZLE_SPEED,
+      airspeed,
+      pitch,
+    });
+    renderer.setCrosshairRocketCueOffset?.(rocketCueAngleToPixels(dropAngle));
   }
 
   // ── Public control accessors ──

@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { HelicopterWeaponSystem } from './HelicopterWeaponSystem';
+import { HelicopterWeaponSystem, computeRocketCueDrop } from './HelicopterWeaponSystem';
 import type { AircraftWeaponMount } from './AircraftConfigs';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
@@ -508,6 +508,69 @@ describe('HelicopterWeaponSystem', () => {
       ws.disposeAll();
       expect(ws.getWeaponStatus('heli_a')).toBeNull();
       expect(ws.getWeaponStatus('heli_b')).toBeNull();
+    });
+  });
+
+  // ── Attack-sight state (gunship-reticle-upgrade) ──
+  describe('active-weapon kind + rocket ballistics (read-only)', () => {
+    beforeEach(() => {
+      ws.initWeapons(HELI_ID, [MINIGUN, ROCKET]);
+    });
+
+    it('reports the selected pilot weapon kind, switching with the active weapon', () => {
+      // Index 0 = minigun (hitscan), index 1 = rocket pod (projectile).
+      expect(ws.getActiveWeaponKind(HELI_ID)).toBe('gun');
+      ws.switchWeapon(HELI_ID, 1);
+      expect(ws.getActiveWeaponKind(HELI_ID)).toBe('rockets');
+      ws.switchWeapon(HELI_ID, 0);
+      expect(ws.getActiveWeaponKind(HELI_ID)).toBe('gun');
+    });
+
+    it('has no weapon kind for an aircraft with no pilot armament', () => {
+      ws.initWeapons('unarmed', [CREW_GUN]);
+      expect(ws.getActiveWeaponKind('unarmed')).toBeNull();
+    });
+
+    it('exposes rocket ballistics only while the rocket pod is selected', () => {
+      // Gun selected: no rocket ballistics.
+      expect(ws.getActiveRocketBallistics(HELI_ID)).toBeNull();
+
+      ws.switchWeapon(HELI_ID, 1);
+      const ballistics = ws.getActiveRocketBallistics(HELI_ID);
+      expect(ballistics).not.toBeNull();
+      // Muzzle speed is the SAME value the rocket fire path launches at.
+      expect(ballistics!.muzzleSpeed).toBe(ROCKET.projectileSpeed);
+      expect(ballistics!.ammo).toBe(ROCKET.ammoCapacity);
+    });
+  });
+
+  describe('computeRocketCueDrop (CCIP-lite rocket-fall lead)', () => {
+    const MUZZLE = 150;
+
+    it('drops the cue below the boresight in level flight', () => {
+      const drop = computeRocketCueDrop({ muzzleSpeed: MUZZLE, airspeed: 0, pitch: 0 });
+      // Gravity bends a level shot down → the impact sits below the pipper.
+      expect(drop).toBeGreaterThan(0);
+    });
+
+    it('converges the cue toward the pipper as the nose pitches down into a dive', () => {
+      const level = computeRocketCueDrop({ muzzleSpeed: MUZZLE, airspeed: 40, pitch: 0 });
+      const shallow = computeRocketCueDrop({ muzzleSpeed: MUZZLE, airspeed: 40, pitch: -0.3 });
+      const steep = computeRocketCueDrop({ muzzleSpeed: MUZZLE, airspeed: 40, pitch: -0.8 });
+      // The steeper the dive, the smaller the angular gap to the boresight.
+      expect(shallow).toBeLessThan(level);
+      expect(steep).toBeLessThan(shallow);
+    });
+
+    it('never returns a negative drop (gravity only ever pulls below the line of fire)', () => {
+      const steepDive = computeRocketCueDrop({ muzzleSpeed: MUZZLE, airspeed: 60, pitch: -1.2 });
+      expect(steepDive).toBeGreaterThanOrEqual(0);
+    });
+
+    it('forward airspeed flattens the lead (a faster shot falls less over the same range)', () => {
+      const slow = computeRocketCueDrop({ muzzleSpeed: MUZZLE, airspeed: 0, pitch: 0 });
+      const fast = computeRocketCueDrop({ muzzleSpeed: MUZZLE, airspeed: 60, pitch: 0 });
+      expect(fast).toBeLessThan(slow);
     });
   });
 });

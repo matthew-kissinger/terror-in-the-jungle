@@ -53,6 +53,13 @@ export type CrosshairMode =
  */
 export type TraverseStopDir = 'left' | 'right' | 'up' | 'down' | null;
 
+/**
+ * Which pilot weapon the attack-helicopter sight is showing prominently:
+ * `'gun'` raises the gun pipper, `'rockets'` raises the rocket pipper + drops
+ * the CCIP rocket-fall cue. Driven by the in-cockpit weapon-cycle input.
+ */
+export type HeliReticleWeapon = 'gun' | 'rockets';
+
 export class CrosshairSystem extends UIComponent {
   private mode = this.signal<CrosshairMode>('infantry');
   private spreadRadius = this.signal(15);
@@ -60,6 +67,13 @@ export class CrosshairSystem extends UIComponent {
   private pipperIconsLoaded = false;
   /** Active traverse stop for the emplacement_mg reticle (null = no stop). */
   private traverseStop = this.signal<TraverseStopDir>(null);
+  /** Which attack-sight weapon reticle is prominent (gun pipper vs rocket cue). */
+  private heliWeapon = this.signal<HeliReticleWeapon>('gun');
+  /**
+   * Vertical pixel offset (≥ 0) the CCIP rocket-fall cue sits BELOW the
+   * boresight pipper. Pushed per-frame by the attack-helicopter adapter.
+   */
+  private rocketCueOffset = this.signal(0);
 
   protected build(): void {
     this.root.className = styles.container;
@@ -80,6 +94,9 @@ export class CrosshairSystem extends UIComponent {
         <img data-ref="pipperGun" data-icon="reticle-cobra-gun" alt="Gun reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;" draggable="false">
         <img data-ref="pipperRocket" data-icon="reticle-rocket" alt="Rocket reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;display:none;" draggable="false">
         <div class="${styles.pipperDot}"></div>
+        <!-- CCIP rocket-fall cue: a caret the renderer drops below the boresight
+             pipper by the computed rocket lead. Shown only with rockets selected. -->
+        <div data-ref="rocketCue" class="${styles.rocketCue}" style="display:none"></div>
       </div>
       <div data-ref="tankGunner" class="${styles.tankGunnerReticle}" style="display:none">
         <!-- Center aim cross (short open arms, gap at the bore). -->
@@ -233,6 +250,28 @@ export class CrosshairSystem extends UIComponent {
       dgLeft?.classList.toggle(styles.dgStopActive, stop === 'left');
       dgRight?.classList.toggle(styles.dgStopActive, stop === 'right');
     });
+
+    // Effect: attack-helicopter per-weapon reticle states. Gun selected → the
+    // gun pipper is prominent and the rocket-fall cue is hidden. Rockets
+    // selected → the rocket pipper is prominent and the CCIP cue is shown,
+    // dropped below the boresight by the live rocket-fall offset.
+    this.effect(() => {
+      const weapon = this.heliWeapon.value;
+      const offset = this.rocketCueOffset.value;
+      const gun = this.$('[data-ref="pipperGun"]');
+      const rocket = this.$('[data-ref="pipperRocket"]');
+      const cue = this.$('[data-ref="rocketCue"]');
+
+      const rocketsActive = weapon === 'rockets';
+      if (gun) gun.style.display = rocketsActive ? 'none' : '';
+      if (rocket) rocket.style.display = rocketsActive ? '' : 'none';
+      if (cue) {
+        cue.style.display = rocketsActive ? '' : 'none';
+        // Drop the cue below the boresight pipper by the computed lead. The
+        // element is centered on the bore; translate it straight down.
+        cue.style.transform = `translate(-50%, calc(-50% + ${Math.max(0, offset)}px))`;
+      }
+    });
   }
 
   // --- Public API (backward-compatible with CrosshairUI) ---
@@ -279,6 +318,33 @@ export class CrosshairSystem extends UIComponent {
 
   getTraverseStop(): TraverseStopDir {
     return this.traverseStop.value;
+  }
+
+  /**
+   * Select which attack-helicopter weapon reticle is prominent: `'gun'` raises
+   * the gun pipper, `'rockets'` raises the rocket pipper and reveals the CCIP
+   * rocket-fall cue. A harmless no-op outside `helicopter_attack` (the pipper
+   * group is hidden in other modes).
+   */
+  setHelicopterWeapon(weapon: HeliReticleWeapon): void {
+    this.heliWeapon.value = weapon;
+  }
+
+  getHelicopterWeapon(): HeliReticleWeapon {
+    return this.heliWeapon.value;
+  }
+
+  /**
+   * Drop the CCIP rocket-fall cue this many pixels BELOW the boresight pipper
+   * (clamped to ≥ 0). Pushed per-frame by the attack-helicopter adapter from
+   * the live rocket-lead solution; shown only while rockets are selected.
+   */
+  setRocketCueOffset(offsetPx: number): void {
+    this.rocketCueOffset.value = Math.max(0, offsetPx);
+  }
+
+  getRocketCueOffset(): number {
+    return this.rocketCueOffset.value;
   }
 
   private loadPipperIcons(): void {

@@ -243,6 +243,65 @@ describe('CrosshairSystem', () => {
     });
   });
 
+  describe('attack-helicopter per-weapon reticle (gunship-reticle-upgrade)', () => {
+    function pipperEls() {
+      return {
+        gun: crosshair.element.querySelector('[data-ref="pipperGun"]') as HTMLElement,
+        rocket: crosshair.element.querySelector('[data-ref="pipperRocket"]') as HTMLElement,
+        cue: crosshair.element.querySelector('[data-ref="rocketCue"]') as HTMLElement,
+      };
+    }
+
+    it('defaults to the gun pipper with the rocket cue hidden', () => {
+      crosshair.setMode('helicopter_attack');
+      const { gun, rocket, cue } = pipperEls();
+      expect(gun.style.display).toBe('');
+      expect(rocket.style.display).toBe('none');
+      expect(cue.style.display).toBe('none');
+      expect(crosshair.getHelicopterWeapon()).toBe('gun');
+    });
+
+    it('raises the rocket pipper + reveals the fall cue when rockets are selected', () => {
+      crosshair.setMode('helicopter_attack');
+      crosshair.setHelicopterWeapon('rockets');
+
+      const { gun, rocket, cue } = pipperEls();
+      expect(rocket.style.display).toBe('');
+      expect(cue.style.display).toBe('');
+      // Gun pipper steps back while rockets are up.
+      expect(gun.style.display).toBe('none');
+    });
+
+    it('swaps reticle prominence back to the gun on weapon cycle', () => {
+      crosshair.setMode('helicopter_attack');
+      crosshair.setHelicopterWeapon('rockets');
+      crosshair.setHelicopterWeapon('gun');
+
+      const { gun, rocket, cue } = pipperEls();
+      expect(gun.style.display).toBe('');
+      expect(rocket.style.display).toBe('none');
+      expect(cue.style.display).toBe('none');
+    });
+
+    it('drops the rocket-fall cue below the boresight by the pushed offset', () => {
+      crosshair.setMode('helicopter_attack');
+      crosshair.setHelicopterWeapon('rockets');
+
+      crosshair.setRocketCueOffset(24);
+      const { cue } = pipperEls();
+      // The cue translates straight down by the offset (below the bore).
+      expect(cue.style.transform).toContain('24px');
+      expect(crosshair.getRocketCueOffset()).toBe(24);
+    });
+
+    it('clamps a negative cue offset to zero', () => {
+      crosshair.setMode('helicopter_attack');
+      crosshair.setHelicopterWeapon('rockets');
+      crosshair.setRocketCueOffset(-10);
+      expect(crosshair.getRocketCueOffset()).toBe(0);
+    });
+  });
+
   describe('visibility', () => {
     it('hideCrosshair and showCrosshair toggle the hidden state', () => {
       crosshair.hideCrosshair();

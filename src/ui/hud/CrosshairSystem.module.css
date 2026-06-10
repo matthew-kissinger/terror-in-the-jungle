@@ -183,6 +183,44 @@
   box-shadow: 0 0 4px rgba(231, 217, 186, 0.6);
 }
 
+/* CCIP rocket-fall cue (gunship-reticle-upgrade): a hollow downward caret the
+   adapter drops below the boresight pipper by the computed rocket lead. Drawn
+   as two short angled bars (a ∨ chevron) so it reads as a "rounds fall here"
+   marker distinct from the bright bore pipper. The renderer sets its vertical
+   translate; left/top pin it to the bore. */
+.rocketCue {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 6px;
+  pointer-events: none;
+}
+
+.rocketCue::before,
+.rocketCue::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 7px;
+  height: 1.5px;
+  background: rgba(231, 217, 186, 0.85);
+  box-shadow: 0 0 3px rgba(231, 217, 186, 0.5);
+}
+
+.rocketCue::before {
+  left: 0;
+  transform-origin: left center;
+  transform: rotate(40deg);
+}
+
+.rocketCue::after {
+  right: 0;
+  transform-origin: right center;
+  transform: rotate(-40deg);
+}
+
 /* --- Tank gunner sight (R2 tank-gunner-sight: stadia rangefinder) ---
    Aim cross (open arms, gap at the bore) + a horizontal stadia rangefinder
    for bracketing target width + mil-style drop ticks below the bore for

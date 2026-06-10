@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { PostProcessingManager } from '../systems/effects/PostProcessingManager';
 import { CrosshairSystem } from '../ui/hud/CrosshairSystem';
-import type { CrosshairMode } from '../ui/hud/CrosshairSystem';
+import type { CrosshairMode, HeliReticleWeapon } from '../ui/hud/CrosshairSystem';
 import { LoadingUI } from './LoadingUI';
 import { Logger } from '../utils/Logger';
 import { freezeTransform } from '../utils/SceneUtils';
@@ -410,6 +410,24 @@ export class GameRenderer {
 
   setCrosshairSpread(radius: number): void {
     this.crosshairSystem.setSpread(radius);
+  }
+
+  /**
+   * Select which attack-helicopter weapon reticle is prominent (gun pipper vs
+   * rocket-fall cue). Concrete passthrough, not on the fenced `IGameRenderer` —
+   * the attack-heli adapter duck-types it, mirroring the fixed-wing ammo seam.
+   */
+  setCrosshairHelicopterWeapon(weapon: HeliReticleWeapon): void {
+    this.crosshairSystem.setHelicopterWeapon(weapon);
+  }
+
+  /**
+   * Drop the CCIP rocket-fall cue this many pixels below the boresight pipper.
+   * Concrete passthrough (not fenced); pushed per-frame by the attack-heli
+   * adapter from the live rocket-lead solution.
+   */
+  setCrosshairRocketCueOffset(offsetPx: number): void {
+    this.crosshairSystem.setRocketCueOffset(offsetPx);
   }
 
   showSpawnLoadingIndicator(): void {
