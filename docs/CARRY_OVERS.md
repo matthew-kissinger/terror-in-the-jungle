@@ -50,6 +50,22 @@ the cycle that re-opens it.
 
 History log:
 
+- 2026-06-10 — budget-ratchet re-base (ashau-load-freeze):
+  `src/systems/navigation/NavmeshSystem.ts` snapshot raised 808→833 LOC —
+  pre-baked navmesh loads now route through the new time-sliced
+  `PrebakedTiledNavmeshImporter` (fetch + tile-batched import extracted there)
+  with per-phase startup marks and a loading-bar progress hook.
+  `src/systems/terrain/TerrainSystem.ts` snapshot raised 898→904 LOC /
+  69→75 methods — six `markStartup` statements bracketing the
+  `propagateTerrainSourceChanges` phases; this instrumentation attributed the
+  ~47s A Shau mode-load freeze to the stamped-provider gameplay-grid bake
+  (fixed the same day by `StampSpatialIndex`; the methods delta is the
+  heuristic miscounting those statement lines, not new methods). Within-cycle
+  growth, not a new carry-over; both split targets unchanged. Related:
+  KB-STARTUP-1's "stall is terrain CPU bake" finding is now root-caused to
+  the per-sample all-stamps loop and fixed (47.2s→68ms main-thread,
+  15.7s→95ms worker, measured via startup telemetry on the built bundle).
+
 - 2026-06-09 — budget-ratchet re-base (per-aircraft-ordnance,
   cycle-2026-06-09-fixed-wing-craft): `src/systems/vehicle/FixedWingModel.ts`
   snapshot raised 1155→1163 LOC / 48→51 methods. Per-airframe ordnance

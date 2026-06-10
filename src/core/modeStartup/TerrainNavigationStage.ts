@@ -23,6 +23,7 @@ export async function configureTerrainAndNavigation(
   engine: GameEngine,
   config: ReturnType<typeof getGameModeConfig>,
   preparedTerrainSource: PreparedTerrainSource,
+  emitProgress?: (phase: string, progress: number, label: string) => void,
 ): Promise<void> {
   markStartup(`engine-init.start-game.${config.id}.terrain-config.begin`);
   if (!engine.systemManager.navmeshSystem.isReady()) {
@@ -77,7 +78,18 @@ export async function configureTerrainAndNavigation(
       navWorldSize,
       config.features,
       config.navmeshAsset,
-      { anchors: navmeshAnchors, cacheFingerprint: navmeshCacheFingerprint },
+      {
+        anchors: navmeshAnchors,
+        cacheFingerprint: navmeshCacheFingerprint,
+        telemetryPrefix: `engine-init.start-game.${config.id}.navmesh`,
+        onTileProgress: (tilesAdded, totalTiles) => {
+          emitProgress?.(
+            'navmesh',
+            tilesAdded / totalTiles,
+            `Linking navigation tiles (${tilesAdded}/${totalTiles})...`,
+          );
+        },
+      },
     );
     markStartup(`engine-init.start-game.${config.id}.navmesh.end`);
 
@@ -89,6 +101,7 @@ export async function configureTerrainAndNavigation(
 
     // Validate navmesh connectivity using representative home bases (not all-pairs).
     // For 16 zones, all-pairs requires up to 120 path queries. Home-base check needs 1-2.
+    markStartup(`engine-init.start-game.${config.id}.navmesh.connectivity.begin`);
     if (config.zones?.length && engine.systemManager.navmeshSystem.isReady()) {
       const homeBases = config.zones.filter(z => z.isHomeBase);
 
@@ -120,6 +133,7 @@ export async function configureTerrainAndNavigation(
         }
       }
     }
+    markStartup(`engine-init.start-game.${config.id}.navmesh.connectivity.end`);
   }
 }
 

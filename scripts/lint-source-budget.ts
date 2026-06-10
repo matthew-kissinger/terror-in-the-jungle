@@ -84,7 +84,12 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/vehicle/airframe/Airframe.ts': { round: 'P3R4', reason: '0 tests → add tests + slim split', loc: 985, methods: 22 },
   'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: 'ai-timing-gate; +5 LOC: sole body-despawn owner now reaps terminal DEAD stragglers (combat-death-body-persistence)', loc: 933, methods: 32 },
   'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: 'split into 3 files', loc: 860, methods: 34 },
-  'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files; +19 LOC: worker-offload tiled generation past the anchor window (navmesh-coverage-ashau)', loc: 808, methods: 24 },
+  // Snapshot raised 808 → 833 (ashau-load-freeze, 2026-06-10): pre-baked loads
+  // now route through the time-sliced PrebakedTiledNavmeshImporter (fetch +
+  // import live there) with per-phase startup marks and an onTileProgress
+  // loading-bar hook threaded through generateNavmesh. Within-cycle ratchet
+  // re-base; split target unchanged. See docs/CARRY_OVERS.md.
+  'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files; +19 LOC: worker-offload tiled generation past the anchor window (navmesh-coverage-ashau); +25 LOC: time-sliced prebaked import wiring + load telemetry (ashau-load-freeze, 2026-06-10)', loc: 833, methods: 24 },
   'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: 'split into 2 files', loc: 788, methods: 36 },
   'src/systems/combat/ai/AIStateEngage.ts': { round: 'P3R2', reason: 'cover-search extraction P4F2', loc: 1005, methods: 30 },
   'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path; +12 LOC: per-frame stepper hook for the shared NPC tank cannon, scaled-dt signature per combat-review (npc-tank-cannon-wiring, 2026-06-09)', loc: 1004, methods: 44 },
@@ -131,7 +136,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy', loc: 764, methods: 0 },
   'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate)', loc: 1155, methods: 0 },
-  'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade; +22 LOC cycle-2026-06-09 gameplay-heightmap-resolution (DEM-faithful CPU query grid in syncCpuHeightsToGpu + rationale)', loc: 898, methods: 69 },
+  // Snapshot raised 898 → 904 / 69 → 75 (ashau-load-freeze, 2026-06-10): six
+  // markStartup statements bracketing propagateTerrainSourceChanges phases —
+  // the instrumentation that attributed the 47s A Shau load freeze to the
+  // stamped-provider gameplay-grid bake. The methods delta is those statement
+  // lines tripping the first-class-method heuristic, not new methods.
+  // Within-cycle ratchet re-base; split target unchanged. See docs/CARRY_OVERS.md.
+  'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade; +22 LOC cycle-2026-06-09 gameplay-heightmap-resolution (DEM-faithful CPU query grid in syncCpuHeightsToGpu + rationale); +6 LOC: propagate-phase startup marks (ashau-load-freeze, 2026-06-10)', loc: 904, methods: 75 },
   'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 861, methods: 24 },
   'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 882, methods: 42 },
   'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '0 tests → split into terrain config + biome config + spawn data; +5 LOC: prebaked navmesh asset wiring (navmesh-coverage-ashau)', loc: 761, methods: 0 },

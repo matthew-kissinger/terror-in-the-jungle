@@ -86,6 +86,7 @@ export async function prepareModeStartup(
     engine,
     config,
     startupTerrain.preparedTerrainSource,
+    emitProgress,
   );
   emitProgress('world', 1, 'World ready');
   emitProgress('navmesh', 1, 'Navigation ready');

@@ -7,6 +7,8 @@ import { buildHeightfieldMesh } from './NavmeshHeightfieldBuilder';
 import { NavmeshMovementAdapter } from './NavmeshMovementAdapter';
 import { computeNavmeshCacheKey, getCachedNavmesh, setCachedNavmesh } from './NavmeshCache';
 import { buildNavmeshFeatureObstacleMeshes } from './NavmeshFeatureObstacles';
+import { fetchAndImportPrebakedNavmesh } from './PrebakedTiledNavmeshImporter';
+import { markStartup } from '../../core/StartupTelemetry';
 
 import type { Crowd, NavMesh, NavMeshQuery } from '@recast-navigation/core';
 import type { MapFeatureDefinition } from '../../config/gameModeTypes';
@@ -25,6 +27,15 @@ interface NavmeshGenerationOptions {
   anchors?: THREE.Vector3[];
   /** Terrain/feature fingerprint used to avoid reusing stale runtime navmesh cache entries. */
   cacheFingerprint?: unknown;
+  /** Loading-bar callback for the time-sliced pre-baked tile import. */
+  onTileProgress?: (tilesAdded: number, totalTiles: number) => void;
+  /** StartupTelemetry mark prefix for pre-baked load sub-phases (fetch/import/crowd). */
+  telemetryPrefix?: string;
+}
+
+interface PrebakedLoadOptions {
+  onTileProgress?: (tilesAdded: number, totalTiles: number) => void;
+  telemetryPrefix?: string;
 }
 
 interface TiledGenerationBounds {
@@ -124,6 +135,10 @@ export class NavmeshSystem {
   } | null = null;
 
   // Module references (lazy loaded)
+  private recastCore: Pick<
+    typeof import('@recast-navigation/core'),
+    'NavMesh' | 'NavMeshParams' | 'UnsignedCharArray' | 'Detour' | 'statusFailed'
+  > | null = null;
   private recastInit: typeof import('@recast-navigation/core').init | null = null;
   private CrowdClass: typeof import('@recast-navigation/core').Crowd | null = null;
   private NavMeshQueryClass: typeof import('@recast-navigation/core').NavMeshQuery | null = null;
@@ -149,6 +164,7 @@ export class NavmeshSystem {
   private async doInit(skipWorker: boolean): Promise<void> {
     try {
       const core = await import('@recast-navigation/core');
+      this.recastCore = core;
       this.recastInit = core.init;
       this.CrowdClass = core.Crowd;
       this.NavMeshQueryClass = core.NavMeshQuery;
@@ -226,29 +242,35 @@ export class NavmeshSystem {
    * Load a pre-baked navmesh binary from a static asset URL.
    * Returns true on success, false if fetch fails or asset is missing.
    */
-  async loadPrebakedNavmesh(assetUrl: string, worldSize: number): Promise<boolean> {
-    if (!this.wasmReady || !this.importNavMeshFn) {
+  async loadPrebakedNavmesh(
+    assetUrl: string,
+    worldSize: number,
+    options: PrebakedLoadOptions = {},
+  ): Promise<boolean> {
+    if (!this.wasmReady || !this.importNavMeshFn || !this.recastCore) {
       Logger.warn('Navigation', 'Cannot load pre-baked navmesh - WASM not ready');
       return false;
     }
+    const markPrefix = options.telemetryPrefix ?? 'navmesh';
 
     try {
-      const response = await fetch(assetUrl);
-      if (!response.ok) {
-        Logger.warn('Navigation', `Pre-baked navmesh fetch failed: ${response.status} ${assetUrl}`);
-        return false;
-      }
+      const navMesh = await fetchAndImportPrebakedNavmesh(assetUrl, {
+        core: this.recastCore,
+        importNavMeshFallback: this.importNavMeshFn,
+        onTileProgress: options.onTileProgress,
+        mark: (name) => markStartup(`${markPrefix}.${name}`),
+        warn: (message) => Logger.warn('Navigation', `Pre-baked navmesh ${message}`),
+      });
+      if (!navMesh) return false;
 
-      const buffer = await response.arrayBuffer();
-      const navMeshData = new Uint8Array(buffer);
-      const imported = this.importNavMeshFn(navMeshData);
-
-      this.navMesh = imported.navMesh;
+      this.navMesh = navMesh;
       this.worldSize = worldSize;
       this.generationMode = 'solo';
+      markStartup(`${markPrefix}.crowd.begin`);
       this.createCrowd();
+      markStartup(`${markPrefix}.crowd.end`);
 
-      Logger.info('Navigation', `Pre-baked navmesh loaded: ${(navMeshData.byteLength / 1024).toFixed(1)}KB from ${assetUrl}`);
+      Logger.info('Navigation', `Pre-baked navmesh loaded from ${assetUrl}`);
       return true;
     } catch (error) {
       Logger.warn('Navigation', `Pre-baked navmesh load failed:`, error);
@@ -274,7 +296,10 @@ export class NavmeshSystem {
 
     // Try pre-baked asset first
     if (navmeshAsset) {
-      const loaded = await this.loadPrebakedNavmesh(navmeshAsset, worldSize);
+      const loaded = await this.loadPrebakedNavmesh(navmeshAsset, worldSize, {
+        onTileProgress: options.onTileProgress,
+        telemetryPrefix: options.telemetryPrefix,
+      });
       if (loaded) return true;
       Logger.warn('Navigation', 'Pre-baked navmesh unavailable; generating the explicit runtime navmesh for this mode');
     }

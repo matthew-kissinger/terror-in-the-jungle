@@ -884,18 +884,24 @@ export class TerrainSystem implements GameSystem {
   }
 
   private propagateTerrainSourceChanges(): void {
+    markStartup('terrain.propagate.sync-cpu-heights.begin');
     this.syncCpuHeightsToGpu();
+    markStartup('terrain.propagate.sync-cpu-heights.end');
 
     const cache = getHeightQueryCache();
     const providerConfig = cache.getProvider().getWorkerConfig();
     this.workerPool.sendHeightProvider(providerConfig);
 
+    markStartup('terrain.propagate.bvh-rebuild.begin');
     this.raycastRuntime.forceRebuildNearFieldMesh(
       this.playerPosition,
       this.config.bvhRadius,
       (x, z) => this.getHeightAt(x, z),
     );
+    markStartup('terrain.propagate.bvh-rebuild.end');
 
+    markStartup('terrain.propagate.vegetation-regen.begin');
     this.vegetationScatterer.regenerateAll();
+    markStartup('terrain.propagate.vegetation-regen.end');
   }
 }

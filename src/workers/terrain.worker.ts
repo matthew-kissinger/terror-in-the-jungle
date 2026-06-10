@@ -15,6 +15,7 @@
 import { bakePreparedVisualGrid, generateNormalData } from './terrainPreparedVisualBake';
 import { DemBufferCache } from './demBufferCache';
 import { sampleDEMBilinearWithTaper } from '../systems/terrain/DEMSampling';
+import { getStampSpatialIndex } from '../systems/terrain/StampSpatialIndex';
 
 // ── Height provider reconstruction ──
 // We can't import the real classes because workers get a separate module graph.
@@ -249,7 +250,9 @@ function sampleProviderHeight(config: HeightProviderConfig, worldX: number, worl
     }
     case 'stamped': {
       let height = sampleProviderHeight(config.base, worldX, worldZ);
-      for (const stamp of config.stamps) {
+      // Index is WeakMap-cached on the stamps array (stable per posted
+      // provider config), so the grid builds once per config, not per sample.
+      for (const stamp of getStampSpatialIndex(config.stamps).stampsNear(worldX, worldZ)) {
         height = applyResolvedStamp(height, worldX, worldZ, stamp);
       }
       return height;

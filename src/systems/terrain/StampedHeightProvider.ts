@@ -2,6 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import type { HeightProviderConfig, IHeightProvider } from './IHeightProvider';
+import { StampSpatialIndex } from './StampSpatialIndex';
 import type {
   ResolvedTerrainStampConfig,
   TerrainStampConfig,
@@ -14,16 +15,18 @@ const DEFAULT_POINTS_PER_RING = 8;
 export class StampedHeightProvider implements IHeightProvider {
   private readonly baseProvider: IHeightProvider;
   private readonly stamps: ResolvedTerrainStampConfig[];
+  private readonly stampIndex: StampSpatialIndex;
 
   constructor(baseProvider: IHeightProvider, stamps: TerrainStampConfig[]) {
     this.baseProvider = baseProvider;
     this.stamps = resolveTerrainStamps(baseProvider, stamps);
+    this.stampIndex = new StampSpatialIndex(this.stamps);
   }
 
   getHeightAt(worldX: number, worldZ: number): number {
     let height = this.baseProvider.getHeightAt(worldX, worldZ);
 
-    for (const stamp of this.stamps) {
+    for (const stamp of this.stampIndex.stampsNear(worldX, worldZ)) {
       height = applyResolvedStamp(height, worldX, worldZ, stamp);
     }
 
