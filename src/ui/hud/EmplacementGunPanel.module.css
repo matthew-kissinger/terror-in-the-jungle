@@ -1,0 +1,131 @@
+/**
+ * EmplacementGunPanel - M2HB heavy-MG station readout (Field Journal language).
+ *
+ * Dark manila chip drawn over the battlefield (pencil-on-acetate HUD), with
+ * paper-light Special Elite numerals. Full belt = field green, LOW belt =
+ * stamp red. Traverse-stop edge ticks flash stamp red when the barrel pins
+ * against a mechanical stop. Bottom-right anchored so it stays clear of the MG
+ * reticle in the screen centre and the lower-left vehicle instruments stack.
+ * No fallbacks — tokens are used bare (a missing token must surface).
+ */
+
+.panel {
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right, 0px));
+  bottom: max(64px, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  width: 132px;
+  padding: var(--space-2);
+  background: rgba(43, 38, 32, 0.82);
+  border: 1px solid rgba(231, 217, 186, 0.4);
+  border-radius: var(--r);
+  box-shadow: var(--ops-shadow);
+  pointer-events: none;
+  user-select: none;
+  z-index: var(--z-hud-overlay);
+}
+
+.beltRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.label {
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-3xs);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: rgba(231, 217, 186, 0.6);
+}
+
+.count {
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.countOk {
+  color: var(--paper-lt);
+}
+
+.countLow {
+  color: var(--red);
+}
+
+/* Belt remaining — hatched fill in the FJ idiom (45deg paper hatch),
+   draining left-to-right as the box empties. */
+.beltBarOuter {
+  position: relative;
+  height: 5px;
+  background: rgba(231, 217, 186, 0.12);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.beltFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--green) 0,
+    var(--green) 4px,
+    var(--green-dk) 4px,
+    var(--green-dk) 8px
+  );
+  transition: width 0.08s linear;
+}
+
+/* Traverse-stop cluster — a small cross of edge ticks that flash when the
+   barrel pins against its mechanical stop. */
+.stops {
+  position: relative;
+  width: 100%;
+  height: 30px;
+}
+
+.stop {
+  position: absolute;
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-3xs);
+  letter-spacing: 0.5px;
+  color: rgba(231, 217, 186, 0.22);
+  transition: color 0.05s linear, text-shadow 0.05s linear;
+}
+
+.stopUp {
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.stopDown {
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+}
+
+.stopLeft {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.stopRight {
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Lit edge — stamp red, the gunner has run out of travel that way. */
+.stopActive {
+  color: var(--red);
+  text-shadow: 0 0 4px var(--red-dk);
+}

@@ -124,6 +124,50 @@ describe('CrosshairSystem', () => {
     });
   });
 
+  describe('emplacement traverse-stop cue', () => {
+    // The CSS-module proxy returns the class name verbatim, so the lit edge
+    // carries the `mgStopActive` class. We assert the OBSERVABLE behavior —
+    // which edge is lit — not the styling values.
+    function litEdges(): string[] {
+      const refs = ['mgStopUp', 'mgStopDown', 'mgStopLeft', 'mgStopRight'];
+      return refs.filter((ref) => {
+        const el = crosshair.element.querySelector(`[data-ref="${ref}"]`) as HTMLElement;
+        return el.classList.contains('mgStopActive');
+      });
+    }
+
+    it('lights no edge by default', () => {
+      crosshair.setMode('emplacement_mg');
+      expect(litEdges()).toEqual([]);
+    });
+
+    it('lights exactly the edge the barrel is pinned against', () => {
+      crosshair.setMode('emplacement_mg');
+
+      crosshair.setTraverseStop('up');
+      expect(litEdges()).toEqual(['mgStopUp']);
+
+      crosshair.setTraverseStop('down');
+      expect(litEdges()).toEqual(['mgStopDown']);
+
+      crosshair.setTraverseStop('left');
+      expect(litEdges()).toEqual(['mgStopLeft']);
+
+      crosshair.setTraverseStop('right');
+      expect(litEdges()).toEqual(['mgStopRight']);
+    });
+
+    it('clears the cue when the barrel regains travel', () => {
+      crosshair.setMode('emplacement_mg');
+      crosshair.setTraverseStop('up');
+      expect(litEdges()).toEqual(['mgStopUp']);
+
+      crosshair.setTraverseStop(null);
+      expect(litEdges()).toEqual([]);
+      expect(crosshair.getTraverseStop()).toBeNull();
+    });
+  });
+
   describe('visibility', () => {
     it('hideCrosshair and showCrosshair toggle the hidden state', () => {
       crosshair.hideCrosshair();

@@ -302,11 +302,14 @@
   width: 18px;
 }
 
-/* --- Emplacement MG (open cross — gap at the centre) --- */
-/* R2 task `m2hb-gun-experience` refines this with belt/ammo state. */
+/* --- Emplacement MG (R2 m2hb-gun-experience: heavy-MG sight) ---
+   Open-center cross with short vertical posts above/below the bore and two
+   WIDE horizontal wings reaching out to either side — the classic ladder-less
+   .50-cal sight picture. Four edge ticks light when the barrel pins against a
+   traverse stop. The container is wide to seat the long wings. */
 .mgReticle {
   position: relative;
-  width: 64px;
+  width: 140px;
   height: 64px;
 }
 
@@ -316,36 +319,40 @@
   box-shadow: 0 0 2px rgba(231, 217, 186, 0.85);
 }
 
+/* Short vertical posts — gap at the bore. */
 .mgLineTop {
   width: 2px;
-  height: 18px;
+  height: 14px;
   left: 50%;
-  top: 0;
+  top: 8px;
   transform: translateX(-50%);
 }
 
 .mgLineBottom {
   width: 2px;
-  height: 18px;
+  height: 14px;
   left: 50%;
-  bottom: 0;
+  bottom: 8px;
   transform: translateX(-50%);
 }
 
-.mgLineLeft {
-  width: 18px;
+/* Wide horizontal wings — long bars to each side, gap at the bore. */
+.mgWing {
+  position: absolute;
   height: 2px;
-  left: 0;
+  width: 48px;
   top: 50%;
   transform: translateY(-50%);
+  background: rgba(231, 217, 186, 0.85);
+  box-shadow: 0 0 2px rgba(231, 217, 186, 0.85);
 }
 
-.mgLineRight {
-  width: 18px;
-  height: 2px;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+.mgWingLeft {
+  left: 8px;
+}
+
+.mgWingRight {
+  right: 8px;
 }
 
 .mgDot {
@@ -358,4 +365,50 @@
   background: rgba(231, 217, 186, 0.9);
   border-radius: 50%;
   box-shadow: 0 0 3px rgba(231, 217, 186, 0.85);
+}
+
+/* Traverse-stop edge ticks — dim by default, stamp red when the barrel hits
+   the matching mechanical stop. Seated just outside the wing tips / posts. */
+.mgStop {
+  position: absolute;
+  background: rgba(231, 217, 186, 0.18);
+  transition: background 0.05s linear, box-shadow 0.05s linear;
+}
+
+.mgStopUp,
+.mgStopDown {
+  width: 10px;
+  height: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.mgStopUp {
+  top: 0;
+}
+
+.mgStopDown {
+  bottom: 0;
+}
+
+.mgStopLeft,
+.mgStopRight {
+  width: 2px;
+  height: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.mgStopLeft {
+  left: 0;
+}
+
+.mgStopRight {
+  right: 0;
+}
+
+/* Lit stop — stamp red (#9E3B2E), the barrel has run out of travel that way. */
+.mgStopActive {
+  background: #9e3b2e;
+  box-shadow: 0 0 5px rgba(158, 59, 46, 0.85);
 }
