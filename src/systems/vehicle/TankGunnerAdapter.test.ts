@@ -505,4 +505,126 @@ describe('TankGunnerAdapter', () => {
       expect(adapter.consumeFireRequest()).toBe(false);
     });
   });
+
+  describe('main-gun fire-gate state (READY / RELOADING)', () => {
+    it('reports READY before the first shot', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      expect(adapter.getMainGunState()).toBe('ready');
+      expect(adapter.getReloadProgress01()).toBe(1);
+    });
+
+    it('enters RELOADING after a shot and clears once the reload gate elapses', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      // Deterministic clock so the gate does not depend on wall time.
+      let nowMs = 1000;
+      adapter.setHudPanelHost(null, () => nowMs);
+      adapter.reloadSeconds = 3.5;
+      adapter.onEnter(ctx);
+
+      // Pull the trigger: the gate stamps the shot and the gun goes RELOADING.
+      (ctx.input.isMouseButtonPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (b: number) => b === 0,
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(adapter.getMainGunState()).toBe('reloading');
+      expect(adapter.getReloadProgress01()).toBeLessThan(1);
+
+      // Halfway through the reload it is still RELOADING.
+      nowMs += 1750; // 1.75s of a 3.5s reload
+      expect(adapter.getMainGunState()).toBe('reloading');
+      expect(adapter.getReloadProgress01()).toBeCloseTo(0.5, 2);
+
+      // Once the full reload elapses the gun is READY again.
+      nowMs += 1750;
+      expect(adapter.getMainGunState()).toBe('ready');
+      expect(adapter.getReloadProgress01()).toBe(1);
+    });
+
+    it('does not re-stamp the gate while the trigger is held mid-reload', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      let nowMs = 1000;
+      adapter.setHudPanelHost(null, () => nowMs);
+      adapter.reloadSeconds = 3.5;
+      adapter.onEnter(ctx);
+
+      (ctx.input.isMouseButtonPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (b: number) => b === 0,
+      );
+      // Fire frame 1 → stamps the gate.
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      // Hold the trigger another second — still mid-reload, so the gate must
+      // not reset (a held trigger can't beat the rate limit).
+      nowMs += 1000;
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(adapter.getMainGunState()).toBe('reloading');
+      // Progress reflects the original shot time, ~1s into a 3.5s reload.
+      expect(adapter.getReloadProgress01()).toBeCloseTo(1000 / 3500, 2);
+    });
+  });
+
+  describe('sight magnification (RMB toggle: 1x ↔ zoom)', () => {
+    it('starts unmagnified at the wide sight FOV', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      expect(adapter.isZoomed()).toBe(false);
+      const wideFov = adapter.getSightFov();
+      const out = { value: 0 };
+      adapter.computeGunnerSightCamera(new THREE.Vector3(), new THREE.Vector3(), out);
+      expect(out.value).toBe(wideFov);
+    });
+
+    it('toggles to the zoomed (narrower) FOV on an RMB press and back on a second press', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+
+      const wideFov = adapter.getSightFov();
+
+      // Press RMB (rising edge) → zoom in (narrower FOV, higher magnification).
+      (ctx.input.isMouseButtonPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (b: number) => b === 2,
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(adapter.isZoomed()).toBe(true);
+      const zoomFov = adapter.getSightFov();
+      expect(zoomFov).toBeLessThan(wideFov);
+      expect(adapter.getMagnification()).toBeGreaterThan(1);
+
+      // Hold RMB down (no rising edge) → no further toggle.
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(adapter.isZoomed()).toBe(true);
+
+      // Release then press again → toggle back to 1x.
+      (ctx.input.isMouseButtonPressed as ReturnType<typeof vi.fn>).mockReturnValue(false);
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      (ctx.input.isMouseButtonPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (b: number) => b === 2,
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+      expect(adapter.isZoomed()).toBe(false);
+      expect(adapter.getSightFov()).toBe(wideFov);
+    });
+
+    it('republishes the magnification through the HUD vehicle context on a zoom toggle', () => {
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps);
+      adapter.onEnter(ctx);
+      (ctx.hudSystem!.setVehicleContext as ReturnType<typeof vi.fn>).mockClear();
+
+      (ctx.input.isMouseButtonPressed as ReturnType<typeof vi.fn>).mockImplementation(
+        (b: number) => b === 2,
+      );
+      adapter.update(createUpdateContext(ctx.input, ctx.hudSystem));
+
+      expect(ctx.hudSystem!.setVehicleContext).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'turret', role: 'gunner', sightMagnification: expect.any(Number) }),
+      );
+    });
+  });
 });

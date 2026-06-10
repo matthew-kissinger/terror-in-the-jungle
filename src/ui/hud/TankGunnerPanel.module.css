@@ -1,0 +1,153 @@
+/**
+ * TankGunnerPanel - M48 main-gun station readout (Field Journal language).
+ *
+ * Dark manila chip drawn over the battlefield (pencil-on-acetate HUD), with
+ * paper-light Special Elite numerals. READY = field green, RELOADING = stamp
+ * red. Bottom-right anchored so it stays clear of the gunner sight reticle in
+ * the screen centre and the lower-left helicopter/vehicle instruments stack.
+ * No fallbacks — tokens are used bare (a missing token must surface).
+ */
+
+.panel {
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right, 0px));
+  bottom: max(64px, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  width: 148px;
+  padding: var(--space-2);
+  background: rgba(43, 38, 32, 0.82);
+  border: 1px solid rgba(231, 217, 186, 0.4);
+  border-radius: var(--r);
+  box-shadow: var(--ops-shadow);
+  pointer-events: none;
+  user-select: none;
+  z-index: var(--z-hud-overlay);
+}
+
+.gunRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.label {
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-3xs);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: rgba(231, 217, 186, 0.6);
+}
+
+.state {
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.stateReady {
+  color: var(--green);
+}
+
+.stateReloading {
+  color: var(--red);
+}
+
+/* Reload progress — hatched fill in the FJ idiom (45deg paper hatch). */
+.reloadBarOuter {
+  position: relative;
+  height: 5px;
+  background: rgba(231, 217, 186, 0.12);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.reloadFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 100%;
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--green) 0,
+    var(--green) 4px,
+    var(--green-dk) 4px,
+    var(--green-dk) 8px
+  );
+}
+
+.azimuthRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Turret-azimuth dial: a hull-relative arc with a rotating barrel needle. */
+.dial {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(231, 217, 186, 0.4);
+  border-radius: 50%;
+  background: rgba(43, 38, 32, 0.5);
+  flex: 0 0 auto;
+}
+
+/* A short mark at the top of the dial = hull bow (turret azimuth 0). */
+.dialBow {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 2px;
+  height: 6px;
+  transform: translateX(-50%);
+  background: rgba(231, 217, 186, 0.55);
+}
+
+.needle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 19px;
+  background: var(--red);
+  transform-origin: 50% 100%;
+  /* Default points up (over the bow); rotated by JS to the turret yaw. */
+  transform: translate(-50%, -100%) rotate(0deg);
+}
+
+.dialHub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(231, 217, 186, 0.85);
+}
+
+.azimuthMeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.azValue {
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--paper-lt);
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom {
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-3xs);
+  letter-spacing: 0.5px;
+  color: rgba(231, 217, 186, 0.6);
+}

@@ -16,6 +16,7 @@ import type { VehicleUIContext } from '../../ui/layout/types';
 import type { SeatRole } from './IVehicle';
 import type { Tank } from './Tank';
 import { TankTurret } from './TankTurret';
+import { TankGunnerPanel, type MainGunState } from '../../ui/hud/TankGunnerPanel';
 import {
   clearFlightBookkeeping,
   relockPointer,
@@ -32,15 +33,31 @@ const DEFAULT_EXIT_SIDE_OFFSET_M = 3.0; // metres to the +X side of chassis on d
 const DEFAULT_SIGHT_FORWARD_OFFSET = 0.25; // metres ahead of barrel tip along sight line
 const DEFAULT_SIGHT_UP_OFFSET = 0.0; // metres above barrel tip (gunner sight is barrel-axis)
 
-function createTankGunnerUIContext(): VehicleUIContext {
-  // Gunner POV reuses the 'turret' HUD bucket (same as M2HB tripod); the
-  // tank-specific gunner HUD lands in a follow-up cycle once the cannon
-  // round counter + lead-prediction reticule exist.
+// ── Cannon fire-gate tuning ──
+// Mirrors TankPlayerAdapter's reload model so the player gunner path enforces
+// the same crew-served reload regardless of which adapter crews the gun. There
+// is no ammo economy here (the M48 model carries no stowage count): the gate is
+// a rate limit, and the panel shows STATE ONLY (READY / RELOADING).
+const DEFAULT_RELOAD_SECONDS = 3.5; // M48 90mm crew-served reload, playable abstraction
+
+// ── Sight magnification (RMB toggle: 1x ↔ zoom) ──
+const SIGHT_FOV_1X = 50; // degrees — unmagnified gunner sight
+const SIGHT_FOV_ZOOM = 18; // degrees — one zoomed optical step
+const SIGHT_MAG_1X = 1.0;
+const SIGHT_MAG_ZOOM = SIGHT_FOV_1X / SIGHT_FOV_ZOOM; // ~2.8x effective magnification
+const RMB_BUTTON = 2; // DOM MouseEvent.button code for the right mouse button
+
+function createTankGunnerUIContext(zoomed: boolean): VehicleUIContext {
+  // Gunner POV reuses the 'turret' HUD bucket (same as M2HB tripod). The
+  // craft-specific gunner panel is owned by this adapter (TankGunnerPanel),
+  // not by HUDVehicleHud; the additive `sightMagnification` field lets a HUD
+  // consumer reflect the zoom step without reading adapter internals.
   return {
     kind: 'turret',
     role: 'gunner',
     hudVariant: 'turret',
     weaponCount: 1,
+    sightMagnification: zoomed ? SIGHT_MAG_ZOOM : SIGHT_MAG_1X,
     capabilities: {
       canExit: true,
       canFirePrimary: true,
@@ -105,14 +122,58 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
   sightForwardOffset = DEFAULT_SIGHT_FORWARD_OFFSET;
   sightUpOffset = DEFAULT_SIGHT_UP_OFFSET;
 
+  // Cannon reload-gate tuning (mutable for retune / tests). Injected `clock`
+  // keeps the gate deterministic in tests (no Date.now / performance.now leak).
+  reloadSeconds = DEFAULT_RELOAD_SECONDS;
+
   private readonly chassis: Tank;
   private readonly turret: TankTurret;
   private mounted = false;
   private fireRequested = false;
 
+  // Cannon fire-gate state. `lastShotMs` is the wall-clock time of the last
+  // fired round; the gate reopens `reloadSeconds` later. NEGATIVE_INFINITY
+  // means "never fired" so the gun starts READY.
+  private clock: () => number = () => performance.now();
+  private lastShotMs = Number.NEGATIVE_INFINITY;
+
+  // Sight magnification: 1x ↔ one zoomed step, toggled on RMB rising edge.
+  private zoomed = false;
+  private prevRmbDown = false;
+
+  // Craft-specific gunner panel (FJ language). Owned + lifecycle-driven here:
+  // mounted into `panelHost` on seat entry, unmounted on exit. `panelHost` is
+  // the HUD root the composer injects via `setHudPanelHost`; when absent (test
+  // doubles, headless) the panel is never constructed. The panel is created
+  // lazily (not in a field initializer) so a headless adapter — e.g. the
+  // node-env unit tests — never touches `document` via UIComponent.
+  private panel: TankGunnerPanel | null = null;
+  private panelHost: HTMLElement | null = null;
+
   constructor(chassis: Tank, turret: TankTurret) {
     this.chassis = chassis;
     this.turret = turret;
+  }
+
+  /**
+   * Inject the DOM host the gunner panel mounts into (the in-game HUD root)
+   * plus an optional deterministic clock for the reload gate. The composer
+   * wires the host once; tests pass a fake host + clock. Both are optional so
+   * the adapter stays headless-safe.
+   */
+  setHudPanelHost(host: HTMLElement | null, clock?: () => number): void {
+    this.panelHost = host;
+    if (clock) this.clock = clock;
+  }
+
+  /**
+   * The gunner panel instance, lazily constructed on first access (so it is
+   * created only in an environment with a DOM). Exposed for the composer +
+   * tests.
+   */
+  getPanel(): TankGunnerPanel {
+    if (!this.panel) this.panel = new TankGunnerPanel();
+    return this.panel;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -120,6 +181,10 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
   onEnter(ctx: VehicleTransitionContext): void {
     this.resetControlState();
     this.mounted = true;
+    // Gun starts loaded; sight starts unmagnified each time the seat is taken.
+    this.lastShotMs = Number.NEGATIVE_INFINITY;
+    this.zoomed = false;
+    this.prevRmbDown = false;
 
     // Player out of infantry motion, snapped onto the gunner station.
     seatPlayer(ctx, 'tank.gunner.enter');
@@ -132,11 +197,13 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
     ctx.cameraController.saveInfantryAngles();
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
-    hudSystem?.setVehicleContext?.(createTankGunnerUIContext());
+    hudSystem?.setVehicleContext?.(createTankGunnerUIContext(this.zoomed));
 
-    // Gunner-sight reticle (center cross + stadia placeholder). The R2
-    // `tank-gunner-sight` task refines the geometry.
+    // Stadia gunner-sight reticle (aim cross + rangefinder + drop ticks).
     setCrosshairMode(ctx.gameRenderer, 'tank_gunner');
+
+    // Mount the FJ gunner panel into the HUD root and seed its initial state.
+    this.mountPanel();
 
     // Re-acquire pointer lock so mouse-look (turret aim) keeps working.
     relockPointer(ctx.input);
@@ -152,6 +219,9 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
     hudSystem?.setVehicleContext?.(null);
 
     setInfantryCrosshair(ctx.gameRenderer);
+
+    // Tear down the gunner panel so it doesn't linger over the infantry HUD.
+    this.unmountPanel();
 
     this.mounted = false;
     this.resetControlState();
@@ -179,6 +249,8 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
 
     this.readAimInput(ctx.input, ctx.deltaTime);
     this.readFireInput(ctx.input);
+    this.readZoomToggle(ctx.input, ctx.hudSystem);
+    this.refreshPanel();
   }
 
   resetControlState(): void {
@@ -214,10 +286,16 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
    * Sourced from the turret model's `getBarrelTipWorldPosition` +
    * `getBarrelDirectionWorld` so the camera tracks the rendered turret
    * pose exactly — no double-derivation of yaw/pitch math here.
+   *
+   * Optional `outFov` receives the desired vertical FOV (degrees) for the
+   * current magnification step, so the same call that drives the pose drives
+   * the zoom. Magnification is a FOV change only; the DOM reticle overlay is
+   * unaffected (it scales naturally with the zoomed view).
    */
   computeGunnerSightCamera(
     outPosition: THREE.Vector3,
     outLookTarget: THREE.Vector3,
+    outFov?: { value: number },
   ): boolean {
     if (!this.mounted) return false;
     this.turret.getBarrelTipWorldPosition(_scratchTip);
@@ -233,7 +311,46 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
     // Look-target is one metre further along the barrel; this gives
     // `PlayerCamera.lookAt(outLookTarget)` a stable forward vector.
     outLookTarget.copy(outPosition).addScaledVector(_scratchDir, 1);
+
+    if (outFov) outFov.value = this.getSightFov();
     return true;
+  }
+
+  /** Desired gunner-sight vertical FOV (degrees) for the current zoom step. */
+  getSightFov(): number {
+    return this.zoomed ? SIGHT_FOV_ZOOM : SIGHT_FOV_1X;
+  }
+
+  /** Current sight magnification factor (1 = 1x, >1 = zoomed). */
+  getMagnification(): number {
+    return this.zoomed ? SIGHT_MAG_ZOOM : SIGHT_MAG_1X;
+  }
+
+  /** Whether the sight is currently in the zoomed step. */
+  isZoomed(): boolean {
+    return this.zoomed;
+  }
+
+  /**
+   * Main-gun fire-gate state for the HUD: `'reloading'` while the reload timer
+   * is still cooling after a shot, else `'ready'`. There is no ammo economy —
+   * this is purely the rate-limit gate, so the panel shows state, not a count.
+   */
+  getMainGunState(): MainGunState {
+    return this.getReloadProgress01() >= 1 ? 'ready' : 'reloading';
+  }
+
+  /**
+   * Reload completion 0..1 (1 = loaded / READY). Drives the panel's reload bar.
+   * Before the first shot the gate is fully open (1).
+   */
+  getReloadProgress01(): number {
+    if (this.lastShotMs === Number.NEGATIVE_INFINITY) return 1;
+    const elapsedMs = this.clock() - this.lastShotMs;
+    const reloadMs = this.reloadSeconds * 1000;
+    if (reloadMs <= 0) return 1;
+    const p = elapsedMs / reloadMs;
+    return p < 0 ? 0 : p > 1 ? 1 : p;
   }
 
   // ── Input plumbing ─────────────────────────────────────────────────────────
@@ -289,6 +406,59 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
     // button state, so this latches a fire request for any frame the
     // trigger is down.
     const fire = input.isMouseButtonPressed(0) || input.isKeyPressed('space');
-    if (fire) this.fireRequested = true;
+    if (!fire) return;
+
+    this.fireRequested = true;
+
+    // Stamp the reload gate the first frame the trigger is pulled while the
+    // gun is loaded. The actual round launch is owned by the cannon
+    // integration polling `consumeFireRequest`; this gate only models the
+    // crew-served reload so the panel can show READY / RELOADING. A held
+    // trigger does not re-stamp mid-reload (the gate is already closed), so
+    // it can't be defeated by holding the button down.
+    if (this.getReloadProgress01() >= 1) {
+      this.lastShotMs = this.clock();
+    }
+  }
+
+  /**
+   * RMB toggles the sight between 1x and the zoomed step on a rising edge
+   * (press, not hold). Real mouse-button input landed 2026-06-09; the toggle
+   * pushes the new magnification through the HUD vehicle context so a consumer
+   * can reflect it, and the next `computeGunnerSightCamera` call applies the
+   * matching FOV.
+   */
+  private readZoomToggle(input: PlayerInput, hudSystem: VehicleUpdateContext['hudSystem']): void {
+    const down = typeof input.isMouseButtonPressed === 'function'
+      ? input.isMouseButtonPressed(RMB_BUTTON)
+      : false;
+    if (down && !this.prevRmbDown) {
+      this.zoomed = !this.zoomed;
+      const hud = hudSystem as IHUDSystem | undefined;
+      hud?.setVehicleContext?.(createTankGunnerUIContext(this.zoomed));
+    }
+    this.prevRmbDown = down;
+  }
+
+  // ── Gunner panel plumbing ────────────────────────────────────────────────────
+
+  private mountPanel(): void {
+    if (!this.panelHost) return;
+    const panel = this.getPanel();
+    if (!panel.mounted) panel.mount(this.panelHost);
+    this.refreshPanel();
+  }
+
+  private unmountPanel(): void {
+    if (this.panel?.mounted) this.panel.unmount();
+  }
+
+  /** Push the live weapon + turret + zoom state into the FJ gunner panel. */
+  private refreshPanel(): void {
+    if (!this.panel?.mounted) return;
+    this.panel.setMainGunState(this.getMainGunState());
+    this.panel.setReloadProgress(this.getReloadProgress01());
+    this.panel.setTurretAzimuth(this.turret.getYaw());
+    this.panel.setMagnification(this.getMagnification());
   }
 }
