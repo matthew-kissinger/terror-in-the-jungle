@@ -170,6 +170,7 @@
     "check:helicopter-parity": "npx tsx scripts/check-helicopter-parity.ts",
     "check:platform-capabilities": "npx tsx scripts/check-platform-capabilities.ts",
     "evidence:atmosphere": "npx tsx scripts/capture-atmosphere-recovery-shots.ts",
+    "capture:tod-sweep": "npx tsx scripts/capture-tod-coherence-sweep.ts",
     "cloudflare:assets:manifest": "npx tsx scripts/cloudflare-assets.ts manifest",
     "cloudflare:assets:upload": "npx tsx scripts/cloudflare-assets.ts upload",
     "cloudflare:assets:validate": "npx tsx scripts/cloudflare-assets.ts validate",
