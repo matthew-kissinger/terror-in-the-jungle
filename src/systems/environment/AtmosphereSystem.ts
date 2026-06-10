@@ -7,7 +7,6 @@ import type { ICloudRuntime, IGameRenderer, ISkyRuntime } from '../../types/Syst
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
 import { SunDiscMesh } from './atmosphere/SunDiscMesh';
-import { shapeDirectLightForRenderer } from './AtmosphereLightingColor';
 import { createLightingRigState, createRigSceneLightRadiance, deriveLightingRigState, isLightingRigEnabled, lightingRigBindings, publishLightingRigConfig, rigSceneLightRadiance } from './LightingRig';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
@@ -585,8 +584,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       sunAboveHorizon ? this.sunDirection : NIGHT_DIRECTIONAL_LIGHT_DIRECTION,
     );
     if (sunAboveHorizon) {
+      // Direct sun color for the kill-switch legacy path. The `shapeDirectLightForRenderer`
+      // compression (the dawn white-out HACK) was deleted in `legacy-path-deletion`;
+      // the raw backend sun is bounded here by the same component ceiling used for
+      // the sky/ground terms so the OFF fallback stays a usable presentation color.
       this.backend.getSun(snapshot.directLightColor);
-      shapeDirectLightForRenderer(snapshot.directLightColor, this.sunDirection.y);
+      compressSkyRadianceForRenderer(snapshot.directLightColor, SKY_LIGHT_MAX_COMPONENT);
     } else {
       snapshot.directLightColor.copy(NIGHT_DIRECTIONAL_LIGHT_COLOR);
     }

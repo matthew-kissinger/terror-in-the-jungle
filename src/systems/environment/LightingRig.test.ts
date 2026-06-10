@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import {
@@ -48,25 +48,29 @@ function makeBackend(opts: {
 }
 
 describe('LightingRig flag gating', () => {
-  beforeEach(() => {
-    LightingRigConfig.enabled = false;
+  // The rig ships default-ON (`legacy-path-deletion`); restore that production
+  // default after each test that flips the one-release kill-switch.
+  afterEach(() => {
+    LightingRigConfig.enabled = true;
   });
 
-  it('defaults OFF so production keeps the legacy lighting path', () => {
-    expect(isLightingRigEnabled()).toBe(false);
+  it('defaults ON so production runs the unified lighting rig', () => {
+    expect(isLightingRigEnabled()).toBe(true);
   });
 
-  it('reflects a runtime flag flip into the shared binding the materials read', () => {
+  it('reflects the runtime kill-switch into the shared binding the materials read', () => {
     const state = createLightingRigState();
     const backend = makeBackend({ sun: [2, 1.5, 1], zenith: [1.2, 1.4, 2.0], horizon: [1, 0.8, 0.6] });
     const sunDir = new THREE.Vector3(0.2, 0.8, 0.1);
 
-    deriveLightingRigState(backend, sunDir, 1, state);
-    expect(lightingRigBindings.rigEnabled.value).toBe(0);
-
-    LightingRigConfig.enabled = true;
+    // Production default: binding reads ON.
     deriveLightingRigState(backend, sunDir, 1, state);
     expect(lightingRigBindings.rigEnabled.value).toBe(1);
+
+    // Kill-switch OFF: binding reverts to 0 for the legacy CPU-side fallback.
+    LightingRigConfig.enabled = false;
+    deriveLightingRigState(backend, sunDir, 1, state);
+    expect(lightingRigBindings.rigEnabled.value).toBe(0);
   });
 });
 

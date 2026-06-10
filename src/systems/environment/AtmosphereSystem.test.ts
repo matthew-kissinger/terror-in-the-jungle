@@ -117,7 +117,15 @@ describe('AtmosphereSystem (ISkyRuntime contract)', () => {
 });
 
 describe('AtmosphereSystem (renderer coupling)', () => {
-  it('drives the moonLight color from a renderer-shaped backend sun color when bound to a renderer', () => {
+  // The lighting rig ships default-ON (`legacy-path-deletion`), so the renderer
+  // scene lights are driven from the rig terms. The rig flag is a module
+  // singleton other suites toggle; reset to the production default each test.
+  afterEach(() => {
+    LightingRigConfig.enabled = true;
+  });
+
+  it('drives the moonLight color from the rig sun term (production rig path)', () => {
+    LightingRigConfig.enabled = true;
     const system = new AtmosphereSystem();
     const backend: ISkyBackend = {
       update: () => {},
@@ -130,14 +138,23 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     const renderer = makeRendererStub();
 
     system.setRenderer(renderer);
+    // update() derives the rig state from the backend, then projects it into the
+    // scene lights — without it the rig state is still the neutral bootstrap.
+    system.update(0.016);
 
+    // Warm backend sun -> warm directional light, non-black, hue preserved.
     const color = renderer.moonLight!.color;
-    expect(Math.max(color.r, color.g, color.b)).toBeLessThanOrEqual(0.78);
+    expect(Math.max(color.r, color.g, color.b)).toBeGreaterThan(0);
     expect(color.r).toBeGreaterThan(color.g);
     expect(color.g).toBeGreaterThan(color.b);
   });
 
-  it('desaturates low-sun renderer light before it reaches terrain materials', () => {
+  it('passes the uncompressed backend sun through the rig instead of clamping it neutral', () => {
+    // The legacy `shapeDirectLightForRenderer` compressed the low-sun color
+    // toward a neutral ~0.78 ceiling (the dawn white-out). That HACK is deleted:
+    // the rig carries the warm backend sun through, so a saturated warm sun stays
+    // warm at the directional light (red dominates, not neutralized to grey).
+    LightingRigConfig.enabled = true;
     const system = new AtmosphereSystem();
     system.applyScenarioPreset('ashau');
     const backend: ISkyBackend = {
@@ -151,13 +168,13 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     const renderer = makeRendererStub();
 
     system.setRenderer(renderer);
+    // update() derives the rig state from the backend before projecting it.
+    system.update(0.016);
 
-    const rawSun = system.getSunColor(new THREE.Color());
     const shaped = renderer.moonLight!.color;
-    expect(rawSun.r).toBeGreaterThan(1);
-    expect(shaped.r).toBeLessThan(rawSun.r);
-    expect(shaped.b).toBeGreaterThan(rawSun.b);
-    expect(shaped.r / shaped.g).toBeLessThan(rawSun.r / rawSun.g);
+    // Warmth (red >> green >> blue) survives — the rig did not lerp it neutral.
+    expect(shaped.r).toBeGreaterThan(shaped.g);
+    expect(shaped.g).toBeGreaterThan(shaped.b);
   });
 
   it('positions the moonLight above the origin in the sun direction', () => {
@@ -171,7 +188,11 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     expect(renderer.moonLight!.position.lengthSq()).toBeGreaterThan(0);
   });
 
-  it('uses cool moonlight instead of a clamped sub-horizon sun for night terrain lighting', () => {
+  it('aims the directional light from above the horizon at night instead of from a sub-horizon sun', () => {
+    // The directional-light DIRECTION (position ray) is driven from the night
+    // moonlight direction, not a clamped sub-horizon sun, on both the rig and the
+    // kill-switch path — the contract that keeps night shadows sane.
+    LightingRigConfig.enabled = true;
     const system = new AtmosphereSystem();
     system.applyScenarioPreset('tdm');
     const preset = system.getCurrentPreset()!;
@@ -192,8 +213,33 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     system.update(0.016);
 
     const lightDir = renderer.moonLight!.position.clone().normalize();
-    const lightColor = renderer.moonLight!.color;
     expect(lightDir.y).toBeGreaterThan(0.4);
+  });
+
+  it('kill-switch OFF: uses an explicitly cool night moonlight color (legacy fallback)', () => {
+    // The documented one-release kill-switch reverts the directional light COLOR
+    // to the legacy snapshot, which carries an explicit cool sub-horizon moonlight.
+    LightingRigConfig.enabled = false;
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('tdm');
+    const preset = system.getCurrentPreset()!;
+    const dayLen = preset.todCycle!.dayLengthSeconds;
+    let foundSubHorizon = false;
+
+    for (let i = 0; i < 48; i++) {
+      system.setSimulationTimeSeconds((dayLen * i) / 48);
+      if (system.getSunDirection(new THREE.Vector3()).y < 0) {
+        foundSubHorizon = true;
+        break;
+      }
+    }
+    expect(foundSubHorizon).toBe(true);
+
+    const renderer = makeRendererStub();
+    system.setRenderer(renderer);
+    system.update(0.016);
+
+    const lightColor = renderer.moonLight!.color;
     expect(lightColor.r).toBeLessThan(lightColor.b);
     expect(lightColor.g).toBeGreaterThan(lightColor.r);
   });
@@ -224,7 +270,12 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     expect(ambient.b).toBeGreaterThan(ambient.r);
   });
 
-  it('publishes the same effective night lighting snapshot that it applies to the renderer', () => {
+  it('kill-switch OFF: publishes the same effective night lighting snapshot it applies to the renderer', () => {
+    // On the legacy kill-switch path the renderer lights are driven directly from
+    // the published snapshot, so snapshot == renderer light state. On the rig path
+    // the renderer reads rig terms instead (the snapshot stays the legacy fallback
+    // source), so this snapshot==renderer identity is a kill-switch-OFF property.
+    LightingRigConfig.enabled = false;
     const system = new AtmosphereSystem();
     system.applyScenarioPreset('tdm');
     const preset = system.getCurrentPreset()!;
@@ -271,7 +322,12 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     expect(renderer.moonLight!.position.y).toBeGreaterThan(target.y);
   });
 
-  it('drives hemisphere sky color from the backend zenith sample without saturating HDR values', () => {
+  it('kill-switch OFF: drives hemisphere sky color from the bounded backend zenith sample', () => {
+    // The legacy snapshot compresses the zenith below a presentation ceiling
+    // before it reaches the hemisphere light. That compression is the kill-switch
+    // path; the rig hands the renderer uncompressed HDR radiance (AGX owns the
+    // knee), so the `<= zenith` bound is a kill-switch-OFF property.
+    LightingRigConfig.enabled = false;
     const system = new AtmosphereSystem();
     const renderer = makeRendererStub();
 
@@ -307,7 +363,12 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     expect(ground.getHex()).not.toBe(0);
   });
 
-  it('bounds HDR sky samples before using them as renderer fog and hemisphere light colors', () => {
+  it('kill-switch OFF: bounds HDR sky samples before using them as renderer fog and hemisphere light colors', () => {
+    // The component-ceiling compression that keeps the legacy renderer lights/fog
+    // below 1.0 is the kill-switch path. The rig deliberately passes uncompressed
+    // HDR radiance to the renderer (AGX owns the presentation knee), so the `< 1`
+    // bound only holds with the kill-switch OFF.
+    LightingRigConfig.enabled = false;
     const system = new AtmosphereSystem();
     const backend: ISkyBackend = {
       update: () => {},
@@ -339,9 +400,13 @@ describe('AtmosphereSystem (renderer coupling)', () => {
     const system = new AtmosphereSystem();
     const renderer = makeRendererStub();
     system.setRenderer(renderer);
+    system.update(0.016);
+    const moonBefore = renderer.moonLight!.color.getHex();
+    const skyBefore = renderer.hemisphereLight!.color.getHex();
 
     // Swap to a backend with distinctly different colors; the swap alone
-    // does not push to the renderer — update() must.
+    // does not push to the renderer — update() must. (The exact derived hex is
+    // rig-driven, so we assert the push happens on update(), not the legacy hex.)
     const backend: ISkyBackend = {
       update: () => {},
       sample: (_dir, out) => out,
@@ -350,11 +415,11 @@ describe('AtmosphereSystem (renderer coupling)', () => {
       getHorizon: (out) => out.setHex(0x445566),
     };
     system.setBackend(backend);
-    expect(renderer.moonLight!.color.getHex()).not.toBe(0xaabbcc);
+    expect(renderer.moonLight!.color.getHex()).toBe(moonBefore);
 
     system.update(0.016);
-    expect(renderer.moonLight!.color.getHex()).toBe(0xaabbcc);
-    expect(renderer.hemisphereLight!.color.getHex()).toBe(0x112233);
+    expect(renderer.moonLight!.color.getHex()).not.toBe(moonBefore);
+    expect(renderer.hemisphereLight!.color.getHex()).not.toBe(skyBefore);
   });
 
   it('leaves moonLight intensity untouched (weather owns intensity)', () => {

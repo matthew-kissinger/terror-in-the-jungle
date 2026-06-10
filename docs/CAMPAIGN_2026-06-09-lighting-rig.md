@@ -54,9 +54,10 @@ divergent lighting models:
   while PBR terrain swings the full range. Divergence at the TOD extremes is
   guaranteed by construction.
 - **"Dawn reflects almost white"** = `shapeDirectLightForRenderer`
-  (`src/systems/environment/AtmosphereLightingColor.ts`) compresses the
-  Hosek-Wilkie low-sun color to ~0.78 in all channels — converting warm dim
-  dawn light into bright neutral white before it hits terrain PBR.
+  (formerly in `AtmosphereLightingColor.ts`, deleted in Phase 4
+  `legacy-path-deletion`) compressed the Hosek-Wilkie low-sun color to ~0.78 in
+  all channels — converting warm dim dawn light into bright neutral white before
+  it hit terrain PBR.
 - The pipeline is a stack of per-material compensations (clamps, compression,
   cool tints, emissive night fill) each tuned in isolation by past cycles.
   SOL-1's gates measured sun disc / sky parity / night-red channels — never
@@ -129,7 +130,7 @@ lighting-rig-state ──► terrain-rig-migration
 
 | slug | intent | files | reviewer | size |
 |---|---|---|---|---|
-| lighting-rig-state | Implement the canonical rig per the ratified memo: derived once per frame in AtmosphereSystem from the Hosek model (sun direction + radiance, sky/ground irradiance, ambient, fog), exposed as one shared TSL uniform block. Retire `shapeDirectLightForRenderer` compression (kept callable until Phase 4 deletion; rig path does not use it). | `src/systems/environment/AtmosphereSystem.ts`, `src/systems/environment/AtmosphereLightingColor.ts`, new rig module under `src/systems/environment/` | — | L |
+| lighting-rig-state | Implement the canonical rig per the ratified memo: derived once per frame in AtmosphereSystem from the Hosek model (sun direction + radiance, sky/ground irradiance, ambient, fog), exposed as one shared TSL uniform block. Retire `shapeDirectLightForRenderer` compression (kept callable until Phase 4 deletion; rig path does not use it). | `src/systems/environment/AtmosphereSystem.ts`, `AtmosphereLightingColor.ts` (since deleted in Phase 4 `legacy-path-deletion`), new rig module under `src/systems/environment/` | — | L |
 | terrain-rig-migration | TerrainMaterial consumes the rig block; replace the night-fill emissive hack with the rig's ambient/moon term; horizon occlusion re-driven from rig sun elevation (keep the effect, kill the bespoke inputs). | `src/systems/terrain/TerrainMaterial.ts`, `src/core/SystemUpdater.ts` (wiring) | terrain-nav (TerrainMaterial is terrain path) | M |
 | scene-light-unification | The scene lights AtmosphereSystem maintains in applyToRenderer (directional/ambient/hemisphere feeding GLB PBR materials) are driven from the same rig values — GLBs and terrain track the same curve. | `src/systems/environment/AtmosphereSystem.ts` | — | S |
 

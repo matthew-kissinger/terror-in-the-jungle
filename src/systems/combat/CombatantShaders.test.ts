@@ -3,7 +3,6 @@
 
 import * as THREE from 'three';
 import { updateShaderUniforms } from './CombatantShaders';
-import { LightingRigConfig } from '../environment/LightingRig';
 
 function createNpcUniformMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
@@ -27,7 +26,11 @@ function createNpcUniformMaterial(): THREE.ShaderMaterial {
 }
 
 describe('CombatantShaders NPC atmosphere uniforms', () => {
-  it('forwards scene camera, fog, and selected-profile lighting into NPC impostor materials', () => {
+  it('forwards scene camera and fog, and keeps lighting rig-owned (no scene-scan) into NPC impostor materials', () => {
+    // Since `legacy-path-deletion` the impostor reads the shared lighting rig
+    // bindings directly as its only lighting path, so the per-material atmosphere
+    // lighting stays disabled even with scene lights present (single authority).
+    // Camera + fog still forward.
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x112233, 0.004);
     scene.add(new THREE.HemisphereLight(0xe8f1db, 0x4b5a3f, 1.45));
@@ -41,9 +44,9 @@ describe('CombatantShaders NPC atmosphere uniforms', () => {
     updateShaderUniforms(new Map([['US_idle', material]]), camera, scene);
 
     expect(material.uniforms.cameraPosition.value).toEqual(camera.position);
-    expect(material.uniforms.npcLightingEnabled.value).toBe(1);
-    expect(material.uniforms.npcAtmosphereLightScale.value).toBeGreaterThan(0.95);
-    expect(material.uniforms.npcAtmosphereLightScale.value).toBeLessThan(1.05);
+    // Lighting is rig-owned: the scene-scan "second authority" is deleted.
+    expect(material.uniforms.npcLightingEnabled.value).toBe(0);
+    expect(material.uniforms.npcAtmosphereLightScale.value).toBe(1);
     expect(material.uniforms.npcFogMode.value).toBe(1);
     expect(material.uniforms.npcFogColor.value.getHex()).toBe(0x112233);
     expect(material.uniforms.npcFogDensity.value).toBe(0.002);
@@ -51,7 +54,10 @@ describe('CombatantShaders NPC atmosphere uniforms', () => {
     material.dispose();
   });
 
-  it('darkens impostor atmosphere scale under low-sun lighting profiles', () => {
+  it('leaves per-material lighting disabled regardless of scene light intensity (single authority)', () => {
+    // The legacy scene-scan derived a per-material light scale from the scene
+    // hemisphere/directional lights. That second authority is deleted; the rig
+    // owns lighting, so no scene-light configuration enables per-material lighting.
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xc6d7ff, 0x22283a, 0.95));
     scene.add(new THREE.DirectionalLight(0xff9a65, 0.7));
@@ -60,9 +66,8 @@ describe('CombatantShaders NPC atmosphere uniforms', () => {
 
     updateShaderUniforms(new Map([['NVA_idle', material]]), camera, scene);
 
-    expect(material.uniforms.npcLightingEnabled.value).toBe(1);
-    expect(material.uniforms.npcAtmosphereLightScale.value).toBeLessThan(0.6);
-    expect(material.uniforms.npcAtmosphereLightScale.value).toBeGreaterThanOrEqual(0.42);
+    expect(material.uniforms.npcLightingEnabled.value).toBe(0);
+    expect(material.uniforms.npcAtmosphereLightScale.value).toBe(1);
 
     material.dispose();
   });
@@ -84,46 +89,20 @@ describe('CombatantShaders NPC atmosphere uniforms', () => {
     material.dispose();
   });
 
-  describe('on the unified lighting-rig path', () => {
-    afterEach(() => {
-      LightingRigConfig.enabled = false;
-    });
+  it('forwards scene fog while keeping lighting rig-owned even with scene lights present', () => {
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x223344, 0.003);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1.0));
+    const camera = new THREE.PerspectiveCamera();
+    const material = createNpcUniformMaterial();
 
-    it('does not stamp scene-scanned light into impostor materials (single authority)', () => {
-      // With scene lights present, the legacy path would enable per-material
-      // lighting and derive a scale. On the rig path the impostor reads the
-      // shared rig bindings directly, so the per-material atmosphere lighting is
-      // left disabled — the scene-scan "second authority" is bypassed.
-      const scene = new THREE.Scene();
-      scene.add(new THREE.HemisphereLight(0xe8f1db, 0x4b5a3f, 1.45));
-      scene.add(new THREE.DirectionalLight(0xffffff, 1.25));
-      const camera = new THREE.PerspectiveCamera();
-      const material = createNpcUniformMaterial();
+    updateShaderUniforms(new Map([['NVA_idle', material]]), camera, scene);
 
-      LightingRigConfig.enabled = true;
-      updateShaderUniforms(new Map([['US_idle', material]]), camera, scene);
+    expect(material.uniforms.npcFogMode.value).toBe(1);
+    expect(material.uniforms.npcFogColor.value.getHex()).toBe(0x223344);
+    // Lighting stays rig-owned even with scene lights present (single authority).
+    expect(material.uniforms.npcLightingEnabled.value).toBe(0);
 
-      expect(material.uniforms.npcLightingEnabled.value).toBe(0);
-
-      material.dispose();
-    });
-
-    it('still forwards scene fog on the rig path (fog is unchanged this pass)', () => {
-      const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x223344, 0.003);
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1.0));
-      const camera = new THREE.PerspectiveCamera();
-      const material = createNpcUniformMaterial();
-
-      LightingRigConfig.enabled = true;
-      updateShaderUniforms(new Map([['NVA_idle', material]]), camera, scene);
-
-      expect(material.uniforms.npcFogMode.value).toBe(1);
-      expect(material.uniforms.npcFogColor.value.getHex()).toBe(0x223344);
-      // Lighting stays rig-owned even with scene lights present.
-      expect(material.uniforms.npcLightingEnabled.value).toBe(0);
-
-      material.dispose();
-    });
+    material.dispose();
   });
 });

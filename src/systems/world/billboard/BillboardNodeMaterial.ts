@@ -486,50 +486,19 @@ function createBillboardFadeNode(
 function createBillboardLightingNode(
   baseColor: TslNode,
   normalColor: TslNode,
-  cameraDistance: TslNode,
+  _cameraDistance: TslNode,
   uniforms: BillboardMaterialUniforms,
 ) {
-  const lightingEnabled = tslReference('bool', uniforms.lightingEnabled);
+  // Unified-rig lighting is the ONLY path (`legacy-path-deletion`). The legacy
+  // hemisphere-blend + the [0.40, 0.78] `minVegetationLight`/`maxVegetationLight`
+  // clamp band — the mechanism that pinned foliage near-constant across the day
+  // and guaranteed divergence from PBR terrain at the TOD extremes — is deleted.
+  // Wrapped-Lambert against the SAME uncompressed sun/sky/ground rig terms
+  // terrain + NPC impostors consume, so foliage tracks them by construction:
+  // midnight foliage is allowed to go dark, dawn allowed to warm with terrain.
+  // See docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §2c.
   const normalMapEnabled = tslReference('bool', uniforms.normalMapEnabled);
-  const sunColor = tslReference('color', uniforms.sunColor);
-  const skyColor = tslReference('color', uniforms.skyColor);
-  const groundColor = tslReference('color', uniforms.groundColor);
-  const minVegetationLight = tslReference('float', uniforms.minVegetationLight);
-  const maxVegetationLight = tslReference('float', uniforms.maxVegetationLight);
-  const ambient = mix(groundColor, skyColor, tslFloat(0.5).add(uv().y.mul(0.5)));
-  const hemiLight = ambient.mul(0.82).add(sunColor.mul(0.22));
   const imposterNormal = normalColor.rgb.mul(2).sub(1).normalize();
-  const captureSun = tslVec3(0.35, 0.65, 0.68).normalize();
-  const ndotl = tslMax(imposterNormal.dot(captureSun), tslFloat(0));
-  const normalAmbient = mix(
-    groundColor,
-    skyColor,
-    tslFloat(0.62).add(tslFloat(0.38).mul(tslClamp(imposterNormal.y, tslFloat(-1), tslFloat(1)))),
-  );
-  const normalLight = normalAmbient.mul(0.82).add(sunColor.mul(tslFloat(0.16).add(tslFloat(0.34).mul(ndotl))));
-  const verticalOcclusion = tslMix(
-    tslFloat(0.68),
-    tslFloat(1.0),
-    smoothstep(tslFloat(0.08), tslFloat(0.95), uv().y),
-  );
-  const selectedLight = select(normalMapEnabled, normalLight, hemiLight).mul(verticalOcclusion);
-  const light = tslClamp(
-    selectedLight,
-    tslVec3(minVegetationLight),
-    tslVec3(maxVegetationLight),
-  );
-  const shaded = baseColor.mul(light);
-  const legacyLit = select(lightingEnabled, shaded, baseColor).mul(
-    tslFloat(1).add(tslFloat(0).mul(cameraDistance)),
-  );
-
-  // Phase 0 unified-rig branch (flag-gated). Wrapped-Lambert against the SAME
-  // uncompressed sun/sky/ground terms terrain consumes, so foliage tracks
-  // terrain by construction. The [0.40, 0.78] clamp band is bypassed here —
-  // midnight foliage is allowed to go dark, dawn allowed to warm with terrain —
-  // which is exactly the divergence the legacy clamp guarantees. See
-  // docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §2c.
-  const rigEnabled = tslReference('float', lightingRigBindings.rigEnabled).greaterThan(tslFloat(0.5));
   const rigSun = tslReference('color', lightingRigBindings.sunRadiance);
   const rigSky = tslReference('color', lightingRigBindings.skyIrradiance);
   const rigGround = tslReference('color', lightingRigBindings.groundIrradiance);
@@ -545,7 +514,7 @@ function createBillboardLightingNode(
   const diff = nl.add(wrap).div(tslFloat(1).add(wrap));
   // Hemisphere fill: an up-facing card lerps toward the sky, but trimmed below a
   // pure-zenith pick (a real tuft integrates the whole hemisphere). Weight goes
-  // from 0.5 at a side-facing normal to FOLIAGE_HEMI_UP_SKY_WEIGHT straight up.
+  // from 0.5 at a side-facing normal to RIG_HEMI_UP_SKY_WEIGHT straight up.
   const hemiWeight = tslFloat(0.5).add(
     cardNormal.y.mul(tslFloat(RIG_HEMI_UP_SKY_WEIGHT - 0.5)),
   );
@@ -567,9 +536,7 @@ function createBillboardLightingNode(
     ),
   );
   const directSun = rigSun.mul(diff).mul(lowSunFade);
-  const rigLit = baseColor.mul(hemi.add(directSun)).add(rigAmbient).mul(rigExposure);
-
-  return tslSelect(rigEnabled, rigLit, legacyLit);
+  return baseColor.mul(hemi.add(directSun)).add(rigAmbient).mul(rigExposure);
 }
 
 function createBillboardFogNode(

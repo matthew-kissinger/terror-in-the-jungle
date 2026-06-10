@@ -16,7 +16,6 @@ import {
   mix,
   positionWorld,
   reference,
-  select,
   smoothstep,
   step,
   texture as tslTextureNode,
@@ -113,7 +112,6 @@ const tslAttribute = (name: string, type: string): TslNode => attribute(name, ty
 const tslVec2 = (...args: TslNode[]): TslNode => (vec2 as (...values: TslNode[]) => TslNode)(...args);
 const tslVec3 = (...args: TslNode[]): TslNode => (vec3 as (...values: TslNode[]) => TslNode)(...args);
 const tslMix = (...args: TslNode[]): TslNode => (mix as (...values: TslNode[]) => TslNode)(...args);
-const tslSelect = (...args: TslNode[]): TslNode => (select as (...values: TslNode[]) => TslNode)(...args);
 const tslTexture = (source: THREE.Texture, sampleUv: TslNode): TslNode => tslTextureNode(source, sampleUv) as TslNode;
 const tslFloat = (value: number): TslNode => float(value) as TslNode;
 const tslReference = (type: string, uniform: { value: unknown }): TslNode => reference('value', type, uniform) as TslNode;
@@ -198,17 +196,6 @@ function createNpcImpostorColorNode(
   const combatState = tslReference('float', uniforms.combatState);
   const readabilityColor = tslReference('color', uniforms.readabilityColor);
   const readabilityStrength = tslReference('float', uniforms.readabilityStrength);
-  const npcExposure = tslReference('float', uniforms.npcExposure);
-  const minNpcLight = tslReference('float', uniforms.minNpcLight);
-  const npcTopLight = tslReference('float', uniforms.npcTopLight);
-  const parityScale = tslReference('float', uniforms.parityScale);
-  const parityLift = tslReference('float', uniforms.parityLift);
-  const paritySaturation = tslReference('float', uniforms.paritySaturation);
-  const npcLightingEnabled = tslReference('float', uniforms.npcLightingEnabled);
-  const npcAtmosphereLightScale = tslReference('float', uniforms.npcAtmosphereLightScale);
-  const npcSkyColor = tslReference('color', uniforms.npcSkyColor);
-  const npcGroundColor = tslReference('color', uniforms.npcGroundColor);
-  const npcSunColor = tslReference('color', uniforms.npcSunColor);
   const npcFogMode = tslReference('float', uniforms.npcFogMode);
   const npcFogColor = tslReference('color', uniforms.npcFogColor);
   const npcFogDensity = tslReference('float', uniforms.npcFogDensity);
@@ -216,7 +203,6 @@ function createNpcImpostorColorNode(
   const npcFogStartDistance = tslReference('float', uniforms.npcFogStartDistance);
   const npcFogNear = tslReference('float', uniforms.npcFogNear);
   const npcFogFar = tslReference('float', uniforms.npcFogFar);
-  const baseUv = uv() as TslNode;
   const alertBoost = tslMix(tslVec3(1, 1, 1), tslVec3(1.12, 1.06, 0.96), tslClamp(combatState, tslFloat(0), tslFloat(1)));
   let npcColor = texColor.rgb.mul(alertBoost);
   const luma = dot(npcColor, tslVec3(0.299, 0.587, 0.114));
@@ -224,39 +210,21 @@ function createNpcImpostorColorNode(
   npcColor = tslMin(npcColor.add(tslVec3(0.045, 0.040, 0.030)), tslVec3(1, 1, 1));
   const readabilityLift = readabilityColor.mul(tslFloat(0.18).add(tslFloat(0.12).mul(combatState)));
   npcColor = tslMix(npcColor, tslMin(npcColor.add(readabilityLift), tslVec3(1, 1, 1)), readabilityStrength);
-  // Color-managed albedo BEFORE the legacy exposure/top-light/parity/atmosphere
-  // lighting — the rig path's analog of the billboard `colorManaged` term. The
-  // wrapped-Lambert rig lighting below multiplies this clean albedo so the NPC
-  // impostor tracks terrain the same way foliage does.
-  const rigAlbedo = npcColor;
-  const topLight = smoothstep(tslFloat(0.12), tslFloat(1), baseUv.y).mul(npcTopLight);
-  const npcLight = tslMax(minNpcLight, minNpcLight.add(topLight));
-  npcColor = tslMin(npcColor.mul(npcExposure).mul(npcLight), tslVec3(1, 1, 1));
-  npcColor = tslMin(npcColor.mul(parityScale).add(tslVec3(parityLift)), tslVec3(1, 1, 1));
-  const parityLuma = dot(npcColor, tslVec3(0.299, 0.587, 0.114));
-  npcColor = tslClamp(tslMix(tslVec3(parityLuma), npcColor, paritySaturation), tslVec3(0, 0, 0), tslVec3(1, 1, 1));
 
-  const atmosphereTint = tslMix(npcGroundColor, npcSkyColor, tslFloat(0.42).add(tslFloat(0.58).mul(baseUv.y)))
-    .add(npcSunColor.mul(0.18));
-  const atmosphereLuma = tslMax(dot(atmosphereTint, tslVec3(0.299, 0.587, 0.114)), tslFloat(0.001));
-  const normalizedTint = tslClamp(atmosphereTint.div(atmosphereLuma), tslVec3(0.62, 0.62, 0.62), tslVec3(1.38, 1.38, 1.38));
-  npcColor = tslMix(
-    npcColor,
-    tslClamp(npcColor.mul(normalizedTint).mul(npcAtmosphereLightScale), tslVec3(0, 0, 0), tslVec3(1, 1, 1)),
-    step(tslFloat(0.5), npcLightingEnabled),
-  );
-
-  // --- Unified-rig branch (flag-gated, npc-impostor-and-effects-rig) ---------
+  // --- Unified-rig lighting — the ONLY path (`legacy-path-deletion`) ---------
   // Wrapped-Lambert against the SAME uncompressed rig terms terrain + foliage
   // consume, so the NPC impostor tracks them by construction. This is the
   // billboard migration's response, shared by import (RIG_WRAP / RIG_HEMI_* /
   // RIG_LOW_SUN_FADE_*) — no per-family re-tune. The impostor sprite is a
   // camera-facing up-biased plane with no normal map, so its card normal is
   // (0,1,0) — identical to the foliage card without a normal map — and it reads
-  // the identical hemisphere/low-sun trims. The legacy scene-scan tint above is
-  // bypassed on this path (single authority); legacy stays byte-identical when
-  // the flag is OFF. See docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §2c.
-  const rigEnabled = tslReference('float', lightingRigBindings.rigEnabled).greaterThan(tslFloat(0.5));
+  // the identical hemisphere/low-sun trims. The legacy per-faction
+  // exposure/top-light/parity chain and the scene-scan atmosphere tint are
+  // DELETED (no dead ALU, single lighting authority): `npcColor` here is the
+  // color-managed + readability-lifted albedo, and the rig lights it once. The
+  // per-faction PIXEL_FORGE parity constants were re-validated under the rig at
+  // 4 TODs (see the PR body); they are retained as material uniforms but no
+  // longer shape the lit output. See docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §2c.
   const rigSun = tslReference('color', lightingRigBindings.sunRadiance);
   const rigSky = tslReference('color', lightingRigBindings.skyIrradiance);
   const rigGround = tslReference('color', lightingRigBindings.groundIrradiance);
@@ -276,8 +244,7 @@ function createNpcImpostorColorNode(
     ),
   );
   const rigDirectSun = rigSun.mul(rigDiff).mul(rigLowSunFade);
-  const rigLit = rigAlbedo.mul(rigHemi.add(rigDirectSun)).add(rigAmbient).mul(rigExposure);
-  npcColor = tslSelect(rigEnabled, rigLit, npcColor);
+  npcColor = npcColor.mul(rigHemi.add(rigDirectSun)).add(rigAmbient).mul(rigExposure);
 
   const cameraDistance = tslCameraPosition.sub(tslPositionWorld).length();
   const expFog = tslFloat(1).sub(exp(npcFogDensity.negate().mul(tslMax(tslFloat(0), cameraDistance.sub(npcFogStartDistance)))));
