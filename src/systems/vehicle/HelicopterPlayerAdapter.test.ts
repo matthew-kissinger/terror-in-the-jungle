@@ -116,7 +116,12 @@ function createTransitionContext(playerState: PlayerState, vehicleId = 'heli_1')
       getHelicopterMouseControlEnabled: vi.fn(() => flightMouseControlEnabled),
     } as any,
     hudSystem: createMockHudSystem() as any,
-    gameRenderer: { setCrosshairMode: vi.fn() } as any,
+    gameRenderer: {
+      setCrosshairMode: vi.fn(),
+      // Concrete (non-fenced) attack-sight cue seam (gunship-reticle-upgrade).
+      setCrosshairHelicopterWeapon: vi.fn(),
+      setCrosshairRocketCueOffset: vi.fn(),
+    } as any,
   };
 }
 
@@ -350,6 +355,85 @@ describe('HelicopterPlayerAdapter', () => {
       expect(gunModel.setPlayerDoorGunCrewing).toHaveBeenLastCalledWith('heli_gun', false);
       expect((ctx.gameRenderer as any).setCrosshairMode).toHaveBeenLastCalledWith('infantry');
       expect(adapter.getCrewSeat()).toBe('pilot');
+    });
+  });
+
+  describe('attack-sight reticle cue (gunship-reticle-upgrade)', () => {
+    /** A full pilot-seat update ctx (the door-gun ctx omits the cyclic inputs). */
+    function pilotUpdateCtx() {
+      return {
+        deltaTime: 1 / 60,
+        input: {
+          getIsPointerLocked: vi.fn(() => false),
+          getMouseMovement: vi.fn(() => ({ x: 0, y: 0 })),
+          clearMouseMovement: vi.fn(),
+          isMouseButtonPressed: vi.fn(() => false),
+          isKeyPressed: vi.fn(() => false),
+          getTouchControls: vi.fn(() => null),
+          getTouchMovementVector: vi.fn(() => ({ x: 0, z: 0 })),
+          getTouchCyclicInput: vi.fn(() => ({ pitch: 0, roll: 0 })),
+          getTouchFlightCyclicInput: vi.fn(() => ({ pitch: 0, roll: 0 })),
+        } as any,
+        cameraController: {
+          getFlightMouseControlEnabled: vi.fn(() => false),
+          getHelicopterMouseControlEnabled: vi.fn(() => false),
+        } as any,
+        hudSystem: createMockHudSystem() as any,
+      };
+    }
+
+    /** Board an attack-role airframe (AH-1 Cobra) in the pilot seat. */
+    function boardAttackHeli(weaponName: string, pitch = 0) {
+      const model = createMockHelicopterModel({ role: 'attack' });
+      model.getWeaponStatus = vi.fn(() => ({ name: weaponName, ammo: 14, maxAmmo: 14 }));
+      model.getHelicopterQuaternionTo = vi.fn((_id: string, out: THREE.Quaternion) => {
+        out.setFromEuler(new THREE.Euler(pitch, 0, 0, 'YXZ'));
+        return true;
+      });
+      adapter = new HelicopterPlayerAdapter(model as any);
+      const ctx = createTransitionContext(createPlayerState(), 'cobra_1');
+      adapter.onEnter(ctx);
+      return { model, renderer: ctx.gameRenderer as any };
+    }
+
+    it('keeps the gun pipper prominent + no rocket cue when the minigun is selected', () => {
+      const { renderer } = boardAttackHeli('M134 Minigun');
+      adapter.update(pilotUpdateCtx() as any);
+
+      expect(renderer.setCrosshairHelicopterWeapon).toHaveBeenLastCalledWith('gun');
+      expect(renderer.setCrosshairRocketCueOffset).toHaveBeenLastCalledWith(0);
+    });
+
+    it('raises the rocket reticle + drops the fall cue below the bore when rockets are selected', () => {
+      const { renderer } = boardAttackHeli('Rocket Pod', 0); // level flight
+      adapter.update(pilotUpdateCtx() as any);
+
+      expect(renderer.setCrosshairHelicopterWeapon).toHaveBeenLastCalledWith('rockets');
+      // Level flight → gravity pulls the rocket below the boresight → cue > 0.
+      const offset = renderer.setCrosshairRocketCueOffset.mock.calls.at(-1)![0];
+      expect(offset).toBeGreaterThan(0);
+    });
+
+    it('converges the rocket cue toward the pipper as the nose pitches into a dive', () => {
+      const level = boardAttackHeli('Rocket Pod', 0);
+      adapter.update(pilotUpdateCtx() as any);
+      const levelOffset = level.renderer.setCrosshairRocketCueOffset.mock.calls.at(-1)![0];
+
+      const dive = boardAttackHeli('Rocket Pod', -0.7);
+      adapter.update(pilotUpdateCtx() as any);
+      const diveOffset = dive.renderer.setCrosshairRocketCueOffset.mock.calls.at(-1)![0];
+
+      expect(diveOffset).toBeLessThan(levelOffset);
+    });
+
+    it('does not push the attack sight for a transport helicopter (no pilot sight)', () => {
+      const model = createMockHelicopterModel({ role: 'transport' });
+      adapter = new HelicopterPlayerAdapter(model as any);
+      const ctx = createTransitionContext(createPlayerState(), 'huey_1');
+      adapter.onEnter(ctx);
+      adapter.update(pilotUpdateCtx() as any);
+
+      expect((ctx.gameRenderer as any).setCrosshairHelicopterWeapon).not.toHaveBeenCalled();
     });
   });
 });

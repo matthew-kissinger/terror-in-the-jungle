@@ -46,6 +46,73 @@ interface HelicopterWeaponState {
 const MINIGUN_REARM_RATE = 100;  // rounds per second
 const ROCKET_REARM_RATE = 1;     // rockets per second
 
+// ── Rocket ballistics (CCIP-lite cue) ──
+// The downward acceleration the rocket integrates against once spawned. The
+// rocket flies as a `GrenadeSystem` projectile, which falls under that system's
+// GRAVITY (m/s², magnitude). This is the SAME value the live fire path uses —
+// the cue computes lead from it, it does not introduce new ballistics. Kept in
+// sync with `GrenadeSystem.GRAVITY` (currently -52 → magnitude 52).
+const ROCKET_GRAVITY = 52;
+// Reference slant range the cue solves the impact drop at. The cue is a
+// fall-lead hint, not a ranged solution — a fixed reference range keeps it
+// deterministic and free of a target-range query.
+const ROCKET_CUE_REFERENCE_RANGE = 300; // meters
+
+/** Read-only snapshot of the active pilot weapon for the attack-sight cue. */
+export type HeliWeaponKind = 'gun' | 'rockets';
+
+/**
+ * Rocket-fall cue inputs: the muzzle speed the active rocket pod launches at
+ * plus the airframe's own forward airspeed and nose-down pitch. All read from
+ * existing state — no new ballistics.
+ */
+export interface RocketCueParams {
+  /** Rocket muzzle speed along the boresight (m/s). */
+  muzzleSpeed: number;
+  /** Airframe forward airspeed (m/s); adds to the launch speed when level. */
+  airspeed: number;
+  /** Nose pitch in radians; negative = nose-down (a dive). */
+  pitch: number;
+}
+
+/**
+ * CCIP-lite rocket-fall lead: the angle (radians, ≥ 0) the rocket's impact
+ * sits BELOW the boresight pipper at the reference range. Deterministic and
+ * dependency-free so it unit-tests directly.
+ *
+ * The rocket leaves along the boresight (pitch θ) at `muzzleSpeed`, with the
+ * airframe's forward airspeed projected onto the boresight added on. It then
+ * falls under gravity for the time it takes to reach the reference slant range.
+ * The cue is the angular gap between the boresight and the gravity-bent impact
+ * direction:
+ *   - level flight (θ ≈ 0): full gravity drop → the cue sits well below the pipper;
+ *   - nose-down dive (θ ≪ 0): the boresight already points down the fall line,
+ *     so the angular gap shrinks → the cue converges toward the pipper.
+ */
+export function computeRocketCueDrop(params: RocketCueParams): number {
+  const { muzzleSpeed, airspeed, pitch } = params;
+  // Launch speed along the boresight = muzzle speed + the airframe's airspeed
+  // projected onto the boresight (cos of the dive angle). Floor it so a stalled
+  // hover never divides by ~0.
+  const launchSpeed = Math.max(1, muzzleSpeed + airspeed * Math.cos(pitch));
+  const range = ROCKET_CUE_REFERENCE_RANGE;
+  // Time to fly the reference range at the boresight launch speed.
+  const t = range / launchSpeed;
+  // Gravity drop over that flight (meters below the straight-line boresight path).
+  const drop = 0.5 * ROCKET_GRAVITY * t * t;
+  // Impact point relative to the muzzle, in the airframe's vertical plane:
+  // straight out along the boresight (pitch θ) then pulled down by `drop`.
+  const fwdY = range * Math.sin(pitch);
+  const fwdH = range * Math.cos(pitch);
+  const impactY = fwdY - drop;
+  // Angle of the boresight and of the impact direction, measured from horizontal.
+  const boresightAngle = Math.atan2(fwdY, fwdH);
+  const impactAngle = Math.atan2(impactY, fwdH);
+  // The cue is how far below the boresight the impact lands (never negative —
+  // gravity only ever drops the rocket below the line of fire).
+  return Math.max(0, boresightAngle - impactAngle);
+}
+
 // ── Tracer / muzzle flash ──
 const MAX_TRACER_RANGE = 400;    // max hitscan visual range
 const MUZZLE_FLASH_THROTTLE = 0.1; // seconds between muzzle flashes (~10/sec)
@@ -283,6 +350,34 @@ export class HelicopterWeaponSystem {
 
   getWeaponCount(heliId: string): number {
     return this.states.get(heliId)?.weapons.length ?? 0;
+  }
+
+  /**
+   * Which kind of pilot weapon is selected — `'rockets'` for a ballistic
+   * projectile pod, `'gun'` for a hitscan weapon. `null` when the aircraft has
+   * no pilot armament. Read-only; drives which attack-sight reticle is
+   * prominent (gun pipper vs rocket-fall cue).
+   */
+  getActiveWeaponKind(heliId: string): HeliWeaponKind | null {
+    const state = this.states.get(heliId);
+    const active = state?.weapons[state.activeIndex];
+    if (!active) return null;
+    return (active.config.projectileSpeed ?? 0) > 0 ? 'rockets' : 'gun';
+  }
+
+  /**
+   * Ballistic params for the active rocket pod (muzzle speed + remaining
+   * count), or `null` when the selected weapon is not a projectile pod. These
+   * are the SAME values the live fire path integrates with — read-only, no new
+   * ballistics — so the CCIP-lite cue can lead the rocket fall.
+   */
+  getActiveRocketBallistics(heliId: string): { muzzleSpeed: number; ammo: number } | null {
+    const state = this.states.get(heliId);
+    const active = state?.weapons[state.activeIndex];
+    if (!active) return null;
+    const muzzleSpeed = active.config.projectileSpeed ?? 0;
+    if (muzzleSpeed <= 0) return null;
+    return { muzzleSpeed, ammo: Math.floor(active.ammo) };
   }
 
   /** Number of crew-served weapons (door guns) registered for this aircraft. */

@@ -94,6 +94,20 @@ describe('HelicopterHUD', () => {
     expect(hud.element.querySelector('[data-ref="weaponAmmoEl"]')?.textContent).toBe('3500');
   });
 
+  it('shows the selected rocket pod with its remaining count on weapon cycle', () => {
+    // Cycling from the minigun to the rocket pod swaps the live readout.
+    hud.setWeaponStatus('M134 Minigun', 3500);
+    hud.setWeaponStatus('Rocket Pod', 14);
+    expect(hud.element.querySelector('[data-ref="weaponNameEl"]')?.textContent).toBe('Rocket Pod');
+    expect(hud.element.querySelector('[data-ref="weaponAmmoEl"]')?.textContent).toBe('14');
+  });
+
+  it('floors a fractional ammo count to whole rounds in the readout', () => {
+    // Rocket pods rearm in floating increments; the readout shows whole rounds.
+    hud.setWeaponStatus('Rocket Pod', 7.8);
+    expect(hud.element.querySelector('[data-ref="weaponAmmoEl"]')?.textContent).toBe('7');
+  });
+
   it('shows the current damage percent and bar width', () => {
     hud.setDamage(42);
     expect(hud.element.querySelector('[data-ref="damageValue"]')?.textContent).toBe('42%');
