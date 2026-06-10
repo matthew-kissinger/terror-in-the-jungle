@@ -74,11 +74,14 @@ import { applyRigPresetTrim, type RigPresetTrim } from './LightingRigPresetTrim'
  *
  * Setting this back to `false` — at runtime via
  * `window.__lightingRig.enabled = false` (see `LIGHTING_RIG_GLOBAL_KEY`), or in
- * source here — reverts the CPU-side lighting authority to the legacy path: the
- * scene lights + scene fog read the compressed `AtmosphereLightingSnapshot`
- * again, the impostor scene-graph scan resumes, and the terrain night-fill
- * emissive comes back. It is the documented safety valve for the first release
- * after the flip; the next cycle removes the flag and this object entirely.
+ * source here — reverts the CPU-side SCENE authority only: the scene lights +
+ * scene fog read the compressed `AtmosphereLightingSnapshot` again. The deleted
+ * in-shader paths do NOT come back — the impostor scene-graph scan, the terrain
+ * night-fill emissive, and the foliage clamp band are gone on both flag states
+ * (material graphs are rig-only; on OFF the night floor returns via the legacy
+ * scene ambient light, and impostors stay rig-lit, a mild deliberate mismatch).
+ * It is the documented safety valve for the first release after the flip; the
+ * next cycle removes the flag and this object entirely.
  */
 export const LightingRigConfig = {
   /**

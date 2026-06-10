@@ -290,7 +290,8 @@ export class TerrainSystem implements GameSystem {
     // ambientRadiance is the single night floor — driven into the terrain PBR
     // via the rig scene lights — so the legacy night-fill emissive re-shaping is
     // gone: pass a zero strength and a black fill (the night-fill emissive node
-    // is collapsed to black in TerrainMaterial). The direct-light direction and
+    // was DELETED from TerrainMaterial; these uniforms are inert declarations
+    // kept for out-of-scope writers). The direct-light direction and
     // daylight factor still drive the horizon-occlusion relief that the rig path
     // retains ("keep the effect, kill the bespoke inputs").
     this.atmosphereNightFillColor.setRGB(0, 0, 0);
