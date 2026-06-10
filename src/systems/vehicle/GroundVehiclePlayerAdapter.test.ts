@@ -293,7 +293,7 @@ describe('GroundVehiclePlayerAdapter', () => {
   });
 
   describe('third-person follow camera pose', () => {
-    it('computes a camera position behind and above the chassis with a look-target on the chassis', () => {
+    it('computes a camera position behind and above the chassis looking ahead of it', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
@@ -306,10 +306,21 @@ describe('GroundVehiclePlayerAdapter', () => {
       // With identity quaternion the chassis 'back' direction is world +Z.
       expect(camPos.z).toBeGreaterThan(0);
       expect(camPos.y).toBeGreaterThan(0); // lifted above the chassis
+      // Elevated but NOT bird's-eye: the camera position sits in a band that
+      // keeps the view over the hood toward the terrain ahead (owner feedback
+      // 2026-06-10: the old ~48° framing pointed too far down).
       const downAngleDeg = THREE.MathUtils.radToDeg(Math.atan2(camPos.y, Math.hypot(camPos.x, camPos.z)));
-      expect(downAngleDeg).toBeGreaterThan(45);
+      expect(downAngleDeg).toBeGreaterThan(15);
+      expect(downAngleDeg).toBeLessThan(40);
+      // Look-target sits ahead of the chassis (local -Z forward), not on it.
       expect(lookAt.x).toBe(0);
-      expect(lookAt.z).toBe(0);
+      expect(lookAt.z).toBeLessThan(-1);
+      expect(lookAt.z).toBeCloseTo(-adapter.cameraLookAhead, 4);
+      // Resulting view pitch is shallow — the driver sees ahead, not the roof.
+      const viewPitchDeg = THREE.MathUtils.radToDeg(
+        Math.atan2(camPos.y - lookAt.y, Math.hypot(lookAt.x - camPos.x, lookAt.z - camPos.z)),
+      );
+      expect(viewPitchDeg).toBeLessThan(15);
     });
 
     it('returns false when no vehicle is active', () => {

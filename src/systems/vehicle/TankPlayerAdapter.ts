@@ -164,10 +164,13 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   playerSeat: CrewSeat = 'pilot';
 
   // Third-person follow tuning — wider/higher than the jeep to clear the
-  // turret silhouette.
+  // turret silhouette, with a forward look-ahead so the driver view stays
+  // near-level (~5° down) toward the terrain ahead instead of pitching
+  // down onto the hull.
   cameraDistance = 11.0;
-  cameraHeight = 11.0;
-  cameraLookHeight = 2.4;
+  cameraHeight = 5.5;
+  cameraLookHeight = 3.0;
+  cameraLookAhead = 18.0;
 
   // Gunner aim sensitivity + sight offsets (mutable so settings can retune).
   mouseSensitivity = MOUSE_AIM_SENSITIVITY;
@@ -461,7 +464,7 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     const back = new THREE.Vector3(0, 0, 1).applyQuaternion(this.model.quaternion);
     outPosition.copy(this.model.position).addScaledVector(back, this.cameraDistance);
     outPosition.y += this.cameraHeight;
-    outLookTarget.copy(this.model.position);
+    outLookTarget.copy(this.model.position).addScaledVector(back, -this.cameraLookAhead);
     outLookTarget.y += this.cameraLookHeight;
     return true;
   }

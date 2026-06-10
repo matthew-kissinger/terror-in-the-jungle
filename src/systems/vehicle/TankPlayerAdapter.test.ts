@@ -431,7 +431,7 @@ describe('TankPlayerAdapter', () => {
   });
 
   describe('third-person orbit-tank camera', () => {
-    it('computes a camera position behind and above the chassis with a look-target on the chassis', () => {
+    it('computes a camera position behind and above the chassis looking ahead of it', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
@@ -444,12 +444,22 @@ describe('TankPlayerAdapter', () => {
       // With identity quaternion the chassis 'back' direction is world +Z.
       expect(camPos.z).toBeGreaterThan(0);
       expect(camPos.y).toBeGreaterThan(0); // lifted above the chassis
+      // Elevated but NOT bird's-eye: clears the turret silhouette while the
+      // view stays toward the terrain ahead (owner feedback 2026-06-10: the
+      // old ~46° framing pointed too far down).
       const downAngleDeg = THREE.MathUtils.radToDeg(Math.atan2(camPos.y - tank.position.y, Math.hypot(camPos.x - tank.position.x, camPos.z - tank.position.z)));
-      expect(downAngleDeg).toBeGreaterThan(43);
-      // Look-target sits on the chassis center, lifted by cameraLookHeight.
+      expect(downAngleDeg).toBeGreaterThan(15);
+      expect(downAngleDeg).toBeLessThan(40);
+      // Look-target sits ahead of the chassis (local -Z forward), lifted by
+      // cameraLookHeight above the chassis origin.
       expect(lookAt.x).toBe(0);
-      expect(lookAt.z).toBe(0);
+      expect(lookAt.z).toBeCloseTo(-adapter.cameraLookAhead, 4);
       expect(lookAt.y).toBeCloseTo(adapter.cameraLookHeight + 1, 4); // chassis y = 1
+      // Resulting view pitch is shallow — the driver sees ahead, not the hull.
+      const viewPitchDeg = THREE.MathUtils.radToDeg(
+        Math.atan2(camPos.y - lookAt.y, Math.hypot(lookAt.x - camPos.x, lookAt.z - camPos.z)),
+      );
+      expect(viewPitchDeg).toBeLessThan(15);
     });
 
     it('orbits with the chassis: rotating the tank 90° CCW about Y moves the camera to its world-+X side', () => {

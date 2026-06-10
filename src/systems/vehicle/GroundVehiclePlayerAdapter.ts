@@ -92,9 +92,13 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
   readonly inputContext: InputContext = 'gameplay';
 
   // Third-person follow tuning (jeep-sized; tank/truck adapters may override).
+  // Height + look-ahead frame the road ahead at a shallow (~6°) downward
+  // view pitch instead of staring down at the chassis roof; the camera still
+  // sits clearly above the vehicle so it can never read as a bumper cam.
   cameraDistance = 7.25;
-  cameraHeight = 8.0;
-  cameraLookHeight = 1.25;
+  cameraHeight = 4.0;
+  cameraLookHeight = 1.6;
+  cameraLookAhead = 14.0;
 
   private controls: GroundVehicleControls = {
     throttle: 0,
@@ -266,7 +270,9 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
    * Compute a third-person follow camera pose for the active vehicle.
    * Writes into the provided vectors and returns true on success.
    * Camera sits `cameraDistance` behind the chassis and `cameraHeight`
-   * above its position, looking at the chassis center + `cameraLookHeight`.
+   * above its position, looking at a point `cameraLookAhead` ahead of the
+   * chassis (+ `cameraLookHeight`) so the view stays near-level toward the
+   * terrain in front instead of pitching down onto the vehicle.
    *
    * Mirrors the helicopter follow-camera math in `PlayerCamera`; lives on
    * the adapter so the integration layer can swap in a generalized
@@ -287,7 +293,7 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
     const back = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
     outPosition.copy(pos).addScaledVector(back, this.cameraDistance);
     outPosition.y += this.cameraHeight;
-    outLookTarget.copy(pos);
+    outLookTarget.copy(pos).addScaledVector(back, -this.cameraLookAhead);
     outLookTarget.y += this.cameraLookHeight;
     return true;
   }

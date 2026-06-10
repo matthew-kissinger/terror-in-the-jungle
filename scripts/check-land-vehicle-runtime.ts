@@ -191,10 +191,20 @@ const MIN_TRAVEL_METERS: Record<VehicleKind, number> = {
   m48: 0.75,
 };
 
-const MIN_CAMERA_DOWN_ANGLE_DEG: Record<VehicleKind, number> = {
-  m151: 45,
-  m48: 43,
+// Elevated-but-forward band: below min the camera is back at the old
+// "mounts under the car / flat rear bumper" bug; above max it points too
+// far down at the chassis instead of framing the terrain ahead (owner
+// feedback 2026-06-10). Current adapter tuning lands ~29° (m151) / ~27° (m48).
+const CAMERA_DOWN_ANGLE_DEG_BAND: Record<VehicleKind, { min: number; max: number }> = {
+  m151: { min: 15, max: 40 },
+  m48: { min: 15, max: 40 },
 };
+
+function cameraDownAngleInBand(kind: VehicleKind, snapshot: CameraSnapshot | null | undefined): boolean {
+  if (!snapshot) return false;
+  const band = CAMERA_DOWN_ANGLE_DEG_BAND[kind];
+  return snapshot.downAngleDeg >= band.min && snapshot.downAngleDeg <= band.max;
+}
 
 function parseOptions(): Options {
   const portFlagIndex = process.argv.findIndex((arg) => arg === '--port');
@@ -693,14 +703,14 @@ function buildChecks(results: TargetResult[], activeTargets = TARGETS): CheckRow
     rows.push(
       check('open_frontier_m151_boarded', openFrontierJeep?.boarded === true, openFrontierJeep, 'Open Frontier M151 boards through PlayerController.handleBoardNearestVehicle.'),
       check('open_frontier_m151_drives', (openFrontierJeep?.travelMeters ?? 0) >= MIN_TRAVEL_METERS.m151, openFrontierJeep?.travelMeters, 'Open Frontier M151 moves after holding W in the live loop.'),
-      check('open_frontier_m151_camera_high_enough', (openFrontierJeep?.cameraAfterBoard?.downAngleDeg ?? 0) >= MIN_CAMERA_DOWN_ANGLE_DEG.m151, openFrontierJeep?.cameraAfterBoard, 'Open Frontier M151 follow camera has an elevated third-person angle, not a flat rear bumper view.'),
+      check('open_frontier_m151_camera_framing', cameraDownAngleInBand('m151', openFrontierJeep?.cameraAfterBoard), openFrontierJeep?.cameraAfterBoard, 'Open Frontier M151 follow camera sits in the elevated-but-forward band — neither a flat rear bumper view nor pitched down onto the chassis.'),
     );
   }
   if (hasTarget('open_frontier', 'm48')) {
     rows.push(
       check('open_frontier_m48_boarded', openFrontierTank?.boarded === true, openFrontierTank, 'Open Frontier M48 boards through PlayerController.handleBoardNearestVehicle.'),
       check('open_frontier_m48_drives', (openFrontierTank?.travelMeters ?? 0) >= MIN_TRAVEL_METERS.m48, openFrontierTank?.travelMeters, 'Open Frontier M48 moves after holding W in the live loop.'),
-      check('open_frontier_m48_camera_high_enough', (openFrontierTank?.cameraAfterBoard?.downAngleDeg ?? 0) >= MIN_CAMERA_DOWN_ANGLE_DEG.m48, openFrontierTank?.cameraAfterBoard, 'Open Frontier M48 follow camera has an elevated third-person driver view.'),
+      check('open_frontier_m48_camera_framing', cameraDownAngleInBand('m48', openFrontierTank?.cameraAfterBoard), openFrontierTank?.cameraAfterBoard, 'Open Frontier M48 follow camera sits in the elevated-but-forward band.'),
     );
   }
   if (hasTarget('a_shau_valley', 'm48')) {
@@ -710,13 +720,13 @@ function buildChecks(results: TargetResult[], activeTargets = TARGETS): CheckRow
     rows.push(
       check('a_shau_m151_boarded', aShauJeep?.boarded === true, aShauJeep, 'A Shau M151 boards through PlayerController.handleBoardNearestVehicle.'),
       check('a_shau_m151_drives', (aShauJeep?.travelMeters ?? 0) >= MIN_TRAVEL_METERS.m151, aShauJeep?.travelMeters, 'A Shau M151 moves after holding W in the live loop.'),
-      check('a_shau_m151_camera_high_enough', (aShauJeep?.cameraAfterBoard?.downAngleDeg ?? 0) >= MIN_CAMERA_DOWN_ANGLE_DEG.m151, aShauJeep?.cameraAfterBoard, 'A Shau M151 follow camera has an elevated third-person driver view.'),
+      check('a_shau_m151_camera_framing', cameraDownAngleInBand('m151', aShauJeep?.cameraAfterBoard), aShauJeep?.cameraAfterBoard, 'A Shau M151 follow camera sits in the elevated-but-forward band.'),
     );
   }
   rows.push(
     check('exits_cleanly', results.filter((result) => result.boarded).every((result) => result.exited), results.map((result) => ({ mode: result.mode, kind: result.kind, boarded: result.boarded, exited: result.exited })), 'Every successfully boarded land vehicle exits through PlayerController.handleExitVehicle.'),
     check('drive_rows_have_motion', driveRows.every((result) => (result.travelMeters ?? 0) >= MIN_TRAVEL_METERS[result.kind]), driveRows.map((result) => ({ mode: result.mode, kind: result.kind, travelMeters: result.travelMeters })), 'All boarded drive rows clear the movement threshold for their vehicle class.'),
-    check('camera_rows_have_elevated_angles', cameraRows.every((result) => (result.cameraAfterBoard?.downAngleDeg ?? 0) >= MIN_CAMERA_DOWN_ANGLE_DEG[result.kind]), cameraRows.map((result) => ({ mode: result.mode, kind: result.kind, camera: result.cameraAfterBoard })), 'All boarded land vehicles use elevated third-person camera framing.'),
+    check('camera_rows_in_framing_band', cameraRows.every((result) => cameraDownAngleInBand(result.kind, result.cameraAfterBoard)), cameraRows.map((result) => ({ mode: result.mode, kind: result.kind, camera: result.cameraAfterBoard })), 'All boarded land vehicles use elevated-but-forward third-person camera framing.'),
     check('weapon_overlay_hidden_in_vehicles', weaponRows.length > 0 && weaponRows.every((row) =>
       row.weapon.inAnyVehicle === true
       && row.weapon.vehicleSuppressed === true
