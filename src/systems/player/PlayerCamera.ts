@@ -9,6 +9,12 @@ import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { PlayerInput } from './PlayerInput';
 import { IHelicopterModel } from '../../types/SystemInterfaces';
 import type { FixedWingModel } from '../vehicle/FixedWingModel';
+import {
+  computeFixedWingConvergencePoint,
+  getFixedWingCameraFit,
+  getFixedWingWeaponConfig,
+} from '../vehicle/FixedWingArmament';
+import type { FixedWingCameraFit } from '../vehicle/FixedWingArmament';
 
 const _helicopterPosition = new THREE.Vector3();
 const _helicopterQuaternion = new THREE.Quaternion();
@@ -18,6 +24,8 @@ const _lookTarget = new THREE.Vector3();
 const _fwPosition = new THREE.Vector3();
 const _fwQuaternion = new THREE.Quaternion();
 const _fwForward = new THREE.Vector3();
+const _fwRight = new THREE.Vector3();
+const _fwConvergence = new THREE.Vector3();
 const _followPosition = new THREE.Vector3();
 const _followLookTarget = new THREE.Vector3();
 // Out-param scratch for the optional weapon-sight FOV (degrees; 0 = unset).
@@ -80,6 +88,10 @@ export class PlayerCamera {
   private fixedWingLookTarget = new THREE.Vector3();
   private hasFixedWingCameraState = false;
   private activeFixedWingCameraId: string | null = null;
+  // AC-47 broadside gunner view: when on, the fixed-wing camera looks down the
+  // left-side fire axis to aim the broadside battery (the chase cam cannot).
+  // Set by the fixed-wing adapter; ignored by airframes without a broadside.
+  private fixedWingBroadsideView = false;
 
   // Saved infantry angles for helicopter enter/exit transitions
   private savedInfantryYaw = Math.PI;
@@ -104,6 +116,25 @@ export class PlayerCamera {
 
   setFixedWingModel(fixedWingModel: FixedWingModel): void {
     this.fixedWingModel = fixedWingModel;
+  }
+
+  /**
+   * Enable (or disable) the AC-47 broadside gunner view. The fixed-wing adapter
+   * toggles this; airframes without a broadside battery (A-1, F-4) ignore it and
+   * stay on the chase cam. Force-resetting to false on exit guarantees the view
+   * never leaks back into the next aircraft or infantry.
+   */
+  setFixedWingBroadsideView(enabled: boolean): void {
+    if (this.fixedWingBroadsideView !== enabled) {
+      this.fixedWingBroadsideView = enabled;
+      // A view switch re-seeds the follow smoothing so it snaps to the new pose
+      // instead of lerping across the cut.
+      this.resetFixedWingCameraState();
+    }
+  }
+
+  isFixedWingBroadsideView(): boolean {
+    return this.fixedWingBroadsideView;
   }
 
   /**
@@ -344,12 +375,32 @@ export class PlayerCamera {
       return;
     }
 
-    // Per-aircraft camera tuning
-    const display = this.fixedWingModel.getDisplayInfo(aircraftId);
-    const distanceBack = display?.cameraDistance ?? 30;
-    const heightAbove = display?.cameraHeight ?? 8;
+    // Per-airframe camera tuning comes from the data-driven camera-fit table
+    // (FixedWingArmament), not hardcoded here. The reticle (screen centre) is
+    // boresighted to the gun convergence point so it predicts where the guns
+    // hit — forward for A-1/F-4, broadside-left for the AC-47.
+    const configKey = this.fixedWingModel.getConfigKey(aircraftId);
+    const fit = getFixedWingCameraFit(configKey);
+    const weapon = getFixedWingWeaponConfig(configKey);
+    const distanceBack = fit.chaseDistance;
+    const heightAbove = fit.chaseHeight;
 
-    if (!this.flightMouseControlEnabled && input.getIsPointerLocked()) {
+    // Convergence point the reticle sits on (chase + broadside both aim here).
+    computeFixedWingConvergencePoint(
+      weapon,
+      _fwPosition,
+      _fwQuaternion,
+      fit.sightConvergenceRange,
+      _fwConvergence,
+    );
+
+    // AC-47 broadside gunner view: only when the airframe has a broadside battery
+    // AND the gunner view is toggled on. The chase cam owns every other case.
+    const broadsideActive = this.fixedWingBroadsideView && fit.broadside !== undefined;
+
+    if (broadsideActive) {
+      this.applyBroadsideView(aircraftId, fit, deltaTime);
+    } else if (!this.flightMouseControlEnabled && input.getIsPointerLocked()) {
       // Free orbital look mode
       const mouseSensitivity = 0.01;
       const mouseMovement = input.getMouseMovement();
@@ -378,8 +429,9 @@ export class PlayerCamera {
       _cameraPosition.addScaledVector(_fwForward, -distanceBack);
       _cameraPosition.y += heightAbove;
 
-      _lookTarget.copy(_fwPosition);
-      _lookTarget.y += 2;
+      // Look at the forward gun convergence so the boresighted reticle predicts
+      // where the guns hit at the reference range.
+      _lookTarget.copy(_fwConvergence);
 
       if (!this.hasFixedWingCameraState || this.activeFixedWingCameraId !== aircraftId) {
         this.camera.position.copy(_cameraPosition);
@@ -397,7 +449,9 @@ export class PlayerCamera {
     }
 
     let targetFOV = this.baseFOV;
-    if (display?.fovWidenEnabled) {
+    // The broadside gunner view holds the base FOV (no speed widen); only the
+    // chase cam widens with speed on airframes that opt in.
+    if (!broadsideActive && fit.fovWidenEnabled) {
       const fd = this.fixedWingModel.getFlightData(aircraftId);
       if (fd) {
         const maxSpeed = 200; // F-4 max speed
@@ -409,6 +463,43 @@ export class PlayerCamera {
     const fovAlpha = 1 - Math.exp(-FIXED_WING_FOV_RATE * Math.max(deltaTime, 0));
     this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, fovAlpha);
     this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * AC-47 broadside gunner view. The battery fires 90° to the aircraft's left,
+   * so the camera sits OPPOSITE the fire axis (off the right side, slightly aft
+   * and above) and looks across the airframe at the broadside convergence point
+   * — the reticle centres on it, predicting where the orbit fire lands. The same
+   * follow-smoothing state is reused so the cut into and out of this view snaps
+   * cleanly (the view toggle re-seeds it). Flight CONTROLS are unaffected: this
+   * only repositions the camera.
+   */
+  private applyBroadsideView(aircraftId: string, fit: FixedWingCameraFit, deltaTime: number): void {
+    const broadside = fit.broadside;
+    if (!broadside) return;
+
+    // Airframe right = +X (opposite the left fire axis); aft = +Z.
+    _fwRight.set(1, 0, 0).applyQuaternion(_fwQuaternion);
+    _fwForward.set(0, 0, -1).applyQuaternion(_fwQuaternion);
+
+    _cameraPosition.copy(_fwPosition);
+    _cameraPosition.addScaledVector(_fwRight, broadside.lateralOffset);
+    _cameraPosition.addScaledVector(_fwForward, -broadside.aftOffset);
+    _cameraPosition.y += broadside.heightOffset;
+
+    if (!this.hasFixedWingCameraState || this.activeFixedWingCameraId !== aircraftId) {
+      this.camera.position.copy(_cameraPosition);
+      this.fixedWingLookTarget.copy(_fwConvergence);
+      this.hasFixedWingCameraState = true;
+      this.activeFixedWingCameraId = aircraftId;
+    } else {
+      const followAlpha = 1 - Math.exp(-FIXED_WING_CAMERA_FOLLOW_RATE * Math.max(deltaTime, 0));
+      const lookAlpha = 1 - Math.exp(-FIXED_WING_CAMERA_LOOK_RATE * Math.max(deltaTime, 0));
+      this.camera.position.lerp(_cameraPosition, followAlpha);
+      this.fixedWingLookTarget.lerp(_fwConvergence, lookAlpha);
+    }
+
+    this.camera.lookAt(this.fixedWingLookTarget);
   }
 
   private resetFixedWingCameraState(): void {
@@ -429,6 +520,9 @@ export class PlayerCamera {
     // Reset FOV in case it was widened by fixed-wing speed
     this.camera.fov = this.baseFOV;
     this.camera.updateProjectionMatrix();
+    // Clear the AC-47 broadside view so it can never leak into infantry or the
+    // next aircraft after a dismount.
+    this.fixedWingBroadsideView = false;
   }
 
   setInfantryViewAngles(yaw: number, pitch = 0): void {

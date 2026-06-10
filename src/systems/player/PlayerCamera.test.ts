@@ -457,22 +457,20 @@ describe('PlayerCamera', () => {
   describe('updateCamera - Fixed-wing Following Mode', () => {
     function createFixedWingModel(
       aircraftPosition: THREE.Vector3,
-      options: { fovWidenEnabled?: boolean; airspeed?: number } = {},
+      options: { configKey?: string; airspeed?: number; quaternion?: THREE.Quaternion } = {},
     ) {
+      const configKey = options.configKey ?? 'A1_SKYRAIDER';
       return {
         getAircraftPositionTo: vi.fn((_id: string, target: THREE.Vector3) => {
           target.copy(aircraftPosition);
           return true;
         }),
         getAircraftQuaternionTo: vi.fn((_id: string, target: THREE.Quaternion) => {
-          target.identity();
+          if (options.quaternion) target.copy(options.quaternion);
+          else target.identity();
           return true;
         }),
-        getDisplayInfo: vi.fn(() => ({
-          cameraDistance: 30,
-          cameraHeight: 8,
-          fovWidenEnabled: options.fovWidenEnabled ?? false,
-        })),
+        getConfigKey: vi.fn(() => configKey),
         getFlightData: vi.fn(() => ({ airspeed: options.airspeed ?? 0 })),
       };
     }
@@ -481,6 +479,13 @@ describe('PlayerCamera', () => {
       playerState.isInFixedWing = true;
       playerState.fixedWingId = 'fw-1';
       playerCamera.setFixedWingModel(fixedWingModel as never);
+    }
+
+    // Screen-space offset of a world point from the camera centre, in NDC.
+    // (0,0) is dead centre; the reticle lives at screen centre.
+    function screenOffset(worldPoint: THREE.Vector3): { x: number; y: number } {
+      const ndc = worldPoint.clone().project(camera);
+      return { x: ndc.x, y: ndc.y };
     }
 
     it('snaps on first entry, then smooths follow movement instead of teleporting to the new target', () => {
@@ -527,7 +532,7 @@ describe('PlayerCamera', () => {
     it('smooths high-speed FOV widening instead of snapping to the full boost in one frame', () => {
       const aircraftPosition = new THREE.Vector3(0, 0, 0);
       const fixedWingModel = createFixedWingModel(aircraftPosition, {
-        fovWidenEnabled: true,
+        configKey: 'F4_PHANTOM', // the F-4 opts into speed FOV widen
         airspeed: 200,
       });
       enterFixedWing(fixedWingModel);
@@ -537,6 +542,129 @@ describe('PlayerCamera', () => {
 
       expect(camera.fov).toBeGreaterThan(initialFov);
       expect(camera.fov).toBeLessThan(90);
+    });
+
+    it('consumes the per-airframe chase fit (the wide AC-47 frames farther back than the agile A-1)', () => {
+      // A-1 chase distance.
+      const a1Model = createFixedWingModel(new THREE.Vector3(0, 0, 0), { configKey: 'A1_SKYRAIDER' });
+      enterFixedWing(a1Model);
+      playerCamera.updateCamera(mockInput, 1 / 60);
+      const a1Back = camera.position.z;
+
+      // AC-47 chase distance, fresh camera so the snap is clean.
+      const ac47Camera = new THREE.PerspectiveCamera();
+      const ac47State = { ...playerState, isInFixedWing: true, fixedWingId: 'fw-1' } as PlayerState;
+      const ac47PlayerCamera = new PlayerCamera(ac47Camera, ac47State);
+      ac47PlayerCamera.setFixedWingModel(
+        createFixedWingModel(new THREE.Vector3(0, 0, 0), { configKey: 'AC47_SPOOKY' }) as never,
+      );
+      ac47PlayerCamera.updateCamera(mockInput, 1 / 60);
+
+      // The AC-47 sits farther behind and higher than the A-1.
+      expect(ac47Camera.position.z).toBeGreaterThan(a1Back);
+      expect(ac47Camera.position.y).toBeGreaterThan(camera.position.y);
+    });
+
+    it('boresights the reflector reticle (screen centre) onto the forward gun convergence for the A-1', () => {
+      const fixedWingModel = createFixedWingModel(new THREE.Vector3(0, 0, 0), { configKey: 'A1_SKYRAIDER' });
+      enterFixedWing(fixedWingModel);
+      playerCamera.updateCamera(mockInput, 1 / 60);
+      camera.updateMatrixWorld(true);
+
+      // The forward gun convergence (far down the nose axis) projects to screen
+      // centre, so the boresighted reticle predicts where the wing cannons hit.
+      const convergence = new THREE.Vector3(0, 0, -320);
+      const offset = screenOffset(convergence);
+      expect(Math.abs(offset.x)).toBeLessThan(0.06);
+      expect(Math.abs(offset.y)).toBeLessThan(0.06);
+    });
+
+    it('boresights the reticle onto the nose axis for the F-4 too', () => {
+      const fixedWingModel = createFixedWingModel(new THREE.Vector3(0, 0, 0), { configKey: 'F4_PHANTOM' });
+      enterFixedWing(fixedWingModel);
+      playerCamera.updateCamera(mockInput, 1 / 60);
+      camera.updateMatrixWorld(true);
+
+      const convergence = new THREE.Vector3(0, 0, -420);
+      const offset = screenOffset(convergence);
+      expect(Math.abs(offset.x)).toBeLessThan(0.06);
+      expect(Math.abs(offset.y)).toBeLessThan(0.06);
+    });
+  });
+
+  describe('updateCamera - AC-47 broadside gunner view', () => {
+    function createAc47Model(aircraftPosition: THREE.Vector3) {
+      return {
+        getAircraftPositionTo: vi.fn((_id: string, target: THREE.Vector3) => {
+          target.copy(aircraftPosition);
+          return true;
+        }),
+        getAircraftQuaternionTo: vi.fn((_id: string, target: THREE.Quaternion) => {
+          target.identity();
+          return true;
+        }),
+        getConfigKey: vi.fn(() => 'AC47_SPOOKY'),
+        getFlightData: vi.fn(() => ({ airspeed: 60 })),
+      };
+    }
+
+    function enterAc47(model: unknown): void {
+      playerState.isInFixedWing = true;
+      playerState.fixedWingId = 'fw-1';
+      playerCamera.setFixedWingModel(model as never);
+    }
+
+    it('looks down the left-side fire axis so the reticle aims the broadside battery', () => {
+      const model = createAc47Model(new THREE.Vector3(0, 100, 0));
+      enterAc47(model);
+      playerCamera.setFixedWingBroadsideView(true);
+      playerCamera.updateCamera(mockInput, 1 / 60);
+      camera.updateMatrixWorld(true);
+
+      // Broadside fires 90° left (world -X); the camera looks roughly left so the
+      // forward axis has a strong negative-X component.
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      expect(forward.x).toBeLessThan(-0.6);
+
+      // The broadside convergence (far to the left) projects near screen centre.
+      const convergence = new THREE.Vector3(-360, 100, 0);
+      const ndc = convergence.clone().project(camera);
+      expect(Math.abs(ndc.x)).toBeLessThan(0.1);
+      expect(Math.abs(ndc.y)).toBeLessThan(0.1);
+    });
+
+    it('restores the forward chase cam when the broadside view is toggled back off', () => {
+      const model = createAc47Model(new THREE.Vector3(0, 100, 0));
+      enterAc47(model);
+
+      playerCamera.setFixedWingBroadsideView(true);
+      playerCamera.updateCamera(mockInput, 1 / 60);
+      const broadsidePos = camera.position.clone();
+
+      playerCamera.setFixedWingBroadsideView(false);
+      playerCamera.updateCamera(mockInput, 1 / 60);
+
+      // Chase cam sits behind the nose (+Z for an identity-heading aircraft),
+      // a different pose than the side-mounted broadside camera.
+      expect(camera.position.equals(broadsidePos)).toBe(false);
+      expect(camera.position.z).toBeGreaterThan(0);
+    });
+
+    it('never leaks the broadside view into infantry after a dismount', () => {
+      const model = createAc47Model(new THREE.Vector3(0, 100, 0));
+      enterAc47(model);
+      playerCamera.setFixedWingBroadsideView(true);
+      playerCamera.updateCamera(mockInput, 1 / 60);
+      expect(playerCamera.isFixedWingBroadsideView()).toBe(true);
+
+      // Dismount restores infantry angles, which clears the broadside flag.
+      playerCamera.restoreInfantryAngles();
+      playerState.isInFixedWing = false;
+      playerState.fixedWingId = null;
+      playerCamera.updateCamera(mockInput, 1 / 60);
+
+      expect(playerCamera.isFixedWingBroadsideView()).toBe(false);
+      expect(camera.position.equals(playerState.position)).toBe(true);
     });
   });
 
