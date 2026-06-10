@@ -205,6 +205,16 @@ changes, zero hard-stops. Next: owner playtest sweep
 ([PLAYTEST_PENDING](PLAYTEST_PENDING.md) rows for phases 2-4 + standing
 deferrals).
 
+**Two campaigns SCAFFOLDED 2026-06-09, awaiting owner `/goal`** (from the
+owner's post-deploy playtest verdicts on lighting + per-craft gaps):
+
+- [CAMPAIGN_2026-06-09-lighting-rig.md](CAMPAIGN_2026-06-09-lighting-rig.md)
+  — 5 cycles, spike-first with a hard owner GO/NO-GO after Phase 0.
+  Recommended to run first.
+- [CAMPAIGN_2026-06-09-craft-specialization.md](CAMPAIGN_2026-06-09-craft-specialization.md)
+  — 3 cycles, vertical slices per craft family (ground gunnery → fixed-wing →
+  helicopter). Disjoint layer from the lighting campaign; can interleave.
+
 Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
