@@ -22,8 +22,42 @@
  * family curve against the terrain curve. The known defect this instrument was
  * built to detect: foliage's range ratio sits far below terrain's, because the
  * billboard hemisphere blend is clamped to [0.40, 0.78] while PBR terrain swings
- * the full day/night range. There is NO pass/fail gate here — this is evidence
- * capture, not CI. The gate lands later (Phase 4 `tod-coherence-gate`).
+ * the full day/night range.
+ *
+ * --- Gate mode (`--gate`, Phase 4 `tod-coherence-gate`) ---
+ * With `--gate` the sweep runs the rig path ON (the gate asserts the RIG path;
+ * the legacy path is being deleted in R2), spawns/teleports an NPC impostor into
+ * frame so the npc row reads real pixels, evaluates the committed coherence
+ * tolerances from `docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md` §5 (foliage AND
+ * npc corrVsTerrain >= 0.92, rangeRatio in [0.6, 1.6], dawn terrain <= 0.85, all
+ * TODs measurable), writes a `verdict.json` artifact, and exits NONZERO on
+ * failure. The tolerances + pass/fail logic live as a pure, unit-tested module
+ * (`scripts/tod-coherence-gate.ts`) so the verdict is testable without launching
+ * a browser. Without `--gate` the script is pure evidence capture (no exit on
+ * incoherence), as it was in Phase 0.
+ *
+ * --- Why pre-deploy checklist, NOT a blocking CI job ---
+ * This gate is wired as `npm run check:tod-coherence` and documented as a
+ * PRE-DEPLOY checklist step in `docs/DEPLOY_WORKFLOW.md`, deliberately NOT a
+ * blocking CI job. A headless GPU TOD sweep is ~5 min and CI GPU runners are
+ * starvation-prone (STABILIZAT-1) — gating every push on a flaky long-running
+ * GPU capture would stall the pipeline. It runs on the human's machine before a
+ * deploy, mirroring the Phase-1-2026-06-09 gate-consolidation pattern where
+ * GPU-dependent proofs stay owner-path / pre-deploy.
+ *
+ * --- Deterministic foliage / npc anchor (load-bearing for --gate) ---
+ * The Phase 0 anchor picked the nearest on-screen instance, which depended on
+ * billboard streaming order (which clusters had a live `count` that frame). On
+ * 3-decimal-identical renders that read foliage corr 0.874 in one run (anchor on
+ * a shadowed dusk cluster at x=0.51) vs 0.989/0.996 in a re-run + control (lit
+ * cards) — instrument variance, not a lighting change (PR #379 merge evidence).
+ * Before tolerances become pass/fail the anchor MUST be deterministic. The fix
+ * (`MEDIAN_ANCHOR_CANDIDATES`): for each anchored family, collect ALL on-screen
+ * candidate instances, sort them by a stable world-position key (NOT scan
+ * order), take the N nearest-to-camera, and centre the box on the geometric
+ * MEDIAN of their screen positions. The median is robust to a single shadowed
+ * outlier cluster and is a pure function of the scene's world positions, so two
+ * identical renders produce the identical anchor.
  *
  * --- Framework reuse ---
  * Extends `scripts/capture-sun-and-atmosphere-shots.ts`: same `preview-server`
@@ -67,12 +101,17 @@
  *
  * Usage:
  *   npm run capture:tod-sweep                     # 8-TOD baseline sweep
- *   npx tsx scripts/capture-tod-coherence-sweep.ts --label=rig-on
+ *   npm run capture:tod-sweep -- --label=rig-on --rig-on
+ *   npm run check:tod-coherence                   # gate (rig-on + NPC + assert)
  *   npx tsx scripts/capture-tod-coherence-sweep.ts --label=rig-off --headed
+ *
+ * Run order: `npm run build:perf` first (the DEM streams from R2 — the
+ * "pinned R2 metadata" warning is normal), then the sweep / gate.
  *
  * Artifacts (gitignored; commit with `git add -f` if evidence must be retained):
  *   artifacts/lighting-rig/tod-sweep/<label>/tod-<hh>h.png   (one PNG per TOD)
  *   artifacts/lighting-rig/tod-sweep/<label>/curves.json     (the curves + summary)
+ *   artifacts/lighting-rig/tod-sweep/<label>/verdict.json    (gate mode only)
  */
 
 import { chromium, type Page, type ConsoleMessage } from 'playwright';
@@ -80,8 +119,18 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import sharp from 'sharp';
 import { startServer, stopServer, type ServerHandle } from './preview-server';
+import type { CurvesFile, FamilyCurve, FamilyKey, Region, TodSample } from './tod-coherence-sweep-types';
+import { evaluateCoherenceGate, type GateVerdict } from './tod-coherence-gate';
 
 // ----- Scenario fixture -----
+
+/**
+ * NOTE (per-scenario follow-up): the sweep + gate measure ONLY the A Shau
+ * fixture below. A single-scenario gate is sufficient for R1 (A Shau is the
+ * hardest case — 21km DEM, fog-dominated distances, the original defect's home
+ * scenario). Per-scenario coverage (5 presets x 4 TODs) is a documented
+ * follow-up; the script's camera/fixture is currently hardcoded to A Shau.
+ */
 
 /**
  * Single scenario fixture: default A Shau. `startHour` mirrors the
@@ -107,16 +156,8 @@ const SCENARIO = {
 const TOD_HOURS: number[] = [0, 4, 6, 8, 12, 17, 19, 21];
 
 // ----- Material-family region fixture (documented constants) -----
-
-type FamilyKey = 'terrain' | 'foliage' | 'npc' | 'glb';
-
-interface Region {
-  /** Fractional screen box, all in [0, 1]; x grows right, y grows down. */
-  x0: number;
-  x1: number;
-  y0: number;
-  y1: number;
-}
+// `FamilyKey` and `Region` are shared with the gate module via
+// `tod-coherence-sweep-types.ts` (imported above).
 
 /**
  * Fixed fractional region boxes per material family for the documented camera
@@ -147,12 +188,42 @@ const ANCHORED_FAMILIES: AnchoredFamily[] = ['foliage', 'npc', 'glb'];
 
 /**
  * Per-mesh instance cap when scanning for anchor candidates. A Shau places tens
- * of thousands of billboard cards; we only need the nearest on-screen one, and
- * scanning every instance in a `page.evaluate` is wasteful. The mesh instance
- * buffers are roughly camera-sorted by streaming order, so a generous cap still
- * finds a near, on-screen subject. Matches the crop-probe's bounded scan.
+ * of thousands of billboard cards; scanning every instance in a `page.evaluate`
+ * is wasteful. The mesh instance buffers are roughly camera-sorted by streaming
+ * order, so a generous cap still finds the near on-screen subjects. Matches the
+ * crop-probe's bounded scan.
  */
 const ANCHOR_INSTANCE_SCAN_CAP = 4096;
+
+/**
+ * Number of nearest-to-camera on-screen candidate instances whose screen
+ * positions are MEDIANED to form a deterministic anchor (the determinism fix —
+ * see header "Deterministic foliage / npc anchor"). The candidates are sorted by
+ * a stable world-position key first, so the chosen set is independent of scene
+ * traversal / streaming order; the geometric median of N is robust to a single
+ * shadowed outlier cluster (the PR #379 corr-0.874 instrument-variance miss).
+ */
+const MEDIAN_ANCHOR_CANDIDATES = 9;
+
+/**
+ * NPC fixture anchor (gate mode). The camera sits at world XZ origin looking
+ * down the sun azimuth at a shallow pitch; A Shau may not place a live combatant
+ * in THIS frame. In gate mode we deterministically TELEPORT the nearest live
+ * combatant onto a fixed point along the view ray at terrain height, so the npc
+ * row reads real impostor pixels instead of falling back to the fixed box. This
+ * is a capture-surface mutation of `Combatant.position` / `renderedPosition`
+ * only — NO combat-AI change. The placement distance keeps the impostor at LOD
+ * range (renders as a billboard sprite, the family the rig migrated).
+ *
+ * Geometry: the fixture camera sits ~95m above local terrain looking down the
+ * valley at a -16 deg pitch with a 75 deg vertical FOV, so visible ground starts
+ * ~70m out (the bottom frustum edge) and the look-at-ground point is ~330m out.
+ * 120m horizontal sits comfortably in the lower-mid band where terrain + foliage
+ * also read — the impostor lands in frame, not clipped by the bottom edge.
+ */
+const NPC_FIXTURE_FORWARD_DISTANCE = 120;
+/** Lift above local terrain so the teleported sprite's centre is in frame. */
+const NPC_FIXTURE_GROUND_LIFT = 1.6;
 
 const PORT = 9184;
 const VIEWPORT = { width: 1920, height: 1080 };
@@ -503,14 +574,16 @@ async function snap(page: Page, outFile: string): Promise<Buffer | null> {
  * `instancePosition` buffer attribute; an NPC impostor carries an `npcExposure`
  * uniform and is a `THREE.InstancedMesh` with per-instance matrices. For each
  * anchored family we project every live instance to screen, keep the on-screen
- * ones, and centre the anchor on the nearest cluster to the camera (the largest
- * on-screen subject). GLB still anchors on the nearest vehicle's body centre.
- * Returns null for families with no on-screen instance (the caller falls back to
- * the fixed box and records `fallback` in the sample notes).
+ * ones, and centre the anchor on the geometric MEDIAN of the `nCandidates`
+ * nearest-to-camera subjects (a DETERMINISTIC selection — sorted by a stable
+ * world-position key, not scene-traversal/streaming order, robust to a single
+ * shadowed outlier). GLB anchors the same way on live vehicle bodies. Returns
+ * null for families with no on-screen instance (the caller falls back to the
+ * fixed box and records `fallback` in the sample notes).
  */
 async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Record<FamilyKey, Region>>> {
   const projected = await page.evaluate(
-    ({ camPos, instCap }: { camPos: [number, number, number]; instCap: number }) => {
+    ({ camPos, instCap, nCandidates }: { camPos: [number, number, number]; instCap: number; nCandidates: number }) => {
       const w = window as unknown as { __engine?: { renderer?: { camera?: unknown; scene?: unknown }; systemManager?: { vehicleManager?: unknown } } };
       const engine = w.__engine;
       const camera = engine?.renderer?.camera as unknown as {
@@ -541,22 +614,41 @@ async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Rec
         return { x: (ndcX + 1) / 2, y: (1 - ndcY) / 2 };
       };
 
-      // Nearest on-screen world point to the camera -> its screen fraction. A
-      // tight box around this lands on the closest (largest) subject instance.
-      const nearestOnScreen = (entries: Array<{ x: number; y: number; z: number }>): { x: number; y: number } | null => {
-        let best: { x: number; y: number } | null = null;
-        let bestDist = Infinity;
+      // DETERMINISTIC anchor: of all on-screen candidate world points, take the
+      // `nCandidates` nearest to the camera (sorted by a STABLE key — distance,
+      // then world position to break ties, NOT scene-traversal/streaming order),
+      // and return the geometric MEDIAN of their screen positions. The median of
+      // a small near cluster is robust to one shadowed outlier card (the PR #379
+      // corr-0.874 instrument-variance miss) and is a pure function of the
+      // scene's world positions, so two identical renders anchor identically.
+      const medianAnchor = (
+        entries: Array<{ x: number; y: number; z: number }>,
+        nCandidates: number
+      ): { x: number; y: number } | null => {
+        const onScreen: Array<{ sx: number; sy: number; dist: number; wx: number; wy: number; wz: number }> = [];
         for (const e of entries) {
-          const dx = e.x - camPos[0];
-          const dz = e.z - camPos[2];
-          const dist = dx * dx + dz * dz;
-          if (dist >= bestDist) continue;
           const s = toScreen(e.x, e.y, e.z);
           if (!s) continue;
-          best = s;
-          bestDist = dist;
+          const dx = e.x - camPos[0];
+          const dz = e.z - camPos[2];
+          onScreen.push({ sx: s.x, sy: s.y, dist: dx * dx + dz * dz, wx: e.x, wy: e.y, wz: e.z });
         }
-        return best;
+        if (onScreen.length === 0) return null;
+        // Stable ordering: nearest first; ties broken by world position so the
+        // selected set never depends on push order.
+        onScreen.sort((a, b) =>
+          a.dist !== b.dist ? a.dist - b.dist
+          : a.wx !== b.wx ? a.wx - b.wx
+          : a.wz !== b.wz ? a.wz - b.wz
+          : a.wy - b.wy
+        );
+        const chosen = onScreen.slice(0, Math.max(1, Math.min(nCandidates, onScreen.length)));
+        const median = (vals: number[]): number => {
+          const sorted = [...vals].sort((a, b) => a - b);
+          const mid = sorted.length >> 1;
+          return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        };
+        return { x: median(chosen.map((c) => c.sx)), y: median(chosen.map((c) => c.sy)) };
       };
 
       const hasUniform = (material: unknown, key: string): boolean => {
@@ -654,12 +746,12 @@ async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Rec
       }
 
       return {
-        foliage: nearestOnScreen(foliagePoints),
-        npc: nearestOnScreen(npcPoints),
-        glb: nearestOnScreen(glbPoints),
+        foliage: medianAnchor(foliagePoints, nCandidates),
+        npc: medianAnchor(npcPoints, nCandidates),
+        glb: medianAnchor(glbPoints, nCandidates),
       };
     },
-    { camPos: pose.position, instCap: ANCHOR_INSTANCE_SCAN_CAP }
+    { camPos: pose.position, instCap: ANCHOR_INSTANCE_SCAN_CAP, nCandidates: MEDIAN_ANCHOR_CANDIDATES }
   );
 
   const out: Partial<Record<FamilyKey, Region>> = {};
@@ -736,43 +828,112 @@ function pearson(a: number[], b: number[]): number | null {
 }
 
 // ----- Result types -----
+// `TodSample`, `FamilyCurve`, and `CurvesFile` are shared with the gate module
+// via `tod-coherence-sweep-types.ts` (imported above).
 
-interface TodSample {
-  hour: number;
-  forceTimeOfDay: number;
-  pngBytes: number;
-  regions: Record<FamilyKey, Region>;
-  /** Mean relative luminance per family; null where the region had no valid pixels. */
-  luminance: Record<FamilyKey, number | null>;
-  notes: string;
-}
+// ----- NPC fixture (gate mode) -----
 
-interface FamilyCurve {
-  family: FamilyKey;
-  /** Luminance per swept hour (aligned to TOD_HOURS that produced a sample). */
-  values: number[];
-  hours: number[];
-  min: number | null;
-  max: number | null;
-  range: number | null;
-  /** range / terrain.range. Foliage << 1 is the known clamp-band defect signature. */
-  rangeRatioVsTerrain: number | null;
-  /** Pearson correlation of this family's curve against terrain's. */
-  correlationVsTerrain: number | null;
-}
+/**
+ * Place one combatant impostor onto a deterministic point inside the camera
+ * frustum so the npc row reads real impostor pixels (gate mode). Two paths,
+ * both capture-surface only (NO combat-AI change):
+ *   1. If the scenario already has a live combatant, teleport the one with the
+ *      lexicographically-smallest id (deterministic) to the fixture point.
+ *   2. Otherwise MATERIALIZE one via the public `materializeAgent` API (the same
+ *      WarSimulator materialization path the engine uses), which grounds it at
+ *      terrain height — robust to headless spawn-timing where the scenario has
+ *      not progressively spawned anyone yet.
+ * Either way it then sets `position` + `renderedPosition` and drives the
+ * combatant renderer once so the instance matrix updates while the engine RAF is
+ * stopped. Returns true if an impostor was placed (false only when neither path
+ * is available — e.g. terrain not ready to ground a materialized agent).
+ */
+async function teleportNpcIntoFixture(page: Page, pose: Pose): Promise<boolean> {
+  return page.evaluate(
+    ({ camPos, lookAt, forward, lift }: {
+      camPos: [number, number, number];
+      lookAt: [number, number, number];
+      forward: number;
+      lift: number;
+    }) => {
+      interface CombatantHandle {
+        id?: string;
+        position?: { x: number; y: number; z: number; set?: (x: number, y: number, z: number) => unknown };
+        renderedPosition?: { set?: (x: number, y: number, z: number) => unknown; copy?: (v: unknown) => unknown };
+        health?: number;
+      }
+      interface CombatantSystemHandle {
+        getAllCombatants?: () => CombatantHandle[];
+        materializeAgent?: (data: { faction: string; x: number; y: number; z: number; health: number }) => string;
+        playerPosition?: unknown;
+        combatantRenderer?: { updateBillboards?: (combatants: unknown, playerPos: unknown) => void; updateWalkFrame?: (dt: number) => void; updateShaderUniforms?: (dt: number) => void };
+      }
+      const engine = (window as { __engine?: {
+        systemManager?: {
+          combatantSystem?: CombatantSystemHandle;
+          terrainSystem?: { getHeightAt?: (x: number, z: number) => number };
+        };
+      } }).__engine;
+      const cs = engine?.systemManager?.combatantSystem;
+      if (!cs?.getAllCombatants) return false;
 
-interface CurvesFile {
-  createdAt: string;
-  label: string;
-  scenario: string;
-  todHours: number[];
-  samples: TodSample[];
-  curves: FamilyCurve[];
+      // Deterministic fixture point: a fixed horizontal distance ahead along the
+      // camera->lookAt XZ direction, grounded at terrain height + a small lift.
+      const fx = lookAt[0] - camPos[0];
+      const fz = lookAt[2] - camPos[2];
+      const len = Math.hypot(fx, fz) || 1;
+      const px = camPos[0] + (fx / len) * forward;
+      const pz = camPos[2] + (fz / len) * forward;
+      const terrain = engine?.systemManager?.terrainSystem;
+      const gy = terrain?.getHeightAt?.(px, pz);
+      const groundY = Number.isFinite(gy) ? Number(gy) : NaN;
+      const py = (Number.isFinite(groundY) ? groundY : camPos[1] - forward) + lift;
+
+      // Pick a live combatant (smallest id) or materialize one at the fixture.
+      const all = cs.getAllCombatants();
+      const living = all.filter((c) => c && (c.health === undefined || c.health > 0) && c.position);
+      living.sort((a, b) => String(a.id ?? '').localeCompare(String(b.id ?? '')));
+      let subject: CombatantHandle | undefined = living[0];
+      if (!subject) {
+        if (!cs.materializeAgent || !Number.isFinite(groundY)) return false;
+        // Materialize an OPFOR impostor (NVA) at the fixture; materializeAgent
+        // grounds y at terrain height internally.
+        const id = cs.materializeAgent({ faction: 'NVA', x: px, y: py, z: pz, health: 100 });
+        subject = cs.getAllCombatants().find((c) => c.id === id);
+      }
+      if (!subject) return false;
+
+      subject.position?.set?.(px, py, pz);
+      if (subject.renderedPosition?.set) subject.renderedPosition.set(px, py, pz);
+      else if (subject.renderedPosition?.copy && subject.position) subject.renderedPosition.copy(subject.position);
+
+      // Drive the renderer so the impostor instance matrix reflects the placement
+      // (RAF is stopped during capture). Mirrors CombatantSystem.update's render
+      // calls; no AI / simulation step.
+      const renderer = cs.combatantRenderer;
+      const combatants = cs.getAllCombatants();
+      renderer?.updateWalkFrame?.(0.016);
+      renderer?.updateBillboards?.(combatants, cs.playerPosition);
+      renderer?.updateShaderUniforms?.(0.016);
+      return true;
+    },
+    {
+      camPos: pose.position,
+      lookAt: pose.lookAt,
+      forward: NPC_FIXTURE_FORWARD_DISTANCE,
+      lift: NPC_FIXTURE_GROUND_LIFT,
+    }
+  );
 }
 
 // ----- Sweep -----
 
-async function captureTod(page: Page, hour: number, outDir: string): Promise<TodSample> {
+async function captureTod(
+  page: Page,
+  hour: number,
+  outDir: string,
+  options: { gate: boolean }
+): Promise<TodSample> {
   // Stop the engine RAF first so the streaming terrain does not keep the main
   // thread busy past Playwright's screenshot timeout (ashau 21km DEM).
   await page.evaluate(() => {
@@ -791,6 +952,14 @@ async function captureTod(page: Page, hour: number, outDir: string): Promise<Tod
 
   const pose = await buildFixturePose(page);
   await poseAndRender(page, pose);
+
+  // Gate mode: place an NPC impostor in frame, then re-render so its instance
+  // matrix is current before we project the anchor and snap.
+  if (options.gate) {
+    const placed = await teleportNpcIntoFixture(page, pose);
+    if (placed) await poseAndRender(page, pose);
+    else logStep(`TOD ${hour}h: no live combatant to teleport into the fixture (npc will fall back)`);
+  }
 
   const anchorRegions = await resolveAnchorRegions(page, pose);
   const regions: Record<FamilyKey, Region> = {
@@ -884,12 +1053,17 @@ function printSummary(label: string, curves: FamilyCurve[]): void {
 // ----- Main -----
 
 async function main(): Promise<void> {
-  const label = readFlagValue('label') ?? 'baseline';
+  const gate = hasFlag('gate');
+  // Gate mode asserts the RIG path (legacy is deleted in R2); force rig-on
+  // regardless of an explicit `--rig-on`.
+  const rigOn = gate || hasFlag('rig-on');
+  const label = readFlagValue('label') ?? (gate ? 'gate' : 'baseline');
   const outDir = join(OUT_ROOT, label);
   if (!existsSync(outDir)) {
     mkdirSync(outDir, { recursive: true });
     logStep(`Created ${outDir}`);
   }
+  if (gate) logStep('GATE MODE: rig path ON + NPC fixture + committed tolerances asserted.');
 
   const headless = !hasFlag('headed');
   let server: ServerHandle | null = null;
@@ -925,10 +1099,11 @@ async function main(): Promise<void> {
       await waitForEngine(page);
       await startMode(page, SCENARIO.mode);
       await dismissBriefingIfPresent(page);
-      // rig-prototype A/B: flip the Phase 0 unified lighting-rig flag ON when
-      // `--rig-on` is passed. The flag object is published on `window.__lightingRig`
-      // by AtmosphereSystem; the shared binding picks the value up next frame.
-      if (hasFlag('rig-on')) {
+      // rig-prototype A/B: flip the unified lighting-rig flag ON when `--rig-on`
+      // (or `--gate`) is passed. The flag object is published on
+      // `window.__lightingRig` by AtmosphereSystem; the shared binding picks the
+      // value up next frame.
+      if (rigOn) {
         await page.evaluate(() => {
           const rig = (window as unknown as { __lightingRig?: { enabled: boolean } }).__lightingRig;
           if (rig) rig.enabled = true;
@@ -946,7 +1121,7 @@ async function main(): Promise<void> {
     if (scenarioReady) {
       for (const hour of TOD_HOURS) {
         try {
-          const sample = await captureTod(page, hour, outDir);
+          const sample = await captureTod(page, hour, outDir, { gate });
           samples.push(sample);
           const lum = (Object.keys(sample.luminance) as FamilyKey[])
             .map((f) => `${f}=${sample.luminance[f] === null ? 'n/a' : sample.luminance[f]!.toFixed(3)}`)
@@ -981,6 +1156,47 @@ async function main(): Promise<void> {
   const ok = samples.filter((s) => s.pngBytes > 0).length;
   logStep(`Sweep complete: ${ok}/${TOD_HOURS.length} TODs captured.`);
   printSummary(label, curves);
+
+  if (gate) {
+    const verdict = evaluateCoherenceGate(curves, samples, TOD_HOURS);
+    writeVerdict(outDir, verdict, out);
+    printVerdict(verdict);
+    if (!verdict.passed) {
+      logStep('GATE: FAIL');
+      process.exit(1);
+    }
+    logStep('GATE: PASS');
+  }
+}
+
+/** Write the gate verdict (+ the curves it was computed from) to verdict.json. */
+function writeVerdict(outDir: string, verdict: GateVerdict, curvesFile: CurvesFile): void {
+  const path = join(outDir, 'verdict.json');
+  const payload = {
+    createdAt: new Date().toISOString(),
+    label: curvesFile.label,
+    scenario: curvesFile.scenario,
+    todHours: curvesFile.todHours,
+    verdict,
+    curves: curvesFile.curves,
+  };
+  writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`);
+  logStep(`Wrote ${path}`);
+}
+
+/** Print the gate verdict as a human-readable table for the deploy operator. */
+function printVerdict(verdict: GateVerdict): void {
+  logStep('Coherence gate verdict:');
+  for (const c of verdict.checks) {
+    const mark = c.status === 'pass' ? 'PASS' : c.status === 'fail' ? 'FAIL' : 'N/A ';
+    const val = c.value === null ? 'n/a' : c.value.toFixed(3);
+    const tag = c.hard ? '' : ' (advisory)';
+    logStep(`  [${mark}] ${c.id.padEnd(28)} ${val} in ${c.bound}${tag} — ${c.detail}`);
+  }
+  if (verdict.failures.length > 0) {
+    logStep('  Failures:');
+    for (const f of verdict.failures) logStep(`    - ${f}`);
+  }
 }
 
 main().catch((err) => {
