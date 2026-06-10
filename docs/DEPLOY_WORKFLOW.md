@@ -97,10 +97,17 @@ Key facts:
   advisory. Inspect the perf advisory step summary before using a green CI run
   as release evidence; see `docs/DEVELOPMENT.md` for why perf does not block.
 - PRs do not auto-deploy. Preview deploys are not currently configured; see "Open Items" below.
-- The build does not emit `.gz` or `.br` sidecar files. Cloudflare negotiates
-  visitor-facing compression for supported content types, including JavaScript,
-  CSS, JSON, fonts, and WASM, based on `Accept-Encoding` and zone compression
-  rules. This keeps `dist/` and Pages uploads to the canonical assets only.
+- The build emits gzip sidecars ONLY for the large `/data/` binaries
+  (`dist/data/navmesh/*.bin.gz`, `dist/data/heightmaps/*.f32.gz`, via
+  `scripts/compress-data-assets.ts` in `npm run build`) because Cloudflare
+  does not compress `application/octet-stream` — the A Shau navmesh shipped
+  19.4MB raw before this (now ~6.1MB wire). The runtime prefers the sidecar
+  through `DecompressionStream` and falls back to the plain asset
+  (`src/utils/CompressedAssetFetch.ts`); dev servers serve only the plain
+  assets and hit the fallback. For everything else Cloudflare negotiates
+  visitor-facing compression for supported content types (JavaScript, CSS,
+  JSON, fonts, WASM) based on `Accept-Encoding` and zone compression rules;
+  no other sidecars are emitted.
 - Local evidence and deployed evidence are intentionally separate. `npm run
   evidence:atmosphere`, `npm run build`, and `npm run build:perf` prove the
   local preview bundle and local manifest path. They do not prove that the live

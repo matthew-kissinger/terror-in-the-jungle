@@ -90,6 +90,6 @@ async function networkFirst(request, preloadResponsePromise, options = {}) {
 
 function isImmutableResource(pathname) {
   return HASHED_BUILD_ASSET_RE.test(pathname)
-    || (pathname.startsWith('/data/navmesh/') && pathname.endsWith('.bin'))
-    || (pathname.startsWith('/data/heightmaps/') && pathname.endsWith('.f32'));
+    || (pathname.startsWith('/data/navmesh/') && (pathname.endsWith('.bin') || pathname.endsWith('.bin.gz')))
+    || (pathname.startsWith('/data/heightmaps/') && (pathname.endsWith('.f32') || pathname.endsWith('.f32.gz')));
 }

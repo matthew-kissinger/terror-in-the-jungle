@@ -10,6 +10,7 @@ import { DEMHeightProvider } from '../../systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../../systems/terrain/NoiseHeightProvider';
 import type { PreparedTerrainSource } from '../../systems/terrain/PreparedTerrainSource';
 import { Logger } from '../../utils/Logger';
+import { fetchBinaryAsset, prefetchBinaryAsset } from '../../utils/CompressedAssetFetch';
 import { resolveGameAssetUrl } from '../GameAssetManifest';
 import type { GameEngine } from '../GameEngine';
 import { markStartup } from '../StartupTelemetry';
@@ -27,6 +28,13 @@ export async function configureHeightSource(
   config: ReturnType<typeof getGameModeConfig>
 ): Promise<PreparedTerrainSource> {
   markStartup(`engine-init.start-game.${mode}.height-source.begin`);
+  // Overlap the pre-baked navmesh transfer with the DEM/heightmap transfer
+  // (A Shau: ~6.5MB gz navmesh alongside the 21MB DEM instead of after it).
+  // Seed-rotation modes may override navmeshAsset below; the prefetch store
+  // simply misses on the old URL and the loader fetches the final one.
+  if (config.navmeshAsset) {
+    prefetchBinaryAsset(config.navmeshAsset);
+  }
   if (config.heightSource?.type === 'dem') {
     markStartup(`engine-init.start-game.${mode}.dem-load.begin`);
     const { assetId, path, width, height, metersPerPixel } = config.heightSource;
@@ -110,15 +118,17 @@ export async function configureHeightSource(
     config.navmeshAsset = variant.navmeshAsset;
     config.heightmapAsset = variant.heightmapAsset;
     Logger.info('engine-init', `Selected map variant: seed=${variant.seed}`);
+    if (config.navmeshAsset) {
+      prefetchBinaryAsset(config.navmeshAsset);
+    }
   }
 
   // Try loading a pre-baked heightmap
   if (config.heightmapAsset) {
     try {
-      const response = await fetch(config.heightmapAsset);
-      if (response.ok) {
-        const buffer = await response.arrayBuffer();
-        const gridData = new Float32Array(buffer);
+      const bytes = await fetchBinaryAsset(config.heightmapAsset);
+      if (bytes && bytes.byteLength > 0 && bytes.byteLength % 4 === 0) {
+        const gridData = new Float32Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength / 4);
         const gridSize = Math.round(Math.sqrt(gridData.length));
         if (gridSize * gridSize !== gridData.length) {
           throw new Error(`Heightmap asset is not a square grid: ${gridData.length} samples`);
@@ -128,7 +138,7 @@ export async function configureHeightSource(
         getHeightQueryCache().setProvider(
           new BakedHeightProvider(gridData, gridSize, config.worldSize, workerConfig),
         );
-        Logger.info('engine-init', `Pre-baked heightmap loaded: ${gridSize}x${gridSize} (${(buffer.byteLength / 1024).toFixed(0)}KB), seed=${seed}`);
+        Logger.info('engine-init', `Pre-baked heightmap loaded: ${gridSize}x${gridSize} (${(bytes.byteLength / 1024).toFixed(0)}KB), seed=${seed}`);
         markStartup(`engine-init.start-game.${mode}.height-source.end`);
         return {
           kind: 'prebaked',
@@ -140,7 +150,7 @@ export async function configureHeightSource(
           terrainFingerprint: config.heightmapAsset,
         };
       }
-      Logger.warn('engine-init', `Pre-baked heightmap not found (${response.status}), falling back to procedural`);
+      Logger.warn('engine-init', 'Pre-baked heightmap not found or malformed, falling back to procedural');
     } catch (error) {
       Logger.warn('engine-init', 'Failed to fetch pre-baked heightmap, falling back to procedural:', error);
     }

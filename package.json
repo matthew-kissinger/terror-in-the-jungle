@@ -72,7 +72,7 @@
   "scripts": {
     "dev": "vite",
     "prebuild": "npx tsx scripts/prebake-navmesh.ts",
-    "build": "tsc && vite build && npm run cloudflare:assets:manifest",
+    "build": "tsc && vite build && npx tsx scripts/compress-data-assets.ts && npm run cloudflare:assets:manifest",
     "build:perf": "cross-env VITE_PERF_HARNESS=1 tsc && cross-env VITE_PERF_HARNESS=1 vite build --outDir dist-perf && npm run cloudflare:assets:manifest -- --out=dist-perf/asset-manifest.json",
     "typecheck": "tsc --noEmit",
     "typecheck:scripts": "tsc -p tsconfig.scripts.json --noEmit",

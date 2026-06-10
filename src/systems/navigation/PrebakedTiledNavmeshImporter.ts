@@ -2,6 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import type { NavMesh } from '@recast-navigation/core';
+import { fetchBinaryAsset, takeBinaryAssetPrefetch } from '../../utils/CompressedAssetFetch';
 
 /**
  * Time-sliced importer for pre-baked tiled navmesh binaries.
@@ -184,12 +185,14 @@ export async function fetchAndImportPrebakedNavmesh(
   hooks: PrebakedNavmeshLoadHooks,
 ): Promise<NavMesh | null> {
   hooks.mark('fetch.begin');
-  const response = await fetch(assetUrl);
-  if (!response.ok) {
-    hooks.warn(`fetch failed: ${response.status} ${assetUrl}`);
+  // Consume the mode-startup prefetch when one is in flight (started before
+  // the DEM transfer so the two downloads overlap), else fetch now. Either
+  // path prefers the gzip sidecar.
+  const data = await (takeBinaryAssetPrefetch(assetUrl) ?? fetchBinaryAsset(assetUrl));
+  if (!data) {
+    hooks.warn(`fetch failed: ${assetUrl}`);
     return null;
   }
-  const data = new Uint8Array(await response.arrayBuffer());
   hooks.mark('fetch.end');
 
   hooks.mark('import.begin');
