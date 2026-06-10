@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { AtmosphereSystem, createAtmosphereLightingSnapshot } from './AtmosphereSystem';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import type { IGameRenderer } from '../../types/SystemInterfaces';
+import { LightingRigConfig, lightingRigBindings } from './LightingRig';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
   computeSunDirectionAtTime,
@@ -900,5 +901,82 @@ describe('AtmosphereSystem (WorldBuilder forceTimeOfDay wiring)', () => {
 
     // combat120 carries no todCycle; flag must be silently ignored.
     expect(() => system.update(0.016)).not.toThrow();
+  });
+});
+
+/**
+ * Behavior contract for the Phase 3 rig-path scene fog
+ * (`exposure-fog-presets-rig`). When the lighting rig flag is ON, scene fog must
+ * read the single rig fog color (the same horizon source the foliage fog binding
+ * reads) so there is one fog authority and the horizon matches the Hosek sky.
+ * When OFF, the legacy compressed-snapshot fog path is byte-identical. The rig
+ * flag is a module singleton, so each test resets it.
+ */
+describe('AtmosphereSystem (rig-path scene fog)', () => {
+  const makeFogStub = () => {
+    const fog: any = { color: new THREE.Color(0x000000), density: 0.004 };
+    return { renderer: { fog } as any, fog };
+  };
+
+  const makeBackend = (horizonHex: number): ISkyBackend => {
+    const horizon = new THREE.Color(horizonHex);
+    return {
+      update: () => {},
+      sample: (_dir, out) => out.copy(horizon),
+      getSun: (out) => out,
+      getZenith: (out) => out,
+      getHorizon: (out) => out.copy(horizon),
+    };
+  };
+
+  afterEach(() => {
+    LightingRigConfig.enabled = false;
+  });
+
+  it('OFF: scene fog reads the legacy compressed-snapshot horizon color (byte-identical path)', () => {
+    LightingRigConfig.enabled = false;
+    const system = new AtmosphereSystem();
+    system.setBackend(makeBackend(0xaabbcc));
+    const { renderer, fog } = makeFogStub();
+    system.setRenderer(renderer);
+
+    system.update(0.016);
+    // Legacy path: the snapshot horizon (low-magnitude, uncompressed here) lands
+    // directly as the fog color.
+    expect(fog.color.getHex()).toBe(0xaabbcc);
+  });
+
+  it('ON: scene fog reads the single rig fog color binding, not the legacy snapshot', () => {
+    LightingRigConfig.enabled = true;
+    const system = new AtmosphereSystem();
+    system.setBackend(makeBackend(0x405060));
+    const { renderer, fog } = makeFogStub();
+    system.setRenderer(renderer);
+
+    system.update(0.016);
+
+    // The rig fog binding is derived from the horizon × ground-bounce/darken;
+    // scene fog must equal that binding exactly (single authority), and it is
+    // NOT the raw legacy horizon hex.
+    expect(fog.color.r).toBeCloseTo(lightingRigBindings.fogColor.value.r, 5);
+    expect(fog.color.g).toBeCloseTo(lightingRigBindings.fogColor.value.g, 5);
+    expect(fog.color.b).toBeCloseTo(lightingRigBindings.fogColor.value.b, 5);
+  });
+
+  it('ON: scene fog and the foliage fog binding share one authority frame to frame', () => {
+    LightingRigConfig.enabled = true;
+    const system = new AtmosphereSystem();
+    const { renderer, fog } = makeFogStub();
+    system.setRenderer(renderer);
+
+    // First frame at one horizon.
+    system.setBackend(makeBackend(0x304050));
+    system.update(0.016);
+    expect(fog.color.getHex()).toBe(lightingRigBindings.fogColor.value.getHex());
+
+    // Swap horizon: both scene fog and the binding must track together.
+    system.setBackend(makeBackend(0x607080));
+    system.update(0.016);
+    expect(fog.color.getHex()).toBe(lightingRigBindings.fogColor.value.getHex());
   });
 });

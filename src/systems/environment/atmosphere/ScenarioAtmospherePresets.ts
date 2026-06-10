@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { GameMode } from '../../../config/gameModeTypes';
+import type { RigPresetTrim } from '../LightingRigPresetTrim';
 
 /**
  * Per-scenario atmosphere presets. Each preset chooses a starting sun
@@ -98,6 +99,16 @@ export interface AtmospherePreset {
    * default (~900m).
    */
   cloudScaleMetersPerFeature?: number;
+  /**
+   * Optional bounded rig trims (Phase 3, `exposure-fog-presets-rig`). On the
+   * lighting-rig path each scenario contributes tint/intensity MULTIPLIERS over
+   * the physical baseline instead of the legacy absolute color stack — so the
+   * preset shapes mood without fighting the rig. Omitted means "pure physical
+   * baseline on the rig path". Read ONLY when the rig flag is ON; the legacy
+   * OFF path ignores it entirely (the absolute stacks above stay authoritative).
+   * Multipliers are clamped into a narrow band in `applyRigPresetTrim`.
+   */
+  rigTrim?: RigPresetTrim;
 }
 
 /** Clamp lower bound for sun elevation (radians). Matches ~-10deg by default. */
@@ -220,6 +231,13 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     // feature scale (700m) gives denser puffs over the narrow valley.
     cloudCoverageDefault: 0.55,
     cloudScaleMetersPerFeature: 700,
+    // Rig trim: dawn patrol leans warm. A small warm sun tint + a touch above
+    // baseline exposure keeps the iconic amber dawn mood on the rig path
+    // without an absolute stack. Sky stays neutral so the haze reads true.
+    rigTrim: {
+      sunTint: new THREE.Color(1.12, 1.04, 0.9),
+      intensity: 1.08,
+    },
   },
   // Noon: sun near zenith, neutral turbidity, deep saturated zenith blue.
   openfrontier: {
@@ -244,6 +262,12 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     // screenshots, not only in A Shau.
     cloudCoverageDefault: 0.62,
     cloudScaleMetersPerFeature: 1400,
+    // Rig trim: neutral high-noon. A hair below baseline exposure tames the
+    // bright uncompressed zenith under AGX; tints stay identity so the cobalt
+    // sky reads physically true.
+    rigTrim: {
+      intensity: 0.95,
+    },
   },
   // Dusk: sun very low in the west, heavy haze, strong orange extinction.
   // Highest fog density — dusk reads as "can see nearby, distance fades"
@@ -269,6 +293,15 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     // so the thicker field still reads as broken layers rather than a
     // uniform grey sheet once the 5-octave modulator gates large-scale gaps.
     cloudCoverageDefault: 0.7,
+    // Rig trim: blood-orange dusk. Warm sun + fog tint with a slightly cooled
+    // sky pushes the warm/cool stratification; a touch below baseline exposure
+    // keeps the heavy-turbidity warm band from clipping.
+    rigTrim: {
+      sunTint: new THREE.Color(1.18, 0.96, 0.78),
+      skyTint: new THREE.Color(0.92, 0.96, 1.06),
+      fogTint: new THREE.Color(1.14, 0.98, 0.82),
+      intensity: 0.92,
+    },
   },
   // Golden hour: oblique warm light, moderate turbidity.
   zc: {
@@ -292,6 +325,13 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     // warm oblique light has clouds to catch; the large-scale modulator
     // keeps the gaps open enough to read as "broken" rather than "overcast".
     cloudCoverageDefault: 0.55,
+    // Rig trim: golden hour. Warm oblique sun with a faintly warm fog so the
+    // backlit rim light reads on combatants/vegetation; exposure near baseline.
+    rigTrim: {
+      sunTint: new THREE.Color(1.14, 1.0, 0.84),
+      fogTint: new THREE.Color(1.08, 1.0, 0.9),
+      intensity: 1.04,
+    },
   },
   // AI sandbox (perf harness): noon, perf-neutral; matches the legacy
   // combat120 framing so the baseline PNG diff stays meaningful.
@@ -315,6 +355,11 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     // so combat120 actually reads as "noon with some clouds" instead of
     // the effectively-empty sky the 3-octave threshold produced at 0.2.
     cloudCoverageDefault: 0.56,
+    // No `rigTrim` BY DESIGN: combat120 is the perf-baseline scenario; the
+    // pure physical baseline on the rig path keeps its luminance directly
+    // comparable to openfrontier's physical baseline and to the historical
+    // combat120 perf framing. A trim here would couple the perf baseline to
+    // artistic tuning. Intentional identity, not an omission.
   },
 };
 
