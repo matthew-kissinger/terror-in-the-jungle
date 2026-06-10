@@ -44,6 +44,30 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-09-exposure-atmosphere-unify)
+
+Phase 3 of [CAMPAIGN_2026-06-09-lighting-rig](CAMPAIGN_2026-06-09-lighting-rig.md).
+1/1 merged: exposure-fog-presets-rig #379 (rig-path scene fog reads the single
+rig fogColor authority — no dawn/dusk fog-line seam against the Hosek sky;
+exposure policy RATIFIED as in-shader/scene-radiance, computed exactly once on
+`LightingRigState.exposure` and read by both consumers, AGX stays
+presentation-only at 1.0, regression-tested; scenario presets re-expressed as
+bounded `rigTrim` multipliers — ashau warm, tdm dusk-warm, zc golden, of
+dimmer, combat120 identity-BY-DESIGN for perf comparability). Merge evidence:
+p3-on bands HOLD (foliage corr 0.989, rangeRatio 0.945; legacy p3-off
+reproduces the 0.290 defect signature). Two findings flagged to Phase 4:
+(1) the sweep's foliage anchor is streaming-order timing-dependent — one run
+landed a shadowed dusk cluster and read corr 0.874 while a master control +
+re-run read 0.996/0.989 on 3-decimal-identical renders; `tod-coherence-gate`
+must make the anchor deterministic before tolerances become pass/fail.
+(2) Trims are sub-rounding in the sweep's fog-dominated box averages (live
+runtime probe: moonLight ratios match tint × intensity exactly) — visible on
+direct-lit surfaces, invisible under haze, as designed. The branch was rebased
+onto master mid-review (originally cut pre-#378, so its first A/B ran on the
+old instrument — root cause of an apparent band failure that was actually
+instrument drift).
+Brief: `docs/tasks/archive/cycle-2026-06-09-exposure-atmosphere-unify/`.
+
 ## Recently Completed (cycle-2026-06-09-foliage-npc-lighting)
 
 Phase 2 of [CAMPAIGN_2026-06-09-lighting-rig](CAMPAIGN_2026-06-09-lighting-rig.md).

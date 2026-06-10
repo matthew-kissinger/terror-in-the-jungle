@@ -9,7 +9,15 @@
 > looks wrong. The orchestrator engineers; the owner judges captures at every
 > exit gate.
 > **Concurrency cap:** 5
-> **Status:** Phase 0 `cycle-2026-06-09-lighting-rig-spike` **COMPLETE 2026-06-09**
+> **Status:** Phases 0-3 COMPLETE; Phase 4 `cycle-2026-06-09-lighting-acceptance`
+> IN FLIGHT (R1 `tod-coherence-gate` dispatched 2026-06-10; R2
+> `legacy-path-deletion` serialized after it). Phase 3
+> `cycle-2026-06-09-exposure-atmosphere-unify` **COMPLETE 2026-06-10** (#379:
+> rig fog authority, exposure policy ratified in-shader/once, presets as
+> bounded trims; p3-on bands hold — foliage corr 0.989, rangeRatio 0.945; two
+> instrument findings handed to Phase 4, see BACKLOG entry). Phases 1-2
+> complete earlier (#371 #376 #378 — foliage band met on the fixed
+> instrument). Phase 0 `cycle-2026-06-09-lighting-rig-spike` **COMPLETE 2026-06-09**
 > (3/3: memo #363, harness #365, prototype #368 terrain-nav
 > APPROVE-WITH-NOTES). A/B verdict: clamp bypass CONFIRMED (foliage range
 > ratio 0.290→1.564 in-band; midnight foliage finally dark) but foliage corr
