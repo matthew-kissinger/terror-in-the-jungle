@@ -62,6 +62,13 @@ export interface VehicleUIContext {
   capabilities: VehicleCapabilities;
   hudVariant: 'flight' | 'groundVehicle' | 'turret';
   weaponCount: number;
+  /**
+   * Optional sight magnification factor for craft with a zoomable sight
+   * (1 = 1x, >1 = zoomed). The tank gunner toggles this with RMB. Additive +
+   * optional so existing vehicle contexts are unaffected; consumers that don't
+   * read it just ignore the zoom step.
+   */
+  sightMagnification?: number;
 }
 
 export interface InteractionContext {

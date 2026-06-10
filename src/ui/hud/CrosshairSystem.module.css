@@ -183,34 +183,53 @@
   box-shadow: 0 0 4px rgba(231, 217, 186, 0.6);
 }
 
-/* --- Tank gunner sight (placeholder: center cross + stadia ticks) --- */
-/* R2 task `tank-gunner-sight` swaps this for a real rangefinder reticle. */
+/* --- Tank gunner sight (R2 tank-gunner-sight: stadia rangefinder) ---
+   Aim cross (open arms, gap at the bore) + a horizontal stadia rangefinder
+   for bracketing target width + mil-style drop ticks below the bore for
+   range holdover. All markings are static — no live ballistic computation. */
 .tankGunnerReticle {
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 120px;
+  height: 120px;
 }
 
-.gunnerLine {
+/* Center aim cross — four short open arms leaving a gap at the bore. */
+.gunnerArm {
   position: absolute;
   background: rgba(231, 217, 186, 0.85);
   box-shadow: 0 0 2px rgba(231, 217, 186, 0.85);
 }
 
-.gunnerLineV {
+.gunnerArmUp,
+.gunnerArmDown {
   width: 1.5px;
-  height: 80px;
+  height: 16px;
   left: 50%;
-  top: 0;
   transform: translateX(-50%);
 }
 
-.gunnerLineH {
-  width: 80px;
+.gunnerArmUp {
+  top: 18px;
+}
+
+.gunnerArmDown {
+  bottom: 18px;
+}
+
+.gunnerArmLeft,
+.gunnerArmRight {
   height: 1.5px;
-  left: 0;
+  width: 16px;
   top: 50%;
   transform: translateY(-50%);
+}
+
+.gunnerArmLeft {
+  left: 18px;
+}
+
+.gunnerArmRight {
+  right: 18px;
 }
 
 .gunnerDot {
@@ -226,22 +245,61 @@
   z-index: 2;
 }
 
-/* Stadia rangefinder ticks along the vertical line (placeholder spacing). */
-.stadia {
+/* Horizontal stadia rangefinder: vertical graduations either side of the bore,
+   stepping down in height so the longer ticks read as the major graduations. */
+.stadiaTick {
+  position: absolute;
+  top: 50%;
+  width: 1.5px;
+  transform: translateY(-50%);
+  background: rgba(231, 217, 186, 0.7);
+}
+
+.stadiaL1,
+.stadiaR1 {
+  height: 12px;
+}
+
+.stadiaL2,
+.stadiaR2 {
+  height: 9px;
+}
+
+.stadiaL3,
+.stadiaR3 {
+  height: 6px;
+}
+
+.stadiaL1 { left: calc(50% - 16px); }
+.stadiaL2 { left: calc(50% - 28px); }
+.stadiaL3 { left: calc(50% - 40px); }
+.stadiaR1 { left: calc(50% + 16px); }
+.stadiaR2 { left: calc(50% + 28px); }
+.stadiaR3 { left: calc(50% + 40px); }
+
+/* Mil-style drop ticks below the bore — range-holdover marks, widening as
+   they descend (a stadia ladder). */
+.dropTick {
   position: absolute;
   left: 50%;
-  width: 14px;
   height: 1.5px;
   transform: translateX(-50%);
   background: rgba(231, 217, 186, 0.7);
 }
 
-.stadiaUp {
-  top: 22px;
+.drop1 {
+  top: calc(50% + 18px);
+  width: 10px;
 }
 
-.stadiaDown {
-  bottom: 22px;
+.drop2 {
+  top: calc(50% + 30px);
+  width: 14px;
+}
+
+.drop3 {
+  top: calc(50% + 42px);
+  width: 18px;
 }
 
 /* --- Emplacement MG (open cross — gap at the centre) --- */

@@ -9,11 +9,13 @@
  *   helicopter_transport - hidden (no pilot weapons)
  *   helicopter_gunship   - hidden (door guns are crew-operated)
  *   helicopter_attack    - forward pipper reticle (circle + center dot)
- *   tank_gunner          - gunner sight: center cross + stadia placeholder
+ *   tank_gunner          - gunner sight: aim cross + horizontal stadia rangefinder + mil drop ticks
  *   emplacement_mg       - open MG cross (M2HB tripod / vehicle mount)
  *
- * The two ground-gunnery reticles are placeholder geometry; the R2 craft
- * tasks (tank-gunner-sight, m2hb-gun-experience) refine the visuals.
+ * The tank_gunner reticle is a real stadia sight (R2 tank-gunner-sight); the
+ * emplacement_mg reticle is still placeholder geometry refined by the sibling
+ * m2hb-gun-experience task. The stadia / drop ticks are static markings — no
+ * live ballistic computation is drawn into them.
  */
 
 import { UIComponent } from '../engine/UIComponent';
@@ -55,11 +57,24 @@ export class CrosshairSystem extends UIComponent {
         <div class="${styles.pipperDot}"></div>
       </div>
       <div data-ref="tankGunner" class="${styles.tankGunnerReticle}" style="display:none">
-        <div class="${styles.gunnerLine} ${styles.gunnerLineV}"></div>
-        <div class="${styles.gunnerLine} ${styles.gunnerLineH}"></div>
+        <!-- Center aim cross (short open arms, gap at the bore). -->
+        <div class="${styles.gunnerArm} ${styles.gunnerArmUp}"></div>
+        <div class="${styles.gunnerArm} ${styles.gunnerArmDown}"></div>
+        <div class="${styles.gunnerArm} ${styles.gunnerArmLeft}"></div>
+        <div class="${styles.gunnerArm} ${styles.gunnerArmRight}"></div>
         <div class="${styles.gunnerDot}"></div>
-        <div class="${styles.stadia} ${styles.stadiaUp}"></div>
-        <div class="${styles.stadia} ${styles.stadiaDown}"></div>
+        <!-- Horizontal stadia rangefinder: graduated ticks each side of the
+             bore for bracketing a target's width (static markings). -->
+        <div class="${styles.stadiaTick} ${styles.stadiaL1}"></div>
+        <div class="${styles.stadiaTick} ${styles.stadiaL2}"></div>
+        <div class="${styles.stadiaTick} ${styles.stadiaL3}"></div>
+        <div class="${styles.stadiaTick} ${styles.stadiaR1}"></div>
+        <div class="${styles.stadiaTick} ${styles.stadiaR2}"></div>
+        <div class="${styles.stadiaTick} ${styles.stadiaR3}"></div>
+        <!-- Mil-style drop ticks below the bore (range holdover marks). -->
+        <div class="${styles.dropTick} ${styles.drop1}"></div>
+        <div class="${styles.dropTick} ${styles.drop2}"></div>
+        <div class="${styles.dropTick} ${styles.drop3}"></div>
       </div>
       <div data-ref="emplacementMg" class="${styles.mgReticle}" style="display:none">
         <div class="${styles.mgLine} ${styles.mgLineTop}"></div>
