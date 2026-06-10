@@ -11,13 +11,13 @@
 > reticle correctness is verifiable but reticle *feel* is the owner's call)
 > **Concurrency cap:** 5
 > **Status:** Phase 1 `cycle-2026-06-09-ground-gunnery-craft` **COMPLETE
-> 2026-06-09** (5/5: #362 reticle-framework, #364 npc-tank-cannon-wiring
-> [combat-reviewer CHANGES-REQUESTED → single-owner stepping fix → merged],
-> #366 tank-gunner-sight, #367 m2hb-gun-experience, #369
-> tank-sight-prod-wiring). The Phase 1 exit feel-walk is deferred to a
-> PLAYTEST_PENDING row under the owner's 2026-06-09 `/goal` (complete both
-> campaigns); Phase 2 (fixed-wing) opens next under that authority.
-> Running interleaved with the lighting-rig campaign (disjoint layers).
+> 2026-06-09** (5/5: #362 #364 #366 #367 #369). Phase 2
+> `cycle-2026-06-09-fixed-wing-craft` **COMPLETE 2026-06-10** (3/3: #370
+> gunsight+ammo, #372 per-airframe ordnance incl. AC-47 broadside, #373
+> camera fit + broadside view). Both exit feel-walks deferred to
+> PLAYTEST_PENDING rows under the owner's 2026-06-09 `/goal`. Phase 3
+> (helicopter) in flight. Running interleaved with the lighting-rig
+> campaign (disjoint layers).
 
 Source: 2026-06-09 owner direction — "all the HUD and crosshairs and cameras
 and controllers and combat need to start being specialized by craft — none of

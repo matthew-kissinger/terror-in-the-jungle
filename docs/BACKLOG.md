@@ -44,6 +44,24 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-09-fixed-wing-craft)
+
+Phase 2 of [CAMPAIGN_2026-06-09-craft-specialization](CAMPAIGN_2026-06-09-craft-specialization.md).
+3/3 merged, fence untouched: fixedwing-gunsight #370 (fence-clean `fixed_wing`
+reflector reticle + visible ammo counter — the hidden hardcoded 600 is now a
+named per-airframe magazine with HUD readout + LOW state), per-aircraft-ordnance
+#372 (closes the AVIATSIYA-5/6 guns-identity deferral via the new data-driven
+FixedWingArmament module: A-1 4x20mm wing cannons w/ paired convergence, F-4
+nose rotary, AC-47 nose gun REMOVED for the signature 3x7.62 broadside firing
+90° left; AI untouched by construction — no NPC gun path exists),
+fixedwing-camera-fit #373 (per-airframe chase tuning, reticle-on-convergence
+alignment proven by NDC projection tests, AC-47 RMB-toggled broadside gunner
+view reusing the tank-sight restore guarantees). Follow-ups:
+FixedWingDisplayInfo camera fields now unused (cleanup candidate); bombs/
+rockets remain a future ordnance cycle; AI AC-47 orbit-fire is a follow-up if
+AI ever flies it. Owner feel-walk row in PLAYTEST_PENDING.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-fixed-wing-craft/`.
+
 ## Recently Completed (cycle-2026-06-09-lighting-rig-spike)
 
 Phase 0 of [CAMPAIGN_2026-06-09-lighting-rig](CAMPAIGN_2026-06-09-lighting-rig.md).
