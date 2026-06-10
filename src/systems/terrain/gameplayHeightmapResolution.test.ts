@@ -5,22 +5,21 @@
  * Behavior coverage for the A Shau gameplay-query heightmap resolution.
  *
  * The defect (combat-movement-stall-tail root): A Shau CPU height/slope queries
- * used to read the same coarse grid the GPU surface is baked at
- * (`computeTerrainSurfaceGridSize` ≈ 512 over a ~21.5km world ⇒ ~42m/sample).
+ * used to read a coarse 512 surface grid (~42m/sample over a ~21.5km world).
  * Over a real 9m DEM that coarse grid C0-smooths sharp ridges, so the slope
  * GRADIENT DIRECTION (which decides which way an NPC contours around a slope)
  * flips relative to the true terrain — the input signal that drives the
  * contour-direction oscillation.
  *
- * These tests assert the observable outcome at the gameplay-query path:
- *  - a sharp, asymmetric ridge narrower than a coarse surface cell keeps its
- *    real slope sign when sampled at gameplay-query resolution (no 42m plateau),
- *  - the gameplay-query grid resolves finer than the GPU surface grid for
- *    DEM-scale worlds and stays equal for small procedural worlds (no regression
- *    where it is not needed).
- *
- * They are deliberately decoupled from the GPU surface texture so the render
- * path is untouched (campaign non-goal).
+ * Since ashau-load-freeze (2026-06-10) the GPU surface grid for DEM-scale
+ * worlds is baked at the same 1024 cap as the gameplay-query grid, so render
+ * and collision interpolate ONE grid. These tests assert:
+ *  - the surface and gameplay-query grids are the same fine grid for
+ *    DEM-scale worlds (render↔collision coherence),
+ *  - small procedural worlds don't over-resolve (no needless memory growth),
+ *  - a sharp, asymmetric ridge narrower than the pre-fix 42m cell keeps its
+ *    real slope sign at the shared resolution (the historical defect repro
+ *    stays pinned at the old 512 grid).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -82,18 +81,18 @@ describe('gameplay heightmap resolution (A Shau contour-input fidelity)', () => 
   const A_SHAU_WORLD = 21136;
   const A_SHAU_SURFACE = A_SHAU_WORLD + 400; // default visualMargin 200 each side
 
-  it('gameplay-query grid resolves finer than the GPU surface grid for A Shau', () => {
+  it('surface and gameplay-query grids are the same fine grid for A Shau (coherence)', () => {
     const surfaceGrid = computeTerrainSurfaceGridSize(A_SHAU_SURFACE);
     const queryGrid = computeGameplayQueryGridSize(A_SHAU_WORLD);
 
-    // The surface (render) grid is coarse: ~42m/sample at A Shau scale.
-    const surfaceMetersPerSample = A_SHAU_SURFACE / (surfaceGrid - 1);
-    expect(surfaceMetersPerSample).toBeGreaterThan(30);
+    // One shared grid: the rendered surface and every CPU height query
+    // (collision, BVH, AI slope, vegetation) interpolate identical data.
+    expect(surfaceGrid).toBe(queryGrid);
 
-    // The gameplay-query grid is materially finer so slope is faithful to the DEM.
-    const queryMetersPerSample = A_SHAU_WORLD / (queryGrid - 1);
-    expect(queryGrid).toBeGreaterThan(surfaceGrid);
-    expect(queryMetersPerSample).toBeLessThan(surfaceMetersPerSample * 0.6);
+    // And that grid is fine enough to be DEM-faithful (~21m/sample, not the
+    // pre-fix ~42m that C0-smoothed sharp ridges).
+    const surfaceMetersPerSample = A_SHAU_SURFACE / (surfaceGrid - 1);
+    expect(surfaceMetersPerSample).toBeLessThan(25);
   });
 
   it('does not over-resolve small procedural worlds (no needless memory growth)', () => {
@@ -108,7 +107,9 @@ describe('gameplay heightmap resolution (A Shau contour-input fidelity)', () => 
   it('coarse surface-resolution bake flattens a sub-cell ridge (the defect repro)', () => {
     const ridgeX = 137; // off-grid so the ridge sits inside a coarse cell
     const provider = makeAsymmetricRidgeProvider(ridgeX, 60);
-    const surfaceGrid = computeTerrainSurfaceGridSize(A_SHAU_SURFACE);
+    // Pinned at the PRE-FIX surface grid (512 ⇒ ~42m/sample): this documents
+    // the defect the resolution lift fixed, independent of the live sizing.
+    const surfaceGrid = 512;
 
     const coarse = bakeGrid(provider, surfaceGrid, A_SHAU_SURFACE);
     const coarseProvider = new BakedHeightProvider(coarse, surfaceGrid, A_SHAU_SURFACE, NOISE_CONFIG);

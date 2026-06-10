@@ -828,15 +828,14 @@ export class TerrainSystem implements GameSystem {
    * one that bilinear-interpolates a baked grid, so CPU height queries (collision,
    * vegetation, BVH, AI) read a stable, GPU-coherent surface.
    *
-   * The GPU surface grid is power-of-two-capped and bottoms out at ~42m/sample on
-   * a ~21.5km A Shau world — far coarser than the 9m DEM. That coarse grid
-   * C0-smooths sharp ridges, flipping the slope gradient direction the NPC contour
-   * solver reads (the combat-movement-stall-tail root). So for DEM-scale worlds we
-   * bake a finer CPU-only gameplay-query grid from the live source provider (the
-   * full-resolution DEM at this point) over the same extent the GPU grid maps, and
-   * wrap THAT. The GPU surface texture is untouched (no render regression). For
-   * small procedural worlds the query grid size equals the surface grid, so we
-   * reuse the already-baked GPU grid and add no extra work or memory.
+   * Since ashau-load-freeze (2026-06-10) DEM-scale worlds bake the GPU surface
+   * at the same 1024 cap the gameplay-query sizing targets, so the query grid
+   * size equals the surface grid everywhere and we reuse the already-baked GPU
+   * grid: render and collision interpolate ONE grid (residual divergence is
+   * the rasterizer's triangle interpolation, ~±0.3m at LOD0). The finer-bake
+   * branch below stays as the guard for any future world whose surface grid
+   * is capped coarser than the query target — there we bake a CPU-only grid
+   * from the live source provider over the same extent the GPU grid maps.
    */
   private syncCpuHeightsToGpu(): void {
     const baked = this.surfaceRuntime.getBakedHeightmap();

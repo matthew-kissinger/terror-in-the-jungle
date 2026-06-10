@@ -23,16 +23,20 @@ const MIN_HEIGHTMAP_GRID_SIZE = 256;
 const MAX_HEIGHTMAP_GRID_SIZE = 1024;
 
 /**
- * Gameplay (CPU) height/slope queries are decoupled from the GPU surface grid.
- * The GPU surface grid is power-of-two-capped for cheap texture filtering, which
- * on a ~21.5km A Shau world bottoms out at ~42m/sample — far coarser than the 9m
- * DEM. That coarse grid C0-smooths sharp ridges, so the slope GRADIENT DIRECTION
- * fed to the NPC contour solver flips relative to the true terrain (the
- * combat-movement-stall-tail root). The gameplay-query grid below resolves the
- * playable area at ~DEM scale so collision, BVH, AI slope, and vegetation read a
- * faithful surface. It is a CPU-only Float32 grid — no GPU texture, no render
- * regression. Native pixels are still the upper bound: there is no fidelity past
- * the source DEM, so this never out-resolves the asset.
+ * Gameplay (CPU) height/slope queries read the same grid spec the GPU surface
+ * is baked at whenever that grid is fine enough; the query grid below only
+ * out-resolves the surface when the surface is capped coarser. Since
+ * ashau-load-freeze (2026-06-10) DEM-scale worlds bake the surface at the
+ * 1024 cap (~21m/sample on A Shau — comfortably above the 9m DEM floor, so
+ * this never out-resolves the asset), which makes the two grids IDENTICAL
+ * there: collision, BVH, AI slope, vegetation, and the rendered surface all
+ * interpolate one grid, and the render↔collision divergence reduces to the
+ * GPU rasterizer's triangle interpolation between mesh vertices (~±0.3m at
+ * LOD0 spacing). History: pre-2026-06-09 the queries read a 512 surface grid
+ * (~42m/sample) whose C0-smoothing flipped the slope GRADIENT DIRECTION fed
+ * to the NPC contour solver (the combat-movement-stall-tail root); #354
+ * introduced the finer CPU-only query grid, and the surface grid was lifted
+ * to match once StampSpatialIndex made DEM+stamp sampling cheap.
  */
 const GAMEPLAY_QUERY_TARGET_METERS_PER_SAMPLE = 20;
 const MAX_GAMEPLAY_QUERY_GRID_SIZE = 1024;
@@ -46,8 +50,12 @@ function roundUpToPowerOfTwo(value: number): number {
 }
 
 export function computeTerrainSurfaceGridSize(worldSize: number): number {
+  // DEM-scale target lowered 48 → 24 (ashau-load-freeze): lands the A Shau
+  // surface grid on the 1024 cap so it matches the gameplay-query grid (one
+  // shared grid, render↔collision coherent). Costs +3MB R32F + +3MB RGBA8
+  // normals GPU vs the old 512 — accepted on the only mode at this scale.
   const targetMetersPerSample =
-    worldSize >= 16384 ? 48 :
+    worldSize >= 16384 ? 24 :
     worldSize >= 8192 ? 32 :
     worldSize >= 4096 ? 8 :
     worldSize >= 1024 ? 4 :
