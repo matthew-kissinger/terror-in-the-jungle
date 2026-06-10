@@ -129,7 +129,7 @@ export class HUDVehicleHud {
     this.fixedWingHUD.setMouseMode(controlMode);
   }
 
-  updateFixedWingAmmo(rounds: number, capacity: number): void {
-    this.fixedWingHUD.setAmmo(rounds, capacity);
+  updateFixedWingAmmo(rounds: number, capacity: number, weaponName?: string): void {
+    this.fixedWingHUD.setAmmo(rounds, capacity, weaponName);
   }
 }

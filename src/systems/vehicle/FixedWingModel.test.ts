@@ -469,6 +469,121 @@ describe('FixedWingModel', () => {
     });
   });
 
+  describe('per-airframe ordnance', () => {
+    function makeRayCapturingCombatantSystem() {
+      const rays: THREE.Ray[] = [];
+      const cs = {
+        handlePlayerShot: vi.fn((ray: THREE.Ray) => {
+          rays.push(ray.clone());
+          return { hit: false, point: new THREE.Vector3() };
+        }),
+        impactEffectsPool: { spawn: vi.fn() },
+      } as unknown as CombatantSystem;
+      return { cs, rays };
+    }
+
+    function makeAirbornePlayerController() {
+      const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+      camera.position.set(0, 500, 0);
+      return {
+        isInHelicopter: () => false,
+        isInFixedWing: () => true,
+        getFixedWingId: () => 'fw1',
+        exitFixedWing: vi.fn(),
+        updatePlayerPosition: vi.fn(),
+        getCamera: () => camera,
+      };
+    }
+
+    function angleDeg(a: THREE.Vector3, b: THREE.Vector3): number {
+      return (Math.acos(THREE.MathUtils.clamp(a.clone().normalize().dot(b.clone().normalize()), -1, 1)) * 180) / Math.PI;
+    }
+
+    async function fireAndCaptureDirection(modelPath: string): Promise<THREE.Vector3> {
+      const { cs, rays } = makeRayCapturingCombatantSystem();
+      const metadata = createSpawnMetadata();
+      model.setCombatantSystem(cs);
+      model.setPlayerController(makeAirbornePlayerController() as any);
+
+      await model.createAircraftAtSpot('fw1', modelPath, new THREE.Vector3(100, 10, -200), 0, metadata);
+      model.setPilotedAircraft('fw1');
+      model.positionAircraftOnApproach('fw1'); // airborne, heading along the runway
+
+      model.startFiring('fw1');
+      model.update(0.2);
+
+      expect(rays.length).toBeGreaterThan(0);
+      return rays[0].direction.clone();
+    }
+
+    it('reports a distinct magazine capacity per airframe', async () => {
+      await model.createAircraftAtSpot('a1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(0, 10, 0), 0);
+      await model.createAircraftAtSpot('f4', AircraftModels.F4_PHANTOM, new THREE.Vector3(0, 10, 0), 0);
+      await model.createAircraftAtSpot('ac47', AircraftModels.AC47_SPOOKY, new THREE.Vector3(0, 10, 0), 0);
+
+      const a1Cap = model.getWeaponAmmoCapacity('a1');
+      const f4Cap = model.getWeaponAmmoCapacity('f4');
+      const ac47Cap = model.getWeaponAmmoCapacity('ac47');
+
+      expect(a1Cap).toBeGreaterThan(0);
+      expect(f4Cap).toBeGreaterThan(0);
+      expect(ac47Cap).toBeGreaterThan(0);
+      // The gunship's broadside battery carries the most rounds.
+      expect(ac47Cap).toBeGreaterThan(a1Cap);
+      expect(ac47Cap).toBeGreaterThan(f4Cap);
+      // A fresh aircraft starts at a full magazine.
+      expect(model.getWeaponAmmo('ac47')).toBe(ac47Cap);
+    });
+
+    it('reports a distinct weapon name per airframe', async () => {
+      await model.createAircraftAtSpot('a1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(0, 10, 0), 0);
+      await model.createAircraftAtSpot('f4', AircraftModels.F4_PHANTOM, new THREE.Vector3(0, 10, 0), 0);
+      await model.createAircraftAtSpot('ac47', AircraftModels.AC47_SPOOKY, new THREE.Vector3(0, 10, 0), 0);
+
+      const names = new Set([
+        model.getWeaponName('a1'),
+        model.getWeaponName('f4'),
+        model.getWeaponName('ac47'),
+      ]);
+      expect(names.size).toBe(3);
+      expect(model.getWeaponName('a1').length).toBeGreaterThan(0);
+      expect(model.getWeaponName('nonexistent')).toBe('');
+    });
+
+    it('fires the A-1 and F-4 forward along the nose', async () => {
+      const a1Dir = await fireAndCaptureDirection(AircraftModels.A1_SKYRAIDER);
+      const a1Forward = new THREE.Vector3(0, 0, -1).applyQuaternion(captureQuaternion());
+      expect(angleDeg(a1Dir, a1Forward)).toBeLessThan(15);
+
+      // Fresh model for the F-4.
+      model.dispose();
+      model = new FixedWingModel(scene);
+      model.setTerrainManager(createMockTerrain() as any);
+      const f4Dir = await fireAndCaptureDirection(AircraftModels.F4_PHANTOM);
+      const f4Forward = new THREE.Vector3(0, 0, -1).applyQuaternion(captureQuaternion());
+      expect(angleDeg(f4Dir, f4Forward)).toBeLessThan(15);
+    });
+
+    it('fires the AC-47 broadside ~90 degrees to the left of the nose', async () => {
+      const dir = await fireAndCaptureDirection(AircraftModels.AC47_SPOOKY);
+      const q = captureQuaternion();
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+      const left = new THREE.Vector3(-1, 0, 0).applyQuaternion(q);
+
+      // The shot is perpendicular to the nose (the signature broadside geometry),
+      // pointing to the aircraft's left rather than forward.
+      expect(angleDeg(dir, forward)).toBeGreaterThan(75);
+      expect(angleDeg(dir, forward)).toBeLessThan(105);
+      expect(angleDeg(dir, left)).toBeLessThan(15);
+    });
+
+    function captureQuaternion(): THREE.Quaternion {
+      const q = new THREE.Quaternion();
+      model.getAircraftQuaternionTo('fw1', q);
+      return q;
+    }
+  });
+
   describe('dispose', () => {
     it('cleans up all aircraft on dispose', async () => {
       const pos = new THREE.Vector3(0, 10, 0);

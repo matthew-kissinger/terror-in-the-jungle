@@ -50,6 +50,14 @@ the cycle that re-opens it.
 
 History log:
 
+- 2026-06-09 — budget-ratchet re-base (per-aircraft-ordnance,
+  cycle-2026-06-09-fixed-wing-craft): `src/systems/vehicle/FixedWingModel.ts`
+  snapshot raised 1155→1163 LOC / 48→51 methods. Per-airframe ordnance
+  (A-1 wing cannons, F-4 nose rotary, AC-47 broadside) — the bulk weapon table
+  was EXTRACTED to the new sibling `src/systems/vehicle/FixedWingArmament.ts`
+  (net new module, not in-file growth); the in-file delta is the per-airframe
+  config plumbing + the new `getWeaponName` getter. Within-cycle growth, not a
+  new carry-over; R4 split target unchanged.
 - 2026-06-09 — budget-grandfather note (orchestrator): `src/core/StartupPlayerRuntimeComposer.ts`
   admitted to the lint-source-budget grandfather list at 739 LOC. The prod
   composition point absorbed the seated-weapon lifecycle (tank cannon + M2HB),

@@ -39,6 +39,11 @@ describe('FixedWingHUD — nose-gun ammo readout', () => {
     return el.classList.contains('ammoLow');
   }
 
+  function weaponLabel(): string {
+    const el = hud.element.querySelector('[data-ref="weaponLabel"]') as HTMLElement;
+    return el.textContent ?? '';
+  }
+
   it('shows the rounds remaining and follows the fire path down', () => {
     hud.setAmmo(600, 600);
     expect(ammoText()).toBe('600');
@@ -75,5 +80,19 @@ describe('FixedWingHUD — nose-gun ammo readout', () => {
 
     hud.setAmmo(600, 600);
     expect(isLow()).toBe(false);
+  });
+
+  it('shows the per-airframe weapon name on the gun-panel label', () => {
+    hud.setAmmo(1500, 1500, '3x 7.62mm Broadside');
+    expect(weaponLabel()).toBe('3x 7.62mm Broadside');
+
+    hud.setAmmo(480, 480, '4x 20mm Wing Cannon');
+    expect(weaponLabel()).toBe('4x 20mm Wing Cannon');
+  });
+
+  it('keeps the default gun label when no weapon name is supplied', () => {
+    expect(weaponLabel()).toBe('GUN');
+    hud.setAmmo(540, 600); // legacy 2-arg call
+    expect(weaponLabel()).toBe('GUN');
   });
 });

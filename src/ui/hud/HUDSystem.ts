@@ -603,8 +603,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.updateFixedWingMouseMode(controlMode);
   }
 
-  updateFixedWingAmmo(rounds: number, capacity: number): void {
-    this.elements.updateFixedWingAmmo(rounds, capacity);
+  updateFixedWingAmmo(rounds: number, capacity: number, weaponName?: string): void {
+    this.elements.updateFixedWingAmmo(rounds, capacity, weaponName);
   }
 
   // Squad deploy prompt methods (IHUDSystem)
