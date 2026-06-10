@@ -291,6 +291,11 @@ export class PlayerController implements GameSystem {
           this.helicopterModel.switchHelicopterWeapon(this.playerState.helicopterId, index);
         }
       },
+      onHelicopterDoorGunToggle: () => {
+        if (this.playerState.isInHelicopter) {
+          this.helicopterAdapter?.toggleDoorGunSeat();
+        }
+      },
       onAirSupportMenu: () => this.handleAirSupportRequest(),
       onSquadCommand: () => this.commandInputManager?.toggleCommandMode(),
       onSquadQuickCommand: (slot: number) => this.commandInputManager?.issueQuickCommand(slot),

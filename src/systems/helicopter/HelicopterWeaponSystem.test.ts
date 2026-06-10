@@ -412,6 +412,66 @@ describe('HelicopterWeaponSystem', () => {
     });
   });
 
+  describe('player-crewed door gun (door-gun-seat)', () => {
+    const aimDir = new THREE.Vector3(-1, 0, 0); // straight out the left door
+
+    it('reports the door-gun belt status for the player gunner HUD', () => {
+      ws.initWeapons(HELI_ID, [CREW_GUN]);
+      const status = ws.getPlayerDoorGunStatus(HELI_ID)!;
+      expect(status.name).toBe('M60 Door Gun');
+      expect(status.ammo).toBe(CREW_GUN.ammoCapacity);
+      expect(status.maxAmmo).toBe(CREW_GUN.ammoCapacity);
+    });
+
+    it('returns null door-gun status for an aircraft with no door gun', () => {
+      ws.initWeapons(HELI_ID, [MINIGUN]);
+      expect(ws.getPlayerDoorGunStatus(HELI_ID)).toBeNull();
+    });
+
+    it('fires the door gun along the player aim direction while crewing', () => {
+      ws.initWeapons(HELI_ID, [CREW_GUN]);
+      ws.setPlayerCrewing(HELI_ID, true);
+
+      ws.firePlayerDoorGun(HELI_ID, pos, quat, aimDir, true, false, 0.5);
+
+      expect(cs.handlePlayerShot).toHaveBeenCalled();
+      expect(ws.getCrewAmmo(HELI_ID)).toBeLessThan(CREW_GUN.ammoCapacity);
+      // The shot ray points along the supplied (left-door) aim, not the airframe nose.
+      const ray = (cs.handlePlayerShot as any).mock.calls[0][0] as THREE.Ray;
+      expect(ray.direction.x).toBeLessThan(-0.9);
+    });
+
+    it('does not fire the door gun when the trigger is released', () => {
+      ws.initWeapons(HELI_ID, [CREW_GUN]);
+      ws.setPlayerCrewing(HELI_ID, true);
+      ws.firePlayerDoorGun(HELI_ID, pos, quat, aimDir, false, false, 0.5);
+      expect(cs.handlePlayerShot).not.toHaveBeenCalled();
+    });
+
+    it('holds the door gun on the ground even with the trigger held', () => {
+      ws.initWeapons(HELI_ID, [CREW_GUN]);
+      ws.setPlayerCrewing(HELI_ID, true);
+      ws.firePlayerDoorGun(HELI_ID, pos, quat, aimDir, true, true, 0.5); // grounded
+      expect(cs.handlePlayerShot).not.toHaveBeenCalled();
+    });
+
+    it('suspends the AI auto-fire path while the player crews the door gun', () => {
+      ws.initWeapons(HELI_ID, [CREW_GUN]);
+      ws.setCrewManned(HELI_ID, true);
+      ws.setPlayerCrewing(HELI_ID, true);
+
+      // The per-frame update would auto-fire a manned AI door gun, but the
+      // player is crewing it — so the auto path must stay silent (no double-fire).
+      ws.update(0.5, HELI_ID, pos, quat, false, false);
+      expect(cs.handlePlayerShot).not.toHaveBeenCalled();
+
+      // Once the player leaves, the AI auto-fire resumes.
+      ws.setPlayerCrewing(HELI_ID, false);
+      ws.update(0.5, HELI_ID, pos, quat, false, false);
+      expect(cs.handlePlayerShot).toHaveBeenCalled();
+    });
+  });
+
   describe('friend-or-foe filtering', () => {
     it('shoots through the shared combatant fire path with the owning faction', () => {
       // OPFOR gunship: its guns must resolve hits as an OPFOR shooter so the

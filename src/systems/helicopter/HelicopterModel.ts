@@ -451,6 +451,20 @@ export class HelicopterModel implements GameSystem {
   getWeaponStatus(heliId: string): { name: string; ammo: number; maxAmmo: number } | null { return this.weaponSystem.getWeaponStatus(heliId); }
   getWeaponCount(heliId: string): number { return this.weaponSystem.getWeaponCount(heliId); }
 
+  // ── Player door-gun seat (door-gun-seat) ──
+  // Thin pass-throughs so the player heli adapter can crew the door gun without
+  // depending on the weapon system directly (it only holds the fenced
+  // IHelicopterModel). The arc clamp lives on the adapter; this only marks the
+  // crew state, forwards the clamped aim/trigger, and surfaces ammo.
+  hasDoorGun(heliId: string): boolean { return this.weaponSystem.getCrewWeaponCount(heliId) > 0; }
+  setPlayerDoorGunCrewing(heliId: string, crewing: boolean): void { this.weaponSystem.setPlayerCrewing(heliId, crewing); }
+  getPlayerDoorGunStatus(heliId: string): { name: string; ammo: number; maxAmmo: number } | null { return this.weaponSystem.getPlayerDoorGunStatus(heliId); }
+  firePlayerDoorGun(heliId: string, position: THREE.Vector3, quaternion: THREE.Quaternion, aimDir: THREE.Vector3, fire: boolean, dt: number): void {
+    const physics = this.helicopterPhysics.get(heliId);
+    const isGrounded = physics ? physics.getState().isGrounded : true;
+    this.weaponSystem.firePlayerDoorGun(heliId, position, quaternion, aimDir, fire, isGrounded, dt);
+  }
+
   applyDamage(heliId: string, damage: number): void {
     const pos = this.getHelicopterPosition(heliId);
     if (!pos) return;

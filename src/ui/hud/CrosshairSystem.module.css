@@ -413,6 +413,112 @@
   box-shadow: 0 0 5px rgba(158, 59, 46, 0.85);
 }
 
+/* --- Helicopter door gun (door-gun-seat: M60 open cross) ---
+   A lighter open cross than the emplacement .50-cal sight: four short open arms
+   leaving a gap at the bore, a hollow center dot, and four arc-stop edge ticks
+   that light when the door gun runs out of traverse/elevation travel. Reuses
+   the emplacement traverse-stop signal but with door-gun-specific geometry. */
+.doorGunReticle {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.dgArm {
+  position: absolute;
+  background: rgba(231, 217, 186, 0.85);
+  box-shadow: 0 0 2px rgba(231, 217, 186, 0.85);
+}
+
+.dgArmTop,
+.dgArmBottom {
+  width: 1.5px;
+  height: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.dgArmTop {
+  top: 8px;
+}
+
+.dgArmBottom {
+  bottom: 8px;
+}
+
+.dgArmLeft,
+.dgArmRight {
+  height: 1.5px;
+  width: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dgArmLeft {
+  left: 8px;
+}
+
+.dgArmRight {
+  right: 8px;
+}
+
+.dgDot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 3px;
+  border: 1px solid rgba(231, 217, 186, 0.9);
+  border-radius: 50%;
+  background: transparent;
+  z-index: 2;
+}
+
+/* Arc-stop edge ticks — dim by default, stamp red at the mount limit. */
+.dgStop {
+  position: absolute;
+  background: rgba(231, 217, 186, 0.18);
+  transition: background 0.05s linear, box-shadow 0.05s linear;
+}
+
+.dgStopUp,
+.dgStopDown {
+  width: 10px;
+  height: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.dgStopUp {
+  top: 0;
+}
+
+.dgStopDown {
+  bottom: 0;
+}
+
+.dgStopLeft,
+.dgStopRight {
+  width: 2px;
+  height: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dgStopLeft {
+  left: 0;
+}
+
+.dgStopRight {
+  right: 0;
+}
+
+.dgStopActive {
+  background: #9e3b2e;
+  box-shadow: 0 0 5px rgba(158, 59, 46, 0.85);
+}
+
 /* --- Fixed-wing reflector gunsight (R2 fixedwing-gunsight) ---
    A static reflector sight boresighted to the nose-cannon convergence: an
    outer ring, four short cross ticks just outside it (gap at the bore), and a
