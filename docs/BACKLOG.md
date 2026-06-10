@@ -44,6 +44,43 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-09-lighting-acceptance)
+
+Phase 4 — FINAL phase — of
+[CAMPAIGN_2026-06-09-lighting-rig](CAMPAIGN_2026-06-09-lighting-rig.md);
+campaign engineering CLOSED (owner prod acceptance row in PLAYTEST_PENDING).
+2/2 merged: tod-coherence-gate #380 (standing `check:tod-coherence`
+acceptance gate — tolerances as named constants in
+`scripts/tod-coherence-gate.ts` (corr ≥0.92, rangeRatio [0.6,1.6], dawn
+≤0.85), NPC-in-frame fixture that materializes a combatant via the public
+`materializeAgent` API when the harness has none (npc row reads real impostor
+pixels 8/8 TODs), deterministic median-of-9 anchor sorted by stable
+world-position key — closes the Phase 3 anchor-variance finding; pre-deploy
+checklist tier, NOT CI-blocking per the STABILIZAT-1 GPU-runner rationale)
+and legacy-path-deletion #381 (rig DEFAULT ON; legacy paths deleted −405 LOC:
+whole `AtmosphereLightingColor.ts` / `shapeDirectLightForRenderer`, legacy
+scene-light + fog shaping, terrain night stabilizer + night-fill emissive,
+billboard [0.40,0.78] clamp band, NPC scene scan; flag-gated selects
+collapsed — the dead ALU both terrain reviews flagged is gone; one-release
+runtime kill-switch `window.__lightingRig.enabled=false` reverts CPU scene
+authority only — deleted in-shader paths do NOT return; flag removal next
+cycle). Evidence: gate GREEN post-flip (foliage 0.953, npc 0.997, dawn 0.050,
+midnight 0.016); combat120 p99 IMPROVED 38.80→33.60ms / peak 43.6→34.2ms
+(same-machine same-session A/B); combat-reviewer APPROVE; terrain-nav
+REQUEST-CHANGES resolved (its blocking claim was factually wrong —
+`emissiveNode` defaults to null and `toBeDefined()` passes on null — but the
+assertion WAS vacuous; now asserts the deletion). Advisory carry-over: GLB
+rangeRatio 6.6× (direct-sun swing on vehicle bodies; promote to
+`HARD_GATED_FAMILIES` later if wanted). Per-scenario gate coverage (5 presets
+× 4 TODs) noted in the script header as a follow-up. HARNESS GOTCHA for the
+record: combat120 captures CANNOT run from an agent worktree on Windows —
+the Chromium profile under `<worktree>\artifacts\perf\<ts>\browser-profile`
+exceeds MAX_PATH and every worker/dynamic-import fetch dies with ERR_FAILED
+while the static page loads; run from a short path (junction works for the
+capture but `vite build` cannot run through a junction — build from the real
+path, capture with `--no-build`).
+Briefs: `docs/tasks/archive/cycle-2026-06-09-lighting-acceptance/`.
+
 ## Recently Completed (cycle-2026-06-09-exposure-atmosphere-unify)
 
 Phase 3 of [CAMPAIGN_2026-06-09-lighting-rig](CAMPAIGN_2026-06-09-lighting-rig.md).

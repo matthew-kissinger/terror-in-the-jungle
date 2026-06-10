@@ -9,9 +9,20 @@
 > looks wrong. The orchestrator engineers; the owner judges captures at every
 > exit gate.
 > **Concurrency cap:** 5
-> **Status:** Phases 0-3 COMPLETE; Phase 4 `cycle-2026-06-09-lighting-acceptance`
-> IN FLIGHT (R1 `tod-coherence-gate` dispatched 2026-06-10; R2
-> `legacy-path-deletion` serialized after it). Phase 3
+> **Status:** ALL PHASES COMPLETE 2026-06-10 — campaign engineering CLOSED;
+> owner prod acceptance walk pending (row in PLAYTEST_PENDING). Phase 4
+> `cycle-2026-06-09-lighting-acceptance` COMPLETE: R1 `tod-coherence-gate`
+> #380 (standing `check:tod-coherence` gate — committed tolerances, NPC
+> impostor fixture anchored on real pixels 8/8 TODs, deterministic
+> median-of-9 anchor) and R2 `legacy-path-deletion` #381 (rig DEFAULT ON,
+> legacy paths deleted −405 LOC: shapeDirectLightForRenderer + whole
+> AtmosphereLightingColor.ts, terrain night-fill emissive + stabilizer,
+> billboard [0.40,0.78] clamp band, NPC scene scan; one-release runtime
+> kill-switch `window.__lightingRig.enabled=false` documented). Post-flip
+> evidence: gate GREEN (foliage corr 0.953, npc 0.997, dawn 0.050, midnight
+> dark); combat120 p99 IMPROVED 38.80→33.60ms (−13.4%, same-machine A/B);
+> combat-reviewer APPROVE; terrain-nav REQUEST-CHANGES resolved (vacuous
+> emissive assertion → asserts deletion). Phase 3
 > `cycle-2026-06-09-exposure-atmosphere-unify` **COMPLETE 2026-06-10** (#379:
 > rig fog authority, exposure policy ratified in-shader/once, presets as
 > bounded trims; p3-on bands hold — foliage corr 0.989, rangeRatio 0.945; two
