@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { updateShaderUniforms } from './CombatantShaders';
+import { LightingRigConfig } from '../environment/LightingRig';
 
 function createNpcUniformMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
@@ -81,5 +82,48 @@ describe('CombatantShaders NPC atmosphere uniforms', () => {
     expect(material.uniforms.npcLightingEnabled.value).toBe(0);
 
     material.dispose();
+  });
+
+  describe('on the unified lighting-rig path', () => {
+    afterEach(() => {
+      LightingRigConfig.enabled = false;
+    });
+
+    it('does not stamp scene-scanned light into impostor materials (single authority)', () => {
+      // With scene lights present, the legacy path would enable per-material
+      // lighting and derive a scale. On the rig path the impostor reads the
+      // shared rig bindings directly, so the per-material atmosphere lighting is
+      // left disabled — the scene-scan "second authority" is bypassed.
+      const scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xe8f1db, 0x4b5a3f, 1.45));
+      scene.add(new THREE.DirectionalLight(0xffffff, 1.25));
+      const camera = new THREE.PerspectiveCamera();
+      const material = createNpcUniformMaterial();
+
+      LightingRigConfig.enabled = true;
+      updateShaderUniforms(new Map([['US_idle', material]]), camera, scene);
+
+      expect(material.uniforms.npcLightingEnabled.value).toBe(0);
+
+      material.dispose();
+    });
+
+    it('still forwards scene fog on the rig path (fog is unchanged this pass)', () => {
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x223344, 0.003);
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 1.0));
+      const camera = new THREE.PerspectiveCamera();
+      const material = createNpcUniformMaterial();
+
+      LightingRigConfig.enabled = true;
+      updateShaderUniforms(new Map([['NVA_idle', material]]), camera, scene);
+
+      expect(material.uniforms.npcFogMode.value).toBe(1);
+      expect(material.uniforms.npcFogColor.value.getHex()).toBe(0x223344);
+      // Lighting stays rig-owned even with scene lights present.
+      expect(material.uniforms.npcLightingEnabled.value).toBe(0);
+
+      material.dispose();
+    });
   });
 });

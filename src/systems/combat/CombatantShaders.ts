@@ -2,6 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
+import { isLightingRigEnabled } from '../environment/LightingRig';
 
 export interface NPCShaderSettings {
   celShadingEnabled: boolean;
@@ -120,6 +121,52 @@ const clamp = (value: number, min: number, max: number): number => (
 const colorLuma = (color: THREE.Color): number => (
   0.299 * color.r + 0.587 * color.g + 0.114 * color.b
 );
+
+/**
+ * Rig-path snapshot: the impostor shader reads the shared `lightingRigBindings`
+ * (updated once per frame by AtmosphereSystem) directly on its rig branch, so
+ * the per-material atmosphere uniforms are inert — we skip the `scene.children`
+ * scan entirely (the memo's "second authority", HACK 5) and write a neutral
+ * snapshot with `lightingEnabled = false`. Fog is still resolved from the scene
+ * because the impostor fog block is unchanged this pass (Phase 3 owns fog). The
+ * legacy scan path is byte-identical when the flag is OFF; deletion of the scan
+ * is Phase 4's job.
+ */
+const resolveNpcRigPassFogOnlySnapshot = (scene?: THREE.Scene): NpcAtmosphereSnapshot => {
+  scratchNpcSkyColor.setRGB(1, 1, 1);
+  scratchNpcGroundColor.setRGB(0.35, 0.35, 0.3);
+  scratchNpcSunColor.setRGB(1, 1, 1);
+  scratchNpcFogColor.set(0x7a8f88);
+
+  let fogMode = 0;
+  let fogDensity = NPC_FOG_DEFAULT_DENSITY;
+  let fogNear = NPC_FOG_DEFAULT_NEAR;
+  let fogFar = NPC_FOG_DEFAULT_FAR;
+
+  if (scene?.fog instanceof THREE.FogExp2) {
+    fogMode = 1;
+    scratchNpcFogColor.copy(scene.fog.color);
+    fogDensity = clamp(scene.fog.density, 0, NPC_FOG_MAX_DENSITY);
+  } else if (scene?.fog instanceof THREE.Fog) {
+    fogMode = 2;
+    scratchNpcFogColor.copy(scene.fog.color);
+    fogNear = scene.fog.near;
+    fogFar = scene.fog.far;
+  }
+
+  return {
+    lightingEnabled: false,
+    lightScale: 1,
+    skyColor: scratchNpcSkyColor,
+    groundColor: scratchNpcGroundColor,
+    sunColor: scratchNpcSunColor,
+    fogMode,
+    fogColor: scratchNpcFogColor,
+    fogDensity,
+    fogNear,
+    fogFar,
+  };
+};
 
 const resolveNpcAtmosphereSnapshot = (scene?: THREE.Scene): NpcAtmosphereSnapshot => {
   let skyWeight = 0;
@@ -245,7 +292,12 @@ export const updateShaderUniforms = (
   scene?: THREE.Scene
 ): void => {
   const time = performance.now() * 0.001;
-  const atmosphere = resolveNpcAtmosphereSnapshot(scene);
+  // On the rig path the impostor shader reads `lightingRigBindings` directly;
+  // skip the per-frame `scene.children` scan (single authority). Legacy path
+  // keeps the scan byte-identical when the flag is OFF.
+  const atmosphere = isLightingRigEnabled()
+    ? resolveNpcRigPassFogOnlySnapshot(scene)
+    : resolveNpcAtmosphereSnapshot(scene);
 
   materials.forEach(material => {
     if (material.uniforms) {
