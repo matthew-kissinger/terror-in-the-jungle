@@ -7,10 +7,12 @@ import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import {
   LightingRigConfig,
   createLightingRigState,
+  createRigSceneLightRadiance,
   deriveLightingRigState,
   isLightingRigEnabled,
   lightingRigBindings,
   rigExposureForElevation,
+  rigSceneLightRadiance,
 } from './LightingRig';
 
 /**
@@ -144,5 +146,66 @@ describe('LightingRig night floor + exposure track time of day', () => {
 
     deriveLightingRigState(backend, new THREE.Vector3(0, 0.5, 0), 0, state);
     expect(state.fogColor.r).toBeCloseTo(0, 5);
+  });
+
+  it('keeps a measurable (non-black) night ambient floor so deep-night terrain is readable', () => {
+    // Phase 1 raised the floor: with terrain rig-lit via PBR ambient (no
+    // colorNode self-light), a near-black floor made midnight terrain
+    // unmeasurable. The floor must lift deep-night radiance into a readable band.
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [0.001, 0.001, 0.002], zenith: [0.01, 0.012, 0.02], horizon: [0.01, 0.01, 0.012] });
+    deriveLightingRigState(backend, new THREE.Vector3(0.05, -0.25, 0), 1, state);
+    // Some readable green-channel radiance, and cool-biased (blue > red) night.
+    expect(state.ambientRadiance.g).toBeGreaterThan(0.02);
+    expect(state.ambientRadiance.b).toBeGreaterThan(state.ambientRadiance.r);
+  });
+});
+
+describe('LightingRig scene-light projection drives the PBR lights from rig terms', () => {
+  beforeEach(() => {
+    LightingRigConfig.enabled = false;
+  });
+
+  // Base construction intensities the rig divides out (mirrors GameRenderer).
+  const BASE = { ambient: 1.0, directional: 2.0, hemisphere: 0.8 };
+
+  it('projects the scene-light colors so color × base intensity equals rig radiance × exposure', () => {
+    // The scene-light projection is how terrain + GLB PBR are made to track the
+    // rig curve: each light's PBR contribution (color × base intensity) equals
+    // the matching rig radiance scaled by the one exposure scalar. The rig
+    // divides the base intensity out so it can leave `.intensity` to weather.
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [2.0, 1.5, 1.0], zenith: [1.2, 1.4, 2.0], horizon: [1.0, 0.8, 0.6] });
+    // Mid-morning sun: above horizon, daylight exposure regime.
+    deriveLightingRigState(backend, new THREE.Vector3(0.2, 0.6, 0.1), 1, state);
+
+    const lights = createRigSceneLightRadiance();
+    rigSceneLightRadiance(state, BASE, lights);
+    const exposure = rigExposureForElevation(state.sunElevation);
+
+    // color × baseIntensity reproduces rigRadiance × exposure for each light.
+    expect(lights.sunColor.r * BASE.directional).toBeCloseTo(state.sunRadiance.r * exposure, 5);
+    expect(lights.skyColor.b * BASE.hemisphere).toBeCloseTo(state.skyIrradiance.b * exposure, 5);
+    expect(lights.groundColor.r * BASE.hemisphere).toBeCloseTo(state.groundIrradiance.r * exposure, 5);
+    expect(lights.ambientColor.g * BASE.ambient).toBeCloseTo(state.ambientRadiance.g * exposure, 5);
+  });
+
+  it('keeps the scene sun light brighter by day than by night so terrain swings the full range', () => {
+    const state = createLightingRigState();
+    const lights = createRigSceneLightRadiance();
+
+    // Bright HDR daytime sun.
+    const dayBackend = makeBackend({ sun: [3.0, 2.5, 2.0], zenith: [1.5, 1.6, 2.0], horizon: [1.2, 1.0, 0.8] });
+    deriveLightingRigState(dayBackend, new THREE.Vector3(0, 0.85, 0), 1, state);
+    rigSceneLightRadiance(state, BASE, lights);
+    const daySun = lights.sunColor.r;
+
+    // Below-horizon: getSun has crossfaded to a dim moon term.
+    const nightBackend = makeBackend({ sun: [0.02, 0.025, 0.04], zenith: [0.02, 0.025, 0.04], horizon: [0.02, 0.02, 0.025] });
+    deriveLightingRigState(nightBackend, new THREE.Vector3(0.05, -0.2, 0), 1, state);
+    rigSceneLightRadiance(state, BASE, lights);
+    const nightSun = lights.sunColor.r;
+
+    expect(daySun).toBeGreaterThan(nightSun);
   });
 });

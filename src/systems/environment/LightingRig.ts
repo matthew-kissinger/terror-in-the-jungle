@@ -151,8 +151,17 @@ const GROUND_BOUNCE_FACTOR = 0.55;
  * billboard 0.40 clamp, NPC lightScale); the memo collapses them into this one
  * term (§3). Cool, dim — midnight foliage is then *allowed* to be dark, bounded
  * only by this floor.
+ *
+ * Phase 1 (`terrain-rig-and-scene-lights`) raised this from the Phase 0
+ * prototype's `(0.018, 0.024, 0.038)`: with the rig now driving the terrain via
+ * PBR scene lights (no colorNode self-lighting), the 21h / midnight terrain
+ * region read as an unmeasurable near-black floor (Phase 0 reviewer note). The
+ * floor lifts the deepest-night radiance into a dark-but-readable band so every
+ * swept TOD produces a measurable luminance. Cool-biased so night stays blue,
+ * not grey. Still the ONE night authority — bright enough to read, dim enough
+ * that midnight is unmistakably dark.
  */
-const NIGHT_AMBIENT_FLOOR = new THREE.Color(0.018, 0.024, 0.038);
+const NIGHT_AMBIENT_FLOOR = new THREE.Color(0.052, 0.064, 0.090);
 
 /**
  * Prototype TOD-aware exposure scalar keyed on sun elevation (memo §3 / scope
@@ -229,5 +238,82 @@ export function deriveLightingRigState(
   lightingRigBindings.ambientRadiance.value.copy(out.ambientRadiance);
   lightingRigBindings.exposure.value = exposure;
 
+  return out;
+}
+
+/**
+ * Scene-light radiance the rig hands to the renderer's three PBR lights
+ * (directional sun/moon, hemisphere sky+ground, ambient fill) on the rig path.
+ *
+ * This is the OTHER half of resolving the terrain double-lighting (memo §2,
+ * Phase 1 scope item 2). When the rig is ON the terrain `colorNode` stops
+ * self-lighting the albedo and emits raw albedo, so the PBR scene lights apply
+ * the sun/sky energy exactly once. Those scene lights are driven from the SAME
+ * rig terms the unlit foliage reads directly, with the single rig exposure
+ * folded in — so terrain (PBR), GLB props (PBR), and foliage (direct rig math)
+ * all track one luminance-vs-sun-elevation curve.
+ *
+ * Intensity ownership is deliberately untouched: `WeatherAtmosphere` reads each
+ * light's *base* construction intensity once and multiplies it per frame
+ * (storm dims), and `AtmosphereSystem` must not write `.intensity` (the
+ * "weather owns intensity" contract). So the rig folds the reciprocal of each
+ * light's base construction intensity into the color it writes, so that
+ * `color × baseIntensity == rigRadiance × exposure`. The PBR contribution then
+ * reduces to `albedo * (hemi + sunRadiance·n·l + ambient) * exposure` —
+ * matching the foliage wrapped-Lambert form — and any weather intensity
+ * multiplier scales both the legacy and rig paths identically. Colors are
+ * otherwise uncompressed linear radiance; AGX owns the final presentation knee.
+ */
+export interface RigSceneLightRadiance {
+  /** Directional sun/moon color (sunRadiance × exposure ÷ base directional intensity). */
+  sunColor: THREE.Color;
+  /** Hemisphere upper color (skyIrradiance × exposure ÷ base hemisphere intensity). */
+  skyColor: THREE.Color;
+  /** Hemisphere lower color (groundIrradiance × exposure ÷ base hemisphere intensity). */
+  groundColor: THREE.Color;
+  /** Ambient fill color (ambientRadiance × exposure ÷ base ambient intensity). */
+  ambientColor: THREE.Color;
+}
+
+export function createRigSceneLightRadiance(): RigSceneLightRadiance {
+  return {
+    sunColor: new THREE.Color(0, 0, 0),
+    skyColor: new THREE.Color(0, 0, 0),
+    groundColor: new THREE.Color(0, 0, 0),
+    ambientColor: new THREE.Color(0, 0, 0),
+  };
+}
+
+/**
+ * Base construction intensities of the renderer scene lights, mirrored from
+ * `GameRenderer` (ambient 1.0, directional/moon 2.0, hemisphere 0.8). The rig
+ * divides these out of the color so `color × baseIntensity` reproduces the
+ * intended `rigRadiance × exposure`, leaving intensity ownership to weather.
+ */
+export interface SceneLightBaseIntensities {
+  ambient: number;
+  directional: number;
+  hemisphere: number;
+}
+
+/**
+ * Project the current rig state into the four scene-light colors, exposure
+ * folded in and the base construction intensity divided out. Pure read of
+ * `rig` + `rigExposureForElevation`; the caller copies the result into the
+ * renderer lights and leaves their `.intensity` alone (weather owns it).
+ */
+export function rigSceneLightRadiance(
+  rig: LightingRigState,
+  base: SceneLightBaseIntensities,
+  out: RigSceneLightRadiance,
+): RigSceneLightRadiance {
+  const exposure = rigExposureForElevation(rig.sunElevation);
+  const sunScale = exposure / Math.max(base.directional, 1e-4);
+  const hemiScale = exposure / Math.max(base.hemisphere, 1e-4);
+  const ambientScale = exposure / Math.max(base.ambient, 1e-4);
+  out.sunColor.copy(rig.sunRadiance).multiplyScalar(sunScale);
+  out.skyColor.copy(rig.skyIrradiance).multiplyScalar(hemiScale);
+  out.groundColor.copy(rig.groundIrradiance).multiplyScalar(hemiScale);
+  out.ambientColor.copy(rig.ambientRadiance).multiplyScalar(ambientScale);
   return out;
 }

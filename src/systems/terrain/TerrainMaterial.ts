@@ -599,28 +599,21 @@ function applyNightTerrainColorStabilizer(color: TslNode, uniforms: TerrainUnifo
 }
 
 /**
- * Phase 0 unified-rig terrain color (flag-gated, cycle-2026-06-09-lighting-rig-spike).
- * Lights the terrain albedo with the SAME uncompressed sun/sky/ground terms the
- * billboard foliage consumes, so the families track together by construction.
- * PBR stays (this multiplies the albedo `colorNode`; scene lights still apply
- * until Phase 1 migrates them) but the compression-driven shaping is gone: no
- * `shapeDirectLightForRenderer` neutral-lerp, no night stabilizer cool-lerp —
- * which is exactly the dawn white-out source. Returns a `select(rigEnabled,
- * rigLit, legacyColor)` so the legacy path is byte-identical when OFF. See
- * docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §1b / §2c / §3.
+ * Phase 1 unified-rig terrain color (flag-gated, `terrain-rig-and-scene-lights`).
+ * Resolves the Phase 0 double-lighting blocker: terrain's `colorNode` is the
+ * *albedo* fed into PBR, which re-lights it with the scene lights. The Phase 0
+ * prototype self-lit the albedo here AND let PBR re-light it — sun/sky energy
+ * applied twice — so terrain could not cohere with unlit foliage (corr 0.533 vs
+ * the ≥0.92 band). The memo split (§2, scope 2): on the rig path PBR keeps the
+ * scene lights, now rig-driven (`AtmosphereSystem` / `rigSceneLightRadiance`),
+ * and the colorNode emits RAW albedo — sun/sky energy applied exactly once. The
+ * dawn white-out goes with the legacy `shapeDirectLightForRenderer` neutral-lerp
+ * and night stabilizer off this path. `select(rigEnabled, albedo, legacyColor)`
+ * keeps the legacy path byte-identical when OFF. See spike memo §1b / §2c / §3.
  */
-function applyTerrainRigLighting(legacyColor: TslNode, albedo: TslNode, terrainNormal: TslNode): TslNode {
+function applyTerrainRigLighting(legacyColor: TslNode, albedo: TslNode): TslNode {
   const rigEnabled = tslReference('float', lightingRigBindings.rigEnabled).greaterThan(tslFloat(0.5));
-  const rigSun = tslReference('color', lightingRigBindings.sunRadiance);
-  const rigSky = tslReference('color', lightingRigBindings.skyIrradiance);
-  const rigGround = tslReference('color', lightingRigBindings.groundIrradiance);
-  const rigAmbient = tslReference('color', lightingRigBindings.ambientRadiance);
-  const rigSunDir = normalize(tslReference('vec3', lightingRigBindings.sunDirection)) as TslNode;
-  const rigExposure = tslReference('float', lightingRigBindings.exposure);
-  const ndotl = tslMax(dot(terrainNormal, rigSunDir), tslFloat(0));
-  const hemi = tslMix(rigGround, rigSky, tslClamp(tslFloat(0.5).add(terrainNormal.y.mul(0.5)), tslFloat(0), tslFloat(1)));
-  const rigLit = albedo.mul(hemi.add(rigSun.mul(ndotl))).add(rigAmbient).mul(rigExposure);
-  return tslSelect(rigEnabled, rigLit, legacyColor);
+  return tslSelect(rigEnabled, albedo, legacyColor);
 }
 
 function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
@@ -680,9 +673,9 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
   const lowSunOcclusion = terrainLowSunOcclusionMask(terrainNormal, worldPos, uniforms);
   finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.28, 0.36, 0.44)), lowSunOcclusion);
-  // Rig path lights the albedo directly with uncompressed terms; legacy path
-  // keeps the night stabilizer cool-lerp. Flag-gated select inside the helper.
-  finalColor = applyTerrainRigLighting(applyNightTerrainColorStabilizer(finalColor, uniforms), finalColor, terrainNormal);
+  // Rig path emits raw albedo (rig-driven PBR scene lights light it once);
+  // legacy path keeps the night-stabilizer cool-lerp. Flag-gated select inside.
+  finalColor = applyTerrainRigLighting(applyNightTerrainColorStabilizer(finalColor, uniforms), finalColor);
 
   const tileParams0 = tslAttribute('tileParams0', 'vec4');
   const tileParams1 = tslAttribute('tileParams1', 'vec4');

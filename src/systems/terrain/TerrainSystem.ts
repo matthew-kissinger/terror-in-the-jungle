@@ -28,6 +28,7 @@ import {
   buildTerrainVegetationRuntimeConfig,
 } from './TerrainBiomeRuntimeConfig';
 import { createTerrainConfig, computeDefaultLODRanges, computeMaxLODLevels, type TerrainSystemConfig, type TerrainRuntimeBootstrapConfig } from './TerrainConfig';
+import { isLightingRigEnabled } from '../environment/LightingRig';
 
 interface TerrainStreamingMetricDebug {
   name: string;
@@ -283,21 +284,20 @@ export class TerrainSystem implements GameSystem {
     const nightBlend = THREE.MathUtils.clamp(lighting.nightBlend, 0, 1);
     const daylightFactor = THREE.MathUtils.clamp(lighting.daylightFactor, 0, 1);
     this.atmosphereDirectLightDirection.copy(lighting.directLightDirection);
-    if (this.atmosphereDirectLightDirection.lengthSq() < 1e-8) {
-      this.atmosphereDirectLightDirection.set(0, 1, 0);
-    } else {
-      this.atmosphereDirectLightDirection.normalize();
-    }
+    if (this.atmosphereDirectLightDirection.lengthSq() < 1e-8) this.atmosphereDirectLightDirection.set(0, 1, 0);
+    else this.atmosphereDirectLightDirection.normalize();
     const lowSunOcclusionStrength = lighting.sunAboveHorizon
-      ? daylightFactor * (1 - smoothstep01(0.16, 0.5, this.atmosphereDirectLightDirection.y)) * 0.85
-      : 0;
+      ? daylightFactor * (1 - smoothstep01(0.16, 0.5, this.atmosphereDirectLightDirection.y)) * 0.85 : 0;
+    // Rig path: the rig's ambientRadiance is the single night floor, so the
+    // night-fill re-shaping is zeroed before it reaches the material (no second
+    // re-shaping site — spike memo §3, scope 3).
     this.atmosphereNightFillColor
       .copy(lighting.ambientColor)
       .lerp(lighting.skyColor, 0.18)
       .lerp(lighting.groundColor, 0.08);
     this.surfaceRuntime.setAtmosphereLighting({
       nightFillColor: this.atmosphereNightFillColor,
-      nightFillStrength: nightBlend * 0.38,
+      nightFillStrength: isLightingRigEnabled() ? 0 : nightBlend * 0.38,
       directLightDirection: this.atmosphereDirectLightDirection,
       daylightFactor,
       lowSunOcclusionStrength,
