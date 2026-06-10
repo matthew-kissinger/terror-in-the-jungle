@@ -14,9 +14,16 @@ import type {
 } from './PlayerVehicleAdapter';
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
+import {
+  clearFlightBookkeeping,
+  readLateralAxis,
+  readThrottleAxis,
+  relockPointer,
+  seatPlayer,
+  setInfantryCrosshair,
+} from './VehicleAdapterShared';
 
 // ── Ground-vehicle control tuning ──
-const TOUCH_DEADZONE = 0.1;
 const DEFAULT_BRAKE_PEDAL = 1.0;
 
 /**
@@ -112,20 +119,11 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
     this.activePhysics = this.model.getPhysics(ctx.vehicleId);
 
     // Take the player out of infantry motion and snap them onto the seat.
-    ctx.playerState.velocity.set(0, 0, 0);
-    ctx.playerState.isRunning = false;
-    ctx.setPosition(ctx.position, 'ground-vehicle.enter');
+    seatPlayer(ctx, 'ground-vehicle.enter');
 
     // Ground vehicles share the gameplay input context. Mark any flight
     // mode bookkeeping off so leftover heli/plane flags do not linger.
-    if (typeof ctx.input.setFlightVehicleMode === 'function') {
-      ctx.input.setFlightVehicleMode('none');
-    } else {
-      ctx.input.setInHelicopter(false);
-    }
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    clearFlightBookkeeping(ctx.input);
 
     // Save infantry angles so look direction restores cleanly on exit.
     ctx.cameraController.saveInfantryAngles();
@@ -137,30 +135,19 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(createGroundUIContext());
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     this.model.setEngineActive?.(ctx.vehicleId, true);
 
     // Re-acquire pointer lock so mouse-look (free orbital) keeps working.
-    if (typeof ctx.input.relockPointer === 'function') {
-      ctx.input.relockPointer();
-    }
+    relockPointer(ctx.input);
   }
 
   onExit(ctx: VehicleTransitionContext): void {
     const exitPos = ctx.position;
     ctx.setPosition(exitPos, 'ground-vehicle.exit');
 
-    if (typeof ctx.input.setFlightVehicleMode === 'function') {
-      ctx.input.setFlightVehicleMode('none');
-    } else {
-      ctx.input.setInHelicopter(false);
-    }
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    clearFlightBookkeeping(ctx.input);
     // Re-attach first-person before restoring infantry angles so the next
     // updateCamera frame uses the infantry path, not the stale follow-cam.
     ctx.cameraController?.setVehicleFollowCamera?.(null);
@@ -169,9 +156,7 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(null);
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     if (this.activeVehicleId) {
       this.model.setEngineActive?.(this.activeVehicleId, false);
@@ -310,36 +295,11 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
   // ── Input plumbing ─────────────────────────────────────────────────────────
 
   private readInputs(input: PlayerInput): void {
-    const touch = input.getTouchControls?.();
-    const hasTouch = !!touch;
+    // --- Throttle (W = +1, S = -1; touch -z forward) ---
+    this.controls.throttle = readThrottleAxis(input);
 
-    // --- Throttle ---
-    let throttle = 0;
-    if (hasTouch) {
-      const move = input.getTouchMovementVector();
-      if (Math.abs(move.z) > TOUCH_DEADZONE) {
-        // Touch joystick: -z is forward (matches helicopter convention).
-        throttle = THREE.MathUtils.clamp(-move.z, -1, 1);
-      }
-    } else if (input.isKeyPressed('keyw')) {
-      throttle = 1;
-    } else if (input.isKeyPressed('keys')) {
-      throttle = -1;
-    }
-    this.controls.throttle = throttle;
-
-    // --- Steering ---
-    let steerNorm = 0;
-    if (hasTouch) {
-      const move = input.getTouchMovementVector();
-      if (Math.abs(move.x) > TOUCH_DEADZONE) {
-        steerNorm = THREE.MathUtils.clamp(move.x, -1, 1);
-      }
-    } else if (input.isKeyPressed('keya')) {
-      steerNorm = -1;
-    } else if (input.isKeyPressed('keyd')) {
-      steerNorm = 1;
-    }
+    // --- Steering (D = +1, A = -1; touch x) ---
+    const steerNorm = readLateralAxis(input);
     // Physics layer applies its own max-steer clamp; we pass an angle equal
     // to the normalized magnitude. The physics setControls clamps to maxSteer.
     if (this.activePhysics) {

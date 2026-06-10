@@ -9,7 +9,6 @@ import { FIXED_WING_CONFIGS } from './FixedWingConfigs';
 import { buildOrbitAnchorFromHeading } from './FixedWingOperations';
 import type { IHUDSystem } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
-import type { PlayerCamera } from '../player/PlayerCamera';
 import type {
   PlayerVehicleAdapter,
   VehicleExitOptions,
@@ -19,6 +18,15 @@ import type {
 } from './PlayerVehicleAdapter';
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
+import {
+  getFlightMouseControlEnabled,
+  getTouchFlightCyclicInput,
+  isTouchFlightMode,
+  relockPointer,
+  seatPlayer,
+  setFlightVehicleInputState,
+  setInputContext,
+} from './VehicleAdapterShared';
 
 // ── Fixed-wing control tuning ──
 const FW_THROTTLE_RAMP_RATE = 0.8;
@@ -91,24 +99,20 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.fixedWingOrbitCenterX = 0;
     this.fixedWingOrbitCenterZ = 0;
     this.fixedWingPilotMode = 'assisted';
-    this.lastMouseControlEnabled = this.getFlightMouseControlEnabled(ctx.cameraController);
+    this.lastMouseControlEnabled = getFlightMouseControlEnabled(ctx.cameraController);
     this.activeAircraftId = ctx.vehicleId;
 
-    ctx.playerState.velocity.set(0, 0, 0);
-    ctx.playerState.isRunning = false;
-    ctx.setPosition(ctx.position, 'fixedwing.enter');
+    seatPlayer(ctx, 'fixedwing.enter');
 
-    this.setFlightVehicleInputState(ctx.input, 'plane');
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('fixed_wing');
-    }
+    setFlightVehicleInputState(ctx.input, 'plane');
+    setInputContext(ctx.input, 'fixed_wing');
     ctx.cameraController.saveInfantryAngles();
     ctx.cameraController.setFlightMouseControlEnabled(true);
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.showFixedWingInstruments?.();
     hudSystem?.showFixedWingMouseIndicator?.();
-    hudSystem?.updateFixedWingMouseMode?.(this.getFlightMouseControlEnabled(ctx.cameraController));
+    hudSystem?.updateFixedWingMouseMode?.(getFlightMouseControlEnabled(ctx.cameraController));
     hudSystem?.setVehicleContext?.(createFixedWingUIContext(
       config?.role ?? 'pilot',
       this.fixedWingModel.getWeaponCount(ctx.vehicleId),
@@ -134,17 +138,13 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.fixedWingModel.setPilotedAircraft(ctx.vehicleId);
 
     // Re-acquire pointer lock for mouse flight controls
-    if (typeof ctx.input.relockPointer === 'function') {
-      ctx.input.relockPointer();
-    }
+    relockPointer(ctx.input);
   }
 
   onExit(ctx: VehicleTransitionContext): void {
     ctx.setPosition(ctx.position, 'fixedwing.exit');
-    this.setFlightVehicleInputState(ctx.input, 'none');
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    setFlightVehicleInputState(ctx.input, 'none');
+    setInputContext(ctx.input, 'gameplay');
     ctx.cameraController?.restoreInfantryAngles();
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
@@ -174,8 +174,8 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     if (!this.activeAircraftId) return;
 
     let mouseMovement: { x: number; y: number } | undefined;
-    const touchFlight = this.isTouchFlightMode(ctx.input);
-    const mouseControlEnabled = this.getFlightMouseControlEnabled(ctx.cameraController);
+    const touchFlight = isTouchFlightMode(ctx.input);
+    const mouseControlEnabled = getFlightMouseControlEnabled(ctx.cameraController);
     if (
       !touchFlight
       && mouseControlEnabled
@@ -258,7 +258,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     mouseMovement?: { x: number; y: number },
     mouseControlEnabled: boolean = false,
   ): void {
-    const hasTouchMode = this.isTouchFlightMode(input);
+    const hasTouchMode = isTouchFlightMode(input);
     const gp = input.getGamepadManager?.();
     const gpActive = gp?.isActive() ?? false;
 
@@ -323,7 +323,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     }
 
     // --- Pitch / bank intent adapter ---
-    const touchCyclic = this.getTouchFlightCyclicInput(input);
+    const touchCyclic = getTouchFlightCyclicInput(input);
     const hasTouchCyclic = Math.abs(touchCyclic.pitch) > 0.05 || Math.abs(touchCyclic.roll) > 0.05;
     let pitchIntent = 0;
     let bankIntent = 0;
@@ -470,39 +470,6 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.fixedWingOrbitCenterX = anchor.centerX;
     this.fixedWingOrbitCenterZ = anchor.centerZ;
     this.fixedWingStabilityAssist = true;
-  }
-
-  // ── Input helpers ──
-
-  private setFlightVehicleInputState(input: PlayerInput, mode: 'none' | 'helicopter' | 'plane'): void {
-    if (typeof input.setFlightVehicleMode === 'function') {
-      input.setFlightVehicleMode(mode);
-      return;
-    }
-    input.setInHelicopter(mode !== 'none');
-  }
-
-  private getFlightMouseControlEnabled(cameraController: PlayerCamera): boolean {
-    if (typeof cameraController.getFlightMouseControlEnabled === 'function') {
-      return cameraController.getFlightMouseControlEnabled();
-    }
-    return cameraController.getHelicopterMouseControlEnabled();
-  }
-
-  private isTouchFlightMode(input: PlayerInput): boolean {
-    const touchControls = input.getTouchControls?.();
-    if (!touchControls) return false;
-    if (typeof touchControls.isInFlightMode === 'function') {
-      return touchControls.isInFlightMode();
-    }
-    return touchControls.isInHelicopterMode();
-  }
-
-  private getTouchFlightCyclicInput(input: PlayerInput): { pitch: number; roll: number } {
-    if (typeof input.getTouchFlightCyclicInput === 'function') {
-      return input.getTouchFlightCyclicInput();
-    }
-    return input.getTouchCyclicInput();
   }
 
   private isGunshipActive(): boolean {

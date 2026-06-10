@@ -14,9 +14,16 @@ import type {
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 import type { SeatRole } from './IVehicle';
+import {
+  clearFlightBookkeeping,
+  readLateralAxis,
+  readThrottleAxis,
+  relockPointer,
+  seatPlayer,
+  setInfantryCrosshair,
+} from './VehicleAdapterShared';
 
 // ── Watercraft control tuning ──
-const TOUCH_DEADZONE = 0.1;
 const DEFAULT_EXIT_SIDE_OFFSET_M = 1.5; // metres to the +X side of the hull on dismount fallback
 
 function createWatercraftUIContext(): VehicleUIContext {
@@ -151,20 +158,11 @@ export class WatercraftPlayerAdapter implements PlayerVehicleAdapter {
     this.mounted = true;
 
     // Player out of infantry motion, snapped onto the pilot deck.
-    ctx.playerState.velocity.set(0, 0, 0);
-    ctx.playerState.isRunning = false;
-    ctx.setPosition(ctx.position, 'watercraft.enter');
+    seatPlayer(ctx, 'watercraft.enter');
 
     // Watercraft are surface vehicles — clear any leftover flight
     // bookkeeping (defensive pattern from jeep / tank adapters).
-    if (typeof ctx.input.setFlightVehicleMode === 'function') {
-      ctx.input.setFlightVehicleMode('none');
-    } else {
-      ctx.input.setInHelicopter(false);
-    }
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    clearFlightBookkeeping(ctx.input);
 
     // Save infantry look angles so the camera restores cleanly on exit.
     ctx.cameraController.saveInfantryAngles();
@@ -178,27 +176,16 @@ export class WatercraftPlayerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(createWatercraftUIContext());
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     // Re-acquire pointer lock so mouse-look (free orbital) keeps working.
-    if (typeof ctx.input.relockPointer === 'function') {
-      ctx.input.relockPointer();
-    }
+    relockPointer(ctx.input);
   }
 
   onExit(ctx: VehicleTransitionContext): void {
     ctx.setPosition(ctx.position, 'watercraft.exit');
 
-    if (typeof ctx.input.setFlightVehicleMode === 'function') {
-      ctx.input.setFlightVehicleMode('none');
-    } else {
-      ctx.input.setInHelicopter(false);
-    }
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    clearFlightBookkeeping(ctx.input);
     // Re-attach first-person before restoring infantry angles so the next
     // updateCamera frame uses the infantry path, not the stale follow-cam.
     ctx.cameraController?.setVehicleFollowCamera?.(null);
@@ -207,9 +194,7 @@ export class WatercraftPlayerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(null);
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     // Park the hull: zero the driver inputs so the watercraft coasts
     // to a stop under water drag rather than carrying the player's
@@ -328,42 +313,15 @@ export class WatercraftPlayerAdapter implements PlayerVehicleAdapter {
   // ── Input plumbing ─────────────────────────────────────────────────────────
 
   private readInputs(input: PlayerInput): void {
-    const touch = input.getTouchControls?.();
-    const hasTouch = !!touch;
+    // --- Throttle (W = +1, S = -1; touch -z forward) ---
+    this.controls.throttle = readThrottleAxis(input);
 
-    // --- Throttle (W = +1, S = -1) ---
-    let throttle = 0;
-    if (hasTouch) {
-      const move = input.getTouchMovementVector();
-      if (Math.abs(move.z) > TOUCH_DEADZONE) {
-        // Touch joystick: -z is forward (matches helicopter / jeep /
-        // tank convention).
-        throttle = THREE.MathUtils.clamp(-move.z, -1, 1);
-      }
-    } else if (input.isKeyPressed('keyw')) {
-      throttle = 1;
-    } else if (input.isKeyPressed('keys')) {
-      throttle = -1;
-    }
-    this.controls.throttle = throttle;
-
-    // --- Rudder (D = +1, A = -1) ---
+    // --- Rudder (D = +1, A = -1; touch x) ---
     // Water-rudder convention: positive rudder yaws the hull to the
     // right (handed by WatercraftPhysics). Same key mapping as the
     // tank's turn axis so the muscle memory transfers, but the
     // physics layer interprets it as continuous rudder authority,
     // not track differential.
-    let rudder = 0;
-    if (hasTouch) {
-      const move = input.getTouchMovementVector();
-      if (Math.abs(move.x) > TOUCH_DEADZONE) {
-        rudder = THREE.MathUtils.clamp(move.x, -1, 1);
-      }
-    } else if (input.isKeyPressed('keyd')) {
-      rudder = 1;
-    } else if (input.isKeyPressed('keya')) {
-      rudder = -1;
-    }
-    this.controls.rudder = rudder;
+    this.controls.rudder = readLateralAxis(input);
   }
 }
