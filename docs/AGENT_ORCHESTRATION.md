@@ -198,41 +198,38 @@ manifest file as usual.
 
 ## Current state
 
-**No active campaign.** The consultation-remediation campaign
-([CAMPAIGN_2026-06-09-consultation-remediation.md](CAMPAIGN_2026-06-09-consultation-remediation.md))
-completed 2026-06-09 — all 5 phases, 25/25 tasks merged (#337-#361), zero fence
-changes, zero hard-stops. Next: owner playtest sweep
-([PLAYTEST_PENDING](PLAYTEST_PENDING.md) rows for phases 2-4 + standing
-deferrals).
-
-**Two campaigns ACTIVE (interleaved) under the owner's 2026-06-09 `/goal`**
-(complete both campaigns):
+**No active campaign.** Both 2026-06-09 `/goal` campaigns completed
+2026-06-10 (engineering closed; owner walks pending in
+[PLAYTEST_PENDING](PLAYTEST_PENDING.md)):
 
 - [CAMPAIGN_2026-06-09-lighting-rig.md](CAMPAIGN_2026-06-09-lighting-rig.md)
-  — Phase 0 spike COMPLETE (GO recorded, owner review row in
-  PLAYTEST_PENDING); Phase 1 `cycle-2026-06-09-lighting-rig-core` next, with
-  scene-light-unification re-scoped as a co-requisite of terrain migration.
+  — ALL PHASES COMPLETE (#363-#381): unified rig is the shipped default
+  lighting path, legacy paths deleted, standing `check:tod-coherence`
+  acceptance gate landed. Owner prod acceptance walk is the formal exit gate.
 - [CAMPAIGN_2026-06-09-craft-specialization.md](CAMPAIGN_2026-06-09-craft-specialization.md)
-  — Phase 1 ground-gunnery COMPLETE (feel-walk row in PLAYTEST_PENDING);
-  Phase 2 `cycle-2026-06-09-fixed-wing-craft` next.
+  — ALL PHASES COMPLETE (11 PRs, zero fence changes); three feel-walk rows
+  pending.
+
+Also merged 2026-06-10 (standalone owner request): `task/konveyer-rename`
+#382 — the konveyer codename retired from the live surface (env vars,
+identifiers, scripts, live docs; archives keep the historical narrative).
+
+Before these: the consultation-remediation campaign
+([CAMPAIGN_2026-06-09-consultation-remediation.md](CAMPAIGN_2026-06-09-consultation-remediation.md)),
+5 phases, 25/25 merged (#337-#361).
 
 Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active cycles (interleaved, 2026-06-09 owner `/goal`):**
-  - `cycle-2026-06-09-lighting-rig-core` — Phase 1 of the lighting-rig
-    campaign (opens next; brief authored at open per the manifest)
-  - `cycle-2026-06-09-fixed-wing-craft` — Phase 2 of the craft-specialization
-    campaign (opens next)
-- **Previous:** `cycle-2026-06-09-lighting-rig-spike` (3/3, GO recorded) +
-  `cycle-2026-06-09-ground-gunnery-craft` (5/5) closed 2026-06-09 — see
-  BACKLOG "Recently Completed" for both. Before that: the
-  consultation-remediation campaign, 5 phases, 25/25 merged (#337-#361).
+- **Active:** none.
+- **Previous:** `cycle-2026-06-09-lighting-acceptance` (2/2: #380 #381,
+  campaign closer) — see BACKLOG "Recently Completed". The full campaign arc:
+  spike → core → foliage-npc → exposure-unify → acceptance.
 
 ### Tasks (DAG)
 
-(Populate when the next cycles open.)
+(Populate when the next cycle opens.)
 
 ## Dispatch protocol
 
