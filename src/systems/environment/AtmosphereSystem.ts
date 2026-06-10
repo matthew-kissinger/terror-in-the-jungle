@@ -9,6 +9,11 @@ import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
 import { SunDiscMesh } from './atmosphere/SunDiscMesh';
 import { shapeDirectLightForRenderer } from './AtmosphereLightingColor';
 import {
+  createLightingRigState,
+  deriveLightingRigState,
+  publishLightingRigConfig,
+} from './LightingRig';
+import {
   SCENARIO_ATMOSPHERE_PRESETS,
   computeSunDirectionAtTime,
   scenarioKeyForMode,
@@ -178,6 +183,13 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly scratchSunPosition = new THREE.Vector3();
   private readonly cameraPosition = new THREE.Vector3();
   private readonly lightingSnapshot = createAtmosphereLightingSnapshot();
+  /**
+   * Phase 0 unified lighting-rig state (cycle-2026-06-09-lighting-rig-spike).
+   * Derived once per frame from the uncompressed Hosek backend at the LightFog
+   * marker, alongside the legacy snapshot. Materials consume it only when the
+   * runtime flag is ON; the legacy path is untouched when OFF.
+   */
+  private readonly lightingRig = createLightingRigState();
 
   constructor() {
     this.hosekBackend = new HosekWilkieSkyBackend();
@@ -194,6 +206,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // Apply bootstrap preset synchronously so the first render sees a real
     // sky — no NullSkyBackend flat-color frame, no legacy PNG fallback.
     this.applyScenarioPreset(AtmosphereSystem.BOOTSTRAP_PRESET);
+    // Mirror the rig runtime flag onto window so a headless capture harness can
+    // flip the Phase 0 prototype on for the A/B sweep. No-op outside a browser.
+    publishLightingRigConfig();
   }
 
   async init(): Promise<void> {
@@ -228,6 +243,11 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       this.applyToRenderer();
       this.applyFogColor();
       this.updateSunDisc();
+      // Unified lighting rig (Phase 0 prototype). Derive the uncompressed rig
+      // state + mirror its shared bindings from the same Hosek backend this
+      // frame, one authority, one update point. Flag-gated consumption lives in
+      // the material families; deriving each frame is cheap.
+      deriveLightingRigState(this.backend, this.sunDirection, this.fogDarkenFactor, this.lightingRig);
     });
     this.trackAtmosphereTiming('World.Atmosphere.Clouds', () => {
       this.updateCloudCoverage(deltaTime);
