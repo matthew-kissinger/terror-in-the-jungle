@@ -219,23 +219,35 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** (none — closed `cycle-2026-06-09-deploy-weight-reduction` on
-  2026-06-09, the final phase of the consultation-remediation campaign:
-  6/6 merged (#356-#361), exit gate PASS — dist 110.2→109.4 MB, knip:ci clean,
-  no mockup routes, settings key migrated with shim. Campaign total: 25 tasks /
-  25 PRs across 5 phases, zero fence changes, zero hard-stops.)
-- **Previous:** Phase 4 `cycle-2026-06-09-terrain-fidelity-and-worker-safety`
-  (stall-tail premise confirmed + fixed). Full per-phase records in BACKLOG
-  "Recently Completed" sections.
-- **Next:** owner playtest sweep ([PLAYTEST_PENDING](PLAYTEST_PENDING.md));
-  candidate follow-ups from reviewer notes are listed in the per-phase BACKLOG
-  entries (notably: lift GPU surface grid to 1024 for CPU↔render coherence,
-  NPC tank cannon wiring, owner-display/resupply isBlufor sweep,
-  combat-movement-stall-tail retirement after the owner's A Shau walk).
+- **Active cycles (interleaved, 2026-06-09 owner `/goal`):**
+  - `cycle-2026-06-09-lighting-rig-spike` — Phase 0 of
+    [CAMPAIGN_2026-06-09-lighting-rig.md](CAMPAIGN_2026-06-09-lighting-rig.md)
+  - `cycle-2026-06-09-ground-gunnery-craft` — Phase 1 of
+    [CAMPAIGN_2026-06-09-craft-specialization.md](CAMPAIGN_2026-06-09-craft-specialization.md)
+  - The two campaigns touch disjoint layers (materials/atmosphere vs
+    UI/vehicle); combined executor concurrency stays ≤5.
+- **Previous:** consultation-remediation campaign, 5 phases, 25/25 merged
+  (#337-#361). Full per-phase records in BACKLOG "Recently Completed".
 
 ### Tasks (DAG)
 
-(Empty — populate when the next cycle opens.)
+`cycle-2026-06-09-lighting-rig-spike`:
+
+```
+tod-capture-harness   ──► rig-prototype (R2)
+lighting-audit-memo   (root, docs-only)
+```
+
+`cycle-2026-06-09-ground-gunnery-craft`:
+
+```
+reticle-framework ──► tank-gunner-sight (R2)
+                 └──► m2hb-gun-experience (R2)
+npc-tank-cannon-wiring (root; combat-reviewer gates)
+```
+
+R1 batch (4 executors): tod-capture-harness, lighting-audit-memo,
+reticle-framework, npc-tank-cannon-wiring.
 
 ## Dispatch protocol
 
