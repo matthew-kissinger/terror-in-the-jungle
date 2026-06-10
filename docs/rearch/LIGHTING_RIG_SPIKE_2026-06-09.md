@@ -32,7 +32,7 @@ structural (per-family clamp bands + a second light authority), not parametric.
 | Item | File | Note |
 |---|---|---|
 | `AtmosphereLightingSnapshot` interface + `refreshLightingSnapshot()` | `src/systems/environment/AtmosphereSystem.ts` | The one canonical per-frame state. Built each frame; re-derived on every `getLightingSnapshot()` call. |
-| `shapeDirectLightForRenderer(color, sunY)` | `src/systems/environment/AtmosphereLightingColor.ts` | **HACK 1 (the dawn white-out).** Compresses the Hosek sun color to a 0.78 channel ceiling, then at low sun *lerps toward a fixed cool neutral* (`luma * [0.72, 1.02, 1.20]`). Converts warm dim dawn into bright neutral white. |
+| `shapeDirectLightForRenderer(color, sunY)` | `AtmosphereLightingColor.ts` (deleted in Phase 4 `legacy-path-deletion`) | **HACK 1 (the dawn white-out).** Compressed the Hosek sun color to a 0.78 channel ceiling, then at low sun *lerped toward a fixed cool neutral* (`luma * [0.72, 1.02, 1.20]`). Converted warm dim dawn into bright neutral white. |
 | `compressSkyRadianceForRenderer(color, 0.84)` for sky/ground; `(color, 0.74)` for fog | `src/systems/environment/AtmosphereSystem.ts` | **HACK 2.** Peak-normalizes zenith/horizon radiance to a fixed component ceiling so noon does not blow out the hemisphere fill / fog under WebGPU. A second, independent energy clamp. |
 | `HEMISPHERE_GROUND_DARKEN = 0.55`, `NIGHT_*` fills, `lowSunAmbientBlend()` | `src/systems/environment/AtmosphereSystem.ts` | Ground-bounce darken + bespoke night ambient/direction substitution + a night-blend ramp. Per-frame artistic shaping baked into the snapshot itself. |
 

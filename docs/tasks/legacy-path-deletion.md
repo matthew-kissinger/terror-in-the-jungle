@@ -11,7 +11,7 @@ for PRs #368 #371 #376 #378.
 
 - `src/systems/environment/LightingRig.ts` — flag default ON (keep the
   runtime kill-switch for one release; document)
-- `src/systems/environment/AtmosphereLightingColor.ts` —
+- `AtmosphereLightingColor.ts` (whole file DELETED) —
   `shapeDirectLightForRenderer` compression deleted (with its callers'
   legacy branches)
 - `src/systems/environment/AtmosphereSystem.ts` — legacy scene-light

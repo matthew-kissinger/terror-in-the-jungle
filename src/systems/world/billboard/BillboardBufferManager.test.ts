@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as THREE from 'three'
 import { GPUBillboardVegetation } from './BillboardBufferManager'
 import { Logger } from '../../../utils/Logger'
+import { lightingRigBindings } from '../../environment/LightingRig'
 
 vi.mock('three', () => {
   class Vector3 {
@@ -595,17 +596,24 @@ describe('GPUBillboardVegetation', () => {
     expect(internal.material.uniforms.viewMatrix.value.copiedFrom).toBeUndefined()
   })
 
-  it('update enables fog and copies fog color when fog is provided', () => {
+  it('update enables fog and copies the single rig fog authority color when fog is provided', () => {
+    // Since `legacy-path-deletion` the rig ships default-ON: the billboard fog
+    // tint comes from the single rig fog authority (`lightingRigBindings.fogColor`),
+    // the same horizon source the scene fog derives from — NOT the raw passed
+    // scene fog color (the old parallel read). Density still forwards from the
+    // scene fog. Pin a known rig fog color and assert the billboard copies it.
     const manager = new GPUBillboardVegetation(scene, createConfig())
     const internal = manager as any
-    const fogColor = new THREE.Color(0.1, 0.2, 0.3)
+    lightingRigBindings.fogColor.value.r = 0.42
+    lightingRigBindings.fogColor.value.g = 0.51
+    lightingRigBindings.fogColor.value.b = 0.47
 
-    manager.update(new THREE.PerspectiveCamera(), 0, { color: fogColor, density: 0.0003 } as any)
+    manager.update(new THREE.PerspectiveCamera(), 0, { color: new THREE.Color(0.1, 0.2, 0.3), density: 0.0003 } as any)
 
     expect(internal.material.uniforms.fogEnabled.value).toBe(true)
-    expect(internal.material.uniforms.fogColor.value.r).toBeCloseTo(0.1)
-    expect(internal.material.uniforms.fogColor.value.g).toBeCloseTo(0.2)
-    expect(internal.material.uniforms.fogColor.value.b).toBeCloseTo(0.3)
+    expect(internal.material.uniforms.fogColor.value.r).toBeCloseTo(0.42)
+    expect(internal.material.uniforms.fogColor.value.g).toBeCloseTo(0.51)
+    expect(internal.material.uniforms.fogColor.value.b).toBeCloseTo(0.47)
     expect(internal.material.uniforms.fogDensity.value).toBeCloseTo(0.0003)
   })
 

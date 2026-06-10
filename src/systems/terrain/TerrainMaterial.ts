@@ -24,7 +24,6 @@ import {
   positionWorld,
   pow,
   reference,
-  select,
   sin,
   smoothstep,
   step,
@@ -36,7 +35,6 @@ import {
 import type { SplatmapConfig } from './TerrainConfig';
 import type { TerrainSurfaceKind, TerrainSurfacePatch } from './TerrainFeatureTypes';
 import type { TerrainFarCanopyTintConfig } from '../../config/biomes';
-import { lightingRigBindings } from '../environment/LightingRig';
 
 const MAX_BIOME_TEXTURES = 8;
 const MAX_BIOME_RULES = 8;
@@ -68,7 +66,6 @@ const tslClamp = (...args: TslNode[]): TslNode => (tslClampBase as (...values: T
 const tslLength = (value: TslNode): TslNode => (tslLengthBase as (node: TslNode) => TslNode)(value);
 const tslMax = (...args: TslNode[]): TslNode => (tslMaxBase as (...values: TslNode[]) => TslNode)(...args);
 const tslMin = (...args: TslNode[]): TslNode => (tslMinBase as (...values: TslNode[]) => TslNode)(...args);
-const tslSelect = (...args: TslNode[]): TslNode => (select as (...values: TslNode[]) => TslNode)(...args);
 const tslPositionGeometry = positionGeometry as TslNode;
 const tslPositionWorld = positionWorld as TslNode;
 const tslCameraPosition = cameraPosition as TslNode;
@@ -577,45 +574,6 @@ function applyFeatureSurfaceColor(color: TslNode, worldPos: TslNode, uniforms: T
   return result;
 }
 
-function applyNightTerrainColorStabilizer(color: TslNode, uniforms: TerrainUniforms): TslNode {
-  const daylight = tslClamp(tslReference('float', uniforms.atmosphereDaylightFactor), tslFloat(0), tslFloat(1));
-  const nightStrength = tslFloat(1).sub(smoothstep(tslFloat(0.08), tslFloat(0.42), daylight));
-  const luma = color.r.mul(0.2126).add(color.g.mul(0.7152)).add(color.b.mul(0.0722));
-  const coolLuma = tslVec3(luma.mul(0.72), luma.mul(0.84), luma.mul(1.08));
-  const redExcess = tslClamp(
-    color.r.sub(tslMax(color.g.mul(1.05), color.b.mul(1.12))),
-    tslFloat(0),
-    tslFloat(1),
-  );
-  const warmExcess = tslClamp(color.r.sub(color.b.mul(1.08)), tslFloat(0), tslFloat(1));
-  const redMask = smoothstep(tslFloat(0.012), tslFloat(0.075), redExcess);
-  const warmMask = smoothstep(tslFloat(0.025), tslFloat(0.12), warmExcess);
-  const stabilizer = tslClamp(
-    nightStrength.mul(tslMax(redMask.mul(0.92), warmMask.mul(0.48))),
-    tslFloat(0),
-    tslFloat(0.92),
-  );
-  return tslMix(color, coolLuma, stabilizer);
-}
-
-/**
- * Phase 1 unified-rig terrain color (flag-gated, `terrain-rig-and-scene-lights`).
- * Resolves the Phase 0 double-lighting blocker: terrain's `colorNode` is the
- * *albedo* fed into PBR, which re-lights it with the scene lights. The Phase 0
- * prototype self-lit the albedo here AND let PBR re-light it — sun/sky energy
- * applied twice — so terrain could not cohere with unlit foliage (corr 0.533 vs
- * the ≥0.92 band). The memo split (§2, scope 2): on the rig path PBR keeps the
- * scene lights, now rig-driven (`AtmosphereSystem` / `rigSceneLightRadiance`),
- * and the colorNode emits RAW albedo — sun/sky energy applied exactly once. The
- * dawn white-out goes with the legacy `shapeDirectLightForRenderer` neutral-lerp
- * and night stabilizer off this path. `select(rigEnabled, albedo, legacyColor)`
- * keeps the legacy path byte-identical when OFF. See spike memo §1b / §2c / §3.
- */
-function applyTerrainRigLighting(legacyColor: TslNode, albedo: TslNode): TslNode {
-  const rigEnabled = tslReference('float', lightingRigBindings.rigEnabled).greaterThan(tslFloat(0.5));
-  return tslSelect(rigEnabled, albedo, legacyColor);
-}
-
 function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   const worldPos = tslPositionWorld;
   const terrainNormal = createTerrainNormalNode(uniforms, worldPos);
@@ -673,9 +631,11 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
   const lowSunOcclusion = terrainLowSunOcclusionMask(terrainNormal, worldPos, uniforms);
   finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.28, 0.36, 0.44)), lowSunOcclusion);
-  // Rig path emits raw albedo (rig-driven PBR scene lights light it once);
-  // legacy path keeps the night-stabilizer cool-lerp. Flag-gated select inside.
-  finalColor = applyTerrainRigLighting(applyNightTerrainColorStabilizer(finalColor, uniforms), finalColor);
+  // Rig is the only path (`legacy-path-deletion`): the colorNode emits RAW albedo,
+  // and the rig-driven PBR scene lights (sun/sky/ground/ambient from
+  // `rigSceneLightRadiance`) light it exactly once. The legacy night-stabilizer
+  // cool-lerp and the flag-gated `select(rigEnabled, albedo, legacyColor)` are
+  // deleted — no dead ALU. See docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §2c.
 
   const tileParams0 = tslAttribute('tileParams0', 'vec4');
   const tileParams1 = tslAttribute('tileParams1', 'vec4');
@@ -728,16 +688,6 @@ function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
   return tslMax(farCanopyAdjusted, tslFloat(0.88));
 }
 
-function createTerrainNightFillNode(uniforms: TerrainUniforms): TslNode {
-  // HACK 3 (night-fill emissive). On the rig path the night floor lives in the
-  // rig's ambientRadiance (applied in the color node), so the emissive is
-  // suppressed — gate to black when the flag is ON. Legacy path unchanged.
-  const rigEnabled = tslReference('float', lightingRigBindings.rigEnabled).greaterThan(tslFloat(0.5));
-  const legacy = tslReference('color', uniforms.atmosphereNightFillColor)
-    .mul(tslReference('float', uniforms.atmosphereNightFillStrength));
-  return tslSelect(rigEnabled, tslVec3(0, 0, 0), legacy);
-}
-
 function terrainLowSunOcclusionMask(terrainNormal: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
   const strength = tslClamp(
     tslReference('float', uniforms.atmosphereLowSunOcclusionStrength),
@@ -779,7 +729,10 @@ function configureTerrainNodeMaterial(material: TerrainMaterial, uniforms: Terra
   material.colorNode = createTerrainColorNode(uniforms);
   material.roughnessNode = createTerrainRoughnessNode(uniforms);
   material.metalnessNode = tslFloat(0);
-  material.emissiveNode = createTerrainNightFillNode(uniforms);
+  // Night-fill emissive deleted (`legacy-path-deletion`): the rig's
+  // ambientRadiance, fed through the PBR scene lights, is the single night
+  // floor now, so terrain carries no self-lit emissive. MeshStandardNodeMaterial
+  // emissive defaults to black, so no emissiveNode assignment is needed.
 }
 
 export function createTerrainMaterial(options: TerrainMaterialOptions): TerrainMaterial {

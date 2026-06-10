@@ -295,7 +295,12 @@ describe('TerrainSystem', () => {
       expect(terrain.getChunkSize()).toBe(128);
     });
 
-    it('forwards atmosphere lighting as a bounded cool terrain night fill', async () => {
+    it('forwards atmosphere direction + daylight + occlusion and zeroes the deleted night-fill', async () => {
+      // `legacy-path-deletion`: the terrain night-fill emissive is gone — the
+      // rig's ambientRadiance, applied through the rig scene lights, is the single
+      // night floor. So night-fill strength is always zero. The direct-light
+      // direction, daylight factor, and low-sun occlusion still forward because
+      // the rig path retains the horizon-occlusion relief.
       await terrain.init();
 
       terrain.setAtmosphereLighting({
@@ -310,9 +315,7 @@ describe('TerrainSystem', () => {
 
       expect(mockUpdateAtmosphereLighting).toHaveBeenCalled();
       const lighting = mockUpdateAtmosphereLighting.mock.calls.at(-1)?.[1];
-      expect(lighting.nightFillStrength).toBeGreaterThan(0.3);
-      expect(lighting.nightFillStrength).toBeLessThanOrEqual(0.38);
-      expect(lighting.nightFillColor.b).toBeGreaterThan(lighting.nightFillColor.r);
+      expect(lighting.nightFillStrength).toBe(0);
       expect(lighting.directLightDirection.length()).toBeCloseTo(1);
       expect(lighting.daylightFactor).toBeCloseTo(0.8);
       expect(lighting.lowSunOcclusionStrength).toBeGreaterThan(0.45);

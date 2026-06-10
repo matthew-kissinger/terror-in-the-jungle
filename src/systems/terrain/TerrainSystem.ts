@@ -28,7 +28,6 @@ import {
   buildTerrainVegetationRuntimeConfig,
 } from './TerrainBiomeRuntimeConfig';
 import { createTerrainConfig, computeDefaultLODRanges, computeMaxLODLevels, type TerrainSystemConfig, type TerrainRuntimeBootstrapConfig } from './TerrainConfig';
-import { isLightingRigEnabled } from '../environment/LightingRig';
 
 interface TerrainStreamingMetricDebug {
   name: string;
@@ -281,23 +280,23 @@ export class TerrainSystem implements GameSystem {
   }
 
   setAtmosphereLighting(lighting: TerrainAtmosphereLightingInput): void {
-    const nightBlend = THREE.MathUtils.clamp(lighting.nightBlend, 0, 1);
     const daylightFactor = THREE.MathUtils.clamp(lighting.daylightFactor, 0, 1);
     this.atmosphereDirectLightDirection.copy(lighting.directLightDirection);
     if (this.atmosphereDirectLightDirection.lengthSq() < 1e-8) this.atmosphereDirectLightDirection.set(0, 1, 0);
     else this.atmosphereDirectLightDirection.normalize();
     const lowSunOcclusionStrength = lighting.sunAboveHorizon
       ? daylightFactor * (1 - smoothstep01(0.16, 0.5, this.atmosphereDirectLightDirection.y)) * 0.85 : 0;
-    // Rig path: the rig's ambientRadiance is the single night floor, so the
-    // night-fill re-shaping is zeroed before it reaches the material (no second
-    // re-shaping site — spike memo §3, scope 3).
-    this.atmosphereNightFillColor
-      .copy(lighting.ambientColor)
-      .lerp(lighting.skyColor, 0.18)
-      .lerp(lighting.groundColor, 0.08);
+    // Rig path is the only path (`legacy-path-deletion`). The rig's
+    // ambientRadiance is the single night floor — driven into the terrain PBR
+    // via the rig scene lights — so the legacy night-fill emissive re-shaping is
+    // gone: pass a zero strength and a black fill (the night-fill emissive node
+    // is collapsed to black in TerrainMaterial). The direct-light direction and
+    // daylight factor still drive the horizon-occlusion relief that the rig path
+    // retains ("keep the effect, kill the bespoke inputs").
+    this.atmosphereNightFillColor.setRGB(0, 0, 0);
     this.surfaceRuntime.setAtmosphereLighting({
       nightFillColor: this.atmosphereNightFillColor,
-      nightFillStrength: isLightingRigEnabled() ? 0 : nightBlend * 0.38,
+      nightFillStrength: 0,
       directLightDirection: this.atmosphereDirectLightDirection,
       daylightFactor,
       lowSunOcclusionStrength,

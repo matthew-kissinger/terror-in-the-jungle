@@ -18,13 +18,12 @@ import { applyRigPresetTrim, type RigPresetTrim } from './LightingRigPresetTrim'
  * `[0.40, 0.78]` band). Brightness is owned downstream by AGX + the single TOD
  * exposure scalar here.
  *
- * Phase 0 scope: behind a runtime flag (`LightingRigConfig.enabled`, default
- * OFF). When OFF, the rig is still derived each frame (cheap) but no material
- * consumes it — the legacy paths are byte-identical. When ON, terrain and the
- * billboard foliage family read the shared bindings below and take their
- * flag-gated rig branch. This is the GO/NO-GO measurement target, not final
- * visual tuning. Phases 1-4 build this out (scene lights, NPC impostors, fog
- * unification, legacy deletion).
+ * Shipped path since `legacy-path-deletion` (Phase 4): `LightingRigConfig.enabled`
+ * defaults ON and the legacy in-shader branches are deleted, so terrain, the
+ * billboard foliage family, and the NPC impostor all read the shared bindings
+ * below as their ONLY lighting path. A single documented runtime kill-switch
+ * (`LightingRigConfig.enabled = false`, see its doc) reverts the CPU-side
+ * scene-light/fog authority to the legacy compressed snapshot for one release.
  *
  * ## Exposure policy (Phase 3 — RATIFIED: in-shader / scene-color, NOT an AGX split)
  *
@@ -57,13 +56,37 @@ import { applyRigPresetTrim, type RigPresetTrim } from './LightingRigPresetTrim'
 
 /**
  * Runtime flag config. Plain mutable object so a Playwright `page.evaluate`
- * (and the WorldBuilder dev console, later) can flip the prototype on for the
- * A/B sweep — mirrors the `NpcLodConfig` / `SquadCommandConfig` pattern. Do NOT
- * freeze. Default OFF: production behaviour is the legacy path until Phase 4.
+ * (and the WorldBuilder dev console) can flip the rig at runtime — mirrors the
+ * `NpcLodConfig` / `SquadCommandConfig` pattern. Do NOT freeze.
+ *
+ * ## Default ON since `legacy-path-deletion` (Phase 4, cycle
+ * `cycle-2026-06-09-lighting-acceptance`).
+ *
+ * The unified rig is now the shipped lighting path: the renderer scene lights
+ * (directional/hemisphere/ambient feeding terrain + GLB PBR) and scene fog are
+ * driven from the rig terms, the impostor scene-graph scan is skipped, and the
+ * terrain night-fill emissive is suppressed — all gated on `isLightingRigEnabled()`.
+ * The legacy IN-SHADER branches (the foliage `[0.40, 0.78]` clamp band, the
+ * terrain night-stabilizer / night-fill emissive, the NPC scene-scan tint) were
+ * DELETED this pass, so the compiled material graphs are rig-only (no dead ALU).
+ *
+ * ## Runtime kill-switch (retained for ONE release)
+ *
+ * Setting this back to `false` — at runtime via
+ * `window.__lightingRig.enabled = false` (see `LIGHTING_RIG_GLOBAL_KEY`), or in
+ * source here — reverts the CPU-side lighting authority to the legacy path: the
+ * scene lights + scene fog read the compressed `AtmosphereLightingSnapshot`
+ * again, the impostor scene-graph scan resumes, and the terrain night-fill
+ * emissive comes back. It is the documented safety valve for the first release
+ * after the flip; the next cycle removes the flag and this object entirely.
  */
 export const LightingRigConfig = {
-  /** Master flag. When false, every material takes its legacy lighting branch. */
-  enabled: false,
+  /**
+   * Master flag, default ON. The documented one-release runtime kill-switch:
+   * flip to `false` (e.g. `window.__lightingRig.enabled = false`) to fall back
+   * to the legacy CPU-side scene-light/fog authority. See the type doc above.
+   */
+  enabled: true,
 };
 
 /**
