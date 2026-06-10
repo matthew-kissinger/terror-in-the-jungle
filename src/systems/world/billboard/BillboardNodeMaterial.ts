@@ -31,6 +31,10 @@ import {
 } from 'three/tsl';
 import type { VegetationAlphaCrop, VegetationAtlasProfile } from '../../../config/vegetationTypes';
 import type { GPUVegetationConfig } from './BillboardTypes';
+import { lightingRigBindings } from '../../environment/LightingRig';
+
+/** Wrapped-Lambert terminator softening for foliage cards (memo §2c, wrap=0.5). */
+const RIG_WRAP = 0.5;
 
 const DEFAULT_BILLBOARD_FOG_DENSITY = 0.00055;
 const BILLBOARD_ALPHA_TEST = 0.25;
@@ -464,10 +468,33 @@ function createBillboardLightingNode(
     tslVec3(maxVegetationLight),
   );
   const shaded = baseColor.mul(light);
-
-  return select(lightingEnabled, shaded, baseColor).mul(
+  const legacyLit = select(lightingEnabled, shaded, baseColor).mul(
     tslFloat(1).add(tslFloat(0).mul(cameraDistance)),
   );
+
+  // Phase 0 unified-rig branch (flag-gated). Wrapped-Lambert against the SAME
+  // uncompressed sun/sky/ground terms terrain consumes, so foliage tracks
+  // terrain by construction. The [0.40, 0.78] clamp band is bypassed here —
+  // midnight foliage is allowed to go dark, dawn allowed to warm with terrain —
+  // which is exactly the divergence the legacy clamp guarantees. See
+  // docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §2c.
+  const rigEnabled = tslReference('float', lightingRigBindings.rigEnabled).greaterThan(tslFloat(0.5));
+  const rigSun = tslReference('color', lightingRigBindings.sunRadiance);
+  const rigSky = tslReference('color', lightingRigBindings.skyIrradiance);
+  const rigGround = tslReference('color', lightingRigBindings.groundIrradiance);
+  const rigAmbient = tslReference('color', lightingRigBindings.ambientRadiance);
+  const rigSunDir = tslReference('vec3', lightingRigBindings.sunDirection);
+  const rigExposure = tslReference('float', lightingRigBindings.exposure);
+  // Card normal: the camera-facing impostor normal where present, else the
+  // up-biased card normal (foliage cards lack true geometric normals).
+  const cardNormal = tslSelect(normalMapEnabled, imposterNormal, tslVec3(0, 1, 0));
+  const wrap = tslFloat(RIG_WRAP);
+  const nl = tslMax(cardNormal.dot(rigSunDir), wrap.negate());
+  const diff = nl.add(wrap).div(tslFloat(1).add(wrap));
+  const hemi = tslMix(rigGround, rigSky, tslFloat(0.5).add(cardNormal.y.mul(0.5)));
+  const rigLit = baseColor.mul(hemi.add(rigSun.mul(diff))).add(rigAmbient).mul(rigExposure);
+
+  return tslSelect(rigEnabled, rigLit, legacyLit);
 }
 
 function createBillboardFogNode(

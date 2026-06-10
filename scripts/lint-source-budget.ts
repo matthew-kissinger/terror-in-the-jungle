@@ -95,7 +95,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 810, methods: 44 },
   'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy', loc: 764, methods: 0 },
-  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling', loc: 1120, methods: 0 },
+  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate)', loc: 1155, methods: 0 },
   'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade; +22 LOC cycle-2026-06-09 gameplay-heightmap-resolution (DEM-faithful CPU query grid in syncCpuHeightsToGpu + rationale)', loc: 898, methods: 69 },
   'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 861, methods: 24 },
   'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 882, methods: 42 },

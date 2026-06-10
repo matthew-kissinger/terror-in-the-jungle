@@ -806,6 +806,16 @@ async function main(): Promise<void> {
       await waitForEngine(page);
       await startMode(page, SCENARIO.mode);
       await dismissBriefingIfPresent(page);
+      // rig-prototype A/B: flip the Phase 0 unified lighting-rig flag ON when
+      // `--rig-on` is passed. The flag object is published on `window.__lightingRig`
+      // by AtmosphereSystem; the shared binding picks the value up next frame.
+      if (hasFlag('rig-on')) {
+        await page.evaluate(() => {
+          const rig = (window as unknown as { __lightingRig?: { enabled: boolean } }).__lightingRig;
+          if (rig) rig.enabled = true;
+        });
+        logStep('Lighting rig flag ON (window.__lightingRig.enabled = true)');
+      }
       await page.waitForTimeout(SCENARIO.settleSec * 1000);
       scenarioReady = true;
     } catch (err) {
