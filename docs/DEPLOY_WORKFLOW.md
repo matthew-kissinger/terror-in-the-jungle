@@ -304,6 +304,19 @@ Useful for checking that the bundled app boots and assets resolve with the same 
 
 This is the best local built-app gate, but it still does not validate Cloudflare response headers.
 
+### Tier 2.5: `npm run check:tod-coherence` (lighting coherence, pre-deploy)
+
+For deploys that touch lighting, atmosphere, terrain/foliage/NPC materials, the lighting rig, or exposure/fog, run the time-of-day cross-material coherence gate before deploying:
+
+```bash
+npm run build:perf          # the A Shau DEM streams from R2; the "pinned R2 metadata" warning is normal
+npm run check:tod-coherence # rig-on TOD sweep + NPC fixture; asserts the committed coherence band
+```
+
+It sweeps A Shau across the day with the lighting rig ON, places an NPC impostor in frame, and asserts the committed tolerances from `docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md` §5 (foliage and NPC luminance track terrain: corr >= 0.92, range ratio in [0.6, 1.6]; no dawn terrain white-out; all TODs measurable). It exits nonzero and writes `artifacts/lighting-rig/tod-sweep/gate/verdict.json` on failure. This is the gate that would have caught the original cross-material incoherence (SOL-1's channel gates never checked it).
+
+This is a **pre-deploy checklist step, not a blocking CI job**: a headless GPU TOD sweep is ~5 min and CI GPU runners are starvation-prone (STABILIZAT-1), so it runs on the operator's machine before a lighting/atmosphere deploy rather than gating every push.
+
 ### Tier 3: Cloudflare header spot-check
 
 After a deploy, run the commands in section 7 against `https://terror-in-the-jungle.pages.dev/`.
