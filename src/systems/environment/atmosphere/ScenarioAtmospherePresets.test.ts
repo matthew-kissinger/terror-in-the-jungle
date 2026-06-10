@@ -107,4 +107,54 @@ describe('SCENARIO_ATMOSPHERE_PRESETS', () => {
       }
     });
   });
+
+  /**
+   * Phase 3 rig trims (`exposure-fog-presets-rig`): on the rig path each scenario
+   * contributes BOUNDED tint/intensity multipliers over the physical baseline
+   * instead of an absolute color stack. We assert the trims stay inside the
+   * narrow band (so a trim can never re-create the old absolute-stack dominance)
+   * and that the per-scenario INTENT reads correctly — warm scenarios lean warm,
+   * the perf-baseline scenario stays identity. Bound magnitudes themselves are
+   * tuning values, so we assert directional intent + the band, not literals.
+   */
+  describe('rig trims are bounded nudges over the physical baseline', () => {
+    // Mirror of the trim band in LightingRigPresetTrim (kept local so this test
+    // fails loudly if the band silently widens past a sane nudge range).
+    const TINT_FLOOR = 0.7;
+    const TINT_CEIL = 1.4;
+    const INTENSITY_FLOOR = 0.75;
+    const INTENSITY_CEIL = 1.35;
+
+    for (const key of allKeys) {
+      it(`${key} trim (if present) stays inside the nudge band`, () => {
+        const trim = SCENARIO_ATMOSPHERE_PRESETS[key].rigTrim;
+        if (!trim) return; // identity baseline is allowed (e.g. combat120)
+        for (const tint of [trim.sunTint, trim.skyTint, trim.fogTint]) {
+          if (!tint) continue;
+          for (const ch of [tint.r, tint.g, tint.b]) {
+            expect(ch).toBeGreaterThanOrEqual(TINT_FLOOR);
+            expect(ch).toBeLessThanOrEqual(TINT_CEIL);
+          }
+        }
+        if (trim.intensity !== undefined) {
+          expect(trim.intensity).toBeGreaterThanOrEqual(INTENSITY_FLOOR);
+          expect(trim.intensity).toBeLessThanOrEqual(INTENSITY_CEIL);
+        }
+      });
+    }
+
+    it('warm scenarios (dawn, dusk, golden hour) carry a warm sun tint (red > blue)', () => {
+      for (const key of ['ashau', 'tdm', 'zc'] as const) {
+        const sunTint = SCENARIO_ATMOSPHERE_PRESETS[key].rigTrim?.sunTint;
+        expect(sunTint, `${key} should define a warm sun tint`).toBeDefined();
+        expect(sunTint!.r).toBeGreaterThan(sunTint!.b);
+      }
+    });
+
+    it('combat120 (perf baseline) carries no trim so its rig-path luminance stays directly comparable', () => {
+      // A trim here would couple the perf baseline to artistic tuning. Identity
+      // by design keeps the combat120 rig-path read comparable to openfrontier's.
+      expect(SCENARIO_ATMOSPHERE_PRESETS.combat120.rigTrim).toBeUndefined();
+    });
+  });
 });

@@ -8,7 +8,7 @@ import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
 import { SunDiscMesh } from './atmosphere/SunDiscMesh';
 import { shapeDirectLightForRenderer } from './AtmosphereLightingColor';
-import { createLightingRigState, createRigSceneLightRadiance, deriveLightingRigState, isLightingRigEnabled, publishLightingRigConfig, rigSceneLightRadiance } from './LightingRig';
+import { createLightingRigState, createRigSceneLightRadiance, deriveLightingRigState, isLightingRigEnabled, lightingRigBindings, publishLightingRigConfig, rigSceneLightRadiance } from './LightingRig';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
   computeSunDirectionAtTime,
@@ -179,18 +179,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly scratchSunPosition = new THREE.Vector3();
   private readonly cameraPosition = new THREE.Vector3();
   private readonly lightingSnapshot = createAtmosphereLightingSnapshot();
-  /**
-   * Phase 0 unified lighting-rig state (cycle-2026-06-09-lighting-rig-spike).
-   * Derived once per frame from the uncompressed Hosek backend at the LightFog
-   * marker, alongside the legacy snapshot. Materials consume it only when the
-   * runtime flag is ON; the legacy path is untouched when OFF.
-   */
+  /** Unified lighting-rig state, derived once per frame from the uncompressed
+   * Hosek backend at the LightFog marker alongside the legacy snapshot.
+   * Consumed only when the rig flag is ON; legacy path untouched OFF. */
   private readonly lightingRig = createLightingRigState();
-  /**
-   * Phase 1 scratch (`terrain-rig-and-scene-lights`): the rig's projection into
-   * the four scene-light colors, copied into the renderer lights when the flag
-   * is ON so GLB + terrain PBR track the rig curve. Legacy path untouched OFF.
-   */
+  /** The rig's projection into the four scene-light colors; copied into the
+   * renderer lights when the flag is ON so GLB + terrain PBR track the curve. */
   private readonly rigSceneLights = createRigSceneLightRadiance();
 
   constructor() {
@@ -242,14 +236,14 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       this.backend.update(deltaTime, this.sunDirection);
     });
     this.trackAtmosphereTiming('World.Atmosphere.LightFog', () => {
+      // Unified lighting rig: derive + mirror the bindings FIRST (one authority,
+      // one update point) so the scene lights + scene fog below read this frame's
+      // terms. The scenario's bounded rig trim is applied here on the rig path;
+      // legacy stacks stay authoritative OFF (rig state unused → order is a no-op).
+      deriveLightingRigState(this.backend, this.sunDirection, this.fogDarkenFactor, this.lightingRig, preset?.rigTrim);
       this.applyToRenderer();
       this.applyFogColor();
       this.updateSunDisc();
-      // Unified lighting rig (Phase 0 prototype). Derive the uncompressed rig
-      // state + mirror its shared bindings from the same Hosek backend this
-      // frame, one authority, one update point. Flag-gated consumption lives in
-      // the material families; deriving each frame is cheap.
-      deriveLightingRigState(this.backend, this.sunDirection, this.fogDarkenFactor, this.lightingRig);
     });
     this.trackAtmosphereTiming('World.Atmosphere.Clouds', () => {
       this.updateCloudCoverage(deltaTime);
@@ -457,9 +451,8 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   /**
    * Base construction intensities of the renderer scene lights, mirrored from
    * `GameRenderer` (ambient 1.0, directional 2.0, hemisphere 0.8). The rig path
-   * divides these out of the colors so `color × intensity == rigRadiance ×
-   * exposure`, leaving `.intensity` to weather (the "weather owns intensity"
-   * contract — AtmosphereSystem never writes intensity on either path).
+   * divides these out so `color × intensity == rigRadiance × exposure`, leaving
+   * `.intensity` to weather (AtmosphereSystem never writes intensity).
    */
   private static readonly SCENE_LIGHT_BASE_INTENSITIES = {
     ambient: 1.0, directional: 2.0, hemisphere: 0.8,
@@ -471,9 +464,8 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
 
     // Rig path: the three PBR scene lights take rig radiance (exposure folded
     // in, base intensity divided out) so terrain + GLB PBR track the curve the
-    // unlit foliage reads. The terrain colorNode stops self-lighting on this
-    // path (TerrainMaterial.applyTerrainRigLighting), so sun/sky energy is
-    // applied exactly once. Direction / shadow / `.intensity` are untouched.
+    // unlit foliage reads. Terrain stops self-lighting on this path so sun/sky
+    // energy applies exactly once. Direction / shadow / `.intensity` untouched.
     const rigOn = isLightingRigEnabled();
     if (rigOn) {
       rigSceneLightRadiance(this.lightingRig, AtmosphereSystem.SCENE_LIGHT_BASE_INTENSITIES, this.rigSceneLights);
@@ -570,7 +562,14 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private applyFogColor(): void {
     const fog = this.renderer?.fog;
     if (!fog) return;
-    fog.color.copy(this.refreshLightingSnapshot().fogColor);
+    // Rig path: scene fog reads the SINGLE rig fog color (same horizon source
+    // the foliage fog binding reads) → one authority, horizon matches the Hosek
+    // sky with no dawn/dusk seam. OFF path: byte-identical legacy snapshot fog.
+    fog.color.copy(
+      isLightingRigEnabled()
+        ? lightingRigBindings.fogColor.value
+        : this.refreshLightingSnapshot().fogColor,
+    );
   }
 
   private refreshLightingSnapshot(): AtmosphereLightingSnapshot {

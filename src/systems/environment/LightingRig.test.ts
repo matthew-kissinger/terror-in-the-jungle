@@ -14,6 +14,10 @@ import {
   rigExposureForElevation,
   rigSceneLightRadiance,
 } from './LightingRig';
+import {
+  RIG_TRIM_INTENSITY_MAX,
+  RIG_TRIM_TINT_MAX,
+} from './LightingRigPresetTrim';
 
 /**
  * Behavior tests for the Phase 0 unified lighting rig (cycle
@@ -253,5 +257,129 @@ describe('LightingRig scene-light projection drives the PBR lights from rig term
     const nightSun = lights.sunColor.r;
 
     expect(daySun).toBeGreaterThan(nightSun);
+  });
+});
+
+describe('LightingRig exposure is applied exactly once (Phase 3 exposure policy)', () => {
+  beforeEach(() => {
+    LightingRigConfig.enabled = false;
+  });
+
+  // Base construction intensities the rig divides out (mirrors GameRenderer).
+  const BASE = { ambient: 1.0, directional: 2.0, hemisphere: 0.8 };
+
+  it('uses the one exposure stored on the state for BOTH the foliage binding and the scene lights', () => {
+    // The exposure policy (module header §3): energy is applied once, in-shader /
+    // scene-color, never per-family twice. The single application is the one
+    // exposure scalar `deriveLightingRigState` stores on the state. This test
+    // pins the invariant the policy depends on: the foliage `exposure` binding
+    // and the scene-light projection both reflect that SAME scalar — if a future
+    // edit made the scene-light path recompute exposure independently, the two
+    // would diverge and energy could double-apply.
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [2.0, 1.5, 1.0], zenith: [1.2, 1.4, 2.0], horizon: [1.0, 0.8, 0.6] });
+    deriveLightingRigState(backend, new THREE.Vector3(0.2, 0.6, 0.1), 1, state);
+
+    // Foliage reads exposure through the binding.
+    const foliageExposure = lightingRigBindings.exposure.value;
+
+    // Scene lights fold the same exposure into their colors. Recover it from the
+    // sun channel: sunColor = sunRadiance * exposure / baseDirectional.
+    const lights = createRigSceneLightRadiance();
+    rigSceneLightRadiance(state, BASE, lights);
+    const sceneExposure = (lights.sunColor.r * BASE.directional) / state.sunRadiance.r;
+
+    expect(sceneExposure).toBeCloseTo(foliageExposure, 6);
+    expect(foliageExposure).toBeCloseTo(state.exposure, 6);
+  });
+
+  it('does NOT double-apply: scene-light radiance is the rig radiance scaled by exposure once', () => {
+    // A double application would show up as exposure^2. Assert the linear
+    // (single) relationship holds across two different sun heights.
+    const state = createLightingRigState();
+    const lights = createRigSceneLightRadiance();
+    const backend = makeBackend({ sun: [2.0, 1.6, 1.2], zenith: [1.3, 1.5, 2.1], horizon: [1.1, 0.9, 0.7] });
+
+    for (const sunDir of [new THREE.Vector3(0, 0.8, 0), new THREE.Vector3(0.3, 0.3, 0)]) {
+      deriveLightingRigState(backend, sunDir, 1, state);
+      rigSceneLightRadiance(state, BASE, lights);
+      // sunColor * baseIntensity must equal radiance * exposure (NOT * exposure^2).
+      expect(lights.sunColor.g * BASE.directional).toBeCloseTo(state.sunRadiance.g * state.exposure, 6);
+    }
+  });
+});
+
+describe('LightingRig scenario trim shapes the rig path within bounds', () => {
+  beforeEach(() => {
+    LightingRigConfig.enabled = false;
+  });
+
+  it('renders the pure physical baseline when no trim is supplied', () => {
+    const trimless = createLightingRigState();
+    const backend = makeBackend({ sun: [2.0, 1.5, 1.0], zenith: [1.2, 1.4, 2.0], horizon: [1.0, 0.8, 0.6] });
+    deriveLightingRigState(backend, new THREE.Vector3(0.2, 0.6, 0.1), 1, trimless);
+
+    // Undefined trim leaves the sun term and exposure exactly at the baseline.
+    expect(trimless.exposure).toBeCloseTo(rigExposureForElevation(trimless.sunElevation), 6);
+    expect(trimless.sunRadiance.r).toBeCloseTo(2.0, 5);
+  });
+
+  it('a warm sun tint + intensity trim nudges the sun term and exposure relative to baseline', () => {
+    const backend = makeBackend({ sun: [2.0, 2.0, 2.0], zenith: [1.0, 1.0, 1.0], horizon: [1.0, 1.0, 1.0] });
+    const sunDir = new THREE.Vector3(0.2, 0.6, 0.1);
+
+    const baseline = createLightingRigState();
+    deriveLightingRigState(backend, sunDir, 1, baseline);
+
+    const trimmed = createLightingRigState();
+    deriveLightingRigState(backend, sunDir, 1, trimmed, {
+      sunTint: new THREE.Color(1.15, 1.0, 0.85),
+      intensity: 1.1,
+    });
+
+    // Warm tint: red lifts, blue drops, relative to the neutral baseline.
+    expect(trimmed.sunRadiance.r).toBeGreaterThan(baseline.sunRadiance.r);
+    expect(trimmed.sunRadiance.b).toBeLessThan(baseline.sunRadiance.b);
+    // Intensity > 1 lifts the single exposure scalar.
+    expect(trimmed.exposure).toBeGreaterThan(baseline.exposure);
+  });
+
+  it('clamps an out-of-band trim so a typo cannot dominate the physical baseline', () => {
+    const backend = makeBackend({ sun: [1.0, 1.0, 1.0], zenith: [1.0, 1.0, 1.0], horizon: [1.0, 1.0, 1.0] });
+    const sunDir = new THREE.Vector3(0.2, 0.6, 0.1);
+
+    const baseline = createLightingRigState();
+    deriveLightingRigState(backend, sunDir, 1, baseline);
+
+    // Absurd multipliers (10x tint, 100x intensity) must be clamped to the band.
+    const trimmed = createLightingRigState();
+    deriveLightingRigState(backend, sunDir, 1, trimmed, {
+      sunTint: new THREE.Color(10, 10, 10),
+      intensity: 100,
+    });
+
+    // Sun term cannot exceed baseline × the max tint; exposure cannot exceed
+    // baseline × the max intensity. The trim nudges, it never dominates.
+    expect(trimmed.sunRadiance.r).toBeLessThanOrEqual(baseline.sunRadiance.r * RIG_TRIM_TINT_MAX + 1e-6);
+    expect(trimmed.exposure).toBeLessThanOrEqual(baseline.exposure * RIG_TRIM_INTENSITY_MAX + 1e-6);
+  });
+
+  it('a fog tint shapes the fog color without leaving the trim band', () => {
+    const backend = makeBackend({ sun: [1.0, 1.0, 1.0], zenith: [1.0, 1.0, 1.0], horizon: [0.8, 0.8, 0.8] });
+    const sunDir = new THREE.Vector3(0, 0.5, 0);
+
+    const baseline = createLightingRigState();
+    deriveLightingRigState(backend, sunDir, 1, baseline);
+
+    const trimmed = createLightingRigState();
+    deriveLightingRigState(backend, sunDir, 1, trimmed, {
+      fogTint: new THREE.Color(1.2, 1.0, 0.85),
+    });
+
+    // Warm fog tint: red rises above the neutral baseline fog, blue drops.
+    expect(trimmed.fogColor.r).toBeGreaterThan(baseline.fogColor.r);
+    expect(trimmed.fogColor.b).toBeLessThan(baseline.fogColor.b);
+    // The published binding mirrors the trimmed fog color (single fog authority).
+    expect(lightingRigBindings.fogColor.value.r).toBeCloseTo(trimmed.fogColor.r, 5);
   });
 });

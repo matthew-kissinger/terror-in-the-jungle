@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
+import { applyRigPresetTrim, type RigPresetTrim } from './LightingRigPresetTrim';
 
 /**
  * Unified lighting rig — Phase 0 prototype (cycle `cycle-2026-06-09-lighting-rig-spike`,
@@ -24,6 +25,34 @@ import type { ISkyBackend } from './atmosphere/ISkyBackend';
  * flag-gated rig branch. This is the GO/NO-GO measurement target, not final
  * visual tuning. Phases 1-4 build this out (scene lights, NPC impostors, fog
  * unification, legacy deletion).
+ *
+ * ## Exposure policy (Phase 3 — RATIFIED: in-shader / scene-color, NOT an AGX split)
+ *
+ * The memo §3 proposed handling energy "exactly once, at AGX" via
+ * `renderer.toneMappingExposure`. Phase 3 reviewed that against the
+ * implementation and ratifies the IN-SHADER / SCENE-COLOR application as the
+ * final policy, for three load-bearing reasons:
+ *
+ * 1. **The rig exposure is sun-elevation-keyed and varies per scenario.** AGX
+ *    `toneMappingExposure` is a single global the WorldBuilder dev console
+ *    A/B-toggles (`GameRenderer` holds it at 1.0); writing a per-frame TOD curve
+ *    into it would fight that toggle and couple the rig to a renderer global.
+ * 2. **One application, one curve, computed once.** `deriveLightingRigState`
+ *    computes the exposure scalar exactly once per frame (base curve × the
+ *    scenario's bounded intensity trim) and stores it on
+ *    `LightingRigState.exposure`. BOTH consumers read that one value: the
+ *    foliage branch via the `exposure` binding, terrain + GLB via
+ *    `rigSceneLightRadiance` (which READS `rig.exposure`, it does NOT recompute).
+ *    No family gets exposure twice; fog carries no exposure on either consumer
+ *    (scene fog and foliage fog both mix post-lighting against the same
+ *    un-exposed rig `fogColor`).
+ * 3. **AGX stays the single PRESENTATION stage.** AGX still owns the tonemap
+ *    knee at `toneMappingExposure = 1.0`; the rig owns *scene radiance scale*.
+ *    Radiance scaling and tonemap mapping are different stages, so this is not
+ *    a double application of the same energy.
+ *
+ * The single-application invariant is regression-tested in `LightingRig.test.ts`
+ * ("exposure is applied exactly once"). See `docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md` §3.
  */
 
 /**
@@ -80,6 +109,15 @@ export interface LightingRigState {
   ambientRadiance: THREE.Color;
   /** `asin(sunDirection.y)` in radians — the single driver for low-sun falloff. */
   sunElevation: number;
+  /**
+   * The single scene-wide exposure scalar for this frame: the base TOD curve
+   * (`rigExposureForElevation`) times the active scenario's bounded intensity
+   * trim. Computed ONCE in `deriveLightingRigState` and read by both exposure
+   * consumers (the foliage `exposure` binding and `rigSceneLightRadiance` for
+   * terrain + GLB) so no family applies exposure twice. See the exposure-policy
+   * note in the module header.
+   */
+  exposure: number;
   /** Linear fog color derived from `groundIrradiance` (horizon), pre-exposure. */
   fogColor: THREE.Color;
   /** Per-scenario base × weather multiplier (ownership unchanged). */
@@ -96,6 +134,7 @@ export function createLightingRigState(): LightingRigState {
     groundIrradiance: new THREE.Color(0.3, 0.3, 0.25),
     ambientRadiance: new THREE.Color(0, 0, 0),
     sunElevation: Math.PI / 2,
+    exposure: 1,
     fogColor: new THREE.Color(0.48, 0.56, 0.53),
     fogDensity: 0,
     daylightFactor: 1,
@@ -219,12 +258,18 @@ export function rigExposureForElevation(sunElevationRad: number): number {
  * @param sunDirection authoritative sun direction (normalized world vector).
  * @param fogDarkenFactor weather fog-darken multiplier [0,1].
  * @param out        the rig state to fill.
+ * @param trim       the active scenario's bounded rig trim (tint/intensity
+ *                   multipliers over the physical baseline). Undefined renders
+ *                   the pure physical baseline. The trim is the ONLY
+ *                   scenario-specific shaping on the rig path — the legacy
+ *                   absolute color stacks are untouched (they drive the OFF path).
  */
 export function deriveLightingRigState(
   backend: ISkyBackend,
   sunDirection: THREE.Vector3,
   fogDarkenFactor: number,
   out: LightingRigState,
+  trim?: RigPresetTrim,
 ): LightingRigState {
   out.sunDirection.copy(sunDirection).normalize();
   out.sunElevation = Math.asin(THREE.MathUtils.clamp(out.sunDirection.y, -1, 1));
@@ -251,15 +296,21 @@ export function deriveLightingRigState(
 
   out.daylightFactor = 1 - nightT;
 
+  // Apply the active scenario's bounded rig trim over the physical baseline:
+  // tint multipliers on the sun/sky/ground/fog terms and an intensity multiplier
+  // on the exposure curve. Identity when `trim` is undefined. This is the single
+  // application of exposure (base curve × trim intensity), stored once on the
+  // state and read by both consumers (foliage binding + scene-light projection).
+  out.exposure = applyRigPresetTrim(out, rigExposureForElevation(out.sunElevation), trim);
+
   // Mirror into the shared bindings the materials read.
-  const exposure = rigExposureForElevation(out.sunElevation);
   lightingRigBindings.rigEnabled.value = isLightingRigEnabled() ? 1 : 0;
   lightingRigBindings.sunDirection.value.copy(out.sunDirection);
   lightingRigBindings.sunRadiance.value.copy(out.sunRadiance);
   lightingRigBindings.skyIrradiance.value.copy(out.skyIrradiance);
   lightingRigBindings.groundIrradiance.value.copy(out.groundIrradiance);
   lightingRigBindings.ambientRadiance.value.copy(out.ambientRadiance);
-  lightingRigBindings.exposure.value = exposure;
+  lightingRigBindings.exposure.value = out.exposure;
   // Low-sun driver for the unlit families (sin of elevation == sunDirection.y),
   // and the single rig fog color the billboard buffer reads on the rig path.
   lightingRigBindings.sunElevationSin.value = out.sunDirection.y;
@@ -325,16 +376,20 @@ export interface SceneLightBaseIntensities {
 
 /**
  * Project the current rig state into the four scene-light colors, exposure
- * folded in and the base construction intensity divided out. Pure read of
- * `rig` + `rigExposureForElevation`; the caller copies the result into the
- * renderer lights and leaves their `.intensity` alone (weather owns it).
+ * folded in and the base construction intensity divided out. Reads the single
+ * `rig.exposure` scalar `deriveLightingRigState` already computed (base curve ×
+ * scenario intensity trim) — it deliberately does NOT recompute exposure, so
+ * terrain + GLB carry the SAME exposure the foliage binding does (no double
+ * application; see the module-header exposure policy). The caller copies the
+ * result into the renderer lights and leaves their `.intensity` alone (weather
+ * owns it).
  */
 export function rigSceneLightRadiance(
   rig: LightingRigState,
   base: SceneLightBaseIntensities,
   out: RigSceneLightRadiance,
 ): RigSceneLightRadiance {
-  const exposure = rigExposureForElevation(rig.sunElevation);
+  const exposure = rig.exposure;
   const sunScale = exposure / Math.max(base.directional, 1e-4);
   const hemiScale = exposure / Math.max(base.hemisphere, 1e-4);
   const ambientScale = exposure / Math.max(base.ambient, 1e-4);
