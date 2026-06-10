@@ -10,7 +10,13 @@ import type { PlayerVehicleAdapter } from '../systems/vehicle/PlayerVehicleAdapt
 import { TankPlayerAdapter } from '../systems/vehicle/TankPlayerAdapter';
 import { EmplacementPlayerAdapter } from '../systems/vehicle/EmplacementPlayerAdapter';
 import { TankCannonProjectileSystem } from '../systems/combat/projectiles/TankCannonProjectile';
+import { TankBallisticSolver } from '../systems/combat/projectiles/TankBallisticSolver';
+import { TankAIGunnerRoute } from '../systems/combat/ai/TankAIGunnerRoute';
+import type { TankGunnerContext } from '../systems/combat/CombatantAI';
+import { Tank } from '../systems/vehicle/Tank';
 import type { M2HBEmplacementSystem } from '../systems/combat/weapons/M2HBEmplacement';
+import type { VehicleManager } from '../systems/vehicle/VehicleManager';
+import type { Combatant } from '../systems/combat/types';
 import type { CombatantSystem } from '../systems/combat/CombatantSystem';
 import type { ITerrainRuntime } from '../types/SystemInterfaces';
 import { Logger } from '../utils/Logger';
@@ -258,6 +264,14 @@ function wirePlayerRuntime(
     commandInputManager,
   });
 
+  // Shared M48 cannon launcher (npc-tank-cannon-wiring): one pool, one damage
+  // sink for the player gunner path AND the NPC route. Null on composer-test
+  // doubles (no scene / combatantSystem) → both cannon wires skip.
+  const sharedCannon =
+    options.scene && combatantSystem
+      ? new TankCannonProjectileSystem(options.scene, combatantSystem.explosionEffectsPool, combatantSystem)
+      : null;
+
   // Boarding factory wire (VEKHIKL-UX-2, split B). Closes the
   // F-key gap shipped by the 2026-05-19 wayfinding cycle: the
   // "Press F to board" prompt rendered but no handler dispatched
@@ -282,10 +296,17 @@ function wirePlayerRuntime(
       combatantSystem,
       terrainSystem,
       m2hbEmplacementSystem,
+      cannon: sharedCannon,
     });
     if (factory) {
       playerController.setPlayerVehicleAdapterFactory(factory);
     }
+  }
+
+  // NPC tank-gunner wire (npc-tank-cannon-wiring): nothing bound a cannon +
+  // solver to CombatantAI's existing route in prod, so NPC M48s never fired.
+  if (sharedCannon && combatantSystem && vehicleManager) {
+    wireNpcTankGunner({ combatantSystem, vehicleManager, terrainSystem, cannon: sharedCannon });
   }
 
   playerHealthSystem.setZoneManager(zoneManager);
@@ -520,6 +541,8 @@ function createPlayerVehicleAdapterFactory(args: {
   combatantSystem?: CombatantSystem;
   terrainSystem?: ITerrainRuntime;
   m2hbEmplacementSystem?: M2HBEmplacementSystem;
+  /** Shared cannon (npc-tank-cannon-wiring): the player path binds this so player + NPC share one pool. Null → lazy player-only build. */
+  cannon?: TankCannonProjectileSystem | null;
 }): PlayerVehicleAdapterFactory | null {
   const internals = args.playerController.getBoardingFactoryInternals?.();
   if (!internals) return null;
@@ -570,26 +593,25 @@ function createPlayerVehicleAdapterFactory(args: {
  *     ticked `M2HBEmplacementSystem.update` polls its fire requests.
  * On dismount both are detached so a stale binding can't keep firing.
  *
- * The cannon system is constructed once and shared across every player tank
- * session (single-player, one crewed tank at a time). When `scene` /
- * `combatantSystem` are absent (composer-test doubles), the cannon wire is a
- * silent no-op; the M2HB wire still works since it needs neither.
+ * The injected `cannon` is the pool shared with the NPC tank-gunner route
+ * (npc-tank-cannon-wiring). When absent (older composer-test doubles) it is
+ * lazily built on first tank board from `scene` + `combatantSystem`; when
+ * neither is available the cannon wire is a silent no-op (M2HB still works).
  */
 function buildSeatedWeaponLifecycle(args: {
   scene?: THREE.Scene;
   combatantSystem?: CombatantSystem;
   terrainSystem?: ITerrainRuntime;
   m2hbEmplacementSystem?: M2HBEmplacementSystem;
+  cannon?: TankCannonProjectileSystem | null;
 }): {
   onSessionEnter: (adapter: PlayerVehicleAdapter, vehicleId: string) => void;
   onSessionExit: (adapter: PlayerVehicleAdapter, vehicleId: string) => void;
 } {
   const { scene, combatantSystem, terrainSystem, m2hbEmplacementSystem } = args;
 
-  // Lazily construct the shared cannon system on first tank board so a session
-  // that never touches a tank pays nothing. Requires scene + combatantSystem
-  // (its explosion pool + radial-damage handler live there).
-  let cannon: TankCannonProjectileSystem | null = null;
+  // Prefer the injected shared cannon (player + NPC share one pool); else lazy.
+  let cannon: TankCannonProjectileSystem | null = args.cannon ?? null;
   const ensureCannon = (): TankCannonProjectileSystem | null => {
     if (cannon) return cannon;
     if (!scene || !combatantSystem) return null;
@@ -644,4 +666,51 @@ function buildSeatedWeaponLifecycle(args: {
   };
 
   return { onSessionEnter, onSessionExit };
+}
+
+// Per-frame cannon step bound so a stalled frame can't tunnel a shell.
+const NPC_CANNON_MAX_STEP_S = 1 / 30;
+
+/**
+ * Wire the NPC tank-gunner firing route (npc-tank-cannon-wiring). CombatantAI's
+ * route + delegation already exist; this binds the prod deps it lacked — a
+ * shared solver + route (`setTankGunnerRoute`, with a resolver that maps an
+ * IN_VEHICLE combatant to its tank/turret + shared cannon only in the gunner
+ * seat) and a per-frame cannon-flight stepper. Damage routes through the
+ * cannon's existing `applyExplosionDamage` path — no new code.
+ */
+function wireNpcTankGunner(args: {
+  combatantSystem: CombatantSystem;
+  vehicleManager: VehicleManager;
+  terrainSystem?: ITerrainRuntime;
+  cannon: TankCannonProjectileSystem;
+}): void {
+  const { combatantSystem, vehicleManager, terrainSystem, cannon } = args;
+
+  const solver = new TankBallisticSolver();
+  void solver.init(); // optional WASM load; route uses the TS fallback meanwhile
+  const route = new TankAIGunnerRoute();
+
+  const contextProvider = (combatant: Combatant): TankGunnerContext | null => {
+    const tank = vehicleManager.getTankByOccupant(combatant.id);
+    if (!(tank instanceof Tank)) return null;
+    // Only the gunner crews the cannon; drivers / loaders / commanders ride.
+    const inGunnerSeat = tank.getSeats().some((s) => s.role === 'gunner' && s.occupantId === combatant.id);
+    if (!inGunnerSeat) return null;
+    return { tank, turret: tank.getTurret(), cannon, solver };
+  };
+
+  combatantSystem.combatantAI.setTankGunnerRoute(route, contextProvider);
+
+  // `beginFrame()` carries no dt; derive it from a wall-clock delta, clamped.
+  let lastStepMs = performance.now();
+  combatantSystem.combatantAI.setFrameStepper(() => {
+    const now = performance.now();
+    const dt = Math.min((now - lastStepMs) / 1000, NPC_CANNON_MAX_STEP_S);
+    lastStepMs = now;
+    if (dt <= 0) return;
+    cannon.update(dt, (x, z) => terrainSystem?.getEffectiveHeightAt(x, z) ?? 0);
+  });
+
+  Logger.info('vehicle', 'NPC tank-gunner route wired to shared cannon (npc-tank-cannon-wiring)');
 }
