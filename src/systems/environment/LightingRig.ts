@@ -270,7 +270,22 @@ export function rigExposureForElevation(sunElevationRad: number): number {
   // (tame the bright uncompressed zenith). Linear between.
   const NIGHT_EXPOSURE = 2.6;
   const NOON_EXPOSURE = 0.9;
-  return NIGHT_EXPOSURE + (NOON_EXPOSURE - NIGHT_EXPOSURE) * smooth;
+  const base = NIGHT_EXPOSURE + (NOON_EXPOSURE - NIGHT_EXPOSURE) * smooth;
+
+  // Dawn/dusk shoulder (ashau-load-freeze owner feedback, 2026-06-10):
+  // night readability and dawn brightness were coupled through the single
+  // curve, so a sun just above the horizon still carried ~95% of the night
+  // lift while Hosek's direct term was already substantial — terrain read as
+  // glare ("catches too much light"). Cut exposure through the low-sun band
+  // only: zero below the horizon (night unchanged), full ~22% cut once the
+  // sun clears ~3.5deg, fading out by ~26deg where the base curve has fallen
+  // on its own. Continuous everywhere; the LightingRig.test contract
+  // (midnight > noon, dawn(0) > noon, midnight >= dawn) is unaffected
+  // because the shoulder is zero at and below elevation 0.
+  const rise = THREE.MathUtils.smoothstep(sunElevationRad, 0.0, 0.06);
+  const fall = 1 - THREE.MathUtils.smoothstep(sunElevationRad, 0.18, 0.45);
+  const DAWN_SHOULDER_CUT = 0.22;
+  return base * (1 - DAWN_SHOULDER_CUT * rise * fall);
 }
 
 /**

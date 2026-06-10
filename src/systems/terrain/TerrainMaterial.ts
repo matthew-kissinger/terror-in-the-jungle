@@ -274,8 +274,11 @@ function terrainHorizonBlockerSample(
   horizontalLength: TslNode,
   distanceMeters: number,
   uniforms: TerrainUniforms,
+  distanceScale?: TslNode,
 ): TslNode {
-  const distance = tslFloat(distanceMeters);
+  const distance = distanceScale
+    ? tslFloat(distanceMeters).mul(distanceScale)
+    : tslFloat(distanceMeters);
   const sampleXz = worldPos.xz.add(sunHorizontal.mul(distance));
   const sampledHeight = sampleTerrainHeightAtWorldXz(sampleXz, uniforms);
   const rayHeight = worldPos.y
@@ -685,7 +688,16 @@ function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
   // and is rocky-looking; combined with wetness/feature mixing it can drift
   // to specular territory. 0.88 keeps a matte read across all biome × mask
   // combinations while still letting the relative variation through.
-  return tslMax(farCanopyAdjusted, tslFloat(0.88));
+  // At grazing sun (dawn/dusk) GGX still pulls a sheen out of 0.88 across
+  // sun-facing slopes (owner "terrain catches too much light", 2026-06-10),
+  // so the floor rises to 0.94 as the sun drops below ~20deg elevation.
+  const sunY = (normalize(tslReference('vec3', uniforms.atmosphereDirectLightDirection)) as TslNode).y;
+  const lowSunFloor = tslMix(
+    tslFloat(0.94),
+    tslFloat(0.88),
+    smoothstep(tslFloat(0.12), tslFloat(0.35), sunY),
+  );
+  return tslMax(farCanopyAdjusted, lowSunFloor);
 }
 
 function terrainLowSunOcclusionMask(terrainNormal: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
@@ -702,11 +714,20 @@ function terrainLowSunOcclusionMask(terrainNormal: TslNode, worldPos: TslNode, u
   const shadowFacing = tslFloat(1).sub(smoothstep(tslFloat(0.05), tslFloat(0.38), nDotL));
   const slopeMask = tslFloat(1).sub(smoothstep(tslFloat(0.72), tslFloat(0.97), terrainNormal.y));
   const ridgeElevationMask = smoothstep(tslFloat(80), tslFloat(620), worldPos.y);
+  // Per-fragment jitter on the march distances. The blocker samples the
+  // heightmap texture, and a fixed-step march creases along the bilinear
+  // texel grid under grazing sun — the "black grid lines around dawn"
+  // (owner report, 2026-06-10). Scaling each tap by a hash-derived factor
+  // in [0.85, 1.15] turns any residual grid-aligned crease into
+  // unstructured noise the eye reads as terrain texture.
+  const marchJitter = tslFloat(0.85).add(hashUvNode(worldPos.xz.mul(0.37)).mul(0.3));
   let horizonBlocker = tslFloat(0);
   for (const sampleDistance of TERRAIN_HORIZON_SHADOW_SAMPLE_DISTANCES) {
     horizonBlocker = tslMax(
       horizonBlocker,
-      terrainHorizonBlockerSample(worldPos, lightDirection, sunHorizontal, horizontalLength, sampleDistance, uniforms),
+      terrainHorizonBlockerSample(
+        worldPos, lightDirection, sunHorizontal, horizontalLength, sampleDistance, uniforms, marchJitter,
+      ),
     );
   }
   horizonBlocker = horizonBlocker.mul(tslFloat(1).sub(smoothstep(tslFloat(0.22), tslFloat(0.52), lightDirection.y)));
