@@ -8,11 +8,7 @@ import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
 import { SunDiscMesh } from './atmosphere/SunDiscMesh';
 import { shapeDirectLightForRenderer } from './AtmosphereLightingColor';
-import {
-  createLightingRigState,
-  deriveLightingRigState,
-  publishLightingRigConfig,
-} from './LightingRig';
+import { createLightingRigState, createRigSceneLightRadiance, deriveLightingRigState, isLightingRigEnabled, publishLightingRigConfig, rigSceneLightRadiance } from './LightingRig';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
   computeSunDirectionAtTime,
@@ -190,6 +186,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
    * runtime flag is ON; the legacy path is untouched when OFF.
    */
   private readonly lightingRig = createLightingRigState();
+  /**
+   * Phase 1 scratch (`terrain-rig-and-scene-lights`): the rig's projection into
+   * the four scene-light colors, copied into the renderer lights when the flag
+   * is ON so GLB + terrain PBR track the rig curve. Legacy path untouched OFF.
+   */
+  private readonly rigSceneLights = createRigSceneLightRadiance();
 
   constructor() {
     this.hosekBackend = new HosekWilkieSkyBackend();
@@ -452,9 +454,31 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.fogDarkenFactor = Math.max(0, Math.min(1, factor));
   }
 
+  /**
+   * Base construction intensities of the renderer scene lights, mirrored from
+   * `GameRenderer` (ambient 1.0, directional 2.0, hemisphere 0.8). The rig path
+   * divides these out of the colors so `color × intensity == rigRadiance ×
+   * exposure`, leaving `.intensity` to weather (the "weather owns intensity"
+   * contract — AtmosphereSystem never writes intensity on either path).
+   */
+  private static readonly SCENE_LIGHT_BASE_INTENSITIES = {
+    ambient: 1.0, directional: 2.0, hemisphere: 0.8,
+  } as const;
+
   private applyToRenderer(): void {
     const renderer = this.renderer;
     if (!renderer) return;
+
+    // Rig path: the three PBR scene lights take rig radiance (exposure folded
+    // in, base intensity divided out) so terrain + GLB PBR track the curve the
+    // unlit foliage reads. The terrain colorNode stops self-lighting on this
+    // path (TerrainMaterial.applyTerrainRigLighting), so sun/sky energy is
+    // applied exactly once. Direction / shadow / `.intensity` are untouched.
+    const rigOn = isLightingRigEnabled();
+    if (rigOn) {
+      rigSceneLightRadiance(this.lightingRig, AtmosphereSystem.SCENE_LIGHT_BASE_INTENSITIES, this.rigSceneLights);
+    }
+
     const lighting = this.refreshLightingSnapshot();
 
     // Sun direction + color drive the directional "moon" light while the
@@ -492,7 +516,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
       }
       renderer.moonLight.target.updateMatrixWorld();
 
-      renderer.moonLight.color.copy(lighting.directLightColor);
+      renderer.moonLight.color.copy(rigOn ? this.rigSceneLights.sunColor : lighting.directLightColor);
 
       // Matrix world must be updated manually; setupLighting() no longer
       // freezeTransform()s this light but without an explicit update here
@@ -505,13 +529,13 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // ground color is a darkened horizon sample — the horizon is the
     // dominant contributor to terrain-bounced light in the jungle scene.
     if (renderer.hemisphereLight) {
-      renderer.hemisphereLight.color.copy(lighting.skyColor);
-      renderer.hemisphereLight.groundColor.copy(lighting.groundColor);
+      renderer.hemisphereLight.color.copy(rigOn ? this.rigSceneLights.skyColor : lighting.skyColor);
+      renderer.hemisphereLight.groundColor.copy(rigOn ? this.rigSceneLights.groundColor : lighting.groundColor);
       renderer.hemisphereLight.updateMatrixWorld();
     }
 
     if (renderer.ambientLight) {
-      renderer.ambientLight.color.copy(lighting.ambientColor);
+      renderer.ambientLight.color.copy(rigOn ? this.rigSceneLights.ambientColor : lighting.ambientColor);
     }
   }
 
