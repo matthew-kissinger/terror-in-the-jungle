@@ -119,6 +119,27 @@ export interface LightingRigBindings {
   groundIrradiance: { value: THREE.Color };
   ambientRadiance: { value: THREE.Color };
   exposure: { value: number };
+  /**
+   * `sin(sunElevation)` — i.e. the normalized sun direction's up component
+   * (`sunDirection.y`). The single low-sun driver the unlit families read,
+   * mirroring how terrain's horizon occlusion is keyed on
+   * `directLightDirection.y` (`terrainLowSunOcclusionMask`). Foliage cards lack
+   * true sloped normals + a horizon ray-march, so their up-biased card normal
+   * over-catches the low warm sun (Phase 1: 17h foliage 0.180 vs terrain 0.054).
+   * The foliage branch fades its direct-sun contribution toward zero as the sun
+   * drops with this term, so foliage tracks terrain's low-sun suppression by
+   * construction instead of overshooting it.
+   */
+  sunElevationSin: { value: number };
+  /**
+   * Linear fog color from the rig (`groundIrradiance`/horizon, pre-exposure).
+   * The single fog authority on the rig path. `BillboardBufferManager` reads
+   * `scene.fog.color` directly today (a parallel fog authority, memo flag #2);
+   * on the rig path the buffer manager folds in this term instead so foliage fog
+   * tint comes from the same source terrain/atmosphere fog derives from. Legacy
+   * (flag OFF) keeps the direct `scene.fog.color` read byte-identical.
+   */
+  fogColor: { value: THREE.Color };
 }
 
 /**
@@ -135,6 +156,8 @@ export const lightingRigBindings: LightingRigBindings = {
   groundIrradiance: { value: new THREE.Color(0.3, 0.3, 0.25) },
   ambientRadiance: { value: new THREE.Color(0, 0, 0) },
   exposure: { value: 1 },
+  sunElevationSin: { value: 1 },
+  fogColor: { value: new THREE.Color(0.48, 0.56, 0.53) },
 };
 
 /**
@@ -237,6 +260,10 @@ export function deriveLightingRigState(
   lightingRigBindings.groundIrradiance.value.copy(out.groundIrradiance);
   lightingRigBindings.ambientRadiance.value.copy(out.ambientRadiance);
   lightingRigBindings.exposure.value = exposure;
+  // Low-sun driver for the unlit families (sin of elevation == sunDirection.y),
+  // and the single rig fog color the billboard buffer reads on the rig path.
+  lightingRigBindings.sunElevationSin.value = out.sunDirection.y;
+  lightingRigBindings.fogColor.value.copy(out.fogColor);
 
   return out;
 }

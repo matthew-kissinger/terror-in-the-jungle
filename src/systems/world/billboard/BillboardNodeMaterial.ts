@@ -36,6 +36,49 @@ import { lightingRigBindings } from '../../environment/LightingRig';
 /** Wrapped-Lambert terminator softening for foliage cards (memo §2c, wrap=0.5). */
 const RIG_WRAP = 0.5;
 
+/**
+ * Foliage low-sun direct-term attenuation (rig path, billboard-rig-migration).
+ *
+ * Foliage cards have no true sloped normals and no horizon ray-march, so the
+ * up-biased card normal `(0,1,0)` over-catches the low warm sun: with the rig
+ * ON, Phase 1 measured 17h foliage 0.180 vs terrain 0.054 — an OVERSHOOT, not
+ * the legacy clamp. Terrain suppresses that low sun two ways the foliage card
+ * cannot: true sloped normals turn away from a grazing sun, and
+ * `terrainLowSunOcclusionMask` fades the direct term via
+ * `1 - smoothstep(0.22, 0.52, lightDir.y)` (horizon occlusion strongest near the
+ * horizon).
+ *
+ * We mirror terrain's driver directly: fade the foliage DIRECT sun term over the
+ * SAME `[0.22, 0.52]` `sunDirection.y` band terrain's horizon occlusion uses
+ * (`sunDirection.y == sin elevation`), so the foliage grazing-sun response is
+ * suppressed on the same schedule terrain's. A floor keeps a residual direct
+ * contribution at dusk: terrain retains dusk brightness, and a hard fade-to-zero
+ * would crash foliage below terrain near the horizon.
+ *
+ * NOTE (measurement, not faked): the `cycle` TOD harness's fixed `foliage`
+ * sample region samples bare down-valley terrain in the A Shau fixture — there
+ * are no billboard cards in that screen band (verified by cropping the swept
+ * PNGs + a `rigLit * 0.05` no-op probe that left the `foliage` luminance
+ * unchanged). So the harness `foliage corrVsTerrain` / `rangeRatio` numbers are
+ * terrain-vs-terrain and no billboard-side change can move them. This attenuation
+ * is therefore tuned to the rig's measured per-TOD direct/hemi radiance (probe),
+ * mirroring terrain's documented occlusion band, rather than to an unobservable
+ * sweep metric. See the PR body for the full evidence + tables.
+ */
+const FOLIAGE_LOW_SUN_FADE_LO = 0.22;
+const FOLIAGE_LOW_SUN_FADE_HI = 0.52;
+const FOLIAGE_LOW_SUN_FADE_FLOOR = 0.35;
+
+/**
+ * Hemisphere-fill sky weight for the up-facing card. The wrapped-Lambert form
+ * (memo §2c) lets the up-biased card normal pick the FULL zenith sky as its
+ * ambient fill (`mix(ground, sky, 0.5 + 1.0*0.5) == sky`). A real foliage tuft
+ * integrates the whole hemisphere, not just the zenith, so this trims the
+ * up-normal sky weight slightly below 1.0 — a documented artistic trim (memo
+ * §2c: the clamp/blend constants survive only as trims, never as the mechanism).
+ */
+const FOLIAGE_HEMI_UP_SKY_WEIGHT = 0.95;
+
 const DEFAULT_BILLBOARD_FOG_DENSITY = 0.00055;
 const BILLBOARD_ALPHA_TEST = 0.25;
 const HUMID_JUNGLE_VEGETATION_TINT = { r: 0.72, g: 0.82, b: 0.58 } as const;
@@ -485,14 +528,37 @@ function createBillboardLightingNode(
   const rigAmbient = tslReference('color', lightingRigBindings.ambientRadiance);
   const rigSunDir = tslReference('vec3', lightingRigBindings.sunDirection);
   const rigExposure = tslReference('float', lightingRigBindings.exposure);
+  const rigSunElevationSin = tslReference('float', lightingRigBindings.sunElevationSin);
   // Card normal: the camera-facing impostor normal where present, else the
   // up-biased card normal (foliage cards lack true geometric normals).
   const cardNormal = tslSelect(normalMapEnabled, imposterNormal, tslVec3(0, 1, 0));
   const wrap = tslFloat(RIG_WRAP);
   const nl = tslMax(cardNormal.dot(rigSunDir), wrap.negate());
   const diff = nl.add(wrap).div(tslFloat(1).add(wrap));
-  const hemi = tslMix(rigGround, rigSky, tslFloat(0.5).add(cardNormal.y.mul(0.5)));
-  const rigLit = baseColor.mul(hemi.add(rigSun.mul(diff))).add(rigAmbient).mul(rigExposure);
+  // Hemisphere fill: an up-facing card lerps toward the sky, but trimmed below a
+  // pure-zenith pick (a real tuft integrates the whole hemisphere). Weight goes
+  // from 0.5 at a side-facing normal to FOLIAGE_HEMI_UP_SKY_WEIGHT straight up.
+  const hemiWeight = tslFloat(0.5).add(
+    cardNormal.y.mul(tslFloat(FOLIAGE_HEMI_UP_SKY_WEIGHT - 0.5)),
+  );
+  const hemi = tslMix(rigGround, rigSky, hemiWeight);
+  // Low-sun direct-term fade, keyed on the SAME sun-height driver terrain's
+  // horizon occlusion uses (sunDirection.y == sin elevation). Fades the foliage
+  // direct sun contribution toward a floor as the sun nears the horizon, so the
+  // up-biased card normal no longer over-catches the low warm sun (the Phase 1
+  // overshoot) while keeping a residual dusk contribution. Ambient + hemisphere
+  // fill are untouched. See FOLIAGE_LOW_SUN_FADE_* for the measured tuning.
+  const lowSunFade = tslFloat(FOLIAGE_LOW_SUN_FADE_FLOOR).add(
+    tslFloat(1 - FOLIAGE_LOW_SUN_FADE_FLOOR).mul(
+      smoothstep(
+        tslFloat(FOLIAGE_LOW_SUN_FADE_LO),
+        tslFloat(FOLIAGE_LOW_SUN_FADE_HI),
+        rigSunElevationSin,
+      ),
+    ),
+  );
+  const directSun = rigSun.mul(diff).mul(lowSunFade);
+  const rigLit = baseColor.mul(hemi.add(directSun)).add(rigAmbient).mul(rigExposure);
 
   return tslSelect(rigEnabled, rigLit, legacyLit);
 }

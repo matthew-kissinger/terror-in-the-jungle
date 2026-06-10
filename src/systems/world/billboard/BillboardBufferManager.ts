@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { Logger } from '../../../utils/Logger';
 import { createBillboardNodeMaterial, type BillboardNodeMaterial } from './BillboardNodeMaterial';
+import { isLightingRigEnabled, lightingRigBindings } from '../../environment/LightingRig';
 import type { BillboardLighting, GPUVegetationConfig } from './BillboardTypes';
 
 export type { BillboardLighting, GPUVegetationConfig } from './BillboardTypes';
@@ -261,7 +262,12 @@ export class GPUBillboardVegetation {
     // Enable height fog when scene has fog (use our custom height fog parameters)
     if (fog) {
       this.material.uniforms.fogEnabled.value = true;
-      this.material.uniforms.fogColor.value.copy(fog.color);
+      // Fog color authority: on the rig path read the single rig fog color
+      // (derived from the same horizon irradiance terrain/atmosphere fog uses)
+      // instead of the direct `scene.fog.color` read — the memo's parallel-fog
+      // flag (#2). Legacy path (flag OFF) keeps the direct read byte-identical.
+      const rigFogColor = isLightingRigEnabled() ? lightingRigBindings.fogColor.value : fog.color;
+      this.material.uniforms.fogColor.value.copy(rigFogColor);
       const sceneFogDensity = Number.isFinite(fog.density)
         ? fog.density
         : DEFAULT_BILLBOARD_FOG_DENSITY;

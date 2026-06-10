@@ -105,6 +105,52 @@ describe('LightingRig radiance is honest (uncompressed)', () => {
   });
 });
 
+describe('LightingRig shares the low-sun + fog terms the foliage branch reads', () => {
+  beforeEach(() => {
+    LightingRigConfig.enabled = false;
+  });
+
+  it('exposes the sun height so the foliage direct-sun term can fade with a low sun', () => {
+    // The unlit foliage card has no sloped normal or horizon ray-march, so the
+    // billboard rig branch fades its direct sun contribution using this term —
+    // the same sun-height driver terrain's horizon occlusion uses. Behaviour we
+    // depend on: the binding tracks the sun's up component (drops as the sun
+    // sinks toward and below the horizon).
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [1, 1, 1], zenith: [1, 1, 1], horizon: [1, 1, 1] });
+
+    deriveLightingRigState(backend, new THREE.Vector3(0, 1, 0), 1, state);
+    const highSun = lightingRigBindings.sunElevationSin.value;
+
+    deriveLightingRigState(backend, new THREE.Vector3(1, 0.18, 0).normalize(), 1, state);
+    const lowSun = lightingRigBindings.sunElevationSin.value;
+
+    deriveLightingRigState(backend, new THREE.Vector3(1, -0.2, 0).normalize(), 1, state);
+    const belowHorizon = lightingRigBindings.sunElevationSin.value;
+
+    expect(highSun).toBeGreaterThan(lowSun);
+    expect(lowSun).toBeGreaterThan(belowHorizon);
+    expect(belowHorizon).toBeLessThan(0);
+  });
+
+  it('publishes the rig fog color so the billboard buffer can drop its parallel fog read', () => {
+    // BillboardBufferManager reads scene.fog.color directly on the legacy path
+    // (a second fog authority). On the rig path it folds in this binding instead,
+    // so foliage fog tint comes from the same horizon source the rest of the
+    // scene fog derives from. Behaviour: the binding mirrors the rig fog color,
+    // and weather darkening drives it toward black like the state field.
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [1, 1, 1], zenith: [1, 1, 1], horizon: [0.8, 0.7, 0.6] });
+
+    deriveLightingRigState(backend, new THREE.Vector3(0, 0.5, 0), 1, state);
+    expect(lightingRigBindings.fogColor.value.r).toBeCloseTo(state.fogColor.r, 5);
+    expect(lightingRigBindings.fogColor.value.r).toBeGreaterThan(0);
+
+    deriveLightingRigState(backend, new THREE.Vector3(0, 0.5, 0), 0, state);
+    expect(lightingRigBindings.fogColor.value.r).toBeCloseTo(0, 5);
+  });
+});
+
 describe('LightingRig night floor + exposure track time of day', () => {
   beforeEach(() => {
     LightingRigConfig.enabled = false;
