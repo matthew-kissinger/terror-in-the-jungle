@@ -135,6 +135,31 @@ mean 0.86m — owner-walk item). NOTE: navmesh crowd was re-enabled 2026-05-18
 (steered direction) — older "crowd disabled" notes are stale.
 Briefs: `docs/tasks/archive/cycle-2026-06-09-terrain-fidelity-and-worker-safety/`.
 
+## Recently Completed (cycle-2026-06-09-deploy-weight-reduction)
+
+Phase 5 (FINAL) of [CAMPAIGN_2026-06-09-consultation-remediation](CAMPAIGN_2026-06-09-consultation-remediation.md)
+— campaign COMPLETE, 25/25 tasks merged across 5 phases. This cycle: 6/6 merged,
+fence untouched. settings-key-migration #356 ('pixelart-sandbox-settings' →
+'terror-in-the-jungle-settings' with read-old/write-new shim; audit found no
+other legacy keys), prune-prod-mockups #357 (build-only Vite plugin strips
+public/mockups from dist + dist-perf; files stay in git as reference; ~769KB),
+dedup-map-renderers #358 (shared `src/ui/map/MapProjection.ts`: north-up +
+player-centered transforms + faction palette across the 4 canvas renderers;
+deploy map inherits via OpenFrontierRespawnMapUtils), purge-water-remnants #359
+(setUnderwater/underwater overrides/a-shau-rivers required-pin/2 dead textures
+deleted; -195 LOC; capture scripts' 'underwater' shot kind now a no-op —
+follow-up), delete-orphan-modules #360 (terrain-nav APPROVE; Konveyer compute
+spike + generateChunk/'generate' branch deleted, -794 LOC; TankGunnerAdapter +
+NpcM2HBAdapter verified LIVE and kept — consultation orphan list was a lead,
+not a verdict; knip.ignore could NOT honestly shrink: every entry load-bearing),
+dedup-vehicle-adapters #361 (free-function helpers in VehicleAdapterShared.ts;
+-217 adapter LOC; zero test files touched — full suite as no-op proof).
+**Exit gate PASS:** dist 110.2→109.4 MB, knip:ci clean, no mockup routes,
+settings migration test-proven. Follow-ups: red-laterite.webp + sandy-beach.webp
+binaries still in public/assets (owner decision); two capture scripts call the
+removed setUnderwater inside browser closures (no-op, not type-coupled).
+Briefs: `docs/tasks/archive/cycle-2026-06-09-deploy-weight-reduction/`.
+
 ## Recently Completed Archive
 
 Detailed recently-completed cycle retrospectives moved to

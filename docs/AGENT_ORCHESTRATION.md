@@ -198,51 +198,34 @@ manifest file as usual.
 
 ## Current state
 
-**Active campaign:** [CAMPAIGN_2026-06-09-consultation-remediation.md](CAMPAIGN_2026-06-09-consultation-remediation.md)
-— large (5 sequenced cycles), `auto-advance: yes`, `posture: attended`,
-concurrency cap 5. Phase barriers are hard: a phase's exit gate (CI green +
-reviewer APPROVE on all merged tasks + the named acceptance) must pass before
-the next cycle's R1 dispatch. Campaign hard-stops are listed in the manifest.
-Phases 2-5 briefs are authored at each phase's open, not up front.
+**No active campaign.** The consultation-remediation campaign
+([CAMPAIGN_2026-06-09-consultation-remediation.md](CAMPAIGN_2026-06-09-consultation-remediation.md))
+completed 2026-06-09 — all 5 phases, 25/25 tasks merged (#337-#361), zero fence
+changes, zero hard-stops. Next: owner playtest sweep
+([PLAYTEST_PENDING](PLAYTEST_PENDING.md) rows for phases 2-4 + standing
+deferrals).
 
 Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Cycle:** `cycle-2026-06-09-deploy-weight-reduction` — Phase 5 (final) of
-  the consultation-remediation campaign. Mostly deletion in disjoint areas:
-  prod mockup routes, unreachable water-era code, verified orphan modules,
-  the legacy localStorage settings key, and the adapter/map-renderer dedups
-  that waited for Phases 2/4 to stabilize their targets. Deletion tasks may
-  exceed the 400-net rule per the runbook's retired-code exception.
+- **Cycle:** (none — closed `cycle-2026-06-09-deploy-weight-reduction` on
+  2026-06-09, the final phase of the consultation-remediation campaign:
+  6/6 merged (#356-#361), exit gate PASS — dist 110.2→109.4 MB, knip:ci clean,
+  no mockup routes, settings key migrated with shim. Campaign total: 25 tasks /
+  25 PRs across 5 phases, zero fence changes, zero hard-stops.)
 - **Previous:** Phase 4 `cycle-2026-06-09-terrain-fidelity-and-worker-safety`
-  closed 2026-06-09 — 4/4 merged (#352-#355), stall-tail premise confirmed +
-  fixed, mid-phase checkpoint showed the stall-warning storm gone. See
-  BACKLOG "Recently Completed".
-- **Next:** campaign close — final summary, carry-over reconciliation,
-  combat-movement-stall-tail retirement assessment, owner playtest sweep
-  handoff (PLAYTEST_PENDING has one row per phase 2-5).
+  (stall-tail premise confirmed + fixed). Full per-phase records in BACKLOG
+  "Recently Completed" sections.
+- **Next:** owner playtest sweep ([PLAYTEST_PENDING](PLAYTEST_PENDING.md));
+  candidate follow-ups from reviewer notes are listed in the per-phase BACKLOG
+  entries (notably: lift GPU surface grid to 1024 for CPU↔render coherence,
+  NPC tank cannon wiring, owner-display/resupply isBlufor sweep,
+  combat-movement-stall-tail retirement after the owner's A Shau walk).
 
 ### Tasks (DAG)
 
-| slug | brief | deps | reviewer |
-|---|---|---|---|
-| prune-prod-mockups | [docs/tasks/prune-prod-mockups.md](tasks/prune-prod-mockups.md) | (root; deletion) | — |
-| purge-water-remnants | [docs/tasks/purge-water-remnants.md](tasks/purge-water-remnants.md) | (root; deletion) | — |
-| delete-orphan-modules | [docs/tasks/delete-orphan-modules.md](tasks/delete-orphan-modules.md) | (root; deletion) | — |
-| settings-key-migration | [docs/tasks/settings-key-migration.md](tasks/settings-key-migration.md) | (root) | — |
-| dedup-map-renderers | [docs/tasks/dedup-map-renderers.md](tasks/dedup-map-renderers.md) | (root) | — |
-| dedup-vehicle-adapters | [docs/tasks/dedup-vehicle-adapters.md](tasks/dedup-vehicle-adapters.md) | delete-orphan-modules (surviving adapter set must be known) | — |
-
-Round 1: prune-prod-mockups, purge-water-remnants, delete-orphan-modules,
-settings-key-migration, dedup-map-renderers (5 parallel — at cap).
-Round 2: dedup-vehicle-adapters (after delete-orphan-modules merges).
-Merge note: prune-prod-mockups and delete-orphan-modules both edit
-package.json knip.ignore — serialize their merges (second rebases).
-
-**Phase 5 exit gate:** dist/ size measurably down from the 110.2 MB open
-baseline; `knip:ci` clean with a smaller ignore list; no mockup routes in
-prod; user settings survive the key migration.
+(Empty — populate when the next cycle opens.)
 
 ## Dispatch protocol
 

@@ -6,16 +6,21 @@
 > **Posture:** attended (NOT autonomous-loop — these cycles touch combat/terrain/vehicle
 > hot paths; owner wants eyes on perf deltas between phases)
 > **Concurrency cap:** 5
-> **Status:** Phase 5 open (`cycle-2026-06-09-deploy-weight-reduction`)
+> **Status:** **CAMPAIGN COMPLETE — all 5 phases closed 2026-06-09, 25/25 tasks
+> merged (#337-#361), zero fence changes, zero hard-stops fired.** Remaining:
+> owner playtest sweep (one PLAYTEST_PENDING row per phase 2-4 + the standing
+> vehicle/UI deferrals).
 >
-> **Progress:** ✅ 1 weapon-input-and-gate-hardening (4/4: #337 #338 #339 #340) ·
-> ✅ 2 vehicle-occupancy-truth (5/5: #341 #342 #343 #344 #345, live proof 11/11 PASS) ·
+> **Progress:** ✅ 1 weapon-input-and-gate-hardening (4/4: #337-#340; four CI
+> gates now blocking) ·
+> ✅ 2 vehicle-occupancy-truth (5/5: #341-#345, live proof 11/11 PASS) ·
 > ✅ 3 combat-death-and-alliance (6/6: #346-#351; exit gate PASS — combat120 p99
 > 50.6→~31ms vs Phase 2 close) ·
 > ✅ 4 terrain-fidelity-and-worker-safety (4/4: #352-#355; stall-tail premise
 > CONFIRMED + fixed — contour flips ~9x down, stall-warning storm gone at the
-> mid-phase checkpoint; closed 2026-06-09) ·
-> ▶ 5 deploy-weight-reduction (dist baseline at open: 110.2 MB)
+> mid-phase checkpoint) ·
+> ✅ 5 deploy-weight-reduction (6/6: #356-#361; dist 110.2→109.4 MB, knip clean,
+> -1,200+ LOC dead code, settings migrated)
 
 Source: 2026-06-09 full-codebase consultation review. Each phase is one cycle.
 **Phase barriers are hard:** a phase's exit gate (CI green + reviewer APPROVE on all
