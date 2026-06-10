@@ -24,10 +24,10 @@ review checklist items included.
    dawn terrain ≤ 0.85; all TODs measurable), exits nonzero on failure,
    writes a JSON verdict artifact. Tolerances live as named constants with
    the memo reference.
-3. `npm run check:tod-coherence` wires it; document in the deploy checklist
-   as a pre-deploy step (NOT a blocking CI job — headless GPU sweeps are
-   ~5min and CI GPU runners are starvation-prone per STABILIZAT-1; record
-   that decision in the script header).
+3. A new package script (name it check:tod-coherence) wires it; document in
+   the deploy checklist as a pre-deploy step (NOT a blocking CI job —
+   headless GPU sweeps are ~5min and CI GPU runners are starvation-prone
+   per STABILIZAT-1; record that decision in the script header).
 4. Run the gate; paste the verdict. If the NPC row fails the band with the
    shared constants, flag it with numbers (per-faction parity re-validation
    is the deletion task's tuning surface) — do not loosen tolerances.

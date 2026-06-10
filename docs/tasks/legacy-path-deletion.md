@@ -35,7 +35,8 @@ for PRs #368 #371 #376 #378.
    single runtime kill-switch (documented) for one release.
 2. Delete every item on the memo §4 list + reviewer checklist; the
    terrain→environment binding import stays (documented coupling).
-3. Re-run `npm run check:tod-coherence` (the gate) — green required.
+3. Re-run the coherence gate (the check:tod-coherence package script the
+   gate task added) — green required.
 4. Run a combat120 perf capture; p99 within ±5% of the pre-flip baseline.
 5. Visual evidence: 4-TOD capture set (dawn/noon/dusk/midnight) attached
    paths in the PR for the owner acceptance walk.
