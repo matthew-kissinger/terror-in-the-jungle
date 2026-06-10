@@ -10,14 +10,13 @@
 > **Posture:** attended at phase boundaries (gunnery/sight feel is subjective;
 > reticle correctness is verifiable but reticle *feel* is the owner's call)
 > **Concurrency cap:** 5
-> **Status:** Phase 1 `cycle-2026-06-09-ground-gunnery-craft` **COMPLETE
-> 2026-06-09** (5/5: #362 #364 #366 #367 #369). Phase 2
-> `cycle-2026-06-09-fixed-wing-craft` **COMPLETE 2026-06-10** (3/3: #370
-> gunsight+ammo, #372 per-airframe ordnance incl. AC-47 broadside, #373
-> camera fit + broadside view). Both exit feel-walks deferred to
-> PLAYTEST_PENDING rows under the owner's 2026-06-09 `/goal`. Phase 3
-> (helicopter) in flight. Running interleaved with the lighting-rig
-> campaign (disjoint layers).
+> **Status:** **CAMPAIGN COMPLETE 2026-06-10 — all 3 phases, 11 PRs, zero
+> fence changes.** Phase 1 ground-gunnery (5/5: #362 #364 #366 #367 #369),
+> Phase 2 fixed-wing (3/3: #370 #372 #373), Phase 3 helicopter (3/3: #374
+> #375 #377). Every craft family now has a real sight, weapon-state HUD,
+> fitting camera, and distinct ordnance; NPC tanks return cannon fire.
+> Remaining: the three owner exit feel-walks (one PLAYTEST_PENDING row per
+> phase) deferred under the owner's 2026-06-09 `/goal`.
 
 Source: 2026-06-09 owner direction — "all the HUD and crosshairs and cameras
 and controllers and combat need to start being specialized by craft — none of

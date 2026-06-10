@@ -44,6 +44,24 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-09-helicopter-craft)
+
+Phase 3 (final) of [CAMPAIGN_2026-06-09-craft-specialization](CAMPAIGN_2026-06-09-craft-specialization.md)
+— **campaign COMPLETE: 3 phases, 11 PRs, zero fence changes.** 3/3 merged:
+door-gun-seat #374 (player-crewable UH1C door gun — pilot↔door_gun toggle on a
+heli-mode F binding [the factory seat machinery is flight-gated], arc-clamped
+aim, fire through the existing hitscan path, AI auto-fire suspended while the
+player crews, `door_gun` reticle), gunship-reticle-upgrade #375 (Cobra
+CCIP-lite rocket-fall cue from existing ballistics, per-weapon reticle
+prominence, live weapon/ammo HUD; added the fence-clean GameRenderer
+crosshair-passthrough seam), heli-hud-consolidation #377 (per-variant
+HELI_VARIANT_DESCRIPTORS panel table retiring role duck-typing, door-side
+gunner POV with leak-proof restore, traverse-stop reticle ticks wired for
+door_gun + emplacement_mg). Follow-ups: gunship MANNED/AI crew badge needs a
+fenced IHUDSystem method (deliberately dropped); door-gun belt panel reuses
+the fenced weapon-status path. Owner feel-walk row in PLAYTEST_PENDING.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-helicopter-craft/`.
+
 ## Recently Completed (cycle-2026-06-09-fixed-wing-craft)
 
 Phase 2 of [CAMPAIGN_2026-06-09-craft-specialization](CAMPAIGN_2026-06-09-craft-specialization.md).
