@@ -616,6 +616,15 @@ function buildSeatedWeaponLifecycle(args: {
     }
     if (adapter instanceof EmplacementPlayerAdapter && m2hbEmplacementSystem) {
       m2hbEmplacementSystem.attachPlayerAdapter(vehicleId, adapter);
+      // Mount the FJ belt/traverse panel (m2hb-gun-experience): inject the HUD
+      // root + the read-only weapon binding so the panel can show the live
+      // belt count. The host is resolved lazily from the live DOM here (the
+      // HUD root is present once the in-game HUD has mounted); when it is
+      // absent — headless / tests — the adapter stays panel-less and safe.
+      const host = typeof document !== 'undefined'
+        ? document.getElementById('game-hud-root')
+        : null;
+      adapter.setHudPanelHost(host, m2hbEmplacementSystem.getWeapon(vehicleId));
     }
   };
 
@@ -627,6 +636,10 @@ function buildSeatedWeaponLifecycle(args: {
     }
     if (adapter instanceof EmplacementPlayerAdapter && m2hbEmplacementSystem) {
       m2hbEmplacementSystem.detachPlayerAdapter(vehicleId, adapter);
+      // Drop the panel host + weapon ref so the panel tears down on dismount
+      // (the adapter's onExit unmounts it; clearing the host keeps a re-board
+      // from re-mounting into a stale host).
+      adapter.setHudPanelHost(null, null);
     }
   };
 

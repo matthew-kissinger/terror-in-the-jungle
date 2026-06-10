@@ -14,6 +14,8 @@ import type {
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 import type { Emplacement } from './Emplacement';
+import type { M2HBWeapon } from '../combat/weapons/M2HBWeapon';
+import { EmplacementGunPanel, type TraverseStop } from '../../ui/hud/EmplacementGunPanel';
 import {
   clearFlightBookkeeping,
   relockPointer,
@@ -28,6 +30,19 @@ const TOUCH_AIM_SENSITIVITY = 1.6; // radians/sec at full deflection
 const DEFAULT_EXIT_OFFSET_M = 1.8; // metres to the +X side of mount on dismount fallback
 const DEFAULT_CAMERA_FORWARD_OFFSET = 0.15; // metres ahead of mount along barrel
 const DEFAULT_CAMERA_UP_OFFSET = 0.05; // metres above mount (eye-line on sights)
+
+// ── Fire-feel tuning ──
+// Visual-only camera recoil: the eye pulls back along the barrel by a fraction
+// of the weapon's live recoil offset, and the look-target lifts a touch, so a
+// burst reads as muzzle climb without touching the aim solution (no gameplay
+// punch). The weapon already decays its recoil; we just read it.
+const CAMERA_RECOIL_PULLBACK = 0.6; // fraction of weapon recoilOffsetM pulled into the eye
+const CAMERA_RECOIL_CLIMB = 0.5; // fraction of weapon recoilOffsetM lifted into the look-target
+
+// A barrel within this many radians of a hard limit reads as "at the stop" for
+// the traverse cue. Small enough that it only fires when the gunner is actually
+// pinned against the mechanical envelope, not merely near it.
+const TRAVERSE_STOP_EPSILON = 0.5 * (Math.PI / 180); // 0.5 degrees
 
 function createEmplacementUIContext(): VehicleUIContext {
   return {
@@ -90,8 +105,50 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
   private mounted = false;
   private fireRequested = false;
 
+  // Craft-specific FJ gunner panel (belt counter + traverse cue). Owned +
+  // lifecycle-driven here: mounted into `panelHost` on seat entry, unmounted on
+  // exit. `panelHost` is the HUD root the composer injects via
+  // `setHudPanelHost`; when absent (test doubles, headless) the panel is never
+  // constructed. Lazy (not a field initializer) so a headless adapter never
+  // touches `document` via UIComponent. `weapon` is the read-only M2HB binding
+  // the composer hands in so the panel can show the live belt — display only,
+  // the adapter never mutates ammo.
+  private panel: EmplacementGunPanel | null = null;
+  private panelHost: HTMLElement | null = null;
+  private weapon: M2HBWeapon | null = null;
+
+  // Current traverse stop the barrel is pinned against (null = has travel).
+  private traverseStop: TraverseStop | null = null;
+
   constructor(model: Emplacement) {
     this.model = model;
+  }
+
+  /**
+   * Inject the DOM host the gunner panel mounts into (the in-game HUD root)
+   * plus the read-only M2HB weapon binding that drives the belt readout. The
+   * composer wires both on board; tests pass a fake host + weapon. Both are
+   * optional so the adapter stays headless-safe — same shape as
+   * `TankGunnerAdapter.setHudPanelHost`.
+   */
+  setHudPanelHost(host: HTMLElement | null, weapon?: M2HBWeapon | null): void {
+    this.panelHost = host;
+    if (weapon !== undefined) this.weapon = weapon;
+  }
+
+  /**
+   * The gunner panel instance, lazily constructed on first access (so it is
+   * created only in an environment with a DOM). Exposed for the composer +
+   * tests.
+   */
+  getPanel(): EmplacementGunPanel {
+    if (!this.panel) this.panel = new EmplacementGunPanel();
+    return this.panel;
+  }
+
+  /** The traverse stop the barrel is currently pinned against (null = none). */
+  getTraverseStop(): TraverseStop | null {
+    return this.traverseStop;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -116,9 +173,13 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(createEmplacementUIContext());
 
-    // Open MG cross reticle for the M2HB. The R2 `m2hb-gun-experience`
-    // task refines it with belt/ammo state.
+    // Open MG cross reticle (open-center cross + wide wings) for the M2HB.
     setCrosshairMode(ctx.gameRenderer, 'emplacement_mg');
+
+    // Mount the FJ belt/traverse panel into the HUD root and seed it from the
+    // live belt (clears any stale traverse cue from the prior session).
+    this.traverseStop = null;
+    this.mountPanel();
 
     relockPointer(ctx.input);
   }
@@ -133,6 +194,10 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.setVehicleContext?.(null);
 
     setInfantryCrosshair(ctx.gameRenderer);
+
+    // Tear down the gunner panel so it doesn't linger over the infantry HUD.
+    this.traverseStop = null;
+    this.unmountPanel();
 
     this.mounted = false;
     this.resetControlState();
@@ -162,6 +227,8 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
 
     this.readAimInput(ctx.input, ctx.deltaTime);
     this.readFireInput(ctx.input);
+    this.refreshTraverseStop();
+    this.refreshPanel();
   }
 
   /**
@@ -237,7 +304,21 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     outPosition.y += this.cameraUpOffset;
     outPosition.addScaledVector(_scratchForward, this.cameraForwardOffset);
 
+    // Fire feel: a subtle, visual-only camera recoil. The weapon already
+    // tracks a per-shot recoil offset that kicks on fire and decays; we read
+    // it (never write) and pull the eye back along the barrel + lift the
+    // look-target a touch so a burst reads as muzzle climb. This does NOT move
+    // the aim solution — the barrel forward (and therefore where rounds go) is
+    // unchanged; only the camera pose shifts.
+    const recoil = this.weapon ? this.weapon.getRecoilOffsetM() : 0;
+    if (recoil > 0) {
+      outPosition.addScaledVector(_scratchForward, -recoil * CAMERA_RECOIL_PULLBACK);
+    }
+
     outLookTarget.copy(outPosition).addScaledVector(_scratchForward, 1);
+    if (recoil > 0) {
+      outLookTarget.y += recoil * CAMERA_RECOIL_CLIMB;
+    }
     return true;
   }
 
@@ -294,5 +375,68 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     // the trigger is down.
     const fire = input.isMouseButtonPressed(0) || input.isKeyPressed('space');
     if (fire) this.fireRequested = true;
+  }
+
+  // ── Traverse-stop feedback ───────────────────────────────────────────────────
+
+  /**
+   * Decide whether the barrel is pinned against a mechanical stop, and which
+   * one, so the reticle + panel can cue it. The Emplacement clamps its target
+   * aim to the pitch (and optional yaw) envelope, so a target that the gunner
+   * is still pushing past the clamped value means "at the stop". We compare the
+   * gunner's intent (the raw target the input layer set, recoverable from the
+   * clamped target sitting on a limit) against the hard limits within a small
+   * epsilon. Pitch limits always exist (M2HB elevation envelope); yaw limits
+   * exist only for limited-arc sandbag emplacements (360° tripods never stop).
+   */
+  private refreshTraverseStop(): void {
+    const target = this.model.getTargetAim();
+    const pitchLimits = this.model.getPitchLimits();
+    const yawLimits = this.model.getYawLimits();
+
+    let stop: TraverseStop | null = null;
+
+    // Pitch: barrel pinned at the elevation/depression stop.
+    if (target.pitch >= pitchLimits.max - TRAVERSE_STOP_EPSILON) {
+      stop = 'up';
+    } else if (target.pitch <= pitchLimits.min + TRAVERSE_STOP_EPSILON) {
+      stop = 'down';
+    }
+
+    // Yaw: only limited-arc emplacements stop. Pitch stops take precedence in
+    // the single-edge cue (the gunner most often hits the elevation stop on a
+    // .50 cal), so only consider yaw when pitch is mid-travel.
+    if (!stop && yawLimits) {
+      if (target.yaw >= yawLimits.max - TRAVERSE_STOP_EPSILON) {
+        // +yaw is to the gunner's left in our convention (yaw CCW around Y).
+        stop = 'left';
+      } else if (target.yaw <= yawLimits.min + TRAVERSE_STOP_EPSILON) {
+        stop = 'right';
+      }
+    }
+
+    this.traverseStop = stop;
+  }
+
+  // ── Gunner panel plumbing ────────────────────────────────────────────────────
+
+  private mountPanel(): void {
+    if (!this.panelHost) return;
+    const panel = this.getPanel();
+    if (!panel.mounted) panel.mount(this.panelHost);
+    this.refreshPanel();
+  }
+
+  private unmountPanel(): void {
+    if (this.panel?.mounted) this.panel.unmount();
+  }
+
+  /** Push the live belt count + traverse cue into the FJ gunner panel. */
+  private refreshPanel(): void {
+    if (!this.panel?.mounted) return;
+    if (this.weapon) {
+      this.panel.setBelt(this.weapon.getAmmo(), this.weapon.ammoMax);
+    }
+    this.panel.setTraverseStop(this.traverseStop);
   }
 }

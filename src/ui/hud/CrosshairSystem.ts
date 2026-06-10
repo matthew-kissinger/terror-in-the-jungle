@@ -13,8 +13,10 @@
  *   emplacement_mg       - open MG cross (M2HB tripod / vehicle mount)
  *
  * The tank_gunner reticle is a real stadia sight (R2 tank-gunner-sight); the
- * emplacement_mg reticle is still placeholder geometry refined by the sibling
- * m2hb-gun-experience task. The stadia / drop ticks are static markings — no
+ * emplacement_mg reticle is a real heavy-MG sight (R2 m2hb-gun-experience):
+ * an open-center cross with wide horizontal wings (the classic ladder-less
+ * .50-cal sight picture) plus four edge ticks that light when the barrel pins
+ * against a traverse stop. The stadia / drop ticks are static markings — no
  * live ballistic computation is drawn into them.
  */
 
@@ -30,11 +32,20 @@ export type CrosshairMode =
   | 'tank_gunner'
   | 'emplacement_mg';
 
+/**
+ * Which mechanical traverse stop the emplacement barrel is pinned against, or
+ * `null` when it has travel in every direction. Drives the MG reticle's edge
+ * ticks so the gunner sees the swing weight running out of travel.
+ */
+export type TraverseStopDir = 'left' | 'right' | 'up' | 'down' | null;
+
 export class CrosshairSystem extends UIComponent {
   private mode = this.signal<CrosshairMode>('infantry');
   private spreadRadius = this.signal(15);
   private isVisible = this.signal(true);
   private pipperIconsLoaded = false;
+  /** Active traverse stop for the emplacement_mg reticle (null = no stop). */
+  private traverseStop = this.signal<TraverseStopDir>(null);
 
   protected build(): void {
     this.root.className = styles.container;
@@ -77,11 +88,19 @@ export class CrosshairSystem extends UIComponent {
         <div class="${styles.dropTick} ${styles.drop3}"></div>
       </div>
       <div data-ref="emplacementMg" class="${styles.mgReticle}" style="display:none">
+        <!-- Open-center cross: short vertical posts above/below the bore. -->
         <div class="${styles.mgLine} ${styles.mgLineTop}"></div>
         <div class="${styles.mgLine} ${styles.mgLineBottom}"></div>
-        <div class="${styles.mgLine} ${styles.mgLineLeft}"></div>
-        <div class="${styles.mgLine} ${styles.mgLineRight}"></div>
+        <!-- Wide horizontal wings — the classic ladder-less .50-cal sight: two
+             long bars reaching out to either side, with a gap at the bore. -->
+        <div class="${styles.mgWing} ${styles.mgWingLeft}"></div>
+        <div class="${styles.mgWing} ${styles.mgWingRight}"></div>
         <div class="${styles.mgDot}"></div>
+        <!-- Edge ticks: light when the barrel pins against a traverse stop. -->
+        <div data-ref="mgStopUp" class="${styles.mgStop} ${styles.mgStopUp}"></div>
+        <div data-ref="mgStopDown" class="${styles.mgStop} ${styles.mgStopDown}"></div>
+        <div data-ref="mgStopLeft" class="${styles.mgStop} ${styles.mgStopLeft}"></div>
+        <div data-ref="mgStopRight" class="${styles.mgStop} ${styles.mgStopRight}"></div>
       </div>
     `;
   }
@@ -141,6 +160,21 @@ export class CrosshairSystem extends UIComponent {
       ring.style.width = `${diameter}px`;
       ring.style.height = `${diameter}px`;
     });
+
+    // Effect: emplacement traverse-stop edge ticks — exactly one edge lit (or
+    // none). Lighting the matching tick is the visual stop cue; the panel
+    // mirrors it with a label.
+    this.effect(() => {
+      const stop = this.traverseStop.value;
+      const up = this.$('[data-ref="mgStopUp"]');
+      const down = this.$('[data-ref="mgStopDown"]');
+      const left = this.$('[data-ref="mgStopLeft"]');
+      const right = this.$('[data-ref="mgStopRight"]');
+      up?.classList.toggle(styles.mgStopActive, stop === 'up');
+      down?.classList.toggle(styles.mgStopActive, stop === 'down');
+      left?.classList.toggle(styles.mgStopActive, stop === 'left');
+      right?.classList.toggle(styles.mgStopActive, stop === 'right');
+    });
   }
 
   // --- Public API (backward-compatible with CrosshairUI) ---
@@ -171,6 +205,20 @@ export class CrosshairSystem extends UIComponent {
 
   setSpread(radius: number): void {
     this.spreadRadius.value = Math.max(0, radius);
+  }
+
+  /**
+   * Light the emplacement_mg reticle's edge tick for the traverse stop the
+   * barrel is pinned against, or clear it with `null`. Only the emplacement_mg
+   * reticle shows these ticks; the call is a harmless no-op in other modes.
+   * Driven each frame by `EmplacementPlayerAdapter`.
+   */
+  setTraverseStop(stop: TraverseStopDir): void {
+    this.traverseStop.value = stop;
+  }
+
+  getTraverseStop(): TraverseStopDir {
+    return this.traverseStop.value;
   }
 
   private loadPipperIcons(): void {
