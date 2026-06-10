@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import type { HelicopterControls } from '../helicopter/HelicopterPhysics';
 import type { IHelicopterModel, IHUDSystem } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
-import type { PlayerCamera } from '../player/PlayerCamera';
 import type {
   PlayerVehicleAdapter,
   VehicleExitOptions,
@@ -15,6 +14,15 @@ import type {
 } from './PlayerVehicleAdapter';
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
+import {
+  getFlightMouseControlEnabled,
+  getTouchFlightCyclicInput,
+  isTouchFlightMode,
+  relockPointer,
+  seatPlayer,
+  setFlightVehicleInputState,
+  setInputContext,
+} from './VehicleAdapterShared';
 
 // ── Helicopter control tuning ──
 const HELI_AUTOHOVER_TARGET = 0.4;
@@ -74,20 +82,16 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     this.resetControlState();
     this.activeHelicopterId = ctx.vehicleId;
 
-    ctx.playerState.velocity.set(0, 0, 0);
-    ctx.playerState.isRunning = false;
-    ctx.setPosition(ctx.position, 'helicopter.enter');
+    seatPlayer(ctx, 'helicopter.enter');
 
-    this.setFlightVehicleInputState(ctx.input, 'helicopter');
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('helicopter');
-    }
+    setFlightVehicleInputState(ctx.input, 'helicopter');
+    setInputContext(ctx.input, 'helicopter');
     ctx.cameraController.saveInfantryAngles();
     ctx.cameraController.setFlightMouseControlEnabled(true);
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.showHelicopterMouseIndicator();
-    hudSystem?.updateHelicopterMouseMode(this.getFlightMouseControlEnabled(ctx.cameraController));
+    hudSystem?.updateHelicopterMouseMode(getFlightMouseControlEnabled(ctx.cameraController));
     hudSystem?.showHelicopterInstruments();
 
     const role = this.helicopterModel.getAircraftRole(ctx.vehicleId);
@@ -95,9 +99,7 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.setHelicopterAircraftRole(role);
 
     // Re-acquire pointer lock for mouse flight controls
-    if (typeof ctx.input.relockPointer === 'function') {
-      ctx.input.relockPointer();
-    }
+    relockPointer(ctx.input);
 
     if (ctx.gameRenderer) {
       const crosshairMode = role === 'attack'
@@ -111,10 +113,8 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
 
   onExit(ctx: VehicleTransitionContext): void {
     ctx.setPosition(ctx.position, 'helicopter.exit');
-    this.setFlightVehicleInputState(ctx.input, 'none');
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    setFlightVehicleInputState(ctx.input, 'none');
+    setInputContext(ctx.input, 'gameplay');
     ctx.cameraController?.restoreInfantryAngles();
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
@@ -145,10 +145,10 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     if (!this.activeHelicopterId) return;
 
     let mouseMovement: { x: number; y: number } | undefined;
-    const touchFlight = this.isTouchFlightMode(ctx.input);
+    const touchFlight = isTouchFlightMode(ctx.input);
     if (
       !touchFlight
-      && this.getFlightMouseControlEnabled(ctx.cameraController)
+      && getFlightMouseControlEnabled(ctx.cameraController)
       && ctx.input.getIsPointerLocked()
     ) {
       mouseMovement = ctx.input.getMouseMovement();
@@ -203,7 +203,7 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?: IHUDSystem,
     mouseMovement?: { x: number; y: number },
   ): void {
-    const hasTouchHeliMode = this.isTouchFlightMode(input);
+    const hasTouchHeliMode = isTouchFlightMode(input);
 
     // --- Collective (vertical thrust) ---
     if (hasTouchHeliMode) {
@@ -238,7 +238,7 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     }
 
     // --- Cyclic Pitch/Roll ---
-    const touchCyclic = this.getTouchFlightCyclicInput(input);
+    const touchCyclic = getTouchFlightCyclicInput(input);
     const hasTouchCyclic = Math.abs(touchCyclic.pitch) > HELI_TOUCH_CYCLIC_DEADZONE || Math.abs(touchCyclic.roll) > HELI_TOUCH_CYCLIC_DEADZONE;
 
     if (hasTouchCyclic) {
@@ -295,38 +295,5 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
       this.helicopterControls.cyclicPitch - mouseMovement.y * sensitivity,
       -1.0, 1.0,
     );
-  }
-
-  // ── Input helpers (mirrors PlayerVehicleController helpers) ──
-
-  private setFlightVehicleInputState(input: PlayerInput, mode: 'none' | 'helicopter' | 'plane'): void {
-    if (typeof input.setFlightVehicleMode === 'function') {
-      input.setFlightVehicleMode(mode);
-      return;
-    }
-    input.setInHelicopter(mode !== 'none');
-  }
-
-  private getFlightMouseControlEnabled(cameraController: PlayerCamera): boolean {
-    if (typeof cameraController.getFlightMouseControlEnabled === 'function') {
-      return cameraController.getFlightMouseControlEnabled();
-    }
-    return cameraController.getHelicopterMouseControlEnabled();
-  }
-
-  private isTouchFlightMode(input: PlayerInput): boolean {
-    const touchControls = input.getTouchControls?.();
-    if (!touchControls) return false;
-    if (typeof touchControls.isInFlightMode === 'function') {
-      return touchControls.isInFlightMode();
-    }
-    return touchControls.isInHelicopterMode();
-  }
-
-  private getTouchFlightCyclicInput(input: PlayerInput): { pitch: number; roll: number } {
-    if (typeof input.getTouchFlightCyclicInput === 'function') {
-      return input.getTouchFlightCyclicInput();
-    }
-    return input.getTouchCyclicInput();
   }
 }

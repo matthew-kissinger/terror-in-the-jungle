@@ -14,6 +14,11 @@ import type {
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
 import type { Emplacement } from './Emplacement';
+import {
+  clearFlightBookkeeping,
+  relockPointer,
+  setInfantryCrosshair,
+} from './VehicleAdapterShared';
 
 // ── Emplacement aim / camera tuning ──
 const MOUSE_AIM_SENSITIVITY = 0.0022; // radians per mouse-pixel (yaw + pitch)
@@ -102,14 +107,7 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
 
     // Emplacement is a ground-mounted system — clear any leftover flight
     // bookkeeping the same way the ground-vehicle adapter does.
-    if (typeof ctx.input.setFlightVehicleMode === 'function') {
-      ctx.input.setFlightVehicleMode('none');
-    } else {
-      ctx.input.setInHelicopter(false);
-    }
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    clearFlightBookkeeping(ctx.input);
 
     // Save infantry look angles so the camera restores cleanly on dismount.
     ctx.cameraController.saveInfantryAngles();
@@ -117,34 +115,21 @@ export class EmplacementPlayerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(createEmplacementUIContext());
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
-    if (typeof ctx.input.relockPointer === 'function') {
-      ctx.input.relockPointer();
-    }
+    relockPointer(ctx.input);
   }
 
   onExit(ctx: VehicleTransitionContext): void {
     ctx.setPosition(ctx.position, 'emplacement.exit');
 
-    if (typeof ctx.input.setFlightVehicleMode === 'function') {
-      ctx.input.setFlightVehicleMode('none');
-    } else {
-      ctx.input.setInHelicopter(false);
-    }
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    clearFlightBookkeeping(ctx.input);
     ctx.cameraController?.restoreInfantryAngles();
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(null);
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     this.mounted = false;
     this.resetControlState();

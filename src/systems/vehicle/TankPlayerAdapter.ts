@@ -16,9 +16,16 @@ import type { VehicleUIContext } from '../../ui/layout/types';
 import type { SeatRole } from './IVehicle';
 import type { Tank } from './Tank';
 import type { Faction } from '../combat/types';
+import {
+  clearFlightBookkeeping,
+  readLateralAxis,
+  readThrottleAxis,
+  relockPointer,
+  seatPlayer,
+  setInfantryCrosshair,
+} from './VehicleAdapterShared';
 
 // ── Tank chassis control tuning ──
-const TOUCH_DEADZONE = 0.1;
 const DEFAULT_EXIT_SIDE_OFFSET_M = 3.0; // metres to the +X side of chassis on dismount fallback
 
 // ── Turret aim tuning (gunner seat) ──
@@ -224,13 +231,11 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     this.lastShotMs = Number.NEGATIVE_INFINITY;
 
     // Player out of infantry motion, snapped onto the crew station.
-    ctx.playerState.velocity.set(0, 0, 0);
-    ctx.playerState.isRunning = false;
-    ctx.setPosition(ctx.position, this.enterReason());
+    seatPlayer(ctx, this.enterReason());
 
     // Tanks are ground vehicles — clear any leftover flight bookkeeping
     // (same defensive pattern the jeep adapter uses).
-    this.clearFlightBookkeeping(ctx.input);
+    clearFlightBookkeeping(ctx.input);
 
     // Save infantry look angles so the camera restores cleanly on exit.
     ctx.cameraController.saveInfantryAngles();
@@ -241,20 +246,16 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
 
     this.applyHudContext(ctx.hudSystem);
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     // Re-acquire pointer lock so mouse-look / turret aim keeps working.
-    if (typeof ctx.input.relockPointer === 'function') {
-      ctx.input.relockPointer();
-    }
+    relockPointer(ctx.input);
   }
 
   onExit(ctx: VehicleTransitionContext): void {
     ctx.setPosition(ctx.position, this.exitReason());
 
-    this.clearFlightBookkeeping(ctx.input);
+    clearFlightBookkeeping(ctx.input);
     // Re-attach first-person before restoring infantry angles so the next
     // updateCamera frame uses the infantry path, not the stale follow-cam.
     ctx.cameraController?.setVehicleFollowCamera?.(null);
@@ -263,9 +264,7 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(null);
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     // Park the chassis: zero the driver inputs so the tank coasts to a
     // stop under the physics layer's drag rather than carrying the
@@ -474,40 +473,14 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   }
 
   private readDriverInputs(input: PlayerInput): void {
-    const touch = input.getTouchControls?.();
-    const hasTouch = !!touch;
-
-    // --- Throttle axis (W = +1, S = -1) ---
-    let throttle = 0;
-    if (hasTouch) {
-      const move = input.getTouchMovementVector();
-      if (Math.abs(move.z) > TOUCH_DEADZONE) {
-        // Touch joystick: -z is forward (matches helicopter / jeep convention).
-        throttle = THREE.MathUtils.clamp(-move.z, -1, 1);
-      }
-    } else if (input.isKeyPressed('keyw')) {
-      throttle = 1;
-    } else if (input.isKeyPressed('keys')) {
-      throttle = -1;
-    }
-    this.controls.throttleAxis = throttle;
+    // --- Throttle axis (W = +1, S = -1; touch -z forward) ---
+    this.controls.throttleAxis = readThrottleAxis(input);
 
     // --- Turn axis (D = +1, A = -1) — track-differential, NOT a steer angle ---
     // TrackedVehiclePhysics composes left/right track commands as:
     //   leftCmd  = clamp(throttle - turn, -1, +1)
     //   rightCmd = clamp(throttle + turn, -1, +1)
-    let turn = 0;
-    if (hasTouch) {
-      const move = input.getTouchMovementVector();
-      if (Math.abs(move.x) > TOUCH_DEADZONE) {
-        turn = THREE.MathUtils.clamp(move.x, -1, 1);
-      }
-    } else if (input.isKeyPressed('keyd')) {
-      turn = 1;
-    } else if (input.isKeyPressed('keya')) {
-      turn = -1;
-    }
-    this.controls.turnAxis = turn;
+    this.controls.turnAxis = readLateralAxis(input);
 
     // --- Brake (Space, held) ---
     this.controls.brake = input.isKeyPressed('space');
@@ -609,17 +582,6 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     const hud = hudSystem as IHUDSystem | undefined;
     const uiCtx = this.crewSeat === 'gunner' ? createGunnerUIContext() : createPilotUIContext();
     hud?.setVehicleContext?.(uiCtx);
-  }
-
-  private clearFlightBookkeeping(input: PlayerInput): void {
-    if (typeof input.setFlightVehicleMode === 'function') {
-      input.setFlightVehicleMode('none');
-    } else {
-      input.setInHelicopter(false);
-    }
-    if ('setInputContext' in input) {
-      (input as any).setInputContext('gameplay');
-    }
   }
 
   private enterReason(): string {

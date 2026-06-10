@@ -16,6 +16,12 @@ import type { VehicleUIContext } from '../../ui/layout/types';
 import type { SeatRole } from './IVehicle';
 import type { Tank } from './Tank';
 import { TankTurret } from './TankTurret';
+import {
+  clearFlightBookkeeping,
+  relockPointer,
+  seatPlayer,
+  setInfantryCrosshair,
+} from './VehicleAdapterShared';
 
 // ── Turret aim / camera tuning ──
 const MOUSE_AIM_SENSITIVITY = 0.0022; // radians per mouse-pixel (yaw + pitch)
@@ -115,20 +121,11 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
     this.mounted = true;
 
     // Player out of infantry motion, snapped onto the gunner station.
-    ctx.playerState.velocity.set(0, 0, 0);
-    ctx.playerState.isRunning = false;
-    ctx.setPosition(ctx.position, 'tank.gunner.enter');
+    seatPlayer(ctx, 'tank.gunner.enter');
 
     // Tank is a ground vehicle — clear any leftover flight bookkeeping
     // (same defensive pattern the pilot adapter uses).
-    if (typeof ctx.input.setFlightVehicleMode === 'function') {
-      ctx.input.setFlightVehicleMode('none');
-    } else {
-      ctx.input.setInHelicopter(false);
-    }
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    clearFlightBookkeeping(ctx.input);
 
     // Save infantry look angles so the camera restores cleanly on dismount.
     ctx.cameraController.saveInfantryAngles();
@@ -136,35 +133,22 @@ export class TankGunnerAdapter implements PlayerVehicleAdapter {
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(createTankGunnerUIContext());
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     // Re-acquire pointer lock so mouse-look (turret aim) keeps working.
-    if (typeof ctx.input.relockPointer === 'function') {
-      ctx.input.relockPointer();
-    }
+    relockPointer(ctx.input);
   }
 
   onExit(ctx: VehicleTransitionContext): void {
     ctx.setPosition(ctx.position, 'tank.gunner.exit');
 
-    if (typeof ctx.input.setFlightVehicleMode === 'function') {
-      ctx.input.setFlightVehicleMode('none');
-    } else {
-      ctx.input.setInHelicopter(false);
-    }
-    if ('setInputContext' in ctx.input) {
-      (ctx.input as any).setInputContext('gameplay');
-    }
+    clearFlightBookkeeping(ctx.input);
     ctx.cameraController?.restoreInfantryAngles();
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.setVehicleContext?.(null);
 
-    if (ctx.gameRenderer) {
-      ctx.gameRenderer.setCrosshairMode('infantry');
-    }
+    setInfantryCrosshair(ctx.gameRenderer);
 
     this.mounted = false;
     this.resetControlState();
