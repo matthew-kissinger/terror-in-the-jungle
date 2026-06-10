@@ -2,7 +2,7 @@
 
 > **Date:** 2026-06-09
 > **Cycle:** cycle-2026-06-09-lighting-rig-spike
-> **Task brief:** [docs/tasks/lighting-audit-memo.md](../tasks/lighting-audit-memo.md)
+> **Task brief:** [docs/tasks/archive/cycle-2026-06-09-lighting-rig-spike/lighting-audit-memo.md](../tasks/archive/cycle-2026-06-09-lighting-rig-spike/lighting-audit-memo.md)
 > **Campaign:** [docs/CAMPAIGN_2026-06-09-lighting-rig.md](../CAMPAIGN_2026-06-09-lighting-rig.md)
 > **Status:** PROPOSED — ratifies the campaign's target principles into a
 > concrete rig spec. No code changed by this task.

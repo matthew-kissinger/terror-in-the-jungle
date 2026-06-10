@@ -205,49 +205,34 @@ changes, zero hard-stops. Next: owner playtest sweep
 ([PLAYTEST_PENDING](PLAYTEST_PENDING.md) rows for phases 2-4 + standing
 deferrals).
 
-**Two campaigns SCAFFOLDED 2026-06-09, awaiting owner `/goal`** (from the
-owner's post-deploy playtest verdicts on lighting + per-craft gaps):
+**Two campaigns ACTIVE (interleaved) under the owner's 2026-06-09 `/goal`**
+(complete both campaigns):
 
 - [CAMPAIGN_2026-06-09-lighting-rig.md](CAMPAIGN_2026-06-09-lighting-rig.md)
-  — 5 cycles, spike-first with a hard owner GO/NO-GO after Phase 0.
-  Recommended to run first.
+  — Phase 0 spike COMPLETE (GO recorded, owner review row in
+  PLAYTEST_PENDING); Phase 1 `cycle-2026-06-09-lighting-rig-core` next, with
+  scene-light-unification re-scoped as a co-requisite of terrain migration.
 - [CAMPAIGN_2026-06-09-craft-specialization.md](CAMPAIGN_2026-06-09-craft-specialization.md)
-  — 3 cycles, vertical slices per craft family (ground gunnery → fixed-wing →
-  helicopter). Disjoint layer from the lighting campaign; can interleave.
+  — Phase 1 ground-gunnery COMPLETE (feel-walk row in PLAYTEST_PENDING);
+  Phase 2 `cycle-2026-06-09-fixed-wing-craft` next.
 
 Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
 - **Active cycles (interleaved, 2026-06-09 owner `/goal`):**
-  - `cycle-2026-06-09-lighting-rig-spike` — Phase 0 of
-    [CAMPAIGN_2026-06-09-lighting-rig.md](CAMPAIGN_2026-06-09-lighting-rig.md)
-  - `cycle-2026-06-09-ground-gunnery-craft` — Phase 1 of
-    [CAMPAIGN_2026-06-09-craft-specialization.md](CAMPAIGN_2026-06-09-craft-specialization.md)
-  - The two campaigns touch disjoint layers (materials/atmosphere vs
-    UI/vehicle); combined executor concurrency stays ≤5.
-- **Previous:** consultation-remediation campaign, 5 phases, 25/25 merged
-  (#337-#361). Full per-phase records in BACKLOG "Recently Completed".
+  - `cycle-2026-06-09-lighting-rig-core` — Phase 1 of the lighting-rig
+    campaign (opens next; brief authored at open per the manifest)
+  - `cycle-2026-06-09-fixed-wing-craft` — Phase 2 of the craft-specialization
+    campaign (opens next)
+- **Previous:** `cycle-2026-06-09-lighting-rig-spike` (3/3, GO recorded) +
+  `cycle-2026-06-09-ground-gunnery-craft` (5/5) closed 2026-06-09 — see
+  BACKLOG "Recently Completed" for both. Before that: the
+  consultation-remediation campaign, 5 phases, 25/25 merged (#337-#361).
 
 ### Tasks (DAG)
 
-`cycle-2026-06-09-lighting-rig-spike`:
-
-```
-tod-capture-harness   ──► rig-prototype (R2)
-lighting-audit-memo   (root, docs-only)
-```
-
-`cycle-2026-06-09-ground-gunnery-craft`:
-
-```
-reticle-framework ──► tank-gunner-sight (R2)
-                 └──► m2hb-gun-experience (R2)
-npc-tank-cannon-wiring (root; combat-reviewer gates)
-```
-
-R1 batch (4 executors): tod-capture-harness, lighting-audit-memo,
-reticle-framework, npc-tank-cannon-wiring.
+(Populate when the next cycles open.)
 
 ## Dispatch protocol
 

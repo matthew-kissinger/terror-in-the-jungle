@@ -10,11 +10,14 @@
 > **Posture:** attended at phase boundaries (gunnery/sight feel is subjective;
 > reticle correctness is verifiable but reticle *feel* is the owner's call)
 > **Concurrency cap:** 5
-> **Status:** SCAFFOLDED — awaiting owner `/goal`. Recommended to start after
-> (or overlapping) the lighting-rig campaign's Phase 0 review
-> ([CAMPAIGN_2026-06-09-lighting-rig.md](CAMPAIGN_2026-06-09-lighting-rig.md))
-> — the two campaigns touch disjoint layers (UI/gameplay vs materials) and can
-> interleave if the owner wants.
+> **Status:** Phase 1 `cycle-2026-06-09-ground-gunnery-craft` **COMPLETE
+> 2026-06-09** (5/5: #362 reticle-framework, #364 npc-tank-cannon-wiring
+> [combat-reviewer CHANGES-REQUESTED → single-owner stepping fix → merged],
+> #366 tank-gunner-sight, #367 m2hb-gun-experience, #369
+> tank-sight-prod-wiring). The Phase 1 exit feel-walk is deferred to a
+> PLAYTEST_PENDING row under the owner's 2026-06-09 `/goal` (complete both
+> campaigns); Phase 2 (fixed-wing) opens next under that authority.
+> Running interleaved with the lighting-rig campaign (disjoint layers).
 
 Source: 2026-06-09 owner direction — "all the HUD and crosshairs and cameras
 and controllers and combat need to start being specialized by craft — none of

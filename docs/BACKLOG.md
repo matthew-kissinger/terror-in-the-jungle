@@ -44,6 +44,46 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-09-lighting-rig-spike)
+
+Phase 0 of [CAMPAIGN_2026-06-09-lighting-rig](CAMPAIGN_2026-06-09-lighting-rig.md).
+3/3 merged, fence untouched: lighting-audit-memo #363 (rig spec + 3-clamp
+inventory + coherence band; found the capture tool is a 5th snapshot consumer,
+BillboardBufferManager reads scene.fog.color directly, and
+TerrainSystem.setAtmosphereLighting is a sixth shaping site),
+tod-capture-harness #365 (8-TOD per-family luminance curves; baseline proves
+the defect: foliage range ratio 0.459/0.290 vs terrain, GLB corr -0.77 to -0.83),
+rig-prototype #368 (flag-gated LightingRig + terrain/billboard branches;
+terrain-nav APPROVE-WITH-NOTES). A/B verdict: clamp bypass CONFIRMED (foliage
+min 0.129→0.012, range ratio →1.564 in-band); foliage corr 0.533 vs ≥0.92 NOT
+met — structural (terrain stacks legacy scene lights on rig terms), so Phase 1
+re-scopes scene-light-unification as a co-requisite of terrain-rig-migration.
+Recorded GO pending owner review (PLAYTEST_PENDING row). Reviewer follow-ups:
+OFF-path dead ALU until Phase 4; terrain→environment binding coupling on the
+Phase 4 deletion checklist; midnight rig-path darkness check at the owner A/B.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-lighting-rig-spike/`.
+
+## Recently Completed (cycle-2026-06-09-ground-gunnery-craft)
+
+Phase 1 of [CAMPAIGN_2026-06-09-craft-specialization](CAMPAIGN_2026-06-09-craft-specialization.md).
+5/5 merged, fence untouched (CrosshairMode union widened in CrosshairSystem.ts
+— additive, fence-clean by type-reference): reticle-framework #362 (tank_gunner
++ emplacement_mg modes routed through the adapter lifecycle), npc-tank-cannon-wiring
+#364 (dormant TankAIGunnerRoute bound in prod — setTankGunnerRoute had ZERO prod
+callers; combat-reviewer caught a real double-stepping regression → single-owner
+CannonStepGate + scaled-dt beginFrame(deltaTime), NPC shells now respect
+TimeScale), tank-gunner-sight #366 (stadia reticle, FJ TankGunnerPanel, RMB
+2.8x zoom), m2hb-gun-experience #367 (MG reticle, belt counter, traverse cue,
+visual recoil; M2HB weapon files untouched — getters existed),
+tank-sight-prod-wiring #369 (orchestrator-inline: TankGunnerAdapter had zero
+prod imports AND PlayerCamera never called any computeGunnerSightCamera — the
+sight POV was unreachable for every adapter; new shared TankSightSurface +
+optional sight pose/FOV on VehicleFollowCamera). Follow-ups: converge
+TankGunnerAdapter onto TankSightSurface or retire it; in-flight cannon round
+freezes on dismount (MVP caveat, pre-existing); NPC fire cadence still
+wall-clock (documented bypass list). Owner feel-walk row in PLAYTEST_PENDING.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-ground-gunnery-craft/`.
+
 ## Recently Completed (cycle-2026-06-09-weapon-input-and-gate-hardening)
 
 Phase 1 of [CAMPAIGN_2026-06-09-consultation-remediation](CAMPAIGN_2026-06-09-consultation-remediation.md).

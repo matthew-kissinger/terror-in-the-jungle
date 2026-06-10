@@ -9,7 +9,17 @@
 > looks wrong. The orchestrator engineers; the owner judges captures at every
 > exit gate.
 > **Concurrency cap:** 5
-> **Status:** SCAFFOLDED — awaiting owner `/goal` to start Phase 0.
+> **Status:** Phase 0 `cycle-2026-06-09-lighting-rig-spike` **COMPLETE 2026-06-09**
+> (3/3: memo #363, harness #365, prototype #368 terrain-nav
+> APPROVE-WITH-NOTES). A/B verdict: clamp bypass CONFIRMED (foliage range
+> ratio 0.290→1.564 in-band; midnight foliage finally dark) but foliage corr
+> 0.533 vs the ≥0.92 band — structural (terrain still stacks legacy scene
+> lights on rig terms; that is Phase 1's scope). **Orchestrator recorded GO
+> under the owner's 2026-06-09 `/goal` (complete both campaigns); owner
+> review row in PLAYTEST_PENDING — a NO-GO there halts before further
+> migration.** Phase 1 re-scoped: `scene-light-unification` is a hard
+> co-requisite of `terrain-rig-migration` (same PR set), and the night
+> ambient floor needs raising (21h terrain unmeasurable on the rig path).
 
 Source: 2026-06-09 owner playtest verdict on deployed prod (post-SOL-1,
 SHA `c2663e9e` line): day/night cycle works, but foliage holds near-constant
