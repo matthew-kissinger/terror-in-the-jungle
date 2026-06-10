@@ -23,14 +23,14 @@ Renderer backend is chosen by `src/core/RendererBackend.ts`
 - Default: `'webgpu'`. `WebGPURenderer` boots; if `navigator.gpu` is
   unavailable or the adapter probe fails, Three.js's automatic WebGL2
   backend is accepted silently. This is the production path.
-- `?renderer=webgpu-strict` (or `VITE_KONVEYER_WEBGPU_STRICT=1`): strict
+- `?renderer=webgpu-strict` (or `VITE_WEBGPU_STRICT=1`): strict
   proof mode. Any WebGL2 resolution throws; used for KONVEYER evidence
   captures.
 - `?renderer=webgpu-force-webgl`: forces the `WebGPURenderer`'s WebGL2
   backend even when WebGPU is available. Useful for testing TSL node
   materials on the fallback surface.
-- `?renderer=webgl` (or `VITE_KONVEYER_WEBGPU=0` /
-  `VITE_KONVEYER_FORCE_WEBGL=1`): diagnostic plain `WebGLRenderer` with the
+- `?renderer=webgl` (or `VITE_WEBGPU=0` /
+  `VITE_FORCE_WEBGL=1`): diagnostic plain `WebGLRenderer` with the
   `WebGLNodesHandler` shim so TSL node materials still resolve. Pre-KONVEYER
   parity check, not the production path.
 

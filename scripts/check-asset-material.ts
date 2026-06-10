@@ -100,7 +100,7 @@ interface ModeAssetAudit {
 interface AssetMaterialAuditReport {
   createdAt: string;
   sourceGitSha: string;
-  mode: 'konveyer-asset-material-audit';
+  mode: 'asset-material-audit';
   status: AuditStatus;
   inputSceneParityReport: string;
   output: {
@@ -114,7 +114,7 @@ interface AssetMaterialAuditReport {
 }
 
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
-const OUTPUT_NAME = 'konveyer-asset-material-audit';
+const OUTPUT_NAME = 'asset-material-audit';
 const RAW_DARK_LUMA = 0.08;
 const NPC_HEAVY_MIN_LIGHT = 0.85;
 const NPC_HEAVY_EXPOSURE = 1.1;
@@ -144,11 +144,11 @@ function findLatestSceneParityReport(): string {
   if (!existsSync(ARTIFACT_ROOT)) throw new Error(`Artifact root missing: ${ARTIFACT_ROOT}`);
   const candidates: string[] = [];
   for (const runDir of readdirSync(ARTIFACT_ROOT)) {
-    const candidate = join(ARTIFACT_ROOT, runDir, 'konveyer-scene-parity', 'scene-parity.json');
+    const candidate = join(ARTIFACT_ROOT, runDir, 'scene-parity', 'scene-parity.json');
     if (existsSync(candidate)) candidates.push(candidate);
   }
   candidates.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-  if (!candidates[0]) throw new Error('No konveyer-scene-parity report found. Run check:konveyer-scene-parity first.');
+  if (!candidates[0]) throw new Error('No scene-parity report found. Run check:scene-parity first.');
   return candidates[0];
 }
 
@@ -303,7 +303,7 @@ function fmt(value: number | null | undefined, digits = 3): string {
 
 function writeMarkdown(report: AssetMaterialAuditReport): string {
   const lines: string[] = [
-    '# KONVEYER Asset Material Audit',
+    '# Asset Material Audit',
     '',
     `Created: ${report.createdAt}`,
     `Status: ${report.status}`,
@@ -378,7 +378,7 @@ function main(): void {
   };
   writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(markdownPath, writeMarkdown(report));
-  console.log(`KONVEYER asset material audit written to ${relative(process.cwd(), markdownPath)}`);
+  console.log(`Asset material audit written to ${relative(process.cwd(), markdownPath)}`);
   if (report.status === 'fail') process.exitCode = 1;
 }
 

@@ -9,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
-  collectKonveyerNodeMaterialShaders,
+  collectNodeMaterialShaders,
   createInitialRendererCapabilities,
   resolveRendererBackendMode,
 } from './RendererBackend';
@@ -21,9 +21,9 @@ function setSearch(search: string): void {
 }
 
 beforeEach(() => {
-  vi.stubEnv('VITE_KONVEYER_WEBGPU', '');
-  vi.stubEnv('VITE_KONVEYER_FORCE_WEBGL', '');
-  vi.stubEnv('VITE_KONVEYER_WEBGPU_STRICT', '');
+  vi.stubEnv('VITE_WEBGPU', '');
+  vi.stubEnv('VITE_FORCE_WEBGL', '');
+  vi.stubEnv('VITE_WEBGPU_STRICT', '');
   setSearch('');
 });
 
@@ -58,18 +58,18 @@ describe('resolveRendererBackendMode', () => {
   });
 
   it('allows build-time legacy WebGL opt-out for compatibility runs', () => {
-    vi.stubEnv('VITE_KONVEYER_WEBGPU', '0');
+    vi.stubEnv('VITE_WEBGPU', '0');
     expect(resolveRendererBackendMode()).toBe('webgl');
   });
 
   it('allows explicit build-time force-WebGL compatibility runs', () => {
-    vi.stubEnv('VITE_KONVEYER_FORCE_WEBGL', '1');
+    vi.stubEnv('VITE_FORCE_WEBGL', '1');
     expect(resolveRendererBackendMode()).toBe('webgl');
   });
 
   it('allows build-time strict proof opt-in for migration gates', () => {
-    vi.stubEnv('VITE_KONVEYER_WEBGPU', '1');
-    vi.stubEnv('VITE_KONVEYER_WEBGPU_STRICT', '1');
+    vi.stubEnv('VITE_WEBGPU', '1');
+    vi.stubEnv('VITE_WEBGPU_STRICT', '1');
     expect(resolveRendererBackendMode()).toBe('webgpu-strict');
   });
 });
@@ -99,7 +99,7 @@ describe('createInitialRendererCapabilities', () => {
   });
 });
 
-describe('collectKonveyerNodeMaterialShaders', () => {
+describe('collectNodeMaterialShaders', () => {
   // Synthetic fragment GLSL approximating the shape of a TSL-emitted
   // terrain fragment. Used to verify the helper's sampler/uniform/
   // instruction counters report the metrics that the probe ranks against.
@@ -150,13 +150,13 @@ void main() {
 
   type TaggedMaterial = THREE.Material & {
     _latestBuilder?: { fragmentShader?: string; vertexShader?: string };
-    isKonveyerTerrainNodeMaterial?: boolean;
-    isKonveyerNpcImpostorNodeMaterial?: boolean;
-    isKonveyerBillboardNodeMaterial?: boolean;
+    isTerrainNodeMaterial?: boolean;
+    isNpcImpostorNodeMaterial?: boolean;
+    isBillboardNodeMaterial?: boolean;
   };
 
   function makeTaggedMaterial(
-    marker: 'isKonveyerTerrainNodeMaterial' | 'isKonveyerNpcImpostorNodeMaterial' | 'isKonveyerBillboardNodeMaterial',
+    marker: 'isTerrainNodeMaterial' | 'isNpcImpostorNodeMaterial' | 'isBillboardNodeMaterial',
     fragmentShader: string | undefined,
   ): TaggedMaterial {
     const material = new THREE.MeshBasicMaterial() as TaggedMaterial;
@@ -176,18 +176,18 @@ void main() {
     };
   }
 
-  function materialRecords(records: ReturnType<typeof collectKonveyerNodeMaterialShaders>) {
+  function materialRecords(records: ReturnType<typeof collectNodeMaterialShaders>) {
     return records.filter((r): r is Extract<typeof r, { kind: 'material' }> => r.kind === 'material');
   }
-  function cacheRecords(records: ReturnType<typeof collectKonveyerNodeMaterialShaders>) {
+  function cacheRecords(records: ReturnType<typeof collectNodeMaterialShaders>) {
     return records.filter((r): r is Extract<typeof r, { kind: 'cacheEntry' }> => r.kind === 'cacheEntry');
   }
 
-  it('returns nothing when the scene has no Konveyer-tagged materials and the cache is empty', () => {
+  it('returns nothing when the scene has no node-material-tagged materials and the cache is empty', () => {
     const scene = new THREE.Scene();
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial());
     scene.add(mesh);
-    const records = collectKonveyerNodeMaterialShaders(makeFakeRenderer(), scene);
+    const records = collectNodeMaterialShaders(makeFakeRenderer(), scene);
     expect(records).toEqual([]);
   });
 
@@ -195,38 +195,38 @@ void main() {
     const scene = new THREE.Scene();
     scene.add(new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
-      makeTaggedMaterial('isKonveyerTerrainNodeMaterial', FAKE_TERRAIN_FRAG_UNROLLED),
+      makeTaggedMaterial('isTerrainNodeMaterial', FAKE_TERRAIN_FRAG_UNROLLED),
     ));
     scene.add(new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
-      makeTaggedMaterial('isKonveyerBillboardNodeMaterial', FAKE_TERRAIN_FRAG_EARLY_OUT),
+      makeTaggedMaterial('isBillboardNodeMaterial', FAKE_TERRAIN_FRAG_EARLY_OUT),
     ));
-    const records = materialRecords(collectKonveyerNodeMaterialShaders(makeFakeRenderer(), scene));
+    const records = materialRecords(collectNodeMaterialShaders(makeFakeRenderer(), scene));
     expect(records).toHaveLength(2);
     const markers = records.map((r) => r.marker).sort();
-    expect(markers).toEqual(['isKonveyerBillboardNodeMaterial', 'isKonveyerTerrainNodeMaterial']);
+    expect(markers).toEqual(['isBillboardNodeMaterial', 'isTerrainNodeMaterial']);
   });
 
   it('deduplicates a material instance shared across multiple meshes', () => {
     const scene = new THREE.Scene();
-    const shared = makeTaggedMaterial('isKonveyerTerrainNodeMaterial', FAKE_TERRAIN_FRAG_UNROLLED);
+    const shared = makeTaggedMaterial('isTerrainNodeMaterial', FAKE_TERRAIN_FRAG_UNROLLED);
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shared));
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shared));
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), shared));
-    const records = materialRecords(collectKonveyerNodeMaterialShaders(makeFakeRenderer(), scene));
+    const records = materialRecords(collectNodeMaterialShaders(makeFakeRenderer(), scene));
     expect(records).toHaveLength(1);
     expect(records[0].uuid).toBe(shared.uuid);
   });
 
   it('reports a higher fragment sampler count for the unrolled biome chain than the early-out variant', () => {
     const scene = new THREE.Scene();
-    const unrolled = makeTaggedMaterial('isKonveyerTerrainNodeMaterial', FAKE_TERRAIN_FRAG_UNROLLED);
-    const earlyOut = makeTaggedMaterial('isKonveyerBillboardNodeMaterial', FAKE_TERRAIN_FRAG_EARLY_OUT);
+    const unrolled = makeTaggedMaterial('isTerrainNodeMaterial', FAKE_TERRAIN_FRAG_UNROLLED);
+    const earlyOut = makeTaggedMaterial('isBillboardNodeMaterial', FAKE_TERRAIN_FRAG_EARLY_OUT);
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), unrolled));
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), earlyOut));
-    const records = materialRecords(collectKonveyerNodeMaterialShaders(makeFakeRenderer(), scene));
-    const u = records.find((r) => r.marker === 'isKonveyerTerrainNodeMaterial')!;
-    const e = records.find((r) => r.marker === 'isKonveyerBillboardNodeMaterial')!;
+    const records = materialRecords(collectNodeMaterialShaders(makeFakeRenderer(), scene));
+    const u = records.find((r) => r.marker === 'isTerrainNodeMaterial')!;
+    const e = records.find((r) => r.marker === 'isBillboardNodeMaterial')!;
     expect(u.fragmentSamplerCount!).toBeGreaterThan(e.fragmentSamplerCount!);
     // Behavior: the ratio is significant (R1 fix-cycle target floor is 4x).
     expect(u.fragmentSamplerCount! / Math.max(1, e.fragmentSamplerCount!)).toBeGreaterThanOrEqual(4);
@@ -234,9 +234,9 @@ void main() {
 
   it('records `shaderSource: "none"` when the material has no compiled builder yet', () => {
     const scene = new THREE.Scene();
-    const material = makeTaggedMaterial('isKonveyerTerrainNodeMaterial', undefined);
+    const material = makeTaggedMaterial('isTerrainNodeMaterial', undefined);
     scene.add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material));
-    const records = materialRecords(collectKonveyerNodeMaterialShaders(makeFakeRenderer(), scene));
+    const records = materialRecords(collectNodeMaterialShaders(makeFakeRenderer(), scene));
     expect(records).toHaveLength(1);
     expect(records[0].shaderSource).toBe('none');
     expect(records[0].fragmentShader).toBeNull();
@@ -253,7 +253,7 @@ void main() {
     } as any;
     renderer._nodes.nodeBuilderCache.set(1, { fragmentShader: FAKE_TERRAIN_FRAG_UNROLLED, vertexShader: '#version 300 es\nvoid main(){}' });
     renderer._nodes.nodeBuilderCache.set(2, { fragmentShader: FAKE_TERRAIN_FRAG_EARLY_OUT, vertexShader: '#version 300 es\nvoid main(){}' });
-    const records = cacheRecords(collectKonveyerNodeMaterialShaders(renderer, scene));
+    const records = cacheRecords(collectNodeMaterialShaders(renderer, scene));
     expect(records).toHaveLength(2);
     // Behavior: cache-entry records expose the same per-shader metrics.
     expect(Math.max(...records.map((r) => r.fragmentSamplerCount ?? 0)))

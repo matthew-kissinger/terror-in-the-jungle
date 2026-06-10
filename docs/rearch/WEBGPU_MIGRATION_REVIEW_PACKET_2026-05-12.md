@@ -344,12 +344,12 @@ slice landing on this branch:
   criteria + findings.
 - `docs/rearch/KONVEYER_PARITY_2026-05-10.md` — KONVEYER-0..9 migration
   ledger.
-- `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md` — Phase F
+- `docs/rearch/WEBGPU_MIGRATION_MATERIALIZATION_TIERS_2026-05-12.md` — Phase F
   sim/render tier model + the six shipped slices in detail.
-- `docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md` —
+- `docs/rearch/WEBGPU_MIGRATION_STACK_RESEARCH_SPIKES_2026-05-11.md` —
   WebGPU/TSL stack research spike (terrain, clouds, water, assets,
   ECS/materialization vocabulary).
-- `docs/rearch/KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md` — research
+- `docs/rearch/WEBGPU_MIGRATION_PRIMITIVE_SPIKES_2026-05-12.md` — research
   spike: better compute primitives for the expensive systems
   (SkyTexture, Combat, World) identified by slices 10–11.
 - `docs/tasks/cycle-2026-05-11-konveyer-scene-parity.md` — active cycle

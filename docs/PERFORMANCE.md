@@ -17,7 +17,7 @@ Pre-Phase-1 content archived at `docs/archive/PERFORMANCE.md`.
   combat120, and A Shau Valley. Strict mode (`?renderer=webgpu-strict`)
   remains the acceptance bar for KONVEYER-style evidence; production startup
   without the flag falls back gracefully on browsers without WebGPU support.
-  See `docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md` for the post-merge
+  See `docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md` for the post-merge
   framing.
 - **Atmosphere CPU is now < 1 ms/frame across all five modes** after KONVEYER
   slices 9-15 and the 2026-05-13 sky-refresh idempotency fix (commit

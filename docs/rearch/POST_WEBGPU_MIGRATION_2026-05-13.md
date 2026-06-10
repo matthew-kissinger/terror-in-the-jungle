@@ -4,11 +4,11 @@ Last verified: 2026-05-28 (drift-correction link fixes under `doc-consolidation-
 
 Branch context: `master` (post-merge). This memo replaces the
 "do-not-merge" gate that governed
-`docs/rearch/KONVEYER_REVIEW_PACKET_2026-05-12.md` while the migration
+`docs/rearch/WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md` while the migration
 lived on `exp/konveyer-webgpu-migration`. It documents what landed at the
 master merge, what is queued as fast-follow, and what still needs proof on
 production hardware variety. Predecessor packet:
-[KONVEYER_REVIEW_PACKET_2026-05-12.md](KONVEYER_REVIEW_PACKET_2026-05-12.md).
+[WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md](WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md).
 
 ## TL;DR
 
@@ -171,7 +171,7 @@ queued behind it.
   Required before the silhouette and cluster lanes can compose without
   re-implementing per-system caps.
 - **Multi-mode strict-WebGPU proof v2** (review packet condition): the
-  R1 proof packet from `KONVEYER_REVIEW_PACKET_2026-05-12.md` gets
+  R1 proof packet from `WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md` gets
   re-captured on the master baseline after R2-R4 land, against the
   A Shau p99 31.0 ms ceiling.
 
@@ -293,10 +293,10 @@ follow-up cycles need a directional read on:
 
 ## Cross-references
 
-- [KONVEYER_REVIEW_PACKET_2026-05-12.md](KONVEYER_REVIEW_PACKET_2026-05-12.md)
+- [WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md](WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md)
   — the predecessor packet; documents the "do not merge" gate that this
   memo closes.
-- [KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md](KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md)
+- [WEBGPU_MIGRATION_PRIMITIVE_SPIKES_2026-05-12.md](WEBGPU_MIGRATION_PRIMITIVE_SPIKES_2026-05-12.md)
   — research spike on better compute primitives for the expensive
   systems (SkyTexture, Combat, World) identified by slices 10-11.
 - [GROUND_VEHICLE_PHYSICS_2026-05-13.md](GROUND_VEHICLE_PHYSICS_2026-05-13.md)

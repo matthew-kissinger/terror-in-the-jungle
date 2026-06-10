@@ -569,7 +569,7 @@ async function snap(page: Page, outFile: string): Promise<Buffer | null> {
  * Anchor the foliage / npc / glb families on the screen position of the actual
  * instances that render, by scanning the live scene (INSTRUMENT FIX, scope 0).
  *
- * The scene scan mirrors `scripts/konveyer-asset-crop-probe.ts`: a billboard
+ * The scene scan mirrors `scripts/asset-crop-probe.ts`: a billboard
  * card carries a `vegetationExposure` uniform and stores world positions in an
  * `instancePosition` buffer attribute; an NPC impostor carries an `npcExposure`
  * uniform and is a `THREE.InstancedMesh` with per-instance matrices. For each

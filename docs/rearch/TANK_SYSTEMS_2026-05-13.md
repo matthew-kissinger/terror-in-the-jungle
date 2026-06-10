@@ -457,7 +457,7 @@ open without these confirmed.
   §"Open questions". Tanks amplify the need (more pronounced marks
   than wheels). v1: no terrain decals. v2: shared terrain-decal
   storage texture for wheels + tracks, gated on the WebGPU rollout
-  per `KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`.
+  per `WEBGPU_MIGRATION_MATERIALIZATION_TIERS_2026-05-12.md`.
 
 ## Open questions / deferred
 
@@ -535,9 +535,9 @@ Related docs:
 - [ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
   — "no external physics lib" stance (§2.1, §6); 2026-05-13 addendum
   extends to ground; tanks fall inside that scope.
-- [KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md](KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md)
+- [WEBGPU_MIGRATION_PRIMITIVE_SPIKES_2026-05-12.md](WEBGPU_MIGRATION_PRIMITIVE_SPIKES_2026-05-12.md)
   — house-style reference.
-- [KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md](KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md)
+- [WEBGPU_MIGRATION_MATERIALIZATION_TIERS_2026-05-12.md](WEBGPU_MIGRATION_MATERIALIZATION_TIERS_2026-05-12.md)
   — house-style; v2 track-mark-decal cross-ref gates on WebGPU
   rollout.
 - [BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md](../archive/BROWSER_RUNTIME_PRIMITIVES_2026-05-13.md)

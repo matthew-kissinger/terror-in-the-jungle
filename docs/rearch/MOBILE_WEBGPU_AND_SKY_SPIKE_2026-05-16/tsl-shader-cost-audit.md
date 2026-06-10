@@ -32,7 +32,7 @@ The dominant cost — by an order of magnitude — is the **terrain TSL fragment
 
 ### 1. Terrain ground material — `TerrainMaterial`
 
-- File: `src/systems/terrain/TerrainMaterial.ts` (1011 LOC, grandfathered on the source-budget list per `docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md`).
+- File: `src/systems/terrain/TerrainMaterial.ts` (1011 LOC, grandfathered on the source-budget list per `docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md`).
 - Class: `MeshStandardNodeMaterial` from `three/webgpu` (instantiated at `src/systems/terrain/TerrainMaterial.ts:639` via `createTerrainMaterial`).
 - Lit / PBR. `flatShading: false`, `metalness: 0.0`, `roughness: 1.0` initial, overridden by `roughnessNode`.
 - Wired by `TerrainSurfaceRuntime.ts:97` (initial) and `TerrainSurfaceRuntime.ts:146` (reconfigure). One material per terrain surface runtime → applied to every CDLOD tile in every mode.

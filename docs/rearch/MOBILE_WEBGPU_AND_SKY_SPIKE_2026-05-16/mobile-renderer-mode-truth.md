@@ -36,7 +36,7 @@ shader compile stalls.
 - Built a small read-only probe at
   [`scripts/mobile-renderer-probe.ts`](../../../scripts/mobile-renderer-probe.ts)
   modelled on the existing
-  [`scripts/konveyer-renderer-matrix.ts`](../../../scripts/konveyer-renderer-matrix.ts).
+  [`scripts/renderer-matrix.ts`](../../../scripts/renderer-matrix.ts).
   It serves `dist/` over a local HTTP server, drives a Playwright
   Chromium device-emulation context with x4 CPU throttle via CDP
   `Emulation.setCPUThrottlingRate`, captures `navigator.gpu`
@@ -270,7 +270,7 @@ helper that is reusable for the follow-on fix cycle. Justification:
   would either build the same probe again or rely on `?diag=1` +
   manual screenshot inspection.
 - **Modelled on existing prior art.**
-  `scripts/konveyer-renderer-matrix.ts` is the desktop-strict-WebGPU
+  `scripts/renderer-matrix.ts` is the desktop-strict-WebGPU
   equivalent. The new file follows the same shape: serve `dist/`,
   drive a Playwright context, read `__rendererBackendCapabilities()`,
   emit `report.json` + `report.md`, exit 0/1. The fix cycle could
@@ -368,7 +368,7 @@ re-run the probe.
 - `src/core/bootstrap.ts:177-179` —
   `window.__rendererBackendCapabilities` global the probe reads.
 - `src/core/PerfDiagnostics.ts:46-51` — `?diag=1` gate.
-- `scripts/konveyer-renderer-matrix.ts` — desktop-strict-WebGPU
+- `scripts/renderer-matrix.ts` — desktop-strict-WebGPU
   matrix the new probe is modelled on.
 
 ## Cross-references
@@ -378,7 +378,7 @@ re-run the probe.
 - Parent campaign manifest:
   [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 - POST-KONVEYER milestone memo:
-  [`docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md`](../POST_KONVEYER_MIGRATION_2026-05-13.md)
+  [`docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md`](../POST_WEBGPU_MIGRATION_2026-05-13.md)
   — "What still needs proof on production hardware variety"
   enumerates the open mobile-validation gap this memo closes the
   renderer-mode half of.

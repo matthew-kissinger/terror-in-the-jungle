@@ -381,8 +381,8 @@ specific knobs, then validate on real devices.
 - **Hard stops (cycle-specific):**
   - Any TSL early-out rewrite that regresses the strict-WebGPU path
     on desktop. Strict-WebGPU evidence (per
-    [`POST_KONVEYER_MIGRATION_2026-05-13.md`](POST_KONVEYER_MIGRATION_2026-05-13.md)
-    and `KONVEYER_REVIEW_PACKET`) remains the renderer-architecture
+    [`POST_WEBGPU_MIGRATION_2026-05-13.md`](POST_WEBGPU_MIGRATION_2026-05-13.md)
+    and `WEBGPU_MIGRATION_REVIEW_PACKET`) remains the renderer-architecture
     acceptance bar.
   - Real-device-validation infeasible. Cycle must produce real-device
     evidence; emulation-only is not acceptable as merge evidence (it
@@ -451,7 +451,7 @@ cycle delta: 0. Cycle exits clean, no INCOMPLETE flag.
 - Carry-over registry:
   [`docs/CARRY_OVERS.md`](../CARRY_OVERS.md).
 - Post-KONVEYER milestone:
-  [`docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md`](POST_KONVEYER_MIGRATION_2026-05-13.md).
+  [`docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md`](POST_WEBGPU_MIGRATION_2026-05-13.md).
 - WebGPU + TSL skill:
   [`.claude/skills/webgpu-threejs-tsl/SKILL.md`](../../.claude/skills/webgpu-threejs-tsl/SKILL.md).
 - Strict-WebGPU fallback gate: commit `4aec731e`.

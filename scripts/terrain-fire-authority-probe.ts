@@ -30,7 +30,7 @@ function hasFlag(name: string): boolean {
 
 function artifactDir(): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return join(process.cwd(), 'artifacts', 'perf', stamp, 'konveyer-terrain-fire-authority');
+  return join(process.cwd(), 'artifacts', 'perf', stamp, 'terrain-fire-authority');
 }
 
 async function waitForGame(page: Page, mode: string): Promise<void> {
@@ -294,7 +294,7 @@ async function runProbe(page: Page): Promise<Record<string, unknown>> {
 
 async function main(): Promise<void> {
   if (hasFlag('help')) {
-    console.log('Usage: npx tsx scripts/konveyer-terrain-fire-authority-probe.ts --renderer webgpu-strict --mode open_frontier --headed');
+    console.log('Usage: npx tsx scripts/terrain-fire-authority-probe.ts --renderer webgpu-strict --mode open_frontier --headed');
     return;
   }
 

@@ -120,8 +120,8 @@ as of this refresh:
   re-establish a baseline via `perf:update-baseline`. See
   [docs/state/perf-trust.md](perf-trust.md) for the measurement chain.
 - **KONVEYER-10/11** — closed; full slice-by-slice evidence in
-  [docs/directives/konveyer-10.md](../directives/konveyer-10.md) and
-  [docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).
+  [docs/directives/webgpu-migration-10.md](../directives/webgpu-migration-10.md) and
+  [docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md](../rearch/POST_WEBGPU_MIGRATION_2026-05-13.md).
 - **AVIATSIYA-4, AVIATSIYA-7** — code-complete (playtest deferred) per the
   2026-06-01 scope pass; **AVIATSIYA-5, AVIATSIYA-6** — open (partial): nose
   cannon + live-fire + station-keep + NPC maneuver state machine done;
@@ -169,7 +169,7 @@ as of this refresh:
 - Atmosphere CPU cost holds under ~1 ms total across all five modes after the
   KONVEYER and sun-atmosphere work moved the visual dome off the old large
   LUT-bake path; the small CPU LUT remains for fog/hemisphere readers. Evidence:
-  [docs/directives/konveyer-10.md](../directives/konveyer-10.md).
+  [docs/directives/webgpu-migration-10.md](../directives/webgpu-migration-10.md).
 - SOL-1 is engineering-complete and deployed for the current visual rejection:
   sun scale, red/white night terrain reads, lighting-angle coherence,
   terrain/water material response, and hill/ridge light bleed have full local

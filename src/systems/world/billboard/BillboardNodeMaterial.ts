@@ -164,7 +164,7 @@ interface BillboardMaterialUniforms {
 
 export type BillboardNodeMaterial = MeshBasicNodeMaterial & {
   uniforms: BillboardMaterialUniforms;
-  isKonveyerBillboardNodeMaterial: true;
+  isBillboardNodeMaterial: true;
 };
 
 type TslNode = any;
@@ -242,7 +242,7 @@ export function createBillboardNodeMaterial(
   };
 
   const material = new MeshBasicNodeMaterial({
-    name: 'konveyer-vegetation-billboard-node-material',
+    name: 'vegetation-billboard-node-material',
     transparent: true,
     side: THREE.DoubleSide,
     depthWrite: true,
@@ -250,7 +250,7 @@ export function createBillboardNodeMaterial(
     alphaTest: BILLBOARD_ALPHA_TEST,
     forceSinglePass: true,
   }) as BillboardNodeMaterial;
-  material.isKonveyerBillboardNodeMaterial = true;
+  material.isBillboardNodeMaterial = true;
   material.uniforms = uniforms;
   material.fog = false;
   material.blending = THREE.CustomBlending;

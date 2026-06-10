@@ -482,9 +482,9 @@ Related docs:
 - [docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md](ENGINE_TRAJECTORY_2026-04-23.md)
   — "no external physics lib" stance (§2.1, §6); addendum
   2026-05-13 extends to ground.
-- [docs/rearch/KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md](KONVEYER_PRIMITIVE_SPIKES_2026-05-12.md)
+- [docs/rearch/WEBGPU_MIGRATION_PRIMITIVE_SPIKES_2026-05-12.md](WEBGPU_MIGRATION_PRIMITIVE_SPIKES_2026-05-12.md)
   — house-style reference.
-- [docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md](KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md)
+- [docs/rearch/WEBGPU_MIGRATION_MATERIALIZATION_TIERS_2026-05-12.md](WEBGPU_MIGRATION_MATERIALIZATION_TIERS_2026-05-12.md)
   — house-style reference.
 - [docs/tasks/vekhikl-1-jeep-spike.md](../tasks/archive/cycle-vekhikl-1-jeep-drivable/vekhikl-1-jeep-spike.md)
   — task brief unblocked by this memo.

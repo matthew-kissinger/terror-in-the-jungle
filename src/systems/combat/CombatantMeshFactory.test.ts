@@ -301,14 +301,14 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect(material?.uniforms.tileCropMapSize.value.x).toBe(28);
     expect(material?.uniforms.tileCropMapSize.value.y).toBe(14);
     const nodeMaterial = material as typeof material & {
-      isKonveyerNpcImpostorNodeMaterial?: boolean;
+      isNpcImpostorNodeMaterial?: boolean;
       isNodeMaterial?: boolean;
       colorNode?: unknown;
       opacityNode?: unknown;
       alphaTestNode?: unknown;
     };
     expect(nodeMaterial.isNodeMaterial).toBe(true);
-    expect(nodeMaterial.isKonveyerNpcImpostorNodeMaterial).toBe(true);
+    expect(nodeMaterial.isNpcImpostorNodeMaterial).toBe(true);
     expect(nodeMaterial.fog).toBe(false);
     expect(nodeMaterial.colorNode).toBeDefined();
     expect(nodeMaterial.opacityNode).toBeDefined();
@@ -330,7 +330,7 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect(assets.factionMaterials.get('US_idle')?.uniforms.animationMode.value).toBe(0);
     const deathMaterial = assets.factionMaterials.get('US_death_fall_back') as
       | (THREE.Material & {
-          isKonveyerNpcImpostorNodeMaterial?: boolean;
+          isNpcImpostorNodeMaterial?: boolean;
           isNodeMaterial?: boolean;
           colorNode?: unknown;
           opacityNode?: unknown;
@@ -339,7 +339,7 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
       | undefined;
     expect(deathMaterial?.uniforms?.animationMode.value).toBe(1);
     expect(deathMaterial?.isNodeMaterial).toBe(true);
-    expect(deathMaterial?.isKonveyerNpcImpostorNodeMaterial).toBe(true);
+    expect(deathMaterial?.isNpcImpostorNodeMaterial).toBe(true);
     expect(deathMaterial?.colorNode).toBeDefined();
     expect(deathMaterial?.opacityNode).toBeDefined();
 

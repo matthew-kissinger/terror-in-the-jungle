@@ -117,7 +117,7 @@ function timestampSlug(): string {
 
 function ensureBuildExists(): void {
   if (!existsSync(INDEX_PATH)) {
-    throw new Error('dist/index.html not found. Run `npm run build` before `check:konveyer-renderer-matrix`.');
+    throw new Error('dist/index.html not found. Run `npm run build` before `check:renderer-matrix`.');
   }
 }
 
@@ -156,7 +156,7 @@ function serveFile(req: IncomingMessage, res: ServerResponse): void {
 function resolveListeningPort(server: ReturnType<typeof createServer>): number {
   const address = server.address();
   if (!address || typeof address === 'string') {
-    throw new Error('Failed to resolve KONVEYER renderer matrix server port.');
+    throw new Error('Failed to resolve Renderer matrix server port.');
   }
   return address.port;
 }
@@ -306,23 +306,23 @@ async function main(): Promise<void> {
 
     const artifact: RendererMatrixArtifact = {
       createdAt: new Date().toISOString(),
-      source: 'scripts/konveyer-renderer-matrix.ts',
+      source: 'scripts/renderer-matrix.ts',
       config,
       userAgent,
       results,
       nonClaims: [
         'This matrix proves built-app backend selection behavior, not full visual parity.',
         'Default and strict WebGPU pass only when resolvedBackend=webgpu; fallback success is rejected.',
-        'Explicit WebGL diagnostics live outside this matrix and do not count as KONVEYER proof.',
+        'Explicit WebGL diagnostics live outside this matrix and do not count as strict-WebGPU proof.',
       ],
     };
 
-    const artifactDir = join(ARTIFACT_ROOT, timestampSlug(), 'konveyer-renderer-matrix');
+    const artifactDir = join(ARTIFACT_ROOT, timestampSlug(), 'renderer-matrix');
     mkdirSync(artifactDir, { recursive: true });
     const artifactPath = join(artifactDir, 'matrix.json');
     writeFileSync(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`);
 
-    console.log(`KONVEYER renderer matrix written to ${artifactPath}`);
+    console.log(`Renderer matrix written to ${artifactPath}`);
     for (const result of results) {
       console.log(`${result.name}: ${result.status} (${result.capabilities?.resolvedBackend ?? 'no-capabilities'})`);
       for (const failure of result.failures) {

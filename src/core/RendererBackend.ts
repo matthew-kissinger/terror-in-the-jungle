@@ -89,12 +89,12 @@ export function resolveRendererBackendMode(): RendererBackendMode {
     }
   }
 
-  if (import.meta.env.VITE_KONVEYER_WEBGPU_STRICT === '1') {
+  if (import.meta.env.VITE_WEBGPU_STRICT === '1') {
     return 'webgpu-strict';
   }
   if (
-    import.meta.env.VITE_KONVEYER_WEBGPU === '0'
-    || import.meta.env.VITE_KONVEYER_FORCE_WEBGL === '1'
+    import.meta.env.VITE_WEBGPU === '0'
+    || import.meta.env.VITE_FORCE_WEBGL === '1'
   ) {
     return 'webgl';
   }
@@ -132,7 +132,7 @@ export function createInitialRendererCapabilities(
       ? ['Explicit WebGL diagnostic renderer selected.']
       : [requestedMode === 'webgpu-strict'
         ? 'Strict WebGPU proof mode requested; backend fallback must fail loudly.'
-        : 'WebGPU renderer requested; WebGL fallback is disabled for KONVEYER proof.'],
+        : 'WebGPU renderer requested; WebGL fallback is disabled for strict-WebGPU proof.'],
   };
 }
 
@@ -191,11 +191,11 @@ export function toErrorMessage(error: unknown): string {
 }
 
 /**
- * TSL node-material debug record produced by {@link collectKonveyerNodeMaterialShaders}.
+ * TSL node-material debug record produced by {@link collectNodeMaterialShaders}.
  *
  * Two record kinds:
  *
- * 1. `kind: 'material'` — one per unique `isKonveyer*NodeMaterial`-tagged
+ * 1. `kind: 'material'` — one per unique `is*NodeMaterial`-tagged
  *    material instance found in the scene. Identifies the material and (best
  *    effort) attaches the compiled GLSL when the classic
  *    `WebGLRenderer + WebGLNodesHandler` path is in use (which writes
@@ -220,11 +220,11 @@ export function toErrorMessage(error: unknown): string {
  * sampler-count drop named in
  * `docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/tsl-shader-cost-audit.md`.
  */
-export type KonveyerNodeMaterialShaderRecord = MaterialShaderRecord | CacheEntryShaderRecord;
+export type NodeMaterialShaderRecord = MaterialShaderRecord | CacheEntryShaderRecord;
 
 export interface MaterialShaderRecord {
   kind: 'material';
-  marker: 'isKonveyerTerrainNodeMaterial' | 'isKonveyerNpcImpostorNodeMaterial' | 'isKonveyerBillboardNodeMaterial';
+  marker: 'isTerrainNodeMaterial' | 'isNpcImpostorNodeMaterial' | 'isBillboardNodeMaterial';
   className: string;
   materialName: string | null;
   uuid: string;
@@ -263,9 +263,9 @@ type MaterialWithLatestBuilder = THREE.Material & {
     fragmentShader?: string;
     vertexShader?: string;
   };
-  isKonveyerTerrainNodeMaterial?: boolean;
-  isKonveyerNpcImpostorNodeMaterial?: boolean;
-  isKonveyerBillboardNodeMaterial?: boolean;
+  isTerrainNodeMaterial?: boolean;
+  isNpcImpostorNodeMaterial?: boolean;
+  isBillboardNodeMaterial?: boolean;
   customProgramCacheKey?: () => string;
 };
 
@@ -285,16 +285,16 @@ type RendererWithNodes = CommonRenderer & {
   };
 };
 
-const KONVEYER_MARKERS = [
-  'isKonveyerTerrainNodeMaterial',
-  'isKonveyerNpcImpostorNodeMaterial',
-  'isKonveyerBillboardNodeMaterial',
+const NODE_MATERIAL_MARKERS = [
+  'isTerrainNodeMaterial',
+  'isNpcImpostorNodeMaterial',
+  'isBillboardNodeMaterial',
 ] as const;
 
-function detectKonveyerMarker(
+function detectNodeMaterialMarker(
   material: MaterialWithLatestBuilder,
 ): MaterialShaderRecord['marker'] | null {
-  for (const marker of KONVEYER_MARKERS) {
+  for (const marker of NODE_MATERIAL_MARKERS) {
     if (material[marker] === true) return marker;
   }
   return null;
@@ -391,8 +391,8 @@ function buildCacheRecord(
 }
 
 /**
- * Walks the scene, collects every TSL node-material tagged with a Konveyer
- * `isKonveyer*NodeMaterial` marker, and enumerates every entry in
+ * Walks the scene, collects every TSL node-material tagged with a node-material
+ * `is*NodeMaterial` marker, and enumerates every entry in
  * `renderer._nodes.nodeBuilderCache`. Returns a flat array containing both
  * record kinds; run **after** at least one render or after
  * `renderer.compileAsync(scene, camera)` resolves so the builder cache is
@@ -412,10 +412,10 @@ function buildCacheRecord(
  *
  * Unique material instances are deduplicated by `material.uuid`.
  */
-export function collectKonveyerNodeMaterialShaders(
+export function collectNodeMaterialShaders(
   renderer: CommonRenderer,
   scene: THREE.Object3D,
-): KonveyerNodeMaterialShaderRecord[] {
+): NodeMaterialShaderRecord[] {
   const seen = new Set<string>();
   const candidates: { material: MaterialWithLatestBuilder; marker: MaterialShaderRecord['marker'] }[] = [];
 
@@ -427,7 +427,7 @@ export function collectKonveyerNodeMaterialShaders(
     for (const mat of materials) {
       if (!mat || seen.has(mat.uuid)) continue;
       const tagged = mat as MaterialWithLatestBuilder;
-      const marker = detectKonveyerMarker(tagged);
+      const marker = detectNodeMaterialMarker(tagged);
       if (!marker) continue;
       seen.add(mat.uuid);
       candidates.push({ material: tagged, marker });
@@ -439,7 +439,7 @@ export function collectKonveyerNodeMaterialShaders(
     ? Array.from(rendererWithNodes._nodes.nodeBuilderCache.values())
     : [];
 
-  const records: KonveyerNodeMaterialShaderRecord[] = [];
+  const records: NodeMaterialShaderRecord[] = [];
 
   for (const { material, marker } of candidates) {
     // Classic WebGLRenderer + WebGLNodesHandler attaches the compiled

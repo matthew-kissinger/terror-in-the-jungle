@@ -185,9 +185,9 @@ Recommended next asset spike:
 
 2026-05-11 first K14 audit:
 
-- `npm run check:konveyer-asset-material -- --input artifacts/perf/2026-05-11T22-11-28-128Z/konveyer-scene-parity/scene-parity.json`
+- `npm run check:asset-material -- --input artifacts/perf/2026-05-11T22-11-28-128Z/scene-parity/scene-parity.json`
   writes
-  `artifacts/perf/2026-05-11T22-24-56-014Z/konveyer-asset-material-audit/asset-material-audit.json`.
+  `artifacts/perf/2026-05-11T22-24-56-014Z/asset-material-audit/asset-material-audit.json`.
 - The audit turns the strict scene-probe JSON into a source-vs-runtime packet.
   It records raw atlas metrics, material lighting lift, fog state, and whole
   pose final-composite proxies for vegetation and NPC impostors.
@@ -259,7 +259,7 @@ Recommended next asset spike:
   policy is now the open architectural decision: combat120 surfaces ~29-32
   candidates against a 12-slot cap, and faction-pool sizing is asymmetric.
   The Phase F materialization-tier draft at
-  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md` proposes the
+  `docs/rearch/WEBGPU_MIGRATION_MATERIALIZATION_TIERS_2026-05-12.md` proposes the
   budget arbiter, hard-near reserve generalization, and silhouette/cluster
   render lanes that replace uniform-cap tuning.
 - The same proof adds startup `terrain-features.compile` attribution for the
