@@ -657,6 +657,12 @@ function buildSeatedWeaponLifecycle(args: {
         system.update(dt, (x, z) => terrainSystem?.getEffectiveHeightAt(x, z) ?? 0);
       });
       if (cannonStepGate) cannonStepGate.playerOwns = true;
+      // Gunner-panel host (tank-sight-prod-wiring; m2hb precedent): resolved
+      // lazily from the live DOM; absent — headless / tests — the adapter
+      // stays panel-less and safe.
+      adapter.setHudPanelHost(
+        typeof document !== 'undefined' ? document.getElementById('game-hud-root') : null,
+      );
       return;
     }
     if (adapter instanceof EmplacementPlayerAdapter && m2hbEmplacementSystem) {
@@ -677,6 +683,7 @@ function buildSeatedWeaponLifecycle(args: {
     if (adapter instanceof TankPlayerAdapter) {
       adapter.setCannonSystem(null);
       adapter.setCannonStepper(null);
+      adapter.setHudPanelHost(null);
       if (cannonStepGate) cannonStepGate.playerOwns = false;
       return;
     }

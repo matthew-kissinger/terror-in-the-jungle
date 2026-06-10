@@ -83,7 +83,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // single-owner stepping gate in one cycle window. Orchestrator note in
   // docs/CARRY_OVERS.md (Parked). Factor into a composition split when it
   // next grows.
-  'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; split queued when it next grows', loc: 739, methods: 50 },
+  'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; +9 LOC: tank gunner-panel host (tank-sight-prod-wiring, same cycle window); split queued when it next grows', loc: 748, methods: 50 },
   'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files', loc: 757, methods: 83 },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence)', loc: 762, methods: 43 },
   // ZoneManager removed from grandfather list 2026-05-09 (Phase 2): fan-in

@@ -853,4 +853,73 @@ describe('PlayerCamera', () => {
       expect(provider.computeThirdPersonCamera).not.toHaveBeenCalled();
     });
   });
+
+  describe('Gunner weapon-sight camera (tank-sight-prod-wiring)', () => {
+    // A provider that crews a weapon sight: first-person down-the-barrel pose
+    // + a sight FOV. Stands in for TankPlayerAdapter in the gunner seat.
+    const sightPos = new THREE.Vector3(12, 3, -7);
+    const sightLook = new THREE.Vector3(12, 3, -107);
+    const chassisCamPos = new THREE.Vector3(40, 12, -25);
+
+    function makeSightProvider(inSight: boolean, fovDeg = 18) {
+      return {
+        computeThirdPersonCamera: vi.fn(
+          (outPos: THREE.Vector3, outLook: THREE.Vector3) => {
+            outPos.copy(chassisCamPos);
+            outLook.copy(sightLook);
+            return true;
+          },
+        ),
+        computeGunnerSightCamera: vi.fn(
+          (outPos: THREE.Vector3, outLook: THREE.Vector3, outFov?: { value: number }) => {
+            if (!inSight) return false;
+            outPos.copy(sightPos);
+            outLook.copy(sightLook);
+            if (outFov) outFov.value = fovDeg;
+            return true;
+          },
+        ),
+      };
+    }
+
+    it('uses the sight pose and applies the sight FOV while the provider crews the sight', () => {
+      const provider = makeSightProvider(true, 18);
+      playerCamera.setVehicleFollowCamera(provider);
+
+      playerCamera.updateCamera(mockInput);
+
+      expect(camera.position.equals(sightPos)).toBe(true);
+      expect(camera.fov).toBe(18);
+      // The third-person path must not run while the sight owns the frame.
+      expect(provider.computeThirdPersonCamera).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the third-person pose and restores the base FOV when the sight reports false (driver seat)', () => {
+      const provider = makeSightProvider(true, 18);
+      playerCamera.setVehicleFollowCamera(provider);
+      playerCamera.updateCamera(mockInput);
+      expect(camera.fov).toBe(18);
+
+      // Seat swap: same provider, sight no longer active.
+      provider.computeGunnerSightCamera.mockImplementation(() => false);
+      playerCamera.updateCamera(mockInput);
+
+      expect(camera.position.equals(chassisCamPos)).toBe(true);
+      expect(camera.fov).toBe(75); // base FOV restored exactly once
+    });
+
+    it('never leaks the sight FOV into infantry view after a mid-sight dismount', () => {
+      const provider = makeSightProvider(true, 18);
+      playerCamera.setVehicleFollowCamera(provider);
+      playerCamera.updateCamera(mockInput);
+      expect(camera.fov).toBe(18);
+
+      // Dismount clears the provider without any intermediate frame.
+      playerCamera.setVehicleFollowCamera(null);
+      playerCamera.updateCamera(mockInput);
+
+      expect(camera.position.equals(playerState.position)).toBe(true);
+      expect(camera.fov).toBe(75);
+    });
+  });
 });

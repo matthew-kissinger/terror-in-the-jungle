@@ -91,12 +91,13 @@ function createPlayerState(at = new THREE.Vector3(0, 1, 0)): PlayerState {
  * throttle, A/D to turn, Space to brake) without rebuilding the whole
  * input object.
  */
-function makeInput(keyMap: Record<string, boolean> = {}) {
+function makeInput(keyMap: Record<string, boolean> = {}, mouseButtons: Record<number, boolean> = {}) {
   return {
     setInHelicopter: vi.fn(),
     setFlightVehicleMode: vi.fn(),
     setInputContext: vi.fn(),
     isKeyPressed: vi.fn((k: string) => !!keyMap[k.toLowerCase()]),
+    isMouseButtonPressed: vi.fn((b: number) => !!mouseButtons[b]),
     getMouseMovement: vi.fn(() => ({ x: 0, y: 0 })),
     clearMouseMovement: vi.fn(),
     getIsPointerLocked: vi.fn(() => false),
@@ -375,5 +376,80 @@ describe('M48 Patton player boarding end-to-end (pilot seat)', () => {
       adapter.stepPhysics(1 / 60, terrain);
     }
     expect(tank.position.distanceTo(startPos)).toBeGreaterThan(0.5);
+  });
+});
+
+describe('M48 gunner sight surface across board → swap → zoom → exit (tank-sight-prod-wiring)', () => {
+  let tank: Tank;
+  let adapter: TankPlayerAdapter;
+
+  beforeEach(() => {
+    tank = spawnTank('m48_patton_alpha', new THREE.Vector3(100, 1, 200));
+    adapter = new TankPlayerAdapter(tank);
+  });
+
+  it('driver seat shows the infantry crosshair; the gunner station shows the stadia sight; exit restores infantry', () => {
+    const player = createPlayerState(new THREE.Vector3(98, 1, 200));
+    const ctx = makeTransitionContext(player, tank.position, tank.id);
+    adapter.onEnter(ctx);
+
+    // Boarded at the driver hatch: plain infantry crosshair, no sight camera.
+    expect(ctx._renderer.setCrosshairMode).toHaveBeenLastCalledWith('infantry');
+    expect(adapter.computeGunnerSightCamera(new THREE.Vector3(), new THREE.Vector3())).toBe(false);
+
+    // Swap up into the gunner station: stadia sight + sight camera live.
+    const swapCtx = makeUpdateContext(ctx._input, ctx._hud);
+    adapter.swapSeat(swapCtx);
+    expect(adapter.getCrewSeat()).toBe('gunner');
+    expect(ctx._renderer.setCrosshairMode).toHaveBeenLastCalledWith('tank_gunner');
+
+    const fov = { value: 0 };
+    expect(adapter.computeGunnerSightCamera(new THREE.Vector3(), new THREE.Vector3(), fov)).toBe(true);
+    expect(fov.value).toBe(50); // unmagnified sight FOV
+
+    // Swap back down: infantry crosshair, sight camera yields to the orbit cam.
+    adapter.swapSeat(swapCtx);
+    expect(ctx._renderer.setCrosshairMode).toHaveBeenLastCalledWith('infantry');
+    expect(adapter.computeGunnerSightCamera(new THREE.Vector3(), new THREE.Vector3())).toBe(false);
+
+    // Full dismount restores infantry from the gunner seat too.
+    adapter.swapSeat(swapCtx);
+    adapter.onExit(ctx);
+    expect(ctx._renderer.setCrosshairMode).toHaveBeenLastCalledWith('infantry');
+  });
+
+  it('RMB toggles sight magnification on a rising edge and pushes it through the HUD context', () => {
+    const player = createPlayerState(new THREE.Vector3(98, 1, 200));
+    const ctx = makeTransitionContext(player, tank.position, tank.id);
+    adapter.onEnter(ctx);
+    const swapCtx = makeUpdateContext(ctx._input, ctx._hud);
+    adapter.swapSeat(swapCtx);
+
+    // Hold RMB for one update: zoom engages on the rising edge.
+    const mouseButtons: Record<number, boolean> = { 2: true };
+    const zoomInput = makeInput({}, mouseButtons);
+    adapter.update(makeUpdateContext(zoomInput, ctx._hud));
+    expect(adapter.isZoomed()).toBe(true);
+
+    const fov = { value: 0 };
+    adapter.computeGunnerSightCamera(new THREE.Vector3(), new THREE.Vector3(), fov);
+    expect(fov.value).toBe(18); // zoomed optical step
+    expect(ctx._hud.setVehicleContext).toHaveBeenLastCalledWith(
+      expect.objectContaining({ role: 'gunner', sightMagnification: 50 / 18 }),
+    );
+
+    // Held RMB does NOT re-toggle (rising edge only)...
+    adapter.update(makeUpdateContext(zoomInput, ctx._hud));
+    expect(adapter.isZoomed()).toBe(true);
+
+    // ...release + press again toggles back to 1x.
+    mouseButtons[2] = false;
+    adapter.update(makeUpdateContext(zoomInput, ctx._hud));
+    mouseButtons[2] = true;
+    adapter.update(makeUpdateContext(zoomInput, ctx._hud));
+    expect(adapter.isZoomed()).toBe(false);
+
+    // Reload-gate display reads READY off the same gate the fire path uses.
+    expect(adapter.getMainGunState()).toBe('ready');
   });
 });

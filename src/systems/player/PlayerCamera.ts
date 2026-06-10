@@ -20,6 +20,8 @@ const _fwQuaternion = new THREE.Quaternion();
 const _fwForward = new THREE.Vector3();
 const _followPosition = new THREE.Vector3();
 const _followLookTarget = new THREE.Vector3();
+// Out-param scratch for the optional weapon-sight FOV (degrees; 0 = unset).
+const _sightFovOut = { value: 0 };
 
 /**
  * Minimal contract a ground/tank/surface adapter implements so the camera
@@ -33,6 +35,20 @@ const _followLookTarget = new THREE.Vector3();
  */
 export interface VehicleFollowCamera {
   computeThirdPersonCamera(outPosition: THREE.Vector3, outLookTarget: THREE.Vector3): boolean;
+  /**
+   * Optional first-person weapon-sight pose (tank gunner station, emplacement
+   * barrel cam). When present AND it returns true, the camera uses this pose
+   * INSTEAD of the third-person follow pose for the frame, applying `outFov`
+   * (vertical degrees) when the provider writes one — that is how sight
+   * magnification reaches the projection (tank-sight-prod-wiring). Returning
+   * false falls back to the third-person pose (e.g. player in the driver
+   * seat), so seat swaps switch cameras with no re-registration.
+   */
+  computeGunnerSightCamera?(
+    outPosition: THREE.Vector3,
+    outLookTarget: THREE.Vector3,
+    outFov?: { value: number },
+  ): boolean;
 }
 
 const FIXED_WING_CAMERA_FOLLOW_RATE = 9.5;
@@ -68,6 +84,10 @@ export class PlayerCamera {
   // Saved infantry angles for helicopter enter/exit transitions
   private savedInfantryYaw = Math.PI;
   private savedInfantryPitch = 0;
+
+  // True while a vehicle weapon-sight owns the projection FOV, so the base
+  // FOV is restored exactly once on leaving the sight.
+  private vehicleSightFovApplied = false;
 
   constructor(camera: THREE.PerspectiveCamera, playerState: PlayerState) {
     this.camera = camera;
@@ -146,6 +166,26 @@ export class PlayerCamera {
    */
   private updateVehicleFollowCamera(input: PlayerInput): void {
     const provider = this.vehicleFollowCamera;
+
+    // Weapon-sight pose wins when the provider crews a sight this frame
+    // (tank gunner station): first-person down-the-barrel + sight FOV.
+    // Returning false (driver seat, mid-spawn) falls through to the
+    // third-person follow pose below.
+    if (provider?.computeGunnerSightCamera) {
+      _sightFovOut.value = 0;
+      if (provider.computeGunnerSightCamera(_followPosition, _followLookTarget, _sightFovOut)) {
+        if (input.getIsPointerLocked()) {
+          input.clearMouseMovement();
+        }
+        this.applyVehicleSightFov(_sightFovOut.value > 0 ? _sightFovOut.value : null);
+        this.camera.position.copy(_followPosition);
+        this.camera.lookAt(_followLookTarget);
+        return;
+      }
+    }
+    // Not in a sight this frame — restore the base FOV if a sight set one.
+    this.applyVehicleSightFov(null);
+
     if (!provider || !provider.computeThirdPersonCamera(_followPosition, _followLookTarget)) {
       this.updateFirstPersonCamera(input);
       return;
@@ -161,7 +201,35 @@ export class PlayerCamera {
     this.camera.lookAt(_followLookTarget);
   }
 
+  /**
+   * Apply (or clear with `null`) the vehicle weapon-sight FOV. Tracks
+   * whether the sight owns the projection so the base FOV is restored
+   * exactly once on leaving the sight — never fighting the fixed-wing FOV
+   * smoothing, which manages the projection on its own path.
+   */
+  private applyVehicleSightFov(fovDeg: number | null): void {
+    if (fovDeg !== null) {
+      if (this.camera.fov !== fovDeg) {
+        this.camera.fov = fovDeg;
+        this.camera.updateProjectionMatrix();
+      }
+      this.vehicleSightFovApplied = true;
+      return;
+    }
+    if (this.vehicleSightFovApplied) {
+      this.vehicleSightFovApplied = false;
+      if (this.camera.fov !== this.baseFOV) {
+        this.camera.fov = this.baseFOV;
+        this.camera.updateProjectionMatrix();
+      }
+    }
+  }
+
   private updateFirstPersonCamera(input: PlayerInput): void {
+    // A dismount mid-sight skips the follow-cam path entirely (provider
+    // cleared) — make sure the sight FOV never sticks into infantry view.
+    this.applyVehicleSightFov(null);
+
     // Update camera rotation from mouse/touch movement
     // On touch devices getIsPointerLocked() returns true when game is started
     if (input.getIsPointerLocked()) {
