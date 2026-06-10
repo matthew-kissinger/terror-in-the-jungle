@@ -22,8 +22,11 @@ import {
   readThrottleAxis,
   relockPointer,
   seatPlayer,
+  setCrosshairMode,
   setInfantryCrosshair,
 } from './VehicleAdapterShared';
+import { TankSightSurface, SIGHT_MAG_1X, SIGHT_MAG_ZOOM } from './TankSightSurface';
+import type { IGameRenderer } from '../../types/SystemInterfaces';
 
 // ── Tank chassis control tuning ──
 const DEFAULT_EXIT_SIDE_OFFSET_M = 3.0; // metres to the +X side of chassis on dismount fallback
@@ -32,6 +35,9 @@ const DEFAULT_EXIT_SIDE_OFFSET_M = 3.0; // metres to the +X side of chassis on d
 const MOUSE_AIM_SENSITIVITY = 0.0022; // radians per mouse-pixel (yaw + pitch)
 const TOUCH_AIM_DEADZONE = 0.05;
 const TOUCH_AIM_SENSITIVITY = 1.2; // radians/sec at full deflection (big gun, slow)
+
+// Sight magnification constants live in TankSightSurface (shared with the
+// standalone gunner station so both crews get one sight feel).
 
 // ── Cannon fire tuning ──
 const DEFAULT_MUZZLE_SPEED = 400; // m/s; matches TankCannonProjectileSystem v1 default
@@ -82,15 +88,18 @@ function createPilotUIContext(): VehicleUIContext {
   };
 }
 
-function createGunnerUIContext(): VehicleUIContext {
+function createGunnerUIContext(zoomed: boolean): VehicleUIContext {
   // Gunner station: 90mm main cannon. Reuses the 'turret' HUD bucket the
-  // M2HB emplacement gunner uses; the cannon round-counter + lead reticle
-  // are a follow-up cycle, so the shared turret bucket is the right fit.
+  // M2HB emplacement gunner uses; the craft-specific gunner panel
+  // (TankGunnerPanel) is adapter-owned. The additive `sightMagnification`
+  // field lets a HUD consumer reflect the zoom step without reading
+  // adapter internals (tank-sight-prod-wiring).
   return {
     kind: 'turret',
     role: 'gunner',
     hudVariant: 'turret',
     weaponCount: 1,
+    sightMagnification: zoomed ? SIGHT_MAG_ZOOM : SIGHT_MAG_1X,
     capabilities: {
       canExit: true,
       canFirePrimary: true,
@@ -195,8 +204,30 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   // tank (the normal fire → flight → impact window). Null = no stepper bound.
   private cannonStep: ((deltaTime: number) => void) | null = null;
 
+  // Sight magnification + FJ gunner panel (tank-sight-prod-wiring): owned by
+  // the shared sight surface; the adapter feeds it live gun/turret reads.
+  private readonly sight = new TankSightSurface({
+    getTurretYaw: () => this.model.getTurret().getYaw(),
+    getReloadProgress01: () => this.getReloadProgress01(),
+  });
+
+  // Renderer captured on enter so `swapSeat` (update-context only) can
+  // switch the crosshair mode between seats.
+  private gameRenderer: IGameRenderer | undefined;
+
   constructor(model: Tank) {
     this.model = model;
+  }
+
+  /**
+   * Inject the DOM host the gunner panel mounts into (the in-game HUD root).
+   * The composer wires this at board-time (m2hb-gun-experience precedent);
+   * tests omit it to stay headless. The session-enter hook fires AFTER the
+   * adapter's `onEnter`, so a board straight into the gunner seat mounts
+   * late here (the surface mounts on host arrival while active).
+   */
+  setHudPanelHost(host: HTMLElement | null): void {
+    this.sight.setHost(host);
   }
 
   // ── Cannon wiring ────────────────────────────────────────────────────────
@@ -229,6 +260,7 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     this.mounted = true;
     this.crewSeat = this.playerSeat;
     this.lastShotMs = Number.NEGATIVE_INFINITY;
+    this.gameRenderer = ctx.gameRenderer;
 
     // Player out of infantry motion, snapped onto the crew station.
     seatPlayer(ctx, this.enterReason());
@@ -246,7 +278,9 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
 
     this.applyHudContext(ctx.hudSystem);
 
-    setInfantryCrosshair(ctx.gameRenderer);
+    // Seat-conditional surface: stadia sight + gunner panel in the gunner
+    // station, plain infantry crosshair at the driver hatch.
+    this.applySeatSurface(ctx.gameRenderer);
 
     // Re-acquire pointer lock so mouse-look / turret aim keeps working.
     relockPointer(ctx.input);
@@ -265,6 +299,10 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.setVehicleContext?.(null);
 
     setInfantryCrosshair(ctx.gameRenderer);
+
+    // Tear down the gunner panel so it doesn't linger over the infantry HUD.
+    this.sight.deactivate();
+    this.gameRenderer = undefined;
 
     // Park the chassis: zero the driver inputs so the tank coasts to a
     // stop under the physics layer's drag rather than carrying the
@@ -381,6 +419,7 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     // between shots.
 
     this.applyHudContext(ctx.hudSystem);
+    this.applySeatSurface(this.gameRenderer);
     return this.crewSeat;
   }
 
@@ -437,6 +476,7 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
   computeGunnerSightCamera(
     outPosition: THREE.Vector3,
     outLookTarget: THREE.Vector3,
+    outFov?: { value: number },
   ): boolean {
     if (!this.mounted || this.crewSeat !== 'gunner') return false;
 
@@ -449,7 +489,38 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     outPosition.y += this.sightUpOffset;
 
     outLookTarget.copy(outPosition).addScaledVector(_scratchDir, 1);
+    // Same call drives the zoom: the camera keystone applies this FOV while
+    // the sight is active (magnification is a FOV change only; the DOM
+    // reticle overlay scales naturally with the zoomed view).
+    if (outFov) outFov.value = this.sight.getSightFov();
     return true;
+  }
+
+  /** Desired gunner-sight vertical FOV (degrees) for the current zoom step. */
+  getSightFov(): number {
+    return this.sight.getSightFov();
+  }
+
+  /** Whether the sight is currently in the zoomed step. */
+  isZoomed(): boolean {
+    return this.sight.isZoomed();
+  }
+
+  /**
+   * Main-gun fire-gate state for the HUD, derived from the SAME reload gate
+   * `tryFireCannon` enforces — display and gate cannot drift.
+   */
+  getMainGunState(): 'ready' | 'reloading' {
+    return this.sight.getMainGunState();
+  }
+
+  /** Reload completion 0..1 (1 = loaded / READY). Drives the panel's bar. */
+  getReloadProgress01(): number {
+    const elapsedMs = this.clock() - this.lastShotMs;
+    const reloadMs = this.reloadSeconds * 1000;
+    if (reloadMs <= 0) return 1;
+    const p = elapsedMs / reloadMs;
+    return p >= 1 ? 1 : p < 0 ? 0 : p;
   }
 
   // ── Driver seat ──────────────────────────────────────────────────────────
@@ -492,6 +563,12 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     this.readAimInput(ctx.input, ctx.deltaTime);
     this.readFireInput(ctx.input);
     this.tryFireCannon();
+    // RMB zoom toggle (rising edge): push the new magnification through the
+    // HUD context so consumers see it without reading adapter internals.
+    if (this.sight.readZoomToggle(ctx.input)) {
+      this.applyHudContext(ctx.hudSystem);
+    }
+    this.sight.refreshPanel();
   }
 
   private readAimInput(input: PlayerInput, deltaTime: number): void {
@@ -576,11 +653,28 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
     return id;
   }
 
+  // ── Gunner sight surface (tank-sight-prod-wiring) ─────────────────────────
+
+  /**
+   * Seat-conditional crosshair + panel: the gunner station gets the stadia
+   * `tank_gunner` reticle and the FJ gunner panel; the driver hatch gets the
+   * plain infantry crosshair and no panel. Called on enter and on seat swap.
+   */
+  private applySeatSurface(gameRenderer: IGameRenderer | undefined): void {
+    if (this.crewSeat === 'gunner') {
+      setCrosshairMode(gameRenderer, 'tank_gunner');
+      this.sight.activate();
+    } else {
+      setCrosshairMode(gameRenderer, 'infantry');
+      this.sight.deactivate();
+    }
+  }
+
   // ── Shared helpers ─────────────────────────────────────────────────────────
 
   private applyHudContext(hudSystem: VehicleUpdateContext['hudSystem'] | VehicleTransitionContext['hudSystem']): void {
     const hud = hudSystem as IHUDSystem | undefined;
-    const uiCtx = this.crewSeat === 'gunner' ? createGunnerUIContext() : createPilotUIContext();
+    const uiCtx = this.crewSeat === 'gunner' ? createGunnerUIContext(this.sight.isZoomed()) : createPilotUIContext();
     hud?.setVehicleContext?.(uiCtx);
   }
 
