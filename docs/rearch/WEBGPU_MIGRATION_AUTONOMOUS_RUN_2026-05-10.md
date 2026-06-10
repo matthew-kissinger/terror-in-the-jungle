@@ -53,7 +53,7 @@ Read these first, in order:
 4. `docs/TESTING.md`
 5. `docs/state/CURRENT.md`
 6. `docs/state/perf-trust.md`
-7. `docs/rearch/KONVEYER_AUTONOMOUS_RUN_2026-05-10.md`
+7. `docs/rearch/WEBGPU_MIGRATION_AUTONOMOUS_RUN_2026-05-10.md`
 8. `docs/tasks/konveyer-full-autonomous-migration.md`
 9. `docs/rearch/KONVEYER_PARITY_2026-05-10.md`
 10. `docs/rearch/KONVEYER_TERRAIN_LIGHTING_ANALYSIS_2026-05-11.md`

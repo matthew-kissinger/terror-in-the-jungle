@@ -216,7 +216,7 @@ worker. Good.
 update tick. The named regression behind `DEFEKT-3` (combat AI p99) is
 this exact bucket: synchronous cover-search inside
 `AIStateEngage.initiateSquadSuppression()` (named in
-`docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md` §"Cover
+`docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md` §"Cover
 spatial-grid"). On the emulation-mobile profile under 4x CPU throttle
 with 60 NPCs, the EMA sits at 46.9 ms (over 2.8x the 16.67 ms frame
 budget on its own) and the peak hits 954 ms — a 1 s stall, mostly
@@ -231,13 +231,13 @@ cycle should sequence it ahead of the "mobile playable" close gate.
 The Hosek-Wilkie LUT-driven sky backend
 (`src/systems/environment/atmosphere/HosekWilkieSkyBackend.ts`, 807
 LOC, grandfathered for size — see
-`POST_KONVEYER_MIGRATION_2026-05-13.md` §"File-split debt") drives the
+`POST_WEBGPU_MIGRATION_2026-05-13.md` §"File-split debt") drives the
 sky-texture refresh. On desktop after the slice-12-15 idempotency work
 the cost is sub-1 ms per frame. On emulation-mobile this is 31.6 ms
 avg EMA — about 30x slower than desktop, almost twice the entire
 desktop frame budget. The 2 s `SKY_TEXTURE_REFRESH_SECONDS` cadence
 gate
-(`POST_KONVEYER_MIGRATION_2026-05-13.md` §"Idempotent setCloudCoverage
+(`POST_WEBGPU_MIGRATION_2026-05-13.md` §"Idempotent setCloudCoverage
 / sky-refresh gate") is *not* fully suppressing the cost on the
 mobile path — the 31.6 ms is amortized over many frames, but the
 single-frame peaks (763 ms) prove the refresh itself still runs
@@ -412,7 +412,7 @@ candidates when proposing the named fix cycle:
   partially in this cycle's marks):
   `docs/rearch/MODE_STARTUP_TERRAIN_BAKE_2026-05-13.md`.
 - KONVEYER milestone summary:
-  `docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md`.
+  `docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md`.
 - Carry-over registry: `docs/CARRY_OVERS.md` — `KB-MOBILE-WEBGPU` and
   `KB-SKY-BLAND` open with this cycle's launch, close at R2
   alignment memo merge with promotion-to-fix-cycle resolution.

@@ -51,7 +51,7 @@ type TslNode = any;
 
 export type TerrainMaterial = MeshStandardNodeMaterial & {
   uniforms: TerrainUniforms;
-  isKonveyerTerrainNodeMaterial: true;
+  isTerrainNodeMaterial: true;
   emissiveNode?: TslNode;
 };
 
@@ -720,7 +720,7 @@ function terrainLowSunOcclusionMask(terrainNormal: TslNode, worldPos: TslNode, u
 
 function configureTerrainNodeMaterial(material: TerrainMaterial, uniforms: TerrainUniforms): void {
   material.uniforms = uniforms;
-  material.isKonveyerTerrainNodeMaterial = true;
+  material.isTerrainNodeMaterial = true;
   // TSL owns terrain fog/tint in colorNode; disabling legacy fog avoids
   // WebGLRenderer's fixed fog uniform path for node-generated programs.
   material.fog = false;
@@ -867,7 +867,7 @@ function applyTerrainMaterialOptions(
   material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
   material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
   material.userData.terrainAtmosphereLighting = normalizeTerrainAtmosphereLighting(options.atmosphereLighting);
-  material.customProgramCacheKey = () => 'KonveyerTerrainTSL_v1';
+  material.customProgramCacheKey = () => 'TerrainTSL_v1';
   configureTerrainNodeMaterial(material, shaderBindings.uniforms);
 }
 

@@ -380,7 +380,7 @@ owner opens or reassigns them.
 - E2: GPU-driven rendering and WebGPU migration are now active on
   `exp/konveyer-webgpu-migration` (KONVEYER-0 through KONVEYER-10). The
   scene/material/materialization rearchitecture memo lives at
-  `docs/rearch/KONVEYER_MATERIALIZATION_TIERS_2026-05-12.md`; concrete
+  `docs/rearch/WEBGPU_MIGRATION_MATERIALIZATION_TIERS_2026-05-12.md`; concrete
   instancing-capacity cliffs may still be fixed in place on `master` while
   the experimental branch matures.
 - E3: Utility-AI combat layer expansion remains a design candidate; do not

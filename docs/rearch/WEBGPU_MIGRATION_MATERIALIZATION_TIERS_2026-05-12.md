@@ -70,7 +70,7 @@ Phase F slice 1 (shipped 2026-05-12) renamed the config keys
 slots. Per-faction pool size grows from 12 to 14.
 
 Multi-mode strict-WebGPU verification under the new policy is recorded at
-`artifacts/perf/2026-05-12T02-24-10-594Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+`artifacts/perf/2026-05-12T02-24-10-594Z/asset-crop-probe/asset-crop-probe.json`.
 All five modes resolve `resolvedBackend=webgpu` with zero console/page errors.
 Per-mode effective cap and review-pose fallback counts versus the prior
 `01-50-30-290Z` evidence (TOTAL_CAP+4):
@@ -201,7 +201,7 @@ These are independently shippable. Each one assumes branch hard-stops.
     candidates of the same faction hit a false pool-empty even though the
     slot would have been released milliseconds later. Multi-mode strict
     WebGPU verification:
-    `artifacts/perf/2026-05-12T03-06-33-332Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    `artifacts/perf/2026-05-12T03-06-33-332Z/asset-crop-probe/asset-crop-probe.json`.
     combat120 review: `pool-empty:6` → `pool-empty:0`; all 22 fallbacks now
     `total-cap`, which is the designed materialization tier boundary.
     Open Frontier and Zone Control regressed to cap 8 in this run only
@@ -216,7 +216,7 @@ These are independently shippable. Each one assumes branch hard-stops.
     actionable input for "renderer/world budgets attribution".
 
     Strict WebGPU multi-mode evidence (RTX 3070, headed):
-    `artifacts/perf/2026-05-12T16-06-33-882Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    `artifacts/perf/2026-05-12T16-06-33-882Z/asset-crop-probe/asset-crop-probe.json`.
 
     Top contributor per mode:
 
@@ -267,7 +267,7 @@ These are independently shippable. Each one assumes branch hard-stops.
     spurious zero-frame samples.
 
     Strict WebGPU multi-mode evidence (RTX 3070, headed):
-    `artifacts/perf/2026-05-12T15-39-11-477Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    `artifacts/perf/2026-05-12T15-39-11-477Z/asset-crop-probe/asset-crop-probe.json`.
 
     | Mode | avg ms | p95 ms | p99 ms | max ms | hitch33 | close-active | candidates |
     | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -303,7 +303,7 @@ These are independently shippable. Each one assumes branch hard-stops.
     the slice extends the diagnostic surface added by slice 0e.
 
     Strict WebGPU multi-mode evidence:
-    `artifacts/perf/2026-05-12T13-59-07-487Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    `artifacts/perf/2026-05-12T13-59-07-487Z/asset-crop-probe/asset-crop-probe.json`.
 
     Per-mode capture (counts of transitions in a single probe window):
 
@@ -349,7 +349,7 @@ These are independently shippable. Each one assumes branch hard-stops.
     synchronous fan-out cost.
 
     Strict WebGPU multi-mode regression proof:
-    `artifacts/perf/2026-05-12T12-55-00-499Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    `artifacts/perf/2026-05-12T12-55-00-499Z/asset-crop-probe/asset-crop-probe.json`.
     No close-NPC materialization regressions vs slice 5: per-mode caps,
     rendered counts, and fallback counts are equivalent.
 
@@ -373,7 +373,7 @@ These are independently shippable. Each one assumes branch hard-stops.
     weight, not a hard override.
 
     Strict WebGPU multi-mode proof:
-    `artifacts/perf/2026-05-12T09-45-53-698Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    `artifacts/perf/2026-05-12T09-45-53-698Z/asset-crop-probe/asset-crop-probe.json`.
     Effect on the densest mode (combat120 / ai_sandbox): 7 of the 14
     close-GLB slots are now in-combat actors (slice 4 had 0 measured
     in-combat promotions). The single remaining "missed" in-combat
@@ -401,7 +401,7 @@ These are independently shippable. Each one assumes branch hard-stops.
     when state is ENGAGING/SUPPRESSING/ADVANCING. This is the budget
     arbiter's input surface — slice 5 of the Phase F memo. Strict WebGPU
     multi-mode proof:
-    `artifacts/perf/2026-05-12T04-48-59-955Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    `artifacts/perf/2026-05-12T04-48-59-955Z/asset-crop-probe/asset-crop-probe.json`.
     First architectural finding the diagnostic surfaces: A Shau's
     review-pose `nearest[]` contains actors with `inActiveCombat=true`
     stuck on `impostor:total-cap` (e.g., combatant_40 at 7.9 m) — exactly
@@ -417,11 +417,11 @@ These are independently shippable. Each one assumes branch hard-stops.
     for the WarSimulator to materialize live combatants near the new
     player position, then runs the normal close-NPC review pose. No
     game-code change — `prepareDirectedZoneWarp` in
-    `scripts/konveyer-asset-crop-probe.ts` reads
+    `scripts/asset-crop-probe.ts` reads
     `engine.systemManager.zoneManager.getAllZones()` and warps to the
     first contested non-home-base zone. Five-mode strict WebGPU proof
     after slices 0/0a/0b:
-    `artifacts/perf/2026-05-12T03-33-59-816Z/konveyer-asset-crop-probe/asset-crop-probe.json`.
+    `artifacts/perf/2026-05-12T03-33-59-816Z/asset-crop-probe/asset-crop-probe.json`.
     A Shau wait observation: 5865 ms from warp to first live combatants
     (0 → 4 within close radius); by review phase the WarSimulator
     populated 60 candidates inside the close radius, of which 14 render
@@ -475,9 +475,9 @@ These are independently shippable. Each one assumes branch hard-stops.
 - `src/systems/combat/CombatantRenderer.ts` — current render lanes, close-GLB
   pool, spawn-residency reserve
 - `src/systems/combat/PixelForgeNpcRuntime.ts` — distance/cap config
-- `artifacts/perf/2026-05-12T01-26-56-068Z/konveyer-asset-crop-probe/asset-crop-probe.json`
+- `artifacts/perf/2026-05-12T01-26-56-068Z/asset-crop-probe/asset-crop-probe.json`
   — Open Frontier 11 close-GLB residency proof
-- `docs/rearch/KONVEYER_WEBGPU_STACK_RESEARCH_SPIKES_2026-05-11.md` — Spike 6
+- `docs/rearch/WEBGPU_MIGRATION_STACK_RESEARCH_SPIKES_2026-05-11.md` — Spike 6
   (ECSY/materialization vocabulary)
 - `docs/tasks/cycle-2026-05-16-phase-f-ecs-and-cover-rearch.md` — Phase F
   cycle that will host this work

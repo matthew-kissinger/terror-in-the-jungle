@@ -87,7 +87,7 @@ squad-aggregated strategic sim, budget arbiter v2, multi-mode strict-WebGPU
 proof v2) queued on master as
 [`cycle-phase-f-r2-r4-on-master`](../tasks/archive/cycle-phase-f-r2-r4-on-master-DEFERRED/cycle-phase-f-r2-r4-on-master.md).
 Milestone memo:
-[docs/rearch/POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md).
+[docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md](../rearch/POST_WEBGPU_MIGRATION_2026-05-13.md).
 
 ---
 
@@ -117,7 +117,7 @@ touched.
 - Strategic-doc alignment to post-master-merge WebGPU state (PR #193;
   bundle 1).
 - New `docs/state/CURRENT.md` 2026-05-13 entry, milestone memo
-  [POST_KONVEYER_MIGRATION_2026-05-13.md](../rearch/POST_KONVEYER_MIGRATION_2026-05-13.md),
+  [POST_WEBGPU_MIGRATION_2026-05-13.md](../rearch/POST_WEBGPU_MIGRATION_2026-05-13.md),
   and active campaign manifest
   [CAMPAIGN_2026-05-13-POST-WEBGPU.md](../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
   (PR #194; bundle 2).

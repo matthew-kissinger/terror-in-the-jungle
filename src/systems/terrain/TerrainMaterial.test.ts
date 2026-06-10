@@ -152,7 +152,7 @@ describe('TerrainMaterial', () => {
 
     expect(mat).toBeDefined();
     expect(mat.isNodeMaterial).toBe(true);
-    expect(mat.isKonveyerTerrainNodeMaterial).toBe(true);
+    expect(mat.isTerrainNodeMaterial).toBe(true);
     expect(mat.fog).toBe(false);
     expect(mat.positionNode).toBeDefined();
     expect(mat.normalNode).toBeDefined();

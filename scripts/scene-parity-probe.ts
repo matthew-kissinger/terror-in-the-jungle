@@ -848,7 +848,7 @@ function terrainLodLine(pose: PoseProbe | undefined): string {
 
 function renderMarkdown(report: ProbeReport): string {
   const lines: string[] = [
-    '# KONVEYER Scene Parity Probe',
+    '# Scene Parity Probe',
     '',
     `Created: ${report.createdAt}`,
     `Status: ${report.status}`,
@@ -897,7 +897,7 @@ function renderMarkdown(report: ProbeReport): string {
 
 async function main(): Promise<void> {
   if (hasFlag('help')) {
-    console.log('Usage: npx tsx scripts/konveyer-scene-parity-probe.ts --modes open_frontier,zone_control --renderer webgpu-strict --headed');
+    console.log('Usage: npx tsx scripts/scene-parity-probe.ts --modes open_frontier,zone_control --renderer webgpu-strict --headed');
     return;
   }
   const modes = normalizeModes(parseStringFlag('modes', 'open_frontier,zone_control'));
@@ -910,7 +910,7 @@ async function main(): Promise<void> {
     throw new Error('dist-perf/index.html not found. Run `npm run build:perf` or pass --force-build.');
   }
 
-  const artifactDir = join(ARTIFACT_ROOT, nowSlug(), 'konveyer-scene-parity');
+  const artifactDir = join(ARTIFACT_ROOT, nowSlug(), 'scene-parity');
   mkdirSync(artifactDir, { recursive: true });
   const summaryPath = join(artifactDir, 'scene-parity.json');
   const markdownPath = join(artifactDir, 'scene-parity.md');
@@ -975,7 +975,7 @@ async function main(): Promise<void> {
         .split(/\r?\n/)
         .map(line => line.trim())
         .filter(Boolean),
-      source: 'scripts/konveyer-scene-parity-probe.ts',
+      source: 'scripts/scene-parity-probe.ts',
       status: aggregateStatus(modeReports),
       options: { modes, renderer, headed, port, forceBuild },
       files: {
@@ -997,7 +997,7 @@ async function main(): Promise<void> {
     };
     writeFileSync(summaryPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     writeFileSync(markdownPath, renderMarkdown(report), 'utf8');
-    console.log(`KONVEYER scene parity probe written to ${relative(process.cwd(), markdownPath)}`);
+    console.log(`Scene parity probe written to ${relative(process.cwd(), markdownPath)}`);
     if (report.status === 'fail') process.exitCode = 1;
   } finally {
     if (browser) await browser.close().catch(() => {});

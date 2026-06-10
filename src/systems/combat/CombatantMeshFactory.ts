@@ -417,9 +417,9 @@ export class CombatantMeshFactory {
       forceSinglePass: true,
       depthWrite: true,
     }) as MeshBasicNodeMaterial & CombatantUniformMaterial & {
-      isKonveyerNpcImpostorNodeMaterial: true;
+      isNpcImpostorNodeMaterial: true;
     };
-    material.isKonveyerNpcImpostorNodeMaterial = true;
+    material.isNpcImpostorNodeMaterial = true;
     material.fog = false;
     material.uniforms = uniforms;
     material.colorNode = createNpcImpostorColorNode(texture, tileCrop.texture, uniforms);

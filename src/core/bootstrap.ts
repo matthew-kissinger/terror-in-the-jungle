@@ -8,7 +8,7 @@ import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
 import { isBlufor, isOpfor } from '../systems/combat/types';
 import { isPerfDiagnosticsEnabled, isDiagEnabled } from './PerfDiagnostics';
-import { collectKonveyerNodeMaterialShaders } from './RendererBackend';
+import { collectNodeMaterialShaders } from './RendererBackend';
 import { Logger } from '../utils/Logger';
 import { preloadIcons } from '../ui/icons/IconRegistry';
 import { isFlightTestMode } from '../dev/flightTestMode';
@@ -184,7 +184,7 @@ export async function bootstrapGame(): Promise<void> {
 
       // R3 TSL shader-cost probe surface. Returns per-material compiled
       // GLSL + sampler / uniform / instruction counts for every TSL
-      // node-material tagged with a Konveyer marker. Used by
+      // node-material tagged with a node-material marker. Used by
       // `scripts/perf-tsl-shader-cost.ts` to verify the R1 terrain
       // biome-sampler early-out drops the WebGL2-fallback sampler count
       // by >= 4x. Optionally awaits `renderer.compileAsync(scene, camera)`
@@ -210,14 +210,14 @@ export async function bootstrapGame(): Promise<void> {
               // Don't fail the probe on compile error; report it.
               return {
                 error: e instanceof Error ? e.message : String(e),
-                records: collectKonveyerNodeMaterialShaders(threeRenderer as any, threeScene),
+                records: collectNodeMaterialShaders(threeRenderer as any, threeScene),
               };
             }
           }
         }
         return {
           error: null,
-          records: collectKonveyerNodeMaterialShaders(threeRenderer as any, threeScene),
+          records: collectNodeMaterialShaders(threeRenderer as any, threeScene),
         };
       };
 

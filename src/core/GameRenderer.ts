@@ -308,7 +308,7 @@ export class GameRenderer {
 
       Logger.info(
         'Renderer',
-        `KONVEYER renderer backend initialized (${this.rendererCapabilities.resolvedBackend})`
+        `Renderer backend initialized (${this.rendererCapabilities.resolvedBackend})`
       );
     } catch (error) {
       const errorMessage = toErrorMessage(error);
@@ -324,7 +324,7 @@ export class GameRenderer {
       };
       Logger.warn(
         'Renderer',
-        `KONVEYER WebGPU init failed: ${this.rendererCapabilities.error}`
+        `WebGPU init failed: ${this.rendererCapabilities.error}`
       );
       throw error instanceof Error ? error : new Error(errorMessage);
     }

@@ -124,7 +124,7 @@ interface DirectedZoneWarp {
 interface TierEventCapture {
   // Slice 8: empirical tier-transition flow captured during the probe.
   // `available` reflects whether `__materializationTierEvents` is exposed
-  // (requires `?diag=1` and KONVEYER slice-6 bus subscription).
+  // (requires `?diag=1` and diag slice-6 bus subscription).
   available: boolean;
   totalEvents: number;
   byTransition: Record<string, number>;
@@ -209,7 +209,7 @@ interface MaterializationPerfWindow {
   // sub-paths. Empty array when `window.perf` is unavailable.
   perfTelemetryTimings: PerfTelemetrySystemTiming[];
   atmosphereSubTimings: PerfTelemetrySystemTiming[];
-  // konveyer-combat-sub-attribution: per-step breakdown of the Combat
+  // combat-sub-attribution: per-step breakdown of the Combat
   // bucket (Combat.Influence, Combat.AI, Combat.Billboards, Combat.Effects)
   // captured via the same `systemBreakdown` rollup. Used to size R2's
   // cover-spatial-grid against the AI sub-step rather than the Combat
@@ -257,7 +257,7 @@ interface ModeCropResult {
 interface CropProbeReport {
   createdAt: string;
   sourceGitSha: string;
-  mode: 'konveyer-asset-crop-probe';
+  mode: 'asset-crop-probe';
   status: ProbeStatus;
   options: {
     modes: string[];
@@ -277,7 +277,7 @@ interface CropProbeReport {
 const HOST = '127.0.0.1';
 const DEFAULT_PORT = 9271;
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
-const OUTPUT_NAME = 'konveyer-asset-crop-probe';
+const OUTPUT_NAME = 'asset-crop-probe';
 const VIEWPORT = { width: 1440, height: 900 };
 const CLOSE_MODEL_LAZY_LOAD_FLAG = '__TIJ_ALLOW_NPC_CLOSE_MODEL_LAZY_LOAD__';
 const MODE_ALIASES: Record<string, string> = {
@@ -608,13 +608,13 @@ async function setVegetationVisibilityForProbe(page: Page, visible: boolean): Pr
     scene.traverse((object: any) => {
       if (!object || !isVegetationObject(object)) return;
       if (nextVisible) {
-        if (Object.prototype.hasOwnProperty.call(object.userData ?? {}, '__konveyerCropPrevVisible')) {
-          object.visible = Boolean(object.userData.__konveyerCropPrevVisible);
-          delete object.userData.__konveyerCropPrevVisible;
+        if (Object.prototype.hasOwnProperty.call(object.userData ?? {}, '__assetCropPrevVisible')) {
+          object.visible = Boolean(object.userData.__assetCropPrevVisible);
+          delete object.userData.__assetCropPrevVisible;
         }
-      } else if (!Object.prototype.hasOwnProperty.call(object.userData ?? {}, '__konveyerCropPrevVisible')) {
+      } else if (!Object.prototype.hasOwnProperty.call(object.userData ?? {}, '__assetCropPrevVisible')) {
         object.userData = object.userData ?? {};
-        object.userData.__konveyerCropPrevVisible = object.visible !== false;
+        object.userData.__assetCropPrevVisible = object.visible !== false;
         object.visible = false;
       }
     });
@@ -647,13 +647,13 @@ async function setTerrainVisibilityForProbe(page: Page, visible: boolean): Promi
     scene.traverse((object: any) => {
       if (!object || !isTerrainObject(object)) return;
       if (nextVisible) {
-        if (Object.prototype.hasOwnProperty.call(object.userData ?? {}, '__konveyerCropPrevTerrainVisible')) {
-          object.visible = Boolean(object.userData.__konveyerCropPrevTerrainVisible);
-          delete object.userData.__konveyerCropPrevTerrainVisible;
+        if (Object.prototype.hasOwnProperty.call(object.userData ?? {}, '__assetCropPrevTerrainVisible')) {
+          object.visible = Boolean(object.userData.__assetCropPrevTerrainVisible);
+          delete object.userData.__assetCropPrevTerrainVisible;
         }
-      } else if (!Object.prototype.hasOwnProperty.call(object.userData ?? {}, '__konveyerCropPrevTerrainVisible')) {
+      } else if (!Object.prototype.hasOwnProperty.call(object.userData ?? {}, '__assetCropPrevTerrainVisible')) {
         object.userData = object.userData ?? {};
-        object.userData.__konveyerCropPrevTerrainVisible = object.visible !== false;
+        object.userData.__assetCropPrevTerrainVisible = object.visible !== false;
         object.visible = false;
       }
     });
@@ -1167,7 +1167,7 @@ async function prepareDirectedZoneWarp(
     );
     const playerY = (Number.isFinite(terrainY) ? terrainY : 0) + 2.2;
     const playerPos = new Vector3(zoneX, playerY, zoneZ);
-    playerController.setPosition(playerPos, 'harness.konveyer-a-shau-directed-warp');
+    playerController.setPosition(playerPos, 'harness.asset-crop-a-shau-directed-warp');
     terrain?.updatePlayerPosition?.(playerPos);
     terrain?.update?.(0.016);
     return {
@@ -1350,7 +1350,7 @@ async function captureMaterializationPerfWindow(
         entry.name.startsWith('World.Atmosphere.')
         || entry.name === 'World.Atmosphere',
     );
-    // konveyer-combat-sub-attribution: peel the Combat bucket into its
+    // combat-sub-attribution: peel the Combat bucket into its
     // four sub-steps (Combat.Influence, Combat.AI, Combat.Billboards,
     // Combat.Effects). `Combat` itself is included so the report can
     // verify that the sum of children matches the aggregate within ~5%.
@@ -1544,7 +1544,7 @@ async function prepareCloseGlbReviewPose(page: Page): Promise<CloseGlbReviewPose
     );
     const playerY = (Number.isFinite(terrainY) ? terrainY : targetY) + 2.2;
     const playerPos = new Vector3(playerX, playerY, playerZ);
-    playerController.setPosition(playerPos, 'harness.konveyer-close-glb-review');
+    playerController.setPosition(playerPos, 'harness.asset-crop-close-glb-review');
     terrain?.updatePlayerPosition?.(playerPos);
     terrain?.update?.(0.016);
 
@@ -1815,7 +1815,7 @@ async function captureCloseGlbComparison(
       findings.push('atmosphere-subs:perf-report-unavailable');
     }
     if (perfWindow.combatSubTimings.length > 0) {
-      // konveyer-combat-sub-attribution: surface the four Combat.* child
+      // combat-sub-attribution: surface the four Combat.* child
       // EMAs plus the aggregate. sumChildren/aggregate ratio tells R2
       // sizing whether the wrapping overhead is acceptable (≤5% gap).
       const children = perfWindow.combatSubTimings.filter(entry => entry.name !== 'Combat');
@@ -1939,7 +1939,7 @@ async function runMode(
 
 function writeMarkdown(report: CropProbeReport): string {
   const lines: string[] = [
-    '# KONVEYER Asset Crop Probe',
+    '# Asset Crop Probe',
     '',
     `Created: ${report.createdAt}`,
     `Status: ${report.status}`,
@@ -1992,7 +1992,7 @@ async function main(): Promise<void> {
   const headed = hasFlag('headed');
   const distPerf = join(process.cwd(), 'dist-perf', 'index.html');
   if (!existsSync(distPerf)) {
-    throw new Error('dist-perf missing. Run npm run build:perf before konveyer asset crop probe.');
+    throw new Error('dist-perf missing. Run npm run build:perf before asset crop probe.');
   }
   const artifactDir = join(ARTIFACT_ROOT, nowSlug(), OUTPUT_NAME);
   mkdirSync(artifactDir, { recursive: true });
@@ -2032,7 +2032,7 @@ async function main(): Promise<void> {
     };
     writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
     writeFileSync(markdownPath, writeMarkdown(report));
-    console.log(`KONVEYER asset crop probe written to ${relative(process.cwd(), markdownPath)}`);
+    console.log(`Asset crop probe written to ${relative(process.cwd(), markdownPath)}`);
     if (report.status === 'fail') process.exitCode = 1;
   } finally {
     await browser?.close();

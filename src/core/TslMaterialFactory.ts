@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { RendererBackendCapabilities } from './RendererBackend';
 
-export type KonveyerTslSurface =
+export type TslSurface =
   | 'proof-fixture'
   | 'vegetation-billboard'
   | 'combatant-impostor'
@@ -26,7 +26,7 @@ export interface AlphaTextureNodeMaterialOptions {
   name?: string;
 }
 
-export type KonveyerNodeMaterial = THREE.Material & {
+export type TslNodeMaterial = THREE.Material & {
   isNodeMaterial?: boolean;
   colorNode?: unknown;
   opacityNode?: unknown;
@@ -39,7 +39,7 @@ const DEFAULT_ALPHA_TEST = 0.25;
 
 export function evaluateNodeMaterialReadiness(
   capabilities: RendererBackendCapabilities,
-  surface: KonveyerTslSurface,
+  surface: TslSurface,
 ): NodeMaterialReadiness {
   if (!capabilities.isWebGPURenderer) {
     return {
@@ -85,7 +85,7 @@ export function evaluateNodeMaterialReadiness(
 
 export async function createAlphaTextureNodeMaterial(
   options: AlphaTextureNodeMaterialOptions,
-): Promise<KonveyerNodeMaterial> {
+): Promise<TslNodeMaterial> {
   const [webgpu, tsl] = await Promise.all([
     import('three/webgpu'),
     import('three/tsl'),
@@ -93,14 +93,14 @@ export async function createAlphaTextureNodeMaterial(
 
   const alphaTest = options.alphaTest ?? DEFAULT_ALPHA_TEST;
   const material = new webgpu.MeshBasicNodeMaterial({
-    name: options.name ?? 'konveyer-alpha-texture-node-material',
+    name: options.name ?? 'alpha-texture-node-material',
     transparent: options.transparent ?? true,
     depthWrite: options.depthWrite ?? true,
     depthTest: true,
     side: options.side ?? THREE.DoubleSide,
     alphaTest,
     forceSinglePass: options.forceSinglePass ?? true,
-  }) as KonveyerNodeMaterial;
+  }) as TslNodeMaterial;
 
   material.fog = false;
   const sample = tsl.texture(options.texture, tsl.uv());

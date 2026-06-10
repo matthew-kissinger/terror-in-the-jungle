@@ -97,10 +97,10 @@ describe('createAlphaTextureNodeMaterial', () => {
     const material = await createAlphaTextureNodeMaterial({
       texture,
       alphaTest: 0.3,
-      name: 'konveyer-test-alpha-node-material',
+      name: 'test-alpha-node-material',
     });
 
-    expect(material.name).toBe('konveyer-test-alpha-node-material');
+    expect(material.name).toBe('test-alpha-node-material');
     expect(material.isNodeMaterial).toBe(true);
     expect(material.colorNode).toBeDefined();
     expect(material.opacityNode).toBeDefined();

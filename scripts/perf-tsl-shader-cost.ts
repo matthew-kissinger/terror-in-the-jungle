@@ -13,7 +13,7 @@
  *
  * Refs: docs/tasks/cycle-mobile-webgl2-fallback-fix.md;
  * docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/tsl-shader-cost-audit.md;
- * src/core/RendererBackend.ts (collectKonveyerNodeMaterialShaders);
+ * src/core/RendererBackend.ts (collectNodeMaterialShaders);
  * src/core/bootstrap.ts (window.__tslShaderCost).
  *
  * Usage:
@@ -126,7 +126,7 @@ function serveDist(req: IncomingMessage, res: ServerResponse, distRoot: string):
   res.end(body);
 }
 
-// Mirror of `KonveyerNodeMaterialShaderRecord` (src/core/RendererBackend.ts).
+// Mirror of `NodeMaterialShaderRecord` (src/core/RendererBackend.ts).
 interface ShaderMetrics {
   fragmentShader: string | null;
   vertexShader: string | null;
@@ -142,7 +142,7 @@ interface ShaderMetrics {
 
 interface MaterialRecord extends ShaderMetrics {
   kind: 'material';
-  marker: 'isKonveyerTerrainNodeMaterial' | 'isKonveyerNpcImpostorNodeMaterial' | 'isKonveyerBillboardNodeMaterial';
+  marker: 'isTerrainNodeMaterial' | 'isNpcImpostorNodeMaterial' | 'isBillboardNodeMaterial';
   className: string;
   materialName: string | null;
   uuid: string;
@@ -206,7 +206,7 @@ function rangeOf(records: ShaderRecord[], key: 'fragmentSamplerCount' | 'fragmen
 }
 
 function bucketCacheEntries(records: ShaderRecord[]): BucketSummary[] {
-  // Sampler-count discriminates Konveyer cache entries (TSL mangles uniform names).
+  // Sampler-count discriminates node-material cache entries (TSL mangles uniform names).
   // Pre-R1 terrain ~150+ samplers; post-R1 ~10–20; vegetation/impostor ~2–4.
   const cacheOnly = records.filter((r): r is CacheRecord => r.kind === 'cacheEntry');
   const buckets: Array<[string, (s: number) => boolean]> = [
