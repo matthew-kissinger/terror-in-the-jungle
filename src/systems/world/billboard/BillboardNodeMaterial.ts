@@ -536,7 +536,13 @@ function createBillboardLightingNode(
     ),
   );
   const directSun = rigSun.mul(diff).mul(lowSunFade);
-  return baseColor.mul(hemi.add(directSun)).add(rigAmbient).mul(rigExposure);
+  // Ambient (the night moon/skyglow floor) joins the light sum INSIDE the
+  // albedo multiply: night light dims the leaf's own color instead of
+  // painting a flat grey-blue over it. This matches how terrain receives
+  // ambientRadiance (PBR scene lights multiply by albedo) — adding it after
+  // the multiply was the source of the grey night foliage (owner report
+  // 2026-06-10).
+  return baseColor.mul(hemi.add(directSun).add(rigAmbient)).mul(rigExposure);
 }
 
 function createBillboardFogNode(

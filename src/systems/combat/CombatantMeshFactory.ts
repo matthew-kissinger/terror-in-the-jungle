@@ -244,7 +244,10 @@ function createNpcImpostorColorNode(
     ),
   );
   const rigDirectSun = rigSun.mul(rigDiff).mul(rigLowSunFade);
-  npcColor = npcColor.mul(rigHemi.add(rigDirectSun)).add(rigAmbient).mul(rigExposure);
+  // Ambient joins the light sum inside the albedo multiply (hue-preserving
+  // night light, consistent with terrain's PBR ambient) — see the matching
+  // note in BillboardNodeMaterial.createBillboardRigLightingNode.
+  npcColor = npcColor.mul(rigHemi.add(rigDirectSun).add(rigAmbient)).mul(rigExposure);
 
   const cameraDistance = tslCameraPosition.sub(tslPositionWorld).length();
   const expFog = tslFloat(1).sub(exp(npcFogDensity.negate().mul(tslMax(tslFloat(0), cameraDistance.sub(npcFogStartDistance)))));
