@@ -158,7 +158,9 @@ describe('TerrainMaterial', () => {
     expect(mat.normalNode).toBeDefined();
     expect(mat.colorNode).toBeDefined();
     expect(mat.roughnessNode).toBeDefined();
-    expect(mat.emissiveNode).toBeDefined();
+    // Night-fill emissive deleted in legacy-path-deletion (Phase 4): the rig
+    // night floor lives in the scene lights, not a terrain emissive term.
+    expect(mat.emissiveNode).toBeNull();
     const uniforms = terrainUniforms(mat);
 
     // Observable: the material publishes terrain-specific uniforms bound to the
