@@ -255,37 +255,61 @@ describe("GunplayCore", () => {
       expect(gun.recoilIndex).toBe(1);
     });
 
-    it("should return recoil values based on spec and pattern", () => {
+    it("the first shot kicks the camera by nearly the full per-shot recoil", () => {
       const gun = new GunplayCore(testSpec);
-      gun.registerShot(); // Increment recoil index to 1
+      gun.registerShot(); // first shot
       const recoilOffset = gun.getRecoilOffsetDeg();
 
       expect(typeof recoilOffset.pitch).toBe("number");
       expect(typeof recoilOffset.yaw).toBe("number");
 
-      // Verify pitch is based on recoilPerShotDeg and capped, applying recoilMultiplier
-      expect(recoilOffset.pitch).toBeCloseTo(testSpec.recoilPerShotDeg * (1 - testSpec.recoilPerShotDeg / 15));
+      // First-shot vertical kick is the un-tapered snap: essentially the full
+      // per-shot recoil (the plateau curve has barely begun). This is the feel
+      // the owner wants to keep — only sustained fire should taper.
+      expect(recoilOffset.pitch).toBeGreaterThan(testSpec.recoilPerShotDeg * 0.9);
+      expect(recoilOffset.pitch).toBeLessThanOrEqual(testSpec.recoilPerShotDeg);
 
-      // Verify yaw is within bounds based on recoilHorizontalDeg
+      // Yaw stays within the horizontal recoil bounds.
       expect(recoilOffset.yaw).toBeGreaterThanOrEqual(-testSpec.recoilHorizontalDeg);
       expect(recoilOffset.yaw).toBeLessThanOrEqual(testSpec.recoilHorizontalDeg);
     });
 
-    it("should apply diminishing returns to vertical recoil based on accumulated recoil", () => {
+    it("sustained automatic fire plateaus: vertical kick tapers toward zero as recoil saturates", () => {
       const gun = new GunplayCore(testSpec);
-      const initialRecoilPerShot = testSpec.recoilPerShotDeg; // 0.3
 
-      // Shoot multiple times to accumulate recoil
-      // The recoil multiplier caps at 0.3 when accumulatedRecoil is 10 (or more)
-      // So at 10 accumulated recoil, pitch should be 0.3 * 0.3 = 0.09
-      for (let i = 0; i < 30; i++) { // 30 * 0.3 = 9 degrees, then it caps at 10
+      const firstPitch = (() => {
+        gun.registerShot();
+        return gun.getRecoilOffsetDeg().pitch;
+      })();
+
+      // Empty a long burst so accumulated recoil saturates at its cap.
+      for (let i = 0; i < 200; i++) {
         gun.registerShot();
       }
-      // @ts-ignore
-      expect(gun.accumulatedRecoil).toBeCloseTo(9); // Should be 9, not 10, as 30 * 0.3 = 9
+      const saturatedPitch = gun.getRecoilOffsetDeg().pitch;
 
-      const recoilOffset = gun.getRecoilOffsetDeg();
-      expect(recoilOffset.pitch).toBeCloseTo(initialRecoilPerShot * 0.4); // 0.3 * 0.4 = 0.12
+      // Once saturated, each further shot adds (near-)zero camera climb — the gun
+      // holds a believable height instead of climbing forever.
+      const PLATEAU_PITCH_EPSILON = testSpec.recoilPerShotDeg * 0.1;
+      expect(saturatedPitch).toBeLessThanOrEqual(PLATEAU_PITCH_EPSILON);
+      // And it is a genuine taper down from the first shot, not a flat curve.
+      expect(saturatedPitch).toBeLessThan(firstPitch);
+    });
+
+    it("pausing fire (cooldown) restores the full kick after the plateau", () => {
+      const gun = new GunplayCore(testSpec);
+
+      // Saturate, confirm the kick has collapsed.
+      for (let i = 0; i < 200; i++) gun.registerShot();
+      expect(gun.getRecoilOffsetDeg().pitch).toBeLessThanOrEqual(testSpec.recoilPerShotDeg * 0.1);
+
+      // Stop firing long enough to fully recover accumulated recoil, then fire again.
+      gun.cooldown(100);
+      gun.registerShot();
+      const restoredPitch = gun.getRecoilOffsetDeg().pitch;
+
+      // Kick is back to nearly the full per-shot recoil.
+      expect(restoredPitch).toBeGreaterThan(testSpec.recoilPerShotDeg * 0.9);
     });
 
     it("cooldown should reduce accumulated recoil over time", () => {

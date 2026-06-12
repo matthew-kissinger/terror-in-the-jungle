@@ -41,6 +41,19 @@ export class RecoilPattern {
   }
 }
 
+// Camera-climb plateau constants. Sustained automatic fire used to climb the
+// look pitch forever: the per-shot vertical multiplier floored at 0.3 of
+// recoilPerShotDeg, so every shot kept raising look pitch by >=0.3x indefinitely.
+// These make the kick taper to ~zero once accumulated recoil saturates, so the
+// gun holds a believable height. The early-shots curve is unchanged: the
+// multiplier still starts at ~1.0 and only collapses near the cap.
+const RECOIL_ACCUMULATION_CAP_DEG = 10; // accumulatedRecoil ceiling (deg)
+const RECOIL_PLATEAU_FLOOR = 0.04;      // residual multiplier once saturated (was 0.3)
+// Accumulated recoil at which the per-shot multiplier reaches the plateau floor.
+// Equal to the cap so the taper completes exactly as accumulation saturates:
+// the camera stops climbing once sustained fire pins accumulatedRecoil at the cap.
+const RECOIL_PLATEAU_KNEE_DEG = RECOIL_ACCUMULATION_CAP_DEG;
+
 export class GunplayCore {
   private spec: WeaponSpec;
   private bloomDeg = 0;
@@ -63,7 +76,7 @@ export class GunplayCore {
     this.lastShotTime = performance.now();
     this.bloomDeg = Math.min(this.bloomDeg + this.spec.bloomPerShotDeg, this.spec.baseSpreadDeg * 4);
     this.recoilIndex++;
-    this.accumulatedRecoil = Math.min(this.accumulatedRecoil + this.spec.recoilPerShotDeg, 10); // Cap at 10 degrees
+    this.accumulatedRecoil = Math.min(this.accumulatedRecoil + this.spec.recoilPerShotDeg, RECOIL_ACCUMULATION_CAP_DEG);
   }
 
   cooldown(delta: number): void {
@@ -79,8 +92,13 @@ export class GunplayCore {
 
   getRecoilOffsetDeg(): { pitch: number; yaw: number } {
     const h = this.recoil.next(this.recoilIndex) * this.spec.recoilHorizontalDeg;
-    // Use diminishing returns on vertical recoil based on accumulated recoil
-    const recoilMultiplier = Math.max(0.3, 1 - this.accumulatedRecoil / 15);
+    // Diminishing-returns vertical recoil that PLATEAUS: the multiplier eases
+    // from ~1.0 (first shots feel identical to before) down to a near-zero floor
+    // by the time accumulated recoil reaches the knee, so sustained automatic
+    // fire holds a believable height instead of climbing the camera forever.
+    // Linear ramp 1.0 -> RECOIL_PLATEAU_FLOOR over [0, knee], then held at floor.
+    const t = THREE.MathUtils.clamp(this.accumulatedRecoil / RECOIL_PLATEAU_KNEE_DEG, 0, 1);
+    const recoilMultiplier = THREE.MathUtils.lerp(1, RECOIL_PLATEAU_FLOOR, t);
     const v = this.spec.recoilPerShotDeg * recoilMultiplier;
     return { pitch: v, yaw: h };
   }

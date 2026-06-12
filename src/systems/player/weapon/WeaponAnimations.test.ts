@@ -244,6 +244,54 @@ describe('WeaponAnimations', () => {
       expect(Math.abs(velocity2.z)).toBeGreaterThan(Math.abs(velocity1.z))
       expect(Math.abs(velocity2.rotX)).toBeGreaterThan(Math.abs(velocity1.rotX))
     })
+
+    // Helper: peak upward viewmodel offset a settling spring reaches.
+    const peakUpwardOffset = (anim: WeaponAnimations, frames = 90, dt = 1 / 60): number => {
+      let peak = 0
+      for (let i = 0; i < frames; i++) {
+        anim.update(dt, false, new THREE.Vector3())
+        peak = Math.max(peak, anim.getRecoilOffset().y)
+      }
+      return peak
+    }
+
+    it('sustained automatic fire never rides the viewmodel above a believable height', () => {
+      // Measure a single shot's natural peak first (the snap we must preserve).
+      animations.applyRecoilImpulse(1)
+      const singleShotPeak = peakUpwardOffset(animations)
+      animations.reset()
+
+      // Now hammer the gun at a realistic automatic cadence: fire roughly every
+      // ~5 frames at 60fps so the spring never fully relaxes between shots.
+      let maxOffset = 0
+      const dt = 1 / 60
+      let sinceShot = 0
+      for (let frame = 0; frame < 360; frame++) {
+        if (sinceShot <= 0) {
+          animations.applyRecoilImpulse(1)
+          sinceShot = 5
+        }
+        animations.update(dt, false, new THREE.Vector3())
+        sinceShot--
+        maxOffset = Math.max(maxOffset, animations.getRecoilOffset().y)
+      }
+
+      // The gun used to stack to ~2.5x a single shot under sustained fire; it must
+      // now hold a believable height — never far above what one shot produces.
+      expect(maxOffset).toBeLessThan(singleShotPeak * 1.6)
+    })
+
+    it("a single shot's peak kick is visually unchanged by the saturation clamp", () => {
+      // A lone shot is well within headroom, so neither the headroom-scaling nor
+      // the hard clamp should noticeably alter its peak. Compare against the
+      // analytic peak of the un-clamped spring impulse (y velocity 1.2).
+      animations.applyRecoilImpulse(1)
+      const peak = peakUpwardOffset(animations)
+
+      // Un-clamped single-shot peak for this spring is ~0.040 world units.
+      expect(peak).toBeGreaterThan(0.035)
+      expect(peak).toBeCloseTo(0.04, 2)
+    })
   })
 
   // Idle Bob & Sway
