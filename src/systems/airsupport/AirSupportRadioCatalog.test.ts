@@ -8,6 +8,7 @@ import {
   countReadyAssets,
   getAirSupportRadioAsset,
   getCooldownRemaining,
+  radioAssetToSupportType,
   type AirSupportRadioCooldowns,
 } from './AirSupportRadioCatalog';
 
@@ -22,6 +23,7 @@ describe('AirSupportRadioCatalog', () => {
       'AC-47 Spooky',
       'AH-1 Cobra',
       'UH-1C Gunship',
+      'B-52 Stratofortress',
     ]));
     expect(payloads).toEqual(expect.arrayContaining([
       'Napalm',
@@ -29,7 +31,28 @@ describe('AirSupportRadioCatalog', () => {
       'Bombs',
       'Miniguns',
       'Minigun strafe',
+      'Bomb string',
     ]));
+  });
+
+  it('makes the B-52 Arc Light the top-tier call-in with the longest cooldown', () => {
+    const arclight = getAirSupportRadioAsset('b52_arclight');
+    const others = AIR_SUPPORT_RADIO_ASSETS.filter((asset) => asset.id !== 'b52_arclight');
+
+    // The Arc Light is the most expensive call-in: no other asset cools longer.
+    for (const asset of others) {
+      expect(arclight.cooldownSeconds).toBeGreaterThan(asset.cooldownSeconds);
+    }
+    // It maps onto the dedicated arclight runtime sortie type.
+    expect(radioAssetToSupportType.b52_arclight).toBe('arclight');
+    // Saturation strikes document a danger-close envelope for the player.
+    expect(arclight.dangerCloseRadius).toBeGreaterThan(0);
+  });
+
+  it('keeps every radio asset wired to a runtime support type', () => {
+    for (const asset of AIR_SUPPORT_RADIO_ASSETS) {
+      expect(radioAssetToSupportType[asset.id]).toBeTruthy();
+    }
   });
 
   it('keeps radio asset ids unique and lookup-safe', () => {

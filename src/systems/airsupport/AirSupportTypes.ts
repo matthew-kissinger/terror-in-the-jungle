@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { Faction } from '../combat/types';
 
-export type AirSupportType = 'spooky' | 'napalm' | 'rocket_run' | 'recon';
+export type AirSupportType = 'spooky' | 'napalm' | 'rocket_run' | 'recon' | 'arclight';
 
 export interface AirSupportRequest {
   type: AirSupportType;
@@ -79,5 +79,20 @@ export const AIR_SUPPORT_CONFIGS: Record<AirSupportType, AirSupportConfig> = {
     modelKey: 'A1_SKYRAIDER',
     altitude: 200,
     speed: 50,
+  },
+  // B-52 Arc Light: the top-tier strike. A single high-altitude pass walks a
+  // long bomb string across the marked heading. It is the most expensive
+  // call-in in the catalog (longest cooldown) and the bomber spawns well above
+  // the AA/engagement ceiling — visually small from the ground, audible on the
+  // run-in. The `duration` is the active bomb-walk window; the airframe then
+  // continues outbound. Faster than the prop strikers but slower than the F-4
+  // fast jet, reflecting a heavy-bomber cruise.
+  arclight: {
+    delay: 20,
+    duration: 10,
+    cooldown: 300,
+    modelKey: 'B52_STRATOFORTRESS',
+    altitude: 600,
+    speed: 150,
   },
 };

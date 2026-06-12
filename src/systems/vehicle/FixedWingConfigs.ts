@@ -462,6 +462,67 @@ export function getDormantFixedWingInfo(key: string): DormantFixedWingInfo | nul
   return FIXED_WING_DORMANT[key] ?? null;
 }
 
+/**
+ * Minimal high-altitude flight profile for the B-52 Arc Light strike
+ * (cycle-2026-06-11-war-asset-repaint).
+ *
+ * The B-52 is NOT player-flyable this cycle — it is deliberately kept out of
+ * `FIXED_WING_CONFIGS` so `isFixedWingRunwayEnterable('B52_STRATOFORTRESS')`
+ * stays false and the airframe remains a dormant catalog entry. This profile
+ * exists only to drive the airborne `NPCFlightController` for the air-support
+ * sortie: a single straight, high-altitude run-in over the marked heading with
+ * no orbit. The numbers are heavy-bomber-shaped (high mass and cruise speed,
+ * gentle control authority, large turn radius) but are not tuned for ground
+ * handling or takeoff/landing, since the sortie spawns airborne and despawns
+ * outbound. Values track the AC-47 gunship profile's structure (the other large
+ * multi-engine plane) scaled up for a bomber.
+ */
+export const B52_ARCLIGHT_PHYSICS: FixedWingPhysicsConfig = {
+  mass: 100000,
+  wingArea: 370,
+  maxThrust: 540000,
+  stallSpeed: 70,
+  vrSpeed: 80,
+  v2Speed: 95,
+  maxSpeed: 200,
+  throttleResponse: 0.8,
+  controlResponse: 1.6,
+  cl0: 0.30,
+  clAlpha: 4.6,
+  clMax: 1.6,
+  alphaStallDeg: 13,
+  alphaMaxDeg: 22,
+  trimAlphaDeg: 3.5,
+  cd0: 0.030,
+  inducedDragK: 0.055,
+  sideForceCoefficient: 1.4,
+  elevatorPower: 1.0,
+  aileronPower: 0.9,
+  rudderPower: 0.8,
+  pitchStability: 2.8,
+  rollLevelStrength: 1.1,
+  yawStability: 2.3,
+  pitchDamping: 2.2,
+  rollDamping: 3.0,
+  yawDamping: 2.0,
+  stabilityAssistPitch: 1.6,
+  stabilityAssistRoll: 2.8,
+  stabilityAssistYaw: 2.0,
+  maxPitchRate: 0.4,
+  maxRollRate: 0.5,
+  maxYawRate: 0.35,
+  groundSteering: 0.3,
+  groundLateralFriction: 8.0,
+  rollingResistance: 0.018,
+  brakeDeceleration: 10,
+  // The repaint B-52 catalog entry seats its lowest mesh at model origin
+  // (minY 0); the run-in flies at altitude, so gear clearance is nominal.
+  gearClearance: 0.0,
+  liftoffClearance: 0.2,
+  rotationPitchLimitDeg: 8,
+  groundEffectStrength: 0.12,
+};
+
 export function isFixedWingRunwayEnterable(key: string): boolean {
   return Boolean(FIXED_WING_CONFIGS[key]);
 }

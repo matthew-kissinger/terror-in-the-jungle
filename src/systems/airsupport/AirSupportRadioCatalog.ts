@@ -9,7 +9,8 @@ export type AirSupportRadioAssetId =
   | 'f4_bombs'
   | 'ac47_orbit'
   | 'cobra_rocket_run'
-  | 'huey_gunship_strafe';
+  | 'huey_gunship_strafe'
+  | 'b52_arclight';
 
 export type AirSupportTargetMarking = 'smoke' | 'willie_pete' | 'position_only';
 
@@ -20,6 +21,14 @@ export interface AirSupportRadioAsset {
   payload: string;
   mission: string;
   cooldownSeconds: number;
+  /**
+   * Approximate radius (meters) around the marked line inside which friendlies
+   * are at risk from the strike. Friendly combatants are spared by the
+   * faction-filtered damage path (IFF), but this documents the danger-close
+   * envelope a player should respect when calling near their own positions.
+   * Present only for area/saturation strikes; omitted for precision runs.
+   */
+  dangerCloseRadius?: number;
 }
 
 export interface AirSupportTargetMarkingOption {
@@ -85,6 +94,21 @@ export const AIR_SUPPORT_RADIO_ASSETS: AirSupportRadioAsset[] = [
     mission: 'Close support',
     cooldownSeconds: 180,
   },
+  {
+    id: 'b52_arclight',
+    label: 'B-52 Arc Light',
+    aircraft: 'B-52 Stratofortress',
+    payload: 'Bomb string',
+    mission: 'High-altitude saturation — danger close 180m',
+    // Top-tier call-in: the longest cooldown in the catalog. Kept in step with
+    // the runtime `arclight` AIR_SUPPORT_CONFIGS cooldown (the cooldown
+    // authority) for the HUD bar.
+    cooldownSeconds: 300,
+    // The walked stick spans ~180 m along the heading; friendlies inside this
+    // envelope are at risk (IFF spares them, but the player should mark clear
+    // of their own line).
+    dangerCloseRadius: 180,
+  },
 ];
 
 /**
@@ -100,6 +124,7 @@ export const radioAssetToSupportType: Record<AirSupportRadioAssetId, AirSupportT
   ac47_orbit: 'spooky',
   cobra_rocket_run: 'rocket_run',
   huey_gunship_strafe: 'spooky',
+  b52_arclight: 'arclight',
 };
 
 export function getAirSupportRadioAsset(assetId: AirSupportRadioAssetId): AirSupportRadioAsset {

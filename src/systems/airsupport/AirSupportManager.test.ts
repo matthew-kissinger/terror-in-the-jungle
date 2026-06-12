@@ -30,6 +30,7 @@ vi.mock('../assets/modelPaths', () => ({
     F4_PHANTOM: 'vehicles/aircraft/f4-phantom.glb',
     AH1_COBRA: 'vehicles/aircraft/ah1-cobra.glb',
     A1_SKYRAIDER: 'vehicles/aircraft/a1-skyraider.glb',
+    B52_STRATOFORTRESS: 'vehicles/aircraft/b52-stratofortress.glb',
   },
   // FixedWingConfigs reads the catalog at module-init for prop joints + dims.
   warAssetCatalog: {
@@ -52,6 +53,11 @@ vi.mock('../assets/modelPaths', () => ({
       slug: 'f4-phantom', class: 'aircraft', path: 'vehicles/aircraft/f4-phantom.glb',
       forward: 'pos-z', dims: [12, 4.19, 18.82], tris: 1580, sizeKB: 63, materials: 10,
       minY: -0.1, budgetStatus: 'PASS', action: 'replace',
+    },
+    'b52-stratofortress': {
+      slug: 'b52-stratofortress', class: 'aircraft', path: 'vehicles/aircraft/b52-stratofortress.glb',
+      forward: 'pos-z', dims: [54.4, 11.7, 47.85], tris: 3168, sizeKB: 60.2, materials: 6,
+      minY: 0, budgetStatus: 'PASS', action: 'new',
     },
   },
 }));
@@ -155,7 +161,17 @@ describe('AirSupportManager', () => {
     expect(types).toContain('napalm');
     expect(types).toContain('rocket_run');
     expect(types).toContain('recon');
-    expect(types).toHaveLength(4);
+    expect(types).toContain('arclight');
+    expect(types).toHaveLength(5);
+  });
+
+  it('accepts a B-52 Arc Light request', () => {
+    manager.setHUDSystem(createMockHUD());
+    const result = manager.requestSupport({
+      type: 'arclight',
+      targetPosition: new THREE.Vector3(100, 0, 100),
+    });
+    expect(result).toBe(true);
   });
 
   it('spawns mission after delay elapses', async () => {
@@ -195,7 +211,7 @@ describe('AirSupportManager', () => {
   });
 
   it('has correct config values for each type', () => {
-    const types: AirSupportType[] = ['spooky', 'napalm', 'rocket_run', 'recon'];
+    const types: AirSupportType[] = ['spooky', 'napalm', 'rocket_run', 'recon', 'arclight'];
     for (const type of types) {
       const config = AIR_SUPPORT_CONFIGS[type];
       expect(config.delay).toBeGreaterThan(0);
@@ -217,5 +233,17 @@ describe('AirSupportManager', () => {
     expect(AIR_SUPPORT_CONFIGS.napalm.speed).toBeGreaterThan(
       AIR_SUPPORT_CONFIGS.rocket_run.speed
     );
+  });
+
+  it('arclight is the top-tier strike: longest cooldown and highest altitude', () => {
+    const arclight = AIR_SUPPORT_CONFIGS.arclight;
+    const others = (Object.keys(AIR_SUPPORT_CONFIGS) as AirSupportType[])
+      .filter((t) => t !== 'arclight')
+      .map((t) => AIR_SUPPORT_CONFIGS[t]);
+    for (const config of others) {
+      expect(arclight.cooldown).toBeGreaterThan(config.cooldown);
+      expect(arclight.altitude).toBeGreaterThan(config.altitude);
+    }
+    expect(arclight.modelKey).toBe('B52_STRATOFORTRESS');
   });
 });

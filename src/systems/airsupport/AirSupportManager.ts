@@ -17,13 +17,14 @@ import { initSpooky, updateSpooky } from './SpookyMission';
 import { initNapalm, updateNapalm } from './NapalmMission';
 import { initRocketRun, updateRocketRun } from './RocketRunMission';
 import { initRecon, updateRecon } from './ReconMission';
+import { initArclight, updateArclight } from './ArclightMission';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { IAudioManager, IHUDSystem, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { AircraftModels } from '../assets/modelPaths';
 import { NPCFlightController, buildAirSupportMission } from './NPCFlightController';
-import { FIXED_WING_CONFIGS } from '../vehicle/FixedWingConfigs';
+import { FIXED_WING_CONFIGS, B52_ARCLIGHT_PHYSICS } from '../vehicle/FixedWingConfigs';
 import { createRuntimeTerrainProbe } from '../vehicle/airframe/terrainProbe';
 
 interface AirSupportManagerDependencies {
@@ -242,8 +243,11 @@ export class AirSupportManager implements GameSystem {
       aircraft = createPlaceholderAircraft(request.type);
     }
 
-    // Scale aircraft
-    aircraft.scale.setScalar(2.0);
+    // Scale aircraft. The legacy strike aircraft GLBs are undersized and get a
+    // 2x bump; the repaint B-52 is catalogued at its true ~48 m length, so it
+    // flies at native scale (a 2x bump would read as a ~96 m monster from the
+    // ground).
+    aircraft.scale.setScalar(request.type === 'arclight' ? 1.0 : 2.0);
     aircraft.matrixAutoUpdate = true;
     this.scene.add(aircraft);
 
@@ -276,7 +280,7 @@ export class AirSupportManager implements GameSystem {
         this.terrainSystem ? createRuntimeTerrainProbe(this.terrainSystem) : undefined,
       );
       const missionType = request.type === 'spooky' ? 'orbit' as const
-        : request.type === 'recon' ? 'flyover' as const
+        : request.type === 'recon' || request.type === 'arclight' ? 'flyover' as const
         : 'attack_run' as const;
       fc.setMission(buildAirSupportMission(
         request.targetPosition,
@@ -294,6 +298,7 @@ export class AirSupportManager implements GameSystem {
       case 'napalm': initNapalm(mission); break;
       case 'rocket_run': initRocketRun(mission); break;
       case 'recon': initRecon(mission); break;
+      case 'arclight': initArclight(mission); break;
     }
 
     this.activeMissions.push(mission);
@@ -353,6 +358,10 @@ export class AirSupportManager implements GameSystem {
         updateNapalm(mission, dt, this.combatantSystem, this.audioManager, explosionSpawn, getHeight, mission.requesterFaction);
         break;
 
+      case 'arclight':
+        updateArclight(mission, dt, this.combatantSystem, this.audioManager, explosionSpawn, getHeight, mission.requesterFaction);
+        break;
+
       case 'rocket_run':
         updateRocketRun(mission, dt, this.grenadeSystem, this.audioManager, getHeight);
         break;
@@ -370,6 +379,10 @@ export class AirSupportManager implements GameSystem {
   private getPhysicsConfig(type: AirSupportType) {
     switch (type) {
       case 'spooky': return FIXED_WING_CONFIGS.AC47_SPOOKY?.physics;
+      // The B-52 is non-flyable this cycle, so it has no FIXED_WING_CONFIGS
+      // entry; it uses a standalone high-altitude physics profile to drive the
+      // airborne NPCFlightController for the run-in/outbound flight.
+      case 'arclight': return B52_ARCLIGHT_PHYSICS;
       default: return undefined;
     }
   }
@@ -421,5 +434,6 @@ function formatSupportName(type: AirSupportType): string {
     case 'napalm': return 'Napalm strike';
     case 'rocket_run': return 'Rocket run';
     case 'recon': return 'Recon flight';
+    case 'arclight': return 'Arc Light strike';
   }
 }

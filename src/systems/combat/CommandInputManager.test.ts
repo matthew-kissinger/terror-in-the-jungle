@@ -12,6 +12,9 @@ import { SquadCommand, Faction } from './types';
 import { CommandInputManager } from './CommandInputManager';
 import { getQuickCommandOption } from './SquadCommandPresentation';
 import { ViewportManager } from '../../ui/design/responsive';
+import { AIR_SUPPORT_RADIO_ASSETS } from '../airsupport/AirSupportRadioCatalog';
+
+const RADIO_ASSET_COUNT = AIR_SUPPORT_RADIO_ASSETS.length;
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class {
@@ -174,7 +177,7 @@ describe('CommandInputManager', () => {
 
     const radio = document.body.querySelector<HTMLElement>('[role="dialog"]');
     expect(radio?.dataset.visible).toBe('true');
-    expect(document.body.textContent).toContain('5/6 ready');
+    expect(document.body.textContent).toContain(`${RADIO_ASSET_COUNT - 1}/${RADIO_ASSET_COUNT} ready`);
     expect(document.body.querySelector<HTMLButtonElement>('[data-radio-asset="ac47_orbit"]')?.disabled).toBe(true);
 
     expect(manager.handleCancel()).toBe(true);
