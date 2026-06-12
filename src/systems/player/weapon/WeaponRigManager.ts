@@ -6,8 +6,19 @@ import * as THREE from 'three'
 import { GunplayCore, WeaponSpec } from '../../weapons/GunplayCore'
 import type { IAmmoManager, IAudioManager, IHUDSystem } from '../../../types/SystemInterfaces'
 import { modelLoader } from '../../assets/ModelLoader'
-import { WeaponModels } from '../../assets/modelPaths'
+import { WeaponModels, warAssetCatalog } from '../../assets/modelPaths'
 import { Faction, isBlufor } from '../../combat/types'
+
+/**
+ * Per-rig catalog slug, so magazine/muzzle node discovery reads the normalized
+ * repaint metadata (warAssetCatalog) instead of fuzzy substring matching. The
+ * repaint weapon node vocabulary drifted per asset (e.g. m16 magazine is
+ * Mesh_MagSeg1-3 + decals + Mesh_MagFloor, NOT Mesh_Magazine; a loose 'mag'
+ * search would wrongly capture Mesh_Magwell), so the catalog is the single
+ * source of truth for which nodes the reload animation may move. Weapons with
+ * no catalog magazine/muzzle metadata fall back to the bbox max-Z marker.
+ */
+type WeaponRigSlug = 'm16a1' | 'ak47' | 'ithaca37' | 'm3-grease-gun' | 'm1911' | 'm60' | 'm79'
 
 /**
  * Manages weapon model creation and switching between rifle/shotgun/SMG
@@ -122,36 +133,36 @@ export class WeaponRigManager {
       modelLoader.loadModel(WeaponModels.M79),
     ])
 
-    this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false)
+    this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false, 'm16a1')
     this.m16RifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.weaponScene.add(this.m16RifleRig)
 
-    this.akRifleRig = this.prepareWeaponRig(akScene, 1.5, false)
+    this.akRifleRig = this.prepareWeaponRig(akScene, 1.5, false, 'ak47')
     this.akRifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.akRifleRig.visible = false
     this.weaponScene.add(this.akRifleRig)
 
-    this.shotgunRig = this.prepareWeaponRig(shotgunScene, 1.5, true)
+    this.shotgunRig = this.prepareWeaponRig(shotgunScene, 1.5, true, 'ithaca37')
     this.shotgunRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.shotgunRig.visible = false
     this.weaponScene.add(this.shotgunRig)
 
-    this.smgRig = this.prepareWeaponRig(smgScene, 1.5, false)
+    this.smgRig = this.prepareWeaponRig(smgScene, 1.5, false, 'm3-grease-gun')
     this.smgRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.smgRig.visible = false
     this.weaponScene.add(this.smgRig)
 
-    this.pistolRig = this.prepareWeaponRig(pistolScene, 1.7, false)
+    this.pistolRig = this.prepareWeaponRig(pistolScene, 1.7, false, 'm1911')
     this.pistolRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.pistolRig.visible = false
     this.weaponScene.add(this.pistolRig)
 
-    this.m60Rig = this.prepareWeaponRig(m60Scene, 1.5, false)
+    this.m60Rig = this.prepareWeaponRig(m60Scene, 1.5, false, 'm60')
     this.m60Rig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.m60Rig.visible = false
     this.weaponScene.add(this.m60Rig)
 
-    this.m79Rig = this.prepareWeaponRig(m79Scene, 1.5, false)
+    this.m79Rig = this.prepareWeaponRig(m79Scene, 1.5, false, 'm79')
     this.m79Rig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.m79Rig.visible = false
     this.weaponScene.add(this.m79Rig)
@@ -170,11 +181,18 @@ export class WeaponRigManager {
 
   /**
    * Prepare a loaded GLB scene for first-person weapon display.
-   * GLB models face +Z (convention), weapon scene expects barrel along +X.
-   * Converts MeshStandardMaterial to MeshBasicMaterial for unlit FPS overlay.
-   * Adds fallback named markers (muzzle, magazine, pumpGrip) for animations.
+   * GLB models face +Z (importer-normalized convention), weapon scene expects
+   * barrel along +X. Converts MeshStandardMaterial to MeshBasicMaterial for
+   * unlit FPS overlay. Adds named markers (muzzle, magazine) for animations.
+   *
+   * Magazine + muzzle nodes come from the generated `warAssetCatalog`
+   * (`magazineNodes` / `muzzleNodes`) keyed by the weapon's catalog slug, so the
+   * reload group contains exactly the per-asset magazine meshes and the muzzle
+   * marker rides the per-asset flash hider / muzzle device. Weapons without
+   * catalog node metadata (ithaca37, m3-grease-gun, m1911, m79) fall back to a
+   * barrel-tip bbox marker for the muzzle and skip the detachable-mag group.
    */
-  private prepareWeaponRig(scene: THREE.Group, scale: number, isShotgun: boolean): THREE.Group {
+  private prepareWeaponRig(scene: THREE.Group, scale: number, isShotgun: boolean, slug: WeaponRigSlug): THREE.Group {
     const rig = new THREE.Group()
 
     // Rotate so +Z-facing GLB barrel points along +X (rig-local barrel axis)
@@ -198,22 +216,25 @@ export class WeaponRigManager {
     rig.add(scene)
     rig.scale.set(scale, scale, scale)
 
-    // Wire GLB magazine meshes under a 'magazine' group for reload animation.
-    // Shotgun (Ithaca 37) has a fixed tubular magazine - no detachable mag animation.
-    // GLB nodes: Mesh_Magazine, Mesh_MagFloorPlate, Mesh_MagFeedLips, Mesh_MagBase, Mesh_MagazineBase
-    if (!isShotgun && !rig.getObjectByName('magazine')) {
+    const catalogEntry = warAssetCatalog[slug]
+    const magazineNodes = catalogEntry?.magazineNodes ?? []
+    const muzzleNodes = catalogEntry?.muzzleNodes ?? []
+
+    // Wire the catalog magazine meshes under a single 'magazine' group so the
+    // reload animation moves exactly those nodes and nothing else. Belt-fed
+    // (m60), break-action (m79), and the fixed-tube shotgun (ithaca37) have no
+    // catalog magazine nodes, so no detachable-mag group is created for them.
+    if (!isShotgun && magazineNodes.length > 0 && !rig.getObjectByName('magazine')) {
       const magParts: THREE.Object3D[] = []
-      scene.traverse((child) => {
-        const n = child.name.toLowerCase()
-        if (n.includes('magazine') || n === 'mesh_magfloorplate' || n === 'mesh_magfeedlips' || n === 'mesh_magbase') {
-          magParts.push(child)
-        }
-      })
+      for (const nodeName of magazineNodes) {
+        const part = scene.getObjectByName(nodeName)
+        if (part) magParts.push(part)
+      }
       if (magParts.length > 0) {
-        // Group magazine parts under a single parent so reload moves them all
+        // Group magazine parts under a single parent so reload moves them all.
         const magGroup = new THREE.Group()
         magGroup.name = 'magazine'
-        // Use first part's position as pivot
+        // Use first part's position as pivot.
         const pivot = magParts[0].position.clone()
         magGroup.position.copy(pivot)
         for (const part of magParts) {
@@ -222,36 +243,20 @@ export class WeaponRigManager {
           magGroup.add(part)
         }
         scene.add(magGroup)
-      } else {
-        // Fallback invisible marker
-        const magazine = new THREE.Object3D()
-        magazine.name = 'magazine'
-        magazine.position.set(0.2, -0.25, 0)
-        magazine.rotation.set(0, 0, 0.1)
-        rig.add(magazine)
       }
     }
 
-    // Attach a muzzle marker at the actual barrel tip.
-    // Priority list matches the four weapon GLBs:
-    //   Mesh_FlashHider  → M16A1  (flash hider at barrel end)
-    //   Mesh_Muzzle      → M3 Grease Gun (dedicated muzzle node)
-    //   Mesh_FrontBead   → Ithaca37 (front bead at muzzle end)
-    //   Mesh_BarrelBushing → M1911 (bushing at barrel muzzle end)
-    //   Mesh_Barrel      → universal fallback
+    // Attach a muzzle marker at the actual barrel tip. The catalog muzzleNodes
+    // name the per-asset flash hider / muzzle device meshes; the marker rides
+    // the first one found. Weapons without catalog muzzle metadata fall back to
+    // the barrel mesh, then to a fixed forward offset.
     if (!rig.getObjectByName('muzzle')) {
-      const MUZZLE_TIP_NAMES = [
-        'Mesh_FlashHider',
-        'Mesh_Muzzle',
-        'Mesh_FrontBead',
-        'Mesh_BarrelBushing',
-        'Mesh_Barrel',
-      ]
+      const muzzleTipNames = [...muzzleNodes, 'Mesh_Barrel']
       const muzzle = new THREE.Object3D()
       muzzle.name = 'muzzle'
 
       let attached = false
-      for (const name of MUZZLE_TIP_NAMES) {
+      for (const name of muzzleTipNames) {
         const tipNode = rig.getObjectByName(name)
         if (tipNode instanceof THREE.Mesh && tipNode.geometry) {
           tipNode.geometry.computeBoundingBox()
