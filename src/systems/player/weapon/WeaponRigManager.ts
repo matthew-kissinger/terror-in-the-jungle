@@ -230,19 +230,39 @@ export class WeaponRigManager {
         const part = scene.getObjectByName(nodeName)
         if (part) magParts.push(part)
       }
-      if (magParts.length > 0) {
-        // Group magazine parts under a single parent so reload moves them all.
+      // Some catalog magazine entries are CHILDREN of other magazine meshes
+      // (e.g. the m16 MagSeg decals are children of MagSeg2 / MagSeg3 with a
+      // ~9mm decal-local offset). Re-parenting a child whose ancestor is also
+      // being re-parented double-moves it. Drop any entry that already has an
+      // ancestor in the magazine set: it rides along with that ancestor when
+      // the ancestor is attached, so its world pose stays exactly correct.
+      const magSet = new Set(magParts)
+      const topLevelMagParts = magParts.filter((part) => {
+        for (let p = part.parent; p; p = p.parent) {
+          if (magSet.has(p)) return false
+        }
+        return true
+      })
+      if (topLevelMagParts.length > 0) {
+        // Build the magazine group INSIDE the mag parts' original parent (the
+        // weapon body node, under the importer's TIJ_AxisNormalize wrapper) and
+        // move the parts in with `attach()`, which preserves each part's WORLD
+        // transform by baking the wrapper rotation + body offset into its new
+        // local transform. The previous `scene.add(magGroup)` re-homed the mag
+        // at the GLTF scene ROOT — outside the axis wrapper — and applied a
+        // body-local pivot in scene-root space, leaving the magazine rotated
+        // ~90deg and offset from the magwell from rig load. Same defect class
+        // as the m48 turret fix (commit 38d98f7d).
+        const parent = topLevelMagParts[0].parent ?? scene
         const magGroup = new THREE.Group()
         magGroup.name = 'magazine'
-        // Use first part's position as pivot.
-        const pivot = magParts[0].position.clone()
-        magGroup.position.copy(pivot)
-        for (const part of magParts) {
-          part.removeFromParent()
-          part.position.sub(pivot)
-          magGroup.add(part)
-        }
-        scene.add(magGroup)
+        // Seat the group pivot at the magazine's own location in the SAME
+        // (body-node-local) space the parts live in, so the reload animation —
+        // which offsets the group's local position around this base pose — drops
+        // the mag along the body node's +Y (still up, pre-wrapper).
+        magGroup.position.copy(topLevelMagParts[0].position)
+        parent.add(magGroup)
+        for (const part of topLevelMagParts) magGroup.attach(part)
       }
     }
 
