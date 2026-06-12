@@ -1,0 +1,16 @@
+{
+  "slug": "kbar-knife",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kbar-knife.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T19:21:24.712Z",
+  "sourcePrompt": "A USMC KA-BAR fighting knife, about thirty centimeters end to end. A classic combat knife: a long clip-point blade with a shallow fuller groove, a small oval steel crossguard, a stacked leather-washer handle with fine ring ridges, and a flat steel pommel cap. Dark parkerized blade, warm brown leather grip, simple and timeless.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

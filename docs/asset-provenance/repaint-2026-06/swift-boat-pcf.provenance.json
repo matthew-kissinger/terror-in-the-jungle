@@ -1,0 +1,16 @@
+{
+  "slug": "swift-boat-pcf",
+  "class": "boats",
+  "action": "new",
+  "tijTarget": "vehicles/watercraft/swift-boat-pcf.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:44:27.288Z",
+  "sourcePrompt": "A PCF \"Swift Boat\" coastal patrol craft, about fifteen meters of welded aluminum, all straight lines. A boxy hull with a vertical bow leads to a two-level deckhouse amidships: an enclosed pilothouse with rectangular windows below, and an open gun tub on its roof mounting twin .50 caliber machine guns. The long aft deck carries a combined mortar and machine-gun mount near the stern. Gray-green metal, sturdy, angular and workmanlike.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

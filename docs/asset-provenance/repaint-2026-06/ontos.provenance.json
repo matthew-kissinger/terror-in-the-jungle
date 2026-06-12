@@ -1,0 +1,16 @@
+{
+  "slug": "ontos",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/ontos.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:27:03.935Z",
+  "sourcePrompt": "An M50 Ontos, the tiny US Marine tank destroyer, under four meters long but impossible to mistake: six long recoilless rifles mounted in two stacked banks of three on either side of a small turret atop a stubby tracked hull. The tubes overhang the vehicle in both directions, dwarfing it. Short tracks with four road wheels per side, a low boxy hull barely taller than a man. Olive-drab, odd, bristling and disproportionate.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "guard-tower",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/guard-tower.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:47:10.631Z",
+  "sourcePrompt": "A firebase guard tower about eight meters tall. Four heavy timber legs lean inward, laced with diagonal cross-bracing; a ladder climbs one face to a square observation platform with a waist-high sandbag wall and a simple corrugated-tin shade roof on corner posts. Rough-cut timber, sandbags and rusty tin, narrow and watchful.",
+  "handEdit": "ladder widthAxis x->z: rails were stacked into the -X wall (rotated 90deg); now side-by-side along Z flat against the face",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "5102 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

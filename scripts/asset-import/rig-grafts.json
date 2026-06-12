@@ -1,0 +1,158 @@
+{
+  "$comment": [
+    "Per-slug rig-graft + node-metadata specs consumed by scripts/import-war-catalog.ts.",
+    "The 2026-06 repaint package shipped 100% static GLBs with the rig joints DELETED",
+    "upstream (see docs/rearch/WAR_ASSET_REPAINT_AUDIT_2026-06-11.md). The importer",
+    "grafts canonical pivot joints back in from the named meshes so runtime articulation",
+    "(tank turret rig, procedural rotor/prop spin) has stable node-name contracts instead",
+    "of fuzzy substring search. Node names below were read from each source GLB's JSON",
+    "chunk on 2026-06-12; verify against the source before editing.",
+    "",
+    "graftJoints: each entry inserts a new node `name` whose pivot is computed from the",
+    "  listed `meshes` (bounds-center by default, or the `hubMesh` center when pivot=hub).",
+    "  The meshes are reparented under the joint (their local transforms rebased so world",
+    "  position is preserved); the joint is reparented under the asset root. The graft is",
+    "  done in pre-wrap source space so the axis-normalize wrapper rotates joint and meshes",
+    "  together. `type`/`spinAxis` are recorded in the generated catalog for procedural",
+    "  rotor/prop spin (no animation tracks survive the repaint).",
+    "renameJoints: an existing joint already carries the blade meshes; only the node name",
+    "  is canonicalized (e.g. uh1c Joint_Rotor -> Joint_MainRotor) and type/spinAxis logged.",
+    "magazineNodes / muzzleNodes: explicit node lists recorded in the catalog so weapon",
+    "  rigs resolve magazine/muzzle anchors by data, not by the drifted substring search",
+    "  ('magazine' now matches nothing; a loose 'mag' wrongly grabs Mesh_Magwell)."
+  ],
+  "grafts": {
+    "m48-patton": {
+      "graftJoints": [
+        {
+          "name": "Joint_Turret",
+          "meshes": [
+            "Mesh_Turret", "Mesh_Searchlight", "Mesh_SearchlightLens",
+            "Mesh_SearchlightBracketR", "Mesh_SearchlightBracketL",
+            "Mesh_CupolaRing", "Mesh_CupolaDome", "Mesh_MGBody", "Mesh_MGBarrel",
+            "Mesh_LoaderHatch", "Mesh_DriverHatch"
+          ],
+          "pivot": "meshes-center"
+        },
+        {
+          "name": "Joint_MainGun",
+          "meshes": [
+            "Mesh_Mantlet", "Mesh_Barrel", "Mesh_BoreEvacuator",
+            "Mesh_MuzzleBrakeBar", "Mesh_MuzzleBrakeCap"
+          ],
+          "pivot": "meshes-center"
+        }
+      ]
+    },
+    "uh1-huey": {
+      "renameJoints": [
+        { "from": "Joint_MainRotor", "to": "Joint_MainRotor", "type": "mainBlades", "spinAxis": "y" },
+        { "from": "Joint_TailRotor", "to": "Joint_TailRotor", "type": "tailBlades", "spinAxis": "z" }
+      ]
+    },
+    "uh1c-gunship": {
+      "renameJoints": [
+        { "from": "Joint_Rotor", "to": "Joint_MainRotor", "type": "mainBlades", "spinAxis": "y" }
+      ],
+      "graftJoints": [
+        {
+          "name": "Joint_TailRotor",
+          "meshes": ["Mesh_TRHub", "Mesh_TRBlades"],
+          "pivot": "meshes-center",
+          "type": "tailBlades",
+          "spinAxis": "z"
+        }
+      ]
+    },
+    "ah1-cobra": {
+      "graftJoints": [
+        {
+          "name": "Joint_MainRotor",
+          "meshes": ["Mesh_RotorHub", "Mesh_MainRotorBlades"],
+          "pivot": "hub",
+          "hubMesh": "Mesh_RotorHub",
+          "type": "mainBlades",
+          "spinAxis": "y"
+        },
+        {
+          "name": "Joint_TailRotor",
+          "meshes": ["Mesh_TailRotorHub", "Mesh_TailRotorBlades"],
+          "pivot": "hub",
+          "hubMesh": "Mesh_TailRotorHub",
+          "type": "tailBlades",
+          "spinAxis": "z"
+        }
+      ]
+    },
+    "oh6-kiowa-scout": {
+      "graftJoints": [
+        {
+          "name": "Joint_MainRotor",
+          "meshes": ["Mesh_RotorHub", "Mesh_MainBlade1", "Mesh_MainBlade2", "Mesh_MainBlade3", "Mesh_MainBlade4"],
+          "pivot": "hub",
+          "hubMesh": "Mesh_RotorHub",
+          "type": "mainBlades",
+          "spinAxis": "y"
+        },
+        {
+          "name": "Joint_TailRotor",
+          "meshes": ["Mesh_TailRotorHub", "Mesh_TailBlade1", "Mesh_TailBlade2"],
+          "pivot": "hub",
+          "hubMesh": "Mesh_TailRotorHub",
+          "type": "tailBlades",
+          "spinAxis": "z"
+        }
+      ]
+    },
+    "ac47-spooky": {
+      "graftJoints": [
+        {
+          "name": "Joint_PropellerR",
+          "meshes": ["Mesh_PropHubR", "Mesh_SpinnerR", "Mesh_BladeR0", "Mesh_BladeR1", "Mesh_BladeR2"],
+          "pivot": "hub",
+          "hubMesh": "Mesh_PropHubR",
+          "type": "mainBlades",
+          "spinAxis": "x"
+        },
+        {
+          "name": "Joint_PropellerL",
+          "meshes": ["Mesh_PropHubL", "Mesh_SpinnerL", "Mesh_BladeL0", "Mesh_BladeL1", "Mesh_BladeL2"],
+          "pivot": "hub",
+          "hubMesh": "Mesh_PropHubL",
+          "type": "mainBlades",
+          "spinAxis": "x"
+        }
+      ]
+    },
+    "a1-skyraider": {
+      "graftJoints": [
+        {
+          "name": "Joint_Propeller",
+          "meshes": [
+            "Mesh_PropHub", "Mesh_Spinner",
+            "Mesh_BladeMesh0", "Mesh_BladeTip0", "Mesh_BladeMesh1", "Mesh_BladeTip1",
+            "Mesh_BladeMesh2", "Mesh_BladeTip2", "Mesh_BladeMesh3", "Mesh_BladeTip3"
+          ],
+          "pivot": "hub",
+          "hubMesh": "Mesh_PropHub",
+          "type": "mainBlades",
+          "spinAxis": "x"
+        }
+      ]
+    }
+  },
+  "weaponNodes": {
+    "m16a1": {
+      "magazineNodes": ["Mesh_MagSeg1", "Mesh_MagSeg2", "Mesh_MagSeg2DecalL", "Mesh_MagSeg2DecalR", "Mesh_MagSeg3", "Mesh_MagSeg3DecalL", "Mesh_MagSeg3DecalR", "Mesh_MagFloor"],
+      "muzzleNodes": ["Mesh_FlashHiderBase", "Mesh_FlashHiderBirdcage", "Mesh_FlashHiderBore"]
+    },
+    "ak47": {
+      "magazineNodes": ["Mesh_MagSeg1", "Mesh_MagSeg2", "Mesh_MagSeg3", "Mesh_MagFloor"],
+      "muzzleNodes": ["Mesh_MuzzleBrake"]
+    },
+    "m60": {
+      "magazineNodes": [],
+      "muzzleNodes": ["Mesh_FlashHiderBase", "Mesh_FlashHiderFlare"]
+    }
+  }
+}

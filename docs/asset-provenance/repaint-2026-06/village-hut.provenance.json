@@ -1,0 +1,16 @@
+{
+  "slug": "village-hut",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "structures/village-hut.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:18:54.386Z",
+  "sourcePrompt": "A traditional Vietnamese village hut of the Mekong Delta, a single small room about four meters wide, raised a hand's height off the ground on short wooden posts. Woven bamboo-mat walls under a steep thatched palm-leaf roof whose eaves overhang deeply, a single doorway with a woven door leaf, and one small window opening. Weathered bamboo and sun-bleached golden thatch, humble and tidy.",
+  "handEdit": "roof thatch rotation signs flipped to lie on slope planes, panels raised 0.13 to meet rafters/hold-downs, top courses shortened under ridge cap; window leaf flipped onto its prop stick; offline rebake",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

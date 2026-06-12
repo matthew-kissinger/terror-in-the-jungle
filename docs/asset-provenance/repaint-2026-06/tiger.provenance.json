@@ -1,0 +1,16 @@
+{
+  "slug": "tiger",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/tiger.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T18:43:27.184Z",
+  "sourcePrompt": "An Indochinese tiger caught mid-stalk, about two and a half meters nose to tail-tip. A big cat pressed low and forward, shoulders rolling above a dipped spine, head level and fixed ahead, the long tail trailing in a shallow curve, all four paws planted wide and silent. A broad white-cheeked face, and the classic coat: burnt orange banded with black stripes over a white underbelly. Muscular, sleek and menacing.",
+  "handEdit": "Math.PI radian rotations converted to intended degrees (createPart rotation is degrees); offline rebake, no model call",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

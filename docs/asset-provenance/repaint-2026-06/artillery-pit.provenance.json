@@ -1,0 +1,18 @@
+{
+  "slug": "artillery-pit",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/artillery-pit.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:35:26.013Z",
+  "sourcePrompt": "A 105mm howitzer emplacement, a circular sandbagged gun pit about eight meters across. The howitzer centers it - a long barrel angled up over the parapet, a shield plate, two splayed trail legs and two rubber tires - while ammunition crates and a powder canister stack against the inside of the chest-high sandbag ring. Sandbags and olive-drab steel, dug-in firepower.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "7812 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

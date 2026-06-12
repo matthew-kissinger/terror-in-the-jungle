@@ -1,0 +1,16 @@
+{
+  "slug": "rice-barn",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/rice-barn.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:55:36.256Z",
+  "sourcePrompt": "A Vietnamese rice granary raised on stilts, a small square store about three meters on a side, lifted a full meter off the ground on four stout flared posts that keep rodents and floodwater out. Woven bamboo walls bulge slightly between corner posts, a steep thatched roof caps it, and a short ladder leans up to one small square door. Bamboo, thatch and heavy timber legs, plump and practical.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "ak47",
+  "class": "weapons",
+  "action": "replace",
+  "tijTarget": "weapons/ak47.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T18:48:14.216Z",
+  "sourcePrompt": "An AK-47, the iconic rifle of the NVA and Viet Cong, just under a meter long and lying level. A rugged rifle with a deep banana magazine curving down from the middle, a warm reddish-brown wood handguard, pistol grip and buttstock, a gas tube riding above the barrel, a front sight post, and a slanted muzzle cut. Blued steel and weathered wood, purposeful and battle-worn.",
+  "handEdit": "mag rebuilt smooth: 3 chord-matched POSITIVE-angle segments (5/15/25deg) with 0.064-height burial overlap over 0.050 chords (old negative angles fought the forward march = sawtooth); stock leveled 5.2->2deg and raised to meet the mount line",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "buddhist-temple",
+  "class": "buildings",
+  "action": "new",
+  "tijTarget": "buildings/buddhist-temple.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:02:56.487Z",
+  "sourcePrompt": "An ornate rural Vietnamese Buddhist temple hall, about twelve meters wide and grander than a village pagoda. A broad timber hall under a sweeping two-tier roof whose ridges curl up into carved dragon finials, deep eaves over a colonnade of red-and-gold columns, full-width entrance steps rising to triple doorways, and carved lintels and lattice panels across the front. Rich red, gold and green glazed tile, majestic and sacred.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "14632 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

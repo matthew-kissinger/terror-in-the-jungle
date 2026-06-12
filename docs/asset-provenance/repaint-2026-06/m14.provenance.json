@@ -1,0 +1,16 @@
+{
+  "slug": "m14",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/m14.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T19:11:47.550Z",
+  "sourcePrompt": "An M14 battle rifle, early-war US issue, about one point one meters long and traditional in profile. A full-length rifle with a one-piece walnut stock and handguard running most of its length, a long barrel ending in a slotted flash suppressor, a twenty-round box magazine below the receiver, and iron sights front and rear. Walnut wood and parkerized steel, upright and robust.",
+  "handEdit": "Math.PI radian rotations converted to intended degrees (createPart rotation is degrees); offline rebake, no model call",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

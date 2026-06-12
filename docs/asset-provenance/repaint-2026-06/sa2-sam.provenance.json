@@ -1,0 +1,16 @@
+{
+  "slug": "sa2-sam",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/sa2-sam.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:27:00.353Z",
+  "sourcePrompt": "An SA-2 Guideline surface-to-air missile on its launcher, the missile alone over ten meters long. A slender two-stage missile - cruciform fins at the tail of a flared booster, smaller fins mid-body and at the pointed nose - angled steeply skyward on a single launch rail atop a rotating pedestal with a trailer-style base. White missile with green-drab launcher steel, tall and threatening.",
+  "handEdit": "rail assembly shifted +2.4 local-x so the rail pivots near its REAR (real SA-2 layout): booster tail/fins/truss now clear the ground (were buried to y=-1.45); missile and shoes ride the same shift",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

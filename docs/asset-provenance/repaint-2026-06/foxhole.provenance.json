@@ -1,0 +1,16 @@
+{
+  "slug": "foxhole",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/foxhole.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:45:00.028Z",
+  "sourcePrompt": "A two-man foxhole fighting position, a rectangular hole about two meters by one, dug shoulder-deep. A low parapet of sandbags rims the front lip, a dirt firing step runs inside the forward wall, and the spoil is heaped loosely behind the rear edge. Dark turned earth and a handful of worn sandbags, simple and grim.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

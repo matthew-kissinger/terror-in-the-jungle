@@ -1,0 +1,16 @@
+{
+  "slug": "m113-apc",
+  "class": "ground",
+  "action": "replace",
+  "tijTarget": "vehicles/ground/m113-apc.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:14:50.555Z",
+  "sourcePrompt": "An M113 armored personnel carrier, about five meters long, flat and boxy on its tracks. A slab-sided aluminum hull with a steeply sloped bow plate, a flat roof carrying a small commander's cupola with a .50 caliber machine gun, a tall flat rear panel hiding the drop ramp, and tracks running over five evenly spaced road wheels per side with a drive sprocket forward. About two meters tall, the proportions of an armored shoebox. Olive-drab, utilitarian.",
+  "handEdit": "front rework: trim vane laid flat on the 32deg glacis (was perpendicular to it - the flap); spare road wheel deleted from the glacis (not a real M113 fitment, sat cocked on the wrong axis - the weird wheel)",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "dragunov-svd",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/dragunov-svd.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T19:16:15.815Z",
+  "sourcePrompt": "A Dragunov SVD sniper rifle, the NVA designated-marksman weapon, about one point two meters long and noticeably slender. A long thin barrel with a slotted flash hider, a skeletonized wooden thumbhole stock with an open cut-out, a short curved magazine, and a long telescopic scope riding above the receiver on a side mount. Reddish wood and blued steel, elegant and lethal.",
+  "handEdit": "scope lowered onto thicker mounts + lens glow muted + magazine seated; offline rebake",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

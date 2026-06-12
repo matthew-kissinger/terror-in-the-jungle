@@ -1,0 +1,16 @@
+{
+  "slug": "claymore-mine",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/claymore-mine.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:02:07.527Z",
+  "sourcePrompt": "An M18 Claymore mine deployed on its legs, a small curved rectangular block about twenty-two centimeters wide. The olive-drab plastic body bows convex toward the front with raised embossed lettering, two pairs of thin scissor legs splay into the soil beneath, and a blasting-cap well with a wire stub sits on top. Olive-drab plastic, small and sinister.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

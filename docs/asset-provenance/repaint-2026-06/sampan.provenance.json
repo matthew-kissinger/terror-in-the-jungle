@@ -1,0 +1,16 @@
+{
+  "slug": "sampan",
+  "class": "boats",
+  "action": "replace",
+  "tijTarget": "vehicles/watercraft/sampan.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:40:19.790Z",
+  "sourcePrompt": "A Vietnamese sampan, the flat-bottomed wooden river boat of the Mekong, about five meters long and barely a meter wide. A long narrow open hull of lapped planks, the bow and stern both rising gently from a low waist, two or three plank thwart benches across the middle, a small section of cargo decking, and a single long steering oar trailing from the stern. Weathered gray-brown wood, humble and graceful.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

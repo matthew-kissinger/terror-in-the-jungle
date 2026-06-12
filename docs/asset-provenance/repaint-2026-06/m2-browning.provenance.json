@@ -1,0 +1,18 @@
+{
+  "slug": "m2-browning",
+  "class": "weapons",
+  "action": "replace",
+  "tijTarget": "weapons/m2-browning.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T18:54:50.842Z",
+  "sourcePrompt": "An M2 Browning .50 caliber \"Ma Deuce\" heavy machine gun mounted low on its ground tripod. A massive boxy receiver feeding a thick barrel inside a perforated jacket, more than one and a half meters of gun, with big spade grips and a butterfly trigger at the rear, sitting on a splayed three-legged tripod whose front legs reach forward. Gunmetal gray, brutally industrial, knee-high in stance.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2084 tris over 1,500 weapon budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

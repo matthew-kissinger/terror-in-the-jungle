@@ -1,0 +1,18 @@
+{
+  "slug": "tunnel-entrance",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/tunnel-entrance.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:24:38.024Z",
+  "sourcePrompt": "A VC tunnel entrance, a concealed spider hole barely sixty centimeters square. A woven stick-and-earth trapdoor lies tipped aside revealing a tight dark vertical shaft cut into the ground, its rim packed smooth, with scuffed dirt and scattered leaves around the opening. Dark earth and camouflage litter, claustrophobic and secret.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2540 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

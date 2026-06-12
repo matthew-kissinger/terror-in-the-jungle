@@ -1,0 +1,16 @@
+{
+  "slug": "hh3e-jolly-green-giant",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/hh3e-jolly-green-giant.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:00:12.281Z",
+  "sourcePrompt": "An HH-3E \"Jolly Green Giant\" rescue helicopter, about twenty-two meters with rotors, resting on wheels tucked into side sponsons. A deep boat-bottomed hull swells under a five-bladed main rotor; a long thin refueling probe spears forward from the nose, stubby sponson floats flank the lower hull, and the rear fuselage rises into an angled tail pylon with the tail rotor high on one side, a ramp underneath. Olive-drab, husky and protective.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

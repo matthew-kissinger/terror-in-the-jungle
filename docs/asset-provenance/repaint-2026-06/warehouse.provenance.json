@@ -1,0 +1,18 @@
+{
+  "slug": "warehouse",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/warehouse.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:47:09.846Z",
+  "sourcePrompt": "A rural warehouse or supply depot, a long low building about fifteen meters by eight. Cinder-block walls to waist height with corrugated-metal sheeting above, a corrugated gable roof with shallow pitch, a pair of large sliding cargo doors on the long face hung from an exterior rail, and a few small high windows. Rust-streaked silver steel over gray block, plain and industrial.",
+  "handEdit": "both roof slopes extended 4.34->4.9 on their 14.68deg planes: eaves now drop to y=3.36 (below 3.5 wall top) with ~0.85m overhang - flush stub eaves read as two flaps propped up; ribs ride parents",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "5776 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

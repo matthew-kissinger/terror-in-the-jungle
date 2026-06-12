@@ -1,0 +1,16 @@
+{
+  "slug": "bunker-nva",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/bunker-nva.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:57:57.734Z",
+  "sourcePrompt": "An NVA earthen bunker, a buried timber-and-earth strongpoint about five meters across that barely rises a meter above grade. A low rounded mound of packed earth over a log roof, a wide dark horizontal firing slit facing front between timber lintels, and a small log-framed crawl entrance at the rear flanked by a few sandbags. Raw earth, rough logs and shadow, hunkered and grim.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

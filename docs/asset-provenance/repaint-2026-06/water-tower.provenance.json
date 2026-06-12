@@ -1,0 +1,18 @@
+{
+  "slug": "water-tower",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/water-tower.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:53:22.775Z",
+  "sourcePrompt": "An elevated water tower about nine meters tall. A cylindrical riveted tank with a shallow cone cap sits on a four-legged tower of steel and timber laced with diagonal cross-bracing, a ladder climbing one leg to a small platform at the tank base, and a single down-pipe dropping to ground level. Weathered gray tank over rusty framing, tall and utilitarian.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "5316 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

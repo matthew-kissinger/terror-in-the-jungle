@@ -1,0 +1,18 @@
+{
+  "slug": "bridge-stone",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/bridge-stone.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:27:33.910Z",
+  "sourcePrompt": "A small stone arch bridge over a canal, about eight meters end to end. A single low masonry arch of fitted gray stone blocks springs between squat abutments, carrying a gently humped walking deck, with low solid stone parapet walls along both edges that step down at the ends. Moss-darkened weathered stone, old, heavy and permanent.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2640 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

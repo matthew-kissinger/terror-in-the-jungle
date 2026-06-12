@@ -1,0 +1,16 @@
+{
+  "slug": "firebase-gate",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/firebase-gate.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:09:08.524Z",
+  "sourcePrompt": "A firebase entrance gate about five meters wide. Two stout timber posts carry a horizontal lifting cross-pole barrier, a hand-painted unit sign board hangs from the crossbar, and a small sandbagged guard position with a tin roof hunches to one side. Rough timber, sandbags and stenciled paint, the way in.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

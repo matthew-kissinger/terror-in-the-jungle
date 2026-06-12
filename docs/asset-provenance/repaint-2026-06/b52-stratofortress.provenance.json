@@ -1,0 +1,16 @@
+{
+  "slug": "b52-stratofortress",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/b52-stratofortress.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T20:45:05.996Z",
+  "sourcePrompt": "A B-52D Stratofortress strategic bomber, immense - nearly fifty meters of slender fuselage under a wingspan wider still. Long thin wings droop visibly under the weight of eight jet engines slung in four twin pods, small outrigger wheels sit near the wingtips, and the main gear rides in fuselage bogies. A stepped cockpit caps the nose, and a tall swept tail fin stands far aft. Olive-drab over a gloss-black belly, the Arc Light silhouette, vast and menacing.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

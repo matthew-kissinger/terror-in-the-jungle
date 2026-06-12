@@ -1,0 +1,18 @@
+{
+  "slug": "aid-station",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/aid-station.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:42:52.472Z",
+  "sourcePrompt": "A field medical aid station tent about six meters long. A canvas field tent with both entrance flaps tied wide open revealing folding cots and stacked medical chests inside, a large red cross on white painted on the roof and another on the side wall, guy ropes staked out, and supply crates by the entrance. Olive-drab canvas and red crosses, a place of triage.",
+  "handEdit": "whole tent yawed -90deg: ridge now along Z, entrance +Z, matching old TIJ asset orientation (placements assume it)",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3266 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "zil-157",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/zil-157.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:30:07.722Z",
+  "sourcePrompt": "A ZIL-157 six-wheel cargo truck, the NVA supply hauler of the Ho Chi Minh Trail, about six and a half meters long. A rounded 1950s Soviet cab with bulbous fenders, a split flat windshield and a wide louvered grille; behind it a long wooden-sided cargo bed under canvas-topped bows. Three axles on big single tires - one forward, two at the rear - with a spare slung under the bed. Faded dark green, mud-worn and hard-used.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

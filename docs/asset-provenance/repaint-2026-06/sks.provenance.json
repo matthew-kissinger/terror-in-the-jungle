@@ -1,0 +1,16 @@
+{
+  "slug": "sks",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/sks.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T19:13:55.201Z",
+  "sourcePrompt": "An SKS carbine, early-war NVA and VC issue, just over a meter long. A trim wood-stocked rifle with a fixed shallow magazine ahead of the trigger guard, a long barrel with a hooded front sight, and a folding spike bayonet stowed flat under the muzzle end. Warm honey-toned wood over blued steel, simple, slender and classic.",
+  "handEdit": "Math.PI radian rotations converted to intended degrees (createPart rotation is degrees); offline rebake, no model call",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

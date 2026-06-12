@@ -1,0 +1,16 @@
+{
+  "slug": "concrete-building",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/concrete-building.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:33:56.976Z",
+  "sourcePrompt": "A plain utilitarian concrete town building, a two-story Vietnamese government office or small hotel about ten meters wide. A flat-roofed rectangular block with its concrete frame showing as a grid around rows of plain rectangular windows, a recessed ground-floor entrance behind a couple of square columns, and a low parapet hiding the roof. Streaked gray concrete, drab and functional.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

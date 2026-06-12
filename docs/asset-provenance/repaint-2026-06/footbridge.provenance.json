@@ -1,0 +1,16 @@
+{
+  "slug": "footbridge",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/footbridge.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:04:02.365Z",
+  "sourcePrompt": "A simple wooden footbridge over a stream, about five meters long and one plank-width wide. A slightly sagging deck of mismatched planks rests on two or three timber pile bents, with a single rough handrail down each side on slender posts, one rail leaning. Sun-grayed weathered timber, rustic and creaky-looking.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

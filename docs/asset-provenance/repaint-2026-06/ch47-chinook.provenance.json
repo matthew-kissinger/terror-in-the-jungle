@@ -1,0 +1,16 @@
+{
+  "slug": "ch47-chinook",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/ch47-chinook.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T20:59:56.037Z",
+  "sourcePrompt": "A CH-47 Chinook heavy-lift helicopter, about sixteen meters of fat straight fuselage with no tail rotor at all - its silhouette is the two tall rotor pylons, one at the nose and a taller one at the tail, carrying huge overlapping three-bladed rotors. Long sponsons run low along each side housing fuel and the four-wheel landing gear, and a loading ramp closes the rear. Parked level and heavy. Olive-drab, twin-rotor and unmistakable.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

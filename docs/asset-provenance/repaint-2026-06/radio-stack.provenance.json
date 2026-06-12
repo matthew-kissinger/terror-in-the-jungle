@@ -1,0 +1,18 @@
+{
+  "slug": "radio-stack",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/radio-stack.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:30:14.819Z",
+  "sourcePrompt": "An AN/PRC-25 field-radio stack for a command post, about half a meter tall on its crate. A boxy olive-drab radio set with a dialed control face, a coiled handset cable hanging to a handset hooked on the side, a long whip antenna rising well overhead, and a spare battery box stacked beneath. Olive-drab metal, black dials and a thin whip, field communications.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3664 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

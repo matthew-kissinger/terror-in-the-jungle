@@ -1,0 +1,16 @@
+{
+  "slug": "m42-duster",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/m42-duster.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:32:37.271Z",
+  "sourcePrompt": "An M42 Duster self-propelled anti-aircraft gun, about five and a half meters long on tracks. A light-tank hull carries a wide open-topped turret amidships mounting twin 40mm Bofors autocannons side by side, their long barrels angled skyward past vertical seats and ammunition racks visible in the open tub. Five road wheels per side, a flat engine deck aft. Olive-drab, open-topped and bristling upward.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

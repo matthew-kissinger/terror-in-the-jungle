@@ -1,0 +1,16 @@
+{
+  "slug": "f4-phantom",
+  "class": "aircraft",
+  "action": "replace",
+  "tijTarget": "vehicles/aircraft/f4-phantom.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T20:15:24.614Z",
+  "sourcePrompt": "An F-4 Phantom II fighter-bomber, about nineteen meters long, parked on tricycle gear with its nose high. A long pointed radome leads to a tandem two-seat canopy; broad low-set wings sweep back with their outer tips angled sharply upward, while the tailplanes angle just as sharply down - the Phantom's unmistakable cranked silhouette. Twin engine exhausts open under the tail, and underwing pylons carry bombs and missiles. Navy gray over white, muscular and angular.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "ov10-bronco",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/ov10-bronco.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T21:12:31.915Z",
+  "sourcePrompt": "An OV-10 Bronco forward-air-control aircraft, about thirteen meters long with its strangest feature in plan view: two slim booms run back from the wing-mounted turboprop engines to a single high tailplane bridging them, framing open air behind the short central pod. That pod carries a huge greenhouse canopy up front and sponson stubs below hung with rocket pods. Parked on tall tricycle gear. Olive-drab over gray, insect-like and unmistakable.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "mig17-nva",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/mig17-nva.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:03:46.512Z",
+  "sourcePrompt": "A MiG-17 \"Fresco\", the NVA's nimble Soviet jet fighter, about eleven meters long, parked nose-high on tricycle gear. The whole nose is a round open air intake; a bubble canopy sits close behind it over a slim barrel fuselage that tapers straight to a single exhaust. Mid-set wings sweep back hard wearing low fences across their tops, and the swept tailplane rides halfway up the tall swept fin. Bare polished silver with red-star markings, light and quick.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

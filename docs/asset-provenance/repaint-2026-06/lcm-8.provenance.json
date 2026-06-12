@@ -1,0 +1,16 @@
+{
+  "slug": "lcm-8",
+  "class": "boats",
+  "action": "new",
+  "tijTarget": "vehicles/watercraft/lcm-8.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:47:50.702Z",
+  "sourcePrompt": "An LCM-8 \"Mike Boat\" mechanized landing craft, about twenty-two meters of rectangular steel box. A tall flat bow ramp leans back against the front, ribbed and hinged at the deck line; high slab side walls run straight aft framing an open cargo well big enough for a vehicle; at the stern a small blocky pilothouse rises with a rail and an exhaust stack. Everything is welded plate at right angles. Olive-gray steel, blunt and industrial.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

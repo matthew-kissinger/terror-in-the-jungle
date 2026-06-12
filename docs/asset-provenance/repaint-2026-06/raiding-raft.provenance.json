@@ -1,0 +1,16 @@
+{
+  "slug": "raiding-raft",
+  "class": "boats",
+  "action": "new",
+  "tijTarget": "vehicles/watercraft/raiding-raft.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:50:03.135Z",
+  "sourcePrompt": "A small inflatable rubber raiding raft for SEAL and recon teams, about four meters long. Fat rounded buoyancy tubes form the sides and meet at a blunt upturned bow, with a squared transom at the stern; the floor is flat with visible slats, rope grab lines loop along the outer tubes, and two wooden paddles lie across the thwarts. Matte black rubber throughout, low-profile and silent-looking.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

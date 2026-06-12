@@ -1,0 +1,16 @@
+{
+  "slug": "church",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/church.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:40:40.824Z",
+  "sourcePrompt": "A small Vietnamese Catholic mission church, French-built, about eight meters wide with its bell tower reaching twice the height of the nave. A white stucco church with a steep gabled roof, a narrow square tower centered on the front face carrying an arched open belfry under a small spire with a cross, tall arched windows down the sides, and an arched doorway up a few steps. White stucco and gray tile, quietly dignified.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}
