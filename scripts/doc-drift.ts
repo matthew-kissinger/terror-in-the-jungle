@@ -138,11 +138,6 @@ const GRANDFATHER: ReadonlySet<string> = new Set<string>([
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/file.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/other.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/test.test.ts",
-  "docs/tasks/ambient-wildlife-mvp.md::missing_code_path::src/config/WildlifeConfig.ts",
-  "docs/tasks/ambient-wildlife-mvp.md::missing_code_path::src/systems/wildlife/WildlifeSystem.ts",
-  "docs/tasks/asset-gallery-route.md::missing_code_path::scripts/check-asset-gallery.ts",
-  "docs/tasks/asset-gallery-route.md::missing_code_path::src/dev/assetGallery/AssetGalleryApp.ts",
-  "docs/tasks/asset-gallery-route.md::missing_package_script::check:asset-gallery",
 ]);
 // >>> GRANDFATHER-END <<<
 // ---------------------------------------------------------------------------

@@ -123,11 +123,35 @@ Any asset over budget is blocked unless its acceptance note includes:
 GLB replacement is not a file-copy task. The runtime contract must be checked
 against the source contract before import.
 
-- Aircraft source assets from Pixel Forge are authored `+X` forward. TIJ public
-  aircraft assets are stored `+Z` forward for the existing fixed-wing and
-  helicopter runtime. Use `npm run assets:import-pixel-forge-aircraft`, which
-  wraps the source scene under `TIJ_AxisNormalize_XForward_To_ZForward`, and
-  keep the import summary as evidence.
+The general import path for Pixel Forge GLB batches is
+`npm run assets:import-war-catalog` (`scripts/import-war-catalog.ts`), which
+generalizes the earlier aircraft-only importer: per-class axis wrap under a
+`TIJ_AxisNormalize` root, canonical rig-joint grafts from named meshes, index
+and vertex-storage canonicalization (uniform indexing, tightly packed
+attributes — both required for `mergeGeometries` in three r184), budget triage
+with REROLL output, and a generated catalog
+(`src/config/generated/warAssetCatalog.ts`) recording `forward`, measured dims,
+tris, and per-asset magazine/muzzle/joint node metadata. The importer owns ALL
+rotation normalization; loaders keep their documented per-class assumption and
+must never re-litigate engine frames at load time.
+
+Per-class on-disk convention (enforced by the importer; `forward` is recorded
+per asset in the generated catalog so the convention is data, not tribal
+knowledge):
+
+| Class | Source frame | On-disk target | Loader behavior |
+|---|---|---|---|
+| weapons | +X fwd | **+Z fwd** | `WeaponRigManager` rotates +Z to the rig axis |
+| aircraft | +X fwd | **+Z fwd** | `HelicopterGeometry` / fixed-wing `-Math.PI/2` wrap (matches the original `TIJ_AxisNormalize_XForward_To_ZForward` aircraft importer) |
+| ground vehicles | +X fwd | **-Z fwd** | `VehicleGlbVisuals` applies no rotation |
+| buildings/structures/props/animals | +X "front" | **+Z front** | layout yaw applied at placement; orientation-sensitive assets verified in the `/gallery` dev route |
+
+Runtime code that re-parents nodes out of the `TIJ_AxisNormalize` wrapper MUST
+use `Object3D.attach()` (or otherwise preserve world transforms) — naive
+`removeFromParent()` + position arithmetic silently drops the wrapper rotation.
+This defect class shipped twice (m48 turret seating, viewmodel magazine group)
+before becoming policy; tests for node re-parenting must use fixtures that
+include the wrapper node.
 - Animated rotor, propeller, turret, or weapon pivots must remain as named GLB
   nodes with preserved animation tracks. Runtime code may infer spin axes from
   the tracks, but cannot silently assume a single global axis for all assets.

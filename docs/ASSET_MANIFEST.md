@@ -39,14 +39,19 @@ source package but live under `structures/` in TIJ (catalog `StructureModels`).
 
 | Category | Status | Details |
 |----------|--------|---------|
-| Weapons | 7/9 integrated | M16A1, AK-47, Ithaca 37, M3, M1911, M60, M79 via WeaponRigManager. RPG-7 and M2 Browning not wired. |
-| Helicopters | 3/3 integrated | UH-1 Huey, UH-1C Gunship, AH-1 Cobra via ModelLoader. Runtime aircraft GLBs now come from the Pixel Forge aircraft import and preserve embedded rotor pivot animation metadata. |
-| Fixed-wing | 3/3 integrated | F-4 Phantom, AC-47 Spooky, A-1 Skyraider flyable at airfields via FixedWingModel. Runtime aircraft GLBs now come from the Pixel Forge aircraft import; propeller spin axes are inferred from embedded GLB animation tracks. |
-| Ground vehicles | 5/5 static | Staged in motor pools. No driving/interaction. |
-| Watercraft | Boarding/spawn wired | Sampan + PBR board and spawn via OperationalRuntimeComposer; watercraft-grade hydrodynamics remain open. |
-| Structures | Integrated | Procedural firebase/airfield generators, WorldFeatureSystem. |
+| Weapons | 7 viewmodel + M2HB emplacement | M16A1, AK-47, Ithaca 37, M3, M1911, M60, M79 via WeaponRigManager on 2026-06 repaint GLBs; magazine/muzzle nodes come from catalog metadata (`magazineNodes`/`muzzleNodes`), not substring search. M2 Browning is the emplacement gun (player + NPC adapters). New m14/sks/dragunov/rpd/kbar/claymore GLBs are cataloged, not yet loadout-wired (backlog). |
+| Helicopters | 3/3 integrated | UH-1 Huey, UH-1C Gunship, AH-1 Cobra on 2026-06 repaint GLBs; rotor pivots are canonical `Joint_*` nodes grafted at import (rotor contract verified by `check:visual-integrity`). |
+| Fixed-wing | 3/3 flyable + 5 dormant + B-52 sortie | F-4 Phantom, AC-47 Spooky, A-1 Skyraider flyable on repaint GLBs. B-52, C-130, OV-10, A-37, MiG-17 registered dormant (`getDormantFixedWingKeys()`); the B-52 flies the non-player `arclight` air-support sortie. |
+| Ground vehicles | 2 drivable + 7 scenery | M151 jeep + M48 Patton drivable on repaint GLBs (turret rig re-seated via `attach()`); M35/M113/PT-76 scenery swapped to catalog paths; T-54, ZIL-157, M42 Duster, Ontos placed as parked scenery at faction bases (world-catalog pass). |
+| Animals | 4 ambient + 7 cataloged | Tiger, water buffalo, wild boar, macaque wander/flee via `WildlifeSystem` (Open Frontier + A Shau only; combat120 harness stays animal-free). Remaining species catalog/gallery-only; egret is a size re-roll. |
+| Watercraft | Dormant | Sampan + PBR retained but not spawned since the 2026-06-09 water scorch; rework deferred to a terrain/world-gen cycle. |
+| Structures + buildings | Integrated | Procedural firebase/airfield/settlement generators via WorldFeatureSystem on the repaint catalog; placement profiles derive from measured catalog dims (displayScale fudges removed). 6 net-new buildings (Buddhist temple, stilt house, schoolhouse, tea house, plantation mansion, rice mill) in settlement pools. 8 budget REJECTs keep their prior GLBs (see REROLL_REQUESTS). |
 | Pixel Forge NPCs | Integrated first pass | Close actors use combined skinned GLBs with M16A1/AK-47 attachments. Mid/far actors use Pixel Forge animated impostor atlases through instanced buckets. No old NPC sprite assets are allowed by the cutover validator. |
 | Pixel Forge props | Cataloged | `PixelForgePropCatalog` exposes the 80 curated GLBs for placement profiles. These props are not substitutes for vegetation or NPC gaps. |
+
+The `/gallery` dev route (Vite dev/perf builds only) renders every catalog
+entry on a neutral rig with dims/tris overlays — it is the owner's re-roll
+review surface for the 2026-06 repaint.
 
 ## Other Assets
 

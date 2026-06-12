@@ -44,6 +44,48 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-11-war-asset-repaint)
+
+KATALOG-1 → code-complete (owner walk pending). 12 PRs #383-#394, 4 rounds,
+zero fence changes, zero dropped tasks. R1 generalized importer
+(`assets:import-war-catalog`: per-class axis wrap, joint grafts, budget
+triage, generated `warAssetCatalog` with per-asset forward/dims/node
+metadata) + two post-merge importer defect classes fixed at the ASSET layer,
+not the consumers (#384 mixed indexed/non-indexed primitives, #385 mixed
+interleaved/packed vertex storage — both broke r184 `mergeGeometries`).
+R2 ×5: gallery route, weapons rig (catalog `magazineNodes`/`muzzleNodes`),
+helicopter (rotor-contract rewrite), fixed-wing (5 dormant airframes),
+ground vehicles (m48 turret re-seat via `attach()` — caught a latent
+wrapper-rotation bug). R3 ×3: world catalog refresh (6 net-new buildings,
+parked armor, displayScale fudges removed; +9-15.6k map tris, EXCEPTION
+documented), wildlife MVP (greenfield `WildlifeSystem`, combat120
+animal-free verified), B-52 arclight call-in (12-bomb stick, IFF reuses the
+centralized napalm gate — combat-reviewer verified). Post-close hotfix #394:
+owner-reported viewmodel mag off/rotated — mag group was re-homed outside
+the `TIJ_AxisNormalize` wrapper; same defect class as the m48 turret, now
+policy in `ASSET_ACCEPTANCE_STANDARD` (attach()-only re-parenting +
+wrapper-bearing test fixtures). Round gates: post-R2 33.60 / post-R3
+33.70ms steady-state combat120 p99 vs R0 33.70 (halt 35.39). 8 structure
+budget REJECTs keep prior GLBs (`REROLL_REQUESTS.md`). Owner walk row in
+PLAYTEST_PENDING (5 sub-walks).
+
+Deferred follow-ups (strategic reserve): new-weapon loadout variants
+(m14/sks/dragunov/rpd), melee (kbar), deployable claymore, enemy armor AI
+(t54), transport/role aircraft (c130/ch47/oh6/ov10/hh3e), enemy air (mig17),
+boats-on-water (post water rework), bird/reptile wildlife tier 2, re-roll
+re-import round (same importer, idempotent), `AirSupportManager`
+concurrent-pass guard (pre-existing, all strike types), arclight
+active→outbound camera-handoff polish (reviewer LOW), market/riverside
+settlement prefabs catalog-ready but not yet referenced by mode configs,
+lighting-rig kill-switch flag removal (carried from lighting campaign, still
+due), A Shau heap-peak churn profiling (close captures show ~139-145MB
+transient peak with FULL recovery — no leak — vs R0's 15MB; analyst attributes
+to GLB decode/material working set + effect-pool pressure under sustained
+combat; profile buffer lifetime + pool sizing), harness debt: ashau:short
+driver flake (one dead-driver run at close: 0 shots) + combat120
+run-wide-max startup sensitivity (steady-state gating policy adopted this
+cycle).
+
 ## Recently Completed (cycle-2026-06-09-lighting-acceptance)
 
 Phase 4 — FINAL phase — of

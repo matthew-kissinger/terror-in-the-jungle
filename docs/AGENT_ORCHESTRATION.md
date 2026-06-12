@@ -222,75 +222,13 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** `cycle-2026-06-11-war-asset-repaint` — integrate the 108-asset
-  pixel-forge repaint (69 replacements + 39 net-new) through the acceptance
-  standard: importer-normalized, budget-triaged, all five GLB consumer classes
-  cut over, catalog-registered with an in-engine gallery; plus two net-new
-  features (ambient wildlife MVP, B-52 arclight call-in). Ground truth +
-  policy: [docs/rearch/WAR_ASSET_REPAINT_AUDIT_2026-06-11.md](rearch/WAR_ASSET_REPAINT_AUDIT_2026-06-11.md).
-  Directive: KATALOG-1.
-- **Previous:** `cycle-2026-06-09-lighting-acceptance` (2/2: #380 #381,
-  campaign closer) — see BACKLOG "Recently Completed". The full campaign arc:
-  spike → core → foliage-npc → exposure-unify → acceptance.
-
-### Tasks (DAG)
-
-**R0 (orchestrator, main session, before any dispatch):**
-capture pre-cycle perf evidence — `npm run perf:capture:combat120`,
-`perf:capture:openfrontier:short`, `perf:capture:ashau:short` — and record
-the artifact dirs + HEAD SHA here. These are the close gate's comparison
-basis (no tracked baseline exists).
-
-**R0 evidence (captured 2026-06-12, HEAD `13747aee`, quiet machine):**
-
-- combat120: `artifacts/perf/2026-06-12T07-07-07-560Z` — avg 15.84ms,
-  peak p99 33.70ms, hitch>50ms 0%, measurement_trust certified.
-- openfrontier:short: `artifacts/perf/2026-06-12T07-09-36-691Z` —
-  avg 9.40ms, peak p99 31.10ms, hitch>50ms 0.02%, measurement_trust
-  certified.
-- ashau:short: `artifacts/perf/2026-06-12T07-18-15-618Z` — avg 8.54ms,
-  peak p99 31.40ms, hitch>50ms 0%, measurement_trust certified.
-- Close-gate halt line: combat120 peak p99 33.70ms +5% = **35.39ms**.
-- Discarded attempts (for the record): combat120
-  `2026-06-12T02-17-15-015Z` (machine contention from concurrent external
-  agents — validation fail), ashau `2026-06-12T07-13-42-100Z` (harness
-  driver flake: movement transitions 2 < min 6, perf otherwise clean —
-  passed on immediate retry; flag as harness debt at cycle close).
-
-| Round | Task slug | Brief | Notes |
-|---|---|---|---|
-| R1 | `war-asset-import-pipeline` | docs/tasks/war-asset-import-pipeline.md | Solo round — gates everything; owns modelPaths.ts + all GLB writes. Do NOT run the package's copy-to-tij.ps1. |
-| R2 | `asset-gallery-route` | docs/tasks/asset-gallery-route.md | |
-| R2 | `weapons-rig-cutover` | docs/tasks/weapons-rig-cutover.md | combat-reviewer gate |
-| R2 | `helicopter-glb-cutover` | docs/tasks/helicopter-glb-cutover.md | |
-| R2 | `fixed-wing-glb-cutover` | docs/tasks/fixed-wing-glb-cutover.md | |
-| R2 | `ground-vehicle-glb-cutover` | docs/tasks/ground-vehicle-glb-cutover.md | |
-| R3 | `world-catalog-refresh` | docs/tasks/world-catalog-refresh.md | terrain-nav-reviewer if terrain/nav files touched |
-| R3 | `ambient-wildlife-mvp` | docs/tasks/ambient-wildlife-mvp.md | DROPPABLE → backlog without blocking close |
-| R3 | `b52-arclight-callin` | docs/tasks/b52-arclight-callin.md | DROPPABLE → backlog without blocking close |
-| R4 | `repaint-acceptance-close` | docs/tasks/repaint-acceptance-close.md | Orchestrator may run inline (docs + captures + deploy) |
-
-### Dependencies
-
-- Everything `addBlockedBy: war-asset-import-pipeline`.
-- `world-catalog-refresh` additionally blocked by `ground-vehicle-glb-cutover`
-  (places its catalog entries as parked scenery).
-- `b52-arclight-callin` additionally blocked by `fixed-wing-glb-cutover`
-  (shared `FixedWingConfigs.ts`).
-- `repaint-acceptance-close` blocked by all R2 + surviving R3 tasks.
-
-### File-ownership (conflict prevention)
-
-- `modelPaths.ts` + `public/models/**` + generated catalog: import-pipeline ONLY.
-- `WorldFeaturePrefabs.ts` + templates + `ModelPlacementProfiles.ts`: world-catalog-refresh ONLY.
-- `FixedWingConfigs.ts`: fixed-wing task (R2), then arclight (R3) — sequenced.
-
-### Cycle-specific hard-stops (on top of the standing ones)
-
-- combat120 p99 > +5% vs the R0 capture after any round → halt, do not deploy.
-- Import-pipeline budget triage diverging wildly from the audit memo's
-  expected reject set (>±4 assets) → pause and re-verify measurement before
-  dispatching R2.
+- **Active:** (none — between cycles. Seed the next cycle here: active slug,
+  R0 evidence, task DAG, dependencies, file-ownership, cycle-specific
+  hard-stops.)
+- **Previous:** `cycle-2026-06-11-war-asset-repaint` (12/12: #383-#394 incl.
+  3 mid-cycle defect-fix PRs, closed 2026-06-12) — KATALOG-1 code-complete;
+  see BACKLOG "Recently Completed" and the PLAYTEST_PENDING owner-walk row.
+  Briefs archived at `docs/tasks/archive/cycle-2026-06-11-war-asset-repaint/`.
 
 ## Dispatch protocol
 
