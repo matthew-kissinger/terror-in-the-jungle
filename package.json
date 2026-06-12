@@ -156,6 +156,7 @@
     "check:scene-parity": "npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed",
     "check:asset-material": "npx tsx scripts/check-asset-material.ts",
     "check:asset-crops": "npx tsx scripts/asset-crop-probe.ts --renderer webgpu-strict --headed",
+    "check:asset-gallery": "npx tsx scripts/check-asset-gallery.ts",
     "check:terrain-fire-authority": "npx tsx scripts/terrain-fire-authority-probe.ts --renderer webgpu-strict --headed",
     "check:doc-drift": "npx tsx scripts/doc-drift.ts",
     "check:doc-drift:full": "npx tsx scripts/doc-drift.ts --full",

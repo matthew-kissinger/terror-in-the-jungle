@@ -103,6 +103,23 @@ export async function bootstrapGame(): Promise<void> {
       return;
     }
 
+    const { isAssetGalleryMode, getAssetGallerySlugParam } = await import('../dev/assetGallery/assetGalleryMode');
+    if (isAssetGalleryMode()) {
+      try {
+        const { AssetGalleryApp } = await import('../dev/assetGallery/AssetGalleryApp');
+        const gallery = new AssetGalleryApp(document.body);
+        gallery.start();
+        const slug = getAssetGallerySlugParam();
+        if (slug) void gallery.selectAsset(slug);
+        window.addEventListener('beforeunload', () => gallery.dispose());
+      } catch (error) {
+        Logger.error('bootstrap', 'Asset-gallery mode failed to initialize', error);
+        const message = error instanceof Error ? error.message : String(error);
+        showFatalError(message);
+      }
+      return;
+    }
+
     const { isTerrainSandboxMode } = await import('../dev/terrainSandboxMode');
     if (isTerrainSandboxMode()) {
       try {
