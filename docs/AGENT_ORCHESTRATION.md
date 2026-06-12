@@ -241,6 +241,22 @@ capture pre-cycle perf evidence — `npm run perf:capture:combat120`,
 the artifact dirs + HEAD SHA here. These are the close gate's comparison
 basis (no tracked baseline exists).
 
+**R0 evidence (captured 2026-06-12, HEAD `13747aee`, quiet machine):**
+
+- combat120: `artifacts/perf/2026-06-12T07-07-07-560Z` — avg 15.84ms,
+  peak p99 33.70ms, hitch>50ms 0%, measurement_trust certified.
+- openfrontier:short: `artifacts/perf/2026-06-12T07-09-36-691Z` —
+  avg 9.40ms, peak p99 31.10ms, hitch>50ms 0.02%, measurement_trust
+  certified.
+- ashau:short: `artifacts/perf/2026-06-12T07-18-15-618Z` — avg 8.54ms,
+  peak p99 31.40ms, hitch>50ms 0%, measurement_trust certified.
+- Close-gate halt line: combat120 peak p99 33.70ms +5% = **35.39ms**.
+- Discarded attempts (for the record): combat120
+  `2026-06-12T02-17-15-015Z` (machine contention from concurrent external
+  agents — validation fail), ashau `2026-06-12T07-13-42-100Z` (harness
+  driver flake: movement transitions 2 < min 6, perf otherwise clean —
+  passed on immediate retry; flag as harness debt at cycle close).
+
 | Round | Task slug | Brief | Notes |
 |---|---|---|---|
 | R1 | `war-asset-import-pipeline` | docs/tasks/war-asset-import-pipeline.md | Solo round — gates everything; owns modelPaths.ts + all GLB writes. Do NOT run the package's copy-to-tij.ps1. |
